@@ -10,7 +10,9 @@ export async function GET(request: NextRequest) {
     const result = await exportDashboardCSV({ from, to });
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      const status =
+        result.error === 'Unauthorized' ? 401 : result.error === 'Forbidden' ? 403 : 500;
+      return NextResponse.json({ error: result.error }, { status });
     }
 
     return new NextResponse(result.data, {
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[Dashboard] CSV export route failed:', error);
+    return NextResponse.json({ error: 'InternalServerError' }, { status: 500 });
   }
 }

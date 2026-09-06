@@ -6,8 +6,7 @@ import { can } from '@/lib/rbac';
 import { Role } from '@prisma/client';
 import { Dashboard } from '@/modules/m5/ui/Dashboard';
 import { getKpiMetrics, getKpiTrend } from '@/modules/m5/server/queries';
-
-const DEFAULT_RANGE_DAYS = 30;
+import { resolveDashboardRange, toRangeParam } from '@/modules/m5/server/range';
 
 export async function generateMetadata({
   params,
@@ -23,21 +22,6 @@ export async function generateMetadata({
     // KPI figures are tenant data; keep the page out of every index.
     robots: { index: false, follow: false },
   };
-}
-
-/** `YYYY-MM-DD` in local time — the client sends the same shape back. */
-function toParam(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-/** Accepts `YYYY-MM-DD` only; anything else falls back to the default range. */
-function parseRangeParam(value: string | undefined): Date | null {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const parsed = new Date(`${value}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function Notice({ title, body, detail }: { title: string; body: string; detail?: string }) {
@@ -75,17 +59,7 @@ export default async function DashboardPage({
     return <Notice title={t('sessionErrorTitle')} body={t('sessionErrorBody')} />;
   }
 
-  const today = new Date();
-  const toDate =
-    parseRangeParam(to) ?? new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const parsedFrom = parseRangeParam(from);
-  const fromDate =
-    parsedFrom && parsedFrom <= toDate
-      ? parsedFrom
-      : new Date(toDate.getTime() - DEFAULT_RANGE_DAYS * 24 * 60 * 60 * 1000);
-
-  // The range is inclusive of the end day.
-  const rangeEnd = new Date(toDate.getTime() + 24 * 60 * 60 * 1000 - 1);
+  const { from: fromDate, to: toDate, rangeEnd } = resolveDashboardRange(from, to);
 
   let metrics;
   let trendData;
@@ -106,8 +80,8 @@ export default async function DashboardPage({
       <Dashboard
         metrics={metrics}
         trendData={trendData}
-        from={toParam(fromDate)}
-        to={toParam(toDate)}
+        from={toRangeParam(fromDate)}
+        to={toRangeParam(toDate)}
       />
     </div>
   );

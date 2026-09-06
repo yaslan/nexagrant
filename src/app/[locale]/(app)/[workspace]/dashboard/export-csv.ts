@@ -1,7 +1,19 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { auth } from '@/lib/auth';
+import { can } from '@/lib/rbac';
+import { Role } from '@prisma/client';
+import { resolveDashboardRange } from '@/modules/m5/server/range';
+
+interface ExportRow {
+  id: string;
+  title: string | null;
+  stage: string | null;
+  status: string | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
 
 export async function exportDashboardCSV(params: {
   from?: string;
@@ -9,54 +21,37 @@ export async function exportDashboardCSV(params: {
 }): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
     const session = (await auth()) as unknown;
-    const sessionObj = session as { tenantId?: string } | null;
+    const sessionObj = session as { tenantId?: string; role?: string } | null;
     const tenantId = sessionObj?.tenantId;
 
     if (!tenantId) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    const { from, to } = params;
-    const fromDate = from ? new Date(from) : null;
-    const toDate = to ? new Date(to) : null;
-
-    // Build Prisma query
-    let opportunities: Array<{ id: string; title?: string; stage?: string; status?: string; createdAt?: Date; updatedAt?: Date }> = [];
-
-    if (fromDate || toDate) {
-      const whereObj: { tenantId: string; createdAt?: object } = { tenantId };
-      const dateFilter: { gte?: Date; lte?: Date } = {};
-      if (fromDate) dateFilter.gte = fromDate;
-      if (toDate) dateFilter.lte = toDate;
-      if (Object.keys(dateFilter).length > 0) {
-        whereObj.createdAt = dateFilter;
-      }
-      opportunities = await prisma.opportunity.findMany({
-        where: whereObj,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          stage: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-    } else {
-      opportunities = await prisma.opportunity.findMany({
-        where: { tenantId },
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          stage: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
+    // The export carries the same tenant data as the dashboard, so it needs the
+    // same permission — the endpoint must not be softer than the page linking to it.
+    if (!can(sessionObj?.role as Role | undefined, 'evaluate_gates')) {
+      return { success: false, error: 'Forbidden' };
     }
+
+    // Same resolution as the page, so the CSV matches what the user is looking at.
+    const { from: fromDate, rangeEnd } = resolveDashboardRange(params.from, params.to);
+
+    // Tenant scope goes through withTenant so RLS backs up the explicit filter.
+    const opportunities = await withTenant<ExportRow[]>(tenantId, async (tx) =>
+      tx.opportunity.findMany({
+        where: { tenantId, createdAt: { gte: fromDate, lte: rangeEnd } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          stage: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+    );
 
     // Build CSV
     const headers = ['ID', 'Title', 'Stage', 'Status', 'Created', 'Updated'];
@@ -76,10 +71,8 @@ export async function exportDashboardCSV(params: {
       data: csv,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to export CSV';
-    return {
-      success: false,
-      error: message,
-    };
+    // Keep database detail server-side; the caller gets a stable, generic reason.
+    console.error('[Dashboard] CSV export failed:', error);
+    return { success: false, error: 'ExportFailed' };
   }
 }

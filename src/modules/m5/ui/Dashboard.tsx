@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import { KpiCard } from './KpiCard';
 import { DateRangeFilter } from './DateRangeFilter';
 import {
@@ -12,191 +14,173 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  BarChart,
-  Bar,
 } from 'recharts';
 import type { KpiMetrics } from '../server/queries';
 
 export interface DashboardProps {
-  initialMetrics: KpiMetrics;
+  metrics: KpiMetrics;
   trendData: Array<{ date: string; metric: string; value: number }>;
-  tenantId: string;
+  /** Applied range — resolved on the server from the `from`/`to` search params. */
+  from: string;
+  to: string;
 }
 
-export function Dashboard({
-  initialMetrics,
-  trendData,
-  tenantId,
-}: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'export'>(
-    'overview'
+type Tab = 'overview' | 'trends' | 'export';
+
+/** `YYYY-MM-DD` in local time; the server parses these back into the range. */
+function toParam(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function Dashboard({ metrics, trendData, from, to }: DashboardProps) {
+  const t = useTranslations('Dashboard');
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
+
+  // The range lives in the URL so the server component refetches on change and
+  // the filtered view stays shareable and bookmarkable.
+  const handleRangeChange = useCallback(
+    (range: { from: Date; to: Date }) => {
+      const params = new URLSearchParams({
+        from: toParam(range.from),
+        to: toParam(range.to),
+      });
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [pathname, router]
   );
-  const [dateRange, setDateRange] = useState({
-    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-    to: new Date(),
-  });
 
-  const handleExport = useCallback(async () => {
-    // Prepare CSV data
-    const rows = [
-      ['Date', 'Metric', 'Value'],
-      ...trendData.map((row) => [
-        row.date,
-        row.metric,
-        row.value.toString(),
-      ]),
-    ];
-
-    const csv = rows.map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-
-    link.setAttribute('href', url);
-    link.setAttribute(
-      'download',
-      `fabrika-dashboard-${new Date().toISOString().split('T')[0]}.csv`
-    );
-    link.style.visibility = 'hidden';
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const mergedTrendData = useMemo(() => {
+    const byDate = new Map<string, { date: string; offers: number; successRate: number }>();
+    for (const point of trendData) {
+      const row = byDate.get(point.date) ?? { date: point.date, offers: 0, successRate: 0 };
+      if (point.metric === 'offers') row.offers = point.value;
+      if (point.metric === 'success_rate') row.successRate = point.value;
+      byDate.set(point.date, row);
+    }
+    return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   }, [trendData]);
 
-  // Transform trend data for Recharts
-  const offersData = trendData
-    .filter((d) => d.metric === 'offers')
-    .map((d) => ({
-      date: d.date,
-      offers: d.value,
-    }));
+  const exportHref = `${pathname}/api/export-csv?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
 
-  const successRateData = trendData
-    .filter((d) => d.metric === 'success_rate')
-    .map((d) => ({
-      date: d.date,
-      successRate: d.value,
-    }));
+  const count = (value: number) => value.toLocaleString(locale);
+  const decimal = (value: number) =>
+    value.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-  // Merge data by date
-  const mergedTrendData = offersData.map((item) => {
-    const successItem = successRateData.find((d) => d.date === item.date);
-    return {
-      date: item.date,
-      offers: item.offers,
-      successRate: successItem?.successRate || 0,
-    };
-  });
+  const tabs: Array<{ id: Tab; label: string }> = [
+    { id: 'overview', label: t('tabOverview') },
+    { id: 'trends', label: t('tabTrends') },
+    { id: 'export', label: t('tabExport') },
+  ];
+
+  const tabClass = (isActive: boolean) =>
+    `px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+      isActive
+        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+        : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+    }`;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Pipeline Dashboard
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Real-time metrics and trends
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('subtitle')}</p>
         </div>
         <DateRangeFilter
-          from={dateRange.from}
-          to={dateRange.to}
-          onChange={setDateRange}
+          from={new Date(`${from}T00:00:00`)}
+          to={new Date(`${to}T00:00:00`)}
+          onChange={handleRangeChange}
         />
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-            activeTab === 'overview'
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-          }`}
-        >
-          Overview
-        </button>
-        <button
-          onClick={() => setActiveTab('trends')}
-          className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-            activeTab === 'trends'
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-          }`}
-        >
-          Trends
-        </button>
-        <button
-          onClick={() => setActiveTab('export')}
-          className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-            activeTab === 'export'
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-          }`}
-        >
-          Export
-        </button>
+      <div role="tablist" className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            id={`dashboard-tab-${tab.id}`}
+            aria-selected={activeTab === tab.id}
+            aria-controls={`dashboard-panel-${tab.id}`}
+            onClick={() => setActiveTab(tab.id)}
+            className={tabClass(activeTab === tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Overview Tab */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          id="dashboard-panel-overview"
+          role="tabpanel"
+          aria-labelledby="dashboard-tab-overview"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        >
           <KpiCard
-            title="Total Offers"
-            value={initialMetrics.totalOffers}
-            unit="projects"
-            description="Active opportunities in this period"
+            title={t('totalProposals')}
+            value={count(metrics.totalOffers)}
+            unit={t('unitProjects')}
+            description={t('descTotalProposals')}
             variant="default"
           />
           <KpiCard
-            title="Success Rate"
-            value={initialMetrics.successRate}
+            title={t('hitRate')}
+            value={decimal(metrics.successRate)}
             unit="%"
-            description="Funded or above-threshold proposals"
+            description={t('descHitRate')}
             variant="success"
           />
           <KpiCard
-            title="Average Score"
-            value={initialMetrics.averageScore}
-            unit="/100"
-            description="Average evaluation score"
+            title={t('averageScore')}
+            value={decimal(metrics.averageScore)}
+            unit={t('unitScore')}
+            description={t('descAverageScore')}
             variant="default"
           />
           <KpiCard
-            title="Person-Days"
-            value={initialMetrics.personDays}
-            unit="days"
-            description="Total effort in person-days"
+            title={t('personDays')}
+            value={decimal(metrics.personDays)}
+            unit={t('unitDays')}
+            description={t('descPersonDays')}
             variant="default"
           />
           <KpiCard
-            title="G0→G2 Timeline"
-            value={initialMetrics.g0ToG2Days}
-            unit="days"
-            description="Average gate progression time"
+            title={t('avgDaysG2')}
+            value={decimal(metrics.g0ToG2Days)}
+            unit={t('unitDays')}
+            description={t('descAvgDaysG2')}
             variant="warning"
           />
           <KpiCard
-            title="Active Modules"
-            value={initialMetrics.activeModules}
-            unit="modules"
-            description="Enabled platform modules"
+            title={t('activeModules')}
+            value={count(metrics.activeModules)}
+            unit={t('unitModules')}
+            description={t('descActiveModules')}
             variant="success"
           />
         </div>
       )}
 
-      {/* Trends Tab */}
       {activeTab === 'trends' && (
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-              Offers & Success Rate
-            </h2>
+        <div
+          id="dashboard-panel-trends"
+          role="tabpanel"
+          aria-labelledby="dashboard-tab-trends"
+          className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700"
+        >
+          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            {t('trendChartTitle')}
+          </h2>
+          {mergedTrendData.length === 0 ? (
+            <p className="text-sm text-gray-600 dark:text-gray-400">{t('emptyTrend')}</p>
+          ) : (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={mergedTrendData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -211,7 +195,7 @@ export function Dashboard({
                   dataKey="offers"
                   stroke="#3b82f6"
                   dot={false}
-                  name="Offers"
+                  name={t('legendOffers')}
                 />
                 <Line
                   yAxisId="right"
@@ -219,29 +203,33 @@ export function Dashboard({
                   dataKey="successRate"
                   stroke="#10b981"
                   dot={false}
-                  name="Success Rate (%)"
+                  name={t('legendSuccessRate')}
                 />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          )}
         </div>
       )}
 
-      {/* Export Tab */}
       {activeTab === 'export' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div
+          id="dashboard-panel-export"
+          role="tabpanel"
+          aria-labelledby="dashboard-tab-export"
+          className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700"
+        >
           <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Export Data
+            {t('exportTitle')}
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            Export trend data as CSV for analysis and reporting.
-          </p>
-          <button
-            onClick={handleExport}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">{t('exportBody')}</p>
+          <a
+            href={exportHref}
+            aria-label={t('exportAria')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium text-sm"
           >
-            Export CSV
-          </button>
+            <span aria-hidden="true">⬇</span>
+            {t('exportButton')}
+          </a>
         </div>
       )}
     </div>

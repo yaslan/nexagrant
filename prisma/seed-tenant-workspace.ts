@@ -52,6 +52,18 @@ export const BETA_SEATS: BetaSeat[] = [
   { id: 'demo-user-judy', email: 'judy@fabrika.test', name: 'Judy', role: 'MEMBER' },
 ];
 
+/**
+ * The demo superadmin. Without a membership the auth callback falls back to a
+ * hard-coded tenant id that no row matches, so every tenant-scoped page renders
+ * empty for the quick-demo login. Seeding the seat binds it to the demo tenant.
+ */
+export const DEMO_ADMIN_SEAT = {
+  id: 'demo-user-superadmin',
+  email: 'admin@yasinaslan.com.tr',
+  name: 'Yasin Aslan (Süperadmin)',
+  role: 'TENANT_OWNER' as SeatRole,
+};
+
 export default async function seedTenantWorkspace() {
   // 1. Tenant
   const tenant = {
@@ -92,14 +104,34 @@ export default async function seedTenantWorkspace() {
     });
   }
 
-  // 4. Subscription (Team plan, ACTIVE)
+  // 4. Demo superadmin seat — same upsert shape, plus the platform-admin flag.
+  const adminUser = await prisma.user.upsert({
+    where: { email: DEMO_ADMIN_SEAT.email },
+    update: { name: DEMO_ADMIN_SEAT.name, locale: 'tr', isPlatformAdmin: true },
+    create: {
+      id: DEMO_ADMIN_SEAT.id,
+      email: DEMO_ADMIN_SEAT.email,
+      name: DEMO_ADMIN_SEAT.name,
+      locale: 'tr',
+      isPlatformAdmin: true,
+    },
+  });
+  await prisma.membership.upsert({
+    where: { tenantId_userId: { tenantId: TENANT_ID, userId: adminUser.id } },
+    update: { role: DEMO_ADMIN_SEAT.role },
+    create: { tenantId: TENANT_ID, userId: adminUser.id, role: DEMO_ADMIN_SEAT.role },
+  });
+
+  // 5. Subscription (Team plan, ACTIVE)
   await prisma.subscription.upsert({
     where: { tenantId: TENANT_ID },
     update: { planId: 'team', status: 'ACTIVE' },
     create: { tenantId: TENANT_ID, planId: 'team', status: 'ACTIVE', billingInterval: 'month' },
   });
 
-  console.log(`Tenant and users seeded (Fabrika Beta, ${BETA_SEATS.length} seats).`);
+  console.log(
+    `Tenant and users seeded (Fabrika Beta, ${BETA_SEATS.length} seats + superadmin).`
+  );
 }
 
 /**
@@ -109,7 +141,7 @@ export default async function seedTenantWorkspace() {
  */
 export async function rollbackTenantWorkspace() {
   const { count } = await prisma.user.deleteMany({
-    where: { email: { in: BETA_SEATS.map((s) => s.email) } },
+    where: { email: { in: [...BETA_SEATS.map((s) => s.email), DEMO_ADMIN_SEAT.email] } },
   });
   console.log(`Rolled back ${count} beta seat(s).`);
 }
