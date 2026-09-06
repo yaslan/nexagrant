@@ -363,3 +363,28 @@ kullanın — aynı işi idempotent, 8 tabloyu kapsayarak ve geri-alma dosyasıy
 - TASK-MTQ602Y8V5QOK: `src/app/(marketing)/` ağacını ve gömülü `isTr ? …` metinlerini
   tekilleştirsin — artık hepsi geçmişte.
 - DevOps (TASK-MTQ32X4CFRMR5): §6.2 ve §6.3'teki iki script kararını versin.
+
+---
+
+## Ek — rapor commit'lendikten sonraki ağaç durumu (dürüstlük notu)
+
+§2.5'teki snapshot alındıktan sonra, ben raporu yazarken paralel bir ajan çalışmaya
+devam etti ve ağaçta yeni satırlar belirdi:
+
+```
+$ git status --short --untracked-files=all   # 7d3b690 sonrası
+ M docs/.agent-notifications
+ M package.json
+?? .agentspace/memory/shared/fabrika-docker-broken-symlink.md
+?? prisma/rls-app-role-rollback.sql
+?? prisma/rls-app-role.sql
+?? scripts/setup-rls-role.ts
+```
+
+Bunların **hiçbiri bana devredilen 60 dosyalık envanterin parçası değil** — hepsi ben
+çalışırken doğdu ve sahibi hâlâ aktif. Başkasının yarım işini commit'lememek için
+dokunulmadı. Devraldığım kümenin tamamı `4bee05b..7d3b690` arasındaki 11 commit'te.
+
+Yeşil kapı çıktıları (§2.2, §2.3) `97b89e2`, yani benim son kod commit'im anındaki
+ağaca ait; yukarıdaki yeni dosyalar o ölçümden sonra geldi ve benim commit'lerimin
+kapsamında değil.
