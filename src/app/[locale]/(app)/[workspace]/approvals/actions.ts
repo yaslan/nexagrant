@@ -1,6 +1,6 @@
 'use server';
 
-import { auth } from '@/lib/auth';
+import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import {
   createApprovalRequest,
@@ -11,6 +11,13 @@ import {
 import { DualApprovalActionType } from '@/lib/rbac';
 import { Role } from '@prisma/client';
 
+/**
+ * `tenantId` used to be read as `(session as any).tenantId` with no null check
+ * and passed straight into the dual-approval helpers. Prisma treats an
+ * `undefined` field in a `where` clause as *absent*, so a session without a
+ * tenant approved and cancelled requests across the whole platform.
+ */
+
 export async function submitApprovalRequestAction(data: {
   workspaceId?: string;
   actionType: DualApprovalActionType;
@@ -20,14 +27,12 @@ export async function submitApprovalRequestAction(data: {
   requiredRole?: Role;
   expiresInHours?: number;
 }) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  const tenantId = (session as any).tenantId;
+  const { tenantId, userId } = await requireTenantAction();
 
   const result = await createApprovalRequest({
     tenantId,
     workspaceId: data.workspaceId,
-    requesterId: session.user.id,
+    requesterId: userId,
     actionType: data.actionType,
     title: data.title,
     description: data.description,
@@ -41,15 +46,12 @@ export async function submitApprovalRequestAction(data: {
 }
 
 export async function approveRequestAction(requestId: string, comment?: string) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  const tenantId = (session as any).tenantId;
-  const role = ((session as any).role as Role) || "MEMBER";
+  const { tenantId, userId, role } = await requireTenantAction();
 
   const result = await approveApprovalRequest({
     requestId,
-    approverId: session.user.id,
-    approverRole: role,
+    approverId: userId,
+    approverRole: role as Role,
     tenantId,
     comment,
   });
@@ -59,15 +61,12 @@ export async function approveRequestAction(requestId: string, comment?: string) 
 }
 
 export async function rejectRequestAction(requestId: string, reason: string) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  const tenantId = (session as any).tenantId;
-  const role = ((session as any).role as Role) || "MEMBER";
+  const { tenantId, userId, role } = await requireTenantAction();
 
   const result = await rejectApprovalRequest({
     requestId,
-    approverId: session.user.id,
-    approverRole: role,
+    approverId: userId,
+    approverRole: role as Role,
     tenantId,
     reason,
   });
@@ -77,13 +76,11 @@ export async function rejectRequestAction(requestId: string, reason: string) {
 }
 
 export async function cancelRequestAction(requestId: string) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  const tenantId = (session as any).tenantId;
+  const { tenantId, userId } = await requireTenantAction();
 
   const result = await cancelApprovalRequest({
     requestId,
-    requesterId: session.user.id,
+    requesterId: userId,
     tenantId,
   });
 

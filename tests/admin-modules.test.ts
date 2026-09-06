@@ -1,11 +1,13 @@
 import { describe, test, expect, vi } from 'vitest';
 import { updateTenantModuleStatus } from '../src/app/[locale]/admin/modules/actions';
 
-vi.mock('../src/lib/auth', () => ({
-  auth: vi.fn().mockResolvedValue({
-    user: { id: 'admin-user-1', email: 'admin@fabrika.app' }
-  })
-}));
+// These actions take a `tenantId` argument, so they are platform-admin only.
+const auth = vi.fn().mockResolvedValue({
+  user: { id: 'admin-user-1', email: 'admin@fabrika.app', isPlatformAdmin: true },
+  isPlatformAdmin: true
+});
+
+vi.mock('../src/lib/auth', () => ({ auth: () => auth() }));
 
 vi.mock('../src/lib/db', () => ({
   prisma: {
@@ -52,5 +54,13 @@ describe('Admin Module Actions', () => {
     await expect(
       updateTenantModuleStatus('tenant-empty', 'M4', 'ON')
     ).rejects.toThrow('Missing required dependency');
+  });
+
+  test('A signed-in user who is not a platform admin is rejected', async () => {
+    auth.mockResolvedValueOnce({ user: { id: 'member-1', email: 'member@tenant.app' } });
+
+    await expect(
+      updateTenantModuleStatus('tenant-1', 'M4', 'ON')
+    ).rejects.toThrow('platform admin required');
   });
 });

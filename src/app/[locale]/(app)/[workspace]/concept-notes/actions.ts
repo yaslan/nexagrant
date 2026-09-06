@@ -1,10 +1,17 @@
 'use server';
 
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { generateWithAI, LlmMessage } from '@/lib/llm';
 import { buildRagPrompt } from '@/lib/rag';
 import { revalidatePath } from 'next/cache';
+
+/**
+ * `tenantId` was read as `(session as any).tenantId` with no null check. Prisma
+ * treats an `undefined` field in a `where` clause as absent, so
+ * `findFirst({ where: { id, tenantId: undefined } })` matched a note in *any*
+ * tenant — and the follow-up `update({ where: { id } })` then wrote to it.
+ */
 
 /**
  * Create a new Concept Note from a template for an opportunity.
@@ -13,9 +20,7 @@ export async function createConceptNote(
   opportunityId: string,
   templateId: string
 ) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  const tenantId = (session as any).tenantId;
+  const { tenantId, userId } = await requireTenantAction();
 
   const template = await prisma.conceptTemplate.findUnique({
     where: { id: templateId },
@@ -29,7 +34,8 @@ export async function createConceptNote(
     content[section.key] = '';
   }
 
-  const note = await prisma.conceptNote.create({
+  const note = await withTenant<any>(tenantId, (tx) =>
+    tx.conceptNote.create({
     data: {
       tenantId,
       opportunityId,
@@ -37,9 +43,10 @@ export async function createConceptNote(
       content,
       status: 'draft',
       version: 1,
-      createdBy: session.user.id,
+      createdBy: userId,
     },
-  });
+    })
+  );
 
   revalidatePath('/[locale]/(app)/[workspace]/concept-notes', 'page');
   return note;
@@ -53,21 +60,21 @@ export async function saveSectionContent(
   sectionKey: string,
   markdown: string
 ) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  const tenantId = (session as any).tenantId;
+  const { tenantId, userId } = await requireTenantAction();
 
-  const note = await prisma.conceptNote.findFirst({
-    where: { id: noteId, tenantId },
-  });
-  if (!note) throw new Error('Note not found');
+  await withTenant(tenantId, async (tx) => {
+    const note = await tx.conceptNote.findFirst({
+      where: { id: noteId, tenantId },
+    });
+    if (!note) throw new Error('Note not found');
 
-  const content = note.content as Record<string, string>;
-  content[sectionKey] = markdown;
+    const content = note.content as Record<string, string>;
+    content[sectionKey] = markdown;
 
-  await prisma.conceptNote.update({
-    where: { id: noteId },
-    data: { content, version: note.version + 1 },
+    await tx.conceptNote.update({
+      where: { id: note.id },
+      data: { content, version: note.version + 1 },
+    });
   });
 
   return { success: true };
@@ -84,9 +91,7 @@ export async function generateSectionDraft(
   maxWords: number,
   opportunityTitle: string
 ) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  const tenantId = (session as any).tenantId;
+  const { tenantId, userId } = await requireTenantAction();
 
   // Build RAG-augmented context
   const ragQuery = `${opportunityTitle} — section: ${sectionLabel}`;
@@ -117,7 +122,7 @@ Requirements:
 
   const result = await generateWithAI(
     tenantId,
-    session.user.id || "",
+    userId,
     messages,
     {
       module: 'M2',
@@ -128,17 +133,19 @@ Requirements:
   );
 
   // Auto-save the generated draft into the note
-  const note = await prisma.conceptNote.findFirst({
-    where: { id: noteId, tenantId },
-  });
-  if (note) {
+  await withTenant(tenantId, async (tx) => {
+    const note = await tx.conceptNote.findFirst({
+      where: { id: noteId, tenantId },
+    });
+    if (!note) return;
+
     const content = note.content as Record<string, string>;
     content[sectionKey] = result.text;
-    await prisma.conceptNote.update({
-      where: { id: noteId },
+    await tx.conceptNote.update({
+      where: { id: note.id },
       data: { content, version: note.version + 1 },
     });
-  }
+  });
 
   revalidatePath('/[locale]/(app)/[workspace]/concept-notes', 'page');
 
@@ -154,14 +161,16 @@ Requirements:
  * Update the status of a concept note (draft → review → approved).
  */
 export async function updateNoteStatus(noteId: string, status: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  const tenantId = (session as any).tenantId;
+  const { tenantId, userId } = await requireTenantAction();
 
-  await prisma.conceptNote.update({
-    where: { id: noteId, tenantId },
-    data: { status },
-  });
+  // `updateMany` so the tenant is a real filter rather than an extra column on
+  // a unique selector.
+  await withTenant(tenantId, (tx) =>
+    tx.conceptNote.updateMany({
+      where: { id: noteId, tenantId },
+      data: { status },
+    })
+  );
 
   revalidatePath('/[locale]/(app)/[workspace]/concept-notes', 'page');
   return { success: true };

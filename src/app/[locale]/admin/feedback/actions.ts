@@ -2,8 +2,8 @@
 
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { requirePlatformAdmin } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
 
 /**
@@ -11,26 +11,9 @@ import { logger } from '@/lib/logger';
  *
  * The layout above already gates the route on platform admin, but a server
  * action is its own HTTP entry point — anyone who can guess the action id can
- * call it. The check is repeated here on purpose.
+ * call it. The check is repeated here on purpose — see requirePlatformAdmin in
+ * src/lib/tenant.ts.
  */
-async function requirePlatformAdmin(): Promise<{ userId: string }> {
-  const session = await auth();
-  // auth.ts adds isPlatformAdmin/role in its session callback; next-auth's own
-  // Session type does not declare them.
-  const claims = session as unknown as
-    | { isPlatformAdmin?: boolean; role?: string; user?: { isPlatformAdmin?: boolean } }
-    | null;
-  const isPlatformAdmin = Boolean(
-    claims?.isPlatformAdmin ||
-      claims?.user?.isPlatformAdmin ||
-      claims?.role === 'SUPER_ADMIN' ||
-      claims?.role === 'PLATFORM_ADMIN'
-  );
-  if (!session?.user?.id || !isPlatformAdmin) {
-    throw new Error('Unauthorized: platform admin required.');
-  }
-  return { userId: session.user.id };
-}
 
 const TriageSchema = z.object({
   id: z.string().min(1),

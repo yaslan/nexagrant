@@ -3,7 +3,12 @@ import { prisma } from '@/lib/db';
 import { Building2, Shield, Users } from 'lucide-react';
 
 export default async function AdminTenantsPage() {
+  // CLAUDE.md §7: the tenant list is real rows or nothing. The previous
+  // fallback rendered two invented organisations (with user counts and PIC
+  // numbers) whenever the query failed or returned nothing, so an operator
+  // could not tell an empty platform from an unreachable database.
   let tenants: any[] = [];
+  let loadError: string | null = null;
   try {
     tenants = await prisma.tenant.findMany({
       include: {
@@ -14,32 +19,8 @@ export default async function AdminTenantsPage() {
       orderBy: { createdAt: 'desc' }
     });
   } catch (e: any) {
-    console.warn(`[AdminTenantsPage] DB query bypassed: ${e.message}`);
-  }
-
-  if (tenants.length === 0) {
-    tenants = [
-      {
-        id: 'demo-tenant-1',
-        name: 'Demo SME Consultancy',
-        slug: 'demo-sme',
-        country: 'TR',
-        orgType: 'SME',
-        pic: '999984059',
-        createdAt: new Date(),
-        _count: { users: 5, workspaces: 2 }
-      },
-      {
-        id: 'demo-tenant-2',
-        name: 'Horizon Research Lab',
-        slug: 'horizon-lab',
-        country: 'DE',
-        orgType: 'RESEARCH',
-        pic: '999123456',
-        createdAt: new Date(),
-        _count: { users: 12, workspaces: 4 }
-      }
-    ];
+    console.error(`[AdminTenantsPage] DB query failed: ${e.message}`);
+    loadError = 'Kiracı listesi okunamadı (veritabanına ulaşılamıyor).';
   }
 
   return (
@@ -84,6 +65,13 @@ export default async function AdminTenantsPage() {
                 <td className="p-4 text-center font-bold">{t._count?.workspaces || 0}</td>
               </tr>
             ))}
+            {tenants.length === 0 && (
+              <tr>
+                <td colSpan={7} className="p-6 text-center text-muted text-xs">
+                  {loadError || 'Kayıtlı kiracı yok.'}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

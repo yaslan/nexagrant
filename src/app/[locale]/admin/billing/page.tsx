@@ -1,6 +1,6 @@
 import React from 'react';
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
 import { BillingSsoClient } from './client';
 
 export default async function AdminBillingPage({
@@ -9,27 +9,31 @@ export default async function AdminBillingPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const session = await auth();
-  const tenantId = (session as any)?.tenantId || 'demo-tenant-1';
+  // The billing screen shows a subscription and opens an SSO portal session, so
+  // a fallback tenant here meant a broken session could manage `demo-tenant-1`'s
+  // billing. No session tenant → redirect, never a placeholder.
+  const { tenantId } = await requireTenantPage(locale);
 
   let tenant: any = null;
   let subscription: any = null;
   try {
-    tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      include: { subscription: true },
-    });
+    tenant = await withTenant<any>(tenantId, (tx) =>
+      tx.tenant.findFirst({
+        where: { id: tenantId },
+        include: { subscription: true },
+      })
+    );
     subscription = tenant?.subscription;
   } catch (e: any) {
-    console.warn(`[AdminBillingPage] DB query bypassed: ${e.message}`);
+    console.warn(`[AdminBillingPage] DB query failed: ${e.message}`);
   }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <BillingSsoClient
         tenantId={tenantId}
-        tenantName={tenant?.name || 'FonBridge SME Ar-Ge Ltd.'}
-        currentPlanId={subscription?.planId || 'pro'}
+        tenantName={tenant?.name || ''}
+        currentPlanId={subscription?.planId || ''}
         currentProvider="stripe"
       />
     </div>

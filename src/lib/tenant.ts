@@ -20,7 +20,7 @@ import { getPublicRoute } from '@/lib/routes';
 /** Shape of the extra claims the NextAuth session callback puts on the session. */
 type SessionLike =
   | {
-      user?: { id?: string | null; email?: string | null } | null;
+      user?: { id?: string | null; email?: string | null; isPlatformAdmin?: unknown } | null;
       tenantId?: unknown;
       role?: unknown;
       workspaceIds?: unknown;
@@ -137,4 +137,46 @@ export async function requireTenantApi(): Promise<TenantApiResult> {
   }
 
   return { ok: true, scope };
+}
+
+/**
+ * Platform-admin scope. A platform admin acts *across* tenants, so it is a
+ * separate check from {@link tenantScopeOf} — never a stronger version of it.
+ *
+ * `auth.ts` already resolves the flag (from the User row, the demo profile or
+ * the superadmin email) and puts it on the session, so this reads the claim and
+ * does not re-derive it from an email address.
+ */
+export function isPlatformAdminSession(session: SessionLike): boolean {
+  if (!session) return false;
+  return Boolean(
+    session.isPlatformAdmin === true ||
+      session.user?.isPlatformAdmin === true ||
+      session.role === 'SUPER_ADMIN' ||
+      session.role === 'PLATFORM_ADMIN'
+  );
+}
+
+export class PlatformAdminRequiredError extends Error {
+  readonly code = 'PLATFORM_ADMIN_REQUIRED';
+
+  constructor(message = 'Unauthorized: platform admin required.') {
+    super(message);
+    this.name = 'PlatformAdminRequiredError';
+  }
+}
+
+/**
+ * For admin server actions. Throws unless the caller is a platform admin —
+ * being signed in is not enough, because these actions take a `tenantId`
+ * argument and therefore write outside the caller's own tenant.
+ */
+export async function requirePlatformAdmin(): Promise<{ userId: string }> {
+  const session = (await auth()) as SessionLike;
+
+  if (!session?.user?.id || !isPlatformAdminSession(session)) {
+    throw new PlatformAdminRequiredError();
+  }
+
+  return { userId: session.user.id };
 }

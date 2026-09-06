@@ -3,22 +3,19 @@ import { prisma } from '@/lib/db';
 import { ScrollText } from 'lucide-react';
 
 export default async function AdminAuditPage() {
+  // An audit log that invents entries is worse than an empty one: it is the
+  // record an operator reaches for when they need to know what actually
+  // happened. Real rows or an explicit empty/error state, never placeholders.
   let auditEvents: any[] = [];
+  let loadError: string | null = null;
   try {
     auditEvents = await prisma.auditEvent.findMany({
       take: 50,
       orderBy: { createdAt: 'desc' }
     });
   } catch (e: any) {
-    console.warn(`[AdminAuditPage] DB query bypassed: ${e.message}`);
-  }
-
-  if (auditEvents.length === 0) {
-    auditEvents = [
-      { id: 'aud-1', type: 'module.state.changed', target: 'M4', actorId: 'admin-user-1', tenantId: 'demo-tenant-1', createdAt: new Date() },
-      { id: 'aud-2', type: 'gate.decided', target: 'G0', actorId: 'admin-user-1', tenantId: 'demo-tenant-1', createdAt: new Date() },
-      { id: 'aud-3', type: 'subscription.updated', target: 'team', actorId: 'system', tenantId: 'demo-tenant-2', createdAt: new Date() },
-    ];
+    console.error(`[AdminAuditPage] DB query failed: ${e.message}`);
+    loadError = 'Denetim kayıtları okunamadı (veritabanına ulaşılamıyor).';
   }
 
   return (
@@ -57,6 +54,13 @@ export default async function AdminAuditPage() {
                 </td>
               </tr>
             ))}
+            {auditEvents.length === 0 && (
+              <tr>
+                <td colSpan={5} className="p-6 text-center text-muted text-xs">
+                  {loadError || 'Henüz denetim kaydı yok.'}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

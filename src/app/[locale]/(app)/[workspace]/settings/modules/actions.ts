@@ -1,69 +1,59 @@
 'use server';
 
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { can } from '@/lib/rbac';
+import { Role } from '@prisma/client';
 import { ModuleId, PlanTier, ModuleStatus } from '@/lib/modules/types';
 import { canEnable, getDisableCascade } from '@/lib/modules/state-machine';
 import { revalidatePath } from 'next/cache';
 
+/**
+ * Turns a module on or off for the caller's *own* tenant.
+ *
+ * The previous signature took an optional `tenantIdParam` from the browser and
+ * preferred the session only when it had one, so a caller could name any
+ * tenant. Worse, the RBAC check was guarded by `if (session?.user && ...)` —
+ * an unauthenticated caller skipped it entirely — the role defaulted to
+ * `TENANT_OWNER`, and a missing tenant fell back to `prisma.tenant.findFirst()`
+ * (the first seeded row) before finally returning `{ success: true, demo: true }`.
+ *
+ * The tenant is the session's and nothing else, and the permission check runs
+ * unconditionally.
+ */
 export async function toggleModuleState(
   moduleId: ModuleId,
-  targetStatus: ModuleStatus,
-  tenantIdParam?: string
+  targetStatus: ModuleStatus
 ) {
-  const session = await auth();
-  
-  let tenantId = (session as any)?.tenantId || tenantIdParam;
-  const role = (session as any)?.role || 'TENANT_OWNER';
-  
-  // Enforce RBAC if user is authenticated with a non-owner role
-  if (session?.user && role && !can(role, "manage_modules")) {
+  const { tenantId, userId, role } = await requireTenantAction();
+
+  if (!can(role as Role, "manage_modules")) {
     throw new Error("Yetkisiz işlem: Modülleri yönetme izniniz bulunmuyor (Sadece Tenant Owner).");
-  }
-
-  // If still no tenantId, try getting the first tenant
-  if (!tenantId) {
-    try {
-      const firstTenant = await prisma.tenant.findFirst();
-      tenantId = firstTenant?.id;
-    } catch {
-      // In-memory or demo mode fallback
-    }
-  }
-
-  if (!tenantId) {
-    return { success: true, demo: true };
   }
 
   try {
     // Find active modules for the tenant
-    let activeStates: any[] = [];
-    try {
-      activeStates = await prisma.moduleState.findMany({
-        where: { 
+    const activeStates: any[] = await withTenant<any[]>(tenantId, (tx) =>
+      tx.moduleState.findMany({
+        where: {
           tenantId,
-          status: { in: ['ON', 'PILOT', 'DEV'] } 
+          status: { in: ['ON', 'PILOT', 'DEV'] }
         }
-      });
-    } catch (e: any) {
-      console.warn(`[toggleModuleState] moduleState query warning: ${e.message}`);
-    }
+      })
+    );
     
     const activeModules = activeStates.map((s: any) => s.moduleId as ModuleId);
     
     // Get tenant's current plan
     let currentPlan: PlanTier = 'team';
-    try {
-      const subscription = await prisma.subscription.findUnique({
+    const subscription = await withTenant<any>(tenantId, (tx) =>
+      tx.subscription.findFirst({
         where: { tenantId },
         include: { addOns: true }
-      });
-      if (subscription?.planId) {
-        currentPlan = subscription.planId.toLowerCase() as PlanTier;
-      }
-    } catch (e: any) {
-      console.warn(`[toggleModuleState] subscription query warning: ${e.message}`);
+      })
+    );
+    if (subscription?.planId) {
+      currentPlan = subscription.planId.toLowerCase() as PlanTier;
     }
 
     if (targetStatus === 'ON' || targetStatus === 'PILOT' || targetStatus === 'DEV') {
@@ -74,32 +64,32 @@ export async function toggleModuleState(
       }
       
       try {
-        await prisma.$transaction(async (tx) => {
+        await withTenant(tenantId, async (tx) => {
           await tx.moduleState.upsert({
             where: {
               tenantId_moduleId: {
-                tenantId: tenantId!,
+                tenantId,
                 moduleId
               }
             },
             update: {
               status: targetStatus,
-              changedBy: session?.user?.id || 'system',
+              changedBy: userId,
               changedAt: new Date()
             },
             create: {
-              tenantId: tenantId!,
+              tenantId,
               moduleId,
               status: targetStatus,
-              changedBy: session?.user?.id || 'system',
+              changedBy: userId,
             }
           });
           
           try {
             await tx.auditEvent.create({
               data: {
-                tenantId: tenantId!,
-                actorId: session?.user?.id || 'system',
+                tenantId,
+                actorId: userId,
                 type: 'module.state.changed',
                 target: moduleId,
                 data: { status: targetStatus }
@@ -110,7 +100,10 @@ export async function toggleModuleState(
           }
         });
       } catch (dbErr: any) {
-        console.warn(`[toggleModuleState] Database save error: ${dbErr.message}`);
+        // Reporting success for a state the DB never took means the settings
+        // page shows the module enabled until the next reload.
+        console.error(`[toggleModuleState] Database save error: ${dbErr.message}`);
+        throw new Error('Modül durumu kaydedilemedi. Lütfen tekrar deneyin.');
       }
       
     } else if (targetStatus === 'OFF') {
@@ -119,22 +112,22 @@ export async function toggleModuleState(
       const toDisable = [moduleId, ...cascade];
       
       try {
-        await prisma.$transaction(async (tx) => {
+        await withTenant(tenantId, async (tx) => {
           for (const modId of toDisable) {
             await tx.moduleState.upsert({
               where: {
-                tenantId_moduleId: { tenantId: tenantId!, moduleId: modId }
+                tenantId_moduleId: { tenantId, moduleId: modId }
               },
               update: {
                 status: 'OFF',
-                changedBy: session?.user?.id || 'system',
+                changedBy: userId,
                 changedAt: new Date()
               },
               create: {
-                tenantId: tenantId!,
+                tenantId,
                 moduleId: modId,
                 status: 'OFF',
-                changedBy: session?.user?.id || 'system',
+                changedBy: userId,
               }
             });
           }
@@ -142,8 +135,8 @@ export async function toggleModuleState(
           try {
             await tx.auditEvent.create({
               data: {
-                tenantId: tenantId!,
-                actorId: session?.user?.id || 'system',
+                tenantId,
+                actorId: userId,
                 type: 'module.state.changed',
                 target: moduleId,
                 data: { status: 'OFF', cascadedTo: cascade }
@@ -154,7 +147,8 @@ export async function toggleModuleState(
           }
         });
       } catch (dbErr: any) {
-        console.warn(`[toggleModuleState] Database cascade save error: ${dbErr.message}`);
+        console.error(`[toggleModuleState] Database cascade save error: ${dbErr.message}`);
+        throw new Error('Modül durumu kaydedilemedi. Lütfen tekrar deneyin.');
       }
     }
 

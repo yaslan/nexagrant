@@ -69,10 +69,18 @@ export async function handleIyzicoWebhook(payload: {
   tenantId?: string;
   planId?: string;
 }) {
-  const { token, status, tenantId = 'demo-tenant-1', planId = 'team' } = payload;
+  const { token, status, tenantId, planId = 'team' } = payload;
 
   if (status !== 'SUCCESS' && status !== 'success') {
     return { success: false, message: 'Payment failed' };
+  }
+
+  // The tenant defaulted to `demo-tenant-1`, which is a real seeded row: a
+  // webhook body without a tenantId activated a paid subscription on somebody
+  // else's account. An unattributable payment notification is an error.
+  if (!tenantId) {
+    console.error('[handleIyzicoWebhook] payload carries no tenantId; refusing to activate a subscription');
+    return { success: false, message: 'Payment notification is not attributable to a tenant' };
   }
 
   let subscription: any = null;
@@ -96,14 +104,10 @@ export async function handleIyzicoWebhook(payload: {
       },
     });
   } catch (e: any) {
-    console.warn(`[handleIyzicoWebhook] DB update bypassed: ${e.message}`);
-    subscription = {
-      tenantId,
-      planId,
-      status: 'ACTIVE',
-      provider: 'iyzico',
-      providerSubId: token,
-    };
+    // Reporting success for a subscription that was never written means the
+    // customer paid and the platform forgot; the provider must be allowed to retry.
+    console.error(`[handleIyzicoWebhook] subscription upsert failed: ${e.message}`);
+    return { success: false, message: 'Subscription could not be persisted' };
   }
 
   return {

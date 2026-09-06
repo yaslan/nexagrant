@@ -158,7 +158,7 @@ export function ModulesClient({
         startTransition(async () => {
           setActiveModules((prev) => prev.filter((m) => m !== id));
           try {
-            await toggleModuleState(id, 'OFF', tenantId);
+            await toggleModuleState(id, 'OFF');
             showToast(`${id} modülü başarıyla devre dışı bırakıldı.`, 'info');
           } catch (e: any) {
             showToast(e?.message || 'Modül kapatılırken hata oluştu.', 'error');
@@ -173,7 +173,7 @@ export function ModulesClient({
         startTransition(async () => {
           setActiveModules((prev) => [...prev, id]);
           try {
-            await toggleModuleState(id, 'ON', tenantId);
+            await toggleModuleState(id, 'ON');
             showToast(`${id} modülü başarıyla aktifleştirildi!`, 'success');
           } catch (e: any) {
             showToast(e?.message || 'Modül etkinleştirilirken hata oluştu.', 'error');
@@ -200,7 +200,7 @@ export function ModulesClient({
       setCascadeWarning(null);
 
       try {
-        await toggleModuleState(target, 'OFF', tenantId);
+        await toggleModuleState(target, 'OFF');
         showToast(`${target} ve bağlı ${count - 1} alt modül kapatıldı.`, 'info');
       } catch (e: any) {
         showToast(e?.message || 'Modüller kapatılırken hata oluştu.', 'error');

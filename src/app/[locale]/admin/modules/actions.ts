@@ -1,21 +1,27 @@
 'use server';
 
-import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { requirePlatformAdmin } from '@/lib/tenant';
 import { getManifest } from '@/lib/modules/registry';
 import { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { revalidatePath } from 'next/cache';
 import { getDisableCascade } from '@/lib/modules/state-machine';
 
+/**
+ * Switches a module on or off for *another* tenant, so it is platform-admin
+ * only. It previously accepted any signed-in user — and in development, no user
+ * at all (`admin-dev-user`) — which let any tenant member flip any other
+ * tenant's modules and write an AuditEvent into their workspace.
+ */
 export async function updateTenantModuleStatus(
   tenantId: string,
   moduleId: ModuleId,
   targetStatus: ModuleStatus
 ) {
-  const session = await auth();
-  const userId = session?.user?.id || (process.env.NODE_ENV === 'development' ? 'admin-dev-user' : null);
-  if (!userId) {
-    throw new Error('Unauthorized: Authentication required.');
+  const { userId } = await requirePlatformAdmin();
+
+  if (!tenantId) {
+    throw new Error('A tenant must be selected.');
   }
 
   const manifest = getManifest(moduleId);
@@ -24,14 +30,9 @@ export async function updateTenantModuleStatus(
   }
 
   // Fetch current active module states for this tenant
-  let currentStates: any[] = [];
-  try {
-    currentStates = await prisma.moduleState.findMany({
-      where: { tenantId }
-    });
-  } catch (e: any) {
-    console.warn(`[updateTenantModuleStatus] DB query bypassed (DB offline): ${e.message}`);
-  }
+  const currentStates: any[] = await prisma.moduleState.findMany({
+    where: { tenantId }
+  });
 
   const activeModuleIds = currentStates
     .filter((s: { status: string }) => s.status === 'ON' || s.status === 'PILOT')
@@ -98,7 +99,10 @@ export async function updateTenantModuleStatus(
       }
     });
   } catch (e: any) {
-    console.warn(`[Admin Module Action] DB update bypassed (DB offline): ${e.message}`);
+    // A silent no-op here would report success for a change that never
+    // happened, and the admin UI would show the new state until reload.
+    console.error(`[Admin Module Action] DB update failed: ${e.message}`);
+    throw new Error('Modül durumu kaydedilemedi. Lütfen tekrar deneyin.');
   }
 
   try {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { auth } from '@/lib/auth';
+import { isPlatformAdminSession } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import UserMenu from '@/components/UserMenu';
@@ -31,13 +32,9 @@ export default async function AdminLayout({
   const locale = resolvedParams?.locale || 'tr';
   const session = await auth();
 
-  const isPlatformAdmin = Boolean(
-    (session as any)?.isPlatformAdmin ||
-    (session?.user as any)?.isPlatformAdmin ||
-    session?.user?.email === 'admin@yasinaslan.com.tr' ||
-    (session as any)?.role === 'SUPER_ADMIN' ||
-    (session as any)?.role === 'PLATFORM_ADMIN'
-  );
+  // auth.ts already resolves the flag for the superadmin email, so the check is
+  // the shared claim reader rather than a second email allow-list here.
+  const isPlatformAdmin = isPlatformAdminSession(session as any);
 
   if (!isPlatformAdmin) {
     notFound();
