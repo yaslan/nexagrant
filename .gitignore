@@ -45,3 +45,12 @@ next-env.d.ts
 # Both stay out of the repository.
 docs/BETA_DATA/generated/
 docs/BETA_DATA/beta-partners.local.csv
+
+# one-off codemod scripts and tooling dumps (S8 cleanup)
+# Ad-hoc regex patchers written during a typecheck firefight: they rewrite
+# source in place (including the `as any` hacks CLAUDE.md forbids) and must
+# never be re-run. resolution.log is a 5 MB `tsc --traceResolution` dump.
+fix-*.py
+patch_schema*.py
+resolution.log
+*.bak
