@@ -1,11 +1,21 @@
 import { z } from 'zod';
 
+/**
+ * Optional URL setting. A variable that is present but blank (`SENTRY_DSN=`) is
+ * treated as unset: an unused observability endpoint must not throw at import
+ * time and take down every route that reads config.
+ */
+const optionalUrl = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().url().optional()
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  DATABASE_URL: z.string().url().optional(),
+  DATABASE_URL: optionalUrl,
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
-  NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
-  SENTRY_DSN: z.string().url().optional(),
+  NEXT_PUBLIC_POSTHOG_HOST: optionalUrl,
+  SENTRY_DSN: optionalUrl,
   INNGEST_API_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
@@ -23,8 +33,12 @@ const envSchema = z.object({
 const _env = envSchema.safeParse(process.env);
 
 if (!_env.success) {
-  console.error('❌ Invalid environment variables:', _env.error.format());
-  throw new Error('Invalid environment variables');
+  // `issues` names the offending variable; `format()` renders as `{}` on zod v4.
+  const details = _env.error.issues
+    .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+    .join('; ');
+  console.error('❌ Invalid environment variables:', details);
+  throw new Error(`Invalid environment variables — ${details}`);
 }
 
 export const env = _env.data;
