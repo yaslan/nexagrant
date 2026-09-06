@@ -29,8 +29,6 @@ interface BriefItem {
 
 interface MeetingBriefsClientProps {
   opportunityId: string;
-  tenantId: string;
-  userId: string;
   locale: string;
   workspace: string;
   opportunityTitle: string;
@@ -39,8 +37,6 @@ interface MeetingBriefsClientProps {
 
 export function MeetingBriefsClient({
   opportunityId,
-  tenantId,
-  userId,
   locale,
   workspace,
   opportunityTitle,
@@ -70,12 +66,12 @@ export function MeetingBriefsClient({
     setIsGenerating(true);
     try {
       const interactionId = `int-${Date.now()}`;
+      // tenantId/userId are no longer passed: the action reads them from the
+      // session, so the browser cannot name a tenant.
       const res = await generateMeetingBrief({
         interactionId,
         partnerName: partnerName.trim(),
         callTopic: opportunityTitle,
-        tenantId,
-        userId,
       });
 
       if (res.brief) {
@@ -120,8 +116,6 @@ export function MeetingBriefsClient({
         decisions: meetingDecisions,
         actionItems,
         nextMeetingDate,
-        tenantId,
-        userId,
       });
 
       if (res.formattedPostNotes) {

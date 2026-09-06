@@ -9,7 +9,7 @@ export default async function MeetingBriefsPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, workspace, id } = await params;
-  const { tenantId, userId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPage(locale);
 
   let opp: any = null;
   let briefs: any[] = [];
@@ -75,8 +75,6 @@ export default async function MeetingBriefsPage({
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <MeetingBriefsClient
         opportunityId={opp.id}
-        tenantId={opp.tenantId || tenantId}
-        userId={userId}
         locale={locale}
         workspace={workspace}
         opportunityTitle={opp.title}

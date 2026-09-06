@@ -1,22 +1,30 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
 import { revalidatePath } from 'next/cache';
+
+/**
+ * M9 meeting briefs.
+ *
+ * `tenantId` and `userId` used to be *parameters*: the briefs client component
+ * read them off the page and passed them back in. A server action is a public
+ * POST endpoint, so those were attacker-controlled — any value could be sent
+ * and the brief, the credit charge and the DB row all followed it. Both are
+ * now read from the session inside the action and cannot be overridden.
+ */
 
 export async function generateMeetingBrief({
   interactionId,
   partnerName,
   callTopic,
-  tenantId,
-  userId,
 }: {
   interactionId: string;
   partnerName: string;
   callTopic: string;
-  tenantId: string;
-  userId: string;
 }) {
+  const { tenantId, userId } = await requireTenantAction();
   const prompt = `Generate a 1-page pre-meeting briefing note for a Horizon Europe consortium discussion.
   Partner Name: ${partnerName}
   Call Topic: ${callTopic}
@@ -70,28 +78,35 @@ export async function generateMeetingBrief({
 - Verify potential conflict of interest if partner is participating in competing proposals under the same call.`;
   }
 
-  // Deduct 1 AI credit for M9 Brief
   try {
-    await prisma.creditLedger.create({
-      data: {
-        tenantId: tenantId || 'demo-tenant',
-        delta: -1,
-        reason: `M9: Meeting Brief Generator for ${partnerName}`,
-      },
-    });
-  } catch (e) {
-    // Credit ledger optional in offline mode
-  }
+    const brief = await withTenant<any>(tenantId, async (tx) => {
+      // Deduct 1 AI credit for M9 Brief
+      await tx.creditLedger.create({
+        data: {
+          tenantId,
+          delta: -1,
+          reason: `M9: Meeting Brief Generator for ${partnerName}`,
+        },
+      });
 
-  try {
-    const brief = await prisma.meetingBrief.upsert({
-      where: { interactionId },
-      update: { content: briefContent },
-      create: {
-        tenantId: tenantId || 'demo-tenant',
-        interactionId,
-        content: briefContent,
-      },
+      // interactionId is globally unique, so an upsert keyed on it alone would
+      // let one tenant overwrite another tenant's brief. Existing rows are
+      // matched on (interactionId, tenantId) first.
+      const existing = await tx.meetingBrief.findFirst({
+        where: { interactionId, tenantId },
+        select: { id: true },
+      });
+
+      if (existing) {
+        return tx.meetingBrief.update({
+          where: { id: existing.id },
+          data: { content: briefContent },
+        });
+      }
+
+      return tx.meetingBrief.create({
+        data: { tenantId, interactionId, content: briefContent },
+      });
     });
 
     try {
@@ -100,17 +115,8 @@ export async function generateMeetingBrief({
 
     return { success: true, brief };
   } catch (e: any) {
-    console.warn('[M9 generateMeetingBrief] DB upsert bypassed:', e.message);
-    return {
-      success: true,
-      brief: {
-        id: `brief-${Date.now()}`,
-        tenantId: tenantId || 'demo-tenant',
-        interactionId,
-        content: briefContent,
-        createdAt: new Date(),
-      },
-    };
+    console.warn('[M9 generateMeetingBrief] DB write failed:', e.message);
+    return { success: false, brief: null, error: 'BRIEF_NOT_PERSISTED' };
   }
 }
 
@@ -121,8 +127,6 @@ export async function savePostMeetingNotes({
   decisions,
   actionItems,
   nextMeetingDate,
-  tenantId,
-  userId,
 }: {
   briefId: string;
   partnerName: string;
@@ -130,9 +134,8 @@ export async function savePostMeetingNotes({
   decisions: string;
   actionItems: string[];
   nextMeetingDate?: string;
-  tenantId: string;
-  userId: string;
 }) {
+  const { tenantId } = await requireTenantAction();
   const formattedPostNotes = `\n\n---
 ### 📝 Toplantı Sonrası Notlar & Alınan Kararlar (${new Date().toLocaleDateString('tr-TR')})
 - **Ortak:** ${partnerName}
@@ -144,17 +147,26 @@ ${actionItems.map((item, idx) => `${idx + 1}. ${item}`).join('\n')}
 
 ${nextMeetingDate ? `- **Sonraki Görüşme Tarihi:** ${nextMeetingDate}` : ''}`;
 
+  let appended = false;
   try {
-    const brief = await prisma.meetingBrief.findUnique({ where: { id: briefId } });
-    if (brief) {
-      const updatedContent = brief.content + formattedPostNotes;
-      await prisma.meetingBrief.update({
-        where: { id: briefId },
-        data: { content: updatedContent },
+    appended = await withTenant<boolean>(tenantId, async (tx) => {
+      // Scoped read: a brief id from another tenant must not be found here.
+      const brief = await tx.meetingBrief.findFirst({ where: { id: briefId, tenantId } });
+      if (!brief) return false;
+
+      await tx.meetingBrief.update({
+        where: { id: brief.id },
+        data: { content: brief.content + formattedPostNotes },
       });
-    }
+      return true;
+    });
   } catch (dbErr: any) {
-    console.warn('[savePostMeetingNotes] DB update bypassed:', dbErr.message);
+    console.warn('[savePostMeetingNotes] DB update failed:', dbErr.message);
+    return { success: false, formattedPostNotes: '' };
+  }
+
+  if (!appended) {
+    return { success: false, formattedPostNotes: '' };
   }
 
   try {

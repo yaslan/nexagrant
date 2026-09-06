@@ -1,158 +1,111 @@
 'use server';
 
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { scoreCandidatesForSeat, detectConflicts } from '@/lib/scoring/consortium';
 import { revalidatePath } from 'next/cache';
 
+/**
+ * M8 consortium seats.
+ *
+ * Every action here used to resolve its tenant as
+ * `session.tenantId ?? prisma.tenant.findFirst()` — the first row in the table,
+ * which is whichever tenant happened to be seeded first — and then queried
+ * seats by `id` alone. A seat id from another tenant was therefore readable and
+ * writable. The tenant now comes from `requireTenantAction()` and every query
+ * runs inside `withTenant`, matched on `(id, tenantId)`.
+ */
+
+const PIPELINE_PATH = '/[locale]/(app)/[workspace]/pipeline';
+
 export async function addSeat(opportunityId: string, roleKey: string, required: boolean = true) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  let tenantId = (session as any)?.tenantId;
+  const { tenantId } = await requireTenantAction();
 
-  try {
-    if (!tenantId) {
-      const tenant = await prisma.tenant.findFirst();
-      tenantId = tenant?.id;
-    }
+  const seat = await withTenant<any>(tenantId, async (tx) => {
+    // The opportunity must belong to this tenant; an id is guessable.
+    const opp = await tx.opportunity.findFirst({
+      where: { id: opportunityId, tenantId },
+      select: { id: true },
+    });
+    if (!opp) return null;
 
-    if (tenantId) {
-      // Ensure opportunity exists in DB if it's a demo-opp or new opp
-      let opp = await prisma.opportunity.findUnique({ where: { id: opportunityId } });
-      if (!opp && opportunityId.startsWith('demo-opp')) {
-        opp = await prisma.opportunity
-          .create({
-            data: {
-              id: opportunityId,
-              tenantId,
-              title: `Demo Project (${opportunityId})`,
-              stage: 'G2',
-              status: 'ACTIVE',
-              topicId: 'HORIZON-CL6-2024-CIRCBIO-01',
-              intendedRole: 'coordinator',
-              g0Score: 85,
-            },
-          })
-          .catch(() => null);
-      }
+    return tx.consortiumSeat.create({
+      data: {
+        tenantId,
+        opportunityId,
+        roleKey,
+        required,
+        status: 'OPEN',
+      },
+    });
+  });
 
-      if (opp || !opportunityId.startsWith('demo-opp')) {
-        const seat = await prisma.consortiumSeat.create({
-          data: {
-            tenantId,
-            opportunityId,
-            roleKey,
-            required,
-            status: 'OPEN',
-          },
-        });
-        revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
-        return seat;
-      }
-    }
-  } catch (e: any) {
-    console.warn(`[addSeat] DB create failed for ${opportunityId}: ${e.message}`);
+  if (!seat) {
+    throw new Error(`Opportunity ${opportunityId} not found in this workspace.`);
   }
 
-  // Fallback return object if DB query/fk fails or in demo mode
-  const fallbackSeat = {
-    id: `seat-${Date.now()}`,
-    tenantId: tenantId || 'demo-tenant-hq',
-    opportunityId,
-    roleKey,
-    required,
-    status: 'OPEN',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
-  return fallbackSeat;
+  revalidatePath(PIPELINE_PATH, 'page');
+  return seat;
 }
 
 export async function findCandidates(seatId: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  let tenantId = (session as any)?.tenantId;
+  const { tenantId } = await requireTenantAction();
 
-  try {
-    if (!tenantId) {
-      const tenant = await prisma.tenant.findFirst();
-      tenantId = tenant?.id;
-    }
+  const seat = await withTenant<{ id: string; opportunityId: string } | null>(tenantId, (tx) =>
+    tx.consortiumSeat.findFirst({
+      where: { id: seatId, tenantId },
+      select: { id: true, opportunityId: true },
+    })
+  );
 
-    const seat = tenantId
-      ? await prisma.consortiumSeat.findFirst({ where: { id: seatId, tenantId } })
-      : await prisma.consortiumSeat.findFirst({ where: { id: seatId } });
+  if (!seat) return [];
 
-    if (seat) {
-      const opp = await prisma.opportunity.findUnique({
-        where: { id: seat.opportunityId },
-        select: { topicId: true },
-      });
+  const opp = await withTenant<{ topicId: string | null } | null>(tenantId, (tx) =>
+    tx.opportunity.findFirst({
+      where: { id: seat.opportunityId, tenantId },
+      select: { topicId: true },
+    })
+  );
 
-      const candidates = await scoreCandidatesForSeat(
-        tenantId || seat.tenantId,
-        seatId,
-        seat.opportunityId,
-        opp?.topicId || null,
-        5
-      );
-      revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
-      return candidates;
-    }
-  } catch (e: any) {
-    console.warn(`[findCandidates] DB error for ${seatId}: ${e.message}`);
-  }
+  const candidates = await scoreCandidatesForSeat(
+    tenantId,
+    seatId,
+    seat.opportunityId,
+    opp?.topicId || null,
+    5
+  );
 
-  // Fallback demo candidates
-  return [
-    {
-      id: `cand-1-${seatId}`,
-      seatId,
-      organizationId: 'demo-org-1',
-      score: 94,
-      rank: 1,
-      matchReasons: ['Strong CORDIS track record in Horizon Europe', 'Verified SME status in DE'],
-    },
-    {
-      id: `cand-2-${seatId}`,
-      seatId,
-      organizationId: 'demo-org-2',
-      score: 88,
-      rank: 2,
-      matchReasons: ['High eigenvector centrality in Cluster 6', 'Approved research facility in FR'],
-    },
-  ];
+  revalidatePath(PIPELINE_PATH, 'page');
+  return candidates;
 }
 
 export async function assignSeat(seatId: string, organizationId: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  let tenantId = (session as any)?.tenantId;
+  const { tenantId } = await requireTenantAction();
 
-  try {
-    if (!tenantId) {
-      const tenant = await prisma.tenant.findFirst();
-      tenantId = tenant?.id;
-    }
-
-    const whereClause: any = { id: seatId };
-    if (tenantId) whereClause.tenantId = tenantId;
-
-    await prisma.consortiumSeat.update({
-      where: whereClause,
+  // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
+  // unique selector and would let a guessed seat id reassign another tenant's seat.
+  const updated = await withTenant<{ count: number }>(tenantId, (tx) =>
+    tx.consortiumSeat.updateMany({
+      where: { id: seatId, tenantId },
       data: { organizationId, status: 'INVITED' },
-    });
-  } catch (e: any) {
-    console.warn(`[assignSeat] DB error for ${seatId}: ${e.message}`);
-  }
+    })
+  );
 
-  revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
-  return { success: true };
+  revalidatePath(PIPELINE_PATH, 'page');
+  return { success: updated.count > 0 };
 }
 
 export async function getConflicts(opportunityId: string) {
+  const { tenantId } = await requireTenantAction();
+
+  const opp = await withTenant<{ id: string } | null>(tenantId, (tx) =>
+    tx.opportunity.findFirst({
+      where: { id: opportunityId, tenantId },
+      select: { id: true },
+    })
+  );
+  if (!opp) return [];
+
   try {
     return await detectConflicts(opportunityId);
   } catch (e: any) {

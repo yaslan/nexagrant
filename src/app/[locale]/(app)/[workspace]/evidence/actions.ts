@@ -1,7 +1,7 @@
 'use server';
 
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import { 
   getPresignedUploadUrl, 
@@ -10,15 +10,13 @@ import {
   getPresignedDownloadUrl 
 } from '@/lib/storage';
 import { extractEvidenceMetadata } from '@/lib/evidence-ai';
-import { calculateEvidenceHealthScore, HealthScoreResult } from '@/lib/evidence-health';
+import { calculateEvidenceHealthScore, HealthScoreResult, MinimalEvidenceItem } from '@/lib/evidence-health';
 
 /**
  * Retrieves all Evidence items for active tenant
  */
 export async function getEvidenceItemsAction(categoryFilter?: string) {
-  const session = await auth();
-  if (!session?.user) return [];
-  const tenantId = (session as any)?.tenantId || 'demo-tenant-hq';
+  const { tenantId } = await requireTenantAction();
 
   try {
     const whereClause: any = { tenantId };
@@ -26,17 +24,19 @@ export async function getEvidenceItemsAction(categoryFilter?: string) {
       whereClause.category = categoryFilter;
     }
 
-    const items = await prisma.evidence.findMany({
-      where: whereClause,
-      include: {
-        claimLinks: {
-          include: {
-            claim: true,
+    const items = await withTenant<any[]>(tenantId, (tx) =>
+      tx.evidence.findMany({
+        where: whereClause,
+        include: {
+          claimLinks: {
+            include: {
+              claim: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      })
+    );
 
     return items;
   } catch (error: any) {
@@ -53,9 +53,7 @@ export async function getPresignedUploadUrlAction(
   fileName: string,
   mimeType: string
 ) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  const tenantId = (session as any)?.tenantId || 'demo-tenant-hq';
+  const { tenantId } = await requireTenantAction();
 
   return getPresignedUploadUrl(
     tenantId,
@@ -82,9 +80,7 @@ export async function confirmEvidenceUploadAction(data: {
   confidentiality?: string;
   language?: string;
 }) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  const tenantId = (session as any)?.tenantId || 'demo-tenant-hq';
+  const { tenantId, userId } = await requireTenantAction();
 
   const publicUrl = `https://storage.fonbridge.app/${data.objectKey}`;
 
@@ -96,7 +92,8 @@ export async function confirmEvidenceUploadAction(data: {
     : (extracted.validUntil ? new Date(extracted.validUntil) : null);
 
   try {
-    const evidence = await prisma.evidence.create({
+    const evidence = await withTenant<any>(tenantId, async (tx) => {
+      const created = await tx.evidence.create({
       data: {
         tenantId,
         title: data.title || data.fileName.replace(/\.[^/.]+$/, ''),
@@ -123,32 +120,35 @@ export async function confirmEvidenceUploadAction(data: {
           maskedPiiFound: extracted.maskedPiiFound,
         },
         tags: extracted.tags,
-        createdBy: session.user.id,
+        createdBy: userId,
       },
-    });
+      });
 
-    // Auto-create suggested claims if present
-    if (extracted.suggestedClaims && extracted.suggestedClaims.length > 0) {
-      for (const claimItem of extracted.suggestedClaims) {
-        const claim = await prisma.claim.create({
-          data: {
-            tenantId,
-            statement: claimItem.statementTr,
-            statementEn: claimItem.statementEn,
-            confidenceScore: 0.95,
-            tags: extracted.tags,
-          },
-        });
+      // Auto-create suggested claims if present
+      if (extracted.suggestedClaims && extracted.suggestedClaims.length > 0) {
+        for (const claimItem of extracted.suggestedClaims) {
+          const claim = await tx.claim.create({
+            data: {
+              tenantId,
+              statement: claimItem.statementTr,
+              statementEn: claimItem.statementEn,
+              confidenceScore: 0.95,
+              tags: extracted.tags,
+            },
+          });
 
-        await prisma.claimEvidenceLink.create({
-          data: {
-            claimId: claim.id,
-            evidenceId: evidence.id,
-            isPrimary: true,
-          },
-        });
+          await tx.claimEvidenceLink.create({
+            data: {
+              claimId: claim.id,
+              evidenceId: created.id,
+              isPrimary: true,
+            },
+          });
+        }
       }
-    }
+
+      return created;
+    });
 
     revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
     return { success: true, evidence };
@@ -177,10 +177,7 @@ export async function confirmEvidenceUploadAction(data: {
  * Traditional FormData upload fallback
  */
 export async function createEvidence(formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  
-  const tenantId = (session as any)?.tenantId || 'demo-tenant-hq';
+  const { tenantId, userId } = await requireTenantAction();
 
   const title = formData.get('title') as string;
   const kind = (formData.get('kind') as string) || 'certificate';
@@ -207,7 +204,8 @@ export async function createEvidence(formData: FormData) {
   const extracted = await extractEvidenceMetadata(title || fileName || 'Belge', category);
 
   try {
-    const evidence = await prisma.evidence.create({
+    const evidence = await withTenant<any>(tenantId, (tx) =>
+      tx.evidence.create({
       data: {
         tenantId,
         title: title || fileName || 'Kanıt Belgesi',
@@ -222,9 +220,10 @@ export async function createEvidence(formData: FormData) {
         fileUrl,
         ocrText: extracted.ocrSummary,
         tags: extracted.tags,
-        createdBy: session.user.id,
+        createdBy: userId,
       },
-    });
+      })
+    );
 
     revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
     return evidence;
@@ -248,78 +247,86 @@ export async function createEvidence(formData: FormData) {
  * Deletes an Evidence Item and removes associated file from R2
  */
 export async function deleteEvidence(evidenceId: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
-  const tenantId = (session as any)?.tenantId || 'demo-tenant-hq';
+  const { tenantId } = await requireTenantAction();
 
+  let deleted = 0;
   try {
-    const ev = await prisma.evidence.findUnique({
-      where: { id: evidenceId },
-    });
+    // An evidence id is guessable, so the row is looked up *and* deleted by
+    // (id, tenantId). `deleteMany` is deliberate: `delete({ where: { id } })`
+    // would remove another tenant's document.
+    deleted = await withTenant<number>(tenantId, async (tx) => {
+      const ev = await tx.evidence.findFirst({ where: { id: evidenceId, tenantId } });
+      if (!ev) return 0;
 
-    if (ev?.r2ObjectKey || ev?.fileUrl) {
-      await deleteFileFromR2(ev.r2ObjectKey || ev.fileUrl!);
-    }
+      if (ev.r2ObjectKey || ev.fileUrl) {
+        await deleteFileFromR2(ev.r2ObjectKey || ev.fileUrl!);
+      }
 
-    await prisma.evidence.delete({
-      where: { id: evidenceId },
+      const result = await tx.evidence.deleteMany({ where: { id: evidenceId, tenantId } });
+      return result.count;
     });
   } catch (error: any) {
     console.warn(`[deleteEvidence] DB error: ${error.message}`);
+    return { success: false };
   }
 
   revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
-  return { success: true };
+  return { success: deleted > 0 };
 }
 
 /**
  * Updates verification status of an Evidence Item
  */
 export async function verifyEvidenceAction(evidenceId: string, status: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error('Unauthorized');
+  const { tenantId } = await requireTenantAction();
 
+  let updated = 0;
   try {
-    await prisma.evidence.update({
-      where: { id: evidenceId },
-      data: { status },
+    // `updateMany` so the tenant id is part of the WHERE clause; `update` only
+    // accepts a unique selector and would flip another tenant's row.
+    updated = await withTenant<number>(tenantId, async (tx) => {
+      const result = await tx.evidence.updateMany({
+        where: { id: evidenceId, tenantId },
+        data: { status },
+      });
+      return result.count;
     });
   } catch (error: any) {
     console.warn(`[verifyEvidenceAction] DB error: ${error.message}`);
+    return { success: false };
   }
 
   revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
-  return { success: true };
+  return { success: updated > 0 };
 }
 
 /**
  * Generates Evidence Pack Health Score (0-100) for tenant
  */
 export async function getHealthScoreAction(): Promise<HealthScoreResult> {
-  const session = await auth();
-  const tenantId = (session as any)?.tenantId || 'demo-tenant-hq';
+  const { tenantId } = await requireTenantAction();
 
   try {
-    const items = await prisma.evidence.findMany({
-      where: { tenantId },
-      select: {
-        id: true,
-        kind: true,
-        category: true,
-        status: true,
-        validUntil: true,
-        title: true,
-      },
-    });
+    const items = await withTenant<MinimalEvidenceItem[]>(tenantId, (tx) =>
+      tx.evidence.findMany({
+        where: { tenantId },
+        select: {
+          id: true,
+          kind: true,
+          category: true,
+          status: true,
+          validUntil: true,
+          title: true,
+        },
+      })
+    );
 
     return calculateEvidenceHealthScore(items);
   } catch (error: any) {
-    console.warn(`[getHealthScoreAction] DB fallback: ${error.message}`);
-    // Mock health score calculation for demo
-    return calculateEvidenceHealthScore([
-      { id: '1', category: 'CORPORATE_IDENTITY', kind: 'corporate', title: 'Ticaret Sicil Gazetesi', status: 'VALID' },
-      { id: '2', category: 'CERTIFICATION', kind: 'certificate', title: 'ISO 27001 BGYS', status: 'VALID', validUntil: new Date(Date.now() + 365 * 24 * 3600 * 1000) },
-      { id: '3', category: 'FINANCIAL', kind: 'financial', title: '2025 Bilanço', status: 'VALID' },
-    ]);
+    // CLAUDE.md §7: a score shown to the user is derived from real Evidence rows
+    // or not shown at all. The previous fallback invented three documents, so a
+    // tenant with an empty pack saw a healthy score during a DB outage.
+    console.warn(`[getHealthScoreAction] DB error: ${error.message}`);
+    return calculateEvidenceHealthScore([]);
   }
 }
