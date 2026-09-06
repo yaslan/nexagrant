@@ -6,7 +6,6 @@ import { tenantScopeOf, TenantScope } from '@/lib/tenant';
 // @ts-ignore
 import { Gate, OppStatus } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-import { evaluateGate } from '@/lib/scoring/g0';
 import {
   addInMemoryOpportunity,
   updateInMemoryOpportunityStage,
@@ -240,54 +239,4 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
     revalidatePath('/[locale]/(app)/[workspace]/firsatlar', 'page');
   } catch (e) {}
   return { success: true };
-}
-
-export async function evaluateAndPassGate(opportunityId: string, gate: Gate, inputs: any) {
-  const scope = await sessionScope();
-  if (!scope) return { passed: false, reasons: ['TENANT_SCOPE_REQUIRED'] };
-  const { tenantId, userId } = scope;
-
-  const rules = { gate, minScore: 6, mandatoryCriteria: ['conceptNoteReady'] };
-  const score = inputs?.score || 7.5;
-  
-  const { passed, reasons } = evaluateGate(gate, score, rules, inputs);
-
-  if (passed) {
-    const nextGateMap: Record<Gate, Gate> = {
-      G0: 'G1', G1: 'G2', G2: 'G3', G3: 'G4', G4: 'G4'
-    };
-    updateInMemoryOpportunityStage(tenantId, opportunityId, nextGateMap[gate] as any);
-  }
-
-  try {
-    await prisma.gateDecision.create({
-      data: {
-        tenantId,
-        opportunityId,
-        gate,
-        passed,
-        inputs: inputs || {},
-        ruleVersion: 'v1.0',
-        decidedBy: userId
-      }
-    });
-
-    if (passed) {
-      const nextGateMap: Record<Gate, Gate> = {
-        G0: 'G1', G1: 'G2', G2: 'G3', G3: 'G4', G4: 'G4'
-      };
-      await prisma.opportunity.updateMany({
-        where: { id: opportunityId, tenantId },
-        data: { stage: nextGateMap[gate] }
-      });
-    }
-  } catch (err: any) {
-    console.warn(`[evaluateAndPassGate] DB error: ${err.message}`);
-  }
-
-  try {
-    revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
-    revalidatePath('/[locale]/(app)/[workspace]/firsatlar', 'page');
-  } catch (e) {}
-  return { passed, reasons };
 }

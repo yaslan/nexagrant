@@ -33,3 +33,5 @@
 
 - [fabrika-board-cards-go-stale](fabrika-board-cards-go-stale.md) — Fabrika görev panosundaki in_progress kartlar bitmiş işi gösteriyor olabilir — kartı koda karşı doğrulamadan iş dağıtma
 - [fabrika-k1-upstream-sources](fabrika-k1-upstream-sources.md) — K1'in üç dış kaynağının 2026-09-06'da ölçülmüş gerçek durumu — SEDIA arama yanıtı açıklamayı zaten taşır (topicDetails çağrısı gereksiz), Eurostars portalı 403, TÜBİTAK /en/funding 404
+
+- [fabrika-worker-panes-die-uncommitted](fabrika-worker-panes-die-uncommitted.md) — Fabrika'da worker pane'ler ~30 dakikada code 129 ile ölüyor ve commit edilmemiş işi ağaçta bırakıyor — lider kurtarmak zorunda
