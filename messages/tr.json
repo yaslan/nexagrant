@@ -45,7 +45,14 @@
     "avgDaysG2": "Ort. G2 Süresi (gün)",
     "activeModules": "Açık Modüller",
     "aiCredits": "YZ Kredisi",
-    "pipelineFunnel": "Pipeline Hunisi"
+    "pipelineFunnel": "Pipeline Hunisi",
+    "metaDescription": "Fabrika pipeline KPI paneli — teklif sayısı, eşik üstü oranı, isabet oranı ve G2 süresi tek ekranda.",
+    "accessDeniedTitle": "Erişim Reddedildi",
+    "accessDeniedBody": "Bu sayfayı görmek için Pipeline Yöneticisi veya daha yüksek izne ihtiyacınız var.",
+    "sessionErrorTitle": "Oturum Bulunamadı",
+    "sessionErrorBody": "Kullanıcı kimliği belirlenemedi. Lütfen yeniden giriş yapın.",
+    "loadErrorTitle": "Veri Yüklenemedi",
+    "loadErrorBody": "Panel verisi yüklenirken bir hata oluştu. Sayfayı yenileyin; sorun sürerse yöneticinize bildirin."
   },
   "Pipeline": {
     "title": "Fırsat Pipeline",

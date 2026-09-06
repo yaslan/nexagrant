@@ -45,7 +45,14 @@
     "avgDaysG2": "Avg Days to G2",
     "activeModules": "Active Modules",
     "aiCredits": "AI Credits",
-    "pipelineFunnel": "Pipeline Funnel"
+    "pipelineFunnel": "Pipeline Funnel",
+    "metaDescription": "Fabrika pipeline KPI dashboard — proposal count, above-threshold rate, hit rate and time to G2 on one screen.",
+    "accessDeniedTitle": "Access Denied",
+    "accessDeniedBody": "You need Pipeline Manager permission or higher to view this page.",
+    "sessionErrorTitle": "Session Not Found",
+    "sessionErrorBody": "We could not identify your account. Please sign in again.",
+    "loadErrorTitle": "Could Not Load Data",
+    "loadErrorBody": "Something went wrong while loading the dashboard. Refresh the page; if it keeps happening, tell your administrator."
   },
   "Pipeline": {
     "title": "Opportunity Pipeline",
