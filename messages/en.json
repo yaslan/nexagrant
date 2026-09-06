@@ -131,6 +131,13 @@
     "signOut": "Sign Out",
     "register": "Register"
   },
+  "NoWorkspace": {
+    "title": "You do not have a workspace yet",
+    "description": "Your account is active, but it is not attached to any organisation's workspace. That is why we cannot show you any data.",
+    "hint": "If you were invited to an organisation, use the link in the invitation email. Otherwise ask your organisation's administrator to add you.",
+    "signInAgain": "Sign in again",
+    "backHome": "Back to home"
+  },
   "GDPR": {
     "cookieConsent": "This site uses cookies. By continuing, you accept cookie usage.",
     "accept": "Accept",

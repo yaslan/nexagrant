@@ -131,6 +131,13 @@
     "signOut": "Çıkış Yap",
     "register": "Kayıt Ol"
   },
+  "NoWorkspace": {
+    "title": "Henüz bir çalışma alanınız yok",
+    "description": "Hesabınız açık, ancak hiçbir kuruluşun çalışma alanına bağlı değil. Bu yüzden size ait olmayan hiçbir veriyi gösteremiyoruz.",
+    "hint": "Bir kuruluşa davet edildiyseniz davet e-postasındaki bağlantıyı kullanın; değilse kuruluşunuzun yöneticisinden sizi eklemesini isteyin.",
+    "signInAgain": "Tekrar giriş yap",
+    "backHome": "Ana sayfaya dön"
+  },
   "GDPR": {
     "cookieConsent": "Bu site çerez kullanmaktadır. Devam ederek çerez kullanımını kabul etmiş olursunuz.",
     "accept": "Kabul Et",
