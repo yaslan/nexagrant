@@ -422,5 +422,33 @@
       "esrScore": "ESR Score",
       "delta": "Difference"
     }
+  },
+  "calls_region": {
+    "back": "Back",
+    "title": "Horizon Calls",
+    "open_calls": "open calls",
+    "total_budget": "Total Budget",
+    "deadline": "Deadline",
+    "budget": "Budget",
+    "view_details": "View Details",
+    "no_calls": "No open calls for {region} at the moment.",
+    "no_calls_hint": "Check other countries or create a saved search from the dashboard."
+  },
+  "partner_portal": {
+    "badge": "Consortium Partner Portal",
+    "title": "Partner Portal",
+    "subtitle": "Budget and effort entry",
+    "intro": "🔒 Through this secure link (magic link), you can enter administrative information and effort (Person-Months) budget for project application (Part A). Your total budget will be automatically calculated according to Horizon Europe rates.",
+    "partner_name_label": "Organization Name (PIC)",
+    "partner_name_placeholder": "Eg: Siemens AG (999984059)",
+    "effort_label": "Effort (Person-Months)",
+    "effort_placeholder": "Eg: 24",
+    "submit_button": "Save and Submit Budget",
+    "budget_table_title": "Current Budget Table",
+    "table_partner": "Partner",
+    "table_pm": "PM",
+    "table_grant": "Requested Grant",
+    "no_entries": "No entries yet.",
+    "footer": "Secured by FonBridge SaaS — Horizon Europe Engine"
   }
 }

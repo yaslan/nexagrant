@@ -42,6 +42,17 @@ checkI18n();
 const nextConfig: NextConfig = {
   output: 'standalone',
   serverExternalPackages: ['pg', 'pdf-parse', 'inngest'],
+  async redirects() {
+    return [
+      // ─── Migrate locale-less marketing pages to [locale] ───
+      { source: '/pricing', destination: '/tr/pricing', permanent: true },
+      { source: '/privacy', destination: '/tr/privacy', permanent: true },
+      { source: '/terms', destination: '/tr/terms', permanent: true },
+      { source: '/compliance/dpa', destination: '/tr/compliance/dpa', permanent: true },
+      { source: '/calls/:region', destination: '/tr/calls/:region', permanent: true },
+      { source: '/portal/partner/:token', destination: '/tr/portal/partner/:token', permanent: true },
+    ];
+  },
   async rewrites() {
     return [
       // ─── Public Marketing Pages (TR SEO Slugs) ───

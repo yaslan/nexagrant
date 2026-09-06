@@ -422,5 +422,33 @@
       "esrScore": "ESR Puanı",
       "delta": "Fark"
     }
+  },
+  "calls_region": {
+    "back": "Geri",
+    "title": "Horizon Çağrıları",
+    "open_calls": "açık çağrı",
+    "total_budget": "Toplam Bütçe",
+    "deadline": "Deadline",
+    "budget": "Bütçe",
+    "view_details": "Detayları Gör",
+    "no_calls": "Şu anda {region} için açık çağrı yok.",
+    "no_calls_hint": "Diğer ülkeleri gözlemleyin ya da panelden kayıtlı arama oluşturun."
+  },
+  "partner_portal": {
+    "badge": "Consortium Partner Portal",
+    "title": "Partner Portal",
+    "subtitle": "Bütçe ve efor girişi",
+    "intro": "🔒 Bu güvenli bağlantı (magic link) aracılığıyla proje başvurusu (Part A) için idari bilgilerinizi ve efor (Kişi/Ay) bütçenizi girebilirsiniz. Toplam bütçeniz Horizon Europe katsayılarına göre otomatik hesaplanacaktır.",
+    "partner_name_label": "Kurum Adı (PIC)",
+    "partner_name_placeholder": "Örn: Siemens AG (999984059)",
+    "effort_label": "Efor (Person-Months / Kişi-Ay)",
+    "effort_placeholder": "Örn: 24",
+    "submit_button": "Bütçeyi Kaydet ve Gönder",
+    "budget_table_title": "Güncel Bütçe Tablosu",
+    "table_partner": "Partner",
+    "table_pm": "PM",
+    "table_grant": "Talep Edilen Hibe",
+    "no_entries": "Henüz giriş yapılmamış.",
+    "footer": "Secured by FonBridge SaaS — Horizon Europe Engine"
   }
 }
