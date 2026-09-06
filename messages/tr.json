@@ -59,7 +59,7 @@
     "tabExport": "Dışa Aktar",
     "averageScore": "Ortalama Puan",
     "descTotalProposals": "Bu dönemdeki aktif fırsatlar",
-    "descHitRate": "Fonlanan veya eşik üstü teklifler",
+    "descHitRate": "G0 puanı alan fırsatlar içinde gönderilen teklif oranı",
     "descAverageScore": "Ortalama değerlendirme puanı (iç ön değerlendirme)",
     "descPersonDays": "Teklif başına toplam efor",
     "descAvgDaysG2": "Ortalama kapı ilerleme süresi",

@@ -59,7 +59,7 @@
     "tabExport": "Export",
     "averageScore": "Average Score",
     "descTotalProposals": "Active opportunities in this period",
-    "descHitRate": "Funded or above-threshold proposals",
+    "descHitRate": "Submitted proposals per G0-scored opportunity",
     "descAverageScore": "Average evaluation score (internal pre-assessment)",
     "descPersonDays": "Total effort per proposal",
     "descAvgDaysG2": "Average gate progression time",

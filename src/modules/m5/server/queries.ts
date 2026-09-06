@@ -18,7 +18,8 @@ export async function getKpiMetrics(
   return withTenant(tenantId, async (tx) => {
     const [
       totalOffers,
-      successCount,
+      submittedProposals,
+      g0ScoredOpportunities,
       totalProposals,
       evaluations,
       efforts,
@@ -33,28 +34,37 @@ export async function getKpiMetrics(
         },
       }),
 
-      // 2. Successful proposals (submitted or above threshold)
+      // 2. Hit rate numerator: proposals actually submitted
       tx.proposal.count({
         where: {
           tenantId,
-          opportunity: {
-            createdAt: { gte: from, lte: to },
-            status: { in: ['FUNDED', 'ABOVE_THRESHOLD'] },
-          },
-        },
-      }),
-
-      // 3. Total proposals for success rate denominator
-      tx.proposal.count({
-        where: {
-          tenantId,
+          submittedAt: { not: null },
           opportunity: {
             createdAt: { gte: from, lte: to },
           },
         },
       }),
 
-      // 4. Average evaluation score (excellence, impact, implementation)
+      // 3. Hit rate denominator: opportunities that cleared G0 scoring
+      tx.opportunity.count({
+        where: {
+          tenantId,
+          g0Score: { not: null },
+          createdAt: { gte: from, lte: to },
+        },
+      }),
+
+      // 4. Total proposals (used for person-days-per-proposal below)
+      tx.proposal.count({
+        where: {
+          tenantId,
+          opportunity: {
+            createdAt: { gte: from, lte: to },
+          },
+        },
+      }),
+
+      // 5. Average evaluation score (excellence, impact, implementation)
       tx.evaluation.findMany({
         where: {
           tenantId,
@@ -67,7 +77,7 @@ export async function getKpiMetrics(
         },
       }) as Promise<Array<{ excellence: number; impact: number; implementation: number }>>,
 
-      // 5. Person-days: sum(hours) / 8
+      // 6. Person-days: sum(hours) / 8
       tx.effort.aggregate({
         where: {
           tenantId,
@@ -78,7 +88,7 @@ export async function getKpiMetrics(
         },
       }),
 
-      // 6. Active modules (on state)
+      // 7. Active modules (on state)
       tx.moduleState.count({
         where: {
           tenantId,
@@ -86,7 +96,7 @@ export async function getKpiMetrics(
         },
       }),
 
-      // 7. G0→G2 timeline: find last gate decisions
+      // 8. G0→G2 timeline: find last gate decisions
       tx.gateDecision.findMany({
         where: {
           tenantId,
@@ -102,9 +112,13 @@ export async function getKpiMetrics(
       }),
     ]);
 
-    // Hit rate: funded / above-threshold proposals over all proposals in range.
+    // Hit rate ("isabet oranı"): submitted proposals over G0-scored opportunities —
+    // how many opportunities that cleared G0 scoring actually became a submission.
+    // Guard the denominator, not totalProposals, since that's what's actually divided by.
     const successRate =
-      totalProposals > 0 ? (successCount / totalProposals) * 100 : 0;
+      g0ScoredOpportunities > 0
+        ? (submittedProposals / g0ScoredOpportunities) * 100
+        : 0;
 
     // Calculate average score: (excellence + impact + implementation) / 3
     let averageScore = 0;
@@ -191,27 +205,26 @@ export async function getKpiTrend(
         },
       });
 
-      const proposalCount = await tx.proposal.count({
+      const submittedCount = await tx.proposal.count({
         where: {
           tenantId,
+          submittedAt: { not: null },
           opportunity: {
             createdAt: { gte: current, lte: intervalEnd },
           },
         },
       });
 
-      const successCount = await tx.proposal.count({
+      const g0ScoredCount = await tx.opportunity.count({
         where: {
           tenantId,
-          opportunity: {
-            createdAt: { gte: current, lte: intervalEnd },
-            status: { in: ['FUNDED', 'ABOVE_THRESHOLD'] },
-          },
+          g0Score: { not: null },
+          createdAt: { gte: current, lte: intervalEnd },
         },
       });
 
       const successRate =
-        proposalCount > 0 ? (successCount / proposalCount) * 100 : 0;
+        g0ScoredCount > 0 ? (submittedCount / g0ScoredCount) * 100 : 0;
 
       const dateStr = current.toISOString().split('T')[0];
 
