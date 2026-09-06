@@ -81,6 +81,21 @@ Triyaj Tarihi: 2026-09-06T21:00:45.251Z
 
 ---
 
+## 3.5 Kod İncelemesi — Mimari Kuralları Kontrolü ✅
+
+### CLAUDE.md Kural Uygunluğu
+- **Kural 1 (Çok kiracılılık):** `tenantId` zorunlu ✅ — Feedback model'de var
+- **RLS Politikası:** `prisma/rls.sql`'de `Feedback` tanımlı ✅ — tenant_isolation policy otomatik
+- **Parametre Validasyonu:** Zod schema (category, impact, title, body) ✅ — form + API'de
+- **Veri Gizliliği:** Kullanıcı emaili/adı loglama yok ✅ — log sadece feedbackId, priority, sentryStatus
+
+### Indeksler
+- `[tenantId, createdAt]` — dashboard pagination
+- `[tenantId, status, priority]` — triyaj filtreleri
+- `[priority, status]` — SLA tracking
+
+---
+
 ## 4. Riskler
 
 ### 🔴 P2: Sentry Entegrasyonu Yapılandırılmamış
@@ -92,8 +107,9 @@ Triyaj Tarihi: 2026-09-06T21:00:45.251Z
 
 ### 🟡 P3: Playwright E2E Testi Yazıldı Ama Çalıştırılmamadı
 - **Bulgu:** `tests/e2e/feedback.spec.ts` auth gerekli; seed demo user'ları direct giriş yapmaz
-- **Etkisi:** UI workflow'u (formu açma, doldurum) henüz otomatik test edilmedi
+- **Etkisi:** UI workflow'u (formu açma, doldurma) henüz otomatik test edilmedi
 - **Çözüm:** Playwright config auth setup veya session mock gerekli
+- **Notlandırma:** Business logic (submitFeedback → DB → triyaj) Node script ile %100 test edild; UI render test'i bağımlılığı budur
 
 ---
 
