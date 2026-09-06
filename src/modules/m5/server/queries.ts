@@ -19,7 +19,7 @@ export async function getKpiMetrics(
     const [
       totalOffers,
       successCount,
-      totalOpportunities,
+      totalProposals,
       evaluations,
       efforts,
       activeModules,
@@ -37,8 +37,8 @@ export async function getKpiMetrics(
       tx.proposal.count({
         where: {
           tenantId,
-          createdAt: { gte: from, lte: to },
           opportunity: {
+            createdAt: { gte: from, lte: to },
             status: { in: ['FUNDED', 'ABOVE_THRESHOLD'] },
           },
         },
@@ -48,7 +48,9 @@ export async function getKpiMetrics(
       tx.proposal.count({
         where: {
           tenantId,
-          createdAt: { gte: from, lte: to },
+          opportunity: {
+            createdAt: { gte: from, lte: to },
+          },
         },
       }),
 
@@ -100,11 +102,9 @@ export async function getKpiMetrics(
       }),
     ]);
 
-    // Calculate success rate
+    // Hit rate: funded / above-threshold proposals over all proposals in range.
     const successRate =
-      totalOpportunities > 0
-        ? (successCount / totalOpportunities) * 100
-        : 0;
+      totalProposals > 0 ? (successCount / totalProposals) * 100 : 0;
 
     // Calculate average score: (excellence + impact + implementation) / 3
     let averageScore = 0;
@@ -117,10 +117,13 @@ export async function getKpiMetrics(
       averageScore = sumScores / evaluations.length;
     }
 
-    // Calculate person-days
-    const personDays = efforts._sum.hours
-      ? Math.round((efforts._sum.hours / 8) * 100) / 100
-      : 0;
+    // Person-days PER PROPOSAL (docs/ROADMAP.md: "kişi-gün/teklif"). Reporting the
+    // raw total here would overstate the effort each proposal costs.
+    const totalPersonDays = (efforts._sum.hours ?? 0) / 8;
+    const personDays =
+      totalProposals > 0
+        ? Math.round((totalPersonDays / totalProposals) * 100) / 100
+        : 0;
 
     // Calculate G0→G2 days (naive: average time between G0 and G2 decisions)
     let g0ToG2Days = 0;
@@ -128,7 +131,7 @@ export async function getKpiMetrics(
       const g0Map = new Map<string, Date>();
       const g2Map = new Map<string, Date>();
 
-      g0ToG2Times.forEach((gd: any) => {
+      g0ToG2Times.forEach((gd: { opportunityId: string; gate: string; decidedAt: Date }) => {
         if (gd.gate === 'G0') {
           g0Map.set(gd.opportunityId, gd.decidedAt);
         } else if (gd.gate === 'G2') {
@@ -191,15 +194,17 @@ export async function getKpiTrend(
       const proposalCount = await tx.proposal.count({
         where: {
           tenantId,
-          createdAt: { gte: current, lte: intervalEnd },
+          opportunity: {
+            createdAt: { gte: current, lte: intervalEnd },
+          },
         },
       });
 
       const successCount = await tx.proposal.count({
         where: {
           tenantId,
-          createdAt: { gte: current, lte: intervalEnd },
           opportunity: {
+            createdAt: { gte: current, lte: intervalEnd },
             status: { in: ['FUNDED', 'ABOVE_THRESHOLD'] },
           },
         },

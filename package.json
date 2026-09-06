@@ -16,7 +16,8 @@
     "rls:check": "tsx scripts/check-rls.ts",
     "i18n:check": "tsx scripts/i18n-check.ts",
     "beta:onboard": "tsx scripts/beta-onboarding.ts",
-    "beta:rollback": "tsx scripts/beta-onboarding.ts --rollback"
+    "beta:rollback": "tsx scripts/beta-onboarding.ts --rollback",
+    "beta:seed-users": "tsx prisma/seed-tenant-workspace.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

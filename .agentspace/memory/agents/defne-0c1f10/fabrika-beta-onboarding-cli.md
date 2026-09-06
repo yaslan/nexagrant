@@ -32,4 +32,19 @@ kaydırır. Doğru yöntem: her tekrar kendi UTC anını `Intl.DateTimeFormat` +
 recurrence'ı DST üzerinden farklı genişletebiliyor. `src/lib/beta/checkin-schedule.ts`
 içindeki `zonedTimeToUtc` bunu kütüphanesiz yapıyor; testi DST kayması üzerine kurulu.
 
-İlgili: [[fabrika-parallel-agent-collisions]], [[fabrika-rls-bypass-role]], [[fabrika-workspace]]
+**İki ayrı mekanizma var, karıştırma (E11.1 tekrarında netleşti):**
+- `scripts/beta-onboarding.ts` → **10 gerçek ortak, 10 ayrı kiracı**, her birinde 1 TENANT_OWNER + davet.
+- `prisma/seed-tenant-workspace.ts` → **tek `fabrika-beta` kiracısında 10 test koltuğu**
+  (alice=PIPELINE_MANAGER, bob=WRITER, kalan 8 MEMBER), `pnpm beta:seed-users [--rollback]`.
+  Bu koltuklar gerçek ortak DEĞİL; ürünü rol bazlı denemek için. `pnpm db:seed` de bunu çağırır.
+
+**Neden `@fabrika.test`, `@fabrika.beta` değil:** `.test` RFC 6761 ile ayrılmış ve
+`isPlaceholderEmail()` onu yer tutucu sayıyor → `--send` kapısı bu adreslere göndermeyi reddediyor.
+`.beta` ayrılmış TLD değil, kapıdan geçerdi. Görev metni `.beta` istese bile `.test`'te kalmak
+bilinçli güvenlik kararı.
+
+**Seeder'da düzeltilen idempotency hatası:** membership `create`'i sabit `seat.id` kullanıyordu;
+kullanıcı başka seeder tarafından farklı id ile yaratılmışsa öksüz membership doğuyordu. Doğrusu
+`user.upsert()`'in döndürdüğü id'ye bağlamak. Aynı tuzak email-unique + id-sabit her upsert çiftinde var.
+
+İlgili: [[agent-exit-129-sighup]], [[fabrika-prisma-client-type-override]], [[fabrika-parallel-agent-collisions]], [[fabrika-rls-bypass-role]], [[fabrika-workspace]]

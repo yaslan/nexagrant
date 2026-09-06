@@ -211,6 +211,18 @@ Every ratio on the dashboard is backed by a record; with no source, the metric s
 | Account or permissions | Admin console → program channel if unresolved | 1 business day |
 | Data or legal | Contact address in the DPA | 5 business days |
 
+### Support addresses
+
+| Purpose | Address |
+|---|---|
+| Support, bugs, account | **support@fabrika.dev** |
+| Product feedback, feature requests | **feedback@fabrika.dev** |
+
+> These addresses come from the `BETA_SUPPORT_EMAIL` / `BETA_FEEDBACK_EMAIL` environment
+> variables ([`src/lib/beta/constants.ts`](../src/lib/beta/constants.ts)), so the invitation
+> email and this guide cannot drift apart. The values above are the defaults when the
+> variables are not set.
+
 ---
 
 ## 9. After the beta
@@ -247,3 +259,33 @@ keeps working. Ask for more credits at the sync.
 
 **Can I work in Turkish?** Yes, the interface is TR/EN and the language switch is at the top right. The
 Turkish version of this guide: [`BETA_GUIDE.md`](./BETA_GUIDE.md).
+
+---
+
+## Appendix C · Beta test accounts (development environment only)
+
+The `fabrika-beta` tenant carries 10 fixed seats so the product can be exercised without real
+partner data. **These are not real design partners** — real partners are provisioned into their
+own tenants by `scripts/beta-onboarding.ts`.
+
+| # | Email | Name | Role |
+|---|---|---|---|
+| 1 | alice@fabrika.test | Alice | PIPELINE_MANAGER |
+| 2 | bob@fabrika.test | Bob | WRITER |
+| 3 | charlie@fabrika.test | Charlie | MEMBER |
+| 4 | dave@fabrika.test | Dave | MEMBER |
+| 5 | eve@fabrika.test | Eve | MEMBER |
+| 6 | frank@fabrika.test | Frank | MEMBER |
+| 7 | grace@fabrika.test | Grace | MEMBER |
+| 8 | heidi@fabrika.test | Heidi | MEMBER |
+| 9 | ivan@fabrika.test | Ivan | MEMBER |
+| 10 | judy@fabrika.test | Judy | MEMBER |
+
+```bash
+pnpm beta:seed-users              # create / converge (idempotent)
+pnpm beta:seed-users --rollback   # delete only these 10 seats (tenant and demo data stay)
+```
+
+> **Why `.test`?** It is reserved by RFC 6761 and can never be delivered. `isPlaceholderEmail()`
+> in `src/lib/beta/roster.ts` treats it as a placeholder, so the onboarding CLI's `--send` gate
+> refuses to mail these seats. `.beta` is **not** a reserved TLD and would pass that gate.

@@ -209,6 +209,17 @@ Panelde gösterilen her oran bir kayda dayanır; kaynak yoksa metrik "veri yok" 
 | Hesap / yetki | Yönetici konsolu → çözülmezse program kanalı | 1 iş günü |
 | Veri / hukuki | DPA'daki iletişim adresi | 5 iş günü |
 
+### Destek adresleri
+
+| Amaç | Adres |
+|---|---|
+| Destek, hata, hesap | **support@fabrika.dev** |
+| Ürün geri bildirimi, özellik isteği | **feedback@fabrika.dev** |
+
+> Bu adresler `BETA_SUPPORT_EMAIL` / `BETA_FEEDBACK_EMAIL` ortam değişkenlerinden okunur
+> ([`src/lib/beta/constants.ts`](../src/lib/beta/constants.ts)); davet e-postası ve bu rehber
+> aynı kaynağı kullanır, ayrışmaz. Ortam değişkeni tanımlı değilse yukarıdaki değerler geçerlidir.
+
 ---
 
 ## 9. Beta sonrası
@@ -245,3 +256,33 @@ devam eder. Beta'da ek kredi talebinizi sync'te iletin.
 
 **İngilizce kullanabilir miyim?** Evet, arayüz TR/EN'dir; sağ üstten dil değiştirilir. Bu rehberin
 İngilizcesi: [`BETA_GUIDE.en.md`](./BETA_GUIDE.en.md).
+
+---
+
+## Ek C · Beta test hesapları (yalnızca geliştirme ortamı)
+
+Ürünü gerçek ortak verisi olmadan denemek için `fabrika-beta` kiracısında 10 sabit koltuk vardır.
+**Bunlar gerçek tasarım ortakları değildir**; gerçek ortaklar `scripts/beta-onboarding.ts` ile
+kendi kiracılarına kurulur.
+
+| # | E-posta | Ad | Rol |
+|---|---|---|---|
+| 1 | alice@fabrika.test | Alice | PIPELINE_MANAGER |
+| 2 | bob@fabrika.test | Bob | WRITER |
+| 3 | charlie@fabrika.test | Charlie | MEMBER |
+| 4 | dave@fabrika.test | Dave | MEMBER |
+| 5 | eve@fabrika.test | Eve | MEMBER |
+| 6 | frank@fabrika.test | Frank | MEMBER |
+| 7 | grace@fabrika.test | Grace | MEMBER |
+| 8 | heidi@fabrika.test | Heidi | MEMBER |
+| 9 | ivan@fabrika.test | Ivan | MEMBER |
+| 10 | judy@fabrika.test | Judy | MEMBER |
+
+```bash
+pnpm beta:seed-users              # oluştur / mevcut duruma yakınsa (idempotent)
+pnpm beta:seed-users --rollback   # yalnız bu 10 koltuğu sil (kiracı ve demo veri kalır)
+```
+
+> **Neden `.test`?** RFC 6761 ile ayrılmış, asla teslim edilemeyen bir TLD. `src/lib/beta/roster.ts`
+> içindeki `isPlaceholderEmail()` bunu yer tutucu sayar, böylece onboarding CLI'ının `--send` kapısı
+> bu adreslere posta göndermeyi reddeder. `.beta` ayrılmış bir TLD **değildir** ve kapıdan geçerdi.
