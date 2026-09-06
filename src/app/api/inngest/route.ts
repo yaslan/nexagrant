@@ -6,6 +6,7 @@ import {
   alertsDaily,
   creditsMonthlyGrant,
   m4WeeklySummary,
+  usersScheduledDeletion,
 } from '@/lib/inngest/jobs';
 
 export const { GET, POST, PUT } = serve({
@@ -16,5 +17,6 @@ export const { GET, POST, PUT } = serve({
     alertsDaily,
     creditsMonthlyGrant,
     m4WeeklySummary,
+    usersScheduledDeletion,
   ],
 });

@@ -1,47 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { NextResponse } from 'next/server';
+import { exportUserData } from '@/actions/user/export-data';
 
-// Mock auth since it's not fully wired in the repo
-async function getAuth() {
-  return { user: { id: 'mock-user-id' } };
-}
+/**
+ * GET /api/gdpr/export — legacy path kept for links published in the privacy
+ * notice. Delegates to the audited export action, which authenticates the real
+ * session and omits OAuth/session secrets from the payload.
+ */
+export async function GET() {
+  const result = await exportUserData();
 
-export async function GET(req: NextRequest) {
-  const session = await getAuth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!result.success || !result.data) {
+    const status = result.error === 'Unauthorized' ? 401 : 500;
+    return NextResponse.json({ error: result.error ?? 'Export failed' }, { status });
   }
 
-  const userId = session.user.id;
+  const filename = `fabrika-data-export-${new Date().toISOString().split('T')[0]}.json`;
 
-  // Gather user data
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      memberships: true,
-      accounts: true,
-    }
-  });
-
-  const efforts = await prisma.effort.findMany({
-    where: { userId }
-  });
-
-  const aiLogs = await prisma.aiUsageLog.findMany({
-    where: { userId }
-  });
-
-  const exportData = {
-    user,
-    efforts,
-    aiLogs,
-    exportedAt: new Date().toISOString()
-  };
-
-  return new NextResponse(JSON.stringify(exportData, null, 2), {
+  return new NextResponse(JSON.stringify(result.data, null, 2), {
+    status: 200,
     headers: {
-      'Content-Type': 'application/json',
-      'Content-Disposition': `attachment; filename="gdpr_export_${userId}.json"`
-    }
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'no-store',
+    },
   });
 }

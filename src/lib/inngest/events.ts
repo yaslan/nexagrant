@@ -94,3 +94,23 @@ export const M4WeeklySummaryOutputSchema = z.object({
 
 export type M4WeeklySummaryInput = z.infer<typeof M4WeeklySummaryEventSchema>;
 export type M4WeeklySummaryOutput = z.infer<typeof M4WeeklySummaryOutputSchema>;
+
+// KVKK/GDPR: Purge accounts whose 30-day erasure grace period has expired
+export const UsersScheduledDeletionEventSchema = z.object({
+  /** Override the grace period for testing; defaults to 30 days */
+  gracePeriodDays: z.number().int().positive().optional(),
+}).partial();
+
+export const UsersScheduledDeletionOutputSchema = z.object({
+  success: z.boolean(),
+  dueCount: z.number(),
+  purgedCount: z.number(),
+  failedCount: z.number(),
+  errors: z.array(z.object({
+    userId: z.string(),
+    message: z.string(),
+  })).optional(),
+});
+
+export type UsersScheduledDeletionInput = z.infer<typeof UsersScheduledDeletionEventSchema>;
+export type UsersScheduledDeletionOutput = z.infer<typeof UsersScheduledDeletionOutputSchema>;

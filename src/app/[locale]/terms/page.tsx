@@ -1,3 +1,36 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
+
+/**
+ * Legal pages get shared publicly, so they carry their own title, description
+ * and Open Graph tags per locale instead of falling back to the app-wide
+ * defaults. Copy lives in messages/{tr,en}.json under `legal.terms`.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'legal.terms' });
+  const title = t('metaTitle');
+  const description = t('metaDescription');
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/${locale}/terms` },
+    openGraph: {
+      title,
+      description,
+      type: 'article',
+      locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
+      url: `/${locale}/terms`,
+    },
+    twitter: { card: 'summary', title, description },
+  };
+}
+
 export default async function TermsPage({
   params
 }: {

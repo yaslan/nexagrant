@@ -10,9 +10,13 @@
   --ink-2: #334155;
   --muted: #64748B;
   --line: #E2E8F0;
-  --accent: #0891B2;
+  --accent: #0369A1;
   --accent-ink: #0369A1;
-  --accent-light: rgba(8, 145, 178, 0.12);
+  --accent-light: rgba(3, 105, 161, 0.12);
+  /* Solid fills that carry white text. --accent alone drops to 3.68:1 against
+     white in dark mode, which fails WCAG AA for body-size text, so buttons use
+     this darker step instead. Light mode is already compliant at 6.4:1. */
+  --accent-strong: #0369A1;
   --amber: #D97706;
   --ok: #059669;
   --bad: #DC2626;
@@ -26,9 +30,10 @@
   --ink-2: #CBD5E1;
   --muted: #94A3B8;
   --line: #1E293B;
-  --accent: #22D3EE;
+  --accent: #0891B2;
   --accent-ink: #67E8F9;
-  --accent-light: rgba(34, 211, 238, 0.15);
+  --accent-light: rgba(8, 145, 178, 0.12);
+  --accent-strong: #0E7490; /* 5.36:1 against white */
   --amber: #FBBF24;
   --ok: #34D399;
   --bad: #F87171;
@@ -45,6 +50,7 @@
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-accent-light: var(--accent-light);
+  --color-accent-strong: var(--accent-strong);
   --color-amber: var(--amber);
   --color-ok: var(--ok);
   --color-bad: var(--bad);

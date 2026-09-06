@@ -278,5 +278,52 @@
     "cta_title": "Hazır mısınız?",
     "cta_subtitle": "Bugün başlayın — ücretsiz deneme deneyin",
     "contact_us": "İletişim"
+  },
+  "settings": {
+    "privacy": {
+      "title": "Gizlilik ve Verilerim",
+      "breadcrumbHome": "Panel",
+      "intro": "KVKK 11. madde ve GDPR kapsamındaki haklarınızı buradan kullanabilirsiniz.",
+      "statusHeading": "Hesap Durumu",
+      "statusActive": "Aktif",
+      "statusPending": "Silinme bekleniyor (30 gün) — kalıcı silme tarihi: {date}",
+      "cancelDeletion": "Silme Talebini İptal Et",
+      "cancelledOk": "Silme talebi iptal edildi.",
+      "cancelFailed": "İptal başarısız",
+      "exportHeading": "Verilerimi İndir",
+      "exportDescription": "Hesabınıza ait tüm kayıtları JSON biçiminde indirin. Kimlik doğrulama anahtarları (OAuth ve oturum jetonları) güvenlik gereği dosyaya dahil edilmez.",
+      "exportButton": "Verilerimi İndir",
+      "exportPreparing": "Hazırlanıyor…",
+      "exportOk": "Veri dosyanız indirildi.",
+      "exportFailed": "Dışa aktarma başarısız",
+      "deleteHeading": "Hesabı Sil",
+      "deleteDescription": "Talebiniz hesabınızı hemen erişime kapatır ve 30 gün sonra kalıcı olarak siler. Bu süre içinde talebi iptal edebilirsiniz.",
+      "deleteButton": "Hesabı Sil İsteği",
+      "deleteRequestedOk": "Silme talebiniz alındı. 30 gün içinde iptal edebilirsiniz.",
+      "deleteFailed": "Talep başarısız",
+      "confirmTitle": "Hesabınızı silmek istiyor musunuz?",
+      "confirmBody": "Hesabınız hemen erişime kapatılacak ve 30 gün sonra tüm verileriniz kalıcı olarak silinecektir. Bu süre içinde giriş yapıp talebi iptal edebilirsiniz.",
+      "confirmCancel": "Vazgeç",
+      "confirmAccept": "Evet, Sil",
+      "confirmSubmitting": "Gönderiliyor…",
+      "legalHeading": "Yasal Belgeler",
+      "legalPrivacy": "Gizlilik Politikası ve KVKK Aydınlatma Metni",
+      "legalTerms": "Kullanım Koşulları",
+      "legalDpa": "Veri İşleme Sözleşmesi (DPA)"
+    }
+  },
+  "legal": {
+    "privacy": {
+      "metaTitle": "Gizlilik Politikası ve KVKK Aydınlatma Metni — Fabrika",
+      "metaDescription": "Fabrika'nın KVKK ve GDPR uyumlu gizlilik politikası: işlenen veriler, işleme amaçları, saklama süreleri ve veri sahibi hakları."
+    },
+    "terms": {
+      "metaTitle": "Kullanım Koşulları ve Hizmet Sözleşmesi — Fabrika",
+      "metaDescription": "Fabrika hizmetinin kapsamı, yapay zeka çıktılarına ilişkin sorumluluk reddi, abonelik ve kredi koşulları."
+    },
+    "dpa": {
+      "metaTitle": "Veri İşleme Sözleşmesi (DPA) — Fabrika",
+      "metaDescription": "Fabrika ile kurumsal müşteriler arasındaki KVKK/GDPR uyumlu veri işleme sözleşmesi."
+    }
   }
 }

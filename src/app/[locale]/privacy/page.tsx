@@ -1,3 +1,36 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
+
+/**
+ * Legal pages get shared publicly, so they carry their own title, description
+ * and Open Graph tags per locale instead of falling back to the app-wide
+ * defaults. Copy lives in messages/{tr,en}.json under `legal.privacy`.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'legal.privacy' });
+  const title = t('metaTitle');
+  const description = t('metaDescription');
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/${locale}/privacy` },
+    openGraph: {
+      title,
+      description,
+      type: 'article',
+      locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
+      url: `/${locale}/privacy`,
+    },
+    twitter: { card: 'summary', title, description },
+  };
+}
+
 export default async function PrivacyPage({
   params
 }: {
@@ -41,8 +74,8 @@ export default async function PrivacyPage({
           </h2>
           <p>
             {isTr
-              ? 'KVKK 11. maddesi ve GDPR uyarınca verilerinizi dilediğiniz an sistemden JSON formatında dışa aktarabilir (/api/gdpr/export) veya hesabınızı ve tüm yüklenmiş belgelerinizi kalıcı olarak silebilirsiniz (/api/gdpr/delete).'
-              : 'Under GDPR and relevant data protection legislation, you may export your complete data profile at any time in JSON format (/api/gdpr/export) or request immediate, permanent deletion of your account and files (/api/gdpr/delete).'}
+              ? 'KVKK 11. maddesi ve GDPR uyarınca verilerinizi dilediğiniz an “Ayarlar → Gizlilik ve Verilerim” ekranından JSON biçiminde dışa aktarabilirsiniz. Aynı ekrandan hesabınızın silinmesini talep edebilirsiniz: hesabınız derhal erişime kapatılır ve 30 gün sonra tüm verileriniz ile yüklediğiniz belgeler kalıcı olarak silinir. Bu 30 günlük süre içinde talebinizi iptal edebilirsiniz. Güvenlik gereği dışa aktarım dosyasına kimlik doğrulama anahtarları (OAuth ve oturum jetonları) dahil edilmez.'
+              : 'Under GDPR and applicable data protection law, you can export your data as JSON at any time from “Settings → Privacy & My Data”. From the same screen you can request deletion of your account: it is closed immediately and all of your data and uploaded files are permanently deleted after 30 days. You may cancel the request within that 30-day window. For security, authentication secrets (OAuth and session tokens) are excluded from the export file.'}
           </p>
         </section>
 

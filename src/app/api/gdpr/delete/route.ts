@@ -1,36 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { deleteUserFilesFromR2 } from '@/lib/storage';
+import { NextResponse } from 'next/server';
+import { requestAccountDeletion } from '@/actions/user/request-deletion';
 
-async function getAuth() {
-  return { user: { id: 'mock-user-id' } };
-}
+/**
+ * DELETE /api/gdpr/delete — legacy path kept for links published in the privacy
+ * notice. It now starts the 30-day erasure grace period instead of destroying
+ * the account immediately: the previous implementation ran an unauthenticated
+ * hard delete, which was both unrecoverable and open to anyone who called it.
+ * The irreversible purge happens in the `users-scheduled-deletion` job.
+ */
+export async function DELETE() {
+  const result = await requestAccountDeletion();
 
-export async function DELETE(req: NextRequest) {
-  const session = await getAuth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!result.success) {
+    const status = result.error === 'Unauthorized' ? 401 : 500;
+    return NextResponse.json({ error: result.error ?? 'Request failed' }, { status });
   }
 
-  const userId = session.user.id;
-
-  try {
-    // 1. Hard delete user, which cascades to accounts, sessions, memberships
-    await prisma.user.delete({
-      where: { id: userId }
-    });
-    
-    // 2. Clean up other relations
-    await prisma.effort.deleteMany({ where: { userId } });
-    await prisma.aiUsageLog.updateMany({ where: { userId }, data: { userId: null } });
-
-    // 3. Clean up physical files from R2 Storage
-    // Intentionally not awaiting in the critical path to respond faster, 
-    // or we can await it if we want strict consistency. We will await it.
-    await deleteUserFilesFromR2(userId);
-
-    return NextResponse.json({ success: true, message: 'Account deleted successfully' });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  return NextResponse.json(
+    {
+      success: true,
+      status: result.status,
+      deletedAt: result.deletedAt,
+      ...(result.soleOwnerOf ? { soleOwnerOf: result.soleOwnerOf } : {}),
+    },
+    { status: 200, headers: { 'Cache-Control': 'no-store' } }
+  );
 }

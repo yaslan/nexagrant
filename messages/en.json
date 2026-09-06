@@ -278,5 +278,52 @@
     "cta_title": "Ready to get started?",
     "cta_subtitle": "Start today — try free for 14 days",
     "contact_us": "Contact Us"
+  },
+  "settings": {
+    "privacy": {
+      "title": "Privacy & My Data",
+      "breadcrumbHome": "Dashboard",
+      "intro": "Exercise your rights under GDPR and Turkish data protection law (KVKK art. 11) here.",
+      "statusHeading": "Account Status",
+      "statusActive": "Active",
+      "statusPending": "Deletion pending (30 days) — permanent deletion on {date}",
+      "cancelDeletion": "Cancel Deletion Request",
+      "cancelledOk": "Deletion request cancelled.",
+      "cancelFailed": "Cancel failed",
+      "exportHeading": "Export My Data",
+      "exportDescription": "Download every record tied to your account as JSON. Authentication secrets (OAuth and session tokens) are excluded for security.",
+      "exportButton": "Export My Data",
+      "exportPreparing": "Preparing…",
+      "exportOk": "Your data file has been downloaded.",
+      "exportFailed": "Export failed",
+      "deleteHeading": "Delete Account",
+      "deleteDescription": "Your request closes the account immediately and permanently deletes it after 30 days. You can cancel within that window.",
+      "deleteButton": "Request Account Deletion",
+      "deleteRequestedOk": "Deletion requested. You can cancel within 30 days.",
+      "deleteFailed": "Request failed",
+      "confirmTitle": "Delete your account?",
+      "confirmBody": "Your account will be closed immediately and all data permanently deleted after 30 days. You can sign in and cancel during that period.",
+      "confirmCancel": "Cancel",
+      "confirmAccept": "Yes, Delete",
+      "confirmSubmitting": "Submitting…",
+      "legalHeading": "Legal Documents",
+      "legalPrivacy": "Privacy Policy & GDPR Disclosure",
+      "legalTerms": "Terms of Service",
+      "legalDpa": "Data Processing Agreement (DPA)"
+    }
+  },
+  "legal": {
+    "privacy": {
+      "metaTitle": "Privacy Policy & GDPR Disclosure — Fabrika",
+      "metaDescription": "Fabrika's GDPR and KVKK compliant privacy policy: what we process, why, how long we keep it, and the rights you can exercise."
+    },
+    "terms": {
+      "metaTitle": "Terms of Service — Fabrika",
+      "metaDescription": "Scope of the Fabrika service, the disclaimer covering AI-generated output, and the subscription and credit terms."
+    },
+    "dpa": {
+      "metaTitle": "Data Processing Agreement (DPA) — Fabrika",
+      "metaDescription": "The GDPR-compliant data processing agreement between Fabrika and its customers."
+    }
   }
 }

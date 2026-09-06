@@ -1,0 +1,189 @@
+'use server';
+
+import { Resend } from 'resend';
+import { prisma } from '@/lib/db';
+import { auth } from '@/lib/auth';
+import { env } from '@/lib/env';
+
+/**
+ * KVKK md.7 & md.11 / GDPR art.17 — right to erasure.
+ *
+ * A deletion request marks the account soft-deleted and starts a 30-day grace
+ * period. Nothing is destroyed here: memberships and owned rows stay intact so
+ * the subject can cancel within the window. The scheduled purge job
+ * (`usersScheduledDeletion`) performs the irreversible delete once the window
+ * closes.
+ */
+
+// Not exported: a "use server" module may only export async functions.
+const DELETION_GRACE_PERIOD_DAYS = 30;
+
+export interface DeletionRequestResult {
+  success: boolean;
+  /** 'pending' once the grace period has started */
+  status?: 'pending';
+  /** ISO-8601 timestamp of the scheduled permanent deletion */
+  deletedAt?: string;
+  /** Set when the subject is the only owner of a tenant that will be left without one */
+  soleOwnerOf?: string[];
+  error?: string;
+}
+
+let resendClient: Resend | null = null;
+function getResend(): Resend | null {
+  if (!resendClient && env.RESEND_API_KEY) {
+    resendClient = new Resend(env.RESEND_API_KEY);
+  }
+  return resendClient;
+}
+
+export async function requestAccountDeletion(): Promise<DeletionRequestResult> {
+  try {
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        locale: true,
+        deletionRequestedAt: true,
+        memberships: { select: { tenantId: true, role: true } },
+      },
+    });
+
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    if (user.deletionRequestedAt) {
+      // Idempotent: an existing request keeps its original deadline.
+      return {
+        success: true,
+        status: 'pending',
+        deletedAt: addDays(user.deletionRequestedAt, DELETION_GRACE_PERIOD_DAYS).toISOString(),
+      };
+    }
+
+    // Warn (do not block) when the subject is the last owner of a tenant.
+    const soleOwnerOf: string[] = [];
+    for (const membership of user.memberships) {
+      if (membership.role !== 'TENANT_OWNER') continue;
+      const otherOwners = await prisma.membership.count({
+        where: {
+          tenantId: membership.tenantId,
+          role: 'TENANT_OWNER',
+          userId: { not: userId },
+        },
+      });
+      if (otherOwners === 0) soleOwnerOf.push(membership.tenantId);
+    }
+
+    const requestedAt = new Date();
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        deletionRequestedAt: requestedAt,
+        deletedAt: requestedAt,
+        deletionReason: 'subject_request',
+      },
+    });
+
+    const purgeAt = addDays(requestedAt, DELETION_GRACE_PERIOD_DAYS);
+
+    await notifySubject(user.email, user.locale, purgeAt);
+
+    const result: DeletionRequestResult = {
+      success: true,
+      status: 'pending',
+      deletedAt: purgeAt.toISOString(),
+    };
+    if (soleOwnerOf.length > 0) result.soleOwnerOf = soleOwnerOf;
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to request deletion';
+    console.error('[request-deletion]', message);
+    return { success: false, error: message };
+  }
+}
+
+/** Cancels a pending deletion during the grace period and restores the account. */
+export async function cancelAccountDeletion(): Promise<DeletionRequestResult> {
+  try {
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { deletionRequestedAt: null, deletedAt: null, deletionReason: null },
+    });
+
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to cancel deletion';
+    console.error('[cancel-deletion]', message);
+    return { success: false, error: message };
+  }
+}
+
+/** Reads the current erasure state for the signed-in subject. */
+export async function getDeletionStatus(): Promise<{
+  pending: boolean;
+  requestedAt?: string;
+  purgeAt?: string;
+}> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { pending: false };
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { deletionRequestedAt: true },
+  });
+
+  if (!user?.deletionRequestedAt) return { pending: false };
+
+  return {
+    pending: true,
+    requestedAt: user.deletionRequestedAt.toISOString(),
+    purgeAt: addDays(user.deletionRequestedAt, DELETION_GRACE_PERIOD_DAYS).toISOString(),
+  };
+}
+
+function addDays(from: Date, days: number): Date {
+  const result = new Date(from);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
+
+/** Best-effort confirmation email; delivery failure must not fail the request. */
+async function notifySubject(email: string, locale: string, purgeAt: Date): Promise<void> {
+  const client = getResend();
+  if (!client || !env.RESEND_API_KEY) return;
+
+  const isTr = locale === 'tr';
+  const formatted = purgeAt.toISOString().split('T')[0];
+
+  try {
+    await client.emails.send({
+      from: 'Fabrika <noreply@fabrika.app>',
+      to: email,
+      subject: isTr ? 'Hesap silme talebiniz alındı' : 'Your account deletion request',
+      text: isTr
+        ? `Hesabınız ${formatted} tarihinde kalıcı olarak silinecektir. Bu tarihe kadar giriş yapıp talebi iptal edebilirsiniz.`
+        : `Your account will be permanently deleted on ${formatted}. You can sign in and cancel the request until then.`,
+    });
+  } catch (error) {
+    console.warn('[request-deletion] notification email failed:', error);
+  }
+}

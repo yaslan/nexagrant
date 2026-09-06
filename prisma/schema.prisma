@@ -27,6 +27,8 @@ model Tenant {
   settings      Json     @default("{}") // scoringWeights, gateRules, aiRegion...
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String?
 
   users         Membership[]
   workspaces    Workspace[]
@@ -37,6 +39,7 @@ model Tenant {
   auditEvents   AuditEvent[]
   invitations   Invitation[]
   approvalRequests ApprovalRequest[]
+  @@index([deletedAt])
 }
 
 enum OrgType {
@@ -59,6 +62,10 @@ model User {
   name          String?
   locale        String   @default("tr")
   isPlatformAdmin Boolean @default(false)
+  // KVKK md.7/md.11 · GDPR art.17 — erasure grace period. See prisma/migrations/add-soft-delete.sql
+  deletionRequestedAt DateTime?  // set when the subject asks for erasure; purge job scans this
+  deletedAt     DateTime?        // soft-delete marker: hidden from the product, still restorable
+  deletionReason String?         // subject_request | policy | tenant_cascade
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   memberships   Membership[]
@@ -68,6 +75,8 @@ model User {
   reviewerSeats Reviewer[]
   requestedApprovals ApprovalRequest[] @relation("Requester")
   approvedApprovals  ApprovalRequest[] @relation("Approver")
+  @@index([deletionRequestedAt])
+  @@index([deletedAt])
 }
 
 model Account {
@@ -136,9 +145,12 @@ model Workspace {
   name      String   // e.g. client name for consultancies
   slug      String
   createdAt DateTime @default(now())
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String?
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   opportunities Opportunity[]
   @@unique([tenantId, slug])
+  @@index([deletedAt])
 }
 
 model TenantProfile {
@@ -553,6 +565,8 @@ model Opportunity {
   notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String?
   workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   proposal     Proposal?
   gateDecisions GateDecision[]
@@ -562,6 +576,7 @@ model Opportunity {
   followupDocs FollowupDoc[]
   applicationParts ApplicationPart[]
   evaluations Evaluation[]
+  @@index([deletedAt])
 }
 
 enum Gate {
@@ -590,8 +605,11 @@ model GateDecision {
   ruleVersion   String
   decidedBy     String
   decidedAt     DateTime @default(now())
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String?
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   @@index([tenantId, opportunityId])
+  @@index([deletedAt])
 }
 
 model ConsortiumSeat {
@@ -638,8 +656,11 @@ model Proposal {
   esrScores     Json?    // {excellence, impact, implementation, total, threshold}
   esrFileUrl    String?
   outcome       String?  // funded | reserve | above_threshold | below
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String?
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   evaluations   Evaluation[]
+  @@index([deletedAt])
 }
 
 model Effort {
@@ -650,8 +671,11 @@ model Effort {
   date          DateTime
   hours         Float
   note          String?
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String?
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   @@index([tenantId, opportunityId])
+  @@index([deletedAt])
 }
 
 // ───────────────────────── M3 Evidence Pack ─────────────────────────

@@ -77,10 +77,41 @@ pnpm test:e2e -- tests/e2e/rls.spec.ts
 ## 3. Veri koruma (KVKK + GDPR)
 - Veri envanteri (`docs/data-inventory.md` üretilecek): kişisel veri = kullanıcı hesabı, muhatap adı/e-postası (`Relationship`), toplantı notları.
 - Hukuki dayanak: sözleşme (hesap), meşru menfaat (muhatap iletişim bilgisi — kullanıcı girer; "kaynak" alanı zorunlu).
-- Haklar: dışa aktarma (`/settings/privacy/export` JSON), silme (kiracı sahibi → 30 gün sonra cascade; `AuditEvent` anonim), muhatap silme isteği formu (herkese açık).
+- Haklar: dışa aktarma (`/{locale}/{workspace}/settings/privacy` → `POST /api/user/export`, JSON), silme (aynı ekran → `POST /api/user/request-deletion`; 30 gün sonra kalıcı imha), muhatap silme isteği formu (herkese açık).
 - İşleyici sözleşmesi (DPA) şablonu tr/en; alt işleyiciler listesi: Vercel, Neon/Supabase, Fly.io, Cloudflare R2, Resend, Stripe, Anthropic/OpenAI, PostHog, Sentry.
 - Veri yeri: AB bölgesi (Frankfurt) varsayılan; Türkiye için KVKK yurt dışı aktarım — açık rıza + standart sözleşme; kurumsal müşteriye "AB bölgesi model" seçeneği.
 - Çerez onayı; analitik yalnızca onayla.
+
+### 3.1 Veri kategorileri ve hukuki dayanak (uygulanan)
+
+| Kategori | Alanlar | Veri sahibi | KVKK dayanağı | Saklama |
+|---|---|---|---|---|
+| Kimlik ve iletişim | `User.name`, `User.email`, `User.locale` | Platform kullanıcısı | md.5/2-c (sözleşmenin ifası) | Hesap ömrü + 30 gün |
+| Üyelik ve yetki | `Membership.role`, `workspaceIds` | Platform kullanıcısı | md.5/2-c | Hesap ömrü + 30 gün |
+| Kimlik doğrulama | `Account`, `Session` (jetonlar) | Platform kullanıcısı | md.5/2-c | Oturum ömrü; **dışa aktarıma dahil edilmez** |
+| Çalışma kaydı | `Effort.hours`, `date`, `note` | Platform kullanıcısı | md.5/2-f (meşru menfaat) | Hesap ömrü + 30 gün |
+| Değerlendirme | `Evaluation` (puanlar) | Platform kullanıcısı | md.5/2-f | Kalıcı; silmede `userId` NULL |
+| YZ kullanım günlüğü | `AiUsageLog` (model, jeton, kredi) | Platform kullanıcısı | md.5/2-f + şeffaflık beyanı | Kalıcı; silmede `userId` NULL |
+| Onay akışı | `ApprovalRequest` | Platform kullanıcısı | md.5/2-ç (hukuki yükümlülük) | Talep eden silinince cascade; onaylayan NULL |
+| Faturalama | `Subscription`, `AddOn`, `CreditLedger` | Kiracı (tüzel kişi) | md.5/2-ç | Yasal saklama süresi |
+
+### 3.2 Silme akışı (uygulanan)
+
+1. Kullanıcı `Ayarlar → Gizlilik ve Verilerim → Hesabı Sil İsteği` ile talepte bulunur (onay modalı zorunlu).
+2. `requestAccountDeletion` yalnızca **işaretler**: `User.deletionRequestedAt` ve `User.deletedAt` = şimdi. Hiçbir satır silinmez; üyelikler durur, böylece talep geri alınabilir.
+3. Kullanıcıya bilgilendirme e-postası gider (Resend; gönderim hatası talebi bloke etmez).
+4. Kullanıcı 30 gün içinde aynı ekrandan `cancelAccountDeletion` ile dönebilir.
+5. `users-scheduled-deletion` Inngest işi her gün 03:00 UTC'de süresi dolanları kalıcı siler. Sıra: R2 dosyaları → `AiUsageLog.userId = NULL` → `Effort` sil → `User` sil (cascade: `Account`, `Session`, `Membership`, talep edilen `ApprovalRequest`).
+
+Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete yapmaz.
+
+### 3.3 Dışa aktarım kapsamı (uygulanan)
+
+`exportUserData` çıktısı: `{ timestamp, tenant, tables }`. `tables` yalnızca **talep eden kişiye ait** satırları içerir (`userId` filtresi); kiracının tamamı değil. `Account` satırlarından yalnızca `provider`, `type`, `createdAt` alınır — `access_token`, `refresh_token`, `id_token` taşınabilirlik kapsamında değildir ve indirilen dosyaya yazılması sır sızıntısı olur.
+
+### 3.4 DPA süreci
+
+Şablonlar `docs/legal/dpa-tr.md` ve `docs/legal/dpa-en.md` dosyalarındadır; `/{locale}/compliance/dpa` sayfası bu dosyaları okuyup yayımlar (metin kodda gömülü değildir). Sürüm ve yürürlük tarihi belgenin başındadır; alt işleyen değişikliği önceden bildirilir, ihlal bildirimi 72 saat içindedir.
 
 ## 4. YZ kullanımı
 - Komisyon kuralı: üretken YZ kullanılabilir; başvuran sorumlu; hangi araçların nasıl kullanıldığı şeffaf; kaynaklar listelenir. → `AiUsageLog` + otomatik beyan (`/ai/disclosure`).
