@@ -8,3 +8,7 @@
 - [fabrika-parallel-agent-collisions](fabrika-parallel-agent-collisions.md) — Fabrika'da paralel ajanlar aynı görev id'sine atanabiliyor ve aynı dosyayı/DB'yi eziyor — işe başlamadan ve bitirmeden önce git log kontrolü
 - [fabrika-rls-bypass-role](fabrika-rls-bypass-role.md) — Fabrika yerel DB'sinde RLS etkisiz — uygulama superuser+BYPASSRLS rolüyle bağlanıyor, 39 politika atlanıyor
 - [e10-marketing-learnings](e10-marketing-learnings.md) — E10 Marketing Site — Topic.destination seed pattern, (marketing) group routing, i18n key structure, Lighthouse targets
+
+- [fabrika-feedback-triage-e11](fabrika-feedback-triage-e11.md) — E11.2 beta geri bildirim sistemi — öncelik kuralları nerede, SLA sayıları rehberle bağlı, autoPriority neden korunuyor
+
+- [e11-2-feedback-form-learnings](e11-2-feedback-form-learnings.md) — Sentry integration, seed patterns, and i18n practices from E11.2 feedback form

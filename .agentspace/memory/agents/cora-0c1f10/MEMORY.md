@@ -14,3 +14,5 @@
 - [labelled-dataset-without-new-tables](labelled-dataset-without-new-tables.md) — Etiketli bir değerlendirme/kalibrasyon veri seti için yeni tablo açma — Opportunity + Proposal.outcome + GateDecision.inputs zinciri zaten tahmin/gerçek/özellik taşıyor
 
 - [m6-evaluator-scoring-model](m6-evaluator-scoring-model.md) — M6 scoring: 4 criteria (1–5 scale), 70% consensus, ESR normalization (0–15 → 1–5)
+- [m6-withTenant-pattern](m6-withTenant-pattern.md) — withTenant() callback pattern + DB transaction compat — type union for Prisma client/tx contexts
+- [fabrika-no-shadcn](fabrika-no-shadcn.md) — Fabrika lacks shadcn/ui — use native HTML + Tailwind for UI components
