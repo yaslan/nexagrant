@@ -401,5 +401,19 @@
     "statusWONT_FIX": "Yapılmayacak",
     "noteLabel": "Triyaj notu",
     "notePlaceholder": "Kararın gerekçesi"
+  },
+  "m6": {
+    "form": {
+      "title": "Değerlendirici Paneli Puanlaması",
+      "submit": "Puanları Gönder",
+      "close": "Kapat"
+    },
+    "dashboard": {
+      "title": "Panel Değerlendirmesi Panosu",
+      "proposalId": "Teklif",
+      "panelScore": "Panel Puanı",
+      "esrScore": "ESR Puanı",
+      "delta": "Fark"
+    }
   }
 }

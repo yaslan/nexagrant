@@ -401,5 +401,19 @@
     "statusWONT_FIX": "Won't fix",
     "noteLabel": "Triage note",
     "notePlaceholder": "Why this call was made"
+  },
+  "m6": {
+    "form": {
+      "title": "Evaluator Panel Scoring",
+      "submit": "Submit Scores",
+      "close": "Close"
+    },
+    "dashboard": {
+      "title": "Panel Evaluation Dashboard",
+      "proposalId": "Proposal",
+      "panelScore": "Panel Score",
+      "esrScore": "ESR Score",
+      "delta": "Difference"
+    }
   }
 }

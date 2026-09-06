@@ -1,8 +1,9 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
 import { generateText } from '@/lib/ai/llm';
 import { revalidatePath } from 'next/cache';
+import { updateEvaluationScore } from './scoring';
 
 export async function generateAiEvaluation(opportunityId: string, tenantId: string, userId: string) {
   const prompt = `Perform a rigorous EU Horizon Europe expert evaluation for opportunity ${opportunityId} based on official REA criteria:
@@ -29,7 +30,7 @@ export async function generateAiEvaluation(opportunityId: string, tenantId: stri
     ]
   }`;
 
-  let parsed = {
+  const parsed = {
     excellence: 4.2,
     impact: 4.0,
     implementation: 3.8,
@@ -165,4 +166,57 @@ export async function calibrateESR(evaluationId: string, actualScore: number) {
   } catch (e) {}
 
   return { calibration };
+}
+
+export async function saveEvaluation(data: {
+  tenantId: string;
+  evaluationId: string;
+  proposalId: string;
+  scores: Record<string, number>;
+}) {
+  try {
+    await withTenant(data.tenantId, async (tx) => {
+      const evaluation = await tx.evaluation.findUnique({
+        where: { id: data.evaluationId },
+        include: { reviewers: true, criteria: true },
+      });
+
+      if (!evaluation) throw new Error('Evaluation not found');
+
+      for (const [criterionName, score] of Object.entries(data.scores)) {
+        const criterion = evaluation.criteria.find((c: typeof evaluation.criteria[0]) => c.name === criterionName);
+        if (!criterion) continue;
+
+        const firstReviewer = evaluation.reviewers[0];
+        if (!firstReviewer) continue;
+
+        await tx.score.upsert({
+          where: {
+            reviewerId_criterionId: {
+              reviewerId: firstReviewer.id,
+              criterionId: criterion.id,
+            },
+          },
+          create: {
+            tenantId: data.tenantId,
+            reviewerId: firstReviewer.id,
+            criterionId: criterion.id,
+            score: Math.round(score),
+            submittedAt: new Date(),
+          },
+          update: {
+            score: Math.round(score),
+            submittedAt: new Date(),
+          },
+        });
+      }
+
+      await updateEvaluationScore(tx, data.evaluationId, data.tenantId);
+    });
+
+    revalidatePath('/[workspace]/proposals/[id]', 'page');
+  } catch (err) {
+    console.warn('[saveEvaluation] DB error:', err);
+    throw err;
+  }
 }

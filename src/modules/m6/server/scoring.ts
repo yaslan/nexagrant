@@ -239,7 +239,7 @@ export async function getPanelScoresForProposal(
  * Called after a reviewer submits their scores.
  */
 export async function updateEvaluationScore(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>,
   evaluationId: string,
   tenantId: string,
 ): Promise<void> {
