@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# beta onboarding (E11.1) — rendered invitations carry live invitation tokens,
+# which grant TENANT_OWNER access; the real roster carries partner PII.
+# Both stay out of the repository.
+docs/BETA_DATA/generated/
+docs/BETA_DATA/beta-partners.local.csv

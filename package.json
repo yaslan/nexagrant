@@ -14,7 +14,9 @@
     "db:rls": "psql -f prisma/rls.sql",
     "db:seed": "tsx prisma/seed.ts",
     "rls:check": "tsx scripts/check-rls.ts",
-    "i18n:check": "tsx scripts/i18n-check.ts"
+    "i18n:check": "tsx scripts/i18n-check.ts",
+    "beta:onboard": "tsx scripts/beta-onboarding.ts",
+    "beta:rollback": "tsx scripts/beta-onboarding.ts --rollback"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
