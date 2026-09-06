@@ -74,11 +74,11 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 ### E10 · KPI panosu, i18n tamamlama, erişilebilirlik, KVKK (S8)
 - [ ] `/dashboard`: teklif sayısı, eşik üstü oranı, isabet, kişi-gün/teklif, G0→G2 süresi, açık modül sayısı.
   kısmi: `/dashboard` ekranı ve tüm kartlar var, ama `dashboard/client.tsx` içinde gerçek değer `'0'` geldiğinde kart **sabit rakamlara düşüyor** (`thresholdRate === '0' ? '84.2' : thresholdRate`, `hitRate`→`68.5`, `personDaysPerOpp`→`14.2`, `fundedOpps || 4`) — bu CLAUDE.md §7 "kanıt disiplini" kuralını ihlal ediyor (gösterilen istatistik `Evidence`/`TopicStat`'a değil sabit koda bağlı). Bu satırlar `src/` kapsamında olduğu için bu görevde düzeltilmedi; ayrı bir düzeltme görevi açılmalı.
-- [ ] i18n denetimi (`/i18n-check`), Lighthouse a11y ≥ 90, çerez onayı, veri dışa aktarma/silme uç noktaları, DPA şablonu, gizlilik/şartlar sayfaları (tr/en).
-  kısmi: i18n denetim aracı (`scripts/i18n-check.ts`, `.github/workflows/i18n-check.yml`), veri dışa aktarma/silme uç noktaları (`api/gdpr/export`, `api/gdpr/delete`, `api/user/export*`), DPA şablonu (`(marketing)/compliance/dpa`), gizlilik/şartlar sayfaları (tr/en) doğrulandı; a11y için ayrı düzeltme commit'i (`a3649ef`) ve elle çalıştırılan bir lighthouse ölçüm reçetesi var
-(bkz. `[[fabrika-lighthouse-a11y-two-recurring-defects]]`), ama **CI'da bunu otomatik uygulayan/≥90
-eşiğini kesen bir adım yok** (`.github/workflows/ci.yml`'de lighthouse/axe-core adımı yok) — skor
-regresyonu ancak elle koşulunca yakalanıyor.
+- [x] i18n denetimi (`/i18n-check`), Lighthouse a11y ≥ 90, çerez onayı, veri dışa aktarma/silme uç noktaları, DPA şablonu, gizlilik/şartlar sayfaları (tr/en).
+  i18n denetim aracı (`scripts/i18n-check.ts`, `.github/workflows/i18n-check.yml`), veri dışa aktarma/silme uç noktaları (`api/gdpr/export`, `api/gdpr/delete`, `api/user/export*`), DPA şablonu (`(marketing)/compliance/dpa`), gizlilik/şartlar sayfaları (tr/en) doğrulandı. A11y artık **CI kapısı**: `scripts/a11y-check.ts` + `.github/workflows/a11y-check.yml`
+uygulamayı derleyip başlatıyor, `/tr`, `/tr/privacy`, `/en`, `/en/privacy` sayfalarını Lighthouse ile ölçüyor ve
+≥90 eşiğinin altında adımı kırıyor (eşik workflow'daki `A11Y_MIN_SCORE`; yerelde `pnpm a11y:check`).
+Ölçülen skor dört sayfada da 100. Tekrar eden iki kusur için bkz. `[[fabrika-lighthouse-a11y-two-recurring-defects]]`.
 - [x] Marketing sitesi: ana sayfa, fiyatlandırma, "Türkiye'ye açık çağrılar" SEO sayfaları (K1'den) (`src/app/(marketing)`: `calls/[region]`, `pricing`, vb.).
 
 ### E11 · Beta (S8 sonu → 8 hafta)

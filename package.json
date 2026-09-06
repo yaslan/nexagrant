@@ -26,7 +26,8 @@
     "feedback:digest": "tsx scripts/run-feedback-digest.ts",
     "beta:pricing": "tsx scripts/beta-pricing-survey.ts",
     "beta:esr-calibration": "tsx scripts/esr-calibration.ts",
-    "beta:esr-calibration:rollback": "tsx scripts/esr-calibration.ts --rollback"
+    "beta:esr-calibration:rollback": "tsx scripts/esr-calibration.ts --rollback",
+    "a11y:check": "tsx scripts/a11y-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
@@ -76,10 +77,12 @@
     "@types/react-dom": "^19",
     "@types/unzipper": "^0.10.11",
     "@types/uuid": "^11.0.0",
+    "chrome-launcher": "^1.2.1",
     "csstype": "^3.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "jsdom": "^30.0.1",
+    "lighthouse": "^13.4.1",
     "prisma": "7.10.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
