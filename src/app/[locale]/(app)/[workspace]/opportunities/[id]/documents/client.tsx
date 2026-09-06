@@ -34,16 +34,12 @@ interface DocItem {
 
 interface DocumentsClientProps {
   opportunityId: string;
-  tenantId: string;
-  userId: string;
   opportunityTitle: string;
   documents: DocItem[];
 }
 
 export function DocumentsClient({
   opportunityId,
-  tenantId,
-  userId,
   opportunityTitle,
   documents: initialDocs,
 }: DocumentsClientProps) {
@@ -55,7 +51,8 @@ export function DocumentsClient({
   const handleGenerateDoc = async (kind: 'NDA' | 'LOI' | 'COMMITMENT' | 'ESR_DEBRIEF' | 'AWARD_PACK') => {
     setIsGenerating(true);
     try {
-      const res = await generateStandardDoc(opportunityId, tenantId, kind, userId);
+      // The action reads the tenant and user from the session.
+      const res = await generateStandardDoc(opportunityId, kind);
       const newDoc: DocItem = {
         id: res.id || `doc-${Date.now()}`,
         kind: res.kind || kind,

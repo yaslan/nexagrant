@@ -9,7 +9,7 @@ export default async function DocumentsPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, workspace, id } = await params;
-  const { tenantId, userId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPage(locale);
 
   let opp: any = null;
   try {
@@ -66,8 +66,6 @@ export default async function DocumentsPage({
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <DocumentsClient
         opportunityId={opp.id}
-        tenantId={opp.tenantId || tenantId}
-        userId={userId}
         opportunityTitle={opp.title}
         documents={opp.followupDocs || []}
       />

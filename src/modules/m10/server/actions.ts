@@ -1,26 +1,38 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
 import { submitForDualApproval, approveByDepartment, rejectDualApproval, Department } from '@/lib/dual-approval';
 import { revalidatePath } from 'next/cache';
 
+/**
+ * M10 follow-up documents.
+ *
+ * `tenantId`/`userId` were arguments passed in by the documents client
+ * component, i.e. attacker-controlled on a public POST endpoint, and the
+ * document lookups keyed on `id` alone. Both are fixed here: the tenant comes
+ * from the session and every query is matched on `(id, tenantId)`.
+ */
+
 export async function generateStandardDoc(
   opportunityId: string,
-  tenantId: string,
-  kind: 'NDA' | 'LOI' | 'COMMITMENT' | 'ESR_DEBRIEF' | 'AWARD_PACK' | string,
-  userId?: string
+  kind: 'NDA' | 'LOI' | 'COMMITMENT' | 'ESR_DEBRIEF' | 'AWARD_PACK' | string
 ) {
-  let oppTitle = 'Ufuk Avrupa Proje Başvurusu';
-  try {
-    const opp = await prisma.opportunity.findUnique({
-      where: { id: opportunityId },
+  const { tenantId, userId } = await requireTenantAction();
+
+  const opp = await withTenant<{ title: string } | null>(tenantId, (tx) =>
+    tx.opportunity.findFirst({
+      where: { id: opportunityId, tenantId },
       select: { title: true }
-    });
-    if (opp?.title) oppTitle = opp.title;
-  } catch (e: any) {
-    console.warn(`[m10 generateStandardDoc] DB query bypassed: ${e.message}`);
+    })
+  );
+
+  if (!opp) {
+    throw new Error(`Opportunity ${opportunityId} not found in this workspace.`);
   }
+
+  const oppTitle = opp.title || 'Ufuk Avrupa Proje Başvurusu';
 
   const prompt = `Generate an official, legally structured EU Horizon Europe ${kind} document for:
   Opportunity: ${oppTitle}
@@ -37,7 +49,7 @@ export async function generateStandardDoc(
   try {
     contentText = await generateText({
       tenantId,
-      userId: userId || 'system',
+      userId,
       module: 'M10',
       purpose: `document_generation_${kind.toLowerCase()}`,
       prompt,
@@ -60,9 +72,8 @@ export async function generateStandardDoc(
 
   const mockUrl = `https://storage.fabrika.app/docs/${tenantId}/${opportunityId}/${kind.toLowerCase()}_v1.pdf`;
 
-  let doc: any = null;
-  try {
-    doc = await prisma.followupDoc.create({
+  const doc = await withTenant<any>(tenantId, async (tx) => {
+    const created = await tx.followupDoc.create({
       data: {
         tenantId,
         opportunityId,
@@ -71,29 +82,18 @@ export async function generateStandardDoc(
         contentUrl: mockUrl
       }
     });
-  } catch (e: any) {
-    console.warn(`[m10 generateStandardDoc] DB create bypassed: ${e.message}`);
-    doc = {
-      id: `doc-${kind.toLowerCase()}-${Date.now()}`,
-      tenantId,
-      opportunityId,
-      kind,
-      version: 1,
-      contentUrl: mockUrl,
-      createdAt: new Date(),
-    };
-  }
 
-  // Deduct 1 AI credit for M10 document generation
-  try {
-    await prisma.creditLedger.create({
+    // Deduct 1 AI credit for M10 document generation
+    await tx.creditLedger.create({
       data: {
         tenantId,
         delta: -1,
         reason: `M10: Follow-up Document Generation (${kind})`
       }
     });
-  } catch (e) {}
+
+    return created;
+  });
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/documents', 'page');
@@ -103,46 +103,49 @@ export async function generateStandardDoc(
 }
 
 export async function signDocument(docId: string) {
-  try {
-    await prisma.followupDoc.update({
-      where: { id: docId },
-      data: { signedAt: new Date() }
-    });
-  } catch (e: any) {
-    console.warn(`[m10 signDocument] DB update bypassed: ${e.message}`);
-  }
+  const { tenantId } = await requireTenantAction();
+
+  // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
+  // unique selector, so a guessed doc id would sign another tenant's document.
+  const signedAt = new Date();
+  const updated = await withTenant<{ count: number }>(tenantId, (tx) =>
+    tx.followupDoc.updateMany({
+      where: { id: docId, tenantId },
+      data: { signedAt }
+    })
+  );
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/documents', 'page');
   } catch (e) {}
 
-  return { success: true, signedAt: new Date() };
+  return { success: updated.count > 0, signedAt };
 }
 
 export async function createNewVersion(docId: string) {
-  let updatedDoc: any = null;
-  try {
-    const existing = await prisma.followupDoc.findUnique({ where: { id: docId } });
-    if (existing) {
-      const nextVer = existing.version + 1;
-      updatedDoc = await prisma.followupDoc.update({
-        where: { id: docId },
-        data: {
-          version: nextVer,
-          signedAt: null, // Reset signature state for new revision
-          contentUrl: `https://storage.fabrika.app/docs/${existing.tenantId}/${existing.opportunityId}/${existing.kind.toLowerCase()}_v${nextVer}.pdf`
-        }
-      });
-    }
-  } catch (e: any) {
-    console.warn(`[m10 createNewVersion] DB update bypassed: ${e.message}`);
-  }
+  const { tenantId } = await requireTenantAction();
+
+  const updatedDoc = await withTenant<any>(tenantId, async (tx) => {
+    // Scoped read: a doc id from another tenant must not resolve here.
+    const existing = await tx.followupDoc.findFirst({ where: { id: docId, tenantId } });
+    if (!existing) return null;
+
+    const nextVer = existing.version + 1;
+    return tx.followupDoc.update({
+      where: { id: existing.id },
+      data: {
+        version: nextVer,
+        signedAt: null, // Reset signature state for new revision
+        contentUrl: `https://storage.fabrika.app/docs/${existing.tenantId}/${existing.opportunityId}/${existing.kind.toLowerCase()}_v${nextVer}.pdf`
+      }
+    });
+  });
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/documents', 'page');
   } catch (e) {}
 
-  return { success: true, updatedDoc };
+  return { success: updatedDoc !== null, updatedDoc };
 }
 
 export async function submitDualApprovalAction(docId: string, actorName: string = 'Dr. Mehmet Yılmaz') {

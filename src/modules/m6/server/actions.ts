@@ -1,11 +1,22 @@
 'use server';
 
-import { prisma, withTenant } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
 import { revalidatePath } from 'next/cache';
 import { updateEvaluationScore } from './scoring';
 
-export async function generateAiEvaluation(opportunityId: string, tenantId: string, userId: string) {
+/**
+ * M6 Evaluator Lens.
+ *
+ * A server action is a public POST endpoint, so `tenantId`/`userId` arriving as
+ * arguments from the evaluations client component were attacker-controlled:
+ * a caller could charge another tenant's credits and write an Evaluation row
+ * into their workspace. Both now come from the session.
+ */
+
+export async function generateAiEvaluation(opportunityId: string) {
+  const { tenantId, userId } = await requireTenantAction();
   const prompt = `Perform a rigorous EU Horizon Europe expert evaluation for opportunity ${opportunityId} based on official REA criteria:
   1. Excellence (0.0 - 5.0): Clarity of objectives, soundness of methodology, open science, gender dimension.
   2. Impact (0.0 - 5.0): Credibility of outcomes/impacts, scale and significance, dissemination & exploitation plan (DEC).
@@ -72,15 +83,23 @@ export async function generateAiEvaluation(opportunityId: string, tenantId: stri
 
   // Record 3 credit usage for M6 Evaluator Lens
   try {
-    await prisma.creditLedger.create({
-      data: {
+    await withTenant(tenantId, async (tx) => {
+      // The opportunity must belong to the session tenant; its id is guessable.
+      const opp = await tx.opportunity.findFirst({
+        where: { id: opportunityId, tenantId },
+        select: { id: true },
+      });
+      if (!opp) throw new Error(`Opportunity ${opportunityId} not found in this workspace.`);
+
+      await tx.creditLedger.create({
+        data: {
         tenantId,
         delta: -3,
         reason: 'M6: Evaluator Lens AI Pre-Evaluation Simulation'
-      }
-    });
+        }
+      });
 
-    await prisma.evaluation.create({
+      await tx.evaluation.create({
       data: {
         tenantId,
         opportunityId,
@@ -95,9 +114,10 @@ export async function generateAiEvaluation(opportunityId: string, tenantId: stri
           recommendations: parsed.recommendations
         }
       }
+      });
     });
   } catch (dbErr) {
-    console.warn('[generateAiEvaluation] DB query bypassed (offline mode):', dbErr);
+    console.warn('[generateAiEvaluation] DB write failed:', dbErr);
   }
 
   try {
@@ -110,21 +130,28 @@ export async function generateAiEvaluation(opportunityId: string, tenantId: stri
 }
 
 export async function saveHumanEvaluation(data: {
-  tenantId: string;
   opportunityId: string;
-  userId: string;
   excellence: number;
   impact: number;
   implementation: number;
   weaknesses: string[];
   strengths?: string[];
 }) {
+  const { tenantId, userId } = await requireTenantAction();
+
   try {
-    await prisma.evaluation.create({
+    await withTenant(tenantId, async (tx) => {
+      const opp = await tx.opportunity.findFirst({
+        where: { id: data.opportunityId, tenantId },
+        select: { id: true },
+      });
+      if (!opp) throw new Error(`Opportunity ${data.opportunityId} not found in this workspace.`);
+
+      await tx.evaluation.create({
       data: {
-        tenantId: data.tenantId,
+        tenantId,
         opportunityId: data.opportunityId,
-        userId: data.userId,
+        userId,
         readerType: 'HUMAN',
         excellence: data.excellence,
         impact: data.impact,
@@ -134,9 +161,10 @@ export async function saveHumanEvaluation(data: {
           weaknesses: data.weaknesses || []
         }
       }
+      });
     });
   } catch (dbErr) {
-    console.warn('[saveHumanEvaluation] DB query bypassed:', dbErr);
+    console.warn('[saveHumanEvaluation] DB write failed:', dbErr);
   }
 
   try {
@@ -145,20 +173,26 @@ export async function saveHumanEvaluation(data: {
 }
 
 export async function calibrateESR(evaluationId: string, actualScore: number) {
+  const { tenantId } = await requireTenantAction();
+
   let calibration = 0;
   try {
-    const ev = await prisma.evaluation.findUnique({ where: { id: evaluationId } });
-    if (ev) {
-      const predictedTotal = ev.excellence + ev.impact + ev.implementation;
-      calibration = Number((predictedTotal - actualScore).toFixed(2));
+    calibration = await withTenant<number>(tenantId, async (tx) => {
+      // Scoped read: an evaluation id from another tenant must not resolve here.
+      const ev = await tx.evaluation.findFirst({ where: { id: evaluationId, tenantId } });
+      if (!ev) return 0;
 
-      await prisma.evaluation.update({
-        where: { id: evaluationId },
-        data: { calibration }
+      const predictedTotal = ev.excellence + ev.impact + ev.implementation;
+      const value = Number((predictedTotal - actualScore).toFixed(2));
+
+      await tx.evaluation.update({
+        where: { id: ev.id },
+        data: { calibration: value }
       });
-    }
+      return value;
+    });
   } catch (dbErr) {
-    console.warn('[calibrateESR] DB query bypassed:', dbErr);
+    console.warn('[calibrateESR] DB write failed:', dbErr);
   }
 
   try {
@@ -169,15 +203,16 @@ export async function calibrateESR(evaluationId: string, actualScore: number) {
 }
 
 export async function saveEvaluation(data: {
-  tenantId: string;
   evaluationId: string;
   proposalId: string;
   scores: Record<string, number>;
 }) {
+  const { tenantId } = await requireTenantAction();
+
   try {
-    await withTenant(data.tenantId, async (tx) => {
-      const evaluation = await tx.evaluation.findUnique({
-        where: { id: data.evaluationId },
+    await withTenant(tenantId, async (tx) => {
+      const evaluation = await tx.evaluation.findFirst({
+        where: { id: data.evaluationId, tenantId },
         include: { reviewers: true, criteria: true },
       });
 
@@ -198,7 +233,7 @@ export async function saveEvaluation(data: {
             },
           },
           create: {
-            tenantId: data.tenantId,
+            tenantId,
             reviewerId: firstReviewer.id,
             criterionId: criterion.id,
             score: Math.round(score),
@@ -211,7 +246,7 @@ export async function saveEvaluation(data: {
         });
       }
 
-      await updateEvaluationScore(tx, data.evaluationId, data.tenantId);
+      await updateEvaluationScore(tx, data.evaluationId, tenantId);
     });
 
     revalidatePath('/[workspace]/proposals/[id]', 'page');

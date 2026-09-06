@@ -1,6 +1,7 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
 
@@ -19,12 +20,50 @@ export type {
   CollaboratorPresence 
 };
 
-export async function createApplicationPart(opportunityId: string, tenantId: string, part: string) {
+
+/**
+ * M11 collaborative Part A/B editing.
+ *
+ * Every action here used to load its ApplicationPart with
+ * `findUnique({ where: { id: partId } })` and write it back the same way — no
+ * tenant anywhere — so a part id was enough to read another tenant's proposal
+ * text, budget and comments, and to overwrite them. `createApplicationPart`
+ * additionally took `tenantId` as an argument from the client.
+ *
+ * The tenant now comes from the session and both helpers below key on
+ * `(id, tenantId)`. The consortium partner portal is the one session-less
+ * caller; it has its own token-scoped entry point (`addBudgetLineByToken`),
+ * where the magic token — not a session — is the credential.
+ */
+
+/** Loads a part the session tenant owns, or null. */
+async function loadPart(tenantId: string, partId: string): Promise<any> {
+  return withTenant<any>(tenantId, (tx) =>
+    tx.applicationPart.findFirst({ where: { id: partId, tenantId } })
+  );
+}
+
+/** Writes a part's content back, refusing rows outside the tenant. */
+async function savePartContent(tenantId: string, partId: string, content: unknown): Promise<boolean> {
+  const result = await withTenant<{ count: number }>(tenantId, (tx) =>
+    tx.applicationPart.updateMany({ where: { id: partId, tenantId }, data: { content } })
+  );
+  return result.count > 0;
+}
+
+export async function createApplicationPart(opportunityId: string, part: string) {
+  const { tenantId } = await requireTenantAction();
   const token = crypto.randomBytes(32).toString('hex');
-  
-  let createdPart: any = null;
-  try {
-    createdPart = await prisma.applicationPart.create({
+
+  const createdPart = await withTenant<any>(tenantId, async (tx) => {
+    // The opportunity must belong to this tenant; its id is guessable.
+    const opp = await tx.opportunity.findFirst({
+      where: { id: opportunityId, tenantId },
+      select: { id: true },
+    });
+    if (!opp) return null;
+
+    return tx.applicationPart.create({
       data: {
         tenantId,
         opportunityId,
@@ -40,24 +79,10 @@ export async function createApplicationPart(opportunityId: string, tenantId: str
         }
       }
     });
-  } catch (e: any) {
-    console.warn(`[m11 createApplicationPart] DB create bypassed: ${e.message}`);
-    createdPart = {
-      id: `part-${part.toLowerCase()}-${Date.now()}`,
-      tenantId,
-      opportunityId,
-      part,
-      magicToken: token,
-      content: {
-        budget: [],
-        workPackages: [],
-        sections: part === 'PART_B' ? DEFAULT_PART_B_SECTIONS : [],
-        revisions: [],
-        comments: [],
-        presence: [],
-      },
-      createdAt: new Date(),
-    };
+  });
+
+  if (!createdPart) {
+    throw new Error(`Opportunity ${opportunityId} not found in this workspace.`);
   }
 
   try {
@@ -68,8 +93,10 @@ export async function createApplicationPart(opportunityId: string, tenantId: str
 }
 
 export async function getPartBData(partId: string) {
+  const { tenantId } = await requireTenantAction();
+
   try {
-    const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
+    const part = await loadPart(tenantId, partId);
     if (part && part.content) {
       const content = part.content as any;
       if (!content.sections || content.sections.length === 0) {
@@ -105,11 +132,11 @@ export async function acquireSectionLock(
   authorName: string,
   authorOrg: string
 ) {
-  let updatedPart: any = null;
+  const { tenantId } = await requireTenantAction();
   const now = new Date().toISOString();
 
   try {
-    const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
+    const part = await loadPart(tenantId, partId);
     if (part) {
       const content: any = part.content || {};
       const sections: PartBSectionItem[] = content.sections || [...DEFAULT_PART_B_SECTIONS];
@@ -135,10 +162,7 @@ export async function acquireSectionLock(
       }
 
       content.sections = sections;
-      updatedPart = await prisma.applicationPart.update({
-        where: { id: partId },
-        data: { content },
-      });
+      await savePartContent(tenantId, partId, content);
     }
   } catch (e: any) {
     console.warn(`[m11 acquireSectionLock] DB bypass: ${e.message}`);
@@ -148,8 +172,10 @@ export async function acquireSectionLock(
 }
 
 export async function releaseSectionLock(partId: string, sectionKey: string, userId: string) {
+  const { tenantId } = await requireTenantAction();
+
   try {
-    const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
+    const part = await loadPart(tenantId, partId);
     if (part) {
       const content: any = part.content || {};
       const sections: PartBSectionItem[] = content.sections || [];
@@ -161,10 +187,7 @@ export async function releaseSectionLock(partId: string, sectionKey: string, use
         targetSec.lockedAt = null;
       }
       content.sections = sections;
-      await prisma.applicationPart.update({
-        where: { id: partId },
-        data: { content },
-      });
+      await savePartContent(tenantId, partId, content);
     }
   } catch (e: any) {
     console.warn(`[m11 releaseSectionLock] DB bypass: ${e.message}`);
@@ -182,12 +205,12 @@ export async function updateSectionContent(
   authorOrg: string,
   changeSummary?: string
 ) {
-  let updatedPart: any = null;
+  const { tenantId } = await requireTenantAction();
   const now = new Date().toISOString();
   const wordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
 
   try {
-    const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
+    const part = await loadPart(tenantId, partId);
     if (part) {
       const content: any = part.content || {};
       const sections: PartBSectionItem[] = content.sections || [...DEFAULT_PART_B_SECTIONS];
@@ -220,10 +243,7 @@ export async function updateSectionContent(
       content.sections = sections;
       content.revisions = [revisionItem, ...revisions].slice(0, 30);
 
-      updatedPart = await prisma.applicationPart.update({
-        where: { id: partId },
-        data: { content },
-      });
+      await savePartContent(tenantId, partId, content);
     }
   } catch (e: any) {
     console.warn(`[m11 updateSectionContent] DB bypass: ${e.message}`);
@@ -249,17 +269,16 @@ export async function addSectionComment(
     resolved: false,
   };
 
+  const { tenantId } = await requireTenantAction();
+
   try {
-    const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
+    const part = await loadPart(tenantId, partId);
     if (part) {
       const content: any = part.content || {};
       const comments: SectionCommentItem[] = content.comments || [];
       content.comments = [newComment, ...comments];
 
-      await prisma.applicationPart.update({
-        where: { id: partId },
-        data: { content },
-      });
+      await savePartContent(tenantId, partId, content);
     }
   } catch (e: any) {
     console.warn(`[m11 addSectionComment] DB bypass: ${e.message}`);
@@ -269,8 +288,10 @@ export async function addSectionComment(
 }
 
 export async function resolveSectionComment(partId: string, sectionKey: string, commentId: string) {
+  const { tenantId } = await requireTenantAction();
+
   try {
-    const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
+    const part = await loadPart(tenantId, partId);
     if (part) {
       const content: any = part.content || {};
       const comments: SectionCommentItem[] = content.comments || [];
@@ -280,10 +301,7 @@ export async function resolveSectionComment(partId: string, sectionKey: string, 
       }
       content.comments = comments;
 
-      await prisma.applicationPart.update({
-        where: { id: partId },
-        data: { content },
-      });
+      await savePartContent(tenantId, partId, content);
     }
   } catch (e: any) {
     console.warn(`[m11 resolveSectionComment] DB bypass: ${e.message}`);
@@ -293,8 +311,10 @@ export async function resolveSectionComment(partId: string, sectionKey: string, 
 }
 
 export async function restoreSectionRevision(partId: string, sectionKey: string, revisionId: string) {
+  const { tenantId } = await requireTenantAction();
+
   try {
-    const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
+    const part = await loadPart(tenantId, partId);
     if (part) {
       const content: any = part.content || {};
       const sections: PartBSectionItem[] = content.sections || [];
@@ -309,10 +329,7 @@ export async function restoreSectionRevision(partId: string, sectionKey: string,
         targetSec.lastModifiedAt = new Date().toISOString();
 
         content.sections = sections;
-        await prisma.applicationPart.update({
-          where: { id: partId },
-          data: { content },
-        });
+        await savePartContent(tenantId, partId, content);
 
         return { success: true, content: targetRev.content };
       }
@@ -344,8 +361,10 @@ export async function updatePresenceHeartbeat(
     lastSeenAt: new Date().toISOString(),
   };
 
+  const { tenantId } = await requireTenantAction();
+
   try {
-    const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
+    const part = await loadPart(tenantId, partId);
     if (part) {
       const content: any = part.content || {};
       let presenceList: CollaboratorPresence[] = content.presence || [];
@@ -358,10 +377,7 @@ export async function updatePresenceHeartbeat(
       presenceList.push(presenceItem);
       content.presence = presenceList;
 
-      await prisma.applicationPart.update({
-        where: { id: partId },
-        data: { content },
-      });
+      await savePartContent(tenantId, partId, content);
 
       return presenceList;
     }
@@ -421,11 +437,12 @@ export async function addBudgetLine(
   subcontracting: number = 0,
   travel: number = 0
 ) {
+  const { tenantId } = await requireTenantAction();
   const requestedTotal = await calculateLumpSumBudget(pm, countryCoefficient, subcontracting, travel);
 
   let updatedPart: any = null;
   try {
-    const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
+    const part = await loadPart(tenantId, partId);
     if (part) {
       const content: any = part.content || { budget: [] };
       content.budget = content.budget || [];
@@ -438,10 +455,8 @@ export async function addBudgetLine(
         requestedTotal
       });
 
-      updatedPart = await prisma.applicationPart.update({
-        where: { id: partId },
-        data: { content }
-      });
+      await savePartContent(tenantId, partId, content);
+      updatedPart = { ...part, content };
     }
   } catch (e: any) {
     console.warn(`[m11 addBudgetLine] DB update bypassed: ${e.message}`);
@@ -465,9 +480,11 @@ export async function addWorkPackage(
     deliverables?: string[];
   }
 ) {
+  const { tenantId } = await requireTenantAction();
+
   let updatedPart: any = null;
   try {
-    const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
+    const part = await loadPart(tenantId, partId);
     if (part) {
       const content: any = part.content || { workPackages: [] };
       content.workPackages = content.workPackages || [];
@@ -480,10 +497,8 @@ export async function addWorkPackage(
         deliverables: wpData.deliverables || []
       });
 
-      updatedPart = await prisma.applicationPart.update({
-        where: { id: partId },
-        data: { content }
-      });
+      await savePartContent(tenantId, partId, content);
+      updatedPart = { ...part, content };
     }
   } catch (e: any) {
     console.warn(`[m11 addWorkPackage] DB update bypassed: ${e.message}`);
@@ -496,3 +511,56 @@ export async function addWorkPackage(
   return updatedPart;
 }
 
+/**
+ * Consortium partner portal entry point.
+ *
+ * The partner has no Fabrika session: the 32-byte magic token in the URL *is*
+ * the credential, and the tenant is whatever the matching row says. This is the
+ * only place an ApplicationPart is resolved without a session, and it is
+ * deliberately narrow — token only, Part A only, budget lines only.
+ */
+export async function addBudgetLineByToken(
+  magicToken: string,
+  partnerName: string,
+  pm: number,
+  countryCoefficient: number = 1.0,
+  subcontracting: number = 0,
+  travel: number = 0
+) {
+  if (!magicToken || !partnerName || !Number.isFinite(pm)) {
+    return { success: false };
+  }
+
+  const requestedTotal = await calculateLumpSumBudget(pm, countryCoefficient, subcontracting, travel);
+
+  const { prisma } = await import('@/lib/db');
+
+  // Resolved by token, then re-scoped to that row's own tenant for the write.
+  const part = await prisma.applicationPart.findUnique({
+    where: { magicToken },
+    select: { id: true, tenantId: true, part: true, content: true },
+  });
+
+  if (!part || part.part !== 'PART_A') {
+    return { success: false };
+  }
+
+  const content: any = part.content || { budget: [] };
+  content.budget = content.budget || [];
+  content.budget.push({
+    partnerName,
+    personMonths: pm,
+    countryCoefficient,
+    subcontractingCost: subcontracting,
+    travelCost: travel,
+    requestedTotal,
+  });
+
+  const saved = await savePartContent(part.tenantId, part.id, content);
+
+  try {
+    revalidatePath('/portal/partner/[token]', 'page');
+  } catch (e) {}
+
+  return { success: saved, requestedTotal };
+}

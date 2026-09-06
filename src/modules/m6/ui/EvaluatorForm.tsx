@@ -8,11 +8,10 @@ import { DEFAULT_CRITERIA } from '../types';
 export interface EvaluatorFormProps {
   proposalId: string;
   evaluationId: string;
-  tenantId: string;
   onClose?: () => void;
 }
 
-export function EvaluatorForm({ proposalId, evaluationId, tenantId, onClose }: EvaluatorFormProps) {
+export function EvaluatorForm({ proposalId, evaluationId, onClose }: EvaluatorFormProps) {
   const t = useTranslations('m6');
   const [scores, setScores] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
@@ -33,7 +32,6 @@ export function EvaluatorForm({ proposalId, evaluationId, tenantId, onClose }: E
     setIsSubmitting(true);
     try {
       await saveEvaluation({
-        tenantId,
         evaluationId,
         proposalId,
         scores,

@@ -9,7 +9,7 @@ export default async function TtoAcceleratorPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
-  const { tenantId, userId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPage(locale);
 
   let items: any[] = [];
   try {
@@ -58,11 +58,7 @@ export default async function TtoAcceleratorPage({
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <TtoAcceleratorClient
-        tenantId={tenantId}
-        userId={userId}
-        items={items}
-      />
+      <TtoAcceleratorClient items={items} />
     </div>
   );
 }

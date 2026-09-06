@@ -1,35 +1,36 @@
-import { prisma } from '@/lib/db';
-import { notFound, redirect } from 'next/navigation';
+import { prisma, withTenant } from '@/lib/db';
+import { notFound } from 'next/navigation';
+import { requireTenantPage } from '@/lib/tenant';
 import ConceptNoteEditor from '@/modules/m2/ui/ConceptNoteEditor';
-
-// Mocking auth since it might not be fully implemented in the repo yet. 
-// In a real scenario, we'd import { auth } from '@/lib/auth';
-async function getAuth() {
-  return { user: { id: 'mock-user-id' } };
-}
 
 export default async function OpportunityM2Page({
   params
 }: {
-  params: { workspace: string; id: string }
+  params: Promise<{ locale: string; workspace: string; id: string }>
 }) {
-  const session = await getAuth();
-  if (!session?.user) {
-    redirect('/api/auth/signin');
-  }
+  const { locale, workspace, id } = await params;
+
+  // This page used to call a local `getAuth()` stub that returned a fixed
+  // `mock-user-id` and then loaded the opportunity by `(id, workspace slug)`
+  // with no tenant, so any visitor could open any tenant's concept note.
+  const { tenantId } = await requireTenantPage(locale);
 
   // Find the opportunity
-  const opp = await prisma.opportunity.findUnique({
-    where: { id: params.id, workspace: { slug: params.workspace } },
-    include: { workspace: true }
-  });
+  const opp = await withTenant<any>(tenantId, (tx) =>
+    tx.opportunity.findFirst({
+      where: { id, tenantId, workspace: { slug: workspace } },
+      include: { workspace: true }
+    })
+  );
 
   if (!opp) return notFound();
 
   // Check M2 module state
-  const m2State = await prisma.moduleState.findUnique({
-    where: { tenantId_moduleId: { tenantId: opp.tenantId, moduleId: 'M2' } }
-  });
+  const m2State = await withTenant<any>(tenantId, (tx) =>
+    tx.moduleState.findUnique({
+      where: { tenantId_moduleId: { tenantId, moduleId: 'M2' } }
+    })
+  );
 
   if (!m2State || m2State.status === 'OFF') {
     return (
@@ -41,10 +42,13 @@ export default async function OpportunityM2Page({
   }
 
   // Get existing note if any
-  const note = await prisma.conceptNote.findFirst({
-    where: { opportunityId: opp.id }
-  });
+  const note = await withTenant<any>(tenantId, (tx) =>
+    tx.conceptNote.findFirst({
+      where: { opportunityId: opp.id, tenantId }
+    })
+  );
 
+  // ConceptTemplate is shared platform catalogue data, not tenant data.
   let templateId = note?.templateId;
   if (!templateId) {
     const genericTemplate = await prisma.conceptTemplate.findFirst({
@@ -52,7 +56,7 @@ export default async function OpportunityM2Page({
     });
     templateId = genericTemplate?.id;
   }
-  
+
   if (!templateId) {
     return <div>No template found in system. Please run seed.</div>;
   }
@@ -64,8 +68,6 @@ export default async function OpportunityM2Page({
   return (
     <div className="p-6 max-w-4xl mx-auto mt-6 bg-surface border rounded-lg shadow-sm">
       <ConceptNoteEditor
-        tenantId={opp.tenantId}
-        userId={session.user.id}
         opportunityId={opp.id}
         templateId={templateId}
         schema={template?.schema as any}

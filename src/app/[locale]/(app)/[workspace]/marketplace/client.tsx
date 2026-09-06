@@ -73,8 +73,8 @@ export function MarketplaceClient({
 
     setIsPublishing(true);
     try {
+      // The action stamps the session tenant itself.
       const res = await createMarketplaceListing({
-        tenantId,
         kind,
         title: title.trim(),
         description: description.trim(),
@@ -109,7 +109,6 @@ export function MarketplaceClient({
     setIsGeneratingKey(true);
     try {
       const res = await generateApiKey({
-        tenantId,
         name: keyName.trim(),
       });
 
@@ -139,7 +138,6 @@ export function MarketplaceClient({
       const priceNum = parseInt((listing.price || '').replace(/[^0-9]/g, ''), 10) || 1500;
       const res = await orderMarketplaceService({
         listingId: listing.id,
-        buyerTenantId: tenantId,
         priceAmountEUR: priceNum,
       });
 

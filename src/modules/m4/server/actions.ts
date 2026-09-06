@@ -1,43 +1,56 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 
+/**
+ * M4 relationships.
+ *
+ * `tenantId`, `ownerUserId` and `createdBy` were arguments supplied by the
+ * caller, and the relationship updates keyed on `id` alone — so a guessed
+ * relationship id could have an interaction appended to it, or its next step
+ * rewritten, from outside its tenant. All three now come from the session and
+ * every write is matched on `(id, tenantId)`.
+ */
+
 export async function createRelationship(data: {
-  tenantId: string;
   organizationId?: string;
   partnerOrgId?: string;
   kind: string; // partner | ncp | city | cluster | consultant | tto
-  ownerUserId: string;
   counterpartName?: string;
   counterpartEmail?: string;
 }) {
+  const { tenantId, userId } = await requireTenantAction();
+
   if (!data.organizationId && !data.partnerOrgId) {
     throw new Error('Must provide either organizationId or partnerOrgId');
   }
 
-  // Rule: One Relationship per organization per tenant
-  if (data.organizationId) {
-    const existing = await prisma.relationship.findFirst({
-      where: { tenantId: data.tenantId, organizationId: data.organizationId }
-    });
-    if (existing) {
-      throw new Error('Relationship already exists for this organization in your tenant.');
+  const rel = await withTenant<any>(tenantId, async (tx) => {
+    // Rule: One Relationship per organization per tenant
+    if (data.organizationId) {
+      const existing = await tx.relationship.findFirst({
+        where: { tenantId, organizationId: data.organizationId }
+      });
+      if (existing) {
+        throw new Error('Relationship already exists for this organization in your tenant.');
+      }
     }
-  }
 
-  const rel = await prisma.relationship.create({
-    data: {
-      tenantId: data.tenantId,
-      organizationId: data.organizationId,
-      partnerOrgId: data.partnerOrgId,
-      kind: data.kind,
-      ownerUserId: data.ownerUserId,
-      counterpartName: data.counterpartName,
-      counterpartEmail: data.counterpartEmail,
-      warmth: 'active', // starts active if we just reached out/created
-      lastContactAt: new Date()
-    }
+    return tx.relationship.create({
+      data: {
+        tenantId,
+        organizationId: data.organizationId,
+        partnerOrgId: data.partnerOrgId,
+        kind: data.kind,
+        ownerUserId: userId,
+        counterpartName: data.counterpartName,
+        counterpartEmail: data.counterpartEmail,
+        warmth: 'active', // starts active if we just reached out/created
+        lastContactAt: new Date()
+      }
+    });
   });
 
   revalidatePath('/[workspace]/relationships', 'page');
@@ -45,30 +58,41 @@ export async function createRelationship(data: {
 }
 
 export async function addInteraction(data: {
-  tenantId: string;
   relationshipId: string;
   kind: string; // meeting | email | call | event
   summary?: string;
-  createdBy: string;
 }) {
-  const interaction = await prisma.interaction.create({
-    data: {
-      tenantId: data.tenantId,
-      relationshipId: data.relationshipId,
-      kind: data.kind,
-      summary: data.summary,
-      createdBy: data.createdBy,
-      at: new Date()
-    }
-  });
+  const { tenantId, userId } = await requireTenantAction();
 
-  // Update relationship warmth and lastContactAt
-  await prisma.relationship.update({
-    where: { id: data.relationshipId },
-    data: {
-      lastContactAt: new Date(),
-      warmth: 'active'
-    }
+  const interaction = await withTenant<any>(tenantId, async (tx) => {
+    // The relationship must be this tenant's before anything is written to it.
+    const rel = await tx.relationship.findFirst({
+      where: { id: data.relationshipId, tenantId },
+      select: { id: true }
+    });
+    if (!rel) throw new Error('Relationship not found in this workspace.');
+
+    const created = await tx.interaction.create({
+      data: {
+        tenantId,
+        relationshipId: data.relationshipId,
+        kind: data.kind,
+        summary: data.summary,
+        createdBy: userId,
+        at: new Date()
+      }
+    });
+
+    // Update relationship warmth and lastContactAt
+    await tx.relationship.update({
+      where: { id: rel.id },
+      data: {
+        lastContactAt: new Date(),
+        warmth: 'active'
+      }
+    });
+
+    return created;
   });
 
   revalidatePath('/[workspace]/relationships/[id]', 'page');
@@ -76,13 +100,20 @@ export async function addInteraction(data: {
 }
 
 export async function updateNextStep(
-  relationshipId: string, 
-  nextStep: string, 
+  relationshipId: string,
+  nextStep: string,
   nextStepDue: Date | null
 ) {
-  await prisma.relationship.update({
-    where: { id: relationshipId },
-    data: { nextStep, nextStepDue }
-  });
+  const { tenantId } = await requireTenantAction();
+
+  // `updateMany` keeps tenantId in the WHERE clause.
+  const updated = await withTenant<{ count: number }>(tenantId, (tx) =>
+    tx.relationship.updateMany({
+      where: { id: relationshipId, tenantId },
+      data: { nextStep, nextStepDue }
+    })
+  );
+
   revalidatePath('/[workspace]/relationships/[id]', 'page');
+  return { success: updated.count > 0 };
 }

@@ -24,14 +24,10 @@ interface TtoItem {
 }
 
 interface TtoAcceleratorClientProps {
-  tenantId: string;
-  userId: string;
   items: TtoItem[];
 }
 
 export function TtoAcceleratorClient({
-  tenantId,
-  userId,
   items: initialItems,
 }: TtoAcceleratorClientProps) {
   const [items, setItems] = useState<TtoItem[]>(initialItems);
@@ -61,8 +57,8 @@ export function TtoAcceleratorClient({
     setIsSubmitting(true);
     try {
       const kwList = keywords.split(',').map((s) => s.trim()).filter(Boolean);
+      // The action stamps the session tenant itself; the browser cannot name one.
       const res = await createTtoItem({
-        tenantId,
         title: title.trim(),
         trl,
         patentStatus,
@@ -111,8 +107,6 @@ export function TtoAcceleratorClient({
         title: item.title,
         trl: item.trl,
         patentStatus: item.patentStatus,
-        tenantId,
-        userId,
       });
       setChecklistContent(res.checklistContent);
     } catch (err) {

@@ -32,16 +32,12 @@ interface EvaluationItem {
 
 interface EvaluationsClientProps {
   opportunityId: string;
-  tenantId: string;
-  userId: string;
   opportunityTitle: string;
   evaluations: EvaluationItem[];
 }
 
 export function EvaluationsClient({
   opportunityId,
-  tenantId,
-  userId,
   opportunityTitle,
   evaluations: initialEvaluations,
 }: EvaluationsClientProps) {
@@ -83,7 +79,9 @@ export function EvaluationsClient({
   const handleRunAiEvaluation = async () => {
     setIsAiLoading(true);
     try {
-      const result = await generateAiEvaluation(opportunityId, tenantId, userId);
+      // The action reads the tenant and user from the session; the browser
+      // no longer names either.
+      const result = await generateAiEvaluation(opportunityId);
       const newEval: EvaluationItem = {
         id: `ev-ai-${Date.now()}`,
         readerType: 'AI',
@@ -116,9 +114,7 @@ export function EvaluationsClient({
       const strList = humanStrengths.split('\n').filter((s) => s.trim().length > 0);
 
       await saveHumanEvaluation({
-        tenantId,
         opportunityId,
-        userId,
         excellence: exc,
         impact: imp,
         implementation: impl,

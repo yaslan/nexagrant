@@ -52,7 +52,6 @@ export function ApiKeysClient({
     setIsGenerating(true);
     try {
       const res = await generateApiKey({
-        tenantId,
         name: keyName.trim(),
       });
 

@@ -14,8 +14,6 @@ interface SchemaItem {
 }
 
 interface ConceptNoteEditorProps {
-  tenantId: string;
-  userId: string;
   opportunityId: string;
   templateId: string;
   schema: SchemaItem[];
@@ -24,8 +22,6 @@ interface ConceptNoteEditorProps {
 }
 
 export default function ConceptNoteEditor({
-  tenantId,
-  userId,
   opportunityId,
   templateId,
   schema,
@@ -41,13 +37,8 @@ export default function ConceptNoteEditor({
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      const newNoteId = await generateConceptNoteDraft(
-        opportunityId,
-        tenantId,
-        userId,
-        templateId,
-        {}
-      );
+      // The action reads the tenant and user from the session.
+      const newNoteId = await generateConceptNoteDraft(opportunityId, templateId, {});
       setCurrentNoteId(newNoteId);
       alert('Draft generated successfully! Please refresh to load content if needed, or implement auto-fetch.');
     } catch (err: any) {

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
-import { addBudgetLine } from '@/modules/m11/server/actions';
+import { addBudgetLineByToken } from '@/modules/m11/server/actions';
 
 export default async function PartnerPortalPage({
   params
@@ -11,6 +11,10 @@ export default async function PartnerPortalPage({
 
   if (!token) return notFound();
 
+  // This page is unauthenticated — the token is the credential. An unknown or
+  // expired token must render nothing. The previous fallback invented a budget
+  // table (with real-looking partner names and figures) for *any* token string,
+  // so a stranger saw a working partner portal and a DB outage was invisible.
   let part: any = null;
   try {
     part = await prisma.applicationPart.findUnique({
@@ -18,29 +22,11 @@ export default async function PartnerPortalPage({
       include: { opportunity: true }
     });
   } catch (e: any) {
-    console.warn(`[PartnerPortalPage] DB query bypassed: ${e.message}`);
+    console.warn(`[PartnerPortalPage] DB query failed: ${e.message}`);
+    return notFound();
   }
 
-  // Fallback demo application part if DB is unseeded/offline
-  if (!part) {
-    part = {
-      id: 'part-a-1',
-      part: 'PART_A',
-      magicToken: token,
-      content: {
-        budget: [
-          { partnerName: 'Demo SME Consultancy', personMonths: 24, requestedTotal: 180000 },
-          { partnerName: 'Fraunhofer Institute', personMonths: 36, requestedTotal: 340000 }
-        ]
-      },
-      opportunity: {
-        id: 'opp-1',
-        title: 'HORIZON-CL5-2026-D3-01: Zero-Emission Transport Systems'
-      }
-    };
-  }
-
-  if (part.part !== 'PART_A') return notFound();
+  if (!part || part.part !== 'PART_A') return notFound();
 
   const opp = part.opportunity;
 
@@ -62,7 +48,13 @@ export default async function PartnerPortalPage({
 
           <form action={async (fd) => {
             'use server';
-            await addBudgetLine(part.id, fd.get('partnerName') as string, parseInt(fd.get('pm') as string, 10));
+            // The magic token, not a part id, is what authorises this write —
+            // `addBudgetLine` now requires a session and would reject the partner.
+            await addBudgetLineByToken(
+              token,
+              fd.get('partnerName') as string,
+              parseInt(fd.get('pm') as string, 10)
+            );
           }} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-ink-2 mb-1">Kurum Adı (PIC)</label>

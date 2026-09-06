@@ -1,27 +1,36 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
 import { revalidatePath } from 'next/cache';
 
+/**
+ * M7 TTO portfolio.
+ *
+ * `tenantId`/`userId` used to be arguments supplied by the TTO client
+ * component. A server action is a public POST endpoint, so those were
+ * attacker-controlled — a portfolio item could be written into, and an AI
+ * call billed to, any tenant. Both now come from the session.
+ */
+
 export async function createTtoItem({
-  tenantId,
   title,
   trl,
   patentStatus,
   summary,
   keywords,
 }: {
-  tenantId: string;
   title: string;
   trl: number;
   patentStatus: string;
   summary: string;
   keywords: string[];
 }) {
-  let item: any = null;
-  try {
-    item = await prisma.ttoPortfolioItem.create({
+  const { tenantId } = await requireTenantAction();
+
+  const item = await withTenant<any>(tenantId, (tx) =>
+    tx.ttoPortfolioItem.create({
       data: {
         tenantId,
         title,
@@ -30,20 +39,8 @@ export async function createTtoItem({
         summary,
         keywords,
       },
-    });
-  } catch (e: any) {
-    console.warn(`[createTtoItem] DB create bypassed: ${e.message}`);
-    item = {
-      id: `tto-${Date.now()}`,
-      tenantId,
-      title,
-      trl,
-      patentStatus,
-      summary,
-      keywords,
-      createdAt: new Date(),
-    };
-  }
+    })
+  );
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/tto', 'page');
@@ -53,15 +50,19 @@ export async function createTtoItem({
 }
 
 export async function matchTtoItemToCalls(itemId: string) {
-  let itemTitle = 'Teknoloji IP Portföyü';
-  let itemTrl = 5;
-  try {
-    const item = await prisma.ttoPortfolioItem.findUnique({ where: { id: itemId } });
-    if (item) {
-      itemTitle = item.title;
-      itemTrl = item.trl;
-    }
-  } catch (e) {}
+  const { tenantId } = await requireTenantAction();
+
+  // Scoped read: a portfolio item id from another tenant must not resolve here.
+  const item = await withTenant<{ title: string; trl: number } | null>(tenantId, (tx) =>
+    tx.ttoPortfolioItem.findFirst({
+      where: { id: itemId, tenantId },
+      select: { title: true, trl: true },
+    })
+  );
+
+  if (!item) return { matchedTopics: [] };
+
+  const itemTrl = item.trl;
 
   return {
     matchedTopics: [
@@ -97,15 +98,13 @@ export async function generateIpChecklist({
   title,
   trl,
   patentStatus,
-  tenantId,
-  userId,
 }: {
   title: string;
   trl: number;
   patentStatus: string;
-  tenantId: string;
-  userId: string;
 }) {
+  const { tenantId, userId } = await requireTenantAction();
+
   const prompt = `Generate a university Tech Transfer Office (TTO) IP & Licensing Checklist for:
   Technology Title: ${title}
   Current TRL: TRL ${trl}

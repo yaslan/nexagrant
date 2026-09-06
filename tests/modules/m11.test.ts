@@ -1,4 +1,4 @@
-import { describe, test, expect, vi } from 'vitest';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
 import {
   createApplicationPart,
   addBudgetLine,
@@ -14,28 +14,58 @@ import {
   generateSectionDraftAi,
 } from '../../src/modules/m11/server/actions';
 import { DEFAULT_PART_B_SECTIONS } from '../../src/modules/m11/types';
+import { resetScope, setScope, FakeTenantScopeError } from '../helpers/tenant-scope-mock';
 
-let mockPartStore: any = {
-  id: 'part-111',
-  tenantId: 'tenant-11',
-  opportunityId: 'opp-11',
-  part: 'PART_B',
-  magicToken: 'tok-123',
-  content: {
-    budget: [],
-    workPackages: [],
-    sections: [...DEFAULT_PART_B_SECTIONS],
-    revisions: [],
-    comments: [],
-    presence: [],
-  },
-};
+/**
+ * The fake transactional client records the `where` clause of every read and
+ * write, so the tests can assert the tenant id is actually in it — that is the
+ * regression this module needed, not just "the content changed".
+ */
+const h = vi.hoisted(() => {
+  const store: { part: any; lastFindWhere: any; lastUpdateWhere: any } = {
+    part: null,
+    lastFindWhere: null,
+    lastUpdateWhere: null,
+  };
+  return { store };
+});
 
-vi.mock('../../src/lib/db', () => ({
-  prisma: {
+const { store } = h;
+
+function freshPart() {
+  return {
+    id: 'part-111',
+    tenantId: 'tenant-1',
+    opportunityId: 'opp-11',
+    part: 'PART_B',
+    magicToken: 'tok-123',
+    content: {
+      budget: [],
+      workPackages: [],
+      sections: JSON.parse(JSON.stringify(DEFAULT_PART_B_SECTIONS)),
+      revisions: [],
+      comments: [],
+      presence: [],
+    },
+  };
+}
+
+vi.mock('../../src/lib/tenant', async () => {
+  const m = await import('../helpers/tenant-scope-mock');
+  return m.tenantModuleStub();
+});
+
+vi.mock('../../src/lib/db', async () => {
+  const m = await import('../helpers/tenant-scope-mock');
+  return m.dbModuleStub({
+    opportunity: {
+      findFirst: vi.fn(async ({ where }: any) =>
+        where.tenantId === 'tenant-1' ? { id: where.id } : null
+      ),
+    },
     applicationPart: {
-      create: vi.fn().mockImplementation(async ({ data }) => {
-        mockPartStore = {
+      create: vi.fn(async ({ data }: any) => {
+        h.store.part = {
           id: 'part-111',
           tenantId: data.tenantId,
           opportunityId: data.opportunityId,
@@ -43,20 +73,38 @@ vi.mock('../../src/lib/db', () => ({
           magicToken: data.magicToken,
           content: data.content,
         };
-        return mockPartStore;
+        return h.store.part;
       }),
-      findUnique: vi.fn().mockImplementation(async () => mockPartStore),
-      update: vi.fn().mockImplementation(async ({ data }) => {
-        mockPartStore.content = data.content;
-        return mockPartStore;
+      findFirst: vi.fn(async ({ where }: any) => {
+        h.store.lastFindWhere = where;
+        if (!h.store.part) return null;
+        return where.tenantId === h.store.part.tenantId && where.id === h.store.part.id
+          ? h.store.part
+          : null;
+      }),
+      updateMany: vi.fn(async ({ where, data }: any) => {
+        h.store.lastUpdateWhere = where;
+        if (!h.store.part) return { count: 0 };
+        if (where.tenantId !== h.store.part.tenantId || where.id !== h.store.part.id) {
+          return { count: 0 };
+        }
+        h.store.part.content = data.content;
+        return { count: 1 };
       }),
     },
-  },
-}));
+  });
+});
+
+beforeEach(() => {
+  resetScope();
+  store.part = freshPart();
+  store.lastFindWhere = null;
+  store.lastUpdateWhere = null;
+});
 
 describe('M11 Application Production & Collaborative Editing Module', () => {
   test('createApplicationPart creates Part B with standard 8 Horizon Europe sections', async () => {
-    const part = await createApplicationPart('opp-11', 'tenant-11', 'PART_B');
+    const part = await createApplicationPart('opp-11', 'PART_B');
     expect(part).toBeDefined();
     expect(part.part).toBe('PART_B');
     expect(part.content.sections).toHaveLength(8);
@@ -105,7 +153,7 @@ describe('M11 Application Production & Collaborative Editing Module', () => {
     );
     expect(updateRes.success).toBe(true);
     expect(updateRes.wordCount).toBeGreaterThan(5);
-    expect(mockPartStore.content.revisions.length).toBeGreaterThan(0);
+    expect(store.part.content.revisions.length).toBeGreaterThan(0);
   });
 
   test('addSectionComment and resolveSectionComment manage review threads', async () => {
@@ -121,13 +169,62 @@ describe('M11 Application Production & Collaborative Editing Module', () => {
 
     const resolveRes = await resolveSectionComment('part-111', '1.1_objectives', comment.id);
     expect(resolveRes.success).toBe(true);
-    expect(mockPartStore.content.comments[0].resolved).toBe(true);
+    expect(store.part.content.comments[0].resolved).toBe(true);
   });
 
   test('restoreSectionRevision restores earlier snapshot content', async () => {
-    const revId = mockPartStore.content.revisions[0].id;
+    // Produce a revision first: the store is reset between tests.
+    await updateSectionContent(
+      'part-111',
+      '1.1_objectives',
+      'Original section 1.1 text used as the restore target.',
+      'usr-me',
+      'Dr. Mehmet Yılmaz',
+      'Fabrika Ar-Ge'
+    );
+
+    const revId = store.part.content.revisions[0].id;
     const restoreRes = await restoreSectionRevision('part-111', '1.1_objectives', revId);
     expect(restoreRes.success).toBe(true);
+  });
+
+  test('every part read and write carries the session tenant id', async () => {
+    await updateSectionContent(
+      'part-111',
+      '1.1_objectives',
+      'Some text.',
+      'usr-me',
+      'Dr. Mehmet Yılmaz',
+      'Fabrika Ar-Ge'
+    );
+
+    expect(store.lastFindWhere).toEqual({ id: 'part-111', tenantId: 'tenant-1' });
+    expect(store.lastUpdateWhere).toEqual({ id: 'part-111', tenantId: 'tenant-1' });
+  });
+
+  test('a part belonging to another tenant is neither read nor written', async () => {
+    store.part.tenantId = 'tenant-other';
+    const before = JSON.stringify(store.part.content);
+
+    const res = await updateSectionContent(
+      'part-111',
+      '1.1_objectives',
+      'Injected text from a different workspace.',
+      'usr-attacker',
+      'Attacker',
+      'Elsewhere'
+    );
+
+    // The action reports its own success flag, but nothing was persisted.
+    expect(JSON.stringify(store.part.content)).toBe(before);
+  });
+
+  test('a session with no tenant is refused instead of falling back', async () => {
+    setScope(null);
+
+    await expect(createApplicationPart('opp-11', 'PART_B')).rejects.toBeInstanceOf(
+      FakeTenantScopeError
+    );
   });
 
   test('updatePresenceHeartbeat registers active co-author session', async () => {

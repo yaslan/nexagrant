@@ -1,26 +1,41 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
+import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
 import { semanticSearch } from '@/lib/ai/rag';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 
+/**
+ * M2 concept notes.
+ *
+ * `tenantId`/`userId` were arguments, and the opportunity and note lookups
+ * keyed on `id` alone — so a guessed id could draft against, read, or overwrite
+ * another tenant's concept note, and bill the AI call to whichever tenant the
+ * caller named. Both now come from the session.
+ *
+ * `ConceptTemplate` is deliberately still read off the shared `prisma` client:
+ * it is platform catalogue data, not tenant data.
+ */
+
 export async function generateConceptNoteDraft(
   opportunityId: string,
-  tenantId: string,
-  userId: string,
   templateId: string,
   inputs: Record<string, string>
 ) {
-  // 1. Get the opportunity and topic
-  const opp = await prisma.opportunity.findUnique({
-    where: { id: opportunityId },
-    include: { topic: true }
-  });
-  
+  const { tenantId, userId } = await requireTenantAction();
+
+  // 1. Get the opportunity and topic — scoped to the session tenant
+  const opp = await withTenant<any>(tenantId, (tx) =>
+    tx.opportunity.findFirst({
+      where: { id: opportunityId, tenantId },
+      include: { topic: true }
+    })
+  );
+
   if (!opp) throw new Error('Opportunity not found');
 
-  // 2. Get the template
+  // 2. Get the template (shared catalogue, not tenant-scoped)
   const template = await prisma.conceptTemplate.findUnique({
     where: { id: templateId }
   });
@@ -69,33 +84,47 @@ export async function generateConceptNoteDraft(
   }
 
   // 4. Save to db
-  const note = await prisma.conceptNote.create({
-    data: {
-      tenantId,
-      opportunityId,
-      templateId,
-      content,
-      status: 'draft',
-      version: 1,
-      createdBy: userId,
-    }
-  });
+  const note = await withTenant<any>(tenantId, (tx) =>
+    tx.conceptNote.create({
+      data: {
+        tenantId,
+        opportunityId,
+        templateId,
+        content,
+        status: 'draft',
+        version: 1,
+        createdBy: userId,
+      }
+    })
+  );
 
   return note.id;
 }
 
 export async function saveConceptNoteDraft(noteId: string, content: any) {
-  await prisma.conceptNote.update({
-    where: { id: noteId },
-    data: { content, updatedAt: new Date() }
-  });
+  const { tenantId } = await requireTenantAction();
+
+  // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
+  // unique selector and would overwrite another tenant's draft.
+  const updated = await withTenant<{ count: number }>(tenantId, (tx) =>
+    tx.conceptNote.updateMany({
+      where: { id: noteId, tenantId },
+      data: { content, updatedAt: new Date() }
+    })
+  );
+
+  return { success: updated.count > 0 };
 }
 
 export async function exportToDocx(noteId: string) {
-  const note = await prisma.conceptNote.findUnique({
-    where: { id: noteId },
-    include: { opportunity: true }
-  });
+  const { tenantId } = await requireTenantAction();
+
+  const note = await withTenant<any>(tenantId, (tx) =>
+    tx.conceptNote.findFirst({
+      where: { id: noteId, tenantId },
+      include: { opportunity: true }
+    })
+  );
 
   if (!note) throw new Error('Note not found');
 
@@ -133,11 +162,15 @@ export async function exportToDocx(noteId: string) {
   return buffer.toString('base64');
 }
 
-export async function generateAiUsageDeclaration(opportunityId: string, tenantId: string) {
-  const logs = await prisma.aiUsageLog.findMany({
-    where: { tenantId, proposalId: opportunityId },
-    orderBy: { createdAt: 'asc' }
-  });
+export async function generateAiUsageDeclaration(opportunityId: string) {
+  const { tenantId } = await requireTenantAction();
+
+  const logs = await withTenant<any[]>(tenantId, (tx) =>
+    tx.aiUsageLog.findMany({
+      where: { tenantId, proposalId: opportunityId },
+      orderBy: { createdAt: 'asc' }
+    })
+  );
 
   const totalInputs = logs.reduce((acc: number, l: any) => acc + l.inputTokens, 0);
   const totalOutputs = logs.reduce((acc: number, l: any) => acc + l.outputTokens, 0);
