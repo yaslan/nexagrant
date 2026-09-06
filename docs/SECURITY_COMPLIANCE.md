@@ -46,22 +46,43 @@
 - Test ve lint pipelines paralel yürütülür.
 
 **Lokal Test:**
+
+> ⚠️ RLS yalnızca politikalara **tabi** bir rolle ölçülebilir. Yerel `fabrika` rolü
+> `SUPERUSER` + `BYPASSRLS` olduğu için o oturumda yapılan her izolasyon testi
+> yanlış yeşil verir. Bu yüzden ayrı bir rol var: **`fabrika_app`**
+> (`NOSUPERUSER`, `NOBYPASSRLS`, `NOCREATEDB`, `NOCREATEROLE`, yalnız DML).
+
 ```bash
-# 1. Two psql sessions
-docker-compose exec db psql -U postgres fabrika_dev
+# 0. Rolü oluştur (idempotent). Parolayı üretir ve DATABASE_URL_RLS_TEST olarak
+#    .env'e ekler; uygulamanın DATABASE_URL'ine DOKUNMAZ.
+pnpm db:rls-role
+#    Geri alma: pnpm db:rls-role:rollback
 
-# Session A (Tenant A)
-SET app.tenant_id = 'tenant-a-id';
-SELECT * FROM "Workspace"; -- görür
-SELECT * FROM "Workspace" WHERE "tenantId" = 'tenant-b-id'; -- 0 satır (RLS blocks)
+# 1. Rolün gerçekten muaf olmadığını doğrula — bu satır yeşil değilse aşağıdaki
+#    hiçbir test bir şey kanıtlamaz.
+psql "$DATABASE_URL_RLS_TEST" -c \
+  "select rolname, rolsuper, rolbypassrls from pg_roles where rolname = current_user"
+#    Beklenen: fabrika_app | f | f
 
-# Session B (Tenant B)
-SET app.tenant_id = 'tenant-b-id';
-SELECT * FROM "Workspace"; -- sadece B'nin verisi
+# 2. Aynı oturumda filtrelemeyi gör
+psql "$DATABASE_URL_RLS_TEST"
+SELECT count(*) FROM "Workspace";                          -- 0  (app.tenant_id set değil)
+SELECT set_config('app.tenant_id', 'tenant-a-id', false);  -- SET bind parametresi almaz
+SELECT count(*) FROM "Workspace";                          -- yalnız A'nın satırları
+SELECT set_config('app.tenant_id', 'tenant-b-id', false);
+SELECT count(*) FROM "Workspace";                          -- yalnız B'nin satırları
 
-# 2. E2E Tests
+# 3. Entegrasyon testi (fixture'ları superuser yazar, iddiaları fabrika_app okur)
+pnpm test -- tests/rls.spec.ts
+
+# 4. E2E
 pnpm test:e2e -- tests/e2e/rls.spec.ts
 ```
+
+`DATABASE_URL_RLS_TEST` yoksa `tests/rls.spec.ts` iddialarını **atlar** ve nedenini
+yazar — sessizce yeşile dönmez. Uygulamanın ana `DATABASE_URL`'i hâlâ `fabrika`
+rolündedir; ana bağlantının `fabrika_app`'e çevrilmesi ayrı bir iştir ve
+`withTenant()` kapsamı tüm sorgulara yayılmadan yapılamaz.
 
 **Test Coverage (33 models):**
 - ✅ Opportunity, Workspace, Evidence (API isolation)

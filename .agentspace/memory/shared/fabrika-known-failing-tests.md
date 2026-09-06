@@ -1,15 +1,19 @@
 ---
 name: fabrika-known-failing-tests
-description: pnpm test'te taban çizgisi 4 kırmızı — 3 SEDIA ağ testi + 1 RLS testi; bunlar senin değişikliğinden değil, kovalama
+description: pnpm test'te taban çizgisi 3 kırmızı — hepsi canlı SEDIA API'sine çıkan ağ testleri; bunlar senin değişikliğinden değil, kovalama
 metadata:
   type: reference
   updatedAt: 2026-09-06
 ---
 
-`pnpm test` bu repoda **temiz bir çalışma ağacında bile** kırmızı bitiyor. 2026-09-06
-itibarıyla taban çizgisi: `Test Files 3 failed | 29 passed (32)` · `Tests 4 failed | 141 passed (145)`.
+`pnpm test` bu repoda **temiz bir çalışma ağacında bile** kırmızı bitiyor.
 
-Dört başarısızlık ve sebepleri:
+**Güncel taban çizgisi (2026-09-06, TASK-MTQ0BIV9UXVRU sonrası):**
+`Test Files 2 failed | 42 passed (44)` · `Tests 3 failed | 320 passed (323)` — kalan
+üçü de aşağıdaki SEDIA ağ testleri. Eskiden dördüncü kırmızı `tests/rls.spec.ts` idi;
+**artık yeşil**, bkz. aşağıda 4. madde.
+
+Başarısızlıklar ve sebepleri:
 
 1. `tests/sedia-adapter.test.ts` → "should format framework programme filters correctly"
 2. `tests/k1-daily-calls.test.ts` → "should return empty array on fetch failure gracefully"
@@ -18,14 +22,14 @@ Dört başarısızlık ve sebepleri:
    Üçü de **canlı SEDIA API'sine** çıkıyor ve 5s/10s timeout ile düşüyor. Ağ/servis
    bağımlı; mock'lanmamışlar. Kendi değişikliğinle ilgisi yok.
 
-4. `tests/rls.spec.ts` → "Tenant A cannot see Tenant B workspaces"
+4. ~~`tests/rls.spec.ts` → "Tenant A cannot see Tenant B workspaces"~~ — **ÇÖZÜLDÜ**
+   (TASK-MTQ0BIV9UXVRU). Sebebi uygulama rolünün BYPASSRLS olmasıydı. Spec artık
+   fixture'ları ayrıcalıklı bağlantıyla yazıp iddiaları `DATABASE_URL_RLS_TEST`
+   (`fabrika_app`, NOBYPASSRLS) üzerinden okuyor: [[fabrika-rls-bypass-local-dev]].
 
-   `expect(workspaces.length).toBe(1)` diyor ama DB'deki **tüm** workspace'leri
-   görüyor, çünkü uygulama rolü BYPASSRLS: [[fabrika-rls-bypass-local-dev]].
-   Ayrıca test izole değil — mutlak sayı bekliyor, bu yüzden DB'ye herhangi bir
-   kiracı eklendiğinde (ör. E11.1 beta ortakları) sayı büyür ama sonuç aynı kalır
-   (hep ≠ 1). Düzeltmenin iki ayağı var: rolü BYPASSRLS'siz yapmak **ve** assertion'ı
-   "yalnız kendi kiracısının kaydını görüyor mu"ya çevirmek.
+   **Yine kırmızı görürsen** önce `pnpm db:rls-role` koştur — `DATABASE_URL_RLS_TEST`
+   `.env`'de yoksa spec iddialarını atlar (git'te izlenmeyen bir dosya olduğu için
+   yeni klonda kendiliğinden gelmez).
 
 Kendi değişikliğinin regresyon yapıp yapmadığını anlamak için toplam sayıya değil,
-**hangi testlerin** düştüğüne bak; bu dördünün dışında bir isim varsa o senindir.
+**hangi testlerin** düştüğüne bak; yukarıdaki SEDIA üçlüsü dışında bir isim varsa o senindir.
