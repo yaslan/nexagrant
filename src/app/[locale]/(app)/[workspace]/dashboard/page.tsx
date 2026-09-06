@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { auth } from '@/lib/auth';
 import { can } from '@/lib/rbac';
@@ -7,6 +8,22 @@ import { Dashboard } from '@/modules/m5/ui/Dashboard';
 import { getKpiMetrics, getKpiTrend } from '@/modules/m5/server/queries';
 
 const DEFAULT_RANGE_DAYS = 30;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'Dashboard' });
+
+  return {
+    title: `${t('title')} — Fabrika`,
+    description: t('metaDescription'),
+    // KPI figures are tenant data; keep the page out of every index.
+    robots: { index: false, follow: false },
+  };
+}
 
 /** `YYYY-MM-DD` in local time — the client sends the same shape back. */
 function toParam(date: Date): string {
@@ -25,7 +42,7 @@ function parseRangeParam(value: string | undefined): Date | null {
 
 function Notice({ title, body, detail }: { title: string; body: string; detail?: string }) {
   return (
-    <div className="max-w-2xl mx-auto p-8 text-center">
+    <div className="max-w-2xl mx-auto p-8 text-center" role="alert">
       <h1 className="text-2xl font-bold mb-2">{title}</h1>
       <p className="text-ink-2">{body}</p>
       {detail && <p className="text-xs text-gray-500 mt-4">{detail}</p>}
