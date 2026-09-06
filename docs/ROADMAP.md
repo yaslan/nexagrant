@@ -79,11 +79,12 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 5. Ücretsiz plan kredisi (10) ve deneme süresi (14 gün) — beta sonrası gözden geçirilir.
 6. Başarı primi sunulacak mı, yoksa yalnızca sabit ücret + bonus mu (hukuki görüş).
 7. Türkçe e-fatura entegrasyonu için sağlayıcı.
-8. **G0 eşiği hangi sayıya uygulanıyor?** PROJECT.md:75 kapıyı "uyum ≥ 70 **ve** taban oran ≥ %8 **ve** ülke uygun"
-   diye tanımlıyor; `/settings/gates` ekranı aynı 70'i "Minimum AI Alignment Score" diye etiketliyor;
-   `src/lib/gates/evaluate.ts` ise 70'i **bileşik** skora uyguluyor. Üçü aynı davranış değil — E11.3
-   kalibrasyon koşusunda iki okuma arasında 10 puanlık doğruluk farkı ölçüldü
-   (bkz. `docs/CORDIS-SAMPLE-CALIBRATION.md`). Karar verilmeden eşik değiştirilmemeli.
+8. **G0 eşiği hangi sayıya uygulanıyor?** — ✅ **KARARLAŞTIRILDI (2026-09-06, patron onayı).**
+   Eşik **bileşik skora** uygulanır: `src/lib/scoring/g0-canonical.ts` içindeki 7 faktörlü 0–100
+   bileşik skor **≥ 70**, PROJECT.md:75'in sert kurallarıyla birlikte (taban oran ≥ %8, ülke uygun).
+   Kanonik kural seti = `DEFAULT_G0_RULES`. `SPEC_LITERAL_G0_RULES` yalnız kalibrasyon karşılaştırması
+   için saklanır, kapıda kullanılmaz. Bu karar `/settings/gates` etiketine ve `gates/evaluate.ts`
+   çağrısına yansıtılacaktır (bkz. board TASK-MTQ63RR8Z0G8E).
 
 ## Riskler (teknik)
 - F&T API'si resmî değil → adaptör + yedek kaynak + alarm (E4).
