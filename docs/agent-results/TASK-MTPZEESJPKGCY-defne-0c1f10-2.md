@@ -157,6 +157,16 @@ git checkout -- prisma/seed-tenant-workspace.ts package.json docs/BETA_GUIDE.md 
 ```
 Prod etkisi yok: seeder yalnız yereldeki `DATABASE_URL`'e yazar, canlıya dağıtım yapılmadı.
 
+### Commit notu (çakışma)
+Değişikliklerimi stage edip commit ederken paralel bir ajan `commit -a` tarzı bir commit attı ve
+stage'imdeki dosyaları **kendi commit'inin içine süpürdü**. İçerik kaybı yok — tüm dosyalarım
+**`6114937`** ("fix(m5): report person-days per proposal") içinde, sadece commit mesajı başkasının.
+Paylaşılan `dev` dalında başka ajanlar aktif commit atarken `reset`/`amend` ile tarihi düzeltmedim
+(yıkıcı olurdu). Doğrulama: `git show 6114937 --stat` ve `git show HEAD:prisma/seed-tenant-workspace.ts`.
+
+Board notu: TASK-MTPZEESJPKGCY bu tekrar bana verilmiş olsa da board'da zaten
+`[done] @sora-0c1f10` görünüyor; kartı geri çevirmedim.
+
 ---
 
 ## 5. Riskler

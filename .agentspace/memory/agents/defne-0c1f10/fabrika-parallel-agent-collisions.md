@@ -27,6 +27,23 @@ yazdım ve **onların commit'li dosyasını ezdim**.
 5. İki tasarım çelişiyorsa (bende: tüm-modül vs MVP, Pazartesi-Brüksel vs Perşembe-İstanbul)
    **ikisini de bayrağa bağla**; seçimi ucuzlaştır, kendin seçme.
 
+**YENİ (2026-09-06 tekrar koşumu) — çakışma commit AŞAMASINDA da oluyor:**
+`git add <dosyalarım>` ile stage ettim, `git commit -F -` çalıştırdım → **"no changes added
+to commit"**. Sebep: aradaki saniyelerde başka bir ajan `commit -a` / `add -A` tarzı bir
+commit atmış ve **benim stage'imdeki dosyaları kendi commit'inin içine süpürmüş**
+(`6114937 fix(m5): report person-days…` içinde benim `prisma/seed-tenant-workspace.ts`,
+`docs/BETA_GUIDE*.md`, raporum ve hafıza dosyalarım duruyor).
+
+Nasıl davranmalı:
+- Önce **içerik kayboldu mu** diye bak: `git log --oneline -3 -- <yolum>` +
+  `git show HEAD:<yolum> | grep <benim eklediğim satır>`. İçerik commit'lendiyse **iş
+  bitmiştir**, sadece mesaj başkasının. Paylaşılan `dev` dalında başka ajanlar aktif
+  commit atarken `reset`/`rebase`/`commit --amend` ile tarihi düzeltmeye KALKMA — yıkıcı.
+- Raporda "commit'im X sha'sında, başka ajanın mesajı altında" diye yaz; sha'yı ver.
+- Board da aynı şekilde kayabiliyor: TASK-MTPZEESJPKGCY tekrar bana verildiği hâlde
+  board'da `[done] @sora-0c1f10` görünüyordu. Zaten `done` olan kartı geri çevirme,
+  raporda not düş.
+
 Aynı risk veritabanında da var: paralel ajanlar aynı `localhost:5432/fabrika`'ya yazıyor.
 Şema değişikliği (`prisma db push`) yapmadan önce başkasının uygulamış olabileceğini varsay.
 
