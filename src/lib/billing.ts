@@ -84,3 +84,44 @@ export async function getEntitlements(tenantId: string): Promise<Entitlements> {
     aiCreditsMonthly,
   };
 }
+
+export interface PlanDetails {
+  id: string;
+  name: string;
+  price: { monthly: number; yearly: number; currency: string };
+  seats: number;
+  workspaces: number;
+  aiCreditsMonthly: number;
+  modules: string[];
+}
+
+export async function getAllPlans(): Promise<PlanDetails[]> {
+  const plans = await prisma.plan.findMany({
+    orderBy: { id: 'asc' },
+  });
+
+  return plans.map((plan: (typeof plans)[number]) => ({
+    id: plan.id,
+    name: plan.name,
+    price: {
+      monthly: plan.monthlyCents,
+      yearly: plan.yearlyCents,
+      currency: plan.currency,
+    },
+    seats: plan.seats,
+    workspaces: plan.workspaces,
+    aiCreditsMonthly: plan.aiCreditsMonthly,
+    modules: plan.modules,
+  }));
+}
+
+export function formatPrice(cents: number, currency: string = 'EUR'): string {
+  const euros = cents / 100;
+  const formatter = new Intl.NumberFormat('tr-TR', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+  return formatter.format(euros);
+}
