@@ -1,0 +1,122 @@
+{
+  "Navigation": {
+    "dashboard": "Panel",
+    "calls": "Çağrılar",
+    "pipeline": "Fırsatlar",
+    "partners": "Ortaklar",
+    "relationships": "İlişkiler",
+    "evidence": "Kanıtlar",
+    "conceptNotes": "Konsept Notlar",
+    "settings": "Ayarlar"
+  },
+  "Common": {
+    "loading": "Yükleniyor...",
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "delete": "Sil",
+    "edit": "Düzenle",
+    "create": "Oluştur",
+    "search": "Ara",
+    "filter": "Filtrele",
+    "export": "Dışa Aktar",
+    "back": "Geri",
+    "next": "İleri",
+    "submit": "Gönder",
+    "confirm": "Onayla",
+    "yes": "Evet",
+    "no": "Hayır",
+    "actions": "İşlemler",
+    "status": "Durum",
+    "noResults": "Sonuç bulunamadı."
+  },
+  "Dashboard": {
+    "title": "Panel",
+    "totalProposals": "Toplam Teklif",
+    "thresholdRate": "Eşik Üstü Oranı",
+    "hitRate": "İsabet Oranı",
+    "personDays": "Kişi-Gün / Teklif",
+    "avgDaysG2": "Ort. G2 Süresi (gün)",
+    "activeModules": "Açık Modüller",
+    "aiCredits": "YZ Kredisi",
+    "pipelineFunnel": "Pipeline Hunisi"
+  },
+  "Pipeline": {
+    "title": "Fırsat Pipeline",
+    "newOpportunity": "Yeni Fırsat",
+    "addToPipeline": "Pipeline'a Al",
+    "stage": "Aşama",
+    "score": "Puan"
+  },
+  "Evidence": {
+    "title": "Kanıt Çekmecesi",
+    "addEvidence": "Kanıt Ekle",
+    "expired": "Süresi Dolmuş",
+    "expiringSoon": "Süresi Dolacak",
+    "exportCSV": "CSV Dışa Aktar"
+  },
+  "ConceptNote": {
+    "title": "Konsept Notlar",
+    "aiDraft": "YZ Taslağı",
+    "saveSection": "Bölümü Kaydet",
+    "wordCount": "Kelime Sayısı",
+    "overLimit": "Limit Aşıldı",
+    "aiUsage": "YZ Kullanım Beyanı",
+    "creditsUsed": "Kullanılan Kredi"
+  },
+  "Relationships": {
+    "title": "İlişki Yönetimi",
+    "warmth": "Sıcaklık",
+    "cold": "Soğuk",
+    "warm": "Ilık",
+    "hot": "Sıcak",
+    "active": "Aktif",
+    "stale": "Bayat",
+    "logInteraction": "Etkileşim Kaydet"
+  },
+  "Consortium": {
+    "title": "Konsorsiyum Oluşturucu",
+    "findCandidates": "Aday Bul",
+    "invite": "Davet Et",
+    "conflict": "Çakışma Uyarısı"
+  },
+  "Auth": {
+    "signIn": "Giriş Yap",
+    "signOut": "Çıkış Yap",
+    "register": "Kayıt Ol"
+  },
+  "GDPR": {
+    "cookieConsent": "Bu site çerez kullanmaktadır. Devam ederek çerez kullanımını kabul etmiş olursunuz.",
+    "accept": "Kabul Et",
+    "reject": "Reddet",
+    "privacyPolicy": "Gizlilik Politikası",
+    "terms": "Kullanım Koşulları",
+    "exportData": "Verilerimi İndir",
+    "deleteAccount": "Hesabımı Sil",
+    "dataProcessing": "Veri İşleme Sözleşmesi (DPA)"
+  },
+  "Theme": {
+    "title": "Tema Görünümü",
+    "light": "Açık Mod",
+    "dark": "Koyu Mod",
+    "system": "Sistem"
+  },
+  "Approvals": {
+    "title": "Kurumsal Onay Merkezi",
+    "subtitle": "4-Eyes Çift Onaylı Yetkilendirme Akışı",
+    "actionableTab": "Onayımı Bekleyenler",
+    "myRequestsTab": "Taleplerim (Maker)",
+    "historyTab": "Denetim İzi & Geçmiş",
+    "newRequest": "Yeni Çift Onay Talebi",
+    "approve": "Onayla",
+    "reject": "Reddet",
+    "cancel": "Talebi Geri Çek",
+    "reason": "Red Gerekçesi",
+    "selfApprovalForbidden": "4-Eyes İlkesi Uyarısı: Talep eden kişi kendi talebini onaylayamaz.",
+    "auditHash": "Doğrulama Hash'i",
+    "statusPending": "Onay Bekliyor",
+    "statusApproved": "Onaylandı",
+    "statusRejected": "Reddedildi",
+    "statusCancelled": "İptal Edildi",
+    "statusExpired": "Süresi Doldu"
+  }
+}

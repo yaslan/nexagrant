@@ -1,0 +1,1025 @@
+// Fabrika — Prisma schema (MVP scope + v1.1 tables marked)
+// Conventions: PascalCase singular models, camelCase fields, tenantId on every tenant-scoped table.
+// Money: Int minor units + currency. Timestamps UTC.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "driverAdapters"]
+  binaryTargets   = ["native", "rhel-openssl-3.0.x", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector]
+}
+
+// ───────────────────────── Tenancy & identity ─────────────────────────
+
+model Tenant {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  country       String   // ISO-3166-1 alpha-2
+  orgType       OrgType  @default(SME)
+  pic           String?  // EU Participant Identification Code
+  locale        String   @default("tr")
+  timezone      String   @default("Europe/Istanbul")
+  settings      Json     @default("{}") // scoringWeights, gateRules, aiRegion...
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users         Membership[]
+  workspaces    Workspace[]
+  profile       TenantProfile?
+  subscription  Subscription?
+  moduleStates  ModuleState[]
+  creditLedger  CreditLedger[]
+  auditEvents   AuditEvent[]
+  invitations   Invitation[]
+  approvalRequests ApprovalRequest[]
+}
+
+enum OrgType {
+  SME
+  LARGE
+  UNIVERSITY
+  RESEARCH
+  PUBLIC
+  NGO
+  CONSULTANCY
+  CLUSTER
+  MUNICIPALITY
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified DateTime?
+  image         String?
+  name          String?
+  locale        String   @default("tr")
+  isPlatformAdmin Boolean @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  memberships   Membership[]
+  accounts      Account[]
+  sessions      Session[]
+  evaluations   Evaluation[]
+  requestedApprovals ApprovalRequest[] @relation("Requester")
+  approvedApprovals  ApprovalRequest[] @relation("Approver")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  role      Role     @default(MEMBER)
+  workspaceIds String[] // empty = all workspaces of tenant
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, userId])
+}
+
+enum Role {
+  TENANT_OWNER
+  TENANT_ADMIN
+  PIPELINE_MANAGER
+  WRITER
+  MEMBER
+  GUEST_PARTNER
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String   // e.g. client name for consultancies
+  slug      String
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  opportunities Opportunity[]
+  @@unique([tenantId, slug])
+}
+
+model TenantProfile {
+  tenantId      String   @id
+  capabilities  String   // free text, used for embedding
+  keywords      String[]
+  naceCodes     String[]
+  trlRange      Int[]    // [min,max]
+  preferredRoles String[] // coordinator, tech_provider, pilot_site, dissemination...
+  priorProjects Json     @default("[]")
+  embedding     Unsupported("vector(1536)")?
+  updatedAt     DateTime @updatedAt
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────────── Modules & entitlements ─────────────────────────
+
+model ModuleCatalog {           // platform-level, seeded from manifests
+  id          String  @id      // "M1".."M11"
+  key         String  @unique
+  name        String
+  version     String
+  requires    String[]
+  recommends  String[]
+  planTiers   String[]
+  addOnSku    String?
+  isActive    Boolean @default(true)
+}
+
+enum ModuleStatus {
+  OFF
+  DEV
+  PILOT
+  ON
+}
+
+model ModuleState {
+  id        String       @id @default(cuid())
+  tenantId  String
+  moduleId  String
+  status    ModuleStatus @default(OFF)
+  settings  Json         @default("{}")
+  changedBy String?
+  changedAt DateTime     @default(now())
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, moduleId])
+}
+
+model Plan {                    // seeded: free, starter, team, business, enterprise
+  id            String  @id    // "team"
+  name          String
+  monthlyCents  Int
+  yearlyCents   Int
+  currency      String  @default("EUR")
+  seats         Int
+  workspaces    Int
+  aiCreditsMonthly Int
+  modules       String[]       // default ON modules
+  stripePriceMonthly String?
+  stripePriceYearly  String?
+}
+
+model AddOnCatalog {
+  sku           String @id     // "addon_m6", "addon_m11", "addon_seat_team", "addon_credits_250"
+  name          String
+  monthlyCents  Int?
+  oneTimeCents  Int?
+  currency      String @default("EUR")
+  grantsModule  String?
+  grantsSeats   Int?
+  grantsCredits Int?
+  grantsWorkspaces Int?
+  stripePriceId String?
+}
+
+model Subscription {
+  tenantId          String   @id
+  planId            String
+  status            SubStatus @default(TRIALING)
+  billingInterval   String   @default("month") // month|year
+  provider          String   @default("stripe") // stripe|iyzico
+  providerCustomerId String?
+  providerSubId     String?
+  currentPeriodEnd  DateTime?
+  seatsExtra        Int      @default(0)
+  workspacesExtra   Int      @default(0)
+  trialEndsAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  addOns            AddOn[]
+}
+
+enum SubStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PAUSED
+}
+
+model AddOn {
+  id             String   @id @default(cuid())
+  tenantId       String
+  sku            String
+  quantity       Int      @default(1)
+  providerItemId String?
+  startedAt      DateTime @default(now())
+  endedAt        DateTime?
+  subscription   Subscription @relation(fields: [tenantId], references: [tenantId], onDelete: Cascade)
+  @@index([tenantId, sku])
+}
+
+model CreditLedger {
+  id        String   @id @default(cuid())
+  tenantId  String
+  delta     Int      // + grant, - usage
+  reason    String   // monthly_grant | purchase | usage:M2 | refund
+  refId     String?
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId, createdAt])
+}
+
+// ───────────────────────── K1 Calls (shared, not tenant-scoped) ─────────────────────────
+
+model Programme {
+  id        String @id          // "HE", "DEP", "EUROSTARS", "CETP", "DUT", "ERASMUS", "EIT", "EUREKA", "TUBITAK"
+  name      String
+  sourceKey String             // adapter key
+  calls     Call[]
+}
+
+model Call {
+  id           String   @id @default(cuid())
+  programmeId  String
+  callIdentifier String @unique   // e.g. HORIZON-CL5-2026-09
+  title        String
+  openDate     DateTime?
+  budgetCents  BigInt?
+  currency     String   @default("EUR")
+  url          String?
+  programme    Programme @relation(fields: [programmeId], references: [id])
+  topics       Topic[]
+}
+
+model Topic {
+  id             String   @id @default(cuid())
+  callId         String
+  identifier     String   @unique // HORIZON-CL5-2026-09-D4-01
+  title          String
+  status         TopicStatus @default(FORTHCOMING)
+  typeOfAction   String?   // RIA IA CSA ...
+  isLumpSum      Boolean  @default(false)
+  isTwoStage     Boolean  @default(false)
+  budgetPerProjectCents BigInt?
+  numProjects    Int?
+  deadlines      Json     // [{stage:1, at:"2026-09-15T17:00:00Z", tz:"Europe/Brussels"}]
+  nextDeadlineAt DateTime?
+  eligibility    Json     @default("{}") // { restricted: "EU_EEA_CH_ONLY" | null, countriesExcluded: [] , notes }
+  destination    String?
+  keywords       String[]
+  description    String?  // expected outcomes + scope (from topicDetails)
+  sourceUrl      String?
+  rawHash        String?
+  embedding      Unsupported("vector(1536)")?
+  fetchedAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  call           Call     @relation(fields: [callId], references: [id])
+  matches        TopicMatch[]
+  stats          TopicStat[]
+  @@index([nextDeadlineAt])
+  @@index([status])
+}
+
+enum TopicStatus {
+  FORTHCOMING
+  OPEN
+  CLOSED
+}
+
+model TopicStat {                 // K3 — Horizon Dashboard imports (shared)
+  id            String @id @default(cuid())
+  topicId       String?
+  topicPrefix   String            // e.g. HORIZON-CL5-2025-02-D4
+  country       String?           // null = all
+  orgType       String?
+  proposals     Int?
+  funded        Int?
+  successRate   Float?
+  source        String            // "horizon-dashboard-2026Q3"
+  importedAt    DateTime @default(now())
+  topic         Topic?   @relation(fields: [topicId], references: [id])
+  @@index([topicPrefix])
+}
+
+model RawFetch {
+  id        String   @id @default(cuid())
+  source    String
+  key       String
+  hash      String
+  storageUrl String?
+  payload   Json?
+  fetchedAt DateTime @default(now())
+  @@index([source, key])
+}
+
+model SystemAlert {
+  id        String   @id @default(cuid())
+  level     String   // info|warn|error
+  source    String
+  message   String
+  meta      Json?
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+}
+
+// ───────────────────────── K1 tenant-scoped ─────────────────────────
+
+model TopicMatch {
+  id        String   @id @default(cuid())
+  tenantId  String
+  topicId   String
+  fitScore  Float    // 0..100
+  g0Score   Float?   // weighted total
+  breakdown Json     // per-criterion
+  computedAt DateTime @default(now())
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, topicId])
+  @@index([tenantId, g0Score])
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  name      String
+  filters   Json
+  notify    Boolean  @default(true)
+  lastRunAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([tenantId])
+}
+
+// ───────────────────────── K2 CORDIS & M1 Derived Tables (shared) ─────────────────────────
+
+model CordisProject {
+  id                 String     @id // CORDIS project id (PK)
+  rcn                String?
+  acronym            String?
+  title              String
+  objective          String?    @db.Text
+  status             String?
+  framework          String     // HORIZON | H2020
+  masterCall         String?
+  subCall            String?
+  fundingScheme      String?
+  legalBasis         String?
+  startDate          DateTime?
+  endDate            DateTime?
+  ecSignatureDate    DateTime?
+  totalCost          BigInt?
+  ecMaxContribution  BigInt?
+  grantDoi           String?
+  contentUpdateDate  DateTime?
+  rawJson            Json?
+  importedAt         DateTime   @default(now())
+
+  participations     CordisParticipation[]
+  topics             CordisProjectTopic[]
+  scivocs            CordisProjectSciVoc[]
+
+  @@index([startDate])
+  @@index([masterCall])
+  @@index([framework])
+}
+
+model CordisOrganization {
+  organisationId     String     @id // CORDIS organisationID (PIC)
+  name               String
+  nameNormalized     String?
+  shortName          String?
+  vatNumber          String?
+  activityType       String?    // HES | REC | PRC | PUB | OTH
+  sme                Boolean    @default(false)
+  country            String?
+  city               String?
+  postCode           String?
+  nutsCode           String?
+  geolocation        String?
+  url                String?
+  isTurkish          Boolean    @default(false)
+  rawJson            Json?
+  updatedAt          DateTime   @updatedAt
+
+  participations     CordisParticipation[]
+  profile            CordisPartnerProfile?
+
+  @@index([country])
+  @@index([activityType])
+  @@index([nameNormalized])
+  @@index([isTurkish])
+}
+
+model CordisParticipation {
+  projectId          String
+  organisationId     String
+  role               String     // coordinator | participant | thirdParty...
+  order              Int?
+  ecContribution     BigInt?
+  netEcContribution  BigInt?
+  totalCost          BigInt?
+  endOfParticipation Boolean?   @default(false)
+  active             Boolean?   @default(true)
+
+  project            CordisProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization       CordisOrganization @relation(fields: [organisationId], references: [organisationId], onDelete: Cascade)
+
+  @@id([projectId, organisationId])
+  @@index([organisationId])
+  @@index([projectId])
+  @@index([role])
+}
+
+model CordisProjectTopic {
+  projectId          String
+  topicCode          String
+  topicTitle         String?
+
+  project            CordisProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, topicCode])
+  @@index([topicCode])
+}
+
+model CordisProjectSciVoc {
+  projectId          String
+  scivocCode         String
+  scivocPath         String?
+  scivocTitle        String?
+
+  project            CordisProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, scivocCode])
+}
+
+model CordisImportRun {
+  runId              String     @id @default(cuid())
+  dataset            String     // HORIZON | H2020
+  startedAt          DateTime   @default(now())
+  finishedAt         DateTime?
+  status             String     // RUNNING | SUCCESS | FAILED
+  fileHash           String?
+  rowCounts          Json?      // { projects: N, organizations: N, participations: N }
+  error              String?    @db.Text
+}
+
+model CordisPartnerProfile {
+  organisationId        String     @id
+  name                  String
+  nameNormalized        String?
+  country               String?
+  activityType          String?
+  sme                   Boolean    @default(false)
+  isTurkish             Boolean    @default(false)
+  
+  totalProjects         Int        @default(0)
+  horizonProjects       Int        @default(0)
+  h2020Projects         Int        @default(0)
+  coordinatorProjects   Int        @default(0)
+  activeProjects        Int        @default(0)
+  totalEcContribution   BigInt     @default(0)
+  lastProjectDate       DateTime?
+
+  topTopics             Json       @default("[]") // top 20 [{code, title, count}]
+  topCountries          Json       @default("[]") // top 20 [{country, count}]
+  topPartners           Json       @default("[]") // top 20 [{organisationId, name, country, count}]
+
+  updatedAt             DateTime   @updatedAt
+  organization          CordisOrganization @relation(fields: [organisationId], references: [organisationId], onDelete: Cascade)
+
+  @@index([country, activityType])
+  @@index([totalProjects])
+  @@index([coordinatorProjects])
+  @@index([isTurkish])
+}
+
+model CordisCoParticipation {
+  orgA                  String
+  orgB                  String
+  sharedProjectCount    Int        @default(0)
+  lastSharedYear        Int?
+
+  @@id([orgA, orgB])
+  @@index([orgA])
+  @@index([orgB])
+}
+
+// ───────────────────────── K5 Pipeline (tenant-scoped) ─────────────────────────
+
+model Opportunity {
+  id           String   @id @default(cuid())
+  tenantId     String
+  workspaceId  String
+  topicId      String?
+  title        String
+  stage        Gate     @default(G0)
+  status       OppStatus @default(ACTIVE)
+  intendedRole String?  // coordinator | partner
+  ownerId      String?
+  g0Score      Float?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  proposal     Proposal?
+  gateDecisions GateDecision[]
+  seats        ConsortiumSeat[]
+  efforts      Effort[]
+  @@index([tenantId, workspaceId, stage])
+  followupDocs FollowupDoc[]
+  applicationParts ApplicationPart[]
+  evaluations Evaluation[]
+}
+
+enum Gate {
+  G0
+  G1
+  G2
+  G3
+  G4
+}
+enum OppStatus {
+  ACTIVE
+  WITHDRAWN
+  SUBMITTED
+  FUNDED
+  REJECTED
+  ABOVE_THRESHOLD
+}
+
+model GateDecision {
+  id            String   @id @default(cuid())
+  tenantId      String
+  opportunityId String
+  gate          Gate
+  passed        Boolean
+  inputs        Json     // values evaluated
+  ruleVersion   String
+  decidedBy     String
+  decidedAt     DateTime @default(now())
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  @@index([tenantId, opportunityId])
+}
+
+model ConsortiumSeat {
+  id            String   @id @default(cuid())
+  tenantId      String
+  opportunityId String
+  roleKey       String   // coordinator | research | industry | end_user | widening | dissemination | custom
+  required      Boolean  @default(true)
+  organizationId String? // filled seat (CORDIS PIC) or
+  partnerOrgId  String?  // tenant-private partner record
+  status        SeatStatus @default(OPEN)
+  budgetCents   BigInt?
+  personMonths  Float?
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  @@index([tenantId, opportunityId])
+}
+
+enum SeatStatus {
+  OPEN
+  CANDIDATE
+  INVITED
+  CONFIRMED
+  DECLINED
+}
+
+model PartnerOrg {                 // tenant-private orgs not in CORDIS
+  id        String  @id @default(cuid())
+  tenantId  String
+  name      String
+  country   String?
+  orgType   String?
+  pic       String?
+  website   String?
+  createdAt DateTime @default(now())
+  @@index([tenantId])
+}
+
+model Proposal {
+  id            String   @id @default(cuid())
+  tenantId      String
+  opportunityId String   @unique
+  acronym       String?
+  submittedAt   DateTime?
+  esrScores     Json?    // {excellence, impact, implementation, total, threshold}
+  esrFileUrl    String?
+  outcome       String?  // funded | reserve | above_threshold | below
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+}
+
+model Effort {
+  id            String   @id @default(cuid())
+  tenantId      String
+  opportunityId String
+  userId        String
+  date          DateTime
+  hours         Float
+  note          String?
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  @@index([tenantId, opportunityId])
+}
+
+// ───────────────────────── M3 Evidence Pack ─────────────────────────
+
+model Evidence {
+  id                 String               @id @default(cuid())
+  tenantId           String
+  kind               String               // corporate | financial | certificate | infrastructure | performance | ethics | partner | personnel
+  category           String               @default("certificate") // CAT-01 .. CAT-08
+  title              String
+  body               String               @db.Text
+  description        String?              @db.Text
+  language           String               @default("tr") // tr | en | bilingual
+  issuingAuthority   String?              // TSE, İTO, TÜRKAK, Audit Firm
+  documentNumber     String?              // Certificate / Doc No
+  issuedAt           DateTime?
+  validFrom          DateTime?
+  validUntil         DateTime?
+  confidentiality    String               @default("INTERNAL") // PUBLIC | CONSORTIUM | INTERNAL | RESTRICTED
+  status             String               @default("VALID") // UNVERIFIED | VALID | EXPIRING_SOON | EXPIRED | REJECTED
+  version            Int                  @default(1)
+  
+  // Cloudflare R2 Depolama Bilgileri
+  r2ObjectKey        String?              // tenantId/orgId/cat/hash.ext
+  fileBucket         String               @default("fonbridge-evidence")
+  fileName           String?
+  fileSizeBytes      Int?
+  mimeType           String?
+  checksumSha256     String?
+  fileUrl            String?
+  sourceUrl          String?
+  sourceDate         DateTime?
+
+  // YZ & OCR Metadata
+  ocrText            String?              @db.Text
+  extractedFields    Json                 @default("{}")
+  tags               String[]
+  lastUsedIn         String?              // proposalId
+  createdBy          String               @default("system")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  claimLinks         ClaimEvidenceLink[]
+  proposalUsages     ProposalUsage[]
+  reminders          EvidenceReminder[]
+
+  @@index([tenantId, kind])
+  @@index([tenantId, category])
+  @@index([tenantId, status])
+  @@index([validUntil])
+}
+
+model Claim {
+  id                 String               @id @default(cuid())
+  tenantId           String
+  statement          String               @db.Text
+  statementEn        String?              @db.Text
+  confidenceScore    Float                @default(1.0)
+  tags               String[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  evidenceLinks      ClaimEvidenceLink[]
+
+  @@index([tenantId])
+}
+
+model ClaimEvidenceLink {
+  id                 String               @id @default(cuid())
+  claimId            String
+  evidenceId         String
+  isPrimary          Boolean              @default(true)
+  notes              String?
+
+  claim              Claim                @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@unique([claimId, evidenceId])
+}
+
+model ProposalUsage {
+  id                 String               @id @default(cuid())
+  tenantId           String
+  opportunityId      String
+  evidenceId         String
+  sectionKey         String               // "PartB_Sec3_2", "Annex_4", "ConceptNote_G0"
+  usedAt             DateTime             @default(now())
+  usedByUserId       String?
+
+  evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, opportunityId])
+}
+
+model EvidenceReminder {
+  id                 String               @id @default(cuid())
+  evidenceId         String
+  notifyAt           DateTime
+  sent               Boolean              @default(false)
+  recipientEmails    String[]
+
+  evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────────── M2 Concept Note ─────────────────────────
+
+model ConceptTemplate {             // platform + tenant templates
+  id        String  @id @default(cuid())
+  tenantId  String? // null = platform
+  key       String  // cetp_pre, dut_pre, eurostars_summary, he_stage1_blind, eic_step1, hopon
+  name      String
+  schema    Json    // sections[] {key,labelKey,maxWords,promptKey}
+  version   String
+}
+
+model ConceptNote {
+  id            String   @id @default(cuid())
+  tenantId      String
+  opportunityId String
+  templateId    String
+  content       Json     // {sectionKey: markdown}
+  status        String   @default("draft") // draft | review | approved
+  version       Int      @default(1)
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId, opportunityId])
+}
+
+// ───────────────────────── M4 Focal Point ─────────────────────────
+
+model Relationship {
+  id             String   @id @default(cuid())
+  tenantId       String
+  organizationId String?  // CORDIS PIC
+  partnerOrgId   String?
+  kind           String   // partner | ncp | city | cluster | consultant | tto
+  ownerUserId    String   // internal focal point
+  counterpartName String?
+  counterpartEmail String?
+  warmth         String   @default("cold") // cold | warm | hot | active
+  lastContactAt  DateTime?
+  nextStep       String?
+  nextStepDue    DateTime?
+  notes          String?
+  updatedAt      DateTime @updatedAt
+  @@index([tenantId, ownerUserId])
+  @@index([tenantId, lastContactAt])
+}
+
+model Interaction {
+  id             String   @id @default(cuid())
+  tenantId       String
+  relationshipId String
+  kind           String   // meeting | email | call | event
+  at             DateTime
+  summary        String?
+  briefId        String?   // M9
+  createdBy      String
+  @@index([tenantId, relationshipId])
+}
+
+// ───────────────────────── M8 Consortium Matching ─────────────────────────
+
+model SeatCandidate {
+  id             String @id @default(cuid())
+  tenantId       String
+  seatId         String
+  organizationId String?
+  partnerOrgId   String?
+  score          Float
+  breakdown      Json
+  rank           Int
+  computedAt     DateTime @default(now())
+  @@index([tenantId, seatId, rank])
+}
+
+// ───────────────────────── K6 AI ─────────────────────────
+
+model AiUsageLog {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String?
+  module      String
+  purpose     String
+  provider    String
+  model       String
+  promptHash  String
+  inputTokens Int
+  outputTokens Int
+  credits     Int
+  proposalId  String?
+  section     String?
+  createdAt   DateTime @default(now())
+  @@index([tenantId, createdAt])
+  @@index([tenantId, proposalId])
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  tenantId  String?  // null = shared public (work programmes)
+  kind      String   // work_programme | topic | cordis_summary | tenant_upload
+  title     String
+  sourceUrl String?
+  fileUrl   String?
+  createdAt DateTime @default(now())
+  chunks    Chunk[]
+}
+
+model Chunk {
+  id         String @id @default(cuid())
+  documentId String
+  tenantId   String?
+  ordinal    Int
+  text       String
+  embedding  Unsupported("vector(1536)")?
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@index([documentId])
+}
+
+// ───────────────────────── Audit ─────────────────────────
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  actorId   String?
+  type      String   // module.state.changed | gate.decided | subscription.updated | ...
+  target    String?
+  data      Json?
+  createdAt DateTime @default(now())
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId, createdAt])
+}
+
+// ───────────────────────── v1.1+ (M6, M9, M10, M11, M7, marketplace) ─────────────────────────
+
+
+model Evaluation {
+  id             String      @id @default(cuid())
+  tenantId       String
+  opportunityId  String
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  readerType     String      // "HUMAN" | "AI"
+  excellence     Float
+  impact         Float
+  implementation Float
+  weaknesses     Json?
+  calibration    Float?
+  createdAt      DateTime    @default(now())
+}
+
+model MeetingBrief {
+  id             String      @id @default(cuid())
+  tenantId       String
+  interactionId  String      @unique
+  content        String
+  createdAt      DateTime    @default(now())
+}
+
+
+
+model FollowupDoc {
+  id             String      @id @default(cuid())
+  tenantId       String
+  opportunityId  String
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  kind           String      // NDA, LOI, COMMITMENT, ESR_DEBRIEF, AWARD_PACK
+  version        Int         @default(1)
+  contentUrl     String?
+  signedAt       DateTime?
+  createdAt      DateTime    @default(now())
+}
+
+model ApplicationPart {
+  id             String      @id @default(cuid())
+  tenantId       String
+  opportunityId  String
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  part           String      // PART_A, PART_B
+  content        Json?       // Section tree, budget tables, etc.
+  magicToken     String?     @unique // For external partner access
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model TtoPortfolioItem {
+  id           String   @id @default(cuid())
+  tenantId     String
+  title        String
+  trl          Int      @default(5)
+  patentStatus String   // pending | granted | licensed
+  summary      String
+  keywords     String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model MarketplaceListing {
+  id          String   @id @default(cuid())
+  tenantId    String
+  kind        String   // service | patent_license | consultancy
+  title       String
+  description String
+  price       String?  // e.g. "€2,500" or "Negotiable"
+  status      String   @default("active") // active | unlisted | fulfilled
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId, kind])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String
+  name        String
+  keyHash     String    @unique
+  prefix      String
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  @@index([tenantId])
+}
+
+model Invitation {
+  id        String   @id @default(cuid())
+  email     String
+  tenantId  String
+  role      Role     @default(MEMBER)
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+  
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  @@unique([email, tenantId])
+}
+
+model ApprovalRequest {
+  id              String         @id @default(cuid())
+  tenantId        String
+  workspaceId     String?
+  actionType      String         // GATE_G4_SUBMISSION | BUDGET_ALLOCATION | LEGAL_COMMITMENT | MEMBER_ROLE_ELEVATION | SENSITIVE_SETTINGS_CHANGE
+  title           String
+  description     String?
+  payload         Json
+  status          ApprovalStatus @default(PENDING)
+  requiredRole    Role           @default(TENANT_ADMIN)
+  requesterId     String
+  approverId      String?
+  rejectionReason String?
+  auditHash       String?
+  expiresAt       DateTime
+  executedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requester       User           @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  approver        User?          @relation("Approver", fields: [approverId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([requesterId])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+

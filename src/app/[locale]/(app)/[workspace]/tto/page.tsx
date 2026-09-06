@@ -1,0 +1,68 @@
+import React from 'react';
+import { prisma } from '@/lib/db';
+import { auth } from '@/lib/auth';
+import { TtoAcceleratorClient } from './client';
+
+export default async function TtoAcceleratorPage({
+  params,
+}: {
+  params: Promise<{ locale: string; workspace: string }>;
+}) {
+  const { locale, workspace } = await params;
+  const session = await auth();
+  const userId = session?.user?.id || 'demo-user-id';
+  const tenantId = (session as any)?.tenantId || 'demo-tenant-1';
+
+  let items: any[] = [];
+  try {
+    items = await prisma.ttoPortfolioItem.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+    });
+  } catch (e: any) {
+    console.warn(`[TtoAcceleratorPage] DB query bypassed: ${e.message}`);
+  }
+
+  // Fallback demo items if DB is unseeded/offline
+  if (items.length === 0) {
+    items = [
+      {
+        id: 'tto-demo-1',
+        title: 'Solid-State Electrolyte Micro-Sensor Array',
+        trl: 5,
+        patentStatus: 'granted',
+        summary: 'Patented high-precision thermal monitoring sensor for EV battery packs in harsh environments.',
+        keywords: ['thermal management', 'sensors', 'battery', 'solid state'],
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'tto-demo-2',
+        title: 'AI-Driven Catalyst Design for Green Hydrogen Synthesis',
+        trl: 4,
+        patentStatus: 'pending',
+        summary: 'Machine learning guided electrocatalyst synthesis for high-efficiency water electrolysis.',
+        keywords: ['green hydrogen', 'catalyst', 'electrolysis', 'machine learning'],
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'tto-demo-3',
+        title: 'Recyclable Carbon Fiber Composite Matrix',
+        trl: 6,
+        patentStatus: 'licensed',
+        summary: 'Bio-based epoxy matrix enabling low-energy recycling of aerospace carbon composites.',
+        keywords: ['composites', 'carbon fiber', 'recycling', 'aerospace'],
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
+      <TtoAcceleratorClient
+        tenantId={tenantId}
+        userId={userId}
+        items={items}
+      />
+    </div>
+  );
+}

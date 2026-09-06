@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Next.js 16 Web Application
+  fabrika-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fabrika-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://fabrika:fabrika_pass@postgres-vector:5432/fabrika_db?schema=public
+      - AUTH_SECRET=fabrika-secret-key-horizon-europe-2026-super-secure
+      - NEXTAUTH_URL=http://localhost:3000
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+
+  # PostgreSQL Database with pgvector extension
+  postgres-vector:
+    image: pgvector/pgvector:pg16
+    container_name: postgres-vector
+    restart: always
+    environment:
+      POSTGRES_USER: fabrika
+      POSTGRES_PASSWORD: fabrika_pass
+      POSTGRES_DB: fabrika_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fabrika -d fabrika_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+    driver: local

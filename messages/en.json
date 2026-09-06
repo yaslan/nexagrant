@@ -1,0 +1,122 @@
+{
+  "Navigation": {
+    "dashboard": "Dashboard",
+    "calls": "Calls",
+    "pipeline": "Pipeline",
+    "partners": "Partners",
+    "relationships": "Relationships",
+    "evidence": "Evidence",
+    "conceptNotes": "Concept Notes",
+    "settings": "Settings"
+  },
+  "Common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "actions": "Actions",
+    "status": "Status",
+    "noResults": "No results found."
+  },
+  "Dashboard": {
+    "title": "Dashboard",
+    "totalProposals": "Total Proposals",
+    "thresholdRate": "Above Threshold Rate",
+    "hitRate": "Hit Rate",
+    "personDays": "Person-Days / Proposal",
+    "avgDaysG2": "Avg Days to G2",
+    "activeModules": "Active Modules",
+    "aiCredits": "AI Credits",
+    "pipelineFunnel": "Pipeline Funnel"
+  },
+  "Pipeline": {
+    "title": "Opportunity Pipeline",
+    "newOpportunity": "New Opportunity",
+    "addToPipeline": "Add to Pipeline",
+    "stage": "Stage",
+    "score": "Score"
+  },
+  "Evidence": {
+    "title": "Evidence Pack",
+    "addEvidence": "Add Evidence",
+    "expired": "Expired",
+    "expiringSoon": "Expiring Soon",
+    "exportCSV": "Export CSV"
+  },
+  "ConceptNote": {
+    "title": "Concept Notes",
+    "aiDraft": "AI Draft",
+    "saveSection": "Save Section",
+    "wordCount": "Word Count",
+    "overLimit": "Over Limit",
+    "aiUsage": "AI Usage Disclosure",
+    "creditsUsed": "Credits Used"
+  },
+  "Relationships": {
+    "title": "Relationship Manager",
+    "warmth": "Warmth",
+    "cold": "Cold",
+    "warm": "Warm",
+    "hot": "Hot",
+    "active": "Active",
+    "stale": "Stale",
+    "logInteraction": "Log Interaction"
+  },
+  "Consortium": {
+    "title": "Consortium Builder",
+    "findCandidates": "Find Candidates",
+    "invite": "Invite",
+    "conflict": "Conflict Warning"
+  },
+  "Auth": {
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "register": "Register"
+  },
+  "GDPR": {
+    "cookieConsent": "This site uses cookies. By continuing, you accept cookie usage.",
+    "accept": "Accept",
+    "reject": "Reject",
+    "privacyPolicy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "exportData": "Export My Data",
+    "deleteAccount": "Delete My Account",
+    "dataProcessing": "Data Processing Agreement (DPA)"
+  },
+  "Theme": {
+    "title": "Appearance",
+    "light": "Light Mode",
+    "dark": "Dark Mode",
+    "system": "System"
+  },
+  "Approvals": {
+    "title": "Enterprise Approvals Center",
+    "subtitle": "4-Eyes Dual-Approval Authorization Workflow",
+    "actionableTab": "Pending My Approval",
+    "myRequestsTab": "My Requests (Maker)",
+    "historyTab": "Audit Trail & History",
+    "newRequest": "New Dual-Approval Request",
+    "approve": "Approve",
+    "reject": "Reject",
+    "cancel": "Withdraw Request",
+    "reason": "Rejection Reason",
+    "selfApprovalForbidden": "4-Eyes Principle Alert: Initiators cannot approve their own requests.",
+    "auditHash": "Verification Hash",
+    "statusPending": "Pending Approval",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected",
+    "statusCancelled": "Cancelled",
+    "statusExpired": "Expired"
+  }
+}

@@ -1,1 +1,58 @@
-@AGENTS.md
+# CLAUDE.md — Fabrika çalışma kuralları
+
+Sen bu depoda çalışan Claude Code'sun. Önce `PROJECT.md`'yi oku; sonra görevle ilgili `docs/` dosyasını. Bu dosya kısa tutulur: kurallar, komutlar, tuzaklar.
+
+## Proje kimliği
+- Ürün: **Fabrika** — Avrupa fonları için çok kiracılı proje pipeline SaaS'ı (Next.js 15 + TS + Prisma + Postgres/pgvector; Python worker).
+- Diller: UI Türkçe (varsayılan) + İngilizce (`next-intl`). Kod, şema, commit: İngilizce.
+- Tek doğruluk kaynağı: `PROJECT.md` → `docs/*.md`. Çelişki görürsen `docs/ROADMAP.md` "Açık kararlar"a yaz, devam etmeden sor.
+
+## Komutlar
+```bash
+pnpm install
+pnpm dev                 # Next.js :3000
+pnpm db:migrate          # prisma migrate dev
+pnpm db:seed             # prisma/seed.ts (planlar, modül kataloğu, demo kiracı)
+pnpm db:rls              # prisma/rls.sql uygula
+pnpm test                # vitest
+pnpm test:e2e            # playwright
+pnpm lint && pnpm typecheck
+pnpm worker:dev          # workers/ (python -m uvicorn app:app --reload)
+pnpm jobs:k1             # K1 çağrı toplama işini elle tetikle
+pnpm jobs:k2 -- --month 2026-09
+```
+
+## Mimari kurallar (ihlal etme)
+1. **Çok kiracılılık:** Her iş tablosunda `tenantId` zorunlu; sorgular `withTenant(prisma, tenantId)` sarmalayıcısından geçer; RLS politikası olmayan tablo PR'ı geçmez.
+2. **Modül sistemi:** Her modül `src/modules/<mX>/manifest.ts` (`id, name, version, requires[], recommends[], planTiers[], addOnSku?, routes[], nav[], permissions[], tables[]`) ile kayıtlıdır. Modül kodu başka modülü doğrudan import etmez; `src/core/events` (olay veri yolu) ve `src/core/contracts` (tipli arayüzler) üzerinden konuşur.
+3. **Modül durumu:** `ModuleState` tablosu (tenant × module → `off|dev|pilot|on`). Rota koruması `requireModule('M8')` middleware'iyle; UI'da `useModuleEnabled('M8')`. Bağımlılık ve kademeli kapanış mantığı **yalnızca** `src/core/modules/state-machine.ts`'te; UI bu fonksiyonu çağırır, kopyalamaz.
+4. **Yetkilendirme:** `PlanEntitlement` + `ModuleState` + rol → `can(user, action, resource)` (`src/lib/authz`). Modül `on` olsa da plan kapsamı dışındaysa kullanılamaz.
+5. **YZ:** Tüm LLM çağrıları `src/core/k6-ai/llm.ts` üzerinden; her çağrı `AiUsageLog` yazar (tenant, user, module, purpose, model, tokens, credits, promptHash) ve kredi düşer. Kullanıcı verisini eğitim için göndermek yok. Prompt'lar `src/core/k6-ai/prompts/*.md` dosyalarında, kodda gömülü string değil.
+6. **Dış veri:** K1/K2 çekiciler idempotent; ham yanıt `RawFetch` tablosuna (veya R2'ye) kaydedilir, sonra normalize edilir. API şeması değişirse (zorunlu alan yok) `SystemAlert` üret, işi kırma.
+7. **Kanıt disiplini:** Kullanıcıya gösterilen her istatistik/oran `Evidence` veya `TopicStat` kaydına bağlıdır; kod içine sabit rakam yazma.
+8. **i18n:** Kullanıcıya görünen sabit metin yok; `t('...')`. Yeni anahtar iki dile de eklenir.
+9. **Para:** Tüm tutarlar `Int` minor unit (cent) + `currency`; hesaplamalar `src/lib/money.ts`.
+10. **Tarih/saat:** DB UTC; çağrı son tarihleri `deadlineAt` (UTC) + `deadlineTz` ("Europe/Brussels"); UI kullanıcı saat diliminde gösterir ve Brüksel saatini de yazar.
+
+## Kod stili
+- TypeScript strict, `noUncheckedIndexedAccess`. Zod ile giriş doğrulama (API ve server action).
+- Server Actions küçük; iş mantığı `src/modules/*/server/` ve `src/core/*/` içinde saf fonksiyonlar → birim test edilebilir.
+- Dosya adları kebab-case; React bileşenleri PascalCase; DB alanları camelCase (Prisma), tablolar PascalCase tekil.
+- Her yeni tablo: migration + RLS + seed (gerekiyorsa) + `docs/DATA_MODEL.md` güncellemesi aynı PR'da.
+- Test: her kapı kuralı, puanlama fonksiyonu ve modül durum makinesi için birim test zorunlu; her modül için en az bir e2e "mutlu yol".
+
+## Yapma
+- F&T Portal'a otomatik gönderim ya da portal oturumu taklidi.
+- Evaluator Lens çıktısını "resmî puan" gibi sunma; her yerde "iç ön değerlendirme" etiketi.
+- Başarı primini "uygun maliyet" olarak modelleme (`docs/BILLING.md`).
+- `any`, `// @ts-ignore`, çevre değişkenlerini doğrudan `process.env` ile okuma (`src/lib/env.ts` kullan).
+
+## Görev akışı
+1. `docs/ROADMAP.md`'den görevi al; kabul kriterini oku.
+2. Plan yaz (kısa), etkilenen dosyaları listele.
+3. Kodla + test + `pnpm lint && pnpm typecheck && pnpm test`.
+4. `docs/` etkilendiyse güncelle. Commit mesajı: `feat(m8): consortium role matrix` biçiminde (scope = modül/katman id).
+5. PR açıklamasında kabul kriterlerini işaretle.
+
+## Yardımcı komutlar
+`.claude/commands/` altında: `/new-module`, `/add-table`, `/review-rls`, `/gate-rule`, `/i18n-check`.

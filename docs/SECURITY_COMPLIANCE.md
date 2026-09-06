@@ -3,22 +3,71 @@
 ## 1. Çok kiracılı izolasyon
 **RLS (Row Level Security) Pattern:**
 - Her kiracı-bağımlı tablo (`tenantId: String` alanı) PostgreSQL RLS politikası ile korunur.
-- Politika: `USING ("tenantId" = current_setting('app.tenant_id'))` ve `WITH CHECK (...)` simetrik.
-- Nullable tenantId tablolar (Document, Chunk, ConceptTemplate) paylaşılan satırlar için `USING ("tenantId" IS NULL OR ...)` kuralı.
-- Sistem-geneli tablolar (Tenant, User, Call, Topic, Cordis*) RLS gerektirmez.
+- Politika iki aşamalı:
+  1. `USING` cümlesi: Okunan satırlar filtrelenir → `"tenantId" = current_setting('app.tenant_id', true)`
+  2. `WITH CHECK` cümlesi: Yazılan/güncelenen satırlar filtrelenir → simetrik ve aynı koşul
+- Nullable tenantId tablolar (Document, Chunk, ConceptTemplate) paylaşılan satırlar için `USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.tenant_id', true))` kuralı.
+- Sistem-geneli tablolar (Tenant, User, Call, Topic, Cordis*, SystemAlert) RLS gerektirmez.
+
+**Katmanlı koruma:**
+```
+┌──────────────────────────────────────────┐
+│ Uygulama (withTenant sarmalayıcı)        │
+├──────────────────────────────────────────┤
+│ Prisma ORM (app.tenant_id session var)   │
+├──────────────────────────────────────────┤
+│ PostgreSQL RLS Policy (veri tabanı)      │ ← DB-level enforcement
+└──────────────────────────────────────────┘
+```
 
 **Uygulama tarafı:**
-- Tüm Prisma sorguları `withTenant(prisma, tenantId)` sarmalayıcısında çalışır → istekte `SET LOCAL app.tenant_id = '<id>'`.
-- Server Action / Route Handler dışında yalın Prisma çağrısı yasak (lint kuralı).
-- Yeni model eklendiğinde tenantId varsa otomatik olarak `prisma/rls.sql`'e politika eklenir.
+- Tüm Prisma sorguları `src/lib/db.ts`'deki `withTenant(prisma, tenantId)` sarmalayıcısında çalışır:
+  ```typescript
+  await withTenant(prisma, tenantId, async (client) => {
+    return client.opportunity.findMany(...)
+  })
+  ```
+  → İstekte `SET LOCAL app.tenant_id = '<id>'` tetiklenir.
+- Server Action / Route Handler dışında yalın `prisma.model.findMany()` çağrısı **yasak** (lint kuralı).
+- Modül event bus (`src/core/events`) yapılar arası veri geçişini sağlar (tenantId implicit).
+
+**Policy Yönetimi:**
+- Tüm policies `prisma/rls.sql`'de toplu tanımlanır (idempotent).
+- Yeni model eklendiğinde:
+  1. `schema.prisma`'ya `tenantId String` alanı ekle
+  2. Modeli `prisma/rls.sql` FOREACH dizisine ekle
+  3. Migration oluştur: `pnpm db:migrate dev`
+  4. Policies uygula: `pnpm db:rls`
+  5. Doğrula: `pnpm rls:check` → PASS
 
 **CI & Doğrulama:**
-- `pnpm rls:check` → `scripts/check-rls.ts` schema.prisma'daki tüm `tenantId` alanlarını tarar, eksik politikaları raporlar.
-- `.github/workflows/check-rls.yml` — PR'da schema/rls.sql değiştiğinde otomatik çalışır.
+- `pnpm rls:check` → `scripts/check-rls.ts` schema.prisma'daki tüm `tenantId` alanlarını tarar, `rls.sql`'deki politikalar ile karşılaştırır; eksik olanları raporlar ve exit code 1 ile çıkar.
+- `.github/workflows/check-rls.yml` — PR'da `prisma/schema.prisma` veya `prisma/rls.sql` değiştiğinde otomatik çalışır; başarısız olursa PR yorumu ekler.
+- Test ve lint pipelines paralel yürütülür.
 
-**Test:**
-- `tests/e2e/rls.spec.ts` — A kiracısı B'nin verilerine erişemesin (API + DB düzeyinde).
-- Lokal: `docker-compose exec db psql` → iki session, farklı `app.tenant_id`, veri izolasyonunu doğrula.
+**Lokal Test:**
+```bash
+# 1. Two psql sessions
+docker-compose exec db psql -U postgres fabrika_dev
+
+# Session A (Tenant A)
+SET app.tenant_id = 'tenant-a-id';
+SELECT * FROM "Workspace"; -- görür
+SELECT * FROM "Workspace" WHERE "tenantId" = 'tenant-b-id'; -- 0 satır (RLS blocks)
+
+# Session B (Tenant B)
+SET app.tenant_id = 'tenant-b-id';
+SELECT * FROM "Workspace"; -- sadece B'nin verisi
+
+# 2. E2E Tests
+pnpm test:e2e -- tests/e2e/rls.spec.ts
+```
+
+**Test Coverage (33 models):**
+- ✅ Opportunity, Workspace, Evidence (API isolation)
+- ✅ TopicMatch, Claim, Interaction (DB-level isolation)
+- ✅ Document, Chunk, ConceptTemplate (nullable tenantId / shared rows)
+- ✅ Cross-tenant session variable test
 
 ## 2. Kimlik ve erişim
 - Auth.js; parola argon2; 2FA (TOTP) faz 2; SSO (SAML/OIDC) Kurumsal.

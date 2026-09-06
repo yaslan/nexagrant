@@ -1,0 +1,83 @@
+'use server';
+
+import { prisma } from '@/lib/db';
+import { runCordisImport } from '@/lib/k2-cordis/importer';
+import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
+import { syncCordisBigData, aggregateCordisMetrics } from '@/lib/cordis-sync';
+import { fetchLiveCordisDelta, getCordisLiveStreamLogs } from '@/lib/cordis-delta';
+import { retrieveChunks, buildRagPrompt } from '@/lib/rag';
+
+export async function handleRunCordisImportAction(dataset: 'HORIZON' | 'H2020', limit?: number) {
+  const importRes = await runCordisImport({ dataset, limit });
+  if (!importRes.success) {
+    return { success: false, error: importRes.error };
+  }
+
+  let profileRes = { updatedProfiles: 0, updatedCoParticipations: 0, durationMs: 0 };
+  if (!importRes.skipped) {
+    profileRes = await generatePartnerProfiles();
+  }
+
+  return {
+    success: true,
+    runId: importRes.runId,
+    skipped: importRes.skipped || false,
+    fileHash: importRes.fileHash,
+    rowCounts: importRes.rowCounts,
+    importDurationMs: importRes.durationMs,
+    profilesUpdated: profileRes.updatedProfiles,
+  };
+}
+
+export async function handleGetK2Status() {
+  const [lastRun, projectCount, orgCount, participationCount, profileCount] = await Promise.all([
+    prisma.cordisImportRun.findFirst({ orderBy: { startedAt: 'desc' } }),
+    prisma.cordisProject.count(),
+    prisma.cordisOrganization.count(),
+    prisma.cordisParticipation.count(),
+    prisma.cordisPartnerProfile.count(),
+  ]);
+
+  return {
+    lastRun: lastRun
+      ? {
+          runId: lastRun.runId,
+          dataset: lastRun.dataset,
+          startedAt: lastRun.startedAt,
+          finishedAt: lastRun.finishedAt,
+          status: lastRun.status,
+          fileHash: lastRun.fileHash,
+          rowCounts: lastRun.rowCounts,
+          error: lastRun.error,
+        }
+      : null,
+    rowCounts: {
+      projects: projectCount,
+      organizations: orgCount,
+      participations: participationCount,
+      profiles: profileCount,
+    },
+  };
+}
+
+export async function handleRunCordisSync() {
+  return await syncCordisBigData();
+}
+
+export async function handleGetCordisMetrics() {
+  return await aggregateCordisMetrics();
+}
+
+export async function handleRunCordisLiveDelta(sinceDays: number = 7) {
+  return await fetchLiveCordisDelta(sinceDays);
+}
+
+export async function handleGetCordisDeltaLogs() {
+  return await getCordisLiveStreamLogs();
+}
+
+export async function handleTestRagQuery(query: string, topK: number = 3) {
+  const chunks = await retrieveChunks(query, topK);
+  const ragPrompt = await buildRagPrompt(query, undefined, topK);
+  return { chunks, ragPrompt };
+}

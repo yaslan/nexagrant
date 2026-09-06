@@ -1,0 +1,51 @@
+export default async function TermsPage({
+  params
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const isTr = locale === 'tr';
+
+  return (
+    <div className="max-w-4xl mx-auto py-12 px-6 bg-surface border rounded-xl my-8">
+      <h1 className="text-3xl font-bold font-heading mb-6 text-ink">
+        {isTr ? 'Kullanım Koşulları ve Hizmet Sözleşmesi' : 'Terms of Service'}
+      </h1>
+      
+      <div className="prose prose-slate max-w-none text-ink-2 space-y-6">
+        <section>
+          <h2 className="text-xl font-bold text-ink mb-2">
+            {isTr ? '1. Hizmetin Tanımı ve Kapsamı' : '1. Service Scope'}
+          </h2>
+          <p>
+            {isTr 
+              ? 'FonBridge, Horizon Europe ve diğer uluslararası Ar-Ge fonları için çağrı keşfi, konsorsiyum eşleştirme ve yapay zeka destekli başvuru hazırlama yazılımı sunar.'
+              : 'FonBridge provides discovery, consortium matching, and AI-assisted proposal preparation tools for Horizon Europe and international research funding.'}
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-bold text-ink mb-2">
+            {isTr ? '2. Yapay Zeka Çıktıları ve Sorumluluk' : '2. AI Generated Content'}
+          </h2>
+          <p>
+            {isTr 
+              ? 'Sistem tarafından üretilen konsept notlar ve metin taslakları karar destek niteliğindedir. Başvuru sahibinin resmi teslim öncesinde metinleri doğrulama ve etik kurallara uyumunu denetleme yükümlülüğü bulunmaktadır.'
+              : 'AI-generated concept notes and sections are intended as decision support drafts. The applicant holds sole responsibility for final review, factual correctness, and compliance with grant authority guidelines.'}
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-bold text-ink mb-2">
+            {isTr ? '3. Abonelik, Krediler ve İptal' : '3. Subscriptions & Credits'}
+          </h2>
+          <p>
+            {isTr 
+              ? 'Abonelikler seçilen dönem başında tahsil edilir. Kullanılmayan yapay zeka kredileri plan yenilemesinde güncellenir. Müşteri portalı üzerinden abonelik istenildiğinde iptal edilebilir.'
+              : 'Subscriptions are billed in advance per billing cycle. AI credits are granted per plan entitlements and may be cancelled anytime via the Stripe Customer Portal.'}
+          </p>
+        </section>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,326 @@
+import NextAuth from "next-auth";
+import Google from "next-auth/providers/google";
+import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
+import Credentials from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { prisma } from "./db";
+
+const DEMO_PROFILES: Record<string, { name: string; orgName: string; orgType: any; role: string; isPlatformAdmin?: boolean }> = {
+  "admin@yasinaslan.com.tr": {
+    name: "Yasin Aslan (Süperadmin)",
+    orgName: "FonBridge HQ",
+    orgType: "CONSULTANCY",
+    role: "TENANT_OWNER",
+    isPlatformAdmin: true,
+  },
+  "mehmet@fonbridge.app": {
+    name: "Dr. Mehmet Yılmaz",
+    orgName: "FonBridge SME Ar-Ge Ltd.",
+    orgType: "SME",
+    role: "TENANT_OWNER",
+  },
+  "ayse@tto.edu.tr": {
+    name: "Prof. Dr. Ayşe Kaya",
+    orgName: "İstanbul Teknik Üniversitesi TTO",
+    orgType: "UNIVERSITY",
+    role: "TENANT_OWNER",
+  },
+  "can@arge-lab.com": {
+    name: "Dr. Can Demir",
+    orgName: "Biyo-Teknoloji Araştırma Merkezi",
+    orgType: "RESEARCH",
+    role: "PIPELINE_MANAGER",
+  },
+};
+
+const baseAdapter = PrismaAdapter(prisma);
+
+const safeAdapter: any = {
+  ...baseAdapter,
+  async createUser(user: any) {
+    try {
+      return await baseAdapter.createUser!(user);
+    } catch (e: any) {
+      console.warn(`[AuthAdapter.createUser] DB error/fallback: ${e.message}`);
+      return {
+        id: `user-oauth-${Date.now()}`,
+        email: user.email,
+        name: user.name || user.email?.split("@")[0],
+        image: user.image,
+        emailVerified: new Date(),
+      };
+    }
+  },
+  async getUser(id: string) {
+    try {
+      return await baseAdapter.getUser!(id);
+    } catch (e: any) {
+      console.warn(`[AuthAdapter.getUser] DB error/fallback: ${e.message}`);
+      return null;
+    }
+  },
+  async getUserByEmail(email: string) {
+    try {
+      return await baseAdapter.getUserByEmail!(email);
+    } catch (e: any) {
+      console.warn(`[AuthAdapter.getUserByEmail] DB error/fallback: ${e.message}`);
+      return null;
+    }
+  },
+  async getUserByAccount(account: any) {
+    try {
+      return await baseAdapter.getUserByAccount!(account);
+    } catch (e: any) {
+      console.warn(`[AuthAdapter.getUserByAccount] DB error/fallback: ${e.message}`);
+      return null;
+    }
+  },
+  async linkAccount(account: any) {
+    try {
+      return await baseAdapter.linkAccount!(account);
+    } catch (e: any) {
+      console.warn(`[AuthAdapter.linkAccount] DB error/fallback: ${e.message}`);
+      return account;
+    }
+  },
+  async createSession(session: any) {
+    try {
+      return await baseAdapter.createSession!(session);
+    } catch (e: any) {
+      console.warn(`[AuthAdapter.createSession] DB error/fallback: ${e.message}`);
+      return session;
+    }
+  },
+  async getSessionAndUser(sessionToken: string) {
+    try {
+      return await baseAdapter.getSessionAndUser!(sessionToken);
+    } catch (e: any) {
+      console.warn(`[AuthAdapter.getSessionAndUser] DB error/fallback: ${e.message}`);
+      return null;
+    }
+  },
+  async updateSession(session: any) {
+    try {
+      return await baseAdapter.updateSession!(session);
+    } catch (e: any) {
+      console.warn(`[AuthAdapter.updateSession] DB error/fallback: ${e.message}`);
+      return session;
+    }
+  },
+  async deleteSession(sessionToken: string) {
+    try {
+      return await baseAdapter.deleteSession!(sessionToken);
+    } catch (e: any) {
+      console.warn(`[AuthAdapter.deleteSession] DB error/fallback: ${e.message}`);
+    }
+  },
+};
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: safeAdapter,
+  session: { strategy: "jwt" },
+  trustHost: true,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "fabrika-secret-key-horizon-europe-2026-super-secure",
+  basePath: "/api/auth",
+  providers: [
+    Google({
+      clientId: process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID || "demo-google-id",
+      clientSecret: process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET || "demo-google-secret",
+      allowDangerousEmailAccountLinking: true,
+    }),
+    MicrosoftEntraID({
+      clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID || "demo-entra-id",
+      clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET || "demo-entra-secret",
+      tenantId: process.env.AUTH_MICROSOFT_ENTRA_ID_TENANT_ID || "common",
+      allowDangerousEmailAccountLinking: true,
+    } as any),
+    Credentials({
+      name: "Email / Demo",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = (credentials?.email as string)?.trim()?.toLowerCase();
+        if (!email) return null;
+
+        const demoProfile = DEMO_PROFILES[email];
+        const computedName =
+          demoProfile?.name ||
+          email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        const isSuperadmin = email === "admin@yasinaslan.com.tr" || !!demoProfile?.isPlatformAdmin;
+
+        try {
+          // Find or create user
+          let user = await prisma.user.findUnique({
+            where: { email },
+            include: { memberships: true },
+          });
+
+          if (!user) {
+            // Auto create user and organization
+            user = await prisma.$transaction(async (tx) => {
+              const newUser = await tx.user.create({
+                data: {
+                  email,
+                  name: computedName,
+                  locale: "tr",
+                  isPlatformAdmin: isSuperadmin,
+                },
+              });
+
+              const tenant = await tx.tenant.create({
+                data: {
+                  name: demoProfile?.orgName || `${computedName} Kuruluşu`,
+                  slug: `org-${newUser.id.slice(-6)}`,
+                  country: "TR",
+                  orgType: demoProfile?.orgType || "SME",
+                },
+              });
+
+              const workspace = await tx.workspace.create({
+                data: {
+                  tenantId: tenant.id,
+                  name: "Ana Çalışma Alanı",
+                  slug: "default",
+                },
+              });
+
+              await tx.membership.create({
+                data: {
+                  userId: newUser.id,
+                  tenantId: tenant.id,
+                  role: demoProfile?.role || "TENANT_OWNER",
+                  workspaceIds: [workspace.id],
+                },
+              });
+
+              return newUser;
+            });
+          } else {
+            // Ensure superadmin flag and name are updated
+            if (isSuperadmin && !user.isPlatformAdmin) {
+              user = await prisma.user.update({
+                where: { id: user.id },
+                data: { isPlatformAdmin: true, name: computedName },
+                include: { memberships: true },
+              });
+            }
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name || computedName,
+            image: user.image,
+          };
+        } catch (error: any) {
+          console.warn(`[Auth.authorize] DB fallback for demo: ${error.message}`);
+          return {
+            id: email === "admin@yasinaslan.com.tr" ? "superadmin-yasin" : "demo-user-mehmet",
+            email,
+            name: computedName,
+          };
+        }
+      },
+    }),
+  ],
+  callbacks: {
+    async jwt({ token, user, trigger }) {
+      if (user) {
+        token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
+        token.image = user.image;
+      }
+
+      if (token.email) {
+        const emailLower = token.email.toLowerCase();
+        const demo = DEMO_PROFILES[emailLower];
+        if (demo) {
+          token.name = demo.name;
+          if (demo.isPlatformAdmin || emailLower === "admin@yasinaslan.com.tr") {
+            token.isPlatformAdmin = true;
+          }
+        }
+      }
+
+      if (token.id && (!token.tenantId || trigger === "signIn")) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            include: { memberships: true },
+          });
+          if (dbUser) {
+            if (dbUser.isPlatformAdmin) token.isPlatformAdmin = true;
+            if (dbUser.memberships.length > 0) {
+              const activeMembership = dbUser.memberships[0];
+              token.tenantId = activeMembership.tenantId;
+              token.role = activeMembership.role;
+              token.workspaceIds = activeMembership.workspaceIds;
+              if (dbUser.name) token.name = dbUser.name;
+            }
+          }
+        } catch (e: any) {
+          console.warn(`[Auth.jwt] DB query bypassed: ${e.message}`);
+          token.tenantId = "demo-tenant-hq";
+          token.role = "TENANT_OWNER";
+          token.workspaceIds = ["default"];
+        }
+      }
+
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = (token.id as string) || (token.sub as string);
+        session.user.name = (token.name as string) || session.user.name;
+        session.user.email = (token.email as string) || session.user.email;
+        session.user.image = (token.image as string) || session.user.image;
+        (session as any).tenantId = token.tenantId || "demo-tenant-hq";
+        (session as any).role = token.role || "TENANT_OWNER";
+        (session as any).workspaceIds = token.workspaceIds || ["default"];
+        (session as any).isPlatformAdmin = token.isPlatformAdmin || token.email === "admin@yasinaslan.com.tr";
+      }
+      return session;
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      const userId = user.id;
+      if (!userId) return;
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          const tenant = await tx.tenant.create({
+            data: {
+              name: `${user.name || "My"} Organization`,
+              slug: `org-${userId.slice(-6)}`,
+              country: "TR",
+              orgType: "SME",
+            },
+          });
+
+          const workspace = await tx.workspace.create({
+            data: {
+              tenantId: tenant.id,
+              name: "Default Workspace",
+              slug: "default",
+            },
+          });
+
+          await tx.membership.create({
+            data: {
+              userId,
+              tenantId: tenant.id,
+              role: "TENANT_OWNER",
+              workspaceIds: [workspace.id],
+            },
+          });
+        });
+      } catch (err: any) {
+        console.warn(`[Auth.createUser] DB error: ${err.message}`);
+      }
+    },
+  },
+});

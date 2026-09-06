@@ -9,6 +9,10 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
+    "test:e2e": "playwright test",
+    "db:migrate": "prisma migrate dev",
+    "db:rls": "psql -f prisma/rls.sql",
+    "db:seed": "tsx prisma/seed.ts",
     "rls:check": "tsx scripts/check-rls.ts"
   },
   "dependencies": {

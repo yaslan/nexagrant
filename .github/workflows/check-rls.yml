@@ -29,4 +29,37 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check RLS policies
+        id: rls_check
         run: pnpm rls:check
+        continue-on-error: true
+
+      - name: Comment on PR if RLS Check Fails
+        if: steps.rls_check.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `❌ **RLS Policy Check Failed**
+
+One or more tenant-scoped models are missing RLS policies in \`prisma/rls.sql\`.
+
+**Action Required:**
+1. Run \`pnpm rls:check\` locally to see which models are missing
+2. Add the missing models to the FOREACH array in \`prisma/rls.sql\`
+3. Verify with \`pnpm db:rls\` that policies are applied correctly
+4. Commit and push the changes
+
+**RLS Pattern:**
+- Every tenant-scoped table must have a \`tenantId\` field
+- Tables must have a \`tenant_isolation\` RLS policy enforcing: \`"tenantId" = current_setting('app.tenant_id', true)\`
+- Tables with nullable \`tenantId\` use \`tenant_or_shared\` policy
+
+See [SECURITY_COMPLIANCE.md](docs/SECURITY_COMPLIANCE.md) for details.`
+            })
+
+      - name: Fail if RLS Check Failed
+        if: steps.rls_check.outcome == 'failure'
+        run: exit 1
