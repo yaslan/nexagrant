@@ -36,13 +36,13 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 - Kabul: PROJECT.md §8 modül maddeleri.
 
 ### E4 · K1 çağrı toplama, kayıtlı arama, uyarı (S3–S4)
-- [x] `adapters/sedia.ts` (arama + topicDetails; zod şema; ham kayıt; SystemAlert), `adapters/eurostars.ts`, `adapters/tubitak.ts`; Inngest günlük iş (`k1-daily-calls.ts`, `0 2 * * *`); normalize.
-- [ ] Uygunluk çıkarımı (ülke listesi, "EU/EEA/CH only" tespiti), lump-sum/iki aşamalı bayrakları.
-  doğrulanmadı: adaptör/normalize kodu içinde bu alanlar taranmadı — ayrıca teyit gerek.
+- [x] `adapters/sedia.ts` (arama; zod sözleşmeleri `adapters/schemas/`; ham kayıt; SystemAlert), `adapters/eurostars.ts`, `adapters/tubitak.ts`; Inngest günlük iş (`k1-daily-calls.ts`, `0 2 * * *`); normalize; elle tetikleme `pnpm jobs:k1`.
+- [x] Uygunluk çıkarımı (`eligibility.eligibleCountries`, "EU/EEA/CH only" → `['EU','EEA','CH']`), lump-sum/iki aşamalı bayrakları, `ageInDays`.
+  doğrulandı 2026-09-06 (`pnpm jobs:k1 -- --dry-run`): SEDIA 1214 konu / 12 sn · lumpSum 453 · twoStage 592 · EU-EEA-CH-only 25 · ageInDays 1214/1214. Eurostars 2 çağrı, TÜBİTAK 54 program. Birim testler: `tests/k1-adapters.test.ts` (16 test, ağsız fixture).
 - [ ] `TenantProfile` formu + embedding; `TopicMatch` gece hesaplama; `/calls` listesi (filtre: program, son tarih, uygunluk, uyum), `/calls/[id]`.
   kısmi: `TenantProfile` formu (`settings/profile`) ve `embedding vector(1536)` alanları var; `/calls` listesi + filtre + `/calls/[id]` var. **`TopicMatch` gece hesaplama işi (cron) yok** — model şemada duruyor ama `TopicMatch` yalnız bir yorum satırında (`src/lib/scoring/g0-canonical.ts:29`) geçiyor, onu dolduran bir job bulunamadı.
 - [x] `SavedSearch` + günlük diff e-postası (Resend, tr/en) (`SavedSearch` modeli, `src/lib/inngest/jobs/alerts-daily.ts`, Resend kullanımı `src/actions`/`src/lib/feedback` içinde doğrulandı).
-- Kabul: ≥500 konu; uyarı 24 saat içinde; API şeması değişince alarm.
+- Kabul: ≥500 konu **(karşılandı: 1214)**; uyarı 24 saat içinde; API şeması değişince alarm **(zarf zod doğrulaması → `SystemAlert`; testle kanıtlandı)**.
 
 ### E5 · K5/M5 pipeline ve kapılar (S4–S5)
 - [ ] `Opportunity` oluşturma (`/calls/[id]` → "pipeline'a al"), kanban, kapı paneli, `evaluateGate` + varsayılan kurallar + `/settings/gates`, T-6 plan şablonu, görevler, çaba kaydı, takvim.

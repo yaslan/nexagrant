@@ -8,6 +8,15 @@ import { z } from 'zod';
 // K1: Daily call sync from external sources
 export const K1DailyCallsEventSchema = z.object({});
 
+/** Per-source outcome, so a dead upstream is visible in the run result. */
+export const K1SourceResultSchema = z.object({
+  source: z.string(),
+  status: z.enum(['ok', 'error']),
+  topicsProcessed: z.number(),
+  reason: z.string().optional(),
+  schemaDrift: z.array(z.string()).default([]),
+});
+
 export const K1DailyCallsOutputSchema = z.object({
   success: z.boolean(),
   totalProcessed: z.number(),
@@ -16,11 +25,16 @@ export const K1DailyCallsOutputSchema = z.object({
   sediaCount: z.number(),
   eurostarsCount: z.number(),
   tubitakCount: z.number(),
+  sources: z.array(K1SourceResultSchema).default([]),
+  /** True when at least one adapter reported an upstream contract change. */
+  schemaChangeDetected: z.boolean().default(false),
   errors: z.array(z.object({
     identifier: z.string(),
     message: z.string(),
   })).optional(),
 });
+
+export type K1SourceResult = z.infer<typeof K1SourceResultSchema>;
 
 export type K1DailyCallsInput = z.infer<typeof K1DailyCallsEventSchema>;
 export type K1DailyCallsOutput = z.infer<typeof K1DailyCallsOutputSchema>;

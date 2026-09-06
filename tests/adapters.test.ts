@@ -113,19 +113,21 @@ describe('K1 Topic Adapters - Schema Validation', () => {
     });
   });
 
-  describe('Adapter implementations', () => {
+  // Live — hits the real endpoints. See tests/k1-adapters.test.ts for the
+  // offline coverage. Run with RUN_LIVE_ADAPTER_TESTS=1.
+  describe.skipIf(!process.env.RUN_LIVE_ADAPTER_TESTS)('Adapter implementations', () => {
     it('EurostarsAdapter should initialize', async () => {
       const adapter = new EurostarsAdapter();
       expect(adapter).toBeDefined();
       const topics = await adapter.fetchTopics();
       expect(Array.isArray(topics)).toBe(true);
-    });
+    }, 30000);
 
     it('TubitakAdapter should initialize', async () => {
       const adapter = new TubitakAdapter();
       expect(adapter).toBeDefined();
       const topics = await adapter.fetchTopics();
       expect(Array.isArray(topics)).toBe(true);
-    });
+    }, 30000);
   });
 });

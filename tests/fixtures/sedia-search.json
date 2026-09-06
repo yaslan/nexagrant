@@ -1,0 +1,63 @@
+{
+  "apiVersion": "2.154",
+  "totalResults": 1214,
+  "pageNumber": 1,
+  "pageSize": 1,
+  "results": [
+    {
+      "reference": "50132976TOPICSen",
+      "summary": "MSCA COFUND 2027",
+      "metadata": {
+        "identifier": [
+          "HORIZON-MSCA-2027-COFUND-01-01"
+        ],
+        "title": [
+          "MSCA COFUND 2027"
+        ],
+        "status": [
+          "31094501"
+        ],
+        "typesOfAction": [
+          "HORIZON TMA MSCA Cofund Doctoral programme"
+        ],
+        "frameworkProgramme": [
+          "43108390"
+        ],
+        "callIdentifier": [
+          "HORIZON-MSCA-2027-COFUND-01"
+        ],
+        "callTitle": [
+          "MSCA COFUND 2027"
+        ],
+        "deadlineDate": [
+          "2027-04-06T00:00:00.000+0000"
+        ],
+        "deadlineModel": [
+          "single-stage"
+        ],
+        "startDate": [
+          "2026-12-08T00:00:00.000+0000"
+        ],
+        "keywords": [
+          "HORIZON-MSCA-2027-COFUND-01-01",
+          "HORIZON-MSCA-2027-COFUND-01"
+        ],
+        "url": [
+          "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/HORIZON-MSCA-2027-COFUND-01-01"
+        ],
+        "budgetOverview": [
+          "{\"budgetYearsColumns\":[\"2027\"],\"budgetTopicActionMap\":{\"112956\":[{\"action\":\"HORIZON-MSCA-2027-COFUND-01-01 - HORIZON-TMA-MSCA-Cofund-D HORIZON TMA MSCA Cofund Doctoral programme\",\"expectedGrants\":0,\"minContribution\":0,\"maxContribution\":0,\"budgetYearMap\":{\"2027\":\"51251165\"},\"plannedOpeningDate\":\"2026-12-08\",\"deadlineModel\":\"single-stage\",\"deadlineDates\":[\"2027-04-06\"]}]}}"
+        ],
+        "destination": [
+          "48080591"
+        ],
+        "descriptionByte": [
+          "<p class=\"topicdescriptionkind\">Expected Outcome:</p><p>Projects are expected to strengthen doctoral training.</p>"
+        ],
+        "topicConditions": [
+          "<h4>Eligibility</h4><p>Participation is limited to EU/EEA/CH only.</p>"
+        ]
+      }
+    }
+  ]
+}

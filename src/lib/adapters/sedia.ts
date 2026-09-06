@@ -1,38 +1,40 @@
-import { z } from 'zod';
-import { prisma } from '../db';
 import { logger } from '../logger';
+import { createAdapterAlert, reportSchemaDrift } from './alerts';
+import {
+  type AdapterResult,
+  adapterError,
+  adapterOk,
+  computeAgeInDays,
+  type Deadline,
+  detectLumpSum,
+  detectTwoStage,
+  type Eligibility,
+  errorMessage,
+  inferEligibilityFromText,
+  OPEN_ELIGIBILITY,
+  stripHtml,
+} from './schemas/common';
+import {
+  mapSediaStatus,
+  SEDIA_STATUS_CODES,
+  SediaBudgetOverviewSchema,
+  SediaRawResultSchema,
+  SediaSearchEnvelopeSchema,
+  SediaTopicSchema,
+  type SediaTopic,
+} from './schemas/sedia';
 
-export const SediaTopicSchema = z.object({
-  identifier: z.string(),
-  title: z.string(),
-  status: z.enum(['FORTHCOMING', 'OPEN', 'CLOSED']),
-  typeOfAction: z.string().optional(),
-  frameworkProgramme: z.string().optional(),
-  callIdentifier: z.string().optional(),
-  callTitle: z.string().optional(),
-  isLumpSum: z.boolean().default(false),
-  isTwoStage: z.boolean().default(false),
-  budgetPerProjectCents: z.number().optional(),
-  numProjects: z.number().optional(),
-  deadlines: z.array(z.object({
-    stage: z.number(),
-    at: z.string(),
-    tz: z.string()
-  })).default([]),
-  nextDeadlineAt: z.string().optional().nullable(),
-  plannedOpeningDate: z.string().optional().nullable(),
-  eligibility: z.object({
-    restricted: z.string().nullable().optional(),
-    countriesExcluded: z.array(z.string()).default([]),
-    notes: z.string().optional()
-  }).default({ restricted: null, countriesExcluded: [] }),
-  destination: z.string().optional(),
-  keywords: z.array(z.string()).default([]),
-  description: z.string().optional(),
-  sourceUrl: z.string().optional(),
-});
+export { createAdapterAlert, reportSchemaDrift };
+export {
+  SediaTopicSchema,
+  SediaRawResultSchema,
+  SediaSearchEnvelopeSchema,
+  SEDIA_STATUS_CODES,
+  mapSediaStatus,
+};
+export type { SediaTopic };
 
-export type SediaTopic = z.infer<typeof SediaTopicSchema>;
+export const SEDIA_SOURCE = 'sedia';
 
 export interface SediaSearchOptions {
   text?: string;
@@ -42,6 +44,15 @@ export interface SediaSearchOptions {
   frameworkProgrammes?: string[];
   types?: string[];
   languages?: string[];
+  /**
+   * Fetch `topicDetails/<id>.json` for topics whose description is missing from
+   * the search payload. Off by default: the search response already carries
+   * `descriptionByte` and `topicConditions`, so enrichment would add one blocking
+   * HTTP round-trip per topic (≈1000 per daily run) for almost no extra data.
+   */
+  enrichFromTopicDetails?: boolean;
+  /** Hard cap on enrichment round-trips, even when enabled. */
+  maxDetailFetches?: number;
 }
 
 export interface SediaSearchResult {
@@ -49,48 +60,193 @@ export interface SediaSearchResult {
   pageNumber: number;
   pageSize: number;
   topics: SediaTopic[];
+  /** Upstream shape problems seen while parsing — empty means the API matched. */
+  schemaDrift: string[];
+  /** Transport/parse errors that stopped pagination early. */
+  errors: string[];
+}
+
+function firstOf(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    const v = value[0];
+    return typeof v === 'string' ? v : v === undefined || v === null ? undefined : String(v);
+  }
+  if (typeof value === 'string') return value;
+  return undefined;
+}
+
+function toArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string');
+  if (typeof value === 'string') return [value];
+  return [];
+}
+
+/** SEDIA sends `2027-04-06T00:00:00.000+0000` or a bare `2027-04-06`. */
+function toIsoDeadline(raw: string): string | null {
+  if (!raw) return null;
+  const withTime = raw.includes('T') ? raw : `${raw}T17:00:00Z`;
+  const d = new Date(withTime);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function toIsoDate(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 export class SediaAdapter {
   private baseUrl = 'https://api.tech.ec.europa.eu/search-api/prod/rest/search';
   private apiKey = 'SEDIA';
 
-  private detectEuOnlyEligibility(text: string): boolean {
-    const euOnlyPatterns = [
-      /EU\/EEA\/CH only/i,
-      /European Union.*European Economic Area.*Switzerland/i,
-      /limited to EU.*EEA.*CH/i,
-      /restricted to European member states/i,
-      /only.*European Union/i
-    ];
-    return euOnlyPatterns.some(p => p.test(text));
-  }
-
-  private async fetchTopicDetails(identifier: string): Promise<Partial<SediaTopic> | null> {
+  /**
+   * Optional per-topic enrichment. Kept for topics the search payload leaves
+   * empty; callers must opt in via `enrichFromTopicDetails`.
+   */
+  private async fetchTopicDetails(
+    identifier: string
+  ): Promise<{ description?: string; eligibility?: Eligibility } | null> {
     try {
       const url = `https://ec.europa.eu/info/funding-tenders/opportunities/data/topicDetails/${identifier.toLowerCase()}.json`;
       const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (!response.ok) return null;
 
-      const data = await response.json();
-      const details: Partial<SediaTopic> = {};
+      const data = (await response.json()) as Record<string, unknown>;
+      const details: { description?: string; eligibility?: Eligibility } = {};
 
-      if (data.description) {
-        details.description = data.description;
+      if (typeof data.description === 'string') {
+        details.description = stripHtml(data.description);
       }
       if (data.eligibility) {
-        const eligText = String(data.eligibility);
-        details.eligibility = {
-          restricted: this.detectEuOnlyEligibility(eligText) ? 'EU_EEA_CH_ONLY' : null,
-          countriesExcluded: [],
-          notes: eligText
+        const eligText = stripHtml(String(data.eligibility));
+        details.eligibility = inferEligibilityFromText(eligText) ?? {
+          ...OPEN_ELIGIBILITY,
+          notes: eligText,
         };
       }
 
       return details;
-    } catch (e) {
+    } catch {
       return null;
     }
+  }
+
+  /**
+   * Normalize one raw search result. Pure — no I/O — so it is unit-testable
+   * against a captured payload.
+   */
+  normalizeResult(item: Record<string, unknown>, now: Date = new Date()): SediaTopic {
+    const meta = (item.metadata ?? {}) as Record<string, unknown>;
+
+    const identifier =
+      firstOf(meta.identifier) ??
+      firstOf(meta.REFERENCE) ??
+      (typeof item.reference === 'string' ? item.reference : undefined) ??
+      'UNKNOWN-ID';
+    const title =
+      firstOf(meta.title) ??
+      (typeof item.summary === 'string' ? item.summary : undefined) ??
+      'Untitled Topic';
+
+    const status = mapSediaStatus(firstOf(meta.status));
+    const typeOfAction = firstOf(meta.typesOfAction) ?? 'Grant';
+    const frameworkProgramme =
+      firstOf(meta.frameworkProgramme) ?? firstOf(meta.programmeDivision) ?? 'EU Funding';
+    const callIdentifier =
+      firstOf(meta.callIdentifier) ?? identifier.split('-').slice(0, 3).join('-');
+    const callTitle = firstOf(meta.callTitle) ?? '';
+    const destination = firstOf(meta.destination);
+    const sourceUrl =
+      firstOf(meta.url) ??
+      `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${identifier}`;
+
+    const deadlines: Deadline[] = [];
+    let plannedOpeningDate = toIsoDate(firstOf(meta.plannedOpeningDate) ?? firstOf(meta.startDate));
+    let budgetPerProjectCents: number | undefined;
+    let isTwoStage = detectTwoStage(firstOf(meta.deadlineModel));
+
+    // budgetOverview carries the authoritative deadline dates (17:00 Brussels),
+    // the deadline model and the per-year budget.
+    const budgetRaw = firstOf(meta.budgetOverview);
+    if (budgetRaw) {
+      try {
+        const parsed = SediaBudgetOverviewSchema.safeParse(JSON.parse(budgetRaw));
+        if (parsed.success) {
+          for (const actions of Object.values(parsed.data.budgetTopicActionMap ?? {})) {
+            for (const act of actions) {
+              if (detectTwoStage(act.deadlineModel)) isTwoStage = true;
+              if (act.plannedOpeningDate && !plannedOpeningDate) {
+                plannedOpeningDate = toIsoDate(act.plannedOpeningDate);
+              }
+              for (const [idx, dStr] of (act.deadlineDates ?? []).entries()) {
+                const at = toIsoDeadline(dStr);
+                if (at) deadlines.push({ stage: idx + 1, at, tz: 'Europe/Brussels' });
+              }
+              const budgets = Object.values(act.budgetYearMap ?? {}).map(
+                (v) => parseFloat(String(v)) || 0
+              );
+              const maxBudget = budgets.length > 0 ? Math.max(...budgets) : 0;
+              if (maxBudget > 0) budgetPerProjectCents = Math.round(maxBudget * 100);
+            }
+          }
+        }
+      } catch {
+        // A malformed budgetOverview must not drop the whole topic.
+      }
+    }
+
+    if (deadlines.length === 0) {
+      for (const [idx, dStr] of toArray(meta.deadlineDate).entries()) {
+        const at = toIsoDeadline(dStr);
+        if (at) deadlines.push({ stage: idx + 1, at, tz: 'Europe/Brussels' });
+      }
+    }
+
+    deadlines.sort((a, b) => a.at.localeCompare(b.at));
+    deadlines.forEach((d, idx) => {
+      d.stage = idx + 1;
+    });
+    const nextDeadlineAt = deadlines.length > 0 ? deadlines[0]!.at : null;
+    if (deadlines.length > 1) isTwoStage = true;
+
+    // The search payload already ships the topic description and the eligibility
+    // conditions as HTML — no per-topic round-trip needed.
+    const description =
+      stripHtml(firstOf(meta.descriptionByte)) ||
+      (typeof item.summary === 'string' ? item.summary : '') ||
+      undefined;
+    const conditions = stripHtml(firstOf(meta.topicConditions));
+
+    const isLumpSum = detectLumpSum(title, typeOfAction, firstOf(meta.typeOfMGAs), conditions);
+
+    const eligibility: Eligibility =
+      inferEligibilityFromText(`${title} ${typeOfAction} ${conditions} ${description ?? ''}`) ??
+      OPEN_ELIGIBILITY;
+
+    const raw = {
+      identifier,
+      title,
+      status,
+      typeOfAction,
+      frameworkProgramme,
+      callIdentifier,
+      callTitle,
+      isLumpSum,
+      isTwoStage,
+      budgetPerProjectCents,
+      deadlines,
+      nextDeadlineAt,
+      plannedOpeningDate,
+      ageInDays: computeAgeInDays(plannedOpeningDate, now),
+      eligibility,
+      destination,
+      keywords: toArray(meta.keywords),
+      description,
+      sourceUrl,
+    };
+
+    const parsed = SediaTopicSchema.safeParse(raw);
+    return parsed.success ? parsed.data : (raw as SediaTopic);
   }
 
   async searchSedia(options: SediaSearchOptions = {}): Promise<SediaSearchResult> {
@@ -98,37 +254,32 @@ export class SediaAdapter {
       text = '***',
       pageSize = 100,
       maxPages = 10,
-      statuses = ['31094501', '31094502'],
+      statuses = [SEDIA_STATUS_CODES.FORTHCOMING, SEDIA_STATUS_CODES.OPEN],
       frameworkProgrammes = [],
       types = ['1'],
-      languages = ['en']
+      languages = ['en'],
+      enrichFromTopicDetails = false,
+      maxDetailFetches = 25,
     } = options;
 
     const queryText = text.trim() || '***';
-    const mustConditions: any[] = [];
+    const mustConditions: Record<string, unknown>[] = [];
 
-    if (types && types.length > 0) {
-      mustConditions.push({ terms: { type: types } });
-    }
-
-    if (statuses && statuses.length > 0) {
-      mustConditions.push({ terms: { status: statuses } });
-    }
-
-    if (frameworkProgrammes && frameworkProgrammes.length > 0) {
+    if (types.length > 0) mustConditions.push({ terms: { type: types } });
+    if (statuses.length > 0) mustConditions.push({ terms: { status: statuses } });
+    if (frameworkProgrammes.length > 0) {
       mustConditions.push({ terms: { frameworkProgramme: frameworkProgrammes } });
     }
 
-    const queryObj = {
-      bool: {
-        must: mustConditions
-      }
-    };
+    const queryObj = { bool: { must: mustConditions } };
 
     const topics: SediaTopic[] = [];
+    const schemaDrift: string[] = [];
+    const errors: string[] = [];
+    const now = new Date();
     let totalResults = 0;
     let pageNumber = 1;
-    const errors: string[] = [];
+    let detailFetches = 0;
 
     while (pageNumber <= maxPages) {
       const encodedText = encodeURIComponent(queryText);
@@ -138,23 +289,43 @@ export class SediaAdapter {
 
       try {
         const formData = new FormData();
-        formData.append('query', new Blob([JSON.stringify(queryObj)], { type: 'application/json' }), 'query.json');
-        formData.append('languages', new Blob([JSON.stringify(languages)], { type: 'application/json' }), 'languages.json');
+        formData.append(
+          'query',
+          new Blob([JSON.stringify(queryObj)], { type: 'application/json' }),
+          'query.json'
+        );
+        formData.append(
+          'languages',
+          new Blob([JSON.stringify(languages)], { type: 'application/json' }),
+          'languages.json'
+        );
 
-        const response = await fetch(searchUrl, {
-          method: 'POST',
-          body: formData,
-        });
-
+        const response = await fetch(searchUrl, { method: 'POST', body: formData });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        const data = await response.json();
-        const rawResults = data.results || [];
+        const data: unknown = await response.json();
 
-        if (pageNumber === 1) {
-          totalResults = typeof data.totalResults === 'number' ? data.totalResults : 0;
+        // Envelope check — a failure here is a real API contract change.
+        const envelope = SediaSearchEnvelopeSchema.safeParse(data);
+        if (!envelope.success) {
+          schemaDrift.push(
+            `search envelope changed on page ${pageNumber}: ${envelope.error.issues
+              .slice(0, 3)
+              .map((i) => `${i.path.join('.') || '(root)'} ${i.message}`)
+              .join('; ')}`
+          );
+        }
+
+        const rawResults: unknown[] = envelope.success
+          ? envelope.data.results
+          : Array.isArray((data as { results?: unknown })?.results)
+            ? ((data as { results: unknown[] }).results)
+            : [];
+
+        if (pageNumber === 1 && envelope.success) {
+          totalResults = envelope.data.totalResults;
         }
 
         if (rawResults.length === 0) {
@@ -163,164 +334,92 @@ export class SediaAdapter {
         }
 
         for (const item of rawResults) {
+          const shape = SediaRawResultSchema.safeParse(item);
+          if (!shape.success) {
+            schemaDrift.push(
+              `result missing required metadata: ${shape.error.issues
+                .slice(0, 2)
+                .map((i) => i.path.join('.'))
+                .join(', ')}`
+            );
+            continue;
+          }
+
           try {
-            const meta = item.metadata || {};
-            const identifier = meta.identifier?.[0] || meta.REFERENCE?.[0] || item.reference || 'UNKNOWN-ID';
-            const title = meta.title?.[0] || item.summary || 'Untitled Topic';
+            const topic = this.normalizeResult(shape.data as Record<string, unknown>, now);
 
-            const rawStatus = meta.status?.[0] || '31094502';
-            let status: 'FORTHCOMING' | 'OPEN' | 'CLOSED' = 'OPEN';
-            if (rawStatus === '31094501') status = 'FORTHCOMING';
-            else if (rawStatus === '31094503') status = 'CLOSED';
-
-            const typeOfAction = meta.typesOfAction?.[0] || (types.includes('2') ? 'Tender' : 'Grant');
-            const frameworkProgramme = meta.frameworkProgramme?.[0] || meta.programmeDivision?.[0] || 'EU Funding';
-            const callIdentifier = meta.callIdentifier?.[0] || identifier.split('-').slice(0, 3).join('-');
-            const callTitle = meta.callTitle?.[0] || '';
-            const sourceUrl = meta.url?.[0] || `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${identifier}`;
-
-            let isTwoStage = false;
-            let isLumpSum = false;
-            let nextDeadlineAt: string | null = null;
-            let plannedOpeningDate: string | null = meta.plannedOpeningDate?.[0] || null;
-            let budgetPerProjectCents: number | undefined = undefined;
-            const deadlines: { stage: number; at: string; tz: string }[] = [];
-            let eligibilityRestricted: string | null = null;
-            let eligibilityNotes = '';
-
-            if (meta.budgetOverview?.[0]) {
-              try {
-                const bo = JSON.parse(meta.budgetOverview[0]);
-                const actionMaps = Object.values(bo.budgetTopicActionMap || {});
-                for (const actions of actionMaps as any[]) {
-                  for (const act of (actions || [])) {
-                    if (act.deadlineModel?.toLowerCase().includes('two-stage')) {
-                      isTwoStage = true;
-                    }
-                    if (act.plannedOpeningDate && !plannedOpeningDate) {
-                      plannedOpeningDate = act.plannedOpeningDate;
-                    }
-                    if (act.deadlineDates && Array.isArray(act.deadlineDates)) {
-                      act.deadlineDates.forEach((dStr: string, idx: number) => {
-                        deadlines.push({ stage: idx + 1, at: `${dStr}T17:00:00Z`, tz: 'Europe/Brussels' });
-                      });
-                    }
-                    if (act.budgetYearMap) {
-                      const bVals = Object.values(act.budgetYearMap).map((v: any) => parseFloat(String(v)) || 0);
-                      const maxB = Math.max(...bVals, 0);
-                      if (maxB > 0) {
-                        budgetPerProjectCents = Math.round(maxB * 100);
-                      }
-                    }
-                  }
-                }
-              } catch (e) {
-                // Ignore JSON parse error
+            if (
+              enrichFromTopicDetails &&
+              !topic.description &&
+              detailFetches < maxDetailFetches
+            ) {
+              detailFetches++;
+              const details = await this.fetchTopicDetails(topic.identifier);
+              if (details?.description) topic.description = details.description;
+              if (details?.eligibility?.restricted && !topic.eligibility.restricted) {
+                topic.eligibility = details.eligibility;
               }
             }
 
-            if (deadlines.length === 0 && meta.deadlineDate) {
-              meta.deadlineDate.forEach((dStr: string, idx: number) => {
-                deadlines.push({ stage: idx + 1, at: dStr.includes('T') ? dStr : `${dStr}T17:00:00Z`, tz: 'Europe/Brussels' });
-              });
-            }
-
-            if (deadlines.length > 0) {
-              nextDeadlineAt = deadlines[0].at;
-            }
-
-            if (title.toLowerCase().includes('lump sum') || typeOfAction.toLowerCase().includes('lump sum')) {
-              isLumpSum = true;
-            }
-
-            // Detect EU/EEA/CH-only eligibility from text
-            const fullText = `${title} ${item.summary || ''} ${typeOfAction || ''}`;
-            if (this.detectEuOnlyEligibility(fullText)) {
-              eligibilityRestricted = 'EU_EEA_CH_ONLY';
-              eligibilityNotes = 'EU/EEA/CH only — detected from call description';
-            }
-
-            let description = item.summary || meta.description?.[0];
-
-            // Try to fetch topic details for enrichment (with timeout)
-            const topicDetails = await this.fetchTopicDetails(identifier);
-            if (topicDetails?.description) {
-              description = topicDetails.description;
-            }
-            if (topicDetails?.eligibility?.restricted && !eligibilityRestricted) {
-              eligibilityRestricted = topicDetails.eligibility.restricted;
-              eligibilityNotes = topicDetails.eligibility.notes || '';
-            }
-
-            const rawTopic = {
-              identifier,
-              title,
-              status,
-              typeOfAction,
-              frameworkProgramme,
-              callIdentifier,
-              callTitle,
-              isLumpSum,
-              isTwoStage,
-              budgetPerProjectCents,
-              deadlines,
-              nextDeadlineAt,
-              plannedOpeningDate,
-              eligibility: {
-                restricted: eligibilityRestricted,
-                countriesExcluded: [],
-                notes: eligibilityNotes
-              },
-              keywords: meta.keywords || [],
-              description,
-              sourceUrl
-            };
-
-            const parsed = SediaTopicSchema.safeParse(rawTopic);
-            if (parsed.success) {
-              topics.push(parsed.data);
-            } else {
-              topics.push(rawTopic as SediaTopic);
-            }
+            topics.push(topic);
           } catch (itemErr) {
-            const msg = itemErr instanceof Error ? itemErr.message : String(itemErr);
-            errors.push(`Topic parse error: ${msg}`);
+            errors.push(`Topic normalize error: ${errorMessage(itemErr)}`);
           }
         }
 
         pageNumber++;
-      } catch (e: any) {
+      } catch (e) {
+        const msg = errorMessage(e);
         logger.error(`[SediaAdapter] Error on page ${pageNumber}:`, e);
-        errors.push(`Page ${pageNumber} fetch error: ${e.message}`);
+        errors.push(`Page ${pageNumber} fetch error: ${msg}`);
         break;
       }
     }
 
     if (errors.length > 0) {
-      logger.warn(`[SediaAdapter] ${errors.length} errors during fetch`, { firstErrors: errors.slice(0, 3) });
-      if (errors.length > 3) {
-        await prisma.systemAlert.create({
-          data: {
-            level: 'warn',
-            source: 'sedia_adapter',
-            message: `SEDIA fetch completed with ${errors.length} errors. First 3: ${errors.slice(0, 3).join('; ')}`,
-          }
-        }).catch(() => {});
-      }
+      logger.warn(`[SediaAdapter] ${errors.length} errors during fetch`, {
+        firstErrors: errors.slice(0, 3),
+      });
     }
 
-    logger.info(`[SediaAdapter] Total fetched: ${topics.length} topics across ${pageNumber - 1} pages`);
+    logger.info(
+      `[SediaAdapter] Total fetched: ${topics.length} topics across ${pageNumber - 1} pages`
+    );
 
-    return {
-      totalResults,
-      pageNumber: 1,
-      pageSize,
-      topics
-    };
+    return { totalResults, pageNumber: 1, pageSize, topics, schemaDrift, errors };
   }
 
-  async fetchTopics(): Promise<SediaTopic[]> {
-    const result = await this.searchSedia({ pageSize: 100, maxPages: 10 });
+  /** Back-compatible plain list. Never throws; an empty array means "nothing usable". */
+  async fetchTopics(options: SediaSearchOptions = {}): Promise<SediaTopic[]> {
+    const result = await this.fetchSediaTopics(options);
     return result.topics;
+  }
+
+  /**
+   * Primary K1 entry point. Reports status, drift and a reason instead of throwing,
+   * so a dead SEDIA never takes the daily job down with it.
+   */
+  async fetchSediaTopics(options: SediaSearchOptions = {}): Promise<AdapterResult<SediaTopic>> {
+    try {
+      const result = await this.searchSedia({ pageSize: 100, maxPages: 13, ...options });
+
+      await reportSchemaDrift(SEDIA_SOURCE, result.schemaDrift);
+
+      // Pagination died before any topic came back → treat as a source failure.
+      if (result.topics.length === 0 && result.errors.length > 0) {
+        return adapterError<SediaTopic>(
+          SEDIA_SOURCE,
+          result.errors[0] ?? 'SEDIA returned no topics',
+          result.schemaDrift
+        );
+      }
+
+      return adapterOk(SEDIA_SOURCE, result.topics, result.schemaDrift);
+    } catch (e) {
+      const reason = errorMessage(e);
+      logger.error('[SediaAdapter] fetchSediaTopics failed:', e);
+      await createAdapterAlert(SEDIA_SOURCE, 'error', `SEDIA fetch failed: ${reason}`);
+      return adapterError<SediaTopic>(SEDIA_SOURCE, reason);
+    }
   }
 }

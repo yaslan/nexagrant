@@ -15,6 +15,7 @@
     "db:rls-role": "tsx scripts/setup-rls-role.ts",
     "db:rls-role:rollback": "tsx scripts/setup-rls-role.ts --rollback",
     "db:seed": "tsx prisma/seed.ts",
+    "jobs:k1": "tsx scripts/run-k1-daily.ts",
     "rls:check": "tsx scripts/check-rls.ts",
     "i18n:check": "tsx scripts/i18n-check.ts",
     "beta:onboard": "tsx scripts/beta-onboarding.ts",

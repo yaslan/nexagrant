@@ -1,172 +1,187 @@
-import { z } from 'zod';
 import { logger } from '../logger';
-import { prisma } from '../db';
+import { createAdapterAlert, reportSchemaDrift } from './alerts';
+import {
+  type AdapterResult,
+  adapterError,
+  adapterOk,
+  computeAgeInDays,
+  type Deadline,
+  errorMessage,
+  OPEN_ELIGIBILITY,
+} from './schemas/common';
+import {
+  EUROSTARS_CALL_PATTERNS,
+  EUROSTARS_CARD_PATTERN,
+  EurostarsTopicSchema,
+  parseLongDate,
+  type EurostarsTopic,
+} from './schemas/eurostars';
 
-export const EurostarsTopicSchema = z.object({
-  identifier: z.string(),
-  title: z.string(),
-  status: z.enum(['FORTHCOMING', 'OPEN', 'CLOSED']),
-  typeOfAction: z.string().optional(),
-  callIdentifier: z.string().optional(),
-  callTitle: z.string().optional(),
-  isLumpSum: z.boolean().default(false),
-  isTwoStage: z.boolean().default(false),
-  budgetPerProjectCents: z.number().optional(),
-  numProjects: z.number().optional(),
-  deadlines: z.array(z.object({
-    stage: z.number(),
-    at: z.string(),
-    tz: z.string()
-  })).default([]),
-  nextDeadlineAt: z.string().optional(),
-  eligibility: z.object({
-    restricted: z.string().nullable().optional(),
-    countriesExcluded: z.array(z.string()).default([]),
-    notes: z.string().optional()
-  }).default({ restricted: null, countriesExcluded: [] }),
-  destination: z.string().optional(),
-  keywords: z.array(z.string()).default([]),
-  description: z.string().optional(),
-  sourceUrl: z.string().optional(),
-});
+export { EurostarsTopicSchema };
+export type { EurostarsTopic };
 
-export type EurostarsTopic = z.infer<typeof EurostarsTopicSchema>;
+export const EUROSTARS_SOURCE = 'eurostars';
+
+/** `dd/mm/yyyy` or `dd-mm-yyyy` → ISO at 17:00 UTC, or null when unparseable. */
+function parseShortDate(dateStr: string): string | null {
+  const [day, month, year] = dateStr.split(/[/-]/);
+  if (!day || !month || !year) return null;
+  const date = new Date(
+    `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T17:00:00Z`
+  );
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
 
 export class EurostarsAdapter {
-  private baseUrl = 'https://www.eurostars-eureka.eu';
-  private callsUrl = `${this.baseUrl}/en/Participant/Page/Calls-for-Proposals`;
+  /**
+   * The old participant portal (`eurostars-eureka.eu`) answers 403 to every
+   * non-browser client, so the EUREKA programme page is the working source.
+   * Override with `K1_EUROSTARS_URL` if the network moves it again.
+   */
+  private callsUrl =
+    process.env.K1_EUROSTARS_URL ?? 'https://eurekanetwork.org/programmes/eurostars/';
 
-  private parseDateString(dateStr: string): string {
-    const [day, month, year] = dateStr.split('/');
-    if (!day || !month || !year) {
-      return new Date().toISOString();
+  /** Pure — parses a captured page, so it is unit-testable without the network. */
+  parseCallsFromHtml(html: string, now: Date = new Date()): EurostarsTopic[] {
+    const byIdentifier = new Map<string, EurostarsTopic>();
+
+    // Primary: "Deadline 10 September 2026 … Eurostars Call 11 for projects".
+    EUROSTARS_CARD_PATTERN.lastIndex = 0;
+    for (const match of html.matchAll(EUROSTARS_CARD_PATTERN)) {
+      const [, day, month, year, callNumber] = match;
+      if (!day || !month || !year || !callNumber) continue;
+
+      const deadlineAt = parseLongDate(day, month, year);
+      const identifier = `EUROSTARS-CALL-${callNumber}`;
+      const topic = this.buildTopic({ identifier, deadlineAt, now });
+      if (topic) byIdentifier.set(identifier, topic);
     }
-    const date = new Date(`${year}-${month}-${day}T17:00:00Z`);
-    return date.toISOString();
+
+    // Fallback: legacy call codes such as "EUROSTARS-2026-01".
+    if (byIdentifier.size === 0) {
+      for (const pattern of EUROSTARS_CALL_PATTERNS) {
+        pattern.lastIndex = 0;
+        for (const match of html.matchAll(pattern)) {
+          const identifier = match[0].trim().replace(/\s/g, '-').toUpperCase();
+          const deadlineMatch = html.match(
+            new RegExp(
+              `${identifier.replace(/[-\s]/g, '[-\\s]')}[^]*?(?:deadline|closing date)[:\\s]+(?:\\w+\\s+)?(\\d{1,2}[/-]\\d{1,2}[/-]\\d{4})`,
+              'i'
+            )
+          );
+          const deadlineAt = deadlineMatch?.[1] ? parseShortDate(deadlineMatch[1]) : null;
+          const topic = this.buildTopic({ identifier, deadlineAt, now, html });
+          if (topic) byIdentifier.set(identifier, topic);
+        }
+      }
+    }
+
+    return [...byIdentifier.values()];
   }
 
-  async fetchTopics(): Promise<EurostarsTopic[]> {
+  private buildTopic(args: {
+    identifier: string;
+    deadlineAt: string | null;
+    now: Date;
+    html?: string;
+  }): EurostarsTopic | null {
+    const { identifier, deadlineAt, now, html } = args;
+
+    let status: 'FORTHCOMING' | 'OPEN' | 'CLOSED' = 'OPEN';
+    if (deadlineAt) {
+      status = new Date(deadlineAt).getTime() < now.getTime() ? 'CLOSED' : 'OPEN';
+    } else if (html) {
+      const statusMatch = html.match(
+        new RegExp(`${identifier.replace(/[-\s]/g, '[-\\s]')}[^]*?(?:open|closed|forthcoming)`, 'i')
+      );
+      const statusText = statusMatch?.[0].toLowerCase() ?? '';
+      if (statusText.includes('forthcoming')) status = 'FORTHCOMING';
+      else if (statusText.includes('closed')) status = 'CLOSED';
+    }
+
+    const deadlines: Deadline[] = deadlineAt
+      ? [{ stage: 1, at: deadlineAt, tz: 'Europe/Brussels' }]
+      : [];
+
+    const parsed = EurostarsTopicSchema.safeParse({
+      identifier,
+      title: `Eurostars Call ${identifier.replace(/^EUROSTARS-(CALL-)?/, '')}`,
+      callIdentifier: identifier,
+      callTitle: `Eurostars Call ${identifier.replace(/^EUROSTARS-(CALL-)?/, '')}`,
+      status,
+      typeOfAction: 'Research & Innovation',
+      frameworkProgramme: 'EUROSTARS',
+      isLumpSum: false,
+      // Eurostars runs a single full-proposal submission per cut-off.
+      isTwoStage: false,
+      deadlines,
+      nextDeadlineAt: deadlineAt,
+      plannedOpeningDate: null,
+      ageInDays: computeAgeInDays(null, now),
+      eligibility: {
+        ...OPEN_ELIGIBILITY,
+        notes:
+          'Eurostars consortium: EUREKA member and associated countries — no single-country restriction',
+      },
+      keywords: ['research', 'innovation', 'eurostars', 'eureka', 'sme'],
+      description:
+        'Eurostars supports transnational R&D projects driven by SMEs in cooperation with research organisations',
+      sourceUrl: this.callsUrl,
+    });
+
+    if (!parsed.success) {
+      logger.warn(`[EurostarsAdapter] Failed to parse call ${identifier}: ${parsed.error.message}`);
+      return null;
+    }
+    return parsed.data;
+  }
+
+  /**
+   * Primary K1 entry point. Never throws — a blocked or restructured page comes
+   * back as `{ status: 'error', reason, topicsProcessed: 0 }`.
+   */
+  async fetchEurostarsTopics(): Promise<AdapterResult<EurostarsTopic>> {
     try {
       logger.info('[EurostarsAdapter] Fetching Eurostars calls');
 
-      const response = await fetch(this.callsUrl, {
-        headers: {
-          'User-Agent': 'Fabrika/1.0'
-        }
-      });
-
+      const response = await fetch(this.callsUrl, { headers: { 'User-Agent': 'Fabrika/1.0' } });
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const reason = `HTTP ${response.status}: ${response.statusText}`;
+        await createAdapterAlert(
+          EUROSTARS_SOURCE,
+          'error',
+          `Failed to fetch Eurostars calls: ${reason}`
+        );
+        return adapterError<EurostarsTopic>(EUROSTARS_SOURCE, reason);
       }
 
       const html = await response.text();
       const topics = this.parseCallsFromHtml(html);
-
       logger.info(`[EurostarsAdapter] Fetched ${topics.length} Eurostars calls`);
 
-      if (topics.length === 0) {
-        await prisma.systemAlert.create({
-          data: {
-            level: 'warn',
-            source: 'eurostars_adapter',
-            message: 'Eurostars adapter returned 0 calls; check HTML structure or endpoint'
-          }
-        }).catch(() => {});
-      }
+      // A 200 page with no recognizable call id means the markup changed.
+      const schemaDrift =
+        topics.length === 0
+          ? ['Eurostars page returned 200 but matched no known call-id pattern']
+          : [];
+      await reportSchemaDrift(EUROSTARS_SOURCE, schemaDrift);
 
-      return topics;
+      return adapterOk(EUROSTARS_SOURCE, topics, schemaDrift);
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.error('[EurostarsAdapter] Error fetching Eurostars calls:', err);
-      await prisma.systemAlert.create({
-        data: {
-          level: 'error',
-          source: 'eurostars_adapter',
-          message: `Failed to fetch Eurostars calls: ${err.message}`
-        }
-      }).catch(() => {});
-
-      return [];
+      const reason = errorMessage(error);
+      logger.error('[EurostarsAdapter] Error fetching Eurostars calls:', error);
+      await createAdapterAlert(
+        EUROSTARS_SOURCE,
+        'error',
+        `Failed to fetch Eurostars calls: ${reason}`
+      );
+      return adapterError<EurostarsTopic>(EUROSTARS_SOURCE, reason);
     }
   }
 
-  private parseCallsFromHtml(html: string): EurostarsTopic[] {
-    const topics: EurostarsTopic[] = [];
-    const processedCalls = new Set<string>();
-
-    // Extract multiple call ID patterns
-    const patterns = [
-      /EUROSTARS[-\s](\d{4}[-\s](?:01|02|03|04|05|06|07|08|09|10|11|12|A|B))/gi,
-      /eurostars\s*call\s*(\d{4}[-\s][\dAB]{2,3})/gi,
-      /EUREKA[-\s](\d{4}[-\s][\dAB]{2,3})/gi
-    ];
-
-    const callIds = new Set<string>();
-
-    for (const pattern of patterns) {
-      const matches = html.matchAll(pattern);
-      for (const match of matches) {
-        const callId = match[0].trim().replace(/\s/g, '-').toUpperCase();
-        if (!callIds.has(callId) && !processedCalls.has(callId)) {
-          callIds.add(callId);
-        }
-      }
-    }
-
-    // Process each found call ID
-    for (const callId of callIds) {
-      try {
-        // Extract deadline for this call
-        const deadlinePattern = new RegExp(`${callId.replace(/[-\s]/g, '[-\\s]')}[^]*?(?:deadline|closing date)[:\\s]+(?:\\w+\\s+)?(\\d{1,2}[/-]\\d{1,2}[/-]\\d{4})`, 'i');
-        const deadlineMatch = html.match(deadlinePattern);
-        const deadlineStr = deadlineMatch ? deadlineMatch[1] : null;
-
-        // Extract status: assume calls are OPEN unless marked otherwise
-        const statusPattern = new RegExp(`${callId.replace(/[-\s]/g, '[-\\s]')}[^]*?(?:open|closed|forthcoming)`, 'i');
-        const statusMatch = html.match(statusPattern);
-        let status: 'FORTHCOMING' | 'OPEN' | 'CLOSED' = 'OPEN';
-        if (statusMatch) {
-          const statusText = statusMatch[0].toLowerCase();
-          if (statusText.includes('forthcoming')) status = 'FORTHCOMING';
-          else if (statusText.includes('closed')) status = 'CLOSED';
-        }
-
-        const topic: EurostarsTopic = {
-          identifier: callId,
-          title: `Eurostars Call ${callId}`,
-          callIdentifier: callId,
-          callTitle: `Eurostars Call ${callId}`,
-          status,
-          typeOfAction: 'Research & Innovation',
-          isLumpSum: false,
-          isTwoStage: true,
-          deadlines: deadlineStr ? [{
-            stage: 1,
-            at: this.parseDateString(deadlineStr),
-            tz: 'Europe/Brussels'
-          }] : [],
-          nextDeadlineAt: deadlineStr ? this.parseDateString(deadlineStr) : undefined,
-          eligibility: {
-            restricted: null,
-            countriesExcluded: [],
-            notes: 'Eurostars consortium: EU/EFTA member countries + associated countries'
-          },
-          keywords: ['research', 'innovation', 'eurostars', 'eureka', 'sme'],
-          description: 'Eurostars supports transnational R&D projects driven by SMEs in cooperation with research organisations',
-          sourceUrl: this.callsUrl
-        };
-
-        const parsed = EurostarsTopicSchema.safeParse(topic);
-        if (parsed.success) {
-          topics.push(parsed.data);
-          processedCalls.add(callId);
-        }
-      } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        logger.warn(`[EurostarsAdapter] Failed to parse call ${callId}: ${errMsg}`);
-      }
-    }
-
-    return topics;
+  /** Back-compatible plain list. */
+  async fetchTopics(): Promise<EurostarsTopic[]> {
+    const result = await this.fetchEurostarsTopics();
+    return result.topics;
   }
 }

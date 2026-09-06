@@ -58,6 +58,9 @@ yüzden bir tasarım ortağının hattında ya da KPI panosunda **görünmez**. 
 
 - Kiracı silme: `Tenant` cascade; paylaşımlı veriye dokunmaz; `AuditEvent` 12 ay anonimleştirilmiş saklanır (KVKK/GDPR).
 - `RawFetch` 90 gün; `AiUsageLog` 24 ay (şeffaflık beyanı için).
+- `RawFetch` yalnızca **içerik değiştiğinde** yazılır (`hash` karşılaştırması). Aynı yükü her gece yeniden saklamak tabloyu günde ~1200 satır büyütür, denetim değeri katmaz.
+- `Topic.eligibility` (Json) şekli: `{ restricted: "EU_EEA_CH_ONLY" | "TR" | null, eligibleCountries: string[], countriesExcluded: string[], notes?: string }`. `eligibleCountries` boş dizi = tespit edilmiş kısıt yok.
+- `Call.openDate` K1 günlük işi tarafından SEDIA `plannedOpeningDate`/`startDate` alanından doldurulur. Çağrının yaşı (`ageInDays`) **saklanmaz**, bu alandan türetilir.
 
 ### 7.1 Yumuşak silme (soft delete) — KVKK md.7/md.11 · GDPR md.17
 
