@@ -11,3 +11,35 @@
 [18:39:18] FAIL: TASK-6 (cora: pane exited (code 129) ve beklenen çıktı yok: scripts/i18n-check.ts working, messages/tr.json + en.json complete (≥1000 keys), GitHub Actions workflow passing, no hardcoded strings in code)
 [18:39:18] REPORT: dlg-1788708892962-1 (0/1 alt-görev ok — eksik/başarısız var)
 [18:44:51] REPORT: dlg-1788709146619-1 (0/1 alt-görev ok — eksik/başarısız var)
+[18:50:49] DONE: st2 → derin-0c1f10: KPI kartları: `src/modules/m5/ui/DashboardCard.tsx` (6 bile…
+[18:53:51] FAIL: 2 görev BAŞARISIZ: st4, st1 (cora-0c1f10, sora-0c1f10)
+[19:03:16] FAIL: st3 (defne-0c1f10: pane exited (code 129) — bu motorda sıfır-dışı çıkışın hata OLDUĞU ölçülmedi, kanıt hedefi de yok)
+[19:03:16] REPORT: dlg-1788709351562-1 (1/4 alt-görev ok — eksik/başarısız var)
+[19:10:49] DONE: st1 → derin-0c1f10: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTPZC55KNA4FU-cora.md
+[19:11:13] DONE: st1 → sora-0c1f10: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTPZEESJPKGCY-derin.md
+[19:20:52] DONE: st1 → cora-0c1f10: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTPZH6T9L6E2E-cora.md
+[19:21:10] FAIL: st1 (derin-0c1f10: pane exited (code 129) ve beklenen çıktı yok: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTPZOCARP56UH-cora.md)
+[19:21:10] REPORT: dlg-1788711037543-1 (0/1 alt-görev ok — eksik/başarısız var)
+[19:27:04] FAIL: st1 (defne-0c1f10: pane exited (code 129) ve beklenen çıktı yok: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTPZEESJPKGCY-<ajanad>.md)
+[19:27:04] REPORT: dlg-1788710585341-1 (0/1 alt-görev ok — eksik/başarısız var)
+[19:30:41] DONE: st2 → cora-0c1f10: 6 KPI kartı: `src/modules/m5/ui/DashboardCard.tsx`
+[19:36:37] DONE: st3 → defne-0c1f10: Teklif sayısı: `Opportunity.count()`
+[19:36:54] FAIL: st1 (derin-0c1f10: pane exited (code 129) — bu motorda sıfır-dışı çıkışın hata OLDUĞU ölçülmedi, kanıt hedefi de yok)
+[19:38:33] FAIL: st4 (sora-0c1f10: pane kayboldu — zombi meşguliyet kaydı ayıklandı (ADP-289))
+[19:38:33] REPORT: dlg-1788712023385-1 (2/4 alt-görev ok — eksik/başarısız var)
+[19:46:06] DONE: st1 → derin-0c1f10: /Users/macbook/AgentSpace/fabrika/docs/agent-results/UTF-8-derin-0c1f10.md
+[19:50:21] DONE: st4 → sora-0c1f10: Metadata: title, description
+[20:00:02] REPORT: dlg-1788712701468-1 (4/4 alt-görev ok)
+[20:01:43] DONE: st2 → defne-0c1f10: Query:
+[20:06:52] DONE: st1 → derin-0c1f10: KPI kartında "Başarı Oranı": G0→G2 hızlanma % (teklif sayıs…
+[20:34:57] DONE: st1 → cora-0c1f10: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTQ2K9YENR68X-cora.md
+[20:58:15] DONE: st2 → cora-0c1f10: Sentry entegrasyonu (label `beta`, custom context)
+[21:00:46] DONE: st3 → sora-0c1f10: Triage dashboard (P0–P3 kategorize, trend chart, filter by …
+[21:18:12] FAIL: st1 (cora-0c1f10: pane exited (code 129) ve beklenen çıktı yok: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTQ2KWMK4Y0NQ-defne.md)
+[21:18:12] REPORT: dlg-1788718257047-1 (0/1 alt-görev ok — eksik/başarısız var)
+[21:24:27] FAIL: st1 (defne-0c1f10: pane exited (code 129) — bu motorda sıfır-dışı çıkışın hata OLDUĞU ölçülmedi, kanıt hedefi de yok)
+[21:24:27] REPORT: dlg-1788716132329-1 (2/3 alt-görev ok — eksik/başarısız var)
+[21:27:51] DONE: st1 → defne-0c1f10: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTQ3DLVLT42VF-defne-retry.md
+[21:29:38] DONE: st1 → cora-0c1f10: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTQ2KWMK4Y0NQ-TASK-MTQ2L2XN88AJN-TASK-MTQ2L85KKT06J-cora-retry.md
+[21:52:35] FAIL: 6 görev BAŞARISIZ: st1, st2, st3, st4, st6, st5 (geli-tirici, blok-zincir-dse, customer-support, blockzincir-pm, blog-yazar, ex-en)
+[21:52:35] REPORT: dlg-1788720731639-1 (0/6 alt-görev ok — eksik/başarısız var)

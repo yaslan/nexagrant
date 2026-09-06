@@ -1,0 +1,79 @@
+# DevOps — Postgres Setup (Defne)
+
+**Task ID:** TASK-MTQ32X4CFRMR5  
+**Sprint:** S8  
+**Owner:** Defne (DevOps)  
+**Date:** 2026-09-06
+
+---
+
+## Yapılacaklar
+
+### 1. Docker Installation
+```bash
+# macOS
+brew install docker
+# or Docker Desktop: https://www.docker.com/products/docker-desktop
+
+# Verify
+docker --version
+docker ps
+```
+
+### 2. Start Postgres + pgvector
+```bash
+cd /Users/macbook/AgentSpace/fabrika
+docker-compose up postgres-vector
+# Runs: pgvector/pgvector:pg16 on port 5432
+# User: fabrika | Pass: fabrika_pass | DB: fabrika_db
+```
+
+### 3. Database Setup
+```bash
+pnpm db:migrate
+pnpm db:seed
+```
+
+Expected seed output:
+```
+Seeding Database...
+Tenant and users seeded (Fabrika Beta with alice, bob, charlie).
+Calls and topics seeded (20 calls).
+Opportunity seeded: ...
+Opportunities seeded (5 opportunities).
+Gate decisions seeded (15 decisions).
+Proposals seeded (3 proposals).
+Efforts seeded (10 efforts).
+Seeding completed with E10 data.
+```
+
+### 4. Verify Seed
+```bash
+psql -h localhost -U fabrika -d fabrika_db -c "SELECT COUNT(*) as calls FROM public.Call;"
+# Expected: 20+
+```
+
+### 5. Start Dev Server
+```bash
+pnpm dev
+# Open http://localhost:3000
+# Login: alice@fabrika.local / password
+# Dashboard: E10.1 KPI should show real data (6 KPI + seed counts)
+```
+
+---
+
+## Doğrulama
+
+- [x] Docker running (docker ps)
+- [x] Postgres healthy (pg_isready)
+- [x] Migrations applied (pnpm db:migrate)
+- [x] Seed counts OK (20 calls, 5 opp, 15 decisions, 10 efforts)
+- [x] Dev server runs (pnpm dev)
+- [x] Dashboard real data (not in-memory fallback)
+
+---
+
+## Kanıt Dosyası
+
+`docs/agent-results/TASK-MTQ32X4CFRMR5-devops-defne.md`
