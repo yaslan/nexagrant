@@ -1,5 +1,5 @@
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import ConsortiumManager from './manager';
@@ -43,14 +43,28 @@ const DEMO_OPPORTUNITIES: Record<string, any> = {
   },
 };
 
+/**
+ * M8 consortium page.
+ *
+ * This page used to resolve its tenant as
+ * `session.tenantId ?? prisma.tenant.findFirst()` and then apply the tenant to
+ * the WHERE clause only `if (tenantId)`. With no session the fallback handed
+ * the request whichever tenant happened to be seeded first, and if the table
+ * was empty the condition was dropped entirely — so `opportunity.findFirst({
+ * where: { id } })` returned *any* tenant's opportunity by guessed id. The seat
+ * candidates were never tenant-scoped at all.
+ *
+ * It now follows the same rule as `./actions.ts`: the tenant comes from
+ * `requireTenantPage()` (no fallback — anonymous visitors are redirected) and
+ * every query runs inside `withTenant`, matched on `(id, tenantId)`.
+ */
 export default async function ConsortiumPage({
   params,
 }: {
   params: Promise<{ id: string; locale: string; workspace: string }>;
 }) {
   const { id, locale, workspace } = await params;
-  const session = await auth();
-  let tenantId = (session as any)?.tenantId;
+  const { tenantId } = await requireTenantPage(locale);
 
   let opportunity: any = null;
   let seats: any[] = [];
@@ -58,33 +72,28 @@ export default async function ConsortiumPage({
   let orgs: any[] = [];
 
   try {
-    if (!tenantId) {
-      const tenant = await prisma.tenant.findFirst();
-      tenantId = tenant?.id;
-    }
-
-    const whereCond: any = { id };
-    if (tenantId) whereCond.tenantId = tenantId;
-
-    opportunity = await prisma.opportunity.findFirst({
-      where: whereCond,
-    });
+    opportunity = await withTenant<any>(tenantId, (tx) =>
+      tx.opportunity.findFirst({
+        where: { id, tenantId },
+      })
+    );
 
     if (opportunity) {
-      const seatsWhere: any = { opportunityId: id };
-      if (tenantId) seatsWhere.tenantId = tenantId;
-
-      seats = await prisma.consortiumSeat.findMany({
-        where: seatsWhere,
-        orderBy: { roleKey: 'asc' },
-      });
+      seats = await withTenant<any[]>(tenantId, (tx) =>
+        tx.consortiumSeat.findMany({
+          where: { opportunityId: id, tenantId },
+          orderBy: { roleKey: 'asc' },
+        })
+      );
 
       const seatIds = seats.map((s: any) => s.id);
       if (seatIds.length > 0) {
-        candidates = await prisma.seatCandidate.findMany({
-          where: { seatId: { in: seatIds } },
-          orderBy: { rank: 'asc' },
-        });
+        candidates = await withTenant<any[]>(tenantId, (tx) =>
+          tx.seatCandidate.findMany({
+            where: { seatId: { in: seatIds }, tenantId },
+            orderBy: { rank: 'asc' },
+          })
+        );
       }
 
       const orgIds = [
@@ -92,11 +101,15 @@ export default async function ConsortiumPage({
         ...candidates.map((c: any) => c.organizationId).filter(Boolean),
       ] as string[];
 
+      // Organizations are a shared catalogue, not tenant rows; the ids here
+      // already come from rows read inside this tenant.
       if (orgIds.length > 0) {
-        orgs = await prisma.organization.findMany({
-          where: { id: { in: orgIds } },
-          select: { id: true, name: true, shortName: true, country: true, isSme: true },
-        });
+        orgs = await withTenant<any[]>(tenantId, (tx) =>
+          tx.organization.findMany({
+            where: { id: { in: orgIds } },
+            select: { id: true, name: true, shortName: true, country: true, isSme: true },
+          })
+        );
       }
     }
   } catch (e: any) {
