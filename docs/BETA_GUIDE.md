@@ -225,8 +225,12 @@ Panelde gösterilen her oran bir kayda dayanır; kaynak yoksa metrik "veri yok" 
 ## 9. Beta sonrası
 
 - **7. hafta:** fiyat doğrulama atölyesi — planlar (Başlangıç €59, Ekip €249, İşletme, Kurumsal) ve
-  eklentiler ortaklarla test edilir. Detay: [`BILLING.md`](./BILLING.md).
-- **8. hafta:** kapanış — beta ortaklarına geçiş koşulları yazılı olarak sunulur.
+  eklentiler ortaklarla test edilir. Atölyeden önce 8 dakikalık anket gelir (tr/en); soruların ilk
+  bölümünde bilerek hiçbir fiyat gösterilmez. Anket ve sonuç raporu:
+  [`E11-PRICING-FEEDBACK.md`](./E11-PRICING-FEEDBACK.md), fiyat tablosu: [`BILLING.md`](./BILLING.md).
+- **8. hafta:** kapanış — beta ortaklarına geçiş koşulları yazılı olarak sunulur. Koşullar önceden
+  tanımlıdır ve katılıma bağlıdır (`founding` / `contributor` / `alumni` kademeleri):
+  [`BILLING.md` §8](./BILLING.md) ve [`E11-PRICING-FEEDBACK.md` §11](./E11-PRICING-FEEDBACK.md).
 - **Veri:** Beta sonunda devam etmeseniz de verileriniz silinene kadar korunur; dışa aktarma her zaman
   açıktır. Silme talebi ürün içinden yapılır.
 

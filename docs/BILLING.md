@@ -63,3 +63,21 @@ Aynı `Subscription.provider='iyzico'`; fiyat listesi TL olarak ayrı (`Plan.pri
 ## 7. Raporlama
 
 Yönetici: MRR, ARPA, churn, kredi tüketimi, eklenti oranı (PostHog + Stripe). Kiracı: fatura geçmişi, kredi geçmişi, koltuk kullanımı.
+
+## 8. Beta → ücretli geçiş (E11 kohortu)
+
+Beta tasarım ortaklarının v1.0 → v1.1 geçiş koşulları — indirim kademeleri, fiyat kilidi
+(grandfathering), pilot modül süresi — tek kaynakta tanımlıdır:
+[`src/lib/beta/pricing-transition.ts`](../src/lib/beta/pricing-transition.ts).
+
+Kademe harcamaya değil **katılıma** bağlıdır (sync katılımı + en az bir teklifin G2'ye ulaşması):
+`founding` %40 / 12 ay indirim + 24 ay fiyat kilidi · `contributor` %25 / 12 ay + 12 ay kilit ·
+`alumni` %15 / 6 ay, kilit yok. İndirim seçilen döngünün **liste** fiyatına uygulanır; yıllık listedeki
+%20 yeniden uygulanmaz. Kilit bitince artış 12 ayda en çok %20 ve 60 gün önceden yazılı bildirim.
+
+Kuralın tamamı, gerekçesi ve örnek teklif tablosu: [`E11-PRICING-FEEDBACK.md`](./E11-PRICING-FEEDBACK.md)
+(§11). Yüzdeler beta 7. hafta anketinin sonucuna göre yeniden ayarlanır; değişiklik noktası
+`TRANSITION_TIERS` sabitidir, testler koruma bandıdır.
+
+> Stripe karşılığı: kademe başına `coupon` + `promotion_code` (`repeating`, `discountMonths` kadar).
+> Fiyat kilidi Stripe'ta ifade edilemez; `Subscription` üzerinde ayrı bir `priceLockEndsOn` alanı gerekir.
