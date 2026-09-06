@@ -1,5 +1,13 @@
 import 'dotenv/config';
 import { prisma } from '../src/lib/db';
+import { DEFAULT_CRITERIA } from '../src/modules/m6/types';
+import seedTenantWorkspace from './seed-tenant-workspace';
+import seedCalls from './seed-calls';
+import seedOpportunities from './seed-opportunities';
+import seedGateDecisions from './seed-gate-decisions';
+import seedProposals from './seed-proposals';
+import seedEfforts from './seed-efforts';
+import seedE11Feedback from './seed-e11-feedback';
 
 // Module catalog — also used to derive the demo tenant's ModuleState rows.
 const modules = [
@@ -132,210 +140,88 @@ async function main() {
     }
   }
 
-  await seedDemoTenant();
+  // E10 Seed Data
+  await seedTenantWorkspace();
+  await seedCalls();
+  await seedOpportunities();
+  await seedGateDecisions();
+  await seedProposals();
+  await seedEfforts();
+  await seedM6EvaluatorLens();
 
-  console.log('Seeding completed.');
+  // E11.2 Feedback
+  await seedE11Feedback();
+
+  console.log('Seeding completed with E10 data.');
 }
 
 /**
- * 6. Demo tenant — DEVELOPMENT ONLY (prisma/seed.md §6).
- * Every write is keyed on a deterministic `demo-*` id so the block is idempotent:
- * running the seed twice updates the same rows instead of creating duplicates.
+ * M6 Evaluator Lens panel — DEVELOPMENT ONLY (TASK-MTPZH6T9L6E2E).
+ *
+ * Layers a panel evaluation onto rows the E10 seed already created:
+ * demo-proposal-3 (GFLEX, on demo-opp-3) reviewed by alice and bob.
+ * Every write is keyed on a deterministic id and upserted, so running the
+ * seed twice updates the same rows instead of creating duplicates.
+ *
+ * Seeded state: 1 evaluation (draft) / 2 reviewers (both pending) / 4 criteria / 0 scores.
  */
-async function seedDemoTenant() {
+async function seedM6EvaluatorLens() {
   if (process.env.NODE_ENV === 'production') {
-    console.log('Skipping demo tenant (NODE_ENV=production).');
+    console.log('Skipping M6 evaluator lens seed (NODE_ENV=production).');
     return;
   }
 
   const TENANT_ID = 'demo-tenant';
-  const WORKSPACE_ID = 'demo-workspace';
+  const PROPOSAL_ID = 'demo-proposal-3'; // GFLEX — HORIZON-CL5 grid flexibility platform
+  const OPPORTUNITY_ID = 'demo-opp-3';
+  const EVALUATION_ID = 'demo-evaluation-panel-1';
 
-  const tenant = {
-    name: 'Demo KOBİ',
-    slug: 'demo-kobi',
-    country: 'TR',
-    orgType: 'SME' as const,
-    locale: 'tr',
-    timezone: 'Europe/Istanbul',
+  const proposal = await prisma.proposal.findUnique({ where: { id: PROPOSAL_ID } });
+  if (!proposal) {
+    console.log('Skipping M6 evaluator lens seed (demo-proposal-3 not found).');
+    return;
+  }
+
+  // Official ESR marks, 0-5 per criterion. M6.3 compares the panel score against `total`.
+  // Only filled in when absent, so a hand-edited ESR record is never overwritten.
+  if (!proposal.esrScores) {
+    await prisma.proposal.update({
+      where: { id: PROPOSAL_ID },
+      data: { esrScores: { excellence: 3.5, impact: 3.5, implementation: 3.5, total: 3.5, threshold: 3.0 } },
+    });
+  }
+
+  const evaluationData = {
+    tenantId: TENANT_ID,
+    opportunityId: OPPORTUNITY_ID,
+    proposalId: PROPOSAL_ID,
+    userId: 'demo-user-alice',
+    readerType: 'PANEL',
+    status: 'draft', // no reviewer has submitted yet
+    avgScore: null,
   };
-  await prisma.tenant.upsert({
-    where: { id: TENANT_ID },
-    update: tenant,
-    create: { id: TENANT_ID, ...tenant },
+  await prisma.evaluation.upsert({
+    where: { id: EVALUATION_ID },
+    update: evaluationData,
+    create: { id: EVALUATION_ID, ...evaluationData },
   });
 
-  await prisma.workspace.upsert({
-    where: { id: WORKSPACE_ID },
-    update: { name: 'Ana Çalışma Alanı' },
-    create: { id: WORKSPACE_ID, tenantId: TENANT_ID, name: 'Ana Çalışma Alanı', slug: 'main' },
-  });
-
-  // 3 users with distinct roles
-  const demoUsers = [
-    { id: 'demo-user-owner', email: 'owner@demo.fabrika.test', name: 'Demo Owner', role: 'TENANT_OWNER' as const },
-    { id: 'demo-user-manager', email: 'manager@demo.fabrika.test', name: 'Demo Pipeline Manager', role: 'PIPELINE_MANAGER' as const },
-    { id: 'demo-user-writer', email: 'writer@demo.fabrika.test', name: 'Demo Writer', role: 'WRITER' as const },
+  const panelReviewers = [
+    { id: 'demo-reviewer-alice', userId: 'demo-user-alice', role: 'evaluator' },
+    { id: 'demo-reviewer-bob', userId: 'demo-user-bob', role: 'coordinator' },
   ];
-  for (const u of demoUsers) {
-    await prisma.user.upsert({
-      where: { email: u.email },
-      update: { name: u.name, locale: 'tr' },
-      create: { id: u.id, email: u.email, name: u.name, locale: 'tr' },
-    });
-    await prisma.membership.upsert({
-      where: { tenantId_userId: { tenantId: TENANT_ID, userId: u.id } },
-      update: { role: u.role },
-      create: { tenantId: TENANT_ID, userId: u.id, role: u.role },
-    });
+  for (const r of panelReviewers) {
+    const data = { tenantId: TENANT_ID, evaluationId: EVALUATION_ID, userId: r.userId, role: r.role, status: 'pending' };
+    await prisma.reviewer.upsert({ where: { id: r.id }, update: data, create: { id: r.id, ...data } });
   }
 
-  // Team plan subscription + module states (M1–M5 + M8 ON, rest OFF)
-  await prisma.subscription.upsert({
-    where: { tenantId: TENANT_ID },
-    update: { planId: 'team', status: 'ACTIVE' },
-    create: { tenantId: TENANT_ID, planId: 'team', status: 'ACTIVE', billingInterval: 'month' },
-  });
-
-  const onModules = ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'];
-  for (const m of modules) {
-    const status = onModules.includes(m.id) ? 'ON' : 'OFF';
-    await prisma.moduleState.upsert({
-      where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: m.id } },
-      update: { status },
-      create: { tenantId: TENANT_ID, moduleId: m.id, status },
-    });
+  for (const c of DEFAULT_CRITERIA) {
+    const id = `demo-criterion-${c.name.toLowerCase()}`;
+    const data = { tenantId: TENANT_ID, evaluationId: EVALUATION_ID, name: c.name, weight: c.weight, order: c.order };
+    await prisma.criterion.upsert({ where: { id }, update: data, create: { id, ...data } });
   }
 
-  // Calls + topics referenced by the demo opportunities
-  await prisma.call.upsert({
-    where: { callIdentifier: 'HORIZON-CL5-2026-09' },
-    update: { title: 'Horizon Europe Cluster 5 — 2026 Calls' },
-    create: {
-      id: 'demo-call-cl5',
-      programmeId: 'HE',
-      callIdentifier: 'HORIZON-CL5-2026-09',
-      title: 'Horizon Europe Cluster 5 — 2026 Calls',
-      openDate: new Date('2026-05-06T00:00:00Z'),
-    },
-  });
-  await prisma.call.upsert({
-    where: { callIdentifier: 'HORIZON-MISS-2026-04' },
-    update: { title: 'Horizon Europe Missions — 2026 Calls' },
-    create: {
-      id: 'demo-call-miss',
-      programmeId: 'HE',
-      callIdentifier: 'HORIZON-MISS-2026-04',
-      title: 'Horizon Europe Missions — 2026 Calls',
-      openDate: new Date('2026-04-15T00:00:00Z'),
-    },
-  });
-
-  const demoTopics = [
-    { id: 'demo-topic-1', callId: 'demo-call-cl5', identifier: 'HORIZON-CL5-2026-09-D4-01', title: 'Energy-efficient building renovation at district scale', deadline: '2026-09-15T17:00:00Z' },
-    { id: 'demo-topic-2', callId: 'demo-call-cl5', identifier: 'HORIZON-CL5-2026-09-D4-02', title: 'Industrial heat decarbonisation pilots', deadline: '2026-09-15T17:00:00Z' },
-    { id: 'demo-topic-3', callId: 'demo-call-cl5', identifier: 'HORIZON-CL5-2026-09-D4-03', title: 'Smart grid flexibility for renewables', deadline: '2026-09-15T17:00:00Z' },
-    { id: 'demo-topic-4', callId: 'demo-call-cl5', identifier: 'HORIZON-CL5-2026-09-D4-04', title: 'Circular construction materials', deadline: '2026-09-15T17:00:00Z' },
-    { id: 'demo-topic-5', callId: 'demo-call-miss', identifier: 'HORIZON-MISS-2026-04-CIT-02', title: 'Climate-neutral cities: citizen engagement', deadline: '2026-04-22T17:00:00Z' },
-    { id: 'demo-topic-6', callId: 'demo-call-miss', identifier: 'HORIZON-NEB-2026-01-REGEN-02', title: 'New European Bauhaus: regenerative neighbourhoods', deadline: '2026-01-28T17:00:00Z' },
-  ];
-  for (const t of demoTopics) {
-    const data = {
-      callId: t.callId,
-      title: t.title,
-      status: 'FORTHCOMING' as const,
-      typeOfAction: 'IA',
-      isTwoStage: false,
-      deadlines: [{ stage: 1, at: t.deadline, tz: 'Europe/Brussels' }],
-      nextDeadlineAt: new Date(t.deadline),
-      keywords: ['energy', 'climate', 'urban'],
-    };
-    await prisma.topic.upsert({
-      where: { identifier: t.identifier },
-      update: data,
-      create: { id: t.id, identifier: t.identifier, ...data },
-    });
-  }
-
-  // 5 opportunities spanning gates G0–G3
-  const demoOpps = [
-    { id: 'demo-opp-1', topicId: 'demo-topic-1', title: 'District renovation pilot — İzmir', stage: 'G0' as const, g0Score: 0.42 },
-    { id: 'demo-opp-2', topicId: 'demo-topic-2', title: 'Industrial waste-heat recovery consortium', stage: 'G1' as const, g0Score: 0.61 },
-    { id: 'demo-opp-3', topicId: 'demo-topic-3', title: 'Grid flexibility platform', stage: 'G2' as const, g0Score: 0.74 },
-    { id: 'demo-opp-4', topicId: 'demo-topic-5', title: 'Citizen engagement for climate-neutral Bursa', stage: 'G3' as const, g0Score: 0.81 },
-    { id: 'demo-opp-5', topicId: 'demo-topic-6', title: 'Regenerative neighbourhood design', stage: 'G1' as const, g0Score: 0.55 },
-  ];
-  for (const o of demoOpps) {
-    const data = {
-      tenantId: TENANT_ID,
-      workspaceId: WORKSPACE_ID,
-      topicId: o.topicId,
-      title: o.title,
-      stage: o.stage,
-      status: 'ACTIVE' as const,
-      intendedRole: 'partner',
-      ownerId: 'demo-user-manager',
-      g0Score: o.g0Score,
-    };
-    await prisma.opportunity.upsert({ where: { id: o.id }, update: data, create: { id: o.id, ...data } });
-  }
-
-  // Gate decisions: one recorded pass per gate the opportunity has already cleared
-  const gateOrder = ['G0', 'G1', 'G2', 'G3'] as const;
-  for (const o of demoOpps) {
-    const reached = gateOrder.indexOf(o.stage);
-    for (let i = 0; i <= reached; i++) {
-      const gate = gateOrder[i]!;
-      const id = `${o.id}-${gate.toLowerCase()}`;
-      const data = {
-        tenantId: TENANT_ID,
-        opportunityId: o.id,
-        gate,
-        passed: true,
-        inputs: { score: o.g0Score, source: 'seed' },
-        ruleVersion: '1.0',
-        decidedBy: 'demo-user-manager',
-      };
-      await prisma.gateDecision.upsert({ where: { id }, update: data, create: { id, ...data } });
-    }
-  }
-
-  // 20 evidence records across the eight categories
-  const evidenceKinds = ['corporate', 'financial', 'certificate', 'infrastructure', 'performance', 'ethics', 'partner', 'personnel'];
-  for (let i = 1; i <= 20; i++) {
-    const id = `demo-evidence-${String(i).padStart(2, '0')}`;
-    const kind = evidenceKinds[(i - 1) % evidenceKinds.length]!;
-    const data = {
-      tenantId: TENANT_ID,
-      kind,
-      category: `CAT-0${((i - 1) % 8) + 1}`,
-      title: `Demo evidence ${i} (${kind})`,
-      body: `Seeded ${kind} evidence record #${i} for the demo tenant. Replace with real documents before any customer demo.`,
-      language: 'tr',
-      status: 'VALID',
-      confidentiality: 'INTERNAL',
-      createdBy: 'seed',
-    };
-    await prisma.evidence.upsert({ where: { id }, update: data, create: { id, ...data } });
-  }
-
-  // 6 relationships with varying warmth
-  const warmths = ['cold', 'warm', 'hot', 'active', 'warm', 'cold'];
-  for (let i = 1; i <= 6; i++) {
-    const id = `demo-relationship-${i}`;
-    const data = {
-      tenantId: TENANT_ID,
-      kind: i % 2 === 0 ? 'partner' : 'ncp',
-      ownerUserId: 'demo-user-manager',
-      counterpartName: `Demo Counterpart ${i}`,
-      counterpartEmail: `contact${i}@partner.demo.test`,
-      warmth: warmths[i - 1]!,
-      nextStep: 'Follow-up call',
-    };
-    await prisma.relationship.upsert({ where: { id }, update: data, create: { id, ...data } });
-  }
-
-  console.log('Demo tenant seeded (3 users, 5 opportunities, 20 evidence, 6 relationships).');
+  console.log('M6 evaluator lens seeded (1 evaluation, 2 reviewers pending, 4 criteria, 0 scores).');
 }
 
 main()
