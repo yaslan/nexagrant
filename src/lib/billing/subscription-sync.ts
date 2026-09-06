@@ -1,10 +1,7 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/db';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock', {
-  // @ts-ignore
-  apiVersion: '2026-08-26.dahlia',
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
 interface SubscriptionSyncResult {
   tenantId: string;
@@ -177,13 +174,16 @@ export async function syncStripeSubscription(
   });
 
   // Upsert subscription
+  const stripeSubscription = subscription as {
+    current_period_end?: number;
+  } & Stripe.Subscription;
   const currentPeriodEnd =
-    (subscription as any).current_period_end &&
-    typeof (subscription as any).current_period_end === 'number'
-      ? new Date((subscription as any).current_period_end * 1000)
+    stripeSubscription.current_period_end &&
+    typeof stripeSubscription.current_period_end === 'number'
+      ? new Date(stripeSubscription.current_period_end * 1000)
       : null;
 
-  const updatedSubscription = await prisma.subscription.upsert({
+  await prisma.subscription.upsert({
     where: { tenantId },
     create: {
       tenantId,
@@ -213,7 +213,9 @@ export async function syncStripeSubscription(
     where: { tenantId, endedAt: null },
   });
 
-  const currentAddOnSkus = new Set(currentAddOns.map((a: any) => a.sku as string));
+  const currentAddOnSkus = new Set(
+    currentAddOns.map((a: typeof currentAddOns[0]) => a.sku)
+  );
   const incomingAddOnSkus = new Set(incomingAddOns.map((a) => a.sku));
 
   // Find removed add-ons
@@ -395,11 +397,11 @@ export async function handleSubscriptionCancellation(
     const freeModules = new Set(freePlan.modules);
     const allModules = await prisma.moduleCatalog.findMany();
 
-    for (const module of allModules) {
-      if (!freeModules.has(module.id)) {
+    for (const moduleCatalog of allModules) {
+      if (!freeModules.has(moduleCatalog.id)) {
         await prisma.moduleState.upsert({
-          where: { tenantId_moduleId: { tenantId, moduleId: module.id } },
-          create: { tenantId, moduleId: module.id, status: 'OFF' },
+          where: { tenantId_moduleId: { tenantId, moduleId: moduleCatalog.id } },
+          create: { tenantId, moduleId: moduleCatalog.id, status: 'OFF' },
           update: { status: 'OFF' },
         });
       }
@@ -436,7 +438,8 @@ export async function logInvoicePayment(
   invoice: Stripe.Invoice,
   eventId: string
 ): Promise<void> {
-  const subscriptionId = (invoice as any).subscription as string | undefined;
+  const stripeInvoice = invoice as { subscription?: string } & Stripe.Invoice;
+  const subscriptionId = stripeInvoice.subscription;
   if (!subscriptionId) {
     return;
   }

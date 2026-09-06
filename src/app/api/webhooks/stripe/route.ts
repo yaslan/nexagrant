@@ -6,10 +6,7 @@ import {
   logInvoicePayment,
 } from '@/lib/billing/subscription-sync';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock', {
-  // @ts-ignore
-  apiVersion: '2026-08-26.dahlia',
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -24,9 +21,10 @@ export async function POST(request: Request) {
       throw new Error('Missing STRIPE_WEBHOOK_SECRET');
     }
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-  } catch (err: any) {
-    console.error(`Webhook signature verification failed: ${err.message}`);
-    return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error(`Webhook signature verification failed: ${error.message}`);
+    return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
   }
 
   try {
@@ -85,13 +83,14 @@ export async function POST(request: Request) {
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
-  } catch (error: any) {
-    console.error(`Error processing webhook: ${error.message}`, error);
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error(`Error processing webhook: ${err.message}`, error);
     // Don't return 500 for already-processed events (idempotency)
-    if (error.message?.includes('already processed')) {
+    if (err.message?.includes('already processed')) {
       return NextResponse.json({ received: true });
     }
-    return new NextResponse(`Error processing webhook: ${error.message}`, {
+    return new NextResponse(`Error processing webhook: ${err.message}`, {
       status: 500,
     });
   }

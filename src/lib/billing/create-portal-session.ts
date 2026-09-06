@@ -1,10 +1,7 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/db';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock', {
-  // @ts-ignore
-  apiVersion: '2026-08-26.dahlia',
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
 /**
  * Creates or retrieves a Stripe customer portal session for subscription management.
