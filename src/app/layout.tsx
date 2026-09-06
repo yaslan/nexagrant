@@ -12,6 +12,8 @@ import './globals.css';
  * NEXT_PUBLIC_APP_URL per environment so those resolve to the real host.
  */
 export const metadata: Metadata = {
+  title: 'Fabrika',
+  description: 'Avrupa fonları için proje pipeline SaaS',
   metadataBase: new URL(env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
 };
 

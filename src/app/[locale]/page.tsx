@@ -245,7 +245,7 @@ export default async function HomePage({
                   desc: isTr
                     ? 'Mükemmeliyet (Excellence), Etki (Impact) ve Uygulama mimarisi AB standartlarında yapılandırılır.'
                     : 'Draft Excellence, Impact, and Implementation sections with EU policy alignment.',
-                  color: 'bg-teal-600',
+                  color: 'bg-teal-700',
                 },
                 {
                   gate: 'G2',
@@ -253,7 +253,7 @@ export default async function HomePage({
                   desc: isTr
                     ? '150k+ CORDIS profilinden eksik yetkinlik koltukları, koordinatör ve partnerler eşleştirilir.'
                     : 'Match optimal coordinators and partners from 150k+ CORDIS profiles by centrality and topic history.',
-                  color: 'bg-purple-600',
+                  color: 'bg-purple-700',
                 },
                 {
                   gate: 'G3',
@@ -261,7 +261,7 @@ export default async function HomePage({
                   desc: isTr
                     ? 'Teklif metni, bağımsız AB hakemi perspektifiyle 15 puan üzerinden taranır ve zayıf noktalar raporlanır.'
                     : 'Deep AI evaluator simulation grading against official 15-point criteria with actionable fixes.',
-                  color: 'bg-amber-600',
+                  color: 'bg-amber-700',
                 },
                 {
                   gate: 'G4',
@@ -269,7 +269,7 @@ export default async function HomePage({
                   desc: isTr
                     ? 'Bütçe tabloları, PIC doğrulamaları ve Part A/B dosyaları AB Funding Portal formatında teslimata hazır hale gelir.'
                     : 'Final budget verification, PIC validations, and complete application submission readiness.',
-                  color: 'bg-emerald-600',
+                  color: 'bg-emerald-700',
                 },
               ].map((step, idx) => (
                 <div
@@ -474,7 +474,7 @@ export default async function HomePage({
                 <div className="pt-2">
                   <Link
                     href={getWorkspaceRoute('partners', locale, 'default')}
-                    className="inline-flex items-center gap-2 bg-accent hover:opacity-90 text-white text-xs font-bold px-6 py-3.5 rounded-xl shadow-2xs transition"
+                    className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold px-6 py-3.5 rounded-xl shadow-2xs transition"
                   >
                     <span>{isTr ? 'Ortak Arama Motorunu Dene' : 'Open Partner Search'}</span>
                     <span>→</span>
@@ -494,7 +494,7 @@ export default async function HomePage({
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="font-bold text-base text-ink">Fraunhofer-Gesellschaft</h4>
+                      <h3 className="font-bold text-base text-ink">Fraunhofer-Gesellschaft</h3>
                       <p className="text-xs text-muted">PIC: 999984059 • Almanya (DE) • REC</p>
                     </div>
                   </div>

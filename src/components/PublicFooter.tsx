@@ -35,9 +35,9 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
 
           {/* Col 2: Platform & Yetenekler */}
           <div className="space-y-3">
-            <h4 className="text-ink font-bold text-sm tracking-wide">
+            <h3 className="text-ink font-bold text-sm tracking-wide">
               {isTr ? 'Yetenekler' : 'Platform'}
-            </h4>
+            </h3>
             <ul className="space-y-2">
               <li>
                 <Link href={getWorkspaceRoute('pipeline', locale, 'default')} className="hover:text-ink transition">
