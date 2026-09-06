@@ -1,0 +1,117 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Fabrika//Beta Program 1.0//TR
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Fabrika Beta — Haftalik Sync / Weekly Sync
+X-WR-TIMEZONE:Europe/Istanbul
+BEGIN:VTIMEZONE
+TZID:Europe/Istanbul
+X-LIC-LOCATION:Europe/Istanbul
+BEGIN:STANDARD
+TZOFFSETFROM:+0300
+TZOFFSETTO:+0300
+TZNAME:+03
+DTSTART:19700101T000000
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+UID:fabrika-beta-kickoff@fabrika.app
+DTSTAMP:20260906T090000Z
+DTSTART;TZID=Europe/Istanbul:20260907T100000
+DTEND;TZID=Europe/Istanbul:20260907T110000
+SUMMARY:Fabrika Beta — Kickoff / Program acilisi
+DESCRIPTION:Beta programinin acilisi: kapsam\, onboarding adimlari\, haftalik ritim. Rehber: docs/BETA_GUIDE.md — Beta kickoff: scope\, onboarding steps\, weekly rhythm. Guide: docs/BETA_GUIDE.en.md
+LOCATION:Online
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+END:VEVENT
+BEGIN:VEVENT
+UID:fabrika-beta-week01@fabrika.app
+DTSTAMP:20260906T090000Z
+DTSTART;TZID=Europe/Istanbul:20260910T140000
+DTEND;TZID=Europe/Istanbul:20260910T144500
+SUMMARY:Fabrika Beta — Hafta 1 Sync / Week 1 Sync
+DESCRIPTION:Tema / Theme: Kurulum, ilk cagri secimi, engeller — Setup, first call selection, blockers\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Online
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+END:VEVENT
+BEGIN:VEVENT
+UID:fabrika-beta-week02@fabrika.app
+DTSTAMP:20260906T090000Z
+DTSTART;TZID=Europe/Istanbul:20260917T140000
+DTEND;TZID=Europe/Istanbul:20260917T144500
+SUMMARY:Fabrika Beta — Hafta 2 Sync / Week 2 Sync
+DESCRIPTION:Tema / Theme: G0/G1 deneyimi, cagri istihbarati kalitesi — G0/G1 experience, quality of call intelligence\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Online
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+END:VEVENT
+BEGIN:VEVENT
+UID:fabrika-beta-week03@fabrika.app
+DTSTAMP:20260906T090000Z
+DTSTART;TZID=Europe/Istanbul:20260924T140000
+DTEND;TZID=Europe/Istanbul:20260924T144500
+SUMMARY:Fabrika Beta — Hafta 3 Sync / Week 3 Sync
+DESCRIPTION:Tema / Theme: M1/M8 ortak eslestirme dogrulugu — M1/M8 partner matching accuracy\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Online
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+END:VEVENT
+BEGIN:VEVENT
+UID:fabrika-beta-week04@fabrika.app
+DTSTAMP:20260906T090000Z
+DTSTART;TZID=Europe/Istanbul:20261001T140000
+DTEND;TZID=Europe/Istanbul:20261001T144500
+SUMMARY:Fabrika Beta — Hafta 4 Sync / Week 4 Sync
+DESCRIPTION:Tema / Theme: Konsept notu (M2) cikti kalitesi + kredi tuketimi — Concept note (M2) output quality and credit usage\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Online
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+END:VEVENT
+BEGIN:VEVENT
+UID:fabrika-beta-week05@fabrika.app
+DTSTAMP:20260906T090000Z
+DTSTART;TZID=Europe/Istanbul:20261008T140000
+DTEND;TZID=Europe/Istanbul:20261008T144500
+SUMMARY:Fabrika Beta — Hafta 5 Sync / Week 5 Sync
+DESCRIPTION:Tema / Theme: Kanit disiplini (M3) ve raporlama — Evidence discipline (M3) and reporting\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Online
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+END:VEVENT
+BEGIN:VEVENT
+UID:fabrika-beta-week06@fabrika.app
+DTSTAMP:20260906T090000Z
+DTSTART;TZID=Europe/Istanbul:20261015T140000
+DTEND;TZID=Europe/Istanbul:20261015T144500
+SUMMARY:Fabrika Beta — Hafta 6 Sync / Week 6 Sync
+DESCRIPTION:Tema / Theme: KPI paneli: hangi metrik karar degistiriyor? — KPI dashboard: which metric changes a decision?\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Online
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+END:VEVENT
+BEGIN:VEVENT
+UID:fabrika-beta-week07@fabrika.app
+DTSTAMP:20260906T090000Z
+DTSTART;TZID=Europe/Istanbul:20261022T140000
+DTEND;TZID=Europe/Istanbul:20261022T144500
+SUMMARY:Fabrika Beta — Hafta 7 Sync / Week 7 Sync
+DESCRIPTION:Tema / Theme: Fiyat dogrulama atolyesi (E11.4) — Price validation workshop (E11.4)\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Online
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+END:VEVENT
+BEGIN:VEVENT
+UID:fabrika-beta-week08@fabrika.app
+DTSTAMP:20260906T090000Z
+DTSTART;TZID=Europe/Istanbul:20261029T140000
+DTEND;TZID=Europe/Istanbul:20261029T144500
+SUMMARY:Fabrika Beta — Hafta 8 Sync / Week 8 Sync
+DESCRIPTION:Tema / Theme: G0 kalibrasyonu (E11.3) + beta kapanisi — G0 calibration (E11.3) and beta close-out\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Online
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+END:VEVENT
+END:VCALENDAR

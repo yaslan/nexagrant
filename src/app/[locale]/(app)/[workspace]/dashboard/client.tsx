@@ -132,10 +132,12 @@ export default function DashboardClient({
       <div className="bg-surface border border-border rounded-2xl p-4 shadow-xs">
         <form onSubmit={handleDateFilter} className="flex flex-col sm:flex-row gap-3 items-end">
           <div className="flex-1">
-            <label className="text-xs font-bold text-muted uppercase mb-1 block">
+            <label htmlFor="dashboard-from-date" className="text-xs font-bold text-muted uppercase mb-1 block">
               {isTr ? 'Başlangıç Tarihi' : 'From Date'}
             </label>
             <input
+              id="dashboard-from-date"
+              name="from"
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
@@ -143,10 +145,12 @@ export default function DashboardClient({
             />
           </div>
           <div className="flex-1">
-            <label className="text-xs font-bold text-muted uppercase mb-1 block">
+            <label htmlFor="dashboard-to-date" className="text-xs font-bold text-muted uppercase mb-1 block">
               {isTr ? 'Bitiş Tarihi' : 'To Date'}
             </label>
             <input
+              id="dashboard-to-date"
+              name="to"
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
@@ -157,15 +161,16 @@ export default function DashboardClient({
             type="submit"
             className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/80 transition flex items-center gap-2 text-sm font-semibold"
           >
-            <Filter className="w-4 h-4" />
+            <Filter className="w-4 h-4" aria-hidden="true" />
             {isTr ? 'Filtrele' : 'Filter'}
           </button>
           <button
             type="button"
             onClick={handleExportCSV}
+            aria-label={isTr ? 'KPI verilerini CSV olarak indir' : 'Download KPI data as CSV'}
             className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition flex items-center gap-2 text-sm font-semibold"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-4 h-4" aria-hidden="true" />
             CSV
           </button>
         </form>
@@ -225,7 +230,7 @@ export default function DashboardClient({
               </div>
               <div className="text-xl font-bold text-white font-mono flex items-baseline gap-1">
                 <span>{creditBalance}</span>
-                <span className="text-xs font-normal text-slate-400">/ 500 Kredi</span>
+                <span className="text-xs font-normal text-slate-400">{isTr ? '/ 500 Kredi' : '/ 500 credits'}</span>
               </div>
               <Link
                 href={`/${locale}/${workspace}/ayarlar/faturalama`}
@@ -372,7 +377,7 @@ export default function DashboardClient({
             </div>
             <div>
               <div className="text-xs font-bold text-muted uppercase">{isTr ? 'Kalan YZ Kredisi' : 'Remaining AI Credits'}</div>
-              <div className="text-xl font-bold text-emerald-500 font-mono">{creditBalance} AI Kredisi</div>
+              <div className="text-xl font-bold text-emerald-500 font-mono">{creditBalance} {isTr ? 'YZ Kredisi' : 'AI credits'}</div>
             </div>
           </div>
           <span className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
