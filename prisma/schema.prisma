@@ -65,6 +65,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   evaluations   Evaluation[]
+  reviewerSeats Reviewer[]
   requestedApprovals ApprovalRequest[] @relation("Requester")
   approvedApprovals  ApprovalRequest[] @relation("Approver")
 }
@@ -638,6 +639,7 @@ model Proposal {
   esrFileUrl    String?
   outcome       String?  // funded | reserve | above_threshold | below
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  evaluations   Evaluation[]
 }
 
 model Effort {
@@ -887,20 +889,86 @@ model AuditEvent {
 // ───────────────────────── v1.1+ (M6, M9, M10, M11, M7, marketplace) ─────────────────────────
 
 
+// M6 Evaluator Lens.
+// Two shapes share this table, distinguished by `readerType`:
+//   HUMAN | AI    — single-reader lens on an Opportunity (v1.0, excellence/impact/implementation)
+//   PANEL         — multi-reviewer panel on a Proposal (v1.1, reviewers + criteria + scores)
+// The v1.1 columns are all nullable or defaulted, so existing v1.0 rows and callers are unaffected.
 model Evaluation {
   id             String      @id @default(cuid())
   tenantId       String
   opportunityId  String
   opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  userId         String?
+  proposalId     String?     // v1.1 — set for PANEL evaluations
+  proposal       Proposal?   @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  userId         String?     // owning evaluator / creator
   user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  readerType     String      // "HUMAN" | "AI"
-  excellence     Float
-  impact         Float
-  implementation Float
+  readerType     String      @default("HUMAN") // "HUMAN" | "AI" | "PANEL"
+  status         String      @default("draft") // draft | in-progress | completed
+  avgScore       Float?      // weighted 1-5 panel average; null until reviewers submit
+  excellence     Float       @default(0)
+  impact         Float       @default(0)
+  implementation Float       @default(0)
   weaknesses     Json?
   calibration    Float?
   createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @default(now()) @updatedAt
+  reviewers      Reviewer[]
+  criteria       Criterion[]
+  @@index([tenantId, proposalId])
+  @@index([tenantId, opportunityId])
+}
+
+// One assigned reviewer on a PANEL evaluation. A user may sit on an evaluation once.
+model Reviewer {
+  id           String     @id @default(cuid())
+  tenantId     String
+  evaluationId String
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         String     @default("evaluator") // evaluator | coordinator
+  status       String     @default("pending")   // pending | completed
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
+  scores       Score[]
+  @@unique([evaluationId, userId])
+  @@index([evaluationId, status])
+  @@index([tenantId])
+}
+
+// A weighted scoring axis of a PANEL evaluation. Weights are 0..1 and should sum to 1 per evaluation.
+model Criterion {
+  id           String     @id @default(cuid())
+  tenantId     String
+  evaluationId String
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  name         String     // Innovation | Feasibility | Impact | Communication
+  weight       Float      @default(0)
+  order        Int        @default(0)
+  createdAt    DateTime   @default(now())
+  scores       Score[]
+  @@unique([evaluationId, name])
+  @@index([tenantId, evaluationId])
+}
+
+// One reviewer's mark on one criterion. score is 1..5 (DB CHECK in the M6 migration).
+// submittedAt stays null while the reviewer is still drafting.
+model Score {
+  id          String    @id @default(cuid())
+  tenantId    String
+  reviewerId  String
+  reviewer    Reviewer  @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  criterionId String
+  criterion   Criterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  score       Int
+  comment     String?   @db.Text
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  @@unique([reviewerId, criterionId])
+  @@index([criterionId])
+  @@index([tenantId])
 }
 
 model MeetingBrief {

@@ -53,4 +53,31 @@ Durumlar: `Opportunity.stage` yalnızca `GateDecision(passed=true)` ile ilerler;
 
 ## 8. v1.1+ tablolar (şemada yorum olarak)
 
-`MockEvaluation` (M6), `MeetingBrief` (M9), `FollowupDoc` (M10), `ApplicationPart` (M11), `TtoPortfolioItem` (M7), `MarketplaceListing/Engagement/Commission`, `ApiKey`.
+`Evaluation` (M6), `MeetingBrief` (M9), `FollowupDoc` (M10), `ApplicationPart` (M11), `TtoPortfolioItem` (M7), `MarketplaceListing/Engagement/Commission`, `ApiKey`.
+
+### 8.1 M6 Evaluator Lens — değerlendirme paneli
+
+`Evaluation` tek tablo, iki şekil taşır; ayrım `readerType` alanındadır:
+
+| readerType | Bağlam | Kullanan alanlar |
+|---|---|---|
+| `HUMAN` \| `AI` | v1.0 tek-okuyucu merceği, `Opportunity` üzerinde | `excellence`, `impact`, `implementation`, `weaknesses`, `calibration` |
+| `PANEL` | v1.1 çok-değerlendiricili panel, `Proposal` üzerinde | `proposalId`, `status`, `avgScore` + `Reviewer` / `Criterion` / `Score` |
+
+v1.1 sütunlarının tümü nullable ya da varsayılanlıdır; mevcut v1.0 satırları ve
+`src/modules/m6/server/actions.ts` çağrıları etkilenmez.
+
+- `Reviewer` — panele atanmış değerlendirici. `role`: `evaluator | coordinator`, `status`: `pending | completed`.
+  `@@unique([evaluationId, userId])` bir kullanıcının aynı panele iki kez atanmasını engeller.
+- `Criterion` — ağırlıklı puanlama ekseni (`Innovation | Feasibility | Impact | Communication`).
+  `weight` 0..1 (DB CHECK), bir panelde toplamı 1.0 olmalıdır. `@@unique([evaluationId, name])`.
+- `Score` — bir değerlendiricinin bir kriter için verdiği not. `score` 1..5 (DB CHECK `Score_score_check`;
+  Prisma CHECK üretemediği için migration dosyasında tanımlıdır). `submittedAt` taslak aşamasında `null`.
+  `@@unique([reviewerId, criterionId])` çift puanlamayı engeller.
+
+Dördü de kiracıya özeldir (`tenantId` + `tenant_isolation` RLS politikası).
+`Evaluation` silinince `Reviewer`/`Criterion`, `Reviewer` veya `Criterion` silinince `Score` cascade ile silinir.
+
+Migration: `prisma/migrations/add-m6-evaluator-lens.sql` (idempotent, additive) —
+geri alma: `prisma/migrations/add-m6-evaluator-lens.down.sql` (yıkıcı, açık onay ister).
+TypeScript sözleşmeleri: `src/modules/m6/types.ts`.
