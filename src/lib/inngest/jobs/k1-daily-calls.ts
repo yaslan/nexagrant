@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { SediaAdapter } from '@/lib/adapters/sedia';
 import { EurostarsAdapter } from '@/lib/adapters/eurostars';
 import { TubitakAdapter } from '@/lib/adapters/tubitak';
+import { K1DailyCallsOutputSchema, type K1DailyCallsOutput } from '../events';
 
 /**
  * K1 Daily Call Sync — 2 AM UTC
@@ -11,7 +12,7 @@ import { TubitakAdapter } from '@/lib/adapters/tubitak';
  */
 export const k1DailyCalls = inngest.createFunction(
   { id: 'k1-daily-calls', triggers: [{ cron: '0 2 * * *' }] },
-  async ({ step }: any) => {
+  async ({ step }): Promise<K1DailyCallsOutput> => {
     const sediaTopics = await step.run('fetch-sedia-topics', async () => {
       const adapter = new SediaAdapter();
       return await adapter.fetchTopics();
@@ -29,15 +30,17 @@ export const k1DailyCalls = inngest.createFunction(
 
     const result = await step.run('normalize-and-upsert', async () => {
       const allTopics = [...sediaTopics, ...eurostarsTopics, ...tubitakTopics];
+      const errors: Array<{ identifier: string; message: string }> = [];
 
       let insertedCount = 0;
       for (const t of allTopics) {
         try {
+          const topicStatus = t.status as 'FORTHCOMING' | 'OPEN' | 'CLOSED';
           await prisma.topic.upsert({
             where: { identifier: t.identifier },
             update: {
               title: t.title,
-              status: t.status as any,
+              status: topicStatus,
               typeOfAction: t.typeOfAction,
               isLumpSum: t.isLumpSum,
               isTwoStage: t.isTwoStage,
@@ -46,7 +49,7 @@ export const k1DailyCalls = inngest.createFunction(
             create: {
               identifier: t.identifier,
               title: t.title,
-              status: (t.status as any) || 'FORTHCOMING',
+              status: topicStatus || 'FORTHCOMING',
               typeOfAction: t.typeOfAction,
               isLumpSum: t.isLumpSum || false,
               isTwoStage: t.isTwoStage || false,
@@ -74,14 +77,13 @@ export const k1DailyCalls = inngest.createFunction(
           });
           insertedCount++;
         } catch (error) {
-          console.error(
-            `Failed to upsert topic ${t.identifier}:`,
-            error
-          );
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error(`Failed to upsert topic ${t.identifier}:`, error);
+          errors.push({ identifier: t.identifier, message: msg });
         }
       }
 
-      return {
+      const output: K1DailyCallsOutput = {
         success: true,
         totalProcessed: allTopics.length,
         inserted: insertedCount,
@@ -89,6 +91,12 @@ export const k1DailyCalls = inngest.createFunction(
         eurostarsCount: eurostarsTopics.length,
         tubitakCount: tubitakTopics.length,
       };
+
+      if (errors.length > 0) {
+        output.errors = errors;
+      }
+
+      return K1DailyCallsOutputSchema.parse(output);
     });
 
     return result;

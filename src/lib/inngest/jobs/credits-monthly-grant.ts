@@ -1,6 +1,7 @@
 import { inngest } from '../client';
 import { prisma } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
+import { CreditsMonthlyGrantOutputSchema, type CreditsMonthlyGrantOutput } from '../events';
 
 /**
  * Credits Monthly Grant — 1st of month, 6 AM UTC
@@ -8,7 +9,7 @@ import { getEntitlements } from '@/lib/billing';
  */
 export const creditsMonthlyGrant = inngest.createFunction(
   { id: 'credits-monthly-grant', triggers: [{ cron: '0 6 1 * *' }] },
-  async ({ step }: any) => {
+  async ({ step }): Promise<CreditsMonthlyGrantOutput> => {
     const tenants = await step.run('fetch-active-tenants', async () => {
       return await prisma.tenant.findMany({
         select: { id: true },
@@ -19,6 +20,7 @@ export const creditsMonthlyGrant = inngest.createFunction(
       let grantedCount = 0;
       let failedCount = 0;
       let totalCredits = 0;
+      const errors: Array<{ tenantId: string; message: string }> = [];
 
       for (const tenant of tenants) {
         try {
@@ -37,21 +39,26 @@ export const creditsMonthlyGrant = inngest.createFunction(
             totalCredits += creditsToGrant;
           }
         } catch (error) {
-          console.error(
-            `Failed to grant credits for tenant ${tenant.id}:`,
-            error
-          );
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error(`Failed to grant credits for tenant ${tenant.id}:`, error);
           failedCount++;
+          errors.push({ tenantId: tenant.id, message: msg });
         }
       }
 
-      return {
+      const output: CreditsMonthlyGrantOutput = {
         success: true,
         totalTenants: tenants.length,
         grantedCount,
         failedCount,
         totalCreditsGranted: totalCredits,
       };
+
+      if (errors.length > 0) {
+        output.errors = errors;
+      }
+
+      return CreditsMonthlyGrantOutputSchema.parse(output);
     });
 
     return result;
