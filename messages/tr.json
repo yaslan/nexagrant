@@ -7,7 +7,14 @@
     "relationships": "İlişkiler",
     "evidence": "Kanıtlar",
     "conceptNotes": "Konsept Notlar",
-    "settings": "Ayarlar"
+    "tto": "TTO Hızlandırıcısı (M7)",
+    "approvals": "Onay Merkezi (4-Eyes)",
+    "marketplace": "Pazar Yeri & API",
+    "apiKeys": "Partner REST API",
+    "settings": "Ayarlar",
+    "adminModules": "Yönetici Konsolu",
+    "workspaceLabel": "Çalışma Alanı",
+    "administrationLabel": "Yönetim"
   },
   "Common": {
     "loading": "Yükleniyor...",

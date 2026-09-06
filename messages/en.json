@@ -7,7 +7,14 @@
     "relationships": "Relationships",
     "evidence": "Evidence",
     "conceptNotes": "Concept Notes",
-    "settings": "Settings"
+    "tto": "TTO Accelerator (M7)",
+    "approvals": "Approvals (4-Eyes)",
+    "marketplace": "Marketplace & API",
+    "apiKeys": "Partner REST API",
+    "settings": "Settings",
+    "adminModules": "Platform Admin",
+    "workspaceLabel": "Workspace",
+    "administrationLabel": "Administration"
   },
   "Common": {
     "loading": "Loading...",

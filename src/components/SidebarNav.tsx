@@ -28,23 +28,23 @@ export default function SidebarNav({ locale, isPlatformAdmin = false }: SidebarN
     { key: 'partners', href: getWorkspaceRoute('partners', locale, workspaceSlug), label: t('partners') },
     { key: 'relationships', href: getWorkspaceRoute('relationships', locale, workspaceSlug), label: t('relationships') },
     { key: 'evidence', href: getWorkspaceRoute('evidence', locale, workspaceSlug), label: t('evidence') },
-    { key: 'tto', href: getWorkspaceRoute('tto', locale, workspaceSlug), label: locale === 'tr' ? 'TTO Hızlandırıcısı (M7)' : 'TTO Accelerator (M7)' },
-    { key: 'approvals', href: getWorkspaceRoute('approvals', locale, workspaceSlug), label: locale === 'tr' ? 'Onay Merkezi (4-Eyes)' : 'Approvals (4-Eyes)' },
-    { key: 'marketplace', href: getWorkspaceRoute('marketplace', locale, workspaceSlug), label: locale === 'tr' ? 'Pazar Yeri & API' : 'Marketplace & API' },
-    { key: 'apiKeys', href: getWorkspaceRoute('settingsApiKeys', locale, workspaceSlug), label: locale === 'tr' ? 'Partner REST API' : 'Partner REST API' },
+    { key: 'tto', href: getWorkspaceRoute('tto', locale, workspaceSlug), label: t('tto') },
+    { key: 'approvals', href: getWorkspaceRoute('approvals', locale, workspaceSlug), label: t('approvals') },
+    { key: 'marketplace', href: getWorkspaceRoute('marketplace', locale, workspaceSlug), label: t('marketplace') },
+    { key: 'apiKeys', href: getWorkspaceRoute('settingsApiKeys', locale, workspaceSlug), label: t('apiKeys') },
     { key: 'settings', href: getWorkspaceRoute('settingsModules', locale, workspaceSlug), label: t('settings') },
   ];
 
   const adminItem = {
     key: 'adminModules',
     href: `/${locale}/admin/modules`,
-    label: locale === 'tr' ? 'Yönetici Konsolu' : 'Platform Admin',
+    label: t('adminModules'),
   };
 
   return (
     <nav className="p-4 flex flex-col gap-1.5 flex-grow font-sans text-sm">
       <div className="text-[11px] font-semibold tracking-wider text-muted uppercase px-3 py-1 mb-1">
-        {locale === 'tr' ? 'Çalışma Alanı' : 'Workspace'}
+        {t('workspaceLabel')}
       </div>
       
       {navItems.map((item) => {
@@ -69,7 +69,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false }: SidebarN
           <div className="my-3 border-t border-border" />
 
           <div className="text-[11px] font-semibold tracking-wider text-muted uppercase px-3 py-1 mb-1">
-            {locale === 'tr' ? 'Yönetim' : 'Administration'}
+            {t('administrationLabel')}
           </div>
 
           <Link
