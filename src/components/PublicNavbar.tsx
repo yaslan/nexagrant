@@ -117,6 +117,7 @@ export default function PublicNavbar({
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 text-ink-2 hover:text-ink focus:outline-hidden"
+            aria-label={mobileMenuOpen ? (isTr ? "Menüyü Kapat" : "Close Menu") : (isTr ? "Menüyü Aç" : "Open Menu")}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {mobileMenuOpen ? (

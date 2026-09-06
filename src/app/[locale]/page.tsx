@@ -67,6 +67,7 @@ export default async function HomePage({
                 <Link
                   href={getPublicRoute('register', locale)}
                   className="w-full sm:w-auto bg-accent hover:opacity-90 text-white font-bold text-xs sm:text-sm px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                  style={{ backgroundColor: '#003D5C' }}
                 >
                   <span>{isTr ? 'Ücretsiz Çalışma Alanı Başlatın' : 'Launch Free Workspace'}</span>
                   <span>→</span>
