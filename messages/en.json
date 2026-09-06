@@ -439,15 +439,16 @@
         "solid": "Solid",
         "divergent": "Divergent"
       },
-      "loading": "Loading…",
-      "empty": "No panel evaluation for this proposal yet.",
-      "loadFailed": "Panel scores could not be loaded.",
-      "retry": "Retry"
+      "empty": "No panel evaluation for this proposal yet."
     },
     "errors": {
       "aiFailed": "The AI pre-assessment did not complete; no score was recorded.",
       "saveFailed": "The evaluation could not be saved. Please try again.",
       "calibrationFailed": "The ESR calibration could not be saved."
+    },
+    "panel": {
+      "title": "Reviewer Panel",
+      "notSeated": "You are not seated as a reviewer on this evaluation."
     }
   },
   "calls_region": {

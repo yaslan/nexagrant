@@ -89,3 +89,39 @@ export interface EsrComparison {
   /** esrScore - m6Score. Negative means M6 scored higher. */
   delta: number | null;
 }
+
+/**
+ * `Evaluation.weaknesses` is a free-form JSON column. Rows written by the current actions
+ * hold `{ strengths, weaknesses, recommendations }`; rows written by an earlier version
+ * hold a bare `string[]` of weaknesses. Both shapes are still in the database, so both are
+ * described here rather than read as `any` (CLAUDE.md forbids it).
+ */
+export type EvaluationNotesObject = {
+  strengths?: string[];
+  weaknesses?: string[];
+  recommendations?: string[];
+};
+
+export type EvaluationNotes = EvaluationNotesObject | string[] | null;
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+}
+
+/** Narrow a raw JSON column value to the notes shapes, discarding anything else. */
+export function toEvaluationNotes(value: unknown): EvaluationNotes {
+  if (isStringArray(value)) return value;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const raw = value as Record<string, unknown>;
+  const out: EvaluationNotesObject = {};
+  if (isStringArray(raw.strengths)) out.strengths = raw.strengths;
+  if (isStringArray(raw.weaknesses)) out.weaknesses = raw.weaknesses;
+  if (isStringArray(raw.recommendations)) out.recommendations = raw.recommendations;
+  return out;
+}
+
+/** The object form of the notes column, or null when the row holds the legacy array. */
+export function notesObject(notes: EvaluationNotes | undefined): EvaluationNotesObject | null {
+  return notes && !Array.isArray(notes) ? notes : null;
+}

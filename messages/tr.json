@@ -439,15 +439,16 @@
         "solid": "Güçlü",
         "divergent": "Ayrışık"
       },
-      "loading": "Yükleniyor…",
-      "empty": "Bu teklif için henüz panel değerlendirmesi yok.",
-      "loadFailed": "Panel puanları yüklenemedi.",
-      "retry": "Tekrar dene"
+      "empty": "Bu teklif için henüz panel değerlendirmesi yok."
     },
     "errors": {
       "aiFailed": "YZ ön değerlendirmesi tamamlanamadı; hiçbir puan kaydedilmedi.",
       "saveFailed": "Değerlendirme kaydedilemedi. Lütfen tekrar deneyin.",
       "calibrationFailed": "ESR kalibrasyonu kaydedilemedi."
+    },
+    "panel": {
+      "title": "Hakem Paneli",
+      "notSeated": "Bu değerlendirmede hakem olarak görevli değilsiniz."
     }
   },
   "calls_region": {

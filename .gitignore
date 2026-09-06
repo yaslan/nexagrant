@@ -54,3 +54,7 @@ fix-*.py
 patch_schema*.py
 resolution.log
 *.bak
+
+# Playwright artifacts
+test-results/
+playwright-report/

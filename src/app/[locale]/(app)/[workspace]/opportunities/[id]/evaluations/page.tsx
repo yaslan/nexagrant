@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 
+import { toEvaluationNotes } from '@/modules/m6/types';
+
 import { EvaluationsClient } from './client';
 
 /**
@@ -82,7 +84,7 @@ export default async function EvaluationsPage({
           excellence: e.excellence,
           impact: e.impact,
           implementation: e.implementation,
-          weaknesses: e.weaknesses,
+          weaknesses: toEvaluationNotes(e.weaknesses),
           calibration: e.calibration,
           createdAt: e.createdAt.toISOString(),
         }))}

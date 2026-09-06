@@ -1,14 +1,29 @@
+import 'dotenv/config';
 import { test, expect } from '@playwright/test';
-import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
+
+import { createDbClient } from '../../src/lib/db';
 
 // E2E RLS Isolation Tests
 // Verifies that Row Level Security policies correctly isolate tenant data at the database level
 
-const prisma = new PrismaClient();
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+// `new PrismaClient()` throws on Prisma 7 — this project runs the pg driver adapter, so
+// the client has to be built the same way the app builds it. The spec never ran before
+// (there was no playwright.config.ts, so `pnpm test:e2e` collected nothing), which is why
+// the incompatibility went unnoticed.
+const connectionString =
+  process.env.DATABASE_URL || 'postgresql://fabrika:fabrika@localhost:5432/fabrika';
+const prisma = createDbClient(connectionString);
+
+/**
+ * Isolation can only be observed through a role that is subject to the policies. The
+ * default `fabrika` role is SUPERUSER + BYPASSRLS, so reading back through it proves
+ * nothing — the pool below therefore connects as `fabrika_app` (NOBYPASSRLS) via
+ * DATABASE_URL_RLS_TEST, the same convention tests/rls.spec.ts uses. Create the role
+ * with `pnpm db:rls-role`.
+ */
+const RLS_URL = process.env.DATABASE_URL_RLS_TEST;
+const pool = new Pool({ connectionString: RLS_URL ?? connectionString });
 
 test.describe('Row Level Security (RLS) Isolation', () => {
   let tenantA: { id: string };
@@ -95,11 +110,18 @@ test.describe('Row Level Security (RLS) Isolation', () => {
       },
     });
 
+    test.skip(
+      !RLS_URL,
+      'DATABASE_URL_RLS_TEST is not set. Run `pnpm db:rls-role` to create the NOBYPASSRLS role.',
+    );
+
     // Simulate query with wrong tenant_id session variable
     const client = await pool.connect();
     try {
-      // Set session variable for tenant A
-      await client.query('SET app.tenant_id = $1', [tenantA.id]);
+      // `SET app.tenant_id = $1` is a syntax error: SET does not take bind parameters.
+      // set_config(..., is_local => true) is the parameterisable equivalent, and is what
+      // src/lib/db.ts uses, so the tenant id stays a bound value.
+      await client.query('SELECT set_config($1, $2, true)', ['app.tenant_id', tenantA.id]);
 
       // Try to query workspaces (should only see tenant A's data)
       const result = await client.query(

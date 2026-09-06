@@ -15,7 +15,10 @@ export const m6Manifest: ModuleManifest = {
   planTiers: ['business', 'enterprise'],
   addOnSku: null,
   // Reached from an opportunity, so it contributes no sidebar entry.
-  routes: [{ path: 'opportunities/[id]/evaluations', permission: 'evaluator:read' }],
+  routes: [
+    { path: 'opportunities/[id]/evaluations', permission: 'evaluator:read' },
+    { path: 'opportunities/[id]/evaluations/panel', permission: 'evaluator:read' },
+  ],
   nav: [],
   permissions: [
     { id: 'evaluator:read', minRole: Role.MEMBER },

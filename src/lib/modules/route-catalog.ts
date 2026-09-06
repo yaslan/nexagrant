@@ -29,6 +29,7 @@ export const WORKSPACE_ROUTE_CATALOG = [
   'opportunities/[id]/briefs',
   'opportunities/[id]/documents',
   'opportunities/[id]/evaluations',
+  'opportunities/[id]/evaluations/panel',
   'opportunities/[id]/m2',
   'opportunities/[id]/matching',
   'partners',

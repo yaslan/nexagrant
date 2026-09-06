@@ -1,37 +1,27 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useCallback, useEffect, useState } from 'react';
 
-import { listPanelScores } from '../server/actions';
+import type { PanelScoreQueryResult } from '../server/scoring';
 
 export interface EvaluationDashboardProps {
-  proposalId: string;
-}
-
-interface PanelScoreRow {
-  evaluationId: string;
-  reviewerCount: number;
-  completedReviewerCount: number;
-  panelScore: number | null;
-  esrScore: number | null;
-  consensusOutcome: string | null;
-  deltaAbsolute: number | null;
+  /** Panel scores for one proposal, already read on the server under the session tenant. */
+  rows: PanelScoreQueryResult[];
 }
 
 /** A panel and an ESR score are treated as agreeing when they sit within half a point. */
 const AGREEMENT_TOLERANCE = 0.5;
 
 /**
- * Panel scores for one proposal, read from the database through a tenant-scoped server
- * action.
+ * Panel scores for one proposal.
  *
  * This component previously imported `prisma` directly and queried inside a `useEffect`
  * — from a `'use client'` module, which cannot reach a database — and took `tenantId` as
- * a prop supplied by the browser. The tenant now comes from the session inside
- * `listPanelScores`, and the component never names one.
+ * a prop supplied by the browser. The rows now arrive from the server component above,
+ * which reads them through `listPanelScores` under the session's tenant; the component
+ * never names a tenant and never fetches.
  */
-export function EvaluationDashboard({ proposalId }: EvaluationDashboardProps) {
+export function EvaluationDashboard({ rows }: EvaluationDashboardProps) {
   const t = useTranslations('m6');
 
   /** Literal keys, not an interpolated one — see the note in EvaluatorForm. */
@@ -39,63 +29,6 @@ export function EvaluationDashboard({ proposalId }: EvaluationDashboardProps) {
     solid: t('dashboard.consensusOutcome.solid'),
     divergent: t('dashboard.consensusOutcome.divergent'),
   };
-
-  const [rows, setRows] = useState<PanelScoreRow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await listPanelScores(proposalId);
-      setRows(
-        result.map((r) => ({
-          evaluationId: r.evaluationId,
-          reviewerCount: r.reviewerCount,
-          completedReviewerCount: r.completedReviewerCount,
-          panelScore: r.panelScore,
-          esrScore: r.esrScore,
-          consensusOutcome: r.consensusOutcome,
-          deltaAbsolute:
-            r.esrScore !== null && r.panelScore !== null ? r.esrScore - r.panelScore : null,
-        })),
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('dashboard.loadFailed'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [proposalId, t]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  if (isLoading) {
-    return (
-      <div className="text-center py-8 text-gray-500" data-testid="m6-dashboard-loading">
-        {t('dashboard.loading')}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="border border-red-200 bg-red-50 rounded-lg p-6" data-testid="m6-dashboard-error">
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="mt-3 text-sm font-semibold text-red-700 underline"
-        >
-          {t('dashboard.retry')}
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="border border-gray-200 rounded-lg p-6 bg-white" data-testid="m6-dashboard">
@@ -126,7 +59,12 @@ export function EvaluationDashboard({ proposalId }: EvaluationDashboardProps) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rows.map((row) => {
+                const delta =
+                  row.esrScore !== null && row.panelScore !== null
+                    ? row.esrScore - row.panelScore
+                    : null;
+                return (
                 <tr key={row.evaluationId} className="border-b hover:bg-gray-50" data-testid="m6-dashboard-row">
                   <td className="py-2 px-4 font-medium text-gray-900">
                     {row.completedReviewerCount}/{row.reviewerCount}
@@ -138,16 +76,16 @@ export function EvaluationDashboard({ proposalId }: EvaluationDashboardProps) {
                     {row.esrScore !== null ? row.esrScore.toFixed(2) : '—'}
                   </td>
                   <td className="py-2 px-4 text-right">
-                    {row.deltaAbsolute !== null ? (
+                    {delta !== null ? (
                       <span
                         className={
-                          Math.abs(row.deltaAbsolute) <= AGREEMENT_TOLERANCE
+                          Math.abs(delta) <= AGREEMENT_TOLERANCE
                             ? 'text-green-600 font-semibold'
                             : 'text-red-600 font-semibold'
                         }
                       >
-                        {row.deltaAbsolute >= 0 ? '+' : ''}
-                        {row.deltaAbsolute.toFixed(2)}
+                        {delta >= 0 ? '+' : ''}
+                        {delta.toFixed(2)}
                       </span>
                     ) : (
                       '—'
@@ -157,7 +95,8 @@ export function EvaluationDashboard({ proposalId }: EvaluationDashboardProps) {
                     {(row.consensusOutcome && consensusLabels[row.consensusOutcome]) ?? '—'}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

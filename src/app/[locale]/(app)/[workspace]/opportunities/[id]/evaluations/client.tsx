@@ -9,7 +9,6 @@ import {
   AlertTriangle, 
   CheckCircle2, 
   Sparkles, 
-  HelpCircle, 
   Scale, 
   FileCheck, 
   Sliders, 
@@ -19,6 +18,7 @@ import {
   Info
 } from 'lucide-react';
 import { generateAiEvaluation, saveHumanEvaluation, calibrateESR } from '@/modules/m6/server/actions';
+import { notesObject, type EvaluationNotes } from '@/modules/m6/types';
 
 interface EvaluationItem {
   id: string;
@@ -26,10 +26,11 @@ interface EvaluationItem {
   excellence: number;
   impact: number;
   implementation: number;
-  weaknesses?: any;
+  weaknesses?: EvaluationNotes;
   calibration?: number | null;
   createdAt?: Date | string;
 }
+
 
 interface EvaluationsClientProps {
   opportunityId: string;
@@ -547,39 +548,46 @@ export function EvaluationsClient({
                     </div>
 
                     {/* Strengths & Weaknesses */}
-                    {ev.weaknesses && (
-                      <div className="space-y-2 text-xs pt-1">
-                        {ev.weaknesses?.strengths?.length > 0 && (
-                          <div className="bg-emerald-50/60 border border-emerald-100 p-3 rounded-xl">
-                            <span className="font-bold text-emerald-800 flex items-center gap-1 mb-1">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              Tespit Edilen Güçlü Yönler:
-                            </span>
-                            <ul className="list-disc pl-4 space-y-0.5 text-emerald-900">
-                              {ev.weaknesses.strengths.map((s: string, idx: number) => (
-                                <li key={idx}>{s}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
+                    {(() => {
+                      const notes = notesObject(ev.weaknesses);
+                      const strengths = notes?.strengths ?? [];
+                      const weaknessList = Array.isArray(ev.weaknesses)
+                        ? ev.weaknesses
+                        : notes?.weaknesses ?? [];
+                      if (strengths.length === 0 && weaknessList.length === 0) return null;
 
-                        {((Array.isArray(ev.weaknesses) && ev.weaknesses.length > 0) || ev.weaknesses?.weaknesses?.length > 0) && (
-                          <div className="bg-rose-50/60 border border-rose-100 p-3 rounded-xl">
-                            <span className="font-bold text-rose-800 flex items-center gap-1 mb-1">
-                              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                              Tespit Edilen Zayıf Yönler & Kritik Eksikler:
-                            </span>
-                            <ul className="list-disc pl-4 space-y-0.5 text-rose-900">
-                              {(Array.isArray(ev.weaknesses) ? ev.weaknesses : ev.weaknesses.weaknesses).map(
-                                (w: string, idx: number) => (
+                      return (
+                        <div className="space-y-2 text-xs pt-1">
+                          {strengths.length > 0 && (
+                            <div className="bg-emerald-50/60 border border-emerald-100 p-3 rounded-xl">
+                              <span className="font-bold text-emerald-800 flex items-center gap-1 mb-1">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                Tespit Edilen Güçlü Yönler:
+                              </span>
+                              <ul className="list-disc pl-4 space-y-0.5 text-emerald-900">
+                                {strengths.map((s, idx) => (
+                                  <li key={idx}>{s}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {weaknessList.length > 0 && (
+                            <div className="bg-rose-50/60 border border-rose-100 p-3 rounded-xl">
+                              <span className="font-bold text-rose-800 flex items-center gap-1 mb-1">
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                Tespit Edilen Zayıf Yönler &amp; Kritik Eksikler:
+                              </span>
+                              <ul className="list-disc pl-4 space-y-0.5 text-rose-900">
+                                {weaknessList.map((w, idx) => (
                                   <li key={idx}>{w}</li>
-                                )
-                              )}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })
