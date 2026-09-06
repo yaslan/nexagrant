@@ -194,4 +194,4 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export { FEATURE_KEYS as G0_FEATURE_KEYS };
+export { FEATURE_KEYS as G0_FEATURE_KEYS, DEFAULT_SCORING_WEIGHTS, DEFAULT_GATE_RULES };
