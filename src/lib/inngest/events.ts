@@ -12,6 +12,7 @@ export const K1DailyCallsOutputSchema = z.object({
   success: z.boolean(),
   totalProcessed: z.number(),
   inserted: z.number(),
+  updated: z.number().optional(),
   sediaCount: z.number(),
   eurostarsCount: z.number(),
   tubitakCount: z.number(),
