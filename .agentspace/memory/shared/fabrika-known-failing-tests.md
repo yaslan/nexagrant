@@ -1,14 +1,26 @@
 ---
 name: fabrika-known-failing-tests
-description: pnpm test'te taban çizgisi 3 kırmızı — hepsi canlı SEDIA API'sine çıkan ağ testleri; bunlar senin değişikliğinden değil, kovalama
+description: pnpm test taban çizgisi ARTIK TEMİZ (2026-09-07 doğrulandı) — eski SEDIA ağ kırmızıları görünmüyor; kırmızı görürsen o senindir
 metadata:
   type: reference
-  updatedAt: 2026-09-06
+  updatedAt: 2026-09-07
 ---
 
-`pnpm test` bu repoda **temiz bir çalışma ağacında bile** kırmızı bitiyor.
+> **2026-09-07 güncellemesi (TASK-MTQ5ZF5ZRU5SM sırasında doğrulandı):** `pnpm test` artık
+> **temiz bitiyor** — `Test Files 47 passed | 2 skipped (49)` · `Tests 405 passed | 8 skipped (413)`.
+> Aşağıda listelenen SEDIA ağ kırmızıları bu koşuda görünmedi (skip'e alınmış ya da düzeltilmiş
+> olabilir; ayrıca kovalamadım). **Pratik sonuç: artık bir kırmızı görürsen "bilinen taban çizgisi"
+> deyip geçme — muhtemelen senin değişikliğin.** Aşağısı tarihsel kayıt olarak duruyor.
+>
+> `pnpm typecheck` de temiz. Ama bir işe başlarken kırık gelebilir: `.next/types/validator.ts`
+> silinmiş `src/app/(marketing)` dizinine referans veren bayat üretilmiş dosyalar tutuyor.
+> Çözüm `pnpm build` (bu dosyaları yeniden yazar) — kaynakta hata yok demektir.
 
-**Güncel taban çizgisi (2026-09-06, TASK-MTQ0BIV9UXVRU sonrası):**
+## Tarihsel kayıt (2026-09-06 ve öncesi)
+
+O tarihte `pnpm test` temiz bir çalışma ağacında bile kırmızı bitiyordu.
+
+**Taban çizgisi (2026-09-06, TASK-MTQ0BIV9UXVRU sonrası):**
 `Test Files 2 failed | 42 passed (44)` · `Tests 3 failed | 320 passed (323)` — kalan
 üçü de aşağıdaki SEDIA ağ testleri. Eskiden dördüncü kırmızı `tests/rls.spec.ts` idi;
 **artık yeşil**, bkz. aşağıda 4. madde.
