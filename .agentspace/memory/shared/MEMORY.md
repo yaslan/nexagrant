@@ -23,3 +23,11 @@
 - [fabrika-sentry-envelope-without-sdk](fabrika-sentry-envelope-without-sdk.md) — Fabrika'da Sentry'ye SDK'sız gönderim — envelope HTTP sözleşmesi, DSN yokken no-op deseni ve fetch BodyInit tuzağı
 
 - [agentspace-delegate-splits-numbered-lists](agentspace-delegate-splits-numbered-lists.md) — agentspace_delegate objective'indeki numaralı/madde listesini alt-görevlere böler — tek ajana verilecek çok adımlı iş listesiz yazılmalı
+
+- [fabrika-docker-broken-symlink](fabrika-docker-broken-symlink.md) — Bu makinede docker "yok" DEĞİL — /usr/local/bin/docker kırık symlink; çalışan CLI /Applications/Docker.app/Contents/Resources/bin/docker ve postgres-vector ayakta
+- [fabrika-migrations-are-not-prisma-migrate](fabrika-migrations-are-not-prisma-migrate.md) — Fabrika'da prisma/migrations elle yazılmış düz SQL — Prisma Migrate DEĞİL; pnpm db:migrate koşmak veritabanını sıfırlatabilir, doğru yol prisma db execute --file
+
+- [fabrika-prisma-role-type-gotcha](fabrika-prisma-role-type-gotcha.md) — Fabrika'da import type { Role } from '@prisma/client' string union vermiyor ve prisma client repo'da generate edilmiş gelmiyor
+- [fabrika-team-handover-cekirdek](fabrika-team-handover-cekirdek.md) — Fabrika iki ajan takımı arasında devredildi — eski *-0c1f10 takımı ile yeni Çekirdek takımını raporlarda ayırt etme kuralı
+
+- [fabrika-dashboard-hardcoded-kpi-fallback](fabrika-dashboard-hardcoded-kpi-fallback.md) — KPI panosu (dashboard/client.tsx) gerçek metrik 0 geldiğinde sabit demo rakamlarına düşüyor — CLAUDE.md §7 kanıt disiplinini ihlal ediyor

@@ -32,4 +32,18 @@ Ek not: `node_modules/.prisma` kök dizinde **yok**; üretilmiş client pnpm sto
 (`node_modules/.pnpm/@prisma+client@.../node_modules/.prisma/client`). "Client generate edilmemiş"
 sonucuna atlamadan önce oraya bak.
 
-İlgili: [[fabrika-prisma7-driver-adapter]], [[fabrika-local-dev-db]]
+## Override'ı kaldırmak isteyene (2026-09-06, ölçüldü)
+
+Silme DENENDİ: 8 adet `Role` tip hatası sıfırlanıyor, ama override'ın **maskelediği 3 gerçek
+hata** ortaya çıkıyor:
+- `prisma/seed-m6-evaluations.ts` ×2 — `callId` / `status` diye alanlar `Opportunity`/`Proposal`
+  modellerinde YOK, yani bu seed çalışma anında patlar (tsc bugüne dek görmedi).
+- `src/app/[locale]/(app)/[workspace]/pipeline/actions.ts` ×1.
+
+Ayrıca **CI `prisma generate` koşmuyor** (`.github/workflows/ci.yml`: validate + lint + typecheck
++ test). Override kaldırılırsa CI, üretilmiş tipler olmadan tsc koşar ve kırılır.
+
+Doğru sıra: (1) yukarıdaki 3 hatayı düzelt, (2) CI'ya `prisma generate` adımı ekle,
+(3) sonra `prisma-override.d.ts`'i sil. Tek adımda kaldırma denemesi geri alınır.
+
+İlgili: [[fabrika-team-handover-cekirdek]], [[fabrika-prisma7-driver-adapter]], [[fabrika-local-dev-db]]
