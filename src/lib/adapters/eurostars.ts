@@ -32,17 +32,19 @@ export const EurostarsTopicSchema = z.object({
 
 export type EurostarsTopic = z.infer<typeof EurostarsTopicSchema>;
 
-/**
- * Adapter for Eurostars/Eureka call listings
- * Fetches from Eurostars website and parses HTML structure
- */
 export class EurostarsAdapter {
   private baseUrl = 'https://www.eurostars-eureka.eu';
   private callsUrl = `${this.baseUrl}/en/Participant/Page/Calls-for-Proposals`;
 
-  /**
-   * Fetch and parse Eurostars calls from their website
-   */
+  private parseDateString(dateStr: string): string {
+    const [day, month, year] = dateStr.split('/');
+    if (!day || !month || !year) {
+      return new Date().toISOString();
+    }
+    const date = new Date(`${year}-${month}-${day}T17:00:00Z`);
+    return date.toISOString();
+  }
+
   async fetchTopics(): Promise<EurostarsTopic[]> {
     try {
       logger.info('[EurostarsAdapter] Fetching Eurostars calls');
@@ -67,7 +69,7 @@ export class EurostarsAdapter {
           data: {
             level: 'warn',
             source: 'eurostars_adapter',
-            message: 'Eurostars adapter returned 0 calls; check HTML structure'
+            message: 'Eurostars adapter returned 0 calls; check HTML structure or endpoint'
           }
         }).catch(() => {});
       }
@@ -88,72 +90,83 @@ export class EurostarsAdapter {
     }
   }
 
-  /**
-   * Parse Eurostars calls from HTML
-   * Expected structure: table or list with call rows
-   */
   private parseCallsFromHtml(html: string): EurostarsTopic[] {
     const topics: EurostarsTopic[] = [];
+    const processedCalls = new Set<string>();
 
-    // Simple fallback: if HTML contains call identifiers, extract them
-    // Eurostars typically has call numbers like "EUROSTARS-2026-01"
-    const callPattern = /EUROSTARS[-\d]+/gi;
-    const matches = html.matchAll(callPattern);
+    // Extract multiple call ID patterns
+    const patterns = [
+      /EUROSTARS[-\s](\d{4}[-\s](?:01|02|03|04|05|06|07|08|09|10|11|12|A|B))/gi,
+      /eurostars\s*call\s*(\d{4}[-\s][\dAB]{2,3})/gi,
+      /EUREKA[-\s](\d{4}[-\s][\dAB]{2,3})/gi
+    ];
+
     const callIds = new Set<string>();
 
-    for (const match of matches) {
-      callIds.add(match[0]);
+    for (const pattern of patterns) {
+      const matches = html.matchAll(pattern);
+      for (const match of matches) {
+        const callId = match[0].trim().replace(/\s/g, '-').toUpperCase();
+        if (!callIds.has(callId) && !processedCalls.has(callId)) {
+          callIds.add(callId);
+        }
+      }
     }
 
-    // For each call ID found, create a topic entry
-    // In production, you'd parse the full HTML with cheerio/jsdom
+    // Process each found call ID
     for (const callId of callIds) {
-      const deadlineMatch = html.match(new RegExp(`${callId}.*?(\\d{1,2}/\\d{1,2}/\\d{4})`, 'i'));
-      const deadline = deadlineMatch ? deadlineMatch[1] : null;
+      try {
+        // Extract deadline for this call
+        const deadlinePattern = new RegExp(`${callId.replace(/[-\s]/g, '[-\\s]')}[^]*?(?:deadline|closing date)[:\\s]+(?:\\w+\\s+)?(\\d{1,2}[/-]\\d{1,2}[/-]\\d{4})`, 'i');
+        const deadlineMatch = html.match(deadlinePattern);
+        const deadlineStr = deadlineMatch ? deadlineMatch[1] : null;
 
-      const topic: EurostarsTopic = {
-        identifier: callId,
-        title: `Eurostars Call ${callId}`,
-        callIdentifier: callId,
-        callTitle: `Eurostars Call ${callId}`,
-        status: 'OPEN',
-        typeOfAction: 'Research & Innovation',
-        isLumpSum: false,
-        isTwoStage: true,
-        deadlines: deadline ? [{
-          stage: 1,
-          at: this.parseDateString(deadline),
-          tz: 'Europe/Brussels'
-        }] : [],
-        nextDeadlineAt: deadline ? this.parseDateString(deadline) : undefined,
-        eligibility: {
-          restricted: null,
-          countriesExcluded: [],
-          notes: 'Eurostars consortium: EU/EFTA + associated countries'
-        },
-        keywords: ['research', 'innovation', 'eurostars', 'eureka'],
-        description: 'Eurostars calls are aimed at SMEs and research organizations',
-        sourceUrl: `${this.baseUrl}/en/Participant/Page/Calls-for-Proposals`
-      };
+        // Extract status: assume calls are OPEN unless marked otherwise
+        const statusPattern = new RegExp(`${callId.replace(/[-\s]/g, '[-\\s]')}[^]*?(?:open|closed|forthcoming)`, 'i');
+        const statusMatch = html.match(statusPattern);
+        let status: 'FORTHCOMING' | 'OPEN' | 'CLOSED' = 'OPEN';
+        if (statusMatch) {
+          const statusText = statusMatch[0].toLowerCase();
+          if (statusText.includes('forthcoming')) status = 'FORTHCOMING';
+          else if (statusText.includes('closed')) status = 'CLOSED';
+        }
 
-      const parsed = EurostarsTopicSchema.safeParse(topic);
-      if (parsed.success) {
-        topics.push(parsed.data);
+        const topic: EurostarsTopic = {
+          identifier: callId,
+          title: `Eurostars Call ${callId}`,
+          callIdentifier: callId,
+          callTitle: `Eurostars Call ${callId}`,
+          status,
+          typeOfAction: 'Research & Innovation',
+          isLumpSum: false,
+          isTwoStage: true,
+          deadlines: deadlineStr ? [{
+            stage: 1,
+            at: this.parseDateString(deadlineStr),
+            tz: 'Europe/Brussels'
+          }] : [],
+          nextDeadlineAt: deadlineStr ? this.parseDateString(deadlineStr) : undefined,
+          eligibility: {
+            restricted: null,
+            countriesExcluded: [],
+            notes: 'Eurostars consortium: EU/EFTA member countries + associated countries'
+          },
+          keywords: ['research', 'innovation', 'eurostars', 'eureka', 'sme'],
+          description: 'Eurostars supports transnational R&D projects driven by SMEs in cooperation with research organisations',
+          sourceUrl: this.callsUrl
+        };
+
+        const parsed = EurostarsTopicSchema.safeParse(topic);
+        if (parsed.success) {
+          topics.push(parsed.data);
+          processedCalls.add(callId);
+        }
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        logger.warn(`[EurostarsAdapter] Failed to parse call ${callId}: ${errMsg}`);
       }
     }
 
     return topics;
-  }
-
-  /**
-   * Parse date string in DD/MM/YYYY format to ISO string
-   */
-  private parseDateString(dateStr: string): string {
-    const [day, month, year] = dateStr.split('/');
-    if (!day || !month || !year) {
-      return new Date().toISOString();
-    }
-    const date = new Date(`${year}-${month}-${day}T17:00:00Z`);
-    return date.toISOString();
   }
 }

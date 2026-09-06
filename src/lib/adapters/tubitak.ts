@@ -32,17 +32,19 @@ export const TubitakTopicSchema = z.object({
 
 export type TubitakTopic = z.infer<typeof TubitakTopicSchema>;
 
-/**
- * Adapter for TÜBİTAK (Turkish Science & Technology Council) calls
- * Fetches from TÜBİTAK website and parses HTML structure
- */
 export class TubitakAdapter {
   private baseUrl = 'https://www.tubitak.gov.tr';
-  private callsUrl = `${this.baseUrl}/en/announcement-calls`;
+  private callsUrl = `${this.baseUrl}/en/funding/research-projects-funding`;
 
-  /**
-   * Fetch and parse TÜBİTAK calls from their website
-   */
+  private parseDateString(dateStr: string): string {
+    const [day, month, year] = dateStr.split('/');
+    if (!day || !month || !year) {
+      return new Date().toISOString();
+    }
+    const date = new Date(`${year}-${month}-${day}T17:00:00Z`);
+    return date.toISOString();
+  }
+
   async fetchTopics(): Promise<TubitakTopic[]> {
     try {
       logger.info('[TubitakAdapter] Fetching TÜBİTAK calls');
@@ -67,7 +69,7 @@ export class TubitakAdapter {
           data: {
             level: 'warn',
             source: 'tubitak_adapter',
-            message: 'TÜBİTAK adapter returned 0 calls; check HTML structure'
+            message: 'TÜBİTAK adapter returned 0 calls; check HTML structure or endpoint'
           }
         }).catch(() => {});
       }
@@ -88,75 +90,88 @@ export class TubitakAdapter {
     }
   }
 
-  /**
-   * Parse TÜBİTAK calls from HTML
-   * TÜBİTAK typically has program codes like "2026-1" or "2026-A"
-   */
   private parseCallsFromHtml(html: string): TubitakTopic[] {
     const topics: TubitakTopic[] = [];
+    const processedPrograms = new Set<string>();
 
-    // Extract TÜBİTAK program identifiers
-    // Typical pattern: "2026-1", "2026-A", "TUBITAK-2026-001"
-    const programPattern = /(?:TUBITAK[-])?(\d{4}[-][A-Z0-9]+)/gi;
-    const matches = html.matchAll(programPattern);
+    // Extract multiple TÜBİTAK program patterns
+    const patterns = [
+      /(?:TÜBİTAK|TUBITAK)[-\s]([\d]{4}[-][A-Z0-9]{1,3})/gi,
+      /(?:program|call)[-\s]*(\d{4}[-][A-Z0-9]{1,3})/gi,
+      /[A-Z]{1,3}[-](\d{4})(?=\s|$)/gi  // Program codes like "RDI-2024"
+    ];
+
     const programIds = new Set<string>();
 
-    for (const match of matches) {
-      const programId = match[1];
-      if (!programIds.has(programId)) {
-        programIds.add(programId);
+    for (const pattern of patterns) {
+      const matches = html.matchAll(pattern);
+      for (const match of matches) {
+        let programId = match[0].trim().toUpperCase();
+        if (match[1]) {
+          programId = `TUBITAK-${match[1]}`.replace(/\s/g, '-');
+        } else {
+          programId = `TUBITAK-${programId}`.replace(/\s/g, '-');
+        }
+        if (!programIds.has(programId) && !processedPrograms.has(programId)) {
+          programIds.add(programId);
+        }
       }
     }
 
-    // For each program, create a topic entry
+    // Process each program
     for (const programId of programIds) {
-      const deadlineMatch = html.match(new RegExp(`${programId}.*?(\\d{1,2}\\/\\d{1,2}\\/\\d{4})`, 'i'));
-      const deadline = deadlineMatch ? deadlineMatch[1] : null;
+      try {
+        // Extract deadline
+        const deadlinePattern = new RegExp(`${programId.replace(/[-]/g, '[-\\s]')}[^]*?(?:deadline|closing date|application deadline)[:\\s]+(?:\\w+\\s+)?(\\d{1,2}[./-]\\d{1,2}[./-]\\d{4})`, 'i');
+        const deadlineMatch = html.match(deadlinePattern);
+        const deadlineStr = deadlineMatch ? deadlineMatch[1].replace(/\./g, '/') : null;
 
-      const topic: TubitakTopic = {
-        identifier: `TUBITAK-${programId}`,
-        title: `TÜBİTAK Call ${programId}`,
-        callIdentifier: `TUBITAK-${programId}`,
-        callTitle: `TÜBİTAK Call ${programId}`,
-        status: 'OPEN',
-        typeOfAction: 'Research & Development',
-        isLumpSum: false,
-        isTwoStage: false,
-        deadlines: deadline ? [{
-          stage: 1,
-          at: this.parseDateString(deadline),
-          tz: 'Europe/Istanbul'
-        }] : [],
-        nextDeadlineAt: deadline ? this.parseDateString(deadline) : undefined,
-        eligibility: {
-          restricted: 'TR',
-          countriesExcluded: [],
-          notes: 'TÜBİTAK calls are primarily for Turkish institutions and researchers'
-        },
-        keywords: ['tubitak', 'research', 'development', 'turkey'],
-        description: 'TÜBİTAK research and technology development program calls',
-        sourceUrl: this.callsUrl
-      };
+        // Extract status
+        const statusPattern = new RegExp(`${programId.replace(/[-]/g, '[-\\s]')}[^]*?(?:open|closed|forthcoming|planned)`, 'i');
+        const statusMatch = html.match(statusPattern);
+        let status: 'FORTHCOMING' | 'OPEN' | 'CLOSED' = 'OPEN';
+        if (statusMatch) {
+          const statusText = statusMatch[0].toLowerCase();
+          if (statusText.includes('forthcoming') || statusText.includes('planned')) status = 'FORTHCOMING';
+          else if (statusText.includes('closed')) status = 'CLOSED';
+        }
 
-      const parsed = TubitakTopicSchema.safeParse(topic);
-      if (parsed.success) {
-        topics.push(parsed.data);
+        const topic: TubitakTopic = {
+          identifier: programId,
+          title: `TÜBİTAK Call ${programId}`,
+          callIdentifier: programId,
+          callTitle: `TÜBİTAK Call ${programId}`,
+          status,
+          typeOfAction: 'Research & Development',
+          isLumpSum: false,
+          isTwoStage: false,
+          deadlines: deadlineStr ? [{
+            stage: 1,
+            at: this.parseDateString(deadlineStr),
+            tz: 'Europe/Istanbul'
+          }] : [],
+          nextDeadlineAt: deadlineStr ? this.parseDateString(deadlineStr) : undefined,
+          eligibility: {
+            restricted: 'TR',
+            countriesExcluded: [],
+            notes: 'TÜBİTAK calls are primarily for Turkish institutions and researchers. Consortium participation with EU/international partners may be possible.'
+          },
+          keywords: ['tubitak', 'research', 'development', 'turkey', 'innovation'],
+          description: 'TÜBİTAK (The Scientific and Technological Research Council of Turkey) supports research and technology development projects',
+          sourceUrl: this.callsUrl
+        };
+
+        const parsed = TubitakTopicSchema.safeParse(topic);
+        if (parsed.success) {
+          topics.push(parsed.data);
+          processedPrograms.add(programId);
+        }
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        logger.warn(`[TubitakAdapter] Failed to parse program ${programId}: ${errMsg}`);
       }
     }
 
     return topics;
-  }
-
-  /**
-   * Parse date string in DD/MM/YYYY format to ISO string (Istanbul timezone)
-   */
-  private parseDateString(dateStr: string): string {
-    const [day, month, year] = dateStr.split('/');
-    if (!day || !month || !year) {
-      return new Date().toISOString();
-    }
-    // Convert to ISO UTC string (TÜBİTAK dates → 17:00 Turkey time)
-    const date = new Date(`${year}-${month}-${day}T17:00:00+03:00`);
-    return date.toISOString();
   }
 }

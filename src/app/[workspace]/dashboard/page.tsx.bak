@@ -1,0 +1,90 @@
+import { redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
+import { prisma, withTenant } from '@/lib/db';
+import { auth } from '@/lib/auth';
+import { Dashboard } from '@/modules/m5/ui/Dashboard';
+import { getKpiMetrics, getKpiTrend } from '@/modules/m5/server/queries';
+
+interface DashboardPageProps {
+  params: {
+    workspace: string;
+  };
+  searchParams: {
+    from?: string;
+    to?: string;
+  };
+}
+
+export default async function DashboardPage({
+  params,
+  searchParams,
+}: DashboardPageProps) {
+  // Authentication
+  const session = await getServerSession(auth);
+  if (!session?.user?.email) {
+    redirect('/auth/signin');
+  }
+
+  // Get user membership and tenant
+  const membership = await prisma.membership.findFirst({
+    where: {
+      user: { email: session.user.email },
+      tenant: { workspaces: { some: { slug: params.workspace } } },
+    },
+    include: {
+      tenant: {
+        include: {
+          workspaces: {
+            where: { slug: params.workspace },
+          },
+        },
+      },
+    },
+  });
+
+  if (!membership) {
+    redirect('/');
+  }
+
+  const tenantId = membership.tenantId;
+  const workspace = membership.tenant.workspaces[0];
+
+  // Authorization: require PIPELINE_MANAGER or above
+  const allowedRoles = ['TENANT_OWNER', 'TENANT_ADMIN', 'PIPELINE_MANAGER'];
+  if (!allowedRoles.includes(membership.role)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Access Denied
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            You need pipeline manager access to view this dashboard.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Parse date range from query params
+  const from = searchParams.from
+    ? new Date(searchParams.from)
+    : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default: last 30 days
+  const to = searchParams.to ? new Date(searchParams.to) : new Date();
+
+  // Fetch metrics
+  const metrics = await getKpiMetrics(tenantId, from, to);
+  const trendData = await getKpiTrend(tenantId, from, to);
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        <Dashboard
+          initialMetrics={metrics}
+          trendData={trendData}
+          tenantId={tenantId}
+        />
+      </div>
+    </div>
+  );
+}

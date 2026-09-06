@@ -2,25 +2,28 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { 
-  TrendingUp, 
-  Target, 
-  Award, 
-  Clock, 
-  Puzzle, 
-  Zap, 
-  Sparkles, 
-  ArrowUpRight, 
-  Building2, 
-  CheckCircle2, 
-  AlertCircle, 
-  FileText, 
-  ChevronRight, 
-  BarChart3, 
-  Layers, 
-  Compass, 
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  TrendingUp,
+  Target,
+  Award,
+  Clock,
+  Puzzle,
+  Zap,
+  Sparkles,
+  ArrowUpRight,
+  Building2,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  ChevronRight,
+  BarChart3,
+  Layers,
+  Compass,
   ShieldCheck,
-  Plus
+  Plus,
+  Download,
+  Filter
 } from 'lucide-react';
 import { getWorkspaceRoute } from '@/lib/routes';
 
@@ -55,6 +58,37 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const isTr = locale === 'tr';
   const [selectedGate, setSelectedGate] = useState<string | null>('G2');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [fromDate, setFromDate] = useState(searchParams.get('from') || '');
+  const [toDate, setToDate] = useState(searchParams.get('to') || '');
+
+  const handleDateFilter = (e: React.FormEvent) => {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (fromDate) params.set('from', fromDate);
+    if (toDate) params.set('to', toDate);
+    router.push(`?${params.toString()}`);
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const response = await fetch(`/api/dashboard/export-csv?from=${fromDate}&to=${toDate}`, {
+        method: 'GET',
+      });
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dashboard-metrics-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('CSV export failed:', error);
+    }
+  };
 
   const gates = [
     { key: 'G0', title: isTr ? 'G0: Fikir & Konsept' : 'G0: Concept & Idea', desc: 'Fikir tarama & stratejik uyum' },
@@ -94,6 +128,49 @@ export default function DashboardClient({
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-12">
+      {/* ──────────────────────── DATE FILTER & EXPORT ──────────────────────── */}
+      <div className="bg-surface border border-border rounded-2xl p-4 shadow-xs">
+        <form onSubmit={handleDateFilter} className="flex flex-col sm:flex-row gap-3 items-end">
+          <div className="flex-1">
+            <label className="text-xs font-bold text-muted uppercase mb-1 block">
+              {isTr ? 'Başlangıç Tarihi' : 'From Date'}
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-sm text-ink"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs font-bold text-muted uppercase mb-1 block">
+              {isTr ? 'Bitiş Tarihi' : 'To Date'}
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-sm text-ink"
+            />
+          </div>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/80 transition flex items-center gap-2 text-sm font-semibold"
+          >
+            <Filter className="w-4 h-4" />
+            {isTr ? 'Filtrele' : 'Filter'}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition flex items-center gap-2 text-sm font-semibold"
+          >
+            <Download className="w-4 h-4" />
+            CSV
+          </button>
+        </form>
+      </div>
+
       {/* ──────────────────────── VIP EXECUTIVE HEADER BANNER ──────────────────────── */}
       <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-slate-800 shadow-2xl text-white overflow-hidden">
         {/* Background Glowing Orbs */}

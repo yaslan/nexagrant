@@ -7,7 +7,7 @@ describe('SediaAdapter & Live SEDIA Search API', () => {
     const result = await adapter.searchSedia({
       text: 'climate',
       pageSize: 5,
-      pageNumber: 1,
+      maxPages: 1,
     });
 
     expect(result).toBeDefined();

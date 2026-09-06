@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { inngest } from '../client';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -82,12 +83,40 @@ export const k1DailyCalls = inngest.createFunction(
       const errors: Array<{ identifier: string; message: string }> = [];
       let insertedCount = 0;
       let updatedCount = 0;
+      const schemaAlerts: string[] = [];
 
       for (const t of allTopics) {
         try {
           const topicStatus = (t.status || 'FORTHCOMING') as 'FORTHCOMING' | 'OPEN' | 'CLOSED';
           const callId = extractCallIdentifier(t);
           const programmeId = getProgrammeIdFromTopic(callId);
+
+          // Hash raw topic for schema change detection
+          const rawHash = crypto.createHash('sha256').update(JSON.stringify(t)).digest('hex');
+          const source = programmeId === 'HE' ? 'sedia' : programmeId === 'EUROSTARS' ? 'eurostars' : 'tubitak';
+
+          // Check for schema changes by comparing with last fetch
+          const lastFetch = await prisma.rawFetch.findFirst({
+            where: { source, key: t.identifier },
+            orderBy: { fetchedAt: 'desc' }
+          });
+
+          if (lastFetch && lastFetch.hash !== rawHash) {
+            // Schema likely changed if hash differs
+            const schemaMsg = `API schema change detected for ${source}/${t.identifier}: hash mismatch. Storing raw payload for analysis.`;
+            schemaAlerts.push(schemaMsg);
+            logger.warn(schemaMsg);
+          }
+
+          // Store raw fetch for audit trail
+          await prisma.rawFetch.create({
+            data: {
+              source,
+              key: t.identifier,
+              hash: rawHash,
+              payload: t,
+            }
+          }).catch(() => {}); // Don't fail if storage fails
 
           // Ensure programme exists
           await prisma.programme.upsert({
@@ -132,6 +161,7 @@ export const k1DailyCalls = inngest.createFunction(
             keywords: t.keywords || [],
             description: t.description || undefined,
             sourceUrl: t.sourceUrl || undefined,
+            rawHash: rawHash,
             callId: call.id,
           };
 
@@ -155,6 +185,18 @@ export const k1DailyCalls = inngest.createFunction(
           logger.error(`Failed to upsert topic ${t.identifier}:`, error);
           errors.push({ identifier: t.identifier, message: msg });
         }
+      }
+
+      // Alert on schema changes
+      if (schemaAlerts.length > 0) {
+        await prisma.systemAlert.create({
+          data: {
+            level: 'warn',
+            source: 'k1_daily_calls',
+            message: `API schema changes detected in ${schemaAlerts.length} topics. Check RawFetch table for details.`,
+            meta: { schemaAlerts: schemaAlerts.slice(0, 5) }
+          }
+        }).catch(() => {});
       }
 
       const output: K1DailyCallsOutput = {

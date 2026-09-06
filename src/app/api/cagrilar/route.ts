@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
     const adapter = new SediaAdapter();
     const result = await adapter.searchSedia({
       text,
-      pageNumber,
       pageSize,
+      maxPages: 5, // Limit API calls for web endpoint
       statuses,
       frameworkProgrammes,
       types,
