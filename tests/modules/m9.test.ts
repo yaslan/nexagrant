@@ -1,29 +1,73 @@
-import { describe, test, expect, vi } from 'vitest';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { generateMeetingBrief, savePostMeetingNotes } from '../../src/modules/m9/server/actions';
 
+/**
+ * The tenant is no longer a parameter of these actions — it is read from the
+ * session — so the fake tenant scope lives here and the tests assert the
+ * queries are keyed on it.
+ *
+ * `@/lib/tenant` is replaced rather than partially mocked: importing it for
+ * real pulls in next-auth, which does not resolve under the vitest node
+ * environment. The stub keeps the same contract (a scope, or a throw).
+ */
+const h = vi.hoisted(() => {
+  const scope = {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    role: 'TENANT_OWNER',
+    workspaceIds: [] as string[],
+    isPlatformAdmin: false,
+  };
+
+  class TenantScopeError extends Error {
+    readonly code = 'TENANT_SCOPE_REQUIRED';
+    constructor() {
+      super('Request has no tenant scope; refusing to query tenant data.');
+      this.name = 'TenantScopeError';
+    }
+  }
+
+  return {
+    scope,
+    TenantScopeError,
+    state: { currentScope: scope as typeof scope | null },
+    meetingBriefFindFirst: vi.fn(),
+    meetingBriefCreate: vi.fn(),
+    meetingBriefUpdate: vi.fn(),
+    creditLedgerCreate: vi.fn(),
+  };
+});
+
+const {
+  scope,
+  TenantScopeError,
+  state,
+  meetingBriefFindFirst,
+  meetingBriefCreate,
+  meetingBriefUpdate,
+  creditLedgerCreate,
+} = h;
+
+vi.mock('../../src/lib/tenant', () => ({
+  TenantScopeError: h.TenantScopeError,
+  requireTenantAction: vi.fn(async () => {
+    if (!h.state.currentScope) throw new h.TenantScopeError();
+    return h.state.currentScope;
+  }),
+}));
+
 vi.mock('../../src/lib/db', () => ({
-  prisma: {
-    creditLedger: {
-      create: vi.fn().mockResolvedValue({ id: 'ledger-1' }),
-    },
-    meetingBrief: {
-      upsert: vi.fn().mockImplementation(async ({ create }) => ({
-        id: 'brief-123',
-        tenantId: create.tenantId,
-        interactionId: create.interactionId,
-        content: create.content,
-        createdAt: new Date(),
-      })),
-      findUnique: vi.fn().mockResolvedValue({
-        id: 'brief-123',
-        content: '### Initial Brief Content',
-      }),
-      update: vi.fn().mockResolvedValue({
-        id: 'brief-123',
-        content: '### Initial Brief Content\n\n---\n### Toplantı Sonrası Notlar',
-      }),
-    },
-  },
+  prisma: {},
+  withTenant: vi.fn(async (_tenantId: string, cb: (t: any) => Promise<any>) =>
+    cb({
+      creditLedger: { create: h.creditLedgerCreate },
+      meetingBrief: {
+        findFirst: h.meetingBriefFindFirst,
+        create: h.meetingBriefCreate,
+        update: h.meetingBriefUpdate,
+      },
+    })
+  ),
 }));
 
 vi.mock('../../src/lib/ai/llm', () => ({
@@ -34,13 +78,29 @@ vi.mock('../../src/lib/ai/llm', () => ({
 }));
 
 describe('M9 Meeting Briefs Module', () => {
+  beforeEach(() => {
+    state.currentScope = scope;
+    vi.clearAllMocks();
+    creditLedgerCreate.mockResolvedValue({ id: 'ledger-1' });
+    meetingBriefFindFirst.mockResolvedValue(null);
+    meetingBriefCreate.mockImplementation(async ({ data }: any) => ({
+      id: 'brief-123',
+      tenantId: data.tenantId,
+      interactionId: data.interactionId,
+      content: data.content,
+      createdAt: new Date(),
+    }));
+    meetingBriefUpdate.mockImplementation(async ({ data }: any) => ({
+      id: 'brief-123',
+      content: data.content,
+    }));
+  });
+
   test('generateMeetingBrief returns formatted brief content', async () => {
     const result = await generateMeetingBrief({
       interactionId: 'int-123',
       partnerName: 'Fraunhofer Institute',
       callTopic: 'HORIZON-CL5-2026-D3-01',
-      tenantId: 'tenant-1',
-      userId: 'user-1',
     });
 
     expect(result.success).toBe(true);
@@ -48,7 +108,28 @@ describe('M9 Meeting Briefs Module', () => {
     expect(result.brief.content).toContain('Partner Background');
   });
 
+  test('generateMeetingBrief writes the session tenant, not a caller-supplied one', async () => {
+    await generateMeetingBrief({
+      interactionId: 'int-123',
+      partnerName: 'Fraunhofer Institute',
+      callTopic: 'HORIZON-CL5-2026-D3-01',
+    });
+
+    // The existing-brief lookup and the insert are both keyed on the session tenant.
+    expect(meetingBriefFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { interactionId: 'int-123', tenantId: 'tenant-1' } })
+    );
+    expect(meetingBriefCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-1' }) })
+    );
+  });
+
   test('savePostMeetingNotes formats and appends post-meeting decisions and action items', async () => {
+    meetingBriefFindFirst.mockResolvedValue({
+      id: 'brief-123',
+      content: '### Initial Brief Content',
+    });
+
     const result = await savePostMeetingNotes({
       briefId: 'brief-123',
       partnerName: 'Fraunhofer Institute',
@@ -56,13 +137,39 @@ describe('M9 Meeting Briefs Module', () => {
       decisions: 'NDA will be signed next week.',
       actionItems: ['Prepare NDA draft by Friday', 'Send WP3 effort matrix'],
       nextMeetingDate: '2026-09-15',
-      tenantId: 'tenant-1',
-      userId: 'user-1',
     });
 
     expect(result.success).toBe(true);
     expect(result.formattedPostNotes).toContain('Toplantı Sonrası Notlar & Alınan Kararlar');
     expect(result.formattedPostNotes).toContain('Prepare NDA draft by Friday');
     expect(result.formattedPostNotes).toContain('2026-09-15');
+  });
+
+  test('savePostMeetingNotes refuses a brief id that belongs to another tenant', async () => {
+    // The scoped findFirst returns nothing for a foreign brief id.
+    meetingBriefFindFirst.mockResolvedValue(null);
+
+    const result = await savePostMeetingNotes({
+      briefId: 'brief-from-other-tenant',
+      partnerName: 'Fraunhofer Institute',
+      notes: 'x',
+      decisions: 'y',
+      actionItems: [],
+    });
+
+    expect(result.success).toBe(false);
+    expect(meetingBriefUpdate).not.toHaveBeenCalled();
+  });
+
+  test('a session with no tenant is refused instead of falling back to demo-tenant', async () => {
+    state.currentScope = null;
+
+    await expect(
+      generateMeetingBrief({
+        interactionId: 'int-999',
+        partnerName: 'Fraunhofer Institute',
+        callTopic: 'HORIZON-CL5-2026-D3-01',
+      })
+    ).rejects.toBeInstanceOf(TenantScopeError);
   });
 });
