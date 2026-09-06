@@ -79,6 +79,11 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 5. Ücretsiz plan kredisi (10) ve deneme süresi (14 gün) — beta sonrası gözden geçirilir.
 6. Başarı primi sunulacak mı, yoksa yalnızca sabit ücret + bonus mu (hukuki görüş).
 7. Türkçe e-fatura entegrasyonu için sağlayıcı.
+8. **G0 eşiği hangi sayıya uygulanıyor?** PROJECT.md:75 kapıyı "uyum ≥ 70 **ve** taban oran ≥ %8 **ve** ülke uygun"
+   diye tanımlıyor; `/settings/gates` ekranı aynı 70'i "Minimum AI Alignment Score" diye etiketliyor;
+   `src/lib/gates/evaluate.ts` ise 70'i **bileşik** skora uyguluyor. Üçü aynı davranış değil — E11.3
+   kalibrasyon koşusunda iki okuma arasında 10 puanlık doğruluk farkı ölçüldü
+   (bkz. `docs/CORDIS-SAMPLE-CALIBRATION.md`). Karar verilmeden eşik değiştirilmemeli.
 
 ## Riskler (teknik)
 - F&T API'si resmî değil → adaptör + yedek kaynak + alarm (E4).

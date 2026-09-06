@@ -1,0 +1,786 @@
+#!/usr/bin/env tsx
+/**
+ * E11.3 — G0 ↔ ESR calibration (TASK-MTQ2KL3JO4MK2).
+ *
+ * Seeds the calibration sample set, scores every sample with the canonical G0 scorer, compares the
+ * gate's answer against the recorded evaluation outcome, and writes the confusion matrix, the
+ * threshold sweep and the partner survey to disk.
+ *
+ * Safety model — same as scripts/beta-onboarding.ts, deliberately:
+ *   • `--dry-run` is the DEFAULT. Nothing is written to the database and nothing is emailed unless
+ *     you pass `--apply` and/or `--send`.
+ *   • Every database write is an upsert on a deterministic id, so a second run converges instead of
+ *     duplicating. Running twice is safe and is part of the definition of done.
+ *   • Everything lands in its own tenant (`esr-calibration`), so calibration rows can never show up
+ *     in a design partner's pipeline or KPI dashboard.
+ *   • `--send` refuses while any roster address sits on a reserved, undeliverable domain.
+ *
+ * ROLLBACK
+ *   pnpm tsx scripts/esr-calibration.ts --rollback --apply
+ *   Deletes the calibration tenant (cascading its workspace, opportunities, proposals and gate
+ *   decisions) and the SAMPLE-* CordisProject rows this script created. Nothing outside the
+ *   `esr-calibration` tenant and the reserved `SAMPLE-` id namespace is touched. Emails already
+ *   sent cannot be recalled.
+ *
+ * Usage
+ *   pnpm tsx scripts/esr-calibration.ts                          # dry run: score + report only
+ *   pnpm tsx scripts/esr-calibration.ts --apply                  # …and write the samples to the DB
+ *   pnpm tsx scripts/esr-calibration.ts --apply --survey         # …and render the partner survey
+ *   pnpm tsx scripts/esr-calibration.ts --apply --survey --send  # …and deliver it via Resend
+ *   pnpm tsx scripts/esr-calibration.ts --responses=<csv>        # re-label from partner verdicts
+ *   pnpm tsx scripts/esr-calibration.ts --rollback --apply       # undo
+ *
+ * Flags
+ *   --samples=<path>    default docs/BETA_DATA/esr-calibration-samples.csv
+ *   --roster=<path>     default docs/BETA_DATA/beta-partners.csv
+ *   --responses=<path>  partner verdicts; when given they override the provisional labels
+ *   --out=<dir>         default docs/BETA_DATA/generated/esr-calibration
+ *   --report=<path>     default docs/CORDIS-SAMPLE-CALIBRATION.md
+ *   --per-partner=<n>   survey items per partner, default 4 (20 samples × 10 partners = 2 each)
+ *   --deadline=<date>   survey deadline, YYYY-MM-DD; default two weeks from today
+ */
+
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+import { prisma } from '../src/lib/db';
+import { DEFAULT_SCORING_WEIGHTS } from '../src/lib/scoring/defaults';
+import {
+  DEFAULT_G0_RULES,
+  SPEC_LITERAL_G0_RULES,
+  decideG0,
+  weightsTotal,
+  type G0Decision,
+  type G0Result,
+  type G0Rules,
+} from '../src/lib/scoring/g0-canonical';
+import {
+  bestSweepPoint,
+  formatPercent,
+  metrics,
+  sweepThreshold,
+  wilsonInterval,
+  type CalibrationMetrics,
+  type LabelledPrediction,
+} from '../src/lib/scoring/calibration';
+import { isFixtureSampleSet, parseEsrSamples, type EsrSample } from '../src/lib/beta/esr-samples';
+import { parseBetaRoster, isPlaceholderEmail, type BetaPartner } from '../src/lib/beta/roster';
+import {
+  assignSamplesToPartners,
+  buildResponseTemplateCsv,
+  coveragePerSample,
+  parseSurveyResponses,
+  renderEsrSurveyEmail,
+  rollUpVerdicts,
+  surveyUrlFor,
+  type SurveyResponse,
+} from '../src/lib/beta/esr-survey';
+import { BETA_SUPPORT_EMAIL } from '../src/lib/beta/constants';
+
+const REPO_ROOT = path.resolve(__dirname, '..');
+const TENANT_ID = 'esr-calibration';
+const WORKSPACE_ID = 'esr-calibration-ws';
+const RULE_VERSION = 'g0-canonical-1.0';
+const ACTOR = 'esr-calibration-cli';
+const FIXTURE_PREFIX = 'SAMPLE-';
+
+interface Options {
+  samples: string;
+  roster: string;
+  responses: string | null;
+  out: string;
+  report: string;
+  perPartner: number;
+  deadline: string;
+  apply: boolean;
+  survey: boolean;
+  send: boolean;
+  rollback: boolean;
+}
+
+function parseArgs(argv: string[]): Options {
+  const twoWeeks = new Date(Date.now() + 14 * 86400_000).toISOString().slice(0, 10);
+  const opts: Options = {
+    samples: path.join(REPO_ROOT, 'docs/BETA_DATA/esr-calibration-samples.csv'),
+    roster: path.join(REPO_ROOT, 'docs/BETA_DATA/beta-partners.csv'),
+    responses: null,
+    out: path.join(REPO_ROOT, 'docs/BETA_DATA/generated/esr-calibration'),
+    report: path.join(REPO_ROOT, 'docs/CORDIS-SAMPLE-CALIBRATION.md'),
+    perPartner: 4,
+    deadline: twoWeeks,
+    apply: false,
+    survey: false,
+    send: false,
+    rollback: false,
+  };
+
+  for (const arg of argv) {
+    if (arg === '--apply') opts.apply = true;
+    else if (arg === '--dry-run') opts.apply = false;
+    else if (arg === '--survey') opts.survey = true;
+    else if (arg === '--send') opts.send = true;
+    else if (arg === '--rollback') opts.rollback = true;
+    else if (arg.startsWith('--samples=')) opts.samples = path.resolve(arg.slice('--samples='.length));
+    else if (arg.startsWith('--roster=')) opts.roster = path.resolve(arg.slice('--roster='.length));
+    else if (arg.startsWith('--responses=')) opts.responses = path.resolve(arg.slice('--responses='.length));
+    else if (arg.startsWith('--out=')) opts.out = path.resolve(arg.slice('--out='.length));
+    else if (arg.startsWith('--report=')) opts.report = path.resolve(arg.slice('--report='.length));
+    else if (arg.startsWith('--per-partner=')) {
+      const n = Number(arg.slice('--per-partner='.length));
+      if (!Number.isInteger(n) || n < 1) throw new Error('--per-partner must be a positive integer');
+      opts.perPartner = n;
+    } else if (arg.startsWith('--deadline=')) {
+      const value = arg.slice('--deadline='.length);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error('--deadline must look like YYYY-MM-DD');
+      opts.deadline = value;
+    } else if (arg.startsWith('--')) {
+      throw new Error(`Unknown flag: ${arg}`);
+    }
+  }
+  if (opts.send && !opts.survey) throw new Error('--send requires --survey');
+  return opts;
+}
+
+function log(scope: string, message: string): void {
+  console.log(`  [${scope}] ${message}`);
+}
+
+// ───────────────────────── scoring ─────────────────────────
+
+interface ScoredSample {
+  sample: EsrSample;
+  result: G0Result;
+  predicted: G0Decision;
+  actual: G0Decision;
+  correct: boolean;
+}
+
+function scoreAll(samples: EsrSample[], rules: G0Rules): ScoredSample[] {
+  return samples.map((sample) => {
+    const result = decideG0(sample.features, sample.facts, rules, DEFAULT_SCORING_WEIGHTS);
+    return {
+      sample,
+      result,
+      predicted: result.decision,
+      actual: sample.expertLabel,
+      correct: result.decision === sample.expertLabel,
+    };
+  });
+}
+
+function toPredictions(scored: ScoredSample[]): LabelledPrediction[] {
+  return scored.map((s) => ({
+    id: s.sample.sampleId,
+    predicted: s.predicted,
+    actual: s.actual,
+    score: s.result.score,
+  }));
+}
+
+// ───────────────────────── database ─────────────────────────
+
+async function ensureCalibrationTenant(): Promise<void> {
+  await prisma.tenant.upsert({
+    where: { id: TENANT_ID },
+    update: { name: 'ESR Calibration (internal)' },
+    create: {
+      id: TENANT_ID,
+      name: 'ESR Calibration (internal)',
+      slug: TENANT_ID,
+      country: 'BE',
+      orgType: 'RESEARCH',
+      locale: 'tr',
+      timezone: 'Europe/Brussels',
+    },
+  });
+  await prisma.workspace.upsert({
+    where: { id: WORKSPACE_ID },
+    update: { name: 'ESR calibration samples' },
+    create: { id: WORKSPACE_ID, tenantId: TENANT_ID, name: 'ESR calibration samples', slug: 'samples' },
+  });
+}
+
+async function seedSample(scored: ScoredSample): Promise<void> {
+  const { sample, result } = scored;
+  const oppId = `esr-cal-${sample.sampleId}`;
+
+  await prisma.cordisProject.upsert({
+    where: { id: sample.cordisProjectId },
+    update: { acronym: sample.acronym, title: sample.title, framework: sample.framework },
+    create: {
+      id: sample.cordisProjectId,
+      acronym: sample.acronym,
+      title: sample.title,
+      framework: sample.framework,
+      masterCall: sample.topicCode,
+      status: sample.outcome === 'funded' ? 'SIGNED' : 'NOT_FUNDED',
+    },
+  });
+  await prisma.cordisProjectTopic.upsert({
+    where: { projectId_topicCode: { projectId: sample.cordisProjectId, topicCode: sample.topicCode } },
+    update: { topicTitle: sample.title },
+    create: { projectId: sample.cordisProjectId, topicCode: sample.topicCode, topicTitle: sample.title },
+  });
+
+  await prisma.opportunity.upsert({
+    where: { id: oppId },
+    update: { title: sample.title, g0Score: result.score, stage: 'G0', notes: sample.notes },
+    create: {
+      id: oppId,
+      tenantId: TENANT_ID,
+      workspaceId: WORKSPACE_ID,
+      title: sample.title,
+      stage: 'G0',
+      status: sample.outcome === 'funded' ? 'FUNDED' : sample.outcome === 'below' ? 'REJECTED' : 'ACTIVE',
+      intendedRole: 'coordinator',
+      g0Score: result.score,
+      notes: sample.notes,
+    },
+  });
+
+  await prisma.proposal.upsert({
+    where: { opportunityId: oppId },
+    update: {
+      acronym: sample.acronym,
+      outcome: sample.outcome,
+      esrScores: esrScoresJson(sample),
+    },
+    create: {
+      id: `esr-cal-prop-${sample.sampleId}`,
+      tenantId: TENANT_ID,
+      opportunityId: oppId,
+      acronym: sample.acronym,
+      outcome: sample.outcome,
+      esrScores: esrScoresJson(sample),
+    },
+  });
+
+  // Deterministic id so the decision is upserted, not appended to on every run. The features live
+  // in `inputs` because that is the column the gate engine already uses to make a decision
+  // reproducible — the calibration report and the audit trail then read the same numbers.
+  await prisma.gateDecision.upsert({
+    where: { id: `esr-cal-gd-${sample.sampleId}` },
+    update: {
+      passed: result.decision === 'GO',
+      inputs: gateInputsJson(scored),
+      ruleVersion: RULE_VERSION,
+      decidedBy: ACTOR,
+    },
+    create: {
+      id: `esr-cal-gd-${sample.sampleId}`,
+      tenantId: TENANT_ID,
+      opportunityId: oppId,
+      gate: 'G0',
+      passed: result.decision === 'GO',
+      inputs: gateInputsJson(scored),
+      ruleVersion: RULE_VERSION,
+      decidedBy: ACTOR,
+    },
+  });
+}
+
+function esrScoresJson(sample: EsrSample) {
+  return {
+    total: sample.esrTotal,
+    threshold: sample.esrThreshold,
+    outcome: sample.outcome,
+    labelSource: sample.labelSource,
+  };
+}
+
+function gateInputsJson(scored: ScoredSample) {
+  return {
+    sampleId: scored.sample.sampleId,
+    features: scored.sample.features,
+    baseRatePct: scored.sample.facts.baseRatePct,
+    countryEligible: scored.sample.facts.countryEligible,
+    weights: DEFAULT_SCORING_WEIGHTS,
+    score: scored.result.score,
+    contributions: scored.result.contributions,
+    reasons: scored.result.reasons,
+    predicted: scored.predicted,
+    expertLabel: scored.actual,
+    labelSource: scored.sample.labelSource,
+  };
+}
+
+async function rollback(): Promise<void> {
+  const oppIds = (
+    await prisma.opportunity.findMany({ where: { tenantId: TENANT_ID }, select: { id: true } })
+  ).map((o: { id: string }) => o.id);
+  const gd = await prisma.gateDecision.deleteMany({ where: { tenantId: TENANT_ID } });
+  const props = await prisma.proposal.deleteMany({ where: { tenantId: TENANT_ID } });
+  const opps = await prisma.opportunity.deleteMany({ where: { tenantId: TENANT_ID } });
+  const topics = await prisma.cordisProjectTopic.deleteMany({
+    where: { projectId: { startsWith: FIXTURE_PREFIX } },
+  });
+  const projects = await prisma.cordisProject.deleteMany({ where: { id: { startsWith: FIXTURE_PREFIX } } });
+  const ws = await prisma.workspace.deleteMany({ where: { tenantId: TENANT_ID } });
+  const tenants = await prisma.tenant.deleteMany({ where: { id: TENANT_ID } });
+  log('rollback', `opportunities seen: ${oppIds.length}`);
+  log(
+    'rollback',
+    `deleted gateDecision=${gd.count} proposal=${props.count} opportunity=${opps.count} ` +
+      `cordisProjectTopic=${topics.count} cordisProject=${projects.count} workspace=${ws.count} tenant=${tenants.count}`,
+  );
+}
+
+async function countCalibrationRows() {
+  const [opportunities, proposals, gateDecisions, cordisProjects] = await Promise.all([
+    prisma.opportunity.count({ where: { tenantId: TENANT_ID } }),
+    prisma.proposal.count({ where: { tenantId: TENANT_ID } }),
+    prisma.gateDecision.count({ where: { tenantId: TENANT_ID } }),
+    prisma.cordisProject.count({ where: { id: { startsWith: FIXTURE_PREFIX } } }),
+  ]);
+  return { opportunities, proposals, gateDecisions, cordisProjects };
+}
+
+// ───────────────────────── report ─────────────────────────
+
+function matrixTable(m: CalibrationMetrics): string {
+  return [
+    '| | Gerçek: GO | Gerçek: NO_GO |',
+    '|---|---:|---:|',
+    `| **Tahmin: GO** | ${m.truePositive} (TP) | ${m.falsePositive} (FP) |`,
+    `| **Tahmin: NO_GO** | ${m.falseNegative} (FN) | ${m.trueNegative} (TN) |`,
+  ].join('\n');
+}
+
+function metricsLine(m: CalibrationMetrics): string {
+  const wilson = wilsonInterval(m.truePositive + m.trueNegative, m.total);
+  const ci = wilson ? ` (Wilson %95 GA: ${formatPercent(wilson.low)} – ${formatPercent(wilson.high)})` : '';
+  return (
+    `- **Doğruluk (accuracy):** ${formatPercent(m.accuracy)}${ci}\n` +
+    `- **Kesinlik (precision, GO dediklerimizin doğruluğu):** ${formatPercent(m.precision)}\n` +
+    `- **Duyarlılık (recall, kaçırmadıklarımız):** ${formatPercent(m.recall)}\n` +
+    `- **F1:** ${formatPercent(m.f1)}`
+  );
+}
+
+/**
+ * The report has to end in a recommendation, and the recommendation has to be computed from this
+ * run rather than typed in — otherwise it goes stale the first time the sample set changes.
+ *
+ * The shape of the recommendation is a judgement (a review band beats moving one threshold when the
+ * sample is this small); the numbers in it are not.
+ */
+function buildRecommendation(
+  scored: ScoredSample[],
+  scoredLiteral: ScoredSample[],
+  best: ReturnType<typeof bestSweepPoint>,
+): string {
+  const m = metrics(toPredictions(scored));
+  const strict = DEFAULT_G0_RULES.minScore ?? 70;
+  const reviewLow = best ? best.threshold : strict;
+
+  // Samples the strict rule rejects on the composite alone — i.e. every hard rule passed and only
+  // the threshold stopped them. These are exactly the cases a human review band would catch.
+  const compositeOnlyRejects = scored.filter(
+    (s) => s.predicted === 'NO_GO' && s.result.reasons.length === 1 && s.result.reasons[0]!.startsWith('composite'),
+  );
+  const inBand = compositeOnlyRejects.filter((s) => s.result.score >= reviewLow);
+  const bandWouldHaveBeenRight = inBand.filter((s) => s.actual === 'GO');
+  const falsePositives = scored.filter((s) => s.predicted === 'GO' && s.actual === 'NO_GO');
+
+  const lines: string[] = [];
+
+  lines.push(
+    m.falseNegative > m.falsePositive
+      ? `Bu koşuda hata dağılımı **kaçırma yönünde**: ${m.falseNegative} yanlış negatif (kaçırılan hibe) ` +
+          `karşısında ${m.falsePositive} yanlış pozitif (boşa emek). Bileşik eşik ${strict} olduğu gibi bırakılırsa ` +
+          `eşiği geçen tekliflerin bir kısmı hiç denenmeden eleniyor.`
+      : `Bu koşuda hata dağılımı **fazla cömert** yönde: ${m.falsePositive} yanlış pozitif karşısında ` +
+          `${m.falseNegative} yanlış negatif. Eşiği gevşetmek maliyeti artırır.`,
+  );
+
+  if (best && best.threshold < strict) {
+    lines.push(
+      `Tarama en yüksek doğruluğu eşik **${best.threshold}**'te veriyor (${formatPercent(best.metrics.accuracy)}). ` +
+        `Ancak n=${m.total} için Wilson aralığı çok geniş; eşiği tek hamlede ${strict}'ten ${best.threshold}'e ` +
+        `çekmek bu örnek setine aşırı uyum (overfit) olur.`,
+    );
+  }
+
+  lines.push(
+    `**Önerilen tasarım — üç bant, tek eşik yerine:**\n` +
+      `- \`GO\` : bileşik skor ≥ ${strict} (bugünkü davranış korunur)\n` +
+      `- \`İNCELE\` : ${reviewLow} ≤ skor < ${strict} — otomatik eleme yok, insan kararı ister\n` +
+      `- \`NO_GO\` : skor < ${reviewLow} ya da herhangi bir sert kural düşmüş\n\n` +
+      `Bu setde inceleme bandına ${inBand.length} örnek düşüyor` +
+      (inBand.length
+        ? ` (${inBand.map((s) => s.sample.sampleId).join(', ')}); bunların ${bandWouldHaveBeenRight.length} tanesi ` +
+          `gerçekte eşiği geçmiş tekliflerdi, yani bugün sessizce kaybediliyorlar.`
+        : '.'),
+  );
+
+  if (falsePositives.length) {
+    lines.push(
+      `Kalan yanlış pozitif${falsePositives.length > 1 ? 'ler' : ''} eşik meselesi değil: ` +
+        falsePositives
+          .map(
+            (s) =>
+              `**${s.sample.sampleId} ${s.sample.acronym}** (skor ${s.result.score.toFixed(2)}, taban oran %${s.sample.facts.baseRatePct})`,
+          )
+          .join(', ') +
+        `. Yüksek taban oranlı çağrı tipleri bileşik skoru şişiriyor; \`baseRate\` ağırlığının çağrı tipine göre ` +
+        `sınırlandırılması ayrı bir iş olarak açılmalı.`,
+    );
+  }
+
+  const gap = Math.abs(
+    ((metrics(toPredictions(scoredLiteral)).accuracy ?? 0) - (m.accuracy ?? 0)) * 100,
+  );
+  lines.push(
+    `**Karar bekleyen belirsizlik:** PROJECT.md:75 kapıyı üç sert kural olarak tanımlıyor, ayarlar ekranı aynı ` +
+      `sayıyı "Minimum AI Alignment Score" diye etiketliyor, \`gates/evaluate.ts\` ise bileşik skora uyguluyor. ` +
+      `Üçü aynı şey değil: bu koşuda A ile B okuması arasında **${gap.toFixed(1)} puanlık** doğruluk farkı çıkıyor. ` +
+      `docs/ROADMAP.md · Açık kararlar #8'de kayıtlı; kapatılmadan eşik değiştirilmemeli.`,
+  );
+
+  return lines.join('\n\n');
+}
+
+function buildReport(args: {
+  scoredDefault: ScoredSample[];
+  scoredLiteral: ScoredSample[];
+  sweep: ReturnType<typeof sweepThreshold>;
+  isFixture: boolean;
+  samplesPath: string;
+  responsesPath: string | null;
+  responseCount: number;
+  relabelled: string[];
+  coverage: Map<string, number>;
+  partnerCount: number;
+  deadline: string;
+}): string {
+  const mDefault = metrics(toPredictions(args.scoredDefault));
+  const mLiteral = metrics(toPredictions(args.scoredLiteral));
+  const best = bestSweepPoint(args.sweep);
+  const generatedAt = new Date().toISOString();
+
+  const rows = args.scoredDefault
+    .map((s) => {
+      const literal = args.scoredLiteral.find((l) => l.sample.sampleId === s.sample.sampleId)!;
+      const esr =
+        s.sample.esrTotal === null
+          ? '—'
+          : `${s.sample.esrTotal}/${s.sample.esrThreshold ?? '—'}`;
+      return `| ${s.sample.sampleId} | ${s.sample.acronym} | ${s.result.score.toFixed(2)} | ${s.sample.features.alignment} | ${s.sample.facts.baseRatePct}% | ${s.predicted} | ${literal.predicted} | ${s.actual} | ${esr} | ${s.sample.outcome} | ${s.correct ? '✅' : '❌'} |`;
+    })
+    .join('\n');
+
+  const sweepRows = args.sweep
+    .map(
+      (p) =>
+        `| ${p.threshold} | ${p.metrics.truePositive} | ${p.metrics.falsePositive} | ${p.metrics.trueNegative} | ${p.metrics.falseNegative} | ${formatPercent(p.metrics.accuracy)} |`,
+    )
+    .join('\n');
+
+  const misses = args.scoredDefault.filter((s) => !s.correct);
+
+  return `# CORDIS örnek seti — G0 ↔ ESR kalibrasyonu
+
+> Üretilmiş dosya. Elle düzenlemeyin; \`pnpm tsx scripts/esr-calibration.ts\` yeniden üretir.
+> Üretim zamanı: ${generatedAt} · Kural sürümü: \`${RULE_VERSION}\` · Örnek seti: \`${path.relative(REPO_ROOT, args.samplesPath)}\`
+
+${
+  args.isFixture
+    ? `> ⚠️ **Bu koşu KÜRATE EDİLMİŞ bir fixture üzerinde yapıldı** (tüm \`cordisProjectId\` değerleri rezerve
+> \`SAMPLE-*\` ad alanında). Buradaki doğruluk oranı **kalibrasyon hattının** çalıştığını gösterir;
+> modelin gerçek dünyadaki doğruluğunu **göstermez**. Gerçek sayı, beta tasarım ortaklarının kendi
+> ESR'leri geldiğinde \`--samples=\` ile bu dosyanın yerine konarak üretilir.`
+    : `> ✅ Bu koşu gerçek ESR verisi üzerinde yapıldı (fixture ad alanı dışında satırlar mevcut).`
+}
+
+## 1. Ne ölçülüyor
+
+G0 triyaj kapısının kararı ile teklifin gerçek değerlendirme sonucu karşılaştırılıyor.
+
+- **Pozitif sınıf = GO** ("bu fırsatın peşinden gidilir"). Sekiz haftalık emeği harcatan karar bu.
+- **Gerçek etiket**: ESR sonucu \`funded | reserve | above_threshold\` → GO; \`below | ineligible\` → NO_GO.
+- **Yanlış pozitif (FP)** = boşa harcanan emek. **Yanlış negatif (FN)** = kaçırılan hibe. Maliyetleri
+  simetrik değil; eşik seçimi bu asimetriyi bilerek yapılmalı.
+
+Puanlama PROJECT.md:81'deki ağırlıklarla (toplam ${weightsTotal(DEFAULT_SCORING_WEIGHTS)}):
+${Object.entries(DEFAULT_SCORING_WEIGHTS)
+  .map(([k, v]) => `\`${k}\`=${v}`)
+  .join(' · ')}
+
+## 2. Örnek başına sonuç (n=${args.scoredDefault.length})
+
+| Örnek | Kısaltma | G0 skoru | Uyum | Taban oran | Karar (A) | Karar (B) | Gerçek | ESR | Sonuç | ✓ |
+|---|---|---:|---:|---:|---|---|---|---|---|:-:|
+${rows}
+
+**A** = uygulanan kural: bileşik skor ≥ ${DEFAULT_G0_RULES.minScore} **ve** uyum ≥ ${DEFAULT_G0_RULES.minAlignment} **ve** taban oran ≥ %${DEFAULT_G0_RULES.minBaseRate} **ve** ülke uygun.
+**B** = PROJECT.md:75'in düz okunuşu: bileşik skor eşiği **yok**; yalnız uyum ≥ ${SPEC_LITERAL_G0_RULES.minAlignment}, taban oran ≥ %${SPEC_LITERAL_G0_RULES.minBaseRate}, ülke uygun.
+
+## 3. Karışıklık matrisi
+
+### 3.1 A — bugün uygulanan kural (\`DEFAULT_GATE_RULES.G0\`)
+
+${matrixTable(mDefault)}
+
+${metricsLine(mDefault)}
+
+### 3.2 B — PROJECT.md:75 düz okunuşu
+
+${matrixTable(mLiteral)}
+
+${metricsLine(mLiteral)}
+
+## 4. Eşik taraması
+
+Yalnız bileşik skor eşiği değiştirildi; üç sert kural (uyum, taban oran, ülke) sabit tutuldu.
+
+| Eşik | TP | FP | TN | FN | Doğruluk |
+|---:|---:|---:|---:|---:|---:|
+${sweepRows}
+
+${
+  best
+    ? `**Bu örnek setinde en yüksek doğruluk: eşik ${best.threshold} → ${formatPercent(best.metrics.accuracy)}.**`
+    : '**Tarama sonuç üretmedi.**'
+}
+
+## 5. Öneri
+
+${buildRecommendation(args.scoredDefault, args.scoredLiteral, best)}
+
+## 6. Yanlış sınıflandırılan örnekler (A kuralı)
+
+${
+  misses.length === 0
+    ? '_Yok._'
+    : misses
+        .map(
+          (s) =>
+            `- **${s.sample.sampleId} ${s.sample.acronym}** — skor ${s.result.score.toFixed(2)}, tahmin ${s.predicted}, gerçek ${s.actual} (${s.sample.outcome}).\n` +
+            `  Gerekçe: ${s.result.reasons.length ? s.result.reasons.join('; ') : 'tüm kurallar geçildi'}.\n` +
+            `  Not: ${s.sample.notes}`,
+        )
+        .join('\n')
+}
+
+## 7. Beta ortak anketi
+
+- Ankete çıkarılan ortak sayısı: **${args.partnerCount}**, ortak başına **${[...args.coverage.values()].length ? Math.round([...args.coverage.values()].reduce((a, b) => a + b, 0) / Math.max(1, args.partnerCount)) : 0}** örnek.
+- Örnek başına bağımsız görüş: **${[...new Set(args.coverage.values())].sort().join(', ') || '—'}**.
+- Yanıt son tarihi: **${args.deadline}**.
+- Yanıt dosyası: ${args.responsesPath ? `\`${path.relative(REPO_ROOT, args.responsesPath)}\` — ${args.responseCount} yanıt işlendi.` : '_henüz yok._'}
+${
+  args.relabelled.length
+    ? `- Ortak çoğunluğu ile etiketi değişen örnekler: ${args.relabelled.join(', ')}.`
+    : '- Ortak çoğunluğu hiçbir etiketi değiştirmedi.'
+}
+
+## 8. Kabul kriteri karşısında durum
+
+| Kriter | Durum |
+|---|---|
+| 20 örnek seed edildi ve puanlandı | ${args.scoredDefault.length === 20 ? '✅' : '⚠️'} ${args.scoredDefault.length}/20 |
+| Karışıklık matrisi üretiliyor | ✅ |
+| Doğruluk ≥ %85 | ${(mDefault.accuracy ?? 0) >= 0.85 ? '✅' : '❌'} A kuralı ${formatPercent(mDefault.accuracy)} · B kuralı ${formatPercent(mLiteral.accuracy)}${best ? ` · en iyi eşik ${best.threshold} → ${formatPercent(best.metrics.accuracy)}` : ''} |
+| Ortak anketi gönderilmiş | ${args.partnerCount > 0 ? '✅ hazırlandı' : '❌'} |
+
+${
+  args.isFixture
+    ? '> Bu tablodaki doğruluk satırı fixture üzerinden okunmuştur; kabul kriteri gerçek ESR verisiyle tekrar ölçülmeden **kapatılmamalıdır**.'
+    : ''
+}
+`;
+}
+
+// ───────────────────────── main ─────────────────────────
+
+async function main(): Promise<void> {
+  const opts = parseArgs(process.argv.slice(2));
+
+  console.log('🎯 ESR calibration (E11.3)');
+  console.log(`   mode      : ${opts.rollback ? 'ROLLBACK' : opts.apply ? 'APPLY' : 'DRY RUN'}`);
+  console.log(`   samples   : ${path.relative(REPO_ROOT, opts.samples)}`);
+  console.log(`   report    : ${path.relative(REPO_ROOT, opts.report)}`);
+  console.log('');
+
+  if (opts.rollback) {
+    if (!opts.apply) {
+      console.log('   --rollback without --apply does nothing. Re-run with --apply to delete.');
+      return;
+    }
+    await rollback();
+    return;
+  }
+
+  const samples = parseEsrSamples(fs.readFileSync(opts.samples, 'utf8'));
+  const isFixture = isFixtureSampleSet(samples);
+  log('samples', `${samples.length} parsed${isFixture ? ' — CURATED FIXTURE (SAMPLE-* ids)' : ''}`);
+
+  // Partner verdicts, when present, replace the provisional labels before anything is measured.
+  let responses: SurveyResponse[] = [];
+  const relabelled: string[] = [];
+  let effective = samples;
+  if (opts.responses) {
+    responses = parseSurveyResponses(fs.readFileSync(opts.responses, 'utf8'));
+    const provisional = scoreAll(samples, DEFAULT_G0_RULES);
+    const predicted = new Map(provisional.map((s) => [s.sample.sampleId, s.predicted]));
+    const rollups = rollUpVerdicts(responses, predicted);
+    effective = samples.map((sample) => {
+      const rollup = rollups.find((r) => r.sampleId === sample.sampleId);
+      if (!rollup?.majority || rollup.majority === sample.expertLabel) return sample;
+      relabelled.push(`${sample.sampleId} ${sample.expertLabel}→${rollup.majority}`);
+      return { ...sample, expertLabel: rollup.majority, labelSource: 'beta-survey' as const };
+    });
+    log('responses', `${responses.length} verdicts, ${relabelled.length} label(s) changed`);
+  }
+
+  const scoredDefault = scoreAll(effective, DEFAULT_G0_RULES);
+  const scoredLiteral = scoreAll(effective, SPEC_LITERAL_G0_RULES);
+  const mDefault = metrics(toPredictions(scoredDefault));
+  const mLiteral = metrics(toPredictions(scoredLiteral));
+
+  log('score', `rule A (composite ≥ ${DEFAULT_G0_RULES.minScore}): accuracy ${formatPercent(mDefault.accuracy)}`);
+  log('score', `rule B (spec literal, no composite): accuracy ${formatPercent(mLiteral.accuracy)}`);
+
+  const thresholds: number[] = [];
+  for (let t = 40; t <= 90; t += 2) thresholds.push(t);
+  const sweep = sweepThreshold(thresholds, (threshold) =>
+    toPredictions(scoreAll(effective, { ...DEFAULT_G0_RULES, minScore: threshold })),
+  );
+  const best = bestSweepPoint(sweep);
+  if (best) log('sweep', `best threshold ${best.threshold} → accuracy ${formatPercent(best.metrics.accuracy)}`);
+
+  // Survey — rendered whether or not the database is written, so the programme manager can review
+  // the worksheets before anything is sent.
+  const partners: BetaPartner[] = fs.existsSync(opts.roster)
+    ? parseBetaRoster(fs.readFileSync(opts.roster, 'utf8'))
+    : [];
+  const assignments = assignSamplesToPartners(effective, partners, opts.perPartner).map((assignment) => ({
+    ...assignment,
+    items: assignment.items.map((item) => {
+      const scored = scoredDefault.find((s) => s.sample.sampleId === item.sampleId)!;
+      return { ...item, score: scored.result.score, decision: scored.predicted, reasons: scored.result.reasons };
+    }),
+  }));
+  const coverage = coveragePerSample(assignments);
+
+  if (opts.survey) {
+    if (opts.send) {
+      const placeholders = partners.filter((p) => isPlaceholderEmail(p.contactEmail));
+      if (placeholders.length > 0) {
+        throw new Error(
+          `--send refused: ${placeholders.length} roster address(es) are on a reserved, undeliverable domain ` +
+            `(${placeholders.map((p) => p.contactEmail).join(', ')}). Replace the roster with real partners first.`,
+        );
+      }
+    }
+    fs.mkdirSync(path.join(opts.out, 'survey'), { recursive: true });
+    for (const assignment of assignments) {
+      const email = renderEsrSurveyEmail({
+        locale: assignment.partner.locale,
+        contactName: assignment.partner.contactName,
+        items: assignment.items,
+        surveyUrl: surveyUrlFor(assignment.partner.slug),
+        deadlineLabel: opts.deadline,
+      });
+      const base = path.join(opts.out, 'survey', assignment.partner.slug);
+      fs.writeFileSync(`${base}.html`, email.html, 'utf8');
+      fs.writeFileSync(
+        `${base}.txt`,
+        `Subject: ${email.subject}\nTo: ${assignment.partner.contactName} <${assignment.partner.contactEmail}>\n\n${email.text}\n`,
+        'utf8',
+      );
+      fs.writeFileSync(`${base}.responses.csv`, buildResponseTemplateCsv(assignment), 'utf8');
+
+      if (opts.send) {
+        const apiKey = process.env.RESEND_API_KEY;
+        if (!apiKey) throw new Error('--send requires RESEND_API_KEY in the environment');
+        const { Resend } = await import('resend');
+        const resend = new Resend(apiKey);
+        const { error } = await resend.emails.send({
+          from: process.env.EMAIL_FROM ?? `Fabrika Beta <${BETA_SUPPORT_EMAIL}>`,
+          to: assignment.partner.contactEmail,
+          subject: email.subject,
+          html: email.html,
+          text: email.text,
+        });
+        if (error) throw new Error(`Resend rejected ${assignment.partner.contactEmail}: ${error.message}`);
+        log('survey', `${assignment.partner.contactEmail}: sent (${assignment.items.length} items)`);
+      } else {
+        log(
+          'survey',
+          `${assignment.partner.slug}: rendered ${assignment.items.length} items → survey/${assignment.partner.slug}.html (not sent)`,
+        );
+      }
+    }
+  }
+
+  if (opts.apply) {
+    const before = await countCalibrationRows();
+    await ensureCalibrationTenant();
+    for (const scored of scoredDefault) await seedSample(scored);
+    const after = await countCalibrationRows();
+    log('db', `before: ${JSON.stringify(before)}`);
+    log('db', `after : ${JSON.stringify(after)}`);
+  } else {
+    log('db', 'dry run — nothing written. Re-run with --apply to seed.');
+  }
+
+  const report = buildReport({
+    scoredDefault,
+    scoredLiteral,
+    sweep,
+    isFixture,
+    samplesPath: opts.samples,
+    responsesPath: opts.responses,
+    responseCount: responses.length,
+    relabelled,
+    coverage,
+    partnerCount: assignments.length,
+    deadline: opts.deadline,
+  });
+  fs.mkdirSync(path.dirname(opts.report), { recursive: true });
+  fs.writeFileSync(opts.report, report, 'utf8');
+  log('report', `written → ${path.relative(REPO_ROOT, opts.report)}`);
+
+  fs.mkdirSync(opts.out, { recursive: true });
+  fs.writeFileSync(
+    path.join(opts.out, 'calibration-summary.json'),
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        ruleVersion: RULE_VERSION,
+        isFixture,
+        sampleCount: scoredDefault.length,
+        ruleA: mDefault,
+        ruleB: mLiteral,
+        bestThreshold: best,
+        perSample: scoredDefault.map((s) => ({
+          sampleId: s.sample.sampleId,
+          score: s.result.score,
+          predicted: s.predicted,
+          actual: s.actual,
+          outcome: s.sample.outcome,
+          correct: s.correct,
+          reasons: s.result.reasons,
+        })),
+        surveyCoverage: Object.fromEntries(coverage),
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  );
+  log('report', `written → ${path.relative(REPO_ROOT, path.join(opts.out, 'calibration-summary.json'))}`);
+}
+
+main()
+  .then(() => prisma.$disconnect())
+  .then(() => process.exit(0))
+  .catch(async (err) => {
+    console.error('❌', err instanceof Error ? err.message : err);
+    await prisma.$disconnect().catch(() => {});
+    process.exit(1);
+  });

@@ -1,0 +1,55 @@
+# Fabrika — G0 ↔ ESR calibration sample set (E11.3 / TASK-MTQ2KL3JO4MK2)
+#
+# STATUS: CURATED FIXTURE, not a CORDIS extract. Read this before quoting any number from it.
+#   • `cordisProjectId` values live in the reserved `SAMPLE-*` namespace precisely so they can never
+#     be mistaken for real CORDIS project ids. Nothing here claims to be a specific real project.
+#   • Feature values and ESR outcomes are a *plausible, deliberately mixed* sample built to exercise
+#     the calibration harness — including near-threshold cases the scorer is expected to get wrong.
+#     An accuracy measured on this file validates the HARNESS, not the model's real-world accuracy.
+#   • The real number comes from the beta design partners' own ESRs. Replace this file (or point the
+#     CLI elsewhere) once they land:
+#         pnpm tsx scripts/esr-calibration.ts --samples=/secure/path/real-esrs.csv --apply
+#     `scripts/cordis-import.ts --dataset=HORIZON --limit=…` populates the CordisProject side from
+#     the real CORDIS bulk export when network access is available.
+#
+# PII / confidentiality: ESR scores belong to the applicant. Do NOT commit a real partner's ESR to
+# this file — keep it as docs/BETA_DATA/esr-calibration-samples.local.csv (gitignored) and pass
+# --samples=. This committed file stays a fixture.
+#
+# columns
+#   sampleId            stable key, also the Opportunity id suffix (esr-cal-<sampleId>)
+#   cordisProjectId     SAMPLE-nnnn (reserved) or a real CORDIS project id once replaced
+#   acronym,title       project identity
+#   framework           HORIZON | H2020 | OTHER (Eurostars, CETP, DUT … are OTHER)
+#   topicCode           call topic identifier
+#   coordinatorCountry  ISO-3166-1 alpha-2 of the applicant we scored
+#   orgType             SME|LARGE|UNIVERSITY|RESEARCH|PUBLIC|NGO|CONSULTANCY|CLUSTER|MUNICIPALITY
+#   countryEligible     true|false — hard rule (PROJECT.md:75)
+#   alignment..lumpSumTwoStage   the seven G0 features, each 0–100 (PROJECT.md:81)
+#   baseRatePct         RAW historical success rate in % — hard rule input, also feeds `baseRate`
+#   esrTotal/esrThreshold        Evaluation Summary Report total and the call's threshold (of 15)
+#   outcome             funded | reserve | above_threshold | below | ineligible  ← ground truth
+#   expertLabel         GO | NO_GO — what a human says the gate SHOULD have answered
+#   labelSource         cordis-outcome | beta-survey | expert-review
+#   notes               why this sample is in the set
+sampleId,cordisProjectId,acronym,title,framework,topicCode,coordinatorCountry,orgType,countryEligible,alignment,baseRatePct,coordinatorHistory,researchAndEndUser,networkCentrality,budgetRoleEconomy,lumpSumTwoStage,esrTotal,esrThreshold,outcome,expertLabel,labelSource,notes
+S01,SAMPLE-0001,DISTRENOV,District renovation pilot for a Mediterranean city,HORIZON,HORIZON-CL5-2026-D4-01,TR,SME,true,88,14,60,80,55,75,100,13.5,10,funded,GO,cordis-outcome,Clear GO — strong alignment and a lump-sum topic
+S02,SAMPLE-0002,DIGITWIN,Digital twin for discrete manufacturing SMEs,HORIZON,HORIZON-CL4-2026-TWIN-02,TR,UNIVERSITY,true,84,11,85,90,75,70,0,12.5,10,funded,GO,cordis-outcome,Experienced coordinator carries a mid base rate
+S03,SAMPLE-0003,AGRISENSE,Precision-agriculture sensing network,HORIZON,HORIZON-CL6-2026-FARM2FORK-01,NL,SME,true,92,18,40,85,60,80,100,14.0,10,funded,GO,cordis-outcome,EN-locale control; high base rate topic
+S04,SAMPLE-0004,CULTHER,Cultural heritage resilience observatory,HORIZON,HORIZON-CL2-2026-HERITAGE-03,ES,RESEARCH,true,79,9,75,70,80,65,0,11.0,10,above_threshold,GO,cordis-outcome,HARD CASE — cleared the threshold on a composite score below 70
+S05,SAMPLE-0005,CLIMANEUT,Citizen engagement for a climate-neutral city,OTHER,DUT-2026-CALL-02,TR,MUNICIPALITY,true,86,22,30,95,40,85,100,12.0,10,funded,GO,cordis-outcome,First-time coordinator but an unusually high base rate call
+S06,SAMPLE-0006,SMERAD,SME-led radar component R&D,OTHER,EUROSTARS-2026-01,SE,CONSULTANCY,true,81,25,70,60,50,90,100,13.0,10,funded,GO,cordis-outcome,EN-locale control; Eurostars base rate
+S07,SAMPLE-0007,BATTREC,Battery pack disassembly and recovery line,HORIZON,HORIZON-CL4-2026-CIRC-05,TR,SME,true,76,12,55,75,45,60,0,10.5,10,reserve,GO,cordis-outcome,HARD CASE — reserve list; scored well below the composite threshold
+S08,SAMPLE-0008,GRIDFLEX,Grid flexibility marketplace pilot,HORIZON,HORIZON-CL5-2026-D3-04,TR,CLUSTER,true,90,16,65,88,70,72,100,13.5,10,funded,GO,cordis-outcome,Strongest sample in the set
+S09,SAMPLE-0009,DOCNET,Doctoral network on industrial decarbonisation,HORIZON,HORIZON-MSCA-2026-DN-01,TR,UNIVERSITY,true,83,10,80,85,90,70,0,88.0,80,funded,GO,cordis-outcome,MSCA scores out of 100 — esrTotal/Threshold are call-relative on purpose
+S10,SAMPLE-0010,HEALTHEQ,Equity in primary-care digital pathways,HORIZON,HORIZON-CL1-2026-CARE-02,TR,RESEARCH,true,74,8.5,45,70,50,58,0,10.0,10,above_threshold,GO,cordis-outcome,HARD CASE — exactly on the threshold; base rate barely clears the hard rule
+S11,SAMPLE-0011,SOLIDBAT,Solid-state battery scale-up pilot line,HORIZON,HORIZON-CL5-2026-D2-02,NL,SME,true,87,13,50,82,62,70,100,12.5,10,funded,GO,cordis-outcome,EN-locale control
+S12,SAMPLE-0012,GEOHEAT,Shallow geothermal for district heating,OTHER,CETP-2026-JC-01,TR,SME,true,80,20,35,78,42,76,100,11.5,10,funded,GO,cordis-outcome,Transnational joint call; lump-sum
+S13,SAMPLE-0013,VAGUEAI,General-purpose AI assistant for public services,HORIZON,HORIZON-CL4-2026-HUMAN-01,TR,SME,true,52,7,20,40,25,45,0,7.5,10,below,NO_GO,cordis-outcome,Fails on alignment AND base rate — should be an easy NO_GO
+S14,SAMPLE-0014,HYDROPT,Hydrogen valley feasibility study,HORIZON,HORIZON-CL5-2026-D3-09,TR,SME,true,68,11,30,55,35,50,0,8.5,10,below,NO_GO,cordis-outcome,Alignment just under the 70 hard rule
+S15,SAMPLE-0015,SOCINN,Social innovation lab for rural depopulation,HORIZON,HORIZON-CL2-2026-DEMOCRACY-04,TR,UNIVERSITY,true,71,9,25,60,30,48,0,9.0,10,below,NO_GO,cordis-outcome,HARD CASE for the rule-only reading — clears both hard rules but was rejected
+S16,SAMPLE-0016,QUANTLINK,Quantum key distribution testbed,HORIZON,HORIZON-CL3-2026-CS-01,GB,SME,false,89,15,70,80,65,70,100,,,ineligible,NO_GO,expert-review,Country not eligible for this call — hard rule must catch it before any score
+S17,SAMPLE-0017,SMARTPARK,Smart parking and kerbside management,HORIZON,HORIZON-CL5-2026-D6-03,TR,MUNICIPALITY,true,63,10,15,50,20,40,0,7.0,10,below,NO_GO,cordis-outcome,Weak on every feature
+S18,SAMPLE-0018,SCALEUP,Deep-tech scale-up for photonic sensors,OTHER,EIC-2026-ACCELERATOR-01,TR,SME,true,77,5,40,45,30,50,0,,,below,NO_GO,cordis-outcome,Base rate below the 8% hard rule — the rule is the whole point of this sample
+S19,SAMPLE-0019,NETSUPP,Coordination and support action for a national network,HORIZON,HORIZON-CL5-2026-CSA-02,TR,CONSULTANCY,true,72,26,60,65,55,80,100,9.5,10,below,NO_GO,cordis-outcome,HARD CASE — high base rate CSA flatters the composite; the ESR still said no
+S20,SAMPLE-0020,BIOPACK,Compostable food packaging from agri residue,HORIZON,HORIZON-CL6-2026-CIRCBIO-02,TR,RESEARCH,true,66,12,35,58,38,52,0,8.0,10,below,NO_GO,cordis-outcome,Alignment under the hard rule

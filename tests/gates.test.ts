@@ -33,6 +33,20 @@ vi.mock('../src/lib/db', () => ({
             evaluations: [{ excellence: 2.0, impact: 3.0, implementation: 2.5 }]
           });
         }
+        if (where.id === 'opp-unscored') {
+          return Promise.resolve({
+            id: 'opp-unscored',
+            tenantId: 'tenant-1',
+            title: 'Never scored',
+            stage: 'G0',
+            status: 'ACTIVE',
+            intendedRole: 'partner',
+            g0Score: null,
+            seats: [],
+            proposal: null,
+            evaluations: []
+          });
+        }
         return Promise.resolve(null);
       }),
       update: vi.fn().mockResolvedValue({})
@@ -54,6 +68,14 @@ describe('Gate Evaluation Engine (M5)', () => {
     const result = await evaluateGate('opp-fail', 'G0', 'tenant-1');
     expect(result.passed).toBe(false);
     expect(result.reasons[0]).toContain('below minimum threshold');
+  });
+
+  test('G0 gate says so when the opportunity has never been scored', async () => {
+    // Regression: the old fallback scored an unscored opportunity on a 0-10 scale and compared it
+    // against a 0-100 threshold, reporting "7.5 is below 70" — a number nobody had computed.
+    const result = await evaluateGate('opp-unscored', 'G0', 'tenant-1');
+    expect(result.passed).toBe(false);
+    expect(result.reasons[0]).toContain('has not been calculated');
   });
 
   test('G2 gate fails when seats are still OPEN', async () => {

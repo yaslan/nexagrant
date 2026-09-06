@@ -1,6 +1,5 @@
 import { prisma } from '../db';
-import { DEFAULT_GATE_RULES, DEFAULT_SCORING_WEIGHTS } from '../scoring/defaults';
-import { calculateG0Score } from '../scoring/g0';
+import { DEFAULT_GATE_RULES } from '../scoring/defaults';
 
 export type GateEvaluationResult = {
   passed: boolean;
@@ -42,17 +41,18 @@ export async function evaluateGate(
 
   switch (gateId) {
     case 'G0': {
-      const g0Score = opp.g0Score ?? calculateG0Score({
-        strategicAlignmentScore: 8,
-        technicalCapabilityScore: 8,
-        budgetMatchScore: 7,
-        partnershipPotentialScore: 7
-      }, {
-        strategicAlignment: 0.3,
-        technicalCapability: 0.3,
-        budgetMatch: 0.2,
-        partnershipPotential: 0.2
-      });
+      // `rules.minScore` is on the 0–100 scale of PROJECT.md:81. The previous fallback called
+      // `calculateG0Score`, a 0–10 model, so an unscored opportunity was compared as 7.5 < 70 and
+      // failed with a misleading reason. An opportunity that has never been scored has not failed
+      // the gate on merit — say so, and keep the outcome (no pass) unchanged.
+      if (opp.g0Score === null || opp.g0Score === undefined) {
+        passed = false;
+        reasons.push('G0 score has not been calculated for this opportunity yet');
+        inputs.calculatedG0Score = null;
+        break;
+      }
+
+      const g0Score = opp.g0Score;
       inputs.calculatedG0Score = g0Score;
 
       if (g0Score < rules.minScore) {

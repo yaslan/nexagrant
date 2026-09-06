@@ -1,0 +1,316 @@
+/**
+ * E11.3 — G0 canonical scorer, calibration maths, sample parsing and survey ingest.
+ *
+ * No database: every unit here is a pure function on purpose, so the numbers the calibration report
+ * prints are the same numbers a test can pin.
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { describe, test, expect } from 'vitest';
+
+import { DEFAULT_SCORING_WEIGHTS } from '../src/lib/scoring/defaults';
+import {
+  BASE_RATE_FULL_MARKS_PCT,
+  DEFAULT_G0_RULES,
+  SPEC_LITERAL_G0_RULES,
+  baseRateToScore,
+  decideG0,
+  g0Contributions,
+  scoreG0,
+  weightsTotal,
+  type G0Features,
+} from '../src/lib/scoring/g0-canonical';
+import {
+  bestSweepPoint,
+  confusionMatrix,
+  metrics,
+  sweepThreshold,
+  wilsonInterval,
+  type LabelledPrediction,
+} from '../src/lib/scoring/calibration';
+import { labelForOutcome, parseEsrSamples, isFixtureSampleSet } from '../src/lib/beta/esr-samples';
+import {
+  assignSamplesToPartners,
+  coveragePerSample,
+  parseSurveyResponses,
+  rollUpVerdicts,
+  buildResponseTemplateCsv,
+} from '../src/lib/beta/esr-survey';
+import { parseBetaRoster } from '../src/lib/beta/roster';
+
+const SAMPLES_CSV = path.join(__dirname, '../docs/BETA_DATA/esr-calibration-samples.csv');
+const ROSTER_CSV = path.join(__dirname, '../docs/BETA_DATA/beta-partners.csv');
+
+const flat = (value: number): G0Features => ({
+  alignment: value,
+  baseRate: value,
+  coordinatorHistory: value,
+  researchAndEndUser: value,
+  networkCentrality: value,
+  budgetRoleEconomy: value,
+  lumpSumTwoStage: value,
+});
+
+describe('G0 canonical scorer (PROJECT.md:81)', () => {
+  test('the shipped weights sum to 100', () => {
+    expect(weightsTotal(DEFAULT_SCORING_WEIGHTS)).toBe(100);
+  });
+
+  test('an all-100 feature vector scores 100 and an all-zero one scores 0', () => {
+    expect(scoreG0(flat(100))).toBe(100);
+    expect(scoreG0(flat(0))).toBe(0);
+  });
+
+  test('the composite is the weighted mean of the seven features', () => {
+    const features: G0Features = {
+      alignment: 88,
+      baseRate: 70,
+      coordinatorHistory: 60,
+      researchAndEndUser: 80,
+      networkCentrality: 55,
+      budgetRoleEconomy: 75,
+      lumpSumTwoStage: 100,
+    };
+    // 0.30*88 + 0.15*70 + 0.15*60 + 0.12*80 + 0.10*55 + 0.10*75 + 0.08*100
+    expect(scoreG0(features)).toBeCloseTo(76.5, 6);
+  });
+
+  test('weights that do not sum to 100 are normalised, not clipped', () => {
+    const doubled = Object.fromEntries(
+      Object.entries(DEFAULT_SCORING_WEIGHTS).map(([k, v]) => [k, v * 2]),
+    ) as typeof DEFAULT_SCORING_WEIGHTS;
+    expect(scoreG0(flat(64), doubled)).toBe(scoreG0(flat(64)));
+  });
+
+  test('out-of-range features are clamped instead of blowing the 0–100 scale', () => {
+    expect(scoreG0(flat(500))).toBe(100);
+    expect(scoreG0(flat(-40))).toBe(0);
+  });
+
+  test('contributions sum back to the composite', () => {
+    const features = { ...flat(50), alignment: 91, lumpSumTwoStage: 12 };
+    const total = Object.values(g0Contributions(features)).reduce((a, b) => a + b, 0);
+    expect(total).toBeCloseTo(scoreG0(features), 1);
+  });
+
+  test('base rate reaches full marks at the documented ceiling and never exceeds it', () => {
+    expect(baseRateToScore(0)).toBe(0);
+    expect(baseRateToScore(BASE_RATE_FULL_MARKS_PCT)).toBe(100);
+    expect(baseRateToScore(BASE_RATE_FULL_MARKS_PCT * 2)).toBe(100);
+    expect(baseRateToScore(10)).toBe(50);
+    expect(baseRateToScore(-3)).toBe(0);
+  });
+});
+
+describe('G0 hard rules (PROJECT.md:75)', () => {
+  const strong = { ...flat(90), alignment: 90 };
+
+  test('a strong opportunity in an eligible country passes', () => {
+    const result = decideG0(strong, { baseRatePct: 15, countryEligible: true });
+    expect(result.decision).toBe('GO');
+    expect(result.reasons).toEqual([]);
+  });
+
+  test('an ineligible country fails however good the score is', () => {
+    const result = decideG0(strong, { baseRatePct: 15, countryEligible: false });
+    expect(result.decision).toBe('NO_GO');
+    expect(result.reasons.join(' ')).toContain('country not eligible');
+  });
+
+  test('a base rate under 8% fails', () => {
+    const result = decideG0(strong, { baseRatePct: 7.9, countryEligible: true });
+    expect(result.decision).toBe('NO_GO');
+    expect(result.reasons.join(' ')).toContain('base rate');
+  });
+
+  test('every failing rule is reported, not just the first', () => {
+    const weak = { ...flat(20), alignment: 20 };
+    const result = decideG0(weak, { baseRatePct: 2, countryEligible: false });
+    expect(result.reasons).toHaveLength(4); // composite + alignment + base rate + eligibility
+    expect(result.reasons.join(' ')).toContain('composite score');
+    expect(result.reasons.join(' ')).toContain('alignment');
+    expect(result.reasons.join(' ')).toContain('base rate');
+    expect(result.reasons.join(' ')).toContain('country not eligible');
+  });
+
+  test('the spec-literal rule set drops the composite threshold but keeps the three hard rules', () => {
+    const midScore = { ...flat(30), alignment: 75 };
+    expect(decideG0(midScore, { baseRatePct: 12, countryEligible: true }, DEFAULT_G0_RULES).decision).toBe('NO_GO');
+    expect(decideG0(midScore, { baseRatePct: 12, countryEligible: true }, SPEC_LITERAL_G0_RULES).decision).toBe('GO');
+    expect(decideG0(midScore, { baseRatePct: 4, countryEligible: true }, SPEC_LITERAL_G0_RULES).decision).toBe('NO_GO');
+  });
+});
+
+describe('calibration maths', () => {
+  const predictions: LabelledPrediction[] = [
+    { id: 'a', predicted: 'GO', actual: 'GO', score: 90 },
+    { id: 'b', predicted: 'GO', actual: 'NO_GO', score: 80 },
+    { id: 'c', predicted: 'NO_GO', actual: 'NO_GO', score: 40 },
+    { id: 'd', predicted: 'NO_GO', actual: 'GO', score: 60 },
+  ];
+
+  test('confusion matrix counts each quadrant', () => {
+    expect(confusionMatrix(predictions)).toEqual({
+      truePositive: 1,
+      falsePositive: 1,
+      trueNegative: 1,
+      falseNegative: 1,
+      total: 4,
+    });
+  });
+
+  test('accuracy, precision, recall and F1', () => {
+    const m = metrics(predictions);
+    expect(m.accuracy).toBe(0.5);
+    expect(m.precision).toBe(0.5);
+    expect(m.recall).toBe(0.5);
+    expect(m.f1).toBe(0.5);
+  });
+
+  test('an empty set yields nulls rather than NaN', () => {
+    const m = metrics([]);
+    expect(m.accuracy).toBeNull();
+    expect(m.precision).toBeNull();
+    expect(m.recall).toBeNull();
+  });
+
+  test('the sweep finds the threshold with the best accuracy', () => {
+    const rows = [
+      { id: 'p1', score: 80, actual: 'GO' as const },
+      { id: 'p2', score: 60, actual: 'GO' as const },
+      { id: 'p3', score: 30, actual: 'NO_GO' as const },
+    ];
+    const points = sweepThreshold([70, 55, 20], (threshold) =>
+      rows.map((r) => ({ id: r.id, score: r.score, actual: r.actual, predicted: r.score >= threshold ? 'GO' : 'NO_GO' })),
+    );
+    const best = bestSweepPoint(points);
+    expect(best?.threshold).toBe(55);
+    expect(best?.metrics.accuracy).toBe(1);
+  });
+
+  test('a tie in the sweep breaks toward the stricter threshold', () => {
+    const rows = [{ id: 'p1', score: 80, actual: 'GO' as const }];
+    const points = sweepThreshold([50, 70], (threshold) =>
+      rows.map((r) => ({ id: r.id, score: r.score, actual: r.actual, predicted: r.score >= threshold ? 'GO' : 'NO_GO' })),
+    );
+    expect(bestSweepPoint(points)?.threshold).toBe(70);
+  });
+
+  test('the Wilson interval brackets the point estimate and stays inside [0,1]', () => {
+    const ci = wilsonInterval(18, 20)!;
+    expect(ci.low).toBeGreaterThan(0);
+    expect(ci.low).toBeLessThan(0.9);
+    expect(ci.high).toBeGreaterThan(0.9);
+    expect(ci.high).toBeLessThanOrEqual(1);
+    expect(wilsonInterval(0, 0)).toBeNull();
+  });
+});
+
+describe('sample set', () => {
+  const csv = fs.readFileSync(SAMPLES_CSV, 'utf8');
+
+  test('parses 20 samples and they are all fixture rows', () => {
+    const samples = parseEsrSamples(csv);
+    expect(samples).toHaveLength(20);
+    expect(isFixtureSampleSet(samples)).toBe(true);
+  });
+
+  test('outcomes map to the ground-truth label the way the report claims', () => {
+    expect(labelForOutcome('funded')).toBe('GO');
+    expect(labelForOutcome('reserve')).toBe('GO');
+    expect(labelForOutcome('above_threshold')).toBe('GO');
+    expect(labelForOutcome('below')).toBe('NO_GO');
+    expect(labelForOutcome('ineligible')).toBe('NO_GO');
+  });
+
+  test('a label that silently contradicts its own outcome is rejected', () => {
+    const bad = csv.replace(
+      'below,NO_GO,cordis-outcome,Weak on every feature',
+      'below,GO,cordis-outcome,Weak on every feature',
+    );
+    expect(() => parseEsrSamples(bad)).toThrow(/contradicts outcome/);
+  });
+
+  test('a deliberate human override is allowed when labelSource says so', () => {
+    const overridden = csv.replace(
+      'below,NO_GO,cordis-outcome,Weak on every feature',
+      'below,GO,expert-review,Weak on every feature',
+    );
+    expect(() => parseEsrSamples(overridden)).not.toThrow();
+  });
+
+  test('a duplicate sampleId is rejected', () => {
+    const duped = `${csv}\n${csv.trim().split('\n').at(-1)}`;
+    expect(() => parseEsrSamples(duped)).toThrow(/duplicate sampleId/);
+  });
+
+  test('the committed set is the one the report is generated from and is not all-positive', () => {
+    const samples = parseEsrSamples(csv);
+    const go = samples.filter((s) => s.expertLabel === 'GO').length;
+    expect(go).toBeGreaterThan(0);
+    expect(go).toBeLessThan(samples.length);
+  });
+});
+
+describe('beta survey', () => {
+  const samples = parseEsrSamples(fs.readFileSync(SAMPLES_CSV, 'utf8'));
+  const partners = parseBetaRoster(fs.readFileSync(ROSTER_CSV, 'utf8'));
+
+  test('every sample is reviewed by more than one partner', () => {
+    const assignments = assignSamplesToPartners(samples, partners, 4);
+    const coverage = coveragePerSample(assignments);
+    expect(coverage.size).toBe(samples.length);
+    for (const count of coverage.values()) expect(count).toBeGreaterThanOrEqual(2);
+  });
+
+  test('assignment is deterministic — a re-run gives a partner the same worksheet', () => {
+    const a = assignSamplesToPartners(samples, partners, 4);
+    const b = assignSamplesToPartners(samples, partners, 4);
+    expect(a.map((x) => x.items.map((i) => i.sampleId))).toEqual(b.map((x) => x.items.map((i) => i.sampleId)));
+  });
+
+  test('the response template round-trips through the parser once filled in', () => {
+    const assignment = assignSamplesToPartners(samples, partners, 2)[0]!;
+    const filled = buildResponseTemplateCsv(assignment)
+      .split('\n')
+      .map((line) =>
+        line.startsWith(assignment.partner.slug) ? `${line.replace(/,,,$/, ',true,,')}` : line,
+      )
+      .join('\n');
+    const responses = parseSurveyResponses(filled);
+    expect(responses).toHaveLength(assignment.items.length);
+    expect(responses.every((r) => r.agrees)).toBe(true);
+  });
+
+  test('unanswered rows are skipped rather than counted as agreement', () => {
+    const assignment = assignSamplesToPartners(samples, partners, 3)[0]!;
+    expect(parseSurveyResponses(buildResponseTemplateCsv(assignment))).toHaveLength(0);
+  });
+
+  test('a disagreement without a verdict is rejected', () => {
+    const csv = 'partnerSlug,sampleId,agrees,verdict,comment\np1,S01,false,,no reason given\n';
+    expect(() => parseSurveyResponses(csv)).toThrow(/verdict of GO or NO_GO/);
+  });
+
+  test('agreement votes for whatever the scorer said, disagreement for the partner verdict', () => {
+    const responses = parseSurveyResponses(
+      'partnerSlug,sampleId,agrees,verdict,comment\n' +
+        'p1,S04,true,,looks right\n' +
+        'p2,S04,false,GO,threshold is too strict here\n' +
+        'p3,S04,false,GO,agreed with p2\n',
+    );
+    const rollup = rollUpVerdicts(responses, new Map([['S04', 'NO_GO']]))[0]!;
+    expect(rollup.responses).toBe(3);
+    expect(rollup.noGo).toBe(1);
+    expect(rollup.go).toBe(2);
+    expect(rollup.majority).toBe('GO');
+  });
+
+  test('a tie produces no majority instead of silently picking a side', () => {
+    const responses = parseSurveyResponses(
+      'partnerSlug,sampleId,agrees,verdict,comment\np1,S04,true,,\np2,S04,false,GO,\n',
+    );
+    expect(rollUpVerdicts(responses, new Map([['S04', 'NO_GO']]))[0]!.majority).toBeNull();
+  });
+});
