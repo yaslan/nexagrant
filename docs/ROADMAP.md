@@ -8,7 +8,11 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 - [x] `pnpm create next-app` (App Router, TS strict, Tailwind, ESLint), shadcn/ui, next-intl (tr/en), Prisma + Postgres (docker-compose: postgres16+pgvector, redis, mailpit), Vitest, Playwright, GitHub Actions (lint, typecheck, test, migrate check).
   kısmi: `docker-compose.yml`'de yalnız `postgres-vector` (pgvector/pgvector:pg16) + `fabrika-web` var; **redis ve mailpit servisleri yok**. CI (`.github/workflows/ci.yml`) `prisma validate`+lint+typecheck+test çalıştırıyor ama ayrı bir "migrate check" adımı yok.
 - [ ] `src/lib/env.ts` (zod ile env), `src/lib/logger.ts`, Sentry, PostHog.
-  kısmi: `src/lib/env.ts` (zod) ve `src/lib/logger.ts` var; **Sentry ve PostHog `package.json`'da yok** — kurulmamış.
+  kısmi: `env.ts`/`logger.ts` var. Sentry gerçekten var ama `@sentry/nextjs` SDK'sı ile değil,
+  `src/lib/observability/sentry.ts` içinde elle yazılmış envelope HTTP istemcisiyle (bkz.
+  `[[fabrika-sentry-envelope-without-sdk]]`) — `package.json`'da "sentry" aramak yanıltıyor, dosyayı
+  doğrudan kontrol et. **PostHog ise yalnız bir stub** (`src/lib/analytics.ts` — `console.log`
+  yapıyor, gerçek PostHog SDK/API çağrısı yok) — bu yüzden kutu tam işaretlenmedi.
 - [x] `docs/UI_GUIDE.md`'ye göre tema tokenleri; boş sayfa kabuğu (sol nav, üst çubuk, çalışma alanı seçici).
 - [x] `npx prisma validate` + ilk migration (`prisma/schema.prisma` hazırlandığı ortamda çevrimdışı olduğu için henüz doğrulanmadı; hata çıkarsa şemayı düzelt ve `docs/DATA_MODEL.md`'yi güncelle).
 - Kabul: CI yeşil; `pnpm dev` ile tr/en boş kabuk.
@@ -71,7 +75,10 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 - [ ] `/dashboard`: teklif sayısı, eşik üstü oranı, isabet, kişi-gün/teklif, G0→G2 süresi, açık modül sayısı.
   kısmi: `/dashboard` ekranı ve tüm kartlar var, ama `dashboard/client.tsx` içinde gerçek değer `'0'` geldiğinde kart **sabit rakamlara düşüyor** (`thresholdRate === '0' ? '84.2' : thresholdRate`, `hitRate`→`68.5`, `personDaysPerOpp`→`14.2`, `fundedOpps || 4`) — bu CLAUDE.md §7 "kanıt disiplini" kuralını ihlal ediyor (gösterilen istatistik `Evidence`/`TopicStat`'a değil sabit koda bağlı). Bu satırlar `src/` kapsamında olduğu için bu görevde düzeltilmedi; ayrı bir düzeltme görevi açılmalı.
 - [ ] i18n denetimi (`/i18n-check`), Lighthouse a11y ≥ 90, çerez onayı, veri dışa aktarma/silme uç noktaları, DPA şablonu, gizlilik/şartlar sayfaları (tr/en).
-  kısmi: i18n denetim aracı (`scripts/i18n-check.ts`, `.github/workflows/i18n-check.yml`), veri dışa aktarma/silme uç noktaları (`api/gdpr/export`, `api/gdpr/delete`, `api/user/export*`), DPA şablonu (`(marketing)/compliance/dpa`), gizlilik/şartlar sayfaları (tr/en) doğrulandı; a11y için ayrı a11y düzeltme commit'i var (`a3649ef`) ama **CI'da Lighthouse a11y ≥ 90 eşiğini uygulayan bir adım/iş akışı bulunamadı** (`.github/workflows/ci.yml`'de yok, `axe-core` bağımlılığı yok).
+  kısmi: i18n denetim aracı (`scripts/i18n-check.ts`, `.github/workflows/i18n-check.yml`), veri dışa aktarma/silme uç noktaları (`api/gdpr/export`, `api/gdpr/delete`, `api/user/export*`), DPA şablonu (`(marketing)/compliance/dpa`), gizlilik/şartlar sayfaları (tr/en) doğrulandı; a11y için ayrı düzeltme commit'i (`a3649ef`) ve elle çalıştırılan bir lighthouse ölçüm reçetesi var
+(bkz. `[[fabrika-lighthouse-a11y-two-recurring-defects]]`), ama **CI'da bunu otomatik uygulayan/≥90
+eşiğini kesen bir adım yok** (`.github/workflows/ci.yml`'de lighthouse/axe-core adımı yok) — skor
+regresyonu ancak elle koşulunca yakalanıyor.
 - [x] Marketing sitesi: ana sayfa, fiyatlandırma, "Türkiye'ye açık çağrılar" SEO sayfaları (K1'den) (`src/app/(marketing)`: `calls/[region]`, `pricing`, vb.).
 
 ### E11 · Beta (S8 sonu → 8 hafta)

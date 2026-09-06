@@ -8,11 +8,13 @@
 `git log`, `docs/agent-results/` ve gerçek kod (grep/find ile dosya, model, cron,
 CI adımı varlığı) karşılaştırılarak her E0–E11 kutusu incelendi:
 
-- **Uçtan uca doğrulanan** kutular `[x]` işaretlendi (18 kutu).
+- **Uçtan uca doğrulanan** kutular `[x]` işaretlendi (21 kutu).
 - **Kısmen tamamlanan** kutular `[ ]` bırakıldı ve altına `kısmi: <ne eksik>`
-  notu eklendi (9 kutu) — somut eksikler:
+  notu eklendi (8 kutu) — somut eksikler:
   - `docker-compose.yml`'de redis/mailpit yok, yalnız postgres-vector + web var.
-  - Sentry ve PostHog `package.json`'da hiç yok.
+  - PostHog yalnız bir stub (`src/lib/analytics.ts` — `console.log`, gerçek SDK/API çağrısı yok).
+    (Sentry ise gerçekten var — `@sentry/nextjs` yerine elle yazılmış envelope istemcisi,
+    `src/lib/observability/sentry.ts`; `package.json`'a bakmak yanıltıyordu, düzeltildi.)
   - `TopicMatch` gece hesaplama cron'u yok (model var, iş yok — yalnız bir yorum
     satırında geçiyor: `src/lib/scoring/g0-canonical.ts:29`).
   - T-6 plan şablonu / görev listesi / takvim modeli/ekranı yok (`Task`/`Calendar`
