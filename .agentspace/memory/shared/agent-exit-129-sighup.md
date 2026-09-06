@@ -17,6 +17,10 @@ kill -l 1                                          # -> HUP
 Genel olarak `128+N` = N numaralı sinyal: 130 = SIGINT (Ctrl-C), 137 = SIGKILL, 143 = SIGTERM.
 Bunların hiçbiri kodun/dosyanın hatası değildir; **süreç dışarıdan sonlandırılmıştır.**
 
+Gerçek izin/exec hatası **126** (çalıştırılamadı) ve **127** (komut bulunamadı) ile gelir — 129 ile
+değil. Dolayısıyla "file system permission? `chmod 755`" teşhisi 129 için her zaman yanlıştır;
+iki satırda çürütülür: `ls -ld <dizin>` + `test -w <dizin> && echo WRITABLE`.
+
 ## Fabrika'da en olası tetikleyici
 
 `pnpm dev` ön planda **hiç çıkmaz**, üstelik aynı dizinde ikinci dev sunucusuna izin verilmez
