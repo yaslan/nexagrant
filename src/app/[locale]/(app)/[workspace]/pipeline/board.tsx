@@ -11,7 +11,6 @@ interface KanbanBoardProps {
   opportunities: Opportunity[];
   workspace?: string;
   locale?: string;
-  tenantId?: string;
 }
 
 const GATES: { key: Gate; title: string; subtitle: string; color: string }[] = [
@@ -33,7 +32,6 @@ export default function KanbanBoard({
   opportunities: initialOpps,
   workspace = 'default',
   locale = 'tr',
-  tenantId,
 }: KanbanBoardProps) {
   const [opps, setOpps] = useState<any[]>(initialOpps);
   const [isPending, startTransition] = useTransition();
@@ -106,7 +104,7 @@ export default function KanbanBoard({
 
     startTransition(async () => {
       try {
-        await moveOpportunityStage(oppId, newStage, tenantId);
+        await moveOpportunityStage(oppId, newStage);
         showToast(`Fırsat ${newStage} aşamasına taşındı.`, 'info');
       } catch (err) {
         console.error(err);
@@ -202,7 +200,6 @@ export default function KanbanBoard({
           ownerName: member?.name || 'Ahmet Yılmaz',
           stage: targetStage,
           notes: formData.notes.trim() || undefined,
-          tenantIdParam: tenantId,
         });
 
         if (res.success && res.opportunity) {

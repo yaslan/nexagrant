@@ -2,6 +2,7 @@
 
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { tenantScopeOf, TenantScope } from '@/lib/tenant';
 // @ts-ignore
 import { Gate, OppStatus } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
@@ -14,6 +15,25 @@ import {
   WORKSPACE_MEMBERS
 } from '@/lib/k5-pipeline/pipelineStore';
 
+/**
+ * The tenant of a server action comes from the session and from nowhere else.
+ *
+ * These actions used to accept a `tenantIdParam` sent by the browser and fall
+ * back to `prisma.tenant.findFirst()` when the session had none — either path
+ * lets a caller write into a tenant it was never granted. Returning `null` here
+ * makes the action refuse instead of guessing.
+ */
+async function sessionScope(): Promise<TenantScope | null> {
+  try {
+    return tenantScopeOf((await auth()) as any);
+  } catch (e: any) {
+    console.warn(`[pipeline/actions] session lookup failed: ${e.message}`);
+    return null;
+  }
+}
+
+const NO_TENANT = { success: false as const, error: 'TENANT_SCOPE_REQUIRED' as const };
+
 export async function createOpportunity({
   workspaceSlug,
   title,
@@ -22,8 +42,7 @@ export async function createOpportunity({
   ownerId,
   ownerName,
   stage = 'G0',
-  notes,
-  tenantIdParam
+  notes
 }: {
   workspaceSlug: string;
   title: string;
@@ -33,14 +52,10 @@ export async function createOpportunity({
   ownerName?: string;
   stage?: Gate;
   notes?: string;
-  tenantIdParam?: string;
 }) {
-  let session = null;
-  try {
-    session = await auth();
-  } catch (e) {}
-  let tenantId = (session as any)?.tenantId || tenantIdParam;
-  const userId = session?.user?.id;
+  const scope = await sessionScope();
+  if (!scope) return NO_TENANT;
+  const { tenantId, userId } = scope;
 
   const calculatedScore = Math.floor(Math.random() * 15 + 80);
 
@@ -58,7 +73,7 @@ export async function createOpportunity({
 
   const mockOpp = {
     id: `opp-${Date.now()}`,
-    tenantId: tenantId || 'demo-tenant',
+    tenantId,
     workspaceId: workspaceSlug || 'default',
     title,
     topicId: topicId ? topicId.trim() : null,
@@ -87,25 +102,19 @@ export async function createOpportunity({
   addInMemoryOpportunity(mockOpp);
 
   try {
-    if (!tenantId) {
-      const firstTenant = await prisma.tenant.findFirst();
-      tenantId = firstTenant?.id;
-    }
-
-    let workspace = null;
-    if (tenantId) {
-      workspace = await prisma.workspace.findFirst({
-        where: {
-          tenantId,
-          ...(workspaceSlug && workspaceSlug !== 'default' ? { slug: workspaceSlug } : {})
-        }
-      });
-      if (!workspace) {
-        workspace = await prisma.workspace.findFirst({ where: { tenantId } });
+    // Both lookups carry `tenantId`, so a workspace slug from another tenant
+    // resolves to nothing instead of to that tenant's workspace.
+    let workspace = await prisma.workspace.findFirst({
+      where: {
+        tenantId,
+        ...(workspaceSlug && workspaceSlug !== 'default' ? { slug: workspaceSlug } : {})
       }
+    });
+    if (!workspace) {
+      workspace = await prisma.workspace.findFirst({ where: { tenantId } });
     }
 
-    if (workspace && tenantId) {
+    if (workspace) {
       await prisma.opportunity.create({
         data: {
           tenantId,
@@ -141,16 +150,17 @@ export async function assignOpportunityOwner({
   ownerId: string;
   ownerName: string;
 }) {
-  let session = null;
-  try {
-    session = await auth();
-  } catch (e) {}
+  const scope = await sessionScope();
+  if (!scope) return NO_TENANT;
+  const { tenantId } = scope;
 
-  updateInMemoryOpportunityOwner(opportunityId, ownerId, ownerName);
+  updateInMemoryOpportunityOwner(tenantId, opportunityId, ownerId, ownerName);
 
   try {
-    await prisma.opportunity.update({
-      where: { id: opportunityId },
+    // updateMany + tenantId, not update by id: `update` on a guessable id would
+    // reassign an opportunity belonging to another tenant.
+    await prisma.opportunity.updateMany({
+      where: { id: opportunityId, tenantId },
       data: { ownerId },
     });
   } catch (err: any) {
@@ -176,10 +186,9 @@ export async function addOpportunityNote({
   authorName: string;
   authorAvatar: string;
 }) {
-  let session = null;
-  try {
-    session = await auth();
-  } catch (e) {}
+  const scope = await sessionScope();
+  if (!scope) return NO_TENANT;
+  const { tenantId } = scope;
 
   const nowFormatted = new Date().toLocaleString('tr-TR', {
     day: '2-digit',
@@ -197,7 +206,7 @@ export async function addOpportunityNote({
     createdAt: nowFormatted,
   };
 
-  addInMemoryOpportunityNote(opportunityId, noteObj);
+  addInMemoryOpportunityNote(tenantId, opportunityId, noteObj);
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
@@ -207,21 +216,18 @@ export async function addOpportunityNote({
   return { success: true, note: noteObj };
 }
 
-export async function moveOpportunityStage(opportunityId: string, newStage: Gate, tenantIdParam?: string) {
-  let session = null;
-  try {
-    session = await auth();
-  } catch (e) {}
-  const tenantId = (session as any)?.tenantId || tenantIdParam;
+export async function moveOpportunityStage(opportunityId: string, newStage: Gate) {
+  const scope = await sessionScope();
+  if (!scope) return NO_TENANT;
+  const { tenantId } = scope;
 
-  updateInMemoryOpportunityStage(opportunityId, newStage as any);
+  updateInMemoryOpportunityStage(tenantId, opportunityId, newStage as any);
 
   try {
+    // `tenantId` is always part of the filter — an empty tenant clause here used
+    // to update the row whatever tenant it belonged to.
     await prisma.opportunity.updateMany({
-      where: {
-        id: opportunityId,
-        ...(tenantId ? { tenantId } : {})
-      },
+      where: { id: opportunityId, tenantId },
       data: { stage: newStage }
     });
   } catch (err: any) {
@@ -236,12 +242,9 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
 }
 
 export async function evaluateAndPassGate(opportunityId: string, gate: Gate, inputs: any) {
-  let session = null;
-  try {
-    session = await auth();
-  } catch (e) {}
-  const tenantId = (session as any)?.tenantId;
-  const userId = session?.user?.id;
+  const scope = await sessionScope();
+  if (!scope) return { passed: false, reasons: ['TENANT_SCOPE_REQUIRED'] };
+  const { tenantId, userId } = scope;
 
   const rules = { gate, minScore: 6, mandatoryCriteria: ['conceptNoteReady'] };
   const score = inputs?.score || 7.5;
@@ -252,32 +255,30 @@ export async function evaluateAndPassGate(opportunityId: string, gate: Gate, inp
     const nextGateMap: Record<Gate, Gate> = {
       G0: 'G1', G1: 'G2', G2: 'G3', G3: 'G4', G4: 'G4'
     };
-    updateInMemoryOpportunityStage(opportunityId, nextGateMap[gate] as any);
+    updateInMemoryOpportunityStage(tenantId, opportunityId, nextGateMap[gate] as any);
   }
 
   try {
-    if (tenantId) {
-      await prisma.gateDecision.create({
-        data: {
-          tenantId,
-          opportunityId,
-          gate,
-          passed,
-          inputs: inputs || {},
-          ruleVersion: 'v1.0',
-          decidedBy: userId || 'system'
-        }
-      });
-
-      if (passed) {
-        const nextGateMap: Record<Gate, Gate> = {
-          G0: 'G1', G1: 'G2', G2: 'G3', G3: 'G4', G4: 'G4'
-        };
-        await prisma.opportunity.updateMany({
-          where: { id: opportunityId },
-          data: { stage: nextGateMap[gate] }
-        });
+    await prisma.gateDecision.create({
+      data: {
+        tenantId,
+        opportunityId,
+        gate,
+        passed,
+        inputs: inputs || {},
+        ruleVersion: 'v1.0',
+        decidedBy: userId
       }
+    });
+
+    if (passed) {
+      const nextGateMap: Record<Gate, Gate> = {
+        G0: 'G1', G1: 'G2', G2: 'G3', G3: 'G4', G4: 'G4'
+      };
+      await prisma.opportunity.updateMany({
+        where: { id: opportunityId, tenantId },
+        data: { stage: nextGateMap[gate] }
+      });
     }
   } catch (err: any) {
     console.warn(`[evaluateAndPassGate] DB error: ${err.message}`);

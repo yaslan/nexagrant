@@ -1,5 +1,5 @@
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
 import KanbanBoard from './board';
 import { getInMemoryOpportunities } from '@/lib/k5-pipeline/pipelineStore';
 
@@ -9,25 +9,25 @@ export default async function PipelinePage({
   params: Promise<{ locale: string; workspace: string }>
 }) {
   const { locale, workspace } = await params;
-  const session = await auth();
-  let tenantId = (session as any)?.tenantId;
+  // No `findFirst()` tenant fallback: an empty `where` on Opportunity returns
+  // every tenant's pipeline, and `findFirst()` on Tenant hands the session an
+  // arbitrary one.
+  const { tenantId } = await requireTenantPage(locale);
 
   let dbOpportunities: any[] = [];
   try {
-    if (!tenantId) {
-      const tenant = await prisma.tenant.findFirst();
-      tenantId = tenant?.id;
-    }
-    dbOpportunities = await prisma.opportunity.findMany({
-      where: tenantId ? { tenantId } : {},
-      orderBy: { updatedAt: 'desc' }
-    });
+    dbOpportunities = await withTenant(tenantId, (tx) =>
+      tx.opportunity.findMany({
+        where: { tenantId },
+        orderBy: { updatedAt: 'desc' }
+      })
+    );
   } catch (e: any) {
     console.warn(`[Pipeline] DB query bypassed: ${e.message}`);
   }
 
   // Combine DB opportunities with in-memory store opportunities (deduplicating by ID)
-  const inMemory = getInMemoryOpportunities();
+  const inMemory = getInMemoryOpportunities(tenantId);
   const dbMap = new Map(dbOpportunities.map((o) => [o.id, o]));
   
   for (const item of inMemory) {
@@ -42,11 +42,13 @@ export default async function PipelinePage({
 
   return (
     <div className="max-w-[1600px] mx-auto py-8 px-4">
-      <KanbanBoard 
-        opportunities={opportunities} 
-        workspace={workspace} 
-        locale={locale} 
-        tenantId={tenantId}
+      {/* The board never receives a tenantId: server actions read the tenant
+          from the session, so a value travelling through the client would be
+          an attacker-controlled input, not a fact. */}
+      <KanbanBoard
+        opportunities={opportunities}
+        workspace={workspace}
+        locale={locale}
       />
     </div>
   );

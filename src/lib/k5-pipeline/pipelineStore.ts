@@ -170,50 +170,70 @@ if (!globalStore.inMemoryOpportunities) {
   globalStore.inMemoryOpportunities = [...initialDemoOpportunities];
 }
 
-export function getInMemoryOpportunities(): OpportunityItem[] {
-  return globalStore.inMemoryOpportunities || [...initialDemoOpportunities];
+/**
+ * Every accessor is tenant-scoped on purpose.
+ *
+ * This store is a resilience fallback that survives a database outage, but it is
+ * still tenant data: it is process-global and shared by every request the server
+ * handles. Handing the whole array to a caller (the previous
+ * `getInMemoryOpportunities()` with no arguments) leaked one tenant's pipeline
+ * into another tenant's board, and the mutators keyed on `id` alone let a
+ * guessed id move or annotate a row belonging to someone else. So reads filter
+ * by `tenantId` and writes must match both `id` and `tenantId`.
+ */
+export function getInMemoryOpportunities(tenantId: string): OpportunityItem[] {
+  return store().filter((o) => o.tenantId === tenantId);
 }
 
-export function addInMemoryOpportunity(opp: OpportunityItem): OpportunityItem {
+function store(): OpportunityItem[] {
   if (!globalStore.inMemoryOpportunities) {
     globalStore.inMemoryOpportunities = [...initialDemoOpportunities];
   }
+  return globalStore.inMemoryOpportunities;
+}
+
+/** Finds a row inside the caller's tenant, or undefined — never across tenants. */
+function findScoped(tenantId: string, id: string): OpportunityItem | undefined {
+  return store().find((o) => o.id === id && o.tenantId === tenantId);
+}
+
+export function addInMemoryOpportunity(opp: OpportunityItem): OpportunityItem {
   if (!opp.notesList) opp.notesList = [];
-  globalStore.inMemoryOpportunities.unshift(opp);
+  store().unshift(opp);
   return opp;
 }
 
-export function updateInMemoryOpportunityStage(id: string, stage: 'G0' | 'G1' | 'G2' | 'G3' | 'G4'): boolean {
-  if (!globalStore.inMemoryOpportunities) return false;
-  const found = globalStore.inMemoryOpportunities.find((o) => o.id === id);
-  if (found) {
-    found.stage = stage;
-    found.updatedAt = new Date();
-    return true;
-  }
-  return false;
+export function updateInMemoryOpportunityStage(
+  tenantId: string,
+  id: string,
+  stage: 'G0' | 'G1' | 'G2' | 'G3' | 'G4'
+): boolean {
+  const found = findScoped(tenantId, id);
+  if (!found) return false;
+  found.stage = stage;
+  found.updatedAt = new Date();
+  return true;
 }
 
-export function updateInMemoryOpportunityOwner(id: string, ownerId: string, ownerName: string): boolean {
-  if (!globalStore.inMemoryOpportunities) return false;
-  const found = globalStore.inMemoryOpportunities.find((o) => o.id === id);
-  if (found) {
-    found.ownerId = ownerId;
-    found.ownerName = ownerName;
-    found.updatedAt = new Date();
-    return true;
-  }
-  return false;
+export function updateInMemoryOpportunityOwner(
+  tenantId: string,
+  id: string,
+  ownerId: string,
+  ownerName: string
+): boolean {
+  const found = findScoped(tenantId, id);
+  if (!found) return false;
+  found.ownerId = ownerId;
+  found.ownerName = ownerName;
+  found.updatedAt = new Date();
+  return true;
 }
 
-export function addInMemoryOpportunityNote(id: string, note: NoteEntry): boolean {
-  if (!globalStore.inMemoryOpportunities) return false;
-  const found = globalStore.inMemoryOpportunities.find((o) => o.id === id);
-  if (found) {
-    if (!found.notesList) found.notesList = [];
-    found.notesList.push(note);
-    found.updatedAt = new Date();
-    return true;
-  }
-  return false;
+export function addInMemoryOpportunityNote(tenantId: string, id: string, note: NoteEntry): boolean {
+  const found = findScoped(tenantId, id);
+  if (!found) return false;
+  if (!found.notesList) found.notesList = [];
+  found.notesList.push(note);
+  found.updatedAt = new Date();
+  return true;
 }
