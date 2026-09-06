@@ -33,7 +33,7 @@ export async function generateSeatCandidates(
     take: 100 // limit search space for performance (< 3s target)
   });
   
-  let candidatesMap = new Map<string, MatchCandidate>();
+  const candidatesMap = new Map<string, MatchCandidate>();
 
   const confirmedSeats = opp.seats.filter((s: any) => s.status === 'CONFIRMED' && s.organizationId);
   const confirmedOrgIds = confirmedSeats.map((s: any) => s.organizationId!);

@@ -212,7 +212,7 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
   try {
     session = await auth();
   } catch (e) {}
-  let tenantId = (session as any)?.tenantId || tenantIdParam;
+  const tenantId = (session as any)?.tenantId || tenantIdParam;
 
   updateInMemoryOpportunityStage(opportunityId, newStage as any);
 
@@ -240,7 +240,7 @@ export async function evaluateAndPassGate(opportunityId: string, gate: Gate, inp
   try {
     session = await auth();
   } catch (e) {}
-  let tenantId = (session as any)?.tenantId;
+  const tenantId = (session as any)?.tenantId;
   const userId = session?.user?.id;
 
   const rules = { gate, minScore: 6, mandatoryCriteria: ['conceptNoteReady'] };

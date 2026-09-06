@@ -15,7 +15,7 @@ async function syncPlans() {
     if (plan.id === 'free' || plan.id === 'enterprise') continue; // Free and Enterprise (custom) are not directly synced with fixed prices
 
     // Create or retrieve product
-    let productId = `prod_${plan.id}`;
+    const productId = `prod_${plan.id}`;
     let product;
     try {
       product = await stripe.products.retrieve(productId);
@@ -64,7 +64,7 @@ async function syncAddOns() {
   const addOns = await prisma.addOnCatalog.findMany();
 
   for (const addon of addOns) {
-    let productId = `prod_${addon.sku}`;
+    const productId = `prod_${addon.sku}`;
     let product;
     try {
       product = await stripe.products.retrieve(productId);
