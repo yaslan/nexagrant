@@ -13,6 +13,9 @@ const envSchema = z.object({
   WORKER_TOKEN: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_PUBLISHABLE_KEY: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);
