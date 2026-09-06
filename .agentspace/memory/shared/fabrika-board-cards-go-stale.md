@@ -20,6 +20,26 @@ Fabrika panosundaki kart durumu **güvenilir değil**. 2026-09-06'da "IN PROGRES
 **Why:** bayat karta iş dağıtmak, bitmiş işi ikinci kez yaptırır ve gerçek kalan işi gizler —
 devir sonrası en pahalı karışıklık türü bu.
 
+## Kuyruk otomatik ilerletmesi bitmiş işi yeniden başlatabiliyor
+
+2026-09-06: HANDOVER-1 modül manifest sözleşmesini bitirip commit'ledikten (`5cf3d9f`) SONRA,
+başarısız delegasyonların kuyruğu otomatik ilerletildi ve `TASK-MTQ5YNJNF17OZ`
+("11 manifest sözleşmesi") yeniden bir pane'de başlatıldı — yani **zaten inmiş iş**
+ikinci kez yapılıyordu. Aynı anda `TASK-MTQ5Y8EPT7FDA` (kiracı izolasyonu) ise gerçekten
+yeni alanı (m6/m7/m10) genişletiyordu.
+
+Ders: bir delegasyon "done" raporladıktan sonra `agentspace_delegation_status`'a bak —
+"in-flight · pane AYAKTA" satırları, senin bitirdiğin işi tekrar koşuyor olabilir.
+Yeniden başlatılan kartın kapsamını `git log`'a karşı kontrol et.
+
+## Yineleme kapatma kuralı (panonun kendi konvansiyonu)
+
+Bu panoda yinelenen kart SİLİNMİYOR: başlığa `[YİNELENEN → TASK-XXX]` ön eki konup
+`done` yapılıyor (`[BİRLEŞTİRİLDİ → ...]` ve `[TAŞINDI → ...]` de aynı ailedendir).
+Hayatta kalan kart olarak en ileri durumdakini seç (review > todo > backlog).
+2026-09-06'da Çekirdek'teki 42 kartın 9'u böyle kapatıldı: M6.2/M6.3/M6.4 ikişer,
+E11.2 ve E11.4 üçer, E11.3 iki, E10-seed iki kart.
+
 **How to apply:** Bir kartı ekibe vermeden ÖNCE kapsamını koda karşı doğrula — ilgili script'i
 KOŞ (`check-rls.ts`, `i18n-check.ts`), dosyanın/cron'un varlığına bak, `git log`'a bak.
 Bitmişse iş dağıtma; kartı `review`'a al ve kanıtı yaz. `docs/ROADMAP.md` de aynı şekilde

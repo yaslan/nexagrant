@@ -27,7 +27,9 @@
 - [fabrika-docker-broken-symlink](fabrika-docker-broken-symlink.md) — Bu makinede docker "yok" DEĞİL — /usr/local/bin/docker kırık symlink; çalışan CLI /Applications/Docker.app/Contents/Resources/bin/docker ve postgres-vector ayakta
 - [fabrika-migrations-are-not-prisma-migrate](fabrika-migrations-are-not-prisma-migrate.md) — Fabrika'da prisma/migrations elle yazılmış düz SQL — Prisma Migrate DEĞİL; pnpm db:migrate koşmak veritabanını sıfırlatabilir, doğru yol prisma db execute --file
 
-- [fabrika-prisma-role-type-gotcha](fabrika-prisma-role-type-gotcha.md) — Fabrika'da import type { Role } from '@prisma/client' string union vermiyor ve prisma client repo'da generate edilmiş gelmiyor
 - [fabrika-team-handover-cekirdek](fabrika-team-handover-cekirdek.md) — Fabrika iki ajan takımı arasında devredildi — eski *-0c1f10 takımı ile yeni Çekirdek takımını raporlarda ayırt etme kuralı
 
 - [fabrika-dashboard-hardcoded-kpi-fallback](fabrika-dashboard-hardcoded-kpi-fallback.md) — KPI panosu (dashboard/client.tsx) gerçek metrik 0 geldiğinde sabit demo rakamlarına düşüyor — CLAUDE.md §7 kanıt disiplinini ihlal ediyor
+
+- [fabrika-board-cards-go-stale](fabrika-board-cards-go-stale.md) — Fabrika görev panosundaki in_progress kartlar bitmiş işi gösteriyor olabilir — kartı koda karşı doğrulamadan iş dağıtma
+- [fabrika-k1-upstream-sources](fabrika-k1-upstream-sources.md) — K1'in üç dış kaynağının 2026-09-06'da ölçülmüş gerçek durumu — SEDIA arama yanıtı açıklamayı zaten taşır (topicDetails çağrısı gereksiz), Eurostars portalı 403, TÜBİTAK /en/funding 404
