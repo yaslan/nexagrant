@@ -1,6 +1,6 @@
 import React from 'react';
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { prisma, withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
 import { MarketplaceClient } from './client';
 
 export default async function MarketplacePage({
@@ -9,21 +9,23 @@ export default async function MarketplacePage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
-  const session = await auth();
-  const userId = session?.user?.id || 'demo-user-id';
-  const tenantId = (session as any)?.tenantId || 'demo-tenant-1';
+  const { tenantId, userId } = await requireTenantPage(locale);
 
   let listings: any[] = [];
   let apiKeys: any[] = [];
 
   try {
+    // MarketplaceListing is a cross-tenant catalogue by design, so it stays on
+    // the unscoped client; ApiKey is tenant data and goes through withTenant.
     listings = await prisma.marketplaceListing.findMany({
       orderBy: { createdAt: 'desc' },
     });
-    apiKeys = await prisma.apiKey.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-    });
+    apiKeys = await withTenant(tenantId, (tx) =>
+      tx.apiKey.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      })
+    );
   } catch (e: any) {
     console.warn(`[MarketplacePage] DB query bypassed: ${e.message}`);
   }

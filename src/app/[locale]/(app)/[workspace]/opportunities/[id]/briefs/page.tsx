@@ -1,6 +1,6 @@
 import React from 'react';
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
 import { MeetingBriefsClient } from './client';
 
 export default async function MeetingBriefsPage({
@@ -9,25 +9,28 @@ export default async function MeetingBriefsPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, workspace, id } = await params;
-  const session = await auth();
-  const userId = session?.user?.id || 'demo-user-id';
-  const tenantId = (session?.user as any)?.tenantId || 'demo-tenant-1';
+  const { tenantId, userId } = await requireTenantPage(locale);
 
   let opp: any = null;
   let briefs: any[] = [];
 
   try {
-    opp = await prisma.opportunity.findUnique({
-      where: { id },
-      select: { id: true, title: true, tenantId: true, topicId: true },
-    });
-
-    if (opp) {
-      briefs = await prisma.meetingBrief.findMany({
-        where: { tenantId: opp.tenantId },
-        orderBy: { createdAt: 'desc' },
+    // Both reads are scoped to the session tenant. The briefs query used to key
+    // off `opp.tenantId`, so a cross-tenant opportunity would have pulled that
+    // other tenant's briefs along with it.
+    await withTenant(tenantId, async (tx) => {
+      opp = await tx.opportunity.findFirst({
+        where: { id, tenantId },
+        select: { id: true, title: true, tenantId: true, topicId: true },
       });
-    }
+
+      if (opp) {
+        briefs = await tx.meetingBrief.findMany({
+          where: { tenantId },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+    });
   } catch (e: any) {
     console.warn(`[MeetingBriefsPage] DB query bypassed: ${e.message}`);
   }

@@ -1,6 +1,6 @@
 import React from 'react';
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
 import { ApiKeysClient } from './client';
 
 export default async function ApiKeysSettingsPage({
@@ -9,16 +9,16 @@ export default async function ApiKeysSettingsPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
-  const session = await auth();
-  const userId = session?.user?.id || 'demo-user-id';
-  const tenantId = (session?.user as any)?.tenantId || 'demo-tenant-1';
+  const { tenantId, userId } = await requireTenantPage(locale);
 
   let apiKeys: any[] = [];
   try {
-    apiKeys = await prisma.apiKey.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-    });
+    apiKeys = await withTenant(tenantId, (tx) =>
+      tx.apiKey.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      })
+    );
   } catch (e: any) {
     console.warn(`[ApiKeysSettingsPage] DB query bypass: ${e.message}`);
   }

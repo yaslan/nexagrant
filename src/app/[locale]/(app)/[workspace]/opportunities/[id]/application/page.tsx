@@ -1,6 +1,6 @@
 import React from 'react';
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
 import { ApplicationClient } from './client';
 
 export default async function ApplicationPage({
@@ -9,16 +9,18 @@ export default async function ApplicationPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, workspace, id } = await params;
-  const session = await auth();
-  const userId = session?.user?.id || 'demo-user-id';
-  const tenantId = (session?.user as any)?.tenantId || 'demo-tenant-1';
+  const { tenantId, userId } = await requireTenantPage(locale);
 
   let opp: any = null;
   try {
-    opp = await prisma.opportunity.findUnique({
-      where: { id },
-      include: { applicationParts: true }
-    });
+    // findFirst + tenantId, not findUnique by id: an opportunity id is
+    // guessable, and findUnique would happily return another tenant's row.
+    opp = await withTenant(tenantId, (tx) =>
+      tx.opportunity.findFirst({
+        where: { id, tenantId },
+        include: { applicationParts: true }
+      })
+    );
   } catch (e: any) {
     console.warn(`[ApplicationPage] DB query bypassed: ${e.message}`);
   }

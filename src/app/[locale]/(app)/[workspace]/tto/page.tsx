@@ -1,6 +1,6 @@
 import React from 'react';
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
 import { TtoAcceleratorClient } from './client';
 
 export default async function TtoAcceleratorPage({
@@ -9,16 +9,16 @@ export default async function TtoAcceleratorPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
-  const session = await auth();
-  const userId = session?.user?.id || 'demo-user-id';
-  const tenantId = (session as any)?.tenantId || 'demo-tenant-1';
+  const { tenantId, userId } = await requireTenantPage(locale);
 
   let items: any[] = [];
   try {
-    items = await prisma.ttoPortfolioItem.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-    });
+    items = await withTenant(tenantId, (tx) =>
+      tx.ttoPortfolioItem.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      })
+    );
   } catch (e: any) {
     console.warn(`[TtoAcceleratorPage] DB query bypassed: ${e.message}`);
   }

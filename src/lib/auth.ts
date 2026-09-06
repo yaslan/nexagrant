@@ -4,6 +4,7 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./db";
+import { env } from "./env";
 
 const DEMO_PROFILES: Record<string, { name: string; orgName: string; orgType: any; role: string; isPlatformAdmin?: boolean }> = {
   "admin@yasinaslan.com.tr": {
@@ -215,7 +216,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             image: user.image,
           };
         } catch (error: any) {
+          // Signing in against a fabricated user id is a development
+          // convenience only: in production a database outage must fail the
+          // sign-in, not mint a session for an account nobody verified.
+          if (env.NODE_ENV === "production") {
+            console.error(`[Auth.authorize] sign-in refused, database unavailable: ${error.message}`);
+            return null;
+          }
           console.warn(`[Auth.authorize] DB fallback for demo: ${error.message}`);
+          // Deliberately tenantless — see the jwt callback below.
           return {
             id: email === "admin@yasinaslan.com.tr" ? "superadmin-yasin" : "demo-user-mehmet",
             email,
@@ -262,10 +271,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
           }
         } catch (e: any) {
-          console.warn(`[Auth.jwt] DB query bypassed: ${e.message}`);
-          token.tenantId = "demo-tenant-hq";
-          token.role = "TENANT_OWNER";
-          token.workspaceIds = ["default"];
+          // No fallback tenant here on purpose. A hardcoded demo tenant id
+          // used to be assigned when the membership lookup failed, which
+          // handed the session a tenant it was never granted — and some of
+          // those ids match real rows in the database. A tenantless token is
+          // the safe outcome: the UI routes such a user to the "no workspace"
+          // screen instead of into another tenant's data. See src/lib/tenant.ts.
+          console.warn(`[Auth.jwt] membership lookup failed, session stays tenantless: ${e.message}`);
         }
       }
 
@@ -277,9 +289,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.name = (token.name as string) || session.user.name;
         session.user.email = (token.email as string) || session.user.email;
         session.user.image = (token.image as string) || session.user.image;
-        (session as any).tenantId = token.tenantId || "demo-tenant-hq";
-        (session as any).role = token.role || "TENANT_OWNER";
-        (session as any).workspaceIds = token.workspaceIds || ["default"];
+        // tenantId/role are only ever what the membership lookup produced.
+        // Defaulting them (to a demo tenant, or to TENANT_OWNER) is how a user
+        // with no membership silently gained another tenant's data and an
+        // owner's permissions.
+        (session as any).tenantId = token.tenantId ?? null;
+        (session as any).role = token.role ?? null;
+        (session as any).workspaceIds = token.workspaceIds ?? [];
         (session as any).isPlatformAdmin = token.isPlatformAdmin || token.email === "admin@yasinaslan.com.tr";
       }
       return session;

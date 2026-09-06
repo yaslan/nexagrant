@@ -1,6 +1,6 @@
 import React from 'react';
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
 import { EvaluationsClient } from './client';
 
 export default async function EvaluationsPage({
@@ -9,16 +9,17 @@ export default async function EvaluationsPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, workspace, id } = await params;
-  const session = await auth();
-  const userId = session?.user?.id || 'demo-user-id';
-  const tenantId = (session?.user as any)?.tenantId || 'demo-tenant-1';
+  const { tenantId, userId } = await requireTenantPage(locale);
 
   let opp: any = null;
   try {
-    opp = await prisma.opportunity.findUnique({
-      where: { id },
-      include: { evaluations: { orderBy: { createdAt: 'desc' } } }
-    });
+    // Tenant-scoped lookup: findUnique by a guessable id would cross tenants.
+    opp = await withTenant(tenantId, (tx) =>
+      tx.opportunity.findFirst({
+        where: { id, tenantId },
+        include: { evaluations: { orderBy: { createdAt: 'desc' } } }
+      })
+    );
   } catch (e: any) {
     console.warn(`[EvaluationsPage] DB query bypassed: ${e.message}`);
   }

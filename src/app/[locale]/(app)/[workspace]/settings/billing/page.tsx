@@ -1,8 +1,23 @@
 import React from 'react';
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
 import { getEntitlements } from '@/lib/billing';
 import { BillingClient } from './BillingClient';
+
+/**
+ * The shape this page actually reads off the tenant row.
+ *
+ * `withTenant`'s type parameter has to be supplied explicitly here:
+ * `src/types/prisma-override.d.ts` declares `PrismaClient` with a
+ * `[key: string]: any` index signature, so the delegate call inside the
+ * callback carries no type and `T` collapses to `unknown` (which then narrows
+ * to `{}` after the truthiness check — that was the TS2339 on `.name`).
+ */
+type TenantBillingRow = {
+  id: string;
+  name: string;
+  subscription: { planId: string } | null;
+};
 
 export default async function BillingSettingsPage({
   params
@@ -10,25 +25,25 @@ export default async function BillingSettingsPage({
   params: Promise<{ workspace: string; locale: string }>;
 }) {
   const { workspace, locale } = await params;
-  const session = await auth();
+  // The tenant comes from the session and nowhere else. Re-resolving it from
+  // "the first membership of this user" quietly picked a different tenant than
+  // the one the session was issued for.
+  const { tenantId } = await requireTenantPage(locale);
 
-  let tenantId = (session as any)?.tenantId || 'demo-tenant-1';
   let tenantName = 'FonBridge Demo Kuruluşu';
   let currentPlanId = 'team';
 
-  // Attempt to resolve real tenant from DB
   try {
-    if (session?.user?.id) {
-      const membership = await prisma.membership.findFirst({
-        where: { userId: session.user.id },
-        include: { tenant: { include: { subscription: true } } }
-      });
-      if (membership?.tenant) {
-        tenantId = membership.tenant.id;
-        tenantName = membership.tenant.name;
-        if (membership.tenant.subscription?.planId) {
-          currentPlanId = membership.tenant.subscription.planId;
-        }
+    const tenant = await withTenant<TenantBillingRow | null>(tenantId, (tx) =>
+      tx.tenant.findFirst({
+        where: { id: tenantId },
+        include: { subscription: true }
+      })
+    );
+    if (tenant) {
+      tenantName = tenant.name;
+      if (tenant.subscription?.planId) {
+        currentPlanId = tenant.subscription.planId;
       }
     }
   } catch (err: any) {

@@ -42,18 +42,11 @@ export async function authenticateApiKey(req: Request): Promise<
     });
 
     if (!keyRecord) {
-      // Demo / Fallback validation for test keys (e.g. fp_live_demo...)
-      if (apiKeyHeader.startsWith('fp_live_demo') || apiKeyHeader === 'fp_live_test_key_123') {
-        return {
-          authenticated: true,
-          data: {
-            tenantId: 'demo-tenant-1',
-            apiKeyId: 'key-demo-1',
-            name: 'Demo Integration Key',
-          },
-        };
-      }
-
+      // An unknown key is rejected, full stop. There used to be a prefix
+      // escape hatch here (`fp_live_demo...`) that authenticated the caller as
+      // a fixed tenant — that is an unauthenticated cross-tenant read for
+      // anyone who can guess a prefix, so it is gone. Integration testing uses
+      // a real ApiKey row created by the seed.
       return {
         authenticated: false,
         errorResponse: NextResponse.json(
@@ -84,17 +77,10 @@ export async function authenticateApiKey(req: Request): Promise<
       },
     };
   } catch (e: any) {
-    // If DB is offline, allow demo prefix for resilient prototyping
-    if (apiKeyHeader.startsWith('fp_live_')) {
-      return {
-        authenticated: true,
-        data: {
-          tenantId: 'demo-tenant-1',
-          apiKeyId: 'key-demo-resilient',
-          name: 'Resilient Prototype Key',
-        },
-      };
-    }
+    // A database outage must fail closed. The previous behaviour authenticated
+    // any `fp_live_` prefixed string as a fixed tenant whenever the key lookup
+    // threw, which turned an outage into an open door.
+    console.error(`[authenticateApiKey] key lookup failed: ${e.message}`);
 
     return {
       authenticated: false,
