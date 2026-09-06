@@ -100,3 +100,39 @@ Dördü de kiracıya özeldir (`tenantId` + `tenant_isolation` RLS politikası).
 Migration: `prisma/migrations/add-m6-evaluator-lens.sql` (idempotent, additive) —
 geri alma: `prisma/migrations/add-m6-evaluator-lens.down.sql` (yıkıcı, açık onay ister).
 TypeScript sözleşmeleri: `src/modules/m6/types.ts`.
+
+---
+
+## 9. Beta geri bildirimi (E11.2)
+
+`Feedback` — beta tasarım ortaklarının uygulama içinden gönderdiği kayıtlar. Kiracıya özeldir
+(`tenantId` + `tenant_isolation` RLS politikası); triyaj panelini yalnız platform yöneticisi
+görür ve o okuma bilinçli olarak kiracılar arasıdır (rota admin layout'unda, her server action
+kendi içinde ayrıca rol kontrolü yapar).
+
+| Alan | Not |
+|---|---|
+| `category` | `BUG · FEATURE_REQUEST · UX · PERFORMANCE · DATA_QUALITY · OTHER` |
+| `impact` | Bildirenin beyanı: `BLOCKER · MAJOR · MINOR · IDEA` |
+| `priority` | Yürürlükteki öncelik (`P0…P3`). Triyajda elle değiştirilebilir. |
+| `autoPriority` | Kural motorunun ilk kararı. **Elle değiştirilse de korunur** — ikisi arasındaki fark, kuralların ne kadar isabetli olduğunun ölçüsüdür. |
+| `triageReason` | Hangi kuralın çalıştığı (`impact:BLOCKER`, `keyword:data-loss`, `…>capped:UX`). Kararın denetlenebilirliği. |
+| `status` | `NEW · TRIAGED · IN_PROGRESS · RESOLVED · WONT_FIX` |
+| `screenshotKey` | R2 nesne anahtarı — **hiçbir zaman açık URL değil**; indirme bağlantısı istendiğinde imzalanır. R2 yapılandırılmamışsa `null` kalır, görsel Sentry ekine gider. |
+| `sentryStatus` / `sentryEventId` | `sent · skipped · failed`. Sentry bir yükselticidir, doğruluk kaynağı satırın kendisidir. |
+| `triagedById` / `triagedAt` / `triageNote` | Kimin, ne zaman, hangi gerekçeyle karar verdiği. |
+
+Yazma sırası kasıtlıdır: **önce satır** (triyaj saf fonksiyon, başarısız olamaz), sonra ekran
+görüntüsü, sonra Sentry. Son iki adım "en iyi çaba"dır ve gönderimi düşürmez —
+Sentry ya da R2 kesintisinde ortağın bildirimi yine de kaydedilir
+(`src/lib/feedback/submit.ts`).
+
+İndeksler: `[tenantId, createdAt]` (kiracı listesi), `[tenantId, status, priority]` (açık
+kayıtlar), `[priority, status]` ve `[createdAt]` (platform geneli triyaj panosu ve haftalık özet).
+
+Öncelik kuralları ve yanıt süresi bütçeleri: `src/lib/feedback/triage.ts` —
+`PRIORITY_SLA_HOURS` sabiti `docs/BETA_GUIDE.md § 5` tablosunu izler, ikisi birlikte değişir.
+
+Migration: `prisma/migrations/add-feedback.sql` (idempotent, additive; RLS politikasını da
+kurar) — geri alma: `prisma/migrations/add-feedback.down.sql` (yıkıcı: tabloyu ve içindeki tüm
+bildirimleri siler, önce dışa aktarın).

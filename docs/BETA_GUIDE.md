@@ -152,8 +152,26 @@ program kanalında paylaşılır.
 
 ### Nasıl bildirilir
 
-Her kayıt şunları içermeli: **ne yapmaya çalıştınız · ne oldu · ne beklediniz · ekran görüntüsü/URL.**
-Detaylı triyaj sistemi E11.2 kapsamında kurulur; beta boyunca kayıtlar program kanalından toplanır.
+**Uygulamanın içinden.** Her çalışma alanı sayfasının sağ alt köşesinde **"Geri bildirim"**
+düğmesi var. Açılan formda dört alan istiyoruz:
+
+| Alan | Ne yazmalı |
+|---|---|
+| **Konu** | Hata · Yeni özellik isteği · Kullanım zorluğu · Yavaşlık · Veri hatası · Diğer |
+| **Sizi ne kadar etkiliyor?** | Çalışamıyorum · Ciddi engel · İdare ediyorum · Fikrim var |
+| **Başlık** | Tek cümleyle özet |
+| **Ne oldu?** | Ne yapmaya çalıştınız · ne beklediniz · ne oldu (adım adım) |
+
+Ekran görüntüsü ekleyebilirsiniz (PNG/JPEG/WebP, en fazla 2 MB). Bulunduğunuz sayfanın adresi
+ve tarayıcı bilginiz otomatik eklenir — **ekran görüntüsünde kişisel veri varsa lütfen önce
+üzerini kapatın.**
+
+Gönderdiğiniz anda formda kaydın **önceliğini ve o önceliğe ait yanıt süremizi** görürsünüz.
+Önceliği kurallar atar (aşağıdaki tablo); ekip bunu triyajda değiştirebilir. Kayıt her hâlükârda
+veritabanımıza yazılır — hata izleme servisimiz kapalı olsa bile bildiriminiz kaybolmaz.
+
+E-posta ile de bildirebilirsiniz (§ 8); tek fark, uygulama içi formun sayfa adresini ve
+tarayıcı bilgisini sizin yerinize doldurmasıdır.
 
 ### Öncelik ve hedef süreler (taahhüt değil, hedef)
 
@@ -165,6 +183,15 @@ Detaylı triyaj sistemi E11.2 kapsamında kurulur; beta boyunca kayıtlar progra
 | P3 | İyileştirme / istek | Haftalık sync'te | Yol haritasına alınır |
 
 > **P0 şüphesi varsa beklemeyin**, doğrudan destek kanalından yazın (§ 8).
+
+**Öncelik nasıl atanır.** Seçtiğiniz etki düzeyi başlangıç noktasıdır; metninizde veri kaybı,
+kiracı sızıntısı, giriş yapılamaması ya da tam kesinti anlamına gelen ifadeler geçiyorsa kayıt
+otomatik olarak **P0'a yükseltilir** — "idare ediyorum" demiş olsanız bile. Tersi de geçerli:
+bir *yeni özellik isteği* hiçbir zaman P3'ün üstüne çıkmaz, *kullanım zorluğu* P2'nin üstüne
+çıkmaz. Hangi kuralın çalıştığı kayda yazılır ve triyaj panelinde görünür.
+
+Ekip her Pazartesi sabahı haftalık bir özet alır: gelen kayıt sayısı, önceliklere dağılımı ve
+**yanıt süresi aşılmış açık kayıtlar**. Böylece bir bildirim sessizce beklemede kalmaz.
 
 ---
 

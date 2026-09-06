@@ -169,3 +169,30 @@ export async function deleteUserFilesFromR2(userId: string): Promise<void> {
     console.error(`[R2 Cleanup] Failed to delete files for user ${userId}:`, error);
   }
 }
+
+/**
+ * Uploads raw bytes under an explicit object key. Unlike `uploadFileToR2`, this
+ * really writes to R2 and reports whether it did — callers that must not claim
+ * a stored file (beta feedback screenshots) need the truthful answer, and in a
+ * dev environment with no R2 credentials the honest answer is `false`.
+ */
+export async function putObjectToR2(
+  objectKey: string,
+  data: Buffer,
+  contentType: string
+): Promise<{ stored: boolean; reason?: string }> {
+  if (!s3) return { stored: false, reason: 'r2_not_configured' };
+
+  try {
+    await s3.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: objectKey,
+      Body: data,
+      ContentType: contentType,
+    }));
+    return { stored: true };
+  } catch (err: any) {
+    console.error(`[R2 Storage] Put error for ${objectKey}: ${err.message}`);
+    return { stored: false, reason: 'r2_put_failed' };
+  }
+}

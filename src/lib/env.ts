@@ -12,6 +12,8 @@ const envSchema = z.object({
   WORKER_URL: z.string().optional(),
   WORKER_TOKEN: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
+  /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */
+  FEEDBACK_DIGEST_TO: z.string().email().optional(),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),

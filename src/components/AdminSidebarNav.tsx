@@ -9,7 +9,8 @@ import {
   CreditCard, 
   ScrollText, 
   Sliders, 
-  Newspaper 
+  Newspaper,
+  MessageSquareWarning 
 } from 'lucide-react';
 
 interface AdminSidebarNavProps {
@@ -43,6 +44,14 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       desc: 'Stripe paketleri & limitler',
       icon: CreditCard,
       badge: 'Stripe',
+    },
+    {
+      key: 'feedback',
+      href: `/${locale}/admin/feedback`,
+      label: locale === 'tr' ? 'Geri Bildirim Triyajı' : 'Feedback Triage',
+      desc: 'Beta kayıtları, P0–P3 önceliklendirme',
+      icon: MessageSquareWarning,
+      badge: 'Beta',
     },
     {
       key: 'audit',

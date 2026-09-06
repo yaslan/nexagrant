@@ -1115,3 +1115,76 @@ enum ApprovalStatus {
   EXPIRED
 }
 
+
+// ───────────────────────── E11 Beta · feedback & triage ─────────────────────────
+
+/// In-product feedback from beta design partners. Written first and always: the
+/// Sentry forward is best-effort, so an outage on the observability side must
+/// never lose a partner's report. `autoPriority` keeps what the rule engine
+/// decided even after a human overrides `priority` — that gap is how the rules
+/// get calibrated during the beta.
+model Feedback {
+  id            String            @id @default(cuid())
+  tenantId      String
+  userId        String?
+  workspaceSlug String?
+  category      FeedbackCategory
+  impact        FeedbackImpact    @default(MINOR)
+  priority      FeedbackPriority  @default(P3)
+  autoPriority  FeedbackPriority  @default(P3)
+  status        FeedbackStatus    @default(NEW)
+  title         String
+  body          String
+  triageReason  String?           // which rule fired, for auditability
+  pageUrl       String?
+  userAgent     String?
+  appVersion    String?
+  locale        String            @default("tr")
+  screenshotKey String?           // R2 object key; the URL is signed on demand
+  sentryEventId String?
+  sentryStatus  String?           // sent | skipped | failed
+  triageNote    String?
+  triagedById   String?
+  triagedAt     DateTime?
+  resolvedAt    DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status, priority])
+  @@index([priority, status])
+  @@index([createdAt])
+}
+
+enum FeedbackCategory {
+  BUG
+  FEATURE_REQUEST
+  UX
+  PERFORMANCE
+  DATA_QUALITY
+  OTHER
+}
+
+/// What the reporter says the report costs them. Combined with category and a
+/// keyword scan in src/lib/feedback/triage.ts to produce P0–P3.
+enum FeedbackImpact {
+  BLOCKER   // cannot work at all
+  MAJOR     // major function unusable, no workaround
+  MINOR     // annoying, workaround exists
+  IDEA      // nothing is broken
+}
+
+enum FeedbackPriority {
+  P0
+  P1
+  P2
+  P3
+}
+
+enum FeedbackStatus {
+  NEW
+  TRIAGED
+  IN_PROGRESS
+  RESOLVED
+  WONT_FIX
+}

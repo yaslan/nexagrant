@@ -114,3 +114,31 @@ export const UsersScheduledDeletionOutputSchema = z.object({
 
 export type UsersScheduledDeletionInput = z.infer<typeof UsersScheduledDeletionEventSchema>;
 export type UsersScheduledDeletionOutput = z.infer<typeof UsersScheduledDeletionOutputSchema>;
+
+// E11.2: Weekly beta feedback digest to the platform admin
+export const FeedbackWeeklyDigestEventSchema = z.object({
+  /** Override the window for testing; defaults to the last 7 days. */
+  sinceIso: z.string().datetime().optional(),
+  /** Override the recipient; defaults to FEEDBACK_DIGEST_TO. */
+  to: z.string().email().optional(),
+}).partial();
+
+export const FeedbackWeeklyDigestOutputSchema = z.object({
+  success: z.boolean(),
+  windowStart: z.string(),
+  windowEnd: z.string(),
+  newCount: z.number(),
+  openCount: z.number(),
+  overdueCount: z.number(),
+  byPriority: z.object({
+    P0: z.number(),
+    P1: z.number(),
+    P2: z.number(),
+    P3: z.number(),
+  }),
+  emailStatus: z.enum(['sent', 'skipped', 'failed']),
+  emailReason: z.string().optional(),
+});
+
+export type FeedbackWeeklyDigestInput = z.infer<typeof FeedbackWeeklyDigestEventSchema>;
+export type FeedbackWeeklyDigestOutput = z.infer<typeof FeedbackWeeklyDigestOutputSchema>;

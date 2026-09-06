@@ -18,6 +18,9 @@
     "beta:onboard": "tsx scripts/beta-onboarding.ts",
     "beta:rollback": "tsx scripts/beta-onboarding.ts --rollback",
     "beta:seed-users": "tsx prisma/seed-tenant-workspace.ts",
+    "feedback:seed": "tsx scripts/seed-beta-feedback.ts",
+    "feedback:rollback": "tsx scripts/seed-beta-feedback.ts --rollback",
+    "feedback:digest": "tsx scripts/run-feedback-digest.ts",
     "beta:pricing": "tsx scripts/beta-pricing-survey.ts",
     "beta:esr-calibration": "tsx scripts/esr-calibration.ts",
     "beta:esr-calibration:rollback": "tsx scripts/esr-calibration.ts --rollback"

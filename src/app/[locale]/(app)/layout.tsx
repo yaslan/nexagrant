@@ -7,6 +7,7 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
 import MobileAppHeader from '@/components/MobileAppHeader';
+import FeedbackWidget from '@/components/FeedbackWidget';
 
 export default async function AppLayout({
   children,
@@ -86,6 +87,9 @@ export default async function AppLayout({
           {children}
         </main>
       </div>
+
+      {/* E11.2 — beta feedback entry point, present on every workspace page */}
+      <FeedbackWidget locale={locale} workspace={workspace} />
     </div>
   );
 }

@@ -5,3 +5,4 @@ export { alertsDaily } from './alerts-daily';
 export { creditsMonthlyGrant } from './credits-monthly-grant';
 export { m4WeeklySummary } from './m4-weekly-summary';
 export { usersScheduledDeletion } from './users-scheduled-deletion';
+export { feedbackWeeklyDigest } from './feedback-weekly-digest';

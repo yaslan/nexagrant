@@ -155,6 +155,31 @@ All jobs are defined in `src/lib/inngest/jobs/` directory.
 }
 ```
 
+### 7. `feedback-weekly-digest` — E11.2 beta feedback digest
+
+| | |
+|---|---|
+| **Trigger** | Cron `0 6 * * 1` (Mondays 06:00 UTC) |
+| **Reads** | `Feedback` (last 7 days + everything still open), `Tenant` (names) |
+| **Sends** | One HTML digest to `FEEDBACK_DIGEST_TO` via Resend |
+| **Output** | `{ newCount, openCount, overdueCount, byPriority, emailStatus }` |
+
+The report covers two windows on purpose: reports filed in the last seven days, **and** every
+still-open report past its response-time budget regardless of age — a P0 that has been sitting
+for three weeks is exactly what a weekly digest is for.
+
+Delivery is best effort. With no `RESEND_API_KEY` or no recipient the job still runs and still
+returns the counts, reporting `emailStatus: "skipped"` with a named reason, so the numbers are
+visible in the run history before email is wired up.
+
+The logic lives in `src/lib/feedback/digest-run.ts`, not in the job — so it can be run by hand:
+
+```bash
+pnpm tsx scripts/run-feedback-digest.ts                     # render + print, no send
+pnpm tsx scripts/run-feedback-digest.ts --out digest.html   # render to a file
+pnpm tsx scripts/run-feedback-digest.ts --send --to ops@example.org
+```
+
 ## Testing
 
 ### Run Unit Tests
