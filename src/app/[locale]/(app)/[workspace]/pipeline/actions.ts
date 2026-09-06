@@ -71,9 +71,8 @@ export async function createOpportunity({
     minute: '2-digit'
   });
 
-  const mockOpp = {
+  const newOpp = {
     id: `opp-${Date.now()}`,
-    tenantId,
     workspaceId: workspaceSlug || 'default',
     title,
     topicId: topicId ? topicId.trim() : null,
@@ -99,7 +98,9 @@ export async function createOpportunity({
     updatedAt: new Date()
   };
 
-  addInMemoryOpportunity(mockOpp);
+  // The tenant comes from the session, not from the object: the store signature
+  // takes it separately so this call cannot file the row under another tenant.
+  const storedOpp = addInMemoryOpportunity(tenantId, newOpp);
 
   try {
     // Both lookups carry `tenantId`, so a workspace slug from another tenant
@@ -138,7 +139,7 @@ export async function createOpportunity({
     revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
     revalidatePath('/[locale]/(app)/[workspace]/firsatlar', 'page');
   } catch (e) {}
-  return { success: true, opportunity: mockOpp };
+  return { success: true, opportunity: storedOpp };
 }
 
 export async function assignOpportunityOwner({

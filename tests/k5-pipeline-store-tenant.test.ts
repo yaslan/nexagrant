@@ -21,10 +21,9 @@ const globalStore = globalThis as unknown as {
 const TENANT_A = 'tenant-a';
 const TENANT_B = 'tenant-b';
 
-function opp(id: string, tenantId: string): OpportunityItem {
+function opp(id: string): Omit<OpportunityItem, 'tenantId'> {
   return {
     id,
-    tenantId,
     workspaceId: 'default',
     title: `Opportunity ${id}`,
     stage: 'G0',
@@ -37,11 +36,11 @@ function opp(id: string, tenantId: string): OpportunityItem {
 
 describe('pipeline store tenant scoping', () => {
   beforeEach(() => {
-    // The store lives on globalThis; reset it so each test starts from a
-    // known set of rows rather than from the demo seed.
+    // The store lives on globalThis and is shared across tests in the file;
+    // reset it so each test starts from a known set of rows.
     globalStore.inMemoryOpportunities = [];
-    addInMemoryOpportunity(opp('opp-a', TENANT_A));
-    addInMemoryOpportunity(opp('opp-b', TENANT_B));
+    addInMemoryOpportunity(TENANT_A, opp('opp-a'));
+    addInMemoryOpportunity(TENANT_B, opp('opp-b'));
   });
 
   it('returns only the rows of the tenant that asked', () => {
@@ -76,5 +75,28 @@ describe('pipeline store tenant scoping', () => {
     };
     expect(addInMemoryOpportunityNote(TENANT_A, 'opp-b', note)).toBe(false);
     expect(getInMemoryOpportunities(TENANT_B)[0]?.notesList).toEqual([]);
+  });
+
+  it('starts empty rather than shipping demo rows into product code', async () => {
+    // Fresh module state: no fixture is planted by the store itself, so a tenant
+    // that never wrote anything sees an empty board instead of invented rows.
+    globalStore.inMemoryOpportunities = undefined;
+    const mod = await import('../src/lib/k5-pipeline/pipelineStore');
+    expect(mod.getInMemoryOpportunities('demo-tenant')).toEqual([]);
+  });
+
+  it('files a write under the caller’s tenant, not one carried in the payload', () => {
+    const smuggled = { ...opp('opp-smuggled'), tenantId: TENANT_B } as Omit<
+      OpportunityItem,
+      'tenantId'
+    >;
+    const written = addInMemoryOpportunity(TENANT_A, smuggled);
+
+    expect(written.tenantId).toBe(TENANT_A);
+    expect(getInMemoryOpportunities(TENANT_B).map((o) => o.id)).toEqual(['opp-b']);
+  });
+
+  it('refuses a write with no tenant', () => {
+    expect(() => addInMemoryOpportunity('', opp('opp-orphan'))).toThrow(/tenantId/);
   });
 });
