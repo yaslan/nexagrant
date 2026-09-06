@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { 
   Award, 
   Bot, 
@@ -41,9 +42,13 @@ export function EvaluationsClient({
   opportunityTitle,
   evaluations: initialEvaluations,
 }: EvaluationsClientProps) {
+  const t = useTranslations('m6');
   const [evaluations, setEvaluations] = useState<EvaluationItem[]>(initialEvaluations);
   const [activeTab, setActiveTab] = useState<'evaluations' | 'rea' | 'calibration'>('evaluations');
   const [isAiLoading, setIsAiLoading] = useState(false);
+  // The M6 actions now throw on a failed save instead of logging and returning
+  // normally, so the page has to be able to tell the user something went wrong.
+  const [actionError, setActionError] = useState<string | null>(null);
   const [isInnovationAction, setIsInnovationAction] = useState(false);
 
   // Human evaluation form state
@@ -78,6 +83,7 @@ export function EvaluationsClient({
 
   const handleRunAiEvaluation = async () => {
     setIsAiLoading(true);
+    setActionError(null);
     try {
       // The action reads the tenant and user from the session; the browser
       // no longer names either.
@@ -97,7 +103,7 @@ export function EvaluationsClient({
       };
       setEvaluations((prev) => [newEval, ...prev]);
     } catch (e) {
-      console.error('AI Evaluation error:', e);
+      setActionError(e instanceof Error ? e.message : t('errors.aiFailed'));
     } finally {
       setIsAiLoading(false);
     }
@@ -106,6 +112,7 @@ export function EvaluationsClient({
   const handleSaveHumanEvaluation = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingHuman(true);
+    setActionError(null);
     try {
       const exc = parseFloat(humanExcellence);
       const imp = parseFloat(humanImpact);
@@ -138,7 +145,7 @@ export function EvaluationsClient({
       setHumanWeaknesses('');
       setHumanStrengths('');
     } catch (err) {
-      console.error('Save Human Evaluation error:', err);
+      setActionError(err instanceof Error ? err.message : t('errors.saveFailed'));
     } finally {
       setIsSubmittingHuman(false);
     }
@@ -149,14 +156,19 @@ export function EvaluationsClient({
     if (!selectedEvalForCalibration) return;
 
     const actual = parseFloat(actualEsrScore);
-    const res = await calibrateESR(selectedEvalForCalibration, actual);
+    setActionError(null);
+    try {
+      const res = await calibrateESR(selectedEvalForCalibration, actual);
 
-    setCalibrationResult(res.calibration);
-    setEvaluations((prev) =>
-      prev.map((ev) =>
-        ev.id === selectedEvalForCalibration ? { ...ev, calibration: res.calibration } : ev
-      )
-    );
+      setCalibrationResult(res.calibration);
+      setEvaluations((prev) =>
+        prev.map((ev) =>
+          ev.id === selectedEvalForCalibration ? { ...ev, calibration: res.calibration } : ev
+        )
+      );
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t('errors.calibrationFailed'));
+    }
   };
 
   // Compute G3 Gate Eligibility
@@ -188,6 +200,17 @@ export function EvaluationsClient({
 
   return (
     <div className="space-y-6">
+      {actionError && (
+        <div
+          role="alert"
+          data-testid="m6-action-error"
+          className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800 flex items-start gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>{actionError}</span>
+        </div>
+      )}
+
       {/* ──────────────────────── HEADER BANNER ──────────────────────── */}
       <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-xl border border-slate-800 relative overflow-hidden">
         <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -199,7 +222,7 @@ export function EvaluationsClient({
               <span>Modül 6 — Evaluator Lens</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-white">
-              Resmî EU Ön Değerlendirme & Hakem Simülasyonu
+              İç Ön Değerlendirme &amp; Hakem Simülasyonu
             </h1>
             <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl">
               Fırsat: <strong className="text-slate-200">{opportunityTitle}</strong>

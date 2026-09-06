@@ -410,17 +410,44 @@
     "notePlaceholder": "Kararın gerekçesi"
   },
   "m6": {
+    "internalPreAssessment": "İç ön değerlendirme",
+    "internalPreAssessmentBody": "Bu puanlar şirket içi kalite kontrol içindir; resmî Komisyon değerlendirmesi yerine geçmez.",
+    "criteria": {
+      "Innovation": "Yenilikçilik",
+      "Feasibility": "Uygulanabilirlik",
+      "Impact": "Etki",
+      "Communication": "İletişim"
+    },
     "form": {
       "title": "Değerlendirici Paneli Puanlaması",
       "submit": "Puanları Gönder",
-      "close": "Kapat"
+      "submitting": "Gönderiliyor…",
+      "close": "Kapat",
+      "weight": "ağırlık",
+      "panelAverage": "Panel Ortalaması",
+      "invalidInput": "Puanlar geçersiz. Her ölçüt 1 ile 5 arasında tam sayı olmalıdır.",
+      "saveFailed": "Değerlendirme kaydedilemedi. Lütfen tekrar deneyin."
     },
     "dashboard": {
       "title": "Panel Değerlendirmesi Panosu",
-      "proposalId": "Teklif",
+      "reviewers": "Hakem (tamamlanan/toplam)",
       "panelScore": "Panel Puanı",
       "esrScore": "ESR Puanı",
-      "delta": "Fark"
+      "delta": "Fark",
+      "consensus": "Uzlaşı",
+      "consensusOutcome": {
+        "solid": "Güçlü",
+        "divergent": "Ayrışık"
+      },
+      "loading": "Yükleniyor…",
+      "empty": "Bu teklif için henüz panel değerlendirmesi yok.",
+      "loadFailed": "Panel puanları yüklenemedi.",
+      "retry": "Tekrar dene"
+    },
+    "errors": {
+      "aiFailed": "YZ ön değerlendirmesi tamamlanamadı; hiçbir puan kaydedilmedi.",
+      "saveFailed": "Değerlendirme kaydedilemedi. Lütfen tekrar deneyin.",
+      "calibrationFailed": "ESR kalibrasyonu kaydedilemedi."
     }
   },
   "calls_region": {

@@ -410,17 +410,44 @@
     "notePlaceholder": "Why this call was made"
   },
   "m6": {
+    "internalPreAssessment": "Internal pre-assessment",
+    "internalPreAssessmentBody": "These scores are an internal quality check; they do not replace the official Commission evaluation.",
+    "criteria": {
+      "Innovation": "Innovation",
+      "Feasibility": "Feasibility",
+      "Impact": "Impact",
+      "Communication": "Communication"
+    },
     "form": {
       "title": "Evaluator Panel Scoring",
       "submit": "Submit Scores",
-      "close": "Close"
+      "submitting": "Submitting…",
+      "close": "Close",
+      "weight": "weight",
+      "panelAverage": "Panel Average",
+      "invalidInput": "The scores are invalid. Each criterion must be a whole number from 1 to 5.",
+      "saveFailed": "The evaluation could not be saved. Please try again."
     },
     "dashboard": {
       "title": "Panel Evaluation Dashboard",
-      "proposalId": "Proposal",
+      "reviewers": "Reviewers (done/total)",
       "panelScore": "Panel Score",
       "esrScore": "ESR Score",
-      "delta": "Difference"
+      "delta": "Difference",
+      "consensus": "Consensus",
+      "consensusOutcome": {
+        "solid": "Solid",
+        "divergent": "Divergent"
+      },
+      "loading": "Loading…",
+      "empty": "No panel evaluation for this proposal yet.",
+      "loadFailed": "Panel scores could not be loaded.",
+      "retry": "Retry"
+    },
+    "errors": {
+      "aiFailed": "The AI pre-assessment did not complete; no score was recorded.",
+      "saveFailed": "The evaluation could not be saved. Please try again.",
+      "calibrationFailed": "The ESR calibration could not be saved."
     }
   },
   "calls_region": {

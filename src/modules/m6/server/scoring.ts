@@ -11,6 +11,49 @@
 import { PrismaClient } from '@prisma/client';
 import { ScoreValue } from '../types';
 
+/**
+ * The client shape `withTenant()` hands its callback: a PrismaClient without the
+ * connection/transaction methods. Every query below takes this rather than a bare
+ * `PrismaClient` so it can only be called from inside a tenant-scoped transaction
+ * (CLAUDE.md §1) — a plain `prisma` still satisfies it structurally.
+ */
+export type TenantScopedDb = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+/** An ESR panel total is scored out of 15 (3 criteria x 5.0). */
+export const ESR_TOTAL_MAX = 15;
+export const PANEL_SCALE_MIN = 1;
+export const PANEL_SCALE_MAX = 5;
+
+/**
+ * Map an official ESR total (0..15) onto the 1..5 panel scale so the two can be
+ * compared on one axis: 0 -> 1, 15 -> 5.
+ *
+ * This lived inline in three places (`compareWithEsr`, `getPanelScoresForProposal`,
+ * `getCalibrationMatrix`). Three copies of one conversion is three chances for the
+ * dashboard and the calibration report to disagree about the same proposal, so the
+ * formula now exists once.
+ */
+export function esrTotalToPanelScale(total: number, maxTotal: number = ESR_TOTAL_MAX): number | null {
+  if (!Number.isFinite(total) || maxTotal <= 0) return null;
+  const clamped = Math.min(Math.max(total, 0), maxTotal);
+  return (clamped / maxTotal) * (PANEL_SCALE_MAX - PANEL_SCALE_MIN) + PANEL_SCALE_MIN;
+}
+
+/**
+ * Read the ESR total out of `Proposal.esrScores` (free-form JSON) and put it on the
+ * panel scale. Returns null when the proposal has no recorded official score — the UI
+ * must render that as "not scored yet", never as a zero.
+ */
+export function esrScoreFromProposal(esrScores: unknown): number | null {
+  if (!esrScores || typeof esrScores !== 'object') return null;
+  const total = (esrScores as Record<string, unknown>).total;
+  if (typeof total !== 'number') return null;
+  return esrTotalToPanelScale(total);
+}
+
 export interface ReviewerScores {
   reviewerId: string;
   scores: Record<string, ScoreValue>; // criterionId -> score
@@ -157,15 +200,7 @@ export function compareWithEsr(
   panelScore: number,
   esrScores: unknown,
 ): EsrComparisonResult {
-  let esrScore: number | null = null;
-
-  if (esrScores && typeof esrScores === 'object' && 'total' in esrScores) {
-    const total = (esrScores as Record<string, unknown>).total;
-    if (typeof total === 'number') {
-      // Normalize ESR (typically 0–15) to 1–5 scale
-      esrScore = (total / 15) * 4 + 1; // maps 0→1, 15→5
-    }
-  }
+  const esrScore = esrScoreFromProposal(esrScores);
 
   let deltaAbsolute: number | null = null;
   let deltaPercent: number | null = null;
@@ -197,11 +232,11 @@ export function compareWithEsr(
  * Used for dashboard and calibration reporting.
  */
 export async function getPanelScoresForProposal(
-  prisma: PrismaClient,
+  db: TenantScopedDb,
   tenantId: string,
   proposalId: string,
 ): Promise<PanelScoreQueryResult[]> {
-  const evaluations = await prisma.evaluation.findMany({
+  const evaluations = await db.evaluation.findMany({
     where: {
       tenantId,
       proposalId,
@@ -209,18 +244,26 @@ export async function getPanelScoresForProposal(
     },
     include: {
       proposal: { select: { esrScores: true } },
-      reviewers: { select: { id: true, status: true } },
+      reviewers: {
+        select: { id: true, status: true, scores: { select: { score: true, criterionId: true } } },
+      },
     },
+    orderBy: { createdAt: 'desc' },
   });
 
   return evaluations.map((eval_: typeof evaluations[0]) => {
     const completed = eval_.reviewers.filter((r: typeof eval_.reviewers[0]) => r.status === 'completed').length;
 
-    const esrScores = eval_.proposal?.esrScores as Record<string, unknown> | null;
-    let esrScore: number | null = null;
-    if (esrScores?.total && typeof esrScores.total === 'number') {
-      esrScore = (esrScores.total / 15) * 4 + 1;
-    }
+    // Consensus is derived from the stored marks rather than reported as null: the
+    // dashboard column exists to tell an owner whether the panel actually agreed.
+    const reviewerScores: ReviewerScores[] = eval_.reviewers
+      .map((r: typeof eval_.reviewers[0]) => ({
+        reviewerId: r.id,
+        scores: Object.fromEntries(
+          r.scores.map((s: typeof r.scores[0]) => [s.criterionId, s.score as ScoreValue]),
+        ) as Record<string, ScoreValue>,
+      }))
+      .filter((r: ReviewerScores) => Object.keys(r.scores).length > 0);
 
     return {
       evaluationId: eval_.id,
@@ -228,8 +271,9 @@ export async function getPanelScoresForProposal(
       reviewerCount: eval_.reviewers.length,
       completedReviewerCount: completed,
       panelScore: eval_.avgScore ?? null,
-      esrScore,
-      consensusOutcome: null, // Would need to query scores to recalculate
+      esrScore: esrScoreFromProposal(eval_.proposal?.esrScores),
+      consensusOutcome:
+        reviewerScores.length > 0 ? calculateConsensusOutcome(reviewerScores).outcome : null,
     };
   });
 }
@@ -239,12 +283,12 @@ export async function getPanelScoresForProposal(
  * Called after a reviewer submits their scores.
  */
 export async function updateEvaluationScore(
-  prisma: PrismaClient | Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>,
+  db: TenantScopedDb,
   evaluationId: string,
   tenantId: string,
 ): Promise<void> {
   // Fetch all submitted scores for this evaluation
-  const scores = await prisma.score.findMany({
+  const scores = await db.score.findMany({
     where: { reviewer: { evaluationId, tenantId } },
     include: {
       reviewer: { select: { id: true } },
@@ -279,7 +323,7 @@ export async function updateEvaluationScore(
   const result = calculatePanelScore(reviewerScoresArray, criterionWeights);
 
   // Persist back to evaluation
-  await prisma.evaluation.update({
+  await db.evaluation.update({
     where: { id: evaluationId },
     data: {
       avgScore: result.panelAverage,
@@ -293,7 +337,7 @@ export async function updateEvaluationScore(
  * Used to assess calibration of the M6 panel against official scoring.
  */
 export async function getCalibrationMatrix(
-  prisma: PrismaClient,
+  db: TenantScopedDb,
   tenantId: string,
 ): Promise<Array<{
   evaluationId: string;
@@ -302,7 +346,7 @@ export async function getCalibrationMatrix(
   deltaAbsolute: number;
   deltaPercent: number;
 }>> {
-  const evaluations = await prisma.evaluation.findMany({
+  const evaluations = await db.evaluation.findMany({
     where: {
       tenantId,
       readerType: 'PANEL',
@@ -323,12 +367,9 @@ export async function getCalibrationMatrix(
   for (const eval_ of evaluations) {
     if (!eval_.avgScore || !eval_.proposal?.esrScores) continue;
 
-    const esrScores = eval_.proposal.esrScores as Record<string, unknown>;
-    const esrTotal = esrScores.total as number;
+    const esrScore = esrScoreFromProposal(eval_.proposal.esrScores);
+    if (esrScore === null) continue;
 
-    if (!esrTotal) continue;
-
-    const esrScore = (esrTotal / 15) * 4 + 1;
     const deltaAbsolute = esrScore - eval_.avgScore;
     const deltaPercent = (deltaAbsolute / esrScore) * 100;
 

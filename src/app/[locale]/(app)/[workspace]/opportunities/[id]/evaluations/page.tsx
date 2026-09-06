@@ -1,68 +1,91 @@
 import React from 'react';
+import { notFound } from 'next/navigation';
+
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
+
 import { EvaluationsClient } from './client';
 
+/**
+ * Shape of the tenant-scoped read below. `withTenant`'s generic cannot be inferred from
+ * the Prisma client shape this repo ships (src/types/prisma-override.d.ts), so it is
+ * supplied explicitly rather than falling back to `any`.
+ */
+type EvaluationRow = {
+  id: string;
+  readerType: string;
+  excellence: number;
+  impact: number;
+  implementation: number;
+  weaknesses: unknown;
+  calibration: number | null;
+  createdAt: Date;
+};
+
+type OpportunityWithEvaluations = {
+  id: string;
+  title: string;
+  evaluations: EvaluationRow[];
+};
+
+/**
+ * M6 Evaluator Lens — evaluations for one opportunity.
+ *
+ * There is no demo fallback here. The previous version answered a DB miss with a
+ * hard-coded opportunity carrying invented scores (4.5 / 4.2 / 3.8) and invented
+ * strengths and weaknesses, rendered exactly like a real assessment. CLAUDE.md §7 ties
+ * every number shown to a record; an unseeded or unreachable database is a reason to
+ * show nothing, never a reason to show made-up marks about someone's proposal.
+ */
 export default async function EvaluationsPage({
-  params
+  params,
 }: {
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
-  const { locale, workspace, id } = await params;
+  const { locale, id } = await params;
   const { tenantId } = await requireTenantPage(locale);
 
-  let opp: any = null;
-  try {
-    // Tenant-scoped lookup: findUnique by a guessable id would cross tenants.
-    opp = await withTenant(tenantId, (tx) =>
-      tx.opportunity.findFirst({
-        where: { id, tenantId },
-        include: { evaluations: { orderBy: { createdAt: 'desc' } } }
-      })
-    );
-  } catch (e: any) {
-    console.warn(`[EvaluationsPage] DB query bypassed: ${e.message}`);
-  }
-
-  // Fallback demo opportunity if DB is unseeded/offline
-  if (!opp) {
-    opp = {
-      id,
-      tenantId,
-      title: 'HORIZON-CL5-2026-D3-01: Zero-Emission Transport Systems & Battery Tech',
-      evaluations: [
-        {
-          id: 'ev-ai-1',
-          readerType: 'AI',
-          excellence: 4.5,
-          impact: 4.2,
-          implementation: 3.8,
-          weaknesses: {
-            strengths: [
-              'Clear TRL progression roadmap from TRL 4 to TRL 7',
-              'Strong multi-disciplinary consortium with leading EU research institutes'
-            ],
-            weaknesses: [
-              'Risk mitigation matrix lacks specific contingency measures for TRL scale-up.',
-              'Budget allocation for dissemination activities is under-justified in Work Package 5.'
-            ],
-            recommendations: [
-              'Detail quantifiable KPIs for exploitation in section 2.2',
-              'Add backup partner roles for critical WP3 deliverables'
-            ]
+  // Tenant-scoped lookup: findUnique by a guessable id would cross tenants.
+  const opp = await withTenant<OpportunityWithEvaluations | null>(tenantId, (tx) =>
+    tx.opportunity.findFirst({
+      where: { id, tenantId },
+      select: {
+        id: true,
+        title: true,
+        evaluations: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            readerType: true,
+            excellence: true,
+            impact: true,
+            implementation: true,
+            weaknesses: true,
+            calibration: true,
+            createdAt: true,
           },
-          createdAt: new Date().toISOString(),
         },
-      ],
-    };
-  }
+      },
+    }),
+  );
+
+  if (!opp) notFound();
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <EvaluationsClient
         opportunityId={opp.id}
         opportunityTitle={opp.title}
-        evaluations={opp.evaluations || []}
+        evaluations={opp.evaluations.map((e: EvaluationRow) => ({
+          id: e.id,
+          readerType: e.readerType === 'AI' ? 'AI' : 'HUMAN',
+          excellence: e.excellence,
+          impact: e.impact,
+          implementation: e.implementation,
+          weaknesses: e.weaknesses,
+          calibration: e.calibration,
+          createdAt: e.createdAt.toISOString(),
+        }))}
       />
     </div>
   );
