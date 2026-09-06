@@ -5,26 +5,27 @@ ajan takımından diğerine devredildiği için (bkz.
 `.agentspace/memory/shared/fabrika-team-handover-cekirdek.md`) kök klasörde iki
 farklı dönemin raporları bir arada bulunuyordu; bu dosya o karışıklığı çözer.
 
-## Soneke göre takım ayrımı
+## Takım ayrımı — dosya adına değil, rapor içeriğine göre
 
-- **`-0c1f10` sonekli dosyalar** (ör. `TASK-MTPZC55KNA4FU-defne-0c1f10.md`) →
-  **eski ajan takımına** ait. Hepsi `archive-team-0c1f10/` altına taşındı.
-  Bir raporun ekran görüntüsü klasörü **yalnızca** `-0c1f10` sonekli bir
-  rapordan referans alınıyorsa o klasör de arşive taşındı
-  (`TASK-MTQ3DLVLT42VF-screenshots`, `E10.1-E11.1-retry-screenshots`).
-- **Sonek taşımayan dosyalar** kök klasörde kaldı. Bunların bir kısmı
-  Çekirdek takımının bilinen ajan adlarını taşıyor: `geli-tirici`,
-  `blok-zincir-dse`, `blok-zincir-lead`, `blockzincir-pm`,
-  `customer-support`, `blog-yazar`, `ex-en`.
+İlk taramada yalnız `-0c1f10` soneki mekanik ölçüt olarak kullanılmıştı, ama
+kökte kalan `cora`/`derin`/`defne`/`sora`/`product`-adlı dosyaların **içeriği**
+okununca (her raporun kendi "Ajan:" satırı, ya da agent-memory dizinindeki
+karşılığı) bunların da eski takıma ait olduğu doğrulandı — sonek dosya adında
+görünmese de. Kanıt: `.agentspace/memory/agents/blok-zincir-lead/agentspace-cross-team-delegation-grant.md`
+şunu ölçüyor: *"Fabrika uzmanları (cora/defne/sora/derin) cekirdek takımında
+değil"*. Ayrıca `TASK-MTQ3DZS6W6DFC-product.md` dosya adında "product" yazsa
+da içeriği `Ajan: Sora (sora-0c1f10)` diyor; `TASK-MTPZC55KNA4FU-cora.md`
+içeriği `Yürüten ajan: derin-0c1f10` diyor. Yani **dosya adı takımı garanti
+etmiyor** — bu tür bir karışıklıkla tekrar karşılaşırsan içeriği oku.
 
-**Açık nokta:** Kökte ayrıca sonek taşımayan `cora`, `derin`, `defne-retry`
-adlı dosyalar da var (ör. `TASK-MTPVAYDFKQ187-cora.md`,
-`TASK-MTPZEESJPKGCY-derin.md`, `TASK-MTQ3DLVLT42VF-defne-retry.md`). Bu adlar
-eski takımın da kullandığı adlarla aynı, ama sonek taşımadıkları için devir
-talimatının harfine göre kökte bırakıldı. Bunların Çekirdek takımının aynı
-kişiler tarafından (soneksiz) devam ettirilen işler mi, yoksa eski takımın
-sonek eklenmeden önceki ilk raporları mı olduğu doğrulanmadı — taşımadan önce
-sahibiyle teyit edin.
+- **`archive-team-0c1f10/`** → eski takıma (cora/defne/sora/derin, hangi
+  isimle/sonekle imzalanmış olursa olsun) ait TÜM raporlar + onlara özel
+  ekran görüntüsü klasörleri + `PLAN-E10-FINAL-20-E11-M6.md` (eski takıma iş
+  dağıtan planlama dokümanı).
+- **Kök klasör** → yalnız içeriği Çekirdek takımının bilinen ajan adlarıyla
+  imzalı raporlar kaldı: `geli-tirici`, `blok-zincir-dse`, `blok-zincir-lead`
+  (+ henüz rapor üretmemiş `blockzincir-pm`, `customer-support`,
+  `blog-yazar`, `ex-en`).
 
 ## Tekilleştirme
 
