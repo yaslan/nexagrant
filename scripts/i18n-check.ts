@@ -22,12 +22,15 @@ interface AuditReport {
 }
 
 // Recursively extract all keys from nested objects (dot-notation)
-function flattenKeys(obj: any, prefix = ''): string[] {
+function flattenKeys(
+  obj: Record<string, unknown>,
+  prefix = ''
+): string[] {
   const keys: string[] = [];
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key;
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      keys.push(...flattenKeys(value, fullKey));
+      keys.push(...flattenKeys(value as Record<string, unknown>, fullKey));
     } else {
       keys.push(fullKey);
     }
@@ -51,7 +54,7 @@ function findFiles(dir: string, extensions: string[] = ['.ts', '.tsx']): string[
           files.push(fullPath);
         }
       }
-    } catch (err) {
+    } catch {
       // silently ignore read errors
     }
   }

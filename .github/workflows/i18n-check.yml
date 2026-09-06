@@ -1,0 +1,108 @@
+name: i18n Translation Check
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'messages/**'
+      - 'scripts/i18n-check.ts'
+      - 'package.json'
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'src/**'
+      - 'messages/**'
+      - 'scripts/i18n-check.ts'
+      - 'package.json'
+
+jobs:
+  i18n-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 11.25.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run i18n audit
+        id: audit
+        run: pnpm i18n:check
+        continue-on-error: true
+
+      - name: Comment PR on i18n gaps
+        if: github.event_name == 'pull_request' && steps.audit.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { exec } = require('child_process');
+            const { promisify } = require('util');
+            const execAsync = promisify(exec);
+
+            try {
+              const { stdout } = await execAsync('pnpm i18n:check');
+              const lines = stdout.split('\n');
+
+              // Extract the JSON from stdout
+              const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+              if (!jsonMatch) {
+                console.log('No JSON found in output');
+                return;
+              }
+
+              const report = JSON.parse(jsonMatch[0]);
+              const { summary } = report;
+
+              let comment = '## 🌐 i18n Translation Audit\n\n';
+
+              if (summary.missingInBoth.length > 0) {
+                comment += `### ❌ Missing in BOTH languages (${summary.missingInBoth.length})\n`;
+                comment += summary.missingInBoth.map(k => `- \`${k}\``).join('\n');
+                comment += '\n\n';
+              }
+
+              if (summary.missingInTurkish.length > 0) {
+                comment += `### ⚠️  Missing in Turkish (${summary.missingInTurkish.length})\n`;
+                comment += summary.missingInTurkish.map(k => `- \`${k}\``).join('\n');
+                comment += '\n\n';
+              }
+
+              if (summary.missingInEnglish.length > 0) {
+                comment += `### ⚠️  Missing in English (${summary.missingInEnglish.length})\n`;
+                comment += summary.missingInEnglish.map(k => `- \`${k}\``).join('\n');
+                comment += '\n\n';
+              }
+
+              if (summary.missingInBoth.length === 0 &&
+                  summary.missingInTurkish.length === 0 &&
+                  summary.missingInEnglish.length === 0) {
+                comment += '✅ All translation keys are present in both languages!\n';
+              }
+
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.error('Failed to post comment:', error);
+            }
+
+      - name: Fail if gaps found
+        if: steps.audit.outcome == 'failure'
+        run: exit 1

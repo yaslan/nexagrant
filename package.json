@@ -13,7 +13,8 @@
     "db:migrate": "prisma migrate dev",
     "db:rls": "psql -f prisma/rls.sql",
     "db:seed": "tsx prisma/seed.ts",
-    "rls:check": "tsx scripts/check-rls.ts"
+    "rls:check": "tsx scripts/check-rls.ts",
+    "i18n:check": "tsx scripts/i18n-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

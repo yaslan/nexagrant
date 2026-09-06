@@ -1,7 +1,43 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from 'next-intl/plugin';
+import { execSync } from 'child_process';
 
 const withNextIntl = createNextIntlPlugin();
+
+// Pre-build i18n check: warn if translation gaps exist
+function checkI18n() {
+  try {
+    console.log('\n🌐 Checking i18n translations...');
+    const output = execSync('tsx scripts/i18n-check.ts', { encoding: 'utf-8' });
+    const lines = output.split('\n');
+    // Extract JSON from output
+    const jsonMatch = output.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const report = JSON.parse(jsonMatch[0]);
+      const { summary } = report;
+      if (summary.missingInBoth.length > 0) {
+        console.warn(
+          `⚠️  i18n gaps found:\n` +
+          `   Missing in BOTH: ${summary.missingInBoth.length}\n` +
+          `   Build will proceed but fix these before shipping.`
+        );
+      } else if (summary.missingInTurkish.length > 0 || summary.missingInEnglish.length > 0) {
+        console.warn(
+          `⚠️  Partial translation gaps:\n` +
+          `   Missing in Turkish: ${summary.missingInTurkish.length}\n` +
+          `   Missing in English: ${summary.missingInEnglish.length}`
+        );
+      } else {
+        console.log('✅ All translations complete!');
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️  Could not run i18n check:', error instanceof Error ? error.message : String(error));
+    // Don't block build on check failure
+  }
+}
+
+checkI18n();
 
 const nextConfig: NextConfig = {
   output: 'standalone',

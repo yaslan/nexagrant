@@ -6,3 +6,5 @@
 [17:32:46] REPORT: dlg-1788704892303-1 (0/1 alt-görev ok — eksik/başarısız var)
 [17:41:23] FAIL: TASK-3 (cora: pane exited (code 129) ve beklenen çıktı yok: scripts/check-rls.ts working, all RLS policies in place, GitHub Actions workflow passing, local tenant isolation verified)
 [17:41:23] REPORT: dlg-1788705154738-1 (0/1 alt-görev ok — eksik/başarısız var)
+[18:35:04] FAIL: TASK-3 (cora: pane exited (code 129) ve beklenen çıktı yok: scripts/check-rls.ts working, all RLS policies in place, GitHub Actions workflow passing, local tenant isolation verified)
+[18:35:04] REPORT: dlg-1788705671868-1 (0/1 alt-görev ok — eksik/başarısız var)
