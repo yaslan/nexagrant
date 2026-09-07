@@ -44,3 +44,10 @@
 - [fabrika-dashboard-outcome-case-mismatch](fabrika-dashboard-outcome-case-mismatch.md) — Fabrika dashboard başarı oranını %0 gösteriyor — kod ABOVE_THRESHOLD arıyor, DB above_threshold tutuyor (ölçüldü 2026-09-07)
 - [fabrika-i18n-dead-catalog-trap](fabrika-i18n-dead-catalog-trap.md) — Bir modül JSON i18n katalog dosyası src/locales/<lang>/<mod>.json altına yazılırsa next-intl onu hiç okumaz — DoD "i18n tamam" iddiası doğru olsa bile UI hard-coded kalır
 - [fabrika-m6-disclaimer-surfaces](fabrika-m6-disclaimer-surfaces.md) — Evaluator Lens (M6) skoru gösteren beş yüzey ve her birinin "iç ön değerlendirme" etiketini nereden aldığı — yeni copy icat etme, m6.internalPreAssessment anahtarlarını kullan
+
+- [fabrika-dev-server-stale-prisma-client](fabrika-dev-server-stale-prisma-client.md) — Fabrika'da uzun süredir ayakta olan dev sunucusu şema değişikliğinden sonra BAYAT Prisma istemcisi taşır — özellik sessizce çalışmaz, "Unknown field" hatası yutulur; sunucuyu öldürmeden ayırt etme yöntemi
+- [fabrika-no-sentry-systemalert-decision](fabrika-no-sentry-systemalert-decision.md) — Patron kararı 2026-09-07 — Fabrika'da Sentry KULLANILMAYACAK; hata/geri bildirim izleme kendi SystemAlert tablosu + /admin/alerts ekranı üzerinden yürüyor
+- [fabrika-workspace-url-segment-is-decorative](fabrika-workspace-url-segment-is-decorative.md) — Fabrika'da /{locale}/{workspace}/... yolundaki workspace segmenti kiracıyı BELİRLEMEZ — tenant yalnız oturumdan gelir; URL'e herhangi bir slug yazılabilir, izolasyon testini URL üzerinden kurma
+
+- [fabrika-done-reports-can-be-wrong](fabrika-done-reports-can-be-wrong.md) — Fabrika'da worker "bitti + DoD 5/5" raporu verdiği halde özellik hiç çalışmayabiliyor — M9.2 örneği (2026-09-07): brief hiç kaydedilmiyordu, i18n iddiası yalandı
+- [fabrika-module-state-not-enforced](fabrika-module-state-not-enforced.md) — ModuleState (OFF/DEV/PILOT/ON) hiçbir route'ta kontrol edilmiyor — checkModuleAccess/requireModule hiç çağrılmıyor, sistemik ve M9'a özgü değil
