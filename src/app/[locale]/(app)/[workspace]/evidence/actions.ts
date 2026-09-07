@@ -12,6 +12,7 @@ import {
 import { extractEvidenceMetadata } from '@/lib/evidence-ai';
 import { calculateEvidenceHealthScore, HealthScoreResult, MinimalEvidenceItem } from '@/lib/evidence-health';
 import { errorMessage } from '@/lib/errors';
+import type { EvidenceItemData } from './evidence-client';
 
 /**
  * Retrieves all Evidence items for active tenant
@@ -20,12 +21,12 @@ export async function getEvidenceItemsAction(categoryFilter?: string) {
   const { tenantId } = await requireTenantAction();
 
   try {
-    const whereClause: any = { tenantId };
+    const whereClause: Record<string, unknown> = { tenantId };
     if (categoryFilter && categoryFilter !== 'ALL') {
       whereClause.category = categoryFilter;
     }
 
-    const items = await withTenant<any[]>(tenantId, (tx) =>
+    const items = await withTenant<EvidenceItemData[]>(tenantId, (tx) =>
       tx.evidence.findMany({
         where: whereClause,
         include: {
@@ -93,7 +94,7 @@ export async function confirmEvidenceUploadAction(data: {
     : (extracted.validUntil ? new Date(extracted.validUntil) : null);
 
   try {
-    const evidence = await withTenant<any>(tenantId, async (tx) => {
+    const evidence = await withTenant<EvidenceItemData>(tenantId, async (tx) => {
       const created = await tx.evidence.create({
       data: {
         tenantId,
@@ -205,7 +206,7 @@ export async function createEvidence(formData: FormData) {
   const extracted = await extractEvidenceMetadata(title || fileName || 'Belge', category);
 
   try {
-    const evidence = await withTenant<any>(tenantId, (tx) =>
+    const evidence = await withTenant<EvidenceItemData>(tenantId, (tx) =>
       tx.evidence.create({
       data: {
         tenantId,

@@ -8,6 +8,7 @@ import { ModuleId, PlanTier, ModuleStatus } from '@/lib/modules/types';
 import { canEnable, getDisableCascade } from '@/lib/modules/state-machine';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
+import type { ModuleStateRow } from '@/types/db-rows';
 
 /**
  * Turns a module on or off for the caller's *own* tenant.
@@ -34,7 +35,7 @@ export async function toggleModuleState(
 
   try {
     // Find active modules for the tenant
-    const activeStates: any[] = await withTenant<any[]>(tenantId, (tx) =>
+    const activeStates = await withTenant<ModuleStateRow[]>(tenantId, (tx) =>
       tx.moduleState.findMany({
         where: {
           tenantId,
@@ -43,11 +44,11 @@ export async function toggleModuleState(
       })
     );
     
-    const activeModules = activeStates.map((s: any) => s.moduleId as ModuleId);
+    const activeModules = activeStates.map((s) => s.moduleId as ModuleId);
     
     // Get tenant's current plan
     let currentPlan: PlanTier = 'team';
-    const subscription = await withTenant<any>(tenantId, (tx) =>
+    const subscription = await withTenant<{ planId: string } | null>(tenantId, (tx) =>
       tx.subscription.findFirst({
         where: { tenantId },
         include: { addOns: true }

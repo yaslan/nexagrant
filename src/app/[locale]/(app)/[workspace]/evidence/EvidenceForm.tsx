@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import type { EvidenceItemData } from './evidence-client';
 
 type EvidenceKind = 'stat' | 'prior_result' | 'trl' | 'letter' | 'reference' | 'publication' | 'certificate';
 
 type Props = {
-  onSave: (evidence: any) => void;
+  onSave: (evidence: EvidenceItemData) => void;
   onCancel: () => void;
 };
 

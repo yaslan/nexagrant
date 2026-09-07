@@ -3,6 +3,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { TtoAcceleratorClient } from './client';
 import { errorMessage } from '@/lib/errors';
+import type { TtoItem } from './client';
 
 export default async function TtoAcceleratorPage({
   params,
@@ -12,7 +13,7 @@ export default async function TtoAcceleratorPage({
   const { locale, workspace } = await params;
   const { tenantId } = await requireTenantPage(locale);
 
-  let items: any[] = [];
+  let items: TtoItem[] = [];
   try {
     items = await withTenant(tenantId, (tx) =>
       tx.ttoPortfolioItem.findMany({

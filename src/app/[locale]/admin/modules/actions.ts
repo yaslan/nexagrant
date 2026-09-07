@@ -7,6 +7,7 @@ import { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { revalidatePath } from 'next/cache';
 import { getDisableCascade } from '@/lib/modules/state-machine';
 import { errorMessage } from '@/lib/errors';
+import type { ModuleStateRow } from '@/types/db-rows';
 
 /**
  * Switches a module on or off for *another* tenant, so it is platform-admin
@@ -31,7 +32,7 @@ export async function updateTenantModuleStatus(
   }
 
   // Fetch current active module states for this tenant
-  const currentStates: any[] = await prisma.moduleState.findMany({
+  const currentStates: ModuleStateRow[] = await prisma.moduleState.findMany({
     where: { tenantId }
   });
 

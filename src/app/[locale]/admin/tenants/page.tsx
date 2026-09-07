@@ -8,7 +8,18 @@ export default async function AdminTenantsPage() {
   // fallback rendered two invented organisations (with user counts and PIC
   // numbers) whenever the query failed or returned nothing, so an operator
   // could not tell an empty platform from an unreachable database.
-  let tenants: any[] = [];
+  /** The Tenant columns this table renders, with the two relation counts. */
+  interface TenantRow {
+    id: string;
+    name: string;
+    slug: string;
+    country: string | null;
+    orgType: string;
+    pic: string | null;
+    _count?: { users?: number; workspaces?: number };
+  }
+
+  let tenants: TenantRow[] = [];
   let loadError: string | null = null;
   try {
     tenants = await prisma.tenant.findMany({
@@ -51,7 +62,7 @@ export default async function AdminTenantsPage() {
             </tr>
           </thead>
           <tbody>
-            {tenants.map((t: any) => (
+            {tenants.map((t) => (
               <tr key={t.id} className="border-b last:border-0 hover:bg-ground transition-colors">
                 <td className="p-4 font-bold text-ink">{t.name}</td>
                 <td className="p-4 font-mono text-xs text-muted">{t.slug}</td>

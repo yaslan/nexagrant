@@ -4,6 +4,13 @@ import { requireTenantPage } from '@/lib/tenant';
 import { BillingSsoClient } from './client';
 import { errorMessage } from '@/lib/errors';
 
+/** The Tenant fields the billing header shows, with its subscription. */
+interface TenantWithSubscription {
+  id: string;
+  name: string;
+  subscription: { planId: string; status: string } | null;
+}
+
 export default async function AdminBillingPage({
   params,
 }: {
@@ -15,16 +22,16 @@ export default async function AdminBillingPage({
   // billing. No session tenant → redirect, never a placeholder.
   const { tenantId } = await requireTenantPage(locale);
 
-  let tenant: any = null;
-  let subscription: any = null;
+  let tenant: TenantWithSubscription | null = null;
+  let subscription: TenantWithSubscription['subscription'] = null;
   try {
-    tenant = await withTenant<any>(tenantId, (tx) =>
+    tenant = await withTenant<TenantWithSubscription | null>(tenantId, (tx) =>
       tx.tenant.findFirst({
         where: { id: tenantId },
         include: { subscription: true },
       })
     );
-    subscription = tenant?.subscription;
+    subscription = tenant?.subscription ?? null;
   } catch (e) {
     console.warn(`[AdminBillingPage] DB query failed: ${errorMessage(e)}`);
   }

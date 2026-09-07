@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { createTtoItem, matchTtoItemToCalls, generateIpChecklist } from '@/modules/m7/server/actions';
 
-interface TtoItem {
+export interface TtoItem {
   id: string;
   title: string;
   trl: number;

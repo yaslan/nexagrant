@@ -7,7 +7,17 @@ export default async function AdminAuditPage() {
   // An audit log that invents entries is worse than an empty one: it is the
   // record an operator reaches for when they need to know what actually
   // happened. Real rows or an explicit empty/error state, never placeholders.
-  let auditEvents: any[] = [];
+  /** The AuditEvent columns this table renders. */
+  interface AuditEventRow {
+    id: string;
+    type: string;
+    target: string | null;
+    tenantId: string | null;
+    actorId: string | null;
+    createdAt: Date | string;
+  }
+
+  let auditEvents: AuditEventRow[] = [];
   let loadError: string | null = null;
   try {
     auditEvents = await prisma.auditEvent.findMany({
@@ -44,7 +54,7 @@ export default async function AdminAuditPage() {
             </tr>
           </thead>
           <tbody>
-            {auditEvents.map((ev: any) => (
+            {auditEvents.map((ev) => (
               <tr key={ev.id} className="border-b last:border-0 hover:bg-ground transition-colors">
                 <td className="p-4 font-mono font-bold text-blue-700">{ev.type}</td>
                 <td className="p-4 font-mono text-xs text-ink">{ev.target || '-'}</td>
