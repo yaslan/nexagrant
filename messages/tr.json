@@ -1287,6 +1287,101 @@
       }
     }
   },
+  "adminPlans": {
+    "title": "Paket Yönetimi",
+    "subtitle": "Paketleri, sürümleri ve kiracıya özel atamaları yönetin. Yayınlanan sürüm değişmez; düzenleme yeni sürüm yaratır.",
+    "planCount": "{count} paket",
+    "planListLabel": "Paket listesi",
+    "liveTenants": "{count} aktif kiracı",
+    "saved": "Kaydedildi.",
+    "loadError": "Paketler okunamadı (veritabanına ulaşılamıyor).",
+    "editDraft": "Taslağı düzenle",
+    "createDraft": "Taslak oluştur",
+    "openDraft": "Açık taslağı düzenle",
+    "archivePlan": "Arşivle",
+    "deletePlan": "Sil",
+    "deleteBlocked": "{count} aktif abonelik var — bu paket silinemez, arşivlenir.",
+    "immutable": "Değişmez",
+    "immutableHint": "Yayınlanmış sürüm düzenlenemez. Düzenleme yeni bir taslak sürüm yaratır.",
+    "publishedSummary": "Yayında: v{version} · modüller: {modules}",
+    "status": {
+      "draft": "Taslak",
+      "published": "Yayında",
+      "archived": "Arşiv"
+    },
+    "visibility": {
+      "label": "Görünürlük",
+      "public": "Herkese açık",
+      "private": "Özel (atamalı)",
+      "archived": "Arşiv"
+    },
+    "history": {
+      "title": "Sürüm geçmişi",
+      "version": "Sürüm",
+      "status": "Durum",
+      "monthly": "Aylık",
+      "limits": "Koltuk/Alan/Kredi",
+      "publishedAt": "Yayın tarihi",
+      "actions": "İşlem"
+    },
+    "editor": {
+      "title": "Taslak sürüm v{version}",
+      "hint": "Bu taslak yayınlanana kadar hiçbir kiracıyı etkilemez. Yayınlanan sürüm bir daha düzenlenemez.",
+      "monthlyCents": "Aylık (kuruş)",
+      "yearlyCents": "Yıllık (kuruş)",
+      "currency": "Para birimi",
+      "seats": "Koltuk",
+      "workspaces": "Çalışma alanı",
+      "credits": "Aylık YZ kredisi",
+      "modules": "Paketin verdiği modüller",
+      "features": "Kart maddeleri",
+      "featureGrantHint": "Modül maddesi yalnızca bu sürümün verdiği modüllerden seçilebilir; grant dışı modül yazılamaz.",
+      "addFeature": "Madde ekle",
+      "removeFeature": "Maddeyi kaldır",
+      "kindModule": "Modül",
+      "kindLimit": "Limit",
+      "kindText": "Metin",
+      "pickModule": "Modül seçin",
+      "textTr": "Türkçe metin",
+      "textEn": "İngilizce metin",
+      "save": "Taslağı kaydet",
+      "checkImpact": "Etkiyi hesapla",
+      "publish": "Yayınla",
+      "discard": "Taslağı sil"
+    },
+    "impact": {
+      "mustCheck": "Yayınlamadan önce \"Etkiyi hesapla\" düğmesine basın: kaç aktif kiracının limiti düşüyor gösterilmeden yayın yapılamaz.",
+      "lowers": "Bu değişiklik {count} aktif kiracının limitini düşürüyor.",
+      "loweredNoTenants": "Bu sürüm limitleri düşürüyor, ancak şu anda bu pakette aktif kiracı yok — kimse etkilenmiyor.",
+      "none": "Bu değişiklik hiçbir kiracının limitini düşürmüyor ({count} aktif kiracı).",
+      "dimensions": "Düşen alanlar: {list}",
+      "removedModules": "Kaldırılan modüller: {list}",
+      "dim": {
+        "seats": "koltuk",
+        "workspaces": "çalışma alanı",
+        "aiCreditsMonthly": "YZ kredisi",
+        "modules": "modüller"
+      }
+    },
+    "assign": {
+      "title": "Özel pakete kiracı atama",
+      "hint": "Özel paket listelerde görünmez; yalnızca atanan kiracılar görür.",
+      "tenant": "Kiracı",
+      "pickTenant": "Kiracı seçin",
+      "note": "Not",
+      "submit": "Ata",
+      "remove": "Kaldır",
+      "empty": "Henüz atanmış kiracı yok."
+    },
+    "errors": {
+      "PUBLISHED_VERSION_IMMUTABLE": "Yayınlanmış sürüm değiştirilemez. Önce yeni bir taslak oluşturun.",
+      "IMPACT_NOT_ACKNOWLEDGED": "Yayın reddedildi: etkilenen kiracı sayısı değişmiş. Etkiyi yeniden hesaplayın.",
+      "MODULE_NOT_GRANTED": "Kart maddesi, paketin vermediği bir modülü gösteriyor.",
+      "PLAN_IN_USE": "Aktif aboneliği olan paket silinemez — arşivleyin.",
+      "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekir.",
+      "UNKNOWN": "İşlem başarısız: {detail}"
+    }
+  },
   "calls_turkey": {
     "title": "Türkiye'ye Açık Horizon Çağrıları",
     "meta_description": "Türk kuruluşlarının katılabildiği açık Horizon Europe çağrıları. Son başvuru tarihleri, bütçeler ve başvuru bağlantıları.",

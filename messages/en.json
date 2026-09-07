@@ -1287,6 +1287,101 @@
       }
     }
   },
+  "adminPlans": {
+    "title": "Plan Management",
+    "subtitle": "Manage plans, versions and tenant-specific assignments. A published version is immutable; editing creates a new version.",
+    "planCount": "{count} plans",
+    "planListLabel": "Plan list",
+    "liveTenants": "{count} live tenants",
+    "saved": "Saved.",
+    "loadError": "Plans could not be read (the database is unreachable).",
+    "editDraft": "Edit draft",
+    "createDraft": "Create draft",
+    "openDraft": "Edit open draft",
+    "archivePlan": "Archive",
+    "deletePlan": "Delete",
+    "deleteBlocked": "{count} live subscription(s) — this plan cannot be deleted, only archived.",
+    "immutable": "Immutable",
+    "immutableHint": "A published version cannot be edited. Editing creates a new draft version.",
+    "publishedSummary": "Live: v{version} · modules: {modules}",
+    "status": {
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "visibility": {
+      "label": "Visibility",
+      "public": "Public",
+      "private": "Private (assigned)",
+      "archived": "Archived"
+    },
+    "history": {
+      "title": "Version history",
+      "version": "Version",
+      "status": "Status",
+      "monthly": "Monthly",
+      "limits": "Seats/Spaces/Credits",
+      "publishedAt": "Published",
+      "actions": "Action"
+    },
+    "editor": {
+      "title": "Draft version v{version}",
+      "hint": "This draft affects no tenant until it is published. A published version can never be edited again.",
+      "monthlyCents": "Monthly (minor units)",
+      "yearlyCents": "Yearly (minor units)",
+      "currency": "Currency",
+      "seats": "Seats",
+      "workspaces": "Workspaces",
+      "credits": "Monthly AI credits",
+      "modules": "Modules this plan grants",
+      "features": "Card bullets",
+      "featureGrantHint": "A module bullet may only name a module this version grants; anything outside the grant is refused.",
+      "addFeature": "Add bullet",
+      "removeFeature": "Remove bullet",
+      "kindModule": "Module",
+      "kindLimit": "Limit",
+      "kindText": "Text",
+      "pickModule": "Pick a module",
+      "textTr": "Turkish text",
+      "textEn": "English text",
+      "save": "Save draft",
+      "checkImpact": "Compute impact",
+      "publish": "Publish",
+      "discard": "Discard draft"
+    },
+    "impact": {
+      "mustCheck": "Press \"Compute impact\" before publishing: publishing is not offered until you have been shown how many live tenants lose limits.",
+      "lowers": "This change lowers limits for {count} live tenant(s).",
+      "loweredNoTenants": "This version lowers limits, but no tenant is on this plan right now — nobody is affected.",
+      "none": "This change lowers no tenant's limits ({count} live tenants).",
+      "dimensions": "Lowered: {list}",
+      "removedModules": "Removed modules: {list}",
+      "dim": {
+        "seats": "seats",
+        "workspaces": "workspaces",
+        "aiCreditsMonthly": "AI credits",
+        "modules": "modules"
+      }
+    },
+    "assign": {
+      "title": "Assign tenants to a private plan",
+      "hint": "A private plan is unlisted; only assigned tenants can see it.",
+      "tenant": "Tenant",
+      "pickTenant": "Pick a tenant",
+      "note": "Note",
+      "submit": "Assign",
+      "remove": "Remove",
+      "empty": "No tenant assigned yet."
+    },
+    "errors": {
+      "PUBLISHED_VERSION_IMMUTABLE": "A published version cannot be changed. Create a new draft first.",
+      "IMPACT_NOT_ACKNOWLEDGED": "Publish refused: the affected-tenant count moved. Recompute the impact.",
+      "MODULE_NOT_GRANTED": "A card bullet names a module this plan does not grant.",
+      "PLAN_IN_USE": "A plan with live subscriptions cannot be deleted — archive it.",
+      "PLATFORM_ADMIN_REQUIRED": "This action requires a platform administrator.",
+      "UNKNOWN": "Action failed: {detail}"
+    }
+  },
   "calls_turkey": {
     "title": "Open Horizon Calls for Turkey",
     "meta_description": "Open Horizon Europe calls that Turkish organisations can apply to. Deadlines, budgets and application links.",

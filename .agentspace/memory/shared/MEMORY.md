@@ -118,3 +118,6 @@
 
 - [fabrika-db-mock-invents-the-model](fabrika-db-mock-invents-the-model.md) — vi.mock('@/lib/db') şemayı mock'a tanımlatıyor — hayali bir modeli mock'lamak testi yeşil tutarken uç nokta bozuk kalıyor; rota testinde eşlemeyi alan-alan ve boş/404 durumunu iddia et
 - [fabrika-schema-contract-guard-misses-relation-names](fabrika-schema-contract-guard-misses-relation-names.md) — schema-contract.test.ts repo-sweep'i yalnız phantom MODEL yakalar; phantom RELATION (include:{x:true}) sadece SCANNED listesindeki (M8) dosyalarda kontrol edilir — M2 bu boşlukta kaldı
+
+- [fabrika-api-v1-needs-a-handmade-apikey](fabrika-api-v1-needs-a-handmade-apikey.md) — /api/v1/* rotalarını curl ile doğrulamak için ApiKey satırını elle açman gerekir — seed böyle bir satır üretmiyor, api-auth.ts yorumu üretiyormuş gibi yazıyor
+- [fabrika-undefined-tenantid-drops-the-where-clause](fabrika-undefined-tenantid-drops-the-where-clause.md) — Prisma bir where alanı undefined ise o koşulu HİÇ yazmaz — session?.tenantId doğrudan where'e girerse kiracı filtresi sessizce düşer; typecheck bunu göremez, hâlâ taşıyan 3 sayfa listeli

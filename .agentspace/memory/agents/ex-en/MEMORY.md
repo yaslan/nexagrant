@@ -13,3 +13,5 @@
 - [fabrika-dashboard-threshold-rate-learned](fabrika-dashboard-threshold-rate-learned.md) — KPI panoda "Eşik Üstü Oranı" kartı ekledi (2026-09-07) — MetricValue tasarımı, i18n kaynakları, pano grid düzeni kalıcı bilgi
 
 - [fabrika-ghost-tables-are-mostly-dead-code](fabrika-ghost-tables-are-mostly-dead-code.md) — Dört "hayalet tablo"dan üçü (Participation/Collab/OrgTopicStat) canlı çağrısı olmayan ölü koddu; sınıfın gerçek kalıntısı hayalet ALAN/İLİŞKİ — sso.ts, calls/turkey, api/v1/calls, m2 actions, alerts-daily
+
+- [fabrika-playwright-webserver-probe-blocks-e2e](fabrika-playwright-webserver-probe-blocks-e2e.md) — Fabrika'da pnpm test:e2e hiç koşmuyor — playwright.config hazırlık probu / (=> /tr, 500) üzerinden gidiyor, sunucuyu kapalı sanıp ikincisini açıyor ve EADDRINUSE ile ölüyor; çözüm scratch config
