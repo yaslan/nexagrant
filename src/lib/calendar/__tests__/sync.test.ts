@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { syncMeetingBriefToCalendar } from '../sync';
-import type { PrismaClient } from '@prisma/client';
+import type { TenantTx } from '@/lib/db';
 
 describe('syncMeetingBriefToCalendar', () => {
-  let mockTx: any;
+  let mockTx: Partial<TenantTx>;
 
   beforeEach(() => {
     mockTx = {

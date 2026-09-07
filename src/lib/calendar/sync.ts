@@ -1,14 +1,14 @@
-import { PrismaClient } from '@prisma/client';
 import { CalendarEvent } from './provider';
 import { createCalendarProvider } from './factory';
 import type { CalendarProviderType } from './provider';
+import type { TenantTx } from '@/lib/db';
 
 /**
  * Sync a meeting brief to all enabled calendar providers for a tenant user.
  * On error, creates a SystemAlert instead of throwing.
  */
 export async function syncMeetingBriefToCalendar(
-  tx: PrismaClient,
+  tx: TenantTx,
   tenantId: string,
   userId: string,
   brief: {
@@ -58,20 +58,21 @@ export async function syncMeetingBriefToCalendar(
           lastSyncAt: new Date(),
         },
       });
-    } catch (error: any) {
+    } catch (error) {
       // Sync error: create SystemAlert instead of breaking the flow
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await tx.systemAlert.create({
         data: {
           severity: 'warning',
           type: 'calendar_sync_failed',
-          message: `Calendar sync failed for provider ${conn.provider}: ${error.message}`,
+          message: `Calendar sync failed for provider ${conn.provider}: ${errorMessage}`,
           sourceModule: 'M9',
           metadata: {
             tenantId,
             userId,
             briefId: brief.id,
             provider: conn.provider,
-            error: error.message,
+            error: errorMessage,
           },
         },
       });

@@ -31,7 +31,7 @@ export const prisma: PrismaClient = globalForPrisma.prisma ?? createDbClient(con
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-type TenantTx = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
+export type TenantTx = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
 
 /**
  * Same as {@link withTenant}, but on an explicitly supplied client. Keeps the

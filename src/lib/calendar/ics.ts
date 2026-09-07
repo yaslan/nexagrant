@@ -16,11 +16,11 @@ export class IcsProvider implements CalendarProvider {
     return { externalId };
   }
 
-  async updateEvent(externalId: string, event: CalendarEvent) {
+  async updateEvent(_externalId: string, _event: CalendarEvent) {
     // ICS doesn't track updates; new event replaces old
   }
 
-  async deleteEvent(externalId: string) {
+  async deleteEvent(_externalId: string) {
     // ICS doesn't track deletions
   }
 }
