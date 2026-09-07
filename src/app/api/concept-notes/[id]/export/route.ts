@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
-// @ts-ignore
 import HTMLtoDOCX from 'html-to-docx';
 
 export async function GET(

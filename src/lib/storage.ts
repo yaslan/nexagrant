@@ -64,7 +64,6 @@ export async function getPresignedUploadUrl(
   }
 
   try {
-    // @ts-ignore
     const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
     const command = new PutObjectCommand({
       Bucket: BUCKET,
@@ -92,7 +91,6 @@ export async function getPresignedDownloadUrl(objectKey: string): Promise<string
   }
 
   try {
-    // @ts-ignore
     const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
     const command = new GetObjectCommand({
       Bucket: BUCKET,

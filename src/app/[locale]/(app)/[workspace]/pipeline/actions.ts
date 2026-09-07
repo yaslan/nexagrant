@@ -3,15 +3,15 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { tenantScopeOf, TenantScope } from '@/lib/tenant';
-// @ts-ignore
-import { Gate, OppStatus } from '@prisma/client';
+import { Gate } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import {
   addInMemoryOpportunity,
   updateInMemoryOpportunityStage,
   updateInMemoryOpportunityOwner,
   addInMemoryOpportunityNote,
-  WORKSPACE_MEMBERS
+  WORKSPACE_MEMBERS,
+  type OpportunityItem
 } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
 
@@ -71,7 +71,7 @@ export async function createOpportunity({
     minute: '2-digit'
   });
 
-  const newOpp = {
+  const newOpp: Omit<OpportunityItem, 'tenantId'> = {
     id: `opp-${Date.now()}`,
     workspaceId: workspaceSlug || 'default',
     title,
@@ -79,8 +79,8 @@ export async function createOpportunity({
     intendedRole,
     ownerId: ownerId || resolvedOwner?.id || 'usr-1',
     ownerName: ownerName || resolvedOwner?.name || 'Ahmet Yılmaz',
-    stage: (stage || 'G0') as any,
-    status: 'ACTIVE' as OppStatus,
+    stage: stage || 'G0',
+    status: 'ACTIVE',
     g0Score: calculatedScore,
     notes: notes || null,
     notesList: notes

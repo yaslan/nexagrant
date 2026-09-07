@@ -7,7 +7,6 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const isLiveStripe = Boolean(stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.startsWith('sk_'));
 
 const stripe = isLiveStripe ? new Stripe(stripeSecretKey!, {
-  // @ts-ignore
   apiVersion: '2026-08-26.dahlia',
 }) : null;
 

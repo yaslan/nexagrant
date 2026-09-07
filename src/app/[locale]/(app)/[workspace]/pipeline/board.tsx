@@ -2,7 +2,6 @@
 
 import React, { useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
-// @ts-ignore
 import { Gate, Opportunity } from '@prisma/client';
 import { moveOpportunityStage, createOpportunity, assignOpportunityOwner, addOpportunityNote } from './actions';
 import { WORKSPACE_MEMBERS, NoteEntry } from '@/lib/k5-pipeline/pipelineStore';

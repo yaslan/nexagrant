@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, CheckCircle2, AlertTriangle, Sparkles, Clock, ArrowLeft, CheckCheck } from 'lucide-react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
+import { useOptionalSession } from '@/lib/hooks/use-optional-session';
 
 interface NotificationItem {
   id: string;
@@ -26,13 +26,8 @@ export default function NotificationsClient({
   locale,
   workspace,
 }: NotificationsClientProps) {
-  let userEmail = 'guest';
-  try {
-    const { data } = useSession();
-    if (data?.user?.email) {
-      userEmail = data.user.email;
-    }
-  } catch (e) {}
+  const session = useOptionalSession();
+  const userEmail = session?.user?.email || 'guest';
 
   const storageKey = `fonbridge_read_notifs_${userEmail}`;
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);

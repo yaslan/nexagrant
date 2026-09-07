@@ -3,7 +3,6 @@ import Stripe from 'stripe';
 
 // Initialize Stripe with the secret key from environment
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock', {
-  // @ts-ignore
   apiVersion: '2026-08-26.dahlia',
 });
 

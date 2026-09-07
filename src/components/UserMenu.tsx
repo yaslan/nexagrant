@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { logoutAction } from '@/lib/actions/auth';
-import { useSession, signOut as clientSignOut } from 'next-auth/react';
+import { signOut as clientSignOut } from 'next-auth/react';
+import { useOptionalSession } from '@/lib/hooks/use-optional-session';
 import { 
   User, 
   Settings, 
@@ -52,13 +53,7 @@ export default function UserMenu({
   const router = useRouter();
   const { theme, setTheme } = useTheme();
 
-  let sessionData: any = null;
-  try {
-    const { data } = useSession();
-    sessionData = data;
-  } catch (e) {
-    // Fallback if SessionProvider context not initialized
-  }
+  const sessionData = useOptionalSession();
 
   const effectiveUserEmail = propUserEmail || sessionData?.user?.email;
   const effectiveUserName =

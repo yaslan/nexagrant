@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import OpenAI from 'openai';
-const pdfParse = require('pdf-parse');
+import { PDFParse } from 'pdf-parse';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'sk-mock-key-for-testing',
@@ -13,8 +13,10 @@ export async function processPdfAndStore(
   title: string,
   sourceUrl?: string
 ) {
-  const data = await pdfParse(fileBuffer);
-  const text = data.text;
+  // pdf-parse v2 exports the PDFParse class and no callable default, so the
+  // v1-style `pdfParse(buffer)` this used to `require()` could only ever throw.
+  const parser = new PDFParse({ data: fileBuffer });
+  const { text } = await parser.getText();
   
   // Basic text chunking
   const chunks = chunkText(text, 1000, 200);

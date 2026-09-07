@@ -576,7 +576,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
 
             <div className="bg-slate-950 text-slate-200 p-4 rounded-2xl border border-slate-800 shadow-sm space-y-3 font-mono text-[11px]">
               <span className="text-purple-400 font-bold block text-xs border-b border-slate-800 pb-2">
-                // Formatted LLM Context Payload
+                {'// Formatted LLM Context Payload'}
               </span>
 
               {ragPrompt ? (

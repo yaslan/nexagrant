@@ -1,7 +1,10 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
 
-const standaloneDir = path.resolve(__dirname, '../.next/standalone');
+// ESM has no __dirname; Node 20.11+ exposes the same value here.
+const scriptDir = import.meta.dirname;
+
+const standaloneDir = path.resolve(scriptDir, '../.next/standalone');
 const targetNodeModules = path.join(standaloneDir, 'node_modules');
 const pnpmDir = path.join(targetNodeModules, '.pnpm');
 
@@ -23,7 +26,10 @@ function copyFolderRecursive(src, dest) {
   } else {
     try {
       fs.copyFileSync(src, dest);
-    } catch (e) {}
+    } catch {
+      // A package that is already present, or a file the flattener has no
+      // business owning — the next candidate copy still gets a chance.
+    }
   }
 }
 
@@ -56,7 +62,7 @@ if (fs.existsSync(pnpmDir)) {
 }
 
 // Copy extra @prisma packages from root node_modules/.pnpm
-const rootPnpm = path.resolve(__dirname, '../node_modules/.pnpm');
+const rootPnpm = path.resolve(scriptDir, '../node_modules/.pnpm');
 if (fs.existsSync(rootPnpm)) {
   const rootPnpmEntries = fs.readdirSync(rootPnpm);
   for (const entry of rootPnpmEntries) {
