@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 interface SediaTopic {
   identifier: string;
@@ -29,14 +30,14 @@ interface SediaTopic {
 }
 
 const FRAMEWORK_PROGRAMMES = [
-  { id: 'ALL', labelTr: 'Tüm Programlar', labelEn: 'All Programmes' },
-  { id: '43108390', labelTr: 'Ufuk Avrupa (Horizon Europe)', labelEn: 'Horizon Europe' },
-  { id: '43152860', labelTr: 'Dijital Avrupa (Digital Europe)', labelEn: 'Digital Europe' },
-  { id: '43353764', labelTr: 'Erasmus+', labelEn: 'Erasmus+' },
-  { id: '43252434', labelTr: 'LIFE Programı', labelEn: 'LIFE Programme' },
-  { id: '43353744', labelTr: 'Avrupa Savunma Fonu (EDF)', labelEn: 'European Defence Fund' },
-  { id: '43353724', labelTr: 'CEF (Altyapı)', labelEn: 'Connecting Europe Facility' },
-];
+  { id: 'ALL', labelKey: 'all' },
+  { id: '43108390', labelKey: 'horizon' },
+  { id: '43152860', labelKey: 'digitalEurope' },
+  { id: '43353764', labelKey: 'erasmusPlus' },
+  { id: '43252434', labelKey: 'life' },
+  { id: '43353744', labelKey: 'edf' },
+  { id: '43353724', labelKey: 'cef' },
+] as const;
 
 export default function CallsPage({
   params,
@@ -47,6 +48,7 @@ export default function CallsPage({
   const locale = resolvedParams.locale || 'tr';
   const workspace = resolvedParams.workspace || 'default';
   const isTr = locale === 'tr';
+  const t = useTranslations('callsPage');
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -60,6 +62,7 @@ export default function CallsPage({
   const [totalResults, setTotalResults] = useState(0);
   const [loading, setLoading] = useState(true);
   const [savingSearch, setSavingSearch] = useState(false);
+  const [savedSearchMessage, setSavedSearchMessage] = useState<string | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<SediaTopic | null>(null);
 
   type SortField = 'status' | 'title' | 'action' | 'budget' | 'deadline';
@@ -173,18 +176,15 @@ export default function CallsPage({
   const handleSaveSearch = async () => {
     setSavingSearch(true);
     await new Promise((resolve) => setTimeout(resolve, 500));
-    alert(
-      isTr
-        ? `Arama kaydedildi (${debouncedSearch || 'Tüm Arama'}). Yeni çağrılar için e-posta bildirimi alacaksınız.`
-        : `Search saved for "${debouncedSearch || 'All Calls'}". You will receive notification alerts.`
-    );
+    setSavedSearchMessage(t('savedSearchMessage', { query: debouncedSearch || t('allSearchesFallback') }));
     setSavingSearch(false);
+    setTimeout(() => setSavedSearchMessage(null), 5000);
   };
 
   const totalPages = Math.ceil(totalResults / limit) || 1;
 
   const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return isTr ? 'Belirtilmedi' : 'N/A';
+    if (!dateStr) return t('notSpecified');
     try {
       const d = new Date(dateStr);
       return d.toLocaleDateString(isTr ? 'tr-TR' : 'en-US', {
@@ -198,7 +198,7 @@ export default function CallsPage({
   };
 
   const formatCurrency = (cents?: number) => {
-    if (!cents || cents <= 0) return isTr ? 'Bütçe Detayda' : 'See Details';
+    if (!cents || cents <= 0) return t('seeDetails');
     const euros = cents / 100;
     return new Intl.NumberFormat(isTr ? 'tr-TR' : 'en-US', {
       style: 'currency',
@@ -215,16 +215,14 @@ export default function CallsPage({
           <div className="flex items-center gap-2 mb-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              {isTr ? 'SEDIA Canlı API Bağlantısı Etkin' : 'Live SEDIA API Active'}
+              {t('liveApiActive')}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold font-heading mb-2 text-ink">
-            {isTr ? 'AB Hibeleri & Çağrı Başlıkları (SEDIA)' : 'EU Funding Calls & Topics (SEDIA)'}
+            {t('pageTitle')}
           </h1>
           <p className="text-muted text-xs sm:text-sm max-w-2xl">
-            {isTr
-              ? 'Avrupa Komisyonu (SEDIA) arama servisine canlı erişim ile Ufuk Avrupa, Dijital Avrupa, Erasmus+, LIFE ve diğer AB programlarına ait açık ve gelecek çağrıları arayın.'
-              : 'Browse and search live funding opportunities across Horizon Europe, Digital Europe, Erasmus+, and EU programmes.'}
+            {t('pageDescription')}
           </p>
         </div>
 
@@ -238,7 +236,7 @@ export default function CallsPage({
                 : 'text-muted hover:text-ink'
             }`}
           >
-            {isTr ? 'Hibeler (Grants)' : 'Grants'}
+            {t('grantsTab')}
           </button>
           <button
             onClick={() => { setCallType('2'); setPage(1); }}
@@ -248,7 +246,7 @@ export default function CallsPage({
                 : 'text-muted hover:text-ink'
             }`}
           >
-            {isTr ? 'İhaleler (Tenders)' : 'Tenders'}
+            {t('tendersTab')}
           </button>
         </div>
       </div>
@@ -265,7 +263,7 @@ export default function CallsPage({
                 : 'bg-surface text-muted hover:text-ink border-border hover:border-border/80'
             }`}
           >
-            {isTr ? prog.labelTr : prog.labelEn}
+            {t(`framework.${prog.labelKey}`)}
           </button>
         ))}
       </div>
@@ -276,11 +274,7 @@ export default function CallsPage({
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder={
-                isTr
-                  ? 'Anahtar kelime, konu kodu (örn: HORIZON-CL5), başlık ile ara...'
-                  : 'Search by keyword, topic code (e.g. HORIZON-CL5), or title...'
-              }
+              placeholder={t('searchPlaceholder')}
               className="w-full pl-3 pr-8 py-2.5 bg-ground border border-border rounded-lg text-ink text-xs sm:text-sm placeholder:text-muted focus:outline-hidden focus:ring-2 focus:ring-accent"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -301,16 +295,23 @@ export default function CallsPage({
             className="w-full sm:w-auto px-4 py-2.5 border border-accent text-accent font-semibold text-xs sm:text-sm rounded-lg hover:bg-accent/10 transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <span>🔔</span>
-            {savingSearch
-              ? isTr ? 'Kaydediliyor...' : 'Saving...'
-              : isTr ? 'Aramayı Kaydet & Bildirim Al' : 'Save Search & Alert'}
+            {savingSearch ? t('savingLabel') : t('saveSearchLabel')}
           </button>
         </div>
+
+        {savedSearchMessage && (
+          <div
+            role="status"
+            className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 px-4 py-3 text-xs sm:text-sm"
+          >
+            {savedSearchMessage}
+          </div>
+        )}
 
         {/* Status Checkboxes & Results count */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-border/50 text-xs">
           <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
-            <span className="font-semibold text-muted">{isTr ? 'Çağrı Durumu:' : 'Status:'}</span>
+            <span className="font-semibold text-muted">{t('statusLabel')}</span>
             <label className="flex items-center gap-1.5 cursor-pointer text-ink hover:text-accent select-none">
               <input
                 type="checkbox"
@@ -319,7 +320,7 @@ export default function CallsPage({
                 className="rounded border-border text-accent focus:ring-accent"
               />
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-              {isTr ? 'Açık Çağrılar' : 'Open Calls'}
+              {t('openCalls')}
             </label>
 
             <label className="flex items-center gap-1.5 cursor-pointer text-ink hover:text-accent select-none">
@@ -330,7 +331,7 @@ export default function CallsPage({
                 className="rounded border-border text-accent focus:ring-accent"
               />
               <span className="inline-block w-2 h-2 rounded-full bg-blue-500"></span>
-              {isTr ? 'Gelecek' : 'Forthcoming'}
+              {t('forthcoming')}
             </label>
 
             <label className="flex items-center gap-1.5 cursor-pointer text-ink hover:text-accent select-none">
@@ -341,19 +342,15 @@ export default function CallsPage({
                 className="rounded border-border text-accent focus:ring-accent"
               />
               <span className="inline-block w-2 h-2 rounded-full bg-gray-400"></span>
-              {isTr ? 'Kapanmış' : 'Closed'}
+              {t('closed')}
             </label>
           </div>
 
           <div className="text-muted font-medium text-[11px] sm:text-xs">
             {loading ? (
-              <span>{isTr ? 'Canlı veriler yükleniyor...' : 'Fetching live data...'}</span>
+              <span>{t('loadingData')}</span>
             ) : (
-              <span>
-                {isTr
-                  ? `Toplam ${totalResults} çağrı bulundu (${page}. sayfa)`
-                  : `Found ${totalResults} calls (Page ${page})`}
-              </span>
+              <span>{t('resultsCount', { count: totalResults, page })}</span>
             )}
           </div>
         </div>
@@ -370,7 +367,7 @@ export default function CallsPage({
                   className="px-4 py-3 text-xs font-semibold text-muted uppercase cursor-pointer hover:text-ink transition"
                 >
                   <div className="flex items-center gap-1">
-                    <span>{isTr ? 'Durum' : 'Status'}</span>
+                    <span>{t('colStatus')}</span>
                     {renderSortIcon('status')}
                   </div>
                 </th>
@@ -379,7 +376,7 @@ export default function CallsPage({
                   className="px-4 py-3 text-xs font-semibold text-muted uppercase min-w-[260px] cursor-pointer hover:text-ink transition"
                 >
                   <div className="flex items-center gap-1">
-                    <span>{isTr ? 'Çağrı Başlığı & Kodu' : 'Topic & Code'}</span>
+                    <span>{t('colTopic')}</span>
                     {renderSortIcon('title')}
                   </div>
                 </th>
@@ -388,7 +385,7 @@ export default function CallsPage({
                   className="px-4 py-3 text-xs font-semibold text-muted uppercase cursor-pointer hover:text-ink transition"
                 >
                   <div className="flex items-center gap-1">
-                    <span>{isTr ? 'Eylem Tipi' : 'Type of Action'}</span>
+                    <span>{t('colActionType')}</span>
                     {renderSortIcon('action')}
                   </div>
                 </th>
@@ -397,7 +394,7 @@ export default function CallsPage({
                   className="px-4 py-3 text-xs font-semibold text-muted uppercase cursor-pointer hover:text-ink transition"
                 >
                   <div className="flex items-center gap-1">
-                    <span>{isTr ? 'Tahmini Bütçe' : 'Est. Budget'}</span>
+                    <span>{t('colBudget')}</span>
                     {renderSortIcon('budget')}
                   </div>
                 </th>
@@ -406,12 +403,12 @@ export default function CallsPage({
                   className="px-4 py-3 text-xs font-semibold text-muted uppercase cursor-pointer hover:text-ink transition"
                 >
                   <div className="flex items-center gap-1">
-                    <span>{isTr ? 'Son Başvuru' : 'Deadline'}</span>
+                    <span>{t('colDeadline')}</span>
                     {renderSortIcon('deadline')}
                   </div>
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted uppercase text-right">
-                  {isTr ? 'İşlem' : 'Action'}
+                  {t('colAction')}
                 </th>
               </tr>
             </thead>
@@ -457,10 +454,10 @@ export default function CallsPage({
                         }`}
                       >
                         {call.status === 'OPEN'
-                          ? isTr ? 'AÇIK' : 'OPEN'
+                          ? t('statusOpen')
                           : call.status === 'FORTHCOMING'
-                          ? isTr ? 'GELECEK' : 'FORTHCOMING'
-                          : isTr ? 'KAPANDI' : 'CLOSED'}
+                          ? t('statusForthcoming')
+                          : t('statusClosed')}
                       </span>
                     </td>
 
@@ -483,7 +480,7 @@ export default function CallsPage({
                         )}
                         {call.isTwoStage && (
                           <span className="text-[10px] font-bold bg-purple-500/10 text-purple-600 border border-purple-500/20 px-1.5 py-0.5 rounded">
-                            {isTr ? '2 Aşamalı' : '2-Stage'}
+                            {t('twoStage')}
                           </span>
                         )}
                       </div>
@@ -507,7 +504,7 @@ export default function CallsPage({
                           onClick={() => setSelectedTopic(call)}
                           className="px-3 py-1.5 text-xs font-semibold bg-accent/10 text-accent hover:bg-accent hover:text-white rounded-lg transition border border-accent/20"
                         >
-                          {isTr ? 'Detaylar' : 'Details'}
+                          {t('detailsButton')}
                         </button>
                         {call.sourceUrl && (
                           <a
@@ -515,7 +512,7 @@ export default function CallsPage({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-1.5 text-muted hover:text-accent rounded-lg border border-border hover:border-accent transition"
-                            title={isTr ? 'SEDIA Portalında Aç' : 'Open in SEDIA Portal'}
+                            title={t('openInSedia')}
                           >
                             ↗
                           </a>
@@ -527,9 +524,7 @@ export default function CallsPage({
               ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-muted text-xs sm:text-sm">
-                    {isTr
-                      ? 'Seçilen filtrelere uygun çağrı bulunamadı. Lütfen arama terimini veya durum filtrelerini kontrol edin.'
-                      : 'No funding calls found matching your filter parameters.'}
+                    {t('noResults')}
                   </td>
                 </tr>
               )}
@@ -540,7 +535,7 @@ export default function CallsPage({
         {/* Pagination controls */}
         <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-border bg-ground/40 gap-4 text-xs">
           <div className="flex items-center gap-2">
-            <span className="text-muted">{isTr ? 'Sayfa Başı Gösterim:' : 'Per page:'}</span>
+            <span className="text-muted">{t('perPage')}</span>
             <select
               value={limit}
               onChange={(e) => {
@@ -562,7 +557,7 @@ export default function CallsPage({
               disabled={page <= 1 || loading}
               className="px-3 py-1.5 border border-border rounded-lg bg-surface text-ink hover:bg-surface-hover disabled:opacity-40 transition font-semibold"
             >
-              ← {isTr ? 'Önceki' : 'Previous'}
+              ← {t('previous')}
             </button>
             <span className="font-semibold text-ink">
               {page} / {totalPages}
@@ -572,7 +567,7 @@ export default function CallsPage({
               disabled={page >= totalPages || loading}
               className="px-3 py-1.5 border border-border rounded-lg bg-surface text-ink hover:bg-surface-hover disabled:opacity-40 transition font-semibold"
             >
-              {isTr ? 'Sonraki' : 'Next'} →
+              {t('next')} →
             </button>
           </div>
         </div>
@@ -600,25 +595,25 @@ export default function CallsPage({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-ground p-4 rounded-xl border border-border mb-6 text-xs">
               <div>
-                <span className="text-muted block">{isTr ? 'Program:' : 'Programme:'}</span>
+                <span className="text-muted block">{t('programmeLabel')}</span>
                 <span className="font-semibold text-ink">
                   {selectedTopic.frameworkProgramme || 'EU Funding'}
                 </span>
               </div>
               <div>
-                <span className="text-muted block">{isTr ? 'Eylem Türü (Type of Action):' : 'Type of Action:'}</span>
+                <span className="text-muted block">{t('typeOfActionLabel')}</span>
                 <span className="font-semibold text-ink">
                   {selectedTopic.typeOfAction || '-'}
                 </span>
               </div>
               <div>
-                <span className="text-muted block">{isTr ? 'Son Başvuru Tarihi:' : 'Deadline:'}</span>
+                <span className="text-muted block">{t('deadlineLabel')}</span>
                 <span className="font-mono font-semibold text-accent">
                   {formatDate(selectedTopic.nextDeadlineAt)}
                 </span>
               </div>
               <div>
-                <span className="text-muted block">{isTr ? 'Tahmini Bütçe:' : 'Est. Budget:'}</span>
+                <span className="text-muted block">{t('budgetLabel')}</span>
                 <span className="font-semibold text-ink">
                   {formatCurrency(selectedTopic.budgetPerProjectCents)}
                 </span>
@@ -628,7 +623,7 @@ export default function CallsPage({
             {selectedTopic.description && (
               <div className="mb-6">
                 <h3 className="text-xs font-bold text-muted uppercase tracking-wider mb-2">
-                  {isTr ? 'Çağrı Özeti & Amaç' : 'Summary & Scope'}
+                  {t('summaryScope')}
                 </h3>
                 <p className="text-xs sm:text-sm text-ink-2 leading-relaxed bg-ground/50 p-4 rounded-xl border border-border">
                   {selectedTopic.description}
@@ -639,7 +634,7 @@ export default function CallsPage({
             {selectedTopic.deadlines && selectedTopic.deadlines.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-xs font-bold text-muted uppercase tracking-wider mb-2">
-                  {isTr ? 'Başvuru Aşamaları' : 'Deadline Stages'}
+                  {t('deadlineStages')}
                 </h3>
                 <div className="space-y-2">
                   {selectedTopic.deadlines.map((dl, i) => (
@@ -657,7 +652,7 @@ export default function CallsPage({
                 href={`/${locale}/${workspace}/cagrilar/${selectedTopic.identifier}`}
                 className="px-4 py-2 bg-accent text-white font-semibold text-xs rounded-lg hover:bg-accent/90 transition"
               >
-                {isTr ? 'Proje Fırsatına Dönüştür →' : 'Convert to Opportunity →'}
+                {t('convertToOpportunity')}
               </Link>
 
               {selectedTopic.sourceUrl && (
@@ -667,7 +662,7 @@ export default function CallsPage({
                   rel="noopener noreferrer"
                   className="px-4 py-2 border border-border text-ink hover:text-accent font-semibold text-xs rounded-lg hover:border-accent transition flex items-center gap-1.5"
                 >
-                  <span>{isTr ? 'AB Portalında İncele' : 'View on EU Portal'}</span>
+                  <span>{t('viewOnEuPortal')}</span>
                   <span>↗</span>
                 </a>
               )}
