@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Role } from '@prisma/client';
 import {
   submitApprovalRequestAction,
@@ -47,6 +48,7 @@ export default function ApprovalsClient({
   workspace: _workspace,
   locale,
 }: ApprovalsClientProps) {
+  const t = useTranslations('Approvals');
   const [requests, setRequests] = useState<ApprovalRequestItem[]>(initialRequests);
   const [activeTab, setActiveTab] = useState<'actionable' | 'my_requests' | 'history'>('actionable');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -72,7 +74,7 @@ export default function ApprovalsClient({
     try {
       setLoadingId(req.id);
       setErrorMessage(null);
-      const res = await approveRequestAction(req.id, "Onaylandı");
+      const res = await approveRequestAction(req.id, t('statusApproved'));
       if (res.success) {
         setRequests((prev) =>
           prev.map((item) =>
@@ -83,7 +85,7 @@ export default function ApprovalsClient({
         );
       }
     } catch (err) {
-      setErrorMessage(toErrorMessage(err) || 'Onaylama işlemi sırasında hata oluştu.');
+      setErrorMessage(toErrorMessage(err) || t('errorApprove'));
     } finally {
       setLoadingId(null);
     }
@@ -108,14 +110,14 @@ export default function ApprovalsClient({
         setRejectionReason('');
       }
     } catch (err) {
-      setErrorMessage(toErrorMessage(err) || 'Reddetme işlemi sırasında hata oluştu.');
+      setErrorMessage(toErrorMessage(err) || t('errorReject'));
     } finally {
       setLoadingId(null);
     }
   };
 
   const handleCancel = async (req: ApprovalRequestItem) => {
-    if (!confirm('Bu onay talebini geri çekmek istediğinizden emin misiniz?')) return;
+    if (!confirm(t('confirmCancel'))) return;
     try {
       setLoadingId(req.id);
       setErrorMessage(null);
@@ -126,7 +128,7 @@ export default function ApprovalsClient({
         );
       }
     } catch (err) {
-      setErrorMessage(toErrorMessage(err) || 'İptal işlemi sırasında hata oluştu.');
+      setErrorMessage(toErrorMessage(err) || t('errorCancel'));
     } finally {
       setLoadingId(null);
     }
@@ -140,7 +142,7 @@ export default function ApprovalsClient({
       try {
         parsedPayload = JSON.parse(formPayloadJson);
       } catch {
-        throw new Error('Payload geçerli bir JSON formatında olmalıdır.');
+        throw new Error(t('errorInvalidPayload'));
       }
 
       const res = await submitApprovalRequestAction({
@@ -158,22 +160,22 @@ export default function ApprovalsClient({
         setActiveTab('my_requests');
       }
     } catch (err) {
-      setErrorMessage(toErrorMessage(err) || 'Talep oluşturulurken hata oluştu.');
+      setErrorMessage(toErrorMessage(err) || t('errorCreate'));
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PENDING':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">⏳ Onay Bekliyor</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">⏳ {t('statusPending')}</span>;
       case 'APPROVED':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">✓ Onaylandı</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">✓ {t('statusApproved')}</span>;
       case 'REJECTED':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">✕ Reddedildi</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">✕ {t('statusRejected')}</span>;
       case 'CANCELLED':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-hover text-ink dark:bg-gray-800 dark:text-gray-300">⊘ İptal Edildi</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-hover text-ink dark:bg-gray-800 dark:text-gray-300">⊘ {t('statusCancelled')}</span>;
       case 'EXPIRED':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-400">⏱ Süresi Doldu</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-400">⏱ {t('statusExpired')}</span>;
       default:
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-hover text-ink">{status}</span>;
     }
@@ -182,15 +184,15 @@ export default function ApprovalsClient({
   const getActionTypeLabel = (type: string) => {
     switch (type) {
       case 'GATE_G4_SUBMISSION':
-        return { label: 'G4 Resmî Gönderim', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+        return { label: t('actionTypeG4'), color: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
       case 'BUDGET_ALLOCATION':
-        return { label: 'Bütçe / Kaynak Değişikliği', color: 'bg-blue-50 text-blue-700 border-blue-200' };
+        return { label: t('actionTypeBudget'), color: 'bg-blue-50 text-blue-700 border-blue-200' };
       case 'LEGAL_COMMITMENT':
-        return { label: 'Hukuki Taahhüt & NDA', color: 'bg-purple-50 text-purple-700 border-purple-200' };
+        return { label: t('actionTypeLegal'), color: 'bg-purple-50 text-purple-700 border-purple-200' };
       case 'MEMBER_ROLE_ELEVATION':
-        return { label: 'Yönetici Yetki Ataması', color: 'bg-rose-50 text-rose-700 border-rose-200' };
+        return { label: t('actionTypeRoleElevation'), color: 'bg-rose-50 text-rose-700 border-rose-200' };
       case 'SENSITIVE_SETTINGS_CHANGE':
-        return { label: 'Hassas Güvenlik Ayarı', color: 'bg-orange-50 text-orange-700 border-orange-200' };
+        return { label: t('actionTypeSensitiveSettings'), color: 'bg-orange-50 text-orange-700 border-orange-200' };
       default:
         return { label: type, color: 'bg-ground text-ink-2 border-border' };
     }
@@ -225,7 +227,7 @@ export default function ApprovalsClient({
                 : 'bg-surface hover:bg-surface-hover text-ink-2 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300 border border-border dark:border-gray-700/60'
             }`}
           >
-            <span>Onayımı Bekleyenler</span>
+            <span>{t('actionableTab')}</span>
             {actionableRequests.length > 0 && (
               <span className="bg-surface text-indigo-600 px-1.5 py-0.2 rounded-full text-xs font-bold">
                 {actionableRequests.length}
@@ -240,7 +242,7 @@ export default function ApprovalsClient({
                 : 'bg-surface hover:bg-surface-hover text-ink-2 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300 border border-border dark:border-gray-700/60'
             }`}
           >
-            <span>Taleplerim (Maker)</span>
+            <span>{t('myRequestsTab')}</span>
             <span className="text-xs opacity-75">({myRequests.length})</span>
           </button>
           <button
@@ -251,7 +253,7 @@ export default function ApprovalsClient({
                 : 'bg-surface hover:bg-surface-hover text-ink-2 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300 border border-border dark:border-gray-700/60'
             }`}
           >
-            <span>Denetim İzi & Geçmiş</span>
+            <span>{t('historyTab')}</span>
           </button>
         </div>
 
@@ -261,7 +263,7 @@ export default function ApprovalsClient({
           className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-sm font-semibold rounded-lg shadow-sm transition-all flex items-center gap-2"
         >
           <span>+</span>
-          <span>Yeni Çift Onay Talebi</span>
+          <span>{t('newRequest')}</span>
         </button>
       </div>
 
@@ -270,10 +272,10 @@ export default function ApprovalsClient({
         <div className="text-center py-16 bg-surface dark:bg-zinc-900 border border-dashed border-border dark:border-gray-800 rounded-2xl">
           <p className="text-muted text-sm">
             {activeTab === 'actionable'
-              ? 'Şu anda onayınızı bekleyen kritik bir işlem talebi bulunmuyor.'
+              ? t('emptyActionable')
               : activeTab === 'my_requests'
-              ? 'Henüz başlattığınız bir onay talebi bulunmuyor.'
-              : 'Henüz tamamlanmış bir onay geçmişi kaydı yok.'}
+              ? t('emptyMyRequests')
+              : t('emptyHistory')}
           </p>
         </div>
       ) : (
@@ -295,12 +297,12 @@ export default function ApprovalsClient({
                     {getStatusBadge(req.status)}
                     {isMaker && (
                       <span className="px-2 py-0.5 rounded text-xs bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/50 dark:text-purple-300">
-                        👤 Sizin Talebiniz (Maker)
+                        👤 {t('makerBadge')}
                       </span>
                     )}
                     {req.requiredRole && (
                       <span className="text-xs text-muted">
-                        Gereken Rol: <strong>{req.requiredRole}</strong>
+                        {t('requiredRoleLabel')}: <strong>{req.requiredRole}</strong>
                       </span>
                     )}
                   </div>
@@ -310,21 +312,21 @@ export default function ApprovalsClient({
 
                   <div className="flex flex-wrap items-center gap-4 text-xs text-muted pt-1">
                     <span>
-                      Talep Eden: <strong>{req.requester?.name || req.requester?.email || req.requesterId}</strong>
+                      {t('requesterLabel')}: <strong>{req.requester?.name || req.requester?.email || req.requesterId}</strong>
                     </span>
                     <span>•</span>
-                    <span>Tarih: {new Date(req.createdAt).toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US')}</span>
+                    <span>{t('dateLabel')}: {new Date(req.createdAt).toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US')}</span>
                     {req.auditHash && (
                       <>
                         <span>•</span>
                         <span className="font-mono bg-surface-hover dark:bg-gray-800 px-1.5 py-0.5 rounded text-[10px]">
-                          Hash: {req.auditHash.substring(0, 10)}...
+                          {t('hashLabel')}: {req.auditHash.substring(0, 10)}...
                         </span>
                       </>
                     )}
                     {req.rejectionReason && (
                       <div className="w-full text-red-600 dark:text-red-400 font-medium">
-                        Red Gerekçesi: {req.rejectionReason}
+                        {t('reason')}: {req.rejectionReason}
                       </div>
                     )}
                   </div>
@@ -336,7 +338,7 @@ export default function ApprovalsClient({
                     onClick={() => setSelectedRequestDetails(req)}
                     className="px-3 py-1.5 text-xs font-medium text-ink-2 dark:text-gray-300 bg-surface border border-border hover:bg-surface-hover dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   >
-                    Detay / Payload
+                    {t('detailButton')}
                   </button>
 
                   {/* Actions for Checker */}
@@ -347,7 +349,7 @@ export default function ApprovalsClient({
                         disabled={loadingId === req.id}
                         className="px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm transition-all"
                       >
-                        {loadingId === req.id ? 'İşleniyor...' : '✓ Onayla'}
+                        {loadingId === req.id ? t('processing') : `✓ ${t('approve')}`}
                       </button>
                       <button
                         onClick={() => {
@@ -357,7 +359,7 @@ export default function ApprovalsClient({
                         disabled={loadingId === req.id}
                         className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
                       >
-                        ✕ Reddet
+                        ✕ {t('reject')}
                       </button>
                     </>
                   )}
@@ -369,7 +371,7 @@ export default function ApprovalsClient({
                       disabled={loadingId === req.id}
                       className="px-3 py-1.5 text-xs font-medium text-ink-2 hover:text-red-600 bg-surface-hover dark:bg-gray-800 hover:bg-red-50 rounded-lg transition-colors"
                     >
-                      Talebi Geri Çek
+                      {t('cancel')}
                     </button>
                   )}
                 </div>

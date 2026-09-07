@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getPublicRoute, getWorkspaceRoute } from '@/lib/routes';
 
@@ -16,7 +17,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
           {/* Col 1: Brand */}
           <div className="md:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <img src="/logo.png" alt="FonBridge Logo" className="h-18 w-auto object-contain" />
+              <Image src="/logo.png" alt="FonBridge Logo" width={72} height={72} className="object-contain" />
             </div>
             <p className="text-muted text-xs leading-relaxed max-w-sm">
               {isTr

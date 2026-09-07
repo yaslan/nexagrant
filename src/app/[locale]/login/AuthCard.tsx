@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions/auth';
 import { Lock, Sparkles, Building2, User, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
@@ -141,7 +142,7 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
       {/* Dynamic Header */}
       <div className="text-center space-y-2 pt-1">
         <div className="flex items-center justify-center pb-1">
-          <img src="/logo.png" alt="FonBridge Logo" className="h-15 sm:h-17 w-auto object-contain" />
+          <Image src="/logo.png" alt="FonBridge Logo" width={64} height={64} className="object-contain" />
         </div>
         <h1 className="text-2xl font-bold font-heading text-ink tracking-tight">
           {mode === 'login'

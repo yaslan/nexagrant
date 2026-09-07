@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import AdminSidebarNav from './AdminSidebarNav';
 import UserMenu from './UserMenu';
@@ -37,7 +38,7 @@ export default function MobileAdminHeader({
           </button>
 
           <Link href={`/${locale}`} title={locale === 'tr' ? 'Ana Sayfa' : 'Home'} className="flex items-center space-x-2 hover:opacity-90 transition">
-            <img src="/logo.png" alt="FonBridge Logo" className="h-8 w-auto object-contain brightness-0 invert" />
+            <Image src="/logo.png" alt="FonBridge Logo" width={32} height={32} className="object-contain brightness-0 invert" />
             <span className="font-bold text-sm tracking-tight text-white">Admin</span>
           </Link>
         </div>

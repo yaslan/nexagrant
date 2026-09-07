@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { auth } from '@/lib/auth';
 import { isPlatformAdminSession } from '@/lib/tenant';
 import { getTranslations } from 'next-intl/server';
@@ -121,7 +122,7 @@ export default async function AdminLayout({
       <header className="hidden md:flex bg-slate-900 text-white border-b border-slate-800 px-6 py-3.5 items-center justify-between sticky top-0 z-40 shadow-md">
         <div className="flex items-center space-x-4">
           <Link href={`/${locale}`} title={locale === 'tr' ? 'Ana Sayfa' : 'Home'} className="flex items-center space-x-2.5 hover:opacity-90 transition">
-            <img src="/logo.png" alt="FonBridge Logo" className="h-10 w-auto object-contain brightness-0 invert" />
+            <Image src="/logo.png" alt="FonBridge Logo" width={40} height={40} className="object-contain brightness-0 invert" />
             <div>
               <span className="font-bold text-base tracking-tight text-white block leading-none">
                 Admin Console

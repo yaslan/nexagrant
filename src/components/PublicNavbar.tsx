@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
@@ -39,10 +40,12 @@ export default function PublicNavbar({
           className="flex items-center gap-3 group cursor-pointer"
           title={isTr ? "Ana Sayfa" : "Home"}
         >
-          <img 
-            src="/logo.png" 
-            alt="FonBridge Logo" 
-            className="h-12 sm:h-14 w-auto object-contain group-hover:scale-105 transition" 
+          <Image
+            src="/logo.png"
+            alt="FonBridge Logo"
+            width={56}
+            height={56}
+            className="object-contain group-hover:scale-105 transition"
           />
         </Link>
 

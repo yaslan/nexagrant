@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getFeaturedBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
@@ -50,10 +51,11 @@ export default function BlogSection({ locale }: BlogSectionProps) {
             >
               {/* Cover Image */}
               <div className="relative h-48 w-full overflow-hidden bg-muted/20">
-                <img
+                <Image
                   src={post.image}
                   alt={post.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-300"
                 />
                 <div className="absolute top-3 left-3">
                   <span className="bg-surface/90 backdrop-blur-md border border-border text-ink text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-2xs">
@@ -85,10 +87,12 @@ export default function BlogSection({ locale }: BlogSectionProps) {
                 {/* Author Badge & Read More Button */}
                 <div className="pt-4 border-t border-border/80 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <img
+                    <Image
                       src={post.author.avatar}
                       alt={post.author.name}
-                      className="w-7 h-7 rounded-full object-cover border border-border"
+                      width={28}
+                      height={28}
+                      className="rounded-full object-cover border border-border"
                     />
                     <div>
                       <div className="text-xs font-semibold text-ink leading-none">{post.author.name}</div>

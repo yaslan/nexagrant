@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import SidebarNav from '@/components/SidebarNav';
 import UserMenu from '@/components/UserMenu';
@@ -66,10 +67,12 @@ export default async function AppLayout({
           title={locale === 'tr' ? 'Ana Sayfa' : 'Home'}
           className="p-4 border-b border-border flex items-center justify-center hover:bg-surface-hover transition-colors group cursor-pointer"
         >
-          <img 
-            src="/logo.png" 
-            alt="FonBridge Logo" 
-            className="h-18 w-auto object-contain group-hover:scale-105 transition shrink-0" 
+          <Image
+            src="/logo.png"
+            alt="FonBridge Logo"
+            width={72}
+            height={72}
+            className="object-contain group-hover:scale-105 transition shrink-0"
           />
         </Link>
 

@@ -23,3 +23,5 @@
 - [fabrika-stash-pop-can-silently-fail](fabrika-stash-pop-can-silently-fail.md) — git stash pop bir e2e koşusunun ürettiği artefakt dosya yüzünden sessizce başarısız olabilir — çalışma ağacı temiz görünür, işin hâlâ stash'tedir
 
 - [fabrika-react19-render-purity-fixes](fabrika-react19-render-purity-fixes.md) — React 19'un set-state-in-effect ve purity lint hatalarını istisna yazmadan çözen üç desen — Fabrika'da kanıtlanmış
+
+- [price-lock-validation-complete](price-lock-validation-done.md) — TASK-MTR882HVZ8BG7 fiyat kilidi doğrulaması tamamlandı — koda dokunmamış, UI kareleri ve test kanıtı yeterli

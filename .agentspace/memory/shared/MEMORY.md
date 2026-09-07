@@ -100,3 +100,5 @@
 - [fabrika-new-workspace-page-must-enter-route-catalog](fabrika-new-workspace-page-must-enter-route-catalog.md) — [workspace] altına yeni sayfa eklemek src/lib/modules/route-catalog.ts kaydı olmadan tamam değil — route-catalog testi kırmızıya döner ve kapıyı SONRAKİ karta miras bırakır
 - [fabrika-playwright-caret-hide-fake-hydration-error](fabrika-playwright-caret-hide-fake-hydration-error.md) — Playwright'ın page.screenshot() varsayılanı sahte React hidrasyon uyuşmazlığı üretir — caret 'initial' ile kapat
 - [fabrika-shared-dev-db-can-be-reset-under-you](fabrika-shared-dev-db-can-be-reset-under-you.md) — Paylaşılan dev veritabanı başka bir ajanın prisma migrate dev'i altında sıfırlanabilir — CLI boş DB'yi, çalışan :3000 sunucusu hâlâ eskisini görür
+
+- [fabrika-rls-check-is-declaration-not-behaviour](fabrika-rls-check-is-declaration-not-behaviour.md) — `pnpm rls:check` yeşilken izolasyon ölçülmemiş olabilir — davranışı `pnpm rls:verify` + tests/rls.spec.ts ölçer; 2026-09-07'de bunlar 42501 (şema yetkisi yok) ile kırmızıydı

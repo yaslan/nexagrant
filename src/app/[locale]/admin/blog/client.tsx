@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { BlogPost } from '@/lib/blog';
 import { 
   createBlogPostAction, 
@@ -250,10 +251,12 @@ export default function AdminBlogClient({ initialPosts, locale }: AdminBlogClien
               {filteredPosts.map((post) => (
                 <tr key={post.slug} className="hover:bg-surface-hover/50 transition">
                   <td className="p-4">
-                    <img
+                    <Image
                       src={post.image}
                       alt={post.title}
-                      className="w-14 h-10 object-cover rounded-lg border border-border"
+                      width={56}
+                      height={40}
+                      className="object-cover rounded-lg border border-border"
                     />
                   </td>
                   <td className="p-4 max-w-xs">

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import SidebarNav from './SidebarNav';
 import UserMenu from './UserMenu';
@@ -40,10 +41,12 @@ export default function MobileAppHeader({
           </button>
 
           <Link href={`/${locale}`} className="flex items-center">
-            <img
+            <Image
               src="/logo.png"
               alt="FonBridge Logo"
-              className="h-8 w-auto object-contain"
+              width={32}
+              height={32}
+              className="object-contain"
             />
           </Link>
         </div>
@@ -74,10 +77,12 @@ export default function MobileAppHeader({
             {/* Drawer Header */}
             <div className="p-4 border-b border-border flex items-center justify-between">
               <Link href={`/${locale}`} onClick={() => setMobileOpen(false)}>
-                <img
+                <Image
                   src="/logo.png"
                   alt="FonBridge Logo"
-                  className="h-10 w-auto object-contain"
+                  width={40}
+                  height={40}
+                  className="object-contain"
                 />
               </Link>
               <button

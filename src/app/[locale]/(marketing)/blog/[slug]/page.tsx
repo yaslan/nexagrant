@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import PublicNavbar from '@/components/PublicNavbar';
@@ -54,10 +55,12 @@ export default async function BlogDetailPage({
 
             {/* Author Badge */}
             <div className="flex items-center gap-3 pt-2">
-              <img
+              <Image
                 src={post.author.avatar}
                 alt={post.author.name}
-                className="w-10 h-10 rounded-full object-cover border border-border"
+                width={40}
+                height={40}
+                className="rounded-full object-cover border border-border"
               />
               <div>
                 <div className="text-sm font-bold text-ink">{post.author.name}</div>
@@ -67,11 +70,12 @@ export default async function BlogDetailPage({
           </div>
 
           {/* Hero Cover Image */}
-          <div className="rounded-2xl overflow-hidden border border-border shadow-md h-80 sm:h-96 w-full">
-            <img
+          <div className="relative rounded-2xl overflow-hidden border border-border shadow-md h-80 sm:h-96 w-full">
+            <Image
               src={post.image}
               alt={post.title}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
             />
           </div>
 

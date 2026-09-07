@@ -14,3 +14,7 @@
 - [fabrika-ask-workers-to-report-not-fix-adjacent-lies](fabrika-ask-workers-to-report-not-fix-adjacent-lies.md) — Worker'a "yolun üstünde gördüğün kayıtsız rakamları DÜZELTME, ADIYLA BİLDİR" demek kapsamı korurken üç gerçek kart kazandırdı
 
 - [fabrika-red-gate-may-be-a-live-worker-wip](fabrika-red-gate-may-be-a-live-worker-wip.md) — Kapı kırmızıysa önce pane listesine bak — commit'siz bir dizin çalışan worker'ın WIP'i olabilir, regresyon değil
+
+- [fabrika-check-artifact-timestamps-against-dispatch](fabrika-check-artifact-timestamps-against-dispatch.md) — Worker "kanıt var" derken eski dosyayı gösteriyor olabilir — kare/çıktı dosyalarının mtime'ını görevin başlama saatiyle karşılaştır, ve raporda doğrulamayı REDDEDEN cümleyi ara
+
+- [fabrika-verify-each-claim-not-the-headline](fabrika-verify-each-claim-not-the-headline.md) — Dürüst bir raporun toplam rakamı doğru olsa bile tek bir maddesi uydurma olabilir — numaralı her iddiayı KENDİ komutuyla ölç, manşet sayıyla yetinme

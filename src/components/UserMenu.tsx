@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { logoutAction } from '@/lib/actions/auth';
@@ -326,10 +327,12 @@ export default function UserMenu({
           {/* Avatar Image / Initials */}
           <div className="relative">
             {effectiveUserImage ? (
-              <img
+              <Image
                 src={effectiveUserImage}
                 alt={effectiveUserName}
-                className="w-8 h-8 rounded-full object-cover ring-2 ring-accent/30"
+                width={32}
+                height={32}
+                className="rounded-full object-cover ring-2 ring-accent/30"
               />
             ) : (
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-accent-ink text-white font-bold text-xs flex items-center justify-center shadow-inner">
