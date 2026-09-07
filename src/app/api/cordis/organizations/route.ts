@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
+import type { CordisPartnerProfileRow } from '@/lib/k2-cordis/rows';
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
 
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (q) {
       where.OR = [
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    const data = profiles.map((p: any) => ({
+    const data = (profiles as CordisPartnerProfileRow[]).map((p) => ({
       organisationId: p.organisationId,
       name: p.name,
       country: p.country,

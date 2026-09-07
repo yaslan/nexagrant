@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
+import type { CordisProjectWithParticipants } from '@/lib/k2-cordis/rows';
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const rawLimit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
 
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (q) {
       where.OR = [
@@ -32,9 +33,10 @@ export async function GET(req: NextRequest) {
     }
 
     if (yearFrom || yearTo) {
-      where.startDate = {};
-      if (yearFrom) where.startDate.gte = new Date(`${yearFrom}-01-01`);
-      if (yearTo) where.startDate.lte = new Date(`${yearTo}-12-31`);
+      const startDate: { gte?: Date; lte?: Date } = {};
+      if (yearFrom) startDate.gte = new Date(`${yearFrom}-01-01`);
+      if (yearTo) startDate.lte = new Date(`${yearTo}-12-31`);
+      where.startDate = startDate;
     }
 
     if (topic) {
@@ -81,8 +83,8 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    const formattedProjects = projects.map((p: any) => {
-      const coordinator = p.participations.find((pt: any) => pt.role === 'coordinator')?.organization;
+    const formattedProjects = (projects as CordisProjectWithParticipants[]).map((p) => {
+      const coordinator = p.participations.find((pt) => pt.role === 'coordinator')?.organization;
       return {
         id: p.id,
         acronym: p.acronym,
@@ -102,7 +104,7 @@ export async function GET(req: NextRequest) {
               isTurkish: coordinator.isTurkish,
             }
           : null,
-        topics: p.topics.map((t: any) => t.topicCode),
+        topics: p.topics.map((t) => t.topicCode),
         participationsCount: p.participations.length,
       };
     });

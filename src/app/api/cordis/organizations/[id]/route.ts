@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
+import type {
+  CordisCoParticipationRow,
+  CordisOrganizationSummary,
+  CordisParticipationWithProject,
+} from '@/lib/k2-cordis/rows';
 
 export async function GET(
   req: NextRequest,
@@ -47,7 +52,9 @@ export async function GET(
       take: 20,
     });
 
-    const partnerOrgIds = coParts.map((cp: any) => (cp.orgA === id ? cp.orgB : cp.orgA));
+    const partnerOrgIds = (coParts as CordisCoParticipationRow[]).map((cp) =>
+      cp.orgA === id ? cp.orgB : cp.orgA
+    );
     const partnerOrgs = await prisma.cordisOrganization.findMany({
       where: { organisationId: { in: partnerOrgIds } },
       select: {
@@ -59,9 +66,11 @@ export async function GET(
       },
     });
 
-    const partnerMap = new Map<string, any>(partnerOrgs.map((p: any) => [p.organisationId, p]));
+    const partnerMap = new Map(
+      (partnerOrgs as CordisOrganizationSummary[]).map((p) => [p.organisationId, p])
+    );
 
-    const network = coParts.map((cp: any) => {
+    const network = (coParts as CordisCoParticipationRow[]).map((cp) => {
       const partnerId = cp.orgA === id ? cp.orgB : cp.orgA;
       const partner = partnerMap.get(partnerId);
       return {
@@ -75,7 +84,7 @@ export async function GET(
       };
     });
 
-    const formattedProjects = org.participations.map((pt: any) => ({
+    const formattedProjects = (org.participations as CordisParticipationWithProject[]).map((pt) => ({
       projectId: pt.projectId,
       acronym: pt.project.acronym,
       title: pt.project.title,
@@ -85,7 +94,7 @@ export async function GET(
       startDate: pt.project.startDate,
       endDate: pt.project.endDate,
       cordisUrl: `https://cordis.europa.eu/project/id/${pt.projectId}`,
-      topics: pt.project.topics.map((t: any) => t.topicCode),
+      topics: pt.project.topics.map((t) => t.topicCode),
     }));
 
     return NextResponse.json({

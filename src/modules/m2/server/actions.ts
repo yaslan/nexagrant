@@ -18,6 +18,48 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
  * it is platform catalogue data, not tenant data.
  */
 
+/**
+ * One section of a ConceptTemplate. The template's `schema` Json column holds
+ * an array of these — see the comment on the column in prisma/schema.prisma.
+ */
+interface ConceptTemplateSection {
+  key: string;
+  labelKey: string;
+  maxWords: number;
+  promptKey: string;
+}
+
+/** `ConceptNote.content`: the drafted markdown, keyed by section. */
+type ConceptNoteContent = Record<string, string>;
+
+/** The Opportunity this module drafts against, with its topic. */
+interface OpportunityWithTopic {
+  id: string;
+  title: string;
+  topic: { title: string | null; identifier: string | null } | null;
+}
+
+/** A ConceptNote with the opportunity the export titles itself from. */
+interface ConceptNoteWithOpportunity {
+  id: string;
+  templateId: string;
+  content: ConceptNoteContent;
+  opportunity: { title: string };
+}
+
+/** The AiUsageLog columns the transparency report reads. */
+interface AiUsageLogRow {
+  module: string;
+  purpose: string;
+  model: string;
+  promptHash: string;
+  inputTokens: number;
+  outputTokens: number;
+  credits: number;
+  section: string | null;
+  createdAt: Date;
+}
+
 export async function generateConceptNoteDraft(
   opportunityId: string,
   templateId: string,
@@ -26,7 +68,7 @@ export async function generateConceptNoteDraft(
   const { tenantId, userId } = await requireTenantAction();
 
   // 1. Get the opportunity and topic — scoped to the session tenant
-  const opp = await withTenant<any>(tenantId, (tx) =>
+  const opp = await withTenant<OpportunityWithTopic | null>(tenantId, (tx) =>
     tx.opportunity.findFirst({
       where: { id: opportunityId, tenantId },
       include: { topic: true }
@@ -44,7 +86,7 @@ export async function generateConceptNoteDraft(
 
   // 3. For each section, search RAG for context and generate text
   const content: Record<string, string> = {};
-  const schema = template.schema as any[];
+  const schema = template.schema as ConceptTemplateSection[];
   
   for (const section of schema) {
     // Basic RAG search
@@ -84,7 +126,7 @@ export async function generateConceptNoteDraft(
   }
 
   // 4. Save to db
-  const note = await withTenant<any>(tenantId, (tx) =>
+  const note = await withTenant<{ id: string }>(tenantId, (tx) =>
     tx.conceptNote.create({
       data: {
         tenantId,
@@ -101,7 +143,7 @@ export async function generateConceptNoteDraft(
   return note.id;
 }
 
-export async function saveConceptNoteDraft(noteId: string, content: any) {
+export async function saveConceptNoteDraft(noteId: string, content: ConceptNoteContent) {
   const { tenantId } = await requireTenantAction();
 
   // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
@@ -119,7 +161,7 @@ export async function saveConceptNoteDraft(noteId: string, content: any) {
 export async function exportToDocx(noteId: string) {
   const { tenantId } = await requireTenantAction();
 
-  const note = await withTenant<any>(tenantId, (tx) =>
+  const note = await withTenant<ConceptNoteWithOpportunity | null>(tenantId, (tx) =>
     tx.conceptNote.findFirst({
       where: { id: noteId, tenantId },
       include: { opportunity: true }
@@ -132,7 +174,7 @@ export async function exportToDocx(noteId: string) {
     where: { id: note.templateId }
   });
 
-  const schema = template?.schema as any[];
+  const schema = (template?.schema ?? []) as ConceptTemplateSection[];
 
   const children = [
     new Paragraph({
@@ -165,18 +207,18 @@ export async function exportToDocx(noteId: string) {
 export async function generateAiUsageDeclaration(opportunityId: string) {
   const { tenantId } = await requireTenantAction();
 
-  const logs = await withTenant<any[]>(tenantId, (tx) =>
+  const logs = await withTenant<AiUsageLogRow[]>(tenantId, (tx) =>
     tx.aiUsageLog.findMany({
       where: { tenantId, proposalId: opportunityId },
       orderBy: { createdAt: 'asc' }
     })
   );
 
-  const totalInputs = logs.reduce((acc: number, l: any) => acc + l.inputTokens, 0);
-  const totalOutputs = logs.reduce((acc: number, l: any) => acc + l.outputTokens, 0);
-  const totalCredits = logs.reduce((acc: number, l: any) => acc + l.credits, 0);
+  const totalInputs = logs.reduce((acc: number, l) => acc + l.inputTokens, 0);
+  const totalOutputs = logs.reduce((acc: number, l) => acc + l.outputTokens, 0);
+  const totalCredits = logs.reduce((acc: number, l) => acc + l.credits, 0);
 
-  const sectionsUsed = Array.from(new Set(logs.map((l: any) => l.section).filter(Boolean)));
+  const sectionsUsed = Array.from(new Set(logs.map((l) => l.section).filter(Boolean)));
 
   const declarationMarkdown = `
 # Artificial Intelligence Usage & Transparency Declaration
@@ -201,7 +243,7 @@ This document provides full transparency regarding the use of Artificial Intelli
 
 | Timestamp (UTC) | Module | Section / Purpose | Model | Prompt Hash | Tokens (In/Out) | Credits |
 |---|---|---|---|---|---|---|
-${logs.map((l: any) => `| ${l.createdAt.toISOString()} | ${l.module} | ${l.section || l.purpose} | ${l.model} | \`${l.promptHash.slice(0, 10)}...\` | ${l.inputTokens}/${l.outputTokens} | ${l.credits} |`).join('\n')}
+${logs.map((l) => `| ${l.createdAt.toISOString()} | ${l.module} | ${l.section || l.purpose} | ${l.model} | \`${l.promptHash.slice(0, 10)}...\` | ${l.inputTokens}/${l.outputTokens} | ${l.credits} |`).join('\n')}
 
 ---
 *Generated automatically by FonBridge SaaS Platform Compliance Engine.*
