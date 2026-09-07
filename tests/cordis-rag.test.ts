@@ -1,35 +1,161 @@
-import { describe, test, expect, vi } from 'vitest';
-import { syncCordisBigData, aggregateCordisMetrics } from '../src/lib/cordis-sync';
-import { retrieveChunks, buildRagPrompt, splitText } from '../src/lib/rag';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { createCordisPrismaStub, type CordisPrismaStub } from './helpers/cordis-prisma-stub';
 
-vi.mock('../src/lib/db', () => ({
-  prisma: {
-    organization: {
-      upsert: vi.fn().mockResolvedValue({ id: 'org-1' }),
-    },
-    document: {
-      create: vi.fn().mockResolvedValue({ id: 'doc-rag-1' }),
-    },
-    $executeRawUnsafe: vi.fn().mockResolvedValue(1),
-    $queryRawUnsafe: vi.fn().mockResolvedValue([
-      { text: 'Mock CORDIS project chunk text', documentId: 'doc-rag-1', score: 0.92 },
-    ]),
-  },
-}));
+const db: CordisPrismaStub = createCordisPrismaStub();
 
-describe('Faz E (v2.0) CORDIS Big Data Sync & Advanced RAG Pipeline', () => {
-  test('syncCordisBigData ingests CORDIS project records and creates RAG embeddings', async () => {
-    const res = await syncCordisBigData();
+vi.mock('../src/lib/db', () => ({ prisma: db.prisma }));
+
+const { syncCordisBigData, aggregateCordisMetrics } = await import('../src/lib/cordis-sync');
+const { retrieveChunks, buildRagPrompt, splitText } = await import('../src/lib/rag');
+
+/** A record with every field the importer maps, so drift tests are unambiguous. */
+function record(overrides: Record<string, unknown> = {}) {
+  return {
+    projectId: '101100001',
+    framework: 'HORIZON',
+    rcn: '248101',
+    acronym: 'ZERO-EMISSION-EV',
+    title: 'Solid-state battery thermal management',
+    objectiveText: 'Scalable micro-sensor array embedded solid-state batteries.',
+    ecContributionEUR: 4_500_000,
+    startDate: '2026-01-01',
+    endDate: '2028-12-31',
+    coordinatorPic: '999985210',
+    coordinatorName: 'Fraunhofer-Gesellschaft',
+    coordinatorCountry: 'DE',
+    topicCode: 'HORIZON-CL5-2026-D3-01',
+    ...overrides,
+  } as Parameters<typeof syncCordisBigData>[0] extends (infer T)[] | undefined ? T : never;
+}
+
+describe('syncCordisBigData writes to the real CORDIS tables', () => {
+  beforeEach(() => db.reset());
+
+  test('persists a project, its coordinator and the participation between them', async () => {
+    const res = await syncCordisBigData([record()]);
+
     expect(res.success).toBe(true);
-    expect(res.syncedProjectsCount).toBeGreaterThan(0);
-    expect(res.totalEcContributionEUR).toBeGreaterThan(0);
+    expect(res.source).toBe('input');
+    expect(res.syncedProjectsCount).toBe(1);
+    expect(res.skippedCount).toBe(0);
+    expect(res.totalEcContributionEUR).toBe(4_500_000);
+
+    expect(db.rows('cordisProject')).toHaveLength(1);
+    expect(db.rows('cordisOrganization')).toHaveLength(1);
+    expect(db.rows('cordisParticipation')).toHaveLength(1);
+    expect(db.rows('cordisProjectTopic')).toHaveLength(1);
+
+    // The regression this file exists for: `prisma.organization` is undefined,
+    // so any write routed through it silently wrote nothing.
+    expect(db.prisma.organization).toBeUndefined();
   });
 
-  test('aggregateCordisMetrics computes OLAP project metrics', async () => {
-    const metrics = await aggregateCordisMetrics();
-    expect(metrics.totalProjectsCount).toBeGreaterThan(100000);
-    expect(metrics.topCountriesBreakdown.length).toBeGreaterThan(0);
+  test('is idempotent — the same record twice leaves one row per table', async () => {
+    await syncCordisBigData([record()]);
+    const afterFirst = {
+      projects: db.rows('cordisProject').length,
+      organizations: db.rows('cordisOrganization').length,
+      participations: db.rows('cordisParticipation').length,
+      topics: db.rows('cordisProjectTopic').length,
+    };
+
+    await syncCordisBigData([record({ title: 'Solid-state battery thermal management v2' })]);
+
+    expect({
+      projects: db.rows('cordisProject').length,
+      organizations: db.rows('cordisOrganization').length,
+      participations: db.rows('cordisParticipation').length,
+      topics: db.rows('cordisProjectTopic').length,
+    }).toEqual(afterFirst);
+    expect(afterFirst).toEqual({ projects: 1, organizations: 1, participations: 1, topics: 1 });
+
+    // Second pass updates in place rather than inserting a duplicate.
+    expect(db.rows('cordisProject')[0]?.title).toBe('Solid-state battery thermal management v2');
   });
+
+  test('an unknown field does not break the run — it is kept and alerted (CLAUDE.md #6)', async () => {
+    const res = await syncCordisBigData([
+      record({ someBrandNewCordisColumn: 'value the importer has never seen' }),
+    ]);
+
+    expect(res.success).toBe(true);
+    expect(res.syncedProjectsCount).toBe(1);
+
+    const alerts = db.rows('systemAlert');
+    expect(alerts.some((a) => String(a.message).includes('does not map'))).toBe(true);
+
+    // Drift is preserved in rawJson, the same way mapProjectRow keeps unknown
+    // CSV columns — not dropped.
+    expect(db.rows('cordisProject')[0]?.rawJson).toEqual({
+      someBrandNewCordisColumn: 'value the importer has never seen',
+    });
+  });
+
+  test('a record with no project id is skipped and alerted, never counted as synced', async () => {
+    const res = await syncCordisBigData([record({ projectId: '  ' })]);
+
+    expect(res.success).toBe(false);
+    expect(res.syncedProjectsCount).toBe(0);
+    expect(res.skippedCount).toBe(1);
+    expect(db.rows('cordisProject')).toHaveLength(0);
+    expect(db.rows('systemAlert').some((a) => String(a.message).includes('missing project id'))).toBe(true);
+  });
+
+  test('a coordinator without a PIC keeps the project but writes no organisation', async () => {
+    const res = await syncCordisBigData([record({ coordinatorPic: null })]);
+
+    expect(res.syncedProjectsCount).toBe(1);
+    expect(db.rows('cordisProject')).toHaveLength(1);
+    expect(db.rows('cordisOrganization')).toHaveLength(0);
+    expect(db.rows('cordisParticipation')).toHaveLength(0);
+    expect(db.rows('systemAlert').some((a) => String(a.message).includes('no organisation id'))).toBe(true);
+  });
+
+  test('with no records it mirrors already-imported rows instead of inventing a dataset', async () => {
+    await syncCordisBigData([record()]);
+    db.clear('document');
+
+    const res = await syncCordisBigData();
+
+    expect(res.source).toBe('database');
+    expect(res.syncedProjectsCount).toBe(1);
+    // Re-indexing must not create a second copy of the project.
+    expect(db.rows('cordisProject')).toHaveLength(1);
+    expect(db.rows('document')).toHaveLength(1);
+  });
+});
+
+describe('aggregateCordisMetrics reports measured figures (CLAUDE.md #7)', () => {
+  beforeEach(() => db.reset());
+
+  test('an empty database reports zeros rather than a hard-coded headline', async () => {
+    const metrics = await aggregateCordisMetrics();
+
+    expect(metrics.totalProjectsCount).toBe(0);
+    expect(metrics.totalEcContributionEUR).toBe(0);
+    expect(metrics.averageGrantPerProjectEUR).toBe(0);
+    expect(metrics.topCountriesBreakdown).toEqual([]);
+    expect(metrics.lastSyncTimestamp).toBe('');
+  });
+
+  test('figures follow the rows that were actually written', async () => {
+    await syncCordisBigData([
+      record(),
+      record({ projectId: '101100002', coordinatorPic: '999888777', ecContributionEUR: 1_500_000 }),
+    ]);
+
+    const metrics = await aggregateCordisMetrics();
+
+    expect(metrics.totalProjectsCount).toBe(2);
+    expect(metrics.totalEcContributionEUR).toBe(6_000_000);
+    expect(metrics.averageGrantPerProjectEUR).toBe(3_000_000);
+    expect(metrics.topCountriesBreakdown[0]?.country).toBe('DE');
+    expect(metrics.topCountriesBreakdown[0]?.projectCount).toBe(2);
+  });
+});
+
+describe('RAG helpers', () => {
+  beforeEach(() => db.reset());
 
   test('splitText divides long document text into overlapping chunks', () => {
     const text = 'A'.repeat(4000);
