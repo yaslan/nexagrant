@@ -19,9 +19,22 @@ uydurma-id-123/evaluations   HTTP 200   <- aynı
 /tr/main/zzzz                HTTP 404   <- eşleşmeyen rota: DOĞRU
 ```
 
-Yani sorun tek bir sayfada değil, `notFound()` çağıran **her** sayfada. Eşleşmeyen bir rota
-doğru 404 döndüğü için sebep büyük olasılıkla `src/app/not-found.tsx`'in `[locale]` segmentinin
-**dışında** olması: sınır rota ağacının içinde çözülmüyor. (Kart: TASK-MTQYY136Q3CGG.)
+Yani sorun tek bir sayfada değil, `notFound()` çağıran **her** sayfada. (Kart: TASK-MTQYY136Q3CGG.)
+
+**SEBEP ÖLÇÜLDÜ (2026-09-07, TASK-MTRKV9JGY7OQY) — yukarıdaki "not-found.tsx `[locale]` dışında"
+tahmini YANLIŞ.** Gerçek sebep `src/app/[locale]/(app)/[workspace]/loading.tsx`: bu dosya varken
+Next kabuğu akıtıyor (streaming), 200 başlığı `notFound()` daha çalışmadan tele çıkıyor ve
+sonradan değiştirilemiyor. Aynı dev sunucusunda, aynı URL ile iki yönlü ölçüm:
+
+```
+loading.tsx yerinde            -> 200
+loading.tsx geçici kenara alındı -> 404      (dosya hemen geri kondu)
+```
+
+Bu yüzden düzeltme "not-found.tsx'i taşımak" DEĞİL; `loading.tsx`'i kaldırmak ya da
+`notFound()` kararını akıtma sınırının üstüne (layout/segment girişine) taşımak gerekiyor.
+Eşleşmeyen rotanın (`/tr/main/zzzz`) doğru 404 vermesi de buna uyuyor: o istek
+`[workspace]/loading.tsx` sınırının içine hiç girmiyor.
 
 **Why:** İki şeyi birden bozuyor — arama motorları var olmayan kaydı indekslenebilir sayfa
 sanıyor, uptime/hata izleme 404'leri hiç görmüyor. Ayrıca doğrulama yaparken yanıltıyor:

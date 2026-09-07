@@ -1,5 +1,7 @@
 # Memory Index
 
+- [m6-scoring-complete](m6-scoring-complete.md) — M6.3 Scoring Logic tamamlandı — puanlama motor, ESR comparison, validation + tests all passing, gate clean
+
 - [fabrika-tsx-script-must-live-in-repo-root](fabrika-tsx-script-must-live-in-repo-root.md) — Fabrika'da tek seferlik DB sorgusu için tsx script'i scratchpad'e değil repo köküne yaz — Prisma client generated/prisma/client'ta ve driver adapter istiyor, dışarıdan import çözülmez
 
 - [fabrika-dev-postgres-is-up](fabrika-dev-postgres-is-up.md) — Fabrika'da yerel Postgres AYAKTA (localhost:5432) — "DB yok" diye uçtan-uca doğrulamayı atlama, önce nc -z localhost 5432 ile bak
@@ -19,3 +21,7 @@
 - [fabrika-photograph-degraded-state-by-renaming-function](fabrika-photograph-degraded-state-by-renaming-function.md) — Bir bağımlılık okunamadığında UI'ın ne gösterdiğini tarayıcıda kanıtlamak için DB fonksiyonunu DROP etme — ALTER FUNCTION ... RENAME ile kenara al, finally'de geri adlandır
 
 - [fabrika-fabrication-audit-must-cover-defaults](fabrika-fabrication-audit-must-cover-defaults.md) — Uydurma veri avında yalnız uydurulmuş DEĞERLERİ arama — bir şey İDDİA EDEN varsayılanlar (`@default("VALID")`, `status || 'VALID'`, hardcoded `status: 'VALID'`) de uydurmadır; ayrıca doğrulama kolonu çoğu zaman ZATEN vardır, kimse okumuyordur
+
+- [e11-3-calibration-status](e11-3-calibration-status.md) — E11.3 ESR Calibration — Fixture tamamlandı, Rule A 80% (kriter karşılanmıyor), anket 2026-09-21 bekleniyor
+
+- [fabrika-baseline-snapshot-goes-stale](fabrika-baseline-snapshot-goes-stale.md) — Paylaşılan ağaçta lint/typecheck baseline'ını kendi dosyalarını scratchpad'e kopyalayıp HEAD'e döndürerek ölç — ama snapshot'tan SONRA yaptığın düzeltmeler snapshot'ta yok, geri kopyalarsan onları ezersin

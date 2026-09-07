@@ -12,3 +12,5 @@
 - [fabrika-dashboard-outcome-has-no-live-ui-surface](fabrika-dashboard-outcome-has-no-live-ui-surface.md) — Pano kartlarının hiçbiri Proposal.outcome okumuyor — "Eşik Üstü Oranı" anahtarı var ama render edilmiyor; iki CSV uç noktasından biri yetim (ölçüldü 2026-09-07)
 
 - [e11-3-calibration-status](e11-3-calibration-status.md) — E11.3 ESR Calibration mevcut durumu (fixture yeniden üretildi, doğruluk ölçümleri tamamlandı, ortak anketi yanıtları bekleniyor)
+
+- [fabrika-i18n-locales-dead-pattern](fabrika-i18n-locales-dead-pattern.md) — src/locales/{locale}/{namespace}.json pattern is dead code — next-intl reads only messages/{locale}.json; spot & delete these files if you see them

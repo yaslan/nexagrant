@@ -110,3 +110,11 @@
 - [fabrika-e2e-blocked-by-landing-page-500](fabrika-e2e-blocked-by-landing-page-500.md) — Ana sayfa (/tr) 500 verdiği sürece pnpm test:e2e HİÇBİR testi koşturamaz — Playwright webServer yoklaması / adresine gider; çözüm E2E_BASE_URL'i giriş sayfasına almak
 
 - [fabrika-stage-only-your-hunks-from-shared-json](fabrika-stage-only-your-hunks-from-shared-json.md) — messages/*.json gibi paylaşılan bir dosyada yalnız KENDİ hunk'larını commit'lemenin yolu — `git diff` çıktısını hunk'lara böl, seninkileri filtrele, `git apply --cached` ile yalnız onları index'e uygula
+
+- [fabrika-prisma-generate-alone-changes-nothing](fabrika-prisma-generate-alone-changes-nothing.md) — prisma generate'i kapıya eklemek TEK BAŞINA hiçbir şey korumaz — prisma-override.d.ts'teki ambient declare module gerçek tipleri gölgeler; asıl ucuz kapı M8'in schema-contract tarayıcısı
+- [fabrika-typecheck-is-blind-to-db-calls](fabrika-typecheck-is-blind-to-db-calls.md) — pnpm typecheck DB çağrılarına kör — prisma generate kapıda değil, model delegate'leri any; şemada olmayan tabloya çağrı yeşil geçiyor
+
+- [fabrika-prisma-mock-makes-green-tests-for-crashing-calls](fabrika-prisma-mock-makes-green-tests-for-crashing-calls.md) — vi.mock ile elle yazılan prisma sahtesi, şemada OLMAYAN bir delegate'i mock'larsa çöken çağrıyı yeşil geçirir — sahte yalnız gerçek delegate'leri açmalı ve upsert'ü PK semantiğiyle uygulamalı
+
+- [fabrika-db-mock-invents-the-model](fabrika-db-mock-invents-the-model.md) — vi.mock('@/lib/db') şemayı mock'a tanımlatıyor — hayali bir modeli mock'lamak testi yeşil tutarken uç nokta bozuk kalıyor; rota testinde eşlemeyi alan-alan ve boş/404 durumunu iddia et
+- [fabrika-schema-contract-guard-misses-relation-names](fabrika-schema-contract-guard-misses-relation-names.md) — schema-contract.test.ts repo-sweep'i yalnız phantom MODEL yakalar; phantom RELATION (include:{x:true}) sadece SCANNED listesindeki (M8) dosyalarda kontrol edilir — M2 bu boşlukta kaldı

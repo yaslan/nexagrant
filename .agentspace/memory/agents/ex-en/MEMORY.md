@@ -9,3 +9,7 @@
 - [fabrika-g0-25-opportunities-was-two-tenants](fabrika-g0-25-opportunities-was-two-tenants.md) — "25 fırsat 18 alıyor" kartı yanıltıcıydı — sadece demo-tenant'ın 5'i öyleydi; esr-calibration'ın 20'si ayrı bir fixture mekanizmasından zaten farklılaşmıştı. Ayrıca G0 demo-tenant tavanı yapısal olarak 75/100'de kilitli.
 
 - [fabrika-entitlement-is-getentitlements-not-planentitlement](fabrika-entitlement-is-getentitlements-not-planentitlement.md) — CLAUDE.md §4'ün andığı PlanEntitlement tablosu ve src/lib/authz depoda YOK — hak edişin tek gerçeği src/lib/billing.ts::getEntitlements(); plan kapısı 2026-09-07'de checkModuleAccess içine bağlandı
+
+- [fabrika-dashboard-threshold-rate-learned](fabrika-dashboard-threshold-rate-learned.md) — KPI panoda "Eşik Üstü Oranı" kartı ekledi (2026-09-07) — MetricValue tasarımı, i18n kaynakları, pano grid düzeni kalıcı bilgi
+
+- [fabrika-ghost-tables-are-mostly-dead-code](fabrika-ghost-tables-are-mostly-dead-code.md) — Dört "hayalet tablo"dan üçü (Participation/Collab/OrgTopicStat) canlı çağrısı olmayan ölü koddu; sınıfın gerçek kalıntısı hayalet ALAN/İLİŞKİ — sso.ts, calls/turkey, api/v1/calls, m2 actions, alerts-daily
