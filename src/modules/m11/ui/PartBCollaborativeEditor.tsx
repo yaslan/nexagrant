@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   FileText,
   Users,
@@ -39,6 +39,12 @@ import {
   generateSectionDraftAi,
 } from '../server/actions';
 import { errorMessage } from '@/lib/errors';
+import { useNow } from '@/lib/hooks/use-now';
+
+/** A section lock the server hands out is honoured for this long, then treated as abandoned. */
+const LOCK_TTL_SECONDS = 60;
+/** How often the lock badge re-checks the clock. Well under the TTL, cheap enough to leave on. */
+const LOCK_TICK_MS = 5000;
 
 interface PartBCollaborativeEditorProps {
   partId: string;
@@ -52,7 +58,6 @@ interface PartBCollaborativeEditorProps {
 /**
  * Seed rows for a part that has no comments yet. Built per mount so the
  * timestamps read as "an hour ago" rather than a fixed date, and kept out of
- // eslint-disable-next-line react-hooks/purity
  * the component body because `Date.now()` may not run during render.
  */
 function demoComments(): SectionCommentItem[] {
@@ -62,7 +67,6 @@ function demoComments(): SectionCommentItem[] {
       sectionKey: '1.1_objectives',
       authorName: 'Prof. Klaus Müller',
       authorOrg: 'Fraunhofer Institute',
-      // eslint-disable-next-line react-hooks/purity
       timestamp: new Date(Date.now() - 3600000).toISOString(),
       text: 'SO2 hedefinde AI model doğruluğu %99.2 olarak belirtilmiş. Bu metriği test senaryolarıyla detaylandırmalıyız.',
       resolved: false,
@@ -72,7 +76,6 @@ function demoComments(): SectionCommentItem[] {
       sectionKey: '1.2_methodology',
       authorName: 'Dr. Sofia Rossi',
       authorOrg: 'Politecnico di Milano',
-      // eslint-disable-next-line react-hooks/purity
       timestamp: new Date(Date.now() - 7200000).toISOString(),
       text: 'Açık bilim bölümünde Zenodo ve CC-BY lisanslama taahhüdü çok net, teşekkürler.',
       resolved: true,
@@ -88,7 +91,6 @@ function demoRevisions(content: string): SectionRevisionItem[] {
       sectionKey: '1.1_objectives',
       authorName: 'Dr. Mehmet Yılmaz',
       authorOrg: 'Demo SME Consultancy',
-      // eslint-disable-next-line react-hooks/purity
       timestamp: new Date(Date.now() - 1800000).toISOString(),
       wordCount: 172,
       summary: 'SMART hedefler ve TRL hedefleri eklendi',
@@ -115,10 +117,33 @@ export function PartBCollaborativeEditor({
   const [activeSectionKey, setActiveSectionKey] = useState<string>('1.1_objectives');
   const activeSection = sections.find((s) => s.key === activeSectionKey) || sections[0]!;
 
-  const [editorText, setEditorText] = useState<string>(activeSection.content || '');
+  /**
+   * The unsaved edit buffer, tagged with the section it belongs to. Tagging it is what lets the
+   * editor text be *derived* during render: selecting another section makes the tag stale, so
+   * that section's saved content shows through on its own. The effect that used to copy the
+   * content across on every selection change — and the cascading render it caused — is gone.
+   */
+  const [editorDraft, setEditorDraft] = useState<{ sectionKey: string; text: string } | null>(null);
+  const editorText =
+    editorDraft?.sectionKey === activeSectionKey ? editorDraft.text : activeSection.content || '';
+  const setEditorText = useCallback(
+    (text: string) => setEditorDraft({ sectionKey: activeSectionKey, text }),
+    [activeSectionKey]
+  );
+
   const [viewMode, setViewMode] = useState<'EDIT' | 'PREVIEW'>('EDIT');
   const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'SAVED' | 'UNSAVED' | 'SAVING'>('SAVED');
+
+  /**
+   * Derived, not stored. A save in flight is SAVING; a buffer that differs from the section's
+   * saved content is UNSAVED; anything else is SAVED. A failed save leaves the section row
+   * untouched, so the indicator falls back to UNSAVED without an error branch setting it.
+   */
+  const saveStatus: 'SAVED' | 'UNSAVED' | 'SAVING' = isSaving
+    ? 'SAVING'
+    : editorText !== (activeSection.content || '')
+      ? 'UNSAVED'
+      : 'SAVED';
 
   const [activeDrawer, setActiveDrawer] = useState<'COMMENTS' | 'HISTORY' | 'AI' | null>(null);
 
@@ -162,18 +187,6 @@ export function PartBCollaborativeEditor({
   const [aiPromptNotes, setAiPromptNotes] = useState('');
 
   useEffect(() => {
-    const sec = sections.find((s) => s.key === activeSectionKey);
-    if (sec) {
-      // Loading the newly selected section into the editor is a one-shot sync from server data;
-      // it cannot be derived during render because the buffer is user-editable afterwards.
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
-      setEditorText(sec.content || '');
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
-      setSaveStatus('SAVED');
-    }
-  }, [activeSectionKey, sections]);
-
-  useEffect(() => {
     const interval = setInterval(async () => {
       try {
         await updatePresenceHeartbeat(
@@ -194,7 +207,6 @@ export function PartBCollaborativeEditor({
 
   const handleSaveContent = async (isManual: boolean = true) => {
     setIsSaving(true);
-    setSaveStatus('SAVING');
     try {
       await updateSectionContent(
         partId,
@@ -230,26 +242,20 @@ export function PartBCollaborativeEditor({
         content: editorText,
       };
       setRevisions((prev) => [newRev, ...prev.slice(0, 20)]);
-
-      setSaveStatus('SAVED');
     } catch (err) {
       console.error('Error saving content:', err);
-      setSaveStatus('UNSAVED');
     } finally {
       setIsSaving(false);
     }
   };
 
+  // Autosave only. The dirty indicator is derived above, so this effect no longer sets state
+  // in its body — it just arms the 2.5s timer and disarms it on the next keystroke.
   useEffect(() => {
-    if (editorText === activeSection.content) return;
-    // Marking the draft dirty is the whole point of this effect: the user typed, so the
-    // save indicator must flip before the 2.5s autosave timer fires. There is no render-time
-    // value to derive it from.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
-    setSaveStatus('UNSAVED');
+    if (editorText === (activeSection.content || '')) return;
 
-    const timer = setTimeout(async () => {
-      await handleSaveContent(false);
+    const timer = setTimeout(() => {
+      void handleSaveContent(false);
     }, 2500);
 
     return () => clearTimeout(timer);
@@ -263,12 +269,18 @@ export function PartBCollaborativeEditor({
   const MAX_PAGE_LIMIT = 45;
 
   const isLockedByMe = activeSection.lockedBy === currentUserId;
-  const isLockedByOther =
+
+  // A lock goes stale 60s after it was taken. Reading `Date.now()` during render made that an
+  // impure render that also never re-ran, so an expired lock kept the section greyed out until
+  // something unrelated re-rendered the tree. Ticking the clock makes the badge expire on time.
+  const now = useNow(LOCK_TICK_MS);
+  const isLockedByOther = Boolean(
     activeSection.lockedBy &&
-    activeSection.lockedBy !== currentUserId &&
-    activeSection.lockedAt &&
-    // eslint-disable-next-line react-hooks/purity
-    (Date.now() - new Date(activeSection.lockedAt).getTime()) / 1000 < 60;
+      activeSection.lockedBy !== currentUserId &&
+      activeSection.lockedAt &&
+      now !== null &&
+      (now - new Date(activeSection.lockedAt).getTime()) / 1000 < LOCK_TTL_SECONDS
+  );
 
   const handleAcquireLock = async () => {
     const res = await acquireSectionLock(
