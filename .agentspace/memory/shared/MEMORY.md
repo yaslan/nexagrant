@@ -40,3 +40,7 @@
 - [fabrika-g0-score-never-computed](fabrika-g0-score-never-computed.md) — Fabrika'da G0 kapı puanı hiç hesaplanmıyor — g0Score seed'den statik ya da Math.random() ile geliyor, kanonik scoreG0() üretimde hiç çağrılmıyor (ölçüldü 2026-09-07)
 
 - [fabrika-stripe-idempotency-guard-dead](fabrika-stripe-idempotency-guard-dead.md) — Fabrika'da Stripe webhook'unun idempotency kapısı fiilen kapalı — `data: { equals: { stripeEventId } }` tam-belge eşitliği arıyor, asla eşleşmiyor; webhook kopyalarken bunu kopyalama
+
+- [fabrika-dashboard-outcome-case-mismatch](fabrika-dashboard-outcome-case-mismatch.md) — Fabrika dashboard başarı oranını %0 gösteriyor — kod ABOVE_THRESHOLD arıyor, DB above_threshold tutuyor (ölçüldü 2026-09-07)
+- [fabrika-i18n-dead-catalog-trap](fabrika-i18n-dead-catalog-trap.md) — Bir modül JSON i18n katalog dosyası src/locales/<lang>/<mod>.json altına yazılırsa next-intl onu hiç okumaz — DoD "i18n tamam" iddiası doğru olsa bile UI hard-coded kalır
+- [fabrika-m6-disclaimer-surfaces](fabrika-m6-disclaimer-surfaces.md) — Evaluator Lens (M6) skoru gösteren beş yüzey ve her birinin "iç ön değerlendirme" etiketini nereden aldığı — yeni copy icat etme, m6.internalPreAssessment anahtarlarını kullan

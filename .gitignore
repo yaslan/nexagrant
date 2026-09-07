@@ -58,3 +58,4 @@ resolution.log
 # Playwright artifacts
 test-results/
 playwright-report/
+.tmp-be-en/

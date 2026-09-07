@@ -1,28 +1,32 @@
 ---
 name: fabrika-g0-score-never-computed
-description: Fabrika'da G0 kapı puanı hiç hesaplanmıyor — g0Score seed'den statik ya da Math.random() ile geliyor, kanonik scoreG0() üretimde hiç çağrılmıyor (ölçüldü 2026-09-07)
+description: G0 puanı ARTIK hesaplanıyor (2026-09-07 düzeltildi) — asıl kalan sorun kanıt verisi yok; demo kiracıda her fırsat %18 kapsamla 18 puan alıyor
 metadata:
   type: project
   updatedAt: 2026-09-07
 ---
 
-2026-09-07'de ölçüldü (TASK-MTQ63RR8Z0G8E keşfi):
-`src/lib/scoring/g0-canonical.ts` içindeki `scoreG0()` ve `decideG0()` fonksiyonlarının
-ÜRETİM KODUNDA TEK ÇAĞRISI YOK. Yalnız `scripts/esr-calibration.ts` CLI'ı çağırıyor.
+**DURUM DEĞİŞTİ — bu dosya artık "hesaplanmıyor" demiyor.**
 
-`opportunity.g0Score` alanı şu üç yoldan doluyor:
-- `prisma/seed-opportunities.ts` — statik değerler (75, 82, 85, 88, 92)
-- pipeline mock'u — `Math.random() * 15 + 80`
-- hiç dolmuyor
+2026-09-07 sabahı ölçülen bulgu (TASK-MTQ63RR8Z0G8E keşfi): `scoreG0()`/`decideG0()` üretimde hiç
+çağrılmıyordu; `Opportunity.g0Score` ya seed sabitinden (75/82/85/88/92) ya da
+`Math.floor(Math.random() * 15 + 80)`'den geliyordu ve kapı bu uydurma sayıyla karar veriyordu.
 
-`src/lib/gates/evaluate.ts` bu uydurma sayıyı okuyup kapı kararı veriyor. Yani kullanıcıya
-gösterilen G0 puanı hiçbir Evidence kaydına dayanmıyor — CLAUDE.md kural 7 ihlali.
+2026-09-07 öğleden sonra **kapatıldı** (aynı görevin 2. turu):
+- `src/lib/scoring/g0-features.ts` — kayıt anlık görüntüsü → 7 özellik + 2 sert olgu + kaynak izi (saf)
+- `src/lib/scoring/g0-compute.ts` — Prisma okuması + puanlama + kalıcılık; G0 puanı yazan **tek** yer
+- çağrı noktaları: `gates/evaluate.ts` (G0 artık kendi puanlıyor), `pipeline/actions.ts::createOpportunity`,
+  `prisma/seed-opportunities.ts`, `scripts/rescore-g0.ts` (`pnpm jobs:g0-rescore`)
+- `src/lib/scoring/g0.ts` (4-faktör 0–10 ölü model) SİLİNDİ
+- kanıt kaydı: `TopicMatch.g0Score` + `TopicMatch.breakdown` (katkılar, kaynak izi, coverage,
+  `assessment: "internal-pre-assessment"`) ve `GateDecision.inputs.g0Evidence`
 
-İKİNCİ ÖLÇÜM TUZAĞI: kart "G0 üç yerde farklı hesaplanıyor" diyordu; gerçek "hiç
-hesaplanmıyor". Kart teşhisi ÇÜRÜDÜ. Bu yüzden koda karşı doğrulamadan iş dağıtma —
-bkz. [[fabrika-board-cards-go-stale]].
+**ASIL KALAN SORUN — VERİ, KOD DEĞİL.** Demo kiracıda kanıt tablolarının hiçbiri seed edilmemiş:
+`TopicStat` boş, `TopicMatch` yok, `TenantProfile.keywords` yok, `Tenant.pic` yok, CORDIS yok.
+Sonuç: beş demo fırsatının hepsi **18 puan / %18 kanıt kapsamı** alıyor ve TÜM G0 kapıları düşüyor.
+Panoda gördüğün düşük puan bir hesaplama hatası DEĞİL, veri yokluğunun dürüst raporu.
+Kanıtı görmek için: `pnpm jobs:g0-rescore -- --tenant demo-tenant --verbose` (her özelliğin
+kaynağını ve neden `missing` olduğunu satır satır basar).
 
-Bağlı sonuç: E11.3 ESR kalibrasyonunun "%85 doğruluk" kriteri bu boşluğun üstünde duruyor;
-fixture ölçümü %80 (A kuralı), ortak anket yanıtları 2026-09-20'ye kadar bekleniyor.
-
-Eski `src/lib/scoring/g0.ts` (`calculateG0Score`, 4-faktör, 0-10 ölçek) referanssız ölü kod.
+Kapı karar semantiği kasıtlı değiştirilmedi — bkz. [[fabrika-g0-scoring-three-implementations]]
+(Açık karar #8 hâlâ açık). Uygulama tuzağı için [[fabrika-g0-evidence-placeholder-laundering]].

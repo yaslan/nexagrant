@@ -1,0 +1,1 @@
+- [Verify before every commit, not just after git add](git-add-verify-before-commit.md) — a scoped `git add` can still get swept by a concurrent agent's stage before commit; check `git diff --cached` right before committing
