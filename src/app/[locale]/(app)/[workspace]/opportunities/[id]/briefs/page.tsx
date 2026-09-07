@@ -26,6 +26,15 @@ export default async function MeetingBriefsPage({
 
       if (opp) {
         briefs = await tx.meetingBrief.findMany({
+          select: {
+            id: true,
+            interactionId: true,
+            partnerName: true,
+            content: true,
+            meetingScheduledAt: true,
+            meetingScheduledTz: true,
+            createdAt: true,
+          },
           where: { tenantId },
           orderBy: { createdAt: 'desc' },
         });

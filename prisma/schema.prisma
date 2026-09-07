@@ -996,11 +996,14 @@ model Score {
 }
 
 model MeetingBrief {
-  id             String      @id @default(cuid())
-  tenantId       String
-  interactionId  String      @unique
-  content        String
-  createdAt      DateTime    @default(now())
+  id                  String      @id @default(cuid())
+  tenantId            String
+  interactionId       String      @unique
+  partnerName         String?
+  content             String
+  meetingScheduledAt  DateTime?   // UTC meeting time
+  meetingScheduledTz  String      @default("Europe/Brussels")
+  createdAt           DateTime    @default(now())
 }
 
 

@@ -19,10 +19,14 @@ export async function generateMeetingBrief({
   interactionId,
   partnerName,
   callTopic,
+  meetingScheduledAt,
+  meetingScheduledTz = 'Europe/Brussels',
 }: {
   interactionId: string;
   partnerName: string;
   callTopic: string;
+  meetingScheduledAt?: Date;
+  meetingScheduledTz?: string;
 }) {
   const { tenantId, userId } = await requireTenantAction();
   const prompt = `Generate a 1-page pre-meeting briefing note for a Horizon Europe consortium discussion.
@@ -100,12 +104,24 @@ export async function generateMeetingBrief({
       if (existing) {
         return tx.meetingBrief.update({
           where: { id: existing.id },
-          data: { content: briefContent },
+          data: {
+            content: briefContent,
+            partnerName,
+            meetingScheduledAt,
+            meetingScheduledTz,
+          },
         });
       }
 
       return tx.meetingBrief.create({
-        data: { tenantId, interactionId, content: briefContent },
+        data: {
+          tenantId,
+          interactionId,
+          content: briefContent,
+          partnerName,
+          meetingScheduledAt,
+          meetingScheduledTz,
+        },
       });
     });
 

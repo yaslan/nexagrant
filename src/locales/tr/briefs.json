@@ -1,0 +1,42 @@
+{
+  "briefs": {
+    "moduleTitle": "Modül 9 — Meeting Briefs",
+    "pageTitle": "Görüşme Brifingi & Not Alma Motoru",
+    "creditCost": "1 AI Kredi / Brief",
+    "backToPipeline": "Pipeline'a Dön",
+    "form": {
+      "title": "Yeni Görüşme Notu Oluştur (AI Pre-Meeting Brief)",
+      "partnerPlaceholder": "Görüşülecek Ortak / Kurum Adı",
+      "generateButton": "Yapay Zeka Brief Oluştur",
+      "generatingButton": "AI Brief Hazırlanıyor...",
+      "utcNote": "UTC olarak kaydedilecektir.",
+      "brusselsTime": "Brüksel Saati (Europe/Brussels)"
+    },
+    "list": {
+      "title": "Görüşme Kayıtları",
+      "empty": "Henüz kayıtlı bir görüşme bulunmuyor."
+    },
+    "detail": {
+      "header": "Etkileşim ID",
+      "createdAt": "Oluşturulma",
+      "printButton": "Yazdır",
+      "downloadCalendarButton": "Takvim (.ics)",
+      "downloadCalendarWarning": "Toplantı tarihi belirlenmemiş"
+    },
+    "postmeeting": {
+      "title": "Toplantı Sonrası Kararları & Aksiyon Notu Ekle",
+      "decisions": "Alınan Kararlar / Sonuç",
+      "decisionsPlaceholder": "Örn: Fraunhofer WP3 liderliğini kabul etti; NDA haftaya imzalanacak.",
+      "notes": "Görüşme Detay Notları",
+      "notesPlaceholder": "Toplantıda konuşulan detaylar...",
+      "actionItems": "Aksiyon Maddeleri",
+      "actionItemPlaceholder": "Aksiyon maddesi ekle...",
+      "addActionItem": "Ekle",
+      "removeActionItem": "Kaldır",
+      "nextMeetingDate": "Sonraki Takip Görüşme Tarihi",
+      "saveButton": "Toplantı Sonrası Notlarını Brief'e Ekle",
+      "savingButton": "Notlar Ekleniyor..."
+    },
+    "empty": "Lütfen sol panelden bir görüşme seçin veya yeni bir AI Brief oluşturun."
+  }
+}
