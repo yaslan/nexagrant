@@ -1,0 +1,20 @@
+### grep -rni "sentry" src/ prisma/schema.prisma .env.example
+-> 0 hits
+
+### grep -rni "sentry" prisma/migrations/  (rename statements must name the old column)
+    prisma/migrations/rename-feedback-alert-columns.sql:9:--     "sentryEventId" -> "alertId"      references SystemAlert.id
+    prisma/migrations/rename-feedback-alert-columns.sql:10:--     "sentryStatus"  -> "alertStatus"   recorded | failed
+    prisma/migrations/rename-feedback-alert-columns.sql:28:-- 1. Archive the legacy Sentry pairs before the rename, so the archive can be
+    prisma/migrations/rename-feedback-alert-columns.sql:35:    WHERE table_name = 'Feedback' AND column_name = 'sentryEventId'
+    prisma/migrations/rename-feedback-alert-columns.sql:40:      SELECT coalesce(jsonb_agg(jsonb_build_object('id', "id", 'eventId', "sentryEventId", 'status', "sentryStatus")), '[]'::jsonb)
+    prisma/migrations/rename-feedback-alert-columns.sql:42:      WHERE "sentryEventId" IS NOT NULL OR "sentryStatus" IS NOT NULL
+    prisma/migrations/rename-feedback-alert-columns.sql:62:             WHERE table_name = 'Feedback' AND column_name = 'sentryEventId') THEN
+    prisma/migrations/rename-feedback-alert-columns.sql:63:    ALTER TABLE "Feedback" RENAME COLUMN "sentryEventId" TO "alertId";
+    prisma/migrations/rename-feedback-alert-columns.sql:69:             WHERE table_name = 'Feedback' AND column_name = 'sentryStatus') THEN
+    prisma/migrations/rename-feedback-alert-columns.sql:70:    ALTER TABLE "Feedback" RENAME COLUMN "sentryStatus" TO "alertStatus";
+    prisma/migrations/rename-feedback-alert-columns.down.sql:16:    ALTER TABLE "Feedback" RENAME COLUMN "alertId" TO "sentryEventId";
+    prisma/migrations/rename-feedback-alert-columns.down.sql:23:    ALTER TABLE "Feedback" RENAME COLUMN "alertStatus" TO "sentryStatus";
+    prisma/migrations/rename-feedback-alert-columns.down.sql:36:       SET "sentryEventId" = a."eventId",
+    prisma/migrations/rename-feedback-alert-columns.down.sql:37:           "sentryStatus"  = a."status"
+    prisma/migrations/rename-feedback-alert-columns.down.sql:50:   SET "sentryStatus" = NULL, "sentryEventId" = NULL
+    prisma/migrations/rename-feedback-alert-columns.down.sql:51: WHERE "sentryStatus" IN ('recorded', 'legacy');

@@ -8,6 +8,15 @@ Kaynak: `prisma/schema.prisma` (bağlayıcı). Bu dosya niyeti ve ilişkileri a�
 - `Membership(tenant, user, role, workspaceIds[])`; boş `workspaceIds` = tüm çalışma alanları.
 - **Paylaşımlı (tenant-agnostik) tablolar:** `Programme, Call, Topic, TopicStat, Organization, Project, Participation, OrgTopicStat, Collab, ModuleCatalog, Plan, AddOnCatalog, Document(tenantId=null), RawFetch, SystemAlert`. RLS: herkese okuma, yalnızca sistem yazma.
 - **Kiracıya özel:** geri kalan tümü; `tenantId` zorunlu, RLS `tenant_id = current_setting('app.tenant_id')`.
+- ⚠️ **`SystemAlert` kiracı içeriği taşımaz.** Tabloda `tenantId` yoktur ve `prisma/rls.sql`
+  içinde **hiçbir politikası yoktur** — buraya yazılan her şey kiracı yalıtımının dışındadır.
+  Uyarılara başlık, gövde, e-posta, sayfa adresi veya `tenantId` yazılmaz; yalnızca
+  RLS korumalı satıra bir kimlik referansı (ör. `feedbackId`) ve kapalı kümeli sınıflandırma
+  alanları konur. Tek yazar: `src/lib/observability/system-alert.ts` (`recordAlert`), kimlik
+  görünümlü anahtarları (`email`, `token`, `apiKey`, …) düşürür ve `redactedKeys` ile bildirir.
+  Okuyucu: `/[locale]/admin/alerts` (yalnız platform-admin).
+  İndeksler: `[createdAt]`, `[source, createdAt]`, `[resolvedAt, createdAt]`
+  (`prisma/migrations/add-systemalert-console-indexes.sql`).
 
 ## 2. Ana akış (K5)
 
@@ -146,14 +155,19 @@ kendi içinde ayrıca rol kontrolü yapar).
 | `autoPriority` | Kural motorunun ilk kararı. **Elle değiştirilse de korunur** — ikisi arasındaki fark, kuralların ne kadar isabetli olduğunun ölçüsüdür. |
 | `triageReason` | Hangi kuralın çalıştığı (`impact:BLOCKER`, `keyword:data-loss`, `…>capped:UX`). Kararın denetlenebilirliği. |
 | `status` | `NEW · TRIAGED · IN_PROGRESS · RESOLVED · WONT_FIX` |
-| `screenshotKey` | R2 nesne anahtarı — **hiçbir zaman açık URL değil**; indirme bağlantısı istendiğinde imzalanır. R2 yapılandırılmamışsa `null` kalır, görsel Sentry ekine gider. |
-| `sentryStatus` / `sentryEventId` | `sent · skipped · failed`. Sentry bir yükselticidir, doğruluk kaynağı satırın kendisidir. |
+| `screenshotKey` | R2 nesne anahtarı — **hiçbir zaman açık URL değil**; indirme bağlantısı istendiğinde imzalanır. R2 yapılandırılmamışsa `null` kalır **ve görsel kaybolur**: bildiren kişiye gönderim ekranında söylenir, ayrıca `beta-feedback-screenshot` kaynaklı bir `SystemAlert` yazılır. |
+| `alertStatus` / `alertId` | `recorded · failed` (`legacy` = SystemAlert kanalından önceki kayıt). `alertId` → `SystemAlert.id`. Uyarı bir yükselticidir, doğruluk kaynağı satırın kendisidir. |
 | `triagedById` / `triagedAt` / `triageNote` | Kimin, ne zaman, hangi gerekçeyle karar verdiği. |
 
 Yazma sırası kasıtlıdır: **önce satır** (triyaj saf fonksiyon, başarısız olamaz), sonra ekran
-görüntüsü, sonra Sentry. Son iki adım "en iyi çaba"dır ve gönderimi düşürmez —
-Sentry ya da R2 kesintisinde ortağın bildirimi yine de kaydedilir
-(`src/lib/feedback/submit.ts`).
+görüntüsü, sonra `SystemAlert`. Son iki adım "en iyi çaba"dır ve gönderimi düşürmez —
+R2 kesintisinde ya da uyarı yazılamadığında ortağın bildirimi yine de kaydedilir
+(`src/lib/feedback/submit.ts`). Sonucun satıra damgalanması da (`alertStatus`/`alertId`)
+kırılmaz: kayıt zaten kalıcıdır, damga başarısız olursa kullanıcıya hata gösterilmez.
+
+Dış hata izleme servisi **kullanılmaz** (patron kararı, TASK-MTQUN8VV6DK8C): veri
+dağıtımdan çıkmaz. Yükseltme kanalı `SystemAlert` tablosu ve `/[locale]/admin/alerts`
+konsoludur.
 
 İndeksler: `[tenantId, createdAt]` (kiracı listesi), `[tenantId, status, priority]` (açık
 kayıtlar), `[priority, status]` ve `[createdAt]` (platform geneli triyaj panosu ve haftalık özet).
@@ -163,4 +177,7 @@ kayıtlar), `[priority, status]` ve `[createdAt]` (platform geneli triyaj panosu
 
 Migration: `prisma/migrations/add-feedback.sql` (idempotent, additive; RLS politikasını da
 kurar) — geri alma: `prisma/migrations/add-feedback.down.sql` (yıkıcı: tabloyu ve içindeki tüm
-bildirimleri siler, önce dışa aktarın).
+bildirimleri siler, önce dışa aktarın). Sütun adları
+`prisma/migrations/rename-feedback-alert-columns.sql` ile nötr adlara taşındı; eski dış izleyici
+kimlikleri silinmeden tek bir `SystemAlert` satırına (`source = 'feedback-migration'`)
+arşivlendi, geri alma bunu geri oynatır (kayıpsız).

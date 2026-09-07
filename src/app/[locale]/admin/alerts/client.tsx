@@ -36,15 +36,16 @@ const LEVELS = ['error', 'warn', 'info'] as const;
 
 /**
  * Level chips. Weight and border differ as well as hue, so the ranking survives
- * a colour-vision difference and a greyscale print — same rule as the P0–P3
- * chips on the feedback board.
+ * a colour-vision difference and a greyscale print.
+ *
+ * Built from the theme tokens in globals.css rather than a light palette plus a
+ * `dark:` override: the tokens are already defined per theme, so one class
+ * string is correct in both and cannot drift out of step.
  */
 const LEVEL_STYLE: Record<string, string> = {
-  error:
-    'bg-red-100 text-red-900 border-red-500 border-2 font-extrabold dark:bg-red-950 dark:text-red-100 dark:border-red-400',
-  warn:
-    'bg-amber-50 text-amber-900 border-amber-400 font-bold dark:bg-amber-950 dark:text-amber-100 dark:border-amber-600',
-  info: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600',
+  error: 'border-2 border-bad bg-bad/10 text-bad font-extrabold',
+  warn: 'border border-amber bg-amber/10 text-amber font-bold',
+  info: 'border border-border bg-surface-hover text-ink-2 font-semibold',
 };
 
 export default function AlertsConsoleClient({
@@ -241,8 +242,10 @@ export default function AlertsConsoleClient({
               return (
                 <React.Fragment key={row.id}>
                   <tr
+                    // Token-based tint: a raw light-palette highlight would put
+                    // the theme's own light text on a light background.
                     className={`border-b last:border-0 hover:bg-ground ${
-                      isHighlighted ? 'bg-blue-50 dark:bg-blue-950/40' : ''
+                      isHighlighted ? 'bg-accent-light' : ''
                     }`}
                   >
                     <td className="p-3 align-top">
@@ -266,14 +269,14 @@ export default function AlertsConsoleClient({
                         {row.message}
                       </button>
                       {isHighlighted && (
-                        <span className="mt-0.5 block text-[10px] font-semibold text-blue-700 dark:text-blue-300">
+                        <span className="mt-0.5 block text-[10px] font-semibold text-accent-ink">
                           {labels.highlighted}
                         </span>
                       )}
                     </td>
                     <td className="p-3 align-top text-xs">
                       {resolvedAt ? (
-                        <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-300">
+                        <span className="inline-flex items-center gap-1 font-semibold text-ok">
                           <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                           {labels.resolvedAt}
                         </span>
@@ -338,7 +341,7 @@ export default function AlertsConsoleClient({
                             {failedId === row.id && (
                               <p
                                 role="status"
-                                className="text-xs font-semibold text-red-700 dark:text-red-300"
+                                className="text-xs font-semibold text-bad"
                               >
                                 {labels.saveFailed}
                               </p>

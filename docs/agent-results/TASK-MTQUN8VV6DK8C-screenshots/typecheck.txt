@@ -1,0 +1,19 @@
+===== pnpm typecheck — full error list =====
+scripts/_dogfood-g0-probe2.ts(33,44): error TS7006: Parameter 'a' implicitly has an 'any' type.
+scripts/_dogfood-g0-probe2.ts(33,47): error TS7006: Parameter 'e' implicitly has an 'any' type.
+scripts/_dogfood-g0-probe3.ts(7,100): error TS7006: Parameter 'e' implicitly has an 'any' type.
+scripts/_dogfood-g0-probe4.ts(14,26): error TS7006: Parameter 'o' implicitly has an 'any' type.
+scripts/_dogfood-g0-probe5.ts(7,144): error TS7006: Parameter 'e' implicitly has an 'any' type.
+scripts/_pm-m9-audit.ts(19,29): error TS7006: Parameter 'x' implicitly has an 'any' type.
+scripts/_pm-m9-audit.ts(24,40): error TS7006: Parameter 's' implicitly has an 'any' type.
+scripts/_pm-m9-audit.ts(32,29): error TS7006: Parameter 'x' implicitly has an 'any' type.
+scripts/_pm-m9-audit2.ts(8,62): error TS7006: Parameter 'm' implicitly has an 'any' type.
+scripts/_pm-m9-audit2.ts(10,61): error TS7006: Parameter 'm' implicitly has an 'any' type.
+
+-> every error is in scripts/_dogfood-g0-probe*.ts and scripts/_pm-m9-audit*.ts — untracked
+   throwaway probe scripts left in the tree by other agents' sessions (git status: ??).
+   No error in src/, tests/ or prisma/. Baseline confirmed by attribution, not by claim.
+===== pnpm typecheck (other sessions' untracked probe scripts parked aside) =====
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+$ tsc --noEmit
+exit=0

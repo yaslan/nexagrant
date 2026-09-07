@@ -181,14 +181,31 @@ export async function submitFeedback(
     },
   });
 
-  await prisma.feedback.update({
-    where: { id: created.id },
-    data: {
-      screenshotKey,
-      alertStatus: alert.status,
-      alertId: alert.id ?? null,
-    },
-  });
+  // Stamping the outcome back is bookkeeping, not the submission. The report is
+  // already persisted and the alert already raised, so a failure here must not
+  // turn a saved report into a user-visible error — the same promise steps 3 and
+  // 4 make. (Observed for real: a stale client rejected the renamed columns and
+  // the reporter was told their report had not been saved, when it had.)
+  try {
+    await prisma.feedback.update({
+      where: { id: created.id },
+      data: {
+        screenshotKey,
+        alertStatus: alert.status,
+        alertId: alert.id ?? null,
+      },
+    });
+  } catch (error) {
+    logger.error('feedback outcome stamp failed; the report itself is saved', error, {
+      feedbackId: created.id,
+    });
+    await recordAlert({
+      level: 'warn',
+      source: FEEDBACK_ALERT_SOURCE,
+      message: 'Beta feedback row saved but its alert/screenshot outcome could not be stamped back.',
+      meta: { feedbackId: created.id },
+    });
+  }
 
   const result: SubmitFeedbackResult = {
     id: created.id,

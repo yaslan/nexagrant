@@ -25,7 +25,7 @@
 -- Rollback: prisma/migrations/rename-feedback-alert-columns.down.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- 1. Archive the legacy Sentry pairs before the rename, so the archive can be
+-- 1. Archive the legacy tracker pairs before the rename, so the archive can be
 --    written even if the second run finds the columns already renamed.
 DO $$
 DECLARE archived jsonb;

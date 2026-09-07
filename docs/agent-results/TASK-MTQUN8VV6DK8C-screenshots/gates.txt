@@ -1,0 +1,21 @@
+===== pnpm typecheck =====
+scripts/_pm-m9-audit.ts(24,40): error TS7006: Parameter 's' implicitly has an 'any' type.
+scripts/_pm-m9-audit.ts(32,29): error TS7006: Parameter 'x' implicitly has an 'any' type.
+scripts/_pm-m9-audit2.ts(8,62): error TS7006: Parameter 'm' implicitly has an 'any' type.
+scripts/_pm-m9-audit2.ts(10,61): error TS7006: Parameter 'm' implicitly has an 'any' type.
+[ELIFECYCLE] Command failed with exit code 2.
+
+===== pnpm test =====
+(Use `node --trace-warnings ...` to show where the warning was created)
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+
+ Test Files  56 passed | 2 skipped (58)
+      Tests  526 passed | 8 skipped (534)
+   Start at  09:44:31
+   Duration  2.88s (transform 4.49s, setup 0ms, import 10.71s, tests 4.47s, environment 943ms)
+
+
+===== pnpm i18n:check (tail) =====
+
+✅ All translation keys are present in both languages!
+
