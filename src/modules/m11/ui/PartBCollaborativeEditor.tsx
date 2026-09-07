@@ -196,7 +196,7 @@ export function PartBCollaborativeEditor({
           currentUserOrg,
           activeSectionKey
         );
-      } catch (e) {}
+      } catch {}
     }, 20000);
     return () => clearInterval(interval);
   }, [partId, activeSectionKey]);

@@ -19,7 +19,7 @@ export async function GET(req: Request) {
         if (part && (part.content)?.sections) {
           sections = (part.content).sections;
         }
-      } catch (e) {
+      } catch (_e) {
         sections = DEFAULT_PART_B_SECTIONS;
       }
     }

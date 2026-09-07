@@ -48,7 +48,7 @@ export default function NotificationsClient({
           unread: combined.includes(n.id) ? false : n.unread,
         }))
       );
-    } catch (e) {
+    } catch (_e) {
       setNotifications(initialNotifications);
     }
   }, [initialNotifications]);
@@ -80,7 +80,7 @@ export default function NotificationsClient({
       const updated = Array.from(new Set([...existing, ...allIds]));
       localStorage.setItem(storageKey, JSON.stringify(updated));
       window.dispatchEvent(new Event('fonbridge_notifications_updated'));
-    } catch (e) {}
+    } catch (_e) {}
   };
 
   const handleMarkSingleRead = (id: string) => {
@@ -91,7 +91,7 @@ export default function NotificationsClient({
       const updated = Array.from(new Set([...existing, id]));
       localStorage.setItem(storageKey, JSON.stringify(updated));
       window.dispatchEvent(new Event('fonbridge_notifications_updated'));
-    } catch (e) {}
+    } catch (_e) {}
   };
 
   return (

@@ -64,7 +64,7 @@ export async function getEmbedding(text: string): Promise<number[]> {
         const data = await res.json();
         return data.data[0].embedding;
       }
-    } catch (e) {}
+    } catch {}
   }
 
   return mockEmbedding(text);

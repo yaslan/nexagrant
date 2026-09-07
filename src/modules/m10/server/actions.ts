@@ -99,7 +99,7 @@ export async function generateStandardDoc(
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/documents', 'page');
-  } catch (e) {}
+  } catch {}
 
   return { ...doc, contentText };
 }
@@ -119,7 +119,7 @@ export async function signDocument(docId: string) {
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/documents', 'page');
-  } catch (e) {}
+  } catch {}
 
   return { success: updated.count > 0, signedAt };
 }
@@ -145,7 +145,7 @@ export async function createNewVersion(docId: string) {
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/documents', 'page');
-  } catch (e) {}
+  } catch {}
 
   return { success: updatedDoc !== null, updatedDoc };
 }

@@ -270,7 +270,7 @@ export async function createOpportunity({
   try {
     revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
     revalidatePath('/[locale]/(app)/[workspace]/firsatlar', 'page');
-  } catch (e) {}
+  } catch {}
   return { success: true, opportunity };
 }
 
@@ -303,7 +303,7 @@ export async function assignOpportunityOwner({
   try {
     revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
     revalidatePath('/[locale]/(app)/[workspace]/firsatlar', 'page');
-  } catch (e) {}
+  } catch {}
 
   return { success: true, ownerId, ownerName };
 }
@@ -344,7 +344,7 @@ export async function addOpportunityNote({
   try {
     revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
     revalidatePath('/[locale]/(app)/[workspace]/firsatlar', 'page');
-  } catch (e) {}
+  } catch {}
 
   return { success: true, note: noteObj };
 }
@@ -370,7 +370,7 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
   try {
     revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
     revalidatePath('/[locale]/(app)/[workspace]/firsatlar', 'page');
-  } catch (e) {}
+  } catch {}
   return { success: true };
 }
 
@@ -419,7 +419,7 @@ export async function evaluateOpportunityGate({
     try {
       revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
       revalidatePath('/[locale]/(app)/[workspace]/pipeline/[id]', 'page');
-    } catch (e) {}
+    } catch {}
 
     return { success: true, passed: result.passed, reasons: result.reasons };
   } catch (err) {
@@ -516,7 +516,7 @@ export async function archiveOpportunity({
       revalidatePath('/[locale]/(app)/[workspace]/pipeline/[id]', 'page');
       revalidatePath('/[locale]/(app)/[workspace]/firsatlar', 'page');
       revalidatePath('/[locale]/(app)/[workspace]/dashboard', 'page');
-    } catch (e) {}
+    } catch {}
 
     return { success: true, opportunityId, archivedAt: archivedAt.toISOString() };
   } catch (err) {
@@ -598,7 +598,7 @@ export async function logEffort({
     try {
       revalidatePath('/[locale]/(app)/[workspace]/pipeline/[id]', 'page');
       revalidatePath('/[locale]/(app)/[workspace]/dashboard', 'page');
-    } catch (e) {}
+    } catch {}
 
     return { success: true };
   } catch (err) {

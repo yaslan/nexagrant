@@ -216,7 +216,7 @@ export default function UserMenu({
       const updated = Array.from(new Set([...existing, ...allIds]));
       localStorage.setItem(storageKey, JSON.stringify(updated));
       window.dispatchEvent(new Event('fonbridge_notifications_updated'));
-    } catch (e) {}
+    } catch {}
   };
 
   const markSingleAsRead = (id: string) => {
@@ -227,7 +227,7 @@ export default function UserMenu({
       const updated = Array.from(new Set([...existing, id]));
       localStorage.setItem(storageKey, JSON.stringify(updated));
       window.dispatchEvent(new Event('fonbridge_notifications_updated'));
-    } catch (e) {}
+    } catch {}
   };
 
   if (!effectiveUserEmail) {

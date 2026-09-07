@@ -44,7 +44,7 @@ export async function createMarketplaceListing({
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/marketplace', 'page');
-  } catch (e) {}
+  } catch {}
 
   return listing;
 }
@@ -105,7 +105,7 @@ export async function generateApiKey({ name }: { name: string }) {
   try {
     revalidatePath('/[locale]/(app)/[workspace]/marketplace', 'page');
     revalidatePath('/[locale]/(app)/[workspace]/settings/api-keys', 'page');
-  } catch (e) {}
+  } catch {}
 
   return { apiKeyRecord, rawKey };
 }
@@ -122,7 +122,7 @@ export async function revokeApiKey(keyId: string) {
   try {
     revalidatePath('/[locale]/(app)/[workspace]/marketplace', 'page');
     revalidatePath('/[locale]/(app)/[workspace]/settings/api-keys', 'page');
-  } catch (e) {}
+  } catch {}
 
   return { success: deleted.count > 0 };
 }

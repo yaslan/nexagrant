@@ -46,7 +46,7 @@ export async function createTtoItem({
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/tto', 'page');
-  } catch (e) {}
+  } catch {}
 
   return item;
 }

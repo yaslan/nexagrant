@@ -90,7 +90,7 @@ export async function createApplicationPart(opportunityId: string, part: string)
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/application', 'page');
-  } catch (e) {}
+  } catch {}
 
   return createdPart;
 }
@@ -467,7 +467,7 @@ export async function addBudgetLine(
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/application', 'page');
-  } catch (e) {}
+  } catch {}
 
   return updatedPart;
 }
@@ -509,7 +509,7 @@ export async function addWorkPackage(
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/application', 'page');
-  } catch (e) {}
+  } catch {}
 
   return updatedPart;
 }
@@ -563,7 +563,7 @@ export async function addBudgetLineByToken(
 
   try {
     revalidatePath('/portal/partner/[token]', 'page');
-  } catch (e) {}
+  } catch {}
 
   return { success: saved, requestedTotal };
 }

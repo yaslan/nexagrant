@@ -156,7 +156,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
         where: { dataset, status: 'SUCCESS' },
         orderBy: { finishedAt: 'desc' },
       });
-    } catch (e) {
+    } catch (_e) {
       // Ignore DB find error in dry-run/offline mode
     }
 
@@ -511,7 +511,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
           error: errorMsg,
         },
       });
-    } catch (e) {
+    } catch (_e) {
       // Ignore DB update error
     }
 
