@@ -13,17 +13,26 @@
 import { parse } from 'csv-parse/sync';
 
 import {
+  ABOVE_THRESHOLD_OUTCOMES,
+  PROPOSAL_OUTCOMES,
+  type ProposalOutcome,
+} from '../proposal-outcome';
+import {
   baseRateToScore,
   type G0Decision,
   type G0Features,
   type G0HardFacts,
 } from '../scoring/g0-canonical';
 
-export const ESR_OUTCOMES = ['funded', 'reserve', 'above_threshold', 'below', 'ineligible'] as const;
-export type EsrOutcome = (typeof ESR_OUTCOMES)[number];
+/**
+ * The outcome vocabulary is `Proposal.outcome`'s, not this file's — the calibration script
+ * writes these very strings into that column, so a second copy here is how the two drift apart.
+ */
+export const ESR_OUTCOMES = PROPOSAL_OUTCOMES;
+export type EsrOutcome = ProposalOutcome;
 
-/** Outcomes that mean "pursuing this was the right call". */
-const POSITIVE_OUTCOMES = new Set<EsrOutcome>(['funded', 'reserve', 'above_threshold']);
+/** Outcomes that mean "pursuing this was the right call" — the same set the dashboard counts. */
+const POSITIVE_OUTCOMES = new Set<EsrOutcome>(ABOVE_THRESHOLD_OUTCOMES);
 
 export const LABEL_SOURCES = ['cordis-outcome', 'beta-survey', 'expert-review'] as const;
 export type LabelSource = (typeof LABEL_SOURCES)[number];

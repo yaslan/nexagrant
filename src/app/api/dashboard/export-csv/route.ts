@@ -1,8 +1,10 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/db';
 import { asRole, can } from '@/lib/rbac';
-// Same query, same shape as the dashboard page's — declared once there.
-import type { OppWithRelations } from '@/lib/dashboard/fetch-metrics';
+// One implementation of the dashboard KPIs, shared with the page that shows them. This route
+// used to carry its own copy, which is how the outcome comparison could be fixed in one place
+// and stay broken in the other (TASK-MTQTYXC0NUT0B).
+import { fetchDashboardMetrics, generateCSV } from '@/lib/dashboard/fetch-metrics';
+import { resolveDashboardRange } from '@/modules/m5/server/range';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -18,72 +20,24 @@ export async function GET(request: Request) {
     return new Response('Forbidden', { status: 403 });
   }
 
-  const url = new URL(request.url);
-  const from = url.searchParams.get('from');
-  const to = url.searchParams.get('to');
+  if (!tenantId) {
+    return new Response('Unauthorized', { status: 401 });
+  }
 
-  const fromDate = from ? new Date(from) : null;
-  const toDate = to ? new Date(to) : null;
+  const url = new URL(request.url);
+
+  // Same resolution as the page and as the dashboard's own export action, so the CSV covers
+  // the window the user is looking at. `new Date('2026-09-07')` — what this route used to do —
+  // is midnight UTC, which silently drops everything created on the last day of the range.
+  const { from, to, rangeEnd } = resolveDashboardRange(
+    url.searchParams.get('from') ?? undefined,
+    url.searchParams.get('to') ?? undefined
+  );
 
   try {
-    // Fetch opportunities with date filter
-    const where: Record<string, unknown> = { tenantId };
-    if (fromDate || toDate) {
-      where.createdAt = {};
-      if (fromDate) (where.createdAt as Record<string, Date>).gte = fromDate;
-      if (toDate) (where.createdAt as Record<string, Date>).lte = toDate;
-    }
+    const metrics = await fetchDashboardMetrics({ tenantId, from, to: rangeEnd });
+    const csv = generateCSV(metrics, from, to);
 
-    const opportunities = (await prisma.opportunity.findMany({
-      where,
-      include: { proposal: true, efforts: true },
-    })) as OppWithRelations[];
-
-    // Calculate metrics
-    const totalOpps = opportunities.length;
-    const submittedOpps = opportunities.filter(
-      (o) => o.proposal && ['SUBMITTED', 'FUNDED', 'ABOVE_THRESHOLD'].includes(o.proposal.outcome || '')
-    ).length;
-    const fundedOpps = opportunities.filter((o) => o.proposal?.outcome === 'FUNDED').length;
-
-    const avgIsabet = totalOpps > 0
-      ? (opportunities.reduce((sum: number, o) => sum + (o.g0Score || 0), 0) / totalOpps).toFixed(1)
-      : '0';
-
-    const totalEffortDays = opportunities.reduce(
-      (sum: number, o) => sum + o.efforts.reduce((s: number, e) => s + e.hours, 0) / 8,
-      0
-    );
-
-    const g2Opps = opportunities.filter((o) => ['G2', 'G3', 'G4'].includes(o.stage));
-    const avgG2Days = g2Opps.length > 0
-      ? g2Opps.reduce((sum: number, o) => sum + ((o.updatedAt.getTime() - o.createdAt.getTime()) / (1000 * 3600 * 24)), 0) / g2Opps.length
-      : 0;
-
-    const activeModules = await prisma.moduleState.count({
-      where: { tenantId, status: { in: ['ON', 'PILOT'] } },
-    });
-
-    // Generate CSV
-    const headers = ['KPI', 'Değer', 'Birim', 'Dönem'];
-    const rows = [
-      headers.join(','),
-      `Toplam Teklif,${totalOpps},adet,"${fromDate?.toLocaleDateString('tr-TR') || 'Başlangıç'} - ${toDate?.toLocaleDateString('tr-TR') || 'Günümüz'}"`,
-      `Başarı Oranı,${totalOpps > 0 ? ((submittedOpps / totalOpps) * 100).toFixed(1) : 0},%`,
-      `İsabet Oranı,${avgIsabet},skor`,
-      `Kişi-Gün,${totalEffortDays.toFixed(1)},gün`,
-      `G0→G2 Süresi,${Math.round(avgG2Days)},gün`,
-      `Açık Modüller,${activeModules},modül`,
-      '',
-      'Stage,Sayı',
-      `G0,${opportunities.filter((o) => o.stage === 'G0').length}`,
-      `G1,${opportunities.filter((o) => o.stage === 'G1').length}`,
-      `G2,${opportunities.filter((o) => o.stage === 'G2').length}`,
-      `G3,${opportunities.filter((o) => o.stage === 'G3').length}`,
-      `G4,${opportunities.filter((o) => o.stage === 'G4').length}`,
-    ];
-
-    const csv = rows.join('\n');
     return new Response(csv, {
       status: 200,
       headers: {

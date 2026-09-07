@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { isAboveThreshold, isFunded } from '@/lib/proposal-outcome';
 import type { Opportunity } from '@prisma/client';
 
 export interface MetricsFilters {
@@ -18,10 +19,35 @@ export interface OppWithRelations extends Opportunity {
   efforts: { hours: number }[];
 }
 
+const G2_AND_BEYOND = ['G2', 'G3', 'G4'];
+
+/** Just enough of a loaded row for {@link countOutcomes} to be testable without a database. */
+export interface OutcomeBearingRow {
+  proposal: { outcome: string | null } | null;
+}
+
+/**
+ * The two counts that read `Proposal.outcome`, kept pure so the case rule they depend on can
+ * be pinned by a unit test (tests/proposal-outcome.test.ts). Both go through
+ * src/lib/proposal-outcome rather than comparing the raw column: the spelling stored by the
+ * seeds and by the ESR calibration script is snake_case, and the SCREAMING_CASE literals that
+ * used to sit here matched no row ever written — which is why this KPI reported 0 % on data
+ * whose real answer was 20 % (docs/ROADMAP.md, TASK-MTQTYXC0NUT0B).
+ */
+export function countOutcomes(rows: readonly OutcomeBearingRow[]) {
+  return {
+    aboveThreshold: rows.filter((r) => isAboveThreshold(r.proposal?.outcome)).length,
+    funded: rows.filter((r) => isFunded(r.proposal?.outcome)).length,
+  };
+}
+
 export async function fetchDashboardMetrics(filters: MetricsFilters) {
   const { tenantId, from, to } = filters;
 
-  const where: Record<string, unknown> = { tenantId };
+  // `deletedAt: null` is part of the base filter, not an afterthought: every KPI below is a
+  // count or an average over this result set, so an archived opportunity left in it would keep
+  // inflating the hit rate and the person-day totals after it left the board.
+  const where: Record<string, unknown> = { tenantId, deletedAt: null };
   if (from || to) {
     where.createdAt = {};
     if (from) (where.createdAt as Record<string, Date>).gte = from;
@@ -35,10 +61,8 @@ export async function fetchDashboardMetrics(filters: MetricsFilters) {
 
   // Calculate KPIs
   const totalOpps = opportunities.length;
-  const submittedOpps = opportunities.filter(
-    (o: OppWithRelations) => o.proposal && ['SUBMITTED', 'FUNDED', 'ABOVE_THRESHOLD'].includes(o.proposal.outcome || '')
-  ).length;
-  const fundedOpps = opportunities.filter((o: OppWithRelations) => o.proposal?.outcome === 'FUNDED').length;
+
+  const { aboveThreshold: aboveThresholdOpps, funded: fundedOpps } = countOutcomes(opportunities);
 
   const avgIsabet = totalOpps > 0
     ? (opportunities.reduce((sum: number, o) => sum + (o.g0Score || 0), 0) / totalOpps).toFixed(1)
@@ -49,12 +73,13 @@ export async function fetchDashboardMetrics(filters: MetricsFilters) {
     0
   );
 
-  const avgG2Days = opportunities
-    .filter((o) => ['G2', 'G3', 'G4'].includes(o.stage))
-    .reduce((sum: number, o) => {
-      const diff = (o.updatedAt.getTime() - o.createdAt.getTime()) / (1000 * 3600 * 24);
-      return sum + diff;
-    }, 0) / Math.max(opportunities.filter((o) => ['G2', 'G3', 'G4'].includes(o.stage)).length, 1);
+  const g2Opps = opportunities.filter((o) => G2_AND_BEYOND.includes(o.stage));
+  const avgG2Days = g2Opps.length > 0
+    ? g2Opps.reduce(
+        (sum: number, o) => sum + (o.updatedAt.getTime() - o.createdAt.getTime()) / (1000 * 3600 * 24),
+        0
+      ) / g2Opps.length
+    : 0;
 
   const activeModules = await prisma.moduleState.count({
     where: { tenantId, status: { in: ['ON', 'PILOT'] } },
@@ -62,7 +87,7 @@ export async function fetchDashboardMetrics(filters: MetricsFilters) {
 
   return {
     totalOpps,
-    submittedOpps,
+    aboveThresholdOpps,
     fundedOpps,
     avgIsabet: parseFloat(avgIsabet as string),
     totalEffortDays: totalEffortDays.toFixed(1),
@@ -82,7 +107,7 @@ export async function fetchDashboardMetrics(filters: MetricsFilters) {
 /** The KPI block {@link fetchDashboardMetrics} returns, as the CSV writer reads it. */
 export interface DashboardMetricsCsvInput {
   totalOpps: number;
-  submittedOpps: number;
+  aboveThresholdOpps: number;
   avgIsabet: number;
   totalEffortDays: string;
   avgG2Days: number;
@@ -90,20 +115,32 @@ export interface DashboardMetricsCsvInput {
   stageBreakdown: Array<{ stage: string; count: number }>;
 }
 
+/**
+ * An empty cell, for a KPI with no inputs.
+ *
+ * Same rule the on-screen cards follow (src/modules/m5/server/metrics.ts): a ratio over no
+ * opportunities is not "0 %", it is a figure that does not exist yet. A spreadsheet reads an
+ * empty cell as "no value" and a `0` as a measurement, so absence gets the empty cell.
+ */
+const ratio = (numerator: number, denominator: number) =>
+  denominator > 0 ? ((numerator / denominator) * 100).toFixed(1) : '';
+
+const orBlank = (value: number | string, denominator: number) => (denominator > 0 ? value : '');
+
 export function generateCSV(metrics: DashboardMetricsCsvInput, from?: Date, to?: Date): string {
   const headers = ['KPI', 'Değer', 'Birim', 'Dönem'];
-  const metricsTyped = metrics;
+  const period = `${from?.toLocaleDateString('tr-TR') ?? 'Başlangıç'} - ${to?.toLocaleDateString('tr-TR') ?? 'Günümüz'}`;
   const rows = [
     headers.join(','),
-    `Toplam Teklif,${metricsTyped.totalOpps},adet,"${from?.toLocaleDateString('tr-TR')} - ${to?.toLocaleDateString('tr-TR')}"`,
-    `Başarı Oranı,${((metricsTyped.submittedOpps / metricsTyped.totalOpps) * 100).toFixed(1)},%`,
-    `İsabet Oranı,${metricsTyped.avgIsabet},skor`,
-    `Kişi-Gün,${metricsTyped.totalEffortDays},gün`,
-    `G0→G2 Süresi,${metricsTyped.avgG2Days},gün`,
-    `Açık Modüller,${metricsTyped.activeModules},modül`,
+    `Toplam Teklif,${metrics.totalOpps},adet,"${period}"`,
+    `Başarı Oranı,${ratio(metrics.aboveThresholdOpps, metrics.totalOpps)},%`,
+    `İsabet Oranı,${orBlank(metrics.avgIsabet, metrics.totalOpps)},skor`,
+    `Kişi-Gün,${metrics.totalEffortDays},gün`,
+    `G0→G2 Süresi,${orBlank(metrics.avgG2Days, metrics.totalOpps)},gün`,
+    `Açık Modüller,${metrics.activeModules},modül`,
     '',
     'Stage,Sayı',
-    ...metricsTyped.stageBreakdown.map((s) => `${s.stage},${s.count}`),
+    ...metrics.stageBreakdown.map((s) => `${s.stage},${s.count}`),
   ];
 
   return rows.join('\n');
