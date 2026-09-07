@@ -17,14 +17,19 @@ export async function GET(
 
   const note = await prisma.conceptNote.findFirst({
     where: { id, tenantId },
-    include: {
-      opportunity: true,
-    }
   });
 
   if (!note) {
     return new NextResponse('Not Found', { status: 404 });
   }
+
+  // ConceptNote.opportunityId has no `opportunity` relation in the Prisma
+  // schema — fetch it separately rather than `include: { opportunity: true }`,
+  // which throws PrismaClientValidationError.
+  const opportunity = await prisma.opportunity.findFirst({
+    where: { id: note.opportunityId, tenantId },
+    select: { title: true },
+  });
 
   const template = await prisma.conceptTemplate.findUnique({
     where: { id: note.templateId },
@@ -47,7 +52,7 @@ export async function GET(
     </head>
     <body>
         <h1>${template.name}</h1>
-        <h2>Opportunity: ${note.opportunity?.title || 'Untitled'}</h2>
+        <h2>Opportunity: ${opportunity?.title || 'Untitled'}</h2>
         <hr />
   `;
 
@@ -71,7 +76,7 @@ export async function GET(
     status: 200,
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'Content-Disposition': `attachment; filename="${note.opportunity?.title || 'ConceptNote'}.docx"`,
+      'Content-Disposition': `attachment; filename="${opportunity?.title || 'ConceptNote'}.docx"`,
     },
   });
 }

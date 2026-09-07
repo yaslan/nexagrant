@@ -32,19 +32,31 @@ interface ConceptTemplateSection {
 /** `ConceptNote.content`: the drafted markdown, keyed by section. */
 type ConceptNoteContent = Record<string, string>;
 
-/** The Opportunity this module drafts against, with its topic. */
+/**
+ * The Opportunity this module drafts against.
+ *
+ * `Opportunity.topicId` has no `topic` relation in the Prisma schema (it is a
+ * plain, unenforced foreign key), so the topic is fetched separately — see
+ * `generateConceptNoteDraft` below. Do not add `include: { topic: true }`
+ * here; Prisma will throw `PrismaClientValidationError` since the relation
+ * does not exist.
+ */
 interface OpportunityWithTopic {
   id: string;
   title: string;
-  topic: { title: string | null; identifier: string | null } | null;
+  topicId: string | null;
 }
 
-/** A ConceptNote with the opportunity the export titles itself from. */
+/**
+ * A ConceptNote. `opportunityId` likewise has no `opportunity` relation in
+ * the schema — fetch it separately (see `exportToDocx`) rather than
+ * `include: { opportunity: true }`.
+ */
 interface ConceptNoteWithOpportunity {
   id: string;
   templateId: string;
   content: ConceptNoteContent;
-  opportunity: { title: string };
+  opportunityId: string;
 }
 
 /** The AiUsageLog columns the transparency report reads. */
@@ -67,15 +79,23 @@ export async function generateConceptNoteDraft(
 ) {
   const { tenantId, userId } = await requireTenantAction();
 
-  // 1. Get the opportunity and topic — scoped to the session tenant
+  // 1. Get the opportunity — scoped to the session tenant
   const opp = await withTenant<OpportunityWithTopic | null>(tenantId, (tx) =>
     tx.opportunity.findFirst({
-      where: { id: opportunityId, tenantId },
-      include: { topic: true }
+      where: { id: opportunityId, tenantId }
     })
   );
 
   if (!opp) throw new Error('Opportunity not found');
+
+  // 1b. Topic is shared catalogue data with no Prisma relation to Opportunity
+  // (see the OpportunityWithTopic comment) — fetched separately by topicId.
+  const topic = opp.topicId
+    ? await prisma.topic.findUnique({
+        where: { id: opp.topicId },
+        select: { title: true, identifier: true }
+      })
+    : null;
 
   // 2. Get the template (shared catalogue, not tenant-scoped)
   const template = await prisma.conceptTemplate.findUnique({
@@ -90,7 +110,7 @@ export async function generateConceptNoteDraft(
   
   for (const section of schema) {
     // Basic RAG search
-    const searchQuery = `${opp.title} ${opp.topic?.title || ''} ${section.promptKey}`;
+    const searchQuery = `${opp.title} ${topic?.title || ''} ${section.promptKey}`;
     const ragResults = await semanticSearch(searchQuery, tenantId, 3);
     
     let contextStr = '';
@@ -100,7 +120,7 @@ export async function generateConceptNoteDraft(
 
     const prompt = `
       You are an expert grant writer for EU funding (Horizon Europe, etc.).
-      Topic: ${opp.topic?.title} (${opp.topic?.identifier})
+      Topic: ${topic?.title} (${topic?.identifier})
       Project Idea/Title: ${opp.title}
       Additional Inputs: ${JSON.stringify(inputs)}
       
@@ -163,12 +183,22 @@ export async function exportToDocx(noteId: string) {
 
   const note = await withTenant<ConceptNoteWithOpportunity | null>(tenantId, (tx) =>
     tx.conceptNote.findFirst({
-      where: { id: noteId, tenantId },
-      include: { opportunity: true }
+      where: { id: noteId, tenantId }
     })
   );
 
   if (!note) throw new Error('Note not found');
+
+  // ConceptNote has no `opportunity` relation in the schema (see the
+  // ConceptNoteWithOpportunity comment) — fetched separately by opportunityId.
+  const opportunity = await withTenant<{ title: string } | null>(tenantId, (tx) =>
+    tx.opportunity.findFirst({
+      where: { id: note.opportunityId, tenantId },
+      select: { title: true }
+    })
+  );
+
+  if (!opportunity) throw new Error('Opportunity not found for concept note');
 
   const template = await prisma.conceptTemplate.findUnique({
     where: { id: note.templateId }
@@ -178,7 +208,7 @@ export async function exportToDocx(noteId: string) {
 
   const children = [
     new Paragraph({
-      children: [new TextRun({ text: `Concept Note: ${note.opportunity.title}`, bold: true, size: 32 })]
+      children: [new TextRun({ text: `Concept Note: ${opportunity.title}`, bold: true, size: 32 })]
     })
   ];
 
