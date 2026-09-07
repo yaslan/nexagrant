@@ -30,9 +30,17 @@ M9/M11'de bulunan iki örnek (TASK-MTQW5BVFW6CMT'de temizlendi, 2026-09-07):
 
 Aynı deseni hâlâ taşıyan yerler (temizlenmedi, kapsam dışıydı — TASK-MTQYXISOPUJ53):
 - `pipeline/[id]/consortium/page.tsx` → `DEMO_OPPORTUNITIES` sabiti.
-- **`api/v1/partners/route.ts` — ailenin en ağırı:** tablo boşsa Fraunhofer için
-  `projectCount: 1420`, `totalEuContributionEur: 840500000`, `networkCentralityScore: 0.98`
-  uyduruyor ve bunu **API'den servis ediyor**. `api/v1/partners/[pic]/route.ts` → `topCoAuthors`.
+- ~~`api/v1/partners/route.ts` + `api/v1/partners/[pic]/route.ts`~~ — **TEMİZLENDİ**
+  (TASK-MTRK8YPNJDCIT, 2026-09-07). Uydurma sebebi şuydu: `prisma.organization` şemada yok,
+  delegate `undefined`, çağrı `TypeError` fırlatıyor, `try/catch` yutup demo diziye düşüyordu —
+  yani **200 OK, hiç koşmamış bir sorgunun yerine**. Detay uç noktası HERHANGİ bir PIC için
+  kurum uyduruyordu. Şimdi CORDIS tablolarına bağlı; veri yoksa `data: []`, bilinmeyen PIC'te
+  gerçek HTTP 404. Kaynağı olmayan iki metrik (`networkCentralityScore`, `cooperationIndex`)
+  anahtar olarak duruyor ama değeri `null` — şekil bozulmadan "ölçülmedi" diyor.
+  **Hâlâ aynı ailede olan kardeşleri:** `api/v1/calls/route.ts` (Topic boşsa sabit
+  "HORIZON-CL5-2026-D3-01 / €25.000.000") ve `api/v1/opportunities/route.ts`. Bunlar GERÇEK bir
+  modeli çağırdığı için schema-contract taraması onları yakalamaz — bu bir *veri* uydurması,
+  *model* uydurması değil.
 - `application/client.tsx` (62, 71, 79) + `m11/types.ts` + `m11/ui/PartBCollaborativeEditor.tsx`:
   fallback **istemcide** de var. Sunucu sayfasını temizlemek yetmiyor — `useState` başlangıç
   değeri sabit bütçe/WP/"3 aktif yazar" tutuyor, `applicationPart` tablosu 0 satırken bile
