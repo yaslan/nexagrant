@@ -363,11 +363,13 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
  * it announced a pass without reading a rule, without writing a `GateDecision` and without
  * moving the stage. This action is the call site `evaluateGate` never had from the product.
  *
- * The ownership check is not redundant. `evaluateGate` looks the opportunity up with
- * `findUnique({ where: { id } })` — no tenant clause — and then writes a `GateDecision` under
- * whatever `tenantId` it was handed, so an id guessed from another tenant would be evaluated and
- * filed here. The tenant-scoped `findFirst` below is what makes that impossible; it stays until
- * the gate engine (not this module's file) carries its own tenant filter.
+ * The ownership check below is now a second layer, not the only one. `evaluateGate` carries its own
+ * tenant filter as of TASK-MTQZMLLZE1I29 — it runs inside `withTenant` and refuses an id it cannot
+ * see with `GateOpportunityNotFoundError` — so a guessed cross-tenant id is rejected by the engine
+ * whatever the caller does. This check stays anyway: it is what distinguishes the two honest
+ * answers this action can give (`OPPORTUNITY_NOT_FOUND` for an id that is not this tenant's or
+ * lives only in the in-memory fallback, `GATE_EVALUATION_FAILED` for a gate that broke), and a
+ * future third caller inherits the engine's guarantee rather than this file's.
  */
 export async function evaluateOpportunityGate({
   opportunityId,

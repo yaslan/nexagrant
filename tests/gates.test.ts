@@ -1,5 +1,5 @@
-import { describe, test, expect, vi } from 'vitest';
-import { evaluateGate } from '../src/lib/gates/evaluate';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { evaluateGate, GateOpportunityNotFoundError } from '../src/lib/gates/evaluate';
 import { prisma } from '../src/lib/db';
 
 /**
@@ -88,11 +88,14 @@ const TENANTS: Record<string, { country: string | null; pic: string | null; sett
 };
 
 vi.mock('../src/lib/db', () => {
+  // `findUnique` is kept on the mock deliberately, with NO tenant clause honoured, so that a
+  // regression which goes back to `findUnique({ where: { id } })` reads another tenant's row here
+  // exactly as it would in production — and the cross-tenant tests below fail instead of passing
+  // on a mock that is safer than the database.
   const findUnique = vi.fn(({ where }: { where: { id: string } }) =>
     Promise.resolve(OPPORTUNITIES[where.id] ?? null),
   );
-  return {
-    prisma: {
+  const prisma = {
       opportunity: {
         findUnique,
         findFirst: vi.fn(({ where }: { where: { id: string; tenantId: string } }) => {
@@ -159,7 +162,12 @@ vi.mock('../src/lib/db', () => {
         ),
       },
       gateDecision: { create: vi.fn().mockResolvedValue({ id: 'decision-1' }) },
-    },
+  };
+  return {
+    prisma,
+    // The engine now runs inside the tenant's RLS context; the mock just hands the callback the
+    // same client, so the per-statement `tenantId` clauses are what the tests actually measure.
+    withTenant: vi.fn((_tenantId: string, cb: (tx: unknown) => unknown) => cb(prisma)),
   };
 });
 
@@ -226,5 +234,63 @@ describe('Gate Evaluation Engine (M5)', () => {
     const result = await evaluateGate('opp-fail', 'G2', 'tenant-1');
     expect(result.passed).toBe(false);
     expect(result.reasons[0]).toContain('Consortium lock failed');
+  });
+});
+
+/**
+ * Cross-tenant isolation (CLAUDE.md §1).
+ *
+ * The engine used to read the opportunity with `findUnique({ where: { id } })` — no tenant clause —
+ * and then write the `GateDecision` and the stage update under whatever `tenantId` it was handed.
+ * Nothing in the engine stopped tenant B from evaluating, filing a decision on and *advancing the
+ * stage of* tenant A's opportunity; the only thing that did was the one caller remembering to check
+ * ownership first. `opp-pass` belongs to `tenant-1`, so every call below uses `tenant-2`'s id.
+ */
+describe('Gate Evaluation Engine — tenant isolation', () => {
+  beforeEach(() => {
+    vi.mocked(prisma.gateDecision.create).mockClear();
+    vi.mocked(prisma.opportunity.updateMany).mockClear();
+  });
+
+  test('refuses an opportunity id belonging to another tenant', async () => {
+    await expect(evaluateGate('opp-pass', 'G0', 'tenant-2')).rejects.toBeInstanceOf(
+      GateOpportunityNotFoundError,
+    );
+  });
+
+  test('the refusal is an error, never a silent null or a zero score', async () => {
+    // A `{ passed: false }` here would read as "assessed and rejected" on screen, which is a
+    // different and untrue statement from "not yours to assess".
+    const outcome = await evaluateGate('opp-pass', 'G0', 'tenant-2').then(
+      (r) => ({ kind: 'resolved' as const, r }),
+      (e: unknown) => ({ kind: 'rejected' as const, e }),
+    );
+    expect(outcome.kind).toBe('rejected');
+  });
+
+  test('files no GateDecision and moves no stage on a cross-tenant call', async () => {
+    await evaluateGate('opp-pass', 'G0', 'tenant-2').catch(() => {});
+    expect(prisma.gateDecision.create).not.toHaveBeenCalled();
+    expect(prisma.opportunity.updateMany).not.toHaveBeenCalled();
+  });
+
+  test('the error does not disclose that the id exists under another tenant', async () => {
+    const err = await evaluateGate('opp-pass', 'G0', 'tenant-2').catch((e: Error) => e);
+    const missing = await evaluateGate('no-such-opportunity', 'G0', 'tenant-2').catch(
+      (e: Error) => e,
+    );
+    expect((err as Error).message.replace('opp-pass', 'X')).toBe(
+      (missing as Error).message.replace('no-such-opportunity', 'X'),
+    );
+  });
+
+  test('the passing stage update is tenant-scoped, not update-by-id', async () => {
+    await evaluateGate('opp-pass', 'G0', 'tenant-1');
+    expect(prisma.opportunity.updateMany).toHaveBeenCalledWith({
+      where: { id: 'opp-pass', tenantId: 'tenant-1' },
+      data: { stage: 'G0' },
+    });
+    // `update` by bare id is the shape that could move another tenant's row.
+    expect(prisma.opportunity.update).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { prisma } from '../db';
+import { withTenant, type TenantTx } from '../db';
 import { DEFAULT_GATE_RULES } from '../scoring/defaults';
 import { computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
 
@@ -7,26 +7,79 @@ export type GateEvaluationResult = {
   reasons: string[];
 };
 
+/**
+ * The opportunity is not visible to this tenant — it does not exist, or it belongs to someone else.
+ *
+ * Deliberately one error for both cases: telling a caller "exists, but not yours" would confirm
+ * that a guessed id is a live opportunity somewhere else in the system. Callers translate this into
+ * their own user-facing message; the engine never returns a score or files a decision instead.
+ */
+export class GateOpportunityNotFoundError extends Error {
+  readonly opportunityId: string;
+  readonly tenantId: string;
+
+  constructor(opportunityId: string, tenantId: string) {
+    super(`Opportunity not visible to tenant: ${opportunityId}`);
+    this.name = 'GateOpportunityNotFoundError';
+    this.opportunityId = opportunityId;
+    this.tenantId = tenantId;
+  }
+}
+
+/**
+ * Runs one stage gate for one opportunity and files the `GateDecision`.
+ *
+ * Every read and every write here is scoped to `tenantId` twice over: the whole body runs inside
+ * `withTenant`, so `app.tenant_id` is set and the RLS policies apply at the database, and each
+ * statement still carries its own `tenantId` clause so the engine is correct even against a role
+ * that is exempt from RLS (the local `fabrika` superuser is — see `prisma/rls-app-role.sql`).
+ *
+ * This used to be `findUnique({ where: { id } })` with no tenant clause at all. It was safe only
+ * because the single caller checked ownership first; the protection lived in the caller's memory,
+ * so the second caller would have opened cross-tenant reads and, worse, cross-tenant *writes* —
+ * the stage update below moved whichever opportunity carried the id. Both are closed here, and the
+ * caller's check stays as a second layer.
+ *
+ * Soft-deleted opportunities: `deletedAt` is NOT filtered here. Running a gate is an audit event,
+ * not a content edit, and a `GateDecision` that already exists for an archived opportunity must
+ * still be explicable. Deciding whether an archived opportunity may be *newly* gated is a product
+ * rule and belongs to the caller, which is where the user, the button and the message are; the
+ * pipeline action already refuses (`deletedAt: null` in its ownership check). Recorded in
+ * docs/agent-results/TASK-MTQZMLLZE1I29-blockzincir-pm.md.
+ */
 export async function evaluateGate(
-  opportunityId: string, 
+  opportunityId: string,
   gateId: 'G0' | 'G1' | 'G2' | 'G3' | 'G4',
   tenantId: string,
   decidedBy: string = 'system'
 ): Promise<GateEvaluationResult> {
+  return withTenant(tenantId, (tx) => runGate(tx, opportunityId, gateId, tenantId, decidedBy));
+}
+
+/** The gate itself, on a client that already carries the tenant's RLS context. */
+async function runGate(
+  tx: TenantTx,
+  opportunityId: string,
+  gateId: 'G0' | 'G1' | 'G2' | 'G3' | 'G4',
+  tenantId: string,
+  decidedBy: string
+): Promise<GateEvaluationResult> {
   let passed = true;
   const reasons: string[] = [];
 
-  const opp = await prisma.opportunity.findUnique({
-    where: { id: opportunityId },
+  const opp = await tx.opportunity.findFirst({
+    where: { id: opportunityId, tenantId },
     include: {
-      seats: true,
-      proposal: true,
-      evaluations: true,
+      // The relations are reachable only through an opportunity this tenant owns, but they carry
+      // their own `tenantId` and are filtered on it too: a mis-parented row must not be able to
+      // change a gate outcome (an OPEN seat stamped with another tenant would fail G2 here).
+      seats: { where: { tenantId } },
+      evaluations: { where: { tenantId } },
     }
   });
 
   if (!opp) {
-    throw new Error(`Opportunity not found: ${opportunityId}`);
+    throw new GateOpportunityNotFoundError(opportunityId, tenantId);
   }
 
   const inputs: Record<string, unknown> = {
@@ -52,12 +105,12 @@ export async function evaluateGate(
       // the real gate — this composite minimum, or the three hard rules — is still open
       // (docs/ROADMAP.md · Açık kararlar #8), so the pass/fail rule is left exactly as it was and
       // `decideG0`'s hard-rule findings are recorded as advisory evidence, not enforced here.
-      const computation = await computeG0ForOpportunity(prisma, tenantId, opportunityId);
+      const computation = await computeG0ForOpportunity(tx, tenantId, opportunityId);
 
       if (computation) {
         inputs.g0Evidence = g0EvidencePayload(computation);
         if (computation.score !== null) {
-          await persistG0(prisma, computation);
+          await persistG0(tx, computation);
         }
       }
 
@@ -130,7 +183,7 @@ export async function evaluateGate(
     }
   }
 
-  await prisma.gateDecision.create({
+  await tx.gateDecision.create({
     data: {
       tenantId,
       opportunityId,
@@ -143,8 +196,12 @@ export async function evaluateGate(
   });
 
   if (passed) {
-    await prisma.opportunity.update({
-      where: { id: opportunityId },
+    // `updateMany` with the tenant clause, never `update` by id: `update({ where: { id } })` would
+    // advance the stage of an opportunity belonging to another tenant if the id ever reached here
+    // unchecked. The read above already refuses that id, so this is the second lock on the same
+    // door — the write that actually mutates another tenant's row is the one worth double-locking.
+    await tx.opportunity.updateMany({
+      where: { id: opportunityId, tenantId },
       data: { stage: gateId }
     });
   }
