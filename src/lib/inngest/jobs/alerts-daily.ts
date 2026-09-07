@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { AlertsDailyOutputSchema, type AlertsDailyOutput } from '../events';
+import { z } from 'zod';
 
 let resend: Resend | null = null;
 function getResend(): Resend | null {
@@ -27,8 +28,74 @@ function getResend(): Resend | null {
  */
 export const SAVED_SEARCH_ALERT_QUERY = {
   where: { notify: true },
-  select: { id: true, tenantId: true, name: true },
+  select: { id: true, tenantId: true, name: true, filters: true, lastRunAt: true, createdAt: true },
 } as const;
+
+/**
+ * `SavedSearch.filters` is a bare `Json` column, and nothing in this codebase
+ * ever writes one: there is no API route that creates a `SavedSearch` row,
+ * and the "Save search" button on the /calls page (client.tsx `handleSaveSearch`)
+ * only sleeps 500ms and shows a toast — it calls no API and touches no table.
+ * So there is no established contract for what `filters` contains. This
+ * schema recognises only the two fields the /calls search state has a direct
+ * analogue for (`q`, `status`); anything else, or a row that fails to parse
+ * at all, degrades to "no filter" rather than throwing, so a legacy or
+ * malformed row still counts new topics instead of failing the whole search.
+ */
+export const SavedSearchFiltersSchema = z
+  .object({
+    q: z.string().trim().min(1),
+    status: z.array(z.enum(['FORTHCOMING', 'OPEN', 'CLOSED'])).min(1),
+  })
+  .partial();
+
+function parseFilters(filters: unknown): z.infer<typeof SavedSearchFiltersSchema> {
+  const result = SavedSearchFiltersSchema.safeParse(filters);
+  return result.success ? result.data : {};
+}
+
+/**
+ * Shaped by hand rather than pulled from `Prisma.TopicWhereInput`: this
+ * generated client exposes that namespace as a runtime value but not as an
+ * importable type under this repo's `moduleResolution: bundler` (`import
+ * type { Prisma }` and `import { Prisma }` both fail with "has no exported
+ * member 'Prisma'" — reproduced directly with `tsc`, unrelated to this fix).
+ * `prisma.topic.count` still checks this object structurally at the call
+ * site, so the query is exactly as type-safe as it would be with the
+ * generated type.
+ */
+interface TopicMatchWhere {
+  fetchedAt: { gt: Date };
+  status?: { in: Array<'FORTHCOMING' | 'OPEN' | 'CLOSED'> };
+  OR?: Array<
+    | { title: { contains: string; mode: 'insensitive' } }
+    | { description: { contains: string; mode: 'insensitive' } }
+  >;
+}
+
+/**
+ * New-match count for one saved search: Topics first seen (`fetchedAt`) after
+ * `since`, narrowed by whatever of `q`/`status` the filters carry. `since` is
+ * `lastRunAt`, or `createdAt` on a search's first run — never "the beginning
+ * of time" — so a brand-new saved search does not report every historical
+ * topic as a "new" match on day one.
+ */
+export function matchCountQuery(filters: unknown, since: Date): { where: TopicMatchWhere } {
+  const parsed = parseFilters(filters);
+  const where: TopicMatchWhere = { fetchedAt: { gt: since } };
+
+  if (parsed.status && parsed.status.length > 0) {
+    where.status = { in: parsed.status };
+  }
+  if (parsed.q) {
+    where.OR = [
+      { title: { contains: parsed.q, mode: 'insensitive' } },
+      { description: { contains: parsed.q, mode: 'insensitive' } },
+    ];
+  }
+
+  return { where };
+}
 
 /**
  * The owner lookup, keyed by the scalar `tenantId` — the same "separate query
@@ -73,6 +140,7 @@ export const alertsDaily = inngest.createFunction(
     const result = await step.run('send-alerts', async () => {
       let emailsSent = 0;
       let emailsFailed = 0;
+      let emailsSkipped = 0;
       const errors: Array<{ searchId: string; reason: string }> = [];
 
       for (const search of savedSearches) {
@@ -86,19 +154,28 @@ export const alertsDaily = inngest.createFunction(
             continue;
           }
 
-          const matchCount = 0; // TODO: fetch actual new matches since lastRunAt
+          const since = search.lastRunAt ?? search.createdAt;
+          const matchCount = await prisma.topic.count(matchCountQuery(search.filters, since));
 
-          const subject = `New Call Opportunities: ${search.name} ${matchCount > 0 ? `(${matchCount} new)` : '(no new)'}`;
+          // No new matches: skip the send entirely rather than mail a "(no new)"
+          // notification every morning. `lastRunAt` still advances below — this
+          // was a real check, not a failure.
+          if (matchCount === 0) {
+            await prisma.savedSearch.update({
+              where: { id: search.id },
+              data: { lastRunAt: new Date() },
+            });
+            emailsSkipped++;
+            continue;
+          }
+
+          const subject = `New Call Opportunities: ${search.name} (${matchCount} new)`;
           const appUrl = env.NEXT_PUBLIC_APP_URL || 'https://app.fabrika.io';
           const html = `
             <h2>Fabrika Saved Search Alert</h2>
             <p>Hi there,</p>
             <p>We checked for new opportunities matching your saved search <strong>${search.name}</strong>.</p>
-            ${
-              matchCount > 0
-                ? `<p>Found <strong>${matchCount} new opportunities</strong>. <a href="${appUrl}/calls?search=${search.id}">View them now</a></p>`
-                : '<p>No new opportunities found this round.</p>'
-            }
+            <p>Found <strong>${matchCount} new opportunities</strong>. <a href="${appUrl}/calls?search=${search.id}">View them now</a></p>
             <p>Happy hunting!<br/>Fabrika Team</p>
           `;
 
@@ -119,12 +196,15 @@ export const alertsDaily = inngest.createFunction(
 
           emailsSent++;
         } catch (error) {
+          // Covers the owner lookup and the match-count query too: a broken
+          // query here must not silently report 0 matches and skip the send
+          // as if the check had actually run clean (CLAUDE.md rule 6).
           emailsFailed++;
           errors.push({ searchId: search.id, reason: errorMessage(error) });
         }
       }
 
-      return { emailsSent, emailsFailed, errors };
+      return { emailsSent, emailsFailed, emailsSkipped, errors };
     });
 
     if (result.errors.length > 0) {
@@ -149,6 +229,7 @@ export const alertsDaily = inngest.createFunction(
       totalSearches: savedSearches.length,
       emailsSent: result.emailsSent,
       emailsFailed: result.emailsFailed,
+      emailsSkipped: result.emailsSkipped,
     };
 
     if (result.errors.length > 0) {

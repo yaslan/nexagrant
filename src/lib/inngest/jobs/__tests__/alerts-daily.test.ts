@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createDbClient } from '@/lib/db';
-import { SAVED_SEARCH_ALERT_QUERY, ownerEmailQuery } from '../alerts-daily';
+import { SAVED_SEARCH_ALERT_QUERY, ownerEmailQuery, matchCountQuery } from '../alerts-daily';
 
 /**
  * These assertions run against the REAL generated Prisma client, not a mock.
@@ -52,8 +52,15 @@ describe('alerts-daily query contract', () => {
     expect(kind).not.toBe('PrismaClientValidationError');
   });
 
-  it('selects the tenantId the owner lookup needs, and no relation', () => {
-    expect(SAVED_SEARCH_ALERT_QUERY.select).toEqual({ id: true, tenantId: true, name: true });
+  it('selects what the match-count query needs, and no relation', () => {
+    expect(SAVED_SEARCH_ALERT_QUERY.select).toEqual({
+      id: true,
+      tenantId: true,
+      name: true,
+      filters: true,
+      lastRunAt: true,
+      createdAt: true,
+    });
     expect(SAVED_SEARCH_ALERT_QUERY).not.toHaveProperty('include');
   });
 
@@ -61,6 +68,42 @@ describe('alerts-daily query contract', () => {
     expect(ownerEmailQuery('tenant:1')).toEqual({
       where: { tenantId: 'tenant:1', role: 'TENANT_OWNER' },
       select: { user: { select: { email: true } } },
+    });
+  });
+});
+
+describe('alerts-daily match-count query', () => {
+  const db = createDbClient(UNREACHABLE_DB);
+  const since = new Date('2026-09-01T00:00:00Z');
+
+  it('accepts the plain since-only query — no filter fields', async () => {
+    const kind = await rejectionKind(() => db.topic.count(matchCountQuery(undefined, since)));
+    expect(kind).not.toBe('PrismaClientValidationError');
+  });
+
+  it('accepts the query narrowed by q and status', async () => {
+    const args = matchCountQuery({ q: 'quantum', status: ['OPEN', 'FORTHCOMING'] }, since);
+    const kind = await rejectionKind(() => db.topic.count(args));
+    expect(kind).not.toBe('PrismaClientValidationError');
+  });
+
+  it('treats a malformed filters value as no filter, not a crash', () => {
+    expect(matchCountQuery('not-an-object', since)).toEqual({ where: { fetchedAt: { gt: since } } });
+    expect(matchCountQuery({ status: [] }, since)).toEqual({ where: { fetchedAt: { gt: since } } });
+  });
+
+  it('builds the text and status constraints only when the filters carry them', () => {
+    expect(matchCountQuery({ q: 'quantum' }, since)).toEqual({
+      where: {
+        fetchedAt: { gt: since },
+        OR: [
+          { title: { contains: 'quantum', mode: 'insensitive' } },
+          { description: { contains: 'quantum', mode: 'insensitive' } },
+        ],
+      },
+    });
+    expect(matchCountQuery({ status: ['OPEN'] }, since)).toEqual({
+      where: { fetchedAt: { gt: since }, status: { in: ['OPEN'] } },
     });
   });
 });
