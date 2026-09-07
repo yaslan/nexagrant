@@ -28,5 +28,16 @@ Panoda gördüğün düşük puan bir hesaplama hatası DEĞİL, veri yokluğunu
 Kanıtı görmek için: `pnpm jobs:g0-rescore -- --tenant demo-tenant --verbose` (her özelliğin
 kaynağını ve neden `missing` olduğunu satır satır basar).
 
+**DÜZELTME (2026-09-07 dogfood):** yukarıdaki "çağrı noktaları" listesi yanıltıcı okunabiliyor.
+`gates/evaluate.ts` İÇİNDE G0 artık kendi puanlıyor — ama `evaluateGate()`'in KENDİSİ hiçbir uygulama
+kodundan çağrılmıyor (yalnız testler). Kullanıcının gördüğü tek "Kapıyı Değerlendir" düğmesi bir
+`alert()`. Ayrıntı: [[fabrika-gate-engine-has-no-callers]].
+
+Aynı dogfood ikinci bir şey ölçtü: kanıt tabloları boş olduğu için ölçülebilen tek iki özellik
+`budgetRoleEconomy` (ağırlık 10) ve `lumpSumTwoStage` (ağırlık 8) — ikisi de yalnız `Topic` satırından
+okunuyor, kiracı verisi gerektirmiyor. Yani bugünkü veriyle **azami puan 10+8 = 18/100**, kapı eşiği
+70. Kapı hiçbir kiracı için, hiçbir fırsatla geçilemez. Beş demo fırsatının da, yeni yaratılan
+altıncının da 18 alması tesadüf değil, tavan. Veri kartı: TASK-MTQW90XSQ1SU1.
+
 Kapı karar semantiği kasıtlı değiştirilmedi — bkz. [[fabrika-g0-scoring-three-implementations]]
 (Açık karar #8 hâlâ açık). Uygulama tuzağı için [[fabrika-g0-evidence-placeholder-laundering]].
