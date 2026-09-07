@@ -43,6 +43,8 @@ describe('SEO-Friendly Localized Multilingual Routing System (TR & EN)', () => {
       expect(getWorkspaceRoute('marketplace', 'tr', ws)).toBe('/tr/itu-tto/pazar-yeri');
       expect(getWorkspaceRoute('settingsModules', 'tr', ws)).toBe('/tr/itu-tto/ayarlar/moduller');
       expect(getWorkspaceRoute('settingsBilling', 'tr', ws)).toBe('/tr/itu-tto/ayarlar/faturalama');
+      // The KVKK/GDPR console had no route key at all, so nothing could link to it.
+      expect(getWorkspaceRoute('settingsPrivacy', 'tr', ws)).toBe('/tr/itu-tto/ayarlar/gizlilik');
     });
 
     test('resolves English workspace routes with standard English slugs', () => {
@@ -55,6 +57,7 @@ describe('SEO-Friendly Localized Multilingual Routing System (TR & EN)', () => {
       expect(getWorkspaceRoute('conceptNotes', 'en', ws)).toBe('/en/itu-tto/concept-notes');
       expect(getWorkspaceRoute('approvals', 'en', ws)).toBe('/en/itu-tto/approvals');
       expect(getWorkspaceRoute('settingsModules', 'en', ws)).toBe('/en/itu-tto/settings/modules');
+      expect(getWorkspaceRoute('settingsPrivacy', 'en', ws)).toBe('/en/itu-tto/settings/privacy');
     });
   });
 });

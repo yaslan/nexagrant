@@ -1,5 +1,6 @@
 'use server';
 
+import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 
@@ -158,6 +159,8 @@ export async function exportUserData(): Promise<ExportResult> {
       ApprovalRequest: approvals,
     };
 
+    await recordAccessAudit(userId, tenantId, tables);
+
     return {
       success: true,
       data: {
@@ -178,5 +181,46 @@ export async function exportUserData(): Promise<ExportResult> {
     const message = error instanceof Error ? error.message : 'Failed to export user data';
     console.error('[export-data]', message);
     return { success: false, error: message };
+  }
+}
+
+/**
+ * GDPR art.5(2) — the controller must be able to demonstrate that a subject
+ * access request was answered. The purge job already writes `user.erased`; an
+ * access request left no trace at all, so a completed export was impossible to
+ * evidence after the fact.
+ *
+ * The subject is referenced by `sha256(userId)`, exactly as the erasure audit
+ * does, and `actorId` is deliberately left unset: once the account is purged,
+ * an audit row still holding the raw id would re-create the identifier the
+ * erasure was supposed to remove. Anyone holding the original id can recompute
+ * the hash and find the record.
+ *
+ * A failed audit write must never deny a data subject their access right, so
+ * this is best-effort and only logged.
+ */
+async function recordAccessAudit(
+  userId: string,
+  tenantId: string | undefined,
+  tables: Record<string, unknown[]>
+): Promise<void> {
+  try {
+    const subjectRef = createHash('sha256').update(userId).digest('hex');
+    // Row counts only — the audit trail records that the export happened, never
+    // a second copy of the personal data it contained.
+    const rowCounts = Object.fromEntries(
+      Object.entries(tables).map(([table, rows]) => [table, rows.length])
+    );
+
+    await prisma.auditEvent.create({
+      data: {
+        ...(tenantId ? { tenantId } : {}),
+        type: 'user.data.exported',
+        target: subjectRef,
+        data: { subjectRef, rowCounts },
+      },
+    });
+  } catch (error) {
+    console.warn('[export-data] audit write failed:', error);
   }
 }

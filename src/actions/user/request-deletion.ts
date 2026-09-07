@@ -1,5 +1,6 @@
 'use server';
 
+import { createHash } from 'node:crypto';
 import { Resend } from 'resend';
 import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
@@ -97,6 +98,13 @@ export async function requestAccountDeletion(): Promise<DeletionRequestResult> {
 
     const purgeAt = addDays(requestedAt, DELETION_GRACE_PERIOD_DAYS);
 
+    await recordErasureAudit(
+      userId,
+      user.memberships.map((m: { tenantId: string }) => m.tenantId),
+      'user.erasure.requested',
+      { requestedAt: requestedAt.toISOString(), purgeAt: purgeAt.toISOString() }
+    );
+
     await notifySubject(user.email, user.locale, purgeAt);
 
     const result: DeletionRequestResult = {
@@ -123,10 +131,22 @@ export async function cancelAccountDeletion(): Promise<DeletionRequestResult> {
       return { success: false, error: 'Unauthorized' };
     }
 
+    const memberships = await prisma.membership.findMany({
+      where: { userId },
+      select: { tenantId: true },
+    });
+
     await prisma.user.update({
       where: { id: userId },
       data: { deletionRequestedAt: null, deletedAt: null, deletionReason: null },
     });
+
+    await recordErasureAudit(
+      userId,
+      memberships.map((m: { tenantId: string }) => m.tenantId),
+      'user.erasure.cancelled',
+      { cancelledAt: new Date().toISOString() }
+    );
 
     return { success: true };
   } catch (error) {
@@ -185,5 +205,41 @@ async function notifySubject(email: string, locale: string, purgeAt: Date): Prom
     });
   } catch (error) {
     console.warn('[request-deletion] notification email failed:', error);
+  }
+}
+
+/**
+ * GDPR art.5(2) — an erasure request and its withdrawal both have to be
+ * demonstrable. Only the completed purge used to be audited, so a request made
+ * and cancelled inside the grace period left no record that the subject had
+ * ever exercised the right.
+ *
+ * Written per tenant the subject belongs to, matching `user.erased`, and the
+ * subject is referenced by `sha256(userId)` so the row that survives the later
+ * purge does not re-create the erased identifier.
+ *
+ * Best-effort: an audit failure must not block the subject's request.
+ */
+async function recordErasureAudit(
+  userId: string,
+  tenantIds: string[],
+  type: 'user.erasure.requested' | 'user.erasure.cancelled',
+  extra: Record<string, string>
+): Promise<void> {
+  try {
+    const subjectRef = createHash('sha256').update(userId).digest('hex');
+    const data = { subjectRef, ...extra };
+    const unique = [...new Set(tenantIds)];
+
+    if (unique.length === 0) {
+      await prisma.auditEvent.create({ data: { type, target: subjectRef, data } });
+      return;
+    }
+
+    for (const tenantId of unique) {
+      await prisma.auditEvent.create({ data: { tenantId, type, target: subjectRef, data } });
+    }
+  } catch (error) {
+    console.warn(`[request-deletion] audit write failed for ${type}:`, error);
   }
 }

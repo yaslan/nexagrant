@@ -537,7 +537,17 @@
   "legal": {
     "privacy": {
       "metaTitle": "Gizlilik Politikası ve KVKK Aydınlatma Metni — Fabrika",
-      "metaDescription": "Fabrika'nın KVKK ve GDPR uyumlu gizlilik politikası: işlenen veriler, işleme amaçları, saklama süreleri ve veri sahibi hakları."
+      "metaDescription": "Fabrika'nın KVKK ve GDPR uyumlu gizlilik politikası: işlenen veriler, işleme amaçları, saklama süreleri ve veri sahibi hakları.",
+      "heading": "Gizlilik Politikası ve KVKK Aydınlatma Metni",
+      "controllerHeading": "1. Veri Sorumlusu",
+      "controllerBody": "Fabrika SaaS Platformu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) ve AB Genel Veri Koruma Tüzüğü (“GDPR”) uyarınca kişisel verilerinizin güvenliğine azami özen göstermekteyiz.",
+      "dataHeading": "2. İşlenen Veriler ve Toplama Amaçları",
+      "dataBody": "Kullanıcı hesabı açma, oturum doğrulama, AB hibe çağrılarıyla eşleştirme, yapay zeka destekli teklif taslağı oluşturma ve abonelik faturalandırması süreçlerinde ad, e-posta, şirket/kurum bilgileri ve ödeme kayıtları işlenmektedir.",
+      "rightsHeading": "3. Veri Sahibi Hakları (Dışa Aktarma ve Silme)",
+      "rightsBody": "KVKK 11. maddesi ve GDPR uyarınca verilerinizi dilediğiniz an “Ayarlar → Gizlilik ve Verilerim” ekranından JSON biçiminde dışa aktarabilirsiniz. Aynı ekrandan hesabınızın silinmesini talep edebilirsiniz: hesabınız derhal erişime kapatılır ve 30 gün sonra tüm verileriniz ile yüklediğiniz belgeler kalıcı olarak silinir. Bu 30 günlük süre içinde talebinizi iptal edebilirsiniz. Güvenlik gereği dışa aktarım dosyasına kimlik doğrulama anahtarları (OAuth ve oturum jetonları) dahil edilmez.",
+      "rightsLink": "Gizlilik ve Verilerim ekranına git",
+      "securityHeading": "4. Güvenlik ve Depolama",
+      "securityBody": "Verileriniz çok kiracılı veritabanında PostgreSQL Row-Level Security (RLS) ile diğer kiracılardan yalıtılmış olup, dosya ekleriniz şifreli bulut depolama (R2/S3) üzerinde saklanır."
     },
     "terms": {
       "metaTitle": "Kullanım Koşulları ve Hizmet Sözleşmesi — Fabrika",

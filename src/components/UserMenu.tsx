@@ -59,6 +59,9 @@ export default function UserMenu({
   const sessionData = useOptionalSession();
 
   const tIdentity = useTranslations('UserIdentity');
+  // The KVKK/GDPR console has its own copy in both locales already; this entry
+  // reuses it rather than adding another hardcoded pair of strings.
+  const tPrivacy = useTranslations('settings.privacy');
 
   const effectiveUserEmail = propUserEmail || sessionData?.user?.email;
   // Never invent an identity: the name falls back to the e-mail local part and then to a
@@ -415,6 +418,20 @@ export default function UserMenu({
               >
                 <Key className="w-4 h-4 text-muted" />
                 <span>{isTr ? 'API Anahtarları & Entegrasyonlar' : 'API Keys & Integrations'}</span>
+              </Link>
+
+              {/*
+                KVKK md.11 / GDPR art.12 — the data subject console has to be
+                reachable from the product, not only by typing the URL. It had a
+                page and an API but no link anywhere in the navigation.
+              */}
+              <Link
+                href={getWorkspaceRoute('settingsPrivacy', locale, activeWorkspace)}
+                onClick={() => setIsOpen(false)}
+                className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
+              >
+                <ShieldCheck className="w-4 h-4 text-muted" />
+                <span>{tPrivacy('title')}</span>
               </Link>
             </div>
 

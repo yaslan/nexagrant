@@ -57,6 +57,7 @@ export type WorkspaceRoutePath = (typeof WORKSPACE_ROUTE_CATALOG)[number];
 /** Turkish page path → the canonical page it re-exports. */
 export const WORKSPACE_ROUTE_ALIASES: Record<string, WorkspaceRoutePath> = {
   'ayarlar/faturalama': 'settings/billing',
+  'ayarlar/gizlilik': 'settings/privacy',
   'ayarlar/kapilar': 'settings/gates',
   'ayarlar/moduller': 'settings/modules',
   'ayarlar/profil': 'settings/profile',

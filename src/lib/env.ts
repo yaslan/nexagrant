@@ -64,6 +64,23 @@ const envSchema = z.object({
   INVOICE_SUPPLIER_CITY: z.string().optional(),
   INVOICE_SUPPLIER_COUNTRY: z.string().optional(),
   INVOICE_SUPPLIER_EMAIL: z.string().optional(),
+  /**
+   * The GİB e-invoice integrator (özel entegratör) Fabrika files through.
+   *
+   * Optional, like everything else here, and for the same reason: an
+   * unconfigured integration must leave billing working rather than take the
+   * process down at import time. `src/lib/efatura-integrator.ts` reports which
+   * of them are missing and files nothing until all four are set — it never
+   * invents a credential and never reports a document as filed.
+   *
+   * EFATURA_INTEGRATOR_TEST_MODE defaults to the vendor's test environment;
+   * only the literal string `false` points a filing at production.
+   */
+  EFATURA_INTEGRATOR_PROVIDER: z.string().optional(),
+  EFATURA_INTEGRATOR_BASE_URL: optionalUrl,
+  EFATURA_INTEGRATOR_USERNAME: z.string().optional(),
+  EFATURA_INTEGRATOR_PASSWORD: z.string().optional(),
+  EFATURA_INTEGRATOR_TEST_MODE: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);

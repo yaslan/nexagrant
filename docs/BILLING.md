@@ -123,7 +123,8 @@ oranını belirlemez.
 - Tutar **daima** `priceLine()` + `getActiveTier()` ile sunucuda hesaplanır;
   istek yalnızca *hangi* planı söyleyebilir, *ne kadar* olduğunu söyleyemez.
 - Stripe Customer Portal: kart, fatura, iptal.
-- Vergi: Stripe Tax. Türkiye e-fatura entegrasyonu faz 2.
+- Vergi: Stripe Tax. Türkiye e-fatura entegrasyonu faz 2 — **canlı değil**; doldurulacak
+  ortam değişkenleri tek tabloda: `docs/EFATURA_SETUP.md`.
 
 #### 4.1.1 Fiyat kilidi — "katıldığın fiyat seninle kalır" (TASK-MTR882HVZ8BG7)
 

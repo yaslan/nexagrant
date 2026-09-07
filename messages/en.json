@@ -537,7 +537,17 @@
   "legal": {
     "privacy": {
       "metaTitle": "Privacy Policy & GDPR Disclosure — Fabrika",
-      "metaDescription": "Fabrika's GDPR and KVKK compliant privacy policy: what we process, why, how long we keep it, and the rights you can exercise."
+      "metaDescription": "Fabrika's GDPR and KVKK compliant privacy policy: what we process, why, how long we keep it, and the rights you can exercise.",
+      "heading": "Privacy Policy & GDPR Disclosure",
+      "controllerHeading": "1. Data Controller",
+      "controllerBody": "Fabrika SaaS Platform, in compliance with GDPR and applicable national laws, prioritizes the security and privacy of all user data.",
+      "dataHeading": "2. Data Processed & Collection Purposes",
+      "dataBody": "Account registration, session authentication, EU funding call matching, AI-assisted concept note drafting, and subscription billing processes involve processing names, emails, organization profiles, and payment metadata.",
+      "rightsHeading": "3. Data Subject Rights (Export & Deletion)",
+      "rightsBody": "Under GDPR and applicable data protection law, you can export your data as JSON at any time from “Settings → Privacy & My Data”. From the same screen you can request deletion of your account: it is closed immediately and all of your data and uploaded files are permanently deleted after 30 days. You may cancel the request within that 30-day window. For security, authentication secrets (OAuth and session tokens) are excluded from the export file.",
+      "rightsLink": "Go to Privacy & My Data",
+      "securityHeading": "4. Security and Storage",
+      "securityBody": "Your data is partitioned via PostgreSQL Row-Level Security (RLS) in a multi-tenant environment, and uploaded files are protected in encrypted cloud object storage (R2/S3)."
     },
     "terms": {
       "metaTitle": "Terms of Service — Fabrika",

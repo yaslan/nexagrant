@@ -304,6 +304,12 @@ yapılandırılır (`INVOICE_SUPPLIER_NAME`, `_VKN`, `_TAX_OFFICE`, `_ADDRESS`, 
 `_COUNTRY` ve `_EMAIL` isteğe bağlı). Hiçbirinin varsayılanı **yoktur**: eksikse rota belge
 üretmez, `503` ile eksik değişkenleri **adıyla** sayar. Bunlar go-live ayarlarıdır.
 
+**Gönderim entegratör üzerinden olur ve henüz yoktur.** GİB'e iletim lisanslı bir özel
+entegratör gerektirir; arayüz ve hata yolları `src/lib/efatura-integrator.ts` içinde,
+kimlik bilgileri `EFATURA_INTEGRATOR_*` değişkenlerinde. Dördü de dolmadan gönderim
+denenmez (`not_configured`), o entegratöre ait adaptör yazılmadan da gönderilmiş sayılmaz
+(`provider_unsupported`). Patronun dolduracağı tam liste: `docs/EFATURA_SETUP.md`.
+
 **Seed yoktur ve olmamalıdır:** seed'lenmiş bir fatura, kesilmemiş bir faturadır.
 
 Migration: `prisma/migrations/add-invoice.sql` (additive + idempotent) — geri alma:
