@@ -39,4 +39,37 @@ girmiştir ve yapacak bir şey kalmamıştır. "diff yok" = kayboldu DEĞİL;
 Pencereyi daralt: yazdıktan hemen sonra stage'le, doğrulamayı stage'ten sonra yap,
 `git add` ile `git commit` arasına uzun komut koyma.
 
+## Yarışı tamamen atlatan yol: kendi geçici index'in (2026-09-07'de kullanıldı)
+
+Paylaşılan index'e hiç dokunmadan commit alınabilir. Başka bir ajanın stage'lediği dev bir
+iş dururken (`git diff --cached --stat` 25 dosya gösteriyordu) yalnız kendi 13 dosyamı
+commit etmenin yolu:
+
+```bash
+export GIT_INDEX_FILE=/tmp/my-index          # paylaşılan .git/index'e DOKUNULMAZ
+rm -f "$GIT_INDEX_FILE"
+HEAD_SHA=$(git rev-parse HEAD)
+git read-tree "$HEAD_SHA"
+git add -- <yalnız kendi yollarım>
+git diff --cached --stat "$HEAD_SHA"          # DOĞRULA: yalnız senin dosyaların
+TREE=$(git write-tree)
+COMMIT=$(git commit-tree "$TREE" -p "$HEAD_SHA" -F msg.txt)
+git update-ref refs/heads/dev "$COMMIT" "$HEAD_SHA"   # eski değer verilir → yarışta güvenli
+unset GIT_INDEX_FILE
+git reset -q -- <kendi yolların>              # ŞART: paylaşılan index'i yeni HEAD'e hizala
+```
+
+Son `git reset` **atlanamaz**: onsuz paylaşılan index senin dosyaların için hâlâ eski blob'u
+tutar, bir sonraki ajanın `git commit`'i onu "değişiklik" sanıp **senin işini geri alır**.
+
+Bir dosya hem seninkini hem başkasınınkini taşıyorsa (ör. `messages/*.json`) çalışma ağacını
+hiç bozmadan yalnız kendi sürümünü stage'le:
+
+```bash
+git show HEAD:messages/tr.json > base.json
+node -e "…base + yalnız senin ad alanın → staged.json…"
+SHA=$(git hash-object -w --path messages/tr.json -- staged.json)
+git update-index --cacheinfo 100644,$SHA,messages/tr.json
+```
+
 İlgili: [[fabrika-agents-share-one-working-tree]] · [[fabrika-parallel-agent-file-race]]
