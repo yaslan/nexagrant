@@ -6,6 +6,8 @@ import { BillingClient } from './BillingClient';
 import { errorMessage } from '@/lib/errors';
 import { getActiveTier } from '@/lib/billing/active-tier';
 import { countLifetimeLicences, lifetimeScarcity } from '@/lib/billing/lifetime-licence';
+import { effectiveTier, isQuotedOnLock, priceLockDefect, readPriceLock } from '@/lib/billing/price-lock';
+import { resolvePlanId, FALLBACK_PLAN_ID } from '@/lib/billing/catalog';
 
 /**
  * The lifetime badge counts rows, so this page must not be served from a cache
@@ -28,7 +30,17 @@ export const dynamic = 'force-dynamic';
 type TenantBillingRow = {
   id: string;
   name: string;
-  subscription: { planId: string } | null;
+  subscription:
+    | ({
+        planId: string;
+      } & {
+        lockedTierCode: string | null;
+        lockedPercentOff: number | null;
+        lockedAmountMinor: number | null;
+        lockedCurrency: string | null;
+        priceLockedAt: Date | null;
+      })
+    | null;
 };
 
 export default async function BillingSettingsPage({
@@ -43,7 +55,11 @@ export default async function BillingSettingsPage({
   const { tenantId } = await requireTenantPage(locale);
 
   let tenantName = 'FonBridge Demo Kuruluşu';
-  let currentPlanId = 'team';
+  let currentPlanId = FALLBACK_PLAN_ID;
+  // The rate this tenant joined at, if it has one. Set from the same row the
+  // plan comes from, so the panel can never quote a plan and a rate that
+  // belong to different subscriptions.
+  let priceLock: ReturnType<typeof readPriceLock> = null;
 
   try {
     const tenant = await withTenant<TenantBillingRow | null>(tenantId, (tx) =>
@@ -55,8 +71,13 @@ export default async function BillingSettingsPage({
     if (tenant) {
       tenantName = tenant.name;
       if (tenant.subscription?.planId) {
-        currentPlanId = tenant.subscription.planId;
+        currentPlanId = resolvePlanId(tenant.subscription.planId);
       }
+      const defect = priceLockDefect(tenant.subscription);
+      if (defect) {
+        console.warn(`[BillingSettings] price lock not honoured: ${defect}`);
+      }
+      priceLock = readPriceLock(tenant.subscription);
     }
   } catch (err) {
     console.warn(`[BillingSettings] DB query bypassed: ${errorMessage(err)}`);
@@ -66,26 +87,61 @@ export default async function BillingSettingsPage({
   let entitlements = {
     allowedModules: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'],
     seats: 6,
-    usedSeats: 3,
+    usedSeats: 0,
     workspaces: 5,
-    usedWorkspaces: 1,
+    usedWorkspaces: 0,
     aiCreditsMonthly: 1000,
-    aiCreditsRemaining: 500,
+    aiCreditsRemaining: 1000,
   };
 
   try {
     const dbEntitlements = await getEntitlements(tenantId);
+
+    // Count active members and workspaces from the database
+    const usageData = await withTenant<{
+      memberCount: number;
+      workspaceCount: number;
+      creditsUsedThisMonth: number;
+    }>(tenantId, async (tx) => {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const [memberCount, workspaceCount, creditUsage] = await Promise.all([
+        tx.membership.count({ where: { tenantId } }),
+        tx.workspace.count({ where: { tenantId } }),
+        tx.creditLedger.aggregate({
+          where: {
+            tenantId,
+            createdAt: { gte: monthStart },
+            reason: { startsWith: 'usage' },
+          },
+          _sum: { delta: true },
+        }),
+      ]);
+
+      return {
+        memberCount,
+        workspaceCount,
+        creditsUsedThisMonth: Math.abs(creditUsage._sum.delta || 0),
+      };
+    });
+
     if (dbEntitlements) {
+      const aiCreditsRemaining = Math.max(
+        0,
+        dbEntitlements.aiCreditsMonthly - usageData.creditsUsedThisMonth
+      );
+
       entitlements = {
         allowedModules: dbEntitlements.allowedModules.length > 0
           ? dbEntitlements.allowedModules
           : ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'],
-        seats: dbEntitlements.seats || 6,
-        usedSeats: 3,
-        workspaces: dbEntitlements.workspaces || 5,
-        usedWorkspaces: 1,
-        aiCreditsMonthly: dbEntitlements.aiCreditsMonthly || 1000,
-        aiCreditsRemaining: 500,
+        seats: dbEntitlements.seats,
+        usedSeats: usageData.memberCount,
+        workspaces: dbEntitlements.workspaces,
+        usedWorkspaces: usageData.workspaceCount,
+        aiCreditsMonthly: dbEntitlements.aiCreditsMonthly,
+        aiCreditsRemaining,
       };
     }
   } catch (err) {
@@ -99,6 +155,13 @@ export default async function BillingSettingsPage({
   // falling back to zero.
   const scarcity = lifetimeScarcity(await countLifetimeLicences());
 
+  // This panel quotes *this tenant's* renewal, not the shopfront: what it shows
+  // has to be the rate the tenant will actually be charged. `/[locale]/pricing`
+  // deliberately keeps showing the campaign of the day — it is the page a
+  // stranger buys from. The two disagreeing is the promise working, not a bug.
+  const shopfrontTier = getActiveTier();
+  const quotedTier = effectiveTier(priceLock, shopfrontTier);
+
   return (
     <BillingClient
       workspace={workspace}
@@ -106,7 +169,8 @@ export default async function BillingSettingsPage({
       tenantId={tenantId}
       tenantName={tenantName}
       currentPlanId={currentPlanId}
-      activeTier={getActiveTier()}
+      activeTier={quotedTier}
+      priceLocked={isQuotedOnLock(priceLock, shopfrontTier)}
       lifetimeScarcity={scarcity}
       entitlements={entitlements}
     />
