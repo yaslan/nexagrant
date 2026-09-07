@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import React from 'react';
 import PricingClient from './PricingClient';
+import { getActiveTier } from '@/lib/billing/active-tier';
 
 export async function generateMetadata({
   params,
@@ -34,5 +35,8 @@ export default async function PricingPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  return <PricingClient locale={locale} />;
+  // The running campaign is a server decision (`BILLING_ACTIVE_TIER`), the same
+  // one `/api/billing/checkout` prices under. The page renders it; it never
+  // picks one.
+  return <PricingClient locale={locale} activeTier={getActiveTier()} />;
 }

@@ -4,6 +4,7 @@ import { requireTenantPage } from '@/lib/tenant';
 import { getEntitlements } from '@/lib/billing';
 import { BillingClient } from './BillingClient';
 import { errorMessage } from '@/lib/errors';
+import { getActiveTier } from '@/lib/billing/active-tier';
 
 /**
  * The shape this page actually reads off the tenant row.
@@ -88,6 +89,7 @@ export default async function BillingSettingsPage({
       tenantId={tenantId}
       tenantName={tenantName}
       currentPlanId={currentPlanId}
+      activeTier={getActiveTier()}
       entitlements={entitlements}
     />
   );

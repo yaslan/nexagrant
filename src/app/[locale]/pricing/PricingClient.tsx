@@ -1,38 +1,46 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
-import { Sparkles, Check, ArrowRight, Zap, Shield, Gift, Copy, CheckCircle, Flame, Layers, Award, ShoppingBag } from 'lucide-react';
+import { Check, Zap, Shield, Gift, Copy, Flame, Layers, ShoppingBag } from 'lucide-react';
 import { useCart } from '@/components/cart/CartContext';
+import {
+  CATALOG,
+  DISCOUNT_TIERS,
+  MONTHS_PER_YEAR,
+  NO_DISCOUNT_TIER,
+  findEntry,
+  priceLine,
+  type BillingCycle,
+  type DiscountTier,
+  type PlanEntry,
+} from '@/lib/billing/catalog';
+import { formatMoney } from '@/lib/money';
 
 interface PricingClientProps {
   locale: string;
+  /**
+   * The campaign the server is running, from `getActiveTier()`. The page shows
+   * it; it does not get to pick one. The tier bar below is a read-only
+   * schedule for exactly this reason: a selector that moved the headline price
+   * let a visitor read $132.30 off the card and then be charged $44.10 at
+   * checkout, which is the mismatch this screen was reported for.
+   */
+  activeTier: DiscountTier;
 }
 
-export default function PricingClient({ locale }: PricingClientProps) {
-  const isTr = locale === 'tr';
-  const { addToCart, applyCoupon } = useCart();
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
+/** The three subscription plans, in catalogue order. */
+const PLAN_ENTRIES = CATALOG.filter((entry): entry is PlanEntry => entry.kind === 'plan');
 
-  // Tiered Early-Bird Pricing Policy Tiers
-  const DISCOUNT_TIERS = [
-    { id: 1, labelTr: 'İlk 5 Abone', labelEn: 'First 5 Subs', discount: 70, code: 'ILK5', statusTr: '🔥 AKTİF DÖNEM (Son 2 Koltuk)', statusEn: 'ACTIVE TIER (2 seats left)', isCurrent: true },
-    { id: 2, labelTr: 'Sonraki 10 Abone', labelEn: 'Next 10 Subs', discount: 60, code: 'SONRAKI10', statusTr: 'Sırada (Yakında)', statusEn: 'Upcoming', isCurrent: false },
-    { id: 3, labelTr: 'Sonraki 20 Abone', labelEn: 'Next 20 Subs', discount: 50, code: 'LANSMAN50', statusTr: 'Sırada', statusEn: 'Upcoming', isCurrent: false },
-    { id: 4, labelTr: 'Sonraki 50 Abone', labelEn: 'Next 50 Subs', discount: 40, code: 'KURUCU40', statusTr: 'Sırada', statusEn: 'Upcoming', isCurrent: false },
-    { id: 5, labelTr: 'Sonraki 100 Abone', labelEn: 'Next 100 Subs', discount: 30, code: 'GROWTH30', statusTr: 'Sırada', statusEn: 'Upcoming', isCurrent: false },
-    { id: 6, labelTr: 'Sonraki 200 Abone', labelEn: 'Next 200 Subs', discount: 20, code: 'SCALE20', statusTr: 'Sırada', statusEn: 'Upcoming', isCurrent: false },
-    { id: 7, labelTr: 'Sonraki 500 Abone', labelEn: 'Next 500 Subs', discount: 10, code: 'PROMO10', statusTr: 'Sırada', statusEn: 'Upcoming', isCurrent: false },
-  ];
-
-  const [selectedTierId, setSelectedTierId] = useState(1);
+export default function PricingClient({ locale, activeTier }: PricingClientProps) {
+  const t = useTranslations('billingPanels.pricing');
+  const { addToCart } = useCart();
+  const [billingCycle, setBillingCycle] = useState<Exclude<BillingCycle, 'one-time'>>('yearly');
   const [copiedCoupon, setCopiedCoupon] = useState(false);
 
-  const activeTier = DISCOUNT_TIERS.find((t) => t.id === selectedTierId) || DISCOUNT_TIERS[0];
-  const discountRate = activeTier.discount;
-  const discountMultiplier = (100 - discountRate) / 100;
+  const money = (amountMinor: number, currency: string) => formatMoney(amountMinor, currency, locale);
 
   const handleCopyCoupon = (code: string) => {
     if (typeof navigator !== 'undefined') {
@@ -42,99 +50,32 @@ export default function PricingClient({ locale }: PricingClientProps) {
     }
   };
 
-  // Base Prices (Tripled)
-  const plans = [
-    {
-      id: 'basic',
-      name: 'Basic',
-      subtitle: isTr ? 'Solo başlangıç — İlk adım' : 'Solo start — the first step',
-      recommended: false,
-      monthly: {
-        original: 45,
-        discounted: 45 * discountMultiplier,
-        billingNote: isTr ? 'Aylık faturalandırılır · İstediğin zaman iptal et' : 'Billed monthly · cancel any time',
-      },
-      yearly: {
-        original: 32.25,
-        discounted: 32.25 * discountMultiplier,
-        totalYearly: 32.25 * discountMultiplier * 12,
-        originalYearly: 387,
-        billingNote: isTr ? `Yıllık $${(32.25 * discountMultiplier * 12).toFixed(2)} tek seferde ödenir (~%28 daha ucuz)` : `$${(32.25 * discountMultiplier * 12).toFixed(2)} billed once for the first year · ~28% cheaper yearly`,
-      },
-      features: [
-        isTr ? '1 Çalışma Alanı (Workspace)' : '1 Workspace',
-        isTr ? '500 YZ Kredisi / ay' : '500 AI credits / month',
-        isTr ? 'Açık Çağrı Arama & Filtreleme (SEDIA Live)' : 'Open Call Search & Filtering (SEDIA Live)',
-        isTr ? 'G0-G4 Opportunity Pipeline & Kanban' : 'G0-G4 Opportunity Pipeline & Kanban',
-        isTr ? 'Temel CORDIS Ortak Arama' : 'Basic CORDIS Partner Search',
-        isTr ? 'Topluluk & Discord Destek Erişimi' : 'Community & Discord Support Access',
-      ],
-      cta: isTr ? 'Basic ile Başla' : 'Start with Basic',
-      ctaHref: `/${locale}/default/dashboard`,
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
-      subtitle: isTr ? 'Ciddi günlük kullanım & projeler için' : 'For serious daily use & projects',
-      recommended: true,
-      badgeText: isTr ? 'ÖNERİLEN' : 'RECOMMENDED',
-      monthly: {
-        original: 87,
-        discounted: 87 * discountMultiplier,
-        billingNote: isTr ? 'Aylık faturalandırılır · İstediğin zaman iptal et' : 'Billed monthly · cancel any time',
-      },
-      yearly: {
-        original: 62.25,
-        discounted: 62.25 * discountMultiplier,
-        totalYearly: 62.25 * discountMultiplier * 12,
-        originalYearly: 747,
-        billingNote: isTr ? `Yıllık $${(62.25 * discountMultiplier * 12).toFixed(2)} tek seferde ödenir (~%28 daha ucuz)` : `$${(62.25 * discountMultiplier * 12).toFixed(2)} billed once for the first year · ~28% cheaper yearly`,
-      },
-      features: [
-        isTr ? 'Sınırsız Çalışma Alanı (Unlimited Workspaces)' : 'Unlimited Workspaces',
-        isTr ? '3.000 YZ Kredisi / ay' : '3,000 AI credits / month',
-        isTr ? 'M1 CORDIS Ağ Analitiği & Graf Haritası' : 'M1 CORDIS Network & Graph Analytics',
-        isTr ? 'M2 Konsept Notu & M3 Kanıt Paketi Deposu' : 'M2 Concept Notes & M3 Evidence Vault',
-        isTr ? 'Evaluator Lens (AB Hakem Simülatörü - 15 Puan)' : 'Evaluator Lens (EU Review Simulator)',
-        isTr ? 'TTO Hızlandırıcı & Tam Part A/B Üretici' : 'TTO Accelerator & Full Part A/B Generator',
-        isTr ? 'Öncelikli E-posta & Canlı Destek' : 'Priority Email & Live Support',
-      ],
-      cta: isTr ? 'Pro ile Başla' : 'Start with Pro',
-      ctaHref: `/${locale}/default/dashboard`,
-    },
-    {
-      id: 'ultra',
-      name: 'Ultra / Kurumsal',
-      subtitle: isTr ? 'Tüm ekosistem & kurumsal konsorsiyumlar' : 'The whole ecosystem & enterprise',
-      recommended: false,
-      monthly: {
-        original: 147,
-        discounted: 147 * discountMultiplier,
-        billingNote: isTr ? 'Aylık faturalandırılır · İstediğin zaman iptal et' : 'Billed monthly · cancel any time',
-      },
-      yearly: {
-        original: 99.75,
-        discounted: 99.75 * discountMultiplier,
-        totalYearly: 99.75 * discountMultiplier * 12,
-        originalYearly: 1197,
-        billingNote: isTr ? `Yıllık $${(99.75 * discountMultiplier * 12).toFixed(2)} tek seferde ödenir (~%32 daha ucuz)` : `$${(99.75 * discountMultiplier * 12).toFixed(2)} billed once for the first year · ~28% cheaper yearly`,
-      },
-      lifetime: {
-        discounted: 897 * discountMultiplier,
-        original: 897,
-      },
-      features: [
-        isTr ? 'Pro paketindeki tüm özellikler +' : 'Everything in Pro, plus:',
-        isTr ? 'Sınırsız YZ Kredisi / Kendi Modellerini Bağla (BYO AI)' : 'Unlimited AI Credits / Bring your own LLM keys',
-        isTr ? '150.000+ CORDIS Tam Veri Dışa Aktarımı (UBL-TR/JSON/CSV)' : 'Full 150k+ CORDIS Data Exports',
-        isTr ? 'Öncelikli Kurucu Onboarding & VIP Danışmanlık' : 'Priority Founder Onboarding & VIP Consulting',
-        isTr ? 'Çoklu Ekip Üyesi Koltukları (Team Seats)' : 'Team Seats & Organization Role Management',
-        isTr ? 'GİB E-Fatura & Resmi Kurumsal Sözleşme (SLA)' : 'Official GİB E-Invoice & Dedicated SLA',
-      ],
-      cta: isTr ? 'Ultra ile Başla' : 'Start with Ultra',
-      ctaHref: `/${locale}/default/dashboard`,
-    },
-  ];
+  /** Every figure on a plan card, priced by the catalogue under the live tier. */
+  const cards = PLAN_ENTRIES.map((entry) => {
+    const charged = priceLine({ sku: entry.sku, billingCycle }, activeTier);
+    const list = priceLine({ sku: entry.sku, billingCycle }, NO_DISCOUNT_TIER);
+    // How much the yearly cycle saves against paying monthly for a year — read
+    // off the catalogue rather than the "~28%" that used to be typed in.
+    const yearlyVsMonthly = Math.round(
+      ((entry.monthlyListMinor * MONTHS_PER_YEAR - entry.yearlyListMinor) /
+        (entry.monthlyListMinor * MONTHS_PER_YEAR)) *
+        100
+    );
+    return { entry, charged, list, yearlyVsMonthly };
+  });
+
+  const lifetimeEntry = findEntry('lifetime-ultra');
+  const lifetime = lifetimeEntry ? priceLine({ sku: lifetimeEntry.sku }, activeTier) : null;
+
+  // The lifetime comparison box, all of it derived: what Ultra costs this year
+  // under the live campaign, what it costs to renew at list, and what three
+  // years of that comes to against one lifetime payment.
+  const ultraYearly = priceLine({ sku: 'ultra', billingCycle: 'yearly' }, activeTier);
+  const ultraYearlyList = priceLine({ sku: 'ultra', billingCycle: 'yearly' }, NO_DISCOUNT_TIER);
+  const ultraThreeYearMinor = ultraYearly.amountMinor + ultraYearlyList.amountMinor * 2;
+  const lifetimeSavingMinor = lifetime ? ultraThreeYearMinor - lifetime.amountMinor : 0;
+
+  const cycleLabel = billingCycle === 'yearly' ? t('cycleYearly') : t('cycleMonthly');
 
   return (
     <div className="min-h-screen flex flex-col bg-[#080d1a] text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
@@ -145,88 +86,82 @@ export default function PricingClient({ locale }: PricingClientProps) {
         <div className="text-center max-w-3xl mx-auto mb-10 space-y-4">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold uppercase tracking-wider shadow-[0_0_15px_rgba(34,211,238,0.15)]">
             <Flame className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span>{isTr ? 'Kademeli Erken Kayıt İndirim Politikası' : 'Tiered Early-Bird Discount Policy'}</span>
+            <span>{t('policyBadge')}</span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white font-heading">
-            {isTr ? 'Erken Gelen Kazansın: Kademeli Abonelik Sistemi' : 'First Come, Highest Savings: Tiered Pricing'}
+            {t('heroTitle')}
           </h1>
           <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
-            {isTr
-              ? 'İlk abonelerimize özel %70’ten başlayan indirimler. Abone sayısı arttıkça indirim oranı kademeli olarak güncellenir. Katıldığınız fiyat sabit kalır.'
-              : 'Discounts starting at 70% off for early supporters. As subscriber count grows, discount rates step down tier by tier.'}
+            {t('heroSubtitle')}
           </p>
         </div>
 
-        {/* ─── DYNAMIC TIERED DISCOUNT SELECTOR BANNER ─── */}
+        {/* ─── TIER SCHEDULE (read-only: the live tier comes from the server) ─── */}
         <div className="bg-[#0e1628]/90 border border-cyan-500/30 rounded-2xl p-6 shadow-xl mb-10 relative overflow-hidden backdrop-blur-md">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-5">
             <div>
               <div className="text-[11px] font-bold text-cyan-400 font-mono uppercase tracking-wider flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-cyan-400" />
-                <span>{isTr ? 'KADEMELİ İNDİRİM KATMANLARI' : 'EARLY BIRD TIER SCHEDULE'}</span>
+                <span>{t('tierScheduleKicker')}</span>
               </div>
-              <h2 className="text-lg font-bold text-white mt-0.5">
-                {isTr ? 'Mevcut İndirim Katmanını Seçin & Fiyatları Canlı İnceleyin' : 'Select a Discount Tier to Preview Prices'}
-              </h2>
+              <h2 className="text-lg font-bold text-white mt-0.5">{t('tierScheduleTitle')}</h2>
             </div>
 
             <div className="bg-slate-900 border border-slate-700 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold text-cyan-300 flex items-center gap-2 self-start sm:self-auto">
-              <span>{isTr ? 'Aktif Kupon:' : 'Active Code:'}</span>
-              <span className="text-amber-300 font-extrabold">{activeTier.code}</span>
+              <span>{t('activeCode')}</span>
+              <span className="text-amber-300 font-extrabold" data-testid="active-tier-code">
+                {activeTier.code}
+              </span>
               <button
                 onClick={() => handleCopyCoupon(activeTier.code)}
                 className="hover:text-white transition"
-                title={isTr ? 'Kodu Kopyala' : 'Copy Code'}
+                title={t('copyCode')}
+                aria-label={t('copyCode')}
               >
                 {copiedCoupon ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
             </div>
           </div>
 
-          {/* Tier Buttons Bar */}
+          {/* Tier bar — display only. Rank tells past from live from upcoming. */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             {DISCOUNT_TIERS.map((tier) => {
-              const isSelected = selectedTierId === tier.id;
+              const isActive = tier.code === activeTier.code;
               return (
-                <button
-                  key={tier.id}
-                  onClick={() => setSelectedTierId(tier.id)}
-                  className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
-                    isSelected
+                <div
+                  key={tier.code}
+                  className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                    isActive
                       ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-[0_0_15px_rgba(34,211,238,0.25)] ring-1 ring-cyan-400'
-                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                  }`}
+                      : 'bg-slate-900/80 border-slate-800 text-slate-400'
+                  } ${tier.rank < activeTier.rank ? 'opacity-50' : ''}`}
                 >
-                  {tier.isCurrent && (
+                  {isActive && (
                     <span className="absolute -top-2 left-2 bg-amber-500 text-slate-950 text-[9px] font-black uppercase px-1.5 py-0.2 rounded font-mono">
-                      {isTr ? 'AKTİF' : 'LIVE'}
+                      {t('tierLive')}
                     </span>
                   )}
                   <div>
                     <div className="text-[10px] font-bold font-mono text-slate-400">
-                      {isTr ? tier.labelTr : tier.labelEn}
+                      {t(`tiers.${tier.code}`)}
                     </div>
                     <div className="text-lg font-extrabold text-cyan-300 font-heading mt-0.5">
-                      -%{tier.discount}
+                      -{tier.percentOff}%
                     </div>
                   </div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-2">
-                    {tier.code}
-                  </div>
-                </button>
+                  <div className="text-[9px] font-mono text-slate-400 mt-2">{tier.code}</div>
+                </div>
               );
             })}
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row justify-between items-center text-xs font-mono text-slate-400 gap-2">
             <div>
-              <span className="text-amber-400 font-bold">▶ {isTr ? activeTier.labelTr : activeTier.labelEn}:</span>{' '}
-              <span>%{activeTier.discount} {isTr ? 'İndirim uygulanıyor' : 'discount active'} ({activeTier.code})</span>
+              <span className="text-amber-400 font-bold">▶ {t(`tiers.${activeTier.code}`)}:</span>{' '}
+              <span>{t('tierApplied', { percent: activeTier.percentOff, code: activeTier.code })}</span>
             </div>
-            <div className="text-cyan-400 text-[11px] font-bold">
-              {isTr ? activeTier.statusTr : activeTier.statusEn}
-            </div>
+            <div className="text-cyan-400 text-[11px] font-bold">{t('tierServerNote')}</div>
           </div>
         </div>
 
@@ -241,7 +176,7 @@ export default function PricingClient({ locale }: PricingClientProps) {
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              {isTr ? 'Aylık' : 'Monthly'}
+              {t('cycleMonthly')}
             </button>
             <button
               onClick={() => setBillingCycle('yearly')}
@@ -251,11 +186,13 @@ export default function PricingClient({ locale }: PricingClientProps) {
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <span>{isTr ? 'Yıllık' : 'Yearly'}</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold tracking-tight ${
-                billingCycle === 'yearly' ? 'bg-slate-950 text-cyan-300' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-              }`}>
-                {isTr ? '3 Ay Ücretsiz' : '3 months free'}
+              <span>{t('cycleYearly')}</span>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold tracking-tight ${
+                  billingCycle === 'yearly' ? 'bg-slate-950 text-cyan-300' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                }`}
+              >
+                {t('yearlyBadge')}
               </span>
             </button>
           </div>
@@ -263,66 +200,75 @@ export default function PricingClient({ locale }: PricingClientProps) {
 
         {/* ─── THREE PRICING CARDS GRID ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-16 items-stretch">
-          {plans.map((plan) => {
-            const pricingData = billingCycle === 'yearly' ? plan.yearly : plan.monthly;
-            const originalPrice = pricingData.original;
-            const discountedPrice = pricingData.discounted;
-
+          {cards.map(({ entry, charged, list, yearlyVsMonthly }) => {
+            const recommended = entry.planId === 'pro';
             return (
               <div
-                key={plan.id}
+                key={entry.planId}
+                data-testid={`plan-card-${entry.planId}`}
                 className={`rounded-2xl p-6 sm:p-7 flex flex-col justify-between relative transition-all duration-300 ${
-                  plan.recommended
+                  recommended
                     ? 'bg-[#0f192e] border-2 border-cyan-400 shadow-[0_0_35px_rgba(34,211,238,0.2)] ring-1 ring-cyan-400/50'
                     : 'bg-[#0b1324] border border-slate-800 hover:border-slate-700 shadow-xl'
                 }`}
               >
-                {/* Recommended Badge */}
-                {plan.recommended && (
+                {recommended && (
                   <div className="absolute -top-3.5 right-6 bg-cyan-400 text-slate-950 text-[10px] font-black uppercase tracking-wider py-1 px-3 rounded-full shadow-[0_0_15px_rgba(34,211,238,0.5)]">
-                    {plan.badgeText}
+                    {t('recommended')}
                   </div>
                 )}
 
                 <div>
-                  {/* Title & Subtitle */}
-                  <h3 className="text-2xl font-bold text-white mb-1 font-heading">{plan.name}</h3>
-                  <p className="text-slate-400 text-xs mb-6 min-h-[32px]">{plan.subtitle}</p>
+                  <h3 className="text-2xl font-bold text-white mb-1 font-heading">{entry.name}</h3>
+                  <p className="text-slate-400 text-xs mb-6 min-h-[32px]">{t(`plans.${entry.planId}.subtitle`)}</p>
 
                   {/* Price Header */}
                   <div className="mb-4">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-4xl sm:text-5xl font-extrabold text-white font-heading tracking-tight">
-                        ${discountedPrice.toFixed(2)}
+                      <span
+                        data-testid={`plan-price-${entry.planId}`}
+                        className="text-4xl sm:text-5xl font-extrabold text-white font-heading tracking-tight"
+                      >
+                        {money(charged.monthlyEquivalentMinor, charged.currency)}
                       </span>
                       <span className="text-lg text-slate-500 line-through font-semibold">
-                        ${originalPrice.toFixed(2)}
+                        {money(list.monthlyEquivalentMinor, list.currency)}
                       </span>
                       <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[11px] font-extrabold px-2 py-0.5 rounded font-mono">
-                        -%{discountRate}
+                        -{charged.percentOff}%
                       </span>
-                      <span className="text-slate-400 text-xs">/ay</span>
+                      <span className="text-slate-400 text-xs">{t('perMonth')}</span>
                     </div>
 
                     <div className="text-[11px] text-slate-400 mt-2 font-mono leading-relaxed">
-                      {pricingData.billingNote}
+                      {billingCycle === 'yearly'
+                        ? t('yearlyBillingNote', {
+                            total: money(charged.amountMinor, charged.currency),
+                            percent: yearlyVsMonthly,
+                          })
+                        : t('monthlyBillingNote')}
                     </div>
 
-                    {/* Promo Coupon Line */}
                     <div className="mt-2 text-[10px] font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 rounded-lg p-2 flex items-center justify-between">
-                      <span>Kupon: {activeTier.code}</span>
-                      <span>{isTr ? `%${discountRate} İndirimli Yenileme` : `${discountRate}% Off Rate`}</span>
+                      <span>{t('couponLabel', { code: charged.campaignCode })}</span>
+                      <span>{t('renewalRate', { percent: charged.percentOff })}</span>
                     </div>
                   </div>
 
-                  {/* Lifetime option for Ultra */}
-                  {plan.lifetime && (
+                  {/* Lifetime option, shown on the plan the licence covers */}
+                  {entry.planId === 'ultra' && lifetime && (
                     <div className="mb-6 bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs font-mono">
-                      <span className="text-slate-300">{isTr ? 'Ömür Boyu · Tek Ödeme ↓' : 'Lifetime · one payment ↓'}</span>
+                      <span className="text-slate-300">{t('lifetimeInline')}</span>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-cyan-300">${plan.lifetime.discounted.toFixed(2)}</span>
-                        <span className="line-through text-slate-500 text-[10px]">${plan.lifetime.original}</span>
-                        <span className="bg-cyan-500/20 text-cyan-300 text-[9px] px-1 rounded">-%{discountRate}</span>
+                        <span className="font-bold text-cyan-300">
+                          {money(lifetime.amountMinor, lifetime.currency)}
+                        </span>
+                        <span className="line-through text-slate-500 text-[10px]">
+                          {money(lifetime.listAmountMinor, lifetime.currency)}
+                        </span>
+                        <span className="bg-cyan-500/20 text-cyan-300 text-[9px] px-1 rounded">
+                          -{lifetime.percentOff}%
+                        </span>
                       </div>
                     </div>
                   )}
@@ -330,39 +276,34 @@ export default function PricingClient({ locale }: PricingClientProps) {
                   {/* CTA Button */}
                   <div className="mb-8">
                     <button
-                      onClick={() => {
-                        applyCoupon(activeTier.code, discountRate);
+                      onClick={() =>
                         addToCart({
-                          id: `plan-${plan.id}`,
+                          sku: entry.sku,
                           type: 'plan',
-                          name: `${plan.name} Plan (${billingCycle === 'yearly' ? (isTr ? 'Yıllık' : 'Yearly') : (isTr ? 'Aylık' : 'Monthly')})`,
-                          subtitle: plan.subtitle,
-                          price: discountedPrice,
-                          originalPrice: originalPrice,
-                          billingCycle: billingCycle,
+                          name: `${entry.name} · ${cycleLabel}`,
+                          subtitle: t(`plans.${entry.planId}.subtitle`),
+                          billingCycle,
                           quantity: 1,
-                          promoCode: activeTier.code,
-                          discountPercent: discountRate,
-                        });
-                      }}
+                        })
+                      }
                       className={`w-full py-3.5 rounded-xl font-extrabold text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
-                        plan.recommended
+                        recommended
                           ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_25px_rgba(34,211,238,0.4)] hover:shadow-[0_0_35px_rgba(34,211,238,0.6)]'
                           : 'bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 hover:border-slate-600'
                       }`}
                     >
                       <ShoppingBag className="w-4 h-4" />
-                      <span>{isTr ? `${plan.name} Paketini Sepete Ekle` : `Add ${plan.name} to Cart`}</span>
+                      <span>{t('addToCart', { plan: entry.name })}</span>
                       <span>↗</span>
                     </button>
                   </div>
 
                   {/* Feature Checklist */}
                   <div className="space-y-3 pt-4 border-t border-slate-800/80">
-                    {plan.features.map((feature, idx) => (
-                      <div key={idx} className="flex items-start gap-2.5 text-xs text-slate-300 leading-snug">
+                    {['f1', 'f2', 'f3', 'f4', 'f5', 'f6'].map((key) => (
+                      <div key={key} className="flex items-start gap-2.5 text-xs text-slate-300 leading-snug">
                         <Check className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                        <span>{feature}</span>
+                        <span>{t(`plans.${entry.planId}.${key}`)}</span>
                       </div>
                     ))}
                   </div>
@@ -372,187 +313,193 @@ export default function PricingClient({ locale }: PricingClientProps) {
           })}
         </div>
 
-        {/* ─── EXCLUSIVE LIFETIME OFFER BANNER (FIRST 20 ENTITIES) ─── */}
-        <div className="bg-[#0b1426] border-2 border-cyan-400/80 rounded-3xl p-6 sm:p-8 shadow-[0_0_40px_rgba(34,211,238,0.2)] mb-12 relative overflow-hidden backdrop-blur-xl">
-          {/* Header Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800 font-mono">
-            <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 tracking-widest uppercase">
-              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-              <span>● LIFETIME · PAY ONCE</span>
-            </div>
-            <div className="bg-slate-900 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs text-slate-300 font-bold flex items-center gap-2 self-start sm:self-auto shadow-inner">
-              <span className="text-amber-400 font-extrabold">5 {isTr ? 'Lisans Sahibi' : 'owners'}</span>
-              <span>·</span>
-              <span className="text-cyan-300">{isTr ? 'Sıradaki Lisans #6 (İlk 20 Firma ile Sınırlı)' : 'next license #6 (Limited to First 20 Entities)'}</span>
-            </div>
-          </div>
-
-          {/* Banner Title & Description */}
-          <div className="max-w-3xl mb-8">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight mb-2 font-heading">
-              {isTr ? 'Tek ödeme — ömür boyu sizin.' : 'Pay once — yours forever.'}
-            </h2>
-            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              {isTr
-                ? 'Abonelik yok, yenileme yok, sürpriz yok. Tek bir ödeme; plan hesabınızda ömür boyu kalır. Yalnızca ilk 20 kişi/firma bu avantajdan yararlanabilir.'
-                : 'No subscription, no renewal, no surprises. One payment; the plan stays on your account forever. Limited to the first 20 entities.'}
-            </p>
-          </div>
-
-          {/* Grid: Purchase Card vs Comparison Matrix */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-            {/* Left Purchase Card (5 cols) */}
-            <div className="lg:col-span-5 bg-[#0e182e] border border-cyan-400/50 rounded-2xl p-6 flex flex-col justify-between shadow-xl relative">
-              <div>
-                <div className="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider mb-1">
-                  Ultra · Lifetime
-                </div>
-                <div className="flex items-baseline gap-2 mb-3">
-                  <span className="text-4xl sm:text-5xl font-extrabold text-white font-heading">
-                    $1,288
-                  </span>
-                  <span className="text-lg text-slate-500 line-through font-semibold">$2,576</span>
-                  <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-extrabold px-2.5 py-0.5 rounded font-mono">
-                    -50%
-                  </span>
-                  <span className="text-xs text-slate-400 font-mono">one-time</span>
-                </div>
-
-                <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-cyan-300 bg-cyan-950/80 border border-cyan-500/30 px-2.5 py-1 rounded-lg mb-6">
-                  <span>OMURBOYU20</span>
-                  <span>·</span>
-                  <span>{isTr ? 'Tek seferlik %50 indirim' : '50% off the one-time payment'}</span>
-                </div>
+        {/* ─── LIFETIME OFFER BANNER ─── */}
+        {lifetime && (
+          <div className="bg-[#0b1426] border-2 border-cyan-400/80 rounded-3xl p-6 sm:p-8 shadow-[0_0_40px_rgba(34,211,238,0.2)] mb-12 relative overflow-hidden backdrop-blur-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800 font-mono">
+              <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 tracking-widest uppercase">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+                <span>{t('lifetimeKicker')}</span>
               </div>
-
-              <div>
-                <button
-                  onClick={() => {
-                    addToCart({
-                      id: 'lifetime-ultra',
-                      type: 'lifetime',
-                      name: 'Ultra Ömür Boyu Lisans (Lifetime)',
-                      subtitle: isTr ? 'İlk 20 Firma — Tek ödeme, ömür boyu erişim' : 'First 20 Entities — Pay once, access forever',
-                      price: 1288,
-                      originalPrice: 2576,
-                      billingCycle: 'one-time',
-                      quantity: 1,
-                      promoCode: 'OMURBOYU20',
-                      discountPercent: 50,
-                    });
-                  }}
-                  className="w-full py-3.5 rounded-xl font-extrabold text-xs bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_25px_rgba(34,211,238,0.4)] hover:shadow-[0_0_35px_rgba(34,211,238,0.6)] transition-all flex items-center justify-center gap-2 cursor-pointer mb-3"
-                >
-                  <ShoppingBag className="w-4 h-4" />
-                  <span>{isTr ? 'Ömür Boyu Lisans Al — Lisans #6' : 'Buy lifetime — License #6'}</span>
-                  <span>↗</span>
-                </button>
-                <div className="text-[10px] text-slate-400 font-mono text-center">
-                  {isTr
-                    ? '14 gün para iade garantisi — kupon ve ömür boyu satın alımlar dahildir.'
-                    : '14-day refund guarantee — coupon and lifetime purchases included.'}
-                </div>
+              {/*
+                Scarcity counters. These numbers are typed in, not counted: no
+                table records a lifetime licence (see TASK-MTR6QYPGOS2N0 report
+                §5). CLAUDE.md rule 7 wants every shown figure behind a record —
+                left untouched here on purpose and raised as its own card.
+              */}
+              <div className="bg-slate-900 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs text-slate-300 font-bold flex items-center gap-2 self-start sm:self-auto shadow-inner">
+                <span className="text-amber-400 font-extrabold">{t('lifetimeOwners')}</span>
+                <span>·</span>
+                <span className="text-cyan-300">{t('lifetimeNext')}</span>
               </div>
             </div>
 
-            {/* Right Comparison Box (7 cols) */}
-            <div className="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between font-mono text-xs shadow-xl">
-              <div>
-                <h3 className="font-bold text-white mb-4 text-sm font-heading">
-                  {isTr ? 'Ultra Yıllık Plan ile Karşılaştırma' : 'Against the Ultra yearly plan'}
-                </h3>
+            <div className="max-w-3xl mb-8">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight mb-2 font-heading">
+                {t('lifetimeTitle')}
+              </h2>
+              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">{t('lifetimeBody')}</p>
+            </div>
 
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-                    <span className="text-slate-400">{isTr ? 'Bugün Ödenen Tutar' : 'You pay today'}</span>
-                    <div className="space-x-4">
-                      <span className="text-slate-400">{isTr ? 'YIL: $598.50' : 'YEARLY $598.50'}</span>
-                      <span className="font-bold text-cyan-300">{isTr ? 'ÖMÜR BOYU: $1,288' : 'LIFETIME $1,288'}</span>
-                    </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+              {/* Purchase card */}
+              <div className="lg:col-span-5 bg-[#0e182e] border border-cyan-400/50 rounded-2xl p-6 flex flex-col justify-between shadow-xl relative">
+                <div>
+                  <div className="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider mb-1">
+                    {lifetime.name}
+                  </div>
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span
+                      data-testid="lifetime-price"
+                      className="text-4xl sm:text-5xl font-extrabold text-white font-heading"
+                    >
+                      {money(lifetime.amountMinor, lifetime.currency)}
+                    </span>
+                    <span className="text-lg text-slate-500 line-through font-semibold">
+                      {money(lifetime.listAmountMinor, lifetime.currency)}
+                    </span>
+                    <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-extrabold px-2.5 py-0.5 rounded font-mono">
+                      -{lifetime.percentOff}%
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">{t('oneTime')}</span>
                   </div>
 
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-                    <span className="text-slate-400">{isTr ? 'Sonraki Her Yıl' : 'Every year after'}</span>
-                    <div className="space-x-4">
-                      <span className="text-slate-400">$1,197.00</span>
-                      <span className="font-bold text-emerald-400">$0</span>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-1 font-bold">
-                    <span className="text-white">{isTr ? '3 Yıldaki Toplam Maliyet' : 'Total over 3 years'}</span>
-                    <div className="space-x-4">
-                      <span className="text-slate-400 line-through">$2,992.50</span>
-                      <span className="text-cyan-300 text-sm">$1,288</span>
-                    </div>
+                  <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-cyan-300 bg-cyan-950/80 border border-cyan-500/30 px-2.5 py-1 rounded-lg mb-6">
+                    <span>{lifetime.campaignCode}</span>
+                    <span>·</span>
+                    <span>{t('lifetimeCouponNote', { percent: lifetime.percentOff })}</span>
                   </div>
                 </div>
 
-                <div className="mt-5 bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-3 text-cyan-300 text-xs font-semibold leading-relaxed">
-                  {isTr
-                    ? '3 yılda tam $1,704.50 daha az ödersiniz — ömür boyu lisans kendini 13 ayda amorti eder.'
-                    : 'You pay $1,704.50 less over 3 years — lifetime pays for itself in 13 months.'}
+                <div>
+                  <button
+                    onClick={() =>
+                      addToCart({
+                        sku: lifetime.sku,
+                        type: 'lifetime',
+                        name: lifetime.name,
+                        subtitle: t('lifetimeCartSubtitle'),
+                        billingCycle: 'one-time',
+                        quantity: 1,
+                      })
+                    }
+                    className="w-full py-3.5 rounded-xl font-extrabold text-xs bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_25px_rgba(34,211,238,0.4)] hover:shadow-[0_0_35px_rgba(34,211,238,0.6)] transition-all flex items-center justify-center gap-2 cursor-pointer mb-3"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>{t('lifetimeCta')}</span>
+                    <span>↗</span>
+                  </button>
+                  <div className="text-[10px] text-slate-400 font-mono text-center">{t('refundNote')}</div>
                 </div>
               </div>
 
-              <div className="mt-6 pt-3 border-t border-slate-800 text-[11px] text-slate-400">
-                {isTr
-                  ? 'AB proje modülleri, CORDIS analitiği, hakem simülatörü ve tüm 1.x güncellemeleri — sonsuza kadar.'
-                  : 'Desktop app, agents, memory, skills and every 1.x update — forever. Cloud sync and mobile stay on subscription.'}
+              {/* Comparison box — every figure priced from the catalogue */}
+              <div className="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between font-mono text-xs shadow-xl">
+                <div>
+                  <h3 className="font-bold text-white mb-4 text-sm font-heading">{t('compareTitle')}</h3>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                      <span className="text-slate-400">{t('compareToday')}</span>
+                      <div className="space-x-4">
+                        <span className="text-slate-400">
+                          {t('compareYearlyTag')} {money(ultraYearly.amountMinor, ultraYearly.currency)}
+                        </span>
+                        <span className="font-bold text-cyan-300">
+                          {t('compareLifetimeTag')} {money(lifetime.amountMinor, lifetime.currency)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                      <span className="text-slate-400">{t('compareEveryYear')}</span>
+                      <div className="space-x-4">
+                        <span className="text-slate-400">
+                          {money(ultraYearlyList.amountMinor, ultraYearlyList.currency)}
+                        </span>
+                        <span className="font-bold text-emerald-400">{money(0, lifetime.currency)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-1 font-bold">
+                      <span className="text-white">{t('compareThreeYears')}</span>
+                      <div className="space-x-4">
+                        <span className="text-slate-400 line-through">
+                          {money(ultraThreeYearMinor, ultraYearly.currency)}
+                        </span>
+                        <span className="text-cyan-300 text-sm">
+                          {money(lifetime.amountMinor, lifetime.currency)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-3 text-cyan-300 text-xs font-semibold leading-relaxed">
+                    {t('compareSaving', { amount: money(lifetimeSavingMinor, lifetime.currency) })}
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-3 border-t border-slate-800 text-[11px] text-slate-400">
+                  {t('lifetimeFooter')}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* ─── FULL DISCOUNTS TIER SCHEDULE TABLE ─── */}
+        {/* ─── FULL TIER SCHEDULE TABLE (the preview surface: each row is labelled with its own tier) ─── */}
         <div className="bg-[#0b1324] border border-slate-800 rounded-2xl p-6 shadow-xl mb-12">
-          <h3 className="text-lg font-bold text-white mb-2 font-heading">
-            {isTr ? '📋 Kademeli İndirim Politikası Detay Tablosu' : '📋 Tiered Discount Schedule Details'}
-          </h3>
-          <p className="text-xs text-slate-400 mb-6">
-            {isTr
-              ? 'Erken abonelik sıranıza göre uygulanan indirim oranları ve kupon kodları tablosu.'
-              : 'Complete breakdown of discount rates and coupon codes based on subscription order.'}
-          </p>
+          <h3 className="text-lg font-bold text-white mb-2 font-heading">{t('scheduleTitle')}</h3>
+          <p className="text-xs text-slate-400 mb-6">{t('scheduleBody')}</p>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse font-mono">
               <thead>
                 <tr className="bg-slate-900 text-cyan-400 border-b border-slate-800">
-                  <th className="p-3 font-bold">{isTr ? 'Katman (Abone Sırası)' : 'Tier (Subscriber Count)'}</th>
-                  <th className="p-3 font-bold">{isTr ? 'İndirim Oranı' : 'Discount Rate'}</th>
-                  <th className="p-3 font-bold">{isTr ? 'Kupon Kodu' : 'Promo Code'}</th>
-                  <th className="p-3 font-bold">{isTr ? 'Basic Aylık' : 'Basic Monthly'}</th>
-                  <th className="p-3 font-bold">{isTr ? 'Pro Aylık' : 'Pro Monthly'}</th>
-                  <th className="p-3 font-bold">{isTr ? 'Ultra Aylık' : 'Ultra Monthly'}</th>
-                  <th className="p-3 font-bold text-right">{isTr ? 'Durum' : 'Status'}</th>
+                  <th className="p-3 font-bold">{t('colTier')}</th>
+                  <th className="p-3 font-bold">{t('colRate')}</th>
+                  <th className="p-3 font-bold">{t('colCode')}</th>
+                  {PLAN_ENTRIES.map((entry) => (
+                    <th key={entry.planId} className="p-3 font-bold">
+                      {t('colPlanMonthly', { plan: entry.name })}
+                    </th>
+                  ))}
+                  <th className="p-3 font-bold text-right">{t('colStatus')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80 text-slate-300">
-                {DISCOUNT_TIERS.map((tier) => (
-                  <tr
-                    key={tier.id}
-                    className={`hover:bg-slate-900/50 transition ${selectedTierId === tier.id ? 'bg-cyan-950/40 text-white font-bold' : ''}`}
-                  >
-                    <td className="p-3">{isTr ? tier.labelTr : tier.labelEn}</td>
-                    <td className="p-3 text-cyan-300 font-extrabold">-%{tier.discount}</td>
-                    <td className="p-3 font-bold text-amber-300">{tier.code}</td>
-                    <td className="p-3">${(45 * (100 - tier.discount) / 100).toFixed(2)}</td>
-                    <td className="p-3 font-bold text-white">${(87 * (100 - tier.discount) / 100).toFixed(2)}</td>
-                    <td className="p-3">${(147 * (100 - tier.discount) / 100).toFixed(2)}</td>
-                    <td className="p-3 text-right">
-                      {tier.isCurrent ? (
-                        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded text-[10px]">
-                          {isTr ? '🔥 AKTİF KATMAN' : 'ACTIVE TIER'}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 text-[10px]">
-                          {isTr ? 'SIRADA' : 'UPCOMING'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {DISCOUNT_TIERS.map((tier) => {
+                  const isActive = tier.code === activeTier.code;
+                  return (
+                    <tr
+                      key={tier.code}
+                      className={`hover:bg-slate-900/50 transition ${isActive ? 'bg-cyan-950/40 text-white font-bold' : ''}`}
+                    >
+                      <td className="p-3">{t(`tiers.${tier.code}`)}</td>
+                      <td className="p-3 text-cyan-300 font-extrabold">-{tier.percentOff}%</td>
+                      <td className="p-3 font-bold text-amber-300">{tier.code}</td>
+                      {PLAN_ENTRIES.map((entry) => {
+                        const row = priceLine({ sku: entry.sku, billingCycle: 'monthly' }, tier);
+                        return (
+                          <td key={entry.planId} className={`p-3 ${entry.planId === 'pro' ? 'font-bold text-white' : ''}`}>
+                            {money(row.amountMinor, row.currency)}
+                          </td>
+                        );
+                      })}
+                      <td className="p-3 text-right">
+                        {isActive ? (
+                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded text-[10px]">
+                            {t('statusActive')}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 text-[10px]">
+                            {tier.rank < activeTier.rank ? t('statusEnded') : t('statusUpcoming')}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -560,23 +507,19 @@ export default function PricingClient({ locale }: PricingClientProps) {
 
         {/* Bottom Guarantee & SLA Note */}
         <div className="text-center text-xs text-slate-400 font-mono space-y-2 max-w-2xl mx-auto border-t border-slate-800 pt-8">
-          <p>
-            {isTr
-              ? 'Hesabınızla giriş yapın — seçtiğiniz katman ve indirim kuponu ödeme adımında otomatik uygulanır.'
-              : 'Sign in with your account — the tier and coupon code apply automatically at checkout.'}
-          </p>
+          <p>{t('footerNote')}</p>
           <div className="flex justify-center items-center gap-6 text-[11px] text-slate-400 pt-2">
             <span className="flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-cyan-400" />
-              {isTr ? '14 Gün Para İade Garantisi' : '14-day Money Back Guarantee'}
+              {t('guaranteeRefund')}
             </span>
             <span className="flex items-center gap-1.5">
               <Zap className="w-3.5 h-3.5 text-cyan-400" />
-              {isTr ? 'İstediğin Zaman İptal Et' : 'Cancel Any Time'}
+              {t('guaranteeCancel')}
             </span>
             <span className="flex items-center gap-1.5">
               <Gift className="w-3.5 h-3.5 text-cyan-400" />
-              {isTr ? 'GİB E-Fatura Uyumlu' : 'GİB E-Invoice Compliant'}
+              {t('guaranteeInvoice')}
             </span>
           </div>
         </div>

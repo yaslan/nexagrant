@@ -105,3 +105,29 @@ export function applyPercentDiscount(amountMinor: number, percentOff: number): n
   }
   return Math.floor(numerator / 100 + 0.5);
 }
+
+/**
+ * Renders minor units for a *person* to read, in their locale.
+ *
+ * The display side of this module: `toDecimalString` is the wire format a
+ * provider parses, this is the one a customer sees. It exists so no screen has
+ * to write `$${x.toFixed(2)}` again — that hard-coded symbol was wrong in every
+ * locale but one, and `toFixed` on a float is how a cent goes missing between
+ * the price card and the invoice.
+ *
+ * The `Number()` here is the single allowed float in the money path and it is
+ * display-only: the value has already been rounded to a whole minor unit, and
+ * `Intl` is then told exactly how many fraction digits the currency has, so the
+ * float can never change the rendered digits for any amount inside the safe
+ * integer range.
+ */
+export function formatMoney(amountMinor: number, currency: string, locale: string): string {
+  const decimal = toDecimalString(amountMinor, currency);
+  const exponent = currencyExponent(currency);
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    minimumFractionDigits: exponent,
+    maximumFractionDigits: exponent,
+  }).format(Number(decimal));
+}

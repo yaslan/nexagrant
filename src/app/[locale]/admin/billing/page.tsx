@@ -3,6 +3,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { BillingSsoClient } from './client';
 import { errorMessage } from '@/lib/errors';
+import { getActiveTier } from '@/lib/billing/active-tier';
 
 /** The Tenant fields the billing header shows, with its subscription. */
 interface TenantWithSubscription {
@@ -38,11 +39,15 @@ export default async function AdminBillingPage({
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {/* Prices come from the catalogue under the server's live tier — the same
+          pair the public pricing page and the checkout route use. */}
       <BillingSsoClient
+        locale={locale}
         tenantId={tenantId}
         tenantName={tenant?.name || ''}
         currentPlanId={subscription?.planId || ''}
         currentProvider="stripe"
+        activeTier={getActiveTier()}
       />
     </div>
   );

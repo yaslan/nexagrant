@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyPercentDiscount, currencyExponent, sameAmount, toDecimalString, toMinorUnits } from './money';
+import { applyPercentDiscount, currencyExponent, formatMoney, sameAmount, toDecimalString, toMinorUnits } from './money';
 
 describe('toMinorUnits', () => {
   it('parses provider decimal strings', () => {
@@ -75,5 +75,24 @@ describe('applyPercentDiscount', () => {
     expect(() => applyPercentDiscount(4_500, 101)).toThrow();
     expect(() => applyPercentDiscount(4_500, -1)).toThrow();
     expect(() => applyPercentDiscount(-4_500, 10)).toThrow();
+  });
+});
+
+describe('formatMoney', () => {
+  it('renders the same amount in each locale\u2019s own number format', () => {
+    // Same 128_800 cents; the separators move, the value does not.
+    expect(formatMoney(128_800, 'USD', 'tr')).toBe('$1.288,00');
+    expect(formatMoney(128_800, 'USD', 'en')).toBe('$1,288.00');
+  });
+
+  it('always shows the currency\u2019s own number of fraction digits', () => {
+    expect(formatMoney(2_610, 'USD', 'en')).toBe('$26.10');
+    expect(formatMoney(2_600, 'USD', 'en')).toBe('$26.00');
+    // JPY has no minor unit: a ".00" here would invent one.
+    expect(formatMoney(2_600, 'JPY', 'en')).toBe('\u00a52,600');
+  });
+
+  it('refuses a non-integer amount rather than rendering a rounded one', () => {
+    expect(() => formatMoney(26.105, 'USD', 'en')).toThrow();
   });
 });

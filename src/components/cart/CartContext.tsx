@@ -1,95 +1,112 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
+  priceLine,
+  UnknownSkuError,
+  UnsupportedCycleError,
+  type BillingCycle,
+  type DiscountTier,
+  type PricedLine,
+} from '@/lib/billing/catalog';
 
+/**
+ * What the cart stores: *which* catalogue line, never how much it costs.
+ *
+ * The cart used to carry `price`, `originalPrice` and `discountPercent` as
+ * floats and post them to checkout, which is how the browser got to name its
+ * own price. It also meant a cart left in localStorage kept quoting a campaign
+ * that had already ended. Amounts are now derived on every render from
+ * `priceLine()` — the same function the checkout route prices with — under the
+ * tier the server hands down, so what the drawer shows and what the server
+ * charges cannot drift apart.
+ */
 export interface CartItem {
-  id: string;
+  /** Catalogue sku (`plan-pro`, `lifetime-ultra`). The only price authority. */
+  sku: string;
   type: 'plan' | 'lifetime' | 'credits' | 'addon';
   name: string;
   subtitle?: string;
-  price: number;
-  originalPrice?: number;
-  billingCycle?: 'monthly' | 'yearly' | 'one-time';
+  billingCycle: BillingCycle;
   quantity: number;
-  promoCode?: string;
-  discountPercent?: number;
-  details?: string[];
 }
 
-export interface DiscountTier {
-  id: number;
-  labelTr: string;
-  labelEn: string;
-  discount: number;
-  code: string;
-  statusTr?: string;
-  statusEn?: string;
+/** A cart line with its catalogue price attached, ready to render. */
+export interface PricedCartItem extends CartItem {
+  priced: PricedLine;
+}
+
+export interface CartTotals {
+  /** Undiscounted total, in minor units. */
+  subtotalMinor: number;
+  /** What the campaign takes off, in minor units. */
+  discountMinor: number;
+  /** What checkout will charge, in minor units. */
+  totalMinor: number;
+  currency: string;
+  lines: PricedCartItem[];
 }
 
 interface CartContextType {
   cartItems: CartItem[];
   isOpen: boolean;
-  activeCoupon: string;
-  discountPercent: number;
+  /** The campaign the server is running. Read-only to every screen. */
+  activeTier: DiscountTier;
   openCart: () => void;
   closeCart: () => void;
   toggleCart: () => void;
   addToCart: (item: CartItem) => void;
-  removeFromCart: (id: string) => void;
+  removeFromCart: (sku: string) => void;
   clearCart: () => void;
-  applyCoupon: (code: string, discount: number) => void;
-  getCartTotal: () => { subtotal: number; discountAmount: number; total: number };
+  getCartTotal: () => CartTotals;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-const CART_STORAGE_KEY = 'fonbridge_cart_items_v1';
-const COUPON_STORAGE_KEY = 'fonbridge_cart_coupon_v1';
+/**
+ * v2: v1 entries carried float prices and a client-chosen discount. Reading one
+ * back under the new shape would render `NaN` and, worse, imply a price nobody
+ * would honour — so the key changes and stale carts are simply dropped.
+ */
+const CART_STORAGE_KEY = 'fonbridge_cart_items_v2';
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(CART_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+/** Drops anything that is not a `{sku, quantity}` line of the current shape. */
+function readStoredItems(): CartItem[] {
+  try {
+    const stored = localStorage.getItem(CART_STORAGE_KEY);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is CartItem =>
+        Boolean(item) &&
+        typeof item === 'object' &&
+        typeof (item as CartItem).sku === 'string' &&
+        Number.isInteger((item as CartItem).quantity)
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function CartProvider({
+  children,
+  activeTier,
+}: {
+  children: React.ReactNode;
+  /** Comes from `getActiveTier()` in the server layout — never chosen here. */
+  activeTier: DiscountTier;
+}) {
+  const [cartItems, setCartItems] = useState<CartItem[]>(readStoredItems);
   const [isOpen, setIsOpen] = useState(false);
-  const [activeCoupon, setActiveCoupon] = useState<string>(() => {
-    try {
-      const stored = localStorage.getItem(COUPON_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed.code || 'ILK5';
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-    return 'ILK5';
-  });
-  const [discountPercent, setDiscountPercent] = useState<number>(() => {
-    try {
-      const stored = localStorage.getItem(COUPON_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed.discount ?? 70;
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-    return 70;
-  });
 
-  // Sync to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
-      localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify({ code: activeCoupon, discount: discountPercent }));
     } catch {
-      // Ignore
+      // A blocked or full localStorage must not break the cart itself.
     }
-  }, [cartItems, activeCoupon, discountPercent]);
+  }, [cartItems]);
 
   const openCart = () => setIsOpen(true);
   const closeCart = () => setIsOpen(false);
@@ -97,60 +114,63 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addToCart = (newItem: CartItem) => {
     setCartItems((prevItems) => {
-      // If adding a main subscription plan or lifetime, replace any existing main plan in cart
+      // A subscription plan or a lifetime licence replaces any other one.
       if (newItem.type === 'plan' || newItem.type === 'lifetime') {
-        const nonPlanItems = prevItems.filter((i) => i.type !== 'plan' && i.type !== 'lifetime');
-        return [...nonPlanItems, { ...newItem, promoCode: activeCoupon, discountPercent }];
+        const others = prevItems.filter((i) => i.type !== 'plan' && i.type !== 'lifetime');
+        return [...others, newItem];
       }
-      // If adding credits or add-ons, update quantity if already present or append
-      const existingIndex = prevItems.findIndex((i) => i.id === newItem.id);
+      const existingIndex = prevItems.findIndex((i) => i.sku === newItem.sku);
       if (existingIndex > -1) {
-        const updated = [...prevItems];
-        updated[existingIndex].quantity += newItem.quantity || 1;
-        return updated;
+        return prevItems.map((item, index) =>
+          index === existingIndex
+            ? { ...item, quantity: item.quantity + (newItem.quantity || 1) }
+            : item
+        );
       }
-      return [...prevItems, { ...newItem, promoCode: activeCoupon, discountPercent }];
+      return [...prevItems, newItem];
     });
     setIsOpen(true);
   };
 
-  const removeFromCart = (id: string) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
+  const removeFromCart = (sku: string) => {
+    setCartItems((prev) => prev.filter((item) => item.sku !== sku));
   };
 
-  const clearCart = () => {
-    setCartItems([]);
-  };
+  const clearCart = () => setCartItems([]);
 
-  const applyCoupon = (code: string, discount: number) => {
-    setActiveCoupon(code);
-    setDiscountPercent(discount);
-    // Update promo details on items
-    setCartItems((prev) =>
-      prev.map((item) => ({
-        ...item,
-        promoCode: code,
-        discountPercent: discount,
-      }))
+  const getCartTotal = (): CartTotals => {
+    const lines: PricedCartItem[] = [];
+    for (const item of cartItems) {
+      try {
+        lines.push({
+          ...item,
+          priced: priceLine(
+            { sku: item.sku, billingCycle: item.billingCycle, quantity: item.quantity },
+            activeTier
+          ),
+        });
+      } catch (error) {
+        // A sku the catalogue does not know cannot be shown with a price and
+        // would be refused by checkout anyway (400). Skipping it keeps the
+        // drawer total equal to what the server will charge.
+        if (error instanceof UnknownSkuError || error instanceof UnsupportedCycleError) continue;
+        throw error;
+      }
+    }
+
+    const subtotalMinor = lines.reduce(
+      (sum, line) => sum + line.priced.listAmountMinor * line.priced.quantity,
+      0
     );
-  };
+    const totalMinor = lines.reduce((sum, line) => sum + line.priced.totalMinor, 0);
 
-  const getCartTotal = () => {
-    let subtotal = 0;
-    let discountAmount = 0;
-
-    cartItems.forEach((item) => {
-      const itemSubtotal = item.originalPrice ? item.originalPrice * item.quantity : item.price * item.quantity;
-      subtotal += itemSubtotal;
-
-      // Apply discount tier percentage if applicable
-      const itemDiscountRate = item.type === 'lifetime' ? 50 : (item.discountPercent ?? discountPercent);
-      const itemDiscount = (itemSubtotal * itemDiscountRate) / 100;
-      discountAmount += itemDiscount;
-    });
-
-    const total = Math.max(0, subtotal - discountAmount);
-    return { subtotal, discountAmount, total };
+    return {
+      subtotalMinor,
+      discountMinor: subtotalMinor - totalMinor,
+      totalMinor,
+      currency: lines[0]?.priced.currency ?? 'USD',
+      lines,
+    };
   };
 
   return (
@@ -158,15 +178,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       value={{
         cartItems,
         isOpen,
-        activeCoupon,
-        discountPercent,
+        activeTier,
         openCart,
         closeCart,
         toggleCart,
         addToCart,
         removeFromCart,
         clearCart,
-        applyCoupon,
         getCartTotal,
       }}
     >

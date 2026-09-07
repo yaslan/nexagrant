@@ -1,45 +1,72 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  CreditCard, 
-  ShieldCheck, 
-  CheckCircle2, 
-  KeyRound, 
-  Check, 
+import { useTranslations } from 'next-intl';
+import {
+  CreditCard,
+  CheckCircle2,
+  KeyRound,
+  Check,
   ShoppingBag,
   ExternalLink,
-  Zap,
-  Sparkles
 } from 'lucide-react';
 import { handleConfigureSso } from './actions';
 import { useCart } from '@/components/cart/CartContext';
+import {
+  CATALOG,
+  MONTHS_PER_YEAR,
+  NO_DISCOUNT_TIER,
+  priceLine,
+  type BillingCycle,
+  type DiscountTier,
+  type PlanEntry,
+} from '@/lib/billing/catalog';
+import { formatMoney } from '@/lib/money';
 
 interface BillingSsoClientProps {
+  locale: string;
   tenantId: string;
   tenantName: string;
   currentPlanId: string;
   currentProvider: string;
+  /**
+   * The live campaign, from `getActiveTier()` on the server.
+   *
+   * This panel used to bill `price * 0.3 // Apply active 70% discount`: the
+   * campaign was frozen into the admin screen while the public pricing page
+   * moved with its own selector, so the two panels quoted different prices for
+   * the same plan. Both now read one tier and one catalogue.
+   */
+  activeTier: DiscountTier;
 }
 
+const PLAN_ENTRIES = CATALOG.filter((entry): entry is PlanEntry => entry.kind === 'plan');
+
 export function BillingSsoClient({
+  locale,
   tenantId,
   tenantName,
   currentPlanId = 'pro',
   currentProvider = 'stripe',
+  activeTier,
 }: BillingSsoClientProps) {
-  const { addToCart, applyCoupon } = useCart();
+  const t = useTranslations('billingPanels.admin');
+  const { addToCart } = useCart();
   const [activeTab, setActiveTab] = useState<'billing' | 'sso'>('billing');
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
+  const [billingCycle, setBillingCycle] = useState<Exclude<BillingCycle, 'one-time'>>('yearly');
+  const [portalNotice, setPortalNotice] = useState<string | null>(null);
 
   // SSO Form state
   const [ssoDomain, setSsoDomain] = useState('itu.edu.tr');
   const [idpEntityId, setIdpEntityId] = useState('https://sso.itu.edu.tr/idp/shibboleth');
   const [ssoAcsUrl, setSsoAcsUrl] = useState('https://fabrika.app/api/auth/saml/acs');
   const [providerType, setProviderType] = useState('SAML_2_0');
-  const [x509Cert, setX509Cert] = useState('-----BEGIN CERTIFICATE-----\nMIIDdDCCAigCCQ... (İTÜ SAML Certificate)\n-----END CERTIFICATE-----');
+  const [x509Cert, setX509Cert] = useState('-----BEGIN CERTIFICATE-----\nMIIDdDCCAigCCQ...\n-----END CERTIFICATE-----');
   const [ssoSaved, setSsoSaved] = useState(false);
   const [isSavingSso, setIsSavingSso] = useState(false);
+
+  const money = (amountMinor: number, currency: string) => formatMoney(amountMinor, currency, locale);
+  const cycleLabel = billingCycle === 'yearly' ? t('cycleYearly') : t('cycleMonthly');
 
   const handleSaveSso = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,48 +91,31 @@ export function BillingSsoClient({
   };
 
   const handleStripePortal = async () => {
+    setPortalNotice(null);
     try {
       const res = await fetch('/api/billing/portal', { method: 'POST' });
       const data = await res.json();
       if (data?.url) {
         window.location.href = data.url;
       } else {
-        alert('Stripe portal simülasyonu çalıştırıldı (Demo modu).');
+        setPortalNotice(t('portalDemo'));
       }
     } catch {
-      alert('Stripe portalına bağlanılamadı.');
+      setPortalNotice(t('portalUnreachable'));
     }
   };
 
-  const plans = [
-    {
-      id: 'basic',
-      name: 'Basic',
-      monthlyPrice: 45,
-      yearlyPrice: 32.25,
-      desc: 'Solo başlangıç — İlk adım',
-      features: ['1 Çalışma Alanı', '500 YZ Kredisi / ay', 'Açık Çağrı Arama (SEDIA Live)', 'G0-G4 Pipeline & Kanban'],
-      recommended: false,
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
-      monthlyPrice: 87,
-      yearlyPrice: 62.25,
-      desc: 'Ciddi günlük kullanım & projeler için',
-      features: ['Sınırsız Çalışma Alanı', '3.000 YZ Kredisi / ay', 'M1 CORDIS Graf Haritası', 'Evaluator Lens AB Hakem Simülatörü'],
-      recommended: true,
-    },
-    {
-      id: 'ultra',
-      name: 'Ultra / Kurumsal',
-      monthlyPrice: 147,
-      yearlyPrice: 99.75,
-      desc: 'Tüm ekosistem & kurumsal konsorsiyumlar',
-      features: ['Pro Özelliklerinin Tamamı', 'Sınırsız YZ Kredisi (BYO Key)', '150.000+ CORDIS Dışa Aktarımı', 'GİB E-Fatura & Kurumsal SLA'],
-      recommended: false,
-    },
-  ];
+  /** Same catalogue, same tier, same function as the public pricing cards. */
+  const cards = PLAN_ENTRIES.map((entry) => {
+    const charged = priceLine({ sku: entry.sku, billingCycle }, activeTier);
+    const list = priceLine({ sku: entry.sku, billingCycle }, NO_DISCOUNT_TIER);
+    const yearlyVsMonthly = Math.round(
+      ((entry.monthlyListMinor * MONTHS_PER_YEAR - entry.yearlyListMinor) /
+        (entry.monthlyListMinor * MONTHS_PER_YEAR)) *
+        100
+    );
+    return { entry, charged, list, yearlyVsMonthly };
+  });
 
   return (
     <div className="space-y-6 font-sans">
@@ -115,14 +125,16 @@ export function BillingSsoClient({
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 font-semibold tracking-wider uppercase mb-1">
               <CreditCard className="w-4 h-4 text-cyan-400" />
-              <span>Faturalama & Kurumsal Kimlik</span>
+              <span>{t('kicker')}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-white">
-              Stripe Ödeme Altyapısı & Kurumsal SSO Entegrasyonu
+              {t('title')}
             </h1>
             <p className="text-slate-300 text-xs md:text-sm mt-1 max-w-2xl">
-              Kuruluş: <strong className="text-white font-semibold">{tenantName}</strong> — Aktif Sağlayıcı:{' '}
-              <span className="font-mono text-cyan-400 font-bold uppercase">STRIPE (Tek Ödeme Altyapısı)</span>
+              {t('orgLabel')}{' '}
+              <strong className="text-white font-semibold">{tenantName}</strong> —{' '}
+              {t('providerLabel')}{' '}
+              <span className="font-mono text-cyan-400 font-bold uppercase">{currentProvider}</span>
             </p>
           </div>
 
@@ -132,11 +144,17 @@ export function BillingSsoClient({
               className="bg-[#22d3ee] hover:bg-[#67e8f9] text-[#080d1a] px-4 py-2.5 rounded-xl font-extrabold text-xs shadow-md transition flex items-center gap-2 cursor-pointer font-mono"
             >
               <CreditCard className="w-4 h-4 text-[#080d1a]" />
-              <span>Stripe Müşteri Portalı</span>
+              <span>{t('portalCta')}</span>
               <ExternalLink className="w-3.5 h-3.5 text-[#080d1a]" />
             </button>
           </div>
         </div>
+
+        {portalNotice && (
+          <div role="status" className="mt-4 text-xs font-mono text-cyan-200 bg-slate-950/60 border border-cyan-500/30 rounded-xl px-3 py-2 relative z-10">
+            {portalNotice}
+          </div>
+        )}
       </div>
 
       {/* ──────────────────────── NAVIGATION TABS ──────────────────────── */}
@@ -150,7 +168,7 @@ export function BillingSsoClient({
           }`}
         >
           <CreditCard className="w-4 h-4" />
-          <span>Stripe Global Abonelik Planları (3D Secure 2.0)</span>
+          <span>{t('tabBilling')}</span>
         </button>
 
         <button
@@ -162,7 +180,7 @@ export function BillingSsoClient({
           }`}
         >
           <KeyRound className="w-4 h-4" />
-          <span>Kurumsal SSO (SAML 2.0 / Okta / Entra ID)</span>
+          <span>{t('tabSso')}</span>
         </button>
       </div>
 
@@ -172,9 +190,10 @@ export function BillingSsoClient({
           {/* Header Controls */}
           <div className="bg-surface border border-line rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-sm text-ink">Stripe Güvenli Ödeme Altyapısı</h3>
-              <p className="text-muted text-xs mt-0.5">
-                Tüm abonelik ve eklenti paketleri tek bir Stripe altyapısı üzerinden 256-bit SSL korumasıyla işlenir.
+              <h3 className="font-bold text-sm text-ink">{t('secureTitle')}</h3>
+              <p className="text-muted text-xs mt-0.5">{t('secureBody')}</p>
+              <p className="text-muted text-[11px] mt-1 font-mono">
+                {t('activeTierNote', { code: activeTier.code, percent: activeTier.percentOff })}
               </p>
             </div>
 
@@ -185,7 +204,7 @@ export function BillingSsoClient({
                   billingCycle === 'monthly' ? 'bg-accent text-slate-950 shadow-xs' : 'text-muted hover:text-ink'
                 }`}
               >
-                Aylık Faturalama
+                {t('cycleMonthly')}
               </button>
               <button
                 onClick={() => setBillingCycle('yearly')}
@@ -193,9 +212,9 @@ export function BillingSsoClient({
                   billingCycle === 'yearly' ? 'bg-accent text-slate-950 shadow-xs' : 'text-muted hover:text-ink'
                 }`}
               >
-                <span>Yıllık Faturalama</span>
+                <span>{t('cycleYearly')}</span>
                 <span className="text-[9px] bg-slate-950 text-cyan-300 px-1.5 py-0.2 rounded font-mono font-extrabold">
-                  3 Ay Ücretsiz
+                  {t('yearlyBadge')}
                 </span>
               </button>
             </div>
@@ -203,54 +222,71 @@ export function BillingSsoClient({
 
           {/* Pricing Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.map((p) => {
-              const price = billingCycle === 'yearly' ? p.yearlyPrice : p.monthlyPrice;
-              const isCurrent = currentPlanId.toLowerCase() === p.id;
+            {cards.map(({ entry, charged, list, yearlyVsMonthly }) => {
+              const isCurrent = currentPlanId.toLowerCase() === entry.planId;
+              const recommended = entry.planId === 'pro';
 
               return (
                 <div
-                  key={p.id}
+                  key={entry.planId}
+                  data-testid={`admin-plan-card-${entry.planId}`}
                   className={`bg-surface border rounded-2xl p-6 shadow-xs space-y-4 flex flex-col justify-between relative transition-all ${
-                    p.recommended ? 'border-2 border-accent ring-1 ring-accent/30' : 'border-line hover:border-accent/40'
+                    recommended ? 'border-2 border-accent ring-1 ring-accent/30' : 'border-line hover:border-accent/40'
                   }`}
                 >
-                  {p.recommended && (
+                  {recommended && (
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-slate-950 text-[10px] font-bold font-mono px-3 py-0.5 rounded-full uppercase shadow-xs">
-                      En Popüler Plan
+                      {t('mostPopular')}
                     </span>
                   )}
 
                   <div className="space-y-3">
-                    <span className="text-xs font-mono font-bold text-muted uppercase tracking-wider">{p.name}</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-bold text-ink font-mono">${price.toFixed(2)}</span>
-                      <span className="text-xs text-muted font-semibold">/ ay</span>
+                    <span className="text-xs font-mono font-bold text-muted uppercase tracking-wider">{entry.name}</span>
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <span
+                        data-testid={`admin-plan-price-${entry.planId}`}
+                        className="text-3xl font-bold text-ink font-mono"
+                      >
+                        {money(charged.monthlyEquivalentMinor, charged.currency)}
+                      </span>
+                      <span className="text-sm text-muted line-through font-mono">
+                        {money(list.monthlyEquivalentMinor, list.currency)}
+                      </span>
+                      <span className="text-[11px] bg-accent/15 text-accent font-extrabold px-1.5 py-0.5 rounded font-mono">
+                        -{charged.percentOff}%
+                      </span>
+                      <span className="text-xs text-muted font-semibold">{t('perMonth')}</span>
                     </div>
-                    <p className="text-xs text-muted">{p.desc}</p>
+                    <p className="text-[10px] font-mono text-muted">
+                      {billingCycle === 'yearly'
+                        ? t('yearlyBillingNote', {
+                            total: money(charged.amountMinor, charged.currency),
+                            percent: yearlyVsMonthly,
+                          })
+                        : t('monthlyBillingNote')}
+                    </p>
+                    <p className="text-xs text-muted">{t(`plans.${entry.planId}.desc`)}</p>
                     <ul className="text-xs space-y-2 pt-2 border-t border-line text-ink-2">
-                      {p.features.map((f, i) => (
-                        <li key={i} className="flex items-center gap-2">
+                      {['f1', 'f2', 'f3', 'f4'].map((key) => (
+                        <li key={key} className="flex items-center gap-2">
                           <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
-                          <span>{f}</span>
+                          <span>{t(`plans.${entry.planId}.${key}`)}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
                   <button
-                    onClick={() => {
+                    onClick={() =>
                       addToCart({
-                        id: `plan-${p.id}`,
+                        sku: entry.sku,
                         type: 'plan',
-                        name: `${p.name} Plan (${billingCycle === 'yearly' ? 'Yıllık' : 'Aylık'})`,
-                        subtitle: p.desc,
-                        price: price * 0.3, // Apply active 70% discount
-                        originalPrice: price,
-                        billingCycle: billingCycle,
+                        name: `${entry.name} · ${cycleLabel}`,
+                        subtitle: t(`plans.${entry.planId}.desc`),
+                        billingCycle,
                         quantity: 1,
-                        discountPercent: 70,
-                      });
-                    }}
+                      })
+                    }
                     className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center justify-center gap-2 ${
                       isCurrent
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
@@ -258,7 +294,7 @@ export function BillingSsoClient({
                     }`}
                   >
                     <ShoppingBag className="w-4 h-4" />
-                    <span>{isCurrent ? '✓ Aktif Planınız' : 'Stripe İle Sepete Ekle'}</span>
+                    <span>{isCurrent ? t('currentPlan') : t('addToCart')}</span>
                   </button>
                 </div>
               );
@@ -273,35 +309,39 @@ export function BillingSsoClient({
           <div>
             <h2 className="text-base font-bold text-ink flex items-center gap-2">
               <KeyRound className="w-5 h-5 text-cyan-400" />
-              <span>Kurumsal SAML 2.0 Single Sign-On (SSO) Yapılandırması</span>
+              <span>{t('ssoTitle')}</span>
             </h2>
-            <p className="text-muted text-xs mt-1">
-              Üniversite ve kurumsal Identity Provider (İTÜ, METU, Okta, Azure AD) SSO entegrasyonu.
-            </p>
+            <p className="text-muted text-xs mt-1">{t('ssoBody')}</p>
           </div>
 
           <form onSubmit={handleSaveSso} className="space-y-4 text-xs">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="font-semibold text-ink block mb-1">Kurumsal E-posta Alan Adı (Domain)</label>
+                <label htmlFor="sso-domain" className="font-semibold text-ink block mb-1">
+                  {t('ssoDomainLabel')}
+                </label>
                 <input
+                  id="sso-domain"
                   type="text"
                   value={ssoDomain}
                   onChange={(e) => setSsoDomain(e.target.value)}
-                  placeholder="Örn: itu.edu.tr"
+                  placeholder={t('ssoDomainPlaceholder')}
                   required
                   className="w-full border border-line rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-none bg-ground text-ink font-mono font-semibold"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-ink block mb-1">Kimlik Sağlayıcı (IdP Protocol)</label>
+                <label htmlFor="sso-provider" className="font-semibold text-ink block mb-1">
+                  {t('ssoProviderLabel')}
+                </label>
                 <select
+                  id="sso-provider"
                   value={providerType}
                   onChange={(e) => setProviderType(e.target.value)}
                   className="w-full border border-line rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-none bg-ground text-ink"
                 >
-                  <option value="SAML_2_0">SAML 2.0 (Shibboleth / General IdP)</option>
+                  <option value="SAML_2_0">SAML 2.0 (Shibboleth)</option>
                   <option value="AZURE_AD">Microsoft Entra ID (Azure AD)</option>
                   <option value="OKTA">Okta Enterprise SSO</option>
                   <option value="KEYCLOAK">Keycloak Realm</option>
@@ -310,8 +350,11 @@ export function BillingSsoClient({
             </div>
 
             <div>
-              <label className="font-semibold text-ink block mb-1">IdP Entity ID / Issuer URL</label>
+              <label htmlFor="sso-issuer" className="font-semibold text-ink block mb-1">
+                {t('ssoIssuerLabel')}
+              </label>
               <input
+                id="sso-issuer"
                 type="text"
                 value={idpEntityId}
                 onChange={(e) => setIdpEntityId(e.target.value)}
@@ -321,8 +364,11 @@ export function BillingSsoClient({
             </div>
 
             <div>
-              <label className="font-semibold text-ink block mb-1">Assertion Consumer Service (ACS) URL</label>
+              <label htmlFor="sso-acs" className="font-semibold text-ink block mb-1">
+                {t('ssoAcsLabel')}
+              </label>
               <input
+                id="sso-acs"
                 type="text"
                 value={ssoAcsUrl}
                 onChange={(e) => setSsoAcsUrl(e.target.value)}
@@ -332,8 +378,11 @@ export function BillingSsoClient({
             </div>
 
             <div>
-              <label className="font-semibold text-ink block mb-1">x509 Güvenlik Sertifikası (PEM Public Key)</label>
+              <label htmlFor="sso-cert" className="font-semibold text-ink block mb-1">
+                {t('ssoCertLabel')}
+              </label>
               <textarea
+                id="sso-cert"
                 rows={3}
                 value={x509Cert}
                 onChange={(e) => setX509Cert(e.target.value)}
@@ -343,12 +392,12 @@ export function BillingSsoClient({
 
             <div className="flex items-center justify-between pt-2 border-t border-line">
               {ssoSaved ? (
-                <span className="inline-flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
+                <span role="status" className="inline-flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
                   <Check className="w-4 h-4 text-emerald-400" />
-                  SAML SSO Ayarları Başarıyla Kaydedildi!
+                  {t('ssoSaved')}
                 </span>
               ) : (
-                <span className="text-muted text-[11px]">Domain kullanıcıları oturum açarken doğrudan IdP&apos;ye yönlendirilir.</span>
+                <span className="text-muted text-[11px]">{t('ssoHint')}</span>
               )}
 
               <button
@@ -356,7 +405,7 @@ export function BillingSsoClient({
                 disabled={isSavingSso}
                 className="bg-accent text-slate-950 font-black px-5 py-2.5 rounded-xl transition text-xs shadow-xs cursor-pointer"
               >
-                {isSavingSso ? 'Kaydediliyor...' : 'SSO Yapılandırmasını Kaydet'}
+                {isSavingSso ? t('ssoSaving') : t('ssoSave')}
               </button>
             </div>
           </form>

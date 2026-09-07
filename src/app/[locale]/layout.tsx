@@ -6,6 +6,7 @@ import CookieConsent from '@/components/CookieConsent';
 
 import { CartProvider } from '@/components/cart/CartContext';
 import { CartDrawer } from '@/components/cart/CartDrawer';
+import { getActiveTier } from '@/lib/billing/active-tier';
 
 export default async function LocaleLayout({
   children,
@@ -24,7 +25,10 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider messages={messages}>
-      <CartProvider>
+      {/* The running campaign is decided here, on the server, and handed down
+          read-only: the cart and every price card render under the same tier
+          the checkout route prices with. */}
+      <CartProvider activeTier={getActiveTier()}>
         {children}
         <CartDrawer locale={locale} />
         <CookieConsent />
