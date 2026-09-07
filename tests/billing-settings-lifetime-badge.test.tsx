@@ -23,14 +23,21 @@ import { lifetimeScarcity, type LifetimeScarcity } from '@/lib/billing/lifetime-
  * The catalogues are the real ones: a key deleted or renamed fails here rather
  * than shipping as a blank badge.
  */
+/**
+ * A measured entitlement set, matching what the `pro` grant in
+ * `src/lib/billing/catalog.ts` actually gives: 6 seats, 1 workspace, 500 AI
+ * credits a month. The fixture used to claim 5 workspaces and 1000 credits —
+ * a capacity no plan in the catalogue sells — and a `usedSeats: 3` that was
+ * mistaken for the panel's own behaviour when TASK-MTRD91ZLKEQ3A was raised.
+ */
 const ENTITLEMENTS = {
   allowedModules: ['M1'],
   seats: 6,
   usedSeats: 3,
-  workspaces: 5,
+  workspaces: 1,
   usedWorkspaces: 1,
-  aiCreditsMonthly: 1000,
-  aiCreditsRemaining: 500,
+  aiCreditsMonthly: 500,
+  aiCreditsRemaining: 320,
 };
 
 function renderPanel(scarcity: LifetimeScarcity, locale: 'tr' | 'en' = 'tr') {
@@ -46,10 +53,13 @@ function renderPanel(scarcity: LifetimeScarcity, locale: 'tr' | 'en' = 'tr') {
           locale={locale}
           tenantId="tenant-1"
           tenantName="FonBridge Demo"
-          currentPlanId="team"
+          currentPlanId="pro"
           activeTier={NO_DISCOUNT_TIER}
           lifetimeScarcity={scarcity}
           entitlements={ENTITLEMENTS}
+          invoices={[]}
+          invoicesMeasured
+          buyerIdentity={null}
         />
       </CartProvider>
     </NextIntlClientProvider>

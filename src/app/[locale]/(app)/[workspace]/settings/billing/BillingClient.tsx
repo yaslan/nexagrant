@@ -18,12 +18,14 @@ import {
 } from '@/lib/billing/catalog';
 import { formatMoney } from '@/lib/money';
 import type { LifetimeScarcity } from '@/lib/billing/lifetime-licence';
+import type { InvoiceBuyerIdentity, InvoiceListRow } from '@/lib/billing/invoice-list';
 
 interface BillingClientProps {
   workspace: string;
   locale: string;
   tenantId: string;
-  tenantName: string;
+  /** The tenant's own name, or null when the row could not be read. */
+  tenantName: string | null;
   currentPlanId: string;
   /**
    * The tier this tenant is priced under, from the server. Not necessarily the
@@ -45,15 +47,28 @@ interface BillingClientProps {
    * because a missing count is not zero owners.
    */
   lifetimeScarcity: LifetimeScarcity;
+  /**
+   * What the tenant is entitled to, as measured. Every field is nullable and
+   * `null` means *not measured* — the panel then shows a dash and says so.
+   * It used to receive a fallback object (`seats: 6`, `workspaces: 5`,
+   * `aiCreditsMonthly: 1000`) whenever the query failed, and printed that
+   * invented capacity as the customer's quota (TASK-MTRD91ZLKEQ3A).
+   */
   entitlements: {
-    allowedModules: string[];
-    seats: number;
-    usedSeats?: number;
-    workspaces: number;
-    usedWorkspaces?: number;
-    aiCreditsMonthly: number;
-    aiCreditsRemaining?: number;
+    allowedModules: string[] | null;
+    seats: number | null;
+    usedSeats: number | null;
+    workspaces: number | null;
+    usedWorkspaces: number | null;
+    aiCreditsMonthly: number | null;
+    aiCreditsRemaining: number | null;
   };
+  /** Invoices actually issued to this tenant, newest first. May be empty. */
+  invoices: InvoiceListRow[];
+  /** False when the history could not be read — which is not the same as none. */
+  invoicesMeasured: boolean;
+  /** Buyer identity as frozen on the newest invoice; null when there is none. */
+  buyerIdentity: InvoiceBuyerIdentity | null;
 }
 
 const PLAN_ENTRIES = CATALOG.filter((entry): entry is PlanEntry => entry.kind === 'plan');
@@ -68,28 +83,6 @@ const PLAN_ENTRIES = CATALOG.filter((entry): entry is PlanEntry => entry.kind ==
  */
 const UNPRICED_ADDONS = ['credits500', 'credits1500', 'addonM6'] as const;
 
-/**
- * The invoice rows this screen has always shown. They are demo fixtures, not
- * records: nothing in the database issues them and their amounts are unrelated
- * to the billing catalogue. Kept verbatim so the change stays a pricing change;
- * binding invoice history to real rows is a separate card.
- */
-const DEMO_INVOICES = [
-  {
-    no: 'GIB202600000001',
-    date: '01.09.2026',
-    description: 'Team Plan (Aylık) + M11 Full App',
-    base: '₺26,850 + ₺5,370 (%20)',
-    total: '₺32,220.00',
-  },
-  {
-    no: 'GIB202600000014',
-    date: '01.08.2026',
-    description: 'Team Plan (Aylık Abonelik)',
-    base: '₺8,950 + ₺1,790 (%20)',
-    total: '₺10,740.00',
-  },
-] as const;
 
 export function BillingClient({
   workspace,
@@ -100,6 +93,9 @@ export function BillingClient({
   priceLocked = false,
   lifetimeScarcity,
   entitlements,
+  invoices,
+  invoicesMeasured,
+  buyerIdentity,
 }: BillingClientProps) {
   const t = useTranslations('billingPanels.settings');
   const { addToCart } = useCart();
@@ -111,13 +107,27 @@ export function BillingClient({
     setTimeout(() => setToast(null), 4000);
   };
 
-  const usedSeats = entitlements.usedSeats ?? 0;
+  // Anything that was not measured renders as a dash. `?? 0` would have been a
+  // number the customer could read as their remaining balance.
+  const dash = '—';
+  const num = (value: number | null) => (value === null ? dash : String(value));
+  const usedSeats = entitlements.usedSeats;
   const totalSeats = entitlements.seats;
-  const usedWorkspaces = entitlements.usedWorkspaces ?? 0;
+  const usedWorkspaces = entitlements.usedWorkspaces;
   const totalWorkspaces = entitlements.workspaces;
-  const remainingCredits = entitlements.aiCreditsRemaining ?? 0;
+  const remainingCredits = entitlements.aiCreditsRemaining;
   const totalCredits = entitlements.aiCreditsMonthly;
-  const creditPercent = Math.min(100, Math.round((remainingCredits / Math.max(1, totalCredits)) * 100));
+  // The bar is drawn only when both ends of the ratio were actually read.
+  const creditPercent =
+    remainingCredits === null || totalCredits === null
+      ? null
+      : Math.min(100, Math.round((remainingCredits / Math.max(1, totalCredits)) * 100));
+  const invoiceDate = new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    // The issue date is a calendar fact on the document, so it is rendered in
+    // the timezone it was stored in rather than the reader's.
+    timeZone: 'UTC',
+  });
 
   const money = (amountMinor: number, currency: string) => formatMoney(amountMinor, currency, locale);
   const cycleLabel = billingCycle === 'yearly' ? t('cycleYearly') : t('cycleMonthly');
@@ -188,7 +198,7 @@ export function BillingClient({
               <span className="text-accent-ink font-semibold">{t('breadcrumbBilling')}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold font-heading text-ink">{t('title')}</h1>
-            <p className="text-xs md:text-sm text-ink-2 mt-1">{t('subtitle', { tenant: tenantName })}</p>
+            <p className="text-xs md:text-sm text-ink-2 mt-1">{t('subtitle', { tenant: tenantName ?? workspace })}</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -219,22 +229,28 @@ export function BillingClient({
             <div className="flex justify-between items-center text-xs">
               <span className="text-muted font-medium">{t('metricCredits')}</span>
               <span className="font-bold text-ink font-mono">
-                {remainingCredits} / {totalCredits}
+                {num(remainingCredits)} / {num(totalCredits)}
               </span>
             </div>
             <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500"
-                style={{ width: `${creditPercent}%` }}
-              />
+              {creditPercent !== null && (
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500"
+                  style={{ width: `${creditPercent}%` }}
+                />
+              )}
             </div>
-            <div className="text-[10px] text-muted">{t('metricCreditsRemaining', { percent: creditPercent })}</div>
+            <div className="text-[10px] text-muted">
+              {creditPercent === null
+                ? t('notMeasuredHint')
+                : t('metricCreditsRemaining', { percent: creditPercent })}
+            </div>
           </div>
 
           <div className="p-4 bg-ground border border-border rounded-2xl space-y-1.5">
             <div className="text-xs text-muted font-medium">{t('metricSeats')}</div>
             <div className="text-xl font-bold text-ink">
-              {usedSeats} <span className="text-sm font-normal text-muted">/ {totalSeats}</span>
+              {num(usedSeats)} <span className="text-sm font-normal text-muted">/ {num(totalSeats)}</span>
             </div>
             <div className="text-[11px] text-muted">
               <Link href={`/${locale}/${workspace}/settings/members`} className="text-blue-600 hover:underline">
@@ -246,7 +262,8 @@ export function BillingClient({
           <div className="p-4 bg-ground border border-border rounded-2xl space-y-1.5">
             <div className="text-xs text-muted font-medium">{t('metricWorkspaces')}</div>
             <div className="text-xl font-bold text-ink">
-              {usedWorkspaces} <span className="text-sm font-normal text-muted">/ {totalWorkspaces}</span>
+              {num(usedWorkspaces)}{' '}
+              <span className="text-sm font-normal text-muted">/ {num(totalWorkspaces)}</span>
             </div>
             <div className="text-[11px] text-muted font-mono">{t('metricWorkspaceSlug', { slug: workspace })}</div>
           </div>
@@ -269,7 +286,10 @@ export function BillingClient({
         </div>
 
         <div className="flex flex-wrap gap-2 pt-1">
-          {entitlements.allowedModules.map((m) => (
+          {entitlements.allowedModules === null && (
+            <span className="text-xs text-muted font-mono">{t('notMeasuredHint')}</span>
+          )}
+          {(entitlements.allowedModules ?? []).map((m) => (
             <Link
               key={m}
               href={`/${locale}/${workspace}/settings/modules`}
@@ -532,7 +552,10 @@ export function BillingClient({
       </div>
 
       {/* ─── E-INVOICE & PAYMENT HISTORY ─── */}
-      <div className="bg-surface border rounded-2xl p-6 shadow-xs space-y-6">
+      <div
+        data-testid="billing-invoice-section"
+        className="bg-surface border rounded-2xl p-6 shadow-xs space-y-6"
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
           <div>
             <div className="flex items-center gap-2">
@@ -545,66 +568,127 @@ export function BillingClient({
           </div>
         </div>
 
-        {/* Demo invoice warning */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-          ⚠ {t('invoiceDemo')}
-        </div>
+        {!invoicesMeasured && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+            ⚠ {t('invoiceUnreadable')}
+          </div>
+        )}
 
+        {/* Who the invoices were issued to — read off the newest document, or
+            nothing. This block used to print a legal name and VKN 2840958172
+            that belonged to no registered company. */}
         <div className="bg-ground border border-border rounded-xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div>
             <span className="text-[11px] text-muted block">{t('invoiceLegalName')}</span>
-            <span className="font-bold text-ink block mt-0.5 text-amber-700">
-              <span className="font-mono text-[10px] mr-1">Demo:</span> Demo Ar-Ge ve Danışmanlık Ltd. Şti.
+            <span className="font-bold text-ink block mt-0.5">
+              {buyerIdentity ? buyerIdentity.name : <span className="text-muted font-normal">{t('notMeasured')}</span>}
             </span>
           </div>
           <div>
             <span className="text-[11px] text-muted block">{t('invoiceTaxOffice')}</span>
-            <span className="font-bold text-ink block mt-0.5 font-mono text-amber-700">
-              <span className="text-[10px] mr-1">Demo:</span> Doğanbey V.D. / 2840958172
+            <span className="font-bold text-ink block mt-0.5 font-mono">
+              {buyerIdentity ? (
+                `${buyerIdentity.taxOffice} / ${buyerIdentity.vknTckn}`
+              ) : (
+                <span className="text-muted font-normal font-sans">{t('notMeasured')}</span>
+              )}
             </span>
           </div>
           <div>
             <span className="text-[11px] text-muted block">{t('invoiceStatus')}</span>
-            <span className="font-bold text-amber-700 block mt-0.5 flex items-center gap-1 font-mono text-[10px]">
-              {t('invoiceStatusDemo')}
+            <span className="font-bold text-ink block mt-0.5 font-mono">
+              {invoices[0] ? (
+                invoices[0].number
+              ) : (
+                <span className="text-muted font-normal font-sans">{t('notMeasured')}</span>
+              )}
             </span>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-ground text-muted border-b">
-                <th className="p-3 font-semibold">{t('invoiceColNo')}</th>
-                <th className="p-3 font-semibold">{t('invoiceColDate')}</th>
-                <th className="p-3 font-semibold">{t('invoiceColDesc')}</th>
-                <th className="p-3 font-semibold">{t('invoiceColBase')}</th>
-                <th className="p-3 font-semibold">{t('invoiceColTotal')}</th>
-                <th className="p-3 font-semibold">{t('invoiceColStatus')}</th>
-                <th className="p-3 font-semibold text-right">{t('invoiceColDownload')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {DEMO_INVOICES.map((invoice) => (
-                <tr key={invoice.no} className="hover:bg-ground/50 opacity-60">
-                  <td className="p-3 font-mono font-bold text-slate-500">{invoice.no}</td>
-                  <td className="p-3 text-ink-2 font-mono">{invoice.date}</td>
-                  <td className="p-3 text-ink font-medium">{invoice.description}</td>
-                  <td className="p-3 font-mono text-ink-2">{invoice.base}</td>
-                  <td className="p-3 font-mono font-bold text-ink">{invoice.total}</td>
-                  <td className="p-3">
-                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">
-                      {t('invoiceStatusDemo')}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right">
-                    <span className="text-[11px] text-muted font-mono">{t('invoiceDemo')}</span>
-                  </td>
+        {invoices.length === 0 ? (
+          <div
+            data-testid="billing-invoices-empty"
+            className="border border-dashed border-border rounded-xl p-6 text-center space-y-1"
+          >
+            <div className="text-sm font-bold text-ink">{t('invoiceEmptyTitle')}</div>
+            <div className="text-xs text-muted">{t('invoiceEmptyBody')}</div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse" data-testid="billing-invoices">
+              <thead>
+                <tr className="bg-ground text-muted border-b">
+                  <th className="p-3 font-semibold">{t('invoiceColNo')}</th>
+                  <th className="p-3 font-semibold">{t('invoiceColDate')}</th>
+                  <th className="p-3 font-semibold">{t('invoiceColDesc')}</th>
+                  <th className="p-3 font-semibold">{t('invoiceColBase')}</th>
+                  <th className="p-3 font-semibold">{t('invoiceColTotal')}</th>
+                  <th className="p-3 font-semibold">{t('invoiceColStatus')}</th>
+                  <th className="p-3 font-semibold text-right">{t('invoiceColDownload')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {invoices.map((invoice) => (
+                  <tr key={invoice.id} className="hover:bg-ground/50">
+                    <td className="p-3 font-mono font-bold text-ink">{invoice.number}</td>
+                    <td className="p-3 text-ink-2 font-mono">
+                      {invoiceDate.format(new Date(invoice.issuedAt))}
+                    </td>
+                    <td className="p-3 text-ink font-medium">
+                      {invoice.description || <span className="text-muted">{t('invoiceAmountUnreadable')}</span>}
+                    </td>
+                    <td className="p-3 font-mono text-ink-2">
+                      {invoice.amounts
+                        ? `${money(invoice.amounts.subtotalMinor, invoice.currency)} + ${money(
+                            invoice.amounts.payableVatMinor,
+                            invoice.currency
+                          )}`
+                        : t('invoiceAmountUnreadable')}
+                    </td>
+                    <td className="p-3 font-mono font-bold text-ink">
+                      {invoice.amounts
+                        ? money(invoice.amounts.totalMinor, invoice.currency)
+                        : t('invoiceAmountUnreadable')}
+                    </td>
+                    <td className="p-3">
+                      {/* Only an envelope id GİB returned may be reported as a
+                          filing; everything else says it was not filed. */}
+                      {invoice.filedWithGib ? (
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">
+                          {t('invoiceFiled')}
+                        </span>
+                      ) : (
+                        <span
+                          title={t('invoiceUnfiledHint')}
+                          className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono"
+                        >
+                          {t('invoiceUnfiled')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 text-right space-x-2 whitespace-nowrap">
+                      <a
+                        href={`/api/billing/invoices/${encodeURIComponent(invoice.number)}/export?format=xml`}
+                        className="text-[11px] font-bold text-blue-600 hover:underline"
+                      >
+                        {t('invoiceXml')}
+                      </a>
+                      <a
+                        href={`/api/billing/invoices/${encodeURIComponent(invoice.number)}/export?format=pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-bold text-blue-600 hover:underline"
+                      >
+                        {t('invoicePdf')}
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

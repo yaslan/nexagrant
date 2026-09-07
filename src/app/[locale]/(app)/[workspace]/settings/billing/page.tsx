@@ -8,6 +8,13 @@ import { getActiveTier } from '@/lib/billing/active-tier';
 import { countLifetimeLicences, lifetimeScarcity } from '@/lib/billing/lifetime-licence';
 import { effectiveTier, isQuotedOnLock, priceLockDefect, readPriceLock } from '@/lib/billing/price-lock';
 import { resolvePlanId, FALLBACK_PLAN_ID } from '@/lib/billing/catalog';
+import {
+  buildInvoiceList,
+  latestBuyerIdentity,
+  type InvoiceBuyerIdentity,
+  type InvoiceListRecord,
+  type InvoiceListRow
+} from '@/lib/billing/invoice-list';
 
 /**
  * The lifetime badge counts rows, so this page must not be served from a cache
@@ -54,7 +61,11 @@ export default async function BillingSettingsPage({
   // the one the session was issued for.
   const { tenantId } = await requireTenantPage(locale);
 
-  let tenantName = 'FonBridge Demo Kuruluşu';
+  // Null until the tenant row is actually read. It used to default to
+  // "FonBridge Demo Kuruluşu", so a failed query greeted a paying customer with
+  // somebody else's organisation name; the panel now falls back to the
+  // workspace slug in the URL, which is at least theirs.
+  let tenantName: string | null = null;
   let currentPlanId = FALLBACK_PLAN_ID;
   // The rate this tenant joined at, if it has one. Set from the same row the
   // plan comes from, so the panel can never quote a plan and a rate that
@@ -83,15 +94,29 @@ export default async function BillingSettingsPage({
     console.warn(`[BillingSettings] DB query bypassed: ${errorMessage(err)}`);
   }
 
-  // Load entitlements with fallback
-  let entitlements = {
-    allowedModules: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'],
-    seats: 6,
-    usedSeats: 0,
-    workspaces: 5,
-    usedWorkspaces: 0,
-    aiCreditsMonthly: 1000,
-    aiCreditsRemaining: 1000,
+  // What this tenant is entitled to, or nothing.
+  //
+  // There is no fallback object here on purpose. This used to fall back to
+  // `seats: 6, workspaces: 5, aiCreditsMonthly: 1000` — a capacity nobody sold,
+  // printed as fact the moment the entitlement query failed. A quota that could
+  // not be read is `null`, and the panel says it was not measured (CLAUDE.md
+  // rule 7).
+  let entitlements: {
+    allowedModules: string[] | null;
+    seats: number | null;
+    usedSeats: number | null;
+    workspaces: number | null;
+    usedWorkspaces: number | null;
+    aiCreditsMonthly: number | null;
+    aiCreditsRemaining: number | null;
+  } = {
+    allowedModules: null,
+    seats: null,
+    usedSeats: null,
+    workspaces: null,
+    usedWorkspaces: null,
+    aiCreditsMonthly: null,
+    aiCreditsRemaining: null,
   };
 
   try {
@@ -133,9 +158,7 @@ export default async function BillingSettingsPage({
       );
 
       entitlements = {
-        allowedModules: dbEntitlements.allowedModules.length > 0
-          ? dbEntitlements.allowedModules
-          : ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'],
+        allowedModules: dbEntitlements.allowedModules,
         seats: dbEntitlements.seats,
         usedSeats: usageData.memberCount,
         workspaces: dbEntitlements.workspaces,
@@ -146,6 +169,46 @@ export default async function BillingSettingsPage({
     }
   } catch (err) {
     console.warn(`[BillingSettings] Entitlements fallback: ${errorMessage(err)}`);
+  }
+
+  // The invoice history, from the invoices this tenant was actually issued.
+  //
+  // Two constants used to stand here — GİB document numbers, a retired "Team
+  // Plan" and ₺32,220 — labelled "Demo örnek" but sitting under a column header
+  // reading "GİB fatura no". `model Invoice` holds issued invoices now, so the
+  // rows come from there and an empty history renders as empty
+  // (TASK-MTRD91ZLKEQ3A). The query runs inside `withTenant`, so the RLS policy
+  // on `Invoice` is the second lock behind the `tenantId` in the where clause.
+  let invoices: InvoiceListRow[] = [];
+  let buyerIdentity: InvoiceBuyerIdentity | null = null;
+  // Distinguishes "this tenant has no invoices" from "the history could not be
+  // read": the first is a fact, the second must not be shown as one.
+  let invoicesMeasured = true;
+
+  try {
+    const records = await withTenant<InvoiceListRecord[]>(tenantId, (tx) =>
+      tx.invoice.findMany({
+        where: { tenantId },
+        orderBy: { issuedAt: 'desc' },
+        take: 24,
+        select: {
+          id: true,
+          number: true,
+          issuedAt: true,
+          currency: true,
+          buyerName: true,
+          buyerVknTckn: true,
+          buyerTaxOffice: true,
+          lines: true,
+          gibEnvelopeId: true,
+        },
+      })
+    );
+    invoices = buildInvoiceList(records);
+    buyerIdentity = latestBuyerIdentity(records);
+  } catch (err) {
+    invoicesMeasured = false;
+    console.warn(`[BillingSettings] invoice history unreadable: ${errorMessage(err)}`);
   }
 
   // The limited run is a global count, not a tenant one: the same
@@ -173,6 +236,9 @@ export default async function BillingSettingsPage({
       priceLocked={isQuotedOnLock(priceLock, shopfrontTier)}
       lifetimeScarcity={scarcity}
       entitlements={entitlements}
+      invoices={invoices}
+      invoicesMeasured={invoicesMeasured}
+      buyerIdentity={buyerIdentity}
     />
   );
 }
