@@ -42,7 +42,7 @@ async function testFeedbackSubmission() {
       priority: result.priority,
       triageReason: result.triageReason,
       slaHours: result.slaHours,
-      sentryStatus: result.sentryStatus,
+      alertStatus: result.alertStatus,
     });
 
     // Verify record in DB

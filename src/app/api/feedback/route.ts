@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     logger.info('beta feedback received', {
       feedbackId: result.id,
       priority: result.priority,
-      sentryStatus: result.sentryStatus,
+      alertStatus: result.alertStatus,
     });
 
     return NextResponse.json({ ok: true, ...result }, { status: 201 });

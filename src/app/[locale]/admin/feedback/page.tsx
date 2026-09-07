@@ -1,7 +1,6 @@
 import React from 'react';
 import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
-import { env } from '@/lib/env';
 import { PRIORITY_SLA_HOURS, type FeedbackPriorityValue } from '@/lib/feedback/triage';
 import type { FeedbackRecord, TenantNameRow, UserContactRow } from '@/lib/feedback/types';
 import FeedbackTriageClient, { type TriageRow } from './client';
@@ -81,8 +80,8 @@ export default async function AdminFeedbackPage({
     triageReason: r.triageReason,
     triageNote: r.triageNote,
     pageUrl: r.pageUrl,
-    sentryStatus: r.sentryStatus,
-    sentryEventId: r.sentryEventId,
+    alertStatus: r.alertStatus,
+    alertId: r.alertId,
     screenshotKey: r.screenshotKey,
     tenantName: tenantById.get(r.tenantId) ?? r.tenantId,
     reporter: r.userId ? (userById.get(r.userId)?.email ?? userById.get(r.userId)?.name ?? null) : null,
@@ -95,7 +94,6 @@ export default async function AdminFeedbackPage({
     <FeedbackTriageClient
       locale={locale}
       rows={data}
-      sentryConnected={Boolean(env.SENTRY_DSN)}
       labels={{
         title: t('title'),
         subtitle: t('subtitle'),
@@ -112,7 +110,7 @@ export default async function AdminFeedbackPage({
         colStatus: t('colStatus'),
         colReporter: t('colReporter'),
         colCreated: t('colCreated'),
-        colSentry: t('colSentry'),
+        colAlert: t('colAlert'),
         slaLabel: t('slaLabel'),
         overdue: t('overdue'),
         autoPriorityChanged: t('autoPriorityChanged', { auto: '{auto}' }),
@@ -121,11 +119,11 @@ export default async function AdminFeedbackPage({
         saving: t('saving'),
         saved: t('saved'),
         saveFailed: t('saveFailed'),
-        sentrySent: t('sentrySent'),
-        sentrySkipped: t('sentrySkipped'),
-        sentryFailed: t('sentryFailed'),
-        sentryPending: t('sentryPending'),
-        sentryNotConnected: t('sentryNotConnected'),
+        alertRecorded: t('alertRecorded'),
+        alertFailed: t('alertFailed'),
+        alertLegacy: t('alertLegacy'),
+        alertPending: t('alertPending'),
+        alertConsoleLink: t('alertConsoleLink'),
         noteLabel: t('noteLabel'),
         notePlaceholder: t('notePlaceholder'),
         statusNEW: t('statusNEW'),

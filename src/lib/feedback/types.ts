@@ -24,8 +24,8 @@ export interface FeedbackRecord {
   appVersion: string | null;
   locale: string;
   screenshotKey: string | null;
-  sentryEventId: string | null;
-  sentryStatus: string | null;
+  alertId: string | null;
+  alertStatus: string | null;
   triageNote: string | null;
   triagedById: string | null;
   triagedAt: Date | null;

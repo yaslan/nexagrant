@@ -71,6 +71,13 @@ interface Props {
 interface SuccessState {
   priority: string;
   slaHours: number;
+  /**
+   * Screenshots used to ride along to the external error tracker as well as to
+   * object storage. Storage is now the only copy, so a failure there is a real
+   * loss and the reporter is told on the success screen instead of it vanishing
+   * into a server log.
+   */
+  screenshotLost: boolean;
 }
 
 export default function FeedbackWidget({ locale, workspace }: Props) {
@@ -167,7 +174,11 @@ export default function FeedbackWidget({ locale, workspace }: Props) {
         return;
       }
 
-      setSuccess({ priority: payload.priority, slaHours: payload.slaHours });
+      setSuccess({
+        priority: payload.priority,
+        slaHours: payload.slaHours,
+        screenshotLost: payload.screenshotOutcome === 'not_stored',
+      });
     } catch {
       setError(t('errorGeneric'));
     } finally {
@@ -230,6 +241,16 @@ export default function FeedbackWidget({ locale, workspace }: Props) {
                     </p>
                   </div>
                 </div>
+                {success.screenshotLost && (
+                  <p
+                    role="status"
+                    data-testid="feedback-screenshot-lost"
+                    className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+                  >
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span>{t('screenshotNotStored')}</span>
+                  </p>
+                )}
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"

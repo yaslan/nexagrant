@@ -358,6 +358,9 @@ model RawFetch {
   @@index([source, key])
 }
 
+/// Operator-visible alerts. Deliberately tenant-agnostic and NOT covered by
+/// prisma/rls.sql — never write tenant content here, only a reference to the
+/// tenant-scoped row (see src/lib/observability/system-alert.ts).
 model SystemAlert {
   id        String   @id @default(cuid())
   level     String   // info|warn|error
@@ -366,6 +369,9 @@ model SystemAlert {
   meta      Json?
   createdAt DateTime @default(now())
   resolvedAt DateTime?
+  @@index([createdAt])
+  @@index([source, createdAt])
+  @@index([resolvedAt, createdAt])
 }
 
 // ───────────────────────── K1 tenant-scoped ─────────────────────────
@@ -1139,7 +1145,7 @@ enum ApprovalStatus {
 // ───────────────────────── E11 Beta · feedback & triage ─────────────────────────
 
 /// In-product feedback from beta design partners. Written first and always: the
-/// Sentry forward is best-effort, so an outage on the observability side must
+/// SystemAlert write is best-effort, so a failure on the observability side must
 /// never lose a partner's report. `autoPriority` keeps what the rule engine
 /// decided even after a human overrides `priority` — that gap is how the rules
 /// get calibrated during the beta.
@@ -1161,8 +1167,8 @@ model Feedback {
   appVersion    String?
   locale        String            @default("tr")
   screenshotKey String?           // R2 object key; the URL is signed on demand
-  sentryEventId String?
-  sentryStatus  String?           // sent | skipped | failed
+  alertId       String?           // SystemAlert.id raised for this report
+  alertStatus   String?           // recorded | failed ('legacy' = predates the SystemAlert channel)
   triageNote    String?
   triagedById   String?
   triagedAt     DateTime?

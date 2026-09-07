@@ -10,7 +10,8 @@ import {
   ScrollText, 
   Sliders, 
   Newspaper,
-  MessageSquareWarning 
+  MessageSquareWarning,
+  ShieldAlert
 } from 'lucide-react';
 
 interface AdminSidebarNavProps {
@@ -52,6 +53,14 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       desc: 'Beta kayıtları, P0–P3 önceliklendirme',
       icon: MessageSquareWarning,
       badge: 'Beta',
+    },
+    {
+      key: 'alerts',
+      href: `/${locale}/admin/alerts`,
+      label: locale === 'tr' ? 'Sistem Uyarıları' : 'System Alerts',
+      desc: 'Hata ve geri bildirim uyarıları, çözüldü takibi',
+      icon: ShieldAlert,
+      badge: 'Alerts',
     },
     {
       key: 'audit',

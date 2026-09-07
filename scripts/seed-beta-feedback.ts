@@ -5,7 +5,7 @@
  * Puts ten representative beta reports through the real submission path
  * (src/lib/feedback/submit.ts), so the priorities on the board are produced by
  * the live rule engine rather than hand-written. That is the point: it also
- * doubles as a smoke test of triage + persistence + the Sentry forward.
+ * doubles as a smoke test of triage + persistence + the SystemAlert write.
  *
  * Safety:
  *   - Dry run by default. Nothing is written without --apply.
@@ -211,7 +211,7 @@ async function main() {
     });
     created += 1;
     console.log(
-      `  create [${result.priority}] ${sample.title}  (${result.triageReason}, sentry:${result.sentryStatus})`
+      `  create [${result.priority}] ${sample.title}  (${result.triageReason}, alert:${result.alertStatus})`
     );
   }
 

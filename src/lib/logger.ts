@@ -7,7 +7,9 @@ export const logger = {
   },
   error: (message: string, error?: unknown, meta?: Record<string, unknown>) => {
     console.error(`[ERROR] ${message}`, error, meta ? JSON.stringify(meta) : '');
-    // In the future, this is where we would report errors to Sentry
+    // Operator-visible errors go to the SystemAlert table via
+    // recordAlert() in src/lib/observability/system-alert.ts — not called from
+    // here, because the logger must stay synchronous and dependency-free.
   },
   debug: (message: string, meta?: Record<string, unknown>) => {
     if (process.env.NODE_ENV === 'development') {

@@ -13,7 +13,7 @@
  */
 
 import React, { useMemo, useState, useTransition } from 'react';
-import { MessageSquareWarning, AlertTriangle, Filter, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { MessageSquareWarning, Filter, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { triageFeedbackEntry } from './actions';
 
 export interface TriageRow {
@@ -28,8 +28,8 @@ export interface TriageRow {
   triageReason: string | null;
   triageNote: string | null;
   pageUrl: string | null;
-  sentryStatus: string | null;
-  sentryEventId: string | null;
+  alertStatus: string | null;
+  alertId: string | null;
   screenshotKey: string | null;
   tenantName: string;
   reporter: string | null;
@@ -61,13 +61,11 @@ export default function FeedbackTriageClient({
   rows,
   labels,
   categoryLabels,
-  sentryConnected,
 }: {
   locale: string;
   rows: TriageRow[];
   labels: Labels;
   categoryLabels: Record<string, string>;
-  sentryConnected: boolean;
 }) {
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -97,16 +95,20 @@ export default function FeedbackTriageClient({
     return { byPriority, open, overdue };
   }, [rows]);
 
-  const sentryLabel = (status: string | null) => {
+  /**
+   * `legacy` marks a report filed before alerts moved into SystemAlert. Those
+   * rows have no alert to link to, and saying so beats showing a blank cell.
+   */
+  const alertLabel = (status: string | null) => {
     switch (status) {
-      case 'sent':
-        return labels.sentrySent;
-      case 'skipped':
-        return labels.sentrySkipped;
+      case 'recorded':
+        return labels.alertRecorded;
       case 'failed':
-        return labels.sentryFailed;
+        return labels.alertFailed;
+      case 'legacy':
+        return labels.alertLegacy;
       default:
-        return labels.sentryPending;
+        return labels.alertPending;
     }
   };
 
@@ -151,13 +153,6 @@ export default function FeedbackTriageClient({
           </div>
         </dl>
       </div>
-
-      {!sentryConnected && (
-        <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{labels.sentryNotConnected}</span>
-        </p>
-      )}
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-surface p-3">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-muted">
@@ -209,7 +204,7 @@ export default function FeedbackTriageClient({
               <th scope="col" className="p-3">{labels.colCategory}</th>
               <th scope="col" className="p-3">{labels.colStatus}</th>
               <th scope="col" className="p-3">{labels.colReporter}</th>
-              <th scope="col" className="p-3">{labels.colSentry}</th>
+              <th scope="col" className="p-3">{labels.colAlert}</th>
               <th scope="col" className="p-3 text-right">{labels.colCreated}</th>
             </tr>
           </thead>
@@ -259,7 +254,7 @@ export default function FeedbackTriageClient({
                   </td>
                   <td className="p-3 align-top text-xs text-ink-2">{labels[`status${row.status}`]}</td>
                   <td className="p-3 align-top text-xs text-muted">{row.reporter ?? '—'}</td>
-                  <td className="p-3 align-top text-xs text-muted">{sentryLabel(row.sentryStatus)}</td>
+                  <td className="p-3 align-top text-xs text-muted">{alertLabel(row.alertStatus)}</td>
                   <td className="p-3 align-top text-right font-mono text-[11px] text-muted">
                     {dateFormat(row.createdAt)}
                   </td>
@@ -269,6 +264,7 @@ export default function FeedbackTriageClient({
                     <td colSpan={7} className="p-4">
                       <TriageDetail
                         row={row}
+                        locale={locale}
                         labels={labels}
                         pending={pending}
                         result={feedbackMessage?.id === row.id ? feedbackMessage.ok : null}
@@ -313,12 +309,14 @@ function FilterChip({
 
 function TriageDetail({
   row,
+  locale,
   labels,
   pending,
   result,
   onSave,
 }: {
   row: TriageRow;
+  locale: string;
   labels: Labels;
   pending: boolean;
   result: boolean | null;
@@ -353,10 +351,15 @@ function TriageDetail({
               <span className="font-mono">{row.screenshotKey}</span>
             </div>
           )}
-          {row.sentryEventId && (
+          {row.alertId && (
             <div className="col-span-2 flex items-center gap-1">
               <ExternalLink className="h-3 w-3" aria-hidden="true" />
-              <span className="font-mono">{row.sentryEventId}</span>
+              <a
+                href={`/${locale}/admin/alerts?alert=${encodeURIComponent(row.alertId)}`}
+                className="font-mono underline underline-offset-2"
+              >
+                {labels.alertConsoleLink}
+              </a>
             </div>
           )}
         </dl>

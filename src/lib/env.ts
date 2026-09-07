@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 /**
- * Optional URL setting. A variable that is present but blank (`SENTRY_DSN=`) is
- * treated as unset: an unused observability endpoint must not throw at import
- * time and take down every route that reads config.
+ * Optional URL setting. A variable that is present but blank
+ * (`NEXT_PUBLIC_POSTHOG_HOST=`) is treated as unset: an unused endpoint must not
+ * throw at import time and take down every route that reads config.
  */
 const optionalUrl = z.preprocess(
   (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
@@ -15,7 +15,6 @@ const envSchema = z.object({
   DATABASE_URL: optionalUrl,
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: optionalUrl,
-  SENTRY_DSN: optionalUrl,
   INNGEST_API_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
