@@ -26,6 +26,11 @@ DOSYASININ VARLIĞINA bakar, DoD'a değil; kimse ölçmezse yanlış kapanış �
   riskli bir toplu değişiklik denemeden ÖNCE commit et (`dev` üstünde ara commit ucuzdur).
 - Lider olarak: dağıtmadan önce `agentspace_pane action=list` ile ORTAMI TEMİZLE — aynı karta
   girebilecek başıboş pane kalmasın; her prompt'a "`git reset --hard` yasak" kuralını yaz.
+  DİKKAT: bir sprint SETTLED olduktan sonra da worker pane'leri `[WORKING]` görünmeye devam
+  eder — bu "iş var" demek DEĞİLDİR. Ayrımı `agentspace_delegation_status` yapar: tüm
+  delegasyonlar `[reported]` ve sprint SETTLED ise o pane'ler ATIL'dır, `agentspace_pane
+  action=close agentId=<ajan>` ile kapat (transkript diskte kalır, iş kaybolmaz). 2026-09-07'de
+  dört atıl pane bu şekilde temizlendi; temizlenmeseydi yeni dalga aynı çakışmayı üretecekti.
 - Lider olarak: "done" bildirimini ASLA kapanış saymayın — DoD'un ölçülebilir maddesini
   kendi komutunla koştur (`pnpm lint | tail -1`, `grep -rln ... | wc -l`). Üç ajanın üç farklı
   sayı vermesi mümkün; ağaçtaki ölçüm tektir.
