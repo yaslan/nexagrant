@@ -47,7 +47,8 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 ### E5 · K5/M5 pipeline ve kapılar (S4–S5)
 - [ ] `Opportunity` oluşturma (`/calls/[id]` → "pipeline'a al"), kanban, kapı paneli, `evaluateGate` + varsayılan kurallar + `/settings/gates`, T-6 plan şablonu, görevler, çaba kaydı, takvim.
   kısmi: `Opportunity`, kanban (`pipeline/page.tsx`), `GateDecision` + `/settings/gates` + `tests/gates.test.ts`, çaba kaydı (`Effort` modeli) doğrulandı. **T-6 plan şablonu, ayrı görev (task) listesi ve takvim modeli/ekranı bulunamadı** (şemada `Task`/`Calendar` modeli yok).
-- [x] G0 puanlama (`src/lib/scoring/g0-canonical.ts`, 7 faktörlü bileşik skor, ağırlıklar — bkz. Açık karar #8).
+- [ ] G0 puanlama (`src/lib/scoring/g0-canonical.ts`, 7 faktörlü bileşik skor, ağırlıklar — bkz. Açık karar #8).
+  kısmi: `scoreG0()`/`decideG0()` kanonik ve test edilmiş (27 test, `tests/g0-scoring.test.ts`) ama **üretimde hiç çağrılmıyor** — ölçüldü 2026-09-07. `Opportunity.g0Score` seed'den statik (75/82/85/88/92) veya demo pipeline'da `Math.random()`'dan geliyor; `src/lib/gates/evaluate.ts` bu sayıyla kapı kararı veriyor. Eski 4-faktörlü `src/lib/scoring/g0.ts` de ölü kod (hiç import edilmiyor). Kapanmamış iş: kanonik fonksiyonu bir üretim çağrı noktasına bağlamak (fırsat oluşturma/güncelleme anı). Bkz. `docs/agent-results/TASK-MTQ63RR8Z0G8E-blok-zincir-dse.md`, board TASK-MTQ63RR8Z0G8E (açık), PROJECT.md:81 dipnotu.
 - Kabul: kapı kuralları test; olay kaydı; kişi-gün raporu.
 
 ### E6 · K2/M1 CORDIS ve ortak kartları (S5–S6)
@@ -74,6 +75,7 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 ### E10 · KPI panosu, i18n tamamlama, erişilebilirlik, KVKK (S8)
 - [ ] `/dashboard`: teklif sayısı, eşik üstü oranı, isabet, kişi-gün/teklif, G0→G2 süresi, açık modül sayısı.
   kısmi: `/dashboard` ekranı ve tüm kartlar var, ama `dashboard/client.tsx` içinde gerçek değer `'0'` geldiğinde kart **sabit rakamlara düşüyor** (`thresholdRate === '0' ? '84.2' : thresholdRate`, `hitRate`→`68.5`, `personDaysPerOpp`→`14.2`, `fundedOpps || 4`) — bu CLAUDE.md §7 "kanıt disiplini" kuralını ihlal ediyor (gösterilen istatistik `Evidence`/`TopicStat`'a değil sabit koda bağlı). Bu satırlar `src/` kapsamında olduğu için bu görevde düzeltilmedi; ayrı bir düzeltme görevi açılmalı.
+  **Ek bulgu (ölçüldü 2026-09-07, hâlâ kodda — board TASK-MTQTYXC0NUT0B, todo):** `src/lib/dashboard/fetch-metrics.ts` "Başarı Oranı" hesabı `['SUBMITTED','FUNDED','ABOVE_THRESHOLD'].includes(outcome)` ile büyük harf arıyor, ama `Proposal.outcome` şemada/seed'de küçük harf (`above_threshold`). Sonuç: demo kiracıda gerçek oran %20 iken ekranda %0 gösteriliyor. Kanıt: `docs/agent-results/TASK-MTQ63RR8Z0G8E-ui-audit-customer-support.md` bulgu #2.
 - [x] i18n denetimi (`/i18n-check`), Lighthouse a11y ≥ 90, çerez onayı, veri dışa aktarma/silme uç noktaları, DPA şablonu, gizlilik/şartlar sayfaları (tr/en).
   i18n denetim aracı (`scripts/i18n-check.ts`, `.github/workflows/i18n-check.yml`), veri dışa aktarma/silme uç noktaları (`api/gdpr/export`, `api/gdpr/delete`, `api/user/export*`), DPA şablonu (`(marketing)/compliance/dpa`), gizlilik/şartlar sayfaları (tr/en) doğrulandı. A11y artık **CI kapısı**: `scripts/a11y-check.ts` + `.github/workflows/a11y-check.yml`
 uygulamayı derleyip başlatıyor, `/tr`, `/tr/privacy`, `/en`, `/en/privacy` sayfalarını Lighthouse ile ölçüyor ve
@@ -85,6 +87,24 @@ uygulamayı derleyip başlatıyor, `/tr`, `/tr/privacy`, `/en`, `/en/privacy` sa
 - kısmi: alt yapı hazır ve kısmen işletildi — tasarım-ortağı davet CLI'ı (`scripts/beta-onboarding.ts`), fiyat doğrulama anketi/analizi (`src/lib/beta/pricing-*`), geri bildirim + P0-P3 triyaj + haftalık özet (`feat(e11): in-app beta feedback...` commit'leri), ESR örnekleri ve G0 kalibrasyonu (`src/lib/beta/esr-samples.ts`, `tests/esr-calibration.test.ts`, `feat(m5): calibrate the G0 gate against real evaluation outcomes`). **10 tasarım ortağının gerçekten kayıtlı/aktif olduğu ve 8 haftalık betanın fiilen yürütüldüğü bu depodan doğrulanamaz** (bu, üründen değil operasyondan kanıt ister) — bu satır bilinçli olarak işaretlenmedi.
 
 ## Faz B — v1.1 (S9–S12): M6 Evaluator Lens, M9 Meeting Briefs, takvim entegrasyonu, iyzico, SSO.
+
+Durum (S9–S10 dalgası, ölçüldü 2026-09-07 — kartların çoğu **`review`** durumunda; S8–S10 kapanış doğrulaması board TASK-MTQTZNLS2CO2L'de hâlâ sürüyor, aşağıdaki maddeler koda dayanır, kart statüsüne değil):
+
+- [ ] **M6 Evaluator Lens** (veri modeli + puanlama + UI) — `src/modules/m6/`.
+  - Veri modeli, puanlama motoru (`server/scoring.ts`, panel/ESR karşılaştırma, uzlaşı hesabı) ve iki UI yüzeyi (`ui/EvaluatorForm.tsx`, `ui/EvaluationDashboard.tsx`) mevcut ve gerçek kiracı verisine bağlı (`listPanelScores`, session tenant — bkz. `docs/agent-results/TASK-MTQ5ZF5ZRU5SM-geli-tirici.md`).
+  - "İç ön değerlendirme" etiketi (CLAUDE.md "Yapma" §, `messages/*.json:internalPreAssessment`) **her iki UI yüzeyinde de mevcut** (`EvaluatorForm.tsx:94`, `EvaluationDashboard.tsx:42`, `data-testid="m6-internal-badge"`) — bu, board'daki açık **TASK-MTQTYE287FERM** ("etiket yok") ve `docs/agent-results/TASK-MTQ63RR8Z0G8E-ui-audit-customer-support.md` bulgu #1'in **doğrulanamadığı** anlamına gelir; kod tarihi (`02f7fd2`) bu bulgudan önceye dayanıyor. M6'nın PDF/dışa aktarım yüzeyi yok, dolayısıyla kontrol edilecek başka ekran da yok. Kart kapatılmadan önce bu çelişki not düşülsün.
+  - Kabul edilmemiş: `M6.3 Scoring Logic` (board TASK-MTPZHMSPMDA66, todo).
+- [ ] **M9 Meeting Briefs** — `src/modules/m9/`, `opportunities/[id]/briefs/`.
+  - Brief oluşturma/listeleme/detay + saat dilimi (UTC saklama, Brüksel gösterimi, CLAUDE.md kural 10) + `.ics` indirme çalışır durumda (`docs/agent-results/TASK-MTPZL5YDY9TAW-blok-zincir-dse.md`, commit `318cec4`).
+  - i18n kataloğu var (`src/locales/{tr,en}/briefs.json`, 40+ anahtar) ama UI'da henüz **bağlanmadı** — `client.tsx` hâlâ Türkçe metni doğrudan kod içine yazıyor (kendi raporunun "Sonraki Adımlar"ı, S11'e bırakılmış). CLAUDE.md §8 "kullanıcıya görünen sabit metin yok" kuralı bu ekranda şu an karşılanmıyor.
+  - Takvim senkronizasyonu (Google/Outlook) **altyapı düzeyinde** kuruldu (`src/lib/calendar/`, `CalendarProvider` sözleşmesi + ICS/Google/Outlook sağlayıcıları, `docs/agent-results/TASK-MTPZLC9PI5VEH-blok-zincir-dse.md`, commit `6866353`) ama **production'a hazır değil**: Google/Outlook sağlayıcıları OAuth anahtarı olmadığı için mock (yalnız log), `CalendarConnection` token'ları şifresiz saklanıyor (`CALENDAR_ENCRYPTION_KEY` yok, OWASP-A02 açığı), CLAUDE.md'nin işaret ettiği `src/core/events` olay veri yolu henüz yok (senkron doğrudan fonksiyon çağrısıyla yapılıyor). ICS indirme yolu (üçünün yedeği) tam çalışır.
+  - S10 kapanışı doğrulanmadı: dogfood/düşman-kullanıcı testi board TASK-MTQU053U24RYH hâlâ açık.
+- [x] **iyzico ödeme + entitlement akışı** — `docs/agent-results/TASK-MTPZL9GK4TFS1-geli-tirici.md`, commit `5bd921a`. Webhook imza doğrulaması (`x-iyz-signature-v3`, HMAC-SHA256), sonucun yalnız sağlayıcı `.../detail` çağrısından okunması, `pg_advisory_xact_lock` ile aynı olayın iki kez işlenmesinin engellenmesi, tutarların `Int` kuruş + `currency` (`src/lib/money.ts`) olması doğrulandı. Ortamda iyzico sandbox anahtarı olmadığı için gerçek sağlayıcıya değil yerel mock sunucuya karşı test edildi (Fabrika tarafı kod gerçek çalıştı).
+  **Yan bulgu (Stripe tarafında, bu kartın kapsamı dışı, ayrı teknik borç):** Stripe webhook idempotency sorgusu (`auditEvent.findFirst({ where: { data: { equals: {...} } } })`) Prisma JSON `equals` semantiği yüzünden **hiçbir zaman eşleşmiyor** — Stripe'ın çift-işlem koruması fiilen kapalı. Ayrı bir düzeltme görevi açılmalı.
+- [ ] SSO (kurumsal SAML) — bu dalgada dokunulmadı, PROJECT.md §7'de faz 2 olarak zaten işaretli.
+
+**CI/kalite kapısı riski (bu fazı etkiler):** Lint kapısı kırmızı — 777 sorun / 561 hata (ölçüldü 2026-09-06, board TASK-MTQ60SGW45T0X, todo). CI kapısı henüz bunu kırmıyor; sıfırlanana kadar yeni PR'larda regresyon sessizce birikebilir.
+
 ## Faz C — v1.2 (S13–S16): M10 Follow-up Documents, M11 Full Application Production (ortak portalı, bütçe/lump-sum, Gantt), e-fatura.
 ## Faz D — v1.3 (S17–S20): M7 TTO Accelerator, pazar yeri (Stripe Connect), Partner Intelligence API, İngilizce pazar açılışı.
 
@@ -102,6 +122,10 @@ uygulamayı derleyip başlatıyor, `/tr`, `/tr/privacy`, `/en`, `/en/privacy` sa
    Kanonik kural seti = `DEFAULT_G0_RULES`. `SPEC_LITERAL_G0_RULES` yalnız kalibrasyon karşılaştırması
    için saklanır, kapıda kullanılmaz. Bu karar `/settings/gates` etiketine ve `gates/evaluate.ts`
    çağrısına yansıtılacaktır (bkz. board TASK-MTQ63RR8Z0G8E).
+9. **G0 kanonik fonksiyonu üretime ne zaman/nerede bağlanacak?** — Ağırlıklar ve eşik kararlaştırıldı (madde 8), ama `scoreG0()`/`decideG0()` bugün hâlâ hiçbir üretim çağrı noktasında kullanılmıyor (ölçüldü 2026-09-07, PROJECT.md:81 dipnotu). Karar bekliyor: çağrı fırsat oluşturma anında mı, günlük bir job'da mı, yoksa her `gates/evaluate.ts` çağrısında canlı mı hesaplanacak? Kanıt: `docs/agent-results/TASK-MTQ63RR8Z0G8E-blok-zincir-dse.md`.
+10. **Evaluator Lens "iç ön değerlendirme" etiketi bulgusu çelişkili — kim doğrulayacak?** — Board'da açık **TASK-MTQTYE287FERM** ve `docs/agent-results/TASK-MTQ63RR8Z0G8E-ui-audit-customer-support.md` bulgu #1, etiketin `EvaluationDashboard.tsx`'te olmadığını iddia ediyor; kod incelemesi (2026-09-07) etiketi **hem `EvaluatorForm.tsx:94` hem `EvaluationDashboard.tsx:42`'de** buluyor (`internalPreAssessment` anahtarı, tr+en). Kart kapatılmadan önce bu çelişki bir kişi tarafından ekran görüntüsüyle çözülmeli — stale bulgu mu, yoksa görülmeyen bir yüzey mi var?
+11. **Dashboard "Başarı Oranı" case-mismatch ne zaman düzeltilecek, benzer başka enum karşılaştırması var mı?** — `fetch-metrics.ts` büyük harf arıyor, veri küçük harf (board TASK-MTQTYXC0NUT0B, todo). Tek satırlık düzeltme ama aynı desenin (`proposal.outcome` gibi serbest string alanlar üstünde case-sensitive `.includes`/`===`) başka yerde tekrarlanıp tekrarlanmadığı taranmadı.
+12. **M9 takvim entegrasyonunun (Google/Outlook) production ön koşulları kimin sorumluluğunda?** — OAuth anahtarları (`GOOGLE_OAUTH_*`, `MICROSOFT_OAUTH_*`) yok, `CalendarConnection` token'ları şifresiz saklanıyor (`CALENDAR_ENCRYPTION_KEY` yok), `src/core/events` olay veri yolu (CLAUDE.md kural 2) henüz kurulmadı. Şu an yalnız ICS indirme yolu üretime hazır. Kanıt: `docs/agent-results/TASK-MTPZLC9PI5VEH-blok-zincir-dse.md` Riskler §.
 
 ## Riskler (teknik)
 - F&T API'si resmî değil → adaptör + yedek kaynak + alarm (E4).

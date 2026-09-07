@@ -80,6 +80,8 @@ Her modülün işlevsel spesifikasyonu `docs/MODULES.md`'de; her modül `src/mod
 
 G0 puanlama ağırlıkları (100): uyum 30, taban oran 15, koordinatör geçmişi 15, araştırma+son kullanıcı 12, ağ merkeziliği 10, bütçe/rol ekonomisi 10, lump-sum/iki aşamalı 8. Ağırlıklar `TenantSettings.scoringWeights` JSON'unda; varsayılanlar `src/lib/scoring/defaults.ts`.
 
+> **⚠️ Doküman/kod farkı (ölçüldü 2026-09-07):** Yukarıdaki kural (satır 75) ve ağırlıklar (bu satır) kanonik `scoreG0()`/`decideG0()` fonksiyonlarında (`src/lib/scoring/g0-canonical.ts`) doğru tanımlı, ama üretim kodunda **hiçbir yerden çağrılmıyor**. `Opportunity.g0Score` bugün ya `prisma/seed-opportunities.ts`'teki sabit değerlerden (75, 82, 85, 88, 92) ya da demo pipeline'daki `Math.random() * 15 + 80`'den geliyor; `src/lib/gates/evaluate.ts` kapı kararını bu üretilmemiş sayıyla veriyor. Yani kullanıcıya gösterilen G0 puanı şu an bu sayfadaki formülün ürünü değil. Kanıt: `docs/agent-results/TASK-MTQ63RR8Z0G8E-blok-zincir-dse.md`, `docs/agent-results/TASK-MTQ63RR8Z0G8E-ui-audit-customer-support.md`. Kapatma işi board'da **TASK-MTQ63RR8Z0G8E** (henüz açık — kanonik fonksiyonu üretime bağlamak kaldı).
+
 ## 6. Faturalama ve planlar
 
 `docs/BILLING.md`. Özet: Keşif €0 / Başlangıç €59 / Ekip €249 / İşletme €599 / Kurumsal €1.500+ (aylık, EUR, yıllıkta %20 indirim); eklentiler M6 €99, M11 €149, M7 €129, M8 Pro €79, ek çalışma alanı €49; ek koltuk €19/€29/€39; YZ kredi paketi €49/250. Stripe Billing (EUR) MVP; iyzico (TL) faz 2. Plan → `PlanEntitlement` tablosu (modüller, koltuk, çalışma alanı, kredi).
