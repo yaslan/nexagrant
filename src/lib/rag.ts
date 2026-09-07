@@ -11,6 +11,13 @@
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 
+/** One row of the pgvector similarity search over `Chunk`. */
+interface ChunkMatch {
+  text: string;
+  documentId: string;
+  score: number;
+}
+
 const CHUNK_SIZE = 1500;  // characters per chunk
 const CHUNK_OVERLAP = 200;
 
@@ -129,19 +136,23 @@ export async function retrieveChunks(
     const queryEmbedding = await getEmbedding(query);
     const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
-    // Build a WHERE clause that includes shared docs (tenantId IS NULL) + tenant-specific docs
+    // Shared docs (tenantId IS NULL) plus this tenant's. The tenant id is a
+    // bound parameter, not interpolated: it used to be spliced into the SQL
+    // string, which is an injection sink even though the value comes from the
+    // session today.
     const tenantFilter = tenantId
-      ? `("tenantId" IS NULL OR "tenantId" = '${tenantId}')`
+      ? `("tenantId" IS NULL OR "tenantId" = $3)`
       : `"tenantId" IS NULL`;
 
-    const results: any[] = await prisma.$queryRawUnsafe(
+    const results: ChunkMatch[] = await prisma.$queryRawUnsafe(
       `SELECT text, "documentId", 1 - (embedding <=> $1::vector) AS score
        FROM "Chunk"
        WHERE ${tenantFilter}
        ORDER BY embedding <=> $1::vector
        LIMIT $2`,
       embeddingStr,
-      topK
+      topK,
+      ...(tenantId ? [tenantId] : [])
     );
 
     if (results && results.length > 0) {

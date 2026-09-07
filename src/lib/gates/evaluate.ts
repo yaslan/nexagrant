@@ -12,7 +12,6 @@ export async function evaluateGate(
   tenantId: string,
   decidedBy: string = 'system'
 ): Promise<GateEvaluationResult> {
-  const rules: any = DEFAULT_GATE_RULES[gateId];
   let passed = true;
   const reasons: string[] = [];
 
@@ -29,7 +28,7 @@ export async function evaluateGate(
     throw new Error(`Opportunity not found: ${opportunityId}`);
   }
 
-  const inputs: Record<string, any> = {
+  const inputs: Record<string, unknown> = {
     opportunityId: opp.id,
     stage: opp.stage,
     intendedRole: opp.intendedRole,
@@ -41,6 +40,7 @@ export async function evaluateGate(
 
   switch (gateId) {
     case 'G0': {
+      const rules = DEFAULT_GATE_RULES.G0;
       // `rules.minScore` is on the 0–100 scale of PROJECT.md:81. The previous fallback called
       // `calculateG0Score`, a 0–10 model, so an unscored opportunity was compared as 7.5 < 70 and
       // failed with a misleading reason. An opportunity that has never been scored has not failed
@@ -62,12 +62,14 @@ export async function evaluateGate(
       break;
     }
     case 'G1': {
+      const rules = DEFAULT_GATE_RULES.G1;
       if (rules.requireCoordinatorHistoryIfCoordinator && opp.intendedRole === 'coordinator') {
         inputs.coordinatorRoleCheck = true;
       }
       break;
     }
     case 'G2': {
+      const rules = DEFAULT_GATE_RULES.G2;
       const openSeats = opp.seats.filter((s: { status: string }) => s.status === 'OPEN');
       if (rules.requireAllSeatsFilled && openSeats.length > 0) {
         passed = false;
@@ -76,6 +78,7 @@ export async function evaluateGate(
       break;
     }
     case 'G3': {
+      const rules = DEFAULT_GATE_RULES.G3;
       if (opp.evaluations.length > 0) {
         const latestEval = opp.evaluations[opp.evaluations.length - 1];
         const minScore = Math.min(latestEval.excellence, latestEval.impact, latestEval.implementation);
@@ -98,6 +101,9 @@ export async function evaluateGate(
       break;
     }
     case 'G4': {
+      // DEFAULT_GATE_RULES.G4.minHoursBeforeDeadline is not checked here — the
+      // gate only refuses withdrawn and rejected opportunities. Recorded in the
+      // TASK-MTQ60SGW45T0X report rather than added silently.
       if (opp.status === 'WITHDRAWN' || opp.status === 'REJECTED') {
         passed = false;
         reasons.push(`Opportunity status is ${opp.status}, submission not permitted`);

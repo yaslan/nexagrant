@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { addBudgetLineByToken } from '@/modules/m11/server/actions';
 import { getTranslations } from 'next-intl/server';
 import { errorMessage } from '@/lib/errors';
+import type { PartContent } from '@/modules/m11/types';
 
 interface PageProps {
   params: Promise<{
@@ -12,11 +13,24 @@ interface PageProps {
   }>;
 }
 
+/**
+ * The ApplicationPart the magic-token portal resolves. The token in the URL is
+ * the only credential here, so this is the one place a part is read without a
+ * session — see the comment in src/modules/m11/server/actions.ts.
+ */
+interface PartnerPortalPart {
+  id: string;
+  tenantId: string;
+  part: string;
+  content: PartContent | null;
+  opportunity: { title: string } | null;
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { token, locale } = await params;
   const t = await getTranslations({ locale, namespace: 'partner_portal' });
 
-  let part: any = null;
+  let part: PartnerPortalPart | null = null;
   try {
     part = await prisma.applicationPart.findUnique({
       where: { magicToken: token },
@@ -52,7 +66,7 @@ export default async function PartnerPortalPage({ params }: PageProps) {
 
   if (!token) return notFound();
 
-  let part: any = null;
+  let part: PartnerPortalPart | null = null;
   try {
     part = await prisma.applicationPart.findUnique({
       where: { magicToken: token },
@@ -75,7 +89,7 @@ export default async function PartnerPortalPage({ params }: PageProps) {
             {t('badge')}
           </span>
           <h1 className="text-2xl font-bold text-ink mt-3 font-heading">{t('title')}</h1>
-          <p className="text-muted text-sm mt-1">{t('subtitle')}: <strong className="text-ink">{opp.title}</strong></p>
+          <p className="text-muted text-sm mt-1">{t('subtitle')}: <strong className="text-ink">{opp?.title}</strong></p>
         </div>
 
         <div className="space-y-6">
@@ -116,7 +130,7 @@ export default async function PartnerPortalPage({ params }: PageProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {((part.content)?.budget || []).map((b: any, idx: number) => (
+                  {(part.content?.budget || []).map((b, idx: number) => (
                     <tr key={idx} className="bg-surface hover:bg-ground">
                       <td className="p-3 font-bold text-ink">{b.partnerName}</td>
                       <td className="p-3 font-mono text-ink-2">{b.personMonths} PM</td>

@@ -1,7 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 
-function getDeepKeys(obj: Record<string, any>, prefix = ''): string[] {
+/** A parsed messages file: nested objects down to string leaves. */
+type MessageTree = { [key: string]: MessageTree | string | string[] };
+
+function getDeepKeys(obj: MessageTree, prefix = ''): string[] {
   let keys: string[] = [];
   for (const key of Object.keys(obj)) {
     const nextPrefix = prefix ? `${prefix}.${key}` : key;

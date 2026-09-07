@@ -5,6 +5,17 @@ import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
 import { errorMessage } from '@/lib/errors';
 
+/** The Topic columns this listing renders, with its parent call. */
+interface OpenTopicRow {
+  id: string;
+  identifier: string;
+  title: string;
+  status: string;
+  typeOfAction: string | null;
+  isLumpSum: boolean;
+  call?: { program?: string | null } | null;
+}
+
 export default async function TurkiyeyeAcikCagrilarPage({
   params
 }: {
@@ -13,7 +24,7 @@ export default async function TurkiyeyeAcikCagrilarPage({
   const { locale } = await params;
   const isTr = locale === 'tr';
 
-  let topics: any[] = [];
+  let topics: OpenTopicRow[] = [];
   try {
     topics = await prisma.topic.findMany({
       where: {
@@ -100,7 +111,7 @@ export default async function TurkiyeyeAcikCagrilarPage({
         </div>
 
         <div className="space-y-4 mb-10">
-          {topics.map((t: any) => (
+          {topics.map((t) => (
             <div key={t.id} className="bg-surface border border-border rounded-xl p-6 hover:border-accent transition shadow-xs flex flex-col md:flex-row justify-between gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">

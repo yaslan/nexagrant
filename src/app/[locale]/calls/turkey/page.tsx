@@ -36,6 +36,24 @@ export async function generateMetadata({
   };
 }
 
+/**
+ * The Call columns this page renders.
+ *
+ * NOTE: none of `country`, `isOpen`, `deadline`, `description` or
+ * `budgetEstimate` exist on `model Call` in prisma/schema.prisma, so the query
+ * below can only ever throw into its catch and the page renders empty. Recorded
+ * in the TASK-MTQ60SGW45T0X report; the shape here is what the markup reads.
+ */
+interface TurkeyCallRow {
+  id: string;
+  title: string;
+  description?: string | null;
+  /** Always present in practice: the query filters on `deadline > now`. */
+  deadline: Date | string;
+  budgetEstimate?: string | null;
+  url?: string | null;
+}
+
 export default async function TurkeyCalls({
   params,
 }: {
@@ -44,7 +62,7 @@ export default async function TurkeyCalls({
   const { locale } = await params;
   const isTr = locale === 'tr';
 
-  let calls: any[] = [];
+  let calls: TurkeyCallRow[] = [];
   try {
     calls = await prisma.call.findMany({
       where: {

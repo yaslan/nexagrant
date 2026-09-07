@@ -17,7 +17,7 @@ export interface EnterpriseSsoConfig {
 export async function configureEnterpriseSso(config: EnterpriseSsoConfig) {
   const { tenantId, domain, idpEntityId, ssoAcsUrl, x509Certificate, providerType, enabled } = config;
 
-  let tenant: any = null;
+  let tenant: { id: string; domain: string | null } | null = null;
   try {
     // Save metadata in tenant record or settings JSON
     tenant = await prisma.tenant.update({
@@ -48,12 +48,36 @@ export async function configureEnterpriseSso(config: EnterpriseSsoConfig) {
 /**
  * Resolves incoming email domain to enterprise SAML 2.0 SSO identity provider
  */
-export async function resolveSsoProviderForDomain(emailOrDomain: string) {
+/**
+ * The answer to "does this email domain sign in through an IdP?".
+ *
+ * The provider fields are optional because an unconfigured domain gets only
+ * `{ domain, ssoEnabled: false }` — callers must check `ssoEnabled` before
+ * reading them.
+ */
+export interface SsoProviderLookup {
+  domain: string;
+  ssoEnabled: boolean;
+  orgName?: string;
+  providerType?: string;
+  idpEndpoint?: string;
+}
+
+export async function resolveSsoProviderForDomain(
+  emailOrDomain: string
+): Promise<SsoProviderLookup | null> {
   const domain = (emailOrDomain.includes('@') ? emailOrDomain.split('@')[1] : emailOrDomain)?.toLowerCase().trim();
   if (!domain) return null;
 
   // Pre-configured university & corporate enterprise domains
-  const ENTERPRISE_SSO_DOMAINS: Record<string, any> = {
+  /** A pre-configured identity provider for one email domain. */
+  interface EnterpriseSsoDomain {
+    orgName: string;
+    providerType: string;
+    idpEndpoint: string;
+  }
+
+  const ENTERPRISE_SSO_DOMAINS: Record<string, EnterpriseSsoDomain> = {
     'itu.edu.tr': {
       orgName: 'İstanbul Teknik Üniversitesi (İTÜ)',
       providerType: 'SAML_2_0',

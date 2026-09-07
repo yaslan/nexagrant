@@ -44,7 +44,17 @@ export default async function seedProposals() {
 
     const proposalId = `demo-proposal-${pData.opportunityIndex}`;
 
-    const createData: any = {
+    // Built up field by field because submittedAt/outcome/esrScores are only
+    // set when the fixture has them.
+    const createData: {
+      id: string;
+      tenantId: string;
+      opportunityId: string;
+      acronym: string;
+      submittedAt?: Date;
+      outcome?: string;
+      esrScores?: unknown;
+    } = {
       id: proposalId,
       tenantId: TENANT_ID,
       opportunityId: opportunity.id,

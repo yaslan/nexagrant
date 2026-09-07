@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/db';
 import crypto from 'crypto';
+import type { TenantTx } from '@/lib/db';
 
 export type LlmProvider = 'anthropic' | 'openai';
 
@@ -177,7 +178,7 @@ export async function generateWithAI(
     .digest('hex')
     .slice(0, 16);
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx: TenantTx) => {
     await tx.aiUsageLog.create({
       data: {
         tenantId,

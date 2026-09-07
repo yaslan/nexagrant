@@ -34,8 +34,11 @@ export function useModuleEnabled(moduleId: ModuleId): boolean {
 /**
  * A Higher-Order Component to protect routes/components based on module state.
  */
-export function requireModule(moduleId: ModuleId, Fallback?: React.ComponentType) {
-  return function ProtectedComponent(props: any) {
+export function requireModule<P extends object>(
+  moduleId: ModuleId,
+  Fallback?: React.ComponentType
+) {
+  return function ProtectedComponent(props: P) {
     const isEnabled = useModuleEnabled(moduleId);
     const manifest = getManifest(moduleId);
 
