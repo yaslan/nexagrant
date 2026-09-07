@@ -55,3 +55,25 @@ Dosya sistemi paylaşılıyor ve kimse kilit almıyor.
 
 Köşeli parantezli yollarda git pathspec'i **glob** sanar (`[locale]` = karakter sınıfı);
 `git status`/`git log` sessizce boş döner. `-- ':(literal)<yol>'` kullan.
+
+## Yeni varyant (2026-09-07): süpürme **yarım** iş commit'leyip HEAD'i kırabilir
+
+Kayıp yalnız "değişikliğim silindi" biçiminde gelmiyor. TASK-MTQTYE287FERM'de tersi oldu:
+`git add -A` atan başka ajanlar **kodumu** commit'lerine aldı ama aynı değişikliğin
+**`messages/*.json` yarısını almadı**. Sonuç: HEAD'de `t('lensTitle')` çağrısı var,
+anahtar yok — kimsenin açmadığı, testin yakalamadığı kırık bir ara durum.
+
+**How to apply:** Doğrulama koşuların uzun sürdüyse, iş bitiminde "commit'im geçti mi"
+diye değil, **değişikliğin her parçası HEAD'de mi** diye bak — özellikle kod + katalog,
+kod + migration, kod + fixture gibi **çift dosyalı** değişikliklerde:
+
+```bash
+for f in <değiştirdiğin TÜM dosyalar>; do
+  printf '%-60s ' "$f"; git diff HEAD --stat -- ':(literal)'"$f" | wc -l
+done   # hepsi 0 olmalı; 0 değilse o parça hâlâ commit'siz
+```
+
+Eksik parçayı bulursan yalnız onu stage'leyip commit'le. Ayrıca `git add <yol>` sonrası
+`git diff --cached --name-only` ile **başkasının dosyasının index'ine sızmadığını**
+doğrula — süpürme index'i de kirletiyor (bir kez başka ajanın rapor dosyası benim
+index'imde belirdi, commit'ten önce `git restore --staged` ile çıkardım).
