@@ -35,3 +35,6 @@
 - [fabrika-k1-upstream-sources](fabrika-k1-upstream-sources.md) — K1'in üç dış kaynağının 2026-09-06'da ölçülmüş gerçek durumu — SEDIA arama yanıtı açıklamayı zaten taşır (topicDetails çağrısı gereksiz), Eurostars portalı 403, TÜBİTAK /en/funding 404
 
 - [fabrika-worker-panes-die-uncommitted](fabrika-worker-panes-die-uncommitted.md) — Fabrika'da worker pane'ler ~30 dakikada code 129 ile ölüyor ve commit edilmemiş işi ağaçta bırakıyor — lider kurtarmak zorunda
+
+- [fabrika-fabricated-fallback-antipattern](fabrika-fabricated-fallback-antipattern.md) — Fabrika kod tabanında yaygın anti-desen — DB/LLM hatasında uydurma rakam render edip DB'ye yazan "demo fallback"lar; CLAUDE.md kural 7 ihlali, gördüğün yerde temizle
+- [fabrika-g0-score-never-computed](fabrika-g0-score-never-computed.md) — Fabrika'da G0 kapı puanı hiç hesaplanmıyor — g0Score seed'den statik ya da Math.random() ile geliyor, kanonik scoreG0() üretimde hiç çağrılmıyor (ölçüldü 2026-09-07)
