@@ -229,7 +229,9 @@
       "terms": "Kullanım Koşulları",
       "compliance": "Uyum",
       "contact": "İletişim"
-    }
+    },
+    "metaTitle": "Fabrika — AB Finansman Platformu (Horizon Europe, Eurostars)",
+    "metaDescription": "Fabrika: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya."
   },
   "pricing": {
     "title": "Fabrika Fiyatlandırması",
@@ -284,7 +286,9 @@
     "faq_8_a": "Yıllık planlarda %20 indirim sunulmaktadır.",
     "cta_title": "Hazır mısınız?",
     "cta_subtitle": "Bugün başlayın — ücretsiz deneme deneyin",
-    "contact_us": "İletişim"
+    "contact_us": "İletişim",
+    "metaTitle": "Fiyatlandırma — Fabrika AI-Powered EU Funding Platform",
+    "metaDescription": "Fabrika fiyatlandırması: Başlangıç, Profesyonel ve İşletme planları. Ücretsiz deneme, aylık veya yıllık faturalandırma, kurumsal çözümler."
   },
   "settings": {
     "privacy": {

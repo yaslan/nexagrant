@@ -27,16 +27,28 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { region } = await params;
+  const { region, locale } = await params;
   const regionInfo = REGIONS[region as RegionParam];
   const regionLabel = regionInfo?.name || region;
+  const t = await getTranslations({ locale, namespace: 'calls_region' });
+
+  const title = t.rich('title', {
+    region: () => regionLabel,
+  });
+  const description = locale === 'tr'
+    ? `${regionLabel}'deki açık Horizon çağrıları. Deadline, bütçe ve uygunluk bilgisi.`
+    : `Open Horizon calls in ${regionLabel}. Deadlines, budgets, and eligibility information.`;
 
   return {
-    title: `${regionLabel} Horizon Çağrıları — Fabrika`,
-    description: `${regionLabel}'deki açık Horizon çağrıları. Deadline, bütçe ve uygunluk bilgisi.`,
+    title: `${regionLabel} — Fabrika`,
+    description,
+    alternates: { canonical: `/${locale}/calls/${region}` },
     openGraph: {
-      title: `${regionLabel} Horizon Çağrıları — Fabrika`,
-      description: `${regionLabel}'deki açık Horizon çağrıları.`,
+      title: `${regionLabel} — Fabrika`,
+      description,
+      type: 'website',
+      locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
+      url: `/${locale}/calls/${region}`,
     },
   };
 }

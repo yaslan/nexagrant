@@ -229,7 +229,9 @@
       "terms": "Terms of Service",
       "compliance": "Compliance",
       "contact": "Contact"
-    }
+    },
+    "metaTitle": "Fabrika — AI-Powered EU Funding Platform for Horizon Europe & Eurostars",
+    "metaDescription": "Fabrika: End-to-end platform for EU research proposals. Consortium matching, AI evaluator simulation, CORDIS network intelligence. From concept to funding."
   },
   "pricing": {
     "title": "Fabrika Pricing",
@@ -284,7 +286,9 @@
     "faq_8_a": "Annual plans include 20% discount.",
     "cta_title": "Ready to get started?",
     "cta_subtitle": "Start today — try free for 14 days",
-    "contact_us": "Contact Us"
+    "contact_us": "Contact Us",
+    "metaTitle": "Pricing — Fabrika AI-Powered EU Funding Platform",
+    "metaDescription": "Fabrika pricing: Starter, Professional and Enterprise plans. Free trial, monthly or yearly billing, custom enterprise solutions available."
   },
   "settings": {
     "privacy": {

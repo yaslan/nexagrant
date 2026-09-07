@@ -14,9 +14,10 @@ interface CallCardProps {
     status: string;
     nextDeadlineAt: Date | null;
   };
+  locale: string;
 }
 
-function CallCard({ call, topic }: CallCardProps) {
+function CallCard({ call, topic, locale }: CallCardProps) {
   const budget = Number(call.budgetCents) / 100;
   const deadline = topic.nextDeadlineAt ? new Date(topic.nextDeadlineAt).toLocaleDateString() : 'TBA';
   const statusColor = topic.status === 'OPEN' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
@@ -40,17 +41,22 @@ function CallCard({ call, topic }: CallCardProps) {
           <p className="text-lg font-bold text-slate-900">{deadline}</p>
         </div>
       </div>
-      <a
-        href={`/en/calls/${topic.identifier}`}
+      <Link
+        href={`/${locale}/calls/${topic.identifier}`}
         className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold text-sm"
       >
         View Details
-      </a>
+      </Link>
     </div>
   );
 }
 
-export default async function CallsPage() {
+interface PageProps {
+  params: Promise<{ locale: string }>;
+}
+
+export default async function CallsPage({ params }: PageProps) {
+  const { locale } = await params;
   const t = await getTranslations();
 
   const topics = await prisma.topic.findMany({
@@ -81,10 +87,10 @@ export default async function CallsPage() {
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-slate-200">
         <nav className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <Link href="/" className="text-2xl font-bold text-slate-900">
+          <Link href={`/${locale}`} className="text-2xl font-bold text-slate-900">
             Fabrika
           </Link>
-          <Link href="/" className="text-slate-600 hover:text-slate-900 font-medium">
+          <Link href={`/${locale}`} className="text-slate-600 hover:text-slate-900 font-medium">
             Back
           </Link>
         </nav>
@@ -100,7 +106,7 @@ export default async function CallsPage() {
               <h2 className="text-2xl font-bold text-slate-900 mb-6">{country === 'TR' ? '🇹🇷 Turkey' : country}</h2>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {countryTopics.map((topic) => (
-                  <CallCard key={topic.id} call={topic.call} topic={topic} />
+                  <CallCard key={topic.id} call={topic.call} topic={topic} locale={locale} />
                 ))}
               </div>
             </div>

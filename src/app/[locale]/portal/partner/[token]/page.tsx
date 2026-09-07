@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { addBudgetLineByToken } from '@/modules/m11/server/actions';
@@ -8,6 +9,40 @@ interface PageProps {
     token: string;
     locale: string;
   }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { token, locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'partner_portal' });
+
+  let part: any = null;
+  try {
+    part = await prisma.applicationPart.findUnique({
+      where: { magicToken: token },
+      include: { opportunity: true }
+    });
+  } catch (e: any) {
+    return {
+      title: t('title'),
+      description: t('intro'),
+    };
+  }
+
+  const opp = part?.opportunity;
+  const projectTitle = opp?.title || 'Partner Portal';
+
+  return {
+    title: `${t('title')} — ${projectTitle}`,
+    description: t('intro'),
+    alternates: { canonical: `/${locale}/portal/partner/${token}` },
+    openGraph: {
+      title: `${t('title')} — ${projectTitle}`,
+      description: t('intro'),
+      type: 'website',
+      locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
+      url: `/${locale}/portal/partner/${token}`,
+    },
+  };
 }
 
 export default async function PartnerPortalPage({ params }: PageProps) {
