@@ -67,7 +67,7 @@
     "unitProjects": "projects",
     "unitDays": "days",
     "unitModules": "modules",
-    "unitScore": "/100",
+    "unitScore": "/5",
     "trendChartTitle": "Proposals & Hit Rate",
     "legendOffers": "Proposals",
     "legendSuccessRate": "Hit Rate (%)",
@@ -85,7 +85,17 @@
     "fromLabel": "From",
     "toLabel": "To",
     "applyLabel": "Apply",
-    "emptyTrend": "No trend data to show for the selected range."
+    "emptyTrend": "No trend data to show for the selected range.",
+    "noData": "No data yet",
+    "emptyTitle": "No opportunities in this workspace yet",
+    "emptyBody": "The dashboard is calculated from your saved opportunities. Add your first opportunity and take it through G0 scoring — hit rate, average score and gate durations start to appear here.",
+    "emptyCta": "Go to opportunities",
+    "emptyRangeTitle": "No opportunities in the selected date range",
+    "emptyRangeBody": "This workspace has opportunities, but none fall inside the selected date range. Choose a wider range above.",
+    "emptyHitRate": "No opportunity has been G0-scored yet, so there is no ratio to report.",
+    "emptyAverageScore": "No pre-assessment has been completed yet.",
+    "emptyPersonDays": "No proposal yet, so effort per proposal cannot be calculated.",
+    "emptyAvgDaysG2": "No opportunity has both a G0 and a G2 decision yet."
   },
   "Pipeline": {
     "title": "Opportunity Pipeline",
@@ -158,7 +168,9 @@
     "title": "Consortium Builder",
     "findCandidates": "Find Candidates",
     "invite": "Invite",
-    "conflict": "Conflict Warning"
+    "conflict": "Conflict Warning",
+    "addRoleToConsortium": "ADD ROLE TO CONSORTIUM",
+    "topCandidates": "TOP CANDIDATES"
   },
   "Auth": {
     "signIn": "Sign In",
@@ -471,7 +483,9 @@
       "iaMultiplierLabel": "IA Impact Multiplier (1.5x)",
       "iaActive": "Active (Impact ×1.5)",
       "iaInactive": "Inactive (Standard)",
-      "iaToggleTitle": "Apply a 1.5x multiplier to the Impact score for an Innovation Action (IA)"
+      "iaToggleTitle": "Apply a 1.5x multiplier to the Impact score for an Innovation Action (IA)",
+      "notEvaluated": "Not evaluated",
+      "notEvaluatedHint": "No pre-assessment has been completed yet"
     },
     "tabs": {
       "evaluations": "Evaluations & Score Cards",
@@ -516,7 +530,11 @@
       "impactMultiplierSuffix": "(1.5x)",
       "implementationLabel": "3. Implementation",
       "detectedStrengths": "Detected Strengths:",
-      "detectedWeaknesses": "Detected Weaknesses & Critical Gaps:"
+      "detectedWeaknesses": "Detected Weaknesses & Critical Gaps:",
+      "notEvaluated": "Not evaluated yet",
+      "notEvaluatedBody": "This record was opened but no scores have been entered yet. The total and threshold status will appear here once they are.",
+      "panelNotEvaluatedBody": "This is a panel evaluation; its reviewers enter marks on the panel screen. It carries no score for the pre-assessment lens.",
+      "panelReader": "Panel Evaluation"
     },
     "rea": {
       "title": "REA (European Research Executive Agency) Common Pitfalls Check",
@@ -564,7 +582,8 @@
       "resultLabel": "Calculated Calibration Variance:",
       "deviationLabel": "Deviation: {value} points",
       "goodMessage": "🎯 Great! Your internal evaluation model is very close to the official ESR score (≤ 0.5 point deviation).",
-      "driftMessage": "⚠️ Your model shows some drift from the official score. The calibration coefficient will be updated for future projects."
+      "driftMessage": "⚠️ Your model shows some drift from the official score. The calibration coefficient will be updated for future projects.",
+      "noScoredEvaluations": "There is no scored evaluation to calibrate. Complete a pre-assessment first."
     },
     "form": {
       "title": "Evaluator Panel Scoring",
@@ -596,7 +615,11 @@
     },
     "panel": {
       "title": "Reviewer Panel",
-      "notSeated": "You are not seated as a reviewer on this evaluation."
+      "notSeated": "You are not seated as a reviewer on this evaluation.",
+      "noProposal": "This opportunity has no proposal yet, so there is nothing to score.",
+      "errorTitle": "The panel could not be opened",
+      "errorBody": "Something went wrong while loading this evaluation panel. If it keeps happening, contact your workspace admin.",
+      "errorRetry": "Try again"
     }
   },
   "m9": {
@@ -607,7 +630,60 @@
       "partnerRequired": "Enter the partner or organisation name before you generate a brief.",
       "failed": "The brief could not be generated. What you typed is still in the form — check your connection and try again. Tell your administrator if this keeps happening.",
       "notSaved": "The brief was written but could not be saved, so it is not in the list. What you typed is still in the form — please try again.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "generating": "Preparing AI Brief...",
+      "submit": "Generate AI Brief"
+    },
+    "nav": {
+      "backToPipeline": "Back to Pipeline"
+    },
+    "header": {
+      "moduleLabel": "Module 9 — Meeting Briefs",
+      "title": "Meeting Briefing & Note-Taking Engine",
+      "opportunityLabel": "Call Opportunity",
+      "aiCreditBadge": "1 AI Credit / Brief"
+    },
+    "actions": {
+      "print": "Print",
+      "downloadIcs": "Calendar (.ics)"
+    },
+    "form": {
+      "heading": "Create New Meeting Note (AI Pre-Meeting Brief)",
+      "partnerPlaceholder": "Partner / Organisation to Meet",
+      "dateAriaLabel": "Meeting date",
+      "timeAriaLabel": "Meeting time",
+      "brusselsTimeLabel": "Brussels Time (Europe/Brussels):",
+      "utcNote": "Will be saved in UTC."
+    },
+    "list": {
+      "heading": "Meeting Records ({count})",
+      "empty": "No meetings have been recorded yet."
+    },
+    "brief": {
+      "createdLabel": "Created:",
+      "meetingDateUtcLabel": "Meeting Date (UTC):",
+      "brusselsLabel": "Brussels:",
+      "emptyState": "Select a meeting from the left panel or generate a new AI brief."
+    },
+    "postMeeting": {
+      "heading": "Add Post-Meeting Decisions & Action Notes",
+      "decisionsLabel": "Decisions Made / Outcome",
+      "decisionsPlaceholder": "e.g. Fraunhofer agreed to lead WP3; NDA to be signed next week.",
+      "notesLabel": "Meeting Detail Notes",
+      "notesPlaceholder": "Details discussed in the meeting...",
+      "actionItemsLabel": "Action Items",
+      "actionItemPlaceholder": "Add an action item...",
+      "addButton": "Add",
+      "removeButton": "Remove",
+      "nextMeetingLabel": "Next Follow-up Meeting Date",
+      "saving": "Adding Notes...",
+      "submit": "Add Post-Meeting Notes to Brief",
+      "defaultPartnerName": "Consortium Partner"
+    },
+    "ics": {
+      "noScheduleError": "This meeting record has no meeting date, so a calendar file could not be created. Regenerate the brief with a meeting date and time.",
+      "eventTitle": "Meeting: {partner}",
+      "defaultPartner": "Partner"
     }
   },
   "calls_region": {

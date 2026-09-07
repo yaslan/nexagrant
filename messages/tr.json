@@ -67,7 +67,7 @@
     "unitProjects": "proje",
     "unitDays": "gün",
     "unitModules": "modül",
-    "unitScore": "/100",
+    "unitScore": "/5",
     "trendChartTitle": "Teklifler ve İsabet Oranı",
     "legendOffers": "Teklifler",
     "legendSuccessRate": "İsabet Oranı (%)",
@@ -85,7 +85,17 @@
     "fromLabel": "Başlangıç",
     "toLabel": "Bitiş",
     "applyLabel": "Uygula",
-    "emptyTrend": "Seçili aralıkta gösterilecek eğilim verisi yok."
+    "emptyTrend": "Seçili aralıkta gösterilecek eğilim verisi yok.",
+    "noData": "Henüz veri yok",
+    "emptyTitle": "Bu çalışma alanında henüz fırsat yok",
+    "emptyBody": "Panel, kayıtlı fırsatlarınızdan hesaplanır. İlk fırsatınızı ekleyip G0 puanlamasından geçirdiğinizde isabet oranı, ortalama puan ve kapı süreleri burada görünmeye başlar.",
+    "emptyCta": "Fırsatlara git",
+    "emptyRangeTitle": "Seçili tarih aralığında fırsat yok",
+    "emptyRangeBody": "Bu çalışma alanında fırsatlar var, ancak hiçbiri seçili tarih aralığına düşmüyor. Yukarıdan daha geniş bir aralık seçin.",
+    "emptyHitRate": "Henüz G0 puanı almış fırsat yok; oran hesaplanamıyor.",
+    "emptyAverageScore": "Henüz tamamlanmış bir ön değerlendirme yok.",
+    "emptyPersonDays": "Henüz teklif yok; teklif başına efor hesaplanamıyor.",
+    "emptyAvgDaysG2": "Henüz hem G0 hem G2 kararı olan fırsat yok."
   },
   "Pipeline": {
     "title": "Fırsat Pipeline",
@@ -158,7 +168,9 @@
     "title": "Konsorsiyum Oluşturucu",
     "findCandidates": "Aday Bul",
     "invite": "Davet Et",
-    "conflict": "Çakışma Uyarısı"
+    "conflict": "Çakışma Uyarısı",
+    "addRoleToConsortium": "KONSORSİYUMA ROL EKLE",
+    "topCandidates": "EN İYİ ADAYLAR"
   },
   "Auth": {
     "signIn": "Giriş Yap",
@@ -471,7 +483,9 @@
       "iaMultiplierLabel": "IA Etki Çarpanı (1.5x)",
       "iaActive": "Aktif (Impact ×1.5)",
       "iaInactive": "Pasif (Standart)",
-      "iaToggleTitle": "Innovation Action (IA) için Etki puanına 1.5 katsayısı uygula"
+      "iaToggleTitle": "Innovation Action (IA) için Etki puanına 1.5 katsayısı uygula",
+      "notEvaluated": "Değerlendirilmedi",
+      "notEvaluatedHint": "Henüz tamamlanmış bir ön değerlendirme yok"
     },
     "tabs": {
       "evaluations": "Değerlendirmeler & Puan Kartları",
@@ -516,7 +530,11 @@
       "impactMultiplierSuffix": "(1.5x)",
       "implementationLabel": "3. Implementation",
       "detectedStrengths": "Tespit Edilen Güçlü Yönler:",
-      "detectedWeaknesses": "Tespit Edilen Zayıf Yönler & Kritik Eksikler:"
+      "detectedWeaknesses": "Tespit Edilen Zayıf Yönler & Kritik Eksikler:",
+      "notEvaluated": "Henüz değerlendirilmedi",
+      "notEvaluatedBody": "Bu kayıt açıldı ama puanları henüz girilmedi. Puanlar girildiğinde toplam ve eşik durumu burada görünecek.",
+      "panelNotEvaluatedBody": "Bu bir panel değerlendirmesi; puanları panel ekranında hakemler girer. Ön değerlendirme merceği için puanı yok.",
+      "panelReader": "Panel Değerlendirmesi"
     },
     "rea": {
       "title": "REA (European Research Executive Agency) Sık Hatalar Kontrolü",
@@ -564,7 +582,8 @@
       "resultLabel": "Hesaplanan Kalibrasyon Sapması (Variance):",
       "deviationLabel": "Sapma: {value} puan",
       "goodMessage": "🎯 Harika! İç değerlendirme modeliniz resmî ESR puanına çok yakın (≤ 0.5 puan sapma).",
-      "driftMessage": "⚠️ Modeliniz resmî puandan biraz sapma gösteriyor. Gelecek projelerde kalibrasyon katsayısı güncellenecektir."
+      "driftMessage": "⚠️ Modeliniz resmî puandan biraz sapma gösteriyor. Gelecek projelerde kalibrasyon katsayısı güncellenecektir.",
+      "noScoredEvaluations": "Kalibre edilecek puanlanmış bir değerlendirme yok. Önce bir ön değerlendirme tamamlayın."
     },
     "form": {
       "title": "Değerlendirici Paneli Puanlaması",
@@ -596,7 +615,11 @@
     },
     "panel": {
       "title": "Hakem Paneli",
-      "notSeated": "Bu değerlendirmede hakem olarak görevli değilsiniz."
+      "notSeated": "Bu değerlendirmede hakem olarak görevli değilsiniz.",
+      "noProposal": "Bu fırsat için henüz bir teklif oluşturulmadı; puanlanacak bir şey yok.",
+      "errorTitle": "Panel açılamadı",
+      "errorBody": "Bu değerlendirme paneli yüklenirken bir hata oluştu. Sorun sürerse çalışma alanı yöneticinize başvurun.",
+      "errorRetry": "Tekrar dene"
     }
   },
   "m9": {
@@ -607,7 +630,60 @@
       "partnerRequired": "Brief oluşturmak için önce görüşülecek ortak ya da kurum adını yazın.",
       "failed": "Brief oluşturulamadı. Girdikleriniz formda duruyor — bağlantınızı kontrol edip yeniden deneyin. Sorun sürerse yöneticinize bildirin.",
       "notSaved": "Brief hazırlandı ama kaydedilemedi, bu yüzden listeye eklenmedi. Girdikleriniz formda duruyor — yeniden deneyin.",
-      "retry": "Yeniden dene"
+      "retry": "Yeniden dene",
+      "generating": "AI Brief Hazırlanıyor...",
+      "submit": "Yapay Zeka Brief Oluştur"
+    },
+    "nav": {
+      "backToPipeline": "Pipeline'a Dön"
+    },
+    "header": {
+      "moduleLabel": "Modül 9 — Görüşme Brifingleri",
+      "title": "Görüşme Brifingi & Not Alma Motoru",
+      "opportunityLabel": "Çağrı Fırsatı",
+      "aiCreditBadge": "1 AI Kredi / Brief"
+    },
+    "actions": {
+      "print": "Yazdır",
+      "downloadIcs": "Takvim (.ics)"
+    },
+    "form": {
+      "heading": "Yeni Görüşme Notu Oluştur (AI Pre-Meeting Brief)",
+      "partnerPlaceholder": "Görüşülecek Ortak / Kurum Adı",
+      "dateAriaLabel": "Toplantı tarihi",
+      "timeAriaLabel": "Toplantı saati",
+      "brusselsTimeLabel": "Brüksel Saati (Europe/Brussels):",
+      "utcNote": "UTC olarak kaydedilecektir."
+    },
+    "list": {
+      "heading": "Görüşme Kayıtları ({count})",
+      "empty": "Henüz kayıtlı bir görüşme bulunmuyor."
+    },
+    "brief": {
+      "createdLabel": "Oluşturulma:",
+      "meetingDateUtcLabel": "Toplantı Tarihi (UTC):",
+      "brusselsLabel": "Brüksel:",
+      "emptyState": "Lütfen sol panelden bir görüşme seçin veya yeni bir AI Brief oluşturun."
+    },
+    "postMeeting": {
+      "heading": "Toplantı Sonrası Kararları & Aksiyon Notu Ekle",
+      "decisionsLabel": "Alınan Kararlar / Sonuç",
+      "decisionsPlaceholder": "Örn: Fraunhofer WP3 liderliğini kabul etti; NDA haftaya imzalanacak.",
+      "notesLabel": "Görüşme Detay Notları",
+      "notesPlaceholder": "Toplantıda konuşulan detaylar...",
+      "actionItemsLabel": "Aksiyon Maddeleri",
+      "actionItemPlaceholder": "Aksiyon maddesi ekle...",
+      "addButton": "Ekle",
+      "removeButton": "Kaldır",
+      "nextMeetingLabel": "Sonraki Takip Görüşme Tarihi",
+      "saving": "Notlar Ekleniyor...",
+      "submit": "Toplantı Sonrası Notlarını Brief'e Ekle",
+      "defaultPartnerName": "Konsorsiyum Ortağı"
+    },
+    "ics": {
+      "noScheduleError": "Bu görüşme kaydında toplantı tarihi yok, bu yüzden takvim dosyası oluşturulamadı. Brief'i toplantı tarihi ve saatiyle yeniden oluşturun.",
+      "eventTitle": "Görüşme: {partner}",
+      "defaultPartner": "Ortak"
     }
   },
   "calls_region": {

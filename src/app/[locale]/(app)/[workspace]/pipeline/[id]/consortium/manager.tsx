@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { addSeat, findCandidates, assignSeat, getConflicts } from './actions';
 import type { ScoringBreakdown } from '@/lib/scoring/consortium';
 
@@ -57,6 +58,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function ConsortiumManager({ opportunityId, seats: initSeats, candidates: initCandidates, orgMap }: Props) {
+  const t = useTranslations('Consortium');
   const [seats, setSeats] = useState(initSeats);
   const [candidateMap, setCandidateMap] = useState<Record<string, SeatCandidate[]>>(() => {
     const map: Record<string, SeatCandidate[]> = {};
@@ -166,7 +168,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
               {/* Candidate Results Drawer */}
               {isExpanded && seatCandidates.length > 0 && (
                 <div className="border-t border-border bg-ground/50 p-4">
-                  <h4 className="text-xs font-bold text-muted uppercase tracking-wider mb-3">Top Candidates</h4>
+                  <h4 className="text-xs font-bold text-muted tracking-wider mb-3">{t('topCandidates')}</h4>
                   <div className="space-y-2">
                     {seatCandidates.map((c) => {
                       const cOrg = orgMap[c.organizationId];
@@ -212,7 +214,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
 
       {/* Add Seat */}
       <div className="border-2 border-dashed border-border rounded-xl p-4 bg-surface/40">
-        <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Add Role to Consortium</h3>
+        <h3 className="text-xs font-semibold text-muted tracking-wider mb-3">{t('addRoleToConsortium')}</h3>
         <div className="flex flex-wrap gap-2">
           {ROLE_OPTIONS.map((r) => (
             <button
