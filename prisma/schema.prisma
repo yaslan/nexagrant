@@ -41,6 +41,7 @@ model Tenant {
   invitations   Invitation[]
   approvalRequests ApprovalRequest[]
   invoices      Invoice[]
+  planAssignments PlanAssignment[]
   @@index([deletedAt])
 }
 
@@ -213,6 +214,63 @@ model Plan {                    // projection of src/lib/billing/catalog.ts; see
   modules       String[]       // default ON modules
   stripePriceMonthly String?
   stripePriceYearly  String?
+  visibility    String  @default("public") // public | private | archived
+  versions      PlanVersion[]
+  assignments   PlanAssignment[]
+}
+
+model PlanVersion {
+  id            String  @id    @default(cuid())
+  planId        String
+  plan          Plan    @relation(fields: [planId], references: [id], onDelete: Restrict)
+  version       Int             // semantic version: 1, 2, 3, ...
+  status        String  @default("draft") // draft | published | archived
+  monthlyCents  Int
+  yearlyCents   Int
+  currency      String  @default("USD")
+  seats         Int
+  workspaces    Int
+  aiCreditsMonthly Int
+  modules       String[]       // modules granted by this version
+  features      PlanFeature[]
+  publishedBy   String?        // user id who published this version
+  publishedAt   DateTime?      // when this version was published (immutable after)
+  subscriptions Subscription[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([planId, version])
+}
+
+model PlanFeature {
+  id            String  @id    @default(cuid())
+  planVersionId String
+  planVersion   PlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Cascade)
+  order         Int             // display order (1, 2, 3, ...)
+  kind          String          // module | limit | text
+  moduleId      String?         // if kind='module': module identifier (M1, M8, etc)
+  limitKey      String?         // if kind='limit': limit identifier (e.g. "seats", "credits")
+  textTr        String?         // if kind='text': Turkish label or description
+  textEn        String?         // if kind='text': English label or description
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([planVersionId, order])
+}
+
+model PlanAssignment {
+  id            String  @id    @default(cuid())
+  planId        String
+  plan          Plan    @relation(fields: [planId], references: [id], onDelete: Restrict)
+  tenantId      String
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedBy    String?        // user id who made the assignment
+  assignedAt    DateTime @default(now())
+  note          String?        // reason or memo
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([planId, tenantId])
 }
 
 model AddOnCatalog {
@@ -252,6 +310,8 @@ model Subscription {
   lockedAmountMinor Int?      // what one period cost at that rate, minor units (rule 9)
   lockedCurrency    String?   // currency of lockedAmountMinor
   priceLockedAt     DateTime? // when the rate was locked
+  planVersionId     String?  // current plan version (ADIM 2: checkout writes this)
+  planVersion       PlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)

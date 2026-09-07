@@ -1286,5 +1286,20 @@
         }
       }
     }
+  },
+  "calls_turkey": {
+    "title": "Türkiye'ye Açık Horizon Çağrıları",
+    "meta_description": "Türk kuruluşlarının katılabildiği açık Horizon Europe çağrıları. Son başvuru tarihleri, bütçeler ve başvuru bağlantıları.",
+    "og_description": "Türkiye’nin katılabileceği açık Horizon Europe fonları",
+    "count": "{count} aktif çağrı bulundu",
+    "call_id": "Çağrı",
+    "deadline_local": "Yerel saatiniz",
+    "budget": "Çağrı bütçesi",
+    "budget_per_project": "Proje başına",
+    "not_recorded": "Kayıtlı değil",
+    "view_details": "Detayları Gör",
+    "empty_title": "Şu anda Türkiye’ye açık çağrı kaydı yok.",
+    "empty_hint": "Bu liste yalnızca veri tabanındaki çağrılardan üretilir; örnek kayıt gösterilmez. Çağrı toplama işi çalıştığında burada görünür.",
+    "deadline_official": "Resmî saat ({tz})"
   }
 }

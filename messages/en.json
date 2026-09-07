@@ -1286,5 +1286,20 @@
         }
       }
     }
+  },
+  "calls_turkey": {
+    "title": "Open Horizon Calls for Turkey",
+    "meta_description": "Open Horizon Europe calls that Turkish organisations can apply to. Deadlines, budgets and application links.",
+    "og_description": "Open Horizon Europe funding opportunities for Turkey",
+    "count": "{count} open calls found",
+    "call_id": "Call",
+    "deadline_local": "Your local time",
+    "budget": "Call budget",
+    "budget_per_project": "Per project",
+    "not_recorded": "Not recorded",
+    "view_details": "View Details",
+    "empty_title": "No open calls for Turkey are on record right now.",
+    "empty_hint": "This list is built only from calls in the database; no sample rows are shown. Entries appear here once the call-harvesting job has run.",
+    "deadline_official": "Official time ({tz})"
   }
 }
