@@ -125,6 +125,52 @@ oranını belirlemez.
 - Stripe Customer Portal: kart, fatura, iptal.
 - Vergi: Stripe Tax. Türkiye e-fatura entegrasyonu faz 2.
 
+#### 4.1.1 Fiyat kilidi — "katıldığın fiyat seninle kalır" (TASK-MTR882HVZ8BG7)
+
+Pricing sayfasının vaadi: bir kiracı hangi kampanyada abone olduysa, o oranı
+kampanya bitse de korur (`src/lib/billing/price-lock.ts`). Kilit
+`Subscription`'da beş sütun: `lockedTierCode`, `lockedPercentOff`,
+`lockedAmountMinor`, `lockedCurrency`, `priceLockedAt`.
+
+- **Ne kilitleniyor:** *yüzde*, mutlak tutar değil. `lockedAmountMinor` yalnız
+  kanıt/denetim amaçlı — "o gün gerçekten ne tahsil edildi" — bir sonraki
+  fiyat teklifini o rakamdan değil, kilitli yüzdeyi **o anki** katalog liste
+  fiyatına uygulayarak hesaplar (`effectiveTier()` → `priceLine()`). Bu
+  bilinçli: yüzde, plan değişince de (yükselt/düşür) taşınabilsin diye
+  (`price-lock.test.ts` → "carries the rate across an upgrade and a
+  downgrade"). Katalog liste fiyatları (`catalog.ts`'teki `PLANS`) bugüne
+  kadar hiç değişmedi; değişirse bu, yeni bir fiyat kararıdır ve o zaman
+  kilitli kiracıların yüzdesi yeni liste fiyatına uygulanır — "kilitli %70"
+  demek "sabit $26,10 sonsuza dek" değil, "liste fiyatının %70 indirimlisi
+  sonsuza dek" demektir.
+- **Yazılma anı:** yalnız ilk aktivasyonda ve iptalden sonra yeniden
+  aktivasyonda (`priceLockOnActivation`). Aradaki her olay (plan değişikliği,
+  yenileme) sütunlara dokunmaz — kilit varsa karar her zaman `keep`.
+- **Yenilemede ne olur — kanıtlı:** Bu depoda bir "aboneliği yenilerken yeniden
+  fiyatlandır" kod yolu **yok**. `syncStripeSubscription`, Stripe'ın
+  `customer.subscription.updated` webhook'unda (yenileme de bunu tetikler)
+  çalışan tek fonksiyondur ve hiçbir yerde `stripe.subscriptions.update`
+  çağırmaz (`grep -rn "subscriptions\.update" src` → 0 sonuç) — yalnız DB'yi
+  Stripe'ın söylediğiyle senkron eder. Asıl tahsilat, checkout anında
+  `price_data.unit_amount` ile yaratılan ve aboneliğe kalıcı olarak bağlanan
+  Stripe fiyat nesnesinden gelir (`src/app/api/billing/checkout/route.ts`);
+  o tutar da `priceLine(line, effectiveTier(lock, shopfrontTier))`'dan gelir
+  (aynı dosya, `lockedRateFor()`). Yani "yenilemede ne ödenir" sorusunun
+  cevabı, checkout anında **bir kez** bu iki fonksiyonla karara bağlanır,
+  sonrası Stripe'ın kendi tekrarlayan faturalama motorudur — ne bizim kodumuz
+  ne de bir cron o tutara sonradan dokunur. Testler:
+  `subscription-sync.test.ts` → "does not touch the lock when a later event
+  arrives under a worse campaign"; `price-lock.test.ts` → "renewal quoting —
+  effectiveTier() feeding priceLine(), not a catalogue refresh".
+- **İptal:** kilit temizlenir (`clearedPriceLock()`) — yeniden abone olmak
+  o günkü kampanyaya yeniden katılmaktır.
+- **Bilinen görünürlük açığı — `RENEWAL-UI-1`:** `Subscription.currentPeriodEnd`
+  DB'de tutulur ama hiçbir ekranda okunmaz (`grep -rn currentPeriodEnd src`).
+  Faturalandırma ayarları sayfası (`settings/billing/page.tsx`) kiracının
+  kilitli/güncel oranıyla fiyat tablosunu gösterir ama "bir sonraki
+  yenilemede *şu tarihte şu kadar* ödeyeceksin" biçiminde tek bir cümle
+  yoktur. Yeni bir ekran açılmadı; bu satır bulguyu kayda geçirir.
+
 ### 4.2 iyzico (faz 2, TL) — fiyatları bayat
 
 Aynı `Subscription.provider='iyzico'`; TL liste `src/lib/iyzico.ts`

@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+import { prisma } from '../../src/lib/db';
+
 /**
  * TASK-MTRH86RCGVEGC — the evidence module invented accreditation.
  *
@@ -15,7 +17,34 @@ import { test, expect } from '@playwright/test';
 
 const SHOTS = 'docs/agent-results/TASK-MTRH86RCGVEGC-screenshots';
 const WORKSPACE = 'org-1xnfma';
+const TENANT_ID = 'cmtrhjys10001ncxk13gwtbcb';
 const EVIDENCE_URL = `/tr/${WORKSPACE}/evidence`;
+
+// The evidence page is behind moduleGate('M3'), and this tenant has no ModuleState
+// row, which reads as OFF. The fixture turns M3 on for the run and puts the tenant
+// back exactly as it was afterwards.
+let hadModuleRow = false;
+
+test.beforeAll(async () => {
+  const existing = await prisma.moduleState.findUnique({
+    where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M3' } },
+    select: { status: true },
+  });
+  hadModuleRow = existing !== null;
+  await prisma.moduleState.upsert({
+    where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M3' } },
+    update: { status: 'ON' },
+    create: { tenantId: TENANT_ID, moduleId: 'M3', status: 'ON' },
+  });
+});
+
+test.afterAll(async () => {
+  if (!hadModuleRow) {
+    await prisma.moduleState.deleteMany({ where: { tenantId: TENANT_ID, moduleId: 'M3' } });
+  }
+  await prisma.evidence.deleteMany({ where: { tenantId: TENANT_ID, fileName: PLAIN_FILE.name } });
+  await prisma.$disconnect();
+});
 
 // A document with no certificate content at all. Whatever the drawer claims about
 // an issuing authority or a document number for THIS file was not read off it.
@@ -52,7 +81,7 @@ test('an upload with no readable metadata does not gain invented metadata', asyn
   await page.screenshot({ path: `${SHOTS}/03-uploaded.png`, fullPage: true });
 
   // ── Open the detail drawer: this is the surface that shows the metadata.
-  await card.click();
+  await page.getByRole('button', { name: /İncele & İddialar/ }).first().click();
   const drawer = page.locator('text=Veren Kurum:').first();
   await expect(drawer).toBeVisible({ timeout: 15_000 });
   await page.screenshot({ path: `${SHOTS}/04-detail-drawer.png`, fullPage: true });
@@ -69,4 +98,17 @@ test('an upload with no readable metadata does not gain invented metadata', asyn
   expect(body).not.toMatch(/uluslararası standartlara tam uyumlu/);
   expect(body).not.toMatch(/bağımsız akredite denetçi/);
   expect(body).not.toMatch(/AB veri koruması doğrulanmıştır/);
+
+  // The status badge is computed from the expiry date alone, so it may say the
+  // document is valid but never that it was verified. (The page intro's "Doğrulanmış
+  // belgeleri yükleyerek..." is instruction to the user, not a claim about this file,
+  // which is why the check is on the badge rather than on the whole page.)
+  await expect(page.getByText('Doğrulanmış Geçerli')).toHaveCount(0);
+
+  // And the honest replacements are on screen instead of the invented values.
+  await expect(page.getByText('Belirtilmedi — elle doldurun').first()).toBeVisible();
+  await expect(
+    page.getByText(/Bu belgeden metin okunmadı/).first(),
+  ).toBeVisible();
+  await expect(page.getByText(/Bu belgeye bağlı bir iddia yok/).first()).toBeVisible();
 });

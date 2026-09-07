@@ -137,7 +137,10 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-2 py-0.5 rounded-full">
         <CheckCircle2 className="w-3 h-3" />
-        <span>{isTr ? 'Doğrulanmış Geçerli' : 'Valid'}</span>
+        {/* "Geçerli", not "Doğrulanmış Geçerli". This badge is computed from the
+            expiry date alone — nothing verifies the document — and the Turkish label
+            was the only one of the two claiming it had been verified. */}
+        <span>{isTr ? 'Geçerli' : 'Valid'}</span>
       </span>
     );
   };

@@ -171,6 +171,43 @@ describe('effectiveTier — what an existing subscriber is priced under', () => 
   });
 });
 
+/**
+ * TASK-MTR882HVZ8BG7, 3rd pass — "what do I pay at the next renewal", stated
+ * as the two scenarios the task named by name.
+ *
+ * There is no code path in this repo that reprices an existing Stripe
+ * subscription on renewal: `syncStripeSubscription` (the only function a
+ * renewal event reaches, via `customer.subscription.updated`) never calls
+ * `stripe.subscriptions.update` and, per `priceLockOnActivation`, always
+ * chooses `keep` once a lock exists — see the `does not touch the lock when a
+ * later event arrives under a worse campaign` case in `subscription-sync.test.ts`.
+ * Stripe renews the `price_data` amount fixed at checkout
+ * (`src/app/api/billing/checkout/route.ts`), which is exactly
+ * `priceLine(line, effectiveTier(lock, shopfrontTier))` — the pair asserted
+ * here. So "what renews" is decided once, by these two functions, and then
+ * left to Stripe; these tests are that decision, not a simulation of Stripe.
+ */
+describe('renewal quoting — effectiveTier() feeding priceLine(), not a catalogue refresh', () => {
+  it('catalogue effectively "raised" (the campaign ended): the locked price still renews, not list', () => {
+    const lock = readPriceLock(ilk5ProLock()); // joined Pro monthly at ILK5 (70% off) → $26.10
+    const renewalQuote = priceLine({ sku: 'pro', billingCycle: 'monthly' }, effectiveTier(lock, NO_DISCOUNT_TIER));
+    expect(renewalQuote.amountMinor).toBe(2_610);
+    expect(renewalQuote.amountMinor).toBe(lock!.amountMinor);
+    expect(renewalQuote.amountMinor).not.toBe(
+      priceLine({ sku: 'pro', billingCycle: 'monthly' }, NO_DISCOUNT_TIER).amountMinor
+    );
+  });
+
+  it('catalogue effectively "cheapened" (a deeper campaign is running today): the cheaper price renews', () => {
+    const lock = readPriceLock({ ...ilk5ProLock(), lockedTierCode: 'PROMO10', lockedPercentOff: 10 }); // joined at 10% off
+    const renewalQuote = priceLine({ sku: 'pro', billingCycle: 'monthly' }, effectiveTier(lock, tier('ILK5')));
+    expect(renewalQuote.amountMinor).toBe(priceLine({ sku: 'pro', billingCycle: 'monthly' }, tier('ILK5')).amountMinor);
+    expect(renewalQuote.amountMinor).toBeLessThan(
+      priceLine({ sku: 'pro', billingCycle: 'monthly' }, tier('PROMO10')).amountMinor
+    );
+  });
+});
+
 describe('priceLockOnActivation — when the lock is written', () => {
   it('locks a tenant’s first ever subscription at the running campaign', () => {
     const decision = priceLockOnActivation({

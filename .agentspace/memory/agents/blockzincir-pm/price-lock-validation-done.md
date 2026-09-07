@@ -23,3 +23,11 @@ Deneme/rapor akışında **3. defadan sonra çıkmak kurali**:
 - **3. deneme bu rapor** — taraftar: kapandı; sonrası PRlı kapatma isteneceğine kadar açık kalır
 
 Gelecek görevlerde 2. rapor yazarken KENAR doğrulamayı atlayıp "test + eski kanıt" sonucuna varırsa, liderin "3. deneme açmadan geç" uyarısı belki işe yarayabilir.
+
+### Ek (2026-09-07, aynı gün 4. tur) — yenileme sorusu ayrı ele alındı
+
+Aynı görev numarası altında (`-3.md`) bir sonraki tur geldi: "ilk satın alma kanıtlandı, tek
+kalan soru yenileme". Kod kopukluğu **bulunmadı** (mekanik ve kanıt: [[fabrika-stripe-renewal-price-mechanics]]);
+yalnız 2 yeni birim test (`price-lock.test.ts`) ve `docs/BILLING.md` §4.1.1 eklendi. Kullanıcı
+görünürlük açığı (`RENEWAL-UI-1` — "sıradaki tahsilat ne zaman/ne kadar" hiçbir ekranda yok)
+BULGU olarak docs'a işlendi, yeni ekran açılmadı.
