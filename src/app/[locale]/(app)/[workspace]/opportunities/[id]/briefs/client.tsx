@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   FileText, 
   Sparkles,
@@ -16,6 +16,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { generateMeetingBrief, savePostMeetingNotes } from '@/modules/m9/server/actions';
 import { generateIcsContent } from '@/lib/calendar';
 import { resolveMeetingSchedule } from '@/modules/m9/meeting-schedule';
@@ -59,6 +60,55 @@ const formatBrusselsTime = (date: Date | string | null): string => {
   }
 };
 
+/**
+ * The one error band this screen uses. It existed inline for the calendar
+ * failure (P3-14); the brief generator needs the same surface, so the markup
+ * is shared instead of copied — one visual language, one set of tokens, one
+ * a11y contract (`role="alert"`, so it is announced the moment it appears).
+ *
+ * `action` carries the recovery affordance. An error the user can do something
+ * about should say so next to the sentence that reports it.
+ */
+function AlertBanner({
+  id,
+  testId,
+  message,
+  dismissLabel,
+  onDismiss,
+  action,
+}: {
+  id?: string;
+  testId: string;
+  message: string;
+  dismissLabel: string;
+  onDismiss: () => void;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div
+      id={id}
+      role="alert"
+      data-testid={testId}
+      className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800 flex items-start gap-2"
+    >
+      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+      <div className="flex-1 space-y-2">
+        <p>{message}</p>
+        {action}
+      </div>
+      {/* min-h-6 keeps the hit area at 24px (WCAG 2.2 SC 2.5.8) — the label
+          text alone is only 16px tall. */}
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="ml-auto shrink-0 min-h-6 px-1 text-xs font-bold text-rose-700 hover:text-rose-900 underline underline-offset-2"
+      >
+        {dismissLabel}
+      </button>
+    </div>
+  );
+}
+
 const dateToUTC = (dateStr: string, timeStr: string): Date => {
   const local = new Date(`${dateStr}T${timeStr}`);
   return new Date(local.getTime());
@@ -71,6 +121,7 @@ export function MeetingBriefsClient({
   opportunityTitle,
   briefs: initialBriefs,
 }: MeetingBriefsClientProps) {
+  const t = useTranslations('m9');
   const [briefs, setBriefs] = useState<BriefItem[]>(initialBriefs);
   const [partnerName, setPartnerName] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
@@ -91,14 +142,44 @@ export function MeetingBriefsClient({
   // `alert()` (dogfood findings P2-9 and P3-14).
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [icsError, setIcsError] = useState<string | null>(null);
+  // Every way brief generation can fail lands here. It used to have no surface
+  // at all: the throw went to `console.error` and an empty `res.brief` went
+  // nowhere, so the user pressed the button, watched the spinner, and was told
+  // nothing (dogfood finding P0, TASK-MTQURC2H4E0WF).
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const meetingDateRef = useRef<HTMLInputElement>(null);
   const meetingTimeRef = useRef<HTMLInputElement>(null);
+  const generateButtonRef = useRef<HTMLButtonElement>(null);
+  const focusOrphanedRef = useRef(false);
 
   const activeBrief = briefs.find((b) => b.id === activeBriefId) || briefs[0];
 
-  const handleGenerateBrief = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!partnerName.trim()) return;
+  /**
+   * Both controls inside the error band unmount when the band closes, so a
+   * keyboard user who pressed one is left with focus on <body> and no place in
+   * the page (WCAG 2.4.3). Focus goes back to the button the band belongs to —
+   * but only once that button is enabled again, since focusing a disabled
+   * element does nothing, and only if nothing else has claimed focus meanwhile.
+   */
+  useEffect(() => {
+    if (isGenerating || !focusOrphanedRef.current) return;
+    focusOrphanedRef.current = false;
+    if (document.activeElement === document.body) generateButtonRef.current?.focus();
+  }, [isGenerating, generateError]);
+
+  /**
+   * One entry point for both the form submit and the "try again" button in the
+   * error band, so a retry runs exactly the validation and the request the
+   * first attempt did — and so no branch can return without saying why.
+   *
+   * The user's input is never cleared on a failure path: the fields are reset
+   * only after a brief actually comes back, which is what makes retrying cheap.
+   */
+  const attemptGenerateBrief = async () => {
+    if (!partnerName.trim()) {
+      setGenerateError(t('generate.partnerRequired'));
+      return;
+    }
 
     // A half-filled date/time pair is rejected here rather than silently
     // dropped, and focus is moved to the field the user still has to fill.
@@ -110,6 +191,7 @@ export function MeetingBriefsClient({
       return;
     }
     setScheduleError(null);
+    setGenerateError(null);
 
     setIsGenerating(true);
     try {
@@ -124,27 +206,42 @@ export function MeetingBriefsClient({
         meetingScheduledTz: 'Europe/Brussels',
       });
 
-      if (res.brief) {
-        const newBrief: BriefItem = {
-          id: res.brief.id,
-          interactionId: res.brief.interactionId,
-          partnerName: res.brief.partnerName,
-          content: res.brief.content,
-          meetingScheduledAt: res.brief.meetingScheduledAt,
-          meetingScheduledTz: res.brief.meetingScheduledTz,
-          createdAt: res.brief.createdAt,
-        };
-        setBriefs((prev) => [newBrief, ...prev]);
-        setActiveBriefId(newBrief.id);
-        setPartnerName('');
-        setMeetingDate('');
-        setMeetingTime('');
+      if (!res.brief) {
+        // "Succeeded" with nothing to show: the action reports this when the
+        // brief was written but the DB row was not persisted. Reporting it as a
+        // failure is the honest reading — there is no brief on the screen.
+        console.error('[M9] generateMeetingBrief returned no brief:', res);
+        setGenerateError(t('generate.notSaved'));
+        return;
       }
+
+      const newBrief: BriefItem = {
+        id: res.brief.id,
+        interactionId: res.brief.interactionId,
+        partnerName: res.brief.partnerName,
+        content: res.brief.content,
+        meetingScheduledAt: res.brief.meetingScheduledAt,
+        meetingScheduledTz: res.brief.meetingScheduledTz,
+        createdAt: res.brief.createdAt,
+      };
+      setBriefs((prev) => [newBrief, ...prev]);
+      setActiveBriefId(newBrief.id);
+      setPartnerName('');
+      setMeetingDate('');
+      setMeetingTime('');
     } catch (err) {
+      // The raw reason stays in the console. On screen the user gets a sentence
+      // they can act on — never a stack trace or an HTTP status.
       console.error('Error generating brief:', err);
+      setGenerateError(t('generate.failed'));
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleGenerateBrief = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await attemptGenerateBrief();
   };
 
   const handleDownloadIcs = () => {
@@ -234,21 +331,12 @@ export function MeetingBriefsClient({
   return (
     <div className="space-y-6">
       {icsError && (
-        <div
-          role="alert"
-          data-testid="m9-ics-error"
-          className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800 flex items-start gap-2"
-        >
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>{icsError}</span>
-          <button
-            type="button"
-            onClick={() => setIcsError(null)}
-            className="ml-auto shrink-0 text-xs font-bold text-rose-700 hover:text-rose-900 underline underline-offset-2"
-          >
-            Kapat
-          </button>
-        </div>
+        <AlertBanner
+          testId="m9-ics-error"
+          message={icsError}
+          dismissLabel={t('alerts.dismiss')}
+          onDismiss={() => setIcsError(null)}
+        />
       )}
 
       {/* HEADER BANNER */}
@@ -391,9 +479,41 @@ export function MeetingBriefsClient({
             </div>
           )}
 
+          {/* The band sits with the control that raised it, right above the
+              button the user just pressed — not at the top of the page, where a
+              scrolled-down user would never see it. */}
+          {generateError && (
+            <AlertBanner
+              id="m9-generate-error"
+              testId="m9-generate-error"
+              message={generateError}
+              dismissLabel={t('alerts.dismiss')}
+              onDismiss={() => {
+                focusOrphanedRef.current = true;
+                setGenerateError(null);
+              }}
+              action={
+                <button
+                  type="button"
+                  onClick={() => {
+                    focusOrphanedRef.current = true;
+                    void attemptGenerateBrief();
+                  }}
+                  disabled={isGenerating}
+                  data-testid="m9-generate-retry"
+                  className="min-h-6 rounded-lg border border-rose-300 bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-900 transition hover:bg-rose-200 focus:outline-none focus:ring-2 focus:ring-rose-600 disabled:opacity-50"
+                >
+                  {t('generate.retry')}
+                </button>
+              }
+            />
+          )}
+
           <button
+            ref={generateButtonRef}
             type="submit"
             disabled={isGenerating}
+            aria-describedby={generateError ? 'm9-generate-error' : undefined}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-5 rounded-xl transition text-xs shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isGenerating ? (

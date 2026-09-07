@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+
+import trMessages from '../messages/tr.json';
 
 /**
  * M9 briefs form — the two silent-failure surfaces from the dogfood pass.
@@ -11,6 +14,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
  * P3-14: the only error the screen could raise came out of `window.alert()` —
  *       outside the design system, untranslatable, and unreachable because the
  *       control that raises it used to be hidden in exactly that case.
+ * TASK-MTQURC2H4E0WF: brief generation failed in silence — a thrown action went
+ *       to `console.error` and an empty `res.brief` went nowhere, so the user
+ *       pressed the button, watched the spinner, and was told nothing.
  *
  * The server action is mocked: what is under test is what the client does with
  * the user's input before and after the call, not the action itself.
@@ -37,17 +43,26 @@ const DATED_BRIEF: BriefItem = {
 
 const UNDATED_BRIEF: BriefItem = { ...DATED_BRIEF, id: 'brief-2', meetingScheduledAt: null };
 
+/**
+ * The real Turkish catalogue, not a stub: an assertion below reads the message
+ * out of it, so a key that goes missing fails here instead of shipping as a
+ * blank error band.
+ */
 function renderClient(briefs: BriefItem[] = []) {
   return render(
-    <MeetingBriefsClient
-      opportunityId="demo-opp-1"
-      locale="tr"
-      workspace="fabrika-beta"
-      opportunityTitle="District renovation pilot — İzmir"
-      briefs={briefs}
-    />,
+    <NextIntlClientProvider locale="tr" messages={trMessages} timeZone="Europe/Istanbul">
+      <MeetingBriefsClient
+        opportunityId="demo-opp-1"
+        locale="tr"
+        workspace="fabrika-beta"
+        opportunityTitle="District renovation pilot — İzmir"
+        briefs={briefs}
+      />
+    </NextIntlClientProvider>,
   );
 }
+
+const m9 = trMessages.m9;
 
 const dateInput = () => screen.getByTestId('m9-meeting-date') as HTMLInputElement;
 const timeInput = () => screen.getByTestId('m9-meeting-time') as HTMLInputElement;
@@ -57,8 +72,9 @@ const submit = () => screen.getByRole('button', { name: /Yapay Zeka Brief Oluşt
  * The partner name is required before the form will do anything at all, so
  * every schedule case fills it first — the schedule rule is what is under test.
  */
+const nameInput = () => screen.getByPlaceholderText(/Ortak \/ Kurum Adı/) as HTMLInputElement;
 const fillName = (value = 'Fraunhofer Institute') =>
-  fireEvent.change(screen.getByPlaceholderText(/Ortak \/ Kurum Adı/), { target: { value } });
+  fireEvent.change(nameInput(), { target: { value } });
 
 let alertSpy: ReturnType<typeof vi.spyOn>;
 
@@ -175,5 +191,132 @@ describe('P3-14 — the calendar failure is an inline alert, not window.alert', 
     expect(click).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId('m9-ics-error')).toBeNull();
     click.mockRestore();
+  });
+});
+
+describe('TASK-MTQURC2H4E0WF — brief generation never fails in silence', () => {
+  it('reports a thrown action in the band instead of only the console', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    generateMeetingBrief.mockRejectedValue(new Error('PrismaClientKnownRequestError: P2002'));
+
+    renderClient();
+    fillName();
+    fireEvent.change(dateInput(), { target: { value: '2026-10-24' } });
+    fireEvent.change(timeInput(), { target: { value: '14:00' } });
+    fireEvent.click(submit());
+
+    const band = await screen.findByTestId('m9-generate-error');
+    expect(band).toHaveProperty('role', 'alert');
+    expect(band.textContent).toContain(m9.generate.failed);
+
+    // The raw reason stays in the console; none of it reaches the screen.
+    expect(band.textContent).not.toContain('Prisma');
+    expect(band.textContent).not.toContain('P2002');
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('reports a "successful" call that came back with no brief', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // What the action actually returns when the DB write fails.
+    generateMeetingBrief.mockResolvedValue({
+      success: false,
+      brief: null,
+      error: 'BRIEF_NOT_PERSISTED',
+    });
+
+    renderClient();
+    fillName();
+    fireEvent.click(submit());
+
+    const band = await screen.findByTestId('m9-generate-error');
+    expect(band.textContent).toContain(m9.generate.notSaved);
+    // The internal code is not a user-facing message.
+    expect(band.textContent).not.toContain('BRIEF_NOT_PERSISTED');
+    consoleError.mockRestore();
+  });
+
+  it('keeps what the user typed and lets them retry from the band', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    generateMeetingBrief.mockRejectedValueOnce(new Error('network down'));
+
+    renderClient();
+    fillName();
+    fireEvent.change(dateInput(), { target: { value: '2026-10-24' } });
+    fireEvent.change(timeInput(), { target: { value: '14:00' } });
+    fireEvent.click(submit());
+
+    await screen.findByTestId('m9-generate-error');
+
+    // Nothing the user typed was thrown away by the failure.
+    expect(nameInput().value).toBe('Fraunhofer Institute');
+    expect(dateInput().value).toBe('2026-10-24');
+    expect(timeInput().value).toBe('14:00');
+    // The band points at the button that just failed, for a keyboard user who
+    // tabs back to it.
+    expect(submit().getAttribute('aria-describedby')).toBe('m9-generate-error');
+
+    // Retrying sends the same payload again — the user does not retype it.
+    generateMeetingBrief.mockResolvedValueOnce({
+      success: true,
+      brief: {
+        id: 'brief-new',
+        interactionId: 'int-new',
+        partnerName: 'Fraunhofer Institute',
+        content: '### 1. Partner Background\n- Retried body.',
+        meetingScheduledAt: '2026-10-24T12:00:00.000Z',
+        meetingScheduledTz: 'Europe/Brussels',
+        createdAt: '2026-09-07T09:00:00.000Z',
+      },
+    });
+    fireEvent.click(screen.getByTestId('m9-generate-retry'));
+
+    await waitFor(() => expect(screen.queryByTestId('m9-generate-error')).toBeNull());
+    expect(generateMeetingBrief).toHaveBeenCalledTimes(2);
+    expect(generateMeetingBrief.mock.calls[1]![0]).toMatchObject({
+      partnerName: 'Fraunhofer Institute',
+    });
+    // Only a brief that actually came back clears the form.
+    expect(nameInput().value).toBe('');
+    expect(screen.getAllByText(/Retried body/).length).toBeGreaterThan(0);
+    consoleError.mockRestore();
+  });
+
+  it('closes the last silent branch: retry with an emptied name says why', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    generateMeetingBrief.mockRejectedValueOnce(new Error('network down'));
+
+    renderClient();
+    fillName();
+    fireEvent.click(submit());
+    await screen.findByTestId('m9-generate-error');
+
+    fireEvent.change(nameInput(), { target: { value: '  ' } });
+    fireEvent.click(screen.getByTestId('m9-generate-retry'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('m9-generate-error').textContent).toContain(
+        m9.generate.partnerRequired,
+      ),
+    );
+    // No second request went out for an input that cannot produce a brief.
+    expect(generateMeetingBrief).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
+  });
+
+  it('is dismissible, like the calendar band — one error surface, one behaviour', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    generateMeetingBrief.mockRejectedValue(new Error('boom'));
+
+    renderClient();
+    fillName();
+    fireEvent.click(submit());
+    await screen.findByTestId('m9-generate-error');
+
+    fireEvent.click(
+      screen.getByTestId('m9-generate-error').querySelector('button:last-of-type')!,
+    );
+    expect(screen.queryByTestId('m9-generate-error')).toBeNull();
+    consoleError.mockRestore();
   });
 });
