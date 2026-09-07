@@ -37,6 +37,13 @@ const envSchema = z.object({
   IYZICO_SECRET_KEY: z.string().optional(),
   /** Defaults to the sandbox host; set to https://api.iyzipay.com only for live. */
   IYZICO_BASE_URL: optionalUrl,
+  /**
+   * Which early-bird discount tier billing runs under — a code from
+   * `DISCOUNT_TIERS` in src/lib/billing/catalog.ts, or `NONE` for list price.
+   * Unset = the advertised default tier. The discount rate is a server setting;
+   * it is never taken from the browser.
+   */
+  BILLING_ACTIVE_TIER: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);

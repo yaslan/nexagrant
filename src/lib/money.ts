@@ -79,3 +79,29 @@ export function toDecimalString(amountMinor: number, currency: string): string {
 export function sameAmount(a: MoneyAmount, b: MoneyAmount): boolean {
   return a.amountMinor === b.amountMinor && a.currency.toUpperCase() === b.currency.toUpperCase();
 }
+
+/**
+ * Takes a whole-percent discount off a minor-unit amount, in integer
+ * arithmetic, rounding half-up on the resulting cent.
+ *
+ * Kept here rather than in the billing catalogue because it is the arithmetic
+ * every discounted price in the product goes through (CLAUDE.md rule 9), and
+ * because `amountMinor * (100 - percentOff)` is exact for integer inputs where
+ * `amountMinor * 0.3` is not.
+ */
+export function applyPercentDiscount(amountMinor: number, percentOff: number): number {
+  if (!Number.isInteger(amountMinor)) {
+    throw new Error(`Minor-unit amounts must be integers, got ${amountMinor}`);
+  }
+  if (!Number.isInteger(percentOff) || percentOff < 0 || percentOff > 100) {
+    throw new Error(`Discount must be a whole percent between 0 and 100, got ${percentOff}`);
+  }
+  if (amountMinor < 0) {
+    throw new Error(`Cannot discount a negative amount: ${amountMinor}`);
+  }
+  const numerator = amountMinor * (100 - percentOff);
+  if (!Number.isSafeInteger(numerator)) {
+    throw new Error(`Amount out of safe integer range: ${amountMinor}`);
+  }
+  return Math.floor(numerator / 100 + 0.5);
+}

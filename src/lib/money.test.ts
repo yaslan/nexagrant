@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { currencyExponent, sameAmount, toDecimalString, toMinorUnits } from './money';
+import { applyPercentDiscount, currencyExponent, sameAmount, toDecimalString, toMinorUnits } from './money';
 
 describe('toMinorUnits', () => {
   it('parses provider decimal strings', () => {
@@ -52,5 +52,28 @@ describe('sameAmount', () => {
   it('compares value and currency', () => {
     expect(sameAmount({ amountMinor: 100, currency: 'try' }, { amountMinor: 100, currency: 'TRY' })).toBe(true);
     expect(sameAmount({ amountMinor: 100, currency: 'TRY' }, { amountMinor: 100, currency: 'EUR' })).toBe(false);
+  });
+});
+
+describe('applyPercentDiscount', () => {
+  it('takes a whole percent off in integer arithmetic', () => {
+    expect(applyPercentDiscount(8_700, 70)).toBe(2_610);
+    expect(applyPercentDiscount(38_700, 70)).toBe(11_610);
+    expect(applyPercentDiscount(257_600, 50)).toBe(128_800);
+    expect(applyPercentDiscount(4_500, 0)).toBe(4_500);
+    expect(applyPercentDiscount(4_500, 100)).toBe(0);
+  });
+
+  it('rounds the resulting cent half-up', () => {
+    expect(applyPercentDiscount(3_225, 70)).toBe(968); // 967.5
+    expect(applyPercentDiscount(3_223, 70)).toBe(967); // 966.9
+  });
+
+  it('refuses inputs that would produce a wrong charge silently', () => {
+    expect(() => applyPercentDiscount(45.5, 10)).toThrow();
+    expect(() => applyPercentDiscount(4_500, 10.5)).toThrow();
+    expect(() => applyPercentDiscount(4_500, 101)).toThrow();
+    expect(() => applyPercentDiscount(4_500, -1)).toThrow();
+    expect(() => applyPercentDiscount(-4_500, 10)).toThrow();
   });
 });
