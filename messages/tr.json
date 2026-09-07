@@ -201,6 +201,13 @@
       "noMatch": "Aramanızla eşleşen kanıt yok.",
       "loadFailed": "Kanıtlar yüklenemedi. Sayfayı yenileyip tekrar deneyin.",
       "loading": "Kanıtlar yükleniyor…"
+    },
+    "badge": {
+      "expired": "Süresi Dolmuş",
+      "rejected": "Reddedildi",
+      "unverified": "Doğrulanmamış",
+      "valid": "Geçerli",
+      "daysLeft": "{days} Gün Kaldı"
     }
   },
   "ConceptNote": {

@@ -1,3 +1,5 @@
+import { evidenceBadge } from './evidence-status';
+
 export interface HealthScoreResult {
   score: number;
   grade: 'A+' | 'A' | 'B' | 'C' | 'F';
@@ -16,7 +18,7 @@ export interface MinimalEvidenceItem {
   category?: string;
   status?: string;
   validUntil?: Date | string | null;
-  title: string;
+  title?: string;
 }
 
 const CORE_DOC_TYPES = [
@@ -47,27 +49,26 @@ export function calculateEvidenceHealthScore(items: MinimalEvidenceItem[]): Heal
   }
 
   const now = new Date();
-  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
 
   let validCount = 0;
   let expiringCount = 0;
   let expiredCount = 0;
 
+  // One rule for the badge and for this score, so the header cannot say "1 valid
+  // document" about a row the list badges as unverified.
   items.forEach(item => {
-    if (!item.validUntil) {
-      validCount++;
-      return;
-    }
+    const badge = evidenceBadge(item, now);
 
-    const expiry = new Date(item.validUntil);
-    if (expiry < now) {
+    if (badge.kind === 'EXPIRED') {
       expiredCount++;
-    } else if (expiry <= thirtyDaysFromNow) {
+    } else if (badge.kind === 'EXPIRING_SOON') {
       expiringCount++;
       validCount++;
-    } else {
+    } else if (badge.kind === 'VALID') {
       validCount++;
     }
+    // UNVERIFIED and REJECTED count towards nothing. A document nobody has checked is
+    // not readiness, and reporting it as such is what CLAUDE.md §7 forbids.
   });
 
   // Check core document presence

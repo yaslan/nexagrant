@@ -201,6 +201,13 @@
       "noMatch": "No evidence matches your search.",
       "loadFailed": "Evidence could not be loaded. Refresh the page and try again.",
       "loading": "Loading evidence…"
+    },
+    "badge": {
+      "expired": "Expired",
+      "rejected": "Rejected",
+      "unverified": "Unverified",
+      "valid": "Valid",
+      "daysLeft": "{days} Days Left"
     }
   },
   "ConceptNote": {

@@ -8,6 +8,7 @@ import {
   deleteEvidence,
 } from './actions';
 import { calculateEvidenceHealthScore, HealthScoreResult } from '@/lib/evidence-health';
+import { evidenceBadge } from '@/lib/evidence-status';
 import {
   ShieldCheck,
   Upload,
@@ -18,6 +19,7 @@ import {
   Download,
   Trash2,
   FileText,
+  HelpCircle,
   ExternalLink,
   Eye,
 } from 'lucide-react';
@@ -112,37 +114,54 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
     return matchesCategory && matchesStatus && matchesSearch;
   });
 
+  // The rule lives in evidenceBadge() (src/lib/evidence-status.ts) and is unit tested
+  // there; this only paints the answer. The green badge is reachable only for a record
+  // whose status column says verification passed — an unchecked document is labelled
+  // as unchecked rather than shown with a tick.
   const getStatusBadge = (status?: string, validUntil?: Date | string | null) => {
-    if (status === 'EXPIRED' || (validUntil && new Date(validUntil) < new Date())) {
-      return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-bad/15 text-bad border border-bad/30 px-2 py-0.5 rounded-full">
-          <AlertTriangle className="w-3 h-3" />
-          <span>{isTr ? 'Süresi Dolmuş' : 'Expired'}</span>
-        </span>
-      );
-    }
+    const badge = evidenceBadge({ status, validUntil });
 
-    if (validUntil) {
-      const daysLeft = Math.ceil((new Date(validUntil).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
-      if (daysLeft > 0 && daysLeft <= 30) {
+    switch (badge.kind) {
+      case 'EXPIRED':
         return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber/15 text-amber border border-amber/30 px-2 py-0.5 rounded-full">
-            <Clock className="w-3 h-3" />
-            <span>{isTr ? `${daysLeft} Gün Kaldı` : `${daysLeft} Days Left`}</span>
+          <span data-testid="evidence-badge" data-badge-kind={badge.kind} className="inline-flex items-center gap-1 text-[10px] font-bold bg-bad/15 text-bad border border-bad/30 px-2 py-0.5 rounded-full">
+            <AlertTriangle className="w-3 h-3" />
+            <span>{t('badge.expired')}</span>
           </span>
         );
-      }
-    }
 
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-        <CheckCircle2 className="w-3 h-3" />
-        {/* "Geçerli", not "Doğrulanmış Geçerli". This badge is computed from the
-            expiry date alone — nothing verifies the document — and the Turkish label
-            was the only one of the two claiming it had been verified. */}
-        <span>{isTr ? 'Geçerli' : 'Valid'}</span>
-      </span>
-    );
+      case 'REJECTED':
+        return (
+          <span data-testid="evidence-badge" data-badge-kind={badge.kind} className="inline-flex items-center gap-1 text-[10px] font-bold bg-bad/15 text-bad border border-bad/30 px-2 py-0.5 rounded-full">
+            <AlertTriangle className="w-3 h-3" />
+            <span>{t('badge.rejected')}</span>
+          </span>
+        );
+
+      case 'UNVERIFIED':
+        return (
+          <span data-testid="evidence-badge" data-badge-kind={badge.kind} className="inline-flex items-center gap-1 text-[10px] font-bold bg-muted/15 text-muted border border-border px-2 py-0.5 rounded-full">
+            <HelpCircle className="w-3 h-3" />
+            <span>{t('badge.unverified')}</span>
+          </span>
+        );
+
+      case 'EXPIRING_SOON':
+        return (
+          <span data-testid="evidence-badge" data-badge-kind={badge.kind} className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber/15 text-amber border border-amber/30 px-2 py-0.5 rounded-full">
+            <Clock className="w-3 h-3" />
+            <span>{t('badge.daysLeft', { days: badge.daysLeft ?? 0 })}</span>
+          </span>
+        );
+
+      default:
+        return (
+          <span data-testid="evidence-badge" data-badge-kind={badge.kind} className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+            <CheckCircle2 className="w-3 h-3" />
+            <span>{t('badge.valid')}</span>
+          </span>
+        );
+    }
   };
 
   const handlePresignedUploadSubmit = async (e: React.FormEvent) => {
@@ -221,7 +240,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
   const exportCSV = () => {
     const header = "ID,Title,Category,IssuingAuthority,ValidUntil,Status,FileUrl\n";
     const rows = filteredItems.map(i => 
-      `${i.id},"${i.title.replace(/"/g, '""')}",${i.category || i.kind || ''},"${i.issuingAuthority || ''}",${i.validUntil || ''},${i.status || 'VALID'},"${i.fileUrl || ''}"`
+      `${i.id},"${i.title.replace(/"/g, '""')}",${i.category || i.kind || ''},"${i.issuingAuthority || ''}",${i.validUntil || ''},${i.status || 'UNVERIFIED'},"${i.fileUrl || ''}"`
     ).join('\n');
     
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
