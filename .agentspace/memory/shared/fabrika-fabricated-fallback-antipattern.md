@@ -76,3 +76,19 @@ Fallback sökerken üç şey:
 3. **Tahmini varsayılan de bir uydurmadır.** `deadlineTz` yoksa "Europe/Brussels" yazmak son
    tarihi bir saat kaydırır; `null` döndür (bkz. [[fabrika-absence-is-not-zero]]).
 
+Faturalandırma panelinde bulunan iki örnek (TASK-MTRD91ZLKEQ3A'de temizlendi, 2026-09-07):
+- `settings/billing/BillingClient.tsx`: `DEMO_INVOICES` sabiti — `GIB202600000001` /
+  `…014` GİB fatura numaraları, emekli "Team Plan" adı, ₺32.220 ve ₺10.740, üstünde
+  sabit "Demo Ar-Ge ve Danışmanlık Ltd. Şti." unvanı ve **VKN 2840958172**. "Demo örnek"
+  etiketi vardı ama sütun başlığı "GİB fatura no" diyordu. Gerçek `Invoice` tablosuna
+  bağlandı; kayıt yoksa boş durum.
+- `settings/billing/page.tsx`: entitlement sorgusu patlarsa
+  `{seats: 6, workspaces: 5, aiCreditsMonthly: 1000}` — hiçbir planın satmadığı bir
+  kapasite — ve `tenantName = 'FonBridge Demo Kuruluşu'` (başkasının kuruluş adı).
+  Yedek nesne silindi; okunamayan alan `null` ve UI "—" + "ölçülmedi" gösteriyor.
+
+**Desenin genel kuralı:** yedek değer *gerçekten* okunamadığını söylemelidir. `?? 0` da
+uydurmadır — müşteri onu "kalan kredin 0" diye okur. Ayrıca "bu kiracının kaydı yok" ile
+"okuyamadım" birbirinden ayrı iki durumdur; ikincisini boşluk olarak göstermek de yalandır
+(panelde `invoicesMeasured` bayrağı bunun için var).
+
