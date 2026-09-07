@@ -41,6 +41,23 @@ checkI18n();
 const nextConfig: NextConfig = {
   output: 'standalone',
   serverExternalPackages: ['pg', 'pdf-parse', 'inngest'],
+  /**
+   * Hosts `next/image` is allowed to optimise from.
+   *
+   * ca73ced migrated 16 `<img>` elements to `next/image` to clear the `no-img-element` lint
+   * warnings, but the blog's images are remote (`src/lib/blog.ts` and the admin blog form both
+   * carry `images.unsplash.com` URLs) and `next/image` refuses an unlisted host by throwing.
+   * The result was a 500 on `/tr`, `/en` and `/tr/blog` — the public landing page — and, because
+   * Playwright's `webServer.url` probe never saw a status below 400, `pnpm test:e2e` could not
+   * start either. Measured and recorded in
+   * docs/agent-results/TASK-MTQ63RR8Z0G8E-blok-zincir-denet-i-2.md.
+   *
+   * Listed host by host on purpose: a wildcard would let any URL pasted into the blog admin form
+   * run through the image optimiser.
+   */
+  images: {
+    remotePatterns: [{ protocol: 'https', hostname: 'images.unsplash.com' }],
+  },
   async redirects() {
     return [
       // ─── Migrate locale-less marketing pages to [locale] ───

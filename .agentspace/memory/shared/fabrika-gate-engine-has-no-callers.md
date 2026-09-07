@@ -1,6 +1,6 @@
 ---
 name: fabrika-gate-engine-has-no-callers
-description: ÇÖZÜLDÜ (2026-09-07, TASK-MTQW4FY5E9UBK) — evaluateGate() artık pipeline detay sayfasından çağrılıyor; engine hâlâ kiracı filtresiz okuduğu için her ÇAĞIRAN sahipliği kendisi doğrulamak zorunda
+description: ÇÖZÜLDÜ (2026-09-07) — evaluateGate() pipeline detay sayfasındaki düğmeden çağrılıyor ve gerçek tıklamayla e2e'de doğrulandı; engine'in tenant filtresi de artık içeride (eski 'filtresiz okuyor' uyarısı geçersiz)
 metadata:
   type: project
   updatedAt: 2026-09-07
@@ -11,11 +11,15 @@ metadata:
 > `pipeline/[id]/client.tsx`'teki düğme bunu tetikliyor, iki `alert()` gitti. Gerçek tıklamayla
 > yazılan `GateDecision` satırları artık `decidedBy = demo-user-alice` (script değil).
 >
-> **KALICI OLAN kısım:** `src/lib/gates/evaluate.ts` fırsatı hâlâ `findUnique({where:{id}})` ile,
-> yani **tenant filtresi olmadan** okuyor ve `GateDecision`'ı kendisine verilen `tenantId` ile
-> yazıyor. Bu yüzden HER çağıran, çağırmadan önce `withTenant` içinde sahipliği doğrulamak
-> zorunda (bkz. `evaluateOpportunityGate`). Engine'e ikinci bir çağıran eklemeden önce ya aynı
-> kontrolü kopyala ya da filtreyi engine'in içine taşı.
+> **DÜZELTME (2026-09-07 22:20, blok-zincir-denet-i — ölçüldü, kod okundu):** Aşağıdaki
+> "tenant filtresi yok" uyarısı ARTIK GEÇERSİZ. `evaluate.ts:58` gövdeyi `withTenant(tenantId, …)`
+> içine alıyor ve `evaluate.ts:75` fırsatı `findFirst({ where: { id: opportunityId, tenantId } })`
+> ile, ilişkileri de (`seats`, `evaluations`) kendi `tenantId`'leriyle okuyor. Çağıranın sahiplik
+> kontrolü ikinci katman olarak duruyor, tek koruma değil. Buna göre davranmadan önce dosyayı
+> yine de aç — bu satır da eskiyebilir.
+>
+> _(tarihsel)_ `src/lib/gates/evaluate.ts` fırsatı `findUnique({where:{id}})` ile, yani tenant
+> filtresi olmadan okuyordu; o dönemde HER çağıran sahipliği kendisi doğrulamak zorundaydı.
 
 2026-09-07 dogfood'unda (TASK-MTQUY6BHOGO66) ölçüldü:
 
@@ -50,4 +54,9 @@ mi yoksa **kullanıcı yolu** mu olduğuna bak. Bir fonksiyonu script'ten çağ�
 demek değildir. İki adımlık kontrol: (1) `grep -rn "<fn>" src` ile uygulama kodunda çağıran ara —
 yoksa iddia yanlıştır; (2) gerçek tıklamayla o yolu yürü. Kart: TASK-MTQW4FY5E9UBK.
 
-İlgili: [[fabrika-done-reports-can-be-wrong]] · [[fabrika-g0-scoring-three-implementations]]
+2026-09-07 22:30 — düğme **gerçek tarayıcıda tıklandı** (`tests/e2e/g0-computed-score.spec.ts`):
+kapı çalıştı, `GateDecision` yazıldı ve `inputs.calculatedG0Score` = ekrandaki 44.9 çıktı. Yani
+"kullanıcı yolundan sıfır kayıt" durumu da kapandı; artık regresyon testi var.
+
+İlgili: [[fabrika-done-reports-can-be-wrong]] · [[fabrika-g0-scoring-three-implementations]] ·
+[[fabrika-check-every-surface-not-the-fix]]

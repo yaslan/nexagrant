@@ -1,6 +1,6 @@
 ---
 name: fabrika-e2e-blocked-by-landing-page-500
-description: Ana sayfa (/tr) 500 verdiği sürece pnpm test:e2e HİÇBİR testi koşturamaz — Playwright webServer yoklaması / adresine gider; çözüm E2E_BASE_URL'i giriş sayfasına almak
+description: KÖK NEDEN GİDERİLDİ (2026-09-07 22:29, next.config.ts images.remotePatterns) — ama kalıp kalıcı: ana sayfa 500 verdiği sürece pnpm test:e2e HİÇBİR testi koşturamaz, e2e koşmuyorsa önce /tr'yi curl'le
 metadata:
   type: project
 updatedAt: 2026-09-07
@@ -61,5 +61,28 @@ Paylaşılan dev sunucusunu keyfî öldürme (başka bir ajanın doğrulaması s
 `curl /logo.png` ile ayakta mı bak, ayaktaysa `E2E_PORT` ile ona bağlan. Repo config'ini
 düzeltmek doğru kalıcı çözüm ama o `next.config.ts` sahibinin işi — kendi görevinin kapsamı
 değilse rapora yaz, dokunma.
+
+## KÖK NEDEN GİDERİLDİ — 2026-09-07 22:29 (blok-zincir-denet-i, TASK-MTQ63RR8Z0G8E)
+
+Yukarıdaki geçici çözümlere **artık gerek yok**: `next.config.ts` içine `images.remotePatterns`
+eklendi (`https://images.unsplash.com`, joker değil host host — admin blog formuna yapıştırılan
+rastgele URL image optimizer'dan geçmesin).
+
+Aynı komutla doğrulandı:
+
+```
+düzeltme öncesi        düzeltme sonrası
+500  /tr               200  /tr
+500  /en               200  /en
+500  /tr/blog          200  /tr/blog
+```
+
+`npx playwright test tests/e2e/<spec>.spec.ts` artık **override'sız, `E2E_BASE_URL`'siz**
+çalışıyor ve çalışan dev sunucusunu yeniden kullanıyor.
+
+**Kalıcı olan ders (bu kısım eskimez):** e2e hiç başlamıyorsa ve hata porttan bahsediyorsa,
+teşhise `curl -s -o /dev/null -w "%{http_code}" localhost:<port>/tr` ile başla. Ayrıca:
+bir lint uyarısını temizleyen değişiklik (burada `no-img-element` → `next/image`) yapılandırma
+gerektirebilir; "0 uyarı" tek başına kanıt değildir, sayfanın gerçekten açıldığını gör.
 
 İlgili: [[fabrika-agents-share-one-working-tree]], [[fabrika-e2e-own-fixture-hides-route-bugs]]

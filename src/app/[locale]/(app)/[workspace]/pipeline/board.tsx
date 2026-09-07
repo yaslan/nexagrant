@@ -36,12 +36,12 @@ const nextToastId = () => (toastSequence += 1);
 /** The intended-role filter above the board; matches the <option> values. */
 type RoleFilter = 'all' | 'coordinator' | 'partner';
 
-const GATES: { key: Gate; title: string; subtitle: string; color: string }[] = [
-  { key: 'G0', title: 'G0: Triage & Fizibilite', subtitle: 'Stratejik Uygunluk & Filtre', color: 'border-t-blue-500' },
-  { key: 'G1', title: 'G1: Konsept & Taslak', subtitle: 'Konsept Notu & Mimari', color: 'border-t-teal-500' },
-  { key: 'G2', title: 'G2: Konsorsiyum & Ortaklar', subtitle: 'Partner Eşleştirme & Bütçe', color: 'border-t-purple-500' },
-  { key: 'G3', title: 'G3: Tam Başvuru & İnceleme', subtitle: 'Part A & B / Hakem Simülasyonu', color: 'border-t-amber-500' },
-  { key: 'G4', title: 'G4: Son Onay & Teslim', subtitle: 'AB Portalına Teslim & Onay', color: 'border-t-emerald-500' },
+const GATES: { key: Gate; subtitle: string; color: string }[] = [
+  { key: 'G0', subtitle: 'Stratejik Uygunluk & Filtre', color: 'border-t-blue-500' },
+  { key: 'G1', subtitle: 'Konsept Notu & Mimari', color: 'border-t-teal-500' },
+  { key: 'G2', subtitle: 'Partner Eşleştirme & Bütçe', color: 'border-t-purple-500' },
+  { key: 'G3', subtitle: 'Part A & B / Hakem Simülasyonu', color: 'border-t-amber-500' },
+  { key: 'G4', subtitle: 'AB Portalına Teslim & Onay', color: 'border-t-emerald-500' },
 ];
 
 export default function KanbanBoard({
@@ -295,7 +295,7 @@ export default function KanbanBoard({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="pipeline-board">
       {/* Toast */}
       {toast && (
         <div className="fixed top-5 right-5 z-50 animate-in slide-in-from-top-2">
@@ -392,7 +392,7 @@ export default function KanbanBoard({
 
       {/* Kanban Board Column Container */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto pb-6 min-h-[calc(100vh-280px)]">
-        {GATES.map(({ key, title, subtitle, color }) => {
+        {GATES.map(({ key, subtitle, color }) => {
           const stageOpps = filteredOpps.filter((o) => o.stage === key);
 
           return (
