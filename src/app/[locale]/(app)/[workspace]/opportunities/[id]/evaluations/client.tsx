@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { 
   Award, 
   Bot, 
@@ -44,6 +44,7 @@ export function EvaluationsClient({
   evaluations: initialEvaluations,
 }: EvaluationsClientProps) {
   const t = useTranslations('m6');
+  const locale = useLocale();
   const [evaluations, setEvaluations] = useState<EvaluationItem[]>(initialEvaluations);
   const [activeTab, setActiveTab] = useState<'evaluations' | 'rea' | 'calibration'>('evaluations');
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -220,13 +221,16 @@ export function EvaluationsClient({
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-blue-400 font-semibold tracking-wider uppercase mb-1">
               <Award className="w-4 h-4 text-blue-400" />
-              <span>Modül 6 — Evaluator Lens</span>
+              <span>{t('moduleLabel')}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-white">
               {t('lensTitle')}
             </h1>
             <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl">
-              Fırsat: <strong className="text-slate-200">{opportunityTitle}</strong>
+              {t.rich('opportunityLabel', {
+                title: opportunityTitle,
+                strong: (chunks) => <strong className="text-slate-200">{chunks}</strong>,
+              })}
             </p>
           </div>
 
@@ -247,31 +251,34 @@ export function EvaluationsClient({
         {/* Top Metric Cards Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800 text-xs">
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Ortalama Tahmin Puanı</span>
+            <span className="text-muted block text-[11px]">{t('metrics.avgScore')}</span>
             <span className="text-xl font-bold text-white font-mono mt-0.5 block">
-              {avgTotalScore} <span className="text-xs text-muted">/ 15.0</span>
+              {avgTotalScore} <span className="text-xs text-muted">{t('metrics.outOf15')}</span>
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Değerlendirici Sayısı</span>
+            <span className="text-muted block text-[11px]">{t('metrics.evaluatorCount')}</span>
             <span className="text-xl font-bold text-white font-mono mt-0.5 block">
-              {evaluations.length} <span className="text-xs text-muted">({humanCount} İnsan, {aiCount} YZ)</span>
+              {evaluations.length}{' '}
+              <span className="text-xs text-muted">
+                {t('metrics.evaluatorBreakdown', { human: humanCount, ai: aiCount })}
+              </span>
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">G3 Kapısı Durumu</span>
+            <span className="text-muted block text-[11px]">{t('metrics.g3GateStatus')}</span>
             <span className={`text-sm font-bold font-mono mt-1 flex items-center gap-1.5 ${passesG3Gate ? 'text-emerald-400' : 'text-amber-400'}`}>
               {passesG3Gate ? (
                 <>
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  G3 Hazır (Geçti)
+                  {t('metrics.g3Ready')}
                 </>
               ) : (
                 <>
                   <AlertTriangle className="w-4 h-4 text-amber-400" />
-                  Eksik Değerlendirme
+                  {t('metrics.g3Incomplete')}
                 </>
               )}
             </span>
@@ -279,15 +286,15 @@ export function EvaluationsClient({
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 flex items-center justify-between">
             <div>
-              <span className="text-muted block text-[11px]">IA Etki Çarpanı (1.5x)</span>
+              <span className="text-muted block text-[11px]">{t('metrics.iaMultiplierLabel')}</span>
               <span className="text-xs font-bold text-blue-300 mt-0.5 block">
-                {isInnovationAction ? 'Aktif (Impact ×1.5)' : 'Pasif (Standart)'}
+                {isInnovationAction ? t('metrics.iaActive') : t('metrics.iaInactive')}
               </span>
             </div>
             <button
               onClick={() => setIsInnovationAction(!isInnovationAction)}
               className={`p-1.5 rounded-lg border transition ${isInnovationAction ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-700 text-slate-300 border-slate-600'}`}
-              title="Innovation Action (IA) için Etki puanına 1.5 katsayısı uygula"
+              title={t('metrics.iaToggleTitle')}
             >
               <Sliders className="w-4 h-4" />
             </button>
@@ -306,7 +313,7 @@ export function EvaluationsClient({
           }`}
         >
           <Scale className="w-4 h-4" />
-          <span>Değerlendirmeler & Puan Kartları</span>
+          <span>{t('tabs.evaluations')}</span>
           <span className="bg-slate-200 text-ink-2 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
             {evaluations.length}
           </span>
@@ -321,9 +328,9 @@ export function EvaluationsClient({
           }`}
         >
           <FileCheck className="w-4 h-4" />
-          <span>REA Sık Hatalar Kontrolü</span>
+          <span>{t('tabs.rea')}</span>
           <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
-            Checklist
+            {t('tabs.reaBadge')}
           </span>
         </button>
 
@@ -336,7 +343,7 @@ export function EvaluationsClient({
           }`}
         >
           <RotateCcw className="w-4 h-4" />
-          <span>ESR Kalibrasyonu</span>
+          <span>{t('tabs.calibration')}</span>
         </button>
       </div>
 
@@ -353,12 +360,12 @@ export function EvaluationsClient({
                     <Bot className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-white">YZ Hakem Simülasyonu</h3>
-                    <p className="text-[11px] text-slate-300">Resmî Horizon Europe REA promptu</p>
+                    <h3 className="font-bold text-sm text-white">{t('ai.title')}</h3>
+                    <p className="text-[11px] text-slate-300">{t('ai.subtitle')}</p>
                   </div>
                 </div>
                 <span className="text-[11px] font-mono font-bold bg-indigo-950 text-indigo-300 border border-indigo-700 px-2 py-0.5 rounded-full">
-                  3 Kredi
+                  {t('ai.creditBadge', { count: 3 })}
                 </span>
               </div>
 
@@ -370,19 +377,19 @@ export function EvaluationsClient({
                 {isAiLoading ? (
                   <>
                     <Zap className="w-4 h-4 animate-spin" />
-                    <span>YZ Değerlendiriyor (Analiz Yapılıyor)...</span>
+                    <span>{t('ai.loading')}</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>Yapay Zeka Değerlendirmesi Başlat</span>
+                    <span>{t('ai.startButton')}</span>
                   </>
                 )}
               </button>
 
               <div className="text-[11px] text-muted flex items-center gap-1.5 pt-1">
                 <Info className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span>Excellence, Impact ve Implementation detaylı tespiti ve zayıf yön analizi üretir.</span>
+                <span>{t('ai.description')}</span>
               </div>
             </div>
 
@@ -390,14 +397,14 @@ export function EvaluationsClient({
             <div className="bg-surface rounded-2xl p-5 border border-border shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b pb-3">
                 <UserCheck className="w-4 h-4 text-blue-600" />
-                <h3 className="font-bold text-sm text-ink">İnsan Uzman Değerlendirmesi Ekle</h3>
+                <h3 className="font-bold text-sm text-ink">{t('human.title')}</h3>
               </div>
 
               <form onSubmit={handleSaveHumanEvaluation} className="space-y-3.5 text-xs">
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="font-semibold text-ink-2">1. Excellence / Mükemmeliyet (0 - 5.0)</label>
-                    <span className="font-mono font-bold text-blue-600">{humanExcellence} / 5.0</span>
+                    <label className="font-semibold text-ink-2">{t('human.excellenceLabel')}</label>
+                    <span className="font-mono font-bold text-blue-600">{t('human.outOf5', { value: humanExcellence })}</span>
                   </div>
                   <input
                     type="range"
@@ -412,8 +419,8 @@ export function EvaluationsClient({
 
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="font-semibold text-ink-2">2. Impact / Etki (0 - 5.0)</label>
-                    <span className="font-mono font-bold text-blue-600">{humanImpact} / 5.0</span>
+                    <label className="font-semibold text-ink-2">{t('human.impactLabel')}</label>
+                    <span className="font-mono font-bold text-blue-600">{t('human.outOf5', { value: humanImpact })}</span>
                   </div>
                   <input
                     type="range"
@@ -428,8 +435,8 @@ export function EvaluationsClient({
 
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="font-semibold text-ink-2">3. Implementation / Uygulama (0 - 5.0)</label>
-                    <span className="font-mono font-bold text-blue-600">{humanImplementation} / 5.0</span>
+                    <label className="font-semibold text-ink-2">{t('human.implementationLabel')}</label>
+                    <span className="font-mono font-bold text-blue-600">{t('human.outOf5', { value: humanImplementation })}</span>
                   </div>
                   <input
                     type="range"
@@ -443,23 +450,23 @@ export function EvaluationsClient({
                 </div>
 
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">Güçlü Yönler (Her satıra bir tane)</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('human.strengthsLabel')}</label>
                   <textarea
                     rows={2}
                     value={humanStrengths}
                     onChange={(e) => setHumanStrengths(e.target.value)}
-                    placeholder="Örn: Net TRL4->TRL7 yol haritası var."
+                    placeholder={t('human.strengthsPlaceholder')}
                     className="w-full border border-border rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">Zayıf Yönler & Eleştiriler (Her satıra bir tane)</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('human.weaknessesLabel')}</label>
                   <textarea
                     rows={2}
                     value={humanWeaknesses}
                     onChange={(e) => setHumanWeaknesses(e.target.value)}
-                    placeholder="Örn: WP3 bütçe dağılımı detaylandırılmamış."
+                    placeholder={t('human.weaknessesPlaceholder')}
                     className="w-full border border-border rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
@@ -470,7 +477,7 @@ export function EvaluationsClient({
                   className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 text-xs"
                 >
                   <UserCheck className="w-3.5 h-3.5" />
-                  <span>{isSubmittingHuman ? 'Kaydediliyor...' : 'Değerlendirmeyi Kaydet'}</span>
+                  <span>{isSubmittingHuman ? t('human.saving') : t('human.saveButton')}</span>
                 </button>
               </form>
             </div>
@@ -479,17 +486,17 @@ export function EvaluationsClient({
           {/* Right Column: Evaluations Feed (7 cols) */}
           <div className="lg:col-span-7 space-y-4">
             <h3 className="font-bold text-sm text-ink flex items-center justify-between">
-              <span>Mevcut Ön Değerlendirme Raporları</span>
+              <span>{t('feed.title')}</span>
               <span className="text-xs font-normal text-muted">
-                G3 Kapısı İçin En Az 2 Değerlendirme Önerilir
+                {t('feed.hint')}
               </span>
             </h3>
 
             {evaluations.length === 0 ? (
               <div className="bg-surface border border-border rounded-2xl p-8 text-center text-muted space-y-2">
                 <BookOpen className="w-8 h-8 text-muted mx-auto" />
-                <p className="font-semibold text-sm">Henüz bir ön değerlendirme bulunmuyor.</p>
-                <p className="text-xs">Sol panelden YZ simülasyonu başlatabilir veya uzman görüşü ekleyebilirsiniz.</p>
+                <p className="font-semibold text-sm">{t('feed.emptyTitle')}</p>
+                <p className="text-xs">{t('feed.emptyBody')}</p>
               </div>
             ) : (
               evaluations.map((ev) => {
@@ -515,17 +522,20 @@ export function EvaluationsClient({
                         )}
                         <div>
                           <span className="font-bold text-xs text-ink block leading-none">
-                            {ev.readerType === 'AI' ? 'Yapay Zeka Okuyucusu (EU Standard)' : 'İnsan Uzman Okuyucu'}
+                            {ev.readerType === 'AI' ? t('feed.aiReader') : t('feed.humanReader')}
                           </span>
                           <span className="text-[10px] text-muted font-mono">
-                            {ev.createdAt ? new Date(ev.createdAt).toLocaleDateString('tr-TR') : 'Bugün'}
+                            {ev.createdAt ? new Date(ev.createdAt).toLocaleDateString(locale) : t('feed.today')}
                           </span>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${getScoreColor(Number(total) / 3)}`}>
-                          Toplam: {total} / 15.0 {isPassed ? '(Eşik Üstü)' : '(Eşik Altı)'}
+                          {t('feed.totalScore', {
+                            total,
+                            status: isPassed ? t('feed.aboveThreshold') : t('feed.belowThreshold'),
+                          })}
                         </span>
                       </div>
                     </div>
@@ -533,22 +543,22 @@ export function EvaluationsClient({
                     {/* Breakdown Meters */}
                     <div className="grid grid-cols-3 gap-3 text-xs">
                       <div className="bg-ground border border-border p-2.5 rounded-xl text-center">
-                        <span className="text-[10px] text-muted font-medium block">1. Excellence</span>
-                        <span className="font-bold text-sm font-mono text-ink">{ev.excellence.toFixed(1)} / 5.0</span>
+                        <span className="text-[10px] text-muted font-medium block">{t('feed.excellenceLabel')}</span>
+                        <span className="font-bold text-sm font-mono text-ink">{t('human.outOf5', { value: ev.excellence.toFixed(1) })}</span>
                       </div>
 
                       <div className="bg-ground border border-border p-2.5 rounded-xl text-center">
                         <span className="text-[10px] text-muted font-medium block">
-                          2. Impact {isInnovationAction && '(1.5x)'}
+                          {t('feed.impactLabel')} {isInnovationAction && t('feed.impactMultiplierSuffix')}
                         </span>
                         <span className="font-bold text-sm font-mono text-ink">
-                          {(isInnovationAction ? ev.impact * 1.5 : ev.impact).toFixed(1)} / 5.0
+                          {t('human.outOf5', { value: (isInnovationAction ? ev.impact * 1.5 : ev.impact).toFixed(1) })}
                         </span>
                       </div>
 
                       <div className="bg-ground border border-border p-2.5 rounded-xl text-center">
-                        <span className="text-[10px] text-muted font-medium block">3. Implementation</span>
-                        <span className="font-bold text-sm font-mono text-ink">{ev.implementation.toFixed(1)} / 5.0</span>
+                        <span className="text-[10px] text-muted font-medium block">{t('feed.implementationLabel')}</span>
+                        <span className="font-bold text-sm font-mono text-ink">{t('human.outOf5', { value: ev.implementation.toFixed(1) })}</span>
                       </div>
                     </div>
 
@@ -567,7 +577,7 @@ export function EvaluationsClient({
                             <div className="bg-emerald-50/60 border border-emerald-100 p-3 rounded-xl">
                               <span className="font-bold text-emerald-800 flex items-center gap-1 mb-1">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                Tespit Edilen Güçlü Yönler:
+                                {t('feed.detectedStrengths')}
                               </span>
                               <ul className="list-disc pl-4 space-y-0.5 text-emerald-900">
                                 {strengths.map((s, idx) => (
@@ -581,7 +591,7 @@ export function EvaluationsClient({
                             <div className="bg-rose-50/60 border border-rose-100 p-3 rounded-xl">
                               <span className="font-bold text-rose-800 flex items-center gap-1 mb-1">
                                 <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                                Tespit Edilen Zayıf Yönler &amp; Kritik Eksikler:
+                                {t('feed.detectedWeaknesses')}
                               </span>
                               <ul className="list-disc pl-4 space-y-0.5 text-rose-900">
                                 {weaknessList.map((w, idx) => (
@@ -607,72 +617,36 @@ export function EvaluationsClient({
           <div>
             <h2 className="text-base font-bold text-ink flex items-center gap-2">
               <FileCheck className="w-5 h-5 text-blue-600" />
-              <span>REA (European Research Executive Agency) Sık Hatalar Kontrolü</span>
+              <span>{t('rea.title')}</span>
             </h2>
             <p className="text-muted text-xs mt-1">
-              Avrupa Komisyonu hakemlerinin elenme gerekçesi olarak en çok sunduğu 7 kritik tasarım hatasını kontrol edin.
+              {t('rea.description')}
             </p>
           </div>
 
           <div className="space-y-3">
-            {[
-              {
-                key: 'kpi',
-                title: 'Sayısallaştırılmış KPI ve Hedef Metrikler',
-                desc: '2.1 bölümünde etki göstergeleri için somut basamaklar verilmiş mi? (Örn: %30 maliyet düşüşü, 500 hasta testi).',
-              },
-              {
-                key: 'trl',
-                title: 'TRL Yol Haritası ve Teknoloji Olgunlaşması',
-                desc: 'Başlangıç TRL ve bitiş TRL açıkça tanımlanmış ve Work Package faaliyetleriyle desteklenmiş mi?',
-              },
-              {
-                key: 'gender',
-                title: 'Cinsiyet Boyutu ve Etik / Açık Bilim (Gender & Open Science)',
-                desc: 'Araştırma metodolojisinde cinsiyet boyutu ve veri paylaşım protokolü (FAIR data) belirtilmiş mi?',
-              },
-              {
-                key: 'dec',
-                title: 'Yaygınlaştırma & Sömürü Planı (DEC)',
-                desc: 'Fikri mülkiyet (IP) koruması, lisanslama ve pazar açılım stratejisi iş paketlerine yedirilmiş mi?',
-              },
-              {
-                key: 'risk',
-                title: 'Risk Yönetimi ve Alternatif B Planı',
-                desc: 'Kritik milestone aksamaları için "Contingency Measures" (B Planı) matrisi yazılmış mı?',
-              },
-              {
-                key: 'effort',
-                title: 'Kişi-Ay (Person-Months) ve Bütçe Dengesi',
-                desc: 'İş paketi liderlerinin kişi-ay eforları çıktı ile orantılı mı? (Aşırı veya yetersiz efor yok).',
-              },
-              {
-                key: 'openScience',
-                title: 'Açık Bilim ve Veri Yönetimi Planı (DMP)',
-                desc: 'Açık erişim yayıncılık ve veri yönetim şeması detaylandırılmış mı?',
-              },
-            ].map((item) => (
+            {(['kpi', 'trl', 'gender', 'dec', 'risk', 'effort', 'openScience'] as const).map((key) => (
               <div
-                key={item.key}
-                onClick={() => handleToggleRea(item.key)}
+                key={key}
+                onClick={() => handleToggleRea(key)}
                 className={`p-4 rounded-xl border transition cursor-pointer flex items-start gap-3 ${
-                  reaChecklist[item.key]
+                  reaChecklist[key]
                     ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950'
                     : 'bg-ground border-border text-ink-2 hover:bg-surface-hover/80'
                 }`}
               >
                 <div
                   className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0 border transition ${
-                    reaChecklist[item.key]
+                    reaChecklist[key]
                       ? 'bg-emerald-600 text-white border-emerald-600'
                       : 'bg-surface border-border'
                   }`}
                 >
-                  {reaChecklist[item.key] && <CheckCircle2 className="w-3.5 h-3.5" />}
+                  {reaChecklist[key] && <CheckCircle2 className="w-3.5 h-3.5" />}
                 </div>
                 <div>
-                  <h4 className="font-bold text-xs">{item.title}</h4>
-                  <p className="text-[11px] opacity-80 mt-0.5">{item.desc}</p>
+                  <h4 className="font-bold text-xs">{t(`rea.items.${key}.title`)}</h4>
+                  <p className="text-[11px] opacity-80 mt-0.5">{t(`rea.items.${key}.desc`)}</p>
                 </div>
               </div>
             ))}
@@ -686,17 +660,17 @@ export function EvaluationsClient({
           <div>
             <h2 className="text-base font-bold text-ink flex items-center gap-2">
               <RotateCcw className="w-5 h-5 text-blue-600" />
-              <span>Resmî ESR (Evaluation Summary Report) Kalibrasyonu</span>
+              <span>{t('calibration.title')}</span>
             </h2>
             <p className="text-muted text-xs mt-1">
-              Komisyon sonuçları açıklandığında gelen resmî ESR puanını girerek iç YZ/İnsan modelinizin tahmin sapmasını kaydedin.
+              {t('calibration.description')}
             </p>
           </div>
 
           <form onSubmit={handleCalibrate} className="space-y-4 max-w-md">
             <div>
               <label className="text-xs font-semibold text-ink-2 block mb-1">
-                Kalibre Edilecek Değerlendirmeyi Seçin
+                {t('calibration.selectLabel')}
               </label>
               <select
                 value={selectedEvalForCalibration}
@@ -705,8 +679,10 @@ export function EvaluationsClient({
               >
                 {evaluations.map((ev) => (
                   <option key={ev.id} value={ev.id}>
-                    {ev.readerType === 'AI' ? '🤖 YZ Okuyucusu' : '👤 İnsan Okuyucu'} (Puan:{' '}
-                    {(ev.excellence + ev.impact + ev.implementation).toFixed(1)})
+                    {ev.readerType === 'AI' ? t('calibration.aiOption') : t('calibration.humanOption')}{' '}
+                    {t('calibration.scoreSuffix', {
+                      value: (ev.excellence + ev.impact + ev.implementation).toFixed(1),
+                    })}
                   </option>
                 ))}
               </select>
@@ -714,7 +690,7 @@ export function EvaluationsClient({
 
             <div>
               <label className="text-xs font-semibold text-ink-2 block mb-1">
-                Resmî Komisyon ESR Toplam Puanı (0 - 15.0)
+                {t('calibration.officialScoreLabel')}
               </label>
               <input
                 type="number"
@@ -732,20 +708,22 @@ export function EvaluationsClient({
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-xl transition text-xs shadow-sm flex items-center gap-2"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Kalibrasyon Hesapla ve Kaydet</span>
+              <span>{t('calibration.submitButton')}</span>
             </button>
           </form>
 
           {calibrationResult !== null && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs space-y-1">
-              <span className="font-bold text-blue-900 block">Hesaplanan Kalibrasyon Sapması (Variance):</span>
+              <span className="font-bold text-blue-900 block">{t('calibration.resultLabel')}</span>
               <p className="text-blue-800 font-mono text-sm">
-                Sapma: <strong>{calibrationResult > 0 ? `+${calibrationResult}` : calibrationResult}</strong> puan
+                {t('calibration.deviationLabel', {
+                  value: calibrationResult > 0 ? `+${calibrationResult}` : calibrationResult,
+                })}
               </p>
               <p className="text-[11px] text-blue-700">
                 {Math.abs(calibrationResult) <= 0.5
-                  ? '🎯 Harika! İç değerlendirme modeliniz resmî ESR puanına çok yakın (≤ 0.5 puan sapma).'
-                  : '⚠️ Modeliniz resmî puandan biraz sapma gösteriyor. Gelecek projelerde kalibrasyon katsayısı güncellenecektir.'}
+                  ? t('calibration.goodMessage')
+                  : t('calibration.driftMessage')}
               </p>
             </div>
           )}
