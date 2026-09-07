@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import trMessages from '../../../messages/tr.json';
+import enMessages from '../../../messages/en.json';
 import { applyPercentDiscount } from '../money';
 import {
   CATALOG,
@@ -253,8 +255,11 @@ describe('plan entitlements', () => {
     }
   });
 
-  it('opens M6 and M7 on ultra only', () => {
-    expect(plansGrantingModule('M6')).toEqual(['ultra']);
+  it('opens M6 on pro and ultra, M7 on ultra only', () => {
+    // Owner decision, TASK-MTRIXGYXLLQR1: Pro keeps Evaluator Lens — the public
+    // pricing page has sold it under Pro for months, and the cost is already
+    // capped by the plan's 500 AI-credit ceiling.
+    expect(plansGrantingModule('M6')).toEqual(['pro', 'ultra']);
     expect(plansGrantingModule('M7')).toEqual(['ultra']);
     expect(plansGrantingModule('M3')).toEqual(['basic', 'pro', 'ultra']);
     // The fallback plan grants M3 but is never a tier you can be gated up to.
@@ -294,4 +299,90 @@ describe('plan entitlements', () => {
     expect(resolvePlanId('platinum')).toBe('platinum');
     expect(grantsFor('platinum')).toBeNull();
   });
+});
+
+/**
+ * Sentinel — TASK-MTRIXGYXLLQR1. `billingPanels.settings.plans.<id>.modules` is
+ * marketing/settings copy typed by hand in two JSON files; nothing regenerates
+ * it from `PLAN_GRANTS`. It had drifted before this task started: the Pro card
+ * said "M1-M5, M8" a version behind the catalogue, which already granted M6.
+ * This guards the two from silently diverging again, in either direction —
+ * a card cannot promise a module the plan does not grant, and cannot grant one
+ * the card does not mention, so the seats/credits/module figures a tenant
+ * reads on the settings page are always exactly what `grantsFor()` computes.
+ */
+describe('plan card copy matches grantsFor() exactly (tr + en)', () => {
+  const PLAN_IDS = ['basic', 'pro', 'ultra'] as const;
+
+  /** "M1-M6, M8" / "M2, M3, M5" → ['M1','M2','M3','M4','M5','M6','M8'] */
+  function parseModuleIds(label: string): string[] {
+    const list = label.split(':')[1];
+    if (!list) throw new Error(`No "label: list" split point in "${label}"`);
+    const ids: string[] = [];
+    for (const token of list.split(',').map((t) => t.trim())) {
+      const range = token.match(/^M(\d+)-M(\d+)$/);
+      if (range) {
+        const from = Number(range[1]);
+        const to = Number(range[2]);
+        for (let n = from; n <= to; n += 1) ids.push(`M${n}`);
+        continue;
+      }
+      if (!/^M\d+$/.test(token)) {
+        throw new Error(`Unrecognised module token "${token}" in "${label}"`);
+      }
+      ids.push(token);
+    }
+    return ids;
+  }
+
+  /** Strips thousands separators (both "2.000" and "2,000") before reading the number. */
+  function parseCount(label: string): number {
+    const digitsOnly = label.replace(/[.,](?=\d{3}(\D|$))/g, '');
+    const match = digitsOnly.match(/\d+/);
+    if (!match) throw new Error(`No number found in "${label}"`);
+    return Number(match[0]);
+  }
+
+  /** True only for wording that claims the figure is unlimited, in either locale. */
+  function claimsUnlimited(label: string): boolean {
+    return /sınırsız|unlimited/i.test(label);
+  }
+
+  for (const [locale, messages] of [
+    ['tr', trMessages],
+    ['en', enMessages],
+  ] as const) {
+    const cards = (messages as { billingPanels: { settings: { plans: Record<string, { seats: string; credits: string; modules: string }> } } })
+      .billingPanels.settings.plans;
+
+    for (const planId of PLAN_IDS) {
+      const grant = grantsFor(planId)!;
+      const card = cards[planId];
+
+      it(`${locale}/${planId}: modules line names exactly grantsFor('${planId}').moduleIds`, () => {
+        expect(card, `${locale} plan card missing for "${planId}"`).toBeDefined();
+        const named = parseModuleIds(card.modules);
+        const grantedSet = [...grant.moduleIds].sort();
+        expect(
+          [...named].sort(),
+          `${locale}/${planId} modules line "${card.modules}" vs grant [${grantedSet.join(', ')}]`
+        ).toEqual(grantedSet);
+      });
+
+      it(`${locale}/${planId}: seats/credits figures match grantsFor('${planId}')`, () => {
+        expect(claimsUnlimited(card.seats) ? Infinity : parseCount(card.seats)).toBe(
+          claimsUnlimited(card.seats) ? Infinity : grant.seats
+        );
+        expect(claimsUnlimited(card.credits) ? Infinity : parseCount(card.credits)).toBe(
+          claimsUnlimited(card.credits) ? Infinity : grant.aiCreditsMonthly
+        );
+        // "sınırsız"/"unlimited" may only appear where the underlying number really has
+        // no cap — this product has no such grant field today, so the wording must not
+        // appear at all; the day a grant becomes a real sentinel-for-unlimited, this
+        // assertion is the one to relax, not delete.
+        expect(claimsUnlimited(card.seats), card.seats).toBe(false);
+        expect(claimsUnlimited(card.credits), card.credits).toBe(false);
+      });
+    }
+  }
 });

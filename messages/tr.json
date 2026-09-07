@@ -60,6 +60,7 @@
     "averageScore": "Ortalama Puan",
     "descTotalProposals": "Bu dönemdeki aktif fırsatlar",
     "descHitRate": "G0 puanı alan fırsatlar içinde gönderilen teklif oranı",
+    "descThresholdRate": "Gönderilen teklifler içinde eşik üstü puanlandırılanların oranı",
     "descAverageScore": "Ortalama değerlendirme puanı (iç ön değerlendirme)",
     "descPersonDays": "Teklif başına toplam efor",
     "descAvgDaysG2": "Ortalama kapı ilerleme süresi",
@@ -93,6 +94,7 @@
     "emptyRangeTitle": "Seçili tarih aralığında fırsat yok",
     "emptyRangeBody": "Bu çalışma alanında fırsatlar var, ancak hiçbiri seçili tarih aralığına düşmüyor. Yukarıdan daha geniş bir aralık seçin.",
     "emptyHitRate": "Henüz G0 puanı almış fırsat yok; oran hesaplanamıyor.",
+    "emptyThresholdRate": "Henüz hiç teklif gönderilmemiş; oran hesaplanamıyor.",
     "emptyAverageScore": "Henüz tamamlanmış bir ön değerlendirme yok.",
     "emptyPersonDays": "Henüz teklif yok; teklif başına efor hesaplanamıyor.",
     "emptyAvgDaysG2": "Henüz hem G0 hem G2 kararı olan fırsat yok."
@@ -308,6 +310,9 @@
   "Approvals": {
     "title": "Kurumsal Onay Merkezi",
     "subtitle": "4-Eyes Çift Onaylı Yetkilendirme Akışı",
+    "breadcrumbSecurity": "Kurumsal Güvenlik",
+    "breadcrumbPrinciple": "4-Eyes İlkesi",
+    "pageDescription": "Kritik bütçe, G4 başvuru onayı, hukuki taahhütler ve yönetici yetki değişiklikleri için Çift Onay (Maker-Checker) yönetim merkezi.",
     "actionableTab": "Onayımı Bekleyenler",
     "myRequestsTab": "Taleplerim (Maker)",
     "historyTab": "Denetim İzi & Geçmiş",
@@ -1271,7 +1276,7 @@
           "desc": "Ciddi günlük kullanım ve projeler.",
           "seats": "6 kullanıcı / 1 çalışma alanı",
           "credits": "500 YZ kredisi / ay",
-          "modules": "Modüller: M1-M5, M8"
+          "modules": "Modüller: M1-M6, M8"
         },
         "ultra": {
           "desc": "Tüm ekosistem ve kurumsal konsorsiyumlar.",

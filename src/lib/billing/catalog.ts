@@ -389,7 +389,7 @@ export const PLAN_GRANTS: readonly PlanGrant[] = [
     seats: 6,
     workspaces: 1,
     aiCreditsMonthly: 500,
-    moduleIds: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'],
+    moduleIds: ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8'],
   },
   {
     planId: 'ultra',

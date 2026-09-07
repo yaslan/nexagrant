@@ -15,7 +15,7 @@ Para birimi **USD**, tutarlar cent (CLAUDE.md kural 9). Aşağıdaki fiyatlar
 |---|---|---|---|---|---|---|---|---|
 | `free` | Discover | — | — | — | 1 | 1 | 10 | M3, M5 |
 | `basic` | Basic | $45,00 | $387,00 | $32,25 | 2 | 1 | 100 | M2, M3, M5 |
-| `pro` | Pro | $87,00 | $747,00 | $62,25 | 6 | 1 | 500 | M1-M5, M8 |
+| `pro` | Pro | $87,00 | $747,00 | $62,25 | 6 | 1 | 500 | M1-M6, M8 |
 | `ultra` | Ultra | $147,00 | $1.197,00 | $99,75 | 15 | 5 | 2.000 | M1-M11 |
 
 | Tek seferlik sku | Ad | Liste | İndirim | Ödenen | Kampanya kodu |
