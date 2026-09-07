@@ -3,6 +3,7 @@
 import React, { useState, useTransition } from 'react';
 import { saveSectionContent, generateSectionDraft, updateNoteStatus } from '../actions';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
+import type { Editor } from '@tiptap/react';
 import { EvidenceDrawer } from '@/components/evidence/EvidenceDrawer';
 import { errorMessage } from '@/lib/errors';
 
@@ -36,7 +37,7 @@ export default function ConceptNoteEditor({
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [lastAiUsage, setLastAiUsage] = useState<{ creditsUsed: number; inputTokens: number; outputTokens: number } | null>(null);
   const [isEvidenceDrawerOpen, setIsEvidenceDrawerOpen] = useState(false);
-  const editorRef = React.useRef<any>(null);
+  const editorRef = React.useRef<Editor | null>(null);
 
   const handleSave = (sectionKey: string) => {
     startTransition(async () => {

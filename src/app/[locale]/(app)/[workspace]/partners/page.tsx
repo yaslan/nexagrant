@@ -151,6 +151,52 @@ const DEMO_CORDIS_PARTNERS = [
   },
 ];
 
+/**
+ * A partner row as this table renders it. The three fallback queries below
+ * (CordisPartnerProfile, then CordisOrganization, then the legacy Organization
+ * table) each normalise into this one shape, so the table does not have to know
+ * which source it got.
+ */
+interface PartnerRow {
+  organisationId: string;
+  name: string;
+  country: string | null;
+  activityType: string | null;
+  sme: boolean;
+  isTurkish: boolean;
+  totalProjects: number;
+  coordinatorProjects: number;
+  totalEcContribution: bigint;
+  /**
+   * Top-20 topic tags from the derived profile; `[]` for the fallbacks. Older
+   * profile rows stored bare topic codes rather than objects, which is why the
+   * table renders `t.code || t`.
+   */
+  topTopics: Array<{ code: string; title?: string; count?: number } | string>;
+}
+
+/** The CordisOrganization columns the second fallback reads. */
+interface CordisOrganizationRow {
+  organisationId: string;
+  name: string;
+  country: string | null;
+  activityType: string | null;
+  sme: boolean;
+  isTurkish: boolean;
+}
+
+/** The legacy Organization columns the third fallback reads. */
+interface LegacyOrganizationRow {
+  id: string;
+  name: string;
+  country: string | null;
+  activityType: string | null;
+  isSme: boolean;
+  participationCount: number | null;
+  coordinatorCount: number | null;
+  ecContributionSum: bigint | null;
+}
+
 export default async function PartnersPage({
   params,
   searchParams,
@@ -168,13 +214,13 @@ export default async function PartnersPage({
   const isTurkishOnly = sParams.is_turkish === 'true';
   const minProjects = sParams.min_projects ? parseInt(sParams.min_projects, 10) : 0;
 
-  let profiles: any[] = [];
+  let profiles: PartnerRow[] = [];
   let totalCount = 0;
   let dataSource = 'cordis_partner_profile';
 
   // 1. Try querying CordisPartnerProfile
   try {
-    const where: any = {};
+    const where: Record<string, unknown> = {};
     if (q) {
       where.OR = [
         { name: { contains: q, mode: 'insensitive' } },
@@ -201,7 +247,7 @@ export default async function PartnersPage({
   // 2. Fallback to CordisOrganization if profile table is empty or DB offline
   if (profiles.length === 0) {
     try {
-      const orgWhere: any = {};
+      const orgWhere: Record<string, unknown> = {};
       if (q) {
         orgWhere.OR = [
           { name: { contains: q, mode: 'insensitive' } },
@@ -225,7 +271,7 @@ export default async function PartnersPage({
       if (cOrgs.length > 0) {
         dataSource = 'cordis_organization';
         totalCount = cCount;
-        profiles = cOrgs.map((o: any) => ({
+        profiles = (cOrgs as CordisOrganizationRow[]).map((o) => ({
           organisationId: o.organisationId,
           name: o.name,
           country: o.country,
@@ -246,7 +292,7 @@ export default async function PartnersPage({
   // 3. Fallback to legacy Organization table if DB is running with legacy seeds
   if (profiles.length === 0) {
     try {
-      const legWhere: any = {};
+      const legWhere: Record<string, unknown> = {};
       if (q) {
         legWhere.OR = [
           { name: { contains: q, mode: 'insensitive' } },
@@ -270,7 +316,7 @@ export default async function PartnersPage({
       if (legOrgs.length > 0) {
         dataSource = 'organization_legacy';
         totalCount = legCount;
-        profiles = legOrgs.map((o: any) => ({
+        profiles = (legOrgs as LegacyOrganizationRow[]).map((o) => ({
           organisationId: o.id,
           name: o.name,
           country: o.country,
@@ -396,7 +442,7 @@ export default async function PartnersPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {profiles.map((p: any) => (
+              {profiles.map((p) => (
                 <tr key={p.organisationId} className="hover:bg-surface-hover transition-colors">
                   <td className="p-4 font-mono font-semibold">
                     <span className="text-blue-600 font-bold">{p.organisationId}</span>
@@ -419,9 +465,9 @@ export default async function PartnersPage({
                     {/* Top topics tag pills */}
                     {p.topTopics && Array.isArray(p.topTopics) && p.topTopics.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
-                        {p.topTopics.slice(0, 3).map((t: any, idx: number) => (
+                        {p.topTopics.slice(0, 3).map((t, idx: number) => (
                           <span key={idx} className="bg-ground text-ink-2 border border-border text-[10px] px-1.5 py-0.5 rounded font-mono truncate max-w-[150px]">
-                            {t.code || t}
+                            {typeof t === 'string' ? t : t.code}
                           </span>
                         ))}
                       </div>

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import ConceptNoteEditor from './editor';
 import { errorMessage } from '@/lib/errors';
+import type { ConceptNoteRow, ConceptTemplateRow, ConceptTemplateSchema } from '@/modules/m2/types';
 
 export default async function ConceptNoteDetailPage({
   params,
@@ -14,9 +15,9 @@ export default async function ConceptNoteDetailPage({
   const session = await auth();
   const tenantId = session?.tenantId;
 
-  let note: any = null;
-  let template: any = null;
-  let opportunity: any = null;
+  let note: Omit<ConceptNoteRow, 'updatedAt'> | null = null;
+  let template: ConceptTemplateRow | null = null;
+  let opportunity: { title: string } | null = null;
 
   try {
     note = await prisma.conceptNote.findFirst({
@@ -45,7 +46,7 @@ export default async function ConceptNoteDetailPage({
       id,
       templateId: 't1',
       opportunityId: 'demo-opp-1',
-      version: '1.0',
+      version: 1,
       status: 'draft',
       content: {
         excellence: 'This concept addresses zero-emission hydrogen storage using innovative metal-organic frameworks.',
@@ -56,7 +57,9 @@ export default async function ConceptNoteDetailPage({
 
     template = {
       id: 't1',
+      key: 'he_stage1_blind',
       name: 'Horizon Europe Stage 1 (Blind)',
+      version: '1.0',
       schema: {
         sections: [
           { key: 'excellence', labelKey: 'Excellence & Innovation', maxWords: 1000 },
@@ -75,9 +78,7 @@ export default async function ConceptNoteDetailPage({
       { key: 'impact', labelKey: 'Expected Impact', maxWords: 800 },
       { key: 'implementation', labelKey: 'Implementation Plan', maxWords: 600 },
     ],
-  }) as {
-    sections: { key: string; labelKey: string; maxWords: number }[];
-  };
+  }) as ConceptTemplateSchema;
 
   return (
     <div className="max-w-[1400px] mx-auto py-6 px-4">

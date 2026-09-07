@@ -5,6 +5,7 @@ import { requireTenantAction } from '@/lib/tenant';
 import { generateWithAI, LlmMessage } from '@/lib/llm';
 import { buildRagPrompt } from '@/lib/rag';
 import { revalidatePath } from 'next/cache';
+import type { ConceptTemplateSchema } from '@/modules/m2/types';
 
 /**
  * `tenantId` was read as `session.tenantId` with no null check. Prisma
@@ -28,13 +29,13 @@ export async function createConceptNote(
   if (!template) throw new Error('Template not found');
 
   // Initialize empty content from template schema
-  const schema = template.schema as { sections: { key: string; labelKey: string; maxWords: number }[] };
+  const schema = template.schema as ConceptTemplateSchema;
   const content: Record<string, string> = {};
   for (const section of schema.sections) {
     content[section.key] = '';
   }
 
-  const note = await withTenant<any>(tenantId, (tx) =>
+  const note = await withTenant<{ id: string }>(tenantId, (tx) =>
     tx.conceptNote.create({
     data: {
       tenantId,

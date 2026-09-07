@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import Link from 'next/link';
 import { errorMessage } from '@/lib/errors';
+import type { ConceptNoteRow, ConceptTemplateRow } from '@/modules/m2/types';
 
 export default async function ConceptNotesListPage({
   params,
@@ -12,8 +13,8 @@ export default async function ConceptNotesListPage({
   const session = await auth();
   const tenantId = session?.tenantId;
 
-  let notes: any[] = [];
-  let templates: any[] = [];
+  let notes: ConceptNoteRow[] = [];
+  let templates: ConceptTemplateRow[] = [];
 
   try {
     notes = await prisma.conceptNote.findMany({
@@ -59,7 +60,7 @@ export default async function ConceptNotesListPage({
       <div className="mb-10">
         <h2 className="text-lg font-semibold mb-3 text-ink-2">Available Templates</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-          {templates.map((t: any) => (
+          {templates.map((t) => (
             <div
               key={t.id || t.key}
               className="border rounded-lg p-4 bg-surface hover:border-blue-400 transition-colors"
@@ -75,7 +76,7 @@ export default async function ConceptNotesListPage({
       {/* Notes List */}
       <h2 className="text-lg font-semibold mb-3 text-ink-2">Your Notes</h2>
       <div className="space-y-4">
-        {notes.map((note: any) => (
+        {notes.map((note) => (
           <Link
             href={`/${locale}/${workspace}/concept-notes/${note.id}`}
             key={note.id}
