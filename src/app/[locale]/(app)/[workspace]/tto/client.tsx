@@ -27,6 +27,16 @@ interface TtoAcceleratorClientProps {
   items: TtoItem[];
 }
 
+/** One call the TRL matcher proposes for a portfolio item. */
+interface MatchedTopic {
+  topicId: string;
+  title: string;
+  fitScore: number;
+  targetTrlRange: string;
+  matchReason: string;
+  recommendedRole: string;
+}
+
 export function TtoAcceleratorClient({
   items: initialItems,
 }: TtoAcceleratorClientProps) {
@@ -43,7 +53,7 @@ export function TtoAcceleratorClient({
 
   // Matcher state
   const [selectedMatchItem, setSelectedMatchItem] = useState<TtoItem | null>(null);
-  const [matchedTopics, setMatchedTopics] = useState<any[]>([]);
+  const [matchedTopics, setMatchedTopics] = useState<MatchedTopic[]>([]);
   const [isMatching, setIsMatching] = useState(false);
 
   // IP Checklist modal state

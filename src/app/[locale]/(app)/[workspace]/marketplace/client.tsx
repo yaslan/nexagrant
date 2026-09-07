@@ -38,6 +38,18 @@ interface MarketplaceClientProps {
   apiKeys: ApiKeyItem[];
 }
 
+/** The order `orderMarketplaceService` returns, as the confirmation modal reads it. */
+interface ConfirmedOrder {
+  id: string;
+  listingId: string;
+  buyerTenantId: string;
+  totalAmountEUR: number;
+  platformFeeEUR: number;
+  consultantPayoutEUR: number;
+  status: string;
+  createdAt: Date;
+}
+
 export function MarketplaceClient({
   tenantId,
   userId,
@@ -65,7 +77,7 @@ export function MarketplaceClient({
   // Order modal state
   const [selectedOrderListing, setSelectedOrderListing] = useState<ListingItem | null>(null);
   const [isOrdering, setIsOrdering] = useState(false);
-  const [orderConfirmed, setOrderConfirmed] = useState<any | null>(null);
+  const [orderConfirmed, setOrderConfirmed] = useState<ConfirmedOrder | null>(null);
 
   const handlePublishListing = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { getEvidenceItemsAction } from '@/app/[locale]/(app)/[workspace]/evidence/actions';
 import { Sparkles, Check, Copy, FileText, Search, ShieldCheck } from 'lucide-react';
+import type { EvidenceItemData } from '@/app/[locale]/(app)/[workspace]/evidence/evidence-client';
 
-const FALLBACK_EVIDENCE = [
+const FALLBACK_EVIDENCE: EvidenceItemData[] = [
   { id: '1', category: 'CAT-05', kind: 'performance', title: 'H2020 SmartGrid Results', body: 'The organization successfully achieved a 15% reduction in grid loss across 3 European pilot sites [Evidence ID: EV-H2020].', tags: ['energy', 'grid', 'h2020'], validUntil: '2027-12-31' },
   { id: '2', category: 'CAT-03', kind: 'certificate', title: 'ISO 27001 BGYS Sertifikası', body: 'Information Security Management System ISO/IEC 27001:2022 certified by BSI Audit [Sertifika No: ISO-27001-2025-9921].', tags: ['security', 'iso27001', 'bgys'], validUntil: '2028-01-15' },
   { id: '3', category: 'CAT-01', kind: 'corporate', title: 'KOBİ Beyannamesi (SME Declaration)', body: 'Verified SME Status under European Commission Recommendation 2003/361/EC with < 250 FTE staff.', tags: ['sme', 'kobi', 'ec-verified'], validUntil: '2026-12-31' },
@@ -18,7 +19,7 @@ type Props = {
 
 export function EvidenceDrawer({ isOpen, onClose, onSelect }: Props) {
   const [search, setSearch] = useState('');
-  const [evidenceItems, setEvidenceItems] = useState<any[]>(FALLBACK_EVIDENCE);
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItemData[]>(FALLBACK_EVIDENCE);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -103,7 +104,7 @@ export function EvidenceDrawer({ isOpen, onClose, onSelect }: Props) {
                 {onSelect && (
                   <button 
                     type="button"
-                    onClick={() => onSelect(e.body)}
+                    onClick={() => onSelect(e.body ?? '')}
                     className="text-xs bg-accent text-white px-3 py-1 rounded-lg font-bold hover:opacity-90 transition cursor-pointer"
                   >
                     Insert Claim
@@ -111,7 +112,7 @@ export function EvidenceDrawer({ isOpen, onClose, onSelect }: Props) {
                 )}
                 <button 
                   type="button"
-                  onClick={() => handleCopy(e.id, e.body)}
+                  onClick={() => handleCopy(e.id, e.body ?? '')}
                   className="text-xs bg-ground text-ink-2 border border-border px-2.5 py-1 rounded-lg font-medium hover:bg-surface-hover hover:text-ink transition flex items-center gap-1 cursor-pointer"
                 >
                   {copiedId === e.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}

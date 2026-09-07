@@ -26,7 +26,8 @@ export interface ParsedCordisProject {
   ecMaxContribution?: bigint;
   grantDoi?: string;
   contentUpdateDate?: Date;
-  rawJson?: Record<string, any>;
+  /** The upstream CSV row as parsed, kept verbatim for re-normalisation. */
+  rawJson?: Record<string, unknown>;
 }
 
 export interface ParsedCordisOrganization {
@@ -44,7 +45,8 @@ export interface ParsedCordisOrganization {
   geolocation?: string;
   url?: string;
   isTurkish: boolean;
-  rawJson?: Record<string, any>;
+  /** The upstream CSV row as parsed, kept verbatim for re-normalisation. */
+  rawJson?: Record<string, unknown>;
 }
 
 export interface ParsedCordisParticipation {
@@ -152,7 +154,7 @@ export function mapProjectRow(row: RawCsvRow, defaultFramework: string): ParsedC
     'rcn', 'grantDoi', 'keywords', 'Human-validated', 'legalBasis'
   ]);
 
-  const rawJson: Record<string, any> = {};
+  const rawJson: Record<string, unknown> = {};
   for (const key of Object.keys(row)) {
     if (!knownFields.has(key) && row[key] !== undefined && row[key] !== '') {
       rawJson[key] = row[key];
@@ -199,7 +201,7 @@ export function mapOrganizationAndParticipationRow(
     'order', 'role', 'ecContribution', 'netEcContribution', 'totalCost', 'endOfParticipation', 'active'
   ]);
 
-  const rawJson: Record<string, any> = {};
+  const rawJson: Record<string, unknown> = {};
   for (const key of Object.keys(row)) {
     if (!knownFields.has(key) && row[key] !== undefined && row[key] !== '') {
       rawJson[key] = row[key];

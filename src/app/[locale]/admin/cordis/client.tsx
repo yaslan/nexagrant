@@ -28,35 +28,99 @@ interface CordisMetrics {
   lastSyncTimestamp: string;
 }
 
+/** Row counts from the last CORDIS import run, as the status cards read them. */
+interface K2RowCounts {
+  projects?: number;
+  organizations?: number;
+  participations?: number;
+  profiles?: number;
+  topics?: number;
+  scivocs?: number;
+}
+
+/** `model CordisImportRun` — one import attempt. */
+interface K2ImportRun {
+  runId: string;
+  dataset: string;
+  startedAt: Date | string;
+  finishedAt: Date | string | null;
+  status: string;
+  fileHash: string | null;
+  /** Json column; the importer writes K2RowCounts, or a `{ message }` note. */
+  rowCounts: K2RowCounts | null;
+  error: string | null;
+}
+
+/** The K2 ingestion status header: current table counts plus the last run. */
+interface K2Status {
+  lastRun?: K2ImportRun | null;
+  rowCounts?: K2RowCounts;
+}
+
+/** The result of a full CORDIS import. */
+interface K2ImportResult {
+  success: boolean;
+  skipped?: boolean;
+  error?: string;
+  importDurationMs?: number;
+  rowCounts?: K2RowCounts;
+}
+
+/** The result of an incremental sync. */
+interface K2SyncResult {
+  syncedProjectsCount: number;
+  totalEcContributionEUR: number;
+}
+
+/** The result of a delta ingestion, with the projects it brought in. */
+interface K2DeltaResult {
+  deltaCount: number;
+  ingestedProjects: Array<{
+    acronym: string | null;
+    title: string;
+    topicCode: string | null;
+    coordinatorName: string | null;
+    coordinatorCountry: string | null;
+    ecContributionEUR: number | null;
+  }>;
+}
+
+/** One chunk returned by the RAG workbench query. */
+interface RetrievedChunk {
+  documentId: string;
+  text: string;
+  score: number;
+}
+
 interface CordisRagAdminClientProps {
   metrics: CordisMetrics;
-  initialK2Status?: any;
+  initialK2Status?: K2Status;
 }
 
 export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status }: CordisRagAdminClientProps) {
   const [metrics, setMetrics] = useState<CordisMetrics>(initialMetrics);
-  const [k2Status, setK2Status] = useState<any>(initialK2Status);
+  const [k2Status, setK2Status] = useState<K2Status | undefined>(initialK2Status);
   const [activeTab, setActiveTab] = useState<'k2_ingestion' | 'sync' | 'delta' | 'workbench'>('k2_ingestion');
 
   // K2 Import State
   const [selectedDataset, setSelectedDataset] = useState<'HORIZON' | 'H2020'>('HORIZON');
   const [limitInput, setLimitInput] = useState<string>('5000');
   const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState<any | null>(null);
+  const [importResult, setImportResult] = useState<K2ImportResult | null>(null);
 
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<any | null>(null);
+  const [syncResult, setSyncResult] = useState<K2SyncResult | null>(null);
 
   // Delta Sync state
   const [isDeltaSyncing, setIsDeltaSyncing] = useState(false);
-  const [deltaResult, setDeltaResult] = useState<any | null>(null);
+  const [deltaResult, setDeltaResult] = useState<K2DeltaResult | null>(null);
 
   // RAG Workbench state
   const [searchQuery, setSearchQuery] = useState('Zero-emission battery thermal management');
   const [topK, setTopK] = useState(3);
   const [isSearching, setIsSearching] = useState(false);
-  const [retrievedChunks, setRetrievedChunks] = useState<any[]>([]);
+  const [retrievedChunks, setRetrievedChunks] = useState<RetrievedChunk[]>([]);
   const [ragPrompt, setRagPrompt] = useState<string | null>(null);
 
   const handleRunK2Import = async () => {
@@ -476,7 +540,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                {deltaResult.ingestedProjects.map((p: any, idx: number) => (
+                {deltaResult.ingestedProjects.map((p, idx: number) => (
                   <div key={idx} className="bg-surface border border-purple-100 p-4 rounded-xl space-y-2 shadow-2xs">
                     <div className="flex justify-between items-start">
                       <span className="font-bold text-ink font-mono text-xs">{p.acronym}</span>
