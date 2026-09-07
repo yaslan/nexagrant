@@ -66,6 +66,32 @@ S12 "hayalet alan" dalgasında bulunan iki **halka açık** örnek (TASK-MTRKVJK
   veri tabanında ne olursa olsun **"0 aktif çağrı"** gösteriyordu; sessiz fallback her zaman
   "uydurma satır" değildir, bazen **sessiz boşluktur** ve daha zor fark edilir.
 
+TASK-MTQYXISOPUJ53'te (2026-09-07, commit `dc97077`) **TEMİZLENDİ** — bu satırları tekrar
+"açık bulgu" olarak sayma:
+- ~~`api/v1/opportunities/route.ts`~~ — boş pipeline'da da patlayan sorguda da iki demo fırsat
+  dönüyordu; artık boş = `[]`, hata = 500 `OPPORTUNITIES_QUERY_FAILED`.
+- ~~`partners/page.tsx` `DEMO_CORDIS_PARTNERS`~~ + `CordisOrganization` fallback'inin
+  `totalProjects: 1 / totalEcContribution: BigInt(0)` uydurması (artık `null`, tabloda `—`).
+- ~~`opportunities/[id]/documents/page.tsx`~~ — "13.5/15.0 ESR" TÜBİTAK paketi; `notFound()`.
+- ~~`notifications/page.tsx`~~ **ve** `src/components/UserMenu.tsx` — şemada notification modeli
+  yok, ikisi de tamamen uydurmaydı; boş.
+- ~~`reports/person-days/page.tsx` `MOCK_REPORTS`~~ — hiç sorgu yapmıyordu; gerçek `Effort`.
+- ~~`application/client.tsx` (62,71,79)~~ — istemci mount'ta €412.500'lük konsorsiyumu yeniden
+  uyduruyordu; `[]` + boş durum.
+- ~~`m10/server/actions.ts` LLM fallback'i~~ — uydurma hukuki belge DB'ye yazılıyor + 1 kredi
+  düşülüyordu; artık `recordAlert` + throw, belge yok, kredi yok.
+
+**Hâlâ açık (başka kartların):** `pipeline/[id]/consortium/page.tsx` `DEMO_OPPORTUNITIES` ·
+`settings/billing/BillingClient.tsx` `DEMO_INVOICES` · `m11/types.ts`
+`DEFAULT_PART_B_SECTIONS` (hazır Part B metni, "Dr. Mehmet Yılmaz / Fraunhofer" imzalı) ·
+`m10/server/actions.ts` `mockUrl` (hiçbir yere çıkmayan `storage.fabrika.app` linki).
+
+Ailenin **dördüncü** biçimi (bu turda bulundu): *sahte başarı sağlayıcısı*. `calendar/google.ts`
+ve `outlook.ts` `console.log('[MOCK]')` + rastgele `externalId` dönüyordu; senkron kodu bunu
+başarı sayıp `lastSyncAt` damgalıyor, ekran "Son senkronizasyon: <tarih>" diyordu. Uydurma satır
+değil, **uydurma olay**. Aynı yerde arayacağın soru: "bu dönüş değeri gerçekten bir şey yaptı mı,
+yoksa yalnız öyle mi görünüyor?"
+
 Fallback sökerken üç şey:
 1. **Fallback'i ayakta tutan yeşil bir test ara.** Buradaki `tests/api/v1-partners.test.ts`
    `topic.findMany` mock'u `[]` dönerken `data.length > 0` bekliyordu — yalnızca demo dizisi
