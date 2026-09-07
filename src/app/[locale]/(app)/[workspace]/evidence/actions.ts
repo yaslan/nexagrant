@@ -240,7 +240,7 @@ export async function createEvidence(formData: FormData) {
       validUntil,
       fileUrl,
       createdAt: new Date(),
-    } as any;
+    };
   }
 }
 

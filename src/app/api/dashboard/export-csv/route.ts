@@ -1,10 +1,8 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { asRole, can } from '@/lib/rbac';
-
-type OppWithRelations = Awaited<
-  ReturnType<typeof prisma.opportunity.findMany>
->[number];
+// Same query, same shape as the dashboard page's — declared once there.
+import type { OppWithRelations } from '@/lib/dashboard/fetch-metrics';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -44,22 +42,22 @@ export async function GET(request: Request) {
     // Calculate metrics
     const totalOpps = opportunities.length;
     const submittedOpps = opportunities.filter(
-      (o) => (o as any)?.proposal && ['SUBMITTED', 'FUNDED', 'ABOVE_THRESHOLD'].includes((o as any)?.proposal?.outcome || '')
+      (o) => o.proposal && ['SUBMITTED', 'FUNDED', 'ABOVE_THRESHOLD'].includes(o.proposal.outcome || '')
     ).length;
-    const fundedOpps = opportunities.filter((o) => (o as any)?.proposal?.outcome === 'FUNDED').length;
+    const fundedOpps = opportunities.filter((o) => o.proposal?.outcome === 'FUNDED').length;
 
     const avgIsabet = totalOpps > 0
-      ? (opportunities.reduce((sum: number, o) => sum + ((o as any)?.g0Score || 0), 0) / totalOpps).toFixed(1)
+      ? (opportunities.reduce((sum: number, o) => sum + (o.g0Score || 0), 0) / totalOpps).toFixed(1)
       : '0';
 
     const totalEffortDays = opportunities.reduce(
-      (sum: number, o) => sum + ((o as any)?.efforts?.reduce((s: number, e: any) => s + (e?.hours || 0), 0) || 0) / 8,
+      (sum: number, o) => sum + o.efforts.reduce((s: number, e) => s + e.hours, 0) / 8,
       0
     );
 
-    const g2Opps = opportunities.filter((o) => ['G2', 'G3', 'G4'].includes((o as any)?.stage));
+    const g2Opps = opportunities.filter((o) => ['G2', 'G3', 'G4'].includes(o.stage));
     const avgG2Days = g2Opps.length > 0
-      ? g2Opps.reduce((sum: number, o) => sum + (((o as any)?.updatedAt?.getTime() - (o as any)?.createdAt?.getTime()) / (1000 * 3600 * 24)), 0) / g2Opps.length
+      ? g2Opps.reduce((sum: number, o) => sum + ((o.updatedAt.getTime() - o.createdAt.getTime()) / (1000 * 3600 * 24)), 0) / g2Opps.length
       : 0;
 
     const activeModules = await prisma.moduleState.count({
@@ -78,11 +76,11 @@ export async function GET(request: Request) {
       `Açık Modüller,${activeModules},modül`,
       '',
       'Stage,Sayı',
-      `G0,${opportunities.filter((o) => (o as any)?.stage === 'G0').length}`,
-      `G1,${opportunities.filter((o) => (o as any)?.stage === 'G1').length}`,
-      `G2,${opportunities.filter((o) => (o as any)?.stage === 'G2').length}`,
-      `G3,${opportunities.filter((o) => (o as any)?.stage === 'G3').length}`,
-      `G4,${opportunities.filter((o) => (o as any)?.stage === 'G4').length}`,
+      `G0,${opportunities.filter((o) => o.stage === 'G0').length}`,
+      `G1,${opportunities.filter((o) => o.stage === 'G1').length}`,
+      `G2,${opportunities.filter((o) => o.stage === 'G2').length}`,
+      `G3,${opportunities.filter((o) => o.stage === 'G3').length}`,
+      `G4,${opportunities.filter((o) => o.stage === 'G4').length}`,
     ];
 
     const csv = rows.join('\n');

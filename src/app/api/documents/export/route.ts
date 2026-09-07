@@ -15,8 +15,8 @@ export async function GET(req: Request) {
     if (partId) {
       try {
         const part = await prisma.applicationPart.findUnique({ where: { id: partId } });
-        if (part && (part.content as any)?.sections) {
-          sections = (part.content as any).sections;
+        if (part && (part.content)?.sections) {
+          sections = (part.content).sections;
         }
       } catch (e) {
         sections = DEFAULT_PART_B_SECTIONS;

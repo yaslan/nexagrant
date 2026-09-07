@@ -87,7 +87,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
     startTransition(async () => {
       await assignSeat(seatId, orgId);
       setSeats(prev =>
-        prev.map(s => (s.id === seatId ? { ...s, organizationId: orgId, status: 'INVITED' as any } : s))
+        prev.map(s => (s.id === seatId ? { ...s, organizationId: orgId, status: 'INVITED' } : s))
       );
       const c = await getConflicts(opportunityId);
       setConflicts(c);
@@ -119,7 +119,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
             <div key={seat.id} className="border border-border rounded-xl bg-surface overflow-hidden shadow-2xs">
               <div className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="font-bold text-ink capitalize text-sm">{((seat as any).roleKey || seat.role || '').replace('_', ' ')}</div>
+                  <div className="font-bold text-ink capitalize text-sm">{((seat).roleKey || seat.role || '').replace('_', ' ')}</div>
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${statusColors[seat.status]}`}>
                     {seat.status}
                   </span>
@@ -152,7 +152,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                   <div className="space-y-2">
                     {seatCandidates.map((c: any) => {
                       const cOrg = orgMap[c.organizationId];
-                      const bd = c.breakdown as any;
+                      const bd = c.breakdown;
                       return (
                         <div key={c.organizationId || c.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-surface rounded-lg border border-border gap-3">
                           <div>

@@ -26,11 +26,11 @@ describe('generateSeatCandidates', () => {
       status: 'ACTIVE',
       seats: [],
       topic: { id: 't-1', identifier: 'HORIZON-CL5-2026-09-01', callId: 'c-1', title: 'T' }
-    } as any);
+    });
 
     vi.mocked(prisma.consortiumSeat.findUnique).mockResolvedValue({
       id: 'seat-1', roleKey: 'partner', status: 'OPEN', organizationId: null
-    } as any);
+    });
 
     // Mock 100 stats
     const mockStats = Array.from({ length: 100 }).map((_, i) => ({
@@ -39,7 +39,7 @@ describe('generateSeatCandidates', () => {
       participationCount: 5,
       organization: { id: `org-${i}`, country: 'FR', degree: 50, eigenvector: 0.1 }
     }));
-    vi.mocked(prisma.orgTopicStat.findMany).mockResolvedValue(mockStats as any);
+    vi.mocked(prisma.orgTopicStat.findMany).mockResolvedValue(mockStats);
 
     vi.mocked(prisma.organization.findMany).mockResolvedValue([]);
     vi.mocked(prisma.relationship.findMany).mockResolvedValue([]);

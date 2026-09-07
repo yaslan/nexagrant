@@ -25,7 +25,7 @@ import { errorMessage } from '@/lib/errors';
  */
 async function sessionScope(): Promise<TenantScope | null> {
   try {
-    return tenantScopeOf((await auth()) as any);
+    return tenantScopeOf((await auth()));
   } catch (e) {
     console.warn(`[pipeline/actions] session lookup failed: ${errorMessage(e)}`);
     return null;
@@ -222,7 +222,7 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
   if (!scope) return NO_TENANT;
   const { tenantId } = scope;
 
-  updateInMemoryOpportunityStage(tenantId, opportunityId, newStage as any);
+  updateInMemoryOpportunityStage(tenantId, opportunityId, newStage);
 
   try {
     // `tenantId` is always part of the filter — an empty tenant clause here used

@@ -110,7 +110,7 @@ export async function evaluateGate(
     data: {
       tenantId,
       opportunityId,
-      gate: gateId as any,
+      gate: gateId,
       passed,
       inputs,
       ruleVersion: '1.0',
@@ -121,7 +121,7 @@ export async function evaluateGate(
   if (passed) {
     await prisma.opportunity.update({
       where: { id: opportunityId },
-      data: { stage: gateId as any }
+      data: { stage: gateId }
     });
   }
 

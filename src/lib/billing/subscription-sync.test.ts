@@ -66,11 +66,11 @@ describe('subscription-sync', () => {
       } as unknown as Stripe.Subscription;
 
       vi.mocked(prisma.auditEvent.findFirst).mockResolvedValue(null);
-      vi.mocked(prisma.tenant.findUnique).mockResolvedValue(mockTenant as any);
+      vi.mocked(prisma.tenant.findUnique).mockResolvedValue(mockTenant);
       vi.mocked(prisma.plan.findFirst).mockResolvedValue({
         id: 'team',
-      } as any);
-      vi.mocked(prisma.plan.findUnique).mockResolvedValue(mockPlan as any);
+      });
+      vi.mocked(prisma.plan.findUnique).mockResolvedValue(mockPlan);
       vi.mocked(prisma.addOnCatalog.findMany).mockResolvedValue([]);
       vi.mocked(prisma.addOn.findMany).mockResolvedValue([]);
       vi.mocked(prisma.subscription.findUnique).mockResolvedValue(null);
@@ -78,9 +78,9 @@ describe('subscription-sync', () => {
         tenantId,
         planId: 'team',
         status: 'ACTIVE',
-      } as any);
-      vi.mocked(prisma.creditLedger.create).mockResolvedValue({} as any);
-      vi.mocked(prisma.auditEvent.create).mockResolvedValue({} as any);
+      });
+      vi.mocked(prisma.creditLedger.create).mockResolvedValue({});
+      vi.mocked(prisma.auditEvent.create).mockResolvedValue({});
 
       const result = await syncStripeSubscription(
         mockSubscription as unknown as Stripe.Subscription,
@@ -109,7 +109,7 @@ describe('subscription-sync', () => {
         metadata: { tenantId: 'tenant_test' },
       } as unknown as Stripe.Subscription;
 
-      vi.mocked(prisma.auditEvent.findFirst).mockResolvedValue({} as any);
+      vi.mocked(prisma.auditEvent.findFirst).mockResolvedValue({});
 
       const result = await syncStripeSubscription(mockSubscription, eventId);
 
@@ -134,16 +134,16 @@ describe('subscription-sync', () => {
       };
 
       vi.mocked(prisma.auditEvent.findFirst).mockResolvedValue(null);
-      vi.mocked(prisma.subscription.update).mockResolvedValue({} as any);
-      vi.mocked(prisma.addOn.updateMany).mockResolvedValue({ count: 2 } as any);
-      vi.mocked(prisma.plan.findUnique).mockResolvedValue(freePlan as any);
+      vi.mocked(prisma.subscription.update).mockResolvedValue({});
+      vi.mocked(prisma.addOn.updateMany).mockResolvedValue({ count: 2 });
+      vi.mocked(prisma.plan.findUnique).mockResolvedValue(freePlan);
       vi.mocked(prisma.moduleCatalog.findMany).mockResolvedValue([
         { id: 'M1' },
         { id: 'M2' },
         { id: 'M3' },
-      ] as any);
-      vi.mocked(prisma.moduleState.upsert).mockResolvedValue({} as any);
-      vi.mocked(prisma.auditEvent.create).mockResolvedValue({} as any);
+      ]);
+      vi.mocked(prisma.moduleState.upsert).mockResolvedValue({});
+      vi.mocked(prisma.auditEvent.create).mockResolvedValue({});
 
       const result = await handleSubscriptionCancellation(mockSubscription, eventId);
 
@@ -169,7 +169,7 @@ describe('subscription-sync', () => {
         metadata: { tenantId: 'tenant_test' },
       } as unknown as Stripe.Subscription;
 
-      vi.mocked(prisma.auditEvent.findFirst).mockResolvedValue({} as any);
+      vi.mocked(prisma.auditEvent.findFirst).mockResolvedValue({});
 
       const result = await handleSubscriptionCancellation(mockSubscription, eventId);
 

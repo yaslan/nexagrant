@@ -70,8 +70,8 @@ export default async function OpportunityM2Page({
       <ConceptNoteEditor
         opportunityId={opp.id}
         templateId={templateId}
-        schema={template?.schema as any}
-        initialContent={(note?.content as any) || {}}
+        schema={template?.schema}
+        initialContent={(note?.content) || {}}
         noteId={note?.id}
       />
     </div>

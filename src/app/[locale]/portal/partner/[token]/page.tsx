@@ -116,14 +116,14 @@ export default async function PartnerPortalPage({ params }: PageProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {((part.content as any)?.budget || []).map((b: any, idx: number) => (
+                  {((part.content)?.budget || []).map((b: any, idx: number) => (
                     <tr key={idx} className="bg-surface hover:bg-ground">
                       <td className="p-3 font-bold text-ink">{b.partnerName}</td>
                       <td className="p-3 font-mono text-ink-2">{b.personMonths} PM</td>
                       <td className="p-3 text-right font-mono font-bold text-emerald-700">€{Number(b.requestedTotal).toLocaleString(locale)}</td>
                     </tr>
                   ))}
-                  {((part.content as any)?.budget || []).length === 0 && (
+                  {((part.content)?.budget || []).length === 0 && (
                     <tr className="bg-surface">
                       <td colSpan={3} className="p-4 text-center text-muted">{t('no_entries')}</td>
                     </tr>

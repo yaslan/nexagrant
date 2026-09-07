@@ -65,14 +65,14 @@ export function ApplicationClient({
   const [isAddingWp, setIsAddingWp] = useState(false);
 
   // Dynamic budget lines state
-  const initialBudget = (partA?.content as any)?.budget || [
+  const initialBudget = (partA?.content)?.budget || [
     { partnerName: 'Demo SME Consultancy (TR)', personMonths: 24, countryCoefficient: 1.0, requestedTotal: 165000 },
     { partnerName: 'Fraunhofer Institute (DE)', personMonths: 36, countryCoefficient: 1.0, requestedTotal: 247500 },
   ];
   const [budgetLines, setBudgetLines] = useState<any[]>(initialBudget);
 
   // Dynamic Work Packages state
-  const initialWps = (partB?.content as any)?.workPackages || [
+  const initialWps = (partB?.content)?.workPackages || [
     { code: 'WP1', title: 'Management & Coordination', leadPartner: 'Demo SME Consultancy', startMonth: 1, endMonth: 36, deliverables: ['D1.1 Data Management Plan'] },
     { code: 'WP2', title: 'System Requirements & Architecture', leadPartner: 'METU TTO', startMonth: 1, endMonth: 12, deliverables: ['D2.1 Technical Specs'] },
     { code: 'WP3', title: 'Prototyping & Pilot Testing', leadPartner: 'Fraunhofer Institute', startMonth: 7, endMonth: 24, deliverables: ['D3.1 Thermal Pilot'] },
@@ -278,9 +278,9 @@ export function ApplicationClient({
           partId={partB?.id || 'part-b-1'}
           opportunityTitle={opportunityTitle}
           tenantId={tenantId}
-          initialSections={(partB?.content as any)?.sections}
-          initialRevisions={(partB?.content as any)?.revisions}
-          initialComments={(partB?.content as any)?.comments}
+          initialSections={(partB?.content)?.sections}
+          initialRevisions={(partB?.content)?.revisions}
+          initialComments={(partB?.content)?.comments}
         />
       )}
 

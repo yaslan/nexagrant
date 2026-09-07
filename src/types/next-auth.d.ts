@@ -3,7 +3,7 @@
  * every session and token.
  *
  * NextAuth's own `Session` carries only `user` and `expires`, so before this
- * augmentation every reader wrote `(session as any).tenantId` — which dropped
+ * augmentation every reader wrote `(session).tenantId` — which dropped
  * type checking for the value that decides which tenant's rows a request may
  * touch. Declared here, a typo in a claim name is a build error.
  *

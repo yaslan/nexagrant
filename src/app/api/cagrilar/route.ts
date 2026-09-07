@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
               where: { identifier: t.identifier },
               update: {
                 title: t.title,
-                status: t.status as any,
+                status: t.status,
                 typeOfAction: t.typeOfAction,
                 isLumpSum: t.isLumpSum,
                 isTwoStage: t.isTwoStage,
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
               create: {
                 identifier: t.identifier,
                 title: t.title,
-                status: (t.status as any) || 'OPEN',
+                status: (t.status) || 'OPEN',
                 typeOfAction: t.typeOfAction,
                 isLumpSum: t.isLumpSum || false,
                 isTwoStage: t.isTwoStage || false,
