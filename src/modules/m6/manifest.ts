@@ -2,6 +2,7 @@
 // declares it as a TS enum, so `'MEMBER'` is not assignable to `Role` (TS2322).
 import { Role } from '@prisma/client';
 
+import { plansGrantingModule } from '@/lib/billing/catalog';
 import { ModuleManifest } from '@/lib/modules/types';
 
 export const m6Manifest: ModuleManifest = {
@@ -12,7 +13,8 @@ export const m6Manifest: ModuleManifest = {
   version: '1.0',
   requires: [],
   recommends: [],
-  planTiers: ['business', 'enterprise'],
+  // Which plans open this module is declared once, in the billing catalogue.
+  planTiers: plansGrantingModule('M6'),
   addOnSku: null,
   // Reached from an opportunity, so it contributes no sidebar entry.
   routes: [

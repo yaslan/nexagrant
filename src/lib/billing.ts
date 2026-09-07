@@ -1,4 +1,12 @@
 import { prisma } from './db';
+import {
+  CATALOG_CURRENCY,
+  FALLBACK_PLAN_ID,
+  PLAN_GRANTS,
+  findEntry,
+  grantsFor,
+  resolvePlanId,
+} from './billing/catalog';
 
 /**
  * prisma/schema.prisma `model AddOn` — one purchased add-on on a subscription.
@@ -29,6 +37,20 @@ export interface Entitlements {
   aiCreditsMonthly: number;
 }
 
+/**
+ * What a tenant is entitled to right now.
+ *
+ * Capacity and module grants come from the billing catalogue, not from the
+ * `Plan` row: the row is a projection of the catalogue written by the seed, and
+ * reading the catalogue directly means a stale or hand-edited row cannot
+ * silently hand out a module (TASK-MTR6QIE05ZKNH). Add-ons stay in the
+ * database, because they are per-subscription purchases rather than catalogue
+ * facts.
+ *
+ * A retired EUR plan id still sitting on a subscription resolves to its
+ * replacement (`team` → `pro`) instead of throwing, so a row the migration did
+ * not reach is served rather than locked out.
+ */
 export async function getEntitlements(tenantId: string): Promise<Entitlements> {
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
@@ -45,20 +67,18 @@ export async function getEntitlements(tenantId: string): Promise<Entitlements> {
     throw new Error(`Tenant not found: ${tenantId}`);
   }
 
-  let planId = 'free';
+  let planId: string = FALLBACK_PLAN_ID;
   if (tenant.subscription && ['TRIALING', 'ACTIVE'].includes(tenant.subscription.status)) {
-    planId = tenant.subscription.planId;
+    planId = resolvePlanId(tenant.subscription.planId);
   }
 
-  const plan = await prisma.plan.findUnique({
-    where: { id: planId },
-  });
+  const plan = grantsFor(planId);
 
   if (!plan) {
-    throw new Error(`Plan not found: ${planId}`);
+    throw new Error(`Plan not found in catalogue: ${planId}`);
   }
 
-  const allowedModules = new Set<string>(plan.modules);
+  const allowedModules = new Set<string>(plan.moduleIds);
   let seats = plan.seats + (tenant.subscription?.seatsExtra || 0);
   let workspaces = plan.workspaces + (tenant.subscription?.workspacesExtra || 0);
   let aiCreditsMonthly = plan.aiCreditsMonthly;
@@ -119,33 +139,42 @@ export interface PlanDetails {
   modules: string[];
 }
 
-export async function getAllPlans(): Promise<PlanDetails[]> {
-  const plans = await prisma.plan.findMany({
-    orderBy: { id: 'asc' },
+/**
+ * The plan ladder as the product sells it. Derived from the catalogue rather
+ * than queried, so this and the pricing panels cannot disagree; `free` is
+ * excluded because it is a fallback state, not a purchasable plan.
+ *
+ * Prices are **list** prices — the campaign discount belongs to checkout.
+ */
+export function getAllPlans(): PlanDetails[] {
+  return PLAN_GRANTS.filter((grant) => grant.purchasable).map((grant) => {
+    const entry = findEntry(grant.planId);
+    if (!entry || entry.kind !== 'plan') {
+      throw new Error(`Purchasable plan ${grant.planId} has no catalogue price`);
+    }
+    return {
+      id: grant.planId,
+      name: grant.name,
+      price: {
+        monthly: entry.monthlyListMinor,
+        yearly: entry.yearlyListMinor,
+        currency: CATALOG_CURRENCY,
+      },
+      seats: grant.seats,
+      workspaces: grant.workspaces,
+      aiCreditsMonthly: grant.aiCreditsMonthly,
+      modules: [...grant.moduleIds],
+    };
   });
-
-  return plans.map((plan: (typeof plans)[number]) => ({
-    id: plan.id,
-    name: plan.name,
-    price: {
-      monthly: plan.monthlyCents,
-      yearly: plan.yearlyCents,
-      currency: plan.currency,
-    },
-    seats: plan.seats,
-    workspaces: plan.workspaces,
-    aiCreditsMonthly: plan.aiCreditsMonthly,
-    modules: plan.modules,
-  }));
 }
 
-export function formatPrice(cents: number, currency: string = 'EUR'): string {
-  const euros = cents / 100;
+export function formatPrice(cents: number, currency: string = CATALOG_CURRENCY): string {
+  const major = cents / 100;
   const formatter = new Intl.NumberFormat('tr-TR', {
     style: 'currency',
     currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
-  return formatter.format(euros);
+  return formatter.format(major);
 }

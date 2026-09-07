@@ -83,11 +83,9 @@ const MODULE_METADATA: Record<ModuleId, { descriptionTr: string; category: 'core
 };
 
 const PLAN_BADGES: Record<PlanTier, { label: string; bg: string; text: string }> = {
-  discover: { label: 'Discover', bg: 'bg-ground text-ink-2 border border-border', text: 'text-ink-2' },
-  starter: { label: 'Starter', bg: 'bg-accent/15 text-accent-ink border border-accent/20', text: 'text-accent-ink' },
-  team: { label: 'Team', bg: 'bg-ok/15 text-ok border border-ok/20', text: 'text-ok' },
-  business: { label: 'Business', bg: 'bg-purple-500/15 text-purple-400 border border-purple-500/20', text: 'text-purple-400' },
-  enterprise: { label: 'Enterprise', bg: 'bg-amber/15 text-amber border border-amber/20', text: 'text-amber' },
+  basic: { label: 'Basic', bg: 'bg-accent/15 text-accent-ink border border-accent/20', text: 'text-accent-ink' },
+  pro: { label: 'Pro', bg: 'bg-ok/15 text-ok border border-ok/20', text: 'text-ok' },
+  ultra: { label: 'Ultra', bg: 'bg-amber/15 text-amber border border-amber/20', text: 'text-amber' },
 };
 
 /**

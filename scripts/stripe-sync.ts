@@ -11,7 +11,10 @@ async function syncPlans() {
   const plans = await prisma.plan.findMany();
 
   for (const plan of plans) {
-    if (plan.id === 'free' || plan.id === 'enterprise') continue; // Free and Enterprise (custom) are not directly synced with fixed prices
+    // `free` is the no-subscription fallback, not a purchasable plan, so it has
+    // nothing to sync. (`enterprise` used to be skipped here too — it was a
+    // contract-priced tier and was retired with the EUR ladder.)
+    if (plan.id === 'free') continue;
 
     // Create or retrieve product
     const productId = `prod_${plan.id}`;

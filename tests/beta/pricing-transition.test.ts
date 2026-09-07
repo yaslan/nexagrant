@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import fs from 'fs';
-import path from 'path';
+import { PLAN_GRANTS } from '@/lib/billing/catalog';
 import {
   BETA_CHECKIN_TOTAL,
   CATALOGUE_LIST_CENTS,
@@ -143,21 +142,31 @@ describe('date arithmetic', () => {
 });
 
 describe('catalogue prices', () => {
-  // The offer maths must stay pure, so the plan prices are duplicated out of
-  // prisma/seed.ts. This test is the only thing stopping the duplicate from rotting.
-  it('agrees with the plan rows seeded in prisma/seed.ts', () => {
-    const seed = fs.readFileSync(path.resolve(__dirname, '../../prisma/seed.ts'), 'utf8');
-    const seeded = new Map<string, { monthly: number; annual: number }>();
-    const pattern = /\{\s*id:\s*'([a-z]+)',[^}]*?monthlyCents:\s*(\d+),\s*yearlyCents:\s*(\d+)/g;
-    for (const match of seed.matchAll(pattern)) {
-      const [, id, monthly, annual] = match;
-      if (id && monthly && annual) seeded.set(id, { monthly: Number(monthly), annual: Number(annual) });
-    }
-    expect(seeded.size).toBeGreaterThan(0);
-    for (const [id, prices] of seeded) {
-      expect(CATALOGUE_LIST_CENTS[id], `plan "${id}" is seeded but missing from CATALOGUE_LIST_CENTS`).toEqual(
-        prices
-      );
+  // The beta anchors used to be checked against the literal plan rows in
+  // prisma/seed.ts. Those literals are gone: the seed now derives `Plan` from
+  // src/lib/billing/catalog.ts (TASK-MTR6QIE05ZKNH), so the regex matched
+  // nothing and the guard would have held on an empty map.
+  //
+  // What has to be guarded now is the opposite of what it was: the beta ladder
+  // is the *retired* EUR list, frozen because the E11 offers were made against
+  // it, and it must not be confused with the live catalogue. So assert both
+  // that the anchors are intact and that they are not the catalogue's.
+  it('keeps the frozen EUR beta anchors, which are not the live catalogue', () => {
+    expect(CATALOGUE_LIST_CENTS).toEqual({
+      free: { monthly: 0, annual: 0 },
+      starter: { monthly: 5900, annual: 56600 },
+      team: { monthly: 24900, annual: 239000 },
+      business: { monthly: 59900, annual: 575000 },
+      enterprise: { monthly: 150000, annual: 1440000 },
+    });
+
+    // No live plan may be silently priced off a beta anchor: the ids are disjoint.
+    for (const grant of PLAN_GRANTS) {
+      if (grant.planId === 'free') continue; // the fallback plan kept its id
+      expect(
+        CATALOGUE_LIST_CENTS[grant.planId],
+        `live plan "${grant.planId}" must not appear in the frozen beta ladder`
+      ).toBeUndefined();
     }
   });
 

@@ -28,8 +28,12 @@ export const BETA_MODULE_SETS = {
 
 export type BetaModuleSet = keyof typeof BETA_MODULE_SETS;
 
-/** Plan the beta tenants are put on so no module is blocked by a plan tier. */
-export const BETA_PLAN_ID = 'enterprise';
+/**
+ * Plan the beta tenants are put on so no module is blocked by a plan tier.
+ * Was `enterprise`; that plan was retired with the EUR ladder
+ * (TASK-MTR6QIE05ZKNH) and `ultra` is the tier that now grants all 11 modules.
+ */
+export const BETA_PLAN_ID = 'ultra';
 
 /** Number of weekly check-ins across the beta (S8 → S16). */
 export const BETA_CHECKIN_WEEKS = 8;

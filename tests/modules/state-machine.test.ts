@@ -4,27 +4,35 @@ import { ModuleId } from '../../src/lib/modules/types';
 
 describe('Module State Machine', () => {
   describe('canEnable', () => {
-    it('allows enabling M1 (no dependencies) on team plan', () => {
-      const result = canEnable('M1', [], 'team');
+    it('allows enabling M1 (no dependencies) on the pro plan', () => {
+      const result = canEnable('M1', [], 'pro');
       expect(result.allowed).toBe(true);
     });
 
-    it('rejects M1 on discover plan (plan tier restriction)', () => {
-      const result = canEnable('M1', [], 'discover');
+    it('rejects M1 on the basic plan (plan tier restriction)', () => {
+      const result = canEnable('M1', [], 'basic');
       expect(result.allowed).toBe(false);
       expect(result.reason).toBe('Plan upgrade required.');
     });
 
     it('rejects M4 if M1 is not active', () => {
-      const result = canEnable('M4', [], 'business');
+      const result = canEnable('M4', [], 'ultra');
       expect(result.allowed).toBe(false);
       expect(result.reason).toBe('Missing dependencies.');
       expect(result.missingDependencies).toContain('M1');
     });
 
     it('allows M4 if M1 is active', () => {
-      const result = canEnable('M4', ['M1'], 'business');
+      const result = canEnable('M4', ['M1'], 'ultra');
       expect(result.allowed).toBe(true);
+    });
+
+    it('opens M6 on ultra and refuses it on basic — the retired EUR ladder no longer decides', () => {
+      expect(canEnable('M6', [], 'ultra').allowed).toBe(true);
+      expect(canEnable('M6', [], 'basic')).toMatchObject({
+        allowed: false,
+        reason: 'Plan upgrade required.',
+      });
     });
   });
 

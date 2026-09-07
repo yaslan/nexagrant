@@ -235,12 +235,19 @@ export function resolveBetaTransition(input: TransitionInput): TransitionOffer {
 }
 
 /**
- * Catalogue list prices, in EUR cents, mirroring the plan rows seeded in
- * `prisma/seed.ts` §2 (and the table in `docs/BILLING.md` §1).
+ * The **beta-era** list prices, in EUR cents — the retired
+ * `free/starter/team/business/enterprise` ladder.
  *
- * Duplicated here so the offer maths and the report stay pure — no database in a
- * pure function. `tests/beta/pricing-transition.test.ts` reads `prisma/seed.ts` and
- * fails if the two ever disagree, so the duplicate cannot rot silently.
+ * These are frozen on purpose. They are the prices the E11 design partners were
+ * shown, and the percentages in `TRANSITION_TIERS` are discounts *off these
+ * numbers*; re-denominating them in the live USD catalogue would silently
+ * restate an offer that has already been made. They are therefore no longer a
+ * mirror of `prisma/seed.ts` §2 — since TASK-MTR6QIE05ZKNH the seeded `Plan`
+ * rows come from `src/lib/billing/catalog.ts` (USD `basic/pro/ultra`) and the
+ * two ladders are different things.
+ *
+ * What the beta cohort actually pays at GA — which of these EUR anchors carries
+ * over, and onto which USD plan — is an open decision, docs/BILLING.md §9.
  */
 export const CATALOGUE_LIST_CENTS: Record<string, { monthly: number; annual: number }> = {
   free: { monthly: 0, annual: 0 },

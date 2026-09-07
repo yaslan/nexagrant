@@ -47,7 +47,11 @@ export async function toggleModuleState(
     const activeModules = activeStates.map((s) => s.moduleId as ModuleId);
     
     // Get tenant's current plan
-    let currentPlan: PlanTier = 'team';
+    // Fallback when the tenant has no subscription row. Kept at the middle
+    // tier the EUR ladder used ('team' → 'pro') so retiring the ladder does not
+    // quietly change who can enable what; that this default is permissive at
+    // all is a separate question — docs/BILLING.md §9, open card.
+    let currentPlan: PlanTier = 'pro';
     const subscription = await withTenant<{ planId: string } | null>(tenantId, (tx) =>
       tx.subscription.findFirst({
         where: { tenantId },

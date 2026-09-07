@@ -199,12 +199,12 @@ model ModuleState {
   @@unique([tenantId, moduleId])
 }
 
-model Plan {                    // seeded: free, starter, team, business, enterprise
-  id            String  @id    // "team"
+model Plan {                    // projection of src/lib/billing/catalog.ts; seeded: free, basic, pro, ultra
+  id            String  @id    // "pro"
   name          String
-  monthlyCents  Int
+  monthlyCents  Int            // list price, minor units — the campaign discount lives at checkout
   yearlyCents   Int
-  currency      String  @default("EUR")
+  currency      String  @default("USD")
   seats         Int
   workspaces    Int
   aiCreditsMonthly Int

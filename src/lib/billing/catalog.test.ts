@@ -12,6 +12,12 @@ import {
   tierForSubscriberCount,
   UnknownSkuError,
   UnsupportedCycleError,
+  FALLBACK_PLAN_ID,
+  PLAN_GRANTS,
+  RETIRED_PLAN_IDS,
+  grantsFor,
+  plansGrantingModule,
+  resolvePlanId,
   type DiscountTier,
 } from './catalog';
 import { DEFAULT_ACTIVE_TIER, resolveConfiguredTier } from './active-tier';
@@ -213,5 +219,79 @@ describe('active tier resolution', () => {
 
   it('falls back loudly instead of guessing when the setting is unreadable', () => {
     expect(resolveConfiguredTier('50%').code).toBe(DEFAULT_ACTIVE_TIER.code);
+  });
+});
+
+describe('plan entitlements', () => {
+  it('prices every purchasable plan and never prices the fallback', () => {
+    for (const grant of PLAN_GRANTS) {
+      const entry = findEntry(grant.planId);
+      if (grant.purchasable) {
+        expect(entry, `${grant.planId} is sold but not in CATALOG`).not.toBeNull();
+      } else {
+        // `free` must stay out of CATALOG, or a pricing panel would render it.
+        expect(entry, `${grant.planId} is not sold and must not be in CATALOG`).toBeNull();
+      }
+    }
+    expect(grantsFor(FALLBACK_PLAN_ID)?.purchasable).toBe(false);
+  });
+
+  it('grants strictly more the further up the ladder you pay', () => {
+    const ladder = ['free', 'basic', 'pro', 'ultra'] as const;
+    for (let i = 1; i < ladder.length; i += 1) {
+      const lower = grantsFor(ladder[i - 1]!)!;
+      const upper = grantsFor(ladder[i]!)!;
+      for (const moduleId of lower.moduleIds) {
+        expect(
+          upper.moduleIds,
+          `${upper.planId} must not drop ${moduleId} that ${lower.planId} grants`
+        ).toContain(moduleId);
+      }
+      expect(upper.seats).toBeGreaterThanOrEqual(lower.seats);
+      expect(upper.workspaces).toBeGreaterThanOrEqual(lower.workspaces);
+      expect(upper.aiCreditsMonthly).toBeGreaterThanOrEqual(lower.aiCreditsMonthly);
+    }
+  });
+
+  it('opens M6 and M7 on ultra only', () => {
+    expect(plansGrantingModule('M6')).toEqual(['ultra']);
+    expect(plansGrantingModule('M7')).toEqual(['ultra']);
+    expect(plansGrantingModule('M3')).toEqual(['basic', 'pro', 'ultra']);
+    // The fallback plan grants M3 but is never a tier you can be gated up to.
+    expect(plansGrantingModule('M3')).not.toContain('free');
+  });
+
+  it('retires every EUR plan id onto a plan that still exists', () => {
+    for (const [retired, replacement] of Object.entries(RETIRED_PLAN_IDS)) {
+      expect(grantsFor(replacement), `${retired} → ${replacement} is not a plan`).not.toBeNull();
+      expect(resolvePlanId(retired)).toBe(replacement);
+      expect(resolvePlanId(retired.toUpperCase())).toBe(replacement);
+    }
+  });
+
+  it('never takes a module away from a migrated subscription', () => {
+    // The EUR ladder's module sets, as they were the day it was retired
+    // (prisma/migrations/retire-eur-plan-ladder.down.sql). Every one of them
+    // must survive the mapping, or the migration silently downgraded a tenant.
+    const retiredModules: Record<string, string[]> = {
+      starter: ['M3', 'M5', 'M2'],
+      team: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'],
+      business: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8', 'M6', 'M9', 'M10', 'M11'],
+      enterprise: ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11'],
+    };
+    for (const [retired, modules] of Object.entries(retiredModules)) {
+      const replacement = grantsFor(retired)!;
+      for (const moduleId of modules) {
+        expect(
+          replacement.moduleIds,
+          `${retired} → ${replacement.planId} would lose ${moduleId}`
+        ).toContain(moduleId);
+      }
+    }
+  });
+
+  it('leaves an unknown plan id alone so the caller fails loudly', () => {
+    expect(resolvePlanId('platinum')).toBe('platinum');
+    expect(grantsFor('platinum')).toBeNull();
   });
 });

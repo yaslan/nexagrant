@@ -30,7 +30,8 @@ export default async function ModulesSettingsPage({
   }
 
   const state = {
-    currentPlan: 'team' as PlanTier,
+    // Same permissive fallback as the server action — see actions.ts.
+    currentPlan: 'pro' as PlanTier,
     activeModules: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'] as ModuleId[],
     tenantName: 'Varsayılan Çalışma Alanı'
   };

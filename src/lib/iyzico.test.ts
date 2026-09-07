@@ -50,7 +50,7 @@ type MockedPrisma = Record<string, Record<string, MockFn> & MockFn>;
 const db = prisma as unknown as MockedPrisma;
 
 function planRow(id: string, credits: number, modules: string[]) {
-  return { id, name: id, monthlyCents: 0, yearlyCents: 0, currency: 'EUR', seats: 3, workspaces: 1, aiCreditsMonthly: credits, modules };
+  return { id, name: id, monthlyCents: 0, yearlyCents: 0, currency: 'USD', seats: 3, workspaces: 1, aiCreditsMonthly: credits, modules };
 }
 
 function successfulDetail(overrides: Record<string, unknown> = {}) {
@@ -82,15 +82,15 @@ beforeEach(() => {
   vi.unstubAllGlobals();
   db.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma));
   db.tenant.findUnique.mockResolvedValue({ id: TENANT, name: 'Anadolu' });
-  db.plan.findUnique.mockResolvedValue(planRow('team', 500, ['M1', 'M2', 'M3']));
+  db.plan.findUnique.mockResolvedValue(planRow('pro', 500, ['M1', 'M2', 'M3']));
   db.subscription.findUnique.mockResolvedValue(null);
   db.auditEvent.findFirst.mockResolvedValue(null);
 });
 
 describe('conversationId', () => {
   it('round-trips tenant, plan and interval', () => {
-    const id = buildConversationId(TENANT, 'team', 'year');
-    expect(parseConversationId(id)).toMatchObject({ tenantId: TENANT, planId: 'team', interval: 'year' });
+    const id = buildConversationId(TENANT, 'pro', 'year');
+    expect(parseConversationId(id)).toMatchObject({ tenantId: TENANT, planId: 'pro', interval: 'year' });
   });
 
   it('rejects a conversationId we did not mint', () => {
@@ -103,30 +103,30 @@ describe('conversationId', () => {
 
 describe('signature verification', () => {
   it('accepts a correctly signed notification', () => {
-    const n = notificationFor(buildConversationId(TENANT, 'team', 'month'));
+    const n = notificationFor(buildConversationId(TENANT, 'pro', 'month'));
     expect(verifyIyzicoSignature(n, signNotification(n, SECRET), SECRET)).toBe(true);
   });
 
   it('rejects a missing signature', () => {
-    const n = notificationFor(buildConversationId(TENANT, 'team', 'month'));
+    const n = notificationFor(buildConversationId(TENANT, 'pro', 'month'));
     expect(verifyIyzicoSignature(n, null, SECRET)).toBe(false);
     expect(verifyIyzicoSignature(n, '', SECRET)).toBe(false);
   });
 
   it('rejects a body edited after signing', () => {
-    const n = notificationFor(buildConversationId(TENANT, 'team', 'month'));
+    const n = notificationFor(buildConversationId(TENANT, 'pro', 'month'));
     const signature = signNotification(n, SECRET);
     const tampered = { ...n, status: 'FAILURE' };
     expect(verifyIyzicoSignature(tampered, signature, SECRET)).toBe(false);
   });
 
   it('rejects a signature made with another secret', () => {
-    const n = notificationFor(buildConversationId(TENANT, 'team', 'month'));
+    const n = notificationFor(buildConversationId(TENANT, 'pro', 'month'));
     expect(verifyIyzicoSignature(n, signNotification(n, 'attacker-secret'), SECRET)).toBe(false);
   });
 
   it('rejects a wrong-length signature without throwing', () => {
-    const n = notificationFor(buildConversationId(TENANT, 'team', 'month'));
+    const n = notificationFor(buildConversationId(TENANT, 'pro', 'month'));
     expect(verifyIyzicoSignature(n, 'deadbeef', SECRET)).toBe(false);
   });
 });
@@ -157,7 +157,7 @@ describe('createIyzicoCheckout', () => {
 
     const result = await createIyzicoCheckout({
       tenantId: TENANT,
-      planId: 'team',
+      planId: 'pro',
       interval: 'month',
       buyer: { id: 'u1', name: 'Ada', surname: 'Yılmaz', email: 'ada@example.com' },
       callbackUrl: 'https://app.example.com/tr/billing/iyzico/return',
@@ -165,7 +165,7 @@ describe('createIyzicoCheckout', () => {
 
     expect(result.status).toBe('success');
     expect(result.token).toBe('tok_9');
-    expect(result.priceMinor).toBe(tryPriceMinor('team', 'month'));
+    expect(result.priceMinor).toBe(tryPriceMinor('pro', 'month'));
     expect(result.currency).toBe('TRY');
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
@@ -176,7 +176,7 @@ describe('createIyzicoCheckout', () => {
     expect(sent.price).toBe('7850.00');
     expect(sent.paidPrice).toBe('7850.00');
     expect(sent.currency).toBe('TRY');
-    expect(parseConversationId(sent.conversationId)).toMatchObject({ tenantId: TENANT, planId: 'team' });
+    expect(parseConversationId(sent.conversationId)).toMatchObject({ tenantId: TENANT, planId: 'pro' });
   });
 
   it('reports a provider failure instead of pretending success', async () => {
@@ -187,7 +187,7 @@ describe('createIyzicoCheckout', () => {
 
     const result = await createIyzicoCheckout({
       tenantId: TENANT,
-      planId: 'team',
+      planId: 'pro',
       interval: 'month',
       buyer: { id: 'u1', name: 'Ada', surname: 'Yılmaz', email: 'ada@example.com' },
       callbackUrl: 'https://app.example.com/return',
@@ -213,7 +213,7 @@ describe('createIyzicoCheckout', () => {
 
 describe('handleIyzicoWebhook', () => {
   it('activates the subscription and records an invoice on a successful payment', async () => {
-    const conversationId = buildConversationId(TENANT, 'team', 'month');
+    const conversationId = buildConversationId(TENANT, 'pro', 'month');
     const result = await handleIyzicoWebhook(notificationFor(conversationId), {
       retrievePayment: async () => successfulDetail({ conversationId }),
     });
@@ -222,7 +222,7 @@ describe('handleIyzicoWebhook', () => {
       success: true,
       outcome: 'synced',
       tenantId: TENANT,
-      planId: 'team',
+      planId: 'pro',
       status: 'ACTIVE',
       amountMinor: 785_000,
       currency: 'TRY',
@@ -232,7 +232,7 @@ describe('handleIyzicoWebhook', () => {
     expect(db.subscription.upsert).toHaveBeenCalledTimes(1);
     const upsert = db.subscription.upsert.mock.calls[0][0];
     expect(upsert.where).toEqual({ tenantId: TENANT });
-    expect(upsert.create).toMatchObject({ provider: 'iyzico', status: 'ACTIVE', planId: 'team' });
+    expect(upsert.create).toMatchObject({ provider: 'iyzico', status: 'ACTIVE', planId: 'pro' });
 
     expect(db.creditLedger.create).toHaveBeenCalledTimes(1);
 
@@ -247,7 +247,7 @@ describe('handleIyzicoWebhook', () => {
   });
 
   it('is idempotent: the same event twice writes once', async () => {
-    const conversationId = buildConversationId(TENANT, 'team', 'month');
+    const conversationId = buildConversationId(TENANT, 'pro', 'month');
     const notification = notificationFor(conversationId);
     const retrievePayment = async () => successfulDetail({ conversationId });
 
@@ -283,7 +283,7 @@ describe('handleIyzicoWebhook', () => {
   });
 
   it('refuses a payment the provider reports as unsuccessful, even when the body says SUCCESS', async () => {
-    const conversationId = buildConversationId(TENANT, 'team', 'month');
+    const conversationId = buildConversationId(TENANT, 'pro', 'month');
     const result = await handleIyzicoWebhook(notificationFor(conversationId), {
       retrievePayment: async () => successfulDetail({ conversationId, paymentStatus: 'FAILURE' }),
     });
@@ -293,9 +293,9 @@ describe('handleIyzicoWebhook', () => {
   });
 
   it('refuses a payment that belongs to a different conversation', async () => {
-    const conversationId = buildConversationId(TENANT, 'team', 'month');
+    const conversationId = buildConversationId(TENANT, 'pro', 'month');
     const result = await handleIyzicoWebhook(notificationFor(conversationId), {
-      retrievePayment: async () => successfulDetail({ conversationId: buildConversationId('other', 'team', 'month') }),
+      retrievePayment: async () => successfulDetail({ conversationId: buildConversationId('other', 'pro', 'month') }),
     });
 
     expect(result).toMatchObject({ success: false, outcome: 'not_attributable' });
@@ -304,7 +304,7 @@ describe('handleIyzicoWebhook', () => {
 
   it('refuses an unknown tenant', async () => {
     db.tenant.findUnique.mockResolvedValue(null);
-    const conversationId = buildConversationId('ghost-tenant', 'team', 'month');
+    const conversationId = buildConversationId('ghost-tenant', 'pro', 'month');
     const result = await handleIyzicoWebhook(notificationFor(conversationId), {
       retrievePayment: async () => successfulDetail({ conversationId }),
     });
@@ -314,8 +314,8 @@ describe('handleIyzicoWebhook', () => {
   });
 
   it('does not re-grant credits when an already-active subscription renews', async () => {
-    db.subscription.findUnique.mockResolvedValue({ tenantId: TENANT, planId: 'team', status: 'ACTIVE' });
-    const conversationId = buildConversationId(TENANT, 'team', 'month');
+    db.subscription.findUnique.mockResolvedValue({ tenantId: TENANT, planId: 'pro', status: 'ACTIVE' });
+    const conversationId = buildConversationId(TENANT, 'pro', 'month');
 
     const result = await handleIyzicoWebhook(notificationFor(conversationId), {
       retrievePayment: async () => successfulDetail({ conversationId }),
@@ -326,14 +326,14 @@ describe('handleIyzicoWebhook', () => {
   });
 
   it('turns off modules the new plan no longer covers on a downgrade', async () => {
-    db.subscription.findUnique.mockResolvedValue({ tenantId: TENANT, planId: 'business', status: 'ACTIVE' });
+    db.subscription.findUnique.mockResolvedValue({ tenantId: TENANT, planId: 'ultra', status: 'ACTIVE' });
     db.plan.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) =>
-      where.id === 'business'
-        ? planRow('business', 2000, ['M1', 'M2', 'M3', 'M6', 'M9'])
-        : planRow('team', 500, ['M1', 'M2', 'M3'])
+      where.id === 'ultra'
+        ? planRow('ultra', 2000, ['M1', 'M2', 'M3', 'M6', 'M9'])
+        : planRow('pro', 500, ['M1', 'M2', 'M3'])
     );
 
-    const conversationId = buildConversationId(TENANT, 'team', 'month');
+    const conversationId = buildConversationId(TENANT, 'pro', 'month');
     const result = await handleIyzicoWebhook(notificationFor(conversationId), {
       retrievePayment: async () => successfulDetail({ conversationId }),
     });

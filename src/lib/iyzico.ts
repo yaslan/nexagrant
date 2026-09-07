@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { prisma } from './db';
 import { env } from './env';
 import { toDecimalString, toMinorUnits } from './money';
+import { resolvePlanId } from './billing/catalog';
 
 /**
  * iyzico billing (BILLING.md §4 — phase 2, TRY).
@@ -58,23 +59,48 @@ export type BillingInterval = 'month' | 'year';
 /**
  * TRY list prices in **kuruş** (minor units, rule 9).
  *
- * BILLING.md §4 puts the eventual home of this list in `Plan.prices[]` JSON;
- * until that column exists this table is the single place a TRY price is
- * written, and `createIyzicoCheckout` reads the price from here rather than
- * from its caller — a client-supplied amount is a payment-tampering vector.
+ * ⚠️ STALE — these amounts do not follow the USD catalogue, and they are the
+ * open card `TRY-FX-1` (docs/BILLING.md §4), not a rate anyone has signed off.
+ *
+ * They were derived from the retired EUR ladder at a hand-typed rate of roughly
+ * 31.4 TRY/EUR, undated and recorded nowhere. TASK-MTR6QIE05ZKNH re-keyed them
+ * onto the surviving plan ids so nothing points at a plan that no longer
+ * exists, and deliberately did **not** re-derive the amounts: inventing a
+ * USD/TRY rate is a pricing decision, not a refactor.
+ *
+ * What the amounts imply against the catalogue's monthly USD list price:
+ *
+ *   basic  ₺1,850  / $45   =  41.1 TRY per USD
+ *   pro    ₺7,850  / $87   =  90.2 TRY per USD
+ *   ultra  ₺18,900 / $147  = 128.6 TRY per USD
+ *
+ * One table, one currency pair, three rates 3.1× apart — so at least two of
+ * them are wrong whatever the real rate turns out to be, and a Turkish buyer on
+ * `ultra` would be charged roughly three times a card buyer on the same plan.
+ * iyzico is phase 2 and no live subscription uses it (`Subscription.provider`
+ * is `stripe` on every row as of 2026-09-07), so this is a risk, not an active
+ * overcharge — but it must be repriced before the provider is switched on.
+ *
+ * `enterprise` had its own row (₺45,000/mo); it now maps to `ultra`, which
+ * `business` also maps to, and the lower of the two is kept — a migration must
+ * not raise anybody's price.
  */
 export const TRY_PLAN_PRICES: Record<
   string,
   { name: string; monthlyMinor: number; yearlyMinor: number }
 > = {
-  starter: { name: 'Başlangıç Planı', monthlyMinor: 185_000, yearlyMinor: 1_776_000 },
-  team: { name: 'Ekip Planı', monthlyMinor: 785_000, yearlyMinor: 7_536_000 },
-  business: { name: 'İşletme Planı', monthlyMinor: 1_890_000, yearlyMinor: 18_144_000 },
-  enterprise: { name: 'Kurumsal Plan', monthlyMinor: 4_500_000, yearlyMinor: 43_200_000 },
+  basic: { name: 'Basic Planı', monthlyMinor: 185_000, yearlyMinor: 1_776_000 },
+  pro: { name: 'Pro Planı', monthlyMinor: 785_000, yearlyMinor: 7_536_000 },
+  ultra: { name: 'Ultra Planı', monthlyMinor: 1_890_000, yearlyMinor: 18_144_000 },
 };
 
+/**
+ * TRY price for a plan. A retired EUR plan id (`team`, `business`…) resolves to
+ * its replacement rather than returning null, so an in-flight link built before
+ * the ladder was retired still prices.
+ */
 export function tryPriceMinor(planId: string, interval: BillingInterval): number | null {
-  const row = TRY_PLAN_PRICES[planId];
+  const row = TRY_PLAN_PRICES[resolvePlanId(planId)];
   if (!row) return null;
   return interval === 'year' ? row.yearlyMinor : row.monthlyMinor;
 }
@@ -231,13 +257,17 @@ interface IyzicoInitResponse {
 export async function createIyzicoCheckout(
   params: IyzicoCheckoutParams
 ): Promise<IyzicoCheckoutResult> {
-  const { tenantId, planId, interval, buyer, callbackUrl } = params;
+  const { tenantId, interval, buyer, callbackUrl } = params;
 
   if (!tenantId) throw new Error('createIyzicoCheckout requires a tenantId');
 
   const config = getIyzicoConfig();
   if (!config) throw new Error('iyzico is not configured (IYZICO_API_KEY / IYZICO_SECRET_KEY)');
 
+  // A retired EUR plan id is normalised here, before it is written into the
+  // conversationId — that id is what the webhook later looks the plan up by,
+  // and `Plan` no longer has a `team` row to find.
+  const planId = resolvePlanId(params.planId);
   const price = TRY_PLAN_PRICES[planId];
   const priceMinor = tryPriceMinor(planId, interval);
   if (!price || priceMinor === null) {

@@ -55,6 +55,7 @@ yüzden bir tasarım ortağının hattında ya da KPI panosunda **görünmez**. 
 
 - `ModuleCatalog` manifestlerden seed; `ModuleState(tenant, module) ∈ {OFF, DEV, PILOT, ON}`.
 - `Plan` → varsayılan `modules[]`, koltuk, çalışma alanı, kredi; `AddOn(sku)` → `AddOnCatalog.grantsModule|grantsSeats|grantsCredits|grantsWorkspaces`.
+- `Plan` **elle yazılmaz**: `src/lib/billing/catalog.ts`'in izdüşümüdür (`free`, `basic`, `pro`, `ultra`; USD liste fiyatı) ve `prisma/seed.ts` §2 tarafından yazılır. EUR merdiveni (`starter/team/business/enterprise`) `prisma/migrations/retire-eur-plan-ladder.sql` ile emekliye ayrıldı — eşleme tablosu ve gerekçesi `docs/BILLING.md` §9. `Subscription.planId`'de yabancı anahtar **yoktur**; emekli bir id ile karşılaşan kod `resolvePlanId()` ile karşılığına çevirir.
 - Etkin kapsam (`entitlements(tenant)`) = plan + aktif eklentiler; `canEnable` bunu ve bağımlılıkları kontrol eder.
 
 ## 6. İndeks ve performans notları

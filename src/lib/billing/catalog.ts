@@ -12,8 +12,9 @@
  *
  * Canonical list (owner decision, 2026-09-07): the USD three-plan catalogue the
  * customer is shown today. The internal EUR five-plan list (free/starter/team/
- * business/enterprise in `prisma/schema.prisma model Plan`) is retired
- * separately in TASK-MTR6QIE05ZKNH — this file does not touch it.
+ * business/enterprise) was retired in TASK-MTR6QIE05ZKNH; what a plan *opens*
+ * now lives at the bottom of this file (`PLAN_GRANTS`), so the `Plan` table,
+ * the entitlement calculation and every module manifest read one list.
  *
  * CLAUDE.md rule 9: every amount is an `Int` in the currency's minor unit
  * (cents) plus a currency code. There is no floating-point dollar in here.
@@ -301,4 +302,140 @@ export function priceLine(request: PriceRequest, tier: DiscountTier): PricedLine
       billingCycle === 'yearly' ? Math.round(amountMinor / MONTHS_PER_YEAR) : amountMinor,
     recurringInterval: billingCycle === 'yearly' ? 'year' : 'month',
   };
+}
+
+// ─────────────────────── Entitlements: what a plan opens ───────────────────────
+//
+// TASK-MTR6QIE05ZKNH. Until now the product knew two plan ladders: the USD one
+// above, which is what a customer is actually shown and charged, and an
+// internal EUR one (`free/starter/team/business/enterprise`) that decided which
+// modules, seats, workspaces and AI credits a tenant got. Authorisation
+// therefore did not recognise the thing the customer had bought.
+//
+// The USD ladder wins (owner decision, 2026-09-07). Everything below is the
+// *entitlement* half of the catalogue: no prices, no discounting, nothing that
+// touches `priceLine`. `prisma/seed.ts` writes the `Plan` table from it,
+// `src/lib/billing.ts` computes entitlements from it, and each module manifest
+// derives its `planTiers` from it, so the fact "Ultra opens M6" is typed once.
+
+/**
+ * The plan a tenant is on when it has no active subscription.
+ *
+ * It is not for sale — it never appears in `CATALOG`, so no pricing panel can
+ * render it — but it must exist as a `Plan` row, because `getEntitlements`
+ * falls back to it for every tenant without a live subscription.
+ */
+export const FALLBACK_PLAN_ID = 'free';
+
+export type EntitlementPlanId = PlanId | typeof FALLBACK_PLAN_ID;
+
+export interface PlanGrant {
+  planId: EntitlementPlanId;
+  name: string;
+  /** False for `free`: a state a tenant falls into, not a thing it can buy. */
+  purchasable: boolean;
+  seats: number;
+  workspaces: number;
+  aiCreditsMonthly: number;
+  /** Modules switched on by the plan itself, before any add-on. */
+  moduleIds: readonly string[];
+}
+
+const ALL_MODULE_IDS = [
+  'M1',
+  'M2',
+  'M3',
+  'M4',
+  'M5',
+  'M6',
+  'M7',
+  'M8',
+  'M9',
+  'M10',
+  'M11',
+] as const;
+
+export const PLAN_GRANTS: readonly PlanGrant[] = [
+  {
+    planId: 'free',
+    name: 'Discover',
+    purchasable: false,
+    seats: 1,
+    workspaces: 1,
+    aiCreditsMonthly: 10,
+    moduleIds: ['M3', 'M5'],
+  },
+  {
+    planId: 'basic',
+    name: 'Basic',
+    purchasable: true,
+    seats: 2,
+    workspaces: 1,
+    aiCreditsMonthly: 100,
+    moduleIds: ['M2', 'M3', 'M5'],
+  },
+  {
+    planId: 'pro',
+    name: 'Pro',
+    purchasable: true,
+    seats: 6,
+    workspaces: 1,
+    aiCreditsMonthly: 500,
+    moduleIds: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'],
+  },
+  {
+    planId: 'ultra',
+    name: 'Ultra',
+    purchasable: true,
+    seats: 15,
+    workspaces: 5,
+    aiCreditsMonthly: 2_000,
+    moduleIds: ALL_MODULE_IDS,
+  },
+];
+
+/**
+ * Retired EUR plan id → the USD plan that replaces it.
+ *
+ * The rule the mapping obeys is *no capability may be taken away*: each target
+ * grants a superset of the source's modules, and where the source granted more
+ * seats or workspaces than the target (only `enterprise` did), the migration
+ * preserves the difference on `Subscription.seatsExtra` / `workspacesExtra`
+ * rather than shrinking the tenant. The rationale per row is in
+ * docs/BILLING.md §9.
+ */
+export const RETIRED_PLAN_IDS: Readonly<Record<string, EntitlementPlanId>> = {
+  starter: 'basic',
+  team: 'pro',
+  business: 'ultra',
+  enterprise: 'ultra',
+};
+
+export function grantsFor(planId: string): PlanGrant | null {
+  const wanted = resolvePlanId(planId);
+  return PLAN_GRANTS.find((grant) => grant.planId === wanted) ?? null;
+}
+
+/**
+ * Normalises any plan id the database or a stale payload may still carry.
+ * A retired id resolves to its replacement; an unknown id is returned
+ * unchanged so the caller can fail loudly rather than silently entitle.
+ */
+export function resolvePlanId(planId: string): string {
+  const wanted = planId.trim().toLowerCase();
+  return RETIRED_PLAN_IDS[wanted] ?? wanted;
+}
+
+/**
+ * Which purchasable plans open a module — the value each module manifest puts
+ * in `planTiers`, derived here so the grant is stated once.
+ *
+ * `free` is deliberately excluded: a manifest's `planTiers` has never listed
+ * the free tier, and `canEnable` uses it as "which plan do you have to buy",
+ * so adding it here would change module gating rather than move it.
+ */
+export function plansGrantingModule(moduleId: string): PlanId[] {
+  return PLAN_GRANTS.filter(
+    (grant) => grant.purchasable && grant.moduleIds.includes(moduleId)
+  ).map((grant) => grant.planId as PlanId);
 }

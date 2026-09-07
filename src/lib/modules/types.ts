@@ -1,5 +1,6 @@
 import type { Role } from '@prisma/client';
 import type { WorkspaceRouteKey } from '@/lib/routes';
+import type { PlanId } from '@/lib/billing/catalog';
 
 export type ModuleId =
   | 'M1'
@@ -16,7 +17,17 @@ export type ModuleId =
 
 export type ModuleStatus = 'OFF' | 'DEV' | 'PILOT' | 'ON';
 
-export type PlanTier = 'discover' | 'starter' | 'team' | 'business' | 'enterprise';
+/**
+ * The plan tiers module gating speaks in. Re-exported from the billing
+ * catalogue (TASK-MTR6QIE05ZKNH) rather than re-typed: the EUR ladder
+ * `discover/starter/team/business/enterprise` is retired, and "which plan opens
+ * this module" is now one fact, declared in `PLAN_GRANTS`.
+ *
+ * Only *purchasable* plans appear here, which is what `canEnable` has always
+ * meant by `planTiers`: the free fallback plan is not a tier you can be gated
+ * up to.
+ */
+export type PlanTier = PlanId;
 
 /**
  * Module-scoped capability id, always `<moduleKey>:<verb>`.

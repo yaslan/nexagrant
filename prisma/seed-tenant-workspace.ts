@@ -16,7 +16,11 @@
  */
 
 import 'dotenv/config'; // tsx does not load .env on its own (standalone runs)
+import { resolvePlanId } from '../src/lib/billing/catalog';
 import { prisma } from '../src/lib/db';
+
+/** The demo tenant's plan — the mid tier, resolved through the catalogue. */
+const DEMO_PLAN_ID = resolvePlanId('team');
 
 const TENANT_ID = 'demo-tenant';
 const WORKSPACE_ID = 'demo-workspace';
@@ -122,11 +126,15 @@ export default async function seedTenantWorkspace() {
     create: { tenantId: TENANT_ID, userId: adminUser.id, role: DEMO_ADMIN_SEAT.role },
   });
 
-  // 5. Subscription (Team plan, ACTIVE)
+  // 5. Subscription — Pro, ACTIVE.
+  //
+  // The plan id is taken from the billing catalogue, not typed: this used to
+  // say 'team', and when the EUR ladder was retired (TASK-MTR6QIE05ZKNH) a
+  // re-seed put the demo tenant back on a plan that no longer has a row.
   await prisma.subscription.upsert({
     where: { tenantId: TENANT_ID },
-    update: { planId: 'team', status: 'ACTIVE' },
-    create: { tenantId: TENANT_ID, planId: 'team', status: 'ACTIVE', billingInterval: 'month' },
+    update: { planId: DEMO_PLAN_ID, status: 'ACTIVE' },
+    create: { tenantId: TENANT_ID, planId: DEMO_PLAN_ID, status: 'ACTIVE', billingInterval: 'month' },
   });
 
   console.log(

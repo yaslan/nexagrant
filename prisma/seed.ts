@@ -1,5 +1,11 @@
 import 'dotenv/config';
 import { prisma } from '../src/lib/db';
+import {
+  CATALOG_CURRENCY,
+  PLAN_GRANTS,
+  findEntry,
+  plansGrantingModule,
+} from '../src/lib/billing/catalog';
 import { rescoreOpportunityG0 } from '../src/lib/scoring/g0-compute';
 import { DEFAULT_CRITERIA } from '../src/modules/m6/types';
 import seedTenantWorkspace from './seed-tenant-workspace';
@@ -12,17 +18,17 @@ import seedE11Feedback from './seed-e11-feedback';
 
 // Module catalog — also used to derive the demo tenant's ModuleState rows.
 const modules = [
-  { id: 'M1', key: 'partner_intelligence', name: 'Partner Intelligence Database', version: '1.0', requires: [], recommends: [], planTiers: ['team', 'business', 'enterprise'], addOnSku: null },
-  { id: 'M2', key: 'concept_note', name: 'Concept Note Architectures', version: '1.0', requires: [], recommends: ['M3'], planTiers: ['starter', 'team', 'business', 'enterprise'], addOnSku: null },
-  { id: 'M3', key: 'evidence_pack', name: 'Evidence Pack', version: '1.0', requires: [], recommends: [], planTiers: ['starter', 'team', 'business', 'enterprise'], addOnSku: null },
-  { id: 'M4', key: 'focal_point', name: 'Focal Point', version: '1.0', requires: ['M1'], recommends: [], planTiers: ['team', 'business', 'enterprise'], addOnSku: null },
-  { id: 'M5', key: 'proposal_workflows', name: 'Proposal Production Workflows', version: '1.0', requires: [], recommends: [], planTiers: ['starter', 'team', 'business', 'enterprise'], addOnSku: null },
-  { id: 'M6', key: 'evaluator_lens', name: 'Evaluator Lens', version: '1.1', requires: ['M2', 'M11'], recommends: [], planTiers: ['business', 'enterprise'], addOnSku: 'addon_m6' },
-  { id: 'M7', key: 'tto_accelerator', name: 'TTO Accelerator', version: '1.3', requires: ['M1', 'M4'], recommends: [], planTiers: ['enterprise'], addOnSku: 'addon_m7' },
-  { id: 'M8', key: 'consortium_matching', name: 'Consortium Matching', version: '1.0', requires: ['M1'], recommends: ['M4'], planTiers: ['team', 'business', 'enterprise'], addOnSku: 'addon_m8_pro' },
-  { id: 'M9', key: 'meeting_briefs', name: 'Meeting Briefs', version: '1.1', requires: ['M1', 'M4'], recommends: [], planTiers: ['business', 'enterprise'], addOnSku: null },
-  { id: 'M10', key: 'followup_docs', name: 'Follow-up Documents', version: '1.2', requires: ['M4'], recommends: ['M9'], planTiers: ['business', 'enterprise'], addOnSku: null },
-  { id: 'M11', key: 'full_app_production', name: 'Full Application Production', version: '1.2', requires: ['M2', 'M3', 'M5', 'M8'], recommends: [], planTiers: ['business', 'enterprise'], addOnSku: 'addon_m11' },
+  { id: 'M1', key: 'partner_intelligence', name: 'Partner Intelligence Database', version: '1.0', requires: [], recommends: [], planTiers: plansGrantingModule('M1'), addOnSku: null },
+  { id: 'M2', key: 'concept_note', name: 'Concept Note Architectures', version: '1.0', requires: [], recommends: ['M3'], planTiers: plansGrantingModule('M2'), addOnSku: null },
+  { id: 'M3', key: 'evidence_pack', name: 'Evidence Pack', version: '1.0', requires: [], recommends: [], planTiers: plansGrantingModule('M3'), addOnSku: null },
+  { id: 'M4', key: 'focal_point', name: 'Focal Point', version: '1.0', requires: ['M1'], recommends: [], planTiers: plansGrantingModule('M4'), addOnSku: null },
+  { id: 'M5', key: 'proposal_workflows', name: 'Proposal Production Workflows', version: '1.0', requires: [], recommends: [], planTiers: plansGrantingModule('M5'), addOnSku: null },
+  { id: 'M6', key: 'evaluator_lens', name: 'Evaluator Lens', version: '1.1', requires: ['M2', 'M11'], recommends: [], planTiers: plansGrantingModule('M6'), addOnSku: 'addon_m6' },
+  { id: 'M7', key: 'tto_accelerator', name: 'TTO Accelerator', version: '1.3', requires: ['M1', 'M4'], recommends: [], planTiers: plansGrantingModule('M7'), addOnSku: 'addon_m7' },
+  { id: 'M8', key: 'consortium_matching', name: 'Consortium Matching', version: '1.0', requires: ['M1'], recommends: ['M4'], planTiers: plansGrantingModule('M8'), addOnSku: 'addon_m8_pro' },
+  { id: 'M9', key: 'meeting_briefs', name: 'Meeting Briefs', version: '1.1', requires: ['M1', 'M4'], recommends: [], planTiers: plansGrantingModule('M9'), addOnSku: null },
+  { id: 'M10', key: 'followup_docs', name: 'Follow-up Documents', version: '1.2', requires: ['M4'], recommends: ['M9'], planTiers: plansGrantingModule('M10'), addOnSku: null },
+  { id: 'M11', key: 'full_app_production', name: 'Full Application Production', version: '1.2', requires: ['M2', 'M3', 'M5', 'M8'], recommends: [], planTiers: plansGrantingModule('M11'), addOnSku: 'addon_m11' },
 ];
 
 /**
@@ -71,7 +77,30 @@ async function seedG0DemoEvidence() {
     { topicId: 'demo-topic-5', fitScore: 38, note: 'weak overlap: citizen engagement / participatory governance sits outside tenant capability' },
     { topicId: 'demo-topic-6', fitScore: 68, note: 'moderate overlap: maintenance/repair is adjacent to renovation, not a core keyword match' },
   ];
+  // The `demo-topic-N` ids these rows point at no longer exist: `seedCalls()`
+  // creates topics with generated ids and `seed-opportunities.ts` looks them up
+  // by `identifier`. A missing topic used to abort the whole seed on the
+  // TopicMatch foreign key, which left every later fixture (proposals, efforts,
+  // M6, E11 feedback) unwritten and took the e2e suite down with it. Skip and
+  // say so instead — the same thing `seed-opportunities.ts` already does for an
+  // unmatched topic. Re-pointing these ids at real topics belongs to
+  // TASK-MTQW90XSQ1SU1, which owns this fixture.
+  const knownTopics = await prisma.topic.findMany({
+    where: { id: { in: topicMatches.map((m) => m.topicId) } },
+    select: { id: true },
+  });
+  const knownTopicIds = new Set(knownTopics.map((t: { id: string }) => t.id));
+  const missingTopics = topicMatches.filter((m) => !knownTopicIds.has(m.topicId));
+  if (missingTopics.length > 0) {
+    console.warn(
+      `  G0 demo evidence: skipping ${missingTopics.length} K1 match(es) — no such Topic: ${missingTopics
+        .map((m) => m.topicId)
+        .join(', ')}. G0 alignment (weight 30) stays unseeded.`
+    );
+  }
+
   for (const m of topicMatches) {
+    if (!knownTopicIds.has(m.topicId)) continue;
     const breakdown = {
       method: 'k1-keyword-cosine-mock',
       note: `seed demo K1 match (TASK-MTQW90XSQ1SU1) — ${m.note}`,
@@ -143,14 +172,35 @@ async function main() {
     });
   }
 
-  // 2. Plan
-  const plans = [
-    { id: 'free', name: 'Discover', monthlyCents: 0, yearlyCents: 0, currency: 'EUR', seats: 1, workspaces: 1, aiCreditsMonthly: 10, modules: ['M3', 'M5'] },
-    { id: 'starter', name: 'Starter', monthlyCents: 5900, yearlyCents: 56600, currency: 'EUR', seats: 2, workspaces: 1, aiCreditsMonthly: 100, modules: ['M3', 'M5', 'M2'] },
-    { id: 'team', name: 'Team', monthlyCents: 24900, yearlyCents: 239000, currency: 'EUR', seats: 6, workspaces: 1, aiCreditsMonthly: 500, modules: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'] },
-    { id: 'business', name: 'Business', monthlyCents: 59900, yearlyCents: 575000, currency: 'EUR', seats: 15, workspaces: 5, aiCreditsMonthly: 2000, modules: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8', 'M6', 'M9', 'M10', 'M11'] },
-    { id: 'enterprise', name: 'Enterprise', monthlyCents: 150000, yearlyCents: 1440000, currency: 'EUR', seats: 999, workspaces: 999, aiCreditsMonthly: 10000, modules: ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11'] },
-  ];
+  // 2. Plan — derived from the billing catalogue, never re-typed.
+  //
+  // TASK-MTR6QIE05ZKNH: this list used to be a second, EUR-denominated plan
+  // ladder (free/starter/team/business/enterprise) that had nothing to do with
+  // what the customer is shown and charged. It is now a projection of
+  // `src/lib/billing/catalog.ts`: prices from `CATALOG`, capacity and module
+  // grants from `PLAN_GRANTS`. Add a plan there, not here.
+  //
+  // The amounts stored are **list** prices. The rolling campaign discount is
+  // applied at checkout by `getActiveTier()`, so a discounted amount must never
+  // be persisted onto a plan row — see docs/BILLING.md §3.
+  const plans = PLAN_GRANTS.map((grant) => {
+    const entry = findEntry(grant.planId);
+    const priced = entry && entry.kind === 'plan' ? entry : null;
+    if (grant.purchasable && !priced) {
+      throw new Error(`Plan ${grant.planId} is purchasable but has no catalogue price`);
+    }
+    return {
+      id: grant.planId,
+      name: grant.name,
+      monthlyCents: priced?.monthlyListMinor ?? 0,
+      yearlyCents: priced?.yearlyListMinor ?? 0,
+      currency: CATALOG_CURRENCY,
+      seats: grant.seats,
+      workspaces: grant.workspaces,
+      aiCreditsMonthly: grant.aiCreditsMonthly,
+      modules: [...grant.moduleIds],
+    };
+  });
 
   for (const p of plans) {
     await prisma.plan.upsert({
@@ -158,6 +208,16 @@ async function main() {
       update: p,
       create: p,
     });
+  }
+
+  // Retired EUR plan rows. `prisma migrate` moved the subscriptions off them
+  // (prisma/migrations/retire-eur-plan-ladder.sql); this keeps a database that
+  // is re-seeded without replaying the migration from growing them back.
+  const retired = await prisma.plan.deleteMany({
+    where: { id: { notIn: plans.map((p) => p.id) } },
+  });
+  if (retired.count > 0) {
+    console.log(`  Plan: removed ${retired.count} retired row(s)`);
   }
 
   // 3. AddOnCatalog
