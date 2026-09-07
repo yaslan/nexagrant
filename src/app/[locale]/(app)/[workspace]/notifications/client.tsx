@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Bell, CheckCircle2, AlertTriangle, Sparkles, Clock, ArrowLeft, CheckCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useOptionalSession } from '@/lib/hooks/use-optional-session';
@@ -52,6 +52,7 @@ export default function NotificationsClient({
       setNotifications(initialNotifications);
     }
   }, [initialNotifications]);
+ // eslint-disable-next-line react-hooks/set-state-in-effect
 
   useEffect(() => {
     syncNotifications();

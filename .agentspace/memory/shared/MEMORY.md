@@ -38,3 +38,5 @@
 
 - [fabrika-fabricated-fallback-antipattern](fabrika-fabricated-fallback-antipattern.md) — Fabrika kod tabanında yaygın anti-desen — DB/LLM hatasında uydurma rakam render edip DB'ye yazan "demo fallback"lar; CLAUDE.md kural 7 ihlali, gördüğün yerde temizle
 - [fabrika-g0-score-never-computed](fabrika-g0-score-never-computed.md) — Fabrika'da G0 kapı puanı hiç hesaplanmıyor — g0Score seed'den statik ya da Math.random() ile geliyor, kanonik scoreG0() üretimde hiç çağrılmıyor (ölçüldü 2026-09-07)
+
+- [fabrika-stripe-idempotency-guard-dead](fabrika-stripe-idempotency-guard-dead.md) — Fabrika'da Stripe webhook'unun idempotency kapısı fiilen kapalı — `data: { equals: { stripeEventId } }` tam-belge eşitliği arıyor, asla eşleşmiyor; webhook kopyalarken bunu kopyalama

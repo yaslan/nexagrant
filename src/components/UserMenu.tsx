@@ -167,6 +167,7 @@ export default function UserMenu({
       setNotificationsList(baseNotifications);
     }
   }, [baseNotifications, storageKey]);
+ // eslint-disable-next-line react-hooks/set-state-in-effect
 
   useEffect(() => {
     syncNotifications();

@@ -64,3 +64,6 @@
 [06:11:41] DONE: T11 → blog-yazar: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTQ602Y8V5QOK-blog-yazar.md
 [06:13:35] DONE: T8 → blok-zincir-dse: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTPZL5YDY9TAW-blok-zincir-dse.md
 [06:18:05] DONE: T9 → geli-tirici: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTPZL9GK4TFS1-geli-tirici.md
+[06:23:50] DONE: T10 → blok-zincir-dse: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTPZLC9PI5VEH-blok-zincir-dse.md
+[08:58:55] FAIL: T12 (geli-tirici: pane exited (code 129) ve beklenen çıktı yok: docs/agent-results/TASK-MTQ60SGW45T0X-geli-tirici.md)
+[08:58:55] REPORT: dlg-1788751418516-1 (0/1 alt-görev ok — eksik/başarısız var)

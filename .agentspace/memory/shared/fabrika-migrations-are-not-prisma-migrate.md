@@ -1,10 +1,34 @@
 ---
 name: fabrika-migrations-are-not-prisma-migrate
-description: Fabrika'da prisma/migrations elle yazılmış düz SQL — Prisma Migrate DEĞİL; pnpm db:migrate koşmak veritabanını sıfırlatabilir, doğru yol prisma db execute --file
+description: Fabrika'da prisma/migrations KARIŞIK — eski işler düz SQL (Migrate dışı), S9-S10'dan itibaren yeni işler gerçek Prisma Migrate klasörü kullanıyor ve DB artık kısmen Migrate'e bağlı
 metadata:
   type: project
-  updatedAt: 2026-09-06
+  updatedAt: 2026-09-07
 ---
+
+**2026-09-07 güncellemesi:** Aşağıdaki "veritabanı Prisma Migrate tarafından yönetilmiyor" tespiti
+**artık kısmen eski.** S10'da iki yeni iş (`add-m9-meeting-schedule`, `add-calendar-connections`)
+gerçek Prisma Migrate klasörü formatında (`<ad>/migration.sql`) geldi ve DB bugün bu ikisi için
+`_prisma_migrations` defterine baseline'landı — `npx prisma migrate status` artık "Database schema
+is up to date!" diyor (yalnız bu iki migration için; `add-feedback.sql` gibi eski loose-SQL dosyaları
+hâlâ Migrate defterinin dışında, aşağıdaki eski tespit onlar için geçerli).
+
+**Yeni gotcha — P3005 "schema not empty":** Bir ajan önce `prisma db push` ile şemayı DB'ye yazıp
+SONRA gerçek bir migration klasörü eklerse (`add-m9-meeting-schedule` böyle oldu), `prisma migrate
+deploy` P3005 ile reddeder çünkü tablo zaten var ama migration history'de kaydı yok. Bu **reset
+gerektirmez** — yıkıcı olmayan çözüm:
+```
+npx prisma migrate resolve --applied <migration-adı>   # zaten var olanı baseline'la
+npx prisma migrate deploy                                # geri kalanını gerçekten uygula
+```
+İçeriği `CREATE TABLE IF NOT EXISTS` / additive ise (veri kaybı riski yoksa) bunu kullanıcı onayı
+beklemeden uygulamak makul — bkz. `docs/agent-results/TASK-MTQTZNLS2CO2L-blockzincir-pm.md` §3.5.
+Bir ajan raporunda "migration reset için kullanıcı onayı gerekiyor, BLOKE" derse önce bunun gerçekten
+reset mi yoksa yalnızca baseline mi gerektirdiğini kontrol et — çoğu zaman baseline yeterli.
+
+---
+
+## Eski tespit (2026-09-06, hâlâ loose-SQL dosyalar için geçerli)
 
 `prisma/migrations/` bu repoda Prisma Migrate klasörü **değil**. İçi düz, elle yazılmış
 `add-<ad>.sql` + `add-<ad>.down.sql` çiftleri (`add-soft-delete`, `add-feedback`,

@@ -18,8 +18,10 @@
  * are expressed here as *configurable rules* and the calibration harness measures which one fits
  * the observed ESR outcomes. Nothing is hard-coded that a calibration run cannot move.
  *
- * This module is additive: `calculateG0Score` in ./g0.ts (a different, 4-factor 0–10 model used by
- * the existing gate engine) is left untouched so no current caller changes behaviour.
+ * `./g0.ts` used to hold a second, 4-factor 0–10 model (`calculateG0Score`). It had no callers and
+ * scored on a different scale to the 70 threshold, so it was deleted rather than kept as a trap.
+ * The features this scorer needs are assembled in ./g0-features.ts and read from the database in
+ * ./g0-compute.ts, which is the only place a G0 score is written.
  */
 
 import { DEFAULT_GATE_RULES, DEFAULT_SCORING_WEIGHTS } from './defaults';

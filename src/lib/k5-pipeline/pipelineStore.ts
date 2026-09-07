@@ -19,7 +19,11 @@ export interface OpportunityItem {
   ownerName?: string | null;
   stage: 'G0' | 'G1' | 'G2' | 'G3' | 'G4';
   status: 'ACTIVE' | 'WITHDRAWN' | 'SUBMITTED' | 'FUNDED' | 'REJECTED';
-  g0Score: number;
+  /**
+   * `null` until the canonical scorer has evidence to work from. Nullable on purpose: the previous
+   * non-null type is what pushed callers into inventing a placeholder number to satisfy it.
+   */
+  g0Score: number | null;
   notes?: string | null;
   notesList?: NoteEntry[];
   createdAt: Date;
@@ -118,6 +122,18 @@ export function updateInMemoryOpportunityOwner(
   if (!found) return false;
   found.ownerId = ownerId;
   found.ownerName = ownerName;
+  found.updatedAt = new Date();
+  return true;
+}
+
+/**
+ * Writes back the G0 score once `rescoreOpportunityG0` has derived it, so the buffered row shows
+ * the same number as the database row rather than staying unscored until the next page load.
+ */
+export function updateInMemoryOpportunityScore(tenantId: string, id: string, g0Score: number | null): boolean {
+  const found = findScoped(tenantId, id);
+  if (!found) return false;
+  found.g0Score = g0Score;
   found.updatedAt = new Date();
   return true;
 }
