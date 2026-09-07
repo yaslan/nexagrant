@@ -4,7 +4,6 @@ import { getWorkspaceRoute } from '@/lib/routes';
 import { PartnerFilters } from './PartnerFilters';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
-import type { LegacyOrganizationRow } from '@/types/db-rows';
 
 const DEMO_CORDIS_PARTNERS = [
   {
@@ -282,52 +281,7 @@ export default async function PartnersPage({
     }
   }
 
-  // 3. Fallback to legacy Organization table if DB is running with legacy seeds
-  if (profiles.length === 0) {
-    try {
-      const legWhere: Record<string, unknown> = {};
-      if (q) {
-        legWhere.OR = [
-          { name: { contains: q, mode: 'insensitive' } },
-          { id: { contains: q, mode: 'insensitive' } },
-        ];
-      }
-      if (country) legWhere.country = country;
-      if (activityType) legWhere.activityType = activityType;
-      if (isTurkishOnly) legWhere.country = 'TR';
-      if (minProjects > 0) legWhere.participationCount = { gte: minProjects };
-
-      const [legCount, legOrgs] = await Promise.all([
-        prisma.organization.count({ where: legWhere }),
-        prisma.organization.findMany({
-          where: legWhere,
-          take: 50,
-          orderBy: { participationCount: 'desc' },
-        }),
-      ]);
-
-      if (legOrgs.length > 0) {
-        dataSource = 'organization_legacy';
-        totalCount = legCount;
-        profiles = (legOrgs as LegacyOrganizationRow[]).map((o) => ({
-          organisationId: o.id,
-          name: o.name,
-          country: o.country,
-          activityType: o.activityType,
-          sme: o.isSme,
-          isTurkish: o.country === 'TR',
-          totalProjects: o.participationCount || 1,
-          coordinatorProjects: o.coordinatorCount || 0,
-          totalEcContribution: o.ecContributionSum || BigInt(0),
-          topTopics: [],
-        }));
-      }
-    } catch (e) {
-      console.warn(`[PartnersPage] Legacy Organization DB unavailable: ${errorMessage(e)}`);
-    }
-  }
-
-  // 4. Fallback to resilient Demo CORDIS dataset if database server is offline
+  // 3. Fallback to resilient Demo CORDIS dataset if database server is offline
   if (profiles.length === 0) {
     dataSource = 'demo_cordis_dataset';
     let filtered = DEMO_CORDIS_PARTNERS;

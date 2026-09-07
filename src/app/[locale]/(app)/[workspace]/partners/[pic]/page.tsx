@@ -3,8 +3,29 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
-import type { LegacyOrganizationWithParticipations } from '@/types/db-rows';
 import { moduleGate } from '@/lib/modules/guard';
+
+interface OrgDetail {
+  id: string;
+  name: string;
+  country: string | null;
+  activityType: string | null;
+  sme: boolean;
+  participationCount: number;
+  coordinatorCount: number;
+  ecContributionSum: bigint;
+  participations: Array<{
+    projectId: string;
+    organisationId: string;
+    role: string;
+    ecContribution: bigint | null;
+    project: {
+      id: string;
+      acronym: string | null;
+      title: string | null;
+    } | null;
+  }>;
+}
 
 export default async function PartnerDetailPage({
   params
@@ -16,16 +37,33 @@ export default async function PartnerDetailPage({
   if (locked) return locked;
   const isTr = locale === 'tr';
 
-  let org: LegacyOrganizationWithParticipations | null = null;
+  let org: OrgDetail | null = null;
   try {
-    org = await prisma.organization.findUnique({
-      where: { id: pic },
-      include: {
-        participations: {
-          include: { project: true }
-        }
-      }
+    const cordisOrg = await prisma.cordisOrganization.findUnique({
+      where: { organisationId: pic },
     });
+
+    if (cordisOrg) {
+      const participations = await prisma.cordisParticipation.findMany({
+        where: { organisationId: pic },
+        include: { project: { select: { id: true, acronym: true, title: true } } },
+      });
+
+      const coordinatorCount = participations.filter((p: typeof participations[number]) => p.role === 'coordinator').length;
+      const ecSum = participations.reduce((sum: bigint, p: typeof participations[number]) => sum + (p.ecContribution || BigInt(0)), BigInt(0));
+
+      org = {
+        id: cordisOrg.organisationId,
+        name: cordisOrg.name,
+        country: cordisOrg.country,
+        activityType: cordisOrg.activityType,
+        sme: cordisOrg.sme,
+        participationCount: participations.length,
+        coordinatorCount,
+        ecContributionSum: ecSum,
+        participations,
+      };
+    }
   } catch (e) {
     console.warn(`[PartnerDetailPage] Failed to fetch organization: ${errorMessage(e)}`);
   }
@@ -64,12 +102,12 @@ export default async function PartnerDetailPage({
               <span className="bg-ground border border-border px-2.5 py-1 rounded-md font-mono">PIC: {org.id}</span>
               <span className="bg-ground border border-border px-2.5 py-1 rounded-md">{isTr ? 'Ülke:' : 'Country:'} {org.country || '-'}</span>
               <span className="bg-ground border border-border px-2.5 py-1 rounded-md">{isTr ? 'Tür:' : 'Type:'} {org.activityType || '-'}</span>
-              {org.isSme && <span className="bg-accent/15 text-accent-ink border border-accent/20 px-2.5 py-1 rounded-md font-bold">{isTr ? 'KOBİ' : 'SME'}</span>}
+              {org.sme && <span className="bg-accent/15 text-accent-ink border border-accent/20 px-2.5 py-1 rounded-md font-bold">{isTr ? 'KOBİ' : 'SME'}</span>}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
           <div className="p-4 bg-ground border border-border rounded-xl">
             <div className="text-xs text-muted font-medium">{isTr ? 'Toplam Katılım' : 'Total Participations'}</div>
             <div className="text-2xl font-bold text-ink mt-1">{org.participationCount}</div>
@@ -82,10 +120,6 @@ export default async function PartnerDetailPage({
             <div className="text-xs text-muted font-medium">{isTr ? 'Toplam AB Fonu' : 'Total EC Funding'}</div>
             <div className="text-xl md:text-2xl font-bold text-ink font-mono mt-1">€ {Number(org.ecContributionSum || 0).toLocaleString()}</div>
           </div>
-          <div className="p-4 bg-ground border border-border rounded-xl">
-            <div className="text-xs text-muted font-medium">{isTr ? 'Ağ Merkezilik Skoru' : 'Network Centrality'}</div>
-            <div className="text-2xl font-bold text-ok font-mono mt-1">{Number(org.eigenvector || 0).toFixed(4)}</div>
-          </div>
         </div>
 
         {/* Network Graph Placeholder */}
@@ -93,8 +127,8 @@ export default async function PartnerDetailPage({
           <h2 className="text-lg font-bold font-heading text-ink mb-4">{isTr ? 'İşbirliği ve Ortaklık Grafiği' : 'Collaboration Graph'}</h2>
           <div className="h-48 bg-ground rounded-xl border-2 border-dashed border-border flex items-center justify-center text-muted text-xs text-center p-4">
             {isTr
-              ? `[CORDIS Etkileşim Grafiği] — Kurumun ${org.degree || 0} doğrudan konsorsiyum bağlantısı bulunmaktadır.`
-              : `[Interactive Collaboration Graph] — Visualizing ${org.degree || 0} direct consortium connections.`}
+              ? `[CORDIS Etkileşim Grafiği] — Kurumun Horizon Europe ve H2020 projeleriyle ortaklık ağı.`
+              : `[Interactive Collaboration Graph] — This organization's network within Horizon Europe and H2020 projects.`}
           </div>
         </div>
 
@@ -102,14 +136,14 @@ export default async function PartnerDetailPage({
           <h2 className="text-lg font-bold font-heading text-ink mb-4">{isTr ? 'Geçmiş AB Projeleri' : 'Past Projects'}</h2>
           <div className="space-y-3">
             {org.participations.map((p) => (
-              <div key={p.id} className="p-4 border border-border rounded-xl bg-surface hover:bg-surface-hover transition-colors flex justify-between items-center gap-4">
+              <div key={`${p.projectId}-${p.organisationId}`} className="p-4 border border-border rounded-xl bg-surface hover:bg-surface-hover transition-colors flex justify-between items-center gap-4">
                 <div>
                   <div className="font-bold text-accent text-sm">{p.project?.acronym}</div>
                   <div className="text-xs text-ink-2 truncate max-w-md">{p.project?.title}</div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-[10px] uppercase font-bold text-muted">{p.role}</div>
-                  <div className="font-mono text-xs font-semibold text-ink">€ {Number(p.ecContributionCents || 0).toLocaleString()}</div>
+                  <div className="font-mono text-xs font-semibold text-ink">€ {Number(p.ecContribution || 0).toLocaleString()}</div>
                 </div>
               </div>
             ))}
