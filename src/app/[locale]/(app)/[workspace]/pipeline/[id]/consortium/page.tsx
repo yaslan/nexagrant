@@ -6,6 +6,15 @@ import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidat
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
 
+/** `CordisOrganization` columns this page maps onto the manager's `OrgInfo`. */
+interface CordisOrgRow {
+  organisationId: string;
+  name: string;
+  shortName: string | null;
+  country: string | null;
+  sme: boolean;
+}
+
 /** The header fields this page renders for an opportunity. */
 interface ConsortiumOpportunity {
   id: string;
@@ -116,15 +125,24 @@ export default async function ConsortiumPage({
         ...candidates.map((c) => c.organizationId).filter(Boolean),
       ] as string[];
 
-      // Organizations are a shared catalogue, not tenant rows; the ids here
-      // already come from rows read inside this tenant.
+      // Organizations are shared CORDIS reference data, not tenant rows; the ids
+      // here already come from rows read inside this tenant. `prisma.organization`
+      // is not a model in prisma/schema.prisma — the query threw on every render
+      // and the catch below quietly served the demo fallback instead.
       if (orgIds.length > 0) {
-        orgs = await withTenant<OrgInfo[]>(tenantId, (tx) =>
-          tx.organization.findMany({
-            where: { id: { in: orgIds } },
-            select: { id: true, name: true, shortName: true, country: true, isSme: true },
+        const cordisOrgs = await withTenant<CordisOrgRow[]>(tenantId, (tx) =>
+          tx.cordisOrganization.findMany({
+            where: { organisationId: { in: orgIds } },
+            select: { organisationId: true, name: true, shortName: true, country: true, sme: true },
           })
         );
+        orgs = cordisOrgs.map((o) => ({
+          id: o.organisationId,
+          name: o.name,
+          shortName: o.shortName,
+          country: o.country,
+          isSme: o.sme,
+        }));
       }
     }
   } catch (e) {

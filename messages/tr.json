@@ -185,7 +185,22 @@
     "addEvidence": "Kanıt Ekle",
     "expired": "Süresi Dolmuş",
     "expiringSoon": "Süresi Dolacak",
-    "exportCSV": "CSV Dışa Aktar"
+    "exportCSV": "CSV Dışa Aktar",
+    "field": {
+      "empty": "Belirtilmedi — elle doldurun"
+    },
+    "documentText": {
+      "title": "Belge Metni",
+      "none": "Bu belgeden metin okunmadı. Kanıt modülünde OCR yok; veren kurum, belge no ve geçerlilik alanlarını elle doldurun."
+    },
+    "claims": {
+      "none": "Bu belgeye bağlı bir iddia yok. Bir iddiayı elle yazıp bu belgeye bağlayın."
+    },
+    "drawer": {
+      "empty": "Henüz kanıt belgesi yok. Kanıtlar sayfasından belge yükleyin.",
+      "noMatch": "Aramanızla eşleşen kanıt yok.",
+      "loadFailed": "Kanıtlar yüklenemedi. Sayfayı yenileyip tekrar deneyin."
+    }
   },
   "ConceptNote": {
     "title": "Konsept Notlar",
@@ -220,7 +235,8 @@
       "INVITED": "DAVET EDİLDİ",
       "CONFIRMED": "ONAYLANDI",
       "DECLINED": "REDDEDİLDİ",
-      "unknown": "BİLİNMİYOR"
+      "unknown": "BİLİNMİYOR",
+      "label": "Durum"
     },
     "role": {
       "coordinator": "Koordinatör",
@@ -230,6 +246,27 @@
       "widening": "Genişleme Ülkesi",
       "dissemination": "Yaygınlaştırma",
       "unknown": "Rol"
+    },
+    "matrixTitle": "Konsorsiyum Rol Matrisi",
+    "opportunity": "Fırsat",
+    "assigned": "Atandı",
+    "rank": "Sıra",
+    "organization": "Kuruluş",
+    "score": "Puan",
+    "action": "İşlem",
+    "breakdown": "Puan dökümü",
+    "computing": "Adaylar hesaplanıyor…",
+    "candidatesReady": "{count} aday hesaplandı.",
+    "computeFailed": "Adaylar hesaplanamadı.",
+    "noCandidatesYet": "Bu koltuk için henüz aday hesaplanmadı. \"Aday Bul\"a basın.",
+    "partnerDataMissing": "Ortak veritabanı (CORDIS) henüz içe aktarılmadı, bu yüzden aday üretilemiyor. Yöneticinizden K2 içe aktarımını çalıştırmasını isteyin.",
+    "dimension": {
+      "topicExperience": "Konu deneyimi",
+      "geographicBalance": "Coğrafi denge",
+      "collabHistory": "Ortak proje geçmişi",
+      "relationshipWarmth": "İlişki sıcaklığı",
+      "centrality": "Ağ merkeziliği",
+      "rivalRisk": "Rakip riski"
     }
   },
   "Auth": {

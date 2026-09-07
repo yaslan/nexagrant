@@ -1,39 +1,33 @@
 /**
- * M8 — SeatCandidate scoring algorithm.
- * 
- * Ranks CORDIS organizations for a given ConsortiumSeat by:
- *  - topicExperience: Has the org participated in projects with the same topicCode?
- *  - networkCentrality: eigenvector from the CORDIS graph
- *  - countryDiversity: bonus if country not already in the consortium
- *  - smeBonus: bonus if seat requires SME and org is SME
- *  - warmthBonus: bonus if we have an existing warm/hot relationship
+ * M8 — SeatCandidate scoring algorithm (the "Aday Bul" button on
+ * /[workspace]/pipeline/[id]/consortium).
+ *
+ * Ranks CORDIS organisations for a given ConsortiumSeat by:
+ *  - topicExperience: has the org been on a project under the same topic prefix?
+ *  - networkCentrality: how broad the org's CORDIS track record is
+ *  - countryDiversity: bonus if its country is not already in the consortium
+ *  - smeBonus: bonus if the org is an SME
+ *  - warmthBonus: bonus if the tenant already has a warm/hot relationship
+ *
+ * This scorer used to read `prisma.organization` and `prisma.participation`.
+ * Neither model is in prisma/schema.prisma, so every click on "Aday Bul"
+ * returned a 500. The partner graph the product actually imports is CORDIS
+ * (src/lib/k2-cordis), so the sources are now:
+ *
+ *   Organization.eigenvector → CordisPartnerProfile.totalProjects  (the
+ *       purpose-built ranked partner summary; "top 50 by centrality" becomes
+ *       "top 50 by track record", which is the signal that table exists to carry)
+ *   Organization.isSme       → CordisPartnerProfile.sme
+ *   Participation            → CordisProjectTopic ⨝ CordisParticipation
+ *
+ * The second bug this fixes is the topic argument: callers pass
+ * `Opportunity.topicId`, which is a `Topic` cuid — it was compared against
+ * `project.topicCode`, a call identifier like `HORIZON-CL5-2026-D4-01`, and so
+ * never matched. The topic is now resolved to its identifier here.
  */
 
-import { prisma } from '@/lib/db';
-
-/**
- * The columns this scorer reads off its query results. Rows arrive untyped
- * (`prisma generate` does not run here; see src/types/prisma-override.d.ts), so
- * each shape is stated at the query rather than inferred from it.
- */
-interface SeatOrgIdRow {
-  organizationId: string | null;
-}
-
-interface OrgCountryRow {
-  country: string | null;
-}
-
-interface CandidateOrgRow {
-  id: string;
-  country: string | null;
-  isSme: boolean;
-  eigenvector: number;
-}
-
-interface ParticipationOrgRow {
-  organizationId: string;
-}
+import { withTenant, type TenantTx } from '@/lib/db';
+import { topicPrefix } from '@/modules/m8/server/matching';
 
 export interface ScoringBreakdown {
   topicExperience: number;
@@ -44,83 +38,135 @@ export interface ScoringBreakdown {
   total: number;
 }
 
+/** Bounds on the search space, mirroring src/modules/m8/server/matching.ts. */
+const TOPIC_PROJECT_LIMIT = 2_000;
+const PARTICIPATION_LIMIT = 20_000;
+/** Organisations pre-filtered by track record before scoring. */
+const CANDIDATE_POOL = 50;
+
+interface PartnerProfileRow {
+  organisationId: string;
+  country: string | null;
+  sme: boolean;
+  totalProjects: number;
+}
+
 export async function scoreCandidatesForSeat(
   tenantId: string,
   seatId: string,
   opportunityId: string,
-  topicCode: string | null,
+  topicId: string | null,
   limit: number = 5
 ): Promise<{ organizationId: string; score: ScoringBreakdown; rank: number }[]> {
-  // 1. Get existing consortium members to check country diversity
-  const existingSeats: SeatOrgIdRow[] = await prisma.consortiumSeat.findMany({
-    where: { opportunityId, status: { in: ['CONFIRMED', 'INVITED'] }, organizationId: { not: null } },
+  return withTenant(tenantId, (tx) =>
+    runScoring(tx, { tenantId, seatId, opportunityId, topicId, limit })
+  );
+}
+
+async function runScoring(
+  tx: TenantTx,
+  params: {
+    tenantId: string;
+    seatId: string;
+    opportunityId: string;
+    topicId: string | null;
+    limit: number;
+  }
+) {
+  const { tenantId, seatId, opportunityId, topicId, limit } = params;
+
+  // 1. Existing consortium members, for country diversity. Scoped to the tenant:
+  // the seat ids come from a URL and an opportunity id is guessable.
+  const existingSeats: { organizationId: string | null }[] = await tx.consortiumSeat.findMany({
+    where: {
+      tenantId,
+      opportunityId,
+      status: { in: ['CONFIRMED', 'INVITED'] },
+      organizationId: { not: null },
+    },
     select: { organizationId: true },
   });
-  const existingOrgIds = existingSeats.map((s) => s.organizationId).filter(Boolean) as string[];
+  const existingOrgIds = existingSeats
+    .map((s) => s.organizationId)
+    .filter((id): id is string => Boolean(id));
 
-  // Get countries already in consortium
-  const existingOrgs = existingOrgIds.length > 0
-    ? ((await prisma.organization.findMany({
-        where: { id: { in: existingOrgIds } },
+  const existingOrgs: { country: string | null }[] = existingOrgIds.length
+    ? await tx.cordisOrganization.findMany({
+        where: { organisationId: { in: existingOrgIds } },
         select: { country: true },
-      })) as OrgCountryRow[])
+      })
     : [];
-  const existingCountries = new Set(existingOrgs.map((o) => o.country).filter(Boolean));
+  const existingCountries = new Set(
+    existingOrgs.map((o) => o.country).filter((c): c is string => Boolean(c))
+  );
 
-  // 2. Get tenant's warm/hot relationships
-  const relationships = await prisma.relationship.findMany({
+  // 2. The tenant's warm relationships.
+  const relationships: { organizationId: string | null }[] = await tx.relationship.findMany({
     where: { tenantId, warmth: { in: ['warm', 'hot', 'active'] } },
     select: { organizationId: true },
   });
   const warmOrgIds = new Set(
-    (relationships as SeatOrgIdRow[]).map((r) => r.organizationId).filter(Boolean)
+    relationships.map((r) => r.organizationId).filter((id): id is string => Boolean(id))
   );
 
-  // 3. Get candidate organizations (exclude already assigned)
-  const candidates: CandidateOrgRow[] = await prisma.organization.findMany({
-    where: { id: { notIn: existingOrgIds } },
-    orderBy: { eigenvector: 'desc' },
-    take: 50, // pre-filter top 50 by centrality
+  // 3. Candidate organisations, best track record first, minus the seated ones.
+  const candidates: PartnerProfileRow[] = await tx.cordisPartnerProfile.findMany({
+    where: existingOrgIds.length ? { organisationId: { notIn: existingOrgIds } } : {},
+    orderBy: { totalProjects: 'desc' },
+    select: { organisationId: true, country: true, sme: true, totalProjects: true },
+    take: CANDIDATE_POOL,
   });
 
-  // 4. If we have a topicCode, find orgs that have participated in projects with that topic
+  // 4. Organisations with experience under this topic's call prefix.
+  const topic = topicId
+    ? await tx.topic.findUnique({ where: { id: topicId }, select: { identifier: true } })
+    : null;
+  const prefix = topicPrefix(topic?.identifier);
+
   let topicOrgIds = new Set<string>();
-  if (topicCode) {
-    const participations: ParticipationOrgRow[] = await prisma.participation.findMany({
-      where: { project: { topicCode } },
-      select: { organizationId: true },
-      distinct: ['organizationId'],
+  if (prefix) {
+    const topicProjects: { projectId: string }[] = await tx.cordisProjectTopic.findMany({
+      where: { topicCode: { startsWith: prefix } },
+      select: { projectId: true },
+      take: TOPIC_PROJECT_LIMIT,
     });
-    topicOrgIds = new Set(participations.map((p) => p.organizationId));
+    const projectIds = [...new Set(topicProjects.map((r) => r.projectId))];
+
+    if (projectIds.length) {
+      const participations: { organisationId: string }[] = await tx.cordisParticipation.findMany({
+        where: { projectId: { in: projectIds } },
+        select: { organisationId: true },
+        take: PARTICIPATION_LIMIT,
+      });
+      topicOrgIds = new Set(participations.map((p) => p.organisationId));
+    }
   }
 
-  // 5. Score each candidate
+  // 5. Score each candidate.
   const scored = candidates.map((org) => {
-    const topicExperience = topicOrgIds.has(org.id) ? 3.0 : 0;
-    const networkCentrality = Math.min(org.eigenvector * 10, 3.0); // normalize to 0-3
-    const countryDiversity = (org.country && !existingCountries.has(org.country)) ? 1.5 : 0;
-    const smeBonus = org.isSme ? 1.0 : 0;
-    const warmthBonus = warmOrgIds.has(org.id) ? 1.5 : 0;
+    const topicExperience = topicOrgIds.has(org.organisationId) ? 3.0 : 0;
+    const networkCentrality = Math.min(org.totalProjects / 10, 3.0); // normalise to 0-3
+    const countryDiversity = org.country && !existingCountries.has(org.country) ? 1.5 : 0;
+    const smeBonus = org.sme ? 1.0 : 0;
+    const warmthBonus = warmOrgIds.has(org.organisationId) ? 1.5 : 0;
     const total = topicExperience + networkCentrality + countryDiversity + smeBonus + warmthBonus;
 
     return {
-      organizationId: org.id,
+      organizationId: org.organisationId,
       score: { topicExperience, networkCentrality, countryDiversity, smeBonus, warmthBonus, total },
     };
   });
 
-  // 6. Sort by total score descending, take top N
+  // 6. Sort by total score descending, take top N.
   scored.sort((a, b) => b.score.total - a.score.total);
-  const topCandidates = scored.slice(0, limit);
+  const results = scored.slice(0, limit).map((c, i) => ({ ...c, rank: i + 1 }));
 
-  // 7. Persist as SeatCandidate records
-  const results = topCandidates.map((c, i) => ({ ...c, rank: i + 1 }));
-
-  // Clear old candidates for this seat
-  await prisma.seatCandidate.deleteMany({ where: { seatId } });
+  // 7. Persist. `deleteMany` carries the tenant so a guessed seat id from
+  // another tenant cannot clear its candidates.
+  await tx.seatCandidate.deleteMany({ where: { tenantId, seatId } });
 
   for (const r of results) {
-    await prisma.seatCandidate.create({
+    await tx.seatCandidate.create({
       data: {
         tenantId,
         seatId,
@@ -138,11 +184,18 @@ export async function scoreCandidatesForSeat(
 /**
  * Detect conflicts: same org assigned to multiple seats in the same opportunity.
  */
-export async function detectConflicts(opportunityId: string): Promise<string[]> {
-  const seats = await prisma.consortiumSeat.findMany({
-    where: { opportunityId, organizationId: { not: null } },
-    select: { organizationId: true, roleKey: true },
-  });
+export async function detectConflicts(
+  opportunityId: string,
+  tenantId: string
+): Promise<string[]> {
+  const seats: { organizationId: string | null; roleKey: string }[] = await withTenant(
+    tenantId,
+    (tx) =>
+      tx.consortiumSeat.findMany({
+        where: { tenantId, opportunityId, organizationId: { not: null } },
+        select: { organizationId: true, roleKey: true },
+      })
+  );
 
   const seen = new Map<string, string[]>();
   for (const s of seats) {

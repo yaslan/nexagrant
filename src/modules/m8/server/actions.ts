@@ -1,6 +1,7 @@
 'use server';
 
 import { withTenant } from '@/lib/db';
+import { errorMessage } from '@/lib/errors';
 import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import { generateSeatCandidates } from './matching';
@@ -25,8 +26,9 @@ export async function computeSeatCandidates(opportunityId: string, seatId: strin
   );
   if (!seat) throw new Error(`Seat ${seatId} not found in this workspace.`);
 
-  await generateSeatCandidates(opportunityId, seatId, tenantId, 5);
+  const created = await generateSeatCandidates(opportunityId, seatId, tenantId, 5);
   revalidatePath('/[workspace]/opportunities/[id]/matching', 'page');
+  return created;
 }
 
 export async function assignCandidateToSeat(
@@ -41,12 +43,24 @@ export async function assignCandidateToSeat(
     if (status === 'CONFIRMED') {
       const opp = await tx.opportunity.findFirst({
         where: { id: opportunityId, tenantId },
-        include: { topic: true }
+        select: { id: true, topicId: true }
       });
 
       if (!opp) throw new Error(`Opportunity ${opportunityId} not found in this workspace.`);
 
-      if (opp.topic?.callId) {
+      // `Opportunity` carries a `topicId` column but no `topic` relation and no
+      // `callId`, so the call is resolved in two steps rather than included —
+      // `include: { topic: true }` threw PrismaClientValidationError here.
+      const topic = opp.topicId
+        ? await tx.topic.findUnique({ where: { id: opp.topicId }, select: { callId: true } })
+        : null;
+
+      if (topic?.callId) {
+        const siblingTopics: { id: string }[] = await tx.topic.findMany({
+          where: { callId: topic.callId },
+          select: { id: true }
+        });
+
         // The conflict check stays inside the tenant: another tenant's
         // consortium is none of this tenant's business and must not leak a
         // partner name through the error message.
@@ -56,7 +70,7 @@ export async function assignCandidateToSeat(
             organizationId,
             status: 'CONFIRMED',
             opportunity: {
-              callId: opp.topic.callId,
+              topicId: { in: siblingTopics.map((t) => t.id) },
               id: { not: opportunityId },
               status: 'ACTIVE'
             }
@@ -83,4 +97,37 @@ export async function assignCandidateToSeat(
   if (updated === 0) throw new Error(`Seat ${seatId} not found in this workspace.`);
 
   revalidatePath('/[workspace]/opportunities/[id]/matching', 'page');
+}
+
+/**
+ * The state the "Aday Bul" form renders.
+ *
+ * `computeSeatCandidates` throws, which in a server component form means the
+ * user gets Next's error screen instead of an explanation. This wrapper turns a
+ * failure into a message the page can show next to the button, and reports how
+ * many candidates were written so an empty result can say *why* it is empty.
+ */
+export interface SeatCandidateFormState {
+  status: 'idle' | 'ok' | 'error';
+  message?: string;
+  count?: number;
+}
+
+export async function computeSeatCandidatesForm(
+  _prev: SeatCandidateFormState,
+  formData: FormData
+): Promise<SeatCandidateFormState> {
+  const opportunityId = String(formData.get('opportunityId') ?? '');
+  const seatId = String(formData.get('seatId') ?? '');
+
+  if (!opportunityId || !seatId) {
+    return { status: 'error', message: 'Eksik istek: fırsat veya koltuk belirtilmedi.' };
+  }
+
+  try {
+    const created = await computeSeatCandidates(opportunityId, seatId);
+    return { status: 'ok', count: created.length };
+  } catch (e) {
+    return { status: 'error', message: errorMessage(e) };
+  }
 }

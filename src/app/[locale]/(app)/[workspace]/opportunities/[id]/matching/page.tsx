@@ -1,14 +1,64 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
-import { computeSeatCandidates, assignCandidateToSeat } from '@/modules/m8/server/actions';
+import { getTranslations } from 'next-intl/server';
+import { assignCandidateToSeat } from '@/modules/m8/server/actions';
+import FindCandidatesButton from '@/modules/m8/components/find-candidates-button';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
-import type {
-  ConsortiumSeatWithOrg,
-  ModuleStateRow,
-  SeatCandidateWithOrg,
-} from '@/types/db-rows';
+import type { MatchBreakdown } from '@/modules/m8/server/matching';
+
+/**
+ * M8 consortium role matrix.
+ *
+ * This page returned a 500 on every load. It asked Prisma for
+ * `include: { seats: { include: { organization: true } } }` and
+ * `include: { topic: true }`, and neither `ConsortiumSeat.organization` nor
+ * `Opportunity.topic` is a relation in prisma/schema.prisma — so the user never
+ * reached the "Aday Bul" button at all. Organisation names now come from a
+ * separate `CordisOrganization` lookup keyed by the PIC the seat already stores.
+ */
+
+interface SeatRow {
+  id: string;
+  roleKey: string;
+  status: string;
+  organizationId: string | null;
+}
+
+interface CandidateRow {
+  id: string;
+  rank: number;
+  score: number;
+  breakdown: unknown;
+  organizationId: string | null;
+}
+
+interface OrgRow {
+  organisationId: string;
+  name: string;
+  country: string | null;
+}
+
+/** The six scoring dimensions, in the order the breakdown is rendered. */
+const DIMENSIONS: (keyof MatchBreakdown)[] = [
+  'topicExperience',
+  'geographicBalance',
+  'collabHistory',
+  'relationshipWarmth',
+  'centrality',
+  'rivalRisk',
+];
+
+function readBreakdown(value: unknown): Partial<Record<keyof MatchBreakdown, number>> {
+  if (!value || typeof value !== 'object') return {};
+  const source = value as Record<string, unknown>;
+  const out: Partial<Record<keyof MatchBreakdown, number>> = {};
+  for (const key of DIMENSIONS) {
+    if (typeof source[key] === 'number') out[key] = source[key] as number;
+  }
+  return out;
+}
 
 export default async function MatchingPage({
   params
@@ -19,131 +69,175 @@ export default async function MatchingPage({
   const locked = await moduleGate('M8', locale);
   if (locked) return locked;
   const { tenantId } = await requireTenantPage(locale);
+  const t = await getTranslations({ locale, namespace: 'Consortium' });
 
   // Everything below is read inside the session tenant. The page used to load
   // the opportunity by `(id, workspace slug)` with no tenant at all, so any
   // signed-in user could open another tenant's consortium by URL.
-  const opp = await withTenant<{ id: string; title: string; seats: ConsortiumSeatWithOrg[] } | null>(tenantId, (tx) =>
+  const opp = await withTenant<{ id: string; title: string; seats: SeatRow[] } | null>(tenantId, (tx) =>
     tx.opportunity.findFirst({
       where: { id, tenantId, workspace: { slug: workspace } },
-      include: {
+      select: {
+        id: true,
+        title: true,
         seats: {
-          include: {
-            organization: true
-          }
+          select: { id: true, roleKey: true, status: true, organizationId: true },
+          orderBy: { roleKey: 'asc' },
         },
-        topic: true
       }
     })
   );
 
   if (!opp) return notFound();
 
-  // Check M8 state
-  const m8State = await withTenant<ModuleStateRow | null>(tenantId, (tx) =>
-    tx.moduleState.findUnique({
-      where: { tenantId_moduleId: { tenantId, moduleId: 'M8' } }
-    })
+  // The module gate above already refuses a tenant whose M8 is OFF; the page
+  // used to repeat that check itself, which could only ever be dead code.
+
+  const seatIds = opp.seats.map((s) => s.id);
+  const candidates = seatIds.length
+    ? await withTenant<CandidateRow[]>(tenantId, (tx) =>
+        tx.seatCandidate.findMany({
+          where: { seatId: { in: seatIds }, tenantId },
+          orderBy: { rank: 'asc' },
+          select: { id: true, seatId: true, rank: true, score: true, breakdown: true, organizationId: true },
+        })
+      )
+    : [];
+
+  const candidatesBySeat = new Map<string, CandidateRow[]>();
+  for (const c of candidates as (CandidateRow & { seatId: string })[]) {
+    const list = candidatesBySeat.get(c.seatId) ?? [];
+    list.push(c);
+    candidatesBySeat.set(c.seatId, list);
+  }
+
+  // Organisations are shared CORDIS reference data, keyed by PIC. The ids come
+  // from rows already read inside this tenant.
+  const orgIds = [
+    ...opp.seats.map((s) => s.organizationId),
+    ...candidates.map((c) => c.organizationId),
+  ].filter((v): v is string => Boolean(v));
+
+  const orgs = orgIds.length
+    ? await withTenant<OrgRow[]>(tenantId, (tx) =>
+        tx.cordisOrganization.findMany({
+          where: { organisationId: { in: [...new Set(orgIds)] } },
+          select: { organisationId: true, name: true, country: true },
+        })
+      )
+    : [];
+  const orgById = new Map(orgs.map((o) => [o.organisationId, o]));
+
+  // An empty result has two very different causes, and telling them apart is the
+  // difference between "press the button" and "ask an admin to run the import".
+  const partnerGraphSize = await withTenant<number>(tenantId, (tx) =>
+    tx.cordisOrganization.count()
   );
-
-  if (!m8State || m8State.status === 'OFF') {
-    return (
-      <div className="p-8 text-center border rounded-lg bg-ground max-w-2xl mx-auto mt-10">
-        <h2 className="text-xl font-bold mb-2">Consortium Matching Kapalı</h2>
-        <p className="text-ink-2">Bu modülü kullanmak için eklenti satın almalı veya planınızı yükseltmelisiniz.</p>
-      </div>
-    );
-  }
-
-  // Load candidates for each seat
-  const seatCandidatesMap = new Map<string, SeatCandidateWithOrg[]>();
-  for (const seat of opp.seats) {
-    const candidates = await withTenant<SeatCandidateWithOrg[]>(tenantId, (tx) =>
-      tx.seatCandidate.findMany({
-        where: { seatId: seat.id, tenantId },
-        orderBy: { rank: 'asc' },
-        include: {
-          organization: true
-        }
-      })
-    );
-    seatCandidatesMap.set(seat.id, candidates);
-  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Consortium Role Matrix</h1>
-        <p className="text-ink-2">Opportunity: {opp.title}</p>
+        <h1 className="text-2xl font-bold">{t('matrixTitle')}</h1>
+        <p className="text-ink-2">{t('opportunity')}: {opp.title}</p>
       </div>
+
+      {partnerGraphSize === 0 && (
+        <p role="status" className="border border-amber-300 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 rounded-lg px-4 py-3 text-sm">
+          {t('partnerDataMissing')}
+        </p>
+      )}
 
       <div className="grid gap-6">
         {opp.seats.map((seat) => {
-          const candidates = seatCandidatesMap.get(seat.id) || [];
+          const seatCandidates = candidatesBySeat.get(seat.id) ?? [];
+          const assigned = seat.organizationId ? orgById.get(seat.organizationId) : null;
           return (
-            <div key={seat.id} className="border p-4 rounded-lg bg-surface shadow-sm">
-              <div className="flex items-center justify-between mb-4">
+            <div key={seat.id} className="border border-border p-4 rounded-lg bg-surface shadow-sm">
+              <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold capitalize">{seat.roleKey} Seat</h3>
-                  <p className="text-sm text-muted">Status: {seat.status}</p>
-                  {seat.organization && (
-                    <p className="text-sm font-medium text-green-700">Assigned: {seat.organization.name}</p>
+                  <h2 className="text-lg font-semibold">
+                    {t(`role.${seat.roleKey}` as 'role.unknown', {})}
+                  </h2>
+                  <p className="text-sm text-muted">
+                    {t('status.label')}: {t(`status.${seat.status}` as 'status.unknown', {})}
+                  </p>
+                  {assigned && (
+                    <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                      {t('assigned')}: {assigned.name}
+                    </p>
                   )}
                 </div>
-                <form action={async () => {
-                  'use server';
-                  await computeSeatCandidates(opp.id, seat.id);
-                }}>
-                  <button type="submit" className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded">
-                    Find Candidates
-                  </button>
-                </form>
+                <FindCandidatesButton opportunityId={opp.id} seatId={seat.id} />
               </div>
 
-              {candidates.length > 0 && (
+              {seatCandidates.length === 0 ? (
+                <p className="text-sm text-muted border border-dashed border-border rounded-md px-4 py-6 text-center">
+                  {partnerGraphSize === 0 ? t('partnerDataMissing') : t('noCandidatesYet')}
+                </p>
+              ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm border-collapse">
+                    <caption className="sr-only">{t('topCandidates')}</caption>
                     <thead>
-                      <tr className="bg-ground border-y">
-                        <th className="py-2 px-4">Rank</th>
-                        <th className="py-2 px-4">Organization</th>
-                        <th className="py-2 px-4">Score</th>
-                        <th className="py-2 px-4">Action</th>
+                      <tr className="bg-ground border-y border-border">
+                        <th scope="col" className="py-2 px-4">{t('rank')}</th>
+                        <th scope="col" className="py-2 px-4">{t('organization')}</th>
+                        <th scope="col" className="py-2 px-4">{t('score')}</th>
+                        <th scope="col" className="py-2 px-4">{t('action')}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {candidates.map((c) => (
-                        <tr key={c.id} className="border-b">
-                          <td className="py-2 px-4 font-medium text-ink">#{c.rank}</td>
-                          <td className="py-2 px-4">
-                            <div className="font-semibold">{c.organization?.name}</div>
-                            <div className="text-xs text-muted">{c.organization?.country} | {c.organization?.id}</div>
-                          </td>
-                          <td className="py-2 px-4">
-                            <div className="font-bold">{c.score.toFixed(1)}</div>
-                            <div className="text-xs text-muted" title={JSON.stringify(c.breakdown)}>Hover for breakdown</div>
-                          </td>
-                          <td className="py-2 px-4">
-                            <form action={async () => {
-                              'use server';
-                              // SeatCandidate.organizationId is nullable in the
-                              // schema even though the scorer always writes one.
-                              // Assigning a seat to nothing is not an invite.
-                              if (!c.organizationId) return;
-                              try {
-                                await assignCandidateToSeat(seat.id, c.organizationId, 'INVITED', opp.id);
-                              } catch (e) {
-                                console.error(errorMessage(e));
-                                // A real app would toast this error to the client
-                              }
-                            }}>
-                              <button type="submit" className="text-xs bg-surface hover:bg-surface-hover dark:bg-gray-800 dark:hover:bg-gray-700 text-ink border border-border px-2 py-1 rounded">
-                                Invite
-                              </button>
-                            </form>
-                          </td>
-                        </tr>
-                      ))}
+                      {seatCandidates.map((c) => {
+                        const org = c.organizationId ? orgById.get(c.organizationId) : null;
+                        const breakdown = readBreakdown(c.breakdown);
+                        return (
+                          <tr key={c.id} className="border-b border-border align-top">
+                            <td className="py-2 px-4 font-medium text-ink">#{c.rank}</td>
+                            <td className="py-2 px-4">
+                              <div className="font-semibold">{org?.name ?? c.organizationId}</div>
+                              <div className="text-xs text-muted">
+                                {org?.country ?? '—'} | {c.organizationId}
+                              </div>
+                            </td>
+                            <td className="py-2 px-4">
+                              <div className="font-bold">{c.score.toFixed(1)}</div>
+                              {/* Was a `title` attribute — invisible to keyboard and
+                                  touch users, who could not see why a partner ranked. */}
+                              <details className="text-xs text-muted mt-1">
+                                <summary className="cursor-pointer min-h-11 flex items-center">
+                                  {t('breakdown')}
+                                </summary>
+                                <dl className="mt-1 space-y-0.5">
+                                  {DIMENSIONS.map((key) => (
+                                    <div key={key} className="flex gap-2 justify-between">
+                                      <dt>{t(`dimension.${key}` as 'dimension.centrality')}</dt>
+                                      <dd className="tabular-nums">{(breakdown[key] ?? 0).toFixed(1)}</dd>
+                                    </div>
+                                  ))}
+                                </dl>
+                              </details>
+                            </td>
+                            <td className="py-2 px-4">
+                              <form action={async () => {
+                                'use server';
+                                // SeatCandidate.organizationId is nullable in the
+                                // schema even though the scorer always writes one.
+                                // Assigning a seat to nothing is not an invite.
+                                if (!c.organizationId) return;
+                                try {
+                                  await assignCandidateToSeat(seat.id, c.organizationId, 'INVITED', opp.id);
+                                } catch (e) {
+                                  console.error(errorMessage(e));
+                                }
+                              }}>
+                                <button type="submit" className="min-h-11 text-xs bg-surface hover:bg-surface-hover dark:bg-gray-800 dark:hover:bg-gray-700 text-ink border border-border px-2 py-1 rounded">
+                                  {t('invite')}
+                                </button>
+                              </form>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

@@ -69,6 +69,8 @@ export async function findCandidates(seatId: string) {
     })
   );
 
+  // `Opportunity.topicId` is a `Topic` cuid; the scorer resolves it to the topic
+  // identifier itself, so it is passed through as an id rather than a code.
   const candidates = await scoreCandidatesForSeat(
     tenantId,
     seatId,
@@ -109,7 +111,7 @@ export async function getConflicts(opportunityId: string) {
   if (!opp) return [];
 
   try {
-    return await detectConflicts(opportunityId);
+    return await detectConflicts(opportunityId, tenantId);
   } catch (e) {
     console.warn(`[getConflicts] error for ${opportunityId}: ${errorMessage(e)}`);
     return [];
