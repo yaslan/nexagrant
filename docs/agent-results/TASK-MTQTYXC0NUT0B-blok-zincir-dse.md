@@ -222,7 +222,7 @@ Yeni kullanıcı metni eklenmedi, `messages/*.json` **hiç değiştirilmedi**. P
 
 ## 6. Sonraki adım
 
-1. **Kart aç:** "Panoya *Eşik Üstü Oranı* KPI kartını ekle" — `m5/server/queries.ts`'e `isAboveThreshold` ile bir sayım, `Dashboard.tsx`'e bir `KpiCard`, `MetricValue` ile boş durum, `descThresholdRate`/`emptyThresholdRate` anahtarları (tr+en). `queries.ts` üzerindeki paralel iş bittikten sonra.
+1. **Kart açıldı → `TASK-MTR68G2W1IQPI`** "Panoya *Eşik Üstü Oranı* KPI kartını ekle" — `m5/server/queries.ts`'e `isAboveThreshold` ile bir sayım, `Dashboard.tsx`'e bir `KpiCard`, `MetricValue` ile boş durum, `descThresholdRate`/`emptyThresholdRate` anahtarları (tr+en). `queries.ts` üzerindeki paralel iş bittikten sonra.
 2. **Kart aç:** `fetchDashboardMetrics`'i `withTenant`'a taşı (CLAUDE.md kural 1).
 3. İki CSV dışa aktarma uç noktasından hangisinin kalacağına karar ver; biri KPI özeti, diğeri satır dökümü — ikisi de meşru ama panoda yalnız biri bağlı.
 
