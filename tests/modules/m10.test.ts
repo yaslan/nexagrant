@@ -30,6 +30,16 @@ vi.mock('../../src/lib/db', async () => {
   });
 });
 
+// The dual-approval actions read the signer's display name straight from the
+// session, so `@/lib/auth` is in this module's import graph even though the
+// tenant module is stubbed. Left unmocked, next-auth's `next/server` import
+// fails to resolve under vitest and the whole suite refuses to load.
+vi.mock('../../src/lib/auth', () => ({
+  auth: vi.fn(async () => ({
+    user: { id: 'user-1', name: 'Test Kullanıcı', email: 'test@fabrika.test' },
+  })),
+}));
+
 vi.mock('../../src/lib/ai/llm', () => ({
   generateText: vi.fn().mockResolvedValue(`### MUTUAL NON-DISCLOSURE AGREEMENT (NDA)\n\nMock document content.`),
 }));
