@@ -4,6 +4,12 @@ import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 
+/** Whole days between `d` and now, or null when there is no date. */
+const daysSince = (d: Date | null) => {
+  if (!d) return null;
+  return Math.floor((Date.now() - new Date(d).getTime()) / (1000 * 3600 * 24));
+};
+
 export default async function RelationshipsPage({
   params,
 }: {
@@ -28,11 +34,6 @@ export default async function RelationshipsPage({
     warm: 'bg-amber/15 text-amber border border-amber/20',
     hot: 'bg-bad/15 text-bad border border-bad/20',
     active: 'bg-ok/15 text-ok border border-ok/20',
-  };
-
-  const daysSince = (d: Date | null) => {
-    if (!d) return null;
-    return Math.floor((Date.now() - new Date(d).getTime()) / (1000 * 3600 * 24));
   };
 
   const isTr = locale === 'tr';

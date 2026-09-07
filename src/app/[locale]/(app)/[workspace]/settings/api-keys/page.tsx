@@ -1,8 +1,31 @@
 import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
-import { ApiKeysClient } from './client';
+import { ApiKeysClient, type ApiKeyRecord } from './client';
 import { errorMessage } from '@/lib/errors';
+
+/**
+ * Placeholder rows for the empty state — the timestamps are relative to the
+ * request so the screen never shows a date from whenever this file was written.
+ */
+function demoApiKeys(): ApiKeyRecord[] {
+  return [
+    {
+      id: 'key-1',
+      name: 'ERP Entegrasyonu & B2B Pipeline',
+      prefix: 'fp_live_9b4e72',
+      lastUsedAt: new Date(Date.now() - 3600000).toISOString(),
+      createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    },
+    {
+      id: 'key-2',
+      name: 'CORDIS Intelligence Bot',
+      prefix: 'fp_live_1a8f03',
+      lastUsedAt: new Date(Date.now() - 7200000).toISOString(),
+      createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
+    },
+  ];
+}
 
 export default async function ApiKeysSettingsPage({
   params,
@@ -12,7 +35,7 @@ export default async function ApiKeysSettingsPage({
   const { locale, workspace } = await params;
   const { tenantId, userId } = await requireTenantPage(locale);
 
-  let apiKeys: any[] = [];
+  let apiKeys: ApiKeyRecord[] = [];
   try {
     apiKeys = await withTenant(tenantId, (tx) =>
       tx.apiKey.findMany({
@@ -25,22 +48,7 @@ export default async function ApiKeysSettingsPage({
   }
 
   if (!apiKeys || apiKeys.length === 0) {
-    apiKeys = [
-      {
-        id: 'key-1',
-        name: 'ERP Entegrasyonu & B2B Pipeline',
-        prefix: 'fp_live_9b4e72',
-        lastUsedAt: new Date(Date.now() - 3600000).toISOString(),
-        createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-      },
-      {
-        id: 'key-2',
-        name: 'CORDIS Intelligence Bot',
-        prefix: 'fp_live_1a8f03',
-        lastUsedAt: new Date(Date.now() - 7200000).toISOString(),
-        createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
-      },
-    ];
+    apiKeys = demoApiKeys();
   }
 
   return (

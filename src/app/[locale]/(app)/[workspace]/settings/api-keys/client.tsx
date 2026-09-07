@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { generateApiKey, revokeApiKey } from '@/modules/marketplace/server/actions';
 
-interface ApiKeyRecord {
+export interface ApiKeyRecord {
   id: string;
   name: string;
   prefix: string;

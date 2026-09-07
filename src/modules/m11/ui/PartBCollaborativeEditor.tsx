@@ -49,6 +49,50 @@ interface PartBCollaborativeEditorProps {
   initialComments?: SectionCommentItem[];
 }
 
+/**
+ * Seed rows for a part that has no comments yet. Built per mount so the
+ * timestamps read as "an hour ago" rather than a fixed date, and kept out of
+ * the component body because `Date.now()` may not run during render.
+ */
+function demoComments(): SectionCommentItem[] {
+  return [
+    {
+      id: 'cmt-1',
+      sectionKey: '1.1_objectives',
+      authorName: 'Prof. Klaus Müller',
+      authorOrg: 'Fraunhofer Institute',
+      timestamp: new Date(Date.now() - 3600000).toISOString(),
+      text: 'SO2 hedefinde AI model doğruluğu %99.2 olarak belirtilmiş. Bu metriği test senaryolarıyla detaylandırmalıyız.',
+      resolved: false,
+    },
+    {
+      id: 'cmt-2',
+      sectionKey: '1.2_methodology',
+      authorName: 'Dr. Sofia Rossi',
+      authorOrg: 'Politecnico di Milano',
+      timestamp: new Date(Date.now() - 7200000).toISOString(),
+      text: 'Açık bilim bölümünde Zenodo ve CC-BY lisanslama taahhüdü çok net, teşekkürler.',
+      resolved: true,
+    },
+  ];
+}
+
+/** Seed revision for a part with no history yet. See {@link demoComments}. */
+function demoRevisions(content: string): SectionRevisionItem[] {
+  return [
+    {
+      id: 'rev-1',
+      sectionKey: '1.1_objectives',
+      authorName: 'Dr. Mehmet Yılmaz',
+      authorOrg: 'Demo SME Consultancy',
+      timestamp: new Date(Date.now() - 1800000).toISOString(),
+      wordCount: 172,
+      summary: 'SMART hedefler ve TRL hedefleri eklendi',
+      content,
+    },
+  ];
+}
+
 export function PartBCollaborativeEditor({
   partId,
   opportunityTitle,
@@ -74,47 +118,13 @@ export function PartBCollaborativeEditor({
 
   const [activeDrawer, setActiveDrawer] = useState<'COMMENTS' | 'HISTORY' | 'AI' | null>(null);
 
-  const [comments, setComments] = useState<SectionCommentItem[]>(
-    initialComments.length > 0
-      ? initialComments
-      : [
-          {
-            id: 'cmt-1',
-            sectionKey: '1.1_objectives',
-            authorName: 'Prof. Klaus Müller',
-            authorOrg: 'Fraunhofer Institute',
-            timestamp: new Date(Date.now() - 3600000).toISOString(),
-            text: 'SO2 hedefinde AI model doğruluğu %99.2 olarak belirtilmiş. Bu metriği test senaryolarıyla detaylandırmalıyız.',
-            resolved: false,
-          },
-          {
-            id: 'cmt-2',
-            sectionKey: '1.2_methodology',
-            authorName: 'Dr. Sofia Rossi',
-            authorOrg: 'Politecnico di Milano',
-            timestamp: new Date(Date.now() - 7200000).toISOString(),
-            text: 'Açık bilim bölümünde Zenodo ve CC-BY lisanslama taahhüdü çok net, teşekkürler.',
-            resolved: true,
-          },
-        ]
+  const [comments, setComments] = useState<SectionCommentItem[]>(() =>
+    initialComments.length > 0 ? initialComments : demoComments()
   );
   const [newCommentText, setNewCommentText] = useState('');
 
-  const [revisions, setRevisions] = useState<SectionRevisionItem[]>(
-    initialRevisions.length > 0
-      ? initialRevisions
-      : [
-          {
-            id: 'rev-1',
-            sectionKey: '1.1_objectives',
-            authorName: 'Dr. Mehmet Yılmaz',
-            authorOrg: 'Demo SME Consultancy',
-            timestamp: new Date(Date.now() - 1800000).toISOString(),
-            wordCount: 172,
-            summary: 'SMART hedefler ve TRL hedefleri eklendi',
-            content: activeSection.content,
-          },
-        ]
+  const [revisions, setRevisions] = useState<SectionRevisionItem[]>(() =>
+    initialRevisions.length > 0 ? initialRevisions : demoRevisions(activeSection.content)
   );
 
   const [presenceList, setPresenceList] = useState<CollaboratorPresence[]>([
