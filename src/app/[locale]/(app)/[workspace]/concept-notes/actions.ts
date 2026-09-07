@@ -61,7 +61,7 @@ export async function saveSectionContent(
   sectionKey: string,
   markdown: string
 ) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction();
 
   await withTenant(tenantId, async (tx) => {
     const note = await tx.conceptNote.findFirst({
@@ -162,7 +162,7 @@ Requirements:
  * Update the status of a concept note (draft → review → approved).
  */
 export async function updateNoteStatus(noteId: string, status: string) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction();
 
   // `updateMany` so the tenant is a real filter rather than an extra column on
   // a unique selector.

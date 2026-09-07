@@ -21,7 +21,7 @@ async function syncPlans() {
     let product;
     try {
       product = await stripe.products.retrieve(productId);
-    } catch (e) {
+    } catch (_e) {
       product = await stripe.products.create({
         id: productId,
         name: `Fabrika - ${plan.name}`,
@@ -70,7 +70,7 @@ async function syncAddOns() {
     let product;
     try {
       product = await stripe.products.retrieve(productId);
-    } catch (e) {
+    } catch (_e) {
       product = await stripe.products.create({
         id: productId,
         name: `Fabrika Add-on - ${addon.name}`,

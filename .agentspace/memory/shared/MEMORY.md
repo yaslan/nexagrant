@@ -94,3 +94,9 @@
 
 - [fabrika-billing-ui-lives-in-two-namespaces](fabrika-billing-ui-lives-in-two-namespaces.md) — Fiyat rozetleri iki panelde birden yaşıyor — billingPanels.pricing düzeltilip billingPanels.settings unutuluyor
 - [fabrika-plan-card-copy-contradicts-plan-grants](fabrika-plan-card-copy-contradicts-plan-grants.md) — Plan kartlarındaki özellik satırları (koltuk/kredi/modül) i18n metni — yetkilendirmenin koştuğu PLAN_GRANTS ile sekiz yerde çelişiyor, yani kullanıcı kartta okuduğunu almıyor
+
+- [fabrika-concurrent-agents-and-git-reset-hard](fabrika-concurrent-agents-and-git-reset-hard.md) — Aynı depoda iki ajan çalışırken `git reset --hard` diğerinin commit'lenmemiş işini siler — sprint maxConcurrent yalnız SPRINT görevlerini sıralar, sprint dışı pane'i durdurmaz
+- [fabrika-grep-count-drop-may-be-comments](fabrika-grep-count-drop-may-be-comments.md) — Bir denetim göstergesini grep sayısıyla kapatma — kalan eşleşmeler düzeltmeyi ANLATAN yorumlar olabilir; sayı değil bağlam karar verir
+- [fabrika-new-workspace-page-must-enter-route-catalog](fabrika-new-workspace-page-must-enter-route-catalog.md) — [workspace] altına yeni sayfa eklemek src/lib/modules/route-catalog.ts kaydı olmadan tamam değil — route-catalog testi kırmızıya döner ve kapıyı SONRAKİ karta miras bırakır
+- [fabrika-playwright-caret-hide-fake-hydration-error](fabrika-playwright-caret-hide-fake-hydration-error.md) — Playwright'ın page.screenshot() varsayılanı sahte React hidrasyon uyuşmazlığı üretir — caret 'initial' ile kapat
+- [fabrika-shared-dev-db-can-be-reset-under-you](fabrika-shared-dev-db-can-be-reset-under-you.md) — Paylaşılan dev veritabanı başka bir ajanın prisma migrate dev'i altında sıfırlanabilir — CLI boş DB'yi, çalışan :3000 sunucusu hâlâ eskisini görür

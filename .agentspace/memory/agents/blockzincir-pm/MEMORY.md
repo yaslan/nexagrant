@@ -21,3 +21,5 @@
 - [fabrika-capability-parity-not-price-parity](fabrika-capability-parity-not-price-parity.md) — Fabrika'da EUR 5 plan → USD 3 plan geçişinin eşleme kuralı — fiyat eşliği imkânsızdı, yetenek eşliği seçildi ve fazla kapasite seatsExtra'ya taşındı
 - [fabrika-plan-id-rename-blast-radius](fabrika-plan-id-rename-blast-radius.md) — Fabrika'da bir plan id'sini değiştirmek 5 dosyayı değil ~20'yi kırar — derleyicinin bulduğu yerler ve bulamadığı yerler
 - [fabrika-stash-pop-can-silently-fail](fabrika-stash-pop-can-silently-fail.md) — git stash pop bir e2e koşusunun ürettiği artefakt dosya yüzünden sessizce başarısız olabilir — çalışma ağacı temiz görünür, işin hâlâ stash'tedir
+
+- [fabrika-react19-render-purity-fixes](fabrika-react19-render-purity-fixes.md) — React 19'un set-state-in-effect ve purity lint hatalarını istisna yazmadan çözen üç desen — Fabrika'da kanıtlanmış

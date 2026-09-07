@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
-import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import ConceptNoteEditor from './editor';
 import { errorMessage } from '@/lib/errors';

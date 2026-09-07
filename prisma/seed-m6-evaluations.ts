@@ -16,9 +16,6 @@ function generateId(): string {
 }
 
 async function seedM6Evaluations() {
-  const tenantId = 'demo-tenant'; // Use a known demo tenant
-  const workspaceId = generateId();
-
   // Get or create demo tenant + users
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'demo' },

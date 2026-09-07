@@ -12,3 +12,5 @@
 - [fabrika-boss-prefers-clean-chain-over-busy-team](fabrika-boss-prefers-clean-chain-over-busy-team.md) — Patron, bağımlı adımlarda paralellik yerine sıralı doğrulamayı seçiyor — boşta duran ekip, bulanık kanıttan iyidir
 
 - [fabrika-ask-workers-to-report-not-fix-adjacent-lies](fabrika-ask-workers-to-report-not-fix-adjacent-lies.md) — Worker'a "yolun üstünde gördüğün kayıtsız rakamları DÜZELTME, ADIYLA BİLDİR" demek kapsamı korurken üç gerçek kart kazandırdı
+
+- [fabrika-red-gate-may-be-a-live-worker-wip](fabrika-red-gate-may-be-a-live-worker-wip.md) — Kapı kırmızıysa önce pane listesine bak — commit'siz bir dizin çalışan worker'ın WIP'i olabilir, regresyon değil

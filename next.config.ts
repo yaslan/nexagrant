@@ -9,7 +9,6 @@ function checkI18n() {
   try {
     console.log('\n🌐 Checking i18n translations...');
     const output = execSync('tsx scripts/i18n-check.ts', { encoding: 'utf-8' });
-    const lines = output.split('\n');
     // Extract JSON from output
     const jsonMatch = output.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
