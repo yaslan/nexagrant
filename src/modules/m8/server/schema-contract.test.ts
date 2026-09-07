@@ -17,6 +17,24 @@ import { describe, it, expect } from 'vitest';
  * feature returned a 500. A mock can never catch this; only the schema can. This
  * test reads prisma/schema.prisma and checks the queries M8 actually writes
  * against it — no database, no mock.
+ *
+ * TASK-MTRK8YPNJDCIT widened it, because the class was not closed. The public
+ * API (`src/app/api/v1/partners`) was still calling `prisma.organization` after
+ * M8 had been "fixed" twice, and nothing caught it: `prisma generate` is not
+ * part of the install or the gate, so src/types/prisma-override.d.ts types every
+ * delegate as `any` and `pnpm typecheck` sees a call to a model that does not
+ * exist as perfectly well typed. At runtime the delegate is `undefined` and the
+ * call throws a TypeError, which the route's try/catch swallowed into a
+ * fabricated demo response — a green build and a 200 OK over a query that never
+ * ran.
+ *
+ * So there are now two guards:
+ *
+ * 1. The field-level check over SCANNED — model, relation *and* column names for
+ *    the surfaces listed there.
+ * 2. A repo-wide sweep of `src/`: no file anywhere may call a Prisma model the
+ *    schema does not declare. KNOWN_UNKNOWN_MODEL_CALLS below is the ledger of
+ *    the ones that remain, and it can only shrink.
  */
 
 const REPO = resolve(__dirname, '../../../..');
@@ -28,7 +46,27 @@ const SCANNED = [
   'src/app/[locale]/(app)/[workspace]/opportunities/[id]/matching/page.tsx',
   'src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx',
   'src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions.ts',
+  'src/app/api/v1/partners',
 ];
+
+/** Everything the repo-wide sweep looks at. */
+const SWEEP_ROOT = 'src';
+
+/**
+ * Files allowed to call a model prisma/schema.prisma does not declare, with the
+ * model each one names.
+ *
+ * **It is empty, and the intent is that it stays empty.** As of
+ * TASK-MTRK8YPNJDCIT no file in `src/` calls an undeclared model: the last four
+ * were src/app/api/v1/partners (both routes, fixed there) and
+ * src/lib/cordis-sync.ts / src/lib/cordis-delta.ts (fixed in the same wave).
+ *
+ * The map exists so that a call that genuinely cannot be fixed yet is *written
+ * down* rather than left to fail the build. It may only shrink: an entry whose
+ * call has been fixed fails the staleness test below, and a call in a file that
+ * is not listed fails the sweep. It can never quietly absorb a new one.
+ */
+const KNOWN_UNKNOWN_MODEL_CALLS = new Map<string, string[]>([]);
 
 const QUERY_METHODS = [
   'findMany', 'findFirst', 'findUnique', 'findFirstOrThrow', 'findUniqueOrThrow',
@@ -89,6 +127,51 @@ function listFiles(target: string): string[] {
     else if (/\.(ts|tsx)$/.test(entry) && !entry.endsWith('.test.ts')) out.push(child);
   }
   return out;
+}
+
+/**
+ * Blanks comment text, keeping the file's length and line breaks.
+ *
+ * Both scanners match on source text, so without this a doc comment that merely
+ * *names* a call — `prisma.organization.findMany(...)`, as src/types/db-rows.ts
+ * does when it explains why that model is gone — is reported as a call. A `//`
+ * that has an odd number of quotes before it on its line is inside a string
+ * (`'https://...'`) and is left alone.
+ */
+function stripComments(source: string): string {
+  const out = source.split('');
+  const blank = (from: number, to: number) => {
+    for (let k = from; k < to && k < out.length; k++) {
+      if (out[k] !== '\n') out[k] = ' ';
+    }
+  };
+
+  /** Is `at` inside a string literal, judged from the quotes earlier on its line? */
+  const inString = (at: number): boolean => {
+    const lineStart = source.lastIndexOf('\n', at - 1) + 1;
+    let single = 0, double = 0, back = 0;
+    for (let k = lineStart; k < at; k++) {
+      if (source[k] === '\\') { k++; continue; }
+      if (source[k] === "'") single++;
+      else if (source[k] === '"') double++;
+      else if (source[k] === '`') back++;
+    }
+    return single % 2 === 1 || double % 2 === 1 || back % 2 === 1;
+  };
+
+  let i = 0;
+  while (i < source.length) {
+    const two = source.slice(i, i + 2);
+    if ((two === '//' || two === '/*') && !inString(i)) {
+      const end = two === '//' ? source.indexOf('\n', i) : source.indexOf('*/', i + 2);
+      const stop = end === -1 ? source.length : two === '//' ? end : end + 2;
+      blank(i, stop);
+      i = stop;
+      continue;
+    }
+    i++;
+  }
+  return out.join('');
 }
 
 /** Reads the balanced `(...)` that starts at `open`, returning its inner text. */
@@ -189,16 +272,18 @@ function checkFieldObject(
   }
 }
 
+const CALL_SOURCE = `\\b(?:prisma|tx)\\.([a-z][A-Za-z0-9_]*)\\.(${QUERY_METHODS.join('|')})\\s*\\(`;
+
 function scan(models: Map<string, Map<string, Field>>): Problem[] {
   const problems: Problem[] = [];
-  const callRe = new RegExp(
-    `\\b(?:prisma|tx)\\.([a-z][A-Za-z0-9_]*)\\.(${QUERY_METHODS.join('|')})\\s*\\(`,
-    'g'
-  );
 
   for (const target of SCANNED) {
     for (const file of listFiles(target)) {
-      const source = readFileSync(file, 'utf8');
+      // Built per file on purpose: a `g` regex carries `lastIndex` between
+      // strings, so a match near the end of one file silently skips the next
+      // shorter one.
+      const callRe = new RegExp(CALL_SOURCE, 'g');
+      const source = stripComments(readFileSync(file, 'utf8'));
       const rel = file.slice(REPO.length + 1);
       let m: RegExpExecArray | null;
 
@@ -231,6 +316,32 @@ function scan(models: Map<string, Map<string, Field>>): Problem[] {
   return problems;
 }
 
+/**
+ * Every `prisma.<delegate>.<query>` in `src/`, as file -> model names — the
+ * models that exist as well as the ones that do not, so the sweep can prove it
+ * actually read something before it reports "nothing wrong". Model existence
+ * only; the field-level check above is what walks `where`/`select`/`include` for
+ * the surfaces it covers.
+ */
+function sweepModelCalls(): Map<string, Set<string>> {
+  const found = new Map<string, Set<string>>();
+
+  for (const file of listFiles(SWEEP_ROOT)) {
+    const callRe = new RegExp(CALL_SOURCE, 'g');
+    const source = stripComments(readFileSync(file, 'utf8'));
+    const rel = file.slice(REPO.length + 1);
+    let m: RegExpExecArray | null;
+    while ((m = callRe.exec(source)) !== null) {
+      const delegate = m[1];
+      if (!delegate) continue;
+      const set = found.get(rel) ?? new Set<string>();
+      set.add(delegateToModel(delegate));
+      found.set(rel, set);
+    }
+  }
+  return found;
+}
+
 describe('M8 Prisma queries match prisma/schema.prisma', () => {
   const models = parseSchema();
 
@@ -257,5 +368,68 @@ describe('M8 Prisma queries match prisma/schema.prisma', () => {
     expect(models.get('ConsortiumSeat')?.has('organization')).toBe(false);
     expect(models.get('Opportunity')?.has('callId')).toBe(false);
     expect(models.get('Opportunity')?.has('topic')).toBe(false);
+  });
+});
+
+describe('no Prisma call in src/ names a model the schema does not have', () => {
+  const models = parseSchema();
+
+  it('actually reads the queries it is checking', () => {
+    // A sweep that walked nothing, or whose regex stopped matching, would report
+    // a clean repo and make the assertion below vacuous. Pin it to calls that
+    // are known to be there — including the two this task rewrote.
+    const found = sweepModelCalls();
+    expect(found.size).toBeGreaterThan(20);
+    expect(found.get('src/app/api/v1/partners/route.ts')?.has('CordisOrganization')).toBe(true);
+    expect(
+      found.get('src/app/api/v1/partners/[pic]/route.ts')?.has('CordisParticipation')
+    ).toBe(true);
+  });
+
+  it('has no unknown-model call outside the known-broken list', () => {
+    const found = sweepModelCalls();
+    const unexpected: string[] = [];
+
+    for (const [file, called] of found) {
+      const allowed = KNOWN_UNKNOWN_MODEL_CALLS.get(file) ?? [];
+      for (const model of called) {
+        if (models.has(model) || allowed.includes(model)) continue;
+        unexpected.push(
+          `  ${file}: prisma.${model.charAt(0).toLowerCase()}${model.slice(1)}.* — ` +
+            `there is no \`model ${model}\` in prisma/schema.prisma`
+        );
+      }
+    }
+
+    const report = unexpected.sort().join('\n');
+    expect(
+      report,
+      `A Prisma call names a model the schema does not declare. The delegate is ` +
+        `\`undefined\` at runtime and the call throws a TypeError; \`pnpm typecheck\` ` +
+        `cannot see it because prisma-override.d.ts types every delegate as \`any\`. ` +
+        `Bind the query to a model that exists — do not add it to ` +
+        `KNOWN_UNKNOWN_MODEL_CALLS.\n${report}`
+    ).toBe('');
+  });
+
+  it('keeps the known-broken list from going stale', () => {
+    const found = sweepModelCalls();
+    const stale: string[] = [];
+
+    for (const [file, allowed] of KNOWN_UNKNOWN_MODEL_CALLS) {
+      const called = found.get(file);
+      for (const model of allowed) {
+        if (!called?.has(model) || models.has(model)) {
+          stale.push(`  ${file}: no longer calls \`${model}\` — drop it from the list`);
+        }
+      }
+    }
+
+    const report = stale.sort().join('\n');
+    expect(
+      report,
+      `KNOWN_UNKNOWN_MODEL_CALLS is out of date. The list may only shrink, so a ` +
+        `fixed entry has to be deleted rather than left behind.\n${report}`
+    ).toBe('');
   });
 });

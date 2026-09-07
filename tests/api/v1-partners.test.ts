@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { describe, test, expect, vi } from 'vitest';
 import { authenticateApiKey } from '../../src/lib/api-auth';
 import { GET as getPartners } from '../../src/app/api/v1/partners/route';
+import { GET as getPartnerDetail } from '../../src/app/api/v1/partners/[pic]/route';
 import { GET as getCalls } from '../../src/app/api/v1/calls/route';
 import { GET as getOpportunities } from '../../src/app/api/v1/opportunities/route';
 
@@ -12,7 +13,34 @@ import { GET as getOpportunities } from '../../src/app/api/v1/opportunities/rout
  * guess the prefix, so it is gone. The fixture below is what a real integration
  * key looks like instead: a plaintext key the caller sends, and an `ApiKey` row
  * stored under its SHA-256 — exactly what `pnpm db:seed` writes.
+ *
+ * The partner mocks below used to be `organization`, and that is how this file
+ * missed the bug in TASK-MTRK8YPNJDCIT: there is no `model Organization` in
+ * prisma/schema.prisma, so the *mock* was the only place that model ever
+ * existed. `prisma.organization.findMany` resolved to `[]` here and threw
+ * `TypeError: Cannot read properties of undefined` in production, where the
+ * route's catch turned it into a hard-coded demo array — which is what made
+ * `data.length > 0` below pass. A mock can never catch that class of bug;
+ * src/modules/m8/server/schema-contract.test.ts checks the query against the
+ * schema instead. What these mocks are for is the *mapping*: CORDIS columns in,
+ * published API field names out.
  */
+
+/** A CordisOrganization row with its derived profile, as the list route selects it. */
+const CORDIS_ORG_WITH_PROFILE = {
+  organisationId: '999984059',
+  name: 'FRAUNHOFER GESELLSCHAFT ZUR FOERDERUNG DER ANGEWANDTEN FORSCHUNG E.V.',
+  shortName: 'Fraunhofer-Gesellschaft',
+  country: 'DE',
+  activityType: 'REC',
+  sme: false,
+  city: 'München',
+  profile: {
+    totalProjects: 2,
+    coordinatorProjects: 1,
+    totalEcContribution: BigInt(4840000),
+  },
+};
 const TEST_API_KEY = 'fp_live_test_9f2c41ab7d0e4c8fa1b6';
 const TEST_API_KEY_HASH = crypto.createHash('sha256').update(TEST_API_KEY).digest('hex');
 
@@ -34,10 +62,18 @@ vi.mock('../../src/lib/db', () => ({
       }),
       update: vi.fn().mockResolvedValue({}),
     },
-    organization: {
-      findMany: vi.fn().mockResolvedValue([]),
+    cordisOrganization: {
+      // Lazy on purpose: `vi.mock` is hoisted above the const declarations, so
+      // reading the fixture eagerly here would hit the temporal dead zone.
+      findMany: vi.fn().mockImplementation(async () => [CORDIS_ORG_WITH_PROFILE]),
       findUnique: vi.fn().mockResolvedValue(null),
     },
+    cordisParticipation: {
+      findMany: vi.fn().mockResolvedValue([]),
+      groupBy: vi.fn().mockResolvedValue([]),
+    },
+    cordisProjectTopic: { groupBy: vi.fn().mockResolvedValue([]) },
+    cordisCoParticipation: { findMany: vi.fn().mockResolvedValue([]) },
     topic: {
       findMany: vi.fn().mockResolvedValue([]),
     },
@@ -79,7 +115,7 @@ describe('Partner Intelligence REST API (v1)', () => {
     }
   });
 
-  test('GET /api/v1/partners returns CORDIS organizations with metadata', async () => {
+  test('GET /api/v1/partners maps CORDIS columns onto the published field names', async () => {
     const req = new Request('http://localhost:3000/api/v1/partners?country=DE', {
       headers: { 'x-api-key': TEST_API_KEY },
     });
@@ -87,8 +123,56 @@ describe('Partner Intelligence REST API (v1)', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
-    expect(body.data.length).toBeGreaterThan(0);
-    expect(body.data[0].pic).toBeDefined();
+    expect(body.meta.authenticatedTenant).toBe(TEST_API_KEY_ROW.tenantId);
+    expect(body.data).toHaveLength(1);
+
+    // The whole contract of this endpoint, asserted field by field: the names
+    // are the ones it has always published, the values come from CORDIS.
+    expect(body.data[0]).toEqual({
+      id: '999984059',
+      pic: '999984059',
+      name: 'Fraunhofer-Gesellschaft',
+      legalName: 'FRAUNHOFER GESELLSCHAFT ZUR FOERDERUNG DER ANGEWANDTEN FORSCHUNG E.V.',
+      country: 'DE',
+      orgType: 'REC',
+      isSme: false,
+      city: 'München',
+      stats: {
+        projectCount: 2,
+        coordinatorCount: 1,
+        totalEuContributionEur: 4840000,
+        // No CORDIS table carries a centrality measure. Null, never invented.
+        networkCentralityScore: null,
+      },
+    });
+  });
+
+  test('GET /api/v1/partners returns an empty list, not demo rows, when nothing matches', async () => {
+    const { prisma } = await import('../../src/lib/db');
+    const findMany = prisma.cordisOrganization.findMany as ReturnType<typeof vi.fn>;
+    findMany.mockResolvedValueOnce([]);
+
+    const req = new Request('http://localhost:3000/api/v1/partners?country=ZZ', {
+      headers: { 'x-api-key': TEST_API_KEY },
+    });
+    const res = await getPartners(req);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toEqual([]);
+    expect(body.meta.total).toBe(0);
+  });
+
+  test('GET /api/v1/partners/[pic] 404s on an unknown PIC instead of inventing one', async () => {
+    // It used to answer any PIC at all with a fabricated organisation —
+    // a name, a country, 142 projects and €54.2M, none of it from a row.
+    const req = new Request('http://localhost:3000/api/v1/partners/000000000', {
+      headers: { 'x-api-key': TEST_API_KEY },
+    });
+    const res = await getPartnerDetail(req, { params: Promise.resolve({ pic: '000000000' }) });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.code).toBe('PARTNER_NOT_FOUND');
+    expect(body.data).toBeUndefined();
   });
 
   test('GET /api/v1/calls returns open Horizon Europe & national calls', async () => {

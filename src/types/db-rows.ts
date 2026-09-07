@@ -1,72 +1,32 @@
 /**
- * Row shapes for the partner-graph tables the M1/M8 screens query.
+ * Row shapes for the tables the app queries.
  *
- * Two things make these necessary rather than derivable:
+ * These exist because `prisma generate` does not run in this repo, so
+ * `@prisma/client` carries no model types at all (see
+ * src/types/prisma-override.d.ts) and every delegate is `any`. Each interface
+ * below records the columns one screen or action reads, so the compiler has
+ * something to check even though Prisma gives it nothing.
  *
- * 1. `prisma generate` does not run in this repo, so `@prisma/client` carries
- *    no model types at all (see src/types/prisma-override.d.ts).
- * 2. `Organization`, `Participation`, `Collab` and `OrgTopicStat` are **not in
- *    prisma/schema.prisma**. Every `prisma.organization.*` call therefore
- *    throws at runtime, which is why each of these screens wraps its query in
- *    try/catch and falls back to CORDIS tables or demo rows. These interfaces
- *    record the columns the code reads, so whoever adds the models has the
- *    contract in front of them. Tracked in the TASK-MTQ60SGW45T0X result
- *    report.
+ * Every model named here exists in prisma/schema.prisma. That is now a rule, not
+ * a hope: this file used to also carry `LegacyOrganizationRow`,
+ * `LegacyParticipationRow`, `LegacyCollabRow`, `LegacyOrgTopicStatRow`,
+ * `LegacyOrganizationWithParticipations`, `ConsortiumSeatWithOrg` and
+ * `SeatCandidateWithOrg` — hand-written shapes for models and relations that are
+ * *not* in the schema (`Organization`, `Participation`, `Collab`,
+ * `OrgTopicStat`, `ConsortiumSeat.organization`). Because the delegates are
+ * `any`, typing a phantom model made `prisma.organization.findMany(...)` look
+ * checked while the delegate was `undefined` at runtime. All seven were dead
+ * code by the time the last caller (src/app/api/v1/partners) was bound to the
+ * CORDIS tables, and they are deleted so nobody reads them as evidence that the
+ * table exists.
+ *
+ * The guard that replaces them is a test, not a comment:
+ * src/modules/m8/server/schema-contract.test.ts reads prisma/schema.prisma and
+ * fails on any `prisma.<model>.<query>` in the repo that names a model, relation
+ * or column the schema does not have.
  */
 
-/** `Organization` — the pre-CORDIS partner table. */
-export interface LegacyOrganizationRow {
-  id: string;
-  name: string;
-  shortName: string | null;
-  country: string | null;
-  activityType: string | null;
-  isSme: boolean;
-  eigenvector: number | null;
-  degree: number | null;
-  participationCount: number | null;
-  coordinatorCount: number | null;
-  ecContributionSum: bigint | null;
-}
-
-/** `Participation` — an organisation on a project, in the legacy graph. */
-export interface LegacyParticipationRow {
-  id: string;
-  organizationId: string;
-  role: string | null;
-  ecContributionCents: number | null;
-  project: {
-    id: string;
-    acronym: string | null;
-    title: string;
-    topicCode: string | null;
-    startDate: Date | null;
-    endDate: Date | null;
-  } | null;
-}
-
-/** A legacy Organization with the project history the detail page lists. */
-export interface LegacyOrganizationWithParticipations extends LegacyOrganizationRow {
-  participations: LegacyParticipationRow[];
-}
-
-/** `Collab` — a co-participation edge in the legacy graph. */
-export interface LegacyCollabRow {
-  orgA: string;
-  orgB: string;
-  projects: number | null;
-}
-
-/** `OrgTopicStat` — an organisation's record against one topic prefix. */
-export interface LegacyOrgTopicStatRow {
-  organizationId: string | null;
-  topicPrefix: string;
-  participationCount: number;
-  coordinatorCount: number;
-  organization: LegacyOrganizationRow;
-}
-
-/** `model Relationship` — M3 focal-point CRM. This one does exist. */
+/** `model Relationship` — M3 focal-point CRM. */
 export interface RelationshipRow {
   id: string;
   organizationId: string | null;
@@ -86,27 +46,6 @@ export interface RelationshipRow {
 export interface ModuleStateRow {
   moduleId: string;
   status: 'OFF' | 'DEV' | 'PILOT' | 'ON' | string;
-}
-
-/** `model ConsortiumSeat`, with the organisation assigned to it. */
-export interface ConsortiumSeatWithOrg {
-  id: string;
-  roleKey: string;
-  required: boolean;
-  status: string;
-  organizationId: string | null;
-  organization: LegacyOrganizationRow | null;
-}
-
-/** `model SeatCandidate`, with the organisation it proposes. */
-export interface SeatCandidateWithOrg {
-  id: string;
-  seatId: string;
-  organizationId: string | null;
-  score: number;
-  breakdown: unknown;
-  rank: number;
-  organization: LegacyOrganizationRow | null;
 }
 
 /** `model Interaction` — one logged touch on a relationship. */

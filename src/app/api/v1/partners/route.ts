@@ -4,19 +4,75 @@ import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 
 /**
- * One row of GET /api/v1/partners — the `select` below, which the offline demo
- * rows imitate. `stats` is a Json column, so it stays `unknown` here.
+ * One row of GET /api/v1/partners.
+ *
+ * The field *names* are the ones this endpoint has always published and are
+ * deliberately unchanged. What changed is where they come from: this route used
+ * to call `prisma.organization`, and there is no `model Organization` in
+ * prisma/schema.prisma, so the delegate was `undefined` and the call threw a
+ * TypeError on every request. The try/catch swallowed it and the endpoint served
+ * a hard-coded demo array with 200 OK — an invented `projectCount: 1420` for
+ * Fraunhofer among them. Rows now come from the CORDIS partner graph
+ * (CordisOrganization + its derived CordisPartnerProfile).
+ *
+ * `stats.networkCentralityScore` is null on purpose: no CORDIS table carries a
+ * centrality measure, and CLAUDE.md rule 7 forbids inventing one. The key stays
+ * so the response shape does not change; the value says "not measured".
  */
 interface PartnerApiRow {
   id: string;
-  pic: string | null;
+  pic: string;
   name: string;
-  legalName: string | null;
+  legalName: string;
   country: string | null;
   orgType: string | null;
   isSme: boolean;
   city: string | null;
-  stats?: unknown;
+  stats: {
+    /** From CordisPartnerProfile; null when the profile has not been derived. */
+    projectCount: number | null;
+    coordinatorCount: number | null;
+    totalEuContributionEur: number | null;
+    /** No source in the CORDIS schema. Always null — never a made-up number. */
+    networkCentralityScore: number | null;
+  };
+}
+
+/** The CordisOrganization columns this endpoint reads, with its profile. */
+interface CordisOrgWithProfile {
+  organisationId: string;
+  name: string;
+  shortName: string | null;
+  country: string | null;
+  activityType: string | null;
+  sme: boolean;
+  city: string | null;
+  profile: {
+    totalProjects: number;
+    coordinatorProjects: number;
+    totalEcContribution: bigint;
+  } | null;
+}
+
+function toApiRow(org: CordisOrgWithProfile): PartnerApiRow {
+  return {
+    id: org.organisationId,
+    pic: org.organisationId,
+    // CORDIS stores the registered legal name in `name` and the trading short
+    // form in `shortName`, which is the display/legal split this API publishes.
+    name: org.shortName || org.name,
+    legalName: org.name,
+    country: org.country,
+    orgType: org.activityType,
+    isSme: org.sme,
+    city: org.city,
+    stats: {
+      projectCount: org.profile ? org.profile.totalProjects : null,
+      coordinatorCount: org.profile ? org.profile.coordinatorProjects : null,
+      totalEuContributionEur: org.profile ? Number(org.profile.totalEcContribution) : null,
+      networkCentralityScore: null,
+    },
+  };
 }
 
 export async function GET(req: Request) {
@@ -28,135 +84,71 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const country = searchParams.get('country');
   const orgType = searchParams.get('orgType');
-  const q = searchParams.get('q')?.toLowerCase();
-  const limit = Math.min(50, parseInt(searchParams.get('limit') || '20', 10));
+  const q = searchParams.get('q')?.trim();
+  const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20));
 
-  let partners: PartnerApiRow[] = [];
+  const where: Record<string, unknown> = {};
+  if (country) where.country = country.toUpperCase();
+  if (orgType) where.activityType = orgType.toUpperCase();
+  if (q) {
+    where.OR = [
+      { name: { contains: q, mode: 'insensitive' } },
+      { nameNormalized: { contains: q, mode: 'insensitive' } },
+      { organisationId: { contains: q } },
+    ];
+  }
 
+  let orgs: CordisOrgWithProfile[];
   try {
-    const where: Record<string, unknown> = {};
-    if (country) where.country = country.toUpperCase();
-    if (orgType) where.orgType = orgType.toUpperCase();
-    if (q) {
-      where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
-        { legalName: { contains: q, mode: 'insensitive' } },
-        { pic: { contains: q } },
-      ];
-    }
-
-    partners = await prisma.organization.findMany({
+    // The CORDIS tables are shared reference data, not tenant data: they carry
+    // no tenantId and scripts/rls-models.ts lists all eight of them as
+    // SYSTEM_WIDE, so no tenant_isolation policy applies and `withTenant` would
+    // have nothing to scope. The API key still decides *who may ask*; it does
+    // not partition *what is returned*. `meta.authenticatedTenant` records the
+    // caller.
+    orgs = await prisma.cordisOrganization.findMany({
       where,
       take: limit,
+      orderBy: { name: 'asc' },
       select: {
-        id: true,
-        pic: true,
+        organisationId: true,
         name: true,
-        legalName: true,
+        shortName: true,
         country: true,
-        orgType: true,
-        isSme: true,
+        activityType: true,
+        sme: true,
         city: true,
-        stats: true,
+        profile: {
+          select: {
+            totalProjects: true,
+            coordinatorProjects: true,
+            totalEcContribution: true,
+          },
+        },
       },
     });
   } catch (e) {
-    console.warn(`[/api/v1/partners] DB query fallback: ${errorMessage(e)}`);
+    // A query failure is reported, not replaced with invented rows. The old
+    // catch fell through to a demo array, which is how a broken query shipped
+    // twice without anyone noticing.
+    console.error(`[/api/v1/partners] query failed: ${errorMessage(e)}`);
+    return NextResponse.json(
+      {
+        error: 'Internal Server Error',
+        message: 'Partner lookup failed.',
+        code: 'PARTNERS_QUERY_FAILED',
+      },
+      { status: 500 }
+    );
   }
 
-  // Fallback demo dataset if database table is empty or offline
-  if (!partners || partners.length === 0) {
-    partners = [
-      {
-        id: 'org-fraunhofer',
-        pic: '999984059',
-        name: 'Fraunhofer-Gesellschaft',
-        legalName: 'Fraunhofer Gesellschaft zur Förderung der angewandten Forschung e.V.',
-        country: 'DE',
-        orgType: 'REC',
-        isSme: false,
-        city: 'München',
-        stats: {
-          projectCount: 1420,
-          coordinatorCount: 385,
-          totalEuContributionEur: 840500000,
-          networkCentralityScore: 0.98,
-        },
-      },
-      {
-        id: 'org-metu',
-        pic: '999841469',
-        name: 'METU / ODTÜ',
-        legalName: 'Middle East Technical University',
-        country: 'TR',
-        orgType: 'HES',
-        isSme: false,
-        city: 'Ankara',
-        stats: {
-          projectCount: 168,
-          coordinatorCount: 24,
-          totalEuContributionEur: 62400000,
-          networkCentralityScore: 0.82,
-        },
-      },
-      {
-        id: 'org-polimi',
-        pic: '999879881',
-        name: 'Politecnico di Milano',
-        legalName: 'Politecnico di Milano',
-        country: 'IT',
-        orgType: 'HES',
-        isSme: false,
-        city: 'Milano',
-        stats: {
-          projectCount: 420,
-          coordinatorCount: 88,
-          totalEuContributionEur: 195000000,
-          networkCentralityScore: 0.91,
-        },
-      },
-      {
-        id: 'org-siemens',
-        pic: '999987260',
-        name: 'Siemens AG',
-        legalName: 'Siemens Aktiengesellschaft',
-        country: 'DE',
-        orgType: 'PRC',
-        isSme: false,
-        city: 'Munich',
-        stats: {
-          projectCount: 512,
-          coordinatorCount: 65,
-          totalEuContributionEur: 230000000,
-          networkCentralityScore: 0.94,
-        },
-      },
-      {
-        id: 'org-tubitak',
-        pic: '999479368',
-        name: 'TÜBİTAK MAM',
-        legalName: 'Türkiye Bilimsel ve Teknolojik Araştırma Kurumu Marmara Araştırma Merkezi',
-        country: 'TR',
-        orgType: 'REC',
-        isSme: false,
-        city: 'Gebze',
-        stats: {
-          projectCount: 95,
-          coordinatorCount: 18,
-          totalEuContributionEur: 38200000,
-          networkCentralityScore: 0.76,
-        },
-      },
-    ];
-
-    if (country) {
-      partners = partners.filter((p) => p.country === country.toUpperCase());
-    }
-  }
+  const partners = orgs.map(toApiRow);
 
   return NextResponse.json({
     success: true,
     meta: {
+      // Unchanged semantics: the number of rows in `data`, not the number of
+      // matches in the database. Flagged in the TASK-MTRK8YPNJDCIT report.
       total: partners.length,
       limit,
       queriedAt: new Date().toISOString(),
