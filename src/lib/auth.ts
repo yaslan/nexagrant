@@ -173,11 +173,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const isSuperadmin = email === "admin@yasinaslan.com.tr" || !!demoProfile?.isPlatformAdmin;
 
         try {
-          // Find or create user
-          let user = await prisma.user.findUnique({
-            where: { email },
-            include: { memberships: true },
-          });
+          // Find or create user. No `include: { memberships: true }`: nothing in
+          // `authorize` reads them (the jwt callback does its own membership
+          // lookup below), and the include is what made this variable
+          // `User & { memberships }` while the create path a few lines down
+          // returns a plain `User` — the type mismatch that
+          // src/types/prisma-override.d.ts was hiding, and the reason `user`
+          // read as possibly null all the way to the return.
+          let user = await prisma.user.findUnique({ where: { email } });
 
           if (!user) {
             // Auto create user and organization
@@ -225,7 +228,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               user = await prisma.user.update({
                 where: { id: user.id },
                 data: { isPlatformAdmin: true, name: computedName },
-                include: { memberships: true },
               });
             }
           }

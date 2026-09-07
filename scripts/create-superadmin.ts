@@ -8,10 +8,10 @@ async function main() {
   console.log(`[Superadmin Seed] Creating/updating superadmin account: ${email}...`);
 
   try {
-    let user = await prisma.user.findUnique({
-      where: { email },
-      include: { memberships: true },
-    });
+    // No membership include: this script never reads them, and the include is
+    // what typed `user` as `User & { memberships }` while the transaction below
+    // returns a plain `User`.
+    let user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
       user = await prisma.$transaction(async (tx) => {
