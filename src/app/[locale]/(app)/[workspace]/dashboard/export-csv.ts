@@ -40,7 +40,9 @@ export async function exportDashboardCSV(params: {
     // Tenant scope goes through withTenant so RLS backs up the explicit filter.
     const opportunities = await withTenant<ExportRow[]>(tenantId, async (tx) =>
       tx.opportunity.findMany({
-        where: { tenantId, createdAt: { gte: fromDate, lte: rangeEnd } },
+        // `deletedAt: null`: an archived opportunity is off the dashboard, so it must be off
+        // the export the dashboard links to — otherwise the CSV contradicts the screen.
+        where: { tenantId, deletedAt: null, createdAt: { gte: fromDate, lte: rangeEnd } },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,

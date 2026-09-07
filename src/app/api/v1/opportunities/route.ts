@@ -47,7 +47,9 @@ export async function GET(req: Request) {
 
   try {
     opportunities = await prisma.opportunity.findMany({
-      where: { tenantId },
+      // Archived opportunities (`deletedAt` set) are hidden from the product, so the public
+      // API must not be the one place they are still readable.
+      where: { tenantId, deletedAt: null },
       include: {
         gateDecisions: {
           orderBy: { decidedAt: 'desc' },

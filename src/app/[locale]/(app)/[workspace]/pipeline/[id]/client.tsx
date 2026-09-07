@@ -4,12 +4,12 @@ import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Archive, CheckCircle2 } from 'lucide-react';
 import type { Gate } from '@prisma/client';
 
-import { evaluateOpportunityGate } from '../actions';
+import { archiveOpportunity, evaluateOpportunityGate } from '../actions';
 import { errorMessage } from '@/lib/errors';
-import { EffortTracker } from './effort';
+import { EffortTracker, type EffortEntry } from './effort';
 
 /**
  * What the G0 scorer produced for this opportunity, already computed on the server.
@@ -47,10 +47,16 @@ const TASK_TEMPLATE = ['T-6', 'T-5', 'T-4'] as const;
 export function OpportunityDetailClient({
   opportunity,
   g0,
+  efforts,
+  canArchive,
   backHref,
 }: {
   opportunity: OpportunityView;
   g0: G0Display;
+  /** Rows from the `Effort` table for this opportunity — empty is a real answer, not an error. */
+  efforts: EffortEntry[];
+  /** Whether this session may archive. The server action re-checks; this only hides the control. */
+  canArchive: boolean;
   backHref: string;
 }) {
   const t = useTranslations('Pipeline');
@@ -59,6 +65,10 @@ export function OpportunityDetailClient({
   const [outcome, setOutcome] = useState<GateOutcome | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Two-step archive: the button opens the confirmation panel, the panel's own button commits.
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [isArchiving, startArchiveTransition] = useTransition();
 
   /**
    * The button runs the real gate.
@@ -91,6 +101,34 @@ export function OpportunityDetailClient({
     });
   };
 
+  /**
+   * Archiving is a two-step action and never says "delete".
+   *
+   * The row is not removed: `deletedAt` is stamped, the opportunity leaves every board and
+   * every KPI, and the history attached to it stays on file. The confirmation copy says exactly
+   * that, because a user who reads "delete" and means "hide" gets a different answer than the
+   * one the database gives.
+   */
+  const handleArchive = () => {
+    setArchiveError(null);
+    startArchiveTransition(async () => {
+      try {
+        const res = await archiveOpportunity({ opportunityId: opportunity.id });
+        if (!res.success) {
+          setArchiveError(t(`detail.archive.error.${res.error}`));
+          return;
+        }
+        // The detail page 404s for an archived opportunity, so there is nothing to return to
+        // here: go back to the board, which will already have dropped the card.
+        setConfirmingArchive(false);
+        router.push(backHref);
+        router.refresh();
+      } catch (err) {
+        setArchiveError(errorMessage(err, t('detail.archive.error.ARCHIVE_FAILED')));
+      }
+    });
+  };
+
   const scoreKnown = g0.score !== null;
 
   return (
@@ -116,17 +154,83 @@ export function OpportunityDetailClient({
             {opportunity.topicId && <p className="text-muted font-mono text-sm">{opportunity.topicId}</p>}
           </div>
 
-          <button
-            onClick={handleEvaluateGate}
-            disabled={isPending}
-            data-testid="pipeline-evaluate-gate"
-            className="bg-accent hover:opacity-90 disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-lg transition shadow-2xs shrink-0 cursor-pointer"
-          >
-            {isPending
-              ? t('detail.evaluating')
-              : t('detail.evaluateGate', { gate: opportunity.stage })}
-          </button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={handleEvaluateGate}
+              disabled={isPending}
+              data-testid="pipeline-evaluate-gate"
+              className="bg-accent hover:opacity-90 disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-lg transition shadow-2xs cursor-pointer"
+            >
+              {isPending
+                ? t('detail.evaluating')
+                : t('detail.evaluateGate', { gate: opportunity.stage })}
+            </button>
+
+            {canArchive && !confirmingArchive && (
+              <button
+                onClick={() => {
+                  setArchiveError(null);
+                  setConfirmingArchive(true);
+                }}
+                data-testid="pipeline-archive"
+                className="border border-border text-ink-2 hover:text-ink hover:border-ink-2 font-semibold py-2.5 px-5 rounded-lg transition cursor-pointer flex items-center gap-2"
+              >
+                <Archive className="w-4 h-4" aria-hidden="true" />
+                {t('detail.archive.action')}
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Confirmation step. An archive is easy to trigger by accident from a card menu and,
+            until restore ships, cannot be undone from the product — so it asks first, in its own
+            band, and names what actually happens to the record. */}
+        {confirmingArchive && (
+          <div
+            role="alertdialog"
+            aria-labelledby="archive-confirm-title"
+            data-testid="pipeline-archive-confirm"
+            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 mb-4 text-sm text-amber-900"
+          >
+            <p id="archive-confirm-title" className="font-semibold flex items-center gap-2">
+              <Archive className="w-4 h-4 shrink-0" aria-hidden="true" />
+              {t('detail.archive.confirmTitle', { title: opportunity.title })}
+            </p>
+            <p className="mt-1 text-xs opacity-90">{t('detail.archive.confirmBody')}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={handleArchive}
+                disabled={isArchiving}
+                data-testid="pipeline-archive-confirm-yes"
+                className="bg-amber-700 hover:opacity-90 disabled:opacity-50 text-white font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer"
+              >
+                {isArchiving ? t('detail.archive.archiving') : t('detail.archive.confirmYes')}
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmingArchive(false);
+                  setArchiveError(null);
+                }}
+                disabled={isArchiving}
+                data-testid="pipeline-archive-cancel"
+                className="border border-amber-300 text-amber-900 font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
+              >
+                {t('detail.archive.confirmNo')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {archiveError && (
+          <div
+            role="alert"
+            data-testid="pipeline-archive-error"
+            className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 mb-4 text-sm text-rose-800 flex items-start gap-2"
+          >
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{archiveError}</span>
+          </div>
+        )}
 
         {/* Gate result. Same banner shape as the M6 Evaluator Lens error band
             (opportunities/[id]/evaluations/client.tsx) so the two screens report failure
@@ -266,7 +370,9 @@ export function OpportunityDetailClient({
             </div>
           )}
 
-          {activeTab === 'effort' && <EffortTracker opportunityId={opportunity.id} />}
+          {activeTab === 'effort' && (
+            <EffortTracker opportunityId={opportunity.id} efforts={efforts} />
+          )}
         </div>
       </div>
     </div>

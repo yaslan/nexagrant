@@ -7,8 +7,10 @@ import { requireTenantPage } from '@/lib/tenant';
 import { computeG0ForOpportunity } from '@/lib/scoring/g0-compute';
 import type { G0Computation } from '@/lib/scoring/g0-compute';
 import { DEFAULT_GATE_RULES } from '@/lib/scoring/defaults';
+import { canArchiveOpportunity } from '@/lib/pipeline/archive';
 
 import { OpportunityDetailClient, type G0Display, type OpportunityView } from './client';
+import type { EffortEntry } from './effort';
 
 /**
  * Shape of the tenant-scoped read below. `withTenant`'s generic cannot be inferred from the
@@ -22,6 +24,16 @@ type OpportunityRow = {
   stage: Gate;
   status: string;
   intendedRole: string | null;
+  ownerId: string | null;
+};
+
+/** One `Effort` row as loaded here, before the user id is resolved to a display name. */
+type EffortRow = {
+  id: string;
+  date: Date;
+  hours: number;
+  note: string | null;
+  userId: string;
 };
 
 /**
@@ -45,28 +57,59 @@ export default async function OpportunityDetailPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, workspace, id } = await params;
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId, userId, role } = await requireTenantPage(locale);
 
-  const loaded = await withTenant<{ opp: OpportunityRow | null; g0: G0Computation | null }>(
-    tenantId,
-    async (tx) => {
-      // findFirst + tenantId, never findUnique on a guessable id, and `deletedAt: null` so a
-      // soft-deleted (KVKK/GDPR erasure) opportunity 404s instead of staying readable.
-      const opp: OpportunityRow | null = await tx.opportunity.findFirst({
-        where: { id, tenantId, deletedAt: null },
-        select: {
-          id: true,
-          title: true,
-          topicId: true,
-          stage: true,
-          status: true,
-          intendedRole: true,
-        },
-      });
-      if (!opp) return { opp: null, g0: null };
-      return { opp, g0: await computeG0ForOpportunity(tx, tenantId, id) };
-    },
-  );
+  const loaded = await withTenant<{
+    opp: OpportunityRow | null;
+    g0: G0Computation | null;
+    efforts: EffortEntry[];
+  }>(tenantId, async (tx) => {
+    // findFirst + tenantId, never findUnique on a guessable id, and `deletedAt: null` so a
+    // soft-deleted (KVKK/GDPR erasure) or archived opportunity 404s instead of staying readable.
+    const opp: OpportunityRow | null = await tx.opportunity.findFirst({
+      where: { id, tenantId, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        topicId: true,
+        stage: true,
+        status: true,
+        intendedRole: true,
+        ownerId: true,
+      },
+    });
+    if (!opp) return { opp: null, g0: null, efforts: [] };
+
+    // The effort tab used to render a two-row `MOCK_EFFORTS` constant. These are the rows the
+    // `Effort` table actually holds for this opportunity; when there are none the tab says so.
+    const rows: EffortRow[] = await tx.effort.findMany({
+      where: { tenantId, opportunityId: id, deletedAt: null },
+      orderBy: [{ date: 'desc' }],
+      select: { id: true, date: true, hours: true, note: true, userId: true },
+    });
+
+    // `Effort.userId` is a plain column with no relation, so the display names are a second,
+    // id-bounded read. A user id that resolves to nobody stays unresolved in the UI rather than
+    // being replaced with a plausible name.
+    const userIds = Array.from(new Set(rows.map((r) => r.userId)));
+    const users: { id: string; name: string | null }[] = userIds.length
+      ? await tx.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const nameById = new Map(users.map((u) => [u.id, u.name]));
+
+    const efforts: EffortEntry[] = rows.map((r) => ({
+      id: r.id,
+      date: r.date.toISOString(),
+      hours: r.hours,
+      note: r.note,
+      userName: nameById.get(r.userId) ?? null,
+    }));
+
+    return { opp, g0: await computeG0ForOpportunity(tx, tenantId, id), efforts };
+  });
 
   if (!loaded.opp) notFound();
 
@@ -88,10 +131,16 @@ export default async function OpportunityDetailPage({
     intendedRole: loaded.opp.intendedRole,
   };
 
+  // Whether the archive control is offered at all. The server action re-checks it — hiding a
+  // button is not authorisation — but showing a control that always refuses is its own defect.
+  const canArchive = canArchiveOpportunity(role, loaded.opp.ownerId, userId);
+
   return (
     <OpportunityDetailClient
       opportunity={opportunity}
       g0={g0}
+      efforts={loaded.efforts}
+      canArchive={canArchive}
       backHref={`/${locale}/${workspace}/pipeline`}
     />
   );

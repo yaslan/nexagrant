@@ -52,13 +52,17 @@ export async function getKpiMetrics(
       tx.opportunity.count({
         where: {
           tenantId,
+          // Archived opportunities are off the board, so they are off the KPI too. Without
+          // `deletedAt: null` every count and every ratio below keeps counting a card the
+          // user can no longer see.
+          deletedAt: null,
           createdAt: { gte: from, lte: to },
         },
       }),
 
       // 1b. Range-independent: is this workspace new, or just quiet in this range?
       // The two deserve different copy, and only a tenant-wide count can tell them apart.
-      tx.opportunity.count({ where: { tenantId } }),
+      tx.opportunity.count({ where: { tenantId, deletedAt: null } }),
 
       // 2. Hit rate numerator: proposals actually submitted
       tx.proposal.count({
@@ -66,6 +70,7 @@ export async function getKpiMetrics(
           tenantId,
           submittedAt: { not: null },
           opportunity: {
+            deletedAt: null,
             createdAt: { gte: from, lte: to },
           },
         },
@@ -75,6 +80,7 @@ export async function getKpiMetrics(
       tx.opportunity.count({
         where: {
           tenantId,
+          deletedAt: null,
           g0Score: { not: null },
           createdAt: { gte: from, lte: to },
         },
@@ -85,6 +91,7 @@ export async function getKpiMetrics(
         where: {
           tenantId,
           opportunity: {
+            deletedAt: null,
             createdAt: { gte: from, lte: to },
           },
         },
@@ -113,6 +120,9 @@ export async function getKpiMetrics(
       tx.effort.aggregate({
         where: {
           tenantId,
+          // Effort logged against an archived opportunity leaves the person-days figure with
+          // it; the denominator (proposals) already excludes archived rows.
+          opportunity: { deletedAt: null },
           date: { gte: from, lte: to },
         },
         _sum: {
@@ -132,6 +142,7 @@ export async function getKpiMetrics(
       tx.gateDecision.findMany({
         where: {
           tenantId,
+          opportunity: { deletedAt: null },
           decidedAt: { gte: from, lte: to },
           gate: { in: ['G0', 'G2'] },
         },
@@ -183,6 +194,7 @@ export async function getKpiTrend(
       const offerCount = await tx.opportunity.count({
         where: {
           tenantId,
+          deletedAt: null,
           createdAt: { gte: current, lte: intervalEnd },
         },
       });
@@ -192,6 +204,7 @@ export async function getKpiTrend(
           tenantId,
           submittedAt: { not: null },
           opportunity: {
+            deletedAt: null,
             createdAt: { gte: current, lte: intervalEnd },
           },
         },
@@ -200,6 +213,7 @@ export async function getKpiTrend(
       const g0ScoredCount = await tx.opportunity.count({
         where: {
           tenantId,
+          deletedAt: null,
           g0Score: { not: null },
           createdAt: { gte: current, lte: intervalEnd },
         },

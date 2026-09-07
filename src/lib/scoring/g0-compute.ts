@@ -324,7 +324,9 @@ export async function computeG0ForOpportunity(
 ): Promise<G0Computation | null> {
   const opp: { id: string; topicId: string | null; intendedRole: string | null } | null =
     await client.opportunity.findFirst({
-      where: { id: opportunityId, tenantId },
+      // Archived opportunities are not scored: `deletedAt` means the row is out of the product,
+      // and a score computed for it would still be read by anything that re-renders the id.
+      where: { id: opportunityId, tenantId, deletedAt: null },
       select: { id: true, topicId: true, intendedRole: true },
     });
   if (!opp) return null;

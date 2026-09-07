@@ -82,6 +82,16 @@ Migration: `prisma/migrations/add-soft-delete.sql` (additive + idempotent) · ge
 - `deletionReason` değerleri: `subject_request` (kullanıcı talebi) · `policy` · `tenant_cascade`.
 - Yeni sütunlar mevcut satır-seviyesi politikaları değiştirmez: `prisma/rls.sql` politikaları `tenantId` üzerinden satır bazlı çalışır, sütun eklemek kapsamı etkilemez.
 
+### 7.2 Fırsat arşivleme (üründen giriş noktası)
+
+`Opportunity.deletedAt` uzun süre yalnız şemada durdu; üründe onu yazan bir yol yoktu, yani bir fırsat ancak SQL'den siliniyordu. Arşivleme akışı bu boşluğu kapatır:
+
+- Eylem: `archiveOpportunity` (`src/app/[locale]/(app)/[workspace]/pipeline/actions.ts`). `withTenant` içinde çalışır; filtre hem `id` hem `tenantId` taşır, `deletedAt: null` da filtrenin parçasıdır (iki kez arşivlemek ilk damgayı ezmez).
+- Yetki: `src/lib/pipeline/archive.ts` — `TENANT_OWNER` · `TENANT_ADMIN` · `PIPELINE_MANAGER` her kaydı, diğer roller yalnız `ownerId`'si kendilerine ait kaydı arşivler. Sahipsiz kayıt (`ownerId = null`) yalnız bu üç role açıktır.
+- İz: aynı işlem içinde `AuditEvent(type='opportunity.archived', target=<opportunityId>)`; `deletionReason = 'archived_by_user'`.
+- Görünürlük: `deletedAt` dolu kayıt panodan, listelerden, KPI'lardan, panel CSV'sinden, `/api/v1/opportunities` yanıtından ve G0 puanlayıcıdan düşer; detay sayfası 404 verir. Kayıt, kapı kararları ve efor satırları veritabanında kalır.
+- **Geri alma üründe yok.** Arşivden çıkarma yalnız veritabanından `deletedAt = NULL` ile yapılabilir; ürün içi geri alma açık bir iş kalemidir.
+
 ## 8. v1.1+ tablolar (şemada yorum olarak)
 
 `Evaluation` (M6), `MeetingBrief` (M9), `FollowupDoc` (M10), `ApplicationPart` (M11), `TtoPortfolioItem` (M7), `MarketplaceListing/Engagement/Commission`, `ApiKey`.

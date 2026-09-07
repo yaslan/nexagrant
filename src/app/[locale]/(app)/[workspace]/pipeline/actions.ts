@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { tenantScopeOf, TenantScope } from '@/lib/tenant';
 import { Gate } from '@prisma/client';
+import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import {
   addInMemoryOpportunity,
@@ -18,6 +19,7 @@ import { errorMessage } from '@/lib/errors';
 import { rescoreOpportunityG0 } from '@/lib/scoring/g0-compute';
 import { withTenant } from '@/lib/db';
 import { evaluateGate } from '@/lib/gates/evaluate';
+import { canArchiveOpportunity } from '@/lib/pipeline/archive';
 
 /**
  * The tenant of a server action comes from the session and from nowhere else.
@@ -37,6 +39,22 @@ async function sessionScope(): Promise<TenantScope | null> {
 }
 
 const NO_TENANT = { success: false as const, error: 'TENANT_SCOPE_REQUIRED' as const };
+
+/** One effort row covers at most a week of hours — above that it is a typo, not a fact. */
+const MAX_EFFORT_HOURS = 24 * 7;
+
+/**
+ * Effort form input, validated on the server (CLAUDE.md: Zod on every server action).
+ *
+ * `hours` is bounded on both ends: a `0` row is noise and a four-digit row is a fat-fingered
+ * decimal point, and both would land straight in the person-days figure the dashboard reads.
+ */
+const EffortInput = z.object({
+  opportunityId: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  hours: z.number().finite().gt(0).max(MAX_EFFORT_HOURS),
+  note: z.string().max(500).optional(),
+});
 
 /**
  * The real people a card can be assigned to, for the board (client component)
@@ -408,5 +426,183 @@ export async function evaluateOpportunityGate({
     // The raw driver message is kept in the server log, not handed to the browser.
     console.warn(`[evaluateOpportunityGate] failed: ${errorMessage(err)}`);
     return { success: false, error: 'GATE_EVALUATION_FAILED' };
+  }
+}
+
+/**
+ * Archives one opportunity: hides it from the product, keeps the row.
+ *
+ * `Opportunity.deletedAt` has existed in the schema since the KVKK/GDPR erasure work
+ * ("soft-delete marker … hidden from the product, still restorable") but nothing in the product
+ * ever wrote it — an opportunity could only leave a board by being deleted straight out of the
+ * database. This action is the entry point that column was missing.
+ *
+ * It is deliberately *not* a delete:
+ *   · the row stays, with `deletedAt` and `deletionReason` set, so the audit trail, the gate
+ *     decisions and the effort log attached to it are still there to answer questions later;
+ *   · `updateMany` carries both `id` and `tenantId`, so an id guessed from another tenant
+ *     matches nothing rather than archiving that tenant's work;
+ *   · `deletedAt: null` is part of the filter, so archiving twice is a no-op instead of
+ *     overwriting the original archive timestamp.
+ *
+ * Restoring from the archive is not implemented — see the report for TASK-MTQZNBGENT12T.
+ */
+export async function archiveOpportunity({
+  opportunityId,
+}: {
+  opportunityId: string;
+}): Promise<
+  | { success: true; opportunityId: string; archivedAt: string }
+  | {
+      success: false;
+      error:
+        | 'TENANT_SCOPE_REQUIRED'
+        | 'OPPORTUNITY_NOT_FOUND'
+        | 'ARCHIVE_FORBIDDEN'
+        | 'ARCHIVE_FAILED';
+    }
+> {
+  const scope = await sessionScope();
+  if (!scope) return NO_TENANT;
+  const { tenantId, userId, role } = scope;
+
+  try {
+    const archivedAt = new Date();
+
+    const outcome = await withTenant<'NOT_FOUND' | 'FORBIDDEN' | 'ARCHIVED'>(
+      tenantId,
+      async (tx) => {
+        // findFirst + tenantId, never findUnique on a guessable id.
+        const owned = await tx.opportunity.findFirst({
+          where: { id: opportunityId, tenantId, deletedAt: null },
+          select: { id: true, title: true, stage: true, ownerId: true },
+        });
+        // Also the honest answer for a row that only exists in the in-memory fallback buffer:
+        // there is nothing on file to archive.
+        if (!owned) return 'NOT_FOUND';
+
+        if (!canArchiveOpportunity(role, owned.ownerId, userId)) return 'FORBIDDEN';
+
+        const updated = await tx.opportunity.updateMany({
+          where: { id: opportunityId, tenantId, deletedAt: null },
+          data: { deletedAt: archivedAt, deletionReason: 'archived_by_user' },
+        });
+        if (updated.count === 0) return 'NOT_FOUND';
+
+        // The audit row is written inside the same transaction as the archive: an opportunity
+        // that vanished from every board with no record of who removed it is exactly the
+        // situation this action exists to avoid.
+        await tx.auditEvent.create({
+          data: {
+            tenantId,
+            actorId: userId,
+            type: 'opportunity.archived',
+            target: opportunityId,
+            // Titles are tenant business data, not personal data; no user identity beyond the
+            // actor id (already a column) is recorded here.
+            data: { title: owned.title, stage: owned.stage, reason: 'archived_by_user' },
+          },
+        });
+
+        return 'ARCHIVED';
+      },
+    );
+
+    if (outcome === 'NOT_FOUND') return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
+    if (outcome === 'FORBIDDEN') return { success: false, error: 'ARCHIVE_FORBIDDEN' };
+
+    try {
+      revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
+      revalidatePath('/[locale]/(app)/[workspace]/pipeline/[id]', 'page');
+      revalidatePath('/[locale]/(app)/[workspace]/firsatlar', 'page');
+      revalidatePath('/[locale]/(app)/[workspace]/dashboard', 'page');
+    } catch (e) {}
+
+    return { success: true, opportunityId, archivedAt: archivedAt.toISOString() };
+  } catch (err) {
+    // The driver message stays in the server log; the browser gets a code it can translate.
+    console.warn(`[archiveOpportunity] failed: ${errorMessage(err)}`);
+    return { success: false, error: 'ARCHIVE_FAILED' };
+  }
+}
+
+
+/**
+ * Records one effort entry against an opportunity.
+ *
+ * The effort tab used to be a `MOCK_EFFORTS` array with two invented rows ("Alice, 4.5h, Read
+ * work programme"), and its form pushed into React state and nothing else: the person-day total
+ * on screen was arithmetic over fiction, and every entry logged was gone on reload. The `Effort`
+ * table has been in the schema the whole time; this is the write path it never had.
+ *
+ * The row is filed against the session's own user id. `userId` is not accepted from the browser
+ * — logging effort as somebody else is not a thing this form should be able to do.
+ */
+export async function logEffort({
+  opportunityId,
+  date,
+  hours,
+  note,
+}: {
+  opportunityId: string;
+  /** `YYYY-MM-DD` from an `<input type="date">`; stored at UTC midnight (CLAUDE.md §10). */
+  date: string;
+  hours: number;
+  note?: string;
+}): Promise<
+  | { success: true }
+  | {
+      success: false;
+      error:
+        | 'TENANT_SCOPE_REQUIRED'
+        | 'OPPORTUNITY_NOT_FOUND'
+        | 'EFFORT_INVALID_INPUT'
+        | 'EFFORT_SAVE_FAILED';
+    }
+> {
+  const scope = await sessionScope();
+  if (!scope) return NO_TENANT;
+  const { tenantId, userId } = scope;
+
+  const parsed = EffortInput.safeParse({ opportunityId, date, hours, note });
+  if (!parsed.success) return { success: false, error: 'EFFORT_INVALID_INPUT' };
+
+  // `new Date('2026-09-07')` is parsed as UTC midnight, which is what the column stores; the
+  // regex above is what keeps a locale-dependent string from reaching it.
+  const day = new Date(`${parsed.data.date}T00:00:00.000Z`);
+  if (Number.isNaN(day.getTime())) return { success: false, error: 'EFFORT_INVALID_INPUT' };
+
+  try {
+    const outcome = await withTenant<'NOT_FOUND' | 'LOGGED'>(tenantId, async (tx) => {
+      const owned = await tx.opportunity.findFirst({
+        where: { id: parsed.data.opportunityId, tenantId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!owned) return 'NOT_FOUND';
+
+      await tx.effort.create({
+        data: {
+          tenantId,
+          opportunityId: owned.id,
+          userId,
+          date: day,
+          hours: parsed.data.hours,
+          note: parsed.data.note?.trim() || null,
+        },
+      });
+      return 'LOGGED';
+    });
+
+    if (outcome === 'NOT_FOUND') return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
+
+    try {
+      revalidatePath('/[locale]/(app)/[workspace]/pipeline/[id]', 'page');
+      revalidatePath('/[locale]/(app)/[workspace]/dashboard', 'page');
+    } catch (e) {}
+
+    return { success: true };
+  } catch (err) {
+    console.warn(`[logEffort] failed: ${errorMessage(err)}`);
+    return { success: false, error: 'EFFORT_SAVE_FAILED' };
   }
 }
