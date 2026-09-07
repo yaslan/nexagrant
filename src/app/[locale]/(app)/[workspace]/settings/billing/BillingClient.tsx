@@ -7,6 +7,7 @@ import { useCart } from '@/components/cart/CartContext';
 import { ShoppingBag } from 'lucide-react';
 import {
   CATALOG,
+  FALLBACK_PLAN_ID,
   MONTHS_PER_YEAR,
   NO_DISCOUNT_TIER,
   findEntry,
@@ -94,7 +95,7 @@ export function BillingClient({
   workspace,
   locale,
   tenantName,
-  currentPlanId = 'team',
+  currentPlanId = FALLBACK_PLAN_ID,
   activeTier,
   priceLocked = false,
   lifetimeScarcity,
