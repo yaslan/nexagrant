@@ -3,7 +3,15 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
-import { submitForDualApproval, approveByDepartment, rejectDualApproval, Department, type DualApprovalState } from '@/lib/dual-approval';
+import {
+  submitForDualApproval,
+  approveByDepartment,
+  Department,
+  type ApprovalActor,
+  type DualApprovalState,
+} from '@/lib/dual-approval';
+import { auth } from '@/lib/auth';
+import { emailLocalPart } from '@/lib/user-display';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
 import type { FollowupDocRow } from '@/types/db-rows';
@@ -150,17 +158,41 @@ export async function createNewVersion(docId: string) {
   return { success: updatedDoc !== null, updatedDoc };
 }
 
-export async function submitDualApprovalAction(docId: string, actorName: string = 'Dr. Mehmet Yılmaz') {
-  const approvalState = submitForDualApproval(docId, actorName);
+/**
+ * Who is signing this approval step.
+ *
+ * `submitDualApprovalAction` used to take the actor name as an argument and default
+ * it to the name of one real, uninvolved person, so a call that named nobody produced an audit record
+ * naming a real person who had never seen the document. The actor is now read from
+ * the session only — never from the request body, which a client controls — and a
+ * request without a session is refused by `requireTenantAction()` before any record
+ * exists.
+ *
+ * `displayName` falls back to the e-mail local part and then to the user id: all
+ * three are data the session actually carries, so nothing is invented.
+ */
+async function requireApprovalActor(): Promise<ApprovalActor> {
+  const { userId } = await requireTenantAction();
+  const session = (await auth()) as { user?: { name?: string | null; email?: string | null } } | null;
+  const name = session?.user?.name?.trim();
+  return {
+    userId,
+    displayName: name || emailLocalPart(session?.user?.email) || userId,
+  };
+}
+
+export async function submitDualApprovalAction(docId: string) {
+  const actor = await requireApprovalActor();
+  const approvalState = submitForDualApproval(docId, actor);
   return { success: true, approvalState };
 }
 
 export async function departmentApproveAction(
   currentState: DualApprovalState,
   department: Department,
-  actorName: string,
   note?: string
 ) {
-  const updatedState = approveByDepartment(currentState, department, actorName, note);
+  const actor = await requireApprovalActor();
+  const updatedState = approveByDepartment(currentState, department, actor, note);
   return { success: true, approvalState: updatedState };
 }
