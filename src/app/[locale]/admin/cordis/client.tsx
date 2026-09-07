@@ -1,21 +1,19 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  Database, 
-  Search, 
-  Sparkles, 
-  RefreshCw, 
-  CheckCircle2, 
-  Zap, 
-  Radio, 
-  Code2, 
+import {
+  Database,
+  Search,
+  Sparkles,
+  RefreshCw,
+  CheckCircle2,
+  Zap,
+  Radio,
+  Code2,
   AlertCircle,
   Play,
   FileCheck,
-  Building2,
-  Users,
-  FolderGit2
+  FolderGit2,
 } from 'lucide-react';
 import { handleRunCordisSync, handleRunCordisLiveDelta, handleTestRagQuery, handleRunCordisImportAction, handleGetK2Status } from './actions';
 import { errorMessage } from '@/lib/errors';
@@ -98,7 +96,8 @@ interface CordisRagAdminClientProps {
 }
 
 export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status }: CordisRagAdminClientProps) {
-  const [metrics, setMetrics] = useState<CordisMetrics>(initialMetrics);
+  // Server-rendered figures; no client path updates them, so the setter was dead.
+  const [metrics] = useState<CordisMetrics>(initialMetrics);
   const [k2Status, setK2Status] = useState<K2Status | undefined>(initialK2Status);
   const [activeTab, setActiveTab] = useState<'k2_ingestion' | 'sync' | 'delta' | 'workbench'>('k2_ingestion');
 

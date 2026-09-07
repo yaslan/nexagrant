@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions/auth';
-import { Lock, Sparkles, Building2, User, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { errorMessage as toErrorMessage, isNextRedirectError } from '@/lib/errors';
 
 interface AuthCardProps {

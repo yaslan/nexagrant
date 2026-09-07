@@ -156,7 +156,6 @@ export async function generatePartnerProfiles(): Promise<PartnerProfileJobResult
       let lastProjectDate: Date | null = null;
 
       const topicCounts = new Map<string, { code: string; title: string; count: number }>();
-      const partnerCountryCounts = new Map<string, number>();
 
       for (const pt of participations) {
         const proj = pt.project;

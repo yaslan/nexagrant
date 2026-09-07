@@ -8,14 +8,8 @@ import {
   Check,
   Trash2,
   Code,
-  Terminal,
-  ExternalLink,
   ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
-  Database,
-  Globe,
-  Lock
+  Lock,
 } from 'lucide-react';
 import { generateApiKey, revokeApiKey } from '@/modules/marketplace/server/actions';
 
@@ -28,16 +22,13 @@ export interface ApiKeyRecord {
 }
 
 interface ApiKeysClientProps {
-  tenantId: string;
-  userId: string;
   apiKeys: ApiKeyRecord[];
 }
 
-export function ApiKeysClient({
-  tenantId,
-  userId,
-  apiKeys: initialKeys,
-}: ApiKeysClientProps) {
+// The tenant and user are not props: `generateApiKey` resolves both from the session,
+// and a client component that carries a tenant id is one prop away from naming someone
+// else's workspace. Both were passed in and never read.
+export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>(initialKeys);
   const [keyName, setKeyName] = useState('');
   const [newRawKey, setNewRawKey] = useState<string | null>(null);

@@ -11,7 +11,7 @@ export default async function TtoAcceleratorPage({
 }: {
   params: Promise<{ locale: string; workspace: string }>;
 }) {
-  const { locale, workspace } = await params;
+  const { locale } = await params;
   const locked = await moduleGate('M7', locale);
   if (locked) return locked;
   const { tenantId } = await requireTenantPage(locale);

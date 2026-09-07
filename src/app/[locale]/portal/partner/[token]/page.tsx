@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       where: { magicToken: token },
       include: { opportunity: true }
     });
-  } catch (e) {
+  } catch {
     return {
       title: t('title'),
       description: t('intro'),

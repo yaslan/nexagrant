@@ -30,11 +30,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { region, locale } = await params;
   const regionInfo = REGIONS[region as RegionParam];
   const regionLabel = regionInfo?.name || region;
-  const t = await getTranslations({ locale, namespace: 'calls_region' });
-
-  const title = t.rich('title', {
-    region: () => regionLabel,
-  });
   const description = locale === 'tr'
     ? `${regionLabel}'deki açık Horizon çağrıları. Deadline, bütçe ve uygunluk bilgisi.`
     : `Open Horizon calls in ${regionLabel}. Deadlines, budgets, and eligibility information.`;

@@ -1,8 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import {
   createApplicationPart,
-  addBudgetLine,
-  addWorkPackage,
   calculateLumpSumBudget,
   acquireSectionLock,
   releaseSectionLock,
@@ -253,7 +251,7 @@ describe('M11 Application Production & Collaborative Editing Module', () => {
     storedPart().tenantId = 'tenant-other';
     const before = JSON.stringify(storedPart().content);
 
-    const res = await updateSectionContent(
+    await updateSectionContent(
       'part-111',
       '1.1_objectives',
       'Injected text from a different workspace.',

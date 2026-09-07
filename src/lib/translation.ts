@@ -66,7 +66,7 @@ export async function translateText(text: string, targetLang = 'tr'): Promise<st
         return translated;
       }
     }
-  } catch (err) {
+  } catch {
     // Network or timeout error -> fallback gracefully
   }
 

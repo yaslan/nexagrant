@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { IcsProvider } from '../ics';
+import { CalendarProviderNotImplementedError } from '../provider';
 import { GoogleCalendarProvider } from '../google';
 import { OutlookCalendarProvider } from '../outlook';
 import { createCalendarProvider } from '../factory';
@@ -23,6 +24,33 @@ describe('CalendarProvider', () => {
 
       const result = await provider.createEvent(event);
       expect(result.externalId).toMatch(/^ics:/);
+    });
+
+    it('returns the same external id for the same event twice', async () => {
+      // It used to be base64 of the generated .ics, which embeds a fresh UID and
+      // the current DTSTAMP — so one brief got a new "external id" per sync and
+      // the id identified nothing.
+      const event = {
+        title: 'Team Meeting',
+        description: 'Sync meeting',
+        start: new Date('2026-09-15T10:00:00Z'),
+        end: new Date('2026-09-15T11:00:00Z'),
+      };
+
+      const first = await provider.createEvent(event);
+      const second = await provider.createEvent(event);
+      expect(first.externalId).toBe(second.externalId);
+    });
+
+    it('keeps the caller-supplied handle when there is one', async () => {
+      const result = await provider.createEvent({
+        title: 'Team Meeting',
+        description: 'Sync meeting',
+        start: new Date('2026-09-15T10:00:00Z'),
+        end: new Date('2026-09-15T11:00:00Z'),
+        externalId: 'fabrika-brief-b1',
+      });
+      expect(result.externalId).toBe('ics:fabrika-brief-b1');
     });
 
     it('should handle update (no-op for ICS)', async () => {
@@ -64,7 +92,12 @@ describe('CalendarProvider', () => {
       await expect(noAuthProvider.connect()).rejects.toThrow('GOOGLE_OAUTH_CLIENT_ID not configured');
     });
 
-    it('should create an event (mock)', async () => {
+    it('refuses to invent an event id for an API it does not call', async () => {
+      // Was: `console.log('[MOCK] …')` plus
+      // `{ externalId: 'google:' + Math.random().toString(36) }`. The sync path
+      // took that as success, wrote the id and stamped `lastSyncAt`, so the
+      // settings screen reported "Son senkronizasyon" for an event that exists
+      // in no calendar.
       const event = {
         title: 'Partner Meeting',
         description: 'Consortium discussion',
@@ -72,20 +105,15 @@ describe('CalendarProvider', () => {
         end: new Date('2026-09-15T15:00:00Z'),
       };
 
-      const result = await provider.createEvent(event);
-      expect(result.externalId).toMatch(/^google:/);
-    });
-
-    it('should update and delete events', async () => {
-      const event = {
-        title: 'Updated Meeting',
-        description: 'Changed',
-        start: new Date('2026-09-15T14:00:00Z'),
-        end: new Date('2026-09-15T15:00:00Z'),
-      };
-
-      await expect(provider.updateEvent('google:abc123', event)).resolves.toBeUndefined();
-      await expect(provider.deleteEvent('google:abc123')).resolves.toBeUndefined();
+      await expect(provider.createEvent(event)).rejects.toThrow(
+        CalendarProviderNotImplementedError
+      );
+      await expect(provider.updateEvent('google:abc123', event)).rejects.toThrow(
+        CalendarProviderNotImplementedError
+      );
+      await expect(provider.deleteEvent('google:abc123')).rejects.toThrow(
+        CalendarProviderNotImplementedError
+      );
     });
   });
 
@@ -107,7 +135,12 @@ describe('CalendarProvider', () => {
       await expect(noAuthProvider.connect()).rejects.toThrow('MICROSOFT_OAUTH_CLIENT_ID not configured');
     });
 
-    it('should create an event (mock)', async () => {
+    it('refuses to invent an event id for an API it does not call', async () => {
+      // Was: `console.log('[MOCK] …')` plus
+      // `{ externalId: 'outlook:' + Math.random().toString(36) }`. The sync path
+      // took that as success, wrote the id and stamped `lastSyncAt`, so the
+      // settings screen reported "Son senkronizasyon" for an event that exists
+      // in no calendar.
       const event = {
         title: 'Partner Meeting',
         description: 'Consortium discussion',
@@ -115,20 +148,15 @@ describe('CalendarProvider', () => {
         end: new Date('2026-09-15T15:00:00Z'),
       };
 
-      const result = await provider.createEvent(event);
-      expect(result.externalId).toMatch(/^outlook:/);
-    });
-
-    it('should update and delete events', async () => {
-      const event = {
-        title: 'Updated Meeting',
-        description: 'Changed',
-        start: new Date('2026-09-15T14:00:00Z'),
-        end: new Date('2026-09-15T15:00:00Z'),
-      };
-
-      await expect(provider.updateEvent('outlook:def456', event)).resolves.toBeUndefined();
-      await expect(provider.deleteEvent('outlook:def456')).resolves.toBeUndefined();
+      await expect(provider.createEvent(event)).rejects.toThrow(
+        CalendarProviderNotImplementedError
+      );
+      await expect(provider.updateEvent('outlook:abc123', event)).rejects.toThrow(
+        CalendarProviderNotImplementedError
+      );
+      await expect(provider.deleteEvent('outlook:abc123')).rejects.toThrow(
+        CalendarProviderNotImplementedError
+      );
     });
   });
 

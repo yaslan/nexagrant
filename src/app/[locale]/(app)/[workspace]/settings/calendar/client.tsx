@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Calendar, Trash2, Plus, CheckCircle, AlertCircle } from 'lucide-react';
-import { disconnectCalendar } from '@/modules/m9/server/calendar-actions';
+import { connectCalendar, disconnectCalendar } from '@/modules/m9/server/calendar-actions';
+import { calendarErrorCode, SELF_SERVE_PROVIDERS } from '@/lib/calendar/errors';
+import type { CalendarProviderType } from '@/lib/calendar/provider';
 
 const PROVIDERS = {
   google: { label: 'Google Calendar', color: 'blue' },
@@ -29,30 +31,50 @@ export function CalendarClient({ connections, locale }: CalendarClientProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  /**
+   * What the last connect/disconnect attempt did. The screen used to say
+   * nothing at all: `handleConnect` was a `console.log` and a `TODO`, so the
+   * button spun for a frame and the page looked unchanged whether the attempt
+   * had worked, been refused, or never happened. Every outcome is now stated.
+   */
+  const [status, setStatus] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+
+  /** Translate a server-action failure, or fall back to the generic message. */
+  const messageFor = (error: unknown): string => {
+    const code = calendarErrorCode(error);
+    return code ? t(`errors.${code}`) : t('errors.unknown');
+  };
 
   const handleDisconnect = async (connectionId: string) => {
     if (!confirm(t('confirmDisconnect'))) return;
+    setStatus(null);
     setIsDisconnecting(true);
     try {
       await disconnectCalendar(connectionId);
       window.location.reload();
     } catch (error) {
       console.error('Failed to disconnect calendar:', error);
+      setStatus({ tone: 'error', text: messageFor(error) });
     } finally {
       setIsDisconnecting(false);
     }
   };
 
   const handleConnect = async (provider: string) => {
+    setStatus(null);
     setIsConnecting(true);
     setSelectedProvider(provider);
     try {
-      // TODO: Redirect to OAuth flow for the selected provider
-      // For now, we show a placeholder message
-      console.log(`Connecting to ${provider}...`);
-      // In production: window.location.href = `/api/calendar/oauth/${provider}?redirect=${workspace}`;
+      const result = await connectCalendar(provider);
+      if (result.isConnected) {
+        window.location.reload();
+        return;
+      }
+      setStatus({ tone: 'error', text: t('errors.unknown') });
     } catch (error) {
-      console.error(`Failed to connect ${provider}:`, error);
+      // A refusal is an outcome, not a crash: the user is told why, in their
+      // own language, and the button returns to its resting state.
+      setStatus({ tone: 'error', text: messageFor(error) });
     } finally {
       setIsConnecting(false);
       setSelectedProvider(null);
@@ -70,10 +92,24 @@ export function CalendarClient({ connections, locale }: CalendarClientProps) {
         </p>
       </div>
 
+      {status && (
+        <div
+          role="alert"
+          className={`text-xs rounded-xl p-4 border ${
+            status.tone === 'ok'
+              ? 'border-ok/30 bg-ok/10 text-ok'
+              : 'border-amber-200 bg-amber-50 text-amber-900'
+          }`}
+        >
+          {status.text}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4">
         {Object.entries(PROVIDERS).map(([provider, { label, color }]) => {
           const connection = connections.find((c) => c.provider === provider);
           const isConnected = connection?.isConnected;
+          const isSelfServe = SELF_SERVE_PROVIDERS.includes(provider as CalendarProviderType);
 
           return (
             <div
@@ -101,7 +137,11 @@ export function CalendarClient({ connections, locale }: CalendarClientProps) {
                             locale === 'tr' ? 'tr-TR' : 'en-US'
                           ),
                         })
-                      : t('notConnected')}
+                      : isConnected
+                        ? t('connectedNoSyncYet')
+                        : isSelfServe
+                          ? t('notConnected')
+                          : t('errors.CALENDAR_OAUTH_NOT_CONFIGURED')}
                   </p>
                 </div>
               </div>
@@ -123,7 +163,7 @@ export function CalendarClient({ connections, locale }: CalendarClientProps) {
                     className="text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-2 rounded-lg transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    {t('connect')}
+                    {isConnecting && selectedProvider === provider ? t('connecting') : t('connect')}
                   </button>
                 )}
               </div>

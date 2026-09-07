@@ -4,7 +4,6 @@ import fs from 'fs';
 import {
   normalizeOrgName,
   parseBigIntEur,
-  mapProjectRow,
   mapOrganizationAndParticipationRow,
 } from '../src/lib/k2-cordis/cordisSchema';
 import { runCordisImport } from '../src/lib/k2-cordis/importer';

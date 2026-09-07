@@ -1,5 +1,4 @@
-import { prisma, withTenant } from '@/lib/db';
-import type { PrismaClient } from '@prisma/client';
+import { withTenant } from '@/lib/db';
 
 import {
   averageG0ToG2Days,

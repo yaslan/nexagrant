@@ -3,12 +3,7 @@ import { aggregateCordisMetrics } from '@/lib/cordis-sync';
 import { handleGetK2Status } from './actions';
 import { CordisRagAdminClient } from './client';
 
-export default async function AdminCordisPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
+export default async function AdminCordisPage() {
   const [metrics, k2Status] = await Promise.all([
     aggregateCordisMetrics(),
     handleGetK2Status(),

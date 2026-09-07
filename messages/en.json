@@ -531,7 +531,17 @@
       "disconnect": "Disconnect",
       "confirmDisconnect": "Disconnect this calendar provider?",
       "infoTitle": "How It Works",
-      "infoText": "Connect Google Calendar or Outlook to automatically add meeting briefs to your calendar. Your calendar sync runs every hour."
+      "infoText": "When you set a date on a meeting brief, it is added to your connected calendars as an event. Google and Outlook connections are not enabled in this deployment yet; download the .ics file from the brief screen and add it to your calendar.",
+      "connecting": "Connecting…",
+      "connectedNoSyncYet": "Connected — no meeting has been synced yet.",
+      "errors": {
+        "CALENDAR_ALREADY_CONNECTED": "This calendar provider is already connected in this workspace.",
+        "CALENDAR_OAUTH_NOT_CONFIGURED": "This provider cannot be connected yet: no OAuth client is configured in this deployment. For now, download the .ics file from a meeting brief and add it to your calendar.",
+        "CALENDAR_CONNECTION_NOT_FOUND": "That calendar connection no longer exists; reload the page.",
+        "CALENDAR_FORBIDDEN": "You are not allowed to change this calendar connection.",
+        "CALENDAR_UNKNOWN_PROVIDER": "Unknown calendar provider.",
+        "unknown": "The calendar action could not be completed. Please try again."
+      }
     }
   },
   "legal": {

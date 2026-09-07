@@ -68,7 +68,6 @@ export default async function ModulesSettingsPage({
     <ModulesClient 
       initialActiveModules={state.activeModules} 
       currentPlan={state.currentPlan}
-      tenantId={tenantId}
       tenantName={state.tenantName}
       workspace={workspace}
       locale={locale}

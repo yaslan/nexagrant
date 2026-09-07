@@ -1,5 +1,5 @@
 import { ModuleId, ModuleStatus, PlanTier } from './types';
-import { getManifest, getAllManifests } from './registry';
+import { getManifest } from './registry';
 
 export interface CanEnableResult {
   allowed: boolean;

@@ -109,7 +109,7 @@ export async function updateTenantModuleStatus(
 
   try {
     revalidatePath('/[locale]/admin/modules', 'page');
-  } catch (e) {
+  } catch {
     // Ignore in non-Next runtime/test environment
   }
   return { success: true, updatedModules: modulesToTurnOff };

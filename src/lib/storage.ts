@@ -72,7 +72,7 @@ export async function getPresignedUploadUrl(
     });
     const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 900 });
     return { uploadUrl, objectKey, publicUrl };
-  } catch (err) {
+  } catch {
     return {
       uploadUrl: `/api/evidence/mock-upload?key=${encodeURIComponent(objectKey)}`,
       objectKey,
@@ -97,7 +97,7 @@ export async function getPresignedDownloadUrl(objectKey: string): Promise<string
       Key: objectKey,
     });
     return await getSignedUrl(s3, command, { expiresIn: 3600 });
-  } catch (err) {
+  } catch {
     return `https://storage.fonbridge.app/${objectKey}`;
   }
 }

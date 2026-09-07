@@ -32,8 +32,8 @@ export default async function ApiKeysSettingsPage({
 }: {
   params: Promise<{ locale: string; workspace: string }>;
 }) {
-  const { locale, workspace } = await params;
-  const { tenantId, userId } = await requireTenantPage(locale);
+  const { locale } = await params;
+  const { tenantId } = await requireTenantPage(locale);
 
   let apiKeys: ApiKeyRecord[] = [];
   try {
@@ -53,11 +53,7 @@ export default async function ApiKeysSettingsPage({
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <ApiKeysClient
-        tenantId={tenantId}
-        userId={userId}
-        apiKeys={apiKeys}
-      />
+      <ApiKeysClient apiKeys={apiKeys} />
     </div>
   );
 }

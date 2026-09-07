@@ -12,7 +12,7 @@ export function BillingActions({ hasSubscription }: { hasSubscription: boolean }
       } else {
         alert('Failed to load portal: ' + data.error);
       }
-    } catch (err) {
+    } catch {
       alert('Error opening customer portal');
     }
   };
@@ -30,16 +30,18 @@ export function BillingActions({ hasSubscription }: { hasSubscription: boolean }
       } else {
         alert('Failed to load checkout: ' + data.error);
       }
-    } catch (err) {
+    } catch {
       alert('Error opening checkout');
     }
   };
 
   return (
     <div className="flex gap-4">
-      <button onClick={handleManage} className="bg-surface text-ink-2 border border-border px-4 py-2 rounded font-medium flex-1 hover:bg-ground">
-        Manage Subscription
-      </button>
+      {hasSubscription && (
+        <button onClick={handleManage} className="bg-surface text-ink-2 border border-border px-4 py-2 rounded font-medium flex-1 hover:bg-ground">
+          Manage Subscription
+        </button>
+      )}
       <button onClick={handleUpgrade} className="bg-accent-ink text-surface px-4 py-2 rounded font-medium flex-1 hover:bg-opacity-90">
         Upgrade Plan
       </button>

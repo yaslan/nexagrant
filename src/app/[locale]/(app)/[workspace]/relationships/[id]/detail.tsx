@@ -22,7 +22,8 @@ export default function RelationshipDetail({ relationship: rel, interactions: in
   const [warmth, setWarmth] = useState(rel.warmth);
   const [nextStep, setNextStep] = useState(rel.nextStep || '');
   const [notes, setNotes] = useState(rel.notes || '');
-  const [interactions, setInteractions] = useState(initInteractions);
+  // Read-only after mount: nothing here re-sets this list, so the setter was dead.
+  const [interactions] = useState(initInteractions);
   const [showForm, setShowForm] = useState(false);
   const [isPending, startTransition] = useTransition();
 

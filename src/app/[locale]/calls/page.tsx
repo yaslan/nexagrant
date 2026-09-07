@@ -57,7 +57,7 @@ interface PageProps {
 
 export default async function CallsPage({ params }: PageProps) {
   const { locale } = await params;
-  const t = await getTranslations();
+  const t = await getTranslations({ locale, namespace: 'callsIndex' });
 
   const topics = await prisma.topic.findMany({
     where: {
@@ -97,8 +97,8 @@ export default async function CallsPage({ params }: PageProps) {
       </header>
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <h1 className="text-4xl font-bold text-slate-900 mb-4">Fund Calls</h1>
-        <p className="text-xl text-slate-600 mb-12">Browse available fund calls by country</p>
+        <h1 className="text-4xl font-bold text-slate-900 mb-4">{t('title')}</h1>
+        <p className="text-xl text-slate-600 mb-12">{t('subtitle')}</p>
 
         <div className="space-y-12">
           {Object.entries(groupedByCountry).map(([country, countryTopics]) => (

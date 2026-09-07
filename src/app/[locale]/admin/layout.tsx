@@ -8,18 +8,12 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import UserMenu from '@/components/UserMenu';
 import AdminSidebarNav from '@/components/AdminSidebarNav';
-import { 
-  Puzzle, 
-  Building2, 
-  CreditCard, 
-  ScrollText, 
-  Sliders, 
-  ShieldCheck, 
+import {
+  ShieldCheck,
   Activity,
   ChevronRight,
   ExternalLink,
   Lock,
-  Newspaper
 } from 'lucide-react';
 
 import MobileAdminHeader from '@/components/MobileAdminHeader';
@@ -43,56 +37,8 @@ export default async function AdminLayout({
     notFound();
   }
 
-  const adminNavItems = [
-    {
-      key: 'modules',
-      href: `/${locale}/admin/modules`,
-      label: locale === 'tr' ? 'Modül Yönetimi' : 'Module State Manager',
-      desc: 'OFF, DEV, PILOT, ON geçişleri',
-      icon: Puzzle,
-      badge: '11 Modül',
-    },
-    {
-      key: 'tenants',
-      href: `/${locale}/admin/tenants`,
-      label: locale === 'tr' ? 'Kiracı Hesapları' : 'Tenant Accounts',
-      desc: 'Kurum ve üye yönetimi',
-      icon: Building2,
-      badge: 'Tenant',
-    },
-    {
-      key: 'billing',
-      href: `/${locale}/admin/billing`,
-      label: locale === 'tr' ? 'Faturalama & Planlar' : 'Billing & Subscriptions',
-      desc: 'Stripe paketleri & limitler',
-      icon: CreditCard,
-      badge: 'Stripe',
-    },
-    {
-      key: 'audit',
-      href: `/${locale}/admin/audit`,
-      label: locale === 'tr' ? 'Denetim Kayıtları' : 'Audit Log Events',
-      desc: 'Sistem olay geçmişi',
-      icon: ScrollText,
-      badge: 'Audit',
-    },
-    {
-      key: 'blog',
-      href: `/${locale}/admin/blog`,
-      label: locale === 'tr' ? 'Blog Yönetimi' : 'Blog Management',
-      desc: 'İçerik, makale ve duyuru CRUD',
-      icon: Newspaper,
-      badge: 'Blog CRUD',
-    },
-    {
-      key: 'settings',
-      href: `/${locale}/admin/settings`,
-      label: locale === 'tr' ? 'Sistem Ayarları' : 'Platform Settings',
-      desc: 'Küresel konfigürasyon',
-      icon: Sliders,
-      badge: 'Config',
-    },
-  ];
+  // The admin navigation is rendered by <AdminSidebarNav />; this file used to carry a
+  // second copy of the same list that nothing read.
 
   const user = session?.user;
   const t = await getTranslations({ locale, namespace: 'UserIdentity' });

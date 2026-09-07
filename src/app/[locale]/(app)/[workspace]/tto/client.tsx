@@ -377,12 +377,16 @@ export function TtoAcceleratorClient({
                       ))}
                     </div>
 
+                    {/* `isGeneratingChecklist` was set on both sides of the call and never
+                        read, so the button stayed idle-looking during an AI request and
+                        could be clicked again — each click debits credits (CLAUDE.md §5). */}
                     <button
                       onClick={() => handleGenerateIpChecklist(item)}
-                      className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-1"
+                      disabled={isGeneratingChecklist}
+                      className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                     >
                       <FileCheck className="w-3.5 h-3.5 text-accent" />
-                      <span>IP Kontrol Listesi Üret</span>
+                      <span>{isGeneratingChecklist ? 'Üretiliyor...' : 'IP Kontrol Listesi Üret'}</span>
                     </button>
                   </div>
                 </div>

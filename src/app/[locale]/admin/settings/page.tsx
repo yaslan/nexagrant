@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sliders, ShieldCheck, Database, Key } from 'lucide-react';
+import { Sliders, Database, Key } from 'lucide-react';
 import { SmtpSettingsForm } from './smtp-form';
 
 export default async function AdminSettingsPage() {

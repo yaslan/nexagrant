@@ -27,7 +27,7 @@ describe('Module Gate Coverage', () => {
           if (!hasImport || !hasUsage) {
             unprotected.push(`${route.path} (${manifest.id}): ${!hasImport ? 'missing import' : 'missing call'}`);
           }
-        } catch (e) {
+        } catch {
           // File not found — unusual but not a failure here (manifest might be out of sync)
           unprotected.push(`${route.path} (${manifest.id}): page file not found`);
         }

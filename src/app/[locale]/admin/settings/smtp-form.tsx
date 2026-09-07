@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Mail, Check, Send, ShieldCheck, Key, Server, Lock, AlertCircle, RefreshCw } from 'lucide-react';
+import { Mail, Check, Send, ShieldCheck, Server, Lock, AlertCircle, RefreshCw } from 'lucide-react';
 
 export function SmtpSettingsForm() {
   const [host, setHost] = useState('smtp.gmail.com');

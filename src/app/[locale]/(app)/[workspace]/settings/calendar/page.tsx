@@ -1,11 +1,25 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
+
 import { getWorkspaceRoute } from '@/lib/routes';
 import { requireTenantAction } from '@/lib/tenant';
 import { prisma } from '@/lib/db';
 import { CalendarClient } from './client';
 
-export const metadata = {
-  title: 'Takvim Bağlantıları',
-};
+/**
+ * The title was the literal string 'Takvim Bağlantıları', so the English page
+ * carried a Turkish browser tab (CLAUDE.md rule 8; left open as a known defect
+ * in docs/agent-results/TASK-MTQUTBH8Q9VMK-geli-tirici.md §4).
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'settings.calendar' });
+  return { title: `${t('title')} — Fabrika` };
+}
 
 export default async function CalendarSettingsPage({ params }: { params: Promise<{ locale: string; workspace: string }> }) {
   const { locale, workspace } = await params;

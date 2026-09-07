@@ -8,7 +8,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const text = searchParams.get('q') || searchParams.get('text') || '***';
-    const pageNumber = parseInt(searchParams.get('page') || searchParams.get('pageNumber') || '1', 10);
+    // NOTE: ?page/?pageNumber is not honoured. `SediaAdapter.searchSedia` paginates
+    // internally from page 1 up to maxPages and reports pageNumber 1, so there is no
+    // page argument to forward. Parsing one here only implied otherwise.
     const pageSize = parseInt(searchParams.get('limit') || searchParams.get('pageSize') || '20', 10);
     const lang = (searchParams.get('lang') || searchParams.get('locale') || 'tr').toLowerCase();
     

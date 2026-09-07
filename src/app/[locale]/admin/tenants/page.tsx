@@ -1,6 +1,6 @@
 import React from 'react';
 import { prisma } from '@/lib/db';
-import { Building2, Shield, Users } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { errorMessage } from '@/lib/errors';
 
 export default async function AdminTenantsPage() {

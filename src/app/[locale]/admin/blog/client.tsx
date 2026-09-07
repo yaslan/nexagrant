@@ -9,19 +9,18 @@ import {
   deleteBlogPostAction, 
   toggleFeaturedBlogPostAction 
 } from './actions';
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
-  Star, 
-  BookOpen, 
-  Check, 
-  X, 
-  Sparkles, 
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Star,
+  BookOpen,
+  X,
+  Sparkles,
   FileText,
   Eye,
-  Tag
+  Tag,
 } from 'lucide-react';
 import Link from 'next/link';
 

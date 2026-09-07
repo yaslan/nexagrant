@@ -152,7 +152,6 @@ export function generatePdfHtml(data: ExportDocumentData): string {
   const approval = signatureState(approver ?? null, signedAt);
 
   const isTubitak = kind === 'AWARD_PACK';
-  const isHorizon = kind === 'PART_B' || kind === 'NDA' || kind === 'LOI';
 
   let sectionsHtml = '';
   if (sections.length > 0) {

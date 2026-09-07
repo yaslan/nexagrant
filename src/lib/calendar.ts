@@ -60,7 +60,11 @@ export function generateIcsContent(
     'END:VCALENDAR',
   ];
 
-  return lines.map(foldIcsLine).join('\r\n');
+  // RFC 5545 §3.1 / the `icalobject` ABNF: every content line is *terminated*
+  // by CRLF, the last one included — `icalobject = "BEGIN:VCALENDAR" CRLF
+  // icalbody "END:VCALENDAR" CRLF`. `join` alone leaves the stream ending on
+  // "END:VCALENDAR" with nothing after it, which strict parsers reject.
+  return lines.map(foldIcsLine).join('\r\n') + '\r\n';
 }
 
 export function createIcsDataUrl(

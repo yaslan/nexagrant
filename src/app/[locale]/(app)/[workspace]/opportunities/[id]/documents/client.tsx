@@ -1,26 +1,23 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  FileText, 
-  ShieldCheck, 
-  Award, 
-  CheckCircle2, 
-  Clock, 
-  Download, 
-  FileSignature, 
-  Sparkles, 
-  FileCode, 
-  Plus, 
-  RotateCw, 
-  Eye, 
+import {
+  FileText,
+  ShieldCheck,
+  Award,
+  CheckCircle2,
+  Clock,
+  Download,
+  FileSignature,
+  Sparkles,
+  FileCode,
+  Plus,
+  RotateCw,
+  Eye,
   X,
-  Building,
-  Check,
-  AlertCircle
 } from 'lucide-react';
 import { generateStandardDoc, signDocument, createNewVersion, submitDualApprovalAction, departmentApproveAction } from '@/modules/m10/server/actions';
-import { ShieldAlert, Scale, Landmark } from 'lucide-react';
+import { Landmark } from 'lucide-react';
 
 export interface DocItem {
   id: string;

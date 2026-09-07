@@ -94,7 +94,7 @@ test.describe('Row Level Security (RLS) Isolation', () => {
   });
 
   test('RLS policy blocks cross-tenant access at database level', async () => {
-    const wsA = await prisma.workspace.create({
+    await prisma.workspace.create({
       data: {
         tenantId: tenantA.id,
         name: 'Private Workspace A',
@@ -102,7 +102,7 @@ test.describe('Row Level Security (RLS) Isolation', () => {
       },
     });
 
-    const wsB = await prisma.workspace.create({
+    await prisma.workspace.create({
       data: {
         tenantId: tenantB.id,
         name: 'Private Workspace B',
@@ -145,7 +145,7 @@ test.describe('Row Level Security (RLS) Isolation', () => {
       },
     });
 
-    const oppA1 = await prisma.opportunity.create({
+    await prisma.opportunity.create({
       data: {
         tenantId: tenantA.id,
         workspaceId: ws.id,
@@ -154,7 +154,7 @@ test.describe('Row Level Security (RLS) Isolation', () => {
       },
     });
 
-    const oppA2 = await prisma.opportunity.create({
+    await prisma.opportunity.create({
       data: {
         tenantId: tenantA.id,
         workspaceId: ws.id,
@@ -236,7 +236,7 @@ test.describe('Row Level Security (RLS) Isolation', () => {
 
   test('nullable tenantId (shared) records are visible to all tenants', async () => {
     // Create shared document
-    const sharedDoc = await prisma.document.create({
+    await prisma.document.create({
       data: {
         tenantId: null, // Shared
         kind: 'work_programme',

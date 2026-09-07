@@ -11,7 +11,6 @@ import { errorMessage } from '@/lib/errors';
 interface ModulesClientProps {
   initialActiveModules: ModuleId[];
   currentPlan: PlanTier;
-  tenantId?: string;
   tenantName?: string;
   workspace?: string;
   locale?: string;
@@ -99,7 +98,6 @@ const nextToastId = () => (toastSequence += 1);
 export function ModulesClient({
   initialActiveModules,
   currentPlan,
-  tenantId,
   tenantName,
   workspace = 'default',
   locale = 'tr',

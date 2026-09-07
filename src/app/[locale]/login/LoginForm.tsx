@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions/auth';
 import { errorMessage as toErrorMessage, isNextRedirectError } from '@/lib/errors';
 
@@ -10,7 +10,6 @@ interface LoginFormProps {
 }
 
 export default function LoginForm({ locale }: LoginFormProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const rawCallbackUrl = searchParams.get('callbackUrl') || `/${locale}/default/dashboard`;
 
