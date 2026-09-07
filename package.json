@@ -11,7 +11,7 @@
     "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
     "db:migrate": "prisma migrate dev",
-    "db:rls": "psql -f prisma/rls.sql",
+    "db:rls": "tsx scripts/apply-rls.ts",
     "db:rls-role": "tsx scripts/setup-rls-role.ts",
     "db:rls-role:rollback": "tsx scripts/setup-rls-role.ts --rollback",
     "db:seed": "tsx prisma/seed.ts",
