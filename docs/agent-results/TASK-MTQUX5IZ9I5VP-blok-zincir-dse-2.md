@@ -131,15 +131,28 @@ $ i18n paritesi: tr 1202 / en 1202, m9 dahil eksik anahtar 0
 
 ## 4. Riskler ve BENİM DEĞİL diye işaretlediklerim
 
-1. **`notFound()` HTTP 200 dönüyor (başka kart: TASK-MTQYY136Q3CGG).** Gövde doğru 404 ekranı, durum kodu 200. Ağaç geneli, M9'a özel değil — ölçüm:
+1. **`notFound()` HTTP 200 dönüyor — ve TASK-MTQYY136Q3CGG bunu "bayat kart" diye KAPATMIŞ.**
+   O kart panoda `done`: *"BAYAT KART — notFound() rotaları zaten HTTP 404 dönüyor (ölçümle
+   kapatıldı, kod değişmedi)"*. Benim ölçümüm bunu **doğrulamıyor**; fark oturumdan geliyor —
+   oturumsuz ölçüm `notFound()` yoluna hiç ulaşmıyor, login'e 307 atıyor:
+
    ```
-   /tr/main/opportunities/<yok>/briefs        200
-   /tr/main/opportunities/<yok>/documents     200
-   /tr/main/pipeline/<yok>                    200
-   /tr/main/partners/<yok>                    200
-   /tr/completely-unknown-route-xyz           404   ← rota hiç eşleşmeyince doğru
+   # oturumlu (alice@fabrika.test, demo-tenant)
+   /tr/main/opportunities/nope-abc/briefs      200   ← gövde doğru 404 ekranı, kod yanlış
+   /tr/main/opportunities/nope-abc/documents   200
+   /tr/main/pipeline/nope-abc                  200
+   /tr/main/partners/nope-abc                  200
+
+   # oturumsuz
+   /tr/main/opportunities/nope-abc/briefs      307   ← login'e yönlendirme; notFound() hiç çalışmıyor
+   /tr/completely-unknown-xyz                  404   ← rota hiç eşleşmiyor; bu yol zaten doğruydu
    ```
-   Testte `expect` etmedim, `testInfo.annotations`'a yazdım: başka kartın kusuru yüzünden bu spec'i kırmızı yapmak yanlış olurdu.
+
+   Yani kart muhtemelen **oturumsuz** ya da **hiç eşleşmeyen rota** üzerinden ölçülüp kapatılmış.
+   Kapsam notu: ölçüm `next dev` sunucusuna karşı; production build'de tekrarlamadım.
+   Öneri: TASK-MTQYY136Q3CGG yeniden açılsın, kabul kriteri "oturumlu istekte `(app)` altındaki
+   `notFound()` 404 döner" olsun. Kendi spec'imde `expect` etmedim, `testInfo.annotations`'a
+   yazdım — başka kartın kusuru yüzünden bu spec kırmızı olmamalı.
 2. **`npx tsc` 4 hata: `scripts/_probe-cordis.ts:14,15` ve `scripts/_probe-cordis2.ts:3,6`** (`TS2347`, `TS7006`). Benim dosyalarım değil, dokunmadım.
 3. **Anasayfa `/tr` 500 veriyor** — `next/image` `images.unsplash.com` host'u `next.config` içinde tanımlı değil. Playwright'ın `webServer.url` sağlık kontrolü bu yüzden çalışan sunucuyu "hazır değil" sayıp `EADDRINUSE` ile düşüyor; `E2E_BASE_URL=http://localhost:3000/api/auth/csrf` ile aştım. Kalıcı çözüm o kartın sahibinde.
 4. **`messages/*.json` ortak dosya.** Benim 3 anahtarım dışında dosyada başka ajanların commit edilmemiş anahtarları var (takvim hataları, evaluations `notMeasured`). Commit'e yalnız benim satırlarım alındı (HEAD + kendi anahtarlarım ile blob üretilip index'e yazıldı); çalışma ağacındaki diğer anahtarlara dokunulmadı.
@@ -185,5 +198,5 @@ değil — `git add` + `git commit -- <yollar>` tek adımda yapılmalı, ve rapo
 ## 6. Sonraki adım
 
 - Kart durumu `review`'a alındı; kanıtlar bu dosyada.
-- TASK-MTQYY136Q3CGG sahibine: `notFound()` 200 ölçümü (§4.1) hazır, dört rotada tekrarlanabilir.
+- **TASK-MTQYY136Q3CGG yeniden açılmalı** — `done` işaretli ama oturumlu istekte iddiası tutmuyor (§4.1'de dört rotada ölçüm + oturumsuz/oturumlu farkı).
 - Kart 9 (`set-state-in-effect`, TASK-MTREW28BU7STD + TASK-MTQVFP0LV3YV7) hâlâ açık ve 8. karta bağımlı — bu iş kapsamında ele alınmadı.
