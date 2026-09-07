@@ -3,6 +3,7 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
+import type { RelationshipRow } from '@/types/db-rows';
 
 /**
  * `tenantId` was read as `session.tenantId` with no null check, and
@@ -23,7 +24,7 @@ export async function createRelationship(data: {
 }) {
   const { tenantId, userId } = await requireTenantAction();
 
-  const rel = await withTenant<any>(tenantId, (tx) =>
+  const rel = await withTenant<RelationshipRow>(tenantId, (tx) =>
     tx.relationship.create({
     data: {
       tenantId,

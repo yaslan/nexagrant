@@ -3,6 +3,11 @@ import { requireTenantPage } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
 import { computeSeatCandidates, assignCandidateToSeat } from '@/modules/m8/server/actions';
 import { errorMessage } from '@/lib/errors';
+import type {
+  ConsortiumSeatWithOrg,
+  ModuleStateRow,
+  SeatCandidateWithOrg,
+} from '@/types/db-rows';
 
 export default async function MatchingPage({
   params
@@ -15,7 +20,7 @@ export default async function MatchingPage({
   // Everything below is read inside the session tenant. The page used to load
   // the opportunity by `(id, workspace slug)` with no tenant at all, so any
   // signed-in user could open another tenant's consortium by URL.
-  const opp = await withTenant<any>(tenantId, (tx) =>
+  const opp = await withTenant<{ id: string; title: string; seats: ConsortiumSeatWithOrg[] } | null>(tenantId, (tx) =>
     tx.opportunity.findFirst({
       where: { id, tenantId, workspace: { slug: workspace } },
       include: {
@@ -32,7 +37,7 @@ export default async function MatchingPage({
   if (!opp) return notFound();
 
   // Check M8 state
-  const m8State = await withTenant<any>(tenantId, (tx) =>
+  const m8State = await withTenant<ModuleStateRow | null>(tenantId, (tx) =>
     tx.moduleState.findUnique({
       where: { tenantId_moduleId: { tenantId, moduleId: 'M8' } }
     })
@@ -48,9 +53,9 @@ export default async function MatchingPage({
   }
 
   // Load candidates for each seat
-  const seatCandidatesMap = new Map();
+  const seatCandidatesMap = new Map<string, SeatCandidateWithOrg[]>();
   for (const seat of opp.seats) {
-    const candidates = await withTenant<any[]>(tenantId, (tx) =>
+    const candidates = await withTenant<SeatCandidateWithOrg[]>(tenantId, (tx) =>
       tx.seatCandidate.findMany({
         where: { seatId: seat.id, tenantId },
         orderBy: { rank: 'asc' },
@@ -70,7 +75,7 @@ export default async function MatchingPage({
       </div>
 
       <div className="grid gap-6">
-        {opp.seats.map((seat: any) => {
+        {opp.seats.map((seat) => {
           const candidates = seatCandidatesMap.get(seat.id) || [];
           return (
             <div key={seat.id} className="border p-4 rounded-lg bg-surface shadow-sm">
@@ -104,7 +109,7 @@ export default async function MatchingPage({
                       </tr>
                     </thead>
                     <tbody>
-                      {candidates.map((c: any) => (
+                      {candidates.map((c) => (
                         <tr key={c.id} className="border-b">
                           <td className="py-2 px-4 font-medium text-ink">#{c.rank}</td>
                           <td className="py-2 px-4">
@@ -118,6 +123,10 @@ export default async function MatchingPage({
                           <td className="py-2 px-4">
                             <form action={async () => {
                               'use server';
+                              // SeatCandidate.organizationId is nullable in the
+                              // schema even though the scorer always writes one.
+                              // Assigning a seat to nothing is not an invite.
+                              if (!c.organizationId) return;
                               try {
                                 await assignCandidateToSeat(seat.id, c.organizationId, 'INVITED', opp.id);
                               } catch (e) {

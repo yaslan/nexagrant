@@ -1,7 +1,7 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import KanbanBoard from './board';
-import { getInMemoryOpportunities } from '@/lib/k5-pipeline/pipelineStore';
+import { getInMemoryOpportunities, type OpportunityItem } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
 
 export default async function PipelinePage({
@@ -15,7 +15,7 @@ export default async function PipelinePage({
   // arbitrary one.
   const { tenantId } = await requireTenantPage(locale);
 
-  let dbOpportunities: any[] = [];
+  let dbOpportunities: OpportunityItem[] = [];
   try {
     dbOpportunities = await withTenant(tenantId, (tx) =>
       tx.opportunity.findMany({

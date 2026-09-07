@@ -2,6 +2,8 @@ import { prisma, withTenant } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { requireTenantPage } from '@/lib/tenant';
 import ConceptNoteEditor from '@/modules/m2/ui/ConceptNoteEditor';
+import type { ModuleStateRow } from '@/types/db-rows';
+import type { ConceptNoteRow } from '@/modules/m2/types';
 
 export default async function OpportunityM2Page({
   params
@@ -16,7 +18,7 @@ export default async function OpportunityM2Page({
   const { tenantId } = await requireTenantPage(locale);
 
   // Find the opportunity
-  const opp = await withTenant<any>(tenantId, (tx) =>
+  const opp = await withTenant<{ id: string; title: string } | null>(tenantId, (tx) =>
     tx.opportunity.findFirst({
       where: { id, tenantId, workspace: { slug: workspace } },
       include: { workspace: true }
@@ -26,7 +28,7 @@ export default async function OpportunityM2Page({
   if (!opp) return notFound();
 
   // Check M2 module state
-  const m2State = await withTenant<any>(tenantId, (tx) =>
+  const m2State = await withTenant<ModuleStateRow | null>(tenantId, (tx) =>
     tx.moduleState.findUnique({
       where: { tenantId_moduleId: { tenantId, moduleId: 'M2' } }
     })
@@ -42,7 +44,7 @@ export default async function OpportunityM2Page({
   }
 
   // Get existing note if any
-  const note = await withTenant<any>(tenantId, (tx) =>
+  const note = await withTenant<ConceptNoteRow | null>(tenantId, (tx) =>
     tx.conceptNote.findFirst({
       where: { opportunityId: opp.id, tenantId }
     })

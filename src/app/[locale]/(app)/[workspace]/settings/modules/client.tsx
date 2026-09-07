@@ -90,6 +90,14 @@ const PLAN_BADGES: Record<PlanTier, { label: string; bg: string; text: string }>
   enterprise: { label: 'Enterprise', bg: 'bg-amber/15 text-amber border border-amber/20', text: 'text-amber' },
 };
 
+/**
+ * Identity for a toast, so its dismiss timer can tell it apart from a later
+ * one. A counter rather than `Date.now()`: the clock is impure during render,
+ * and two toasts raised in the same millisecond would have collided.
+ */
+let toastSequence = 0;
+const nextToastId = () => (toastSequence += 1);
+
 export function ModulesClient({
   initialActiveModules,
   currentPlan,
@@ -112,7 +120,7 @@ export function ModulesClient({
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
-    const id = Date.now();
+    const id = nextToastId();
     setToasts((prev) => [...prev, { id, text, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));

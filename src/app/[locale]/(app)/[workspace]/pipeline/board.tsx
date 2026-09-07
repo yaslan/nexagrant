@@ -2,16 +2,29 @@
 
 import React, { useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
-import { Gate, Opportunity } from '@prisma/client';
+import { Gate } from '@prisma/client';
 import { moveOpportunityStage, createOpportunity, assignOpportunityOwner, addOpportunityNote } from './actions';
-import { WORKSPACE_MEMBERS, NoteEntry } from '@/lib/k5-pipeline/pipelineStore';
+import { WORKSPACE_MEMBERS, type NoteEntry, type OpportunityItem } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
 
 interface KanbanBoardProps {
-  opportunities: Opportunity[];
+  /**
+   * OpportunityItem, not the bare Opportunity row: the board reads `ownerName`
+   * and `notesList`, which the pipeline store adds and the table does not have.
+   * The page feeds it DB rows and in-memory rows merged into this one shape.
+   */
+  opportunities: OpportunityItem[];
   workspace?: string;
   locale?: string;
 }
+
+/**
+ * Identity for a toast, so its dismiss timer can tell it apart from a later
+ * one. A counter rather than `Date.now()`: the clock is impure during render,
+ * and two toasts raised in the same millisecond would have collided.
+ */
+let toastSequence = 0;
+const nextToastId = () => (toastSequence += 1);
 
 /** The intended-role filter above the board; matches the <option> values. */
 type RoleFilter = 'all' | 'coordinator' | 'partner';
@@ -36,7 +49,7 @@ export default function KanbanBoard({
   workspace = 'default',
   locale = 'tr',
 }: KanbanBoardProps) {
-  const [opps, setOpps] = useState<any[]>(initialOpps);
+  const [opps, setOpps] = useState<OpportunityItem[]>(initialOpps);
   const [isPending, startTransition] = useTransition();
 
   // Expanded cards state (default minimized for clean high-density view)
@@ -83,7 +96,7 @@ export default function KanbanBoard({
   const [toast, setToast] = useState<{ id: number; text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
-    const id = Date.now();
+    const id = nextToastId();
     setToast({ id, text, type });
     setTimeout(() => {
       setToast((prev) => (prev?.id === id ? null : prev));
@@ -232,7 +245,7 @@ export default function KanbanBoard({
         opp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (opp.topicId && opp.topicId.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (opp.ownerName && opp.ownerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (opp.notesList && opp.notesList.some((n: any) => n.text.toLowerCase().includes(searchQuery.toLowerCase())));
+        (opp.notesList && opp.notesList.some((n) => n.text.toLowerCase().includes(searchQuery.toLowerCase())));
 
       if (!matchesSearch) return false;
 

@@ -81,3 +81,30 @@ export interface RelationshipRow {
   notes: string | null;
   updatedAt: Date;
 }
+
+/** `model ModuleState` — the tenant × module switch. */
+export interface ModuleStateRow {
+  moduleId: string;
+  status: 'OFF' | 'DEV' | 'PILOT' | 'ON' | string;
+}
+
+/** `model ConsortiumSeat`, with the organisation assigned to it. */
+export interface ConsortiumSeatWithOrg {
+  id: string;
+  roleKey: string;
+  required: boolean;
+  status: string;
+  organizationId: string | null;
+  organization: LegacyOrganizationRow | null;
+}
+
+/** `model SeatCandidate`, with the organisation it proposes. */
+export interface SeatCandidateWithOrg {
+  id: string;
+  seatId: string;
+  organizationId: string | null;
+  score: number;
+  breakdown: unknown;
+  rank: number;
+  organization: LegacyOrganizationRow | null;
+}
