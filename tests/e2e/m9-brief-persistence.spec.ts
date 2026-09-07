@@ -96,7 +96,7 @@ test.describe('M9 briefs — persistence and the unknown opportunity', () => {
 
   test('an opportunity that does not exist gets the not-found screen, not a brief', async ({
     page,
-  }, testInfo) => {
+  }) => {
     await signInAsM9User(page, M9_BRIEFS_URL);
 
     const response = await page.goto(MISSING_URL, { waitUntil: 'networkidle' });
@@ -108,17 +108,13 @@ test.describe('M9 briefs — persistence and the unknown opportunity', () => {
     await expect(page.getByRole('button', { name: /Yapay Zeka Brief Oluştur/ })).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/persist-04-unknown-opportunity.png`, fullPage: true });
 
-    // The HTTP status is recorded, not asserted. Every `notFound()` under
-    // `[locale]/(app)` answers 200 with the 404 body — measured on
-    // /pipeline/[id], /partners/[pic] and /opportunities/[id]/documents too — so
-    // it is a tree-wide defect, not something this page can fix alone.
-    // TASK-MTQYY136Q3CGG closed this as "already 404", but that measurement was
-    // taken without a session: signed out, these routes 307 to the login page
-    // and `notFound()` never runs. Asserting it here would only make this spec
-    // red for a defect that belongs to the whole route tree.
-    testInfo.annotations.push({
-      type: 'known-defect',
-      description: `notFound() HTTP status = ${response?.status()} (expected 404) — TASK-MTQYY136Q3CGG`,
-    });
+    // The status, now asserted rather than annotated. This used to answer 200
+    // with the 404 body: a single `loading.tsx` at `[locale]/(app)/[workspace]`
+    // put a Suspense boundary above every workspace route, so Next flushed the
+    // shell — and the 200 status line — before this page decided whether the
+    // opportunity exists. The skeleton was moved down to the sections with no
+    // lookup-decided child (TASK-MTRNO3LBZB2Q7); the tree-wide sweep lives in
+    // tests/e2e/notfound-status.spec.ts.
+    expect(response?.status()).toBe(404);
   });
 });
