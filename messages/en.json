@@ -750,6 +750,7 @@
       "nextMeetingLabel": "Next Follow-up Meeting Date",
       "saving": "Adding Notes...",
       "submit": "Add Post-Meeting Notes to Brief",
+      "notesError": "Post-meeting notes could not be saved. Your input is preserved in the form — check your connection and try again.",
       "defaultPartnerName": "Consortium Partner"
     },
     "ics": {

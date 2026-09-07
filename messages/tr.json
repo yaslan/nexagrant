@@ -750,6 +750,7 @@
       "nextMeetingLabel": "Sonraki Takip Görüşme Tarihi",
       "saving": "Notlar Ekleniyor...",
       "submit": "Toplantı Sonrası Notlarını Brief'e Ekle",
+      "notesError": "Toplantı notları kaydedilemedi. Girdikleriniz formda duruyor — bağlantınızı kontrol edip yeniden deneyin.",
       "defaultPartnerName": "Konsorsiyum Ortağı"
     },
     "ics": {

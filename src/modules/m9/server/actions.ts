@@ -134,7 +134,7 @@ export async function generateMeetingBrief({
 
     try {
       revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/briefs', 'page');
-    } catch (e) {}
+    } catch (_e) {}
 
     // Sync brief to connected calendar providers
     try {
@@ -206,7 +206,7 @@ ${nextMeetingDate ? `- **Sonraki Görüşme Tarihi:** ${nextMeetingDate}` : ''}`
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/briefs', 'page');
-  } catch (e) {}
+  } catch (_e) {}
 
   return { success: true, formattedPostNotes };
 }

@@ -143,7 +143,9 @@ export function MeetingBriefsClient({
   // `alert()` (dogfood findings P2-9 and P3-14).
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [icsError, setIcsError] = useState<string | null>(null);
-  // Every way brief generation can fail lands here. It used to have no surface
+  // Post-meeting notes failure surface. Prevents silent data loss when save fails.
+  const [notesError, setNotesError] = useState<string | null>(null);
+    // Every way brief generation can fail lands here. It used to have no surface
   // at all: the throw went to `console.error` and an empty `res.brief` went
   // nowhere, so the user pressed the button, watched the spinner, and was told
   // nothing (dogfood finding P0, TASK-MTQURC2H4E0WF).
@@ -292,6 +294,7 @@ export function MeetingBriefsClient({
     if (!activeBrief) return;
 
     setIsSavingNotes(true);
+    setNotesError(null);
     try {
       const res = await savePostMeetingNotes({
         briefId: activeBrief.id,
@@ -302,6 +305,15 @@ export function MeetingBriefsClient({
         nextMeetingDate,
       });
 
+      // Critical: check success flag. Without this check, failed saves silently
+      // cleared the form, causing data loss (dogfood finding P1-3, TASK-MTQURC2H4E0WF).
+      if (!res.success) {
+        setNotesError(t('postMeeting.notesError'));
+        console.error('[M9] savePostMeetingNotes failed:', res);
+        return;  // Do NOT clear the form on failure.
+      }
+
+      // Only clear form after confirmed success
       if (res.formattedPostNotes) {
         setBriefs((prev) =>
           prev.map((b) =>
@@ -310,18 +322,20 @@ export function MeetingBriefsClient({
               : b
           )
         );
+        // Now safe to clear form input
+        setMeetingNotes('');
+        setMeetingDecisions('');
+        setActionItems([]);
+        setNextMeetingDate('');
       }
-
-      setMeetingNotes('');
-      setMeetingDecisions('');
-      setActionItems([]);
-      setNextMeetingDate('');
     } catch (err) {
       console.error('Error saving post-meeting notes:', err);
+      setNotesError(t('postMeeting.notesError'));
     } finally {
       setIsSavingNotes(false);
     }
   };
+
 
   const handlePrint = () => {
     window.print();
@@ -617,6 +631,15 @@ export function MeetingBriefsClient({
                     {t('postMeeting.heading')}
                   </h3>
                 </div>
+
+                {notesError && (
+                  <AlertBanner
+                    testId="m9-notes-error"
+                    message={notesError}
+                    dismissLabel={t('alerts.dismiss')}
+                    onDismiss={() => setNotesError(null)}
+                  />
+                )}
 
                 <form onSubmit={handleSavePostMeetingNotes} className="space-y-4 text-xs">
                   <div>
