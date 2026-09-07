@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
+import { assertModuleAccess } from '@/lib/modules/access';
 import { generateText } from '@/lib/ai/llm';
 
 import {
@@ -76,6 +77,9 @@ const AI_EVALUATION_PROMPT = `Perform a rigorous EU Horizon Europe expert evalua
  */
 export async function generateAiEvaluation(opportunityId: string): Promise<AiEvaluationResult> {
   const oppId = parseOrThrow(idSchema, opportunityId);
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M6');
   const { tenantId, userId } = await requireTenantAction();
 
   const resultStr = await generateText({
@@ -146,6 +150,9 @@ export async function saveHumanEvaluation(data: {
   strengths?: string[];
 }): Promise<{ id: string }> {
   const input = parseOrThrow(saveHumanEvaluationSchema, data);
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M6');
   const { tenantId, userId } = await requireTenantAction();
 
   const created = await withTenant(tenantId, async (tx) => {
@@ -182,6 +189,9 @@ export async function saveHumanEvaluation(data: {
 
 export async function calibrateESR(evaluationId: string, actualScore: number): Promise<{ calibration: number }> {
   const input = parseOrThrow(calibrateEsrSchema, { evaluationId, actualScore });
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M6');
   const { tenantId } = await requireTenantAction();
 
   const calibration = await withTenant<number>(tenantId, async (tx) => {
@@ -221,6 +231,9 @@ export async function saveEvaluation(data: {
   scores: Record<string, number>;
 }): Promise<{ avgScore: number | null }> {
   const input = parseOrThrow(saveEvaluationSchema, data);
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M6');
   const { tenantId, userId } = await requireTenantAction();
 
   const avgScore = await withTenant<number | null>(tenantId, async (tx) => {
@@ -294,6 +307,9 @@ export async function saveEvaluation(data: {
  */
 export async function listPanelScores(proposalId: string): Promise<PanelScoreQueryResult[]> {
   const propId = parseOrThrow(idSchema, proposalId);
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M6');
   const { tenantId } = await requireTenantAction();
 
   return withTenant(tenantId, async (tx) => {

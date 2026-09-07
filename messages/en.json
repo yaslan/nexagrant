@@ -92,7 +92,41 @@
     "newOpportunity": "New Opportunity",
     "addToPipeline": "Add to Pipeline",
     "stage": "Stage",
-    "score": "Score"
+    "score": "Score",
+    "detail": {
+      "back": "Back to Pipeline",
+      "evaluateGate": "Evaluate Gate {gate}",
+      "evaluating": "Evaluating…",
+      "gatePassed": "Gate {gate} passed.",
+      "gateFailed": "Gate {gate} did not pass.",
+      "g0Score": "G0 Score",
+      "g0NotComputed": "Not computed",
+      "g0NotComputedHint": "There is no evidence to score this opportunity on yet. The score is computed once a topic match, a success rate or organisation history is on file.",
+      "threshold": "Threshold: {min}/100",
+      "evidenceCoverage": "Evidence: {measured}/{total} criteria measured",
+      "decisionGo": "Pre-assessment: GO",
+      "decisionNoGo": "Pre-assessment: NO_GO",
+      "internalPreAssessment": "Internal pre-assessment — not an official score.",
+      "scoreReasons": "Score Reasons",
+      "intendedRole": "Intended Role",
+      "roleUnset": "Not set",
+      "tasksTemplateNote": "T-6 plan template. These steps are a template and are not linked to real tasks yet.",
+      "tab": {
+        "overview": "Overview",
+        "tasks": "T-6 Tasks",
+        "effort": "Effort Logging"
+      },
+      "taskStep": {
+        "T-6": "Read the work programme",
+        "T-5": "Identify partners",
+        "T-4": "Concept note draft"
+      },
+      "error": {
+        "TENANT_SCOPE_REQUIRED": "Your session is not attached to a workspace. Please sign in again.",
+        "OPPORTUNITY_NOT_FOUND": "This opportunity was not found in the database; the gate cannot be evaluated.",
+        "GATE_EVALUATION_FAILED": "The gate could not be evaluated. Please try again."
+      }
+    }
   },
   "Evidence": {
     "title": "Evidence Pack",
@@ -418,11 +452,119 @@
     "internalPreAssessment": "Internal pre-assessment",
     "internalPreAssessmentBody": "These scores are an internal quality check; they do not replace the official Commission evaluation.",
     "lensTitle": "Internal Pre-Assessment & Reviewer Simulation",
+    "moduleLabel": "Module 6 — Evaluator Lens",
+    "opportunityLabel": "Opportunity: <strong>{title}</strong>",
     "criteria": {
       "Innovation": "Innovation",
       "Feasibility": "Feasibility",
       "Impact": "Impact",
       "Communication": "Communication"
+    },
+    "metrics": {
+      "avgScore": "Average Predicted Score",
+      "outOf15": "/ 15.0",
+      "evaluatorCount": "Evaluator Count",
+      "evaluatorBreakdown": "({human} Human, {ai} AI)",
+      "g3GateStatus": "G3 Gate Status",
+      "g3Ready": "G3 Ready (Passed)",
+      "g3Incomplete": "Incomplete Evaluation",
+      "iaMultiplierLabel": "IA Impact Multiplier (1.5x)",
+      "iaActive": "Active (Impact ×1.5)",
+      "iaInactive": "Inactive (Standard)",
+      "iaToggleTitle": "Apply a 1.5x multiplier to the Impact score for an Innovation Action (IA)"
+    },
+    "tabs": {
+      "evaluations": "Evaluations & Score Cards",
+      "rea": "REA Common Pitfalls Check",
+      "reaBadge": "Checklist",
+      "calibration": "ESR Calibration"
+    },
+    "ai": {
+      "title": "AI Reviewer Simulation",
+      "subtitle": "Official Horizon Europe REA prompt",
+      "creditBadge": "{count} Credits",
+      "loading": "Evaluating (Running Analysis)...",
+      "startButton": "Start AI Evaluation",
+      "description": "Produces a detailed Excellence, Impact and Implementation assessment along with a weakness analysis."
+    },
+    "human": {
+      "title": "Add Human Expert Evaluation",
+      "excellenceLabel": "1. Excellence (0 - 5.0)",
+      "impactLabel": "2. Impact (0 - 5.0)",
+      "implementationLabel": "3. Implementation (0 - 5.0)",
+      "outOf5": "{value} / 5.0",
+      "strengthsLabel": "Strengths (one per line)",
+      "strengthsPlaceholder": "e.g. Has a clear TRL4→TRL7 roadmap.",
+      "weaknessesLabel": "Weaknesses & Critiques (one per line)",
+      "weaknessesPlaceholder": "e.g. WP3 budget breakdown is not detailed.",
+      "saving": "Saving...",
+      "saveButton": "Save Evaluation"
+    },
+    "feed": {
+      "title": "Existing Pre-Assessment Reports",
+      "hint": "At Least 2 Evaluations Recommended for the G3 Gate",
+      "emptyTitle": "No pre-assessment yet.",
+      "emptyBody": "Start an AI simulation from the left panel, or add an expert opinion.",
+      "aiReader": "AI Reader (EU Standard)",
+      "humanReader": "Human Expert Reader",
+      "today": "Today",
+      "totalScore": "Total: {total} / 15.0 {status}",
+      "aboveThreshold": "(Above Threshold)",
+      "belowThreshold": "(Below Threshold)",
+      "excellenceLabel": "1. Excellence",
+      "impactLabel": "2. Impact",
+      "impactMultiplierSuffix": "(1.5x)",
+      "implementationLabel": "3. Implementation",
+      "detectedStrengths": "Detected Strengths:",
+      "detectedWeaknesses": "Detected Weaknesses & Critical Gaps:"
+    },
+    "rea": {
+      "title": "REA (European Research Executive Agency) Common Pitfalls Check",
+      "description": "Check the 7 critical design flaws European Commission reviewers cite most often as grounds for rejection.",
+      "items": {
+        "kpi": {
+          "title": "Quantified KPIs and Target Metrics",
+          "desc": "Does section 2.1 give concrete impact-indicator milestones (e.g. 30% cost reduction, 500 patients tested)?"
+        },
+        "trl": {
+          "title": "TRL Roadmap and Technology Maturation",
+          "desc": "Are the starting and ending TRL clearly defined and backed by the Work Package activities?"
+        },
+        "gender": {
+          "title": "Gender Dimension and Ethics / Open Science",
+          "desc": "Does the research methodology state the gender dimension and a data-sharing protocol (FAIR data)?"
+        },
+        "dec": {
+          "title": "Dissemination & Exploitation Plan (DEC)",
+          "desc": "Are IP protection, licensing and a market entry strategy built into the work packages?"
+        },
+        "risk": {
+          "title": "Risk Management and Plan B",
+          "desc": "Is a \"Contingency Measures\" (Plan B) matrix written for critical milestone slippage?"
+        },
+        "effort": {
+          "title": "Person-Months and Budget Balance",
+          "desc": "Are work-package leads' person-month efforts proportional to the output (no over- or under-effort)?"
+        },
+        "openScience": {
+          "title": "Open Science and Data Management Plan (DMP)",
+          "desc": "Is the open-access publishing and data management scheme detailed?"
+        }
+      }
+    },
+    "calibration": {
+      "title": "Official ESR (Evaluation Summary Report) Calibration",
+      "description": "When the Commission's results are announced, enter the official ESR score to record how far your internal AI/human model's prediction was off.",
+      "selectLabel": "Select the Evaluation to Calibrate",
+      "aiOption": "🤖 AI Reader",
+      "humanOption": "👤 Human Reader",
+      "scoreSuffix": "(Score: {value})",
+      "officialScoreLabel": "Official Commission ESR Total Score (0 - 15.0)",
+      "submitButton": "Calculate and Save Calibration",
+      "resultLabel": "Calculated Calibration Variance:",
+      "deviationLabel": "Deviation: {value} points",
+      "goodMessage": "🎯 Great! Your internal evaluation model is very close to the official ESR score (≤ 0.5 point deviation).",
+      "driftMessage": "⚠️ Your model shows some drift from the official score. The calibration coefficient will be updated for future projects."
     },
     "form": {
       "title": "Evaluator Panel Scoring",
@@ -455,6 +597,17 @@
     "panel": {
       "title": "Reviewer Panel",
       "notSeated": "You are not seated as a reviewer on this evaluation."
+    }
+  },
+  "m9": {
+    "alerts": {
+      "dismiss": "Dismiss"
+    },
+    "generate": {
+      "partnerRequired": "Enter the partner or organisation name before you generate a brief.",
+      "failed": "The brief could not be generated. What you typed is still in the form — check your connection and try again. Tell your administrator if this keeps happening.",
+      "notSaved": "The brief was written but could not be saved, so it is not in the list. What you typed is still in the form — please try again.",
+      "retry": "Try again"
     }
   },
   "calls_region": {
@@ -515,5 +668,16 @@
     "privacyNote": "Alerts carry no tenant content — only a record reference and classification. Use the Feedback Triage screen to read the report itself.",
     "feedbackLink": "Feedback Triage",
     "highlighted": "Alert opened from a link"
+  },
+  "ModuleGate": {
+    "title": "This module is not available",
+    "askAdmin": "If you need access, talk to your workspace administrator or the Fabrika team.",
+    "reason": {
+      "MODULE_OFF": "The {module} module is turned off for your workspace.",
+      "DEV_INTERNAL_ONLY": "The {module} module is in development and is open to the Fabrika team only.",
+      "PILOT_MANAGERS_ONLY": "The {module} module is in pilot and is limited to workspace managers.",
+      "NO_TENANT": "Your session is not linked to a workspace.",
+      "NOT_AUTHENTICATED": "You need to sign in to see this page."
+    }
   }
 }

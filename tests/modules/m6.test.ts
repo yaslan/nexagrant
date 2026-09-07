@@ -29,10 +29,19 @@ const h = vi.hoisted(() => {
     }
   }
 
+  class ModuleAccessError extends Error {
+    readonly code = 'MODULE_ACCESS_DENIED';
+    constructor(readonly moduleId: string, readonly status: string, readonly reason: string) {
+      super(`Module ${moduleId} is not available (${status}/${reason}).`);
+      this.name = 'ModuleAccessError';
+    }
+  }
+
   return {
     scope,
     TenantScopeError,
-    state: { currentScope: scope as typeof scope | null },
+    ModuleAccessError,
+    state: { currentScope: scope as typeof scope | null, moduleOpen: true },
     opportunityFindFirst: vi.fn(),
     creditLedgerCreate: vi.fn(),
     evaluationCreate: vi.fn(),
@@ -45,6 +54,19 @@ const h = vi.hoisted(() => {
     generateText: vi.fn(),
   };
 });
+
+/**
+ * The module gate. `assertModuleAccess` is the first statement of every action in this
+ * file, and importing it for real pulls in next-auth (which does not resolve under the
+ * vitest node environment) — so it is replaced here, with `moduleOpen` steering it, and
+ * the closed case is asserted below.
+ */
+vi.mock('../../src/lib/modules/access', () => ({
+  ModuleAccessError: h.ModuleAccessError,
+  assertModuleAccess: vi.fn(async (moduleId: string) => {
+    if (!h.state.moduleOpen) throw new h.ModuleAccessError(moduleId, 'OFF', 'MODULE_OFF');
+  }),
+}));
 
 vi.mock('../../src/lib/tenant', () => ({
   TenantScopeError: h.TenantScopeError,
@@ -87,6 +109,7 @@ const AI_JSON = JSON.stringify({
 describe('M6 Evaluator Lens Module', () => {
   beforeEach(() => {
     h.state.currentScope = h.scope;
+    h.state.moduleOpen = true;
     vi.clearAllMocks();
     h.opportunityFindFirst.mockResolvedValue({ id: 'opp-1' });
     h.creditLedgerCreate.mockResolvedValue({ id: 'ledger-1' });
@@ -258,5 +281,20 @@ describe('M6 Evaluator Lens Module', () => {
 
     expect(h.evaluationFindFirst).not.toHaveBeenCalled();
     expect(h.scoreUpsert).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The gate that TASK-MTQW8188AWOAT added. `generateAiEvaluation` costs 3 credits;
+   * the refusal has to land before `generateText`, which itself writes AiUsageLog and
+   * debits the ledger as soon as it is called.
+   */
+  test('a closed module refuses the AI reader before any credit is spent', async () => {
+    h.state.moduleOpen = false;
+
+    await expect(generateAiEvaluation('opp-1')).rejects.toThrow(/Module M6 is not available/);
+
+    expect(h.generateText).not.toHaveBeenCalled();
+    expect(h.creditLedgerCreate).not.toHaveBeenCalled();
+    expect(h.evaluationCreate).not.toHaveBeenCalled();
   });
 });

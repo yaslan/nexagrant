@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
+import { moduleGate } from '@/lib/modules/guard';
 
 import { listPanelScores } from '@/modules/m6/server/actions';
 import { EvaluationDashboard } from '@/modules/m6/ui/EvaluationDashboard';
@@ -27,6 +28,11 @@ export default async function EvaluationPanelPage({
 }) {
   const { locale, id } = await params;
   const { tenantId, userId } = await requireTenantPage(locale);
+
+  // Module gate (M6). A tenant whose ModuleState says OFF/DEV/PILOT must not
+  // reach this page just because it can guess the URL.
+  const locked = await moduleGate('M6', locale);
+  if (locked) return locked;
 
   const proposal = await withTenant<SeatedProposal | null>(tenantId, (tx) =>
     tx.proposal.findFirst({

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canEnable, getDisableCascade } from '../../src/lib/modules/state-machine';
+import { canAccessStatus, canEnable, getDisableCascade } from '../../src/lib/modules/state-machine';
 import { ModuleId } from '../../src/lib/modules/types';
 
 describe('Module State Machine', () => {
@@ -62,4 +62,43 @@ describe('Module State Machine', () => {
       expect(cascade.length).toBe(2);
     });
   });
+
+  describe('canAccessStatus', () => {
+    const member = { role: 'MEMBER', isPlatformAdmin: false };
+    const owner = { role: 'TENANT_OWNER', isPlatformAdmin: false };
+    const manager = { role: 'PIPELINE_MANAGER', isPlatformAdmin: false };
+    const staff = { role: 'MEMBER', isPlatformAdmin: true };
+
+    it('ON is open to every member of the tenant', () => {
+      expect(canAccessStatus('ON', member).allowed).toBe(true);
+    });
+
+    it('OFF is closed to everyone, platform staff included', () => {
+      expect(canAccessStatus('OFF', member)).toEqual({ allowed: false, reason: 'MODULE_OFF' });
+      expect(canAccessStatus('OFF', owner).allowed).toBe(false);
+      expect(canAccessStatus('OFF', staff).allowed).toBe(false);
+    });
+
+    // The regression this gate was built for: a beta partner's own TENANT_OWNER used to
+    // pass the DEV check, so moving M9 to DEV hid it from nobody.
+    it('DEV is Fabrika staff only — a tenant owner is not an insider', () => {
+      expect(canAccessStatus('DEV', owner)).toEqual({
+        allowed: false,
+        reason: 'DEV_INTERNAL_ONLY',
+      });
+      expect(canAccessStatus('DEV', member).allowed).toBe(false);
+      expect(canAccessStatus('DEV', staff).allowed).toBe(true);
+    });
+
+    it('PILOT admits the tenant managers and staff, not plain members', () => {
+      expect(canAccessStatus('PILOT', manager).allowed).toBe(true);
+      expect(canAccessStatus('PILOT', owner).allowed).toBe(true);
+      expect(canAccessStatus('PILOT', staff).allowed).toBe(true);
+      expect(canAccessStatus('PILOT', member)).toEqual({
+        allowed: false,
+        reason: 'PILOT_MANAGERS_ONLY',
+      });
+    });
+  });
+
 });

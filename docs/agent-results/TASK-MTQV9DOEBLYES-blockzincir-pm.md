@@ -208,3 +208,19 @@ bırakmaktır.
   atanmalı.
 - Bu kart kendi DoD'unun bir maddesinde açıkça başarısız olduğu için `done` değil, board'da
   `review` durumuna alınacak (lidere/patrona bu bulgu iletilmeli).
+
+---
+
+## EK (2026-09-07, sonradan) — §4'teki kritik bulgu KAPATILDI
+
+Bu raporun §4'ünde tespit ettiğim iki kusur (`checkModuleAccess` hiçbir yerden çağrılmıyor;
+`DEV` dalı `role === 'TENANT_OWNER'` baktığı için beta ortağının kendi sahibini içeri alıyor)
+`TASK-MTQW8188AWOAT` kartında düzeltildi.
+
+- Kapı `moduleGate()` (sayfa) + `assertModuleAccess()` (server action) üzerinden M9 ve M6'ya bağlandı.
+- `DEV` artık yalnız `session.isPlatformAdmin` — karar ve gerekçe: `docs/adr/ADR-0001-module-state-access-gate.md`.
+- Bu raporun üretemediği "beta ortağı → erişim yok" kanıtı artık var:
+  `docs/agent-results/TASK-MTQW8188AWOAT-blockzincir-pm.md` §2.1 (A/B/C ekran görüntüleri) ve
+  §2.2 (kapalı modül 0 kredi harcıyor — server-action replay kanıtı).
+
+Bu dosyanın gövdesi 2026-09-07 sabahındaki durumu anlatır ve olduğu gibi bırakılmıştır.

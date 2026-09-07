@@ -27,10 +27,19 @@ const h = vi.hoisted(() => {
     }
   }
 
+  class ModuleAccessError extends Error {
+    readonly code = 'MODULE_ACCESS_DENIED';
+    constructor(readonly moduleId: string, readonly status: string, readonly reason: string) {
+      super(`Module ${moduleId} is not available (${status}/${reason}).`);
+      this.name = 'ModuleAccessError';
+    }
+  }
+
   return {
     scope,
     TenantScopeError,
-    state: { currentScope: scope as typeof scope | null },
+    ModuleAccessError,
+    state: { currentScope: scope as typeof scope | null, moduleOpen: true },
     meetingBriefFindFirst: vi.fn(),
     meetingBriefCreate: vi.fn(),
     meetingBriefUpdate: vi.fn(),
@@ -47,6 +56,19 @@ const {
   meetingBriefUpdate,
   creditLedgerCreate,
 } = h;
+
+/**
+ * The module gate. `assertModuleAccess` is the first statement of every action in this
+ * file, and importing it for real pulls in next-auth (which does not resolve under the
+ * vitest node environment) — so it is replaced here, with `moduleOpen` steering it, and
+ * the closed case is asserted below.
+ */
+vi.mock('../../src/lib/modules/access', () => ({
+  ModuleAccessError: h.ModuleAccessError,
+  assertModuleAccess: vi.fn(async (moduleId: string) => {
+    if (!h.state.moduleOpen) throw new h.ModuleAccessError(moduleId, 'OFF', 'MODULE_OFF');
+  }),
+}));
 
 vi.mock('../../src/lib/tenant', () => ({
   TenantScopeError: h.TenantScopeError,
@@ -82,6 +104,7 @@ vi.mock('../../src/lib/ai/llm', () => ({
 describe('M9 Meeting Briefs Module', () => {
   beforeEach(() => {
     state.currentScope = scope;
+    state.moduleOpen = true;
     vi.clearAllMocks();
     creditLedgerCreate.mockResolvedValue({ id: 'ledger-1' });
     meetingBriefFindFirst.mockResolvedValue(null);
@@ -173,5 +196,27 @@ describe('M9 Meeting Briefs Module', () => {
         callTopic: 'HORIZON-CL5-2026-D3-01',
       })
     ).rejects.toBeInstanceOf(TenantScopeError);
+  });
+
+  /**
+   * The gate that TASK-MTQW8188AWOAT added. A closed module has to refuse *before*
+   * `generateText`, which writes AiUsageLog and debits CreditLedger the moment it is
+   * reached — and this action debits a credit even when the LLM call fails, so a late
+   * check would have charged the tenant for a module it cannot use.
+   */
+  test('a closed module refuses the brief and writes no credit row', async () => {
+    state.moduleOpen = false;
+
+    await expect(
+      generateMeetingBrief({
+        interactionId: 'int-closed',
+        partnerName: 'Fraunhofer Institute',
+        callTopic: 'HORIZON-CL5-2026-D3-01',
+      })
+    ).rejects.toThrow(/Module M9 is not available/);
+
+    expect(creditLedgerCreate).not.toHaveBeenCalled();
+    expect(meetingBriefCreate).not.toHaveBeenCalled();
+    expect(meetingBriefUpdate).not.toHaveBeenCalled();
   });
 });

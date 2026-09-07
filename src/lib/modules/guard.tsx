@@ -1,0 +1,54 @@
+import React from 'react';
+import { getTranslations } from 'next-intl/server';
+
+import { checkModuleAccess } from '@/lib/modules/access';
+import { getManifest } from '@/lib/modules/registry';
+import type { ModuleId } from '@/lib/modules/types';
+
+/**
+ * Page-side module gate.
+ *
+ * Used as two lines at the top of a module's server component:
+ *
+ *     const locked = await moduleGate('M9', locale);
+ *     if (locked) return locked;
+ *
+ * so the decision lives in one place (`checkModuleAccess` → `canAccessStatus`) and a
+ * page only says *which* module it belongs to. Copying the rule into each page is what
+ * CLAUDE.md §3 forbids.
+ *
+ * A refused page renders an explanation rather than throwing: a closed module is a
+ * normal product state (this tenant is not in the pilot), not an error, and `notFound()`
+ * would tell the user their opportunity does not exist, which is untrue and confusing.
+ */
+export async function moduleGate(
+  moduleId: ModuleId,
+  locale: string,
+): Promise<React.ReactElement | null> {
+  const access = await checkModuleAccess(moduleId);
+  if (access.allowed) return null;
+
+  const t = await getTranslations({ locale, namespace: 'ModuleGate' });
+  const manifest = getManifest(moduleId);
+
+  return (
+    // A <section>, not a <main>: the workspace layout already renders one, and a
+    // nested <main> is invalid HTML and gives screen readers two landmarks.
+    <section
+      role="alert"
+      aria-live="polite"
+      className="max-w-2xl mx-auto px-4 py-16 text-center"
+    >
+      <p className="text-5xl mb-6" aria-hidden="true">
+        🔒
+      </p>
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+        {t('title')}
+      </h1>
+      <p className="mt-3 text-slate-600 dark:text-slate-400">
+        {t(`reason.${access.reason ?? 'MODULE_OFF'}`, { module: manifest?.name ?? moduleId })}
+      </p>
+      <p className="mt-6 text-sm text-slate-500 dark:text-slate-500">{t('askAdmin')}</p>
+    </section>
+  );
+}

@@ -92,7 +92,41 @@
     "newOpportunity": "Yeni Fırsat",
     "addToPipeline": "Pipeline'a Al",
     "stage": "Aşama",
-    "score": "Puan"
+    "score": "Puan",
+    "detail": {
+      "back": "Pipeline'a Geri Dön",
+      "evaluateGate": "{gate} Kapısını Değerlendir",
+      "evaluating": "Değerlendiriliyor…",
+      "gatePassed": "{gate} kapısı geçildi.",
+      "gateFailed": "{gate} kapısı geçilmedi.",
+      "g0Score": "G0 Puanı",
+      "g0NotComputed": "Hesaplanamadı",
+      "g0NotComputedHint": "Bu fırsat için henüz puanlanacak kanıt yok. Konu eşleşmesi, başarı oranı ve kurum geçmişi girildiğinde puan hesaplanır.",
+      "threshold": "Eşik: {min}/100",
+      "evidenceCoverage": "Kanıt: {measured}/{total} ölçüt ölçüldü",
+      "decisionGo": "Ön değerlendirme: GEÇ (GO)",
+      "decisionNoGo": "Ön değerlendirme: GEÇME (NO_GO)",
+      "internalPreAssessment": "İç ön değerlendirme — resmî puan değildir.",
+      "scoreReasons": "Puan Gerekçeleri",
+      "intendedRole": "Hedeflenen Rol",
+      "roleUnset": "Belirlenmedi",
+      "tasksTemplateNote": "T-6 plan şablonu. Bu adımlar bir şablondur; henüz gerçek görevlere bağlı değildir.",
+      "tab": {
+        "overview": "Genel Bakış",
+        "tasks": "T-6 Görevleri",
+        "effort": "Efor Kaydı"
+      },
+      "taskStep": {
+        "T-6": "Çalışma programını oku",
+        "T-5": "Ortakları belirle",
+        "T-4": "Konsept notu taslağı"
+      },
+      "error": {
+        "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Lütfen yeniden giriş yapın.",
+        "OPPORTUNITY_NOT_FOUND": "Bu fırsat veritabanında bulunamadı; kapı değerlendirilemez.",
+        "GATE_EVALUATION_FAILED": "Kapı değerlendirilemedi. Lütfen tekrar deneyin."
+      }
+    }
   },
   "Evidence": {
     "title": "Kanıt Çekmecesi",
@@ -418,11 +452,119 @@
     "internalPreAssessment": "İç ön değerlendirme",
     "internalPreAssessmentBody": "Bu puanlar şirket içi kalite kontrol içindir; resmî Komisyon değerlendirmesi yerine geçmez.",
     "lensTitle": "İç Ön Değerlendirme & Hakem Simülasyonu",
+    "moduleLabel": "Modül 6 — Evaluator Lens",
+    "opportunityLabel": "Fırsat: <strong>{title}</strong>",
     "criteria": {
       "Innovation": "Yenilikçilik",
       "Feasibility": "Uygulanabilirlik",
       "Impact": "Etki",
       "Communication": "İletişim"
+    },
+    "metrics": {
+      "avgScore": "Ortalama Tahmin Puanı",
+      "outOf15": "/ 15.0",
+      "evaluatorCount": "Değerlendirici Sayısı",
+      "evaluatorBreakdown": "({human} İnsan, {ai} YZ)",
+      "g3GateStatus": "G3 Kapısı Durumu",
+      "g3Ready": "G3 Hazır (Geçti)",
+      "g3Incomplete": "Eksik Değerlendirme",
+      "iaMultiplierLabel": "IA Etki Çarpanı (1.5x)",
+      "iaActive": "Aktif (Impact ×1.5)",
+      "iaInactive": "Pasif (Standart)",
+      "iaToggleTitle": "Innovation Action (IA) için Etki puanına 1.5 katsayısı uygula"
+    },
+    "tabs": {
+      "evaluations": "Değerlendirmeler & Puan Kartları",
+      "rea": "REA Sık Hatalar Kontrolü",
+      "reaBadge": "Checklist",
+      "calibration": "ESR Kalibrasyonu"
+    },
+    "ai": {
+      "title": "YZ Hakem Simülasyonu",
+      "subtitle": "Resmî Horizon Europe REA promptu",
+      "creditBadge": "{count} Kredi",
+      "loading": "YZ Değerlendiriyor (Analiz Yapılıyor)...",
+      "startButton": "Yapay Zeka Değerlendirmesi Başlat",
+      "description": "Excellence, Impact ve Implementation detaylı tespiti ve zayıf yön analizi üretir."
+    },
+    "human": {
+      "title": "İnsan Uzman Değerlendirmesi Ekle",
+      "excellenceLabel": "1. Excellence / Mükemmeliyet (0 - 5.0)",
+      "impactLabel": "2. Impact / Etki (0 - 5.0)",
+      "implementationLabel": "3. Implementation / Uygulama (0 - 5.0)",
+      "outOf5": "{value} / 5.0",
+      "strengthsLabel": "Güçlü Yönler (Her satıra bir tane)",
+      "strengthsPlaceholder": "Örn: Net TRL4->TRL7 yol haritası var.",
+      "weaknessesLabel": "Zayıf Yönler & Eleştiriler (Her satıra bir tane)",
+      "weaknessesPlaceholder": "Örn: WP3 bütçe dağılımı detaylandırılmamış.",
+      "saving": "Kaydediliyor...",
+      "saveButton": "Değerlendirmeyi Kaydet"
+    },
+    "feed": {
+      "title": "Mevcut Ön Değerlendirme Raporları",
+      "hint": "G3 Kapısı İçin En Az 2 Değerlendirme Önerilir",
+      "emptyTitle": "Henüz bir ön değerlendirme bulunmuyor.",
+      "emptyBody": "Sol panelden YZ simülasyonu başlatabilir veya uzman görüşü ekleyebilirsiniz.",
+      "aiReader": "Yapay Zeka Okuyucusu (EU Standard)",
+      "humanReader": "İnsan Uzman Okuyucu",
+      "today": "Bugün",
+      "totalScore": "Toplam: {total} / 15.0 {status}",
+      "aboveThreshold": "(Eşik Üstü)",
+      "belowThreshold": "(Eşik Altı)",
+      "excellenceLabel": "1. Excellence",
+      "impactLabel": "2. Impact",
+      "impactMultiplierSuffix": "(1.5x)",
+      "implementationLabel": "3. Implementation",
+      "detectedStrengths": "Tespit Edilen Güçlü Yönler:",
+      "detectedWeaknesses": "Tespit Edilen Zayıf Yönler & Kritik Eksikler:"
+    },
+    "rea": {
+      "title": "REA (European Research Executive Agency) Sık Hatalar Kontrolü",
+      "description": "Avrupa Komisyonu hakemlerinin elenme gerekçesi olarak en çok sunduğu 7 kritik tasarım hatasını kontrol edin.",
+      "items": {
+        "kpi": {
+          "title": "Sayısallaştırılmış KPI ve Hedef Metrikler",
+          "desc": "2.1 bölümünde etki göstergeleri için somut basamaklar verilmiş mi? (Örn: %30 maliyet düşüşü, 500 hasta testi)."
+        },
+        "trl": {
+          "title": "TRL Yol Haritası ve Teknoloji Olgunlaşması",
+          "desc": "Başlangıç TRL ve bitiş TRL açıkça tanımlanmış ve Work Package faaliyetleriyle desteklenmiş mi?"
+        },
+        "gender": {
+          "title": "Cinsiyet Boyutu ve Etik / Açık Bilim (Gender & Open Science)",
+          "desc": "Araştırma metodolojisinde cinsiyet boyutu ve veri paylaşım protokolü (FAIR data) belirtilmiş mi?"
+        },
+        "dec": {
+          "title": "Yaygınlaştırma & Sömürü Planı (DEC)",
+          "desc": "Fikri mülkiyet (IP) koruması, lisanslama ve pazar açılım stratejisi iş paketlerine yedirilmiş mi?"
+        },
+        "risk": {
+          "title": "Risk Yönetimi ve Alternatif B Planı",
+          "desc": "Kritik milestone aksamaları için \"Contingency Measures\" (B Planı) matrisi yazılmış mı?"
+        },
+        "effort": {
+          "title": "Kişi-Ay (Person-Months) ve Bütçe Dengesi",
+          "desc": "İş paketi liderlerinin kişi-ay eforları çıktı ile orantılı mı? (Aşırı veya yetersiz efor yok)."
+        },
+        "openScience": {
+          "title": "Açık Bilim ve Veri Yönetimi Planı (DMP)",
+          "desc": "Açık erişim yayıncılık ve veri yönetim şeması detaylandırılmış mı?"
+        }
+      }
+    },
+    "calibration": {
+      "title": "Resmî ESR (Evaluation Summary Report) Kalibrasyonu",
+      "description": "Komisyon sonuçları açıklandığında gelen resmî ESR puanını girerek iç YZ/İnsan modelinizin tahmin sapmasını kaydedin.",
+      "selectLabel": "Kalibre Edilecek Değerlendirmeyi Seçin",
+      "aiOption": "🤖 YZ Okuyucusu",
+      "humanOption": "👤 İnsan Okuyucu",
+      "scoreSuffix": "(Puan: {value})",
+      "officialScoreLabel": "Resmî Komisyon ESR Toplam Puanı (0 - 15.0)",
+      "submitButton": "Kalibrasyon Hesapla ve Kaydet",
+      "resultLabel": "Hesaplanan Kalibrasyon Sapması (Variance):",
+      "deviationLabel": "Sapma: {value} puan",
+      "goodMessage": "🎯 Harika! İç değerlendirme modeliniz resmî ESR puanına çok yakın (≤ 0.5 puan sapma).",
+      "driftMessage": "⚠️ Modeliniz resmî puandan biraz sapma gösteriyor. Gelecek projelerde kalibrasyon katsayısı güncellenecektir."
     },
     "form": {
       "title": "Değerlendirici Paneli Puanlaması",
@@ -455,6 +597,17 @@
     "panel": {
       "title": "Hakem Paneli",
       "notSeated": "Bu değerlendirmede hakem olarak görevli değilsiniz."
+    }
+  },
+  "m9": {
+    "alerts": {
+      "dismiss": "Kapat"
+    },
+    "generate": {
+      "partnerRequired": "Brief oluşturmak için önce görüşülecek ortak ya da kurum adını yazın.",
+      "failed": "Brief oluşturulamadı. Girdikleriniz formda duruyor — bağlantınızı kontrol edip yeniden deneyin. Sorun sürerse yöneticinize bildirin.",
+      "notSaved": "Brief hazırlandı ama kaydedilemedi, bu yüzden listeye eklenmedi. Girdikleriniz formda duruyor — yeniden deneyin.",
+      "retry": "Yeniden dene"
     }
   },
   "calls_region": {
@@ -515,5 +668,16 @@
     "privacyNote": "Uyarılar kiracı içeriği taşımaz; yalnız kayıt referansı ve sınıflandırma bilgisi tutulur. Geri bildirim metnini görmek için Geri Bildirim Triyajı ekranını kullanın.",
     "feedbackLink": "Geri Bildirim Triyajı",
     "highlighted": "Bağlantıyla açılan uyarı"
+  },
+  "ModuleGate": {
+    "title": "Bu modül şu anda kullanılamıyor",
+    "askAdmin": "Erişim gerekiyorsa çalışma alanı yöneticinizle ya da Fabrika ekibiyle görüşün.",
+    "reason": {
+      "MODULE_OFF": "{module} modülü kiracınızda kapalı.",
+      "DEV_INTERNAL_ONLY": "{module} modülü geliştirme aşamasında ve şu an yalnızca Fabrika ekibine açık.",
+      "PILOT_MANAGERS_ONLY": "{module} modülü pilot aşamasında; yalnızca çalışma alanı yöneticileri kullanabilir.",
+      "NO_TENANT": "Oturumunuz bir çalışma alanına bağlı değil.",
+      "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor."
+    }
   }
 }

@@ -2,6 +2,7 @@
 
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
+import { assertModuleAccess } from '@/lib/modules/access';
 import { generateText } from '@/lib/ai/llm';
 import { revalidatePath } from 'next/cache';
 import { syncMeetingBriefToCalendar } from '@/lib/calendar/sync';
@@ -31,6 +32,9 @@ export async function generateMeetingBrief({
   meetingScheduledAt?: Date;
   meetingScheduledTz?: string;
 }) {
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M9');
   const { tenantId, userId } = await requireTenantAction();
   const prompt = `Generate a 1-page pre-meeting briefing note for a Horizon Europe consortium discussion.
   Partner Name: ${partnerName}
@@ -163,6 +167,9 @@ export async function savePostMeetingNotes({
   actionItems: string[];
   nextMeetingDate?: string;
 }) {
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M9');
   const { tenantId } = await requireTenantAction();
   const formattedPostNotes = `\n\n---
 ### 📝 Toplantı Sonrası Notlar & Alınan Kararlar (${new Date().toLocaleDateString('tr-TR')})

@@ -56,6 +56,15 @@ export async function seed() {
     },
   });
 
+  // The M6 pages are behind the module gate (src/lib/modules/guard.tsx), so the
+  // fixture tenant has to be granted the module the same way a real tenant is —
+  // otherwise the test signs in and lands on the "module is closed" screen.
+  await prisma.moduleState.upsert({
+    where: { tenantId_moduleId: { tenantId: M6_E2E.tenantId, moduleId: 'M6' } },
+    update: { status: 'ON' },
+    create: { tenantId: M6_E2E.tenantId, moduleId: 'M6', status: 'ON', changedBy: 'seed-m6-e2e' },
+  });
+
   await prisma.opportunity.upsert({
     where: { id: M6_E2E.opportunityId },
     update: {},
@@ -141,6 +150,7 @@ export async function rollback() {
   await prisma.evaluation.deleteMany({ where: { id: M6_E2E.evaluationId } });
   await prisma.proposal.deleteMany({ where: { id: M6_E2E.proposalId } });
   await prisma.opportunity.deleteMany({ where: { id: M6_E2E.opportunityId } });
+  await prisma.moduleState.deleteMany({ where: { tenantId: M6_E2E.tenantId } });
   await prisma.membership.deleteMany({ where: { userId: M6_E2E.userId, tenantId: M6_E2E.tenantId } });
   await prisma.user.deleteMany({ where: { id: M6_E2E.userId } });
   await prisma.workspace.deleteMany({ where: { id: M6_E2E.workspaceId } });

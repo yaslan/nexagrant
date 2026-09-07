@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
+import { moduleGate } from '@/lib/modules/guard';
 
 import { toEvaluationNotes } from '@/modules/m6/types';
 
@@ -46,6 +47,11 @@ export default async function EvaluationsPage({
 }) {
   const { locale, id } = await params;
   const { tenantId } = await requireTenantPage(locale);
+
+  // Module gate (M6). A tenant whose ModuleState says OFF/DEV/PILOT must not
+  // reach this page just because it can guess the URL.
+  const locked = await moduleGate('M6', locale);
+  if (locked) return locked;
 
   // Tenant-scoped lookup: findUnique by a guessable id would cross tenants.
   const opp = await withTenant<OpportunityWithEvaluations | null>(tenantId, (tx) =>
