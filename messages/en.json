@@ -927,6 +927,24 @@
     "unnamedUser": "Unnamed user",
     "noRole": "No role assigned"
   },
+  "DocumentExport": {
+    "signatoryBoxTitle": "Coordinator / authorised signature",
+    "approverBoxTitle": "Consortium partner / official approval",
+    "nameLabel": "Name",
+    "titleLabel": "Title",
+    "orgLabel": "Organisation",
+    "signatoryUnassigned": "No signatory assigned",
+    "signatoryUnassignedHint": "No authorised signatory has been assigned to this document. The signature area is filled in once a signatory is recorded.",
+    "signed": "✓ Digitally signed",
+    "awaitingSignature": "⏳ Awaiting signature",
+    "approved": "✓ Approved",
+    "awaitingApproval": "⏳ Awaiting approval",
+    "organizationUnassigned": "Organisation not specified",
+    "callUnspecified": "Call not specified"
+  },
+  "PartBEditor": {
+    "noRevisions": "No saved revision for this section yet."
+  },
   "callDetails": {
     "backToCalls": "Back to Calls",
     "addButton": "Add to Pipeline",

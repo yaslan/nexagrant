@@ -40,6 +40,47 @@ import {
 } from '../server/actions';
 import { errorMessage } from '@/lib/errors';
 import { useNow } from '@/lib/hooks/use-now';
+import { useOptionalSession } from '@/lib/hooks/use-optional-session';
+import { displayUserName } from '@/lib/user-display';
+import { useTranslations } from 'next-intl';
+
+/**
+ * The signed-in user, from the session record.
+ *
+ * Nothing under `src/app` renders a `<SessionProvider>`, so `useOptionalSession()` alone is
+ * always `null` inside the workspace tree and every author would be labelled "unnamed user".
+ * NextAuth's own `/api/auth/session` route returns exactly the record a provider would have
+ * put in context, so it is fetched directly when the context is empty. Either way the
+ * identity comes from the session — never from a constant in this file.
+ */
+function useSessionUser(): SessionUser | null {
+  const contextUser = useOptionalSession()?.user ?? null;
+  const [fetchedUser, setFetchedUser] = useState<SessionUser | null>(null);
+
+  useEffect(() => {
+    if (contextUser) return;
+    let cancelled = false;
+    fetch('/api/auth/session')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((session: { user?: SessionUser } | null) => {
+        if (!cancelled && session?.user) setFetchedUser(session.user);
+      })
+      .catch(() => {
+        // A failed lookup leaves the identity unknown, which the UI states plainly.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [contextUser]);
+
+  return contextUser ?? fetchedUser;
+}
+
+interface SessionUser {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+}
 
 /** A section lock the server hands out is honoured for this long, then treated as abandoned. */
 const LOCK_TTL_SECONDS = 60;
@@ -55,50 +96,6 @@ interface PartBCollaborativeEditorProps {
   initialComments?: SectionCommentItem[];
 }
 
-/**
- * Seed rows for a part that has no comments yet. Built per mount so the
- * timestamps read as "an hour ago" rather than a fixed date, and kept out of
- * the component body because `Date.now()` may not run during render.
- */
-function demoComments(): SectionCommentItem[] {
-  return [
-    {
-      id: 'cmt-1',
-      sectionKey: '1.1_objectives',
-      authorName: 'Prof. Klaus Müller',
-      authorOrg: 'Fraunhofer Institute',
-      timestamp: new Date(Date.now() - 3600000).toISOString(),
-      text: 'SO2 hedefinde AI model doğruluğu %99.2 olarak belirtilmiş. Bu metriği test senaryolarıyla detaylandırmalıyız.',
-      resolved: false,
-    },
-    {
-      id: 'cmt-2',
-      sectionKey: '1.2_methodology',
-      authorName: 'Dr. Sofia Rossi',
-      authorOrg: 'Politecnico di Milano',
-      timestamp: new Date(Date.now() - 7200000).toISOString(),
-      text: 'Açık bilim bölümünde Zenodo ve CC-BY lisanslama taahhüdü çok net, teşekkürler.',
-      resolved: true,
-    },
-  ];
-}
-
-/** Seed revision for a part with no history yet. See {@link demoComments}. */
-function demoRevisions(content: string): SectionRevisionItem[] {
-  return [
-    {
-      id: 'rev-1',
-      sectionKey: '1.1_objectives',
-      authorName: 'Dr. Mehmet Yılmaz',
-      authorOrg: 'Demo SME Consultancy',
-      timestamp: new Date(Date.now() - 1800000).toISOString(),
-      wordCount: 172,
-      summary: 'SMART hedefler ve TRL hedefleri eklendi',
-      content,
-    },
-  ];
-}
-
 export function PartBCollaborativeEditor({
   partId,
   opportunityTitle,
@@ -107,9 +104,24 @@ export function PartBCollaborativeEditor({
   initialRevisions = [],
   initialComments = [],
 }: PartBCollaborativeEditorProps) {
-  const currentUserId = 'usr-me';
-  const currentUserName = 'Dr. Mehmet Yılmaz';
-  const currentUserOrg = 'FonBridge Ar-Ge & Konsorsiyum';
+  // Who is actually editing, from the session — never a hard-coded person. Locks, revisions,
+  // comments and presence are all attributed with these three values, so the old
+  // `'usr-me' / 'Dr. Mehmet Yılmaz'` constants signed every tenant's saved revision history
+  // with the same invented author. `displayUserName` is the shared honest-identity fallback
+  // (real name -> e-mail local part -> translated "unnamed user"); there is no such fallback
+  // for the organisation, so an unknown one is labelled as unknown.
+  const sessionUser = useSessionUser();
+  const tIdentity = useTranslations('UserIdentity');
+  const tEditor = useTranslations('PartBEditor');
+  const currentUserId = sessionUser?.id || sessionUser?.email || '';
+  const currentUserName = displayUserName(
+    sessionUser?.name,
+    sessionUser?.email,
+    tIdentity('unnamedUser')
+  );
+  // The session carries no organisation. An empty string means "not known", and every place
+  // that renders an author's organisation omits it rather than printing a stand-in.
+  const currentUserOrg = '';
 
   const [sections, setSections] = useState<PartBSectionItem[]>(
     initialSections && initialSections.length > 0 ? initialSections : DEFAULT_PART_B_SECTIONS
@@ -147,59 +159,46 @@ export function PartBCollaborativeEditor({
 
   const [activeDrawer, setActiveDrawer] = useState<'COMMENTS' | 'HISTORY' | 'AI' | null>(null);
 
-  const [comments, setComments] = useState<SectionCommentItem[]>(() =>
-    initialComments.length > 0 ? initialComments : demoComments()
-  );
+  // Stored rows only. A part with no review history used to be seeded with comments from
+  // "Prof. Klaus Müller" and a revision by "Dr. Mehmet Yılmaz" — invented collaborators the
+  // user cannot tell apart from their own consortium. An empty section now reads as empty.
+  const [comments, setComments] = useState<SectionCommentItem[]>(initialComments);
   const [newCommentText, setNewCommentText] = useState('');
 
-  const [revisions, setRevisions] = useState<SectionRevisionItem[]>(() =>
-    initialRevisions.length > 0 ? initialRevisions : demoRevisions(activeSection.content)
-  );
+  const [revisions, setRevisions] = useState<SectionRevisionItem[]>(initialRevisions);
 
-  const [presenceList, setPresenceList] = useState<CollaboratorPresence[]>([
-    {
-      userId: 'usr-me',
-      name: currentUserName,
-      org: currentUserOrg,
-      color: '#2563EB',
-      activeSection: '1.1_objectives',
-      lastSeenAt: new Date().toISOString(),
-    },
-    {
-      userId: 'usr-klaus',
-      name: 'Prof. Klaus Müller',
-      org: 'Fraunhofer Institute (DE)',
-      color: '#059669',
-      activeSection: '1.2_methodology',
-      lastSeenAt: new Date().toISOString(),
-    },
-    {
-      userId: 'usr-sofia',
-      name: 'Dr. Sofia Rossi',
-      org: 'Politecnico di Milano (IT)',
-      color: '#7C3AED',
-      activeSection: '2.1_pathways',
-      lastSeenAt: new Date().toISOString(),
-    },
-  ]);
+  // Starts with nobody: the bar used to open showing "Prof. Klaus Müller" and "Dr. Sofia
+  // Rossi" as live co-authors of every part, in every tenant. `updatePresenceHeartbeat`
+  // already returns the real, de-staled presence rows — the heartbeat below now keeps them.
+  const [presenceList, setPresenceList] = useState<CollaboratorPresence[]>([]);
 
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [aiPromptNotes, setAiPromptNotes] = useState('');
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    // Nothing is announced until the session says who is here: a heartbeat under an empty id
+    // would put an anonymous row in every part's presence list.
+    if (!currentUserId) return;
+    let cancelled = false;
+    const beat = async () => {
       try {
-        await updatePresenceHeartbeat(
+        const live = await updatePresenceHeartbeat(
           partId,
           currentUserId,
           currentUserName,
           currentUserOrg,
           activeSectionKey
         );
+        if (!cancelled && Array.isArray(live)) setPresenceList(live);
       } catch {}
-    }, 20000);
-    return () => clearInterval(interval);
-  }, [partId, activeSectionKey]);
+    };
+    void beat();
+    const interval = setInterval(() => void beat(), 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [partId, activeSectionKey, currentUserId, currentUserName, currentUserOrg]);
 
   const calculateWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
   const currentSectionWords = calculateWords(editorText);
@@ -402,9 +401,11 @@ export function PartBCollaborativeEditor({
                 className="w-2 h-2 rounded-full ring-2 ring-slate-900"
               />
               <span className="font-semibold text-slate-100">{user.name}</span>
-              <span className="text-[10px] text-muted font-mono hidden sm:inline">
-                ({user.org.split(' ')[0]})
-              </span>
+              {user.org ? (
+                <span className="text-[10px] text-muted font-mono hidden sm:inline max-w-32 truncate">
+                  ({user.org})
+                </span>
+              ) : null}
               <span className="bg-slate-700/80 text-[10px] font-mono text-blue-300 px-1.5 py-0.5 rounded">
                 {user.activeSection.split('_')[0]}
               </span>
@@ -896,9 +897,11 @@ export function PartBCollaborativeEditor({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-ink">{cmt.authorName}</span>
-                      <span className="text-[11px] text-muted font-mono">
-                        ({cmt.authorOrg})
-                      </span>
+                      {cmt.authorOrg ? (
+                        <span className="text-[11px] text-muted font-mono">
+                          ({cmt.authorOrg})
+                        </span>
+                      ) : null}
                     </div>
                     <span className="text-[10px] text-muted font-mono">
                       {new Date(cmt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -946,6 +949,9 @@ export function PartBCollaborativeEditor({
           </div>
 
           <div className="space-y-3">
+            {activeSectionRevisions.length === 0 && (
+              <p className="text-xs text-muted py-4 text-center">{tEditor('noRevisions')}</p>
+            )}
             {activeSectionRevisions.map((rev, idx) => (
               <div
                 key={rev.id || idx}
@@ -954,9 +960,11 @@ export function PartBCollaborativeEditor({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-ink">{rev.authorName}</span>
-                    <span className="text-[10px] text-muted font-mono">
-                      ({rev.authorOrg})
-                    </span>
+                    {rev.authorOrg ? (
+                      <span className="text-[10px] text-muted font-mono">
+                        ({rev.authorOrg})
+                      </span>
+                    ) : null}
                     <span className="bg-purple-100 text-purple-800 text-[10px] font-mono px-1.5 py-0.5 rounded">
                       {rev.wordCount} Kelime
                     </span>

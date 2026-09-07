@@ -927,6 +927,24 @@
     "unnamedUser": "İsimsiz kullanıcı",
     "noRole": "Rol atanmamış"
   },
+  "DocumentExport": {
+    "signatoryBoxTitle": "Koordinatör / Yetkili İmza",
+    "approverBoxTitle": "Konsorsiyum Ortağı / Resmî Onay",
+    "nameLabel": "İsim",
+    "titleLabel": "Unvan",
+    "orgLabel": "Kurum",
+    "signatoryUnassigned": "İmzalayan atanmadı",
+    "signatoryUnassignedHint": "Bu belgeye yetkili bir imzacı atanmadı. İmza alanı, imzalayan kayıt olarak atandığında doldurulur.",
+    "signed": "✓ Dijital İmzalandı",
+    "awaitingSignature": "⏳ İmza Bekliyor",
+    "approved": "✓ Onaylandı",
+    "awaitingApproval": "⏳ Onay Bekliyor",
+    "organizationUnassigned": "Kuruluş belirtilmedi",
+    "callUnspecified": "Çağrı belirtilmedi"
+  },
+  "PartBEditor": {
+    "noRevisions": "Bu bölüm için henüz kayıtlı bir sürüm yok."
+  },
   "callDetails": {
     "backToCalls": "Çağrılara Geri Dön",
     "addButton": "Fırsatlara / Pipet'e Ekle",
