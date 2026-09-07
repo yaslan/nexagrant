@@ -1,0 +1,16 @@
+{
+  "settings": {
+    "calendar": {
+      "title": "Calendar Connections",
+      "description": "Manage your calendar integrations with Google Calendar, Microsoft Outlook, or .ics file exports. Your meeting briefs will automatically synchronize to your selected calendar application.",
+      "connected": "Connected",
+      "notConnected": "Not Connected",
+      "lastSync": "Last synced: {date}",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "confirmDisconnect": "Are you sure you want to disconnect this calendar? Meeting briefs will no longer be automatically synchronized to your calendar.",
+      "infoTitle": "Information",
+      "infoText": "Calendar connections will automatically add your created meeting briefs to your selected calendar application. Each synchronization is isolated by tenant and user."
+    }
+  }
+}

@@ -35,6 +35,7 @@ export type WorkspaceRouteKey =
   | 'settingsModules'
   | 'settingsBilling'
   | 'settingsApiKeys'
+  | 'settingsCalendar'
   | 'settingsGates'
   | 'settingsMembers'
   | 'settingsSso';
@@ -119,6 +120,8 @@ export function getWorkspaceRoute(
       return isTr ? `/${locale}/${workspace}/ayarlar/faturalama` : `/${locale}/${workspace}/settings/billing`;
     case 'settingsApiKeys':
       return isTr ? `/${locale}/${workspace}/ayarlar/api-anahtarlari` : `/${locale}/${workspace}/settings/api-keys`;
+    case 'settingsCalendar':
+      return isTr ? `/${locale}/${workspace}/ayarlar/takvim` : `/${locale}/${workspace}/settings/calendar`;
     case 'settingsGates':
       return isTr ? `/${locale}/${workspace}/ayarlar/kapilar` : `/${locale}/${workspace}/settings/gates`;
     case 'settingsMembers':

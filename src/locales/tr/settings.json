@@ -1,0 +1,16 @@
+{
+  "settings": {
+    "calendar": {
+      "title": "Takvim Bağlantıları",
+      "description": "Google Calendar, Microsoft Outlook veya .ics dosyası üzerinden takvim entegrasyonlarını yönetin. Meeting briefiniz otomatik olarak seçili takvim uygulamanıza senkronize edilecektir.",
+      "connected": "Bağlı",
+      "notConnected": "Bağlı Değil",
+      "lastSync": "Son senkronizasyon: {date}",
+      "connect": "Bağla",
+      "disconnect": "Bağlantıyı Kes",
+      "confirmDisconnect": "Bu takvim bağlantısını kaldırmak istediğinize emin misiniz? Artık meeting briefs otomatik olarak takvime senkronize edilmeyecektir.",
+      "infoTitle": "Bilgi",
+      "infoText": "Takvim bağlantıları, oluşturduğunuz meeting briefs'leri seçili takvim uygulamanıza otomatik olarak ekleyecektir. Her senkronizasyon kiracı ve kullanıcı bazında izole edilir."
+    }
+  }
+}
