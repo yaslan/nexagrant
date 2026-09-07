@@ -2,14 +2,20 @@
 
 import React, { useState, useTransition } from 'react';
 import { updateRelationship, addInteraction } from '../actions';
+import type { InteractionRow, RelationshipRow } from '@/types/db-rows';
 
-// Local types matching Prisma schema
-type Relationship = { id: string; tenantId: string; organizationId: string | null; partnerOrgId: string | null; status: string; warmth: string; nextStep: string | null; notes: string | null; lastContactAt: Date | null; remindAt: Date | null; createdAt: Date; updatedAt: Date; kind: string; counterpartName: string | null; counterpartEmail: string | null; };
-type Interaction = { id: string; tenantId: string; relationshipId: string; kind: string; at: Date; summary: string; createdBy: string | null; createdAt: Date };
-
+/**
+ * The row shapes come from `@/types/db-rows`, which is kept against
+ * prisma/schema.prisma. The hand-written local types they replace claimed
+ * `Relationship.status`, `.remindAt`, `.createdAt` and `Interaction.createdAt`
+ * — none of which exist as columns — and typed `Interaction.summary` as
+ * non-null when the column is `String?`. Nothing here read those fields, so
+ * they rendered nothing; they were a standing invitation to add a `rel.status`
+ * badge that would always be `undefined`.
+ */
 interface Props {
-  relationship: Relationship;
-  interactions: Interaction[];
+  relationship: RelationshipRow;
+  interactions: InteractionRow[];
 }
 
 export default function RelationshipDetail({ relationship: rel, interactions: initInteractions }: Props) {
@@ -45,7 +51,7 @@ export default function RelationshipDetail({ relationship: rel, interactions: in
     <div className="max-w-5xl mx-auto py-8 px-4">
       {/* Header */}
       <div className="bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 shadow-xs">
-        <h1 className="text-2xl font-bold font-heading text-ink mb-1">
+        <h1 data-testid="relationship-title" className="text-2xl font-bold font-heading text-ink mb-1">
           {rel.counterpartName || rel.organizationId || 'Unnamed'}
         </h1>
         <div className="flex gap-2 text-xs text-muted mb-6">

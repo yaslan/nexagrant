@@ -53,6 +53,12 @@ async function main() {
         return newUser;
       });
 
+      // `user` is `User | null` here — the assignment above does not narrow the
+      // declared type, and prisma-override.d.ts hid the TS18047. Reading `.id`
+      // off null would abort the seed with a TypeError instead of a message
+      // that says what went wrong.
+      if (!user) throw new Error('Superadmin transaction returned no user row.');
+
       console.log(`✓ Superadmin user successfully created in database with ID: ${user.id}`);
     } else {
       await prisma.user.update({

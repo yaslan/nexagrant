@@ -1,9 +1,9 @@
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { withTenant } from '@/lib/db';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 import type { RelationshipRow } from '@/types/db-rows';
+import { requireTenantPage } from '@/lib/tenant';
 import { moduleGate } from '@/lib/modules/guard';
 
 /** Whole days between `d` and now, or null when there is no date. */
@@ -20,16 +20,39 @@ export default async function RelationshipsPage({
   const { locale, workspace } = await params;
   const locked = await moduleGate('M4', locale);
   if (locked) return locked;
-  const session = await auth();
-  const tenantId = session?.tenantId;
+
+  // `where: tenantId ? { tenantId } : {}` — the same TASK-MTRKV9JGY7OQY bug as
+  // the detail page, one degree worse: the empty object is not a narrower query,
+  // it is *no filter*, so a session without a tenant listed every relationship
+  // in the database. `requireTenantPage` cannot return without a tenant, so the
+  // conditional has nothing left to express and is gone.
+  const { tenantId } = await requireTenantPage(locale);
 
   let relationships: RelationshipRow[] = [];
   try {
-    relationships = await prisma.relationship.findMany({
-      where: tenantId ? { tenantId } : {},
-      orderBy: { updatedAt: 'desc' },
-    });
+    relationships = await withTenant<RelationshipRow[]>(tenantId, (tx) =>
+      tx.relationship.findMany({
+        where: { tenantId },
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          organizationId: true,
+          partnerOrgId: true,
+          kind: true,
+          counterpartName: true,
+          counterpartEmail: true,
+          warmth: true,
+          lastContactAt: true,
+          nextStep: true,
+          nextStepDue: true,
+          notes: true,
+          updatedAt: true,
+        },
+      })
+    );
   } catch (e) {
+    // A database outage renders the empty state, as before. It never renders
+    // somebody else's rows, which is what the removed fallback could do.
     console.warn(`[Relationships] DB query bypassed: ${errorMessage(e)}`);
   }
 

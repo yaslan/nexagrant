@@ -230,6 +230,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
           }
 
+          // `user` is `User | null` all the way down this branch: the lookup can
+          // miss and the create path is an assignment TypeScript does not carry
+          // through the if/else. src/types/prisma-override.d.ts hid the four
+          // TS18047 "possibly null" errors, so the only thing standing between a
+          // null here and `Cannot read properties of null (reading 'id')` inside
+          // `authorize` was luck. A sign-in with no user row is refused, not
+          // dereferenced — returning null is NextAuth's "these credentials are
+          // not valid", which is the truthful answer.
+          if (!user) {
+            console.error('[Auth.authorize] sign-in refused: no user row after lookup/create');
+            return null;
+          }
+
           return {
             id: user.id,
             email: user.email,
