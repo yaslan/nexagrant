@@ -462,3 +462,22 @@ fırsat `cmtqv7fp9000a0ixkhgiagykm` ve `GateDecision` satırları dev DB'den **s
       diğer ikisi F5 nedeniyle erişilemez rotada. Ölçüm §4'te.
 - [x] Sayılar SQL ile karşılaştırıldı — §2.3, dört KPI + pano kartları birebir
 - [x] Bulgular etiketli (P0×4, P1×5, P2×7) + 12 kart önerisi, rapor dev'e commit edildi
+
+---
+
+## 9. Açılan kartlar (2026-09-07)
+
+| Kart | Öncelik | Kapsam | Kanıt eki |
+|---|---|---|---|
+| TASK-MTQW4FY5E9UBK | P0 | Detay sayfası sabit 92/100 + `alert()` kapı tiyatrosu (F1 + F2) | ekran 05, 07 |
+| TASK-MTQW5BVFW6CMT | P0 | Konsorsiyum `DEMO_OPPORTUNITIES` fallback'i → 404 (F3, F15) | ekran 06 |
+| TASK-MTQW6CI3N76EF | P0 | Çift kart + hayalet kart: bellek mağazası koşulsuz yazıyor (F4) | ekran 02 |
+| TASK-MTQW76AKXW8OP | P1 | `/evaluations/panel` sonsuz iskelet; rozetin 2 yüzeyi erişilemez (F5) | ekran 04 |
+| TASK-MTQW8188AWOAT | P1 | `requireModule` hiçbir rotada uygulanmıyor; M6 kapalıyken kredi harcanabiliyor (F6) | ekran 03 |
+| TASK-MTQW90XSQ1SU1 | P1 | Kanıt tabloları boş → azami puan 18/100, kapı geçilemez; VERİ işi (F7) | §2.2 |
+| TASK-MTQWA2OAQFHRN | P1 | Rozet etiketi/kapsamı + Evaluator Lens `en` locale sabit Türkçe (F8, F9) | ekran 08 |
+| TASK-MTQWBAJ2T5XSV | P2 | Temizlik paketi: yokluk≠sıfır, ölü pano dosyası, uydurma atananlar, artık kayıtlar (F10–F16) | §3 |
+
+Sekiz kartın sekizi de S10, proje `cekirdek`. F17 (isabet oranı paydasının `g0Score IS NOT NULL`
+sayması) ayrı kart açılmadı — bugün ısırmıyor, TASK-MTQW90XSQ1SU1 kanıt seed'i indikten sonra
+yeniden ölçülmeli.
