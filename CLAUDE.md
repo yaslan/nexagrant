@@ -13,11 +13,12 @@ pnpm install
 pnpm dev                 # Next.js :3000
 pnpm db:migrate          # prisma migrate dev
 pnpm db:seed             # prisma/seed.ts (planlar, modül kataloğu, demo kiracı)
-pnpm db:rls              # prisma/rls.sql uygula
+pnpm db:rls              # prisma/rls.sql uygula (psql gerektirmez)
 pnpm test                # vitest
 pnpm test:e2e            # playwright
 pnpm lint && pnpm typecheck
-pnpm gate                # lint + typecheck + test (kapinin tamami)
+pnpm gate                # lint + typecheck + test + rls:check + rls:verify (kapinin tamami)
+pnpm rls:verify          # DB gercekten kiraci izolasyonu uyguluyor mu (canli olcum)
 pnpm hooks:install       # githooks/ dizinini etkinlestir (pre-commit + pre-push)
 pnpm worker:dev          # workers/ (python -m uvicorn app:app --reload)
 pnpm jobs:k1             # K1 çağrı toplama işini elle tetikle
