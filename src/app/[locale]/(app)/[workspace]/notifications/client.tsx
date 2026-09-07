@@ -144,6 +144,22 @@ export default function NotificationsClient({
 
       {/* Notifications List */}
       <div className="bg-surface border border-border rounded-xl shadow-xs divide-y divide-border overflow-hidden">
+        {/* No notification store exists yet (see page.tsx). An empty feed is the
+            honest state; it used to be filled with four invented items. */}
+        {notifications.length === 0 && (
+          <div className="p-12 text-center space-y-2">
+            <Bell className="w-6 h-6 text-muted mx-auto" />
+            <p className="font-semibold text-sm text-ink">
+              {isTr ? 'Henüz bildiriminiz yok.' : 'You have no notifications yet.'}
+            </p>
+            <p className="text-xs text-muted">
+              {isTr
+                ? 'Eşleşmeler, kanıt belgesi uyarıları ve kredi hareketleri burada görünecek.'
+                : 'Match findings, evidence alerts and credit activity will appear here.'}
+            </p>
+          </div>
+        )}
+
         {notifications.map((n) => (
           <div
             key={n.id}

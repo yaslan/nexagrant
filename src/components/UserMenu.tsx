@@ -145,29 +145,23 @@ export default function UserMenu({
   const isTr = locale === 'tr';
 
   /**
-   * Memoised deliberately. This was a bare array literal, so it was a new array on every
-   * render; `syncNotifications` depends on it, and the effect below depends on
-   * `syncNotifications`. Every render therefore produced a new callback, re-ran the
-   * effect, and `setNotificationsList` rendered again — an unbounded render loop
-   * ("Maximum update depth exceeded") that ran on every page carrying the app shell and
-   * pegged the main thread, so a route whose RSC payload was still streaming stayed on
-   * the workspace loading skeleton. `isTr` is the only real input.
+   * TASK-MTQYXISOPUJ53 — fabricated fallbacks.
+   *
+   * This held three notifications written in code — a "%92" call match, an SME
+   * declaration "expiring in 15 days", "500 AI credits added to your account" —
+   * and it is mounted in the app shell, so every tenant saw them on every page,
+   * with a pulsing unread dot on the bell. prisma/schema.prisma has no
+   * notification model, so none of it was ever a fallback for a query: there is
+   * nothing to query yet. Two of the three are claims a user would act on.
+   *
+   * Empty until a notification store exists. Still memoised: it feeds
+   * `syncNotifications`, whose effect depends on it, and a fresh array literal
+   * per render used to produce an unbounded render loop ("Maximum update depth
+   * exceeded") across every page carrying the shell.
    */
-  const baseNotifications = useMemo(
-    () =>
-      isTr
-        ? [
-            { id: '1', title: 'Yeni Çağrı Eşleşmesi', desc: 'HORIZON-CL5-2026-D3 %92 uyumlu', time: '10 dk önce', unread: true },
-            { id: '2', title: 'Kanıt Belgesi Uyarısı', desc: 'SME Beyannamesi 15 gün içinde doluyor', time: '2 saat önce', unread: true },
-            { id: '3', title: 'Kredi Yüklemesi', desc: 'Aylık 500 AI Kredisi hesabınıza tanımlandı', time: '1 gün önce', unread: false },
-          ]
-        : [
-            { id: '1', title: 'New Call Match', desc: 'HORIZON-CL5-2026-D3 92% match', time: '10m ago', unread: true },
-            { id: '2', title: 'Evidence Vault Alert', desc: 'SME Declaration expires in 15 days', time: '2h ago', unread: true },
-            { id: '3', title: 'Credits Allocated', desc: 'Monthly 500 AI Credits added to account', time: '1d ago', unread: false },
-          ],
-    [isTr],
-  );
+  const baseNotifications = useMemo<
+    Array<{ id: string; title: string; desc: string; time: string; unread: boolean }>
+  >(() => [], []);
 
   const storageKey = `fonbridge_read_notifs_${effectiveUserEmail || 'guest'}`;
 
@@ -291,6 +285,12 @@ export default function UserMenu({
             </div>
 
             <div className="divide-y divide-border max-h-72 overflow-y-auto">
+              {notificationsList.length === 0 && (
+                <p className="p-4 text-xs text-muted text-center">
+                  {isTr ? 'Henüz bildiriminiz yok.' : 'You have no notifications yet.'}
+                </p>
+              )}
+
               {notificationsList.map((n) => (
                 <div
                   key={n.id}

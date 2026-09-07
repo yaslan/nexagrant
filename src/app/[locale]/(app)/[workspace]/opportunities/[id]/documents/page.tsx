@@ -2,68 +2,46 @@ import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { DocumentsClient, type DocItem } from './client';
-import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
+import { notFound } from 'next/navigation';
+
+interface OpportunityWithDocs {
+  id: string;
+  tenantId: string;
+  title: string;
+  followupDocs: DocItem[];
+}
 
 export default async function DocumentsPage({
   params
 }: {
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
-  const { locale, workspace, id } = await params;
+  const { locale, id } = await params;
   const locked = await moduleGate('M10', locale);
   if (locked) return locked;
   const { tenantId } = await requireTenantPage(locale);
 
-  let opp: { id: string; tenantId: string; title: string; followupDocs: DocItem[] } | null = null;
-  try {
-    // Tenant-scoped lookup: findUnique by a guessable id would cross tenants.
-    opp = await withTenant(tenantId, (tx) =>
-      tx.opportunity.findFirst({
-        where: { id, tenantId },
-        include: { followupDocs: { orderBy: { createdAt: 'desc' } } }
-      })
-    );
-  } catch (e) {
-    console.warn(`[DocumentsPage] DB query bypassed: ${errorMessage(e)}`);
-  }
+  // Tenant-scoped lookup: findUnique by a guessable id would cross tenants.
+  //
+  // This block used to be wrapped in a try/catch that logged a warning and fell
+  // through to a hard-coded "demo" document set — a signed NDA, an LOI, and a
+  // TÜBİTAK award pack asserting "Komisyon ESR Puanı: 13.5 / 15.0" for a company
+  // called FonBridge Teknoloji A.Ş. That pack rendered for ANY opportunity id,
+  // including one belonging to another tenant, and the ESR score is exactly the
+  // kind of figure CLAUDE.md rule 7 requires to be backed by a record.
+  //
+  // The catch is gone with it on purpose: `notFound()` signals by throwing, so
+  // leaving a catch here would swallow it and put the page back where it was.
+  const opp = await withTenant<OpportunityWithDocs | null>(tenantId, (tx) =>
+    tx.opportunity.findFirst({
+      where: { id, tenantId },
+      include: { followupDocs: { orderBy: { createdAt: 'desc' } } }
+    })
+  );
 
-  // Fallback demo data if DB is unseeded/offline
   if (!opp) {
-    opp = {
-      id,
-      tenantId,
-      title: 'HORIZON-CL5-2026-D3-01: Zero-Emission Transport Systems & Battery Tech',
-      followupDocs: [
-        {
-          id: 'doc-nda-1',
-          kind: 'NDA',
-          version: 1,
-          contentUrl: 'https://storage.fabrika.app/docs/sample/nda_v1.pdf',
-          signedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          contentText: `### MUTUAL NON-DISCLOSURE AGREEMENT (NDA)\n\n**1. Purpose:** Confidentiality agreement for project **HORIZON-CL5-2026-D3-01**.\n**2. Obligations:** Disclosing Party and Receiving Party agree to hold all technical and financial background IP strictly confidential for a period of 5 years.\n**3. Jurisdiction:** EU Commercial Law & International Arbitration.`
-        },
-        {
-          id: 'doc-loi-1',
-          kind: 'LOI',
-          version: 1,
-          contentUrl: 'https://storage.fabrika.app/docs/sample/loi_v1.pdf',
-          signedAt: null,
-          createdAt: new Date().toISOString(),
-          contentText: `### LETTER OF INTENT (LOI)\n\n**To the European Commission / Coordinator:**\nWe hereby confirm our institutional intent and formal commitment to participate as a full consortium partner in the proposal **HORIZON-CL5-2026-D3-01** under Horizon Europe.`
-        },
-        {
-          id: 'doc-award-1',
-          kind: 'AWARD_PACK',
-          version: 1,
-          contentUrl: 'https://storage.fabrika.app/docs/sample/tubitak_award_pack.pdf',
-          signedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          contentText: `### TÜBİTAK EŞİK ÜSTÜ ÖDÜLÜ BAŞVURU PAKETİ\n\n**1. Proje Adı:** HORIZON-CL5-2026-D3-01\n**2. Çağrı Kodu:** HORIZON-CL5-2026-D3-01\n**3. Komisyon ESR Puanı:** 13.5 / 15.0 (Eşik Üstü Başarılı)\n**4. Başvuran Şirket:** FonBridge Teknoloji A.Ş.\n**5. Ödül Beyanı:** İşbu paket TÜBİTAK Eşik Üstü Ödülü yönetmeliğine uygun olarak hazırlanmıştır.`
-        }
-      ],
-    };
+    notFound();
   }
 
   return (

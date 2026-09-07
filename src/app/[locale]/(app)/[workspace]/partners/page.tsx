@@ -4,159 +4,22 @@ import { getWorkspaceRoute } from '@/lib/routes';
 import { PartnerFilters } from './PartnerFilters';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
+import { recordAlert } from '@/lib/observability/system-alert';
 
-const DEMO_CORDIS_PARTNERS = [
-  {
-    organisationId: '999908205',
-    name: 'MIDDLE EAST TECHNICAL UNIVERSITY (METU)',
-    country: 'TR',
-    activityType: 'HES',
-    sme: false,
-    isTurkish: true,
-    totalProjects: 84,
-    coordinatorProjects: 12,
-    totalEcContribution: BigInt(24500000),
-    topTopics: [{ code: 'HORIZON-CL4-2026-TWIN-01' }, { code: 'HORIZON-CL5-2025-D3-01' }],
-  },
-  {
-    organisationId: '999993557',
-    name: 'İSTANBUL TEKNİK ÜNİVERSİTESİ (İTÜ)',
-    country: 'TR',
-    activityType: 'HES',
-    sme: false,
-    isTurkish: true,
-    totalProjects: 62,
-    coordinatorProjects: 8,
-    totalEcContribution: BigInt(18200000),
-    topTopics: [{ code: 'HORIZON-CL5-2026-D2-02' }, { code: 'HORIZON-CL4-2025-RESILIENCE' }],
-  },
-  {
-    organisationId: '999908302',
-    name: 'TÜBİTAK MARMARA ARAŞTIRMA MERKEZİ (MAM)',
-    country: 'TR',
-    activityType: 'REC',
-    sme: false,
-    isTurkish: true,
-    totalProjects: 51,
-    coordinatorProjects: 6,
-    totalEcContribution: BigInt(15800000),
-    topTopics: [{ code: 'HORIZON-CL6-2026-BIODIV' }],
-  },
-  {
-    organisationId: '999885896',
-    name: 'KOÇ ÜNİVERSİTESİ',
-    country: 'TR',
-    activityType: 'HES',
-    sme: false,
-    isTurkish: true,
-    totalProjects: 44,
-    coordinatorProjects: 14,
-    totalEcContribution: BigInt(16800000),
-    topTopics: [{ code: 'HORIZON-ERC-2026-STG' }],
-  },
-  {
-    organisationId: '999863876',
-    name: 'ARÇELİK A.Ş.',
-    country: 'TR',
-    activityType: 'PRC',
-    sme: false,
-    isTurkish: true,
-    totalProjects: 35,
-    coordinatorProjects: 4,
-    totalEcContribution: BigInt(11200000),
-    topTopics: [{ code: 'HORIZON-CL5-2026-D3-02' }],
-  },
-  {
-    organisationId: '999847192',
-    name: 'ASELSAN ELEKTRONİK SANAYİ VE TİCARET A.Ş.',
-    country: 'TR',
-    activityType: 'PRC',
-    sme: false,
-    isTurkish: true,
-    totalProjects: 28,
-    coordinatorProjects: 2,
-    totalEcContribution: BigInt(9400000),
-    topTopics: [{ code: 'HORIZON-CL3-2026-INFRA' }],
-  },
-  {
-    organisationId: '999980760',
-    name: 'FRAUNHOFER GESELLSCHAFT ZUR FOERDERUNG DER ANGEWANDTEN FORSCHUNG E.V.',
-    country: 'DE',
-    activityType: 'REC',
-    sme: false,
-    isTurkish: false,
-    totalProjects: 1420,
-    coordinatorProjects: 310,
-    totalEcContribution: BigInt(850000000),
-    topTopics: [{ code: 'HORIZON-CL5-2026-D3-01' }, { code: 'HORIZON-CL4-2026-DIGITAL' }],
-  },
-  {
-    organisationId: '999997930',
-    name: 'CENTRE NATIONAL DE LA RECHERCHE SCIENTIFIQUE (CNRS)',
-    country: 'FR',
-    activityType: 'REC',
-    sme: false,
-    isTurkish: false,
-    totalProjects: 1890,
-    coordinatorProjects: 420,
-    totalEcContribution: BigInt(1120000000),
-    topTopics: [{ code: 'HORIZON-ERC-2026-ADV' }],
-  },
-  {
-    organisationId: '999983961',
-    name: 'SIEMENS AKTIENGESELLSCHAFT',
-    country: 'DE',
-    activityType: 'PRC',
-    sme: false,
-    isTurkish: false,
-    totalProjects: 340,
-    coordinatorProjects: 45,
-    totalEcContribution: BigInt(210000000),
-    topTopics: [{ code: 'HORIZON-CL4-2026-TWIN-01' }],
-  },
-  {
-    organisationId: '912743326',
-    name: 'LOMARTOV SL',
-    country: 'ES',
-    activityType: 'PRC',
-    sme: true,
-    isTurkish: false,
-    totalProjects: 18,
-    coordinatorProjects: 3,
-    totalEcContribution: BigInt(4800000),
-    topTopics: [{ code: 'HORIZON-CL5-2021-D2-01-11' }],
-  },
-  {
-    organisationId: '905221942',
-    name: 'BARKHAUSEN INSTITUT GGMBH',
-    country: 'DE',
-    activityType: 'REC',
-    sme: true,
-    isTurkish: false,
-    totalProjects: 12,
-    coordinatorProjects: 2,
-    totalEcContribution: BigInt(3600000),
-    topTopics: [{ code: 'HORIZON-CL4-2025-DIGITAL' }],
-  },
-  {
-    organisationId: '999879881',
-    name: 'POLITECNICO DI MILANO',
-    country: 'IT',
-    activityType: 'HES',
-    sme: false,
-    isTurkish: false,
-    totalProjects: 410,
-    coordinatorProjects: 85,
-    totalEcContribution: BigInt(260000000),
-    topTopics: [{ code: 'HORIZON-CL5-2026-D1-01' }],
-  },
-];
 
 /**
- * A partner row as this table renders it. The three fallback queries below
- * (CordisPartnerProfile, then CordisOrganization, then the legacy Organization
- * table) each normalise into this one shape, so the table does not have to know
- * which source it got.
+ * A partner row as this table renders it. The two queries below
+ * (CordisPartnerProfile, then CordisOrganization) each normalise into this one
+ * shape, so the table does not have to know which source it got.
+ *
+ * There used to be a third step: a `DEMO_CORDIS_PARTNERS` constant of six
+ * invented Turkish institutions (METU with "84 projects / €24.5m", ARÇELİK with
+ * "€260m") that was served whenever both queries came back empty — which is
+ * also what an unseeded database and an offline one look like. The page then
+ * printed a real-looking PIC code, project count and EC grant for every one of
+ * them. CLAUDE.md rule 7: every figure on screen is backed by a record. No
+ * records, no rows — the empty state at the bottom of this file is the honest
+ * answer, and a query that actually failed now says so.
  */
 interface PartnerRow {
   organisationId: string;
@@ -165,9 +28,15 @@ interface PartnerRow {
   activityType: string | null;
   sme: boolean;
   isTurkish: boolean;
-  totalProjects: number;
-  coordinatorProjects: number;
-  totalEcContribution: bigint;
+  /**
+   * `null` where the source does not carry the figure — CordisOrganization has
+   * no project counts. Absence renders as "—", never as a number: reporting an
+   * unknown participation count as `1` (which this page used to do) is the same
+   * class of invention as the demo dataset, just quieter.
+   */
+  totalProjects: number | null;
+  coordinatorProjects: number | null;
+  totalEcContribution: bigint | null;
   /**
    * Top-20 topic tags from the derived profile; `[]` for the fallbacks. Older
    * profile rows stored bare topic codes rather than objects, which is why the
@@ -209,6 +78,9 @@ export default async function PartnersPage({
   let profiles: PartnerRow[] = [];
   let totalCount = 0;
   let dataSource = 'cordis_partner_profile';
+  // Set when a lookup threw. An empty table and a broken database must not look
+  // the same to the user.
+  let queryFailed = false;
 
   // 1. Try querying CordisPartnerProfile
   try {
@@ -233,7 +105,17 @@ export default async function PartnersPage({
       }),
     ]);
   } catch (e) {
+    // A swallowed failure used to be indistinguishable from "no partners
+    // match"; it fell through to the demo dataset and nobody was told.
+    // CLAUDE.md rule 6: raise a SystemAlert, do not break the page.
+    queryFailed = true;
     console.warn(`[PartnersPage] CordisPartnerProfile DB unavailable: ${errorMessage(e)}`);
+    await recordAlert({
+      level: 'warn',
+      source: 'partners_profile_query_failed',
+      message: `CordisPartnerProfile lookup failed: ${errorMessage(e)}`,
+      meta: { module: 'M1', table: 'CordisPartnerProfile' },
+    });
   }
 
   // 2. Fallback to CordisOrganization if profile table is empty or DB offline
@@ -270,43 +152,24 @@ export default async function PartnersPage({
           activityType: o.activityType,
           sme: o.sme,
           isTurkish: o.isTurkish,
-          totalProjects: 1,
-          coordinatorProjects: 0,
-          totalEcContribution: BigInt(0),
+          // CordisOrganization carries no participation figures. They are
+          // unknown here, not 1 and not 0.
+          totalProjects: null,
+          coordinatorProjects: null,
+          totalEcContribution: null,
           topTopics: [],
         }));
       }
     } catch (e) {
+      queryFailed = true;
       console.warn(`[PartnersPage] CordisOrganization DB unavailable: ${errorMessage(e)}`);
+      await recordAlert({
+        level: 'warn',
+        source: 'partners_organization_query_failed',
+        message: `CordisOrganization lookup failed: ${errorMessage(e)}`,
+        meta: { module: 'M1', table: 'CordisOrganization' },
+      });
     }
-  }
-
-  // 3. Fallback to resilient Demo CORDIS dataset if database server is offline
-  if (profiles.length === 0) {
-    dataSource = 'demo_cordis_dataset';
-    let filtered = DEMO_CORDIS_PARTNERS;
-
-    if (q) {
-      const lower = q.toLowerCase();
-      filtered = filtered.filter(
-        (p) => p.name.toLowerCase().includes(lower) || p.organisationId.includes(lower)
-      );
-    }
-    if (country) {
-      filtered = filtered.filter((p) => p.country === country);
-    }
-    if (activityType) {
-      filtered = filtered.filter((p) => p.activityType === activityType);
-    }
-    if (isTurkishOnly) {
-      filtered = filtered.filter((p) => p.isTurkish);
-    }
-    if (minProjects > 0) {
-      filtered = filtered.filter((p) => p.totalProjects >= minProjects);
-    }
-
-    profiles = filtered;
-    totalCount = filtered.length;
   }
 
   return (
@@ -361,6 +224,24 @@ export default async function PartnersPage({
           {activityType && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Tip: {activityType}</span>}
           {isTurkishOnly && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">🇹🇷 Türk Kuruluşlar</span>}
           {minProjects > 0 && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Min. {minProjects} Proje</span>}
+        </div>
+      )}
+
+      {/* A failed lookup is said out loud. It used to fall through to a demo
+          dataset, so the page looked healthiest exactly when it was broken. */}
+      {queryFailed && (
+        <div
+          role="alert"
+          className="border border-amber-200 bg-amber-50 text-amber-900 text-xs rounded-xl p-4"
+        >
+          <p className="font-bold">
+            {isTr ? 'Ortak veritabanı şu anda okunamadı.' : 'The partner database could not be read.'}
+          </p>
+          <p className="mt-1">
+            {isTr
+              ? 'Aşağıdaki liste eksik olabilir. Sorun kaydedildi; lütfen birazdan tekrar deneyin.'
+              : 'The list below may be incomplete. The failure has been recorded; please try again shortly.'}
+          </p>
         </div>
       )}
 
@@ -426,14 +307,18 @@ export default async function PartnersPage({
                       {p.activityType || 'OTH'}
                     </span>
                   </td>
+                  {/* An unknown figure shows as "—". `|| 0` used to turn every
+                      unknown into a confident zero. */}
                   <td className="p-4 text-center font-bold font-mono text-ink text-sm">
-                    {p.totalProjects}
+                    {p.totalProjects ?? '—'}
                   </td>
                   <td className="p-4 text-center font-bold font-mono text-purple-700">
-                    {p.coordinatorProjects || 0}
+                    {p.coordinatorProjects ?? '—'}
                   </td>
                   <td className="p-4 text-right font-mono font-bold text-emerald-700">
-                    € {Number(p.totalEcContribution || 0).toLocaleString()}
+                    {p.totalEcContribution === null
+                      ? '—'
+                      : `€ ${Number(p.totalEcContribution).toLocaleString()}`}
                   </td>
                 </tr>
               ))}

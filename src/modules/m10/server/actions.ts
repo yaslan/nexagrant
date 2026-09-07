@@ -15,6 +15,7 @@ import { emailLocalPart } from '@/lib/user-display';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
 import type { FollowupDocRow } from '@/types/db-rows';
+import { recordAlert } from '@/lib/observability/system-alert';
 
 /**
  * M10 follow-up documents.
@@ -55,7 +56,23 @@ export async function generateStandardDoc(
   - If ESR_DEBRIEF: Post-evaluation ESR score debrief, strengths, weaknesses & resubmission strategy.
   - If AWARD_PACK: TÜBİTAK Eşik Üstü Ödülü (Threshold Award) package application form & company declaration.`;
 
-  let contentText = '';
+  // TASK-MTQYXISOPUJ53 — fabricated fallbacks.
+  //
+  // This call used to be wrapped in a try/catch that, on any LLM failure,
+  // substituted a hard-coded document per `kind` and carried on: an NDA, an
+  // LOI, a COMMITMENT form naming "Fraunhofer Institute / SME Partner" with
+  // "16 Person-Months (WP3 & WP5)", an AWARD_PACK asserting "Komisyon ESR
+  // Puanı: 13.5 / 15.0" for "FonBridge Teknoloji A.Ş.", and an ESR_DEBRIEF
+  // reporting an excellence score of 4.5. The row was then written to
+  // `FollowupDoc`, one AI credit was deducted, and the user was shown a
+  // legal-looking document nothing had generated — figures with no Evidence
+  // record behind them (CLAUDE.md rule 7) on documents meant to be signed and
+  // sent to a consortium.
+  //
+  // A generation that did not happen is an error, not a document. Nothing is
+  // written and no credit is charged; the client already surfaces a thrown
+  // action as a failure.
+  let contentText: string;
   try {
     contentText = await generateText({
       tenantId,
@@ -66,18 +83,27 @@ export async function generateStandardDoc(
       system: 'You are an expert EU Horizon Europe legal & administrative document generator.'
     });
   } catch (e) {
-    console.warn(`[m10 generateStandardDoc] LLM fallback for ${kind}:`, errorMessage(e));
-    if (kind === 'NDA') {
-      contentText = `### MUTUAL NON-DISCLOSURE AGREEMENT (NDA)\n\n**1. Purpose:** Confidentiality agreement for project **${oppTitle}**.\n**2. Obligations:** Disclosing Party and Receiving Party agree to hold all technical and financial background IP strictly confidential for a period of 5 years.\n**3. Jurisdiction:** EU Commercial Law & International Arbitration.`;
-    } else if (kind === 'LOI') {
-      contentText = `### LETTER OF INTENT (LOI)\n\n**To the European Commission / Coordinator:**\nWe hereby confirm our institutional intent and formal commitment to participate as a full consortium partner in the proposal **${oppTitle}** under Horizon Europe.`;
-    } else if (kind === 'COMMITMENT') {
-      contentText = `### CONSORTIUM PARTNER COMMITMENT FORM\n\n**Partner Name:** Fraunhofer Institute / SME Partner\n**Target Proposal:** ${oppTitle}\n**Allocated Effort:** 16 Person-Months (WP3 & WP5)\n**Background IP:** Pre-existing patent portfolio & modeling tools declared under Section 3.`;
-    } else if (kind === 'AWARD_PACK') {
-      contentText = `### TÜBİTAK EŞİK ÜSTÜ ÖDÜLÜ BAŞVURU PAKETİ\n\n**1. Proje Adı:** ${oppTitle}\n**2. Çağrı Kodu:** HORIZON-CL5-2026-D3-01\n**3. Komisyon ESR Puanı:** 13.5 / 15.0 (Eşik Üstü Başarılı)\n**4. Başvuran Şirket:** FonBridge Teknoloji A.Ş.\n**5. Ödül Beyanı:** İşbu paket TÜBİTAK Eşik Üstü Ödülü yönetmeliğine uygun olarak hazırlanmıştır.`;
-    } else {
-      contentText = `### ESR DEBRIEF & ACTION PLAN\n\n**Proposal:** ${oppTitle}\n**Evaluator Feedback Summary:** High excellence score (4.5), minor weakness in WP5 dissemination quantification.\n**Resubmission Plan:** Revise Part B Section 2.2 for the next call cycle.`;
-    }
+    console.error(`[m10 generateStandardDoc] generation failed for ${kind}: ${errorMessage(e)}`);
+    await recordAlert({
+      level: 'error',
+      source: 'm10_document_generation_failed',
+      message: `Follow-up document generation failed for kind ${kind}: ${errorMessage(e)}`,
+      // No tenantId/userId: SystemAlert has no RLS policy. The opportunity id is
+      // the tenant-scoped handle an admin can join back.
+      meta: { module: 'M10', kind, opportunityId },
+    });
+    throw new Error(`Document generation failed for ${kind}. No document was created and no credit was charged.`);
+  }
+
+  if (!contentText.trim()) {
+    // An empty completion is the same non-event as a thrown one.
+    await recordAlert({
+      level: 'error',
+      source: 'm10_document_generation_empty',
+      message: `Follow-up document generation returned empty text for kind ${kind}.`,
+      meta: { module: 'M10', kind, opportunityId },
+    });
+    throw new Error(`Document generation returned no content for ${kind}. No document was created and no credit was charged.`);
   }
 
   const mockUrl = `https://storage.fabrika.app/docs/${tenantId}/${opportunityId}/${kind.toLowerCase()}_v1.pdf`;

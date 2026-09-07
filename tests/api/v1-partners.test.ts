@@ -192,7 +192,13 @@ describe('Partner Intelligence REST API (v1)', () => {
     expect(body.meta.total).toBe(0);
   });
 
-  test('GET /api/v1/opportunities returns tenant pipeline opportunities', async () => {
+  test('GET /api/v1/opportunities reports an empty pipeline as empty', async () => {
+    // Same correction as the calls test above, for the same reason. This
+    // asserted `data.length > 0` against an `opportunity.findMany` mock that
+    // resolves to `[]`; it passed only because the route answered an empty
+    // result with two hard-coded demo opportunities ("opp-demo-1" at €4.2m).
+    // The demo array is gone, so an empty mock means an empty list — the
+    // route's full behaviour is covered in tests/api/v1-opportunities.test.ts.
     const req = new Request('http://localhost:3000/api/v1/opportunities', {
       headers: { 'x-api-key': TEST_API_KEY },
     });
@@ -200,7 +206,8 @@ describe('Partner Intelligence REST API (v1)', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
-    expect(body.data.length).toBeGreaterThan(0);
+    expect(body.data).toEqual([]);
+    expect(body.meta.total).toBe(0);
     // The tenant on the response is the one the key resolved to — never a
     // caller-supplied or fallback value.
     expect(body.meta.tenantId).toBe(TEST_API_KEY_ROW.tenantId);

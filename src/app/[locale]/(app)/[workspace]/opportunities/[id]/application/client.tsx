@@ -53,32 +53,38 @@ export function ApplicationClient({
   const [personMonths, setPersonMonths] = useState(12);
   const [countryCoef, setCountryCoef] = useState('1.0');
   const [subcontracting, setSubcontracting] = useState('0');
-  const [travel, setTravel] = useState('2500');
+  // Was '2500' — an invented travel cost pre-loaded into a money field.
+  const [travel, setTravel] = useState('0');
   const [isAddingBudget, setIsAddingBudget] = useState(false);
 
-  // Work Package form state
-  const [wpCode, setWpCode] = useState('WP3');
-  const [wpTitle, setWpTitle] = useState('Prototyping & Pilot Testing');
-  const [wpLead, setWpLead] = useState('Fraunhofer Institute');
-  const [wpStart, setWpStart] = useState(7);
-  const [wpEnd, setWpEnd] = useState(24);
-  const [wpDeliverable, setWpDeliverable] = useState('D3.1 Thermal Pilot Prototype');
+  // Work Package form state. These used to open pre-filled with "WP3 /
+  // Prototyping & Pilot Testing / Fraunhofer Institute / M7-M24 / D3.1 Thermal
+  // Pilot Prototype" — one Enter away from writing an invented work package
+  // into the tenant's application. Blank fields; the user supplies the content.
+  const [wpCode, setWpCode] = useState('');
+  const [wpTitle, setWpTitle] = useState('');
+  const [wpLead, setWpLead] = useState('');
+  const [wpStart, setWpStart] = useState(1);
+  const [wpEnd, setWpEnd] = useState(12);
+  const [wpDeliverable, setWpDeliverable] = useState('');
   const [isAddingWp, setIsAddingWp] = useState(false);
 
-  // Dynamic budget lines state
-  const initialBudget: BudgetLine[] = (partA?.content)?.budget || [
-    { partnerName: 'Demo SME Consultancy (TR)', personMonths: 24, countryCoefficient: 1.0, subcontractingCost: 0, travelCost: 0, requestedTotal: 165000 },
-    { partnerName: 'Fraunhofer Institute (DE)', personMonths: 36, countryCoefficient: 1.0, subcontractingCost: 0, travelCost: 0, requestedTotal: 247500 },
-  ];
+  // Dynamic budget lines state.
+  //
+  // TASK-MTQYXISOPUJ53 — the `|| [...]` on both of these lines used to hold a
+  // ready-made consortium: a "Demo SME Consultancy (TR)" at €165.000 and
+  // "Fraunhofer Institute (DE)" at €247.500, plus four work packages led by
+  // Fraunhofer, METU TTO and Siemens AG. `applicationPart` could hold zero rows
+  // and the screen still showed a €412.500 budget and a full Gantt chart, which
+  // then fed the total in the black TOPLAM row. Cleaning the server page did not
+  // help while the client re-invented the same figures on mount.
+  //
+  // An application nobody has filled in is empty. The empty states below say so.
+  const initialBudget: BudgetLine[] = (partA?.content)?.budget || [];
   const [budgetLines, setBudgetLines] = useState<BudgetLine[]>(initialBudget);
 
   // Dynamic Work Packages state
-  const initialWps: WorkPackageItem[] = (partB?.content)?.workPackages || [
-    { code: 'WP1', title: 'Management & Coordination', leadPartner: 'Demo SME Consultancy', startMonth: 1, endMonth: 36, deliverables: ['D1.1 Data Management Plan'] },
-    { code: 'WP2', title: 'System Requirements & Architecture', leadPartner: 'METU TTO', startMonth: 1, endMonth: 12, deliverables: ['D2.1 Technical Specs'] },
-    { code: 'WP3', title: 'Prototyping & Pilot Testing', leadPartner: 'Fraunhofer Institute', startMonth: 7, endMonth: 24, deliverables: ['D3.1 Thermal Pilot'] },
-    { code: 'WP4', title: 'Dissemination & Exploitation', leadPartner: 'Siemens AG', startMonth: 1, endMonth: 36, deliverables: ['D4.1 DEC Plan'] },
-  ];
+  const initialWps: WorkPackageItem[] = (partB?.content)?.workPackages || [];
   const [workPackages, setWorkPackages] = useState<WorkPackageItem[]>(initialWps);
 
   const handleCopyMagicLink = () => {
@@ -434,6 +440,14 @@ export function ApplicationClient({
                     </tr>
                   ))}
 
+                  {budgetLines.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-muted">
+                        Henüz bütçe satırı eklenmedi. Aşağıdaki formdan ortak ekleyin.
+                      </td>
+                    </tr>
+                  )}
+
                   <tr className="bg-slate-900 text-white font-bold">
                     <td className="p-3.5">TOPLAM KONSORSİYUM</td>
                     <td className="p-3.5 font-mono">{totalPersonMonths} PM</td>
@@ -483,6 +497,12 @@ export function ApplicationClient({
                 <span>M31-33</span>
                 <span>M34-36</span>
               </div>
+
+              {workPackages.length === 0 && (
+                <div className="p-8 text-center text-xs text-muted">
+                  Henüz iş paketi tanımlanmadı. Aşağıdaki formdan WP ekleyin.
+                </div>
+              )}
 
               {/* Work Package Bar Rows */}
               {workPackages.map((wp, idx) => {

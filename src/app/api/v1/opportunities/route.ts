@@ -6,34 +6,29 @@ import { errorMessage } from '@/lib/errors';
 /**
  * One row of GET /api/v1/opportunities.
  *
- * The live rows and the offline demo rows are deliberately typed as a union
- * because they are **not the same shape**: the demo rows carry currentGate,
- * targetBudgetEur, consortiumSeatsCount and submissionDeadline, none of which
- * exist on the Opportunity table, while the live rows carry stage,
- * gateDecisions and proposal. A consumer therefore sees a different contract
- * depending on whether the database is reachable. Reconciling them is an API
- * decision, not a lint fix; recorded in the TASK-MTQ60SGW45T0X report.
+ * This used to be a *union* of two shapes: the live rows (stage, gateDecisions,
+ * proposal) and a second set of demo rows carrying `currentGate`,
+ * `targetBudgetEur`, `consortiumSeatsCount` and `submissionDeadline` — none of
+ * which are columns on `model Opportunity` in prisma/schema.prisma. Those demo
+ * rows were served with a 200 OK whenever the query threw *or* whenever the
+ * tenant simply had no opportunities yet, so a brand-new workspace was told it
+ * had a €4.2m pipeline sitting at "G1 (Consortium Gate)". That is what
+ * CLAUDE.md rule 7 forbids, and the union meant the published contract changed
+ * shape depending on whether the database answered.
+ *
+ * The demo array is gone. There is one shape now — the real one — an empty
+ * pipeline is an empty list, and a failed query is reported as a failure.
  */
-type OpportunityApiRow =
-  | {
-      id: string;
-      tenantId: string;
-      title: string;
-      stage: string;
-      status: string;
-      gateDecisions: unknown[];
-      proposal: unknown;
-    }
-  | {
-      id: string;
-      tenantId: string;
-      title: string;
-      status: string;
-      currentGate: string;
-      targetBudgetEur: number;
-      consortiumSeatsCount: number;
-      submissionDeadline: string;
-    };
+interface OpportunityApiRow {
+  id: string;
+  tenantId: string;
+  title: string;
+  /** `Opportunity.stage` — the Gate enum (G0…G4). There is no `currentGate` column. */
+  stage: string;
+  status: string;
+  gateDecisions: unknown[];
+  proposal: unknown;
+}
 
 export async function GET(req: Request) {
   const authRes = await authenticateApiKey(req);
@@ -43,7 +38,7 @@ export async function GET(req: Request) {
 
   const { tenantId } = authRes.data;
 
-  let opportunities: OpportunityApiRow[] = [];
+  let opportunities: OpportunityApiRow[];
 
   try {
     opportunities = await prisma.opportunity.findMany({
@@ -60,32 +55,18 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' },
     });
   } catch (e) {
-    console.warn(`[/api/v1/opportunities] DB query fallback: ${errorMessage(e)}`);
-  }
-
-  if (!opportunities || opportunities.length === 0) {
-    opportunities = [
+    // Reported, not replaced with invented rows. The old catch fell through to
+    // a demo array, so a permanently broken query would have answered 200 OK
+    // for as long as nobody read the server log.
+    console.error(`[/api/v1/opportunities] query failed: ${errorMessage(e)}`);
+    return NextResponse.json(
       {
-        id: 'opp-demo-1',
-        tenantId,
-        title: 'HORIZON-CL5-2026-D3-01: Zero-Emission Transport Systems & Battery Tech',
-        status: 'ACTIVE_PIPELINE',
-        currentGate: 'G1 (Consortium Gate)',
-        targetBudgetEur: 4200000,
-        consortiumSeatsCount: 4,
-        submissionDeadline: '2026-09-15T17:00:00.000Z',
+        error: 'Internal Server Error',
+        message: 'Opportunity lookup failed.',
+        code: 'OPPORTUNITIES_QUERY_FAILED',
       },
-      {
-        id: 'opp-demo-2',
-        tenantId,
-        title: 'EIC-ACC-2026-STEP: Autonomous Battery Thermal Sensor Spin-off',
-        status: 'CONCEPT_DRAFT',
-        currentGate: 'G0 (Strategic Go/No-Go)',
-        targetBudgetEur: 2500000,
-        consortiumSeatsCount: 1,
-        submissionDeadline: '2026-11-05T17:00:00.000Z',
-      },
-    ];
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({
