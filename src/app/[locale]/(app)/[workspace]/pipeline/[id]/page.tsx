@@ -1,123 +1,98 @@
-'use client';
+import React from 'react';
+import { notFound } from 'next/navigation';
+import type { Gate } from '@prisma/client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { EffortTracker } from './effort';
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
+import { computeG0ForOpportunity } from '@/lib/scoring/g0-compute';
+import type { G0Computation } from '@/lib/scoring/g0-compute';
+import { DEFAULT_GATE_RULES } from '@/lib/scoring/defaults';
 
-// Mock data
-const getOpportunity = (id: string) => ({
-  id,
-  title: 'Advanced AI solutions for climate modeling',
-  topicId: 'HORIZON-CL5-2026-09-D4-01',
-  stage: 'G0',
-  g0Score: 92,
-  status: 'ACTIVE',
-  intendedRole: 'coordinator'
-});
+import { OpportunityDetailClient, type G0Display, type OpportunityView } from './client';
 
-export default function OpportunityDetailPage({ params }: { params: { id: string } }) {
-  const opp = getOpportunity(params.id);
-  const [activeTab, setActiveTab] = useState('overview');
+/**
+ * Shape of the tenant-scoped read below. `withTenant`'s generic cannot be inferred from the
+ * Prisma client shape this repo ships (src/types/prisma-override.d.ts), so it is supplied
+ * explicitly rather than falling back to `any`.
+ */
+type OpportunityRow = {
+  id: string;
+  title: string;
+  topicId: string | null;
+  stage: Gate;
+  status: string;
+  intendedRole: string | null;
+};
 
-  const handleEvaluateGate = async () => {
-    alert(`Evaluating Gate ${opp.stage}...`);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    alert('Evaluation passed! Moving to G1.');
+/**
+ * One opportunity in the stage-gate pipeline.
+ *
+ * This page used to be a client component built on a `getOpportunity()` mock: a hard-coded
+ * title, a hard-coded `HORIZON-…` topic and `g0Score: 92`, rendered as "92/100" for every id
+ * anyone typed into the URL. The canonical scorer said 18 for the same opportunity, so the
+ * figure on screen contradicted the figure the gate decided on — and CLAUDE.md §7 requires a
+ * record behind any number a user reads.
+ *
+ * The score is now derived here, server-side and tenant-scoped, by `computeG0ForOpportunity`
+ * — the same function `src/lib/gates/evaluate.ts` runs. Nothing is written on a page view: the
+ * gate button persists, the render only reads. When the scorer has no evidence it returns
+ * `null` and the screen says the score could not be computed; it never falls back to 0, and
+ * never to 92.
+ */
+export default async function OpportunityDetailPage({
+  params,
+}: {
+  params: Promise<{ locale: string; workspace: string; id: string }>;
+}) {
+  const { locale, workspace, id } = await params;
+  const { tenantId } = await requireTenantPage(locale);
+
+  const loaded = await withTenant<{ opp: OpportunityRow | null; g0: G0Computation | null }>(
+    tenantId,
+    async (tx) => {
+      // findFirst + tenantId, never findUnique on a guessable id, and `deletedAt: null` so a
+      // soft-deleted (KVKK/GDPR erasure) opportunity 404s instead of staying readable.
+      const opp: OpportunityRow | null = await tx.opportunity.findFirst({
+        where: { id, tenantId, deletedAt: null },
+        select: {
+          id: true,
+          title: true,
+          topicId: true,
+          stage: true,
+          status: true,
+          intendedRole: true,
+        },
+      });
+      if (!opp) return { opp: null, g0: null };
+      return { opp, g0: await computeG0ForOpportunity(tx, tenantId, id) };
+    },
+  );
+
+  if (!loaded.opp) notFound();
+
+  const g0: G0Display = {
+    score: loaded.g0?.score ?? null,
+    decision: loaded.g0?.decision ?? null,
+    measuredSources: loaded.g0?.sources.filter((s) => s.status === 'measured').length ?? 0,
+    totalSources: loaded.g0?.sources.length ?? 0,
+    reasons: loaded.g0?.reasons ?? [],
+    minScore: DEFAULT_GATE_RULES.G0.minScore,
+  };
+
+  const opportunity: OpportunityView = {
+    id: loaded.opp.id,
+    title: loaded.opp.title,
+    topicId: loaded.opp.topicId,
+    stage: loaded.opp.stage,
+    status: loaded.opp.status,
+    intendedRole: loaded.opp.intendedRole,
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-4 md:p-8">
-      <div className="mb-6">
-        <Link href="./" className="text-accent hover:underline text-sm font-medium flex items-center gap-1">
-          ← Back to Pipeline
-        </Link>
-      </div>
-
-      <div className="bg-surface p-6 md:p-8 rounded-xl shadow-xs border border-border mb-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-semibold bg-accent/15 text-accent-ink border border-accent/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
-                {opp.stage}
-              </span>
-              <span className="text-xs font-semibold bg-ok/15 text-ok border border-ok/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                {opp.status}
-              </span>
-            </div>
-            <h1 className="text-2xl md:text-3xl font-bold font-heading text-ink mb-2">{opp.title}</h1>
-            <p className="text-muted font-mono text-sm">{opp.topicId}</p>
-          </div>
-          
-          <button 
-            onClick={handleEvaluateGate}
-            className="bg-accent hover:opacity-90 text-white font-semibold py-2.5 px-6 rounded-lg transition shadow-2xs shrink-0"
-          >
-            Evaluate Gate {opp.stage}
-          </button>
-        </div>
-
-        <div className="flex border-b border-border mt-8 gap-2">
-          <button 
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition ${activeTab === 'overview' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink hover:border-border'}`}
-            onClick={() => setActiveTab('overview')}
-          >
-            Overview
-          </button>
-          <button 
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition ${activeTab === 'tasks' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink hover:border-border'}`}
-            onClick={() => setActiveTab('tasks')}
-          >
-            T-6 Tasks
-          </button>
-          <button 
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition ${activeTab === 'effort' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink hover:border-border'}`}
-            onClick={() => setActiveTab('effort')}
-          >
-            Effort Logging
-          </button>
-        </div>
-
-        <div className="py-6">
-          {activeTab === 'overview' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-ground border border-border p-4 rounded-xl">
-                  <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">G0 Score</h3>
-                  <p className="text-2xl font-bold text-ink">{opp.g0Score}/100</p>
-                </div>
-                <div className="bg-ground border border-border p-4 rounded-xl">
-                  <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Intended Role</h3>
-                  <p className="text-2xl font-bold text-ink capitalize">{opp.intendedRole}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'tasks' && (
-            <div className="space-y-3">
-              <p className="text-muted text-sm mb-4">T-6 Plan Template Checklist (Mock)</p>
-              <ul className="space-y-2 text-sm text-ink-2">
-                <li className="flex items-center gap-2.5 bg-ground p-3 rounded-lg border border-border">
-                  <input type="checkbox" checked readOnly className="accent-accent" />
-                  <span>T-6: Read Work Programme</span>
-                </li>
-                <li className="flex items-center gap-2.5 bg-ground p-3 rounded-lg border border-border">
-                  <input type="checkbox" className="accent-accent" />
-                  <span>T-5: Identify Partners</span>
-                </li>
-                <li className="flex items-center gap-2.5 bg-ground p-3 rounded-lg border border-border">
-                  <input type="checkbox" className="accent-accent" />
-                  <span>T-4: Concept Note Draft</span>
-                </li>
-              </ul>
-            </div>
-          )}
-
-          {activeTab === 'effort' && (
-            <EffortTracker opportunityId={opp.id} />
-          )}
-        </div>
-      </div>
-    </div>
+    <OpportunityDetailClient
+      opportunity={opportunity}
+      g0={g0}
+      backHref={`/${locale}/${workspace}/pipeline`}
+    />
   );
 }

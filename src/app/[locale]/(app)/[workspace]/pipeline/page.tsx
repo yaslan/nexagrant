@@ -19,7 +19,9 @@ export default async function PipelinePage({
   try {
     dbOpportunities = await withTenant(tenantId, (tx) =>
       tx.opportunity.findMany({
-        where: { tenantId },
+        // `deletedAt: null`: a soft-deleted (KVKK/GDPR erasure) opportunity must leave the board,
+        // not linger on it as a card nobody can get rid of.
+        where: { tenantId, deletedAt: null },
         orderBy: { updatedAt: 'desc' }
       })
     );
@@ -27,10 +29,13 @@ export default async function PipelinePage({
     console.warn(`[Pipeline] DB query bypassed: ${errorMessage(e)}`);
   }
 
-  // Combine DB opportunities with in-memory store opportunities (deduplicating by ID)
+  // The buffer only ever holds rows the database refused (see `createOpportunity`), so in the
+  // normal case this loop adds nothing. Deduplicating by id is kept as a belt-and-braces guard,
+  // but it is no longer what the board relies on: ids minted by the buffer and ids minted by
+  // Prisma can never match, which is exactly how every opportunity used to be drawn twice.
   const inMemory = getInMemoryOpportunities(tenantId);
   const dbMap = new Map(dbOpportunities.map((o) => [o.id, o]));
-  
+
   for (const item of inMemory) {
     if (!dbMap.has(item.id)) {
       dbMap.set(item.id, item);
