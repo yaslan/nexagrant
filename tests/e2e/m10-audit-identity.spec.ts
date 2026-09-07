@@ -10,6 +10,10 @@ import { encode } from 'next-auth/jwt';
  * `legalApprover`. The default is gone; the actor now comes from the session, and a
  * request without a session is refused before any record exists.
  *
+ * Precondition: M10 must be `ON` for `demo-tenant`, otherwise the page renders the
+ * module gate instead of the workflow and the first test fails on the missing header.
+ * The dev database carries `ModuleState` row `ms-demo-m10` for exactly this.
+ *
  * The session cookie is minted with the app's own secret — the same JWT the sign-in
  * flow produces — as `identity-honesty.spec.ts` already does, so the test drives the
  * real page rather than a stub.
