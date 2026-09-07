@@ -1,31 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  getPresignedUploadUrlAction, 
-  confirmEvidenceUploadAction, 
-  deleteEvidence, 
-  verifyEvidenceAction 
+import React, { useState } from 'react';
+import {
+  getPresignedUploadUrlAction,
+  confirmEvidenceUploadAction,
+  deleteEvidence,
 } from './actions';
 import { calculateEvidenceHealthScore, HealthScoreResult } from '@/lib/evidence-health';
-import { 
-  ShieldCheck, 
-  Upload, 
-  FileText, 
-  Calendar, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Clock, 
-  Download, 
-  Trash2, 
-  Sparkles, 
-  Plus, 
-  Filter, 
-  Lock, 
+import {
+  ShieldCheck,
+  Upload,
+  Calendar,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Download,
+  Trash2,
+  Sparkles,
   ExternalLink,
-  Info,
-  ChevronRight,
-  Eye
+  Eye,
 } from 'lucide-react';
 import { errorMessage } from '@/lib/errors';
 
@@ -82,7 +75,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
   const [uploadTitle, setUploadTitle] = useState<string>('');
   const [uploadValidUntil, setUploadValidUntil] = useState<string>('');
   const [uploadAuthority, setUploadAuthority] = useState<string>('');
-  const [uploadConfidentiality, setUploadConfidentiality] = useState<string>('INTERNAL');
+  const [uploadConfidentiality] = useState<string>('INTERNAL');
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   
@@ -146,7 +139,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
     try {
       // 1. Get Presigned Upload URL
-      const { uploadUrl, objectKey, publicUrl } = await getPresignedUploadUrlAction(
+      const { uploadUrl, objectKey } = await getPresignedUploadUrlAction(
         uploadCategory,
         uploadFile.name,
         uploadFile.type || 'application/pdf'

@@ -9,7 +9,7 @@ export default async function MarketplacePage({
 }: {
   params: Promise<{ locale: string; workspace: string }>;
 }) {
-  const { locale, workspace } = await params;
+  const { locale } = await params;
   const { tenantId, userId } = await requireTenantPage(locale);
 
   let listings: ListingItem[] = [];

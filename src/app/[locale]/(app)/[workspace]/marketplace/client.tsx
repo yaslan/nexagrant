@@ -51,8 +51,8 @@ interface ConfirmedOrder {
 }
 
 export function MarketplaceClient({
-  tenantId,
-  userId,
+  tenantId: _tenantId,
+  userId: _userId,
   listings: initialListings,
   apiKeys: initialApiKeys,
 }: MarketplaceClientProps) {
