@@ -57,6 +57,17 @@ const statusColors: Record<string, string> = {
   DECLINED: 'bg-bad/15 text-bad border border-bad/20',
 };
 
+const UNKNOWN_STATUS_STYLE = 'bg-ground text-muted border border-border';
+
+const ROLE_LABEL_KEYS: Record<string, string> = {
+  coordinator: 'role.coordinator',
+  research: 'role.research',
+  industry: 'role.industry',
+  end_user: 'role.end_user',
+  widening: 'role.widening',
+  dissemination: 'role.dissemination',
+};
+
 export default function ConsortiumManager({ opportunityId, seats: initSeats, candidates: initCandidates, orgMap }: Props) {
   const t = useTranslations('Consortium');
   const [seats, setSeats] = useState(initSeats);
@@ -134,16 +145,21 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
           const org = seat.organizationId ? orgMap[seat.organizationId] : null;
           const seatCandidates = candidateMap[seat.id] || [];
           const isExpanded = expandedSeat === seat.id;
+          const rawRoleKey = (seat).roleKey || seat.role || '';
+          const roleLabelKey = ROLE_LABEL_KEYS[rawRoleKey];
+          const roleLabel = roleLabelKey ? t(roleLabelKey) : rawRoleKey ? rawRoleKey.replace(/_/g, ' ') : t('role.unknown');
+          const statusLabel = statusColors[seat.status] ? t(`status.${seat.status}`) : t('status.unknown');
+          const statusStyle = statusColors[seat.status] || UNKNOWN_STATUS_STYLE;
 
           return (
             <div key={seat.id} className="border border-border rounded-xl bg-surface overflow-hidden shadow-2xs">
               <div className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="font-bold text-ink capitalize text-sm">{((seat).roleKey || seat.role || '').replace('_', ' ')}</div>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${statusColors[seat.status]}`}>
-                    {seat.status}
+                  <div className="font-bold text-ink capitalize text-sm">{roleLabel}</div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${statusStyle}`}>
+                    {statusLabel}
                   </span>
-                  {seat.required && <span className="text-xs text-muted">Required</span>}
+                  {seat.required && <span className="text-xs text-muted">{t('required')}</span>}
                 </div>
 
                 <div className="flex items-center gap-3">

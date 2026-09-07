@@ -121,6 +121,48 @@
       "intendedRole": "Intended Role",
       "roleUnset": "Not set",
       "tasksTemplateNote": "T-6 plan template. These steps are a template and are not linked to real tasks yet.",
+      "archive": {
+        "action": "Archive",
+        "confirmTitle": "Archive \u201c{title}\u201d?",
+        "confirmBody": "An archived opportunity leaves the board, the lists and the KPIs. The record is not deleted: its history, gate decisions and effort entries stay in the database. Restoring from the archive is not available in the product yet.",
+        "confirmYes": "Yes, archive it",
+        "confirmNo": "Cancel",
+        "archiving": "Archiving…",
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Your session is not attached to a workspace. Please sign in again.",
+          "OPPORTUNITY_NOT_FOUND": "This opportunity was not found in the database; it cannot be archived.",
+          "ARCHIVE_FORBIDDEN": "You are not allowed to archive this opportunity. Only its owner or a pipeline manager can.",
+          "ARCHIVE_FAILED": "The opportunity could not be archived. Please try again."
+        }
+      },
+      "effortTab": {
+        "totalTitle": "Total Effort Logged",
+        "totalHint": "Used for ROI and cost tracking (1 person-day = {hours} hours).",
+        "personDaysUnit": "PDs",
+        "totalHours": "{hours} total hours",
+        "hoursValue": "{hours}h",
+        "unknownUser": "Unknown",
+        "saving": "Saving…",
+        "submit": "Log Effort",
+        "field": {
+          "date": "Date",
+          "hours": "Hours",
+          "hoursPlaceholder": "e.g. 2.5",
+          "note": "Note (optional)",
+          "notePlaceholder": "What did you work on?",
+          "user": "User"
+        },
+        "empty": {
+          "title": "No effort has been logged for this opportunity yet.",
+          "hint": "Use the form above to add the first entry; the table shows database records only."
+        },
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Your session is not attached to a workspace. Please sign in again.",
+          "OPPORTUNITY_NOT_FOUND": "This opportunity was not found in the database; effort cannot be logged.",
+          "EFFORT_INVALID_INPUT": "Hours must be a sensible number greater than 0.",
+          "EFFORT_SAVE_FAILED": "The effort entry could not be saved. Please try again."
+        }
+      },
       "tab": {
         "overview": "Overview",
         "tasks": "T-6 Tasks",
@@ -170,7 +212,25 @@
     "invite": "Invite",
     "conflict": "Conflict Warning",
     "addRoleToConsortium": "ADD ROLE TO CONSORTIUM",
-    "topCandidates": "TOP CANDIDATES"
+    "topCandidates": "TOP CANDIDATES",
+    "required": "Required",
+    "status": {
+      "OPEN": "OPEN",
+      "CANDIDATE": "CANDIDATE",
+      "INVITED": "INVITED",
+      "CONFIRMED": "CONFIRMED",
+      "DECLINED": "DECLINED",
+      "unknown": "UNKNOWN"
+    },
+    "role": {
+      "coordinator": "Coordinator",
+      "research": "Research Partner",
+      "industry": "Industry Partner",
+      "end_user": "End User",
+      "widening": "Widening Country",
+      "dissemination": "Dissemination",
+      "unknown": "Role"
+    }
   },
   "Auth": {
     "signIn": "Sign In",
@@ -755,5 +815,80 @@
       "NO_TENANT": "Your session is not linked to a workspace.",
       "NOT_AUTHENTICATED": "You need to sign in to see this page."
     }
+  },
+  "UserIdentity": {
+    "unnamedUser": "Unnamed user",
+    "noRole": "No role assigned"
+  },
+  "callDetails": {
+    "backToCalls": "Back to Calls",
+    "addButton": "Add to Pipeline",
+    "addingButton": "Adding...",
+    "addError": "Failed to add the opportunity. Please try again.",
+    "keyMetrics": "Key Metrics",
+    "budgetPerProject": "Budget per Project:",
+    "expectedProjects": "Expected Projects:",
+    "deadlinesTitle": "Deadlines",
+    "stageLabel": "Stage {stage}:",
+    "topicDescriptionTitle": "Topic Description",
+    "keywordsTitle": "Keywords",
+    "mockTitle": "Advanced AI solutions for climate modeling",
+    "mockProgramme": "Horizon Europe",
+    "mockStatus": "OPEN",
+    "mockDescription": "This topic aims to fund advanced AI models that can accurately predict climate change patterns over long periods. Submissions should focus on combining existing weather models with novel neural architectures.\n\nExpected Outcomes:\n- High accuracy 10-year forecasts\n- Open source model architecture\n- Reduced compute footprint for inference.",
+    "mockKeywords": "AI, Climate, Modeling, Earth Science"
+  },
+  "callsPage": {
+    "liveApiActive": "Live SEDIA API Active",
+    "pageTitle": "EU Funding Calls & Topics (SEDIA)",
+    "pageDescription": "Browse and search live funding opportunities across Horizon Europe, Digital Europe, Erasmus+, and EU programmes.",
+    "grantsTab": "Grants",
+    "tendersTab": "Tenders",
+    "framework": {
+      "all": "All Programmes",
+      "horizon": "Horizon Europe",
+      "digitalEurope": "Digital Europe",
+      "erasmusPlus": "Erasmus+",
+      "life": "LIFE Programme",
+      "edf": "European Defence Fund",
+      "cef": "Connecting Europe Facility"
+    },
+    "searchPlaceholder": "Search by keyword, topic code (e.g. HORIZON-CL5), or title...",
+    "savingLabel": "Saving...",
+    "saveSearchLabel": "Save Search & Alert",
+    "savedSearchMessage": "Search saved for \"{query}\". You will receive notification alerts.",
+    "allSearchesFallback": "All Calls",
+    "statusLabel": "Status:",
+    "openCalls": "Open Calls",
+    "forthcoming": "Forthcoming",
+    "closed": "Closed",
+    "loadingData": "Fetching live data...",
+    "resultsCount": "Found {count} calls (Page {page})",
+    "colStatus": "Status",
+    "colTopic": "Topic & Code",
+    "colActionType": "Type of Action",
+    "colBudget": "Est. Budget",
+    "colDeadline": "Deadline",
+    "colAction": "Action",
+    "statusOpen": "OPEN",
+    "statusForthcoming": "FORTHCOMING",
+    "statusClosed": "CLOSED",
+    "twoStage": "2-Stage",
+    "detailsButton": "Details",
+    "openInSedia": "Open in SEDIA Portal",
+    "noResults": "No funding calls found matching your filter parameters.",
+    "perPage": "Per page:",
+    "previous": "Previous",
+    "next": "Next",
+    "programmeLabel": "Programme:",
+    "typeOfActionLabel": "Type of Action:",
+    "deadlineLabel": "Deadline:",
+    "budgetLabel": "Est. Budget:",
+    "summaryScope": "Summary & Scope",
+    "deadlineStages": "Deadline Stages",
+    "convertToOpportunity": "Convert to Opportunity →",
+    "viewOnEuPortal": "View on EU Portal",
+    "notSpecified": "N/A",
+    "seeDetails": "See Details"
   }
 }

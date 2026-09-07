@@ -121,6 +121,48 @@
       "intendedRole": "Hedeflenen Rol",
       "roleUnset": "Belirlenmedi",
       "tasksTemplateNote": "T-6 plan şablonu. Bu adımlar bir şablondur; henüz gerçek görevlere bağlı değildir.",
+      "archive": {
+        "action": "Arşivle",
+        "confirmTitle": "\u201c{title}\u201d arşivlensin mi?",
+        "confirmBody": "Arşivlenen fırsat panodan, listelerden ve KPI'lardan düşer. Kayıt silinmez: geçmişi, kapı kararları ve efor kayıtları veritabanında kalır. Arşivden geri alma şu an üründe yok.",
+        "confirmYes": "Evet, arşivle",
+        "confirmNo": "Vazgeç",
+        "archiving": "Arşivleniyor…",
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Lütfen yeniden giriş yapın.",
+          "OPPORTUNITY_NOT_FOUND": "Bu fırsat veritabanında bulunamadı; arşivlenemez.",
+          "ARCHIVE_FORBIDDEN": "Bu fırsatı arşivleme yetkiniz yok. Yalnızca fırsat sahibi ya da pipeline yöneticisi arşivleyebilir.",
+          "ARCHIVE_FAILED": "Fırsat arşivlenemedi. Lütfen tekrar deneyin."
+        }
+      },
+      "effortTab": {
+        "totalTitle": "Kaydedilen Toplam Efor",
+        "totalHint": "ROI ve maliyet takibinde kullanılır (1 adam-gün = {hours} saat).",
+        "personDaysUnit": "AG",
+        "totalHours": "toplam {hours} saat",
+        "hoursValue": "{hours} sa",
+        "unknownUser": "Bilinmiyor",
+        "saving": "Kaydediliyor…",
+        "submit": "Efor Kaydet",
+        "field": {
+          "date": "Tarih",
+          "hours": "Saat",
+          "hoursPlaceholder": "örn. 2.5",
+          "note": "Not (isteğe bağlı)",
+          "notePlaceholder": "Ne üzerinde çalıştınız?",
+          "user": "Kişi"
+        },
+        "empty": {
+          "title": "Bu fırsat için henüz efor kaydı yok.",
+          "hint": "Yukarıdaki formla ilk kaydı girin; tablo yalnızca veritabanındaki kayıtları gösterir."
+        },
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Lütfen yeniden giriş yapın.",
+          "OPPORTUNITY_NOT_FOUND": "Bu fırsat veritabanında bulunamadı; efor kaydedilemez.",
+          "EFFORT_INVALID_INPUT": "Saat değeri 0\u2019dan büyük ve makul bir sayı olmalı.",
+          "EFFORT_SAVE_FAILED": "Efor kaydedilemedi. Lütfen tekrar deneyin."
+        }
+      },
       "tab": {
         "overview": "Genel Bakış",
         "tasks": "T-6 Görevleri",
@@ -170,7 +212,25 @@
     "invite": "Davet Et",
     "conflict": "Çakışma Uyarısı",
     "addRoleToConsortium": "KONSORSİYUMA ROL EKLE",
-    "topCandidates": "EN İYİ ADAYLAR"
+    "topCandidates": "EN İYİ ADAYLAR",
+    "required": "Zorunlu",
+    "status": {
+      "OPEN": "AÇIK",
+      "CANDIDATE": "ADAY",
+      "INVITED": "DAVET EDİLDİ",
+      "CONFIRMED": "ONAYLANDI",
+      "DECLINED": "REDDEDİLDİ",
+      "unknown": "BİLİNMİYOR"
+    },
+    "role": {
+      "coordinator": "Koordinatör",
+      "research": "Araştırma Ortağı",
+      "industry": "Sanayi Ortağı",
+      "end_user": "Son Kullanıcı",
+      "widening": "Genişleme Ülkesi",
+      "dissemination": "Yaygınlaştırma",
+      "unknown": "Rol"
+    }
   },
   "Auth": {
     "signIn": "Giriş Yap",
@@ -755,5 +815,80 @@
       "NO_TENANT": "Oturumunuz bir çalışma alanına bağlı değil.",
       "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor."
     }
+  },
+  "UserIdentity": {
+    "unnamedUser": "İsimsiz kullanıcı",
+    "noRole": "Rol atanmamış"
+  },
+  "callDetails": {
+    "backToCalls": "Çağrılara Geri Dön",
+    "addButton": "Fırsatlara / Pipet'e Ekle",
+    "addingButton": "Ekleniyor...",
+    "addError": "Fırsat eklenemedi. Lütfen tekrar deneyin.",
+    "keyMetrics": "Temel Metrikler",
+    "budgetPerProject": "Proje Başına Bütçe:",
+    "expectedProjects": "Beklenen Proje Sayısı:",
+    "deadlinesTitle": "Son Başvuru Tarihleri",
+    "stageLabel": "{stage}. Aşama:",
+    "topicDescriptionTitle": "Çağrı Detayı & Açıklaması",
+    "keywordsTitle": "Anahtar Kelimeler",
+    "mockTitle": "İklim Modellemesi ve Risk Tahmini İçin İleri Düzey YZ Çözümleri",
+    "mockProgramme": "Ufuk Avrupa (Horizon Europe)",
+    "mockStatus": "AÇIK (OPEN)",
+    "mockDescription": "Bu çağrı başlığı, uzun vadeli iklim değişikliği kalıplarını yüksek doğrulukla tahmin edebilecek ileri düzey yapay zeka modellerini fonlamayı amaçlamaktadır. Başvurular mevcut meteorolojik modeller ile yenilikçi sinir ağı mimarilerinin birleştirilmesine odaklanmalıdır.\n\nBeklenen Çıktılar:\n- 10 yıllık yüksek doğrulukta iklim tahminleri\n- Açık kaynaklı yapay zeka model mimarisi\n- Çıkarım (inference) için düşürülmüş hesaplama ayak izi.",
+    "mockKeywords": "Yapay Zeka, İklim, Modelleme, Dünya Bilimleri"
+  },
+  "callsPage": {
+    "liveApiActive": "SEDIA Canlı API Bağlantısı Etkin",
+    "pageTitle": "AB Hibeleri & Çağrı Başlıkları (SEDIA)",
+    "pageDescription": "Avrupa Komisyonu (SEDIA) arama servisine canlı erişim ile Ufuk Avrupa, Dijital Avrupa, Erasmus+, LIFE ve diğer AB programlarına ait açık ve gelecek çağrıları arayın.",
+    "grantsTab": "Hibeler (Grants)",
+    "tendersTab": "İhaleler (Tenders)",
+    "framework": {
+      "all": "Tüm Programlar",
+      "horizon": "Ufuk Avrupa (Horizon Europe)",
+      "digitalEurope": "Dijital Avrupa (Digital Europe)",
+      "erasmusPlus": "Erasmus+",
+      "life": "LIFE Programı",
+      "edf": "Avrupa Savunma Fonu (EDF)",
+      "cef": "CEF (Altyapı)"
+    },
+    "searchPlaceholder": "Anahtar kelime, konu kodu (örn: HORIZON-CL5), başlık ile ara...",
+    "savingLabel": "Kaydediliyor...",
+    "saveSearchLabel": "Aramayı Kaydet & Bildirim Al",
+    "savedSearchMessage": "Arama kaydedildi ({query}). Yeni çağrılar için e-posta bildirimi alacaksınız.",
+    "allSearchesFallback": "Tüm Arama",
+    "statusLabel": "Çağrı Durumu:",
+    "openCalls": "Açık Çağrılar",
+    "forthcoming": "Gelecek",
+    "closed": "Kapanmış",
+    "loadingData": "Canlı veriler yükleniyor...",
+    "resultsCount": "Toplam {count} çağrı bulundu ({page}. sayfa)",
+    "colStatus": "Durum",
+    "colTopic": "Çağrı Başlığı & Kodu",
+    "colActionType": "Eylem Tipi",
+    "colBudget": "Tahmini Bütçe",
+    "colDeadline": "Son Başvuru",
+    "colAction": "İşlem",
+    "statusOpen": "AÇIK",
+    "statusForthcoming": "GELECEK",
+    "statusClosed": "KAPANDI",
+    "twoStage": "2 Aşamalı",
+    "detailsButton": "Detaylar",
+    "openInSedia": "SEDIA Portalında Aç",
+    "noResults": "Seçilen filtrelere uygun çağrı bulunamadı. Lütfen arama terimini veya durum filtrelerini kontrol edin.",
+    "perPage": "Sayfa Başı Gösterim:",
+    "previous": "Önceki",
+    "next": "Sonraki",
+    "programmeLabel": "Program:",
+    "typeOfActionLabel": "Eylem Türü (Type of Action):",
+    "deadlineLabel": "Son Başvuru Tarihi:",
+    "budgetLabel": "Tahmini Bütçe:",
+    "summaryScope": "Çağrı Özeti & Amaç",
+    "deadlineStages": "Başvuru Aşamaları",
+    "convertToOpportunity": "Proje Fırsatına Dönüştür →",
+    "viewOnEuPortal": "AB Portalında İncele",
+    "notSpecified": "Belirtilmedi",
+    "seeDetails": "Bütçe Detayda"
   }
 }
