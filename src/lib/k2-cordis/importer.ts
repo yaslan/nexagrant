@@ -17,6 +17,7 @@ import {
   RawCsvRow,
 } from './cordisSchema';
 import { errorMessage } from '@/lib/errors';
+import { recordRawFetch } from './raw-fetch';
 
 export interface CordisImportOptions {
   dataset: 'HORIZON' | 'H2020';
@@ -50,13 +51,24 @@ const DATASET_URLS = {
 /**
  * Downloads URL or opens file stream and computes SHA256 hash
  */
-async function getZipFileAndHash(
-  options: CordisImportOptions
-): Promise<{ zipPath: string; isTemp: boolean; fileHash: string }> {
+async function getZipFileAndHash(options: CordisImportOptions): Promise<{
+  zipPath: string;
+  isTemp: boolean;
+  fileHash: string;
+  /** Where the bytes came from — a URL, or the local path when one was given. */
+  origin: string;
+  sizeBytes: number;
+}> {
   if (options.localZipPath && fs.existsSync(options.localZipPath)) {
     const fileBuffer = fs.readFileSync(options.localZipPath);
     const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
-    return { zipPath: options.localZipPath, isTemp: false, fileHash };
+    return {
+      zipPath: options.localZipPath,
+      isTemp: false,
+      fileHash,
+      origin: options.localZipPath,
+      sizeBytes: fileBuffer.byteLength,
+    };
   }
 
   const url = options.url || DATASET_URLS[options.dataset];
@@ -77,7 +89,7 @@ async function getZipFileAndHash(
   const tempPath = path.join(tmpDir, `${options.dataset.toLowerCase()}_${Date.now()}.zip`);
   fs.writeFileSync(tempPath, buffer);
 
-  return { zipPath: tempPath, isTemp: true, fileHash };
+  return { zipPath: tempPath, isTemp: true, fileHash, origin: url, sizeBytes: buffer.byteLength };
 }
 
 /**
@@ -146,8 +158,26 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
   let tempZipPath: string | null = null;
 
   try {
-    const { zipPath, isTemp, fileHash } = await getZipFileAndHash(options);
+    const { zipPath, isTemp, fileHash, origin, sizeBytes } = await getZipFileAndHash(options);
     if (isTemp) tempZipPath = zipPath;
+
+    // CLAUDE.md rule 6: keep the raw upstream answer before normalizing it.
+    // The archive itself is far too large for a Json column, so the row records
+    // what it was and where it came from, hashed on the real bytes. Keyed on
+    // that hash, so re-running against an unchanged dataset writes nothing.
+    await recordRawFetch({
+      source: 'cordis_bulk',
+      key: dataset,
+      hash: fileHash,
+      storageUrl: origin,
+      payload: {
+        dataset,
+        origin,
+        sizeBytes,
+        contentType: 'application/zip',
+        fetchedAt: new Date().toISOString(),
+      },
+    });
 
     // Hash check: check if the last successful run used the same zip hash
     let latestSuccessRun: { fileHash: string | null } | null = null;

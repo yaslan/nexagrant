@@ -65,6 +65,40 @@ function toSourceResult(result: AdapterResult<BaseTopic>): K1SourceResult {
 }
 
 /**
+ * Collapse repeated identifiers inside one run.
+ *
+ * SEDIA answers for a handful of topics twice — once from the search listing and
+ * once from `data/topicDetails` — with different bodies under the same
+ * `identifier`. Processing both wrote the second row over the first in `Topic`
+ * (no net effect, the last one already won) and, worse, appended a fresh
+ * `RawFetch` row on *every* nightly run: the change-detection hash flip-flopped
+ * between the two bodies forever. Measured on 2026-09-07: two identifiers,
+ * +4 `RawFetch` rows per pair of runs, growing without bound.
+ *
+ * Last-one-wins is deliberate — it is exactly what the un-deduplicated loop
+ * already persisted, so no `Topic` content changes. Which of the two bodies is
+ * the *right* one is an adapter question (src/lib/adapters/sedia.ts); this job
+ * only stops the duplicate from compounding and names the ids in an alert.
+ */
+function dedupeByIdentifier(topics: BaseTopic[]): {
+  topics: BaseTopic[];
+  duplicateIdentifiers: string[];
+} {
+  const byIdentifier = new Map<string, BaseTopic>();
+  const duplicates = new Set<string>();
+
+  for (const t of topics) {
+    if (byIdentifier.has(t.identifier)) duplicates.add(t.identifier);
+    byIdentifier.set(t.identifier, t);
+  }
+
+  return {
+    topics: Array.from(byIdentifier.values()),
+    duplicateIdentifiers: Array.from(duplicates),
+  };
+}
+
+/**
  * K1 Daily Call Sync — 02:00 UTC.
  *
  * Pulls SEDIA, Eurostars and TÜBİTAK, normalizes, and upserts `Call`/`Topic`.
@@ -104,8 +138,27 @@ export const k1DailyCalls = inngest.createFunction(
 export async function syncK1Topics(
   sources: AdapterResult<BaseTopic>[]
 ): Promise<K1DailyCallsOutput> {
-  const allTopics: BaseTopic[] = sources.flatMap((s) => s.topics);
+  const { topics: allTopics, duplicateIdentifiers } = dedupeByIdentifier(
+    sources.flatMap((s) => s.topics)
+  );
   const errors: Array<{ identifier: string; message: string }> = [];
+
+  // A feed that answered twice for one identifier is an upstream signal, not a
+  // data error: the run still lands, an operator gets told which ids collided.
+  if (duplicateIdentifiers.length > 0) {
+    await prisma.systemAlert
+      .create({
+        data: {
+          level: 'warn',
+          source: 'k1_daily_calls',
+          message:
+            `K1 sources returned ${duplicateIdentifiers.length} identifier(s) more than once ` +
+            'in a single run; only the last record for each was kept.',
+          meta: { duplicateIdentifiers: duplicateIdentifiers.slice(0, 20) },
+        },
+      })
+      .catch(() => {});
+  }
   let insertedCount = 0;
   let updatedCount = 0;
 
