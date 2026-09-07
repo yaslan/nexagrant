@@ -40,11 +40,11 @@ interface MeetingBriefsClientProps {
   briefs: BriefItem[];
 }
 
-const formatBrusselsTime = (date: Date | string | null): string => {
+const formatBrusselsTime = (date: Date | string | null, dateLocale: string): string => {
   if (!date) return '';
   const d = typeof date === 'string' ? new Date(date) : date;
   try {
-    const brussels = new Intl.DateTimeFormat('tr-TR', {
+    const brussels = new Intl.DateTimeFormat(dateLocale, {
       timeZone: 'Europe/Brussels',
       year: 'numeric',
       month: '2-digit',
@@ -122,6 +122,7 @@ export function MeetingBriefsClient({
   briefs: initialBriefs,
 }: MeetingBriefsClientProps) {
   const t = useTranslations('m9');
+  const dateLocale = locale === 'tr' ? 'tr-TR' : 'en-US';
   const [briefs, setBriefs] = useState<BriefItem[]>(initialBriefs);
   const [partnerName, setPartnerName] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
@@ -249,9 +250,7 @@ export function MeetingBriefsClient({
     // untranslatable `alert()` — which was also unreachable, because the button
     // used to be hidden in exactly the case that raises this.
     if (!activeBrief?.meetingScheduledAt) {
-      setIcsError(
-        'Bu görüşme kaydında toplantı tarihi yok, bu yüzden takvim dosyası oluşturulamadı. Brief\'i toplantı tarihi ve saatiyle yeniden oluşturun.'
-      );
+      setIcsError(t('ics.noScheduleError'));
       return;
     }
     setIcsError(null);
@@ -260,7 +259,7 @@ export function MeetingBriefsClient({
     const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour
 
     const icsContent = generateIcsContent(
-      `Görüşme: ${activeBrief.partnerName || 'Ortak'}`,
+      t('ics.eventTitle', { partner: activeBrief.partnerName || t('ics.defaultPartner') }),
       activeBrief.content.substring(0, 200),
       startDate,
       endDate
@@ -296,7 +295,7 @@ export function MeetingBriefsClient({
     try {
       const res = await savePostMeetingNotes({
         briefId: activeBrief.id,
-        partnerName: activeBrief.partnerName || 'Konsorsiyum Ortağı',
+        partnerName: activeBrief.partnerName || t('postMeeting.defaultPartnerName'),
         notes: meetingNotes,
         decisions: meetingDecisions,
         actionItems,
@@ -349,25 +348,25 @@ export function MeetingBriefsClient({
                 className="text-xs text-blue-400 hover:text-blue-300 transition flex items-center gap-1 font-semibold"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Pipeline&apos;a Dön</span>
+                <span>{t('nav.backToPipeline')}</span>
               </Link>
             </div>
             <div className="flex items-center gap-2 text-xs font-mono text-blue-400 font-semibold tracking-wider uppercase mb-1">
               <FileText className="w-4 h-4 text-blue-400" />
-              <span>Modül 9 — Meeting Briefs</span>
+              <span>{t('header.moduleLabel')}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-white">
-              Görüşme Brifingi & Not Alma Motoru
+              {t('header.title')}
             </h1>
             <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl">
-              Çağrı Fırsatı: <strong className="text-slate-200">{opportunityTitle}</strong>
+              {t('header.opportunityLabel')}: <strong className="text-slate-200">{opportunityTitle}</strong>
             </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-xs bg-indigo-950 text-indigo-300 border border-indigo-700 px-3 py-1.5 rounded-full font-mono font-bold flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span>1 AI Kredi / Brief</span>
+              <span>{t('header.aiCreditBadge')}</span>
             </span>
 
             {activeBrief && (
@@ -377,7 +376,7 @@ export function MeetingBriefsClient({
                   className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Yazdır</span>
+                  <span>{t('actions.print')}</span>
                 </button>
                 {/* Rendered for every brief, not only dated ones. It used to
                     vanish when the brief had no meeting time, which left the
@@ -389,7 +388,7 @@ export function MeetingBriefsClient({
                   className="bg-green-700 hover:bg-green-800 border border-green-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Takvim (.ics)</span>
+                  <span>{t('actions.downloadIcs')}</span>
                 </button>
               </div>
             )}
@@ -401,7 +400,7 @@ export function MeetingBriefsClient({
       <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm space-y-4">
         <div className="flex items-center gap-2 border-b border-border pb-3">
           <Building2 className="w-4 h-4 text-blue-600" />
-          <h2 className="font-bold text-sm text-ink">Yeni Görüşme Notu Oluştur (AI Pre-Meeting Brief)</h2>
+          <h2 className="font-bold text-sm text-ink">{t('form.heading')}</h2>
         </div>
 
         <form onSubmit={handleGenerateBrief} className="space-y-4">
@@ -410,7 +409,7 @@ export function MeetingBriefsClient({
               type="text"
               value={partnerName}
               onChange={(e) => setPartnerName(e.target.value)}
-              placeholder="Görüşülecek Ortak / Kurum Adı"
+              placeholder={t('form.partnerPlaceholder')}
               required
               className="border border-border rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground"
             />
@@ -423,7 +422,7 @@ export function MeetingBriefsClient({
                   setMeetingDate(e.target.value);
                   setScheduleError(null);
                 }}
-                aria-label="Toplantı tarihi"
+                aria-label={t('form.dateAriaLabel')}
                 aria-invalid={scheduleError ? true : undefined}
                 aria-describedby={scheduleError ? 'm9-schedule-error' : undefined}
                 data-testid="m9-meeting-date"
@@ -441,7 +440,7 @@ export function MeetingBriefsClient({
                   setMeetingTime(e.target.value);
                   setScheduleError(null);
                 }}
-                aria-label="Toplantı saati"
+                aria-label={t('form.timeAriaLabel')}
                 aria-invalid={scheduleError ? true : undefined}
                 aria-describedby={scheduleError ? 'm9-schedule-error' : undefined}
                 data-testid="m9-meeting-time"
@@ -470,12 +469,12 @@ export function MeetingBriefsClient({
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1">
               <div className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
-                <strong>Brüksel Saati (Europe/Brussels):</strong>
+                <strong>{t('form.brusselsTimeLabel')}</strong>
               </div>
               <div className="font-mono text-blue-800">
-                {formatBrusselsTime(dateToUTC(meetingDate, meetingTime))}
+                {formatBrusselsTime(dateToUTC(meetingDate, meetingTime), dateLocale)}
               </div>
-              <div className="text-[11px] text-blue-700 mt-1">UTC olarak kaydedilecektir.</div>
+              <div className="text-[11px] text-blue-700 mt-1">{t('form.utcNote')}</div>
             </div>
           )}
 
@@ -519,12 +518,12 @@ export function MeetingBriefsClient({
             {isGenerating ? (
               <>
                 <Sparkles className="w-4 h-4 animate-spin" />
-                <span>AI Brief Hazırlanıyor...</span>
+                <span>{t('generate.generating')}</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>Yapay Zeka Brief Oluştur</span>
+                <span>{t('generate.submit')}</span>
               </>
             )}
           </button>
@@ -536,7 +535,7 @@ export function MeetingBriefsClient({
         {/* Left: Brief Selector */}
         <div className="lg:col-span-4 space-y-3">
           <h3 className="font-bold text-xs text-ink-2 uppercase tracking-wider px-1">
-            Görüşme Kayıtları ({briefs.length})
+            {t('list.heading', { count: briefs.length })}
           </h3>
 
           <div className="space-y-2">
@@ -556,12 +555,12 @@ export function MeetingBriefsClient({
                   </span>
                   <span className="text-[10px] text-muted font-mono flex items-center gap-1">
                     <Clock className="w-3 h-3" />
-                    {new Date(b.createdAt).toLocaleDateString('tr-TR')}
+                    {new Date(b.createdAt).toLocaleDateString(dateLocale)}
                   </span>
                 </div>
                 {b.meetingScheduledAt && (
                   <div className="text-[11px] text-muted font-mono">
-                    📅 {formatBrusselsTime(b.meetingScheduledAt)}
+                    📅 {formatBrusselsTime(b.meetingScheduledAt, dateLocale)}
                   </div>
                 )}
                 <p className="text-[11px] text-muted line-clamp-2">
@@ -572,7 +571,7 @@ export function MeetingBriefsClient({
 
             {briefs.length === 0 && (
               <div className="bg-surface border border-border rounded-xl p-6 text-center text-muted text-xs">
-                Henüz kayıtlı bir görüşme bulunmuyor.
+                {t('list.empty')}
               </div>
             )}
           </div>
@@ -590,7 +589,7 @@ export function MeetingBriefsClient({
                   </span>
                 </div>
                 <span className="text-xs text-muted font-mono">
-                  Oluşturulma: {new Date(activeBrief.createdAt).toLocaleDateString('tr-TR')}
+                  {t('brief.createdLabel')} {new Date(activeBrief.createdAt).toLocaleDateString(dateLocale)}
                 </span>
               </div>
 
@@ -598,9 +597,9 @@ export function MeetingBriefsClient({
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 flex items-center gap-2">
                   <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                   <div>
-                    <strong>Toplantı Tarihi (UTC):</strong> {new Date(activeBrief.meetingScheduledAt).toISOString()}
+                    <strong>{t('brief.meetingDateUtcLabel')}</strong> {new Date(activeBrief.meetingScheduledAt).toISOString()}
                     <br />
-                    <strong>Brüksel:</strong> {formatBrusselsTime(activeBrief.meetingScheduledAt)}
+                    <strong>{t('brief.brusselsLabel')}</strong> {formatBrusselsTime(activeBrief.meetingScheduledAt, dateLocale)}
                   </div>
                 </div>
               )}
@@ -615,41 +614,41 @@ export function MeetingBriefsClient({
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-emerald-600" />
                   <h3 className="font-bold text-sm text-ink">
-                    Toplantı Sonrası Kararları & Aksiyon Notu Ekle
+                    {t('postMeeting.heading')}
                   </h3>
                 </div>
 
                 <form onSubmit={handleSavePostMeetingNotes} className="space-y-4 text-xs">
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">Alınan Kararlar / Sonuç</label>
+                    <label className="font-semibold text-ink-2 block mb-1">{t('postMeeting.decisionsLabel')}</label>
                     <input
                       type="text"
                       value={meetingDecisions}
                       onChange={(e) => setMeetingDecisions(e.target.value)}
-                      placeholder="Örn: Fraunhofer WP3 liderliğini kabul etti; NDA haftaya imzalanacak."
+                      placeholder={t('postMeeting.decisionsPlaceholder')}
                       className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground"
                     />
                   </div>
 
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">Görüşme Detay Notları</label>
+                    <label className="font-semibold text-ink-2 block mb-1">{t('postMeeting.notesLabel')}</label>
                     <textarea
                       rows={3}
                       value={meetingNotes}
                       onChange={(e) => setMeetingNotes(e.target.value)}
-                      placeholder="Toplantıda konuşulan detaylar..."
+                      placeholder={t('postMeeting.notesPlaceholder')}
                       className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground"
                     />
                   </div>
 
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">Aksiyon Maddeleri</label>
+                    <label className="font-semibold text-ink-2 block mb-1">{t('postMeeting.actionItemsLabel')}</label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={actionItemInput}
                         onChange={(e) => setActionItemInput(e.target.value)}
-                        placeholder="Aksiyon maddesi ekle..."
+                        placeholder={t('postMeeting.actionItemPlaceholder')}
                         className="flex-1 border border-border rounded-xl p-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground"
                       />
                       <button
@@ -658,7 +657,7 @@ export function MeetingBriefsClient({
                         className="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-3 py-2 rounded-xl transition text-xs flex items-center gap-1"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Ekle</span>
+                        <span>{t('postMeeting.addButton')}</span>
                       </button>
                     </div>
 
@@ -675,7 +674,7 @@ export function MeetingBriefsClient({
                               onClick={() => handleRemoveActionItem(idx)}
                               className="text-rose-500 hover:text-rose-700 text-[11px] font-bold"
                             >
-                              Kaldır
+                              {t('postMeeting.removeButton')}
                             </button>
                           </li>
                         ))}
@@ -684,7 +683,7 @@ export function MeetingBriefsClient({
                   </div>
 
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">Sonraki Takip Görüşme Tarihi</label>
+                    <label className="font-semibold text-ink-2 block mb-1">{t('postMeeting.nextMeetingLabel')}</label>
                     <input
                       type="date"
                       value={nextMeetingDate}
@@ -699,14 +698,14 @@ export function MeetingBriefsClient({
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 text-xs"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>{isSavingNotes ? 'Notlar Ekleniyor...' : 'Toplantı Sonrası Notlarını Brief\'e Ekle'}</span>
+                    <span>{isSavingNotes ? t('postMeeting.saving') : t('postMeeting.submit')}</span>
                   </button>
                 </form>
               </div>
             </div>
           ) : (
             <div className="bg-surface border border-border rounded-2xl p-12 text-center text-muted text-xs">
-              Lütfen sol panelden bir görüşme seçin veya yeni bir AI Brief oluşturun.
+              {t('brief.emptyState')}
             </div>
           )}
         </div>
