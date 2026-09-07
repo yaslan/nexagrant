@@ -2,6 +2,7 @@ import { CalendarEvent } from './provider';
 import { createCalendarProvider } from './factory';
 import type { CalendarProviderType } from './provider';
 import type { TenantTx } from '@/lib/db';
+import { recordAlert } from '@/lib/observability/system-alert';
 
 /**
  * Sync a meeting brief to all enabled calendar providers for a tenant user.
@@ -40,7 +41,9 @@ export async function syncMeetingBriefToCalendar(
   }
 
   const event: CalendarEvent = {
-    title: `Meeting: ${brief.partnerName}`,
+    // partnerName is nullable; an unnamed partner produced the title
+    // "Meeting: null" on the user's calendar.
+    title: brief.partnerName ? `Meeting: ${brief.partnerName}` : 'Meeting',
     description: brief.content.slice(0, 500), // Truncate for calendar description
     start: brief.meetingScheduledAt,
     end: new Date(brief.meetingScheduledAt.getTime() + 60 * 60 * 1000), // 1-hour meeting
@@ -61,21 +64,32 @@ export async function syncMeetingBriefToCalendar(
         },
       });
     } catch (error) {
-      // Sync error: create SystemAlert instead of breaking the flow
+      // Sync error: record a SystemAlert instead of breaking the flow.
+      //
+      // This used to write `tx.systemAlert.create({ severity, type,
+      // sourceModule, metadata })`. `SystemAlert` has none of those columns —
+      // it is `level, source, message, meta` — so Prisma rejected every one of
+      // these writes with a PrismaClientValidationError, which then escaped the
+      // catch block. No calendar failure was ever recorded. The mocked unit
+      // test could not see it; only the real client can.
+      //
+      // `recordAlert` writes on the singleton, not `tx`, on purpose: the caller
+      // runs this inside a transaction, and an alert about a failure must not
+      // disappear when that transaction rolls back. It never throws.
+      //
+      // No tenantId or userId in `meta` — `SystemAlert` has no RLS policy (see
+      // system-alert.ts). The brief and connection ids are the tenant-scoped
+      // handles a platform admin can join back.
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      await tx.systemAlert.create({
-        data: {
-          severity: 'warning',
-          type: 'calendar_sync_failed',
-          message: `Calendar sync failed for provider ${conn.provider}: ${errorMessage}`,
-          sourceModule: 'M9',
-          metadata: {
-            tenantId,
-            userId,
-            briefId: brief.id,
-            provider: conn.provider,
-            error: errorMessage,
-          },
+      await recordAlert({
+        level: 'warn',
+        source: 'calendar_sync_failed',
+        message: `Calendar sync failed for provider ${conn.provider}: ${errorMessage}`,
+        meta: {
+          module: 'M9',
+          briefId: brief.id,
+          connectionId: conn.id,
+          provider: conn.provider,
         },
       });
     }

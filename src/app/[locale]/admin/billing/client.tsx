@@ -9,6 +9,7 @@ import {
   Check,
   ShoppingBag,
   ExternalLink,
+  TriangleAlert,
 } from 'lucide-react';
 import { handleConfigureSso } from './actions';
 import { useCart } from '@/components/cart/CartContext';
@@ -56,23 +57,31 @@ export function BillingSsoClient({
   const [billingCycle, setBillingCycle] = useState<Exclude<BillingCycle, 'one-time'>>('yearly');
   const [portalNotice, setPortalNotice] = useState<string | null>(null);
 
-  // SSO Form state
-  const [ssoDomain, setSsoDomain] = useState('itu.edu.tr');
-  const [idpEntityId, setIdpEntityId] = useState('https://sso.itu.edu.tr/idp/shibboleth');
-  const [ssoAcsUrl, setSsoAcsUrl] = useState('https://fabrika.app/api/auth/saml/acs');
+  // SSO form state. These start empty on purpose: the fields used to be
+  // pre-filled with an invented İTÜ issuer and a placeholder x509 certificate,
+  // which read as a real configuration that nobody had entered.
+  const [ssoDomain, setSsoDomain] = useState('');
+  const [idpEntityId, setIdpEntityId] = useState('');
+  const [ssoAcsUrl, setSsoAcsUrl] = useState('');
   const [providerType, setProviderType] = useState('SAML_2_0');
-  const [x509Cert, setX509Cert] = useState('-----BEGIN CERTIFICATE-----\nMIIDdDCCAigCCQ...\n-----END CERTIFICATE-----');
+  const [x509Cert, setX509Cert] = useState('');
   const [ssoSaved, setSsoSaved] = useState(false);
+  const [ssoError, setSsoError] = useState<string | null>(null);
   const [isSavingSso, setIsSavingSso] = useState(false);
 
   const money = (amountMinor: number, currency: string) => formatMoney(amountMinor, currency, locale);
   const cycleLabel = billingCycle === 'yearly' ? t('cycleYearly') : t('cycleMonthly');
 
+  // The success banner follows what the server reports. It used to be set
+  // unconditionally, and `configureEnterpriseSso` returned `success: true` even
+  // when the write had failed, so this screen confirmed saves that never
+  // happened.
   const handleSaveSso = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingSso(true);
+    setSsoError(null);
     try {
-      await handleConfigureSso({
+      const result = await handleConfigureSso({
         tenantId,
         domain: ssoDomain,
         idpEntityId,
@@ -81,10 +90,14 @@ export function BillingSsoClient({
         providerType,
         enabled: true,
       });
-      setSsoSaved(true);
-      setTimeout(() => setSsoSaved(false), 3000);
-    } catch (err) {
-      console.error('Error saving SSO config:', err);
+      if (result?.success) {
+        setSsoSaved(true);
+        setTimeout(() => setSsoSaved(false), 3000);
+      } else {
+        setSsoError(t('ssoSaveFailed'));
+      }
+    } catch {
+      setSsoError(t('ssoSaveFailed'));
     } finally {
       setIsSavingSso(false);
     }
@@ -358,6 +371,7 @@ export function BillingSsoClient({
                 type="text"
                 value={idpEntityId}
                 onChange={(e) => setIdpEntityId(e.target.value)}
+                placeholder={t('ssoIssuerPlaceholder')}
                 required
                 className="w-full border border-line rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-none bg-ground text-ink font-mono"
               />
@@ -372,6 +386,7 @@ export function BillingSsoClient({
                 type="text"
                 value={ssoAcsUrl}
                 onChange={(e) => setSsoAcsUrl(e.target.value)}
+                placeholder={t('ssoAcsPlaceholder')}
                 required
                 className="w-full border border-line rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-none bg-ground text-ink font-mono"
               />
@@ -386,12 +401,18 @@ export function BillingSsoClient({
                 rows={3}
                 value={x509Cert}
                 onChange={(e) => setX509Cert(e.target.value)}
+                placeholder={t('ssoCertPlaceholder')}
                 className="w-full border border-line rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-none bg-ground text-ink font-mono text-[11px]"
               />
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-line">
-              {ssoSaved ? (
+              {ssoError ? (
+                <span role="alert" className="inline-flex items-center gap-1.5 text-rose-400 font-bold text-xs">
+                  <TriangleAlert className="w-4 h-4 text-rose-400" />
+                  {ssoError}
+                </span>
+              ) : ssoSaved ? (
                 <span role="status" className="inline-flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
                   <Check className="w-4 h-4 text-emerald-400" />
                   {t('ssoSaved')}
