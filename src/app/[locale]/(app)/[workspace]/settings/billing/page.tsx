@@ -5,6 +5,16 @@ import { getEntitlements } from '@/lib/billing';
 import { BillingClient } from './BillingClient';
 import { errorMessage } from '@/lib/errors';
 import { getActiveTier } from '@/lib/billing/active-tier';
+import { countLifetimeLicences, lifetimeScarcity } from '@/lib/billing/lifetime-licence';
+
+/**
+ * The lifetime badge counts rows, so this page must not be served from a cache
+ * — a stale "19 owners" is how the 21st licence gets sold. The page already
+ * renders dynamically because `requireTenantPage` reads the session cookie;
+ * this states the reason that must keep holding even if the auth call moves,
+ * and matches `/[locale]/pricing`, the other panel reading the same count.
+ */
+export const dynamic = 'force-dynamic';
 
 /**
  * The shape this page actually reads off the tenant row.
@@ -82,6 +92,13 @@ export default async function BillingSettingsPage({
     console.warn(`[BillingSettings] Entitlements fallback: ${errorMessage(err)}`);
   }
 
+  // The limited run is a global count, not a tenant one: the same
+  // `public.lifetime_licence_count()` the public pricing page reads, so both
+  // panels can never disagree about how many licences are left. When it cannot
+  // be read the state is `unknown` and the badge claims no number rather than
+  // falling back to zero.
+  const scarcity = lifetimeScarcity(await countLifetimeLicences());
+
   return (
     <BillingClient
       workspace={workspace}
@@ -90,6 +107,7 @@ export default async function BillingSettingsPage({
       tenantName={tenantName}
       currentPlanId={currentPlanId}
       activeTier={getActiveTier()}
+      lifetimeScarcity={scarcity}
       entitlements={entitlements}
     />
   );

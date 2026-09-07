@@ -16,6 +16,7 @@ import {
   type PlanEntry,
 } from '@/lib/billing/catalog';
 import { formatMoney } from '@/lib/money';
+import type { LifetimeScarcity } from '@/lib/billing/lifetime-licence';
 
 interface BillingClientProps {
   workspace: string;
@@ -25,6 +26,13 @@ interface BillingClientProps {
   currentPlanId: string;
   /** The live campaign, decided by `getActiveTier()` on the server. */
   activeTier: DiscountTier;
+  /**
+   * How many lifetime licences are actually on record, already turned into a
+   * badge state by `lifetimeScarcity()` on the server. Same count and same four
+   * states as `/[locale]/pricing`: `unknown` names the cap and no number,
+   * because a missing count is not zero owners.
+   */
+  lifetimeScarcity: LifetimeScarcity;
   entitlements: {
     allowedModules: string[];
     seats: number;
@@ -77,6 +85,7 @@ export function BillingClient({
   tenantName,
   currentPlanId = 'team',
   activeTier,
+  lifetimeScarcity,
   entitlements,
 }: BillingClientProps) {
   const t = useTranslations('billingPanels.settings');
@@ -403,14 +412,45 @@ export function BillingClient({
               <span>{t('lifetimeKicker')}</span>
             </div>
             {/*
-              Typed-in scarcity counters, kept as they were: no table records a
-              lifetime licence, so there is nothing to count yet. CLAUDE.md rule
-              7 — raised as its own card rather than silently invented here.
+              Scarcity counters, counted rather than typed in: `LifetimeLicence`
+              rows, read on the server and handed down as a state (CLAUDE.md
+              rule 7). The same four states the pricing page renders, and for
+              the same reasons — an unreadable count must not render as zero,
+              and a full run must not promise a next licence.
             */}
-            <div className="bg-slate-900 border border-slate-700 px-3 py-1 rounded-full text-[11px] text-slate-300 font-bold flex items-center gap-1.5 self-start sm:self-auto">
-              <span className="text-amber-400 font-extrabold">{t('lifetimeOwners')}</span>
-              <span>·</span>
-              <span className="text-cyan-300">{t('lifetimeNext')}</span>
+            <div
+              data-testid="settings-lifetime-scarcity"
+              data-scarcity={lifetimeScarcity.kind}
+              className="bg-slate-900 border border-slate-700 px-3 py-1 rounded-full text-[11px] text-slate-300 font-bold flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              {lifetimeScarcity.kind === 'unknown' && (
+                <span className="text-cyan-300">{t('lifetimeCapOnly', { cap: lifetimeScarcity.cap })}</span>
+              )}
+              {lifetimeScarcity.kind === 'none' && (
+                <>
+                  <span className="text-amber-400 font-extrabold">{t('lifetimeOwnersNone')}</span>
+                  <span>·</span>
+                  <span className="text-cyan-300">
+                    {t('lifetimeNextSeq', { next: lifetimeScarcity.next, cap: lifetimeScarcity.cap })}
+                  </span>
+                </>
+              )}
+              {lifetimeScarcity.kind === 'available' && (
+                <>
+                  <span className="text-amber-400 font-extrabold">
+                    {t('lifetimeOwnersCount', { count: lifetimeScarcity.owners })}
+                  </span>
+                  <span>·</span>
+                  <span className="text-cyan-300">
+                    {t('lifetimeNextSeq', { next: lifetimeScarcity.next, cap: lifetimeScarcity.cap })}
+                  </span>
+                </>
+              )}
+              {lifetimeScarcity.kind === 'sold-out' && (
+                <span className="text-amber-400 font-extrabold">
+                  {t('lifetimeSoldOut', { count: lifetimeScarcity.owners, cap: lifetimeScarcity.cap })}
+                </span>
+              )}
             </div>
           </div>
 
