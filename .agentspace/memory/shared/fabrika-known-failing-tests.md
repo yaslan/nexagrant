@@ -16,6 +16,15 @@ metadata:
 > silinmiş `src/app/(marketing)` dizinine referans veren bayat üretilmiş dosyalar tutuyor.
 > Çözüm `pnpm build` (bu dosyaları yeniden yazar) — kaynakta hata yok demektir.
 
+## e2e tabanı — 1 bilinen kırmızı (2026-09-07)
+
+`pnpm exec playwright test tests/e2e/m6-evaluator.spec.ts` → **1 failed / 5 passed**:
+*"a seated reviewer scores a proposal and sees it on the dashboard"* (satır 48). Slider
+`fill('5')` sonrası `m6-criterion-innovation-value` etiketi varsayılan `3/5`'te kalıyor.
+`git stash` ile ölçüldü (TASK-MTQW8188AWOAT): modül kapısı değişiklikleri geri alındığında da
+AYNI şekilde düşüyor, yani önceden var. Kart: `TASK-MTQZ9767FOZMB`. Bunun DIŞINDA bir e2e
+kırmızısı görürsen o senindir.
+
 ## Tarihsel kayıt (2026-09-06 ve öncesi)
 
 O tarihte `pnpm test` temiz bir çalışma ağacında bile kırmızı bitiyordu.

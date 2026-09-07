@@ -1,40 +1,34 @@
 ---
 name: fabrika-module-state-not-enforced
-description: ModuleState (OFF/DEV/PILOT/ON) hiçbir route veya server action tarafından kontrol edilmiyor — checkModuleAccess/requireModule kod tabanında hiç çağrılmıyor, sistemik (M9'a özgü değil)
+description: ESKİ BULGU, 2026-09-07'de ÇÖZÜLDÜ — ModuleState kapısı artık M9 ve M6'da uygulanıyor; güncel kural [[fabrika-module-gate-is-opt-in]] dosyasında
 metadata:
   type: project
   updatedAt: 2026-09-07
 ---
 
-`src/lib/modules/access.ts`'teki `checkModuleAccess`/`assertModuleAccess` ve
-`src/lib/modules/hooks.tsx`'teki `requireModule` HOC'u tanımlı ve doğru yazılmış, ama
-**hiçbir sayfa/route/server action bunları çağırmıyor**:
+> **ARTIK GEÇERLİ DEĞİL.** Bu dosya "ModuleState hiçbir yerde uygulanmıyor" diyordu; kusur
+> 2026-09-07'de `TASK-MTQW8188AWOAT` ile kapatıldı. **Güncel davranış için
+> [[fabrika-module-gate-is-opt-in]] oku.** Bu kayıt yalnızca kusurun ne olduğunu ve nasıl
+> yakalandığını hatırlatmak için duruyor.
 
-```
-$ grep -rln "checkModuleAccess\|assertModuleAccess" src --include=*.ts --include=*.tsx
-src/lib/modules/access.ts   # yalnızca kendi tanımı
-```
+## Neydi (2026-09-07 öncesi)
 
-Bu M9'a özgü değil — CLAUDE.md kural 3'ün öngördüğü "rota koruması `requireModule('M8')`
-middleware'iyle" **hiçbir modülde uygulanmıyor**. Sonuç: `/admin/modules` ekranından bir modülü
-bir kiracı için `OFF`/`DEV` yapmak, DB'ye doğru yazılıyor (state-machine + `AuditEvent` çalışıyor)
-ama o kiracının kullanıcısı ilgili sayfayı **hâlâ tam olarak görüp kullanabiliyor**.
+`checkModuleAccess`/`assertModuleAccess` tanımlıydı ama **hiçbir yerden çağrılmıyordu**; bir
+modülü `/admin/modules`'ten `OFF`/`DEV` yapmak DB'ye doğru yazılıyor, `AuditEvent` üretiliyor ama
+kullanıcı sayfayı yine de tam görüyordu. Ayrıca `DEV` dalı `role === 'TENANT_OWNER'` bakıyordu —
+her kiracının bir sahibi olduğu için `DEV` kimseyi dışarıda bırakmıyordu.
 
-**Ampirik kanıt (2026-09-07, TASK-MTQV9DOEBLYES):** M9 bir beta kiracısında `DEV`'e çekildi,
-o kiracının gerçek `TENANT_OWNER` oturumuyla `/opportunities/[id]/briefs` açıldı → sayfa tam
-render edildi, hiçbir engelleme yok. Ekran kanıtı:
-`docs/agent-results/TASK-MTQV9DOEBLYES-screenshots/01-beta-partner-briefs-attempt.png`. Takip
-kartı: `TASK-MTQVUWC04VOKF` (P0, todo).
+## Ne oldu
 
-**Ek tasarım kusuru — gate eklendiğinde de dikkat:** `checkModuleAccess`'in `DEV` dalı yalnızca
-`role === 'TENANT_OWNER'` kontrolü yapıyor, HANGİ kiracının owner'ı olduğuna bakmıyor. Her
-kiracının kendi TENANT_OWNER'ı (dış müşteri dahil) `DEV` modülü görür. "DEV = yalnızca bizim iç
-ekibimiz" anlamına gelmesi için platform-admin/iç-kiracı ayrımı eklenmesi gerekiyor.
+- Kapı bağlandı: `moduleGate()` (sayfa) + `assertModuleAccess()` (server action), M9 ve M6'da.
+- `DEV` artık yalnız `session.isPlatformAdmin`. Karar: `docs/adr/ADR-0001-module-state-access-gate.md`.
+- Kanıt: `docs/agent-results/TASK-MTQW8188AWOAT-blockzincir-pm.md` (§2.1 ekran görüntüleri,
+  §2.2 kapalı modül 0 kredi harcıyor — server-action replay).
 
-**Nasıl uygulanır:** "Bu modülü şu kiracıda kapat/aç" türü bir işte, ModuleState değişikliği
-DOĞRU YOLDAN (state-machine/admin UI) yapılabilir ve DB'ye doğru yazılır — ama "erişim gerçekten
-engellendi mi" iddiası koda bakmadan yapılmamalı; şu an itibariyle hiçbir modül için gerçek
-değil. `nav: []` olan modüller zaten kimseye görünmez (state'ten bağımsız) — "menüde yok" kanıtı
-bu yüzden yanıltıcı olabilir.
+## Kalıcı ders
 
-İlgili: [[fabrika-done-reports-can-be-wrong]], [[fabrika-workspace-url-segment-is-decorative]].
+"DB'ye doğru yazdım" ≠ "ürün öyle davranıyor". Bir durum/config değişikliğinin **etkisini**
+iddia etmeden önce o durumu okuyan bir çağrı var mı diye koda bak. Bugün de aynı tuzak açık:
+kapı sayfa başına opt-in — [[fabrika-module-gate-is-opt-in]].
+
+İlgili: [[fabrika-done-reports-can-be-wrong]], [[fabrika-workspace-url-segment-is-decorative]]
