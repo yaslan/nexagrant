@@ -1,6 +1,6 @@
 ---
 name: fabrika-prisma-client-type-override
-description: src/types/prisma-override.d.ts @prisma/client'ı gölgeliyor — PrismaClient repoda any, Role gerçek enum, withTenant<T> T'yi çıkaramaz ve Prisma ad alanı import edilemez
+description: src/types/prisma-override.d.ts @prisma/client'ı gölgeliyor — PrismaClient repoda any, prisma generate koşmak bunu DÜZELTMEZ (ambient declare module node_modules'ü yener), Role gerçek enum, withTenant<T> T'yi çıkaramaz
 metadata:
   type: project
   updatedAt: 2026-09-07
@@ -83,4 +83,44 @@ Ve `any` ile susturma: CLAUDE.md yasak listesinde ve `githooks/pre-commit` stage
 `@typescript-eslint/no-explicit-any`'yi hata olarak durduruyor.
 
 
-İlgili: [[fabrika-team-handover-cekirdek]], [[fabrika-prisma7-driver-adapter]], [[fabrika-local-dev-db]], [[fabrika-withtenant-set-config]]
+## DÖRDÜNCÜ SONUÇ (2026-09-07, ölçüldü): `prisma generate` koşmak tip güvenliğini GERİ GETİRMİYOR
+
+Yaygın varsayım — "delegate'ler `any`, çünkü `prisma generate` kurulumun/kapının parçası değil;
+generate koşarsak şemada olmayan tabloya çağrı yakalanır" — **YANLIŞ**. Ölçüm:
+
+`npx prisma generate` koşuldu, `.prisma/client` üretildi, ardından proje tsconfig'inin içine sonda
+dosyası kondu ve `tsconfig.tsbuildinfo` silinip soğuk `tsc --noEmit` koşuldu:
+
+```ts
+// src/lib/billing/__probe.ts
+import { prisma } from '@/lib/db';
+export const probe = () => prisma.plan.findMany({ where: { totallyBogusColumn: 1 } });
+```
+→ **hiçbir hata yok.**
+
+Aynı satır proje DIŞINDA, doğrudan üretilmiş istemciye karşı derlenince yakalanıyor:
+```
+TS2353: 'totallyBogusColumn' does not exist in type 'PlanWhereInput'
+TS2339: Property 'thisTableDoesNotExist' does not exist on type 'PrismaClient<...>'
+```
+
+**Neden:** `prisma-override.d.ts` bir *ambient* `declare module '@prisma/client'` ve projenin
+`include` kümesinde. Ambient modül bildirimi node_modules çözümlemesini **yener**. Yani generate
+edilmiş tipler orada dursa bile proje onları görmez.
+
+**Pratik sonuç:** "şemada olmayan tabloya çağrı" sınıfını (M8'deki `prisma.organization`) kapatmak
+için CI'ya `prisma generate` eklemek **yetmez** — override daraltılmalı ya da kaldırılmalıdır.
+Yukarıdaki "doğru sıra" listesindeki (2). adım tek başına işe yaramaz.
+
+**Ölçerken tuzak:** repo kökünde `tsconfig.tsbuildinfo` var (incremental). Tip çözümlemesini
+değiştiren bir şey denediysen (generate koşmak, d.ts dosyası oynatmak) `tsc` eski sonucu yeniden
+kullanıp **yanıltıcı** çıktı verir. Ölçümden önce `rm -f tsconfig.tsbuildinfo`.
+
+**Bunun bedeli, ölçülmüş:** TASK-MTRJ32BZBY2AI ADIM 1'de `PlanVersion`/`PlanFeature`/
+`PlanAssignment` şemaya eklendi, üzerine okuma katmanı + 20 test yazıldı, `pnpm typecheck` temiz
+geçti ve "tamamlandı" raporlandı — **tablolar veritabanında hiç yaratılmamıştı**. Şema düzenleyip
+migration yazmayan bir iş bu repoda tsc'den de, mock'lu testten de geçer. Bir şema işini "bitti"
+saymadan önce `information_schema.tables`'a SOR.
+
+
+İlgili: [[fabrika-team-handover-cekirdek]], [[fabrika-prisma7-driver-adapter]], [[fabrika-local-dev-db]], [[fabrika-withtenant-set-config]], [[fabrika-migrations-are-not-prisma-migrate]], [[fabrika-e2e-blocked-by-landing-page-500]]

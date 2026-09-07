@@ -28,4 +28,38 @@ basıyor (`src/lib/blog.ts:29,31,60`) ama `next.config.ts`'de `images.remotePatt
 
 Ders: **e2e koşmuyorsa önce `curl -s -o /dev/null -w "%{http_code}" localhost:<port>/tr` çek.**
 Halka açık ana sayfayı bozan herhangi bir değişiklik, ilgisiz görünse de tüm e2e kapısını kapatır.
+## E2E_BASE_URL yetmediğinde: yerel config override'ı (2026-09-07, ölçüldü)
+
+`E2E_BASE_URL`'i giriş sayfasına almak her zaman yetmiyor — `webServer.command` yine de
+`pnpm dev --port <PORT>` başlatmaya çalışır ve **aynı dizinde ikinci `next dev` yasak**:
+`⨯ Another next dev server is already running.` (kilit porta değil DİZİNE bağlı, port değiştirmek
+kurtarmaz). Bu durumda repo config'ini değiştirmeden commit edilmeyen bir override yaz:
+
+```ts
+// .qa-scratch/playwright.local.ts — iş bitince silinir
+export default defineConfig({
+  testDir: '../tests/e2e',
+  use: { baseURL: `http://localhost:${PORT}` },
+  webServer: {
+    command: `npx next dev --port ${PORT}`,
+    cwd: __dirname + '/..',                      // (1)
+    url: `http://localhost:${PORT}/logo.png`,    // (2) 200 dönen statik varlık
+    reuseExistingServer: true,
+  },
+});
+```
+`npx playwright test --config .qa-scratch/playwright.local.ts <spec>`
+
+İki tuzak, ikisi de vakit yedi:
+1. **`cwd` şart.** Playwright `command`'ı CONFIG dosyasının dizininde çalıştırır; vermezsen
+   `next dev` `.qa-scratch/` içinde başlar, `next.config.ts` bulunamaz ve
+   "[next-intl] Could not locate request configuration module" ile ölür.
+2. **Config dosyasında `import.meta` KULLANMA** — Playwright onu CJS olarak yükler:
+   `SyntaxError: Cannot use 'import.meta' outside a module`. `__dirname` kullan.
+
+Paylaşılan dev sunucusunu keyfî öldürme (başka bir ajanın doğrulaması sürüyor olabilir); önce
+`curl /logo.png` ile ayakta mı bak, ayaktaysa `E2E_PORT` ile ona bağlan. Repo config'ini
+düzeltmek doğru kalıcı çözüm ama o `next.config.ts` sahibinin işi — kendi görevinin kapsamı
+değilse rapora yaz, dokunma.
+
 İlgili: [[fabrika-agents-share-one-working-tree]], [[fabrika-e2e-own-fixture-hides-route-bugs]]
