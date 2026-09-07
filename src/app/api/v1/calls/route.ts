@@ -1,29 +1,128 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { authenticateApiKey } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
+import { toDecimalString } from '@/lib/money';
 
 /**
- * One row of GET /api/v1/calls — the `select` below, which is also the shape
- * the offline demo rows imitate.
+ * One row of GET /api/v1/calls.
+ *
+ * The published field *names* are unchanged; what changed is that they now
+ * carry real data. This route used to select `topicId`, `programme`,
+ * `deadlineAt`, `deadlineTz`, `budgetTotalEur` and `fundingType` off
+ * `prisma.topic` — none of which are columns on `model Topic` in
+ * prisma/schema.prisma. The query therefore threw on every request, the
+ * try/catch swallowed the throw, and the endpoint answered 200 OK with four
+ * hard-coded demo calls (a €180m "EIC Accelerator", a TÜBİTAK 1707 row) that no
+ * database ever produced. That is exactly what CLAUDE.md rule 7 forbids. The
+ * demo array is gone: rows come from Topic → Call → Programme, and a query
+ * failure is reported as a failure.
  */
 interface CallApiRow {
-  id?: string;
+  /** `Topic.id` — the cuid, stable across re-imports of the same topic. */
+  id: string;
+  /** `Topic.identifier` — the published topic code, e.g. HORIZON-CL5-2026-D4-01. */
   topicId: string;
   title: string;
+  /** `Programme.name` reached through the topic's call. */
   programme: string | null;
+  /** `Call.callIdentifier` — the call the topic belongs to. */
   callId: string | null;
-  deadlineAt: Date | string | null;
+  /** `Topic.nextDeadlineAt`, ISO-8601 in UTC (CLAUDE.md rule 10). */
+  deadlineAt: string | null;
+  /** The IANA zone the deadline is published in, read out of `Topic.deadlines`. */
   deadlineTz: string | null;
-  budgetTotalEur: number | bigint | null;
-  fundingType: string | null;
-  status: string | null;
+  /** `Call.budgetCents` in euro — the whole call's budget. */
+  budgetTotalEur: number | null;
+  /** `Topic.budgetPerProjectCents` in euro — the indicative grant per project. */
+  budgetPerProjectEur: number | null;
   /**
-   * Only the offline demo rows carry this — the Topic table has no such
-   * column, so a consumer sees it exactly when the database is unreachable.
-   * Recorded in the TASK-MTQ60SGW45T0X report rather than quietly dropped.
+   * No column in prisma/schema.prisma carries a grant *range*; only the demo
+   * rows ever had one ("€4,000,000 - €6,000,000"). The key stays so the
+   * response shape does not change, the value says "not recorded" rather than
+   * inventing a band. Use `budgetPerProjectEur` for the real figure.
    */
-  expectedGrantRangeEur?: string;
+  expectedGrantRangeEur: string | null;
+  /** `Topic.typeOfAction` — RIA / IA / CSA. */
+  fundingType: string | null;
+  /** `Topic.status` — OPEN | FORTHCOMING | CLOSED. */
+  status: string;
+}
+
+/** The Topic columns this endpoint reads, with its call and programme. */
+interface TopicWithCall {
+  id: string;
+  identifier: string;
+  title: string;
+  status: string;
+  typeOfAction: string | null;
+  nextDeadlineAt: Date | null;
+  deadlines: unknown;
+  budgetPerProjectCents: bigint | null;
+  call: {
+    callIdentifier: string;
+    budgetCents: bigint | null;
+    programme: { name: string } | null;
+  } | null;
+}
+
+/** `Topic.status` is an enum; anything else is a client error, not an empty page. */
+const StatusSchema = z.enum(['OPEN', 'FORTHCOMING', 'CLOSED']);
+
+/**
+ * The zone a topic's deadline is published in.
+ *
+ * `Topic.deadlines` is `[{ stage, at, tz }]`; `nextDeadlineAt` is one of those
+ * `at` values hoisted into a column for indexing. Match on the instant so a
+ * two-stage topic reports the zone of the stage that is actually next, and fall
+ * back to the first stage that names one. Never defaults to "Europe/Brussels":
+ * a guessed timezone silently moves a deadline by an hour.
+ */
+function deadlineTimezone(deadlines: unknown, nextDeadlineAt: Date | null): string | null {
+  if (!Array.isArray(deadlines)) return null;
+  const stages = deadlines.filter(
+    (d): d is { at?: unknown; tz?: unknown } => typeof d === 'object' && d !== null
+  );
+  const target = nextDeadlineAt?.getTime();
+  const matched =
+    target === undefined
+      ? undefined
+      : stages.find((d) => typeof d.at === 'string' && new Date(d.at).getTime() === target);
+  const withTz = matched ?? stages.find((d) => typeof d.tz === 'string' && d.tz.trim() !== '');
+  const tz = withTz?.tz;
+  return typeof tz === 'string' && tz.trim() !== '' ? tz.trim() : null;
+}
+
+/**
+ * Minor units → euro, through src/lib/money.ts (CLAUDE.md rule 9): no ad-hoc
+ * `/ 100` on an amount. `null` for an amount too large to be an exact JSON
+ * number — better absent than silently rounded.
+ */
+function centsToEur(cents: bigint | null | undefined): number | null {
+  if (cents === null || cents === undefined) return null;
+  const limit = BigInt(Number.MAX_SAFE_INTEGER);
+  if (cents > limit || cents < -limit) return null;
+  return Number(toDecimalString(Number(cents), 'EUR'));
+}
+
+function toApiRow(topic: TopicWithCall): CallApiRow {
+  return {
+    id: topic.id,
+    topicId: topic.identifier,
+    title: topic.title,
+    programme: topic.call?.programme?.name ?? null,
+    callId: topic.call?.callIdentifier ?? null,
+    // DB is UTC (CLAUDE.md rule 10); `deadlineTz` says which local clock the
+    // published cut-off is quoted on.
+    deadlineAt: topic.nextDeadlineAt ? new Date(topic.nextDeadlineAt).toISOString() : null,
+    deadlineTz: deadlineTimezone(topic.deadlines, topic.nextDeadlineAt),
+    budgetTotalEur: centsToEur(topic.call?.budgetCents ?? null),
+    budgetPerProjectEur: centsToEur(topic.budgetPerProjectCents),
+    expectedGrantRangeEur: null,
+    fundingType: topic.typeOfAction,
+    status: topic.status,
+  };
 }
 
 export async function GET(req: Request) {
@@ -33,96 +132,91 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const programme = searchParams.get('programme'); // Horizon Europe, Eurostars, TUBITAK
-  const status = searchParams.get('status') || 'OPEN'; // OPEN, FORTHCOMING, CLOSED
-  const limit = Math.min(50, parseInt(searchParams.get('limit') || '20', 10));
+  const programme = searchParams.get('programme')?.trim(); // "Horizon Europe", "HE", "Eurostars", "TUBITAK"
+  const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20));
 
-  let calls: CallApiRow[] = [];
+  const statusParam = searchParams.get('status')?.trim().toUpperCase() || 'OPEN';
+  const parsedStatus = StatusSchema.safeParse(statusParam);
+  if (!parsedStatus.success) {
+    return NextResponse.json(
+      {
+        error: 'Bad Request',
+        message: `Unknown status "${statusParam}". Expected one of: ${StatusSchema.options.join(', ')}.`,
+        code: 'CALLS_INVALID_STATUS',
+      },
+      { status: 400 }
+    );
+  }
 
+  const where: Record<string, unknown> = { status: parsedStatus.data };
+  if (programme) {
+    // The programme lives on the topic's call, not on the topic. Accept either
+    // the short id ("HE") or a fragment of the display name ("Horizon").
+    where.call = {
+      programme: {
+        OR: [
+          { id: programme.toUpperCase() },
+          { name: { contains: programme, mode: 'insensitive' } },
+        ],
+      },
+    };
+  }
+
+  let topics: TopicWithCall[];
   try {
-    const where: Record<string, unknown> = {};
-    if (programme) where.programme = { contains: programme, mode: 'insensitive' };
-    if (status) where.status = status;
-
-    calls = await prisma.topic.findMany({
+    // Call / Topic / Programme are shared reference data: none of them carries
+    // a `tenantId` (Call and Topic are listed as SYSTEM_WIDE in
+    // scripts/rls-models.ts), so no tenant_isolation policy applies and
+    // `withTenant` would have nothing to scope. The API key decides *who may
+    // ask*; `meta.authenticatedTenant` records the caller.
+    topics = await prisma.topic.findMany({
       where,
       take: limit,
+      orderBy: { nextDeadlineAt: 'asc' },
       select: {
         id: true,
-        topicId: true,
+        identifier: true,
         title: true,
-        programme: true,
-        callId: true,
-        deadlineAt: true,
-        deadlineTz: true,
-        budgetTotalEur: true,
-        fundingType: true,
         status: true,
+        typeOfAction: true,
+        nextDeadlineAt: true,
+        deadlines: true,
+        budgetPerProjectCents: true,
+        call: {
+          select: {
+            callIdentifier: true,
+            budgetCents: true,
+            programme: { select: { name: true } },
+          },
+        },
       },
     });
   } catch (e) {
-    console.warn(`[/api/v1/calls] DB query fallback: ${errorMessage(e)}`);
+    // Reported, not replaced with invented rows. The old catch fell through to
+    // a demo array, which is how a permanently broken query shipped unnoticed.
+    console.error(`[/api/v1/calls] query failed: ${errorMessage(e)}`);
+    return NextResponse.json(
+      {
+        error: 'Internal Server Error',
+        message: 'Call lookup failed.',
+        code: 'CALLS_QUERY_FAILED',
+      },
+      { status: 500 }
+    );
   }
 
-  if (!calls || calls.length === 0) {
-    calls = [
-      {
-        topicId: 'HORIZON-CL5-2026-D3-01',
-        title: 'Zero-Emission Transport Systems & Next-Gen Battery Thermal Management',
-        programme: 'Horizon Europe (Pillar II - Cluster 5)',
-        callId: 'HORIZON-CL5-2026-D3',
-        deadlineAt: '2026-09-15T17:00:00.000Z',
-        deadlineTz: 'Europe/Brussels',
-        budgetTotalEur: 25000000,
-        expectedGrantRangeEur: '€4,000,000 - €6,000,000',
-        fundingType: 'RIA (Research and Innovation Actions)',
-        status: 'OPEN',
-      },
-      {
-        topicId: 'HORIZON-CL4-2026-TWIN-01',
-        title: 'AI-Driven Materials Discovery and High-Throughput Sensing for Clean Energy',
-        programme: 'Horizon Europe (Pillar II - Cluster 4)',
-        callId: 'HORIZON-CL4-2026-TWIN',
-        deadlineAt: '2026-10-22T17:00:00.000Z',
-        deadlineTz: 'Europe/Brussels',
-        budgetTotalEur: 32000000,
-        expectedGrantRangeEur: '€5,000,000 - €8,000,000',
-        fundingType: 'IA (Innovation Actions)',
-        status: 'OPEN',
-      },
-      {
-        topicId: 'EIC-ACC-2026-STEP',
-        title: 'EIC Accelerator Deep-Tech Scale-Up Blended Finance',
-        programme: 'Horizon Europe (Pillar III - EIC)',
-        callId: 'EIC-2026-ACC',
-        deadlineAt: '2026-11-05T17:00:00.000Z',
-        deadlineTz: 'Europe/Brussels',
-        budgetTotalEur: 180000000,
-        expectedGrantRangeEur: 'Up to €2.5M Grant + €15M Equity',
-        fundingType: 'Blended Finance',
-        status: 'OPEN',
-      },
-      {
-        topicId: 'TUBITAK-1707-2026',
-        title: 'TÜBİTAK 1707 Siparişe Dayalı Ar-Ge Projeleri Çağrısı',
-        programme: 'TÜBİTAK TEYDEB',
-        callId: '1707-2026-1',
-        deadlineAt: '2026-12-01T23:59:00.000Z',
-        deadlineTz: 'Europe/Istanbul',
-        budgetTotalEur: 5000000,
-        expectedGrantRangeEur: '₺7,500,000 / Proje',
-        fundingType: 'Sipariş Ar-Ge Hibe & Eş-Finansman',
-        status: 'OPEN',
-      },
-    ];
-  }
+  const calls = topics.map(toApiRow);
 
   return NextResponse.json({
     success: true,
     meta: {
+      // The number of rows in `data`, not the number of matches in the database.
       total: calls.length,
-      statusFilter: status,
+      limit,
+      statusFilter: parsedStatus.data,
+      programmeFilter: programme || null,
       queriedAt: new Date().toISOString(),
+      authenticatedTenant: authRes.data.tenantId,
     },
     data: calls,
   });

@@ -175,7 +175,12 @@ describe('Partner Intelligence REST API (v1)', () => {
     expect(body.data).toBeUndefined();
   });
 
-  test('GET /api/v1/calls returns open Horizon Europe & national calls', async () => {
+  test('GET /api/v1/calls authenticates and reports an empty database as empty', async () => {
+    // `topic.findMany` is mocked to `[]` above, and this used to assert
+    // `data.length > 0` — it passed only because the route swallowed its own
+    // broken query and served four hard-coded demo calls. The endpoint now
+    // answers with what the database holds, so an empty mock means an empty
+    // list. Its behaviour is covered field by field in tests/api/v1-calls.test.ts.
     const req = new Request('http://localhost:3000/api/v1/calls?status=OPEN', {
       headers: { Authorization: `Bearer ${TEST_API_KEY}` },
     });
@@ -183,7 +188,8 @@ describe('Partner Intelligence REST API (v1)', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
-    expect(body.data.length).toBeGreaterThan(0);
+    expect(body.data).toEqual([]);
+    expect(body.meta.total).toBe(0);
   });
 
   test('GET /api/v1/opportunities returns tenant pipeline opportunities', async () => {

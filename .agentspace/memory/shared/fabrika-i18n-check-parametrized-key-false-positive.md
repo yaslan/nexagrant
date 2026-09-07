@@ -20,3 +20,11 @@ Ayrıca: `pnpm i18n:check` bu depoda **zaten exit 1** dönüyor (şablon değiş
 `${...}` yüzünden, ör. `Pipeline.detail.tab.${tab}`) ve `pnpm gate`'in parçası **değil** —
 kırmızı çıktısını kendi değişikliğine yorma, kendi anahtarlarını `missing*` kovalarında ara.
 İlgili kural: `t()` anahtarı her zaman düz literal olmalı ([[fabrika-i18n-dead-catalog-trap]]).
+
+**İkinci ve daha büyük kör nokta (2026-09-07):** çıkarıcı yalnızca
+`content.includes('useTranslations')` olan dosyaları tarıyor (`scripts/i18n-check.ts:83`). Yani
+`getTranslations(...)` kullanan **tüm sunucu bileşenleri** görünmez — anahtarları hep "unused"
+kovasında çıkar ve o dosyalardaki gerçek bir eksik çeviri hiç yakalanmaz. Bugünkü 510 "unused"
+anahtarın büyük kısmı budur. Kanıt yolu değişmiyor: `missingInTurkish`/`missingInEnglish`
+listelerine bak + ekran görüntüsü al.
+

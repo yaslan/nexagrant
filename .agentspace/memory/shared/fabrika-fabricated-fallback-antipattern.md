@@ -56,3 +56,23 @@ Doğrulama tuzağı: temizlik yaptıktan sonra "404 geliyor" demek için ekran g
 
 Aynı ailenin bilinen bir örneği: [[fabrika-dashboard-hardcoded-kpi-fallback]] (KPI panosu
 gerçek '0' geldiğinde sabit demo oranlarına düşüyor). Bu not onu iptal etmiyor, genelliyor.
+
+S12 "hayalet alan" dalgasında bulunan iki **halka açık** örnek (TASK-MTRKVJKE14KVR, 2026-09-07):
+- `src/app/api/v1/calls/route.ts`: `select`'i `Topic.topicId/.programme/.deadlineAt/.deadlineTz/
+  .budgetTotalEur/.fundingType` istiyordu — hiçbiri şemada yok. Sorgu her istekte fırlıyor,
+  `catch` yutuyor, endpoint **200 OK** ile dört uydurma çağrı (€180m "EIC Accelerator",
+  "TÜBİTAK 1707", uydurma `expectedGrantRangeEur` bantları) servis ediyordu.
+- `src/app/[locale]/calls/turkey/page.tsx`: `Call.country/.isOpen/.deadline` — üçü de yok. Sayfa
+  veri tabanında ne olursa olsun **"0 aktif çağrı"** gösteriyordu; sessiz fallback her zaman
+  "uydurma satır" değildir, bazen **sessiz boşluktur** ve daha zor fark edilir.
+
+Fallback sökerken üç şey:
+1. **Fallback'i ayakta tutan yeşil bir test ara.** Buradaki `tests/api/v1-partners.test.ts`
+   `topic.findMany` mock'u `[]` dönerken `data.length > 0` bekliyordu — yalnızca demo dizisi
+   sayesinde geçiyordu. Fallback'i silmek onu kırar; testi *gerçeğe göre* düzelt, gevşetme.
+2. **Boş durumu gerçekten kanıtla.** Kaynak veriyi geçici olarak filtreden düşür (burada:
+   20 topic'in `eligibility`'sini `{restricted:'EU_EEA_CH_ONLY'}` yap), boş ekranı çek, sonra
+   **birebir geri al** ve öncesi/sonrası ölç. Bu aynı anda filtrenin canlı olduğunu da kanıtlar.
+3. **Tahmini varsayılan de bir uydurmadır.** `deadlineTz` yoksa "Europe/Brussels" yazmak son
+   tarihi bir saat kaydırır; `null` döndür (bkz. [[fabrika-absence-is-not-zero]]).
+
