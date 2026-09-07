@@ -16,20 +16,18 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 const THEME_STORAGE_KEY = 'fabrika-theme';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
-
-  // Read theme from localStorage or default to system on mount
-  useEffect(() => {
+  const [theme, setThemeState] = useState<Theme>(() => {
     try {
       const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
       if (stored && ['light', 'dark', 'system'].includes(stored)) {
-        setThemeState(stored);
+        return stored;
       }
     } catch {
       // Ignore localStorage errors
     }
-  }, []);
+    return 'system';
+  });
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
 
   // Update DOM and handle system preference changes
   useEffect(() => {

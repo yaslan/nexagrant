@@ -29,9 +29,11 @@ export default async function ModulesSettingsPage({
     );
   }
 
-  let currentPlan: PlanTier = 'team';
-  let activeModules: ModuleId[] = ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'];
-  let tenantName = 'Varsayılan Çalışma Alanı';
+  const state = {
+    currentPlan: 'team' as PlanTier,
+    activeModules: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'] as ModuleId[],
+    tenantName: 'Varsayılan Çalışma Alanı'
+  };
 
   try {
     // Tenant comes from the session only. The old chain (session → workspace
@@ -40,11 +42,11 @@ export default async function ModulesSettingsPage({
     await withTenant(tenantId, async (tx) => {
       const tenant = await tx.tenant.findFirst({ where: { id: tenantId } });
       if (!tenant) return;
-      tenantName = tenant.name;
+      state.tenantName = tenant.name;
 
       const subscription = await tx.subscription.findFirst({ where: { tenantId } });
       if (subscription?.planId) {
-        currentPlan = subscription.planId.toLowerCase() as PlanTier;
+        state.currentPlan = subscription.planId.toLowerCase() as PlanTier;
       }
 
       const activeStates = await tx.moduleState.findMany({
@@ -54,7 +56,7 @@ export default async function ModulesSettingsPage({
         }
       });
       if (activeStates.length > 0) {
-        activeModules = activeStates.map((s: { moduleId: string }) => s.moduleId as ModuleId);
+        state.activeModules = activeStates.map((s: { moduleId: string }) => s.moduleId as ModuleId);
       }
     });
   } catch (err) {
@@ -63,10 +65,10 @@ export default async function ModulesSettingsPage({
 
   return (
     <ModulesClient 
-      initialActiveModules={activeModules} 
-      currentPlan={currentPlan}
+      initialActiveModules={state.activeModules} 
+      currentPlan={state.currentPlan}
       tenantId={tenantId}
-      tenantName={tenantName}
+      tenantName={state.tenantName}
       workspace={workspace}
       locale={locale}
     />

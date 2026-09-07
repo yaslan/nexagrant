@@ -12,21 +12,26 @@ export default async function MeetingBriefsPage({
   const { locale, workspace, id } = await params;
   const { tenantId } = await requireTenantPage(locale);
 
-  let opp: { id: string; title: string; tenantId: string; topicId: string | null } | null = null;
-  let briefs: BriefItem[] = [];
+  const state: {
+    opp: { id: string; title: string; tenantId: string; topicId: string | null } | null;
+    briefs: BriefItem[];
+  } = {
+    opp: null,
+    briefs: [],
+  };
 
   try {
     // Both reads are scoped to the session tenant. The briefs query used to key
     // off `opp.tenantId`, so a cross-tenant opportunity would have pulled that
     // other tenant's briefs along with it.
     await withTenant(tenantId, async (tx) => {
-      opp = await tx.opportunity.findFirst({
+      state.opp = await tx.opportunity.findFirst({
         where: { id, tenantId },
         select: { id: true, title: true, tenantId: true, topicId: true },
       });
 
-      if (opp) {
-        briefs = await tx.meetingBrief.findMany({
+      if (state.opp) {
+        state.briefs = await tx.meetingBrief.findMany({
           select: {
             id: true,
             interactionId: true,
@@ -45,15 +50,15 @@ export default async function MeetingBriefsPage({
     console.warn(`[MeetingBriefsPage] DB query bypassed: ${errorMessage(e)}`);
   }
 
-  if (!opp) {
-    opp = {
+  if (!state.opp) {
+    state.opp = {
       id,
       tenantId,
       title: 'HORIZON-CL5-2026-D3-01: Zero-Emission Transport Systems & Battery Tech',
       topicId: 'HORIZON-CL5-2026-D3-01',
     };
 
-    briefs = [
+    state.briefs = [
       {
         id: 'brief-demo-1',
         interactionId: 'int-fraunhofer-01',
@@ -84,11 +89,11 @@ export default async function MeetingBriefsPage({
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <MeetingBriefsClient
-        opportunityId={opp.id}
+        opportunityId={state.opp.id}
         locale={locale}
         workspace={workspace}
-        opportunityTitle={opp.title}
-        briefs={briefs || []}
+        opportunityTitle={state.opp.title}
+        briefs={state.briefs || []}
       />
     </div>
   );

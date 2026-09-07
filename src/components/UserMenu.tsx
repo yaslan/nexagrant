@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { logoutAction } from '@/lib/actions/auth';
@@ -148,7 +148,7 @@ export default function UserMenu({
   const [notificationsList, setNotificationsList] = useState(baseNotifications);
 
   // Sync notifications from localStorage
-  const syncNotifications = () => {
+  const syncNotifications = useCallback(() => {
     if (typeof window === 'undefined') return;
     try {
       const raw = localStorage.getItem(storageKey);
@@ -166,7 +166,7 @@ export default function UserMenu({
     } catch (e) {
       setNotificationsList(baseNotifications);
     }
-  };
+  }, [baseNotifications, storageKey]);
 
   useEffect(() => {
     syncNotifications();
@@ -178,7 +178,7 @@ export default function UserMenu({
       window.removeEventListener('fonbridge_notifications_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
-  }, [locale, effectiveUserEmail]);
+  }, [syncNotifications]);
 
   const unreadCount = notificationsList.filter((n) => n.unread).length;
 

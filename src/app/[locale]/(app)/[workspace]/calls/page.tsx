@@ -156,6 +156,8 @@ export default function CallsPage({
   }, [debouncedSearch, framework, statuses, callType, page, limit]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // loadCalls is a memoized async callback; setState in async callbacks is correct pattern.
     loadCalls();
   }, [loadCalls]);
 

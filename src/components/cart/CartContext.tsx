@@ -47,42 +47,49 @@ const CART_STORAGE_KEY = 'fonbridge_cart_items_v1';
 const COUPON_STORAGE_KEY = 'fonbridge_cart_coupon_v1';
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeCoupon, setActiveCoupon] = useState<string>('ILK5');
-  const [discountPercent, setDiscountPercent] = useState<number>(70);
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  // Restore cart state from localStorage on mount
-  useEffect(() => {
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     try {
-      const storedItems = localStorage.getItem(CART_STORAGE_KEY);
-      if (storedItems) {
-        setCartItems(JSON.parse(storedItems));
-      }
-      const storedCoupon = localStorage.getItem(COUPON_STORAGE_KEY);
-      if (storedCoupon) {
-        const parsed = JSON.parse(storedCoupon);
-        setActiveCoupon(parsed.code || 'ILK5');
-        setDiscountPercent(parsed.discount ?? 70);
+      const stored = localStorage.getItem(CART_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeCoupon, setActiveCoupon] = useState<string>(() => {
+    try {
+      const stored = localStorage.getItem(COUPON_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed.code || 'ILK5';
       }
     } catch {
       // Ignore localStorage errors
-    } finally {
-      setIsHydrated(true);
     }
-  }, []);
+    return 'ILK5';
+  });
+  const [discountPercent, setDiscountPercent] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem(COUPON_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed.discount ?? 70;
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+    return 70;
+  });
 
   // Sync to localStorage
   useEffect(() => {
-    if (!isHydrated) return;
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
       localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify({ code: activeCoupon, discount: discountPercent }));
     } catch {
       // Ignore
     }
-  }, [cartItems, activeCoupon, discountPercent, isHydrated]);
+  }, [cartItems, activeCoupon, discountPercent]);
 
   const openCart = () => setIsOpen(true);
   const closeCart = () => setIsOpen(false);

@@ -4,13 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useLocale } from 'next-intl';
 
 export default function CookieConsent() {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(() => {
+    try {
+      const consent = localStorage.getItem('fabrika_cookie_consent');
+      return !consent;
+    } catch {
+      return false;
+    }
+  });
   const locale = useLocale();
-
-  useEffect(() => {
-    const consent = localStorage.getItem('fabrika_cookie_consent');
-    if (!consent) setVisible(true);
-  }, []);
 
   const handleAccept = () => {
     localStorage.setItem('fabrika_cookie_consent', JSON.stringify({
