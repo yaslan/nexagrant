@@ -24,8 +24,19 @@ interface BillingClientProps {
   tenantId: string;
   tenantName: string;
   currentPlanId: string;
-  /** The live campaign, decided by `getActiveTier()` on the server. */
+  /**
+   * The tier this tenant is priced under, from the server. Not necessarily the
+   * live campaign: a tenant that joined under one keeps that rate
+   * (`src/lib/billing/price-lock.ts`), so this can be a campaign that has since
+   * closed, and every price on this panel is computed from it.
+   */
   activeTier: DiscountTier;
+  /**
+   * True when the rate above is the tenant's own locked one rather than the
+   * campaign running now — the panel then says so instead of naming a campaign
+   * the customer can no longer join.
+   */
+  priceLocked?: boolean;
   /**
    * How many lifetime licences are actually on record, already turned into a
    * badge state by `lifetimeScarcity()` on the server. Same count and same four
@@ -85,6 +96,7 @@ export function BillingClient({
   tenantName,
   currentPlanId = 'team',
   activeTier,
+  priceLocked = false,
   lifetimeScarcity,
   entitlements,
 }: BillingClientProps) {
@@ -276,7 +288,9 @@ export function BillingClient({
             <h2 className="text-xl font-bold font-heading text-ink">{t('plansTitle')}</h2>
             <p className="text-xs text-muted">{t('plansBody')}</p>
             <p className="text-[11px] text-muted font-mono mt-1">
-              {t('activeTierNote', { code: activeTier.code, percent: activeTier.percentOff })}
+              {priceLocked
+                ? t('lockedTierNote', { code: activeTier.code, percent: activeTier.percentOff })
+                : t('activeTierNote', { code: activeTier.code, percent: activeTier.percentOff })}
             </p>
           </div>
 
@@ -528,33 +542,30 @@ export function BillingClient({
             </div>
             <p className="text-xs text-muted mt-0.5">{t('invoiceBody')}</p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold text-ink-2 bg-surface-hover px-3 py-1 rounded-xl">
-              VKN: 2840958172
-            </span>
-          </div>
         </div>
 
-        {/*
-          Demo invoice history. Every value below is typed in — there is no
-          Invoice table behind it, so the totals here are not the catalogue's
-          and are not claimed to be. Left untouched on purpose: binding this to
-          a record is its own card (CLAUDE.md rule 7), not a price-panel edit.
-        */}
+        {/* Demo invoice warning */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+          ⚠ {t('invoiceDemo')}
+        </div>
+
         <div className="bg-ground border border-border rounded-xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div>
             <span className="text-[11px] text-muted block">{t('invoiceLegalName')}</span>
-            <span className="font-bold text-ink block mt-0.5">Demo Ar-Ge ve Danışmanlık Ltd. Şti.</span>
+            <span className="font-bold text-ink block mt-0.5 text-amber-700">
+              <span className="font-mono text-[10px] mr-1">Demo:</span> Demo Ar-Ge ve Danışmanlık Ltd. Şti.
+            </span>
           </div>
           <div>
             <span className="text-[11px] text-muted block">{t('invoiceTaxOffice')}</span>
-            <span className="font-bold text-ink block mt-0.5 font-mono">Doğanbey V.D. / 2840958172</span>
+            <span className="font-bold text-ink block mt-0.5 font-mono text-amber-700">
+              <span className="text-[10px] mr-1">Demo:</span> Doğanbey V.D. / 2840958172
+            </span>
           </div>
           <div>
             <span className="text-[11px] text-muted block">{t('invoiceStatus')}</span>
-            <span className="font-bold text-emerald-700 block mt-0.5 flex items-center gap-1 font-mono">
-              ✓ {t('invoiceStatusValue')}
+            <span className="font-bold text-amber-700 block mt-0.5 flex items-center gap-1 font-mono text-[10px]">
+              {t('invoiceStatusDemo')}
             </span>
           </div>
         </div>
@@ -574,33 +585,19 @@ export function BillingClient({
             </thead>
             <tbody className="divide-y divide-border">
               {DEMO_INVOICES.map((invoice) => (
-                <tr key={invoice.no} className="hover:bg-ground/50">
-                  <td className="p-3 font-mono font-bold text-blue-900">{invoice.no}</td>
+                <tr key={invoice.no} className="hover:bg-ground/50 opacity-60">
+                  <td className="p-3 font-mono font-bold text-slate-500">{invoice.no}</td>
                   <td className="p-3 text-ink-2 font-mono">{invoice.date}</td>
                   <td className="p-3 text-ink font-medium">{invoice.description}</td>
                   <td className="p-3 font-mono text-ink-2">{invoice.base}</td>
                   <td className="p-3 font-mono font-bold text-ink">{invoice.total}</td>
                   <td className="p-3">
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">
-                      {t('invoiceApproved')}
+                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">
+                      {t('invoiceStatusDemo')}
                     </span>
                   </td>
-                  <td className="p-3 text-right space-x-2">
-                    <a
-                      href={`/api/billing/invoices/${invoice.no}/export?format=xml`}
-                      download
-                      className="inline-block text-[11px] bg-surface-hover hover:bg-slate-200 text-ink font-bold px-2.5 py-1 rounded-lg transition"
-                    >
-                      {t('invoiceXml')}
-                    </a>
-                    <a
-                      href={`/api/billing/invoices/${invoice.no}/export?format=pdf`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block text-[11px] bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1 rounded-lg transition shadow-2xs"
-                    >
-                      {t('invoicePdf')}
-                    </a>
+                  <td className="p-3 text-right">
+                    <span className="text-[11px] text-muted font-mono">{t('invoiceDemo')}</span>
                   </td>
                 </tr>
               ))}
