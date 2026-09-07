@@ -28,26 +28,37 @@ import { describe, it, expect } from 'vitest';
  * fabricated demo response — a green build and a 200 OK over a query that never
  * ran.
  *
- * So there are now two guards:
+ * TASK-MTRKVWOGQFSO3 widened it again, for the same reason. The model-level
+ * sweep was already repo-wide, but the *field*-level check still only looked at
+ * a hand-listed set of M8 surfaces — so M2's `include: { topic: true }` and
+ * `include: { opportunity: true }` on models that declare neither relation walked
+ * straight through the gate, and the concept note threw on every call.
  *
- * 1. The field-level check over SCANNED — model, relation *and* column names for
- *    the surfaces listed there.
- * 2. A repo-wide sweep of `src/`: no file anywhere may call a Prisma model the
- *    schema does not declare. KNOWN_UNKNOWN_MODEL_CALLS below is the ledger of
- *    the ones that remain, and it can only shrink.
+ * Pointing the field check at `src/` needed one piece of schema the parser did
+ * not have: compound keys. `@@unique([tenantId, moduleId])` makes
+ * `where: { tenantId_moduleId: {...} }` legal, and without that knowledge the
+ * check called 19 correct queries broken. So the parser now reads `@@unique`
+ * and `@@id` blocks, registers the key name they generate, and validates the
+ * fields *inside* the key object against the same model.
+ *
+ * So there are now two guards, both repo-wide over `src/`:
+ *
+ * 1. The field-level check — model, relation *and* column names, including
+ *    compound-key members. KNOWN_UNKNOWN_FIELD_REFS is its ledger.
+ * 2. The model-level sweep: no file may call a Prisma model the schema does not
+ *    declare. KNOWN_UNKNOWN_MODEL_CALLS is its ledger.
+ *
+ * Both ledgers may only shrink: a fixed entry fails a staleness test, and an
+ * unlisted problem fails the check.
  */
 
 const REPO = resolve(__dirname, '../../../..');
 
-/** Files whose Prisma queries serve M8. */
-const SCANNED = [
-  'src/modules/m8',
-  'src/lib/scoring/consortium.ts',
-  'src/app/[locale]/(app)/[workspace]/opportunities/[id]/matching/page.tsx',
-  'src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx',
-  'src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions.ts',
-  'src/app/api/v1/partners',
-];
+/**
+ * What the field-level check reads. Repo-wide since TASK-MTRKVWOGQFSO3 — the
+ * M8-only list it replaced is exactly why M2's phantom `include`s shipped.
+ */
+const SCANNED = ['src'];
 
 /** Everything the repo-wide sweep looks at. */
 const SWEEP_ROOT = 'src';
@@ -68,6 +79,20 @@ const SWEEP_ROOT = 'src';
  */
 const KNOWN_UNKNOWN_MODEL_CALLS = new Map<string, string[]>([]);
 
+/**
+ * Files allowed to name a field, relation or column the schema does not declare,
+ * with the query path each one takes. Same contract as the model ledger above:
+ * **it may only shrink.** An entry whose reference has been fixed fails the
+ * staleness test below, and an unlisted bad reference fails the check.
+ *
+ * **It is empty, and the intent is that it stays empty.** The one reference that
+ * was still broken when the field check went repo-wide —
+ * `savedSearch.findMany.include.tenant` in src/lib/inngest/jobs/alerts-daily.ts,
+ * a `tenant` relation `model SavedSearch` does not have — was fixed under
+ * TASK-MTRKWBLXUYSHS in the same wave, so its entry is gone with it.
+ */
+const KNOWN_UNKNOWN_FIELD_REFS = new Map<string, string[]>([]);
+
 const QUERY_METHODS = [
   'findMany', 'findFirst', 'findUnique', 'findFirstOrThrow', 'findUniqueOrThrow',
   'create', 'createMany', 'update', 'updateMany', 'upsert',
@@ -83,6 +108,12 @@ interface Field {
   name: string;
   /** Target model when the field is a relation, otherwise null. */
   relationTo: string | null;
+  /**
+   * True for the synthetic field a compound key generates —
+   * `@@unique([tenantId, moduleId])` makes `tenantId_moduleId` addressable in a
+   * `where`. Its value object holds fields of the *same* model, not of another.
+   */
+  compound: boolean;
 }
 
 function parseSchema(): Map<string, Map<string, Field>> {
@@ -105,8 +136,31 @@ function parseSchema(): Map<string, Map<string, Field>> {
       if (!fieldMatch) continue;
       const [, fieldName, type] = fieldMatch;
       if (!fieldName || !type) continue;
-      fields.set(fieldName, { name: fieldName, relationTo: bodies.has(type) ? type : null });
+      fields.set(fieldName, {
+        name: fieldName,
+        relationTo: bodies.has(type) ? type : null,
+        compound: false,
+      });
     }
+
+    // `@@unique([a, b])` / `@@id([a, b])` generate the addressable key `a_b`
+    // (schema order, joined with `_`), or the given `name:` when one is set.
+    // Without this every correct compound-key `where` reads as an unknown field.
+    const keyRe = /^\s*@@(?:unique|id)\s*\(\s*\[([^\]]*)\]([^)]*)\)/gm;
+    let k: RegExpExecArray | null;
+    while ((k = keyRe.exec(body)) !== null) {
+      const members = (k[1] ?? '')
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (members.length === 0 || !members.every((member) => fields.has(member))) continue;
+      const named = /\bname\s*:\s*['"]([^'"]+)['"]/.exec(k[2] ?? '');
+      const keyName = named?.[1] ?? members.join('_');
+      // A real column of that name always wins; do not shadow it.
+      if (fields.has(keyName)) continue;
+      fields.set(keyName, { name: keyName, relationTo: null, compound: true });
+    }
+
     models.set(name, fields);
   }
   return models;
@@ -223,6 +277,8 @@ function topLevelEntries(body: string): { key: string; value: string }[] {
 
 interface Problem {
   file: string;
+  /** Full query path, e.g. `savedSearch.findMany.include.tenant`. */
+  path: string;
   message: string;
 }
 
@@ -249,8 +305,17 @@ function checkFieldObject(
     if (!field) {
       problems.push({
         file,
+        path: `${path}.${key}`,
         message: `${path}.${key} — \`${key}\` is not a field of model \`${model}\` in prisma/schema.prisma`,
       });
+      continue;
+    }
+
+    // A compound key's value is an object of this same model's fields —
+    // `where: { tenantId_moduleId: { tenantId, moduleId } }` — so walk it, and a
+    // typo inside the key is caught like any other.
+    if (field.compound) {
+      if (value) checkFieldObject(value, model, models, file, problems, `${path}.${key}`);
       continue;
     }
 
@@ -274,46 +339,67 @@ function checkFieldObject(
 
 const CALL_SOURCE = `\\b(?:prisma|tx)\\.([a-z][A-Za-z0-9_]*)\\.(${QUERY_METHODS.join('|')})\\s*\\(`;
 
-function scan(models: Map<string, Map<string, Field>>): Problem[] {
+/** Every file the field-level check walks. */
+function scannedFiles(): string[] {
+  return SCANNED.flatMap((target) => listFiles(target));
+}
+
+/** Every Prisma query in one file's (comment-stripped) source. */
+function scanSource(
+  source: string,
+  rel: string,
+  models: Map<string, Map<string, Field>>
+): Problem[] {
   const problems: Problem[] = [];
+  // Built per source on purpose: a `g` regex carries `lastIndex` between
+  // strings, so a match near the end of one file silently skips the next
+  // shorter one.
+  const callRe = new RegExp(CALL_SOURCE, 'g');
+  let m: RegExpExecArray | null;
 
-  for (const target of SCANNED) {
-    for (const file of listFiles(target)) {
-      // Built per file on purpose: a `g` regex carries `lastIndex` between
-      // strings, so a match near the end of one file silently skips the next
-      // shorter one.
-      const callRe = new RegExp(CALL_SOURCE, 'g');
-      const source = stripComments(readFileSync(file, 'utf8'));
-      const rel = file.slice(REPO.length + 1);
-      let m: RegExpExecArray | null;
+  while ((m = callRe.exec(source)) !== null) {
+    const delegate = m[1];
+    if (!delegate) continue;
+    const model = delegateToModel(delegate);
 
-      while ((m = callRe.exec(source)) !== null) {
-        const delegate = m[1];
-        if (!delegate) continue;
-        const model = delegateToModel(delegate);
+    if (!models.has(model)) {
+      problems.push({
+        file: rel,
+        path: `${delegate}.${m[2]}`,
+        message: `prisma.${delegate}.* — there is no \`model ${model}\` in prisma/schema.prisma`,
+      });
+      continue;
+    }
 
-        if (!models.has(model)) {
-          problems.push({
-            file: rel,
-            message: `prisma.${delegate}.* — there is no \`model ${model}\` in prisma/schema.prisma`,
-          });
-          continue;
-        }
+    const argsOpen = source.indexOf('(', m.index + m[0].length - 1);
+    const args = balanced(source, argsOpen, ['(', ')']);
+    // `findMany(SAVED_SEARCH_ALERT_QUERY)` — a query hoisted into a const is
+    // still a query. Without this, extracting one out of the call is enough
+    // to hide it from the gate.
+    const hoisted = /^\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*$/.exec(args)?.[1];
+    const literal = hoisted
+      ? (() => {
+          const declRe = new RegExp(`\\bconst\\s+${hoisted}\\b[^=]*=\\s*\\{`);
+          const decl = declRe.exec(source);
+          return decl ? source.slice(decl.index + decl[0].length - 1) : '';
+        })()
+      : args;
+    const objOpen = literal.indexOf('{');
+    if (objOpen === -1) continue;
+    const objBody = balanced(literal, objOpen, ['{', '}']);
 
-        const argsOpen = source.indexOf('(', m.index + m[0].length - 1);
-        const args = balanced(source, argsOpen, ['(', ')']);
-        const objOpen = args.indexOf('{');
-        if (objOpen === -1) continue;
-        const objBody = balanced(args, objOpen, ['{', '}']);
-
-        for (const { key, value } of topLevelEntries(objBody)) {
-          if (!FIELD_BEARING.has(key) || !value) continue;
-          checkFieldObject(value, model, models, rel, problems, `${delegate}.${m[2]}.${key}`);
-        }
-      }
+    for (const { key, value } of topLevelEntries(objBody)) {
+      if (!FIELD_BEARING.has(key) || !value) continue;
+      checkFieldObject(value, model, models, rel, problems, `${delegate}.${m[2]}.${key}`);
     }
   }
   return problems;
+}
+
+function scan(models: Map<string, Map<string, Field>>): Problem[] {
+  return scannedFiles().flatMap((file) =>
+    scanSource(stripComments(readFileSync(file, 'utf8')), file.slice(REPO.length + 1), models)
+  );
 }
 
 /**
@@ -342,7 +428,7 @@ function sweepModelCalls(): Map<string, Set<string>> {
   return found;
 }
 
-describe('M8 Prisma queries match prisma/schema.prisma', () => {
+describe('every Prisma query in src/ matches prisma/schema.prisma', () => {
   const models = parseSchema();
 
   it('parses the schema it is validating against', () => {
@@ -352,10 +438,84 @@ describe('M8 Prisma queries match prisma/schema.prisma', () => {
     expect(models.get('Opportunity')?.get('seats')?.relationTo).toBe('ConsortiumSeat');
   });
 
+  it('reads compound keys out of the schema', () => {
+    // Compound-key blindness is what kept the field check off `src/`: without
+    // this, 19 correct `where: { tenantId_moduleId: {...} }` queries read as
+    // unknown fields and the noise buried the one real bug.
+    const moduleState = models.get('ModuleState');
+    expect(moduleState?.get('tenantId_moduleId')?.compound).toBe(true);
+    expect(models.get('CordisCoParticipation')?.get('orgA_orgB')?.compound).toBe(true);
+    // `@@id([projectId, topicCode])`, not `@@unique`.
+    expect(models.get('CordisProjectTopic')?.get('projectId_topicCode')?.compound).toBe(true);
+    // A key name is synthetic; it must not shadow or invent a real column.
+    expect(moduleState?.get('tenantId')?.compound).toBe(false);
+    expect(moduleState?.has('tenantId_state')).toBe(false);
+  });
+
+  it('actually reads the queries it is checking', () => {
+    // A scan that walked nothing would report a clean repo and make the
+    // assertion below vacuous. Pin it to files that are known to be walked.
+    const walked = new Set(scannedFiles().map((f) => f.slice(REPO.length + 1)));
+    expect(walked.size).toBeGreaterThan(200);
+    expect(walked.has('src/modules/m8/server/matching.ts')).toBe(true);
+    expect(walked.has('src/lib/inngest/jobs/alerts-daily.ts')).toBe(true);
+    expect(walked.has('src/modules/m2/server/actions.ts')).toBe(true);
+  });
+
+  it('follows a query hoisted into a const', () => {
+    // src/lib/inngest/jobs/alerts-daily.ts moved its query into
+    // SAVED_SEARCH_ALERT_QUERY. If the scanner only read inline literals, then
+    // lifting a query out of the call would be all it took to leave the gate.
+    const sound =
+      'const Q = { where: { notify: true }, select: { id: true, tenantId: true } } as const;\n' +
+      'await prisma.savedSearch.findMany(Q);';
+    expect(scanSource(sound, 'fixture.ts', models)).toEqual([]);
+
+    // `model SavedSearch` has the scalar `tenantId` and no `tenant` relation —
+    // the reference that stopped the daily alert job from ever sending mail.
+    const broken =
+      'const Q = { include: { tenant: true } } as const;\n' +
+      'await prisma.savedSearch.findMany(Q);';
+    expect(scanSource(broken, 'fixture.ts', models).map((p) => p.path)).toEqual([
+      'savedSearch.findMany.include.tenant',
+    ]);
+  });
+
   it('names only models, relations and columns that exist', () => {
+    const unexpected = scan(models).filter(
+      (p) => !(KNOWN_UNKNOWN_FIELD_REFS.get(p.file) ?? []).includes(p.path)
+    );
+    const report = [...new Set(unexpected.map((p) => `  ${p.file}: ${p.message}`))]
+      .sort()
+      .join('\n');
+    expect(
+      report,
+      `A Prisma query names a model, relation or column the schema does not ` +
+        `declare. It throws PrismaClientValidationError on a real click, and ` +
+        `\`pnpm typecheck\` cannot see it because prisma-override.d.ts types every ` +
+        `delegate as \`any\`. Fix the query — do not add it to ` +
+        `KNOWN_UNKNOWN_FIELD_REFS.\n${report}`
+    ).toBe('');
+  });
+
+  it('keeps the known-broken field list from going stale', () => {
     const problems = scan(models);
-    const report = problems.map((p) => `  ${p.file}: ${p.message}`).join('\n');
-    expect(report, `M8 queries reference things the schema does not have:\n${report}`).toBe('');
+    const stale: string[] = [];
+
+    for (const [file, allowed] of KNOWN_UNKNOWN_FIELD_REFS) {
+      for (const path of allowed) {
+        if (!problems.some((p) => p.file === file && p.path === path)) {
+          stale.push(`  ${file}: \`${path}\` is no longer broken — drop it from the list`);
+        }
+      }
+    }
+
+    const report = stale.sort().join('\n');
+    expect(
+      report,
+      `KNOWN_UNKNOWN_FIELD_REFS is out of date. The list may only shrink, so a ` +
+        `fixed entry has to be deleted rather than left behind.\n${report}`
+    ).toBe('');
   });
 
   it('would have caught the models this module used to invent', () => {
@@ -368,6 +528,16 @@ describe('M8 Prisma queries match prisma/schema.prisma', () => {
     expect(models.get('ConsortiumSeat')?.has('organization')).toBe(false);
     expect(models.get('Opportunity')?.has('callId')).toBe(false);
     expect(models.get('Opportunity')?.has('topic')).toBe(false);
+  });
+
+  it('would have caught the phantom includes that crashed M2 concept notes', () => {
+    // TASK-MTRKV25PNBHPX. Both models carry the scalar id and no relation, so
+    // `include: { topic: true }` / `include: { opportunity: true }` threw on
+    // every concept-note call while this check still only looked at M8.
+    expect(models.get('Opportunity')?.has('topicId')).toBe(true);
+    expect(models.get('Opportunity')?.has('topic')).toBe(false);
+    expect(models.get('ConceptNote')?.has('opportunityId')).toBe(true);
+    expect(models.get('ConceptNote')?.has('opportunity')).toBe(false);
   });
 });
 
