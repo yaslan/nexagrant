@@ -1096,7 +1096,7 @@
           "f2": "100 YZ kredisi / ay",
           "f3": "Açık çağrı arama ve filtreleme (SEDIA Live)",
           "f4": "G0-G4 fırsat hattı ve Kanban",
-          "f5": "Temel CORDIS ortak arama",
+          "f5": "M2 konsept notu taslakları",
           "f6": "Topluluk ve Discord destek erişimi"
         },
         "pro": {
@@ -1104,7 +1104,7 @@
           "f1": "1 çalışma alanı (workspace)",
           "f2": "500 YZ kredisi / ay",
           "f3": "M1 CORDIS ağ analitiği ve graf haritası",
-          "f4": "M2 konsept notu ve M3 kanıt paketi deposu",
+          "f4": "M4 Focal Point ve M8 konsorsiyum eşleştirme",
           "f5": "Evaluator Lens (AB hakem simülatörü)",
           "f6": "Öncelikli e-posta ve canlı destek"
         },
@@ -1263,20 +1263,20 @@
       "plans": {
         "basic": {
           "desc": "Solo başlangıç — ilk adım.",
-          "seats": "1 kullanıcı / 1 çalışma alanı",
-          "credits": "500 YZ kredisi / ay",
-          "modules": "Modüller: M3, M5"
+          "seats": "2 kullanıcı / 1 çalışma alanı",
+          "credits": "100 YZ kredisi / ay",
+          "modules": "Modüller: M2, M3, M5"
         },
         "pro": {
           "desc": "Ciddi günlük kullanım ve projeler.",
-          "seats": "Sınırsız çalışma alanı",
-          "credits": "3.000 YZ kredisi / ay",
-          "modules": "Modüller: M1-M6, M8"
+          "seats": "6 kullanıcı / 1 çalışma alanı",
+          "credits": "500 YZ kredisi / ay",
+          "modules": "Modüller: M1-M5, M8"
         },
         "ultra": {
           "desc": "Tüm ekosistem ve kurumsal konsorsiyumlar.",
-          "seats": "Sınırsız koltuk ve çalışma alanı",
-          "credits": "Sınırsız YZ kredisi (kendi anahtarınız)",
+          "seats": "15 kullanıcı / 5 çalışma alanı",
+          "credits": "2.000 YZ kredisi / ay",
           "modules": "Modüller: M1-M11"
         }
       }

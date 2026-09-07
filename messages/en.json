@@ -1096,7 +1096,7 @@
           "f2": "100 AI credits / month",
           "f3": "Open call search and filtering (SEDIA Live)",
           "f4": "G0-G4 opportunity pipeline and Kanban",
-          "f5": "Basic CORDIS partner search",
+          "f5": "M2 concept note drafts",
           "f6": "Community and Discord support access"
         },
         "pro": {
@@ -1104,7 +1104,7 @@
           "f1": "1 workspace",
           "f2": "500 AI credits / month",
           "f3": "M1 CORDIS network and graph analytics",
-          "f4": "M2 concept notes and M3 evidence vault",
+          "f4": "M4 Focal Point and M8 consortium matching",
           "f5": "Evaluator Lens (EU review simulator)",
           "f6": "Priority email and live support"
         },
@@ -1263,20 +1263,20 @@
       "plans": {
         "basic": {
           "desc": "Solo start — the first step.",
-          "seats": "1 user / 1 workspace",
-          "credits": "500 AI credits / month",
-          "modules": "Modules: M3, M5"
+          "seats": "2 users / 1 workspace",
+          "credits": "100 AI credits / month",
+          "modules": "Modules: M2, M3, M5"
         },
         "pro": {
           "desc": "For serious daily use and projects.",
-          "seats": "Unlimited workspaces",
-          "credits": "3,000 AI credits / month",
-          "modules": "Modules: M1-M6, M8"
+          "seats": "6 users / 1 workspace",
+          "credits": "500 AI credits / month",
+          "modules": "Modules: M1-M5, M8"
         },
         "ultra": {
           "desc": "The whole ecosystem and enterprise consortia.",
-          "seats": "Unlimited seats and workspaces",
-          "credits": "Unlimited AI credits (bring your own key)",
+          "seats": "15 users / 5 workspaces",
+          "credits": "2,000 AI credits / month",
           "modules": "Modules: M1-M11"
         }
       }
