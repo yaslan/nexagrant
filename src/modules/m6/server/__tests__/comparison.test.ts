@@ -2,16 +2,14 @@
  * M6 Evaluator Lens — Comparison & Validation Tests.
  *
  * TASK-MTPZHMSPMDA66: Tests for ESR comparison, score validation, and access control.
+ *
+ * Async validation functions (validateEvaluationTenant, validateReviewerAccess,
+ * checkNoDuplicateScore, validateReviewersTenant) are tested via integration tests
+ * in actions.test.ts alongside server action flows, as they require a database.
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  validateScoreRange,
-  validateEvaluationTenant,
-  validateReviewerAccess,
-  checkNoDuplicateScore,
-  validateReviewersTenant,
-} from '../comparison';
+import { validateScoreRange } from '../comparison';
 
 describe('M6 Comparison & Validation', () => {
   // ───────── TEST 1: Score range validation — valid scores

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
@@ -60,7 +60,6 @@ export default function CallsPage({
 
   const [topics, setTopics] = useState<SediaTopic[]>([]);
   const [totalResults, setTotalResults] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [savingSearch, setSavingSearch] = useState(false);
   const [savedSearchMessage, setSavedSearchMessage] = useState<string | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<SediaTopic | null>(null);
@@ -126,45 +125,60 @@ export default function CallsPage({
     return () => clearTimeout(handler);
   }, [search]);
 
-  // Fetch calls from live SEDIA API route
-  const loadCalls = useCallback(async () => {
-    setLoading(true);
-    try {
-      const queryParams = new URLSearchParams();
-      if (debouncedSearch.trim()) queryParams.set('q', debouncedSearch.trim());
-      if (framework !== 'ALL') queryParams.set('framework', framework);
-      if (statuses.length > 0) queryParams.set('status', statuses.join(','));
-      queryParams.set('type', callType);
-      queryParams.set('lang', locale);
-      queryParams.set('page', page.toString());
-      queryParams.set('limit', limit.toString());
+  // The query string doubles as the identity of the request the list is currently showing.
+  const query = useMemo(() => {
+    const queryParams = new URLSearchParams();
+    if (debouncedSearch.trim()) queryParams.set('q', debouncedSearch.trim());
+    if (framework !== 'ALL') queryParams.set('framework', framework);
+    if (statuses.length > 0) queryParams.set('status', statuses.join(','));
+    queryParams.set('type', callType);
+    queryParams.set('lang', locale);
+    queryParams.set('page', page.toString());
+    queryParams.set('limit', limit.toString());
+    return queryParams.toString();
+  }, [debouncedSearch, framework, statuses, callType, locale, page, limit]);
 
-      const res = await fetch(`/api/cagrilar?${queryParams.toString()}`);
-      const data = await res.json();
+  const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
 
-      if (data.success) {
-        setTopics(data.topics || []);
-        setTotalResults(data.totalResults || 0);
-      } else {
+  // Derived, not stored: whatever is on screen was fetched for `loadedQuery`, so the list is
+  // stale exactly while that differs from the query the current filters describe. The old
+  // `loading` flag had to be raised synchronously inside the effect to say the same thing,
+  // which is the cascading render React 19 flags.
+  const loading = loadedQuery !== query;
+
+  // Fetch calls from live SEDIA API route. Nothing here is server-rendered, so the request
+  // has to start from an effect — but every setState happens after an await, and a response
+  // that lands after the filters moved on is dropped instead of overwriting a newer list.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/cagrilar?${query}`);
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (data.success) {
+          setTopics(data.topics || []);
+          setTotalResults(data.totalResults || 0);
+        } else {
+          setTopics([]);
+          setTotalResults(0);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Failed to fetch calls:', err);
         setTopics([]);
         setTotalResults(0);
+      } finally {
+        if (!cancelled) setLoadedQuery(query);
       }
-    } catch (err) {
-      console.error('Failed to fetch calls:', err);
-      setTopics([]);
-      setTotalResults(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedSearch, framework, statuses, callType, page, limit]);
+    })();
 
-  useEffect(() => {
-    // Fetch-on-mount/filter-change: loadCalls is a useCallback with a complete dependency
-    // array and flips the loading flag before awaiting. There is no server-rendered value to
-    // seed this list from, so the request has to start from an effect.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
-    loadCalls();
-  }, [loadCalls]);
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
 
   const toggleStatus = (st: string) => {
     setPage(1);

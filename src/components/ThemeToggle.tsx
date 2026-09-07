@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Sun, Moon, Monitor, Check } from 'lucide-react';
+import { useIsHydrated } from '@/lib/hooks/use-is-hydrated';
 import { useTheme, Theme } from './ThemeProvider';
 
 interface ThemeToggleProps {
@@ -17,15 +18,12 @@ export default function ThemeToggle({
 }: ThemeToggleProps) {
   const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // The mounted flag exists precisely to defer the interactive markup to the client pass;
-    // setting it anywhere but an effect would defeat the hydration guard below.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
-    setMounted(true);
-  }, []);
+  // The theme comes from `localStorage` and the OS preference, neither of which the server can
+  // see, so the interactive markup has to wait for the client. `useIsHydrated` is that guard
+  // without the mount effect that used to drive it.
+  const mounted = useIsHydrated();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

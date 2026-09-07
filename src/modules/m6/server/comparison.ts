@@ -5,8 +5,7 @@
  * for score integrity, reviewer access, and tenant isolation.
  */
 
-import { PrismaClient } from '@prisma/client';
-import { compareWithEsr, esrScoreFromProposal, type EsrComparisonResult, type TenantScopedDb } from './scoring';
+import { compareWithEsr, type EsrComparisonResult, type TenantScopedDb } from './scoring';
 
 /**
  * Compare M6 panel score to ESR for a specific evaluation.
