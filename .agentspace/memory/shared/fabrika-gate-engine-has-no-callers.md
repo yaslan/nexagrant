@@ -1,10 +1,21 @@
 ---
 name: fabrika-gate-engine-has-no-callers
-description: evaluateGate() Fabrika'da hiçbir uygulama kodundan çağrılmıyor — yalnız testler çağırıyor; kullanıcının gördüğü tek "Kapıyı Değerlendir" düğmesi bir alert() tiyatrosu
+description: ÇÖZÜLDÜ (2026-09-07, TASK-MTQW4FY5E9UBK) — evaluateGate() artık pipeline detay sayfasından çağrılıyor; engine hâlâ kiracı filtresiz okuduğu için her ÇAĞIRAN sahipliği kendisi doğrulamak zorunda
 metadata:
   type: project
   updatedAt: 2026-09-07
 ---
+
+> **DURUM (2026-09-07 akşam, TASK-MTQW4FY5E9UBK): ÇÖZÜLDÜ.** Aşağıdaki teşhis tarihseldir.
+> `pipeline/actions.ts → evaluateOpportunityGate` server action'ı `evaluateGate()`'i çağırıyor;
+> `pipeline/[id]/client.tsx`'teki düğme bunu tetikliyor, iki `alert()` gitti. Gerçek tıklamayla
+> yazılan `GateDecision` satırları artık `decidedBy = demo-user-alice` (script değil).
+>
+> **KALICI OLAN kısım:** `src/lib/gates/evaluate.ts` fırsatı hâlâ `findUnique({where:{id}})` ile,
+> yani **tenant filtresi olmadan** okuyor ve `GateDecision`'ı kendisine verilen `tenantId` ile
+> yazıyor. Bu yüzden HER çağıran, çağırmadan önce `withTenant` içinde sahipliği doğrulamak
+> zorunda (bkz. `evaluateOpportunityGate`). Engine'e ikinci bir çağıran eklemeden önce ya aynı
+> kontrolü kopyala ya da filtreyi engine'in içine taşı.
 
 2026-09-07 dogfood'unda (TASK-MTQUY6BHOGO66) ölçüldü:
 
