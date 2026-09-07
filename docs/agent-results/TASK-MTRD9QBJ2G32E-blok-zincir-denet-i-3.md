@@ -300,3 +300,23 @@ silindi; test için açılan iki kiracı ve iki fatura satırı da temizlendi
    `validateTCKN` `src/lib/efatura.ts`'te hazır duruyor ama satır yazılırken çağrılmıyor.
    Satırı yazan kod (madde 2) geldiğinde bu doğrulama oraya konmalı — DB'ye geçersiz bir
    VKN girerse belge onu olduğu gibi basar.
+
+---
+
+## 7. Teslim notu — commit nerede
+
+Bu kartın 11 kaynak dosyası ve kanıtları, ben `git add` etmeden önce **başka ajanların geniş
+`git add`'ine kapıldı** ve şu commit'lere girdi:
+
+- `7a40d72 fix(m5): harmonize G0 gate rules …` — `prisma/schema.prisma`, `prisma/rls.sql`,
+  `add-invoice.sql(.down)`, `src/lib/env.ts`, `src/lib/efatura.ts`, `route.ts`,
+  `invoice-document.ts`, iki test dosyası, `docs/DATA_MODEL.md`
+- `c8abb64 docs(memory): stale board status …` — bu rapor ve tüm kareler
+
+Doğrulandı: **11 dosyanın 11'i de HEAD'de, test ettiğim hâliyle bayt bayt aynı**
+(`git diff HEAD -- <dosya>` her biri için 0 satır). Yani iş eksiksiz indi, yalnız commit
+mesajı yanlış kartın adını taşıyor. Paylaşılan geçmişi yeniden yazmadım — başka ajanlar aynı
+ağaçta çalışıyor ve rebase onların işini bozardı.
+
+Bu, `.agentspace/memory/shared/fabrika-parallel-agent-file-race.md`'de yazılı riskin
+gerçekleşmiş hâlidir: `git add -A` / `git commit -a` bu depoda başkasının işini yutuyor.
