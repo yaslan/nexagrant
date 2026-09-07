@@ -1,46 +1,18 @@
-===== pnpm gate — 2026-09-07T17:47:39Z =====
-  239:11  warning  'sharedDoc' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-/Users/macbook/AgentSpace/fabrika/tests/modules/m11.test.ts
-    4:3   warning  'addBudgetLine' is defined but never used   @typescript-eslint/no-unused-vars
-    5:3   warning  'addWorkPackage' is defined but never used  @typescript-eslint/no-unused-vars
-  256:11  warning  'res' is assigned a value but never used    @typescript-eslint/no-unused-vars
-
-/Users/macbook/AgentSpace/fabrika/tests/modules/module-gate-coverage.test.ts
+===== pnpm gate (final) — 2026-09-07T17:51:08Z =====
+  112:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
+  39:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
+  15:14  warning  'err' is defined but never used. Allowed unused caught errors must match /^_/u     @typescript-eslint/no-unused-vars
+  33:14  warning  'err' is defined but never used. Allowed unused caught errors must match /^_/u     @typescript-eslint/no-unused-vars
+  189:14  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
+  54:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
+  275:16  warning  'err' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
+   75:12  warning  'err' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
+  100:12  warning  'err' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
+  69:12  warning  'err' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
   30:18  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
-
 ✖ 84 problems (0 errors, 84 warnings)
-
-[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
 $ tsc --noEmit
-[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
-$ vitest run --passWithNoTests
-(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
-  - `__dirname` (vitest.config.mts:8:48). Use `import.meta.dirname` instead
-Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
-
- RUN  v4.1.11 /Users/macbook/AgentSpace/fabrika
-
-(node:71908) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
-(Use `node --trace-warnings ...` to show where the warning was created)
-<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
-(node:71900) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
-(Use `node --trace-warnings ...` to show where the warning was created)
-
  Test Files  74 passed | 2 skipped (76)
       Tests  788 passed | 8 skipped (796)
-   Start at  20:47:49
-   Duration  2.33s (transform 3.33s, setup 0ms, import 8.28s, tests 4.35s, environment 1.94s)
-
-[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
-$ tsx scripts/check-rls.ts
-Found 40 tenant-scoped models requiring RLS policies:
-AddOn, AiUsageLog, ApiKey, ApplicationPart, ApprovalRequest, AuditEvent, CalendarConnection, Claim, ConceptNote, ConsortiumSeat, CreditLedger, Criterion, Effort, Evaluation, Evidence, Feedback, FollowupDoc, GateDecision, Interaction, Invitation, Invoice, LifetimeLicence, MarketplaceListing, MeetingBrief, Membership, ModuleState, Opportunity, PartnerOrg, Proposal, ProposalUsage, Relationship, Reviewer, SavedSearch, Score, SeatCandidate, Subscription, TenantProfile, TopicMatch, TtoPortfolioItem, Workspace
-
 ✅ SUCCESS: All 40 tenant-scoped models have RLS policies registered.
-   (Declared, not measured — `pnpm rls:verify` asks the database.)
-[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
-$ tsx scripts/check-rls-live.ts
-Kiracıya özel model: 40 · RLS açık tablo: 43 · tenant_isolation politikası: 40
-
 ✅ Veritabanı 40 kiracıya özel tablonun tamamında izolasyonu uyguluyor.

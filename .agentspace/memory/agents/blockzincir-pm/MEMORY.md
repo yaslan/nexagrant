@@ -27,3 +27,5 @@
 - [price-lock-validation-complete](price-lock-validation-done.md) — TASK-MTR882HVZ8BG7 fiyat kilidi doğrulaması tamamlandı — koda dokunmamış, UI kareleri ve test kanıtı yeterli
 
 - [fabrika-stripe-renewal-price-mechanics](fabrika-stripe-renewal-price-mechanics.md) — Fabrika'da bir Stripe aboneliğinin yenileme tutarını kim/ne zaman belirliyor — checkout'ta bir kez sabitlenir, sonrası Stripe'ın kendi motoru; fiyat kilidi mutlak tutarı değil yüzdeyi dondurur
+
+- [fabrika-stale-board-status-check-git-first](fabrika-stale-board-status-check-git-first.md) — Görev tekrar önüne gelirse önce git log + önceki -N.md raporunu kontrol et; board in_progress diyor diye kör kör yeniden iş yapma
