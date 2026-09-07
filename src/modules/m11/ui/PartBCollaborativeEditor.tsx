@@ -259,7 +259,7 @@ export function PartBCollaborativeEditor({
     }, 2500);
 
     return () => clearTimeout(timer);
-  }, [editorText]);
+  }, [editorText, activeSection.content, handleSaveContent]);
 
   const totalWords = sections.reduce((acc, s) => {
     const content = s.key === activeSectionKey ? editorText : s.content;

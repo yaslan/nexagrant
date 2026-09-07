@@ -385,15 +385,15 @@ export default function ApprovalsClient({
       {rejectModalItem && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface dark:bg-zinc-900 border border-border dark:border-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-ink dark:text-white">Talebi Reddet</h3>
+            <h3 className="text-lg font-bold text-ink dark:text-white">{t('rejectModalTitle')}</h3>
             <p className="text-xs text-muted">
-              4-Eyes denetim izi için red gerekçesi belirtilmesi zorunludur:
+              {t('rejectModalHint')}
             </p>
             <form onSubmit={handleRejectSubmit} className="space-y-4">
               <textarea
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Örn: Bütçe dağılımında WP3 personeli yetersiz veya son revizyon eksik."
+                placeholder={t('rejectPlaceholder')}
                 required
                 rows={3}
                 className="w-full text-sm p-3 border border-border dark:border-gray-700 rounded-lg bg-ground dark:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -404,14 +404,14 @@ export default function ApprovalsClient({
                   onClick={() => setRejectModalItem(null)}
                   className="px-4 py-2 text-xs font-medium text-ink-2 dark:text-gray-300 bg-surface-hover dark:bg-gray-800 rounded-lg"
                 >
-                  İptal
+                  {t('modalCancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={loadingId === rejectModalItem.id || !rejectionReason.trim()}
                   className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg shadow-sm"
                 >
-                  Reddi Kaydet
+                  {t('saveRejection')}
                 </button>
               </div>
             </form>
@@ -426,7 +426,7 @@ export default function ApprovalsClient({
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-lg font-bold text-ink dark:text-white">{selectedRequestDetails.title}</h3>
-                <span className="text-xs text-muted">Talep ID: {selectedRequestDetails.id}</span>
+                <span className="text-xs text-muted">{t('requestIdLabel')}: {selectedRequestDetails.id}</span>
               </div>
               <button
                 onClick={() => setSelectedRequestDetails(null)}
@@ -442,7 +442,7 @@ export default function ApprovalsClient({
               </div>
               {selectedRequestDetails.auditHash && (
                 <div className="text-[11px] text-muted break-all">
-                  <strong>Kriptografik Doğrulama Hash&apos;i:</strong>
+                  <strong>{t('cryptoHashLabel')}:</strong>
                   <br />
                   <span className="font-mono">{selectedRequestDetails.auditHash}</span>
                 </div>
@@ -454,7 +454,7 @@ export default function ApprovalsClient({
                 onClick={() => setSelectedRequestDetails(null)}
                 className="px-4 py-2 text-xs font-medium text-ink-2 dark:text-gray-300 bg-surface-hover dark:bg-gray-800 rounded-lg"
               >
-                Kapat
+                {t('closeButton')}
               </button>
             </div>
           </div>
@@ -466,7 +466,7 @@ export default function ApprovalsClient({
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface dark:bg-zinc-900 border border-border dark:border-gray-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
             <div className="flex justify-between items-start">
-              <h3 className="text-lg font-bold text-ink dark:text-white">Yeni Çift Onay Talebi Oluştur</h3>
+              <h3 className="text-lg font-bold text-ink dark:text-white">{t('newRequestModalTitle')}</h3>
               <button onClick={() => setIsNewModalOpen(false)} className="text-muted hover:text-ink-2 font-bold">
                 &times;
               </button>
@@ -474,45 +474,45 @@ export default function ApprovalsClient({
 
             <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block font-semibold mb-1">İşlem Türü</label>
+                <label className="block font-semibold mb-1">{t('actionTypeFieldLabel')}</label>
                 <select
                   value={formActionType}
                   onChange={(e) => setFormActionType(e.target.value as DualApprovalActionType)}
                   className="w-full p-2.5 border border-border dark:border-gray-700 rounded-lg bg-ground dark:bg-zinc-800"
                 >
-                  <option value="GATE_G4_SUBMISSION">GATE_G4_SUBMISSION (Ufuk Avrupa Resmî Başvuru)</option>
-                  <option value="BUDGET_ALLOCATION">BUDGET_ALLOCATION (Bütçe / Kaynak Dağılımı)</option>
-                  <option value="LEGAL_COMMITMENT">LEGAL_COMMITMENT (Konsorsiyum NDA / LOI İmzası)</option>
-                  <option value="MEMBER_ROLE_ELEVATION">MEMBER_ROLE_ELEVATION (Yönetici Yetki Yükseltme)</option>
-                  <option value="SENSITIVE_SETTINGS_CHANGE">SENSITIVE_SETTINGS_CHANGE (Hassas Kurumsal Ayar)</option>
+                  <option value="GATE_G4_SUBMISSION">{t('actionTypeOptionG4')}</option>
+                  <option value="BUDGET_ALLOCATION">{t('actionTypeOptionBudget')}</option>
+                  <option value="LEGAL_COMMITMENT">{t('actionTypeOptionLegal')}</option>
+                  <option value="MEMBER_ROLE_ELEVATION">{t('actionTypeOptionRoleElevation')}</option>
+                  <option value="SENSITIVE_SETTINGS_CHANGE">{t('actionTypeOptionSensitive')}</option>
                 </select>
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Başlık</label>
+                <label className="block font-semibold mb-1">{t('titleFieldLabel')}</label>
                 <input
                   type="text"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="Örn: HORIZON-CL5-2026-D3-01 Resmî G4 Gönderim Onayı"
+                  placeholder={t('titlePlaceholder')}
                   required
                   className="w-full p-2.5 border border-border dark:border-gray-700 rounded-lg bg-ground dark:bg-zinc-800"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Açıklama (Opsiyonel)</label>
+                <label className="block font-semibold mb-1">{t('descriptionFieldLabel')}</label>
                 <textarea
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="Onaylayacak yetkiliye iletmek istediğiniz ek notlar..."
+                  placeholder={t('descriptionPlaceholder')}
                   rows={2}
                   className="w-full p-2.5 border border-border dark:border-gray-700 rounded-lg bg-ground dark:bg-zinc-800"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Payload Verisi (JSON)</label>
+                <label className="block font-semibold mb-1">{t('payloadFieldLabel')}</label>
                 <textarea
                   value={formPayloadJson}
                   onChange={(e) => setFormPayloadJson(e.target.value)}
@@ -528,13 +528,13 @@ export default function ApprovalsClient({
                   onClick={() => setIsNewModalOpen(false)}
                   className="px-4 py-2 text-xs font-medium text-ink-2 dark:text-gray-300 bg-surface-hover dark:bg-gray-800 rounded-lg"
                 >
-                  İptal
+                  {t('modalCancel')}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm"
                 >
-                  Talebi Başlat (Maker)
+                  {t('submitCreate')}
                 </button>
               </div>
             </form>

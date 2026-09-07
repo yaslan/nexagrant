@@ -51,7 +51,7 @@ export default function NotificationsClient({
     } catch (_e) {
       setNotifications(initialNotifications);
     }
-  }, [initialNotifications]);
+  }, [initialNotifications, storageKey]);
 
   useEffect(() => {
     // localStorage is not readable during SSR, so the read-state overlay cannot go into the
@@ -67,7 +67,7 @@ export default function NotificationsClient({
       window.removeEventListener('fonbridge_notifications_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
-  }, [locale, userEmail, initialNotifications]);
+  }, [syncNotifications]);
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
