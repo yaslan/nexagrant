@@ -177,13 +177,15 @@ bitince bu kayıt silindi — `meetingBrief` tablosu `demo-tenant` için tekrar 
 
 ## 6. Hafıza
 
-`.agentspace/memory/agents/ex-en/` altına iki kalıcı not eklendi:
-- Admin panelinde bir modülü ON yapabilmek için `requires` zincirini (M9 → M1+M4) sırayla ve
-  **art arda değil, her adımın DB'ye yazıldığını doğrulayarak** açmak gerektiği — art arda hızlı tıklama
-  bağımlı modülün "eski state" ile dependency kontrolüne takılıp `setModuleStates(initialStates)` tam
-  reset'iyle sonuçlanıyor (React state bug, ayrı bir kart açılabilir).
-- Demo tenant'ta bir modülün `ModuleState` satırı yoksa varsayılanın OFF olduğu ve `moduleGate` bunu
-  platform admin dahil herkese kapattığı (DEV/PILOT admin bypass'ı var, OFF'ta yok).
+Takım geneli olduğu için `.agentspace/memory/shared/fabrika-module-off-blocks-platform-admin-too.md`
+olarak kaydedildi (ex-en'e özel değil — herhangi bir ajan gated bir modülü canlı test ederken aynı
+duvara çarpar):
+- Demo tenant'ta bir modülün `ModuleState` satırı yoksa varsayılan OFF ve `moduleGate` bunu platform
+  admin dahil herkese kapatıyor (DEV/PILOT'ta admin bypass'ı var, OFF'ta yok).
+- `/admin/modules` istemci kodunda bir state bug: `requires` zincirini (M9 → M1+M4) art arda hızlı
+  tıklayarak açmaya çalışırsan, bağımlı modülün isteği DB'de henüz commit olmamış önceki modülü görüp
+  hata veriyor ve `catch` bloğu `setModuleStates(initialStates)` ile TÜM tenant state'ini mount anındaki
+  haline sıfırlıyor — her adımdan sonra DB'de doğrulayıp sıradakine geçmek gerekiyor.
 
 ## 7. DoD Checklist
 
