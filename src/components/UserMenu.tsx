@@ -167,9 +167,11 @@ export default function UserMenu({
       setNotificationsList(baseNotifications);
     }
   }, [baseNotifications, storageKey]);
- // eslint-disable-next-line react-hooks/set-state-in-effect
 
   useEffect(() => {
+    // Same as the notifications page: the read/unread overlay lives in localStorage, which is
+    // unavailable during SSR, so it is merged in once after mount instead of in the initializer.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
     syncNotifications();
 
     const handleUpdate = () => syncNotifications();

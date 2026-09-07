@@ -52,9 +52,12 @@ export default function NotificationsClient({
       setNotifications(initialNotifications);
     }
   }, [initialNotifications]);
- // eslint-disable-next-line react-hooks/set-state-in-effect
 
   useEffect(() => {
+    // localStorage is not readable during SSR, so the read-state overlay cannot go into the
+    // useState initializer without a hydration mismatch. Syncing it once after mount is the
+    // documented pattern for browser-only storage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
     syncNotifications();
 
     const handleUpdate = () => syncNotifications();

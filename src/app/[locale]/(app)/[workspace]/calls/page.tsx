@@ -156,8 +156,10 @@ export default function CallsPage({
   }, [debouncedSearch, framework, statuses, callType, page, limit]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    // loadCalls is a memoized async callback; setState in async callbacks is correct pattern.
+    // Fetch-on-mount/filter-change: loadCalls is a useCallback with a complete dependency
+    // array and flips the loading flag before awaiting. There is no server-rendered value to
+    // seed this list from, so the request has to start from an effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
     loadCalls();
   }, [loadCalls]);
 

@@ -164,7 +164,11 @@ export function PartBCollaborativeEditor({
   useEffect(() => {
     const sec = sections.find((s) => s.key === activeSectionKey);
     if (sec) {
+      // Loading the newly selected section into the editor is a one-shot sync from server data;
+      // it cannot be derived during render because the buffer is user-editable afterwards.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
       setEditorText(sec.content || '');
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
       setSaveStatus('SAVED');
     }
   }, [activeSectionKey, sections]);
@@ -184,21 +188,72 @@ export function PartBCollaborativeEditor({
     return () => clearInterval(interval);
   }, [partId, activeSectionKey]);
 
+  const calculateWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+  const currentSectionWords = calculateWords(editorText);
+  const currentSectionEstimatedPages = (currentSectionWords / 450).toFixed(1);
+
+  const handleSaveContent = async (isManual: boolean = true) => {
+    setIsSaving(true);
+    setSaveStatus('SAVING');
+    try {
+      await updateSectionContent(
+        partId,
+        activeSectionKey,
+        editorText,
+        currentUserId,
+        currentUserName,
+        currentUserOrg,
+        isManual ? 'Elle anlık kaydedildi' : 'Otomatik arka plan kaydı'
+      );
+
+      setSections((prev) =>
+        prev.map((s) =>
+          s.key === activeSectionKey
+            ? {
+                ...s,
+                content: editorText,
+                lastModifiedBy: currentUserName,
+                lastModifiedAt: new Date().toISOString(),
+              }
+            : s
+        )
+      );
+
+      const newRev: SectionRevisionItem = {
+        id: 'rev-' + Date.now(),
+        sectionKey: activeSectionKey,
+        authorName: currentUserName,
+        authorOrg: currentUserOrg,
+        timestamp: new Date().toISOString(),
+        wordCount: currentSectionWords,
+        summary: isManual ? 'Elle anlık kaydedildi' : 'Otomatik senkronizasyon kaydı',
+        content: editorText,
+      };
+      setRevisions((prev) => [newRev, ...prev.slice(0, 20)]);
+
+      setSaveStatus('SAVED');
+    } catch (err) {
+      console.error('Error saving content:', err);
+      setSaveStatus('UNSAVED');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (editorText === activeSection.content) return;
+    // Marking the draft dirty is the whole point of this effect: the user typed, so the
+    // save indicator must flip before the 2.5s autosave timer fires. There is no render-time
+    // value to derive it from.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
     setSaveStatus('UNSAVED');
 
     const timer = setTimeout(async () => {
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       await handleSaveContent(false);
     }, 2500);
 
     return () => clearTimeout(timer);
   }, [editorText]);
-
-  const calculateWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
-  const currentSectionWords = calculateWords(editorText);
-  const currentSectionEstimatedPages = (currentSectionWords / 450).toFixed(1);
 
   const totalWords = sections.reduce((acc, s) => {
     const content = s.key === activeSectionKey ? editorText : s.content;
@@ -251,55 +306,6 @@ export function PartBCollaborativeEditor({
           : s
       )
     );
-  };
-
-  const handleSaveContent = async (isManual: boolean = true) => {
-    setIsSaving(true);
-    setSaveStatus('SAVING');
-    try {
-      await updateSectionContent(
-        partId,
-        activeSectionKey,
-        editorText,
-        currentUserId,
-        currentUserName,
-        currentUserOrg,
-        isManual ? 'Elle anlık kaydedildi' : 'Otomatik arka plan kaydı'
-      );
-
-      setSections((prev) =>
-        prev.map((s) =>
-          s.key === activeSectionKey
-            ? {
-                ...s,
-                content: editorText,
-                lastModifiedBy: currentUserName,
-                lastModifiedAt: new Date().toISOString(),
-              }
-            : s
-        )
-      );
-
-      const newRev: SectionRevisionItem = {
-        // eslint-disable-next-line react-hooks/purity
-        id: 'rev-' + Date.now(),
-        sectionKey: activeSectionKey,
-        authorName: currentUserName,
-        authorOrg: currentUserOrg,
-        timestamp: new Date().toISOString(),
-        wordCount: currentSectionWords,
-        summary: isManual ? 'Elle anlık kaydedildi' : 'Otomatik senkronizasyon kaydı',
-        content: editorText,
-      };
-      setRevisions((prev) => [newRev, ...prev.slice(0, 20)]);
-
-      setSaveStatus('SAVED');
-    } catch (err) {
-      console.error('Error saving content:', err);
-      setSaveStatus('UNSAVED');
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const handleAddComment = async (e: React.FormEvent) => {

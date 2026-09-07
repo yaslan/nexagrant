@@ -21,8 +21,9 @@ export default function ThemeToggle({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    // Mounted state is necessary to prevent hydration mismatch between SSR and client rendering.
+    // The mounted flag exists precisely to defer the interactive markup to the client pass;
+    // setting it anywhere but an effect would defeat the hydration guard below.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
     setMounted(true);
   }, []);
 
