@@ -127,6 +127,14 @@ const LIFETIME: readonly LifetimeEntry[] = [
   },
 ];
 
+/**
+ * How many lifetime licences the offer is limited to. Catalogue data, not
+ * pricing logic: the marketing copy promises "the first 20 companies", and
+ * `src/lib/billing/lifetime-licence.ts` compares it against the number of
+ * `LifetimeLicence` rows so the pricing badge can stop inventing one.
+ */
+export const LIFETIME_LICENCE_CAP = 20;
+
 export const CATALOG: readonly CatalogEntry[] = [...PLANS, ...LIFETIME];
 
 /**

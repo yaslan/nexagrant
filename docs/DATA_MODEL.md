@@ -192,3 +192,49 @@ bildirimleri siler, önce dışa aktarın). Sütun adları
 `prisma/migrations/rename-feedback-alert-columns.sql` ile nötr adlara taşındı; eski dış izleyici
 kimlikleri silinmeden tek bir `SystemAlert` satırına (`source = 'feedback-migration'`)
 arşivlendi, geri alma bunu geri oynatır (kayıpsız).
+
+## 10. Ömür boyu lisans (TASK-MTR962OV5YGVX)
+
+`LifetimeLicence` — "ilk 20 firma" kampanyasında satılan tek seferlik ömür boyu lisansın
+kaydı. Kiracıya özeldir (`tenantId` + `tenant_isolation` RLS politikası). Bu tablo eklenmeden
+önce satış **hiçbir yere yazılmıyordu**: Stripe webhook'u `checkout.session.completed` olayında
+yalnız `session.subscription` doluysa iş yapıyor, tek seferlik `lifetime-ultra` ödemesi
+tahsil edilip unutuluyordu. Fiyat sayfasındaki "5 lisans sahibi · Sıradaki lisans #6"
+rozeti de bu yüzden mesaj kataloğuna elle yazılmış bir cümleydi — CLAUDE.md kural 7 ihlali.
+Rozet artık bu satırları sayar.
+
+| Alan | Not |
+|---|---|
+| `seq` | Sınırlı serideki sırası (1'den başlar). Rozet `seq+1`'i "sıradaki lisans" olarak gösterir. **Benzersiz** — iki lisans aynı sırayı iddia edemez. |
+| `sku` | `lifetime-ultra` (`src/lib/billing/catalog.ts`). |
+| `amountMinor` / `currency` | Gerçekten tahsil edilen tutar, minor unit (CLAUDE.md kural 9). Liste fiyatı değil: hangi kampanyada satıldığı kaydın parçası. |
+| `providerEventId` | **Benzersiz** — bir Stripe olayı en fazla bir lisans yazar. Aynı olay yeniden gönderilirse ikinci satır oluşmaz. |
+| `providerSessionId` | **Benzersiz** — aynı checkout oturumu *yeni bir olay kimliğiyle* gelse de ikinci satır oluşmaz. |
+| `purchasedAt` | Stripe oturumunun oluşturulma zamanı (UTC). |
+
+Üst sınır (20) veri sabitidir: `LIFETIME_LICENCE_CAP`, `src/lib/billing/catalog.ts`.
+Türetme `src/lib/billing/lifetime-licence.ts` içindeki saf `lifetimeScarcity()` fonksiyonunda
+ve dört durumu var — `unknown` (sayı okunamadı), `none` (0 sahip), `available` (N sahip,
+sıradaki N+1), `sold-out` (N ≥ 20). `unknown` bilinçli olarak ayrı bir durumdur: sayım
+okunamadığında rozet **hiçbir sayı iddia etmez**, sessizce sıfıra düşmez — yanlış bir sıfır da
+en az uydurma bir beş kadar yanlıştır.
+
+**Genel sayım ve RLS.** Fiyat sayfası herkese açıktır, yani hiçbir kiracının içinde değildir;
+`tenant_isolation` altında sıfır satır okur ve "henüz sahip yok" derdi (ölçüldü: `fabrika_app`
+rolüyle doğrudan `SELECT` = 0, gerçek satır sayısı 20). Bu yüzden sayım
+`public.lifetime_licence_count()` üzerinden alınır — `prisma/rls.sql`'de tanımlı, `SECURITY
+DEFINER`, argümansız, **yalnız bir tamsayı** döndüren fonksiyon: satır dönmediği için hiçbir
+kiracı bu yoldan görünmez. Fonksiyon yoksa sayım `null` olur ve rozet `unknown` durumuna düşer.
+
+Seed **yoktur ve olmamalıdır**: seed'lenmiş bir lisans, seed'lenmiş bir satıştır — rozet yine
+kimsenin ödemediği sahipleri duyurmaya başlar (`prisma/seed.ts` §2 sonundaki not).
+
+Migration: `prisma/migrations/add-lifetime-licence.sql` (additive + idempotent; tabloyu,
+benzersizlik indekslerini, RLS politikasını ve sayaç fonksiyonunu kurar — iki kez koşuldu,
+ikincisi no-op) — geri alma: `prisma/migrations/add-lifetime-licence.down.sql` (yıkıcı:
+tabloyu ve tüm lisans kayıtlarını siler; ödeme Stripe'ta kalır, bu veritabanında hiçbir iz
+kalmaz — önce dışa aktarın).
+
+**Açık:** `src/app/[locale]/(app)/[workspace]/settings/billing/BillingClient.tsx` içindeki
+aynı rozet (`billingPanels.settings.lifetimeOwners` / `lifetimeNext`) hâlâ elle yazılmış
+"5 lisans sahibi" metnini gösteriyor; bu görevin dosya kapsamı dışındaydı, ayrı kart gerekiyor.

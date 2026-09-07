@@ -6,6 +6,7 @@ DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'Membership','Workspace','TenantProfile','ModuleState','Subscription','AddOn','CreditLedger',
+    'LifetimeLicence',
     'TopicMatch','SavedSearch','Opportunity','GateDecision','ConsortiumSeat','PartnerOrg','Proposal','Effort',
     'Evidence','ConceptNote','Relationship','Interaction','SeatCandidate','AiUsageLog','AuditEvent',
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','ApplicationPart','Invitation',
@@ -32,3 +33,20 @@ BEGIN
       WITH CHECK ("tenantId" = current_setting('app.tenant_id', true))$p$, t);
   END LOOP;
 END $$;
+
+-- The public pricing page counts lifetime licences from outside any tenant, so
+-- under `tenant_isolation` it would read zero and report "no owners yet" while
+-- licences existed. This function is the narrow exception: SECURITY DEFINER, no
+-- arguments, and it returns a single integer — never a row, so no tenant is
+-- identifiable through it. Mirrored in
+-- prisma/migrations/add-lifetime-licence.sql; both are CREATE OR REPLACE with
+-- the same body, so re-running either is a no-op.
+CREATE OR REPLACE FUNCTION public.lifetime_licence_count()
+RETURNS integer
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $fn$ SELECT count(*)::int FROM "LifetimeLicence" $fn$;
+
+COMMENT ON FUNCTION public.lifetime_licence_count() IS 'Cross-tenant count for the public scarcity badge. Returns a number only — never a row.';

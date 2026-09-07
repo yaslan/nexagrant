@@ -5,6 +5,7 @@ import {
   handleSubscriptionCancellation,
   logInvoicePayment,
 } from '@/lib/billing/subscription-sync';
+import { recordLifetimeLicence } from '@/lib/billing/lifetime-licence';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
@@ -44,7 +45,18 @@ export async function POST(request: Request) {
           console.log(
             `Checkout completed: tenant=${result.tenantId}, plan=${result.planId}, credits=${result.creditsGranted}`
           );
+          break;
         }
+
+        // No subscription on the session: this is a one-time payment. Before
+        // TASK-MTR962OV5YGVX the branch ended above and a `lifetime-ultra`
+        // purchase was collected and then written down nowhere — which is also
+        // why the pricing page had to invent its "5 licence owners".
+        const licence = await recordLifetimeLicence(session, event.id);
+        console.log(
+          `One-time checkout completed: session=${session.id}, lifetime=${licence.status}` +
+            (licence.seq ? `, licence=#${licence.seq}, tenant=${licence.tenantId}` : '')
+        );
         break;
       }
 

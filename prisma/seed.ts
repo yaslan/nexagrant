@@ -220,6 +220,12 @@ async function main() {
     console.log(`  Plan: removed ${retired.count} retired row(s)`);
   }
 
+  // LifetimeLicence is deliberately NOT seeded. Its rows are what the pricing
+  // page counts (TASK-MTR962OV5YGVX), so a seeded licence is a seeded sale: the
+  // badge would go back to announcing owners nobody paid for, which is the bug
+  // the table was added to end. A demo licence, if one is ever wanted, belongs
+  // in a named script that says so.
+
   // 3. AddOnCatalog
   const addOns = [
     { sku: 'addon_m6', name: 'Evaluator Lens', monthlyCents: 9900, oneTimeCents: null, currency: 'EUR', grantsModule: 'M6', grantsSeats: 0, grantsCredits: 0, grantsWorkspaces: 0 },

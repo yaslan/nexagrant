@@ -36,6 +36,7 @@ model Tenant {
   subscription  Subscription?
   moduleStates  ModuleState[]
   creditLedger  CreditLedger[]
+  lifetimeLicences LifetimeLicence[]
   auditEvents   AuditEvent[]
   invitations   Invitation[]
   approvalRequests ApprovalRequest[]
@@ -262,6 +263,22 @@ model AddOn {
   endedAt        DateTime?
   subscription   Subscription @relation(fields: [tenantId], references: [tenantId], onDelete: Cascade)
   @@index([tenantId, sku])
+}
+
+model LifetimeLicence {          // one-time "first 20 companies" purchase; the pricing page counts these rows
+  id                String   @id @default(cuid())
+  tenantId          String
+  seq               Int      @unique   // which licence of the limited run this is: 1, 2, 3…
+  sku               String   @default("lifetime-ultra")
+  amountMinor       Int                // what was actually charged, minor units
+  currency          String   @default("USD")
+  provider          String   @default("stripe")
+  providerEventId   String   @unique   // idempotency: one webhook event writes at most one licence
+  providerSessionId String?  @unique   // idempotency: one checkout session writes at most one licence
+  purchasedAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId, purchasedAt])
 }
 
 model CreditLedger {

@@ -18,6 +18,7 @@ import {
   type PlanEntry,
 } from '@/lib/billing/catalog';
 import { formatMoney } from '@/lib/money';
+import type { LifetimeScarcity } from '@/lib/billing/lifetime-licence';
 
 interface PricingClientProps {
   locale: string;
@@ -29,12 +30,19 @@ interface PricingClientProps {
    * checkout, which is the mismatch this screen was reported for.
    */
   activeTier: DiscountTier;
+  /**
+   * How many lifetime licences are actually on record, already turned into a
+   * badge state by `lifetimeScarcity()`. `unknown` means the count could not be
+   * read, and the badge then names the cap and nothing else — an invented owner
+   * count is exactly what this prop replaced.
+   */
+  lifetimeScarcity: LifetimeScarcity;
 }
 
 /** The three subscription plans, in catalogue order. */
 const PLAN_ENTRIES = CATALOG.filter((entry): entry is PlanEntry => entry.kind === 'plan');
 
-export default function PricingClient({ locale, activeTier }: PricingClientProps) {
+export default function PricingClient({ locale, activeTier, lifetimeScarcity }: PricingClientProps) {
   const t = useTranslations('billingPanels.pricing');
   const { addToCart } = useCart();
   const [billingCycle, setBillingCycle] = useState<Exclude<BillingCycle, 'one-time'>>('yearly');
@@ -322,15 +330,45 @@ export default function PricingClient({ locale, activeTier }: PricingClientProps
                 <span>{t('lifetimeKicker')}</span>
               </div>
               {/*
-                Scarcity counters. These numbers are typed in, not counted: no
-                table records a lifetime licence (see TASK-MTR6QYPGOS2N0 report
-                §5). CLAUDE.md rule 7 wants every shown figure behind a record —
-                left untouched here on purpose and raised as its own card.
+                Scarcity counters, counted rather than typed in: every figure
+                here is `count()` over the `LifetimeLicence` rows (CLAUDE.md
+                rule 7). The four states are not cosmetic variants — a missing
+                count must not render as zero, and a full run must not promise a
+                next licence.
               */}
-              <div className="bg-slate-900 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs text-slate-300 font-bold flex items-center gap-2 self-start sm:self-auto shadow-inner">
-                <span className="text-amber-400 font-extrabold">{t('lifetimeOwners')}</span>
-                <span>·</span>
-                <span className="text-cyan-300">{t('lifetimeNext')}</span>
+              <div
+                data-testid="lifetime-scarcity"
+                data-scarcity={lifetimeScarcity.kind}
+                className="bg-slate-900 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs text-slate-300 font-bold flex items-center gap-2 self-start sm:self-auto shadow-inner"
+              >
+                {lifetimeScarcity.kind === 'unknown' && (
+                  <span className="text-cyan-300">{t('lifetimeCapOnly', { cap: lifetimeScarcity.cap })}</span>
+                )}
+                {lifetimeScarcity.kind === 'none' && (
+                  <>
+                    <span className="text-amber-400 font-extrabold">{t('lifetimeOwnersNone')}</span>
+                    <span>·</span>
+                    <span className="text-cyan-300">
+                      {t('lifetimeNextSeq', { next: lifetimeScarcity.next, cap: lifetimeScarcity.cap })}
+                    </span>
+                  </>
+                )}
+                {lifetimeScarcity.kind === 'available' && (
+                  <>
+                    <span className="text-amber-400 font-extrabold">
+                      {t('lifetimeOwnersCount', { count: lifetimeScarcity.owners })}
+                    </span>
+                    <span>·</span>
+                    <span className="text-cyan-300">
+                      {t('lifetimeNextSeq', { next: lifetimeScarcity.next, cap: lifetimeScarcity.cap })}
+                    </span>
+                  </>
+                )}
+                {lifetimeScarcity.kind === 'sold-out' && (
+                  <span className="text-amber-400 font-extrabold">
+                    {t('lifetimeSoldOut', { count: lifetimeScarcity.owners, cap: lifetimeScarcity.cap })}
+                  </span>
+                )}
               </div>
             </div>
 
