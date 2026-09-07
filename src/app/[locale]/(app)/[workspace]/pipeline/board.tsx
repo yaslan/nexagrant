@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useState, useTransition, useMemo } from 'react';
+import React, { useState, useTransition, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Gate } from '@prisma/client';
-import { moveOpportunityStage, createOpportunity, assignOpportunityOwner, addOpportunityNote } from './actions';
-import { WORKSPACE_MEMBERS, type NoteEntry, type OpportunityItem } from '@/lib/k5-pipeline/pipelineStore';
+import {
+  moveOpportunityStage,
+  createOpportunity,
+  assignOpportunityOwner,
+  addOpportunityNote,
+  getOpportunityFormMembers,
+  getSuggestedTopics
+} from './actions';
+import type { NoteEntry, OpportunityItem, WorkspaceMember } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
 
 interface KanbanBoardProps {
@@ -37,13 +44,6 @@ const GATES: { key: Gate; title: string; subtitle: string; color: string }[] = [
   { key: 'G4', title: 'G4: Son Onay & Teslim', subtitle: 'AB Portalına Teslim & Onay', color: 'border-t-emerald-500' },
 ];
 
-const PRESET_TOPICS = [
-  { code: 'HORIZON-CL5-2024-D3-01-01', name: 'Smart Grids & Flexibility' },
-  { code: 'HORIZON-CL4-2024-DIGITAL-01', name: 'AI & Robotics in Manufacturing' },
-  { code: 'HORIZON-CL6-2024-CIRCBIO-01', name: 'Bio-economy & Circular Packaging' },
-  { code: 'EIC-ACCEL-2024-DEEPTECH', name: 'EIC Accelerator Deep Tech' },
-];
-
 export default function KanbanBoard({
   opportunities: initialOpps,
   workspace = 'default',
@@ -51,6 +51,20 @@ export default function KanbanBoard({
 }: KanbanBoardProps) {
   const [opps, setOpps] = useState<OpportunityItem[]>(initialOpps);
   const [isPending, startTransition] = useTransition();
+
+  // Real tenant members and live call topics — fetched once on mount, since this
+  // client component has no server context of its own to read them with.
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [suggestedTopics, setSuggestedTopics] = useState<{ identifier: string; title: string }[]>([]);
+
+  useEffect(() => {
+    getOpportunityFormMembers().then((res) => {
+      if (res.success) setMembers(res.members);
+    });
+    getSuggestedTopics().then((res) => {
+      if (res.success) setSuggestedTopics(res.topics);
+    });
+  }, []);
 
   // Expanded cards state (default minimized for clean high-density view)
   const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
@@ -87,10 +101,17 @@ export default function KanbanBoard({
     title: '',
     topicId: '',
     intendedRole: 'coordinator',
-    ownerId: WORKSPACE_MEMBERS[0].id,
+    ownerId: '',
     stage: 'G0' as Gate,
     notes: '',
   });
+
+  // The owner the form will actually submit. The member list is fetched after
+  // mount, so `formData.ownerId` starts empty and cannot default to `members[0]`
+  // the way the old fixed array did — this derives the fallback at render time
+  // instead of writing it back into state from an effect (which would be a
+  // cascading render, and is what `react-hooks/set-state-in-effect` forbids).
+  const selectedOwnerId = formData.ownerId || members[0]?.id || '';
 
   // Toasts
   const [toast, setToast] = useState<{ id: number; text: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -136,7 +157,7 @@ export default function KanbanBoard({
 
   // Quick Change Owner / Assign Responsible User
   const handleAssignOwner = (oppId: string, memberId: string) => {
-    const member = WORKSPACE_MEMBERS.find((m) => m.id === memberId);
+    const member = members.find((m) => m.id === memberId);
     const ownerName = member ? member.name : 'Atanmadı';
 
     setOpps((prev) =>
@@ -159,7 +180,11 @@ export default function KanbanBoard({
     const cardInput = noteInputs[oppId];
     if (!cardInput || !cardInput.text.trim()) return;
 
-    const author = WORKSPACE_MEMBERS.find((m) => m.id === cardInput.authorId) || WORKSPACE_MEMBERS[0];
+    const author = members.find((m) => m.id === cardInput.authorId) || members[0];
+    if (!author) {
+      showToast('Kullanıcı listesi henüz yüklenmedi, lütfen tekrar deneyin.', 'error');
+      return;
+    }
     const text = cardInput.text.trim();
 
     startTransition(async () => {
@@ -203,7 +228,7 @@ export default function KanbanBoard({
     if (!formData.title.trim()) return;
 
     const targetStage = formData.stage || modalStage || 'G0';
-    const member = WORKSPACE_MEMBERS.find((m) => m.id === formData.ownerId);
+    const member = members.find((m) => m.id === selectedOwnerId);
 
     startTransition(async () => {
       try {
@@ -212,8 +237,8 @@ export default function KanbanBoard({
           title: formData.title.trim(),
           topicId: formData.topicId.trim() || undefined,
           intendedRole: formData.intendedRole,
-          ownerId: formData.ownerId,
-          ownerName: member?.name || 'Ahmet Yılmaz',
+          ownerId: selectedOwnerId || undefined,
+          ownerName: member?.name || undefined,
           stage: targetStage,
           notes: formData.notes.trim() || undefined,
         });
@@ -226,7 +251,7 @@ export default function KanbanBoard({
             title: '',
             topicId: '',
             intendedRole: 'coordinator',
-            ownerId: WORKSPACE_MEMBERS[0].id,
+            ownerId: '',
             stage: 'G0',
             notes: '',
           });
@@ -336,7 +361,7 @@ export default function KanbanBoard({
             className="text-xs bg-ground border border-border rounded-xl px-3 py-2.5 font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">👥 Tüm Kullanıcılar</option>
-            {WORKSPACE_MEMBERS.map((m) => (
+            {members.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.avatar} {m.name}
               </option>
@@ -403,14 +428,14 @@ export default function KanbanBoard({
               <div className="p-3 flex-1 overflow-y-auto space-y-3 min-h-[160px]">
                 {stageOpps.map((opp) => {
                   const isCoord = (opp.intendedRole || 'coordinator').toLowerCase() === 'coordinator';
-                  const currentMember = WORKSPACE_MEMBERS.find((m) => m.id === opp.ownerId) || {
-                    name: opp.ownerName || 'Ahmet Yılmaz',
+                  const currentMember = members.find((m) => m.id === opp.ownerId) || {
+                    name: opp.ownerName || 'Atanmadı',
                     avatar: '👤',
                   };
                   const isExpanded = !!expandedCardIds[opp.id];
 
                   const notesList: NoteEntry[] = opp.notesList || [];
-                  const cardNoteInput = noteInputs[opp.id] || { text: '', authorId: WORKSPACE_MEMBERS[0].id };
+                  const cardNoteInput = noteInputs[opp.id] || { text: '', authorId: members[0]?.id ?? '' };
 
                   return (
                     <div
@@ -514,12 +539,12 @@ export default function KanbanBoard({
                             <div className="flex items-center gap-1 min-w-0 overflow-hidden max-w-[170px]">
                               <span className="text-xs shrink-0">{currentMember.avatar}</span>
                               <select
-                                value={opp.ownerId || 'usr-1'}
+                                value={opp.ownerId || ''}
                                 onChange={(e) => handleAssignOwner(opp.id, e.target.value)}
                                 className="bg-transparent font-bold text-ink text-[11px] focus:outline-none cursor-pointer hover:text-blue-600 truncate max-w-full"
                                 title="Sorumlu kullanıcıyı değiştir"
                               >
-                                {WORKSPACE_MEMBERS.map((m) => (
+                                {members.map((m) => (
                                   <option key={m.id} value={m.id}>
                                     {m.name}
                                   </option>
@@ -578,7 +603,7 @@ export default function KanbanBoard({
                                   }
                                   className="bg-surface border border-border rounded px-1.5 py-0.5 text-ink font-bold focus:outline-none"
                                 >
-                                  {WORKSPACE_MEMBERS.map((m) => (
+                                  {members.map((m) => (
                                     <option key={m.id} value={m.id}>
                                       {m.avatar} {m.name}
                                     </option>
@@ -708,11 +733,12 @@ export default function KanbanBoard({
                   Sorumlu Kullanıcı / Atanan Kişi <span className="text-accent">*</span>
                 </label>
                 <select
-                  value={formData.ownerId}
+                  value={selectedOwnerId}
                   onChange={(e) => setFormData({ ...formData, ownerId: e.target.value })}
                   className="w-full text-xs bg-ground border border-border rounded-xl p-3 text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-accent"
                 >
-                  {WORKSPACE_MEMBERS.map((m) => (
+                  {members.length === 0 && <option value="">Yükleniyor…</option>}
+                  {members.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.avatar} {m.name} — ({m.role})
                     </option>
@@ -730,26 +756,30 @@ export default function KanbanBoard({
                 </div>
                 <input
                   type="text"
-                  placeholder="Örn: HORIZON-CL5-2024-D3-01-01"
+                  placeholder="Örn: HORIZON-CL5-2026-D3-01-01"
                   value={formData.topicId}
                   onChange={(e) => setFormData({ ...formData, topicId: e.target.value })}
                   className="w-full text-xs bg-ground border border-border rounded-xl p-3 font-mono text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
                 />
 
-                {/* Quick Topic Chips */}
-                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] text-muted">Önerilenler:</span>
-                  {PRESET_TOPICS.map((t) => (
-                    <button
-                      key={t.code}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, topicId: t.code })}
-                      className="text-[10px] bg-ground hover:bg-accent/15 hover:text-accent-ink text-ink-2 px-2 py-0.5 rounded border border-border transition"
-                    >
-                      {t.code}
-                    </button>
-                  ))}
-                </div>
+                {/* Quick Topic Chips — sourced live from `Topic` (open calls first); the
+                    block renders nothing when there is nothing real to suggest. */}
+                {suggestedTopics.length > 0 && (
+                  <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-muted">Önerilenler:</span>
+                    {suggestedTopics.map((t) => (
+                      <button
+                        key={t.identifier}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, topicId: t.identifier })}
+                        title={t.title}
+                        className="text-[10px] bg-ground hover:bg-accent/15 hover:text-accent-ink text-ink-2 px-2 py-0.5 rounded border border-border transition"
+                      >
+                        {t.identifier}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Role & Stage selection grid */}

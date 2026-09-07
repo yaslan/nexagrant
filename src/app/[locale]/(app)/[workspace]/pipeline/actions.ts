@@ -10,8 +10,9 @@ import {
   updateInMemoryOpportunityStage,
   updateInMemoryOpportunityOwner,
   addInMemoryOpportunityNote,
-  WORKSPACE_MEMBERS,
-  type OpportunityItem
+  getWorkspaceMembers,
+  type OpportunityItem,
+  type WorkspaceMember
 } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
 import { rescoreOpportunityG0 } from '@/lib/scoring/g0-compute';
@@ -37,6 +38,68 @@ async function sessionScope(): Promise<TenantScope | null> {
 
 const NO_TENANT = { success: false as const, error: 'TENANT_SCOPE_REQUIRED' as const };
 
+/**
+ * The real people a card can be assigned to, for the board (client component)
+ * to render its owner pickers. `board.tsx` cannot call `withTenant` itself —
+ * it has no server context — so this is the round trip that stands in for the
+ * literal member array it used to import directly.
+ */
+export async function getOpportunityFormMembers(): Promise<{ success: boolean; members: WorkspaceMember[] }> {
+  const scope = await sessionScope();
+  if (!scope) return { success: false, members: [] };
+
+  try {
+    const members = await getWorkspaceMembers(scope.tenantId);
+    return { success: true, members };
+  } catch (err) {
+    console.warn(`[getOpportunityFormMembers] query bypassed: ${errorMessage(err)}`);
+    return { success: false, members: [] };
+  }
+}
+
+/**
+ * Live call topics for the "Suggested" chips under the topic-id field.
+ *
+ * Open calls with a future deadline first, then forthcoming ones as a
+ * fallback when nothing is open yet. Never a fixed list: a hardcoded set of
+ * codes goes stale the moment those calls close, which is what this replaces
+ * (four 2024 Horizon codes, static regardless of what `Topic` actually holds).
+ * `Topic` is not tenant-scoped — it is the shared EU calls catalogue — so this
+ * needs no `withTenant`, only a session to keep the action from being called
+ * by a logged-out request.
+ */
+export async function getSuggestedTopics(): Promise<{
+  success: boolean;
+  topics: { identifier: string; title: string }[];
+}> {
+  const scope = await sessionScope();
+  if (!scope) return { success: false, topics: [] };
+
+  try {
+    const now = new Date();
+    let topics = await prisma.topic.findMany({
+      where: { status: 'OPEN', OR: [{ nextDeadlineAt: null }, { nextDeadlineAt: { gte: now } }] },
+      orderBy: { nextDeadlineAt: 'asc' },
+      select: { identifier: true, title: true },
+      take: 6
+    });
+
+    if (topics.length === 0) {
+      topics = await prisma.topic.findMany({
+        where: { status: 'FORTHCOMING' },
+        orderBy: { nextDeadlineAt: 'asc' },
+        select: { identifier: true, title: true },
+        take: 6
+      });
+    }
+
+    return { success: true, topics };
+  } catch (err) {
+    console.warn(`[getSuggestedTopics] query bypassed: ${errorMessage(err)}`);
+    return { success: false, topics: [] };
+  }
+}
+
 export async function createOpportunity({
   workspaceSlug,
   title,
@@ -60,9 +123,17 @@ export async function createOpportunity({
   if (!scope) return NO_TENANT;
   const { tenantId, userId } = scope;
 
+  // Real tenant members, not a fixed list — falls back to whoever the requesting
+  // session belongs to when no owner was picked or the member lookup comes up empty.
+  let members: WorkspaceMember[] = [];
+  try {
+    members = await getWorkspaceMembers(tenantId);
+  } catch (err) {
+    console.warn(`[createOpportunity] member lookup bypassed: ${errorMessage(err)}`);
+  }
   const resolvedOwner = ownerId
-    ? WORKSPACE_MEMBERS.find((m) => m.id === ownerId)
-    : WORKSPACE_MEMBERS[0];
+    ? members.find((m) => m.id === ownerId)
+    : members.find((m) => m.id === userId);
 
   const nowFormatted = new Date().toLocaleString('tr-TR', {
     day: '2-digit',
@@ -78,8 +149,8 @@ export async function createOpportunity({
     title,
     topicId: topicId ? topicId.trim() : null,
     intendedRole,
-    ownerId: ownerId || resolvedOwner?.id || 'usr-1',
-    ownerName: ownerName || resolvedOwner?.name || 'Ahmet Yılmaz',
+    ownerId: ownerId || resolvedOwner?.id || userId,
+    ownerName: ownerName || resolvedOwner?.name || null,
     stage: stage || 'G0',
     status: 'ACTIVE',
     // Scored below, from the opportunity's own evidence. This used to be
@@ -93,8 +164,8 @@ export async function createOpportunity({
           {
             id: `note-${Date.now()}`,
             text: notes,
-            authorName: ownerName || resolvedOwner?.name || 'Ahmet Yılmaz',
-            authorAvatar: resolvedOwner?.avatar || '👨‍💼',
+            authorName: ownerName || resolvedOwner?.name || 'Atanmadı',
+            authorAvatar: resolvedOwner?.avatar || '👤',
             createdAt: nowFormatted
           }
         ]

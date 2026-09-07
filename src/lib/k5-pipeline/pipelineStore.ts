@@ -1,5 +1,7 @@
 // Resilient In-Memory Store for K5 Pipeline & Opportunity Management
 
+import { withTenant } from '@/lib/db';
+
 export interface NoteEntry {
   id: string;
   text: string;
@@ -30,13 +32,65 @@ export interface OpportunityItem {
   updatedAt: Date;
 }
 
-export const WORKSPACE_MEMBERS = [
-  { id: 'usr-1', name: 'Ahmet Yılmaz', role: 'Pipeline Manager', avatar: '👨‍💼' },
-  { id: 'usr-2', name: 'Ayşe Kaya', role: 'Kıdemli Yazar', avatar: '👩‍💻' },
-  { id: 'usr-3', name: 'Mehmet Demir', role: 'Proje Ofisi Yöneticisi', avatar: '👨‍🔬' },
-  { id: 'usr-4', name: 'Zeynep Şahin', role: 'Ar-Ge Uzmanı', avatar: '👩‍🔬' },
-  { id: 'usr-5', name: 'Can Öztürk', role: 'Konsorsiyum Danışmanı', avatar: '👨‍💼' },
-];
+export interface WorkspaceMember {
+  id: string;
+  name: string;
+  role: string;
+  avatar: string;
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  TENANT_OWNER: 'Kiracı Sahibi',
+  TENANT_ADMIN: 'Kiracı Yöneticisi',
+  PIPELINE_MANAGER: 'Pipeline Yöneticisi',
+  WRITER: 'Yazar',
+  MEMBER: 'Üye',
+  GUEST_PARTNER: 'Misafir Ortak',
+};
+
+/** Exactly the `Membership` columns this module reads (see the `select` below). */
+interface MembershipRow {
+  userId: string;
+  role: string;
+  user: { name: string | null; email: string };
+}
+
+/**
+ * The tenant's real, DB-backed members — the people a pipeline card can
+ * actually be assigned to.
+ *
+ * This replaces a literal five-name array (`usr-1..5`, "Ahmet Yılmaz" etc.)
+ * that was never wired to a real account: assigning a card to it wrote an id
+ * no session, login or `Membership` row could ever match. `Membership` carries
+ * row-level security (prisma/rls.sql), so the read goes through `withTenant`
+ * rather than a bare `prisma.membership.findMany`.
+ */
+export async function getWorkspaceMembers(tenantId: string): Promise<WorkspaceMember[]> {
+  if (!tenantId) throw new Error('getWorkspaceMembers requires a tenantId');
+
+  // `withTenant<T>` is given its type argument explicitly: TypeScript cannot
+  // infer T from the callback here (the same reason every other call site in
+  // the repo annotates its destination, e.g. pipeline/page.tsx), and leaving it
+  // to inference yields `unknown` — which is what the `implicit any` on the map
+  // below came from. `select` keeps the row shape exactly `MembershipRow`.
+  const memberships = await withTenant<MembershipRow[]>(tenantId, (tx) =>
+    tx.membership.findMany({
+      where: { tenantId, user: { deletedAt: null } },
+      select: { userId: true, role: true, user: { select: { name: true, email: true } } },
+      orderBy: { createdAt: 'asc' },
+    })
+  );
+
+  return memberships.map((m) => {
+    const name = m.user.name || m.user.email;
+    return {
+      id: m.userId,
+      name,
+      role: ROLE_LABELS[m.role] ?? m.role,
+      avatar: name.charAt(0).toUpperCase(),
+    };
+  });
+}
 
 /**
  * The store starts empty on purpose.
