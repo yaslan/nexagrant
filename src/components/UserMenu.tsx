@@ -133,8 +133,8 @@ export default function UserMenu({
 
       try {
         await clientSignOut({ callbackUrl: targetUrl, redirect: true });
-      } catch (clientErr) {
-        window.location.href = targetUrl;
+      } catch (_clientErr) {
+        router.push(targetUrl);
       }
     }
   };

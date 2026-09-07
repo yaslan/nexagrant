@@ -62,7 +62,9 @@ export default function ApprovalsClient({
   const [formActionType, setFormActionType] = useState<DualApprovalActionType>('GATE_G4_SUBMISSION');
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formPayloadJson, setFormPayloadJson] = useState('{\n  "opportunityId": "opp-1",\n  "notes": "Konsorsiyum mutabakatı tamamlandı."\n}');
+  const [formPayloadJson, setFormPayloadJson] = useState(
+    `{\n  "opportunityId": "opp-1",\n  "notes": "${t('payloadSampleNote')}"\n}`
+  );
 
   // Filter lists
   const pendingRequests = requests.filter((r) => r.status === 'PENDING');
