@@ -11,6 +11,30 @@
 
 import { prisma } from '@/lib/db';
 
+/**
+ * The columns this scorer reads off its query results. Rows arrive untyped
+ * (`prisma generate` does not run here; see src/types/prisma-override.d.ts), so
+ * each shape is stated at the query rather than inferred from it.
+ */
+interface SeatOrgIdRow {
+  organizationId: string | null;
+}
+
+interface OrgCountryRow {
+  country: string | null;
+}
+
+interface CandidateOrgRow {
+  id: string;
+  country: string | null;
+  isSme: boolean;
+  eigenvector: number;
+}
+
+interface ParticipationOrgRow {
+  organizationId: string;
+}
+
 export interface ScoringBreakdown {
   topicExperience: number;
   networkCentrality: number;
@@ -28,30 +52,32 @@ export async function scoreCandidatesForSeat(
   limit: number = 5
 ): Promise<{ organizationId: string; score: ScoringBreakdown; rank: number }[]> {
   // 1. Get existing consortium members to check country diversity
-  const existingSeats = await prisma.consortiumSeat.findMany({
+  const existingSeats: SeatOrgIdRow[] = await prisma.consortiumSeat.findMany({
     where: { opportunityId, status: { in: ['CONFIRMED', 'INVITED'] }, organizationId: { not: null } },
     select: { organizationId: true },
   });
-  const existingOrgIds = existingSeats.map((s: any) => s.organizationId).filter(Boolean) as string[];
+  const existingOrgIds = existingSeats.map((s) => s.organizationId).filter(Boolean) as string[];
 
   // Get countries already in consortium
   const existingOrgs = existingOrgIds.length > 0
-    ? await prisma.organization.findMany({
+    ? ((await prisma.organization.findMany({
         where: { id: { in: existingOrgIds } },
         select: { country: true },
-      })
+      })) as OrgCountryRow[])
     : [];
-  const existingCountries = new Set(existingOrgs.map((o: any) => o.country).filter(Boolean));
+  const existingCountries = new Set(existingOrgs.map((o) => o.country).filter(Boolean));
 
   // 2. Get tenant's warm/hot relationships
   const relationships = await prisma.relationship.findMany({
     where: { tenantId, warmth: { in: ['warm', 'hot', 'active'] } },
     select: { organizationId: true },
   });
-  const warmOrgIds = new Set(relationships.map((r: any) => r.organizationId).filter(Boolean));
+  const warmOrgIds = new Set(
+    (relationships as SeatOrgIdRow[]).map((r) => r.organizationId).filter(Boolean)
+  );
 
   // 3. Get candidate organizations (exclude already assigned)
-  const candidates = await prisma.organization.findMany({
+  const candidates: CandidateOrgRow[] = await prisma.organization.findMany({
     where: { id: { notIn: existingOrgIds } },
     orderBy: { eigenvector: 'desc' },
     take: 50, // pre-filter top 50 by centrality
@@ -60,16 +86,16 @@ export async function scoreCandidatesForSeat(
   // 4. If we have a topicCode, find orgs that have participated in projects with that topic
   let topicOrgIds = new Set<string>();
   if (topicCode) {
-    const participations = await prisma.participation.findMany({
+    const participations: ParticipationOrgRow[] = await prisma.participation.findMany({
       where: { project: { topicCode } },
       select: { organizationId: true },
       distinct: ['organizationId'],
     });
-    topicOrgIds = new Set(participations.map((p: any) => p.organizationId));
+    topicOrgIds = new Set(participations.map((p) => p.organizationId));
   }
 
   // 5. Score each candidate
-  const scored = candidates.map((org: any) => {
+  const scored = candidates.map((org) => {
     const topicExperience = topicOrgIds.has(org.id) ? 3.0 : 0;
     const networkCentrality = Math.min(org.eigenvector * 10, 3.0); // normalize to 0-3
     const countryDiversity = (org.country && !existingCountries.has(org.country)) ? 1.5 : 0;
@@ -84,11 +110,11 @@ export async function scoreCandidatesForSeat(
   });
 
   // 6. Sort by total score descending, take top N
-  scored.sort((a: any, b: any) => b.score.total - a.score.total);
+  scored.sort((a, b) => b.score.total - a.score.total);
   const topCandidates = scored.slice(0, limit);
 
   // 7. Persist as SeatCandidate records
-  const results = topCandidates.map((c: any, i: any) => ({ ...c, rank: i + 1 }));
+  const results = topCandidates.map((c, i) => ({ ...c, rank: i + 1 }));
 
   // Clear old candidates for this seat
   await prisma.seatCandidate.deleteMany({ where: { seatId } });

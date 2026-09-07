@@ -1,12 +1,30 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-// Local types matching Prisma schema
-type ConsortiumSeat = { id: string; tenantId: string; opportunityId: string; role: string | null; roleKey?: string; required?: boolean; organizationId: string | null; status: string; notes: string | null; invitedAt: Date | null; confirmedAt: Date | null };
-type SeatCandidate = { id: string; seatId: string; organizationId: string; rank: number; score: any };
 import { addSeat, findCandidates, assignSeat, getConflicts } from './actions';
+import type { ScoringBreakdown } from '@/lib/scoring/consortium';
 
-interface OrgInfo {
+// Local types matching prisma/schema.prisma — the generated client is not
+// available here (see src/types/prisma-override.d.ts).
+export type ConsortiumSeat = { id: string; tenantId: string; opportunityId: string; role: string | null; roleKey?: string; required?: boolean; organizationId: string | null; status: string; notes: string | null; invitedAt: Date | null; confirmedAt: Date | null };
+
+/**
+ * A ranked candidate for a seat.
+ *
+ * `score` is the total on a persisted SeatCandidate row and the whole
+ * breakdown on one the scorer just produced client-side, which is why the
+ * display reads `.total` when it is not a number.
+ */
+export type SeatCandidate = {
+  id: string;
+  seatId: string;
+  organizationId: string;
+  rank: number;
+  score: number | ScoringBreakdown;
+  breakdown?: ScoringBreakdown;
+};
+
+export interface OrgInfo {
   id: string;
   name: string;
   shortName: string | null;
@@ -65,7 +83,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
       const results = await findCandidates(seatId);
       setCandidateMap(prev => ({
         ...prev,
-        [seatId]: results.map((r: any) => ({
+        [seatId]: results.map((r) => ({
           id: r.organizationId,
           seatId,
           organizationId: r.organizationId,
@@ -150,7 +168,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                 <div className="border-t border-border bg-ground/50 p-4">
                   <h4 className="text-xs font-bold text-muted uppercase tracking-wider mb-3">Top Candidates</h4>
                   <div className="space-y-2">
-                    {seatCandidates.map((c: any) => {
+                    {seatCandidates.map((c) => {
                       const cOrg = orgMap[c.organizationId];
                       const bd = c.breakdown;
                       return (

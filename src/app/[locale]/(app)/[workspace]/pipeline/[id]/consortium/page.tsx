@@ -2,10 +2,21 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import ConsortiumManager from './manager';
+import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidate } from './manager';
 import { errorMessage } from '@/lib/errors';
 
-const DEMO_OPPORTUNITIES: Record<string, any> = {
+/** The header fields this page renders for an opportunity. */
+interface ConsortiumOpportunity {
+  id: string;
+  title: string;
+  stage: string;
+  status: string;
+  topicId: string | null;
+  intendedRole: string | null;
+  g0Score: number | null;
+}
+
+const DEMO_OPPORTUNITIES: Record<string, ConsortiumOpportunity> = {
   'demo-opp-1': {
     id: 'demo-opp-1',
     title: 'FLEX-GRID: Decarbonised Smart Grid Flexibility Solutions',
@@ -67,29 +78,29 @@ export default async function ConsortiumPage({
   const { id, locale, workspace } = await params;
   const { tenantId } = await requireTenantPage(locale);
 
-  let opportunity: any = null;
-  let seats: any[] = [];
-  let candidates: any[] = [];
-  let orgs: any[] = [];
+  let opportunity: ConsortiumOpportunity | null = null;
+  let seats: ConsortiumSeat[] = [];
+  let candidates: SeatCandidate[] = [];
+  let orgs: OrgInfo[] = [];
 
   try {
-    opportunity = await withTenant<any>(tenantId, (tx) =>
+    opportunity = await withTenant<ConsortiumOpportunity | null>(tenantId, (tx) =>
       tx.opportunity.findFirst({
         where: { id, tenantId },
       })
     );
 
     if (opportunity) {
-      seats = await withTenant<any[]>(tenantId, (tx) =>
+      seats = await withTenant<ConsortiumSeat[]>(tenantId, (tx) =>
         tx.consortiumSeat.findMany({
           where: { opportunityId: id, tenantId },
           orderBy: { roleKey: 'asc' },
         })
       );
 
-      const seatIds = seats.map((s: any) => s.id);
+      const seatIds = seats.map((s) => s.id);
       if (seatIds.length > 0) {
-        candidates = await withTenant<any[]>(tenantId, (tx) =>
+        candidates = await withTenant<SeatCandidate[]>(tenantId, (tx) =>
           tx.seatCandidate.findMany({
             where: { seatId: { in: seatIds }, tenantId },
             orderBy: { rank: 'asc' },
@@ -98,14 +109,14 @@ export default async function ConsortiumPage({
       }
 
       const orgIds = [
-        ...seats.map((s: any) => s.organizationId).filter(Boolean),
-        ...candidates.map((c: any) => c.organizationId).filter(Boolean),
+        ...seats.map((s) => s.organizationId).filter(Boolean),
+        ...candidates.map((c) => c.organizationId).filter(Boolean),
       ] as string[];
 
       // Organizations are a shared catalogue, not tenant rows; the ids here
       // already come from rows read inside this tenant.
       if (orgIds.length > 0) {
-        orgs = await withTenant<any[]>(tenantId, (tx) =>
+        orgs = await withTenant<OrgInfo[]>(tenantId, (tx) =>
           tx.organization.findMany({
             where: { id: { in: orgIds } },
             select: { id: true, name: true, shortName: true, country: true, isSme: true },
@@ -119,12 +130,12 @@ export default async function ConsortiumPage({
 
   // Demo opportunity fallback
   if (!opportunity) {
-    opportunity = DEMO_OPPORTUNITIES[id];
+    opportunity = DEMO_OPPORTUNITIES[id] ?? null;
   }
 
   if (!opportunity) return notFound();
 
-  const orgMap = Object.fromEntries(orgs.map((o: any) => [o.id, o]));
+  const orgMap = Object.fromEntries(orgs.map((o) => [o.id, o]));
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4">
