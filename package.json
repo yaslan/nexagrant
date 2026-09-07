@@ -17,6 +17,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "jobs:k1": "tsx scripts/run-k1-daily.ts",
     "rls:check": "tsx scripts/check-rls.ts",
+    "rls:verify": "tsx scripts/check-rls-live.ts",
     "i18n:check": "tsx scripts/i18n-check.ts",
     "beta:onboard": "tsx scripts/beta-onboarding.ts",
     "beta:rollback": "tsx scripts/beta-onboarding.ts --rollback",
@@ -29,7 +30,7 @@
     "beta:esr-calibration:rollback": "tsx scripts/esr-calibration.ts --rollback",
     "a11y:check": "tsx scripts/a11y-check.ts",
     "jobs:g0-rescore": "tsx scripts/rescore-g0.ts",
-    "gate": "pnpm lint && pnpm typecheck && pnpm test",
+    "gate": "pnpm lint && pnpm typecheck && pnpm test && pnpm rls:check && pnpm rls:verify",
     "hooks:install": "git config core.hooksPath githooks && echo \"core.hooksPath=githooks ayarlandi\""
   },
   "dependencies": {
