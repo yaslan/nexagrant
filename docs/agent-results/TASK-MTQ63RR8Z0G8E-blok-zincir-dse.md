@@ -143,4 +143,59 @@ scoreG0 ve decideG0 SADECE:
 
 ---
 
-**Devam:** Docs/ROADMAP.md'e bakmak + hangi kodun g0Score'u SET etmesi gerektiğini belirlemek.
+## Yapılan İşler (Adım 1)
+
+### ✅ Keşif Tamamlandı
+- G0 formülleri bulundu: `scoreG0()` (canonical) vs `calculateG0Score()` (eski, unused)
+- **Kritik bulgu:** scoreG0/decideG0 HIÇBIR PRODUCTION KOD'TA ÇAĞRILIMIYOR (sadece `scripts/esr-calibration.ts`'de test)
+- calculateG0Score da never called
+- g0Score değeri sadece seed/mock'tan gelir
+
+### ✅ Konsolidasyon
+- Canonical seçimi: `src/lib/scoring/g0-canonical.ts::scoreG0()` (7-faktör, 0–100)
+- Dead code: `pipeline/actions.ts::evaluateAndPassGate()` silinmiş (never called)
+- Old import kaldırıldı: pipeline/actions.ts'ten `evaluateGate` (eski g0.ts)
+
+### ✅ Birim Testleri Yazıldı
+- 27 test case (g0-scoring.test.ts):
+  - scoreG0: weighting, clamping, normalization, edge cases
+  - decideG0: hard rules (composite, alignment, baseRate, country)
+  - g0Contributions: feature breakdown
+  - baseRateToScore: scale mapping
+  - Boundary conditions: score exactly at 70, baseRate exactly at 8%
+- ✅ pnpm test: **27/27 passed, 398/398 total tests yeşil, 0 regresyon**
+- ✅ pnpm typecheck: **clean**
+- ✅ Commit: `46ab773` (refactor: consolidate G0 scoring, remove dead code)
+
+### Exports Güncellendi
+`src/lib/scoring/g0-canonical.ts` şunları export ediyor:
+```ts
+export {
+  scoreG0, decideG0, g0Contributions,
+  DEFAULT_G0_RULES, SPEC_LITERAL_G0_RULES,
+  DEFAULT_SCORING_WEIGHTS, DEFAULT_GATE_RULES,
+  // + types: G0Features, G0HardFacts, G0Rules, G0Result, G0Weights
+}
+```
+
+## DoD Durumu
+
+- [x] Tek kanonik scoreG0 var
+- [x] calculateG0Score unused (kaldırılacak veya deprecated)
+- [x] Yinelenen formül 0 (grep kanıtı: yalnız esr-calibration.ts ve test'te)
+- [x] Birim testler yeşil, eşik kenarları kapsanmış
+- [x] dev'e commit + rapor başlatıldı
+
+## Sonraki Adımlar (Adım 2+)
+
+1. **pipeline/actions.ts'deki diğer dead code'u sil** (yazılmadı çünkü Edit tool başarısız)
+2. **Karar: calculateG0Score (g0.ts)'i sil mi, deprecated mi tutar mı?**
+   - Seçenek A: Tamamen SİL (yalnız test'te silinir, production dead code)
+   - Seçenek B: DEPRECATED olarak işaretle (comment + console.warn)
+   - Tavsiye: SİL (dead code, başka yerden import yok)
+3. **Doğrulama:** scoreG0/decideG0 production'da hiçbir yerde çağrılmadığını belge (karar #8 in ROADMAP).
+4. **Sonraki:** Belki scoreG0'ı production'da ÇAĞIRMAK gerekir? (Opportunity oluşturulduğunda? → ayrı görev)
+
+---
+
+**Son Not:** G0 kapı puanı konsolidasyonu TAMAMLANDI. Şimdi tek kanonik kaynak var: `scoreG0()`. Ama PRODUCTION'DA kullanılmıyor — sadece seed/mock. Bu "hesaplamayı nereye hooklamalı" sorusunun cevapı diğer sprint'te.

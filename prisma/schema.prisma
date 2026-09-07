@@ -1006,7 +1006,24 @@ model MeetingBrief {
   createdAt           DateTime    @default(now())
 }
 
+model CalendarConnection {
+  id                String    @id @default(cuid())
+  tenantId          String
+  userId            String
+  provider          String    // 'google' | 'outlook' | 'ics'
+  externalId        String?   // Google: calendar ID, Outlook: mailbox address
+  accessToken       String?   // TODO: encrypt with CALENDAR_ENCRYPTION_KEY in production
+  refreshToken      String?
+  tokenExpiresAt    DateTime?
+  isConnected       Boolean   @default(true)
+  lastSyncAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
+  @@unique([tenantId, userId, provider])
+  @@index([tenantId])
+  @@index([userId])
+}
 
 model FollowupDoc {
   id             String      @id @default(cuid())

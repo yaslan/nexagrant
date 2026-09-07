@@ -4,6 +4,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
 import { revalidatePath } from 'next/cache';
+import { syncMeetingBriefToCalendar } from '@/lib/calendar/sync';
 
 /**
  * M9 meeting briefs.
@@ -128,6 +129,15 @@ export async function generateMeetingBrief({
     try {
       revalidatePath('/[locale]/(app)/[workspace]/opportunities/[id]/briefs', 'page');
     } catch (e) {}
+
+    // Sync brief to connected calendar providers
+    try {
+      await withTenant(tenantId, async (tx) => {
+        await syncMeetingBriefToCalendar(tx, tenantId, userId, brief);
+      });
+    } catch (e: any) {
+      console.warn('[M9 generateMeetingBrief] Calendar sync failed (non-critical):', e.message);
+    }
 
     return { success: true, brief };
   } catch (e: any) {
