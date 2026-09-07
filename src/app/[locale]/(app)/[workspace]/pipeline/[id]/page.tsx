@@ -11,6 +11,7 @@ import { canArchiveOpportunity } from '@/lib/pipeline/archive';
 
 import { OpportunityDetailClient, type G0Display, type OpportunityView } from './client';
 import type { EffortEntry } from './effort';
+import { moduleGate } from '@/lib/modules/guard';
 
 /**
  * Shape of the tenant-scoped read below. `withTenant`'s generic cannot be inferred from the
@@ -57,6 +58,8 @@ export default async function OpportunityDetailPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, workspace, id } = await params;
+  const locked = await moduleGate('M5', locale);
+  if (locked) return locked;
   const { tenantId, userId, role } = await requireTenantPage(locale);
 
   const loaded = await withTenant<{

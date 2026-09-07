@@ -3,6 +3,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { DocumentsClient, type DocItem } from './client';
 import { errorMessage } from '@/lib/errors';
+import { moduleGate } from '@/lib/modules/guard';
 
 export default async function DocumentsPage({
   params
@@ -10,6 +11,8 @@ export default async function DocumentsPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, workspace, id } = await params;
+  const locked = await moduleGate('M10', locale);
+  if (locked) return locked;
   const { tenantId } = await requireTenantPage(locale);
 
   let opp: { id: string; tenantId: string; title: string; followupDocs: DocItem[] } | null = null;

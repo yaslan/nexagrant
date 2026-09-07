@@ -3,6 +3,7 @@ import { requireTenantPage } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
 import { computeSeatCandidates, assignCandidateToSeat } from '@/modules/m8/server/actions';
 import { errorMessage } from '@/lib/errors';
+import { moduleGate } from '@/lib/modules/guard';
 import type {
   ConsortiumSeatWithOrg,
   ModuleStateRow,
@@ -15,6 +16,8 @@ export default async function MatchingPage({
   params: Promise<{ locale: string; workspace: string; id: string }>
 }) {
   const { locale, workspace, id } = await params;
+  const locked = await moduleGate('M8', locale);
+  if (locked) return locked;
   const { tenantId } = await requireTenantPage(locale);
 
   // Everything below is read inside the session tenant. The page used to load

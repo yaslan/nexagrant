@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import Link from 'next/link';
 import { errorMessage } from '@/lib/errors';
+import { moduleGate } from '@/lib/modules/guard';
 import type { ConceptNoteRow, ConceptTemplateRow } from '@/modules/m2/types';
 
 export default async function ConceptNotesListPage({
@@ -10,6 +11,9 @@ export default async function ConceptNotesListPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const locked = await moduleGate('M2', locale);
+  if (locked) return locked;
+
   const session = await auth();
   const tenantId = session?.tenantId;
 

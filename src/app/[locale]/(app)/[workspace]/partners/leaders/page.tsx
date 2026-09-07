@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 import type { LegacyOrganizationRow } from '@/types/db-rows';
+import { moduleGate } from '@/lib/modules/guard';
 
 export default async function LeadersPage({
   params
@@ -10,6 +11,8 @@ export default async function LeadersPage({
   params: Promise<{ locale: string; workspace: string }>
 }) {
   const { workspace, locale } = await params;
+  const locked = await moduleGate('M1', locale);
+  if (locked) return locked;
   const isTr = locale === 'tr';
   
   // Leaders query: Get orgs with high Eigenvector centrality or most coordination

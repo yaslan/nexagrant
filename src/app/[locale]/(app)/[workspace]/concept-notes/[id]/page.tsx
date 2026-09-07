@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ConceptNoteEditor from './editor';
 import { errorMessage } from '@/lib/errors';
 import type { ConceptNoteRow, ConceptTemplateRow, ConceptTemplateSchema } from '@/modules/m2/types';
+import { moduleGate } from '@/lib/modules/guard';
 
 export default async function ConceptNoteDetailPage({
   params,
@@ -12,6 +13,8 @@ export default async function ConceptNoteDetailPage({
   params: Promise<{ id: string; locale: string; workspace: string }>;
 }) {
   const { id, locale, workspace } = await params;
+  const locked = await moduleGate('M2', locale);
+  if (locked) return locked;
   const session = await auth();
   const tenantId = session?.tenantId;
 

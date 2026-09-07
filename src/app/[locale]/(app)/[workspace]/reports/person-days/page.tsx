@@ -1,7 +1,6 @@
-'use client';
-
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
+import { moduleGate } from '@/lib/modules/guard';
 
 // Mock data
 const MOCK_REPORTS = [
@@ -11,8 +10,16 @@ const MOCK_REPORTS = [
   { opportunityId: 'opp_3', title: 'Smart grids optimization', user: 'Charlie', hours: 16.0 },
 ];
 
-export default function PersonDaysReportPage() {
-  const [groupBy, setGroupBy] = useState<'opportunity' | 'user'>('opportunity');
+export default async function PersonDaysReportPage({
+  params,
+}: {
+  params: Promise<{ locale: string; workspace: string }>;
+}) {
+  const { locale } = await params;
+  const locked = await moduleGate('M5', locale);
+  if (locked) return locked;
+
+  const groupBy = 'opportunity';
 
   let groupedData: { title: string, hours: number }[] = [];
   
@@ -44,18 +51,9 @@ export default function PersonDaysReportPage() {
       <div className="bg-surface rounded-lg shadow-sm border border-border overflow-hidden mb-8">
         <div className="p-4 bg-ground border-b border-border flex justify-between items-center">
           <div className="flex gap-2">
-            <button 
-              className={`px-4 py-1.5 text-sm font-medium rounded-md ${groupBy === 'opportunity' ? 'bg-blue-600 text-white' : 'bg-surface border border-border text-ink-2'}`}
-              onClick={() => setGroupBy('opportunity')}
-            >
+            <span className="px-4 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white">
               By Opportunity
-            </button>
-            <button 
-              className={`px-4 py-1.5 text-sm font-medium rounded-md ${groupBy === 'user' ? 'bg-blue-600 text-white' : 'bg-surface border border-border text-ink-2'}`}
-              onClick={() => setGroupBy('user')}
-            >
-              By User
-            </button>
+            </span>
           </div>
           <div className="text-sm font-medium text-ink-2">
             Total: {totalHours} hours ({(totalHours/8).toFixed(1)} PDs)

@@ -4,6 +4,7 @@ import { requireTenantPage } from '@/lib/tenant';
 import ConceptNoteEditor from '@/modules/m2/ui/ConceptNoteEditor';
 import type { ModuleStateRow } from '@/types/db-rows';
 import type { ConceptNoteRow } from '@/modules/m2/types';
+import { moduleGate } from '@/lib/modules/guard';
 
 export default async function OpportunityM2Page({
   params
@@ -11,6 +12,8 @@ export default async function OpportunityM2Page({
   params: Promise<{ locale: string; workspace: string; id: string }>
 }) {
   const { locale, workspace, id } = await params;
+  const locked = await moduleGate('M2', locale);
+  if (locked) return locked;
 
   // This page used to call a local `getAuth()` stub that returned a fixed
   // `mock-user-id` and then loaded the opportunity by `(id, workspace slug)`

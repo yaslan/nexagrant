@@ -4,6 +4,7 @@ import { requireTenantPage } from '@/lib/tenant';
 import { TtoAcceleratorClient } from './client';
 import { errorMessage } from '@/lib/errors';
 import type { TtoItem } from './client';
+import { moduleGate } from '@/lib/modules/guard';
 
 export default async function TtoAcceleratorPage({
   params,
@@ -11,6 +12,8 @@ export default async function TtoAcceleratorPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const locked = await moduleGate('M7', locale);
+  if (locked) return locked;
   const { tenantId } = await requireTenantPage(locale);
 
   let items: TtoItem[] = [];

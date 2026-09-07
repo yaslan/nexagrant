@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidate } from './manager';
 import { errorMessage } from '@/lib/errors';
+import { moduleGate } from '@/lib/modules/guard';
 
 /** The header fields this page renders for an opportunity. */
 interface ConsortiumOpportunity {
@@ -76,6 +77,8 @@ export default async function ConsortiumPage({
   params: Promise<{ id: string; locale: string; workspace: string }>;
 }) {
   const { id, locale, workspace } = await params;
+  const locked = await moduleGate('M8', locale);
+  if (locked) return locked;
   const { tenantId } = await requireTenantPage(locale);
 
   let opportunity: ConsortiumOpportunity | null = null;

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { PartnerFilters } from './PartnerFilters';
 import { errorMessage } from '@/lib/errors';
+import { moduleGate } from '@/lib/modules/guard';
 import type { LegacyOrganizationRow } from '@/types/db-rows';
 
 const DEMO_CORDIS_PARTNERS = [
@@ -194,6 +195,9 @@ export default async function PartnersPage({
   searchParams: Promise<{ q?: string; country?: string; activity_type?: string; is_turkish?: string; min_projects?: string }>;
 }) {
   const { workspace, locale } = await params;
+  const locked = await moduleGate('M1', locale);
+  if (locked) return locked;
+
   const sParams = await searchParams;
   const isTr = locale === 'tr';
 

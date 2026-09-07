@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 import type { RelationshipRow } from '@/types/db-rows';
+import { moduleGate } from '@/lib/modules/guard';
 
 /** Whole days between `d` and now, or null when there is no date. */
 const daysSince = (d: Date | null) => {
@@ -17,6 +18,8 @@ export default async function RelationshipsPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const locked = await moduleGate('M4', locale);
+  if (locked) return locked;
   const session = await auth();
   const tenantId = session?.tenantId;
 

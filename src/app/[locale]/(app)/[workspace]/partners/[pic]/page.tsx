@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 import type { LegacyOrganizationWithParticipations } from '@/types/db-rows';
+import { moduleGate } from '@/lib/modules/guard';
 
 export default async function PartnerDetailPage({
   params
@@ -11,6 +12,8 @@ export default async function PartnerDetailPage({
   params: Promise<{ pic: string; locale: string; workspace: string }>
 }) {
   const { pic, workspace, locale } = await params;
+  const locked = await moduleGate('M1', locale);
+  if (locked) return locked;
   const isTr = locale === 'tr';
 
   let org: LegacyOrganizationWithParticipations | null = null;

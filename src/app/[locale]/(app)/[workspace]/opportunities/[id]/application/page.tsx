@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { ApplicationClient, type ApplicationPartItem } from './client';
+import { moduleGate } from '@/lib/modules/guard';
 
 export default async function ApplicationPage({
   params
@@ -10,6 +11,8 @@ export default async function ApplicationPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, id } = await params;
+  const locked = await moduleGate('M11', locale);
+  if (locked) return locked;
   const { tenantId } = await requireTenantPage(locale);
 
   // findFirst + tenantId, not findUnique by id: an opportunity id is

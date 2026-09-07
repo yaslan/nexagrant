@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import RelationshipDetail from './detail';
+import { moduleGate } from '@/lib/modules/guard';
 
 export default async function RelationshipDetailPage({
   params,
@@ -10,6 +11,8 @@ export default async function RelationshipDetailPage({
   params: Promise<{ id: string; locale: string; workspace: string }>;
 }) {
   const { id, locale, workspace } = await params;
+  const locked = await moduleGate('M4', locale);
+  if (locked) return locked;
   const session = await auth();
   const tenantId = session?.tenantId;
 

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import EvidenceClient, { type EvidenceItemData } from './evidence-client';
 import { errorMessage } from '@/lib/errors';
+import { moduleGate } from '@/lib/modules/guard';
 
 export default async function EvidencePage({
   params
@@ -9,6 +10,9 @@ export default async function EvidencePage({
   params: Promise<{ locale: string; workspace: string }>
 }) {
   const { locale } = await params;
+  const locked = await moduleGate('M3', locale);
+  if (locked) return locked;
+
   const session = await auth();
   const tenantId = session?.tenantId;
 

@@ -29,6 +29,31 @@ export const moduleRegistry: Record<ModuleId, ModuleManifest> = {
 export const getManifest = (id: ModuleId): ModuleManifest => moduleRegistry[id];
 export const getAllManifests = (): ModuleManifest[] => Object.values(moduleRegistry);
 
+export interface RouteOwnerInfo {
+  moduleId: ModuleId;
+  permission?: string;
+}
+
+/**
+ * Resolve the module that owns a workspace route.
+ * Every manifest route has exactly one owner; double ownership is an error
+ * caught in validateRegistry() and fails the build.
+ */
+export function getRouteOwner(path: string): RouteOwnerInfo | null {
+  const manifests = getAllManifests();
+  for (const m of manifests) {
+    for (const route of m.routes) {
+      if (route.path === path) {
+        return {
+          moduleId: m.id,
+          permission: route.permission,
+        };
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Structural invariants of the module registry.
  *
