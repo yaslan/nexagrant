@@ -81,6 +81,10 @@ $ pnpm typecheck
 settings/calendar/page.tsx(3,37): error TS2307: Cannot find module '@/lib/auth/require-tenant-action'
 settings/calendar/page.tsx(5,32): error TS2307: Cannot find module './client'
 ```
+Not: bu ölçüm bir anlık görüntüdür — dört worker pane'i canlı çalışıyor, rapor yazılırken
+commit'siz giriş sayısı 1'den 9'a çıktı (m9 takvim, m11 Part-B editör, i18n katalogları).
+Hepsi aktif kartların WIP'i; 2026-09-06'daki "60+ sahipsiz dosya" tablosuyla aynı şey değil.
+
 Bu dizin commit'lenmemiş ve `pane-35 blok-zincir-dse [WORKING]` şu an TASK-MTPZLC9PI5VEH
 (Google/Outlook takvim sync) üzerinde çalışıyor. Typecheck hatası da tek test hatası da
 AYNI yarım dosyadan geliyor. Ona dokunulmadı (başka worker'ın kapsamı).
