@@ -152,7 +152,7 @@ export default async function MatchingPage({
           const seatCandidates = candidatesBySeat.get(seat.id) ?? [];
           const assigned = seat.organizationId ? orgById.get(seat.organizationId) : null;
           return (
-            <div key={seat.id} className="border border-border p-4 rounded-lg bg-surface shadow-sm">
+            <div key={seat.id} data-testid={`m8-seat-${seat.roleKey}`} className="border border-border p-4 rounded-lg bg-surface shadow-sm">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
                   <h2 className="text-lg font-semibold">

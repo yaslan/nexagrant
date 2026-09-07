@@ -15,6 +15,11 @@ import { generateSeatCandidates } from './matching';
  * from the session and every row is matched on `(id, tenantId)`.
  */
 
+// The route pattern, not a URL. It was missing the `[locale]` and `(app)`
+// segments, so it matched no route and the page kept serving the candidate list
+// from before the click.
+const MATCHING_PATH = '/[locale]/(app)/[workspace]/opportunities/[id]/matching';
+
 export async function computeSeatCandidates(opportunityId: string, seatId: string) {
   const { tenantId } = await requireTenantAction();
 
@@ -27,7 +32,7 @@ export async function computeSeatCandidates(opportunityId: string, seatId: strin
   if (!seat) throw new Error(`Seat ${seatId} not found in this workspace.`);
 
   const created = await generateSeatCandidates(opportunityId, seatId, tenantId, 5);
-  revalidatePath('/[workspace]/opportunities/[id]/matching', 'page');
+  revalidatePath(MATCHING_PATH, 'page');
   return created;
 }
 
@@ -96,7 +101,7 @@ export async function assignCandidateToSeat(
 
   if (updated === 0) throw new Error(`Seat ${seatId} not found in this workspace.`);
 
-  revalidatePath('/[workspace]/opportunities/[id]/matching', 'page');
+  revalidatePath(MATCHING_PATH, 'page');
 }
 
 /**

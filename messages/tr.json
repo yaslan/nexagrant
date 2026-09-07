@@ -904,6 +904,7 @@
     "askAdmin": "Erişim gerekiyorsa çalışma alanı yöneticinizle ya da Fabrika ekibiyle görüşün.",
     "reason": {
       "MODULE_OFF": "{module} modülü kiracınızda kapalı.",
+      "PLAN_UPGRADE_REQUIRED": "{module} modülü aboneliğinizin kapsamı dışında. Şu planlarda yer alıyor: {plans}.",
       "DEV_INTERNAL_ONLY": "{module} modülü geliştirme aşamasında ve şu an yalnızca Fabrika ekibine açık.",
       "PILOT_MANAGERS_ONLY": "{module} modülü pilot aşamasında; yalnızca çalışma alanı yöneticileri kullanabilir.",
       "NO_TENANT": "Oturumunuz bir çalışma alanına bağlı değil.",

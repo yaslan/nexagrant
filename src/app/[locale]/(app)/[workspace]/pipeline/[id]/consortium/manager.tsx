@@ -40,13 +40,15 @@ interface Props {
   orgMap: Record<string, OrgInfo>;
 }
 
+// Keys only — the labels used to be hardcoded English, so a Turkish page showed
+// "+ Research Partner" directly under the heading "Araştırma Ortağı".
 const ROLE_OPTIONS = [
-  { key: 'coordinator', label: 'Coordinator' },
-  { key: 'research', label: 'Research Partner' },
-  { key: 'industry', label: 'Industry Partner' },
-  { key: 'end_user', label: 'End User' },
-  { key: 'widening', label: 'Widening Country' },
-  { key: 'dissemination', label: 'Dissemination' },
+  { key: 'coordinator' },
+  { key: 'research' },
+  { key: 'industry' },
+  { key: 'end_user' },
+  { key: 'widening' },
+  { key: 'dissemination' },
 ];
 
 const statusColors: Record<string, string> = {
@@ -152,7 +154,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
           const statusStyle = statusColors[seat.status] || UNKNOWN_STATUS_STYLE;
 
           return (
-            <div key={seat.id} className="border border-border rounded-xl bg-surface overflow-hidden shadow-2xs">
+            <div key={seat.id} data-testid={`m8-builder-seat-${rawRoleKey}`} className="border border-border rounded-xl bg-surface overflow-hidden shadow-2xs">
               <div className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-3">
                   <div className="font-bold text-ink capitalize text-sm">{roleLabel}</div>
@@ -175,7 +177,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                       disabled={isPending}
                       className="text-xs bg-accent text-white px-3.5 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50 font-semibold shadow-2xs transition"
                     >
-                      {isPending && isExpanded ? '⏳ Searching...' : '🔍 Find Candidates'}
+                      {isPending && isExpanded ? `⏳ ${t('computing')}` : `🔍 ${t('findCandidates')}`}
                     </button>
                   )}
                 </div>
@@ -239,7 +241,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
               disabled={isPending}
               className="text-xs border border-border px-3 py-1.5 rounded-lg text-ink-2 hover:bg-surface-hover hover:text-ink disabled:opacity-50 transition font-medium"
             >
-              + {r.label}
+              + {t(ROLE_LABEL_KEYS[r.key] ?? 'role.unknown')}
             </button>
           ))}
         </div>

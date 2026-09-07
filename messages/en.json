@@ -904,6 +904,7 @@
     "askAdmin": "If you need access, talk to your workspace administrator or the Fabrika team.",
     "reason": {
       "MODULE_OFF": "The {module} module is turned off for your workspace.",
+      "PLAN_UPGRADE_REQUIRED": "The {module} module is outside your subscription. It is included in: {plans}.",
       "DEV_INTERNAL_ONLY": "The {module} module is in development and is open to the Fabrika team only.",
       "PILOT_MANAGERS_ONLY": "The {module} module is in pilot and is limited to workspace managers.",
       "NO_TENANT": "Your session is not linked to a workspace.",
