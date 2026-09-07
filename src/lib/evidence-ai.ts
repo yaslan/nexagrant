@@ -1,18 +1,51 @@
-import { OpenAI } from 'openai';
+/**
+ * Evidence document metadata.
+ *
+ * This module used to *invent* accreditation. `extractEvidenceMetadata()` had neither
+ * OCR nor an LLM behind it, yet every upload came back with the same hard-coded
+ * certificate: a named accreditation body it had never read, a fixed certificate
+ * number, a randomly generated document number, issue and expiry dates computed off
+ * the clock, a "verified" tag, and two source-less compliance claims that `actions.ts`
+ * persisted as `Claim` rows at confidence 0.95. That content is quoted into EU funding
+ * applications, so it broke CLAUDE.md §7 ("every figure shown to the user is backed by
+ * an Evidence or TopicStat record; never hard-code a number") in the most damaging way
+ * available. See docs/agent-results/TASK-MTRH86RCGVEGC-geli-tirici.md.
+ *
+ * What is left here is only what can be derived from the document itself:
+ *
+ *   - `maskPIIInText()` — deterministic redaction, no inference.
+ *   - `extractEvidenceMetadata()` — masks the text a caller actually read off the
+ *     document, and reports *nothing* when there is no such text.
+ *
+ * Automatic field extraction stays off until there is a real reader. Two pieces are
+ * missing, and neither can be faked: nothing in this repository turns an uploaded PDF
+ * or image into text, and `extractEvidenceMetadata()` was handed only a file name. An
+ * LLM called with a file name reproduces exactly the fabrication above, at the cost of
+ * a credit charge. When OCR lands, pass its output as `rawText` and route the field
+ * extraction through `generateText()` in `src/lib/ai/llm.ts` — that is the one entry
+ * point that writes `AiUsageLog` and debits `CreditLedger` (CLAUDE.md §5).
+ */
 
 /**
- * Interface representing extracted metadata from an Evidence Document
+ * What could be read off an evidence document.
+ *
+ * Every field is nullable on purpose: "not known" is a legitimate and common answer,
+ * and the user fills it in by hand. A caller must never substitute a placeholder for
+ * `null` — an invented issuing authority is worse than a blank one.
  */
 export interface ExtractedEvidenceMetadata {
-  issuingAuthority?: string;
-  documentNumber?: string;
-  issuedAt?: string;
-  validUntil?: string;
-  categorySuggestion?: string;
+  issuingAuthority: string | null;
+  documentNumber: string | null;
+  issuedAt: string | null;
+  validUntil: string | null;
+  categorySuggestion: string | null;
   tags: string[];
   suggestedClaims: Array<{ statementTr: string; statementEn: string }>;
   maskedPiiFound: boolean;
-  ocrSummary: string;
+  /** The document's text after redaction, or `null` when no text was read. */
+  ocrSummary: string | null;
+  /** `false` when no document text reached this function, so nothing was extracted. */
+  extracted: boolean;
 }
 
 /**
@@ -21,7 +54,7 @@ export interface ExtractedEvidenceMetadata {
  */
 export function maskPIIInText(text: string): { maskedText: string; piiFound: boolean } {
   let piiFound = false;
-  
+
   // TCKN regex (11 consecutive digits)
   const tcknRegex = /\b[1-9]\d{10}\b/g;
   // Phone regex
@@ -42,39 +75,46 @@ export function maskPIIInText(text: string): { maskedText: string; piiFound: boo
   return { maskedText, piiFound };
 }
 
+/** Nothing was read off the document. The user enters the fields by hand. */
+const NOTHING_EXTRACTED: ExtractedEvidenceMetadata = {
+  issuingAuthority: null,
+  documentNumber: null,
+  issuedAt: null,
+  validUntil: null,
+  categorySuggestion: null,
+  tags: [],
+  suggestedClaims: [],
+  maskedPiiFound: false,
+  ocrSummary: null,
+  extracted: false,
+};
+
 /**
- * Simulated/AI Vision OCR extraction for evidence documents
+ * Redact and return the text of an evidence document.
+ *
+ * `rawText` is the text a caller genuinely read off the file. There is no reader in
+ * the repository yet, so today every caller omits it and the result is
+ * `NOTHING_EXTRACTED` — no issuing authority, no document number, no dates, no tags
+ * and no claims. That is the honest answer, and the upload flow renders it as an empty
+ * state asking the user to fill the fields in.
+ *
+ * Even when `rawText` is supplied, no field is *inferred* from it: the text is masked
+ * and handed back verbatim. Guessing an issuing authority out of a file name is the
+ * bug this function was rewritten to remove.
  */
 export async function extractEvidenceMetadata(
-  fileName: string,
-  category: string,
-  rawText?: string
+  rawText?: string | null,
 ): Promise<ExtractedEvidenceMetadata> {
-  const defaultOcrText = rawText || `Sertifika Adı: ${fileName}\nVeren Kurum: TÜRKAK / TSE Akredite Kurul\nBelge No: ISO-27001-2025-9921\nDüzenleme Tarihi: 2025-01-15\nGeçerlilik Bitiş Tarihi: 2028-01-15\nYetkinlik: Bilgi Güvenliği Yönetim Sistemi (BGYS) ISO/IEC 27001:2022 Standart Uyum Belgesi.`;
+  if (!rawText || !rawText.trim()) {
+    return { ...NOTHING_EXTRACTED };
+  }
 
-  const { maskedText, piiFound } = maskPIIInText(defaultOcrText);
+  const { maskedText, piiFound } = maskPIIInText(rawText);
 
-  // Default fallback extraction
   return {
-    issuingAuthority: fileName.toLowerCase().includes('iso') ? 'TSE / BSI Certification' : 'İstanbul Ticaret Odası',
-    documentNumber: `DOC-${Math.floor(100000 + Math.random() * 900000)}`,
-    issuedAt: new Date(Date.now() - 180 * 24 * 3600 * 1000).toISOString().split('T')[0],
-    validUntil: fileName.toLowerCase().includes('bilan') || fileName.toLowerCase().includes('mali')
-      ? new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString().split('T')[0]
-      : new Date(Date.now() + 730 * 24 * 3600 * 1000).toISOString().split('T')[0],
-    categorySuggestion: category || 'CERTIFICATION',
-    tags: ['doğrulanmış', 'iso27001', 'AB-uyumlu', 'bgys'],
-    suggestedClaims: [
-      {
-        statementTr: `${fileName.replace(/\.[^/.]+$/, '')} kapsamında uluslararası standartlara tam uyumlu altyapı işletilmektedir.`,
-        statementEn: `The organization operates fully compliant infrastructure verified by ${fileName.replace(/\.[^/.]+$/, '')}.`,
-      },
-      {
-        statementTr: `Kuruluşumuz bağımsız akredite denetçi tarafından belgelenmiş bilgi güvenliği yönetim sistemine sahiptir.`,
-        statementEn: `Our organization maintains an independently audited and certified information security management system.`,
-      }
-    ],
+    ...NOTHING_EXTRACTED,
     maskedPiiFound: piiFound,
     ocrSummary: maskedText,
+    extracted: true,
   };
 }

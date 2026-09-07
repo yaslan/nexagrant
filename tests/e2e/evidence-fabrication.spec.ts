@@ -14,7 +14,7 @@ import { test, expect } from '@playwright/test';
  */
 
 const SHOTS = 'docs/agent-results/TASK-MTRH86RCGVEGC-screenshots';
-const WORKSPACE = 'fabrika-beta';
+const WORKSPACE = 'org-1xnfma';
 const EVIDENCE_URL = `/tr/${WORKSPACE}/evidence`;
 
 // A document with no certificate content at all. Whatever the drawer claims about

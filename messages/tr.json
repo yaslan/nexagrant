@@ -199,7 +199,8 @@
     "drawer": {
       "empty": "Henüz kanıt belgesi yok. Kanıtlar sayfasından belge yükleyin.",
       "noMatch": "Aramanızla eşleşen kanıt yok.",
-      "loadFailed": "Kanıtlar yüklenemedi. Sayfayı yenileyip tekrar deneyin."
+      "loadFailed": "Kanıtlar yüklenemedi. Sayfayı yenileyip tekrar deneyin.",
+      "loading": "Kanıtlar yükleniyor…"
     }
   },
   "ConceptNote": {

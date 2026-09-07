@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   getPresignedUploadUrlAction,
   confirmEvidenceUploadAction,
@@ -16,7 +17,7 @@ import {
   Clock,
   Download,
   Trash2,
-  Sparkles,
+  FileText,
   ExternalLink,
   Eye,
 } from 'lucide-react';
@@ -44,6 +45,10 @@ export interface EvidenceItemData {
   ocrText?: string | null;
   tags?: string[];
   createdAt?: Date | string;
+  claimLinks?: Array<{
+    id: string;
+    claim?: { statement?: string | null; statementEn?: string | null } | null;
+  }>;
 }
 
 interface EvidenceClientProps {
@@ -86,6 +91,13 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
   const healthResult: HealthScoreResult = calculateEvidenceHealthScore(items);
 
   const isTr = locale === 'tr';
+  const t = useTranslations('Evidence');
+
+  // What the drawer may show about the selected document. Both are empty for almost
+  // every row today, and an empty state is the correct thing to render: the module has
+  // no OCR, and a claim exists only once a person has written and linked one.
+  const documentText = selectedDoc?.ocrText || selectedDoc?.body || '';
+  const linkedClaims = selectedDoc?.claimLinks ?? [];
 
   // Filter items
   const filteredItems = items.filter((item) => {
@@ -95,7 +107,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.body && item.body.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (item.issuingAuthority && item.issuingAuthority.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.tags && item.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())));
+      (item.tags && item.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())));
     
     return matchesCategory && matchesStatus && matchesSearch;
   });
@@ -661,11 +673,19 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
               <div className="bg-ground border border-border rounded-2xl p-4 space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-muted">{isTr ? 'Veren Kurum:' : 'Issuing Authority:'}</span>
-                  <span className="font-semibold text-ink">{selectedDoc.issuingAuthority || 'TSE / Akredite Kurul'}</span>
+                  {selectedDoc.issuingAuthority ? (
+                    <span className="font-semibold text-ink">{selectedDoc.issuingAuthority}</span>
+                  ) : (
+                    <span className="text-muted italic">{t('field.empty')}</span>
+                  )}
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">{isTr ? 'Belge No:' : 'Document No:'}</span>
-                  <span className="font-mono text-ink font-semibold">{selectedDoc.documentNumber || 'DOC-992182'}</span>
+                  {selectedDoc.documentNumber ? (
+                    <span className="font-mono text-ink font-semibold">{selectedDoc.documentNumber}</span>
+                  ) : (
+                    <span className="text-muted italic">{t('field.empty')}</span>
+                  )}
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">{isTr ? 'Son Geçerlilik:' : 'Valid Until:'}</span>
@@ -681,24 +701,43 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
               <div>
                 <h4 className="font-bold text-xs text-ink mb-1.5 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-accent" />
-                  <span>{isTr ? 'YZ OCR Çıkarım Metni ve Otomatik Maskeleme' : 'AI OCR Extracted Text'}</span>
+                  <FileText className="w-3.5 h-3.5 text-muted" />
+                  <span>{t('documentText.title')}</span>
                 </h4>
-                <div className="bg-ground border border-border rounded-2xl p-4 text-xs text-ink-2 leading-relaxed font-sans max-h-48 overflow-y-auto">
-                  {selectedDoc.ocrText || selectedDoc.body || (isTr ? 'OCR metni işleniyor.' : 'Processing OCR text.')}
-                </div>
+                {documentText ? (
+                  <div className="bg-ground border border-border rounded-2xl p-4 text-xs text-ink-2 leading-relaxed font-sans max-h-48 overflow-y-auto whitespace-pre-line">
+                    {documentText}
+                  </div>
+                ) : (
+                  /* There is no OCR behind the upload. Saying "processing" implied one
+                     was running and text was on its way; neither is true. */
+                  <div className="bg-ground border border-dashed border-border rounded-2xl p-4 text-xs text-muted leading-relaxed">
+                    {t('documentText.none')}
+                  </div>
+                )}
               </div>
 
               <div>
                 <h4 className="font-bold text-xs text-ink mb-1.5">
                   {isTr ? 'Bağlı Kurumsal İddialar (Claim Links)' : 'Linked Corporate Claims'}
                 </h4>
-                <div className="bg-accent/10 border border-accent/20 rounded-2xl p-4 text-xs text-accent-ink space-y-2">
-                  <div className="flex items-start gap-2">
-                    <span className="text-accent font-bold">✓</span>
-                    <span>{selectedDoc.title} uyarınca kurumsal bilgi güvenliği ve AB veri koruması doğrulanmıştır.</span>
+                {linkedClaims.length > 0 ? (
+                  <div className="bg-accent/10 border border-accent/20 rounded-2xl p-4 text-xs text-accent-ink space-y-2">
+                    {linkedClaims.map((link) => (
+                      <div key={link.id} className="flex items-start gap-2">
+                        <span className="text-accent font-bold">✓</span>
+                        <span>{(isTr ? link.claim?.statement : link.claim?.statementEn) || link.claim?.statement}</span>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                ) : (
+                  /* This panel used to render one hard-coded sentence — "corporate
+                     information security and EU data protection are verified" — with a
+                     green tick, for every document, backed by nothing. CLAUDE.md §7. */
+                  <div className="bg-ground border border-dashed border-border rounded-2xl p-4 text-xs text-muted leading-relaxed">
+                    {t('claims.none')}
+                  </div>
+                )}
               </div>
             </div>
 

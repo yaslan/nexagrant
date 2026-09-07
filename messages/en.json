@@ -199,7 +199,8 @@
     "drawer": {
       "empty": "No evidence documents yet. Upload one from the Evidence page.",
       "noMatch": "No evidence matches your search.",
-      "loadFailed": "Evidence could not be loaded. Refresh the page and try again."
+      "loadFailed": "Evidence could not be loaded. Refresh the page and try again.",
+      "loading": "Loading evidence…"
     }
   },
   "ConceptNote": {

@@ -20,6 +20,10 @@ export default async function EvidencePage({
   try {
     evidence = await prisma.evidence.findMany({
       where: tenantId ? { tenantId } : {},
+      // The detail drawer distinguishes "no claim is linked" from "claims were not
+      // loaded", so the links have to come with the first render, not only from
+      // getEvidenceItemsAction.
+      include: { claimLinks: { include: { claim: true } } },
       orderBy: { createdAt: 'desc' }
     });
   } catch (e) {

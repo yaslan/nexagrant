@@ -2,14 +2,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { getEvidenceItemsAction } from '@/app/[locale]/(app)/[workspace]/evidence/actions';
+import { useTranslations } from 'next-intl';
 import { Sparkles, Check, Copy, FileText, Search, ShieldCheck } from 'lucide-react';
 import type { EvidenceItemData } from '@/app/[locale]/(app)/[workspace]/evidence/evidence-client';
 
-const FALLBACK_EVIDENCE: EvidenceItemData[] = [
-  { id: '1', category: 'CAT-05', kind: 'performance', title: 'H2020 SmartGrid Results', body: 'The organization successfully achieved a 15% reduction in grid loss across 3 European pilot sites [Evidence ID: EV-H2020].', tags: ['energy', 'grid', 'h2020'], validUntil: '2027-12-31' },
-  { id: '2', category: 'CAT-03', kind: 'certificate', title: 'ISO 27001 BGYS Sertifikası', body: 'Information Security Management System ISO/IEC 27001:2022 certified by BSI Audit [Sertifika No: ISO-27001-2025-9921].', tags: ['security', 'iso27001', 'bgys'], validUntil: '2028-01-15' },
-  { id: '3', category: 'CAT-01', kind: 'corporate', title: 'KOBİ Beyannamesi (SME Declaration)', body: 'Verified SME Status under European Commission Recommendation 2003/361/EC with < 250 FTE staff.', tags: ['sme', 'kobi', 'ec-verified'], validUntil: '2026-12-31' },
-];
+/**
+ * This drawer used to ship three hard-coded "evidence" items and render them whenever
+ * the tenant had none — a certificate with an invented number, a claimed 15% grid-loss
+ * reduction across three EU pilot sites, and a "verified" SME status under EC
+ * Recommendation 2003/361/EC. Each carried an "Insert Claim" button that dropped the
+ * sentence straight into a concept note. None of it was backed by an Evidence row
+ * (CLAUDE.md §7), and the failure path fell back to it as well, so a database error
+ * looked like a stocked evidence pack.
+ *
+ * A tenant with no evidence now sees that it has no evidence.
+ */
 
 type Props = {
   isOpen: boolean;
@@ -19,19 +26,38 @@ type Props = {
 
 export function EvidenceDrawer({ isOpen, onClose, onSelect }: Props) {
   const [search, setSearch] = useState('');
-  const [evidenceItems, setEvidenceItems] = useState<EvidenceItemData[]>(FALLBACK_EVIDENCE);
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItemData[]>([]);
+  // One value rather than a loading flag plus an error flag: the empty state has to
+  // tell "still loading" and "the load failed" apart from "you have no evidence",
+  // and only the last of those may be shown as a fact.
+  const [status, setStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const t = useTranslations('Evidence');
 
   useEffect(() => {
-    if (isOpen) {
-      getEvidenceItemsAction().then((items) => {
-        if (items && items.length > 0) {
-          setEvidenceItems(items);
-        }
-      }).catch(() => {
-        setEvidenceItems(FALLBACK_EVIDENCE);
+    if (!isOpen) return;
+
+    // A drawer reopened while an earlier fetch is still in flight must not be
+    // overwritten by that stale answer.
+    let cancelled = false;
+
+    getEvidenceItemsAction()
+      .then((items) => {
+        if (cancelled) return;
+        setEvidenceItems(items ?? []);
+        setStatus('loaded');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // An empty list, and the user is told it is a failure rather than an
+        // accurate "you have no evidence".
+        setEvidenceItems([]);
+        setStatus('failed');
       });
-    }
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -39,7 +65,7 @@ export function EvidenceDrawer({ isOpen, onClose, onSelect }: Props) {
   const filtered = evidenceItems.filter(e => 
     e.title.toLowerCase().includes(search.toLowerCase()) || 
     (e.body && e.body.toLowerCase().includes(search.toLowerCase())) ||
-    (e.tags && e.tags.some((t: string) => t.toLowerCase().includes(search.toLowerCase())))
+    (e.tags && e.tags.some((tag: string) => tag.toLowerCase().includes(search.toLowerCase())))
   );
 
   const handleCopy = (id: string, text: string) => {
@@ -82,7 +108,15 @@ export function EvidenceDrawer({ isOpen, onClose, onSelect }: Props) {
           {filtered.length === 0 ? (
             <div className="text-center py-12 text-muted text-xs">
               <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>No matching evidence found.</p>
+              {status === 'failed' ? (
+                <p>{t('drawer.loadFailed')}</p>
+              ) : status === 'loading' ? (
+                <p>{t('drawer.loading')}</p>
+              ) : evidenceItems.length === 0 ? (
+                <p>{t('drawer.empty')}</p>
+              ) : (
+                <p>{t('drawer.noMatch')}</p>
+              )}
             </div>
           ) : filtered.map(e => (
             <div key={e.id} className="border border-border rounded-2xl p-3.5 hover:border-accent transition group relative bg-surface shadow-2xs space-y-2">

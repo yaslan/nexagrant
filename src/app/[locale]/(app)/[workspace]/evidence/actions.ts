@@ -66,7 +66,13 @@ export async function getPresignedUploadUrlAction(
 }
 
 /**
- * Confirms evidence file upload, triggers AI OCR metadata extraction, auto PII masking, and saves DB record.
+ * Confirms an evidence file upload and saves the DB record.
+ *
+ * Only what the user actually typed is stored. There is no OCR behind the upload, so
+ * `extractEvidenceMetadata()` reports nothing (see src/lib/evidence-ai.ts) and the
+ * issuing authority, document number and validity date stay empty until a human fills
+ * them in. This used to be the opposite: an invented certificate was written to every
+ * row and mirrored into `Claim` records, which CLAUDE.md §7 forbids.
  */
 export async function confirmEvidenceUploadAction(data: {
   title: string;
@@ -85,12 +91,11 @@ export async function confirmEvidenceUploadAction(data: {
 
   const publicUrl = `https://storage.fonbridge.app/${data.objectKey}`;
 
-  // AI OCR Entity Extraction & Automatic PII Masking
-  const extracted = await extractEvidenceMetadata(data.fileName, data.category);
+  // No reader runs over the file yet, so this reports nothing rather than guessing.
+  const extracted = await extractEvidenceMetadata();
 
-  const finalValidUntil = data.validUntil 
-    ? new Date(data.validUntil) 
-    : (extracted.validUntil ? new Date(extracted.validUntil) : null);
+  // The user's date, or none. A document with no stated expiry does not get one.
+  const finalValidUntil = data.validUntil ? new Date(data.validUntil) : null;
 
   try {
     const evidence = await withTenant<EvidenceItemData>(tenantId, async (tx) => {
@@ -100,11 +105,12 @@ export async function confirmEvidenceUploadAction(data: {
         title: data.title || data.fileName.replace(/\.[^/.]+$/, ''),
         category: data.category || 'CAT-03',
         kind: data.kind || 'certificate',
-        body: extracted.ocrSummary,
+        body: extracted.ocrSummary ?? '',
         description: `Uploaded document: ${data.fileName}`,
         language: data.language || 'tr',
-        issuingAuthority: data.issuingAuthority || extracted.issuingAuthority,
-        documentNumber: extracted.documentNumber,
+        // Only the value the user entered. `extracted` has nothing to add.
+        issuingAuthority: data.issuingAuthority || null,
+        documentNumber: null,
         validUntil: finalValidUntil,
         confidentiality: data.confidentiality || 'INTERNAL',
         status: 'VALID',
@@ -116,8 +122,9 @@ export async function confirmEvidenceUploadAction(data: {
         fileUrl: publicUrl,
         ocrText: extracted.ocrSummary,
         extractedFields: {
-          issuingAuthority: extracted.issuingAuthority,
-          documentNumber: extracted.documentNumber,
+          // `extracted: false` is the record that nothing was read off the document,
+          // so a later reader cannot mistake these blanks for a failed extraction.
+          extracted: extracted.extracted,
           maskedPiiFound: extracted.maskedPiiFound,
         },
         tags: extracted.tags,
@@ -125,28 +132,10 @@ export async function confirmEvidenceUploadAction(data: {
       },
       });
 
-      // Auto-create suggested claims if present
-      if (extracted.suggestedClaims && extracted.suggestedClaims.length > 0) {
-        for (const claimItem of extracted.suggestedClaims) {
-          const claim = await tx.claim.create({
-            data: {
-              tenantId,
-              statement: claimItem.statementTr,
-              statementEn: claimItem.statementEn,
-              confidenceScore: 0.95,
-              tags: extracted.tags,
-            },
-          });
-
-          await tx.claimEvidenceLink.create({
-            data: {
-              claimId: claim.id,
-              evidenceId: created.id,
-              isPrimary: true,
-            },
-          });
-        }
-      }
+      // No claim is created here. Uploading a file is not evidence for any statement,
+      // and the rows this used to write ("independently audited", "fully compliant
+      // with international standards", at confidence 0.95) were backed by nothing.
+      // A claim is written when a person makes it and links it to this document.
 
       return created;
     });
@@ -164,7 +153,7 @@ export async function confirmEvidenceUploadAction(data: {
         title: data.title,
         category: data.category,
         kind: 'certificate',
-        body: extracted.ocrSummary,
+        body: extracted.ocrSummary ?? '',
         status: 'VALID',
         validUntil: finalValidUntil,
         fileUrl: publicUrl,
@@ -202,7 +191,8 @@ export async function createEvidence(formData: FormData) {
   }
 
   const validUntil = validUntilRaw ? new Date(validUntilRaw) : null;
-  const extracted = await extractEvidenceMetadata(title || fileName || 'Belge', category);
+  // Same as the presigned path: nothing is read off the file, so nothing is invented.
+  const extracted = await extractEvidenceMetadata();
 
   try {
     const evidence = await withTenant<EvidenceItemData>(tenantId, (tx) =>
@@ -212,7 +202,7 @@ export async function createEvidence(formData: FormData) {
         title: title || fileName || 'Kanıt Belgesi',
         kind,
         category,
-        body: body || extracted.ocrSummary,
+        body: body || extracted.ocrSummary || '',
         validUntil,
         r2ObjectKey: objectKey,
         fileName,
@@ -236,7 +226,7 @@ export async function createEvidence(formData: FormData) {
       title: title || 'Kanıt Belgesi',
       kind,
       category,
-      body: body || extracted.ocrSummary,
+      body: body || extracted.ocrSummary || '',
       validUntil,
       fileUrl,
       createdAt: new Date(),
