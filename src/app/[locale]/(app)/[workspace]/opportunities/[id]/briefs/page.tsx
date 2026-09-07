@@ -1,8 +1,9 @@
 import React from 'react';
+import { notFound } from 'next/navigation';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
+import { moduleGate } from '@/lib/modules/guard';
 import { MeetingBriefsClient, type BriefItem } from './client';
-import { errorMessage } from '@/lib/errors';
 
 export default async function MeetingBriefsPage({
   params,
@@ -12,88 +13,55 @@ export default async function MeetingBriefsPage({
   const { locale, workspace, id } = await params;
   const { tenantId } = await requireTenantPage(locale);
 
-  const state: {
-    opp: { id: string; title: string; tenantId: string; topicId: string | null } | null;
-    briefs: BriefItem[];
-  } = {
-    opp: null,
-    briefs: [],
-  };
+  // Module gate (M9). A tenant whose ModuleState says OFF/DEV/PILOT must not
+  // reach this page just because it can guess the URL.
+  const locked = await moduleGate('M9', locale);
+  if (locked) return locked;
 
-  try {
-    // Both reads are scoped to the session tenant. The briefs query used to key
-    // off `opp.tenantId`, so a cross-tenant opportunity would have pulled that
-    // other tenant's briefs along with it.
-    await withTenant(tenantId, async (tx) => {
-      state.opp = await tx.opportunity.findFirst({
-        where: { id, tenantId },
-        select: { id: true, title: true, tenantId: true, topicId: true },
-      });
+  // Both reads are scoped to the session tenant. The briefs query used to key
+  // off `opp.tenantId`, so a cross-tenant opportunity would have pulled that
+  // other tenant's briefs along with it.
+  //
+  // No try/catch and no demo fallback here: this page used to answer an unknown
+  // or cross-tenant id with a hard-coded "Fraunhofer Institute" brief, which
+  // reads to the user as real data for an opportunity they cannot see. An
+  // unreadable database is an error (global-error.tsx), not an invitation to
+  // invent content.
+  const opp = await withTenant<{ id: string; title: string } | null>(tenantId, (tx) =>
+    tx.opportunity.findFirst({
+      where: { id, tenantId },
+      select: { id: true, title: true },
+    }),
+  );
 
-      if (state.opp) {
-        state.briefs = await tx.meetingBrief.findMany({
-          select: {
-            id: true,
-            interactionId: true,
-            partnerName: true,
-            content: true,
-            meetingScheduledAt: true,
-            meetingScheduledTz: true,
-            createdAt: true,
-          },
-          where: { tenantId },
-          orderBy: { createdAt: 'desc' },
-        });
-      }
-    });
-  } catch (e) {
-    console.warn(`[MeetingBriefsPage] DB query bypassed: ${errorMessage(e)}`);
-  }
+  if (!opp) notFound();
 
-  if (!state.opp) {
-    state.opp = {
-      id,
-      tenantId,
-      title: 'HORIZON-CL5-2026-D3-01: Zero-Emission Transport Systems & Battery Tech',
-      topicId: 'HORIZON-CL5-2026-D3-01',
-    };
-
-    state.briefs = [
-      {
-        id: 'brief-demo-1',
-        interactionId: 'int-fraunhofer-01',
-        content: `### 1. Partner Background & EU Track Record
-- **Partner:** Fraunhofer Institute (Germany) — PIC 999984059
-- **Track Record:** 142 Horizon Europe participations, 48 coordinator roles. Recognized leader in applied industrial research.
-
-### 2. Strategic Complementarity for HORIZON-CL5-2026-D3-01
-- High synergy between Fraunhofer's thermal management testbed and proposal objective for zero-emission heavy transport.
-
-### 3. Suggested Work Package & Role Allocation
-- **Role:** Work Package 3 Leader (Prototyping & Hardware-in-the-Loop Pilot Testing).
-- **Effort Recommendation:** 16 Person-Months.
-
-### 4. 3 Strategic Questions to Ask in Meeting
-1. **Pilot Facility:** Can Fraunhofer host the hardware-in-the-loop thermal pilot in Q3 2027?
-2. **Background IP:** What are the license terms for the thermal modeling software for partner use?
-3. **Consortium Lead:** Who will be the lead PI for grant agreement negotiations?
-
-### 5. Risk Points & Red Flags to Clarify
-- **Data Sharing:** Ensure clear bilateral non-disclosure & data sharing agreement before sharing CAD models.
-- **Overlapping Proposals:** Confirm whether Fraunhofer is participating in a competing proposal under the same call topic.`,
-        createdAt: new Date().toISOString(),
+  // MeetingBrief carries no opportunityId column, so tenant scope is the
+  // narrowest filter available today.
+  const briefs = await withTenant<BriefItem[]>(tenantId, (tx) =>
+    tx.meetingBrief.findMany({
+      select: {
+        id: true,
+        interactionId: true,
+        partnerName: true,
+        content: true,
+        meetingScheduledAt: true,
+        meetingScheduledTz: true,
+        createdAt: true,
       },
-    ];
-  }
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+    }),
+  );
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <MeetingBriefsClient
-        opportunityId={state.opp.id}
+        opportunityId={opp.id}
         locale={locale}
         workspace={workspace}
-        opportunityTitle={state.opp.title}
-        briefs={state.briefs || []}
+        opportunityTitle={opp.title}
+        briefs={briefs}
       />
     </div>
   );
