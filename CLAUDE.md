@@ -17,6 +17,8 @@ pnpm db:rls              # prisma/rls.sql uygula
 pnpm test                # vitest
 pnpm test:e2e            # playwright
 pnpm lint && pnpm typecheck
+pnpm gate                # lint + typecheck + test (kapinin tamami)
+pnpm hooks:install       # githooks/ dizinini etkinlestir (pre-commit + pre-push)
 pnpm worker:dev          # workers/ (python -m uvicorn app:app --reload)
 pnpm jobs:k1             # K1 çağrı toplama işini elle tetikle
 pnpm jobs:k2 -- --month 2026-09

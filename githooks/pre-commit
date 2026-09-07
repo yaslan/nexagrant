@@ -1,0 +1,54 @@
+#!/bin/sh
+# Fabrika commit gate.
+#
+# Every agent works in the SAME working tree on `dev`, so a whole-repo gate
+# would block you for a file a colleague is still halfway through editing.
+# This hook therefore judges you only on what YOU are committing:
+#   - ESLint runs on your staged files;
+#   - tsc runs project-wide (it has to), but only errors that land in a staged
+#     file block the commit. Everyone else's in-flight errors are shown as a
+#     warning so you know the tree is dirty without being held hostage by it.
+# The full gate (lint + typecheck + test, whole repo) is `pnpm gate`.
+
+set -e
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' || true)
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+printf '%s\n' "$STAGED" > "$TMP/staged.txt"
+
+echo "→ eslint (staged files)"
+# shellcheck disable=SC2086
+if ! printf '%s\n' "$STAGED" | tr '\n' '\0' | xargs -0 pnpm exec eslint --max-warnings=-1; then
+  echo
+  echo "✗ Commit durduruldu: staged dosyalarda lint HATASI var."
+  echo "  Kuralı gevşeterek geçme; hatayı düzelt ya da gerekçeli satır-içi istisna yaz."
+  exit 1
+fi
+
+echo "→ tsc --noEmit (proje geneli, yalnız staged dosyalar bloke eder)"
+TSC_OUT="$TMP/tsc.txt"
+pnpm exec tsc --noEmit > "$TSC_OUT" 2>&1 || true
+
+MINE=$(grep -F -f "$TMP/staged.txt" "$TSC_OUT" || true)
+THEIRS=$(grep -E '\.tsx?\([0-9]+,[0-9]+\): error' "$TSC_OUT" | grep -v -F -f "$TMP/staged.txt" || true)
+
+if [ -n "$THEIRS" ]; then
+  echo
+  echo "⚠ Ağaçta senin OLMAYAN typecheck hataları var (başka bir ajan yazıyor olabilir):"
+  printf '%s\n' "$THEIRS" | head -5
+  echo "  Bunlar commit'ini engellemiyor."
+fi
+
+if [ -n "$MINE" ]; then
+  echo
+  echo "✗ Commit durduruldu: staged dosyalarında typecheck hatası var:"
+  printf '%s\n' "$MINE"
+  exit 1
+fi
+
+echo "✓ Kapı temiz (staged kapsamı)."
