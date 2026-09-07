@@ -215,7 +215,7 @@ export function MeetingBriefsClient({
                 className="text-xs text-blue-400 hover:text-blue-300 transition flex items-center gap-1 font-semibold"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Pipeline'a Dön</span>
+                <span>Pipeline&apos;a Dön</span>
               </Link>
             </div>
             <div className="flex items-center gap-2 text-xs font-mono text-blue-400 font-semibold tracking-wider uppercase mb-1">

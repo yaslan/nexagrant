@@ -363,7 +363,7 @@ export default async function PartnersPage({
       {(q || country || activityType || isTurkishOnly || minProjects > 0) && (
         <div className="flex items-center gap-2 flex-wrap text-xs bg-blue-50/50 border border-blue-100 p-3 rounded-xl">
           <span className="font-bold text-blue-900">{isTr ? 'Aktif Filtreler:' : 'Active Filters:'}</span>
-          {q && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Arama: "{q}"</span>}
+          {q && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Arama: &quot;{q}&quot;</span>}
           {country && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Ülke: {country}</span>}
           {activityType && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Tip: {activityType}</span>}
           {isTurkishOnly && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">🇹🇷 Türk Kuruluşlar</span>}

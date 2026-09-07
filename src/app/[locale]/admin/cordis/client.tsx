@@ -364,7 +364,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
             <div>
               <span className="font-bold block">M1 Partner Intelligence Modülü Bağımlılığı</span>
               <p className="mt-0.5 text-amber-800">
-                M1 "Ortak Arama" ekranları doğrudan K2 CORDIS katmanının türettiği <code className="font-mono font-bold bg-amber-100 px-1 rounded">cordis_partner_profile</code> tablosunu kullanır. K2 verisi aktarılmadığında M1 modülü "K2 bağımlılığı kapalı" uyarısı verir.
+                M1 &quot;Ortak Arama&quot; ekranları doğrudan K2 CORDIS katmanının türettiği <code className="font-mono font-bold bg-amber-100 px-1 rounded">cordis_partner_profile</code> tablosunu kullanır. K2 verisi aktarılmadığında M1 modülü &quot;K2 bağımlılığı kapalı&quot; uyarısı verir.
               </p>
             </div>
           </div>

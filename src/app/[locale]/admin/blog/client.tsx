@@ -151,7 +151,7 @@ export default function AdminBlogClient({ initialPosts, locale }: AdminBlogClien
           </div>
           <h1 className="text-2xl font-bold font-heading text-ink">Blog İçerik Yönetimi (CRUD)</h1>
           <p className="text-xs text-muted mt-1">
-            Site ön yüzündeki rehberler, haberler ve öne çıkan 3'lü blog kartlarını anlık yönetin.
+            Site ön yüzündeki rehberler, haberler ve öne çıkan 3&apos;lü blog kartlarını anlık yönetin.
           </p>
         </div>
 
@@ -430,7 +430,7 @@ export default function AdminBlogClient({ initialPosts, locale }: AdminBlogClien
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Kapak Görsel URL'i</label>
+                <label className="block text-xs font-bold text-ink mb-1">Kapak Görsel URL&apos;i</label>
                 <input
                   type="text"
                   value={formData.image}
@@ -449,7 +449,7 @@ export default function AdminBlogClient({ initialPosts, locale }: AdminBlogClien
                   className="w-4 h-4 accent-accent rounded"
                 />
                 <label htmlFor="featured" className="text-xs font-semibold text-ink cursor-pointer">
-                  Ana sayfadaki 3'lü Öne Çıkan Blog Alanında Göster (Featured)
+                  Ana sayfadaki 3&apos;lü Öne Çıkan Blog Alanında Göster (Featured)
                 </label>
               </div>
 

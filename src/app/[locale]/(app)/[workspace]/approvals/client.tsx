@@ -440,7 +440,7 @@ export default function ApprovalsClient({
               </div>
               {selectedRequestDetails.auditHash && (
                 <div className="text-[11px] text-muted break-all">
-                  <strong>Kriptografik Doğrulama Hash'i:</strong>
+                  <strong>Kriptografik Doğrulama Hash&apos;i:</strong>
                   <br />
                   <span className="font-mono">{selectedRequestDetails.auditHash}</span>
                 </div>

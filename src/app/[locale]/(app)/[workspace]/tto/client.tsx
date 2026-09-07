@@ -443,7 +443,7 @@ export function TtoAcceleratorClient({
             </div>
           ) : (
             <div className="p-8 text-center text-muted text-xs border border-dashed border-border rounded-xl space-y-2">
-              <p>Lütfen Portföy sekmesindeki herhangi bir teknoloji için "IP Kontrol Listesi Üret" butonuna tıklayın.</p>
+              <p>Lütfen Portföy sekmesindeki herhangi bir teknoloji için &quot;IP Kontrol Listesi Üret&quot; butonuna tıklayın.</p>
             </div>
           )}
         </div>

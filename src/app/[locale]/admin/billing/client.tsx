@@ -348,7 +348,7 @@ export function BillingSsoClient({
                   SAML SSO Ayarları Başarıyla Kaydedildi!
                 </span>
               ) : (
-                <span className="text-muted text-[11px]">Domain kullanıcıları oturum açarken doğrudan IdP'ye yönlendirilir.</span>
+                <span className="text-muted text-[11px]">Domain kullanıcıları oturum açarken doğrudan IdP&apos;ye yönlendirilir.</span>
               )}
 
               <button
