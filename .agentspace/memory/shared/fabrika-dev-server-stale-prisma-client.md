@@ -39,3 +39,16 @@ ile "ürün çalışıyor" burada ayrışır; yalnız gerçek tarayıcı + ayakt
 
 İlgili: [[fabrika-migrations-are-not-prisma-migrate]] · [[fabrika-runtime-verification-recipe]] ·
 [[fabrika-prisma7-driver-adapter]]
+
+## Varyant: istemci hiç üretilmemiş olabilir
+
+2026-09-07'de aynı belirtinin ikinci bir kaynağı ölçüldü: `node_modules/.prisma` dizini
+**hiç yoktu** — istemci bayat değil, yoktu. Belirti aynı (uygulama "Unknown field" der,
+taze `tsx` süreci de patlar), ayrım tek komutla yapılır:
+
+```bash
+ls node_modules/.prisma/client 2>/dev/null || echo "istemci hiç üretilmemiş"
+```
+
+Çözüm yine `npx prisma generate`. Bunu kalıcılaştıran bir `postinstall`/CI adımı **yok**,
+yani tuzak `pnpm install` sonrası geri gelir. (`TASK-MTQUX5IZ9I5VP` raporu, risk #2.)
