@@ -416,6 +416,7 @@
   "m6": {
     "internalPreAssessment": "Internal pre-assessment",
     "internalPreAssessmentBody": "These scores are an internal quality check; they do not replace the official Commission evaluation.",
+    "lensTitle": "Internal Pre-Assessment & Reviewer Simulation",
     "criteria": {
       "Innovation": "Innovation",
       "Feasibility": "Feasibility",

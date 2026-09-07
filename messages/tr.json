@@ -416,6 +416,7 @@
   "m6": {
     "internalPreAssessment": "İç ön değerlendirme",
     "internalPreAssessmentBody": "Bu puanlar şirket içi kalite kontrol içindir; resmî Komisyon değerlendirmesi yerine geçmez.",
+    "lensTitle": "İç Ön Değerlendirme & Hakem Simülasyonu",
     "criteria": {
       "Innovation": "Yenilikçilik",
       "Feasibility": "Uygulanabilirlik",
