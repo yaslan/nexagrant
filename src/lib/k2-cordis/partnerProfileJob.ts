@@ -1,5 +1,40 @@
 import { prisma } from '@/lib/db';
 
+/**
+ * A CordisOrganization as the profile query loads it — the `include` chain down
+ * to each project's topics. Query results arrive untyped here (`prisma generate`
+ * does not run in this repo; see src/types/prisma-override.d.ts), so the shape
+ * is declared rather than inferred.
+ */
+interface OrganizationWithParticipations {
+  organisationId: string;
+  name: string;
+  nameNormalized: string | null;
+  activityType: string | null;
+  sme: boolean;
+  country: string | null;
+  isTurkish: boolean;
+  participations: Array<{
+    role: string | null;
+    ecContribution: bigint | null;
+    netEcContribution: bigint | null;
+    project: {
+      framework: string | null;
+      startDate: Date | null;
+      endDate: Date | null;
+      topics: Array<{ topicCode: string; topicTitle: string | null }>;
+    };
+  }>;
+}
+
+/** One co-participation edge, as the upsert batch writes it. */
+interface CoParticipationItem {
+  orgA: string;
+  orgB: string;
+  count: number;
+  lastYear?: number;
+}
+
 export interface PartnerProfileJobResult {
   success: boolean;
   updatedProfiles: number;
@@ -71,8 +106,8 @@ export async function generatePartnerProfiles(): Promise<PartnerProfileJobResult
 
   for (let i = 0; i < coPartItems.length; i += BATCH_SIZE) {
     const batch = coPartItems.slice(i, i + BATCH_SIZE);
-    await (prisma as any).$transaction(
-      batch.map((cp: any) =>
+    await prisma.$transaction(
+      batch.map((cp: CoParticipationItem) =>
         prisma.cordisCoParticipation.upsert({
           where: { orgA_orgB: { orgA: cp.orgA, orgB: cp.orgB } },
           create: {
@@ -91,7 +126,7 @@ export async function generatePartnerProfiles(): Promise<PartnerProfileJobResult
   }
 
   // 2. Build partner profiles per organization
-  const organizations = await prisma.cordisOrganization.findMany({
+  const organizations: OrganizationWithParticipations[] = await prisma.cordisOrganization.findMany({
     include: {
       participations: {
         include: {
@@ -110,7 +145,7 @@ export async function generatePartnerProfiles(): Promise<PartnerProfileJobResult
   for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
     const batchOrgs = organizations.slice(i, i + BATCH_SIZE);
 
-    const upsertPromises = batchOrgs.map((org: any) => {
+    const upsertPromises = batchOrgs.map((org) => {
       const participations = org.participations;
 
       let horizonProjects = 0;

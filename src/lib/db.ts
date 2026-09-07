@@ -20,7 +20,7 @@ export function createDbClient(url: string): PrismaClient {
     connectionTimeoutMillis: 1000,
     idleTimeoutMillis: 5000,
   });
-  return new (PrismaClient as any)({ adapter: new PrismaPg(pool) }) as PrismaClient;
+  return new PrismaClient({ adapter: new PrismaPg(pool) });
 }
 
 const globalForPrisma = globalThis as unknown as {

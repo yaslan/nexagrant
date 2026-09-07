@@ -18,7 +18,7 @@ interface ApprovalRequestItem {
   actionType: string;
   title: string;
   description?: string | null;
-  payload: any;
+  payload: Record<string, unknown>;
   status: string;
   requiredRole: Role;
   requesterId: string;
@@ -151,7 +151,7 @@ export default function ApprovalsClient({
       });
 
       if (res.success && res.request) {
-        setRequests((prev) => [res.request as any, ...prev]);
+        setRequests((prev) => [res.request, ...prev]);
         setIsNewModalOpen(false);
         setFormTitle('');
         setFormDescription('');

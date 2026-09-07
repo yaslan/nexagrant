@@ -1,5 +1,27 @@
 import { prisma } from './db';
 
+/**
+ * prisma/schema.prisma `model AddOn` — one purchased add-on on a subscription.
+ *
+ * Query results arrive untyped here (`prisma generate` does not run in this
+ * repo; see src/types/prisma-override.d.ts), so the rows these two queries
+ * return are declared rather than inferred.
+ */
+interface AddOnRow {
+  sku: string;
+  quantity: number;
+  endedAt: Date | null;
+}
+
+/** prisma/schema.prisma `model AddOnCatalog` — what a sku grants. */
+interface AddOnCatalogRow {
+  sku: string;
+  grantsModule: string | null;
+  grantsSeats: number | null;
+  grantsCredits: number | null;
+  grantsWorkspaces: number | null;
+}
+
 export interface Entitlements {
   allowedModules: string[];
   seats: number;
@@ -42,17 +64,19 @@ export async function getEntitlements(tenantId: string): Promise<Entitlements> {
   let aiCreditsMonthly = plan.aiCreditsMonthly;
 
   if (tenant.subscription && tenant.subscription.addOns) {
-    const activeAddOns = tenant.subscription.addOns.filter((a: any) => !a.endedAt || a.endedAt > new Date());
+    const activeAddOns: AddOnRow[] = tenant.subscription.addOns.filter(
+      (a: AddOnRow) => !a.endedAt || a.endedAt > new Date()
+    );
     
     if (activeAddOns.length > 0) {
-      const addOnSkus = activeAddOns.map((a: any) => a.sku);
-      const catalog = await prisma.addOnCatalog.findMany({
+      const addOnSkus = activeAddOns.map((a) => a.sku);
+      const catalog: AddOnCatalogRow[] = await prisma.addOnCatalog.findMany({
         where: { sku: { in: addOnSkus } }
       });
-      const catalogMap = new Map(catalog.map((c: any) => [c.sku, c]));
+      const catalogMap = new Map(catalog.map((c) => [c.sku, c]));
 
       for (const addon of activeAddOns) {
-        const details = catalogMap.get(addon.sku) as any;
+        const details = catalogMap.get(addon.sku);
         if (details) {
           if (details.grantsModule) {
             allowedModules.add(details.grantsModule);

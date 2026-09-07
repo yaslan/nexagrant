@@ -3,11 +3,13 @@ import Google from "next-auth/providers/google";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import type { Adapter, AdapterAccount, AdapterSession, AdapterUser } from "next-auth/adapters";
+import type { OrgType } from "@prisma/client";
 import { prisma } from "./db";
 import { env } from "./env";
 import { errorMessage } from '@/lib/errors';
 
-const DEMO_PROFILES: Record<string, { name: string; orgName: string; orgType: any; role: string; isPlatformAdmin?: boolean }> = {
+const DEMO_PROFILES: Record<string, { name: string; orgName: string; orgType: OrgType; role: string; isPlatformAdmin?: boolean }> = {
   "admin@yasinaslan.com.tr": {
     name: "Yasin Aslan (Süperadmin)",
     orgName: "FonBridge HQ",
@@ -37,9 +39,14 @@ const DEMO_PROFILES: Record<string, { name: string; orgName: string; orgType: an
 
 const baseAdapter = PrismaAdapter(prisma);
 
-const safeAdapter: any = {
+/**
+ * The Prisma adapter with every call wrapped so a database outage degrades to a
+ * signed-in session instead of a 500. Typed as `Adapter` rather than `any` so a
+ * method whose signature drifts from Auth.js is a build error.
+ */
+const safeAdapter: Adapter = {
   ...baseAdapter,
-  async createUser(user: any) {
+  async createUser(user: AdapterUser) {
     try {
       return await baseAdapter.createUser!(user);
     } catch (e) {
@@ -69,7 +76,7 @@ const safeAdapter: any = {
       return null;
     }
   },
-  async getUserByAccount(account: any) {
+  async getUserByAccount(account: Pick<AdapterAccount, 'provider' | 'providerAccountId'>) {
     try {
       return await baseAdapter.getUserByAccount!(account);
     } catch (e) {
@@ -77,15 +84,18 @@ const safeAdapter: any = {
       return null;
     }
   },
-  async linkAccount(account: any) {
+  // The Adapter contract lets these return either the row or nothing; the
+  // wrappers normalise the adapter's `void` to `undefined` (the same value at
+  // runtime) so one arm of the union covers both the success and the fallback.
+  async linkAccount(account: AdapterAccount): Promise<AdapterAccount | undefined> {
     try {
-      return await baseAdapter.linkAccount!(account);
+      return (await baseAdapter.linkAccount!(account)) ?? undefined;
     } catch (e) {
       console.warn(`[AuthAdapter.linkAccount] DB error/fallback: ${errorMessage(e)}`);
       return account;
     }
   },
-  async createSession(session: any) {
+  async createSession(session: { sessionToken: string; userId: string; expires: Date }) {
     try {
       return await baseAdapter.createSession!(session);
     } catch (e) {
@@ -101,19 +111,25 @@ const safeAdapter: any = {
       return null;
     }
   },
-  async updateSession(session: any) {
+  async updateSession(
+    session: Partial<AdapterSession> & Pick<AdapterSession, 'sessionToken'>
+  ): Promise<AdapterSession | null | undefined> {
     try {
       return await baseAdapter.updateSession!(session);
     } catch (e) {
       console.warn(`[AuthAdapter.updateSession] DB error/fallback: ${errorMessage(e)}`);
-      return session;
+      // The fallback echoes the patch it was given, which is a partial session
+      // by construction — the database is what would have filled the rest in.
+      // Sessions are JWT-backed here, so nothing reads this value.
+      return session as AdapterSession;
     }
   },
-  async deleteSession(sessionToken: string) {
+  async deleteSession(sessionToken: string): Promise<AdapterSession | null | undefined> {
     try {
-      return await baseAdapter.deleteSession!(sessionToken);
+      return (await baseAdapter.deleteSession!(sessionToken)) ?? undefined;
     } catch (e) {
       console.warn(`[AuthAdapter.deleteSession] DB error/fallback: ${errorMessage(e)}`);
+      return undefined;
     }
   },
 };
@@ -133,9 +149,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     MicrosoftEntraID({
       clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID || "demo-entra-id",
       clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET || "demo-entra-secret",
-      tenantId: process.env.AUTH_MICROSOFT_ENTRA_ID_TENANT_ID || "common",
+      // Directory (tenant) scoping belongs in `issuer`
+      // (https://login.microsoftonline.com/<tenant>/v2.0). A `tenantId` option
+      // used to be passed here behind an `as any`; the provider never read it,
+      // so it did nothing and the multi-tenant "common" endpoint was always
+      // used. Changing that is a deployment decision, not a lint fix.
       allowDangerousEmailAccountLinking: true,
-    } as any),
+    }),
     Credentials({
       name: "Email / Demo",
       credentials: {

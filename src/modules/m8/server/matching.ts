@@ -1,9 +1,46 @@
 import { prisma } from '@/lib/db';
 
+/**
+ * Why a candidate scored what it did: one entry per scoring dimension, summing
+ * to `MatchCandidate.score`. Persisted to `SeatCandidate.breakdown` (Json), so
+ * the UI can show the reasoning rather than a bare number.
+ */
+export interface MatchBreakdown {
+  topicExperience: number;
+  geographicBalance: number;
+  collabHistory: number;
+  relationshipWarmth: number;
+  centrality: number;
+  rivalRisk: number;
+}
+
 interface MatchCandidate {
   organizationId: string;
   score: number;
-  breakdown: any;
+  breakdown: MatchBreakdown;
+}
+
+/**
+ * The columns this file reads off its query results. Rows arrive untyped
+ * (`prisma generate` does not run here; see src/types/prisma-override.d.ts), so
+ * each shape is stated at the query rather than inferred from it.
+ */
+interface SeatRow {
+  status: string;
+  organizationId: string | null;
+}
+
+interface OrganizationCountryRow {
+  country: string | null;
+}
+
+interface RelationshipRow {
+  organizationId: string | null;
+  warmth: string;
+}
+
+interface CollabRow {
+  projects: number | null;
 }
 
 export async function generateSeatCandidates(
@@ -35,18 +72,22 @@ export async function generateSeatCandidates(
   
   const candidatesMap = new Map<string, MatchCandidate>();
 
-  const confirmedSeats = opp.seats.filter((s: any) => s.status === 'CONFIRMED' && s.organizationId);
-  const confirmedOrgIds = confirmedSeats.map((s: any) => s.organizationId!);
+  const confirmedSeats: SeatRow[] = opp.seats.filter(
+    (s: SeatRow) => s.status === 'CONFIRMED' && s.organizationId
+  );
+  const confirmedOrgIds = confirmedSeats.map((s) => s.organizationId!);
   
   const confirmedOrgs = await prisma.organization.findMany({ 
     where: { id: { in: confirmedOrgIds } } 
   });
-  const confirmedCountries = new Set(confirmedOrgs.map((o: any) => o.country).filter(Boolean));
+  const confirmedCountries = new Set(
+    confirmedOrgs.map((o: OrganizationCountryRow) => o.country).filter(Boolean)
+  );
 
-  const relationships = await prisma.relationship.findMany({
+  const relationships: RelationshipRow[] = await prisma.relationship.findMany({
     where: { tenantId }
   });
-  const relMap = new Map(relationships.map((r: any) => [r.organizationId, r]));
+  const relMap = new Map(relationships.map((r) => [r.organizationId, r] as const));
 
   for (const stat of stats) {
     const orgId = stat.organizationId;
@@ -61,7 +102,9 @@ export async function generateSeatCandidates(
     }
 
     let score = 0;
-    const breakdown: any = {};
+    // Filled dimension by dimension below, then asserted complete when the
+    // candidate is stored.
+    const breakdown: Partial<MatchBreakdown> = {};
 
     // 1. Topic Experience (35 max)
     const expScore = Math.min(35, (stat.participationCount * 5) + (stat.coordinatorCount * 10));
@@ -86,7 +129,7 @@ export async function generateSeatCandidates(
           ]
         }
       });
-      const totalProjects = collabs.reduce((acc: any, c: any) => acc + (c.projects || 0), 0);
+      const totalProjects = collabs.reduce((acc: number, c: CollabRow) => acc + (c.projects || 0), 0);
       collabScore = Math.min(15, totalProjects * 5);
     }
     score += collabScore;
@@ -94,7 +137,7 @@ export async function generateSeatCandidates(
 
     // 4. Warmth (15 max)
     let warmthScore = 0;
-    const rel = relMap.get(orgId) as any;
+    const rel = relMap.get(orgId);
     if (rel) {
       if (rel.warmth === 'active' || rel.warmth === 'hot') warmthScore = 15;
       else if (rel.warmth === 'warm') warmthScore = 10;
@@ -130,7 +173,7 @@ export async function generateSeatCandidates(
     candidatesMap.set(orgId, {
       organizationId: orgId,
       score,
-      breakdown
+      breakdown: breakdown as MatchBreakdown
     });
   }
 

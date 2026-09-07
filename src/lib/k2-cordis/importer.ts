@@ -150,7 +150,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
     if (isTemp) tempZipPath = zipPath;
 
     // Hash check: check if the last successful run used the same zip hash
-    let latestSuccessRun: any = null;
+    let latestSuccessRun: { fileHash: string | null } | null = null;
     try {
       latestSuccessRun = await prisma.cordisImportRun.findFirst({
         where: { dataset, status: 'SUCCESS' },
@@ -299,8 +299,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
     // 1. Projects
     for (let i = 0; i < projects.length; i += BATCH_SIZE) {
       const batch = projects.slice(i, i + BATCH_SIZE);
-      await (prisma as any).$transaction(
-        batch.map((p: any) =>
+      await prisma.$transaction(
+        batch.map((p) =>
           prisma.cordisProject.upsert({
             where: { id: p.id },
             create: {
@@ -344,8 +344,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
     // 2. Organizations
     for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
       const batch = organizations.slice(i, i + BATCH_SIZE);
-      await (prisma as any).$transaction(
-        batch.map((o: any) =>
+      await prisma.$transaction(
+        batch.map((o) =>
           prisma.cordisOrganization.upsert({
             where: { organisationId: o.organisationId },
             create: {
@@ -385,8 +385,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
     // 3. Participations
     for (let i = 0; i < participations.length; i += BATCH_SIZE) {
       const batch = participations.slice(i, i + BATCH_SIZE);
-      await (prisma as any).$transaction(
-        batch.map((pt: any) =>
+      await prisma.$transaction(
+        batch.map((pt) =>
           prisma.cordisParticipation.upsert({
             where: {
               projectId_organisationId: {
@@ -421,8 +421,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
     // 4. Topics
     for (let i = 0; i < topics.length; i += BATCH_SIZE) {
       const batch = topics.slice(i, i + BATCH_SIZE);
-      await (prisma as any).$transaction(
-        batch.map((t: any) =>
+      await prisma.$transaction(
+        batch.map((t) =>
           prisma.cordisProjectTopic.upsert({
             where: {
               projectId_topicCode: {
@@ -446,8 +446,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
     // 5. SciVocs
     for (let i = 0; i < scivocs.length; i += BATCH_SIZE) {
       const batch = scivocs.slice(i, i + BATCH_SIZE);
-      await (prisma as any).$transaction(
-        batch.map((s: any) =>
+      await prisma.$transaction(
+        batch.map((s) =>
           prisma.cordisProjectSciVoc.upsert({
             where: {
               projectId_scivocCode: {

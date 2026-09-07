@@ -23,7 +23,7 @@ export async function submitApprovalRequestAction(data: {
   actionType: DualApprovalActionType;
   title: string;
   description?: string;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   requiredRole?: Role;
   expiresInHours?: number;
 }) {

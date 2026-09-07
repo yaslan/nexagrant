@@ -21,6 +21,17 @@ declare module '@prisma/client' {
     GUEST_PARTNER = 'GUEST_PARTNER'
   }
 
+  /** prisma/schema.prisma `enum OrgType`. */
+  export type OrgType =
+    | 'SME'
+    | 'LARGE'
+    | 'UNIVERSITY'
+    | 'RESEARCH'
+    | 'PUBLIC'
+    | 'NGO'
+    | 'CONSULTANCY'
+    | 'CLUSTER';
+
   /** prisma/schema.prisma `enum Gate` — the G0..G4 pipeline stages. */
   export type Gate = 'G0' | 'G1' | 'G2' | 'G3' | 'G4';
 
@@ -53,8 +64,16 @@ declare module '@prisma/client' {
   }
 
   export class PrismaClient {
+    /**
+     * The driver-adapter form src/lib/db.ts uses. Declared so the call does not
+     * need a cast; the option bag is deliberately loose because the adapter's
+     * own type lives in @prisma/adapter-pg.
+     */
+    constructor(options?: { adapter?: unknown; log?: unknown });
     [key: string]: any;
     $transaction<T>(arg: (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>): Promise<T>;
+    /** Batch form: an array of prepared operations, committed together. */
+    $transaction<T>(operations: Promise<T>[]): Promise<T[]>;
     $executeRaw(query: TemplateStringsArray, ...values: any[]): Promise<any>;
   }
 }

@@ -13,6 +13,9 @@ interface KanbanBoardProps {
   locale?: string;
 }
 
+/** The intended-role filter above the board; matches the <option> values. */
+type RoleFilter = 'all' | 'coordinator' | 'partner';
+
 const GATES: { key: Gate; title: string; subtitle: string; color: string }[] = [
   { key: 'G0', title: 'G0: Triage & Fizibilite', subtitle: 'Stratejik Uygunluk & Filtre', color: 'border-t-blue-500' },
   { key: 'G1', title: 'G1: Konsept & Taslak', subtitle: 'Konsept Notu & Mimari', color: 'border-t-teal-500' },
@@ -59,7 +62,7 @@ export default function KanbanBoard({
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'coordinator' | 'partner'>('all');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
 
   // Modal State
@@ -330,7 +333,7 @@ export default function KanbanBoard({
           {/* Role Filter */}
           <select
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as any)}
+            onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
             className="text-xs bg-ground border border-border rounded-xl px-3 py-2.5 font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">Tüm Roller</option>
