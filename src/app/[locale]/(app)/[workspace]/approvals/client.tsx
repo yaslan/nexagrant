@@ -35,16 +35,16 @@ export interface ApprovalRequestItem {
 interface ApprovalsClientProps {
   initialRequests: ApprovalRequestItem[];
   currentUserId: string;
-  _currentUserRole: Role;
-  _workspace: string;
+  currentUserRole: Role;
+  workspace: string;
   locale: string;
 }
 
 export default function ApprovalsClient({
   initialRequests,
   currentUserId,
-  _currentUserRole,
-  _workspace,
+  currentUserRole: _currentUserRole,
+  workspace: _workspace,
   locale,
 }: ApprovalsClientProps) {
   const [requests, setRequests] = useState<ApprovalRequestItem[]>(initialRequests);
