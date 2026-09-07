@@ -32,11 +32,21 @@ import { logger } from '@/lib/logger';
 import { DISCOUNT_TIERS, findTierByCode, NO_DISCOUNT_TIER, type DiscountTier } from './catalog';
 
 /**
- * The tier applied when `BILLING_ACTIVE_TIER` is unset. It is the deepest tier
- * because that is the campaign the live pricing page advertises today; leaving
- * it unset must not silently raise a price a customer was just quoted.
+ * The tier applied when `BILLING_ACTIVE_TIER` is unset: **no discount**.
+ *
+ * This used to be the deepest tier (ILK5, 70% off), on the reasoning that an
+ * unset setting must not charge more than the pricing page advertises. The
+ * owner reversed it on 2026-09-07, and the asymmetry is why: an unset variable
+ * defaulting to 70% off sells every plan at a third of its price and says
+ * nothing, because "campaign running" is a valid state that logs nothing. The
+ * opposite mistake — a campaign that has not started yet — is visible to
+ * everyone who opens the pricing page.
+ *
+ * So the campaign is now an explicit opt-in: set `BILLING_ACTIVE_TIER=ILK5` to
+ * run it. To keep the reversed risk from being silent in turn, an unset
+ * variable is logged once per process by `getActiveTier()`.
  */
-export const DEFAULT_ACTIVE_TIER: DiscountTier = DISCOUNT_TIERS[0] ?? NO_DISCOUNT_TIER;
+export const DEFAULT_ACTIVE_TIER: DiscountTier = NO_DISCOUNT_TIER;
 
 /** Resolves a configured tier code. Pure — `getActiveTier` wraps it with env. */
 export function resolveConfiguredTier(configured: string | undefined): DiscountTier {
@@ -57,7 +67,19 @@ export function resolveConfiguredTier(configured: string | undefined): DiscountT
   return tier;
 }
 
+/** Warned once per process, so an unconfigured campaign is never silent. */
+let warnedAboutUnsetTier = false;
+
 /** The discount tier every server-side price is computed under. */
 export function getActiveTier(): DiscountTier {
-  return resolveConfiguredTier(env.BILLING_ACTIVE_TIER);
+  const configured = env.BILLING_ACTIVE_TIER;
+  if ((!configured || configured.trim() === '') && !warnedAboutUnsetTier) {
+    warnedAboutUnsetTier = true;
+    logger.warn('BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount', {
+      default: DEFAULT_ACTIVE_TIER.code,
+      hint: 'Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.',
+      knownTiers: DISCOUNT_TIERS.map((t) => t.code).join(','),
+    });
+  }
+  return resolveConfiguredTier(configured);
 }

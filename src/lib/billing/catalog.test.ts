@@ -199,6 +199,13 @@ describe('active tier resolution', () => {
     expect(resolveConfiguredTier('   ').code).toBe(DEFAULT_ACTIVE_TIER.code);
   });
 
+  it('defaults to NO discount, so a forgotten setting cannot give the product away', () => {
+    // Owner decision, 2026-09-07: an unset variable that sells at 70% off is a
+    // silent loss; a campaign that has not started is visible on the page.
+    expect(DEFAULT_ACTIVE_TIER.percentOff).toBe(0);
+    expect(resolveConfiguredTier(undefined).percentOff).toBe(0);
+  });
+
   it('honours a configured tier code, including NONE', () => {
     expect(resolveConfiguredTier('LANSMAN50').percentOff).toBe(50);
     expect(resolveConfiguredTier('none').percentOff).toBe(0);
