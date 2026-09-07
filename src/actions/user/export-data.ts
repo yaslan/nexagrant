@@ -15,6 +15,8 @@ import { auth } from '@/lib/auth';
 export interface UserDataExport {
   timestamp: string;
   tenant: string;
+  /** Carries the Evaluator Lens disclaimer out of the UI with the data. */
+  notice: { tr: string; en: string };
   tables: Record<string, unknown[]>;
 }
 
@@ -161,6 +163,14 @@ export async function exportUserData(): Promise<ExportResult> {
       data: {
         timestamp: new Date().toISOString(),
         tenant: tenantName,
+        // CLAUDE.md — the Evaluation rows below are Evaluator Lens output. The dump
+        // leaves the product's UI behind, so it carries the disclaimer with it rather
+        // than relying on a badge the reader can no longer see. Bilingual because the
+        // file has no locale of its own.
+        notice: {
+          tr: 'Evaluation kayıtları iç ön değerlendirmedir; resmî Komisyon değerlendirmesi yerine geçmez.',
+          en: 'Evaluation records are an internal pre-assessment; they do not replace the official Commission evaluation.',
+        },
         tables,
       },
     };

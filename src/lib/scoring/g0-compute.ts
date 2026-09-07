@@ -1,0 +1,412 @@
+/**
+ * G0 scoring, wired to the database — the call site the canonical scorer never had.
+ *
+ * `g0-canonical.ts` (the maths) and `g0-features.ts` (the evidence → features mapping) are both
+ * pure. This module is the only place that reads Prisma and the only place that writes a G0 score,
+ * so there is exactly one answer to "where did this number come from".
+ *
+ * What it guarantees:
+ *   • the score is derived, never invented — if the snapshot carries no evidence at all
+ *     (`coverage === 0`) the score is `null` and nothing is written, because a stored 0 would be
+ *     just as fabricated as the `Math.random()` it replaces;
+ *   • every stored score comes with its breakdown: `TopicMatch.breakdown` keeps the per-feature
+ *     contributions and the source trail, which is the record CLAUDE.md §7 requires behind any
+ *     figure shown to a user;
+ *   • every read is tenant-scoped (CLAUDE.md §1).
+ *
+ * The score is an *internal pre-assessment* ("iç ön değerlendirme"), never an official evaluation;
+ * the labelling of that on screen is the UI's job, this module only produces the number and the
+ * evidence for it.
+ */
+
+import type { TenantTx } from '../db';
+import { withTenant } from '../db';
+import { decideG0, type G0Decision, type G0Features, type G0Result } from './g0-canonical';
+import { DEFAULT_SCORING_WEIGHTS } from './defaults';
+import {
+  extractG0Features,
+  topicPrefixOf,
+  type G0CordisSnapshot,
+  type G0SeatSnapshot,
+  type G0Snapshot,
+  type G0Source,
+  type G0TopicSnapshot,
+} from './g0-features';
+
+/** Bumped whenever the feature mapping changes, so a stored breakdown says which rules produced it. */
+export const G0_SCORING_VERSION = '2.0';
+
+export interface G0Computation {
+  tenantId: string;
+  opportunityId: string | null;
+  topicId: string | null;
+  /** `null` when no evidence was available — deliberately not 0. */
+  score: number | null;
+  decision: G0Decision | null;
+  features: G0Features;
+  contributions: Record<keyof G0Features, number> | null;
+  reasons: string[];
+  sources: G0Source[];
+  coverage: number;
+  scoringVersion: string;
+}
+
+/** What the score is computed *about* — an existing opportunity or one about to be created. */
+export interface G0Subject {
+  opportunityId: string | null;
+  topicId: string | null;
+  intendedRole: string | null;
+  seats: G0SeatSnapshot[];
+}
+
+type Client = TenantTx;
+
+// ───────────────────────── snapshot loading ─────────────────────────
+
+function toNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'bigint') return Number(value);
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+}
+
+/**
+ * Tenant weights come from `Tenant.settings.scoringWeights` and are operator-editable, so they are
+ * validated key by key: one bad entry falls back to the default for that key rather than throwing
+ * away the whole tenant configuration or, worse, producing NaN.
+ */
+export function resolveWeights(settings: unknown): typeof DEFAULT_SCORING_WEIGHTS {
+  const raw =
+    settings && typeof settings === 'object' && 'scoringWeights' in (settings as Record<string, unknown>)
+      ? (settings as Record<string, unknown>).scoringWeights
+      : null;
+  if (!raw || typeof raw !== 'object') return DEFAULT_SCORING_WEIGHTS;
+  const source = raw as Record<string, unknown>;
+  const out = { ...DEFAULT_SCORING_WEIGHTS };
+  for (const key of Object.keys(DEFAULT_SCORING_WEIGHTS) as (keyof typeof DEFAULT_SCORING_WEIGHTS)[]) {
+    const n = Number(source[key]);
+    if (Number.isFinite(n) && n >= 0) out[key] = n;
+  }
+  return out;
+}
+
+/** Success rate for the topic, preferring a row measured for the tenant's own country. */
+function pickBaseRatePct(
+  stats: { country: string | null; successRate: number | null; topicId: string | null }[],
+  tenantCountry: string | null,
+  topicId: string | null,
+): number | null {
+  const usable = stats.filter((s) => s.successRate !== null && Number.isFinite(Number(s.successRate)));
+  if (usable.length === 0) return null;
+  const country = (tenantCountry ?? '').toUpperCase();
+  const order = [
+    (s: (typeof usable)[number]) => s.topicId === topicId && (s.country ?? '').toUpperCase() === country && country !== '',
+    (s: (typeof usable)[number]) => s.topicId === topicId && s.country === null,
+    (s: (typeof usable)[number]) => (s.country ?? '').toUpperCase() === country && country !== '',
+    (s: (typeof usable)[number]) => s.country === null,
+  ];
+  for (const matches of order) {
+    const hit = usable.find(matches);
+    if (hit) return Number(hit.successRate);
+  }
+  return Number(usable[0]?.successRate ?? 0);
+}
+
+async function loadCordisSnapshot(
+  client: Client,
+  pic: string | null,
+  topicIdentifier: string | null,
+): Promise<G0CordisSnapshot | null> {
+  if (!pic) return null;
+
+  const participations: { role: string; projectId: string; project: { masterCall: string | null } | null }[] =
+    await client.cordisParticipation.findMany({
+      where: { organisationId: pic },
+      select: { role: true, projectId: true, project: { select: { masterCall: true } } },
+      take: 500,
+    });
+  if (participations.length === 0) {
+    return { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0 };
+  }
+
+  const family = topicIdentifier ? topicPrefixOf(topicIdentifier) : null;
+  const coordinations = participations.filter((p) => p.role.trim().toLowerCase() === 'coordinator');
+  const coordinationsInTopicFamily = family
+    ? coordinations.filter((p) => (p.project?.masterCall ?? '').startsWith(family)).length
+    : 0;
+
+  const projectIds = participations.map((p) => p.projectId).slice(0, 200);
+  const collaborators: { organisationId: string }[] = await client.cordisParticipation.findMany({
+    where: { projectId: { in: projectIds }, organisationId: { not: pic } },
+    select: { organisationId: true },
+    distinct: ['organisationId'],
+    take: 500,
+  });
+
+  return {
+    coordinationsInTopicFamily,
+    coordinationsOverall: coordinations.length,
+    distinctCollaborators: collaborators.length,
+  };
+}
+
+/**
+ * Reads every row the score depends on, tenant-scoped.
+ *
+ * Absent rows are not an error: they become `null` in the snapshot and the extraction reports them
+ * as `missing` sources. A tenant that has not imported CORDIS still gets a score, it is simply a
+ * score that says so.
+ */
+export async function loadG0Snapshot(
+  client: Client,
+  tenantId: string,
+  subject: G0Subject,
+): Promise<G0Snapshot> {
+  const tenant: { country: string | null; pic: string | null; settings: unknown } | null =
+    await client.tenant.findUnique({
+      where: { id: tenantId },
+      select: { country: true, pic: true, settings: true },
+    });
+
+  const profile: { keywords: unknown } | null = await client.tenantProfile.findUnique({
+    where: { tenantId },
+    select: { keywords: true },
+  });
+
+  let topic: G0TopicSnapshot | null = null;
+  let topicFitScore: number | null = null;
+  let baseRatePct: number | null = null;
+  let resolvedTopicId: string | null = null;
+
+  if (subject.topicId) {
+    // `Opportunity.topicId` is a `Topic.id` when the row was seeded and a portal identifier
+    // ("HORIZON-CL5-2026-D4-01") when it came from the pipeline form, which accepts the code a user
+    // copies out of the portal. Resolving both keeps the score from silently losing its topic.
+    const topicSelect = {
+      id: true,
+      identifier: true,
+      keywords: true,
+      isLumpSum: true,
+      isTwoStage: true,
+      budgetPerProjectCents: true,
+      eligibility: true,
+    };
+    const row =
+      (await client.topic.findUnique({ where: { id: subject.topicId }, select: topicSelect })) ??
+      (await client.topic.findUnique({ where: { identifier: subject.topicId }, select: topicSelect }));
+    if (row) {
+      resolvedTopicId = String(row.id);
+      topic = {
+        id: resolvedTopicId,
+        identifier: String(row.identifier),
+        keywords: toStringArray(row.keywords),
+        isLumpSum: row.isLumpSum === true,
+        isTwoStage: row.isTwoStage === true,
+        budgetPerProjectCents: toNumberOrNull(row.budgetPerProjectCents),
+        eligibility:
+          row.eligibility && typeof row.eligibility === 'object'
+            ? (row.eligibility as G0TopicSnapshot['eligibility'])
+            : null,
+      };
+
+      const match: { fitScore: number | null } | null = await client.topicMatch.findUnique({
+        where: { tenantId_topicId: { tenantId, topicId: resolvedTopicId } },
+        select: { fitScore: true },
+      });
+      topicFitScore = toNumberOrNull(match?.fitScore);
+
+      const prefix = topicPrefixOf(topic.identifier);
+      const stats: { country: string | null; successRate: number | null; topicId: string | null }[] =
+        await client.topicStat.findMany({
+          where: { OR: [{ topicId: resolvedTopicId }, { topicPrefix: prefix }] },
+          select: { country: true, successRate: true, topicId: true },
+          take: 100,
+        });
+      baseRatePct = pickBaseRatePct(stats, tenant?.country ?? null, resolvedTopicId);
+    }
+  }
+
+  const cordis = await loadCordisSnapshot(client, tenant?.pic ?? null, topic?.identifier ?? null);
+
+  return {
+    tenant: { country: tenant?.country ?? null, pic: tenant?.pic ?? null },
+    profile: profile ? { keywords: toStringArray(profile.keywords) } : null,
+    topic,
+    topicFitScore,
+    baseRatePct,
+    intendedRole: subject.intendedRole,
+    seats: subject.seats,
+    cordis,
+  };
+}
+
+// ───────────────────────── computation ─────────────────────────
+
+/**
+ * Pure half of the pipeline, exported so a caller that already has a snapshot (a test, a batch job)
+ * can score without touching the database.
+ */
+export function computeG0FromSnapshot(
+  tenantId: string,
+  subject: Pick<G0Subject, 'opportunityId' | 'topicId'>,
+  snapshot: G0Snapshot,
+  weights: typeof DEFAULT_SCORING_WEIGHTS = DEFAULT_SCORING_WEIGHTS,
+): G0Computation {
+  const { features, facts, sources, coverage } = extractG0Features(snapshot);
+
+  // No evidence at all → no score. Storing a 0 here would be a fabricated figure wearing a
+  // different mask, and `gates/evaluate.ts` already has an honest branch for "not scored yet".
+  if (coverage === 0) {
+    return {
+      tenantId,
+      opportunityId: subject.opportunityId,
+      topicId: subject.topicId,
+      score: null,
+      decision: null,
+      features,
+      contributions: null,
+      reasons: ['no scoring evidence available for this opportunity'],
+      sources,
+      coverage,
+      scoringVersion: G0_SCORING_VERSION,
+    };
+  }
+
+  const result: G0Result = decideG0(features, facts, undefined, weights);
+  return {
+    tenantId,
+    opportunityId: subject.opportunityId,
+    topicId: subject.topicId,
+    score: result.score,
+    decision: result.decision,
+    features,
+    contributions: result.contributions,
+    reasons: result.reasons,
+    sources,
+    coverage,
+    scoringVersion: G0_SCORING_VERSION,
+  };
+}
+
+/** Load + score, without writing anything. */
+export async function computeG0(
+  client: Client,
+  tenantId: string,
+  subject: G0Subject,
+): Promise<G0Computation> {
+  const tenant: { settings: unknown } | null = await client.tenant.findUnique({
+    where: { id: tenantId },
+    select: { settings: true },
+  });
+  const snapshot = await loadG0Snapshot(client, tenantId, subject);
+  // The evidence row is filed under the resolved `Topic.id`, never under whatever string the
+  // caller happened to hold — a portal identifier would break the TopicMatch foreign key.
+  return computeG0FromSnapshot(
+    tenantId,
+    { opportunityId: subject.opportunityId, topicId: snapshot.topic?.id ?? null },
+    snapshot,
+    resolveWeights(tenant?.settings),
+  );
+}
+
+/** Load + score an opportunity that already exists. `null` when it is not this tenant's. */
+export async function computeG0ForOpportunity(
+  client: Client,
+  tenantId: string,
+  opportunityId: string,
+): Promise<G0Computation | null> {
+  const opp: { id: string; topicId: string | null; intendedRole: string | null } | null =
+    await client.opportunity.findFirst({
+      where: { id: opportunityId, tenantId },
+      select: { id: true, topicId: true, intendedRole: true },
+    });
+  if (!opp) return null;
+
+  const seats: G0SeatSnapshot[] = await client.consortiumSeat.findMany({
+    where: { opportunityId, tenantId },
+    select: { roleKey: true, status: true },
+    take: 200,
+  });
+
+  return computeG0(client, tenantId, {
+    opportunityId: opp.id,
+    topicId: opp.topicId,
+    intendedRole: opp.intendedRole,
+    seats,
+  });
+}
+
+// ───────────────────────── persistence (the evidence record) ─────────────────────────
+
+/** The JSON stored in `TopicMatch.breakdown` and echoed into `GateDecision.inputs`. */
+export function g0EvidencePayload(computation: G0Computation): Record<string, unknown> {
+  return {
+    scoringVersion: computation.scoringVersion,
+    score: computation.score,
+    decision: computation.decision,
+    coverage: computation.coverage,
+    features: computation.features,
+    contributions: computation.contributions,
+    reasons: computation.reasons,
+    sources: computation.sources,
+    assessment: 'internal-pre-assessment',
+  };
+}
+
+/**
+ * Writes the score onto the opportunity and its provenance onto `TopicMatch`.
+ *
+ * `TopicMatch.g0Score` ("weighted total") and `TopicMatch.breakdown` ("per-criterion") are exactly
+ * what the schema reserves for this, so the breakdown a user sees and the number the gate reads
+ * come out of the same write. A computation with no score writes nothing.
+ */
+export async function persistG0(
+  client: Client,
+  computation: G0Computation,
+): Promise<boolean> {
+  if (computation.score === null || !computation.opportunityId) return false;
+
+  await client.opportunity.updateMany({
+    where: { id: computation.opportunityId, tenantId: computation.tenantId },
+    data: { g0Score: computation.score },
+  });
+
+  if (computation.topicId) {
+    const breakdown = g0EvidencePayload(computation);
+    await client.topicMatch.upsert({
+      where: { tenantId_topicId: { tenantId: computation.tenantId, topicId: computation.topicId } },
+      update: { g0Score: computation.score, breakdown },
+      create: {
+        tenantId: computation.tenantId,
+        topicId: computation.topicId,
+        // A row created here has no K1 cosine match yet; the alignment the score actually used is
+        // the honest value to record rather than a placeholder.
+        fitScore: computation.features.alignment,
+        g0Score: computation.score,
+        breakdown,
+      },
+    });
+  }
+
+  return true;
+}
+
+/**
+ * Score an existing opportunity and store the result, inside the tenant's RLS context.
+ * Returns `null` when the opportunity does not belong to the tenant.
+ */
+export async function rescoreOpportunityG0(
+  tenantId: string,
+  opportunityId: string,
+): Promise<G0Computation | null> {
+  return withTenant(tenantId, async (tx) => {
+    const computation = await computeG0ForOpportunity(tx, tenantId, opportunityId);
+    if (!computation) return null;
+    await persistG0(tx, computation);
+    return computation;
+  });
+}

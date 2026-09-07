@@ -1,5 +1,6 @@
 import { prisma } from '../db';
 import { DEFAULT_GATE_RULES } from '../scoring/defaults';
+import { computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
 
 export type GateEvaluationResult = {
   passed: boolean;
@@ -41,19 +42,36 @@ export async function evaluateGate(
   switch (gateId) {
     case 'G0': {
       const rules = DEFAULT_GATE_RULES.G0;
-      // `rules.minScore` is on the 0–100 scale of PROJECT.md:81. The previous fallback called
-      // `calculateG0Score`, a 0–10 model, so an unscored opportunity was compared as 7.5 < 70 and
-      // failed with a misleading reason. An opportunity that has never been scored has not failed
-      // the gate on merit — say so, and keep the outcome (no pass) unchanged.
-      if (opp.g0Score === null || opp.g0Score === undefined) {
-        passed = false;
-        reasons.push('G0 score has not been calculated for this opportunity yet');
-        inputs.calculatedG0Score = null;
-        break;
+      // The gate scores the opportunity itself rather than trusting whatever `g0Score` happens to
+      // sit in the column. That column used to be filled by a seed literal or by
+      // `Math.random() * 15 + 80`, so the gate was deciding on an invented number; now the number
+      // is derived here, from stored evidence, by the canonical scorer, and written back with its
+      // breakdown so the decision can be audited afterwards.
+      //
+      // `rules.minScore` is on the 0–100 scale of PROJECT.md:81. Which reading of PROJECT.md:75 is
+      // the real gate — this composite minimum, or the three hard rules — is still open
+      // (docs/ROADMAP.md · Açık kararlar #8), so the pass/fail rule is left exactly as it was and
+      // `decideG0`'s hard-rule findings are recorded as advisory evidence, not enforced here.
+      const computation = await computeG0ForOpportunity(prisma, tenantId, opportunityId);
+
+      if (computation) {
+        inputs.g0Evidence = g0EvidencePayload(computation);
+        if (computation.score !== null) {
+          await persistG0(prisma, computation);
+        }
       }
 
-      const g0Score = opp.g0Score;
+      const g0Score = computation?.score ?? null;
       inputs.calculatedG0Score = g0Score;
+
+      if (g0Score === null) {
+        // Not a failure on merit: there is no evidence to score this opportunity on. Saying that
+        // is the difference between "we assessed you and you fell short" and "we cannot assess
+        // you yet"; the outcome (no pass) is unchanged either way.
+        passed = false;
+        reasons.push('G0 score could not be calculated: no scoring evidence for this opportunity yet');
+        break;
+      }
 
       if (g0Score < rules.minScore) {
         passed = false;

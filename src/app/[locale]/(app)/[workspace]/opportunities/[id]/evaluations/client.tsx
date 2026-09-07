@@ -223,18 +223,23 @@ export function EvaluationsClient({
               <span>Modül 6 — Evaluator Lens</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-white">
-              İç Ön Değerlendirme &amp; Hakem Simülasyonu
+              {t('lensTitle')}
             </h1>
             <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl">
               Fırsat: <strong className="text-slate-200">{opportunityTitle}</strong>
             </p>
           </div>
 
-          {/* Official Disclaimer Badge */}
-          <div className="bg-amber-500/15 border border-amber-500/30 text-amber-300 rounded-xl px-4 py-2.5 text-xs flex items-center gap-2.5 shadow-xs shrink-0 max-w-sm">
-            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+          {/* CLAUDE.md — Evaluator Lens output is never presented as an official score.
+              The copy was hard-coded Turkish, so an English reader saw no disclaimer they
+              could read. It now comes from the same m6 keys the panel surfaces use. */}
+          <div
+            className="bg-amber-500/15 border border-amber-500/30 text-amber-300 rounded-xl px-4 py-2.5 text-xs flex items-center gap-2.5 shadow-xs shrink-0 max-w-sm"
+            data-testid="m6-internal-badge"
+          >
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" aria-hidden="true" />
             <span>
-              <strong>İç Ön Değerlendirmedir:</strong> Bu puanlar şirket içi kalite kontrol simülasyonudur; resmî Komisyon kararı yerine geçmez.
+              <strong>{t('internalPreAssessment')}:</strong> {t('internalPreAssessmentBody')}
             </span>
           </div>
         </div>

@@ -70,10 +70,30 @@ declare module '@prisma/client' {
      * own type lives in @prisma/adapter-pg.
      */
     constructor(options?: { adapter?: unknown; log?: unknown });
+    /**
+     * The model delegates (`prisma.opportunity`, `tx.evidence`, …).
+     *
+     * This is the one `any` the codebase cannot type away today, and it is
+     * deliberate rather than an oversight. Narrowing it to `unknown` makes
+     * every `prisma.<model>.<method>()` call a "not callable" error, and
+     * declaring a delegate interface instead does not work either: a string
+     * index signature has to cover every member of the class, which
+     * `$transaction<T>` and `$executeRaw` do not conform to.
+     *
+     * The real fix is to stop hand-writing this file: `pnpm exec prisma
+     * generate` succeeds without a database and produces the true model types.
+     * Deleting this override with the client generated leaves 158 type errors
+     * across 36 files — mostly the four tables the code queries that the schema
+     * does not define (Organization, Participation, Collab, OrgTopicStat).
+     * That is a data-model task, not a lint fix; see the
+     * TASK-MTQ60SGW45T0X result report.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see above
     [key: string]: any;
     $transaction<T>(arg: (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>): Promise<T>;
     /** Batch form: an array of prepared operations, committed together. */
     $transaction<T>(operations: Promise<T>[]): Promise<T[]>;
-    $executeRaw(query: TemplateStringsArray, ...values: any[]): Promise<any>;
+    /** Tagged-template raw execute; resolves to the number of rows affected. */
+    $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
   }
 }

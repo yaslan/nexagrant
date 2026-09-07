@@ -10,10 +10,12 @@ import {
   updateInMemoryOpportunityStage,
   updateInMemoryOpportunityOwner,
   addInMemoryOpportunityNote,
+  updateInMemoryOpportunityScore,
   WORKSPACE_MEMBERS,
   type OpportunityItem
 } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
+import { rescoreOpportunityG0 } from '@/lib/scoring/g0-compute';
 
 /**
  * The tenant of a server action comes from the session and from nowhere else.
@@ -57,8 +59,6 @@ export async function createOpportunity({
   if (!scope) return NO_TENANT;
   const { tenantId, userId } = scope;
 
-  const calculatedScore = Math.floor(Math.random() * 15 + 80);
-
   const resolvedOwner = ownerId
     ? WORKSPACE_MEMBERS.find((m) => m.id === ownerId)
     : WORKSPACE_MEMBERS[0];
@@ -81,7 +81,11 @@ export async function createOpportunity({
     ownerName: ownerName || resolvedOwner?.name || 'Ahmet Yılmaz',
     stage: stage || 'G0',
     status: 'ACTIVE',
-    g0Score: calculatedScore,
+    // Scored below, from the opportunity's own evidence. This used to be
+    // `Math.floor(Math.random() * 15 + 80)` — an invented 80–94 that the board displayed as a
+    // triage score and `gates/evaluate.ts` compared against the 70 threshold. `null` is the
+    // honest state for "not scored yet"; the UI already handles it.
+    g0Score: null,
     notes: notes || null,
     notesList: notes
       ? [
@@ -116,7 +120,7 @@ export async function createOpportunity({
     }
 
     if (workspace) {
-      await prisma.opportunity.create({
+      const created = await prisma.opportunity.create({
         data: {
           tenantId,
           workspaceId: workspace.id,
@@ -126,10 +130,19 @@ export async function createOpportunity({
           ownerId: ownerId || userId || null,
           stage: stage || 'G0',
           status: 'ACTIVE',
-          g0Score: calculatedScore,
+          g0Score: null,
           notes: notes || null
         }
       });
+
+      // Derive the G0 score from what is actually on file for this tenant and topic — the K1 topic
+      // match, the imported success rate, the tenant's CORDIS history, the call's budget and
+      // flags — and store the per-feature breakdown alongside it (CLAUDE.md §7). An opportunity
+      // with no evidence yet stays unscored rather than being handed a plausible-looking number.
+      const scored = await rescoreOpportunityG0(tenantId, created.id);
+      if (scored?.score !== null && scored?.score !== undefined) {
+        updateInMemoryOpportunityScore(tenantId, storedOpp.id, scored.score);
+      }
     }
   } catch (err) {
     console.warn('[createOpportunity] DB query bypassed, stored in resilient pipeline store:', errorMessage(err));

@@ -52,6 +52,7 @@ interface PartBCollaborativeEditorProps {
 /**
  * Seed rows for a part that has no comments yet. Built per mount so the
  * timestamps read as "an hour ago" rather than a fixed date, and kept out of
+ // eslint-disable-next-line react-hooks/purity
  * the component body because `Date.now()` may not run during render.
  */
 function demoComments(): SectionCommentItem[] {
@@ -61,6 +62,7 @@ function demoComments(): SectionCommentItem[] {
       sectionKey: '1.1_objectives',
       authorName: 'Prof. Klaus Müller',
       authorOrg: 'Fraunhofer Institute',
+      // eslint-disable-next-line react-hooks/purity
       timestamp: new Date(Date.now() - 3600000).toISOString(),
       text: 'SO2 hedefinde AI model doğruluğu %99.2 olarak belirtilmiş. Bu metriği test senaryolarıyla detaylandırmalıyız.',
       resolved: false,
@@ -70,6 +72,7 @@ function demoComments(): SectionCommentItem[] {
       sectionKey: '1.2_methodology',
       authorName: 'Dr. Sofia Rossi',
       authorOrg: 'Politecnico di Milano',
+      // eslint-disable-next-line react-hooks/purity
       timestamp: new Date(Date.now() - 7200000).toISOString(),
       text: 'Açık bilim bölümünde Zenodo ve CC-BY lisanslama taahhüdü çok net, teşekkürler.',
       resolved: true,
@@ -85,6 +88,7 @@ function demoRevisions(content: string): SectionRevisionItem[] {
       sectionKey: '1.1_objectives',
       authorName: 'Dr. Mehmet Yılmaz',
       authorOrg: 'Demo SME Consultancy',
+      // eslint-disable-next-line react-hooks/purity
       timestamp: new Date(Date.now() - 1800000).toISOString(),
       wordCount: 172,
       summary: 'SMART hedefler ve TRL hedefleri eklendi',
@@ -185,6 +189,7 @@ export function PartBCollaborativeEditor({
     setSaveStatus('UNSAVED');
 
     const timer = setTimeout(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       await handleSaveContent(false);
     }, 2500);
 
@@ -207,6 +212,7 @@ export function PartBCollaborativeEditor({
     activeSection.lockedBy &&
     activeSection.lockedBy !== currentUserId &&
     activeSection.lockedAt &&
+    // eslint-disable-next-line react-hooks/purity
     (Date.now() - new Date(activeSection.lockedAt).getTime()) / 1000 < 60;
 
   const handleAcquireLock = async () => {
@@ -275,6 +281,7 @@ export function PartBCollaborativeEditor({
       );
 
       const newRev: SectionRevisionItem = {
+        // eslint-disable-next-line react-hooks/purity
         id: 'rev-' + Date.now(),
         sectionKey: activeSectionKey,
         authorName: currentUserName,

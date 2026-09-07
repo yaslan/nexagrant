@@ -14,7 +14,8 @@ import { DEFAULT_CRITERIA } from '../../src/modules/m6/types';
 
 const SHOTS = 'docs/agent-results/TASK-MTQ5ZF5ZRU5SM-screenshots';
 const WORKSPACE = 'm6-e2e-ws';
-const PANEL_URL = `/tr/${WORKSPACE}/opportunities/${M6_E2E.opportunityId}/evaluations/panel`;
+const EVALUATIONS_URL = `/tr/${WORKSPACE}/opportunities/${M6_E2E.opportunityId}/evaluations`;
+const PANEL_URL = `${EVALUATIONS_URL}/panel`;
 
 /** Marks the test submits. Weighted by DEFAULT_CRITERIA: 5(.3)+4(.2)+5(.3)+3(.2) = 4.40. */
 const MARKS: Record<string, number> = {
@@ -156,4 +157,42 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
 
     await shot(page, '04-panel-english-locale');
   });
+
+  /**
+   * CLAUDE.md forbids presenting Evaluator Lens output as an official score. The panel
+   * route was already covered; the Evaluator Lens page itself carried the disclaimer as
+   * a hard-coded Turkish string, so an English reader got no readable warning above the
+   * same marks. Both locales are asserted here so a regression cannot pass in one.
+   */
+  for (const { locale, loginPath, badge } of [
+    { locale: 'tr', loginPath: 'giris', badge: 'İç ön değerlendirme' },
+    { locale: 'en', loginPath: 'login', badge: 'Internal pre-assessment' },
+  ]) {
+    test(`the Evaluator Lens page states it is an internal pre-assessment (${locale})`, async ({
+      page,
+    }) => {
+      await page.addInitScript(() => {
+        window.localStorage.setItem(
+          'fabrika_cookie_consent',
+          JSON.stringify({ necessary: true, analytics: true, marketing: true }),
+        );
+      });
+
+      const url = EVALUATIONS_URL.replace('/tr/', `/${locale}/`);
+      await page.goto(`/${locale}/${loginPath}?callbackUrl=${encodeURIComponent(url)}`);
+      await page.locator('input[type="email"]').fill(M6_E2E.email);
+      await page.locator('form button[type="submit"]').click();
+      await page.waitForURL(`**${url}`, { timeout: 30_000 });
+      await page.waitForLoadState('networkidle');
+
+      const app = page.getByRole('main');
+      const disclaimer = app.getByTestId('m6-internal-badge');
+      await expect(disclaimer).toBeVisible();
+      await expect(disclaimer).toContainText(badge);
+      // The disclaimer has to sit with the marks, not below the fold.
+      await expect(disclaimer).toBeInViewport();
+
+      await shot(page, `05-evaluator-lens-disclaimer-${locale}`);
+    });
+  }
 });

@@ -33,7 +33,7 @@ export default function NotificationsClient({
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
   const isTr = locale === 'tr';
 
-  const syncNotifications = () => {
+  const syncNotifications = useCallback(() => {
     if (typeof window === 'undefined') return;
     try {
       const raw = localStorage.getItem(storageKey);
@@ -51,7 +51,7 @@ export default function NotificationsClient({
     } catch (e) {
       setNotifications(initialNotifications);
     }
-  };
+  }, [initialNotifications]);
 
   useEffect(() => {
     syncNotifications();
