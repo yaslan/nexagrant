@@ -11,6 +11,8 @@ import {
   calculatePanelScore,
   calculateConsensusOutcome,
   compareWithEsr,
+  storedPanelAverage,
+  PANEL_SCALE_MIN,
   ReviewerScores,
 } from '../scoring';
 
@@ -82,7 +84,11 @@ describe('M6 Scoring Logic', () => {
 
     // Weighted: 3*0.3 + 4*0.2 + 3*0.3 + 2*0.2 = 0.9 + 0.8 + 0.9 + 0.4 = 3.0
     expect(result.panelAverage).toBeCloseTo(3.0, 1);
-    expect(result.consensusOutcome).toBe('solid');
+    // One reviewer produces a score but not a consensus: there is no second opinion to
+    // agree with. This asserted 'solid' before, which reported unanimous agreement on
+    // a panel of one.
+    expect(result.consensusOutcome).toBe('not-measured');
+    expect(result.agreementPercentage).toBeNull();
   });
 
   // ───────── TEST 4: High consensus (all reviewers similar)
@@ -247,12 +253,18 @@ describe('M6 Scoring Logic', () => {
   });
 
   // ───────── TEST 13: Empty reviewer scores error
-  it('should throw error on empty reviewer list', () => {
+  it('should report an empty reviewer list as unmeasured, not as a score', () => {
     const reviewers: ReviewerScores[] = [];
 
-    expect(() => calculatePanelScore(reviewers, standardWeights)).toThrow(
-      'No reviewer scores',
-    );
+    // This used to throw. A panel nobody has scored is an ordinary state of the board,
+    // so it is returned as one; the caller must not be able to mistake it for a number.
+    const result = calculatePanelScore(reviewers, standardWeights);
+
+    expect(result.panelAverage).toBeNull();
+    expect(result.panelAverage).not.toBe(0);
+    expect(result.unmeasuredReason).toBe('no-submitted-marks');
+    expect(result.consensusOutcome).toBe('not-measured');
+    expect(result.reviewerCount).toBe(0);
   });
 
   // ───────── TEST 14: Criterion weight variations
@@ -442,5 +454,112 @@ describe('M6 Scoring Logic', () => {
     expect(result.esrScore).toBeDefined();
     expect(result.esrScore).toBeLessThanOrEqual(5); // Clamped to max
     expect(result.agreement).toBe(true); // 5.0 and 5.0 agree
+  });
+});
+
+/**
+ * The rule these pin: a panel score that could not be computed is absent, never 0.
+ *
+ * A panel is marked 1..5, so 0 is off the scale entirely — but it is also what a
+ * `?? 0` or a `: 0` fallback produces, and once it reaches `Evaluation.avgScore` the
+ * dashboard renders "0.00" beside a red delta and the proposal reads as the worst-
+ * scored one in the workspace. Nobody scored it at all. Every case below is one route
+ * by which that zero used to be manufactured (CLAUDE.md §7).
+ */
+describe('M6 Scoring — the not-measured contract', () => {
+  const standardWeights = {
+    crit1: 0.3,
+    crit2: 0.2,
+    crit3: 0.3,
+    crit4: 0.2,
+  };
+
+  it('returns no score when the marks land on no weighted criterion', () => {
+    // The reviewer scored axes that carry no weight in this evaluation — a real shape,
+    // since an evaluation's criteria are rows in `Criterion` and may be re-cut while a
+    // review is open. There is nothing to average, so there is no average.
+    const reviewers: ReviewerScores[] = [
+      { reviewerId: 'r1', scores: { unknownAxis: 5 } },
+      { reviewerId: 'r2', scores: { unknownAxis: 4 } },
+    ];
+
+    const result = calculatePanelScore(reviewers, standardWeights);
+
+    expect(result.panelAverage).toBeNull();
+    expect(result.panelAverage).not.toBe(0);
+    expect(result.unmeasuredReason).toBe('no-weighted-criterion');
+  });
+
+  it('returns no score when every weight is zero', () => {
+    const reviewers: ReviewerScores[] = [
+      { reviewerId: 'r1', scores: { crit1: 5, crit2: 5 } },
+      { reviewerId: 'r2', scores: { crit1: 5, crit2: 5 } },
+    ];
+
+    const result = calculatePanelScore(reviewers, { crit1: 0, crit2: 0 });
+
+    // Two reviewers both scoring 5 must never come out as 0.
+    expect(result.panelAverage).toBeNull();
+    expect(result.unmeasuredReason).toBe('no-weighted-criterion');
+  });
+
+  it('sets unmeasuredReason exactly when the average is missing', () => {
+    const scored = calculatePanelScore(
+      [
+        { reviewerId: 'r1', scores: { crit1: 4, crit2: 4, crit3: 4, crit4: 4 } },
+        { reviewerId: 'r2', scores: { crit1: 4, crit2: 4, crit3: 4, crit4: 4 } },
+      ],
+      standardWeights,
+    );
+
+    expect(scored.panelAverage).toBeCloseTo(4.0, 5);
+    expect(scored.unmeasuredReason).toBeNull();
+  });
+
+  it('reports one reviewer as no consensus rather than as unanimity', () => {
+    const outcome = calculateConsensusOutcome([
+      { reviewerId: 'r1', scores: { crit1: 5, crit2: 5, crit3: 5, crit4: 5 } },
+    ]);
+
+    expect(outcome.outcome).toBe('not-measured');
+    expect(outcome.agreementPercentage).toBeNull();
+  });
+
+  it('reports zero reviewers as no consensus', () => {
+    const outcome = calculateConsensusOutcome([]);
+
+    expect(outcome.outcome).toBe('not-measured');
+    expect(outcome.agreementPercentage).toBeNull();
+  });
+
+  it('still measures consensus from two reviewers upward', () => {
+    const outcome = calculateConsensusOutcome([
+      { reviewerId: 'r1', scores: { crit1: 2 } },
+      { reviewerId: 'r2', scores: { crit1: 5 } },
+    ]);
+
+    // 3 points apart: the one pair disagrees, so 0% and divergent — a measured verdict,
+    // which is the point. `not-measured` is only for the absence of any pair.
+    expect(outcome.outcome).toBe('divergent');
+    expect(outcome.agreementPercentage).toBe(0);
+  });
+
+  it('rejects a stored average that is off the panel scale', () => {
+    // Rows written before the `: 0` fallback was removed still hold 0. A weighted mean
+    // of marks that are each ≥ 1 cannot be below 1, so such a row was never computed
+    // from anybody's marks and must not be shown as a score.
+    expect(storedPanelAverage(0)).toBeNull();
+    expect(storedPanelAverage(0.4)).toBeNull();
+    expect(storedPanelAverage(null)).toBeNull();
+    expect(storedPanelAverage(undefined)).toBeNull();
+    expect(storedPanelAverage(Number.NaN)).toBeNull();
+  });
+
+  it('keeps a genuinely low stored average', () => {
+    // The guard must not swallow a real bad score: a panel that everyone marked 1 is a
+    // measured 1.0 and has to keep saying so.
+    expect(storedPanelAverage(PANEL_SCALE_MIN)).toBe(1);
+    expect(storedPanelAverage(1.25)).toBe(1.25);
+    expect(storedPanelAverage(4.75)).toBe(4.75);
   });
 });

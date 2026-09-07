@@ -1,6 +1,13 @@
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import {
+  M9_BRIEFS_URL,
+  M9_TENANT,
+  setupM9Tenant,
+  signInAsM9User,
+  teardownM9Tenant,
+} from './fixtures/m9-tenant';
 
 /**
  * M9 briefs form — the two silent-failure surfaces, driven by a real browser.
@@ -12,8 +19,14 @@ import { prisma } from '../../src/lib/db';
  */
 
 const SHOTS = 'docs/agent-results/TASK-MTQUX5IZ9I5VP-screenshots';
-const WORKSPACE = 'fabrika-beta';
-const BRIEFS_URL = `/tr/${WORKSPACE}/opportunities/demo-opp-1/briefs`;
+/**
+ * The spec used to run in `demo-tenant` as `owner@demo.fabrika.test`. Both moved
+ * underneath it — the owner belongs to another tenant now, and `demo-tenant`'s
+ * plan no longer grants M9 — so every assertion below failed on the module-lock
+ * screen instead of the briefs page. The fixture tenant in ./fixtures/m9-tenant
+ * owns the plan, the switch and the opportunity these tests need.
+ */
+const BRIEFS_URL = M9_BRIEFS_URL;
 
 /**
  * A brief with no meeting time. It is what makes the calendar guard reachable:
@@ -21,7 +34,7 @@ const BRIEFS_URL = `/tr/${WORKSPACE}/opportunities/demo-opp-1/briefs`;
  */
 const UNDATED_BRIEF = {
   id: 'm9-e2e-undated',
-  tenantId: 'demo-tenant',
+  tenantId: M9_TENANT,
   interactionId: 'int-m9-e2e-undated',
   partnerName: 'E2E Ortak (tarihsiz)',
   content: '### 1. Partner Background & EU Track Record\n- E2E fixture, no meeting scheduled.',
@@ -29,14 +42,11 @@ const UNDATED_BRIEF = {
 
 test.describe('M9 briefs — inline validation and error surfaces', () => {
   test.beforeAll(async () => {
-    await prisma.meetingBrief.deleteMany({ where: { id: UNDATED_BRIEF.id } });
+    await setupM9Tenant();
     await prisma.meetingBrief.create({ data: UNDATED_BRIEF });
   });
 
-  test.afterAll(async () => {
-    await prisma.meetingBrief.deleteMany({ where: { id: UNDATED_BRIEF.id } });
-    await prisma.$disconnect();
-  });
+  test.afterAll(teardownM9Tenant);
 
   test('a half-filled meeting time is reported inline, and no alert() is ever raised', async ({
     page,
@@ -48,18 +58,7 @@ test.describe('M9 briefs — inline validation and error surfaces', () => {
       await d.dismiss();
     });
 
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-      );
-    });
-
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(BRIEFS_URL)}`);
-    await page.locator('input[type="email"]').fill('owner@demo.fabrika.test');
-    await page.locator('form button[type="submit"]').click();
-    await page.waitForURL(`**${BRIEFS_URL}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
+    await signInAsM9User(page, BRIEFS_URL);
 
     const app = page.getByRole('main');
     const dateField = app.getByTestId('m9-meeting-date');
@@ -99,18 +98,7 @@ test.describe('M9 briefs — inline validation and error surfaces', () => {
       await d.dismiss();
     });
 
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-      );
-    });
-
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(BRIEFS_URL)}`);
-    await page.locator('input[type="email"]').fill('owner@demo.fabrika.test');
-    await page.locator('form button[type="submit"]').click();
-    await page.waitForURL(`**${BRIEFS_URL}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
+    await signInAsM9User(page, BRIEFS_URL);
 
     const app = page.getByRole('main');
     // The seeded brief has no meeting time. The button is on screen anyway —

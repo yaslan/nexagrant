@@ -838,7 +838,10 @@
       "createdLabel": "Created:",
       "meetingDateUtcLabel": "Meeting Date (UTC):",
       "brusselsLabel": "Brussels:",
-      "emptyState": "Select a meeting from the left panel or generate a new AI brief."
+      "emptyState": "Select a meeting from the left panel or generate a new AI brief.",
+      "draftBadge": "Draft",
+      "draftTitle": "This is a blank template — the AI did not write it.",
+      "draftNotice": "The model could not be reached, so nothing was generated about this partner and no AI credit was spent. Fill in the sections below yourself, or try again."
     },
     "postMeeting": {
       "heading": "Add Post-Meeting Decisions & Action Notes",

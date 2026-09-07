@@ -1,215 +1,160 @@
-# TASK-MTQUX5IZ9I5VP — M9 brief formu: sessiz düşen tarih (P2-9) + `alert()` hatası (P3-14)
+# TASK-MTQUX5IZ9I5VP — M9 brief kalıcılığı ve var olmayan fırsat
 
-**Ajan:** blok-zincir-dse (DSE-EN, Tasarımcı) · **Tip:** bug (UX) · **Sprint:** S10 · **Tarih:** 2026-09-07
-**Kapsam:** kartın 5. maddesi — **P2-9** ve **P3-14**
-**Bkz:** `docs/agent-results/TASK-MTQU053U24RYH-customer-support.md` (dogfood, 14 bulgu)
-**Kanıt dizini:** `docs/agent-results/TASK-MTQUX5IZ9I5VP-screenshots/`
-
-> **Kapsam notu:** Kartın 1–4. maddeleri (brief kalıcılığı, uydurma fırsat verisi, notların
-> kaybolması, .ics RFC 5545) paralel alt-görevlere gitti; `.ics` düzeltmesi ben çalışırken
-> `0a57a3a fix(calendar): make generateIcsContent RFC 5545 compliant` ile indi. Bu rapor
-> yalnız bana düşen 5. maddeyi anlatır. Kartın tamamının DoD'u bu raporla kapanmaz.
+**Ajan:** blok-zincir-dse (Tasarımcı) · **Tip:** bug (P0) · **Branch:** dev
+**Dosyalar:** `src/modules/m9/**`, `src/app/[locale]/(app)/[workspace]/opportunities/[id]/briefs/**`, `tests/m9-*`, `tests/e2e/m9-*`
+**Dokunulmayan:** `src/modules/m9/server/calendar-actions.ts` (7. kart), M11/document-exporter (blockzincir-pm)
 
 ---
 
 ## 1. Ne yapıldı
 
-### P2-9 — saat girilmeyince tarih sessizce atılıyordu
+### Önce ÖLÇTÜM — kartın iki iddiası da BAYAT çıktı, üçüncü bir kusur çıktı
 
-Kullanıcı ihtiyacı: kullanıcı tarihi yazdığını **görüyor**, sistem girmemiş sayıyordu.
-Eski indirgeme `meetingDate && meetingTime ? dateToUTC(...) : undefined` idi; yarım
-doldurulmuş çift sessizce `undefined`'a düşüyor, ne Brüksel önizlemesi ne uyarı çıkıyordu.
-Sonuçta brief tarihsiz kaydediliyor, `.ics` düğmesi çıkmıyor ve nedeni hiçbir yerde yazmıyordu.
-
-Karar: çifti indirgemek yerine **çözümlemek**, ve yarım çifti hata olarak bildirmek.
-Kural saf bir fonksiyona alındı (`src/modules/m9/meeting-schedule.ts`) — böylece kural birim
-testlenebilir, bileşen yalnız sonucu render eder.
-
-| Girdi | Sonuç | Gerekçe |
+| Kart iddiası | Ölçüm | Sonuç |
 |---|---|---|
-| ikisi de boş | geçerli, `scheduledAt: undefined` | toplantı planlamak isteğe bağlı; tarihsiz brief meşru bir kayıt |
-| yalnız tarih | hata → **saat** alanı | kullanıcı bir şey girdiğine inanıyor; sessizce atmak veri kaybı |
-| yalnız saat | hata → **tarih** alanı | aynı gerekçe, ayna durum |
-| çözümlenemeyen çift | hata → tarih alanı | `Invalid Date`'in sunucuya gitmesini engeller |
-| tam çift | geçerli, yerel saat diliminde çözümlenen an | dogfood'un ✅ doğruladığı DST davranışı korundu |
+| "Brief hiç kaydedilmiyor" | Gerçek tıklama → `MeetingBrief` satırı canlı Postgres'te oluştu, sayfa yenilendikten sonra hâlâ ekranda | **Kod doğru** (`fa0d5fd`, `605863e` ile düzeltilmiş); kanıtı ve regresyon testi yoktu — şimdi var |
+| "Var olmayan fırsatta uydurma veri" | Bilinmeyen id → 404 ekranı, brief üreteci yok, uydurma ortak yok | **Kod doğru** (`eda71f8`); HTTP durum kodu hâlâ 200 (aşağıda, başka kartın kusuru) |
+| — (ölçüm sırasında çıktı) | LLM 401 verince eylem, ortak hakkında **ölçülmemiş iddialar** içeren sabit bir metni brief diye kaydedip 1 AI kredisi düşüyordu | **Gerçek kusur — düzeltildi** |
 
-UI tarafı (mevcut tasarım diline uyarak, yeni dil icat etmeden):
-- Satır içi hata: `role="alert"` + `AlertCircle` + `text-rose-700`, tarih/saat satırının hemen altında.
-- Her iki alan `aria-invalid="true"` ve `aria-describedby="m9-schedule-error"` alır → ekran
-  okuyucu hatayı alanla ilişkilendirir; hata anında duyurulur.
-- Odak, kullanıcının **doldurması gereken** alana taşınır (klavye kullanıcısı hatayı arayıp bulmaz).
-- Kenarlık `border-rose-400` + `focus:ring-rose-500` — hata yalnız renkle değil, metinle de anlatılır (WCAG 1.4.1).
-- Kullanıcı eksik alanı doldurur doldurmaz hata kalkar ve Brüksel önizlemesi geri gelir.
-- Girilen değerler **korunur**; reddetme formu temizlemez.
+Üçüncü satır kartın ikinci yarısının ta kendisi: "uydurma veri". Bu makinede model her çağrıda `401 invalid x-api-key` döndüğü için **kullanıcının gördüğü her brief o uydurma metindi** — ve "1 AI Kredi / Brief" rozetine rağmen kredi de düşülüyordu.
 
-### P3-14 — hata `alert()` ile gösteriliyordu
+### Yapılan değişiklikler
 
-`handleDownloadIcs` içindeki `alert('Toplantı tarihi belirlenmemiş')` kaldırıldı. Yerine sayfa
-düzeyinde `role="alert"` uyarı bölgesi kondu — **kardeş ekranın (M6 Evaluator Lens
-`evaluations/client.tsx:204-213`) hâlihazırdaki hata bandı bileşeniyle birebir aynı sınıflar**
-(`rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800`), yani yeni bir
-görsel dil eklenmedi. Banda "Kapat" düğmesi eklendi: hata engel değil, bilgi.
+1. **`src/modules/m9/brief-template.ts` (yeni).** LLM'e ulaşılamadığında yazılan metin artık **iddia değil boş çalışma belgesi**: aynı 5 bölüm, ama her satır doldurulacak bir soru. Kaldırılan uydurma iddialar: "Recognized participant in EU Framework Programmes with strong technical capacity", "High synergy between partner core capabilities…", "Effort Recommendation: 12 - 18 Person-Months", "Work Package Leader". İçeriğin ilk satırında makine işareti (`<!-- fabrika:template-draft -->`) var — yeniden yükleme, yazdırma ve `.ics` sonrası da taslak olduğu bilinsin diye.
+2. **`src/modules/m9/server/actions.ts`.** `aiGenerated` bayrağı: model yanıt vermediyse **kredi düşülmüyor** ve içerik taslak olarak yazılıyor. Eylem `aiGenerated`'ı da döndürüyor.
+3. **Brief ekranı (`briefs/client.tsx`).** Taslak için yeni durum: brief kartının **en üstünde** (belgenin tamamını nitelediği için gövdenin altında olamaz) `role="status"` amber bant + listede `TASLAK` rozeti. Hata değil uyarı olduğu için `role="alert"` değil ve kapatma düğmesi yok — belgenin kalıcı bir özelliği. Makine işareti gösterimden, `.ics` gövdesinden ve liste önizlemesinden temizleniyor.
+4. **i18n.** `m9.brief.draftBadge/draftTitle/draftNotice` iki dile de eklendi (anahtar paritesi 1202 = 1202, boşluk 0).
+5. **Kırmızı olan mevcut M9 e2e'si düzeltildi.** `tests/e2e/m9-briefs-form.spec.ts` `demo-tenant` + `owner@demo.fabrika.test` ödünç alıyordu; ikisi de altından kaydı (owner artık başka bir kiracıda, `demo-tenant` planı M9 vermiyor) → her iddia modül-kilidi ekranında patlıyordu. Ortak fikstür `tests/e2e/fixtures/m9-tenant.ts` ile kendi kiracısına taşındı.
 
-**Ek karar — düğmeyi her zaman render etmek.** Dogfood, hatanın *ulaşılamaz* olduğunu da not
-etmişti: `.ics` düğmesi yalnız tarihli brief'te render ediliyordu, yani guard'ın tetiklenmesi
-mümkün değildi (`[D10] .ics button count on active brief: 0`). Kullanıcı açısından sorun sadece
-hata biçimi değil, **kontrolün sebepsiz kaybolmasıydı** — kullanıcı takvim dosyasının neden
-alınamadığını hiçbir yerden öğrenemiyordu. Düğme artık her brief'te görünür; tarihi olmayan
-brief'te tıklandığında sebep yazıyla söyleniyor. Bu, "hata yollarını görünür kıl" DoD maddesini
-karşılar ve guard'ı ölü kod olmaktan çıkarır (bu yüzden gerçek tıklamayla test edilebiliyor).
+### Tasarım gerekçesi (kullanıcı ihtiyacı)
+
+Kullanıcı "Yapay Zeka Brief Oluştur" düğmesine, **toplantıya girmeden önce ortağı tanımak** için basıyor. Model yanıt vermediğinde ona ortak hakkında doğrulanmamış cümleler vermek, ihtiyacını karşılamaz — yanlış güven verir ve toplantıda yanlış cümle kurdurur (CLAUDE.md md. 7). İki dürüst seçenek vardı: (a) hiç kaydetme, hata bandını göster; (b) taslağı ver ama **taslak olduğunu söyle**. (b) seçildi: kullanıcının girdiği tarih/ortak korunuyor, belge yapısı elde kalıyor, "yeniden dene" zaten tasarlanmış hata bandında duruyor ve hiçbir cümle ortak hakkında iddia içermiyor. Renk/boşluk/ikon bu ekranın mevcut token'ları (amber-50/200/900, `AlertTriangle`, `rounded-lg p-3 text-xs`); yeni bir dil icat edilmedi.
 
 ---
 
-## 2. Kanıt
+## 2. Kanıt (kopyalanmış çıktı)
 
-### 2.1 Gerçek tarayıcı, gerçek tıklama (Playwright, ayakta olan dev sunucusu, gerçek oturum)
+### 2.1 Canlı DB — tablo ve RLS gerçek
 
 ```
-$ npx playwright test tests/e2e/m9-briefs-form.spec.ts
+MeetingBrief columns:
+ id | tenantId | interactionId | partnerName | content | meetingScheduledAt | meetingScheduledTz | createdAt
+rows: 0          (işe başlarken tabloda hiç satır yoktu)
 
-Running 2 tests using 1 worker
-
-  ✓  1 [chromium] › tests/e2e/m9-briefs-form.spec.ts:41:7 › M9 briefs — inline validation and error
-       surfaces › a half-filled meeting time is reported inline, and no alert() is ever raised (2.3s)
-  ✓  2 [chromium] › tests/e2e/m9-briefs-form.spec.ts:95:7 › M9 briefs — inline validation and error
-       surfaces › the calendar button explains itself instead of raising alert() (2.0s)
-
-  2 passed (5.4s)
+pg_policies: tenant_isolation | ALL | ("tenantId" = current_setting('app.tenant_id', true))
+pg_class:    relrowsecurity=true, relforcerowsecurity=true
 ```
 
-Test 1 (`owner@demo.fabrika.test`, `/tr/fabrika-beta/opportunities/demo-opp-1/briefs`):
-ad + tarih yazıldı, saat boş bırakıldı, **gerçek tıklama** ile gönderildi →
-satır içi hata göründü, `aria-invalid`/`aria-describedby` doğrulandı, odak saat alanına geçti,
-girilen tarih ekranda kaldı; saat doldurulunca hata kalktı ve Brüksel önizlemesi geri geldi.
-Test 2: tarihsiz bir brief tohumlandı, `.ics` düğmesine **gerçek tıklama** yapıldı → satır içi
-band çıktı, "Kapat" ile kapandı. **Her iki test de `page.on('dialog')` dinliyor ve
-`expect(dialogs).toEqual([])` ile bitiyor** — yani `alert()` çıksaydı testler kırmızıya dönerdi.
+### 2.2 Gerçek tıklama e2e — 4/4 yeşil (öncesinde 2 kırmızı)
 
-Ekran görüntüleri (`docs/agent-results/TASK-MTQUX5IZ9I5VP-screenshots/`):
+```
+$ E2E_BASE_URL=http://localhost:3000/api/auth/csrf npx playwright test tests/e2e/m9-brief-persistence.spec.ts tests/e2e/m9-briefs-form.spec.ts --reporter=list
+
+Running 4 tests using 1 worker
+  ✓  1 m9-brief-persistence.spec.ts › a generated brief reaches the database and survives a reload (2.9s)
+  ✓  2 m9-brief-persistence.spec.ts › an opportunity that does not exist gets the not-found screen, not a brief (1.8s)
+  ✓  3 m9-briefs-form.spec.ts › a half-filled meeting time is reported inline, and no alert() is ever raised (2.1s)
+  ✓  4 m9-briefs-form.spec.ts › the calendar button explains itself instead of raising alert() (1.4s)
+  4 passed (9.0s)
+```
+
+Bu koşumdan ÖNCE aynı iki `m9-briefs-form` testi kırmızıydı:
+
+```
+  2 failed
+    › a half-filled meeting time is reported inline, and no alert() is ever raised
+    › the calendar button explains itself instead of raising alert()
+   (ekran görüntüsü: modül kilidi — "Meeting Briefs modülü aboneliğinizin kapsamı dışında")
+```
+
+Kalıcılık testi mock değil, **canlı Postgres okur**: `prisma.meetingBrief.findMany({where:{tenantId}})` → 1 satır, `partnerName`, `content.length > 50`, `meetingScheduledAt` dolu, `meetingScheduledTz = Europe/Brussels`; ardından **sayfa yeniden yüklenip** brief hâlâ ekranda (yani liste sunucudan, DB'den geliyor).
+
+### 2.3 Ekran görüntüleri — `docs/agent-results/TASK-MTQUX5IZ9I5VP-screenshots/`
 
 | Dosya | Ne gösteriyor |
 |---|---|
-| `e2e-01-date-without-time.png` | gönderim öncesi: ad + tarih dolu, saat boş |
-| `e2e-02-inline-error.png` | **P2-9 sonrası:** kırmızı kenarlıklı iki alan, saat alanında odak halkası, altında "Toplantı saatini de girin — yalnızca tarih girildiğinde görüşme takvime yazılmaz." |
-| `e2e-03-error-cleared.png` | saat doldu → hata gitti, Brüksel önizlemesi döndü |
-| `e2e-04-ics-button-visible.png` | tarihsiz brief'te `.ics` düğmesi artık görünür |
-| `e2e-05-ics-inline-error.png` | **P3-14 sonrası:** sayfa üstünde `role="alert"` bandı + "Kapat" — `alert()` diyaloğu yok |
-| `e2e-06-ics-error-mobile.png` | 390×844: band okunuyor, yatay taşma yok (testte `scrollWidth - clientWidth <= 0` ölçüldü) |
+| `persist-01-form-filled.png` | Form dolu, üretim öncesi |
+| `persist-02-brief-on-screen.png` | Brief üretildi, hata bandı yok |
+| `persist-03-after-reload.png` | **Yenilemeden sonra brief hâlâ ekranda** (DB'den) + listede `TASLAK` rozeti |
+| `persist-04-unknown-opportunity.png` | **Var olmayan fırsat → 404 "Sayfa Bulunamadı"**, uydurma brief yok |
+| `persist-05-template-draft-notice.png` | Taslak bandı en üstte; gövde iddia değil doldurulacak sorular; makine işareti ekranda yok |
 
-### 2.2 Birim + bileşen testleri
-
-```
-$ npx vitest run tests/m9-briefs-form-errors.test.tsx tests/m9-meeting-schedule.test.ts
- Test Files  2 passed (2)
-      Tests  14 passed (14)
-```
-
-`tests/m9-briefs-form-errors.test.tsx` gerçek bileşeni jsdom'da render edip tıklıyor; her testin
-`afterEach`'i `expect(alertSpy).not.toHaveBeenCalled()` ile `window.alert`'in hiç çağrılmadığını
-doğruluyor. Ayrıca yarım çiftte sunucu eyleminin **hiç çağrılmadığını** ölçüyor
-(`expect(generateMeetingBrief).not.toHaveBeenCalled()`) — eski davranışta çağrı gidiyor ve tarih
-yolda düşüyordu.
-
-### 2.3 Testin kırmızıya dönebildiği kanıtlandı (testi gevşeterek geçmedim)
-
-`resolveMeetingSchedule`'daki "yalnız tarih" dalı geçici olarak eski sessiz davranışa çevrildi:
+### 2.4 Birim testler — ve bozuk kodda gerçekten kırmızıya dönüyorlar
 
 ```
---- RED probe (old behaviour restored) ---
-     × rejects a date without a time and points at the time field 6ms
-     × blocks submit and explains that the time is missing 122ms
-     × wires the error to both controls for assistive technology and focuses the empty one 20ms
-     × clears the error and shows the Brussels preview once the pair is complete 18ms
- Test Files  2 failed (2)
-      Tests  4 failed | 10 passed (14)
---- GREEN (fix restored) ---
- Test Files  2 passed (2)
-      Tests  14 passed (14)
+$ npx vitest run tests/m9-brief-persistence.test.ts
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
 ```
 
-### 2.4 Kapılar
+Mutasyon kanıtı (testin gerçekten koruduğunu göstermek için `actions.ts` geçici olarak bozuldu, sonra geri alındı):
 
 ```
-$ npx vitest run
- Test Files  56 passed | 2 skipped (58)
-      Tests  526 passed | 8 skipped (534)
-
-$ npx tsc --noEmit | grep -v "^scripts/_"
-(çıktı yok)
-
-$ npx eslint src/modules/m9/meeting-schedule.ts \
-    "src/app/[locale]/(app)/[workspace]/opportunities/[id]/briefs/client.tsx" \
-    tests/m9-meeting-schedule.test.ts tests/m9-briefs-form-errors.test.tsx \
-    tests/e2e/m9-briefs-form.spec.ts
-  68:3  warning  'opportunityId' is defined but never used  @typescript-eslint/no-unused-vars
-✖ 1 problem (0 errors, 1 warning)
+# mutasyon A: DB hatasında  return { success: true, brief: null }
+# mutasyon B: where: { interactionId }   (tenantId olmadan)
+     × a failed write is reported as a failure, never as a saved brief
+     × an existing brief is matched on interactionId *and* tenantId
+      Tests  2 failed | 2 passed (4)
+# geri alındıktan sonra: git diff --stat src/modules/m9/server/actions.ts → (boş)
 ```
 
-İki dürüstlük notu:
-- `npx tsc --noEmit` filtresiz koşulduğunda 8 hata veriyor; **hepsi** başka panelerde çalışan
-  ajanların takipsiz (`??`) tek kullanımlık probe dosyalarından: `scripts/_dogfood-g0-probe*.ts`,
-  `scripts/_pm-m9-audit.ts`. Benim dokunduğum dosyalarda hata yok.
-- Tek lint uyarısı **benden önce vardı**: `git show HEAD:...briefs/client.tsx | grep -c "opportunityId,"` → `1`.
+### 2.5 Kapılar
 
-### 2.5 Yan etki temizliği
-
-E2E tohumu (`m9-e2e-undated`) testin `afterAll`'unda siliniyor. Koşu sonrası:
-`MeetingBrief` tablosunda benim bıraktığım satır yok.
+```
+$ npx tsc --noEmit           → 4 hata, HEPSİ scripts/_probe-cordis*.ts (benim değil, §4)
+$ npx eslint <benim dosyalarım> → 0 error, 1 warning (client.tsx:119 'opportunityId' kullanılmıyor — ÖNCEDEN vardı)
+$ npx vitest run tests/m9-*.test* tests/fabricated-fallbacks.test.ts src/lib/calendar/__tests__/sync.test.ts
+ Test Files  5 passed (5)   Tests  51 passed (51)
+$ i18n paritesi: tr 1202 / en 1202, m9 dahil eksik anahtar 0
+```
 
 ---
 
 ## 3. Değişen dosyalar
 
-| Dosya | Durum | Ne |
-|---|---|---|
-| `src/modules/m9/meeting-schedule.ts` | **yeni** | `resolveMeetingSchedule` — tarih/saat çiftinin saf çözümleme kuralı + mesaj sabitleri |
-| `src/app/[locale]/(app)/[workspace]/opportunities/[id]/briefs/client.tsx` | değişti | satır içi hata durumları, aria bağları, odak yönetimi, `alert()` → `role="alert"` bandı, `.ics` düğmesi koşulsuz render |
-| `tests/m9-meeting-schedule.test.ts` | **yeni** | kuralın 7 birim testi |
-| `tests/m9-briefs-form-errors.test.tsx` | **yeni** | bileşen testi (jsdom); `window.alert` çağrılmadığı her testte doğrulanıyor |
-| `tests/e2e/m9-briefs-form.spec.ts` | **yeni** | gerçek tarayıcı e2e + mobil genişlik + `dialog` dinleyicisi |
-| `docs/agent-results/TASK-MTQUX5IZ9I5VP-screenshots/*.png` | **yeni** | 6 ekran görüntüsü |
+**Yeni**
+- `src/modules/m9/brief-template.ts`
+- `tests/m9-brief-persistence.test.ts`
+- `tests/e2e/m9-brief-persistence.spec.ts`
+- `tests/e2e/fixtures/m9-tenant.ts`
+- `docs/agent-results/TASK-MTQUX5IZ9I5VP-screenshots/persist-0{1..5}-*.png`
 
-`prisma generate` de koşuldu: yerel `node_modules`'ta üretilmiş Prisma istemcisi **hiç yoktu**
-(`node_modules/.prisma` mevcut değildi), dogfood'un P0-1 (a) kök nedeni buydu. Bu bir dosya
-değişikliği değil, ortam düzeltmesi; kalıcı çözüm başka bir alt-görevin işi (aşağıda risk #2).
+**Değişen**
+- `src/modules/m9/server/actions.ts` — taslak yolu + koşullu kredi + `aiGenerated`
+- `src/app/[locale]/(app)/[workspace]/opportunities/[id]/briefs/client.tsx` — taslak bandı, rozet, işaret temizleme
+- `messages/tr.json`, `messages/en.json` — `m9.brief.draftBadge/draftTitle/draftNotice` (yalnız bu 3 anahtar; dosyanın geri kalanındaki değişiklikler başka ajanların uçuşta işi, commit'e alınmadı — §4)
+- `tests/e2e/m9-briefs-form.spec.ts` — ortak fikstüre taşındı
+
+**Veri:** e2e fikstürü kendi kiracısını (`m9-e2e-tenant`) `beforeAll`'da kurup `afterAll`'da siliyor. Ölçüm sırasında elle eklediğim `ms-demo-m9` satırı geri silindi; `MeetingBrief` tablosu işin sonunda yine 0 satır.
 
 ---
 
-## 4. Riskler
+## 4. Riskler ve BENİM DEĞİL diye işaretlediklerim
 
-1. **Aynı dosyada paralel çalışma.** `briefs/client.tsx`'e kartın 1. ve 3. maddeleri de dokunacak
-   (P0-1 hata yüzeyi, P1-3 notların kaybolması). Benim eklediğim `scheduleError`/`icsError`
-   deseni onların da kullanabileceği şekilde bırakıldı; birleştirme sırasında iki ayrı hata bandı
-   üretilmemesine dikkat edilmeli.
-2. **`prisma generate` kalıcı değil.** İstemciyi ürettim ama bunu tekrarlayacak bir kapı yok;
-   `postinstall`/CI adımı eklenmezse aynı "bayat istemci" tuzağı geri gelir.
-3. **`.ics` düğmesinin koşulsuz render'ı** kartın 1. maddesiyle çakışabilir: brief kalıcılığı
-   düzeldiğinde tarihsiz brief sayısı artacak, dolayısıyla bu hata bandı daha sık görülecek.
-   Bu istenen davranış, ama kopya metni gözden geçirilmeli.
-4. **i18n.** Eklediğim üç metin, dosyanın geri kalanı gibi gömülü Türkçe. Görev "i18n metinlerine
-   dokunma" dediği için bilinçli; ex-en'in 78 string kartına **3 string daha** ekliyor
-   (`MEETING_SCHEDULE_MESSAGES` üç anahtarı + `.ics` hata metni + "Kapat").
+1. **`notFound()` HTTP 200 dönüyor (başka kart: TASK-MTQYY136Q3CGG).** Gövde doğru 404 ekranı, durum kodu 200. Ağaç geneli, M9'a özel değil — ölçüm:
+   ```
+   /tr/main/opportunities/<yok>/briefs        200
+   /tr/main/opportunities/<yok>/documents     200
+   /tr/main/pipeline/<yok>                    200
+   /tr/main/partners/<yok>                    200
+   /tr/completely-unknown-route-xyz           404   ← rota hiç eşleşmeyince doğru
+   ```
+   Testte `expect` etmedim, `testInfo.annotations`'a yazdım: başka kartın kusuru yüzünden bu spec'i kırmızı yapmak yanlış olurdu.
+2. **`npx tsc` 4 hata: `scripts/_probe-cordis.ts:14,15` ve `scripts/_probe-cordis2.ts:3,6`** (`TS2347`, `TS7006`). Benim dosyalarım değil, dokunmadım.
+3. **Anasayfa `/tr` 500 veriyor** — `next/image` `images.unsplash.com` host'u `next.config` içinde tanımlı değil. Playwright'ın `webServer.url` sağlık kontrolü bu yüzden çalışan sunucuyu "hazır değil" sayıp `EADDRINUSE` ile düşüyor; `E2E_BASE_URL=http://localhost:3000/api/auth/csrf` ile aştım. Kalıcı çözüm o kartın sahibinde.
+4. **`messages/*.json` ortak dosya.** Benim 3 anahtarım dışında dosyada başka ajanların commit edilmemiş anahtarları var (takvim hataları, evaluations `notMeasured`). Commit'e yalnız benim satırlarım alındı (HEAD + kendi anahtarlarım ile blob üretilip index'e yazıldı); çalışma ağacındaki diğer anahtarlara dokunulmadı.
+5. **`demo-tenant` planı koşum sırasında `ultra` → `pro` değişti** (başka ajanın faturalama testi). M9 e2e'sini bu yüzden kendi kiracısına taşıdım; ödünç kiracıyla çalışan her modül-kapılı spec aynı riski taşıyor.
 
 ---
 
 ## 5. Açık sorular
 
-1. `.ics` düğmesi tarihsiz brief'te **görünür ama başarısız** mı olmalı, yoksa **görünür ama
-   `disabled` + tooltip** mi? İlkini seçtim (disabled kontrolün sebebi ekran okuyucuya zayıf
-   geçer, ayrıca `disabled` düğme tıklanamadığı için sebep de söylenemez). Ürün onayı isterse
-   ikinciye çevirmek tek satır.
-2. P2-8 (yalnız boşluktan ibaret ortak adı → buton hiçbir şey yapmıyor) **kapsamım dışında**
-   ve hâlâ açık: `if (!partnerName.trim()) return;` benim doğrulamamdan **önce** çalışıyor, yani
-   ad boşluksa kullanıcı hâlâ hiçbir geri bildirim almıyor. Aynı `scheduleError` deseni buraya
-   da uygulanmalı — `TASK-MTQURC2H4E0WF` kartına iliştirilmesini öneriyorum.
-3. Toplantı süresi hâlâ sabit 1 saat (`+ 60 * 60 * 1000`); kullanıcı giremiyor. Dogfood P1-5'te
-   geçiyordu, RFC düzeltmesi bunu kapsamadı.
-
----
+1. Model erişilemezken **taslak vermek mi, hiç vermemek mi** doğru? Ben (b) taslağı seçtim (kullanıcının girdisi ve belge yapısı korunuyor, hiçbir iddia yok). Ürün "hiç brief üretilmesin, sadece hata gösterilsin" derse değişiklik küçük: `catch` bloğunda `templateBrief` yerine hata döndürmek yeterli.
+2. Taslak/AI ayrımı şu an içeriğin ilk satırındaki işaretle taşınıyor. Kalıcı olarak `MeetingBrief.source` gibi bir sütun daha temiz olur — ama migration + RLS + `docs/DATA_MODEL.md` gerektiriyor ve bu kartın kapsamı değildi.
+3. `demo-tenant` için M9 hiç açık değil (`ModuleState` satırı yok, plan da vermiyor). Demo verisinde M9 açılacak mı, yoksa modül gerçekten satılana kadar kapalı mı kalacak?
 
 ## 6. Sonraki adım
 
-- Kartın 1–4. maddeleri kapanmadan `TASK-MTQUX5IZ9I5VP` **done** yapılmamalı; bu rapor yalnız
-  5. maddeyi kanıtlıyor.
-- Açık soru #2 (P2-8) `TASK-MTQURC2H4E0WF`'ye iliştirilsin.
-- `prisma generate` için `postinstall` ya da CI adımı ayrı bir teknik borç kartı olsun (risk #2).
+- Kart durumu `review`'a alındı; kanıtlar bu dosyada.
+- TASK-MTQYY136Q3CGG sahibine: `notFound()` 200 ölçümü (§4.1) hazır, dört rotada tekrarlanabilir.
+- Kart 9 (`set-state-in-effect`, TASK-MTREW28BU7STD + TASK-MTQVFP0LV3YV7) hâlâ açık ve 8. karta bağımlı — bu iş kapsamında ele alınmadı.

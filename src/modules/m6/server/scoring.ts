@@ -54,6 +54,24 @@ export function esrScoreFromProposal(esrScores: unknown): number | null {
   return esrTotalToPanelScale(total);
 }
 
+/**
+ * Read `Evaluation.avgScore` back as a panel average, or null when the stored value
+ * cannot be one.
+ *
+ * A weighted mean of marks that are each at least 1 is itself at least 1, so a stored
+ * value below `PANEL_SCALE_MIN` was never computed from anyone's marks. Rows written
+ * before this file stopped substituting 0 for "no weighted criterion" still hold that
+ * 0, and there is no migration that can tell them from a real score — the guard is
+ * here so those rows read as unmeasured instead of as a failing grade. Nothing is
+ * deleted: the `Score` rows remain the source of truth and a recalculation overwrites
+ * the cached column with a real value or with null.
+ */
+export function storedPanelAverage(avgScore: number | null | undefined): number | null {
+  if (typeof avgScore !== 'number' || !Number.isFinite(avgScore)) return null;
+  if (avgScore < PANEL_SCALE_MIN) return null;
+  return avgScore;
+}
+
 export interface ReviewerScores {
   reviewerId: string;
   scores: Record<string, ScoreValue>; // criterionId -> score
@@ -61,17 +79,35 @@ export interface ReviewerScores {
 
 /**
  * Panel consensus outcome.
- * - solid: ≥70% of reviewers within 1 point of each other (high agreement)
+ * - solid: ≥70% of reviewer pairs within 1 point of each other (high agreement)
  * - divergent: <70% agreement (conflicting views)
+ * - not-measured: fewer than two reviewers have submitted, so there are no pairs to
+ *   compare. This is not agreement. A lone reviewer used to be reported as
+ *   `solid` at 100%, which asserts a panel agreed when no panel ever met.
  */
-export type ConsensusOutcome = 'solid' | 'divergent';
+export type ConsensusOutcome = 'solid' | 'divergent' | 'not-measured';
+
+/**
+ * Why a panel average does not exist. Carried instead of a number so the dashboard
+ * can say which of the two absences it is looking at.
+ *
+ * - no-submitted-marks: no reviewer has submitted a score on this evaluation.
+ * - no-weighted-criterion: marks exist, but none of them falls on a criterion that
+ *   carries weight, so there is nothing to average. Previously this produced 0.
+ */
+export type PanelScoreUnmeasuredReason = 'no-submitted-marks' | 'no-weighted-criterion';
 
 export interface PanelScoreResult {
-  panelAverage: number; // weighted 1–5 average
+  /** Weighted 1–5 average, or null when it could not be computed. Never 0 as a stand-in. */
+  panelAverage: number | null;
+  /** Set exactly when `panelAverage` is null. */
+  unmeasuredReason: PanelScoreUnmeasuredReason | null;
   consensusOutcome: ConsensusOutcome;
-  criterionAverages: Record<string, number>; // criterion name -> avg score
+  /** criterionId -> unweighted mean of the marks on it. */
+  criterionAverages: Record<string, number>;
   reviewerCount: number;
-  agreementPercentage: number; // 0–100
+  /** 0–100, or null when there was no pair to compare. */
+  agreementPercentage: number | null;
 }
 
 export interface EsrComparisonResult {
@@ -87,10 +123,13 @@ export interface PanelScoreQueryResult {
   evaluationId: string;
   proposalId: string;
   reviewerCount: number;
+  /** Reviewers who have submitted. The panel score is derived from these alone. */
   completedReviewerCount: number;
   panelScore: number | null;
+  /** Set exactly when `panelScore` is null, so the dashboard can name the absence. */
+  unmeasuredReason: PanelScoreUnmeasuredReason | null;
   esrScore: number | null;
-  consensusOutcome: string | null;
+  consensusOutcome: ConsensusOutcome;
 }
 
 /**
@@ -104,8 +143,18 @@ export function calculatePanelScore(
   reviewerScores: ReviewerScores[],
   criterionWeights: Record<string, number>,
 ): PanelScoreResult {
+  // No marks is a state, not a crash. This used to throw, which meant the only two
+  // things a caller could do were guard the call itself or take down the page — and
+  // the one caller that forgot the guard would have written a fabricated number.
   if (reviewerScores.length === 0) {
-    throw new Error('No reviewer scores to calculate panel average');
+    return {
+      panelAverage: null,
+      unmeasuredReason: 'no-submitted-marks',
+      consensusOutcome: 'not-measured',
+      criterionAverages: {},
+      reviewerCount: 0,
+      agreementPercentage: null,
+    };
   }
 
   // Collect all scores per criterion
@@ -140,14 +189,17 @@ export function calculatePanelScore(
     weightSum += weight;
   }
 
-  const panelAverage = weightSum > 0 ? weightedSum / weightSum : 0;
+  // `: 0` used to close this expression. A panel is scored 1..5, so 0 is not a low
+  // score — it is outside the scale, and it reached the dashboard as "0.00", a
+  // failing verdict on a proposal whose marks simply landed on unweighted criteria.
+  // Absence leaves here as absence (CLAUDE.md §7).
+  const panelAverage = weightSum > 0 ? weightedSum / weightSum : null;
 
-  // Calculate consensus: measure reviewer agreement
-  // Consensus = percentage of reviewers whose scores are within ±1 of the mode
   const consensus = calculateConsensusOutcome(reviewerScores);
 
   return {
     panelAverage,
+    unmeasuredReason: panelAverage === null ? 'no-weighted-criterion' : null,
     consensusOutcome: consensus.outcome,
     criterionAverages,
     reviewerCount: reviewerScores.length,
@@ -158,12 +210,18 @@ export function calculatePanelScore(
 /**
  * Determine if reviewers agree (solid) or diverge (divergent).
  * Solid = ≥70% of reviewer pairs have ≤1 point difference.
+ *
+ * Fewer than two sets of marks yields `not-measured`: consensus is a statement about
+ * reviewers agreeing *with each other*, and with one reviewer there is no pair to
+ * compare. The previous `{ solid, 100 }` was a claim of unanimous agreement derived
+ * from an empty set of comparisons — the dashboard printed "Güçlü" on a panel where
+ * exactly one person had voted.
  */
 export function calculateConsensusOutcome(
   reviewerScores: ReviewerScores[],
-): { outcome: ConsensusOutcome; agreementPercentage: number } {
+): { outcome: ConsensusOutcome; agreementPercentage: number | null } {
   if (reviewerScores.length <= 1) {
-    return { outcome: 'solid', agreementPercentage: 100 };
+    return { outcome: 'not-measured', agreementPercentage: null };
   }
 
   // Calculate each reviewer's average score
@@ -185,8 +243,9 @@ export function calculateConsensusOutcome(
     }
   }
 
-  const agreementPercentage = totalPairs > 0 ? (agreeingPairs / totalPairs) * 100 : 100;
-  const outcome = agreementPercentage >= 70 ? 'solid' : 'divergent';
+  // totalPairs is at least 1 here: the early return above covers 0 and 1 reviewers.
+  const agreementPercentage = (agreeingPairs / totalPairs) * 100;
+  const outcome: ConsensusOutcome = agreementPercentage >= 70 ? 'solid' : 'divergent';
 
   return { outcome, agreementPercentage };
 }
@@ -245,7 +304,18 @@ export async function getPanelScoresForProposal(
     include: {
       proposal: { select: { esrScores: true } },
       reviewers: {
-        select: { id: true, status: true, scores: { select: { score: true, criterionId: true } } },
+        select: {
+          id: true,
+          status: true,
+          // Submitted marks only. A reviewer's draft is not their opinion yet, and
+          // `calculateCriterionAverage`/`getScoreDistribution` have always filtered on
+          // this — without it the headline score and the per-criterion breakdown on the
+          // same screen were computed over two different populations.
+          scores: {
+            where: { submittedAt: { not: null } },
+            select: { score: true, criterionId: true },
+          },
+        },
       },
     },
     orderBy: { createdAt: 'desc' },
@@ -265,15 +335,24 @@ export async function getPanelScoresForProposal(
       }))
       .filter((r: ReviewerScores) => Object.keys(r.scores).length > 0);
 
+    const panelScore = storedPanelAverage(eval_.avgScore);
+
     return {
       evaluationId: eval_.id,
       proposalId: eval_.proposalId || '',
       reviewerCount: eval_.reviewers.length,
       completedReviewerCount: completed,
-      panelScore: eval_.avgScore ?? null,
+      panelScore,
+      // Which absence it is: nobody has submitted, versus marks that landed on no
+      // weighted criterion. The row still shows how many reviewers are seated.
+      unmeasuredReason:
+        panelScore !== null
+          ? null
+          : reviewerScores.length === 0
+            ? 'no-submitted-marks'
+            : 'no-weighted-criterion',
       esrScore: esrScoreFromProposal(eval_.proposal?.esrScores),
-      consensusOutcome:
-        reviewerScores.length > 0 ? calculateConsensusOutcome(reviewerScores).outcome : null,
+      consensusOutcome: calculateConsensusOutcome(reviewerScores).outcome,
     };
   });
 }
@@ -337,16 +416,16 @@ export async function updateEvaluationScore(
   evaluationId: string,
   tenantId: string,
 ): Promise<void> {
-  // Fetch all submitted scores for this evaluation
+  // Submitted scores only. The `submittedAt` filter was missing here while the two
+  // analytics readers below both applied it, so `Evaluation.avgScore` — the number the
+  // dashboard prints — was the one figure in the module computed from drafts as well.
   const scores = await db.score.findMany({
-    where: { reviewer: { evaluationId, tenantId } },
+    where: { reviewer: { evaluationId, tenantId }, submittedAt: { not: null } },
     include: {
       reviewer: { select: { id: true } },
       criterion: { select: { id: true, name: true, weight: true } },
     },
   });
-
-  if (scores.length === 0) return;
 
   // Organize scores by reviewer and criterion
   const reviewerScores: Record<string, Record<string, ScoreValue>> = {};
@@ -372,7 +451,10 @@ export async function updateEvaluationScore(
 
   const result = calculatePanelScore(reviewerScoresArray, criterionWeights);
 
-  // Persist back to evaluation
+  // `avgScore` is a cache of the marks, so it is written even when the answer is null:
+  // returning early on "nothing to compute" left whatever number was there last time,
+  // which outlives the marks it came from once a score is withdrawn. Recomputing from
+  // the same rows twice writes the same value, so this is safe to run repeatedly.
   await db.evaluation.update({
     where: { id: evaluationId },
     data: {
@@ -415,17 +497,21 @@ export async function getCalibrationMatrix(
   }> = [];
 
   for (const eval_ of evaluations) {
-    if (!eval_.avgScore || !eval_.proposal?.esrScores) continue;
+    // A calibration point needs both halves to be real. `storedPanelAverage` also
+    // drops legacy rows holding the old fabricated 0, which would otherwise enter the
+    // matrix as a 4-point miss and drag the reported drift of the whole model.
+    const panelScore = storedPanelAverage(eval_.avgScore);
+    if (panelScore === null || !eval_.proposal?.esrScores) continue;
 
     const esrScore = esrScoreFromProposal(eval_.proposal.esrScores);
     if (esrScore === null) continue;
 
-    const deltaAbsolute = esrScore - eval_.avgScore;
+    const deltaAbsolute = esrScore - panelScore;
     const deltaPercent = (deltaAbsolute / esrScore) * 100;
 
     results.push({
       evaluationId: eval_.id,
-      panelScore: eval_.avgScore,
+      panelScore,
       esrScore,
       deltaAbsolute,
       deltaPercent,

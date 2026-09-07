@@ -12,7 +12,7 @@ import { DEFAULT_CRITERIA } from '../../src/modules/m6/types';
  * Postgres through the same server actions the product uses.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQ5ZF5ZRU5SM-screenshots';
+const SHOTS = 'docs/agent-results/TASK-MTPZHMSPMDA66-screenshots';
 const WORKSPACE = 'm6-e2e-ws';
 const EVALUATIONS_URL = `/tr/${WORKSPACE}/opportunities/${M6_E2E.opportunityId}/evaluations`;
 const PANEL_URL = `${EVALUATIONS_URL}/panel`;
@@ -75,10 +75,26 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
     await expect(form).toBeVisible();
     await expect(form.getByTestId('m6-internal-badge')).toContainText('İç ön değerlendirme');
 
-    // Before submitting, the dashboard has no score for this proposal.
+    // Before submitting, the dashboard has no score for this proposal — and says so in
+    // words. This asserted an em dash, which reads as an empty column rather than as a
+    // statement about the evaluation; what it must never read as is 0.00.
     await expect(app.getByTestId('m6-dashboard')).toBeVisible();
-    await expect(app.getByTestId('m6-panel-score')).toHaveText('—');
+    const panelScoreCell = app.getByTestId('m6-panel-score');
+    await expect(panelScoreCell).toHaveText('Hesaplanmadı');
+    await expect(panelScoreCell).not.toHaveText('0.00');
+    // The reason is carried on the cell, not left for the reader to guess.
+    await expect(panelScoreCell.getByTestId('m6-not-measured')).toHaveAttribute(
+      'title',
+      /hakem puanını göndermedi/,
+    );
+    // No marks means no pair of reviewers to compare, so consensus is unmeasured too.
+    await expect(app.getByTestId('m6-consensus')).toHaveText('Ölçülmedi');
     await shot(page, '01-panel-before-scoring');
+    // The dashboard sits below the fold on this page, so the unmeasured state also gets
+    // an element shot — a full-page capture scrolled to the top does not show it.
+    await app
+      .getByTestId('m6-dashboard')
+      .screenshot({ path: `${SHOTS}/01b-dashboard-not-measured.png` });
 
     // ── 3. Move every slider, then submit.
     for (const [name, mark] of Object.entries(MARKS)) {
@@ -105,7 +121,16 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
     const expectedEsr = (M6_E2E.esrTotal / 15) * 4 + 1;
     await expect(app.getByTestId('m6-dashboard-row')).toContainText(expectedEsr.toFixed(2));
 
+    // The fixture seats one reviewer. A score now exists, but a consensus still does
+    // not: agreement is a statement about reviewers agreeing with each other, and there
+    // is no second opinion here. This cell used to read "Güçlü" — solid agreement,
+    // asserted from a panel of one.
+    await expect(app.getByTestId('m6-consensus')).toHaveText('Ölçülmedi');
+
     await shot(page, '03-dashboard-after-save');
+    await app
+      .getByTestId('m6-dashboard')
+      .screenshot({ path: `${SHOTS}/03b-dashboard-scored.png` });
 
     // ── 5. The rows that were actually written carry the tenant.
     const scores = await prisma.score.findMany({

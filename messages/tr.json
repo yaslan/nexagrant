@@ -838,7 +838,10 @@
       "createdLabel": "Oluşturulma:",
       "meetingDateUtcLabel": "Toplantı Tarihi (UTC):",
       "brusselsLabel": "Brüksel:",
-      "emptyState": "Lütfen sol panelden bir görüşme seçin veya yeni bir AI Brief oluşturun."
+      "emptyState": "Lütfen sol panelden bir görüşme seçin veya yeni bir AI Brief oluşturun.",
+      "draftBadge": "Taslak",
+      "draftTitle": "Bu bir taslak şablon — yapay zeka tarafından yazılmadı.",
+      "draftNotice": "Yapay zekaya şu anda ulaşılamadı, bu yüzden ortak hakkında hiçbir bilgi üretilmedi ve AI krediniz harcanmadı. Aşağıdaki başlıkları kendiniz doldurun ya da yeniden deneyin."
     },
     "postMeeting": {
       "heading": "Toplantı Sonrası Kararları & Aksiyon Notu Ekle",

@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { syncMeetingBriefToCalendar } from '@/lib/calendar/sync';
 import { errorMessage } from '@/lib/errors';
 import type { MeetingBriefRow } from '@/types/db-rows';
+import { templateBrief } from '@/modules/m9/brief-template';
 
 /**
  * M9 meeting briefs.
@@ -56,6 +57,10 @@ export async function generateMeetingBrief({
   ### 5. Risk Points & Red Flags to Clarify
   - Background IP constraints, competitor overlaps, and budget expectations.`;
 
+  // `aiGenerated` decides two things below: whether an AI credit is debited, and
+  // whether the brief is stored as a template draft. A brief the model never
+  // wrote must not be charged for or presented as one.
+  let aiGenerated = true;
   let briefContent = '';
   try {
     briefContent = await generateText({
@@ -68,37 +73,24 @@ export async function generateMeetingBrief({
     });
   } catch (e) {
     console.warn('[M9 generateMeetingBrief] LLM call fallback:', errorMessage(e));
-    briefContent = `### 1. Partner Background & EU Track Record
-- **Partner:** ${partnerName}
-- **Track Record:** Recognized participant in EU Framework Programmes with strong technical capacity.
-
-### 2. Strategic Complementarity for ${callTopic}
-- High synergy between partner core capabilities and topic requirements.
-
-### 3. Suggested Work Package & Role Allocation
-- **Role:** Work Package Leader (WP3 Prototyping or WP5 Dissemination).
-- **Effort Recommendation:** 12 - 18 Person-Months.
-
-### 4. 3 Strategic Questions to Ask in Meeting
-1. **TRL Readiness:** What is your current validated TRL level for the key technology component?
-2. **Infrastructure:** Do you have direct access to pilot sites or testing facilities for validation?
-3. **Effort & Budget:** What is your team's target person-month commitment for Part B Section 3?
-
-### 5. Risk Points & Red Flags to Clarify
-- Clarify background IP ownership and licensing terms prior to Consortium Agreement drafting.
-- Verify potential conflict of interest if partner is participating in competing proposals under the same call.`;
+    aiGenerated = false;
+    briefContent = templateBrief({ partnerName, callTopic });
   }
 
   try {
     const brief = await withTenant<MeetingBriefRow>(tenantId, async (tx) => {
-      // Deduct 1 AI credit for M9 Brief
-      await tx.creditLedger.create({
-        data: {
-          tenantId,
-          delta: -1,
-          reason: `M9: Meeting Brief Generator for ${partnerName}`,
-        },
-      });
+      // One AI credit, and only when the model actually answered. A template
+      // draft costs nothing: the header promises "1 AI credit / brief", and
+      // charging it for a document the AI never wrote is charging for nothing.
+      if (aiGenerated) {
+        await tx.creditLedger.create({
+          data: {
+            tenantId,
+            delta: -1,
+            reason: `M9: Meeting Brief Generator for ${partnerName}`,
+          },
+        });
+      }
 
       // interactionId is globally unique, so an upsert keyed on it alone would
       // let one tenant overwrite another tenant's brief. Existing rows are
@@ -145,7 +137,7 @@ export async function generateMeetingBrief({
       console.warn('[M9 generateMeetingBrief] Calendar sync failed (non-critical):', errorMessage(e));
     }
 
-    return { success: true, brief };
+    return { success: true, brief, aiGenerated };
   } catch (e) {
     console.warn('[M9 generateMeetingBrief] DB write failed:', errorMessage(e));
     return { success: false, brief: null, error: 'BRIEF_NOT_PERSISTED' };

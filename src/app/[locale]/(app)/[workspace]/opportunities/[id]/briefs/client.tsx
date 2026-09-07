@@ -20,6 +20,7 @@ import { useTranslations } from 'next-intl';
 import { generateMeetingBrief, savePostMeetingNotes } from '@/modules/m9/server/actions';
 import { generateIcsContent } from '@/lib/calendar';
 import { resolveMeetingSchedule } from '@/modules/m9/meeting-schedule';
+import { isTemplateDraft, stripTemplateMarker } from '@/modules/m9/brief-template';
 
 export interface BriefItem {
   id: string;
@@ -156,6 +157,14 @@ export function MeetingBriefsClient({
   const focusOrphanedRef = useRef(false);
 
   const activeBrief = briefs.find((b) => b.id === activeBriefId) || briefs[0];
+  /**
+   * A brief the model never wrote is a blank working document, not a briefing.
+   * The marker is stored with the content so this survives a reload, a print and
+   * an .ics export; it is machine text and is stripped everywhere the body is
+   * shown or exported.
+   */
+  const activeIsDraft = activeBrief ? isTemplateDraft(activeBrief.content) : false;
+  const activeBody = activeBrief ? stripTemplateMarker(activeBrief.content) : '';
 
   /**
    * Both controls inside the error band unmount when the band closes, so a
@@ -262,7 +271,7 @@ export function MeetingBriefsClient({
 
     const icsContent = generateIcsContent(
       t('ics.eventTitle', { partner: activeBrief.partnerName || t('ics.defaultPartner') }),
-      activeBrief.content.substring(0, 200),
+      stripTemplateMarker(activeBrief.content).substring(0, 200),
       startDate,
       endDate
     );
@@ -577,8 +586,13 @@ export function MeetingBriefsClient({
                     📅 {formatBrusselsTime(b.meetingScheduledAt, dateLocale)}
                   </div>
                 )}
+                {isTemplateDraft(b.content) && (
+                  <span className="self-start rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                    {t('brief.draftBadge')}
+                  </span>
+                )}
                 <p className="text-[11px] text-muted line-clamp-2">
-                  {b.content.substring(0, 100)}...
+                  {stripTemplateMarker(b.content).substring(0, 100)}...
                 </p>
               </button>
             ))}
@@ -607,6 +621,27 @@ export function MeetingBriefsClient({
                 </span>
               </div>
 
+              {/* The first thing in the card, above the meeting-time band: it
+                  qualifies the whole document, so it cannot sit below the body
+                  it is warning about. Amber like that band — this is a caution,
+                  not an error — but with a heavier left edge so two amber blocks
+                  do not read as one. `role="status"`, not "alert": a standing
+                  property of the document, not something that just happened,
+                  which is also why it has no dismiss control. */}
+              {activeIsDraft && (
+                <div
+                  role="status"
+                  data-testid="m9-template-draft-notice"
+                  className="bg-amber-50 border border-amber-200 border-l-4 border-l-amber-500 rounded-lg p-3 text-xs text-amber-900 flex items-start gap-2"
+                >
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <div className="space-y-1">
+                    <strong className="block">{t('brief.draftTitle')}</strong>
+                    <span>{t('brief.draftNotice')}</span>
+                  </div>
+                </div>
+              )}
+
               {activeBrief.meetingScheduledAt && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 flex items-center gap-2">
                   <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
@@ -620,7 +655,7 @@ export function MeetingBriefsClient({
 
               {/* Structured Markdown Viewer */}
               <div className="prose prose-sm max-w-none text-ink whitespace-pre-wrap font-sans leading-relaxed space-y-4">
-                {activeBrief.content}
+                {activeBody}
               </div>
 
               {/* POST-MEETING NOTES FORM */}

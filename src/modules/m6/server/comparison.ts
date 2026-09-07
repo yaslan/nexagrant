@@ -5,7 +5,12 @@
  * for score integrity, reviewer access, and tenant isolation.
  */
 
-import { compareWithEsr, type EsrComparisonResult, type TenantScopedDb } from './scoring';
+import {
+  compareWithEsr,
+  storedPanelAverage,
+  type EsrComparisonResult,
+  type TenantScopedDb,
+} from './scoring';
 
 /**
  * Compare M6 panel score to ESR for a specific evaluation.
@@ -54,9 +59,12 @@ export async function compareM6ToESR(
     }
   }
 
-  // Use the evaluation's avgScore if already calculated, otherwise compute from submitted reviews
-  let panelScore = evaluation.avgScore;
-  if (!panelScore) {
+  // Use the evaluation's avgScore if already calculated, otherwise compute from submitted
+  // reviews. `storedPanelAverage` rather than a falsy check: the guard has to reject a
+  // stored 0 (never a real 1..5 mean) while a legitimate low average like 1.0 — which
+  // `!panelScore` would have accepted anyway — keeps its own value.
+  let panelScore = storedPanelAverage(evaluation.avgScore);
+  if (panelScore === null) {
     const submittedReviews = evaluation.reviewers.filter(
       (r: (typeof evaluation.reviewers)[number]) => r.status === 'completed',
     );

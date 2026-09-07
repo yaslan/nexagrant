@@ -28,7 +28,34 @@ export function EvaluationDashboard({ rows }: EvaluationDashboardProps) {
   const consensusLabels: Record<string, string> = {
     solid: t('dashboard.consensusOutcome.solid'),
     divergent: t('dashboard.consensusOutcome.divergent'),
+    'not-measured': t('dashboard.consensusOutcome.notMeasured'),
   };
+
+  const unmeasuredReasons: Record<string, string> = {
+    'no-submitted-marks': t('dashboard.notMeasuredReason.noSubmittedMarks'),
+    'no-weighted-criterion': t('dashboard.notMeasuredReason.noWeightedCriterion'),
+  };
+
+  /**
+   * What a missing panel score looks like.
+   *
+   * An em dash reads as "nothing here" — which is right for a column that is merely
+   * blank, but a missing panel score is a fact about the evaluation and the owner needs
+   * to know it exists and why. Rendering the reason also keeps the cell from being
+   * mistaken for a rendering glitch and re-entered by hand.
+   */
+  function NotMeasured({ reason }: { reason: string | null }) {
+    const explanation = (reason && unmeasuredReasons[reason]) ?? undefined;
+    return (
+      <span
+        className="text-xs font-normal text-gray-500 italic"
+        title={explanation}
+        data-testid="m6-not-measured"
+      >
+        {t('dashboard.notMeasured')}
+      </span>
+    );
+  }
 
   return (
     <div className="border border-gray-200 rounded-lg p-6 bg-white" data-testid="m6-dashboard">
@@ -70,7 +97,11 @@ export function EvaluationDashboard({ rows }: EvaluationDashboardProps) {
                     {row.completedReviewerCount}/{row.reviewerCount}
                   </td>
                   <td className="py-2 px-4 text-right text-gray-600" data-testid="m6-panel-score">
-                    {row.panelScore !== null ? row.panelScore.toFixed(2) : '—'}
+                    {row.panelScore !== null ? (
+                      row.panelScore.toFixed(2)
+                    ) : (
+                      <NotMeasured reason={row.unmeasuredReason} />
+                    )}
                   </td>
                   <td className="py-2 px-4 text-right text-gray-600">
                     {row.esrScore !== null ? row.esrScore.toFixed(2) : '—'}
@@ -91,8 +122,14 @@ export function EvaluationDashboard({ rows }: EvaluationDashboardProps) {
                       '—'
                     )}
                   </td>
-                  <td className="py-2 px-4 text-right text-gray-600">
-                    {(row.consensusOutcome && consensusLabels[row.consensusOutcome]) ?? '—'}
+                  <td className="py-2 px-4 text-right text-gray-600" data-testid="m6-consensus">
+                    {row.consensusOutcome === 'not-measured' ? (
+                      <span className="text-xs font-normal text-gray-500 italic">
+                        {consensusLabels['not-measured']}
+                      </span>
+                    ) : (
+                      consensusLabels[row.consensusOutcome]
+                    )}
                   </td>
                 </tr>
                 );
