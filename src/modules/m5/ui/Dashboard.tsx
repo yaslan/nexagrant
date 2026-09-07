@@ -206,6 +206,13 @@ export function Dashboard({ metrics, trendData, from, to }: DashboardProps) {
                 variant: 'success',
               })}
               {metricCard({
+                title: t('thresholdRate'),
+                metric: metrics.thresholdRate,
+                unit: '%',
+                description: t('descThresholdRate'),
+                emptyDescription: t('emptyThresholdRate'),
+              })}
+              {metricCard({
                 title: t('averageScore'),
                 metric: metrics.averageScore,
                 unit: t('unitScore'),

@@ -6,6 +6,7 @@ import {
   averageLensScore,
   hitRate,
   personDaysPerProposal,
+  thresholdRate,
   type MetricValue,
 } from './metrics';
 
@@ -24,6 +25,8 @@ export interface KpiMetrics {
   personDays: MetricValue;
   /** Unmeasured until one opportunity has both a G0 and a G2 decision. */
   g0ToG2Days: MetricValue;
+  /** 0-100. Unmeasured until a proposal is submitted. */
+  thresholdRate: MetricValue;
   /**
    * Tenant-wide and range-independent. Separates "new workspace, nothing to show yet"
    * from "this date range happens to be quiet" — two different things to say.
@@ -47,6 +50,8 @@ export async function getKpiMetrics(
       efforts,
       activeModules,
       g0ToG2Times,
+      aboveThresholdProposals,
+      submittedProposalsInRange,
     ] = await Promise.all([
       // 1. Total open offers/opportunities in date range
       tx.opportunity.count({
@@ -153,6 +158,30 @@ export async function getKpiMetrics(
         },
         orderBy: { decidedAt: 'desc' },
       }),
+
+      // 9a. Proposals with outcome 'above_threshold' in range
+      tx.proposal.count({
+        where: {
+          tenantId,
+          outcome: 'above_threshold',
+          opportunity: {
+            deletedAt: null,
+            createdAt: { gte: from, lte: to },
+          },
+        },
+      }),
+
+      // 9b. All submitted proposals in range (denominator for threshold rate)
+      tx.proposal.count({
+        where: {
+          tenantId,
+          submittedAt: { not: null },
+          opportunity: {
+            deletedAt: null,
+            createdAt: { gte: from, lte: to },
+          },
+        },
+      }),
     ]);
 
     // Every figure below is derived by a pure function in ./metrics so the
@@ -161,6 +190,7 @@ export async function getKpiMetrics(
     const averageScore = averageLensScore(evaluations);
     const personDays = personDaysPerProposal(efforts._sum.hours ?? 0, totalProposals);
     const g0ToG2Days = averageG0ToG2Days(g0ToG2Times);
+    const thresholdRateMetric = thresholdRate(aboveThresholdProposals, submittedProposalsInRange);
 
     return {
       totalOffers,
@@ -169,6 +199,7 @@ export async function getKpiMetrics(
       averageScore,
       personDays,
       g0ToG2Days,
+      thresholdRate: thresholdRateMetric,
       hasAnyOpportunity: opportunitiesEver > 0,
     };
   });

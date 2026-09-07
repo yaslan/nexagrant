@@ -106,3 +106,14 @@ export function averageG0ToG2Days(decisions: readonly GateDecisionPoint[]): Metr
   if (count === 0) return NOT_MEASURED;
   return measured(Math.round(totalDays / count));
 }
+
+/**
+ * Threshold rate: proposals with outcome 'above_threshold' as a share of all submitted proposals.
+ *
+ * The denominator is what decides measurability. No submitted proposals means there is no ratio
+ * to state — not a ratio that happens to be zero.
+ */
+export function thresholdRate(aboveThreshold: number, totalSubmitted: number): MetricValue {
+  if (totalSubmitted <= 0) return NOT_MEASURED;
+  return measured(round((aboveThreshold / totalSubmitted) * 100));
+}
