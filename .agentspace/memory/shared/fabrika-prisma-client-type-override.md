@@ -1,9 +1,9 @@
 ---
 name: fabrika-prisma-client-type-override
-description: src/types/prisma-override.d.ts @prisma/client'ı gölgeliyor — PrismaClient repoda any, Role gerçek enum olduğu için string literal atanamıyor
+description: src/types/prisma-override.d.ts @prisma/client'ı gölgeliyor — PrismaClient repoda any, Role gerçek enum, withTenant<T> T'yi çıkaramaz ve Prisma ad alanı import edilemez
 metadata:
   type: project
-  updatedAt: 2026-09-06
+  updatedAt: 2026-09-07
 ---
 
 `src/types/prisma-override.d.ts` (commit c915bc4 ile geldi) `declare module '@prisma/client'`
@@ -46,4 +46,41 @@ Ayrıca **CI `prisma generate` koşmuyor** (`.github/workflows/ci.yml`: validate
 Doğru sıra: (1) yukarıdaki 3 hatayı düzelt, (2) CI'ya `prisma generate` adımı ekle,
 (3) sonra `prisma-override.d.ts`'i sil. Tek adımda kaldırma denemesi geri alınır.
 
-İlgili: [[fabrika-team-handover-cekirdek]], [[fabrika-prisma7-driver-adapter]], [[fabrika-local-dev-db]]
+## Üçüncü sonuç: `withTenant<T>` T'yi ÇIKARAMAZ (2026-09-07, ölçüldü)
+
+Override `PrismaClient`'ı `[key: string]: any` ile ilan ettiği için `TenantTx` üzerindeki
+`tx.membership.findMany(...)` dönüşü jenerik çıkarım için bir tutamak vermiyor:
+
+```ts
+// HER İKİSİ DE: TS18046 'rows' is of type 'unknown'  →  sonra TS7006 implicit any on `m`
+const rows = await withTenant(t, (tx) => tx.membership.findMany({ where: { tenantId: t } }));
+const rows = await withTenant(t, (tx) => tx.membership.findMany({ ..., include: { user: true } }));
+```
+
+Depodaki mevcut çağrı yerlerinin hepsi bunu **hedef değişkeni anotasyona bağlayarak** dolanıyor
+(`let dbOpportunities: OpportunityItem[] = await withTenant(...)` — `pipeline/page.tsx:20`,
+`settings/api-keys/page.tsx:40`, `tto/page.tsx:18`). Dönüşü doğrudan `.map()`'e verdiğin için
+anotasyon yeri yoksa **tip argümanını çağrıya ver**:
+
+```ts
+interface MembershipRow { userId: string; role: string; user: { name: string | null; email: string } }
+
+const rows = await withTenant<MembershipRow[]>(tenantId, (tx) =>
+  tx.membership.findMany({
+    select: { userId: true, role: true, user: { select: { name: true, email: true } } },
+    ...
+  })
+);
+```
+
+`include` yerine `select` kullan: satır şekli `MembershipRow`'a birebir sabitlenir, tip yalanı olmaz.
+
+`Prisma.MembershipGetPayload<...>` ile çözmeye ÇALIŞMA — override `Prisma` ad alanını export
+etmediği için `import { Prisma } from '@prisma/client'` → `TS2305: Module '"@prisma/client"' has
+no exported member 'Prisma'`. Üretilmiş client'ta o ad alanı var, ama override onu gölgeliyor.
+
+Ve `any` ile susturma: CLAUDE.md yasak listesinde ve `githooks/pre-commit` staged dosyada
+`@typescript-eslint/no-explicit-any`'yi hata olarak durduruyor.
+
+
+İlgili: [[fabrika-team-handover-cekirdek]], [[fabrika-prisma7-driver-adapter]], [[fabrika-local-dev-db]], [[fabrika-withtenant-set-config]]
