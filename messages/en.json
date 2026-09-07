@@ -1446,5 +1446,10 @@
     "empty_title": "No open calls for Turkey are on record right now.",
     "empty_hint": "This list is built only from calls in the database; no sample rows are shown. Entries appear here once the call-harvesting job has run.",
     "deadline_official": "Official time ({tz})"
+  },
+  "callsIndex": {
+    "title": "Fund Calls",
+    "subtitle": "Browse available fund calls by country",
+    "deadline": "Deadline"
   }
 }

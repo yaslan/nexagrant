@@ -1446,5 +1446,10 @@
     "empty_title": "Şu anda Türkiye’ye açık çağrı kaydı yok.",
     "empty_hint": "Bu liste yalnızca veri tabanındaki çağrılardan üretilir; örnek kayıt gösterilmez. Çağrı toplama işi çalıştığında burada görünür.",
     "deadline_official": "Resmî saat ({tz})"
+  },
+  "callsIndex": {
+    "title": "Fon Çağrıları",
+    "subtitle": "Ülkeye göre açık fon çağrılarına göz atın",
+    "deadline": "Son başvuru"
   }
 }
