@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   FileText, 
   Sparkles,
@@ -13,10 +13,12 @@ import {
   MessageSquare,
   Download,
   AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateMeetingBrief, savePostMeetingNotes } from '@/modules/m9/server/actions';
 import { generateIcsContent } from '@/lib/calendar';
+import { resolveMeetingSchedule } from '@/modules/m9/meeting-schedule';
 
 export interface BriefItem {
   id: string;
@@ -84,16 +86,35 @@ export function MeetingBriefsClient({
   const [nextMeetingDate, setNextMeetingDate] = useState('');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
 
+  // Inline error surfaces. `scheduleError` belongs to the date/time pair in the
+  // generator form; `icsError` is a page-level failure that used to be an
+  // `alert()` (dogfood findings P2-9 and P3-14).
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [icsError, setIcsError] = useState<string | null>(null);
+  const meetingDateRef = useRef<HTMLInputElement>(null);
+  const meetingTimeRef = useRef<HTMLInputElement>(null);
+
   const activeBrief = briefs.find((b) => b.id === activeBriefId) || briefs[0];
 
   const handleGenerateBrief = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!partnerName.trim()) return;
 
+    // A half-filled date/time pair is rejected here rather than silently
+    // dropped, and focus is moved to the field the user still has to fill.
+    const schedule = resolveMeetingSchedule(meetingDate, meetingTime);
+    if (!schedule.ok) {
+      setScheduleError(schedule.message);
+      const target = schedule.field === 'date' ? meetingDateRef : meetingTimeRef;
+      target.current?.focus();
+      return;
+    }
+    setScheduleError(null);
+
     setIsGenerating(true);
     try {
       const interactionId = `int-${Date.now()}`;
-      const meetingScheduledAt = meetingDate && meetingTime ? dateToUTC(meetingDate, meetingTime) : undefined;
+      const meetingScheduledAt = schedule.scheduledAt;
 
       const res = await generateMeetingBrief({
         interactionId,
@@ -127,10 +148,16 @@ export function MeetingBriefsClient({
   };
 
   const handleDownloadIcs = () => {
+    // Reported through the page alert region instead of a blocking,
+    // untranslatable `alert()` — which was also unreachable, because the button
+    // used to be hidden in exactly the case that raises this.
     if (!activeBrief?.meetingScheduledAt) {
-      alert('Toplantı tarihi belirlenmemiş');
+      setIcsError(
+        'Bu görüşme kaydında toplantı tarihi yok, bu yüzden takvim dosyası oluşturulamadı. Brief\'i toplantı tarihi ve saatiyle yeniden oluşturun.'
+      );
       return;
     }
+    setIcsError(null);
 
     const startDate = new Date(activeBrief.meetingScheduledAt);
     const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour
@@ -206,6 +233,24 @@ export function MeetingBriefsClient({
 
   return (
     <div className="space-y-6">
+      {icsError && (
+        <div
+          role="alert"
+          data-testid="m9-ics-error"
+          className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800 flex items-start gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>{icsError}</span>
+          <button
+            type="button"
+            onClick={() => setIcsError(null)}
+            className="ml-auto shrink-0 text-xs font-bold text-rose-700 hover:text-rose-900 underline underline-offset-2"
+          >
+            Kapat
+          </button>
+        </div>
+      )}
+
       {/* HEADER BANNER */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-xl border border-slate-800 relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
@@ -246,15 +291,18 @@ export function MeetingBriefsClient({
                   <Printer className="w-3.5 h-3.5" />
                   <span>Yazdır</span>
                 </button>
-                {activeBrief.meetingScheduledAt && (
-                  <button
-                    onClick={handleDownloadIcs}
-                    className="bg-green-700 hover:bg-green-800 border border-green-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Takvim (.ics)</span>
-                  </button>
-                )}
+                {/* Rendered for every brief, not only dated ones. It used to
+                    vanish when the brief had no meeting time, which left the
+                    user with no control and no reason; the guard in
+                    handleDownloadIcs now explains the reason instead. */}
+                <button
+                  onClick={handleDownloadIcs}
+                  data-testid="m9-ics-download"
+                  className="bg-green-700 hover:bg-green-800 border border-green-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Takvim (.ics)</span>
+                </button>
               </div>
             )}
           </div>
@@ -280,19 +328,55 @@ export function MeetingBriefsClient({
             />
             <div className="flex gap-2">
               <input
+                ref={meetingDateRef}
                 type="date"
                 value={meetingDate}
-                onChange={(e) => setMeetingDate(e.target.value)}
-                className="flex-1 border border-border rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground font-mono"
+                onChange={(e) => {
+                  setMeetingDate(e.target.value);
+                  setScheduleError(null);
+                }}
+                aria-label="Toplantı tarihi"
+                aria-invalid={scheduleError ? true : undefined}
+                aria-describedby={scheduleError ? 'm9-schedule-error' : undefined}
+                data-testid="m9-meeting-date"
+                className={`flex-1 border rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:outline-none bg-ground font-mono ${
+                  scheduleError
+                    ? 'border-rose-400 focus:ring-rose-500'
+                    : 'border-border focus:ring-blue-500'
+                }`}
               />
               <input
+                ref={meetingTimeRef}
                 type="time"
                 value={meetingTime}
-                onChange={(e) => setMeetingTime(e.target.value)}
-                className="flex-1 border border-border rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground font-mono"
+                onChange={(e) => {
+                  setMeetingTime(e.target.value);
+                  setScheduleError(null);
+                }}
+                aria-label="Toplantı saati"
+                aria-invalid={scheduleError ? true : undefined}
+                aria-describedby={scheduleError ? 'm9-schedule-error' : undefined}
+                data-testid="m9-meeting-time"
+                className={`flex-1 border rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:outline-none bg-ground font-mono ${
+                  scheduleError
+                    ? 'border-rose-400 focus:ring-rose-500'
+                    : 'border-border focus:ring-blue-500'
+                }`}
               />
             </div>
           </div>
+
+          {scheduleError && (
+            <p
+              id="m9-schedule-error"
+              role="alert"
+              data-testid="m9-schedule-error"
+              className="flex items-start gap-1.5 text-[11px] font-semibold text-rose-700"
+            >
+              <AlertCircle className="w-3.5 h-3.5 mt-px shrink-0" />
+              <span>{scheduleError}</span>
+            </p>
+          )}
 
           {meetingDate && meetingTime && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1">
