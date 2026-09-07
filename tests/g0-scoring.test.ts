@@ -331,7 +331,9 @@ describe('G0 Scoring — Canonical', () => {
     });
 
     it('handles NaN features gracefully', () => {
-      const badFeatures: any = {
+      // NaN is a number as far as the type is concerned; the point of the test
+      // is that the scorer does not propagate it.
+      const badFeatures: G0Features = {
         alignment: NaN,
         baseRate: 50,
         coordinatorHistory: 50,

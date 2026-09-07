@@ -27,7 +27,7 @@ describe('M7 TTO Accelerator Module', () => {
   beforeEach(() => {
     resetScope();
     vi.clearAllMocks();
-    h.ttoCreate.mockImplementation(async ({ data }: any) => ({
+    h.ttoCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'tto-123',
       tenantId: data.tenantId,
       title: data.title,

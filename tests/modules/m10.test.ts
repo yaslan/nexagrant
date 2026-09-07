@@ -40,7 +40,7 @@ describe('M10 Follow-up Documents Module', () => {
     vi.clearAllMocks();
     h.creditLedgerCreate.mockResolvedValue({ id: 'ledger-1' });
     h.opportunityFindFirst.mockResolvedValue({ title: 'Test Opp' });
-    h.followupDocCreate.mockImplementation(async ({ data }: any) => ({
+    h.followupDocCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'doc-101',
       tenantId: data.tenantId,
       opportunityId: data.opportunityId,
@@ -57,7 +57,7 @@ describe('M10 Follow-up Documents Module', () => {
       version: 1,
       contentUrl: 'https://storage.fabrika.app/docs/tenant-1/opp-10/nda_v1.pdf',
     });
-    h.followupDocUpdate.mockImplementation(async ({ data }: any) => ({
+    h.followupDocUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'doc-101',
       signedAt: data.signedAt ?? null,
       version: data.version || 1,

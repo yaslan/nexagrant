@@ -10,13 +10,25 @@ import {
 import { runCordisImport } from '../src/lib/k2-cordis/importer';
 import { generatePartnerProfiles } from '../src/lib/k2-cordis/partnerProfileJob';
 
-// In-memory state for testing
-const mockProjects = new Map<string, any>();
-const mockOrganizations = new Map<string, any>();
-const mockParticipations = new Map<string, any>();
-const mockImportRuns = new Map<string, any>();
-const mockProfiles = new Map<string, any>();
-const mockCoParts = new Map<string, any>();
+/**
+ * In-memory stand-in for the CORDIS tables. The fake client stores whatever
+ * `data` the importer sends and hands it back, so the rows are only ever as
+ * shaped as the code under test made them — hence `Record<string, unknown>`
+ * rather than the row types, which would assert a shape the test is meant to
+ * observe rather than impose.
+ */
+type MockRow = Record<string, unknown> & {
+  /** Present on the participation rows the lookups key on. */
+  projectId?: string;
+  organisationId?: string;
+};
+
+const mockProjects = new Map<string, MockRow>();
+const mockOrganizations = new Map<string, MockRow>();
+const mockParticipations = new Map<string, MockRow>();
+const mockImportRuns = new Map<string, MockRow>();
+const mockProfiles = new Map<string, MockRow>();
+const mockCoParts = new Map<string, MockRow>();
 
 vi.mock('../src/lib/db', () => ({
   prisma: {
@@ -61,7 +73,7 @@ vi.mock('../src/lib/db', () => ({
             .filter((pt) => pt.organisationId === org.organisationId)
             .map((pt) => ({
               ...pt,
-              project: mockProjects.get(pt.projectId) || { id: pt.projectId, framework: 'HORIZON', topics: [] },
+              project: mockProjects.get(pt.projectId ?? '') || { id: pt.projectId, framework: 'HORIZON', topics: [] },
             }));
           return { ...org, participations: parts };
         });
@@ -84,7 +96,7 @@ vi.mock('../src/lib/db', () => ({
       findMany: vi.fn().mockImplementation(async () => {
         return Array.from(mockParticipations.values()).map((pt) => ({
           ...pt,
-          project: mockProjects.get(pt.projectId) || { startDate: new Date(), endDate: new Date() },
+          project: mockProjects.get(pt.projectId ?? '') || { startDate: new Date(), endDate: new Date() },
         }));
       }),
     },

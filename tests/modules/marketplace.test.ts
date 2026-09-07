@@ -30,7 +30,7 @@ describe('Marketplace & Partner Intelligence API Module', () => {
   beforeEach(() => {
     resetScope();
     vi.clearAllMocks();
-    h.listingCreate.mockImplementation(async ({ data }: any) => ({
+    h.listingCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'list-123',
       tenantId: data.tenantId,
       kind: data.kind,
@@ -39,7 +39,7 @@ describe('Marketplace & Partner Intelligence API Module', () => {
       price: data.price,
       status: 'active',
     }));
-    h.apiKeyCreate.mockImplementation(async ({ data }: any) => ({
+    h.apiKeyCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'key-123',
       tenantId: data.tenantId,
       name: data.name,

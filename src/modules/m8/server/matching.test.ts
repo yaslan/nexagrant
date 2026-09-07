@@ -10,7 +10,7 @@ vi.mock('@/lib/db', () => ({
     organization: { findMany: vi.fn() },
     relationship: { findMany: vi.fn() },
     collab: { findMany: vi.fn() },
-    $transaction: vi.fn((cb) => cb({ seatCandidate: { deleteMany: vi.fn(), create: vi.fn((args: any) => args.data) } })),
+    $transaction: vi.fn((cb) => cb({ seatCandidate: { deleteMany: vi.fn(), create: vi.fn((args: { data: unknown }) => args.data) } })),
   }
 }));
 

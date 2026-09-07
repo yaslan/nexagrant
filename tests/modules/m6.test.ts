@@ -56,7 +56,9 @@ vi.mock('../../src/lib/tenant', () => ({
 
 vi.mock('../../src/lib/db', () => ({
   prisma: {},
-  withTenant: vi.fn(async (_tenantId: string, cb: (t: any) => Promise<any>) =>
+  // The fake client is built inline below; `as never` hands it to a callback
+  // typed against the real TenantTx without widening either side to `any`.
+  withTenant: vi.fn(async <T,>(_tenantId: string, cb: (t: never) => Promise<T>) =>
     cb({
       opportunity: { findFirst: h.opportunityFindFirst },
       creditLedger: { create: h.creditLedgerCreate },
@@ -67,7 +69,7 @@ vi.mock('../../src/lib/db', () => ({
       },
       score: { upsert: h.scoreUpsert, findMany: h.scoreFindMany },
       reviewer: { update: h.reviewerUpdate, count: h.reviewerCount },
-    })
+    } as never)
   ),
 }));
 

@@ -58,7 +58,9 @@ vi.mock('../../src/lib/tenant', () => ({
 
 vi.mock('../../src/lib/db', () => ({
   prisma: {},
-  withTenant: vi.fn(async (_tenantId: string, cb: (t: any) => Promise<any>) =>
+  // The fake client is built inline below; `as never` hands it to a callback
+  // typed against the real TenantTx without widening either side to `any`.
+  withTenant: vi.fn(async <T,>(_tenantId: string, cb: (t: never) => Promise<T>) =>
     cb({
       creditLedger: { create: h.creditLedgerCreate },
       meetingBrief: {
@@ -66,7 +68,7 @@ vi.mock('../../src/lib/db', () => ({
         create: h.meetingBriefCreate,
         update: h.meetingBriefUpdate,
       },
-    })
+    } as never)
   ),
 }));
 
@@ -83,14 +85,14 @@ describe('M9 Meeting Briefs Module', () => {
     vi.clearAllMocks();
     creditLedgerCreate.mockResolvedValue({ id: 'ledger-1' });
     meetingBriefFindFirst.mockResolvedValue(null);
-    meetingBriefCreate.mockImplementation(async ({ data }: any) => ({
+    meetingBriefCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'brief-123',
       tenantId: data.tenantId,
       interactionId: data.interactionId,
       content: data.content,
       createdAt: new Date(),
     }));
-    meetingBriefUpdate.mockImplementation(async ({ data }: any) => ({
+    meetingBriefUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'brief-123',
       content: data.content,
     }));

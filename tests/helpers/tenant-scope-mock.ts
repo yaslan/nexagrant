@@ -56,7 +56,8 @@ export function resetScope(): void {
 export function tenantModuleStub() {
   return {
     TenantScopeError: FakeTenantScopeError,
-    tenantScopeOf: (session: any) => (session?.tenantId ? scopeState.current : null),
+    tenantScopeOf: (session: { tenantId?: unknown } | null | undefined) =>
+      session?.tenantId ? scopeState.current : null,
     assertTenant: () => {
       if (!scopeState.current) throw new FakeTenantScopeError();
       return scopeState.current;
@@ -75,7 +76,14 @@ export function tenantModuleStub() {
 export function dbModuleStub(tx: unknown) {
   return {
     prisma: {},
-    withTenant: vi.fn(async (_tenantId: string, cb: (t: any) => Promise<any>) => cb(tx)),
-    withTenantOn: vi.fn(async (_client: unknown, _tenantId: string, cb: (t: any) => Promise<any>) => cb(tx)),
+    // The callback is typed against whatever fake client the test passed in, so
+    // `tx` reaches it unchanged and the action under test is checked as written.
+    withTenant: vi.fn(async <T,>(_tenantId: string, cb: (t: never) => Promise<T>) =>
+      cb(tx as never)
+    ),
+    withTenantOn: vi.fn(
+      async <T,>(_client: unknown, _tenantId: string, cb: (t: never) => Promise<T>) =>
+        cb(tx as never)
+    ),
   };
 }
