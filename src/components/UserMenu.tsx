@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { logoutAction } from '@/lib/actions/auth';
@@ -131,17 +131,30 @@ export default function UserMenu({
 
   const isTr = locale === 'tr';
 
-  const baseNotifications = isTr
-    ? [
-        { id: '1', title: 'Yeni Çağrı Eşleşmesi', desc: 'HORIZON-CL5-2026-D3 %92 uyumlu', time: '10 dk önce', unread: true },
-        { id: '2', title: 'Kanıt Belgesi Uyarısı', desc: 'SME Beyannamesi 15 gün içinde doluyor', time: '2 saat önce', unread: true },
-        { id: '3', title: 'Kredi Yüklemesi', desc: 'Aylık 500 AI Kredisi hesabınıza tanımlandı', time: '1 gün önce', unread: false },
-      ]
-    : [
-        { id: '1', title: 'New Call Match', desc: 'HORIZON-CL5-2026-D3 92% match', time: '10m ago', unread: true },
-        { id: '2', title: 'Evidence Vault Alert', desc: 'SME Declaration expires in 15 days', time: '2h ago', unread: true },
-        { id: '3', title: 'Credits Allocated', desc: 'Monthly 500 AI Credits added to account', time: '1d ago', unread: false },
-      ];
+  /**
+   * Memoised deliberately. This was a bare array literal, so it was a new array on every
+   * render; `syncNotifications` depends on it, and the effect below depends on
+   * `syncNotifications`. Every render therefore produced a new callback, re-ran the
+   * effect, and `setNotificationsList` rendered again — an unbounded render loop
+   * ("Maximum update depth exceeded") that ran on every page carrying the app shell and
+   * pegged the main thread, so a route whose RSC payload was still streaming stayed on
+   * the workspace loading skeleton. `isTr` is the only real input.
+   */
+  const baseNotifications = useMemo(
+    () =>
+      isTr
+        ? [
+            { id: '1', title: 'Yeni Çağrı Eşleşmesi', desc: 'HORIZON-CL5-2026-D3 %92 uyumlu', time: '10 dk önce', unread: true },
+            { id: '2', title: 'Kanıt Belgesi Uyarısı', desc: 'SME Beyannamesi 15 gün içinde doluyor', time: '2 saat önce', unread: true },
+            { id: '3', title: 'Kredi Yüklemesi', desc: 'Aylık 500 AI Kredisi hesabınıza tanımlandı', time: '1 gün önce', unread: false },
+          ]
+        : [
+            { id: '1', title: 'New Call Match', desc: 'HORIZON-CL5-2026-D3 92% match', time: '10m ago', unread: true },
+            { id: '2', title: 'Evidence Vault Alert', desc: 'SME Declaration expires in 15 days', time: '2h ago', unread: true },
+            { id: '3', title: 'Credits Allocated', desc: 'Monthly 500 AI Credits added to account', time: '1d ago', unread: false },
+          ],
+    [isTr],
+  );
 
   const storageKey = `fonbridge_read_notifs_${effectiveUserEmail || 'guest'}`;
 

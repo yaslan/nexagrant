@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
@@ -34,8 +35,22 @@ export default async function EvaluationPanelPage({
   const locked = await moduleGate('M6', locale);
   if (locked) return locked;
 
-  const proposal = await withTenant<SeatedProposal | null>(tenantId, (tx) =>
-    tx.proposal.findFirst({
+  // Two reads, because "this opportunity does not exist" and "this opportunity has no
+  // proposal yet" are different answers and used to collapse into one `notFound()`:
+  // an opportunity a user had just created, but not yet written a proposal for,
+  // answered 404 — telling them their opportunity was gone, which was untrue.
+  const found = await withTenant<{
+    opportunity: { id: string } | null;
+    proposal: SeatedProposal | null;
+  }>(tenantId, async (tx) => {
+    // Tenant-matched, not `findUnique`: the id is guessable and must not cross tenants.
+    const opportunity = await tx.opportunity.findFirst({
+      where: { id, tenantId },
+      select: { id: true },
+    });
+    if (!opportunity) return { opportunity: null, proposal: null };
+
+    const proposal = await tx.proposal.findFirst({
       // Matched on the opportunity, so a proposal id from another tenant cannot be
       // reached by guessing one.
       where: { opportunityId: id, tenantId },
@@ -51,10 +66,31 @@ export default async function EvaluationPanelPage({
           },
         },
       },
-    }),
-  );
+    });
+    return { opportunity, proposal };
+  });
 
-  if (!proposal) notFound();
+  // No such opportunity in this workspace — 404 is the honest answer here.
+  if (!found.opportunity) notFound();
+
+  const { proposal } = found;
+
+  // The opportunity is real but carries no proposal, so there is nothing to score.
+  // This renders an empty state rather than 404 or a skeleton that never resolves.
+  if (!proposal) {
+    const t = await getTranslations({ locale, namespace: 'm6' });
+    return (
+      <div className="max-w-4xl mx-auto p-6 space-y-6">
+        <h1 className="text-2xl font-bold tracking-tight">{t('panel.title')}</h1>
+        <p
+          className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300"
+          data-testid="m6-panel-no-proposal"
+        >
+          {t('panel.noProposal')}
+        </p>
+      </div>
+    );
+  }
 
   const seated = proposal.evaluations.find((e) => e.reviewers.length > 0);
 
