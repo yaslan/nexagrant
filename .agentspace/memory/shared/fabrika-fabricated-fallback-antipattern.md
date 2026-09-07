@@ -19,12 +19,32 @@ M6'da bulunan üç örnek (TASK-MTQ5ZF5ZRU5SM'de temizlendi):
 - `calibrateESR`: başka kiracının kaydında `{ calibration: 0 }` dönüyordu — gerçek,
   mükemmel kalibre bir sonuçtan ayırt edilemez.
 
-Aynı deseni hâlâ taşıyan yerler (temizlenmedi, kapsam dışıydı):
-`pipeline/[id]/consortium/page.tsx` → `DEMO_OPPORTUNITIES` sabiti.
+M9/M11'de bulunan iki örnek (TASK-MTQW5BVFW6CMT'de temizlendi, 2026-09-07):
+- `opportunities/[id]/briefs/page.tsx` ve `.../application/page.tsx`: **var olmayan ya da
+  başka kiracıya ait** bir fırsat id'siyle açıldığında sabit "Fraunhofer Institute" brifingi,
+  €412.500'lük konsorsiyum bütçesi ve `magicToken: 'partner-access-token-123'` render
+  ediyorlardı. Sorgudaki tenant kapsamı DOĞRUYDU — yalan olan ekrandı. İkisi de `notFound()`.
+- Aynı commit'te sorguyu yutan `try/catch`ler de kaldırıldı. **Dikkat:** `notFound()` bir
+  exception fırlatır; `try/catch` içinde bırakırsan sessizce yutulur ve sayfa yine fallback'e
+  düşer. Fallback'i söküyorsan `try/catch`i de sök.
+
+Aynı deseni hâlâ taşıyan yerler (temizlenmedi, kapsam dışıydı — TASK-MTQYXISOPUJ53):
+- `pipeline/[id]/consortium/page.tsx` → `DEMO_OPPORTUNITIES` sabiti.
+- **`api/v1/partners/route.ts` — ailenin en ağırı:** tablo boşsa Fraunhofer için
+  `projectCount: 1420`, `totalEuContributionEur: 840500000`, `networkCentralityScore: 0.98`
+  uyduruyor ve bunu **API'den servis ediyor**. `api/v1/partners/[pic]/route.ts` → `topCoAuthors`.
+- `application/client.tsx` (62, 71, 79) + `m11/types.ts` + `m11/ui/PartBCollaborativeEditor.tsx`:
+  fallback **istemcide** de var. Sunucu sayfasını temizlemek yetmiyor — `useState` başlangıç
+  değeri sabit bütçe/WP/"3 aktif yazar" tutuyor, `applicationPart` tablosu 0 satırken bile
+  ekran dolu görünüyor.
+- `dashboard/client.tsx` (~122) ülke dağılımı, `notifications/page.tsx` (44, 82) bildirim listesi.
 
 Kural: veri yoksa **boş durum ya da hata** göster; asla uydurma rakam. Sessizce yutulan
 `console.warn` + normal return da aynı sınıfta — form olmayan bir kaydı "başarılı" gösterir.
 Fabrika'da bir modüle dokunurken bu deseni ara ve raporunda belirt.
+
+Doğrulama tuzağı: temizlik yaptıktan sonra "404 geliyor" demek için ekran görüntüsü YETMEZ — Fabrika'da
+404 gövdesi HTTP 200 ile dönüyor, bkz. [[fabrika-notfound-returns-http-200]].
 
 Aynı ailenin bilinen bir örneği: [[fabrika-dashboard-hardcoded-kpi-fallback]] (KPI panosu
 gerçek '0' geldiğinde sabit demo oranlarına düşüyor). Bu not onu iptal etmiyor, genelliyor.

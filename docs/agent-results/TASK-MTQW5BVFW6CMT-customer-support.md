@@ -170,9 +170,11 @@ Geçici script yazılmadı; sorgular `node -e` ile tek seferlik çalıştırıld
 ## 5. Açık sorular
 
 1. **Workspace kapsamı eklenmeli mi?** Kardeş `matching/page.tsx` fırsatı `{ id, tenantId, workspace: { slug } }`
-   ile arıyor; benim iki sayfam `{ id, tenantId }` ile. Güvenlik açısından belirleyici olan `tenantId` ve o
-   yerinde — ama aynı kiracının B çalışma alanındaki bir fırsat, A çalışma alanının URL'iyle açılabiliyor.
-   Kapsam dışı gördüğüm için değiştirmedim; istenirse tek satırlık ek.
+   ile arıyor; benim iki sayfam `{ id, tenantId }` ile. Bu, uygulamada zaten bilinen ve **kasıtlı** bir durum:
+   `requireTenantPage` yalnız locale alır, kiracıyı oturumdan çözer, yoldaki `[workspace]` segmenti hiç
+   okunmaz (takım hafızası: `fabrika-workspace-url-segment-is-decorative`). Güvenlik açısından belirleyici
+   olan `tenantId` ve o yerinde. Yani yeni bir açık değil — yalnızca iki sayfanın kardeşleriyle tutarsız
+   olduğu bir üslup farkı. Kapsam dışı gördüğüm için değiştirmedim; tutarlılık istenirse tek satırlık ek.
 2. `MeetingBrief` tablosunda `opportunityId` kolonu **yok**, bu yüzden brifingler yalnız kiracıyla filtrelenebiliyor:
    aynı kiracının A fırsatının sayfasında B fırsatının brifingleri de listeleniyor. Şema değişikliği gerektirdiği
    için bu görevde çözülemez — ayrı bir karar.
