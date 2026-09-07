@@ -15,7 +15,8 @@ Fabrika'da oturum gerektiren bir sayfayı Playwright ile gerçek tıklamayla do�
    `beforeAll`/`afterAll`'da import eder. `M6_E2E_KEEP=1` ile rollback atlanır →
    yazılan satırları elle sorgulayıp rapora kanıt koyabilirsin.
    Tuzaklar: `Membership` bileşik anahtarı `tenantId_userId` (ters değil);
-   `Opportunity.workspaceId` zorunlu.
+   `Opportunity.workspaceId` zorunlu; modül sayfası için `ModuleState=ON` TEK BAŞINA
+   YETMEZ — `Subscription` da gerekir, bkz. [[fabrika-module-gate-is-two-locks]].
 
 2. **Login**: Credentials sağlayıcısı sadece e-postayla giriyor.
    `/tr/giris?callbackUrl=<hedef>` → `input[type="email"]` doldur →

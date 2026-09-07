@@ -56,6 +56,17 @@ export async function seed() {
     },
   });
 
+  // The gate is two locks, not one: the plan has to grant M6 *and* the tenant has to
+  // have switched it on. Without a subscription row the tenant falls back to the
+  // entry tier, and the panel page answers "Evaluator Lens modülü aboneliğinizin
+  // kapsamı dışında" instead of rendering the form. `pro` is the cheapest plan that
+  // grants M6 (src/lib/billing/catalog.ts PLAN_GRANTS).
+  await prisma.subscription.upsert({
+    where: { tenantId: M6_E2E.tenantId },
+    update: { planId: 'pro', status: 'ACTIVE' },
+    create: { tenantId: M6_E2E.tenantId, planId: 'pro', status: 'ACTIVE' },
+  });
+
   // The M6 pages are behind the module gate (src/lib/modules/guard.tsx), so the
   // fixture tenant has to be granted the module the same way a real tenant is —
   // otherwise the test signs in and lands on the "module is closed" screen.
@@ -151,6 +162,7 @@ export async function rollback() {
   await prisma.proposal.deleteMany({ where: { id: M6_E2E.proposalId } });
   await prisma.opportunity.deleteMany({ where: { id: M6_E2E.opportunityId } });
   await prisma.moduleState.deleteMany({ where: { tenantId: M6_E2E.tenantId } });
+  await prisma.subscription.deleteMany({ where: { tenantId: M6_E2E.tenantId } });
   await prisma.membership.deleteMany({ where: { userId: M6_E2E.userId, tenantId: M6_E2E.tenantId } });
   await prisma.user.deleteMany({ where: { id: M6_E2E.userId } });
   await prisma.workspace.deleteMany({ where: { id: M6_E2E.workspaceId } });
