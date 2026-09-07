@@ -45,6 +45,58 @@ export interface CollaboratorPresence {
   lastSeenAt: string;
 }
 
+/** One partner's line in a lump-sum budget table (Part A). */
+export interface BudgetLine {
+  partnerName: string;
+  personMonths: number;
+  countryCoefficient: number;
+  subcontractingCost: number;
+  travelCost: number;
+  requestedTotal: number;
+}
+
+/** One work package in the implementation plan (Part A). */
+export interface WorkPackageItem {
+  code: string;
+  title: string;
+  leadPartner: string;
+  startMonth: number;
+  endMonth: number;
+  deliverables: string[];
+}
+
+/**
+ * Shape of `ApplicationPart.content`, the Json column that holds the whole
+ * editable document. Every field is optional: a freshly created part stores
+ * `{}`, and Part A and Part B populate disjoint halves of this.
+ */
+export interface PartContent {
+  sections?: PartBSectionItem[];
+  revisions?: SectionRevisionItem[];
+  comments?: SectionCommentItem[];
+  presence?: CollaboratorPresence[];
+  budget?: BudgetLine[];
+  workPackages?: WorkPackageItem[];
+}
+
+/**
+ * An ApplicationPart row as this module reads it.
+ *
+ * `prisma generate` does not run in this repo (see src/types/prisma-override.d.ts),
+ * so query results arrive untyped and the shape has to be stated at the call
+ * site — that is what `withTenant<T>` is for.
+ */
+export interface ApplicationPartRow {
+  id: string;
+  tenantId: string;
+  opportunityId: string;
+  part: string;
+  content: PartContent | null;
+  magicToken: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export const DEFAULT_PART_B_SECTIONS: PartBSectionItem[] = [
   {
     key: '1.1_objectives',

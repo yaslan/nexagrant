@@ -6,7 +6,9 @@ import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
 
 import { 
+  ApplicationPartRow,
   PartBSectionItem, 
+  PartContent,
   SectionRevisionItem, 
   SectionCommentItem, 
   CollaboratorPresence, 
@@ -38,8 +40,8 @@ export type {
  */
 
 /** Loads a part the session tenant owns, or null. */
-async function loadPart(tenantId: string, partId: string): Promise<any> {
-  return withTenant<any>(tenantId, (tx) =>
+async function loadPart(tenantId: string, partId: string): Promise<ApplicationPartRow | null> {
+  return withTenant<ApplicationPartRow | null>(tenantId, (tx) =>
     tx.applicationPart.findFirst({ where: { id: partId, tenantId } })
   );
 }
@@ -56,7 +58,7 @@ export async function createApplicationPart(opportunityId: string, part: string)
   const { tenantId } = await requireTenantAction();
   const token = crypto.randomBytes(32).toString('hex');
 
-  const createdPart = await withTenant<any>(tenantId, async (tx) => {
+  const createdPart = await withTenant<ApplicationPartRow | null>(tenantId, async (tx) => {
     // The opportunity must belong to this tenant; its id is guessable.
     const opp = await tx.opportunity.findFirst({
       where: { id: opportunityId, tenantId },
@@ -99,7 +101,7 @@ export async function getPartBData(partId: string) {
   try {
     const part = await loadPart(tenantId, partId);
     if (part && part.content) {
-      const content = part.content as any;
+      const content: PartContent = part.content || {};
       if (!content.sections || content.sections.length === 0) {
         content.sections = DEFAULT_PART_B_SECTIONS;
       }
@@ -139,7 +141,7 @@ export async function acquireSectionLock(
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: any = part.content || {};
+      const content: PartContent = part.content || {};
       const sections: PartBSectionItem[] = content.sections || [...DEFAULT_PART_B_SECTIONS];
       
       const targetSec = sections.find((s) => s.key === sectionKey);
@@ -178,7 +180,7 @@ export async function releaseSectionLock(partId: string, sectionKey: string, use
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: any = part.content || {};
+      const content: PartContent = part.content || {};
       const sections: PartBSectionItem[] = content.sections || [];
       const targetSec = sections.find((s) => s.key === sectionKey);
       if (targetSec && (targetSec.lockedBy === userId || !targetSec.lockedBy)) {
@@ -213,7 +215,7 @@ export async function updateSectionContent(
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: any = part.content || {};
+      const content: PartContent = part.content || {};
       const sections: PartBSectionItem[] = content.sections || [...DEFAULT_PART_B_SECTIONS];
       const revisions: SectionRevisionItem[] = content.revisions || [];
 
@@ -275,7 +277,7 @@ export async function addSectionComment(
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: any = part.content || {};
+      const content: PartContent = part.content || {};
       const comments: SectionCommentItem[] = content.comments || [];
       content.comments = [newComment, ...comments];
 
@@ -294,7 +296,7 @@ export async function resolveSectionComment(partId: string, sectionKey: string, 
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: any = part.content || {};
+      const content: PartContent = part.content || {};
       const comments: SectionCommentItem[] = content.comments || [];
       const target = comments.find((c) => c.id === commentId);
       if (target) {
@@ -317,7 +319,7 @@ export async function restoreSectionRevision(partId: string, sectionKey: string,
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: any = part.content || {};
+      const content: PartContent = part.content || {};
       const sections: PartBSectionItem[] = content.sections || [];
       const revisions: SectionRevisionItem[] = content.revisions || [];
 
@@ -367,7 +369,7 @@ export async function updatePresenceHeartbeat(
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: any = part.content || {};
+      const content: PartContent = part.content || {};
       let presenceList: CollaboratorPresence[] = content.presence || [];
       
       // Filter out stale (>90s) and current user
@@ -441,11 +443,11 @@ export async function addBudgetLine(
   const { tenantId } = await requireTenantAction();
   const requestedTotal = await calculateLumpSumBudget(pm, countryCoefficient, subcontracting, travel);
 
-  let updatedPart: any = null;
+  let updatedPart: ApplicationPartRow | null = null;
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: any = part.content || { budget: [] };
+      const content: PartContent = part.content || { budget: [] };
       content.budget = content.budget || [];
       content.budget.push({
         partnerName,
@@ -483,11 +485,11 @@ export async function addWorkPackage(
 ) {
   const { tenantId } = await requireTenantAction();
 
-  let updatedPart: any = null;
+  let updatedPart: ApplicationPartRow | null = null;
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: any = part.content || { workPackages: [] };
+      const content: PartContent = part.content || { workPackages: [] };
       content.workPackages = content.workPackages || [];
       content.workPackages.push({
         code: wpData.code,
@@ -546,7 +548,7 @@ export async function addBudgetLineByToken(
     return { success: false };
   }
 
-  const content: any = part.content || { budget: [] };
+  const content: PartContent = part.content || { budget: [] };
   content.budget = content.budget || [];
   content.budget.push({
     partnerName,
