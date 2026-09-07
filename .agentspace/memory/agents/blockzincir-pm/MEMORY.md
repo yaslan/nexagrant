@@ -29,3 +29,6 @@
 - [fabrika-stripe-renewal-price-mechanics](fabrika-stripe-renewal-price-mechanics.md) — Fabrika'da bir Stripe aboneliğinin yenileme tutarını kim/ne zaman belirliyor — checkout'ta bir kez sabitlenir, sonrası Stripe'ın kendi motoru; fiyat kilidi mutlak tutarı değil yüzdeyi dondurur
 
 - [fabrika-stale-board-status-check-git-first](fabrika-stale-board-status-check-git-first.md) — Görev tekrar önüne gelirse önce git log + önceki -N.md raporunu kontrol et; board in_progress diyor diye kör kör yeniden iş yapma
+
+- [fabrika-billing-panel-copy-has-three-surfaces](fabrika-billing-panel-copy-has-three-surfaces.md) — messages/*.json'da plan kartı metni pricing/admin/settings olmak üzere üç bağımsız yerde elle yazılı; biri düzeltilse diğerleri sessizce eski kalabilir
+- [fabrika-seed-modulecatalog-requires-is-stale-copy](fabrika-seed-modulecatalog-requires-is-stale-copy.md) — prisma/seed.ts'teki ModuleCatalog.requires alanı gerçek manifestodan bağımsız elle yazılmış bir kopya — gate mantığı hep manifestoyu okur
