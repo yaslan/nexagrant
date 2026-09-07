@@ -447,3 +447,14 @@ export function plansGrantingModule(moduleId: string): PlanId[] {
     (grant) => grant.purchasable && grant.moduleIds.includes(moduleId)
   ).map((grant) => grant.planId as PlanId);
 }
+
+/**
+ * The same grant, as the names a customer recognises ("Pro", "Ultra") rather
+ * than the ids the code speaks in. Read-only helper for the module gate's
+ * refusal copy: telling somebody "upgrade to `ultra`" leaks an internal id, and
+ * having the gate hand-map ids to names would put a second copy of the ladder
+ * outside this file.
+ */
+export function planNamesGrantingModule(moduleId: string): string[] {
+  return plansGrantingModule(moduleId).map((planId) => grantsFor(planId)?.name ?? planId);
+}

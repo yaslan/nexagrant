@@ -92,7 +92,14 @@ export type ModuleDenyReason =
   | 'NO_TENANT'
   | 'MODULE_OFF'
   | 'DEV_INTERNAL_ONLY'
-  | 'PILOT_MANAGERS_ONLY';
+  | 'PILOT_MANAGERS_ONLY'
+  /**
+   * The tenant's plan does not include the module — CLAUDE.md §4: "a module may
+   * be `on` and still be unusable when it is outside the plan". Distinct from
+   * `MODULE_OFF`, which says an administrator closed something the tenant owns
+   * and can reopen; this one is answered at checkout, not in settings.
+   */
+  | 'PLAN_UPGRADE_REQUIRED';
 
 export interface ModuleAccessDecision {
   allowed: boolean;

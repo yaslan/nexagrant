@@ -18,8 +18,12 @@ import type { ModuleId } from '@/lib/modules/types';
  * CLAUDE.md §3 forbids.
  *
  * A refused page renders an explanation rather than throwing: a closed module is a
- * normal product state (this tenant is not in the pilot), not an error, and `notFound()`
- * would tell the user their opportunity does not exist, which is untrue and confusing.
+ * normal product state (this tenant is not in the pilot, or its plan does not include
+ * the module), not an error, and `notFound()` would tell the user their opportunity
+ * does not exist, which is untrue and confusing.
+ *
+ * Every sentence here comes from the `ModuleGate` namespace in messages/tr.json and
+ * messages/en.json (CLAUDE.md §8); the server sends a code, never a sentence.
  */
 export async function moduleGate(
   moduleId: ModuleId,
@@ -46,7 +50,13 @@ export async function moduleGate(
         {t('title')}
       </h1>
       <p className="mt-3 text-slate-600 dark:text-slate-400">
-        {t(`reason.${access.reason ?? 'MODULE_OFF'}`, { module: manifest?.name ?? moduleId })}
+        {t(`reason.${access.reason ?? 'MODULE_OFF'}`, {
+          module: manifest?.name ?? moduleId,
+          // Only `PLAN_UPGRADE_REQUIRED` renders it; the other reasons ignore the
+          // extra parameter. An empty list would leave a dangling "included in ."
+          // sentence, so a module no plan sells falls back to the em dash.
+          plans: access.requiredPlans?.length ? access.requiredPlans.join(', ') : '—',
+        })}
       </p>
       <p className="mt-6 text-sm text-slate-500 dark:text-slate-500">{t('askAdmin')}</p>
     </section>
