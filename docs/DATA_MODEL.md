@@ -104,6 +104,31 @@ Migration: `prisma/migrations/add-m6-evaluator-lens.sql` (idempotent, additive) 
 geri alma: `prisma/migrations/add-m6-evaluator-lens.down.sql` (yıkıcı, açık onay ister).
 TypeScript sözleşmeleri: `src/modules/m6/types.ts`.
 
+### 8.2 M9 Takvim Entegrasyonu — Google Calendar & Outlook Senkronizasyonu
+
+`CalendarConnection` — kiracıya özel takvim sağlayıcısı bağlantıları.
+
+| Alan | Not |
+|---|---|
+| `tenantId`, `userId`, `provider` | Composite unique key: bir kullanıcı, kiracı başına bir sağlayıcı (google, outlook, ics). |
+| `externalId` | Sağlayıcı tarafı ID (Google: calendar ID; Outlook: mailbox addresi). |
+| `accessToken`, `refreshToken` | OAuth tokenleri; **TODO:** `CALENDAR_ENCRYPTION_KEY` ile şifre (prod'da zorunlu). |
+| `tokenExpiresAt` | Token refresh gerekli mi kontrolü. |
+| `isConnected`, `lastSyncAt` | Bağlantı durumu ve son senkronizasyon. |
+
+Kiracıya özeldir (`tenantId` + `tenant_isolation` RLS politikası).
+
+**Senkronizasyon:** `MeetingBrief` oluşturulup/güncellenirken, eğer `meetingScheduledAt` belirlenmişse,
+`syncMeetingBriefToCalendar()` (`src/lib/calendar/sync.ts`) kiracı kullanıcısının tüm etkin takvim
+bağlantılarına olayı kopyalar. Hata (OAuth token geçerliliği vs.) `SystemAlert` üretiyor, iş kırılmıyor.
+
+**Sağlayıcı mimarisi:** `CalendarProvider` arayüzü (`src/lib/calendar/provider.ts`) — connect/disconnect/createEvent/updateEvent/deleteEvent.
+Uygulamalar: `IcsProvider` (mevcut generateIcsContent'i wrap), `GoogleCalendarProvider` ve `OutlookCalendarProvider` (mock; OAuth env anahtarları olmadığında).
+
+**Migration:** `prisma/migrations/add-calendar-connections/migration.sql` (idempotent, additive) — 
+migration reset gerekiyor (Prisma güvenlik onayı: kullanıcı `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`'ı
+onaylamalı).
+
 ---
 
 ## 9. Beta geri bildirimi (E11.2)
