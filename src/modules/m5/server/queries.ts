@@ -1,13 +1,34 @@
 import { prisma, withTenant } from '@/lib/db';
 import type { PrismaClient } from '@prisma/client';
 
+import {
+  averageG0ToG2Days,
+  averageLensScore,
+  hitRate,
+  personDaysPerProposal,
+  type MetricValue,
+} from './metrics';
+
+export type { MetricValue } from './metrics';
+
 export interface KpiMetrics {
+  /** A count. Zero is a real answer here: "no opportunities in this range" is measured. */
   totalOffers: number;
-  successRate: number; // 0-100
-  averageScore: number; // 0-100
-  personDays: number;
-  g0ToG2Days: number;
+  /** A count. Zero is a real answer here. */
   activeModules: number;
+  /** 0-100. Unmeasured until an opportunity clears G0 scoring. */
+  successRate: MetricValue;
+  /** Mean of the three lens criteria. Unmeasured until a reader completes one. */
+  averageScore: MetricValue;
+  /** Person-days per proposal. Unmeasured until a proposal exists. */
+  personDays: MetricValue;
+  /** Unmeasured until one opportunity has both a G0 and a G2 decision. */
+  g0ToG2Days: MetricValue;
+  /**
+   * Tenant-wide and range-independent. Separates "new workspace, nothing to show yet"
+   * from "this date range happens to be quiet" — two different things to say.
+   */
+  hasAnyOpportunity: boolean;
 }
 
 export async function getKpiMetrics(
@@ -18,6 +39,7 @@ export async function getKpiMetrics(
   return withTenant(tenantId, async (tx) => {
     const [
       totalOffers,
+      opportunitiesEver,
       submittedProposals,
       g0ScoredOpportunities,
       totalProposals,
@@ -33,6 +55,10 @@ export async function getKpiMetrics(
           createdAt: { gte: from, lte: to },
         },
       }),
+
+      // 1b. Range-independent: is this workspace new, or just quiet in this range?
+      // The two deserve different copy, and only a tenant-wide count can tell them apart.
+      tx.opportunity.count({ where: { tenantId } }),
 
       // 2. Hit rate numerator: proposals actually submitted
       tx.proposal.count({
@@ -64,10 +90,16 @@ export async function getKpiMetrics(
         },
       }),
 
-      // 5. Average evaluation score (excellence, impact, implementation)
+      // 5. Average evaluation score (excellence, impact, implementation).
+      // Only rows that actually carry lens marks. `readerType: PANEL` rows keep their
+      // marks in Reviewer/Score on a 1-5 scale and leave these three columns at their
+      // schema default of 0 forever; a `draft` row has not been filled in at all.
+      // Averaging either in reports a 0 nobody measured.
       tx.evaluation.findMany({
         where: {
           tenantId,
+          status: 'completed',
+          readerType: { not: 'PANEL' },
           createdAt: { gte: from, lte: to },
         },
         select: {
@@ -112,71 +144,21 @@ export async function getKpiMetrics(
       }),
     ]);
 
-    // Hit rate ("isabet oranı"): submitted proposals over G0-scored opportunities —
-    // how many opportunities that cleared G0 scoring actually became a submission.
-    // Guard the denominator, not totalProposals, since that's what's actually divided by.
-    const successRate =
-      g0ScoredOpportunities > 0
-        ? (submittedProposals / g0ScoredOpportunities) * 100
-        : 0;
-
-    // Calculate average score: (excellence + impact + implementation) / 3
-    let averageScore = 0;
-    if (evaluations.length > 0) {
-      const sumScores = evaluations.reduce((acc: number, ev: { excellence: number; impact: number; implementation: number }) => {
-        const avgEval =
-          (ev.excellence + ev.impact + ev.implementation) / 3;
-        return acc + avgEval;
-      }, 0);
-      averageScore = sumScores / evaluations.length;
-    }
-
-    // Person-days PER PROPOSAL (docs/ROADMAP.md: "kişi-gün/teklif"). Reporting the
-    // raw total here would overstate the effort each proposal costs.
-    const totalPersonDays = (efforts._sum.hours ?? 0) / 8;
-    const personDays =
-      totalProposals > 0
-        ? Math.round((totalPersonDays / totalProposals) * 100) / 100
-        : 0;
-
-    // Calculate G0→G2 days (naive: average time between G0 and G2 decisions)
-    let g0ToG2Days = 0;
-    if (g0ToG2Times.length > 1) {
-      const g0Map = new Map<string, Date>();
-      const g2Map = new Map<string, Date>();
-
-      g0ToG2Times.forEach((gd: { opportunityId: string; gate: string; decidedAt: Date }) => {
-        if (gd.gate === 'G0') {
-          g0Map.set(gd.opportunityId, gd.decidedAt);
-        } else if (gd.gate === 'G2') {
-          g2Map.set(gd.opportunityId, gd.decidedAt);
-        }
-      });
-
-      let totalDays = 0;
-      let count = 0;
-      g0Map.forEach((g0Date, oppId) => {
-        const g2Date = g2Map.get(oppId);
-        if (g2Date) {
-          const days = Math.max(
-            0,
-            (g2Date.getTime() - g0Date.getTime()) / (1000 * 60 * 60 * 24)
-          );
-          totalDays += days;
-          count++;
-        }
-      });
-
-      g0ToG2Days = count > 0 ? Math.round(totalDays / count) : 0;
-    }
+    // Every figure below is derived by a pure function in ./metrics so the
+    // absence-vs-zero rule is unit-testable without a database.
+    const successRate = hitRate(submittedProposals, g0ScoredOpportunities);
+    const averageScore = averageLensScore(evaluations);
+    const personDays = personDaysPerProposal(efforts._sum.hours ?? 0, totalProposals);
+    const g0ToG2Days = averageG0ToG2Days(g0ToG2Times);
 
     return {
       totalOffers,
-      successRate: Math.round(successRate * 100) / 100,
-      averageScore: Math.round(averageScore * 100) / 100,
+      activeModules,
+      successRate,
+      averageScore,
       personDays,
       g0ToG2Days,
-      activeModules,
+      hasAnyOpportunity: opportunitiesEver > 0,
     };
   });
 }

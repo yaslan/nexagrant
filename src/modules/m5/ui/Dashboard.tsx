@@ -15,7 +15,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import type { KpiMetrics } from '../server/queries';
+import { getWorkspaceRoute } from '@/lib/routes';
+import type { KpiMetrics, MetricValue } from '../server/queries';
 
 export interface DashboardProps {
   metrics: KpiMetrics;
@@ -72,6 +73,45 @@ export function Dashboard({ metrics, trendData, from, to }: DashboardProps) {
   const decimal = (value: number) =>
     value.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
+  /**
+   * One KPI card, honest about absence.
+   *
+   * An unmeasured metric prints a readable "no data" instead of a formatted 0, drops the
+   * unit (there is no "0.0 %" to qualify) and falls back to the neutral variant — the
+   * green "success" frame around a missing hit rate would read as a good result.
+   * The description is swapped for the reason, so the card says *why* it is empty and
+   * what would fill it, rather than leaving the reader to guess.
+   */
+  const metricCard = (opts: {
+    title: string;
+    metric: MetricValue;
+    unit: string;
+    description: string;
+    emptyDescription: string;
+    variant?: 'default' | 'success' | 'warning';
+  }) =>
+    opts.metric.measured ? (
+      <KpiCard
+        title={opts.title}
+        value={decimal(opts.metric.value)}
+        unit={opts.unit}
+        description={opts.description}
+        variant={opts.variant ?? 'default'}
+      />
+    ) : (
+      <KpiCard
+        title={opts.title}
+        value={t('noData')}
+        description={opts.emptyDescription}
+        variant="default"
+        unmeasured
+      />
+    );
+
+  // The workspace slug sits between the locale and the page segment: /tr/<workspace>/panel.
+  const workspace = pathname.split('/')[2] ?? 'default';
+  const pipelineHref = getWorkspaceRoute('pipeline', locale, workspace);
+
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'overview', label: t('tabOverview') },
     { id: 'trends', label: t('tabTrends') },
@@ -121,50 +161,81 @@ export function Dashboard({ metrics, trendData, from, to }: DashboardProps) {
           id="dashboard-panel-overview"
           role="tabpanel"
           aria-labelledby="dashboard-tab-overview"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
         >
-          <KpiCard
-            title={t('totalProposals')}
-            value={count(metrics.totalOffers)}
-            unit={t('unitProjects')}
-            description={t('descTotalProposals')}
-            variant="default"
-          />
-          <KpiCard
-            title={t('hitRate')}
-            value={decimal(metrics.successRate)}
-            unit="%"
-            description={t('descHitRate')}
-            variant="success"
-          />
-          <KpiCard
-            title={t('averageScore')}
-            value={decimal(metrics.averageScore)}
-            unit={t('unitScore')}
-            description={t('descAverageScore')}
-            variant="default"
-          />
-          <KpiCard
-            title={t('personDays')}
-            value={decimal(metrics.personDays)}
-            unit={t('unitDays')}
-            description={t('descPersonDays')}
-            variant="default"
-          />
-          <KpiCard
-            title={t('avgDaysG2')}
-            value={decimal(metrics.g0ToG2Days)}
-            unit={t('unitDays')}
-            description={t('descAvgDaysG2')}
-            variant="warning"
-          />
-          <KpiCard
-            title={t('activeModules')}
-            value={count(metrics.activeModules)}
-            unit={t('unitModules')}
-            description={t('descActiveModules')}
-            variant="success"
-          />
+          {/* A workspace with no opportunities at all has no KPIs to round down to zero.
+              Six cards reading "0,0 %" tell a tenant on day one that its hit rate is
+              zero, which is a verdict on work it has not started. Say that instead, and
+              point at the one action that starts producing the numbers. */}
+          {!metrics.hasAnyOpportunity ? (
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center max-w-xl mx-auto">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('emptyTitle')}
+              </h2>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{t('emptyBody')}</p>
+              <a
+                href={pipelineHref}
+                className="mt-6 inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium text-sm"
+              >
+                {t('emptyCta')}
+              </a>
+            </div>
+          ) : metrics.totalOffers === 0 ? (
+            /* Opportunities exist, this range just has none — a different sentence, and
+               one the reader can act on without leaving the page. */
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center max-w-xl mx-auto">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('emptyRangeTitle')}
+              </h2>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{t('emptyRangeBody')}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <KpiCard
+                title={t('totalProposals')}
+                value={count(metrics.totalOffers)}
+                unit={t('unitProjects')}
+                description={t('descTotalProposals')}
+                variant="default"
+              />
+              {metricCard({
+                title: t('hitRate'),
+                metric: metrics.successRate,
+                unit: '%',
+                description: t('descHitRate'),
+                emptyDescription: t('emptyHitRate'),
+                variant: 'success',
+              })}
+              {metricCard({
+                title: t('averageScore'),
+                metric: metrics.averageScore,
+                unit: t('unitScore'),
+                description: t('descAverageScore'),
+                emptyDescription: t('emptyAverageScore'),
+              })}
+              {metricCard({
+                title: t('personDays'),
+                metric: metrics.personDays,
+                unit: t('unitDays'),
+                description: t('descPersonDays'),
+                emptyDescription: t('emptyPersonDays'),
+              })}
+              {metricCard({
+                title: t('avgDaysG2'),
+                metric: metrics.g0ToG2Days,
+                unit: t('unitDays'),
+                description: t('descAvgDaysG2'),
+                emptyDescription: t('emptyAvgDaysG2'),
+                variant: 'warning',
+              })}
+              <KpiCard
+                title={t('activeModules')}
+                value={count(metrics.activeModules)}
+                unit={t('unitModules')}
+                description={t('descActiveModules')}
+                variant="success"
+              />
+            </div>
+          )}
         </div>
       )}
 

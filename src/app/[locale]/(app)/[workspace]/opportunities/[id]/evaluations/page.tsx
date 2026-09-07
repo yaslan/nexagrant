@@ -6,6 +6,7 @@ import { requireTenantPage } from '@/lib/tenant';
 import { moduleGate } from '@/lib/modules/guard';
 
 import { toEvaluationNotes } from '@/modules/m6/types';
+import { lensMarks, readerTypeOf } from '@/modules/m6/lens-scores';
 
 import { EvaluationsClient } from './client';
 
@@ -17,6 +18,7 @@ import { EvaluationsClient } from './client';
 type EvaluationRow = {
   id: string;
   readerType: string;
+  status: string;
   excellence: number;
   impact: number;
   implementation: number;
@@ -65,6 +67,10 @@ export default async function EvaluationsPage({
           select: {
             id: true,
             readerType: true,
+            // Read alongside the three mark columns, never instead of them: those
+            // columns default to 0, so `status` is the only thing that says whether
+            // anyone put a number in them. See @/modules/m6/lens-scores.
+            status: true,
             excellence: true,
             impact: true,
             implementation: true,
@@ -86,10 +92,13 @@ export default async function EvaluationsPage({
         opportunityTitle={opp.title}
         evaluations={opp.evaluations.map((e: EvaluationRow) => ({
           id: e.id,
-          readerType: e.readerType === 'AI' ? 'AI' : 'HUMAN',
-          excellence: e.excellence,
-          impact: e.impact,
-          implementation: e.implementation,
+          // The real reader type crosses the boundary. Collapsing PANEL into HUMAN here
+          // is what let a panel row — whose marks live in Reviewer/Score — be rendered
+          // as a human reader scoring 0/0/0.
+          readerType: readerTypeOf(e.readerType),
+          // `null` when nothing has been scored. The client must not turn this back
+          // into 0: absence is the state, not a value.
+          scores: lensMarks(e),
           weaknesses: toEvaluationNotes(e.weaknesses),
           calibration: e.calibration,
           createdAt: e.createdAt.toISOString(),

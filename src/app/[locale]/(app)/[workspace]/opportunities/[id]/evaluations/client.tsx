@@ -19,13 +19,23 @@ import {
 } from 'lucide-react';
 import { generateAiEvaluation, saveHumanEvaluation, calibrateESR } from '@/modules/m6/server/actions';
 import { notesObject, type EvaluationNotes } from '@/modules/m6/types';
+import {
+  averageLensTotal,
+  lensTotal,
+  type LensMarks,
+  type LensReaderType,
+} from '@/modules/m6/lens-scores';
 
 interface EvaluationItem {
   id: string;
-  readerType: 'AI' | 'HUMAN';
-  excellence: number;
-  impact: number;
-  implementation: number;
+  readerType: LensReaderType;
+  /**
+   * `null` when nobody has scored this reader yet — an evaluation opened but not
+   * submitted, or a PANEL row whose marks live in Reviewer/Score. The server decides
+   * (@/modules/m6/lens-scores); this file must never fall back to 0, because a 0 here
+   * renders as a failing verdict on an unassessed proposal.
+   */
+  scores: LensMarks | null;
   weaknesses?: EvaluationNotes;
   calibration?: number | null;
   createdAt?: Date | string;
@@ -61,9 +71,12 @@ export function EvaluationsClient({
   const [humanStrengths, setHumanStrengths] = useState('');
   const [isSubmittingHuman, setIsSubmittingHuman] = useState(false);
 
-  // Calibration state
+  // Calibration state. The default has to be a *scored* reader: the select below only
+  // lists those, so seeding it with `evaluations[0]` would leave the control showing
+  // one row while the state named an unscored one, and submit would calibrate against
+  // a score that was never entered.
   const [selectedEvalForCalibration, setSelectedEvalForCalibration] = useState<string>(
-    evaluations[0]?.id || ''
+    initialEvaluations.find((e) => e.scores !== null)?.id ?? ''
   );
   const [actualEsrScore, setActualEsrScore] = useState('12.5');
   const [calibrationResult, setCalibrationResult] = useState<number | null>(null);
@@ -93,9 +106,13 @@ export function EvaluationsClient({
       const newEval: EvaluationItem = {
         id: `ev-ai-${Date.now()}`,
         readerType: 'AI',
-        excellence: result.excellence,
-        impact: result.impact,
-        implementation: result.implementation,
+        // The action writes status 'completed' with these marks, so the row the user
+        // just produced is scored — not absent.
+        scores: {
+          excellence: result.excellence,
+          impact: result.impact,
+          implementation: result.implementation,
+        },
         weaknesses: {
           strengths: result.strengths,
           weaknesses: result.weaknesses,
@@ -134,9 +151,7 @@ export function EvaluationsClient({
       const newEval: EvaluationItem = {
         id: `ev-human-${Date.now()}`,
         readerType: 'HUMAN',
-        excellence: exc,
-        impact: imp,
-        implementation: impl,
+        scores: { excellence: exc, impact: imp, implementation: impl },
         weaknesses: {
           strengths: strList,
           weaknesses: weakList,
@@ -173,24 +188,21 @@ export function EvaluationsClient({
     }
   };
 
-  // Compute G3 Gate Eligibility
-  const humanCount = evaluations.filter((e) => e.readerType === 'HUMAN').length;
-  const aiCount = evaluations.filter((e) => e.readerType === 'AI').length;
+  // Compute G3 Gate Eligibility.
+  // Only readers who have actually submitted marks count: an evaluation record that
+  // exists but has not been scored is not an evaluator opinion the gate can rest on.
+  const scoredEvaluations = evaluations.filter((e) => e.scores !== null);
+  const humanCount = scoredEvaluations.filter((e) => e.readerType === 'HUMAN').length;
+  const aiCount = scoredEvaluations.filter((e) => e.readerType === 'AI').length;
   const meetsEvaluatorCount = humanCount >= 2 || (humanCount >= 1 && aiCount >= 1);
 
-  const calculateTotal = (e: EvaluationItem) => {
-    const impactVal = isInnovationAction ? e.impact * 1.5 : e.impact;
-    return e.excellence + impactVal + e.implementation;
-  };
+  /** `null` while no reader has scored — never 0, which would read as a failing mark. */
+  const avgTotal = averageLensTotal(evaluations, isInnovationAction);
+  const avgTotalScore = avgTotal === null ? null : avgTotal.toFixed(1);
 
-  const avgTotalScore =
-    evaluations.length > 0
-      ? (
-          evaluations.reduce((acc, ev) => acc + calculateTotal(ev), 0) / evaluations.length
-        ).toFixed(1)
-      : '0.0';
-
-  const meetsScoreThreshold = Number(avgTotalScore) >= 12.0;
+  // An unmeasured average cannot clear the threshold, and it must not *fail* it either:
+  // the gate reports "incomplete", which is exactly what it is.
+  const meetsScoreThreshold = avgTotal !== null && avgTotal >= 12.0;
   const passesG3Gate = meetsEvaluatorCount && meetsScoreThreshold;
 
   const getScoreColor = (score: number) => {
@@ -252,15 +264,26 @@ export function EvaluationsClient({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800 text-xs">
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
             <span className="text-muted block text-[11px]">{t('metrics.avgScore')}</span>
-            <span className="text-xl font-bold text-white font-mono mt-0.5 block">
-              {avgTotalScore} <span className="text-xs text-muted">{t('metrics.outOf15')}</span>
-            </span>
+            {avgTotalScore === null ? (
+              // No completed reader: say so in words at body size, rather than print a
+              // 0.0 that reads as a measured — and failing — result.
+              <span className="text-sm font-semibold text-slate-300 mt-1 block">
+                {t('metrics.notEvaluated')}
+                <span className="block text-[11px] font-normal text-muted mt-0.5">
+                  {t('metrics.notEvaluatedHint')}
+                </span>
+              </span>
+            ) : (
+              <span className="text-xl font-bold text-white font-mono mt-0.5 block">
+                {avgTotalScore} <span className="text-xs text-muted">{t('metrics.outOf15')}</span>
+              </span>
+            )}
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
             <span className="text-muted block text-[11px]">{t('metrics.evaluatorCount')}</span>
             <span className="text-xl font-bold text-white font-mono mt-0.5 block">
-              {evaluations.length}{' '}
+              {scoredEvaluations.length}{' '}
               <span className="text-xs text-muted">
                 {t('metrics.evaluatorBreakdown', { human: humanCount, ai: aiCount })}
               </span>
@@ -500,8 +523,10 @@ export function EvaluationsClient({
               </div>
             ) : (
               evaluations.map((ev) => {
-                const total = calculateTotal(ev).toFixed(1);
-                const isPassed = Number(total) >= 10.0;
+                // `null` here is the whole point of this screen's fix: an unscored row
+                // gets a stated reason, not a total and a threshold verdict.
+                const total = ev.scores === null ? null : lensTotal(ev.scores, isInnovationAction);
+                const isPassed = total !== null && total >= 10.0;
 
                 return (
                   <div
@@ -515,6 +540,10 @@ export function EvaluationsClient({
                           <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
                             <Bot className="w-4 h-4" />
                           </div>
+                        ) : ev.readerType === 'PANEL' ? (
+                          <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">
+                            <Scale className="w-4 h-4" />
+                          </div>
                         ) : (
                           <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
                             <UserCheck className="w-4 h-4" />
@@ -522,7 +551,11 @@ export function EvaluationsClient({
                         )}
                         <div>
                           <span className="font-bold text-xs text-ink block leading-none">
-                            {ev.readerType === 'AI' ? t('feed.aiReader') : t('feed.humanReader')}
+                            {ev.readerType === 'AI'
+                              ? t('feed.aiReader')
+                              : ev.readerType === 'PANEL'
+                                ? t('feed.panelReader')
+                                : t('feed.humanReader')}
                           </span>
                           <span className="text-[10px] text-muted font-mono">
                             {ev.createdAt ? new Date(ev.createdAt).toLocaleDateString(locale) : t('feed.today')}
@@ -531,36 +564,54 @@ export function EvaluationsClient({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${getScoreColor(Number(total) / 3)}`}>
-                          {t('feed.totalScore', {
-                            total,
-                            status: isPassed ? t('feed.aboveThreshold') : t('feed.belowThreshold'),
-                          })}
-                        </span>
+                        {total === null ? (
+                          // Neutral slate, not the rose "below threshold" colour: an
+                          // unassessed record has not failed anything.
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold border text-slate-600 bg-slate-50 border-slate-200">
+                            {t('feed.notEvaluated')}
+                          </span>
+                        ) : (
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${getScoreColor(total / 3)}`}>
+                            {t('feed.totalScore', {
+                              total: total.toFixed(1),
+                              status: isPassed ? t('feed.aboveThreshold') : t('feed.belowThreshold'),
+                            })}
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {/* Breakdown Meters */}
-                    <div className="grid grid-cols-3 gap-3 text-xs">
-                      <div className="bg-ground border border-border p-2.5 rounded-xl text-center">
-                        <span className="text-[10px] text-muted font-medium block">{t('feed.excellenceLabel')}</span>
-                        <span className="font-bold text-sm font-mono text-ink">{t('human.outOf5', { value: ev.excellence.toFixed(1) })}</span>
-                      </div>
+                    {/* Breakdown Meters — three empty "0.0/5" boxes say nothing true
+                        about a record nobody has scored, so the reason takes their
+                        place and names what would fill them. */}
+                    {ev.scores === null ? (
+                      <p className="text-xs text-muted bg-ground border border-border rounded-xl p-3">
+                        {ev.readerType === 'PANEL'
+                          ? t('feed.panelNotEvaluatedBody')
+                          : t('feed.notEvaluatedBody')}
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-3 text-xs">
+                        <div className="bg-ground border border-border p-2.5 rounded-xl text-center">
+                          <span className="text-[10px] text-muted font-medium block">{t('feed.excellenceLabel')}</span>
+                          <span className="font-bold text-sm font-mono text-ink">{t('human.outOf5', { value: ev.scores.excellence.toFixed(1) })}</span>
+                        </div>
 
-                      <div className="bg-ground border border-border p-2.5 rounded-xl text-center">
-                        <span className="text-[10px] text-muted font-medium block">
-                          {t('feed.impactLabel')} {isInnovationAction && t('feed.impactMultiplierSuffix')}
-                        </span>
-                        <span className="font-bold text-sm font-mono text-ink">
-                          {t('human.outOf5', { value: (isInnovationAction ? ev.impact * 1.5 : ev.impact).toFixed(1) })}
-                        </span>
-                      </div>
+                        <div className="bg-ground border border-border p-2.5 rounded-xl text-center">
+                          <span className="text-[10px] text-muted font-medium block">
+                            {t('feed.impactLabel')} {isInnovationAction && t('feed.impactMultiplierSuffix')}
+                          </span>
+                          <span className="font-bold text-sm font-mono text-ink">
+                            {t('human.outOf5', { value: (isInnovationAction ? ev.scores.impact * 1.5 : ev.scores.impact).toFixed(1) })}
+                          </span>
+                        </div>
 
-                      <div className="bg-ground border border-border p-2.5 rounded-xl text-center">
-                        <span className="text-[10px] text-muted font-medium block">{t('feed.implementationLabel')}</span>
-                        <span className="font-bold text-sm font-mono text-ink">{t('human.outOf5', { value: ev.implementation.toFixed(1) })}</span>
+                        <div className="bg-ground border border-border p-2.5 rounded-xl text-center">
+                          <span className="text-[10px] text-muted font-medium block">{t('feed.implementationLabel')}</span>
+                          <span className="font-bold text-sm font-mono text-ink">{t('human.outOf5', { value: ev.scores.implementation.toFixed(1) })}</span>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Strengths & Weaknesses */}
                     {(() => {
@@ -675,17 +726,27 @@ export function EvaluationsClient({
               <select
                 value={selectedEvalForCalibration}
                 onChange={(e) => setSelectedEvalForCalibration(e.target.value)}
-                className="w-full border border-border rounded-xl p-2.5 text-xs bg-ground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-border rounded-xl p-2.5 text-xs bg-ground focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                disabled={scoredEvaluations.length === 0}
               >
-                {evaluations.map((ev) => (
+                {/* Only scored readers: calibration measures the gap between our
+                    estimate and the official ESR, and an unscored row has no estimate
+                    to compare — offering it would invite a deviation against a 0. */}
+                {scoredEvaluations.map((ev) => (
                   <option key={ev.id} value={ev.id}>
                     {ev.readerType === 'AI' ? t('calibration.aiOption') : t('calibration.humanOption')}{' '}
                     {t('calibration.scoreSuffix', {
-                      value: (ev.excellence + ev.impact + ev.implementation).toFixed(1),
+                      value: (ev.scores
+                        ? ev.scores.excellence + ev.scores.impact + ev.scores.implementation
+                        : 0
+                      ).toFixed(1),
                     })}
                   </option>
                 ))}
               </select>
+              {scoredEvaluations.length === 0 && (
+                <p className="text-[11px] text-muted mt-1.5">{t('calibration.noScoredEvaluations')}</p>
+              )}
             </div>
 
             <div>
@@ -705,7 +766,8 @@ export function EvaluationsClient({
 
             <button
               type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-xl transition text-xs shadow-sm flex items-center gap-2"
+              disabled={scoredEvaluations.length === 0}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-xl transition text-xs shadow-sm flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>{t('calibration.submitButton')}</span>

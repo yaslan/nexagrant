@@ -10,6 +10,13 @@ export interface KpiCardProps {
   description?: string;
   chartData?: Array<{ date: string; value: number }>;
   variant?: 'default' | 'success' | 'warning';
+  /**
+   * This card has no measurement yet, and `value` holds the reason in words rather
+   * than a number. The value slot then drops to body size and the muted colour, so a
+   * missing figure never shouts louder than a real one across a row of cards.
+   * Callers pass no `unit`: there is no "0.0 %" left to qualify.
+   */
+  unmeasured?: boolean;
 }
 
 export function KpiCard({
@@ -20,6 +27,7 @@ export function KpiCard({
   description,
   chartData,
   variant = 'default',
+  unmeasured = false,
 }: KpiCardProps) {
   const variantClasses = {
     default: 'border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950',
@@ -56,7 +64,13 @@ export function KpiCard({
       {/* Metric */}
       <div className="mb-4">
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-gray-900 dark:text-white">
+          <span
+            className={
+              unmeasured
+                ? 'text-base font-medium text-gray-500 dark:text-gray-400'
+                : 'text-3xl font-bold text-gray-900 dark:text-white'
+            }
+          >
             {typeof value === 'number' ? value.toFixed(1) : value}
           </span>
           {unit && (
