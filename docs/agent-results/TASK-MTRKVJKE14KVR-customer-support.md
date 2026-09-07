@@ -252,6 +252,14 @@ kaynak seviyesinde demo satırlarının geri sızmadığının kontrolü.
 | `tests/api/v1-partners.test.ts` | Tek testin bayat iddiası düzeltildi (aşağıda) |
 | `docs/agent-results/TASK-MTRKVJKE14KVR-screenshots/*` | 4 ekran görüntüsü |
 
+**Not — i18n değişikliği başka bir commit'e düştü.** Paylaşılan çalışma ağacında paralel çalışan
+başka bir ajan, ben `messages/*.json`'ı stage etmişken `git commit` çalıştırdı; benim 15 satırlık
+`calls_turkey` bloğum onun **09c385b `feat(billing): platform plan editor…`** commit'ine karıştı.
+İçerik doğru ve `dev`'de duruyor; yalnızca benim commit'imde (**a3bf433**) görünmüyor. Aynı
+commit **o ajanın kendi `adminPlans.*` anahtarlarını almadı** — onlar hâlâ çalışma ağacında
+commit'siz duruyor, yani 09c385b'deki plan editörü çevirisiz kalır. Kendi kartımın dışında
+olduğu için düzeltmedim, sahibine bildiriyorum. (bkz. [[fabrika-concurrent-commit-steals-your-stage]])
+
 `tests/api/v1-partners.test.ts` benim kartımın dosyası değil, ama içindeki
 `GET /api/v1/calls returns open Horizon Europe & national calls` testi **benim endpoint'imi** test
 ediyordu ve `topic.findMany` mock'u `[]` dönerken `data.length > 0` bekliyordu — yani yalnızca
