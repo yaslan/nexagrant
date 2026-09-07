@@ -47,17 +47,25 @@ Kaynak raporlar okundu: `TASK-MTQ63RR8Z0G8E-blok-zincir-dse.md`, `TASK-MTQ63RR8Z
 - `docs/ROADMAP.md` (+26/-1 satır)
 - Commit: `3ab21cc` — "docs: sync PROJECT.md/ROADMAP.md to this wave's evidence (S9-S10)"
 
-## 5. Riskler
+## 5. Olay: eşzamanlı ajan yarışı bir commit'i kirletti
+
+İkinci commit'te (`git add docs/agent-results/TASK-MTQU0SAD85B8X-blog-yazar.md && git commit`) `git add`'e YALNIZ kendi rapor dosyamı verdim, ama commit'ten önce `git diff --cached` ile stage'i doğrulamadım — bu depoda bilinen bir tuzak (`fabrika-parallel-agent-file-race` hafıza kaydı) ve tam da o oldu: aynı anda çalışan `blok-zincir-dse`'nin TASK-MTQ63RR8Z0G8E (G0'ı üretime bağlama) işi paylaşılan git index'inde stage edilmiş haldeydi, commit `e816fa9` bu yüzden benim raporumla birlikte 16 başka dosyayı da içeriyor (`src/lib/scoring/g0-compute.ts`, `g0-features.ts`, `src/lib/gates/evaluate.ts` güncellemesi, `qd.mjs`/`qd2.mjs` scratch script'leri, ekran görüntüleri).
+
+**Doğrulama:** İçerik incelendi — `g0-compute.ts` iyi belgelenmiş, tamamlanmış görünen bir G0-üretime-bağlama implementasyonu (CLAUDE.md §7 kanıt disiplinine uygun: kanıt yoksa skor `null`, breakdown `TopicMatch.breakdown`'a yazılıyor). `pnpm typecheck` HEAD'de **temiz** çıktı (önce geçici bir `useCallback` hatası gördüm, ikinci çalıştırmada kayboldu — başka bir ajanın o dosyayı o an düzenlemesinden kaynaklanan geçici bir yarış durumuydu, kalıcı bir regresyon değil). Yani commit içerik olarak zararlı değil, ama **yanlış commit mesajı altında** ve muhtemelen `blok-zincir-dse`'nin kendi commit/rapor akışının önüne geçti.
+
+**Aldığım karar:** `git reset`/`revert` gibi yıkıcı bir düzeltmeye gitmedim — bu, gerçek ve tamamlanmış görünen bir G0 üretim-bağlama işini geri alırdı ve iş kaybına yol açardı. Bunun yerine burada şeffaf şekilde kayda geçirdim; board'da TASK-MTQ63RR8Z0G8E'nin sahibi (blok-zincir-dse) ve PM (blockzincir-pm, TASK-MTQTZNLS2CO2L) bu commit'in içeriğini kendi işleri olarak tanıyıp doğrulamalı. `qd.mjs`/`qd2.mjs` scratch script'lerinin depoda kalması gerekip gerekmediğine ben karar vermedim (kapsamım dışı) — sahibi temizlemek isterse ayrı bir commit'le silebilir.
+
+## 6. Riskler
 
 - Board'da S9–S10'un çoğu kartı hâlâ `review` durumunda; PM kapanış doğrulaması (TASK-MTQTZNLS2CO2L) tamamlanmadan bu maddeler kesin "done" sayılmamalı — ROADMAP'te bu bilinçli olarak "kart statüsüne değil koda dayanır" notuyla belirtildi.
 - M9 takvim entegrasyonu ve dashboard case-mismatch düzeltmeleri kod değişikliği gerektiriyor; bu görev kapsamında (yalnız doküman) yapılmadı.
 
-## 6. Açık sorular
+## 7. Açık sorular
 
 - ROADMAP Açık kararlar #10'daki etiket çelişkisi: TASK-MTQTYE287FERM ekibi (ex-en) kendi bulgusunu ekranda tekrar doğrulamalı; stale bulgu ise kart kapatılabilir.
-- Açık kararlar #9 (G0'ın üretime nerede bağlanacağı) ürün/mimari kararı gerektiriyor — bu doküman görevinin kapsamı dışı.
+- Açık kararlar #9 (G0'ın üretime nerede bağlanacağı) ürün/mimari kararı gerektiriyor — bu doküman görevinin kapsamı dışı; ama bkz. §5 — bu iş `e816fa9` commit'inde zaten yapılmış görünüyor, sahibi doğrulamalı.
 
-## 7. Sonraki adım
+## 8. Sonraki adım
 
 TASK-MTQ63RR8Z0G8E (G0 üretime bağlama), TASK-MTQTYXC0NUT0B (case-mismatch fix) ve TASK-MTQTYE287FERM (etiket doğrulaması) ilgili ajanlar tarafından ele alınmalı; blockzincir-pm'in S8–S10 kapanış doğrulaması bu üç kartı ve M9/iyzico "review" kartlarını kanıtla kapatmalı.
 
