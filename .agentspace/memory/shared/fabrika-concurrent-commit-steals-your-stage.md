@@ -22,6 +22,20 @@ Bu bir hata değil, bir yarış. Yapılacaklar:
    commit'iyle gidebilir. Commit sonrası `git show HEAD:messages/tr.json` ile kendi
    anahtarlarının durduğunu **doğrula** (görev kuralı zaten bunu istiyor).
 
+Ters yön de olur: **stage'lediğin dosya BAŞKASININ commit edilmemiş işini de taşıyor olabilir.**
+`git diff --cached <dosya>` beklediğinden çok satır gösteriyorsa o dosyayı olduğu gibi commit
+etme — `git restore --staged <dosya>` ile çıkar, sonra yalnız kendi hunk'ını indekse uygula:
+
+```
+git restore --staged <dosya>
+git apply --cached /tmp/benim-hunk.patch   # yalnız senin satırların
+```
+
+Patch uymazsa (`patch does not apply`) sebebi genelde HEAD'in bu arada kaymış olmasıdır:
+`git diff HEAD <dosya>` tekrar bak — çoğu zaman senin satırın zaten karşı tarafın commit'ine
+girmiştir ve yapacak bir şey kalmamıştır. "diff yok" = kayboldu DEĞİL;
+`git show HEAD:<dosya> | grep '<senin satırın>'` ayırt eder.
+
 Pencereyi daralt: yazdıktan hemen sonra stage'le, doğrulamayı stage'ten sonra yap,
 `git add` ile `git commit` arasına uzun komut koyma.
 
