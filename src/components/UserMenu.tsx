@@ -1,12 +1,18 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { logoutAction } from '@/lib/actions/auth';
 import { signOut as clientSignOut } from 'next-auth/react';
 import { useOptionalSession } from '@/lib/hooks/use-optional-session';
+import {
+  applyReadState,
+  markNotificationsRead,
+  notificationStorageKey,
+  useReadNotificationIds,
+} from '@/lib/hooks/use-read-notifications';
 import { 
   User, 
   Settings, 
@@ -31,6 +37,14 @@ import { getWorkspaceRoute, getPublicRoute } from '@/lib/routes';
 import { displayUserName } from '@/lib/user-display';
 import { isNextRedirectError } from '@/lib/errors';
 
+/** One entry of the workspace switcher, as it exists in the database. */
+export interface UserMenuWorkspace {
+  /** Workspace slug, the `[workspace]` URL segment. */
+  slug: string;
+  /** Workspace name as the tenant stored it. */
+  name: string;
+}
+
 interface UserMenuProps {
   locale: string;
   userName?: string;
@@ -38,6 +52,12 @@ interface UserMenuProps {
   userImage?: string;
   roleName?: string;
   creditsBalance?: number;
+  /**
+   * The workspaces this session is actually a member of, resolved server-side.
+   * Absent or empty means the session has none, and the switcher says so —
+   * see the switcher block below for what used to stand here.
+   */
+  workspaces?: UserMenuWorkspace[];
 }
 
 export default function UserMenu({
@@ -47,6 +67,7 @@ export default function UserMenu({
   userImage: propUserImage,
   roleName: propRoleName,
   creditsBalance = 500,
+  workspaces = [],
 }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -76,11 +97,23 @@ export default function UserMenu({
   // carries no role; authorization is decided server-side from `session.role`.
   const effectiveRoleName = propRoleName || sessionData?.role || null;
 
-  // Extract active workspace from pathname
+  // Extract active workspace from pathname. No fallback slug: outside a workspace
+  // route ("/tr/admin", "/tr/pricing") no workspace is active, and pretending
+  // 'demo-sme' is would tick a workspace the session may not even belong to.
   const segments = pathname ? pathname.split('/').filter(Boolean) : [];
   const activeWorkspace = (segments.length > 1 && !['admin', 'pricing', 'register'].includes(segments[1]))
     ? segments[1]
-    : 'demo-sme';
+    : null;
+
+  // Where the menu's workspace-scoped links (settings, notifications) point. On a
+  // workspace route it is the one being viewed; elsewhere — /admin, /pricing, the
+  // public navbar — the session's first real workspace. It used to be the literal
+  // 'demo-sme', so every one of these links led into a workspace the session may
+  // never have been granted. With neither, `getWorkspaceRoute` falls back to
+  // 'default', the slug auth.ts gives every tenant's first workspace; the route
+  // itself then enforces the scope (requireTenantPage sends a tenantless session
+  // to /no-workspace) rather than this menu guessing an organisation.
+  const routeWorkspace = activeWorkspace ?? workspaces[0]?.slug ?? null;
 
   // Click outside handlers
   useEffect(() => {
@@ -154,78 +187,36 @@ export default function UserMenu({
    * notification model, so none of it was ever a fallback for a query: there is
    * nothing to query yet. Two of the three are claims a user would act on.
    *
-   * Empty until a notification store exists. Still memoised: it feeds
-   * `syncNotifications`, whose effect depends on it, and a fresh array literal
-   * per render used to produce an unbounded render loop ("Maximum update depth
-   * exceeded") across every page carrying the shell.
+   * Empty until a notification store exists. Still memoised: it feeds the
+   * derivation below, and a fresh array literal per render used to produce an
+   * unbounded render loop ("Maximum update depth exceeded") across every page
+   * carrying the shell.
    */
   const baseNotifications = useMemo<
     Array<{ id: string; title: string; desc: string; time: string; unread: boolean }>
   >(() => [], []);
 
-  const storageKey = `fonbridge_read_notifs_${effectiveUserEmail || 'guest'}`;
+  const storageKey = notificationStorageKey(effectiveUserEmail);
 
-  const [notificationsList, setNotificationsList] = useState(baseNotifications);
-
-  // Sync notifications from localStorage
-  const syncNotifications = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      const rawGuest = localStorage.getItem('fonbridge_read_notifs_guest');
-      const readIds: string[] = raw ? JSON.parse(raw) : [];
-      const guestReadIds: string[] = rawGuest ? JSON.parse(rawGuest) : [];
-      const combined = Array.from(new Set([...readIds, ...guestReadIds]));
-
-      setNotificationsList(
-        baseNotifications.map((n) => ({
-          ...n,
-          unread: combined.includes(n.id) ? false : n.unread,
-        }))
-      );
-    } catch (e) {
-      setNotificationsList(baseNotifications);
-    }
-  }, [baseNotifications, storageKey]);
-
-  useEffect(() => {
-    // Same as the notifications page: the read/unread overlay lives in localStorage, which is
-    // unavailable during SSR, so it is merged in once after mount instead of in the initializer.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
-    syncNotifications();
-
-    const handleUpdate = () => syncNotifications();
-    window.addEventListener('fonbridge_notifications_updated', handleUpdate);
-    window.addEventListener('storage', handleUpdate);
-    return () => {
-      window.removeEventListener('fonbridge_notifications_updated', handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
-    };
-  }, [syncNotifications]);
+  // Same store as the notifications page: subscribed to and derived during render, not copied
+  // into state by an effect. See `use-read-notifications`.
+  const readIds = useReadNotificationIds(storageKey);
+  const notificationsList = useMemo(
+    () => applyReadState(baseNotifications, readIds),
+    [baseNotifications, readIds]
+  );
 
   const unreadCount = notificationsList.filter((n) => n.unread).length;
 
   const markAllAsRead = () => {
-    if (typeof window === 'undefined') return;
-    const allIds = baseNotifications.map((n) => n.id);
-    try {
-      const raw = localStorage.getItem(storageKey);
-      const existing: string[] = raw ? JSON.parse(raw) : [];
-      const updated = Array.from(new Set([...existing, ...allIds]));
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      window.dispatchEvent(new Event('fonbridge_notifications_updated'));
-    } catch {}
+    markNotificationsRead(
+      storageKey,
+      baseNotifications.map((n) => n.id)
+    );
   };
 
   const markSingleAsRead = (id: string) => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      const existing: string[] = raw ? JSON.parse(raw) : [];
-      const updated = Array.from(new Set([...existing, id]));
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      window.dispatchEvent(new Event('fonbridge_notifications_updated'));
-    } catch {}
+    markNotificationsRead(storageKey, [id]);
   };
 
   if (!effectiveUserEmail) {
@@ -310,7 +301,7 @@ export default function UserMenu({
             </div>
 
             <div className="px-4 py-2 border-t border-border text-center">
-              <Link href={getWorkspaceRoute('notifications', locale, activeWorkspace)} className="text-xs font-semibold text-accent hover:underline">
+              <Link href={getWorkspaceRoute('notifications', locale, routeWorkspace ?? undefined)} className="text-xs font-semibold text-accent hover:underline">
                 {isTr ? 'Tüm bildirimleri gör' : 'View all notifications'}
               </Link>
             </div>
@@ -380,7 +371,7 @@ export default function UserMenu({
             {/* Account & Profile Items */}
             <div className="py-1 text-xs">
               <Link
-                href={getWorkspaceRoute('settingsProfile', locale, activeWorkspace)}
+                href={getWorkspaceRoute('settingsProfile', locale, routeWorkspace ?? undefined)}
                 onClick={() => setIsOpen(false)}
                 className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
               >
@@ -389,7 +380,7 @@ export default function UserMenu({
               </Link>
 
               <Link
-                href={getWorkspaceRoute('settingsBilling', locale, activeWorkspace)}
+                href={getWorkspaceRoute('settingsBilling', locale, routeWorkspace ?? undefined)}
                 onClick={() => setIsOpen(false)}
                 className="flex items-center justify-between px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
               >
@@ -403,7 +394,7 @@ export default function UserMenu({
               </Link>
 
               <Link
-                href={getWorkspaceRoute('settingsModules', locale, activeWorkspace)}
+                href={getWorkspaceRoute('settingsModules', locale, routeWorkspace ?? undefined)}
                 onClick={() => setIsOpen(false)}
                 className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
               >
@@ -412,7 +403,7 @@ export default function UserMenu({
               </Link>
 
               <Link
-                href={getWorkspaceRoute('settingsApiKeys', locale, activeWorkspace)}
+                href={getWorkspaceRoute('settingsApiKeys', locale, routeWorkspace ?? undefined)}
                 onClick={() => setIsOpen(false)}
                 className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
               >
@@ -426,7 +417,7 @@ export default function UserMenu({
                 page and an API but no link anywhere in the navigation.
               */}
               <Link
-                href={getWorkspaceRoute('settingsPrivacy', locale, activeWorkspace)}
+                href={getWorkspaceRoute('settingsPrivacy', locale, routeWorkspace ?? undefined)}
                 onClick={() => setIsOpen(false)}
                 className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
               >
@@ -521,27 +512,42 @@ export default function UserMenu({
                 <Building2 className="w-3 h-3" />
                 <span>{isTr ? 'Çalışma Alanı' : 'Workspace'}</span>
               </div>
+              {/*
+                TASK-MTRNQHC3IV2BE — the switcher lists the session's own workspaces.
+
+                Two entries were written in here, "Demo SME Consultancy" (demo-sme)
+                and "Horizon Research Lab" (horizon-lab). Every tenant saw both, in
+                the app shell, on every page: two organisations that are not theirs,
+                offered as somewhere to switch to. The links went to
+                /{locale}/demo-sme/... — routes their membership does not cover — so
+                the honest-looking half of the menu was an invitation into another
+                tenant's URL space. Nothing queried anything; there was no fallback
+                being exercised, just two literals.
+
+                Now: whatever the layout resolved from Membership -> Tenant ->
+                Workspace, and an explicit "you have no workspace" line when that
+                comes back empty.
+              */}
               <div className="space-y-1 mt-1">
-                <Link
-                  href={getWorkspaceRoute('dashboard', locale, 'demo-sme')}
-                  onClick={() => setIsOpen(false)}
-                  className={`w-full text-left px-2.5 py-1 rounded text-xs font-medium flex items-center justify-between transition-colors ${
-                    activeWorkspace === 'demo-sme' ? 'bg-surface-hover font-bold text-ink' : 'hover:bg-surface-hover text-ink-2'
-                  }`}
-                >
-                  <span>Demo SME Consultancy</span>
-                  {activeWorkspace === 'demo-sme' && <Check className="w-3 h-3 text-ok" />}
-                </Link>
-                <Link
-                  href={getWorkspaceRoute('dashboard', locale, 'horizon-lab')}
-                  onClick={() => setIsOpen(false)}
-                  className={`w-full text-left px-2.5 py-1 rounded text-xs font-medium flex items-center justify-between transition-colors ${
-                    activeWorkspace === 'horizon-lab' ? 'bg-surface-hover font-bold text-ink' : 'hover:bg-surface-hover text-ink-2'
-                  }`}
-                >
-                  <span>Horizon Research Lab</span>
-                  {activeWorkspace === 'horizon-lab' && <Check className="w-3 h-3 text-ok" />}
-                </Link>
+                {workspaces.length === 0 ? (
+                  <div className="px-2.5 py-1 text-xs text-muted">
+                    {tIdentity('noWorkspace')}
+                  </div>
+                ) : (
+                  workspaces.map((ws) => (
+                    <Link
+                      key={ws.slug}
+                      href={getWorkspaceRoute('dashboard', locale, ws.slug)}
+                      onClick={() => setIsOpen(false)}
+                      className={`w-full text-left px-2.5 py-1 rounded text-xs font-medium flex items-center justify-between transition-colors ${
+                        activeWorkspace === ws.slug ? 'bg-surface-hover font-bold text-ink' : 'hover:bg-surface-hover text-ink-2'
+                      }`}
+                    >
+                      <span>{ws.name}</span>
+                      {activeWorkspace === ws.slug && <Check className="w-3 h-3 text-ok" />}
+                    </Link>
+                  ))
+                )}
               </div>
             </div>
 

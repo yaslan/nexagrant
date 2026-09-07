@@ -2,6 +2,9 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+
+import messages from '../messages/en.json';
 
 import type { PartBSectionItem } from '@/modules/m11/types';
 
@@ -46,16 +49,23 @@ const SECTIONS: PartBSectionItem[] = [
   },
 ];
 
+/**
+ * The editor reads `UserIdentity` and `PartBEditor` copy through `useTranslations`, which
+ * throws outside a provider. The real catalogue is used rather than a stub so a renamed or
+ * deleted key fails here too.
+ */
 function renderEditor() {
   return render(
-    <PartBCollaborativeEditor
-      partId="part-1"
-      opportunityTitle="HORIZON-CL5-2026-D2-01"
-      tenantId="tenant-1"
-      initialSections={SECTIONS}
-      initialRevisions={[]}
-      initialComments={[]}
-    />
+    <NextIntlClientProvider locale="en" messages={messages}>
+      <PartBCollaborativeEditor
+        partId="part-1"
+        opportunityTitle="HORIZON-CL5-2026-D2-01"
+        tenantId="tenant-1"
+        initialSections={SECTIONS}
+        initialRevisions={[]}
+        initialComments={[]}
+      />
+    </NextIntlClientProvider>
   );
 }
 

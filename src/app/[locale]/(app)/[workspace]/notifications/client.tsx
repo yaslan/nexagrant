@@ -1,9 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { Bell, CheckCircle2, AlertTriangle, Sparkles, Clock, ArrowLeft, CheckCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useOptionalSession } from '@/lib/hooks/use-optional-session';
+import {
+  applyReadState,
+  markNotificationsRead,
+  notificationStorageKey,
+  useReadNotificationIds,
+} from '@/lib/hooks/use-read-notifications';
 
 interface NotificationItem {
   id: string;
@@ -27,71 +33,28 @@ export default function NotificationsClient({
   workspace,
 }: NotificationsClientProps) {
   const session = useOptionalSession();
-  const userEmail = session?.user?.email || 'guest';
-
-  const storageKey = `fonbridge_read_notifs_${userEmail}`;
-  const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+  const storageKey = notificationStorageKey(session?.user?.email);
   const isTr = locale === 'tr';
 
-  const syncNotifications = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      const rawGuest = localStorage.getItem('fonbridge_read_notifs_guest');
-      const readIds: string[] = raw ? JSON.parse(raw) : [];
-      const guestReadIds: string[] = rawGuest ? JSON.parse(rawGuest) : [];
-      const combined = Array.from(new Set([...readIds, ...guestReadIds]));
-
-      setNotifications(
-        initialNotifications.map((n) => ({
-          ...n,
-          unread: combined.includes(n.id) ? false : n.unread,
-        }))
-      );
-    } catch (_e) {
-      setNotifications(initialNotifications);
-    }
-  }, [initialNotifications, storageKey]);
-
-  useEffect(() => {
-    // localStorage is not readable during SSR, so the read-state overlay cannot go into the
-    // useState initializer without a hydration mismatch. Syncing it once after mount is the
-    // documented pattern for browser-only storage.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
-    syncNotifications();
-
-    const handleUpdate = () => syncNotifications();
-    window.addEventListener('fonbridge_notifications_updated', handleUpdate);
-    window.addEventListener('storage', handleUpdate);
-    return () => {
-      window.removeEventListener('fonbridge_notifications_updated', handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
-    };
-  }, [syncNotifications]);
+  // The read overlay is a browser-only store, so it is subscribed to and derived during render
+  // rather than copied into state by an effect. See `use-read-notifications`.
+  const readIds = useReadNotificationIds(storageKey);
+  const notifications: NotificationItem[] = useMemo(
+    () => applyReadState(initialNotifications, readIds),
+    [initialNotifications, readIds]
+  );
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
   const handleMarkAllRead = () => {
-    if (typeof window === 'undefined') return;
-    const allIds = initialNotifications.map((n) => n.id);
-    try {
-      const raw = localStorage.getItem(storageKey);
-      const existing: string[] = raw ? JSON.parse(raw) : [];
-      const updated = Array.from(new Set([...existing, ...allIds]));
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      window.dispatchEvent(new Event('fonbridge_notifications_updated'));
-    } catch (_e) {}
+    markNotificationsRead(
+      storageKey,
+      initialNotifications.map((n) => n.id)
+    );
   };
 
   const handleMarkSingleRead = (id: string) => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      const existing: string[] = raw ? JSON.parse(raw) : [];
-      const updated = Array.from(new Set([...existing, id]));
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      window.dispatchEvent(new Event('fonbridge_notifications_updated'));
-    } catch (_e) {}
+    markNotificationsRead(storageKey, [id]);
   };
 
   return (
