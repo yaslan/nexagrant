@@ -192,3 +192,14 @@ yeniden biçimlendirmedim (diff yalnız eklenen satırlar).
 - Aynı "yokluk ≠ sıfır" taraması diğer sayısal yüzeylerde: `dashboard/client.tsx`
   (customer-support'ta, `personDaysPerOpp === '0' ? '14.2'` gibi bir yedek var),
   `evaluations/panel/**` (geli-tirici'de) ve K5 pipeline kartları.
+
+---
+
+## Commit notu (yarış durumu)
+
+Kodum `dev`'de **`de62d22`** içinde. Commit mesajı bana ait değil: `git commit` çağrımla
+aynı anda başka bir ajan commit aldı ve stage'lediğim 17 dosya onun commit'ine dahil
+oldu; benim çağrım "no changes added to commit" ile döndü. Paylaşılan branch'te geçmişi
+yeniden yazmadım. İçerik eksiksiz — `git show --stat de62d22` hepsini listeliyor.
+`messages/tr.json` + `messages/en.json` ise (aynı sebeple) **`4be94d5`** içinde; 17+17
+anahtarımın ve `unitScore: "/5"` düzeltmesinin HEAD'de durduğunu doğruladım.
