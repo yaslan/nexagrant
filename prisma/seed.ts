@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { prisma } from '../src/lib/db';
+import { rescoreOpportunityG0 } from '../src/lib/scoring/g0-compute';
 import { DEFAULT_CRITERIA } from '../src/modules/m6/types';
 import seedTenantWorkspace from './seed-tenant-workspace';
 import seedCalls from './seed-calls';
@@ -23,6 +24,111 @@ const modules = [
   { id: 'M10', key: 'followup_docs', name: 'Follow-up Documents', version: '1.2', requires: ['M4'], recommends: ['M9'], planTiers: ['business', 'enterprise'], addOnSku: null },
   { id: 'M11', key: 'full_app_production', name: 'Full Application Production', version: '1.2', requires: ['M2', 'M3', 'M5', 'M8'], recommends: [], planTiers: ['business', 'enterprise'], addOnSku: 'addon_m11' },
 ];
+
+/**
+ * G0 evidence for the demo tenant — TASK-MTQW90XSQ1SU1.
+ *
+ * `seedOpportunities()` links demo-opp-1..5 to five real imported Horizon Europe topics
+ * (demo-topic-1/2/3/5/6). Those topics already carry a real budget and lump-sum/two-stage flags,
+ * but every other G0 input was empty for this tenant: no `TopicMatch` (K1), no `TopicStat` (K3),
+ * no `ConsortiumSeat`. `extractG0Features()` correctly reports each of those as `missing` rather
+ * than guessing, so every opportunity capped at `budgetRoleEconomy`(10) + `lumpSumTwoStage`(8) =
+ * 18/100 and the G0 gate (threshold 70) was mathematically unreachable for any opportunity — not
+ * a scoring bug, an evidence gap (see `.agentspace/memory/shared/fabrika-g0-score-never-computed.md`).
+ *
+ * This seeds three of the missing sources with numbers a K1 matcher / K3 import / consortium
+ * builder would plausibly produce for these five topics:
+ *
+ *   - `TopicMatch.fitScore` (K1 topic↔tenant alignment, weight 30) — a real fitScore, not the
+ *     `g0ScorerPlaceholderFitScore` write `persistG0` makes, so `loadG0Snapshot` reads it as
+ *     `measured` evidence instead of the placeholder-laundering bug described in
+ *     `fabrika-g0-evidence-placeholder-laundering`.
+ *   - `TopicStat.successRate` (K3 Horizon Dashboard import, weight 15), one row per topic-family
+ *     prefix, `country: null` (family-wide average — how K3 stores it for topics that have not
+ *     closed yet). Values are demo baseline figures (`source: 'seed-demo-g0-evidence'`), NOT a
+ *     real Horizon Dashboard import — grounded in the ~16% Horizon-Europe-wide average documented
+ *     next to `BASE_RATE_FULL_MARKS_PCT` in `g0-canonical.ts`, varied per call family the way real
+ *     success rates vary (a Missions call runs more competitive than a Cluster call).
+ *   - `ConsortiumSeat` rows (feeds `researchAndEndUser`, weight 12) — who is actually being
+ *     pursued for the consortium, not a rate or a score.
+ *
+ * `coordinatorHistory` (15) and `networkCentrality` (10) stay unseeded on purpose: both read
+ * `CordisParticipation` keyed by `Tenant.pic`, and this database holds zero `CordisOrganization`
+ * / `CordisParticipation` rows — there is nothing real to seed evidence *from*. Without those two
+ * features the reachable ceiling is 30+15+12+10+8 = 75/100, so a well-aligned, well-evidenced
+ * opportunity can still land under the 70 threshold; that gap is reported, not patched, in
+ * `docs/agent-results/TASK-MTQW90XSQ1SU1-ex-en.md`.
+ */
+async function seedG0DemoEvidence() {
+  const TENANT_ID = 'demo-tenant';
+
+  // K1 — alignment (weight 30). Scores vary by how closely each topic's scope matches the
+  // renovation/energy-performance capability the demo tenant's other seed data implies.
+  const topicMatches: { topicId: string; fitScore: number; note: string }[] = [
+    { topicId: 'demo-topic-1', fitScore: 92, note: 'strong overlap: building renovation, energy performance, smart buildings' },
+    { topicId: 'demo-topic-2', fitScore: 55, note: 'partial overlap: industrial process heat is adjacent to, not core to, tenant capability' },
+    { topicId: 'demo-topic-3', fitScore: 81, note: 'strong overlap: data platforms, whole-life-carbon assessment tooling' },
+    { topicId: 'demo-topic-5', fitScore: 38, note: 'weak overlap: citizen engagement / participatory governance sits outside tenant capability' },
+    { topicId: 'demo-topic-6', fitScore: 68, note: 'moderate overlap: maintenance/repair is adjacent to renovation, not a core keyword match' },
+  ];
+  for (const m of topicMatches) {
+    const breakdown = {
+      method: 'k1-keyword-cosine-mock',
+      note: `seed demo K1 match (TASK-MTQW90XSQ1SU1) — ${m.note}`,
+    };
+    await prisma.topicMatch.upsert({
+      where: { tenantId_topicId: { tenantId: TENANT_ID, topicId: m.topicId } },
+      update: { fitScore: m.fitScore, breakdown },
+      create: { tenantId: TENANT_ID, topicId: m.topicId, fitScore: m.fitScore, breakdown },
+    });
+  }
+
+  // K3 — base rate (weight 15). One row per topic-family prefix; successRate is derived from
+  // proposals/funded rather than typed as a bare percentage, so the two numbers stay consistent.
+  const topicStats: { id: string; topicPrefix: string; proposals: number; funded: number }[] = [
+    { id: 'demo-stat-cl5-2026-09-d4', topicPrefix: 'HORIZON-CL5-2026-09-D4', proposals: 230, funded: 44 }, // 19.13%
+    { id: 'demo-stat-miss-2026-04-cit', topicPrefix: 'HORIZON-MISS-2026-04-CIT', proposals: 185, funded: 12 }, // 6.49% — below the 8% hard rule
+    { id: 'demo-stat-neb-2026-01-regen', topicPrefix: 'HORIZON-NEB-2026-01-REGEN', proposals: 142, funded: 15 }, // 10.56%
+  ];
+  for (const s of topicStats) {
+    const successRate = Math.round((s.funded / s.proposals) * 10000) / 100;
+    const data = {
+      topicPrefix: s.topicPrefix,
+      country: null,
+      proposals: s.proposals,
+      funded: s.funded,
+      successRate,
+      source: 'seed-demo-g0-evidence',
+    };
+    await prisma.topicStat.upsert({ where: { id: s.id }, update: data, create: { id: s.id, ...data } });
+  }
+
+  // Consortium seats (weight 12) — deliberately partial: opp-1 has both roles, opp-3 and opp-5
+  // have one each, opp-2 and opp-4 have none, so `researchAndEndUser` itself stays differentiated.
+  const seats: { id: string; opportunityId: string; roleKey: string }[] = [
+    { id: 'demo-seat-opp1-research', opportunityId: 'demo-opp-1', roleKey: 'research' },
+    { id: 'demo-seat-opp1-end-user', opportunityId: 'demo-opp-1', roleKey: 'end_user' },
+    { id: 'demo-seat-opp3-research', opportunityId: 'demo-opp-3', roleKey: 'research' },
+    { id: 'demo-seat-opp5-end-user', opportunityId: 'demo-opp-5', roleKey: 'end_user' },
+  ];
+  for (const s of seats) {
+    const data = { tenantId: TENANT_ID, opportunityId: s.opportunityId, roleKey: s.roleKey, required: true, status: 'CONFIRMED' };
+    await prisma.consortiumSeat.upsert({ where: { id: s.id }, update: data, create: { id: s.id, ...data } });
+  }
+
+  // `seedOpportunities()` already scored each opportunity before this evidence existed (18/100,
+  // unscorable evidence). Rescore now so `Opportunity.g0Score` reflects the evidence just written
+  // instead of the stale pre-evidence number.
+  console.log('G0 evidence seeded for demo tenant — rescoring:');
+  for (const oppId of ['demo-opp-1', 'demo-opp-2', 'demo-opp-3', 'demo-opp-4', 'demo-opp-5']) {
+    const scored = await rescoreOpportunityG0(TENANT_ID, oppId);
+    const label =
+      scored?.score === null || scored?.score === undefined
+        ? 'unscored (no evidence)'
+        : `G0 ${scored.score} → ${scored.decision} (${Math.round(scored.coverage * 100)}% evidence coverage)`;
+    console.log(`  ${oppId}: ${label}`);
+  }
+}
 
 async function main() {
   console.log('Seeding Database...');
@@ -144,6 +250,7 @@ async function main() {
   await seedTenantWorkspace();
   await seedCalls();
   await seedOpportunities();
+  await seedG0DemoEvidence();
   await seedGateDecisions();
   await seedProposals();
   await seedEfforts();
