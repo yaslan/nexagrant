@@ -24,8 +24,10 @@ import {
   Moon,
   Monitor
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useTheme } from './ThemeProvider';
 import { getWorkspaceRoute, getPublicRoute } from '@/lib/routes';
+import { displayUserName } from '@/lib/user-display';
 import { isNextRedirectError } from '@/lib/errors';
 
 interface UserMenuProps {
@@ -55,13 +57,20 @@ export default function UserMenu({
 
   const sessionData = useOptionalSession();
 
+  const tIdentity = useTranslations('UserIdentity');
+
   const effectiveUserEmail = propUserEmail || sessionData?.user?.email;
-  const effectiveUserName =
-    propUserName ||
-    sessionData?.user?.name ||
-    (effectiveUserEmail?.includes('ayse') ? 'Prof. Dr. Ayşe Kaya' : 'Dr. Mehmet Yılmaz');
+  // Never invent an identity: the name falls back to the e-mail local part and then to a
+  // translated "unnamed user" label, never onto somebody else's name and title.
+  const effectiveUserName = displayUserName(
+    propUserName || sessionData?.user?.name,
+    effectiveUserEmail,
+    tIdentity('unnamedUser')
+  );
   const effectiveUserImage = propUserImage || sessionData?.user?.image;
-  const effectiveRoleName = propRoleName || sessionData?.role || 'TENANT_OWNER';
+  // Display only. Assuming TENANT_OWNER here would show an owner badge to a session that
+  // carries no role; authorization is decided server-side from `session.role`.
+  const effectiveRoleName = propRoleName || sessionData?.role || null;
 
   // Extract active workspace from pathname
   const segments = pathname ? pathname.split('/').filter(Boolean) : [];
@@ -349,9 +358,15 @@ export default function UserMenu({
                 <div className="min-w-0 flex-1">
                   <h4 className="font-bold text-sm text-ink truncate">{effectiveUserName}</h4>
                   <p className="text-xs text-muted truncate">{effectiveUserEmail}</p>
-                  <span className="inline-block mt-1 text-[10px] font-bold bg-accent/15 text-accent-ink border border-accent/20 px-2 py-0.5 rounded font-mono">
-                    {effectiveRoleName}
-                  </span>
+                  {effectiveRoleName ? (
+                    <span className="inline-block mt-1 text-[10px] font-bold bg-accent/15 text-accent-ink border border-accent/20 px-2 py-0.5 rounded font-mono">
+                      {effectiveRoleName}
+                    </span>
+                  ) : (
+                    <span className="inline-block mt-1 text-[10px] font-bold bg-surface-hover text-muted border border-border px-2 py-0.5 rounded font-mono">
+                      {tIdentity('noRole')}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

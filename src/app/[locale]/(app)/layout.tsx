@@ -5,6 +5,8 @@ import UserMenu from '@/components/UserMenu';
 import ThemeToggle from '@/components/ThemeToggle';
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
+import { displayUserName } from '@/lib/user-display';
 
 import MobileAppHeader from '@/components/MobileAppHeader';
 import FeedbackWidget from '@/components/FeedbackWidget';
@@ -24,10 +26,19 @@ export default async function AppLayout({
   }
 
   const user = session.user;
-  const userName = user.name || (user.email?.includes('ayse') ? 'Prof. Dr. Ayşe Kaya' : 'Dr. Mehmet Yılmaz');
-  const userEmail = user.email || 'mehmet@fabrika.app';
+  const t = await getTranslations({ locale, namespace: 'UserIdentity' });
+
+  // Never invent an identity. The name falls back to the e-mail local part and then to a
+  // translated "unnamed user" label; the e-mail is shown only if the session carries one.
+  const userName = displayUserName(user.name, user.email, t('unnamedUser'));
+  const userEmail = user.email || undefined;
   const userImage = user.image || undefined;
-  const roleName = session?.role || 'TENANT_OWNER';
+
+  // Display only: every authorization decision reads `session.role` server-side
+  // (src/lib/tenant.ts, src/lib/rbac.ts). Assuming the HIGHEST role here would put a
+  // "TENANT_OWNER" badge on a session that holds no role at all, so an absent role stays
+  // absent and the menu labels it as unassigned.
+  const roleName = session?.role || undefined;
   const isPlatformAdmin = Boolean(
     session?.isPlatformAdmin ||
     session?.user?.isPlatformAdmin ||

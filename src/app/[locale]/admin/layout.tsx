@@ -1,6 +1,8 @@
 import React from 'react';
 import { auth } from '@/lib/auth';
 import { isPlatformAdminSession } from '@/lib/tenant';
+import { getTranslations } from 'next-intl/server';
+import { displayUserName } from '@/lib/user-display';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import UserMenu from '@/components/UserMenu';
@@ -92,10 +94,17 @@ export default async function AdminLayout({
   ];
 
   const user = session?.user;
-  const userName = user?.name || 'Süper Admin (Platform Console)';
-  const userEmail = user?.email || 'admin@yasinaslan.com.tr';
+  const t = await getTranslations({ locale, namespace: 'UserIdentity' });
+
+  // Same rule as the workspace frame: never invent who is signed in. The console used to
+  // fall back onto a fixed title and onto a real person's e-mail address, so an admin
+  // session without a name was labelled with somebody else's account.
+  const userName = displayUserName(user?.name, user?.email, t('unnamedUser'));
+  const userEmail = user?.email || undefined;
   const userImage = user?.image || undefined;
-  const roleName = session?.role || 'SUPER_ADMIN';
+  // The route is already gated by `isPlatformAdminSession` above; the badge only reports
+  // the role the session actually carries, and SUPER_ADMIN is never assumed.
+  const roleName = session?.role || undefined;
 
   return (
     <div className="min-h-screen bg-ground text-ink flex flex-col font-sans">
