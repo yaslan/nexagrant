@@ -27,10 +27,10 @@ export default async function AppLayout({
   const userName = user.name || (user.email?.includes('ayse') ? 'Prof. Dr. Ayşe Kaya' : 'Dr. Mehmet Yılmaz');
   const userEmail = user.email || 'mehmet@fabrika.app';
   const userImage = user.image || undefined;
-  const roleName = (session as any)?.role || 'TENANT_OWNER';
+  const roleName = session?.role || 'TENANT_OWNER';
   const isPlatformAdmin = Boolean(
-    (session as any)?.isPlatformAdmin ||
-    (session?.user as any)?.isPlatformAdmin ||
+    session?.isPlatformAdmin ||
+    session?.user?.isPlatformAdmin ||
     userEmail === 'admin@yasinaslan.com.tr' ||
     roleName === 'SUPER_ADMIN' ||
     roleName === 'PLATFORM_ADMIN'

@@ -11,7 +11,7 @@ export default async function RelationshipDetailPage({
 }) {
   const { id, locale, workspace } = await params;
   const session = await auth();
-  const tenantId = (session as any)?.tenantId;
+  const tenantId = session?.tenantId;
 
   const rel = await prisma.relationship.findFirst({
     where: { id, tenantId },

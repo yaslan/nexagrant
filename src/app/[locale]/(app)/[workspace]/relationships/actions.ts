@@ -5,7 +5,7 @@ import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 
 /**
- * `tenantId` was read as `(session as any).tenantId` with no null check, and
+ * `tenantId` was read as `session.tenantId` with no null check, and
  * `addInteraction` updated the relationship by `id` alone. Prisma treats an
  * `undefined` field in a `where` clause as absent, so a session without a
  * tenant wrote interactions into whatever relationship id it was given.

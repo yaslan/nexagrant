@@ -15,8 +15,8 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
     return { allowed: false, status: 'OFF', reason: 'Not authenticated' };
   }
 
-  const tenantId = (session as any).tenantId;
-  const role = (session as any).role as Role;
+  const tenantId = session.tenantId;
+  const role = session.role as Role;
 
   if (!tenantId) {
     return { allowed: false, status: 'OFF', reason: 'No active tenant' };

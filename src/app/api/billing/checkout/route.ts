@@ -14,7 +14,7 @@ const stripe = isLiveStripe ? new Stripe(stripeSecretKey!, {
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    const tenantId = (session as any)?.tenantId || 'default-tenant';
+    const tenantId = session?.tenantId || 'default-tenant';
 
     const body = await req.json();
     const { priceId, items, mode = 'subscription', couponCode, discountPercent, locale = 'tr', workspace = 'default' } = body;

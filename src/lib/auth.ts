@@ -294,10 +294,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Defaulting them (to a demo tenant, or to TENANT_OWNER) is how a user
         // with no membership silently gained another tenant's data and an
         // owner's permissions.
-        (session as any).tenantId = token.tenantId ?? null;
-        (session as any).role = token.role ?? null;
-        (session as any).workspaceIds = token.workspaceIds ?? [];
-        (session as any).isPlatformAdmin = token.isPlatformAdmin || token.email === "admin@yasinaslan.com.tr";
+        // The token is a `Record<string, unknown>` (see src/types/next-auth.d.ts
+        // for why it is not augmented), so each claim is narrowed on the way out
+        // rather than asserted.
+        session.tenantId = typeof token.tenantId === "string" ? token.tenantId : null;
+        session.role = typeof token.role === "string" ? token.role : null;
+        session.workspaceIds = Array.isArray(token.workspaceIds)
+          ? token.workspaceIds.filter((id): id is string => typeof id === "string")
+          : [];
+        session.isPlatformAdmin =
+          token.isPlatformAdmin === true || token.email === "admin@yasinaslan.com.tr";
       }
       return session;
     },

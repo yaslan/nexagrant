@@ -34,7 +34,7 @@ export default async function AdminLayout({
 
   // auth.ts already resolves the flag for the superadmin email, so the check is
   // the shared claim reader rather than a second email allow-list here.
-  const isPlatformAdmin = isPlatformAdminSession(session as any);
+  const isPlatformAdmin = isPlatformAdminSession(session);
 
   if (!isPlatformAdmin) {
     notFound();
@@ -95,7 +95,7 @@ export default async function AdminLayout({
   const userName = user?.name || 'Süper Admin (Platform Console)';
   const userEmail = user?.email || 'admin@yasinaslan.com.tr';
   const userImage = user?.image || undefined;
-  const roleName = (session as any)?.role || 'SUPER_ADMIN';
+  const roleName = session?.role || 'SUPER_ADMIN';
 
   return (
     <div className="min-h-screen bg-ground text-ink flex flex-col font-sans">

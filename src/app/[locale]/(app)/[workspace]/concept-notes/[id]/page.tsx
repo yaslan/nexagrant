@@ -12,7 +12,7 @@ export default async function ConceptNoteDetailPage({
 }) {
   const { id, locale, workspace } = await params;
   const session = await auth();
-  const tenantId = (session as any)?.tenantId;
+  const tenantId = session?.tenantId;
 
   let note: any = null;
   let template: any = null;

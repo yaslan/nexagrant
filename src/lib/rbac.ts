@@ -75,6 +75,19 @@ export function can(role: Role | undefined | null, action: Action): boolean {
   return permissions ? permissions.includes(action) : false;
 }
 
+/**
+ * Narrows a session's `role` claim to a {@link Role}, or `null` when it names
+ * no current role.
+ *
+ * `Session.role` is a plain string because a token minted before a role was
+ * renamed still carries the old value. A value outside the enum grants nothing,
+ * which is what `can` already did for it — the permission table simply has no
+ * entry to look up.
+ */
+export function asRole(role: string | undefined | null): Role | null {
+  return role !== null && role !== undefined && role in rolePermissions ? (role as Role) : null;
+}
+
 export type DualApprovalActionType =
   | "GATE_G4_SUBMISSION"
   | "BUDGET_ALLOCATION"

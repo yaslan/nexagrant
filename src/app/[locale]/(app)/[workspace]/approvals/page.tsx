@@ -11,9 +11,9 @@ export default async function ApprovalsPage({
 }) {
   const { locale, workspace } = await params;
   const session = await auth();
-  const tenantId = (session as any)?.tenantId;
+  const tenantId = session?.tenantId;
   const currentUserId = session?.user?.id || '';
-  const currentUserRole = ((session as any)?.role as Role) || 'MEMBER';
+  const currentUserRole = (session?.role as Role) || 'MEMBER';
 
   let requests: any[] = [];
   try {

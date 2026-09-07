@@ -8,7 +8,7 @@ import { getPublicRoute } from '@/lib/routes';
  *
  * CLAUDE.md §1 requires every business query to be tenant-scoped. Before this
  * module the codebase resolved the tenant with inline fallbacks
- * (`(session as any)?.tenantId || 'demo-tenant-1'`, or `prisma.tenant.findFirst()`).
+ * (`session?.tenantId || 'demo-tenant-1'`, or `prisma.tenant.findFirst()`).
  * Both are silent cross-tenant grants: `demo-tenant` is a *real* row in the
  * database, so a caller with a broken or missing session was handed a live
  * tenant's data instead of being rejected.

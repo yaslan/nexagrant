@@ -7,7 +7,7 @@ import { buildRagPrompt } from '@/lib/rag';
 import { revalidatePath } from 'next/cache';
 
 /**
- * `tenantId` was read as `(session as any).tenantId` with no null check. Prisma
+ * `tenantId` was read as `session.tenantId` with no null check. Prisma
  * treats an `undefined` field in a `where` clause as absent, so
  * `findFirst({ where: { id, tenantId: undefined } })` matched a note in *any*
  * tenant — and the follow-up `update({ where: { id } })` then wrote to it.

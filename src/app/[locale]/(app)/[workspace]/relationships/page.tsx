@@ -11,7 +11,7 @@ export default async function RelationshipsPage({
 }) {
   const { locale, workspace } = await params;
   const session = await auth();
-  const tenantId = (session as any)?.tenantId;
+  const tenantId = session?.tenantId;
 
   let relationships: any[] = [];
   try {

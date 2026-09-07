@@ -12,7 +12,7 @@ import { DualApprovalActionType } from '@/lib/rbac';
 import { Role } from '@prisma/client';
 
 /**
- * `tenantId` used to be read as `(session as any).tenantId` with no null check
+ * `tenantId` used to be read as `session.tenantId` with no null check
  * and passed straight into the dual-approval helpers. Prisma treats an
  * `undefined` field in a `where` clause as *absent*, so a session without a
  * tenant approved and cancelled requests across the whole platform.

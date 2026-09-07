@@ -10,7 +10,7 @@ export default async function EvidencePage({
 }) {
   const { locale } = await params;
   const session = await auth();
-  const tenantId = (session as any)?.tenantId;
+  const tenantId = session?.tenantId;
 
   let evidence: any[] = [];
   try {

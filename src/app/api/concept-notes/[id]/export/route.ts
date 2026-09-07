@@ -10,7 +10,7 @@ export async function GET(
 ) {
   const { id } = await params;
   const session = await auth();
-  const tenantId = (session as any)?.tenantId;
+  const tenantId = session?.tenantId;
 
   if (!tenantId) {
     return new NextResponse('Unauthorized', { status: 401 });

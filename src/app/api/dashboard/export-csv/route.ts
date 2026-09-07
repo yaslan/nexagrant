@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { can } from '@/lib/rbac';
+import { asRole, can } from '@/lib/rbac';
 
 type OppWithRelations = Awaited<
   ReturnType<typeof prisma.opportunity.findMany>
@@ -12,8 +12,8 @@ export async function GET(request: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const userRole = (session as any)?.role;
-  const tenantId = (session as any)?.tenantId;
+  const userRole = asRole(session?.role);
+  const tenantId = session?.tenantId;
 
   // Authorization
   if (!can(userRole, 'evaluate_gates')) {
