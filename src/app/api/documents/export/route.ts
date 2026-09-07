@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { generateDocxBuffer, generatePdfHtml } from '@/lib/document-exporter';
 import { DEFAULT_PART_B_SECTIONS } from '@/modules/m11/types';
 import { prisma } from '@/lib/db';
+import type { PartBSectionItem } from '@/modules/m11/types';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -10,7 +11,7 @@ export async function GET(req: Request) {
   const title = searchParams.get('title') || `${type} Document`;
   const partId = searchParams.get('partId');
 
-  let sections: any[] = [];
+  let sections: PartBSectionItem[] = [];
   if (type === 'PART_B') {
     if (partId) {
       try {

@@ -3,6 +3,29 @@ import { authenticateApiKey } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 
+/**
+ * One row of GET /api/v1/calls — the `select` below, which is also the shape
+ * the offline demo rows imitate.
+ */
+interface CallApiRow {
+  id?: string;
+  topicId: string;
+  title: string;
+  programme: string | null;
+  callId: string | null;
+  deadlineAt: Date | string | null;
+  deadlineTz: string | null;
+  budgetTotalEur: number | bigint | null;
+  fundingType: string | null;
+  status: string | null;
+  /**
+   * Only the offline demo rows carry this — the Topic table has no such
+   * column, so a consumer sees it exactly when the database is unreachable.
+   * Recorded in the TASK-MTQ60SGW45T0X report rather than quietly dropped.
+   */
+  expectedGrantRangeEur?: string;
+}
+
 export async function GET(req: Request) {
   const authRes = await authenticateApiKey(req);
   if (!authRes.authenticated) {
@@ -14,10 +37,10 @@ export async function GET(req: Request) {
   const status = searchParams.get('status') || 'OPEN'; // OPEN, FORTHCOMING, CLOSED
   const limit = Math.min(50, parseInt(searchParams.get('limit') || '20', 10));
 
-  let calls: any[] = [];
+  let calls: CallApiRow[] = [];
 
   try {
-    const where: any = {};
+    const where: Record<string, unknown> = {};
     if (programme) where.programme = { contains: programme, mode: 'insensitive' };
     if (status) where.status = status;
 

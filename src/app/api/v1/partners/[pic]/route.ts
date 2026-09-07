@@ -3,6 +3,52 @@ import { authenticateApiKey } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 
+/**
+ * The body of GET /api/v1/partners/[pic].
+ *
+ * A union because the two branches are **not the same shape**: the live row is
+ * the Organization record with its `participations`, while the offline
+ * fallback returns a curated `metrics`/`recentProjects`/`networkHub` document
+ * that no table produces. A consumer therefore sees a different contract
+ * depending on whether the database is reachable. Reconciling them is an API
+ * decision, not a lint fix; recorded in the TASK-MTQ60SGW45T0X report.
+ */
+type PartnerDetailApiRow =
+  | {
+      id: string;
+      pic: string | null;
+      name: string;
+      country: string | null;
+      orgType: string | null;
+      isSme: boolean;
+      participations: unknown[];
+    }
+  | {
+      pic: string;
+      name: string;
+      country: string;
+      orgType: string;
+      city: string;
+      isSme: boolean;
+      metrics: {
+        totalProjects: number;
+        coordinatorRoles: number;
+        totalFundingEur: number;
+        averageTeamSize: number;
+        preferredPillars: string[];
+      };
+      recentProjects: Array<{
+        projectAcronym: string;
+        projectTitle: string;
+        programme: string;
+        role: string;
+        grantAmountEur: number;
+        startDate: string;
+        status: string;
+      }>;
+      networkHub: { topCoAuthors: string[]; cooperationIndex: number };
+    };
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ pic: string }> }
@@ -14,7 +60,7 @@ export async function GET(
 
   const { pic } = await params;
 
-  let partner: any = null;
+  let partner: PartnerDetailApiRow | null = null;
 
   try {
     partner = await prisma.organization.findUnique({

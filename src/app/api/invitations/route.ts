@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withTenant } from '@/lib/db';
 import { requireTenantApi } from '@/lib/tenant';
 import { randomBytes } from 'crypto';
+import type { InvitationRow } from '@/types/db-rows';
 
 /**
  * Invites a user into the caller's own tenant.
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
     const token = randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    const result = await withTenant<{ conflict: boolean; invitation: any }>(tenantId, async (tx) => {
+    const result = await withTenant<{ conflict: boolean; invitation: InvitationRow | null }>(tenantId, async (tx) => {
       const existingMembership = await tx.membership.findFirst({
         where: {
           tenantId,

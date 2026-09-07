@@ -3,6 +3,22 @@ import { authenticateApiKey } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 
+/**
+ * One row of GET /api/v1/partners — the `select` below, which the offline demo
+ * rows imitate. `stats` is a Json column, so it stays `unknown` here.
+ */
+interface PartnerApiRow {
+  id: string;
+  pic: string | null;
+  name: string;
+  legalName: string | null;
+  country: string | null;
+  orgType: string | null;
+  isSme: boolean;
+  city: string | null;
+  stats?: unknown;
+}
+
 export async function GET(req: Request) {
   const authRes = await authenticateApiKey(req);
   if (!authRes.authenticated) {
@@ -15,10 +31,10 @@ export async function GET(req: Request) {
   const q = searchParams.get('q')?.toLowerCase();
   const limit = Math.min(50, parseInt(searchParams.get('limit') || '20', 10));
 
-  let partners: any[] = [];
+  let partners: PartnerApiRow[] = [];
 
   try {
-    const where: any = {};
+    const where: Record<string, unknown> = {};
     if (country) where.country = country.toUpperCase();
     if (orgType) where.orgType = orgType.toUpperCase();
     if (q) {

@@ -178,3 +178,13 @@ export interface ApiKeyRow {
   lastUsedAt: Date | null;
   createdAt: Date;
 }
+
+/** `model Invitation` — a pending workspace invite. */
+export interface InvitationRow {
+  id: string;
+  email: string;
+  tenantId: string;
+  token: string;
+  role: string;
+  expires: Date;
+}

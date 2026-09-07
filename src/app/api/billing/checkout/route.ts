@@ -10,6 +10,26 @@ const stripe = isLiveStripe ? new Stripe(stripeSecretKey!, {
   apiVersion: '2026-08-26.dahlia',
 }) : null;
 
+/**
+ * One line of the checkout request body.
+ *
+ * NOTE: `price`/`originalPrice` arrive from the client and are what the Stripe
+ * unit amount is computed from, so a caller can name its own price. Fixing
+ * that needs a server-side catalogue lookup, which is a billing change rather
+ * than a lint fix; recorded in the TASK-MTQ60SGW45T0X report.
+ */
+interface CheckoutItem {
+  id: string;
+  name: string;
+  subtitle?: string;
+  type: 'plan' | 'lifetime' | string;
+  price: number;
+  originalPrice?: number;
+  discountPercent?: number;
+  billingCycle?: 'monthly' | 'yearly' | string;
+  quantity?: number;
+}
+
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -19,7 +39,7 @@ export async function POST(req: Request) {
     const { priceId, items, mode = 'subscription', couponCode, discountPercent, locale = 'tr', workspace = 'default' } = body;
 
     // Determine cart items or single item
-    const checkoutItems = items && Array.isArray(items) && items.length > 0
+    const checkoutItems: CheckoutItem[] = items && Array.isArray(items) && items.length > 0
       ? items
       : priceId
       ? [{ id: priceId, name: 'Plan/Add-on', price: 45, quantity: 1, type: mode === 'payment' ? 'lifetime' : 'plan' }]
@@ -43,7 +63,7 @@ export async function POST(req: Request) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     // Map checkout items to Stripe line items
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = checkoutItems.map((item: any) => {
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = checkoutItems.map((item) => {
       const discount = item.type === 'lifetime' ? 50 : (item.discountPercent ?? discountPercent ?? 0);
       const unitAmountCents = Math.round((item.originalPrice || item.price) * (1 - discount / 100) * 100);
 
@@ -61,7 +81,7 @@ export async function POST(req: Request) {
       };
     });
 
-    const isSubscriptionMode = checkoutItems.some((i: any) => i.type === 'plan');
+    const isSubscriptionMode = checkoutItems.some((i) => i.type === 'plan');
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: isSubscriptionMode ? 'subscription' : 'payment',
@@ -72,7 +92,7 @@ export async function POST(req: Request) {
         tenantId,
         couponCode: couponCode || 'NONE',
         discountPercent: String(discountPercent || 0),
-        itemTypes: checkoutItems.map((i: any) => i.type).join(','),
+        itemTypes: checkoutItems.map((i) => i.type).join(','),
       },
       success_url: `${appUrl}/${locale}/${workspace}/settings/billing?success=true`,
       cancel_url: `${appUrl}/${locale}/${workspace}/settings/billing?canceled=true`,
