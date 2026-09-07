@@ -1,1 +1,4 @@
 - [Verify before every commit, not just after git add](git-add-verify-before-commit.md) — a scoped `git add` can still get swept by a concurrent agent's stage before commit; check `git diff --cached` right before committing
+- [ROADMAP.md section conventions](fabrika-roadmap-section-conventions.md) — where a finding goes: module status line vs "Açık kararlar" vs "Riskler (teknik)" — don't dump everything into one place
+- [Shared messages/*.json may already be committed](fabrika-shared-messages-json-may-already-be-committed.md) — a parallel agent's commit can sweep up your unstaged i18n edits before you commit them; empty `git diff` ≠ your edit was lost
+- [AgentSpace browser click fallback: Playwright](agentspace-browser-click-fallback-playwright.md) — when the internal browser tool's click keeps failing, drive a throwaway @playwright/test script against the running dev server for real-click evidence

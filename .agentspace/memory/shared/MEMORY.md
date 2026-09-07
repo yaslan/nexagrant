@@ -20,7 +20,6 @@
 
 - [fabrika-g0-scoring-three-implementations](fabrika-g0-scoring-three-implementations.md) — G0 skoru için üç ayrı ve çelişkili gerçeklik var (rastgele sayı, 0-10 model, PROJECT.md'nin 0-100 ağırlıkları) ve 70 eşiğinin hangisine uygulandığı karara bağlı
 
-- [fabrika-sentry-envelope-without-sdk](fabrika-sentry-envelope-without-sdk.md) — Fabrika'da Sentry'ye SDK'sız gönderim — envelope HTTP sözleşmesi, DSN yokken no-op deseni ve fetch BodyInit tuzağı
 
 - [agentspace-delegate-splits-numbered-lists](agentspace-delegate-splits-numbered-lists.md) — agentspace_delegate objective'indeki numaralı/madde listesini alt-görevlere böler — tek ajana verilecek çok adımlı iş listesiz yazılmalı
 
@@ -51,3 +50,47 @@
 
 - [fabrika-done-reports-can-be-wrong](fabrika-done-reports-can-be-wrong.md) — Fabrika'da worker "bitti + DoD 5/5" raporu verdiği halde özellik hiç çalışmayabiliyor — M9.2 örneği (2026-09-07): brief hiç kaydedilmiyordu, i18n iddiası yalandı
 - [fabrika-module-state-not-enforced](fabrika-module-state-not-enforced.md) — ModuleState (OFF/DEV/PILOT/ON) hiçbir route'ta kontrol edilmiyor — checkModuleAccess/requireModule hiç çağrılmıyor, sistemik ve M9'a özgü değil
+
+- [fabrika-e2e-own-fixture-hides-route-bugs](fabrika-e2e-own-fixture-hides-route-bugs.md) — Kendi kiracısını seed eden e2e testi yeşilken aynı rota demo-tenant'ta sonsuz iskelette takılabiliyor — M6 panel rotası örneği (2026-09-07)
+- [fabrika-gate-engine-has-no-callers](fabrika-gate-engine-has-no-callers.md) — evaluateGate() Fabrika'da hiçbir uygulama kodundan çağrılmıyor — yalnız testler çağırıyor; kullanıcının gördüğü tek "Kapıyı Değerlendir" düğmesi bir alert() tiyatrosu
+- [fabrika-post-commit-stamp-must-not-fail-request](fabrika-post-commit-stamp-must-not-fail-request.md) — Doğruluk kaynağı satır yazıldıktan SONRA çalışan "sonucu damgala" güncellemesi korumasızsa, kaydedilmiş bir bildirimi kullanıcıya "kaydedilemedi" diye gösterir — Fabrika'da gerçek gönderimde ölçüldü
+- [fabrika-theme-tokens-not-dark-variant](fabrika-theme-tokens-not-dark-variant.md) — Fabrika UI'da renk için ham Tailwind paleti + dark: varyantı yerine globals.css tema token'ları kullan — arka planı boyayıp metni temaya bırakan satır koyu temada okunmaz oluyor
+
+- [agentspace-browser-session-is-shared-between-agents](agentspace-browser-session-is-shared-between-agents.md) — Gömülü tarayıcı tüm ajanlar için TEK oturum — paralel bir ajan giriş yaparsa senin oturumun ortasında kullanıcı/kiracı değişir ve testin sessizce yanlış veriyi ölçer
+- [agentspace-browser-type-does-not-update-react-state](agentspace-browser-type-does-not-update-react-state.md) — agentspace_browser'ın type eylemi DOM'a yazıyor ama React onChange'i tetiklemiyor — disabled={!state} olan submit düğmeleri tıklanamaz kalıyor, sessizce
+- [fabrika-agents-share-one-working-tree](fabrika-agents-share-one-working-tree.md) — Fabrika'da paralel ajanlar TEK çalışma ağacını paylaşır — commit ederken yalnız kendi yollarını ver, `git commit -a`/çıplak `git add .` başkasının yarım işini yutar
+- [fabrika-ci-has-no-remote](fabrika-ci-has-no-remote.md) — Fabrika deposunun git remote'u YOK — .github/workflows/ci.yml hiçbir zaman koşmaz, kapı yalnız lokal komutlardır
+- [fabrika-force-server-action-failure-in-browser](fabrika-force-server-action-failure-in-browser.md) — Bir server action'ın hata dallarını GERÇEK tarayıcıda, action dosyasına dokunmadan tetiklemenin iki yolu — page.route abort (fırlatma) ve elde kurulmuş RSC flight gövdesiyle fulfill (belirli bir dönüş değeri)
+- [fabrika-module-gate-is-opt-in](fabrika-module-gate-is-opt-in.md) — Fabrika'da modül kapısı sayfa başına opt-in — moduleGate() çağırmayan yeni bir sayfa kapalı modülü herkese açar; server action'da assertModuleAccess ilk satır olmalı
+- [fabrika-notfound-returns-http-200](fabrika-notfound-returns-http-200.md) — Fabrika'da notFound() çağıran sayfa doğru 404 EKRANINI gösterir ama sunucu HTTP 200 döner — "404 çalışıyor" kanıtını ekran görüntüsüne dayandırma, durum kodunu ayrıca ölç
+- [fabrika-usetranslations-breaks-existing-tests](fabrika-usetranslations-breaks-existing-tests.md) — Bir bileşene useTranslations eklemek onun MEVCUT testlerini kırar — bu repoda global next-intl kurulumu yok, her render NextIntlClientProvider ile sarılmalı
+
+- [fabrika-concurrent-commit-steals-your-stage](fabrika-concurrent-commit-steals-your-stage.md) — Fabrika'da index paylaşıldığı için başka bir ajanın commit'i senin stage'lediğin dosyaları kendi commit'ine alabilir — commit çağrın "no changes added" derse işin kaybolmadı, HEAD'e bak
+- [fabrika-css-uppercase-turkish-dotted-i](fabrika-css-uppercase-turkish-dotted-i.md) — CSS text-transform uppercase under html lang="tr" Turkish-cases hardcoded/untranslated text — English words get an incorrect dotted İ (e.g. "Consortium" → "CONSORTİUM")
+- [fabrika-db-seed-broken-on-empty-db](fabrika-db-seed-broken-on-empty-db.md) — pnpm db:seed BOŞ bir veritabanında P2003 ile düşüyor — seedG0DemoEvidence, hiçbir seeder'ın üretmediği demo-topic-1..6 Topic id'lerine TopicMatch bağlıyor; düşünce sonraki tüm seed adımları (teklifler, M6 paneli, gate kararları) hiç koşmuyor
+- [fabrika-esr-calibration-fixture-lost-in-s10-rebuild](fabrika-esr-calibration-fixture-lost-in-s10-rebuild.md) — S10 çökme dalgasının şema rebuild'i esr-calibration kiracısını (20 örnek fırsat, scripts/esr-calibration.ts) sildi — TASK-MTQ2KL3JO4MK2 devam etmeden önce --apply ile yeniden üretilmeli
+- [fabrika-module-off-blocks-platform-admin-too](fabrika-module-off-blocks-platform-admin-too.md) — ModuleState OFF (missing row) blocks a page for EVERYONE including platform admin — no bypass; and /admin/modules has a race bug where rapid sequential ON clicks on dependent modules can silently revert to OFF
+- [fabrika-render-loop-reads-as-infinite-skeleton](fabrika-render-loop-reads-as-infinite-skeleton.md) — "Sonsuz iskelet" şikâyeti genelde veri katmanı değil, kabuktaki sınırsız React render döngüsüdür — React 19 bileşen yığını basmaz, console.error'ı addInitScript ile sarıp JS yığınını yakala
+- [fabrika-rls-can-silently-disappear](fabrika-rls-can-silently-disappear.md) — Şema yeniden kurulunca RLS politikaları uçar ve hiçbir şey söylemez — kırmızı RLS testini "ortam hatası" sanma, ölç
+- [fabrika-task-id-reuse-in-wave](fabrika-task-id-reuse-in-wave.md) — The same TASK-xxxx id can be handed to multiple agents for unrelated work in a closing wave — evidence/screenshot folders under that id may hold another task's files
+
+- [fabrika-free-string-columns-fail-silently](fabrika-free-string-columns-fail-silently.md) — Serbest string sütunu literal ile karşılaştırmak sessizce 0 üretir — tarama tarifi ve Fabrika'daki 9 sütunun sonucu (ölçüldü 2026-09-07)
+- [fabrika-honest-fallback-over-invented-identity](fabrika-honest-fallback-over-invented-identity.md) — Fabrika'da bir `||` fallback'i eksik veriyi UYDURUYORSA bu bir bug'dır — kimlik/rol için doğru cevap gerçek veriden türetmek ya da "bilinmiyor" demek, en yüksek/en tanıdık değeri varsaymak değil
+- [fabrika-prove-the-fix-against-the-real-database](fabrika-prove-the-fix-against-the-real-database.md) — Kiracı izolasyonu düzeltmesini mock'la değil gerçek Postgres'e karşı kanıtla — eski kodu geçici geri alıp e2e'yi koşmak "kusur teorikti" tartışmasını tek çıktıyla bitirir
+- [fabrika-shared-json-whole-file-add-swallows-others-edits](fabrika-shared-json-whole-file-add-swallows-others-edits.md) — messages/tr.json veya messages/en.json'a `git add <o dosya>` çağırmak, tam o anda dosyayı düzenleyen başka bir ajanın commit'lenmemiş satırlarını da stage'ler — dosya yolu tekil olsa bile içerik paylaşılıyor
+- [fabrika-tenant-filter-check-the-write-too](fabrika-tenant-filter-check-the-write-too.md) — Bir fonksiyonda kiracı filtresiz OKUMA bulduğunda aynı fonksiyondaki YAZMAYA da bak — Fabrika'da kapı motorunda okuma rapor edilmişti, asıl ağır kusur update({where:{id}}) idi
+
+- [fabrika-client-priced-checkout-was-undercharging](fabrika-client-priced-checkout-was-undercharging.md) — Fabrika checkout istemciden fiyat alıyordu — saldırı kadar önemlisi meşru mutlu yolun 12 kat eksik fatura kesmesiydi; istemci fiyatı yasaklandığında ekranlar da aynı sürümde düzelmeli
+- [fabrika-three-pricing-universes](fabrika-three-pricing-universes.md) — Fabrika'da fiyat üç ayrı yerde koda gömülüydü ve sunucu hiçbirini bilmiyordu — kanonik katalog USD 3 plan (patron kararı, 2026-09-07)
+
+- [fabrika-env-flip-restarts-shared-dev-server](fabrika-env-flip-restarts-shared-dev-server.md) — Sunucu-tarafı bir env değişkenini gerçek tarayıcıda doğrulamak için .env'e satır ekle — Next dev kendini yeniden başlatır, paylaşılan :3000 sunucusunu öldürmen gerekmez; sonra .env'i geri al
+- [fabrika-i18n-messages-cannot-hold-arrays](fabrika-i18n-messages-cannot-hold-arrays.md) — messages/tr.json ve en.json'da dizi kullanma — tests/i18n.test.ts her yaprağın boş olmayan STRING olmasını şart koşuyor; özellik listelerini f1..fN anahtarlarına aç
+
+- [fabrika-seed-was-broken-mid-run](fabrika-seed-was-broken-mid-run.md) — Fabrika'da pnpm db:seed ortada durup fixture'ların yarısını yazmayabiliyordu — e2e "benim yüzümden mi" sorusunda önce seed'in exit kodunu kontrol et
+
+- [fabrika-i18n-check-parametrized-key-false-positive](fabrika-i18n-check-parametrized-key-false-positive.md) — pnpm i18n:check parametreli t('key', {…}) çağrılarını göremez ve anahtarı "unused" sayar — bu bir hata değil; ayrıca komut bu depoda zaten exit 1 dönüyor ve pnpm gate'in parçası değil
+- [fabrika-lifetime-sale-is-never-persisted](fabrika-lifetime-sale-is-never-persisted.md) — Ömür boyu lisans satışı hiçbir yere yazılmıyor — Stripe webhook'u yalnız abonelikli oturumu işliyor
+- [fabrika-public-count-over-rls-table](fabrika-public-count-over-rls-table.md) — Herkese açık bir sayfada kiracıya özel bir tablonun sayısını göstermek gerekiyorsa düz SELECT sessizce 0 döner — prisma/rls.sql'e SECURITY DEFINER sayaç fonksiyonu koy ve "sayı okunamadı"yı sıfırdan ayır
+
+- [fabrika-billing-ui-lives-in-two-namespaces](fabrika-billing-ui-lives-in-two-namespaces.md) — Fiyat rozetleri iki panelde birden yaşıyor — billingPanels.pricing düzeltilip billingPanels.settings unutuluyor
+- [fabrika-plan-card-copy-contradicts-plan-grants](fabrika-plan-card-copy-contradicts-plan-grants.md) — Plan kartlarındaki özellik satırları (koltuk/kredi/modül) i18n metni — yetkilendirmenin koştuğu PLAN_GRANTS ile sekiz yerde çelişiyor, yani kullanıcı kartta okuduğunu almıyor

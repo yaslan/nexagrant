@@ -58,6 +58,44 @@ yüzden bir tasarım ortağının hattında ya da KPI panosunda **görünmez**. 
 - `Plan` **elle yazılmaz**: `src/lib/billing/catalog.ts`'in izdüşümüdür (`free`, `basic`, `pro`, `ultra`; USD liste fiyatı) ve `prisma/seed.ts` §2 tarafından yazılır. EUR merdiveni (`starter/team/business/enterprise`) `prisma/migrations/retire-eur-plan-ladder.sql` ile emekliye ayrıldı — eşleme tablosu ve gerekçesi `docs/BILLING.md` §9. `Subscription.planId`'de yabancı anahtar **yoktur**; emekli bir id ile karşılaşan kod `resolvePlanId()` ile karşılığına çevirir.
 - Etkin kapsam (`entitlements(tenant)`) = plan + aktif eklentiler; `canEnable` bunu ve bağımlılıkları kontrol eder.
 
+### 5.1 Katılım fiyatı kilidi (`Subscription.locked*`) — TASK-MTR882HVZ8BG7
+
+Fiyat sayfası iki katalogda da **"Katıldığınız fiyat sabit kalır"** diyor. Bunu
+karşılayan hiçbir kayıt yoktu: `Subscription` yalnızca plan/durum/dönem tutuyordu,
+her fiyat `getActiveTier()`'dan (o an açık kampanya) hesaplanıyordu. Ölçüm: ILK5
+altında Pro aylık $26.10 ile katılan kiracı, kampanya kapandığında aynı plan için
+$87.00 görüyordu (3,33×).
+
+| Sütun | Tip | Anlamı |
+|---|---|---|
+| `lockedTierCode` | `String?` | Oranın geldiği kampanya (ör. `ILK5`) — köken bilgisi, fiyat otoritesi değil |
+| `lockedPercentOff` | `Int?` | Yenilemede ve bu kiracının her yeni satırında uygulanan oran |
+| `lockedAmountMinor` | `Int?` | O oranla bir dönemin gerçekte kaça mal olduğu (minor unit, kural 9) |
+| `lockedCurrency` | `String?` | `lockedAmountMinor`'ın para birimi |
+| `priceLockedAt` | `DateTime?` | Kilidin yazıldığı an |
+
+- **Beşi birlikte** ya doludur ya boştur; `Subscription_price_lock_complete`
+  CHECK kısıtı yarım yazılmış bir kilidi veritabanı seviyesinde reddeder
+  (`lockedPercentOff` 0–100, `lockedAmountMinor` ≥ 0 da orada doğrulanır).
+- **Hepsi NULL** = kilit yokken satılmış abonelik; vitrin kademesiyle
+  fiyatlanmaya devam eder. Ne sattığımız kayıtlı olmadığı için bugünkü kampanyayı
+  üstüne damgalamak müşterinin oranını sessizce **yükseltebilirdi**.
+- Kural tek yerde: `src/lib/billing/price-lock.ts` (saf, birim testli).
+  Yazma yolları: `subscription-sync.ts` (Stripe) ve `iyzico.ts`. Okuma yolları:
+  `settings/billing/page.tsx` ve `POST /api/billing/checkout`.
+- **Neden ayrı tablo değil:** `Subscription` kiracı başına tek satırdır
+  (`tenantId` birincil anahtar) ve kilit o tek canlı sözleşmenin bir özelliğidir,
+  bir olay akışı değil. Ayrı tablo "hangi satır güncel" kuralını gerektirir ve o
+  kural tarif ettiği abonelik satırıyla çelişebilir; bir sütun kendisiyle
+  çelişemez. Tarihçe kaybolmuyor: `AuditEvent` her abonelik yazımını kaydediyor
+  ve artık kilidi de payload'ında taşıyor.
+- **RLS:** yeni tablo yok, `Subscription` zaten `tenant_isolation` listesinde;
+  39/39 değişmedi.
+
+Migration: `prisma/migrations/add-subscription-price-lock.sql` (additive +
+idempotent) — geri alma: `add-subscription-price-lock.down.sql` (**yıkıcı**:
+sütunları düşürmek her abonenin katılım oranını siler ve geri hesaplanamaz).
+
 ## 6. İndeks ve performans notları
 
 - `Topic(nextDeadlineAt)`, `TopicMatch(tenantId, g0Score)`, `OrgTopicStat(topicPrefix, coordinatorCount)`, `Relationship(tenantId, lastContactAt)`.

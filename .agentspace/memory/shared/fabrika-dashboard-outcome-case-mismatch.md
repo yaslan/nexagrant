@@ -1,22 +1,27 @@
 ---
 name: fabrika-dashboard-outcome-case-mismatch
-description: Fabrika dashboard başarı oranını %0 gösteriyor — kod ABOVE_THRESHOLD arıyor, DB above_threshold tutuyor (ölçüldü 2026-09-07)
+description: ÇÖZÜLDÜ (2026-09-07) — Proposal.outcome kasa uyuşmazlığı; sözlük artık src/lib/proposal-outcome.ts'te tek kaynak, ham sütunu karşılaştırma
 metadata:
   type: project
   updatedAt: 2026-09-07
 ---
 
-`src/lib/dashboard/fetch-metrics.ts:35` proposal outcome'unu
-`['SUBMITTED','FUNDED','ABOVE_THRESHOLD']` ile karşılaştırıyor. Prisma şemasının kendi
-yorumu ise küçük harf diyor: `funded | reserve | above_threshold | below`. Hiçbir kayıt
-eşleşmiyor → "Başarı Oranı %0" gösteriliyor, gerçek değer %20 (5 fırsattan 1'i).
+**Durum: kapandı — TASK-MTQTYXC0NUT0B (commit `6887b59`).**
 
-Aynı ailede ikinci hata: dashboard "G0→G2 süresi 0 gün" diyor, çünkü
-`prisma/seed-opportunities.ts` tüm fırsatları aynı milisaniyede yaratıyor (5ms fark).
+`Proposal.outcome` serbest bir `String?`. Yazan her taraf snake_case yazıyordu
+(`above_threshold`); okuyan taraf `['SUBMITTED','FUNDED','ABOVE_THRESHOLD'].includes(...)`
+ile SCREAMING_CASE arıyordu. Hiçbir satır eşleşmedi, hiçbir hata çıkmadı, oran %20 yerine
+%0 göründü. `'SUBMITTED'` zaten sözlükte hiç yoktu — gönderim `submittedAt` ile izleniyor.
 
-Ders: outcome gibi değer kümeleri elle string olarak karşılaştırılmamalı — enum ya da
-paylaşılan sabit olmalı. UI'daki bir sayı "0" ya da "boş" görünüyorsa önce veri değil
-KARŞILAŞTIRMA hatası aranmalı.
+**Bugünkü kural:** sözlük `src/lib/proposal-outcome.ts`'te (`PROPOSAL_OUTCOMES`,
+`ABOVE_THRESHOLD_OUTCOMES`, `normalizeProposalOutcome`, `isAboveThreshold`, `isFunded`).
+Ham sütunu karşılaştırma — bu fonksiyonları çağır. `src/lib/beta/esr-samples.ts` de aynı
+listeden türüyor (ikinci kopya tam olarak sürüklenmenin kaynağıydı; birim test kimliği
+`toBe` ile sabitliyor). Normalizasyon kasa/ayraç affeder ama sözlük dışı kelimeye `null`
+döner — yazım hatası "outcome yok" olur, sessizce paya katılmaz. `toLocaleLowerCase`
+KULLANMA: Türkçe yerelde `I`→`ı` katlanır, eşleşme kaybolur (bkz. [[fabrika-css-uppercase-turkish-dotted-i]]).
 
-Kart: TASK-MTQTYXC0NUT0B. Kaynak ölçüm: docs/agent-results/TASK-MTQ63RR8Z0G8E-ui-audit-customer-support.md
-İlgili: [[fabrika-g0-score-never-computed]]
+`Prisma` bu sütun için `enum` tanımlamıyor; enum'a taşınıp taşınmayacağı `docs/ROADMAP.md`
+açık karar #11'de duruyor.
+
+İlgili: [[fabrika-free-string-columns-fail-silently]] · [[fabrika-dashboard-outcome-has-no-live-ui-surface]]

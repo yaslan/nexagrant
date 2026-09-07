@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { getActiveTier } from '@/lib/billing/active-tier';
+import { withTenant } from '@/lib/db';
 import {
   findTierByCode,
   priceLine,
@@ -12,6 +13,12 @@ import {
   UnsupportedCycleError,
   type PricedLine,
 } from '@/lib/billing/catalog';
+import {
+  effectiveTier,
+  priceLockDefect,
+  readPriceLock,
+  type PriceLockColumns,
+} from '@/lib/billing/price-lock';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const isLiveStripe = Boolean(stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.startsWith('sk_'));
@@ -78,6 +85,39 @@ function collectClientPriceFields(body: unknown): string[] {
   return [...found];
 }
 
+/**
+ * The tenant's own locked rate, when it has one.
+ *
+ * A miss here must never become a *higher* price by accident, so a database
+ * error is logged and treated as "no lock" — the same tier the shopfront is
+ * quoting — rather than swallowed into some other rate. The read goes through
+ * `withTenant` because `Subscription` is under RLS.
+ */
+async function lockedRateFor(tenantId: string) {
+  try {
+    const row = await withTenant<(Partial<PriceLockColumns>) | null>(tenantId, (tx) =>
+      tx.subscription.findUnique({
+        where: { tenantId },
+        select: {
+          lockedTierCode: true,
+          lockedPercentOff: true,
+          lockedAmountMinor: true,
+          lockedCurrency: true,
+          priceLockedAt: true,
+        },
+      })
+    );
+    const defect = priceLockDefect(row);
+    if (defect) {
+      logger.warn('Checkout found an unusable price lock; pricing at the active tier', { tenantId, defect });
+    }
+    return readPriceLock(row);
+  } catch (error) {
+    logger.error('Checkout could not read the price lock; pricing at the active tier', error, { tenantId });
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -125,16 +165,33 @@ export async function POST(req: Request) {
 
     // The tier is the server's, never the request's. A coupon code names a
     // campaign; if it names one that is not running, it changes nothing.
-    const activeTier = getActiveTier();
+    const shopfrontTier = getActiveTier();
     if (couponCode) {
       const named = findTierByCode(couponCode);
-      if (named && named.code !== activeTier.code) {
+      if (named && named.code !== shopfrontTier.code) {
         logger.warn('Checkout coupon names a tier that is not the active one; pricing at the active tier', {
           tenantId,
           couponCode,
-          activeTier: activeTier.code,
+          activeTier: shopfrontTier.code,
         });
       }
+    }
+
+    // "The price you join at stays yours": a tenant that already carries a lock
+    // is priced at its own rate, so an upgrade or a cycle change made after the
+    // campaign ended still costs what the customer joined at. A tenant with no
+    // lock — a first purchase, or a subscription sold before the lock existed —
+    // is priced at the shopfront tier, exactly as before.
+    const lock = await lockedRateFor(tenantId);
+    const activeTier = effectiveTier(lock, shopfrontTier);
+    if (lock) {
+      logger.info('Checkout priced under the tenant price lock', {
+        tenantId,
+        lockedTier: lock.tierCode,
+        lockedPercentOff: lock.percentOff,
+        shopfrontTier: shopfrontTier.code,
+        appliedPercentOff: activeTier.percentOff,
+      });
     }
 
     let priced: PricedLine[];
@@ -179,6 +236,8 @@ export async function POST(req: Request) {
         tenantId,
         couponCode: couponCode ?? null,
         activeTier: { code: activeTier.code, percentOff: activeTier.percentOff },
+        shopfrontTier: { code: shopfrontTier.code, percentOff: shopfrontTier.percentOff },
+        priceLocked: lock !== null,
         ignoredClientFields: clientPriceFields,
         currency,
         totalMinor,

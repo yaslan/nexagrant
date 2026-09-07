@@ -3,6 +3,7 @@ import { prisma } from './db';
 import { env } from './env';
 import { toDecimalString, toMinorUnits } from './money';
 import { resolvePlanId } from './billing/catalog';
+import { IYZICO_SOLD_TIER, priceLockOnActivation } from './billing/price-lock';
 
 /**
  * iyzico billing (BILLING.md §4 — phase 2, TRY).
@@ -601,6 +602,26 @@ export async function handleIyzicoWebhook(
       Date.now() + SUBSCRIPTION_PERIOD_DAYS[interval] * 24 * 60 * 60 * 1000
     );
 
+    // The price this tenant joined at, kept (TASK-MTR882HVZ8BG7). The rule and
+    // the reasoning are in src/lib/billing/price-lock.ts; this path only differs
+    // in *which* tier it records, and that difference is deliberate:
+    //
+    // `createIyzicoCheckout` charges `TRY_PLAN_PRICES` — a stale, hand-typed TRY
+    // list with no early-bird discount applied at all (open card TRY-FX-1,
+    // docs/BILLING.md §4). So a Turkish buyer is sold at list, whatever campaign
+    // the USD pricing page is advertising. Recording the running tier here would
+    // lock in a rate the customer never got and promise it back to them on
+    // renewal. The lock records what was actually charged: no discount, and the
+    // TRY amount off the payment detail — which is worth keeping on its own,
+    // because it survives the day TRY_PLAN_PRICES is finally re-derived.
+    const lockDecision = priceLockOnActivation({
+      existing,
+      activeTier: IYZICO_SOLD_TIER,
+      charged: { amountMinor, currency },
+      now: new Date(),
+    });
+    const lockColumns = lockDecision.action === 'write' ? lockDecision.columns : null;
+
     await tx.subscription.upsert({
       where: { tenantId },
       create: {
@@ -612,6 +633,7 @@ export async function handleIyzicoWebhook(
         providerCustomerId: notification.merchantId != null ? String(notification.merchantId) : null,
         providerSubId: paymentId,
         currentPeriodEnd,
+        ...(lockColumns ?? {}),
       },
       update: {
         planId,
@@ -620,6 +642,7 @@ export async function handleIyzicoWebhook(
         provider: 'iyzico',
         providerSubId: paymentId,
         currentPeriodEnd,
+        ...(lockColumns ?? {}),
       },
     });
 

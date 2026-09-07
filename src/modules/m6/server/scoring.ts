@@ -279,6 +279,56 @@ export async function getPanelScoresForProposal(
 }
 
 /**
+ * Calculate the average score for a single criterion across all submitted reviews.
+ * Used for per-criterion analytics and UI display.
+ */
+export async function calculateCriterionAverage(
+  db: TenantScopedDb,
+  criterionId: string,
+  tenantId: string,
+): Promise<number | null> {
+  const scores = await db.score.findMany({
+    where: {
+      criterionId,
+      reviewer: { tenantId },
+      submittedAt: { not: null }, // only count submitted scores
+    },
+    select: { score: true },
+  });
+
+  if (scores.length === 0) return null;
+
+  const sum = scores.reduce((acc: number, s: typeof scores[0]) => acc + s.score, 0);
+  return sum / scores.length;
+}
+
+/**
+ * Get the distribution of scores for a criterion: how many reviewers gave each mark (1-5).
+ * Returns { 5: 2, 4: 1, 3: 0, 2: 0, 1: 0 } format.
+ */
+export async function getScoreDistribution(
+  db: TenantScopedDb,
+  criterionId: string,
+  tenantId: string,
+): Promise<Record<ScoreValue, number>> {
+  const scores = await db.score.findMany({
+    where: {
+      criterionId,
+      reviewer: { tenantId },
+      submittedAt: { not: null },
+    },
+    select: { score: true },
+  });
+
+  const distribution: Record<ScoreValue, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  for (const s of scores) {
+    const scoreValue = s.score as ScoreValue;
+    distribution[scoreValue]++;
+  }
+  return distribution;
+}
+
+/**
  * Recalculate and persist panel score for an evaluation.
  * Called after a reviewer submits their scores.
  */

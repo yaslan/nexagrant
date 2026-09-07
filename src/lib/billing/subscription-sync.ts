@@ -1,5 +1,14 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/db';
+import { logger } from '@/lib/logger';
+import { getActiveTier } from '@/lib/billing/active-tier';
+import { CATALOG_CURRENCY, priceLine, UnknownSkuError } from '@/lib/billing/catalog';
+import {
+  clearedPriceLock,
+  priceLockDefect,
+  priceLockOnActivation,
+  type PriceLockColumns,
+} from '@/lib/billing/price-lock';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
@@ -106,6 +115,78 @@ async function extractAddOnsFromSubscription(
 }
 
 /**
+ * What one period of this subscription actually costs, for the price lock.
+ *
+ * Read off the Stripe subscription item first: that is the amount Stripe will
+ * charge on every renewal, so it is the truth about what the customer joined at
+ * rather than a second guess at it. Only when Stripe carries no unit amount
+ * (a mocked object in a test, a legacy item) does it fall back to pricing the
+ * plan through the catalogue at the campaign that is running.
+ */
+function chargedAmountForLock(
+  subscription: Stripe.Subscription,
+  planId: string,
+  billingInterval: string
+): { amountMinor: number; currency: string } {
+  const item = subscription.items?.data?.[0];
+  const price = typeof item?.price === 'string' ? null : item?.price;
+  if (price && typeof price.unit_amount === 'number' && price.unit_amount >= 0) {
+    return {
+      amountMinor: price.unit_amount,
+      currency: (price.currency ?? CATALOG_CURRENCY).toUpperCase(),
+    };
+  }
+
+  try {
+    const line = priceLine(
+      { sku: planId, billingCycle: billingInterval === 'year' ? 'yearly' : 'monthly' },
+      getActiveTier()
+    );
+    return { amountMinor: line.amountMinor, currency: line.currency };
+  } catch (error) {
+    if (error instanceof UnknownSkuError) {
+      // `free` and any retired id are not sellable lines. A subscription on one
+      // has no price to keep, so the lock records zero rather than refusing the
+      // whole sync over an amount nobody is charged.
+      return { amountMinor: 0, currency: CATALOG_CURRENCY };
+    }
+    throw error;
+  }
+}
+
+/**
+ * The price-lock columns this activation writes, or `null` to leave them alone.
+ *
+ * `priceLockOnActivation` holds the whole rule and is unit-tested in
+ * `price-lock.test.ts`; this only supplies it with the charge and logs the
+ * one thing worth hearing about — a lock already in the database that is not
+ * whole, which would otherwise quietly re-price the customer at today's
+ * campaign.
+ */
+function priceLockUpdate(
+  subscription: Stripe.Subscription,
+  existing: ({ status?: string | null } & Partial<PriceLockColumns>) | null,
+  planId: string,
+  billingInterval: string
+): PriceLockColumns | null {
+  const defect = priceLockDefect(existing);
+  if (defect) {
+    logger.warn('Subscription carries an unusable price lock; it will not be honoured', {
+      tenantId: (subscription.metadata?.tenantId as string) ?? '',
+      defect,
+    });
+  }
+
+  const decision = priceLockOnActivation({
+    existing,
+    activeTier: getActiveTier(),
+    charged: chargedAmountForLock(subscription, planId, billingInterval),
+    now: new Date(),
+  });
+  return decision.action === 'write' ? decision.columns : null;
+}
+
+/**
  * Syncs a Stripe subscription to the database, updating Subscription and AddOn records.
  * Handles plan changes, add-on changes, and credit grants.
  * Logs audit events for all changes.
@@ -183,24 +264,31 @@ export async function syncStripeSubscription(
       ? new Date(stripeSubscription.current_period_end * 1000)
       : null;
 
+  const billingInterval = subscription.billing_cycle_anchor ? 'year' : 'month';
+
+  // The price the tenant joined at, kept — see src/lib/billing/price-lock.ts.
+  // `null` means "leave whatever is there alone", which is what a duplicate
+  // event, a renewal and a plan change all get.
+  const lockColumns = priceLockUpdate(subscription, existingSubscription, planId, billingInterval);
+
   await prisma.subscription.upsert({
     where: { tenantId },
     create: {
       tenantId,
       planId,
       status: mapStripeStatus(subscription.status),
-      billingInterval: subscription.billing_cycle_anchor
-        ? 'year'
-        : 'month',
+      billingInterval,
       provider: 'stripe',
       providerCustomerId: subscription.customer as string,
       providerSubId: subscription.id,
       currentPeriodEnd,
+      ...(lockColumns ?? {}),
     },
     update: {
       planId,
       status: mapStripeStatus(subscription.status),
       currentPeriodEnd,
+      ...(lockColumns ?? {}),
     },
   });
 
@@ -328,6 +416,18 @@ export async function syncStripeSubscription(
         removedAddOns,
         creditsGranted,
         planChanged: existingSubscription?.planId !== planId,
+        // The lock is a column, not a table, so this is where its history lives:
+        // "what rate did we lock, and when" stays answerable after an upgrade or
+        // a cancellation has overwritten the column.
+        priceLock: lockColumns
+          ? {
+              tierCode: lockColumns.lockedTierCode,
+              percentOff: lockColumns.lockedPercentOff,
+              amountMinor: lockColumns.lockedAmountMinor,
+              currency: lockColumns.lockedCurrency,
+              lockedAt: lockColumns.priceLockedAt?.toISOString() ?? null,
+            }
+          : 'unchanged',
       },
     },
   });
@@ -376,10 +476,13 @@ export async function handleSubscriptionCancellation(
     };
   }
 
-  // Update subscription status
+  // Update subscription status, and drop the price lock with it: the locked
+  // rate belongs to the subscription that just ended, not to the tenant. Coming
+  // back means joining again, at whatever campaign is running then — which is
+  // what `priceLockOnActivation` does with a CANCELED row.
   await prisma.subscription.update({
     where: { tenantId },
-    data: { status: 'CANCELED' },
+    data: { status: 'CANCELED', ...clearedPriceLock() },
   });
 
   // End all add-ons
@@ -417,6 +520,7 @@ export async function handleSubscriptionCancellation(
       data: {
         stripeEventId: eventId,
         reason: subscription.cancellation_details?.reason || 'user_requested',
+        priceLock: 'cleared',
       },
     },
   });

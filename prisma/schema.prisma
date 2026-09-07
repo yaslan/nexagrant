@@ -239,6 +239,18 @@ model Subscription {
   seatsExtra        Int      @default(0)
   workspacesExtra   Int      @default(0)
   trialEndsAt       DateTime?
+  // The joined price, kept (TASK-MTR882HVZ8BG7). The pricing page promises the
+  // rate a tenant joins at stays theirs; nothing here recorded it, so every
+  // quote came from the campaign running now. Written once on activation and on
+  // a re-activation after cancellation, never in between — the rule and the
+  // reasoning live in src/lib/billing/price-lock.ts. All five are nullable
+  // together: a row with none of them is a subscription sold before the lock
+  // existed and is priced at the shopfront tier, as it was.
+  lockedTierCode    String?   // campaign the rate came from, e.g. ILK5 (provenance)
+  lockedPercentOff  Int?      // the rate honoured on renewal, whole percent
+  lockedAmountMinor Int?      // what one period cost at that rate, minor units (rule 9)
+  lockedCurrency    String?   // currency of lockedAmountMinor
+  priceLockedAt     DateTime? // when the rate was locked
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)

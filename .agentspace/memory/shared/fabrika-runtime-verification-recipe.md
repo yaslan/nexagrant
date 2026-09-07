@@ -36,7 +36,7 @@ curl -s -b cookies.txt http://localhost:3000/api/auth/session   # doğrula
 ## Kullanıcılar
 
 - **Seed kullanıcıları (DB'de gerçekten var):** `owner@demo.fabrika.test`, `manager@demo.fabrika.test`, `writer@demo.fabrika.test` → tenant `demo-tenant`, workspace slug **`main`**.
-- **Demo profiller (auth.ts içinde, DB'de olmayabilir):** `admin@yasinaslan.com.tr`, `mehmet@fonbridge.app`. Bunlarla oturum açılır ama DB sorguları boş döner — veri gerektiren testte **seed kullanıcısını** kullan.
+- **Demo profiller (auth.ts içinde):** `admin@yasinaslan.com.tr`, `mehmet@fonbridge.app`, `ayse@tto.edu.tr` — giriş sayfasındaki "⚡ Hızlı Demo Giriş Rolleri" tek-tık butonlarıyla açılır (bkz. `src/app/[locale]/login/AuthCard.tsx`, buton metni `handleDemoLogin(email)`). **Düzeltme (2026-09-07, TASK-MTQWBAJ2T5XSV):** bu satırın önceki hali "DB sorguları boş döner" diyordu — bu artık doğru değil / muhtemelen hiç doğru değildi: `admin@yasinaslan.com.tr` ile girişte gerçek bir kiracıya (workspace slug `default`) bağlanılıyor, Pipeline board'da gerçek DB'den G0-G4 fırsatları (`demo-opp-1` dahil, gerçek `Opportunity` satırı) görünüyor ve `ConsortiumSeat` gibi tenant-scoped tablolara gerçek yazma/silme yapılabiliyor (Playwright ile doğrulandı). Veri gerektiren testte önce bunu dene; boş dönerse ancak o zaman seed kullanıcısına geç.
 
 Korumalı sayfa yolu: `/{locale}/{workspace}/...` → örn. `/tr/main/settings/privacy`.
 

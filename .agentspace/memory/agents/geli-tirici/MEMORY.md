@@ -9,3 +9,11 @@
 
 - [fabrika-iyzico-billing-flow](fabrika-iyzico-billing-flow.md) — Fabrika iyzico ödeme akışının kilit kararları — kiracı conversationId'den okunur, para sağlayıcıdan yeniden okunur, imza şeması sandbox'a karşı HENÜZ doğrulanmadı
 - [fabrika-next16-second-dev-server-refused](fabrika-next16-second-dev-server-refused.md) — Fabrika'da ikinci bir `next dev` başlatılamaz (Next 16 "Another next dev server is already running" der) — ayrı portta gerçek HTTP e2e için `next build` + `next start -p <port>` kullan
+
+- [fabrika-git-stash-is-unsafe-in-shared-tree](fabrika-git-stash-is-unsafe-in-shared-tree.md) — Fabrika'da lint/test baseline'ı ölçmek için git stash KULLANMA — paralel ajanların commit edilmemiş işini de alır; baseline'ı hata-dosya eşlemesiyle ölç
+
+- [fabrika-soft-delete-column-without-filters](fabrika-soft-delete-column-without-filters.md) — Fabrika'da bir soft-delete sütununa yazma yolu açmadan önce o sütunu KAÇ sorgunun filtrelediğini say — Opportunity.deletedAt için 24 okumadan yalnız 4'ü filtreliyordu
+
+- [fabrika-side-by-side-evidence-shot](fabrika-side-by-side-evidence-shot.md) — "İki ekranı YAN YANA kanıtla" istendiğinde — Playwright ile her ekranın ELEMENT görüntüsünü al, data URI olarak tek bir setContent sayfasına koy, onu screenshot'la
+
+- [fabrika-photograph-degraded-state-by-renaming-function](fabrika-photograph-degraded-state-by-renaming-function.md) — Bir bağımlılık okunamadığında UI'ın ne gösterdiğini tarayıcıda kanıtlamak için DB fonksiyonunu DROP etme — ALTER FUNCTION ... RENAME ile kenara al, finally'de geri adlandır

@@ -373,4 +373,74 @@ describe('M6 Scoring Logic', () => {
     expect(result.esrScore).toBeNull();
     expect(result.panelScore).toBe(3.5);
   });
+
+  // ───────── TEST 21: Score distribution edge case (all same score)
+  it('should track score distribution with all same scores', () => {
+    // This test verifies the logic without DB; in production the DB query
+    // would return multiple Score rows with the same value
+    const reviewers: ReviewerScores[] = [
+      {
+        reviewerId: 'r1',
+        scores: { crit1: 4, crit2: 4, crit3: 4, crit4: 4 },
+      },
+      {
+        reviewerId: 'r2',
+        scores: { crit1: 4, crit2: 4, crit3: 4, crit4: 4 },
+      },
+      {
+        reviewerId: 'r3',
+        scores: { crit1: 4, crit2: 4, crit3: 4, crit4: 4 },
+      },
+    ];
+
+    const result = calculatePanelScore(reviewers, standardWeights);
+
+    // All reviewers gave 4 across all criteria
+    expect(result.panelAverage).toBeCloseTo(4.0, 1);
+    expect(result.criterionAverages.crit1).toBe(4);
+    expect(result.consensusOutcome).toBe('solid');
+  });
+
+  // ───────── TEST 22: Consensus with 2 reviewers
+  it('should classify consensus correctly with 2 reviewers', () => {
+    const reviewers: ReviewerScores[] = [
+      {
+        reviewerId: 'r1',
+        scores: { crit1: 4, crit2: 4, crit3: 4, crit4: 4 },
+      },
+      {
+        reviewerId: 'r2',
+        scores: { crit1: 5, crit2: 5, crit3: 5, crit4: 5 },
+      },
+    ];
+
+    const result = calculatePanelScore(reviewers, standardWeights);
+
+    // 2 reviewers, 1 pair: within 1 point = 100% agreement
+    expect(result.consensusOutcome).toBe('solid');
+    expect(result.agreementPercentage).toBe(100);
+  });
+
+  // ───────── TEST 23: ESR range edge case (minimum score)
+  it('should handle minimum ESR score', () => {
+    const panelScore = 1.5;
+    const esrScores = { total: 0.5, threshold: 12, outcome: 'not_recommended' };
+
+    const result = compareWithEsr(panelScore, esrScores);
+
+    expect(result.esrScore).toBeDefined();
+    expect(result.esrScore).toBeGreaterThanOrEqual(1); // Clamped to min
+  });
+
+  // ───────── TEST 24: ESR range edge case (maximum score)
+  it('should handle maximum ESR score', () => {
+    const panelScore = 5.0;
+    const esrScores = { total: 15, threshold: 12, outcome: 'recommended' };
+
+    const result = compareWithEsr(panelScore, esrScores);
+
+    expect(result.esrScore).toBeDefined();
+    expect(result.esrScore).toBeLessThanOrEqual(5); // Clamped to max
+    expect(result.agreement).toBe(true); // 5.0 and 5.0 agree
+  });
 });

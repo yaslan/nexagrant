@@ -103,6 +103,16 @@ export default function PricingClient({ locale, activeTier, lifetimeScarcity }: 
           <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
             {t('heroSubtitle')}
           </p>
+          {/*
+            The sentence above ("the price you join at stays yours") is backed by
+            `Subscription.locked*` + `src/lib/billing/price-lock.ts` since
+            TASK-MTR882HVZ8BG7. This line states the two limits of that lock so
+            the promise is exact rather than merely reassuring: it belongs to the
+            subscription, and it is a floor, not a ceiling.
+          */}
+          <p className="text-slate-500 text-xs leading-relaxed max-w-2xl mx-auto">
+            {t('priceLockNote')}
+          </p>
         </div>
 
         {/* ─── TIER SCHEDULE (read-only: the live tier comes from the server) ─── */}
