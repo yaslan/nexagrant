@@ -1003,7 +1003,7 @@
         "basic": {
           "subtitle": "Solo başlangıç — ilk adım",
           "f1": "1 çalışma alanı (workspace)",
-          "f2": "500 YZ kredisi / ay",
+          "f2": "100 YZ kredisi / ay",
           "f3": "Açık çağrı arama ve filtreleme (SEDIA Live)",
           "f4": "G0-G4 fırsat hattı ve Kanban",
           "f5": "Temel CORDIS ortak arama",
@@ -1011,20 +1011,20 @@
         },
         "pro": {
           "subtitle": "Ciddi günlük kullanım ve projeler için",
-          "f1": "Sınırsız çalışma alanı",
-          "f2": "3.000 YZ kredisi / ay",
+          "f1": "1 çalışma alanı (workspace)",
+          "f2": "500 YZ kredisi / ay",
           "f3": "M1 CORDIS ağ analitiği ve graf haritası",
           "f4": "M2 konsept notu ve M3 kanıt paketi deposu",
-          "f5": "Evaluator Lens (AB hakem simülatörü) ve TTO hızlandırıcı",
+          "f5": "Evaluator Lens (AB hakem simülatörü)",
           "f6": "Öncelikli e-posta ve canlı destek"
         },
         "ultra": {
           "subtitle": "Tüm ekosistem ve kurumsal konsorsiyumlar",
           "f1": "Pro paketindeki tüm özellikler +",
-          "f2": "Sınırsız YZ kredisi / kendi model anahtarınız (BYO AI)",
+          "f2": "2.000 YZ kredisi / ay",
           "f3": "150.000+ CORDIS tam veri dışa aktarımı (JSON/CSV)",
           "f4": "Öncelikli kurucu onboarding ve VIP danışmanlık",
-          "f5": "Çoklu ekip üyesi koltukları ve rol yönetimi",
+          "f5": "En fazla 15 ekip üyesi koltukları ve rol yönetimi",
           "f6": "GİB e-fatura ve resmî kurumsal sözleşme (SLA)"
         }
       }
@@ -1067,21 +1067,21 @@
         "basic": {
           "desc": "Solo başlangıç — ilk adım",
           "f1": "1 çalışma alanı",
-          "f2": "500 YZ kredisi / ay",
+          "f2": "100 YZ kredisi / ay",
           "f3": "Açık çağrı arama (SEDIA Live)",
           "f4": "G0-G4 fırsat hattı ve Kanban"
         },
         "pro": {
           "desc": "Ciddi günlük kullanım ve projeler için",
-          "f1": "Sınırsız çalışma alanı",
-          "f2": "3.000 YZ kredisi / ay",
+          "f1": "1 çalışma alanı",
+          "f2": "500 YZ kredisi / ay",
           "f3": "M1 CORDIS graf haritası",
           "f4": "Evaluator Lens AB hakem simülatörü"
         },
         "ultra": {
           "desc": "Tüm ekosistem ve kurumsal konsorsiyumlar",
           "f1": "Pro özelliklerinin tamamı",
-          "f2": "Sınırsız YZ kredisi (kendi anahtarınız)",
+          "f2": "2.000 YZ kredisi / ay",
           "f3": "150.000+ CORDIS dışa aktarımı",
           "f4": "GİB e-fatura ve kurumsal SLA"
         }

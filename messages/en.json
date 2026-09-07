@@ -1003,7 +1003,7 @@
         "basic": {
           "subtitle": "Solo start — the first step",
           "f1": "1 workspace",
-          "f2": "500 AI credits / month",
+          "f2": "100 AI credits / month",
           "f3": "Open call search and filtering (SEDIA Live)",
           "f4": "G0-G4 opportunity pipeline and Kanban",
           "f5": "Basic CORDIS partner search",
@@ -1011,20 +1011,20 @@
         },
         "pro": {
           "subtitle": "For serious daily use and projects",
-          "f1": "Unlimited workspaces",
-          "f2": "3,000 AI credits / month",
+          "f1": "1 workspace",
+          "f2": "500 AI credits / month",
           "f3": "M1 CORDIS network and graph analytics",
           "f4": "M2 concept notes and M3 evidence vault",
-          "f5": "Evaluator Lens (EU review simulator) and TTO accelerator",
+          "f5": "Evaluator Lens (EU review simulator)",
           "f6": "Priority email and live support"
         },
         "ultra": {
           "subtitle": "The whole ecosystem and enterprise consortia",
           "f1": "Everything in Pro, plus:",
-          "f2": "Unlimited AI credits / bring your own model keys",
+          "f2": "2,000 AI credits / month",
           "f3": "Full 150,000+ CORDIS data exports (JSON/CSV)",
           "f4": "Priority founder onboarding and VIP consulting",
-          "f5": "Team seats and organisation role management",
+          "f5": "Up to 15 team seats and organisation role management",
           "f6": "Official e-invoice and a dedicated SLA"
         }
       }
@@ -1067,21 +1067,21 @@
         "basic": {
           "desc": "Solo start — the first step",
           "f1": "1 workspace",
-          "f2": "500 AI credits / month",
+          "f2": "100 AI credits / month",
           "f3": "Open call search (SEDIA Live)",
           "f4": "G0-G4 pipeline and Kanban"
         },
         "pro": {
           "desc": "For serious daily use and projects",
-          "f1": "Unlimited workspaces",
-          "f2": "3,000 AI credits / month",
+          "f1": "1 workspace",
+          "f2": "500 AI credits / month",
           "f3": "M1 CORDIS graph map",
           "f4": "Evaluator Lens EU review simulator"
         },
         "ultra": {
           "desc": "The whole ecosystem and enterprise consortia",
           "f1": "Everything in Pro",
-          "f2": "Unlimited AI credits (bring your own key)",
+          "f2": "2,000 AI credits / month",
           "f3": "150,000+ CORDIS exports",
           "f4": "Official e-invoice and enterprise SLA"
         }
