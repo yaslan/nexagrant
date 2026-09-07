@@ -204,6 +204,16 @@ untouched. `src/modules/m8/server/schema-contract.test.ts`,
 
 ---
 
+### Process note — a staging mistake I made and corrected
+My first commit of `messages/{tr,en}.json` swept in two other agents' in-flight
+keys (`DocumentExport`, `PartBEditor`), because `git add <file>` stages the whole
+file in a shared working tree. Caught it by reading the committed diff (23 added
+lines where I had added 4). The commit was amended to contain only my 4 keys per
+language, and their keys were restored to the working tree, unstaged, for them to
+commit. Verified: `git show HEAD -- messages/en.json` shows only the 4 `sso*`
+keys; the working tree still holds theirs. This trap is already recorded in team
+memory as `fabrika-shared-json-whole-file-add-swallows-others-edits`.
+
 ## 5. Risks
 
 - **Behaviour change, deliberate:** `resolveSsoProviderForDomain` no longer
