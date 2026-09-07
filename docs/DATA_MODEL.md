@@ -276,3 +276,43 @@ kalmaz — önce dışa aktarın).
 **Açık:** `src/app/[locale]/(app)/[workspace]/settings/billing/BillingClient.tsx` içindeki
 aynı rozet (`billingPanels.settings.lifetimeOwners` / `lifetimeNext`) hâlâ elle yazılmış
 "5 lisans sahibi" metnini gösteriyor; bu görevin dosya kapsamı dışındaydı, ayrı kart gerekiyor.
+
+## 11. Fatura (TASK-MTRD9QBJ2G32E)
+
+`Invoice` — bir kiracıya gerçekten kesilmiş faturanın kaydı. Kiracıya özeldir
+(`tenantId` + `tenant_isolation` RLS politikası; `pnpm rls:verify` ile canlı ölçüldü).
+
+Bu tablo eklenmeden önce fatura **hiçbir yerde tutulmuyordu**, ama
+`GET /api/billing/invoices/[id]/export` yine de bir Türk e-Faturası **üretiyordu**: ETTN,
+tedarikçi VKN'si, vergi dairesi, `isEfaturaUser: true` ve iki kalem, rota dosyasına gömülü
+sabitlerdi. Rota oturum aramıyordu ve id'ye bakmıyordu — herhangi bir id ile, oturumsuz,
+`200` ve indirilebilir XML/PDF/HTML dönüyordu; belgenin altında "mali mühür ile
+onaylanmıştır" yazıyordu. Belgenin anlattığı fatura hiçbir yerde yoktu.
+
+| Alan | Not |
+|---|---|
+| `number` | Müşterinin gördüğü ve andığı numara. **Kiracı içinde benzersiz**, global değil: iki kiracıya farklı kesenlerden aynı seri gelebilir. |
+| `issuedAt` | Düzenleme anı, UTC (CLAUDE.md kural 10). |
+| `buyerName` / `buyerVknTckn` / `buyerTaxOffice` / `buyerAddress` / `buyerCity` / `buyerCountry` | Alıcının mali kimliğinin **kesim anındaki fotoğrafı**. Bilerek `Tenant`'a join değil: fatura, kiracı adını değiştirdikten sonra da kime kesildiğini söylemeye devam etmek zorundadır. |
+| `lines` | `InvoiceLine[]` (JSONB). Birim fiyatlar **minor unit** (CLAUDE.md kural 9); majör birime tek bir yerde, `invoice-document.ts` içinde çevrilir. Şeması zod ile okunur; okunamayan satır boş fatura değil **hatadır**. |
+| `ettn` | Belgenin kendi UUID'si. **Benzersiz** — kayıt yazılırken atanır, koda gömülü değildir. |
+| `gibEnvelopeId` | **Yalnız** GİB entegratör üzerinden gönderimi gerçekten kabul ettiğinde dolar. `NULL` = belge hiç gönderilmedi; bu durumda `src/lib/efatura.ts` hem XML'e hem yazdırılabilir sayfaya "mali değeri yoktur" damgasını basar ve mali mühür iddiasını **yazmaz**. Bugün ürün hiçbir şeyi göndermiyor, yani her satırda `NULL`. |
+
+**Tedarikçi kimliği bu tabloda değildir.** Satıcı Fabrika'nın kendisidir; her kiracının
+faturasında aynıdır ve uygulamanın seçebileceği bir şey değildir. `src/lib/env.ts` üzerinden
+yapılandırılır (`INVOICE_SUPPLIER_NAME`, `_VKN`, `_TAX_OFFICE`, `_ADDRESS`, `_CITY`;
+`_COUNTRY` ve `_EMAIL` isteğe bağlı). Hiçbirinin varsayılanı **yoktur**: eksikse rota belge
+üretmez, `503` ile eksik değişkenleri **adıyla** sayar. Bunlar go-live ayarlarıdır.
+
+**Seed yoktur ve olmamalıdır:** seed'lenmiş bir fatura, kesilmemiş bir faturadır.
+
+Migration: `prisma/migrations/add-invoice.sql` (additive + idempotent) — geri alma:
+`prisma/migrations/add-invoice.down.sql` (yıkıcı: tabloyu ve tüm fatura kayıtlarını siler;
+fatura mali bir belgedir, bu refleks bir geri alma değildir).
+
+**Açık:** Ayarlar → Faturalandırma ekranındaki fatura tablosu hâlâ `BillingClient.tsx`
+içindeki iki sabit `DEMO_INVOICES` satırını listeliyor (satır 76-92) ve indirme sütununda
+bağlantı yok (ölçüldü: sayfada `a[href*="/api/billing/invoices/"]` sayısı = 0). Satırlar
+"Demo örnek" rozetiyle işaretli, yani ekran yalan söylemiyor; ama gerçek `Invoice`
+satırlarına bağlı da değil. Bağlamak yeni i18n anahtarı (boş durum metni) gerektiriyor ve
+`messages/*.json` bu görevin kapsamı dışındaydı — ayrı kart gerekiyor.

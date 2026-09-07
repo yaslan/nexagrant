@@ -101,10 +101,9 @@ async function runGate(
       // is derived here, from stored evidence, by the canonical scorer, and written back with its
       // breakdown so the decision can be audited afterwards.
       //
-      // `rules.minScore` is on the 0–100 scale of PROJECT.md:81. Which reading of PROJECT.md:75 is
-      // the real gate — this composite minimum, or the three hard rules — is still open
-      // (docs/ROADMAP.md · Açık kararlar #8), so the pass/fail rule is left exactly as it was and
-      // `decideG0`'s hard-rule findings are recorded as advisory evidence, not enforced here.
+      // Açık karar #8 (2026-09-06): the gate is the composite score (minScore ≥ 70) PLUS the three
+      // hard rules (minAlignment ≥ 70, minBaseRate ≥ 8%, country eligible). Both are enforced here,
+      // drawn from the `computation.decision` which was already calculated in the canonical scorer.
       const computation = await computeG0ForOpportunity(tx, tenantId, opportunityId);
 
       if (computation) {
@@ -126,9 +125,14 @@ async function runGate(
         break;
       }
 
-      if (g0Score < rules.minScore) {
+      if (rules.minScore !== null && g0Score < rules.minScore) {
         passed = false;
-        reasons.push(`G0 score ${g0Score} is below minimum threshold ${rules.minScore}`);
+        reasons.push(`G0 composite score ${g0Score} is below minimum threshold ${rules.minScore}`);
+      }
+
+      if (rules.minAlignment !== null && computation?.decision === 'NO_GO' && computation?.reasons?.length > 0) {
+        passed = false;
+        reasons.push(...computation.reasons);
       }
       break;
     }

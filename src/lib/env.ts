@@ -44,6 +44,26 @@ const envSchema = z.object({
    * it is never taken from the browser.
    */
   BILLING_ACTIVE_TIER: z.string().optional(),
+  /**
+   * Who Fabrika is on an invoice it issues: the seller's own fiscal identity.
+   *
+   * Every one of these is optional and has no default, deliberately. A supplier
+   * VKN and tax office are facts about a registered company, not something an
+   * application may pick: the route that exports an invoice
+   * (`src/app/api/billing/invoices/[id]/export`) refuses to produce a document
+   * while any of them is unset rather than printing a plausible-looking number.
+   * They shipped hard-coded once — VKN 3810459281, "Maslak Vergi Dairesi" — on a
+   * document that claimed a fiscal seal (TASK-MTRD9QBJ2G32E).
+   *
+   * INVOICE_SUPPLIER_EMAIL is genuinely optional: UBL-TR does not require it.
+   */
+  INVOICE_SUPPLIER_NAME: z.string().optional(),
+  INVOICE_SUPPLIER_VKN: z.string().optional(),
+  INVOICE_SUPPLIER_TAX_OFFICE: z.string().optional(),
+  INVOICE_SUPPLIER_ADDRESS: z.string().optional(),
+  INVOICE_SUPPLIER_CITY: z.string().optional(),
+  INVOICE_SUPPLIER_COUNTRY: z.string().optional(),
+  INVOICE_SUPPLIER_EMAIL: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);

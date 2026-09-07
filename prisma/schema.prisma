@@ -40,6 +40,7 @@ model Tenant {
   auditEvents   AuditEvent[]
   invitations   Invitation[]
   approvalRequests ApprovalRequest[]
+  invoices      Invoice[]
   @@index([deletedAt])
 }
 
@@ -291,6 +292,35 @@ model LifetimeLicence {          // one-time "first 20 companies" purchase; the 
   createdAt         DateTime @default(now())
   tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   @@index([tenantId, purchasedAt])
+}
+
+model Invoice {                 // an invoice actually issued to a tenant; TASK-MTRD9QBJ2G32E
+  id            String   @id @default(cuid())
+  tenantId      String
+  number        String              // what the customer sees and cites, e.g. "FB-2026-000001"
+  issuedAt      DateTime            // UTC, like every other timestamp (CLAUDE.md rule 10)
+  currency      String   @default("TRY")
+  // The buyer's fiscal identity, frozen at issue time. An invoice must keep
+  // saying who it was issued to even after the tenant renames itself or moves,
+  // so these are a snapshot on the row and never a join to Tenant.
+  buyerName      String
+  buyerVknTckn   String             // 10-digit VKN or 11-digit TCKN, as supplied by the buyer
+  buyerTaxOffice String
+  buyerAddress   String
+  buyerCity      String
+  buyerCountry   String  @default("Türkiye")
+  lines         Json                // InvoiceLine[]; unit prices are minor units (CLAUDE.md rule 9)
+  profileId     String   @default("TICARIFATURA")  // TICARIFATURA | TEMELFATURA | EARSIVFATURA
+  invoiceType   String   @default("SATIS")         // SATIS | ISTISNA | TEVKIFAT
+  ettn          String   @unique    // the document's own UUID, assigned when the row is written
+  // Set only once GİB has actually accepted the filing through an integrator.
+  // NULL means the document was never filed: the exporter marks it as carrying
+  // no fiscal value rather than claiming a fiscal seal it does not have.
+  gibEnvelopeId String?
+  createdAt     DateTime @default(now())
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, number])
+  @@index([tenantId, issuedAt])
 }
 
 model CreditLedger {

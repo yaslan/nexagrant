@@ -37,6 +37,19 @@ export interface EfaturaDocument {
   customer: InvoiceParty;
   lines: InvoiceLineItem[];
   notes?: string[];
+  /**
+   * The envelope id GİB returns once the document has actually been filed
+   * through an e-invoice integrator. Absent means it never was.
+   *
+   * The generators below read only this field to decide whether the document
+   * may describe itself as a filed invoice. A document without it is stamped —
+   * in the XML and across the printable page — as carrying no fiscal value, and
+   * no caller can turn that stamp off. `src/app/api/billing/invoices/[id]/export`
+   * once shipped a hard-coded supplier VKN, tax office and ETTN with a footer
+   * claiming a fiscal seal; that document was never filed anywhere
+   * (TASK-MTRD9QBJ2G32E).
+   */
+  gibEnvelopeId?: string;
 }
 
 export interface TaxCalculationResult {
@@ -45,6 +58,18 @@ export interface TaxCalculationResult {
   totalWithholdingTRY: number;
   payableVatTRY: number;
   grandTotalTRY: number;
+}
+
+/**
+ * Wording used wherever a document that was never filed with GİB has to say so.
+ * One string, so the XML note and the printed page cannot drift apart.
+ */
+export const UNFILED_NOTICE =
+  'ÖRNEK BELGE — GİB\'e gönderilmemiştir, mali mühür taşımaz ve mali değeri yoktur.';
+
+/** True only for a document that carries an envelope id GİB actually returned. */
+export function isFiledWithGib(invoice: EfaturaDocument): boolean {
+  return typeof invoice.gibEnvelopeId === 'string' && invoice.gibEnvelopeId.trim().length > 0;
 }
 
 /**
@@ -176,7 +201,12 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
   <cbc:UUID>${invoice.uuid}</cbc:UUID>
   <cbc:IssueDate>${invoice.issueDate}</cbc:IssueDate>
   <cbc:IssueTime>${invoice.issueTime}</cbc:IssueTime>
-  <cbc:InvoiceTypeCode>${invoice.invoiceType}</cbc:InvoiceTypeCode>
+  <cbc:InvoiceTypeCode>${invoice.invoiceType}</cbc:InvoiceTypeCode>${
+    isFiledWithGib(invoice)
+      ? ''
+      : `
+  <cbc:Note>${UNFILED_NOTICE}</cbc:Note>`
+  }
   <cbc:DocumentCurrencyCode>${invoice.currency}</cbc:DocumentCurrencyCode>
 
   <!-- Tedarikçi / Satıcı Bilgileri -->
@@ -257,7 +287,11 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
 }
 
 /**
- * Resmî GİB Onaylı HTML / Yazdırılabilir PDF Görünüm Şablonu
+ * GİB UBL-TR düzenine göre biçimlenmiş, yazdırılabilir HTML / PDF görünümü.
+ *
+ * "Onaylı" değildir ve öyle demez: bu şablon bir belgeyi biçimlendirir, GİB'e
+ * göndermez. Gönderildiğini yalnız `gibEnvelopeId` kanıtlar; o yoksa çıktı
+ * kendini `UNFILED_NOTICE` ile mali değeri olmayan bir örnek olarak işaretler.
  */
 export function generateEfaturaHtml(invoice: EfaturaDocument): string {
   const totals = calculateInvoiceTotals(invoice.lines);
@@ -281,7 +315,7 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>E-Fatura - ${invoice.id}</title>
+  <title>${isFiledWithGib(invoice) ? '' : 'ÖRNEK — '}E-Fatura - ${invoice.id}</title>
   <style>
     @page { size: A4; margin: 15mm; }
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0f172a; font-size: 10pt; line-height: 1.5; }
@@ -298,12 +332,26 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
     .totals-table td.label { font-weight: bold; color: #475569; }
     .grand-total { background: #f1f5f9; font-size: 11pt; font-weight: bold; color: #0f172a; }
     .footer { font-size: 8pt; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 8px; text-align: center; }
+    /* Deliberately not inside .no-print: the mark has to survive the printout
+       and the PDF, which is exactly where an unfiled document would otherwise
+       start looking like a filed one. */
+    .unfiled-banner {
+      border: 2px solid #b91c1c; background: #fef2f2; color: #7f1d1d;
+      font-weight: bold; text-align: center; padding: 10px; border-radius: 6px;
+      margin-bottom: 14px; letter-spacing: 0.02em;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
     @media print {
       .no-print { display: none; }
     }
   </style>
 </head>
 <body>
+  ${
+    isFiledWithGib(invoice)
+      ? ''
+      : `<div class="unfiled-banner">${UNFILED_NOTICE}</div>`
+  }
   <div class="no-print" style="background:#f1f5f9; padding:10px; text-align:right; margin-bottom:15px;">
     <button onclick="window.print()" style="background:#1e3a8a; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">
       🖨️ Faturayı Yazdır / PDF İndir
@@ -386,7 +434,11 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
   </table>
 
   <div class="footer">
-    İşbu fatura 213 sayılı Vergi Usul Kanunu ve Gelir İdaresi Başkanlığı e-Fatura mevzuatına uygun olarak elektronik ortamda üretilmiş ve mali mühür ile onaylanmıştır.
+    ${
+      isFiledWithGib(invoice)
+        ? `İşbu fatura 213 sayılı Vergi Usul Kanunu ve Gelir İdaresi Başkanlığı e-Fatura mevzuatına uygun olarak elektronik ortamda düzenlenmiş ve GİB'e iletilmiştir. Zarf No: ${invoice.gibEnvelopeId}`
+        : UNFILED_NOTICE
+    }
   </div>
 </body>
 </html>`;

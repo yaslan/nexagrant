@@ -17,3 +17,5 @@
 - [fabrika-side-by-side-evidence-shot](fabrika-side-by-side-evidence-shot.md) — "İki ekranı YAN YANA kanıtla" istendiğinde — Playwright ile her ekranın ELEMENT görüntüsünü al, data URI olarak tek bir setContent sayfasına koy, onu screenshot'la
 
 - [fabrika-photograph-degraded-state-by-renaming-function](fabrika-photograph-degraded-state-by-renaming-function.md) — Bir bağımlılık okunamadığında UI'ın ne gösterdiğini tarayıcıda kanıtlamak için DB fonksiyonunu DROP etme — ALTER FUNCTION ... RENAME ile kenara al, finally'de geri adlandır
+
+- [fabrika-fabrication-audit-must-cover-defaults](fabrika-fabrication-audit-must-cover-defaults.md) — Uydurma veri avında yalnız uydurulmuş DEĞERLERİ arama — bir şey İDDİA EDEN varsayılanlar (`@default("VALID")`, `status || 'VALID'`, hardcoded `status: 'VALID'`) de uydurmadır; ayrıca doğrulama kolonu çoğu zaman ZATEN vardır, kimse okumuyordur

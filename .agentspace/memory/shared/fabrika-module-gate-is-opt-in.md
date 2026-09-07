@@ -27,5 +27,11 @@ beta ortağının sahibi de `TENANT_OWNER`. Yani "iç ekip" demek için rol YETM
 gerekir. Aynı hata başka bir kapıda tekrarlanabilir.
 
 Yeni bir modül sayfası yazan herkes kapıyı elle eklemeli. Yapısal çözüm kartı: `TASK-MTQZ85NESC17T`.
-Plan kapsamı (`PlanEntitlement`) AYRI bir kapı ve bağlı olup olmadığı doğrulanmadı:
-`TASK-MTQZ8MVAU3J7I`. İlgili: [[fabrika-done-reports-can-be-wrong]]
+**Plan kapısı 2026-09-07'de (TASK-MTQZ8MVAU3J7I) `checkModuleAccess`'in İÇİNE bağlandı** —
+artık ayrı bir kapı değil: aynı çağrı önce hak edişe (`getEntitlements`), sonra
+`canAccessStatus`'a bakıyor. Kapsamayan plan → `PLAN_UPGRADE_REQUIRED`. Yani `moduleGate()` /
+`assertModuleAccess()` çağıran bir sayfa ya da action **ikisini birden** almış olur; ayrıca
+plan kontrolü yazma (kopya kapı yasak). CLAUDE.md'nin andığı `PlanEntitlement` tablosu ve
+`src/lib/authz` depoda YOKTUR: [[fabrika-entitlement-is-getentitlements-not-planentitlement]].
+
+İlgili: [[fabrika-done-reports-can-be-wrong]]

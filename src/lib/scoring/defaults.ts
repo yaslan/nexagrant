@@ -11,6 +11,7 @@ export const DEFAULT_SCORING_WEIGHTS = {
 export const DEFAULT_GATE_RULES = {
   G0: {
     minScore: 70,
+    minAlignment: 70,
     minBaseRate: 8,
     requireEligibleCountry: true,
   },

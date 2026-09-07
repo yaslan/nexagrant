@@ -112,3 +112,10 @@
 [19:38:41] DONE: G3 → ex-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTREJ27YUPSY7-ex-en-2.md
 [19:48:09] DONE: H1 → blok-zincir-denet-i: docs/agent-results/TASK-MTRGJ80LV3R7I-blok-zincir-denet-i.md
 [19:51:52] DONE: H2 → blockzincir-pm: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTR882HVZ8BG7-blockzincir-pm-2.md
+[20:00:48] DONE: H3 → ex-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTREJ27YUPSY7-ex-en-3.md
+[20:14:42] DONE: st3 → customer-support: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTR60M5ESB5PZ-customer-support.md
+[20:15:41] DONE: st3 → blockzincir-pm: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTR882HVZ8BG7-blockzincir-pm-3.md
+[20:19:02] FAIL: 5 görev BAŞARISIZ: st1→TASK-MTRH86RCGVEGC-geli-tirici.md, st2→TASK-MTR4CH9IDK4D7-blok-zincir-dse.md, st4, st1→TASK-MTQZ8 (uygulama yeniden başladı, pane kayboldu ve kanıt yok)
+[20:43:49] DONE: st2 → ex-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTQZ8MVAU3J7I-ex-en-2.md
+[20:47:31] DONE: st4 → geli-tirici: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTRH86RCGVEGC-geli-tirici-2.md
+[20:47:43] DONE: st3 → blog-yazar: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTRD9EUQB33QV-blog-yazar.md

@@ -10,3 +10,6 @@
 - [fabrika-blame-e2e-failure-without-stashing](fabrika-blame-e2e-failure-without-stashing.md) — Ortak ağaçta stash edemediğinde bir e2e hatasının senin olup olmadığını kanıtlama — kendi bileşeninin BULUNMADIĞI bir sayfada aynı hatayı say
 
 - [fabrika-mint-a-session-cookie-to-test-unreachable-states](fabrika-mint-a-session-cookie-to-test-unreachable-states.md) — Fabrika'da adsız/rolsüz oturum credentials girişiyle ÜRETİLEMEZ — session çerezini uygulamanın kendi AUTH_SECRET'ıyla üretip gerçek tarayıcıya koy, giriş koduna dokunma
+
+- [fabrika-fabricated-identity-fix-pattern](fabrika-fabricated-identity-fix-pattern.md) — Fabrika'da uydurma kişi adı kusurunun yerleşik düzeltme deseni — ApprovalActor/userId, displayUserName zinciri ve tablo açmak yerine eksik alanı adıyla bildirme
+- [fabrika-unreachable-server-action-probe](fabrika-unreachable-server-action-probe.md) — Fabrika'da bir Next server action'ın gerçekten çağrılabilir olup olmadığını ölç — istemci import etmiş olması yetmez, .next manifest + gerçek POST ile yokla

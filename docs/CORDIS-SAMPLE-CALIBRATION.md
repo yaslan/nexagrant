@@ -1,7 +1,7 @@
 # CORDIS örnek seti — G0 ↔ ESR kalibrasyonu
 
 > Üretilmiş dosya. Elle düzenlemeyin; `pnpm tsx scripts/esr-calibration.ts` yeniden üretir.
-> Üretim zamanı: 2026-09-06T17:52:36.138Z · Kural sürümü: `g0-canonical-1.0` · Örnek seti: `docs/BETA_DATA/esr-calibration-samples.csv`
+> Üretim zamanı: 2026-09-07T17:49:55.293Z · Kural sürümü: `g0-canonical-1.0` · Örnek seti: `docs/BETA_DATA/esr-calibration-samples.csv`
 
 > ⚠️ **Bu koşu KÜRATE EDİLMİŞ bir fixture üzerinde yapıldı** (tüm `cordisProjectId` değerleri rezerve
 > `SAMPLE-*` ad alanında). Buradaki doğruluk oranı **kalibrasyon hattının** çalıştığını gösterir;
@@ -145,7 +145,7 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 
 - Ankete çıkarılan ortak sayısı: **10**, ortak başına **4** örnek.
 - Örnek başına bağımsız görüş: **2**.
-- Yanıt son tarihi: **2026-09-20**.
+- Yanıt son tarihi: **2026-09-21**.
 - Yanıt dosyası: _henüz yok._
 - Ortak çoğunluğu hiçbir etiketi değiştirmedi.
 

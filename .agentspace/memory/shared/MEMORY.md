@@ -92,7 +92,7 @@
 - [fabrika-lifetime-sale-is-never-persisted](fabrika-lifetime-sale-is-never-persisted.md) — Ömür boyu lisans satışı hiçbir yere yazılmıyor — Stripe webhook'u yalnız abonelikli oturumu işliyor
 - [fabrika-public-count-over-rls-table](fabrika-public-count-over-rls-table.md) — Herkese açık bir sayfada kiracıya özel bir tablonun sayısını göstermek gerekiyorsa düz SELECT sessizce 0 döner — prisma/rls.sql'e SECURITY DEFINER sayaç fonksiyonu koy ve "sayı okunamadı"yı sıfırdan ayır
 
-- [fabrika-billing-ui-lives-in-two-namespaces](fabrika-billing-ui-lives-in-two-namespaces.md) — Fiyat rozetleri iki panelde birden yaşıyor — billingPanels.pricing düzeltilip billingPanels.settings unutuluyor
+- [fabrika-billing-ui-lives-in-two-namespaces](fabrika-billing-ui-lives-in-two-namespaces.md) — Fiyat rozetleri ÜÇ panelde birden yaşıyor (pricing, settings, admin) — biri düzeltilip diğer ikisi unutuluyor
 - [fabrika-plan-card-copy-contradicts-plan-grants](fabrika-plan-card-copy-contradicts-plan-grants.md) — Plan kartlarındaki özellik satırları (koltuk/kredi/modül) i18n metni — yetkilendirmenin koştuğu PLAN_GRANTS ile sekiz yerde çelişiyor, yani kullanıcı kartta okuduğunu almıyor
 
 - [fabrika-concurrent-agents-and-git-reset-hard](fabrika-concurrent-agents-and-git-reset-hard.md) — Aynı depoda iki ajan çalışırken `git reset --hard` diğerinin commit'lenmemiş işini siler — sprint maxConcurrent yalnız SPRINT görevlerini sıralar, sprint dışı pane'i durdurmaz
@@ -102,3 +102,11 @@
 - [fabrika-shared-dev-db-can-be-reset-under-you](fabrika-shared-dev-db-can-be-reset-under-you.md) — Paylaşılan dev veritabanı başka bir ajanın prisma migrate dev'i altında sıfırlanabilir — CLI boş DB'yi, çalışan :3000 sunucusu hâlâ eskisini görür
 
 - [fabrika-rls-check-is-declaration-not-behaviour](fabrika-rls-check-is-declaration-not-behaviour.md) — `pnpm rls:check` yeşilken izolasyon ölçülmemiş olabilir — davranışı `pnpm rls:verify` + tests/rls.spec.ts ölçer; 2026-09-07'de bunlar 42501 (şema yetkisi yok) ile kırmızıydı
+
+- [fabrika-dual-approval-fully-in-memory](fabrika-dual-approval-fully-in-memory.md) — src/lib/dual-approval.ts'nin HER iki yarısı da (M10 belge onayı VE Onay Merkezi/ApprovalRequest) DB'ye yazmıyor — cross-user onayla/reddet akışı gerçek tıklamayla asla doğrulanamaz
+
+- [fabrika-dead-pane-work-measure-before-discarding](fabrika-dead-pane-work-measure-before-discarding.md) — Pane ölünce ağaçta kalan yarım işi atma — önce typecheck+test ile ölç, çoğu kez derleniyor ve testleri geçiyor
+
+- [fabrika-e2e-blocked-by-landing-page-500](fabrika-e2e-blocked-by-landing-page-500.md) — Ana sayfa (/tr) 500 verdiği sürece pnpm test:e2e HİÇBİR testi koşturamaz — Playwright webServer yoklaması / adresine gider; çözüm E2E_BASE_URL'i giriş sayfasına almak
+
+- [fabrika-stage-only-your-hunks-from-shared-json](fabrika-stage-only-your-hunks-from-shared-json.md) — messages/*.json gibi paylaşılan bir dosyada yalnız KENDİ hunk'larını commit'lemenin yolu — `git diff` çıktısını hunk'lara böl, seninkileri filtrele, `git apply --cached` ile yalnız onları index'e uygula

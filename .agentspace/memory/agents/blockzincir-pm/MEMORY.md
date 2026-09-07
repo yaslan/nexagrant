@@ -25,3 +25,5 @@
 - [fabrika-react19-render-purity-fixes](fabrika-react19-render-purity-fixes.md) — React 19'un set-state-in-effect ve purity lint hatalarını istisna yazmadan çözen üç desen — Fabrika'da kanıtlanmış
 
 - [price-lock-validation-complete](price-lock-validation-done.md) — TASK-MTR882HVZ8BG7 fiyat kilidi doğrulaması tamamlandı — koda dokunmamış, UI kareleri ve test kanıtı yeterli
+
+- [fabrika-stripe-renewal-price-mechanics](fabrika-stripe-renewal-price-mechanics.md) — Fabrika'da bir Stripe aboneliğinin yenileme tutarını kim/ne zaman belirliyor — checkout'ta bir kez sabitlenir, sonrası Stripe'ın kendi motoru; fiyat kilidi mutlak tutarı değil yüzdeyi dondurur

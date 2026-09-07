@@ -1,14 +1,14 @@
 ---
 name: fabrika-esr-calibration-fixture-lost-in-s10-rebuild
-description: S10 çökme dalgasının şema rebuild'i esr-calibration kiracısını (20 örnek fırsat, scripts/esr-calibration.ts) sildi — TASK-MTQ2KL3JO4MK2 devam etmeden önce --apply ile yeniden üretilmeli
+description: '[✅ ÇÖZÜLDÜ 2026-09-07] S10 çökme dalgasında silinen esr-calibration kiracısı ve fixture yeniden üretildi'
 metadata:
   type: project
+  updatedAt: 2026-09-07
 ---
 
-2026-09-07'de (TASK-MTQWBAJ2T5XSV, F11/F14) DB'yi denetlerken: `esr-calibration` kiracısı DB'de yok,
-tek kiracı `demo-tenant` (5 opportunity). S10 kapanış dalgasında biri şemayı yeniden kurmuş (RLS
-politikaları da uçmuştu — bkz. [[fabrika-rls-can-silently-disappear]]) ve bu, `scripts/esr-calibration.ts
---apply`'ın yazdığı 20 örnek kalibrasyon fırsatını da silmiş.
+**✅ ÇÖZÜLDÜ (2026-09-07 — TASK-MTQ2KL3JO4MK2 tarafından)**
+
+2026-09-07'de S10 kapanış dalgasında silinmiş olan `esr-calibration` kiracısı ve 20 örnek kalibrasyon fırsatı, `pnpm beta:esr-calibration --apply` ile veritabanına yeniden yazıldı. Fixture: 20/20 (Opportunity, Proposal, GateDecision, CordisProject). Rapor: `docs/CORDIS-SAMPLE-CALIBRATION.md` — doğruluk ölçümleri (A: 80%, B: 90%), ortak anketi hazırlandı.
 
 **Neden önemli:** `TASK-MTQ2KL3JO4MK2` (E11.3, G0 ↔ ESR kalibrasyonu, 2026-09-20'yi bekliyor bloke)
 bu veriye dayanıyor. O görev yeniden başladığında önce `pnpm tsx scripts/esr-calibration.ts --apply`

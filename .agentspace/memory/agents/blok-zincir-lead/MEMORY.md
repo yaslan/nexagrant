@@ -18,3 +18,11 @@
 - [fabrika-check-artifact-timestamps-against-dispatch](fabrika-check-artifact-timestamps-against-dispatch.md) — Worker "kanıt var" derken eski dosyayı gösteriyor olabilir — kare/çıktı dosyalarının mtime'ını görevin başlama saatiyle karşılaştır, ve raporda doğrulamayı REDDEDEN cümleyi ara
 
 - [fabrika-verify-each-claim-not-the-headline](fabrika-verify-each-claim-not-the-headline.md) — Dürüst bir raporun toplam rakamı doğru olsa bile tek bir maddesi uydurma olabilir — numaralı her iddiayı KENDİ komutuyla ölç, manşet sayıyla yetinme
+
+- [fabrika-same-image-under-different-names](fabrika-same-image-under-different-names.md) — Kare sayısı DoD'u sağlıyor görünse bile dosyalar bayt bayt aynı olabilir — kanıt karelerini md5 ile tekilleştir, adına güvenme
+- [fabrika-verify-backlog-before-assigning-finds-worse](fabrika-verify-backlog-before-assigning-finds-worse.md) — Bekleyen kartları dağıtmadan önce iddialarını koda karşı ölç — kart metnini doğrularken panoda HİÇ olmayan daha ağır kusurlar çıkıyor
+
+- [fabrika-einvoice-real-record-or-404](fabrika-einvoice-real-record-or-404.md) — Patron kararı — e-Fatura belgesi gerçek kayıttan üretilir, kayıt yoksa 404; tedarikçi kimliği env'den gelir
+- [fabrika-fabrication-audit-must-cover-api-export-routes](fabrika-fabrication-audit-must-cover-api-export-routes.md) — Uydurma veri taramaları UI bileşenlerinde kalırsa API export rotalarındaki sahte resmî belgeleri kaçırır
+
+- [fabrika-plan-catalog-db-source-of-truth-decision](fabrika-plan-catalog-db-source-of-truth-decision.md) — Patron kararı — paket/fiyat yönetimi DB'ye taşınacak (Yol B, sürümlü PlanVersion), önce metin düzeltmesi ve temizlik

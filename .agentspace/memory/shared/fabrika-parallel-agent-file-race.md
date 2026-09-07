@@ -77,3 +77,26 @@ Eksik parçayı bulursan yalnız onu stage'leyip commit'le. Ayrıca `git add <yo
 `git diff --cached --name-only` ile **başkasının dosyasının index'ine sızmadığını**
 doğrula — süpürme index'i de kirletiyor (bir kez başka ajanın rapor dosyası benim
 index'imde belirdi, commit'ten önce `git restore --staged` ile çıkardım).
+
+## Yeni varyant (2026-09-07, TASK-MTR882HVZ8BG7): açıkça isim vererek `git add` bile korumuyor
+
+`git add <5 kesin dosya yolu>` ile stage'ledim, hemen ardından `git commit` çağırdım —
+araya hiçbir başka komut girmedi. Yine de commit **2 fazla dosya** taşıdı
+(`evidence-client.tsx`, `evidence-fabrication.spec.ts`) — benim hiç dokunmadığım, başka bir
+ajanın aynı anda çalıştırdığı `git add` (muhtemelen `-A` ya da kendi dosyalarıyla) benim
+`add` ile `commit` arasındaki milisaniyelerde araya girdi. Kanıt: commit sonrası o 2
+dosyada `git diff` **boş** çıktı — yani başka ajanın `add`'i tamdı, yarım iş değildi; zarar
+yalnız **yanlış commit mesajı altında görünmeleri** oldu, içerik kaybolmadı.
+
+**How to apply — açıkça isim verilen `git add` bile atlama:**
+```bash
+git add <senin dosyaların>
+git diff --cached --name-only        # BURADA dur, commit'ten HEMEN önce, add'ten hemen sonra değil
+# listede senin dosyaların DIŞINDA bir şey varsa:
+git restore --staged <o dosya>       # yalnız fazlalığı çıkar, commit'i o zaman at
+git commit -m "..."
+```
+Tek satırlık `git add X && git commit` zincirleri de aynı riski taşır — ikisi ayrı komut
+olsa da araya başka bir ajanın `add`'i girebilir. `add` ile `commit` arasında **her zaman**
+bir `git diff --cached --name-only` kontrolü olsun, dosya sayısı ne kadar az/açık olursa
+olsun.
