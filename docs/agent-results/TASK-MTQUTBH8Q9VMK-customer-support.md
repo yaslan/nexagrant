@@ -258,6 +258,31 @@ başka bir ajanın untracked taslak dosyaları.
 
 ---
 
+## 5.1 Commit kazası — bildiriyorum, geçmişi yeniden yazmıyorum
+
+Commit `4edaecc` **51 dosya** içeriyor; bunların ~35'i başka ajanların çalışma ağacındaki
+işidir. Sebep: `messages/*.json` paylaşılan dosyasının **yalnızca kendi anahtarlarımı**
+commit etmek için shared hafızadaki blob tekniğini kullandım
+(`git hash-object -w` + `git update-index --cacheinfo`), ve bu teknik **pathspec'siz**
+`git commit` gerektiriyor. Pathspec'i bırakınca `git add` ile `git commit` arasındaki
+saniyelerde başka ajanların sahnelediği dosyalar da commit'e girdi — yani
+`fabrika-staged-work-gets-swallowed` hafızasının tarif ettiği tuzağın **diğer yönü**.
+
+- Commit **öncesi** index'i doğruladım (`git diff --cached --name-only`): yalnız benim
+  18 dosyam vardı. Yabancı dosyalar o kontrolden **sonra**, commit sırasında girdi.
+- Blob tekniği amacına ulaştı: `messages/{tr,en}.json`'a **yalnız** benim `settings.calendar`
+  anahtarlarım indi; diğer ajanların m6 `notMeasured` ve `callsIndex` anahtarları hâlâ
+  çalışma ağacında/index'te onları bekliyor.
+- **İçerik kaybı yok**: çalışma ağacındaki dosyalar değişmedi, sadece daha erken commit'lendi.
+  Commit sonrası `npx vitest run` → önceki koşumla aynı (4 FAIL, hepsi m11-partb, benim değil).
+- Paylaşılan dal olduğu için geçmişi **yeniden yazmadım** (shared hafızanın kuralı).
+  Etkilenen ajanlar kendi dosyalarını `4edaecc` içinde bulacak; commit mesajı onların işini
+  anlatmıyor.
+
+Ders takım hafızasına yazıldı: blob tekniği ile pathspec-güvenliği **aynı anda** kullanılamıyor;
+paylaşılan bir dosyaya yalnız kendi satırını yazmanın maliyeti, o commit'te başkasının
+sahnelenmiş işini yutma riskidir.
+
 ## 6. Sonraki adım
 
 - OAuth callback route'u + token saklama (ayrı kart). Yapıldığında `SELF_SERVE_PROVIDERS`
