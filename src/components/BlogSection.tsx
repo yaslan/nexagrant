@@ -86,18 +86,25 @@ export default function BlogSection({ locale }: BlogSectionProps) {
 
                 {/* Author Badge & Read More Button */}
                 <div className="pt-4 border-t border-border/80 flex items-center justify-between">
+                  {/* Byline only when the post records one — see src/lib/blog.ts. */}
                   <div className="flex items-center gap-2.5">
-                    <Image
-                      src={post.author.avatar}
-                      alt={post.author.name}
-                      width={28}
-                      height={28}
-                      className="rounded-full object-cover border border-border"
-                    />
-                    <div>
-                      <div className="text-xs font-semibold text-ink leading-none">{post.author.name}</div>
-                      <div className="text-[10px] text-muted mt-0.5">{post.author.role}</div>
-                    </div>
+                    {post.author ? (
+                      <>
+                        {post.author.avatar && (
+                          <Image
+                            src={post.author.avatar}
+                            alt={post.author.name}
+                            width={28}
+                            height={28}
+                            className="rounded-full object-cover border border-border"
+                          />
+                        )}
+                        <div>
+                          <div className="text-xs font-semibold text-ink leading-none">{post.author.name}</div>
+                          <div className="text-[10px] text-muted mt-0.5">{post.author.role}</div>
+                        </div>
+                      </>
+                    ) : null}
                   </div>
 
                   <Link

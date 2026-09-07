@@ -1,3 +1,25 @@
+/**
+ * TASK-MTRNQHC3IV2BE — a byline names a real author or it is absent.
+ *
+ * The four posts below shipped with bylines nobody wrote: "Dr. Mehmet Yılmaz /
+ * AB Proje Başdanışmanı", "Av. Ayşe Kaya", "Dr. Sofia Rossi", "Can Aksoy" —
+ * each with a stock photograph of an unrelated real person as their avatar,
+ * signing marketing copy that carries success-rate claims. The posts are public
+ * (`/tr/blog`), so an invented expert was vouching for those numbers.
+ *
+ * `author` is therefore optional. The three surfaces that render a byline
+ * (marketing list, post page, landing section) render it only when one exists;
+ * the admin editor fills it with the signed-in author's own identity. There is
+ * no default author string anywhere: an unattributed post is shown
+ * unattributed.
+ */
+export interface BlogAuthor {
+  name: string;
+  role: string;
+  /** Optional: no stock photograph stands in for a missing portrait. */
+  avatar?: string;
+}
+
 export interface BlogPost {
   slug: string;
   title: string;
@@ -6,11 +28,8 @@ export interface BlogPost {
   category: string;
   readTime: string;
   publishedAt: string;
-  author: {
-    name: string;
-    role: string;
-    avatar: string;
-  };
+  /** Absent when the post has no recorded author. Never a placeholder. */
+  author?: BlogAuthor;
   image: string;
   featured?: boolean;
 }
@@ -23,11 +42,6 @@ export let BLOG_POSTS: BlogPost[] = [
     category: 'Horizon Europe',
     readTime: '5 dk okuma',
     publishedAt: '28 Ağustos 2026',
-    author: {
-      name: 'Dr. Mehmet Yılmaz',
-      role: 'AB Proje Başdanışmanı',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
-    },
     image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
     featured: true,
     content: `
@@ -54,11 +68,6 @@ FonBridge M8 modülü, CORDIS canlı delta API entegrasyonu sayesinde aradığı
     category: 'TÜBİTAK & Hibe',
     readTime: '7 dk okuma',
     publishedAt: '15 Ağustos 2026',
-    author: {
-      name: 'Av. Ayşe Kaya',
-      role: 'Hukuk & Mevzuat Uzmanı',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=120&q=80',
-    },
     image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80',
     featured: true,
     content: `
@@ -82,11 +91,6 @@ FonBridge M6 modülü, resmi AB hakemi bakış açısıyla metninizin zayıf par
     category: 'Yapay Zeka',
     readTime: '4 dk okuma',
     publishedAt: '2 Ağustos 2026',
-    author: {
-      name: 'Dr. Sofia Rossi',
-      role: 'Yapay Zeka Mimarisi Lideri',
-      avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=120&q=80',
-    },
     image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
     featured: true,
     content: `
@@ -110,11 +114,6 @@ Genel yapay zeka modelleri (hallucination) uydurma kaynak üretebilir. FonBridge
     category: 'TTO & Danışmanlık',
     readTime: '6 dk okuma',
     publishedAt: '20 Temmuz 2026',
-    author: {
-      name: 'Can Aksoy',
-      role: 'TTO Ürün Yöneticisi',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80',
-    },
     image: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80',
     featured: false,
     content: `
@@ -160,13 +159,15 @@ export function updateBlogPost(slug: string, updated: Partial<BlogPost>): BlogPo
   if (index === -1) return undefined;
 
   const current = BLOG_POSTS[index];
+  // A partial update that carries no author leaves the recorded one alone; one
+  // that carries an author replaces it. Neither path invents a name.
+  const mergedAuthor = updated.author
+    ? { ...current.author, ...updated.author }
+    : current.author;
   const updatedPost: BlogPost = {
     ...current,
     ...updated,
-    author: {
-      ...current.author,
-      ...(updated.author || {}),
-    },
+    ...(mergedAuthor ? { author: mergedAuthor } : {}),
   };
 
   BLOG_POSTS[index] = updatedPost;

@@ -27,9 +27,19 @@ import Link from 'next/link';
 interface AdminBlogClientProps {
   initialPosts: BlogPost[];
   locale: string;
+  /**
+   * Display name of the signed-in admin, resolved server-side. Seeds the byline
+   * of a new post; empty when the session carries no usable name, in which case
+   * the field starts empty and the post is published unattributed.
+   */
+  sessionUserName?: string;
 }
 
-export default function AdminBlogClient({ initialPosts, locale }: AdminBlogClientProps) {
+export default function AdminBlogClient({
+  initialPosts,
+  locale,
+  sessionUserName = '',
+}: AdminBlogClientProps) {
   const [posts, setPosts] = useState<BlogPost[]>(initialPosts);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -45,9 +55,10 @@ export default function AdminBlogClient({ initialPosts, locale }: AdminBlogClien
     excerpt: '',
     content: '',
     readTime: '5 min read',
-    authorName: 'Dr. Mehmet Yılmaz',
-    authorRole: 'AB Proje Başdanışmanı',
-    authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
+    // The signed-in admin, or nothing. No stand-in author, no stock portrait.
+    authorName: sessionUserName,
+    authorRole: '',
+    authorAvatar: '',
     image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
     featured: true,
   });
@@ -72,9 +83,9 @@ export default function AdminBlogClient({ initialPosts, locale }: AdminBlogClien
       excerpt: '',
       content: '',
       readTime: '5 min read',
-      authorName: 'Dr. Mehmet Yılmaz',
-      authorRole: 'AB Proje Başdanışmanı',
-      authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
+      authorName: sessionUserName,
+      authorRole: '',
+      authorAvatar: '',
       image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
       featured: true,
     });
@@ -90,9 +101,10 @@ export default function AdminBlogClient({ initialPosts, locale }: AdminBlogClien
       excerpt: post.excerpt,
       content: post.content,
       readTime: post.readTime,
-      authorName: post.author.name,
-      authorRole: post.author.role,
-      authorAvatar: post.author.avatar,
+      // A post with no recorded author opens with empty byline fields.
+      authorName: post.author?.name ?? '',
+      authorRole: post.author?.role ?? '',
+      authorAvatar: post.author?.avatar ?? '',
       image: post.image,
       featured: !!post.featured,
     });
@@ -270,8 +282,15 @@ export default function AdminBlogClient({ initialPosts, locale }: AdminBlogClien
                     </span>
                   </td>
                   <td className="p-4">
-                    <div className="font-semibold text-ink">{post.author.name}</div>
-                    <div className="text-[10px] text-muted">{post.author.role}</div>
+                    {/* A post with no recorded author is listed without one. */}
+                    {post.author ? (
+                      <>
+                        <div className="font-semibold text-ink">{post.author.name}</div>
+                        <div className="text-[10px] text-muted">{post.author.role}</div>
+                      </>
+                    ) : (
+                      <div className="text-muted" aria-hidden="true">—</div>
+                    )}
                   </td>
                   <td className="p-4 text-muted">{post.publishedAt}</td>
                   <td className="p-4 text-center">

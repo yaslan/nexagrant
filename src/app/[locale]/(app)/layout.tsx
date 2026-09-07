@@ -8,6 +8,7 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { displayUserName } from '@/lib/user-display';
+import { listSessionWorkspaces } from '@/lib/workspaces';
 
 import MobileAppHeader from '@/components/MobileAppHeader';
 import FeedbackWidget from '@/components/FeedbackWidget';
@@ -40,6 +41,11 @@ export default async function AppLayout({
   // "TENANT_OWNER" badge on a session that holds no role at all, so an absent role stays
   // absent and the menu labels it as unassigned.
   const roleName = session?.role || undefined;
+  // The workspace switcher in the user menu lists these and nothing else. It used
+  // to carry two names written into the component ("Demo SME Consultancy",
+  // "Horizon Research Lab") that no session was ever a member of.
+  const workspaces = await listSessionWorkspaces(session);
+
   const isPlatformAdmin = Boolean(
     session?.isPlatformAdmin ||
     session?.user?.isPlatformAdmin ||
@@ -58,6 +64,7 @@ export default async function AppLayout({
         userImage={userImage}
         roleName={roleName}
         isPlatformAdmin={isPlatformAdmin}
+        workspaces={workspaces}
       />
 
       {/* Desktop Sidebar Navigation */}
@@ -93,6 +100,7 @@ export default async function AppLayout({
               userEmail={userEmail}
               userImage={userImage}
               roleName={roleName}
+              workspaces={workspaces}
             />
           </div>
         </header>

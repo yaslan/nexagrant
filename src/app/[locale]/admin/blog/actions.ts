@@ -24,11 +24,20 @@ export async function createBlogPostAction(data: {
     category: data.category || 'Horizon Europe',
     readTime: data.readTime || '5 min read',
     publishedAt: new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }),
-    author: {
-      name: data.authorName || 'FonBridge Editörü',
-      role: data.authorRole || 'AB Uzmanı',
-      avatar: data.authorAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
-    },
+    // TASK-MTRNQHC3IV2BE — no default byline. An empty author field used to be
+    // filled with "FonBridge Editörü / AB Uzmanı" and a stock portrait, so the
+    // post went out signed by a person and a job title nobody entered. A post
+    // submitted without an author is now stored without one, and the three
+    // public surfaces render no byline for it (src/lib/blog.ts).
+    ...(data.authorName?.trim()
+      ? {
+          author: {
+            name: data.authorName.trim(),
+            role: data.authorRole?.trim() || '',
+            ...(data.authorAvatar?.trim() ? { avatar: data.authorAvatar.trim() } : {}),
+          },
+        }
+      : {}),
     image: data.image || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
     featured: data.featured ?? true,
   };
@@ -61,7 +70,10 @@ export async function updateBlogPostAction(
     readTime: data.readTime,
     image: data.image,
     featured: data.featured,
-    author: data.authorName ? { name: data.authorName, role: data.authorRole || 'AB Uzmanı', avatar: '' } : undefined,
+    // Same rule on edit: a byline the editor cleared is cleared, not refilled.
+    author: data.authorName?.trim()
+      ? { name: data.authorName.trim(), role: data.authorRole?.trim() || '' }
+      : undefined,
   });
 
   revalidatePath('/[locale]/blog', 'layout');

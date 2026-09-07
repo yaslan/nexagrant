@@ -9,28 +9,40 @@ import { prisma } from "./db";
 import { env } from "./env";
 import { errorMessage } from '@/lib/errors';
 
-const DEMO_PROFILES: Record<string, { name: string; orgName: string; orgType: OrgType; role: string; isPlatformAdmin?: boolean }> = {
+/**
+ * TASK-MTRNQHC3IV2BE — the demo sign-in seeds an ORGANISATION, never a person.
+ *
+ * These entries used to carry a `name` too ("Dr. Mehmet Yılmaz", "Prof. Dr. Ayşe
+ * Kaya", "Dr. Can Demir") and the jwt callback re-applied it on every token
+ * refresh. Two things followed. A real account registered on one of these
+ * addresses was renamed to an invented person with an invented academic title
+ * whatever the User row said, and every screenshot of the product named somebody
+ * who does not exist. src/lib/user-display.ts already states the rule: fall back
+ * only onto data the session actually carries.
+ *
+ * What survives is the tenant scaffolding a first sign-in needs — org name, org
+ * type, seat role, the platform-admin flag. The display name is derived from the
+ * address the user actually signed in with, and after that it is whatever the
+ * User row holds.
+ */
+const DEMO_PROFILES: Record<string, { orgName: string; orgType: OrgType; role: string; isPlatformAdmin?: boolean }> = {
   "admin@yasinaslan.com.tr": {
-    name: "Yasin Aslan (Süperadmin)",
     orgName: "FonBridge HQ",
     orgType: "CONSULTANCY",
     role: "TENANT_OWNER",
     isPlatformAdmin: true,
   },
   "mehmet@fonbridge.app": {
-    name: "Dr. Mehmet Yılmaz",
     orgName: "FonBridge SME Ar-Ge Ltd.",
     orgType: "SME",
     role: "TENANT_OWNER",
   },
   "ayse@tto.edu.tr": {
-    name: "Prof. Dr. Ayşe Kaya",
     orgName: "İstanbul Teknik Üniversitesi TTO",
     orgType: "UNIVERSITY",
     role: "TENANT_OWNER",
   },
   "can@arge-lab.com": {
-    name: "Dr. Can Demir",
     orgName: "Biyo-Teknoloji Araştırma Merkezi",
     orgType: "RESEARCH",
     role: "PIPELINE_MANAGER",
@@ -167,9 +179,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!email) return null;
 
         const demoProfile = DEMO_PROFILES[email];
-        const computedName =
-          demoProfile?.name ||
-          email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        // Derived from the address the user typed, never from a profile table.
+        const computedName = email
+          .split("@")[0]
+          .replace(/[._]/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
         const isSuperadmin = email === "admin@yasinaslan.com.tr" || !!demoProfile?.isPlatformAdmin;
 
         try {
@@ -225,9 +239,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           } else {
             // Ensure superadmin flag and name are updated
             if (isSuperadmin && !user.isPlatformAdmin) {
+              // Only the flag. Writing `name` here overwrote the name the user
+              // had chosen with one derived from their e-mail on every sign-in.
               user = await prisma.user.update({
                 where: { id: user.id },
-                data: { isPlatformAdmin: true, name: computedName },
+                data: { isPlatformAdmin: true },
               });
             }
           }
@@ -282,11 +298,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token.email) {
         const emailLower = token.email.toLowerCase();
         const demo = DEMO_PROFILES[emailLower];
-        if (demo) {
-          token.name = demo.name;
-          if (demo.isPlatformAdmin || emailLower === "admin@yasinaslan.com.tr") {
-            token.isPlatformAdmin = true;
-          }
+        // The platform-admin grant only. `token.name = demo.name` used to run
+        // here on every refresh, so the DB name lost to a hardcoded one.
+        if ((demo?.isPlatformAdmin || emailLower === "admin@yasinaslan.com.tr")) {
+          token.isPlatformAdmin = true;
         }
       }
 

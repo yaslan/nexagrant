@@ -789,9 +789,15 @@
       "consensus": "Consensus",
       "consensusOutcome": {
         "solid": "Solid",
-        "divergent": "Divergent"
+        "divergent": "Divergent",
+        "notMeasured": "Not measured"
       },
-      "empty": "No panel evaluation for this proposal yet."
+      "empty": "No panel evaluation for this proposal yet.",
+      "notMeasured": "Not calculated",
+      "notMeasuredReason": {
+        "noSubmittedMarks": "No reviewer has submitted marks yet, so there is nothing to average.",
+        "noWeightedCriterion": "The submitted marks fall on no weighted criterion, so a weighted average cannot be computed."
+      }
     },
     "errors": {
       "aiFailed": "The AI pre-assessment did not complete; no score was recorded.",
@@ -948,7 +954,8 @@
   },
   "UserIdentity": {
     "unnamedUser": "Unnamed user",
-    "noRole": "No role assigned"
+    "noRole": "No role assigned",
+    "noWorkspace": "You have no workspace"
   },
   "DocumentExport": {
     "signatoryBoxTitle": "Coordinator / authorised signature",
@@ -1451,5 +1458,10 @@
     "title": "Fund Calls",
     "subtitle": "Browse available fund calls by country",
     "deadline": "Deadline"
+  },
+  "DemoSignIn": {
+    "roleSme": "SME R&D coordinator",
+    "roleTto": "University TTO lead",
+    "rolePlatformAdmin": "Platform administrator"
   }
 }

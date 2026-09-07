@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import SidebarNav from './SidebarNav';
-import UserMenu from './UserMenu';
+import UserMenu, { type UserMenuWorkspace } from './UserMenu';
 import ThemeToggle from './ThemeToggle';
 import { Menu, X } from 'lucide-react';
 
@@ -15,6 +15,8 @@ interface MobileAppHeaderProps {
   userImage?: string;
   roleName?: string;
   isPlatformAdmin?: boolean;
+  /** Real workspaces of the session, resolved server-side. See UserMenu. */
+  workspaces?: UserMenuWorkspace[];
 }
 
 export default function MobileAppHeader({
@@ -24,6 +26,7 @@ export default function MobileAppHeader({
   userImage,
   roleName,
   isPlatformAdmin = false,
+  workspaces = [],
 }: MobileAppHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -59,6 +62,7 @@ export default function MobileAppHeader({
             userEmail={userEmail}
             userImage={userImage}
             roleName={roleName}
+            workspaces={workspaces}
           />
         </div>
       </header>

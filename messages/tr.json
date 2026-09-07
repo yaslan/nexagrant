@@ -789,9 +789,15 @@
       "consensus": "Uzlaşı",
       "consensusOutcome": {
         "solid": "Güçlü",
-        "divergent": "Ayrışık"
+        "divergent": "Ayrışık",
+        "notMeasured": "Ölçülmedi"
       },
-      "empty": "Bu teklif için henüz panel değerlendirmesi yok."
+      "empty": "Bu teklif için henüz panel değerlendirmesi yok.",
+      "notMeasured": "Hesaplanmadı",
+      "notMeasuredReason": {
+        "noSubmittedMarks": "Henüz hiçbir hakem puanını göndermedi; ortalanacak bir puan yok.",
+        "noWeightedCriterion": "Gönderilen puanlar ağırlığı olan hiçbir ölçüte denk gelmiyor; ağırlıklı ortalama hesaplanamıyor."
+      }
     },
     "errors": {
       "aiFailed": "YZ ön değerlendirmesi tamamlanamadı; hiçbir puan kaydedilmedi.",
@@ -948,7 +954,8 @@
   },
   "UserIdentity": {
     "unnamedUser": "İsimsiz kullanıcı",
-    "noRole": "Rol atanmamış"
+    "noRole": "Rol atanmamış",
+    "noWorkspace": "Çalışma alanınız yok"
   },
   "DocumentExport": {
     "signatoryBoxTitle": "Koordinatör / Yetkili İmza",
@@ -1451,5 +1458,10 @@
     "title": "Fon Çağrıları",
     "subtitle": "Ülkeye göre açık fon çağrılarına göz atın",
     "deadline": "Son başvuru"
+  },
+  "DemoSignIn": {
+    "roleSme": "KOBİ Ar-Ge Koordinatörü",
+    "roleTto": "Üniversite TTO Lideri",
+    "rolePlatformAdmin": "Platform Yöneticisi"
   }
 }

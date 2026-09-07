@@ -53,20 +53,24 @@ export default async function BlogDetailPage({
               {post.title}
             </h1>
 
-            {/* Author Badge */}
-            <div className="flex items-center gap-3 pt-2">
-              <Image
-                src={post.author.avatar}
-                alt={post.author.name}
-                width={40}
-                height={40}
-                className="rounded-full object-cover border border-border"
-              />
-              <div>
-                <div className="text-sm font-bold text-ink">{post.author.name}</div>
-                <div className="text-xs text-muted">{post.author.role}</div>
+            {/* Author Badge — rendered only for a post that records an author. */}
+            {post.author && (
+              <div className="flex items-center gap-3 pt-2">
+                {post.author.avatar && (
+                  <Image
+                    src={post.author.avatar}
+                    alt={post.author.name}
+                    width={40}
+                    height={40}
+                    className="rounded-full object-cover border border-border"
+                  />
+                )}
+                <div>
+                  <div className="text-sm font-bold text-ink">{post.author.name}</div>
+                  <div className="text-xs text-muted">{post.author.role}</div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Hero Cover Image */}

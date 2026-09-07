@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { isPlatformAdminSession } from '@/lib/tenant';
 import { getTranslations } from 'next-intl/server';
 import { displayUserName } from '@/lib/user-display';
+import { listSessionWorkspaces } from '@/lib/workspaces';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import UserMenu from '@/components/UserMenu';
@@ -37,6 +38,10 @@ export default async function AdminLayout({
     notFound();
   }
 
+  // The user menu's workspace switcher lists real Workspace rows of the admin's
+  // own tenant, not the two names that used to be written into the component.
+  const workspaces = await listSessionWorkspaces(session);
+
   // The admin navigation is rendered by <AdminSidebarNav />; this file used to carry a
   // second copy of the same list that nothing read.
 
@@ -62,6 +67,7 @@ export default async function AdminLayout({
         userEmail={userEmail}
         userImage={userImage}
         roleName={roleName}
+        workspaces={workspaces}
       />
 
       {/* Desktop Header */}
@@ -101,6 +107,7 @@ export default async function AdminLayout({
             userEmail={userEmail}
             userImage={userImage}
             roleName={roleName}
+            workspaces={workspaces}
           />
         </div>
       </header>

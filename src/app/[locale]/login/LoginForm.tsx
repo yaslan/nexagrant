@@ -3,8 +3,19 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions/auth';
+import { useTranslations } from 'next-intl';
 import { errorMessage as toErrorMessage, isNextRedirectError } from '@/lib/errors';
 
+/**
+ * TASK-MTRNQHC3IV2BE — NOTE: nothing imports this component.
+ *
+ * `/[locale]/login/page.tsx` and `/[locale]/register/page.tsx` both render
+ * `AuthCard`; a repo-wide grep for "LoginForm" finds only this file. Its demo
+ * buttons therefore never reached a user. They are fixed the same way as
+ * AuthCard's so the two do not drift, but this file is a duplicate that should
+ * be deleted — reported in docs/agent-results/TASK-MTRNQHC3IV2BE-blockzincir-pm.md
+ * rather than removed here, since deleting a route file is not this task's call.
+ */
 interface LoginFormProps {
   locale: string;
 }
@@ -14,6 +25,7 @@ export default function LoginForm({ locale }: LoginFormProps) {
   const rawCallbackUrl = searchParams.get('callbackUrl') || `/${locale}/default/dashboard`;
 
   const isTr = locale === 'tr';
+  const tDemo = useTranslations('DemoSignIn');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -212,8 +224,8 @@ export default function LoginForm({ locale }: LoginFormProps) {
             className="p-2.5 bg-ground hover:bg-surface border border-border rounded-xl text-left transition flex items-center justify-between group cursor-pointer"
           >
             <div>
-              <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">Dr. Mehmet Yılmaz</div>
-              <div className="text-[10px] text-muted">KOBİ Ar-Ge Koordinatörü</div>
+              <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">{tDemo('roleSme')}</div>
+              <div className="text-[10px] text-muted font-mono">mehmet@fonbridge.app</div>
             </div>
             <span className="text-xs text-muted group-hover:text-accent">→</span>
           </button>
@@ -224,8 +236,8 @@ export default function LoginForm({ locale }: LoginFormProps) {
             className="p-2.5 bg-ground hover:bg-surface border border-border rounded-xl text-left transition flex items-center justify-between group cursor-pointer"
           >
             <div>
-              <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">Prof. Dr. Ayşe Kaya</div>
-              <div className="text-[10px] text-muted">Üniversite TTO Lideri</div>
+              <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">{tDemo('roleTto')}</div>
+              <div className="text-[10px] text-muted font-mono">ayse@tto.edu.tr</div>
             </div>
             <span className="text-xs text-muted group-hover:text-accent">→</span>
           </button>

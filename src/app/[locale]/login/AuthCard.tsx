@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions/auth';
+import { useTranslations } from 'next-intl';
 import { errorMessage as toErrorMessage, isNextRedirectError } from '@/lib/errors';
 
 interface AuthCardProps {
@@ -17,6 +18,7 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
   
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const isTr = locale === 'tr';
+  const tDemo = useTranslations('DemoSignIn');
 
   const rawCallbackUrl = searchParams.get('callbackUrl') || `/${locale}/default/dashboard`;
 
@@ -289,6 +291,17 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
         </button>
       </form>
 
+      {/*
+        TASK-MTRNQHC3IV2BE — the demo buttons name a ROLE, not a person.
+
+        Each of these used to be headlined with an invented individual and an
+        academic title — "Dr. Mehmet Yılmaz", "Prof. Dr. Ayşe Kaya" — which is
+        the first thing a visitor sees on the public login page, and the same
+        names src/lib/auth.ts then stamped onto the session. What the button
+        honestly knows is the seat it signs into and the address it signs in
+        with, so that is what it shows. src/lib/user-display.ts states the same
+        rule for the app frame.
+      */}
       {/* ─── QUICK 1-CLICK DEMO ACCOUNTS ─── */}
       <div className="pt-3 border-t border-border space-y-2">
         <div className="text-[11px] font-bold text-muted uppercase tracking-wider flex items-center justify-between">
@@ -305,8 +318,8 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
             <div className="flex items-center gap-2">
               <span className="text-sm">👑</span>
               <div>
-                <div className="font-bold text-xs text-accent-ink">Yasin Aslan (Süperadmin)</div>
-                <div className="text-[10px] text-muted">Platform Admin & Tüm Yetkiler</div>
+                <div className="font-bold text-xs text-accent-ink">{tDemo('rolePlatformAdmin')}</div>
+                <div className="text-[10px] text-muted font-mono">admin@yasinaslan.com.tr</div>
               </div>
             </div>
             <span className="text-xs font-bold text-accent group-hover:translate-x-0.5 transition-transform">Giriş →</span>
@@ -319,8 +332,8 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
               className="p-2 bg-ground hover:bg-surface border border-border rounded-xl text-left transition flex items-center justify-between group cursor-pointer"
             >
               <div>
-                <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">Dr. Mehmet Yılmaz</div>
-                <div className="text-[10px] text-muted">KOBİ Ar-Ge</div>
+                <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">{tDemo('roleSme')}</div>
+                <div className="text-[10px] text-muted font-mono">mehmet@fonbridge.app</div>
               </div>
               <span className="text-xs text-muted group-hover:text-accent">→</span>
             </button>
@@ -331,8 +344,8 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
               className="p-2 bg-ground hover:bg-surface border border-border rounded-xl text-left transition flex items-center justify-between group cursor-pointer"
             >
               <div>
-                <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">Prof. Dr. Ayşe Kaya</div>
-                <div className="text-[10px] text-muted">TTO Lideri</div>
+                <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">{tDemo('roleTto')}</div>
+                <div className="text-[10px] text-muted font-mono">ayse@tto.edu.tr</div>
               </div>
               <span className="text-xs text-muted group-hover:text-accent">→</span>
             </button>
