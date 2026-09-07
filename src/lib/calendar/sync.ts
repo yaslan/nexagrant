@@ -11,12 +11,14 @@ export async function syncMeetingBriefToCalendar(
   tx: TenantTx,
   tenantId: string,
   userId: string,
+  // partnerName and meetingScheduledTz are nullable columns on MeetingBrief;
+  // the parameter used to claim otherwise while the caller passed `any`.
   brief: {
     id: string;
-    partnerName: string;
+    partnerName: string | null;
     content: string;
     meetingScheduledAt: Date | null;
-    meetingScheduledTz: string;
+    meetingScheduledTz: string | null;
   }
 ): Promise<void> {
   if (!brief.meetingScheduledAt) {

@@ -4,6 +4,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
+import type { ApiKeyRow, MarketplaceListingRow } from '@/types/db-rows';
 
 /**
  * Marketplace listings, orders and API keys.
@@ -28,7 +29,7 @@ export async function createMarketplaceListing({
 }) {
   const { tenantId } = await requireTenantAction();
 
-  const listing = await withTenant<any>(tenantId, (tx) =>
+  const listing = await withTenant<MarketplaceListingRow>(tenantId, (tx) =>
     tx.marketplaceListing.create({
       data: {
         tenantId,
@@ -90,7 +91,7 @@ export async function generateApiKey({ name }: { name: string }) {
 
   // No offline fallback: a key the caller believes exists but that was never
   // stored authenticates nothing, and printing one is worse than an error.
-  const apiKeyRecord = await withTenant<any>(tenantId, (tx) =>
+  const apiKeyRecord = await withTenant<ApiKeyRow>(tenantId, (tx) =>
     tx.apiKey.create({
       data: {
         tenantId,

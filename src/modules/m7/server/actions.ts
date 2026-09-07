@@ -5,6 +5,7 @@ import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
+import type { TtoPortfolioItemRow } from '@/types/db-rows';
 
 /**
  * M7 TTO portfolio.
@@ -30,7 +31,7 @@ export async function createTtoItem({
 }) {
   const { tenantId } = await requireTenantAction();
 
-  const item = await withTenant<any>(tenantId, (tx) =>
+  const item = await withTenant<TtoPortfolioItemRow>(tenantId, (tx) =>
     tx.ttoPortfolioItem.create({
       data: {
         tenantId,

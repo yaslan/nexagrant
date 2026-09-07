@@ -107,7 +107,7 @@ describe('M9 Meeting Briefs Module', () => {
 
     expect(result.success).toBe(true);
     expect(result.brief).toBeDefined();
-    expect(result.brief.content).toContain('Partner Background');
+    expect(result.brief?.content).toContain('Partner Background');
   });
 
   test('generateMeetingBrief writes the session tenant, not a caller-supplied one', async () => {

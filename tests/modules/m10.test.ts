@@ -118,7 +118,7 @@ describe('M10 Follow-up Documents Module', () => {
   test('createNewVersion increments document version', async () => {
     const res = await createNewVersion('doc-101');
     expect(res.success).toBe(true);
-    expect(res.updatedDoc.version).toBe(2);
+    expect(res.updatedDoc?.version).toBe(2);
     expect(h.followupDocFindFirst).toHaveBeenCalledWith({
       where: { id: 'doc-101', tenantId: 'tenant-1' },
     });

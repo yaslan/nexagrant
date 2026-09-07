@@ -3,9 +3,10 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
-import { submitForDualApproval, approveByDepartment, rejectDualApproval, Department } from '@/lib/dual-approval';
+import { submitForDualApproval, approveByDepartment, rejectDualApproval, Department, type DualApprovalState } from '@/lib/dual-approval';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
+import type { FollowupDocRow } from '@/types/db-rows';
 
 /**
  * M10 follow-up documents.
@@ -73,7 +74,7 @@ export async function generateStandardDoc(
 
   const mockUrl = `https://storage.fabrika.app/docs/${tenantId}/${opportunityId}/${kind.toLowerCase()}_v1.pdf`;
 
-  const doc = await withTenant<any>(tenantId, async (tx) => {
+  const doc = await withTenant<FollowupDocRow>(tenantId, async (tx) => {
     const created = await tx.followupDoc.create({
       data: {
         tenantId,
@@ -126,7 +127,7 @@ export async function signDocument(docId: string) {
 export async function createNewVersion(docId: string) {
   const { tenantId } = await requireTenantAction();
 
-  const updatedDoc = await withTenant<any>(tenantId, async (tx) => {
+  const updatedDoc = await withTenant<FollowupDocRow | null>(tenantId, async (tx) => {
     // Scoped read: a doc id from another tenant must not resolve here.
     const existing = await tx.followupDoc.findFirst({ where: { id: docId, tenantId } });
     if (!existing) return null;
@@ -155,7 +156,7 @@ export async function submitDualApprovalAction(docId: string, actorName: string 
 }
 
 export async function departmentApproveAction(
-  currentState: any,
+  currentState: DualApprovalState,
   department: Department,
   actorName: string,
   note?: string

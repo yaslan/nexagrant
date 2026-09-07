@@ -3,6 +3,7 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
+import type { InteractionRow, RelationshipRow } from '@/types/db-rows';
 
 /**
  * M4 relationships.
@@ -27,7 +28,7 @@ export async function createRelationship(data: {
     throw new Error('Must provide either organizationId or partnerOrgId');
   }
 
-  const rel = await withTenant<any>(tenantId, async (tx) => {
+  const rel = await withTenant<RelationshipRow>(tenantId, async (tx) => {
     // Rule: One Relationship per organization per tenant
     if (data.organizationId) {
       const existing = await tx.relationship.findFirst({
@@ -64,7 +65,7 @@ export async function addInteraction(data: {
 }) {
   const { tenantId, userId } = await requireTenantAction();
 
-  const interaction = await withTenant<any>(tenantId, async (tx) => {
+  const interaction = await withTenant<InteractionRow>(tenantId, async (tx) => {
     // The relationship must be this tenant's before anything is written to it.
     const rel = await tx.relationship.findFirst({
       where: { id: data.relationshipId, tenantId },

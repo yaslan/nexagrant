@@ -21,10 +21,11 @@ import { generateIcsContent } from '@/lib/calendar';
 export interface BriefItem {
   id: string;
   interactionId: string;
-  partnerName?: string;
+  // Nullable, not just absent: these are nullable columns on MeetingBrief.
+  partnerName?: string | null;
   content: string;
-  meetingScheduledAt?: string | Date;
-  meetingScheduledTz?: string;
+  meetingScheduledAt?: string | Date | null;
+  meetingScheduledTz?: string | null;
   createdAt: string | Date;
 }
 

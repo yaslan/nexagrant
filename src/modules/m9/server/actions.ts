@@ -6,6 +6,7 @@ import { generateText } from '@/lib/ai/llm';
 import { revalidatePath } from 'next/cache';
 import { syncMeetingBriefToCalendar } from '@/lib/calendar/sync';
 import { errorMessage } from '@/lib/errors';
+import type { MeetingBriefRow } from '@/types/db-rows';
 
 /**
  * M9 meeting briefs.
@@ -85,7 +86,7 @@ export async function generateMeetingBrief({
   }
 
   try {
-    const brief = await withTenant<any>(tenantId, async (tx) => {
+    const brief = await withTenant<MeetingBriefRow>(tenantId, async (tx) => {
       // Deduct 1 AI credit for M9 Brief
       await tx.creditLedger.create({
         data: {

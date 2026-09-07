@@ -84,15 +84,16 @@ export function DocumentsClient({
   const handleCreateNewVersion = async (docId: string) => {
     try {
       const res = await createNewVersion(docId);
-      if (res.updatedDoc) {
+      const updatedDoc = res.updatedDoc;
+      if (updatedDoc) {
         setDocs((prev) =>
           prev.map((d) =>
             d.id === docId
               ? {
                   ...d,
-                  version: res.updatedDoc.version,
+                  version: updatedDoc.version,
                   signedAt: null,
-                  contentUrl: res.updatedDoc.contentUrl,
+                  contentUrl: updatedDoc.contentUrl,
                 }
               : d
           )
