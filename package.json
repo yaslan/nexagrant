@@ -27,7 +27,8 @@
     "beta:pricing": "tsx scripts/beta-pricing-survey.ts",
     "beta:esr-calibration": "tsx scripts/esr-calibration.ts",
     "beta:esr-calibration:rollback": "tsx scripts/esr-calibration.ts --rollback",
-    "a11y:check": "tsx scripts/a11y-check.ts"
+    "a11y:check": "tsx scripts/a11y-check.ts",
+    "jobs:g0-rescore": "tsx scripts/rescore-g0.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

@@ -213,11 +213,14 @@ export async function loadG0Snapshot(
             : null,
       };
 
-      const match: { fitScore: number | null } | null = await client.topicMatch.findUnique({
-        where: { tenantId_topicId: { tenantId, topicId: resolvedTopicId } },
-        select: { fitScore: true },
-      });
-      topicFitScore = toNumberOrNull(match?.fitScore);
+      const match: { fitScore: number | null; breakdown: unknown } | null =
+        await client.topicMatch.findUnique({
+          where: { tenantId_topicId: { tenantId, topicId: resolvedTopicId } },
+          select: { fitScore: true, breakdown: true },
+        });
+      // A row this scorer created carries a placeholder fit score, not a K1 match — reading it back
+      // as alignment would turn "we never matched this topic" into "we matched it and scored 0".
+      topicFitScore = match && !isPlaceholderFitScore(match.breakdown) ? toNumberOrNull(match.fitScore) : null;
 
       const prefix = topicPrefixOf(topic.identifier);
       const stats: { country: string | null; successRate: number | null; topicId: string | null }[] =
@@ -342,6 +345,39 @@ export async function computeG0ForOpportunity(
 
 // ───────────────────────── persistence (the evidence record) ─────────────────────────
 
+/**
+ * Marks a `TopicMatch` row this module created rather than K1.
+ *
+ * `TopicMatch.fitScore` is non-nullable and means "the K1 cosine match", so a row created here to
+ * hold the breakdown has to put *something* in it. Writing the alignment we used — which, on a
+ * create, is by definition not a K1 match — and then reading it back on the next run would launder
+ * an absent signal into a measured one and quietly inflate the evidence coverage. The flag lets
+ * `loadG0Snapshot` tell the two apart.
+ */
+export const G0_FIT_SCORE_PLACEHOLDER = 'g0ScorerPlaceholderFitScore';
+
+/**
+ * Did the alignment feature come from a real K1 match on this topic?
+ *
+ * Read off the computation's own source trail rather than re-querying: if the answer is no, then
+ * whatever `TopicMatch.fitScore` is on file is not a K1 match either, and the row must stay
+ * flagged — including when it already exists, or the next write silently promotes a placeholder
+ * back into evidence.
+ */
+function alignmentCameFromTopicMatch(computation: G0Computation): boolean {
+  return computation.sources.some(
+    (s) => s.feature === 'alignment' && s.status === 'measured' && s.source === 'TopicMatch.fitScore',
+  );
+}
+
+function isPlaceholderFitScore(breakdown: unknown): boolean {
+  return (
+    !!breakdown &&
+    typeof breakdown === 'object' &&
+    (breakdown as Record<string, unknown>)[G0_FIT_SCORE_PLACEHOLDER] === true
+  );
+}
+
 /** The JSON stored in `TopicMatch.breakdown` and echoed into `GateDecision.inputs`. */
 export function g0EvidencePayload(computation: G0Computation): Record<string, unknown> {
   return {
@@ -376,16 +412,19 @@ export async function persistG0(
   });
 
   if (computation.topicId) {
-    const breakdown = g0EvidencePayload(computation);
+    const evidence = g0EvidencePayload(computation);
+    const breakdown = alignmentCameFromTopicMatch(computation)
+      ? evidence
+      : { ...evidence, [G0_FIT_SCORE_PLACEHOLDER]: true };
     await client.topicMatch.upsert({
       where: { tenantId_topicId: { tenantId: computation.tenantId, topicId: computation.topicId } },
+      // An existing row's `fitScore` belongs to K1 and is never overwritten here; only the score
+      // and its breakdown are ours to write.
       update: { g0Score: computation.score, breakdown },
       create: {
         tenantId: computation.tenantId,
         topicId: computation.topicId,
-        // A row created here has no K1 cosine match yet; the alignment the score actually used is
-        // the honest value to record rather than a placeholder.
-        fitScore: computation.features.alignment,
+        fitScore: 0,
         g0Score: computation.score,
         breakdown,
       },
