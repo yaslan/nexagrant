@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SediaAdapter } from '@/lib/adapters/sedia';
 import { translateTopicsBatch } from '@/lib/translation';
 import { prisma } from '@/lib/db';
+import { errorMessage } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
   try {
@@ -113,10 +114,10 @@ export async function GET(request: NextRequest) {
       pageSize: result.pageSize,
       topics: processedTopics
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API /api/cagrilar] Internal error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch calls from SEDIA' },
+      { success: false, error: errorMessage(error) || 'Failed to fetch calls from SEDIA' },
       { status: 500 }
     );
   }

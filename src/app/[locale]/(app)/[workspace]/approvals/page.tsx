@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import ApprovalsClient from './client';
 import { Role } from '@prisma/client';
+import { errorMessage } from '@/lib/errors';
 
 export default async function ApprovalsPage({
   params
@@ -30,8 +31,8 @@ export default async function ApprovalsPage({
         orderBy: { createdAt: 'desc' },
       });
     }
-  } catch (e: any) {
-    console.warn(`[Approvals] DB query bypassed or fallback: ${e.message}`);
+  } catch (e) {
+    console.warn(`[Approvals] DB query bypassed or fallback: ${errorMessage(e)}`);
   }
 
   return (

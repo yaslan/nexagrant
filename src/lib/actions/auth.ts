@@ -2,6 +2,7 @@
 
 import { signIn, signOut } from '@/lib/auth';
 import { AuthError } from 'next-auth';
+import { isNextRedirectError } from '@/lib/errors';
 
 export async function loginWithCredentialsAction(
   email: string,
@@ -16,7 +17,7 @@ export async function loginWithCredentialsAction(
       redirect: false,
     });
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof AuthError) {
       switch (error.type) {
         case 'CredentialsSignin':
@@ -38,8 +39,7 @@ export async function loginWithCredentialsAction(
 
     // Catch internal NEXT_REDIRECT exception and treat as successful login
     if (
-      error?.message?.includes('NEXT_REDIRECT') ||
-      error?.digest?.includes('NEXT_REDIRECT')
+      isNextRedirectError(error)
     ) {
       return { success: true };
     }
@@ -55,10 +55,9 @@ export async function loginWithSocialAction(
 ) {
   try {
     await signIn(provider, { redirectTo });
-  } catch (error: any) {
+  } catch (error) {
     if (
-      error?.message?.includes('NEXT_REDIRECT') ||
-      error?.digest?.includes('NEXT_REDIRECT')
+      isNextRedirectError(error)
     ) {
       throw error; // OAuth redirect needs to bubble up
     }

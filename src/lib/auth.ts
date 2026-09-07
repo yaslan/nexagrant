@@ -5,6 +5,7 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./db";
 import { env } from "./env";
+import { errorMessage } from '@/lib/errors';
 
 const DEMO_PROFILES: Record<string, { name: string; orgName: string; orgType: any; role: string; isPlatformAdmin?: boolean }> = {
   "admin@yasinaslan.com.tr": {
@@ -41,8 +42,8 @@ const safeAdapter: any = {
   async createUser(user: any) {
     try {
       return await baseAdapter.createUser!(user);
-    } catch (e: any) {
-      console.warn(`[AuthAdapter.createUser] DB error/fallback: ${e.message}`);
+    } catch (e) {
+      console.warn(`[AuthAdapter.createUser] DB error/fallback: ${errorMessage(e)}`);
       return {
         id: `user-oauth-${Date.now()}`,
         email: user.email,
@@ -55,64 +56,64 @@ const safeAdapter: any = {
   async getUser(id: string) {
     try {
       return await baseAdapter.getUser!(id);
-    } catch (e: any) {
-      console.warn(`[AuthAdapter.getUser] DB error/fallback: ${e.message}`);
+    } catch (e) {
+      console.warn(`[AuthAdapter.getUser] DB error/fallback: ${errorMessage(e)}`);
       return null;
     }
   },
   async getUserByEmail(email: string) {
     try {
       return await baseAdapter.getUserByEmail!(email);
-    } catch (e: any) {
-      console.warn(`[AuthAdapter.getUserByEmail] DB error/fallback: ${e.message}`);
+    } catch (e) {
+      console.warn(`[AuthAdapter.getUserByEmail] DB error/fallback: ${errorMessage(e)}`);
       return null;
     }
   },
   async getUserByAccount(account: any) {
     try {
       return await baseAdapter.getUserByAccount!(account);
-    } catch (e: any) {
-      console.warn(`[AuthAdapter.getUserByAccount] DB error/fallback: ${e.message}`);
+    } catch (e) {
+      console.warn(`[AuthAdapter.getUserByAccount] DB error/fallback: ${errorMessage(e)}`);
       return null;
     }
   },
   async linkAccount(account: any) {
     try {
       return await baseAdapter.linkAccount!(account);
-    } catch (e: any) {
-      console.warn(`[AuthAdapter.linkAccount] DB error/fallback: ${e.message}`);
+    } catch (e) {
+      console.warn(`[AuthAdapter.linkAccount] DB error/fallback: ${errorMessage(e)}`);
       return account;
     }
   },
   async createSession(session: any) {
     try {
       return await baseAdapter.createSession!(session);
-    } catch (e: any) {
-      console.warn(`[AuthAdapter.createSession] DB error/fallback: ${e.message}`);
+    } catch (e) {
+      console.warn(`[AuthAdapter.createSession] DB error/fallback: ${errorMessage(e)}`);
       return session;
     }
   },
   async getSessionAndUser(sessionToken: string) {
     try {
       return await baseAdapter.getSessionAndUser!(sessionToken);
-    } catch (e: any) {
-      console.warn(`[AuthAdapter.getSessionAndUser] DB error/fallback: ${e.message}`);
+    } catch (e) {
+      console.warn(`[AuthAdapter.getSessionAndUser] DB error/fallback: ${errorMessage(e)}`);
       return null;
     }
   },
   async updateSession(session: any) {
     try {
       return await baseAdapter.updateSession!(session);
-    } catch (e: any) {
-      console.warn(`[AuthAdapter.updateSession] DB error/fallback: ${e.message}`);
+    } catch (e) {
+      console.warn(`[AuthAdapter.updateSession] DB error/fallback: ${errorMessage(e)}`);
       return session;
     }
   },
   async deleteSession(sessionToken: string) {
     try {
       return await baseAdapter.deleteSession!(sessionToken);
-    } catch (e: any) {
-      console.warn(`[AuthAdapter.deleteSession] DB error/fallback: ${e.message}`);
+    } catch (e) {
+      console.warn(`[AuthAdapter.deleteSession] DB error/fallback: ${errorMessage(e)}`);
     }
   },
 };
@@ -215,15 +216,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: user.name || computedName,
             image: user.image,
           };
-        } catch (error: any) {
+        } catch (error) {
           // Signing in against a fabricated user id is a development
           // convenience only: in production a database outage must fail the
           // sign-in, not mint a session for an account nobody verified.
           if (env.NODE_ENV === "production") {
-            console.error(`[Auth.authorize] sign-in refused, database unavailable: ${error.message}`);
+            console.error(`[Auth.authorize] sign-in refused, database unavailable: ${errorMessage(error)}`);
             return null;
           }
-          console.warn(`[Auth.authorize] DB fallback for demo: ${error.message}`);
+          console.warn(`[Auth.authorize] DB fallback for demo: ${errorMessage(error)}`);
           // Deliberately tenantless — see the jwt callback below.
           return {
             id: email === "admin@yasinaslan.com.tr" ? "superadmin-yasin" : "demo-user-mehmet",
@@ -270,14 +271,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               if (dbUser.name) token.name = dbUser.name;
             }
           }
-        } catch (e: any) {
+        } catch (e) {
           // No fallback tenant here on purpose. A hardcoded demo tenant id
           // used to be assigned when the membership lookup failed, which
           // handed the session a tenant it was never granted — and some of
           // those ids match real rows in the database. A tenantless token is
           // the safe outcome: the UI routes such a user to the "no workspace"
           // screen instead of into another tenant's data. See src/lib/tenant.ts.
-          console.warn(`[Auth.jwt] membership lookup failed, session stays tenantless: ${e.message}`);
+          console.warn(`[Auth.jwt] membership lookup failed, session stays tenantless: ${errorMessage(e)}`);
         }
       }
 
@@ -334,8 +335,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
           });
         });
-      } catch (err: any) {
-        console.warn(`[Auth.createUser] DB error: ${err.message}`);
+      } catch (err) {
+        console.warn(`[Auth.createUser] DB error: ${errorMessage(err)}`);
       }
     },
   },

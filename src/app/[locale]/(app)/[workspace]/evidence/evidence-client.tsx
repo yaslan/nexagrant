@@ -27,6 +27,7 @@ import {
   ChevronRight,
   Eye
 } from 'lucide-react';
+import { errorMessage } from '@/lib/errors';
 
 export interface EvidenceItemData {
   id: string;
@@ -193,8 +194,8 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
       setUploadTitle('');
       setUploadValidUntil('');
       setUploadAuthority('');
-    } catch (err: any) {
-      alert(isTr ? `Yükleme hatası: ${err.message}` : `Upload error: ${err.message}`);
+    } catch (err) {
+      alert(isTr ? `Yükleme hatası: ${errorMessage(err)}` : `Upload error: ${errorMessage(err)}`);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);

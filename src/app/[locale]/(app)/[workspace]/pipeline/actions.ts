@@ -13,6 +13,7 @@ import {
   addInMemoryOpportunityNote,
   WORKSPACE_MEMBERS
 } from '@/lib/k5-pipeline/pipelineStore';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * The tenant of a server action comes from the session and from nowhere else.
@@ -25,8 +26,8 @@ import {
 async function sessionScope(): Promise<TenantScope | null> {
   try {
     return tenantScopeOf((await auth()) as any);
-  } catch (e: any) {
-    console.warn(`[pipeline/actions] session lookup failed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[pipeline/actions] session lookup failed: ${errorMessage(e)}`);
     return null;
   }
 }
@@ -130,8 +131,8 @@ export async function createOpportunity({
         }
       });
     }
-  } catch (err: any) {
-    console.warn('[createOpportunity] DB query bypassed, stored in resilient pipeline store:', err.message);
+  } catch (err) {
+    console.warn('[createOpportunity] DB query bypassed, stored in resilient pipeline store:', errorMessage(err));
   }
 
   try {
@@ -163,8 +164,8 @@ export async function assignOpportunityOwner({
       where: { id: opportunityId, tenantId },
       data: { ownerId },
     });
-  } catch (err: any) {
-    console.warn(`[assignOpportunityOwner] DB update bypassed: ${err.message}`);
+  } catch (err) {
+    console.warn(`[assignOpportunityOwner] DB update bypassed: ${errorMessage(err)}`);
   }
 
   try {
@@ -230,8 +231,8 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
       where: { id: opportunityId, tenantId },
       data: { stage: newStage }
     });
-  } catch (err: any) {
-    console.warn(`[moveOpportunityStage] DB update bypassed: ${err.message}`);
+  } catch (err) {
+    console.warn(`[moveOpportunityStage] DB update bypassed: ${errorMessage(err)}`);
   }
 
   try {

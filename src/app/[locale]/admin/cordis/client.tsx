@@ -18,6 +18,7 @@ import {
   FolderGit2
 } from 'lucide-react';
 import { handleRunCordisSync, handleRunCordisLiveDelta, handleTestRagQuery, handleRunCordisImportAction, handleGetK2Status } from './actions';
+import { errorMessage } from '@/lib/errors';
 
 interface CordisMetrics {
   totalProjectsCount: number;
@@ -67,8 +68,8 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
       setImportResult(res);
       const updatedStatus = await handleGetK2Status();
       setK2Status(updatedStatus);
-    } catch (err: any) {
-      setImportResult({ success: false, error: err?.message || 'Import failed' });
+    } catch (err) {
+      setImportResult({ success: false, error: errorMessage(err, 'Import failed')});
     } finally {
       setIsImporting(false);
     }

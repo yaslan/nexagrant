@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { addBudgetLineByToken } from '@/modules/m11/server/actions';
 import { getTranslations } from 'next-intl/server';
+import { errorMessage } from '@/lib/errors';
 
 interface PageProps {
   params: Promise<{
@@ -21,7 +22,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       where: { magicToken: token },
       include: { opportunity: true }
     });
-  } catch (e: any) {
+  } catch (e) {
     return {
       title: t('title'),
       description: t('intro'),
@@ -57,8 +58,8 @@ export default async function PartnerPortalPage({ params }: PageProps) {
       where: { magicToken: token },
       include: { opportunity: true }
     });
-  } catch (e: any) {
-    console.warn(`[PartnerPortalPage] DB query failed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[PartnerPortalPage] DB query failed: ${errorMessage(e)}`);
     return notFound();
   }
 

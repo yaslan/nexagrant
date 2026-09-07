@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Gate, Opportunity } from '@prisma/client';
 import { moveOpportunityStage, createOpportunity, assignOpportunityOwner, addOpportunityNote } from './actions';
 import { WORKSPACE_MEMBERS, NoteEntry } from '@/lib/k5-pipeline/pipelineStore';
+import { errorMessage } from '@/lib/errors';
 
 interface KanbanBoardProps {
   opportunities: Opportunity[];
@@ -216,8 +217,8 @@ export default function KanbanBoard({
           });
           showToast(`"${res.opportunity.title}" fırsatı ${member?.name || ''} üzerine atanarak oluşturuldu!`, 'success');
         }
-      } catch (err: any) {
-        showToast(err?.message || 'Fırsat oluşturulurken hata meydana geldi.', 'error');
+      } catch (err) {
+        showToast(errorMessage(err, 'Fırsat oluşturulurken hata meydana geldi.'), 'error');
       }
     });
   };

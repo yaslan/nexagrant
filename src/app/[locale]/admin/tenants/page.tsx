@@ -1,6 +1,7 @@
 import React from 'react';
 import { prisma } from '@/lib/db';
 import { Building2, Shield, Users } from 'lucide-react';
+import { errorMessage } from '@/lib/errors';
 
 export default async function AdminTenantsPage() {
   // CLAUDE.md §7: the tenant list is real rows or nothing. The previous
@@ -18,8 +19,8 @@ export default async function AdminTenantsPage() {
       },
       orderBy: { createdAt: 'desc' }
     });
-  } catch (e: any) {
-    console.error(`[AdminTenantsPage] DB query failed: ${e.message}`);
+  } catch (e) {
+    console.error(`[AdminTenantsPage] DB query failed: ${errorMessage(e)}`);
     loadError = 'Kiracı listesi okunamadı (veritabanına ulaşılamıyor).';
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runCordisImport } from '@/lib/k2-cordis/importer';
 import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
+import { errorMessage } from '@/lib/errors';
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,9 +40,9 @@ export async function POST(req: NextRequest) {
         profileJobDurationMs: profileRes.durationMs,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to execute CORDIS import job' },
+      { success: false, error: errorMessage(error, 'Failed to execute CORDIS import job')},
       { status: 500 }
     );
   }

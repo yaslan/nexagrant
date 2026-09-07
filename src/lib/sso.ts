@@ -1,4 +1,5 @@
 import { prisma } from './db';
+import { errorMessage } from '@/lib/errors';
 
 export interface EnterpriseSsoConfig {
   tenantId: string;
@@ -25,8 +26,8 @@ export async function configureEnterpriseSso(config: EnterpriseSsoConfig) {
         domain: domain.toLowerCase().trim(),
       },
     });
-  } catch (e: any) {
-    console.warn(`[configureEnterpriseSso] DB update bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[configureEnterpriseSso] DB update bypassed: ${errorMessage(e)}`);
   }
 
   return {

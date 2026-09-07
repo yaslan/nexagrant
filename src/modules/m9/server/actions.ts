@@ -5,6 +5,7 @@ import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
 import { revalidatePath } from 'next/cache';
 import { syncMeetingBriefToCalendar } from '@/lib/calendar/sync';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * M9 meeting briefs.
@@ -60,8 +61,8 @@ export async function generateMeetingBrief({
       prompt,
       system: 'You are an expert EU Horizon Europe coordinator preparing pre-meeting briefs for strategic partners.',
     });
-  } catch (e: any) {
-    console.warn('[M9 generateMeetingBrief] LLM call fallback:', e.message);
+  } catch (e) {
+    console.warn('[M9 generateMeetingBrief] LLM call fallback:', errorMessage(e));
     briefContent = `### 1. Partner Background & EU Track Record
 - **Partner:** ${partnerName}
 - **Track Record:** Recognized participant in EU Framework Programmes with strong technical capacity.
@@ -135,13 +136,13 @@ export async function generateMeetingBrief({
       await withTenant(tenantId, async (tx) => {
         await syncMeetingBriefToCalendar(tx, tenantId, userId, brief);
       });
-    } catch (e: any) {
-      console.warn('[M9 generateMeetingBrief] Calendar sync failed (non-critical):', e.message);
+    } catch (e) {
+      console.warn('[M9 generateMeetingBrief] Calendar sync failed (non-critical):', errorMessage(e));
     }
 
     return { success: true, brief };
-  } catch (e: any) {
-    console.warn('[M9 generateMeetingBrief] DB write failed:', e.message);
+  } catch (e) {
+    console.warn('[M9 generateMeetingBrief] DB write failed:', errorMessage(e));
     return { success: false, brief: null, error: 'BRIEF_NOT_PERSISTED' };
   }
 }
@@ -186,8 +187,8 @@ ${nextMeetingDate ? `- **Sonraki Görüşme Tarihi:** ${nextMeetingDate}` : ''}`
       });
       return true;
     });
-  } catch (dbErr: any) {
-    console.warn('[savePostMeetingNotes] DB update failed:', dbErr.message);
+  } catch (dbErr) {
+    console.warn('[savePostMeetingNotes] DB update failed:', errorMessage(dbErr));
     return { success: false, formattedPostNotes: '' };
   }
 

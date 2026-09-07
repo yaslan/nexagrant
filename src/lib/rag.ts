@@ -9,6 +9,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import { errorMessage } from '@/lib/errors';
 
 const CHUNK_SIZE = 1500;  // characters per chunk
 const CHUNK_OVERLAP = 200;
@@ -108,8 +109,8 @@ export async function ingestDocument(
         embeddingStr
       );
     }
-  } catch (e: any) {
-    console.warn(`[ingestDocument] DB ingestion bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[ingestDocument] DB ingestion bypassed: ${errorMessage(e)}`);
   }
 
   return docId;
@@ -150,8 +151,8 @@ export async function retrieveChunks(
         documentId: r.documentId,
       }));
     }
-  } catch (e: any) {
-    console.warn(`[retrieveChunks] DB retrieval bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[retrieveChunks] DB retrieval bypassed: ${errorMessage(e)}`);
   }
 
   // Fallback demo chunks for preview/demo mode

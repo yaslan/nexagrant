@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { PartnerFilters } from './PartnerFilters';
+import { errorMessage } from '@/lib/errors';
 
 const DEMO_CORDIS_PARTNERS = [
   {
@@ -193,8 +194,8 @@ export default async function PartnersPage({
         orderBy: { totalProjects: 'desc' },
       }),
     ]);
-  } catch (e: any) {
-    console.warn(`[PartnersPage] CordisPartnerProfile DB unavailable: ${e.message}`);
+  } catch (e) {
+    console.warn(`[PartnersPage] CordisPartnerProfile DB unavailable: ${errorMessage(e)}`);
   }
 
   // 2. Fallback to CordisOrganization if profile table is empty or DB offline
@@ -237,8 +238,8 @@ export default async function PartnersPage({
           topTopics: [],
         }));
       }
-    } catch (e: any) {
-      console.warn(`[PartnersPage] CordisOrganization DB unavailable: ${e.message}`);
+    } catch (e) {
+      console.warn(`[PartnersPage] CordisOrganization DB unavailable: ${errorMessage(e)}`);
     }
   }
 
@@ -282,8 +283,8 @@ export default async function PartnersPage({
           topTopics: [],
         }));
       }
-    } catch (e: any) {
-      console.warn(`[PartnersPage] Legacy Organization DB unavailable: ${e.message}`);
+    } catch (e) {
+      console.warn(`[PartnersPage] Legacy Organization DB unavailable: ${errorMessage(e)}`);
     }
   }
 

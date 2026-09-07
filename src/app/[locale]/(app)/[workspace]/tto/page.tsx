@@ -2,6 +2,7 @@ import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { TtoAcceleratorClient } from './client';
+import { errorMessage } from '@/lib/errors';
 
 export default async function TtoAcceleratorPage({
   params,
@@ -19,8 +20,8 @@ export default async function TtoAcceleratorPage({
         orderBy: { createdAt: 'desc' },
       })
     );
-  } catch (e: any) {
-    console.warn(`[TtoAcceleratorPage] DB query bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[TtoAcceleratorPage] DB query bypassed: ${errorMessage(e)}`);
   }
 
   // Fallback demo items if DB is unseeded/offline

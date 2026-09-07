@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { generateConceptNoteDraft, saveConceptNoteDraft, exportToDocx } from '../server/actions';
+import { errorMessage } from '@/lib/errors';
 
 // We'll use standard HTML elements if UI components are missing for brevity, but let's assume they exist
 // from shadcn or base-ui per package.json. If they don't, standard works.
@@ -41,8 +42,8 @@ export default function ConceptNoteEditor({
       const newNoteId = await generateConceptNoteDraft(opportunityId, templateId, {});
       setCurrentNoteId(newNoteId);
       alert('Draft generated successfully! Please refresh to load content if needed, or implement auto-fetch.');
-    } catch (err: any) {
-      alert(`Error: ${err.message}`);
+    } catch (err) {
+      alert(`Error: ${errorMessage(err)}`);
     } finally {
       setIsGenerating(false);
     }
@@ -54,8 +55,8 @@ export default function ConceptNoteEditor({
     try {
       await saveConceptNoteDraft(currentNoteId, content);
       alert('Saved successfully!');
-    } catch (err: any) {
-      alert(`Error: ${err.message}`);
+    } catch (err) {
+      alert(`Error: ${errorMessage(err)}`);
     } finally {
       setIsSaving(false);
     }
@@ -70,8 +71,8 @@ export default function ConceptNoteEditor({
       link.href = `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${base64}`;
       link.download = `ConceptNote_${opportunityId}.docx`;
       link.click();
-    } catch (err: any) {
-      alert(`Error: ${err.message}`);
+    } catch (err) {
+      alert(`Error: ${errorMessage(err)}`);
     } finally {
       setIsExporting(false);
     }

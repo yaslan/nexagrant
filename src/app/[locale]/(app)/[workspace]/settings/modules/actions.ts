@@ -7,6 +7,7 @@ import { Role } from '@prisma/client';
 import { ModuleId, PlanTier, ModuleStatus } from '@/lib/modules/types';
 import { canEnable, getDisableCascade } from '@/lib/modules/state-machine';
 import { revalidatePath } from 'next/cache';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * Turns a module on or off for the caller's *own* tenant.
@@ -99,10 +100,10 @@ export async function toggleModuleState(
             // Audit log optional
           }
         });
-      } catch (dbErr: any) {
+      } catch (dbErr) {
         // Reporting success for a state the DB never took means the settings
         // page shows the module enabled until the next reload.
-        console.error(`[toggleModuleState] Database save error: ${dbErr.message}`);
+        console.error(`[toggleModuleState] Database save error: ${errorMessage(dbErr)}`);
         throw new Error('Modül durumu kaydedilemedi. Lütfen tekrar deneyin.');
       }
       
@@ -146,16 +147,16 @@ export async function toggleModuleState(
             // Audit log optional
           }
         });
-      } catch (dbErr: any) {
-        console.error(`[toggleModuleState] Database cascade save error: ${dbErr.message}`);
+      } catch (dbErr) {
+        console.error(`[toggleModuleState] Database cascade save error: ${errorMessage(dbErr)}`);
         throw new Error('Modül durumu kaydedilemedi. Lütfen tekrar deneyin.');
       }
     }
 
     revalidatePath('/[locale]/(app)/[workspace]/settings/modules', 'page');
     return { success: true };
-  } catch (err: any) {
+  } catch (err) {
     console.error('[toggleModuleState] Error:', err);
-    throw new Error(err.message || 'Modül durumu güncellenirken bir hata oluştu.');
+    throw new Error(errorMessage(err) || 'Modül durumu güncellenirken bir hata oluştu.');
   }
 }

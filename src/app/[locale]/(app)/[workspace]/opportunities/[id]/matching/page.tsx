@@ -2,6 +2,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
 import { computeSeatCandidates, assignCandidateToSeat } from '@/modules/m8/server/actions';
+import { errorMessage } from '@/lib/errors';
 
 export default async function MatchingPage({
   params
@@ -119,8 +120,8 @@ export default async function MatchingPage({
                               'use server';
                               try {
                                 await assignCandidateToSeat(seat.id, c.organizationId, 'INVITED', opp.id);
-                              } catch (e: any) {
-                                console.error(e.message);
+                              } catch (e) {
+                                console.error(errorMessage(e));
                                 // A real app would toast this error to the client
                               }
                             }}>

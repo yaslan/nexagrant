@@ -38,6 +38,7 @@ import {
   updatePresenceHeartbeat,
   generateSectionDraftAi,
 } from '../server/actions';
+import { errorMessage } from '@/lib/errors';
 
 interface PartBCollaborativeEditorProps {
   partId: string;
@@ -327,8 +328,8 @@ export function PartBCollaborativeEditor({
       );
       setEditorText(draft);
       setActiveDrawer(null);
-    } catch (e: any) {
-      alert('YZ taslak üretilirken hata oluştu: ' + e.message);
+    } catch (e) {
+      alert('YZ taslak üretilirken hata oluştu: ' + errorMessage(e));
     } finally {
       setIsAiGenerating(false);
     }

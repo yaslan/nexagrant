@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import ConceptNoteEditor from './editor';
+import { errorMessage } from '@/lib/errors';
 
 export default async function ConceptNoteDetailPage({
   params,
@@ -34,8 +35,8 @@ export default async function ConceptNoteDetailPage({
         });
       }
     }
-  } catch (e: any) {
-    console.warn(`[ConceptNoteDetail] DB query bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[ConceptNoteDetail] DB query bypassed: ${errorMessage(e)}`);
   }
 
   // Fallback demo note if DB is unseeded/offline

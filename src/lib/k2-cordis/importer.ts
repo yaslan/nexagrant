@@ -16,6 +16,7 @@ import {
   ParsedCordisSciVoc,
   RawCsvRow,
 } from './cordisSchema';
+import { errorMessage } from '@/lib/errors';
 
 export interface CordisImportOptions {
   dataset: 'HORIZON' | 'H2020';
@@ -499,8 +500,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       rowCounts,
       durationMs: Date.now() - startTime,
     };
-  } catch (error: any) {
-    const errorMsg = error?.message || String(error);
+  } catch (error) {
+    const errorMsg = errorMessage(error, String(error));
     try {
       await prisma.cordisImportRun.update({
         where: { runId: runRecord?.runId || 'unknown' },

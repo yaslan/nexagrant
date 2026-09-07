@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { errorMessage } from '@/lib/errors';
 
 export interface AuthenticatedApiRequest {
   tenantId: string;
@@ -76,11 +77,11 @@ export async function authenticateApiKey(req: Request): Promise<
         name: keyRecord.name,
       },
     };
-  } catch (e: any) {
+  } catch (e) {
     // A database outage must fail closed. The previous behaviour authenticated
     // any `fp_live_` prefixed string as a fixed tenant whenever the key lookup
     // threw, which turned an outage into an open door.
-    console.error(`[authenticateApiKey] key lookup failed: ${e.message}`);
+    console.error(`[authenticateApiKey] key lookup failed: ${errorMessage(e)}`);
 
     return {
       authenticated: false,

@@ -3,6 +3,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { getEntitlements } from '@/lib/billing';
 import { BillingClient } from './BillingClient';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * The shape this page actually reads off the tenant row.
@@ -46,8 +47,8 @@ export default async function BillingSettingsPage({
         currentPlanId = tenant.subscription.planId;
       }
     }
-  } catch (err: any) {
-    console.warn(`[BillingSettings] DB query bypassed: ${err.message}`);
+  } catch (err) {
+    console.warn(`[BillingSettings] DB query bypassed: ${errorMessage(err)}`);
   }
 
   // Load entitlements with fallback
@@ -76,8 +77,8 @@ export default async function BillingSettingsPage({
         aiCreditsRemaining: 500,
       };
     }
-  } catch (err: any) {
-    console.warn(`[BillingSettings] Entitlements fallback: ${err.message}`);
+  } catch (err) {
+    console.warn(`[BillingSettings] Entitlements fallback: ${errorMessage(err)}`);
   }
 
   return (

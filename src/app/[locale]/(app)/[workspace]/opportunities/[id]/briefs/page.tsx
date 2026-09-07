@@ -2,6 +2,7 @@ import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { MeetingBriefsClient } from './client';
+import { errorMessage } from '@/lib/errors';
 
 export default async function MeetingBriefsPage({
   params,
@@ -40,8 +41,8 @@ export default async function MeetingBriefsPage({
         });
       }
     });
-  } catch (e: any) {
-    console.warn(`[MeetingBriefsPage] DB query bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[MeetingBriefsPage] DB query bypassed: ${errorMessage(e)}`);
   }
 
   if (!opp) {

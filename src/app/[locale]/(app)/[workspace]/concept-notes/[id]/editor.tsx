@@ -4,6 +4,7 @@ import React, { useState, useTransition } from 'react';
 import { saveSectionContent, generateSectionDraft, updateNoteStatus } from '../actions';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
 import { EvidenceDrawer } from '@/components/evidence/EvidenceDrawer';
+import { errorMessage } from '@/lib/errors';
 
 interface Section {
   key: string;
@@ -60,8 +61,8 @@ export default function ConceptNoteEditor({
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
       });
-    } catch (err: any) {
-      alert(err.message || 'AI generation failed');
+    } catch (err) {
+      alert(errorMessage(err) || 'AI generation failed');
     } finally {
       setAiLoading(null);
     }

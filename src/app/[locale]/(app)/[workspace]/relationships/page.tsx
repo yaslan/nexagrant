@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
+import { errorMessage } from '@/lib/errors';
 
 export default async function RelationshipsPage({
   params,
@@ -18,8 +19,8 @@ export default async function RelationshipsPage({
       where: tenantId ? { tenantId } : {},
       orderBy: { updatedAt: 'desc' },
     });
-  } catch (e: any) {
-    console.warn(`[Relationships] DB query bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[Relationships] DB query bypassed: ${errorMessage(e)}`);
   }
 
   const warmthColors: Record<string, string> = {

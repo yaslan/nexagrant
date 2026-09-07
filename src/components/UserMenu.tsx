@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { getWorkspaceRoute, getPublicRoute } from '@/lib/routes';
+import { isNextRedirectError } from '@/lib/errors';
 
 interface UserMenuProps {
   locale: string;
@@ -118,10 +119,9 @@ export default function UserMenu({
 
     try {
       await logoutAction(locale);
-    } catch (error: any) {
+    } catch (error) {
       if (
-        error?.message?.includes('NEXT_REDIRECT') ||
-        error?.digest?.includes('NEXT_REDIRECT')
+        isNextRedirectError(error)
       ) {
         return;
       }

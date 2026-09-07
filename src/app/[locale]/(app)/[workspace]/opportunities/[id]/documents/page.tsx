@@ -2,6 +2,7 @@ import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { DocumentsClient } from './client';
+import { errorMessage } from '@/lib/errors';
 
 export default async function DocumentsPage({
   params
@@ -20,8 +21,8 @@ export default async function DocumentsPage({
         include: { followupDocs: { orderBy: { createdAt: 'desc' } } }
       })
     );
-  } catch (e: any) {
-    console.warn(`[DocumentsPage] DB query bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[DocumentsPage] DB query bypassed: ${errorMessage(e)}`);
   }
 
   // Fallback demo data if DB is unseeded/offline

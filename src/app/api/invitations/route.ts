@@ -88,7 +88,7 @@ export async function POST(req: Request) {
     console.log(`[Invitations] invitation issued for tenant ${tenantId}`);
 
     return NextResponse.json({ success: true, invitation: result.invitation, inviteLink });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating invitation:', error);
     return NextResponse.json({ error: 'İç Sunucu Hatası' }, { status: 500 });
   }

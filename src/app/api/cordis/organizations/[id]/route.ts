@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { errorMessage } from '@/lib/errors';
 
 export async function GET(
   req: NextRequest,
@@ -125,9 +126,9 @@ export async function GET(
         projects: formattedProjects,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to fetch CORDIS organization profile' },
+      { success: false, error: errorMessage(error, 'Failed to fetch CORDIS organization profile')},
       { status: 500 }
     );
   }

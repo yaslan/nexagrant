@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
+import { errorMessage } from '@/lib/errors';
 
 export default async function TurkiyeyeAcikCagrilarPage({
   params
@@ -24,8 +25,8 @@ export default async function TurkiyeyeAcikCagrilarPage({
         call: true
       }
     });
-  } catch (err: any) {
-    console.warn(`[TurkiyeyeAcikCagrilar] DB query bypassed: ${err.message}`);
+  } catch (err) {
+    console.warn(`[TurkiyeyeAcikCagrilar] DB query bypassed: ${errorMessage(err)}`);
   }
 
   // Fallback demo topics if DB is empty

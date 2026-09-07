@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authenticateApiKey } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
+import { errorMessage } from '@/lib/errors';
 
 export async function GET(req: Request) {
   const authRes = await authenticateApiKey(req);
@@ -43,8 +44,8 @@ export async function GET(req: Request) {
         stats: true,
       },
     });
-  } catch (e: any) {
-    console.warn(`[/api/v1/partners] DB query fallback: ${e.message}`);
+  } catch (e) {
+    console.warn(`[/api/v1/partners] DB query fallback: ${errorMessage(e)}`);
   }
 
   // Fallback demo dataset if database table is empty or offline

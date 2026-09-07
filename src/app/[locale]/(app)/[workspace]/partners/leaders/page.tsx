@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
+import { errorMessage } from '@/lib/errors';
 
 export default async function LeadersPage({
   params
@@ -17,8 +18,8 @@ export default async function LeadersPage({
       take: 20,
       orderBy: { eigenvector: 'desc' }, // Top central nodes
     });
-  } catch (e: any) {
-    console.warn(`[LeadersPage] Failed to fetch leaders: ${e.message}`);
+  } catch (e) {
+    console.warn(`[LeadersPage] Failed to fetch leaders: ${errorMessage(e)}`);
   }
 
   return (

@@ -2,6 +2,7 @@ import React from 'react';
 import { prisma } from '@/lib/db';
 import { AdminModulesClient } from './client';
 import { ModuleStatus } from '@/lib/modules/types';
+import { errorMessage } from '@/lib/errors';
 
 export default async function AdminModulesPage() {
   // The demo fallback here was actively dangerous, not just cosmetic: it put
@@ -31,8 +32,8 @@ export default async function AdminModulesPage() {
       }
       initialStates[s.tenantId][s.moduleId] = s.status as ModuleStatus;
     }
-  } catch (error: any) {
-    console.error(`[AdminModulesPage] DB query failed: ${error.message}`);
+  } catch (error) {
+    console.error(`[AdminModulesPage] DB query failed: ${errorMessage(error)}`);
     loadError = 'Kiracı listesi okunamadı (veritabanına ulaşılamıyor).';
   }
 

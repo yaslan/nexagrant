@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processPdfAndStore } from '@/lib/ai/rag';
+import { errorMessage } from '@/lib/errors';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,8 +21,8 @@ export async function POST(req: NextRequest) {
     const doc = await processPdfAndStore(buffer, null, kind, title);
 
     return NextResponse.json({ success: true, docId: doc.id });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Upload error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
   }
 }

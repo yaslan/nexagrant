@@ -1,5 +1,6 @@
 import { prisma } from './db';
 import { ingestDocument } from './rag';
+import { errorMessage } from '@/lib/errors';
 
 export interface CordisProjectRecord {
   rcn: string;
@@ -83,8 +84,8 @@ export async function syncCordisBigData(records?: CordisProjectRecord[]) {
       );
 
       syncedCount++;
-    } catch (e: any) {
-      console.warn(`[syncCordisBigData] Item sync bypassed: ${e.message}`);
+    } catch (e) {
+      console.warn(`[syncCordisBigData] Item sync bypassed: ${errorMessage(e)}`);
       syncedCount++;
     }
   }

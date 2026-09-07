@@ -2,6 +2,7 @@ import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { ApplicationClient } from './client';
+import { errorMessage } from '@/lib/errors';
 
 export default async function ApplicationPage({
   params
@@ -21,8 +22,8 @@ export default async function ApplicationPage({
         include: { applicationParts: true }
       })
     );
-  } catch (e: any) {
-    console.warn(`[ApplicationPage] DB query bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[ApplicationPage] DB query bypassed: ${errorMessage(e)}`);
   }
 
   // Fallback demo data if DB is unseeded/offline

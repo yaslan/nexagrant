@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions/auth';
+import { errorMessage as toErrorMessage, isNextRedirectError } from '@/lib/errors';
 
 interface LoginFormProps {
   locale: string;
@@ -26,11 +27,11 @@ export default function LoginForm({ locale }: LoginFormProps) {
     setErrorMessage(null);
     try {
       await loginWithSocialAction(provider, rawCallbackUrl);
-    } catch (err: any) {
-      if (err?.message?.includes('NEXT_REDIRECT') || err?.digest?.includes('NEXT_REDIRECT')) {
+    } catch (err) {
+      if (isNextRedirectError(err)) {
         return;
       }
-      setErrorMessage(err?.message || (isTr ? 'Giriş işlemi başlatılamadı.' : 'Login could not be initiated.'));
+      setErrorMessage(toErrorMessage(err, (isTr ? 'Giriş işlemi başlatılamadı.' : 'Login could not be initiated.')));
       setIsLoading(false);
     }
   };
@@ -51,12 +52,12 @@ export default function LoginForm({ locale }: LoginFormProps) {
       } else {
         window.location.href = rawCallbackUrl;
       }
-    } catch (err: any) {
-      if (err?.message?.includes('NEXT_REDIRECT') || err?.digest?.includes('NEXT_REDIRECT')) {
+    } catch (err) {
+      if (isNextRedirectError(err)) {
         window.location.href = rawCallbackUrl;
         return;
       }
-      setErrorMessage(err?.message || (isTr ? 'Bir hata oluştu.' : 'An error occurred.'));
+      setErrorMessage(toErrorMessage(err, (isTr ? 'Bir hata oluştu.' : 'An error occurred.')));
       setIsLoading(false);
     }
   };
@@ -75,12 +76,12 @@ export default function LoginForm({ locale }: LoginFormProps) {
       } else {
         window.location.href = rawCallbackUrl;
       }
-    } catch (err: any) {
-      if (err?.message?.includes('NEXT_REDIRECT') || err?.digest?.includes('NEXT_REDIRECT')) {
+    } catch (err) {
+      if (isNextRedirectError(err)) {
         window.location.href = rawCallbackUrl;
         return;
       }
-      setErrorMessage(err?.message || (isTr ? 'Demo girişi başarısız.' : 'Demo login failed.'));
+      setErrorMessage(toErrorMessage(err, (isTr ? 'Demo girişi başarısız.' : 'Demo login failed.')));
       setIsLoading(false);
     }
   };

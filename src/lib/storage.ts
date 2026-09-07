@@ -7,6 +7,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand
 } from '@aws-sdk/client-s3';
+import { errorMessage } from '@/lib/errors';
 
 const s3 = process.env.R2_ACCOUNT_ID ? new S3Client({
   region: 'auto',
@@ -132,8 +133,8 @@ export async function deleteFileFromR2(objectKeyOrUrl: string): Promise<boolean>
       Key: key,
     }));
     return true;
-  } catch (err: any) {
-    console.error(`[R2 Storage] Delete error: ${err.message}`);
+  } catch (err) {
+    console.error(`[R2 Storage] Delete error: ${errorMessage(err)}`);
     return false;
   }
 }
@@ -191,8 +192,8 @@ export async function putObjectToR2(
       ContentType: contentType,
     }));
     return { stored: true };
-  } catch (err: any) {
-    console.error(`[R2 Storage] Put error for ${objectKey}: ${err.message}`);
+  } catch (err) {
+    console.error(`[R2 Storage] Put error for ${objectKey}: ${errorMessage(err)}`);
     return { stored: false, reason: 'r2_put_failed' };
   }
 }

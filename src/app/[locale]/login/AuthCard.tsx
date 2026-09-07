@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions/auth';
 import { Lock, Sparkles, Building2, User, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { errorMessage as toErrorMessage, isNextRedirectError } from '@/lib/errors';
 
 interface AuthCardProps {
   locale: string;
@@ -33,11 +34,11 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
     setErrorMessage(null);
     try {
       await loginWithSocialAction(provider, rawCallbackUrl);
-    } catch (err: any) {
-      if (err?.message?.includes('NEXT_REDIRECT') || err?.digest?.includes('NEXT_REDIRECT')) {
+    } catch (err) {
+      if (isNextRedirectError(err)) {
         return;
       }
-      setErrorMessage(err?.message || (isTr ? 'Giriş işlemi başlatılamadı.' : 'Login could not be initiated.'));
+      setErrorMessage(toErrorMessage(err, (isTr ? 'Giriş işlemi başlatılamadı.' : 'Login could not be initiated.')));
       setIsLoading(false);
     }
   };
@@ -64,12 +65,12 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
       } else {
         window.location.href = rawCallbackUrl;
       }
-    } catch (err: any) {
-      if (err?.message?.includes('NEXT_REDIRECT') || err?.digest?.includes('NEXT_REDIRECT')) {
+    } catch (err) {
+      if (isNextRedirectError(err)) {
         window.location.href = rawCallbackUrl;
         return;
       }
-      setErrorMessage(err?.message || (isTr ? 'Bir hata oluştu.' : 'An error occurred.'));
+      setErrorMessage(toErrorMessage(err, (isTr ? 'Bir hata oluştu.' : 'An error occurred.')));
       setIsLoading(false);
     }
   };
@@ -88,12 +89,12 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
       } else {
         window.location.href = rawCallbackUrl;
       }
-    } catch (err: any) {
-      if (err?.message?.includes('NEXT_REDIRECT') || err?.digest?.includes('NEXT_REDIRECT')) {
+    } catch (err) {
+      if (isNextRedirectError(err)) {
         window.location.href = rawCallbackUrl;
         return;
       }
-      setErrorMessage(err?.message || (isTr ? 'Demo girişi başarısız.' : 'Demo login failed.'));
+      setErrorMessage(toErrorMessage(err, (isTr ? 'Demo girişi başarısız.' : 'Demo login failed.')));
       setIsLoading(false);
     }
   };

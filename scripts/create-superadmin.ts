@@ -1,4 +1,5 @@
 import { prisma } from '../src/lib/db';
+import { errorMessage } from '../src/lib/errors';
 
 async function main() {
   const email = 'admin@yasinaslan.com.tr';
@@ -63,8 +64,8 @@ async function main() {
       });
       console.log(`✓ Existing user updated to Superadmin (isPlatformAdmin = true) with ID: ${user.id}`);
     }
-  } catch (err: any) {
-    console.warn(`! DB seed note: Database connection skipped (${err.message}). In-memory superadmin auth rules applied.`);
+  } catch (err) {
+    console.warn(`! DB seed note: Database connection skipped (${errorMessage(err)}). In-memory superadmin auth rules applied.`);
   }
 }
 

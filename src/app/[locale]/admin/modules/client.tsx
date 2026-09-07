@@ -5,6 +5,7 @@ import { getAllManifests, getManifest } from '@/lib/modules/registry';
 import { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { updateTenantModuleStatus } from './actions';
 import { getDisableCascade } from '@/lib/modules/state-machine';
+import { errorMessage as toErrorMessage } from '@/lib/errors';
 
 interface TenantSummary {
   id: string;
@@ -77,8 +78,8 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
 
       try {
         await updateTenantModuleStatus(selectedTenantId, modId, targetStatus);
-      } catch (e: any) {
-        setErrorMessage(e.message || 'Failed to update module state.');
+      } catch (e) {
+        setErrorMessage(toErrorMessage(e) || 'Failed to update module state.');
         // Revert optimistic update
         setModuleStates(initialStates);
       }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { prisma } from '@/lib/db';
 import { ScrollText } from 'lucide-react';
+import { errorMessage } from '@/lib/errors';
 
 export default async function AdminAuditPage() {
   // An audit log that invents entries is worse than an empty one: it is the
@@ -13,8 +14,8 @@ export default async function AdminAuditPage() {
       take: 50,
       orderBy: { createdAt: 'desc' }
     });
-  } catch (e: any) {
-    console.error(`[AdminAuditPage] DB query failed: ${e.message}`);
+  } catch (e) {
+    console.error(`[AdminAuditPage] DB query failed: ${errorMessage(e)}`);
     loadError = 'Denetim kayıtları okunamadı (veritabanına ulaşılamıyor).';
   }
 

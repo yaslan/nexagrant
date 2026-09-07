@@ -11,6 +11,7 @@ import {
 } from '@/lib/storage';
 import { extractEvidenceMetadata } from '@/lib/evidence-ai';
 import { calculateEvidenceHealthScore, HealthScoreResult, MinimalEvidenceItem } from '@/lib/evidence-health';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * Retrieves all Evidence items for active tenant
@@ -39,8 +40,8 @@ export async function getEvidenceItemsAction(categoryFilter?: string) {
     );
 
     return items;
-  } catch (error: any) {
-    console.warn(`[getEvidenceItemsAction] DB error: ${error.message}`);
+  } catch (error) {
+    console.warn(`[getEvidenceItemsAction] DB error: ${errorMessage(error)}`);
     return [];
   }
 }
@@ -152,8 +153,8 @@ export async function confirmEvidenceUploadAction(data: {
 
     revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
     return { success: true, evidence };
-  } catch (error: any) {
-    console.warn(`[confirmEvidenceUploadAction] DB error: ${error.message}`);
+  } catch (error) {
+    console.warn(`[confirmEvidenceUploadAction] DB error: ${errorMessage(error)}`);
     // Mock return if DB offline
     return {
       success: true,
@@ -227,8 +228,8 @@ export async function createEvidence(formData: FormData) {
 
     revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
     return evidence;
-  } catch (err: any) {
-    console.warn(`[createEvidence] DB fallback: ${err.message}`);
+  } catch (err) {
+    console.warn(`[createEvidence] DB fallback: ${errorMessage(err)}`);
     return {
       id: `ev-mock-${Date.now()}`,
       tenantId,
@@ -265,8 +266,8 @@ export async function deleteEvidence(evidenceId: string) {
       const result = await tx.evidence.deleteMany({ where: { id: evidenceId, tenantId } });
       return result.count;
     });
-  } catch (error: any) {
-    console.warn(`[deleteEvidence] DB error: ${error.message}`);
+  } catch (error) {
+    console.warn(`[deleteEvidence] DB error: ${errorMessage(error)}`);
     return { success: false };
   }
 
@@ -291,8 +292,8 @@ export async function verifyEvidenceAction(evidenceId: string, status: string) {
       });
       return result.count;
     });
-  } catch (error: any) {
-    console.warn(`[verifyEvidenceAction] DB error: ${error.message}`);
+  } catch (error) {
+    console.warn(`[verifyEvidenceAction] DB error: ${errorMessage(error)}`);
     return { success: false };
   }
 
@@ -322,11 +323,11 @@ export async function getHealthScoreAction(): Promise<HealthScoreResult> {
     );
 
     return calculateEvidenceHealthScore(items);
-  } catch (error: any) {
+  } catch (error) {
     // CLAUDE.md §7: a score shown to the user is derived from real Evidence rows
     // or not shown at all. The previous fallback invented three documents, so a
     // tenant with an empty pack saw a healthy score during a DB outage.
-    console.warn(`[getHealthScoreAction] DB error: ${error.message}`);
+    console.warn(`[getHealthScoreAction] DB error: ${errorMessage(error)}`);
     return calculateEvidenceHealthScore([]);
   }
 }

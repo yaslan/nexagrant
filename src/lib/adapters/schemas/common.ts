@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { errorMessage as coreErrorMessage } from '@/lib/errors';
 
 /**
  * Shared contracts for the K1 call-aggregation adapters (SEDIA, Eurostars, TÜBİTAK).
@@ -173,8 +174,12 @@ export function adapterError<T>(
   return { status: 'error', source, topics: [], topicsProcessed: 0, reason, schemaDrift };
 }
 
+/**
+ * Adapter flavour of {@link coreErrorMessage}: falls back to `String(e)` so a
+ * non-Error rejection still lands something readable in `AdapterResult.reason`.
+ */
 export function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return coreErrorMessage(e, String(e));
 }
 
 /** Strip HTML tags and collapse whitespace — SEDIA ships rich text in metadata. */

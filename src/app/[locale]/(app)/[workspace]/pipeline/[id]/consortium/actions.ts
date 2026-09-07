@@ -4,6 +4,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { scoreCandidatesForSeat, detectConflicts } from '@/lib/scoring/consortium';
 import { revalidatePath } from 'next/cache';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * M8 consortium seats.
@@ -108,8 +109,8 @@ export async function getConflicts(opportunityId: string) {
 
   try {
     return await detectConflicts(opportunityId);
-  } catch (e: any) {
-    console.warn(`[getConflicts] error for ${opportunityId}: ${e.message}`);
+  } catch (e) {
+    console.warn(`[getConflicts] error for ${opportunityId}: ${errorMessage(e)}`);
     return [];
   }
 }

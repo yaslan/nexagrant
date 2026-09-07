@@ -5,6 +5,7 @@
 
 import { prisma } from './db';
 import { ingestDocument } from './rag';
+import { errorMessage } from '@/lib/errors';
 
 export interface LiveCordisDeltaItem {
   rcn: string;
@@ -105,8 +106,8 @@ export async function fetchLiveCordisDelta(sinceDays: number = 7): Promise<Cordi
         `CORDIS Delta RCN: ${item.rcn}\nTopic: ${item.topicCode}\nCoordinator: ${item.coordinatorName} (${item.coordinatorCountry})\nEC Grant: €${item.ecContributionEUR.toLocaleString()}\nObjective: ${item.objectiveText}\nUpdated: ${item.updatedAt}`,
         'CORDIS_PROJECT_DELTA'
       );
-    } catch (e: any) {
-      console.warn(`[fetchLiveCordisDelta] Ingestion warning: ${e.message}`);
+    } catch (e) {
+      console.warn(`[fetchLiveCordisDelta] Ingestion warning: ${errorMessage(e)}`);
     }
   }
 

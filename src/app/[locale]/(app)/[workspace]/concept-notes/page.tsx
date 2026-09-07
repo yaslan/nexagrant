@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import Link from 'next/link';
+import { errorMessage } from '@/lib/errors';
 
 export default async function ConceptNotesListPage({
   params,
@@ -23,8 +24,8 @@ export default async function ConceptNotesListPage({
     templates = await prisma.conceptTemplate.findMany({
       where: tenantId ? { OR: [{ tenantId: null }, { tenantId }] } : { tenantId: null },
     });
-  } catch (e: any) {
-    console.warn(`[ConceptNotes] DB query bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[ConceptNotes] DB query bypassed: ${errorMessage(e)}`);
   }
 
   // Demo fallback templates if DB is unseeded or offline

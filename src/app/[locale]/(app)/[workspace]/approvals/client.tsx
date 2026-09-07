@@ -9,6 +9,7 @@ import {
   cancelRequestAction,
 } from './actions';
 import { DualApprovalActionType } from '@/lib/rbac';
+import { errorMessage as toErrorMessage } from '@/lib/errors';
 
 interface ApprovalRequestItem {
   id: string;
@@ -81,8 +82,8 @@ export default function ApprovalsClient({
           )
         );
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Onaylama işlemi sırasında hata oluştu.');
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err) || 'Onaylama işlemi sırasında hata oluştu.');
     } finally {
       setLoadingId(null);
     }
@@ -106,8 +107,8 @@ export default function ApprovalsClient({
         setRejectModalItem(null);
         setRejectionReason('');
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Reddetme işlemi sırasında hata oluştu.');
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err) || 'Reddetme işlemi sırasında hata oluştu.');
     } finally {
       setLoadingId(null);
     }
@@ -124,8 +125,8 @@ export default function ApprovalsClient({
           prev.map((item) => (item.id === req.id ? { ...item, status: 'CANCELLED' } : item))
         );
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'İptal işlemi sırasında hata oluştu.');
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err) || 'İptal işlemi sırasında hata oluştu.');
     } finally {
       setLoadingId(null);
     }
@@ -156,8 +157,8 @@ export default function ApprovalsClient({
         setFormDescription('');
         setActiveTab('my_requests');
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Talep oluşturulurken hata oluştu.');
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err) || 'Talep oluşturulurken hata oluştu.');
     }
   };
 

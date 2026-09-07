@@ -4,6 +4,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
 import { revalidatePath } from 'next/cache';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * M7 TTO portfolio.
@@ -126,8 +127,8 @@ export async function generateIpChecklist({
       prompt,
       system: 'You are an expert University Technology Transfer Office (TTO) IP legal specialist for EU Horizon Europe.',
     });
-  } catch (e: any) {
-    console.warn('[generateIpChecklist] LLM fallback:', e.message);
+  } catch (e) {
+    console.warn('[generateIpChecklist] LLM fallback:', errorMessage(e));
     content = `### 📋 TTO IP & Lisanslama Kontrol Listesi
 
 1. **Arka Plan Fikri Mülkiyet (Background IP) Beyanı:**

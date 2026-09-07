@@ -2,6 +2,7 @@ import React from 'react';
 import { prisma, withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { MarketplaceClient } from './client';
+import { errorMessage } from '@/lib/errors';
 
 export default async function MarketplacePage({
   params,
@@ -26,8 +27,8 @@ export default async function MarketplacePage({
         orderBy: { createdAt: 'desc' },
       })
     );
-  } catch (e: any) {
-    console.warn(`[MarketplacePage] DB query bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[MarketplacePage] DB query bypassed: ${errorMessage(e)}`);
   }
 
   // Fallback demo listings if DB is unseeded/offline

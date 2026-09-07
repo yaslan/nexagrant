@@ -6,6 +6,7 @@ import { getAllManifests, getManifest } from '@/lib/modules/registry';
 import { canEnable, getDisableCascade } from '@/lib/modules/state-machine';
 import { ModuleId, PlanTier } from '@/lib/modules/types';
 import { toggleModuleState } from './actions';
+import { errorMessage } from '@/lib/errors';
 
 interface ModulesClientProps {
   initialActiveModules: ModuleId[];
@@ -160,8 +161,8 @@ export function ModulesClient({
           try {
             await toggleModuleState(id, 'OFF');
             showToast(`${id} modülü başarıyla devre dışı bırakıldı.`, 'info');
-          } catch (e: any) {
-            showToast(e?.message || 'Modül kapatılırken hata oluştu.', 'error');
+          } catch (e) {
+            showToast(errorMessage(e, 'Modül kapatılırken hata oluştu.'), 'error');
             setActiveModules((prev) => [...prev, id]); // rollback
           }
         });
@@ -175,8 +176,8 @@ export function ModulesClient({
           try {
             await toggleModuleState(id, 'ON');
             showToast(`${id} modülü başarıyla aktifleştirildi!`, 'success');
-          } catch (e: any) {
-            showToast(e?.message || 'Modül etkinleştirilirken hata oluştu.', 'error');
+          } catch (e) {
+            showToast(errorMessage(e, 'Modül etkinleştirilirken hata oluştu.'), 'error');
             setActiveModules((prev) => prev.filter((m) => m !== id)); // rollback
           }
         });
@@ -202,8 +203,8 @@ export function ModulesClient({
       try {
         await toggleModuleState(target, 'OFF');
         showToast(`${target} ve bağlı ${count - 1} alt modül kapatıldı.`, 'info');
-      } catch (e: any) {
-        showToast(e?.message || 'Modüller kapatılırken hata oluştu.', 'error');
+      } catch (e) {
+        showToast(errorMessage(e, 'Modüller kapatılırken hata oluştu.'), 'error');
         // Rollback
         setActiveModules((prev) => Array.from(new Set([...prev, ...toDisable])));
       }

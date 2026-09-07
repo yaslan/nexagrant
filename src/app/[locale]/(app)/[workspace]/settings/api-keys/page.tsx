@@ -2,6 +2,7 @@ import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { ApiKeysClient } from './client';
+import { errorMessage } from '@/lib/errors';
 
 export default async function ApiKeysSettingsPage({
   params,
@@ -19,8 +20,8 @@ export default async function ApiKeysSettingsPage({
         orderBy: { createdAt: 'desc' },
       })
     );
-  } catch (e: any) {
-    console.warn(`[ApiKeysSettingsPage] DB query bypass: ${e.message}`);
+  } catch (e) {
+    console.warn(`[ApiKeysSettingsPage] DB query bypass: ${errorMessage(e)}`);
   }
 
   if (!apiKeys || apiKeys.length === 0) {

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ShoppingBag, X, Trash2, ShieldCheck, Zap, ArrowRight, Check, Sparkles, CreditCard, Layers } from 'lucide-react';
 import { useCart } from './CartContext';
+import { errorMessage as toErrorMessage } from '@/lib/errors';
 
 interface CartDrawerProps {
   locale?: string;
@@ -72,8 +73,8 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
         setErrorMessage(data?.error || (isTr ? 'Ödeme oturumu başlatılamadı.' : 'Checkout session error.'));
         setIsSubmitting(false);
       }
-    } catch (err: any) {
-      setErrorMessage(err?.message || (isTr ? 'Ödeme servisine bağlanılamadı.' : 'Could not connect to payment service.'));
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, (isTr ? 'Ödeme servisine bağlanılamadı.' : 'Could not connect to payment service.')));
       setIsSubmitting(false);
     }
   };

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { errorMessage } from '@/lib/errors';
 
 export default function MembersSettingsPage() {
   const params = useParams();
@@ -30,8 +31,8 @@ export default function MembersSettingsPage() {
       }
       setMessage(isTr ? `Davet bağlantısı oluşturuldu! Link: ${data.inviteLink}` : `Invitation sent successfully! Link: ${data.inviteLink}`);
       setEmail('');
-    } catch (error: any) {
-      setMessage(`${isTr ? 'Hata' : 'Error'}: ${error.message}`);
+    } catch (error) {
+      setMessage(`${isTr ? 'Hata' : 'Error'}: ${errorMessage(error)}`);
     } finally {
       setLoading(false);
     }

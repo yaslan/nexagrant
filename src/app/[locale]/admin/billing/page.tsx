@@ -2,6 +2,7 @@ import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { BillingSsoClient } from './client';
+import { errorMessage } from '@/lib/errors';
 
 export default async function AdminBillingPage({
   params,
@@ -24,8 +25,8 @@ export default async function AdminBillingPage({
       })
     );
     subscription = tenant?.subscription;
-  } catch (e: any) {
-    console.warn(`[AdminBillingPage] DB query failed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[AdminBillingPage] DB query failed: ${errorMessage(e)}`);
   }
 
   return (

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
+import { errorMessage } from '@/lib/errors';
 
 export default async function PartnerDetailPage({
   params
@@ -21,8 +22,8 @@ export default async function PartnerDetailPage({
         }
       }
     });
-  } catch (e: any) {
-    console.warn(`[PartnerDetailPage] Failed to fetch organization: ${e.message}`);
+  } catch (e) {
+    console.warn(`[PartnerDetailPage] Failed to fetch organization: ${errorMessage(e)}`);
   }
 
   if (!org) return notFound();

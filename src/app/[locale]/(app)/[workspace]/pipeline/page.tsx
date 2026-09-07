@@ -2,6 +2,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import KanbanBoard from './board';
 import { getInMemoryOpportunities } from '@/lib/k5-pipeline/pipelineStore';
+import { errorMessage } from '@/lib/errors';
 
 export default async function PipelinePage({
   params
@@ -22,8 +23,8 @@ export default async function PipelinePage({
         orderBy: { updatedAt: 'desc' }
       })
     );
-  } catch (e: any) {
-    console.warn(`[Pipeline] DB query bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[Pipeline] DB query bypassed: ${errorMessage(e)}`);
   }
 
   // Combine DB opportunities with in-memory store opportunities (deduplicating by ID)

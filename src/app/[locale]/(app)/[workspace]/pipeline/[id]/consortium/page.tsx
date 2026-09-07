@@ -3,6 +3,7 @@ import { requireTenantPage } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import ConsortiumManager from './manager';
+import { errorMessage } from '@/lib/errors';
 
 const DEMO_OPPORTUNITIES: Record<string, any> = {
   'demo-opp-1': {
@@ -112,8 +113,8 @@ export default async function ConsortiumPage({
         );
       }
     }
-  } catch (e: any) {
-    console.warn(`[ConsortiumPage] DB query bypassed for ${id}: ${e.message}`);
+  } catch (e) {
+    console.warn(`[ConsortiumPage] DB query bypassed for ${id}: ${errorMessage(e)}`);
   }
 
   // Demo opportunity fallback

@@ -6,6 +6,7 @@ import { getManifest } from '@/lib/modules/registry';
 import { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { revalidatePath } from 'next/cache';
 import { getDisableCascade } from '@/lib/modules/state-machine';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * Switches a module on or off for *another* tenant, so it is platform-admin
@@ -98,10 +99,10 @@ export async function updateTenantModuleStatus(
         });
       }
     });
-  } catch (e: any) {
+  } catch (e) {
     // A silent no-op here would report success for a change that never
     // happened, and the admin UI would show the new state until reload.
-    console.error(`[Admin Module Action] DB update failed: ${e.message}`);
+    console.error(`[Admin Module Action] DB update failed: ${errorMessage(e)}`);
     throw new Error('Modül durumu kaydedilemedi. Lütfen tekrar deneyin.');
   }
 

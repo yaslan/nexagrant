@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import EvidenceClient from './evidence-client';
+import { errorMessage } from '@/lib/errors';
 
 export default async function EvidencePage({
   params
@@ -17,8 +18,8 @@ export default async function EvidencePage({
       where: tenantId ? { tenantId } : {},
       orderBy: { createdAt: 'desc' }
     });
-  } catch (e: any) {
-    console.warn(`[Evidence] DB query bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[Evidence] DB query bypassed: ${errorMessage(e)}`);
   }
 
   const isTr = locale === 'tr';

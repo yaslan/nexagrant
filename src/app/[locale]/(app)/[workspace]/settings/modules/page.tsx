@@ -4,6 +4,7 @@ import { ModuleId, PlanTier } from '@/lib/modules/types';
 import { ModulesClient } from './client';
 import { can } from '@/lib/rbac';
 import type { Role } from '@prisma/client';
+import { errorMessage } from '@/lib/errors';
 
 export default async function ModulesSettingsPage({
   params
@@ -56,8 +57,8 @@ export default async function ModulesSettingsPage({
         activeModules = activeStates.map((s: { moduleId: string }) => s.moduleId as ModuleId);
       }
     });
-  } catch (err: any) {
-    console.warn(`[ModulesSettings] DB query bypassed/error: ${err.message}`);
+  } catch (err) {
+    console.warn(`[ModulesSettings] DB query bypassed/error: ${errorMessage(err)}`);
   }
 
   return (

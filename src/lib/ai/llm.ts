@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
+import { errorStatus } from '@/lib/errors';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || 'mock-key',
@@ -16,14 +17,18 @@ async function withRetry<T>(
   while (true) {
     try {
       return await operation();
-    } catch (error: any) {
+    } catch (error) {
       attempt++;
       // Check if it's a rate limit (429) or server error (50x)
-      if (attempt > maxRetries || (error.status !== 429 && error.status >= 400 && error.status < 500)) {
+      // An error with no status is not a client error, so it stays retryable —
+      // the same outcome the old `undefined >= 400` comparison produced.
+      const status = errorStatus(error);
+      const isClientError = status !== undefined && status !== 429 && status >= 400 && status < 500;
+      if (attempt > maxRetries || isClientError) {
         throw error;
       }
       const delay = baseDelay * Math.pow(2, attempt - 1);
-      console.warn(`[AI Retry] Attempt ${attempt} failed with ${error.status}. Retrying in ${delay}ms...`);
+      console.warn(`[AI Retry] Attempt ${attempt} failed with ${status}. Retrying in ${delay}ms...`);
       await new Promise(res => setTimeout(res, delay));
     }
   }

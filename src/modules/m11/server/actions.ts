@@ -12,6 +12,7 @@ import {
   CollaboratorPresence, 
   DEFAULT_PART_B_SECTIONS 
 } from '../types';
+import { errorMessage } from '@/lib/errors';
 
 export type { 
   PartBSectionItem, 
@@ -111,8 +112,8 @@ export async function getPartBData(partId: string) {
         workPackages: content.workPackages || [],
       };
     }
-  } catch (e: any) {
-    console.warn(`[m11 getPartBData] Fallback to default: ${e.message}`);
+  } catch (e) {
+    console.warn(`[m11 getPartBData] Fallback to default: ${errorMessage(e)}`);
   }
 
   return {
@@ -164,8 +165,8 @@ export async function acquireSectionLock(
       content.sections = sections;
       await savePartContent(tenantId, partId, content);
     }
-  } catch (e: any) {
-    console.warn(`[m11 acquireSectionLock] DB bypass: ${e.message}`);
+  } catch (e) {
+    console.warn(`[m11 acquireSectionLock] DB bypass: ${errorMessage(e)}`);
   }
 
   return { success: true, lockedAt: now };
@@ -189,8 +190,8 @@ export async function releaseSectionLock(partId: string, sectionKey: string, use
       content.sections = sections;
       await savePartContent(tenantId, partId, content);
     }
-  } catch (e: any) {
-    console.warn(`[m11 releaseSectionLock] DB bypass: ${e.message}`);
+  } catch (e) {
+    console.warn(`[m11 releaseSectionLock] DB bypass: ${errorMessage(e)}`);
   }
 
   return { success: true };
@@ -245,8 +246,8 @@ export async function updateSectionContent(
 
       await savePartContent(tenantId, partId, content);
     }
-  } catch (e: any) {
-    console.warn(`[m11 updateSectionContent] DB bypass: ${e.message}`);
+  } catch (e) {
+    console.warn(`[m11 updateSectionContent] DB bypass: ${errorMessage(e)}`);
   }
 
   return { success: true, timestamp: now, wordCount };
@@ -280,8 +281,8 @@ export async function addSectionComment(
 
       await savePartContent(tenantId, partId, content);
     }
-  } catch (e: any) {
-    console.warn(`[m11 addSectionComment] DB bypass: ${e.message}`);
+  } catch (e) {
+    console.warn(`[m11 addSectionComment] DB bypass: ${errorMessage(e)}`);
   }
 
   return newComment;
@@ -303,8 +304,8 @@ export async function resolveSectionComment(partId: string, sectionKey: string, 
 
       await savePartContent(tenantId, partId, content);
     }
-  } catch (e: any) {
-    console.warn(`[m11 resolveSectionComment] DB bypass: ${e.message}`);
+  } catch (e) {
+    console.warn(`[m11 resolveSectionComment] DB bypass: ${errorMessage(e)}`);
   }
 
   return { success: true };
@@ -334,8 +335,8 @@ export async function restoreSectionRevision(partId: string, sectionKey: string,
         return { success: true, content: targetRev.content };
       }
     }
-  } catch (e: any) {
-    console.warn(`[m11 restoreSectionRevision] DB bypass: ${e.message}`);
+  } catch (e) {
+    console.warn(`[m11 restoreSectionRevision] DB bypass: ${errorMessage(e)}`);
   }
 
   return { success: false };
@@ -381,8 +382,8 @@ export async function updatePresenceHeartbeat(
 
       return presenceList;
     }
-  } catch (e: any) {
-    console.warn(`[m11 updatePresenceHeartbeat] DB bypass: ${e.message}`);
+  } catch (e) {
+    console.warn(`[m11 updatePresenceHeartbeat] DB bypass: ${errorMessage(e)}`);
   }
 
   return [presenceItem];
@@ -458,8 +459,8 @@ export async function addBudgetLine(
       await savePartContent(tenantId, partId, content);
       updatedPart = { ...part, content };
     }
-  } catch (e: any) {
-    console.warn(`[m11 addBudgetLine] DB update bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[m11 addBudgetLine] DB update bypassed: ${errorMessage(e)}`);
   }
 
   try {
@@ -500,8 +501,8 @@ export async function addWorkPackage(
       await savePartContent(tenantId, partId, content);
       updatedPart = { ...part, content };
     }
-  } catch (e: any) {
-    console.warn(`[m11 addWorkPackage] DB update bypassed: ${e.message}`);
+  } catch (e) {
+    console.warn(`[m11 addWorkPackage] DB update bypassed: ${errorMessage(e)}`);
   }
 
   try {

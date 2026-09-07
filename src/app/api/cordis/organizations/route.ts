@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { errorMessage } from '@/lib/errors';
 
 export async function GET(req: NextRequest) {
   try {
@@ -79,9 +80,9 @@ export async function GET(req: NextRequest) {
       },
       data,
     });
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to search M1 partner profiles' },
+      { success: false, error: errorMessage(error, 'Failed to search M1 partner profiles')},
       { status: 500 }
     );
   }

@@ -5,6 +5,7 @@ import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/ai/llm';
 import { submitForDualApproval, approveByDepartment, rejectDualApproval, Department } from '@/lib/dual-approval';
 import { revalidatePath } from 'next/cache';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * M10 follow-up documents.
@@ -55,8 +56,8 @@ export async function generateStandardDoc(
       prompt,
       system: 'You are an expert EU Horizon Europe legal & administrative document generator.'
     });
-  } catch (e: any) {
-    console.warn(`[m10 generateStandardDoc] LLM fallback for ${kind}:`, e.message);
+  } catch (e) {
+    console.warn(`[m10 generateStandardDoc] LLM fallback for ${kind}:`, errorMessage(e));
     if (kind === 'NDA') {
       contentText = `### MUTUAL NON-DISCLOSURE AGREEMENT (NDA)\n\n**1. Purpose:** Confidentiality agreement for project **${oppTitle}**.\n**2. Obligations:** Disclosing Party and Receiving Party agree to hold all technical and financial background IP strictly confidential for a period of 5 years.\n**3. Jurisdiction:** EU Commercial Law & International Arbitration.`;
     } else if (kind === 'LOI') {
