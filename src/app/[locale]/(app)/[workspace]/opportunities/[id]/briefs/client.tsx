@@ -18,7 +18,7 @@ import Link from 'next/link';
 import { generateMeetingBrief, savePostMeetingNotes } from '@/modules/m9/server/actions';
 import { generateIcsContent } from '@/lib/calendar';
 
-interface BriefItem {
+export interface BriefItem {
   id: string;
   interactionId: string;
   partnerName?: string;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
-import { ApplicationClient } from './client';
+import { ApplicationClient, type ApplicationPartItem } from './client';
 import { errorMessage } from '@/lib/errors';
 
 export default async function ApplicationPage({
@@ -12,7 +12,7 @@ export default async function ApplicationPage({
   const { locale, workspace, id } = await params;
   const { tenantId, userId } = await requireTenantPage(locale);
 
-  let opp: any = null;
+  let opp: { id: string; tenantId: string; title: string; applicationParts: ApplicationPartItem[] } | null = null;
   try {
     // findFirst + tenantId, not findUnique by id: an opportunity id is
     // guessable, and findUnique would happily return another tenant's row.
@@ -39,9 +39,9 @@ export default async function ApplicationPage({
           magicToken: 'partner-access-token-123',
           content: {
             budget: [
-              { partnerName: 'Demo SME Consultancy (TR)', personMonths: 24, countryCoefficient: 1.0, requestedTotal: 165000 },
-              { partnerName: 'Fraunhofer Institute (DE)', personMonths: 36, countryCoefficient: 1.0, requestedTotal: 247500 },
-              { partnerName: 'METU TTO (TR)', personMonths: 18, countryCoefficient: 0.85, requestedTotal: 102000 },
+              { partnerName: 'Demo SME Consultancy (TR)', personMonths: 24, countryCoefficient: 1.0, subcontractingCost: 0, travelCost: 0, requestedTotal: 165000 },
+              { partnerName: 'Fraunhofer Institute (DE)', personMonths: 36, countryCoefficient: 1.0, subcontractingCost: 0, travelCost: 0, requestedTotal: 247500 },
+              { partnerName: 'METU TTO (TR)', personMonths: 18, countryCoefficient: 0.85, subcontractingCost: 0, travelCost: 0, requestedTotal: 102000 },
             ],
           },
         },

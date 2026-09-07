@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { PartnerFilters } from './PartnerFilters';
 import { errorMessage } from '@/lib/errors';
+import type { LegacyOrganizationRow } from '@/types/db-rows';
 
 const DEMO_CORDIS_PARTNERS = [
   {
@@ -183,18 +184,6 @@ interface CordisOrganizationRow {
   activityType: string | null;
   sme: boolean;
   isTurkish: boolean;
-}
-
-/** The legacy Organization columns the third fallback reads. */
-interface LegacyOrganizationRow {
-  id: string;
-  name: string;
-  country: string | null;
-  activityType: string | null;
-  isSme: boolean;
-  participationCount: number | null;
-  coordinatorCount: number | null;
-  ecContributionSum: bigint | null;
 }
 
 export default async function PartnersPage({

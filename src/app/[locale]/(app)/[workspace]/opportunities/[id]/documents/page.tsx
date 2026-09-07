@@ -1,7 +1,7 @@
 import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
-import { DocumentsClient } from './client';
+import { DocumentsClient, type DocItem } from './client';
 import { errorMessage } from '@/lib/errors';
 
 export default async function DocumentsPage({
@@ -12,7 +12,7 @@ export default async function DocumentsPage({
   const { locale, workspace, id } = await params;
   const { tenantId } = await requireTenantPage(locale);
 
-  let opp: any = null;
+  let opp: { id: string; tenantId: string; title: string; followupDocs: DocItem[] } | null = null;
   try {
     // Tenant-scoped lookup: findUnique by a guessable id would cross tenants.
     opp = await withTenant(tenantId, (tx) =>

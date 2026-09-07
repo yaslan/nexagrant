@@ -21,12 +21,13 @@ import {
 } from 'lucide-react';
 import { addBudgetLine, addWorkPackage, calculateLumpSumBudget } from '@/modules/m11/server/actions';
 import { PartBCollaborativeEditor } from '@/modules/m11/ui/PartBCollaborativeEditor';
+import type { BudgetLine, PartContent, WorkPackageItem } from '@/modules/m11/types';
 
-interface ApplicationPartItem {
+export interface ApplicationPartItem {
   id: string;
   part: 'PART_A' | 'PART_B' | string;
   magicToken?: string | null;
-  content?: any;
+  content?: PartContent;
 }
 
 interface ApplicationClientProps {
@@ -65,20 +66,20 @@ export function ApplicationClient({
   const [isAddingWp, setIsAddingWp] = useState(false);
 
   // Dynamic budget lines state
-  const initialBudget = (partA?.content)?.budget || [
-    { partnerName: 'Demo SME Consultancy (TR)', personMonths: 24, countryCoefficient: 1.0, requestedTotal: 165000 },
-    { partnerName: 'Fraunhofer Institute (DE)', personMonths: 36, countryCoefficient: 1.0, requestedTotal: 247500 },
+  const initialBudget: BudgetLine[] = (partA?.content)?.budget || [
+    { partnerName: 'Demo SME Consultancy (TR)', personMonths: 24, countryCoefficient: 1.0, subcontractingCost: 0, travelCost: 0, requestedTotal: 165000 },
+    { partnerName: 'Fraunhofer Institute (DE)', personMonths: 36, countryCoefficient: 1.0, subcontractingCost: 0, travelCost: 0, requestedTotal: 247500 },
   ];
-  const [budgetLines, setBudgetLines] = useState<any[]>(initialBudget);
+  const [budgetLines, setBudgetLines] = useState<BudgetLine[]>(initialBudget);
 
   // Dynamic Work Packages state
-  const initialWps = (partB?.content)?.workPackages || [
+  const initialWps: WorkPackageItem[] = (partB?.content)?.workPackages || [
     { code: 'WP1', title: 'Management & Coordination', leadPartner: 'Demo SME Consultancy', startMonth: 1, endMonth: 36, deliverables: ['D1.1 Data Management Plan'] },
     { code: 'WP2', title: 'System Requirements & Architecture', leadPartner: 'METU TTO', startMonth: 1, endMonth: 12, deliverables: ['D2.1 Technical Specs'] },
     { code: 'WP3', title: 'Prototyping & Pilot Testing', leadPartner: 'Fraunhofer Institute', startMonth: 7, endMonth: 24, deliverables: ['D3.1 Thermal Pilot'] },
     { code: 'WP4', title: 'Dissemination & Exploitation', leadPartner: 'Siemens AG', startMonth: 1, endMonth: 36, deliverables: ['D4.1 DEC Plan'] },
   ];
-  const [workPackages, setWorkPackages] = useState<any[]>(initialWps);
+  const [workPackages, setWorkPackages] = useState<WorkPackageItem[]>(initialWps);
 
   const handleCopyMagicLink = () => {
     if (partA?.magicToken) {
@@ -104,7 +105,14 @@ export function ApplicationClient({
 
       setBudgetLines((prev) => [
         ...prev,
-        { partnerName: partnerName.trim(), personMonths, countryCoefficient: coef, requestedTotal: total }
+        {
+          partnerName: partnerName.trim(),
+          personMonths,
+          countryCoefficient: coef,
+          subcontractingCost: sub,
+          travelCost: trv,
+          requestedTotal: total,
+        }
       ]);
 
       setPartnerName('');

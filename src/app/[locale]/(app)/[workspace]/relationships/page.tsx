@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
+import type { RelationshipRow } from '@/types/db-rows';
 
 /** Whole days between `d` and now, or null when there is no date. */
 const daysSince = (d: Date | null) => {
@@ -19,7 +20,7 @@ export default async function RelationshipsPage({
   const session = await auth();
   const tenantId = session?.tenantId;
 
-  let relationships: any[] = [];
+  let relationships: RelationshipRow[] = [];
   try {
     relationships = await prisma.relationship.findMany({
       where: tenantId ? { tenantId } : {},
@@ -54,7 +55,7 @@ export default async function RelationshipsPage({
       </div>
 
       <div className="space-y-4">
-        {relationships.map((rel: any) => {
+        {relationships.map((rel) => {
           const days = daysSince(rel.lastContactAt);
           const stale = days !== null && days > 60;
 

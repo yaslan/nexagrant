@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
+import type { LegacyOrganizationRow } from '@/types/db-rows';
 
 export default async function LeadersPage({
   params
@@ -12,7 +13,7 @@ export default async function LeadersPage({
   const isTr = locale === 'tr';
   
   // Leaders query: Get orgs with high Eigenvector centrality or most coordination
-  let leaders: any[] = [];
+  let leaders: LegacyOrganizationRow[] = [];
   try {
     leaders = await prisma.organization.findMany({
       take: 20,
@@ -53,7 +54,7 @@ export default async function LeadersPage({
       </p>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {leaders.map((org: any) => (
+        {leaders.map((org) => (
           <Link href={getWorkspaceRoute('partnerDetail', locale, workspace, org.id)} key={org.id} className="block group">
             <div className="bg-surface border border-border rounded-2xl p-5 hover:border-accent transition-all shadow-xs">
               <div className="flex justify-between items-start mb-2">

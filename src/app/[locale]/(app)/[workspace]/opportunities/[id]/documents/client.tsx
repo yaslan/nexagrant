@@ -22,7 +22,7 @@ import {
 import { generateStandardDoc, signDocument, createNewVersion, submitDualApprovalAction, departmentApproveAction } from '@/modules/m10/server/actions';
 import { ShieldAlert, Scale, Landmark } from 'lucide-react';
 
-interface DocItem {
+export interface DocItem {
   id: string;
   kind: 'NDA' | 'LOI' | 'COMMITMENT' | 'ESR_DEBRIEF' | 'AWARD_PACK' | string;
   version: number;

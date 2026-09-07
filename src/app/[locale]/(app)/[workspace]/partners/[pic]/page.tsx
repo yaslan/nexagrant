@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
+import type { LegacyOrganizationWithParticipations } from '@/types/db-rows';
 
 export default async function PartnerDetailPage({
   params
@@ -12,7 +13,7 @@ export default async function PartnerDetailPage({
   const { pic, workspace, locale } = await params;
   const isTr = locale === 'tr';
 
-  let org: any = null;
+  let org: LegacyOrganizationWithParticipations | null = null;
   try {
     org = await prisma.organization.findUnique({
       where: { id: pic },
@@ -97,7 +98,7 @@ export default async function PartnerDetailPage({
         <div>
           <h2 className="text-lg font-bold font-heading text-ink mb-4">{isTr ? 'Geçmiş AB Projeleri' : 'Past Projects'}</h2>
           <div className="space-y-3">
-            {org.participations.map((p: any) => (
+            {org.participations.map((p) => (
               <div key={p.id} className="p-4 border border-border rounded-xl bg-surface hover:bg-surface-hover transition-colors flex justify-between items-center gap-4">
                 <div>
                   <div className="font-bold text-accent text-sm">{p.project?.acronym}</div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
-import { MeetingBriefsClient } from './client';
+import { MeetingBriefsClient, type BriefItem } from './client';
 import { errorMessage } from '@/lib/errors';
 
 export default async function MeetingBriefsPage({
@@ -12,8 +12,8 @@ export default async function MeetingBriefsPage({
   const { locale, workspace, id } = await params;
   const { tenantId } = await requireTenantPage(locale);
 
-  let opp: any = null;
-  let briefs: any[] = [];
+  let opp: { id: string; title: string; tenantId: string; topicId: string | null } | null = null;
+  let briefs: BriefItem[] = [];
 
   try {
     // Both reads are scoped to the session tenant. The briefs query used to key

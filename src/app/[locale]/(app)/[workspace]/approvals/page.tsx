@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
-import ApprovalsClient from './client';
+import ApprovalsClient, { type ApprovalRequestItem } from './client';
 import { Role } from '@prisma/client';
 import { errorMessage } from '@/lib/errors';
 
@@ -15,7 +15,7 @@ export default async function ApprovalsPage({
   const currentUserId = session?.user?.id || '';
   const currentUserRole = (session?.role as Role) || 'MEMBER';
 
-  let requests: any[] = [];
+  let requests: ApprovalRequestItem[] = [];
   try {
     if (tenantId) {
       requests = await prisma.approvalRequest.findMany({

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { createMarketplaceListing, orderMarketplaceService, generateApiKey } from '@/modules/marketplace/server/actions';
 
-interface ListingItem {
+export interface ListingItem {
   id: string;
   kind: 'consultancy' | 'patent_license' | 'service' | string;
   title: string;
@@ -24,7 +24,7 @@ interface ListingItem {
   verifiedReviewer?: boolean;
 }
 
-interface ApiKeyItem {
+export interface ApiKeyItem {
   id: string;
   name: string;
   prefix: string;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { prisma, withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
-import { MarketplaceClient } from './client';
+import { MarketplaceClient, type ApiKeyItem, type ListingItem } from './client';
 import { errorMessage } from '@/lib/errors';
 
 export default async function MarketplacePage({
@@ -12,8 +12,8 @@ export default async function MarketplacePage({
   const { locale, workspace } = await params;
   const { tenantId, userId } = await requireTenantPage(locale);
 
-  let listings: any[] = [];
-  let apiKeys: any[] = [];
+  let listings: ListingItem[] = [];
+  let apiKeys: ApiKeyItem[] = [];
 
   try {
     // MarketplaceListing is a cross-tenant catalogue by design, so it stays on

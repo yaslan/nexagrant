@@ -11,7 +11,7 @@ import {
 import { DualApprovalActionType } from '@/lib/rbac';
 import { errorMessage as toErrorMessage } from '@/lib/errors';
 
-interface ApprovalRequestItem {
+export interface ApprovalRequestItem {
   id: string;
   tenantId: string;
   workspaceId?: string | null;

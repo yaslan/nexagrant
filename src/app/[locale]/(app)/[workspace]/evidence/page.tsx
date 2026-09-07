@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
-import EvidenceClient from './evidence-client';
+import EvidenceClient, { type EvidenceItemData } from './evidence-client';
 import { errorMessage } from '@/lib/errors';
 
 export default async function EvidencePage({
@@ -12,7 +12,7 @@ export default async function EvidencePage({
   const session = await auth();
   const tenantId = session?.tenantId;
 
-  let evidence: any[] = [];
+  let evidence: EvidenceItemData[] = [];
   try {
     evidence = await prisma.evidence.findMany({
       where: tenantId ? { tenantId } : {},
