@@ -427,6 +427,18 @@
       "legalPrivacy": "Privacy Policy & GDPR Disclosure",
       "legalTerms": "Terms of Service",
       "legalDpa": "Data Processing Agreement (DPA)"
+    },
+    "calendar": {
+      "title": "Calendar Connections",
+      "description": "Connect your calendar provider to automatically sync meeting briefs and decisions.",
+      "connected": "Connected",
+      "lastSync": "Last sync: {date}",
+      "notConnected": "Not connected",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "confirmDisconnect": "Disconnect this calendar provider?",
+      "infoTitle": "How It Works",
+      "infoText": "Connect Google Calendar or Outlook to automatically add meeting briefs to your calendar. Your calendar sync runs every hour."
     }
   },
   "legal": {

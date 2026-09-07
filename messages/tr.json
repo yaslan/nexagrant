@@ -427,6 +427,18 @@
       "legalPrivacy": "Gizlilik Politikası ve KVKK Aydınlatma Metni",
       "legalTerms": "Kullanım Koşulları",
       "legalDpa": "Veri İşleme Sözleşmesi (DPA)"
+    },
+    "calendar": {
+      "title": "Takvim Bağlantıları",
+      "description": "Takvim sağlayıcınızı bağlayarak toplantı briflerini ve kararları otomatik olarak senkronize edin.",
+      "connected": "Bağlı",
+      "lastSync": "Son senkronizasyon: {date}",
+      "notConnected": "Bağlı değil",
+      "connect": "Bağla",
+      "disconnect": "Bağlantısını Kes",
+      "confirmDisconnect": "Bu takvim sağlayıcısının bağlantısını kesmeyi onaylıyor musunuz?",
+      "infoTitle": "Nasıl Çalışır?",
+      "infoText": "Google Takvim veya Outlook'u bağlayarak toplantı briflerini takvime otomatik olarak ekletin. Takvim senkronizasyonu her saat çalışır."
     }
   },
   "legal": {
