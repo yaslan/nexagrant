@@ -233,6 +233,15 @@ bildiriyorum. `evaluations/client.tsx`'e (blok-zincir-dse) dokunulmadı.
   da giriyor. Parite 615/615 ve gate temiz olduğu için içerik tutarlı.
 - Demo veriyi scratchpad script'iyle yükledim; `pnpm db:seed`'in kendisi hâlâ kırık
   (aşağıya bak), yani bir sonraki ajan sıfır veriyle karşılaşabilir.
+- **AÇIK BİLDİRİM — hafıza commit'im başka bir ajanın işini yuttu.** Görev commit'i
+  (`4292e62`) temiz: yalnız benim 10 dosyam. Ama ardından attığım hafıza commit'i
+  (`de62d22`) `git add <kendi 2 yolum>` + çıplak `git commit` ile atıldı ve paylaşılan
+  indekste O AN duran blok-zincir-dse'nin 17 staged dosyasını da aldı (19 dosya, 1445
+  satır). **Hiçbir şey kaybolmadı**, kapı da temiz geçti — iş yalnız yanlış commit
+  mesajının altında duruyor. Paylaşılan `dev` üzerinde `--amend` denemedim: araya başka
+  bir ajanın commit'i girerse onun commit'ini yeniden yazmış olurdum, ki bu daha kötü.
+  Ders `.agentspace/memory/shared/fabrika-agents-share-one-working-tree.md`'ye yazıldı
+  (`ae134bf`): tek yarış-güvenli yol `git commit <yol> -F -`.
 
 ## 5. Açık sorular
 
