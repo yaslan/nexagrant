@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import ApprovalsClient, { type ApprovalRequestItem } from './client';
 import { Role } from '@prisma/client';
 import { errorMessage } from '@/lib/errors';
+import { getTranslations } from 'next-intl/server';
 
 export default async function ApprovalsPage({
   params
@@ -10,6 +11,7 @@ export default async function ApprovalsPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const t = await getTranslations('Approvals');
   const session = await auth();
   const tenantId = session?.tenantId;
   const currentUserId = session?.user?.id || '';
@@ -39,13 +41,13 @@ export default async function ApprovalsPage({
     <div className="max-w-6xl mx-auto py-8 px-4">
       <div className="mb-8">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">
-          <span>Kurumsal Güvenlik</span>
+          <span>{t('breadcrumbSecurity')}</span>
           <span>•</span>
-          <span>4-Eyes İlkesi</span>
+          <span>{t('breadcrumbPrinciple')}</span>
         </div>
-        <h1 className="text-3xl font-bold font-heading">Kurumsal Onay Merkezi</h1>
+        <h1 className="text-3xl font-bold font-heading">{t('title')}</h1>
         <p className="text-gray-500 mt-2 max-w-3xl">
-          Kritik bütçe, G4 başvuru onayı, hukuki taahhütler ve yönetici yetki değişiklikleri için Çift Onay (Maker-Checker) yönetim merkezi.
+          {t('pageDescription')}
         </p>
       </div>
 
