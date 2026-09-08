@@ -327,6 +327,25 @@ $ git show df209ec -- src/lib/billing/subscription-sync.ts | grep -E "^[-+].*(va
 işini yok ederdim. Kod ağaçta doğru ve çalışıyor (testler yeşil); yalnız
 **atıf** yanlış: o satırlar TASK-MTT1WUUS7MN7R'ye ait, TASK-MTSY88Q6AMCGB'ye değil.
 
+### ⚠️ …ve aynı şeyi BEN de yaptım: hafıza commit'im başkalarının notlarını yuttu
+
+Dürüstlük gereği: `git add .agentspace/memory/shared` derken o dizindeki
+**başka ajanların o an yazdığı dört notu** da almışım ve benim hafıza
+commit'ime girmişler:
+
+```
+.../shared/fabrika-erasure-decision-split-the-two-not-null-columns.md        (31 satır)
+.../shared/fabrika-legal-claims-retention-basis-kvkk-5-2-e-gdpr-17-3-e.md   (40 satır)
+.../shared/fabrika-removing-a-swallow-reds-tests-that-were-hiding-behind-it.md (45 satır)
+.../shared/fabrika-systemalert-probe-time-filter-false-zero.md              (40 satır)
+```
+
+**Hiçbiri bozulmadı/kırpılmadı** — dördü de tam içerikle commit'lendi, kayıp
+yok; yanlış olan yalnız **atıf**. Geçmişi `reset`/`rebase` ile düzeltmedim
+(sahiplerinin işini yok ederdim). Ders: paylaşılan bir dizini toptan
+`git add <dizin>` ile eklememeli, dosyaları tek tek saymalıyım — kod
+dosyalarında öyle yaptım, hafızada gevşedim.
+
 ### 🔒 DOSYA SAHİPLİĞİ İHLALİ — bildiriyorum, dokunmadım
 
 Bu turun kuralı: *"`prisma/schema.prisma` + migration YALNIZ geli-tirici'nindir."*
