@@ -31,6 +31,8 @@ if [ -n "$MODIFIED_EVIDENCE" ]; then
     echo "  eziyor olabilirsin:"
     printf '%s\n' "$MODIFIED_EVIDENCE" | sed 's/^/    /'
     echo
+    echo "  bu kanıt <GÖREV-ID> kartına ait, kendi kartının dosyasına yaz; gerçekten güncellemen gerekiyorsa -<n>.md soneki kullan"
+    echo
     echo "  Kanıt dosyaları bir kez yazılır. Yeni bir deneme/düzeltme ise VAR OLAN"
     echo "  dosyayı değiştirme, -<n>.md sonekiyle yeni bir dosya aç"
     echo "  (ör. TASK-XXXX-ajanadi.md doluysa TASK-XXXX-ajanadi-2.md)."

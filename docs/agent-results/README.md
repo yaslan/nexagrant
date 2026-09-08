@@ -41,3 +41,17 @@ değişse bile sabit kalan). Aynı göreve ikinci bir deneme gerekirse
 `-2`, `-3` … soneki eklenir (ör. `TASK-MTPZEESJPKGCY-defne-0c1f10-2.md`).
 Ekran görüntüsü/kanıt dosyaları varsa `<GÖREV-KODU>-screenshots/` alt
 klasöründe, raporla aynı kökte tutulur.
+
+## Kanıt Koruma Kuralı (Pre-commit Gate)
+
+`docs/agent-results/` klasörü projenin kanıt hafızasıdır. Kapanmış bir görevin kanıt dosyasının sessizce ezilmesini engellemek için `githooks/pre-commit` hook'una mekanik bir koruma kuralı eklenmiştir:
+
+1. **Mevcut dosya koruması:** Commit sırasında `docs/agent-results/` altında **VAR OLAN** (önceden commit'lenmiş) bir dosyanın içeriği değiştiriliyorsa (`git diff --cached --diff-filter=M`), commit otomatik olarak **durdurulur** (exit 1).
+2. **Yeni dosya ekleme:** Yeni dosya eklenmesi (`-2.md` sonekli yeni rapor, yeni `-screenshots/` klasörleri vb.) serbesttir.
+3. **Muafiyet:** `docs/agent-results/INDEX.md` (ve `npm run results:index` çıktısı) bu kuraldan muaftır.
+4. **Kaçış yolu (Escape Hatch):** Gerçekten var olan bir dosyanın bilerek güncellenmesi gerekiyorsa (ör. yazım hatası düzeltme):
+   ```bash
+   ALLOW_EVIDENCE_OVERWRITE=1 git commit -m "mesaj"
+   ```
+   Çevre değişkeni set edildiğinde hook commit'e izin verir ve ezilen dosyaları konsola uyararak yazar.
+

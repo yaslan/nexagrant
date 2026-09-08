@@ -62,6 +62,8 @@ commit denendi:
   eziyor olabilirsin:
     docs/agent-results/TASK-TESTHOOK-blog-yazar.md
 
+  bu kanıt <GÖREV-ID> kartına ait, kendi kartının dosyasına yaz; gerçekten güncellemen gerekiyorsa -<n>.md soneki kullan
+
   Kanıt dosyaları bir kez yazılır. Yeni bir deneme/düzeltme ise VAR OLAN
   dosyayı değiştirme, -<n>.md sonekiyle yeni bir dosya aç
   (ör. TASK-XXXX-ajanadi.md doluysa TASK-XXXX-ajanadi-2.md).
@@ -134,6 +136,7 @@ staged/commit edilmedi.
 | Dosya | Ne |
 |---|---|
 | `githooks/pre-commit` | `docs/agent-results/` kanıt koruma bloğu eklendi (mevcut ts/tsx kapısından ÖNCE çalışıyor, ondan bağımsız — evidence dosyaları `.md`/`.png`/`.csv` olduğu için ts/tsx filtresine hiç girmiyordu, bu yüzden erken `exit 0`'dan önce konumlandırıldı) |
+| `docs/agent-results/README.md` | Kanıt koruma kuralı ve kaçış yolu belgelendi |
 | `docs/agent-results/TASK-MTSJKTGDUC3L5-blog-yazar.md` | bu rapor (yeni dosya) |
 
 Kaynak koda dokunulmadı.
