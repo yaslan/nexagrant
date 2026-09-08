@@ -44,6 +44,14 @@ export const G0_E2E = {
   /** Has evidence. Starts with `g0Score = null`. */
   scoredOppId: 'g0-e2e-opportunity-scored',
   scoredOppTitle: 'G0 E2E — opportunity with real evidence',
+  /**
+   * Second opportunity on the **same topic** as `scoredOppId`, as a partner rather than a
+   * coordinator. `budgetRoleEconomy` (weight 10) reads `Opportunity.intendedRole`, so the two
+   * score differently on identical topic evidence — which is what makes a topic-keyed evidence
+   * row wrong (TASK-MTQ63RR8Z0G8E).
+   */
+  partnerOppId: 'g0-e2e-opportunity-partner',
+  partnerOppTitle: 'G0 E2E — same topic, partner role',
   /** Has no evidence, and a fabricated score sitting in the column. */
   unscoredOppId: 'g0-e2e-opportunity-unscored',
   unscoredOppTitle: 'G0 E2E — opportunity with no evidence',
@@ -58,6 +66,13 @@ export const G0_E2E = {
   /** M5 is the pipeline module; the board and the detail page are both behind its gate. */
   moduleId: 'M5',
 } as const;
+
+/** Every opportunity this fixture owns — what a run resets and what `--rollback` removes. */
+export const G0_E2E_OPP_IDS = [
+  G0_E2E.scoredOppId,
+  G0_E2E.partnerOppId,
+  G0_E2E.unscoredOppId,
+] as const;
 
 export async function seed() {
   await prisma.tenant.upsert({
@@ -172,15 +187,33 @@ export async function seed() {
 
   // A K1 match, not a row this scorer wrote: no `g0ScorerPlaceholderFitScore` flag, so
   // `loadG0Snapshot` reads `fitScore` as a measured alignment instead of discarding it.
-  await prisma.topicMatch.upsert({
-    where: { tenantId_topicId: { tenantId: G0_E2E.tenantId, topicId: G0_E2E.topicId } },
-    update: { fitScore: G0_E2E.fitScore, g0Score: null, breakdown: { source: 'seed-g0-e2e/k1' } },
-    create: {
-      tenantId: G0_E2E.tenantId,
-      topicId: G0_E2E.topicId,
-      fitScore: G0_E2E.fitScore,
-      breakdown: { source: 'seed-g0-e2e/k1' },
-    },
+  // The K1 row is the one with **no** opportunity on it. Prisma cannot put `null` into a
+  // compound-unique `where`, so it is found rather than upserted; the database still allows only
+  // one such row per tenant × topic (`NULLS NOT DISTINCT`).
+  const k1 = await prisma.topicMatch.findFirst({
+    where: { tenantId: G0_E2E.tenantId, topicId: G0_E2E.topicId, opportunityId: null },
+    select: { id: true },
+  });
+  if (k1) {
+    await prisma.topicMatch.update({
+      where: { id: k1.id },
+      data: { fitScore: G0_E2E.fitScore, g0Score: null, breakdown: { source: 'seed-g0-e2e/k1' } },
+    });
+  } else {
+    await prisma.topicMatch.create({
+      data: {
+        tenantId: G0_E2E.tenantId,
+        topicId: G0_E2E.topicId,
+        fitScore: G0_E2E.fitScore,
+        breakdown: { source: 'seed-g0-e2e/k1' },
+      },
+    });
+  }
+
+  // Every G0 evidence row for this fixture's opportunities is cleared, so each run measures a
+  // fresh computation rather than the previous run's stored number.
+  await prisma.topicMatch.deleteMany({
+    where: { tenantId: G0_E2E.tenantId, opportunityId: { in: [...G0_E2E_OPP_IDS] } },
   });
 
   await prisma.topicStat.deleteMany({ where: { topicId: G0_E2E.topicId } });
@@ -214,6 +247,23 @@ export async function seed() {
     },
   });
 
+  // Same topic, same tenant, different role — the pair the badge fix is about.
+  await prisma.opportunity.upsert({
+    where: { id: G0_E2E.partnerOppId },
+    update: { g0Score: null, stage: 'G0', status: 'ACTIVE', deletedAt: null, intendedRole: 'partner' },
+    create: {
+      id: G0_E2E.partnerOppId,
+      tenantId: G0_E2E.tenantId,
+      workspaceId: G0_E2E.workspaceId,
+      title: G0_E2E.partnerOppTitle,
+      topicId: G0_E2E.topicId,
+      stage: 'G0',
+      status: 'ACTIVE',
+      intendedRole: 'partner',
+      g0Score: null,
+    },
+  });
+
   await prisma.opportunity.upsert({
     where: { id: G0_E2E.unscoredOppId },
     update: {
@@ -237,7 +287,7 @@ export async function seed() {
   });
 
   const cleared = await prisma.gateDecision.deleteMany({
-    where: { opportunityId: { in: [G0_E2E.scoredOppId, G0_E2E.unscoredOppId] } },
+    where: { opportunityId: { in: [...G0_E2E_OPP_IDS] } },
   });
 
   console.log(
@@ -249,10 +299,13 @@ export async function seed() {
 
 export async function rollback() {
   await prisma.gateDecision.deleteMany({
-    where: { opportunityId: { in: [G0_E2E.scoredOppId, G0_E2E.unscoredOppId] } },
+    where: { opportunityId: { in: [...G0_E2E_OPP_IDS] } },
+  });
+  await prisma.topicMatch.deleteMany({
+    where: { opportunityId: { in: [...G0_E2E_OPP_IDS] } },
   });
   await prisma.opportunity.deleteMany({
-    where: { id: { in: [G0_E2E.scoredOppId, G0_E2E.unscoredOppId] } },
+    where: { id: { in: [...G0_E2E_OPP_IDS] } },
   });
   await prisma.topicStat.deleteMany({ where: { topicId: G0_E2E.topicId } });
   await prisma.topicMatch.deleteMany({ where: { topicId: G0_E2E.topicId } });

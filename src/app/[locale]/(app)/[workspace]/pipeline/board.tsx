@@ -440,6 +440,7 @@ export default function KanbanBoard({
                   return (
                     <div
                       key={opp.id}
+                      data-testid={`pipeline-card-${opp.id}`}
                       draggable
                       onDragStart={(e) => handleDragStart(e, opp.id)}
                       className={`bg-surface rounded-xl shadow-2xs border border-border cursor-grab active:cursor-grabbing hover:border-accent hover:shadow-md transition-all ${
@@ -486,6 +487,7 @@ export default function KanbanBoard({
 
                           {opp.g0Score !== null && opp.g0Score !== undefined && (
                             <span
+                              data-testid={`pipeline-card-g0-${opp.id}`}
                               className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
                                 opp.g0Score >= 80
                                   ? 'bg-ok/15 text-ok border border-ok/30'

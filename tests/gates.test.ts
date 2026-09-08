@@ -121,8 +121,10 @@ vi.mock('../src/lib/db', () => {
         }),
       },
       topicMatch: {
-        findUnique: vi.fn(({ where }: { where: { tenantId_topicId: { topicId: string } } }) =>
-          Promise.resolve({ fitScore: where.tenantId_topicId.topicId === 'topic-high' ? 95 : 20 }),
+        // The K1 alignment row is the one with no opportunity on it; the loader reads it with
+        // findFirst because Prisma cannot put `null` in a compound-unique where.
+        findFirst: vi.fn(({ where }: { where: { topicId: string } }) =>
+          Promise.resolve({ fitScore: where.topicId === 'topic-high' ? 95 : 20 }),
         ),
         upsert: vi.fn().mockResolvedValue({}),
       },

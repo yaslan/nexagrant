@@ -495,17 +495,40 @@ model SystemAlert {
 
 // ───────────────────────── K1 tenant-scoped ─────────────────────────
 
+/// Two kinds of row live here, told apart by `opportunityId`:
+///
+///   • `opportunityId = NULL` — the K1 match for a tenant × topic. `fitScore` (cosine + rule
+///     corrections) is a property of the *topic*, so exactly one such row exists per pair.
+///   • `opportunityId` set — the G0 evidence record for one opportunity: `g0Score` and the
+///     per-criterion `breakdown` that CLAUDE.md §7 requires behind the figure on screen.
+///
+/// The split exists because a G0 score is *not* a property of the topic. `budgetRoleEconomy`
+/// (weight 10) reads `Opportunity.intendedRole` and `researchAndEndUser` (weight 12) reads that
+/// opportunity's `ConsortiumSeat` rows, so two opportunities on the same topic score differently
+/// — and `Opportunity.topicId` is not unique. While this table was keyed `[tenantId, topicId]`
+/// the second scoring run overwrote the first and the board, which reads this record, drew one
+/// opportunity's score on the other one's card: measured 44.9 vs 48.23 on the same topic, with
+/// both cards showing 48.23 (TASK-MTQ63RR8Z0G8E).
+///
+/// The unique index is created `NULLS NOT DISTINCT` (Postgres >= 15) in
+/// prisma/migrations/topicmatch-per-opportunity/migration.sql, so the K1 row stays one-per-pair
+/// even though `opportunityId` is NULL there — Prisma cannot express that nuance, which is why
+/// the K1 row is read and written with findFirst/create rather than an upsert on the compound key.
 model TopicMatch {
   id        String   @id @default(cuid())
   tenantId  String
   topicId   String
+  /// The opportunity this G0 evidence belongs to; NULL on a topic-level K1 match row.
+  opportunityId String?
   fitScore  Float    // 0..100
   g0Score   Float?   // weighted total
   breakdown Json     // per-criterion
   computedAt DateTime @default(now())
   topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  @@unique([tenantId, topicId])
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, topicId, opportunityId])
   @@index([tenantId, g0Score])
+  @@index([tenantId, opportunityId])
 }
 
 model SavedSearch {
@@ -697,6 +720,7 @@ model Opportunity {
   gateDecisions GateDecision[]
   seats        ConsortiumSeat[]
   efforts      Effort[]
+  topicMatches TopicMatch[]
   @@index([tenantId, workspaceId, stage])
   followupDocs FollowupDoc[]
   applicationParts ApplicationPart[]

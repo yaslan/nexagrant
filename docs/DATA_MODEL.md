@@ -21,7 +21,8 @@ Kaynak: `prisma/schema.prisma` (bağlayıcı). Bu dosya niyeti ve ilişkileri a�
 ## 2. Ana akış (K5)
 
 ```
-Topic ──(TopicMatch: fitScore, g0Score)──▶ Opportunity(stage G0..G4, intendedRole)
+Topic ──(TopicMatch: K1 fitScore, tenant×topic)──▶ Opportunity(stage G0..G4, intendedRole)
+   Opportunity ──(TopicMatch: g0Score + breakdown, fırsat başına)──▶ kanıt kaydı
    Opportunity ──▶ GateDecision[] (her kapı; inputs JSON; ruleVersion)
    Opportunity ──▶ ConsortiumSeat[] (roleKey; organizationId | partnerOrgId; status)
                        └─▶ SeatCandidate[] (M8 puanları)
@@ -98,7 +99,7 @@ sütunları düşürmek her abonenin katılım oranını siler ve geri hesaplana
 
 ## 6. İndeks ve performans notları
 
-- `Topic(nextDeadlineAt)`, `TopicMatch(tenantId, g0Score)`, `OrgTopicStat(topicPrefix, coordinatorCount)`, `Relationship(tenantId, lastContactAt)`.
+- `Topic(nextDeadlineAt)`, `TopicMatch(tenantId, g0Score)`, `TopicMatch(tenantId, opportunityId)` (pano rozetinin toplu okuması), `OrgTopicStat(topicPrefix, coordinatorCount)`, `Relationship(tenantId, lastContactAt)`.
 - Embedding sorguları için `CREATE INDEX ... USING hnsw (embedding vector_cosine_ops)` (migration'da ham SQL).
 - CORDIS yükleme: worker Parquet → `COPY` ile geçici tabloya → upsert; ORM ile satır satır değil.
 
@@ -480,3 +481,41 @@ hazırdır ama fiyat sayfası, ayarlar faturalama paneli ve checkout hâlâ stat
 açık ya da özel — henüz hiçbir müşteri yüzeyinde satılmaz; `visibility` şu an
 yalnız yönetim ekranında anlamlıdır. Üç yüzeyin `PlanVersion`'dan render'ı bu
 kartın kapsamı dışındadır.
+
+## 14. `TopicMatch` fırsat başına anahtarlı (TASK-MTQ63RR8Z0G8E)
+
+`TopicMatch` iki tür satır tutar ve ikisi `opportunityId` ile ayrılır:
+
+| satır | `opportunityId` | anlamı |
+|---|---|---|
+| K1 eşleşmesi | `NULL` | `fitScore` — kiracı × konu uyumu. Konu başına **tek** satır. |
+| G0 kanıt kaydı | dolu | `g0Score` + `breakdown` — **tek bir fırsatın** puanı ve ölçüt dökümü. |
+
+**Neden.** G0 puanı konunun değil fırsatın özelliğidir: `budgetRoleEconomy` (ağırlık 10)
+`Opportunity.intendedRole`'ü, `researchAndEndUser` (ağırlık 12) o fırsatın `ConsortiumSeat`
+satırlarını okur. `Opportunity.topicId` ise unique değil — aynı konuda N fırsat serbest. Tablo
+`@@unique([tenantId, topicId])` iken ikinci skorlama birincinin satırının üzerine yazıyordu ve
+kanıt kaydını okuyan pano, hayatta kalan satırı **iki kartta birden** çiziyordu: aynı konuda
+koordinatör 44.9, ortak 48.23 ölçüldü, panoda iki kart da 48.23 gösterdi, koordinatörün kendi
+detay sayfası ise 44.9 dedi. Aynı fırsat, iki ekran, iki sayı — CLAUDE.md §7 ihlali.
+
+**Anahtar.** `@@unique([tenantId, topicId, opportunityId])`, veritabanında `NULLS NOT DISTINCT`
+(Postgres ≥ 15) ile kurulur; böylece `opportunityId` NULL olan K1 satırı da konu başına tek kalır.
+Prisma bu niteliği ifade edemediği için K1 satırı `findFirst` + `create`/`update` ile okunup
+yazılır (`src/lib/scoring/g0-compute.ts`, `prisma/seed.ts`); fırsat satırı normal `upsert` ile.
+
+**Okuma yüzeyleri.** Pano rozeti (`pipeline/page.tsx`) kanıt satırını **fırsat kimliğiyle** çeker
+(tek toplu sorgu); detay sayfası aynı puanı `computeG0ForOpportunity` ile canlı hesaplar ve
+hiçbir şey yazmaz. `Opportunity.g0Score` bir önbellek sütunudur: `persistG0` doldurur, ama tohum
+verisi de yazabildiği için hiçbir ekran onu doğrudan çizmez.
+
+**Geri doldurma.** `prisma/migrations/topicmatch-per-opportunity/migration.sql` eski konu-başına
+satırları şöyle ayırır: kanıt yükü taşıyan bir satır, o kiracıda o konuda **tek** canlı fırsat
+varsa o fırsata bağlanır (gerçek K1 `fitScore`'u da varsa puan yeni bir fırsat satırına taşınır,
+K1 satırı konu düzeyinde kalır); atfedilemiyorsa (0 veya >1 aday) `g0Score` **temizlenir** ve
+sebebi `breakdown`'a yazılır — tahminle bir fırsata yapıştırılmaz. Yeniden hesaplama:
+`pnpm jobs:g0-rescore -- --apply`. Geri alma: aynı klasörde `down.sql` (yıkıcı — konu başına tek
+satıra çöker, yani geri alınan bozuk davranışın kendisi).
+
+**RLS.** Yeni tablo yok; `TopicMatch` `tenant_isolation` politikasını `prisma/rls.sql`'den almaya
+devam eder ve yeni sütun kiracı anahtarı değildir.

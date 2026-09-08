@@ -93,7 +93,11 @@ function fakeClient(db: FakeDb) {
       }),
     },
     topicMatch: {
-      findUnique: vi.fn(async () => db.topicMatch ?? null),
+      // The K1 row is looked up with findFirst (`opportunityId: null` cannot go into a
+      // compound-unique where), so the fake answers the same call the loader makes.
+      findFirst: vi.fn(async ({ where }: { where: { opportunityId?: string | null } }) =>
+        where.opportunityId === null ? (db.topicMatch ?? null) : null,
+      ),
       upsert: writes.topicMatchUpsert,
     },
     topicStat: {
@@ -220,11 +224,20 @@ describe('persistG0()', () => {
     await persistG0(client, computation);
 
     const call = writes.topicMatchUpsert.mock.calls[0]?.[0] as {
-      where: { tenantId_topicId: { tenantId: string; topicId: string } };
+      where: {
+        tenantId_topicId_opportunityId: { tenantId: string; topicId: string; opportunityId: string };
+      };
       update: { g0Score: number; breakdown: Record<string, unknown> };
-      create: { fitScore: number; breakdown: Record<string, unknown> };
+      create: { fitScore: number; opportunityId: string; breakdown: Record<string, unknown> };
     };
-    expect(call.where.tenantId_topicId).toEqual({ tenantId: 'tenant-1', topicId: 'topic-1' });
+    // Keyed by the opportunity: two opportunities on one topic each keep their own record
+    // (TASK-MTQ63RR8Z0G8E — a topic-keyed row put one card's score on the other card).
+    expect(call.where.tenantId_topicId_opportunityId).toEqual({
+      tenantId: 'tenant-1',
+      topicId: 'topic-1',
+      opportunityId: 'opp-1',
+    });
+    expect(call.create.opportunityId).toBe('opp-1');
     expect(call.update.g0Score).toBe(computation.score);
     expect(call.update.breakdown.contributions).toEqual(computation.contributions);
     // An existing K1 row keeps its own fitScore; only a row we create carries a flagged placeholder.

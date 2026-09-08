@@ -213,9 +213,13 @@ export async function loadG0Snapshot(
             : null,
       };
 
+      // The K1 match is the row with **no** opportunity on it: `fitScore` is a property of the
+      // tenant × topic pair, while `g0Score` belongs to one opportunity (see the model comment in
+      // prisma/schema.prisma). Prisma cannot put `null` in a compound-unique `where`, so this is a
+      // findFirst — the database still allows only one such row (`NULLS NOT DISTINCT`).
       const match: { fitScore: number | null; breakdown: unknown } | null =
-        await client.topicMatch.findUnique({
-          where: { tenantId_topicId: { tenantId, topicId: resolvedTopicId } },
+        await client.topicMatch.findFirst({
+          where: { tenantId, topicId: resolvedTopicId, opportunityId: null },
           select: { fitScore: true, breakdown: true },
         });
       // A row this scorer created carries a placeholder fit score, not a K1 match — reading it back
@@ -400,7 +404,8 @@ export function g0EvidencePayload(computation: G0Computation): Record<string, un
  *
  * `TopicMatch.g0Score` ("weighted total") and `TopicMatch.breakdown` ("per-criterion") are exactly
  * what the schema reserves for this, so the breakdown a user sees and the number the gate reads
- * come out of the same write. A computation with no score writes nothing.
+ * come out of the same write. The row is keyed by `opportunityId`, which is what makes it *this*
+ * opportunity's record rather than the topic's. A computation with no score writes nothing.
  */
 export async function persistG0(
   client: Client,
@@ -418,14 +423,25 @@ export async function persistG0(
     const breakdown = alignmentCameFromTopicMatch(computation)
       ? evidence
       : { ...evidence, [G0_FIT_SCORE_PLACEHOLDER]: true };
+    // Keyed by the opportunity, not by the topic. `Opportunity.topicId` is not unique and the
+    // score is opportunity-specific (`intendedRole`, `ConsortiumSeat`), so a topic-keyed row made
+    // the second opportunity on a topic overwrite the first — and the board, which reads this
+    // record, then drew one opportunity's score on the other one's card (TASK-MTQ63RR8Z0G8E).
     await client.topicMatch.upsert({
-      where: { tenantId_topicId: { tenantId: computation.tenantId, topicId: computation.topicId } },
-      // An existing row's `fitScore` belongs to K1 and is never overwritten here; only the score
-      // and its breakdown are ours to write.
+      where: {
+        tenantId_topicId_opportunityId: {
+          tenantId: computation.tenantId,
+          topicId: computation.topicId,
+          opportunityId: computation.opportunityId,
+        },
+      },
+      // `fitScore` on an evidence row is never a K1 match — the K1 match lives on the row with no
+      // opportunity — so it stays 0 and the breakdown carries the placeholder flag.
       update: { g0Score: computation.score, breakdown },
       create: {
         tenantId: computation.tenantId,
         topicId: computation.topicId,
+        opportunityId: computation.opportunityId,
         fitScore: 0,
         g0Score: computation.score,
         breakdown,

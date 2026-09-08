@@ -105,11 +105,24 @@ async function seedG0DemoEvidence() {
       method: 'k1-keyword-cosine-mock',
       note: `seed demo K1 match (TASK-MTQW90XSQ1SU1) — ${m.note}`,
     };
-    await prisma.topicMatch.upsert({
-      where: { tenantId_topicId: { tenantId: TENANT_ID, topicId: m.topicId } },
-      update: { fitScore: m.fitScore, breakdown },
-      create: { tenantId: TENANT_ID, topicId: m.topicId, fitScore: m.fitScore, breakdown },
+    // The K1 row is the one with no opportunity on it (`fitScore` is a tenant × topic property;
+    // `g0Score` belongs to a single opportunity — see the TopicMatch model comment). Prisma
+    // cannot express `opportunityId: null` in a compound-unique `where`, so this is a
+    // findFirst + update/create; the database still allows only one such row per pair.
+    const existing = await prisma.topicMatch.findFirst({
+      where: { tenantId: TENANT_ID, topicId: m.topicId, opportunityId: null },
+      select: { id: true },
     });
+    if (existing) {
+      await prisma.topicMatch.update({
+        where: { id: existing.id },
+        data: { fitScore: m.fitScore, breakdown },
+      });
+    } else {
+      await prisma.topicMatch.create({
+        data: { tenantId: TENANT_ID, topicId: m.topicId, fitScore: m.fitScore, breakdown },
+      });
+    }
   }
 
   // K3 — base rate (weight 15). One row per topic-family prefix; successRate is derived from

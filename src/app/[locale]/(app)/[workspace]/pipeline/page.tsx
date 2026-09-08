@@ -15,53 +15,45 @@ import { moduleGate } from '@/lib/modules/guard';
  * while its own detail page said "Hesaplanamadı" (measured in
  * docs/agent-results/TASK-MTQ63RR8Z0G8E-blok-zincir-denet-i-2.md).
  *
- * `TopicMatch.g0Score` is the record `persistG0` writes together with the per-criterion
- * breakdown, so it is the number CLAUDE.md §7 allows a user to read. A card with no such row
- * carries no badge — the honest state, and the one the detail page already renders as
- * "not computed" with the reasons attached.
+ * `TopicMatch` is the record `persistG0` writes together with the per-criterion breakdown, so it
+ * is the number CLAUDE.md §7 allows a user to read. A card with no such row carries no badge —
+ * the honest state, and the one the detail page already renders as "not computed" with the
+ * reasons attached.
  *
- * Two batch queries for the whole board, not one score computation per card: recomputing here
+ * The lookup is by **opportunity**, which is the fix in TASK-MTQ63RR8Z0G8E: the evidence row used
+ * to be keyed `[tenantId, topicId]` while `Opportunity.topicId` is not unique and the score is
+ * opportunity-specific (`intendedRole` carries weight 10, that opportunity's `ConsortiumSeat`
+ * rows another 12). Two opportunities on one topic therefore shared one row, and the board drew
+ * the survivor on both cards: measured 44.9 (coordinator) and 48.23 (partner) on the same topic,
+ * with both badges reading 48.23 while the coordinator's own detail page said 44.9.
+ *
+ * One batch query for the whole board, not one score computation per card: recomputing here
  * would be ~8 reads per opportunity on every board render.
  */
 async function withEvidenceBackedScores(
   tenantId: string,
   opportunities: OpportunityItem[],
 ): Promise<OpportunityItem[]> {
-  const topicRefs = Array.from(
-    new Set(opportunities.map((o) => o.topicId).filter((t): t is string => !!t)),
-  );
-  if (topicRefs.length === 0) {
-    return opportunities.map((o) => ({ ...o, g0Score: null }));
-  }
+  const ids = opportunities.map((o) => o.id);
+  if (ids.length === 0) return opportunities;
 
   try {
     return await withTenant(tenantId, async (tx) => {
-      // `Opportunity.topicId` is a `Topic.id` when the row was seeded and a portal identifier
-      // ("HORIZON-CL5-2026-D4-01") when it came from the pipeline form, so both are resolved —
-      // the same rule `loadG0Snapshot` follows.
-      const topics: { id: string; identifier: string }[] = await tx.topic.findMany({
-        where: { OR: [{ id: { in: topicRefs } }, { identifier: { in: topicRefs } }] },
-        select: { id: true, identifier: true },
-      });
-      const topicIdByRef = new Map<string, string>();
-      for (const topic of topics) {
-        topicIdByRef.set(topic.id, topic.id);
-        topicIdByRef.set(topic.identifier, topic.id);
-      }
+      const matches: { opportunityId: string | null; g0Score: number | null }[] =
+        await tx.topicMatch.findMany({
+          where: { tenantId, opportunityId: { in: ids } },
+          select: { opportunityId: true, g0Score: true },
+        });
+      const scoreByOpportunityId = new Map(
+        matches
+          .filter((m): m is { opportunityId: string; g0Score: number | null } => !!m.opportunityId)
+          .map((m) => [m.opportunityId, m.g0Score ?? null]),
+      );
 
-      const resolved = Array.from(new Set(topicIdByRef.values()));
-      const matches: { topicId: string; g0Score: number | null }[] = resolved.length
-        ? await tx.topicMatch.findMany({
-            where: { tenantId, topicId: { in: resolved } },
-            select: { topicId: true, g0Score: true },
-          })
-        : [];
-      const scoreByTopicId = new Map(matches.map((m) => [m.topicId, m.g0Score ?? null]));
-
-      return opportunities.map((o) => {
-        const topicId = o.topicId ? topicIdByRef.get(o.topicId) : undefined;
-        return { ...o, g0Score: topicId ? scoreByTopicId.get(topicId) ?? null : null };
-      });
+      return opportunities.map((o) => ({
+        ...o,
+        g0Score: scoreByOpportunityId.get(o.id) ?? null,
+      }));
     });
   } catch (e) {
     // A failed lookup must not invent scores: the badge disappears, it does not fall back to
