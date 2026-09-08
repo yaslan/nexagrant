@@ -231,15 +231,42 @@ Kareler: `docs/agent-results/TASK-MTRJ32BZBY2AI-screenshots/`
 `12-draft-saved.png` · `13-draft-after-reload.png` · `14-persisted-after-reload-db-checked.png`
 (+ ADIM 2'nin 01–11 kareleri bu koşuda yeniden üretildi).
 
-### 2.6 Kapı
+### 2.6 Kapı — `pnpm gate` UÇTAN UCA YEŞİL
+
+İlk koşuda kapı, başka bir ajanın o sırada yazdığı `scripts/_tmp-csv7/HEAD-consortium-page.tsx`
+dosyasında kırmızıydı (§5.1). O dosyaya dokunmadım; sahibi işini bitirip temizleyince kapı
+kendiliğinden yeşile döndü ve tam koşu tekrarlandı:
 
 ```
-$ pnpm lint
+$ pnpm gate
+$ pnpm lint && pnpm typecheck && pnpm test && pnpm rls:check && pnpm rls:verify
+
+$ eslint
 (çıktı yok — 0 problem)
 
+$ tsc --noEmit
+(çıktı yok — temiz)
+
+$ vitest run --passWithNoTests
+ Test Files  101 passed | 2 skipped (103)
+      Tests  1187 passed | 8 skipped (1195)
+
+$ tsx scripts/check-rls.ts
+Found 42 tenant-scoped models requiring RLS policies:
+... PlanAssignment ...
+✅ SUCCESS: All 42 tenant-scoped models have RLS policies registered.
+
+$ tsx scripts/check-rls-live.ts
+Kiracıya özel model: 42 · RLS açık tablo: 48 · tenant_isolation politikası: 42
+✅ Veritabanı 42 kiracıya özel tablonun tamamında izolasyonu uyguluyor.
+```
+
+Yabancı dosya HÂLÂ ORADAYKEN yapılmış ölçüm (kayıt için — kapının benim değişikliğim
+yüzünden kırmızı OLMADIĞININ kanıtı):
+
+```
 $ npx tsc --noEmit
 scripts/_tmp-csv7/HEAD-consortium-page.tsx(5,90): error TS2307: Cannot find module './manager'
-   ← BENİM DEĞİL, §5.1
 
 $ npx tsc --noEmit -p (aynı tsconfig, yalnız scripts/_tmp-csv7 hariç)
 tsc exit code: 0
@@ -317,6 +344,10 @@ değişikliğimden bağımsız olarak. Dosyaya DOKUNMADIM (sahibi üzerinde çal
 Kalıcı çözüm sahibinde ya da `.gitignore` + tsconfig `exclude`'a `scripts/_tmp-*`
 eklenmesinde.
 
+**Güncelleme (12:55):** sahibi işini bitirip dizini temizledi; `pnpm gate` artık uçtan uca
+yeşil (§2.6). Bulgu yine de duruyor — bir sonraki geçici dosya aynı şeyi tekrar yapacak,
+çünkü sorun dosyada değil, `tsconfig.include`'un `**/*.tsx` olmasında.
+
 ### 5.2 `.tmp-qa-en/measure1.ts` — kendi eski koşumun kalıntısı, lint'i kırıyordu
 
 `pnpm gate`'in ilk koşusu bu dosyada `@typescript-eslint/no-explicit-any` ile
@@ -360,6 +391,5 @@ tabloya çağrı hâlâ typecheck'ten geçer. Karar alınmadı, kapsamım değil
 - [x] Gerçek tarayıcıda paket sürümü oluşturuldu → yenilendi → duruyor (kare + tarayıcı dışı DB ölçümü)
 - [x] Özel paket başka kiracıya görünmüyor — iki seviyede, iki yönde ölçüldü (boş sonuç vacuous değil)
 - [x] Test gevşetilerek geçilmedi
-- [x] `pnpm lint` / `pnpm test` / `pnpm rls:check` / `pnpm rls:verify` temiz; `tsc` yalnız §5.1'deki
-      yabancı dosyada kırmızı, o dosya hariç tutulunca `exit code: 0`
+- [x] `pnpm gate` uçtan uca YEŞİL (lint 0 · tsc temiz · 1187 test · rls:check 42/42 · rls:verify 42/42)
 - [x] Kapsam dışı bulgular düzeltilmedi, dosya adıyla bildirildi (§5)
