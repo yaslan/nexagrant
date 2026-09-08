@@ -49,7 +49,9 @@ On termination the Controller may export all data within 30 days. After that per
 
 ## 7. Sub-processors
 
-The Processor uses sub-processors in the following categories: hosting and database, object storage, email delivery, payment infrastructure, AI model providers, and error monitoring. The Controller is notified in advance of any change to sub-processors.
+The Processor uses sub-processors in the following categories: hosting and database, object storage, email delivery, payment infrastructure, and AI model providers. The Controller is notified in advance of any change to sub-processors.
+
+Error monitoring and product analytics are **not** sub-processed to a third party today: analytics is an inert stub with no network call, and error tracking runs entirely in-house through the `SystemAlert` mechanism, by deliberate decision to keep this category of data from leaving the platform (see `docs/legal/processing-register.md` §19 for the evidence trail). If a third-party error-monitoring or analytics provider is introduced later, this section will be updated before that provider goes live.
 
 ## 8. Breach Notification
 

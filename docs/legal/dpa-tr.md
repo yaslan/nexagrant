@@ -49,7 +49,9 @@ Abonelik sona erdiğinde Veri Sorumlusu 30 gün içinde tüm veriyi dışa aktar
 
 ## 7. Alt İşleyenler
 
-Veri İşleyen, aşağıdaki kategorilerde alt işleyen kullanır: barındırma ve veritabanı, nesne depolama, e-posta gönderimi, ödeme altyapısı, yapay zeka model sağlayıcıları, hata izleme. Alt işleyen değişiklikleri Veri Sorumlusu'na önceden bildirilir.
+Veri İşleyen, aşağıdaki kategorilerde alt işleyen kullanır: barındırma ve veritabanı, nesne depolama, e-posta gönderimi, ödeme altyapısı, yapay zeka model sağlayıcıları. Alt işleyen değişiklikleri Veri Sorumlusu'na önceden bildirilir.
+
+Hata izleme ve ürün analitiği bugün **hiçbir üçüncü tarafa** alt işlettirilmiyor: analitik ağ çağrısı yapmayan atıl bir taslak (stub), hata izleme ise tamamen iç `SystemAlert` mekanizmasıyla yürütülüyor — bu verinin platform dışına çıkmaması için bilinçli bir karardır (kanıt izi için bkz. `docs/legal/processing-register.md` §19). İleride üçüncü taraf bir hata izleme/analitik sağlayıcı devreye alınırsa bu bölüm, o sağlayıcı canlıya alınmadan önce güncellenecektir.
 
 ## 8. İhlal Bildirimi
 

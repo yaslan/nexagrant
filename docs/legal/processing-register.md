@@ -164,17 +164,20 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 
 ## 12. Onay iş akışları (dual approval — M10)
 
+**Patron kararı 2026-09-08 (A4 brifingi, Seçenek C):** İki kolon (`actorUserId`, `actorName`) iki ayrı vakadır ve ikisi de bu kayıtta kalır. "Yalnızca id'yi beyan et, ekranda duran adı atlama" (brifingde Seçenek A — "sahte güvence" gerekçesiyle reddedildi) bu envanterde uygulanmamıştır: aşağıdaki veri kategorileri alanı ve aydınlatma metni taslağı **ikisini birlikte, adıyla** beyan eder. `Relationship.ownerUserId` nullable + imha ile kopma kararı **bu maddenin kapsamı dışıdır** — ayrı kart (TASK-MTT1XL9NP2QYU), migration kilidi açılınca işlenecek.
+
 | Alan | Değer |
 |---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri işleyen |
-| **Veri kategorileri** | Talep eden/onaylayan `userId`, isim anlık görüntüsü (`actorName`, `approvalSubmittedByName`), ret gerekçesi |
-| **İlgili kişi kategorileri** | Platform kullanıcıları (Finans/Hukuk onaylayıcıları) |
-| **Amaç** | Dört-göz kuralı (departman onayı) ile hassas eylemlerin (gönderim, bütçe, yasal taahhüt) denetimi |
-| **Hukuki sebep** | KVKK md.5/2-f / GDPR art.6(1)(f) |
-| **Alıcı ve yurt dışı aktarım** | Yok |
-| **Saklama süresi** | Kalıcı — imza kaydı denetim amaçlı; `actorUserId` bilinçli olarak foreign key değil, kullanıcı silinse de imza kalır (`prisma/schema.prisma` satır 1238) |
-| **Teknik-idari tedbir** | `auditHash`, benzersiz kısıt (bir kişi bir departmanda bir kez imzalar) |
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`ApprovalRequest`, `DualApprovalStep`) |
+| **1. Sorumlu/işleyen rolü** | Fabrika = veri işleyen |
+| **2. Veri kategorileri** | **İki ayrı alan, ikisi de kayda giriyor:** (i) `actorUserId` — imzalayan kişinin sistem kimliği, kasıtlı olarak foreign key değil (aşağıya bkz.); (ii) `actorName` / `approvalSubmittedByName` — imza anındaki **görünen ad anlık görüntüsü**. `actorName` yalnızca DB'de durmuyor, **ekranda ada göre gösteriliyor** (bkz. madde 9 kaynak dosya) — bu yüzden beyan da id ile birlikte adı kapsamalı, yalnız id'yi beyan edip ekrandaki adı atlamak brifingde reddedilen Seçenek A'nın dokümantasyon karşılığı olurdu. Ayrıca: ret gerekçesi (`note`, serbest metin) |
+| **3. İlgili kişi kategorileri** | Platform kullanıcıları — Finans/Hukuk onaylayıcıları ve talebi açan kişi (`approvalSubmittedById`/`approvalSubmittedByName`); hem kimlikle hem adla tanımlanabilir gerçek kişiler |
+| **4. Amaç** | Dört-göz kuralı (departman onayı) ile hassas eylemlerin (gönderim, bütçe, yasal taahhüt) denetimi; imza kaydının **kim olduğu okunaklı kalması** (ad anlık görüntüsü bunun için var — kullanıcı adını değiştirse veya silinse de geçmiş kayıt kimin imzaladığını okunaklı gösterir) |
+| **5. Hukuki sebep (işleme)** | KVKK md.5/2-f (meşru menfaat) / GDPR art.6(1)(f) — onay akışına katılım kullanıcının kendi rolünün gereği |
+| **6. Hukuki sebep (silinmeme/saklama istisnası)** | **KVKK md.5/2-e (bir hakkın tesisin, kullanılması veya korunması için veri işlemenin zorunlu olması) / GDPR art.17(3)(e) (necessary for the establishment, exercise or defence of legal claims).** Bu, `actorUserId`'nin neden FK olmadığının ve kullanıcı hesabı silinse dahi hem id hem ad alanının silinme/anonimleştirme akışının (`users-scheduled-deletion`) DIŞINDA tutulduğunun gerekçesidir — imza kaydı bir hakkın (denetim/uyum, olası uyuşmazlık savunması) korunması için saklanır, kullanıcı silme talebiyle otomatik silinmez. |
+| **7. Alıcı ve yurt dışı aktarım** | Yok — yalnızca iç veritabanı |
+| **8. Saklama süresi** | **Belirsiz bırakılmamıştır.** Ölçüt: ilgili `FollowupDoc.signedAt` (imza tamamlanma tarihi) itibarıyla, madde 6'daki hukuki sebebe bağlı olarak **genel hukuki zamanaşımı süresi (TBK md.146 — 10 yıl)** boyunca saklanır, sonrasında silme/anonimleştirme değerlendirilir. **VARSAYIM — A1 hukuk girdisiyle (TASK-MTSWIFJKGTYC) kesinleşecek:** bu süre bugün için makul bir varsayılan olarak yazılmıştır, hukuk ekibinin onayladığı nihai süre değildir; onaylanınca bu satır güncellenecektir. Bugünkü kod davranışı: satır hiçbir otomatik işle silinmiyor/anonimleştirilmiyor (kalıcı - bkz. madde 9). |
+| **9. Teknik-idari tedbir (bütünlük kuralı)** | İki bütünlük kısıtı, uygulama kodu değil **veritabanı benzersiz indeksi**: `@@unique([followupDocId, department])` (bir departman bir belgeyi bir kez onaylar) ve `@@unique([followupDocId, actorUserId])` (bir kişi en çok bir departmanda imzalar) — `prisma/schema.prisma` satır 1265-1266 (model `DualApprovalStep`, satır 1254-1268). `actorUserId`'nin FK olmama gerekçesi aynı dosyada yorum satırı 1252-1253'te yazılı: "the record must outlive a change to the user row that made it." `actorName` ekranda gösterimi: `src/app/[locale]/(app)/[workspace]/opportunities/[id]/documents/client.tsx` satır 427 (`{entry.actorName}` — audit trail listesinde ada göre render). |
+| **10. Aydınlatma metni durumu** | **TASLAK — henüz yayında değil, i18n mesaj dosyalarına eklenmedi.** Taslak cümle (TR): *"Bu onayı verdiğinizde, kullanıcı kimliğiniz ve o anki görünen adınız onay kaydına ve denetim iznine yazılır; bu kayıt, olası bir hakkın tesisi/korunması amacıyla hesabınız silinse dahi saklanmaya devam eder."* Taslak cümle (EN): *"When you approve, your user identity and your display name at that moment are written to the approval record and audit trail; this record is retained even after account deletion, for the establishment or defence of a legal claim."* Bu metin **A1/TASK-MTSWIFJKGTYC ile yayına alınacaktır** — hukuk girdisi beklenmeden envanter maddesi (bu sayfa) yayınlanmış, ama kullanıcıya gösterilen aydınlatma cümlesi henüz `messages/*.json`'a eklenmemiştir (bu kart kapsamında i18n dosyasına dokunulmadı). |
 
 ## 13. Denetim kaydı (audit log)
 
@@ -262,14 +265,16 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 
 ---
 
-## 19. Ürün analitiği ve hata izleme — beyan edilmiş ama **kodda karşılığı yok**
+## 19. Ürün analitiği ve hata izleme — beyan edilmişti ama kodda karşılığı yoktu (TASK-MTT1VEUF8Z9SH ile düzeltildi)
 
 `docs/SECURITY_COMPLIANCE.md` satır 102, alt işleyen listesine **PostHog** ve **Sentry**'yi dahil ediyor. Bu kart kapsamında koda bakıldığında:
 
 - **PostHog:** `src/lib/analytics.ts` tamamı bir stub — `track`/`identify` yalnızca `NODE_ENV === 'development'` iken `console.log` yapıyor, hiçbir ağ çağrısı yok. **Bugün hiçbir kişisel veri PostHog'a gitmiyor.**
 - **Sentry:** Depoda `@sentry/*` paketi, `sentry.*.config.ts` dosyası veya `Sentry.init` çağrısı **bulunamadı**. Bu bir eksiklik değil, **bilinçli bir karar**: patron 2026-09-07'de "Sentry kullanılmayacak, hata/geri bildirim izleme tamamen kendi içimizde `SystemAlert` üzerinden" kararını verdi — gerekçe tam olarak bu envanterin konusu: "veri dışarı çıkmasın (çok kiracılı Avrupa fonları SaaS'ı, KVKK/GDPR yüzeyi)". `src/lib/observability/sentry.ts` bilinçli olarak silindi (`TASK-MTQUN8VV6DK8C`). **Bugün hiçbir hata verisi üçüncü bir tarafa gitmiyor.**
 
-Bu iki sağlayıcı envanterden **çıkarılmıştır** çünkü aktif bir işleme faaliyeti temsil etmiyorlar. Sentry için bu durum kalıcı bir mimari karardır; entegrasyon yeniden gündeme gelirse bu envantere yeni bir madde eklenmesi gerekir. `docs/SECURITY_COMPLIANCE.md` satır 102 ve `docs/legal/dpa-en.md`/`dpa-tr.md` §7'nin alt işleyen listesi **her ikisi de bu kararla çelişiyor ve güncellenmemiş** — düzeltme önerisi sonuç raporunda.
+Bu iki sağlayıcı envanterden **çıkarılmıştır** çünkü aktif bir işleme faaliyeti temsil etmiyorlar. Sentry için bu durum kalıcı bir mimari karardır; entegrasyon yeniden gündeme gelirse bu envantere yeni bir madde eklenmesi gerekir.
+
+**Düzeltildi (bu kart, TASK-MTT1VEUF8Z9SH):** `docs/SECURITY_COMPLIANCE.md` satır 102 ve satır 145'teki PostHog/Sentry ifadeleri Sentry'nin kaldırılma gerekçesiyle birlikte güncellendi; `docs/legal/dpa-en.md` ve `docs/legal/dpa-tr.md` §7'deki "error monitoring"/"hata izleme" alt işleyen kategorisi kaldırılıp yerine bunun bugün üçüncü tarafa gitmediğini açıklayan bir not eklendi. Üç belge artık kodla tutarlı. Kanıt: `grep -rn "posthog\|@sentry\|Sentry.init" src/` → sonuç yok.
 
 ---
 

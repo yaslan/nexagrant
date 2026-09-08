@@ -99,7 +99,7 @@ rolündedir; ana bağlantının `fabrika_app`'e çevrilmesi ayrı bir iştir ve
 - Veri envanteri (`docs/data-inventory.md` üretilecek): kişisel veri = kullanıcı hesabı, muhatap adı/e-postası (`Relationship`), toplantı notları.
 - Hukuki dayanak: sözleşme (hesap), meşru menfaat (muhatap iletişim bilgisi — kullanıcı girer; "kaynak" alanı zorunlu).
 - Haklar: dışa aktarma (`/{locale}/{workspace}/settings/privacy` → `POST /api/user/export`, JSON), silme (aynı ekran → `POST /api/user/request-deletion`; 30 gün sonra kalıcı imha), muhatap silme isteği formu (herkese açık).
-- İşleyici sözleşmesi (DPA) şablonu tr/en; alt işleyiciler listesi: Vercel, Neon/Supabase, Fly.io, Cloudflare R2, Resend, Stripe, Anthropic/OpenAI, PostHog, Sentry.
+- İşleyici sözleşmesi (DPA) şablonu tr/en; alt işleyiciler listesi: Vercel, Neon/Supabase, Fly.io, Cloudflare R2, Resend, Stripe, Anthropic/OpenAI. **PostHog ve Sentry bu listede DEĞİL** — koda bakıldığında ikisinin de gerçek bir işlemesi yok: `src/lib/analytics.ts` tamamen bir stub (yalnızca `NODE_ENV === 'development'`'ta `console.log`, ağ çağrısı yok — PostHog hiç canlıya alınmadı); Sentry ise patronun 2026-09-07 kararıyla **bilinçli olarak kaldırıldı** — gerekçe: çok kiracılı Avrupa fonları SaaS'ında veri dışarı çıkmasın (`src/lib/observability/sentry.ts` silindi, TASK-MTQUN8VV6DK8C). Hata/geri bildirim izleme bugün tamamen iç `SystemAlert` mekanizmasıyla yapılıyor, üçüncü tarafa gitmiyor. Ayrıntı ve kanıt: `docs/legal/processing-register.md` §19.
 - Veri yeri: AB bölgesi (Frankfurt) varsayılan; Türkiye için KVKK yurt dışı aktarım — açık rıza + standart sözleşme; kurumsal müşteriye "AB bölgesi model" seçeneği.
 - Çerez onayı; analitik yalnızca onayla.
 
@@ -142,7 +142,7 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
 
 ## 5. Uygulama güvenliği
 - OWASP ASVS L2 hedefi; zod ile tüm girişler; CSRF (Server Actions yerleşik); CSP başlıkları; oran sınırlama (Upstash) giriş/AI uç noktaları; dosya yükleme MIME + boyut + virüs taraması (ClamAV faz 2).
-- Sırlar: env; log'da PII maskeleme; Sentry PII kapalı.
+- Sırlar: env; log'da PII maskeleme. **Sentry KULLANILMIYOR** (bilinçli mimari karar, 2026-09-07 — veri dışarı çıkmasın; bkz. §3 ve `docs/legal/processing-register.md` §19), bu yüzden "Sentry PII kapalı" iddiası da geçersizdi ve kaldırıldı.
 - Yedekleme: Neon PITR 7 gün; R2 sürümleme; aylık geri yükleme tatbikatı.
 - Olay müdahale: 72 saat bildirim prosedürü (GDPR), KVKK Kurulu bildirimi.
 
