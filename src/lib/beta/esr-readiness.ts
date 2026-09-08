@@ -58,6 +58,10 @@ export interface EsrReadinessInput {
   responseCount: number;
   /** The responses came from the committed self-test file, not from partners. */
   responsesAreSelfTest: boolean;
+  /** Why the response file was refused, or `null` when it was folded in (or absent). */
+  responseProblem: string | null;
+  /** Samples whose label a partner majority confirms. A tie or a gap confirms nothing. */
+  samplesWithVerdicts: number;
   /** Rule A accuracy, 0–1. `null` when it could not be measured. */
   accuracy: number | null;
   /** Survey deadline the partners are (or would be) given, YYYY-MM-DD. */
@@ -171,8 +175,18 @@ export function evaluateEsrReadiness(input: EsrReadinessInput): EsrReadinessRepo
         },
   );
 
-  // 5 — partner verdicts. The self-test file must never be mistaken for them.
-  if (input.responsesAreSelfTest) {
+  // 5 — partner verdicts. The self-test file must never be mistaken for them, a refused file is not
+  // an ingest, and a verdict count is not coverage: five rows about two samples leave eighteen
+  // labels provisional while reading as "verdicts ingested".
+  if (input.responseProblem) {
+    checks.push({
+      id: 'responses',
+      label: 'Partner verdicts ingested',
+      severity: 'blocked',
+      detail: `the response file was refused, nothing was folded in — ${input.responseProblem}`,
+      fix: 'Run pnpm beta:esr-calibration --responses=<file> to see every problem, fix the file, and re-run. Nothing was folded in.',
+    });
+  } else if (input.responsesAreSelfTest) {
     checks.push({
       id: 'responses',
       label: 'Partner verdicts ingested',
@@ -188,8 +202,19 @@ export function evaluateEsrReadiness(input: EsrReadinessInput): EsrReadinessRepo
       detail: 'no verdicts ingested — labels are still provisional',
       fix: 'cat <out>/survey/*.responses.csv > /secure/path/responses.csv && pnpm beta:esr-calibration --responses=/secure/path/responses.csv --apply',
     });
+  } else if (input.samplesWithVerdicts < input.sampleCount) {
+    const uncovered = input.sampleCount - input.samplesWithVerdicts;
+    checks.push({
+      id: 'responses',
+      label: 'Partner verdicts ingested',
+      severity: 'blocked',
+      detail: `${input.responseCount} verdicts, but only ${input.samplesWithVerdicts}/${input.sampleCount} samples carry a confirmed majority — ${uncovered} label(s) are still provisional, so the accuracy below is not measured against partner ground truth`,
+      fix: 'Chase the partners who have not returned a worksheet, and check for ties: a sample split evenly confirms nothing and needs a third opinion.',
+    });
   } else {
-    checks.push(ok('responses', 'Partner verdicts ingested', `${input.responseCount} verdicts`));
+    checks.push(
+      ok('responses', 'Partner verdicts ingested', `${input.responseCount} verdicts, ${input.samplesWithVerdicts}/${input.sampleCount} samples confirmed`),
+    );
   }
 
   // 6 — labels the criterion may be closed on.

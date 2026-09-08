@@ -324,6 +324,87 @@ export function parseSurveyResponses(csv: string): SurveyResponse[] {
     });
 }
 
+/**
+ * What a response file that cannot be folded in looks like.
+ *
+ * Ingest used to be the quiet step: `applyResponses` looked each verdict up in the sample set with
+ * `.find`, and anything that did not match — a transcribed `S1` where the sheet says `S01`, a row
+ * from someone who was never on the roster — simply never became a label. The run still printed
+ * "5 verdicts" and the readiness gate still turned `responses` green, so a criterion could close on
+ * ground truth that was silently thinner than the count suggested. A verdict is either understood
+ * or it is a problem the operator has to fix; it is never quietly dropped.
+ */
+export interface ResponseReconciliation {
+  /** Rows naming a known sample and a known partner, with identical repeats collapsed. */
+  accepted: SurveyResponse[];
+  /** Why the file cannot be folded in. Empty means it can. */
+  problems: string[];
+  /** Identical repeats that were collapsed — unambiguous, so a note rather than a problem. */
+  collapsed: number;
+}
+
+/**
+ * Check a response file against the sample set and the roster before any label moves.
+ *
+ * `partnerSlugs` empty means the roster was not available; partner identity then goes unchecked
+ * rather than rejecting every row.
+ */
+export function reconcileResponses(
+  responses: SurveyResponse[],
+  known: { sampleIds: Iterable<string>; partnerSlugs: Iterable<string> },
+): ResponseReconciliation {
+  const sampleIds = new Set(known.sampleIds);
+  const partnerSlugs = new Set(known.partnerSlugs);
+  const problems: string[] = [];
+
+  const unknownSamples = [...new Set(responses.filter((r) => !sampleIds.has(r.sampleId)).map((r) => r.sampleId))];
+  if (unknownSamples.length > 0) {
+    problems.push(
+      `${unknownSamples.length} verdict(s) name a sampleId that is not in the sample set: ${unknownSamples.join(', ')} — ` +
+        'fix the transcription; a verdict that matches nothing is lost ground truth, not a blank row',
+    );
+  }
+  if (partnerSlugs.size > 0) {
+    const strangers = [...new Set(responses.filter((r) => !partnerSlugs.has(r.partnerSlug)).map((r) => r.partnerSlug))];
+    if (strangers.length > 0) {
+      problems.push(
+        `${strangers.length} verdict(s) come from a partnerSlug that is not on the roster: ${strangers.join(', ')} — ` +
+          'either the slug is mistyped or the answers are not from a design partner',
+      );
+    }
+  }
+
+  // One partner, one sample, one verdict. The same answer twice is a re-sent sheet and collapses;
+  // two different answers cannot be resolved here — which one supersedes the other is the
+  // operator's knowledge, and guessing "the last row wins" would move a majority on a coin flip.
+  const seen = new Map<string, SurveyResponse>();
+  const accepted: SurveyResponse[] = [];
+  let collapsed = 0;
+  for (const response of responses) {
+    const key = `${response.partnerSlug}\u0000${response.sampleId}`;
+    const prior = seen.get(key);
+    if (!prior) {
+      seen.set(key, response);
+      accepted.push(response);
+      continue;
+    }
+    if (prior.agrees === response.agrees && prior.verdict === response.verdict) {
+      collapsed++;
+      continue;
+    }
+    problems.push(
+      `${response.partnerSlug} answered ${response.sampleId} twice with different verdicts ` +
+        `(${describeVerdict(prior)} then ${describeVerdict(response)}) — remove the superseded row`,
+    );
+  }
+
+  return { accepted: problems.length > 0 ? [] : accepted, problems, collapsed };
+}
+
+function describeVerdict(response: SurveyResponse): string {
+  return response.agrees ? 'agrees' : `disagrees/${response.verdict}`;
+}
+
 export interface VerdictRollup {
   sampleId: string;
   /** Verdicts that name a decision, i.e. the partner's own call. */

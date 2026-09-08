@@ -34,6 +34,7 @@ import {
   assignSamplesToPartners,
   coveragePerSample,
   parseSurveyResponses,
+  reconcileResponses,
   rollUpVerdicts,
   buildResponseTemplateCsv,
 } from '../src/lib/beta/esr-survey';
@@ -345,6 +346,8 @@ describe('E11.3 readiness gate', () => {
     },
     responseCount: 24,
     responsesAreSelfTest: false,
+    responseProblem: null,
+    samplesWithVerdicts: 20,
     accuracy: 0.9,
     deadline: '2026-09-24',
     windowDays: 14,
@@ -540,6 +543,8 @@ describe('E11.3 gate does not overclaim what it can see', () => {
     sendReceipt: null,
     responseCount: 0,
     responsesAreSelfTest: false,
+    responseProblem: null,
+    samplesWithVerdicts: 0,
     accuracy: 0.8,
     deadline: '2026-09-21',
     windowDays: 14,
@@ -567,5 +572,112 @@ describe('E11.3 gate does not overclaim what it can see', () => {
       .checks.find((c) => c.id === 'deadline')!;
     expect(check.detail).toMatch(/22 day\(s\) away/);
     expect(check.detail).not.toMatch(/can no longer give/);
+  });
+});
+
+// A verdict that the ingest step cannot understand used to disappear: `applyResponses` looked the
+// sampleId up with `.find`, so a transcribed `S1` matched nothing, moved no label, and still
+// counted toward the "verdicts ingested" the readiness gate turns green on. Measured against the
+// real script, five nonsense rows dropped the blocker count from 4 to 3.
+describe('E11.3 response ingest refuses what it cannot understand', () => {
+  const KNOWN = { sampleIds: ['S01', 'S02', 'S03'], partnerSlugs: ['p1', 'p2'] };
+  const rows = (...lines: string[]) =>
+    parseSurveyResponses(['partnerSlug,sampleId,agrees,verdict,comment', ...lines].join('\n'));
+
+  test('a verdict naming an unknown sample is a problem, not a silent drop', () => {
+    const result = reconcileResponses(rows('p1,S1,false,GO,typo for S01'), KNOWN);
+    expect(result.problems.join(' ')).toMatch(/not in the sample set: S1/);
+    expect(result.accepted).toHaveLength(0);
+  });
+
+  test('a verdict from someone not on the roster is a problem', () => {
+    const result = reconcileResponses(rows('stranger,S01,true,,'), KNOWN);
+    expect(result.problems.join(' ')).toMatch(/not on the roster: stranger/);
+  });
+
+  test('partner identity goes unchecked when the roster is not available', () => {
+    const result = reconcileResponses(rows('stranger,S01,true,,'), { ...KNOWN, partnerSlugs: [] });
+    expect(result.problems).toEqual([]);
+    expect(result.accepted).toHaveLength(1);
+  });
+
+  test('the same partner answering one sample two different ways is refused, not guessed', () => {
+    const result = reconcileResponses(rows('p1,S03,false,GO,first sheet', 'p1,S03,false,NO_GO,corrected'), KNOWN);
+    expect(result.problems.join(' ')).toMatch(/p1 answered S03 twice with different verdicts/);
+    expect(result.accepted).toHaveLength(0);
+  });
+
+  // A re-sent worksheet is unambiguous — but counted twice it doubles that partner's weight and
+  // can carry a majority on its own.
+  test('an identical repeat collapses to one vote instead of voting twice', () => {
+    const result = reconcileResponses(rows('p1,S01,false,GO,', 'p1,S01,false,GO,', 'p2,S01,true,,'), KNOWN);
+    expect(result.problems).toEqual([]);
+    expect(result.collapsed).toBe(1);
+    expect(result.accepted).toHaveLength(2);
+    expect(rollUpVerdicts(result.accepted, new Map([['S01', 'NO_GO']]))[0]!.majority).toBeNull();
+  });
+
+  test('a clean file passes through untouched', () => {
+    const result = reconcileResponses(rows('p1,S01,true,,', 'p2,S02,false,GO,'), KNOWN);
+    expect(result.problems).toEqual([]);
+    expect(result.accepted).toHaveLength(2);
+    expect(result.collapsed).toBe(0);
+  });
+});
+
+// "N verdicts ingested" is a count, not coverage: it went green on five rows about two samples
+// while eighteen labels stayed provisional and the accuracy line below it was measured on them.
+describe('E11.3 gate does not mistake a verdict count for coverage', () => {
+  const INGESTED: EsrReadinessInput = {
+    sampleCount: 20,
+    isFixture: false,
+    dbRows: { opportunities: 20, proposals: 20, gateDecisions: 20, cordisProjects: 20 },
+    rosterSize: 10,
+    undeliverable: 0,
+    sendReceipt: {
+      sentAt: '2026-09-10T09:00:00.000Z',
+      deadline: '2026-09-24',
+      ruleVersion: 'g0-canonical-1.0',
+      rosterPath: '(external)',
+      recipients: [
+        { slug: 'p1', emailMasked: 'p*@partner.example', messageId: 'abc', items: 4, sentAt: '2026-09-10T09:00:00.000Z' },
+      ],
+    },
+    responseCount: 5,
+    responsesAreSelfTest: false,
+    responseProblem: null,
+    samplesWithVerdicts: 2,
+    accuracy: 0.9,
+    deadline: '2026-09-24',
+    windowDays: 14,
+    today: '2026-09-12',
+  };
+
+  test('verdicts covering part of the sample set keep the check blocked', () => {
+    const report = evaluateEsrReadiness(INGESTED);
+    const check = report.checks.find((c) => c.id === 'responses')!;
+    expect(check.severity).toBe('blocked');
+    expect(check.detail).toMatch(/only 2\/20 samples carry a confirmed majority/);
+    expect(check.detail).toMatch(/18 label\(s\) are still provisional/);
+    expect(report.blocked).toBe(true);
+  });
+
+  test('full coverage passes and says so', () => {
+    const check = evaluateEsrReadiness({ ...INGESTED, samplesWithVerdicts: 20, responseCount: 40 })
+      .checks.find((c) => c.id === 'responses')!;
+    expect(check.severity).toBe('ok');
+    expect(check.detail).toMatch(/20\/20 samples confirmed/);
+  });
+
+  test('a refused response file is reported as refused, never as an ingest', () => {
+    const check = evaluateEsrReadiness({
+      ...INGESTED,
+      responseCount: 0,
+      samplesWithVerdicts: 0,
+      responseProblem: '--responses refused: 1 verdict(s) name a sampleId that is not in the sample set: S1',
+    }).checks.find((c) => c.id === 'responses')!;
+    expect(check.severity).toBe('blocked');
+    expect(check.detail).toMatch(/refused/);
+    expect(check.detail).toMatch(/not in the sample set: S1/);
   });
 });

@@ -93,6 +93,7 @@ import {
   buildResponseTemplateCsv,
   coveragePerSample,
   parseSurveyResponses,
+  reconcileResponses,
   renderEsrSurveyEmail,
   rollUpVerdicts,
   surveyUrlFor,
@@ -210,31 +211,83 @@ function scoreAll(samples: EsrSample[], rules: G0Rules): ScoredSample[] {
  */
 const SELF_TEST_MARKER = 'HARNESS SELF-TEST';
 
+/** A response file the ingest step will not fold in, and every reason why. */
+class ResponseFileRefused extends Error {
+  constructor(
+    readonly file: string,
+    readonly problems: string[],
+  ) {
+    super(
+      `--responses refused: ${file} cannot be folded in as it stands.\n` +
+        problems.map((problem) => `   • ${problem}`).join('\n'),
+    );
+    this.name = 'ResponseFileRefused';
+  }
+}
+
+/** Repo-relative where that reads well, absolute where the file lives outside the repo. */
+function displayPath(target: string): string {
+  const relative = path.relative(REPO_ROOT, target);
+  return relative.startsWith('..') ? target : relative;
+}
+
 interface RelabelResult {
   effective: EsrSample[];
   responses: SurveyResponse[];
   relabelled: string[];
+  /** Samples a partner majority actually confirms — a tie confirms nothing. */
+  confirmed: string[];
   isSelfTest: boolean;
 }
 
-/** Fold partner verdicts into the sample labels. Pure apart from reading the responses file. */
-function applyResponses(samples: EsrSample[], responsesPath: string | null): RelabelResult {
-  if (!responsesPath) return { effective: samples, responses: [], relabelled: [], isSelfTest: false };
+/**
+ * Fold partner verdicts into the sample labels. Pure apart from reading the responses file.
+ *
+ * Throws when the file cannot be understood row for row. Skipping the odd bad row would be
+ * friendlier, and that is exactly what the old `.find` did by accident: a mistyped sampleId matched
+ * nothing, changed no label, and still counted toward "N verdicts ingested". A partly-understood
+ * file measures the acceptance criterion against labels nobody confirmed, so the file is either
+ * clean or it is refused.
+ */
+function applyResponses(
+  samples: EsrSample[],
+  responsesPath: string | null,
+  partnerSlugs: string[],
+): RelabelResult {
+  if (!responsesPath)
+    return { effective: samples, responses: [], relabelled: [], confirmed: [], isSelfTest: false };
 
   const raw = fs.readFileSync(responsesPath, 'utf8');
-  const responses = parseSurveyResponses(raw);
+  const reconciled = reconcileResponses(parseSurveyResponses(raw), {
+    sampleIds: samples.map((s) => s.sampleId),
+    partnerSlugs,
+  });
+  if (reconciled.problems.length > 0) {
+    throw new ResponseFileRefused(displayPath(responsesPath), reconciled.problems);
+  }
+  if (reconciled.collapsed > 0) {
+    log('responses', `${reconciled.collapsed} identical repeat row(s) collapsed — a re-sent sheet does not vote twice`);
+  }
+
+  const responses = reconciled.accepted;
   const relabelled: string[] = [];
+  const confirmed: string[] = [];
   const provisional = scoreAll(samples, DEFAULT_G0_RULES);
   const predicted = new Map(provisional.map((s) => [s.sample.sampleId, s.predicted]));
   const rollups = rollUpVerdicts(responses, predicted);
   const effective = samples.map((sample) => {
     const rollup = rollups.find((r) => r.sampleId === sample.sampleId);
-    if (!rollup?.majority || rollup.majority === sample.expertLabel) return sample;
+    if (!rollup?.majority) return sample;
+    confirmed.push(sample.sampleId);
+    if (rollup.majority === sample.expertLabel) return sample;
     relabelled.push(`${sample.sampleId} ${sample.expertLabel}→${rollup.majority}`);
     return { ...sample, expertLabel: rollup.majority, labelSource: 'beta-survey' as const };
   });
-  log('responses', `${responses.length} verdicts, ${relabelled.length} label(s) changed`);
-  return { effective, responses, relabelled, isSelfTest: raw.includes(SELF_TEST_MARKER) };
+  log(
+    'responses',
+    `${responses.length} verdicts, ${confirmed.length}/${samples.length} sample(s) confirmed, ${relabelled.length} label(s) changed`,
+  );
+  return { effective, responses, relabelled, confirmed, isSelfTest: raw.includes(SELF_TEST_MARKER) };
 }
 
 function toPredictions(scored: ScoredSample[]): LabelledPrediction[] {
@@ -728,13 +781,32 @@ function readSendReceipt(opts: Options): SurveySendReceipt | null {
 async function runPreflight(opts: Options): Promise<boolean> {
   const samples = parseEsrSamples(fs.readFileSync(opts.samples, 'utf8'));
   const isFixture = isFixtureSampleSet(samples);
-  const { effective, responses, isSelfTest } = applyResponses(samples, opts.responses);
-  const scored = scoreAll(effective, DEFAULT_G0_RULES);
-  const accuracy = metrics(toPredictions(scored)).accuracy;
 
+  // Read before ingest: a verdict is only checkable against the roster it was supposed to come from.
   const partners: BetaPartner[] = fs.existsSync(opts.roster)
     ? parseBetaRoster(fs.readFileSync(opts.roster, 'utf8'))
     : [];
+
+  // A refused response file must not crash the read-only gate — it is one more thing the gate is
+  // here to report, so it lands in the `responses` check with the reason attached.
+  let relabel: RelabelResult;
+  let responseProblem: string | null = null;
+  try {
+    relabel = applyResponses(samples, opts.responses, partners.map((p) => p.slug));
+  } catch (err) {
+    // The gate reports the reasons, not the wrapper sentence: "the file was refused" without the
+    // why is the same dead end the silent drop was.
+    responseProblem =
+      err instanceof ResponseFileRefused
+        ? err.problems.join(' · ')
+        : err instanceof Error
+          ? err.message
+          : String(err);
+    relabel = { effective: samples, responses: [], relabelled: [], confirmed: [], isSelfTest: false };
+  }
+  const { effective, responses, confirmed, isSelfTest } = relabel;
+  const scored = scoreAll(effective, DEFAULT_G0_RULES);
+  const accuracy = metrics(toPredictions(scored)).accuracy;
 
   // An unreachable database must read as "cannot verify", never as a pass.
   let dbRows: CalibrationRowCounts | null = null;
@@ -754,6 +826,8 @@ async function runPreflight(opts: Options): Promise<boolean> {
     windowDays: ESR_SURVEY_WINDOW_DAYS,
     responseCount: responses.length,
     responsesAreSelfTest: isSelfTest,
+    responseProblem,
+    samplesWithVerdicts: confirmed.length,
     accuracy: accuracy ?? null,
     deadline: opts.deadline,
     today: new Date().toISOString().slice(0, 10),
@@ -803,8 +877,17 @@ async function main(): Promise<number> {
   const isFixture = isFixtureSampleSet(samples);
   log('samples', `${samples.length} parsed${isFixture ? ' — CURATED FIXTURE (SAMPLE-* ids)' : ''}`);
 
+  // Read before ingest: a verdict is only checkable against the roster it was supposed to come from.
+  const partners: BetaPartner[] = fs.existsSync(opts.roster)
+    ? parseBetaRoster(fs.readFileSync(opts.roster, 'utf8'))
+    : [];
+
   // Partner verdicts, when present, replace the provisional labels before anything is measured.
-  const { effective, responses, relabelled } = applyResponses(samples, opts.responses);
+  const { effective, responses, relabelled } = applyResponses(
+    samples,
+    opts.responses,
+    partners.map((p) => p.slug),
+  );
 
   const scoredDefault = scoreAll(effective, DEFAULT_G0_RULES);
   const scoredLiteral = scoreAll(effective, SPEC_LITERAL_G0_RULES);
@@ -824,9 +907,6 @@ async function main(): Promise<number> {
 
   // Survey — rendered whether or not the database is written, so the programme manager can review
   // the worksheets before anything is sent.
-  const partners: BetaPartner[] = fs.existsSync(opts.roster)
-    ? parseBetaRoster(fs.readFileSync(opts.roster, 'utf8'))
-    : [];
   const assignments = assignSamplesToPartners(effective, partners, opts.perPartner).map((assignment) => ({
     ...assignment,
     items: assignment.items.map((item) => {
