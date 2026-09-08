@@ -170,6 +170,40 @@ $ git stash pop                          # geri alındı
 Veritabanına yazma **yok**, e-posta gönderimi **yok**, sır/PII repoya girmedi. `/settings/gates`
 sayfasına **dokunulmadı** (başka kartın kapsamı).
 
+## 3.1 Commit yarışı (kayıt için)
+
+Bu geçişin işi **iki kez** paylaşılan git index'ine kurban gitti, sonunda temiz commit'lendi:
+
+1. `git add <5 dosyam>` ile `git commit -- <yollar>` arasındaki saniyelerde başka bir ajan
+   pathspec'siz commit aldı; benim 5 dosyam onun `a66cb1cd feat(billing): …` commit'ine girdi ve
+   benim çağrım `no changes added to commit` dedi.
+2. Kısa süre sonra `dev` **geriye sarıldı**: `a66cb1cd` tarihçeden tamamen kayboldu
+   (`git log` artık `90c74fd ← 1e3c39c ← a030d15 ← 9bfdd16`). İçindeki işim commit'siz kaldı —
+   ama **çalışma ağacında duruyordu**, kaybolmadı.
+3. Takım hafızasındaki ([[fabrika-commit-with-a-throwaway-index]]) yöntemle, paylaşılan index'e hiç
+   dokunmadan kendi commit'imi aldım:
+
+```
+--- staged scope (must be ONLY my 5 files):
+ docs/CORDIS-SAMPLE-CALIBRATION.md                  |   6 +-
+ .../TASK-MTQ2KL3JO4MK2-blok-zincir-dev-3.md        | 222 +++++++++++++++++++++
+ scripts/esr-calibration.ts                         |  15 +-
+ src/lib/beta/esr-readiness.ts                      |  24 ++-
+ tests/esr-calibration.test.ts                      |  33 +++
+ 5 files changed, 292 insertions(+), 8 deletions(-)
+--- branch advanced to 2dcbb9fa6d6fc2e1c24c735dde12d9825da2d8aa
+--- my paths after index realign (must be empty):
+--- log:
+2dcbb9f fix(e11): stop the readiness gate pointing at a decision that closed two days ago
+7b628a2 feat(billing): issue an Invoice row when a payment succeeds
+```
+
+**Bu geçişin commit'i: `2dcbb9f`** (5 dosya, yalnız benimkiler). Diğer ajanın işi de `7b628a2`
+olarak yeniden indi — kimsenin işi kaybolmadı. `git reset -q -- <kendi yollarım>` adımı atlanmadı,
+yani paylaşılan index bayat blob taşımıyor (bir sonraki ajanın commit'i işimi geri **almaz**).
+
+---
+
 ## 4. Geri alma
 
 ```bash

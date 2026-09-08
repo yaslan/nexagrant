@@ -34,3 +34,31 @@ girdiyi dosya adından değil içeriğindeki işaretten tanı ve yine de blokede
 **İlgili:** [[fabrika-e11-3-survey-was-never-sent]], [[fabrika-board-cards-go-stale]],
 [[fabrika-generated-report-can-tick-its-own-criterion-green]],
 [[fabrika-prove-the-fix-against-the-real-database]]
+
+## Kapının KENDİ tavsiye metni de eskir — ve eskimiş tavsiye, tavsiyesizden KÖTÜDÜR (2026-09-08, E11.3 3. geçiş)
+
+Kapıyı kurmak yetmiyor. Her kırmızı satırın `fix` metni bir **iddia**dır ve raf ömrü vardır.
+E11.3'te `accuracy` blokesinin tavsiyesi "önce açık karar #8'i (rule A vs rule B) kapat" diyordu;
+karar **iki gün önce** patron onayıyla kapanmıştı (`4bee05bb`, 2026-09-06). İki zarar birden:
+
+1. operatörü yapılmış bir işe yolluyordu;
+2. daha kötüsü, **rule B'nin %90'ını bir çıkış yolu gibi** gösteriyordu. B kapıda kullanılmayan
+   kural setidir; o %90 kabul kriteri değildir. Yani kapı, kriteri **yanlış yoldan kapatmayı**
+   öneriyordu — kapının var oluş sebebinin tam tersi.
+
+Aynı eskime üretilmiş raporda da vardı: `docs/CORDIS-SAMPLE-CALIBRATION.md` paragrafı kararın
+kapandığı **gün** yazılmış (`72b2133`) ve hiç tazelenmemişti.
+
+**Kurallar:**
+- `fix` metni bir karara / karta / dokümana atıfta bulunuyorsa, o atfı **her geçişte doğrula**:
+  `git log -S"<karar cümlesi>" -- docs/ROADMAP.md` kararın kapanıp kapanmadığını saniyede söyler.
+- Metni **testle çivile**, sadece yazma: "tavsiye şu ifadeyi İÇERMELİ" + "şu eski ifadeyi
+  İÇERMEMELİ". Yeni testin eski kodda gerçekten kırmızı olduğunu göster.
+- Kapanmış bir kararı silme, **kapandı olarak kaydet** ve hâlâ doğru olan artığı ayrı yaz —
+  E11.3'te artık `/settings/gates` etiketiydi (`page.tsx:35`, `minG0Score` hâlâ "Minimum AI
+  Alignment Score" diyor): bu bir **karar değil, etiket hatası** ve sahibi başka bir kart.
+- Birden çok bloke varsa **zincir mi bağımsız mı** olduğunu söyle. E11.3'ün 4 kırmızısı 4 sahip
+  gerektiren 4 sorun sanılıyordu; hepsi tek insan aksiyonunun (roster) arkasındaydı. Özet satırı
+  artık zincirin başını adıyla yazıyor.
+
+**İlgili:** [[fabrika-board-cards-go-stale]], [[fabrika-deferred-to-another-card-is-not-fixed]]
