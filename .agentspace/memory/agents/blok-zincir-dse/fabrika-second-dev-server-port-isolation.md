@@ -1,6 +1,6 @@
 ---
 name: fabrika-second-dev-server-port-isolation
-description: Başka worker 3000'i tutuyorsa ikinci dev sunucusu aynı dizinde açılmaz — repo'nun rsync kopyası + cp -Rc ile klonlanmış node_modules tek çalışan yol (symlink Turbopack'te reddediliyor)
+description: Başka worker 3000'i tutuyorsa ikinci dev sunucusu aynı dizinde açılmaz — EN UCUZ yol `git worktree` + o ağaçta gerçek `pnpm install`; rsync + cp -Rc yedek yol, node_modules symlink'i Turbopack'te reddediliyor
 metadata:
   type: reference
   updatedAt: 2026-09-08
@@ -18,6 +18,21 @@ Paralel ajan koşumunda "kendi portunda koştur" talimatı tek başına yetmiyor
 Kilit `<distDir>/dev/lock` (Next 16, `node_modules/next/dist/build/lockfile.js`); `distDir`
 yalnız `next.config.ts`'ten okunuyor, ortam değişkeniyle geçilemiyor — ve o dosya çoğu görevde
 "senin dosyan" değil.
+
+
+**EN UCUZ YOL (2026-09-08'de ölçüldü, ~40 sn) — `git worktree`:**
+```bash
+WT=<scratchpad>/wt
+git worktree add --detach "$WT" <ölçmek-istediğin-commit>
+cp /path/to/repo/.env "$WT/.env"          # worktree izlenmeyen dosyaları taşımaz
+cd "$WT" && pnpm install --frozen-lockfile   # ~10 sn, global store'dan hardlink
+npx next dev --webpack --port 3130
+```
+rsync + `cp -Rc`'ye göre avantajı: 3.1 GB kopya yok, ve kilit dosyasına sadık
+kurulum **beyan edilmemiş bağımlılığı da yakalar** —
+bkz. [[fabrika-phantom-dep-hides-in-shared-node-modules]].
+Worktree'yi ölçtüğün commit'e sabitle; ana dal altından kayabiliyor.
+Bitince `git worktree remove --force "$WT"`.
 
 **Denenip ELENEN yollar** (Turbopack proje kökünün dışına çıkan symlink'i reddediyor):
 - Üst düzey girdileri symlink'leyen "symlink farm" → `Symlink [project]/src/app/package.json is
@@ -40,4 +55,4 @@ koşarsan eski kodu ölçersin.
 Ayrıca: `pnpm test:e2e -- <spec>` dosya filtresini YUTUYOR, bütün süiti koşturur;
 filtre için `pnpm exec playwright test <spec>` kullan.
 
-İlgili: [[fabrika-module-gated-e2e-needs-own-tenant]]
+İlgili: [[fabrika-module-gated-e2e-needs-own-tenant]], [[fabrika-verification-script-gotchas]]

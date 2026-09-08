@@ -14,3 +14,8 @@
 - [e11-3-calibration-status](e11-3-calibration-status.md) — E11.3 ESR Calibration mevcut durumu (fixture yeniden üretildi, doğruluk ölçümleri tamamlandı, ortak anketi yanıtları bekleniyor)
 
 - [fabrika-i18n-locales-dead-pattern](fabrika-i18n-locales-dead-pattern.md) — src/locales/{locale}/{namespace}.json pattern is dead code — next-intl reads only messages/{locale}.json; spot & delete these files if you see them
+
+- [fabrika-module-gated-e2e-needs-own-tenant](fabrika-module-gated-e2e-needs-own-tenant.md) — Modül kapılı ekranın e2e'si demo-tenant'ı ödünç alamaz — M9 gibi modüller hem plana hem ModuleState'e bağlı ve demo-tenant'ın planı koşum sırasında değişiyor; kendi kiracını kur
+
+- [fabrika-e2e-red-check-module-lock-first](fabrika-e2e-red-check-module-lock-first.md) — "element not found" ile düşen Fabrika e2e'sinde ÖNCE error-context.md'deki main bloğuna bak — modül kilidi ekranıysa kusur test edilen özellikte değil, fikstürün planı/ModuleState'i eksik
+- [fabrika-second-dev-server-port-isolation](fabrika-second-dev-server-port-isolation.md) — Başka worker 3000'i tutuyorsa ikinci dev sunucusu aynı dizinde açılmaz — repo'nun rsync kopyası + cp -Rc ile klonlanmış node_modules tek çalışan yol (symlink Turbopack'te reddediliyor)
