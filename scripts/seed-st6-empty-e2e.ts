@@ -25,8 +25,21 @@
  */
 import 'dotenv/config';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 import { prisma } from '../src/lib/db';
+import { Prisma } from '@prisma/client';
+import type {
+  CordisCoParticipation,
+  CordisImportRun,
+  CordisOrganization,
+  CordisParticipation,
+  CordisPartnerProfile,
+  CordisProject,
+  CordisProjectSciVoc,
+  CordisProjectTopic,
+} from '@prisma/client';
 
 export const ST6 = {
   bare: {
@@ -56,6 +69,152 @@ export const ST6 = {
 } as const;
 
 const MODULES = ['M5', 'M11'] as const;
+
+interface CordisBackup {
+  cordisCoParticipations: CordisCoParticipation[];
+  cordisPartnerProfiles: CordisPartnerProfile[];
+  cordisParticipations: CordisParticipation[];
+  cordisProjectTopics: CordisProjectTopic[];
+  cordisProjectSciVocs: CordisProjectSciVoc[];
+  cordisOrganizations: CordisOrganization[];
+  cordisProjects: CordisProject[];
+  cordisImportRuns: CordisImportRun[];
+}
+
+function toJsonInput(val: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  if (val === null || val === undefined) {
+    return Prisma.JsonNull;
+  }
+  return val as Prisma.InputJsonValue;
+}
+
+let cordisBackupInMemory: CordisBackup | null = null;
+const BACKUP_FILE = path.join(__dirname, '.st6-cordis-backup.json');
+
+async function backupAndClearCordis() {
+  const cordisCoParticipations = await prisma.cordisCoParticipation.findMany();
+  const cordisPartnerProfiles = await prisma.cordisPartnerProfile.findMany();
+  const cordisParticipations = await prisma.cordisParticipation.findMany();
+  const cordisProjectTopics = await prisma.cordisProjectTopic.findMany();
+  const cordisProjectSciVocs = await prisma.cordisProjectSciVoc.findMany();
+  const cordisOrganizations = await prisma.cordisOrganization.findMany();
+  const cordisProjects = await prisma.cordisProject.findMany();
+  const cordisImportRuns = await prisma.cordisImportRun.findMany();
+
+  const backupData: CordisBackup = {
+    cordisCoParticipations,
+    cordisPartnerProfiles,
+    cordisParticipations,
+    cordisProjectTopics,
+    cordisProjectSciVocs,
+    cordisOrganizations,
+    cordisProjects,
+    cordisImportRuns,
+  };
+
+  cordisBackupInMemory = backupData;
+  fs.writeFileSync(
+    BACKUP_FILE,
+    JSON.stringify(backupData, (_key, value) =>
+      typeof value === 'bigint' ? { __bigint: value.toString() } : value
+    )
+  );
+
+  await prisma.cordisCoParticipation.deleteMany();
+  await prisma.cordisPartnerProfile.deleteMany();
+  await prisma.cordisParticipation.deleteMany();
+  await prisma.cordisProjectTopic.deleteMany();
+  await prisma.cordisProjectSciVoc.deleteMany();
+  await prisma.cordisOrganization.deleteMany();
+  await prisma.cordisProject.deleteMany();
+  await prisma.cordisImportRun.deleteMany();
+}
+
+async function restoreCordis() {
+  await prisma.cordisCoParticipation.deleteMany();
+  await prisma.cordisPartnerProfile.deleteMany();
+  await prisma.cordisParticipation.deleteMany();
+  await prisma.cordisProjectTopic.deleteMany();
+  await prisma.cordisProjectSciVoc.deleteMany();
+  await prisma.cordisOrganization.deleteMany();
+  await prisma.cordisProject.deleteMany();
+  await prisma.cordisImportRun.deleteMany();
+
+  let data = cordisBackupInMemory;
+  if (!data && fs.existsSync(BACKUP_FILE)) {
+    const raw = fs.readFileSync(BACKUP_FILE, 'utf-8');
+    data = JSON.parse(raw, (_key, value) => {
+      if (value && typeof value === 'object' && '__bigint' in value) {
+        return BigInt(value.__bigint as string);
+      }
+      return value;
+    }) as CordisBackup;
+  }
+
+  if (data) {
+    if (data.cordisProjects.length > 0) {
+      await prisma.cordisProject.createMany({
+        data: data.cordisProjects.map((p) => ({
+          ...p,
+          rawJson: toJsonInput(p.rawJson),
+          startDate: p.startDate ? new Date(p.startDate) : null,
+          endDate: p.endDate ? new Date(p.endDate) : null,
+          ecSignatureDate: p.ecSignatureDate ? new Date(p.ecSignatureDate) : null,
+          contentUpdateDate: p.contentUpdateDate ? new Date(p.contentUpdateDate) : null,
+          importedAt: p.importedAt ? new Date(p.importedAt) : new Date(),
+        })),
+      });
+    }
+    if (data.cordisOrganizations.length > 0) {
+      await prisma.cordisOrganization.createMany({
+        data: data.cordisOrganizations.map((o) => ({
+          ...o,
+          rawJson: toJsonInput(o.rawJson),
+          updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date(),
+        })),
+      });
+    }
+    if (data.cordisImportRuns.length > 0) {
+      await prisma.cordisImportRun.createMany({
+        data: data.cordisImportRuns.map((r) => ({
+          ...r,
+          rowCounts: toJsonInput(r.rowCounts),
+          startedAt: r.startedAt ? new Date(r.startedAt) : new Date(),
+          finishedAt: r.finishedAt ? new Date(r.finishedAt) : null,
+        })),
+      });
+    }
+    if (data.cordisProjectTopics.length > 0) {
+      await prisma.cordisProjectTopic.createMany({ data: data.cordisProjectTopics });
+    }
+    if (data.cordisProjectSciVocs.length > 0) {
+      await prisma.cordisProjectSciVoc.createMany({ data: data.cordisProjectSciVocs });
+    }
+    if (data.cordisParticipations.length > 0) {
+      await prisma.cordisParticipation.createMany({ data: data.cordisParticipations });
+    }
+    if (data.cordisPartnerProfiles.length > 0) {
+      await prisma.cordisPartnerProfile.createMany({
+        data: data.cordisPartnerProfiles.map((p) => ({
+          ...p,
+          topTopics: toJsonInput(p.topTopics),
+          topCountries: toJsonInput(p.topCountries),
+          topPartners: toJsonInput(p.topPartners),
+          lastProjectDate: p.lastProjectDate ? new Date(p.lastProjectDate) : null,
+          updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date(),
+        })),
+      });
+    }
+    if (data.cordisCoParticipations.length > 0) {
+      await prisma.cordisCoParticipation.createMany({ data: data.cordisCoParticipations });
+    }
+
+    if (fs.existsSync(BACKUP_FILE)) {
+      fs.unlinkSync(BACKUP_FILE);
+    }
+    cordisBackupInMemory = null;
+  }
+}
 
 async function seatTenant(t: {
   tenantId: string;
@@ -109,6 +268,7 @@ async function seatTenant(t: {
 }
 
 export async function seed() {
+  await backupAndClearCordis();
   await seatTenant(ST6.bare);
 
   await prisma.apiKey.upsert({
@@ -163,6 +323,7 @@ export async function rollback() {
     await prisma.workspace.deleteMany({ where: { id: t.workspaceId } });
     await prisma.tenant.deleteMany({ where: { id: t.tenantId } });
   }
+  await restoreCordis();
   console.log('[seed-st6-empty-e2e] rolled back');
 }
 
@@ -175,3 +336,4 @@ if (isMain) {
       process.exit(1);
     });
 }
+
