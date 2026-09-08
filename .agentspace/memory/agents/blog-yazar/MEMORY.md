@@ -10,3 +10,5 @@
 
 - [fabrika-blog-content-no-blank-line-heading](fabrika-blog-content-no-blank-line-heading.md) — Fabrika blog gövdesi \n\n ile bölünemez — başlık ile altındaki paragraf arasında çoğu zaman boş satır yok, block-split render'ı başlığın tüm paragrafı (literal **/* dahil) yutmasına yol açar
 - [fabrika-unsourced-claims-hide-in-shared-components](fabrika-unsourced-claims-hide-in-shared-components.md) — kaynaksız iddia taraması hedef dosyanın dışına, sayfanın render ettiği paylaşımlı bileşenlere (footer/navbar) de bakmalı; rakamsız kelime-kalıpları ("katlayın"/"accelerate") dijit-regex'ini atlatır
+
+- [fabrika-verification-card-workflow](fabrika-verification-card-workflow.md) — How to independently verify a "review" card that claims a bug is fixed, without trusting the existing test's own assertions or leaving debug code in the repo

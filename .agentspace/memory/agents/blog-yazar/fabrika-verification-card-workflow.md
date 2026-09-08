@@ -34,3 +34,15 @@ counts. Read each hit's line before concluding the card is still open.
 
 See [[fabrika-unsourced-claims-hide-in-shared-components]] for a related evidence-discipline
 lesson from the same sprint (S12).
+
+**When `tests/e2e/` is off-limits (another agent is actively working there — check the dispatch
+text for a çakışma uyarısı), skip step 2 entirely** and build your own disposable tenant/user/
+opportunity fixture with a name that can't collide with anyone else's (e.g.
+`<your-agent-name>-verify-tenant`), mirroring the pattern in `tests/e2e/fixtures/*.ts` (upsert
+tenant → subscription → moduleState → workspace → user → membership → domain row; real sign-in via
+`/tr/giris` with that seeded email). Put the setup/check/teardown scripts under `scripts/_<name>-
+verify-*.ts` (the `_` prefix matches this repo's existing convention for throwaway probes — several
+already exist untracked in `scripts/`), run them with `npx tsx`, then **delete all of them and the
+fixture's DB rows** before writing the result report (TASK-MTQUX5IZ9I5VP, 2026-09-08). This gives
+the same "real click + real Postgres row" evidence as editing an existing spec, without touching a
+file another agent has open.
