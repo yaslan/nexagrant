@@ -324,6 +324,45 @@ Kartın kuralı gereği yol üstünde görülen ama kapsam dışı kalan kusurla
 
 ---
 
+## 7. Commit notu (paylaşılan worktree kazası)
+
+Bu kartın tüm değişiklikleri `dev` üzerinde — ama **kendi commit'inde değil.** `git add` ile
+yalnız kendi dosyalarımı stage'ledikten sonra, aynı worktree'de paralel çalışan başka bir ajan
+`git commit` çalıştırdı ve stage'imi kendi commit'ine süpürdü:
+
+```
+$ git log --oneline -1
+aa4341f docs(memory): a cross-session send can report success and still never arrive
+
+$ git log --oneline --all -- src/lib/brand.ts
+aa4341f docs(memory): a cross-session send can report success and still never arrive
+```
+
+`aa4341f` bu kartın 25 dosyasının tamamını içeriyor (`src/lib/brand.ts`, iki katalog, 2 test
+dosyası, 16 bileşen/sayfa, kanıt belgeleri) — yani **içerik kaybı YOK**, mesaj yanıltıcı.
+İçerik bütünlüğü doğrulandı:
+
+```
+$ git show HEAD:src/lib/brand.ts | grep -n "PRODUCT_NAME ="
+17:export const PRODUCT_NAME = 'Fabrika';
+$ git show HEAD:messages/tr.json | grep -c "FonBridge"
+0
+$ git show HEAD:messages/en.json | grep -c "FonBridge"
+0
+$ git diff HEAD --stat -- src/lib/brand.ts messages tests/ src/lib/document-exporter.ts
+                                    ← boş: çalışma ağacı = commit
+```
+
+**Geçmişi DÜZELTMEDİM.** `dev` paylaşılan bir dalda ve başka ajanlar şu anda aynı worktree'ye
+commit atıyor; `reset`/`rebase` onların işini yok edebilirdi. Hazırladığım commit mesajı
+(gerekçeyi taşıyan uzun metin) bu raporun git geçmişindeki karşılığı olarak kayboldu —
+gerekçenin tamamı yukarıdaki 1–6. bölümlerde duruyor.
+
+**Takım için:** paylaşılan worktree'de `git add <yol>` + `git commit` atomik DEĞİL. İki ajan aynı
+anda commit ediyorsa stage birbirine karışır.
+
+---
+
 **DoD kontrolü**
 
 - [x] Kartın "40 dosya" rakamı doğrulandı/çürütüldü, gerçek sayı raporlandı (117/63 toplam; 52/32 canlı kod)
