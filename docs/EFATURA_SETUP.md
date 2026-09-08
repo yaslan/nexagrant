@@ -63,6 +63,16 @@ denenmez; eksik olan(lar) adıyla raporlanır (`not_configured`).
 - Bir belge ancak GİB'in döndürdüğü zarf numarası (`Invoice.gibEnvelopeId`)
   kaydedildiğinde "GİB'e gönderildi" sayılır. Ayarlar → Faturalandırma panelinde
   ve basılan belgede tek ölçüt budur.
+- **TRY dışı bir fatura bugün GİB'e GÖNDERİLMEZ.** `fileThrough` böyle bir
+  belgeyi adaptöre hiç ulaştırmadan `blocked` /
+  `FOREIGN_CURRENCY_NO_TL_EQUIVALENT` ile geri çevirir: yabancı para birimli
+  fatura, TCMB kuru ve TL karşılığı olmadan VUK 215 / 385 Sıra No.lu Genel
+  Tebliğ'e aykırıdır ve bu alanlar şemada henüz yok. Kararı bekleyen konu:
+  `docs/adr/ADR-0002-foreign-currency-invoice-fx.md`. **Canlı fiyat kataloğu
+  USD olduğu için bu, kenar durum değil varsayılan yoldur** — go-live'da TL
+  dışı abonelikler faturalandırılacaksa ADR-0002 önce karara bağlanmalıdır.
+  Belge *üretimi* (export) etkilenmez: zarf numarası olmayan belge zaten "mali
+  değeri yoktur" damgası taşır (TASK-MTSWLWDONWA3W).
 
 ## İlgili dosyalar
 
@@ -72,6 +82,8 @@ denenmez; eksik olan(lar) adıyla raporlanır (`not_configured`).
 - `src/lib/efatura.ts` — UBL-TR XML ve yazdırılabilir belge; zarf numarası yoksa "mali değeri yoktur" damgası
 - `scripts/efatura-preflight.ts` — ön denetim komutu (`pnpm efatura:preflight`)
 - `tests/efatura-unit.test.ts`, `tests/efatura-integrator.test.ts`, `tests/invoice-document.test.ts` — entegrasyon testleri
+- `tests/efatura-foreign-currency.test.ts` — yabancı para birimi kuralları (belge kendi para birimini yazar; TRY dışı belge gönderilemez)
+- `tests/e2e/invoice-foreign-currency-export.spec.ts` — aynı kuralın gerçek rota + tarayıcı üzerinden doğrulaması (`INVOICE_SUPPLIER_*` dolu bir sunucu ve boş bir `E2E_PORT` ister)
 
 ## Go-live günü (12-13 Eylül Hafta Sonu Adım Adım Kontrol Listesi)
 

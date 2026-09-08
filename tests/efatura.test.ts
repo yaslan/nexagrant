@@ -42,17 +42,17 @@ describe('Turkish E-Invoice (GİB / UBL-TR) Module', () => {
           name: 'SaaS Subscription',
           quantity: 1,
           unitCode: 'C62',
-          unitPriceTRY: 10000,
+          unitPrice: 10000,
           vatRate: 20,
         },
       ];
 
       const totals = calculateInvoiceTotals(lines);
-      expect(totals.subtotalTRY).toBe(10000);
-      expect(totals.totalVatTRY).toBe(2000);
-      expect(totals.totalWithholdingTRY).toBe(0);
-      expect(totals.payableVatTRY).toBe(2000);
-      expect(totals.grandTotalTRY).toBe(12000);
+      expect(totals.subtotal).toBe(10000);
+      expect(totals.totalVat).toBe(2000);
+      expect(totals.totalWithholding).toBe(0);
+      expect(totals.payableVat).toBe(2000);
+      expect(totals.grandTotal).toBe(12000);
     });
 
     test('calculates 9/10 Consulting Withholding (Code 604) correctly', () => {
@@ -62,7 +62,7 @@ describe('Turkish E-Invoice (GİB / UBL-TR) Module', () => {
           name: 'Horizon Europe Proposal Pre-Evaluation',
           quantity: 1,
           unitCode: 'C62',
-          unitPriceTRY: 10000,
+          unitPrice: 10000,
           vatRate: 20,
           withholdingCode: '604',
           withholdingRate: 0.9, // 9/10
@@ -70,11 +70,11 @@ describe('Turkish E-Invoice (GİB / UBL-TR) Module', () => {
       ];
 
       const totals = calculateInvoiceTotals(lines);
-      expect(totals.subtotalTRY).toBe(10000);
-      expect(totals.totalVatTRY).toBe(2000);
-      expect(totals.totalWithholdingTRY).toBe(1800); // 2000 * 0.9
-      expect(totals.payableVatTRY).toBe(200); // 2000 - 1800
-      expect(totals.grandTotalTRY).toBe(10200); // 10000 + 200
+      expect(totals.subtotal).toBe(10000);
+      expect(totals.totalVat).toBe(2000);
+      expect(totals.totalWithholding).toBe(1800); // 2000 * 0.9
+      expect(totals.payableVat).toBe(200); // 2000 - 1800
+      expect(totals.grandTotal).toBe(10200); // 10000 + 200
     });
   });
 
@@ -109,7 +109,7 @@ describe('Turkish E-Invoice (GİB / UBL-TR) Module', () => {
           name: 'Platform Subscription',
           quantity: 1,
           unitCode: 'C62',
-          unitPriceTRY: 5000,
+          unitPrice: 5000,
           vatRate: 20,
         },
       ],

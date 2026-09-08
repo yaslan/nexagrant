@@ -1,4 +1,4 @@
-import { UNFILED_NOTICE, type EfaturaDocument } from '@/lib/efatura';
+import { UNFILED_NOTICE, foreignCurrencyFilingBlock, type EfaturaDocument } from '@/lib/efatura';
 
 /**
  * The seam between Fabrika and a GİB e-invoice integrator.
@@ -13,6 +13,9 @@ import { UNFILED_NOTICE, type EfaturaDocument } from '@/lib/efatura';
  *   - the credentials are named, so an operator knows what to obtain,
  *   - every failure is a value with a reason on it, never an exception that a
  *     caller can mistake for success,
+ *   - a document that is not fit to be filed never reaches an adapter at all:
+ *     `fileThrough` returns `blocked` for a foreign-currency invoice with no TL
+ *     equivalent (TASK-MTSWLWDONWA3W, docs/adr/ADR-0002-foreign-currency-invoice-fx.md),
  *   - `file()` cannot return `filed` without an envelope id an integrator
  *     actually returned. There is no adapter registered, so today it returns
  *     `provider_unsupported` — the one outcome this file must never fake, since
@@ -107,8 +110,18 @@ export type FilingOutcome =
   | { status: 'provider_unsupported'; provider: string }
   /** The integrator answered, and refused the document. */
   | { status: 'rejected'; code: string; message: string }
+  /**
+   * Fabrika refused to send the document at all, because it is not yet fit to
+   * be filed. Unlike `rejected`, nothing left this process: no integrator was
+   * called, so this outcome costs nothing and can be re-evaluated once the
+   * missing figures exist.
+   */
+  | { status: 'blocked'; code: string; reason: string }
   /** The integrator could not be reached, or answered unintelligibly. */
   | { status: 'unreachable'; detail: string };
+
+/** The one `blocked` reason this module raises today. */
+export const FOREIGN_CURRENCY_FILING_BLOCK = 'FOREIGN_CURRENCY_NO_TL_EQUIVALENT';
 
 export interface EfaturaIntegrator {
   readonly provider: string;
@@ -201,6 +214,13 @@ export async function fileThrough(
   integrator: EfaturaIntegrator,
   document: EfaturaDocument
 ): Promise<FilingOutcome> {
+  // Checked here rather than in `fileInvoice`, because a caller holding its own
+  // adapter reaches GİB through this function and must not slip past the gate.
+  const blocked = foreignCurrencyFilingBlock(document);
+  if (blocked) {
+    return { status: 'blocked', code: FOREIGN_CURRENCY_FILING_BLOCK, reason: blocked };
+  }
+
   try {
     return await integrator.file(document);
   } catch (error) {

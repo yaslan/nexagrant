@@ -60,17 +60,17 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
           name: 'Platform Subscription',
           quantity: 2,
           unitCode: 'C62',
-          unitPriceTRY: 2500, // 5000.00 TRY total
+          unitPrice: 2500, // 5000.00 TRY total
           vatRate: 20,
         },
       ];
 
       const totals = calculateInvoiceTotals(lines);
-      expect(totals.subtotalTRY).toBe(5000);
-      expect(totals.totalVatTRY).toBe(1000);
-      expect(totals.totalWithholdingTRY).toBe(0);
-      expect(totals.payableVatTRY).toBe(1000);
-      expect(totals.grandTotalTRY).toBe(6000);
+      expect(totals.subtotal).toBe(5000);
+      expect(totals.totalVat).toBe(1000);
+      expect(totals.totalWithholding).toBe(0);
+      expect(totals.payableVat).toBe(1000);
+      expect(totals.grandTotal).toBe(6000);
     });
 
     test('calculates 9/10 withholding (Code 604) correctly with kuruş rounding', () => {
@@ -80,7 +80,7 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
           name: 'Consulting Service',
           quantity: 1,
           unitCode: 'C62',
-          unitPriceTRY: 10000,
+          unitPrice: 10000,
           vatRate: 20,
           withholdingCode: '604',
           withholdingRate: 0.9,
@@ -88,11 +88,11 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
       ];
 
       const totals = calculateInvoiceTotals(lines);
-      expect(totals.subtotalTRY).toBe(10000);
-      expect(totals.totalVatTRY).toBe(2000);
-      expect(totals.totalWithholdingTRY).toBe(1800); // 2000 * 0.9
-      expect(totals.payableVatTRY).toBe(200);
-      expect(totals.grandTotalTRY).toBe(10200);
+      expect(totals.subtotal).toBe(10000);
+      expect(totals.totalVat).toBe(2000);
+      expect(totals.totalWithholding).toBe(1800); // 2000 * 0.9
+      expect(totals.payableVat).toBe(200);
+      expect(totals.grandTotal).toBe(10200);
     });
   });
 
@@ -127,7 +127,7 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
           name: 'EU Horizon Europe Advisory Service',
           quantity: 1,
           unitCode: 'MON',
-          unitPriceTRY: 15000,
+          unitPrice: 15000,
           vatRate: 20,
         },
       ],
@@ -208,7 +208,7 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
         city: 'İstanbul',
         country: 'Türkiye',
       },
-      lines: [{ id: '1', name: 'Test Service', quantity: 1, unitCode: 'C62', unitPriceTRY: 1000, vatRate: 20 }],
+      lines: [{ id: '1', name: 'Test Service', quantity: 1, unitCode: 'C62', unitPrice: 1000, vatRate: 20 }],
     };
 
     test('resolves sandbox adapter from ADAPTERS registry', () => {

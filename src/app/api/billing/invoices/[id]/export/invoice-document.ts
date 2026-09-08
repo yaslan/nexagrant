@@ -154,7 +154,7 @@ export function buildInvoiceDocument(
     unitCode: line.unitCode,
     // The row holds minor units; the document renders major ones. One
     // conversion, in one place, through the shared money helper.
-    unitPriceTRY: Number(toDecimalString(line.unitPriceMinor, currency)),
+    unitPrice: Number(toDecimalString(line.unitPriceMinor, currency)),
     vatRate: line.vatRate,
     ...(line.withholdingCode ? { withholdingCode: line.withholdingCode } : {}),
     ...(line.withholdingRate ? { withholdingRate: line.withholdingRate } : {}),

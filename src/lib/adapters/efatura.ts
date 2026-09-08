@@ -10,6 +10,7 @@ export {
   fileInvoice,
   fileThrough,
   isFiled,
+  FOREIGN_CURRENCY_FILING_BLOCK,
   readIntegratorConfig,
   type EfaturaIntegrator,
   type EfaturaIntegratorConfig,

@@ -92,7 +92,7 @@ describe('invoice export document', () => {
       expect(doc.customer.name).toBe('Alıcı Ltd. Şti.');
       expect(doc.customer.vknTckn).toBe('2840958172');
       // 250000 minor units → 2500.00 major, converted once (CLAUDE.md rule 9).
-      expect(doc.lines[0]!.unitPriceTRY).toBe(2500);
+      expect(doc.lines[0]!.unitPrice).toBe(2500);
     });
 
     test('unreadable stored lines are an error, not an empty invoice', () => {

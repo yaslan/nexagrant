@@ -36,7 +36,7 @@ const DOCUMENT = {
     name: 'Alıcı', vknTckn: '1234567890', taxOffice: 'V.D.',
     address: 'Adres', city: 'İstanbul', country: 'Türkiye',
   },
-  lines: [{ id: '1', name: 'Pro', quantity: 1, unitCode: 'MON', unitPriceTRY: 8950, vatRate: 20 }],
+  lines: [{ id: '1', name: 'Pro', quantity: 1, unitCode: 'MON', unitPrice: 8950, vatRate: 20 }],
 } satisfies EfaturaDocument;
 
 const CREDENTIALS = {

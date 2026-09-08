@@ -3,7 +3,7 @@
  * UBL-TR 1.2.1 XML Standartları, VKN/TCKN Algoritmik Doğrulaması, KDV & Tevkifat Hesaplamaları
  */
 
-import { toMinorUnits } from './money';
+import { currencyExponent, toMinorUnits } from './money';
 
 export interface InvoiceParty {
   name: string;
@@ -21,7 +21,7 @@ export interface InvoiceLineItem {
   name: string;
   quantity: number;
   unitCode: string; // 'C62' (Adet), 'MON' (Ay)
-  unitPriceTRY: number;
+  unitPrice: number;
   vatRate: number; // 20 for 20%
   withholdingCode?: string; // e.g. '604' (Danışmanlık 9/10)
   withholdingRate?: number; // 0.9 for 9/10
@@ -55,11 +55,11 @@ export interface EfaturaDocument {
 }
 
 export interface TaxCalculationResult {
-  subtotalTRY: number;
-  totalVatTRY: number;
-  totalWithholdingTRY: number;
-  payableVatTRY: number;
-  grandTotalTRY: number;
+  subtotal: number;
+  totalVat: number;
+  totalWithholding: number;
+  payableVat: number;
+  grandTotal: number;
 }
 
 /**
@@ -68,6 +68,34 @@ export interface TaxCalculationResult {
  */
 export const UNFILED_NOTICE =
   'ÖRNEK BELGE — GİB\'e gönderilmemiştir, mali mühür taşımaz ve mali değeri yoktur.';
+
+/**
+ * Why this document may not be *filed* with GİB, or null when nothing blocks it.
+ *
+ * VUK 215 lets an invoice be denominated in a foreign currency only while it
+ * also shows the Turkish lira equivalent, and 385 Sıra No.lu Genel Tebliğ makes
+ * that mandatory for a domestic transaction, at the TCMB buying rate of the
+ * issue date (VUK 280). Fabrika carries neither the rate nor the TL figures:
+ * there is no TCMB rate source, no field to put one in, and the shape of the
+ * fix — including how a genuine export (ISTISNA) is told apart from a domestic
+ * sale, which is the case that would relax this rule — is the open decision in
+ * docs/adr/ADR-0002-foreign-currency-invoice-fx.md.
+ *
+ * Until that lands the filing is refused rather than guessed. A rate this code
+ * invented would be a fabricated figure on a fiscal document, and a filing
+ * without one is a VUK 352 II-7 usulsüzlük. Rendering and export are
+ * deliberately untouched: an unfiled document already stamps itself as carrying
+ * no fiscal value, so the customer keeps their receipt while the fiscal filing
+ * waits (TASK-MTSWLWDONWA3W).
+ */
+export function foreignCurrencyFilingBlock(invoice: EfaturaDocument): string | null {
+  if (invoice.currency === 'TRY') return null;
+  return (
+    `${invoice.currency} faturasi TCMB kuru ve TL karsiligi tasimadigi icin GIB'e gonderilemez ` +
+    `(VUK 215 / 385 Sira No.lu Genel Teblig). Karar bekliyor: ` +
+    `docs/adr/ADR-0002-foreign-currency-invoice-fx.md`
+  );
+}
 
 /** True only for a document that carries an envelope id GİB actually returned. */
 export function isFiledWithGib(invoice: EfaturaDocument): boolean {
@@ -120,17 +148,28 @@ export function validateTCKN(tckn: string): boolean {
   return digit11 === digits[10];
 }
 
+/** ISO-4217 codes an invoice may be denominated in. */
+export type InvoiceCurrency = EfaturaDocument['currency'];
+
 /**
  * KDV, Tevkifat ve Toplam Tutar Hesaplayıcı
- * Tutarlar Int minor unit (kuruş) bazında hesaplanır (CLAUDE.md #9).
+ * Tutarlar Int minor unit bazında hesaplanır (CLAUDE.md #9).
+ *
+ * The currency is an argument because the minor unit is not always kuruş: the
+ * rounding step belongs to the invoice's own currency, and this used to round
+ * every invoice as if it were TRY.
  */
-export function calculateInvoiceTotals(lines: InvoiceLineItem[]): TaxCalculationResult {
+export function calculateInvoiceTotals(
+  lines: InvoiceLineItem[],
+  currency: InvoiceCurrency = 'TRY'
+): TaxCalculationResult {
   let subtotalMinor = 0;
   let totalVatMinor = 0;
   let totalWithholdingMinor = 0;
+  const majorUnit = 10 ** currencyExponent(currency);
 
   for (const line of lines) {
-    const lineTotalMinor = toMinorUnits(line.quantity * line.unitPriceTRY, 'TRY');
+    const lineTotalMinor = toMinorUnits(line.quantity * line.unitPrice, currency);
     const vatMinor = Math.round((lineTotalMinor * line.vatRate) / 100);
     let withholdingMinor = 0;
 
@@ -147,19 +186,37 @@ export function calculateInvoiceTotals(lines: InvoiceLineItem[]): TaxCalculation
   const grandTotalMinor = subtotalMinor + payableVatMinor;
 
   return {
-    subtotalTRY: subtotalMinor / 100,
-    totalVatTRY: totalVatMinor / 100,
-    totalWithholdingTRY: totalWithholdingMinor / 100,
-    payableVatTRY: payableVatMinor / 100,
-    grandTotalTRY: grandTotalMinor / 100,
+    subtotal: subtotalMinor / majorUnit,
+    totalVat: totalVatMinor / majorUnit,
+    totalWithholding: totalWithholdingMinor / majorUnit,
+    payableVat: payableVatMinor / majorUnit,
+    grandTotal: grandTotalMinor / majorUnit,
   };
+}
+
+/**
+ * Renders an amount in the invoice's own currency, in the Turkish number
+ * format the printed document uses.
+ *
+ * The lira sign used to be hard-coded into every money cell while the box two
+ * rows above said "Para Birimi: USD": a $99.00 subscription printed as a lira
+ * amount, so the document contradicted itself about what was owed and
+ * understated it by whatever the day's rate was (TASK-MTSWLWDONWA3W). The
+ * symbol now comes from the same field as that box.
+ */
+export function formatInvoiceAmount(amount: number, currency: InvoiceCurrency): string {
+  return new Intl.NumberFormat('tr-TR', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: currencyExponent(currency),
+  }).format(amount);
 }
 
 /**
  * Resmî GİB UBL-TR 1.2.1 Standart XML Çıktısı Üretici
  */
 export function generateUblTrXml(invoice: EfaturaDocument): string {
-  const totals = calculateInvoiceTotals(invoice.lines);
+  const totals = calculateInvoiceTotals(invoice.lines, invoice.currency);
 
   const linesXml = invoice.lines
     .map(
@@ -167,12 +224,12 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
     <cac:InvoiceLine>
       <cbc:ID>${idx + 1}</cbc:ID>
       <cbc:InvoicedQuantity unitCode="${line.unitCode}">${line.quantity}</cbc:InvoicedQuantity>
-      <cbc:LineExtensionAmount currencyID="${invoice.currency}">${(line.quantity * line.unitPriceTRY).toFixed(2)}</cbc:LineExtensionAmount>
+      <cbc:LineExtensionAmount currencyID="${invoice.currency}">${(line.quantity * line.unitPrice).toFixed(2)}</cbc:LineExtensionAmount>
       <cac:TaxTotal>
-        <cbc:TaxAmount currencyID="${invoice.currency}">${((line.quantity * line.unitPriceTRY * line.vatRate) / 100).toFixed(2)}</cbc:TaxAmount>
+        <cbc:TaxAmount currencyID="${invoice.currency}">${((line.quantity * line.unitPrice * line.vatRate) / 100).toFixed(2)}</cbc:TaxAmount>
         <cac:TaxSubtotal>
-          <cbc:TaxableAmount currencyID="${invoice.currency}">${(line.quantity * line.unitPriceTRY).toFixed(2)}</cbc:TaxableAmount>
-          <cbc:TaxAmount currencyID="${invoice.currency}">${((line.quantity * line.unitPriceTRY * line.vatRate) / 100).toFixed(2)}</cbc:TaxAmount>
+          <cbc:TaxableAmount currencyID="${invoice.currency}">${(line.quantity * line.unitPrice).toFixed(2)}</cbc:TaxableAmount>
+          <cbc:TaxAmount currencyID="${invoice.currency}">${((line.quantity * line.unitPrice * line.vatRate) / 100).toFixed(2)}</cbc:TaxAmount>
           <cbc:Percent>${line.vatRate}</cbc:Percent>
           <cac:TaxCategory>
             <cac:TaxScheme>
@@ -186,7 +243,7 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
         <cbc:Name>${line.name}</cbc:Name>
       </cac:Item>
       <cac:Price>
-        <cbc:PriceAmount currencyID="${invoice.currency}">${line.unitPriceTRY.toFixed(2)}</cbc:PriceAmount>
+        <cbc:PriceAmount currencyID="${invoice.currency}">${line.unitPrice.toFixed(2)}</cbc:PriceAmount>
       </cac:Price>
     </cac:InvoiceLine>`
     )
@@ -262,10 +319,10 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
 
   <!-- Vergi Toplamı -->
   <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="${invoice.currency}">${totals.payableVatTRY.toFixed(2)}</cbc:TaxAmount>
+    <cbc:TaxAmount currencyID="${invoice.currency}">${totals.payableVat.toFixed(2)}</cbc:TaxAmount>
     <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${invoice.currency}">${totals.subtotalTRY.toFixed(2)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${invoice.currency}">${totals.totalVatTRY.toFixed(2)}</cbc:TaxAmount>
+      <cbc:TaxableAmount currencyID="${invoice.currency}">${totals.subtotal.toFixed(2)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="${invoice.currency}">${totals.totalVat.toFixed(2)}</cbc:TaxAmount>
       <cbc:Percent>20.00</cbc:Percent>
       <cac:TaxCategory>
         <cac:TaxScheme>
@@ -278,10 +335,10 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
 
   <!-- Parasal Toplamlar -->
   <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="${invoice.currency}">${totals.subtotalTRY.toFixed(2)}</cbc:LineExtensionAmount>
-    <cbc:TaxExclusiveAmount currencyID="${invoice.currency}">${totals.subtotalTRY.toFixed(2)}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="${invoice.currency}">${(totals.subtotalTRY + totals.totalVatTRY).toFixed(2)}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="${invoice.currency}">${totals.grandTotalTRY.toFixed(2)}</cbc:PayableAmount>
+    <cbc:LineExtensionAmount currencyID="${invoice.currency}">${totals.subtotal.toFixed(2)}</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="${invoice.currency}">${totals.subtotal.toFixed(2)}</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="${invoice.currency}">${(totals.subtotal + totals.totalVat).toFixed(2)}</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="${invoice.currency}">${totals.grandTotal.toFixed(2)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
 
   <!-- Fatura Kalemleri -->
@@ -297,7 +354,8 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
  * kendini `UNFILED_NOTICE` ile mali değeri olmayan bir örnek olarak işaretler.
  */
 export function generateEfaturaHtml(invoice: EfaturaDocument): string {
-  const totals = calculateInvoiceTotals(invoice.lines);
+  const totals = calculateInvoiceTotals(invoice.lines, invoice.currency);
+  const money = (amount: number) => formatInvoiceAmount(amount, invoice.currency);
 
   const linesHtml = invoice.lines
     .map(
@@ -306,9 +364,9 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${idx + 1}</td>
       <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>${l.name}</strong></td>
       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${l.quantity} Adet</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace;">₺${l.unitPriceTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${money(l.unitPrice)}</td>
       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">%${l.vatRate}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace; font-weight: bold;">₺${(l.quantity * l.unitPriceTRY).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace; font-weight: bold;">${money(l.quantity * l.unitPrice)}</td>
     </tr>
   `
     )
@@ -416,23 +474,23 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
   <table class="totals-table">
     <tr>
       <td class="label">Ara Toplam (Matrah):</td>
-      <td style="text-align: right; font-family: monospace;">₺${totals.subtotalTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+      <td style="text-align: right; font-family: monospace;">${money(totals.subtotal)}</td>
     </tr>
     <tr>
       <td class="label">Hesaplanan KDV (%20):</td>
-      <td style="text-align: right; font-family: monospace;">₺${totals.totalVatTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+      <td style="text-align: right; font-family: monospace;">${money(totals.totalVat)}</td>
     </tr>
     ${
-      totals.totalWithholdingTRY > 0
+      totals.totalWithholding > 0
         ? `<tr>
       <td class="label" style="color: #b91c1c;">Tevkifat Tutarı (9/10):</td>
-      <td style="text-align: right; font-family: monospace; color: #b91c1c;">-₺${totals.totalWithholdingTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+      <td style="text-align: right; font-family: monospace; color: #b91c1c;">-${money(totals.totalWithholding)}</td>
     </tr>`
         : ''
     }
     <tr class="grand-total">
       <td class="label">ÖDENECEK GENEL TOPLAM:</td>
-      <td style="text-align: right; font-family: monospace; color: #047857;">₺${totals.grandTotalTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+      <td style="text-align: right; font-family: monospace; color: #047857;">${money(totals.grandTotal)}</td>
     </tr>
   </table>
 
