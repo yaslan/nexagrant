@@ -464,3 +464,12 @@ Veritabanına yazılan her fikstür `finally` bloğunda silindi ve sayımla doğ
 3. §8.4 için kart aç — "Aramayı Kaydet" düğmesine e2e regresyon testi.
 4. §8.2, §8.3, §8.6 backlog'a.
 5. Beş kart `review` → `done`'a alınabilir.
+
+---
+
+**Commit notu (dürüstlük kaydı):** Bu raporun dosyaları, paralel çalışan başka bir pane'in
+`git add`'i staging alanımı süpürdüğü için `98d1352` ("docs(TASK-MTRJ32BZBY2AI): third run …")
+commit'i içinde ağaca girdi. İçerik doğru ve eksiksiz; yalnız commit mesajı bu dosyaya ait
+değil. Kendi mesajı bir sonraki commit'tedir. Paylaşılan bir ağaçta yedi pane aynı anda
+çalışırken `git add <yol>` + hemen `git commit` arasında bile yarış vardır — §7.2'deki
+"ölçümler anlıktır" uyarısının git tarafındaki karşılığı.
