@@ -80,7 +80,8 @@ denenmez; eksik olan(lar) adıyla raporlanır (`not_configured`).
 - `src/app/api/billing/invoices/[id]/export/invoice-document.ts` — satıcı kimliği çözümü, eksikse `SupplierNotConfiguredError`
 - `src/lib/efatura-integrator.ts` — entegratör arayüzü ve hata yolları
 - `src/lib/efatura.ts` — UBL-TR XML ve yazdırılabilir belge; zarf numarası yoksa "mali değeri yoktur" damgası
-- `scripts/efatura-preflight.ts` — ön denetim komutu (`pnpm efatura:preflight`)
+- `src/lib/billing/vat-rate.ts` — `INVOICE_VAT_RATE` kabul kuralının tek kaynağı; hem fatura yazıcısı hem preflight bunu çağırır
+- `scripts/efatura-preflight.ts` — ön denetim komutu (`pnpm efatura:preflight`); 13 değişken, 3 blok
 - `tests/efatura-unit.test.ts`, `tests/efatura-integrator.test.ts`, `tests/invoice-document.test.ts` — entegrasyon testleri
 - `tests/efatura-foreign-currency.test.ts` — yabancı para birimi kuralları (belge kendi para birimini yazar; TRY dışı belge gönderilemez)
 - `tests/e2e/invoice-foreign-currency-export.spec.ts` — aynı kuralın gerçek rota + tarayıcı üzerinden doğrulaması (`INVOICE_SUPPLIER_*` dolu bir sunucu ve boş bir `E2E_PORT` ister)
@@ -89,7 +90,7 @@ denenmez; eksik olan(lar) adıyla raporlanır (`not_configured`).
 
 Patron veya operatör tarafından sırayla takip edilecek adımlar:
 
-### Adım 1: Değişkenleri Ortam Yöneticisine (Secrets/Vercel/.env) Girin
+### Adım 1: 13 Değişkeni Ortam Yöneticisine (Secrets/Vercel/.env) Girin
 - `INVOICE_SUPPLIER_*` (5 adet zorunlu: unvan, VKN, vergi dairesi, adres, il).
 - `INVOICE_VAT_RATE` (zorunlu — mali müşavirden alınır; boşken hiç fatura kesilmez).
 - `EFATURA_INTEGRATOR_*` (4 adet zorunlu: provider, API adresi, kullanıcı adı, parola).
@@ -101,9 +102,19 @@ pnpm efatura:preflight
 ```
 - **Beklenen Çıktı:**
   - Satıcı Kimliği Bloğu: `✅ TANIMLI`
+  - Vergi (KDV) Bloğu: `✅ TANIMLI`
   - Entegratör Bloğu: `✅ TANIMLI`
-  - Sonuç Hükmü: `📌 Fatura belgesi üretilir. GİB'e gönderilir.`
-- 🛑 **Hangi durumda DURULUR:** Herhangi bir zorunlu değişken `EKSİK` olarak listelenirse veya sonuç cümlesinde `gönderilmez` yazıyorsa **DURULUR**. Eksik değişken giderilmeden bir sonraki adıma geçilmez.
+  - Sonuç Hükmü: `📌 Fatura kaydı oluşturulur. Fatura belgesi üretilir. GİB'e gönderilir.`
+  - Çıkış kodu `0`. Komut `1` ile çıkıyorsa kapı kırmızıdır.
+- 🛑 **Hangi durumda DURULUR:** Herhangi bir zorunlu değişken `EKSİK` ya da `GEÇERSİZ`
+  olarak listelenirse veya sonuç cümlesinde `oluşturulmaz` / `üretilmez` / `gönderilmez`
+  yazıyorsa **DURULUR**. Eksik değişken giderilmeden bir sonraki adıma geçilmez.
+- ℹ️ **Üç blok, üç ayrı durak.** `INVOICE_VAT_RATE` boş ya da 0-100 dışındaysa
+  `createInvoiceForPayment` hiç satır yazmaz (`SystemAlert: vat_rate_not_configured`);
+  ödeme yine de tamamlanır. Satıcı kimliği eksikse satır yazılır ama belge (UBL-TR/PDF)
+  üretilemez. İkisi aynı şey değildir; preflight hangisinde durduğunu cümleyle söyler.
+  Preflight, KDV oranını fatura yazıcısıyla **aynı** kuraldan geçirir
+  (`src/lib/billing/vat-rate.ts`), bu yüzden burada yeşil olan bir değeri yazıcı reddedemez.
 
 ### Adım 3: Otomatik Testleri Koşturun
 ```bash

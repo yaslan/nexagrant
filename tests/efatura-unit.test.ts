@@ -16,6 +16,7 @@ import {
   isFiled,
   resolveIntegrator,
 } from '../src/lib/efatura-integrator';
+import { parseVatRate } from '../src/lib/billing/vat-rate';
 import { evaluatePreflight } from '../scripts/efatura-preflight';
 
 describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
@@ -261,37 +262,73 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
     });
   });
 
-  describe('Preflight Script Verification (3 Scenarios)', () => {
-    test('Scenario (a): No env vars set -> document generation false, GİB send false', () => {
+  describe('Preflight Script Verification', () => {
+    test('Scenario (a): No env vars set -> no invoice record, no document, no GİB send', () => {
       const report = evaluatePreflight({});
 
       expect(report.supplierConfigured).toBe(false);
+      expect(report.vatConfigured).toBe(false);
       expect(report.integratorConfigured).toBe(false);
-      expect(report.documentGenVerdict).toBe('Fatura belgesi üretilmez');
+      expect(report.invoiceRecordVerdict).toContain('Fatura kaydı hiç oluşturulmaz');
+      expect(report.documentGenVerdict).toContain('üretilmez');
       expect(report.gibSendVerdict).toContain("GİB'e gönderilmez, sebep:");
       expect(report.allMissingVars).toContain('INVOICE_SUPPLIER_NAME');
+      expect(report.allMissingVars).toContain('INVOICE_VAT_RATE');
       expect(report.allMissingVars).toContain('EFATURA_INTEGRATOR_PROVIDER');
     });
 
-    test('Scenario (b): Only seller identity set -> document generation true, GİB send false', () => {
+    test('Scenario (b): Seller identity and VAT set -> document generation true, GİB send false', () => {
       const supplierOnlyEnv = {
         INVOICE_SUPPLIER_NAME: 'Fabrika Yazılım A.Ş.',
         INVOICE_SUPPLIER_VKN: '3810459281',
         INVOICE_SUPPLIER_TAX_OFFICE: 'Doğanbey V.D.',
         INVOICE_SUPPLIER_ADDRESS: 'Kızılırmak Mah. No:3',
         INVOICE_SUPPLIER_CITY: 'Ankara',
+        INVOICE_VAT_RATE: '20',
       };
 
       const report = evaluatePreflight(supplierOnlyEnv);
 
       expect(report.supplierConfigured).toBe(true);
+      expect(report.vatConfigured).toBe(true);
       expect(report.integratorConfigured).toBe(false);
+      expect(report.invoiceRecordVerdict).toBe('Fatura kaydı oluşturulur');
       expect(report.documentGenVerdict).toBe('Fatura belgesi üretilir');
       expect(report.gibSendVerdict).toContain("GİB'e gönderilmez, sebep: EFATURA_INTEGRATOR_PROVIDER");
     });
 
     test('Scenario (c): All set with synthetic values -> document generation true, GİB send true', () => {
       const completeEnv = {
+        INVOICE_SUPPLIER_NAME: 'Fabrika Yazılım A.Ş.',
+        INVOICE_SUPPLIER_VKN: '3810459281',
+        INVOICE_SUPPLIER_TAX_OFFICE: 'Doğanbey V.D.',
+        INVOICE_SUPPLIER_ADDRESS: 'Kızılırmak Mah. No:3',
+        INVOICE_SUPPLIER_CITY: 'Ankara',
+        INVOICE_VAT_RATE: '20',
+        EFATURA_INTEGRATOR_PROVIDER: 'sandbox',
+        EFATURA_INTEGRATOR_BASE_URL: 'https://efatura-test.ornek.com',
+        EFATURA_INTEGRATOR_USERNAME: 'fabrika_api',
+        EFATURA_INTEGRATOR_PASSWORD: 'test_password_123',
+        EFATURA_INTEGRATOR_TEST_MODE: 'true',
+      };
+
+      const report = evaluatePreflight(completeEnv);
+
+      expect(report.supplierConfigured).toBe(true);
+      expect(report.vatConfigured).toBe(true);
+      expect(report.integratorConfigured).toBe(true);
+      expect(report.documentGenVerdict).toBe('Fatura belgesi üretilir');
+      expect(report.gibSendVerdict).toBe("GİB'e gönderilir");
+      expect(report.summarySentence).toBe(
+        "Fatura kaydı oluşturulur. Fatura belgesi üretilir. GİB'e gönderilir."
+      );
+    });
+
+    // The bug this block exists for: every other variable filled in and the
+    // gate green, while `createInvoiceForPayment` writes nothing at all
+    // because the VAT rate is missing or unusable (TASK-MTSYAKDK5LV9E).
+    describe('INVOICE_VAT_RATE is the thirteenth required variable', () => {
+      const everythingElse = {
         INVOICE_SUPPLIER_NAME: 'Fabrika Yazılım A.Ş.',
         INVOICE_SUPPLIER_VKN: '3810459281',
         INVOICE_SUPPLIER_TAX_OFFICE: 'Doğanbey V.D.',
@@ -304,13 +341,48 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
         EFATURA_INTEGRATOR_TEST_MODE: 'true',
       };
 
-      const report = evaluatePreflight(completeEnv);
+      test('all twelve other variables set but VAT missing -> gate is red', () => {
+        const report = evaluatePreflight(everythingElse);
 
-      expect(report.supplierConfigured).toBe(true);
-      expect(report.integratorConfigured).toBe(true);
-      expect(report.documentGenVerdict).toBe('Fatura belgesi üretilir');
-      expect(report.gibSendVerdict).toBe("GİB'e gönderilir");
-      expect(report.summarySentence).toBe("Fatura belgesi üretilir. GİB'e gönderilir.");
+        expect(report.supplierConfigured).toBe(true);
+        expect(report.integratorConfigured).toBe(true);
+        expect(report.vatConfigured).toBe(false);
+        expect(report.allMissingVars).toEqual(['INVOICE_VAT_RATE']);
+        expect(report.gibSendVerdict).toContain('INVOICE_VAT_RATE');
+      });
+
+      test('the verdict names the record, the alert and the untouched payment', () => {
+        const report = evaluatePreflight(everythingElse);
+
+        expect(report.invoiceRecordVerdict).toContain('Fatura kaydı hiç oluşturulmaz');
+        expect(report.invoiceRecordVerdict).toContain('vat_rate_not_configured');
+        expect(report.invoiceRecordVerdict).toContain('ödeme etkilenmez');
+        expect(report.documentGenVerdict).toContain('üretilecek kayıt yoktur');
+      });
+
+      test.each(['abc', '-1', '101', '', '   ', 'NaN', '1e999'])(
+        'a value the invoice writer rejects (%j) is GEÇERSİZ here too, never dolu',
+        (raw) => {
+          const report = evaluatePreflight({ ...everythingElse, INVOICE_VAT_RATE: raw });
+
+          // The gate and the writer read one rule, so they cannot disagree.
+          expect(parseVatRate(raw)).toBeNull();
+          expect(report.vatConfigured).toBe(false);
+          expect(report.missingVatVars).toEqual(['INVOICE_VAT_RATE']);
+
+          const row = report.variableResults.find((r) => r.variable === 'INVOICE_VAT_RATE');
+          expect(row?.status).not.toBe('dolu');
+        }
+      );
+
+      test.each(['0', '20', ' 18 ', '100'])('a rate the writer accepts (%j) turns the gate green', (raw) => {
+        const report = evaluatePreflight({ ...everythingElse, INVOICE_VAT_RATE: raw });
+
+        expect(parseVatRate(raw)).not.toBeNull();
+        expect(report.vatConfigured).toBe(true);
+        expect(report.allMissingVars).toEqual([]);
+        expect(report.gibSendVerdict).toBe("GİB'e gönderilir");
+      });
     });
   });
 });

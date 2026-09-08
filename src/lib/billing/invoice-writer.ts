@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { recordAlert } from '@/lib/observability/system-alert';
 
+import { parseVatRate } from './vat-rate';
+
 /**
  * Issuing the `Invoice` row a successful payment earns.
  *
@@ -106,20 +108,12 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
- * The VAT rate an invoice is issued under, or null when it is not configured.
- *
- * `0` is a real answer and must survive: a sale genuinely outside VAT is not
- * the same as a rate nobody has set. Hence an explicit null rather than a
- * falsy check.
+ * Re-exported so this module's existing importers keep their import site, but
+ * the rule itself lives in `./vat-rate` — `scripts/efatura-preflight.ts` has to
+ * apply the very same check without loading the Prisma client that this file
+ * pulls in. See that module for why it is not duplicated here.
  */
-export function parseVatRate(raw: string | undefined): number | null {
-  if (raw === undefined) return null;
-  const trimmed = raw.trim();
-  if (trimmed === '') return null;
-  const value = Number(trimmed);
-  if (!Number.isFinite(value) || value < 0 || value > 100) return null;
-  return value;
-}
+export { parseVatRate } from './vat-rate';
 
 /**
  * A line as it is stored on the row; see `invoiceLineSchema` in the export route.

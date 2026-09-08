@@ -1,19 +1,23 @@
+import { parseVatRate } from '../src/lib/billing/vat-rate';
 import { env } from '../src/lib/env';
 
 export interface PreflightVariableResult {
   variable: string;
-  block: 'Satıcı Kimliği' | 'Entegratör';
+  block: 'Satıcı Kimliği' | 'Vergi (KDV)' | 'Entegratör';
   required: boolean;
-  status: 'dolu' | 'EKSİK';
+  status: 'dolu' | 'EKSİK' | 'GEÇERSİZ';
   valueMasked: string;
 }
 
 export interface PreflightReport {
   supplierConfigured: boolean;
+  vatConfigured: boolean;
   integratorConfigured: boolean;
   missingSupplierVars: string[];
+  missingVatVars: string[];
   missingIntegratorVars: string[];
   allMissingVars: string[];
+  invoiceRecordVerdict: string;
   documentGenVerdict: string;
   gibSendVerdict: string;
   summarySentence: string;
@@ -32,6 +36,15 @@ const OPTIONAL_SUPPLIER_VARS = [
   'INVOICE_SUPPLIER_COUNTRY',
   'INVOICE_SUPPLIER_EMAIL',
 ] as const;
+
+/**
+ * The tax block. Its own block and not a sixth supplier field, because the two
+ * fail in different places and the operator has to be told which: without the
+ * supplier identity an `Invoice` row is still written and only its exported
+ * document fails; without a VAT rate `createInvoiceForPayment` stops before
+ * writing anything, so there is no row to export in the first place.
+ */
+const REQUIRED_VAT_VARS = ['INVOICE_VAT_RATE'] as const;
 
 const REQUIRED_INTEGRATOR_VARS = [
   'EFATURA_INTEGRATOR_PROVIDER',
@@ -84,6 +97,26 @@ export function evaluatePreflight(envSource: Partial<Record<string, string | und
     });
   }
 
+  // Not "is it filled in" but the writer's own rule: `parseVatRate` is the
+  // single source both sides read, so a value this gate calls good is a value
+  // `createInvoiceForPayment` will also accept. A present-but-unusable value
+  // (`abc`, `-1`, `101`) is reported GEÇERSİZ rather than dolu — going green on
+  // one is the exact false green this check was added for.
+  const missingVatVars: string[] = [];
+  for (const v of REQUIRED_VAT_VARS) {
+    const val = envSource[v as keyof typeof envSource];
+    const isSet = Boolean(val && val.trim().length > 0);
+    const parsed = parseVatRate(val);
+    if (parsed === null) missingVatVars.push(v);
+    results.push({
+      variable: v,
+      block: 'Vergi (KDV)',
+      required: true,
+      status: parsed !== null ? 'dolu' : isSet ? 'GEÇERSİZ' : 'EKSİK',
+      valueMasked: parsed !== null ? maskValue(v, val) : isSet ? `${val} (0-100 değil)` : '(EKSİK)',
+    });
+  }
+
   const missingIntegratorVars: string[] = [];
   for (const v of REQUIRED_INTEGRATOR_VARS) {
     const val = envSource[v as keyof typeof envSource];
@@ -111,28 +144,39 @@ export function evaluatePreflight(envSource: Partial<Record<string, string | und
   }
 
   const supplierConfigured = missingSupplierVars.length === 0;
+  const vatConfigured = missingVatVars.length === 0;
   const integratorConfigured = missingIntegratorVars.length === 0;
-  const allMissingVars = [...missingSupplierVars, ...missingIntegratorVars];
+  const allMissingVars = [...missingSupplierVars, ...missingVatVars, ...missingIntegratorVars];
 
-  const documentGenVerdict = supplierConfigured
-    ? 'Fatura belgesi üretilir'
-    : 'Fatura belgesi üretilmez';
+  // Three verdicts and not one, because the blocks fail at three different
+  // points in the pipeline and each stop tells the operator something else.
+  const invoiceRecordVerdict = vatConfigured
+    ? 'Fatura kaydı oluşturulur'
+    : 'Fatura kaydı hiç oluşturulmaz: INVOICE_VAT_RATE 0-100 arası bir yüzde değil. ' +
+      'SystemAlert (vat_rate_not_configured) yazılır, ödeme etkilenmez';
 
-  let gibSendVerdict = '';
-  if (supplierConfigured && integratorConfigured) {
-    gibSendVerdict = 'GİB\'e gönderilir';
-  } else {
-    gibSendVerdict = `GİB'e gönderilmez, sebep: ${allMissingVars.join(', ')} eksik`;
-  }
+  const documentGenVerdict = !vatConfigured
+    ? 'Fatura belgesi de üretilmez, çünkü üretilecek kayıt yoktur'
+    : supplierConfigured
+      ? 'Fatura belgesi üretilir'
+      : `Fatura belgesi üretilmez, sebep: satıcı kimliği eksik (${missingSupplierVars.join(', ')})`;
 
-  const summarySentence = `${documentGenVerdict}. ${gibSendVerdict}.`;
+  const gibSendVerdict =
+    supplierConfigured && vatConfigured && integratorConfigured
+      ? "GİB'e gönderilir"
+      : `GİB'e gönderilmez, sebep: ${allMissingVars.join(', ')} eksik`;
+
+  const summarySentence = `${invoiceRecordVerdict}. ${documentGenVerdict}. ${gibSendVerdict}.`;
 
   return {
     supplierConfigured,
+    vatConfigured,
     integratorConfigured,
     missingSupplierVars,
+    missingVatVars,
     missingIntegratorVars,
     allMissingVars,
+    invoiceRecordVerdict,
     documentGenVerdict,
     gibSendVerdict,
     summarySentence,
@@ -145,23 +189,24 @@ export function printPreflightReport(report: PreflightReport): void {
   console.log('                 E-FATURA YAPILANDIRMA PREFLIGHT KONTROLÜ               ');
   console.log('========================================================================\n');
 
-  console.log('┌──────────────────────────────┬─────────────────┬───────────┬─────────┬──────────────────────┐');
-  console.log('│ Ortam Değişkeni              │ Blok / Kategori │ Zorunlu   │ Durum   │ Değer (Maskeli)      │');
-  console.log('├──────────────────────────────┼─────────────────┼───────────┼─────────┼──────────────────────┤');
+  console.log('┌──────────────────────────────┬─────────────────┬───────────┬───────────┬──────────────────────┐');
+  console.log('│ Ortam Değişkeni              │ Blok / Kategori │ Zorunlu   │ Durum     │ Değer (Maskeli)      │');
+  console.log('├──────────────────────────────┼─────────────────┼───────────┼───────────┼──────────────────────┤');
 
   for (const r of report.variableResults) {
     const vName = r.variable.padEnd(28);
     const block = r.block.padEnd(15);
     const req = (r.required ? 'evet' : 'hayır').padEnd(9);
-    const status = (r.status === 'dolu' ? 'dolu  ' : 'EKSİK ').padEnd(7);
+    const status = r.status.padEnd(9);
     const val = r.valueMasked.padEnd(20);
     console.log(`│ ${vName} │ ${block} │ ${req} │ ${status} │ ${val} │`);
   }
-  console.log('└──────────────────────────────┴─────────────────┴───────────┴─────────┴──────────────────────┘\n');
+  console.log('└──────────────────────────────┴─────────────────┴───────────┴───────────┴──────────────────────┘\n');
 
   console.log('--- BLOK DEĞERLENDİRMESİ ---');
   console.log(`1. Satıcı Kimliği Bloğu : ${report.supplierConfigured ? '✅ TANIMLI (Fatura belgesi üretilebilir)' : `❌ EKSİK (${report.missingSupplierVars.join(', ')})`}`);
-  console.log(`2. Entegratör Bloğu     : ${report.integratorConfigured ? '✅ TANIMLI (Entegratör bağlantısı kurulabilir)' : `❌ EKSİK (${report.missingIntegratorVars.join(', ')})`}`);
+  console.log(`2. Vergi (KDV) Bloğu    : ${report.vatConfigured ? '✅ TANIMLI (Fatura kaydı yazılabilir)' : `❌ EKSİK (${report.missingVatVars.join(', ')})`}`);
+  console.log(`3. Entegratör Bloğu     : ${report.integratorConfigured ? '✅ TANIMLI (Entegratör bağlantısı kurulabilir)' : `❌ EKSİK (${report.missingIntegratorVars.join(', ')})`}`);
 
   console.log('\n--- SONUÇ HÜKMÜ ---');
   console.log(`📌 ${report.summarySentence}\n`);
