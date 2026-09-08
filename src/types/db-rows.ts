@@ -1,11 +1,17 @@
 /**
  * Row shapes for the tables the app queries.
  *
- * These exist because `prisma generate` does not run in this repo, so
- * `@prisma/client` carries no model types at all (see
- * src/types/prisma-override.d.ts) and every delegate is `any`. Each interface
- * below records the columns one screen or action reads, so the compiler has
- * something to check even though Prisma gives it nothing.
+ * These exist because a clone of this repo carries no generated Prisma client:
+ * `prisma generate` writes into node_modules only. `pnpm gate` now runs it
+ * first, but any `tsc` run before that resolves `@prisma/client` to
+ * src/types/prisma-override.d.ts, where the delegate *methods* are `any`. Each
+ * interface below records the columns one screen or action reads, so the
+ * compiler has something to check even though Prisma gives it nothing.
+ *
+ * The model *names* are no longer part of that gap: `ModelName` in
+ * src/types/prisma-override.d.ts enumerates the 71 delegates the schema
+ * declares, so `prisma.organization.findMany()` is a compile error rather than a
+ * runtime TypeError.
  *
  * Every model named here exists in prisma/schema.prisma. That is now a rule, not
  * a hope: this file used to also carry `LegacyOrganizationRow`,

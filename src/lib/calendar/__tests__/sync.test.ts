@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { syncMeetingBriefToCalendar } from '../sync';
 import { buildAlertRow, type RecordAlertInput } from '@/lib/observability/system-alert';
 import { createDbClient } from '@/lib/db';
@@ -38,7 +38,23 @@ function scheduledBrief(overrides: Partial<{ partnerName: string | null; content
 }
 
 describe('syncMeetingBriefToCalendar', () => {
-  let mockTx: Partial<TenantTx>;
+  /**
+   * The two delegates this unit actually touches.
+   *
+   * It used to be `Partial<TenantTx>`, which compiled only because every
+   * delegate on the client was reachable through an index signature — the same
+   * looseness that let calls to models the schema does not have pass
+   * `pnpm typecheck` (src/types/prisma-override.d.ts). With the delegate names
+   * enumerated, a partial client is no longer a client, so the mock states its
+   * own shape and is cast once, at the call boundary, by `asTx`.
+   */
+  type CalendarMockTx = {
+    calendarConnection: { findMany: Mock; update: Mock };
+    systemAlert: { create: Mock };
+  };
+
+  let mockTx: CalendarMockTx;
+  const asTx = () => mockTx as unknown as TenantTx;
 
   beforeEach(() => {
     recordAlert.mockClear();
@@ -63,7 +79,7 @@ describe('syncMeetingBriefToCalendar', () => {
       meetingScheduledTz: 'Europe/Brussels',
     };
 
-    await syncMeetingBriefToCalendar(mockTx, 'tenant:1', 'user:1', brief);
+    await syncMeetingBriefToCalendar(asTx(), 'tenant:1', 'user:1', brief);
 
     expect(mockTx.calendarConnection.findMany).not.toHaveBeenCalled();
   });
@@ -71,7 +87,7 @@ describe('syncMeetingBriefToCalendar', () => {
   it('should skip sync if no connected calendars', async () => {
     mockTx.calendarConnection.findMany.mockResolvedValue([]);
 
-    await syncMeetingBriefToCalendar(mockTx, 'tenant:1', 'user:1', scheduledBrief());
+    await syncMeetingBriefToCalendar(asTx(), 'tenant:1', 'user:1', scheduledBrief());
 
     expect(mockTx.calendarConnection.findMany).toHaveBeenCalledWith({
       where: {
@@ -90,7 +106,7 @@ describe('syncMeetingBriefToCalendar', () => {
     ]);
     mockTx.calendarConnection.update.mockResolvedValue({});
 
-    await syncMeetingBriefToCalendar(mockTx, 'tenant:1', 'user:1', scheduledBrief());
+    await syncMeetingBriefToCalendar(asTx(), 'tenant:1', 'user:1', scheduledBrief());
 
     expect(mockTx.calendarConnection.update).toHaveBeenCalledTimes(2);
     expect(mockTx.calendarConnection.update).toHaveBeenCalledWith(
@@ -109,7 +125,7 @@ describe('syncMeetingBriefToCalendar', () => {
     mockTx.calendarConnection.update.mockResolvedValue({});
 
     await syncMeetingBriefToCalendar(
-      mockTx,
+      asTx(),
       'tenant:1',
       'user:1',
       scheduledBrief({ content: 'A'.repeat(1000) })
@@ -128,7 +144,7 @@ describe('syncMeetingBriefToCalendar', () => {
 
     it('records the failure and does not throw', async () => {
       await expect(
-        syncMeetingBriefToCalendar(mockTx, 'tenant:1', 'user:1', scheduledBrief())
+        syncMeetingBriefToCalendar(asTx(), 'tenant:1', 'user:1', scheduledBrief())
       ).resolves.toBeUndefined();
 
       expect(recordAlert).toHaveBeenCalledTimes(1);
@@ -143,7 +159,7 @@ describe('syncMeetingBriefToCalendar', () => {
     });
 
     it('keeps tenant identifiers out of a table that has no RLS policy', async () => {
-      await syncMeetingBriefToCalendar(mockTx, 'tenant:1', 'user:1', scheduledBrief());
+      await syncMeetingBriefToCalendar(asTx(), 'tenant:1', 'user:1', scheduledBrief());
 
       const { meta } = recordAlert.mock.calls[0]![0] as RecordAlertInput;
       expect(meta).not.toHaveProperty('tenantId');
@@ -162,7 +178,7 @@ describe('syncMeetingBriefToCalendar', () => {
     it('produces a row the real SystemAlert schema accepts', async () => {
       const db = createDbClient(UNREACHABLE_DB);
 
-      await syncMeetingBriefToCalendar(mockTx, 'tenant:1', 'user:1', scheduledBrief());
+      await syncMeetingBriefToCalendar(asTx(), 'tenant:1', 'user:1', scheduledBrief());
       const input = recordAlert.mock.calls[0]![0] as RecordAlertInput;
 
       const accepted = await rejectionKind(() =>
@@ -196,7 +212,7 @@ describe('syncMeetingBriefToCalendar', () => {
     });
 
     it('names the partner when there is one', async () => {
-      await syncMeetingBriefToCalendar(mockTx, 'tenant:1', 'user:1', scheduledBrief());
+      await syncMeetingBriefToCalendar(asTx(), 'tenant:1', 'user:1', scheduledBrief());
 
       expect(createEvent.mock.calls[0]![0]).toMatchObject({ title: 'Meeting: Test Partner' });
     });
@@ -205,7 +221,7 @@ describe('syncMeetingBriefToCalendar', () => {
     // string "Meeting: null" onto the user's real calendar.
     it('does not put "null" on the calendar for an unnamed partner', async () => {
       await syncMeetingBriefToCalendar(
-        mockTx,
+        asTx(),
         'tenant:1',
         'user:1',
         scheduledBrief({ partnerName: null })

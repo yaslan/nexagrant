@@ -28,7 +28,15 @@ jobs:
       
     - name: Validate Prisma schema
       run: pnpm dlx prisma validate
-      
+
+    # `prisma generate` writes into node_modules only, so a fresh checkout has no
+    # client and `@prisma/client` resolves to src/types/prisma-override.d.ts,
+    # where the query methods are `any`. Generating first is what makes
+    # `withTenant(id, (tx) => tx.planAssignment.findMany(…))` infer a row type
+    # instead of `unknown`. It needs no database and no DATABASE_URL.
+    - name: Generate Prisma client
+      run: pnpm db:generate
+
     - name: Lint
       run: pnpm lint
       

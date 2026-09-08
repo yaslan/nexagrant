@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
     "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
     "db:rls": "tsx scripts/apply-rls.ts",
     "db:rls-role": "tsx scripts/setup-rls-role.ts",
     "db:rls-role:rollback": "tsx scripts/setup-rls-role.ts --rollback",
@@ -31,7 +32,7 @@
     "beta:esr-calibration:rollback": "tsx scripts/esr-calibration.ts --rollback",
     "a11y:check": "tsx scripts/a11y-check.ts",
     "jobs:g0-rescore": "tsx scripts/rescore-g0.ts",
-    "gate": "pnpm lint && pnpm typecheck && pnpm test && pnpm i18n:check && pnpm rls:check && pnpm rls:verify",
+    "gate": "pnpm db:generate && pnpm lint && pnpm typecheck && pnpm test && pnpm i18n:check && pnpm rls:check && pnpm rls:verify",
     "hooks:install": "git config core.hooksPath githooks && echo \"core.hooksPath=githooks ayarlandi\""
   },
   "dependencies": {
