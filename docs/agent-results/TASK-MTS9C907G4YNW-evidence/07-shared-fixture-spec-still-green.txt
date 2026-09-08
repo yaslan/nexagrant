@@ -1,0 +1,10 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+Running 2 tests using 1 worker
+
+[seed-plan-e2e] ready — ultra=plan-e2e-ultra-ws (ultra) flip=plan-e2e-flip-ws (pro)
+  ✓  1 [chromium] › tests/e2e/module-plan-gate.spec.ts:84:7 › module gate — an ON module outside the plan is still refused › Pro is locked out of M10 and Ultra is let in — with the module ON both times (3.0s)
+[seed-plan-e2e] rolled back
+  ✓  2 [chromium] › tests/e2e/module-plan-gate.spec.ts:120:7 › module gate — an ON module outside the plan is still refused › an OFF module the plan does include is still refused (1.9s)
+
+  2 passed (6.0s)

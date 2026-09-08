@@ -1,0 +1,47 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+Running 3 tests using 1 worker
+
+[seed-plan-e2e] ready — ultra=plan-e2e-ultra-ws (ultra) flip=plan-e2e-flip-ws (pro)
+  ✓  1 [chromium] › tests/e2e/m10-audit-identity.spec.ts:167:7 › M10 dual approval identity › the approval record names the session that acted, and each step names its own actor (1.7s)
+  ✓  2 [chromium] › tests/e2e/m10-audit-identity.spec.ts:237:7 › M10 dual approval identity › an identity-less visitor never reaches the approval surface (1.0s)
+[seed-plan-e2e] rolled back
+  ✘  3 [chromium] › tests/e2e/m10-audit-identity.spec.ts:258:7 › M10 dual approval identity › an unauthorised write is refused by the action itself — measured on a LIVE action id (1.2s)
+
+
+  1) [chromium] › tests/e2e/m10-audit-identity.spec.ts:258:7 › M10 dual approval identity › an unauthorised write is refused by the action itself — measured on a LIVE action id 
+
+    Error: an identity-less caller signed a document
+
+    expect(received).toBeNull()
+
+    Received: 2026-09-08T06:27:49.283Z
+
+      321 |       await signedAtOf(targetDoc.id),
+      322 |       'an identity-less caller signed a document',
+    > 323 |     ).toBeNull();
+          |       ^
+      324 |
+      325 |     // ── 2. cross-tenant: a real session, somebody else's document ─────────────────
+      326 |     const crossRes = await replay(sessionA, otherTenantDoc.id);
+        at /Users/macbook/AgentSpace/fabrika/tests/e2e/m10-audit-identity.spec.ts:323:7
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/m10-audit-identity-M10-dua-8823e-easured-on-a-LIVE-action-id-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/m10-audit-identity-M10-dua-8823e-easured-on-a-LIVE-action-id-chromium/error-context.md
+
+    Error Context: test-results/m10-audit-identity-M10-dua-8823e-easured-on-a-LIVE-action-id-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/m10-audit-identity-M10-dua-8823e-easured-on-a-LIVE-action-id-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/m10-audit-identity-M10-dua-8823e-easured-on-a-LIVE-action-id-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests/e2e/m10-audit-identity.spec.ts:258:7 › M10 dual approval identity › an unauthorised write is refused by the action itself — measured on a LIVE action id 
+  2 passed (4.8s)
