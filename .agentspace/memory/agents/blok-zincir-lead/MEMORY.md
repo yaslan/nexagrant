@@ -34,3 +34,6 @@
 - [fabrika-zero-warnings-can-mean-rule-is-off](fabrika-zero-warnings-can-mean-rule-is-off.md) — Bir lint kuralı için 0 uyarı görmek kodun temiz olduğu anlamına GELMEZ — Fabrika'da react-hooks/set-state-in-effect hiç yapılandırılmamıştı; kartı dağıtmadan önce eslint.config.mjs'te kuralın AÇIK olduğunu doğrula
 
 - [fabrika-delegation-verdict-wrong-both-directions](fabrika-delegation-verdict-wrong-both-directions.md) — Delegasyon defterinin hükmü İKİ YÖNDE de yanlış olabilir — "failed" biten işi gizler, "tespit=marker" ise hiç kanıt olmadığı demektir
+
+- [fabrika-idle-pane-failure-means-nothing-ran](fabrika-idle-pane-failure-means-nothing-ran.md) — `tespit=idle` ("boş prompt'ta bekliyor") ölü pane'den FARKLIDIR — iş hiç başlamamıştır, ağaçta arayacak yarım kod yoktur
+- [fabrika-review-pile-is-the-real-backlog](fabrika-review-pile-is-the-real-backlog.md) — `review`de bekleyen kart bitmiş iş değil — dağıtılacak iş arıyorsan gerçek kuyruk orada, backlog'da değil

@@ -28,3 +28,14 @@ Bu, [[fabrika-dead-pane-work-measure-before-discarding]]'deki durumdan FARKLI, k
 2. **`delegation failed (504): no app window`** = AgentSpace ofis penceresi kapalı, pane
    açılamaz. Bu bir kod/izin sorunu DEĞİL; tekrar tekrar denemenin faydası yok — patrona
    pencereyi açmasını söyle ve dalgayı hazır tut.
+
+**2026-09-08 ek — "dalga koşmadı" cümlesini görev metnine koyarken DİKKAT.** Yeniden gönderirken
+her alt-göreve "önceki denemede prompt hiç başlamadı, ağaçta yarım kod YOK, sıfırdan başla"
+yazdım. Bu dalga için doğruydu ama blog-yazar bunu haklı olarak düzeltti: onun KARTININ
+geçmişinde iş vardı (`219ddca`, `bb78d65` — bir gün önce, aynı kimlikle). İki şey ayrı:
+
+- **dalga** koşmadı → o KOŞUDAN kod yok
+- **kart** ise günler önce başka bir koşuda çözülmüş olabilir
+
+Doğru cümle: "bu KOŞUDAN ağaçta kod yok; ama kartın kendi geçmişini `git log -- <dosya>` ile
+ÖLÇ ve varsa üstüne çık." Aksi halde worker sıfırdan yazmaya kalkar ve biten işi tekrar eder.
