@@ -1,6 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 
 import trMessages from '../../messages/tr.json';
+import {
+  M9_BRIEFS_URL,
+  setupM9Tenant,
+  signInAsM9User,
+  teardownM9Tenant,
+} from './fixtures/m9-tenant';
 
 /**
  * M9 brief generation — the failure paths, driven by a real browser.
@@ -17,9 +23,27 @@ import trMessages from '../../messages/tr.json';
  * browser.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQURC2H4E0WF-screenshots';
-const WORKSPACE = 'fabrika-beta';
-const BRIEFS_URL = `/tr/${WORKSPACE}/opportunities/demo-opp-1/briefs`;
+const SHOTS = 'docs/agent-results/TASK-MTS6MBA7NEIM0-screenshots';
+/**
+ * TASK-MTS6MBA7NEIM0 — all three tests below timed out waiting for the partner
+ * name field, and the field was never going to appear: the page rendered the
+ * module-lock screen ("Meeting Briefs modülü aboneliğinizin kapsamı dışında.
+ * Şu planlarda yer alıyor: Ultra").
+ *
+ * The spec signed in as `owner@demo.fabrika.test` and opened `demo-opp-1` in
+ * `fabrika-beta`, which stopped being a coherent pair once `15de510`
+ * (feat(authz): plan entitlement gates module access) added the plan half of
+ * the gate. Measured on this database: that account's membership is in tenant
+ * `cmtrhjys10001ncxk13gwtbcb` ("Owner Kuruluşu"), not `demo-tenant`, so it owns
+ * neither the opportunity nor a plan granting M9 — and there is no `ModuleState`
+ * row for M9 anywhere.
+ *
+ * Nothing about the failure surfaces below changed; only the tenant the browser
+ * signs in to. `./fixtures/m9-tenant` owns the plan (`ultra`), the `ModuleState`
+ * switch, the opportunity and the credits, and removes them afterwards — the
+ * same fixture `m9-briefs-form.spec.ts` already runs green on.
+ */
+const BRIEFS_URL = M9_BRIEFS_URL;
 
 const M9 = trMessages.m9;
 
@@ -34,23 +58,15 @@ async function signInAndOpenBriefs(page: Page) {
     await d.dismiss();
   });
 
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
-  });
-
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(BRIEFS_URL)}`);
-  await page.locator('input[type="email"]').fill('owner@demo.fabrika.test');
-  await page.locator('form button[type="submit"]').click();
-  await page.waitForURL(`**${BRIEFS_URL}`, { timeout: 60_000 });
-  await page.waitForLoadState('networkidle');
+  await signInAsM9User(page, BRIEFS_URL);
 
   return { app: page.getByRole('main'), dialogs };
 }
 
 test.describe('M9 brief generation reports every way it can fail', () => {
+  test.beforeAll(setupM9Tenant);
+  test.afterAll(teardownM9Tenant);
+
   test('a dropped request surfaces in the band, keeps the form, and retries', async ({ page }) => {
     const { app, dialogs } = await signInAndOpenBriefs(page);
 

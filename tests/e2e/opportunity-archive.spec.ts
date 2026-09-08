@@ -20,7 +20,7 @@ import { ARCHIVE_E2E, seed, rollback } from '../../scripts/seed-archive-e2e';
  *      fixture), logs one entry, and checks the row that reaches the `Effort` table.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQZNBGENT12T-screenshots';
+const SHOTS = 'docs/agent-results/TASK-MTS6MBA7NEIM0-screenshots';
 const WS = ARCHIVE_E2E.workspaceSlug;
 const BOARD_URL = `/tr/${WS}/pipeline`;
 const DETAIL_URL = `${BOARD_URL}/${ARCHIVE_E2E.archivedOppId}`;

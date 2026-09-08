@@ -62,6 +62,27 @@ export async function seed() {
     },
   });
 
+  // M5 is the module the pipeline board and the opportunity detail page belong to,
+  // and `moduleGate('M5')` reads two independent facts: the plan's grant and this
+  // tenant's own `ModuleState` row. TASK-MTS6MBA7NEIM0 — the fixture created neither,
+  // so `/pipeline` served the module-lock screen ("Proposal Production Workflows
+  // modülü kiracınızda kapalı") and the board assertions failed on a missing switch
+  // rather than on anything about archiving.
+  //
+  // The `free` grant in src/lib/billing/catalog.ts already includes M5, so no
+  // Subscription row is needed here; a fixture that granted itself a plan would be
+  // testing less than the product does.
+  await prisma.moduleState.upsert({
+    where: { tenantId_moduleId: { tenantId: ARCHIVE_E2E.tenantId, moduleId: 'M5' } },
+    update: { status: 'ON' },
+    create: {
+      tenantId: ARCHIVE_E2E.tenantId,
+      moduleId: 'M5',
+      status: 'ON',
+      changedBy: 'seed-archive-e2e',
+    },
+  });
+
   await prisma.membership.upsert({
     where: { tenantId_userId: { tenantId: ARCHIVE_E2E.tenantId, userId: ARCHIVE_E2E.userId } },
     update: { role: 'TENANT_OWNER', workspaceIds: [ARCHIVE_E2E.workspaceId] },
@@ -114,6 +135,7 @@ export async function rollback() {
   await prisma.effort.deleteMany({ where: { tenantId: ARCHIVE_E2E.tenantId } });
   await prisma.auditEvent.deleteMany({ where: { tenantId: ARCHIVE_E2E.tenantId } });
   await prisma.opportunity.deleteMany({ where: { tenantId: ARCHIVE_E2E.tenantId } });
+  await prisma.moduleState.deleteMany({ where: { tenantId: ARCHIVE_E2E.tenantId } });
   await prisma.membership.deleteMany({
     where: { userId: ARCHIVE_E2E.userId, tenantId: ARCHIVE_E2E.tenantId },
   });
