@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTR882HVZ8BG7 — the lock is a floor, not a ceiling.
@@ -18,7 +19,7 @@ import { prisma } from '../../src/lib/db';
  *   E2E_BASE_URL=http://localhost:3210 npx playwright test tests/e2e/price-lock-deeper-campaign.spec.ts
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTR882HVZ8BG7-screenshots';
+const SHOTS = shotsDir('TASK-MTR882HVZ8BG7-screenshots');
 const TENANT_ID = 'demo-tenant';
 const EMAIL = 'admin@yasinaslan.com.tr';
 const BILLING_URL = '/tr/main/settings/billing';

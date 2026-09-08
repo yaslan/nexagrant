@@ -400,6 +400,7 @@ export default function CallsPage({
           <button
             onClick={handleSaveSearch}
             disabled={savingSearch}
+            data-testid="calls-save-search"
             className="w-full sm:w-auto px-4 py-2.5 border border-accent text-accent font-semibold text-xs sm:text-sm rounded-lg hover:bg-accent/10 transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <span>🔔</span>
@@ -410,6 +411,7 @@ export default function CallsPage({
         {savedSearchMessage && (
           <div
             role="status"
+            data-testid="calls-save-search-status"
             className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 px-4 py-3 text-xs sm:text-sm"
           >
             {savedSearchMessage}
@@ -419,6 +421,7 @@ export default function CallsPage({
         {savedSearchError && (
           <div
             role="alert"
+            data-testid="calls-save-search-error"
             className="rounded-lg border border-red-500/40 bg-red-500/10 text-red-700 px-4 py-3 text-xs sm:text-sm"
           >
             {savedSearchError}
@@ -426,7 +429,10 @@ export default function CallsPage({
         )}
 
         {savedSearchesLoaded && savedSearches.length > 0 && (
-          <div className="rounded-lg border border-border/60 bg-ground p-3 flex flex-col gap-2">
+          <div
+            data-testid="calls-saved-search-list"
+            className="rounded-lg border border-border/60 bg-ground p-3 flex flex-col gap-2"
+          >
             <span className="font-semibold text-muted text-xs">{t('savedSearchesTitle')}</span>
             <ul className="flex flex-col gap-1.5">
               {savedSearches.map((s) => (

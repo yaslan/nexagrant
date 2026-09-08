@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTRNQHC3IV2BE — no invented person, organisation or byline on screen.
@@ -14,7 +15,7 @@ import { encode } from 'next-auth/jwt';
  * exists in the DOM while the menu is open.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTRNQHC3IV2BE-screenshots';
+const SHOTS = shotsDir('TASK-MTRNQHC3IV2BE-screenshots');
 const COOKIE_NAME = 'authjs.session-token';
 const SECRET =
   process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';

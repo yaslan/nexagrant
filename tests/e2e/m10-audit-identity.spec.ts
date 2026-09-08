@@ -3,6 +3,7 @@ import { encode } from 'next-auth/jwt';
 
 import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTS9C907G4YNW — this spec used to hand out a false pass.
@@ -44,7 +45,7 @@ import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
  * produces — so the test drives the real page rather than a stub.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTS9C907G4YNW-screenshots';
+const SHOTS = shotsDir('TASK-MTS9C907G4YNW-screenshots');
 const ULTRA = PLAN_E2E.ultra;
 const FLIP = PLAN_E2E.flip;
 const DOCS_URL = `/tr/${ULTRA.workspaceSlug}/opportunities/${ULTRA.opportunityId}/documents`;

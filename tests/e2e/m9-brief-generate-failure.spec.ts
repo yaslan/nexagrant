@@ -7,6 +7,7 @@ import {
   signInAsM9User,
   teardownM9Tenant,
 } from './fixtures/m9-tenant';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * M9 brief generation — the failure paths, driven by a real browser.
@@ -23,7 +24,7 @@ import {
  * browser.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTS6MBA7NEIM0-screenshots';
+const SHOTS = shotsDir('TASK-MTS6MBA7NEIM0-screenshots');
 /**
  * TASK-MTS6MBA7NEIM0 — all three tests below timed out waiting for the partner
  * name field, and the field was never going to appear: the page rendered the

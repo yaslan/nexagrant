@@ -132,7 +132,45 @@ doğrudan 60 sn'lik test zaman aşımına dönüyor. Ölçüm: dört spec, aynı
 Yerine beklediğin şeyi bekle (locator, `waitForURL`); Playwright'ın auto-wait'i zaten
 senkronizasyondur.
 
-### 3.5 Fikstür kullanıcısı önce var olmalı
+### 3.5 Ekran görüntülerini `docs/agent-results/` altına YAZMA
+
+Her spec kendi yolunu elle tutuyordu:
+
+```ts
+const SHOTS = 'docs/agent-results/TASK-MTQZMLLZE1I29-screenshots';   // YANLIŞ
+```
+
+O dizinler **commit'li kanıt** dizinleri. Yani `pnpm test:e2e`, haftalar önce
+kapanmış görevlerin kanıt karelerini üzerine yazıyordu: tek bir tam koşu 27 izlenen
+dosyayı "değişmiş" bırakıyor, ve bunların hepsi PNG gürültüsü değil —
+`TASK-MTQWBAJ2T5XSV-screenshots/02-empty-tenant-dashboard-en.png` 74 927 → 41 503
+bayta düşmüştü, yani **başka bir ekran**. Sonradan koşan alakasız bir testin sessizce
+değiştirebildiği şey kanıt değildir.
+
+Doğrusu `tests/e2e/fixtures/shots.ts`:
+
+```ts
+import { shotsDir } from './fixtures/shots';
+const SHOTS = shotsDir('TASK-MTQZMLLZE1I29-screenshots');   // → test-artifacts/… (git yok sayar)
+```
+
+Kareyi bir kartın klasörüne *yayımlamak* hâlâ mümkün, ama artık bilinçli bir
+eylem — koşunun yan etkisi değil:
+
+```bash
+E2E_SHOTS_ROOT=docs/agent-results npx playwright test tests/e2e/seninki.spec.ts
+```
+
+Klasör adı olduğu gibi geçer, dolayısıyla yayımlanan kare her zamanki yoluna
+düşer ve eski raporların bağlantıları çalışmaya devam eder. `shotsDir()` dizini
+kendisi açar: `page.screenshot()` üst dizinleri yaratır ama `writeFileSync`
+yaratmaz (`dashboard-outcome-case`'in CSV'si yalnızca commit'li klasör diskte
+hazır olduğu için çalışıyordu).
+
+Kontrol: tam bir e2e koşusundan sonra `git status --porcelain -- docs/agent-results`
+hiçbir ` M` satırı göstermemeli.
+
+### 3.6 Fikstür kullanıcısı önce var olmalı
 
 Giriş şifresiz ve **tanımadığı e-postaya kullanıcı + kiracı + çalışma alanı yaratıyor**
 (`src/lib/auth.ts` `authorize`). Seed'lemediğin bir adresle giriş yapan spec, planı
@@ -146,6 +184,7 @@ seed et. (Depoda birikmiş `org-…` slug'lı kiracılar bu yolun kalıntısıd�
 | `scripts/seed-plan-e2e.ts` | `plan-e2e-ultra-*` (kalıcı `ultra`) ve `plan-e2e-flip-*` (planı çevrilen) kiracılar, M10 ON |
 | `scripts/seed-f10-e2e.ts` | `f10-empty-*` / `f10-full-*` — boş vs dolu çalışma alanı, M5+M6 ON, `full` `pro` planında |
 | `scripts/seed-gate-e2e.ts` | `gate-e2e-tenant-a/b` — kiracı izolasyonu için iki kiracı, M5 ON |
+| `scripts/seed-saved-search-e2e.ts` | `saved-search-e2e-*` — "Aramayı Kaydet"in yazdığı `SavedSearch` satırı kendi kiracısında kalsın diye (`alerts-daily` bu tabloyu kiracıdan bağımsız okur) |
 | `scripts/seed-m6-e2e.ts`, `seed-g0-e2e.ts`, `seed-archive-e2e.ts`, `seed-relationship-e2e.ts` | ilgili modüllerin fikstürleri |
 
 Hepsi aynı sözleşmeye uyar: sabit id'lere `upsert` (idempotent, iki kez koşulabilir) +

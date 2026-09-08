@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { getKpiMetrics } from '../../src/modules/m5/server/queries';
 import { ARCHIVE_E2E, seed, rollback } from '../../scripts/seed-archive-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * Archiving an opportunity, and the effort log — against a real browser and a real database.
@@ -20,7 +21,7 @@ import { ARCHIVE_E2E, seed, rollback } from '../../scripts/seed-archive-e2e';
  *      fixture), logs one entry, and checks the row that reaches the `Effort` table.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTS6MBA7NEIM0-screenshots';
+const SHOTS = shotsDir('TASK-MTS6MBA7NEIM0-screenshots');
 const WS = ARCHIVE_E2E.workspaceSlug;
 const BOARD_URL = `/tr/${WS}/pipeline`;
 const DETAIL_URL = `${BOARD_URL}/${ARCHIVE_E2E.archivedOppId}`;

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { prisma } from '../../src/lib/db';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTRJ32BZBY2AI step 2 — the platform plan editor, driven by real clicks.
@@ -17,7 +18,7 @@ import { prisma } from '../../src/lib/db';
  * working screen.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTRJ32BZBY2AI-screenshots';
+const SHOTS = shotsDir('TASK-MTRJ32BZBY2AI-screenshots');
 const COOKIE_NAME = 'authjs.session-token';
 const SECRET = process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
 const URL = '/tr/admin/billing/plans';

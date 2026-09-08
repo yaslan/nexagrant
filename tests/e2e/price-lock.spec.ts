@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTR882HVZ8BG7 — "the price you join at stays yours", in a real browser.
@@ -21,7 +22,7 @@ import { prisma } from '../../src/lib/db';
  * afterwards, so the run leaves the database as it found it.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTR882HVZ8BG7-screenshots';
+const SHOTS = shotsDir('TASK-MTR882HVZ8BG7-screenshots');
 const TENANT_ID = 'demo-tenant';
 const EMAIL = 'admin@yasinaslan.com.tr';
 const BILLING_URL = '/tr/main/settings/billing';

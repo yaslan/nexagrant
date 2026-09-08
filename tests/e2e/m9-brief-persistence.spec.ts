@@ -9,6 +9,7 @@ import {
   signInAsM9User,
   teardownM9Tenant,
 } from './fixtures/m9-tenant';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * M9 briefs — the two claims of TASK-MTQUX5IZ9I5VP, measured against the running
@@ -25,7 +26,7 @@ import {
  * real Postgres reads between the assertions.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQUX5IZ9I5VP-screenshots';
+const SHOTS = shotsDir('TASK-MTQUX5IZ9I5VP-screenshots');
 const PARTNER = 'E2E Kalicilik Ortagi';
 const MISSING_URL = `/tr/${M9_WORKSPACE}/opportunities/m9-e2e-does-not-exist/briefs`;
 

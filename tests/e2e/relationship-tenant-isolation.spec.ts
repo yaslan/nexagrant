@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
 import { REL_E2E, seed, rollback } from '../../scripts/seed-relationship-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTRKV9JGY7OQY — M4 relationship screens, isolation in a real browser.
@@ -15,7 +16,7 @@ import { REL_E2E, seed, rollback } from '../../scripts/seed-relationship-e2e';
  * anything here.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTRKV9JGY7OQY-screenshots';
+const SHOTS = shotsDir('TASK-MTRKV9JGY7OQY-screenshots');
 const OWN_URL = `/tr/${REL_E2E.workspaceSlug}/relationships/${REL_E2E.relationshipId}`;
 const STOLEN_URL = `/tr/${REL_E2E.workspaceSlug}/relationships/${REL_E2E.otherRelationshipId}`;
 const LIST_URL = `/tr/${REL_E2E.workspaceSlug}/relationships`;

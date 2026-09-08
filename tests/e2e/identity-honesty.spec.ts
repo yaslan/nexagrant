@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTR5BGKNELCO2 — the app frame must never invent who is signed in.
@@ -15,7 +16,7 @@ import { encode } from 'next-auth/jwt';
  * secret — the same JWT the OAuth path produces — rather than by changing sign-in code.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTR5BGKNELCO2-screenshots';
+const SHOTS = shotsDir('TASK-MTR5BGKNELCO2-screenshots');
 const WORKSPACE = 'fabrika-beta';
 const PANEL_URL = `/tr/${WORKSPACE}/panel`;
 const COOKIE_NAME = 'authjs.session-token';

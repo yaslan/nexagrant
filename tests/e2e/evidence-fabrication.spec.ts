@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTRH86RCGVEGC — the evidence module invented accreditation.
@@ -15,7 +16,7 @@ import { prisma } from '../../src/lib/db';
  * detail drawer shows. Nothing is stubbed.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTRH86RCGVEGC-screenshots';
+const SHOTS = shotsDir('TASK-MTRH86RCGVEGC-screenshots');
 const WORKSPACE = 'org-1xnfma';
 const TENANT_ID = 'cmtrhjys10001ncxk13gwtbcb';
 const EVIDENCE_URL = `/tr/${WORKSPACE}/evidence`;

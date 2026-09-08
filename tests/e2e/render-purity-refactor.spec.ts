@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTQV1JYGMGU6V — the components that carried inline `eslint-disable` exceptions,
@@ -17,7 +18,7 @@ import { test, expect, type Page } from '@playwright/test';
  * focused input, which React then reports as a mismatch of the harness's own making.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQV1JYGMGU6V-screenshots';
+const SHOTS = shotsDir('TASK-MTQV1JYGMGU6V-screenshots');
 const EMAIL = 'admin@yasinaslan.com.tr';
 const CALLS_URL = '/tr/main/calls';
 

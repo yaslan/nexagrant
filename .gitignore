@@ -59,6 +59,12 @@ resolution.log
 test-results/
 playwright-report/
 .tmp-be-en/
+# Screenshots, CSVs and HTML dumps an e2e run produces. Default root of
+# tests/e2e/fixtures/shots.ts: without it every run rewrote the committed
+# evidence frames of already-closed tasks under docs/agent-results/.
+# Publishing a frame is deliberate: E2E_SHOTS_ROOT=docs/agent-results.
+test-artifacts/
 
 # ad-hoc agent verification scratch (not part of the build)
 .qa-scratch/
+.tmp-qa-en/

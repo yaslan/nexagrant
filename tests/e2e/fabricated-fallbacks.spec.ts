@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
 import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTQYXISOPUJ53 — fabricated data fallbacks, in a real browser.
@@ -23,7 +24,7 @@ import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
  * "F10 — renovation pilot"; `f10-empty-ws` has none. Both have M5 enabled.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQYXISOPUJ53-screenshots';
+const SHOTS = shotsDir('TASK-MTQYXISOPUJ53-screenshots');
 
 const personDaysUrl = (workspace: string) => `/tr/${workspace}/reports/person-days`;
 const notificationsUrl = (workspace: string) => `/tr/${workspace}/bildirimler`;

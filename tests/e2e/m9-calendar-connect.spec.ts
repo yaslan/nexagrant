@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
 import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTQUTBH8Q9VMK — the calendar connect flow, in a real browser.
@@ -19,7 +20,7 @@ import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
  *     that can never carry an event.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQUTBH8Q9VMK-screenshots';
+const SHOTS = shotsDir('TASK-MTQUTBH8Q9VMK-screenshots');
 const calendarSettingsUrl = (workspace: string) => `/tr/${workspace}/settings/calendar`;
 
 async function acceptCookies(page: Page) {

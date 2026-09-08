@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { test, expect, type Page } from '@playwright/test';
 
 import { createDbClient } from '../../src/lib/db';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTRD91ZLKEQ3A — Settings → Billing may not quote a number nobody issued.
@@ -19,7 +20,7 @@ import { createDbClient } from '../../src/lib/db';
  * afterwards.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTRD91ZLKEQ3A-screenshots';
+const SHOTS = shotsDir('TASK-MTRD91ZLKEQ3A-screenshots');
 const TENANT_ID = 'demo-tenant';
 const BILLING_URL = '/tr/main/settings/billing';
 const NUMBER = `E2E-${Date.now()}`;

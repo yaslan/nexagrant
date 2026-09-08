@@ -4,6 +4,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 
 import { createDbClient } from '../../src/lib/db';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTRD9QBJ2G32E — an invoice export may only describe an invoice that exists.
@@ -26,7 +27,7 @@ const STAMP = `e2e-inv-${Date.now()}`;
 const COOKIE_NAME = 'authjs.session-token';
 const SECRET =
   process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
-const SHOTS = 'docs/agent-results/TASK-MTRD9QBJ2G32E-screenshots';
+const SHOTS = shotsDir('TASK-MTRD9QBJ2G32E-screenshots');
 
 /**
  * The identities the route used to print. None of them is a real taxpayer — all three

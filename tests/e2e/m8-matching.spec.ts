@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * M8 "Aday Bul" — a real browser, a real database, a real click.
@@ -14,7 +15,7 @@ import { prisma } from '../../src/lib/db';
  * scope does not include that directory.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTR4CH9IDK4D7-screenshots';
+const SHOTS = shotsDir('TASK-MTR4CH9IDK4D7-screenshots');
 const TENANT = 'demo-tenant';
 const WORKSPACE = 'main';
 const OPP = 'm8-e2e-opp';

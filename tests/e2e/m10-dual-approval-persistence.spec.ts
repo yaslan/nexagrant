@@ -3,6 +3,7 @@ import { encode } from 'next-auth/jwt';
 
 import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTSAIWF4ENUSL — the two middle steps of the M10 dual approval used to live
@@ -26,7 +27,7 @@ import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
  * was written cannot be produced by a hard-coded or defaulted actor.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTSAIWF4ENUSL-screenshots';
+const SHOTS = shotsDir('TASK-MTSAIWF4ENUSL-screenshots');
 const ULTRA = PLAN_E2E.ultra;
 const DOCS_URL = `/tr/${ULTRA.workspaceSlug}/opportunities/${ULTRA.opportunityId}/documents`;
 const COOKIE_NAME = 'authjs.session-token';

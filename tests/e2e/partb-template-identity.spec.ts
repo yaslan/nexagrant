@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import trMessages from '../../messages/tr.json';
 import enMessages from '../../messages/en.json';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTS6LZOD715WM — a Part B the tenant has not written names nobody.
@@ -19,7 +20,7 @@ import enMessages from '../../messages/en.json';
  * both locales. The fixture is rolled back afterwards, keyed on the fixed ids below.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTS6LZOD715WM-screenshots';
+const SHOTS = shotsDir('TASK-MTS6LZOD715WM-screenshots');
 
 const M11_E2E = {
   email: 'm11-e2e@fabrika.test',

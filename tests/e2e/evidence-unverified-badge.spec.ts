@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTRH86RCGVEGC (second pass) — the "verified" badge.
@@ -19,7 +20,7 @@ import { prisma } from '../../src/lib/db';
  */
 
 const SHOTS = process.env.EVIDENCE_SHOTS
-  ?? 'docs/agent-results/TASK-MTRH86RCGVEGC-screenshots/badge-after';
+  ?? `${shotsDir('TASK-MTRH86RCGVEGC-screenshots')}/badge-after`;
 const WORKSPACE = 'org-1xnfma';
 const TENANT_ID = 'cmtrhjys10001ncxk13gwtbcb';
 const EVIDENCE_URL = `/tr/${WORKSPACE}/evidence`;

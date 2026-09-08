@@ -8,6 +8,7 @@ import {
   signInAsM9User,
   teardownM9Tenant,
 } from './fixtures/m9-tenant';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * M9 briefs form — the two silent-failure surfaces, driven by a real browser.
@@ -18,7 +19,7 @@ import {
  * Nothing here is stubbed: real sign-in, real page, real clicks and typing.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQUX5IZ9I5VP-screenshots';
+const SHOTS = shotsDir('TASK-MTQUX5IZ9I5VP-screenshots');
 /**
  * The spec used to run in `demo-tenant` as `owner@demo.fabrika.test`. Both moved
  * underneath it — the owner belongs to another tenant now, and `demo-tenant`'s

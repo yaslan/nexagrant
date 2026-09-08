@@ -11,6 +11,7 @@ import {
   signInAsM9User,
   teardownM9Tenant,
 } from './fixtures/m9-tenant';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTQUTBH8Q9VMK — the .ics the user actually receives, checked as bytes.
@@ -27,7 +28,7 @@ import {
  * verdict does not come from the same code that produced the file.
  */
 
-const EVIDENCE = 'docs/agent-results/TASK-MTQUTBH8Q9VMK-screenshots';
+const EVIDENCE = shotsDir('TASK-MTQUTBH8Q9VMK-screenshots');
 const DOWNLOADED = `${EVIDENCE}/brief-download.ics`;
 
 // Deliberately hostile TEXT (RFC 5545 §3.3.11) and multi-byte characters that

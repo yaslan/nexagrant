@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { shotsDir } from './fixtures/shots';
 
-const OUT = 'docs/agent-results/TASK-MTS6MRKDP168Q-screenshots';
+const OUT = shotsDir('TASK-MTS6MRKDP168Q-screenshots');
 
 test('TASK-MTS6MRKDP168Q — no unsourced figure on any public marketing surface', async ({ page }) => {
   const banned = [

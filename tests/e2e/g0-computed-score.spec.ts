@@ -1,8 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 
 import { prisma, withTenant } from '../../src/lib/db';
-import { computeG0ForOpportunity } from '../../src/lib/scoring/g0-compute';
+import { computeG0ForOpportunity, rescoreOpportunityG0 } from '../../src/lib/scoring/g0-compute';
 import { G0_E2E, seed, rollback } from '../../scripts/seed-g0-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTQ63RR8Z0G8E — the G0 score on screen is the canonical scorer's, in a real browser.
@@ -14,7 +15,7 @@ import { G0_E2E, seed, rollback } from '../../scripts/seed-g0-e2e';
  * G2 because "G0 refuses when the tenant has no scoring evidence on file" — so no end-to-end test
  * ever watched a G0 score reach a screen.
  *
- * Three things are proved here, and the third is why the first two are not enough on their own:
+ * Four things are proved here, and the third is why the first two are not enough on their own:
  *
  *   1. The detail page shows the number `computeG0ForOpportunity` returns for the same
  *      opportunity — asserted against a live call to the scorer, not against a literal copied
@@ -24,9 +25,11 @@ import { G0_E2E, seed, rollback } from '../../scripts/seed-g0-e2e';
  *      CLAUDE.md §7 requires behind any figure a user reads.
  *   3. An opportunity with **no** evidence whose `g0Score` column holds the old fabricated 92
  *      renders "Hesaplanamadı" — not 92, and not the 0 that "absence is not zero" forbids.
+ *   4. Two opportunities on the *same topic* keep their own score — the evidence record is keyed
+ *      by opportunity, not by topic. See the second test for what that defect looked like.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQ63RR8Z0G8E-qa-screenshots';
+const SHOTS = shotsDir('TASK-MTQ63RR8Z0G8E-qa-screenshots');
 
 const BOARD_URL = `/tr/${G0_E2E.workspaceSlug}/pipeline`;
 const SCORED_URL = `${BOARD_URL}/${G0_E2E.scoredOppId}`;
@@ -124,7 +127,13 @@ test.describe('G0 score comes from the canonical scorer', () => {
     // CLAUDE.md §7: the figure a user reads is backed by a record. `TopicMatch.breakdown` is
     // where the per-criterion trail is filed.
     const match = await prisma.topicMatch.findUnique({
-      where: { tenantId_topicId: { tenantId: G0_E2E.tenantId, topicId: G0_E2E.topicId } },
+      where: {
+        tenantId_topicId_opportunityId: {
+          tenantId: G0_E2E.tenantId,
+          topicId: G0_E2E.topicId,
+          opportunityId: G0_E2E.scoredOppId,
+        },
+      },
       select: { g0Score: true, breakdown: true },
     });
     expect(match?.g0Score).toBe(expected);
@@ -175,5 +184,73 @@ test.describe('G0 score comes from the canonical scorer', () => {
       select: { g0Score: true },
     });
     expect(untouched?.g0Score).toBe(G0_E2E.fabricatedScore);
+  });
+  /**
+   * TASK-MTQ63RR8Z0G8E, second defect: the evidence record was keyed `[tenantId, topicId]`, but a
+   * G0 score is not a property of a topic — `budgetRoleEconomy` (weight 10) reads
+   * `Opportunity.intendedRole` and `researchAndEndUser` (weight 12) reads that opportunity's
+   * seats — and `Opportunity.topicId` is not unique. Two opportunities on one topic therefore
+   * shared one row, last write winning, and the board drew the survivor on both cards: measured
+   * 44.9 (coordinator) and 48.23 (partner), both badges reading 48.23 while the coordinator's own
+   * detail page said 44.9. Same opportunity, two screens, two numbers (CLAUDE.md §7).
+   *
+   * The fixture's two opportunities differ only in `intendedRole`, so if the badge ever goes back
+   * to being keyed by topic this test fails on the very first assertion pair.
+   */
+  test('two opportunities on one topic keep their own score, on the board and on their own page', async ({
+    page,
+  }) => {
+    await acceptCookies(page);
+
+    // Score both through the product's own persistence path — the same call
+    // `createOpportunity` makes.
+    const coordinator = await rescoreOpportunityG0(G0_E2E.tenantId, G0_E2E.scoredOppId);
+    const partner = await rescoreOpportunityG0(G0_E2E.tenantId, G0_E2E.partnerOppId);
+    expect(coordinator?.score).not.toBeNull();
+    expect(partner?.score).not.toBeNull();
+    // The premise: identical topic evidence, different role, different score.
+    expect(coordinator?.score).not.toBe(partner?.score);
+
+    // One evidence row per opportunity, not one per topic.
+    const rows: { opportunityId: string | null; g0Score: number | null }[] =
+      await prisma.topicMatch.findMany({
+        where: { tenantId: G0_E2E.tenantId, topicId: G0_E2E.topicId },
+        select: { opportunityId: true, g0Score: true },
+        orderBy: { opportunityId: 'asc' },
+      });
+    const scoreByOpp = new Map(rows.map((r) => [r.opportunityId, r.g0Score]));
+    expect(scoreByOpp.get(G0_E2E.scoredOppId)).toBe(coordinator?.score);
+    expect(scoreByOpp.get(G0_E2E.partnerOppId)).toBe(partner?.score);
+    // The K1 row (no opportunity) still exists and still carries no G0 score.
+    expect(scoreByOpp.get(null)).toBeNull();
+
+    await signIn(page, BOARD_URL);
+    const app = page.getByRole('main');
+
+    // ── the board: each card shows its own number.
+    await expect(app.getByTestId(`pipeline-card-g0-${G0_E2E.scoredOppId}`)).toHaveText(
+      `⭐ ${coordinator?.score}`,
+    );
+    await expect(app.getByTestId(`pipeline-card-g0-${G0_E2E.partnerOppId}`)).toHaveText(
+      `⭐ ${partner?.score}`,
+    );
+    // The opportunity with no evidence has no badge at all — the fabricated 92 in its column is
+    // not a score anybody may read.
+    await expect(app.getByTestId(`pipeline-card-g0-${G0_E2E.unscoredOppId}`)).toHaveCount(0);
+    await expect(app.getByTestId('pipeline-board')).not.toContainText(
+      String(G0_E2E.fabricatedScore),
+    );
+    await shot(page, '05-board-two-opportunities-one-topic');
+
+    // ── each detail page agrees with its own badge.
+    await page.goto(`${BOARD_URL}/${G0_E2E.scoredOppId}`);
+    await page.waitForLoadState('networkidle');
+    await expect(app.getByTestId('pipeline-g0-score')).toContainText(`${coordinator?.score}/100`);
+    await shot(page, '06-detail-coordinator');
+
+    await page.goto(`${BOARD_URL}/${G0_E2E.partnerOppId}`);
+    await page.waitForLoadState('networkidle');
+    await expect(app.getByTestId('pipeline-g0-score')).toContainText(`${partner?.score}/100`);
+    await shot(page, '07-detail-partner');
   });
 });

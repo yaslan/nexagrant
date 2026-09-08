@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { M6_E2E, seed, rollback } from '../../scripts/seed-m6-e2e';
 import { DEFAULT_CRITERIA } from '../../src/modules/m6/types';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * M6 Evaluator Lens — happy path against a real browser and a real database.
@@ -12,7 +13,7 @@ import { DEFAULT_CRITERIA } from '../../src/modules/m6/types';
  * Postgres through the same server actions the product uses.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTPZHMSPMDA66-screenshots';
+const SHOTS = shotsDir('TASK-MTPZHMSPMDA66-screenshots');
 const WORKSPACE = 'm6-e2e-ws';
 const EVALUATIONS_URL = `/tr/${WORKSPACE}/opportunities/${M6_E2E.opportunityId}/evaluations`;
 const PANEL_URL = `${EVALUATIONS_URL}/panel`;

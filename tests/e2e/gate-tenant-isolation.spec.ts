@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { evaluateGate, GateOpportunityNotFoundError } from '../../src/lib/gates/evaluate';
 import { GATE_E2E, seed, rollback } from '../../scripts/seed-gate-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * Stage gate — happy path in a real browser, isolation against the real database.
@@ -14,7 +15,7 @@ import { GATE_E2E, seed, rollback } from '../../scripts/seed-gate-e2e';
  * proves it against Postgres, and proves the fix did not cost tenant A its working button.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQZMLLZE1I29-screenshots';
+const SHOTS = shotsDir('TASK-MTQZMLLZE1I29-screenshots');
 const DETAIL_URL = `/tr/${GATE_E2E.workspaceSlug}/pipeline/${GATE_E2E.opportunityId}`;
 
 test.describe.configure({ mode: 'serial' });

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * Plan gating against the USD catalogue — TASK-MTR6QIE05ZKNH.
@@ -15,7 +16,7 @@ import { prisma } from '../../src/lib/db';
  * product has no UI for changing your own plan — and restored afterwards.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTR6QIE05ZKNH-screenshots';
+const SHOTS = shotsDir('TASK-MTR6QIE05ZKNH-screenshots');
 const TENANT_ID = 'demo-tenant';
 const MODULES_URL = '/tr/main/settings/modules';
 

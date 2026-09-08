@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
 import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTQWBAJ2T5XSV (F10+F16) — "absence is not zero", in a real browser.
@@ -15,7 +16,7 @@ import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
  * two is to suppress zeros everywhere, which would hide a real result.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQWBAJ2T5XSV-screenshots';
+const SHOTS = shotsDir('TASK-MTQWBAJ2T5XSV-screenshots');
 
 const dashboardUrl = (workspace: string, locale = 'tr') =>
   locale === 'tr' ? `/${locale}/${workspace}/panel` : `/${locale}/${workspace}/dashboard`;

@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * The plan half of the module gate, in a real browser — TASK-MTQZ8MVAU3J7I.
@@ -27,7 +28,7 @@ import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
  * of the test belongs to the test.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQZ8MVAU3J7I-screenshots';
+const SHOTS = shotsDir('TASK-MTQZ8MVAU3J7I-screenshots');
 const FLIP = PLAN_E2E.flip;
 const TENANT_ID = FLIP.tenantId;
 /** M10 (Follow-up Documents): granted by `ultra` only, per PLAN_GRANTS. */

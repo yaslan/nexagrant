@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 
 import { prisma } from '../../src/lib/db';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTQTYXC0NUT0B — the dashboard's outcome-based KPI read 0 % where the data said 20 %.
@@ -20,7 +21,7 @@ import { prisma } from '../../src/lib/db';
  * under test.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTQTYXC0NUT0B-screenshots';
+const SHOTS = shotsDir('TASK-MTQTYXC0NUT0B-screenshots');
 const EXPORT_PATH = '/api/dashboard/export-csv';
 const SIGN_IN_AS = 'alice@fabrika.test';
 
