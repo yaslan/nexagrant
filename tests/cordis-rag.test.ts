@@ -3,7 +3,10 @@ import { createCordisPrismaStub, type CordisPrismaStub } from './helpers/cordis-
 
 const db: CordisPrismaStub = createCordisPrismaStub();
 
-vi.mock('../src/lib/db', () => ({ prisma: db.prisma }));
+vi.mock('../src/lib/db', () => ({
+  prisma: db.prisma,
+  withTenant: async (_tenantId: string, fn: (tx: typeof db.prisma) => Promise<unknown>) => fn(db.prisma),
+}));
 
 const { syncCordisBigData, aggregateCordisMetrics } = await import('../src/lib/cordis-sync');
 const { retrieveChunks, buildRagPrompt, splitText } = await import('../src/lib/rag');

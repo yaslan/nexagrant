@@ -13,7 +13,10 @@ const mockPrisma = vi.hoisted(() => ({
   $executeRawUnsafe: vi.fn(),
   $queryRawUnsafe: vi.fn(),
 }));
-vi.mock('@/lib/db', () => ({ prisma: mockPrisma }));
+vi.mock('@/lib/db', () => ({
+  prisma: mockPrisma,
+  withTenant: async (_tenantId: string, fn: (tx: typeof mockPrisma) => Promise<unknown>) => fn(mockPrisma),
+}));
 
 const embedTextMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/llm', async () => {

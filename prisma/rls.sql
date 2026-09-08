@@ -31,7 +31,7 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS tenant_or_shared ON %I', t);
     EXECUTE format($p$CREATE POLICY tenant_or_shared ON %I
       USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.tenant_id', true))
-      WITH CHECK ("tenantId" = current_setting('app.tenant_id', true))$p$, t);
+      WITH CHECK ("tenantId" IS NULL OR "tenantId" = current_setting('app.tenant_id', true))$p$, t);
   END LOOP;
 END $$;
 

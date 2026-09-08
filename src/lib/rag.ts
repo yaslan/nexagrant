@@ -8,9 +8,9 @@
  * - Retrieving relevant chunks via pgvector cosine similarity
  */
 
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
-import { embedText, AiUsageLogWriteError, type AiCallAttribution } from '@/lib/llm';
+import { embedText, AiUsageLogWriteError, PLATFORM_SCOPE_TENANT_ID, type AiCallAttribution } from '@/lib/llm';
 
 /** One row of the pgvector similarity search over `Chunk`. */
 interface ChunkMatch {
@@ -102,35 +102,40 @@ export async function ingestDocument(
   tenantId?: string,
   actor?: RagActor
 ): Promise<string> {
+  const scope = tenantId ?? PLATFORM_SCOPE_TENANT_ID;
   let docId = `doc-${Date.now()}`;
   try {
-    const doc = await prisma.document.create({
-      data: { tenantId, kind, title },
-    });
-    docId = doc.id;
-
-    const chunks = splitText(text);
-
-    for (let i = 0; i < chunks.length; i++) {
-      const embedding = await getEmbedding(chunks[i], {
-        tenantId: tenantId ?? null,
-        userId: actor?.userId,
-        module: RAG_MODULE,
-        purpose: PURPOSE_INGEST,
+    return await withTenant(scope, async (tx) => {
+      const doc = await tx.document.create({
+        data: { tenantId, kind, title },
       });
-      const embeddingStr = `[${embedding.join(',')}]`;
+      docId = doc.id;
 
-      // Use raw SQL to insert vector type
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "Chunk" (id, "documentId", "tenantId", ordinal, text, embedding)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5::vector)`,
-        doc.id,
-        tenantId || null,
-        i,
-        chunks[i],
-        embeddingStr
-      );
-    }
+      const chunks = splitText(text);
+
+      for (let i = 0; i < chunks.length; i++) {
+        const embedding = await getEmbedding(chunks[i], {
+          tenantId: tenantId ?? null,
+          userId: actor?.userId,
+          module: RAG_MODULE,
+          purpose: PURPOSE_INGEST,
+        });
+        const embeddingStr = `[${embedding.join(',')}]`;
+
+        // Use raw SQL to insert vector type
+        await tx.$executeRawUnsafe(
+          `INSERT INTO "Chunk" (id, "documentId", "tenantId", ordinal, text, embedding)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5::vector)`,
+          doc.id,
+          tenantId || null,
+          i,
+          chunks[i],
+          embeddingStr
+        );
+      }
+
+      return doc.id;
+    });
   } catch (e) {
     // An unwritten usage record is not a "bypassable" DB hiccup: the chunk text
     // has already gone to OpenAI, so this has to surface rather than be logged
@@ -169,16 +174,19 @@ export async function retrieveChunks(
       ? `("tenantId" IS NULL OR "tenantId" = $3)`
       : `"tenantId" IS NULL`;
 
-    const results: ChunkMatch[] = await prisma.$queryRawUnsafe(
-      `SELECT text, "documentId", 1 - (embedding <=> $1::vector) AS score
-       FROM "Chunk"
-       WHERE ${tenantFilter}
-       ORDER BY embedding <=> $1::vector
-       LIMIT $2`,
-      embeddingStr,
-      topK,
-      ...(tenantId ? [tenantId] : [])
-    );
+    const scope = tenantId ?? PLATFORM_SCOPE_TENANT_ID;
+    const results: ChunkMatch[] = await withTenant(scope, async (tx) => {
+      return await tx.$queryRawUnsafe(
+        `SELECT text, "documentId", 1 - (embedding <=> $1::vector) AS score
+         FROM "Chunk"
+         WHERE ${tenantFilter}
+         ORDER BY embedding <=> $1::vector
+         LIMIT $2`,
+        embeddingStr,
+        topK,
+        ...(tenantId ? [tenantId] : [])
+      );
+    });
 
     if (results && results.length > 0) {
       return results.map(r => ({
