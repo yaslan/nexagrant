@@ -221,6 +221,8 @@ export function DocumentsClient({
 
   const stepState = (index: number): 'done' | 'active' | 'idle' => {
     if (currentStep < 0) return 'idle';
+    // The last stage is an outcome, not a step still waiting on somebody.
+    if (approval?.stage === 'APPROVED_AND_SIGNED') return 'done';
     if (index < currentStep) return 'done';
     if (index === currentStep) return 'active';
     return 'idle';
