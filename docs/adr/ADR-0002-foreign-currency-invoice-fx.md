@@ -1,10 +1,10 @@
 # ADR-0002 — Yabancı para birimli faturada TL karşılığı ve kur alanı
 
-- **Durum:** Öneri (karar bekliyor — patron/lider onayına açık)
+- **Durum:** **KABUL — Seçenek (b)** (patron kararı, 2026-09-08)
 - **Tarih:** 2026-09-08
 - **Bağlam kartı:** TASK-MTSWLWDONWA3W (ölçüm turu) · önceki tespit: TASK-MTRJSOWFH6B45 §2.4 · Sprint S12
-- **Karar veren:** *(bekliyor)* · **Hazırlayan:** PM-EN
-- **Bloke:** Faz 2 (kod), TASK-MTSWL8ADKZKDM (Invoice yazma yolu) bitene kadar açılamaz — ikisi de `Invoice` modeline dokunuyor.
+- **Karar veren:** Patron (2026-09-08, LEED-EN aracılığıyla) · **Hazırlayan:** PM-EN
+- **Bloke:** ~~Faz 2, TASK-MTSWL8ADKZKDM bitene kadar açılamaz~~ — **kalktı:** TASK-MTSWL8ADKZKDM 2026-09-08'de kanıtla kapandı. Faz 2 açılabilir.
 
 ## Bağlam
 
@@ -118,6 +118,55 @@ Bkz. sonuç raporu §6.
 - `src/lib/billing/invoice-writer.ts` — kur hesaplama adımı
 - yeni: TCMB kur istemcisi (dış servis, henüz bağlı değil)
 - `docs/BILLING.md`, `docs/DATA_MODEL.md`, `docs/EFATURA_SETUP.md`
+
+---
+
+## KARAR (2026-09-08 — patron)
+
+**Seçenek (b) kabul edildi: döviz faturası kesilir, faturaya TCMB kuru ve TL
+karşılığı alanları eklenir.** (a) ve (c) ana çözüm olarak reddedildi.
+
+Bu kararın bağlayıcı sonuçları:
+
+1. **Fatura kendi para biriminde kesilir** (USD/EUR), TRY'ye çevrilerek
+   kesilmez. Abonelik fiyatlaması USD kalır.
+2. **Kur esası VUK 280'dir:** fatura **düzenleme tarihindeki TCMB döviz alış
+   kuru**. Stripe'ın tahsilat anındaki efektif kuru bu alana YAZILMAZ — (a)'nın
+   reddedilme gerekçesi buydu.
+3. **Kur ve TL karşılığı fatura kaydına yazılır** (yalnız XML'de hesaplanmaz):
+   `Invoice` modeli kur alanlarını taşır, böylece kesilmiş bir fatura sonradan
+   yeniden üretilebilir ve denetlenebilir (CLAUDE.md kural 7 — kanıt disiplini).
+4. **`foreignCurrencyFilingBlock` engeli KALDIRILMAZ, koşullu hale gelir:**
+   kur kaydı taşıyan belge geçer, taşımayan hâlâ `blocked` döner. Uydurma kur
+   yazmak yasak — kur ya TCMB'den gelir ya da fatura kesilmez.
+5. **(c) `ISTISNA` bu kararın kapsamı DIŞINDADIR.** Ayrı bir karar olarak açık
+   kalır; gerçek mukimlik doğrulaması (`tenant.country` beyanı YETMEZ)
+   çözülmeden uygulanmaz.
+
+### Bu kararla KAPANMAYAN, Faz 2'de patrona geri gelecek tek soru
+
+**TCMB erişilemediğinde ne olacak?** (bakım/kesinti/şema değişikliği)
+Öneri: fatura kesme **durur**, `SystemAlert` üretilir, kuyruk TCMB dönünce
+işlenir — son bilinen kuru "yeterince yakın" diye kullanmak, mali belgeye
+uydurma rakam yazmaktır (CLAUDE.md kural 6: işi kırma, alert üret).
+Karar Faz 2 başlarken alınacak.
+
+### Faz 2'de yapılacaklar — 2026-09-08 ağaç ölçümü
+
+Zaten inen kısım (`c029e1c`): `EfaturaDocument.exchangeRate` tipi, UBL-TR
+`PricingExchangeRate`/`TaxExchangeRate` blokları, `foreignCurrencyFilingBlock`,
+`convertCurrencyMinor` (`src/lib/money.ts`), `tests/efatura-foreign-currency.test.ts`.
+
+Eksik olan (ölçüldü, yok):
+- `prisma/schema.prisma` → `Invoice` modelinde kur/TL karşılığı alanı **YOK**
+  (yalnız `currency` var) → migration + RLS + `docs/DATA_MODEL.md`
+- **TCMB kur istemcisi YOK** — repoda hiçbir TCMB çağrısı yok
+- `src/lib/billing/invoice-writer.ts` → `exchangeRate` hiç geçmiyor; ödeme
+  para birimini olduğu gibi yazıyor, kur adımı yok
+- `docs/BILLING.md`, `docs/EFATURA_SETUP.md` güncellemesi
+
+**Zamanlama:** GİB env'leri 2026-09-12/13 geliyor. Faz 2 o tarihe kadar
+bitmezse USD abonelikler için hiç fatura gönderilemez (madde 4 gereği).
 
 ---
 

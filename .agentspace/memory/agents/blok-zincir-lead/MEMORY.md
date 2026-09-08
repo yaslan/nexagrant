@@ -48,3 +48,11 @@
 - [fabrika-verification-cards-orphan-when-target-closes](fabrika-verification-cards-orphan-when-target-closes.md) — Hedef kartı done yaparken eşleşen DOĞRULAMA kartı todo'da öksüz kalıyor — ikisini birlikte kapat
 
 - [fabrika-green-gate-does-not-prove-a-clean-clone](fabrika-green-gate-does-not-prove-a-clean-clone.md) — Yerelde yeşil kapı (typecheck/lint/test) temiz klonu KANITLAMAZ — untracked dosyalar suiti ayakta tutabilir; durum kontrolünde git status'a da bak
+
+- [fabrika-blocked-card-premise-may-hide-the-real-blocker](fabrika-blocked-card-premise-may-hide-the-real-blocker.md) — "Dış girdi bekliyor" kartının "kod tarafı hazır" premisini ölç — e-Fatura'da hazır olmayan şey adaptör değil, Invoice yazma yoluydu
+- [fabrika-boss-may-want-portable-prompts-for-another-ide](fabrika-boss-may-want-portable-prompts-for-another-ide.md) — Patron in_progress kartları başka bir IDE'de (Antigravity) kendisi bitirmek isteyebilir — o zaman istenen şey delegasyon değil, ofis bağlamı taşımayan kendi kendine yeten prompt paketidir
+- [fabrika-empty-pane-list-is-not-an-idle-project](fabrika-empty-pane-list-is-not-an-idle-project.md) — Boş pane listesi "iş durdu" demek değildir — harici sürücü (Antigravity) çalışırken gerçeği commit log + -<surucu>.md raporlarının mtime'ı söyler
+- [fabrika-no-route-level-platform-admin-gate](fabrika-no-route-level-platform-admin-gate.md) — Fabrika'da kiracı-üstü API rotalarını koruyacak kapı yok — middleware.ts hiç yok ve requirePlatformAdmin yalnız server action sürümü; her yeni admin rotasında bu boşluk tekrar eder
+- [fabrika-remeasure-before-handing-work-to-another-driver](fabrika-remeasure-before-handing-work-to-another-driver.md) — Devir paketini yazmadan HEMEN ÖNCE ağacı yeniden ölç — pane'i kapattığım worker kapanmadan önce işi bitirip commit'lemişti, paket bir saat içinde bayatladı
+- [fabrika-split-a-sequenced-card-at-its-file-boundary](fabrika-split-a-sequenced-card-at-its-file-boundary.md) — Şema çakışması yüzünden sıraya alınan kart, dosyaya dokunmayan araştırma/ADR fazına bölünüp paralel koşturulabilir
+- [fabrika-verify-the-tree-not-just-the-report](fabrika-verify-the-tree-not-just-the-report.md) — Bir worker "kod değiştirmedim, kapıda durdum" diyebilir ve ağaçta o işin tamamı commit'siz durabilir — raporu okuduktan sonra git status/diff ile ağacı da oku

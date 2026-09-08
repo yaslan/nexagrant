@@ -67,10 +67,11 @@ denenmez; eksik olan(lar) adıyla raporlanır (`not_configured`).
   belgeyi adaptöre hiç ulaştırmadan `blocked` /
   `FOREIGN_CURRENCY_NO_TL_EQUIVALENT` ile geri çevirir: yabancı para birimli
   fatura, TCMB kuru ve TL karşılığı olmadan VUK 215 / 385 Sıra No.lu Genel
-  Tebliğ'e aykırıdır ve bu alanlar şemada henüz yok. Kararı bekleyen konu:
-  `docs/adr/ADR-0002-foreign-currency-invoice-fx.md`. **Canlı fiyat kataloğu
+  Tebliğ'e aykırıdır. **ADR-0002 2026-09-08'de KARARA BAĞLANDI (Seçenek b:
+  döviz faturası + TCMB kuru + TL karşılığı)**; alanların şemaya eklenmesi
+  `TASK-MTT13PK0Z4ZLB` (ADR-0002 Faz 2) ile sürüyor. **Canlı fiyat kataloğu
   USD olduğu için bu, kenar durum değil varsayılan yoldur** — go-live'da TL
-  dışı abonelikler faturalandırılacaksa ADR-0002 önce karara bağlanmalıdır.
+  dışı abonelikler faturalandırılacaksa Faz 2 önce inmelidir.
   Belge *üretimi* (export) etkilenmez: zarf numarası olmayan belge zaten "mali
   değeri yoktur" damgası taşır (TASK-MTSWLWDONWA3W).
 
@@ -89,6 +90,23 @@ denenmez; eksik olan(lar) adıyla raporlanır (`not_configured`).
 ## Go-live günü (12-13 Eylül Hafta Sonu Adım Adım Kontrol Listesi)
 
 Patron veya operatör tarafından sırayla takip edilecek adımlar:
+
+### ⚠️ Adım 0: Entegratörden BU cevapları da alın (yoksa Pazartesi ikinci tur gerekir)
+
+13 değişkeni doldurmak **gönderim için yetmez**: `ADAPTERS`
+(`src/lib/efatura-integrator.ts`) bugün yalnız `sandbox` içeriyor — seçilen
+satıcıya özel adaptör henüz YAZILMADI, o yüzden kimlik bilgileri tam olsa bile
+sonuç `provider_unsupported` döner ("gönderildi" ASLA denmez). Adaptörün
+Pazartesi tek turda yazılabilmesi için görüşmede şunlar da istenmeli:
+
+- **API dokümanı** (fatura gönderme + durum sorgulama uçları) ve **protokol**: REST/JSON mi, SOAP/WSDL mi?
+- **Kimlik doğrulama biçimi**: kullanıcı+parola mı, token mı, mTLS/istemci sertifikası mı?
+- **Zarf numarası** (`gibEnvelopeId`) hangi alanda dönüyor? — bir belgenin "GİB'e gönderildi" sayılmasının tek ölçütü budur.
+- **Test ortamı**: ayrı base URL + ayrı test hesabı verilecek mi? (canlıya çıkmadan denemek şart)
+- **UBL-TR sürümü**: 1.2.1 kabul ediliyor mu; satıcı kendi zarfına mı sarıyor?
+- **Mali mühür/e-imza** kimde: entegratörde mi, bizde mi?
+- **Hata/durum kodları listesi** ve tekrar gönderim (idempotency) kuralı.
+- **Yabancı para birimi**: `PricingExchangeRate` / `TaxExchangeRate` bloklarını kabul ediyor mu? (ADR-0002 Seçenek b gereği USD fatura kesilecek)
 
 ### Adım 1: 13 Değişkeni Ortam Yöneticisine (Secrets/Vercel/.env) Girin
 - `INVOICE_SUPPLIER_*` (5 adet zorunlu: unvan, VKN, vergi dairesi, adres, il).
