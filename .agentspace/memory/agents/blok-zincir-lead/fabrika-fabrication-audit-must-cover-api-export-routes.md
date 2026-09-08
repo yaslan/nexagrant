@@ -16,3 +16,15 @@ lib'leri (`src/lib/efatura*` gibi) AYRI bir kalem olarak tara — dosya adı de�
 resmî belge gibi mi görünüyor diye sor. Bkz. TASK-MTRD9QBJ2G32E.
 
 İlgili: [[fabrika-ask-workers-to-report-not-fix-adjacent-lies]]
+
+**2026-09-08 ek — ikinci export rotası, aynı sınıf, üstüne yetki açığı.**
+`src/app/api/documents/export/route.ts` aynı deseni tekrarladı: sabit `tenantName:
+'FonBridge Teknoloji A.Ş.'`, uydurma çağrı kimliği ve `signedAt: new Date()` — yani her
+indirme "şimdi imzalandı" diyor. Bunu bir kart bulmadı; bağımsız doğrulamacı (dse) başka bir
+işi ölçerken yolun üstünde gördü. Dahası aynı rotada `auth()` YOK ve `findUnique({ where:
+{ id: partId } })` `tenantId` daraltmasız — oturumsuz `curl` 200 döndü (CLAUDE.md §1).
+
+Ders: uydurma-veri taraması ile yetki taraması AYNI dosyada buluşuyor. Belge üreten bir rotayı
+incelerken ikisini birlikte sor: "bu dize gerçek kayıttan mı geliyor?" VE "bu satırı kim
+okuyabilir?". Bir kartın grep listesi kapsamı belirlerse, listede olmayan aynı-sınıf ihlal
+temizlikten sağ çıkar — kapsamı dosya bazında ver, dize listesi bazında değil.

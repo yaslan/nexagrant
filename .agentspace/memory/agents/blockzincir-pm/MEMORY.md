@@ -32,3 +32,14 @@
 
 - [fabrika-billing-panel-copy-has-three-surfaces](fabrika-billing-panel-copy-has-three-surfaces.md) — messages/*.json'da plan kartı metni pricing/admin/settings olmak üzere üç bağımsız yerde elle yazılı; biri düzeltilse diğerleri sessizce eski kalabilir
 - [fabrika-seed-modulecatalog-requires-is-stale-copy](fabrika-seed-modulecatalog-requires-is-stale-copy.md) — prisma/seed.ts'teki ModuleCatalog.requires alanı gerçek manifestodan bağımsız elle yazılmış bir kopya — gate mantığı hep manifestoyu okur
+
+- [fabrika-m11-partb-local-verification-recipe](fabrika-m11-partb-local-verification-recipe.md) — M11 Part B ekranını yerelde gerçek tarayıcıyla açma reçetesi — doğru URL, oturum mint'i ve iki kapı (plan=ultra + ModuleState=ON); demo login ile ULAŞILAMAZ
+- [fabrika-no-session-provider-client-identity](fabrika-no-session-provider-client-identity.md) — Fabrika'da hiçbir yerde <SessionProvider> yok — bir client component'te kullanıcı kimliği lazımsa useOptionalSession() tek başına hep null döner; /api/auth/session'ı fetch et
+
+- [fabrika-idempotency-proof-needs-per-table-counts](fabrika-idempotency-proof-needs-per-table-counts.md) — Bir çekicinin idempotan olduğunu kanıtlarken tabloları TEK TEK say — normalize tablolar sabit dururken audit tablosu (RawFetch) sızabilir
+
+- [fabrika-identity-fallback-doctrine](fabrika-identity-fallback-doctrine.md) — Fabrika'da bir kimlik (ad/kuruluş/imza) eksikse ne yazılır — deponun yerleşik üç kademeli kuralı ve onu uygulayan mevcut yardımcılar
+- [fabrika-stash-baseline-can-lie](fabrika-stash-baseline-can-lie.md) — Stash ile "benden mi?" ölçerken baseline iki şekilde YALAN söyler — stash hiç olmamıştır (tırnaksız pathspec) ya da dev server yarım derlenmiştir; ikisini de doğrula
+- [fabrika-verify-the-card-recheck-not-just-the-old-report](fabrika-verify-the-card-recheck-not-just-the-old-report.md) — Bir kart "önceki rapor X dedi ama bugünkü grep temiz buldu" diyorsa, ŞÜPHELİ olan eski rapor değil kartın kendi yeniden-ölçümü olabilir — ikisini de kendin koştur
+
+- [fabrika-a-template-may-carry-structure-not-content](fabrika-a-template-may-carry-structure-not-content.md) — Fabrika'da bir "varsayılan şablon" sabiti ne taşıyabilir — resmî iskelet (başlık/limit) EVET, yazar ve metin HAYIR; uydurma kimlik avında content alanlarına da bak

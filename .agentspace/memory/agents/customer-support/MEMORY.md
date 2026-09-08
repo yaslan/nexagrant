@@ -13,3 +13,9 @@
 
 - [fabrika-fabricated-identity-fix-pattern](fabrika-fabricated-identity-fix-pattern.md) — Fabrika'da uydurma kişi adı kusurunun yerleşik düzeltme deseni — ApprovalActor/userId, displayUserName zinciri ve tablo açmak yerine eksik alanı adıyla bildirme
 - [fabrika-unreachable-server-action-probe](fabrika-unreachable-server-action-probe.md) — Fabrika'da bir Next server action'ın gerçekten çağrılabilir olup olmadığını ölç — istemci import etmiş olması yetmez, .next manifest + gerçek POST ile yokla
+
+- [fabrika-app-shell-carries-its-own-fake-data](fabrika-app-shell-carries-its-own-fake-data.md) — Bir sayfadaki uydurma veriyi temizlemek yetmez — Fabrika'da app shell (UserMenu) aynı uydurmayı her rotada ayrıca taşıyordu; temizlikten SONRA ekran görüntüsü al
+- [fabrika-source-guard-tests-must-strip-comments](fabrika-source-guard-tests-must-strip-comments.md) — Uydurma dizgiyi arayan kaynak-koruma testi yorumları ayıklamalı — Fabrika'da düzeltilen dosya sildiği metni yorumda alıntılıyor, aksi halde kendi düzeltmen testi kırar
+- [fabrika-use-server-exports-must-be-async](fabrika-use-server-exports-must-be-async.md) — Fabrika'da 'use server' modülünün HER export'u async fonksiyon olmalı — hata sınıfı/tip/sabit oraya konulamaz, ayrı bir lib dosyasına al
+
+- [fabrika-public-figure-audit-procedure](fabrika-public-figure-audit-procedure.md) — Herkese açık bir sayfadaki rakam denetiminde "bağla ya da çıkar" pratikte HEP "çıkar"dır — Evidence kiracıya özel+RLS, public sayfanın tenant'ı yok; önce DB'de ölç, çünkü rakam kaynaksız değil ÇELİŞİK çıkabilir

@@ -19,3 +19,7 @@
 
 - [fabrika-e2e-red-check-module-lock-first](fabrika-e2e-red-check-module-lock-first.md) — "element not found" ile düşen Fabrika e2e'sinde ÖNCE error-context.md'deki main bloğuna bak — modül kilidi ekranıysa kusur test edilen özellikte değil, fikstürün planı/ModuleState'i eksik
 - [fabrika-second-dev-server-port-isolation](fabrika-second-dev-server-port-isolation.md) — Başka worker 3000'i tutuyorsa ikinci dev sunucusu aynı dizinde açılmaz — repo'nun rsync kopyası + cp -Rc ile klonlanmış node_modules tek çalışan yol (symlink Turbopack'te reddediliyor)
+
+- [fabrika-grep-hits-can-be-all-comments](fabrika-grep-hits-can-be-all-comments.md) — Fabrika'da "uydurma isim" kartlarında grep sıfır dönmez — kaldırılan isimler açıklama yorumlarında yaşamaya devam eder; her isabeti kod/yorum diye sınıflandır ve hükmü ekrandan + gerçek dışa aktarım dosyasından ver
+- [fabrika-phantom-dep-hides-in-shared-node-modules](fabrika-phantom-dep-hides-in-shared-node-modules.md) — Fabrika'da bir import yerelde çalışıp CI'da patlayabilir — paket node_modules'ta var ama package.json/pnpm-lock.yaml'da yok; ayrı worktree'de `pnpm install --frozen-lockfile` bunu anında ortaya çıkarır
+- [fabrika-verification-script-gotchas](fabrika-verification-script-gotchas.md) — Fabrika'da elle doğrulama betiği yazarken dört tuzak — betiği worktree köküne koy, `@playwright/test`ten import et, dev sunucusunda networkidle bekleme, Prisma 7 için çıplak PrismaClient yerine pg ya da tsx

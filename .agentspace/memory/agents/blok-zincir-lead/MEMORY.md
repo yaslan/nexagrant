@@ -28,3 +28,7 @@
 - [fabrika-plan-catalog-db-source-of-truth-decision](fabrika-plan-catalog-db-source-of-truth-decision.md) — Patron kararı — paket/fiyat yönetimi DB'ye taşınacak (Yol B, sürümlü PlanVersion), önce metin düzeltmesi ve temizlik
 
 - [fabrika-partial-fix-check-all-surfaces-of-the-same-bug](fabrika-partial-fix-check-all-surfaces-of-the-same-bug.md) — Bir bug "düzeltildi" diye kapanırken aynı hatanın diğer yüzeyleri açık kalıyor — kapatmadan önce grep ile tüm çağrı yerlerini say
+
+- [fabrika-widen-a-narrow-gate-to-size-and-find](fabrika-widen-a-narrow-gate-to-size-and-find.md) — Dar kapsamlı bir kapıyı GEÇİCİ olarak repo geneline açıp koşmak, hem kartı ölçüyor hem panoda gizemli duran bir P0'ın kök nedenini veriyor — dağıtmadan önce yap
+
+- [fabrika-zero-warnings-can-mean-rule-is-off](fabrika-zero-warnings-can-mean-rule-is-off.md) — Bir lint kuralı için 0 uyarı görmek kodun temiz olduğu anlamına GELMEZ — Fabrika'da react-hooks/set-state-in-effect hiç yapılandırılmamıştı; kartı dağıtmadan önce eslint.config.mjs'te kuralın AÇIK olduğunu doğrula

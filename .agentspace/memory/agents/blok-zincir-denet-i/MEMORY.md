@@ -15,3 +15,6 @@
 
 - [fabrika-e2e-seed-riding-specs-go-red-on-plan-drift](fabrika-e2e-seed-riding-specs-go-red-on-plan-drift.md) — Tohum kiracıya (main / fabrika-beta) binen e2e paketleri plan verisi değişince sessizce kırmızıya döner — modül kapısı render edilir, aranan form/başlık hiç basılmaz; kendi fixture kiracısını kuran paketler etkilenmez
 - [playwright-waitforurl-loose-regex-false-red](playwright-waitforurl-loose-regex-false-red.md) — Playwright'ta gevşek bir waitForURL regex'i MEVCUT sayfanın URL'siyle eşleşip anında geçer — gezinme hiç beklenmez ve tıklama testi sahte kırmızı verir; assertion'ı gevşetme, bekleyiciyi sıkılaştır
+
+- [fabrika-fake-showcase-bind-or-remove-needs-a-persistence-check](fabrika-fake-showcase-bind-or-remove-needs-a-persistence-check.md) — "Sahte vitrini gerçek duruma bağla ya da kaldır" kararını vermeden ÖNCE o durumun kalıcı bir tablosu var mı diye bak — yoksa bağlamak yeni bir yalan üretir
+- [fabrika-i18n-evidence-bar-forces-whole-file](fabrika-i18n-evidence-bar-forces-whole-file.md) — i18n kartı birkaç satır numarası verse de kanıt "ekran EN'de İngilizce" ise dosyanın TAMAMINI çevir — yarım çeviri kanıt karesini geçemez

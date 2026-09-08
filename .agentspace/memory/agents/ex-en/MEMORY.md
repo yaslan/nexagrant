@@ -15,3 +15,11 @@
 - [fabrika-ghost-tables-are-mostly-dead-code](fabrika-ghost-tables-are-mostly-dead-code.md) — Dört "hayalet tablo"dan üçü (Participation/Collab/OrgTopicStat) canlı çağrısı olmayan ölü koddu; sınıfın gerçek kalıntısı hayalet ALAN/İLİŞKİ — sso.ts, calls/turkey, api/v1/calls, m2 actions, alerts-daily
 
 - [fabrika-playwright-webserver-probe-blocks-e2e](fabrika-playwright-webserver-probe-blocks-e2e.md) — Fabrika'da pnpm test:e2e hiç koşmuyor — playwright.config hazırlık probu / (=> /tr, 500) üzerinden gidiyor, sunucuyu kapalı sanıp ikincisini açıyor ve EADDRINUSE ile ölüyor; çözüm scratch config
+
+- [prove-a-gate-catches-the-bug-without-a-worktree](prove-a-gate-catches-the-bug-without-a-worktree.md) — Bir kapının gerçekten yakaladığını kanıtlamak için hatayı geri koy-koş-geri al'ı TEK bash komutunda yap; git worktree izni reddedilirse tercih edilen yol budur
+
+- [feature-can-be-complete-and-unreachable](feature-can-be-complete-and-unreachable.md) — Bir özelliğin sayfası + API'si + i18n'i + testi yeşil olabilir ve özellik yine de ÖLÜ olabilir — hiçbir yer ona link vermiyorsa; denetimde "var mı" değil "ulaşılabilir mi" diye sor
+
+- [fabrika-jsdom-has-no-localstorage](fabrika-jsdom-has-no-localstorage.md) — Fabrika'nın vitest/jsdom ortamında localStorage HİÇ YOK (typeof undefined, window'da da globalThis'te de) — tarayıcı-depolaması kullanan bileşen testi kendi Storage'ını kurmalı
+
+- [measure-a-static-gate-by-lifting-its-scanner](measure-a-static-gate-by-lifting-its-scanner.md) — Bir statik kapıyı genişletmeden önce tarayıcısını scratchpad'e kaldırıp tsx ile koş — bulgu sayısını repoya dokunmadan ölçersin ve naif genişletmenin yanlış pozitiflerini önce görürsün

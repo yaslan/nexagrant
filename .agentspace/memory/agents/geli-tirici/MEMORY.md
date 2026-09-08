@@ -25,3 +25,6 @@
 - [e11-3-calibration-status](e11-3-calibration-status.md) — E11.3 ESR Calibration — Fixture tamamlandı, Rule A 80% (kriter karşılanmıyor), anket 2026-09-21 bekleniyor
 
 - [fabrika-baseline-snapshot-goes-stale](fabrika-baseline-snapshot-goes-stale.md) — Paylaşılan ağaçta lint/typecheck baseline'ını kendi dosyalarını scratchpad'e kopyalayıp HEAD'e döndürerek ölç — ama snapshot'tan SONRA yaptığın düzeltmeler snapshot'ta yok, geri kopyalarsan onları ezersin
+
+- [fabrika-e2e-gate-blocked-by-landing-page-500](fabrika-e2e-gate-blocked-by-landing-page-500.md) — Playwright webServer sağlık kontrolü / (ana sayfa) üzerinden yapılır — ana sayfa 500 dönerse reuseExistingServer çalışmaz ve tüm e2e EADDRINUSE ile ölür; E2E_BASE_URL'i sağlıklı bir yola çevir
+- [fabrika-module-gate-is-two-locks](fabrika-module-gate-is-two-locks.md) — Fabrika modül kapısı iki kilit — ModuleState=ON VE planın modülü vermesi; e2e seed'i yalnız birincisini kurarsa sayfa "aboneliğinizin kapsamı dışında" der
