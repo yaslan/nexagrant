@@ -26,8 +26,18 @@ WT=<scratchpad>/wt
 git worktree add --detach "$WT" <ölçmek-istediğin-commit>
 cp /path/to/repo/.env "$WT/.env"          # worktree izlenmeyen dosyaları taşımaz
 cd "$WT" && pnpm install --frozen-lockfile   # ~10 sn, global store'dan hardlink
+npx prisma generate                          # ŞART — yoksa her sayfa "Cannot find module '.prisma/client/default'"
 npx next dev --webpack --port 3130
 ```
+`prisma generate`'i atlarsan sunucu ayağa kalkar, `/tr` 200 döner ve **sayfa runtime error**
+verir; spec "element not found" ile düşer, sebebi error-context.md'nin `dialog "Runtime Error"`
+bloğunda yazar. Ayrıca sunucuyu `nohup … & disown` ile başlat: alt kabukta `( … &)` ile
+açtığımda oturum temizliğinde öldü.
+
+**Bonus — MUTASYON KONTROLÜ için doğru yer burası.** "Testi kasten kır, kırmızı olduğunu
+göster" adımını worktree kopyasında yap: ürün dosyalarına HİÇ dokunmamış olursun, paralel
+dalgada başka ajanın dosyasıyla yarışmazsın, geri alman `cp <dosya>.orig` kadar. Testleri
+ana repo'dan `E2E_PORT=<port>` ile koştur; ölçülen kod worktree'ninkidir.
 rsync + `cp -Rc`'ye göre avantajı: 3.1 GB kopya yok, ve kilit dosyasına sadık
 kurulum **beyan edilmemiş bağımlılığı da yakalar** —
 bkz. [[fabrika-phantom-dep-hides-in-shared-node-modules]].

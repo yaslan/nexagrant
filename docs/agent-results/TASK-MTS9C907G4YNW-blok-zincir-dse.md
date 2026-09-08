@@ -245,6 +245,15 @@ Not changed: any file under `src/`, `scripts/seed-plan-e2e.ts`, any other spec.
 
 ---
 
+6. **A concurrent task is making this very state durable — this spec will need a re-run.**
+   While I was writing the report, `src/lib/dual-approval.ts` and `prisma/schema.prisma`
+   picked up uncommitted work from **TASK-MTSAIWF4ENUSL**: a `DualApprovalStep` table,
+   `PersistedApproval` / `deriveDualApprovalState`, and unique indexes carrying the
+   four-eyes rules. That lands *after* every measurement in this report (taken against
+   HEAD `bcf09fb`; my commit is `503c7ec`). Once it is committed, this spec must be re-run,
+   and risk 1 becomes actionable in the good way: the audit assertions should then read
+   `actorUserId` back from the database instead of from the rendered line.
+
 ## 6. Sonraki adım
 
 - Decide on open question 1 (persist `ApprovalRequest`) — it is the largest remaining
