@@ -322,3 +322,22 @@ bağlantı yok (ölçüldü: sayfada `a[href*="/api/billing/invoices/"]` sayıs�
 "Demo örnek" rozetiyle işaretli, yani ekran yalan söylemiyor; ama gerçek `Invoice`
 satırlarına bağlı da değil. Bağlamak yeni i18n anahtarı (boş durum metni) gerektiriyor ve
 `messages/*.json` bu görevin kapsamı dışındaydı — ayrı kart gerekiyor.
+
+## 12. `SavedSearch` gerçek yazıcısı (TASK-MTS6M5819RW93)
+
+`SavedSearch` modeli ve `tenant_isolation` RLS politikası zaten şemadaydı, ama depoda hiçbir
+yazıcısı yoktu: `/calls` sayfasındaki "Aramayı Kaydet" düğmesi `setTimeout(500)` + toast'tı ve
+`src/lib/inngest/jobs/alerts-daily.ts`'in her 08:00 UTC'de okuduğu `notify: true` sorgusu bu
+yüzden üretimde her zaman boş dönüyordu (bkz. `docs/agent-results/TASK-MTRNQN0NNVBYM-blog-yazar.md`).
+Bu görev gerçek yazıcıyı ekledi; tablo/RLS **değişmedi**, migration yok.
+
+- `GET/POST /api/saved-searches`, `PATCH/DELETE /api/saved-searches/[id]` — hepsi
+  `requireTenantApi()` + `withTenant(tenantId, ...)` üzerinden.
+- **Liste/silme/bildirim değişikliği `tenantId` + `userId` ile daraltılır** — bir kurum üyesi
+  başka bir üyenin kayıtlı aramasını göremez/silemez/susturamaz. Bilinçli bir ürün kararı:
+  "Kayıtlı Aramalarım" kişisel bir liste. `alerts-daily.ts`'in günlük dijest sorgusu
+  (`SAVED_SEARCH_ALERT_QUERY`) bundan bağımsız — kiracı genelinde `notify: true` olan her
+  satırı okur, tek bir kullanıcıya daraltmaz.
+- `filters` şekli tek kaynaktan: `alerts-daily.ts`'in dışa açtığı `SavedSearchFiltersSchema`
+  (yalnızca `q`/`status`, `.partial()`) buradan import edilir, burada tekrar tanımlanmaz — alan
+  adları burada ile cron'da ayrışırsa cron sessizce "filtresiz" davranışa düşer (o dosyadaki not).

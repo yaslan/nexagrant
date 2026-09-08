@@ -62,7 +62,17 @@ export default function CallsPage({
   const [totalResults, setTotalResults] = useState(0);
   const [savingSearch, setSavingSearch] = useState(false);
   const [savedSearchMessage, setSavedSearchMessage] = useState<string | null>(null);
+  const [savedSearchError, setSavedSearchError] = useState<string | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<SediaTopic | null>(null);
+
+  interface SavedSearchEntry {
+    id: string;
+    name: string;
+    notify: boolean;
+    createdAt: string;
+  }
+  const [savedSearches, setSavedSearches] = useState<SavedSearchEntry[]>([]);
+  const [savedSearchesLoaded, setSavedSearchesLoaded] = useState(false);
 
   type SortField = 'status' | 'title' | 'action' | 'budget' | 'deadline';
   type SortOrder = 'asc' | 'desc';
@@ -187,12 +197,96 @@ export default function CallsPage({
     );
   };
 
+  const loadSavedSearches = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/saved-searches');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSavedSearches(data.searches || []);
+      }
+    } catch (err) {
+      console.error('Failed to load saved searches:', err);
+    } finally {
+      setSavedSearchesLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await loadSavedSearches();
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadSavedSearches]);
+
   const handleSaveSearch = async () => {
     setSavingSearch(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setSavedSearchMessage(t('savedSearchMessage', { query: debouncedSearch || t('allSearchesFallback') }));
-    setSavingSearch(false);
-    setTimeout(() => setSavedSearchMessage(null), 5000);
+    setSavedSearchError(null);
+    try {
+      const res = await fetch('/api/saved-searches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: debouncedSearch.trim() || t('allSearchesFallback'),
+          filters: {
+            q: debouncedSearch.trim() || undefined,
+            status: statuses.length > 0 ? statuses : undefined,
+          },
+          notify: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'save failed');
+      }
+      setSavedSearchMessage(t('savedSearchMessage', { query: debouncedSearch || t('allSearchesFallback') }));
+      setTimeout(() => setSavedSearchMessage(null), 5000);
+      await loadSavedSearches();
+    } catch (err) {
+      console.error('Failed to save search:', err);
+      setSavedSearchError(t('saveSearchError'));
+      setTimeout(() => setSavedSearchError(null), 5000);
+    } finally {
+      setSavingSearch(false);
+    }
+  };
+
+  const handleDeleteSavedSearch = async (id: string) => {
+    try {
+      const res = await fetch(`/api/saved-searches/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'delete failed');
+      }
+      setSavedSearches((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      console.error('Failed to delete saved search:', err);
+      setSavedSearchError(t('saveSearchError'));
+      setTimeout(() => setSavedSearchError(null), 5000);
+    }
+  };
+
+  const handleToggleNotify = async (id: string, notify: boolean) => {
+    setSavedSearches((prev) => prev.map((s) => (s.id === id ? { ...s, notify } : s)));
+    try {
+      const res = await fetch(`/api/saved-searches/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notify }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'update failed');
+      }
+    } catch (err) {
+      console.error('Failed to update saved search:', err);
+      setSavedSearches((prev) => prev.map((s) => (s.id === id ? { ...s, notify: !notify } : s)));
+      setSavedSearchError(t('saveSearchError'));
+      setTimeout(() => setSavedSearchError(null), 5000);
+    }
   };
 
   const totalPages = Math.ceil(totalResults / limit) || 1;
@@ -319,6 +413,49 @@ export default function CallsPage({
             className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 px-4 py-3 text-xs sm:text-sm"
           >
             {savedSearchMessage}
+          </div>
+        )}
+
+        {savedSearchError && (
+          <div
+            role="alert"
+            className="rounded-lg border border-red-500/40 bg-red-500/10 text-red-700 px-4 py-3 text-xs sm:text-sm"
+          >
+            {savedSearchError}
+          </div>
+        )}
+
+        {savedSearchesLoaded && savedSearches.length > 0 && (
+          <div className="rounded-lg border border-border/60 bg-ground p-3 flex flex-col gap-2">
+            <span className="font-semibold text-muted text-xs">{t('savedSearchesTitle')}</span>
+            <ul className="flex flex-col gap-1.5">
+              {savedSearches.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-2 bg-surface border border-border/50 rounded-md px-3 py-2 text-xs sm:text-sm"
+                >
+                  <span className="text-ink font-medium truncate">{s.name}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-muted select-none">
+                      <input
+                        type="checkbox"
+                        checked={s.notify}
+                        onChange={(e) => handleToggleNotify(s.id, e.target.checked)}
+                        className="rounded border-border text-accent focus:ring-accent"
+                      />
+                      {t('notifyLabel')}
+                    </label>
+                    <button
+                      onClick={() => handleDeleteSavedSearch(s.id)}
+                      className="text-red-600 hover:text-red-700 font-semibold"
+                      aria-label={t('deleteSavedSearchLabel')}
+                    >
+                      {t('deleteSavedSearchLabel')}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

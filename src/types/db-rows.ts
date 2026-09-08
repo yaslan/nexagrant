@@ -127,3 +127,15 @@ export interface InvitationRow {
   role: string;
   expires: Date;
 }
+
+/** `model SavedSearch` — a /calls search, saved for the daily alert digest. */
+export interface SavedSearchRow {
+  id: string;
+  tenantId: string;
+  userId: string;
+  name: string;
+  filters: unknown;
+  notify: boolean;
+  lastRunAt: Date | null;
+  createdAt: Date;
+}

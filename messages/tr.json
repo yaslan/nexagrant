@@ -970,10 +970,17 @@
     "approved": "✓ Onaylandı",
     "awaitingApproval": "⏳ Onay Bekliyor",
     "organizationUnassigned": "Kuruluş belirtilmedi",
-    "callUnspecified": "Çağrı belirtilmedi"
+    "callUnspecified": "Çağrı belirtilmedi",
+    "leadAuthorLabel": "Lider Yazar",
+    "leadAuthorUnassigned": "Lider yazar atanmadı"
   },
   "PartBEditor": {
-    "noRevisions": "Bu bölüm için henüz kayıtlı bir sürüm yok."
+    "noRevisions": "Bu bölüm için henüz kayıtlı bir sürüm yok.",
+    "leadShort": "Lider",
+    "leadAuthorLabel": "Sorumlu",
+    "leadUnassigned": "Atanmadı",
+    "contentPlaceholder": "Bölüm içeriğini buraya yazın veya YZ Eş-Yazar Asistanı ile taslak üretin...",
+    "aiPromptPlaceholder": "Örn: bu bölümde vurgulanmasını istediğiniz yöntem, sonuç veya saha bilgisini yazın..."
   },
   "callDetails": {
     "backToCalls": "Çağrılara Geri Dön",
@@ -1012,6 +1019,10 @@
     "savingLabel": "Kaydediliyor...",
     "saveSearchLabel": "Aramayı Kaydet & Bildirim Al",
     "savedSearchMessage": "Arama kaydedildi ({query}). Yeni çağrılar için e-posta bildirimi alacaksınız.",
+    "saveSearchError": "Kayıtlı arama işlemi başarısız oldu. Lütfen tekrar deneyin.",
+    "savedSearchesTitle": "Kayıtlı Aramalarım",
+    "notifyLabel": "Bildirim",
+    "deleteSavedSearchLabel": "Sil",
     "allSearchesFallback": "Tüm Arama",
     "statusLabel": "Çağrı Durumu:",
     "openCalls": "Açık Çağrılar",
@@ -1463,5 +1474,10 @@
     "roleSme": "KOBİ Ar-Ge Koordinatörü",
     "roleTto": "Üniversite TTO Lideri",
     "rolePlatformAdmin": "Platform Yöneticisi"
+  },
+  "NotFound": {
+    "title": "Sayfa Bulunamadı",
+    "description": "Aradığınız sayfa veya geçerli bağlantı mevcut değil ya da kaldırılmış olabilir.",
+    "backHome": "Ana Sayfaya Dön"
   }
 }

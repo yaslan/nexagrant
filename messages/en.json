@@ -970,10 +970,17 @@
     "approved": "✓ Approved",
     "awaitingApproval": "⏳ Awaiting approval",
     "organizationUnassigned": "Organisation not specified",
-    "callUnspecified": "Call not specified"
+    "callUnspecified": "Call not specified",
+    "leadAuthorLabel": "Lead author",
+    "leadAuthorUnassigned": "No lead author assigned"
   },
   "PartBEditor": {
-    "noRevisions": "No saved revision for this section yet."
+    "noRevisions": "No saved revision for this section yet.",
+    "leadShort": "Lead",
+    "leadAuthorLabel": "Lead author",
+    "leadUnassigned": "Not assigned",
+    "contentPlaceholder": "Write the section content here, or draft it with the AI co-author assistant...",
+    "aiPromptPlaceholder": "E.g. name the method, result or site you want this section to emphasise..."
   },
   "callDetails": {
     "backToCalls": "Back to Calls",
@@ -1012,6 +1019,10 @@
     "savingLabel": "Saving...",
     "saveSearchLabel": "Save Search & Alert",
     "savedSearchMessage": "Search saved for \"{query}\". You will receive notification alerts.",
+    "saveSearchError": "The saved search action failed. Please try again.",
+    "savedSearchesTitle": "My Saved Searches",
+    "notifyLabel": "Notify",
+    "deleteSavedSearchLabel": "Delete",
     "allSearchesFallback": "All Calls",
     "statusLabel": "Status:",
     "openCalls": "Open Calls",
@@ -1463,5 +1474,10 @@
     "roleSme": "SME R&D coordinator",
     "roleTto": "University TTO lead",
     "rolePlatformAdmin": "Platform administrator"
+  },
+  "NotFound": {
+    "title": "Page Not Found",
+    "description": "The page or link you are looking for does not exist or may have been removed.",
+    "backHome": "Back to Home"
   }
 }
