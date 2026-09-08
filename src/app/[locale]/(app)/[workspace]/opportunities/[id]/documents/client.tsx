@@ -583,7 +583,7 @@ export function DocumentsClient({
                       </button>
 
                       <a
-                        href={`/api/documents/export?type=${doc.kind}&format=docx`}
+                        href={`/api/documents/export?type=${doc.kind}&format=docx&opportunityId=${opportunityId}&locale=${locale}`}
                         target="_blank"
                         rel="noreferrer"
                         className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"
@@ -594,7 +594,7 @@ export function DocumentsClient({
                       </a>
 
                       <a
-                        href={`/api/documents/export?type=${doc.kind}&format=pdf`}
+                        href={`/api/documents/export?type=${doc.kind}&format=pdf&opportunityId=${opportunityId}&locale=${locale}`}
                         target="_blank"
                         rel="noreferrer"
                         className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"

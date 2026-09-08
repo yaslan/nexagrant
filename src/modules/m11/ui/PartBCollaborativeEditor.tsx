@@ -42,7 +42,7 @@ import { errorMessage } from '@/lib/errors';
 import { useNow } from '@/lib/hooks/use-now';
 import { useOptionalSession } from '@/lib/hooks/use-optional-session';
 import { displayUserName } from '@/lib/user-display';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 /**
  * The signed-in user, from the session record.
@@ -132,6 +132,7 @@ export function PartBCollaborativeEditor({
   // (real name -> e-mail local part -> translated "unnamed user"); there is no such fallback
   // for the organisation, so an unknown one is labelled as unknown.
   const sessionUser = useSessionUser();
+  const locale = useLocale();
   const tIdentity = useTranslations('UserIdentity');
   const tEditor = useTranslations('PartBEditor');
   const currentUserId = sessionUser?.id || sessionUser?.email || '';
@@ -482,7 +483,7 @@ export function PartBCollaborativeEditor({
           )}
 
           <a
-            href={`/api/documents/export?type=PART_B&format=docx&partId=${partId}&title=Part_B_Technical_Proposal`}
+            href={`/api/documents/export?type=PART_B&format=docx&partId=${partId}&title=Part_B_Technical_Proposal&locale=${locale}`}
             target="_blank"
             rel="noreferrer"
             className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 shadow-xs text-xs"

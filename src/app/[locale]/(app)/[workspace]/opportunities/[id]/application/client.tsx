@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useLocale } from 'next-intl';
 import {
   FileCheck,
   Euro,
@@ -33,11 +34,13 @@ interface ApplicationClientProps {
 }
 
 export function ApplicationClient({
+  opportunityId,
   tenantId,
   opportunityTitle,
   partA,
   partB,
 }: ApplicationClientProps) {
+  const locale = useLocale();
   const [activeTab, setActiveTab] = useState<'PART_A' | 'PART_B_EDITOR' | 'GANTT' | 'CHECKLIST'>('PART_B_EDITOR');
   const [copiedToken, setCopiedToken] = useState(false);
 
@@ -180,7 +183,7 @@ export function ApplicationClient({
 
           <div className="flex items-center gap-3 shrink-0">
             <a
-              href="/api/documents/export?type=PART_B&format=docx&title=Part_B_Technical_Proposal"
+              href={`/api/documents/export?type=PART_B&format=docx&title=Part_B_Technical_Proposal&opportunityId=${opportunityId}&locale=${locale}`}
               target="_blank"
               rel="noreferrer"
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3.5 py-1.5 rounded-xl transition text-xs shadow-md flex items-center gap-1.5"

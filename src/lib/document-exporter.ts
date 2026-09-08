@@ -23,6 +23,19 @@ function labels(locale?: ExportLocale) {
   return CATALOGS[locale === 'en' ? 'en' : 'tr'];
 }
 
+/**
+ * Boilerplate body for a document that carries no stored content of its own.
+ *
+ * `src/app/api/documents/export/route.ts` used to build this paragraph as a
+ * Turkish template literal inside the route handler, so an English session
+ * downloaded a Turkish document (CLAUDE.md rule 8). It lives in the message
+ * catalogue now, in both languages, and no longer stamps today's date onto the
+ * "effective date" clause — an export is not an execution.
+ */
+export function templateBodyText(kind: string, locale?: ExportLocale): string {
+  return labels(locale).templateBody.replace('{kind}', kind);
+}
+
 /** Interpolation-safe text for the HTML template. Signatory fields are stored user input. */
 function escapeHtml(value: string): string {
   return value
@@ -146,7 +159,12 @@ function signatureIdentityHtml(state: SignatureState, L: ReturnType<typeof label
 }
 
 /**
- * Generates official HTML/CSS template suitable for browser print / PDF export
+ * Generates official HTML/CSS template suitable for browser print / PDF export.
+ *
+ * Every fixed label here used to be a Turkish literal, so an English session
+ * downloaded a document whose body was English and whose table headings, print
+ * button, date format and footer were Turkish. They come from the catalogue
+ * now, like the rest of this module (CLAUDE.md rule 8).
  */
 export function generatePdfHtml(data: ExportDocumentData): string {
   const {
@@ -192,8 +210,10 @@ export function generatePdfHtml(data: ExportDocumentData): string {
       .join('');
   }
 
+  const dateLocale = locale === 'en' ? 'en-GB' : 'tr-TR';
+
   return `<!DOCTYPE html>
-<html lang="tr">
+<html lang="${locale === 'en' ? 'en' : 'tr'}">
 <head>
   <meta charset="UTF-8">
   <title>${kind} - ${title}</title>
@@ -223,17 +243,17 @@ export function generatePdfHtml(data: ExportDocumentData): string {
 <body>
   <div class="no-print" style="background:#f1f5f9; padding:10px; margin-bottom:20px; text-align:right;">
     <button onclick="window.print()" style="background:#1d4ed8; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">
-      🖨️ Resmî Yazdır / PDF İndir
+      ${escapeHtml(L.printButton)}
     </button>
   </div>
 
   <div class="header">
     <div>
       <div class="logo-badge">${isTubitak ? 'TÜBİTAK EŞİK ÜSTÜ ÖDÜLÜ PAKETİ' : 'EUROPEAN COMMISSION - HORIZON EUROPE'}</div>
-      <div class="sub-header">Doküman Ref: ${data.id} | Sürüm v${version}</div>
+      <div class="sub-header">${escapeHtml(L.docRefLabel)}: ${escapeHtml(data.id)} | ${escapeHtml(L.versionLabel)} v${version}</div>
     </div>
     <div style="text-align:right;" class="sub-header">
-      Tarih: ${new Date().toLocaleDateString('tr-TR')}
+      ${escapeHtml(L.dateLabel)}: ${new Date().toLocaleDateString(dateLocale)}
     </div>
   </div>
 
@@ -241,29 +261,29 @@ export function generatePdfHtml(data: ExportDocumentData): string {
 
   <table class="meta-table">
     <tr>
-      <td class="label">Proje / Çağrı Adı:</td>
+      <td class="label">${escapeHtml(L.callLabel)}:</td>
       <td><strong>${escapeHtml(callName)}</strong></td>
     </tr>
     <tr>
-      <td class="label">Başvuran Kuruluş:</td>
+      <td class="label">${escapeHtml(L.organizationLabel)}:</td>
       <td>${escapeHtml(orgName)}</td>
     </tr>
     <tr>
-      <td class="label">Doküman Türü:</td>
-      <td>${kind} (Sürüm v${version})</td>
+      <td class="label">${escapeHtml(L.documentTypeLabel)}:</td>
+      <td>${kind} (${escapeHtml(L.versionLabel)} v${version})</td>
     </tr>
     <tr>
-      <td class="label">E-İmza Onay Durumu:</td>
+      <td class="label">${escapeHtml(L.signatureStatusLabel)}:</td>
       <td>${
         signature.kind === 'SIGNED'
-          ? `${escapeHtml(L.signed)} (${signature.signedAt.toLocaleDateString('tr-TR')})`
+          ? `${escapeHtml(L.signed)} (${signature.signedAt.toLocaleDateString(dateLocale)})`
           : escapeHtml(signature.kind === 'PENDING' ? L.awaitingSignature : L.signatoryUnassigned)
       }</td>
     </tr>
   </table>
 
   <div class="content-box">
-    ${sectionsHtml || (contentText ? contentText.replace(/\n/g, '<br>') : '<p>Doküman içeriği hazırlanmaktadır.</p>')}
+    ${sectionsHtml || (contentText ? contentText.replace(/\n/g, '<br>') : `<p>${escapeHtml(L.contentPending)}</p>`)}
   </div>
 
   <div class="signature-section">
@@ -285,7 +305,7 @@ export function generatePdfHtml(data: ExportDocumentData): string {
   </div>
 
   <div class="footer">
-    FonBridge - Resmî Ufuk Avrupa & TÜBİTAK Doküman Üretim Motoru | Sayfa 1 / 1
+    ${escapeHtml(L.footer)}
   </div>
 </body>
 </html>`;
@@ -325,10 +345,10 @@ export function generateDocxBuffer(data: ExportDocumentData): Buffer {
     bodyXml = `
     <w:p>
       <w:pPr><w:pStyle w:val="Heading1"/></w:pPr>
-      <w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>1. DOKÜMAN İÇERİĞİ VE HÜKÜMLER</w:t></w:r>
+      <w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>${escapeXml(L.docxBodyHeading)}</w:t></w:r>
     </w:p>
     <w:p>
-      <w:r><w:t>${data.contentText ? data.contentText.replace(/<[^>]+>/g, '') : 'İşbu doküman resmî Ufuk Avrupa standartlarına uygun olarak üretilmiştir.'}</w:t></w:r>
+      <w:r><w:t>${data.contentText ? data.contentText.replace(/<[^>]+>/g, '') : escapeXml(L.docxFallbackBody)}</w:t></w:r>
     </w:p>`;
   }
 
@@ -343,15 +363,15 @@ export function generateDocxBuffer(data: ExportDocumentData): Buffer {
     </w:p>
     <w:p><w:r><w:t></w:t></w:r></w:p>
     <w:p>
-      <w:r><w:rPr><w:b/></w:rPr><w:t>Proje Başlığı: </w:t></w:r>
+      <w:r><w:rPr><w:b/></w:rPr><w:t>${escapeXml(L.docxProjectLabel)}: </w:t></w:r>
       <w:r><w:t>${escapeXml(callName)}</w:t></w:r>
     </w:p>
     <w:p>
-      <w:r><w:rPr><w:b/></w:rPr><w:t>Kuruluş: </w:t></w:r>
+      <w:r><w:rPr><w:b/></w:rPr><w:t>${escapeXml(L.docxOrganizationLabel)}: </w:t></w:r>
       <w:r><w:t>${escapeXml(orgName)}</w:t></w:r>
     </w:p>
     <w:p>
-      <w:r><w:rPr><w:b/></w:rPr><w:t>Sürüm: </w:t></w:r>
+      <w:r><w:rPr><w:b/></w:rPr><w:t>${escapeXml(L.versionLabel)}: </w:t></w:r>
       <w:r><w:t>v${version}</w:t></w:r>
     </w:p>
     <w:p><w:r><w:t></w:t></w:r></w:p>
