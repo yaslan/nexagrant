@@ -1,12 +1,17 @@
 ---
 name: fabrika-topicmatch-is-keyed-per-topic-not-per-opportunity
-description: Fabrika'da G0 kanıt kaydı TopicMatch konu başına anahtarlı ama puan fırsat başına değişir — aynı konuda iki fırsat panoda birbirinin puanını gösterir; "kanıta bağla" düzeltmelerinde anahtarın granülerliğini kontrol et
+description: ÇÖZÜLDÜ (2026-09-08, TopicMatch artık fırsat başına anahtarlı) — ders duruyor: "kanıta bağla" düzeltmelerinde kaydın anahtar granülerliği gösterilen şeyinkiyle aynı mı diye ayrıca sor
 metadata:
   type: project
   updatedAt: 2026-09-08
 ---
 
-`TopicMatch` şemada `@@unique([tenantId, topicId])` — yani **konu başına tek satır**. Ama G0 puanı
+**DURUM: kapatıldı** — 2026-09-08, `prisma/migrations/topicmatch-per-opportunity/`. `TopicMatch` artık
+`opportunityId` taşıyor ve `@@unique([tenantId, topicId, opportunityId])` (DB'de `NULLS NOT
+DISTINCT`); pano rozeti kaydı fırsat kimliğiyle okuyor. Yazım kalıbı için
+[[fabrika-prisma-cannot-key-on-null]]. Aşağısı kusurun kendisi, ders için duruyor.
+
+`TopicMatch` eskiden `@@unique([tenantId, topicId])` idi — yani **konu başına tek satır**. Ama G0 puanı
 **fırsat başına** değişir: `budgetRoleEconomy` (ağırlık 10) `Opportunity.intendedRole`'e,
 `researchAndEndUser` (ağırlık 12) o fırsatın `ConsortiumSeat` satırlarına bakar. `Opportunity.topicId`
 unique DEĞİL, yani aynı konuda N canlı fırsat serbest.
@@ -25,4 +30,4 @@ Ayrıca: `computeG0FromSnapshot` yalnız `coverage === 0` iken `null` döner. `c
 biri) geçerli sayılıp `0` puan üretir ve pano bunu `⭐ 0` rozeti olarak gerçek triyaj puanı gibi çizer —
 `demo-tenant`'ta demo-opp-2 ve demo-opp-4 böyle. "Yokluk sıfır değildir" kuralının kalan açığı.
 
-İlgili: [[fabrika-fabrication-audit-must-cover-defaults]]
+İlgili: [[fabrika-fabrication-audit-must-cover-defaults]] · [[fabrika-prisma-cannot-key-on-null]]
