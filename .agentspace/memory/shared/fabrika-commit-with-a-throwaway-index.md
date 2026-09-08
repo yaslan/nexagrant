@@ -39,5 +39,15 @@ Aynı koşuda ters yönü de yaşandı: `messages/*.json`'a eklediğim i18n anah
 commit etmeden başka bir ajanın geniş `git add`'iyle `266f00b`'ye girdi
 (`git log -S"<anahtar>" -- <dosya>` ile bulunur).
 
+**2026-09-08 / TASK-MTREW28BU7STD — tek dosyalık "basit" commit'te bile oldu.** Sadece
+kendi rapor dosyamı `git add <yol>` ile ekleyip düz `git commit` çalıştırdım — "tek
+dosya, throwaway index'e gerek yok" diye düşündüm. Commit `b3b4260`'a başka bir ajanın
+(`ex-en`, TASK-MTPZF8X1W8WCU) o anda stage'li duran 2 dosyası (`...-ex-en-2.md` + bir
+screenshot) da girdi. Zarar yoktu (onların işi de commit'e girip güvenle tarihçeye geçti,
+kaybolmadı) ama attribution kirlendi. **Ders: "tek dosya ekliyorum" commit boyutuyla
+ilgili değil — index PAYLAŞILDIĞI için risk her zaman var; boyut fark etmez, her commit'ten
+önce throwaway index kullan ya da en azından `git status --short` ile commit ÖNCESİ
+index'i gözden geçir.**
+
 İlgili: [[fabrika-agents-share-one-working-tree]] · [[fabrika-stage-one-hunk-of-a-shared-file]] ·
 [[fabrika-concurrent-commit-steals-your-stage]]
