@@ -12,6 +12,36 @@
 
 set -e
 
+# --- docs/agent-results/ kanıt koruması ---------------------------------
+# docs/agent-results/ ajanların kanıt yazdığı ortak, sahipsiz bir alan: kimse
+# başka bir görevin dosyasını ezmemesi gerektiğini "bilerek" tutmuyor, ve bu
+# defalarca sessizce oldu (bkz. docs/agent-results/TASK-MTSHUZUMVLTBF-*.md).
+# Kural mekanik: bu dizin altında VAR OLAN (daha önce commit'lenmiş) bir
+# dosyanın İÇERİĞİ değişemez — yalnız yeni dosya eklenebilir. INDEX.md muaf
+# (o zaten her görevde güncellenmesi beklenen bir özet).
+MODIFIED_EVIDENCE=$(git diff --cached --no-renames --name-only --diff-filter=M -- 'docs/agent-results/' | grep -v -E '(^|/)INDEX\.md$' || true)
+if [ -n "$MODIFIED_EVIDENCE" ]; then
+  if [ -n "${ALLOW_EVIDENCE_OVERWRITE:-}" ]; then
+    echo "⚠ ALLOW_EVIDENCE_OVERWRITE=1: var olan kanıt dosyaları bilerek üzerine yazılıyor:"
+    printf '%s\n' "$MODIFIED_EVIDENCE" | sed 's/^/    /'
+  else
+    echo
+    echo "✗ Commit durduruldu: docs/agent-results/ altında VAR OLAN bir kanıt dosyasının"
+    echo "  içeriği değişiyor — başka bir görevin (ya da kendi eski koşunun) kanıtını"
+    echo "  eziyor olabilirsin:"
+    printf '%s\n' "$MODIFIED_EVIDENCE" | sed 's/^/    /'
+    echo
+    echo "  Kanıt dosyaları bir kez yazılır. Yeni bir deneme/düzeltme ise VAR OLAN"
+    echo "  dosyayı değiştirme, -<n>.md sonekiyle yeni bir dosya aç"
+    echo "  (ör. TASK-XXXX-ajanadi.md doluysa TASK-XXXX-ajanadi-2.md)."
+    echo
+    echo "  Bilerek üzerine yazman gerekiyorsa (ör. kendi az önceki yazım hatanı"
+    echo "  düzeltiyorsun ve kimse o kanıta bel bağlamadı):"
+    echo "    ALLOW_EVIDENCE_OVERWRITE=1 git commit ..."
+    exit 1
+  fi
+fi
+
 STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' || true)
 if [ -z "$STAGED" ]; then
   exit 0
