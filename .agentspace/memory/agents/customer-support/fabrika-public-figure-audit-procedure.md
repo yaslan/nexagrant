@@ -35,6 +35,17 @@ repo'nun kendi `@/lib/db` export'unu kullan, `npx tsx --tsconfig tsconfig.json .
 aynı dosyalarda aynı sınıftan üç tane daha vardı ("%25 ... etki puanını yükseltir", "50+ teklif
 sıfır çakışmayla", "haftalardan saatlere"). Kelime olarak yazılmış oran da orandır.
 
+**Ve `[0-9]` taraması bunu KAÇIRIR.** Commit'ten sonraki son kontrolde landing CTA'sında
+"teklif hazırlama sürenizi **haftalardan günlere** indirin" / "from months to days" çıktı —
+blog'dan çıkardığımın aynısı, tek farkı rakam içermemesi. İki tarama birden koş:
+
+```bash
+grep -nE "[0-9][0-9.,]*\s*(kat|milyar|milyon|bin|/5)|%[0-9]"              # rakamlı
+grep -nE "haftalardan|aylardan|from (months|weeks) to|kat daha|misli"     # kelimeli
+```
+
+Kapan testine de iki formu birden koy, yoksa bir dahaki "aylardan günlere" yeşil geçer.
+
 **En ağırı sayı değil, sayının kime yapıştırıldığıdır.** Landing'deki M1 örnek paneli
 `Fraunhofer-Gesellschaft / PIC: 999984059` altına `342 Proje`, `€940M+`, `CENTRALITY: 0.9412`
 ve "hakem puanını ortalama +1.8 puan yükseltir" yazıyordu — yani **gerçek bir üçüncü kurum
