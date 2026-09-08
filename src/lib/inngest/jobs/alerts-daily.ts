@@ -5,7 +5,7 @@ import { Resend } from 'resend';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { AlertsDailyOutputSchema, type AlertsDailyOutput } from '../events';
-import { z } from 'zod';
+import { parseSavedSearchFilters } from '@/lib/saved-search-filters';
 
 let resend: Resend | null = null;
 function getResend(): Resend | null {
@@ -30,29 +30,6 @@ export const SAVED_SEARCH_ALERT_QUERY = {
   where: { notify: true },
   select: { id: true, tenantId: true, name: true, filters: true, lastRunAt: true, createdAt: true },
 } as const;
-
-/**
- * `SavedSearch.filters` is a bare `Json` column, and nothing in this codebase
- * ever writes one: there is no API route that creates a `SavedSearch` row,
- * and the "Save search" button on the /calls page (client.tsx `handleSaveSearch`)
- * only sleeps 500ms and shows a toast — it calls no API and touches no table.
- * So there is no established contract for what `filters` contains. This
- * schema recognises only the two fields the /calls search state has a direct
- * analogue for (`q`, `status`); anything else, or a row that fails to parse
- * at all, degrades to "no filter" rather than throwing, so a legacy or
- * malformed row still counts new topics instead of failing the whole search.
- */
-export const SavedSearchFiltersSchema = z
-  .object({
-    q: z.string().trim().min(1),
-    status: z.array(z.enum(['FORTHCOMING', 'OPEN', 'CLOSED'])).min(1),
-  })
-  .partial();
-
-function parseFilters(filters: unknown): z.infer<typeof SavedSearchFiltersSchema> {
-  const result = SavedSearchFiltersSchema.safeParse(filters);
-  return result.success ? result.data : {};
-}
 
 /**
  * Shaped by hand rather than pulled from `Prisma.TopicWhereInput`: this
@@ -81,7 +58,7 @@ interface TopicMatchWhere {
  * topic as a "new" match on day one.
  */
 export function matchCountQuery(filters: unknown, since: Date): { where: TopicMatchWhere } {
-  const parsed = parseFilters(filters);
+  const parsed = parseSavedSearchFilters(filters);
   const where: TopicMatchWhere = { fetchedAt: { gt: since } };
 
   if (parsed.status && parsed.status.length > 0) {

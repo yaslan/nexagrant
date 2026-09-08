@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withTenant } from '@/lib/db';
 import { requireTenantApi } from '@/lib/tenant';
-import { SavedSearchFiltersSchema } from '@/lib/inngest/jobs/alerts-daily';
+import { SavedSearchFiltersSchema } from '@/lib/saved-search-filters';
 import type { SavedSearchRow } from '@/types/db-rows';
 
 /**
@@ -13,10 +13,12 @@ import type { SavedSearchRow } from '@/types/db-rows';
  * satır hiç oluşmadığı için o cron'un sorgusu üretimde her zaman boş
  * dönüyordu. Bu route gerçek yazıcı.
  *
- * `filters` şekli `alerts-daily.ts`'in `SavedSearchFiltersSchema`'sıyla
- * (tek kaynak, buradan import) aynı: sadece `/calls` arama state'inin
- * karşılığı olan `q`/`status`. Alan adları burada değişirse cron sessizce
- * "filtresiz" davranışa düşer — bkz. o dosyadaki uyarı.
+ * `filters` şeması `@/lib/saved-search-filters`'ta — bu rota ile cron'un
+ * PAYLAŞTIĞI tek kaynak: sadece `/calls` arama state'inin karşılığı olan
+ * `q`/`status`. Alan adları orada değişirse cron sessizce "filtresiz"
+ * davranışa düşer. Şema kasıtlı olarak cron iş dosyasında DEĞİL: rota o
+ * dosyayı import ettiğinde `resend` gibi yalnız cron'un gereksindiği
+ * paketler bu rotanın derleme grafiğine giriyordu (TASK-MTS9W0C1VC9OS).
  *
  * Liste ve silme kullanıcıya özel: `tenantId` + `userId` ile daraltılır,
  * "kayıtlı aramalarım" bir kurum içindeki başka bir üyenin aramasını
