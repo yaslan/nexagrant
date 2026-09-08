@@ -254,10 +254,14 @@ $ eslint
 ✖ 2 problems (0 errors, 2 warnings)      ← ikisi de BAŞKA bir kartın kanıt dosyasından
 
 ### pnpm test
- Test Files  1 failed | 128 passed | 2 skipped (131)
-      Tests  4 failed | 1527 passed | 8 skipped (1539)
- FAIL  tests/gdpr-data-subject.live.test.ts  (4 test — BENİM DEĞİL, bkz. §4)
+ Test Files  129 passed | 2 skipped (131)
+      Tests  1536 passed | 8 skipped (1544)
 ```
+
+**Not:** commit'ten önceki iki ara koşuda kırmızılar vardı; hepsi başka
+ajanların o an yarım kalmış dosyalarındandı ve onlar işlerini commit ettikçe
+**kendiliğinden düzeldi** (§4). Commit sonrası son ölçüm yukarıdaki: **sıfır
+kırmızı.**
 
 **Kendi dokunduğum test yüzeyi, birlikte koşturuldu — hepsi yeşil:**
 
@@ -284,6 +288,10 @@ o başlıktan sonrasını okuyor).
 **23:09 koşusu: 1513 test, TAMAMEN YEŞİL** (henüz AB genişlemesi yokken).
 **23:13 koşusu:** `tests/cordis-delta.test.ts` 3 kırmızı.
 **23:20 koşusu:** cordis düzeldi, `tests/gdpr-data-subject.live.test.ts` 4 kırmızı.
+**Commit sonrası koşu: 1536 test, TAMAMEN YEŞİL** — sahipleri işlerini commit
+ettikten sonra kırmızılar kendiliğinden kapandı. Atıfın doğru olduğunun kanıtı
+budur: benim değişikliğim boyunca sabit kaldı, kırmızılar başkalarının ağaç
+durumu değiştikçe geldi ve gitti.
 
 Aradaki fark benim dosyalarım değil:
 
