@@ -100,6 +100,26 @@ export interface ExportDocumentData {
   workPackages?: { code: string; title: string; leadPartner: string; startMonth: number; endMonth: number }[];
 }
 
+/**
+ * The "who wrote this section" line of a Part B section.
+ *
+ * A section's lead author comes from the stored part, so it is present only when a real user
+ * has been recorded against that section. It used to be printed as
+ * `Lider Yazar: <name> (<org> || 'Konsorsiyum')`, which invented an organisation for every
+ * author whose organisation was unknown — the export equivalent of the invented template
+ * authors this module used to carry. Now: the recorded organisation or nothing at all, and an
+ * unowned section states that no lead author is assigned rather than staying silent about it.
+ */
+function leadAuthorText(
+  sec: { leadAuthor?: string; leadAuthorOrg?: string },
+  L: ReturnType<typeof labels>
+): string {
+  const author = sec.leadAuthor?.trim();
+  if (!author) return L.leadAuthorUnassigned;
+  const org = sec.leadAuthorOrg?.trim();
+  return `${L.leadAuthorLabel}: ${author}${org ? ` (${org})` : ''}`;
+}
+
 /** The status line of a signature box: signed / awaiting / nobody assigned. */
 function signatureStatusText(state: SignatureState, L: ReturnType<typeof labels>, signedText: string, pendingText: string): string {
   if (state.kind === 'UNASSIGNED') return L.signatoryUnassigned;
@@ -162,7 +182,7 @@ export function generatePdfHtml(data: ExportDocumentData): string {
         <h3 style="color: #1e40af; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; margin-bottom: 8px; font-size: 13pt;">
           ${sec.title}
         </h3>
-        ${sec.leadAuthor ? `<div style="font-size: 9pt; color: #64748b; margin-bottom: 8px;"><strong>Lider Yazar:</strong> ${sec.leadAuthor} (${sec.leadAuthorOrg || 'Konsorsiyum'})</div>` : ''}
+        <div style="font-size: 9pt; color: #64748b; margin-bottom: 8px;">${escapeHtml(leadAuthorText(sec, L))}</div>
         <div style="font-size: 10pt; line-height: 1.5; color: #334155;">
           ${sec.content.replace(/\n/g, '<br>')}
         </div>
@@ -293,7 +313,7 @@ export function generateDocxBuffer(data: ExportDocumentData): Buffer {
       <w:pPr><w:pStyle w:val="Heading2"/></w:pPr>
       <w:r><w:rPr><w:b/><w:sz w:val="26"/><w:color w:val="1E40AF"/></w:rPr><w:t>${sec.title}</w:t></w:r>
     </w:p>
-    ${sec.leadAuthor ? `<w:p><w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>Lider Yazar: ${sec.leadAuthor} (${sec.leadAuthorOrg || 'Konsorsiyum'})</w:t></w:r></w:p>` : ''}
+    <w:p><w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>${escapeXml(leadAuthorText(sec, L))}</w:t></w:r></w:p>
     <w:p>
       <w:r><w:t>${sec.content.replace(/<[^>]+>/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t></w:r>
     </w:p>

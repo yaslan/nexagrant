@@ -87,9 +87,31 @@ const LOCK_TTL_SECONDS = 60;
 /** How often the lock badge re-checks the clock. Well under the TTL, cheap enough to leave on. */
 const LOCK_TICK_MS = 5000;
 
+/**
+ * The short "who owns this section" line in the section list.
+ *
+ * A section has a lead author only once a real person has been recorded against it. The
+ * template ships none, so an unowned section says so plainly instead of rendering
+ * `Lider: undefined (undefined)` — which is what the invented template authors used to hide.
+ * An author whose organisation is unknown is printed without a stand-in organisation.
+ */
+function shortLeadLabel(section: PartBSectionItem, unassigned: string): string {
+  const author = section.leadAuthor?.trim();
+  if (!author) return unassigned;
+  const firstName = author.split(' ')[0] || author;
+  const org = section.leadAuthorOrg?.trim().split(' ')[0];
+  return org ? `${firstName} (${org})` : firstName;
+}
+
 interface PartBCollaborativeEditorProps {
   partId: string;
   opportunityTitle: string;
+  /**
+   * Passed by the application page, deliberately not read here: every server action in this
+   * module resolves the tenant from the session (`requireTenantAction`), so a tenant id
+   * arriving from the client would be an authority the browser must not hold. Kept on the
+   * props so the call site stays explicit about which tenant's part is on screen.
+   */
   tenantId: string;
   initialSections?: PartBSectionItem[];
   initialRevisions?: SectionRevisionItem[];
@@ -99,7 +121,6 @@ interface PartBCollaborativeEditorProps {
 export function PartBCollaborativeEditor({
   partId,
   opportunityTitle,
-  tenantId,
   initialSections = DEFAULT_PART_B_SECTIONS,
   initialRevisions = [],
   initialComments = [],
@@ -204,7 +225,10 @@ export function PartBCollaborativeEditor({
   const currentSectionWords = calculateWords(editorText);
   const currentSectionEstimatedPages = (currentSectionWords / 450).toFixed(1);
 
-  const handleSaveContent = async (isManual: boolean = true) => {
+  // Wrapped in useCallback because the autosave effect below depends on it: as a plain
+  // function it was a new value on every render, so the effect tore down and re-armed its
+  // 2.5s timer on every keystroke-driven render instead of once per edit.
+  const handleSaveContent = useCallback(async (isManual: boolean = true) => {
     setIsSaving(true);
     try {
       await updateSectionContent(
@@ -246,7 +270,7 @@ export function PartBCollaborativeEditor({
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [partId, activeSectionKey, editorText, currentUserId, currentUserName, currentUserOrg, currentSectionWords]);
 
   // Autosave only. The dirty indicator is derived above, so this effect no longer sets state
   // in its body — it just arms the 2.5s timer and disarms it on the next keystroke.
@@ -514,7 +538,7 @@ export function PartBCollaborativeEditor({
                                 isActive ? 'text-blue-100' : 'text-muted'
                               }`}
                             >
-                              Lider: {s.leadAuthor?.split(' ')[0]} ({s.leadAuthorOrg?.split(' ')[0]})
+                              {tEditor('leadShort')}: {shortLeadLabel(s, tEditor('leadUnassigned'))}
                             </div>
                           </div>
 
@@ -580,7 +604,7 @@ export function PartBCollaborativeEditor({
                                 isActive ? 'text-blue-100' : 'text-muted'
                               }`}
                             >
-                              Lider: {s.leadAuthor?.split(' ')[0]} ({s.leadAuthorOrg?.split(' ')[0]})
+                              {tEditor('leadShort')}: {shortLeadLabel(s, tEditor('leadUnassigned'))}
                             </div>
                           </div>
 
@@ -646,7 +670,7 @@ export function PartBCollaborativeEditor({
                                 isActive ? 'text-blue-100' : 'text-muted'
                               }`}
                             >
-                              Lider: {s.leadAuthor?.split(' ')[0]} ({s.leadAuthorOrg?.split(' ')[0]})
+                              {tEditor('leadShort')}: {shortLeadLabel(s, tEditor('leadUnassigned'))}
                             </div>
                           </div>
 
@@ -693,7 +717,11 @@ export function PartBCollaborativeEditor({
                 </h3>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted mt-1 font-mono">
                   <span>
-                    Sorumlu: <strong>{activeSection.leadAuthor}</strong> ({activeSection.leadAuthorOrg})
+                    {tEditor('leadAuthorLabel')}:{' '}
+                    <strong>{activeSection.leadAuthor?.trim() || tEditor('leadUnassigned')}</strong>
+                    {activeSection.leadAuthorOrg?.trim()
+                      ? ` (${activeSection.leadAuthorOrg.trim()})`
+                      : ''}
                   </span>
                   <span>•</span>
                   <span>Hedef: {activeSection.targetPages} Sayfa</span>
@@ -825,7 +853,7 @@ export function PartBCollaborativeEditor({
                     rows={18}
                     value={editorText}
                     onChange={(e) => setEditorText(e.target.value)}
-                    placeholder="Bölüm içeriğini buraya yazın veya YZ Eş-Yazar Asistanı ile taslak üretin..."
+                    placeholder={tEditor('contentPlaceholder')}
                     className="w-full rounded-xl border border-border p-4 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground/50 leading-relaxed"
                   />
                   <div className="absolute bottom-3 right-3 text-[10px] font-mono bg-surface/90 border border-border px-2 py-0.5 rounded text-muted shadow-2xs">
@@ -1019,7 +1047,7 @@ export function PartBCollaborativeEditor({
               rows={3}
               value={aiPromptNotes}
               onChange={(e) => setAiPromptNotes(e.target.value)}
-              placeholder="Örn: Fraunhofer ile geliştirilen mikromimari soğutma deneylerini ve 3 demo sahasını vurgula..."
+              placeholder={tEditor('aiPromptPlaceholder')}
               className="w-full border border-indigo-700/60 rounded-xl p-3 bg-slate-950/80 text-xs text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-400 focus:outline-none font-mono"
             />
 

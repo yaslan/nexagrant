@@ -1,9 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
 import { getBlogPosts, updateBlogPost, type BlogPost } from '@/lib/blog';
 import { displayUserName } from '@/lib/user-display';
+import { DEFAULT_PART_B_SECTIONS } from '@/modules/m11/types';
 import { setScope, resetScope } from './helpers/tenant-scope-mock';
 
 /**
@@ -237,16 +238,23 @@ describe('blog — a byline names a real author or there is none', () => {
 });
 
 describe('login page — the demo buttons name a role, not a person', () => {
-  test.each([
-    'src/app/[locale]/login/AuthCard.tsx',
-    'src/app/[locale]/login/LoginForm.tsx',
-  ])('%s headlines the seat and the address', (file) => {
-    const source = readCode(file);
-    for (const invented of [MEHMET, AYSE, 'Yasin Aslan (Süperadmin)']) {
-      expect(source, `${file} still names "${invented}"`).not.toContain(invented);
+  test.each(['src/app/[locale]/login/AuthCard.tsx'])(
+    '%s headlines the seat and the address',
+    (file) => {
+      const source = readCode(file);
+      for (const invented of [MEHMET, AYSE, 'Yasin Aslan (Süperadmin)']) {
+        expect(source, `${file} still names "${invented}"`).not.toContain(invented);
+      }
+      expect(source).toContain("tDemo('roleSme')");
+      expect(source).toContain("tDemo('roleTto')");
     }
-    expect(source).toContain("tDemo('roleSme')");
-    expect(source).toContain("tDemo('roleTto')");
+  );
+
+  // `LoginForm.tsx` was a second, unreachable copy of the login card: nothing imported it, so
+  // its demo buttons never reached a user and the two copies could drift apart unnoticed. It
+  // was deleted (TASK-MTS6LZOD715WM); this keeps a copy from coming back.
+  test('the unreachable duplicate login form stays deleted', () => {
+    expect(existsSync(resolve(REPO, 'src/app/[locale]/login/LoginForm.tsx'))).toBe(false);
   });
 
   test('the role labels exist in both locales', () => {
@@ -260,6 +268,75 @@ describe('login page — the demo buttons name a role, not a person', () => {
         expect(messages.DemoSignIn?.[key], `messages/${locale}.json DemoSignIn.${key}`).toBeTruthy();
       }
       expect(messages.UserIdentity?.noWorkspace, `messages/${locale}.json noWorkspace`).toBeTruthy();
+    }
+  });
+});
+
+/**
+ * A Part B template can know the official Horizon Europe section frame. It cannot know who
+ * writes a section or what the project is — so it now states neither.
+ */
+describe('Part B template — structure only, no author and no prose', () => {
+  const SELIN = ['Doç.', 'Dr.', 'Selin', 'Kaya'].join(' ');
+  const KLAUS = ['Prof.', 'Klaus', 'Müller'].join(' ');
+  const SOFIA = ['Dr.', 'Sofia', 'Rossi'].join(' ');
+  const MARCUS = ['Marcus', 'Schmidt'].join(' ');
+  const INVENTED_ORGS = [
+    'Demo SME Consultancy',
+    'Fraunhofer',
+    'METU TTO',
+    'Politecnico di Milano',
+    'Siemens AG',
+  ];
+
+  test('every default section ships unowned and unwritten', () => {
+    expect(DEFAULT_PART_B_SECTIONS).toHaveLength(8);
+    for (const section of DEFAULT_PART_B_SECTIONS) {
+      expect(section.leadAuthor, `${section.key} carries a lead author`).toBeUndefined();
+      expect(section.leadAuthorOrg, `${section.key} carries an organisation`).toBeUndefined();
+      expect(section.lastModifiedBy, `${section.key} carries an editor`).toBeUndefined();
+      expect(section.content, `${section.key} ships prose`).toBe('');
+      // The official frame — the part a template legitimately knows — survives.
+      expect(section.title.length).toBeGreaterThan(0);
+      expect(section.targetPages).toBeGreaterThan(0);
+      expect(section.maxWords).toBeGreaterThan(0);
+    }
+  });
+
+  test('the module source names none of the invented consortium members', () => {
+    const source = readCode('src/modules/m11/types.ts');
+    for (const invented of [MEHMET, SELIN, KLAUS, SOFIA, MARCUS, ...INVENTED_ORGS]) {
+      expect(source, `m11/types.ts still names "${invented}"`).not.toContain(invented);
+    }
+  });
+
+  test('the editor names none of them either, and states an unowned section plainly', () => {
+    const source = readCode('src/modules/m11/ui/PartBCollaborativeEditor.tsx');
+    for (const invented of [MEHMET, SELIN, KLAUS, SOFIA, MARCUS, ...INVENTED_ORGS]) {
+      expect(source, `PartBCollaborativeEditor still names "${invented}"`).not.toContain(invented);
+    }
+    expect(source).toContain("tEditor('leadUnassigned')");
+  });
+
+  test('the exporter prints the recorded organisation or none — never a stand-in', () => {
+    const source = readCode('src/lib/document-exporter.ts');
+    expect(source).not.toContain("|| 'Konsorsiyum'");
+    expect(source).toContain('leadAuthorText');
+    for (const locale of ['tr', 'en']) {
+      const messages = JSON.parse(read(`messages/${locale}.json`)) as Record<
+        string,
+        Record<string, string>
+      >;
+      expect(
+        messages.DocumentExport?.leadAuthorUnassigned,
+        `messages/${locale}.json DocumentExport.leadAuthorUnassigned`
+      ).toBeTruthy();
+      for (const key of ['leadShort', 'leadAuthorLabel', 'leadUnassigned']) {
+        expect(
+          messages.PartBEditor?.[key],
+          `messages/${locale}.json PartBEditor.${key}`
+        ).toBeTruthy();
+      }
     }
   });
 });
