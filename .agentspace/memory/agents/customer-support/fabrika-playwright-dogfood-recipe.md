@@ -25,13 +25,22 @@ ama `click`/`type` kullanıcı onayı istiyor ve onay tur-turu zaman aşımına 
 Credentials sağlayıcısı e-posta ile geçiyor, şifre gerekmiyor:
 
 ```js
-await page.goto(`${BASE}/tr/giris?callbackUrl=${encodeURIComponent(hedefUrl)}`);
+// callbackUrl ZORUNLU: form başarıda `window.location.href = rawCallbackUrl` yapıyor,
+// parametre yoksa giriş "başarılı" olur ama sayfa giriş ekranında kalır.
+await page.goto(`${BASE}/tr/giris?callbackUrl=${encodeURIComponent(hedefUrl)}`,
+                { waitUntil: 'networkidle' });
+await page.waitForTimeout(2500);   // hidratlanmadan tıklarsan submit hiç koşmaz
 await page.locator('input[type="email"]').fill('owner@demo.fabrika.test');
 await page.locator('form button[type="submit"]').click();
-await page.waitForURL('**/briefs', { timeout: 45000 });
+await page.waitForURL((u) => !u.pathname.includes('/giris'), { timeout: 60000 });
 ```
 (`/en/` için giriş yolu `login`.) Çerez onayı için `addInitScript` ile
-`localStorage.fabrika_cookie_consent` set et, yoksa banner tıklamaları engelliyor.
+`localStorage.fabrika_cookie_consent` set et, yoksa `role="alertdialog"` katmanı bütün
+tıklamaları yutar ve Playwright "intercepts pointer events" diye 60 sn döner. Değer JSON
+olmalı: `JSON.stringify({ accepted: true, level: 'all' })`.
+
+Şifre alanı boş bırakılabilir (`handleSubmit` `password || 'demo1234'` gönderiyor); giriş
+kartındaki "hızlı demo rolleri" düğmeleri de aynı server action'ı çağırıyor.
 
 ## Asıl numara — sunucu eyleminin cevabını yakala
 
@@ -56,5 +65,5 @@ handler `alert()` kullanan yerleri yakalar (M9 `handleDownloadIcs`'te vardı).
 Ekranda "oldu" görmek yetmiyor — `pg` ile doğrudan sor: ilgili tablo + `CreditLedger` +
 `AiUsageLog`. Üçü de 0 ise iş hiç olmamıştır. Probe satırı yazdıysan **temizle**.
 
-İlgili: [[fabrika-runtime-verification-recipe]] · [[fabrika-dev-server-stale-prisma-client]] ·
+İlgili: [[fabrika-empty-tenant-audit-needs-module-and-plan-rows]] · [[fabrika-runtime-verification-recipe]] · [[fabrika-dev-server-stale-prisma-client]] ·
 [[fabrika-workspace-url-segment-is-decorative]] · [[fabrika-fabricated-fallback-antipattern]]
