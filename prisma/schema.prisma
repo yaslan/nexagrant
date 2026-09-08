@@ -1001,13 +1001,22 @@ model ConceptNote {
 
 // ───────────────────────── M4 Focal Point ─────────────────────────
 
+/// `ownerUserId` is a work assignment, not a record: it names the internal
+/// focal point who currently owns this relationship. No integrity rule depends
+/// on it and the external party is held separately in `counterpartName` /
+/// `counterpartEmail`, so there is no legal basis to keep it once that person
+/// is erased. It is therefore nullable and the erasure purge detaches it
+/// (`users-scheduled-deletion`); NULL means "unassigned — needs a new focal
+/// point", which is also the state a relationship lands in after an erasure.
+/// Decided 2026-09-08, A4 option C: the sibling case `DualApprovalStep.actorUserId`
+/// went the other way and is retained, because there an approval is a signature.
 model Relationship {
   id             String   @id @default(cuid())
   tenantId       String
   organizationId String?  // CORDIS PIC
   partnerOrgId   String?
   kind           String   // partner | ncp | city | cluster | consultant | tto
-  ownerUserId    String   // internal focal point
+  ownerUserId    String?  // internal focal point; NULL = unassigned (or erased)
   counterpartName String?
   counterpartEmail String?
   warmth         String   @default("cold") // cold | warm | hot | active

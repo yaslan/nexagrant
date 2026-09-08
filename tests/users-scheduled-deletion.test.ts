@@ -23,6 +23,7 @@ const auditUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const opportunityUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const feedbackUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const proposalUsageUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+const relationshipUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 
 vi.mock('../src/lib/db', () => ({
   prisma: {
@@ -41,6 +42,7 @@ vi.mock('../src/lib/db', () => ({
     opportunity: { updateMany: (...args: unknown[]) => opportunityUpdateMany(...args) },
     feedback: { updateMany: (...args: unknown[]) => feedbackUpdateMany(...args) },
     proposalUsage: { updateMany: (...args: unknown[]) => proposalUsageUpdateMany(...args) },
+    relationship: { updateMany: (...args: unknown[]) => relationshipUpdateMany(...args) },
   },
 }));
 
@@ -84,6 +86,7 @@ describe('purgeDueUsers — grace period', () => {
     expect(auditCreate).not.toHaveBeenCalled();
     expect(calendarDeleteMany).not.toHaveBeenCalled();
     expect(savedSearchDeleteMany).not.toHaveBeenCalled();
+    expect(relationshipUpdateMany).not.toHaveBeenCalled();
   });
 
   test('every uncascaded column is cleared, and always scoped to the one subject', async () => {
@@ -103,6 +106,12 @@ describe('purgeDueUsers — grace period', () => {
     expect(proposalUsageUpdateMany).toHaveBeenCalledWith({
       where: { usedByUserId: 'due' },
       data: { usedByUserId: null },
+    });
+    // The focal point is detached, never the relationship deleted: the tenant
+    // keeps the partner record, it just has no owner until someone is assigned.
+    expect(relationshipUpdateMany).toHaveBeenCalledWith({
+      where: { ownerUserId: 'due' },
+      data: { ownerUserId: null },
     });
   });
 

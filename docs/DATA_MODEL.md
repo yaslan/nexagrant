@@ -122,6 +122,35 @@ Migration: `prisma/migrations/add-soft-delete.sql` (additive + idempotent) · ge
 - `deletionReason` değerleri: `subject_request` (kullanıcı talebi) · `policy` · `tenant_cascade`.
 - Yeni sütunlar mevcut satır-seviyesi politikaları değiştirmez: `prisma/rls.sql` politikaları `tenantId` üzerinden satır bazlı çalışır, sütun eklemek kapsamı etkilemez.
 
+#### 7.1.1 FK'siz `User.id` sütunları — imhada koparılan vs. saklanan
+
+`DELETE FROM "User"` yabancı anahtarı olmayan sütunlara ulaşamaz; bu yüzden `purgeDueUsers()`
+her birini **elle** adlandırır. Kural: özneye ait satır silinir, kiracıya ait satır kalır ve
+yalnız kişiye giden bağ koparılır.
+
+| Sütun | İmhada | Gerekçe |
+|---|---|---|
+| `CalendarConnection.userId`, `SavedSearch.userId` | satır silinir | özneye ait veri |
+| `Effort.userId` | satır silinir | özneye ait veri |
+| `AiUsageLog.userId`, `AuditEvent.actorId`, `Opportunity.ownerId`, `Feedback.userId`, `ProposalUsage.usedByUserId` | `NULL` | kayıt kiracının; yalnız bağ kopar |
+| `Relationship.ownerUserId` | `NULL` | **aşağıya bakınız** |
+| `DualApprovalStep.actorUserId` (+ `actorName`) | **saklanır** | imza kaydı; `@@unique([followupDocId, actorUserId])` buna dayanır. Saklama `docs/legal/processing-register.md` §12'de **adıyla** beyan edilir |
+
+**`Relationship.ownerUserId` — 2026-09-08 kararı (A4, Seçenek C).** Migration:
+`prisma/migrations/relationship-owner-nullable.sql` · geri alma:
+`relationship-owner-nullable.down.sql` (NULL satır varsa Postgres reddeder — dosyanın başındaki
+uyarıya bakın).
+
+- Sütun `String` → `String?`. `NULL` = **atanmamış** ("yeni odak kişi gerekiyor"); imhadan sonra
+  ilişki bu duruma düşer.
+- Neden koparılıyor: bu bir **iş ataması**, kayıt değil. Üzerinde hiçbir bütünlük kuralı yok
+  (tek yapı `@@index([tenantId, ownerUserId])`) ve dış taraf ayrı sütunlarda
+  (`counterpartName`, `counterpartEmail`) durduğu için kişi erişildiğinde saklanmasının
+  hukuki dayanağı yok. `DualApprovalStep` ile aynı vaka değildir; ikisi ayrı karara bağlandı.
+- İlişki satırı **silinmez**: kiracının ortak kaydıdır, dış taraf bilgisiyle birlikte kalır.
+- Etkilenen tüketici: `m4WeeklySummary` sahipsiz satırları gruplamaz (bildirilecek kimse yok),
+  `unassignedCount` olarak sayar.
+
 ### 7.2 Fırsat arşivleme (üründen giriş noktası)
 
 `Opportunity.deletedAt` uzun süre yalnız şemada durdu; üründe onu yazan bir yol yoktu, yani bir fırsat ancak SQL'den siliniyordu. Arşivleme akışı bu boşluğu kapatır:

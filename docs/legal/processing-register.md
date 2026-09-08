@@ -164,7 +164,7 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 
 ## 12. Onay iş akışları (dual approval — M10)
 
-**Patron kararı 2026-09-08 (A4 brifingi, Seçenek C):** İki kolon (`actorUserId`, `actorName`) iki ayrı vakadır ve ikisi de bu kayıtta kalır. "Yalnızca id'yi beyan et, ekranda duran adı atlama" (brifingde Seçenek A — "sahte güvence" gerekçesiyle reddedildi) bu envanterde uygulanmamıştır: aşağıdaki veri kategorileri alanı ve aydınlatma metni taslağı **ikisini birlikte, adıyla** beyan eder. `Relationship.ownerUserId` nullable + imha ile kopma kararı **bu maddenin kapsamı dışıdır** — ayrı kart (TASK-MTT1XL9NP2QYU), migration kilidi açılınca işlenecek.
+**Patron kararı 2026-09-08 (A4 brifingi, Seçenek C):** İki kolon (`actorUserId`, `actorName`) iki ayrı vakadır ve ikisi de bu kayıtta kalır. "Yalnızca id'yi beyan et, ekranda duran adı atlama" (brifingde Seçenek A — "sahte güvence" gerekçesiyle reddedildi) bu envanterde uygulanmamıştır: aşağıdaki veri kategorileri alanı ve aydınlatma metni taslağı **ikisini birlikte, adıyla** beyan eder. `Relationship.ownerUserId` nullable + imha ile kopma kararı ayrı kartta (TASK-MTT1XL9NP2QYU) **uygulandı**: sütun `String?` oldu (`prisma/migrations/relationship-owner-nullable.sql`) ve `purgeDueUsers()` imhada `NULL`'a çeker — o kolon artık bu envanterde saklanan bir veri değildir. Karşılaştırma tablosu: `docs/DATA_MODEL.md` §7.1.1.
 
 | Alan | Değer |
 |---|---|

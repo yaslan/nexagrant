@@ -74,6 +74,8 @@ const ids = {
   oppSubject: `o-subj-${RUN}`,
   oppNeighbour: `o-nb-${RUN}`,
   oppOutsider: `o-out-${RUN}`,
+  relSubject: `r-subj-${RUN}`,
+  relNeighbour: `r-nb-${RUN}`,
 };
 
 async function seed() {
@@ -191,6 +193,27 @@ async function seed() {
       { tenantId: ids.tenantA, actorId: ids.neighbour, type: 'module.state.changed', target: `m9-${RUN}` },
     ],
   });
+
+  // M4 relationships. `ownerUserId` is the internal focal point and carried the
+  // subject's id in a NOT NULL column until `relationship-owner-nullable.sql`,
+  // so it used to survive the purge outright. `counterpartName`/`Email` are the
+  // external partner — the tenant's own data, and not the subject — so they
+  // must still be there afterwards: erasure detaches the owner, it does not
+  // take the tenant's partner record with it.
+  await db.relationship.createMany({
+    data: [
+      {
+        id: ids.relSubject, tenantId: ids.tenantA, kind: 'partner',
+        ownerUserId: ids.subject, counterpartName: `Partner Contact ${RUN}`,
+        counterpartEmail: `partner-${RUN}@t.invalid`, warmth: 'warm',
+      },
+      {
+        id: ids.relNeighbour, tenantId: ids.tenantA, kind: 'ncp',
+        ownerUserId: ids.neighbour, counterpartName: `NCP Contact ${RUN}`,
+        counterpartEmail: `ncp-${RUN}@t.invalid`, warmth: 'cold',
+      },
+    ],
+  });
 }
 
 async function cleanup() {
@@ -202,6 +225,7 @@ async function cleanup() {
   await db.calendarConnection.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.savedSearch.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.feedback.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
+  await db.relationship.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.tenant.deleteMany({ where: { id: { in: [ids.tenantA, ids.tenantB] } } });
   await db.user.deleteMany({ where: { id: { in: [ids.subject, ids.neighbour, ids.outsider] } } });
 }
@@ -445,6 +469,7 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
       feedback: await db.feedback.count({ where: { userId: ids.subject } }),
       auditActor: await db.auditEvent.count({ where: { actorId: ids.subject } }),
       opportunityOwner: await db.opportunity.count({ where: { ownerId: ids.subject } }),
+      relationshipOwner: await db.relationship.count({ where: { ownerUserId: ids.subject } }),
     };
     expect(residue).toEqual({
       calendarConnection: 0,
@@ -452,7 +477,42 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
       feedback: 0,
       auditActor: 0,
       opportunityOwner: 0,
+      relationshipOwner: 0,
     });
+  });
+
+  test('the erased focal point is detached from the relationship, and the neighbour keeps theirs', async () => {
+    // A4 option C: `Relationship.ownerUserId` is a work assignment, so it has no
+    // retention basis once the person is erased — but the relationship itself is
+    // the tenant's record and stays, with the external partner still on it.
+    const rel = await db.relationship.findUnique({ where: { id: ids.relSubject } });
+    expect(rel).not.toBeNull();
+    expect(rel!.ownerUserId).toBeNull();
+    expect(rel!.counterpartName).toBe(`Partner Contact ${RUN}`);
+    expect(rel!.counterpartEmail).toBe(`partner-${RUN}@t.invalid`);
+    expect(rel!.warmth).toBe('warm');
+
+    // The detach is scoped to the subject: an `updateMany` with the wrong where
+    // clause would unassign every relationship in the tenant and this is what
+    // would catch it.
+    const neighbourRel = await db.relationship.findUnique({ where: { id: ids.relNeighbour } });
+    expect(neighbourRel).not.toBeNull();
+    expect(neighbourRel!.ownerUserId).toBe(ids.neighbour);
+  });
+
+  test('no column anywhere still carries the erased person by name', async () => {
+    // The id is not the whole subject: a purge that only nulls ids can leave the
+    // person readable in a name column next door. `Relationship` is clean by
+    // construction — the only name it holds is the external counterpart — but
+    // that is a property worth measuring rather than assuming.
+    const named = await db.relationship.findMany({
+      where: { tenantId: ids.tenantA },
+      select: { counterpartName: true, counterpartEmail: true, notes: true },
+    });
+    const blob = JSON.stringify(named);
+    expect(blob).not.toContain(ids.subject);
+    expect(blob).not.toContain('Subject');
+    expect(blob).not.toContain(`subject-${RUN}@t.invalid`);
   });
 
   test('detaches rather than destroys: the tenant keeps the work, minus the person', async () => {

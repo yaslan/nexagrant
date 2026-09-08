@@ -101,6 +101,13 @@ export const M4WeeklySummaryOutputSchema = z.object({
   totalPendingActions: z.number(),
   focalPointsNotified: z.number(),
   groupedCount: z.number(),
+  /**
+   * Due actions on a relationship with no focal point (`ownerUserId` NULL).
+   * They are counted in `totalPendingActions` but nobody is notified about
+   * them — a relationship lands here when its owner is erased, so a non-zero
+   * value is work that needs reassigning, not an error.
+   */
+  unassignedCount: z.number(),
   errors: z.array(z.object({
     focalPointId: z.string(),
     reason: z.string(),

@@ -75,11 +75,22 @@ export async function purgeDueUsers(
       await prisma.feedback.updateMany({ where: { userId }, data: { userId: null } });
       await prisma.proposalUsage.updateMany({ where: { usedByUserId: userId }, data: { usedByUserId: null } });
 
-      //     Not handled here, and deliberately so: `Relationship.ownerUserId`
-      //     and `DualApprovalStep.actorUserId` are both NOT NULL, so detaching
-      //     them needs a migration, and `DualApprovalStep` is the record of who
-      //     signed off a document — a retention question for legal, not one to
-      //     settle inside a purge job. Both are reported as open.
+      //     `Relationship.ownerUserId` is the same kind of row — the tenant's
+      //     record, not the subject's — but it needed a migration first: it was
+      //     NOT NULL until `relationship-owner-nullable.sql`. Detaching it is
+      //     complete erasure for this table, because the only person named on a
+      //     relationship apart from the focal point is the external counterpart
+      //     (`counterpartName`/`counterpartEmail`), who is not the subject. The
+      //     relationship stays and becomes unassigned.
+      await prisma.relationship.updateMany({ where: { ownerUserId: userId }, data: { ownerUserId: null } });
+
+      //     Not handled here, and deliberately so: `DualApprovalStep.actorUserId`
+      //     is retained. An approval is a signature and `@@unique([followupDocId,
+      //     actorUserId])` enforces the four-eyes rule over it, so the row must
+      //     outlive the user it names. That retention is declared by name — the
+      //     id *and* `actorName` — in docs/legal/processing-register.md §12.
+      //     Decided 2026-09-08 (A4, option C); the two columns were separate
+      //     cases and got separate answers.
 
       // 4. Finally the user row; cascades clear accounts, sessions,
       //    memberships and requested approvals, and null out approver/

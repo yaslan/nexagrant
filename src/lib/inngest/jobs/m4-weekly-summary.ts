@@ -37,7 +37,18 @@ export const m4WeeklySummary = inngest.createFunction(
       const grouped = new Map<string, PendingAction[]>();
       const errors: Array<{ focalPointId: string; reason: string }> = [];
 
+      // A relationship can be unassigned: `ownerUserId` is nullable so the
+      // KVKK/GDPR purge can detach an erased focal point. There is nobody to
+      // notify for those, and folding them into a `tenant:null` key would
+      // invent one shared recipient out of unrelated rows — so they are counted
+      // and left out of the grouping.
+      let unassignedCount = 0;
+
       for (const action of pendingActions) {
+        if (action.ownerUserId === null) {
+          unassignedCount++;
+          continue;
+        }
         const key = `${action.tenantId}:${action.ownerUserId}`;
         if (!grouped.has(key)) {
           grouped.set(key, []);
@@ -62,6 +73,7 @@ export const m4WeeklySummary = inngest.createFunction(
         totalPendingActions: pendingActions.length,
         focalPointsNotified: notificationsSent,
         groupedCount: grouped.size,
+        unassignedCount,
       };
 
       if (errors.length > 0) {
