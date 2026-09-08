@@ -1137,8 +1137,11 @@ model CalendarConnection {
   userId            String
   provider          String    // 'google' | 'outlook' | 'ics'
   externalId        String?   // Google: calendar ID, Outlook: mailbox address
-  accessToken       String?   // TODO: encrypt with CALENDAR_ENCRYPTION_KEY in production
-  refreshToken      String?
+  accessToken       String?   // Plaintext. Column is unpopulated today — no OAuth writer exists yet
+                               // (google/outlook `connectCalendar` refuses with CALENDAR_OAUTH_NOT_CONFIGURED,
+                               // `/api/calendar/callback` does not exist). Must be encrypted before that
+                               // OAuth flow ships — see docs/ROADMAP.md open decision #12, TASK-MTSHP3BMTAD3Y.
+  refreshToken      String?   // Same as accessToken above.
   tokenExpiresAt    DateTime?
   isConnected       Boolean   @default(true)
   lastSyncAt        DateTime?

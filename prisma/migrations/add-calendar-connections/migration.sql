@@ -6,7 +6,8 @@ CREATE TABLE "CalendarConnection" (
     "userId" TEXT NOT NULL,
     "provider" TEXT NOT NULL, -- 'google' | 'outlook' | 'ics'
     "externalId" TEXT,
-    "accessToken" TEXT, -- TODO: encrypt in production with CALENDAR_ENCRYPTION_KEY
+    "accessToken" TEXT, -- Plaintext, unpopulated today (no OAuth writer yet). Must be encrypted
+                         -- before Google/Outlook OAuth ships — docs/ROADMAP.md open decision #12.
     "refreshToken" TEXT,
     "tokenExpiresAt" TIMESTAMP,
     "isConnected" BOOLEAN NOT NULL DEFAULT true,
