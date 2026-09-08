@@ -2,9 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runCordisImport } from '@/lib/k2-cordis/importer';
 import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
 import { errorMessage } from '@/lib/errors';
+import { requirePlatformAdminApi } from '@/lib/tenant';
 
 export async function POST(req: NextRequest) {
   try {
+    // Platform staff only: this import writes the cross-tenant CORDIS corpus
+    // and partner profiles every tenant reads, and it is expensive to run. The
+    // gate is first, so an unauthorized call cannot even start a fetch.
+    const gate = await requirePlatformAdminApi();
+    if (!gate.ok) return gate.response;
+
     const body = await req.json().catch(() => ({}));
     const dataset = body.dataset === 'H2020' ? 'H2020' : 'HORIZON';
     const limit = body.limit ? parseInt(String(body.limit), 10) : undefined;

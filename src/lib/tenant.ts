@@ -180,3 +180,57 @@ export async function requirePlatformAdmin(): Promise<{ userId: string }> {
 
   return { userId: session.user.id };
 }
+
+export type PlatformAdminApiResult =
+  | { ok: true; userId: string }
+  | { ok: false; response: NextResponse };
+
+/**
+ * For admin route handlers — the route-handler twin of
+ * {@link requirePlatformAdmin}, shaped like {@link requireTenantApi} so the
+ * handler returns `result.response` instead of catching a throw.
+ *
+ * The two refusals are deliberately different answers, not one "denied":
+ * an anonymous caller gets **401** because signing in may well grant the
+ * request, while a signed-in non-admin gets **403** because it never will.
+ * Collapsing them into 401 would send a legitimate tenant user back to the
+ * login page for a permission they cannot obtain by logging in again.
+ *
+ * The admin decision itself is {@link isPlatformAdminSession} — called, not
+ * re-derived here, so route handlers, pages and server actions cannot drift
+ * apart on what counts as platform staff.
+ */
+export async function requirePlatformAdminApi(): Promise<PlatformAdminApiResult> {
+  const session = (await auth()) as SessionLike;
+  const userId = asString(session?.user?.id);
+
+  if (!userId) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          error: 'Unauthorized',
+          message: 'Bu işlem için giriş yapmanız gerekiyor.',
+          code: 'UNAUTHENTICATED',
+        },
+        { status: 401 }
+      ),
+    };
+  }
+
+  if (!isPlatformAdminSession(session)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          error: 'Forbidden',
+          message: 'Bu işlem yalnızca platform yöneticileri tarafından yapılabilir.',
+          code: 'PLATFORM_ADMIN_REQUIRED',
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { ok: true, userId };
+}
