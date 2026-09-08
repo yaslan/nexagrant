@@ -3,6 +3,68 @@ import { createCalendarProvider } from './factory';
 import type { CalendarProviderType } from './provider';
 import type { TenantTx } from '@/lib/db';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { encryptCalendarToken, decryptCalendarToken } from './encryption';
+
+export { encryptCalendarToken, decryptCalendarToken } from './encryption';
+
+/**
+ * Decrypts accessToken and refreshToken from a CalendarConnection record.
+ * Throws CalendarEncryptionNotConfiguredError (503) if CALENDAR_ENCRYPTION_KEY is unset and tokens exist.
+ */
+export function getDecryptedCalendarTokens(conn: {
+  accessToken?: string | null;
+  refreshToken?: string | null;
+}): {
+  accessToken: string | null;
+  refreshToken: string | null;
+} {
+  return {
+    accessToken: conn.accessToken ? decryptCalendarToken(conn.accessToken) : null,
+    refreshToken: conn.refreshToken ? decryptCalendarToken(conn.refreshToken) : null,
+  };
+}
+
+/**
+ * Save or update calendar tokens for a connection using AES-256-GCM encryption.
+ * Encrypts accessToken and refreshToken into "fkenc1:..." envelopes before writing to DB.
+ * If CALENDAR_ENCRYPTION_KEY is unset, throws CalendarEncryptionNotConfiguredError (503).
+ */
+export async function saveCalendarConnectionTokens(
+  tx: TenantTx,
+  connectionId: string,
+  tokens: {
+    accessToken?: string | null;
+    refreshToken?: string | null;
+    tokenExpiresAt?: Date | null;
+  }
+): Promise<void> {
+  const updateData: {
+    accessToken?: string | null;
+    refreshToken?: string | null;
+    tokenExpiresAt?: Date | null;
+  } = {};
+
+  if (tokens.accessToken !== undefined) {
+    updateData.accessToken = tokens.accessToken
+      ? encryptCalendarToken(tokens.accessToken)
+      : null;
+  }
+
+  if (tokens.refreshToken !== undefined) {
+    updateData.refreshToken = tokens.refreshToken
+      ? encryptCalendarToken(tokens.refreshToken)
+      : null;
+  }
+
+  if (tokens.tokenExpiresAt !== undefined) {
+    updateData.tokenExpiresAt = tokens.tokenExpiresAt;
+  }
+
+  await tx.calendarConnection.update({
+    where: { id: connectionId },
+    data: updateData,
+  });
+}
 
 /**
  * Sync a meeting brief to all enabled calendar providers for a tenant user.
@@ -52,7 +114,20 @@ export async function syncMeetingBriefToCalendar(
 
   for (const conn of connections) {
     try {
-      const provider = createCalendarProvider(conn.provider as CalendarProviderType);
+      let decryptedAccessToken: string | null = null;
+      let decryptedRefreshToken: string | null = null;
+
+      if (conn.accessToken) {
+        decryptedAccessToken = decryptCalendarToken(conn.accessToken);
+      }
+      if (conn.refreshToken) {
+        decryptedRefreshToken = decryptCalendarToken(conn.refreshToken);
+      }
+
+      const provider = createCalendarProvider(conn.provider as CalendarProviderType, {
+        accessToken: decryptedAccessToken ?? undefined,
+        refreshToken: decryptedRefreshToken ?? undefined,
+      });
       const result = await provider.createEvent(event);
 
       // Update connection metadata

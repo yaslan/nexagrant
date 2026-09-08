@@ -123,6 +123,11 @@ export function CalendarClient({ connections, locale }: CalendarClientProps) {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-ink text-sm">{label}</h3>
+                    {!isSelfServe && (
+                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+                        {t('mockBadge')}
+                      </span>
+                    )}
                     {isConnected && (
                       <div className="flex items-center gap-1 text-[11px] font-semibold text-ok bg-ok/10 px-2 py-1 rounded-full">
                         <CheckCircle className="w-3 h-3" />

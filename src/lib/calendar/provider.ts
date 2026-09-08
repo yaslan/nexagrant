@@ -40,7 +40,7 @@ export class CalendarProviderNotImplementedError extends Error {
 
   constructor(readonly provider: CalendarProviderType, operation: string) {
     super(
-      `${provider} calendar ${operation} is not implemented: no API call is made, so no event is created.`
+      `[MOCK/DEV] ${provider} calendar ${operation} is not implemented: no API call is made, so no event is created.`
     );
     this.name = 'CalendarProviderNotImplementedError';
   }

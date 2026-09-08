@@ -81,6 +81,11 @@ const envSchema = z.object({
   EFATURA_INTEGRATOR_USERNAME: z.string().optional(),
   EFATURA_INTEGRATOR_PASSWORD: z.string().optional(),
   EFATURA_INTEGRATOR_TEST_MODE: z.string().optional(),
+  /**
+   * 256-bit AES-GCM encryption key for sensitive tokens in CalendarConnection.
+   * If unset, token encryption/decryption will fail with 503 (CalendarEncryptionNotConfiguredError).
+   */
+  CALENDAR_ENCRYPTION_KEY: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);

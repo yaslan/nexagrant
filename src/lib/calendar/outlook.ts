@@ -15,28 +15,29 @@ export class OutlookCalendarProvider implements CalendarProvider {
 
   async connect() {
     if (!this.clientId) {
-      throw new Error('MICROSOFT_OAUTH_CLIENT_ID not configured');
+      console.warn('[MOCK/DEV] Outlook Calendar connect attempted without MICROSOFT_OAUTH_CLIENT_ID (mock/dev mode)');
+      throw new Error('MICROSOFT_OAUTH_CLIENT_ID not configured (mock/dev mode)');
     }
     const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${this.clientId}&scope=calendar.readwrite&redirect_uri=http://localhost:3000/api/calendar/callback`;
     return { authUrl };
   }
 
   async disconnect() {
-    // TODO: Revoke tokens when OAuth is configured
+    console.warn('[MOCK/DEV] Outlook Calendar disconnect called in mock/dev mode');
   }
 
   async createEvent(_event: CalendarEvent): Promise<{ externalId: string }> {
-    // Was: a console.log and a random id, which the sync path recorded as a
-    // real external event with a `lastSyncAt` stamp. See
-    // CalendarProviderNotImplementedError in provider.ts.
+    console.warn('[MOCK/DEV] Outlook Calendar createEvent called in mock/dev mode: no real event created');
     throw new CalendarProviderNotImplementedError('outlook', 'createEvent');
   }
 
   async updateEvent(_externalId: string, _event: CalendarEvent): Promise<void> {
+    console.warn('[MOCK/DEV] Outlook Calendar updateEvent called in mock/dev mode');
     throw new CalendarProviderNotImplementedError('outlook', 'updateEvent');
   }
 
   async deleteEvent(_externalId: string): Promise<void> {
+    console.warn('[MOCK/DEV] Outlook Calendar deleteEvent called in mock/dev mode');
     throw new CalendarProviderNotImplementedError('outlook', 'deleteEvent');
   }
 }

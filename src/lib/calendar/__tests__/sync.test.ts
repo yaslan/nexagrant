@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { syncMeetingBriefToCalendar } from '../sync';
+import {
+  syncMeetingBriefToCalendar,
+  saveCalendarConnectionTokens,
+  getDecryptedCalendarTokens,
+  encryptCalendarToken,
+} from '../sync';
 import { buildAlertRow, type RecordAlertInput } from '@/lib/observability/system-alert';
 import { createDbClient } from '@/lib/db';
 import type { TenantTx } from '@/lib/db';
@@ -232,6 +237,69 @@ describe('syncMeetingBriefToCalendar', () => {
       expect(event.title).toBe('Meeting');
       expect(event.title).not.toContain('null');
       expect(recordAlert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('token encryption read & write paths', () => {
+    const testKey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
+    it('saveCalendarConnectionTokens encrypts tokens before updating DB', async () => {
+      process.env.CALENDAR_ENCRYPTION_KEY = testKey;
+      mockTx.calendarConnection.update.mockResolvedValue({});
+
+      await saveCalendarConnectionTokens(asTx(), 'conn:1', {
+        accessToken: 'plain-access-token-123',
+        refreshToken: 'plain-refresh-token-456',
+      });
+
+      expect(mockTx.calendarConnection.update).toHaveBeenCalledTimes(1);
+      const updateCall = mockTx.calendarConnection.update.mock.calls[0]![0];
+      expect(updateCall.where).toEqual({ id: 'conn:1' });
+      expect(updateCall.data.accessToken).toMatch(/^fkenc1:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+/);
+      expect(updateCall.data.refreshToken).toMatch(/^fkenc1:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+/);
+      expect(updateCall.data.accessToken).not.toContain('plain-access-token-123');
+      expect(updateCall.data.refreshToken).not.toContain('plain-refresh-token-456');
+    });
+
+    it('getDecryptedCalendarTokens decrypts encrypted tokens correctly', () => {
+      process.env.CALENDAR_ENCRYPTION_KEY = testKey;
+      const encryptedAccess = encryptCalendarToken('secret-token-abc', testKey);
+      const encryptedRefresh = encryptCalendarToken('secret-refresh-xyz', testKey);
+
+      const decrypted = getDecryptedCalendarTokens({
+        accessToken: encryptedAccess,
+        refreshToken: encryptedRefresh,
+      });
+
+      expect(decrypted.accessToken).toBe('secret-token-abc');
+      expect(decrypted.refreshToken).toBe('secret-refresh-xyz');
+    });
+
+    it('syncMeetingBriefToCalendar decrypts encrypted connection tokens on read', async () => {
+      process.env.CALENDAR_ENCRYPTION_KEY = testKey;
+      const encryptedAccess = encryptCalendarToken('access-token-live', testKey);
+
+      mockTx.calendarConnection.findMany.mockResolvedValue([
+        {
+          id: 'conn:enc',
+          provider: 'google',
+          tenantId: 'tenant:1',
+          userId: 'user:1',
+          isConnected: true,
+          accessToken: encryptedAccess,
+          refreshToken: null,
+        },
+      ]);
+      mockTx.calendarConnection.update.mockResolvedValue({});
+
+      await syncMeetingBriefToCalendar(asTx(), 'tenant:1', 'user:1', scheduledBrief());
+
+      expect(createEvent).toHaveBeenCalled();
+      expect(mockTx.calendarConnection.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'conn:enc' },
+        })
+      );
     });
   });
 });

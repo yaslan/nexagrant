@@ -548,9 +548,11 @@
       "infoText": "Toplantı brifine bir tarih girdiğinizde, bağlı takvimlerinize etkinlik olarak eklenir. Google ve Outlook bağlantısı bu kurulumda henüz açık değil; .ics dosyasını brif ekranından indirip takviminize ekleyebilirsiniz.",
       "connecting": "Bağlanıyor…",
       "connectedNoSyncYet": "Bağlı — henüz senkronize edilen bir toplantı yok.",
+      "mockBadge": "Mock / Dev Modu",
       "errors": {
         "CALENDAR_ALREADY_CONNECTED": "Bu takvim sağlayıcısı bu çalışma alanında zaten bağlı.",
-        "CALENDAR_OAUTH_NOT_CONFIGURED": "Bu sağlayıcı henüz bağlanamıyor: bu kurulumda OAuth istemcisi tanımlı değil. Şimdilik toplantı brifinden .ics dosyasını indirip takviminize ekleyebilirsiniz.",
+        "CALENDAR_OAUTH_NOT_CONFIGURED": "Bu sağlayıcı henüz bağlanamıyor: bu kurulumda OAuth istemcisi tanımlı değil (Mock / Dev modu). Şimdilik toplantı brifinden .ics dosyasını indirip takviminize ekleyebilirsiniz.",
+        "CALENDAR_ENCRYPTION_NOT_CONFIGURED": "Takvim token şifreleme anahtarı tanımlı değil (503 Service Unavailable). Lütfen sistem yöneticisiyle iletişime geçin.",
         "CALENDAR_CONNECTION_NOT_FOUND": "Bu takvim bağlantısı bulunamadı; sayfayı yenileyin.",
         "CALENDAR_FORBIDDEN": "Bu takvim bağlantısı üzerinde yetkiniz yok.",
         "CALENDAR_UNKNOWN_PROVIDER": "Bilinmeyen takvim sağlayıcısı.",

@@ -14,6 +14,7 @@ import type { CalendarProviderType } from './provider';
 export type CalendarActionCode =
   | 'CALENDAR_ALREADY_CONNECTED'
   | 'CALENDAR_OAUTH_NOT_CONFIGURED'
+  | 'CALENDAR_ENCRYPTION_NOT_CONFIGURED'
   | 'CALENDAR_CONNECTION_NOT_FOUND'
   | 'CALENDAR_FORBIDDEN'
   | 'CALENDAR_UNKNOWN_PROVIDER';
@@ -21,6 +22,7 @@ export type CalendarActionCode =
 const CODES: readonly CalendarActionCode[] = [
   'CALENDAR_ALREADY_CONNECTED',
   'CALENDAR_OAUTH_NOT_CONFIGURED',
+  'CALENDAR_ENCRYPTION_NOT_CONFIGURED',
   'CALENDAR_CONNECTION_NOT_FOUND',
   'CALENDAR_FORBIDDEN',
   'CALENDAR_UNKNOWN_PROVIDER',
@@ -30,6 +32,21 @@ export class CalendarActionError extends Error {
   constructor(readonly code: CalendarActionCode) {
     super(code);
     this.name = 'CalendarActionError';
+  }
+}
+
+/**
+ * Thrown when token encryption/decryption is attempted but CALENDAR_ENCRYPTION_KEY
+ * is not configured in the environment.
+ * Consistent with the iyzico pattern ("anahtar yoksa 503").
+ */
+export class CalendarEncryptionNotConfiguredError extends Error {
+  readonly code = 'CALENDAR_ENCRYPTION_NOT_CONFIGURED';
+  readonly status = 503;
+
+  constructor(message = 'Calendar encryption key is not configured (CALENDAR_ENCRYPTION_KEY)') {
+    super(message);
+    this.name = 'CalendarEncryptionNotConfiguredError';
   }
 }
 

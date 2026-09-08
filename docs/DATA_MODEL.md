@@ -171,7 +171,7 @@ TypeScript sözleşmeleri: `src/modules/m6/types.ts`.
 |---|---|
 | `tenantId`, `userId`, `provider` | Composite unique key: bir kullanıcı, kiracı başına bir sağlayıcı (google, outlook, ics). |
 | `externalId` | Sağlayıcı tarafı ID (Google: calendar ID; Outlook: mailbox addresi). |
-| `accessToken`, `refreshToken` | OAuth tokenleri, düz metin. Bugün **boş** — Google/Outlook OAuth henüz bağlanmadı (`connectCalendar` `CALENDAR_OAUTH_NOT_CONFIGURED` ile reddediyor, `/api/calendar/callback` yok). Bu akış devreye girmeden önce şifreleme şart — bkz. ROADMAP açık karar #12, TASK-MTSHP3BMTAD3Y. |
+| `accessToken`, `refreshToken` | OAuth tokenleri. `CALENDAR_ENCRYPTION_KEY` env değişkeni ile AES-256-GCM algoritması üzerinden şifrelenir (`src/lib/calendar/encryption.ts`, `saveCalendarConnectionTokens`). Çıktı `fkenc1:<iv_hex>:<tag_hex>:<cipher_hex>` zarf formatındadır. Düz metin token yazılması `src/lib/db.ts`'teki Prisma extension (`withCalendarTokenGate`) tarafından engellenir. Anahtar yokluğunda 503 (`CalendarEncryptionNotConfiguredError`) fırlatılır. |
 | `tokenExpiresAt` | Token refresh gerekli mi kontrolü. |
 | `isConnected`, `lastSyncAt` | Bağlantı durumu ve son senkronizasyon. |
 

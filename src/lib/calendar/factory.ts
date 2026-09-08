@@ -10,6 +10,8 @@ export function createCalendarProvider(
     googleClientSecret?: string;
     microsoftClientId?: string;
     microsoftClientSecret?: string;
+    accessToken?: string;
+    refreshToken?: string;
   }
 ): CalendarProvider {
   switch (providerType) {
