@@ -7,3 +7,11 @@
 - [G0 Production Hook](g0-scoring-production-hooked.md) — G0 puanı kanonik scoreG0/decideG0 ile production'da hesalanıyor, rescoreOpportunityG0 hook'u bağlanmış, 28 test yeşil
 
 - [fabrika-schema-done-means-information-schema](fabrika-schema-done-means-information-schema.md) — Bir şema işi "bitti" raporlandıysa tablo gerçekten var demek DEĞİL — typecheck de mock'lu test de yalan söyler; information_schema'ya sor
+
+- [fabrika-check-every-surface-not-the-fix](fabrika-check-every-surface-not-the-fix.md) — "Kanonik hesaplayıcıya bağlandı" raporu bir yüzeyi anlatır, hepsini değil — aynı değeri okuyan her ekranı ayrı ayrı grep'le; Fabrika'da board önbellek kolonunu, detay sayfası canlı hesabı gösteriyordu
+
+- [fabrika-dev-server-500s-after-deleting-a-route-file](fabrika-dev-server-500s-after-deleting-a-route-file.md) — next dev bir route dosyası (loading.tsx/page.tsx) SİLİNDİĞİNDE bayat manifest yüzünden her rotaya 500 verir — bunu regresyon sanma, sunucuyu yeniden başlat; dosya EKLEMEK aynı sorunu yaratmaz
+- [fabrika-status-code-needs-session-and-module-on](fabrika-status-code-needs-session-and-module-on.md) — Bir rotanın HTTP durum kodunu ölçerken iki kapı ölçümü sessizce sahteleştirir — oturumsuz istek 307'de durur, modülü OFF kiracı DOĞRU bir 200 (kilit ekranı) döndürür; ikisini de kapatmadan "geçti/kaldı" deme
+
+- [fabrika-e2e-seed-riding-specs-go-red-on-plan-drift](fabrika-e2e-seed-riding-specs-go-red-on-plan-drift.md) — Tohum kiracıya (main / fabrika-beta) binen e2e paketleri plan verisi değişince sessizce kırmızıya döner — modül kapısı render edilir, aranan form/başlık hiç basılmaz; kendi fixture kiracısını kuran paketler etkilenmez
+- [playwright-waitforurl-loose-regex-false-red](playwright-waitforurl-loose-regex-false-red.md) — Playwright'ta gevşek bir waitForURL regex'i MEVCUT sayfanın URL'siyle eşleşip anında geçer — gezinme hiç beklenmez ve tıklama testi sahte kırmızı verir; assertion'ı gevşetme, bekleyiciyi sıkılaştır
