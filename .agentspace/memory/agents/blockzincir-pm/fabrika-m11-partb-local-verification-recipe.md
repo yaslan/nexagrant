@@ -1,9 +1,9 @@
 ---
 name: fabrika-m11-partb-local-verification-recipe
-description: M11 Part B ekranını yerelde gerçek tarayıcıyla açma reçetesi — doğru URL, oturum mint'i ve iki kapı (plan=ultra + ModuleState=ON); demo login ile ULAŞILAMAZ
+description: M11 Part B ekranını yerelde gerçek tarayıcıyla açma reçetesi — kendi fixture kiracını kur (demo-tenant'ı ödünç alma), iki kapı (plan=ultra + ModuleState=ON), demo login ile ULAŞILAMAZ
 metadata:
   type: reference
-  updatedAt: 2026-09-07
+  updatedAt: 2026-09-08
 ---
 
 TASK-MTRHZIWHU2SKA'da M11 ortak yazım ekranını gerçek tıklamayla doğrularken çıkan tuzaklar.
@@ -37,4 +37,22 @@ aç, `finally`'de İKİSİNİ DE geri al:
 ve `node --env-file-if-exists=.env`. Script repo KÖKÜNDE olmalı (ESM `@playwright/test`
 çözümü için); `/tmp`'den import edilmiyor.
 
-İlgili: [[fabrika-no-session-provider-client-identity]]
+## DAHA İYİSİ (2026-09-08, TASK-MTS6LZOD715WM): ödünç alma, KENDİ kiracını kur
+Yukarıdaki "demo-tenant'ın planını geçici `ultra` yap, `finally`'de geri al" yolu paylaşılan
+DB'de risklidir (koşu yarıda kalırsa kiracı yanlış planla kalır; başka ajanın speci o sırada
+o kiracıyı okur). Onun yerine spec'in kendi `beforeAll`'unda sabit id'li bir fixture kiracı
+kur, `afterAll`'da sil — M6'nın `scripts/seed-m6-e2e.ts` deseni, ama ayrı script gerekmeden
+spec içinde:
+`tests/e2e/partb-template-identity.spec.ts` → tenant/workspace/user/membership +
+`Subscription{planId:'ultra'}` + `ModuleState{M11,'ON'}` + opportunity; **ApplicationPart
+satırı YOK** (şablon durumunu görmek istiyorsan bu şart — satır varsa editör DB'deki eski
+içeriği gösterir, şablonu değil).
+
+Giriş için JWT mint etmeye de gerek kalmadı: `/tr/giris` (EN: `/en/login`) e-posta formuna
+fixture kullanıcının adresini yazıp submit etmek `callbackUrl`e götürüyor
+(`m9-brief-generate-failure.spec.ts` deseni) — mint'ten kısa ve kırılgan değil.
+
+Ekranın kendi scroll konteyneri var: `window.scrollBy` bölüm ağacını görünür yapmaz;
+tam sayfa kanıtı için `page.setViewportSize({width:1280,height:1700})`.
+
+İlgili: [[fabrika-no-session-provider-client-identity]] · [[fabrika-e2e-fixture-needs-modulestate]]
