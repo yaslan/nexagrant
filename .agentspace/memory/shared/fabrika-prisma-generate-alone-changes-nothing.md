@@ -1,28 +1,41 @@
 ---
 name: fabrika-prisma-generate-alone-changes-nothing
-description: prisma generate'i kapıya eklemek TEK BAŞINA hiçbir şey korumaz — prisma-override.d.ts'teki ambient declare module gerçek tipleri gölgeler; asıl ucuz kapı M8'in schema-contract tarayıcısı
+description: prisma generate'i kapıya eklemek hayalet-model çağrısını TEK BAŞINA yakalamaz — ambient declare module gölgelemez, BİRLEŞİR ve içindeki index signature her adı yutar; ama withTenant çıkarımını unknown'dan kurtardığı için yine de kapıda
 metadata:
   type: project
-  updatedAt: 2026-09-07
+  updatedAt: 2026-09-08
 ---
 
-`src/types/prisma-override.d.ts` içindeki `declare module '@prisma/client'` bir **ambient module
-declaration**'dır ve üretilmiş gerçek istemcinin tiplerini **gölgeler**. Ölçüldü (2026-09-07,
-TASK-MTRKA25R5M3SY): `pnpm exec prisma generate` koşulduktan sonra bile, override yerindeyken
-`tsc --noEmit --incremental false` → `EXIT=0`. Yani "`prisma generate`'i postinstall/gate'e
-ekleyelim" adımı **sıfır riskli ama sıfır faydalıdır**; fayda ancak override silinince gelir.
-Override silinince: **144 hata / 51 dosya** (dosyanın kendi yorumundaki "158 / 36" eskimiş).
+## Düzeltme (2026-09-08, TASK-MTSI7YQWUZOFH) — mekanizma iddiam YANLIŞTI
 
-Kapının BUGÜN kazanabileceği tek gerçek koruma başka yerde: `src/modules/m8/server/schema-contract.test.ts`
-`prisma/schema.prisma`'yı okuyup `prisma.*.<method>({where/select/include/orderBy})` literallerini
-şemaya karşı doğrular — veritabanısız, mock'suz, 138 ms. `SCANNED` dizisi (satır ~25) bugün yalnız
-5 M8 yoluna bakıyor; `['src','prisma','scripts']` yapılınca 22 gerçek hayalet isabeti buluyor ve
-tsc'nin göremediği ek sütunları da yakalıyor (tsc bir nesne literalinde ilk hatalı anahtarda durur).
+Bu dosya önceden "`declare module '@prisma/client'` üretilmiş gerçek tipleri **gölgeler**" diyordu.
+Ölçüm bunu çürüttü: **gölgelemiyor, BİRLEŞİYOR.** Üretilmiş istemci varken gerçek tipler kazanıyor —
+`prisma.tenant.findMany()` gerçek satır tipini döndürüyor; istemci gizlenince aynı çağrı `any`.
+(Kanıt: üretilmiş `.prisma/client` dizinini `mv` ile gizleyip ölçüm tekrarlandı — teknik:
+[[phantom-dependency-proof-by-hiding-it]].)
 
-Repo geneline açmadan önce iki körlüğü kapat, yoksa gürültüde boğulur:
-1. `parseSchema` `@@unique([a,b])` / `@@id([a,b])` bileşik anahtar adlarını (`tenantId_moduleId`,
-   `email_tenantId`, …) bilmiyor → **29 yanlış pozitif**. Sanal alan olarak eklenmeli.
-2. `FIELD_BEARING` (satır ~40) `'data'` içermiyor → create/update yüklerindeki hayalet alanlar
-   (`sso.ts` `data:{domain}`, `calendar/sync.ts` `data:{severity}`) gözden kaçıyor.
+Pratik sonuç aynı kalıyor ama sebebi başka: `[key: string]: any` birleşmede **eklemeli** davranıyor
+ve şemada olmayan HER adı kabul ediyor. Ölçüldü — istemci üretilmiş + eski override yerinde,
+`prisma.organization.findMany()` → **0 hata**. Yani "generate'i ekleyelim, override kalsın" yolu bu
+hata sınıfı için gerçekten sıfır fayda; kapıyı kapatan şey delegate adlarının **sayılması**.
 
-İlgili: [[fabrika-typecheck-is-blind-to-db-calls]]
+## Bugünkü durum
+
+- `src/types/prisma-override.d.ts` artık `[key: string]: any` yerine 71 adlık `ModelName` birleşimi
+  taşıyor (`lowerFirst(model)`; gerçek bir generate çıktısıyla birebir doğrulandı). Hayalet model
+  çağrısı `pnpm typecheck`'i **düşürüyor** — ayrıntı: [[fabrika-typecheck-is-blind-to-db-calls]].
+- `pnpm db:generate` betiği eklendi; `pnpm gate`'in İLK adımı ve `ci.yml`'de lint'ten önce.
+  Gerekçesi hayalet model DEĞİL: üretilmiş istemci yokken
+  `withTenant(id, (tx) => tx.planAssignment.findMany(…))` **`unknown`** çıkarıyor (TypeScript
+  delegate'in `any` dönüşünü `Promise<T>` içine ayrıştıramıyor), üretilmişken `{planId: string}[]`.
+  Çağrı yerlerindeki elle tip argümanları bu yüzden hâlâ yük taşıyor — silme.
+- `prisma generate` veritabanı ve `DATABASE_URL` istemiyor, ~300 ms.
+
+## Kalan gerçek boşluk
+
+Birleşim yalnız **model** granülerliğinde. Hayalet **sütun/ilişki** typecheck'e hâlâ görünmüyor;
+onları `src/modules/m8/server/schema-contract.test.ts` yakalıyor ve o yalnız `src/` tarıyor.
+Yani `prisma/seed-*.ts` ve `scripts/` içindeki hayalet sütunlar korumasız — canlı örnek:
+`prisma/seed-m6-evaluations.ts:62,76` (`Opportunity.callId`, `Proposal.status` şemada yok, seed
+çalışma zamanında patlar). Kapatmanın tek yolu override'ı tümden silmek: ölçüldü, **52 hata /
+~20 dosya** (eski "144 / 51" ve dosyanın kendi "158 / 36" notu ikisi de eskidi).

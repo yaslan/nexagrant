@@ -1,9 +1,9 @@
 ---
 name: fabrika-untracked-scratch-scripts-break-gates
-description: Paralel ajanın commit'lenmemiş scripts/_dogfood-*.ts dosyaları typecheck ve build'i kırar — kapıyı HEAD'den açılan izole git worktree'de koş, dosyalara dokunma
+description: Paralel ajanın commit'lenmemiş scripts/_*.ts dosyaları lint/typecheck/build'i kırar — dosyalara dokunma; en ucuz kanıt --ignore-pattern, worktree ancak build gerekiyorsa
 metadata:
   type: feedback
-  updatedAt: 2026-09-07
+  updatedAt: 2026-09-08
 ---
 
 Fabrika'da `pnpm typecheck` / `pnpm build` ana depoda kırmızı çıkabilir çünkü tsconfig `**/*.ts`
@@ -24,3 +24,23 @@ Aynı worktree "kapı kırmızıya dönebiliyor mu" kanıtı için de ideal: kas
 depoya hiç dokunma.
 
 İlgili: [[fabrika-lint-gate-green-narrow-exceptions]] · [[fabrika-parallel-agent-file-race]]
+
+
+## Daha ucuz yol: worktree AÇMADAN kanıtla (2026-09-08, TASK-MTSI7YQWUZOFH)
+
+Worktree pahalı (3 GB `node_modules` klonu) ve bu oturumda `git worktree add` **izin reddiyle
+düştü**. Kırılan adım yalnız `lint` ise tek satır yeter — kimsenin dosyasına dokunmadan:
+
+```bash
+npx eslint $(for f in scripts/_g0-*.ts; do echo "--ignore-pattern $f"; done)
+# EXIT=0, sıfır çıktı  → kapı senin değişikliğin yüzünden kırmızı değil
+```
+
+Aynı mantık `tsc` için `--exclude` ile çalışmaz (tsconfig gerekir), ama `lint`/`test` gibi
+dosya-listesi alan adımlarda geçerli. `pnpm gate`'i bütün olarak koş, çıktısını **olduğu gibi**
+rapora koy, sonra bu daraltılmış koşuyu ikinci kanıt olarak ekle — kapıyı yeşil göstermek için
+adımı değiştirme.
+
+Bu turdaki nüks: `scripts/_g0-apply-sql.ts`, `_g0-inspect.ts`, `_g0-k1dup.ts`, `_g0-verify.ts`,
+`_g0-whoami.ts` — beşi de untracked, ikisi `no-explicit-any` ile `pnpm gate`'i tek başına
+exit 1 yapıyor. Doğrulaması: `git ls-files <dosya>` boş dönüyorsa CI onu hiç görmüyor.

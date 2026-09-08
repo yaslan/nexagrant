@@ -1,9 +1,9 @@
 ---
 name: fabrika-typecheck-is-blind-to-db-calls
-description: pnpm typecheck DB çağrılarına kör (prisma generate kapıda değil, delegate'ler any) — ama artık schema-contract.test.ts src/ genelini tarayıp yakalıyor
+description: pnpm typecheck artık hayalet MODEL çağrısını yakalıyor (delegate adları sayılı) — ama hayalet SÜTUN/İLİŞKİ'ye hâlâ kör, onu yalnız src/ tarayan schema-contract testi görüyor
 metadata:
   type: project
-  updatedAt: 2026-09-07
+  updatedAt: 2026-09-08
 ---
 
 `src/types/prisma-override.d.ts` elle yazılmış bir vekil tip dosyasıdır: `prisma generate`
@@ -41,3 +41,28 @@ Kural yine de duruyor: "typecheck temiz" bir DB değişikliğinin kanıtı DEĞ�
 
 İlgili: [[fabrika-partial-fix-check-all-surfaces-of-the-same-bug]] ·
 [[fabrika-db-mock-invents-the-model]] · [[fabrika-fabricated-fallback-antipattern]]
+
+
+## GÜNCELLEME (2026-09-08, TASK-MTSI7YQWUZOFH) — model düzeyinde artık KÖR DEĞİL
+
+`prisma-override.d.ts`'teki `[key: string]: any` kaldırıldı; yerine şemanın ürettiği **71 delegate
+adının birleşimi** (`ModelName`) geldi. Mutasyonla doğrulandı:
+
+```
+ÖNCE:  pnpm typecheck → EXIT=0   (prisma.thisModelDoesNotExist.findMany temiz geçiyordu)
+SONRA: error TS2339: Property 'thisModelDoesNotExist' does not exist on type 'PrismaClient'.
+       error TS2551: Property 'orgTopicStat' does not exist on type 'TenantTx'. Did you mean 'topicStat'?
+```
+
+Bu, schema-contract testinin yerini ALMAZ; kapsamları farklı ve ikisi de gerekli:
+
+| | schema-contract testi | typecheck (`ModelName`) |
+|---|---|---|
+| granülerlik | model + ilişki + **sütun**, okuma ve yazma gövdeleri | yalnız **model** |
+| kapsam | yalnız `src/` | `src/` + `prisma/` + `scripts/` + `tests/` |
+
+Yani `prisma/seed-*.ts` içindeki hayalet **sütunlar** hâlâ hiçbir kapıya takılmıyor.
+
+Nöbetçi: `src/types/prisma-override.test.ts` birleşimi şemadan yeniden türetir; şemaya model
+eklerken bu listeyi de güncellemen gerekir (test eksik adı yazarak kırmızıya döner). Mekanizma
+düzeltmesi: [[fabrika-prisma-generate-alone-changes-nothing]]
