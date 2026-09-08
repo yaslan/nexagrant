@@ -6,6 +6,7 @@ import {
   signInAsNotFoundUser,
   teardownNotFoundTenant,
 } from './fixtures/notfound-tenant';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTRNO3LBZB2Q7 — `notFound()` under `(app)` must answer HTTP 404 to a
@@ -85,5 +86,74 @@ test.describe('notFound() answers 404 to a signed-in request', () => {
       expect(response!.url()).toContain('/giris');
     }
     await context.close();
+  });
+});
+
+/**
+ * TASK-MTS6MMOD8XF3A — the same page must answer in the reader's own language.
+ *
+ * `not-found.tsx` sits *above* the `[locale]` segment, so it has no route param
+ * to read the language from; it asks `getLocale()`, which resolves the request
+ * locale the proxy negotiated. That indirection is the part worth guarding: a
+ * `getRequestConfig` that stops honouring `requestLocale`, or a proxy matcher
+ * that stops seeing the 404 request, both fail silently — the page still
+ * renders, just always in the default locale (Turkish).
+ *
+ * Measured signed IN, like the status assertions above. Signed out the `(app)`
+ * routes never reach the page at all, so a signed-out pass proves nothing.
+ */
+const LOCALE_CASES = [
+  {
+    locale: 'tr',
+    // A workspace route whose id does not exist: `notFound()` from inside (app).
+    lookup: `/tr/${NF_WORKSPACE}/opportunities/${MISSING}/briefs`,
+    // A path that matches no route at all: Next's own not-found dispatch.
+    unrouted: '/tr/boyle-bir-sayfa-yok-404',
+    title: 'Sayfa Bulunamadı',
+    cta: 'Ana Sayfaya Dön',
+    foreignTitle: 'Page Not Found',
+  },
+  {
+    locale: 'en',
+    lookup: `/en/${NF_WORKSPACE}/opportunities/${MISSING}/briefs`,
+    unrouted: '/en/no-such-page-404',
+    title: 'Page Not Found',
+    cta: 'Back to Home',
+    foreignTitle: 'Sayfa Bulunamadı',
+  },
+] as const;
+
+test.describe('the 404 page speaks the URL\'s language', () => {
+  test.beforeAll(setupNotFoundTenant);
+  test.afterAll(teardownNotFoundTenant);
+
+  test('both locales render their own copy, and the way home keeps the locale', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+
+    await signInAsNotFoundUser(page, `/tr/${NF_WORKSPACE}/dashboard`);
+
+    for (const c of LOCALE_CASES) {
+      for (const url of [c.lookup, c.unrouted]) {
+        const response = await page.goto(url);
+        expect(response!.status(), `${url} must answer 404`).toBe(404);
+
+        await expect(page.locator('html')).toHaveAttribute('lang', c.locale);
+        await expect(page.getByRole('heading', { name: c.title })).toBeVisible();
+        await expect(page.getByText(c.foreignTitle)).toHaveCount(0);
+
+        // The way out must not drop the reader into the other language.
+        const home = page.getByRole('link', { name: c.cta });
+        await expect(home).toBeVisible();
+        await expect(home).toHaveAttribute('href', `/${c.locale}`);
+      }
+
+      await page.goto(c.lookup);
+      await page.screenshot({
+        path: `${shotsDir('TASK-MTS6MMOD8XF3A-screenshots')}/03-404-signed-in-${c.locale}.png`,
+        fullPage: true,
+      });
+    }
   });
 });
