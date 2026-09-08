@@ -131,3 +131,22 @@ export function formatMoney(amountMinor: number, currency: string, locale: strin
     maximumFractionDigits: exponent,
   }).format(Number(decimal));
 }
+
+/**
+ * Converts an integer minor-unit amount to an integer minor-unit amount
+ * in target currency using a record-provided exchange rate.
+ * Integer arithmetic with half-up rounding (0.5 rounds up).
+ */
+export function convertCurrencyMinor(amountMinor: number, rate: number): number {
+  if (!Number.isInteger(amountMinor)) {
+    throw new Error(`Minor-unit amounts must be integers, got ${amountMinor}`);
+  }
+  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) {
+    throw new Error(`Exchange rate must be a positive finite number, got ${rate}`);
+  }
+  const result = amountMinor * rate;
+  if (!Number.isSafeInteger(Math.round(result))) {
+    throw new Error(`Converted amount out of safe integer range: ${amountMinor} * ${rate}`);
+  }
+  return Math.floor(result + 0.5);
+}

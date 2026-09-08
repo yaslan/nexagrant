@@ -51,6 +51,12 @@ export interface InvoiceRecord {
   invoiceType: string;
   ettn: string;
   gibEnvelopeId: string | null;
+  exchangeRate?: {
+    sourceCurrency: 'TRY' | 'EUR' | 'USD';
+    targetCurrency: 'TRY';
+    calculationRate: number;
+    date?: string;
+  };
 }
 
 /**
@@ -178,6 +184,7 @@ export function buildInvoiceDocument(
       country: record.buyerCountry,
     },
     lines,
+    ...(record.exchangeRate ? { exchangeRate: record.exchangeRate } : {}),
     // Only what GİB actually returned. NULL stays absent, and the generators
     // then stamp the document as carrying no fiscal value.
     ...(record.gibEnvelopeId ? { gibEnvelopeId: record.gibEnvelopeId } : {}),

@@ -27,6 +27,13 @@ export interface InvoiceLineItem {
   withholdingRate?: number; // 0.9 for 9/10
 }
 
+export interface InvoiceExchangeRate {
+  sourceCurrency: 'TRY' | 'EUR' | 'USD';
+  targetCurrency: 'TRY';
+  calculationRate: number;
+  date?: string;
+}
+
 export interface EfaturaDocument {
   id: string; // e.g. "GIB202600000001"
   uuid: string;
@@ -39,6 +46,7 @@ export interface EfaturaDocument {
   customer: InvoiceParty;
   lines: InvoiceLineItem[];
   notes?: string[];
+  exchangeRate?: InvoiceExchangeRate;
   /**
    * The envelope id GİB returns once the document has actually been filed
    * through an e-invoice integrator. Absent means it never was.
@@ -75,21 +83,14 @@ export const UNFILED_NOTICE =
  * VUK 215 lets an invoice be denominated in a foreign currency only while it
  * also shows the Turkish lira equivalent, and 385 Sıra No.lu Genel Tebliğ makes
  * that mandatory for a domestic transaction, at the TCMB buying rate of the
- * issue date (VUK 280). Fabrika carries neither the rate nor the TL figures:
- * there is no TCMB rate source, no field to put one in, and the shape of the
- * fix — including how a genuine export (ISTISNA) is told apart from a domestic
- * sale, which is the case that would relax this rule — is the open decision in
- * docs/adr/ADR-0002-foreign-currency-invoice-fx.md.
- *
- * Until that lands the filing is refused rather than guessed. A rate this code
- * invented would be a fabricated figure on a fiscal document, and a filing
- * without one is a VUK 352 II-7 usulsüzlük. Rendering and export are
- * deliberately untouched: an unfiled document already stamps itself as carrying
- * no fiscal value, so the customer keeps their receipt while the fiscal filing
- * waits (TASK-MTSWLWDONWA3W).
+ * issue date (VUK 280). If an exchangeRate record is attached to the document,
+ * the filing block is cleared (null). Otherwise, filing is refused.
  */
 export function foreignCurrencyFilingBlock(invoice: EfaturaDocument): string | null {
   if (invoice.currency === 'TRY') return null;
+  if (invoice.exchangeRate && typeof invoice.exchangeRate.calculationRate === 'number' && invoice.exchangeRate.calculationRate > 0) {
+    return null;
+  }
   return (
     `${invoice.currency} faturasi TCMB kuru ve TL karsiligi tasimadigi icin GIB'e gonderilemez ` +
     `(VUK 215 / 385 Sira No.lu Genel Teblig). Karar bekliyor: ` +
@@ -267,7 +268,25 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
       : `
   <cbc:Note>${UNFILED_NOTICE}</cbc:Note>`
   }
-  <cbc:DocumentCurrencyCode>${invoice.currency}</cbc:DocumentCurrencyCode>
+  <cbc:DocumentCurrencyCode>${invoice.currency}</cbc:DocumentCurrencyCode>${
+    invoice.exchangeRate
+      ? `
+  <cac:PricingExchangeRate>
+    <cbc:SourceCurrencyCode>${invoice.exchangeRate.sourceCurrency}</cbc:SourceCurrencyCode>
+    <cbc:TargetCurrencyCode>${invoice.exchangeRate.targetCurrency}</cbc:TargetCurrencyCode>
+    <cbc:CalculationRate>${invoice.exchangeRate.calculationRate.toFixed(4)}</cbc:CalculationRate>${
+          invoice.exchangeRate.date ? `\n    <cbc:Date>${invoice.exchangeRate.date}</cbc:Date>` : ''
+        }
+  </cac:PricingExchangeRate>
+  <cac:TaxExchangeRate>
+    <cbc:SourceCurrencyCode>${invoice.exchangeRate.sourceCurrency}</cbc:SourceCurrencyCode>
+    <cbc:TargetCurrencyCode>${invoice.exchangeRate.targetCurrency}</cbc:TargetCurrencyCode>
+    <cbc:CalculationRate>${invoice.exchangeRate.calculationRate.toFixed(4)}</cbc:CalculationRate>${
+          invoice.exchangeRate.date ? `\n    <cbc:Date>${invoice.exchangeRate.date}</cbc:Date>` : ''
+        }
+  </cac:TaxExchangeRate>`
+      : ''
+  }
 
   <!-- Tedarikçi / Satıcı Bilgileri -->
   <cac:AccountingSupplierParty>

@@ -6,9 +6,11 @@ import {
 import {
   calculateInvoiceTotals,
   generateEfaturaHtml,
+  generateUblTrXml,
   foreignCurrencyFilingBlock,
   type EfaturaDocument,
 } from '../src/lib/efatura';
+import { convertCurrencyMinor } from '../src/lib/money';
 import {
   fileThrough,
   isFiled,
@@ -148,5 +150,57 @@ describe('a foreign-currency invoice may not be filed without its TL figures', (
 
     expect(reached).toBe(true);
     expect(isFiled(outcome)).toBe(true);
+  });
+
+  test('attaching a recorded exchangeRate clears the filing block and generates UBL-TR exchange rate blocks', async () => {
+    const usdRecordWithRate: InvoiceRecord = {
+      ...USD_RECORD,
+      exchangeRate: {
+        sourceCurrency: 'USD',
+        targetCurrency: 'TRY',
+        calculationRate: 34.5,
+        date: '2026-09-08',
+      },
+    };
+
+    const doc = buildInvoiceDocument(usdRecordWithRate, SUPPLIER);
+    expect(foreignCurrencyFilingBlock(doc)).toBeNull();
+
+    const xml = generateUblTrXml(doc);
+    expect(xml).toContain('<cac:PricingExchangeRate>');
+    expect(xml).toContain('<cbc:SourceCurrencyCode>USD</cbc:SourceCurrencyCode>');
+    expect(xml).toContain('<cbc:TargetCurrencyCode>TRY</cbc:TargetCurrencyCode>');
+    expect(xml).toContain('<cbc:CalculationRate>34.5000</cbc:CalculationRate>');
+    expect(xml).toContain('<cbc:Date>2026-09-08</cbc:Date>');
+    expect(xml).toContain('<cac:TaxExchangeRate>');
+
+    let reached = false;
+    const outcome = await fileThrough(
+      integrator(async () => {
+        reached = true;
+        return { status: 'filed', envelopeId: 'ENV-FX-1', filedAt: '2026-09-08T09:00:00Z' };
+      }),
+      doc
+    );
+    expect(reached).toBe(true);
+    expect(isFiled(outcome)).toBe(true);
+  });
+});
+
+describe('currency conversion arithmetic (convertCurrencyMinor)', () => {
+  test('converts minor unit amounts with half-up rounding (0.5 rounds up)', () => {
+    // 9900 minor units ($99.00) * 34.50 rate = 3415.5 TRY = 341550 kuruş
+    expect(convertCurrencyMinor(9900, 34.5)).toBe(341550);
+
+    // Half-kuruş test: 1005 minor units ($10.05) * 34.565 = 347.37825 TRY -> 34738 kuruş
+    expect(convertCurrencyMinor(1005, 34.565)).toBe(34738);
+
+    // Half-kuruş boundary (exact 0.5 fractional kuruş rounds up):
+    // 100 minor units * 34.505 = 3450.5 minor units -> rounds to 3451
+    expect(convertCurrencyMinor(100, 34.505)).toBe(3451);
+
+    // Below half-kuruş (0.499 rounds down):
+    // 100 minor units * 34.5049 = 3450.49 minor units -> rounds to 3450
+    expect(convertCurrencyMinor(100, 34.5049)).toBe(3450);
   });
 });
