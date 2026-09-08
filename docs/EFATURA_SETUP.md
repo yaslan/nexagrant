@@ -53,4 +53,41 @@ denenmez; eksik olan(lar) adıyla raporlanır (`not_configured`).
 - `src/app/api/billing/invoices/[id]/export/invoice-document.ts` — satıcı kimliği çözümü, eksikse `SupplierNotConfiguredError`
 - `src/lib/efatura-integrator.ts` — entegratör arayüzü ve hata yolları
 - `src/lib/efatura.ts` — UBL-TR XML ve yazdırılabilir belge; zarf numarası yoksa "mali değeri yoktur" damgası
-- `tests/efatura-integrator.test.ts`, `tests/invoice-document.test.ts` — yukarıdaki kuralların testleri
+- `scripts/efatura-preflight.ts` — ön denetim komutu (`pnpm efatura:preflight`)
+- `tests/efatura-unit.test.ts`, `tests/efatura-integrator.test.ts`, `tests/invoice-document.test.ts` — entegrasyon testleri
+
+## Go-live günü (12-13 Eylül Hafta Sonu Adım Adım Kontrol Listesi)
+
+Patron veya operatör tarafından sırayla takip edilecek adımlar:
+
+### Adım 1: Değişkenleri Ortam Yöneticisine (Secrets/Vercel/.env) Girin
+- `INVOICE_SUPPLIER_*` (5 adet zorunlu: unvan, VKN, vergi dairesi, adres, il).
+- `EFATURA_INTEGRATOR_*` (4 adet zorunlu: provider, API adresi, kullanıcı adı, parola).
+- İlk aşamada test ortamında `EFATURA_INTEGRATOR_TEST_MODE=true` bırakılır.
+
+### Adım 2: Preflight Kontrolünü Çalıştırın
+```bash
+pnpm efatura:preflight
+```
+- **Beklenen Çıktı:**
+  - Satıcı Kimliği Bloğu: `✅ TANIMLI`
+  - Entegratör Bloğu: `✅ TANIMLI`
+  - Sonuç Hükmü: `📌 Fatura belgesi üretilir. GİB'e gönderilir.`
+- 🛑 **Hangi durumda DURULUR:** Herhangi bir zorunlu değişken `EKSİK` olarak listelenirse veya sonuç cümlesinde `gönderilmez` yazıyorsa **DURULUR**. Eksik değişken giderilmeden bir sonraki adıma geçilmez.
+
+### Adım 3: Otomatik Testleri Koşturun
+```bash
+pnpm test tests/efatura-unit.test.ts tests/efatura-integrator.test.ts
+```
+- **Beklenen Çıktı:** Tüm testlerin yeşil (`PASSED`) olması (33/33 test).
+- 🛑 **Hangi durumda DURULUR:** Herhangi bir test `FAILED` verirse **DURULUR**.
+
+### Adım 4: Örnek Fatura Belgesini Doğrulayın
+- Üretilen test faturasını `/api/billing/invoices/<fatura-id>/export?format=xml` endpoint'i üzerinden indirin veya görün.
+- **Beklenen Çıktı:** UBL-TR 1.2.1 uyumlu XML belgesi üretilmeli. Test modunda veya zarf numarası olmadan üretilen belgenin üzerinde `"ÖRNEK BELGE — GİB'e gönderilmemiştir, mali mühür taşımaz ve mali değeri yoktur."` damgasının durduğu teyit edilmeli (`isFiledWithGib()` false dönmeli).
+
+### Adım 5: Canlı Mod (Production) Anahtarı
+- Test ortamındaki doğrulama tamamlandıktan sonra entegratör canlı API adresi ve canlı parolası girilir.
+- `EFATURA_INTEGRATOR_TEST_MODE=false` yapılır.
+- Tekrar `pnpm efatura:preflight` koşulup canlı mod teyit edilir.
+

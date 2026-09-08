@@ -1,4 +1,4 @@
-import type { EfaturaDocument } from '@/lib/efatura';
+import { UNFILED_NOTICE, type EfaturaDocument } from '@/lib/efatura';
 
 /**
  * The seam between Fabrika and a GİB e-invoice integrator.
@@ -116,14 +116,40 @@ export interface EfaturaIntegrator {
 }
 
 /**
- * Vendor adapters, by the value of `EFATURA_INTEGRATOR_PROVIDER`.
+ * Sandbox adapter for testing e-invoice flow without sending to GİB.
  *
- * Deliberately empty. Writing an adapter needs the vendor's API contract and a
- * test account, and a stub that answered `filed` would strip the "carries no
- * fiscal value" stamp off a document that was never sent anywhere. Adding one
- * is the whole of the remaining work behind TASK-MTRJSOWFH6B45.
+ * Runs the send path end-to-end BUT never marks the document as sent to GİB:
+ * the document retains the "ÖRNEK BELGE — mali değeri yoktur" watermark and
+ * `isFiledWithGib()` returns false.
+ *
+ * ONLY selectable when EFATURA_INTEGRATOR_TEST_MODE is true (test mode); selecting
+ * this adapter in live/production mode throws an error.
  */
-const ADAPTERS: Record<string, (config: EfaturaIntegratorConfig) => EfaturaIntegrator> = {};
+export function createSandboxAdapter(config: EfaturaIntegratorConfig): EfaturaIntegrator {
+  if (!config.testMode) {
+    throw new Error(
+      'Sandbox integrator adapter can ONLY be used when EFATURA_INTEGRATOR_TEST_MODE is enabled (test mode)'
+    );
+  }
+
+  return {
+    provider: 'sandbox',
+    async file(_document: EfaturaDocument): Promise<FilingOutcome> {
+      return {
+        status: 'rejected',
+        code: 'SANDBOX_SAMPLE',
+        message: UNFILED_NOTICE,
+      };
+    },
+  };
+}
+
+/**
+ * Vendor adapters, by the value of `EFATURA_INTEGRATOR_PROVIDER`.
+ */
+const ADAPTERS: Record<string, (config: EfaturaIntegratorConfig) => EfaturaIntegrator> = {
+  sandbox: createSandboxAdapter,
+};
 
 /** The adapter for the configured vendor, or null when there is none. */
 export function resolveIntegrator(config: EfaturaIntegratorConfig): EfaturaIntegrator | null {
@@ -146,7 +172,16 @@ export async function fileInvoice(
     return { status: 'not_configured', missing: state.missing };
   }
 
-  const integrator = resolveIntegrator(state.config);
+  let integrator: EfaturaIntegrator | null;
+  try {
+    integrator = resolveIntegrator(state.config);
+  } catch (error) {
+    return {
+      status: 'unreachable',
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+
   if (!integrator) {
     return { status: 'provider_unsupported', provider: state.config.provider };
   }

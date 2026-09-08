@@ -3,6 +3,8 @@
  * UBL-TR 1.2.1 XML Standartları, VKN/TCKN Algoritmik Doğrulaması, KDV & Tevkifat Hesaplamaları
  */
 
+import { toMinorUnits } from './money';
+
 export interface InvoiceParty {
   name: string;
   vknTckn: string; // 10 digits for VKN, 11 digits for TCKN
@@ -120,35 +122,36 @@ export function validateTCKN(tckn: string): boolean {
 
 /**
  * KDV, Tevkifat ve Toplam Tutar Hesaplayıcı
+ * Tutarlar Int minor unit (kuruş) bazında hesaplanır (CLAUDE.md #9).
  */
 export function calculateInvoiceTotals(lines: InvoiceLineItem[]): TaxCalculationResult {
-  let subtotal = 0;
-  let totalVat = 0;
-  let totalWithholding = 0;
+  let subtotalMinor = 0;
+  let totalVatMinor = 0;
+  let totalWithholdingMinor = 0;
 
   for (const line of lines) {
-    const lineTotal = line.quantity * line.unitPriceTRY;
-    const vat = (lineTotal * line.vatRate) / 100;
-    let withholding = 0;
+    const lineTotalMinor = toMinorUnits(line.quantity * line.unitPriceTRY, 'TRY');
+    const vatMinor = Math.round((lineTotalMinor * line.vatRate) / 100);
+    let withholdingMinor = 0;
 
     if (line.withholdingRate && line.withholdingRate > 0) {
-      withholding = vat * line.withholdingRate;
+      withholdingMinor = Math.round(vatMinor * line.withholdingRate);
     }
 
-    subtotal += lineTotal;
-    totalVat += vat;
-    totalWithholding += withholding;
+    subtotalMinor += lineTotalMinor;
+    totalVatMinor += vatMinor;
+    totalWithholdingMinor += withholdingMinor;
   }
 
-  const payableVat = totalVat - totalWithholding;
-  const grandTotal = subtotal + payableVat;
+  const payableVatMinor = totalVatMinor - totalWithholdingMinor;
+  const grandTotalMinor = subtotalMinor + payableVatMinor;
 
   return {
-    subtotalTRY: Math.round(subtotal * 100) / 100,
-    totalVatTRY: Math.round(totalVat * 100) / 100,
-    totalWithholdingTRY: Math.round(totalWithholding * 100) / 100,
-    payableVatTRY: Math.round(payableVat * 100) / 100,
-    grandTotalTRY: Math.round(grandTotal * 100) / 100,
+    subtotalTRY: subtotalMinor / 100,
+    totalVatTRY: totalVatMinor / 100,
+    totalWithholdingTRY: totalWithholdingMinor / 100,
+    payableVatTRY: payableVatMinor / 100,
+    grandTotalTRY: grandTotalMinor / 100,
   };
 }
 
