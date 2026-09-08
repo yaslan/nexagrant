@@ -5,7 +5,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
+import { useTranslations } from 'next-intl';
 import { getPublicRoute } from '@/lib/routes';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 interface PublicNavbarProps {
   locale: string;
@@ -23,6 +25,7 @@ export default function PublicNavbar({
   roleName,
 }: PublicNavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const tCommon = useTranslations('Common');
   const isTr = locale === 'tr';
 
   return (
@@ -42,7 +45,7 @@ export default function PublicNavbar({
         >
           <Image
             src="/logo.png"
-            alt="FonBridge Logo"
+            alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
             width={56}
             height={56}
             className="object-contain group-hover:scale-105 transition"

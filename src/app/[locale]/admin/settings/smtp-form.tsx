@@ -1,4 +1,5 @@
 'use client';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 import React, { useState } from 'react';
 import { Mail, Check, Send, ShieldCheck, Server, Lock, AlertCircle, RefreshCw } from 'lucide-react';
@@ -9,7 +10,7 @@ export function SmtpSettingsForm() {
   const [secure, setSecure] = useState(false);
   const [user, setUser] = useState('noreply@fonbridge.app');
   const [password, setPassword] = useState('••••••••••••');
-  const [fromName, setFromName] = useState('FonBridge SaaS');
+  const [fromName, setFromName] = useState(`${PRODUCT_NAME} SaaS`);
   const [fromEmail, setFromEmail] = useState('noreply@fonbridge.app');
 
   const [testEmail, setTestEmail] = useState('');
@@ -152,7 +153,7 @@ export function SmtpSettingsForm() {
               type="text"
               value={fromName}
               onChange={(e) => setFromName(e.target.value)}
-              placeholder="FonBridge SaaS"
+              placeholder={`${PRODUCT_NAME} SaaS`}
               required
               className="w-full bg-ground border border-border rounded-xl px-3 py-2 text-xs text-ink focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />

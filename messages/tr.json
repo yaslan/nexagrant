@@ -34,7 +34,9 @@
     "no": "Hayır",
     "actions": "İşlemler",
     "status": "Durum",
-    "noResults": "Sonuç bulunamadı."
+    "noResults": "Sonuç bulunamadı.",
+    "logoAlt": "{brand} logosu",
+    "copyright": "© {year} {brand} ({brand} SaaS). Tüm hakları saklıdır."
   },
   "Dashboard": {
     "title": "Panel",
@@ -282,7 +284,8 @@
   "Auth": {
     "signIn": "Giriş Yap",
     "signOut": "Çıkış Yap",
-    "register": "Kayıt Ol"
+    "register": "Kayıt Ol",
+    "signInTitle": "{brand} Platformuna Giriş"
   },
   "NoWorkspace": {
     "title": "Henüz bir çalışma alanınız yok",
@@ -442,7 +445,9 @@
       "contact": "İletişim"
     },
     "metaTitle": "Fabrika — AB Finansman Platformu (Horizon Europe, Eurostars)",
-    "metaDescription": "Fabrika: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya."
+    "metaDescription": "Fabrika: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya.",
+    "ecosystemSubtitle": "İster bağımsız bir danışman olun, ister büyük bir üniversite; {brand} iş akışınızı hızlandırır.",
+    "closingSubtitle": "{brand} ile teklif hazırlama sürenizi kısaltın; CORDIS ağ analitiği ve hakem bakış açısıyla teklifinizi güçlendirin."
   },
   "pricing": {
     "title": "Fabrika Fiyatlandırması",
@@ -577,7 +582,8 @@
     },
     "terms": {
       "metaTitle": "Kullanım Koşulları ve Hizmet Sözleşmesi — Fabrika",
-      "metaDescription": "Fabrika hizmetinin kapsamı, yapay zeka çıktılarına ilişkin sorumluluk reddi, abonelik ve kredi koşulları."
+      "metaDescription": "Fabrika hizmetinin kapsamı, yapay zeka çıktılarına ilişkin sorumluluk reddi, abonelik ve kredi koşulları.",
+      "scopeBody": "{brand}, Horizon Europe ve diğer uluslararası Ar-Ge fonları için çağrı keşfi, konsorsiyum eşleştirme ve yapay zeka destekli başvuru hazırlama yazılımı sunar."
     },
     "dpa": {
       "metaTitle": "Veri İşleme Sözleşmesi (DPA) — Fabrika",
@@ -923,7 +929,7 @@
     "table_pm": "PM",
     "table_grant": "Talep Edilen Hibe",
     "no_entries": "Henüz giriş yapılmamış.",
-    "footer": "Secured by FonBridge SaaS — Horizon Europe Engine"
+    "footer": "Secured by {brand} SaaS — Horizon Europe Engine"
   },
   "adminAlerts": {
     "title": "Sistem Uyarıları",
@@ -992,9 +998,9 @@
     "callUnspecified": "Çağrı belirtilmedi",
     "leadAuthorLabel": "Lider Yazar",
     "leadAuthorUnassigned": "Lider yazar atanmadı",
-    "templateBody": "### {kind} DOKÜMANI\n\nBu doküman, kuruluşun kendi başvuru çalışması için Fabrika'da üretilmiş bir taslaktır. Resmî bir başvuru belgesi değildir ve hiçbir fon kuruluşu tarafından düzenlenmemiştir.\n\n1. Taraflar ve Haklar\n2. Gizlilik ve Fikri Mülkiyet Beyanı\n3. Hüküm ve Yürürlük Tarihi",
+    "templateBody": "### {kind} DOKÜMANI\n\nBu doküman, kuruluşun kendi başvuru çalışması için {brand}'da üretilmiş bir taslaktır. Resmî bir başvuru belgesi değildir ve hiçbir fon kuruluşu tarafından düzenlenmemiştir.\n\n1. Taraflar ve Haklar\n2. Gizlilik ve Fikri Mülkiyet Beyanı\n3. Hüküm ve Yürürlük Tarihi",
     "printButton": "🖨️ Yazdır / PDF İndir",
-    "provenanceNotice": "Bu belge {org} tarafından Fabrika'da hazırlanmıştır. Avrupa Komisyonu, TÜBİTAK ya da başka bir fon kuruluşu tarafından düzenlenmiş veya onaylanmış resmî bir belge DEĞİLDİR.",
+    "provenanceNotice": "Bu belge {org} tarafından {brand}'da hazırlanmıştır. Avrupa Komisyonu, TÜBİTAK ya da başka bir fon kuruluşu tarafından düzenlenmiş veya onaylanmış resmî bir belge DEĞİLDİR.",
     "docRefLabel": "Doküman Ref",
     "documentRefUnassigned": "Kayıtlı bir doküman referansı yok",
     "versionLabel": "Sürüm",
@@ -1004,11 +1010,11 @@
     "documentTypeLabel": "Doküman Türü",
     "signatureStatusLabel": "E-İmza Onay Durumu",
     "contentPending": "Doküman içeriği hazırlanmaktadır.",
-    "footer": "FonBridge — Ufuk Avrupa & TÜBİTAK doküman üretim motoru | Sayfa 1 / 1",
+    "footer": "{brand} — Ufuk Avrupa & TÜBİTAK doküman üretim motoru | Sayfa 1 / 1",
     "docxProjectLabel": "Proje Başlığı",
     "docxOrganizationLabel": "Kuruluş",
     "docxBodyHeading": "1. DOKÜMAN İÇERİĞİ VE HÜKÜMLER",
-    "docxFallbackBody": "Bu doküman Fabrika'da hazırlanmış bir taslaktır; resmî bir başvuru belgesi değildir."
+    "docxFallbackBody": "Bu doküman {brand}'da hazırlanmış bir taslaktır; resmî bir başvuru belgesi değildir."
   },
   "PartBEditor": {
     "noRevisions": "Bu bölüm için henüz kayıtlı bir sürüm yok.",

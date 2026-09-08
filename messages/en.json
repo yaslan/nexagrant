@@ -34,7 +34,9 @@
     "no": "No",
     "actions": "Actions",
     "status": "Status",
-    "noResults": "No results found."
+    "noResults": "No results found.",
+    "logoAlt": "{brand} logo",
+    "copyright": "© {year} {brand} ({brand} SaaS). All rights reserved."
   },
   "Dashboard": {
     "title": "Dashboard",
@@ -282,7 +284,8 @@
   "Auth": {
     "signIn": "Sign In",
     "signOut": "Sign Out",
-    "register": "Register"
+    "register": "Register",
+    "signInTitle": "Sign In to {brand}"
   },
   "NoWorkspace": {
     "title": "You do not have a workspace yet",
@@ -442,7 +445,9 @@
       "contact": "Contact"
     },
     "metaTitle": "Fabrika — AI-Powered EU Funding Platform for Horizon Europe & Eurostars",
-    "metaDescription": "Fabrika: End-to-end platform for EU research proposals. Consortium matching, AI evaluator simulation, CORDIS network intelligence. From concept to funding."
+    "metaDescription": "Fabrika: End-to-end platform for EU research proposals. Consortium matching, AI evaluator simulation, CORDIS network intelligence. From concept to funding.",
+    "ecosystemSubtitle": "From high-growth SMEs to university TTOs and international research consortia.",
+    "closingSubtitle": "Shorten your proposal timeline with CORDIS network analytics and an evaluator’s reading of your draft."
   },
   "pricing": {
     "title": "Fabrika Pricing",
@@ -577,7 +582,8 @@
     },
     "terms": {
       "metaTitle": "Terms of Service — Fabrika",
-      "metaDescription": "Scope of the Fabrika service, the disclaimer covering AI-generated output, and the subscription and credit terms."
+      "metaDescription": "Scope of the Fabrika service, the disclaimer covering AI-generated output, and the subscription and credit terms.",
+      "scopeBody": "{brand} provides discovery, consortium matching, and AI-assisted proposal preparation tools for Horizon Europe and international research funding."
     },
     "dpa": {
       "metaTitle": "Data Processing Agreement (DPA) — Fabrika",
@@ -923,7 +929,7 @@
     "table_pm": "PM",
     "table_grant": "Requested Grant",
     "no_entries": "No entries yet.",
-    "footer": "Secured by FonBridge SaaS — Horizon Europe Engine"
+    "footer": "Secured by {brand} SaaS — Horizon Europe Engine"
   },
   "adminAlerts": {
     "title": "System Alerts",
@@ -992,9 +998,9 @@
     "callUnspecified": "Call not specified",
     "leadAuthorLabel": "Lead author",
     "leadAuthorUnassigned": "No lead author assigned",
-    "templateBody": "### {kind} DOCUMENT\n\nThis document is a draft produced in Fabrika for the organisation's own application work. It is not an official application document and has not been issued by any funding body.\n\n1. Parties and rights\n2. Confidentiality and intellectual property statement\n3. Terms and effective date",
+    "templateBody": "### {kind} DOCUMENT\n\nThis document is a draft produced in {brand} for the organisation's own application work. It is not an official application document and has not been issued by any funding body.\n\n1. Parties and rights\n2. Confidentiality and intellectual property statement\n3. Terms and effective date",
     "printButton": "🖨️ Print / download PDF",
-    "provenanceNotice": "This document was prepared by {org} in Fabrika. It is NOT an official document issued or approved by the European Commission, TÜBİTAK or any other funding body.",
+    "provenanceNotice": "This document was prepared by {org} in {brand}. It is NOT an official document issued or approved by the European Commission, TÜBİTAK or any other funding body.",
     "docRefLabel": "Document ref",
     "documentRefUnassigned": "No document reference recorded",
     "versionLabel": "Version",
@@ -1004,11 +1010,11 @@
     "documentTypeLabel": "Document type",
     "signatureStatusLabel": "E-signature status",
     "contentPending": "Document content is being prepared.",
-    "footer": "FonBridge — Horizon Europe & TÜBİTAK document engine | Page 1 / 1",
+    "footer": "{brand} — Horizon Europe & TÜBİTAK document engine | Page 1 / 1",
     "docxProjectLabel": "Project title",
     "docxOrganizationLabel": "Organisation",
     "docxBodyHeading": "1. DOCUMENT CONTENT AND TERMS",
-    "docxFallbackBody": "This document is a draft prepared in Fabrika. It is not an official application document."
+    "docxFallbackBody": "This document is a draft prepared in {brand}. It is not an official application document."
   },
   "PartBEditor": {
     "noRevisions": "No saved revision for this section yet.",

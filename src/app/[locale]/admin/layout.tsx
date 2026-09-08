@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { auth } from '@/lib/auth';
 import { isPlatformAdminSession } from '@/lib/tenant';
 import { getTranslations } from 'next-intl/server';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { displayUserName } from '@/lib/user-display';
 import { listSessionWorkspaces } from '@/lib/workspaces';
 import { notFound } from 'next/navigation';
@@ -47,6 +48,7 @@ export default async function AdminLayout({
 
   const user = session?.user;
   const t = await getTranslations({ locale, namespace: 'UserIdentity' });
+  const tCommon = await getTranslations({ locale, namespace: 'Common' });
 
   // Same rule as the workspace frame: never invent who is signed in. The console used to
   // fall back onto a fixed title and onto a real person's e-mail address, so an admin
@@ -74,7 +76,7 @@ export default async function AdminLayout({
       <header className="hidden md:flex bg-slate-900 text-white border-b border-slate-800 px-6 py-3.5 items-center justify-between sticky top-0 z-40 shadow-md">
         <div className="flex items-center space-x-4">
           <Link href={`/${locale}`} title={locale === 'tr' ? 'Ana Sayfa' : 'Home'} className="flex items-center space-x-2.5 hover:opacity-90 transition">
-            <Image src="/logo.png" alt="FonBridge Logo" width={40} height={40} className="object-contain brightness-0 invert" />
+            <Image src="/logo.png" alt={tCommon('logoAlt', { brand: PRODUCT_NAME })} width={40} height={40} className="object-contain brightness-0 invert" />
             <div>
               <span className="font-bold text-base tracking-tight text-white block leading-none">
                 Admin Console
@@ -155,7 +157,7 @@ export default async function AdminLayout({
       <footer className="bg-surface border-t border-border px-6 py-4 flex flex-col md:flex-row items-center justify-between text-xs text-muted gap-3 z-10">
         <div className="flex items-center space-x-3">
           <Link href={`/${locale}`} className="font-semibold text-ink-2 hover:text-indigo-600 transition-colors" title="Site Ana Sayfasına Git">
-            FonBridge
+            {PRODUCT_NAME}
           </Link>
           <span>•</span>
           <span>Platform Admin Console v1.1.0</span>

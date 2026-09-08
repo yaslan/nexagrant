@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { PRODUCT_NAME } from '@/lib/brand';
 import {
   getPresignedUploadUrlAction,
   confirmEvidenceUploadAction,
@@ -247,7 +248,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `FonBridge_Evidence_Pack_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `${PRODUCT_NAME}_Evidence_Pack_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 

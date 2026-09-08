@@ -1,7 +1,9 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { getPublicRoute, getWorkspaceRoute } from '@/lib/routes';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 interface PublicFooterProps {
   locale: string;
@@ -9,6 +11,7 @@ interface PublicFooterProps {
 
 export default function PublicFooter({ locale }: PublicFooterProps) {
   const isTr = locale === 'tr';
+  const tCommon = useTranslations('Common');
 
   return (
     <footer className="bg-ground border-t border-border text-muted text-xs transition-colors">
@@ -17,7 +20,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
           {/* Col 1: Brand */}
           <div className="md:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <Image src="/logo.png" alt="FonBridge Logo" width={72} height={72} className="object-contain" />
+              <Image src="/logo.png" alt={tCommon('logoAlt', { brand: PRODUCT_NAME })} width={72} height={72} className="object-contain" />
             </div>
             <p className="text-muted text-xs leading-relaxed max-w-sm">
               {isTr
@@ -140,9 +143,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-muted">
           <div>
-            {isTr
-              ? `© ${new Date().getFullYear()} FonBridge (FonBridge SaaS). Tüm hakları saklıdır.`
-              : `© ${new Date().getFullYear()} FonBridge (FonBridge SaaS). All rights reserved.`}
+            {tCommon('copyright', { year: String(new Date().getFullYear()), brand: PRODUCT_NAME })}
           </div>
           <div className="flex items-center gap-6">
             <span>🇪🇺 Frankfurt & Istanbul Data Centers</span>

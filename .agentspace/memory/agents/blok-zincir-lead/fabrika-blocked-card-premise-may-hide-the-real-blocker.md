@@ -26,3 +26,13 @@ gönderilecek tek bir belge olmayacaktı.
 üretiliyor mu? Üretilecek şeyin girdisi yazılıyor mu? Bu depoda kanıt aramanın en hızlı yolu
 ilgili tabloya YAZAN kodu aramaktı (okuyan değil). İlgili:
 [[fabrika-verify-each-claim-not-the-headline]], [[fabrika-green-gate-does-not-prove-a-clean-clone]]
+
+**İkinci kez doğrulandı (2026-09-08, aynı gün, aynı kart).** Invoice yazma yolu kapandıktan
+sonra kart yine "kod tarafı hazır" diyordu; ölçünce `ADAPTERS`
+(`src/lib/efatura-integrator.ts`) yalnız `sandbox` içeriyordu — yani 13 env değişkeni
+eksiksiz girilse bile sonuç `provider_unsupported`. Aynı kart, aynı premis, farklı boşluk.
+**Kural:** bu premis her yeniden gönderilişinde YENİDEN ölçülür; bir kez doğrulanmış olması
+bir sonraki turda geçerli değildir — arada kapanan her kusur, zincirde bir SONRAKİ eksiği
+görünür kılar. Ayrıca: bloke kartın dokümanı bayatlar (bu turda `docs/EFATURA_SETUP.md`
+çoktan karara bağlanmış ADR-0002'yi hâlâ "karar bekliyor" diye anlatıyordu) — kartı
+ertelerken dokümanını da tazele. Bkz. [[stale-audit-report-reframes-before-it-is-reused]]

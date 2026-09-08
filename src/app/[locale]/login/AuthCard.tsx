@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions/auth';
 import { useTranslations } from 'next-intl';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { errorMessage as toErrorMessage, isNextRedirectError } from '@/lib/errors';
 
 interface AuthCardProps {
@@ -19,6 +20,8 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const isTr = locale === 'tr';
   const tDemo = useTranslations('DemoSignIn');
+  const tCommon = useTranslations('Common');
+  const tAuthCard = useTranslations('Auth');
 
   const rawCallbackUrl = searchParams.get('callbackUrl') || `/${locale}/default/dashboard`;
 
@@ -143,11 +146,11 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
       {/* Dynamic Header */}
       <div className="text-center space-y-2 pt-1">
         <div className="flex items-center justify-center pb-1">
-          <Image src="/logo.png" alt="FonBridge Logo" width={64} height={64} className="object-contain" />
+          <Image src="/logo.png" alt={tCommon('logoAlt', { brand: PRODUCT_NAME })} width={64} height={64} className="object-contain" />
         </div>
         <h1 className="text-2xl font-bold font-heading text-ink tracking-tight">
           {mode === 'login'
-            ? (isTr ? 'FonBridge Platformuna Giriş' : 'Sign In to FonBridge')
+            ? tAuthCard('signInTitle', { brand: PRODUCT_NAME })
             : (isTr ? 'Ücretsiz Çalışma Alanı Açın' : 'Create Free Workspace')}
         </h1>
         <p className="text-xs text-muted max-w-xs mx-auto">

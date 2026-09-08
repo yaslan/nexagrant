@@ -1,4 +1,5 @@
 'use client';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 import React, { useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
@@ -620,7 +621,7 @@ export function ModulesClient({
           <span>Modül Mimarisi ve Bağımlılık Hiyerarşisi</span>
         </h4>
         <p className="leading-relaxed">
-          FonBridge SaaS modülleri birbirleriyle entegre çalışır. Örneğin <strong>M4 (Focal Point CRM)</strong> modülü{' '}
+          {PRODUCT_NAME} SaaS modülleri birbirleriyle entegre çalışır. Örneğin <strong>M4 (Focal Point CRM)</strong> modülü{' '}
           <strong>M1 (Partner Intelligence)</strong> veritabanını kullanır; <strong>M11 (Full Application Production)</strong>{' '}
           modülü ise Konsept Notu (M2), Kanıt Paketi (M3), Teklif İş Akışı (M5) ve Konsorsiyum Eşleştirme (M8)
           modüllerinin aktif olmasını gerektirir.

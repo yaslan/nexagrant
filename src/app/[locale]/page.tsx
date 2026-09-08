@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+import { PRODUCT_NAME } from '@/lib/brand';
 import React from 'react';
 import Link from 'next/link';
 import PublicNavbar from '@/components/PublicNavbar';
@@ -46,6 +47,7 @@ export default async function HomePage({
   const { locale } = await params;
   const isTr = locale === 'tr';
   const t = await getTranslations({ locale, namespace: 'landing.heroMock' });
+  const tLanding = await getTranslations({ locale, namespace: 'landing' });
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-ink selection:bg-accent selection:text-white">
@@ -581,9 +583,7 @@ export default async function HomePage({
                 {isTr ? 'Tüm Ekosistem Paydaşları İçin Tek Çözüm' : 'Built for the Entire Innovation Ecosystem'}
               </h2>
               <p className="text-xs sm:text-sm text-muted">
-                {isTr
-                  ? 'İster bağımsız bir danışman olun, ister büyük bir üniversite; FonBridge iş akışınızı hızlandırır.'
-                  : 'From high-growth SMEs to university TTOs and international research consortia.'}
+                {tLanding('ecosystemSubtitle', { brand: PRODUCT_NAME })}
               </p>
             </div>
 
@@ -643,9 +643,7 @@ export default async function HomePage({
                 : 'Start Your Next Horizon Europe Winner Today'}
             </h2>
             <p className="text-xs sm:text-base text-white/80 max-w-2xl mx-auto leading-relaxed">
-              {isTr
-                ? 'FonBridge ile teklif hazırlama sürenizi kısaltın; CORDIS ağ analitiği ve hakem bakış açısıyla teklifinizi güçlendirin.'
-                : 'Shorten your proposal timeline with CORDIS network analytics and an evaluator’s reading of your draft.'}
+              {tLanding('closingSubtitle', { brand: PRODUCT_NAME })}
             </p>
             <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link

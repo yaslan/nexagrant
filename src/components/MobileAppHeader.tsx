@@ -7,6 +7,8 @@ import SidebarNav from './SidebarNav';
 import UserMenu, { type UserMenuWorkspace } from './UserMenu';
 import ThemeToggle from './ThemeToggle';
 import { Menu, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 interface MobileAppHeaderProps {
   locale: string;
@@ -29,6 +31,7 @@ export default function MobileAppHeader({
   workspaces = [],
 }: MobileAppHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const tCommon = useTranslations('Common');
 
   return (
     <>
@@ -46,7 +49,7 @@ export default function MobileAppHeader({
           <Link href={`/${locale}`} className="flex items-center">
             <Image
               src="/logo.png"
-              alt="FonBridge Logo"
+              alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
               width={32}
               height={32}
               className="object-contain"
@@ -83,7 +86,7 @@ export default function MobileAppHeader({
               <Link href={`/${locale}`} onClick={() => setMobileOpen(false)}>
                 <Image
                   src="/logo.png"
-                  alt="FonBridge Logo"
+                  alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
                   width={40}
                   height={40}
                   className="object-contain"

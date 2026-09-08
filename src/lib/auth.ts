@@ -8,6 +8,7 @@ import type { OrgType, Role } from "@prisma/client";
 import { prisma } from "./db";
 import { env } from "./env";
 import { errorMessage } from '@/lib/errors';
+import { PRODUCT_NAME } from './brand';
 
 /**
  * TASK-MTRNQHC3IV2BE — the demo sign-in seeds an ORGANISATION, never a person.
@@ -27,13 +28,13 @@ import { errorMessage } from '@/lib/errors';
  */
 const DEMO_PROFILES: Record<string, { orgName: string; orgType: OrgType; role: Role; isPlatformAdmin?: boolean }> = {
   "admin@yasinaslan.com.tr": {
-    orgName: "FonBridge HQ",
+    orgName: `${PRODUCT_NAME} HQ`,
     orgType: "CONSULTANCY",
     role: "TENANT_OWNER",
     isPlatformAdmin: true,
   },
   "mehmet@fonbridge.app": {
-    orgName: "FonBridge SME Ar-Ge Ltd.",
+    orgName: `${PRODUCT_NAME} SME Ar-Ge Ltd.`,
     orgType: "SME",
     role: "TENANT_OWNER",
   },

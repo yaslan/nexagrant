@@ -11,6 +11,7 @@
  */
 
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
+import { withBrand } from './brand';
 import trMessages from '../../messages/tr.json';
 import enMessages from '../../messages/en.json';
 
@@ -41,7 +42,7 @@ function labels(locale?: ExportLocale) {
  * "effective date" clause — an export is not an execution.
  */
 export function templateBodyText(kind: string, locale?: ExportLocale): string {
-  return labels(locale).templateBody.replace('{kind}', kind);
+  return withBrand(labels(locale).templateBody.replace('{kind}', kind));
 }
 
 /** Interpolation-safe text for the HTML template. Signatory fields are stored user input. */
@@ -160,7 +161,7 @@ function documentRefText(documentRef: string | undefined, L: ReturnType<typeof l
 
 /** Who actually produced this document — printed on every export, in both formats. */
 function provenanceText(orgName: string, L: ReturnType<typeof labels>): string {
-  return L.provenanceNotice.replace('{org}', orgName);
+  return withBrand(L.provenanceNotice.replace('{org}', orgName));
 }
 
 /** The status line of a signature box: signed / awaiting / nobody assigned. */
@@ -337,7 +338,7 @@ export function generatePdfHtml(data: ExportDocumentData): string {
   </div>
 
   <div class="footer">
-    ${escapeHtml(L.footer)}
+    ${escapeHtml(withBrand(L.footer))}
   </div>
 </body>
 </html>`;
@@ -404,7 +405,7 @@ export async function generateDocxBuffer(data: ExportDocumentData): Promise<Buff
   } else {
     children.push(
       new Paragraph({ children: [new TextRun({ text: L.docxBodyHeading, bold: true, size: 28 })] }),
-      ...plainTextParagraphs(data.contentText ?? L.docxFallbackBody)
+      ...plainTextParagraphs(data.contentText ?? withBrand(L.docxFallbackBody))
     );
   }
 

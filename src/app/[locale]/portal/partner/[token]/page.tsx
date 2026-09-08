@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { addBudgetLineByToken } from '@/modules/m11/server/actions';
@@ -150,7 +151,7 @@ export default async function PartnerPortalPage({ params }: PageProps) {
           </div>
         </div>
       </div>
-      <p className="mt-6 text-muted text-xs font-mono">{t('footer')}</p>
+      <p className="mt-6 text-muted text-xs font-mono">{t('footer', { brand: PRODUCT_NAME })}</p>
     </div>
   );
 }

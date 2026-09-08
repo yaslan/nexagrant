@@ -5,6 +5,7 @@ import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
 import { semanticSearch } from '@/lib/ai/rag';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 /**
  * M2 concept notes.
@@ -264,7 +265,7 @@ This document provides full transparency regarding the use of Artificial Intelli
 ${logs.map((l) => `| ${l.createdAt.toISOString()} | ${l.module} | ${l.section || l.purpose} | ${l.model} | \`${l.promptHash.slice(0, 10)}...\` | ${l.inputTokens}/${l.outputTokens} | ${l.credits} |`).join('\n')}
 
 ---
-*Generated automatically by FonBridge SaaS Platform Compliance Engine.*
+*Generated automatically by ${PRODUCT_NAME} SaaS Platform Compliance Engine.*
 `.trim();
 
   return {

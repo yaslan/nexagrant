@@ -7,6 +7,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { displayUserName } from '@/lib/user-display';
 import { listSessionWorkspaces } from '@/lib/workspaces';
 
@@ -29,6 +30,7 @@ export default async function AppLayout({
 
   const user = session.user;
   const t = await getTranslations({ locale, namespace: 'UserIdentity' });
+  const tCommon = await getTranslations({ locale, namespace: 'Common' });
 
   // Never invent an identity. The name falls back to the e-mail local part and then to a
   // translated "unnamed user" label; the e-mail is shown only if the session carries one.
@@ -76,7 +78,7 @@ export default async function AppLayout({
         >
           <Image
             src="/logo.png"
-            alt="FonBridge Logo"
+            alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
             width={72}
             height={72}
             className="object-contain group-hover:scale-105 transition shrink-0"

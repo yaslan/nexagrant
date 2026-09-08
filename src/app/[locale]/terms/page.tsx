@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 /**
  * Legal pages get shared publicly, so they carry their own title, description
@@ -38,6 +39,7 @@ export default async function TermsPage({
 }) {
   const { locale } = await params;
   const isTr = locale === 'tr';
+  const t = await getTranslations({ locale, namespace: 'legal.terms' });
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-6 bg-surface border rounded-xl my-8">
@@ -51,9 +53,7 @@ export default async function TermsPage({
             {isTr ? '1. Hizmetin Tanımı ve Kapsamı' : '1. Service Scope'}
           </h2>
           <p>
-            {isTr 
-              ? 'FonBridge, Horizon Europe ve diğer uluslararası Ar-Ge fonları için çağrı keşfi, konsorsiyum eşleştirme ve yapay zeka destekli başvuru hazırlama yazılımı sunar.'
-              : 'FonBridge provides discovery, consortium matching, and AI-assisted proposal preparation tools for Horizon Europe and international research funding.'}
+            {t('scopeBody', { brand: PRODUCT_NAME })}
           </p>
         </section>
 

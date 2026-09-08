@@ -33,6 +33,8 @@
  * adding the Evidence/TopicStat read that produces it (CLAUDE.md rule 7);
  * `tests/marketing-unsourced-figures.test.ts` pins the removed strings.
  */
+import { PRODUCT_NAME } from './brand';
+
 export interface BlogAuthor {
   name: string;
   role: string;
@@ -77,8 +79,8 @@ CORDIS (Community Research and Development Information Service), Avrupa Komisyon
 * **Coğrafi Çeşitlilik:** AB 27 üye ülkesi ve Asosiye ülkelerden dengeli dağılım.
 * **KOBİ ve Sanayi Katılımı:** Sanayi ve KOBİ ortaklarının bütçe payı, Etki (Impact) bölümünde ticarileştirme ve kullanım planının inandırıcılığını belirler.
 
-## 2. FonBridge M8 Konsorsiyum Eşleştirme Motoru
-FonBridge M8 modülü, CORDIS canlı delta API entegrasyonu sayesinde aradığınız spesifik yetkinliğe sahip partnerleri saniyeler içinde önerir.
+## 2. ${PRODUCT_NAME} M8 Konsorsiyum Eşleştirme Motoru
+${PRODUCT_NAME} M8 modülü, CORDIS canlı delta API entegrasyonu sayesinde aradığınız spesifik yetkinliğe sahip partnerleri saniyeler içinde önerir.
     `,
   },
   {
@@ -100,8 +102,8 @@ Avrupa Komisyonu doğrudan hibelerinde eşik puanı (Threshold) aşmak, hem TÜB
 2. **Impact (Etki) - 5 Puan:** AB Yeşil Mutabakatı (Green Deal) ve Dijital On Yıl hedeflerine somut katkı, CORDIS çıktıları ile yaygınlaştırma planı.
 3. **Implementation (Uygulama) - 5 Puan:** Çalışma paketleri (Work Packages), risk matrisi ve bütçe/adam-gün tutarlılığı.
 
-## FonBridge M6 Evaluator Lens İle Puanınızı Yükseltin
-FonBridge M6 modülü, resmi AB hakemi bakış açısıyla metninizin zayıf paragraflarını tespit eder ve iyileştirme önerileri sunar.
+## ${PRODUCT_NAME} M6 Evaluator Lens İle Puanınızı Yükseltin
+${PRODUCT_NAME} M6 modülü, resmi AB hakemi bakış açısıyla metninizin zayıf paragraflarını tespit eder ve iyileştirme önerileri sunar.
     `,
   },
   {
@@ -119,7 +121,7 @@ FonBridge M6 modülü, resmi AB hakemi bakış açısıyla metninizin zayıf par
 Yapay zeka (LLM) teknolojileri teklif hazırlama sürecini hızlandırsa da, AB Komisyonu tarafından yayımlanan etik ilkeler doğrultusunda kullanılması şarttır.
 
 ## CORDIS RAG Destekli Doğru Üretim
-Genel yapay zeka modelleri (hallucination) uydurma kaynak üretebilir. FonBridge, CORDIS vector veritabanı uyarınca **Retrieval-Augmented Generation (RAG)** mimarisini kullanarak doğruluk sunar.
+Genel yapay zeka modelleri (hallucination) uydurma kaynak üretebilir. ${PRODUCT_NAME}, CORDIS vector veritabanı uyarınca **Retrieval-Augmented Generation (RAG)** mimarisini kullanarak doğruluk sunar.
 
 ### Etik Kullanım İlkeleri:
 * Özgünfikir beyanı ve fikri mülkiyet (IP) koruması.
