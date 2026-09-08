@@ -81,6 +81,21 @@ export async function seed() {
     },
   });
 
+  // The pipeline detail page — where the gate button lives — is an M5 route, and a tenant with
+  // no `ModuleState` row reads as "module off": the page renders the module gate and the button
+  // never exists. M5 is granted by every plan (src/lib/billing/catalog.ts PLAN_GRANTS), so the
+  // row alone is enough and the fixture needs no subscription.
+  await prisma.moduleState.upsert({
+    where: { tenantId_moduleId: { tenantId: GATE_E2E.tenantId, moduleId: 'M5' } },
+    update: { status: 'ON' },
+    create: {
+      tenantId: GATE_E2E.tenantId,
+      moduleId: 'M5',
+      status: 'ON',
+      changedBy: 'seed-gate-e2e',
+    },
+  });
+
   // G2 rather than G0: G0 refuses when the tenant has no scoring evidence on file, and a fixture
   // tenant has none. G2 decides on seats, which the fixture can state outright — so the happy
   // path measures the gate running and filing a decision, not the scorer's evidence coverage.
@@ -153,6 +168,9 @@ export async function rollback() {
   });
   await prisma.opportunity.deleteMany({
     where: { id: { in: [GATE_E2E.opportunityId, GATE_E2E.otherOpportunityId] } },
+  });
+  await prisma.moduleState.deleteMany({
+    where: { tenantId: { in: [GATE_E2E.tenantId, GATE_E2E.otherTenantId] } },
   });
   await prisma.membership.deleteMany({
     where: { userId: GATE_E2E.userId, tenantId: GATE_E2E.tenantId },

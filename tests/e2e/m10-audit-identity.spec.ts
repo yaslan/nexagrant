@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 
+import { prisma } from '../../src/lib/db';
+
 /**
  * TASK-MTR60M5ESB5PZ — the M10 follow-up documents surface must never name
  * somebody who did not act.
@@ -10,9 +12,14 @@ import { encode } from 'next-auth/jwt';
  * `legalApprover`. The default is gone; the actor now comes from the session, and a
  * request without a session is refused before any record exists.
  *
- * Precondition: M10 must be `ON` for `demo-tenant`, otherwise the page renders the
- * module gate instead of the workflow and the first test fails on the missing header.
- * The dev database carries `ModuleState` row `ms-demo-m10` for exactly this.
+ * Precondition: the tenant must be entitled to M10, and that is two facts, not one.
+ * `ModuleState` must say `ON` — the dev database carries row `ms-demo-m10` for that —
+ * and the plan must sell the module, because an ON module outside the plan is still
+ * refused (CLAUDE.md rule 4, proved by tests/e2e/module-plan-gate.spec.ts). M10 is
+ * granted by `ultra` alone and `demo-tenant` ships on `pro`, so this spec lifts the
+ * plan for its own run and puts it back, the same way the plan-gate spec does. Without
+ * that, the page renders the module gate and the first test fails on the missing header
+ * — a refusal that says nothing about whose name the workflow signs records with.
  *
  * The session cookie is minted with the app's own secret — the same JWT the sign-in
  * flow produces — as `identity-honesty.spec.ts` already does, so the test drives the
@@ -50,7 +57,31 @@ async function signInAs(
   });
 }
 
+const TENANT_ID = 'demo-tenant';
+/** M10 (Follow-up Documents) is granted by `ultra` only — src/lib/billing/catalog.ts. */
+const PLAN_WITH_M10 = 'ultra';
+
 test.describe('M10 dual approval identity', () => {
+  let originalPlanId: string;
+
+  test.beforeAll(async () => {
+    const sub = await prisma.subscription.findUnique({ where: { tenantId: TENANT_ID } });
+    if (!sub) throw new Error(`${TENANT_ID} has no subscription; run pnpm db:seed`);
+    originalPlanId = sub.planId;
+    await prisma.subscription.update({
+      where: { tenantId: TENANT_ID },
+      data: { planId: PLAN_WITH_M10, status: 'ACTIVE' },
+    });
+  });
+
+  test.afterAll(async () => {
+    await prisma.subscription.update({
+      where: { tenantId: TENANT_ID },
+      data: { planId: originalPlanId },
+    });
+    await prisma.$disconnect();
+  });
+
   test('a real signed-in user sees the workflow and no invented signer', async ({ page, baseURL }) => {
     await signInAs(page, {
       id: 'demo-user-alice',
@@ -74,7 +105,9 @@ test.describe('M10 dual approval identity', () => {
   test('an identity-less visitor never reaches the approval surface', async ({ page }) => {
     await page.context().clearCookies();
     await page.goto(DOCS_URL);
-    await page.waitForLoadState('networkidle');
+    // The redirect itself is the thing being waited for. `networkidle` stood here and is a
+    // race on a loaded dev server, which never goes quiet for the 500 ms it wants.
+    await page.waitForURL(/\/(giris|login)\b/, { timeout: 30_000 });
 
     // No session → the app frame sends the visitor to sign in; it does not render
     // an approval workflow signed by somebody the request never identified.
@@ -92,9 +125,17 @@ test.describe('M10 dual approval identity', () => {
     await page.screenshot({ path: `${SHOTS}/02-anonymous-refused.png`, fullPage: false });
   });
 
-  test('an identity-less POST to an M10 action is refused, never signed', async ({ request, baseURL }) => {
-    // `signDocument` is the sibling action that IS registered in the action manifest;
-    // it stands in for the whole module's boundary. An anonymous call must fail.
+  test('an identity-less POST to an M10 action never succeeds and never signs', async ({ request, baseURL }) => {
+    // What this establishes, and what it does not. The `Next-Action` id below is a literal,
+    // and Next mints a fresh id for every action on every build: measured on 2026-09-08 this
+    // one is no longer in the running app's server-reference manifest, so the route answers
+    // 404 and the assertion passes without any action having refused anything. The refusal
+    // itself is proved elsewhere — `signDocument` opens with `requireTenantAction()`, which
+    // throws `TenantScopeError` before a row is touched (src/modules/m10/server/actions.ts:142)
+    // — and the test above already shows an identity-less visitor never reaching the surface.
+    // Kept as a regression net on "an anonymous POST here never returns 2xx and never echoes
+    // the invented signer"; pinning it to a live action id needs the id resolved at run time,
+    // which is filed as an open item rather than guessed at here.
     const res = await request.post(DOCS_URL, {
       headers: {
         'Next-Action': '40e67602bd5a3cd92b8e2d385591c18061662e4d26',

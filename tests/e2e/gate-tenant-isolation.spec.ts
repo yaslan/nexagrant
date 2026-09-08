@@ -46,11 +46,13 @@ test.describe('Stage gate — tenant isolation', () => {
     await page.locator('form button[type="submit"]').click();
 
     await page.waitForURL(`**${DETAIL_URL}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
-    await page.screenshot({ path: `${SHOTS}/01-detail-before-gate.png`, fullPage: true });
 
+    // `waitForLoadState('networkidle')` stood here and timed the test out about half the time:
+    // a dev server never goes fully quiet, so "no requests for 500 ms" is a race, not a signal.
+    // The button is what the test is waiting for, so it waits for the button.
     const button = page.locator('main').getByTestId('pipeline-evaluate-gate');
-    await expect(button).toBeVisible();
+    await expect(button).toBeVisible({ timeout: 30_000 });
+    await page.screenshot({ path: `${SHOTS}/01-detail-before-gate.png`, fullPage: true });
     await button.click();
 
     // The banner is the gate's answer on screen; the error band would mean the action refused.
@@ -58,7 +60,6 @@ test.describe('Stage gate — tenant isolation', () => {
     await expect(page.locator('main').getByTestId('pipeline-gate-result')).toBeVisible({
       timeout: 30_000,
     });
-    await page.waitForLoadState('networkidle');
     await page.screenshot({ path: `${SHOTS}/02-detail-after-gate.png`, fullPage: true });
 
     // The row the click wrote, read straight from Postgres.

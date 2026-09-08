@@ -104,6 +104,18 @@ export async function seed() {
 
   const f = F10.full;
 
+  // A `ModuleState` row is only half of the entitlement: the module gate refuses an ON module
+  // the plan does not sell (CLAUDE.md rule 4), and a tenant with no `Subscription` reads as
+  // `free`, which grants M3 and M5 only. The evaluations page is M6 — the "not evaluated"
+  // assertion never reaches it without a plan that includes M6, so the full tenant carries the
+  // cheapest one that does. The empty tenant stays plan-less on purpose: its assertions are all
+  // on the M5 dashboard, and leaving it alone keeps the fixture's blast radius small.
+  await prisma.subscription.upsert({
+    where: { tenantId: f.tenantId },
+    update: { planId: 'pro', status: 'ACTIVE' },
+    create: { tenantId: f.tenantId, planId: 'pro', status: 'ACTIVE' },
+  });
+
   // Two opportunities, both past G0 scoring — this is the hit-rate denominator.
   for (const [id, title, g0Score] of [
     [f.opportunityA, 'F10 — renovation pilot', 74],
@@ -262,6 +274,7 @@ export async function rollback() {
   await prisma.effort.deleteMany({ where: { id: f.effortId } });
   await prisma.proposal.deleteMany({ where: { id: f.proposalId } });
   await prisma.opportunity.deleteMany({ where: { id: { in: [f.opportunityA, f.opportunityB] } } });
+  await prisma.subscription.deleteMany({ where: { tenantId: f.tenantId } });
   for (const t of [F10.empty, F10.full]) {
     await prisma.moduleState.deleteMany({ where: { tenantId: t.tenantId } });
     await prisma.membership.deleteMany({ where: { tenantId: t.tenantId, userId: t.userId } });

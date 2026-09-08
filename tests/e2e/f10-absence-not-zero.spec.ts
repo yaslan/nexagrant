@@ -33,13 +33,18 @@ async function acceptCookies(page: Page) {
   });
 }
 
+/**
+ * `waitForLoadState('networkidle')` used to close this helper and timed the suite out
+ * whenever the machine was busy: "no requests for 500 ms" never comes true on a dev server
+ * under load, so it is a race rather than a signal. Every caller asserts on a locator
+ * straight afterwards, and Playwright's auto-waiting is the synchronisation.
+ */
 async function signIn(page: Page, email: string, target: string, locale = 'tr') {
   const signInPath = locale === 'tr' ? `/${locale}/giris` : `/${locale}/login`;
   await page.goto(`${signInPath}?callbackUrl=${encodeURIComponent(target)}`);
   await page.locator('input[type="email"]').fill(email);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
 }
 
 const shot = (page: Page, name: string) =>
@@ -128,7 +133,6 @@ test.describe('F10 — a workspace with nothing in it is not a workspace scoring
 
     // A window entirely before the fixture was created.
     await page.goto(`${target}?from=2020-01-01&to=2020-02-01`);
-    await page.waitForLoadState('networkidle');
 
     const overview = page.locator('#dashboard-panel-overview');
     await expect(overview).toContainText('Seçili tarih aralığında fırsat yok');
