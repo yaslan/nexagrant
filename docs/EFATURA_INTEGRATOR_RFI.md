@@ -1,8 +1,11 @@
 # Entegratöre gönderilecek yazılı teknik bilgi talebi (RFI)
 
-Bu belge, e-Fatura özel entegratör adaylarına **görüşmeden önce yazılı olarak**
+Bu belge, e-Fatura özel entegratörüne **görüşmeden önce yazılı olarak**
 gönderilecek metindir. Amaç: adaptörün tek turda yazılabilmesi için gereken
 teknik cevapları görüşmeye gelmeden almak.
+
+**Patron kararı 2026-09-08:** metin **tek adaya** gönderilir (karşılaştırmalı çoklu
+teklif turu yapılmayacak). Aday henüz seçilmedi; seçilir seçilmez bu metin gider.
 
 **Köşeli parantezli alanları göndermeden önce doldur.** Uydurma değer yazma.
 
