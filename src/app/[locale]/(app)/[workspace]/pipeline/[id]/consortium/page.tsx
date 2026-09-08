@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidate } from './manager';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
+import { recordAlert } from '@/lib/observability/system-alert';
 
 /** `CordisOrganization` columns this page maps onto the manager's `OrgInfo`. */
 interface CordisOrgRow {
@@ -26,44 +27,19 @@ interface ConsortiumOpportunity {
   g0Score: number | null;
 }
 
-const DEMO_OPPORTUNITIES: Record<string, ConsortiumOpportunity> = {
-  'demo-opp-1': {
-    id: 'demo-opp-1',
-    title: 'FLEX-GRID: Decarbonised Smart Grid Flexibility Solutions',
-    stage: 'G0',
-    status: 'ACTIVE',
-    topicId: 'HORIZON-CL5-2024-D3-01-01',
-    intendedRole: 'coordinator',
-    g0Score: 88,
-  },
-  'demo-opp-2': {
-    id: 'demo-opp-2',
-    title: 'TWIN-HYDRO: AI-Powered Digital Twins for Green Hydrogen Plants',
-    stage: 'G1',
-    status: 'ACTIVE',
-    topicId: 'HORIZON-CL4-2024-TWIN-01',
-    intendedRole: 'partner',
-    g0Score: 92,
-  },
-  'demo-opp-3': {
-    id: 'demo-opp-3',
-    title: 'CIRC-PACK: Circular Bio-Economy Polymers for Industrial Packaging',
-    stage: 'G2',
-    status: 'ACTIVE',
-    topicId: 'HORIZON-CL6-2024-CIRCBIO-01',
-    intendedRole: 'coordinator',
-    g0Score: 85,
-  },
-  'demo-opp-4': {
-    id: 'demo-opp-4',
-    title: 'CLEAN-PORT: Zero-Emission Coastal Freight & Smart Bunkering',
-    stage: 'G3',
-    status: 'ACTIVE',
-    topicId: 'HORIZON-CL5-2024-D5-01-12',
-    intendedRole: 'partner',
-    g0Score: 94,
-  },
-};
+/**
+ * TASK-MTQYXISOPUJ53 — fabricated fallbacks.
+ *
+ * A `DEMO_OPPORTUNITIES` map used to sit here: five invented opportunities keyed
+ * by the ids the demo seed happens to use (`demo-opp-1` … `demo-opp-5`), each
+ * with a title, a stage and a G0 score ("FLEX-GRID: Decarbonised Smart Grid
+ * Flexibility Solutions", G0, 88). When the tenant-scoped query below returned
+ * nothing — an id belonging to another tenant, a deleted row, a failed query —
+ * the page served one of them as this tenant's own opportunity. Measured on
+ * 2026-09-08 against a tenant with zero `Opportunity` rows: the consortium
+ * builder rendered "FLEX-GRID … — Stage G0". The map is gone; the header now
+ * shows only a row this tenant owns.
+ */
 
 /**
  * M8 consortium page.
@@ -90,6 +66,9 @@ export default async function ConsortiumPage({
   if (locked) return locked;
   const { tenantId } = await requireTenantPage(locale);
 
+  const isTr = locale === 'tr';
+
+  let queryFailed = false;
   let opportunity: ConsortiumOpportunity | null = null;
   let seats: ConsortiumSeat[] = [];
   let candidates: SeatCandidate[] = [];
@@ -128,7 +107,7 @@ export default async function ConsortiumPage({
       // Organizations are shared CORDIS reference data, not tenant rows; the ids
       // here already come from rows read inside this tenant. `prisma.organization`
       // is not a model in prisma/schema.prisma — the query threw on every render
-      // and the catch below quietly served the demo fallback instead.
+      // and the catch below swallowed it with a console.warn.
       if (orgIds.length > 0) {
         const cordisOrgs = await withTenant<CordisOrgRow[]>(tenantId, (tx) =>
           tx.cordisOrganization.findMany({
@@ -146,12 +125,34 @@ export default async function ConsortiumPage({
       }
     }
   } catch (e) {
-    console.warn(`[ConsortiumPage] DB query bypassed for ${id}: ${errorMessage(e)}`);
+    // Reported, not replaced with an invented opportunity (CLAUDE.md rule 6).
+    // The old catch only warned to the console and fell through to the demo map,
+    // so a permanently broken query looked like a working page.
+    console.error(`[ConsortiumPage] query failed for ${id}: ${errorMessage(e)}`);
+    await recordAlert({
+      level: 'warn',
+      source: 'consortium_page_query_failed',
+      message: `Consortium lookup failed: ${errorMessage(e)}`,
+      meta: { module: 'M8', table: 'Opportunity', opportunityId: id },
+    });
+    queryFailed = true;
   }
 
-  // Demo opportunity fallback
-  if (!opportunity) {
-    opportunity = DEMO_OPPORTUNITIES[id] ?? null;
+  // "We could not read it" and "this tenant has no such opportunity" are two
+  // different answers, and only the second one is a 404.
+  if (queryFailed) {
+    return (
+      <div className="max-w-5xl mx-auto py-8 px-4">
+        <div
+          role="alert"
+          className="border border-amber-200 bg-amber-50 text-amber-900 text-sm rounded-lg p-4"
+        >
+          {isTr
+            ? 'Konsorsiyum verisi okunamadı. Sorun kaydedildi; lütfen birazdan tekrar deneyin.'
+            : 'Consortium data could not be read. The failure has been recorded; please try again shortly.'}
+        </div>
+      </div>
+    );
   }
 
   if (!opportunity) return notFound();

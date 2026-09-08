@@ -35,3 +35,17 @@ YANLIŞTIR — satır sızar.
 
 İlgili: [[fabrika-idempotency-which-tables-must-stay-flat]] ·
 [[fabrika-opportunity-delete-has-two-fkless-children]]
+
+**2026-09-08 eklemesi — aynı madalyonun diğer yüzü: SIZINTI değil, SESSİZ BOŞLUK.**
+Yukarısı "yerelde sızıntı görmezsin" diyor. Ters yön de doğru ve daha sinsi: kiracıya özel
+bir tabloyu `withTenant` DIŞINDA okuyan kod yerelde **kusursuz çalışır**, üretimde
+(`fabrika_app`) **boş döner**. Çünkü `tenant_isolation` `"tenantId" = current_setting(
+'app.tenant_id', true)` karşılaştırır; ayar yoksa her satır için NULL, tablo boş okunur —
+hata değil, satır yokluğu. `where: { tenantId }` daraltmayı yapıyormuş gibi görünür ama
+politika önce cevap verir.
+
+Ölçülmüş örnek (TASK-MTRJ32BZBY2AI): özel bir paket, **atandığı kiracıdan** kayboldu.
+Ölçüm tuzağı: "atanmamış kiracı göremiyor" testi bunu ÖRTER (o boşluk zaten beklenendir) —
+**iki yönü de ölç**. Gerçek fonksiyonu o role karşı koşturma reçetesi:
+`tests/plan-visibility-rls.spec.ts` (`vi.doMock('@/lib/db', { prisma: rls, withTenant:
+(t,cb)=>withTenantOn(rls,t,cb) })` + dinamik import).

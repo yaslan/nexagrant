@@ -1,0 +1,48 @@
+ÇALIŞMA ALANI
+Panel
+Çağrılar
+Fırsatlar
+Ortaklar
+İlişkiler
+Kanıtlar
+TTO Hızlandırıcısı (M7)
+Onay Merkezi (4-Eyes)
+Pazar Yeri & API
+Partner REST API
+Ayarlar
+DK
+Prof. Dr. Ayşe Kaya
+Panel
+/
+Ortak Arama & CORDIS (M1)
+M1 Partner Intelligence Database & CORDIS Ortak Arama
+
+Avrupa Komisyonu CORDIS (Horizon Europe & H2020) fonlanmış verilerinden türetilen Avrupalı ve Türk kurumların geçmiş proje deneyimleri, koordinatörlük başarıları, AB katkıları ve ortaklık ağı.
+
+Kaynak: CORDIS, Avrupa Komisyonu (CC BY 4.0)
+Kurum Adı veya Anahtar Kelime
+Ülke Kodu
+Kurum Tipi
+Tüm Tipler
+HES (Higher Education / Üniversite)
+REC (Research / Araştırma)
+PRC (Private Company / Özel Şirket)
+PUB (Public Body / Kamu Kurumu)
+OTH (Other / Diğer)
+Min. Proje Sayısı
+Tümü
+≥ 1 Proje
+≥ 5 Proje
+≥ 10 Proje
+≥ 25 Proje
+🇹🇷 Sadece Türk Kuruluşları Göster (isTurkish = true)
+Filtrele & Ara
+Toplam 0 Ortak Profili Bulundu
+Sayfa 1 / Gösteriliyor (cordis_partner_profile)
+PIC KODU	KURUM ADI	ÜLKE	KURUM TÜRÜ	TOPLAM PROJE	KOORDİNATÖRLÜK	AB DESTEĞİ (€)
+
+Aradığınız kriterlere uygun CORDIS ortağı bulunamadı.
+
+Arama kriterlerinizi değiştirebilir veya filtreleri temizleyebilirsiniz.
+
+Geri bildirim

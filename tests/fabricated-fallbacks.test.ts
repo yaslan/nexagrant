@@ -237,6 +237,41 @@ function transactionSpy() {
   return { tx, created };
 }
 
+describe('M8 consortium page — the demo opportunity map is gone', () => {
+  const source = readCode(
+    'src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx'
+  );
+
+  test('none of the five invented opportunities survives in code', () => {
+    for (const invented of [
+      'DEMO_OPPORTUNITIES',
+      'FLEX-GRID',
+      'TWIN-HYDRO',
+      'CIRC-PACK',
+      'CLEAN-PORT',
+      'HORIZON-CL5-2024-D3-01-01',
+    ]) {
+      expect(source).not.toContain(invented);
+    }
+  });
+
+  test('an unreadable query is reported, not answered with a page', () => {
+    // The old catch was a bare `console.warn` that fell through to the demo map,
+    // so a permanently broken query rendered as a working consortium builder.
+    expect(source).toContain('recordAlert');
+    expect(source).toContain('consortium_page_query_failed');
+    expect(source).not.toMatch(/catch \(e\) \{\s*console\.warn/);
+  });
+
+  test('an opportunity this tenant does not own is a 404', () => {
+    expect(source).toContain('notFound()');
+    // notFound() throws; leaving it inside the try would swallow it back into
+    // the catch. It must sit after the try block.
+    const tryEnd = source.lastIndexOf('} catch');
+    expect(source.indexOf('if (!opportunity) return notFound();')).toBeGreaterThan(tryEnd);
+  });
+});
+
 describe('M10 generateStandardDoc — a failed generation is an error, not a document', () => {
   beforeEach(() => {
     generateTextMock.mockReset();

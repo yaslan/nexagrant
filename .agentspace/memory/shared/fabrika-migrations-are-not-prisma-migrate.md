@@ -68,3 +68,16 @@ olmayan, tek tablolu, geri-alma dosyasız eksik kopyasıydı. Silindi (bkz. comm
    -iTCP:5432 -sTCP:LISTEN` ile bak, `docker ps` ile değil.
 
 İlgili: [[fabrika-parallel-agent-file-race]] · [[fabrika-known-failing-tests]]
+
+**2026-09-08 eklemesi — "migration yazdım" defterde kayıt DEMEK DEĞİL.** TASK-MTRJ32BZBY2AI'de
+`prisma/migrations/add-plan-versioning.sql` **düz** bir dosya olarak yazılmış ve elle
+uygulanmıştı; `prisma migrate deploy` onu hiç görmedi ("3 migrations found"), yani temiz bir
+klonda tablolar kurulmuyordu. Bir migration işini kapatmadan önce **deftere sor**:
+
+```
+select migration_name from _prisma_migrations order by finished_at;
+```
+
+Adın orada yoksa iş bitmemiştir. Klasöre taşımak yetti (`<ad>/migration.sql`) → "4 migrations
+found / Applying migration `add-plan-versioning`". Dosyayı `IF NOT EXISTS` ile idempotent
+yazarsan zaten uygulanmış bir DB'de de sorunsuz koşar, `migrate resolve` gerekmez.

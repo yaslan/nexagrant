@@ -1,0 +1,59 @@
+ÇALIŞMA ALANI
+Panel
+Çağrılar
+Fırsatlar
+Ortaklar
+İlişkiler
+Kanıtlar
+TTO Hızlandırıcısı (M7)
+Onay Merkezi (4-Eyes)
+Pazar Yeri & API
+Partner REST API
+Ayarlar
+DK
+Prof. Dr. Ayşe Kaya
+MODÜL 6 — EVALUATOR LENS
+İç Ön Değerlendirme & Hakem Simülasyonu
+
+Fırsat: CSV7 probe — application empty state
+
+İç ön değerlendirme: Bu puanlar şirket içi kalite kontrol içindir; resmî Komisyon değerlendirmesi yerine geçmez.
+Ortalama Tahmin Puanı
+Değerlendirilmedi
+Henüz tamamlanmış bir ön değerlendirme yok
+Değerlendirici Sayısı
+0 (0 İnsan, 0 YZ)
+G3 Kapısı Durumu
+Eksik Değerlendirme
+IA Etki Çarpanı (1.5x)
+Pasif (Standart)
+Değerlendirmeler & Puan Kartları
+0
+REA Sık Hatalar Kontrolü
+Checklist
+ESR Kalibrasyonu
+YZ Hakem Simülasyonu
+
+Resmî Horizon Europe REA promptu
+
+3 Kredi
+Yapay Zeka Değerlendirmesi Başlat
+Excellence, Impact ve Implementation detaylı tespiti ve zayıf yön analizi üretir.
+İnsan Uzman Değerlendirmesi Ekle
+1. Excellence / Mükemmeliyet (0 - 5.0)
+4.0 / 5.0
+2. Impact / Etki (0 - 5.0)
+4.0 / 5.0
+3. Implementation / Uygulama (0 - 5.0)
+3.8 / 5.0
+Güçlü Yönler (Her satıra bir tane)
+Zayıf Yönler & Eleştiriler (Her satıra bir tane)
+Değerlendirmeyi Kaydet
+Mevcut Ön Değerlendirme Raporları
+G3 Kapısı İçin En Az 2 Değerlendirme Önerilir
+
+Henüz bir ön değerlendirme bulunmuyor.
+
+Sol panelden YZ simülasyonu başlatabilir veya uzman görüşü ekleyebilirsiniz.
+
+Geri bildirim
