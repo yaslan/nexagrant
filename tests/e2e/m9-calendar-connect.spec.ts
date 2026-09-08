@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
-import { F10, seed } from '../../scripts/seed-f10-e2e';
+import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
 
 /**
  * TASK-MTQUTBH8Q9VMK — the calendar connect flow, in a real browser.
@@ -36,7 +36,8 @@ async function signIn(page: Page, email: string, target: string) {
   await page.locator('input[type="email"]').fill(email);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
+  // No `waitForLoadState('networkidle')` — see docs/E2E_TESTING.md §3.4: on a dev server
+  // "no requests for 500 ms" is a race, not a signal. The assertions below do the waiting.
 }
 
 /** One provider card: the rounded panel carrying that provider's label. */
@@ -60,7 +61,14 @@ test.describe('M9 calendar connections', () => {
   });
 
   test.afterAll(async () => {
+    // The connections first, then the fixture that owns them: `rollback` deletes the
+    // user these rows point at, and a row left behind would hold it down.
     await clearConnections();
+    // This suite used to seed and never roll back, so `f10-*` stayed in the shared
+    // database after every run — two tenants, two users, two workspaces, and the
+    // opportunities the dashboard counts. Whoever seeds cleans up.
+    if (process.env.F10_E2E_KEEP !== '1') await rollback();
+    await prisma.$disconnect();
   });
 
   test('an unconfigured provider is refused in Turkish, not silently swallowed', async ({
@@ -98,7 +106,7 @@ test.describe('M9 calendar connections', () => {
     await expect(page).toHaveTitle(/Takvim Bağlantıları/);
 
     await page.goto(`/en/${F10.full.workspaceSlug}/settings/calendar`);
-    await page.waitForLoadState('networkidle');
+    // `toHaveTitle` retries until the timeout, so it waits for the new document itself.
     await expect(page).toHaveTitle(/Calendar Connections/);
   });
 

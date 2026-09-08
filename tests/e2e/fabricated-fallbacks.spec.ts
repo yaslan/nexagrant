@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
-import { F10, seed } from '../../scripts/seed-f10-e2e';
+import { prisma } from '../../src/lib/db';
+import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
 
 /**
  * TASK-MTQYXISOPUJ53 — fabricated data fallbacks, in a real browser.
@@ -42,11 +43,24 @@ async function signIn(page: Page, email: string, target: string) {
   await page.locator('input[type="email"]').fill(email);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
+  // No `waitForLoadState('networkidle')`: a dev server never goes quiet for the 500 ms
+  // it waits for, so it is a race and not a signal — it timed this suite out at 60 s on
+  // a loaded machine. Every caller asserts on a locator next, which is the real wait.
 }
 
 const shot = (page: Page, name: string) =>
   page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
+
+/**
+ * File scope, not per-describe: both suites below seed the same fixture, and this runs
+ * once after the last of them. The suites used to seed and never roll back, which left
+ * `f10-*` — two tenants, two users, two workspaces and the opportunities the dashboard
+ * counts — in the shared database after every run.
+ */
+test.afterAll(async () => {
+  if (process.env.F10_E2E_KEEP !== '1') await rollback();
+  await prisma.$disconnect();
+});
 
 /** The three people the mock array invented, and the work it invented for them. */
 const INVENTED_EFFORT = [

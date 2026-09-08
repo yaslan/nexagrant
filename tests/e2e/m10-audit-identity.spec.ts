@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 
 import { prisma } from '../../src/lib/db';
+import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
 
 /**
  * TASK-MTR60M5ESB5PZ — the M10 follow-up documents surface must never name
@@ -13,13 +14,17 @@ import { prisma } from '../../src/lib/db';
  * request without a session is refused before any record exists.
  *
  * Precondition: the tenant must be entitled to M10, and that is two facts, not one.
- * `ModuleState` must say `ON` — the dev database carries row `ms-demo-m10` for that —
- * and the plan must sell the module, because an ON module outside the plan is still
- * refused (CLAUDE.md rule 4, proved by tests/e2e/module-plan-gate.spec.ts). M10 is
- * granted by `ultra` alone and `demo-tenant` ships on `pro`, so this spec lifts the
- * plan for its own run and puts it back, the same way the plan-gate spec does. Without
- * that, the page renders the module gate and the first test fails on the missing header
- * — a refusal that says nothing about whose name the workflow signs records with.
+ * `ModuleState` must say `ON`, and the plan must sell the module, because an ON module
+ * outside the plan is still refused (CLAUDE.md rule 4, proved by
+ * tests/e2e/module-plan-gate.spec.ts). Without both, the page renders the module gate
+ * and the first test fails on the missing header — a refusal that says nothing about
+ * whose name the workflow signs records with.
+ *
+ * Both facts come from `scripts/seed-plan-e2e.ts`, whose `ultra` tenant is seeded on the
+ * plan that grants M10 and is never moved off it. This spec used to lift `demo-tenant`
+ * to `ultra` in `beforeAll` and put it back afterwards; it restored correctly, but
+ * `demo-tenant` is shared with the demo data and with every other spec, and the restore
+ * only held if nothing read the plan in between. Owning the tenant removes the window.
  *
  * The session cookie is minted with the app's own secret — the same JWT the sign-in
  * flow produces — as `identity-honesty.spec.ts` already does, so the test drives the
@@ -27,7 +32,8 @@ import { prisma } from '../../src/lib/db';
  */
 
 const SHOTS = 'docs/agent-results/TASK-MTR60M5ESB5PZ-screenshots';
-const DOCS_URL = '/tr/main/opportunities/demo-opp-1/documents';
+const ULTRA = PLAN_E2E.ultra;
+const DOCS_URL = `/tr/${ULTRA.workspaceSlug}/opportunities/${ULTRA.opportunityId}/documents`;
 const COOKIE_NAME = 'authjs.session-token';
 const SECRET =
   process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
@@ -57,38 +63,25 @@ async function signInAs(
   });
 }
 
-const TENANT_ID = 'demo-tenant';
-/** M10 (Follow-up Documents) is granted by `ultra` only — src/lib/billing/catalog.ts. */
-const PLAN_WITH_M10 = 'ultra';
-
 test.describe('M10 dual approval identity', () => {
-  let originalPlanId: string;
-
   test.beforeAll(async () => {
-    const sub = await prisma.subscription.findUnique({ where: { tenantId: TENANT_ID } });
-    if (!sub) throw new Error(`${TENANT_ID} has no subscription; run pnpm db:seed`);
-    originalPlanId = sub.planId;
-    await prisma.subscription.update({
-      where: { tenantId: TENANT_ID },
-      data: { planId: PLAN_WITH_M10, status: 'ACTIVE' },
-    });
+    await seed();
   });
 
   test.afterAll(async () => {
-    await prisma.subscription.update({
-      where: { tenantId: TENANT_ID },
-      data: { planId: originalPlanId },
-    });
+    // PLAN_E2E_KEEP=1 leaves the fixture behind for inspection;
+    // `pnpm tsx scripts/seed-plan-e2e.ts --rollback` clears it.
+    if (process.env.PLAN_E2E_KEEP !== '1') await rollback();
     await prisma.$disconnect();
   });
 
   test('a real signed-in user sees the workflow and no invented signer', async ({ page, baseURL }) => {
     await signInAs(page, {
-      id: 'demo-user-alice',
-      name: 'Alice',
-      email: 'alice@fabrika.test',
-      tenantId: 'demo-tenant',
-      role: 'PIPELINE_MANAGER',
+      id: ULTRA.userId,
+      name: 'Plan E2E Ultra',
+      email: ULTRA.email,
+      tenantId: ULTRA.tenantId,
+      role: ULTRA.role,
     }, baseURL!);
 
     await page.goto(DOCS_URL);

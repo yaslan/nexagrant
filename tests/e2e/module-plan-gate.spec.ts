@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
 
 /**
  * The plan half of the module gate, in a real browser — TASK-MTQZ8MVAU3J7I.
@@ -14,16 +15,23 @@ import { prisma } from '../../src/lib/db';
  * Same session, same URL, same `ModuleState` row throughout: only the
  * subscription's `planId` moves, so anything that changes is the plan gate and
  * nothing else. The plan is flipped in the database because the product has no
- * UI for changing your own plan, and restored afterwards.
+ * UI for changing your own plan.
+ *
+ * The tenant being flipped is this suite's own — `PLAN_E2E.flip` from
+ * scripts/seed-plan-e2e.ts — and is dropped again afterwards. It used to be
+ * `demo-tenant`, restored to its original plan in `afterAll`. That restore was
+ * correct and still the wrong tenant to use: agents run their specs against
+ * separate dev servers but one Postgres, so any spec reading `demo-tenant`'s
+ * plan during this suite saw `pro` or `ultra` depending on timing, and failed
+ * for a reason written in a file it does not import. A plan that is the subject
+ * of the test belongs to the test.
  */
 
 const SHOTS = 'docs/agent-results/TASK-MTQZ8MVAU3J7I-screenshots';
-const TENANT_ID = 'demo-tenant';
+const FLIP = PLAN_E2E.flip;
+const TENANT_ID = FLIP.tenantId;
 /** M10 (Follow-up Documents): granted by `ultra` only, per PLAN_GRANTS. */
-const M10_URL = '/tr/main/opportunities/demo-opp-1/documents';
-
-let originalPlanId: string;
-let originalM10Status: string | null = null;
+const M10_URL = `/tr/${FLIP.workspaceSlug}/opportunities/${FLIP.opportunityId}/documents`;
 
 async function setPlan(planId: string) {
   await prisma.subscription.update({
@@ -50,26 +58,26 @@ async function signIn(page: Page, target: string) {
     );
   });
   await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill('admin@yasinaslan.com.tr');
+  await page.locator('input[type="email"]').fill(FLIP.email);
   await page.locator('form button[type="submit"]').click();
-  await page.waitForURL(`**/opportunities/demo-opp-1/documents`, { timeout: 60_000 });
-  await page.waitForLoadState('networkidle');
+  await page.waitForURL(`**/opportunities/${FLIP.opportunityId}/documents`, { timeout: 60_000 });
+  // No `waitForLoadState('networkidle')`: a dev server never goes quiet for the 500 ms
+  // it waits for, so it is a race. Every caller asserts on `main` next, and Playwright's
+  // auto-waiting is the synchronisation.
 }
 
 test.describe('module gate — an ON module outside the plan is still refused', () => {
   test.beforeAll(async () => {
-    const sub = await prisma.subscription.findUnique({ where: { tenantId: TENANT_ID } });
-    if (!sub) throw new Error('demo-tenant has no subscription; run pnpm db:seed');
-    originalPlanId = sub.planId;
-    const state = await prisma.moduleState.findUnique({
-      where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M10' } },
-    });
-    originalM10Status = state?.status ?? null;
+    // Re-seeding also puts the plan back to `pro` after a previous run left it on
+    // whatever its last test set — the seed's `update` clause states the plan rather
+    // than leaving it alone, for exactly this.
+    await seed();
   });
 
   test.afterAll(async () => {
-    await setPlan(originalPlanId);
-    if (originalM10Status) await setM10(originalM10Status);
+    // Nothing to restore: the tenant is the fixture, so it is removed rather than
+    // put back. PLAN_E2E_KEEP=1 leaves it for inspection.
+    if (process.env.PLAN_E2E_KEEP !== '1') await rollback();
     await prisma.$disconnect();
   });
 
@@ -103,7 +111,6 @@ test.describe('module gate — an ON module outside the plan is still refused', 
     // ── Ultra includes M10. Same session, same URL, same row: the page opens.
     await setPlan('ultra');
     await page.reload();
-    await page.waitForLoadState('networkidle');
 
     await expect(main).toContainText('Takip Belgeleri');
     await expect(main).not.toContainText('aboneliğinizin kapsamı dışında');
