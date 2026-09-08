@@ -38,6 +38,12 @@ import {
   buildResponseTemplateCsv,
 } from '../src/lib/beta/esr-survey';
 import { parseBetaRoster } from '../src/lib/beta/roster';
+import {
+  daysBetween,
+  evaluateEsrReadiness,
+  type EsrReadinessInput,
+} from '../src/lib/beta/esr-readiness';
+import { maskEmail, parseSendReceipt } from '../src/lib/beta/esr-send-receipt';
 
 const SAMPLES_CSV = path.join(__dirname, '../docs/BETA_DATA/esr-calibration-samples.csv');
 const ROSTER_CSV = path.join(__dirname, '../docs/BETA_DATA/beta-partners.csv');
@@ -312,5 +318,118 @@ describe('beta survey', () => {
       'partnerSlug,sampleId,agrees,verdict,comment\np1,S04,true,,\np2,S04,false,GO,\n',
     );
     expect(rollUpVerdicts(responses, new Map([['S04', 'NO_GO']]))[0]!.majority).toBeNull();
+  });
+});
+
+describe('E11.3 readiness gate', () => {
+  const READY: EsrReadinessInput = {
+    sampleCount: 20,
+    isFixture: false,
+    dbRows: { opportunities: 20, proposals: 20, gateDecisions: 20, cordisProjects: 20 },
+    rosterSize: 10,
+    undeliverable: 0,
+    sendReceipt: {
+      sentAt: '2026-09-10T09:00:00.000Z',
+      deadline: '2026-09-24',
+      ruleVersion: 'g0-canonical-1.0',
+      rosterPath: '(external)',
+      recipients: [
+        { slug: 'p1', emailMasked: 'p*@partner.example', messageId: 'abc', items: 4, sentAt: '2026-09-10T09:00:00.000Z' },
+      ],
+    },
+    responseCount: 24,
+    responsesAreSelfTest: false,
+    accuracy: 0.9,
+    deadline: '2026-09-24',
+    today: '2026-09-20',
+  };
+
+  test('every precondition met — the criterion may be closed', () => {
+    const report = evaluateEsrReadiness(READY);
+    expect(report.blocked).toBe(false);
+    expect(report.blockers).toHaveLength(0);
+    expect(report.summary).toMatch(/can be closed/);
+  });
+
+  test('the state E11.3 is actually in — four blockers, named', () => {
+    const report = evaluateEsrReadiness({
+      ...READY,
+      isFixture: true,
+      rosterSize: 10,
+      undeliverable: 10,
+      sendReceipt: null,
+      responseCount: 0,
+      accuracy: 0.8,
+      today: '2026-09-08',
+      deadline: '2026-09-21',
+    });
+    expect(report.blocked).toBe(true);
+    expect(report.blockers.map((b) => b.id)).toEqual(['roster', 'survey-sent', 'responses', 'accuracy']);
+    // Every blocker has to tell a human what clears it, otherwise the gate is just an alarm.
+    for (const blocker of report.blockers) expect(blocker.fix).not.toBe('');
+  });
+
+  test('the self-test response file cannot close the criterion even when it scores ≥ 85%', () => {
+    const report = evaluateEsrReadiness({ ...READY, responsesAreSelfTest: true, responseCount: 8, accuracy: 0.85 });
+    expect(report.checks.find((c) => c.id === 'accuracy')?.severity).toBe('ok');
+    expect(report.blockers.map((b) => b.id)).toEqual(['responses']);
+  });
+
+  test('an unreachable database reads as "cannot verify", never as a pass', () => {
+    const report = evaluateEsrReadiness({ ...READY, dbRows: null });
+    const check = report.checks.find((c) => c.id === 'fixture-db')!;
+    expect(check.severity).toBe('warn');
+    expect(check.detail).toMatch(/cannot verify/);
+    expect(report.blocked).toBe(false);
+  });
+
+  test('a partly seeded fixture blocks and names the idempotent repair', () => {
+    const report = evaluateEsrReadiness({
+      ...READY,
+      dbRows: { opportunities: 20, proposals: 0, gateDecisions: 20, cordisProjects: 20 },
+    });
+    const check = report.checks.find((c) => c.id === 'fixture-db')!;
+    expect(check.severity).toBe('blocked');
+    expect(check.fix).toMatch(/--apply/);
+  });
+
+  test('a deadline nobody was sent is a warning, not a pass', () => {
+    const report = evaluateEsrReadiness({ ...READY, sendReceipt: null });
+    expect(report.checks.find((c) => c.id === 'deadline')?.severity).toBe('warn');
+  });
+
+  test('daysBetween counts whole days in both directions', () => {
+    expect(daysBetween('2026-09-08', '2026-09-21')).toBe(13);
+    expect(daysBetween('2026-09-21', '2026-09-08')).toBe(-13);
+    expect(daysBetween('2026-09-08', '2026-09-08')).toBe(0);
+  });
+});
+
+describe('E11.3 survey send receipt', () => {
+  test('an address is masked down to one visible character', () => {
+    expect(maskEmail('partner@fabrika.example')).toBe('p******@fabrika.example');
+    expect(maskEmail('a@fabrika.example')).toBe('a*@fabrika.example');
+    expect(maskEmail('not-an-address')).toBe('***');
+    expect(maskEmail('@fabrika.example')).toBe('***');
+  });
+
+  test('a receipt round-trips', () => {
+    const receipt = {
+      sentAt: '2026-09-10T09:00:00.000Z',
+      deadline: '2026-09-24',
+      ruleVersion: 'g0-canonical-1.0',
+      rosterPath: '(external)',
+      recipients: [
+        { slug: 'p1', emailMasked: 'p*@partner.example', messageId: 'abc', items: 4, sentAt: '2026-09-10T09:00:00.000Z' },
+      ],
+    };
+    expect(parseSendReceipt(JSON.stringify(receipt))).toEqual(receipt);
+  });
+
+  test('an unusable receipt reads as no proof of a send, not as a crash', () => {
+    expect(parseSendReceipt('{ truncated')).toBeNull();
+    expect(parseSendReceipt('null')).toBeNull();
+    expect(parseSendReceipt('{"sentAt":"2026-09-10T09:00:00.000Z"}')).toBeNull();
+    expect(parseSendReceipt('{"sentAt":"2026-09-10T09:00:00.000Z","recipients":[]}')).toBeNull();
   });
 });

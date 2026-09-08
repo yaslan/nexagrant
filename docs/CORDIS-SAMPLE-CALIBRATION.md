@@ -1,7 +1,7 @@
 # CORDIS örnek seti — G0 ↔ ESR kalibrasyonu
 
 > Üretilmiş dosya. Elle düzenlemeyin; `pnpm tsx scripts/esr-calibration.ts` yeniden üretir.
-> Üretim zamanı: 2026-09-08T16:47:55.997Z · Kural sürümü: `g0-canonical-1.0` · Örnek seti: `docs/BETA_DATA/esr-calibration-samples.csv`
+> Üretim zamanı: 2026-09-08T17:05:16.611Z · Kural sürümü: `g0-canonical-1.0` · Örnek seti: `docs/BETA_DATA/esr-calibration-samples.csv`
 
 > ⚠️ **Bu koşu KÜRATE EDİLMİŞ bir fixture üzerinde yapıldı** (tüm `cordisProjectId` değerleri rezerve
 > `SAMPLE-*` ad alanında). Buradaki doğruluk oranı **kalibrasyon hattının** çalıştığını gösterir;
@@ -159,3 +159,10 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 | Ortak anketi gönderilmiş | ❌ GÖNDERİLMEDİ — roster'daki 10 adres teslim edilemez alan adında (`.invalid`); `--send` reddediyor. Gerçek roster girilmeden yanıt gelmez. |
 
 > Bu tablodaki doğruluk satırı fixture üzerinden okunmuştur; kabul kriteri gerçek ESR verisiyle tekrar ölçülmeden **kapatılmamalıdır**.
+
+> Bu tablo bu koşumun fotoğrafıdır ve eskir. Kriterin **şu anda** kapatılıp kapatılamayacağını
+> makineye sordurun — hiçbir şey yazmaz, bloke varken 1 ile çıkar:
+>
+> ```bash
+> pnpm beta:esr-preflight
+> ```

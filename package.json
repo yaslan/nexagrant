@@ -31,6 +31,7 @@
     "beta:pricing": "tsx scripts/beta-pricing-survey.ts",
     "beta:esr-calibration": "tsx scripts/esr-calibration.ts",
     "beta:esr-calibration:rollback": "tsx scripts/esr-calibration.ts --rollback",
+    "beta:esr-preflight": "tsx scripts/esr-calibration.ts --preflight",
     "a11y:check": "tsx scripts/a11y-check.ts",
     "jobs:g0-rescore": "tsx scripts/rescore-g0.ts",
     "db:backfill-plan-version": "tsx scripts/backfill-subscription-plan-version.ts",

@@ -23,6 +23,7 @@
  *   sent cannot be recalled.
  *
  * Usage
+ *   pnpm tsx scripts/esr-calibration.ts --preflight              # read-only: can E11.3 be closed?
  *   pnpm tsx scripts/esr-calibration.ts                          # dry run: score + report only
  *   pnpm tsx scripts/esr-calibration.ts --apply                  # …and write the samples to the DB
  *   pnpm tsx scripts/esr-calibration.ts --apply --survey         # …and render the partner survey
@@ -31,6 +32,9 @@
  *   pnpm tsx scripts/esr-calibration.ts --rollback --apply       # undo
  *
  * Flags
+ *   --preflight         read-only readiness gate: prints every precondition of the E11.3 acceptance
+ *                       criterion and exits 1 while any of them blocks. Writes nothing, sends
+ *                       nothing, and refuses to combine with --apply/--survey/--send/--rollback.
  *   --samples=<path>    default docs/BETA_DATA/esr-calibration-samples.csv
  *   --roster=<path>     default docs/BETA_DATA/beta-partners.csv
  *   --responses=<path>  partner verdicts; when given they override the provisional labels
@@ -70,6 +74,13 @@ import {
 import { isFixtureSampleSet, parseEsrSamples, type EsrSample } from '../src/lib/beta/esr-samples';
 import { parseBetaRoster, isPlaceholderEmail, type BetaPartner } from '../src/lib/beta/roster';
 import {
+  maskEmail,
+  parseSendReceipt,
+  type SurveySendReceipt,
+  type SurveySendRecipient,
+} from '../src/lib/beta/esr-send-receipt';
+import { evaluateEsrReadiness, type CalibrationRowCounts } from '../src/lib/beta/esr-readiness';
+import {
   assignSamplesToPartners,
   buildResponseTemplateCsv,
   coveragePerSample,
@@ -100,6 +111,7 @@ interface Options {
   survey: boolean;
   send: boolean;
   rollback: boolean;
+  preflight: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -115,10 +127,12 @@ function parseArgs(argv: string[]): Options {
     survey: false,
     send: false,
     rollback: false,
+    preflight: false,
   };
 
   for (const arg of argv) {
     if (arg === '--apply') opts.apply = true;
+    else if (arg === '--preflight') opts.preflight = true;
     else if (arg === '--dry-run') opts.apply = false;
     else if (arg === '--survey') opts.survey = true;
     else if (arg === '--send') opts.send = true;
@@ -141,6 +155,12 @@ function parseArgs(argv: string[]): Options {
     }
   }
   if (opts.send && !opts.survey) throw new Error('--send requires --survey');
+  // The preflight is a read-only gate. Letting it combine with a mode that writes would make its
+  // one guarantee — "running this changes nothing" — untrue, so the combination is refused rather
+  // than silently ignored.
+  if (opts.preflight && (opts.apply || opts.survey || opts.send || opts.rollback)) {
+    throw new Error('--preflight is read-only and cannot be combined with --apply, --survey, --send or --rollback');
+  }
   return opts;
 }
 
@@ -169,6 +189,40 @@ function scoreAll(samples: EsrSample[], rules: G0Rules): ScoredSample[] {
       correct: result.decision === sample.expertLabel,
     };
   });
+}
+
+/**
+ * The committed response sheet is a harness self-test, not partner answers, and its own header says
+ * so. Detecting it by that header rather than by filename means a copy of the file cannot be passed
+ * off as a finding just by renaming it.
+ */
+const SELF_TEST_MARKER = 'HARNESS SELF-TEST';
+
+interface RelabelResult {
+  effective: EsrSample[];
+  responses: SurveyResponse[];
+  relabelled: string[];
+  isSelfTest: boolean;
+}
+
+/** Fold partner verdicts into the sample labels. Pure apart from reading the responses file. */
+function applyResponses(samples: EsrSample[], responsesPath: string | null): RelabelResult {
+  if (!responsesPath) return { effective: samples, responses: [], relabelled: [], isSelfTest: false };
+
+  const raw = fs.readFileSync(responsesPath, 'utf8');
+  const responses = parseSurveyResponses(raw);
+  const relabelled: string[] = [];
+  const provisional = scoreAll(samples, DEFAULT_G0_RULES);
+  const predicted = new Map(provisional.map((s) => [s.sample.sampleId, s.predicted]));
+  const rollups = rollUpVerdicts(responses, predicted);
+  const effective = samples.map((sample) => {
+    const rollup = rollups.find((r) => r.sampleId === sample.sampleId);
+    if (!rollup?.majority || rollup.majority === sample.expertLabel) return sample;
+    relabelled.push(`${sample.sampleId} ${sample.expertLabel}→${rollup.majority}`);
+    return { ...sample, expertLabel: rollup.majority, labelSource: 'beta-survey' as const };
+  });
+  log('responses', `${responses.length} verdicts, ${relabelled.length} label(s) changed`);
+  return { effective, responses, relabelled, isSelfTest: raw.includes(SELF_TEST_MARKER) };
 }
 
 function toPredictions(scored: ScoredSample[]): LabelledPrediction[] {
@@ -608,27 +662,121 @@ ${
     ? '> Bu tablodaki doğruluk satırı fixture üzerinden okunmuştur; kabul kriteri gerçek ESR verisiyle tekrar ölçülmeden **kapatılmamalıdır**.'
     : ''
 }
+
+> Bu tablo bu koşumun fotoğrafıdır ve eskir. Kriterin **şu anda** kapatılıp kapatılamayacağını
+> makineye sordurun — hiçbir şey yazmaz, bloke varken 1 ile çıkar:
+>
+> \`\`\`bash
+> pnpm beta:esr-preflight
+> \`\`\`
 `;
+}
+
+// ───────────────────────── send receipt & preflight ─────────────────────────
+
+function receiptPath(opts: Options): string {
+  return path.join(opts.out, 'survey', 'send-receipt.json');
+}
+
+/**
+ * Record what actually left the building.
+ *
+ * Deliberately NOT deleted by `--rollback`: the tenant rows can be dropped and re-seeded, but mail
+ * that reached ten partners cannot be un-sent, and erasing the only proof it happened would make
+ * the next preflight lie.
+ */
+function writeSendReceipt(opts: Options, recipients: SurveySendRecipient[]): void {
+  const receipt: SurveySendReceipt = {
+    sentAt: new Date().toISOString(),
+    deadline: opts.deadline,
+    ruleVersion: RULE_VERSION,
+    rosterPath: path.relative(REPO_ROOT, opts.roster),
+    recipients,
+  };
+  fs.writeFileSync(receiptPath(opts), `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+}
+
+function readSendReceipt(opts: Options): SurveySendReceipt | null {
+  const file = receiptPath(opts);
+  if (!fs.existsSync(file)) return null;
+  return parseSendReceipt(fs.readFileSync(file, 'utf8'));
+}
+
+/**
+ * Read-only readiness gate. Writes nothing, sends nothing, touches no database row; exits non-zero
+ * while the E11.3 acceptance criterion cannot honestly be closed.
+ */
+async function runPreflight(opts: Options): Promise<boolean> {
+  const samples = parseEsrSamples(fs.readFileSync(opts.samples, 'utf8'));
+  const isFixture = isFixtureSampleSet(samples);
+  const { effective, responses, isSelfTest } = applyResponses(samples, opts.responses);
+  const scored = scoreAll(effective, DEFAULT_G0_RULES);
+  const accuracy = metrics(toPredictions(scored)).accuracy;
+
+  const partners: BetaPartner[] = fs.existsSync(opts.roster)
+    ? parseBetaRoster(fs.readFileSync(opts.roster, 'utf8'))
+    : [];
+
+  // An unreachable database must read as "cannot verify", never as a pass.
+  let dbRows: CalibrationRowCounts | null = null;
+  try {
+    dbRows = await countCalibrationRows();
+  } catch (err) {
+    log('db', `unreachable — ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  const report = evaluateEsrReadiness({
+    sampleCount: samples.length,
+    isFixture,
+    dbRows,
+    rosterSize: partners.length,
+    undeliverable: partners.filter((p) => isPlaceholderEmail(p.contactEmail)).length,
+    sendReceipt: readSendReceipt(opts),
+    responseCount: responses.length,
+    responsesAreSelfTest: isSelfTest,
+    accuracy: accuracy ?? null,
+    deadline: opts.deadline,
+    today: new Date().toISOString().slice(0, 10),
+  });
+
+  console.log('');
+  for (const check of report.checks) {
+    const mark = check.severity === 'ok' ? '✅' : check.severity === 'warn' ? '⚠️ ' : '❌';
+    console.log(`${mark} ${check.label} — ${check.detail}`);
+    if (check.fix) console.log(`      → ${check.fix}`);
+  }
+  console.log('');
+  console.log(report.blocked ? `❌ ${report.summary}` : `✅ ${report.summary}`);
+  return report.blocked;
 }
 
 // ───────────────────────── main ─────────────────────────
 
-async function main(): Promise<void> {
+/** Resolves to the process exit code: 0 when everything the run was asked to do succeeded. */
+async function main(): Promise<number> {
   const opts = parseArgs(process.argv.slice(2));
 
   console.log('🎯 ESR calibration (E11.3)');
-  console.log(`   mode      : ${opts.rollback ? 'ROLLBACK' : opts.apply ? 'APPLY' : 'DRY RUN'}`);
+  console.log(
+    `   mode      : ${opts.preflight ? 'PREFLIGHT (read-only)' : opts.rollback ? 'ROLLBACK' : opts.apply ? 'APPLY' : 'DRY RUN'}`,
+  );
   console.log(`   samples   : ${path.relative(REPO_ROOT, opts.samples)}`);
-  console.log(`   report    : ${path.relative(REPO_ROOT, opts.report)}`);
+  console.log(`   roster    : ${path.relative(REPO_ROOT, opts.roster)}`);
+  if (!opts.preflight) console.log(`   report    : ${path.relative(REPO_ROOT, opts.report)}`);
   console.log('');
+
+  if (opts.preflight) {
+    const blocked = await runPreflight(opts);
+    return blocked ? 1 : 0;
+  }
 
   if (opts.rollback) {
     if (!opts.apply) {
       console.log('   --rollback without --apply does nothing. Re-run with --apply to delete.');
-      return;
+      return 0;
     }
     await rollback();
-    return;
+    return 0;
   }
 
   const samples = parseEsrSamples(fs.readFileSync(opts.samples, 'utf8'));
@@ -636,22 +784,7 @@ async function main(): Promise<void> {
   log('samples', `${samples.length} parsed${isFixture ? ' — CURATED FIXTURE (SAMPLE-* ids)' : ''}`);
 
   // Partner verdicts, when present, replace the provisional labels before anything is measured.
-  let responses: SurveyResponse[] = [];
-  const relabelled: string[] = [];
-  let effective = samples;
-  if (opts.responses) {
-    responses = parseSurveyResponses(fs.readFileSync(opts.responses, 'utf8'));
-    const provisional = scoreAll(samples, DEFAULT_G0_RULES);
-    const predicted = new Map(provisional.map((s) => [s.sample.sampleId, s.predicted]));
-    const rollups = rollUpVerdicts(responses, predicted);
-    effective = samples.map((sample) => {
-      const rollup = rollups.find((r) => r.sampleId === sample.sampleId);
-      if (!rollup?.majority || rollup.majority === sample.expertLabel) return sample;
-      relabelled.push(`${sample.sampleId} ${sample.expertLabel}→${rollup.majority}`);
-      return { ...sample, expertLabel: rollup.majority, labelSource: 'beta-survey' as const };
-    });
-    log('responses', `${responses.length} verdicts, ${relabelled.length} label(s) changed`);
-  }
+  const { effective, responses, relabelled } = applyResponses(samples, opts.responses);
 
   const scoredDefault = scoreAll(effective, DEFAULT_G0_RULES);
   const scoredLiteral = scoreAll(effective, SPEC_LITERAL_G0_RULES);
@@ -694,6 +827,9 @@ async function main(): Promise<void> {
       }
     }
     fs.mkdirSync(path.join(opts.out, 'survey'), { recursive: true });
+    // Written after every accepted send, not once at the end: a provider rejection half way through
+    // still leaves a record of who already received mail that cannot be recalled.
+    const sentRecipients: SurveySendRecipient[] = [];
     for (const assignment of assignments) {
       const email = renderEsrSurveyEmail({
         locale: assignment.partner.locale,
@@ -716,15 +852,23 @@ async function main(): Promise<void> {
         if (!apiKey) throw new Error('--send requires RESEND_API_KEY in the environment');
         const { Resend } = await import('resend');
         const resend = new Resend(apiKey);
-        const { error } = await resend.emails.send({
+        const { data, error } = await resend.emails.send({
           from: process.env.EMAIL_FROM ?? `Fabrika Beta <${BETA_SUPPORT_EMAIL}>`,
           to: assignment.partner.contactEmail,
           subject: email.subject,
           html: email.html,
           text: email.text,
         });
-        if (error) throw new Error(`Resend rejected ${assignment.partner.contactEmail}: ${error.message}`);
-        log('survey', `${assignment.partner.contactEmail}: sent (${assignment.items.length} items)`);
+        if (error) throw new Error(`Resend rejected ${maskEmail(assignment.partner.contactEmail)}: ${error.message}`);
+        sentRecipients.push({
+          slug: assignment.partner.slug,
+          emailMasked: maskEmail(assignment.partner.contactEmail),
+          messageId: data?.id ?? null,
+          items: assignment.items.length,
+          sentAt: new Date().toISOString(),
+        });
+        writeSendReceipt(opts, sentRecipients);
+        log('survey', `${assignment.partner.slug} (${maskEmail(assignment.partner.contactEmail)}): sent (${assignment.items.length} items)`);
       } else {
         log(
           'survey',
@@ -793,11 +937,14 @@ async function main(): Promise<void> {
     'utf8',
   );
   log('report', `written → ${path.relative(REPO_ROOT, path.join(opts.out, 'calibration-summary.json'))}`);
+  return 0;
 }
 
 main()
-  .then(() => prisma.$disconnect())
-  .then(() => process.exit(0))
+  .then(async (code) => {
+    await prisma.$disconnect();
+    process.exit(code);
+  })
   .catch(async (err) => {
     console.error('❌', err instanceof Error ? err.message : err);
     await prisma.$disconnect().catch(() => {});
