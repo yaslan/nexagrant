@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 
@@ -55,7 +56,18 @@ import { describe, it, expect } from 'vitest';
  * way; none of them was broken when the check went in, so this closes the hole
  * rather than fixing a live bug.
  *
- * So there are now two guards, both repo-wide over `src/`:
+ * TASK-MTSJK8VVG9MKM widened the *scope* rather than the grammar. Both guards
+ * read `src/` only, so the code the product runs was checked and the code we
+ * run — `prisma/seed-*.ts`, `scripts/seed-*-e2e.ts`, one-off maintenance
+ * scripts — was not. `prisma/seed-m6-evaluations.ts` had been writing
+ * `Opportunity.callId`, `Proposal.status` and `Proposal.title`, none of which
+ * the schema declares, since the day it was written: `pnpm test` never looked,
+ * `pnpm typecheck` cannot see columns through prisma-override.d.ts, and the
+ * file is not on any happy path, so it sat there until someone ran it and got
+ * PrismaClientValidationError. Seeds and scripts talk to the same database the
+ * product does; they get the same gate.
+ *
+ * So there are now two guards, both over `src/`, `prisma/` and `scripts/`:
  *
  * 1. The field-level check — model, relation *and* column names, including
  *    compound-key members, in read arguments *and* write bodies.
@@ -77,13 +89,19 @@ import { describe, it, expect } from 'vitest';
 const REPO = resolve(__dirname, '../../../..');
 
 /**
- * What the field-level check reads. Repo-wide since TASK-MTRKVWOGQFSO3 — the
- * M8-only list it replaced is exactly why M2's phantom `include`s shipped.
+ * What both checks read. Repo-wide since TASK-MTRKVWOGQFSO3 — the M8-only list
+ * it replaced is exactly why M2's phantom `include`s shipped.
+ *
+ * TASK-MTSJK8VVG9MKM added `prisma` and `scripts`. `src` alone meant the gate
+ * only saw the code the *user* runs; the code *we* run — seeds, one-off
+ * maintenance scripts, e2e fixtures — wrote to whatever column it liked.
+ * `prisma/seed-m6-evaluations.ts` had been naming three columns the schema does
+ * not declare (`Opportunity.callId`, `Proposal.status`, `Proposal.title`) since
+ * it was written; nothing failed, because no gate looked there and
+ * prisma-override.d.ts hides it from `pnpm typecheck`. It throws
+ * PrismaClientValidationError the moment anyone runs it.
  */
-const SCANNED = ['src'];
-
-/** Everything the repo-wide sweep looks at. */
-const SWEEP_ROOT = 'src';
+const SCANNED = ['src', 'prisma', 'scripts'];
 
 /**
  * Files allowed to call a model prisma/schema.prisma does not declare, with the
@@ -217,14 +235,51 @@ function delegateToModel(delegate: string): string {
   return delegate.charAt(0).toUpperCase() + delegate.slice(1);
 }
 
+/**
+ * Paths git has in its index, repo-relative — or `null` when git cannot answer.
+ *
+ * The gate checks what the repository *contains*, not whatever happens to be
+ * lying in the working tree. TASK-MTSJK8VVG9MKM added `scripts/`, and the first
+ * widened run tripped over `scripts/_cs-st6-probe3.ts`, an untracked debugging
+ * probe another agent had open at that moment. A gate whose colour depends on
+ * one machine's scratch files is red here, green in CI, and trusted nowhere.
+ *
+ * The index, not the commit: `git ls-files -c` lists staged additions too, so a
+ * new file is scanned as soon as it is `git add`ed — which is exactly when the
+ * pre-commit hook runs the gate. Untracked debris is never scanned, and it is
+ * also never shipped.
+ */
+function trackedFiles(): Set<string> | null {
+  const git = spawnSync('git', ['ls-files', '-c', '-z', '--', ...SCANNED], {
+    cwd: REPO,
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  if (git.status !== 0 || typeof git.stdout !== 'string') return null;
+  const paths = git.stdout.split('\0').filter(Boolean);
+  // An empty answer means the checkout is not a repo (or SCANNED is wrong).
+  // Scanning everything is the safe failure; scanning nothing is the vacuous one.
+  return paths.length > 0 ? new Set(paths) : null;
+}
+
+/**
+ * Null when git is unavailable (a tarball, a vendored copy) — over-scanning is
+ * the safe direction, so the walk falls back to the whole tree.
+ */
+const TRACKED = trackedFiles();
+
 function listFiles(target: string): string[] {
   const abs = join(REPO, target);
   if (!statSync(abs).isDirectory()) return [abs];
   const out: string[] = [];
   for (const entry of readdirSync(abs)) {
     const child = join(abs, entry);
-    if (statSync(child).isDirectory()) out.push(...listFiles(join(target, entry)));
-    else if (/\.(ts|tsx)$/.test(entry) && !entry.endsWith('.test.ts')) out.push(child);
+    const rel = join(target, entry);
+    if (statSync(child).isDirectory()) out.push(...listFiles(rel));
+    else if (/\.(ts|tsx)$/.test(entry) && !entry.endsWith('.test.ts')) {
+      if (TRACKED && !TRACKED.has(rel)) continue;
+      out.push(child);
+    }
   }
   return out;
 }
@@ -608,7 +663,7 @@ function scan(models: Map<string, Map<string, Field>>): Problem[] {
 function sweepModelCalls(): Map<string, Set<string>> {
   const found = new Map<string, Set<string>>();
 
-  for (const file of listFiles(SWEEP_ROOT)) {
+  for (const file of scannedFiles()) {
     const callRe = new RegExp(CALL_SOURCE, 'g');
     const source = stripComments(readFileSync(file, 'utf8'));
     const rel = file.slice(REPO.length + 1);
@@ -624,7 +679,7 @@ function sweepModelCalls(): Map<string, Set<string>> {
   return found;
 }
 
-describe('every Prisma query in src/ matches prisma/schema.prisma', () => {
+describe('every Prisma query in src/, prisma/ and scripts/ matches prisma/schema.prisma', () => {
   const models = parseSchema();
 
   it('parses the schema it is validating against', () => {
@@ -656,6 +711,28 @@ describe('every Prisma query in src/ matches prisma/schema.prisma', () => {
     expect(walked.has('src/modules/m8/server/matching.ts')).toBe(true);
     expect(walked.has('src/lib/inngest/jobs/alerts-daily.ts')).toBe(true);
     expect(walked.has('src/modules/m2/server/actions.ts')).toBe(true);
+    // TASK-MTSJK8VVG9MKM. Pin one file per added root: a `SCANNED` entry that
+    // silently resolved to nothing would leave the new coverage imaginary.
+    expect(walked.has('prisma/seed-m6-evaluations.ts')).toBe(true);
+    expect(walked.has('prisma/seed.ts')).toBe(true);
+    expect(walked.has('scripts/seed-m6-e2e.ts')).toBe(true);
+  });
+
+  it('reads the git index, not the working tree', () => {
+    // An untracked scratch probe is not part of the repo and CI never sees it,
+    // so it must not decide whether the gate is red — the first widened run
+    // tripped over one another agent had open. Staged additions *are* in the
+    // index, so a new file is covered from the moment it is `git add`ed.
+    expect(TRACKED, 'git ls-files answered nothing — the scope check is vacuous').not.toBeNull();
+    const untracked = spawnSync('git', ['ls-files', '-o', '--exclude-standard', '-z', '--', ...SCANNED], {
+      cwd: REPO,
+      encoding: 'utf8',
+    });
+    const loose = (untracked.stdout ?? '')
+      .split('\0')
+      .filter((f) => /\.(ts|tsx)$/.test(f) && !f.endsWith('.test.ts'));
+    const walked = new Set(scannedFiles().map((f) => f.slice(REPO.length + 1)));
+    expect(loose.filter((f) => walked.has(f))).toEqual([]);
   });
 
   it('follows a query hoisted into a const', () => {
@@ -756,8 +833,8 @@ describe('every Prisma query in src/ matches prisma/schema.prisma', () => {
 
   it('actually walks the write bodies in src/', () => {
     // Same guard as the read side: a parser that silently walked nothing would
-    // report a clean repo. src/ has ~148 write calls; pin it well under that so
-    // the number is a floor, not a moving target.
+    // report a clean repo. The scanned roots hold ~180 write calls; pin it well
+    // under that so the number is a floor, not a moving target.
     scan(models);
     expect(writeBodiesWalked).toBeGreaterThan(100);
   });
@@ -822,7 +899,7 @@ describe('every Prisma query in src/ matches prisma/schema.prisma', () => {
   });
 });
 
-describe('no Prisma call in src/ names a model the schema does not have', () => {
+describe('no Prisma call in src/, prisma/ or scripts/ names a model the schema does not have', () => {
   const models = parseSchema();
 
   it('actually reads the queries it is checking', () => {
@@ -835,6 +912,9 @@ describe('no Prisma call in src/ names a model the schema does not have', () => 
     expect(
       found.get('src/app/api/v1/partners/[pic]/route.ts')?.has('CordisParticipation')
     ).toBe(true);
+    // TASK-MTSJK8VVG9MKM — the sweep reaches the new roots too.
+    expect(found.get('prisma/seed-m6-evaluations.ts')?.has('Evaluation')).toBe(true);
+    expect(found.get('scripts/seed-m6-e2e.ts')?.has('Evaluation')).toBe(true);
   });
 
   it('has no unknown-model call outside the known-broken list', () => {

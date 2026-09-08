@@ -1,14 +1,18 @@
-import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
+import { prisma } from '../src/lib/db';
 
 /**
  * Seed M6 evaluation panel data for testing and development.
  * Creates 10 evaluations across 2 proposals, each with 2-3 reviewers
  * and full criterion/score data.
  *
- * Usage: npx ts-node prisma/seed-m6-evaluations.ts
+ * Usage: pnpm tsx prisma/seed-m6-evaluations.ts
+ *
+ * The client comes from src/lib/db, like every other seed here. A bare
+ * `new PrismaClient()` throws on construction under Prisma 7 — the driver
+ * adapter and the connection string both live in that module — so this file
+ * could not reach the database at all, never mind the columns below.
  */
-
-const prisma = new PrismaClient();
 
 // Prisma auto-generates IDs, but we provide consistent ones for testing
 function generateId(): string {
@@ -51,30 +55,40 @@ async function seedM6Evaluations() {
     update: {},
   });
 
-  const opportunity = await prisma.opportunity.upsert({
-    where: { id: 'opp-m6-demo' },
-    create: {
-      id: 'opp-m6-demo',
-      tenantId: actualTenantId,
-      workspaceId: workspace.id,
-      stage: 'G0',
-      title: 'Demo Opportunity for M6',
-      callId: 'call-demo',
-    },
-    update: {},
-  });
+  // Re-runnable: the rows below carry fixed ids and are created, not upserted,
+  // so a second run would collide on `Reviewer @@unique([evaluationId, userId])`
+  // before it wrote anything. Dropping this seed's own evaluations first cascades
+  // to their reviewers, criteria and scores and leaves the rest of the tenant
+  // alone.
+  await prisma.evaluation.deleteMany({ where: { id: { startsWith: 'eval-m6-' } } });
 
-  // Create 2 proposals to evaluate
+  // One opportunity per proposal: `Proposal.opportunityId` is `@unique`, so the
+  // two proposals cannot hang off a single opportunity. Hanging both off
+  // `opp-m6-demo` is what made this loop die on P2002 the first time it was run.
   const proposals = [];
   for (let p = 1; p <= 2; p++) {
+    const opportunity = await prisma.opportunity.upsert({
+      where: { id: `opp-m6-demo-${p}` },
+      create: {
+        id: `opp-m6-demo-${p}`,
+        tenantId: actualTenantId,
+        workspaceId: workspace.id,
+        stage: 'G0',
+        title: `Demo Opportunity ${p} for M6`,
+      },
+      update: {},
+    });
+
     const proposal = await prisma.proposal.upsert({
       where: { id: `prop-m6-${p}` },
       create: {
         id: `prop-m6-${p}`,
         tenantId: actualTenantId,
         opportunityId: opportunity.id,
-        status: 'draft',
-        title: `Proposal ${p}`,
+        // `model Proposal` carries no lifecycle column and no title: the label is
+        // `acronym`, and the state lives on the Evaluation rows below. Same shape
+        // as scripts/seed-m6-e2e.ts.
+        acronym: `PROP-${p}`,
         // ESR comparison data
         esrScores: {
           total: 12 + p, // 13 and 14 for proposals 1 and 2
@@ -100,7 +114,7 @@ async function seedM6Evaluations() {
         id: `eval-m6-${e}`,
         tenantId: actualTenantId,
         proposalId: proposal.id,
-        opportunityId: opportunity.id,
+        opportunityId: proposal.opportunityId,
         readerType: 'PANEL',
         status: e <= 5 ? 'completed' : 'in-progress', // First 5 are complete
       },
