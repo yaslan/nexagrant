@@ -150,3 +150,54 @@ export function convertCurrencyMinor(amountMinor: number, rate: number): number 
   }
   return Math.floor(result + 0.5);
 }
+
+/**
+ * The VAT on a VAT-exclusive price, in minor units.
+ *
+ * The single rounding rule for tax in this codebase. It existed in three places
+ * before — `invoice-writer.ts` (`Math.round(net * rate / 100)`), `efatura.ts`
+ * and `invoice-list.ts` — all agreeing by coincidence rather than by
+ * construction. A tax figure that differs by a kuruş between the document, the
+ * stored row and the billing panel is three different claims about one sale.
+ *
+ * Half-up on the exact product, like `convertCurrencyMinor`: `Math.round` in
+ * JavaScript rounds .5 towards +Infinity, which is the same thing for the
+ * non-negative amounts a sale can have, but saying it here means the rule does
+ * not depend on the reader knowing that.
+ *
+ * `ratePercent` of `0` is legitimate and returns 0 — a country that levies no
+ * VAT (Kuveyt) is not the same as a rate nobody configured, which
+ * `resolveVatRate` reports separately.
+ */
+export function vatOnNetMinor(netMinor: number, ratePercent: number): number {
+  if (!Number.isInteger(netMinor)) {
+    throw new Error(`Minor-unit amounts must be integers, got ${netMinor}`);
+  }
+  if (netMinor < 0) {
+    throw new Error(`VAT is computed on a non-negative price, got ${netMinor}`);
+  }
+  if (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent > 100) {
+    throw new Error(`VAT rate must be a percentage between 0 and 100, got ${ratePercent}`);
+  }
+  const exact = (netMinor * ratePercent) / 100;
+  if (!Number.isSafeInteger(Math.floor(exact + 0.5))) {
+    throw new Error(`VAT amount out of safe integer range: ${netMinor} at ${ratePercent}%`);
+  }
+  return Math.floor(exact + 0.5);
+}
+
+/**
+ * What a VAT-exclusive price actually costs: net, its VAT, and the total.
+ *
+ * Catalogue prices are VAT-exclusive since 2026-09-08, so this is the step
+ * between "the price on the pricing page" and "the amount a card is charged".
+ * Both sides of the sale go through it — checkout, so the charge includes the
+ * tax, and the invoice, so the document adds up to that same charge.
+ */
+export function grossFromNetMinor(
+  netMinor: number,
+  ratePercent: number
+): { netMinor: number; vatMinor: number; grossMinor: number } {
+  const vatMinor = vatOnNetMinor(netMinor, ratePercent);
+  return { netMinor, vatMinor, grossMinor: netMinor + vatMinor };
+}

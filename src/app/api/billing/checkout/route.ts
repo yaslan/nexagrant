@@ -11,6 +11,7 @@ import {
 } from '@/lib/billing/catalog';
 import { PlanNotAvailableError, priceLineForTenant } from '@/lib/billing/storefront';
 import { tierForTenant } from '@/lib/billing/tenant-tier';
+import { taxLineForTenant } from '@/lib/billing/checkout-tax';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const isLiveStripe = Boolean(stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.startsWith('sk_'));
@@ -204,6 +205,16 @@ export async function POST(req: Request) {
     const totalMinor = priced.reduce((sum, line) => sum + line.totalMinor, 0);
     const currency = priced[0]?.currency ?? 'USD';
 
+    // Catalogue prices are VAT-exclusive since 2026-09-08, so the charge is the
+    // catalogue total *plus* the tax of the buyer's country. Without this the
+    // "KDV hariç" label on the pricing page would be a claim the checkout
+    // contradicts, and the invoice — which adds the tax — would never reconcile
+    // with the receipt. A buyer whose tax country is unknown is charged the net
+    // total and, by the same rule, gets no invoice until the country is known
+    // (`vat_country_unknown`); that is one gap reported in two places, not a
+    // silent 0%.
+    const tax = await taxLineForTenant(tenantId, totalMinor);
+
     // Stripe credentials not live or missing: the client falls back to its demo
     // checkout modal. The server still returns the amounts it computed, so the
     // demo shows catalogue prices rather than whatever the browser believed.
@@ -219,7 +230,18 @@ export async function POST(req: Request) {
         priceLocked: locked,
         ignoredClientFields: clientPriceFields,
         currency,
+        // `totalMinor` stays the VAT-exclusive catalogue total: it is what the
+        // pricing page shows and what every existing caller reads. The tax and
+        // the amount actually charged are additional fields, not a redefinition
+        // of this one.
         totalMinor,
+        tax: {
+          country: tax.country,
+          ratePercent: tax.ratePercent,
+          vatMinor: tax.vatMinor,
+          resolved: tax.resolved,
+        },
+        grossTotalMinor: totalMinor + tax.vatMinor,
         lines: priced.map((line) => ({
           sku: line.sku,
           name: line.name,
@@ -249,6 +271,26 @@ export async function POST(req: Request) {
       quantity: line.quantity,
     }));
 
+    // The tax rides as its own line so the customer sees what they are paying
+    // it for, and so a zero-VAT country (Kuveyt) simply has no such line rather
+    // than a line reading 0.
+    if (tax.vatMinor > 0) {
+      lineItems.push({
+        price_data: {
+          currency: currency.toLowerCase(),
+          product_data: {
+            name: `KDV / VAT ${tax.ratePercent}% (${tax.country})`,
+            description: 'Katma Değer Vergisi — alıcının ülkesine göre',
+          },
+          unit_amount: tax.vatMinor,
+          ...(priced[0]?.recurringInterval
+            ? { recurring: { interval: priced[0].recurringInterval } }
+            : {}),
+        },
+        quantity: 1,
+      });
+    }
+
     const isSubscriptionMode = priced.some((line) => line.kind === 'plan');
 
     const checkoutSession = await stripe.checkout.sessions.create({
@@ -263,6 +305,10 @@ export async function POST(req: Request) {
         discountPercent: String(activeTier.percentOff),
         skus: priced.map((line) => line.sku).join(','),
         totalMinor: String(totalMinor),
+        vatCountry: tax.country ?? 'UNKNOWN',
+        vatRatePercent: String(tax.ratePercent),
+        vatMinor: String(tax.vatMinor),
+        grossTotalMinor: String(totalMinor + tax.vatMinor),
       },
       success_url: `${appUrl}/${locale}/${workspace}/settings/billing?success=true`,
       cancel_url: `${appUrl}/${locale}/${workspace}/settings/billing?canceled=true`,

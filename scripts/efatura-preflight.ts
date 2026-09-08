@@ -1,4 +1,5 @@
-import { parseVatRate } from '../src/lib/billing/vat-rate';
+import { resolveVatRate, retiredVatRateSetting } from '../src/lib/billing/vat-rate';
+import { chargeableVatCountries } from '../src/lib/billing/vat-rates';
 import { env } from '../src/lib/env';
 
 export interface PreflightVariableResult {
@@ -41,10 +42,25 @@ const OPTIONAL_SUPPLIER_VARS = [
  * The tax block. Its own block and not a sixth supplier field, because the two
  * fail in different places and the operator has to be told which: without the
  * supplier identity an `Invoice` row is still written and only its exported
- * document fails; without a VAT rate `createInvoiceForPayment` stops before
- * writing anything, so there is no row to export in the first place.
+ * document fails; without a usable VAT rate `createInvoiceForPayment` stops
+ * before writing anything, so there is no row to export in the first place.
+ *
+ * What this block checks changed on 2026-09-08. It used to check one variable,
+ * `INVOICE_VAT_RATE`. The boss decided the rate follows the **buyer's country**
+ * (Türkiye 20%, Kuveyt 0%), so a server-wide percentage cannot be the answer and
+ * the variable no longer decides anything.
+ *
+ * The gate therefore asks the question the writer will actually ask, through the
+ * very same resolver: can `src/lib/billing/vat-rates.ts` price a sale to the
+ * supplier's own country? If it cannot, no domestic customer can be invoiced,
+ * and that is worth failing go-live over. `INVOICE_VAT_RATE` is still listed —
+ * as *ignored* — because a deployment that still sets it would otherwise keep
+ * believing it works (TASK-MTT1WUUS7MN7R).
  */
-const REQUIRED_VAT_VARS = ['INVOICE_VAT_RATE'] as const;
+const RETIRED_VAT_VARS = ['INVOICE_VAT_RATE'] as const;
+
+/** Where the supplier is established; the country every domestic sale is taxed in. */
+const DEFAULT_SUPPLIER_COUNTRY = 'Türkiye';
 
 const REQUIRED_INTEGRATOR_VARS = [
   'EFATURA_INTEGRATOR_PROVIDER',
@@ -97,23 +113,42 @@ export function evaluatePreflight(envSource: Partial<Record<string, string | und
     });
   }
 
-  // Not "is it filled in" but the writer's own rule: `parseVatRate` is the
-  // single source both sides read, so a value this gate calls good is a value
-  // `createInvoiceForPayment` will also accept. A present-but-unusable value
-  // (`abc`, `-1`, `101`) is reported GEÇERSİZ rather than dolu — going green on
-  // one is the exact false green this check was added for.
+  // Not "is a variable filled in" but the writer's own rule, through the writer's
+  // own resolver: a rate this gate calls good is a rate `createInvoiceForPayment`
+  // will also accept, because both call `resolveVatRate`. Two copies of the rule
+  // is how a preflight goes green on something the writer then refuses.
+  const supplierCountry =
+    envSource.INVOICE_SUPPLIER_COUNTRY?.trim() || DEFAULT_SUPPLIER_COUNTRY;
+  const supplierVat = resolveVatRate(supplierCountry);
+
   const missingVatVars: string[] = [];
-  for (const v of REQUIRED_VAT_VARS) {
+  if (supplierVat.status !== 'resolved') {
+    // Named as a *table row*, not a variable, because that is what has to be
+    // added to fix it. An operator told to "set INVOICE_VAT_RATE" here would
+    // set it and stay broken.
+    missingVatVars.push(`vat-rates.ts:${supplierCountry}`);
+  }
+  results.push({
+    variable: `KDV oranı (${supplierCountry})`,
+    block: 'Vergi (KDV)',
+    required: true,
+    status: supplierVat.status === 'resolved' ? 'dolu' : 'EKSİK',
+    valueMasked:
+      supplierVat.status === 'resolved'
+        ? `%${supplierVat.ratePercent} (${supplierVat.country})`
+        : '(kaynaklı satır yok)',
+  });
+
+  // Reported, never required. A set value is a false belief worth naming.
+  for (const v of RETIRED_VAT_VARS) {
     const val = envSource[v as keyof typeof envSource];
-    const isSet = Boolean(val && val.trim().length > 0);
-    const parsed = parseVatRate(val);
-    if (parsed === null) missingVatVars.push(v);
+    const stillSet = retiredVatRateSetting(val) !== null || Boolean(val && val.trim().length > 0);
     results.push({
       variable: v,
       block: 'Vergi (KDV)',
-      required: true,
-      status: parsed !== null ? 'dolu' : isSet ? 'GEÇERSİZ' : 'EKSİK',
-      valueMasked: parsed !== null ? maskValue(v, val) : isSet ? `${val} (0-100 değil)` : '(EKSİK)',
+      required: false,
+      status: stillSet ? 'GEÇERSİZ' : 'EKSİK',
+      valueMasked: stillSet ? `${val} (YOK SAYILIR)` : '(kullanılmıyor)',
     });
   }
 
@@ -150,10 +185,14 @@ export function evaluatePreflight(envSource: Partial<Record<string, string | und
 
   // Three verdicts and not one, because the blocks fail at three different
   // points in the pipeline and each stop tells the operator something else.
+  // The green sentence stays exactly what it was. Where the rate comes from is
+  // an explanation, not a verdict, and it is printed on its own line below —
+  // widening the verdict would make every caller re-read a string that is meant
+  // to be stable.
   const invoiceRecordVerdict = vatConfigured
     ? 'Fatura kaydı oluşturulur'
-    : 'Fatura kaydı hiç oluşturulmaz: INVOICE_VAT_RATE 0-100 arası bir yüzde değil. ' +
-      'SystemAlert (vat_rate_not_configured) yazılır, ödeme etkilenmez';
+    : `Fatura kaydı hiç oluşturulmaz: ${supplierCountry} için src/lib/billing/vat-rates.ts içinde kaynaklı bir KDV oranı yok. ` +
+      'SystemAlert (invoice_vat_country_unknown) yazılır, ödeme etkilenmez';
 
   const documentGenVerdict = !vatConfigured
     ? 'Fatura belgesi de üretilmez, çünkü üretilecek kayıt yoktur'
@@ -206,6 +245,8 @@ export function printPreflightReport(report: PreflightReport): void {
   console.log('--- BLOK DEĞERLENDİRMESİ ---');
   console.log(`1. Satıcı Kimliği Bloğu : ${report.supplierConfigured ? '✅ TANIMLI (Fatura belgesi üretilebilir)' : `❌ EKSİK (${report.missingSupplierVars.join(', ')})`}`);
   console.log(`2. Vergi (KDV) Bloğu    : ${report.vatConfigured ? '✅ TANIMLI (Fatura kaydı yazılabilir)' : `❌ EKSİK (${report.missingVatVars.join(', ')})`}`);
+  console.log(`   ↳ KDV oranı artık ALICININ ÜLKESİNDEN gelir (kaynaklı ülkeler: ${chargeableVatCountries().join(', ')}).`);
+  console.log('     INVOICE_VAT_RATE yok sayılır; kaynaklı satırı olmayan ülkeye fatura KESİLMEZ.');
   console.log(`3. Entegratör Bloğu     : ${report.integratorConfigured ? '✅ TANIMLI (Entegratör bağlantısı kurulabilir)' : `❌ EKSİK (${report.missingIntegratorVars.join(', ')})`}`);
 
   console.log('\n--- SONUÇ HÜKMÜ ---');

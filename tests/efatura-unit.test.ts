@@ -16,7 +16,6 @@ import {
   isFiled,
   resolveIntegrator,
 } from '../src/lib/efatura-integrator';
-import { parseVatRate } from '../src/lib/billing/vat-rate';
 import { evaluatePreflight } from '../scripts/efatura-preflight';
 
 describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
@@ -263,17 +262,25 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
   });
 
   describe('Preflight Script Verification', () => {
-    test('Scenario (a): No env vars set -> no invoice record, no document, no GİB send', () => {
+    test('Scenario (a): No env vars set -> no document, no GİB send; the VAT block is not an env question', () => {
       const report = evaluatePreflight({});
 
       expect(report.supplierConfigured).toBe(false);
-      expect(report.vatConfigured).toBe(false);
       expect(report.integratorConfigured).toBe(false);
-      expect(report.invoiceRecordVerdict).toContain('Fatura kaydı hiç oluşturulmaz');
+
+      // Changed by TASK-MTT1WUUS7MN7R and worth stating plainly: an empty
+      // environment still knows what Turkish VAT is, because the rate lives in
+      // src/lib/billing/vat-rates.ts and the supplier country defaults to
+      // Türkiye. There is no longer a variable to forget here — which is the
+      // point of moving the rate out of the environment.
+      expect(report.vatConfigured).toBe(true);
+      expect(report.allMissingVars).not.toContain('INVOICE_VAT_RATE');
+
+      // A record can be written; the document and the filing still cannot.
+      expect(report.invoiceRecordVerdict).toBe('Fatura kaydı oluşturulur');
       expect(report.documentGenVerdict).toContain('üretilmez');
       expect(report.gibSendVerdict).toContain("GİB'e gönderilmez, sebep:");
       expect(report.allMissingVars).toContain('INVOICE_SUPPLIER_NAME');
-      expect(report.allMissingVars).toContain('INVOICE_VAT_RATE');
       expect(report.allMissingVars).toContain('EFATURA_INTEGRATOR_PROVIDER');
     });
 
@@ -324,10 +331,17 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
       );
     });
 
-    // The bug this block exists for: every other variable filled in and the
-    // gate green, while `createInvoiceForPayment` writes nothing at all
-    // because the VAT rate is missing or unusable (TASK-MTSYAKDK5LV9E).
-    describe('INVOICE_VAT_RATE is the thirteenth required variable', () => {
+    // The bug the original block existed for (TASK-MTSYAKDK5LV9E): every other
+    // variable filled in and the gate green, while `createInvoiceForPayment`
+    // writes nothing at all because the VAT rate is unusable. The bug is the
+    // same; what decides the rate is not.
+    //
+    // Since 2026-09-08 (TASK-MTT1WUUS7MN7R) the rate comes from the *buyer's*
+    // country, so `INVOICE_VAT_RATE` cannot be the thirteenth required variable
+    // — it is not required at all, and setting it changes nothing. The property
+    // worth pinning is unchanged: the gate and the writer read one rule, so the
+    // gate cannot go green on a sale the writer will refuse.
+    describe('the VAT block follows the buyer country table, not INVOICE_VAT_RATE', () => {
       const everythingElse = {
         INVOICE_SUPPLIER_NAME: 'Fabrika Yazılım A.Ş.',
         INVOICE_SUPPLIER_VKN: '3810459281',
@@ -341,47 +355,63 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
         EFATURA_INTEGRATOR_TEST_MODE: 'true',
       };
 
-      test('all twelve other variables set but VAT missing -> gate is red', () => {
+      test('with no INVOICE_VAT_RATE at all the gate is green: Türkiye has a sourced rate', () => {
         const report = evaluatePreflight(everythingElse);
 
         expect(report.supplierConfigured).toBe(true);
         expect(report.integratorConfigured).toBe(true);
-        expect(report.vatConfigured).toBe(false);
-        expect(report.allMissingVars).toEqual(['INVOICE_VAT_RATE']);
-        expect(report.gibSendVerdict).toContain('INVOICE_VAT_RATE');
-      });
-
-      test('the verdict names the record, the alert and the untouched payment', () => {
-        const report = evaluatePreflight(everythingElse);
-
-        expect(report.invoiceRecordVerdict).toContain('Fatura kaydı hiç oluşturulmaz');
-        expect(report.invoiceRecordVerdict).toContain('vat_rate_not_configured');
-        expect(report.invoiceRecordVerdict).toContain('ödeme etkilenmez');
-        expect(report.documentGenVerdict).toContain('üretilecek kayıt yoktur');
-      });
-
-      test.each(['abc', '-1', '101', '', '   ', 'NaN', '1e999'])(
-        'a value the invoice writer rejects (%j) is GEÇERSİZ here too, never dolu',
-        (raw) => {
-          const report = evaluatePreflight({ ...everythingElse, INVOICE_VAT_RATE: raw });
-
-          // The gate and the writer read one rule, so they cannot disagree.
-          expect(parseVatRate(raw)).toBeNull();
-          expect(report.vatConfigured).toBe(false);
-          expect(report.missingVatVars).toEqual(['INVOICE_VAT_RATE']);
-
-          const row = report.variableResults.find((r) => r.variable === 'INVOICE_VAT_RATE');
-          expect(row?.status).not.toBe('dolu');
-        }
-      );
-
-      test.each(['0', '20', ' 18 ', '100'])('a rate the writer accepts (%j) turns the gate green', (raw) => {
-        const report = evaluatePreflight({ ...everythingElse, INVOICE_VAT_RATE: raw });
-
-        expect(parseVatRate(raw)).not.toBeNull();
         expect(report.vatConfigured).toBe(true);
         expect(report.allMissingVars).toEqual([]);
         expect(report.gibSendVerdict).toBe("GİB'e gönderilir");
+      });
+
+      test.each(['abc', '-1', '101', '', '   ', 'NaN', '1e999', '20', '0'])(
+        'INVOICE_VAT_RATE=%j changes nothing — it no longer decides the rate',
+        (raw) => {
+          const report = evaluatePreflight({ ...everythingElse, INVOICE_VAT_RATE: raw });
+
+          expect(report.vatConfigured).toBe(true);
+          expect(report.allMissingVars).toEqual([]);
+        }
+      );
+
+      test('a set INVOICE_VAT_RATE is reported as ignored rather than passed over', () => {
+        // Silence would leave an operator believing a number they configured is
+        // the tax on their invoices. The row says otherwise, in the table they
+        // are already reading.
+        const report = evaluatePreflight({ ...everythingElse, INVOICE_VAT_RATE: '20' });
+
+        const row = report.variableResults.find((r) => r.variable === 'INVOICE_VAT_RATE');
+        expect(row).toBeDefined();
+        expect(row?.required).toBe(false);
+        expect(row?.valueMasked).toContain('YOK SAYILIR');
+      });
+
+      test('the resolved domestic rate is shown, so the operator can check it', () => {
+        const report = evaluatePreflight(everythingElse);
+
+        const row = report.variableResults.find((r) => r.variable.startsWith('KDV oranı'));
+        expect(row?.status).toBe('dolu');
+        expect(row?.valueMasked).toBe('%20 (TR)');
+        // The green verdict sentence is deliberately unchanged from before this
+        // rule landed; the rate itself is what the operator reads, in the row.
+        expect(report.invoiceRecordVerdict).toBe('Fatura kaydı oluşturulur');
+      });
+
+      test('a supplier country with no sourced rate turns the gate red and names the table', () => {
+        // Not a variable to set: the fix is a row with a source in
+        // src/lib/billing/vat-rates.ts, and the verdict has to say so.
+        const report = evaluatePreflight({
+          ...everythingElse,
+          INVOICE_SUPPLIER_COUNTRY: 'Ruritanya',
+        });
+
+        expect(report.vatConfigured).toBe(false);
+        expect(report.missingVatVars).toEqual(['vat-rates.ts:Ruritanya']);
+        expect(report.invoiceRecordVerdict).toContain('vat-rates.ts');
+        expect(report.invoiceRecordVerdict).toContain('invoice_vat_country_unknown');
+        expect(report.documentGenVerdict).toContain('üretilecek kayıt yoktur');
+        expect(report.gibSendVerdict).toContain('vat-rates.ts:Ruritanya');
       });
     });
   });

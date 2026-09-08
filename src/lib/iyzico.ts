@@ -746,8 +746,9 @@ export async function handleIyzicoWebhook(
         description: `${plan.name} (${interval === 'year' ? '1 yıl' : '1 ay'})`,
         paidAt: new Date(),
         provider: 'iyzico',
-      },
-      { vatRateRaw: env.INVOICE_VAT_RATE }
+      }
+      // No third argument: the VAT rate is no longer a server setting. It comes
+      // from the buyer's country inside the writer (boss decision 2026-09-08).
     );
 
     return {

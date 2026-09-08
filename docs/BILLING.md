@@ -11,6 +11,11 @@
 Para birimi **USD**, tutarlar cent (CLAUDE.md kural 9). Aşağıdaki fiyatlar
 **liste** fiyatıdır; kampanya indirimi ödeme anında uygulanır (§3).
 
+> **Bütün fiyatlar KDV HARİÇTİR.** KDV, ödeme adımında **alıcının ülkesine**
+> göre eklenir (Türkiye %20, Kuveyt %0). Bu tablodaki hiçbir rakam vergi
+> içermez; müşterinin kartından çekilen tutar liste fiyatı **artı** o ülkenin
+> KDV'sidir. Ayrıntı ve kaynaklar: §1.2. (Patron kararı, 2026-09-08.)
+
 | Plan id | Ad | Aylık liste | Yıllık liste | Aylık eşdeğeri (gösterim) | Koltuk | Çalışma alanı | YZ kredi/ay | Açtığı modüller |
 |---|---|---|---|---|---|---|---|---|
 | `free` | Discover | — | — | — | 1 | 1 | 10 | M3, M5 |
@@ -49,6 +54,77 @@ içindir; ödeme sağlayıcısına asla gönderilmez — gerekçesi katalog dosy
 > var, bu yüzden kimseyi etkilemiyor. USD'ye çevirmek yeni bir fiyat kararıdır;
 > uydurulmadı, karara bırakıldı. Yetkilendirme tarafı çalışmaya devam ediyor:
 > `grantsModule` alanları planın üstüne modül eklemeyi sürdürüyor.
+
+### 1.2 KDV — alıcının ülkesine göre (patron kararı, 2026-09-08)
+
+Fiyatlar KDV hariçtir ve KDV **alıcının ülkesine** göre eklenir. Tek bir sunucu
+ayarı (`INVOICE_VAT_RATE`) bunu ifade edemez: en fazla bir ülke için doğru olur,
+geri kalan her ülke için sessizce yanlıştır.
+
+**Oranın tek kaynağı `src/lib/billing/vat-rates.ts`'tir.** Her satır oranın
+yanında **kaynağını**, **yürürlük/veri tarihini** ve **rejimini** taşır; kaynağı
+olmayan ülke tabloda **yoktur**.
+
+**Oran bilmek, tahsil etmeye karar vermek DEĞİLDİR.** Bu yüzden her satırda bir
+`regime` alanı var: `standard` · `reverse_charge` · `exempt` · `unknown`.
+**Yalnız `standard` fatura kestirir**; diğer üçü, ülke tabloda olsa bile
+tabloda hiç yokmuş gibi davranır (fatura kesilmez + `SystemAlert`).
+
+| Ülke | Oran | Rejim | Tarih | Kaynak |
+|---|---|---|---|---|
+| TR | %20 | `standard` | 2023-07-10 | Cumhurbaşkanı Kararı 7346 (RG 32241, 2023-07-07) |
+| KW | %0 | `standard` | 2018-01-01 | GCC VAT Framework Agreement — Kuveyt uygulamaya koymadı, yürürlükte KDV yok |
+| 27 AB üyesi | %17 (LU) – %27 (HU) | `unknown` | veri tarihi 2026-01-26 | Tax Foundation "VAT Rates in Europe" ← EC *Taxes in Europe Database v4*; ayrıca euvat.dev ile bağımsız doğrulandı |
+
+AB üyeleri (patron, 2026-09-08) tabloya **girdi ama `unknown` rejimiyle**:
+bugün hiçbirine fatura kesilmiyor. Oranlar, rejim kararı çıktığı gün hafızadan
+yeniden türetilmesin diye burada duruyor. **Teknik tuzak: FI %25,5** — oran
+alanı tam sayı DEĞİLDİR (tutarlar yine minor unit tam sayı kalır; ondalıklı olan
+orandır).
+
+Kaynağı olmayan ülke eklenmez. Ülke eklemek = kaynağı, tarihi ve rejimi olan bir
+satır eklemek.
+
+**Bilinmeyen ülke bir cevaptır.** Varsayılan oran yoktur, en yakın komşuya
+düşme yoktur. Tabloda olmayan bir ülke "bu satışın vergisini bilmiyoruz"
+demektir ve `createInvoiceForPayment` fatura kesmez:
+`{ status: 'skipped', reason: 'vat_country_unknown' }` + `SystemAlert`
+(`invoice_vat_country_unknown`). Ödeme etkilenmez. Alert iki farklı boşluğu
+ayırır, çünkü çözümleri farklıdır: **satır yok** (`country_not_in_table` →
+kaynaklı satır ekle) ve **rejim kararı yok** (`regime_not_chargeable` → mali
+müşavir hükmü). Zaten tabloda olan bir ülke için "ülkeyi ekle" demek operatörü
+daire çizdirir. %20 varsaymak KDV'si olmayan
+bir ülkedeki alıcıdan fazla tahsil etmek, %0 varsaymak tahsil edilmemiş bir
+vergiyi üstlenmek olurdu — ikisi de mali belgeye uydurma rakam yazmaktır
+(ADR-0002'nin kur kuralıyla aynı felsefe).
+
+**Vergi ülkesi `TenantBillingIdentity`'den okunur, `Tenant.country`'den DEĞİL.**
+`Tenant.country` kiracının kendi beyanıdır ve hiçbir yerde doğrulanmaz; ona
+dayanmak, alıcının bir profil alanını değiştirerek kendi vergisini seçebilmesi
+demek olurdu. Fatura kimliği olmayan kiracıya zaten fatura kesilmiyor
+(`buyer_identity_missing`).
+
+**Nerede uygulanır:**
+
+| Yüzey | Ne yapar |
+|---|---|
+| `POST /api/billing/checkout` | Net toplamın üstüne KDV'yi ayrı bir kalem olarak ekler (`src/lib/billing/checkout-tax.ts`); yanıtta `totalMinor` **KDV hariç** kalır, `vatMinor` ve `grossTotalMinor` ayrıca döner |
+| `createInvoiceForPayment` | Tahsil edilen tutarı alıcının ülke oranıyla net + KDV'ye ayırır; oran çözülemezse fatura kesmez |
+| Fiyat ekranları | `billingPanels.*.vatExclusiveNote` — "Fiyatlar KDV hariçtir…" ibaresi (tr + en) |
+| `pnpm efatura:preflight` | KDV bloğu artık env değişkeni değil, satıcının ülkesi için tabloda kaynaklı satır olup olmadığını sorar |
+
+**`INVOICE_VAT_RATE` emekliye ayrıldı.** Artık hiçbir oranı belirlemiyor.
+Şemadan silinmedi ve preflight tablosunda **"YOK SAYILIR"** olarak
+raporlanıyor: hâlâ set eden bir kurulum, sessizlik yüzünden o sayının
+çalıştığını sanmaya devam ederdi.
+
+**Aritmetik tek yerde:** `vatOnNetMinor` / `grossFromNetMinor`
+(`src/lib/money.ts`), minor unit tam sayı, yarım-yukarı yuvarlama. Belge, kayıt
+ve fatura paneli aynı fonksiyonu çağırır; bir kuruşluk fark üç ayrı iddia olurdu.
+
+**Açık (mali müşavire sorulacak):** hizmet ihracatı istisnası ve AB B2B tersine
+yükümlülük (reverse charge) bu basit "alıcının ülkesi" kuralını değiştirebilir.
+Bkz. `docs/agent-results/ADR-0002-geli-tirici-2.md` §6.
 
 ### Kredi maliyeti (eylem başına)
 

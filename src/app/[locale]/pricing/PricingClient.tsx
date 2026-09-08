@@ -320,6 +320,17 @@ export default function PricingClient({
                         : t('monthlyBillingNote')}
                     </div>
 
+                    {/* Catalogue prices are VAT-exclusive (boss decision
+                        2026-09-08); the tax is added at checkout from the
+                        buyer's country. Saying so next to the figure is the
+                        only thing that keeps the headline price honest. */}
+                    <div
+                      data-testid="vat-exclusive-note"
+                      className="text-[11px] text-slate-400 mt-1 font-mono leading-relaxed"
+                    >
+                      {t('vatExclusiveNote')}
+                    </div>
+
                     <div className="mt-2 text-[10px] font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 rounded-lg p-2 flex items-center justify-between">
                       <span>{t('couponLabel', { code: charged.campaignCode })}</span>
                       <span>{t('renewalRate', { percent: charged.percentOff })}</span>

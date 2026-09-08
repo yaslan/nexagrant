@@ -427,6 +427,10 @@ export function BillingClient({
                           })
                         : t('monthlyBillingNote')}
                     </div>
+                    {/* See PricingClient: the price shown is net of VAT. */}
+                    <div data-testid="vat-exclusive-note" className="text-[10px] font-mono text-muted mt-1">
+                      {t('vatExclusiveNote')}
+                    </div>
                   </div>
 
                   <ul className="space-y-2 text-xs text-ink-2 pt-2 border-t border-border">

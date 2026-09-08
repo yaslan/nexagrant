@@ -6,10 +6,10 @@ import {
   isConvertibleCurrency,
   type TcmbRateResult,
 } from '@/lib/fx/tcmb';
-import { convertCurrencyMinor } from '@/lib/money';
+import { convertCurrencyMinor, vatOnNetMinor } from '@/lib/money';
 import { recordAlert } from '@/lib/observability/system-alert';
 
-import { parseVatRate } from './vat-rate';
+import { resolveVatRate } from './vat-rate';
 
 /**
  * Issuing the `Invoice` row a successful payment earns.
@@ -83,7 +83,8 @@ export type InvoiceWriteResult =
       status: 'skipped';
       reason:
         | 'buyer_identity_missing'
-        | 'vat_rate_not_configured'
+        /** No sourced VAT rate for the buyer's country (boss decision 2026-09-08). */
+        | 'vat_country_unknown'
         | 'amount_not_invoiceable'
         | 'number_allocation_failed'
         /** TCMB could not be read, so the TL equivalent is unknown (ADR-0002). */
@@ -130,8 +131,12 @@ function isUniqueViolation(error: unknown): boolean {
  * the rule itself lives in `./vat-rate` — `scripts/efatura-preflight.ts` has to
  * apply the very same check without loading the Prisma client that this file
  * pulls in. See that module for why it is not duplicated here.
+ *
+ * `parseVatRate` stays exported for the preflight's "this setting is now
+ * ignored" report; since 2026-09-08 nothing in this file reads it, because the
+ * rate comes from the buyer's country (`resolveVatRate`).
  */
-export { parseVatRate } from './vat-rate';
+export { parseVatRate, resolveVatRate } from './vat-rate';
 
 /**
  * A line as it is stored on the row; see `invoiceLineSchema` in the export route.
@@ -187,12 +192,12 @@ export function decomposeGrossAmount(
   let high = grossMinor;
   while (low < high) {
     const mid = Math.ceil((low + high) / 2);
-    if (mid + Math.round((mid * vatRate) / 100) <= grossMinor) low = mid;
+    if (mid + vatOnNetMinor(mid, vatRate) <= grossMinor) low = mid;
     else high = mid - 1;
   }
 
   const netMinor = low;
-  const vatMinor = Math.round((netMinor * vatRate) / 100);
+  const vatMinor = vatOnNetMinor(netMinor, vatRate);
   return { netMinor, vatMinor, roundingMinor: grossMinor - netMinor - vatMinor };
 }
 
@@ -336,7 +341,6 @@ export async function createInvoiceForPayment(
   db: InvoiceWriterDb,
   payment: PaymentForInvoice,
   options: {
-    vatRateRaw?: string | undefined;
     /**
      * How the TCMB rate is obtained. Injected only by tests and by the
      * disproof probe that takes the client away to prove issuing stops;
@@ -367,18 +371,9 @@ export async function createInvoiceForPayment(
     return { status: 'skipped', reason: 'amount_not_invoiceable' };
   }
 
-  const vatRate = parseVatRate(options.vatRateRaw);
-  if (vatRate === null) {
-    await recordAlert({
-      level: 'error',
-      source: 'invoice_not_issued',
-      message:
-        'INVOICE_VAT_RATE is not set to a percentage between 0 and 100, so the tax on a sale is unknown and no invoice can be issued. Payments are unaffected.',
-      meta: { provider, setting: 'INVOICE_VAT_RATE' },
-    });
-    return { status: 'skipped', reason: 'vat_rate_not_configured', missing: ['INVOICE_VAT_RATE'] };
-  }
-
+  // The buyer's identity is read before the tax rate, and that order is the
+  // change: since 2026-09-08 the rate is a fact about *this buyer's country*,
+  // so there is nothing to resolve until we know who bought.
   const identity = await db.tenantBillingIdentity.findUnique({
     where: { tenantId },
     select: {
@@ -408,6 +403,44 @@ export async function createInvoiceForPayment(
     });
     return { status: 'skipped', reason: 'buyer_identity_missing', missing: [...missing] };
   }
+
+  // VAT by the buyer's country (boss decision, 2026-09-08). Read from the
+  // fiscal identity and never from `Tenant.country`, which is an unverified
+  // self-declaration: a buyer able to pick their own country would be a buyer
+  // able to pick their own tax.
+  const vat = resolveVatRate(identity.buyerCountry);
+  if (vat.status !== 'resolved') {
+    // Two different gaps with two different fixes, so they are not described in
+    // one sentence: an absent country needs a sourced row, while a country whose
+    // regime is undecided needs a tax adviser's ruling. Telling an operator to
+    // "add the country" when it is already there would send them in circles.
+    const message =
+      vat.status === 'regime_not_chargeable'
+        ? `A payment was taken but no invoice could be issued: the buyer's country is in the VAT table, but how the sale is treated has not been decided. ` +
+          `A Türkiye-resident supplier does not normally charge EU VAT — B2B supplies are usually the customer's own liability under the reverse charge, ` +
+          `and B2C digital services run through an OSS registration. Set the country's regime in src/lib/billing/vat-rates.ts once a tax adviser has ruled. Payments are unaffected.`
+        : `A payment was taken but no invoice could be issued: there is no sourced VAT rate for the buyer's country. ` +
+          `A rate is a legal fact about a country, so it is looked up rather than assumed — guessing 20% would overcharge a buyer ` +
+          `in a country with no VAT, and guessing 0% would leave a collected tax unaccounted for. ` +
+          `Add the country to src/lib/billing/vat-rates.ts with its source, and the payment can be invoiced. Payments are unaffected.`;
+
+    await recordAlert({
+      level: 'error',
+      source: 'invoice_vat_country_unknown',
+      message,
+      // Names the country and the table, never the buyer or the amount.
+      meta: {
+        provider,
+        tenantId,
+        reason: vat.status,
+        country: vat.status === 'country_missing' ? null : vat.country,
+        regime: vat.status === 'regime_not_chargeable' ? vat.regime : null,
+        detail: vat.detail,
+      },
+    });
+    return { status: 'skipped', reason: 'vat_country_unknown' };
+  }
+  const vatRate = vat.ratePercent;
 
   // Defensive only: the amount was already established to be a positive whole
   // minor unit above, which is the sole condition under which this returns null.

@@ -12,10 +12,12 @@ import {
   type PaymentForInvoice,
 } from './invoice-writer';
 
-const alerts: Array<{ level: string; source: string; message: string }> = [];
+/** `meta` is part of what an alert has to prove: it names the gap without naming the taxpayer. */
+type CapturedAlert = { level: string; source: string; message: string; meta?: Record<string, unknown> };
+const alerts: CapturedAlert[] = [];
 
 vi.mock('@/lib/observability/system-alert', () => ({
-  recordAlert: vi.fn(async (input: { level: string; source: string; message: string }) => {
+  recordAlert: vi.fn(async (input: CapturedAlert) => {
     alerts.push(input);
     return { status: 'recorded', id: 'alert-1' };
   }),
@@ -211,7 +213,7 @@ describe('createInvoiceForPayment — when no invoice may be issued', () => {
   it('issues nothing and names the fields when the tenant has no billing identity', async () => {
     const db = fakeDb({ identity: null });
 
-    const result = await createInvoiceForPayment(db, payment(), { vatRateRaw: '20' });
+    const result = await createInvoiceForPayment(db, payment());
 
     expect(result).toEqual({
       status: 'skipped',
@@ -231,7 +233,7 @@ describe('createInvoiceForPayment — when no invoice may be issued', () => {
   it('treats a blank field as unset rather than invoicing a blank taxpayer', async () => {
     const db = fakeDb({ identity: { ...completeIdentity(), buyerVknTckn: '   ' } });
 
-    const result = await createInvoiceForPayment(db, payment(), { vatRateRaw: '20' });
+    const result = await createInvoiceForPayment(db, payment());
 
     expect(result).toMatchObject({ status: 'skipped', missing: ['buyerVknTckn'] });
     expect(db.created).toHaveLength(0);
@@ -240,31 +242,71 @@ describe('createInvoiceForPayment — when no invoice may be issued', () => {
   it('never puts the buyer’s tax number into the alert trail', async () => {
     const db = fakeDb({ identity: { ...completeIdentity(), buyerTaxOffice: '' } });
 
-    await createInvoiceForPayment(db, payment(), { vatRateRaw: '20' });
+    await createInvoiceForPayment(db, payment());
 
     expect(JSON.stringify(alerts)).not.toContain('2840958172');
   });
 
-  it('issues nothing when the VAT rate is not configured', async () => {
-    const db = fakeDb();
+  it('issues nothing when no VAT rate is sourced for the buyer’s country', async () => {
+    // Assuming 20% because the neighbouring row says so is how a made-up figure
+    // reaches a fiscal document (boss decision 2026-09-08).
+    const db = fakeDb({ identity: { ...completeIdentity(), buyerCountry: 'Ruritanya' } });
 
-    const result = await createInvoiceForPayment(db, payment(), { vatRateRaw: undefined });
+    const result = await createInvoiceForPayment(db, payment());
 
-    expect(result).toEqual({
-      status: 'skipped',
-      reason: 'vat_rate_not_configured',
-      missing: ['INVOICE_VAT_RATE'],
-    });
+    expect(result).toEqual({ status: 'skipped', reason: 'vat_country_unknown' });
     expect(db.created).toHaveLength(0);
-    expect(alerts.some((a) => a.message.includes('INVOICE_VAT_RATE'))).toBe(true);
+    const alert = alerts.at(-1)!;
+    expect(alert.source).toBe('invoice_vat_country_unknown');
+    expect(JSON.stringify(alert)).toContain('Ruritanya');
+    expect(JSON.stringify(alert)).toContain('vat-rates.ts');
+    // The alert names the country and the table, never the taxpayer.
+    expect(JSON.stringify(alert)).not.toContain('2840958172');
+  });
+
+  it('issues nothing for an EU buyer, and says the regime — not the rate — is missing', async () => {
+    // Belgium's rate is in the table at 21%. It still may not be charged: a
+    // Türkiye-resident supplier does not normally charge EU VAT. The operator
+    // must not be told to "add the country" — it is already there.
+    const db = fakeDb({ identity: { ...completeIdentity(), buyerCountry: 'Belçika' } });
+
+    const result = await createInvoiceForPayment(db, payment());
+
+    expect(result).toEqual({ status: 'skipped', reason: 'vat_country_unknown' });
+    expect(db.created).toHaveLength(0);
+    const alert = alerts.at(-1)!;
+    expect(alert.meta).toMatchObject({ reason: 'regime_not_chargeable', country: 'BE', regime: 'unknown' });
+    expect(alert.message).toContain('reverse charge');
+    expect(alert.message).not.toContain('Add the country');
+  });
+
+  it('issues nothing when the billing identity carries a blank country', async () => {
+    const db = fakeDb({ identity: { ...completeIdentity(), buyerCountry: '   ' } });
+
+    const result = await createInvoiceForPayment(db, payment());
+
+    expect(result).toEqual({ status: 'skipped', reason: 'vat_country_unknown' });
+    expect(db.created).toHaveLength(0);
+  });
+
+  it('treats a zero-VAT country as an answer, not as a missing rate', async () => {
+    // Kuwait levies no VAT. `0` must issue an invoice with no tax line — the
+    // opposite of "no rate configured", which issues nothing at all.
+    const db = fakeDb({ identity: { ...completeIdentity(), buyerCountry: 'Kuveyt' } });
+
+    const result = await createInvoiceForPayment(db, payment());
+
+    expect(result).toMatchObject({ status: 'issued' });
+    const lines = db.created[0]!.lines as Array<{ vatRate: number; unitPriceMinor: number }>;
+    expect(lines.every((line) => line.vatRate === 0)).toBe(true);
+    // Nothing is taken out for tax, so the whole charge is the net price.
+    expect(lines.reduce((sum, line) => sum + line.unitPriceMinor, 0)).toBe(payment().amountMinor);
   });
 
   it('issues nothing for a zero or negative charge', async () => {
     const db = fakeDb();
 
-    const result = await createInvoiceForPayment(db, payment({ amountMinor: 0 }), {
-      vatRateRaw: '20',
-    });
+    const result = await createInvoiceForPayment(db, payment({ amountMinor: 0 }));
 
     expect(result).toMatchObject({ status: 'skipped', reason: 'amount_not_invoiceable' });
     expect(db.created).toHaveLength(0);
@@ -275,7 +317,7 @@ describe('createInvoiceForPayment — when an invoice is issued', () => {
   it('writes one row with the buyer frozen onto it and the net price stored', async () => {
     const db = fakeDb();
 
-    const result = await createInvoiceForPayment(db, payment(), { vatRateRaw: '20' });
+    const result = await createInvoiceForPayment(db, payment());
 
     expect(result).toMatchObject({ status: 'issued', number: 'FB-2026-000001' });
     expect(db.created).toHaveLength(1);
@@ -309,9 +351,7 @@ describe('createInvoiceForPayment — when an invoice is issued', () => {
     // line this sale could not be invoiced at all.
     const db = fakeDb();
 
-    const result = await createInvoiceForPayment(db, payment({ amountMinor: 3 }), {
-      vatRateRaw: '20',
-    });
+    const result = await createInvoiceForPayment(db, payment({ amountMinor: 3 }));
 
     expect(result).toMatchObject({ status: 'issued' });
     expect(db.created[0]!.lines).toEqual([
@@ -323,7 +363,7 @@ describe('createInvoiceForPayment — when an invoice is issued', () => {
   it('flags that the e-Fatura profile was assumed, not resolved', async () => {
     const db = fakeDb();
 
-    await createInvoiceForPayment(db, payment(), { vatRateRaw: '20' });
+    await createInvoiceForPayment(db, payment());
 
     expect(alerts.map((a) => a.source)).toContain('invoice_profile_assumed');
   });
@@ -336,7 +376,7 @@ describe('createInvoiceForPayment — when an invoice is issued', () => {
       ],
     });
 
-    const result = await createInvoiceForPayment(db, payment(), { vatRateRaw: '20' });
+    const result = await createInvoiceForPayment(db, payment());
 
     expect(result).toMatchObject({ status: 'issued', number: 'FB-2026-000003' });
   });
@@ -344,7 +384,7 @@ describe('createInvoiceForPayment — when an invoice is issued', () => {
   it('issues no second document when the payment was already invoiced', async () => {
     const db = fakeDb({ rows: [{ number: 'FB-2026-000007', paymentRef: 'pay_1' }] });
 
-    const result = await createInvoiceForPayment(db, payment(), { vatRateRaw: '20' });
+    const result = await createInvoiceForPayment(db, payment());
 
     expect(result).toEqual({ status: 'already_issued', number: 'FB-2026-000007' });
     expect(db.created).toHaveLength(0);
@@ -354,7 +394,7 @@ describe('createInvoiceForPayment — when an invoice is issued', () => {
     // The first create loses to a concurrent commit on FB-2026-000001.
     const db = fakeDb({ collisions: 1 });
 
-    const result = await createInvoiceForPayment(db, payment(), { vatRateRaw: '20' });
+    const result = await createInvoiceForPayment(db, payment());
 
     expect(result).toMatchObject({ status: 'issued', number: 'FB-2026-000002' });
     expect(db.created).toHaveLength(1);

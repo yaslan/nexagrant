@@ -304,7 +304,6 @@ describe('createInvoiceForPayment carries the rate onto the row', () => {
       db as never,
       { ...PAYMENT, currency: 'USD' },
       {
-        vatRateRaw: '20',
         fetchRate: async () => ({
           ok: true,
           rate: { currency: 'USD', rate: 41.2345, rateDate: '2026-09-08', source: 'TCMB' },
@@ -329,7 +328,7 @@ describe('createInvoiceForPayment carries the rate onto the row', () => {
     const result = await createInvoiceForPayment(
       db as never,
       { ...PAYMENT, currency: 'TRY' },
-      { vatRateRaw: '20', fetchRate: async () => { throw new Error('must not be called'); } }
+      { fetchRate: async () => { throw new Error('must not be called'); } }
     );
 
     expect(result.status).toBe('issued');
@@ -349,7 +348,6 @@ describe('createInvoiceForPayment carries the rate onto the row', () => {
       db as never,
       { ...PAYMENT, currency: 'USD' },
       {
-        vatRateRaw: '20',
         fetchRate: async () => ({
           ok: false,
           failure: { reason: 'unreachable', detail: 'ECONNREFUSED' },
@@ -377,7 +375,6 @@ describe('createInvoiceForPayment carries the rate onto the row', () => {
       db as never,
       { ...PAYMENT, currency: 'USD' },
       {
-        vatRateRaw: '20',
         fetchRate: async () => ({
           ok: false,
           failure: { reason: 'no_bulletin_in_window', detail: 'none' },
