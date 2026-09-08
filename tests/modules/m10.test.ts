@@ -3,6 +3,7 @@ import { generateStandardDoc, signDocument, createNewVersion } from '../../src/m
 import { resetScope, setScope, FakeTenantScopeError } from '../helpers/tenant-scope-mock';
 
 const h = vi.hoisted(() => ({
+  generateText: vi.fn(),
   creditLedgerCreate: vi.fn(),
   opportunityFindFirst: vi.fn(),
   followupDocCreate: vi.fn(),
@@ -44,13 +45,14 @@ vi.mock('../../src/lib/auth', () => ({
 }));
 
 vi.mock('../../src/lib/llm', () => ({
-  generateText: vi.fn().mockResolvedValue(`### MUTUAL NON-DISCLOSURE AGREEMENT (NDA)\n\nMock document content.`),
+  generateText: h.generateText,
 }));
 
 describe('M10 Follow-up Documents Module', () => {
   beforeEach(() => {
     resetScope();
     vi.clearAllMocks();
+    h.generateText.mockResolvedValue(`### MUTUAL NON-DISCLOSURE AGREEMENT (NDA)\n\nMock document content.`);
     h.creditLedgerCreate.mockResolvedValue({ id: 'ledger-1' });
     h.dualApprovalStepDeleteMany.mockResolvedValue({ count: 0 });
     h.opportunityFindFirst.mockResolvedValue({ title: 'Test Opp' });
@@ -100,14 +102,14 @@ describe('M10 Follow-up Documents Module', () => {
       /not found in this workspace/
     );
     expect(h.followupDocCreate).not.toHaveBeenCalled();
-    expect(h.creditLedgerCreate).not.toHaveBeenCalled();
   });
 
-  test('generateStandardDoc bills the session tenant, not one named by the caller', async () => {
+  test('generateStandardDoc operates on the session tenant, not one named by the caller', async () => {
     await generateStandardDoc('opp-10', 'NDA');
 
-    expect(h.creditLedgerCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-1', delta: -1 }) })
+    expect(h.generateText).toHaveBeenCalled();
+    expect(h.followupDocCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-1' }) })
     );
   });
 

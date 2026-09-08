@@ -146,13 +146,14 @@ describe('M6 Evaluator Lens Module', () => {
     expect(result.weaknesses.length).toBeGreaterThan(0);
   });
 
-  test('generateAiEvaluation charges credits to the session tenant only', async () => {
+  test('generateAiEvaluation operates on the session tenant only', async () => {
     await generateAiEvaluation('opp-1');
 
     expect(h.opportunityFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'opp-1', tenantId: 'tenant-1' } })
     );
-    expect(h.creditLedgerCreate).toHaveBeenCalledWith(
+    expect(h.generateText).toHaveBeenCalled();
+    expect(h.evaluationCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-1' }) })
     );
   });
@@ -164,7 +165,6 @@ describe('M6 Evaluator Lens Module', () => {
     // no-op from a recorded evaluation. It now rejects, and still writes nothing.
     await expect(generateAiEvaluation('opp-from-other-tenant')).rejects.toThrow(/not found/i);
 
-    expect(h.creditLedgerCreate).not.toHaveBeenCalled();
     expect(h.evaluationCreate).not.toHaveBeenCalled();
   });
 

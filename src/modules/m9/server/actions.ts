@@ -79,19 +79,6 @@ export async function generateMeetingBrief({
 
   try {
     const brief = await withTenant<MeetingBriefRow>(tenantId, async (tx) => {
-      // One AI credit, and only when the model actually answered. A template
-      // draft costs nothing: the header promises "1 AI credit / brief", and
-      // charging it for a document the AI never wrote is charging for nothing.
-      if (aiGenerated) {
-        await tx.creditLedger.create({
-          data: {
-            tenantId,
-            delta: -1,
-            reason: `M9: Meeting Brief Generator for ${partnerName}`,
-          },
-        });
-      }
-
       // interactionId is globally unique, so an upsert keyed on it alone would
       // let one tenant overwrite another tenant's brief. Existing rows are
       // matched on (interactionId, tenantId) first.

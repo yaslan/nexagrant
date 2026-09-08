@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import trMessages from '../../../messages/tr.json';
 import enMessages from '../../../messages/en.json';
 import { applyPercentDiscount } from '../money';
@@ -18,6 +20,8 @@ import {
   PLAN_GRANTS,
   RETIRED_PLAN_IDS,
   grantsFor,
+  AI_ACTION_CREDITS,
+  aiCreditEntry,
   plansGrantingModule,
   resolvePlanId,
   type DiscountTier,
@@ -385,4 +389,91 @@ describe('plan card copy matches grantsFor() exactly (tr + en)', () => {
       });
     }
   }
+});
+
+describe('AI credit catalogue — docs/BILLING.md and the code say one number', () => {
+  /**
+   * TASK-MTSXGXBCJ007W, owner decision "option C". The card's whole point is
+   * that the published price and the charged price are the same number. That
+   * is only true for as long as somebody keeps them in step, so this test does
+   * the keeping: it reads the table out of docs/BILLING.md and compares it to
+   * `AI_ACTION_CREDITS` row by row.
+   *
+   * Edit one without the other and this goes red — which is the cheapest place
+   * for that mistake to surface. It has previously surfaced as a tenant being
+   * charged a figure no document sold.
+   */
+  const doc = readFileSync(
+    join(__dirname, '..', '..', '..', 'docs', 'BILLING.md'),
+    'utf8'
+  );
+
+  /** `| M6 | Değerlendirme | 3 | Yayımlandı |` → ['M6', 3, published] */
+  function publishedTableRows(): Array<{ module: string; credits: number; approval: string }> {
+    const section = doc.split('### Kredi maliyeti (eylem başına)')[1];
+    if (!section) throw new Error('docs/BILLING.md lost its per-action credit table');
+    const rows: Array<{ module: string; credits: number; approval: string }> = [];
+    for (const line of section.split('\n')) {
+      const m = /^\|\s*(M\d+)\s*\|([^|]*)\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*$/.exec(line);
+      if (!m) continue;
+      rows.push({
+        module: m[1]!,
+        credits: Number(m[3]),
+        approval: m[4]!.includes('Yayımlandı') ? 'published' : 'pending-owner-approval',
+      });
+    }
+    return rows;
+  }
+
+  it('finds every catalogue entry in the document, at the same price', () => {
+    const rows = publishedTableRows();
+    expect(rows.length).toBe(Object.keys(AI_ACTION_CREDITS).length);
+
+    for (const [key, entry] of Object.entries(AI_ACTION_CREDITS)) {
+      const moduleId = key.split(':')[0]!;
+      const match = rows.find((r) => r.module === moduleId && r.credits === entry.credits);
+      expect(match, `docs/BILLING.md has no row for ${key} at ${entry.credits} credit(s)`).toBeTruthy();
+      expect(match!.approval, `approval mismatch for ${key}`).toBe(entry.approval);
+    }
+  });
+
+  it('publishes exactly the seven figures §1 has always sold', () => {
+    const published = Object.entries(AI_ACTION_CREDITS)
+      .filter(([, e]) => e.approval === 'published')
+      .map(([k]) => k)
+      .sort();
+    expect(published).toEqual(['M1', 'M10', 'M11', 'M2', 'M3', 'M6', 'M9']);
+  });
+
+  it('marks the two figures no customer has been shown, and no others', () => {
+    const pending = Object.entries(AI_ACTION_CREDITS)
+      .filter(([, e]) => e.approval === 'pending-owner-approval')
+      .map(([k]) => k)
+      .sort();
+    expect(pending).toEqual(['M6:esr-parser', 'M7']);
+  });
+
+  it('gives every entry a reason a human can read', () => {
+    for (const [key, entry] of Object.entries(AI_ACTION_CREDITS)) {
+      expect(entry.note.length, `${key} has no note`).toBeGreaterThan(20);
+      expect(Number.isInteger(entry.credits), `${key} is not a whole number of credits`).toBe(true);
+      expect(entry.credits).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  describe('aiCreditEntry lookup', () => {
+    it('prefers a module:purpose entry over its module', () => {
+      expect(aiCreditEntry('M6', 'esr-parser')?.credits).toBe(0);
+      expect(aiCreditEntry('M6', 'evaluation')?.credits).toBe(3);
+    });
+
+    it('falls back to the module for a purpose built from data', () => {
+      expect(aiCreditEntry('M10', 'document_generation_nda')?.credits).toBe(1);
+    });
+
+    it('returns null — never a default — for an action nobody priced', () => {
+      expect(aiCreditEntry('M4', 'whatever')).toBeNull();
+      expect(aiCreditEntry('', '')).toBeNull();
+    });
+  });
 });

@@ -199,22 +199,13 @@ describe('generateMeetingBrief — persistence', () => {
     expect(isTemplateDraft('### Real brief')).toBe(false);
   });
 
-  test('the credit is debited in the same transaction as the write, not before it', async () => {
-    // A debit outside the transaction survives a failed insert: the tenant pays
-    // for a brief that was never saved.
-    const { tx, calls } = fakeTx(null);
-    let creditsAtWrite = -1;
+  test('a template draft uses template text and does not call generateText', async () => {
+    generateTextMock.mockRejectedValue(new Error('401 invalid x-api-key'));
+    const { tx } = fakeTx(null);
     withTenantMock.mockImplementation(
-      async (_tenantId: string, fn: (t: unknown) => Promise<unknown>) => {
-        const out = await fn(tx);
-        creditsAtWrite = calls.credit.length;
-        return out;
-      },
+      async (_tenantId: string, fn: (t: unknown) => Promise<unknown>) => fn(tx),
     );
-
-    await generateMeetingBrief(INPUT);
-
-    expect(creditsAtWrite).toBe(1);
-    expect(calls.credit[0]!.data).toMatchObject({ tenantId: SESSION_TENANT, delta: -1 });
+    const result = await generateMeetingBrief(INPUT);
+    expect(result.brief && isTemplateDraft(result.brief.content)).toBe(true);
   });
 });

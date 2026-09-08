@@ -13,6 +13,7 @@
  * moves `CreditLedger`.
  */
 
+import { aiCreditEntry } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
 import crypto from 'crypto';
 import type { TenantTx } from '@/lib/db';
@@ -45,23 +46,22 @@ const DEFAULT_MODELS: Record<LlmProvider, string> = {
 const DEFAULT_MAX_TOKENS = 4096;
 
 /**
- * Tokens per credit.
+ * Model overrides, keyed `module` or `module:purpose` (the pair wins).
  *
- * This is the formula `src/lib/ai/llm.ts` charged at 6 of the 7 production call
- * sites, kept deliberately: unifying on the *other* formula would have raised
- * the price 7× at those six sites with no announcement, which is a commercial
- * decision and not one a refactor gets to make. The seventh (concept notes) gets
- * cheaper, which harms no tenant.
+ * Lives here rather than at the call site so a module never names a model
+ * string: which model serves which action is this file's business, and a
+ * provider migration is then one table, not a grep.
  *
- * It is not the last word. `docs/BILLING.md` §"Kredi maliyeti" sells a *third*
- * model — a flat credit per action (M2 draft 1, M6 evaluation 3, M9 brief 1,
- * M10 document 1, M11 section 2, M1 profile summary 1, M3 source summary 1) —
- * which no code has ever implemented, and two of the call sites here (M7
- * `tto_ip_checklist`, M6 `esr-parser`) have no published figure at all. Aligning
- * code with the published table is an open decision on the card; when it lands
- * it changes `creditsForUsage` and nothing else.
+ * M6 evaluation is the only entry. It is the product's most expensive action
+ * (3 credits against 1 everywhere else) and the one whose output is scored
+ * against a real Commission rubric, so it is served by the Opus-class model.
+ * ASSUMPTION, revertible in one line: this was put to the owner with the
+ * option-C decision and drew no objection — it is not a ruling in writing.
  */
-const TOKENS_PER_CREDIT = 10_000;
+const MODEL_OVERRIDES: Readonly<Record<string, string>> = {
+  'M6:evaluation': 'claude-opus-5',
+};
+
 
 export interface LlmCompletion {
   text: string;
@@ -239,13 +239,67 @@ async function callProvider(
 }
 
 /**
- * Credits charged for one generation. The single seam the pricing decision
- * lands on — see {@link TOKENS_PER_CREDIT}. Pure, so it is unit-testable and no
- * caller may re-derive it: the number a screen shows the user must come from
- * here (or from the `AiUsageLog` row), never from a second copy of the maths.
+ * An AI action nobody has priced. Refused rather than defaulted.
+ *
+ * The tempting fallbacks are both wrong: returning 0 gives away provider spend
+ * on the house and leaves a 0-credit row that looks deliberate in an audit;
+ * returning 1 invents a price and charges a tenant a figure no document sells,
+ * which is the exact class of defect this card exists to remove. So an unpriced
+ * action fails, loudly, before any money is spent — see `resolveCredits`.
  */
-export function creditsForUsage(inputTokens: number, outputTokens: number): number {
-  return Math.max(1, Math.ceil((inputTokens + outputTokens) / TOKENS_PER_CREDIT));
+export class UnpricedAiActionError extends Error {
+  constructor(readonly module: string, readonly purpose: string) {
+    super(
+      `No credit price for AI action "${module}:${purpose}". Add it to ` +
+        `AI_ACTION_CREDITS in src/lib/billing/catalog.ts and to docs/BILLING.md §1.`
+    );
+    this.name = 'UnpricedAiActionError';
+  }
+}
+
+/** What the ledger moves by for one generation, and where the figure came from. */
+export interface AiCreditQuote {
+  credits: number;
+  /** `false` when the figure is the lead's proposal, not a sold price. */
+  published: boolean;
+}
+
+/**
+ * Credits charged for one generation — read from the published catalogue, not
+ * computed from the response.
+ *
+ * The single seam the pricing decision lands on. Before TASK-MTSXGXBCJ007W this
+ * was `max(1, ceil((in+out)/10_000))`, so what a tenant paid for the *same*
+ * button depended on how verbose the model happened to be that afternoon, and
+ * docs/BILLING.md's "M6 değerlendirme 3 kredi" was a promise no code kept. The
+ * figure now comes from `AI_ACTION_CREDITS`, which is what §1 prints.
+ *
+ * `inputTokens`, `outputTokens` and `model` are accepted and deliberately do
+ * not affect the result. They stay in the signature because every one of them
+ * is still written to the `AiUsageLog` row, and because a usage-based
+ * coefficient — if the owner ever wants one — belongs in this function rather
+ * than in a second one; keeping the inputs here means adding it is an edit, not
+ * a new call-site contract.
+ */
+export function creditsForUsage(params: {
+  module: string;
+  purpose: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  model?: string;
+}): number {
+  return resolveCredits(params.module, params.purpose).credits;
+}
+
+/**
+ * The quote behind {@link creditsForUsage}, including whether the figure is one
+ * the customer has been shown. Throws {@link UnpricedAiActionError} for an
+ * action with no entry.
+ */
+export function resolveCredits(module: string, purpose: string): AiCreditQuote {
+  const entry = aiCreditEntry(module, purpose);
+  if (!entry) throw new UnpricedAiActionError(module, purpose);
+  return { credits: entry.credits, published: entry.approval === 'published' };
 }
 
 /**
@@ -308,14 +362,27 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   }
 
   const provider = options.provider || DEFAULT_PROVIDER;
-  const model = options.model || DEFAULT_MODELS[provider];
   const maxTokens = options.maxTokens || DEFAULT_MAX_TOKENS;
   const messages = toMessages(options);
+
+  // Explicit > override table > provider default. The override only applies to
+  // the provider it was written for; asking for OpenAI must not silently send
+  // an Anthropic model id.
+  const overridden = provider === DEFAULT_PROVIDER
+    ? MODEL_OVERRIDES[`${options.module}:${options.purpose}`] ?? MODEL_OVERRIDES[options.module]
+    : undefined;
+  const model = options.model || overridden || DEFAULT_MODELS[provider];
+
+  // Priced BEFORE the provider is called, and deliberately so. Since
+  // TASK-MTSXGXBCJ007W the price no longer depends on the response, so an
+  // action with no catalogue entry can be refused while it is still free to
+  // refuse it. Resolving afterwards would mean paying the provider for a call
+  // we then cannot bill or even log.
+  const { credits } = resolveCredits(options.module, options.purpose);
 
   requireApiKey(provider);
   const result = await withRetry(() => callProvider(messages, { provider, model, maxTokens }));
 
-  const credits = creditsForUsage(result.inputTokens, result.outputTokens);
   const promptHash = hashMessages(messages);
 
   // `withTenant`, not a bare `$transaction`: both tables below are FORCE RLS

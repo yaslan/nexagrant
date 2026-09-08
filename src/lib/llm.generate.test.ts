@@ -37,7 +37,13 @@ const mockEnv = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/env', () => ({ env: mockEnv }));
 
-import { generateText, generateCompletion, creditsForUsage } from './llm';
+import {
+  generateText,
+  generateCompletion,
+  creditsForUsage,
+  resolveCredits,
+  UnpricedAiActionError,
+} from './llm';
 
 /** Stands in for what a tenant actually sends: the prompt must never be stored. */
 const SECRET_PROMPT =
@@ -113,25 +119,101 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('creditsForUsage — one formula, and only one', () => {
-  it('prices the call the card measured (4.000 in / 1.000 out) at a single figure', () => {
-    // The whole defect in one line: this used to be 1 on one path and 7 on the
-    // other. Whatever the agreed number becomes, there is now exactly one.
-    expect(creditsForUsage(4000, 1000)).toBe(1);
+describe('creditsForUsage — the published price, and only the published price', () => {
+  /**
+   * Owner decision "option C" (TASK-MTSXGXBCJ007W): the ledger moves by the
+   * figure docs/BILLING.md §1 sells, not by one derived from token counts.
+   *
+   * The table below IS §1. If these numbers and that document ever disagree,
+   * the product is charging a price it does not publish — which is the whole
+   * defect this card closes, in its second form.
+   */
+  const PUBLISHED: ReadonlyArray<[string, string, number]> = [
+    ['M1', 'profile_summary', 1],
+    ['M2', 'concept_note_draft', 1],
+    ['M3', 'source_summary', 1],
+    ['M6', 'evaluation', 3],
+    ['M9', 'meeting_brief', 1],
+    ['M10', 'document_generation_lou', 1],
+    ['M11', 'section_draft', 2],
+  ];
+
+  it.each(PUBLISHED)('charges %s/%s the %i credit(s) BILLING.md §1 sells', (module, purpose, credits) => {
+    expect(creditsForUsage({ module, purpose })).toBe(credits);
   });
 
-  it('never charges less than one credit for a call that reached the provider', () => {
-    expect(creditsForUsage(1, 0)).toBe(1);
-    expect(creditsForUsage(0, 0)).toBe(1);
+  it('ignores the token counts entirely — the same action costs the same', () => {
+    // The old formula returned 1 here and 10 there. That is precisely what a
+    // customer could not predict from the price list, so it had to go.
+    const cheap = creditsForUsage({ module: 'M6', purpose: 'evaluation', inputTokens: 1, outputTokens: 0 });
+    const vast = creditsForUsage({ module: 'M6', purpose: 'evaluation', inputTokens: 400_000, outputTokens: 90_000 });
+    expect(cheap).toBe(3);
+    expect(vast).toBe(3);
   });
 
-  it('scales with total tokens', () => {
-    expect(creditsForUsage(12000, 3000)).toBe(2);
-    expect(creditsForUsage(100000, 0)).toBe(10);
+  it('prices a purpose the call site builds from data by its module', () => {
+    // M2 sends `Drafting section: ${key}` and M10 `document_generation_${kind}`,
+    // so no purpose-keyed table could ever have covered them.
+    expect(creditsForUsage({ module: 'M2', purpose: 'Drafting section: impact' })).toBe(1);
+    expect(creditsForUsage({ module: 'M10', purpose: 'document_generation_consortium_agreement' })).toBe(1);
   });
 
-  it('does not distinguish the two input shapes — only the token counts matter', () => {
-    expect(creditsForUsage(3000, 2000)).toBe(creditsForUsage(2000, 3000));
+  it('lets a purpose override beat its module', () => {
+    expect(creditsForUsage({ module: 'M6', purpose: 'evaluation' })).toBe(3);
+    expect(creditsForUsage({ module: 'M6', purpose: 'esr-parser' })).toBe(0);
+  });
+
+  describe('figures the owner has not signed off', () => {
+    // Two live call sites have no figure in §1. They are priced, because an
+    // unpriced action cannot be billed at all — but `published: false` is the
+    // machine-readable record that a customer never agreed to these.
+    it('M7 tto_ip_checklist is 1, and marked unpublished', () => {
+      const quote = resolveCredits('M7', 'tto_ip_checklist');
+      expect(quote).toEqual({ credits: 1, published: false });
+    });
+
+    it('M6 esr-parser is 0, and marked unpublished', () => {
+      const quote = resolveCredits('M6', 'esr-parser');
+      expect(quote).toEqual({ credits: 0, published: false });
+    });
+
+    it('marks the seven §1 figures as published, so the two above stand out', () => {
+      for (const [module, purpose] of PUBLISHED) {
+        expect(resolveCredits(module, purpose).published).toBe(true);
+      }
+    });
+  });
+
+  describe('an action nobody priced', () => {
+    // The two silent defaults are both wrong: 0 gives away provider spend and
+    // leaves a deliberate-looking row; 1 invents a price no document sells.
+    it('refuses an unknown module rather than guessing', () => {
+      expect(() => creditsForUsage({ module: 'M4', purpose: 'anything' })).toThrow(UnpricedAiActionError);
+    });
+
+    it('names the action and the two files that have to change', () => {
+      expect(() => creditsForUsage({ module: 'M99', purpose: 'new_thing' })).toThrow(
+        /M99:new_thing.*catalog\.ts.*BILLING\.md/s
+      );
+    });
+
+    it('does not treat the empty string as a module', () => {
+      expect(() => creditsForUsage({ module: '', purpose: '' })).toThrow(UnpricedAiActionError);
+    });
+  });
+});
+
+describe('generateCompletion — refuses an unpriced action before spending money', () => {
+  it('never reaches the provider when the action has no catalogue entry', async () => {
+    const fetchMock = stubAnthropic();
+
+    await expect(
+      generateCompletion({ ...baseOptions, module: 'M4', purpose: 'unpriced' })
+    ).rejects.toThrow(UnpricedAiActionError);
+
+    // The point of pricing up front: the refusal is free. Resolving the price
+    // after the response would have paid for a call we cannot bill or log.
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -201,13 +283,15 @@ describe('generateCompletion — one usage row and one ledger row per call', () 
   });
 
   it('charges the ledger exactly what the usage row records, and reports it back', async () => {
+    // A deliberately large response: under the old token formula this was 2
+    // credits. M2 is sold at 1 (BILLING.md §1), so 1 is what all three say.
     stubAnthropic({ inputTokens: 12000, outputTokens: 3000 });
 
     const result = await generateCompletion(baseOptions);
 
-    expect(result.credits).toBe(2);
-    expect(usageRow().credits).toBe(2);
-    expect(ledgerRow().delta).toBe(-2);
+    expect(result.credits).toBe(1);
+    expect(usageRow().credits).toBe(1);
+    expect(ledgerRow().delta).toBe(-1);
   });
 
   it('records tenant, user, module, purpose, provider, model and token counts', async () => {
@@ -342,7 +426,9 @@ describe('the two input shapes are one billing path', () => {
     const { fromPrompt, fromMessages } = await chargeBothShapes(12000, 3000);
 
     expect(fromMessages.credits).toBe(fromPrompt.credits);
-    expect(fromMessages.credits).toBe(2);
+    // 1, the same as the small call above: since option C the response size is
+    // recorded on the row but is not what the tenant is charged for.
+    expect(fromMessages.credits).toBe(1);
   });
 
   it('hashes both shapes to the same 64 digits, so an audit can join their rows', async () => {
@@ -375,15 +461,77 @@ describe('the provider request', () => {
     runTransactions();
     mockPrisma.creditLedger.aggregate.mockResolvedValue({ _sum: { delta: 500 } });
     const fetchMock2 = stubAnthropic();
+    // The SAME action as baseOptions (M2), sent in the other input shape — the
+    // two adapters used to default to different models, and that is what this
+    // holds shut. A different action may legitimately use a different model;
+    // see the override test below.
+    await generateCompletion({
+      tenantId: 'tenant_1',
+      module: 'M2',
+      purpose: 'concept_note_draft',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+
+    expect(modelFromPrompt).toBe('claude-sonnet-5');
+    expect(requestBody(fetchMock2).model).toBe(modelFromPrompt);
+    expect(usageRow().model).toBe(modelFromPrompt);
+  });
+
+  it('serves the M6 evaluation with the Opus-class model, and records that', async () => {
+    // The product's most expensive action (3 credits) and the only override.
+    // ASSUMPTION on the card, revertible in one line — see MODEL_OVERRIDES.
+    const fetchMock = stubAnthropic();
+
     await generateCompletion({
       tenantId: 'tenant_1',
       module: 'M6',
       purpose: 'evaluation',
-      messages: [{ role: 'user', content: 'hi' }],
+      prompt: 'Evaluate this call.',
     });
 
-    expect(requestBody(fetchMock2).model).toBe(modelFromPrompt);
-    expect(usageRow().model).toBe(modelFromPrompt);
+    expect(requestBody(fetchMock).model).toBe('claude-opus-5');
+    // The row must name the model actually used, or a cost audit is fiction.
+    expect(usageRow().model).toBe('claude-opus-5');
+    expect(usageRow().credits).toBe(3);
+  });
+
+  it('lets an explicit model beat the override', async () => {
+    const fetchMock = stubAnthropic();
+
+    await generateCompletion({
+      tenantId: 'tenant_1',
+      module: 'M6',
+      purpose: 'evaluation',
+      prompt: 'Evaluate this call.',
+      model: 'claude-haiku-4-5-20251001',
+    });
+
+    expect(requestBody(fetchMock).model).toBe('claude-haiku-4-5-20251001');
+  });
+
+  it('does not send an Anthropic model id to OpenAI', async () => {
+    // The override table is Anthropic's. Applying it to another provider would
+    // send `claude-opus-5` to /v1/chat/completions and 400 the whole action.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '',
+      json: async () => ({
+        choices: [{ message: { content: 'x' } }],
+        usage: { prompt_tokens: 10, completion_tokens: 5 },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await generateCompletion({
+      tenantId: 'tenant_1',
+      module: 'M6',
+      purpose: 'evaluation',
+      prompt: 'Evaluate this call.',
+      provider: 'openai',
+    });
+
+    expect(requestBody(fetchMock).model).toBe('gpt-4o');
   });
 
   it('lifts the system prompt out of the message list, as the API expects', async () => {

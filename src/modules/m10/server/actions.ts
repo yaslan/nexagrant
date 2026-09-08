@@ -130,15 +130,6 @@ export async function generateStandardDoc(
       }
     });
 
-    // Deduct 1 AI credit for M10 document generation
-    await tx.creditLedger.create({
-      data: {
-        tenantId,
-        delta: -1,
-        reason: `M10: Follow-up Document Generation (${kind})`
-      }
-    });
-
     return created;
   });
 

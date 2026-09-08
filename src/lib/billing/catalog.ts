@@ -494,3 +494,93 @@ export function plansGrantingModule(moduleId: string): PlanId[] {
 export function planNamesGrantingModule(moduleId: string): string[] {
   return plansGrantingModule(moduleId).map((planId) => grantsFor(planId)?.name ?? planId);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI credit cost per action
+//
+// TASK-MTSXGXBCJ007W, owner decision "option C": what a tenant is charged for an
+// AI action is the figure docs/BILLING.md §1 *sells*, not a figure derived from
+// token counts.
+//
+// Before this, the price was computed from tokens — `max(1, ceil((in+out)/10K))`
+// — which meant the published table ("M6 değerlendirme 3 kredi") was marketing
+// copy that no code implemented. Two long M9 briefs could cost 1 credit and 2 on
+// consecutive days for the same button, and nothing a customer could read told
+// them which. CLAUDE.md rule 7: a number shown to a user must come from a
+// record, not from arithmetic invented in the code path.
+//
+// Token counts are still written to every `AiUsageLog` row. They are simply not
+// what the ledger moves by today; keeping them means a usage-based coefficient
+// can be introduced later against real history rather than from zero.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Whether a figure below is one the customer has actually been shown.
+ *
+ * `published` — printed in docs/BILLING.md §1. Changing it is a price change.
+ * `pending-owner-approval` — proposed by the lead, not yet sold to anyone, and
+ *   deliberately visible as such so it cannot silently harden into a price.
+ */
+export type AiCreditApproval = 'published' | 'pending-owner-approval';
+
+export interface AiCreditEntry {
+  /** Credits the ledger moves by for one successful action. */
+  credits: number;
+  approval: AiCreditApproval;
+  /** Why this figure — one line, read by whoever revisits the decision. */
+  note: string;
+}
+
+/**
+ * The one credit table.
+ *
+ * Keys are either a module id (`M6`) or a module-and-purpose pair (`M6:esr-parser`).
+ * The pair wins when present. Two production call sites build their `purpose`
+ * from data — M2 sends `Drafting section: ${key}`, M10 sends
+ * `document_generation_${kind}` — so a purpose-only table could never have
+ * covered them; the module row is what prices those, exactly as §1 prices them
+ * ("M2 taslak 1", "M10 belge 1") without naming a section or a document kind.
+ */
+export const AI_ACTION_CREDITS: Readonly<Record<string, AiCreditEntry>> = {
+  // ── Published in docs/BILLING.md §1. These are sold figures. ──────────────
+  M1: { credits: 1, approval: 'published', note: 'Profil özeti — BILLING.md §1.' },
+  M2: { credits: 1, approval: 'published', note: 'Taslak bölüm / kavram notu — BILLING.md §1.' },
+  M3: { credits: 1, approval: 'published', note: 'Kaynak özeti — BILLING.md §1.' },
+  M6: { credits: 3, approval: 'published', note: 'Değerlendirme — BILLING.md §1; the most expensive action in the product.' },
+  M9: { credits: 1, approval: 'published', note: 'Brifing — BILLING.md §1.' },
+  M10: { credits: 1, approval: 'published', note: 'Belge üretimi — BILLING.md §1.' },
+  M11: { credits: 2, approval: 'published', note: 'Bölüm — BILLING.md §1.' },
+
+  // ── NOT published. Lead proposal, awaiting owner sign-off. ────────────────
+  // Both are live production call sites, so they had to be priced at *some*
+  // number for the call to be chargeable at all. These are the lead's, and they
+  // are marked so nobody mistakes them for a figure a customer agreed to. Each
+  // is a one-line change once the owner rules.
+  M7: {
+    credits: 1,
+    approval: 'pending-owner-approval',
+    note:
+      'TTO/IP checklist. Proposed 1 by parity: M9 (brifing) and M10 (belge) are 1, ' +
+      'and M7 is the same shape — one click, one generated document.',
+  },
+  'M6:esr-parser': {
+    credits: 0,
+    approval: 'pending-owner-approval',
+    note:
+      'ESR score extraction. Proposed 0 because it has no production caller today ' +
+      '(only tests/modules/esr-parser.test.ts reaches it); when it is wired up it ' +
+      'becomes a sub-step of the M6 evaluation, which already charges 3. Charging ' +
+      'here as well would bill one user action twice.',
+  },
+};
+
+/**
+ * The credit entry for an action, or `null` when the action has no price.
+ *
+ * `null` is not "free" — see `creditsForUsage` in src/lib/llm.ts, which refuses
+ * the call. An action nobody has priced must not reach a provider on the
+ * house.
+ */
+export function aiCreditEntry(module: string, purpose: string): AiCreditEntry | null {
+  return AI_ACTION_CREDITS[`${module}:${purpose}`] ?? AI_ACTION_CREDITS[module] ?? null;
+}

@@ -330,7 +330,7 @@ describe('M10 generateStandardDoc — a failed generation is an error, not a doc
     const doc = await generateStandardDoc('opp-1', 'NDA');
 
     expect(doc.contentText).toContain('Real generated body.');
-    expect(created.map((c) => c.table)).toEqual(['FollowupDoc', 'CreditLedger']);
+    expect(created.map((c) => c.table)).toEqual(['FollowupDoc']);
   });
 
   test('the per-kind invented document bodies are gone from the source', () => {

@@ -30,5 +30,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  // `docs/agent-results/**` holds evidence transcripts and the throwaway probe
+  // scripts that produced them, not product code. They are committed as proof,
+  // are never built or imported, and are written against `tsx` (which resolves
+  // `.ts` import specifiers that `tsc` rejects, TS5097). Leaving them in scope
+  // made `pnpm typecheck` — and therefore the whole `pnpm gate` — red at HEAD
+  // for every agent, from one committed probe file (TASK-MTSYH8LDGV5YU).
+  "exclude": ["node_modules", "docs/agent-results"]
 }

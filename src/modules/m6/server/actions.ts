@@ -108,14 +108,6 @@ export async function generateAiEvaluation(opportunityId: string): Promise<AiEva
     });
     if (!opp) throw new EvaluationNotFoundError(`Opportunity ${oppId} not found in this workspace.`);
 
-    await tx.creditLedger.create({
-      data: {
-        tenantId,
-        delta: -3,
-        reason: 'M6: Evaluator Lens AI pre-assessment',
-      },
-    });
-
     await tx.evaluation.create({
       data: {
         tenantId,
