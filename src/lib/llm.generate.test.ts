@@ -17,10 +17,19 @@ import crypto from 'crypto';
 const mockPrisma = vi.hoisted(() => ({
   aiUsageLog: { create: vi.fn() },
   creditLedger: { aggregate: vi.fn(), create: vi.fn() },
-  $transaction: vi.fn(),
+  withTenant: vi.fn(),
 }));
 
-vi.mock('@/lib/db', () => ({ prisma: mockPrisma }));
+/**
+ * TASK-MTSYH8LDGV5YU — only `withTenant` is exported here, deliberately. Every
+ * table this adapter touches is FORCE ROW LEVEL SECURITY with
+ * `WITH CHECK ("tenantId" = current_setting('app.tenant_id', true))`, and
+ * `withTenant` is the only thing that sets that GUC. A write through the global
+ * `prisma` client is refused by Postgres with 42501 in production while passing
+ * every mocked test. So the mock has no `prisma` export: reintroduce one and
+ * the suite goes red here instead of on the first real deployment.
+ */
+vi.mock('@/lib/db', () => ({ withTenant: mockPrisma.withTenant }));
 
 const mockEnv = vi.hoisted(() => ({
   ANTHROPIC_API_KEY: 'sk-ant-test' as string | undefined,
@@ -59,11 +68,17 @@ function stubAnthropic(opts: StubOptions = {}) {
   return fetchMock;
 }
 
-/** The `$transaction(cb)` shape the adapter uses, with the mock delegates. */
+/** The `withTenant(tenantId, cb)` shape the adapter uses, with the mock delegates. */
 function runTransactions() {
-  mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
-    cb({ aiUsageLog: mockPrisma.aiUsageLog, creditLedger: mockPrisma.creditLedger })
+  mockPrisma.withTenant.mockImplementation(
+    async (_tenantId: string, cb: (tx: unknown) => Promise<unknown>) =>
+      cb({ aiUsageLog: mockPrisma.aiUsageLog, creditLedger: mockPrisma.creditLedger })
   );
+}
+
+/** Tenant ids `withTenant` was opened with, in call order. */
+function tenantScopes(): string[] {
+  return mockPrisma.withTenant.mock.calls.map((c: unknown[]) => c[0] as string);
 }
 
 const baseOptions = {
@@ -117,6 +132,61 @@ describe('creditsForUsage — one formula, and only one', () => {
 
   it('does not distinguish the two input shapes — only the token counts matter', () => {
     expect(creditsForUsage(3000, 2000)).toBe(creditsForUsage(2000, 3000));
+  });
+});
+
+describe('generateCompletion — every database touch is tenant-scoped (RLS)', () => {
+  // TASK-MTSYH8LDGV5YU. Measured against the NOBYPASSRLS role `fabrika_app`:
+  // the balance read returned 0 outside the wrapper (a 500-credit row existed)
+  // and the usage/ledger insert was refused with 42501. Neither showed up under
+  // the local SUPERUSER role, so only these assertions keep it from coming back.
+
+  it('reads the credit balance inside a tenant scope, not through the global client', async () => {
+    stubAnthropic();
+
+    await generateCompletion(baseOptions);
+
+    // The balance read is the first thing the adapter does. Unscoped it reads a
+    // confident 0 and the caller is told to buy credits it already owns.
+    expect(tenantScopes()[0]).toBe('tenant_1');
+    expect(mockPrisma.creditLedger.aggregate).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes the usage row and the ledger row inside the caller tenant scope', async () => {
+    stubAnthropic();
+
+    await generateCompletion(baseOptions);
+
+    // Two scopes: the balance read, then the write transaction. Both are the
+    // tenant the call was made for — never a default and never unset.
+    expect(tenantScopes()).toEqual(['tenant_1', 'tenant_1']);
+  });
+
+  it('scopes to the tenant that was passed, not to a hardcoded one', async () => {
+    stubAnthropic();
+
+    await generateCompletion({ ...baseOptions, tenantId: 'tenant_other' });
+
+    expect(new Set(tenantScopes())).toEqual(new Set(['tenant_other']));
+    expect(mockPrisma.aiUsageLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant_other' }) })
+    );
+  });
+
+  it('keeps the usage row and the ledger row in ONE scope, so neither can land alone', async () => {
+    stubAnthropic();
+
+    await generateCompletion(baseOptions);
+
+    // Both writes come from a single withTenant call: one transaction, one
+    // rollback boundary. Splitting them would let a charge survive a failed
+    // usage row (or the reverse) and silently break the billing audit trail.
+    const writeScopeCalls = mockPrisma.withTenant.mock.calls.filter(
+      (c: unknown[]) => typeof c[1] === 'function'
+    );
+    expect(writeScopeCalls).toHaveLength(2); // balance read + write transaction
+    expect(mockPrisma.aiUsageLog.create).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.creditLedger.create).toHaveBeenCalledTimes(1);
   });
 });
 

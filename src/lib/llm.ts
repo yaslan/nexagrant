@@ -13,7 +13,7 @@
  * moves `CreditLedger`.
  */
 
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import crypto from 'crypto';
 import type { TenantTx } from '@/lib/db';
 import { env } from '@/lib/env';
@@ -274,12 +274,22 @@ function toMessages(options: LlmGenerateOptions): LlmMessage[] {
   return messages;
 }
 
-/** Current credit balance for a tenant. */
+/**
+ * Current credit balance for a tenant.
+ *
+ * Goes through `withTenant` because `CreditLedger` is FORCE RLS: outside the
+ * wrapper `app.tenant_id` is unset, `"tenantId" = current_setting(...)` is NULL
+ * for every row, and the aggregate reads a confident `0` rather than failing.
+ * That is the worst shape a bug can take — it does not throw, it silently says
+ * the tenant is out of credits (TASK-MTSYH8LDGV5YU).
+ */
 export async function getCreditBalance(tenantId: string): Promise<number> {
-  const result = await prisma.creditLedger.aggregate({
-    where: { tenantId },
-    _sum: { delta: true },
-  });
+  const result = await withTenant(tenantId, (tx) =>
+    tx.creditLedger.aggregate({
+      where: { tenantId },
+      _sum: { delta: true },
+    })
+  );
   return result._sum.delta || 0;
 }
 
@@ -308,7 +318,10 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   const credits = creditsForUsage(result.inputTokens, result.outputTokens);
   const promptHash = hashMessages(messages);
 
-  await prisma.$transaction(async (tx: TenantTx) => {
+  // `withTenant`, not a bare `$transaction`: both tables below are FORCE RLS
+  // and their WITH CHECK compares "tenantId" to app.tenant_id, which only
+  // `withTenant` sets. A bare transaction is refused outright (42501).
+  await withTenant(options.tenantId, async (tx: TenantTx) => {
     await tx.aiUsageLog.create({
       data: {
         tenantId: options.tenantId,
@@ -456,21 +469,29 @@ export async function embedText(
   }
 
   // The request has been made — the record is now mandatory, not best-effort.
+  const scope = attribution.tenantId ?? PLATFORM_SCOPE_TENANT_ID;
   try {
-    await prisma.aiUsageLog.create({
-      data: {
-        tenantId: attribution.tenantId ?? PLATFORM_SCOPE_TENANT_ID,
-        userId: attribution.userId,
-        module: attribution.module,
-        purpose: attribution.purpose,
-        provider: 'openai',
-        model,
-        promptHash: hashPrompt(text),
-        inputTokens: data?.usage?.prompt_tokens ?? 0,
-        outputTokens: 0,
-        credits: 0,
-      },
-    });
+    // `withTenant(scope)` and not the global client: AiUsageLog is FORCE RLS, so
+    // an INSERT with app.tenant_id unset is refused (42501) no matter how well
+    // formed the row is. The platform scope goes through the same wrapper — it
+    // matches no Tenant row, but the policy compares strings, not foreign keys,
+    // so `app.tenant_id = '__platform__'` satisfies the WITH CHECK exactly.
+    await withTenant(scope, (tx) =>
+      tx.aiUsageLog.create({
+        data: {
+          tenantId: scope,
+          userId: attribution.userId,
+          module: attribution.module,
+          purpose: attribution.purpose,
+          provider: 'openai',
+          model,
+          promptHash: hashPrompt(text),
+          inputTokens: data?.usage?.prompt_tokens ?? 0,
+          outputTokens: 0,
+          credits: 0,
+        },
+      })
+    );
   } catch (e) {
     console.error('[embedText] AiUsageLog write failed after a provider call', e);
     throw new AiUsageLogWriteError(

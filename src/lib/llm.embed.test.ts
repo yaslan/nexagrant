@@ -15,10 +15,19 @@ import crypto from 'crypto';
 const mockPrisma = vi.hoisted(() => ({
   aiUsageLog: { create: vi.fn() },
   creditLedger: { aggregate: vi.fn(), create: vi.fn() },
-  $transaction: vi.fn(),
+  withTenant: vi.fn(),
 }));
 
-vi.mock('@/lib/db', () => ({ prisma: mockPrisma }));
+/**
+ * TASK-MTSYH8LDGV5YU — `AiUsageLog` is FORCE ROW LEVEL SECURITY and its policy
+ * is `WITH CHECK ("tenantId" = current_setting('app.tenant_id', true))`. Only
+ * `withTenant` sets that setting, so the write above had to move inside it: on
+ * the real NOBYPASSRLS role the old global-client INSERT was refused with 42501
+ * for BOTH the tenant and the platform scope. No `prisma` export here, so a
+ * write that goes back around the wrapper fails the suite rather than only
+ * failing in production.
+ */
+vi.mock('@/lib/db', () => ({ withTenant: mockPrisma.withTenant }));
 
 const mockEnv = vi.hoisted(() => ({ OPENAI_API_KEY: 'sk-test-key' as string | undefined }));
 vi.mock('@/lib/env', () => ({ env: mockEnv }));
@@ -53,6 +62,10 @@ describe('embedText — every provider call leaves an AiUsageLog row', () => {
     vi.clearAllMocks();
     mockEnv.OPENAI_API_KEY = 'sk-test-key';
     mockPrisma.aiUsageLog.create.mockResolvedValue({ id: 'log_1' });
+    mockPrisma.withTenant.mockImplementation(
+      async (_tenantId: string, cb: (tx: unknown) => Promise<unknown>) =>
+        cb({ aiUsageLog: mockPrisma.aiUsageLog, creditLedger: mockPrisma.creditLedger })
+    );
   });
 
   afterEach(() => {
@@ -139,6 +152,52 @@ describe('embedText — every provider call leaves an AiUsageLog row', () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.dimensions).toBe(1536);
+  });
+
+  it('opens the tenant scope the row is attributed to, so RLS accepts the insert', async () => {
+    stubEmbeddingsEndpoint();
+
+    await embedText(SECRET_TEXT, attribution);
+
+    // The scope and the row must name the same tenant: the policy compares the
+    // two, so any drift here is a 42501 in production and nothing else.
+    expect(mockPrisma.withTenant).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.withTenant.mock.calls[0]![0]).toBe('tenant_1');
+    expect(mockPrisma.aiUsageLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant_1' }) })
+    );
+  });
+
+  it('opens the platform scope for a platform-scoped call, matching the row it writes', async () => {
+    stubEmbeddingsEndpoint();
+
+    await embedText('CORDIS shared corpus row', {
+      tenantId: null,
+      module: 'K6',
+      purpose: 'cordis_ingest_embedding',
+    });
+
+    // `__platform__` matches no Tenant row, but tenant_isolation compares
+    // strings rather than foreign keys, so the wrapper satisfies WITH CHECK.
+    expect(mockPrisma.withTenant.mock.calls[0]![0]).toBe(PLATFORM_SCOPE_TENANT_ID);
+    expect(mockPrisma.aiUsageLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantId: PLATFORM_SCOPE_TENANT_ID }),
+      })
+    );
+  });
+
+  it('reports an RLS refusal as a log-write failure rather than returning the vector', async () => {
+    // What production actually threw before this fix. The vector is already
+    // paid for and the text has already left; returning it unlogged is the hole.
+    stubEmbeddingsEndpoint();
+    mockPrisma.withTenant.mockRejectedValue(
+      Object.assign(new Error('new row violates row-level security policy for table "AiUsageLog"'), {
+        code: 'P2039',
+      })
+    );
+
+    await expect(embedText(SECRET_TEXT, attribution)).rejects.toBeInstanceOf(AiUsageLogWriteError);
   });
 
   it('surfaces a failed log write instead of returning a silently unlogged vector', async () => {
