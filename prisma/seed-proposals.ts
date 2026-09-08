@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../src/lib/db';
 
 interface ProposalData {
@@ -44,17 +45,11 @@ export default async function seedProposals() {
 
     const proposalId = `demo-proposal-${pData.opportunityIndex}`;
 
-    // Built up field by field because submittedAt/outcome/esrScores are only
-    // set when the fixture has them.
-    const createData: {
-      id: string;
-      tenantId: string;
-      opportunityId: string;
-      acronym: string;
-      submittedAt?: Date;
-      outcome?: string;
-      esrScores?: unknown;
-    } = {
+    // Built up field by field because submittedAt/outcome are only set when the
+    // fixture has them. Typed as the generated create input rather than a
+    // hand-written shape, so a column the schema does not have is a build error
+    // instead of a PrismaClientValidationError at seed time.
+    const createData: Prisma.ProposalUncheckedCreateInput = {
       id: proposalId,
       tenantId: TENANT_ID,
       opportunityId: opportunity.id,

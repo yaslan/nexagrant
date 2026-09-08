@@ -1,5 +1,4 @@
 import React from 'react';
-import Script from 'next/script';
 import type { Metadata } from 'next';
 import { getLocale } from 'next-intl/server';
 import { env } from '@/lib/env';
@@ -31,9 +30,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
-        <Script
-          id="theme-init"
-          strategy="beforeInteractive"
+        <script
           dangerouslySetInnerHTML={{
             __html: themeInitScript,
           }}

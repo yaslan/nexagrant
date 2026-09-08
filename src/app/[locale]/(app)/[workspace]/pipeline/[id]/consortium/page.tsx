@@ -82,21 +82,23 @@ export default async function ConsortiumPage({
     );
 
     if (opportunity) {
-      seats = await withTenant<ConsortiumSeat[]>(tenantId, (tx) =>
+      const rawSeats = await withTenant(tenantId, (tx) =>
         tx.consortiumSeat.findMany({
           where: { opportunityId: id, tenantId },
           orderBy: { roleKey: 'asc' },
         })
       );
+      seats = rawSeats as unknown as ConsortiumSeat[];
 
       const seatIds = seats.map((s) => s.id);
       if (seatIds.length > 0) {
-        candidates = await withTenant<SeatCandidate[]>(tenantId, (tx) =>
+        const rawCandidates = await withTenant(tenantId, (tx) =>
           tx.seatCandidate.findMany({
             where: { seatId: { in: seatIds }, tenantId },
             orderBy: { rank: 'asc' },
           })
         );
+        candidates = rawCandidates as unknown as SeatCandidate[];
       }
 
       const orgIds = [

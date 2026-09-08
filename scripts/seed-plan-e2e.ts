@@ -29,6 +29,7 @@
  */
 import 'dotenv/config';
 
+import type { Role } from '@prisma/client';
 import { prisma } from '../src/lib/db';
 
 interface PlanFixture {
@@ -40,7 +41,7 @@ interface PlanFixture {
   opportunityId: string;
   /** The plan the fixture is seeded at; `flip` moves away from it and back. */
   planId: string;
-  role: string;
+  role: Role;
 }
 
 export const PLAN_E2E = {

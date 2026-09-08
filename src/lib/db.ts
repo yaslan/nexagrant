@@ -1,8 +1,56 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
+import { assertEnvelopedOrNull } from '@/lib/calendar/token-envelope';
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://fabrika:fabrika@localhost:5432/fabrika';
+
+function guardCalendarTokenWrite(data: unknown): void {
+  if (!data || typeof data !== 'object') return;
+  const record = data as Record<string, unknown>;
+  if ('accessToken' in record) {
+    assertEnvelopedOrNull(record.accessToken as string | null | undefined, 'accessToken');
+  }
+  if ('refreshToken' in record) {
+    assertEnvelopedOrNull(record.refreshToken as string | null | undefined, 'refreshToken');
+  }
+}
+
+/**
+ * Machine-enforced version of the contract in `src/lib/calendar/token-envelope.ts`:
+ * every `calendarConnection` create/update/upsert on this client is checked
+ * before it reaches Postgres, so a future write path that forgets to encrypt a
+ * token fails loudly instead of landing a plaintext row. Applied in
+ * `createDbClient` (not just the `prisma` singleton) so every client this
+ * module hands out — including the RLS-role test client — carries it, and it
+ * survives into `$transaction`'s `tx` because Prisma extensions apply there too.
+ */
+function withCalendarTokenGate(client: PrismaClient): PrismaClient {
+  return client.$extends({
+    name: 'calendar-token-envelope-gate',
+    query: {
+      calendarConnection: {
+        create({ args, query }) {
+          guardCalendarTokenWrite(args.data);
+          return query(args);
+        },
+        update({ args, query }) {
+          guardCalendarTokenWrite(args.data);
+          return query(args);
+        },
+        updateMany({ args, query }) {
+          guardCalendarTokenWrite(args.data);
+          return query(args);
+        },
+        upsert({ args, query }) {
+          guardCalendarTokenWrite(args.create);
+          guardCalendarTokenWrite(args.update);
+          return query(args);
+        },
+      },
+    },
+  }) as unknown as PrismaClient;
+}
 
 /**
  * Builds a Prisma client over its own pg pool.
@@ -20,7 +68,7 @@ export function createDbClient(url: string): PrismaClient {
     connectionTimeoutMillis: 1000,
     idleTimeoutMillis: 5000,
   });
-  return new PrismaClient({ adapter: new PrismaPg(pool) });
+  return withCalendarTokenGate(new PrismaClient({ adapter: new PrismaPg(pool) }));
 }
 
 const globalForPrisma = globalThis as unknown as {
@@ -31,7 +79,7 @@ export const prisma: PrismaClient = globalForPrisma.prisma ?? createDbClient(con
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-export type TenantTx = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
+export type TenantTx = Prisma.TransactionClient;
 
 /**
  * Same as {@link withTenant}, but on an explicitly supplied client. Keeps the

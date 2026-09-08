@@ -27,7 +27,11 @@
 import { DEFAULT_GATE_RULES, DEFAULT_SCORING_WEIGHTS } from './defaults';
 
 /** The seven weighted G0 features, each normalised to 0–100. */
-export interface G0Features {
+// A type alias rather than an interface on purpose: this payload is written
+// verbatim into `TopicMatch.breakdown` and `Evidence.payload`, both JSON
+// columns, and only an object literal type (or an alias of one) carries the
+// implicit index signature that makes it assignable to a JSON value.
+export type G0Features = {
   /** Topic ↔ TenantProfile fit. `TopicMatch.fitScore` (cosine + rule corrections). Weight 30. */
   alignment: number;
   /** Historical success rate for the topic prefix, already normalised — see `baseRateToScore`. Weight 15. */

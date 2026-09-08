@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../src/lib/db';
 import {
   CATALOG_CURRENCY,
@@ -154,7 +155,13 @@ async function seedG0DemoEvidence() {
     { id: 'demo-seat-opp5-end-user', opportunityId: 'demo-opp-5', roleKey: 'end_user' },
   ];
   for (const s of seats) {
-    const data = { tenantId: TENANT_ID, opportunityId: s.opportunityId, roleKey: s.roleKey, required: true, status: 'CONFIRMED' };
+    const data: Omit<Prisma.ConsortiumSeatUncheckedCreateInput, 'id'> = {
+      tenantId: TENANT_ID,
+      opportunityId: s.opportunityId,
+      roleKey: s.roleKey,
+      required: true,
+      status: 'CONFIRMED',
+    };
     await prisma.consortiumSeat.upsert({ where: { id: s.id }, update: data, create: { id: s.id, ...data } });
   }
 

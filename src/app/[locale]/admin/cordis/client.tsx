@@ -45,12 +45,12 @@ interface K2ImportRun {
   status: string;
   fileHash: string | null;
   /** Json column; the importer writes K2RowCounts, or a `{ message }` note. */
-  rowCounts: K2RowCounts | null;
+  rowCounts: K2RowCounts | unknown | null;
   error: string | null;
 }
 
 /** The K2 ingestion status header: current table counts plus the last run. */
-interface K2Status {
+export interface K2Status {
   lastRun?: K2ImportRun | null;
   rowCounts?: K2RowCounts;
 }
@@ -130,7 +130,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
       const res = await handleRunCordisImportAction(selectedDataset, limit);
       setImportResult(res);
       const updatedStatus = await handleGetK2Status();
-      setK2Status(updatedStatus);
+      setK2Status(updatedStatus as unknown as K2Status);
     } catch (err) {
       setImportResult({ success: false, error: errorMessage(err, 'Import failed')});
     } finally {
@@ -341,7 +341,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                 <div>
                   <span className="text-muted block text-[11px]">Son Aktarılan Satırlar:</span>
                   <span className="font-bold text-ink">
-                    {k2Status.lastRun.rowCounts?.projects || 0} proje / {k2Status.lastRun.rowCounts?.organizations || 0} org
+                    {(k2Status.lastRun.rowCounts as K2RowCounts | null)?.projects || 0} proje / {(k2Status.lastRun.rowCounts as K2RowCounts | null)?.organizations || 0} org
                   </span>
                 </div>
               </div>

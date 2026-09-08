@@ -5,14 +5,15 @@ import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
 
-import { 
+import {
   ApplicationPartRow,
-  PartBSectionItem, 
+  PartBSectionItem,
   PartContent,
-  SectionRevisionItem, 
-  SectionCommentItem, 
-  CollaboratorPresence, 
-  DEFAULT_PART_B_SECTIONS 
+  SectionRevisionItem,
+  SectionCommentItem,
+  CollaboratorPresence,
+  DEFAULT_PART_B_SECTIONS,
+  readPartContent,
 } from '../types';
 import { errorMessage } from '@/lib/errors';
 
@@ -47,7 +48,7 @@ async function loadPart(tenantId: string, partId: string): Promise<ApplicationPa
 }
 
 /** Writes a part's content back, refusing rows outside the tenant. */
-async function savePartContent(tenantId: string, partId: string, content: unknown): Promise<boolean> {
+async function savePartContent(tenantId: string, partId: string, content: PartContent): Promise<boolean> {
   const result = await withTenant<{ count: number }>(tenantId, (tx) =>
     tx.applicationPart.updateMany({ where: { id: partId, tenantId }, data: { content } })
   );
@@ -101,7 +102,7 @@ export async function getPartBData(partId: string) {
   try {
     const part = await loadPart(tenantId, partId);
     if (part && part.content) {
-      const content: PartContent = part.content || {};
+      const content = readPartContent(part.content);
       if (!content.sections || content.sections.length === 0) {
         content.sections = DEFAULT_PART_B_SECTIONS;
       }
@@ -141,7 +142,7 @@ export async function acquireSectionLock(
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: PartContent = part.content || {};
+      const content = readPartContent(part.content);
       const sections: PartBSectionItem[] = content.sections || [...DEFAULT_PART_B_SECTIONS];
       
       const targetSec = sections.find((s) => s.key === sectionKey);
@@ -180,7 +181,7 @@ export async function releaseSectionLock(partId: string, sectionKey: string, use
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: PartContent = part.content || {};
+      const content = readPartContent(part.content);
       const sections: PartBSectionItem[] = content.sections || [];
       const targetSec = sections.find((s) => s.key === sectionKey);
       if (targetSec && (targetSec.lockedBy === userId || !targetSec.lockedBy)) {
@@ -215,7 +216,7 @@ export async function updateSectionContent(
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: PartContent = part.content || {};
+      const content = readPartContent(part.content);
       const sections: PartBSectionItem[] = content.sections || [...DEFAULT_PART_B_SECTIONS];
       const revisions: SectionRevisionItem[] = content.revisions || [];
 
@@ -277,7 +278,7 @@ export async function addSectionComment(
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: PartContent = part.content || {};
+      const content = readPartContent(part.content);
       const comments: SectionCommentItem[] = content.comments || [];
       content.comments = [newComment, ...comments];
 
@@ -296,7 +297,7 @@ export async function resolveSectionComment(partId: string, sectionKey: string, 
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: PartContent = part.content || {};
+      const content = readPartContent(part.content);
       const comments: SectionCommentItem[] = content.comments || [];
       const target = comments.find((c) => c.id === commentId);
       if (target) {
@@ -319,7 +320,7 @@ export async function restoreSectionRevision(partId: string, sectionKey: string,
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: PartContent = part.content || {};
+      const content = readPartContent(part.content);
       const sections: PartBSectionItem[] = content.sections || [];
       const revisions: SectionRevisionItem[] = content.revisions || [];
 
@@ -369,7 +370,7 @@ export async function updatePresenceHeartbeat(
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: PartContent = part.content || {};
+      const content = readPartContent(part.content);
       let presenceList: CollaboratorPresence[] = content.presence || [];
       
       // Filter out stale (>90s) and current user
@@ -447,7 +448,7 @@ export async function addBudgetLine(
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: PartContent = part.content || { budget: [] };
+      const content = readPartContent(part.content);
       content.budget = content.budget || [];
       content.budget.push({
         partnerName,
@@ -489,7 +490,7 @@ export async function addWorkPackage(
   try {
     const part = await loadPart(tenantId, partId);
     if (part) {
-      const content: PartContent = part.content || { workPackages: [] };
+      const content = readPartContent(part.content);
       content.workPackages = content.workPackages || [];
       content.workPackages.push({
         code: wpData.code,
@@ -548,7 +549,7 @@ export async function addBudgetLineByToken(
     return { success: false };
   }
 
-  const content: PartContent = part.content || { budget: [] };
+  const content = readPartContent(part.content);
   content.budget = content.budget || [];
   content.budget.push({
     partnerName,

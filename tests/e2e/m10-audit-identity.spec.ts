@@ -1,5 +1,6 @@
 import { test, expect, type BrowserContext, type Page, type Request } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
+import type { Role } from '@prisma/client';
 
 import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
@@ -69,7 +70,7 @@ const ACTOR_A = `E2E Approver A ${RUN}`;
 const ACTOR_B = `E2E Approver B ${RUN}`;
 
 /** The second approver — a real member of the same tenant, seeded by this spec. */
-const USER_B = {
+const USER_B: { id: string; email: string; role: Role } = {
   id: 'plan-e2e-ultra-user-b',
   email: 'plan-e2e-ultra-b@fabrika.test',
   role: 'PIPELINE_MANAGER',

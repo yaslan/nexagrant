@@ -13,7 +13,8 @@ export interface EnterpriseSsoConfig {
 }
 
 /** What `Tenant.settings.sso` holds once an admin has configured a domain. */
-export interface StoredSsoSettings {
+/** Stored verbatim in `Tenant.settings.sso`, a JSON column — hence a type alias, not an interface (only an alias carries the implicit index signature a JSON value needs). */
+export type StoredSsoSettings = {
   domain: string;
   idpEntityId: string;
   ssoAcsUrl: string;

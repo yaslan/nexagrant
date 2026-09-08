@@ -21,13 +21,6 @@ type FollowupDocRow = DocItem & {
   }[];
 };
 
-interface OpportunityWithDocs {
-  id: string;
-  tenantId: string;
-  title: string;
-  followupDocs: FollowupDocRow[];
-}
-
 export default async function DocumentsPage({
   params
 }: {
@@ -49,7 +42,7 @@ export default async function DocumentsPage({
   //
   // The catch is gone with it on purpose: `notFound()` signals by throwing, so
   // leaving a catch here would swallow it and put the page back where it was.
-  const opp = await withTenant<OpportunityWithDocs | null>(tenantId, (tx) =>
+  const opp = await withTenant(tenantId, (tx) =>
     tx.opportunity.findFirst({
       where: { id, tenantId },
       include: {
@@ -65,9 +58,11 @@ export default async function DocumentsPage({
     notFound();
   }
 
+  const followupDocs = (opp.followupDocs || []) as unknown as FollowupDocRow[];
+
   // TASK-MTSAIWF4ENUSL — the flow is read from the database, not rebuilt from a
   // click. A finance approval given before a reload is still here after it.
-  const docs: DocItem[] = (opp.followupDocs || []).map((d) => ({
+  const docs: DocItem[] = followupDocs.map((d) => ({
     id: d.id,
     kind: d.kind,
     version: d.version,
@@ -85,7 +80,7 @@ export default async function DocumentsPage({
   }));
 
   // The banner shows one flow at a time: the one opened most recently.
-  const inFlow = (opp.followupDocs || [])
+  const inFlow = followupDocs
     .filter((d) => d.approvalSubmittedAt)
     .sort((a, b) => b.approvalSubmittedAt!.getTime() - a.approvalSubmittedAt!.getTime())[0];
   const initialApproval: DualApprovalState | null =

@@ -4,7 +4,6 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
-import type { ApiKeyRow, MarketplaceListingRow } from '@/types/db-rows';
 
 /**
  * Marketplace listings, orders and API keys.
@@ -29,7 +28,7 @@ export async function createMarketplaceListing({
 }) {
   const { tenantId } = await requireTenantAction();
 
-  const listing = await withTenant<MarketplaceListingRow>(tenantId, (tx) =>
+  const listing = await withTenant(tenantId, (tx) =>
     tx.marketplaceListing.create({
       data: {
         tenantId,
@@ -91,7 +90,7 @@ export async function generateApiKey({ name }: { name: string }) {
 
   // No offline fallback: a key the caller believes exists but that was never
   // stored authenticates nothing, and printing one is worse than an error.
-  const apiKeyRecord = await withTenant<ApiKeyRow>(tenantId, (tx) =>
+  const apiKeyRecord = await withTenant(tenantId, (tx) =>
     tx.apiKey.create({
       data: {
         tenantId,
@@ -115,7 +114,7 @@ export async function revokeApiKey(keyId: string) {
 
   // `deleteMany` so the tenant is part of the WHERE clause; `delete` takes only
   // a unique selector and would revoke another tenant's key.
-  const deleted = await withTenant<{ count: number }>(tenantId, (tx) =>
+  const deleted = await withTenant(tenantId, (tx) =>
     tx.apiKey.deleteMany({ where: { id: keyId, tenantId } })
   );
 

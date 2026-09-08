@@ -29,13 +29,13 @@ export async function createConceptNote(
   if (!template) throw new Error('Template not found');
 
   // Initialize empty content from template schema
-  const schema = template.schema as ConceptTemplateSchema;
+  const schema = template.schema as unknown as ConceptTemplateSchema;
   const content: Record<string, string> = {};
   for (const section of schema.sections) {
     content[section.key] = '';
   }
 
-  const note = await withTenant<{ id: string }>(tenantId, (tx) =>
+  const note = await withTenant(tenantId, (tx) =>
     tx.conceptNote.create({
     data: {
       tenantId,

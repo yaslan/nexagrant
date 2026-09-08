@@ -25,7 +25,7 @@ export async function getEvidenceItemsAction(categoryFilter?: string) {
       whereClause.category = categoryFilter;
     }
 
-    const items = await withTenant<EvidenceItemData[]>(tenantId, (tx) =>
+    const items = await withTenant(tenantId, (tx) =>
       tx.evidence.findMany({
         where: whereClause,
         include: {
@@ -35,11 +35,11 @@ export async function getEvidenceItemsAction(categoryFilter?: string) {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { updatedAt: 'desc' },
       })
     );
 
-    return items;
+    return (items as unknown as EvidenceItemData[]) || [];
   } catch (error) {
     console.warn(`[getEvidenceItemsAction] DB error: ${errorMessage(error)}`);
     return [];
@@ -98,7 +98,7 @@ export async function confirmEvidenceUploadAction(data: {
   const finalValidUntil = data.validUntil ? new Date(data.validUntil) : null;
 
   try {
-    const evidence = await withTenant<EvidenceItemData>(tenantId, async (tx) => {
+    const evidence = await withTenant(tenantId, async (tx) => {
       const created = await tx.evidence.create({
       data: {
         tenantId,
@@ -197,7 +197,7 @@ export async function createEvidence(formData: FormData) {
   const extracted = await extractEvidenceMetadata();
 
   try {
-    const evidence = await withTenant<EvidenceItemData>(tenantId, (tx) =>
+    const rawEvidence = await withTenant(tenantId, (tx) =>
       tx.evidence.create({
       data: {
         tenantId,
@@ -217,6 +217,7 @@ export async function createEvidence(formData: FormData) {
       },
       })
     );
+    const evidence = rawEvidence as unknown as EvidenceItemData;
 
     revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
     return evidence;

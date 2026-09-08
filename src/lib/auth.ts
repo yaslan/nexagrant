@@ -4,7 +4,7 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Adapter, AdapterAccount, AdapterSession, AdapterUser } from "next-auth/adapters";
-import type { OrgType } from "@prisma/client";
+import type { OrgType, Role } from "@prisma/client";
 import { prisma } from "./db";
 import { env } from "./env";
 import { errorMessage } from '@/lib/errors';
@@ -25,7 +25,7 @@ import { errorMessage } from '@/lib/errors';
  * address the user actually signed in with, and after that it is whatever the
  * User row holds.
  */
-const DEMO_PROFILES: Record<string, { orgName: string; orgType: OrgType; role: string; isPlatformAdmin?: boolean }> = {
+const DEMO_PROFILES: Record<string, { orgName: string; orgType: OrgType; role: Role; isPlatformAdmin?: boolean }> = {
   "admin@yasinaslan.com.tr": {
     orgName: "FonBridge HQ",
     orgType: "CONSULTANCY",

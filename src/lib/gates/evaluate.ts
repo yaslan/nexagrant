@@ -1,3 +1,4 @@
+import type { JsonObject } from '@/types/json';
 import { withTenant, type TenantTx } from '../db';
 import { DEFAULT_GATE_RULES } from '../scoring/defaults';
 import { computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
@@ -82,7 +83,7 @@ async function runGate(
     throw new GateOpportunityNotFoundError(opportunityId, tenantId);
   }
 
-  const inputs: Record<string, unknown> = {
+  const inputs: JsonObject = {
     opportunityId: opp.id,
     stage: opp.stage,
     intendedRole: opp.intendedRole,

@@ -18,7 +18,7 @@ export default async function EvidencePage({
 
   let evidence: EvidenceItemData[] = [];
   try {
-    evidence = await prisma.evidence.findMany({
+    const rawItems = await prisma.evidence.findMany({
       where: tenantId ? { tenantId } : {},
       // The detail drawer distinguishes "no claim is linked" from "claims were not
       // loaded", so the links have to come with the first render, not only from
@@ -26,6 +26,7 @@ export default async function EvidencePage({
       include: { claimLinks: { include: { claim: true } } },
       orderBy: { createdAt: 'desc' }
     });
+    evidence = rawItems as unknown as EvidenceItemData[];
   } catch (e) {
     console.warn(`[Evidence] DB query bypassed: ${errorMessage(e)}`);
   }

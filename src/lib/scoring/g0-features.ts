@@ -88,7 +88,8 @@ export interface G0Snapshot {
 
 export type G0SourceStatus = 'measured' | 'missing';
 
-export interface G0Source {
+/** @see G0Features — a type alias, so the source trail stays JSON-assignable. */
+export type G0Source = {
   feature: keyof G0Features | 'baseRatePct' | 'countryEligible';
   /** The table/column the value came from, or the one that was absent. */
   source: string;

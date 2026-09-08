@@ -19,6 +19,7 @@
  * evidence for it.
  */
 
+import type { JsonObject } from '@/types/json';
 import type { TenantTx } from '../db';
 import { withTenant } from '../db';
 import { decideG0, type G0Decision, type G0Features, type G0Result } from './g0-canonical';
@@ -385,7 +386,7 @@ function isPlaceholderFitScore(breakdown: unknown): boolean {
 }
 
 /** The JSON stored in `TopicMatch.breakdown` and echoed into `GateDecision.inputs`. */
-export function g0EvidencePayload(computation: G0Computation): Record<string, unknown> {
+export function g0EvidencePayload(computation: G0Computation): JsonObject {
   return {
     scoringVersion: computation.scoringVersion,
     score: computation.score,

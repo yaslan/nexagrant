@@ -79,7 +79,7 @@ export default async function PipelinePage({
 
   let dbOpportunities: OpportunityItem[] = [];
   try {
-    dbOpportunities = await withTenant(tenantId, (tx) =>
+    const rows = await withTenant(tenantId, (tx) =>
       tx.opportunity.findMany({
         // `deletedAt: null`: a soft-deleted (KVKK/GDPR erasure) opportunity must leave the board,
         // not linger on it as a card nobody can get rid of.
@@ -87,6 +87,7 @@ export default async function PipelinePage({
         orderBy: { updatedAt: 'desc' }
       })
     );
+    dbOpportunities = rows as unknown as OpportunityItem[];
   } catch (e) {
     console.warn(`[Pipeline] DB query bypassed: ${errorMessage(e)}`);
   }

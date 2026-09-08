@@ -5,7 +5,6 @@ import { requireTenantAction } from '@/lib/tenant';
 import { scoreCandidatesForSeat, detectConflicts } from '@/lib/scoring/consortium';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
-import type { ConsortiumSeat } from './manager';
 
 /**
  * M8 consortium seats.
@@ -23,7 +22,7 @@ const PIPELINE_PATH = '/[locale]/(app)/[workspace]/pipeline';
 export async function addSeat(opportunityId: string, roleKey: string, required: boolean = true) {
   const { tenantId } = await requireTenantAction();
 
-  const seat = await withTenant<ConsortiumSeat | null>(tenantId, async (tx) => {
+  const seat = await withTenant(tenantId, async (tx) => {
     // The opportunity must belong to this tenant; an id is guessable.
     const opp = await tx.opportunity.findFirst({
       where: { id: opportunityId, tenantId },

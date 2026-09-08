@@ -2,6 +2,7 @@
  * K2 CORDIS CSV Schema Mapping & Data Normalization Engine
  * Handles official EU CORDIS datasets (Horizon Europe, H2020)
  */
+import type { JsonObject } from '@/types/json';
 
 export interface RawCsvRow {
   [key: string]: string | undefined;
@@ -27,7 +28,7 @@ export interface ParsedCordisProject {
   grantDoi?: string;
   contentUpdateDate?: Date;
   /** The upstream CSV row as parsed, kept verbatim for re-normalisation. */
-  rawJson?: Record<string, unknown>;
+  rawJson?: JsonObject;
 }
 
 export interface ParsedCordisOrganization {
@@ -46,7 +47,7 @@ export interface ParsedCordisOrganization {
   url?: string;
   isTurkish: boolean;
   /** The upstream CSV row as parsed, kept verbatim for re-normalisation. */
-  rawJson?: Record<string, unknown>;
+  rawJson?: JsonObject;
 }
 
 export interface ParsedCordisParticipation {
@@ -154,10 +155,13 @@ export function mapProjectRow(row: RawCsvRow, defaultFramework: string): ParsedC
     'rcn', 'grantDoi', 'keywords', 'Human-validated', 'legalBasis'
   ]);
 
-  const rawJson: Record<string, unknown> = {};
+  const rawJson: JsonObject = {};
   for (const key of Object.keys(row)) {
-    if (!knownFields.has(key) && row[key] !== undefined && row[key] !== '') {
-      rawJson[key] = row[key];
+    // Read once into a local: `row[key]` on a non-literal key does not narrow,
+    // so the guard below would not tell the compiler the value is a string.
+    const value = row[key];
+    if (!knownFields.has(key) && value !== undefined && value !== '') {
+      rawJson[key] = value;
     }
   }
 
@@ -201,10 +205,13 @@ export function mapOrganizationAndParticipationRow(
     'order', 'role', 'ecContribution', 'netEcContribution', 'totalCost', 'endOfParticipation', 'active'
   ]);
 
-  const rawJson: Record<string, unknown> = {};
+  const rawJson: JsonObject = {};
   for (const key of Object.keys(row)) {
-    if (!knownFields.has(key) && row[key] !== undefined && row[key] !== '') {
-      rawJson[key] = row[key];
+    // Read once into a local: `row[key]` on a non-literal key does not narrow,
+    // so the guard below would not tell the compiler the value is a string.
+    const value = row[key];
+    if (!knownFields.has(key) && value !== undefined && value !== '') {
+      rawJson[key] = value;
     }
   }
 

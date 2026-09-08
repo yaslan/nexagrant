@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import type { ModuleStatus } from '@prisma/client';
 
 import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
@@ -41,7 +42,7 @@ async function setPlan(planId: string) {
   });
 }
 
-async function setM10(status: string) {
+async function setM10(status: ModuleStatus) {
   await prisma.moduleState.upsert({
     where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M10' } },
     update: { status },

@@ -5,12 +5,21 @@
  * for score integrity, reviewer access, and tenant isolation.
  */
 
+import { prisma, withTenant } from '@/lib/db';
 import {
   compareWithEsr,
+  esrScoreFromProposal,
   storedPanelAverage,
   type EsrComparisonResult,
   type TenantScopedDb,
 } from './scoring';
+
+export interface M6EsrComparisonResult extends EsrComparisonResult {
+  m6Score: number;
+  esrScore: number;
+  agreement: boolean;
+  delta: number;
+}
 
 /**
  * Compare M6 panel score to ESR for a specific evaluation.
@@ -20,12 +29,48 @@ import {
  * @throws UnauthorizedError if reviewer lacks access
  */
 export async function compareM6ToESR(
+  evaluationId: string,
+  tenantId?: string,
+): Promise<M6EsrComparisonResult>;
+export async function compareM6ToESR(
   db: TenantScopedDb,
   evaluationId: string,
   tenantId: string,
   currentUserId?: string,
-): Promise<EsrComparisonResult> {
-  // Fetch evaluation with proposal and scores
+): Promise<M6EsrComparisonResult>;
+export async function compareM6ToESR(
+  dbOrEvaluationId: TenantScopedDb | string,
+  evaluationIdOrTenantId?: string,
+  tenantIdParam?: string,
+  currentUserId?: string,
+): Promise<M6EsrComparisonResult> {
+  if (typeof dbOrEvaluationId === 'string') {
+    const evaluationId = dbOrEvaluationId;
+    const tenantId = evaluationIdOrTenantId;
+    if (tenantId) {
+      return withTenant(tenantId, (tx) =>
+        compareM6ToESRInternal(tx, evaluationId, tenantId, currentUserId)
+      );
+    }
+    return compareM6ToESRInternal(
+      prisma as unknown as TenantScopedDb,
+      evaluationId,
+      undefined,
+      currentUserId
+    );
+  }
+  const db = dbOrEvaluationId;
+  const evaluationId = evaluationIdOrTenantId!;
+  const tenantId = tenantIdParam;
+  return compareM6ToESRInternal(db, evaluationId, tenantId, currentUserId);
+}
+
+async function compareM6ToESRInternal(
+  db: TenantScopedDb,
+  evaluationId: string,
+  tenantId?: string,
+  currentUserId?: string,
+): Promise<M6EsrComparisonResult> {
   const evaluation = await db.evaluation.findUnique({
     where: { id: evaluationId },
     include: {
@@ -41,7 +86,7 @@ export async function compareM6ToESR(
     },
   });
 
-  if (!evaluation || evaluation.tenantId !== tenantId) {
+  if (!evaluation || (tenantId && evaluation.tenantId !== tenantId)) {
     throw new Error(`Evaluation ${evaluationId} not found or access denied`);
   }
 
@@ -49,7 +94,6 @@ export async function compareM6ToESR(
     throw new Error(`Proposal for evaluation ${evaluationId} not found or has no ESR scores`);
   }
 
-  // Validate current user is a reviewer (if provided)
   if (currentUserId) {
     const isReviewer = evaluation.reviewers.some(
       (r: (typeof evaluation.reviewers)[number]) => r.userId === currentUserId,
@@ -59,10 +103,6 @@ export async function compareM6ToESR(
     }
   }
 
-  // Use the evaluation's avgScore if already calculated, otherwise compute from submitted
-  // reviews. `storedPanelAverage` rather than a falsy check: the guard has to reject a
-  // stored 0 (never a real 1..5 mean) while a legitimate low average like 1.0 — which
-  // `!panelScore` would have accepted anyway — keeps its own value.
   let panelScore = storedPanelAverage(evaluation.avgScore);
   if (panelScore === null) {
     const submittedReviews = evaluation.reviewers.filter(
@@ -72,7 +112,6 @@ export async function compareM6ToESR(
       throw new Error(`No completed reviews yet for evaluation ${evaluationId}`);
     }
 
-    // Compute unweighted average from all submitted scores
     const allScores = submittedReviews.flatMap(
       (r: (typeof submittedReviews)[number]) =>
         r.scores.map((s: (typeof r.scores)[number]) => s.score),
@@ -83,7 +122,27 @@ export async function compareM6ToESR(
     panelScore = allScores.reduce((a: number, b: number) => a + b, 0) / allScores.length;
   }
 
-  return compareWithEsr(panelScore, evaluation.proposal.esrScores);
+  const baseResult = compareWithEsr(panelScore, evaluation.proposal.esrScores);
+
+  const rawEsr = evaluation.proposal.esrScores;
+  const esrScoreNum =
+    typeof rawEsr === 'number'
+      ? rawEsr
+      : (baseResult.esrScore ?? esrScoreFromProposal(rawEsr) ?? 0);
+
+  const m6Score = Number(panelScore.toFixed(2));
+  const esrScore = Number(esrScoreNum.toFixed(2));
+  const delta = Number((esrScore - m6Score).toFixed(2));
+  // Agreement: true if M6 <= ESR and difference is within 0.5 points
+  const agreement = m6Score <= esrScore && Math.abs(delta) <= 0.5;
+
+  return {
+    ...baseResult,
+    m6Score,
+    esrScore,
+    agreement,
+    delta,
+  };
 }
 
 /**

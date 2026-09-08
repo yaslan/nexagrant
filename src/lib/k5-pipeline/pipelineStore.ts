@@ -1,6 +1,5 @@
-// Resilient In-Memory Store for K5 Pipeline & Opportunity Management
-
 import { withTenant } from '@/lib/db';
+import type { OppStatus } from '@prisma/client';
 
 export interface NoteEntry {
   id: string;
@@ -20,7 +19,7 @@ export interface OpportunityItem {
   ownerId?: string | null;
   ownerName?: string | null;
   stage: 'G0' | 'G1' | 'G2' | 'G3' | 'G4';
-  status: 'ACTIVE' | 'WITHDRAWN' | 'SUBMITTED' | 'FUNDED' | 'REJECTED';
+  status: OppStatus;
   /**
    * `null` until the canonical scorer has evidence to work from. Nullable on purpose: the previous
    * non-null type is what pushed callers into inventing a placeholder number to satisfy it.

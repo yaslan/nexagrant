@@ -35,7 +35,8 @@ import { withTenant, type TenantTx } from '@/lib/db';
  * to `MatchCandidate.score`. Persisted to `SeatCandidate.breakdown` (Json), so
  * the UI can show the reasoning rather than a bare number.
  */
-export interface MatchBreakdown {
+/** Written verbatim into `SeatCandidate.breakdown`, a JSON column — a type alias, not an interface, so it stays assignable to a JSON value. */
+export type MatchBreakdown = {
   topicExperience: number;
   geographicBalance: number;
   collabHistory: number;

@@ -28,6 +28,7 @@ import { prisma } from './db';
 import { ingestDocument } from './rag';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
+import type { Prisma } from '@prisma/client';
 
 /** Stable `SystemAlert.source` for everything this module reports. */
 export const CORDIS_SYNC_ALERT_SOURCE = 'cordis-sync';
@@ -185,7 +186,7 @@ export async function persistCordisRecord(record: CordisProjectRecord): Promise<
     startDate: parseDate(record.startDate),
     endDate: parseDate(record.endDate),
     ecMaxContribution: ecContribution,
-    rawJson: Object.keys(drift).length > 0 ? drift : {},
+    rawJson: (Object.keys(drift).length > 0 ? drift : {}) as unknown as Prisma.InputJsonObject,
   };
 
   await prisma.cordisProject.upsert({

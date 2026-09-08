@@ -5,12 +5,12 @@ import Link from 'next/link';
 interface CallCardProps {
   call: {
     title: string;
-    budgetCents: bigint;
+    budgetCents: bigint | null;
     currency: string;
   };
   topic: {
     identifier: string;
-    destination: string;
+    destination: string | null;
     status: string;
     nextDeadlineAt: Date | null;
   };
@@ -18,7 +18,7 @@ interface CallCardProps {
 }
 
 function CallCard({ call, topic, locale }: CallCardProps) {
-  const budget = Number(call.budgetCents) / 100;
+  const budget = call.budgetCents ? Number(call.budgetCents) / 100 : 0;
   const deadline = topic.nextDeadlineAt ? new Date(topic.nextDeadlineAt).toLocaleDateString() : 'TBA';
   const statusColor = topic.status === 'OPEN' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
 

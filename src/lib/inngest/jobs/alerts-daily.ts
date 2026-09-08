@@ -131,7 +131,9 @@ export const alertsDaily = inngest.createFunction(
             continue;
           }
 
-          const since = search.lastRunAt ?? search.createdAt;
+          // `step.run` hands back the JSON it memoised, so the two timestamps
+          // arrive as ISO strings, not `Date`s — re-hydrate before the query.
+          const since = new Date(search.lastRunAt ?? search.createdAt);
           const matchCount = await prisma.topic.count(matchCountQuery(search.filters, since));
 
           // No new matches: skip the send entirely rather than mail a "(no new)"

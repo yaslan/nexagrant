@@ -22,14 +22,16 @@ export default async function ConceptNoteDetailPage({
   let opportunity: { title: string } | null = null;
 
   try {
-    note = await prisma.conceptNote.findFirst({
+    const rawNote = await prisma.conceptNote.findFirst({
       where: tenantId ? { id, tenantId } : { id },
     });
+    note = (rawNote as unknown as Omit<ConceptNoteRow, 'updatedAt'>) || null;
 
     if (note) {
-      template = await prisma.conceptTemplate.findUnique({
+      const rawTemplate = await prisma.conceptTemplate.findUnique({
         where: { id: note.templateId },
       });
+      template = (rawTemplate as unknown as ConceptTemplateRow) || null;
 
       if (note.opportunityId) {
         opportunity = await prisma.opportunity.findUnique({

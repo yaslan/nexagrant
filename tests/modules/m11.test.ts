@@ -152,7 +152,8 @@ describe('M11 Application Production & Collaborative Editing Module', () => {
     const part = await createApplicationPart('opp-11', 'PART_B');
     expect(part).toBeDefined();
     expect(part.part).toBe('PART_B');
-    expect(part?.content?.sections).toHaveLength(8);
+    const content = part?.content as unknown as PartContent | null;
+    expect(content?.sections).toHaveLength(8);
   });
 
   test('calculateLumpSumBudget computes 25% overhead and direct personnel cost', async () => {

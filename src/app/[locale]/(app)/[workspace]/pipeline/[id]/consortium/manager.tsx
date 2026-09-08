@@ -88,7 +88,9 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
   const handleAddSeat = (roleKey: string) => {
     startTransition(async () => {
       const seat = await addSeat(opportunityId, roleKey);
-      setSeats(prev => [...prev, seat]);
+      if (seat) {
+        setSeats(prev => [...prev, seat as unknown as ConsortiumSeat]);
+      }
     });
   };
 

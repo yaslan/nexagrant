@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import type { SubStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { getActiveTier } from '@/lib/billing/active-tier';
@@ -9,6 +10,7 @@ import {
   priceLockOnActivation,
   type PriceLockColumns,
 } from '@/lib/billing/price-lock';
+import { publishedVersionIdFor } from '@/lib/billing/plan-repository';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
@@ -25,7 +27,7 @@ interface SubscriptionSyncResult {
 /**
  * Maps Stripe subscription status to internal SubStatus enum
  */
-function mapStripeStatus(stripeStatus: string): string {
+function mapStripeStatus(stripeStatus: string): SubStatus {
   switch (stripeStatus) {
     case 'trialing':
       return 'TRIALING';
@@ -271,6 +273,20 @@ export async function syncStripeSubscription(
   // event, a renewal and a plan change all get.
   const lockColumns = priceLockUpdate(subscription, existingSubscription, planId, billingInterval);
 
+  // The terms this subscription is entitled from — the version the plan sells
+  // right now (TASK-MTSJH8NMAXPRM). `Subscription.planVersionId` had sat unused
+  // since the studio's first phase, so `getEntitlements` had nothing to read
+  // and fell back to the compiled catalogue for every subscription ever sold.
+  //
+  // Written on a first sale and on a plan change only. A renewal leaves it
+  // alone: moving a tenant between versions is the publish's job, and doing it
+  // on renewal would quietly re-term whoever happened to pay that day. `null`
+  // (a plan with no published version) also leaves it alone, so a purchase is
+  // never lost to an unpublished plan — the catalogue answers as before.
+  const planChanged = !existingSubscription || existingSubscription.planId !== planId;
+  const versionId = planChanged ? await publishedVersionIdFor(planId) : null;
+  const versionColumn = versionId ? { planVersionId: versionId } : {};
+
   await prisma.subscription.upsert({
     where: { tenantId },
     create: {
@@ -282,12 +298,14 @@ export async function syncStripeSubscription(
       providerCustomerId: subscription.customer as string,
       providerSubId: subscription.id,
       currentPeriodEnd,
+      ...versionColumn,
       ...(lockColumns ?? {}),
     },
     update: {
       planId,
       status: mapStripeStatus(subscription.status),
       currentPeriodEnd,
+      ...versionColumn,
       ...(lockColumns ?? {}),
     },
   });

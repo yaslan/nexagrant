@@ -96,7 +96,7 @@ export default async function PartnersPage({
     if (isTurkishOnly) where.isTurkish = true;
     if (minProjects > 0) where.totalProjects = { gte: minProjects };
 
-    [totalCount, profiles] = await Promise.all([
+    const [countResult, rawProfiles] = await Promise.all([
       prisma.cordisPartnerProfile.count({ where }),
       prisma.cordisPartnerProfile.findMany({
         where,
@@ -104,6 +104,8 @@ export default async function PartnersPage({
         orderBy: { totalProjects: 'desc' },
       }),
     ]);
+    totalCount = countResult;
+    profiles = rawProfiles as unknown as PartnerRow[];
   } catch (e) {
     // A swallowed failure used to be indistinguishable from "no partners
     // match"; it fell through to the demo dataset and nobody was told.

@@ -201,6 +201,23 @@ export async function plansVisibleToTenant(tenantId: string): Promise<
 }
 
 /**
+ * The id of the version a plan sells right now, or `null` if it sells none.
+ *
+ * The non-throwing twin of {@link getPublishedVersion}, for the two callers
+ * that have to cope with a plan that has no published version rather than fail:
+ * the subscription writers (a purchase must not be lost because the studio left
+ * a plan unpublished) and the backfill.
+ */
+export async function publishedVersionIdFor(planId: string): Promise<string | null> {
+  const row = await prisma.planVersion.findFirst({
+    where: { planId, status: 'published' },
+    orderBy: { version: 'desc' },
+    select: { id: true },
+  });
+  return (row?.id as string | undefined) ?? null;
+}
+
+/**
  * Fetch a specific published version by ID (direct lookup).
  *
  * Used internally to resolve a planVersionId to its details.
@@ -607,7 +624,18 @@ export async function computePublishImpact(versionId: string): Promise<PublishIm
  * Publishing archives the previously published version — versions are a
  * history, so the old terms stay readable for the subscriptions that point at
  * them — and mirrors the new body onto the Plan projection so existing readers
- * of `Plan` stay in step. Writes one AuditEvent carrying before and after.
+ * of `Plan` stay in step.
+ *
+ * It also **moves every live subscription on the plan onto the new version**
+ * (TASK-MTSJH8NMAXPRM). That is what `acknowledgedLoweredTenants` has always
+ * been about: the operator is shown "this lowers limits for N live tenants" and
+ * has to echo the number back, which only means anything if the publish reaches
+ * those tenants. Before this, it reached none of them — the price on the
+ * shopfront moved and `getEntitlements` still read the compiled catalogue, so
+ * raising Pro to 10 seats gave nobody a tenth seat. `Subscription.planVersionId`
+ * is the join, and this is the write that keeps it current.
+ *
+ * Writes one AuditEvent carrying before, after, and how many subscriptions moved.
  */
 export async function publishVersion(
   versionId: string,
@@ -658,6 +686,13 @@ export async function publishVersion(
         modules: draft.modules,
       },
     });
+    // Every live tenant on this plan now lives under the new terms. Scoped to
+    // LIVE_SUB_STATUSES on purpose: a CANCELED row keeps the version it ended
+    // on, so the history still says what it was sold under.
+    const moved = await tx.subscription.updateMany({
+      where: { planId: draft.planId, status: { in: [...LIVE_SUB_STATUSES] } },
+      data: { planVersionId: versionId },
+    });
     await tx.auditEvent.create({
       data: {
         type: 'plan.version.published',
@@ -673,6 +708,7 @@ export async function publishVersion(
             lowered: impact.lowered,
             removedModules: impact.removedModules,
           },
+          movedSubscriptions: moved.count,
           before: previous
             ? {
                 versionId: previous.id,

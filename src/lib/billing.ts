@@ -1,4 +1,5 @@
 import { prisma } from './db';
+import { logger } from './logger';
 import {
   CATALOG_CURRENCY,
   FALLBACK_PLAN_ID,
@@ -7,6 +8,12 @@ import {
   grantsFor,
   resolvePlanId,
 } from './billing/catalog';
+import {
+  grantFromPlanVersion,
+  planVersionRefusal,
+  type EntitlementSource,
+  type SubscribedPlanVersion,
+} from './billing/entitlement-source';
 
 /**
  * prisma/schema.prisma `model AddOn` — one purchased add-on on a subscription.
@@ -35,17 +42,36 @@ export interface Entitlements {
   seats: number;
   workspaces: number;
   aiCreditsMonthly: number;
+  /**
+   * Which row decided the figures above — the subscription's own published
+   * `PlanVersion`, or the compiled catalogue. Reported rather than inferred so
+   * an operator looking at a quota can tell whether the studio reaches it;
+   * `'catalogue'` on a live subscription means the backfill has not run for it.
+   */
+  source: EntitlementSource;
+  /** The version the figures came from, `null` when the catalogue answered. */
+  planVersionId: string | null;
 }
 
 /**
  * What a tenant is entitled to right now.
  *
- * Capacity and module grants come from the billing catalogue, not from the
- * `Plan` row: the row is a projection of the catalogue written by the seed, and
- * reading the catalogue directly means a stale or hand-edited row cannot
- * silently hand out a module (TASK-MTR6QIE05ZKNH). Add-ons stay in the
- * database, because they are per-subscription purchases rather than catalogue
- * facts.
+ * The capacity and module grant comes from the **published `PlanVersion` the
+ * subscription points at** — the immutable row holding the terms that tenant is
+ * living under. That is what makes the plan studio real: raising Pro from 6
+ * seats to 10 and publishing moves every live Pro subscription onto the new
+ * version (`publishVersion`), and this function reads it.
+ *
+ * When the subscription carries no version — sold before the column was
+ * written, or a plan with no published version — the compiled catalogue answers
+ * exactly as it did before, and the reason a row is not entitled from the
+ * `Plan` table still holds: `Plan` is a projection, and a stale or hand-edited
+ * row must not hand out a module (TASK-MTR6QIE05ZKNH). The full rule, including
+ * the two pointers that are refused, is in
+ * src/lib/billing/entitlement-source.ts.
+ *
+ * Add-ons stay in the database, because they are per-subscription purchases
+ * rather than catalogue facts.
  *
  * A retired EUR plan id still sitting on a subscription resolves to its
  * replacement (`team` → `pro`) instead of throwing, so a row the migration did
@@ -58,6 +84,10 @@ export async function getEntitlements(tenantId: string): Promise<Entitlements> {
       subscription: {
         include: {
           addOns: true,
+          // Joined, not fetched separately: the version is read on every
+          // entitlement check, and a second round trip per check would be paid
+          // by every module gate in the app.
+          planVersion: true,
         },
       },
     },
@@ -68,11 +98,33 @@ export async function getEntitlements(tenantId: string): Promise<Entitlements> {
   }
 
   let planId: string = FALLBACK_PLAN_ID;
+  let live = false;
   if (tenant.subscription && ['TRIALING', 'ACTIVE'].includes(tenant.subscription.status)) {
     planId = resolvePlanId(tenant.subscription.planId);
+    live = true;
   }
 
-  const plan = grantsFor(planId);
+  // The version only speaks for a live subscription. A CANCELED row may still
+  // carry the pointer it had while it was paying; entitling from it would keep
+  // a cancelled tenant on Pro.
+  const versionRow: SubscribedPlanVersion | null = live
+    ? ((tenant.subscription?.planVersion as SubscribedPlanVersion | null) ?? null)
+    : null;
+  const fromVersion = grantFromPlanVersion(planId, versionRow);
+
+  if (versionRow && !fromVersion) {
+    // Refused, not silently ignored: a subscription pointing at another plan's
+    // version, or at a draft, is a defect somewhere upstream and the tenant is
+    // being served from the catalogue instead.
+    logger.warn('Subscription plan version refused; entitling from the catalogue', {
+      tenantId,
+      planId,
+      planVersionId: versionRow.id,
+      reason: planVersionRefusal(planId, versionRow) ?? 'unknown',
+    });
+  }
+
+  const plan = fromVersion?.grant ?? grantsFor(planId);
 
   if (!plan) {
     throw new Error(`Plan not found in catalogue: ${planId}`);
@@ -126,6 +178,8 @@ export async function getEntitlements(tenantId: string): Promise<Entitlements> {
     seats,
     workspaces,
     aiCreditsMonthly,
+    source: fromVersion ? 'plan-version' : 'catalogue',
+    planVersionId: fromVersion?.versionId ?? null,
   };
 }
 

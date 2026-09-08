@@ -1,3 +1,4 @@
+import type { JsonObject } from '@/types/json';
 import { prisma } from '../db';
 import { logger } from '../logger';
 
@@ -11,7 +12,7 @@ export async function createAdapterAlert(
   source: string,
   level: 'info' | 'warn' | 'error',
   message: string,
-  meta?: Record<string, unknown>
+  meta?: JsonObject
 ): Promise<void> {
   await prisma.systemAlert
     .create({ data: { level, source: `${source}_adapter`, message, meta: meta ?? undefined } })

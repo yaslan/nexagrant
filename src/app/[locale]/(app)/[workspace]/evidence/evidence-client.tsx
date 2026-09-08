@@ -213,7 +213,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
       setUploadProgress(100);
 
       if (res?.evidence) {
-        setItems([res.evidence, ...items]);
+        setItems([res.evidence as unknown as EvidenceItemData, ...items]);
       }
 
       setShowUploadModal(false);

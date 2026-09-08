@@ -1,4 +1,13 @@
-export interface PartBSectionItem {
+import type { ApplicationPart } from '@prisma/client';
+
+/**
+ * Everything from here to `PartContent` is stored *inside* the
+ * `ApplicationPart.content` JSON column, so each shape is declared as a type
+ * alias rather than an interface: only an object literal type or an alias of
+ * one carries TypeScript's implicit index signature, and without it the value
+ * is not assignable to `Prisma.InputJsonValue` however JSON-safe its fields are.
+ */
+export type PartBSectionItem = {
   key: string;
   partGroup: '1_EXCELLENCE' | '2_IMPACT' | '3_IMPLEMENTATION';
   title: string;
@@ -15,7 +24,7 @@ export interface PartBSectionItem {
   lockedAt?: string | null;
 }
 
-export interface SectionRevisionItem {
+export type SectionRevisionItem = {
   id: string;
   sectionKey: string;
   authorName: string;
@@ -26,7 +35,7 @@ export interface SectionRevisionItem {
   content: string;
 }
 
-export interface SectionCommentItem {
+export type SectionCommentItem = {
   id: string;
   sectionKey: string;
   authorName: string;
@@ -36,7 +45,7 @@ export interface SectionCommentItem {
   resolved: boolean;
 }
 
-export interface CollaboratorPresence {
+export type CollaboratorPresence = {
   userId: string;
   name: string;
   org: string;
@@ -46,7 +55,7 @@ export interface CollaboratorPresence {
 }
 
 /** One partner's line in a lump-sum budget table (Part A). */
-export interface BudgetLine {
+export type BudgetLine = {
   partnerName: string;
   personMonths: number;
   countryCoefficient: number;
@@ -56,7 +65,7 @@ export interface BudgetLine {
 }
 
 /** One work package in the implementation plan (Part A). */
-export interface WorkPackageItem {
+export type WorkPackageItem = {
   code: string;
   title: string;
   leadPartner: string;
@@ -70,7 +79,7 @@ export interface WorkPackageItem {
  * editable document. Every field is optional: a freshly created part stores
  * `{}`, and Part A and Part B populate disjoint halves of this.
  */
-export interface PartContent {
+export type PartContent = {
   sections?: PartBSectionItem[];
   revisions?: SectionRevisionItem[];
   comments?: SectionCommentItem[];
@@ -80,21 +89,27 @@ export interface PartContent {
 }
 
 /**
- * An ApplicationPart row as this module reads it.
+ * An ApplicationPart row as this module reads it — the generated row, not a
+ * hand-written copy of it.
  *
- * `prisma generate` does not run in this repo (see src/types/prisma-override.d.ts),
- * so query results arrive untyped and the shape has to be stated at the call
- * site — that is what `withTenant<T>` is for.
+ * It used to be spelled out here with `content: PartContent | null`, which said
+ * something Postgres does not guarantee: `content` is a `Json` column, so all a
+ * read knows is that it is JSON. `readPartContent` below is where that
+ * assumption is now made, once.
  */
-export interface ApplicationPartRow {
-  id: string;
-  tenantId: string;
-  opportunityId: string;
-  part: string;
-  content: PartContent | null;
-  magicToken: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+export type ApplicationPartRow = ApplicationPart;
+
+/**
+ * Reads `ApplicationPart.content` as the document this module writes there.
+ *
+ * The column is `Json`, so a row could hold a string, an array or `null` —
+ * nothing in the database stops it. Anything that is not a JSON object reads as
+ * an empty part, which is what a freshly created one holds anyway, rather than
+ * throwing halfway through an action.
+ */
+export function readPartContent(value: unknown): PartContent {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as PartContent;
 }
 
 /**

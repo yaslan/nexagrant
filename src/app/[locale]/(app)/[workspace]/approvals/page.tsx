@@ -20,7 +20,7 @@ export default async function ApprovalsPage({
   let requests: ApprovalRequestItem[] = [];
   try {
     if (tenantId) {
-      requests = await prisma.approvalRequest.findMany({
+      const rawRequests = await prisma.approvalRequest.findMany({
         where: { tenantId },
         include: {
           requester: {
@@ -32,6 +32,7 @@ export default async function ApprovalsPage({
         },
         orderBy: { createdAt: 'desc' },
       });
+      requests = rawRequests as unknown as ApprovalRequestItem[];
     }
   } catch (e) {
     console.warn(`[Approvals] DB query bypassed or fallback: ${errorMessage(e)}`);

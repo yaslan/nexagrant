@@ -22,9 +22,7 @@ export default async function ApplicationPage({
   // to render a hard-coded "Fraunhofer Institute" budget and work-package plan,
   // which the user cannot tell apart from their own data. A missing row is a
   // 404; an unreadable database is an error (global-error.tsx).
-  const opp = await withTenant<
-    { id: string; tenantId: string; title: string; applicationParts: ApplicationPartItem[] } | null
-  >(tenantId, (tx) =>
+  const opp = await withTenant(tenantId, (tx) =>
     tx.opportunity.findFirst({
       where: { id, tenantId },
       include: { applicationParts: true }
@@ -33,8 +31,9 @@ export default async function ApplicationPage({
 
   if (!opp) notFound();
 
-  const partA = opp.applicationParts.find((p: { part: string }) => p.part === 'PART_A');
-  const partB = opp.applicationParts.find((p: { part: string }) => p.part === 'PART_B');
+  const parts = opp.applicationParts as unknown as ApplicationPartItem[];
+  const partA = parts.find((p) => p.part === 'PART_A');
+  const partB = parts.find((p) => p.part === 'PART_B');
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">

@@ -5,6 +5,7 @@ import { DEFAULT_PART_B_SECTIONS } from '@/modules/m11/types';
 import { withTenant } from '@/lib/db';
 import { requireTenantApi } from '@/lib/tenant';
 import type { PartBSectionItem, PartContent } from '@/modules/m11/types';
+import type { Prisma } from '@prisma/client';
 
 /**
  * Document export — DOCX / print-HTML of a tenant's own document.
@@ -24,18 +25,10 @@ import type { PartBSectionItem, PartContent } from '@/modules/m11/types';
  * signing date is invented, and the boilerplate body comes from the message
  * catalogue in both languages.
  */
-
-/** What the tenant-scoped transaction resolves for this export. */
-interface ExportContext {
-  tenantName: string | null;
-  /** Null when `partId` was given but resolves to no row *inside this tenant*. */
-  part: { content: PartContent | null; opportunityId: string } | null;
-  opportunityTitle: string | null;
-}
-
 /** Part B sections as stored on the row, or none when the row carries none. */
-function storedSections(content: PartContent | null): PartBSectionItem[] {
-  const sections = content?.sections;
+function storedSections(content: Prisma.JsonValue | PartContent | null): PartBSectionItem[] {
+  const c = content as unknown as PartContent | null;
+  const sections = c?.sections;
   return Array.isArray(sections) ? sections : [];
 }
 
@@ -54,7 +47,7 @@ export async function GET(req: Request) {
 
   // One transaction with `app.tenant_id` set: the explicit `tenantId` in each
   // where clause is the first line of defence, the RLS policy the second.
-  const ctx = await withTenant<ExportContext>(tenantId, async (tx) => {
+  const ctx = await withTenant(tenantId, async (tx) => {
     const tenant = await tx.tenant.findFirst({ where: { id: tenantId }, select: { name: true } });
 
     const part = partId

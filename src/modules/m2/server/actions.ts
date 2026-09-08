@@ -47,18 +47,6 @@ interface OpportunityWithTopic {
   topicId: string | null;
 }
 
-/**
- * A ConceptNote. `opportunityId` likewise has no `opportunity` relation in
- * the schema — fetch it separately (see `exportToDocx`) rather than
- * `include: { opportunity: true }`.
- */
-interface ConceptNoteWithOpportunity {
-  id: string;
-  templateId: string;
-  content: ConceptNoteContent;
-  opportunityId: string;
-}
-
 /** The AiUsageLog columns the transparency report reads. */
 interface AiUsageLogRow {
   module: string;
@@ -106,7 +94,7 @@ export async function generateConceptNoteDraft(
 
   // 3. For each section, search RAG for context and generate text
   const content: Record<string, string> = {};
-  const schema = template.schema as ConceptTemplateSection[];
+  const schema = template.schema as unknown as ConceptTemplateSection[];
   
   for (const section of schema) {
     // Basic RAG search
@@ -146,7 +134,7 @@ export async function generateConceptNoteDraft(
   }
 
   // 4. Save to db
-  const note = await withTenant<{ id: string }>(tenantId, (tx) =>
+  const note = await withTenant(tenantId, (tx) =>
     tx.conceptNote.create({
       data: {
         tenantId,
@@ -168,7 +156,7 @@ export async function saveConceptNoteDraft(noteId: string, content: ConceptNoteC
 
   // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
   // unique selector and would overwrite another tenant's draft.
-  const updated = await withTenant<{ count: number }>(tenantId, (tx) =>
+  const updated = await withTenant(tenantId, (tx) =>
     tx.conceptNote.updateMany({
       where: { id: noteId, tenantId },
       data: { content, updatedAt: new Date() }
@@ -181,7 +169,7 @@ export async function saveConceptNoteDraft(noteId: string, content: ConceptNoteC
 export async function exportToDocx(noteId: string) {
   const { tenantId } = await requireTenantAction();
 
-  const note = await withTenant<ConceptNoteWithOpportunity | null>(tenantId, (tx) =>
+  const note = await withTenant(tenantId, (tx) =>
     tx.conceptNote.findFirst({
       where: { id: noteId, tenantId }
     })
@@ -191,7 +179,7 @@ export async function exportToDocx(noteId: string) {
 
   // ConceptNote has no `opportunity` relation in the schema (see the
   // ConceptNoteWithOpportunity comment) — fetched separately by opportunityId.
-  const opportunity = await withTenant<{ title: string } | null>(tenantId, (tx) =>
+  const opportunity = await withTenant(tenantId, (tx) =>
     tx.opportunity.findFirst({
       where: { id: note.opportunityId, tenantId },
       select: { title: true }
@@ -204,7 +192,7 @@ export async function exportToDocx(noteId: string) {
     where: { id: note.templateId }
   });
 
-  const schema = (template?.schema ?? []) as ConceptTemplateSection[];
+  const schema = (template?.schema ?? []) as unknown as ConceptTemplateSection[];
 
   const children = [
     new Paragraph({

@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'crypto';
 import unzipper from 'unzipper';
 import { parse } from 'csv-parse';
@@ -49,26 +49,65 @@ const DATASET_URLS = {
 };
 
 /**
+ * Where a downloaded archive lands, relative to the project root.
+ *
+ * The download path is carried around as a bare *file name* and only ever turned
+ * into a real path by the two helpers below. That is not cosmetic: turbopack
+ * analyses `fs` calls statically, and an `fs.existsSync(someStringVariable)` it
+ * cannot bound makes it trace the **whole project** into the server bundle.
+ * `next build` said so four times over, and `.next/standalone` was carrying
+ * `docs/` (91 MB), `test-artifacts/` (24 MB), `tests/`, `scripts/` and every
+ * source file as a result. Rebuilding the path as
+ * `path.join(process.cwd(), CORDIS_TMP_DIR, name)` is the shape the analyzer can
+ * bound — it is the first remedy the warning itself suggests — so the trace stops
+ * at this one folder.
+ */
+const CORDIS_TMP_DIR = 'tmp_cordis';
+
+/** Absolute path of `fileName` inside the CORDIS scratch folder. */
+function cordisTmpPath(fileName: string): string {
+  return path.join(process.cwd(), CORDIS_TMP_DIR, path.basename(fileName));
+}
+
+/**
+ * Deletes a downloaded archive. A no-op when the run read a local zip instead
+ * (nothing was downloaded, so there is nothing of ours to clean up) or when the
+ * file is already gone.
+ */
+function removeTempZip(fileName: string | null): void {
+  if (!fileName) return;
+  const zipPath = path.join(process.cwd(), CORDIS_TMP_DIR, path.basename(fileName));
+  if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+}
+
+/**
  * Downloads URL or opens file stream and computes SHA256 hash
  */
 async function getZipFileAndHash(options: CordisImportOptions): Promise<{
   zipPath: string;
-  isTemp: boolean;
+  /** File name inside CORDIS_TMP_DIR when the archive was downloaded, else null. */
+  tempFileName: string | null;
   fileHash: string;
   /** Where the bytes came from — a URL, or the local path when one was given. */
   origin: string;
   sizeBytes: number;
 }> {
-  if (options.localZipPath && fs.existsSync(options.localZipPath)) {
-    const fileBuffer = fs.readFileSync(options.localZipPath);
-    const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
-    return {
-      zipPath: options.localZipPath,
-      isTemp: false,
-      fileHash,
-      origin: options.localZipPath,
-      sizeBytes: fileBuffer.byteLength,
-    };
+  if (options.localZipPath) {
+    const resolvedPath = path.isAbsolute(options.localZipPath)
+      ? options.localZipPath
+      : path.resolve(/*turbopackIgnore: true*/ process.cwd(), options.localZipPath);
+
+    if (fs.existsSync(resolvedPath)) {
+      const fileBuffer = fs.readFileSync(resolvedPath);
+      const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+      return {
+        zipPath: resolvedPath,
+        tempFileName: null,
+        fileHash,
+        origin: options.localZipPath,
+        sizeBytes: fileBuffer.byteLength,
+      };
+    }
   }
 
   const url = options.url || DATASET_URLS[options.dataset];
@@ -81,15 +120,21 @@ async function getZipFileAndHash(options: CordisImportOptions): Promise<{
   const buffer = Buffer.from(arrayBuffer);
   const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
 
-  const tmpDir = path.join(process.cwd(), 'tmp_cordis');
+  const tmpDir = path.join(process.cwd(), CORDIS_TMP_DIR);
   if (!fs.existsSync(tmpDir)) {
     fs.mkdirSync(tmpDir, { recursive: true });
   }
 
-  const tempPath = path.join(tmpDir, `${options.dataset.toLowerCase()}_${Date.now()}.zip`);
-  fs.writeFileSync(tempPath, buffer);
+  const tempFileName = `${options.dataset.toLowerCase()}_${Date.now()}.zip`;
+  fs.writeFileSync(cordisTmpPath(tempFileName), buffer);
 
-  return { zipPath: tempPath, isTemp: true, fileHash, origin: url, sizeBytes: buffer.byteLength };
+  return {
+    zipPath: cordisTmpPath(tempFileName),
+    tempFileName,
+    fileHash,
+    origin: url,
+    sizeBytes: buffer.byteLength,
+  };
 }
 
 /**
@@ -155,11 +200,11 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
     runRecord = { runId: `dry-run-${Date.now()}` };
   }
 
-  let tempZipPath: string | null = null;
+  let tempZipName: string | null = null;
 
   try {
-    const { zipPath, isTemp, fileHash, origin, sizeBytes } = await getZipFileAndHash(options);
-    if (isTemp) tempZipPath = zipPath;
+    const { zipPath, tempFileName, fileHash, origin, sizeBytes } = await getZipFileAndHash(options);
+    tempZipName = tempFileName;
 
     // CLAUDE.md rule 6: keep the raw upstream answer before normalizing it.
     // The archive itself is far too large for a Json column, so the row records
@@ -203,7 +248,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
         });
       }
 
-      if (tempZipPath && fs.existsSync(tempZipPath)) fs.unlinkSync(tempZipPath);
+      removeTempZip(tempZipName);
 
       return {
         success: true,
@@ -306,7 +351,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
         // Ignore DB update error in dry-run mode
       }
 
-      if (tempZipPath && fs.existsSync(tempZipPath)) fs.unlinkSync(tempZipPath);
+      removeTempZip(tempZipName);
 
       return {
         success: true,
@@ -521,7 +566,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       });
     }
 
-    if (tempZipPath && fs.existsSync(tempZipPath)) fs.unlinkSync(tempZipPath);
+    removeTempZip(tempZipName);
 
     return {
       success: true,
@@ -545,7 +590,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       // Ignore DB update error
     }
 
-    if (tempZipPath && fs.existsSync(tempZipPath)) fs.unlinkSync(tempZipPath);
+    removeTempZip(tempZipName);
 
     return {
       success: false,

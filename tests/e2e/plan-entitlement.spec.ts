@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import type { ModuleStatus } from '@prisma/client';
 
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
@@ -21,7 +22,7 @@ const TENANT_ID = 'demo-tenant';
 const MODULES_URL = '/tr/main/settings/modules';
 
 let originalPlanId: string;
-let originalM6Status: string | null = null;
+let originalM6Status: ModuleStatus | null = null;
 
 async function setPlan(planId: string) {
   await prisma.subscription.update({
@@ -31,7 +32,7 @@ async function setPlan(planId: string) {
 }
 
 /** M6 has to start OFF, or the card renders "active" and never shows the gate. */
-async function setM6(status: string) {
+async function setM6(status: ModuleStatus) {
   await prisma.moduleState.upsert({
     where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M6' } },
     update: { status },
@@ -73,7 +74,7 @@ test.describe('plan entitlement — the catalogue decides what a plan opens', ()
     const state = await prisma.moduleState.findUnique({
       where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M6' } },
     });
-    originalM6Status = state?.status ?? null;
+    originalM6Status = (state?.status as ModuleStatus) ?? null;
   });
 
   test.afterAll(async () => {

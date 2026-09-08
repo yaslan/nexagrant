@@ -234,7 +234,7 @@ export function BillingClient({
           <div className="p-4 bg-ground border border-border rounded-2xl space-y-2">
             <div className="flex justify-between items-center text-xs">
               <span className="text-muted font-medium">{t('metricCredits')}</span>
-              <span className="font-bold text-ink font-mono">
+              <span className="font-bold text-ink font-mono" data-testid="settings-metric-credits">
                 {num(remainingCredits)} / {num(totalCredits)}
               </span>
             </div>
@@ -255,8 +255,11 @@ export function BillingClient({
 
           <div className="p-4 bg-ground border border-border rounded-2xl space-y-1.5">
             <div className="text-xs text-muted font-medium">{t('metricSeats')}</div>
-            <div className="text-xl font-bold text-ink">
-              {num(usedSeats)} <span className="text-sm font-normal text-muted">/ {num(totalSeats)}</span>
+            <div className="text-xl font-bold text-ink" data-testid="settings-metric-seats">
+              {num(usedSeats)}{' '}
+              <span className="text-sm font-normal text-muted" data-testid="settings-metric-seats-total">
+                / {num(totalSeats)}
+              </span>
             </div>
             <div className="text-[11px] text-muted">
               <Link href={`/${locale}/${workspace}/settings/members`} className="text-blue-600 hover:underline">
@@ -267,9 +270,11 @@ export function BillingClient({
 
           <div className="p-4 bg-ground border border-border rounded-2xl space-y-1.5">
             <div className="text-xs text-muted font-medium">{t('metricWorkspaces')}</div>
-            <div className="text-xl font-bold text-ink">
+            <div className="text-xl font-bold text-ink" data-testid="settings-metric-workspaces">
               {num(usedWorkspaces)}{' '}
-              <span className="text-sm font-normal text-muted">/ {num(totalWorkspaces)}</span>
+              <span className="text-sm font-normal text-muted" data-testid="settings-metric-workspaces-total">
+                / {num(totalWorkspaces)}
+              </span>
             </div>
             <div className="text-[11px] text-muted font-mono">{t('metricWorkspaceSlug', { slug: workspace })}</div>
           </div>

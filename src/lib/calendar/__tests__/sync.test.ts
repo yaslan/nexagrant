@@ -3,6 +3,7 @@ import { syncMeetingBriefToCalendar } from '../sync';
 import { buildAlertRow, type RecordAlertInput } from '@/lib/observability/system-alert';
 import { createDbClient } from '@/lib/db';
 import type { TenantTx } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 
 const recordAlert = vi.hoisted(() =>
   vi.fn(async (_input: unknown) => ({ status: 'recorded' as const, id: 'a1' }))
@@ -182,7 +183,7 @@ describe('syncMeetingBriefToCalendar', () => {
       const input = recordAlert.mock.calls[0]![0] as RecordAlertInput;
 
       const accepted = await rejectionKind(() =>
-        db.systemAlert.create({ data: buildAlertRow(input) })
+        db.systemAlert.create({ data: buildAlertRow(input) as unknown as Prisma.SystemAlertCreateInput })
       );
       expect(accepted).not.toBe('PrismaClientValidationError');
 

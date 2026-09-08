@@ -99,11 +99,6 @@ interface RecentParticipationRow {
   };
 }
 
-interface TeamSizeRow {
-  projectId: string;
-  _count: { organisationId: number };
-}
-
 interface CoParticipationEdgeRow {
   orgA: string;
   orgB: string;
@@ -217,7 +212,7 @@ export async function GET(
 
     // Mean participant count across this organisation's projects. Measured, not
     // assumed: null when there are no participations to average.
-    const teamSizes: TeamSizeRow[] = projectIds.length
+    const teamSizes = projectIds.length
       ? await prisma.cordisParticipation.groupBy({
           by: ['projectId'],
           where: { projectId: { in: projectIds } },
@@ -237,7 +232,7 @@ export async function GET(
       .filter((v): v is string => v !== null)
       .slice(0, 3);
     if (preferredPillars.length === 0 && projectIds.length) {
-      const topTopics: { topicCode: string }[] = await prisma.cordisProjectTopic.groupBy({
+      const topTopics = await prisma.cordisProjectTopic.groupBy({
         by: ['topicCode'],
         where: { projectId: { in: projectIds } },
         _count: { projectId: true },

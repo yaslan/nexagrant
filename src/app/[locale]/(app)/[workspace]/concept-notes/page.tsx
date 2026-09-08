@@ -21,14 +21,16 @@ export default async function ConceptNotesListPage({
   let templates: ConceptTemplateRow[] = [];
 
   try {
-    notes = await prisma.conceptNote.findMany({
+    const rawNotes = await prisma.conceptNote.findMany({
       where: tenantId ? { tenantId } : {},
       orderBy: { updatedAt: 'desc' },
     });
+    notes = rawNotes as unknown as ConceptNoteRow[];
 
-    templates = await prisma.conceptTemplate.findMany({
+    const rawTemplates = await prisma.conceptTemplate.findMany({
       where: tenantId ? { OR: [{ tenantId: null }, { tenantId }] } : { tenantId: null },
     });
+    templates = rawTemplates as unknown as ConceptTemplateRow[];
   } catch (e) {
     console.warn(`[ConceptNotes] DB query bypassed: ${errorMessage(e)}`);
   }

@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { requireTenantPage } from '@/lib/tenant';
 import ConceptNoteEditor from '@/modules/m2/ui/ConceptNoteEditor';
 import type { ModuleStateRow } from '@/types/db-rows';
-import type { ConceptNoteRow } from '@/modules/m2/types';
 import { moduleGate } from '@/lib/modules/guard';
 
 export default async function OpportunityM2Page({
@@ -47,7 +46,7 @@ export default async function OpportunityM2Page({
   }
 
   // Get existing note if any
-  const note = await withTenant<ConceptNoteRow | null>(tenantId, (tx) =>
+  const note = await withTenant(tenantId, (tx) =>
     tx.conceptNote.findFirst({
       where: { opportunityId: opp.id, tenantId }
     })
@@ -75,8 +74,8 @@ export default async function OpportunityM2Page({
       <ConceptNoteEditor
         opportunityId={opp.id}
         templateId={templateId}
-        schema={template?.schema}
-        initialContent={(note?.content) || {}}
+        schema={(template?.schema ?? []) as unknown as Parameters<typeof ConceptNoteEditor>[0]['schema']}
+        initialContent={(note?.content as unknown as Record<string, string>) || {}}
         noteId={note?.id}
       />
     </div>

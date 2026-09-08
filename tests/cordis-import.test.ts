@@ -9,6 +9,8 @@ import {
 import { runCordisImport } from '../src/lib/k2-cordis/importer';
 import { generatePartnerProfiles } from '../src/lib/k2-cordis/partnerProfileJob';
 
+import { recordRawFetch } from '../src/lib/k2-cordis/raw-fetch';
+
 /**
  * In-memory stand-in for the CORDIS tables. The fake client stores whatever
  * `data` the importer sends and hands it back, so the rows are only ever as
@@ -28,9 +30,23 @@ const mockParticipations = new Map<string, MockRow>();
 const mockImportRuns = new Map<string, MockRow>();
 const mockProfiles = new Map<string, MockRow>();
 const mockCoParts = new Map<string, MockRow>();
+const mockRawFetches: MockRow[] = [];
 
 vi.mock('../src/lib/db', () => ({
   prisma: {
+    rawFetch: {
+      create: vi.fn().mockImplementation(async ({ data }) => {
+        const record = { id: `rf-${Date.now()}`, ...data, fetchedAt: new Date() };
+        mockRawFetches.push(record);
+        return record;
+      }),
+      findFirst: vi.fn().mockImplementation(async ({ where }) => {
+        const matches = mockRawFetches.filter(
+          (rf) => rf.source === where?.source && rf.key === where?.key
+        );
+        return matches[matches.length - 1] || null;
+      }),
+    },
     cordisImportRun: {
       create: vi.fn().mockImplementation(async ({ data }) => {
         const id = `run-${Date.now()}-${Math.random()}`;
@@ -164,6 +180,28 @@ describe('K2 CORDIS Ingestion & M1 Partner Intelligence Engine', () => {
     };
     const mappedDe = mapOrganizationAndParticipationRow(deRow);
     expect(mappedDe?.organization.isTurkish).toBe(false);
+  });
+
+  test('recordRawFetch logs audit entry and enforces idempotency on matching hash (CLAUDE.md rule 6)', async () => {
+    const input = {
+      source: 'cordis_bulk',
+      key: 'HORIZON',
+      hash: 'abc123hash',
+      storageUrl: 'https://cordis.europa.eu/data/cordis-HORIZONprojects-csv.zip',
+      payload: {
+        dataset: 'HORIZON',
+        sizeBytes: 1024,
+        contentType: 'application/zip',
+      },
+    };
+
+    // First call: writes record to RawFetch
+    const res1 = await recordRawFetch(input);
+    expect(res1.status).toBe('recorded');
+
+    // Second call with same hash: detects unchanged data and writes nothing
+    const res2 = await recordRawFetch(input);
+    expect(res2.status).toBe('unchanged');
   });
 
   const sampleZipPath = path.join(process.cwd(), 'scripts', 'tmp_cordis', 'horizon.zip');

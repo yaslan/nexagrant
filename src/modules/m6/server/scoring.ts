@@ -9,6 +9,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { prisma, withTenant } from '@/lib/db';
 import { ScoreValue } from '../types';
 
 /**
@@ -362,23 +363,142 @@ export async function getPanelScoresForProposal(
  * Used for per-criterion analytics and UI display.
  */
 export async function calculateCriterionAverage(
+  criterionId: string,
+  tenantId?: string,
+): Promise<number>;
+export async function calculateCriterionAverage(
   db: TenantScopedDb,
   criterionId: string,
   tenantId: string,
-): Promise<number | null> {
+): Promise<number>;
+export async function calculateCriterionAverage(
+  dbOrCriterionId: TenantScopedDb | string,
+  criterionIdOrTenantId?: string,
+  tenantIdParam?: string,
+): Promise<number> {
+  if (typeof dbOrCriterionId === 'string') {
+    const criterionId = dbOrCriterionId;
+    const tenantId = criterionIdOrTenantId;
+    if (tenantId) {
+      return withTenant(tenantId, (tx) => calculateCriterionAverageInternal(tx, criterionId, tenantId));
+    }
+    return calculateCriterionAverageInternal(prisma as unknown as TenantScopedDb, criterionId);
+  }
+  const db = dbOrCriterionId;
+  const criterionId = criterionIdOrTenantId!;
+  const tenantId = tenantIdParam;
+  return calculateCriterionAverageInternal(db, criterionId, tenantId);
+}
+
+async function calculateCriterionAverageInternal(
+  db: TenantScopedDb,
+  criterionId: string,
+  tenantId?: string,
+): Promise<number> {
   const scores = await db.score.findMany({
     where: {
       criterionId,
-      reviewer: { tenantId },
+      ...(tenantId ? { reviewer: { tenantId } } : {}),
       submittedAt: { not: null }, // only count submitted scores
     },
     select: { score: true },
   });
 
-  if (scores.length === 0) return null;
+  if (scores.length === 0) return 0;
 
-  const sum = scores.reduce((acc: number, s: typeof scores[0]) => acc + s.score, 0);
-  return sum / scores.length;
+  const sum = scores.reduce((acc: number, s: { score: number }) => acc + s.score, 0);
+  return Number((sum / scores.length).toFixed(2));
+}
+
+/**
+ * Calculate weighted overall evaluation score (1-5 range) across all criteria.
+ */
+export async function calculateEvaluationScore(
+  evaluationId: string,
+  tenantId?: string,
+): Promise<number>;
+export async function calculateEvaluationScore(
+  db: TenantScopedDb,
+  evaluationId: string,
+  tenantId: string,
+): Promise<number>;
+export async function calculateEvaluationScore(
+  dbOrEvaluationId: TenantScopedDb | string,
+  evaluationIdOrTenantId?: string,
+  tenantIdParam?: string,
+): Promise<number> {
+  if (typeof dbOrEvaluationId === 'string') {
+    const evaluationId = dbOrEvaluationId;
+    const tenantId = evaluationIdOrTenantId;
+    if (tenantId) {
+      return withTenant(tenantId, (tx) => calculateEvaluationScoreInternal(tx, evaluationId, tenantId));
+    }
+    return calculateEvaluationScoreInternal(prisma as unknown as TenantScopedDb, evaluationId);
+  }
+  const db = dbOrEvaluationId;
+  const evaluationId = evaluationIdOrTenantId!;
+  const tenantId = tenantIdParam;
+  return calculateEvaluationScoreInternal(db, evaluationId, tenantId);
+}
+
+async function calculateEvaluationScoreInternal(
+  db: TenantScopedDb,
+  evaluationId: string,
+  tenantId?: string,
+): Promise<number> {
+  const scores = await db.score.findMany({
+    where: {
+      reviewer: { evaluationId, ...(tenantId ? { tenantId } : {}) },
+      submittedAt: { not: null },
+    },
+    include: {
+      reviewer: { select: { id: true } },
+      criterion: { select: { id: true, name: true, weight: true } },
+    },
+  });
+
+  if (scores.length === 0) {
+    const ev = await db.evaluation.findUnique({
+      where: { id: evaluationId },
+      select: { avgScore: true },
+    });
+    return storedPanelAverage(ev?.avgScore) ?? 0;
+  }
+
+  const criterionScores: Record<string, number[]> = {};
+  const criterionWeights: Record<string, number> = {};
+
+  for (const s of scores) {
+    const cId = s.criterion.id;
+    if (!criterionScores[cId]) {
+      criterionScores[cId] = [];
+      criterionWeights[cId] = s.criterion.weight ?? 0;
+    }
+    criterionScores[cId].push(s.score);
+  }
+
+  let weightedSum = 0;
+  let weightSum = 0;
+
+  for (const [cId, cScores] of Object.entries(criterionScores)) {
+    const cAvg = cScores.reduce((a, b) => a + b, 0) / cScores.length;
+    const weight = criterionWeights[cId] ?? 0;
+    weightedSum += cAvg * weight;
+    weightSum += weight;
+  }
+
+  let resultScore: number;
+  if (weightSum > 0) {
+    resultScore = weightedSum / weightSum;
+  } else {
+    const cAvgs = Object.values(criterionScores).map(
+      (arr) => arr.reduce((a, b) => a + b, 0) / arr.length
+    );
+    resultScore = cAvgs.reduce((a, b) => a + b, 0) / cAvgs.length;
+  }
+
+  const clamped = Math.max(1, Math.min(5, resultScore));
+  return Number(clamped.toFixed(2));
 }
 
 /**
@@ -386,23 +506,53 @@ export async function calculateCriterionAverage(
  * Returns { 5: 2, 4: 1, 3: 0, 2: 0, 1: 0 } format.
  */
 export async function getScoreDistribution(
+  criterionId: string,
+  tenantId?: string,
+): Promise<Record<number, number>>;
+export async function getScoreDistribution(
   db: TenantScopedDb,
   criterionId: string,
   tenantId: string,
-): Promise<Record<ScoreValue, number>> {
+): Promise<Record<ScoreValue, number>>;
+export async function getScoreDistribution(
+  dbOrCriterionId: TenantScopedDb | string,
+  criterionIdOrTenantId?: string,
+  tenantIdParam?: string,
+): Promise<Record<number, number>> {
+  if (typeof dbOrCriterionId === 'string') {
+    const criterionId = dbOrCriterionId;
+    const tenantId = criterionIdOrTenantId;
+    if (tenantId) {
+      return withTenant(tenantId, (tx) => getScoreDistributionInternal(tx, criterionId, tenantId));
+    }
+    return getScoreDistributionInternal(prisma as unknown as TenantScopedDb, criterionId);
+  }
+  const db = dbOrCriterionId;
+  const criterionId = criterionIdOrTenantId!;
+  const tenantId = tenantIdParam;
+  return getScoreDistributionInternal(db, criterionId, tenantId);
+}
+
+async function getScoreDistributionInternal(
+  db: TenantScopedDb,
+  criterionId: string,
+  tenantId?: string,
+): Promise<Record<number, number>> {
   const scores = await db.score.findMany({
     where: {
       criterionId,
-      reviewer: { tenantId },
+      ...(tenantId ? { reviewer: { tenantId } } : {}),
       submittedAt: { not: null },
     },
     select: { score: true },
   });
 
-  const distribution: Record<ScoreValue, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   for (const s of scores) {
-    const scoreValue = s.score as ScoreValue;
-    distribution[scoreValue]++;
+    const scoreValue = s.score;
+    if (scoreValue >= 1 && scoreValue <= 5) {
+      distribution[scoreValue] = (distribution[scoreValue] || 0) + 1;
+    }
   }
   return distribution;
 }

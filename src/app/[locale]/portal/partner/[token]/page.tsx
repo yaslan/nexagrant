@@ -32,10 +32,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   let part: PartnerPortalPart | null = null;
   try {
-    part = await prisma.applicationPart.findUnique({
+    const rawPart = await prisma.applicationPart.findUnique({
       where: { magicToken: token },
       include: { opportunity: true }
     });
+    part = rawPart as unknown as PartnerPortalPart | null;
   } catch {
     return {
       title: t('title'),
@@ -68,10 +69,11 @@ export default async function PartnerPortalPage({ params }: PageProps) {
 
   let part: PartnerPortalPart | null = null;
   try {
-    part = await prisma.applicationPart.findUnique({
+    const rawPart = await prisma.applicationPart.findUnique({
       where: { magicToken: token },
       include: { opportunity: true }
     });
+    part = rawPart as unknown as PartnerPortalPart | null;
   } catch (e) {
     console.warn(`[PartnerPortalPage] DB query failed: ${errorMessage(e)}`);
     return notFound();

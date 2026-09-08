@@ -26,7 +26,7 @@ export default async function TurkiyeyeAcikCagrilarPage({
 
   let topics: OpenTopicRow[] = [];
   try {
-    topics = await prisma.topic.findMany({
+    const rawTopics = await prisma.topic.findMany({
       where: {
         status: 'OPEN',
       },
@@ -36,6 +36,7 @@ export default async function TurkiyeyeAcikCagrilarPage({
         call: true
       }
     });
+    topics = rawTopics as unknown as OpenTopicRow[];
   } catch (err) {
     console.warn(`[TurkiyeyeAcikCagrilar] DB query bypassed: ${errorMessage(err)}`);
   }
