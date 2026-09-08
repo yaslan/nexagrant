@@ -28,3 +28,12 @@
 - [fabrika-hiding-a-card-is-not-refusing-a-purchase](fabrika-hiding-a-card-is-not-refusing-a-purchase.md) — Görünürlük kusurlarında listeyi ve satın almayı AYRI ölç — kart gizlendiği hâlde endpoint sku'yu elle kabul edebilir; ayrıca "yok" ile "senin değil" tek mesajla cevaplanmalı
 
 - [a-missing-field-card-hides-a-wrong-value-bug](a-missing-field-card-hides-a-wrong-value-bug.md) — Kart 'şu alan yok' diyorsa grep'le doğrulamakla yetinme — yolu koştur ve ÜRETİLEN belgeye bak; eksik alanın yanında çoğu zaman daha ağır bir 'yanlış değer' kusuru duruyor
+
+- [a-fix-can-turn-a-silent-bug-into-an-outage](a-fix-can-turn-a-silent-bug-into-an-outage.md) — Bir düzeltme "sessizce yutma, fırlat" derse, altındaki yazma yolunun gerçekten çalıştığını KANITLA — yoksa kayıp kayıt kusuru tam kesintiye dönüşür
+- [grep-count-of-zero-can-mean-the-fix-landed](grep-count-of-zero-can-mean-the-fix-landed.md) — Bir kartın "grep sayısı 0" kanıtı düzeltilmiş kodda da 0 kalır — çağıranı değil tıkacı ölç, yoksa bitmiş işi bitmemiş sanırsın
+- [one-action-can-be-billed-twice-in-two-places](one-action-can-be-billed-twice-in-two-places.md) — Bir "tek giriş noktası" birleştirmesini doğrularken adaptörün düşüşünü değil, TEK EYLEMİN defterde kaç satır bıraktığını say — ikinci tahakkuk çağıran modülde durabilir
+- [probes-on-a-shared-db-must-run-one-file-at-a-time](probes-on-a-shared-db-must-run-one-file-at-a-time.md) — Aynı kiracı üzerinde çalışan ve kendi satırlarını temizleyen vitest sondalarını TEK ÇAĞRIDA birlikte koşma — dosya paralelliği altında birbirlerinin satırlarını siler ve anlamsız sayı üretirler
+
+- [live-db-probe-beats-a-mocked-prisma-for-filter-shape-bugs](live-db-probe-beats-a-mocked-prisma-for-filter-shape-bugs.md) — Fabrika'da sorgu-şekli kusurlarını yalnız canlı Postgres sondası yakalar — kalıcı `*.live.test.ts` kalıbı, kendi fixture'ı, `describe.skipIf(!HAS_DB)`, sonda kalıntısı bırakma
+- [prisma-json-equals-compares-the-whole-document](prisma-json-equals-compares-the-whole-document.md) — Prisma'da Json kolonda `data: { equals: { key: v } }` TÜM belgeyi karşılaştırır — tek alan için `path: ['key'], equals: v` şart; bu kalıp sessizce hiç eşleşmeyen muhafızlar üretir
+- [shared-worktree-red-must-be-attributed-before-it-is-reported](shared-worktree-red-must-be-attributed-before-it-is-reported.md) — Paylaşılan ağaçta süit iki koşuda farklı kırmızı veriyorsa suç senin değil olabilir — kendi dosyanı `git stash push -- <file>` ile HEAD'e alıp aynı testi tekrar koş, sonucu rapora KANITLA
