@@ -219,6 +219,17 @@ Benim dokunduğum iki dosyada 0 hata.
 
 **Temizlik**: `scripts/_tmp-cs/` ağaçtan kaldırıldı (§4).
 
+**Commit'ler** — bu koşumun işi iki commit'e dağıldı, sebebi paylaşılan ağaçtaki bir yarış:
+- `73b24e6` — dosyalarım staged beklerken **başka bir ajanın commit'i tüm stage'i yuttu**
+  (kod, testler, rapor ve 44 kanıt dosyası o commit'in içinde, ama mesajı başka bir işi
+  anlatıyor: "docs(memory): a local superuser hides a missing withTenant…"). İçerik güvende,
+  yalnız mesaj yanıltıcı. Bilinen tuzak: `fabrika-concurrent-commit-steals-your-stage`.
+- `56b5541` — `fix(m8): count the removed demo opportunities correctly (four, not five)`;
+  ayrık bir index ile commit edildi, pre-commit kapısı temiz.
+- `19c75aa` — bu bölümü ekleyen commit; **`39506ab` (başka bir oturum) onu geri aldı** çünkü
+  raporun bayat bir kopyasını stage'lemişti. Bu satırı okuyorsan bölüm yeniden yazılmıştır.
+  Bilinen tuzak: `fabrika-parallel-agent-file-race`.
+
 ---
 
 ## 4. Bıraktığım hiçbir iz yok — geri alma listesi
@@ -269,6 +280,14 @@ değil; §5.4).
    genel amaçlı bir SQL çalıştırıcı bıraktı. Benim değil, silmedim; dizin sonradan
    boşaldığı için kaldırabildim. Paralel dalgada iki ajan aynı geçici dizin adını
    kullanıyor — çakışma riski.
+
+1b. **Bu alt-görev iki pane'de birden koşuyor.** 12:55–12:58 arasında ağaçta
+   `scripts/_cs-st6-mkkey.ts`, `_cs-st6-probe2/3/4.ts` ve `scripts/seed-st6-empty-e2e.ts`
+   belirdi; `st6` benim alt-görev etiketim ama bu dosyaları ben yazmadım. Aynı kardeş oturum
+   (`session_01UxN9ht…`) `39506ab` ile hem kendi hafıza notunu yazdı hem de bu raporun bayat
+   bir kopyasını commit'leyip §3'ü geri aldı. **Canlı oldukları için o dosyalara
+   DOKUNMADIM** — sahibi temizlemeli. Aynı kartın iki kez dağıtılmış olması ayrı bir
+   dispatch sorunu.
 
 2. **`src/modules/m10/server/actions.ts:120, 192`** — `mockUrl =
    \`https://storage.fabrika.app/docs/…\`` hâlâ `FollowupDoc.contentUrl`'e yazılıyor.
