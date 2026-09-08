@@ -2,6 +2,7 @@ import React from 'react';
 import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
+import { repeatCountOf, lastSeenAtOf } from '@/lib/observability/system-alert';
 import AlertsConsoleClient, { type AlertRow } from './client';
 
 export const dynamic = 'force-dynamic';
@@ -64,6 +65,10 @@ export default async function AdminAlertsPage({
     meta: isPlainObject(r.meta) ? r.meta : null,
     createdAt: r.createdAt.toISOString(),
     resolvedAt: r.resolvedAt ? r.resolvedAt.toISOString() : null,
+    // A repeat updates the open row rather than adding one, so the count and
+    // the last-seen stamp live in `meta` — see src/lib/observability/system-alert.ts.
+    repeatCount: repeatCountOf(r.meta),
+    lastSeenAt: lastSeenAtOf(r.meta),
   }));
 
   return (
@@ -104,6 +109,9 @@ export default async function AdminAlertsPage({
         privacyNote: t('privacyNote'),
         feedbackLink: t('feedbackLink'),
         highlighted: t('highlighted'),
+        repeatLabel: t('repeatLabel'),
+        repeatNote: t('repeatNote'),
+        lastSeen: t('lastSeen'),
       }}
     />
   );

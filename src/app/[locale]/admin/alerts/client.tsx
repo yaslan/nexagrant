@@ -11,6 +11,12 @@
  * src/lib/observability/system-alert.ts), so a beta-feedback alert links back to
  * the triage board for the report text rather than repeating it here.
  *
+ * TASK-MTS80DUAF39Z8 — a repeating alert no longer adds a row per occurrence, so
+ * `createdAt` is when the problem STARTED, not when it last happened. Any row
+ * standing for more than one occurrence therefore carries a repeat badge and a
+ * last-seen time; without them the table would quietly under-report a failure
+ * that is still happening.
+ *
  * Labels are threaded in from the server component, matching the sibling
  * feedback board, so this file stays free of locale branching.
  */
@@ -28,6 +34,10 @@ export interface AlertRow {
   meta: Record<string, unknown> | null;
   createdAt: string;
   resolvedAt: string | null;
+  /** Occurrences this row stands for. 1 unless the alert repeated while open. */
+  repeatCount: number;
+  /** ISO time of the most recent occurrence; null when it has happened once. */
+  lastSeenAt: string | null;
 }
 
 type Labels = Record<string, string>;
@@ -97,11 +107,15 @@ export default function AlertsConsoleClient({
   const counts = useMemo(() => {
     const byLevel: Record<string, number> = { error: 0, warn: 0, info: 0 };
     let open = 0;
+    // Occurrences folded into a row that already existed. `rows.length` counts
+    // rows; this counts the failures those rows are standing in for.
+    let repeats = 0;
     for (const r of rows) {
       byLevel[r.level] = (byLevel[r.level] ?? 0) + 1;
       if (resolvedAtOf(r) === null) open += 1;
+      repeats += Math.max(0, r.repeatCount - 1);
     }
-    return { byLevel, open };
+    return { byLevel, open, repeats };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, resolvedOverride]);
 
@@ -150,6 +164,10 @@ export default function AlertsConsoleClient({
           <div className="rounded-lg border border-border bg-ground px-3 py-2">
             <dt className="text-muted">{labels.errorCount}</dt>
             <dd className="text-lg font-bold text-ink">{counts.byLevel.error ?? 0}</dd>
+          </div>
+          <div className="rounded-lg border border-border bg-ground px-3 py-2">
+            <dt className="text-muted">{labels.repeatLabel}</dt>
+            <dd className="text-lg font-bold text-ink">{counts.repeats}</dd>
           </div>
         </dl>
       </div>
@@ -268,6 +286,18 @@ export default function AlertsConsoleClient({
                       >
                         {row.message}
                       </button>
+                      {row.repeatCount > 1 && (
+                        <span
+                          // Not colour-only: the badge carries its own text.
+                          className="ml-2 inline-block whitespace-nowrap rounded-full border border-amber bg-amber/10 px-2 py-0.5 align-middle font-mono text-[11px] font-bold text-amber"
+                          data-testid={`alert-repeat-${row.id}`}
+                        >
+                          <span aria-hidden="true">×{row.repeatCount}</span>
+                          <span className="sr-only">
+                            {labels.repeatLabel}: {row.repeatCount}
+                          </span>
+                        </span>
+                      )}
                       {isHighlighted && (
                         <span className="mt-0.5 block text-[10px] font-semibold text-accent-ink">
                           {labels.highlighted}
@@ -333,6 +363,19 @@ export default function AlertsConsoleClient({
                                   ? labels.unresolve
                                   : labels.resolve}
                             </button>
+                            {row.repeatCount > 1 && (
+                              <div className="rounded-lg border border-border bg-surface p-2 text-[11px] text-ink-2">
+                                <p className="font-semibold text-ink">
+                                  {labels.repeatLabel}: {row.repeatCount}
+                                </p>
+                                {row.lastSeenAt && (
+                                  <p className="text-muted">
+                                    {labels.lastSeen}: {dateFormat(row.lastSeenAt)}
+                                  </p>
+                                )}
+                                <p className="mt-1 text-muted">{labels.repeatNote}</p>
+                              </div>
+                            )}
                             {resolvedAt && (
                               <p className="text-[11px] text-muted">
                                 {labels.resolvedAt}: {dateFormat(resolvedAt)}
