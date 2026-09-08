@@ -50,9 +50,21 @@ içindir; ödeme sağlayıcısına asla gönderilmez — gerekçesi katalog dosy
 > uydurulmadı, karara bırakıldı. Yetkilendirme tarafı çalışmaya devam ediyor:
 > `grantsModule` alanları planın üstüne modül eklemeyi sürdürüyor.
 
-Kredi maliyeti: M2 taslak 1, M6 değerlendirme 3, M9 brifing 1, M10 belge 1,
-M11 bölüm 2, M1 profil özeti 1, M3 kaynak özeti 1. Kredi bitince YZ özellikleri
-"satın al" diyaloğu açar; diğer işlevler çalışmaya devam eder.
+### Kredi maliyeti (eylem başına)
+
+| Modül | Eylem | Kredi | Durum |
+|---|---|---|---|
+| M1 | Profil özeti | 1 | Yayımlandı |
+| M2 | Taslak | 1 | Yayımlandı |
+| M3 | Kaynak özeti | 1 | Yayımlandı |
+| M6 | Değerlendirme | 3 | Yayımlandı |
+| M6 | ESR Ayrıştırıcı | 0 | Bekliyor |
+| M7 | TTO Hızlandırıcı | 1 | Bekliyor |
+| M9 | Brifing | 1 | Yayımlandı |
+| M10 | Belge | 1 | Yayımlandı |
+| M11 | Bölüm | 2 | Yayımlandı |
+
+Kredi bitince YZ özellikleri "satın al" diyaloğu açar; diğer işlevler çalışmaya devam eder.
 
 ## 2. Yetkilendirme hesabı
 
