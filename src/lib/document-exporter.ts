@@ -1,8 +1,16 @@
 /**
- * Native DOCX & PDF Template Exporter Engine
- * Generates official EU Horizon Europe & TÜBİTAK formatted document downloads (.docx & .pdf)
+ * DOCX & print-HTML exporter for a tenant's own working documents.
+ *
+ * This module produces the TENANT's draft, not a funding body's paperwork. It used to head
+ * every single export with a fixed `EUROPEAN COMMISSION - HORIZON EUROPE` badge (or
+ * `TÜBİTAK EŞİK ÜSTÜ ÖDÜLÜ PAKETİ` for one document kind), tied to no record at all, and to
+ * open the body with "produced in line with the official Horizon Europe … standards". A
+ * consultancy's half-written NDA therefore downloaded as something that looked issued by the
+ * Commission. The letterhead now names the organisation the document actually belongs to —
+ * a stored row — and the page carries an explicit notice that no funding body issued it.
  */
 
+import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 import trMessages from '../../messages/tr.json';
 import enMessages from '../../messages/en.json';
 
@@ -43,11 +51,6 @@ function escapeHtml(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-}
-
-/** Interpolation-safe text for the WordprocessingML body. */
-function escapeXml(value: string): string {
-  return escapeHtml(value).replace(/'/g, '&apos;');
 }
 
 /**
@@ -94,7 +97,16 @@ function signatureState(
 }
 
 export interface ExportDocumentData {
-  id: string;
+  /**
+   * The stored id of the record this export is OF — an `ApplicationPart` id, for instance.
+   *
+   * It is printed as the document reference, so it has to identify the document rather than
+   * the download: the route used to pass `doc-export-${Date.now()}`, which put a different,
+   * registration-number-looking reference on the header every time the same document was
+   * exported. A document with no stored record behind it has no reference, and the header
+   * says so instead of inventing one — hence optional.
+   */
+  documentRef?: string;
   kind: 'NDA' | 'LOI' | 'COMMITMENT' | 'ESR_DEBRIEF' | 'AWARD_PACK' | 'PART_B' | string;
   title: string;
   opportunityTitle?: string;
@@ -133,6 +145,24 @@ function leadAuthorText(
   return `${L.leadAuthorLabel}: ${author}${org ? ` (${org})` : ''}`;
 }
 
+/**
+ * The reference line of the header.
+ *
+ * A reference identifies the DOCUMENT, so it can only come from a stored id. When there is
+ * none the header states that, rather than printing the `doc-export-<epoch millis>` string the
+ * route used to mint per download — two exports of one document carried two references, each
+ * looking like a registration number nobody could look up.
+ */
+function documentRefText(documentRef: string | undefined, L: ReturnType<typeof labels>): string {
+  const ref = documentRef?.trim();
+  return ref ? `${L.docRefLabel}: ${ref}` : L.documentRefUnassigned;
+}
+
+/** Who actually produced this document — printed on every export, in both formats. */
+function provenanceText(orgName: string, L: ReturnType<typeof labels>): string {
+  return L.provenanceNotice.replace('{org}', orgName);
+}
+
 /** The status line of a signature box: signed / awaiting / nobody assigned. */
 function signatureStatusText(state: SignatureState, L: ReturnType<typeof labels>, signedText: string, pendingText: string): string {
   if (state.kind === 'UNASSIGNED') return L.signatoryUnassigned;
@@ -168,6 +198,7 @@ function signatureIdentityHtml(state: SignatureState, L: ReturnType<typeof label
  */
 export function generatePdfHtml(data: ExportDocumentData): string {
   const {
+    documentRef,
     title,
     kind,
     opportunityTitle,
@@ -188,8 +219,6 @@ export function generatePdfHtml(data: ExportDocumentData): string {
   const orgName = tenantName?.trim() || L.organizationUnassigned;
   const signature = signatureState(signatory, signedAt);
   const approval = signatureState(approver ?? null, signedAt);
-
-  const isTubitak = kind === 'AWARD_PACK';
 
   let sectionsHtml = '';
   if (sections.length > 0) {
@@ -220,9 +249,10 @@ export function generatePdfHtml(data: ExportDocumentData): string {
   <style>
     @page { size: A4; margin: 20mm; }
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; font-size: 11pt; }
-    .header { border-bottom: 2px solid ${isTubitak ? '#b91c1c' : '#1d4ed8'}; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
-    .logo-badge { font-weight: bold; font-size: 14pt; color: ${isTubitak ? '#b91c1c' : '#1d4ed8'}; }
+    .header { border-bottom: 2px solid #1d4ed8; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
+    .logo-badge { font-weight: bold; font-size: 14pt; color: #1d4ed8; }
     .sub-header { font-size: 9pt; color: #64748b; font-family: monospace; }
+    .provenance { font-size: 9pt; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 8px 12px; margin-bottom: 22px; }
     .title { font-size: 18pt; font-weight: bold; margin-bottom: 8px; color: #0f172a; }
     .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; }
     .meta-table td { padding: 8px 12px; font-size: 10pt; border-bottom: 1px solid #e2e8f0; }
@@ -249,13 +279,15 @@ export function generatePdfHtml(data: ExportDocumentData): string {
 
   <div class="header">
     <div>
-      <div class="logo-badge">${isTubitak ? 'TÜBİTAK EŞİK ÜSTÜ ÖDÜLÜ PAKETİ' : 'EUROPEAN COMMISSION - HORIZON EUROPE'}</div>
-      <div class="sub-header">${escapeHtml(L.docRefLabel)}: ${escapeHtml(data.id)} | ${escapeHtml(L.versionLabel)} v${version}</div>
+      <div class="logo-badge">${escapeHtml(orgName)}</div>
+      <div class="sub-header">${escapeHtml(documentRefText(documentRef, L))} | ${escapeHtml(L.versionLabel)} v${version}</div>
     </div>
     <div style="text-align:right;" class="sub-header">
-      ${escapeHtml(L.dateLabel)}: ${new Date().toLocaleDateString(dateLocale)}
+      ${escapeHtml(L.exportedAtLabel)}: ${new Date().toLocaleDateString(dateLocale)}
     </div>
   </div>
+
+  <div class="provenance">${escapeHtml(provenanceText(orgName, L))}</div>
 
   <div class="title">${title}</div>
 
@@ -312,10 +344,19 @@ export function generatePdfHtml(data: ExportDocumentData): string {
 }
 
 /**
- * Generates Word (.docx) XML document buffer formatted according to EC guidelines
+ * Real Word (.docx) bytes: an Office Open XML package, built with the `docx` library the M2
+ * concept-note export already uses.
+ *
+ * This function used to return the bare `word/document.xml` markup with a `Buffer.from(xml)`
+ * and hand it to the route under the OOXML content type and a `.docx` filename. A .docx is a
+ * ZIP container, so what the browser saved began with `<?xml` instead of `PK\x03\x04`, and
+ * every zip tool (and Word itself) rejected it — `unzip -t` reported "End-of-central-directory
+ * signature not found". Nothing about the old output was a document anyone could open.
+ *
+ * Async because packing a zip is: the single caller is a route handler and already awaits.
  */
-export function generateDocxBuffer(data: ExportDocumentData): Buffer {
-  const { title, kind, opportunityTitle, tenantName, version = 1, locale, sections = [] } = data;
+export async function generateDocxBuffer(data: ExportDocumentData): Promise<Buffer> {
+  const { documentRef, title, kind, opportunityTitle, tenantName, version = 1, locale, sections = [] } = data;
 
   // Same rule as the PDF template: an absent call or organisation is labelled as absent
   // rather than back-filled with a plausible-looking placeholder.
@@ -323,61 +364,64 @@ export function generateDocxBuffer(data: ExportDocumentData): Buffer {
   const callName = opportunityTitle?.trim() || L.callUnspecified;
   const orgName = tenantName?.trim() || L.organizationUnassigned;
 
-  let bodyXml = '';
+  /** A label/value line, e.g. **Kuruluş:** Küçük Danışmanlık Ltd. */
+  const field = (label: string, value: string) =>
+    new Paragraph({
+      children: [new TextRun({ text: `${label}: `, bold: true }), new TextRun({ text: value })],
+    });
+
+  const children: Paragraph[] = [
+    new Paragraph({
+      children: [new TextRun({ text: `${kind} - ${title}`, bold: true, size: 36, color: '1D4ED8' })],
+    }),
+    // The .docx carries the same provenance notice as the printed page: the letterhead of an
+    // export is the tenant's own organisation, and no funding body issued this file.
+    new Paragraph({
+      children: [new TextRun({ text: provenanceText(orgName, L), italics: true, color: '92400E' })],
+      spacing: { after: 200 },
+    }),
+    field(L.docxProjectLabel, callName),
+    field(L.docxOrganizationLabel, orgName),
+    field(L.versionLabel, `v${version}`),
+    new Paragraph({ children: [new TextRun({ text: documentRefText(documentRef, L) })] }),
+    new Paragraph({ children: [] }),
+  ];
 
   if (sections.length > 0) {
-    bodyXml = sections
-      .map(
-        (sec) => `
-    <w:p>
-      <w:pPr><w:pStyle w:val="Heading2"/></w:pPr>
-      <w:r><w:rPr><w:b/><w:sz w:val="26"/><w:color w:val="1E40AF"/></w:rPr><w:t>${sec.title}</w:t></w:r>
-    </w:p>
-    <w:p><w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>${escapeXml(leadAuthorText(sec, L))}</w:t></w:r></w:p>
-    <w:p>
-      <w:r><w:t>${sec.content.replace(/<[^>]+>/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t></w:r>
-    </w:p>
-    <w:p><w:r><w:t></w:t></w:r></w:p>
-    `
-      )
-      .join('');
+    for (const sec of sections) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: sec.title, bold: true, size: 26, color: '1E40AF' })],
+          spacing: { before: 300 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: leadAuthorText(sec, L), italics: true, color: '64748B' })],
+        }),
+        ...plainTextParagraphs(sec.content),
+        new Paragraph({ children: [] })
+      );
+    }
   } else {
-    bodyXml = `
-    <w:p>
-      <w:pPr><w:pStyle w:val="Heading1"/></w:pPr>
-      <w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>${escapeXml(L.docxBodyHeading)}</w:t></w:r>
-    </w:p>
-    <w:p>
-      <w:r><w:t>${data.contentText ? data.contentText.replace(/<[^>]+>/g, '') : escapeXml(L.docxFallbackBody)}</w:t></w:r>
-    </w:p>`;
+    children.push(
+      new Paragraph({ children: [new TextRun({ text: L.docxBodyHeading, bold: true, size: 28 })] }),
+      ...plainTextParagraphs(data.contentText ?? L.docxFallbackBody)
+    );
   }
 
-  // Build WordprocessingML XML package document
-  const xmlContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<?mso-application progid="Word.Document"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:body>
-    <w:p>
-      <w:pPr><w:pStyle w:val="Title"/><w:jc w:val="center"/></w:pPr>
-      <w:r><w:rPr><w:b/><w:sz w:val="36"/><w:color w:val="1D4ED8"/></w:rPr><w:t>${kind} - ${title}</w:t></w:r>
-    </w:p>
-    <w:p><w:r><w:t></w:t></w:r></w:p>
-    <w:p>
-      <w:r><w:rPr><w:b/></w:rPr><w:t>${escapeXml(L.docxProjectLabel)}: </w:t></w:r>
-      <w:r><w:t>${escapeXml(callName)}</w:t></w:r>
-    </w:p>
-    <w:p>
-      <w:r><w:rPr><w:b/></w:rPr><w:t>${escapeXml(L.docxOrganizationLabel)}: </w:t></w:r>
-      <w:r><w:t>${escapeXml(orgName)}</w:t></w:r>
-    </w:p>
-    <w:p>
-      <w:r><w:rPr><w:b/></w:rPr><w:t>${escapeXml(L.versionLabel)}: </w:t></w:r>
-      <w:r><w:t>v${version}</w:t></w:r>
-    </w:p>
-    <w:p><w:r><w:t></w:t></w:r></w:p>
-    ${bodyXml}
-  </w:body>
-</w:document>`;
+  const doc = new DocxDocument({ sections: [{ properties: {}, children }] });
+  return Packer.toBuffer(doc);
+}
 
-  return Buffer.from(xmlContent, 'utf-8');
+/**
+ * Stored section content as Word paragraphs.
+ *
+ * Section bodies come out of the Part B editor, so they can carry HTML tags and newlines. The
+ * `docx` library escapes the text it is given, so tags are stripped for readability only — not
+ * as an escaping measure.
+ */
+function plainTextParagraphs(text: string): Paragraph[] {
+  return text
+    .replace(/<[^>]+>/g, '')
+    .split('\n')
+    .map((line) => new Paragraph({ children: [new TextRun({ text: line })] }));
 }

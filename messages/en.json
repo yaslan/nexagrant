@@ -990,11 +990,13 @@
     "callUnspecified": "Call not specified",
     "leadAuthorLabel": "Lead author",
     "leadAuthorUnassigned": "No lead author assigned",
-    "templateBody": "### {kind} OFFICIAL APPLICATION DOCUMENT\n\nThis document is produced in line with the official Horizon Europe and TÜBİTAK Above-Threshold Award Package standards.\n\n1. Parties and rights\n2. Confidentiality and intellectual property statement\n3. Terms and effective date",
-    "printButton": "🖨️ Official print / download PDF",
+    "templateBody": "### {kind} DOCUMENT\n\nThis document is a draft produced in Fabrika for the organisation's own application work. It is not an official application document and has not been issued by any funding body.\n\n1. Parties and rights\n2. Confidentiality and intellectual property statement\n3. Terms and effective date",
+    "printButton": "🖨️ Print / download PDF",
+    "provenanceNotice": "This document was prepared by {org} in Fabrika. It is NOT an official document issued or approved by the European Commission, TÜBİTAK or any other funding body.",
     "docRefLabel": "Document ref",
+    "documentRefUnassigned": "No document reference recorded",
     "versionLabel": "Version",
-    "dateLabel": "Date",
+    "exportedAtLabel": "Exported on",
     "callLabel": "Project / call name",
     "organizationLabel": "Applicant organisation",
     "documentTypeLabel": "Document type",
@@ -1004,7 +1006,7 @@
     "docxProjectLabel": "Project title",
     "docxOrganizationLabel": "Organisation",
     "docxBodyHeading": "1. DOCUMENT CONTENT AND TERMS",
-    "docxFallbackBody": "This document is produced in line with the official Horizon Europe standards."
+    "docxFallbackBody": "This document is a draft prepared in Fabrika. It is not an official application document."
   },
   "PartBEditor": {
     "noRevisions": "No saved revision for this section yet.",

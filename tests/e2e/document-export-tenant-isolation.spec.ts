@@ -1,9 +1,11 @@
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 import { test, expect, type Page } from '@playwright/test';
+import unzipper from 'unzipper';
 
 import { prisma } from '../../src/lib/db';
 import { DOC_E2E, seed, rollback } from '../../scripts/seed-doc-export-e2e';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MTS9VGEKE8N3B — `/api/documents/export`, in a real browser and over real HTTP.
@@ -20,11 +22,28 @@ import { DOC_E2E, seed, rollback } from '../../scripts/seed-doc-export-e2e';
  *   3. tenant A asks for B's partId → 404, B's marker string absent
  *   4. tenant B asks for A's partId → 404 (the mirror measurement: one
  *      direction can pass by accident, both cannot)
+ *
+ * TASK-MTSHTIYJWTQKO extends it with what the served bytes actually SAY: the download is a
+ * real Office Open XML package (it used to be bare `word/document.xml` under a `.docx` name,
+ * which no zip tool could open), its letterhead is the tenant's own organisation rather than
+ * a fixed `EUROPEAN COMMISSION - HORIZON EUROPE` badge, and its document reference is the
+ * stored part id rather than a fresh `doc-export-<epoch>` per download.
  */
 
-const SHOTS = 'docs/agent-results/TASK-MTS9VGEKE8N3B-screenshots';
+const SHOTS = shotsDir('TASK-MTS9VGEKE8N3B-screenshots');
+
+/** The reference the route used to mint per download: `doc-export-` + epoch milliseconds. */
+const MINTED_REF = /doc-export-\d{10,}/;
 
 const APPLICATION_URL = `/tr/${DOC_E2E.workspaceSlug}/opportunities/${DOC_E2E.opportunityId}/application`;
+
+/** The readable text of a .docx — proof, at the same time, that the file is a real zip. */
+async function docxText(path: string): Promise<string> {
+  const archive = await unzipper.Open.buffer(readFileSync(path));
+  const document = archive.files.find((f) => f.path === 'word/document.xml');
+  expect(document, `${path} is not an OOXML package: no word/document.xml`).toBeTruthy();
+  return (await document!.buffer()).toString('utf-8');
+}
 
 const exportUrl = (partId: string) =>
   `/api/documents/export?type=PART_B&format=docx&partId=${partId}&title=Part_B_Technical_Proposal&locale=tr`;
@@ -90,7 +109,7 @@ test.describe('Document export — session required, tenant scoped, no invented 
     ]);
     const saved = `${SHOTS}/03-tenant-a-export.docx`;
     await download.saveAs(saved);
-    const text = readFileSync(saved, 'utf-8');
+    const text = await docxText(saved);
 
     // What the tenant actually owns.
     expect(text).toContain(DOC_E2E.tenantName);
@@ -102,6 +121,28 @@ test.describe('Document export — session required, tenant scoped, no invented 
     expect(text).not.toContain('HORIZON-CL5-2026-D3-01');
     // And nothing of tenant B's.
     expect(text).not.toContain(DOC_E2E.otherSectionText);
+
+    // The bytes really are an OOXML package — `docxText` above would have thrown otherwise —
+    // and the file starts with the ZIP magic instead of `<?xml`.
+    expect(readFileSync(saved).subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+
+    // No funding body issued this: the letterhead is the tenant, and the notice says so.
+    expect(text).not.toContain('EUROPEAN COMMISSION');
+    expect(text).not.toContain('HORIZON EUROPE');
+    expect(text).toContain('resmî bir belge DEĞİLDİR');
+
+    // The reference identifies the DOCUMENT, so a second download of the same part carries
+    // the same one. It used to be `doc-export-${Date.now()}` — different every time.
+    expect(text).toContain(DOC_E2E.partId);
+    // The minted reference was `doc-export-<epoch millis>`; the fixture's own part id happens
+    // to start `doc-export-e2e-`, so the epoch shape is what is asserted against.
+    expect(text).not.toMatch(MINTED_REF);
+
+    const second = await page.request.get(exportUrl(DOC_E2E.partId));
+    expect(second.status()).toBe(200);
+    const secondPath = `${SHOTS}/10-tenant-a-export-again.docx`;
+    writeFileSync(secondPath, Buffer.from(await second.body()));
+    expect(await docxText(secondPath)).toContain(DOC_E2E.partId);
   });
 
   test('tenant A asking for tenant B’s partId gets 404 and none of B’s text', async ({ page }) => {
@@ -152,13 +193,17 @@ test.describe('Document export — session required, tenant scoped, no invented 
 
     const en = await (await page.request.get(printUrl('en'))).text();
     writeFileSync(`${SHOTS}/06-nda-print-en.html`, en);
-    expect(en).toContain('OFFICIAL APPLICATION DOCUMENT');
+    // The body used to open with "OFFICIAL APPLICATION DOCUMENT … produced in line with the
+    // official Horizon Europe … standards" on a document nobody official had seen.
+    expect(en).toContain('This document is a draft produced in Fabrika');
     expect(en).toContain('Parties and rights');
-    expect(en).not.toContain('İşbu doküman');
+    expect(en).not.toContain('OFFICIAL APPLICATION DOCUMENT');
+    expect(en).not.toContain('kuruluşun kendi başvuru çalışması');
 
     const tr = await (await page.request.get(printUrl('tr'))).text();
     writeFileSync(`${SHOTS}/07-nda-print-tr.html`, tr);
-    expect(tr).toContain('İşbu doküman');
+    expect(tr).toContain('kuruluşun kendi başvuru çalışması');
+    expect(tr).not.toContain('RESMÎ BAŞVURU DOKÜMANI');
     expect(tr).not.toContain('Parties and rights');
 
     for (const body of [en, tr]) {
@@ -166,7 +211,22 @@ test.describe('Document export — session required, tenant scoped, no invented 
       expect(body).toContain(DOC_E2E.tenantName);
       expect(body).not.toContain('FonBridge Teknoloji');
       expect(body).not.toContain('HORIZON-CL5-2026-D3-01');
+
+      // The letterhead is that same stored organisation, and no funding body's badge.
+      expect(body).toContain(`<div class="logo-badge">${DOC_E2E.tenantName}</div>`);
+      expect(body).not.toContain('EUROPEAN COMMISSION');
+      expect(body).not.toContain('TÜBİTAK EŞİK ÜSTÜ ÖDÜLÜ PAKETİ');
+
+      // This print URL names no stored document, so it gets no reference at all rather
+      // than a minted one.
+      expect(body).not.toMatch(MINTED_REF);
     }
+
+    expect(en).toContain('No document reference recorded');
+    expect(tr).toContain('Kayıtlı bir doküman referansı yok');
+    // The header date is the date of THIS export, and is labelled as such.
+    expect(en).toContain('Exported on:');
+    expect(tr).toContain('Dışa aktarma tarihi:');
 
     // The whole printable page follows the language, not just the body: the meta
     // table headings, the print button and the footer used to stay Turkish while

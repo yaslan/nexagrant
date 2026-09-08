@@ -990,11 +990,13 @@
     "callUnspecified": "Çağrı belirtilmedi",
     "leadAuthorLabel": "Lider Yazar",
     "leadAuthorUnassigned": "Lider yazar atanmadı",
-    "templateBody": "### {kind} RESMÎ BAŞVURU DOKÜMANI\n\nİşbu doküman resmî Ufuk Avrupa (Horizon Europe) ve TÜBİTAK Eşik Üstü Ödül Paketi standartlarına uygun olarak üretilmiştir.\n\n1. Taraflar ve Haklar\n2. Gizlilik ve Fikri Mülkiyet Beyanı\n3. Hüküm ve Yürürlük Tarihi",
-    "printButton": "🖨️ Resmî Yazdır / PDF İndir",
+    "templateBody": "### {kind} DOKÜMANI\n\nBu doküman, kuruluşun kendi başvuru çalışması için Fabrika'da üretilmiş bir taslaktır. Resmî bir başvuru belgesi değildir ve hiçbir fon kuruluşu tarafından düzenlenmemiştir.\n\n1. Taraflar ve Haklar\n2. Gizlilik ve Fikri Mülkiyet Beyanı\n3. Hüküm ve Yürürlük Tarihi",
+    "printButton": "🖨️ Yazdır / PDF İndir",
+    "provenanceNotice": "Bu belge {org} tarafından Fabrika'da hazırlanmıştır. Avrupa Komisyonu, TÜBİTAK ya da başka bir fon kuruluşu tarafından düzenlenmiş veya onaylanmış resmî bir belge DEĞİLDİR.",
     "docRefLabel": "Doküman Ref",
+    "documentRefUnassigned": "Kayıtlı bir doküman referansı yok",
     "versionLabel": "Sürüm",
-    "dateLabel": "Tarih",
+    "exportedAtLabel": "Dışa aktarma tarihi",
     "callLabel": "Proje / Çağrı Adı",
     "organizationLabel": "Başvuran Kuruluş",
     "documentTypeLabel": "Doküman Türü",
@@ -1004,7 +1006,7 @@
     "docxProjectLabel": "Proje Başlığı",
     "docxOrganizationLabel": "Kuruluş",
     "docxBodyHeading": "1. DOKÜMAN İÇERİĞİ VE HÜKÜMLER",
-    "docxFallbackBody": "İşbu doküman resmî Ufuk Avrupa standartlarına uygun olarak üretilmiştir."
+    "docxFallbackBody": "Bu doküman Fabrika'da hazırlanmış bir taslaktır; resmî bir başvuru belgesi değildir."
   },
   "PartBEditor": {
     "noRevisions": "Bu bölüm için henüz kayıtlı bir sürüm yok.",

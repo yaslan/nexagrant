@@ -99,7 +99,11 @@ export async function GET(req: Request) {
   }
 
   const docData = {
-    id: `doc-export-${Date.now()}`,
+    // The document's reference is the id of the row it is an export OF, so the same document
+    // exported twice carries the same reference. This used to be `doc-export-${Date.now()}`:
+    // a fresh registration-number-looking string per download, traceable to nothing. A
+    // template export has no stored row, so it gets no reference and the header says so.
+    documentRef: partId ?? undefined,
     kind: type,
     title,
     // Absent stays absent: the exporter labels an unknown call and an unknown
@@ -114,8 +118,12 @@ export async function GET(req: Request) {
   };
 
   if (format === 'docx') {
-    const buffer = generateDocxBuffer(docData);
-    const filename = `${type}_v1_${Date.now()}.docx`;
+    // A real Office Open XML package (a zip), not the bare `word/document.xml` this route used
+    // to serve under the OOXML content type — Word and `unzip` both rejected that file.
+    const buffer = await generateDocxBuffer(docData);
+    // Named after the document, not the clock: two exports of one document produced two
+    // differently-named files, which read like two different documents.
+    const filename = `${type}${partId ? `_${partId}` : ''}.docx`;
 
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
