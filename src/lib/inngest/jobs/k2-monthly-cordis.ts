@@ -33,6 +33,11 @@ const REQUIRED_WORKER_FIELDS = ['message'] as const;
  *    `SystemAlert` and a `success: false` result — it never throws;
  *  - a body that no longer carries a field this job reads is *drift*, not
  *    failure: it alerts and the run still counts as delivered.
+ *
+ * And the one the worker side pays for: `/jobs/cordis` runs the pipeline before
+ * it answers, so `success: false` in a 2xx body is a real failure and is
+ * recorded as one. A worker that reports a broken run no longer produces a
+ * green K2 result.
  */
 export async function runK2MonthlyCordis(
   options: K2MonthlyCordisOptions = {}
@@ -131,9 +136,31 @@ export async function runK2MonthlyCordis(
     });
   }
 
+  // The worker now runs the pipeline before it answers, so a 2xx body carries
+  // the *outcome*. When it says the run failed, this job must not record a
+  // success: a green K2 run with an empty CordisProject table was exactly the
+  // failure this path used to hide.
+  const reported = workerResponse as Record<string, unknown>;
+  if (reported?.success === false) {
+    const detail = typeof reported.error === 'string' ? reported.error : 'unknown error';
+    const message = `CORDIS pipeline failed on the worker: ${detail}`;
+    await recordAlert({
+      level: 'error',
+      source: 'k2_monthly_cordis',
+      message,
+      meta: { month, host: safeHost(workerUrl), rowCounts: reported.rowCounts ?? null },
+    });
+    return K2MonthlyCordisOutputSchema.parse({
+      success: false,
+      message,
+      workerResponse,
+      error: detail,
+    });
+  }
+
   return K2MonthlyCordisOutputSchema.parse({
     success: true,
-    message: 'CORDIS pipeline triggered successfully',
+    message: 'CORDIS pipeline finished successfully',
     workerResponse,
   });
 }

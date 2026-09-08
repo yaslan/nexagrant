@@ -140,6 +140,62 @@ describe('runK2MonthlyCordis', () => {
     expect(alerts[0]!.message).toContain('not JSON');
   });
 
+  it('records a failure when the worker reports the pipeline failed', async () => {
+    // The worker runs the pipeline before it answers, so a 2xx body carries the
+    // outcome. A failed run must not be filed as a green K2 run — that pairing
+    // (success: true, zero rows written) is what this job used to produce.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({
+        success: false,
+        message: 'CORDIS pipeline failed',
+        error: 'relation "CordisProject" does not exist',
+        rowCounts: { projects: 0, organizations: 0, participations: 0, topics: 0 },
+      })
+    );
+
+    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('CordisProject');
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!.level).toBe('error');
+    expect(alerts[0]!.message).toContain('failed on the worker');
+    // The body that reported the failure is on record either way.
+    expect((rawFetches[0]!.payload as { body: string }).body).toContain('CordisProject');
+  });
+
+  it('carries the row counts a successful run reported', async () => {
+    // "It answered 200" and "it wrote rows" are different claims; the second
+    // one is only answerable if the counts survive into the job result.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({
+        success: true,
+        message: 'CORDIS pipeline finished successfully',
+        runId: 'wrk_abc',
+        rowCounts: { projects: 2, organizations: 3, participations: 4, topics: 2 },
+      })
+    );
+
+    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
+
+    expect(result.success).toBe(true);
+    expect((result.workerResponse as { rowCounts: { projects: number } }).rowCounts.projects).toBe(2);
+    expect(alerts).toHaveLength(0);
+  });
+
+  it('still treats a worker that reports no success field as delivered', async () => {
+    // Backwards compatibility: an older worker that only echoes `message` keeps
+    // the drift semantics it had, rather than being read as a failure.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ message: 'CORDIS pipeline triggered' })
+    );
+
+    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
+
+    expect(result.success).toBe(true);
+    expect(alerts).toHaveLength(0);
+  });
+
   it('never puts the worker URL credentials into an alert', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('fetch failed'));
 
