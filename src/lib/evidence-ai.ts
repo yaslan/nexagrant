@@ -22,7 +22,7 @@
  * or image into text, and `extractEvidenceMetadata()` was handed only a file name. An
  * LLM called with a file name reproduces exactly the fabrication above, at the cost of
  * a credit charge. When OCR lands, pass its output as `rawText` and route the field
- * extraction through `generateText()` in `src/lib/ai/llm.ts` — that is the one entry
+ * extraction through `generateText()` in `src/lib/llm.ts` — that is the one entry
  * point that writes `AiUsageLog` and debits `CreditLedger` (CLAUDE.md §5).
  */
 

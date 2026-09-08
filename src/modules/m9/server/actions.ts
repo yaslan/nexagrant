@@ -3,7 +3,7 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { assertModuleAccess } from '@/lib/modules/access';
-import { generateText } from '@/lib/ai/llm';
+import { generateText } from '@/lib/llm';
 import { revalidatePath } from 'next/cache';
 import { syncMeetingBriefToCalendar } from '@/lib/calendar/sync';
 import { errorMessage } from '@/lib/errors';

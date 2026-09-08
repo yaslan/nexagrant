@@ -46,7 +46,7 @@ Kapı **iki** katmanda çalışır, çünkü tek başına hiçbiri yetmez:
   Her modül sayfasının başında iki satır: `const locked = await moduleGate('M9', locale); if (locked) return locked;`
   Kapı mantığı sayfaya kopyalanmaz; sayfa yalnız hangi modüle ait olduğunu söyler.
 - **Server action:** `assertModuleAccess(moduleId)` action'ın **ilk** satırı.
-  Bu sıralama pazarlık konusu değil: `generateText()` (`src/lib/ai/llm.ts`) ulaşıldığı
+  Bu sıralama pazarlık konusu değil: `generateText()` (`src/lib/llm.ts`) ulaşıldığı
   anda `AiUsageLog` yazar ve `CreditLedger`'dan düşer. Sonradan yapılan bir kontrol
   krediyi geri getirmez. Ayrıca bir server action herkese açık bir POST uç noktasıdır —
   düğmeyi UI'da gizlemek kapı değildir.

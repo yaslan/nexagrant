@@ -8,7 +8,7 @@ const h = vi.hoisted(() => ({
   proposalUpdate: vi.fn(),
 }));
 
-vi.mock('../../src/lib/ai/llm', () => ({
+vi.mock('../../src/lib/llm', () => ({
   generateText: h.generateText,
 }));
 

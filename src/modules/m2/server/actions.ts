@@ -2,7 +2,7 @@
 
 import { prisma, withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
-import { generateText } from '@/lib/ai/llm';
+import { generateText } from '@/lib/llm';
 import { semanticSearch } from '@/lib/ai/rag';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 

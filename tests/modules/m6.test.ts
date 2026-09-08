@@ -95,7 +95,7 @@ vi.mock('../../src/lib/db', () => ({
   ),
 }));
 
-vi.mock('../../src/lib/ai/llm', () => ({ generateText: h.generateText }));
+vi.mock('../../src/lib/llm', () => ({ generateText: h.generateText }));
 
 const AI_JSON = JSON.stringify({
   excellence: 4.5,

@@ -19,7 +19,7 @@ vi.mock('../../src/lib/db', async () => {
   });
 });
 
-vi.mock('../../src/lib/ai/llm', () => ({
+vi.mock('../../src/lib/llm', () => ({
   generateText: vi.fn().mockResolvedValue(`### 📋 TTO IP & Lisanslama Kontrol Listesi\n\nMock IP checklist content.`),
 }));
 

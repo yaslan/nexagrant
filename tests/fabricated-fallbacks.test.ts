@@ -202,7 +202,7 @@ const { generateTextMock, withTenantMock, requireTenantActionMock, recordAlertMo
   })
 );
 
-vi.mock('@/lib/ai/llm', () => ({ generateText: generateTextMock }));
+vi.mock('@/lib/llm', () => ({ generateText: generateTextMock }));
 vi.mock('@/lib/db', () => ({ withTenant: withTenantMock, prisma: {} }));
 vi.mock('@/lib/tenant', () => ({
   requireTenantAction: requireTenantActionMock,

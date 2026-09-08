@@ -43,7 +43,7 @@ vi.mock('../../src/lib/auth', () => ({
   })),
 }));
 
-vi.mock('../../src/lib/ai/llm', () => ({
+vi.mock('../../src/lib/llm', () => ({
   generateText: vi.fn().mockResolvedValue(`### MUTUAL NON-DISCLOSURE AGREEMENT (NDA)\n\nMock document content.`),
 }));
 

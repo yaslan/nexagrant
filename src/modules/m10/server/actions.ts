@@ -2,7 +2,7 @@
 
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
-import { generateText } from '@/lib/ai/llm';
+import { generateText } from '@/lib/llm';
 import {
   submitForDualApproval,
   approveByDepartment,

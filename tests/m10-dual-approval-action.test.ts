@@ -130,7 +130,7 @@ vi.mock('@/lib/tenant', () => ({
   TenantScopeError: class TenantScopeError extends Error {},
 }));
 vi.mock('@/lib/db', () => ({ withTenant: withTenantMock, prisma: {} }));
-vi.mock('@/lib/ai/llm', () => ({ generateText: vi.fn() }));
+vi.mock('@/lib/llm', () => ({ generateText: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
 const { submitDualApprovalAction, departmentApproveAction } = await import(

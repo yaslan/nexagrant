@@ -62,7 +62,7 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 
 ### E8 · K6 YZ + M2 Concept Note (S6–S7)
 - [ ] `llm.ts` adaptör (Anthropic + OpenAI-uyumlu), `AiUsageLog` + kredi (transaction), RAG (Document/Chunk, pgvector, hnsw), çalışma programı PDF içe aktarma (platform admin).
-  kısmi: `AiUsageLog`, `Document`/`Chunk` (pgvector) modelleri var. LLM adaptör kodu CLAUDE.md §5'in istediği `src/core/k6-ai/llm.ts` yolunda **değil** — `src/lib/llm.ts` ve `src/lib/ai/llm.ts` olmak üzere **iki ayrı dosya** var; bu mimari sapma ayrı bir teknik-borç maddesi olarak işaretlenmeli. Çalışma programı PDF içe aktarma teyit edilmedi.
+  kısmi: `AiUsageLog`, `Document`/`Chunk` (pgvector) modelleri var. LLM adaptörü artık **tek dosya**: `src/lib/llm.ts` (TASK-MTSXGXBCJ007W; ikinci adaptör `src/lib/ai/llm.ts` silindi, CLAUDE.md §5 gerçek yolu gösterecek şekilde düzeltildi). Kredi formülü tek yerde (`creditsForUsage`) toplandı; `docs/BILLING.md`'nin eylem-başına kredi tablosunu koda taşımak **hâlâ açık** bir fiyat kararı. Çalışma programı PDF içe aktarma teyit edilmedi.
 - [x] `ConceptTemplate` seed (model + seed), editör (`concept-notes/[id]/editor.tsx`), YZ taslak, sürüm, DOCX dışa aktarım (`api/concept-notes/[id]/export`), YZ kullanım beyanı.
 - Kabul: taslak < 90 s; kredi/günlük; kör şablon ad tespiti.
 

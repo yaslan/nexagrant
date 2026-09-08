@@ -94,7 +94,7 @@ vi.mock('../../src/lib/db', () => ({
   ),
 }));
 
-vi.mock('../../src/lib/ai/llm', () => ({
+vi.mock('../../src/lib/llm', () => ({
   generateText: vi.fn().mockResolvedValue(`### 1. Partner Background & EU Track Record
 - Mock partner background output.
 ### 4. 3 Strategic Questions to Ask in Meeting

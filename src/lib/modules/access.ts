@@ -118,7 +118,7 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
  *
  * Call it as the *first* statement of the action, above the LLM call: hiding a button
  * in the client is not a gate, and `generateText()` writes an `AiUsageLog` row and
- * debits `CreditLedger` (src/lib/ai/llm.ts) the moment it is reached, so a closed
+ * debits `CreditLedger` (src/lib/llm.ts) the moment it is reached, so a closed
  * module that was checked afterwards would still have cost the tenant credits.
  */
 export async function assertModuleAccess(moduleId: ModuleId): Promise<void> {

@@ -1,4 +1,4 @@
-import { generateText } from '@/lib/ai/llm';
+import { generateText } from '@/lib/llm';
 import { withTenant, type TenantTx } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { z } from 'zod';

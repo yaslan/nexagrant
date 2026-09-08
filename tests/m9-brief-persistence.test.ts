@@ -27,7 +27,7 @@ const { requireTenantActionMock, withTenantMock, generateTextMock, assertModuleA
 
 vi.mock('@/lib/tenant', () => ({ requireTenantAction: requireTenantActionMock }));
 vi.mock('@/lib/db', () => ({ withTenant: withTenantMock, prisma: {} }));
-vi.mock('@/lib/ai/llm', () => ({ generateText: generateTextMock }));
+vi.mock('@/lib/llm', () => ({ generateText: generateTextMock }));
 vi.mock('@/lib/modules/access', () => ({ assertModuleAccess: assertModuleAccessMock }));
 vi.mock('@/lib/calendar/sync', () => ({ syncMeetingBriefToCalendar: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));

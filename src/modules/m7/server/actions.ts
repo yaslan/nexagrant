@@ -2,7 +2,7 @@
 
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
-import { generateText } from '@/lib/ai/llm';
+import { generateText } from '@/lib/llm';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
 import type { TtoPortfolioItemRow } from '@/types/db-rows';

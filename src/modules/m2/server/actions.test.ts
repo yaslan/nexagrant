@@ -33,7 +33,7 @@ vi.mock('@/lib/tenant', () => ({
   requireTenantAction: vi.fn().mockResolvedValue({ tenantId: 'tenant_1', userId: 'user_1' }),
 }));
 
-vi.mock('@/lib/ai/llm', () => ({
+vi.mock('@/lib/llm', () => ({
   generateText: vi.fn().mockResolvedValue('generated section text'),
 }));
 

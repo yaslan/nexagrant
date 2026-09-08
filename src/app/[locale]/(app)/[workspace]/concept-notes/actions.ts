@@ -2,7 +2,7 @@
 
 import { prisma, withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
-import { generateWithAI, LlmMessage } from '@/lib/llm';
+import { generateCompletion, LlmMessage } from '@/lib/llm';
 import { buildRagPrompt } from '@/lib/rag';
 import { revalidatePath } from 'next/cache';
 import type { ConceptTemplateSchema } from '@/modules/m2/types';
@@ -121,17 +121,15 @@ Requirements:
     },
   ];
 
-  const result = await generateWithAI(
+  const result = await generateCompletion({
     tenantId,
     userId,
     messages,
-    {
-      module: 'M2',
-      purpose: 'concept_note_draft',
-      proposalId: noteId,
-      section: sectionKey,
-    }
-  );
+    module: 'M2',
+    purpose: 'concept_note_draft',
+    proposalId: noteId,
+    section: sectionKey,
+  });
 
   // Auto-save the generated draft into the note
   await withTenant(tenantId, async (tx) => {
@@ -154,7 +152,10 @@ Requirements:
     text: result.text,
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
-    creditsUsed: Math.ceil(result.inputTokens / 1000) + Math.ceil(result.outputTokens / 1000) * 3,
+    // The credits the ledger actually moved by, not a second copy of the
+    // formula: this screen used to re-derive the old adapter's price inline, so
+    // the figure it showed drifted from the `AiUsageLog` row behind it.
+    creditsUsed: result.credits,
   };
 }
 

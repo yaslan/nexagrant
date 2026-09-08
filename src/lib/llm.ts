@@ -1,12 +1,23 @@
 /**
- * LLM Adapter — Anthropic + OpenAI-compatible interface
- * Abstracts provider details and logs usage to AiUsageLog + deducts credits.
+ * LLM adapter — the ONE entry point every Fabrika LLM call goes through
+ * (CLAUDE.md rule 5).
+ *
+ * Until TASK-MTSXGXBCJ007W there were two: this file and `src/lib/ai/llm.ts`.
+ * They were not a cosmetic duplicate — they priced the same call differently
+ * (`max(1, total/10K)` vs `in/1K + 3×out/1K`), so a 4.000/1.000-token call cost
+ * 1 credit through one and 7 through the other, inside the same module (M2:
+ * `m2/server/actions.ts` vs the concept-notes screen). They also defaulted to
+ * different models and hashed prompts to different lengths, so an audit could
+ * not tie the two sets of rows together. The second adapter is gone; everything
+ * below is the only place that talks to a provider, writes `AiUsageLog` and
+ * moves `CreditLedger`.
  */
 
 import { prisma } from '@/lib/db';
 import crypto from 'crypto';
 import type { TenantTx } from '@/lib/db';
 import { env } from '@/lib/env';
+import { errorStatus } from '@/lib/errors';
 
 export type LlmProvider = 'anthropic' | 'openai';
 
@@ -15,50 +26,158 @@ export interface LlmMessage {
   content: string;
 }
 
-export interface LlmOptions {
-  provider?: LlmProvider;
-  model?: string;
-  maxTokens?: number;
-  temperature?: number;
-}
+const DEFAULT_PROVIDER: LlmProvider = 'anthropic';
 
-export interface LlmResult {
+/**
+ * One default per provider — the merge had to pick one of the two the old
+ * adapters carried (`claude-3-5-sonnet-20240620` and `claude-sonnet-4-20250514`).
+ * Neither is current, both are Sonnet-class, and `claude-sonnet-5` is the
+ * same-class successor that is *cheaper per token than either* ($2/$10 per MTok
+ * against Sonnet 4's $3/$15), so no call site gets more expensive to serve. A
+ * move to Opus-class is a separate, measured decision — not a side effect of
+ * deleting a duplicate file.
+ */
+const DEFAULT_MODELS: Record<LlmProvider, string> = {
+  anthropic: 'claude-sonnet-5',
+  openai: 'gpt-4o',
+};
+
+const DEFAULT_MAX_TOKENS = 4096;
+
+/**
+ * Tokens per credit.
+ *
+ * This is the formula `src/lib/ai/llm.ts` charged at 6 of the 7 production call
+ * sites, kept deliberately: unifying on the *other* formula would have raised
+ * the price 7× at those six sites with no announcement, which is a commercial
+ * decision and not one a refactor gets to make. The seventh (concept notes) gets
+ * cheaper, which harms no tenant.
+ *
+ * It is not the last word. `docs/BILLING.md` §"Kredi maliyeti" sells a *third*
+ * model — a flat credit per action (M2 draft 1, M6 evaluation 3, M9 brief 1,
+ * M10 document 1, M11 section 2, M1 profile summary 1, M3 source summary 1) —
+ * which no code has ever implemented, and two of the call sites here (M7
+ * `tto_ip_checklist`, M6 `esr-parser`) have no published figure at all. Aligning
+ * code with the published table is an open decision on the card; when it lands
+ * it changes `creditsForUsage` and nothing else.
+ */
+const TOKENS_PER_CREDIT = 10_000;
+
+export interface LlmCompletion {
   text: string;
   inputTokens: number;
   outputTokens: number;
+  /** Credits actually charged for this call — the number the ledger moved by. */
+  credits: number;
   provider: string;
   model: string;
 }
 
-const DEFAULT_PROVIDER: LlmProvider = 'anthropic';
-const DEFAULT_MODELS: Record<LlmProvider, string> = {
-  anthropic: 'claude-sonnet-4-20250514',
-  openai: 'gpt-4o',
-};
+/** What a caller asks for. `prompt`+`system` and `messages` are alternatives. */
+export type LlmGenerateOptions = {
+  tenantId: string;
+  userId?: string;
+  /** Module or layer id the call is booked to, e.g. `M6`. */
+  module: string;
+  /** What the call was for, e.g. `evaluation`. */
+  purpose: string;
+  proposalId?: string;
+  section?: string;
+  model?: string;
+  provider?: LlmProvider;
+  maxTokens?: number;
+} & (
+  | { prompt: string; system?: string; messages?: never }
+  | { messages: LlmMessage[]; prompt?: never; system?: never }
+);
 
-// Credit cost per 1K tokens (configurable per tenant later)
-const CREDITS_PER_1K_INPUT = 1;
-const CREDITS_PER_1K_OUTPUT = 3;
+/** A provider rejection that still carries its HTTP status, so retry can classify it. */
+export class LlmProviderError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = 'LlmProviderError';
+  }
+}
 
 /**
- * Call an LLM and return the response text.
+ * Exponential backoff. Kept from `src/lib/ai/llm.ts`: the surviving adapter had
+ * no retry at all, so merging into it without this would have been a regression
+ * at the six call sites that used to have one.
  */
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await operation();
+    } catch (error) {
+      attempt++;
+      // An error with no status is not a client error, so it stays retryable.
+      const status = errorStatus(error);
+      const isClientError = status !== undefined && status !== 429 && status >= 400 && status < 500;
+      if (attempt > maxRetries || isClientError) {
+        throw error;
+      }
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      console.warn(`[AI Retry] Attempt ${attempt} failed with ${status}. Retrying in ${delay}ms...`);
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+}
+
+/**
+ * The provider key, or a hard failure. Called once before the retry loop as
+ * well: a missing key is a configuration fault, and retrying it three times
+ * with backoff only delays the same error by seven seconds.
+ */
+function requireApiKey(provider: LlmProvider): string {
+  const apiKey = provider === 'anthropic' ? env.ANTHROPIC_API_KEY : env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error(`${provider === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}_API_KEY not set`);
+  }
+  return apiKey;
+}
+
+/** The text a response carries, found by block type. */
+function textFromAnthropicContent(content: unknown): string {
+  if (!Array.isArray(content)) return '';
+  // NOT `content[0]` — the current models return thinking blocks first, so an
+  // index lookup silently yields an empty draft instead of the answer.
+  for (const block of content) {
+    if (
+      typeof block === 'object' && block !== null &&
+      (block as { type?: unknown }).type === 'text' &&
+      typeof (block as { text?: unknown }).text === 'string'
+    ) {
+      return (block as { text: string }).text;
+    }
+  }
+  return '';
+}
+
 async function callProvider(
   messages: LlmMessage[],
-  opts: Required<Pick<LlmOptions, 'provider' | 'model' | 'maxTokens' | 'temperature'>>
-): Promise<LlmResult> {
-  const { provider, model, maxTokens, temperature } = opts;
+  opts: { provider: LlmProvider; model: string; maxTokens: number }
+): Promise<Omit<LlmCompletion, 'credits'>> {
+  const { provider, model, maxTokens } = opts;
 
   if (provider === 'anthropic') {
-    const apiKey = env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+    const apiKey = requireApiKey('anthropic');
 
     const systemMsg = messages.find(m => m.role === 'system')?.content || '';
-    const userMessages = messages.filter(m => m.role !== 'system').map(m => ({
-      role: m.role,
-      content: m.content,
-    }));
+    const userMessages = messages
+      .filter(m => m.role !== 'system')
+      .map(m => ({ role: m.role, content: m.content }));
 
+    // `temperature` is deliberately NOT sent. The old adapter sent it on every
+    // call (default 0.7); the current Anthropic models removed the sampling
+    // parameters and reject a request that carries one with a 400.
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -69,7 +188,6 @@ async function callProvider(
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
-        temperature,
         system: systemMsg,
         messages: userMessages,
       }),
@@ -77,22 +195,21 @@ async function callProvider(
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Anthropic API error ${res.status}: ${body}`);
+      throw new LlmProviderError(`Anthropic API error ${res.status}: ${body}`, res.status);
     }
 
     const data = await res.json();
     return {
-      text: data.content?.[0]?.text || '',
-      inputTokens: data.usage?.input_tokens || 0,
-      outputTokens: data.usage?.output_tokens || 0,
+      text: textFromAnthropicContent(data?.content),
+      inputTokens: data?.usage?.input_tokens || 0,
+      outputTokens: data?.usage?.output_tokens || 0,
       provider: 'anthropic',
       model,
     };
   }
 
   if (provider === 'openai') {
-    const apiKey = env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error('OPENAI_API_KEY not set');
+    const apiKey = requireApiKey('openai');
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -100,24 +217,19 @@ async function callProvider(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        temperature,
-        messages,
-      }),
+      body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
     });
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`OpenAI API error ${res.status}: ${body}`);
+      throw new LlmProviderError(`OpenAI API error ${res.status}: ${body}`, res.status);
     }
 
     const data = await res.json();
     return {
-      text: data.choices?.[0]?.message?.content || '',
-      inputTokens: data.usage?.prompt_tokens || 0,
-      outputTokens: data.usage?.completion_tokens || 0,
+      text: data?.choices?.[0]?.message?.content || '',
+      inputTokens: data?.usage?.prompt_tokens || 0,
+      outputTokens: data?.usage?.completion_tokens || 0,
       provider: 'openai',
       model,
     };
@@ -127,16 +239,42 @@ async function callProvider(
 }
 
 /**
- * Calculate credit cost from token usage.
+ * Credits charged for one generation. The single seam the pricing decision
+ * lands on — see {@link TOKENS_PER_CREDIT}. Pure, so it is unit-testable and no
+ * caller may re-derive it: the number a screen shows the user must come from
+ * here (or from the `AiUsageLog` row), never from a second copy of the maths.
  */
-function calculateCredits(inputTokens: number, outputTokens: number): number {
-  return Math.ceil(inputTokens / 1000) * CREDITS_PER_1K_INPUT
-       + Math.ceil(outputTokens / 1000) * CREDITS_PER_1K_OUTPUT;
+export function creditsForUsage(inputTokens: number, outputTokens: number): number {
+  return Math.max(1, Math.ceil((inputTokens + outputTokens) / TOKENS_PER_CREDIT));
 }
 
 /**
- * Get current credit balance for a tenant.
+ * `promptHash` for an `AiUsageLog` row: sha256, full 64 hex digits, over every
+ * message including the system prompt.
+ *
+ * The two old adapters disagreed on *both* halves of this — one hashed only the
+ * user prompt at 64 digits, the other every message at 16 — so the same prompt
+ * produced two unrelatable hashes and an audit could not join the two sets of
+ * rows. Only the hash is ever stored; the prompt text itself never reaches the
+ * database.
  */
+function hashMessages(messages: LlmMessage[]): string {
+  return crypto
+    .createHash('sha256')
+    .update(messages.map(m => `${m.role}:${m.content}`).join('\n'))
+    .digest('hex');
+}
+
+/** Normalise either input shape into the message list the provider is sent. */
+function toMessages(options: LlmGenerateOptions): LlmMessage[] {
+  if (options.messages) return options.messages;
+  const messages: LlmMessage[] = [];
+  if (options.system) messages.push({ role: 'system', content: options.system });
+  messages.push({ role: 'user', content: options.prompt });
+  return messages;
+}
+
+/** Current credit balance for a tenant. */
 export async function getCreditBalance(tenantId: string): Promise<number> {
   const result = await prisma.creditLedger.aggregate({
     where: { tenantId },
@@ -146,67 +284,67 @@ export async function getCreditBalance(tenantId: string): Promise<number> {
 }
 
 /**
- * High-level function: call LLM, log usage, deduct credits.
- * Throws if tenant has insufficient credits.
+ * Call the model, record the call in `AiUsageLog`, deduct the credits.
+ *
+ * Throws when the tenant has no credits left, and when the provider rejects the
+ * request after retries. Returns the usage the call actually produced —
+ * including the credits charged — so a caller that wants to show the cost reads
+ * it from here instead of recomputing the formula.
  */
-export async function generateWithAI(
-  tenantId: string,
-  userId: string,
-  messages: LlmMessage[],
-  meta: { module: string; purpose: string; proposalId?: string; section?: string },
-  opts?: LlmOptions
-): Promise<LlmResult> {
-  // 1. Check credit balance
-  const balance = await getCreditBalance(tenantId);
+export async function generateCompletion(options: LlmGenerateOptions): Promise<LlmCompletion> {
+  const balance = await getCreditBalance(options.tenantId);
   if (balance <= 0) {
     throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
   }
 
-  const provider = opts?.provider || DEFAULT_PROVIDER;
-  const model = opts?.model || DEFAULT_MODELS[provider];
-  const maxTokens = opts?.maxTokens || 4096;
-  const temperature = opts?.temperature || 0.7;
+  const provider = options.provider || DEFAULT_PROVIDER;
+  const model = options.model || DEFAULT_MODELS[provider];
+  const maxTokens = options.maxTokens || DEFAULT_MAX_TOKENS;
+  const messages = toMessages(options);
 
-  // 2. Call LLM
-  const result = await callProvider(messages, { provider, model, maxTokens, temperature });
+  requireApiKey(provider);
+  const result = await withRetry(() => callProvider(messages, { provider, model, maxTokens }));
 
-  // 3. Calculate credits
-  const credits = calculateCredits(result.inputTokens, result.outputTokens);
-
-  // 4. Log usage + deduct credits in a transaction
-  const promptHash = crypto.createHash('sha256')
-    .update(messages.map(m => m.content).join(''))
-    .digest('hex')
-    .slice(0, 16);
+  const credits = creditsForUsage(result.inputTokens, result.outputTokens);
+  const promptHash = hashMessages(messages);
 
   await prisma.$transaction(async (tx: TenantTx) => {
     await tx.aiUsageLog.create({
       data: {
-        tenantId,
-        userId,
-        module: meta.module,
-        purpose: meta.purpose,
+        tenantId: options.tenantId,
+        userId: options.userId,
+        module: options.module,
+        purpose: options.purpose,
         provider: result.provider,
         model: result.model,
         promptHash,
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
         credits,
-        proposalId: meta.proposalId,
-        section: meta.section,
+        proposalId: options.proposalId,
+        section: options.section,
       },
     });
     await tx.creditLedger.create({
       data: {
-        tenantId,
+        tenantId: options.tenantId,
         delta: -credits,
-        reason: `usage:${meta.module}`,
-        refId: meta.proposalId,
+        reason: `usage:${options.module}`,
+        refId: options.proposalId,
       },
     });
   });
 
-  return result;
+  return { ...result, credits };
+}
+
+/**
+ * The generated text alone — the shape almost every call site wants.
+ * A thin wrapper over {@link generateCompletion}; there is no second path.
+ */
+export async function generateText(options: LlmGenerateOptions): Promise<string> {
+  const result = await generateCompletion(options);
+  return result.text;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
