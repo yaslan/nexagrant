@@ -19,3 +19,5 @@
 - [fabrika-use-server-exports-must-be-async](fabrika-use-server-exports-must-be-async.md) — Fabrika'da 'use server' modülünün HER export'u async fonksiyon olmalı — hata sınıfı/tip/sabit oraya konulamaz, ayrı bir lib dosyasına al
 
 - [fabrika-public-figure-audit-procedure](fabrika-public-figure-audit-procedure.md) — Herkese açık bir sayfadaki rakam denetiminde "bağla ya da çıkar" pratikte HEP "çıkar"dır — Evidence kiracıya özel+RLS, public sayfanın tenant'ı yok; önce DB'de ölç, çünkü rakam kaynaksız değil ÇELİŞİK çıkabilir
+
+- [fabrika-threshold-rate-tile-is-not-the-export-success-rate](fabrika-threshold-rate-tile-is-not-the-export-success-rate.md) — Fabrika panosunda "Eşik Üstü Oranı" kutucuğunun paydası GÖNDERİLEN TEKLİFLER, dışa aktarımdaki "Başarı Oranı"nınki FIRSAT SAYISI — iki farklı sayı, kart metinleri bunları sürekli karıştırıyor

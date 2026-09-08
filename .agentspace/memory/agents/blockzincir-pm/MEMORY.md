@@ -43,3 +43,7 @@
 - [fabrika-verify-the-card-recheck-not-just-the-old-report](fabrika-verify-the-card-recheck-not-just-the-old-report.md) — Bir kart "önceki rapor X dedi ama bugünkü grep temiz buldu" diyorsa, ŞÜPHELİ olan eski rapor değil kartın kendi yeniden-ölçümü olabilir — ikisini de kendin koştur
 
 - [fabrika-a-template-may-carry-structure-not-content](fabrika-a-template-may-carry-structure-not-content.md) — Fabrika'da bir "varsayılan şablon" sabiti ne taşıyabilir — resmî iskelet (başlık/limit) EVET, yazar ve metin HAYIR; uydurma kimlik avında content alanlarına da bak
+
+- [dual-approval-means-two-people](dual-approval-means-two-people.md) — Fabrika'da "çift onay" kuralını uygulama kontrolüyle değil iki unique index'le kur — ve gönderimi sign-off saymayarak akışı iki kişilik tut
+- [fabrika-approvals-screen-is-a-stub](fabrika-approvals-screen-is-a-stub.md) — Fabrika /approvals ekranı gerçek ApprovalRequest satırlarını listeliyor ama Onayla/Reddet düğmeleri hiçbir şey yazmayan stub'lara bağlı — ApprovalRequest'i "kullanımda" sanma
+- [fabrika-prisma-migrations-are-hand-applied](fabrika-prisma-migrations-are-hand-applied.md) — Fabrika'da şema değişikliği reçetesi — klasörlü migration + prisma migrate deploy + pnpm db:rls; migrate dev KULLANMA, RLS'i hem rls.sql'e hem migration'a yaz

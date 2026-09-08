@@ -36,3 +36,8 @@ ve kart kapanışı gecikmiyor. blog-yazar bunu D5'te uyguladı ve eksik raporu 
 
 Kapanış notunda EKSİĞİ AÇIKÇA YAZ ("kod kanıtlı, rapor kanıtı yok") — sessizce `review`e
 taşımak, üç hafta sonra kanıtsız bir "bitti" bırakır.
+
+**2026-09-08 sonuç — çözüm %100 tuttu.** Bir sonraki dalgada beş worker'ın **beşi de** hem yeni
+görev raporunu hem eksik backfill raporunu yazdı (8/8 dosya). Bir önceki iki dalgada oran ~%50'ydi.
+Yani rapor eksikliği disiplin sorunu değil, **görev metni sorunuydu**: "sonuç raporu yaz" genel
+kuralda yazılı olmak yetmiyor, o koşunun görev metninde ADIYLA ve dosya yoluyla istenmeli.

@@ -23,3 +23,7 @@
 - [fabrika-jsdom-has-no-localstorage](fabrika-jsdom-has-no-localstorage.md) — Fabrika'nın vitest/jsdom ortamında localStorage HİÇ YOK (typeof undefined, window'da da globalThis'te de) — tarayıcı-depolaması kullanan bileşen testi kendi Storage'ını kurmalı
 
 - [measure-a-static-gate-by-lifting-its-scanner](measure-a-static-gate-by-lifting-its-scanner.md) — Bir statik kapıyı genişletmeden önce tarayıcısını scratchpad'e kaldırıp tsx ile koş — bulgu sayısını repoya dokunmadan ölçersin ve naif genişletmenin yanlış pozitiflerini önce görürsün
+
+- [fabrika-clean-install-needs-prisma-generate](fabrika-clean-install-needs-prisma-generate.md) — Fabrika'da temiz pnpm install --frozen-lockfile sonrası build ".prisma/client/index-browser" ile ölür — postinstall yok, prisma generate'i elle koşmak gerekir; bu bir kod hatası değildir
+- [fabrika-playwright-login-two-silent-traps](fabrika-playwright-login-two-silent-traps.md) — Fabrika'da Playwright ile giriş sessizce başarısız olur — çerez onayı tam ekran overlay tıklamayı yutar, ve hidrasyon bitmeden basılan submit formu düz GET'e çevirir; ikisinin de çözümü burada
+- [phantom-dependency-proof-by-hiding-it](phantom-dependency-proof-by-hiding-it.md) — node_modules'ta olup package.json/lock'ta olmayan bir paketi ve onun hangi rotaları kirlettiğini kanıtlamanın yolu — paketi gizleyip build'i tekrar koş, derleyicinin import izlerini oku

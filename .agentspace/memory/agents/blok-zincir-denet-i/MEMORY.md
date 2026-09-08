@@ -18,3 +18,5 @@
 
 - [fabrika-fake-showcase-bind-or-remove-needs-a-persistence-check](fabrika-fake-showcase-bind-or-remove-needs-a-persistence-check.md) — "Sahte vitrini gerçek duruma bağla ya da kaldır" kararını vermeden ÖNCE o durumun kalıcı bir tablosu var mı diye bak — yoksa bağlamak yeni bir yalan üretir
 - [fabrika-i18n-evidence-bar-forces-whole-file](fabrika-i18n-evidence-bar-forces-whole-file.md) — i18n kartı birkaç satır numarası verse de kanıt "ekran EN'de İngilizce" ise dosyanın TAMAMINI çevir — yarım çeviri kanıt karesini geçemez
+
+- [grep-count-dod-can-hit-a-legitimate-string](grep-count-dod-can-hit-a-legitimate-string.md) — Kart "indirilen dosyada `grep -c X` = 0" diyorsa önce X'in HER geçtiği yeri ayır — ürün markası ile uydurma kimlik aynı dizeyi paylaşabilir; sayıyı tutturmak için meşru olanı silme
