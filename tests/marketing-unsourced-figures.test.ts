@@ -62,6 +62,12 @@ describe('landing page — the CORDIS scale and budget figures are gone', () => 
     expect(source).not.toContain(literal);
   });
 
+  test('no speed promise survives, including the ones written as words', () => {
+    // "haftalardan günlere", "from months to days" — a ratio spelled out is
+    // still a ratio, and no record times a proposal either way.
+    expect(source).not.toMatch(/haftalardan|aylardan|from (months|weeks) to/i);
+  });
+
   test('the %40-style uplift claim did not reappear in another form', () => {
     // Any "N% faster/more/higher" promise on the landing page needs a record.
     expect(source).not.toMatch(/%\s?\d+\s*(daha|artır|hızl|yüksel)/i);

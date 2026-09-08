@@ -643,8 +643,8 @@ export default async function HomePage({
             </h2>
             <p className="text-xs sm:text-base text-white/80 max-w-2xl mx-auto leading-relaxed">
               {isTr
-                ? 'FonBridge ile teklif hazırlama sürenizi haftalardan günlere indirin, CORDIS analitiği ile kazanma şansınızı en üst seviyeye taşıyın.'
-                : 'Accelerate proposal writing timelines from months to days with verified CORDIS network data and evaluator grade precision.'}
+                ? 'FonBridge ile teklif hazırlama sürenizi kısaltın; CORDIS ağ analitiği ve hakem bakış açısıyla teklifinizi güçlendirin.'
+                : 'Shorten your proposal timeline with CORDIS network analytics and an evaluator’s reading of your draft.'}
             </p>
             <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link

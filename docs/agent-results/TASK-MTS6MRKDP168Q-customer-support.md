@@ -105,6 +105,25 @@ yapılmış olgusal iddia**. Kendi dosyam olduğu için düzelttim: panel `ÖRNE
 işaretlendi, kurum `Örnek Araştırma Merkezi` oldu, üç tile değer yerine `—` gösteriyor ve uplift
 vaadi yerine M1'in **ne hesapladığını** söyleyen (rakamsız, TR+EN) bir cümle kondu.
 
+### 1c. Geç yakalanan bir tane daha (aynı dosya) — commit 2
+
+Commit sonrası son taramada, kapanı yorum-şeridi ile çalıştırınca `page.tsx:646` çıktı:
+
+```
+? 'FonBridge ile teklif hazırlama sürenizi haftalardan günlere indirin, ...'
+: 'Accelerate proposal writing timelines from months to days with ...'
+```
+
+Blog'dan çıkardığım `haftalardan saatlere` ile **aynı iddia**, landing'in son CTA'sında.
+İlk taramalarımda kaçtı çünkü **rakam aramıştım, oran kelimeyle yazılmıştı**. Düzeltildi
+(TR+EN) ve kapana kelime-formu için ayrı bir test eklendi:
+
+```ts
+expect(source).not.toMatch(/haftalardan|aylardan|from (months|weeks) to/i);
+```
+
+Ders: `[0-9]` taraması yetmiyor; "haftalardan günlere", "10 kat", "misli" aynı sınıf.
+
 ---
 
 ## 2. Kanıt (bu koşuda üretildi)
@@ -193,7 +212,7 @@ gitmiş, panel `ÖRNEK GÖRÜNÜM`) · `08-blog-post-body-metrics.png` (metrik l
 | `src/app/[locale]/page.tsx` | 7 metin/blok düzeltmesi + M1 örnek panelinin 4 düzeltmesi |
 | `messages/tr.json` | `billingPanels.pricing.plans.ultra.f3` (tek satır) |
 | `messages/en.json` | `billingPanels.pricing.plans.ultra.f3` (tek satır) |
-| `tests/marketing-unsourced-figures.test.ts` | **yeni** — 34 kaynak-kapanı |
+| `tests/marketing-unsourced-figures.test.ts` | **yeni** — 35 kaynak-kapanı (rakam + kelime formu) |
 | `tests/e2e/st6-marketing-figures.spec.ts` | **yeni** — gerçek tarayıcı doğrulaması |
 
 `src/app/[locale]/admin/blog/client.tsx`'e **dokunulmadı** (gerek olmadı: `BlogPost` arayüzü
