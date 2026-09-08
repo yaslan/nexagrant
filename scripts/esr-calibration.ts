@@ -37,7 +37,8 @@
  *   --out=<dir>         default docs/BETA_DATA/generated/esr-calibration
  *   --report=<path>     default docs/CORDIS-SAMPLE-CALIBRATION.md
  *   --per-partner=<n>   survey items per partner, default 4 (20 samples × 10 partners = 2 each)
- *   --deadline=<date>   survey deadline, YYYY-MM-DD; default two weeks from today
+ *   --deadline=<date>   survey deadline, YYYY-MM-DD; default ESR_SURVEY_DEADLINE (pinned, so a
+ *                       re-run never moves a date the partners were already given)
  */
 
 import fs from 'fs';
@@ -78,7 +79,7 @@ import {
   surveyUrlFor,
   type SurveyResponse,
 } from '../src/lib/beta/esr-survey';
-import { BETA_SUPPORT_EMAIL } from '../src/lib/beta/constants';
+import { BETA_SUPPORT_EMAIL, ESR_SURVEY_DEADLINE } from '../src/lib/beta/constants';
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const TENANT_ID = 'esr-calibration';
@@ -102,7 +103,6 @@ interface Options {
 }
 
 function parseArgs(argv: string[]): Options {
-  const twoWeeks = new Date(Date.now() + 14 * 86400_000).toISOString().slice(0, 10);
   const opts: Options = {
     samples: path.join(REPO_ROOT, 'docs/BETA_DATA/esr-calibration-samples.csv'),
     roster: path.join(REPO_ROOT, 'docs/BETA_DATA/beta-partners.csv'),
@@ -110,7 +110,7 @@ function parseArgs(argv: string[]): Options {
     out: path.join(REPO_ROOT, 'docs/BETA_DATA/generated/esr-calibration'),
     report: path.join(REPO_ROOT, 'docs/CORDIS-SAMPLE-CALIBRATION.md'),
     perPartner: 4,
-    deadline: twoWeeks,
+    deadline: ESR_SURVEY_DEADLINE,
     apply: false,
     survey: false,
     send: false,
@@ -454,12 +454,29 @@ function buildReport(args: {
   relabelled: string[];
   coverage: Map<string, number>;
   partnerCount: number;
+  /** true only when this run actually handed the survey to Resend. */
+  surveySent: boolean;
+  /** roster addresses on a reserved, undeliverable domain — `--send` refuses while > 0. */
+  undeliverable: number;
   deadline: string;
 }): string {
   const mDefault = metrics(toPredictions(args.scoredDefault));
   const mLiteral = metrics(toPredictions(args.scoredLiteral));
   const best = bestSweepPoint(args.sweep);
   const generatedAt = new Date().toISOString();
+
+  // The criterion is "sent", not "rendered". Rendering an HTML file nobody receives used to tick
+  // this box green, which hid the real blocker: the committed roster is a placeholder, so `--send`
+  // refuses and no verdict can ever come back.
+  const surveyStatus =
+    args.surveySent
+      ? `✅ ${args.partnerCount} ortağa gönderildi`
+      : args.undeliverable > 0
+        ? `❌ GÖNDERİLMEDİ — roster'daki ${args.undeliverable} adres teslim edilemez alan adında ` +
+          '(`.invalid`); `--send` reddediyor. Gerçek roster girilmeden yanıt gelmez.'
+        : args.partnerCount > 0
+          ? '❌ hazırlandı, gönderilmedi (`--send` verilmedi)'
+          : '❌';
 
   const rows = args.scoredDefault
     .map((s) => {
@@ -584,7 +601,7 @@ ${
 | 20 örnek seed edildi ve puanlandı | ${args.scoredDefault.length === 20 ? '✅' : '⚠️'} ${args.scoredDefault.length}/20 |
 | Karışıklık matrisi üretiliyor | ✅ |
 | Doğruluk ≥ %85 | ${(mDefault.accuracy ?? 0) >= 0.85 ? '✅' : '❌'} A kuralı ${formatPercent(mDefault.accuracy)} · B kuralı ${formatPercent(mLiteral.accuracy)}${best ? ` · en iyi eşik ${best.threshold} → ${formatPercent(best.metrics.accuracy)}` : ''} |
-| Ortak anketi gönderilmiş | ${args.partnerCount > 0 ? '✅ hazırlandı' : '❌'} |
+| Ortak anketi gönderilmiş | ${surveyStatus} |
 
 ${
   args.isFixture
@@ -739,6 +756,8 @@ async function main(): Promise<void> {
     relabelled,
     coverage,
     partnerCount: assignments.length,
+    surveySent: opts.survey && opts.send,
+    undeliverable: partners.filter((p) => isPlaceholderEmail(p.contactEmail)).length,
     deadline: opts.deadline,
   });
   fs.mkdirSync(path.dirname(opts.report), { recursive: true });

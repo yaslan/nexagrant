@@ -50,3 +50,16 @@ export const BETA_SUPPORT_EMAIL = process.env.BETA_SUPPORT_EMAIL ?? 'support@fab
 export const BETA_FEEDBACK_EMAIL = process.env.BETA_FEEDBACK_EMAIL ?? 'feedback@fabrika.dev';
 export const BETA_APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.fabrika.dev';
 export const BETA_MEETING_URL = process.env.BETA_MEETING_URL ?? 'https://meet.google.com/fabrika-beta-checkin';
+
+/**
+ * E11.3 ESR calibration survey deadline (TASK-MTQ2KL3JO4MK2).
+ *
+ * Pinned, not computed. `scripts/esr-calibration.ts` regenerates
+ * docs/CORDIS-SAMPLE-CALIBRATION.md on every run, and a "two weeks from today"
+ * default silently moved the stated deadline each time: the survey sheets under
+ * docs/BETA_DATA/generated/esr-calibration/survey/ say 2026-09-21 while a re-run
+ * on 2026-09-08 wrote 2026-09-22 into the report. A date partners are told is a
+ * commitment, so it lives here and moves only when a human edits it. Override for
+ * a one-off run with `--deadline=YYYY-MM-DD`.
+ */
+export const ESR_SURVEY_DEADLINE = '2026-09-21';

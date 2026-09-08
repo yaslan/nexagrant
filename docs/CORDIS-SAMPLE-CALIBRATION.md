@@ -1,7 +1,7 @@
 # CORDIS örnek seti — G0 ↔ ESR kalibrasyonu
 
 > Üretilmiş dosya. Elle düzenlemeyin; `pnpm tsx scripts/esr-calibration.ts` yeniden üretir.
-> Üretim zamanı: 2026-09-08T13:58:41.620Z · Kural sürümü: `g0-canonical-1.0` · Örnek seti: `docs/BETA_DATA/esr-calibration-samples.csv`
+> Üretim zamanı: 2026-09-08T16:47:55.997Z · Kural sürümü: `g0-canonical-1.0` · Örnek seti: `docs/BETA_DATA/esr-calibration-samples.csv`
 
 > ⚠️ **Bu koşu KÜRATE EDİLMİŞ bir fixture üzerinde yapıldı** (tüm `cordisProjectId` değerleri rezerve
 > `SAMPLE-*` ad alanında). Buradaki doğruluk oranı **kalibrasyon hattının** çalıştığını gösterir;
@@ -145,7 +145,7 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 
 - Ankete çıkarılan ortak sayısı: **10**, ortak başına **4** örnek.
 - Örnek başına bağımsız görüş: **2**.
-- Yanıt son tarihi: **2026-09-22**.
+- Yanıt son tarihi: **2026-09-21**.
 - Yanıt dosyası: _henüz yok._
 - Ortak çoğunluğu hiçbir etiketi değiştirmedi.
 
@@ -156,6 +156,6 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 | 20 örnek seed edildi ve puanlandı | ✅ 20/20 |
 | Karışıklık matrisi üretiliyor | ✅ |
 | Doğruluk ≥ %85 | ❌ A kuralı 80.0% · B kuralı 90.0% · en iyi eşik 54 → 95.0% |
-| Ortak anketi gönderilmiş | ✅ hazırlandı |
+| Ortak anketi gönderilmiş | ❌ GÖNDERİLMEDİ — roster'daki 10 adres teslim edilemez alan adında (`.invalid`); `--send` reddediyor. Gerçek roster girilmeden yanıt gelmez. |
 
 > Bu tablodaki doğruluk satırı fixture üzerinden okunmuştur; kabul kriteri gerçek ESR verisiyle tekrar ölçülmeden **kapatılmamalıdır**.
