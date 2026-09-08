@@ -3,7 +3,15 @@ import { createCordisPrismaStub, type CordisPrismaStub } from './helpers/cordis-
 
 const db: CordisPrismaStub = createCordisPrismaStub();
 
-vi.mock('../src/lib/db', () => ({ prisma: db.prisma }));
+// `withTenant` has to be mocked too, not just `prisma`: `ingestDocument` runs
+// its writes inside it. While the mock omitted it, every ingest in this file
+// threw `withTenant is not a function` — and `ingestDocument` swallowed that
+// and returned an id anyway, so the suite asserted `deltaCount: 1` over a
+// document that was never written. TASK-MTSYCMWFL22CA.
+vi.mock('../src/lib/db', () => ({
+  prisma: db.prisma,
+  withTenant: async (_tenantId: string, fn: (tx: typeof db.prisma) => Promise<unknown>) => fn(db.prisma),
+}));
 
 const { fetchLiveCordisDelta, getCordisLiveStreamLogs } = await import('../src/lib/cordis-delta');
 

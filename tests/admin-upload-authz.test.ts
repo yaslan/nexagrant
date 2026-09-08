@@ -56,7 +56,7 @@ function uploadRequest(): Request {
 
 beforeEach(() => {
   authMock.mockReset();
-  processPdfAndStoreMock.mockReset().mockResolvedValue({ id: 'doc-1' });
+  processPdfAndStoreMock.mockReset().mockResolvedValue({ doc: { id: 'doc-1' }, storedChunks: 3 });
 });
 
 describe('POST /api/admin/documents/upload', () => {
@@ -86,7 +86,7 @@ describe('POST /api/admin/documents/upload', () => {
     const res = await POST(uploadRequest() as never);
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true, docId: 'doc-1' });
+    await expect(res.json()).resolves.toEqual({ success: true, docId: 'doc-1', chunks: 3 });
     expect(processPdfAndStoreMock).toHaveBeenCalledTimes(1);
 
     const [buffer, tenantId, kind, title, sourceUrl, actor] = processPdfAndStoreMock.mock.calls[0]!;

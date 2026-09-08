@@ -9,6 +9,7 @@
  */
 
 import { withTenant } from '@/lib/db';
+import { env } from '@/lib/env';
 import { errorMessage } from '@/lib/errors';
 import { embedText, AiUsageLogWriteError, PLATFORM_SCOPE_TENANT_ID, type AiCallAttribution } from '@/lib/llm';
 
@@ -60,10 +61,18 @@ export function splitText(text: string): string[] {
  * `attribution` is required, not optional: the whole point is that no caller
  * can reach the provider without saying who the call belongs to.
  *
- * The mock fallback for key-less dev/demo environments stays. It is reached
- * only when nothing was sent — a failed *log* write is rethrown, because by
- * then the text has already gone to OpenAI and pretending otherwise would put
- * the unrecorded-processing hole straight back.
+ * The mock fallback for key-less dev/demo environments stays, and it is now
+ * limited to exactly that case: no `OPENAI_API_KEY` is configured, so no call
+ * was ever made. Two failures are rethrown instead:
+ *
+ *   - a failed *log* write, because by then the text has already gone to OpenAI
+ *     and pretending otherwise would put the unrecorded-processing hole back;
+ *   - any failure while a key *is* configured — a provider outage, a rate
+ *     limit, a rejected request. Substituting `mockEmbedding` there stores a
+ *     chunk whose vector encodes the first 1536 character codes of the text and
+ *     nothing about its meaning: the row looks ingested, is counted as
+ *     ingested, and never comes back from a similarity search. That is the
+ *     silent-failure shape TASK-MTSYCMWFL22CA is about, one layer down.
  */
 export async function getEmbedding(
   text: string,
@@ -73,7 +82,8 @@ export async function getEmbedding(
     return await embedText(text, attribution, { dimensions: EMBEDDING_DIMENSIONS });
   } catch (e) {
     if (e instanceof AiUsageLogWriteError) throw e;
-    console.warn(`[getEmbedding] falling back to mock embedding: ${errorMessage(e)}`);
+    if (env.OPENAI_API_KEY) throw e;
+    console.warn(`[getEmbedding] no OPENAI_API_KEY; using the mock embedding: ${errorMessage(e)}`);
   }
 
   return mockEmbedding(text);
@@ -94,6 +104,27 @@ function mockEmbedding(text: string): number[] {
 
 /**
  * Ingest a document: split into chunks, embed, and store.
+ *
+ * Resolves with the id of a document that is *committed*, with every one of its
+ * chunks committed alongside it. It does not resolve any other way: a caller
+ * that gets an id back may count the ingest, and a caller that gets an
+ * exception must count a skip.
+ *
+ * TASK-MTSYCMWFL22CA — this used to catch every database failure, log it to the
+ * console as an "ingestion bypassed" line and return an id anyway: either
+ * `doc-<timestamp>`, which was never a row, or the id of a document the
+ * transaction had just rolled back. Both of its callers
+ * (`syncCordisBigData`, `syncCordisDelta`) read "no exception" as "stored", so
+ * a run that stored nothing at all reported `success: true, synced: N` with no
+ * `SystemAlert` behind it — measured at synced=1 over 0 documents and 0 chunks.
+ * The two callers already turn a thrown error into `skippedCount` plus an
+ * alert, so surfacing is all that was missing; a second alert written here
+ * would only duplicate theirs.
+ *
+ * `stored` is counted from the rows Postgres reports as inserted rather than
+ * from the loop counter, and an ingest that would leave a document with no
+ * retrievable chunk behind is refused. A document nothing can be retrieved from
+ * is not a stored document, whatever the row count says.
  */
 export async function ingestDocument(
   title: string,
@@ -103,48 +134,46 @@ export async function ingestDocument(
   actor?: RagActor
 ): Promise<string> {
   const scope = tenantId ?? PLATFORM_SCOPE_TENANT_ID;
-  let docId = `doc-${Date.now()}`;
-  try {
-    return await withTenant(scope, async (tx) => {
-      const doc = await tx.document.create({
-        data: { tenantId, kind, title },
-      });
-      docId = doc.id;
-
-      const chunks = splitText(text);
-
-      for (let i = 0; i < chunks.length; i++) {
-        const embedding = await getEmbedding(chunks[i], {
-          tenantId: tenantId ?? null,
-          userId: actor?.userId,
-          module: RAG_MODULE,
-          purpose: PURPOSE_INGEST,
-        });
-        const embeddingStr = `[${embedding.join(',')}]`;
-
-        // Use raw SQL to insert vector type
-        await tx.$executeRawUnsafe(
-          `INSERT INTO "Chunk" (id, "documentId", "tenantId", ordinal, text, embedding)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5::vector)`,
-          doc.id,
-          tenantId || null,
-          i,
-          chunks[i],
-          embeddingStr
-        );
-      }
-
-      return doc.id;
-    });
-  } catch (e) {
-    // An unwritten usage record is not a "bypassable" DB hiccup: the chunk text
-    // has already gone to OpenAI, so this has to surface rather than be logged
-    // away as a skipped ingestion.
-    if (e instanceof AiUsageLogWriteError) throw e;
-    console.warn(`[ingestDocument] DB ingestion bypassed: ${errorMessage(e)}`);
+  const chunks = splitText(text);
+  if (chunks.length === 0) {
+    throw new Error(`ingestDocument: refusing to store "${title}" — its text yields no chunks`);
   }
 
-  return docId;
+  return withTenant(scope, async (tx) => {
+    const doc = await tx.document.create({
+      data: { tenantId, kind, title },
+    });
+
+    let stored = 0;
+    for (let i = 0; i < chunks.length; i++) {
+      const embedding = await getEmbedding(chunks[i], {
+        tenantId: tenantId ?? null,
+        userId: actor?.userId,
+        module: RAG_MODULE,
+        purpose: PURPOSE_INGEST,
+      });
+      const embeddingStr = `[${embedding.join(',')}]`;
+
+      // Use raw SQL to insert vector type
+      stored += await tx.$executeRawUnsafe(
+        `INSERT INTO "Chunk" (id, "documentId", "tenantId", ordinal, text, embedding)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5::vector)`,
+        doc.id,
+        tenantId || null,
+        i,
+        chunks[i],
+        embeddingStr
+      );
+    }
+
+    if (stored !== chunks.length) {
+      throw new Error(
+        `ingestDocument: "${title}" split into ${chunks.length} chunks but Postgres reported ${stored} inserted`
+      );
+    }
+
+    return doc.id;
+  });
 }
 
 /**

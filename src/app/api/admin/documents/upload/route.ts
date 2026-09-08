@@ -28,11 +28,16 @@ export async function POST(req: NextRequest) {
     // Tenant ID is null for shared platform documents. The embedding calls are
     // logged against PLATFORM_SCOPE_TENANT_ID; see `embedText` in src/lib/llm.ts.
     // The actor is the admin the gate just identified — never absent now.
-    const doc = await processPdfAndStore(buffer, null, kind, title, undefined, {
+    const { doc, storedChunks } = await processPdfAndStore(buffer, null, kind, title, undefined, {
       userId: gate.userId,
     });
 
-    return NextResponse.json({ success: true, docId: doc.id });
+    // `chunks` is what Postgres confirmed it stored, not what was attempted.
+    // `success: true` used to be returned no matter how much of the document
+    // reached the corpus (TASK-MTSYCMWFL22CA); a document with no retrievable
+    // chunk behind it now fails the request instead of being reported as an
+    // upload that worked.
+    return NextResponse.json({ success: true, docId: doc.id, chunks: storedChunks });
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
