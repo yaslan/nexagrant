@@ -12,7 +12,6 @@ import {
 } from '@/lib/billing/price-lock';
 import { publishedVersionIdFor } from '@/lib/billing/plan-repository';
 import { createInvoiceForPayment } from '@/lib/billing/invoice-writer';
-import { env } from '@/lib/env';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
@@ -191,6 +190,35 @@ function priceLockUpdate(
 }
 
 /**
+ * The audit row a Stripe event already wrote, or `null` if it is new.
+ *
+ * Every handler below opens with this: Stripe retries a webhook for up to three
+ * days, so a redelivery is ordinary traffic and must be a no-op.
+ *
+ * The filter used to be `data: { equals: { stripeEventId: eventId } }`, which
+ * reads as "the row whose stripeEventId is this one" and is not that. On a Json
+ * column `equals` compares the *whole* document, so it only matched a row whose
+ * `data` was exactly `{"stripeEventId": "..."}` — and every row these handlers
+ * write carries more keys than that. The guard therefore never matched, and a
+ * redelivered event was processed a second time in full: a second audit row, a
+ * second monthly credit grant, and a cancelled subscription pulled back to
+ * ACTIVE by a stale `active` event (TASK-MTSY88Q6AMCGB, measured).
+ *
+ * `path` addresses the one key instead, which is what was meant.
+ *
+ * This is a read-then-write guard, so it settles a redelivery, not two truly
+ * simultaneous deliveries of the same event. Closing that would take a unique
+ * constraint on the event id, which is a migration and is not this change.
+ */
+async function auditForStripeEvent(eventId: string) {
+  return prisma.auditEvent.findFirst({
+    where: {
+      data: { path: ['stripeEventId'], equals: eventId },
+    },
+  });
+}
+
+/**
  * Syncs a Stripe subscription to the database, updating Subscription and AddOn records.
  * Handles plan changes, add-on changes, and credit grants.
  * Logs audit events for all changes.
@@ -201,11 +229,7 @@ export async function syncStripeSubscription(
   eventId: string
 ): Promise<SubscriptionSyncResult> {
   // Check if we've already processed this event
-  const existingAudit = await prisma.auditEvent.findFirst({
-    where: {
-      data: { equals: { stripeEventId: eventId } },
-    },
-  });
+  const existingAudit = await auditForStripeEvent(eventId);
 
   if (existingAudit) {
     console.log(`Event ${eventId} already processed; skipping`);
@@ -479,11 +503,7 @@ export async function handleSubscriptionCancellation(
   }
 
   // Check idempotency
-  const existingAudit = await prisma.auditEvent.findFirst({
-    where: {
-      data: { equals: { stripeEventId: eventId } },
-    },
-  });
+  const existingAudit = await auditForStripeEvent(eventId);
 
   if (existingAudit) {
     return {
@@ -581,11 +601,7 @@ export async function logInvoicePayment(
   }
 
   // Check idempotency
-  const existingAudit = await prisma.auditEvent.findFirst({
-    where: {
-      data: { equals: { stripeEventId: eventId } },
-    },
-  });
+  const existingAudit = await auditForStripeEvent(eventId);
 
   if (existingAudit) {
     return;
@@ -615,9 +631,10 @@ export async function logInvoicePayment(
   // SystemAlert; a genuine database failure is caught here so a webhook Stripe
   // will retry does not replay the whole subscription sync for it.
   //
-  // Idempotency rests on `Invoice.paymentRef` being unique per tenant, not on
-  // the `existingAudit` guard above — that guard compares the whole `data`
-  // object with `equals`, so it never matches and never suppresses anything.
+  // Idempotency here rests on `Invoice.paymentRef` being unique per tenant as
+  // well as on the `existingAudit` guard above: the guard stops a redelivery
+  // before this line, and the constraint stops a payment reaching the writer
+  // twice by any other route.
   try {
     await createInvoiceForPayment(
       prisma,
@@ -629,8 +646,9 @@ export async function logInvoicePayment(
         description: invoiceLineDescription(invoice),
         paidAt: new Date(),
         provider: 'stripe',
-      },
-      { vatRateRaw: env.INVOICE_VAT_RATE }
+      }
+      // No third argument: the VAT rate is no longer a server setting. It comes
+      // from the buyer's country inside the writer (boss decision 2026-09-08).
     );
   } catch (error) {
     console.error(
