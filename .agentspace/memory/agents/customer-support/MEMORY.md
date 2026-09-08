@@ -21,3 +21,5 @@
 - [fabrika-public-figure-audit-procedure](fabrika-public-figure-audit-procedure.md) — Herkese açık bir sayfadaki rakam denetiminde "bağla ya da çıkar" pratikte HEP "çıkar"dır — Evidence kiracıya özel+RLS, public sayfanın tenant'ı yok; önce DB'de ölç, çünkü rakam kaynaksız değil ÇELİŞİK çıkabilir
 
 - [fabrika-threshold-rate-tile-is-not-the-export-success-rate](fabrika-threshold-rate-tile-is-not-the-export-success-rate.md) — Fabrika panosunda "Eşik Üstü Oranı" kutucuğunun paydası GÖNDERİLEN TEKLİFLER, dışa aktarımdaki "Başarı Oranı"nınki FIRSAT SAYISI — iki farklı sayı, kart metinleri bunları sürekli karıştırıyor
+
+- [fabrika-empty-tenant-audit-needs-module-and-plan-rows](fabrika-empty-tenant-audit-needs-module-and-plan-rows.md) — "Kaydı olmayan kullanıcıyla gez" denen uydurma-veri denetimi Fabrika'da doğrudan yapılamaz — boş kiracı her sayfada modül/plan kapısına takılır; geçici ModuleState + Subscription satırı aç, gez, birebir sil

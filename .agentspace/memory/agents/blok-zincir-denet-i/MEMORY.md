@@ -20,3 +20,6 @@
 - [fabrika-i18n-evidence-bar-forces-whole-file](fabrika-i18n-evidence-bar-forces-whole-file.md) — i18n kartı birkaç satır numarası verse de kanıt "ekran EN'de İngilizce" ise dosyanın TAMAMINI çevir — yarım çeviri kanıt karesini geçemez
 
 - [grep-count-dod-can-hit-a-legitimate-string](grep-count-dod-can-hit-a-legitimate-string.md) — Kart "indirilen dosyada `grep -c X` = 0" diyorsa önce X'in HER geçtiği yeri ayır — ürün markası ile uydurma kimlik aynı dizeyi paylaşabilir; sayıyı tutturmak için meşru olanı silme
+
+- [fabrika-gitignore-does-not-hide-a-file-from-the-gate](fabrika-gitignore-does-not-hide-a-file-from-the-gate.md) — .gitignore'daki geçici script yine de eslint ve tsc tarafından okunur ve pnpm gate'i repo genelinde kırar — probe dosyanı koştuktan sonra SİL, ve yabancı bir kalıntıya dokunmadan kapıyı hariç-tutarak ölç
+- [fabrika-superuser-hides-missing-withtenant](fabrika-superuser-hides-missing-withtenant.md) — Kiracı tablosunu withTenant DIŞINDA okumak yerelde DOĞRU görünür — DATABASE_URL SUPERUSER; hatayı görmek için aynı fonksiyonu fabrika_app rolüne bağlı client'la koştur

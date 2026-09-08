@@ -28,3 +28,6 @@
 
 - [fabrika-e2e-gate-blocked-by-landing-page-500](fabrika-e2e-gate-blocked-by-landing-page-500.md) — Playwright webServer sağlık kontrolü / (ana sayfa) üzerinden yapılır — ana sayfa 500 dönerse reuseExistingServer çalışmaz ve tüm e2e EADDRINUSE ile ölür; E2E_BASE_URL'i sağlıklı bir yola çevir
 - [fabrika-module-gate-is-two-locks](fabrika-module-gate-is-two-locks.md) — Fabrika modül kapısı iki kilit — ModuleState=ON VE planın modülü vermesi; e2e seed'i yalnız birincisini kurarsa sayfa "aboneliğinizin kapsamı dışında" der
+
+- [fabrika-no-psql-use-prisma-queryraw](fabrika-no-psql-use-prisma-queryraw.md) — Fabrika kutusunda psql YOK — gerçek SQL kanıtı için tek satırlık bir tsx script'ten prisma.$queryRawUnsafe kullan; ölçüm fixture'ını kendi kiracısında kur ve mutlaka geri al
+- [fabrika-topicmatch-is-keyed-per-topic-not-per-opportunity](fabrika-topicmatch-is-keyed-per-topic-not-per-opportunity.md) — Fabrika'da G0 kanıt kaydı TopicMatch konu başına anahtarlı ama puan fırsat başına değişir — aynı konuda iki fırsat panoda birbirinin puanını gösterir; "kanıta bağla" düzeltmelerinde anahtarın granülerliğini kontrol et

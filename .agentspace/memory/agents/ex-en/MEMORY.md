@@ -27,3 +27,5 @@
 - [fabrika-clean-install-needs-prisma-generate](fabrika-clean-install-needs-prisma-generate.md) — Fabrika'da temiz pnpm install --frozen-lockfile sonrası build ".prisma/client/index-browser" ile ölür — postinstall yok, prisma generate'i elle koşmak gerekir; bu bir kod hatası değildir
 - [fabrika-playwright-login-two-silent-traps](fabrika-playwright-login-two-silent-traps.md) — Fabrika'da Playwright ile giriş sessizce başarısız olur — çerez onayı tam ekran overlay tıklamayı yutar, ve hidrasyon bitmeden basılan submit formu düz GET'e çevirir; ikisinin de çözümü burada
 - [phantom-dependency-proof-by-hiding-it](phantom-dependency-proof-by-hiding-it.md) — node_modules'ta olup package.json/lock'ta olmayan bir paketi ve onun hangi rotaları kirlettiğini kanıtlamanın yolu — paketi gizleyip build'i tekrar koş, derleyicinin import izlerini oku
+
+- [erasure-gap-lives-in-columns-without-a-foreign-key](erasure-gap-lives-in-columns-without-a-foreign-key.md) — Bir imha/purge işini denetlerken kodu değil ŞEMAYI sorgula — FK'sı olmayan userId kolonları hiçbir cascade'e yakalanmaz ve her tamamlanmış silmeden sağ çıkar; Fabrika'da 10 kolondan 8'i böyleydi
