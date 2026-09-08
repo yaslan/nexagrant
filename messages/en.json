@@ -1542,8 +1542,16 @@
       "completed": "Workflow complete and the document is signed",
       "close": "Close workflow",
       "auditTitle": "Approval record",
-      "note": "The intermediate approval steps are held in this session only; the record written for good is the signature at the last step. The approver is always read from the session.",
-      "error": "The approval step could not be completed."
+      "note": "Every approval step is written to the database, so a reload shows the flow exactly where it was left. The approver is always read from the session, and whoever signs one department cannot sign the other.",
+      "error": "The approval step could not be completed.",
+      "refusal": {
+        "DOC_NOT_FOUND": "The document was not found in this workspace.",
+        "NOT_IN_FLOW": "This document is not in the approval flow.",
+        "ALREADY_COMPLETE": "The flow is already complete; the document is signed.",
+        "WRONG_STAGE": "Finance has to approve first; legal is not the next step yet.",
+        "DEPARTMENT_ALREADY_APPROVED": "This department has already approved this document.",
+        "SAME_ACTOR_BOTH_DEPARTMENTS": "Dual approval takes two people: whoever signs one department cannot sign the other."
+      }
     },
     "generate": {
       "title": "Generate a new administrative / legal document (AI draft generator)",

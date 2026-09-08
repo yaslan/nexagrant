@@ -9,6 +9,8 @@ const h = vi.hoisted(() => ({
   followupDocFindFirst: vi.fn(),
   followupDocUpdate: vi.fn(),
   followupDocUpdateMany: vi.fn(),
+  // A new revision drops the sign-off the previous one collected.
+  dualApprovalStepDeleteMany: vi.fn(),
 }));
 
 vi.mock('../../src/lib/tenant', async () => {
@@ -27,6 +29,7 @@ vi.mock('../../src/lib/db', async () => {
       update: h.followupDocUpdate,
       updateMany: h.followupDocUpdateMany,
     },
+    dualApprovalStep: { deleteMany: h.dualApprovalStepDeleteMany },
   });
 });
 
@@ -49,6 +52,7 @@ describe('M10 Follow-up Documents Module', () => {
     resetScope();
     vi.clearAllMocks();
     h.creditLedgerCreate.mockResolvedValue({ id: 'ledger-1' });
+    h.dualApprovalStepDeleteMany.mockResolvedValue({ count: 0 });
     h.opportunityFindFirst.mockResolvedValue({ title: 'Test Opp' });
     h.followupDocCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'doc-101',

@@ -18,6 +18,7 @@ const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
 describe('Row Level Security (RLS)', () => {
   let tenantA_Id: string;
   let tenantB_Id: string;
+  let workspaceA_Id: string;
   let rls: PrismaClient;
   let ready = false;
   let skipReason = '';
@@ -44,9 +45,10 @@ describe('Row Level Security (RLS)', () => {
       tenantA_Id = tenantA.id;
       tenantB_Id = tenantB.id;
 
-      await prisma.workspace.create({
+      const wsA = await prisma.workspace.create({
         data: { tenantId: tenantA_Id, name: 'Workspace A', slug: `ws-a-${Date.now()}` },
       });
+      workspaceA_Id = wsA.id;
       await prisma.workspace.create({
         data: { tenantId: tenantB_Id, name: 'Workspace B', slug: `ws-b-${Date.now()}` },
       });
@@ -107,6 +109,83 @@ describe('Row Level Security (RLS)', () => {
     // every row: the table reads as empty rather than leaking across tenants.
     const workspaces = await rls.workspace.findMany();
     expect(workspaces).toHaveLength(0);
+  });
+
+  test("tenant B cannot see tenant A's dual approval steps", async (ctx) => {
+    if (!ready) return ctx.skip();
+
+    // TASK-MTSAIWF4ENUSL — the M10 approval steps became rows, and a row that
+    // names who signed a consortium document is exactly the kind of record that
+    // must not cross a tenant boundary. Fixtures are written with the privileged
+    // client; both reads go through the NOBYPASSRLS role.
+    const oppA = await prisma.opportunity.create({
+      data: { tenantId: tenantA_Id, workspaceId: workspaceA_Id, title: 'RLS approval fixture' },
+    });
+    const docA = await prisma.followupDoc.create({
+      data: {
+        tenantId: tenantA_Id,
+        opportunityId: oppA.id,
+        kind: 'NDA',
+        approvalSubmittedAt: new Date(),
+        approvalSubmittedById: 'rls-user-a',
+        approvalSubmittedByName: 'RLS Submitter A',
+      },
+    });
+    await prisma.dualApprovalStep.create({
+      data: {
+        tenantId: tenantA_Id,
+        followupDocId: docA.id,
+        department: 'FINANCE',
+        actorUserId: 'rls-user-a2',
+        actorName: 'RLS Finance A',
+      },
+    });
+
+    await withTenantOn(rls, tenantA_Id, async (tx) => {
+      const steps = await tx.dualApprovalStep.findMany();
+      expect(steps).toHaveLength(1);
+      expect(steps[0]!.actorName).toBe('RLS Finance A');
+    });
+
+    // B holds a valid session for its own tenant and still sees nothing of A's.
+    await withTenantOn(rls, tenantB_Id, async (tx) => {
+      expect(await tx.dualApprovalStep.findMany()).toHaveLength(0);
+      expect(await tx.dualApprovalStep.findMany({ where: { followupDocId: docA.id } })).toHaveLength(
+        0
+      );
+    });
+  });
+
+  test('the four-eyes rules are enforced by the database, not only by the app', async (ctx) => {
+    if (!ready) return ctx.skip();
+
+    const opp = await prisma.opportunity.create({
+      data: { tenantId: tenantA_Id, workspaceId: workspaceA_Id, title: 'Four-eyes fixture' },
+    });
+    const doc = await prisma.followupDoc.create({
+      data: { tenantId: tenantA_Id, opportunityId: opp.id, kind: 'LOI' },
+    });
+    const step = {
+      tenantId: tenantA_Id,
+      followupDocId: doc.id,
+      actorUserId: 'four-eyes-bob',
+      actorName: 'Bob',
+    };
+
+    await prisma.dualApprovalStep.create({ data: { ...step, department: 'FINANCE' } });
+
+    // Same person, the other department: the unique index refuses it even if a
+    // caller reached the write without going through the action.
+    await expect(
+      prisma.dualApprovalStep.create({ data: { ...step, department: 'LEGAL' } })
+    ).rejects.toThrow();
+
+    // Same department, another person: refused too.
+    await expect(
+      prisma.dualApprovalStep.create({
+        data: { ...step, actorUserId: 'four-eyes-carol', actorName: 'Carol', department: 'FINANCE' },
+      })
+    ).rejects.toThrow();
   });
 
   test('writes are rejected when they target another tenant', async (ctx) => {

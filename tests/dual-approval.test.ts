@@ -3,8 +3,11 @@ import {
   submitForDualApproval,
   approveByDepartment,
   rejectDualApproval,
+  deriveDualApprovalState,
+  refusalForDepartmentApproval,
   MissingApprovalActorError,
   type ApprovalActor,
+  type PersistedApproval,
 } from '../src/lib/dual-approval';
 
 /**
@@ -110,5 +113,148 @@ describe('the audit trail never names somebody who did not act', () => {
     expect(() => rejectDualApproval(state, 'FINANCE', anonymous, 'sebep')).toThrow(
       MissingApprovalActorError
     );
+  });
+});
+
+/**
+ * TASK-MTSAIWF4ENUSL — the durable half.
+ *
+ * The stage a user sees is no longer whatever React state survived the last
+ * click: it is read back from the stored submission and steps. These tests hold
+ * the two rules that make the workflow "dual" — one sign-off per department, and
+ * one department per person — on the pure functions the action calls. The
+ * database enforces the same two with unique indexes, so neither is the only
+ * line of defence.
+ */
+const T0 = new Date('2026-09-08T09:00:00.000Z');
+const T1 = new Date('2026-09-08T09:05:00.000Z');
+const T2 = new Date('2026-09-08T09:10:00.000Z');
+
+function stored(overrides: Partial<PersistedApproval> = {}): PersistedApproval {
+  return {
+    docId: 'doc-900',
+    submittedAt: T0,
+    submittedById: SUBMITTER.userId,
+    submittedByName: SUBMITTER.displayName,
+    steps: [],
+    signedAt: null,
+    ...overrides,
+  };
+}
+
+const FINANCE_STEP = {
+  id: 'step-fin',
+  department: 'FINANCE',
+  actorUserId: FINANCE.userId,
+  actorName: FINANCE.displayName,
+  note: 'Bütçe uygun',
+  decidedAt: T1,
+};
+
+const LEGAL_STEP = {
+  id: 'step-leg',
+  department: 'LEGAL',
+  actorUserId: LEGAL.userId,
+  actorName: LEGAL.displayName,
+  note: null,
+  decidedAt: T2,
+};
+
+describe('deriveDualApprovalState — the stage comes from the rows', () => {
+  test('a document that was never submitted is not in the flow', () => {
+    expect(
+      deriveDualApprovalState(stored({ submittedAt: null, submittedById: null, submittedByName: null }))
+    ).toBeNull();
+  });
+
+  test('submitted and nothing else waits on finance', () => {
+    const state = deriveDualApprovalState(stored())!;
+    expect(state.stage).toBe('PENDING_FINANCE_APPROVAL');
+    expect(state.financeApproved).toBe(false);
+    expect(state.auditTrail).toHaveLength(1);
+    expect(state.auditTrail[0]!.actorUserId).toBe(SUBMITTER.userId);
+  });
+
+  test('a stored finance step advances the stage and names its own actor', () => {
+    const state = deriveDualApprovalState(stored({ steps: [FINANCE_STEP] }))!;
+    expect(state.stage).toBe('PENDING_LEGAL_APPROVAL');
+    expect(state.financeApprover).toBe(FINANCE.displayName);
+    expect(state.financeApproverUserId).toBe(FINANCE.userId);
+    expect(state.legalApprover).toBeUndefined();
+    // Submission first, then the step — the trail is the record, in order.
+    expect(state.auditTrail.map((l) => l.actorUserId)).toEqual([SUBMITTER.userId, FINANCE.userId]);
+  });
+
+  test('both steps complete the flow, each line naming a different person', () => {
+    const state = deriveDualApprovalState(
+      stored({ steps: [FINANCE_STEP, LEGAL_STEP], signedAt: T2 })
+    )!;
+    expect(state.stage).toBe('APPROVED_AND_SIGNED');
+    expect(state.legalApproverUserId).toBe(LEGAL.userId);
+    expect(new Set(state.auditTrail.slice(1).map((l) => l.actorUserId)).size).toBe(2);
+  });
+
+  test('the derived state is what the in-memory engine used to produce', () => {
+    // The engine and the rows have to agree, or a reload would change the story.
+    const engine = approveByDepartment(
+      submitForDualApproval('doc-900', SUBMITTER),
+      'FINANCE',
+      FINANCE,
+      'Bütçe uygun'
+    );
+    const derived = deriveDualApprovalState(stored({ steps: [FINANCE_STEP] }))!;
+
+    expect(derived.stage).toBe(engine.stage);
+    expect(derived.financeApprover).toBe(engine.financeApprover);
+    expect(derived.financeApproverUserId).toBe(engine.financeApproverUserId);
+    expect(derived.auditTrail.map((l) => l.note)).toEqual(engine.auditTrail.map((l) => l.note));
+  });
+});
+
+describe('refusalForDepartmentApproval — what makes the approval dual', () => {
+  test('finance may sign a freshly submitted document', () => {
+    expect(refusalForDepartmentApproval(stored(), 'FINANCE', FINANCE)).toBeNull();
+  });
+
+  test('the submitter is not disqualified — submitting is not a sign-off', () => {
+    expect(refusalForDepartmentApproval(stored(), 'FINANCE', SUBMITTER)).toBeNull();
+  });
+
+  test('the person who signed finance cannot also sign legal', () => {
+    expect(refusalForDepartmentApproval(stored({ steps: [FINANCE_STEP] }), 'LEGAL', FINANCE)).toBe(
+      'SAME_ACTOR_BOTH_DEPARTMENTS'
+    );
+  });
+
+  test('a second person may sign legal', () => {
+    expect(
+      refusalForDepartmentApproval(stored({ steps: [FINANCE_STEP] }), 'LEGAL', LEGAL)
+    ).toBeNull();
+  });
+
+  test('a department signs once, whoever asks', () => {
+    expect(
+      refusalForDepartmentApproval(stored({ steps: [FINANCE_STEP] }), 'FINANCE', LEGAL)
+    ).toBe('DEPARTMENT_ALREADY_APPROVED');
+  });
+
+  test('legal does not sign before finance', () => {
+    expect(refusalForDepartmentApproval(stored(), 'LEGAL', LEGAL)).toBe('WRONG_STAGE');
+  });
+
+  test('a document outside the flow has no department to sign', () => {
+    expect(
+      refusalForDepartmentApproval(
+        stored({ submittedAt: null, submittedById: null, submittedByName: null }),
+        'FINANCE',
+        FINANCE
+      )
+    ).toBe('NOT_IN_FLOW');
+  });
+
+  test('an unidentified caller is refused before any rule is consulted', () => {
+    expect(() =>
+      refusalForDepartmentApproval(stored(), 'FINANCE', { userId: '', displayName: '' })
+    ).toThrow(MissingApprovalActorError);
   });
 });

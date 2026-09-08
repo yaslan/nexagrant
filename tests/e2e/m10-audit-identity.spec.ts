@@ -211,18 +211,25 @@ test.describe('M10 dual approval identity', () => {
     await expect(trail.nth(0)).toContainText(ACTOR_A);
     await page.screenshot({ path: `${SHOTS}/03-finance-signed-by-actor-b.png`, fullPage: false });
 
+    // ── and legal is signed by somebody who is not the finance approver ──────────
+    // TASK-MTSAIWF4ENUSL made that a rule rather than a convention: one person
+    // signs at most one department (a unique index on DualApprovalStep), so B
+    // cannot close the flow it opened. The flow goes back to A, who submitted it
+    // but has signed no department yet.
+    await setSession(context, await mintSession(ULTRA.userId, ACTOR_A, ULTRA.email), baseURL!);
+
     await page.getByTestId('approve-legal').click();
     await expect(banner).toHaveAttribute('data-approval-stage', 'APPROVED_AND_SIGNED');
     await expect(page.getByTestId('approval-complete')).toBeVisible();
     await expect(trail).toHaveCount(3);
-    await expect(trail.nth(2)).toContainText(ACTOR_B);
+    await expect(trail.nth(2)).toContainText(ACTOR_A);
 
-    // The audit trail, read as a whole: A acted once, B twice, in that order.
+    // The audit trail, read as a whole: each line names the session that made it.
     const lines = await trail.allInnerTexts();
     expect(
       lines.map((l) => (l.includes(ACTOR_A) ? 'A' : l.includes(ACTOR_B) ? 'B' : 'UNKNOWN')),
       'an audit line names somebody other than the two sessions that acted',
-    ).toEqual(['A', 'B', 'B']);
+    ).toEqual(['A', 'B', 'A']);
 
     // Step 4 is an outcome, not a claim: the row really is signed in the database.
     expect(await signedAtOf(doc.id), 'the completed workflow left no signature').not.toBeNull();

@@ -115,6 +115,11 @@ export function submitForDualApproval(
   };
 }
 
+/** The audit note a department step carries when the approver typed none. */
+export function defaultDepartmentNote(department: Department): string {
+  return `${department} Departmanı Onayı Verildi`;
+}
+
 /**
  * Perform department sign-off (FINANCE or LEGAL).
  * Throws `MissingApprovalActorError` when the caller has no identity.
@@ -134,7 +139,7 @@ export function approveByDepartment(
       action: 'APPROVED' as const,
       actorName: displayName,
       actorUserId: userId,
-      note: note || `${department} Departmanı Onayı Verildi`,
+      note: note || defaultDepartmentNote(department),
       timestamp: new Date().toISOString(),
     },
   ];
@@ -159,6 +164,134 @@ export function approveByDepartment(
     legalApproverUserId: userId,
     auditTrail: newTrail,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Durable state (TASK-MTSAIWF4ENUSL)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The functions above build the state; these two read it back from what the
+// database stored and decide whether a step may be taken. Both are pure, so the
+// four-eyes rules are unit-testable without a database — but they are not the
+// only line of defence: `DualApprovalStep` carries the same two rules as unique
+// indexes, so a race that slips past the check still cannot write the row.
+
+/** One persisted department sign-off, as `DualApprovalStep` stores it. */
+export interface PersistedApprovalStep {
+  id: string;
+  department: string;
+  actorUserId: string;
+  actorName: string;
+  note?: string | null;
+  decidedAt: Date | string;
+}
+
+/** The durable half of one document's flow: the submission plus its steps. */
+export interface PersistedApproval {
+  docId: string;
+  submittedAt: Date | string | null;
+  submittedById: string | null;
+  submittedByName: string | null;
+  steps: PersistedApprovalStep[];
+  signedAt: Date | string | null;
+}
+
+function isoOf(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function stepOf(steps: PersistedApprovalStep[], department: Department) {
+  return steps.find((s) => s.department === department);
+}
+
+/**
+ * Rebuilds the workflow state from the stored rows.
+ *
+ * Returns `null` when the document was never submitted — "not in the flow" is a
+ * real state, and it is the one the banner shows as idle. Nothing here invents a
+ * step: a lit stage means a row exists for it.
+ */
+export function deriveDualApprovalState(row: PersistedApproval): DualApprovalState | null {
+  if (!row.submittedAt || !row.submittedById || !row.submittedByName) return null;
+
+  const ordered = [...row.steps].sort(
+    (a, b) => new Date(a.decidedAt).getTime() - new Date(b.decidedAt).getTime()
+  );
+  const finance = stepOf(ordered, 'FINANCE');
+  const legal = stepOf(ordered, 'LEGAL');
+
+  const stage: ApprovalStage = legal
+    ? 'APPROVED_AND_SIGNED'
+    : finance
+      ? 'PENDING_LEGAL_APPROVAL'
+      : 'PENDING_FINANCE_APPROVAL';
+
+  const auditTrail: AuditLogRecord[] = [
+    {
+      id: `sub-${row.docId}`,
+      department: 'FINANCE',
+      action: 'APPROVED',
+      actorName: row.submittedByName,
+      actorUserId: row.submittedById,
+      note: 'Doküman Çift Onaylı Kurumsal Yetki Akışına Gönderildi',
+      timestamp: isoOf(row.submittedAt),
+    },
+    ...ordered.map((s) => ({
+      id: s.id,
+      department: s.department as Department,
+      action: 'APPROVED' as const,
+      actorName: s.actorName,
+      actorUserId: s.actorUserId,
+      note: s.note ?? undefined,
+      timestamp: isoOf(s.decidedAt),
+    })),
+  ];
+
+  return {
+    docId: row.docId,
+    stage,
+    submittedBy: row.submittedByName,
+    submittedByUserId: row.submittedById,
+    financeApproved: Boolean(finance),
+    legalApproved: Boolean(legal),
+    financeApprover: finance?.actorName,
+    financeApproverUserId: finance?.actorUserId,
+    legalApprover: legal?.actorName,
+    legalApproverUserId: legal?.actorUserId,
+    auditTrail,
+  };
+}
+
+/** Why a department sign-off was refused. The client maps these to i18n copy. */
+export type DualApprovalRefusal =
+  | 'DOC_NOT_FOUND'
+  | 'NOT_IN_FLOW'
+  | 'ALREADY_COMPLETE'
+  | 'WRONG_STAGE'
+  | 'DEPARTMENT_ALREADY_APPROVED'
+  | 'SAME_ACTOR_BOTH_DEPARTMENTS';
+
+/**
+ * May `actor` sign `department` on this flow? `null` means yes.
+ *
+ * `SAME_ACTOR_BOTH_DEPARTMENTS` is the rule that makes the workflow dual: the
+ * person who signed finance is not the second pair of eyes on legal. Submitting
+ * a document is not a sign-off, so the submitter may still approve one
+ * department — a two-person flow, not a three-person one.
+ */
+export function refusalForDepartmentApproval(
+  row: PersistedApproval,
+  department: Department,
+  actor: ApprovalActor
+): DualApprovalRefusal | null {
+  const { userId } = requireActor(actor);
+  if (!row.submittedAt || !row.submittedById) return 'NOT_IN_FLOW';
+  if (stepOf(row.steps, department)) return 'DEPARTMENT_ALREADY_APPROVED';
+  if (row.steps.some((s) => s.actorUserId === userId)) return 'SAME_ACTOR_BOTH_DEPARTMENTS';
+  if (stepOf(row.steps, 'LEGAL')) return 'ALREADY_COMPLETE';
+  // Finance first: legal signs off on a budget that finance has already cleared.
+  if (department === 'LEGAL' && !stepOf(row.steps, 'FINANCE')) return 'WRONG_STAGE';
+  return null;
 }
 
 /**

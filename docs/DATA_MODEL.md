@@ -187,6 +187,55 @@ Uygulamalar: `IcsProvider` (mevcut generateIcsContent'i wrap), `GoogleCalendarPr
 migration reset gerekiyor (Prisma güvenlik onayı: kullanıcı `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`'ı
 onaylamalı).
 
+### 8.3 M10 Çift Onay — kalıcı onay adımları (TASK-MTSAIWF4ENUSL)
+
+Akışın ara adımları uzun süre yalnız React state'inde yaşadı: finans onayı veriliyor, sayfa
+yenileniyor, onay kayboluyordu. Kalıcı olan tek olgu `FollowupDoc.signedAt` idi — yani banner'ın
+2. ve 3. aşaması, imzalanıp konsorsiyuma gidecek bir doküman hakkında bellekte tutulan bir
+iddiaydı. İki parça kalıcı hale getirildi:
+
+**1. Akışı açan gönderim — `FollowupDoc` üzerinde (yeni sütunlar):**
+
+| Alan | Not |
+|---|---|
+| `approvalSubmittedAt` | Doküman akışa alındığı an. `null` = akışta değil (banner "boşta"). |
+| `approvalSubmittedById` | Akışa alan oturumun kullanıcı id'si — kaydı atfedilebilir kılan alan. |
+| `approvalSubmittedByName` | Görünen adın o andaki **anlık görüntüsü**; kullanıcı adını sonradan değiştirse de onay kaydı okunabilir kalır. |
+
+**2. Departman onayları — `DualApprovalStep` (yeni tablo, kiracıya özel):**
+
+| Alan | Not |
+|---|---|
+| `tenantId` | `tenant_isolation` RLS politikası (prisma/rls.sql + migration içinde de bildirilir). |
+| `followupDocId` | `FollowupDoc`'a FK, `onDelete: Cascade`. |
+| `department` | `FINANCE` \| `LEGAL`. |
+| `actorUserId`, `actorName` | Onayı veren oturum. **FK değildir**: onay bir imzadır, onu üreten kullanıcı satırındaki değişikliği aşmalıdır. |
+| `note`, `decidedAt` | Onay notu ve zamanı; onay kaydı satırı bu ikisiyle tamamlanır. |
+
+Çift onayın iki kuralı **uygulama kontrolü değil, unique index**:
+
+- `@@unique([followupDocId, department])` — bir departman bir dokümanı bir kez onaylar.
+- `@@unique([followupDocId, actorUserId])` — bir kişi aynı dokümanda en fazla bir departmanı onaylar.
+  "Dual"ın iki tık değil iki kişi anlamına gelmesini sağlayan index budur. Gönderim bir sign-off
+  değildir, dolayısıyla akışı açan kişi bir departmanı hâlâ onaylayabilir (iki kişilik akış).
+
+Uygulama tarafında aynı kurallar `refusalForDepartmentApproval()` (`src/lib/dual-approval.ts`) ile
+okunabilir bir gerekçeye çevrilir; ekrandaki aşama `deriveDualApprovalState()` ile satırlardan
+türetilir — yani yanan bir aşama, karşılığında bir satır olduğu anlamına gelir. Hukuk adımı akışı
+tamamlar ve imza (`signedAt`) **aynı işlem içinde** yazılır: 4. aşamanın yandığı ama dokümanın
+imzasız olduğu bir aralık yoktur. Yeni revizyon (`createNewVersion`) devraldığı onayları siler —
+başka bir metne verilmiş onay yeni sürümü imzalamaz.
+
+**Neden `ApprovalRequest` genişletilmedi:** o tablo tek onaylayanlı (`approverId`, `requiredRole`,
+`expiresAt`, `executedAt`) genel bir maker-checker isteği modeller; iki departmanın ayrı ayrı
+imzaladığı bir akış oraya kardinalite olarak sığmaz (yine de bir alt tablo gerekirdi). Ayrıca
+`/approvals` ekranı o tablonun tüm satırlarını listeler ve Onayla/Reddet düğmeleri hiçbir şey
+yazmayan stub aksiyonlara bağlıdır — M10 satırlarını oraya koymak, çalışmayan düğmelerin altına
+gerçek dokümanlar sermek olurdu.
+
+**Migration:** `prisma/migrations/add-m10-dual-approval-persistence/migration.sql` (idempotent,
+additive) — geri alma: aynı klasörde `down.sql` (yıkıcı, açık onay ister).
+
 ---
 
 ## 9. Beta geri bildirimi (E11.2)

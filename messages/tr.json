@@ -1542,8 +1542,16 @@
       "completed": "Akış tamamlandı ve doküman imzalandı",
       "close": "Akışı Kapat",
       "auditTitle": "Onay Kaydı",
-      "note": "Ara onay adımları yalnız bu oturumda tutulur; kalıcı olarak yazılan kayıt son adımdaki imzadır. Onayı veren kişi her zaman oturumdan okunur.",
-      "error": "Onay adımı tamamlanamadı."
+      "note": "Her onay adımı veritabanına yazılır; sayfayı yenilediğinizde akış kaldığı yerden görünür. Onayı veren kişi her zaman oturumdan okunur ve bir departmanı onaylayan kişi diğerini onaylayamaz.",
+      "error": "Onay adımı tamamlanamadı.",
+      "refusal": {
+        "DOC_NOT_FOUND": "Doküman bu çalışma alanında bulunamadı.",
+        "NOT_IN_FLOW": "Bu doküman onay akışında değil.",
+        "ALREADY_COMPLETE": "Akış zaten tamamlandı; doküman imzalı.",
+        "WRONG_STAGE": "Önce finans onayı gerekir; hukuk onayı sıradaki adım değil.",
+        "DEPARTMENT_ALREADY_APPROVED": "Bu departman bu dokümanı zaten onayladı.",
+        "SAME_ACTOR_BOTH_DEPARTMENTS": "Çift onay iki kişi gerektirir: bir departmanı onaylayan kişi diğerini onaylayamaz."
+      }
     },
     "generate": {
       "title": "Yeni İdari / Yasal Doküman Üret (AI Draft Generator)",

@@ -1160,6 +1160,39 @@ model FollowupDoc {
   contentUrl     String?
   signedAt       DateTime?
   createdAt      DateTime    @default(now())
+
+  // M10 dual approval — the submission that opens the flow (TASK-MTSAIWF4ENUSL).
+  // The two department sign-offs live in DualApprovalStep; the final signature is
+  // `signedAt` above. `approvalSubmittedByName` is a snapshot of the display name
+  // as the session carried it, so the record stays readable after a rename.
+  approvalSubmittedAt     DateTime?
+  approvalSubmittedById   String?
+  approvalSubmittedByName String?
+
+  approvalSteps  DualApprovalStep[]
+}
+
+/// One department sign-off in the M10 dual approval flow (FINANCE or LEGAL).
+///
+/// The two four-eyes rules are unique indexes, not app-level checks:
+///   @@unique([followupDocId, department])  — a department signs a document once
+///   @@unique([followupDocId, actorUserId]) — a person signs at most one department
+/// `actorUserId` is deliberately not a foreign key: an approval is a signature, and
+/// the record must outlive a change to the user row that made it.
+model DualApprovalStep {
+  id            String      @id @default(cuid())
+  tenantId      String
+  followupDocId String
+  followupDoc   FollowupDoc @relation(fields: [followupDocId], references: [id], onDelete: Cascade)
+  department    String      // FINANCE | LEGAL
+  actorUserId   String
+  actorName     String
+  note          String?
+  decidedAt     DateTime    @default(now())
+
+  @@unique([followupDocId, department])
+  @@unique([followupDocId, actorUserId])
+  @@index([tenantId, followupDocId])
 }
 
 model ApplicationPart {

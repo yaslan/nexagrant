@@ -9,7 +9,7 @@ BEGIN
     'LifetimeLicence','Invoice',
     'TopicMatch','SavedSearch','Opportunity','GateDecision','ConsortiumSeat','PartnerOrg','Proposal','Effort',
     'Evidence','ConceptNote','Relationship','Interaction','SeatCandidate','AiUsageLog','AuditEvent',
-    'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','ApplicationPart','Invitation',
+    'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
     'TtoPortfolioItem','MarketplaceListing','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
     'PlanAssignment'
   ] LOOP

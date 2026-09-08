@@ -24,8 +24,14 @@ import {
   createNewVersion,
   submitDualApprovalAction,
   departmentApproveAction,
+  type DualApprovalActionResult,
 } from '@/modules/m10/server/actions';
-import type { ApprovalStage, Department, DualApprovalState } from '@/lib/dual-approval';
+import type {
+  ApprovalStage,
+  Department,
+  DualApprovalRefusal,
+  DualApprovalState,
+} from '@/lib/dual-approval';
 import { errorMessage } from '@/lib/errors';
 
 export interface DocItem {
@@ -36,12 +42,16 @@ export interface DocItem {
   signedAt?: Date | string | null;
   createdAt: Date | string;
   contentText?: string;
+  /** The stored flow for this document, or null when it was never submitted. */
+  approval?: DualApprovalState | null;
 }
 
 interface DocumentsClientProps {
   opportunityId: string;
   opportunityTitle: string;
   documents: DocItem[];
+  /** The flow the page found open, so a reload does not lose a sign-off. */
+  initialApproval?: DualApprovalState | null;
 }
 
 /**
@@ -67,6 +77,7 @@ export function DocumentsClient({
   opportunityId,
   opportunityTitle,
   documents: initialDocs,
+  initialApproval = null,
 }: DocumentsClientProps) {
   const t = useTranslations('m10');
   const locale = useLocale();
@@ -74,7 +85,7 @@ export function DocumentsClient({
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'LEGAL' | 'COMMITMENT' | 'AWARD'>('ALL');
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<DocItem | null>(null);
-  const [approval, setApproval] = useState<DualApprovalState | null>(null);
+  const [approval, setApproval] = useState<DualApprovalState | null>(initialApproval);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
 
@@ -126,15 +137,36 @@ export function DocumentsClient({
                   ...d,
                   version: updatedDoc.version,
                   signedAt: null,
+                  // The server dropped this revision's inherited sign-off; the
+                  // banner must not keep showing it.
+                  approval: null,
                   contentUrl: updatedDoc.contentUrl,
                 }
               : d
           )
         );
+        setApproval((prev) => (prev?.docId === docId ? null : prev));
       }
     } catch (err) {
       console.error('Error updating document version:', err);
     }
+  };
+
+  /** A refusal from the server is copy the user can act on, not a stack trace. */
+  const refusalMessage = (refusal: DualApprovalRefusal) => t(`approval.refusal.${refusal}`);
+
+  /** Keeps the row and the banner telling the same story after every step. */
+  const applyResult = (res: DualApprovalActionResult) => {
+    if (!res.success) {
+      if (res.approvalState) setApproval(res.approvalState);
+      setApprovalError(refusalMessage(res.refusal));
+      return;
+    }
+    const next = res.approvalState;
+    setApproval(next);
+    setDocs((prev) =>
+      prev.map((d) => (d.id === next.docId ? { ...d, signedAt: res.signedAt, approval: next } : d))
+    );
   };
 
   /** Puts one real document into the workflow. The actor comes from the session. */
@@ -142,8 +174,7 @@ export function DocumentsClient({
     setApprovalBusy(true);
     setApprovalError(null);
     try {
-      const res = await submitDualApprovalAction(docId);
-      setApproval(res.approvalState);
+      applyResult(await submitDualApprovalAction(docId));
     } catch (err) {
       setApprovalError(errorMessage(err, t('approval.error')));
     } finally {
@@ -152,24 +183,20 @@ export function DocumentsClient({
   };
 
   /**
-   * One department sign-off. The legal step completes the workflow, and that
-   * outcome is written down: `signDocument` is the only durable record this
-   * screen can produce, so step 4 means the document really is signed in the
-   * database and survives a reload.
+   * One department sign-off.
+   *
+   * The action is told which document and which department, nothing more: the
+   * workflow state it acts on is the one in the database, not one this component
+   * hands it. The legal step writes the signature in the same transaction, so
+   * step 4 lit here means `FollowupDoc.signedAt` is set — and every step before
+   * it is a row too, which is why a reload no longer empties the banner.
    */
   const handleDepartmentApprove = async (department: Department) => {
     if (!approval) return;
     setApprovalBusy(true);
     setApprovalError(null);
     try {
-      const res = await departmentApproveAction(approval, department);
-      const next = res.approvalState;
-      if (next.stage === 'APPROVED_AND_SIGNED') {
-        await signDocument(next.docId);
-        const signedAt = new Date().toISOString();
-        setDocs((prev) => prev.map((d) => (d.id === next.docId ? { ...d, signedAt } : d)));
-      }
-      setApproval(next);
+      applyResult(await departmentApproveAction(approval.docId, department));
     } catch (err) {
       setApprovalError(errorMessage(err, t('approval.error')));
     } finally {
@@ -551,7 +578,7 @@ export function DocumentsClient({
                         </button>
                       )}
 
-                      {!doc.signedAt && approval?.docId !== doc.id && (
+                      {!doc.signedAt && !doc.approval && approval?.docId !== doc.id && (
                         <button
                           data-testid={`submit-approval-${doc.id}`}
                           onClick={() => handleSubmitForApproval(doc.id)}
