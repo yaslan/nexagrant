@@ -12,6 +12,26 @@
  * the admin editor fills it with the signed-in author's own identity. There is
  * no default author string anywhere: an unattributed post is shown
  * unattributed.
+ *
+ * TASK-MTS6MRKDP168Q — a figure on a public page names a record or it is absent.
+ *
+ * The same posts carried numbers no record in this repo produces: "150.000+
+ * CORDIS kurum verisiyle yapılan analize göre", "kazanma şansını %40 artırıyor",
+ * "60 milyar Avro'dan fazla hibe alan 150.000'den fazla kuruluş", "ortalama
+ * 4.8/5.0 puan", "bütçenin en az %25'i ... etki puanını yükseltir", "50+ teklifi
+ * eşzamanlı sıfır çakışmayla", "sürelerini haftalardan saatlere". Measured on
+ * this branch: `CordisOrganization` holds 0 rows and the analysed EU budget is
+ * EUR 0, so "150.000+" and "EUR 60B+" were not merely unsourced — they were
+ * contradicted. `TopicStat` holds 3 demo rows (source "seed-demo-g0-evidence")
+ * carrying per-topic success rates, which back neither a 40% uplift nor a
+ * 4.8/5.0 reviewer average; `Evidence` is tenant-scoped behind RLS and a public
+ * page has no tenant to read it from.
+ *
+ * None of the seven could therefore be bound to a record, so each is gone —
+ * removed, not softened into "yaklaşık". What survives describes what the
+ * platform computes, never how much it is worth. Adding a figure back means
+ * adding the Evidence/TopicStat read that produces it (CLAUDE.md rule 7);
+ * `tests/marketing-unsourced-figures.test.ts` pins the removed strings.
  */
 export interface BlogAuthor {
   name: string;
@@ -38,7 +58,7 @@ export let BLOG_POSTS: BlogPost[] = [
   {
     slug: 'horizon-europe-basarili-konsorsiyum-rehberi',
     title: 'Horizon Europe Çalışma Programlarında Başarılı Konsorsiyum Kurma Rehberi',
-    excerpt: '150.000+ CORDIS kurum verisiyle yapılan analize göre, AB projelerinde koordinatör ve partnerlerin ağ merkezilik skoru kazanma şansını %40 artırıyor.',
+    excerpt: 'CORDIS ağ verisinde bir kurumun merkezilik puanı, geçmişte ne kadar aktif koordinasyon yaptığını gösterir. Konsorsiyum kurarken bu sinyali nasıl okuyacağınızı anlatıyoruz.',
     category: 'Horizon Europe',
     readTime: '5 dk okuma',
     publishedAt: '28 Ağustos 2026',
@@ -50,12 +70,12 @@ export let BLOG_POSTS: BlogPost[] = [
 Horizon Europe projelerinde fonlanma başarısı, yalnızca güçlü bir fikre değil; fikri hayata geçirecek doğru uluslararası konsorsiyuma dayanır. 
 
 ## 1. CORDIS Veri Analitiği ve Ağ Merkeziliği
-CORDIS (Community Research and Development Information Service) verileri, geçmiş 10 yılda 60 milyar Avro'dan fazla hibe alan 150.000'den fazla kuruluşu içerir. Bir kurumun ağ merkezilik puanı (eigenvector centrality), daha önce ne kadar aktif koordinasyon yaptığını gösterir.
+CORDIS (Community Research and Development Information Service), Avrupa Komisyonu'nun fonladığı projeleri, bu projelere katılan kuruluşları ve aldıkları hibe tutarlarını yayımlar. Bir kurumun ağ merkezilik puanı (eigenvector centrality), daha önce ne kadar aktif koordinasyon yaptığını gösterir.
 
 ### Önemli Metrikler:
-* **Koordinatörlük Deneyimi:** En az 2 kabul edilmiş projesi olan koordinatörler, G3 Hakem değerlendirmesinde Mükemmeliyet bölümünden ortalama 4.8/5.0 puan almaktadır.
+* **Koordinatörlük Deneyimi:** Daha önce kabul edilmiş proje yürütmüş koordinatörler, Uygulama (Implementation) bölümünde yönetim kapasitesini somut referansla gösterebilir.
 * **Coğrafi Çeşitlilik:** AB 27 üye ülkesi ve Asosiye ülkelerden dengeli dağılım.
-* **KOBİ ve Sanayi Katılımı:** Bütçenin en az %25'inin sanayi/KOBİ ortağına ayrılması etki puanını yükseltir.
+* **KOBİ ve Sanayi Katılımı:** Sanayi ve KOBİ ortaklarının bütçe payı, Etki (Impact) bölümünde ticarileştirme ve kullanım planının inandırıcılığını belirler.
 
 ## 2. FonBridge M8 Konsorsiyum Eşleştirme Motoru
 FonBridge M8 modülü, CORDIS canlı delta API entegrasyonu sayesinde aradığınız spesifik yetkinliğe sahip partnerleri saniyeler içinde önerir.
@@ -96,7 +116,7 @@ FonBridge M6 modülü, resmi AB hakemi bakış açısıyla metninizin zayıf par
     content: `
 # Ar-Ge Projelerinde Yapay Zeka Desteği: Part B Yazımı
 
-Yapay zeka (LLM) teknolojileri teklif hazırlama sürelerini haftalardan saatlere düşürse de, AB Komisyonu tarafından yayımlanan etik ilkeler doğrultusunda kullanılması şarttır.
+Yapay zeka (LLM) teknolojileri teklif hazırlama sürecini hızlandırsa da, AB Komisyonu tarafından yayımlanan etik ilkeler doğrultusunda kullanılması şarttır.
 
 ## CORDIS RAG Destekli Doğru Üretim
 Genel yapay zeka modelleri (hallucination) uydurma kaynak üretebilir. FonBridge, CORDIS vector veritabanı uyarınca **Retrieval-Augmented Generation (RAG)** mimarisini kullanarak doğruluk sunar.
@@ -110,7 +130,7 @@ Genel yapay zeka modelleri (hallucination) uydurma kaynak üretebilir. FonBridge
   {
     slug: 'tto-ve-danismanlar-icin-multi-tenant-proje-yonetimi',
     title: 'TTO ve Danışmanlar İçin Multi-Tenant Proje Yönetimi: Adam-Gün Eforu',
-    excerpt: 'G0-G4 Stage-Gate boru hattı ile üniversite ve danışmanlık firmalarının 50+ teklifi eşzamanlı sıfır çakışmayla yönetme sırları.',
+    excerpt: 'G0-G4 Stage-Gate boru hattı ile üniversite ve danışmanlık firmaları çok sayıda teklifi eşzamanlı ve birbirinden yalıtılmış yürütür.',
     category: 'TTO & Danışmanlık',
     readTime: '6 dk okuma',
     publishedAt: '20 Temmuz 2026',

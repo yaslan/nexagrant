@@ -119,7 +119,7 @@ export default async function HomePage({
               <div className="pt-8 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs font-semibold text-muted">
                 <div className="flex items-center gap-2">
                   <span className="text-ok font-bold text-sm">✓</span>
-                  <span>{isTr ? '150.000+ CORDIS Kurumu' : '150k+ CORDIS Profiles'}</span>
+                  <span>{isTr ? 'CORDIS Ortak İstihbaratı' : 'CORDIS Partner Intelligence'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-ok font-bold text-sm">✓</span>
@@ -284,8 +284,8 @@ export default async function HomePage({
                   gate: 'G2',
                   title: isTr ? 'Konsorsiyum' : 'Consortium Desk (M8)',
                   desc: isTr
-                    ? '150k+ CORDIS profilinden eksik yetkinlik koltukları, koordinatör ve partnerler eşleştirilir.'
-                    : 'Match optimal coordinators and partners from 150k+ CORDIS profiles by centrality and topic history.',
+                    ? 'CORDIS profillerinden eksik yetkinlik koltukları, koordinatör ve partnerler eşleştirilir.'
+                    : 'Match optimal coordinators and partners from CORDIS profiles by centrality and topic history.',
                   color: 'bg-purple-700',
                 },
                 {
@@ -350,7 +350,7 @@ export default async function HomePage({
                   id: 'M1',
                   name: isTr ? 'CORDIS Ortak İstihbaratı' : 'Partner Intelligence',
                   desc: isTr
-                    ? '150.000+ Avrupalı kurumun geçmiş projeleri, aldığı AB hibesi (€) ve ağ merkezilik puanı.'
+                    ? 'Avrupalı kurumların geçmiş projeleri, aldığı AB hibesi (€) ve ağ merkezilik puanı.'
                     : 'CORDIS graph analytics, past projects, coordinator track record, and eigenvector centrality.',
                   icon: '🌐',
                   tier: 'Team / Business',
@@ -473,13 +473,13 @@ export default async function HomePage({
                 <h2 className="text-3xl sm:text-4xl font-extrabold font-heading text-ink leading-tight">
                   {isTr ? (
                     <>
-                      150.000+ CORDIS Kurumu ile{' '}
+                      CORDIS Ağ Verisiyle{' '}
                       <span className="text-accent">En Güçlü Konsorsiyumu</span> Kurun
                     </>
                   ) : (
                     <>
-                      Build Winning Consortia with{' '}
-                      <span className="text-accent">150k+ CORDIS Network Nodes</span>
+                      Build Winning Consortia on{' '}
+                      <span className="text-accent">CORDIS Network Data</span>
                     </>
                   )}
                 </h2>
@@ -489,20 +489,18 @@ export default async function HomePage({
                     : 'Our network graph analytics over official European Commission funding data surfaces top coordinators and partners. Evaluate PIC codes, eigenvector centrality, and geographic consortium balances instantly.'}
                 </p>
 
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div className="p-4 bg-ground border border-border rounded-xl">
-                    <div className="text-2xl font-extrabold text-accent">150K+</div>
-                    <div className="text-xs text-muted mt-0.5">
-                      {isTr ? 'Kayıtlı CORDIS Kurumu' : 'Verified EU Organizations'}
-                    </div>
-                  </div>
-                  <div className="p-4 bg-ground border border-border rounded-xl">
-                    <div className="text-2xl font-extrabold text-teal-400">€60B+</div>
-                    <div className="text-xs text-muted mt-0.5">
-                      {isTr ? 'İncelenen AB Proje Bütçesi' : 'Analyzed EU Grant Budgets'}
-                    </div>
-                  </div>
-                </div>
+                {/*
+                  TASK-MTS6MRKDP168Q — two stat tiles stood here, "150K+ /
+                  Kayıtlı CORDIS Kurumu" and "EUR 60B+ / İncelenen AB Proje
+                  Bütçesi", typed as literals. Measured on this branch:
+                  CordisOrganization holds 0 rows and the summed EU contribution
+                  over the 20 imported CordisProject rows is EUR 0. There is no
+                  Evidence or TopicStat record these could read from, and a
+                  public page has no tenant with which to read tenant-scoped
+                  Evidence at all — so the tiles are gone rather than rounded
+                  down. A counter returns here only with the query that counts
+                  it (CLAUDE.md rule 7).
+                */}
 
                 <div className="pt-2">
                   <Link
@@ -519,37 +517,54 @@ export default async function HomePage({
               <div className="bg-ground/90 rounded-2xl p-6 text-ink shadow-2xl space-y-4 border border-border font-sans">
                 <div className="flex justify-between items-center border-b border-border pb-3">
                   <span className="text-xs font-mono text-muted">CORDIS Node Analytics</span>
-                  <span className="text-[10px] bg-ok/15 text-ok border border-ok/20 px-2 py-0.5 rounded font-mono font-bold">
-                    CENTRALITY: 0.9412
+                  <span className="text-[10px] bg-ground text-muted border border-border px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider">
+                    {isTr ? 'Örnek Görünüm' : 'Sample View'}
                   </span>
                 </div>
 
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-bold text-base text-ink">Fraunhofer-Gesellschaft</h3>
-                      <p className="text-xs text-muted">PIC: 999984059 • Almanya (DE) • REC</p>
+                      <h3 className="font-bold text-base text-ink">
+                        {isTr ? 'Örnek Araştırma Merkezi' : 'Sample Research Centre'}
+                      </h3>
+                      <p className="text-xs text-muted">
+                        {isTr ? 'PIC · Ülke · Kurum tipi' : 'PIC · Country · Organisation type'}
+                      </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
                     <div className="bg-surface p-2.5 rounded-lg border border-border">
-                      <div className="text-[10px] text-muted">Koordinatörlük</div>
-                      <div className="text-base font-bold text-ink mt-0.5">342 Proje</div>
+                      <div className="text-[10px] text-muted">{isTr ? 'Koordinatörlük' : 'Coordinator roles'}</div>
+                      <div className="text-base font-bold text-muted mt-0.5 font-mono">—</div>
                     </div>
                     <div className="bg-surface p-2.5 rounded-lg border border-border">
-                      <div className="text-[10px] text-muted">Toplam Katılım</div>
-                      <div className="text-base font-bold text-ink mt-0.5">1.840 Proje</div>
+                      <div className="text-[10px] text-muted">{isTr ? 'Toplam Katılım' : 'Total participations'}</div>
+                      <div className="text-base font-bold text-muted mt-0.5 font-mono">—</div>
                     </div>
                     <div className="bg-surface p-2.5 rounded-lg border border-border">
-                      <div className="text-[10px] text-muted">Alınan Fon</div>
-                      <div className="text-base font-bold text-ok mt-0.5">€940M+</div>
+                      <div className="text-[10px] text-muted">{isTr ? 'Alınan Fon' : 'EU contribution'}</div>
+                      <div className="text-base font-bold text-muted mt-0.5 font-mono">—</div>
                     </div>
                   </div>
 
+                  {/*
+                    TASK-MTS6MRKDP168Q — this panel asserted figures about a real,
+                    named institution: "Fraunhofer-Gesellschaft / PIC: 999984059",
+                    "CENTRALITY: 0.9412", "342 Proje", "1.840 Proje", "€940M+", and
+                    "projenin G3 Hakem Mükemmeliyet puanını ortalama +1.8 puan
+                    yükseltmektedir". No record produces any of them — CordisOrganization
+                    holds 0 rows — and the last is the same uplift promise this task
+                    removed from the blog ("ortalama 4.8/5.0"). A marketing mock may show
+                    a sample organisation; it may not publish invented statistics under a
+                    real third party's name, nor promise a reviewer-score gain. The panel
+                    now shows its own shape with the values struck out.
+                  */}
                   <div className="p-3 bg-surface rounded-lg border border-border text-xs text-ink-2">
-                    <span className="text-amber font-bold">💡 Konsorsiyum Etkisi:</span> Bu kurumun ortak olarak yer
-                    alması, projenin G3 Hakem Mükemmeliyet puanını ortalama <strong>+1.8 puan</strong> yükseltmektedir.
+                    {isTr
+                      ? 'M1, her kurum için koordinatörlük geçmişini, AB katkısını ve ağ merkezilik puanını CORDIS kayıtlarından hesaplar. Değerler çalışma alanınızda gerçek veriyle dolar.'
+                      : 'M1 computes coordinator history, EU contribution and network centrality per organisation from CORDIS records. Values fill with real data inside your workspace.'}
                   </div>
                 </div>
               </div>
@@ -590,7 +605,7 @@ export default async function HomePage({
                 {
                   title: isTr ? 'AB Proje Danışmanları' : 'EU Grant Consultancies',
                   desc: isTr
-                    ? 'Çoklu müşteri çalışma alanlarını (Multi-tenant) tek panelden yönetin, teklif yazımını 10 kat hızlandırın.'
+                    ? 'Çoklu müşteri çalışma alanlarını (Multi-tenant) tek panelden yönetin, teklif yazımını hızlandırın.'
                     : 'Manage multi-client workspaces with isolated tenants, stage-gates, and fast proposal generation.',
                   icon: '💼',
                 },
