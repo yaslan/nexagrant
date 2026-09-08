@@ -53,6 +53,34 @@ export async function purgeDueUsers(
       // 3. Remove person-level rows that have no FK cascade.
       await prisma.effort.deleteMany({ where: { userId } });
 
+      // 3b. Ten columns in this schema hold a `User.id` without a foreign key,
+      //     so `DELETE FROM "User"` cannot reach any of them and the erased
+      //     person survives in every one the job does not name here.
+      //
+      //     Two of them are the subject's own data and are removed outright.
+      //     `CalendarConnection` matters most: it stores a Google/Outlook
+      //     access and refresh token in clear text, so leaving the row behind
+      //     leaves a working credential for the mailbox of someone the
+      //     platform has just promised to forget.
+      await prisma.calendarConnection.deleteMany({ where: { userId } });
+      await prisma.savedSearch.deleteMany({ where: { userId } });
+
+      //     The rest are the tenant's records, not the subject's. Erasure must
+      //     not delete the tenant's opportunities, bug reports or audit trail,
+      //     so those rows stay and only the link to the person is dropped —
+      //     the same choice already made for `AiUsageLog` above and for the
+      //     hashed subject reference in the erasure audit below.
+      await prisma.auditEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
+      await prisma.opportunity.updateMany({ where: { ownerId: userId }, data: { ownerId: null } });
+      await prisma.feedback.updateMany({ where: { userId }, data: { userId: null } });
+      await prisma.proposalUsage.updateMany({ where: { usedByUserId: userId }, data: { usedByUserId: null } });
+
+      //     Not handled here, and deliberately so: `Relationship.ownerUserId`
+      //     and `DualApprovalStep.actorUserId` are both NOT NULL, so detaching
+      //     them needs a migration, and `DualApprovalStep` is the record of who
+      //     signed off a document — a retention question for legal, not one to
+      //     settle inside a purge job. Both are reported as open.
+
       // 4. Finally the user row; cascades clear accounts, sessions,
       //    memberships and requested approvals, and null out approver/
       //    evaluation references.

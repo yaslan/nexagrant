@@ -153,6 +153,44 @@ async function seed() {
       payload: {}, requesterId: ids.subject, expiresAt: new Date(Date.now() + 86_400_000),
     },
   });
+
+  // Rows that carry the subject's id with NO foreign key to `User`. Nothing in
+  // the database cascades them, so unless the purge names each one explicitly
+  // they outlive the erasure. Each is seeded for the neighbour too, so the
+  // assertions can tell "the purge cleaned it" from "the purge cleaned
+  // everything".
+  await db.calendarConnection.createMany({
+    data: [
+      {
+        tenantId: ids.tenantA, userId: ids.subject, provider: 'google',
+        externalId: `subject-${RUN}@cal.invalid`,
+        accessToken: 'SECRET_CALENDAR_ACCESS_TOKEN',
+        refreshToken: 'SECRET_CALENDAR_REFRESH_TOKEN',
+      },
+      {
+        tenantId: ids.tenantA, userId: ids.neighbour, provider: 'google',
+        externalId: `nb-${RUN}@cal.invalid`, accessToken: 'nb-access', refreshToken: 'nb-refresh',
+      },
+    ],
+  });
+  await db.savedSearch.createMany({
+    data: [
+      { tenantId: ids.tenantA, userId: ids.subject, name: `Subject search ${RUN}`, filters: { q: 'subject-query' } },
+      { tenantId: ids.tenantA, userId: ids.neighbour, name: `Neighbour search ${RUN}`, filters: { q: 'neighbour-query' } },
+    ],
+  });
+  await db.feedback.createMany({
+    data: [
+      { tenantId: ids.tenantA, userId: ids.subject, category: 'BUG', title: `Subject report ${RUN}`, body: 'subject-body' },
+      { tenantId: ids.tenantA, userId: ids.neighbour, category: 'BUG', title: `Neighbour report ${RUN}`, body: 'neighbour-body' },
+    ],
+  });
+  await db.auditEvent.createMany({
+    data: [
+      { tenantId: ids.tenantA, actorId: ids.subject, type: 'module.state.changed', target: `m8-${RUN}` },
+      { tenantId: ids.tenantA, actorId: ids.neighbour, type: 'module.state.changed', target: `m9-${RUN}` },
+    ],
+  });
 }
 
 async function cleanup() {
@@ -161,6 +199,9 @@ async function cleanup() {
   await db.effort.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.aiUsageLog.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.auditEvent.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
+  await db.calendarConnection.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
+  await db.savedSearch.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
+  await db.feedback.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.tenant.deleteMany({ where: { id: { in: [ids.tenantA, ids.tenantB] } } });
   await db.user.deleteMany({ where: { id: { in: [ids.subject, ids.neighbour, ids.outsider] } } });
 }
@@ -392,6 +433,68 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
     expect(await db.effort.count({ where: { userId: ids.neighbour } })).toBe(1);
     expect(await db.opportunity.count({ where: { tenantId: ids.tenantB } })).toBe(1);
     expect(deleteUserFiles).toHaveBeenCalledWith(ids.subject);
+  });
+
+  test('leaves no row still carrying the erased id in a column the database does not cascade', async () => {
+    // Ten columns hold a `User.id` with no foreign key, so `DELETE FROM "User"`
+    // cannot reach any of them. Each one the purge does not name by hand is a
+    // record of an erased person that survives their erasure.
+    const residue = {
+      calendarConnection: await db.calendarConnection.count({ where: { userId: ids.subject } }),
+      savedSearch: await db.savedSearch.count({ where: { userId: ids.subject } }),
+      feedback: await db.feedback.count({ where: { userId: ids.subject } }),
+      auditActor: await db.auditEvent.count({ where: { actorId: ids.subject } }),
+      opportunityOwner: await db.opportunity.count({ where: { ownerId: ids.subject } }),
+    };
+    expect(residue).toEqual({
+      calendarConnection: 0,
+      savedSearch: 0,
+      feedback: 0,
+      auditActor: 0,
+      opportunityOwner: 0,
+    });
+  });
+
+  test('detaches rather than destroys: the tenant keeps the work, minus the person', async () => {
+    // Erasure must not take the tenant's own records with it. The opportunity,
+    // the feedback report and the audit trail stay; only the link to the erased
+    // person is gone.
+    const opp = await db.opportunity.findUnique({ where: { id: ids.oppSubject } });
+    expect(opp).not.toBeNull();
+    expect(opp!.ownerId).toBeNull();
+
+    const feedback = await db.feedback.findFirst({ where: { title: `Subject report ${RUN}` } });
+    expect(feedback).not.toBeNull();
+    expect(feedback!.userId).toBeNull();
+
+    const audit = await db.auditEvent.findFirst({ where: { target: `m8-${RUN}` } });
+    expect(audit).not.toBeNull();
+    expect(audit!.actorId).toBeNull();
+  });
+
+  test('the neighbour keeps every row of the same kind', async () => {
+    // The counterweight to the test above: a purge that simply emptied these
+    // tables would satisfy it. These rows belong to a user who asked for
+    // nothing and must be untouched.
+    expect(await db.calendarConnection.count({ where: { userId: ids.neighbour } })).toBe(1);
+    expect(await db.savedSearch.count({ where: { userId: ids.neighbour } })).toBe(1);
+    expect(await db.feedback.count({ where: { userId: ids.neighbour } })).toBe(1);
+    expect(await db.auditEvent.count({ where: { actorId: ids.neighbour } })).toBe(1);
+    expect(await db.opportunity.count({ where: { ownerId: ids.neighbour } })).toBe(1);
+  });
+
+  test('no OAuth calendar credential of the erased subject survives', async () => {
+    // CalendarConnection stores a Google/Outlook refresh token in clear text
+    // (its own schema comment marks the encryption as still to do). A token
+    // that outlives the account is a live credential for a third-party mailbox
+    // belonging to someone the platform has promised to forget.
+    const rows = await db.calendarConnection.findMany({
+      where: { tenantId: ids.tenantA },
+      select: { userId: true, accessToken: true, refreshToken: true },
+    });
+    const secrets = JSON.stringify(rows);
+    expect(secrets).not.toContain('SECRET_CALENDAR_ACCESS_TOKEN');
+    expect(secrets).not.toContain('SECRET_CALENDAR_REFRESH_TOKEN');
   });
 
   test('writes an audit record that does not re-create the erased identifier', async () => {

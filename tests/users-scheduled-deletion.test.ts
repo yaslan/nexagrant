@@ -15,6 +15,14 @@ const userDelete = vi.fn().mockResolvedValue({});
 const effortDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const aiUsageUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const auditCreate = vi.fn().mockResolvedValue({});
+// Columns that hold a `User.id` with no foreign key: nothing cascades them, so
+// the job has to clear each one by hand and each one needs a mock here.
+const calendarDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const savedSearchDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const auditUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+const opportunityUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+const feedbackUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+const proposalUsageUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 
 vi.mock('../src/lib/db', () => ({
   prisma: {
@@ -24,7 +32,15 @@ vi.mock('../src/lib/db', () => ({
     },
     effort: { deleteMany: (...args: unknown[]) => effortDeleteMany(...args) },
     aiUsageLog: { updateMany: (...args: unknown[]) => aiUsageUpdateMany(...args) },
-    auditEvent: { create: (...args: unknown[]) => auditCreate(...args) },
+    auditEvent: {
+      create: (...args: unknown[]) => auditCreate(...args),
+      updateMany: (...args: unknown[]) => auditUpdateMany(...args),
+    },
+    calendarConnection: { deleteMany: (...args: unknown[]) => calendarDeleteMany(...args) },
+    savedSearch: { deleteMany: (...args: unknown[]) => savedSearchDeleteMany(...args) },
+    opportunity: { updateMany: (...args: unknown[]) => opportunityUpdateMany(...args) },
+    feedback: { updateMany: (...args: unknown[]) => feedbackUpdateMany(...args) },
+    proposalUsage: { updateMany: (...args: unknown[]) => proposalUsageUpdateMany(...args) },
   },
 }));
 
@@ -66,6 +82,28 @@ describe('purgeDueUsers — grace period', () => {
     expect(userDelete).not.toHaveBeenCalled();
     expect(effortDeleteMany).not.toHaveBeenCalled();
     expect(auditCreate).not.toHaveBeenCalled();
+    expect(calendarDeleteMany).not.toHaveBeenCalled();
+    expect(savedSearchDeleteMany).not.toHaveBeenCalled();
+  });
+
+  test('every uncascaded column is cleared, and always scoped to the one subject', async () => {
+    // A `deleteMany` on one of these tables with no `where` would empty it for
+    // the whole platform, so the scope matters as much as the call.
+    findMany.mockResolvedValue([
+      { id: 'due', deletionRequestedAt: daysAgo(40), deletionReason: 'subject_request', memberships: [] },
+    ]);
+
+    await purgeDueUsers(30);
+
+    expect(calendarDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
+    expect(savedSearchDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
+    expect(auditUpdateMany).toHaveBeenCalledWith({ where: { actorId: 'due' }, data: { actorId: null } });
+    expect(opportunityUpdateMany).toHaveBeenCalledWith({ where: { ownerId: 'due' }, data: { ownerId: null } });
+    expect(feedbackUpdateMany).toHaveBeenCalledWith({ where: { userId: 'due' }, data: { userId: null } });
+    expect(proposalUsageUpdateMany).toHaveBeenCalledWith({
+      where: { usedByUserId: 'due' },
+      data: { usedByUserId: null },
+    });
   });
 
   test('honours a custom grace period', async () => {

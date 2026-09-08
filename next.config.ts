@@ -80,7 +80,14 @@ const nextConfig: NextConfig = {
       { source: '/tr/kayit', destination: '/tr/register' },
       { source: '/tr/kullanim-kosullari', destination: '/tr/terms' },
       { source: '/tr/gizlilik-politikasi', destination: '/tr/privacy' },
-      { source: '/tr/veri-isleme-sozlesmesi', destination: '/tr/dpa' },
+      // The published DPA lives at /compliance/dpa, which renders
+      // docs/legal/dpa-{locale}.md. A second, superseded copy used to sit at
+      // /dpa and was what the public footer actually linked to — it named the
+      // processor "FonBridge", a product name this platform no longer carries.
+      // Both old URLs now resolve to the one document that is maintained.
+      { source: '/tr/veri-isleme-sozlesmesi', destination: '/tr/compliance/dpa' },
+      { source: '/tr/dpa', destination: '/tr/compliance/dpa' },
+      { source: '/en/dpa', destination: '/en/compliance/dpa' },
 
       // ─── Workspace App Routes (TR SEO Slugs) ───
       { source: '/tr/:workspace/panel', destination: '/tr/:workspace/dashboard' },
