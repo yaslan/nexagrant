@@ -386,6 +386,18 @@
       "secondary": "Çağrıları Gözat",
       "image_alt": "Platform Pano"
     },
+    "heroMock": {
+      "sampleViewBadge": "Örnek Görünüm",
+      "gateG0": "G0: Triage & Fizibilite",
+      "gateG1": "G1: Konsept Notu",
+      "gateG2": "G2: Konsorsiyum",
+      "gateG3": "G3: Hakem İncelemesi",
+      "roleCoordinator": "👑 Koordinatör",
+      "rolePartner": "🤝 Ortak",
+      "reviewScoreLabel": "Hakem Puanı",
+      "partnersApproved": "7 Ortak • 5 Ülke Onaylı",
+      "partBApproved": "✓ Part B Taslağı Onaylandı"
+    },
     "features": {
       "title": "Güçlü Özellikler",
       "discovery": "Fon Keşfi",
@@ -975,7 +987,22 @@
     "organizationUnassigned": "Kuruluş belirtilmedi",
     "callUnspecified": "Çağrı belirtilmedi",
     "leadAuthorLabel": "Lider Yazar",
-    "leadAuthorUnassigned": "Lider yazar atanmadı"
+    "leadAuthorUnassigned": "Lider yazar atanmadı",
+    "templateBody": "### {kind} RESMÎ BAŞVURU DOKÜMANI\n\nİşbu doküman resmî Ufuk Avrupa (Horizon Europe) ve TÜBİTAK Eşik Üstü Ödül Paketi standartlarına uygun olarak üretilmiştir.\n\n1. Taraflar ve Haklar\n2. Gizlilik ve Fikri Mülkiyet Beyanı\n3. Hüküm ve Yürürlük Tarihi",
+    "printButton": "🖨️ Resmî Yazdır / PDF İndir",
+    "docRefLabel": "Doküman Ref",
+    "versionLabel": "Sürüm",
+    "dateLabel": "Tarih",
+    "callLabel": "Proje / Çağrı Adı",
+    "organizationLabel": "Başvuran Kuruluş",
+    "documentTypeLabel": "Doküman Türü",
+    "signatureStatusLabel": "E-İmza Onay Durumu",
+    "contentPending": "Doküman içeriği hazırlanmaktadır.",
+    "footer": "FonBridge — Ufuk Avrupa & TÜBİTAK doküman üretim motoru | Sayfa 1 / 1",
+    "docxProjectLabel": "Proje Başlığı",
+    "docxOrganizationLabel": "Kuruluş",
+    "docxBodyHeading": "1. DOKÜMAN İÇERİĞİ VE HÜKÜMLER",
+    "docxFallbackBody": "İşbu doküman resmî Ufuk Avrupa standartlarına uygun olarak üretilmiştir."
   },
   "PartBEditor": {
     "noRevisions": "Bu bölüm için henüz kayıtlı bir sürüm yok.",

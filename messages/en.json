@@ -386,6 +386,18 @@
       "secondary": "Browse Calls",
       "image_alt": "Platform Dashboard"
     },
+    "heroMock": {
+      "sampleViewBadge": "Sample View",
+      "gateG0": "G0: Triage & Feasibility",
+      "gateG1": "G1: Concept Note",
+      "gateG2": "G2: Consortium",
+      "gateG3": "G3: Evaluator Review",
+      "roleCoordinator": "👑 Coordinator",
+      "rolePartner": "🤝 Partner",
+      "reviewScoreLabel": "Evaluator Score",
+      "partnersApproved": "7 Partners • 5 Countries Approved",
+      "partBApproved": "✓ Part B Draft Approved"
+    },
     "features": {
       "title": "Powerful Features",
       "discovery": "Fund Discovery",
@@ -975,7 +987,22 @@
     "organizationUnassigned": "Organisation not specified",
     "callUnspecified": "Call not specified",
     "leadAuthorLabel": "Lead author",
-    "leadAuthorUnassigned": "No lead author assigned"
+    "leadAuthorUnassigned": "No lead author assigned",
+    "templateBody": "### {kind} OFFICIAL APPLICATION DOCUMENT\n\nThis document is produced in line with the official Horizon Europe and TÜBİTAK Above-Threshold Award Package standards.\n\n1. Parties and rights\n2. Confidentiality and intellectual property statement\n3. Terms and effective date",
+    "printButton": "🖨️ Official print / download PDF",
+    "docRefLabel": "Document ref",
+    "versionLabel": "Version",
+    "dateLabel": "Date",
+    "callLabel": "Project / call name",
+    "organizationLabel": "Applicant organisation",
+    "documentTypeLabel": "Document type",
+    "signatureStatusLabel": "E-signature status",
+    "contentPending": "Document content is being prepared.",
+    "footer": "FonBridge — Horizon Europe & TÜBİTAK document engine | Page 1 / 1",
+    "docxProjectLabel": "Project title",
+    "docxOrganizationLabel": "Organisation",
+    "docxBodyHeading": "1. DOCUMENT CONTENT AND TERMS",
+    "docxFallbackBody": "This document is produced in line with the official Horizon Europe standards."
   },
   "PartBEditor": {
     "noRevisions": "No saved revision for this section yet.",

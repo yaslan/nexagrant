@@ -7,6 +7,127 @@ import PublicFooter from '@/components/PublicFooter';
 import { getBlogPostBySlug, getBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
 
+/**
+ * Renders `**bold**` spans inside a line of already-escaped React text.
+ * No HTML is produced — only <strong> elements — so admin-authored post
+ * content can never inject markup via this path.
+ */
+function renderInline(text: string): React.ReactNode {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') ? (
+      <strong key={i}>{part.slice(2, -2)}</strong>
+    ) : (
+      part
+    )
+  );
+}
+
+/**
+ * Post content is stored as plain markdown text (src/lib/blog.ts) with no
+ * blank line guaranteed between a heading and the paragraph or list that
+ * follows it, so blocks are built line-by-line rather than by splitting on
+ * '\n\n' — a block split let a `### heading` swallow the rest of its
+ * paragraph, literal `**`/`*` included, into the heading text.
+ */
+function renderBlogContent(content: string): React.ReactNode[] {
+  const blocks: React.ReactNode[] = [];
+  let paragraphLines: string[] = [];
+  let listItems: string[] = [];
+  let listType: 'ul' | 'ol' | null = null;
+
+  const flushParagraph = () => {
+    if (paragraphLines.length === 0) return;
+    blocks.push(
+      <p key={blocks.length} className="text-ink-2">
+        {renderInline(paragraphLines.join(' '))}
+      </p>
+    );
+    paragraphLines = [];
+  };
+
+  const flushList = () => {
+    if (listItems.length === 0 || !listType) return;
+    const items = listItems;
+    blocks.push(
+      listType === 'ul' ? (
+        <ul key={blocks.length} className="list-disc pl-5 space-y-1">
+          {items.map((item, i) => (
+            <li key={i} className="text-ink-2">{renderInline(item)}</li>
+          ))}
+        </ul>
+      ) : (
+        <ol key={blocks.length} className="list-decimal pl-5 space-y-1">
+          {items.map((item, i) => (
+            <li key={i} className="text-ink-2">{renderInline(item)}</li>
+          ))}
+        </ol>
+      )
+    );
+    listItems = [];
+    listType = null;
+  };
+
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+
+    if (line.length === 0) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const h3 = line.match(/^###\s+(.*)$/);
+    const h2 = line.match(/^##\s+(.*)$/);
+    const h1 = line.match(/^#\s+(.*)$/);
+    const ulItem = line.match(/^\*\s+(.*)$/);
+    const olItem = line.match(/^\d+\.\s+(.*)$/);
+
+    if (h3) {
+      flushParagraph();
+      flushList();
+      blocks.push(
+        <h4 key={blocks.length} className="text-lg font-bold text-accent font-heading pt-2">
+          {renderInline(h3[1])}
+        </h4>
+      );
+    } else if (h2) {
+      flushParagraph();
+      flushList();
+      blocks.push(
+        <h3 key={blocks.length} className="text-xl font-bold text-ink font-heading pt-3 pb-1">
+          {renderInline(h2[1])}
+        </h3>
+      );
+    } else if (h1) {
+      flushParagraph();
+      flushList();
+      blocks.push(
+        <h2 key={blocks.length} className="text-2xl font-bold text-ink font-heading pt-4 pb-2 border-b border-border">
+          {renderInline(h1[1])}
+        </h2>
+      );
+    } else if (ulItem) {
+      flushParagraph();
+      if (listType !== 'ul') flushList();
+      listType = 'ul';
+      listItems.push(ulItem[1]);
+    } else if (olItem) {
+      flushParagraph();
+      if (listType !== 'ol') flushList();
+      listType = 'ol';
+      listItems.push(olItem[1]);
+    } else {
+      flushList();
+      paragraphLines.push(line);
+    }
+  }
+
+  flushParagraph();
+  flushList();
+
+  return blocks;
+}
+
 export default async function BlogDetailPage({
   params,
 }: {
@@ -85,34 +206,7 @@ export default async function BlogDetailPage({
 
           {/* Article Content */}
           <div className="prose prose-slate dark:prose-invert max-w-none bg-surface border border-border rounded-2xl p-6 sm:p-10 shadow-xs text-sm sm:text-base leading-relaxed space-y-4">
-            {post.content.split('\n\n').map((paragraph, index) => {
-              if (paragraph.startsWith('# ')) {
-                return (
-                  <h2 key={index} className="text-2xl font-bold text-ink font-heading pt-4 pb-2 border-b border-border">
-                    {paragraph.replace('# ', '')}
-                  </h2>
-                );
-              }
-              if (paragraph.startsWith('## ')) {
-                return (
-                  <h3 key={index} className="text-xl font-bold text-ink font-heading pt-3 pb-1">
-                    {paragraph.replace('## ', '')}
-                  </h3>
-                );
-              }
-              if (paragraph.startsWith('### ')) {
-                return (
-                  <h4 key={index} className="text-lg font-bold text-accent font-heading pt-2">
-                    {paragraph.replace('### ', '')}
-                  </h4>
-                );
-              }
-              return (
-                <p key={index} className="text-ink-2">
-                  {paragraph}
-                </p>
-              );
-            })}
+            {renderBlogContent(post.content)}
           </div>
 
           {/* Related Articles */}

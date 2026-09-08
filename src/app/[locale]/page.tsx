@@ -45,6 +45,7 @@ export default async function HomePage({
 }) {
   const { locale } = await params;
   const isTr = locale === 'tr';
+  const t = await getTranslations({ locale, namespace: 'landing.heroMock' });
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-ink selection:bg-accent selection:text-white">
@@ -150,8 +151,8 @@ export default async function HomePage({
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="bg-ok/15 text-ok border border-ok/20 px-2 py-0.5 rounded font-mono font-bold text-[10px]">
-                      LIVE SYSTEM
+                    <span className="bg-ground text-muted border border-border px-2 py-0.5 rounded font-mono font-bold text-[10px] uppercase tracking-wider">
+                      {t('sampleViewBadge')}
                     </span>
                   </div>
                 </div>
@@ -161,12 +162,12 @@ export default async function HomePage({
                   {/* Column 1 */}
                   <div className="bg-ground/60 rounded-xl p-3 border-t-4 border-t-blue-500 space-y-2.5 border border-border">
                     <div className="flex justify-between items-center text-xs font-bold text-ink">
-                      <span>G0: Triage & Fizibilite</span>
+                      <span>{t('gateG0')}</span>
                       <span className="bg-ground border border-border px-1.5 py-0.5 rounded-full text-[10px] text-muted">2</span>
                     </div>
                     <div className="bg-surface p-3 rounded-lg border border-border shadow-2xs space-y-2">
                       <div className="flex justify-between items-center text-[10px]">
-                        <span className="bg-purple-500/15 text-purple-400 border border-purple-500/20 font-bold px-1.5 py-0.5 rounded">👑 Koordinatör</span>
+                        <span className="bg-purple-500/15 text-purple-400 border border-purple-500/20 font-bold px-1.5 py-0.5 rounded">{t('roleCoordinator')}</span>
                         <span className="text-ok font-bold font-mono">⭐ 94/100</span>
                       </div>
                       <div className="font-bold text-xs text-ink leading-tight">
@@ -181,12 +182,12 @@ export default async function HomePage({
                   {/* Column 2 */}
                   <div className="bg-ground/60 rounded-xl p-3 border-t-4 border-t-teal-500 space-y-2.5 border border-border">
                     <div className="flex justify-between items-center text-xs font-bold text-ink">
-                      <span>G1: Konsept Notu</span>
+                      <span>{t('gateG1')}</span>
                       <span className="bg-ground border border-border px-1.5 py-0.5 rounded-full text-[10px] text-muted">1</span>
                     </div>
                     <div className="bg-surface p-3 rounded-lg border border-border shadow-2xs space-y-2">
                       <div className="flex justify-between items-center text-[10px]">
-                        <span className="bg-accent/15 text-accent-ink border border-accent/20 font-bold px-1.5 py-0.5 rounded">🤝 Ortak</span>
+                        <span className="bg-accent/15 text-accent-ink border border-accent/20 font-bold px-1.5 py-0.5 rounded">{t('rolePartner')}</span>
                         <span className="text-ok font-bold font-mono">⭐ 88/100</span>
                       </div>
                       <div className="font-bold text-xs text-ink leading-tight">
@@ -201,19 +202,19 @@ export default async function HomePage({
                   {/* Column 3 */}
                   <div className="bg-ground/60 rounded-xl p-3 border-t-4 border-t-purple-500 space-y-2.5 border border-border">
                     <div className="flex justify-between items-center text-xs font-bold text-ink">
-                      <span>G2: Konsorsiyum</span>
+                      <span>{t('gateG2')}</span>
                       <span className="bg-ground border border-border px-1.5 py-0.5 rounded-full text-[10px] text-muted">1</span>
                     </div>
                     <div className="bg-surface p-3 rounded-lg border border-border shadow-2xs space-y-2">
                       <div className="flex justify-between items-center text-[10px]">
-                        <span className="bg-purple-500/15 text-purple-400 border border-purple-500/20 font-bold px-1.5 py-0.5 rounded">👑 Koordinatör</span>
+                        <span className="bg-purple-500/15 text-purple-400 border border-purple-500/20 font-bold px-1.5 py-0.5 rounded">{t('roleCoordinator')}</span>
                         <span className="text-ok font-bold font-mono">⭐ 91/100</span>
                       </div>
                       <div className="font-bold text-xs text-ink leading-tight">
                         CIRC-PACK: Circular Bio Polymers for Packaging
                       </div>
                       <div className="text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded font-semibold">
-                        7 Ortak • 5 Ülke Onaylı
+                        {t('partnersApproved')}
                       </div>
                     </div>
                   </div>
@@ -221,19 +222,19 @@ export default async function HomePage({
                   {/* Column 4 */}
                   <div className="bg-ground/60 rounded-xl p-3 border-t-4 border-t-emerald-500 space-y-2.5 border border-border">
                     <div className="flex justify-between items-center text-xs font-bold text-ink">
-                      <span>G3: Hakem İncelemesi</span>
+                      <span>{t('gateG3')}</span>
                       <span className="bg-ground border border-border px-1.5 py-0.5 rounded-full text-[10px] text-muted">1</span>
                     </div>
                     <div className="bg-surface p-3 rounded-lg border border-border shadow-2xs space-y-2 ring-1 ring-ok/20">
                       <div className="flex justify-between items-center text-[10px]">
-                        <span className="bg-ok/15 text-ok border border-ok/20 font-bold px-1.5 py-0.5 rounded">Hakem Puanı</span>
+                        <span className="bg-ok/15 text-ok border border-ok/20 font-bold px-1.5 py-0.5 rounded">{t('reviewScoreLabel')}</span>
                         <span className="text-ok font-bold font-mono">14.5 / 15.0</span>
                       </div>
                       <div className="font-bold text-xs text-ink leading-tight">
                         CLEAN-PORT: Zero-Emission Coastal Freight
                       </div>
                       <div className="text-[10px] text-ok bg-ok/10 border border-ok/20 px-1.5 py-0.5 rounded font-semibold">
-                        ✓ Part B Taslağı Onaylandı
+                        {t('partBApproved')}
                       </div>
                     </div>
                   </div>
