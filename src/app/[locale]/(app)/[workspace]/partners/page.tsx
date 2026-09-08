@@ -191,8 +191,8 @@ export default async function PartnersPage({
           </h1>
           <p className="text-xs text-muted mt-1 max-w-3xl">
             {isTr
-              ? 'Avrupa Komisyonu CORDIS (Horizon Europe & H2020) fonlanmış verilerinden türetilen 150.000+ Avrupalı ve Türk kurumun geçmiş proje deneyimleri, koordinatörlük başarıları, AB katkıları ve ortaklık ağı.'
-              : 'Past EU project participations, coordinator achievements, EC funding, and partnership networks of 150k+ organizations derived from official CORDIS data.'}
+              ? 'Avrupa Komisyonu CORDIS (Horizon Europe & H2020) fonlanmış verilerinden türetilen Avrupalı ve Türk kurumların geçmiş proje deneyimleri, koordinatörlük başarıları, AB katkıları ve ortaklık ağı.'
+              : 'Past EU project participations, coordinator achievements, EC funding, and partnership networks of European and Turkish organizations derived from official CORDIS data.'}
           </p>
         </div>
 

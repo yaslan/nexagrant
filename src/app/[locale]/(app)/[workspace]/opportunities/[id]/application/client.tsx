@@ -1,20 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  FileCheck, 
-  Euro, 
-  Calendar, 
-  Layers, 
-  ExternalLink, 
-  Plus, 
-  Copy, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
-  Users, 
-  BarChart3, 
-  FileText, 
+import {
+  FileCheck,
+  Euro,
+  Plus,
+  Copy,
+  CheckCircle2,
+  BarChart3,
+  FileText,
   Sparkles,
   Check,
   Link as LinkIcon
@@ -39,7 +33,6 @@ interface ApplicationClientProps {
 }
 
 export function ApplicationClient({
-  opportunityId,
   tenantId,
   opportunityTitle,
   partA,
@@ -66,7 +59,7 @@ export function ApplicationClient({
   const [wpLead, setWpLead] = useState('');
   const [wpStart, setWpStart] = useState(1);
   const [wpEnd, setWpEnd] = useState(12);
-  const [wpDeliverable, setWpDeliverable] = useState('');
+  const [wpDeliverable] = useState('');
   const [isAddingWp, setIsAddingWp] = useState(false);
 
   // Dynamic budget lines state.
