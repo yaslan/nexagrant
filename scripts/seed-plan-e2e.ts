@@ -121,13 +121,30 @@ async function seatFixture(f: PlanFixture) {
     },
   });
 
+  const publishedVersion = await prisma.planVersion
+    .findFirst({
+      where: { planId: f.planId, status: 'published' },
+      orderBy: { version: 'desc' },
+      select: { id: true },
+    })
+    .catch(() => null);
+
   await prisma.subscription.upsert({
     where: { tenantId: f.tenantId },
     // `update` is written out, not left empty: `module-plan-gate` leaves its tenant on
     // whatever plan its last test set, and a re-run must start from the seeded plan
     // rather than inherit that.
-    update: { planId: f.planId, status: 'ACTIVE' },
-    create: { tenantId: f.tenantId, planId: f.planId, status: 'ACTIVE' },
+    update: {
+      planId: f.planId,
+      status: 'ACTIVE',
+      ...(publishedVersion ? { planVersionId: publishedVersion.id } : {}),
+    },
+    create: {
+      tenantId: f.tenantId,
+      planId: f.planId,
+      status: 'ACTIVE',
+      ...(publishedVersion ? { planVersionId: publishedVersion.id } : {}),
+    },
   });
 
   for (const moduleId of MODULES) {

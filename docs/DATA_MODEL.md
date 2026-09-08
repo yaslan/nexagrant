@@ -426,6 +426,18 @@ kredi / modül) tarafı. Bu bölüm o boşluğu kapatan üç tabloyu tarif eder.
 - **Neden okunur kalır:** `Subscription.planVersionId` (nullable, `ON DELETE SET
   NULL`) satılan sürüme çivilenir. Sürüm arşivlense de abonelik satın alındığı
   şartları okumaya devam eder — §5.1'deki `locked*` ile aynı ilke, farklı eksen.
+- **Hak-ediş bu sütundan okunur (TASK-MTSJH8NMAXPRM).** `getEntitlements`
+  aboneliğin işaret ettiği `PlanVersion`'ı okur; sütun `NULL` ise derlenmiş
+  `PLAN_GRANTS` kataloğu cevaplar — sürüm yazılmadan önce satılmış bir satır
+  sessizce yeniden hak-edişlenmez. Kural ve reddedilen iki işaretçi (başka
+  paketin sürümü, `draft`) `src/lib/billing/entitlement-source.ts`'te.
+  Sütunu **kim yazar:** ilk satış ve paket değişiminde abonelik yazıcıları
+  (`subscription-sync.ts`, `iyzico.ts`), yayında `publishVersion` (o paketteki
+  **canlı** abonelikleri yeni sürüme taşır; `CANCELED` satır bittiği sürümde
+  kalır), ve bir kereye mahsus `pnpm db:backfill-plan-version`.
+- **Yayın canlı kiracıya ULAŞIR.** `computePublishImpact`'in "bu değişiklik N
+  canlı kiracının limitini düşürüyor" uyarısı ve onu geri yazma zorunluluğu
+  ancak bu yüzden anlamlı; öncesinde yayın hiçbir kiracıya ulaşmıyordu.
 - `Plan` satırı yayında **izdüşüm olarak** güncellenir (mevcut `Plan`
   okuyucuları bozulmasın diye bilinçli çift-yazım). Üç müşteri yüzeyi
   `PlanVersion`'dan render edildiğinde bu çift-yazım kaldırılmalıdır.

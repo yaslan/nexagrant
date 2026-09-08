@@ -63,9 +63,10 @@ entitlements(tenant) = PLAN_GRANTS[plan]
 allowedModules = plan.moduleIds ∪ addOns.grantsModule
 ```
 
-- Plan tarafı **katalogdan** okunur, `Plan` satırından değil: satır katalogdan
-  yazılan bir izdüşümdür ve elle düzenlenmiş/bayat bir satır sessizce modül
-  dağıtamamalıdır (`src/lib/billing.ts`).
+- Plan tarafı aboneliğin işaret ettiği `Subscription.planVersionId`'den (yayınlanmış
+  `PlanVersion`) okunur (`src/lib/billing/entitlement-source.ts`). Sütun `NULL` ise
+  (eski satırlar) veya geçersiz bir işaretçiyse derlenmiş `PLAN_GRANTS` kataloğu
+  cevaplar — geriye dönük kırılma olmaz (`src/lib/billing.ts`).
 - Emekliye ayrılmış bir plan id'si (`team`, `business`…) hâlâ bir abonelikte
   duruyorsa `resolvePlanId()` onu karşılığına çevirir; kiracı kilitlenmez.
 - `canEnable(module)`: `module ∈ manifest.planTiers` **ve** bağımlılıklar

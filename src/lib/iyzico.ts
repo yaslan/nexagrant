@@ -4,6 +4,7 @@ import { env } from './env';
 import { toDecimalString, toMinorUnits } from './money';
 import { resolvePlanId } from './billing/catalog';
 import { IYZICO_SOLD_TIER, priceLockOnActivation } from './billing/price-lock';
+import { publishedVersionIdFor } from './billing/plan-repository';
 
 /**
  * iyzico billing (BILLING.md §4 — phase 2, TRY).
@@ -622,6 +623,14 @@ export async function handleIyzicoWebhook(
     });
     const lockColumns = lockDecision.action === 'write' ? lockDecision.columns : null;
 
+    // The version this sale is entitled from, on the same rule as the Stripe
+    // path (src/lib/billing/subscription-sync.ts): written on a first sale and
+    // on a plan change, left alone on a renewal, and skipped when the plan has
+    // no published version so a purchase is never lost to one.
+    const planChanged = !existing || existing.planId !== planId;
+    const versionId = planChanged ? await publishedVersionIdFor(planId) : null;
+    const versionColumn = versionId ? { planVersionId: versionId } : {};
+
     await tx.subscription.upsert({
       where: { tenantId },
       create: {
@@ -633,6 +642,7 @@ export async function handleIyzicoWebhook(
         providerCustomerId: notification.merchantId != null ? String(notification.merchantId) : null,
         providerSubId: paymentId,
         currentPeriodEnd,
+        ...versionColumn,
         ...(lockColumns ?? {}),
       },
       update: {
@@ -642,6 +652,7 @@ export async function handleIyzicoWebhook(
         provider: 'iyzico',
         providerSubId: paymentId,
         currentPeriodEnd,
+        ...versionColumn,
         ...(lockColumns ?? {}),
       },
     });

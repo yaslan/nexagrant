@@ -131,10 +131,28 @@ export default async function seedTenantWorkspace() {
   // The plan id is taken from the billing catalogue, not typed: this used to
   // say 'team', and when the EUR ladder was retired (TASK-MTR6QIE05ZKNH) a
   // re-seed put the demo tenant back on a plan that no longer has a row.
+  const demoPublishedVersion = await prisma.planVersion
+    .findFirst({
+      where: { planId: DEMO_PLAN_ID, status: 'published' },
+      orderBy: { version: 'desc' },
+      select: { id: true },
+    })
+    .catch(() => null);
+
   await prisma.subscription.upsert({
     where: { tenantId: TENANT_ID },
-    update: { planId: DEMO_PLAN_ID, status: 'ACTIVE' },
-    create: { tenantId: TENANT_ID, planId: DEMO_PLAN_ID, status: 'ACTIVE', billingInterval: 'month' },
+    update: {
+      planId: DEMO_PLAN_ID,
+      status: 'ACTIVE',
+      ...(demoPublishedVersion ? { planVersionId: demoPublishedVersion.id } : {}),
+    },
+    create: {
+      tenantId: TENANT_ID,
+      planId: DEMO_PLAN_ID,
+      status: 'ACTIVE',
+      billingInterval: 'month',
+      ...(demoPublishedVersion ? { planVersionId: demoPublishedVersion.id } : {}),
+    },
   });
 
   console.log(
