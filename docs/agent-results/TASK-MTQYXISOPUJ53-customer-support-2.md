@@ -219,6 +219,14 @@ Benim dokunduğum iki dosyada 0 hata.
 
 **Temizlik**: `scripts/_tmp-cs/` ağaçtan kaldırıldı (§4).
 
+**Commit'ler** — bu koşumun işi iki commit'e dağıldı, sebebi paylaşılan ağaçtaki bir yarış:
+- `73b24e6` — dosyalarım staged beklerken **başka bir ajanın commit'i tüm stage'i yuttu**
+  (kod, testler, rapor ve 44 kanıt dosyası o commit'in içinde, ama mesajı başka bir işi
+  anlatıyor: "docs(memory): a local superuser hides a missing withTenant…"). İçerik güvende,
+  yalnız mesaj yanıltıcı. Bilinen tuzak: `fabrika-concurrent-commit-steals-your-stage`.
+- `56b5541` — `fix(m8): count the removed demo opportunities correctly (four, not five)`;
+  ayrık bir index ile commit edildi, pre-commit kapısı temiz.
+
 ---
 
 ## 4. Bıraktığım hiçbir iz yok — geri alma listesi
