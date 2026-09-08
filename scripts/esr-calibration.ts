@@ -14,6 +14,9 @@
  *   • Everything lands in its own tenant (`esr-calibration`), so calibration rows can never show up
  *     in a design partner's pipeline or KPI dashboard.
  *   • `--send` refuses while any roster address sits on a reserved, undeliverable domain.
+ *   • `--send` resumes rather than repeats: partners already in the send receipt are skipped, and a
+ *     run with nothing left to deliver refuses instead of mailing everyone twice (`--resend` to
+ *     override on purpose). The receipt is machine-local, so it can only speak for this machine.
  *
  * ROLLBACK
  *   pnpm tsx scripts/esr-calibration.ts --rollback --apply
@@ -43,6 +46,9 @@
  *   --per-partner=<n>   survey items per partner, default 4 (20 samples × 10 partners = 2 each)
  *   --deadline=<date>   survey deadline, YYYY-MM-DD; default ESR_SURVEY_DEADLINE (pinned, so a
  *                       re-run never moves a date the partners were already given)
+ *   --resend            deliver a SECOND copy to partners already recorded in the send receipt.
+ *                       Without it a re-run resumes: it mails only the partners the receipt does not
+ *                       list, and refuses outright when there is nobody left to deliver to.
  */
 
 import fs from 'fs';
@@ -75,7 +81,9 @@ import { isFixtureSampleSet, parseEsrSamples, type EsrSample } from '../src/lib/
 import { parseBetaRoster, isPlaceholderEmail, type BetaPartner } from '../src/lib/beta/roster';
 import {
   maskEmail,
+  mergeRecipients,
   parseSendReceipt,
+  partitionBySent,
   type SurveySendReceipt,
   type SurveySendRecipient,
 } from '../src/lib/beta/esr-send-receipt';
@@ -90,7 +98,7 @@ import {
   surveyUrlFor,
   type SurveyResponse,
 } from '../src/lib/beta/esr-survey';
-import { BETA_SUPPORT_EMAIL, ESR_SURVEY_DEADLINE } from '../src/lib/beta/constants';
+import { BETA_SUPPORT_EMAIL, ESR_SURVEY_DEADLINE, ESR_SURVEY_WINDOW_DAYS } from '../src/lib/beta/constants';
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const TENANT_ID = 'esr-calibration';
@@ -110,6 +118,7 @@ interface Options {
   apply: boolean;
   survey: boolean;
   send: boolean;
+  resend: boolean;
   rollback: boolean;
   preflight: boolean;
 }
@@ -126,6 +135,7 @@ function parseArgs(argv: string[]): Options {
     apply: false,
     survey: false,
     send: false,
+    resend: false,
     rollback: false,
     preflight: false,
   };
@@ -136,6 +146,7 @@ function parseArgs(argv: string[]): Options {
     else if (arg === '--dry-run') opts.apply = false;
     else if (arg === '--survey') opts.survey = true;
     else if (arg === '--send') opts.send = true;
+    else if (arg === '--resend') opts.resend = true;
     else if (arg === '--rollback') opts.rollback = true;
     else if (arg.startsWith('--samples=')) opts.samples = path.resolve(arg.slice('--samples='.length));
     else if (arg.startsWith('--roster=')) opts.roster = path.resolve(arg.slice('--roster='.length));
@@ -155,6 +166,7 @@ function parseArgs(argv: string[]): Options {
     }
   }
   if (opts.send && !opts.survey) throw new Error('--send requires --survey');
+  if (opts.resend && !opts.send) throw new Error('--resend only means anything with --send');
   // The preflight is a read-only gate. Letting it combine with a mode that writes would make its
   // one guarantee — "running this changes nothing" — untrue, so the combination is refused rather
   // than silently ignored.
@@ -739,6 +751,7 @@ async function runPreflight(opts: Options): Promise<boolean> {
     rosterSize: partners.length,
     undeliverable: partners.filter((p) => isPlaceholderEmail(p.contactEmail)).length,
     sendReceipt: readSendReceipt(opts),
+    windowDays: ESR_SURVEY_WINDOW_DAYS,
     responseCount: responses.length,
     responsesAreSelfTest: isSelfTest,
     accuracy: accuracy ?? null,
@@ -824,6 +837,18 @@ async function main(): Promise<number> {
   const coverage = coveragePerSample(assignments);
 
   if (opts.survey) {
+    // Who has already had this mail. `--send` is the only irreversible step here, and it was the
+    // only one that repeated itself on a re-run: the header's "running twice is safe" covered the
+    // database upserts, not the mailbox. A resumed run now skips the partners the receipt already
+    // records, so the natural recovery from a provider rejection half way down the roster does not
+    // put a second copy of the survey in front of everyone who already answered.
+    const priorReceipt = opts.send ? readSendReceipt(opts) : null;
+    const { alreadySent } = partitionBySent(
+      assignments.map((a) => a.partner.slug),
+      priorReceipt,
+    );
+    const skip = new Set(opts.resend ? [] : alreadySent);
+
     if (opts.send) {
       const placeholders = partners.filter((p) => isPlaceholderEmail(p.contactEmail));
       if (placeholders.length > 0) {
@@ -832,11 +857,32 @@ async function main(): Promise<number> {
             `(${placeholders.map((p) => p.contactEmail).join(', ')}). Replace the roster with real partners first.`,
         );
       }
+      if (alreadySent.length > 0 && skip.size >= assignments.length) {
+        throw new Error(
+          `--send refused: every partner on this roster (${alreadySent.length}) is already in the send receipt ` +
+            `(last accepted ${priorReceipt?.sentAt}). There is nothing left to deliver, and re-sending would mail ` +
+            `partners who have already answered. Pass --resend to deliver a second copy on purpose.`,
+        );
+      }
+      if (skip.size > 0) {
+        log('survey', `resuming: ${skip.size} partner(s) already in the receipt will be skipped — ${[...skip].join(', ')}`);
+      }
+      if (opts.resend && alreadySent.length > 0) {
+        log('survey', `--resend: mailing ${alreadySent.length} partner(s) a SECOND copy on purpose — this cannot be undone`);
+      }
+      if (!priorReceipt) {
+        log(
+          'survey',
+          'no local receipt — note this only proves THIS machine has no record; the receipt dir is gitignored, ' +
+            'so a send from another machine is invisible here. Confirm before delivering.',
+        );
+      }
     }
+
     fs.mkdirSync(path.join(opts.out, 'survey'), { recursive: true });
     // Written after every accepted send, not once at the end: a provider rejection half way through
     // still leaves a record of who already received mail that cannot be recalled.
-    const sentRecipients: SurveySendRecipient[] = [];
+    const sentRecipients: SurveySendRecipient[] = [...(priorReceipt?.recipients ?? [])];
     for (const assignment of assignments) {
       const email = renderEsrSurveyEmail({
         locale: assignment.partner.locale,
@@ -854,7 +900,9 @@ async function main(): Promise<number> {
       );
       fs.writeFileSync(`${base}.responses.csv`, buildResponseTemplateCsv(assignment), 'utf8');
 
-      if (opts.send) {
+      if (opts.send && skip.has(assignment.partner.slug)) {
+        log('survey', `${assignment.partner.slug}: already sent ${priorReceipt?.recipients.find((r) => r.slug === assignment.partner.slug)?.sentAt} — skipped`);
+      } else if (opts.send) {
         const apiKey = process.env.RESEND_API_KEY;
         if (!apiKey) throw new Error('--send requires RESEND_API_KEY in the environment');
         const { Resend } = await import('resend');
@@ -867,13 +915,14 @@ async function main(): Promise<number> {
           text: email.text,
         });
         if (error) throw new Error(`Resend rejected ${maskEmail(assignment.partner.contactEmail)}: ${error.message}`);
-        sentRecipients.push({
+        const fresh: SurveySendRecipient = {
           slug: assignment.partner.slug,
           emailMasked: maskEmail(assignment.partner.contactEmail),
           messageId: data?.id ?? null,
           items: assignment.items.length,
           sentAt: new Date().toISOString(),
-        });
+        };
+        sentRecipients.splice(0, sentRecipients.length, ...mergeRecipients(sentRecipients, [fresh]));
         writeSendReceipt(opts, sentRecipients);
         log('survey', `${assignment.partner.slug} (${maskEmail(assignment.partner.contactEmail)}): sent (${assignment.items.length} items)`);
       } else {

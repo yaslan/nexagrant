@@ -63,3 +63,12 @@ export const BETA_MEETING_URL = process.env.BETA_MEETING_URL ?? 'https://meet.go
  * a one-off run with `--deadline=YYYY-MM-DD`.
  */
 export const ESR_SURVEY_DEADLINE = '2026-09-21';
+
+/**
+ * Days a design partner gets to answer the ESR calibration survey, counted from the day it is
+ * actually sent. The number lived only inside a preflight hint ("re-pin to send-day + 14"), which
+ * meant nothing could check it: on 2026-09-08 the pinned deadline above is 13 days out, so it can
+ * no longer give anyone the full window even if the survey went out the same hour. The readiness
+ * gate now does that arithmetic instead of printing a reassuring "13 day(s) away".
+ */
+export const ESR_SURVEY_WINDOW_DAYS = 14;

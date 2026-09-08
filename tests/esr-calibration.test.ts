@@ -43,7 +43,13 @@ import {
   evaluateEsrReadiness,
   type EsrReadinessInput,
 } from '../src/lib/beta/esr-readiness';
-import { maskEmail, parseSendReceipt } from '../src/lib/beta/esr-send-receipt';
+import {
+  maskEmail,
+  mergeRecipients,
+  parseSendReceipt,
+  partitionBySent,
+  type SurveySendRecipient,
+} from '../src/lib/beta/esr-send-receipt';
 
 const SAMPLES_CSV = path.join(__dirname, '../docs/BETA_DATA/esr-calibration-samples.csv');
 const ROSTER_CSV = path.join(__dirname, '../docs/BETA_DATA/beta-partners.csv');
@@ -341,6 +347,7 @@ describe('E11.3 readiness gate', () => {
     responsesAreSelfTest: false,
     accuracy: 0.9,
     deadline: '2026-09-24',
+    windowDays: 14,
     today: '2026-09-20',
   };
 
@@ -464,5 +471,101 @@ describe('E11.3 survey send receipt', () => {
     expect(parseSendReceipt('null')).toBeNull();
     expect(parseSendReceipt('{"sentAt":"2026-09-10T09:00:00.000Z"}')).toBeNull();
     expect(parseSendReceipt('{"sentAt":"2026-09-10T09:00:00.000Z","recipients":[]}')).toBeNull();
+  });
+});
+
+describe('E11.3 survey send is resumable, not repeatable', () => {
+  const receiptFor = (slugs: string[]) => ({
+    sentAt: '2026-09-10T09:00:00.000Z',
+    deadline: '2026-09-24',
+    ruleVersion: 'g0-canonical-1.0',
+    rosterPath: '(external)',
+    recipients: slugs.map((slug) => ({
+      slug,
+      emailMasked: 'p*@partner.example',
+      messageId: 'abc',
+      items: 4,
+      sentAt: '2026-09-10T09:00:00.000Z',
+    })),
+  });
+
+  test('a run with no receipt has to mail everyone', () => {
+    const { pending, alreadySent } = partitionBySent(['a', 'b', 'c'], null);
+    expect(pending).toEqual(['a', 'b', 'c']);
+    expect(alreadySent).toEqual([]);
+  });
+
+  // The recovery case that made this necessary: the provider rejected partner `c`, so the operator
+  // re-runs. Without the split, `a` and `b` get the survey a second time.
+  test('a resumed run mails only the partners the receipt does not list', () => {
+    const { pending, alreadySent } = partitionBySent(['a', 'b', 'c'], receiptFor(['a', 'b']));
+    expect(pending).toEqual(['c']);
+    expect(alreadySent).toEqual(['a', 'b']);
+  });
+
+  test('a fully delivered roster leaves nothing pending — the caller must refuse, not re-mail', () => {
+    const { pending, alreadySent } = partitionBySent(['a', 'b'], receiptFor(['a', 'b']));
+    expect(pending).toEqual([]);
+    expect(alreadySent).toEqual(['a', 'b']);
+  });
+
+  test('a resumed run keeps the proof that the earlier partners were mailed', () => {
+    const previous = receiptFor(['a', 'b']).recipients;
+    const fresh: SurveySendRecipient[] = [
+      { slug: 'c', emailMasked: 'c*@partner.example', messageId: 'zzz', items: 4, sentAt: '2026-09-11T09:00:00.000Z' },
+    ];
+    const merged = mergeRecipients(previous, fresh);
+    expect(merged.map((r) => r.slug)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('a deliberate re-send replaces that partner entry rather than duplicating it', () => {
+    const previous = receiptFor(['a']).recipients;
+    const fresh: SurveySendRecipient[] = [
+      { slug: 'a', emailMasked: 'a*@partner.example', messageId: 'new', items: 4, sentAt: '2026-09-12T09:00:00.000Z' },
+    ];
+    const merged = mergeRecipients(previous, fresh);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.messageId).toBe('new');
+    expect(merged[0]!.sentAt).toBe('2026-09-12T09:00:00.000Z');
+  });
+});
+
+describe('E11.3 gate does not overclaim what it can see', () => {
+  const BLOCKED_TODAY: EsrReadinessInput = {
+    sampleCount: 20,
+    isFixture: true,
+    dbRows: { opportunities: 20, proposals: 20, gateDecisions: 20, cordisProjects: 20 },
+    rosterSize: 10,
+    undeliverable: 10,
+    sendReceipt: null,
+    responseCount: 0,
+    responsesAreSelfTest: false,
+    accuracy: 0.8,
+    deadline: '2026-09-21',
+    windowDays: 14,
+    today: '2026-09-08',
+  };
+
+  // The receipt lives in a gitignored directory, so "no receipt" is a statement about this machine
+  // and nothing more. Claiming it was "never delivered to anyone" invites a second real send.
+  test('a missing receipt is reported as no local proof, not as proof of no send', () => {
+    const check = evaluateEsrReadiness(BLOCKED_TODAY).checks.find((c) => c.id === 'survey-sent')!;
+    expect(check.detail).not.toMatch(/never been delivered to anyone/);
+    expect(check.detail).toMatch(/on this machine/);
+    expect(check.detail).toMatch(/gitignored/);
+  });
+
+  // 2026-09-21 is 13 days out while partners are owed 14: sending today already breaks it.
+  test('a pinned deadline closer than the answering window is reported as unreachable', () => {
+    const check = evaluateEsrReadiness(BLOCKED_TODAY).checks.find((c) => c.id === 'deadline')!;
+    expect(check.detail).toMatch(/can no longer give partners the 14-day window/);
+    expect(check.detail).not.toMatch(/^2026-09-21 is 13 day\(s\) away/);
+  });
+
+  test('a deadline that still fits the window is not called unreachable', () => {
+    const check = evaluateEsrReadiness({ ...BLOCKED_TODAY, deadline: '2026-09-30' })
+      .checks.find((c) => c.id === 'deadline')!;
+    expect(check.detail).toMatch(/22 day\(s\) away/);
+    expect(check.detail).not.toMatch(/can no longer give/);
   });
 });

@@ -62,6 +62,8 @@ export interface EsrReadinessInput {
   accuracy: number | null;
   /** Survey deadline the partners are (or would be) given, YYYY-MM-DD. */
   deadline: string;
+  /** Days partners get to answer, counted from the send day (ESR_SURVEY_WINDOW_DAYS). */
+  windowDays: number;
   /** Today, YYYY-MM-DD — passed in so the gate is testable on any date. */
   today: string;
 }
@@ -163,8 +165,9 @@ export function evaluateEsrReadiness(input: EsrReadinessInput): EsrReadinessRepo
           id: 'survey-sent',
           label: 'Survey actually sent',
           severity: 'blocked',
-          detail: 'no send receipt — the survey has never been delivered to anyone',
-          fix: 'After the roster is real, with explicit approval: pnpm beta:esr-calibration --roster=<real> --survey --send (this sends real mail and cannot be undone).',
+          detail:
+            'no send receipt on this machine — no proof the survey was ever delivered (the receipt lives under docs/BETA_DATA/generated/, which is gitignored, so a send from another machine leaves no trace here)',
+          fix: 'After the roster is real, with explicit approval: pnpm beta:esr-calibration --roster=<real> --survey --send (real mail, cannot be undone). Confirm with whoever else operates this script first — this check cannot see their receipt, and --send only skips partners recorded in the LOCAL one.',
         },
   );
 
@@ -226,12 +229,18 @@ export function evaluateEsrReadiness(input: EsrReadinessInput): EsrReadinessRepo
   // 8 — the deadline. A date nobody was given is not a deadline.
   const daysLeft = daysBetween(input.today, input.deadline);
   if (!input.sendReceipt) {
+    // The pinned date is unreachable once it is closer than the answering window: sending today
+    // would already owe the partners a later date. Saying "13 day(s) away" reads like runway that
+    // does not exist, so the gate does the subtraction it was only ever hinting at.
+    const unreachable = daysLeft < input.windowDays;
     checks.push({
       id: 'deadline',
       label: 'Deadline is a real commitment',
       severity: 'warn',
-      detail: `${input.deadline} is ${daysLeft >= 0 ? `${daysLeft} day(s) away` : `${-daysLeft} day(s) past`}, but nothing has been sent — no partner has ever seen this date`,
-      fix: 'Re-pin ESR_SURVEY_DEADLINE (src/lib/beta/constants.ts) to send-day + 14 when the survey actually goes out.',
+      detail: unreachable
+        ? `${input.deadline} is ${daysLeft >= 0 ? `only ${daysLeft} day(s) away` : `${-daysLeft} day(s) past`} and nothing has been sent — it can no longer give partners the ${input.windowDays}-day window, so it is already a date that must be re-pinned, not met`
+        : `${input.deadline} is ${daysLeft} day(s) away, but nothing has been sent — no partner has ever seen this date`,
+      fix: `Re-pin ESR_SURVEY_DEADLINE (src/lib/beta/constants.ts) to send-day + ${input.windowDays} when the survey actually goes out.`,
     });
   } else if (daysLeft < 0) {
     checks.push({

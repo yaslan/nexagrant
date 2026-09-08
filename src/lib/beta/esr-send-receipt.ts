@@ -74,3 +74,40 @@ export function parseSendReceipt(json: string): SurveySendReceipt | null {
     recipients: candidate.recipients as SurveySendRecipient[],
   };
 }
+
+/**
+ * Split a roster into "already has this survey" and "still needs it", by slug.
+ *
+ * `--send` is the one step in this script that cannot be undone, and it was the one step that was
+ * not idempotent: the script header promises "running twice is safe", but that promise only ever
+ * covered the database upserts. A second `--survey --send` — the obvious move after a provider
+ * rejection half way through the roster — put a second copy of the survey in front of every partner
+ * who had already answered. Re-runs now resume instead of repeating.
+ */
+export function partitionBySent(
+  slugs: readonly string[],
+  receipt: SurveySendReceipt | null,
+): { pending: string[]; alreadySent: string[] } {
+  const sent = new Set((receipt?.recipients ?? []).map((r) => r.slug));
+  return {
+    pending: slugs.filter((s) => !sent.has(s)),
+    alreadySent: slugs.filter((s) => sent.has(s)),
+  };
+}
+
+/**
+ * Merge freshly accepted sends into the existing receipt, newest entry per slug winning.
+ *
+ * The prior recipients are carried over rather than replaced: the receipt is the only record that
+ * a partner was mailed, and a resumed run that rewrote the file from just its own sends would erase
+ * the proof for everyone the earlier run reached.
+ */
+export function mergeRecipients(
+  previous: readonly SurveySendRecipient[],
+  fresh: readonly SurveySendRecipient[],
+): SurveySendRecipient[] {
+  const bySlug = new Map<string, SurveySendRecipient>();
+  for (const r of previous) bySlug.set(r.slug, r);
+  for (const r of fresh) bySlug.set(r.slug, r);
+  return [...bySlug.values()];
+}
