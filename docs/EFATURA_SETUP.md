@@ -63,17 +63,37 @@ denenmez; eksik olan(lar) adıyla raporlanır (`not_configured`).
 - Bir belge ancak GİB'in döndürdüğü zarf numarası (`Invoice.gibEnvelopeId`)
   kaydedildiğinde "GİB'e gönderildi" sayılır. Ayarlar → Faturalandırma panelinde
   ve basılan belgede tek ölçüt budur.
-- **TRY dışı bir fatura bugün GİB'e GÖNDERİLMEZ.** `fileThrough` böyle bir
-  belgeyi adaptöre hiç ulaştırmadan `blocked` /
-  `FOREIGN_CURRENCY_NO_TL_EQUIVALENT` ile geri çevirir: yabancı para birimli
-  fatura, TCMB kuru ve TL karşılığı olmadan VUK 215 / 385 Sıra No.lu Genel
-  Tebliğ'e aykırıdır. **ADR-0002 2026-09-08'de KARARA BAĞLANDI (Seçenek b:
-  döviz faturası + TCMB kuru + TL karşılığı)**; alanların şemaya eklenmesi
-  `TASK-MTT13PK0Z4ZLB` (ADR-0002 Faz 2) ile sürüyor. **Canlı fiyat kataloğu
-  USD olduğu için bu, kenar durum değil varsayılan yoldur** — go-live'da TL
-  dışı abonelikler faturalandırılacaksa Faz 2 önce inmelidir.
-  Belge *üretimi* (export) etkilenmez: zarf numarası olmayan belge zaten "mali
-  değeri yoktur" damgası taşır (TASK-MTSWLWDONWA3W).
+- **Kur kaydı taşıyan TRY dışı fatura artık gönderilebilir; taşımayan hâlâ
+  gönderilemez.** `fileThrough`, TCMB kuru ve TL karşılığı olmayan bir döviz
+  belgesini adaptöre hiç ulaştırmadan `blocked` /
+  `FOREIGN_CURRENCY_NO_TL_EQUIVALENT` ile geri çevirir (VUK 215 / 385 Sıra
+  No.lu Genel Tebliğ). ADR-0002 2026-09-08'de Seçenek (b) ile karara bağlandı ve
+  Faz 2 (`TASK-MTT13PK0Z4ZLB`) indi: `Invoice` satırı artık `fxRate`,
+  `fxRateDate`, `fxRateSource` ve `grandTotalTryMinor` taşıyor, UBL-TR XML'i
+  `PricingExchangeRate`/`TaxExchangeRate` bloklarını yazıyor ve engel yalnız
+  **kaydı olmayan** belgede kalıyor. Belge *üretimi* (export) her iki durumda da
+  etkilenmez: zarf numarası olmayan belge zaten "mali değeri yoktur" damgası
+  taşır (TASK-MTSWLWDONWA3W).
+
+### TCMB kuru — 14. bir değişken YOKTUR
+
+TCMB'nin günlük kur bülteni herkese açıktır; **kimlik bilgisi, anahtar veya
+sözleşme gerektirmez.** `TCMB_BASE_URL` boş bırakılır ve istemci
+(`src/lib/fx/tcmb.ts`) gerçek arşivi okur; bu değişken yalnız testin canlı
+bankaya çıkmaması içindir, başka bir kur kaynağı takmak için değildir.
+
+Operatörün bilmesi gereken tek davranış: **TCMB okunamazsa fatura kesilmez.**
+Ödeme akışı kırılmaz, ödeme kaydı olduğu gibi kalır; `SystemAlert`
+(`source: invoice_not_issued`, `meta.reason: fx_rate_unavailable`) hangi para
+biriminde ve neden kesilemediğini yazar. TCMB döndüğünde aynı ödeme yeniden
+işlendiğinde fatura kesilir — `Invoice.paymentRef` benzersiz olduğu için ikinci
+bir belge oluşmaz. **Son bilinen kur bilerek kullanılmaz:** mali bir belgeye
+"yeterince yakın" bir kur yazmak, uydurma rakam yazmaktır (ADR-0002, KARAR §4).
+
+Hafta sonu ve resmî tatilde TCMB bülten yayımlamaz; yürürlükteki kur en son
+yayımlanan bültenin kurudur ve istemci ona kayar. Faturada hangi günün kurunun
+kullanıldığı `fxRateDate` alanında görünür — bu, bir hata değil beklenen
+davranıştır.
 
 ## İlgili dosyalar
 
@@ -82,9 +102,11 @@ denenmez; eksik olan(lar) adıyla raporlanır (`not_configured`).
 - `src/lib/efatura-integrator.ts` — entegratör arayüzü ve hata yolları
 - `src/lib/efatura.ts` — UBL-TR XML ve yazdırılabilir belge; zarf numarası yoksa "mali değeri yoktur" damgası
 - `src/lib/billing/vat-rate.ts` — `INVOICE_VAT_RATE` kabul kuralının tek kaynağı; hem fatura yazıcısı hem preflight bunu çağırır
+- `src/lib/fx/tcmb.ts` — TCMB günlük bülteni; alış kuru, hafta sonu/tatil kayması, kesintide geriye kaymama kuralı (ADR-0002)
 - `scripts/efatura-preflight.ts` — ön denetim komutu (`pnpm efatura:preflight`); 13 değişken, 3 blok
 - `tests/efatura-unit.test.ts`, `tests/efatura-integrator.test.ts`, `tests/invoice-document.test.ts` — entegrasyon testleri
 - `tests/efatura-foreign-currency.test.ts` — yabancı para birimi kuralları (belge kendi para birimini yazar; TRY dışı belge gönderilemez)
+- `tests/invoice-fx-tcmb.test.ts` — TCMB istemcisi + fatura yazıcısının kur adımı (kesinti fatura kesmeyi durdurur, eski kur kullanılmaz)
 - `tests/e2e/invoice-foreign-currency-export.spec.ts` — aynı kuralın gerçek rota + tarayıcı üzerinden doğrulaması (`INVOICE_SUPPLIER_*` dolu bir sunucu ve boş bir `E2E_PORT` ister)
 
 ## Go-live günü (12-13 Eylül Hafta Sonu Adım Adım Kontrol Listesi)

@@ -51,11 +51,66 @@ export interface InvoiceRecord {
   invoiceType: string;
   ettn: string;
   gibEnvelopeId: string | null;
+  /**
+   * The FX evidence as it sits on the row (`Invoice.fxRate` and friends,
+   * ADR-0002). `fxRate` is a Postgres NUMERIC, which Prisma hands back as a
+   * Decimal object rather than a number; the structural `toNumber()` below
+   * accepts that without this module having to import the Prisma runtime.
+   */
+  fxRate?: number | string | { toNumber(): number } | null;
+  fxRateDate?: Date | null;
+  fxRateSource?: string | null;
+  grandTotalTryMinor?: number | null;
+  /**
+   * A pre-assembled rate, which takes precedence over the columns above.
+   * Callers that already hold a document-shaped rate (tests, and any future
+   * path that reconstructs one) use this; the export route passes the columns.
+   */
   exchangeRate?: {
     sourceCurrency: 'TRY' | 'EUR' | 'USD';
     targetCurrency: 'TRY';
     calculationRate: number;
     date?: string;
+  };
+}
+
+/** The row's `fxRate` as a plain number, or null when it is unusable. */
+function fxRateAsNumber(value: InvoiceRecord['fxRate']): number | null {
+  if (value === null || value === undefined) return null;
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+        ? Number(value)
+        : value.toNumber();
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
+/**
+ * The document's exchange-rate block, built from what the row actually stores.
+ *
+ * Returns undefined for a TRY invoice and for any row with no usable rate — and
+ * `foreignCurrencyFilingBlock` then refuses to let that document be filed,
+ * which is the intended outcome rather than an oversight. Nothing here invents
+ * a rate or reaches for today's: the figure printed on a reissued document has
+ * to be the figure it was issued at (ADR-0002, KARAR §3).
+ */
+export function exchangeRateFromRecord(
+  record: InvoiceRecord,
+  currency: 'TRY' | 'EUR' | 'USD'
+): InvoiceRecord['exchangeRate'] {
+  if (record.exchangeRate) return record.exchangeRate;
+  if (currency === 'TRY') return undefined;
+
+  const calculationRate = fxRateAsNumber(record.fxRate);
+  if (calculationRate === null) return undefined;
+
+  const date = record.fxRateDate ? record.fxRateDate.toISOString().slice(0, 10) : undefined;
+  return {
+    sourceCurrency: currency,
+    targetCurrency: 'TRY',
+    calculationRate,
+    ...(date ? { date } : {}),
   };
 }
 
@@ -184,7 +239,10 @@ export function buildInvoiceDocument(
       country: record.buyerCountry,
     },
     lines,
-    ...(record.exchangeRate ? { exchangeRate: record.exchangeRate } : {}),
+    ...(() => {
+      const exchangeRate = exchangeRateFromRecord(record, currency);
+      return exchangeRate ? { exchangeRate } : {};
+    })(),
     // Only what GİB actually returned. NULL stays absent, and the generators
     // then stamp the document as carrying no fiscal value.
     ...(record.gibEnvelopeId ? { gibEnvelopeId: record.gibEnvelopeId } : {}),

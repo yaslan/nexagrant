@@ -20,15 +20,20 @@ import { shotsDir } from './fixtures/shots';
  * one TRY row on the same tenant, so a regression cannot hide behind a unit
  * test that never renders the page.
  *
- * What this spec does NOT claim: the USD document still carries no TL
- * equivalent and no TCMB rate, which VUK 215/385 require of a domestic
- * foreign-currency invoice. That is the open decision in
- * docs/adr/ADR-0002-foreign-currency-invoice-fx.md; until it lands,
- * `foreignCurrencyFilingBlock` stops such a document being *filed* with GİB
- * (unit-covered in tests/efatura-foreign-currency.test.ts).
+ * Extended by TASK-MTT13PK0Z4ZLB once ADR-0002 was decided (option (b),
+ * 2026-09-08). The USD row now carries the TCMB rate and the TL equivalent it
+ * was issued at, because after that decision a rate-less foreign-currency
+ * invoice can no longer exist: `Invoice_fx_required_for_foreign_currency`
+ * refuses the row in Postgres itself, which this spec also asserts against the
+ * real database. The FX figures below are a fixture — deterministic, so the
+ * rendered document is comparable across runs — and the production path takes
+ * them only from `src/lib/fx/tcmb.ts` (unit-covered in
+ * tests/invoice-fx-tcmb.test.ts).
  */
 
 const STAMP = `e2e-fx-${Date.now()}`;
+/** A fixed stand-in for a published TCMB buying rate; see the header comment. */
+const FIXTURE_RATE = 41.2345;
 const COOKIE_NAME = 'authjs.session-token';
 const SECRET =
   process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
@@ -74,6 +79,17 @@ test.describe('a foreign-currency invoice export', () => {
           number,
           issuedAt: new Date('2026-09-08T09:00:00.000Z'),
           currency,
+          // TRY needs no conversion and stores nothing; USD must store all four
+          // or Postgres rejects the row (ADR-0002). 99.00 x 41.2345 = 4082.2155
+          // TL -> 408222 kuruş.
+          ...(currency === 'TRY'
+            ? {}
+            : {
+                fxRate: FIXTURE_RATE,
+                fxRateDate: new Date('2026-09-08T00:00:00.000Z'),
+                fxRateSource: 'TCMB',
+                grandTotalTryMinor: 408222,
+              }),
           buyerName: `FX Buyer ${STAMP}`,
           buyerVknTckn: '2840958172',
           buyerTaxOffice: 'Kadıköy V.D.',
@@ -149,6 +165,53 @@ test.describe('a foreign-currency invoice export', () => {
     const declared = [...xml!.matchAll(/currencyID="([A-Z]{3})"/g)].map((m) => m[1]);
     expect(declared.length).toBeGreaterThan(0);
     expect([...new Set(declared)]).toEqual(['USD']);
+  });
+
+  test('the XML carries the TCMB rate the row was issued at', async ({ request }) => {
+    const xml = await documentOrConfigRefusal(request, usdNumber, 'xml');
+    test.skip(xml === null, 'INVOICE_SUPPLIER_* unset on the server under test — the rendering branch cannot be reached; set them (and use a free E2E_PORT) to run these assertions');
+
+    // VUK 215/280/385: the rate and the TL side travel with the document, and
+    // they come off the stored row rather than being recomputed at export time.
+    expect(xml).toContain('<cac:PricingExchangeRate>');
+    expect(xml).toContain('<cac:TaxExchangeRate>');
+    expect(xml).toContain('<cbc:SourceCurrencyCode>USD</cbc:SourceCurrencyCode>');
+    expect(xml).toContain('<cbc:TargetCurrencyCode>TRY</cbc:TargetCurrencyCode>');
+    expect(xml).toContain(`<cbc:CalculationRate>${FIXTURE_RATE.toFixed(4)}</cbc:CalculationRate>`);
+    expect(xml).toContain('<cbc:Date>2026-09-08</cbc:Date>');
+
+    // And the TRY document must not grow an exchange-rate block it has no use for.
+    const lira = await documentOrConfigRefusal(request, tryNumber, 'xml');
+    expect(lira).not.toContain('<cac:PricingExchangeRate>');
+  });
+
+  test('the database itself refuses a foreign-currency invoice with no rate', async () => {
+    // The rule this card added is a constraint, not a convention: it holds for
+    // any writer, including one that bypasses `createInvoiceForPayment`.
+    await expect(
+      prisma.invoice.create({
+        data: {
+          tenantId,
+          number: `${STAMP}-USD-NORATE`,
+          issuedAt: new Date('2026-09-08T09:00:00.000Z'),
+          currency: 'USD',
+          buyerName: `FX Buyer ${STAMP}`,
+          buyerVknTckn: '2840958172',
+          buyerTaxOffice: 'Kadıköy V.D.',
+          buyerAddress: 'Bağdat Cad. No:10',
+          buyerCity: 'İstanbul',
+          buyerCountry: 'Türkiye',
+          lines: [
+            { name: 'Fabrika Pro (1 ay)', quantity: 1, unitCode: 'MON', unitPriceMinor: 9900, vatRate: 20 },
+          ],
+          ettn: randomUUID(),
+        },
+      })
+    ).rejects.toThrow(/Invoice_fx_required_for_foreign_currency/);
+
+    expect(
+      await prisma.invoice.count({ where: { tenantId, number: `${STAMP}-USD-NORATE` } })
+    ).toBe(0);
   });
 
   test('the printable page a customer sees agrees with itself', async ({ page, baseURL }) => {

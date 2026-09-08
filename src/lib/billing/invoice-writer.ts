@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
 import type { Prisma } from '@prisma/client';
+import {
+  fetchTcmbBuyingRate,
+  isConvertibleCurrency,
+  type TcmbRateResult,
+} from '@/lib/fx/tcmb';
+import { convertCurrencyMinor } from '@/lib/money';
 import { recordAlert } from '@/lib/observability/system-alert';
 
 import { parseVatRate } from './vat-rate';
@@ -26,6 +32,14 @@ import { parseVatRate } from './vat-rate';
  * the payment is left alone, no row is written, and a `SystemAlert` names what
  * is missing. A missing invoice is a visible, fixable gap; an invented VKN or
  * an invented VAT rate is a false fiscal document (TASK-MTRD9QBJ2G32E).
+ *
+ * The same rule now covers the exchange rate. ADR-0002 (decided 2026-09-08)
+ * issues a foreign-currency invoice in its own currency and states the TCMB
+ * buying rate of the issue date and the TL equivalent beside it (VUK 215/280/
+ * 385). When TCMB cannot be read, this module issues nothing and raises a
+ * SystemAlert — the boss's decision on the one question that ADR left open. It
+ * never substitutes the last known rate: a rate is a fiscal assertion, and the
+ * nearest available number is not the same assertion.
  *
  * Not in scope: filing. `gibEnvelopeId` stays NULL, so the exporter keeps
  * stamping the document "ÖRNEK BELGE — mali değeri yoktur". That is correct —
@@ -71,7 +85,11 @@ export type InvoiceWriteResult =
         | 'buyer_identity_missing'
         | 'vat_rate_not_configured'
         | 'amount_not_invoiceable'
-        | 'number_allocation_failed';
+        | 'number_allocation_failed'
+        /** TCMB could not be read, so the TL equivalent is unknown (ADR-0002). */
+        | 'fx_rate_unavailable'
+        /** Charged in a currency TCMB conversion is not defined for. */
+        | 'fx_currency_unsupported';
       /** Field or setting names, so an operator knows what to fill in. */
       missing?: string[];
     };
@@ -225,6 +243,85 @@ export const ASSUMED_PROFILE_ID = 'EARSIVFATURA';
  */
 export const ROUNDING_LINE_NAME = 'Yuvarlama farkı';
 
+/** The rate lookup this module depends on, narrowed so tests can stand in for it. */
+export type FetchRate = (
+  currency: 'USD' | 'EUR',
+  issuedAt: Date
+) => Promise<TcmbRateResult>;
+
+/** The FX facts written onto a foreign-currency invoice row, or `null` for TRY. */
+export interface InvoiceFxRecord {
+  fxRate: number;
+  fxRateDate: Date;
+  fxRateSource: 'TCMB';
+  grandTotalTryMinor: number;
+}
+
+/**
+ * Establish the rate and TL equivalent for one charge, or say why it cannot be.
+ *
+ * TRY returns `null` — there is nothing to convert, and the row's FX columns
+ * stay NULL, which is exactly what the database CHECK constraint
+ * `Invoice_fx_required_for_foreign_currency` permits for TRY and forbids for
+ * anything else. The constraint is the backstop; this function is the path.
+ *
+ * `grandTotalTryMinor` converts the **gross** charge, not the net line price:
+ * the TL figure a Turkish invoice has to show is the payable total, the same
+ * number the customer was charged.
+ */
+export async function resolveInvoiceFx(
+  amountMinor: number,
+  currency: string,
+  issuedAt: Date,
+  fetchRate: FetchRate
+): Promise<
+  | { ok: true; fx: InvoiceFxRecord | null }
+  | { ok: false; reason: 'fx_currency_unsupported' | 'fx_rate_unavailable'; detail: string }
+> {
+  const code = currency.trim().toUpperCase();
+  if (code === 'TRY') return { ok: true, fx: null };
+
+  if (!isConvertibleCurrency(code)) {
+    return {
+      ok: false,
+      reason: 'fx_currency_unsupported',
+      detail: `TCMB conversion is not defined for ${code}; only TRY, USD and EUR are invoiceable.`,
+    };
+  }
+
+  const result = await fetchRate(code, issuedAt);
+  if (!result.ok) {
+    return { ok: false, reason: 'fx_rate_unavailable', detail: `${result.failure.reason}: ${result.failure.detail}` };
+  }
+
+  let grandTotalTryMinor: number;
+  try {
+    grandTotalTryMinor = convertCurrencyMinor(amountMinor, result.rate.rate);
+  } catch (error) {
+    // convertCurrencyMinor refuses a non-integer amount, a non-positive rate and
+    // a product outside the safe integer range. Any of those means the TL figure
+    // cannot be stated exactly, and a fiscal document may not carry an
+    // approximate one.
+    return {
+      ok: false,
+      reason: 'fx_rate_unavailable',
+      detail: `conversion failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  return {
+    ok: true,
+    fx: {
+      fxRate: result.rate.rate,
+      // Stored as the bulletin's own day at UTC midnight; the column is DATE, so
+      // no time part survives and no timezone can shift it (CLAUDE.md rule 10).
+      fxRateDate: new Date(`${result.rate.rateDate}T00:00:00.000Z`),
+      fxRateSource: result.rate.source,
+      grandTotalTryMinor,
+    },
+  };
+}
+
 /**
  * Issue the invoice for one payment, or explain why none was issued.
  *
@@ -238,7 +335,15 @@ export const ROUNDING_LINE_NAME = 'Yuvarlama farkı';
 export async function createInvoiceForPayment(
   db: InvoiceWriterDb,
   payment: PaymentForInvoice,
-  options: { vatRateRaw?: string | undefined } = {}
+  options: {
+    vatRateRaw?: string | undefined;
+    /**
+     * How the TCMB rate is obtained. Injected only by tests and by the
+     * disproof probe that takes the client away to prove issuing stops;
+     * production leaves it alone and gets `fetchTcmbBuyingRate`.
+     */
+    fetchRate?: FetchRate | undefined;
+  } = {}
 ): Promise<InvoiceWriteResult> {
   const { tenantId, paymentRef, amountMinor, currency, description, paidAt, provider } = payment;
 
@@ -343,6 +448,29 @@ export async function createInvoiceForPayment(
     });
   }
 
+  // The rate is fetched *before* a number is allocated, so a TCMB outage never
+  // burns an invoice number on a document that is not written.
+  const fxResult = await resolveInvoiceFx(
+    amountMinor,
+    currency,
+    paidAt,
+    options.fetchRate ?? fetchTcmbBuyingRate
+  );
+  if (!fxResult.ok) {
+    await recordAlert({
+      level: 'error',
+      source: 'invoice_not_issued',
+      message:
+        fxResult.reason === 'fx_rate_unavailable'
+          ? `A payment was taken in ${currency} but the TCMB buying rate for its issue date could not be established, so no invoice was issued. A foreign-currency invoice without the rate and the TL equivalent is not a valid document (VUK 215/280/385, ADR-0002); the last known rate is deliberately not substituted. The payment is unaffected — reissue once TCMB is reachable.`
+          : `A payment was taken in ${currency}, which no invoice can be denominated in: the TL equivalent required by VUK 215/385 cannot be established for it. No invoice was issued and the payment is unaffected.`,
+      // Names the currency and the failure, never the buyer or the amount.
+      meta: { provider, currency, reason: fxResult.reason, detail: fxResult.detail },
+    });
+    return { status: 'skipped', reason: fxResult.reason };
+  }
+  const fx = fxResult.fx;
+
   const year = paidAt.getUTCFullYear();
 
   for (let attempt = 0; attempt < NUMBER_ATTEMPTS; attempt += 1) {
@@ -373,6 +501,12 @@ export async function createInvoiceForPayment(
           // stamps the document accordingly.
           gibEnvelopeId: null,
           paymentRef,
+          // NULL together on a TRY invoice, all four present on any other —
+          // the shape `Invoice_fx_required_for_foreign_currency` enforces.
+          fxRate: fx?.fxRate ?? null,
+          fxRateDate: fx?.fxRateDate ?? null,
+          fxRateSource: fx?.fxRateSource ?? null,
+          grandTotalTryMinor: fx?.grandTotalTryMinor ?? null,
         },
         select: { id: true, number: true, ettn: true },
       });

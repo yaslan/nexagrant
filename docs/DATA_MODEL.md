@@ -347,6 +347,7 @@ onaylanmıştır" yazıyordu. Belgenin anlattığı fatura hiçbir yerde yoktu.
 | `lines` | `InvoiceLine[]` (JSONB). Birim fiyatlar **minor unit** (CLAUDE.md kural 9); majör birime tek bir yerde, `invoice-document.ts` içinde çevrilir. Şeması zod ile okunur; okunamayan satır boş fatura değil **hatadır**. |
 | `ettn` | Belgenin kendi UUID'si. **Benzersiz** — kayıt yazılırken atanır, koda gömülü değildir. |
 | `gibEnvelopeId` | **Yalnız** GİB entegratör üzerinden gönderimi gerçekten kabul ettiğinde dolar. `NULL` = belge hiç gönderilmedi; bu durumda `src/lib/efatura.ts` hem XML'e hem yazdırılabilir sayfaya "mali değeri yoktur" damgasını basar ve mali mühür iddiasını **yazmaz**. Bugün ürün hiçbir şeyi göndermiyor, yani her satırda `NULL`. |
+| `fxRate` / `fxRateDate` / `fxRateSource` / `grandTotalTryMinor` | Yabancı para faturasının **TCMB döviz alış kuru**, kurun yayımlandığı **gün**, kaynağı (`TCMB`) ve **TL karşılığı** (ödenecek genel toplam, minor unit). TRY faturada dördü de `NULL`; başka her para biriminde dördü de zorunlu — `Invoice_fx_required_for_foreign_currency` CHECK kısıtı bunu veritabanı düzeyinde uygular. Bkz. `docs/adr/ADR-0002-foreign-currency-invoice-fx.md`. |
 
 **Tedarikçi kimliği bu tabloda değildir.** Satıcı Fabrika'nın kendisidir; her kiracının
 faturasında aynıdır ve uygulamanın seçebileceği bir şey değildir. `src/lib/env.ts` üzerinden
@@ -362,9 +363,47 @@ denenmez (`not_configured`), o entegratöre ait adaptör yazılmadan da gönderi
 
 **Seed yoktur ve olmamalıdır:** seed'lenmiş bir fatura, kesilmemiş bir faturadır.
 
-Migration: `prisma/migrations/add-invoice.sql` (additive + idempotent) — geri alma:
-`prisma/migrations/add-invoice.down.sql` (yıkıcı: tabloyu ve tüm fatura kayıtlarını siler;
-fatura mali bir belgedir, bu refleks bir geri alma değildir).
+### 11.1 Yabancı para faturasında kur ve TL karşılığı (ADR-0002)
+
+VUK 215/280/385: yurt içi bir işlemde döviz cinsinden kesilen fatura, **düzenleme
+tarihindeki TCMB döviz alış kurunu** ve **TL karşılığını** da göstermek zorundadır;
+göstermezse VUK 352 II-7 uyarınca ikinci derece usulsüzlük. ADR-0002 (2026-09-08,
+Seçenek (b)) faturayı kendi para biriminde kesip bu iki bilgiyi **satıra yazmayı**
+seçti — yalnız XML'de hesaplamayı değil; böylece kesilmiş bir fatura sonradan aynı
+rakamlarla yeniden üretilebilir (CLAUDE.md kural 7).
+
+- **Kur nereden gelir:** `src/lib/fx/tcmb.ts` → TCMB'nin günlük bülteni
+  (`https://www.tcmb.gov.tr/kurlar/YYYYMM/DDMMYYYY.xml`, kimlik bilgisi gerektirmez).
+  Okunan alan `ForexBuying` (alış); `Unit` dikkate alınır, çünkü TCMB bazı para
+  birimlerini 100 birim üzerinden kotalar.
+- **Hafta sonu / tatil:** TCMB o gün bülten yayımlamaz (HTTP 404). Yürürlükteki kur
+  **en son yayımlanan** bültenin kurudur, bu yüzden istemci gün gün geriye kayar
+  (en çok `MAX_LOOKBACK_DAYS` = 10 gün) ve **fiilen kullanılan gün** `fxRateDate`'e
+  yazılır. Kayma kayıtta görünür, ima edilmez.
+- **TCMB'ye ulaşılamazsa geriye KAYILMAZ.** Bağlantı hatası, zaman aşımı ve 5xx
+  anında `unreachable` ile biter; yalnız 404 ("o gün bülten yok") imleci geriye taşır.
+  Kesinti sırasında geriye kaymak, eski bir kuru geçerli bir kurmuş gibi göstermenin
+  ta kendisi olurdu.
+- **Kur yoksa fatura da yok** (patron kararı, 2026-09-08): `createInvoiceForPayment`
+  `{ status: 'skipped', reason: 'fx_rate_unavailable' }` döner, **hiç satır yazmaz**,
+  `SystemAlert` üretir; ödeme etkilenmez ve TCMB döndüğünde aynı `paymentRef` ile
+  fatura kesilir. **Son bilinen kur kullanılmaz.** Kayıt taşımayan bir döviz belgesi
+  ayrıca `foreignCurrencyFilingBlock` tarafından GİB'e hiç ulaştırılmaz (`blocked`).
+- **`TCMB_BASE_URL`** yalnız testin gerçek bankaya çıkmaması için vardır; gerçek
+  ortamda boş bırakılır. Farklı bir kur kaynağı koymak için değildir.
+
+Migration: `prisma/migrations/add-invoice.sql` +
+`prisma/migrations/add-invoice-fx-rate.sql` (ikisi de additive + idempotent) — geri
+alma: `prisma/migrations/add-invoice.down.sql` (yıkıcı: tabloyu ve tüm fatura
+kayıtlarını siler; fatura mali bir belgedir, bu refleks bir geri alma değildir) ve
+`prisma/migrations/add-invoice-fx-rate.down.sql` (satırlar kalır ama kesilmiş döviz
+faturalarının kur kanıtı silinir ve geri getirilemez).
+
+CHECK kısıtı `NOT VALID` eklenir: yazılan/güncellenen her satırda uygulanır, kural
+konmadan önce yazılmış satırlar olduğu yerde bırakılır (yerel DB'de böyle bir satır
+ölçüldü: TASK-MTSWLWDONWA3W'den kalan `qa-fx-…-USD` QA verisi). Bir ortamda böyle
+satır kalmadığında kısıt tek deyimle terfi ettirilebilir:
+`ALTER TABLE "Invoice" VALIDATE CONSTRAINT "Invoice_fx_required_for_foreign_currency";`
 
 **Açık:** Ayarlar → Faturalandırma ekranındaki fatura tablosu hâlâ `BillingClient.tsx`
 içindeki iki sabit `DEMO_INVOICES` satırını listeliyor (satır 76-92) ve indirme sütununda

@@ -85,6 +85,13 @@ export async function GET(
           invoiceType: true,
           ettn: true,
           gibEnvelopeId: true,
+          // The TCMB rate the document was issued at (ADR-0002). Without these
+          // a foreign-currency document carries no TL equivalent, and
+          // `foreignCurrencyFilingBlock` refuses to let it be filed.
+          fxRate: true,
+          fxRateDate: true,
+          fxRateSource: true,
+          grandTotalTryMinor: true,
         },
       })
     );

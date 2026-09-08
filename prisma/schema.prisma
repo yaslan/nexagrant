@@ -361,6 +361,20 @@ model Invoice {                 // an invoice actually issued to a tenant; TASK-
   number        String              // what the customer sees and cites, e.g. "FB-2026-000001"
   issuedAt      DateTime            // UTC, like every other timestamp (CLAUDE.md rule 10)
   currency      String   @default("TRY")
+  // VUK 215/280/385 (ADR-0002, option (b)): an invoice denominated in a foreign
+  // currency is only valid while it also states the TCMB *buying* rate of its
+  // issue date and the Turkish lira equivalent. Those two facts are stored on
+  // the row and not merely computed into the XML, so an already-issued document
+  // can be reproduced and audited later (CLAUDE.md rule 7).
+  //
+  // NULL on a TRY invoice: there is nothing to convert. On any other currency a
+  // CHECK constraint (`Invoice_fx_required_for_foreign_currency`) refuses the
+  // row outright — an invented rate would be an invented figure on a fiscal
+  // document, so the invoice is not issued at all rather than issued wrong.
+  fxRate             Decimal?  @db.Decimal(18, 6) // TCMB döviz alış kuru: 1 `currency` → TRY
+  fxRateDate         DateTime? @db.Date           // publication date of the rate actually used; may precede `issuedAt` across a weekend or public holiday
+  fxRateSource       String?                      // where the rate came from, e.g. "TCMB"; never a guess
+  grandTotalTryMinor Int?                         // TL karşılığı of the payable grand total, minor units (CLAUDE.md rule 9)
   // The buyer's fiscal identity, frozen at issue time. An invoice must keep
   // saying who it was issued to even after the tenant renames itself or moves,
   // so these are a snapshot on the row and never a join to Tenant.

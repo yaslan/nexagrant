@@ -115,6 +115,17 @@ const envSchema = z.object({
    * If unset, token encryption/decryption will fail with 503 (CalendarEncryptionNotConfiguredError).
    */
   CALENDAR_ENCRYPTION_KEY: z.string().optional(),
+  /**
+   * Where the TCMB daily exchange-rate bulletin is read from
+   * (`src/lib/fx/tcmb.ts`). Unset = the real archive,
+   * https://www.tcmb.gov.tr/kurlar — TCMB publishes it openly, so unlike every
+   * other integration here this one needs no credential and works out of the box.
+   *
+   * It is overridable only so a test can point at a fixture host instead of the
+   * live bank, never to substitute a different rate source: a rate on an invoice
+   * is a fiscal assertion under VUK 280 (ADR-0002).
+   */
+  TCMB_BASE_URL: optionalUrl,
 });
 
 const _env = envSchema.safeParse(process.env);
