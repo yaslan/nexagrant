@@ -390,3 +390,93 @@ Bu görev gerçek yazıcıyı ekledi; tablo/RLS **değişmedi**, migration yok.
 - `filters` şekli tek kaynaktan: `alerts-daily.ts`'in dışa açtığı `SavedSearchFiltersSchema`
   (yalnızca `q`/`status`, `.partial()`) buradan import edilir, burada tekrar tanımlanmaz — alan
   adları burada ile cron'da ayrışırsa cron sessizce "filtresiz" davranışa düşer (o dosyadaki not).
+
+## 13. Sürümlü paketler ve özel paket (TASK-MTRJ32BZBY2AI)
+
+`Plan` bir üründür (`free`/`basic`/`pro`/`ultra`) ve bugün ne sattığımızı tutar —
+ama **ne sattığımızın tarihçesini** tutmaz. Bir paketin koltuk sayısı düşürülünce
+o pakete önceden abone olmuş kiracının hangi şartlarla satın aldığı geri
+okunamıyordu; §5.1'in fiyat için çözdüğü sorunun kapsam (koltuk / çalışma alanı /
+kredi / modül) tarafı. Bu bölüm o boşluğu kapatan üç tabloyu tarif eder.
+
+| Tablo | Kapsam | Ne tutar |
+|---|---|---|
+| `PlanVersion` | platform | Bir paketin **değişmez** anlık görüntüsü: fiyat, koltuk, çalışma alanı, kredi, `modules[]` |
+| `PlanFeature` | platform | O sürümün kart maddeleri — sıralı, iki dilde |
+| `PlanAssignment` | **kiracıya özel** | Özel (private) bir paketin bir kiracıya verilmesi |
+
+### 13.1 `PlanVersion` — yayınlanan sürüm değişmez
+
+| Sütun | Tip | Anlamı |
+|---|---|---|
+| `planId` | `String` | `Plan.id` (FK, `ON DELETE RESTRICT`) |
+| `version` | `Int` | Paket içinde artan sayaç; `(planId, version)` benzersiz |
+| `status` | `String` | `draft` \| `published` \| `archived` |
+| `monthlyCents` / `yearlyCents` / `currency` | `Int` / `Int` / `String` | Kural 9: minor unit + para birimi |
+| `seats` / `workspaces` / `aiCreditsMonthly` | `Int` | O sürümün kapsamı |
+| `modules` | `String[]` | Sürümün açtığı modüller |
+| `publishedBy` / `publishedAt` | `String?` / `DateTime?` | Kim, ne zaman yayınladı |
+
+- **Değişmezlik kod kuralıdır, kolon kısıtı değil:** `updateDraftVersion`,
+  `publishVersion` ve `discardDraftVersion` `draft` olmayan bir sürümde
+  `PublishedVersionImmutableError` fırlatır (`src/lib/billing/plan-repository.ts`).
+  Yayınlanmış bir paketi düzenlemek `createDraftVersion` ile **yeni** bir sürüm
+  yaratır; yayın, önceki `published` satırı `archived` yapar ve satır okunur kalır.
+- **Neden okunur kalır:** `Subscription.planVersionId` (nullable, `ON DELETE SET
+  NULL`) satılan sürüme çivilenir. Sürüm arşivlense de abonelik satın alındığı
+  şartları okumaya devam eder — §5.1'deki `locked*` ile aynı ilke, farklı eksen.
+- `Plan` satırı yayında **izdüşüm olarak** güncellenir (mevcut `Plan`
+  okuyucuları bozulmasın diye bilinçli çift-yazım). Üç müşteri yüzeyi
+  `PlanVersion`'dan render edildiğinde bu çift-yazım kaldırılmalıdır.
+
+### 13.2 `PlanFeature` — kart maddesi vaat ettiğinden fazlasını söyleyemez
+
+| Sütun | Tip | Anlamı |
+|---|---|---|
+| `planVersionId` | `String` | `PlanVersion.id` (FK, `ON DELETE CASCADE`) |
+| `order` | `Int` | Karttaki sıra |
+| `kind` | `String` | `module` \| `limit` \| `text` |
+| `moduleId` / `limitKey` | `String?` | `kind`'a göre dolan alan |
+| `textTr` / `textEn` | `String?` | Kural 8: yeni metin iki dile birden yazılır |
+
+`kind='module'` bir madde yalnızca **o sürümün `modules[]` dizisindeki** ve
+`ModuleCatalog`'ta var olan bir modülü gösterebilir; ihlal
+`ModuleNotGrantedError` ile hem kaydederken hem yayınlarken reddedilir (yayındaki
+kontrol, kayıt kapısını atlayıp doğrudan tabloya yazılmış satırı da yakalar).
+Kural 7'nin fiyat kartı karşılığı: kart, paketin açmadığı bir modülü vaat edemez.
+
+### 13.3 `PlanAssignment` — özel paket (RLS'li tek tablo)
+
+| Sütun | Tip | Anlamı |
+|---|---|---|
+| `planId` | `String` | `Plan.id` (FK, `ON DELETE RESTRICT`) |
+| `tenantId` | `String` | `Tenant.id` (FK, `ON DELETE CASCADE`) — RLS anahtarı |
+| `assignedBy` / `assignedAt` / `note` | `String?` / `DateTime` / `String?` | Denetim izi |
+
+`(planId, tenantId)` benzersizdir, yani atama idempotenttir. `Plan.visibility`
+(`public` \| `private` \| `archived`, varsayılan `public`) hangi paketin
+vitrinde olduğunu söyler; `private` paket yalnızca kendisine atanmış kiracıya
+görünür ve bu daraltmayı `plansVisibleToTenant(tenantId)` yapar
+(`public` olanlar + bu kiracıya atananlar).
+
+**RLS:** `PlanAssignment` `prisma/rls.sql`'deki kanonik `tenant_isolation`
+listesindedir (kiracı sayısı 40 → 41). `Plan`, `PlanVersion` ve `PlanFeature`
+**platform** tablolarıdır: katalog her kiracı için aynıdır, bu yüzden
+`platform_read` (SELECT, `USING (true)`) herkese okutur ve
+`platform_no_insert` / `platform_no_update` / `platform_no_delete` kiracı
+bağlantısına yazdırmaz. Postgres'te bir politika tek komut adlandırır ve INSERT
+politikası `USING` değil `WITH CHECK` alır — üç yazma komutu bu yüzden üç ayrı
+politikadır.
+
+Migration: `prisma/migrations/add-plan-versioning/migration.sql` (additive +
+idempotent, RLS politikaları dosyanın içinde) — geri alma: aynı klasördeki
+`down.sql` (**yıkıcı**: sürüm tarihçesini ve atamaları siler). Depodaki düz
+`prisma/migrations/*.sql` dosyaları `prisma migrate deploy`'un gözüne görünmez;
+yalnızca klasörlü olanlar uygulanır.
+
+**Bugünkü sınır (bilinçli):** `plansVisibleToTenant` ve `listPublicPlans`
+hazırdır ama fiyat sayfası, ayarlar faturalama paneli ve checkout hâlâ statik
+`src/lib/billing/catalog.ts`'ten okur. Yani stüdyoda açılan bir paket — herkese
+açık ya da özel — henüz hiçbir müşteri yüzeyinde satılmaz; `visibility` şu an
+yalnız yönetim ekranında anlamlıdır. Üç yüzeyin `PlanVersion`'dan render'ı bu
+kartın kapsamı dışındadır.

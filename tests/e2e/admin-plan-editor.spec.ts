@@ -341,6 +341,43 @@ test.describe('admin plan editor', () => {
     await page.getByTestId('discard-draft').click();
   });
 
+  test('a saved draft version survives a full page reload', async ({ page }) => {
+    // The question this answers is not "did the form accept it" but "did it
+    // reach Postgres": every earlier assertion in this file runs inside one
+    // page life, and a screen that keeps its state in React state alone passes
+    // all of them. So the draft is created, given a value nothing else in this
+    // suite uses, and then the browser is reloaded from scratch.
+    await page.goto(URL);
+    await page.getByTestId('plan-row-basic').click();
+    await page.getByTestId('create-draft').click();
+    await expect(page.getByTestId('draft-editor')).toBeVisible();
+
+    await page.getByTestId('field-seats').fill('7');
+    await page.getByTestId('field-workspaces').fill('3');
+    await page.getByTestId('save-draft').click();
+    await expect(page.getByTestId('plan-notice')).toContainText('Kaydedildi');
+    await page.screenshot({ path: `${SHOTS}/12-draft-saved.png`, fullPage: true });
+
+    await page.reload();
+    await page.getByTestId('plan-row-basic').click();
+
+    // The draft row is still in the history, still a draft, still holding 7.
+    const draftRow = page.getByTestId('version-row-2');
+    await expect(draftRow).toBeVisible();
+    await expect(page.getByTestId('version-status-2')).toHaveText('Taslak');
+    await expect(draftRow).toContainText('7');
+    await page.getByTestId('edit-draft-2').click();
+    await expect(page.getByTestId('field-seats')).toHaveValue('7');
+    await expect(page.getByTestId('field-workspaces')).toHaveValue('3');
+    await page.screenshot({ path: `${SHOTS}/13-draft-after-reload.png`, fullPage: true });
+
+    // v1 is untouched by all of this — the published version stayed immutable.
+    await expect(page.getByTestId('version-status-1')).toHaveText('Yayında');
+
+    await page.getByTestId('discard-draft').click();
+    await expect(page.getByTestId('draft-editor')).toHaveCount(0);
+  });
+
   test('the English locale renders English labels, not Turkish', async ({ page }) => {
     await page.goto('/en/admin/billing/plans');
     await expect(page.getByTestId('plan-admin')).toBeVisible();

@@ -13,7 +13,7 @@
  * Write access is platform-only. This module provides read-only queries.
  */
 
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
 
 export interface PublishedPlanVersion {
   id: string;
@@ -123,13 +123,27 @@ export async function plansVisibleToTenant(tenantId: string): Promise<
     version: PublishedPlanVersion;
   }>
 > {
-  // Fetch assigned plan IDs for this tenant
-  const assignments = await prisma.planAssignment.findMany({
-    where: { tenantId },
-    select: { planId: true },
-  });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const assignedPlanIds = assignments.map((assign: any) => assign.planId);
+  // PlanAssignment is tenant-scoped, so this read goes through withTenant
+  // (CLAUDE.md rule 1) rather than the bare singleton. It is not a formality:
+  // measured on 2026-09-08, the same query on the app role fabrika_app
+  // (NOBYPASSRLS, which is what production runs as) returns zero rows without
+  // `app.tenant_id` set, because tenant_isolation compares tenantId against a
+  // setting that is NULL. The `where: { tenantId }` filter looks like it is
+  // doing the scoping, but the policy answers first — so a private plan
+  // vanished from the very tenant it had been assigned to, while the same call
+  // on the local SUPERUSER role showed it and looked correct.
+  //
+  // The return type is named rather than inferred for the same reason as the
+  // `rows` cast below: with `prisma generate` run the delegate is precisely
+  // typed and with src/types/prisma-override.d.ts it is `any`, so an inferred
+  // result is `unknown` in one world and `any` in the other.
+  const assignments = await withTenant<Array<{ planId: string }>>(tenantId, (tx) =>
+    tx.planAssignment.findMany({
+      where: { tenantId },
+      select: { planId: true },
+    })
+  );
+  const assignedPlanIds = assignments.map((assign) => assign.planId);
 
   // Query: (visibility = 'public' OR planId IN assignedPlanIds) AND visibility != 'archived'
   const plans = await prisma.plan.findMany({

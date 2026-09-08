@@ -97,3 +97,36 @@ SELECT
   p."currency", p."seats", p."workspaces", p."aiCreditsMonthly", p."modules", CURRENT_TIMESTAMP
 FROM "Plan" p
 WHERE NOT EXISTS (SELECT 1 FROM "PlanVersion" v WHERE v."planId" = p."id");
+
+-- Row level security. prisma/rls.sql is the source of truth and re-creates
+-- these policies on every `pnpm db:rls`; they are stated here too so a database
+-- built from migrations alone is never briefly readable across tenants.
+--
+-- PlanAssignment is tenant-scoped: which private plan a tenant has been given
+-- is that tenant's business and nobody else's.
+ALTER TABLE "PlanAssignment" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "PlanAssignment" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "PlanAssignment";
+CREATE POLICY tenant_isolation ON "PlanAssignment"
+  USING ("tenantId" = current_setting('app.tenant_id', true))
+  WITH CHECK ("tenantId" = current_setting('app.tenant_id', true));
+
+-- Plan, PlanVersion and PlanFeature are platform tables: the catalogue is the
+-- same for every tenant, so everyone reads it and no tenant connection writes
+-- it. A policy names exactly one command, and an INSERT policy is expressed
+-- with WITH CHECK rather than USING — hence three refusals rather than one.
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['Plan','PlanVersion','PlanFeature'] LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS platform_read ON %I', t);
+    EXECUTE format('DROP POLICY IF EXISTS platform_no_insert ON %I', t);
+    EXECUTE format('DROP POLICY IF EXISTS platform_no_update ON %I', t);
+    EXECUTE format('DROP POLICY IF EXISTS platform_no_delete ON %I', t);
+    EXECUTE format('CREATE POLICY platform_read ON %I FOR SELECT USING (true)', t);
+    EXECUTE format('CREATE POLICY platform_no_insert ON %I FOR INSERT WITH CHECK (false)', t);
+    EXECUTE format('CREATE POLICY platform_no_update ON %I FOR UPDATE USING (false)', t);
+    EXECUTE format('CREATE POLICY platform_no_delete ON %I FOR DELETE USING (false)', t);
+  END LOOP;
+END $$;
