@@ -1,12 +1,18 @@
 ---
 name: fabrika-i18n-check-parametrized-key-false-positive
-description: pnpm i18n:check parametreli t('key', {…}) çağrılarını göremez ve anahtarı "unused" sayar — bu bir hata değil; ayrıca komut bu depoda zaten exit 1 dönüyor ve pnpm gate'in parçası değil
+description: KISMEN ESKİDİ (2026-09-08) — "unused" listesi hâlâ kanıt değil ama artık koşuyu düşürmüyor; komut artık her koşuda exit 1 DÖNMÜYOR ve pnpm gate'in parçası, getTranslations körlüğü de kapandı
 metadata:
   type: project
-  updatedAt: 2026-09-07
+  updatedAt: 2026-09-08
 ---
 
-`scripts/i18n-check.ts` çağrı yerlerini `t('...')` biçiminde tarar. `t('key', { count: 3 })`
+> **2026-09-08 GÜNCELLEMESİ (commit `d98da75`).** Aşağıdaki iki büyük iddia artık YANLIŞ:
+> komut **her koşuda exit 1 dönmüyor** (şablon anahtarları artık şekil olarak kontrol
+> ediliyor) ve **`pnpm gate`'in parçası**. `getTranslations` körlüğü de kapandı; sahte
+> "unused" sayısı 600 → 206. Hâlâ doğru olan tek şey: **"unused" listesi kanıt değildir** ve
+> artık koşuyu da düşürmez. Güncel davranış: [[fabrika-i18n-gate-now-blocks-three-ways]].
+
+Tarihsel kayıt: `scripts/i18n-check.ts` çağrı yerlerini `t('...')` biçiminde tarar. `t('key', { count: 3 })`
 gibi **parametreli** çağrıları tanımaz, dolayısıyla anahtarı `unusedInTurkish` /
 `unusedInEnglish` kovasına koyar. Bu bir eksik anahtar değildir — anahtar iki katalogda da
 vardır ve UI'da render edilir.
