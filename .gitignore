@@ -81,3 +81,7 @@ production_backup.zip
 *.sql.gz
 cpanel_*.tar.gz
 
+
+# Throwaway compile probe from tests/prisma-delegate-types-are-real.test.ts —
+# removed by the test itself; ignored so a killed run leaves nothing tracked.
+.prisma-delegate-probe/
