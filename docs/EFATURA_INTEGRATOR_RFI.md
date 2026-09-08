@@ -7,7 +7,8 @@ teknik cevapları görüşmeye gelmeden almak.
 **Patron kararı 2026-09-08:** metin **tek adaya** gönderilir (karşılaştırmalı çoklu
 teklif turu yapılmayacak). Aday henüz seçilmedi; seçilir seçilmez bu metin gider.
 
-**Köşeli parantezli alanları göndermeden önce doldur.** Uydurma değer yazma.
+**Gönderen bilgileri patron tarafından verildi (2026-09-08) ve metne işlendi.**
+Tek eksik: imza satırındaki **unvan** — patron belirtmedi, uydurulmadı.
 
 Bağlam: `docs/EFATURA_SETUP.md` · Kart: `TASK-MTRJSOWFH6B45`
 
@@ -19,12 +20,12 @@ Bağlam: `docs/EFATURA_SETUP.md` · Kart: `TASK-MTRJSOWFH6B45`
 
 Merhaba,
 
-[Firma unvanı] olarak abonelik tabanlı bir yazılım hizmeti sunuyoruz ve
+FonBridge Ltd. Şti. olarak abonelik tabanlı bir yazılım hizmeti sunuyoruz ve
 e-Fatura gönderimi için özel entegratör hizmeti almayı değerlendiriyoruz.
 
 Kısa bağlam:
 - Fatura tipi: abonelik/hizmet faturası, satır sayısı düşük (tipik olarak 1-3 kalem).
-- Tahmini hacim: [aylık fatura adedi] adet/ay.
+- Tahmini hacim: ayda **en az 1, en çok 1.000** fatura.
 - Belge formatı: UBL-TR 1.2.1 XML'i biz üretiyoruz.
 - Para birimi: TRY'nin yanı sıra **USD/EUR** fatura kesilecek; belgeye TCMB kuru
   ve TL karşılığı alanları yazılacak.
@@ -70,8 +71,8 @@ Cevaplarınızı yazılı olarak iletmeniz bizim için yeterli; ardından teknik
 kısa bir görüşme talep edebilir.
 
 İyi çalışmalar,
-[Ad Soyad] · [Unvan] · [Firma unvanı]
-[e-posta] · [telefon]
+Dr. Yasin ASLAN · FonBridge Ltd. Şti.
+bilgi@fonbridge.com · 0533 461 55 95
 
 ---
 

@@ -35,7 +35,7 @@ değeri taşıyan satırlar mükellef sorgusuyla yeniden profillenmeli.
 
 | Değişken | Nereden alınır | Örnek biçim | Zorunlu |
 |---|---|---|---|
-| `INVOICE_SUPPLIER_NAME` | Ticaret sicilindeki tam unvan | `Fabrika Yazılım A.Ş.` | evet |
+| `INVOICE_SUPPLIER_NAME` | Ticaret sicilindeki tam unvan — **`FonBridge Ltd. Şti.`** (patron, 2026-09-08). Bu **tüzel kişi unvanıdır**, ürün adı değil: ürün **Fabrika**. `src/lib/brand.ts` "FonBridge artık taşınmıyor" derken ÜRÜN adını kasteder; buradaki unvan bir yeniden adlandırma taramasıyla DEĞİŞTİRİLMEZ. | `FonBridge Ltd. Şti.` | evet |
 | `INVOICE_SUPPLIER_VKN` | Vergi levhası — 10 haneli VKN | `1234567890` | evet |
 | `INVOICE_SUPPLIER_TAX_OFFICE` | Vergi levhası — bağlı olunan vergi dairesi | `Doğanbey V.D.` | evet |
 | `INVOICE_SUPPLIER_ADDRESS` | Sicildeki merkez adresi (sokak/no) | `Kızılırmak Mah. 1450. Cad. No:3` | evet |
