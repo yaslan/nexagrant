@@ -5,6 +5,7 @@ import { toDecimalString, toMinorUnits } from './money';
 import { resolvePlanId } from './billing/catalog';
 import { IYZICO_SOLD_TIER, priceLockOnActivation } from './billing/price-lock';
 import { publishedVersionIdFor } from './billing/plan-repository';
+import { createInvoiceForPayment } from './billing/invoice-writer';
 
 /**
  * iyzico billing (BILLING.md §4 — phase 2, TRY).
@@ -710,9 +711,10 @@ export async function handleIyzicoWebhook(
       },
     });
 
-    // Invoice record. There is no Invoice table; the Stripe path records paid
-    // invoices as audit events and this follows it, so tenant billing history
-    // reads from one place regardless of provider.
+    // The audit trail of the payment. It is not the invoice — it never was,
+    // despite what the comment here used to claim ("There is no Invoice table").
+    // `Invoice` has existed since TASK-MTRD9QBJ2G32E; this path simply never
+    // wrote to it, so every iyzico customer had an audit row and no document.
     await tx.auditEvent.create({
       data: {
         tenantId,
@@ -729,9 +731,29 @@ export async function handleIyzicoWebhook(
       },
     });
 
+    // The document itself. Shared with the Stripe path so the two providers
+    // cannot issue different invoices for the same kind of sale, and never
+    // allowed to fail the payment: a sale that went through stays recorded even
+    // when the buyer's fiscal identity is missing and no invoice can be issued.
+    // Runs on `tx`, so the invoice and the subscription commit together.
+    const invoice = await createInvoiceForPayment(
+      tx,
+      {
+        tenantId,
+        paymentRef: paymentId,
+        amountMinor,
+        currency,
+        description: `${plan.name} (${interval === 'year' ? '1 yıl' : '1 ay'})`,
+        paidAt: new Date(),
+        provider: 'iyzico',
+      },
+      { vatRateRaw: env.INVOICE_VAT_RATE }
+    );
+
     return {
       success: true,
       outcome: 'synced' as const,
+      invoiceNumber: invoice.status === 'skipped' ? null : invoice.number,
       tenantId,
       planId,
       status: 'ACTIVE',

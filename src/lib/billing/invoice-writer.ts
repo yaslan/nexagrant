@@ -1,0 +1,414 @@
+import { randomUUID } from 'node:crypto';
+
+import type { Prisma } from '@prisma/client';
+import { recordAlert } from '@/lib/observability/system-alert';
+
+/**
+ * Issuing the `Invoice` row a successful payment earns.
+ *
+ * Before TASK-MTSWL8ADKZKDM nothing in production ever wrote one. `Invoice`
+ * existed, the UBL-TR generator existed, the export route existed and the
+ * e-Fatura preflight existed — but both payment paths (Stripe's
+ * `logInvoicePayment` and iyzico's webhook sync) recorded a paid subscription
+ * as an `AuditEvent` and stopped there. Every paying customer therefore had
+ * zero invoices, `/api/billing/invoices/<id>/export` answered 404 for all of
+ * them, and there would have been no document to file on the day integrator
+ * credentials were entered.
+ *
+ * Both paths now call `createInvoiceForPayment`, and only this module writes
+ * invoices, so the two providers cannot drift into issuing different documents
+ * for the same sale.
+ *
+ * The rule this module is built around: an invoice states facts about a
+ * taxpayer and a tax figure. Where a fact is not available it is not guessed —
+ * the payment is left alone, no row is written, and a `SystemAlert` names what
+ * is missing. A missing invoice is a visible, fixable gap; an invented VKN or
+ * an invented VAT rate is a false fiscal document (TASK-MTRD9QBJ2G32E).
+ *
+ * Not in scope: filing. `gibEnvelopeId` stays NULL, so the exporter keeps
+ * stamping the document "ÖRNEK BELGE — mali değeri yoktur". That is correct —
+ * nothing has been sent to GİB.
+ */
+
+/** How the caller's payment is described to this module. */
+export interface PaymentForInvoice {
+  tenantId: string;
+  /**
+   * The provider's own payment/invoice id. Written to `Invoice.paymentRef`,
+   * which is unique per tenant, so a redelivered webhook re-enters this
+   * function and leaves with `already_issued` instead of a second document.
+   */
+  paymentRef: string;
+  /** What the card was actually charged, in minor units (CLAUDE.md rule 9). */
+  amountMinor: number;
+  currency: string;
+  /** What the customer bought, as it should read on the invoice line. */
+  description: string;
+  /** Payment time, UTC (CLAUDE.md rule 10). */
+  paidAt: Date;
+  /** For the alert trail only, never printed on the document. */
+  provider: 'stripe' | 'iyzico';
+}
+
+/** The buyer's fiscal identity, as stored for the tenant. */
+export interface BuyerIdentity {
+  buyerName: string;
+  buyerVknTckn: string;
+  buyerTaxOffice: string;
+  buyerAddress: string;
+  buyerCity: string;
+  buyerCountry: string;
+}
+
+export type InvoiceWriteResult =
+  | { status: 'issued'; id: string; number: string; ettn: string }
+  | { status: 'already_issued'; number: string }
+  | {
+      status: 'skipped';
+      reason:
+        | 'buyer_identity_missing'
+        | 'vat_rate_not_configured'
+        | 'amount_not_invoiceable'
+        | 'number_allocation_failed';
+      /** Field or setting names, so an operator knows what to fill in. */
+      missing?: string[];
+    };
+
+/** The buyer fields an invoice cannot be issued without, in the order reported. */
+const REQUIRED_BUYER_FIELDS = [
+  'buyerName',
+  'buyerVknTckn',
+  'buyerTaxOffice',
+  'buyerAddress',
+  'buyerCity',
+] as const;
+
+/** The subset of a Prisma client this module touches. */
+export type InvoiceWriterDb = Pick<Prisma.TransactionClient, 'invoice' | 'tenantBillingIdentity'>;
+
+/**
+ * How many times a number collision is retried before giving up.
+ *
+ * A collision means another payment for the same tenant committed between this
+ * transaction reading the highest number and writing its own. Three attempts
+ * covers a realistic burst; beyond that something else is wrong and inventing
+ * more numbers will not help.
+ */
+const NUMBER_ATTEMPTS = 3;
+
+/** Prisma's unique-constraint violation. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 'P2002'
+  );
+}
+
+/**
+ * The VAT rate an invoice is issued under, or null when it is not configured.
+ *
+ * `0` is a real answer and must survive: a sale genuinely outside VAT is not
+ * the same as a rate nobody has set. Hence an explicit null rather than a
+ * falsy check.
+ */
+export function parseVatRate(raw: string | undefined): number | null {
+  if (raw === undefined) return null;
+  const trimmed = raw.trim();
+  if (trimmed === '') return null;
+  const value = Number(trimmed);
+  if (!Number.isFinite(value) || value < 0 || value > 100) return null;
+  return value;
+}
+
+/**
+ * A line as it is stored on the row; see `invoiceLineSchema` in the export route.
+ *
+ * A type alias rather than an interface on purpose: only an alias gets an
+ * implicit index signature, which is what makes it assignable to Prisma's
+ * `InputJsonValue` without a cast that would switch the type check off.
+ */
+export type DecomposedLine = {
+  name: string;
+  quantity: number;
+  unitCode: string;
+  unitPriceMinor: number;
+  vatRate: number;
+};
+
+/**
+ * Split a VAT-inclusive charge into the net price the row stores, the VAT that
+ * will be recomputed from it, and the rounding remainder.
+ *
+ * The stored `unitPriceMinor` is the price *before* VAT — `calculateInvoiceTotals`
+ * in src/lib/efatura.ts adds VAT back on top of it. The payment amount is the
+ * gross the card was charged. Storing the gross as the unit price would print a
+ * grand total of `gross × 1.20` on a document for a customer who paid `gross`,
+ * so the gross is decomposed here.
+ *
+ * The complication, measured rather than assumed: `net + round(net × rate/100)`
+ * does not hit every integer. At 20% it lands on only five of every six, so a
+ * scheme that demanded an exact single-line split would have refused to invoice
+ * about one payment in six (16.67% of amounts up to ₺2000.00; 15.25% at 18%,
+ * 9.09% at 10%). Refusing that many real sales is not an acceptable answer.
+ *
+ * So the largest net that does not overshoot is taken, and whatever is left is
+ * returned as `roundingMinor`. Across every amount up to 200 000 minor units at
+ * 0/1/8/10/18/20% that remainder is never more than **one** minor unit, and
+ * `net + vat + rounding` equals the charge exactly, always. The caller puts the
+ * remainder on the document as its own zero-VAT "yuvarlama farkı" line, so the
+ * invoice total always reconciles to the receipt and the difference is visible
+ * rather than absorbed silently into a price.
+ *
+ * Returns null only for an amount that is not a positive whole minor unit.
+ */
+export function decomposeGrossAmount(
+  grossMinor: number,
+  vatRate: number
+): { netMinor: number; vatMinor: number; roundingMinor: number } | null {
+  if (!Number.isInteger(grossMinor) || grossMinor <= 0) return null;
+
+  // Binary search for the largest net with net + round(net × rate/100) <= gross.
+  // The function is monotonic in net, so bisection is exact and needs no guard
+  // against the rounding step the way a divide-and-adjust would.
+  let low = 1;
+  let high = grossMinor;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (mid + Math.round((mid * vatRate) / 100) <= grossMinor) low = mid;
+    else high = mid - 1;
+  }
+
+  const netMinor = low;
+  const vatMinor = Math.round((netMinor * vatRate) / 100);
+  return { netMinor, vatMinor, roundingMinor: grossMinor - netMinor - vatMinor };
+}
+
+/** `FB-<year>-<six digits>`, the form the customer cites. */
+export function formatInvoiceNumber(year: number, sequence: number): string {
+  return `FB-${year}-${String(sequence).padStart(6, '0')}`;
+}
+
+/**
+ * The sequence number following the highest one already issued to this tenant
+ * in this year, given that tenant's newest number for the year (or null).
+ *
+ * A number this function cannot parse is treated as "no usable predecessor" and
+ * restarts the year at 1; the unique index is what actually prevents a
+ * collision, and the retry loop above handles it.
+ */
+export function nextSequence(latestNumber: string | null, year: number): number {
+  if (!latestNumber) return 1;
+  const match = new RegExp(`^FB-${year}-(\\d{6})$`).exec(latestNumber);
+  if (!match?.[1]) return 1;
+  return Number(match[1]) + 1;
+}
+
+/**
+ * The `profileId` an invoice is issued under, and why it is a placeholder.
+ *
+ * The correct value depends on whether the *buyer* is registered with GİB as an
+ * e-Fatura taxpayer: `TICARIFATURA` if they are, `EARSIVFATURA` if they are not.
+ * Answering that requires a query against the GİB register through a licensed
+ * integrator, and Fabrika has no integrator contract yet — so today the answer
+ * is genuinely unknown.
+ *
+ * `EARSIVFATURA` is written, and every invoice issued this way also raises a
+ * SystemAlert saying the profile was assumed rather than resolved. This is safe
+ * only because nothing is filed: `gibEnvelopeId` is NULL on every row, and the
+ * exporter therefore stamps the document as carrying no fiscal value. Before
+ * the first real filing, every row still carrying this value has to be
+ * re-profiled against the register.
+ */
+export const ASSUMED_PROFILE_ID = 'EARSIVFATURA';
+
+/**
+ * The line carrying the sub-kuruş remainder of a VAT-inclusive charge.
+ *
+ * Named in Turkish because it is printed on the document, which is a Turkish
+ * fiscal form; the rest of the line text comes from the plan the customer
+ * bought. See `decomposeGrossAmount` for why it exists and how small it is.
+ */
+export const ROUNDING_LINE_NAME = 'Yuvarlama farkı';
+
+/**
+ * Issue the invoice for one payment, or explain why none was issued.
+ *
+ * Never throws for a business reason and never rolls the caller's transaction
+ * back: a payment that succeeded must stay recorded even when its invoice
+ * cannot be written. The only exceptions that escape are genuine database
+ * failures, which the caller already has to handle.
+ *
+ * @param db a client or an open transaction; the caller decides the boundary
+ */
+export async function createInvoiceForPayment(
+  db: InvoiceWriterDb,
+  payment: PaymentForInvoice,
+  options: { vatRateRaw?: string | undefined } = {}
+): Promise<InvoiceWriteResult> {
+  const { tenantId, paymentRef, amountMinor, currency, description, paidAt, provider } = payment;
+
+  // Already invoiced. Checked before anything else so a redelivered webhook is
+  // cheap and silent — it is normal traffic, not a fault worth alerting on.
+  const existing = await db.invoice.findFirst({
+    where: { tenantId, paymentRef },
+    select: { number: true },
+  });
+  if (existing) return { status: 'already_issued', number: existing.number };
+
+  if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
+    // A zero or negative charge is not a sale. Refunds and credit notes are a
+    // different document type (iade faturası) and are not modelled yet.
+    await recordAlert({
+      level: 'warn',
+      source: 'invoice_not_issued',
+      message: 'Payment is not an invoiceable amount; no invoice issued.',
+      meta: { provider, currency },
+    });
+    return { status: 'skipped', reason: 'amount_not_invoiceable' };
+  }
+
+  const vatRate = parseVatRate(options.vatRateRaw);
+  if (vatRate === null) {
+    await recordAlert({
+      level: 'error',
+      source: 'invoice_not_issued',
+      message:
+        'INVOICE_VAT_RATE is not set to a percentage between 0 and 100, so the tax on a sale is unknown and no invoice can be issued. Payments are unaffected.',
+      meta: { provider, setting: 'INVOICE_VAT_RATE' },
+    });
+    return { status: 'skipped', reason: 'vat_rate_not_configured', missing: ['INVOICE_VAT_RATE'] };
+  }
+
+  const identity = await db.tenantBillingIdentity.findUnique({
+    where: { tenantId },
+    select: {
+      buyerName: true,
+      buyerVknTckn: true,
+      buyerTaxOffice: true,
+      buyerAddress: true,
+      buyerCity: true,
+      buyerCountry: true,
+    },
+  });
+
+  // A blank string counts as unset: a half-filled identity must not become a
+  // half-filled invoice, the same rule `resolveSupplier` applies to the seller.
+  const missing = identity
+    ? REQUIRED_BUYER_FIELDS.filter((field) => !identity[field]?.trim())
+    : [...REQUIRED_BUYER_FIELDS];
+
+  if (!identity || missing.length > 0) {
+    // Deliberately names the fields and not their values: the alert trail must
+    // not become a second copy of a customer's tax identity.
+    await recordAlert({
+      level: 'error',
+      source: 'invoice_buyer_identity_missing',
+      message: `A payment was taken but no invoice could be issued: the tenant's billing identity is incomplete (${missing.join(', ')}).`,
+      meta: { provider, tenantId, missing },
+    });
+    return { status: 'skipped', reason: 'buyer_identity_missing', missing: [...missing] };
+  }
+
+  // Defensive only: the amount was already established to be a positive whole
+  // minor unit above, which is the sole condition under which this returns null.
+  // Reaching it would mean the two checks had drifted apart, so it refuses to
+  // issue rather than carrying on with a total it cannot account for.
+  const decomposed = decomposeGrossAmount(amountMinor, vatRate);
+  if (!decomposed) {
+    await recordAlert({
+      level: 'error',
+      source: 'invoice_not_issued',
+      message:
+        'The charged amount passed the invoiceable-amount check but could not be split into a net price and VAT, so no invoice was issued.',
+      meta: { provider, currency, vatRate },
+    });
+    return { status: 'skipped', reason: 'amount_not_invoiceable' };
+  }
+
+  const lines: DecomposedLine[] = [
+    {
+      name: description,
+      quantity: 1,
+      // UN/ECE 'MON' is a month; a subscription period is billed as one of them.
+      unitCode: 'MON',
+      unitPriceMinor: decomposed.netMinor,
+      vatRate,
+    },
+  ];
+
+  // At most one minor unit, and only when the rate cannot divide the charge
+  // exactly. Carried at 0% VAT so it changes the total and not the tax figure.
+  if (decomposed.roundingMinor > 0) {
+    lines.push({
+      name: ROUNDING_LINE_NAME,
+      quantity: 1,
+      unitCode: 'C62',
+      unitPriceMinor: decomposed.roundingMinor,
+      vatRate: 0,
+    });
+  }
+
+  const year = paidAt.getUTCFullYear();
+
+  for (let attempt = 0; attempt < NUMBER_ATTEMPTS; attempt += 1) {
+    // Read the tenant's highest number for the year, take the next one, and let
+    // the unique index arbitrate if another payment got there first. Ordering
+    // by the string is safe because the sequence is zero-padded to a fixed width.
+    const latest = await db.invoice.findFirst({
+      where: { tenantId, number: { startsWith: `FB-${year}-` } },
+      orderBy: { number: 'desc' },
+      select: { number: true },
+    });
+
+    const number = formatInvoiceNumber(year, nextSequence(latest?.number ?? null, year));
+
+    try {
+      const created = await db.invoice.create({
+        data: {
+          tenantId,
+          number,
+          issuedAt: paidAt,
+          currency,
+          ...identity,
+          lines,
+          profileId: ASSUMED_PROFILE_ID,
+          invoiceType: 'SATIS',
+          ettn: randomUUID(),
+          // Stays NULL: nothing has been filed with GİB, and the exporter
+          // stamps the document accordingly.
+          gibEnvelopeId: null,
+          paymentRef,
+        },
+        select: { id: true, number: true, ettn: true },
+      });
+
+      await recordAlert({
+        level: 'warn',
+        source: 'invoice_profile_assumed',
+        message: `Invoices are being issued as ${ASSUMED_PROFILE_ID} without checking whether the buyer is a registered e-Fatura taxpayer; that check needs an integrator contract. Every such invoice must be re-profiled before it is filed with GİB.`,
+        meta: { profileId: ASSUMED_PROFILE_ID },
+      });
+
+      return { status: 'issued', id: created.id, number: created.number, ettn: created.ettn };
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+
+      // Two payments raced. If the other one was for *this* payment (a
+      // concurrent redelivery), we are done; otherwise take the next number.
+      const raced = await db.invoice.findFirst({
+        where: { tenantId, paymentRef },
+        select: { number: true },
+      });
+      if (raced) return { status: 'already_issued', number: raced.number };
+    }
+  }
+
+  await recordAlert({
+    level: 'error',
+    source: 'invoice_not_issued',
+    message: `Could not allocate an invoice number after ${NUMBER_ATTEMPTS} attempts; the payment succeeded but no invoice was issued.`,
+    meta: { provider, tenantId },
+  });
+  return { status: 'skipped', reason: 'number_allocation_failed' };
+}

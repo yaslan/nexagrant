@@ -11,6 +11,8 @@ import {
   type PriceLockColumns,
 } from '@/lib/billing/price-lock';
 import { publishedVersionIdFor } from '@/lib/billing/plan-repository';
+import { createInvoiceForPayment } from '@/lib/billing/invoice-writer';
+import { env } from '@/lib/env';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
@@ -602,4 +604,52 @@ export async function logInvoicePayment(
       },
     },
   });
+
+  // The invoice document Fabrika issues for this payment, shared with the
+  // iyzico path (TASK-MTSWL8ADKZKDM). Stripe's own hosted invoice is a receipt
+  // from Stripe; it is not a Turkish e-Fatura and cannot be filed with GİB.
+  //
+  // Deliberately outside the audit write and never allowed to throw upward: a
+  // payment that succeeded must stay recorded even if no invoice can be issued
+  // for it. `createInvoiceForPayment` reports that case as `skipped` with a
+  // SystemAlert; a genuine database failure is caught here so a webhook Stripe
+  // will retry does not replay the whole subscription sync for it.
+  //
+  // Idempotency rests on `Invoice.paymentRef` being unique per tenant, not on
+  // the `existingAudit` guard above — that guard compares the whole `data`
+  // object with `equals`, so it never matches and never suppresses anything.
+  try {
+    await createInvoiceForPayment(
+      prisma,
+      {
+        tenantId,
+        paymentRef: invoice.id ?? eventId,
+        amountMinor: invoice.amount_paid,
+        currency: invoice.currency.toUpperCase(),
+        description: invoiceLineDescription(invoice),
+        paidAt: new Date(),
+        provider: 'stripe',
+      },
+      { vatRateRaw: env.INVOICE_VAT_RATE }
+    );
+  } catch (error) {
+    console.error(
+      `[logInvoicePayment] invoice not issued for ${invoice.id}: ${
+        error instanceof Error ? error.message : 'unknown error'
+      }`
+    );
+  }
+}
+
+/**
+ * What the invoice line should say this payment bought.
+ *
+ * Taken from the description Stripe already carries on the line item, because
+ * that is the wording the customer saw at checkout. When Stripe sends no
+ * description the line falls back to naming the period rather than inventing a
+ * plan name — the invoice may be vague about the product, never wrong about it.
+ */
+function invoiceLineDescription(invoice: Stripe.Invoice): string {
+  const first = invoice.lines?.data?.[0]?.description?.trim();
+  return first && first.length > 0 ? first : 'Fabrika abonelik dönemi';
 }

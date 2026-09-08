@@ -15,6 +15,22 @@ değişkenler doldurulana kadar uygulama çalışmaya devam eder — sadece fatu
 Kural (patron kararı): belge yalnızca gerçek `Invoice` kaydından üretilir, kayıt
 yoksa `404`. Sahte belge üretilmez, uydurma VKN yazılmaz.
 
+**Üçüncü şey (TASK-MTSWL8ADKZKDM): alıcı kimliği.** Ödeme başarılı olduğunda artık
+gerçekten bir `Invoice` satırı yazılıyor (Stripe ve iyzico, tek ortak fonksiyondan:
+`src/lib/billing/invoice-writer.ts`). Ama fatura alıcının mali kimliğini de gerektirir ve
+o kimlik `TenantBillingIdentity` tablosundan okunur. Kiracının satırı yoksa **fatura
+kesilmez**: ödeme kaydı yerinde kalır, `SystemAlert` (`invoice_buyer_identity_missing`)
+eksik alanları adıyla sayar. Uydurma VKN yazılmaz.
+
+⚠️ **Go-live için açık iş:** bu satırı dolduran bir ürün ekranı **henüz yok**. O ekran
+(ya da bir toplu içe aktarma) yazılana kadar canlıda kesilecek fatura sayısı **sıfırdır** —
+`INVOICE_SUPPLIER_*` ve `INVOICE_VAT_RATE` doldurulsa bile. Ayrı kart gerekiyor.
+
+⚠️ **`profileId` bugün varsayım.** Alıcının GİB'de e-Fatura mükellefi olup olmadığı
+entegratör sorgusu ister; sözleşme yokken bilinemiyor. `EARSIVFATURA` yazılıyor ve her
+kesimde `invoice_profile_assumed` uyarısı düşüyor. İlk gerçek gönderimden **önce** bu
+değeri taşıyan satırlar mükellef sorgusuyla yeniden profillenmeli.
+
 ## Doldurulacak tablo
 
 | Değişken | Nereden alınır | Örnek biçim | Zorunlu |
@@ -26,6 +42,7 @@ yoksa `404`. Sahte belge üretilmez, uydurma VKN yazılmaz.
 | `INVOICE_SUPPLIER_CITY` | Merkez adresin ili | `Ankara` | evet |
 | `INVOICE_SUPPLIER_COUNTRY` | Ülke | `Türkiye` (boşsa varsayılan) | hayır |
 | `INVOICE_SUPPLIER_EMAIL` | Muhasebe e-postası (UBL-TR zorunlu kılmaz) | `muhasebe@ornek.com` | hayır |
+| `INVOICE_VAT_RATE` | Aboneliğin KDV oranı (yüzde). Mali müşavire sorulur — depoda ilan edilen fiyatların KDV **dahil mi hariç mi** olduğunu söyleyen kayıt yok. Boşken **fatura kesilmez**. `0` = KDV'ye tabi değil (boş bırakmakla aynı şey değildir). | `20` | evet |
 | `EFATURA_INTEGRATOR_PROVIDER` | Sözleşme yapılan özel entegratörün adı | `uyumsoft` | evet* |
 | `EFATURA_INTEGRATOR_BASE_URL` | Entegratörün verdiği API adresi (test/canlı ayrı) | `https://efatura-test.ornek.com` | evet* |
 | `EFATURA_INTEGRATOR_USERNAME` | Entegratörün açtığı API kullanıcısı | `fabrika_api` | evet* |
@@ -62,6 +79,7 @@ Patron veya operatör tarafından sırayla takip edilecek adımlar:
 
 ### Adım 1: Değişkenleri Ortam Yöneticisine (Secrets/Vercel/.env) Girin
 - `INVOICE_SUPPLIER_*` (5 adet zorunlu: unvan, VKN, vergi dairesi, adres, il).
+- `INVOICE_VAT_RATE` (zorunlu — mali müşavirden alınır; boşken hiç fatura kesilmez).
 - `EFATURA_INTEGRATOR_*` (4 adet zorunlu: provider, API adresi, kullanıcı adı, parola).
 - İlk aşamada test ortamında `EFATURA_INTEGRATOR_TEST_MODE=true` bırakılır.
 

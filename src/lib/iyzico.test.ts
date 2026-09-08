@@ -6,6 +6,9 @@ vi.hoisted(() => {
   process.env.IYZICO_API_KEY = 'test-api-key';
   process.env.IYZICO_SECRET_KEY = 'test-secret-key';
   process.env.IYZICO_BASE_URL = 'https://sandbox-api.example.test';
+  // Same reason: the invoice writer reads the VAT rate through the parsed `env`,
+  // so it has to be present before the module graph loads.
+  process.env.INVOICE_VAT_RATE = '20';
 });
 
 vi.mock('@/lib/db', () => {
@@ -17,6 +20,11 @@ vi.mock('@/lib/db', () => {
     creditLedger: { create: vi.fn() },
     moduleState: { upsert: vi.fn() },
     auditEvent: { findFirst: vi.fn(), create: vi.fn() },
+    // The webhook issues the invoice for the payment (TASK-MTSWL8ADKZKDM), so
+    // the fake has to carry the tables that write path touches.
+    invoice: { findFirst: vi.fn(), create: vi.fn() },
+    tenantBillingIdentity: { findUnique: vi.fn() },
+    systemAlert: { create: vi.fn(), findMany: vi.fn(), update: vi.fn() },
     $executeRaw: vi.fn(),
     $transaction: vi.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
   };
@@ -86,6 +94,13 @@ beforeEach(() => {
   db.plan.findUnique.mockResolvedValue(planRow('pro', 500, ['M1', 'M2', 'M3']));
   db.subscription.findUnique.mockResolvedValue(null);
   db.auditEvent.findFirst.mockResolvedValue(null);
+  db.invoice.findFirst.mockResolvedValue(null);
+  db.invoice.create.mockResolvedValue({ id: 'inv_1', number: 'FB-2026-000001', ettn: 'ettn-1' });
+  db.systemAlert.create.mockResolvedValue({ id: 'alert_1' });
+  db.systemAlert.findMany.mockResolvedValue([]);
+  // No buyer fiscal identity by default: that is the state every tenant is in
+  // until one is supplied, and in it a payment must complete without an invoice.
+  db.tenantBillingIdentity.findUnique.mockResolvedValue(null);
 });
 
 describe('conversationId', () => {
@@ -245,6 +260,51 @@ describe('handleIyzicoWebhook', () => {
     const invoice = db.auditEvent.create.mock.calls[1][0].data.data;
     expect(invoice).toMatchObject({ amountMinor: 785_000, currency: 'TRY', provider: 'iyzico' });
     expect(Number.isInteger(invoice.amountMinor)).toBe(true);
+  });
+
+  it('issues no invoice while the tenant has supplied no fiscal identity', async () => {
+    // The payment must still go through — a sale that happened stays recorded —
+    // but no document may name a taxpayer nobody supplied (TASK-MTRD9QBJ2G32E).
+    const conversationId = buildConversationId(TENANT, 'pro', 'month');
+    const result = await handleIyzicoWebhook(notificationFor(conversationId), {
+      retrievePayment: async () => successfulDetail({ conversationId }),
+    });
+
+    expect(result).toMatchObject({ success: true, outcome: 'synced', invoiceNumber: null });
+    expect(db.invoice.create).not.toHaveBeenCalled();
+  });
+
+  it('issues the invoice once the tenant has a fiscal identity', async () => {
+    db.tenantBillingIdentity.findUnique.mockResolvedValue({
+      buyerName: 'Anadolu Teknoloji A.Ş.',
+      buyerVknTckn: '2840958172',
+      buyerTaxOffice: 'Doğanbey V.D.',
+      buyerAddress: 'ODTÜ Teknokent Blok B',
+      buyerCity: 'Ankara',
+      buyerCountry: 'Türkiye',
+    });
+    const conversationId = buildConversationId(TENANT, 'pro', 'month');
+    const result = await handleIyzicoWebhook(notificationFor(conversationId), {
+      retrievePayment: async () => successfulDetail({ conversationId }),
+    });
+
+    expect(result).toMatchObject({ success: true, invoiceNumber: 'FB-2026-000001' });
+    expect(db.invoice.create).toHaveBeenCalledTimes(1);
+    const row = db.invoice.create.mock.calls[0][0].data;
+    expect(row).toMatchObject({
+      tenantId: TENANT,
+      buyerVknTckn: '2840958172',
+      currency: 'TRY',
+      // Nothing has been filed with GİB, so the row must not claim otherwise.
+      gibEnvelopeId: null,
+    });
+    // ₺7850.00 charged at 20% is stored net; adding the VAT back returns the charge.
+    const lines = row.lines as Array<{ unitPriceMinor: number; vatRate: number }>;
+    const total = lines.reduce(
+      (sum, l) => sum + l.unitPriceMinor + Math.round((l.unitPriceMinor * l.vatRate) / 100),
+      0
+    );
+    expect(total).toBe(785_000);
   });
 
   it('is idempotent: the same event twice writes once', async () => {

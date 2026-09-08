@@ -41,6 +41,7 @@ model Tenant {
   invitations   Invitation[]
   approvalRequests ApprovalRequest[]
   invoices      Invoice[]
+  billingIdentity TenantBillingIdentity?
   planAssignments PlanAssignment[]
   @@index([deletedAt])
 }
@@ -377,10 +378,40 @@ model Invoice {                 // an invoice actually issued to a tenant; TASK-
   // NULL means the document was never filed: the exporter marks it as carrying
   // no fiscal value rather than claiming a fiscal seal it does not have.
   gibEnvelopeId String?
+  // The provider payment this invoice was issued for. Unique per tenant, so a
+  // redelivered webhook cannot issue a second invoice for one payment; NULL on
+  // rows written before the write path existed (TASK-MTSWL8ADKZKDM).
+  paymentRef    String?
   createdAt     DateTime @default(now())
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   @@unique([tenantId, number])
+  @@unique([tenantId, paymentRef])
   @@index([tenantId, issuedAt])
+}
+
+/// The buyer's *current* fiscal identity, as the tenant supplied it.
+///
+/// Nothing else in the schema held this: `Tenant` carries a display name and an
+/// ISO country code, and the billing panel used to read the buyer identity back
+/// off the newest invoice, which only ever echoes what an earlier invoice
+/// already claimed. Without a store, filling `Invoice.buyer*` would mean
+/// inventing a taxpayer (TASK-MTSWL8ADKZKDM).
+///
+/// This row is mutable; `Invoice.buyer*` is the snapshot frozen at issue time.
+/// Correcting a typo here never rewrites a document already sent to a customer.
+/// A tenant with no row here is not invoiced at all — a SystemAlert names the
+/// missing fields instead.
+model TenantBillingIdentity {
+  tenantId       String   @id
+  buyerName      String
+  buyerVknTckn   String             // 10-digit VKN or 11-digit TCKN, as supplied by the buyer
+  buyerTaxOffice String
+  buyerAddress   String
+  buyerCity      String
+  buyerCountry   String   @default("Türkiye")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model CreditLedger {

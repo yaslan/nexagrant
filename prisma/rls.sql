@@ -6,7 +6,7 @@ DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'Membership','Workspace','TenantProfile','ModuleState','Subscription','AddOn','CreditLedger',
-    'LifetimeLicence','Invoice',
+    'LifetimeLicence','Invoice','TenantBillingIdentity',
     'TopicMatch','SavedSearch','Opportunity','GateDecision','ConsortiumSeat','PartnerOrg','Proposal','Effort',
     'Evidence','ConceptNote','Relationship','Interaction','SeatCandidate','AiUsageLog','AuditEvent',
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',

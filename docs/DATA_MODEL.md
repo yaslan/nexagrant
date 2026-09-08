@@ -373,6 +373,79 @@ bağlantı yok (ölçüldü: sayfada `a[href*="/api/billing/invoices/"]` sayıs�
 satırlarına bağlı da değil. Bağlamak yeni i18n anahtarı (boş durum metni) gerektiriyor ve
 `messages/*.json` bu görevin kapsamı dışındaydı — ayrı kart gerekiyor.
 
+### 11.1 Faturayı kim yazar (TASK-MTSWL8ADKZKDM)
+
+`Invoice` tablosu, dışa aktarma rotası ve UBL-TR üreteci vardı; **hiçbir üretim kodu
+satır yazmıyordu.** Ölçüm (dev @ `aa11d85`):
+
+```
+$ grep -rniE "invoice\.(create|upsert|createMany)" src scripts prisma tests workers
+tests/e2e/invoice-export-real-record.spec.ts:81:      prisma.invoice.create({
+tests/e2e/billing-invoice-history.spec.ts:90:    await prisma.invoice.create({
+```
+
+İki test dosyası, sıfır üretim yazıcısı. Ödeme alınıyor, yalnız `AuditEvent` yazılıyordu;
+dolayısıyla ödeme yapmış her müşterinin faturası yoktu ve export her zaman `404` dönüyordu.
+
+Artık **iki ödeme yolu da tek bir fonksiyondan** yazıyor:
+`src/lib/billing/invoice-writer.ts` → `createInvoiceForPayment()`. Stripe
+(`subscription-sync.ts` → `logInvoicePayment`) ve iyzico (`iyzico.ts` webhook senkronu)
+onu çağırır; ikisi aynı satış için farklı belge üretemez.
+
+| Alan | Not |
+|---|---|
+| `paymentRef` | Faturanın kesildiği sağlayıcı ödemesi. **Kiracı içinde benzersiz** — yeniden iletilen bir webhook ikinci belge kesemez. Yazma yolu eklenmeden önce kesilmiş satırlarda `NULL`; Postgres benzersiz indekste NULL'ları ayrık saydığı için bu satırlar çakışmaz. |
+
+`TenantBillingIdentity` — alıcının **güncel** mali kimliği (kiracı başına tek satır,
+`tenantId` birincil anahtar + `tenant_isolation` RLS). Şemada bunu tutan **hiçbir yer
+yoktu**: `Tenant` yalnız görünen ad ve ISO ülke kodu taşıyor, Faturalandırma paneli ise
+alıcı kimliğini **en yeni faturadan** okuyordu — yani ancak daha önceki bir faturanın
+iddia ettiğini yankılayabiliyordu. Bu tablo olmadan `Invoice.buyer*` alanlarını doldurmanın
+tek yolu bir mükellef **uydurmaktı**; TASK-MTRD9QBJ2G32E bu depodan tam olarak onu temizledi.
+
+- Bu satır **değişebilir**; `Invoice.buyer*` kesim anındaki dondurulmuş fotoğraftır.
+  Buradaki bir yazım hatasını düzeltmek, müşteriye gitmiş bir belgeyi geriye dönük değiştirmez.
+- Kiracının satırı **yoksa ya da bir alanı boşsa fatura kesilmez**: ödeme kaydı yerinde
+  kalır, `SystemAlert` (`invoice_buyer_identity_missing`) eksik alanları **adıyla** sayar.
+  Uyarıya alanların **adı** yazılır, **değeri** değil — uyarı izi müşterinin vergi
+  kimliğinin ikinci bir kopyası olmamalıdır.
+- **Bu satırı bugün hiçbir ürün ekranı doldurmuyor** — toplama arayüzü ayrı bir kart.
+  O ekran yazılana kadar canlıda kesilecek fatura sayısı sıfırdır (aşağıya bakın).
+
+**KDV: `INVOICE_VAT_RATE`.** Varsayılanı **yoktur** ve satıcı kimliğiyle aynı gerekçeyle:
+bir satışın hangi oranda vergilendiği satıcıya ve ürüne dair mali bir olgudur, kodun
+seçebileceği bir sabit değil. Bu depoda ilan edilen fiyatların KDV **dahil mi hariç mi**
+olduğunu söyleyen hiçbir kayıt yok. Değişken boşken fatura kesilmez (`SystemAlert`,
+değişkeni adıyla anar); ödeme etkilenmez. `0` geçerli bir değerdir ve "KDV'ye tabi değil"
+demektir — "kimse ayarlamamış" ile aynı şey **değildir**.
+
+Tahsil edilen tutar **KDV dahil** kabul edilip ayrıştırılır, çünkü değişmez şudur:
+**faturanın genel toplamı tahsil edilen parayla birebir aynı olmak zorundadır.**
+Ayrıştırmanın bir inceliği ölçüldü: `net + round(net × oran/100)` her tam sayıya
+**denk gelmez** — %20'de her altı tutardan yalnız beşine ulaşır. Tek kalemde birebir
+eşleşme dayatan bir şema, ödemelerin yaklaşık **altıda birini** faturasız bırakırdı
+(200 000 minor unit'e kadar: %20'de tutarların %16,67'si; %18'de %15,25; %10'da %9,09).
+Bunun yerine taşmayan en büyük net alınır ve kalan artık, **kendi 0 KDV'li
+"Yuvarlama farkı" kalemi** olarak belgeye yazılır. Ölçüldü: bu artık test edilen her oran
+ve tutarda **en fazla 1 kuruştur** ve `net + KDV + yuvarlama` her zaman tahsilata eşittir.
+
+**`profileId` bugün bir varsayımdır.** Doğru değer alıcının GİB'de e-Fatura mükellefi olup
+olmadığına bağlıdır (`TICARIFATURA` ise mükellef, `EARSIVFATURA` değilse). Bu sorgu lisanslı
+entegratör gerektirir, sözleşme yoktur — yani cevap bugün gerçekten bilinmiyor.
+`EARSIVFATURA` yazılır ve her kesimde `invoice_profile_assumed` uyarısı düşer. Bu yalnızca
+hiçbir belge **gönderilmediği** için güvenlidir (`gibEnvelopeId` her satırda `NULL`, belgede
+"mali değeri yoktur" damgası). İlk gerçek gönderimden önce bu değeri taşıyan her satır
+mükellef sorgusuyla yeniden profillenmelidir.
+
+Numara: `FB-<yıl>-<altı hane>`, kiracı içinde artan. Tahsis, en yüksek numarayı okuyup bir
+sonrakini yazarak yapılır; hakemlik `@@unique([tenantId, number])` indeksindedir ve
+benzersizlik ihlalinde üç kez yeniden denenir. Eşzamanlı üç ödemeyle canlı DB'de ölçüldü.
+
+Migration: `prisma/migrations/add-invoice-write-path.sql` (additive + idempotent; iki kez
+koşuldu) — geri alma: `add-invoice-write-path.down.sql` (`TenantBillingIdentity`'yi düşürmek
+kiracıların verdiği mali kimliklerin **tek** kopyasını siler; `paymentRef`'i düşürmek ödeme
+başına tekillik güvencesini kaldırır — ödeme alan bir ortamda koşulmaz).
+
 ## 12. `SavedSearch` gerçek yazıcısı (TASK-MTS6M5819RW93)
 
 `SavedSearch` modeli ve `tenant_isolation` RLS politikası zaten şemadaydı, ama depoda hiçbir
