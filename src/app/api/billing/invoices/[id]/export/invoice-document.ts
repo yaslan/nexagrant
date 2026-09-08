@@ -71,6 +71,7 @@ export interface InvoiceRecord {
     targetCurrency: 'TRY';
     calculationRate: number;
     date?: string;
+    tryEquivalentMinor?: number;
   };
 }
 
@@ -106,11 +107,18 @@ export function exchangeRateFromRecord(
   if (calculationRate === null) return undefined;
 
   const date = record.fxRateDate ? record.fxRateDate.toISOString().slice(0, 10) : undefined;
+  // The stored lira total travels with the rate, so the document can state the
+  // figure it was issued with instead of recomputing one (VUK 215; F-4).
+  const tryEquivalentMinor =
+    typeof record.grandTotalTryMinor === 'number' && Number.isFinite(record.grandTotalTryMinor)
+      ? record.grandTotalTryMinor
+      : undefined;
   return {
     sourceCurrency: currency,
     targetCurrency: 'TRY',
     calculationRate,
     ...(date ? { date } : {}),
+    ...(tryEquivalentMinor !== undefined ? { tryEquivalentMinor } : {}),
   };
 }
 

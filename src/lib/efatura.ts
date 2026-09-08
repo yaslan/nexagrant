@@ -32,6 +32,17 @@ export interface InvoiceExchangeRate {
   targetCurrency: 'TRY';
   calculationRate: number;
   date?: string;
+  /**
+   * The lira equivalent of the payable grand total, in minor units, exactly as
+   * it was recorded on the invoice row (`Invoice.grandTotalTryMinor`).
+   *
+   * Optional because it is *read*, never derived: a document handed a rate but
+   * no recorded total prints the rate alone rather than multiplying one out.
+   * The figure on a fiscal document has to be the figure it was issued with,
+   * and a second, independently rounded copy of it would be a second claim
+   * about one sale (ADR-0002, KARAR §3).
+   */
+  tryEquivalentMinor?: number;
 }
 
 export interface EfaturaDocument {
@@ -216,6 +227,48 @@ export function formatInvoiceAmount(amount: number, currency: InvoiceCurrency): 
 /**
  * Resmî GİB UBL-TR 1.2.1 Standart XML Çıktısı Üretici
  */
+/**
+ * The one sentence that states the rate and the lira equivalent, or null.
+ *
+ * VUK 215 requires the lira equivalent to be shown *on the invoice*, and 385
+ * Sıra No.lu Genel Tebliğ makes it mandatory for a domestic sale. Storing it in
+ * a column satisfies neither: the buyer receives the rendered document and an
+ * inspector opens the XML. So both generators print this same sentence rather
+ * than each phrasing the figures their own way (TASK-MTSWLWDONWA3W, F-4).
+ *
+ * The bulletin date is part of the statement because a rate without its day is
+ * not checkable, and the day used may precede the issue date across a weekend
+ * (see `src/lib/fx/tcmb.ts`).
+ */
+export function exchangeRateStatement(
+  invoice: EfaturaDocument,
+  options: { includeTotal?: boolean } = {}
+): string | null {
+  const fx = invoice.exchangeRate;
+  if (!fx || invoice.currency === 'TRY') return null;
+  if (!Number.isFinite(fx.calculationRate) || fx.calculationRate <= 0) return null;
+
+  const rate = new Intl.NumberFormat('tr-TR', {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  }).format(fx.calculationRate);
+
+  const day = fx.date ? ` (${fx.date})` : '';
+  const head = `TCMB döviz alış kuru${day}: 1 ${fx.sourceCurrency} = ${rate} TRY`;
+
+  // The printed document states the total on its own totals row, so it asks
+  // for the rate alone and the figure is not repeated two lines apart.
+  if (options.includeTotal === false) return head;
+  if (typeof fx.tryEquivalentMinor !== 'number' || !Number.isFinite(fx.tryEquivalentMinor)) {
+    return head;
+  }
+  const tl = new Intl.NumberFormat('tr-TR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(fx.tryEquivalentMinor / 100);
+  return `${head} — ödenecek genel toplamın TL karşılığı: ${tl} TRY`;
+}
+
 export function generateUblTrXml(invoice: EfaturaDocument): string {
   const totals = calculateInvoiceTotals(invoice.lines, invoice.currency);
 
@@ -267,6 +320,15 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
       ? ''
       : `
   <cbc:Note>${UNFILED_NOTICE}</cbc:Note>`
+  }${
+    // The rate blocks below carry the rate; a reader still has to be told the
+    // lira figure the invoice was issued with rather than multiplying it out.
+    // `cbc:Note` is repeatable in UBL-TR, which is why the figure goes here and
+    // not into an element the schema does not define for it.
+    exchangeRateStatement(invoice)
+      ? `
+  <cbc:Note>${exchangeRateStatement(invoice)}</cbc:Note>`
+      : ''
   }
   <cbc:DocumentCurrencyCode>${invoice.currency}</cbc:DocumentCurrencyCode>${
     invoice.exchangeRate
@@ -510,7 +572,30 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
     <tr class="grand-total">
       <td class="label">ÖDENECEK GENEL TOPLAM:</td>
       <td style="text-align: right; font-family: monospace; color: #047857;">${money(totals.grandTotal)}</td>
+    </tr>${
+      // VUK 215: a foreign-currency invoice has to show its lira equivalent on
+      // the document itself. The row below is the only place a ₺ may appear on
+      // a document whose sale is in another currency — the amounts above stay
+      // in the currency the header declares (F-1, TASK-MTSWLWDONWA3W).
+      invoice.exchangeRate && invoice.currency !== 'TRY'
+        ? `
+    <tr>
+      <td class="label">TL karşılığı${
+        typeof invoice.exchangeRate.tryEquivalentMinor === 'number'
+          ? ''
+          : ' (kayıtlı tutar yok)'
+      }:</td>
+      <td style="text-align: right; font-family: monospace;">${
+        typeof invoice.exchangeRate.tryEquivalentMinor === 'number'
+          ? formatInvoiceAmount(invoice.exchangeRate.tryEquivalentMinor / 100, 'TRY')
+          : '—'
+      }</td>
     </tr>
+    <tr>
+      <td class="label" style="font-weight: normal; color: #475569;" colspan="2">${exchangeRateStatement(invoice, { includeTotal: false })}</td>
+    </tr>`
+        : ''
+    }
   </table>
 
   <div class="footer">

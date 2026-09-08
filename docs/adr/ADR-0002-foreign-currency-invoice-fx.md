@@ -203,3 +203,29 @@ karar hâlâ gerekli. Zamanlama riski: `TASK-MTRJSOWFH6B45`'e göre GİB env'ler
 abonelikler için hiç fatura GİB'e gönderilemez (yukarıdaki 2. madde gereği).
 Bu, sessizce yanlış fatura kesmekten iyidir ama **fatura kesilememesi de bir
 go-live blokerıdır** — kararın 12 Eylül'den önce verilmesi gerekiyor.
+
+---
+
+## QA 3. tur — Faz 2 doğrulaması ve F-4 (blok-zincir-denet-i, 2026-09-08)
+
+Faz 2 (`c029e1c` + `43d73b0`) gerçek üretim yolundan geçirilerek doğrulandı:
+canlı Postgres, gerçek `createInvoiceForPayment`, gerçek TCMB bülteni, gerçek
+`fileThrough`. Kanıt: `docs/agent-results/TASK-MTSWLWDONWA3W-blok-zincir-denet-i-3.md`.
+Kararın beş maddesi de ayakta (kur TCMB'den, gün kaydediliyor, kesintide fatura
+kesilmiyor, kapı koşullu hale gelmiş, uydurma kur yok).
+
+**F-4 — bulundu ve kapatıldı:** kur ve TL karşılığı satıra ve XML'in
+`PricingExchangeRate`/`TaxExchangeRate` bloklarına yazılıyordu, ama **insanın
+okuduğu belgeye hiç geçmiyordu**: bastırılan/PDF fatura "Para Birimi: USD"
+diyor, üç dolar tutarı gösteriyor, kuru da TL karşılığını da hiç yazmıyordu —
+oysa satırda ₺4.788,90 duruyordu. XML kuru söylüyor ama TL **rakamını** hiç
+söylemiyordu. VUK 215 TL karşılığının **fatura üzerinde gösterilmesini** ister;
+`docs/MALI_MUSAVIR_SORULARI.md` §6'daki kendi okumamız da aynı şeyi söylüyor.
+Bir kolonda duran ve müşterinin göremediği rakam bunu karşılamaz.
+
+Düzeltme (`exchangeRateStatement`, `src/lib/efatura.ts`): basılan belgenin
+toplamlar tablosuna "TL karşılığı" satırı + kur/bülten tarihi satırı; UBL-TR
+XML'ine aynı cümleyi taşıyan bir `cbc:Note` (Note UBL-TR'de tekrarlanabilir,
+şemanın tanımlamadığı bir elemana rakam yazılmadı). Rakam **satırdan okunur,
+yeniden çarpılmaz** — kayıtlı TL toplamı olmayan bir belge yalnız kuru basar,
+toplam uydurmaz.

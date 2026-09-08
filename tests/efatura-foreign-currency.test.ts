@@ -204,3 +204,75 @@ describe('currency conversion arithmetic (convertCurrencyMinor)', () => {
     expect(convertCurrencyMinor(100, 34.5049)).toBe(3450);
   });
 });
+
+/**
+ * F-4 (QA round 3, 2026-09-08). Phase 2 of ADR-0002 put the TCMB rate and the
+ * TL equivalent on the `Invoice` row and the rate into the UBL-TR exchange-rate
+ * blocks. Measured on the real export path, neither figure reached a document a
+ * person reads: the printable/PDF invoice — the artefact the buyer receives and
+ * an inspector opens — showed "Para Birimi: USD", three dollar amounts, and no
+ * rate, no bulletin date and no lira figure anywhere, while the row held
+ * ₺4.788,90. The XML stated the rate but no TL amount at all.
+ *
+ * VUK 215 requires the lira equivalent to be *shown on the invoice*, and this
+ * repo's own reading of it says the same (docs/MALI_MUSAVIR_SORULARI.md §6:
+ * "üzerine ... TCMB döviz alış kuru ve TL karşılığı" plus the date of the rate
+ * actually used). A figure stored in a column no customer can see does not
+ * satisfy that.
+ */
+describe('the TL equivalent is stated on the document, not only stored on the row', () => {
+  const RATE = 48.3727;
+  const usdWithRate: InvoiceRecord = {
+    ...USD_RECORD,
+    fxRate: RATE,
+    fxRateDate: new Date('2026-09-08T00:00:00.000Z'),
+    fxRateSource: 'TCMB',
+    // The payable grand total is 118.80 USD (99.00 + 20% VAT).
+    grandTotalTryMinor: convertCurrencyMinor(11880, RATE),
+  };
+
+  test('the printable invoice shows the rate, the bulletin date and the lira total', () => {
+    const html = generateEfaturaHtml(buildInvoiceDocument(usdWithRate, SUPPLIER));
+
+    expect(html).toContain('TCMB');
+    expect(html).toContain('48,3727');
+    expect(html).toContain('2026-09-08');
+    // 11880 * 48.3727 = 574,667.676 kuruş -> ₺5.746,68
+    expect(html).toContain('₺5.746,68');
+  });
+
+  test('the lira sign appears only on the lira figure — the sale is still in USD', () => {
+    const html = generateEfaturaHtml(buildInvoiceDocument(usdWithRate, SUPPLIER));
+    // F-1's rule still holds for every amount of the sale itself.
+    expect(html).toContain('$118,80');
+    expect((html.match(/₺/g) ?? []).length).toBe(1);
+  });
+
+  test('the filed XML carries the lira figure, not only the rate to compute it with', () => {
+    const xml = generateUblTrXml(buildInvoiceDocument(usdWithRate, SUPPLIER));
+
+    expect(xml).toContain('<cbc:CalculationRate>48.3727</cbc:CalculationRate>');
+    expect(xml).toContain('5.746,68 TRY');
+    expect(xml).toContain('TCMB');
+  });
+
+  test('a TRY invoice gains no exchange-rate line and no note', () => {
+    const html = generateEfaturaHtml(buildInvoiceDocument(TRY_RECORD, SUPPLIER));
+    const xml = generateUblTrXml(buildInvoiceDocument(TRY_RECORD, SUPPLIER));
+    expect(html).not.toContain('TCMB');
+    expect(xml).not.toContain('TCMB');
+  });
+
+  test('a rate with no recorded lira total prints the rate and invents no total', () => {
+    // The pre-assembled path (`record.exchangeRate`) can carry a rate without
+    // the row's stored total. The document may not fill that in by multiplying:
+    // the figure on a fiscal document is the one it was issued with.
+    const handBuilt: InvoiceRecord = {
+      ...USD_RECORD,
+      exchangeRate: { sourceCurrency: 'USD', targetCurrency: 'TRY', calculationRate: RATE, date: '2026-09-08' },
+    };
+    const html = generateEfaturaHtml(buildInvoiceDocument(handBuilt, SUPPLIER));
+    expect(html).toContain('48,3727');
+    expect(html).not.toContain('₺');
+  });
+});

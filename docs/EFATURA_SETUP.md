@@ -69,7 +69,9 @@ denenmez; eksik olan(lar) adıyla raporlanır (`not_configured`).
   `FOREIGN_CURRENCY_NO_TL_EQUIVALENT` ile geri çevirir (VUK 215 / 385 Sıra
   No.lu Genel Tebliğ). ADR-0002 2026-09-08'de Seçenek (b) ile karara bağlandı ve
   Faz 2 (`TASK-MTT13PK0Z4ZLB`) indi: `Invoice` satırı artık `fxRate`,
-  `fxRateDate`, `fxRateSource` ve `grandTotalTryMinor` taşıyor, UBL-TR XML'i
+  `fxRateDate`, `fxRateSource` ve `grandTotalTryMinor` taşıyor; kur ve TL
+  karşılığı ayrıca **basılan belgeye ve XML'e yazılır** (toplamlar tablosunda
+  "TL karşılığı" satırı, XML'de `cbc:Note` — VUK 215, QA 3. tur F-4), UBL-TR XML'i
   `PricingExchangeRate`/`TaxExchangeRate` bloklarını yazıyor ve engel yalnız
   **kaydı olmayan** belgede kalıyor. Belge *üretimi* (export) her iki durumda da
   etkilenmez: zarf numarası olmayan belge zaten "mali değeri yoktur" damgası
