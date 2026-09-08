@@ -87,7 +87,7 @@ import {
   type SurveySendReceipt,
   type SurveySendRecipient,
 } from '../src/lib/beta/esr-send-receipt';
-import { evaluateEsrReadiness, type CalibrationRowCounts } from '../src/lib/beta/esr-readiness';
+import { deadlineWindow, evaluateEsrReadiness, type CalibrationRowCounts } from '../src/lib/beta/esr-readiness';
 import {
   assignSamplesToPartners,
   buildResponseTemplateCsv,
@@ -942,6 +942,23 @@ async function main(): Promise<number> {
           `--send refused: every partner on this roster (${alreadySent.length}) is already in the send receipt ` +
             `(last accepted ${priorReceipt?.sentAt}). There is nothing left to deliver, and re-sending would mail ` +
             `partners who have already answered. Pass --resend to deliver a second copy on purpose.`,
+        );
+      }
+      // The date on the sheet is a promise to people who have not been written to yet, and this
+      // mail cannot be recalled to correct it. The readiness gate has been warning that the pinned
+      // deadline is closer than the answering window, but a warning on a separate read-only command
+      // does not stop this one: without this guard the survey goes out on the day the roster lands
+      // carrying a date that already owes the partners more time — or, if the roster arrives late
+      // enough, a date in the past. Same arithmetic as the gate, deliberately shared.
+      const window = deadlineWindow(new Date().toISOString().slice(0, 10), opts.deadline, ESR_SURVEY_WINDOW_DAYS);
+      if (!window.givesFullWindow) {
+        throw new Error(
+          `--send refused: deadline ${opts.deadline} is ` +
+            `${window.daysLeft >= 0 ? `only ${window.daysLeft} day(s) away` : `${-window.daysLeft} day(s) in the past`}, ` +
+            `so it cannot give partners the ${ESR_SURVEY_WINDOW_DAYS}-day answering window ` +
+            `(${window.shortfall} day(s) short). Mailing it would commit to a date already missed.\n` +
+            `  Re-pin ESR_SURVEY_DEADLINE (src/lib/beta/constants.ts) to send-day + ${ESR_SURVEY_WINDOW_DAYS}, ` +
+            `or pass --deadline=YYYY-MM-DD for a one-off run. Do not shorten the window to fit the old date.`,
         );
       }
       if (skip.size > 0) {

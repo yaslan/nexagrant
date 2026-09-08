@@ -87,6 +87,32 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((b - a) / 86_400_000);
 }
 
+/**
+ * Can this deadline still give a partner the full answering window?
+ *
+ * The pinned date is a commitment made to people who have not been written to
+ * yet, so the only honest question is not "has it passed" but "is it still far
+ * enough away". A deadline closer than the window is already owed a later date
+ * on the day it is mailed.
+ *
+ * Lives here, and only here, because two callers need the same answer and they
+ * must not drift: the read-only gate reports it, and `--send` refuses on it.
+ * The gate warns (nothing has gone out, so nothing is wrong yet); the send
+ * refuses (the mail is irreversible and would carry the unmeetable date).
+ */
+export function deadlineWindow(
+  today: string,
+  deadline: string,
+  windowDays: number,
+): { daysLeft: number; givesFullWindow: boolean; shortfall: number } {
+  const daysLeft = daysBetween(today, deadline);
+  return {
+    daysLeft,
+    givesFullWindow: daysLeft >= windowDays,
+    shortfall: Math.max(0, windowDays - daysLeft),
+  };
+}
+
 function ok(id: string, label: string, detail: string): ReadinessCheck {
   return { id, label, severity: 'ok', detail, fix: '' };
 }
@@ -252,12 +278,12 @@ export function evaluateEsrReadiness(input: EsrReadinessInput): EsrReadinessRepo
   }
 
   // 8 — the deadline. A date nobody was given is not a deadline.
-  const daysLeft = daysBetween(input.today, input.deadline);
+  const { daysLeft, givesFullWindow } = deadlineWindow(input.today, input.deadline, input.windowDays);
   if (!input.sendReceipt) {
     // The pinned date is unreachable once it is closer than the answering window: sending today
     // would already owe the partners a later date. Saying "13 day(s) away" reads like runway that
     // does not exist, so the gate does the subtraction it was only ever hinting at.
-    const unreachable = daysLeft < input.windowDays;
+    const unreachable = !givesFullWindow;
     checks.push({
       id: 'deadline',
       label: 'Deadline is a real commitment',
@@ -265,7 +291,7 @@ export function evaluateEsrReadiness(input: EsrReadinessInput): EsrReadinessRepo
       detail: unreachable
         ? `${input.deadline} is ${daysLeft >= 0 ? `only ${daysLeft} day(s) away` : `${-daysLeft} day(s) past`} and nothing has been sent — it can no longer give partners the ${input.windowDays}-day window, so it is already a date that must be re-pinned, not met`
         : `${input.deadline} is ${daysLeft} day(s) away, but nothing has been sent — no partner has ever seen this date`,
-      fix: `Re-pin ESR_SURVEY_DEADLINE (src/lib/beta/constants.ts) to send-day + ${input.windowDays} when the survey actually goes out.`,
+      fix: `Re-pin ESR_SURVEY_DEADLINE (src/lib/beta/constants.ts) to send-day + ${input.windowDays} when the survey actually goes out. This is enforced, not advisory: --send refuses while the deadline is closer than the window, so re-pin before the send rather than discovering it at the mail step.`,
     });
   } else if (daysLeft < 0) {
     checks.push({

@@ -39,8 +39,10 @@ import {
   buildResponseTemplateCsv,
 } from '../src/lib/beta/esr-survey';
 import { parseBetaRoster } from '../src/lib/beta/roster';
+import { ESR_SURVEY_DEADLINE } from '../src/lib/beta/constants';
 import {
   daysBetween,
+  deadlineWindow,
   evaluateEsrReadiness,
   type EsrReadinessInput,
 } from '../src/lib/beta/esr-readiness';
@@ -679,5 +681,70 @@ describe('E11.3 gate does not mistake a verdict count for coverage', () => {
     expect(check.severity).toBe('blocked');
     expect(check.detail).toMatch(/refused/);
     expect(check.detail).toMatch(/not in the sample set: S1/);
+  });
+});
+
+describe('E11.3 deadline must survive the send, not just the gate', () => {
+  // The pinned deadline is a promise to people who have not been written to yet, and the mail
+  // cannot be recalled to correct it. The readiness gate only warns — it is a separate, read-only
+  // command — so this arithmetic is what `--send` refuses on.
+  const WINDOW = 14;
+
+  test('a deadline exactly one window away is still deliverable', () => {
+    const w = deadlineWindow('2026-09-08', '2026-09-22', WINDOW);
+    expect(w.daysLeft).toBe(14);
+    expect(w.givesFullWindow).toBe(true);
+    expect(w.shortfall).toBe(0);
+  });
+
+  // The state the repo is actually in: pinned 2026-09-21, measured on 2026-09-08. It reads like
+  // runway ("13 days away") and is not one.
+  test('the currently pinned date is one day short and must not be mailed', () => {
+    const w = deadlineWindow('2026-09-08', ESR_SURVEY_DEADLINE, WINDOW);
+    expect(w.daysLeft).toBe(13);
+    expect(w.givesFullWindow).toBe(false);
+    expect(w.shortfall).toBe(1);
+  });
+
+  test('a deadline already in the past is short by more than the whole window', () => {
+    const w = deadlineWindow('2026-09-30', '2026-09-21', WINDOW);
+    expect(w.daysLeft).toBe(-9);
+    expect(w.givesFullWindow).toBe(false);
+    expect(w.shortfall).toBe(23);
+  });
+
+  test('re-pinning to send-day + window is what clears it', () => {
+    const w = deadlineWindow('2026-09-30', '2026-10-14', WINDOW);
+    expect(w.givesFullWindow).toBe(true);
+  });
+
+  // The gate and the send guard must never drift apart: the warning an operator reads on Monday
+  // has to be the same subtraction that refuses the mail on Tuesday. Two copies of this arithmetic
+  // would let the gate say "unreachable" while `--send` mails it anyway, which is exactly the
+  // shape of every silent green already found on this card.
+  test('the gate calls unreachable exactly what the send guard refuses', () => {
+    const base: EsrReadinessInput = {
+      sampleCount: 20,
+      isFixture: true,
+      dbRows: { opportunities: 20, proposals: 20, gateDecisions: 20, cordisProjects: 20 },
+      rosterSize: 10,
+      undeliverable: 0,
+      sendReceipt: null,
+      responseCount: 0,
+      responsesAreSelfTest: false,
+      responseProblem: null,
+      samplesWithVerdicts: 0,
+      accuracy: 0.8,
+      deadline: '2026-09-21',
+      windowDays: WINDOW,
+      today: '2026-09-08',
+    };
+
+    for (const deadline of ['2026-09-21', '2026-09-22', '2026-09-01', '2026-10-31']) {
+      const detail = evaluateEsrReadiness({ ...base, deadline }).checks.find((c) => c.id === 'deadline')!.detail;
+      const gateSaysUnreachable = detail.includes('can no longer give partners');
+      const sendWouldRefuse = !deadlineWindow(base.today, deadline, WINDOW).givesFullWindow;
+      expect({ deadline, gateSaysUnreachable }).toEqual({ deadline, gateSaysUnreachable: sendWouldRefuse });
+    }
   });
 });
