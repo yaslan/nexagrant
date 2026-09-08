@@ -1,6 +1,6 @@
 ---
 name: fabrika-idempotency-which-tables-must-stay-flat
-description: "İşi iki kez koştur, satır sayısı değişmesin" testinde Fabrika'da yalnız normalize tablolar sabit kalır — RawFetch gün-aşırı büyür, SystemAlert HER koşuda büyür; ölçümü arka arkaya yap ve dünün sayısına karşı okuma
+description: "İşi iki kez koştur, satır sayısı değişmesin" testinde Fabrika'da yalnız normalize tablolar sabit kalır — RawFetch gün-aşırı büyür, SystemAlert artık aynı meta'da katlanır ama meta değişince yeni satır açar; ölçümü arka arkaya yap ve dünün sayısına karşı okuma
 metadata:
   type: project
   updatedAt: 2026-09-08
@@ -25,15 +25,24 @@ AFTER RUN 3  {"Call":430,"Topic":1288,"RawFetch":2486,"SystemAlert":10,"Programm
    değişince yeni satır yazar: yukarıda RUN 1 bir günlük SEDIA değişimi yüzünden
    **+1212** satır yazdı, RUN 2–3 hiç yazmadı. Yani **dünkü sayıya karşı ölçme** —
    büyümeyi regresyon sanarsın. Günde ~1200 satır; saklama politikası hâlâ yok.
-3. **`SystemAlert` HER koşuda büyür — tekrar koruması yoktur.**
-   `src/lib/observability/system-alert.ts:139` düz `systemAlert.create`; ne dedupe ne
-   throttle. Aynı metin + aynı `meta` her koşuda yeni satır: ölçümde 3 özdeş
-   "CORDIS worker unreachable" ve 3 özdeş "K1 … more than once" satırı çıktı.
-   **Bir alert satırının artması idempotans ihlali DEĞİLDİR** — ama gece koşan bir iş
-   için sonsuz büyüme yoludur ve `/admin/alerts` ekranını gömer.
+3. **`SystemAlert` artık aynı olayda büyümüyor — ama koşulu `meta`.**
+   *(2026-09-08'e kadar büyüyordu; TASK-MTS80DUAF39Z8 / commit `f79156d` kapattı.
+   Eski not "dedupe yok" diyordu, o artık YANLIŞ.)* `recordAlert()` **çözülmemiş** ve
+   `(level, source, message, çağıranın meta'sı)` olarak aynı bir uyarı bulursa yeni satır
+   yazmaz; o satırı `alertRepeatCount` / `alertLastSeenAt` ile günceller.
+   Doğrudan sonucu: **kimliğin bir parçası `meta`.** Meta'sına her koşuda değişen bir alan
+   koyan çağıran (zaman damgası, deneme sayısı, rastgele id, farklı host/ay) dedupe'u
+   SESSİZCE devre dışı bırakır ve eski sonsuz-büyüme davranışına döner. Ölçülmüş örnek:
+   aynı `CORDIS worker unreachable` metni `{"host":"localhost:8000","month":"2026-09"}`
+   ile tek satırda `×6` katlanırken, `{"host":"127.0.0.1:8123","month":"2026-12"}` ayrı
+   satır açtı — bu doğru davranış, kaçak değil.
+   Uyarıyı **çözmek** pencereyi kapatır: sonraki oluş taze satır açar (bilerek).
+   Düzeltmeden ÖNCE yazılmış özdeş satırlar geriye dönük birleştirilmedi; hâlâ orada
+   (2026-09-08 ölçümü: 3 yinelenen grup, 7 satır). Saklama politikası hâlâ YOK.
 
 **Nasıl uygula:** idempotans iddiasını ölçerken (a) iki koşuyu **arka arkaya** yap,
-(b) sabit kalmasını beklediğin tablo listesine `SystemAlert`'i KOYMA, (c) `RawFetch`
+(b) `SystemAlert`'ten "satır sayısı sabit" bekle ama yalnız `meta` da sabitse — değilse
+sayım artar ve bu ihlal değildir, (c) `RawFetch`
 büyüdüyse önce "üst kaynak değişti mi" diye ikinci bir koşuyla ayır — üçüncü koşuda da
 büyüyorsa o zaman gerçek hatadır (bu hata bir kez oldu: SEDIA aynı identifier'ı tek
 koşuda iki kez döndürüyordu, `k1-daily-calls.ts:87` tekilleştirmesi bunun için var).
