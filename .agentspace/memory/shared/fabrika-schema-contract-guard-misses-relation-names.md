@@ -3,7 +3,7 @@ name: fabrika-schema-contract-guard-misses-relation-names
 description: schema-contract.test.ts artık alan/ilişki adlarını da repo geneli (src/) kontrol ediyor — kalan kör noktaları create/update'in data: bloğu, import edilen sorgu nesnesi ve dinamik kurulan where
 metadata:
   type: project
-  updatedAt: 2026-09-07
+  updatedAt: 2026-09-08
 ---
 
 `src/modules/m8/server/schema-contract.test.ts` (adı M8 diyor, kapsamı repo geneli).
@@ -24,7 +24,11 @@ Sentetik anahtar gerçek bir kolonu gölgelemiyor.
 
 1. **`create`/`update`'in `data:` bloğu taranmıyor.** `FIELD_BEARING` yalnız
    `where` / `select` / `include` / `orderBy`. `data: { hayaletKolon: … }` runtime'da
-   patlar, kapı görmez.
+   patlar, kapı görmez. **DENEYLE ÖLÇÜLDÜ (2026-09-08, TASK-MTRK9FMKE3GSB):** izole
+   worktree'de `cordis-sync.ts`'in `upsert`'üne uydurma bir kolon enjekte edildi —
+   `create: { …, totallyBogusColumn }` → `11 passed`, kapı YAKALAMADI;
+   aynı kolon `where: { …, totallyBogusColumn }` → `1 failed`, YAKALADI. Kör nokta
+   teorik değil, bugün hâlâ açık.
 2. **Sorgu nesnesi BAŞKA dosyadan import edilirse görünmez.** Tarayıcı, çağrı argümanı
    çıplak bir tanımlayıcıysa **aynı dosyadaki** `const <ad> = { ... }` bildirimini çözer
    (alerts-daily.ts'in `SAVED_SEARCH_ALERT_QUERY`'si böyle kapsandı) — ama import
