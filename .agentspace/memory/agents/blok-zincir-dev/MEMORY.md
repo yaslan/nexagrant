@@ -1,3 +1,6 @@
 # Memory Index
 
 - [fabrika-idempotent-covers-the-db-not-the-mailbox](fabrika-idempotent-covers-the-db-not-the-mailbox.md) — Bir betik "running twice is safe" diyorsa bu genelde yalnız DB upsert'leri içindir — mail/ödeme/webhook gibi dış yan etkiler ayrıca korunmalı; Fabrika'da esr-calibration --send tam olarak böyleydi
+
+- [fabrika-a-count-is-not-coverage](fabrika-a-count-is-not-coverage.md) — Bir kapı "N kayıt işlendi" sayısına bakıyorsa hâlâ kör — sayı KAPSAM değildir; teyit edilen birim / toplam birim ölç
+- [fabrika-silently-dropped-input-inflates-a-success-count](fabrika-silently-dropped-input-inflates-a-success-count.md) — `.find` ile eşleştirilen girdi satırı eşleşmezse sessizce düşer ama sayaçta kalır — anlaşılmayan girdi ya reddedilmeli ya raporlanmalı, asla atlanmamalı
