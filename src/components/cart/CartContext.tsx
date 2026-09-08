@@ -1,10 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
-  priceLine,
-  UnknownSkuError,
-  UnsupportedCycleError,
   type BillingCycle,
   type DiscountTier,
   type PricedLine,
@@ -16,10 +13,14 @@ import {
  * The cart used to carry `price`, `originalPrice` and `discountPercent` as
  * floats and post them to checkout, which is how the browser got to name its
  * own price. It also meant a cart left in localStorage kept quoting a campaign
- * that had already ended. Amounts are now derived on every render from
- * `priceLine()` — the same function the checkout route prices with — under the
- * tier the server hands down, so what the drawer shows and what the server
- * charges cannot drift apart.
+ * that had already ended.
+ *
+ * It then derived the amounts in the browser from the static catalogue, which
+ * held for as long as the catalogue was the price. Since TASK-MTSHVKTSGC8A4 a
+ * plan's price is the published `PlanVersion` the studio wrote, and which plans
+ * a viewer may buy at all depends on their tenant — neither of which the
+ * browser can know. So the amounts now come from `POST /api/billing/quote`,
+ * which prices exactly as `POST /api/billing/checkout` charges.
  */
 export interface CartItem {
   /** Catalogue sku (`plan-pro`, `lifetime-ultra`). The only price authority. */
@@ -31,9 +32,16 @@ export interface CartItem {
   quantity: number;
 }
 
-/** A cart line with its catalogue price attached, ready to render. */
+/**
+ * A cart line with the server's price attached, ready to render.
+ *
+ * `priced` is null while the quote has not arrived or could not be obtained.
+ * The row still lists — the customer must be able to see and remove what is in
+ * their cart — but it carries no figure, because the only figure available in
+ * that state would be one the browser invented.
+ */
 export interface PricedCartItem extends CartItem {
-  priced: PricedLine;
+  priced: PricedLine | null;
 }
 
 export interface CartTotals {
@@ -45,6 +53,14 @@ export interface CartTotals {
   totalMinor: number;
   currency: string;
   lines: PricedCartItem[];
+  /**
+   * False while the server has not answered yet, or could not. The drawer shows
+   * no figure in that state: a total the browser made up is the defect, not the
+   * fallback.
+   */
+  measured: boolean;
+  /** Skus the server refused to price for this viewer, dropped from `lines`. */
+  unavailable: string[];
 }
 
 interface CartContextType {
@@ -138,40 +154,132 @@ export function CartProvider({
 
   const clearCart = () => setCartItems([]);
 
-  const getCartTotal = (): CartTotals => {
-    const lines: PricedCartItem[] = [];
-    for (const item of cartItems) {
+  /**
+   * The cart, as a stable string. Used to tell a quote that belongs to what is
+   * in the cart right now from one that answered an older cart — a stale total
+   * next to a "Pay" button is the same defect as an invented one.
+   */
+  const signature = JSON.stringify(
+    cartItems.map((item) => [item.sku, item.quantity, item.billingCycle])
+  );
+
+  /**
+   * What the server says this cart costs, and which cart it was asked about.
+   *
+   * `null` until the first answer arrives, and whenever one could not be
+   * obtained. It is deliberately not seeded with a locally computed total: the
+   * browser does not know the published plan version or this tenant's
+   * visibility, so any figure it produced would be a guess sitting next to a
+   * "Pay" button.
+   */
+  const [quote, setQuote] = useState<{ signature: string; totals: CartTotals } | null>(null);
+
+  useEffect(() => {
+    // An empty cart needs no server round trip; `getCartTotal` answers it
+    // directly, so nothing is set here.
+    if (cartItems.length === 0) return;
+
+    // A cart edited again before the answer lands must not be overwritten by
+    // the stale one.
+    let current = true;
+    const controller = new AbortController();
+    const asked = signature;
+
+    (async () => {
       try {
-        lines.push({
-          ...item,
-          priced: priceLine(
-            { sku: item.sku, billingCycle: item.billingCycle, quantity: item.quantity },
-            activeTier
-          ),
+        const response = await fetch('/api/billing/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            items: cartItems.map((item) => ({
+              sku: item.sku,
+              quantity: item.quantity,
+              billingCycle: item.billingCycle,
+            })),
+          }),
+        });
+        if (!response.ok) throw new Error(`quote responded ${response.status}`);
+        const data = (await response.json()) as {
+          lines?: PricedLine[];
+          unavailable?: string[];
+          subtotalMinor?: number;
+          discountMinor?: number;
+          totalMinor?: number;
+          currency?: string;
+        };
+        if (!current) return;
+
+        // Each priced line is matched back to the cart row it came from, so the
+        // drawer keeps its own labels while every amount stays the server's.
+        const lines: PricedCartItem[] = (data.lines ?? []).map((priced) => {
+          const item = cartItems.find((candidate) => candidate.sku === priced.sku);
+          return {
+            sku: priced.sku,
+            type: item?.type ?? 'plan',
+            name: item?.name ?? priced.name,
+            subtitle: item?.subtitle,
+            billingCycle: priced.billingCycle,
+            quantity: priced.quantity,
+            priced,
+          };
+        });
+
+        setQuote({
+          signature: asked,
+          totals: {
+            subtotalMinor: data.subtotalMinor ?? 0,
+            discountMinor: data.discountMinor ?? 0,
+            totalMinor: data.totalMinor ?? 0,
+            currency: data.currency ?? 'USD',
+            lines,
+            measured: true,
+            unavailable: data.unavailable ?? [],
+          },
         });
       } catch (error) {
-        // A sku the catalogue does not know cannot be shown with a price and
-        // would be refused by checkout anyway (400). Skipping it keeps the
-        // drawer total equal to what the server will charge.
-        if (error instanceof UnknownSkuError || error instanceof UnsupportedCycleError) continue;
-        throw error;
+        if (!current || (error instanceof DOMException && error.name === 'AbortError')) return;
+        // Unmeasured, not zero: the drawer says it cannot price the cart rather
+        // than showing a total nobody would honour.
+        setQuote(null);
       }
-    }
+    })();
 
-    const subtotalMinor = lines.reduce(
-      (sum, line) => sum + line.priced.listAmountMinor * line.priced.quantity,
-      0
-    );
-    const totalMinor = lines.reduce((sum, line) => sum + line.priced.totalMinor, 0);
-
-    return {
-      subtotalMinor,
-      discountMinor: subtotalMinor - totalMinor,
-      totalMinor,
-      currency: lines[0]?.priced.currency ?? 'USD',
-      lines,
+    return () => {
+      current = false;
+      controller.abort();
     };
-  };
+    // `signature` is what actually changes the request; `cartItems` is read
+    // inside and changes identity on every render of the provider's parent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+
+  const getCartTotal = useCallback((): CartTotals => {
+    if (cartItems.length === 0) {
+      return {
+        subtotalMinor: 0,
+        discountMinor: 0,
+        totalMinor: 0,
+        currency: 'USD',
+        lines: [],
+        measured: true,
+        unavailable: [],
+      };
+    }
+    // A quote for a different cart is no quote at all.
+    if (quote && quote.signature === signature) return quote.totals;
+    return {
+      subtotalMinor: 0,
+      discountMinor: 0,
+      totalMinor: 0,
+      currency: 'USD',
+      // The rows are the cart's own, so the drawer can still list and remove
+      // what is in it while the prices are unknown.
+      lines: cartItems.map((item) => ({ ...item, priced: null })),
+      measured: false,
+      unavailable: [],
+    };
+  }, [quote, cartItems, signature]);
 
   return (
     <CartContext.Provider

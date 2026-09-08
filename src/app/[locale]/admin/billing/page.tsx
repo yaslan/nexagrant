@@ -4,6 +4,8 @@ import { requireTenantPage } from '@/lib/tenant';
 import { BillingSsoClient } from './client';
 import { errorMessage } from '@/lib/errors';
 import { getActiveTier } from '@/lib/billing/active-tier';
+import { NO_DISCOUNT_TIER } from '@/lib/billing/catalog';
+import { readStorefront } from '@/lib/billing/storefront';
 
 /** The Tenant fields the billing header shows, with its subscription. */
 interface TenantWithSubscription {
@@ -37,17 +39,23 @@ export default async function AdminBillingPage({
     console.warn(`[AdminBillingPage] DB query failed: ${errorMessage(e)}`);
   }
 
+  const activeTier = getActiveTier();
+  // Prices come from the published plan versions this tenant may see, under the
+  // server's live tier — the same list and the same arithmetic the public
+  // pricing page and `/api/billing/checkout` use.
+  const storefront = await readStorefront(tenantId, activeTier, NO_DISCOUNT_TIER);
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* Prices come from the catalogue under the server's live tier — the same
-          pair the public pricing page and the checkout route use. */}
       <BillingSsoClient
         locale={locale}
         tenantId={tenantId}
         tenantName={tenant?.name || ''}
         currentPlanId={subscription?.planId || ''}
         currentProvider="stripe"
-        activeTier={getActiveTier()}
+        activeTier={activeTier}
+        plans={storefront.cards}
+        plansMeasured={storefront.measured}
       />
     </div>
   );

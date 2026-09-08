@@ -10,6 +10,7 @@ import { CartProvider } from '@/components/cart/CartContext';
 import { NO_DISCOUNT_TIER } from '@/lib/billing/catalog';
 import { lifetimeScarcity } from '@/lib/billing/lifetime-licence';
 import type { InvoiceListRow } from '@/lib/billing/invoice-list';
+import { storefrontCardsFixture } from './helpers/storefront-plans';
 
 /**
  * The invoice history and the quota cards on /settings/billing.
@@ -76,6 +77,8 @@ function renderPanel(
           invoices={[]}
           invoicesMeasured
           buyerIdentity={null}
+          plans={storefrontCardsFixture()}
+          plansMeasured
           {...props}
         />
       </CartProvider>

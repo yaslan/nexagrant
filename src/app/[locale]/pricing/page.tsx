@@ -2,8 +2,11 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import React from 'react';
 import PricingClient from './PricingClient';
+import { auth } from '@/lib/auth';
 import { getActiveTier } from '@/lib/billing/active-tier';
+import { DISCOUNT_TIERS, NO_DISCOUNT_TIER } from '@/lib/billing/catalog';
 import { countLifetimeLicences, lifetimeScarcity } from '@/lib/billing/lifetime-licence';
+import { readStorefront } from '@/lib/billing/storefront';
 
 /**
  * The scarcity badge counts rows, so the page cannot be baked at build time —
@@ -50,5 +53,36 @@ export default async function PricingPage({
   // `LifetimeLicence` rows, and when it cannot be read the state is `unknown`
   // and the badge claims no number — it is not silently zero.
   const scarcity = lifetimeScarcity(await countLifetimeLicences());
-  return <PricingClient locale={locale} activeTier={getActiveTier()} lifetimeScarcity={scarcity} />;
+  const activeTier = getActiveTier();
+
+  // The plan cards, priced here rather than in the browser (TASK-MTSHVKTSGC8A4).
+  //
+  // Two things move by doing it on the server. The figures now come from the
+  // published `PlanVersion` rows the plan studio writes, so a price published
+  // in the studio is the price this page quotes and `/api/billing/checkout`
+  // charges — until this task the page read a static array and the studio's
+  // price reached nobody. And a visitor who is signed in sees the plans that
+  // are visible *to their tenant*: the public list plus any private plan
+  // assigned to them, and no private plan that was not.
+  //
+  // A visitor with no session is anonymous here on purpose — the public list is
+  // what a stranger may see.
+  const session = await auth();
+  const storefront = await readStorefront(
+    session?.tenantId ?? null,
+    activeTier,
+    NO_DISCOUNT_TIER,
+    DISCOUNT_TIERS
+  );
+
+  return (
+    <PricingClient
+      locale={locale}
+      activeTier={activeTier}
+      lifetimeScarcity={scarcity}
+      plans={storefront.cards}
+      tierSchedule={storefront.schedule}
+      plansMeasured={storefront.measured}
+    />
+  );
 }

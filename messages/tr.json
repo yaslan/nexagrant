@@ -1117,7 +1117,10 @@
       "orderSummary": "Sipariş özeti:",
       "serverTotal": "Sunucunun hesapladığı toplam:",
       "pricedUnder": "{code} kampanyası ile fiyatlandı (-%{percent}).",
-      "completeDemo": "Test ödemesini tamamla (demo)"
+      "completeDemo": "Test ödemesini tamamla (demo)",
+      "pricePending": "Fiyat sunucudan bekleniyor…",
+      "totalUnavailable": "Sepet tutarı şu anda sunucudan alınamıyor. Yanlış bir rakam göstermemek için toplam boş bırakıldı.",
+      "unavailableLines": "Şu kalemler kuruluşunuza açık değil ve toplama dahil edilmedi: {skus}"
     },
     "pricing": {
       "policyBadge": "Kademeli erken kayıt indirim politikası",
@@ -1215,7 +1218,9 @@
           "f5": "En fazla 15 ekip üyesi koltukları ve rol yönetimi",
           "f6": "GİB e-fatura ve resmî kurumsal sözleşme (SLA)"
         }
-      }
+      },
+      "plansUnavailable": "Paket listesi şu anda okunamıyor. Fiyatları tahmin etmemek için burada bir rakam göstermiyoruz; birazdan tekrar deneyin.",
+      "plansEmpty": "Şu anda satın alınabilir bir paket yayında değil."
     },
     "admin": {
       "kicker": "Faturalama ve kurumsal kimlik",
@@ -1277,7 +1282,8 @@
           "f3": "CORDIS tam veri dışa aktarımı (JSON/CSV)",
           "f4": "GİB e-fatura ve kurumsal SLA"
         }
-      }
+      },
+      "plansUnavailable": "Paket listesi şu anda okunamıyor. Yanlış bir fiyat göstermemek için burada rakam vermiyoruz."
     },
     "settings": {
       "breadcrumbDashboard": "Panel",
@@ -1386,7 +1392,9 @@
           "credits": "2.000 YZ kredisi / ay",
           "modules": "Modüller: M1-M11"
         }
-      }
+      },
+      "plansUnavailable": "Paket listesi şu anda okunamıyor. Yanlış bir fiyat göstermemek için burada rakam vermiyoruz; birazdan tekrar deneyin.",
+      "plansEmpty": "Kuruluşunuza şu anda açık bir paket yok."
     }
   },
   "adminPlans": {

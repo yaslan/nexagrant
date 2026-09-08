@@ -7,7 +7,8 @@ import { errorMessage } from '@/lib/errors';
 import { getActiveTier } from '@/lib/billing/active-tier';
 import { countLifetimeLicences, lifetimeScarcity } from '@/lib/billing/lifetime-licence';
 import { effectiveTier, isQuotedOnLock, priceLockDefect, readPriceLock } from '@/lib/billing/price-lock';
-import { resolvePlanId, FALLBACK_PLAN_ID } from '@/lib/billing/catalog';
+import { resolvePlanId, FALLBACK_PLAN_ID, NO_DISCOUNT_TIER } from '@/lib/billing/catalog';
+import { readStorefront } from '@/lib/billing/storefront';
 import {
   buildInvoiceList,
   latestBuyerIdentity,
@@ -225,6 +226,17 @@ export default async function BillingSettingsPage({
   const shopfrontTier = getActiveTier();
   const quotedTier = effectiveTier(priceLock, shopfrontTier);
 
+  // The plans this tenant may actually move to, priced on the server at the
+  // rate it will be charged (TASK-MTSHVKTSGC8A4).
+  //
+  // Two things this fixes. The panel used to list the static three-plan array,
+  // so a price published in the plan studio never reached it; and it listed
+  // every plan regardless of visibility, so a private plan assigned to somebody
+  // else was offered here — and, until this task, could be bought. The list is
+  // now the same one `/api/billing/checkout` prices against, which is what
+  // makes "shown" and "buyable" the same set rather than two.
+  const storefront = await readStorefront(tenantId, quotedTier, NO_DISCOUNT_TIER);
+
   return (
     <BillingClient
       workspace={workspace}
@@ -236,6 +248,8 @@ export default async function BillingSettingsPage({
       priceLocked={isQuotedOnLock(priceLock, shopfrontTier)}
       lifetimeScarcity={scarcity}
       entitlements={entitlements}
+      plans={storefront.cards}
+      plansMeasured={storefront.measured}
       invoices={invoices}
       invoicesMeasured={invoicesMeasured}
       buyerIdentity={buyerIdentity}

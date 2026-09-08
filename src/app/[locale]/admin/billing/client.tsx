@@ -14,14 +14,10 @@ import {
 import { handleConfigureSso } from './actions';
 import { useCart } from '@/components/cart/CartContext';
 import {
-  CATALOG,
-  MONTHS_PER_YEAR,
-  NO_DISCOUNT_TIER,
-  priceLine,
   type BillingCycle,
   type DiscountTier,
-  type PlanEntry,
 } from '@/lib/billing/catalog';
+import type { StorefrontPlanCards } from '@/lib/billing/storefront';
 import { formatMoney } from '@/lib/money';
 
 interface BillingSsoClientProps {
@@ -39,9 +35,17 @@ interface BillingSsoClientProps {
    * the same plan. Both now read one tier and one catalogue.
    */
   activeTier: DiscountTier;
+  /**
+   * The plans on offer to this tenant, priced on both cycles by the server from
+   * the published `PlanVersion` rows (TASK-MTSHVKTSGC8A4). This panel used to
+   * price the static catalogue in the browser, so a price the plan studio
+   * published never reached it and the figure here could differ from what
+   * `/api/billing/checkout` charged.
+   */
+  plans: StorefrontPlanCards[];
+  /** False when the plan list could not be read — not the same as "none". */
+  plansMeasured: boolean;
 }
-
-const PLAN_ENTRIES = CATALOG.filter((entry): entry is PlanEntry => entry.kind === 'plan');
 
 export function BillingSsoClient({
   locale,
@@ -50,6 +54,8 @@ export function BillingSsoClient({
   currentPlanId = 'pro',
   currentProvider = 'stripe',
   activeTier,
+  plans,
+  plansMeasured,
 }: BillingSsoClientProps) {
   const t = useTranslations('billingPanels.admin');
   const { addToCart } = useCart();
@@ -118,17 +124,13 @@ export function BillingSsoClient({
     }
   };
 
-  /** Same catalogue, same tier, same function as the public pricing cards. */
-  const cards = PLAN_ENTRIES.map((entry) => {
-    const charged = priceLine({ sku: entry.sku, billingCycle }, activeTier);
-    const list = priceLine({ sku: entry.sku, billingCycle }, NO_DISCOUNT_TIER);
-    const yearlyVsMonthly = Math.round(
-      ((entry.monthlyListMinor * MONTHS_PER_YEAR - entry.yearlyListMinor) /
-        (entry.monthlyListMinor * MONTHS_PER_YEAR)) *
-        100
-    );
-    return { entry, charged, list, yearlyVsMonthly };
-  });
+  /** Server-priced, same source and same tier as the public pricing cards. */
+  const cards = plans.map((card) => ({
+    entry: card.plan,
+    charged: card[billingCycle].charged,
+    list: card[billingCycle].list,
+    yearlyVsMonthly: card.yearlySavingPercent,
+  }));
 
   return (
     <div className="space-y-6 font-sans">
@@ -232,6 +234,21 @@ export function BillingSsoClient({
               </button>
             </div>
           </div>
+
+          {/*
+            A plan list that could not be read says so. Falling back to the
+            static catalogue is what this panel used to do unconditionally, and
+            it is how a price the studio has since changed keeps being quoted.
+          */}
+          {!plansMeasured && (
+            <div
+              data-testid="admin-plans-unavailable"
+              role="status"
+              className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-sm text-amber-900"
+            >
+              {t('plansUnavailable')}
+            </div>
+          )}
 
           {/* Pricing Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

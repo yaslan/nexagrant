@@ -7,16 +7,13 @@ import PublicFooter from '@/components/PublicFooter';
 import { Check, Zap, Shield, Gift, Copy, Flame, Layers, ShoppingBag } from 'lucide-react';
 import { useCart } from '@/components/cart/CartContext';
 import {
-  CATALOG,
   DISCOUNT_TIERS,
-  MONTHS_PER_YEAR,
-  NO_DISCOUNT_TIER,
   findEntry,
   priceLine,
   type BillingCycle,
   type DiscountTier,
-  type PlanEntry,
 } from '@/lib/billing/catalog';
+import type { StorefrontPlanCards, TierScheduleRow } from '@/lib/billing/storefront';
 import { formatMoney } from '@/lib/money';
 import type { LifetimeScarcity } from '@/lib/billing/lifetime-licence';
 
@@ -37,12 +34,37 @@ interface PricingClientProps {
    * count is exactly what this prop replaced.
    */
   lifetimeScarcity: LifetimeScarcity;
+  /**
+   * The plans this visitor may buy, already priced on both cycles by the server
+   * component from the published `PlanVersion` rows.
+   *
+   * The page used to hold the catalogue itself and run `priceLine()` in the
+   * browser. It no longer prices anything: a figure computed here could differ
+   * from the one `/api/billing/checkout` computes, and a card the browser
+   * assembles could show a private plan the visitor was never granted.
+   */
+  plans: StorefrontPlanCards[];
+  /**
+   * The same plans priced under every campaign tier, for the schedule table
+   * lower down the page. Server-computed for the same reason the cards are.
+   */
+  tierSchedule: TierScheduleRow[];
+  /**
+   * False when the plan list could not be read at all. An empty list and an
+   * unreadable one are different facts, and neither may be papered over with a
+   * price typed into this file.
+   */
+  plansMeasured: boolean;
 }
 
-/** The three subscription plans, in catalogue order. */
-const PLAN_ENTRIES = CATALOG.filter((entry): entry is PlanEntry => entry.kind === 'plan');
-
-export default function PricingClient({ locale, activeTier, lifetimeScarcity }: PricingClientProps) {
+export default function PricingClient({
+  locale,
+  activeTier,
+  lifetimeScarcity,
+  plans,
+  tierSchedule,
+  plansMeasured,
+}: PricingClientProps) {
   const t = useTranslations('billingPanels.pricing');
   const { addToCart } = useCart();
   const [billingCycle, setBillingCycle] = useState<Exclude<BillingCycle, 'one-time'>>('yearly');
@@ -58,29 +80,35 @@ export default function PricingClient({ locale, activeTier, lifetimeScarcity }: 
     }
   };
 
-  /** Every figure on a plan card, priced by the catalogue under the live tier. */
-  const cards = PLAN_ENTRIES.map((entry) => {
-    const charged = priceLine({ sku: entry.sku, billingCycle }, activeTier);
-    const list = priceLine({ sku: entry.sku, billingCycle }, NO_DISCOUNT_TIER);
-    // How much the yearly cycle saves against paying monthly for a year — read
-    // off the catalogue rather than the "~28%" that used to be typed in.
-    const yearlyVsMonthly = Math.round(
-      ((entry.monthlyListMinor * MONTHS_PER_YEAR - entry.yearlyListMinor) /
-        (entry.monthlyListMinor * MONTHS_PER_YEAR)) *
-        100
-    );
-    return { entry, charged, list, yearlyVsMonthly };
-  });
+  /**
+   * The cards to draw: the cycle toggle picks between two sets of figures the
+   * server already computed. Nothing here multiplies, discounts or rounds.
+   */
+  const cards = plans.map((card) => ({
+    plan: card.plan,
+    charged: card[billingCycle].charged,
+    list: card[billingCycle].list,
+    yearlyVsMonthly: card.yearlySavingPercent,
+  }));
 
+  // The lifetime licence is a one-time catalogue sku rather than a plan version,
+  // so it is still priced from `catalog.ts` — there is no `Plan` row for it and
+  // the studio does not edit it.
   const lifetimeEntry = findEntry('lifetime-ultra');
   const lifetime = lifetimeEntry ? priceLine({ sku: lifetimeEntry.sku }, activeTier) : null;
 
-  // The lifetime comparison box, all of it derived: what Ultra costs this year
-  // under the live campaign, what it costs to renew at list, and what three
-  // years of that comes to against one lifetime payment.
-  const ultraYearly = priceLine({ sku: 'ultra', billingCycle: 'yearly' }, activeTier);
-  const ultraYearlyList = priceLine({ sku: 'ultra', billingCycle: 'yearly' }, NO_DISCOUNT_TIER);
-  const ultraThreeYearMinor = ultraYearly.amountMinor + ultraYearlyList.amountMinor * 2;
+  // The comparison box weighs that licence against the Ultra subscription, so
+  // the Ultra figures come from the *storefront* card rather than the static
+  // catalogue: a price the studio publishes has to move both sides of the
+  // comparison, or the box argues from a number nobody is charged. When Ultra
+  // is not on this visitor's storefront at all there is nothing to compare
+  // against, and the whole banner is withheld rather than compared to a price
+  // that is not on offer.
+  const ultraCard = plans.find((card) => card.plan.planId === 'ultra') ?? null;
+  const ultraYearly = ultraCard?.yearly.charged ?? null;
+  const ultraYearlyList = ultraCard?.yearly.list ?? null;
+  const ultraThreeYearMinor =
+    ultraYearly && ultraYearlyList ? ultraYearly.amountMinor + ultraYearlyList.amountMinor * 2 : 0;
   const lifetimeSavingMinor = lifetime ? ultraThreeYearMinor - lifetime.amountMinor : 0;
 
   const cycleLabel = billingCycle === 'yearly' ? t('cycleYearly') : t('cycleMonthly');
@@ -216,9 +244,34 @@ export default function PricingClient({ locale, activeTier, lifetimeScarcity }: 
           </div>
         </div>
 
-        {/* ─── THREE PRICING CARDS GRID ─── */}
+        {/*
+          Absence is not zero (CLAUDE.md rule 7). A storefront that could not be
+          read says so; it does not fall back to a price typed into this file,
+          because the figure it would fall back to is exactly the stale one this
+          page was rebuilt to stop showing.
+        */}
+        {!plansMeasured && (
+          <div
+            data-testid="pricing-plans-unavailable"
+            role="status"
+            className="mb-16 rounded-2xl border border-amber-500/40 bg-amber-950/30 p-6 text-center text-sm text-amber-200"
+          >
+            {t('plansUnavailable')}
+          </div>
+        )}
+        {plansMeasured && cards.length === 0 && (
+          <div
+            data-testid="pricing-plans-empty"
+            role="status"
+            className="mb-16 rounded-2xl border border-slate-800 bg-[#0b1324] p-6 text-center text-sm text-slate-400"
+          >
+            {t('plansEmpty')}
+          </div>
+        )}
+
+        {/* ─── PRICING CARDS GRID — one card per plan on this visitor's storefront ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-16 items-stretch">
-          {cards.map(({ entry, charged, list, yearlyVsMonthly }) => {
+          {cards.map(({ plan: entry, charged, list, yearlyVsMonthly }) => {
             const recommended = entry.planId === 'pro';
             return (
               <div
@@ -332,7 +385,7 @@ export default function PricingClient({ locale, activeTier, lifetimeScarcity }: 
         </div>
 
         {/* ─── LIFETIME OFFER BANNER ─── */}
-        {lifetime && (
+        {lifetime && ultraYearly && ultraYearlyList && (
           <div className="bg-[#0b1426] border-2 border-cyan-400/80 rounded-3xl p-6 sm:p-8 shadow-[0_0_40px_rgba(34,211,238,0.2)] mb-12 relative overflow-hidden backdrop-blur-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800 font-mono">
               <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 tracking-widest uppercase">
@@ -507,9 +560,9 @@ export default function PricingClient({ locale, activeTier, lifetimeScarcity }: 
                   <th className="p-3 font-bold">{t('colTier')}</th>
                   <th className="p-3 font-bold">{t('colRate')}</th>
                   <th className="p-3 font-bold">{t('colCode')}</th>
-                  {PLAN_ENTRIES.map((entry) => (
-                    <th key={entry.planId} className="p-3 font-bold">
-                      {t('colPlanMonthly', { plan: entry.name })}
+                  {plans.map(({ plan }) => (
+                    <th key={plan.planId} className="p-3 font-bold">
+                      {t('colPlanMonthly', { plan: plan.name })}
                     </th>
                   ))}
                   <th className="p-3 font-bold text-right">{t('colStatus')}</th>
@@ -518,6 +571,7 @@ export default function PricingClient({ locale, activeTier, lifetimeScarcity }: 
               <tbody className="divide-y divide-slate-800/80 text-slate-300">
                 {DISCOUNT_TIERS.map((tier) => {
                   const isActive = tier.code === activeTier.code;
+                  const row = tierSchedule.find((entry) => entry.tierCode === tier.code);
                   return (
                     <tr
                       key={tier.code}
@@ -526,14 +580,14 @@ export default function PricingClient({ locale, activeTier, lifetimeScarcity }: 
                       <td className="p-3">{t(`tiers.${tier.code}`)}</td>
                       <td className="p-3 text-cyan-300 font-extrabold">-{tier.percentOff}%</td>
                       <td className="p-3 font-bold text-amber-300">{tier.code}</td>
-                      {PLAN_ENTRIES.map((entry) => {
-                        const row = priceLine({ sku: entry.sku, billingCycle: 'monthly' }, tier);
-                        return (
-                          <td key={entry.planId} className={`p-3 ${entry.planId === 'pro' ? 'font-bold text-white' : ''}`}>
-                            {money(row.amountMinor, row.currency)}
-                          </td>
-                        );
-                      })}
+                      {(row?.cells ?? []).map((cell) => (
+                        <td
+                          key={cell.planId}
+                          className={`p-3 ${cell.planId === 'pro' ? 'font-bold text-white' : ''}`}
+                        >
+                          {money(cell.amountMinor, cell.currency)}
+                        </td>
+                      ))}
                       <td className="p-3 text-right">
                         {isActive ? (
                           <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded text-[10px]">

@@ -10,6 +10,7 @@ import { BillingClient } from '@/app/[locale]/(app)/[workspace]/settings/billing
 import { CartProvider } from '@/components/cart/CartContext';
 import { NO_DISCOUNT_TIER, LIFETIME_LICENCE_CAP } from '@/lib/billing/catalog';
 import { lifetimeScarcity, type LifetimeScarcity } from '@/lib/billing/lifetime-licence';
+import { storefrontCardsFixture } from './helpers/storefront-plans';
 
 /**
  * The lifetime scarcity badge on /settings/billing.
@@ -60,6 +61,8 @@ function renderPanel(scarcity: LifetimeScarcity, locale: 'tr' | 'en' = 'tr') {
           invoices={[]}
           invoicesMeasured
           buyerIdentity={null}
+          plans={storefrontCardsFixture()}
+          plansMeasured
         />
       </CartProvider>
     </NextIntlClientProvider>

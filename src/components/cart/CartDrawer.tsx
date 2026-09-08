@@ -46,7 +46,8 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [quote, setQuote] = useState<CheckoutQuote | null>(null);
 
-  const { subtotalMinor, discountMinor, totalMinor, currency, lines } = getCartTotal();
+  const { subtotalMinor, discountMinor, totalMinor, currency, lines, measured, unavailable } =
+    getCartTotal();
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
   const money = (amountMinor: number, amountCurrency = currency) =>
     formatMoney(amountMinor, amountCurrency, locale);
@@ -189,20 +190,29 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
                             <p className="text-[11px] text-muted leading-snug">{line.subtitle}</p>
                           )}
 
-                          <div className="flex items-baseline gap-2 pt-1 font-mono">
-                            <span className="text-base font-extrabold text-accent">
-                              {money(line.priced.totalMinor, line.priced.currency)}
-                            </span>
-                            <span className="text-xs text-muted line-through">
-                              {money(
-                                line.priced.listAmountMinor * line.priced.quantity,
-                                line.priced.currency
-                              )}
-                            </span>
-                            <span className="text-[10px] text-amber-500 dark:text-amber-400 font-bold">
-                              -{line.priced.percentOff}%
-                            </span>
-                          </div>
+                          {/*
+                            The amount is the server's or it is absent. A line
+                            whose price has not been quoted yet shows a dash
+                            rather than a number computed in this browser.
+                          */}
+                          {line.priced ? (
+                            <div className="flex items-baseline gap-2 pt-1 font-mono">
+                              <span className="text-base font-extrabold text-accent">
+                                {money(line.priced.totalMinor, line.priced.currency)}
+                              </span>
+                              <span className="text-xs text-muted line-through">
+                                {money(
+                                  line.priced.listAmountMinor * line.priced.quantity,
+                                  line.priced.currency
+                                )}
+                              </span>
+                              <span className="text-[10px] text-amber-500 dark:text-amber-400 font-bold">
+                                -{line.priced.percentOff}%
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="pt-1 font-mono text-xs text-muted">{t('pricePending')}</div>
+                          )}
                         </div>
 
                         <button
@@ -218,6 +228,16 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
                   </div>
                 )}
 
+                {unavailable.length > 0 && (
+                  <div
+                    role="status"
+                    data-testid="cart-unavailable"
+                    className="p-3 bg-amber-500/10 border border-amber-500/40 text-amber-600 dark:text-amber-300 text-xs rounded-xl"
+                  >
+                    {t('unavailableLines', { skus: unavailable.join(', ') })}
+                  </div>
+                )}
+
                 {errorMessage && (
                   <div role="alert" className="p-3 bg-bad/15 border border-bad/40 text-bad text-xs rounded-xl">
                     {errorMessage}
@@ -228,15 +248,24 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
               {/* Footer Summary & High-Contrast Checkout Button */}
               {lines.length > 0 && (
                 <div className="p-5 sm:p-6 border-t border-line bg-surface-hover space-y-4">
+                  {!measured && (
+                    <div
+                      role="status"
+                      data-testid="cart-total-unmeasured"
+                      className="p-3 bg-amber-500/10 border border-amber-500/40 text-amber-600 dark:text-amber-300 text-xs rounded-xl"
+                    >
+                      {t('totalUnavailable')}
+                    </div>
+                  )}
                   <div className="space-y-2 text-xs font-mono">
                     <div className="flex justify-between text-muted">
                       <span>{t('subtotal')}</span>
-                      <span>{money(subtotalMinor)}</span>
+                      <span>{measured ? money(subtotalMinor) : '—'}</span>
                     </div>
 
                     <div className="flex justify-between text-amber-500 dark:text-amber-400 font-bold">
                       <span>{t('tierDiscount', { code: activeTier.code })}</span>
-                      <span>-{money(discountMinor)}</span>
+                      <span>{measured ? `-${money(discountMinor)}` : '—'}</span>
                     </div>
 
                     <div className="flex justify-between items-center text-sm font-bold text-ink pt-2.5 border-t border-line font-mono">
@@ -245,14 +274,14 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
                         data-testid="cart-total"
                         className="text-accent dark:text-cyan-300 font-mono font-black text-xl tracking-tight"
                       >
-                        {money(totalMinor)}
+                        {measured ? money(totalMinor) : '—'}
                       </span>
                     </div>
                   </div>
 
                   <button
                     onClick={handleCheckout}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !measured}
                     className="w-full py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm bg-[#22d3ee] hover:bg-[#67e8f9] text-[#080d1a] shadow-[0_0_25px_rgba(34,211,238,0.5)] hover:shadow-[0_0_35px_rgba(34,211,238,0.8)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 font-mono tracking-wide border border-cyan-300/60"
                   >
                     {isSubmitting ? (

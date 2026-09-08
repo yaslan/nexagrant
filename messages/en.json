@@ -1117,7 +1117,10 @@
       "orderSummary": "Order summary:",
       "serverTotal": "Total computed by the server:",
       "pricedUnder": "Priced under the {code} campaign ({percent}% off).",
-      "completeDemo": "Complete the test purchase (demo)"
+      "completeDemo": "Complete the test purchase (demo)",
+      "pricePending": "Waiting for the server price…",
+      "totalUnavailable": "The cart total cannot be obtained from the server right now. Rather than show a figure that may be wrong, it is left blank.",
+      "unavailableLines": "These items are not on offer to your organisation and were left out of the total: {skus}"
     },
     "pricing": {
       "policyBadge": "Tiered early-bird discount policy",
@@ -1215,7 +1218,9 @@
           "f5": "Up to 15 team seats and organisation role management",
           "f6": "Official e-invoice and a dedicated SLA"
         }
-      }
+      },
+      "plansUnavailable": "The plan list cannot be read right now. Rather than guess at a price we are showing none; please try again shortly.",
+      "plansEmpty": "No plan is on sale right now."
     },
     "admin": {
       "kicker": "Billing and enterprise identity",
@@ -1277,7 +1282,8 @@
           "f3": "Full CORDIS data exports (JSON/CSV)",
           "f4": "Official e-invoice and enterprise SLA"
         }
-      }
+      },
+      "plansUnavailable": "The plan list cannot be read right now. Rather than show a price that may be wrong we are showing none."
     },
     "settings": {
       "breadcrumbDashboard": "Dashboard",
@@ -1386,7 +1392,9 @@
           "credits": "2,000 AI credits / month",
           "modules": "Modules: M1-M11"
         }
-      }
+      },
+      "plansUnavailable": "The plan list cannot be read right now. Rather than show a price that may be wrong we are showing none; please try again shortly.",
+      "plansEmpty": "No plan is currently on offer to your organisation."
     }
   },
   "adminPlans": {

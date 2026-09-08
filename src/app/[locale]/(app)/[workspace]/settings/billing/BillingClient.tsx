@@ -6,16 +6,13 @@ import { useTranslations } from 'next-intl';
 import { useCart } from '@/components/cart/CartContext';
 import { ShoppingBag } from 'lucide-react';
 import {
-  CATALOG,
   FALLBACK_PLAN_ID,
-  MONTHS_PER_YEAR,
-  NO_DISCOUNT_TIER,
   findEntry,
   priceLine,
   type BillingCycle,
   type DiscountTier,
-  type PlanEntry,
 } from '@/lib/billing/catalog';
+import type { StorefrontPlanCards } from '@/lib/billing/storefront';
 import { formatMoney } from '@/lib/money';
 import type { LifetimeScarcity } from '@/lib/billing/lifetime-licence';
 import type { InvoiceBuyerIdentity, InvoiceListRow } from '@/lib/billing/invoice-list';
@@ -69,9 +66,16 @@ interface BillingClientProps {
   invoicesMeasured: boolean;
   /** Buyer identity as frozen on the newest invoice; null when there is none. */
   buyerIdentity: InvoiceBuyerIdentity | null;
+  /**
+   * The plans this tenant may move to, already priced on both cycles by the
+   * server at the rate it will actually be charged. Public plans plus any
+   * private plan assigned to this tenant — and nothing else, which is the same
+   * set `/api/billing/checkout` will accept.
+   */
+  plans: StorefrontPlanCards[];
+  /** False when the plan list could not be read — not the same as "none". */
+  plansMeasured: boolean;
 }
-
-const PLAN_ENTRIES = CATALOG.filter((entry): entry is PlanEntry => entry.kind === 'plan');
 
 /**
  * Add-ons the screen used to sell at a price typed into this file ($49, $119,
@@ -96,6 +100,8 @@ export function BillingClient({
   invoices,
   invoicesMeasured,
   buyerIdentity,
+  plans,
+  plansMeasured,
 }: BillingClientProps) {
   const t = useTranslations('billingPanels.settings');
   const { addToCart } = useCart();
@@ -148,17 +154,17 @@ export function BillingClient({
     }
   };
 
-  /** Same catalogue, same tier, same function as pricing and admin billing. */
-  const cards = PLAN_ENTRIES.map((entry) => {
-    const charged = priceLine({ sku: entry.sku, billingCycle }, activeTier);
-    const list = priceLine({ sku: entry.sku, billingCycle }, NO_DISCOUNT_TIER);
-    const yearlyVsMonthly = Math.round(
-      ((entry.monthlyListMinor * MONTHS_PER_YEAR - entry.yearlyListMinor) /
-        (entry.monthlyListMinor * MONTHS_PER_YEAR)) *
-        100
-    );
-    return { entry, charged, list, yearlyVsMonthly };
-  });
+  /**
+   * The cards to draw. The cycle toggle picks between two sets of figures the
+   * server already computed from this tenant's published plan versions; nothing
+   * here discounts or rounds.
+   */
+  const cards = plans.map((card) => ({
+    entry: card.plan,
+    charged: card[billingCycle].charged,
+    list: card[billingCycle].list,
+    yearlyVsMonthly: card.yearlySavingPercent,
+  }));
 
   const lifetimeEntry = findEntry('lifetime-ultra');
   const lifetime = lifetimeEntry ? priceLine({ sku: lifetimeEntry.sku }, activeTier) : null;
@@ -342,6 +348,30 @@ export function BillingClient({
             </button>
           </div>
         </div>
+
+        {/*
+          A plan list that could not be read says so. Falling back to the static
+          three-plan array is what this panel used to do unconditionally, and it
+          is how a price the studio has since changed keeps being offered.
+        */}
+        {!plansMeasured && (
+          <div
+            data-testid="settings-plans-unavailable"
+            role="status"
+            className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-sm text-amber-900"
+          >
+            {t('plansUnavailable')}
+          </div>
+        )}
+        {plansMeasured && cards.length === 0 && (
+          <div
+            data-testid="settings-plans-empty"
+            role="status"
+            className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted"
+          >
+            {t('plansEmpty')}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {cards.map(({ entry, charged, list, yearlyVsMonthly }) => {

@@ -34,9 +34,16 @@ export type PlanId = 'basic' | 'pro' | 'ultra';
 /** What a purchasable line is: a recurring plan seat or a one-time licence. */
 export type SkuKind = 'plan' | 'lifetime';
 
-export interface PlanEntry {
+/**
+ * Everything `priceEntry` needs to price a recurring plan line.
+ *
+ * Split out of `PlanEntry` so that a published `PlanVersion` row — a plan the
+ * studio wrote, whose id is not one of the three literals in `PlanId` — can be
+ * priced by the same function rather than by a second copy of the arithmetic.
+ * See `src/lib/billing/storefront.ts`.
+ */
+export interface PricablePlan {
   kind: 'plan';
-  planId: PlanId;
   /** Stable id the client sends and the cart already uses (`plan-pro`). */
   sku: string;
   name: string;
@@ -51,6 +58,16 @@ export interface PlanEntry {
    * `YEARLY_DERIVATION` below.
    */
   yearlyListMinor: number;
+  /**
+   * Currency of the two figures above. Absent on the static entries below,
+   * which are all `CATALOG_CURRENCY`; a database plan carries its own, because
+   * `PlanVersion.currency` is a column the studio can set.
+   */
+  currency?: string;
+}
+
+export interface PlanEntry extends PricablePlan {
+  planId: PlanId;
 }
 
 export interface LifetimeEntry {
@@ -256,7 +273,26 @@ export class UnsupportedCycleError extends Error {
 export function priceLine(request: PriceRequest, tier: DiscountTier): PricedLine {
   const entry = findEntry(request.sku);
   if (!entry) throw new UnknownSkuError(request.sku);
+  return priceEntry(entry, request, tier);
+}
 
+/**
+ * The arithmetic half of `priceLine`, over an entry the caller has already
+ * resolved.
+ *
+ * It is exported because the storefront now resolves plans from the database
+ * (`PlanVersion`, written by the plan studio) rather than from the `PLANS`
+ * array above, and a second implementation of "list price → discounted amount →
+ * line total" is exactly how the two would drift into quoting different
+ * numbers. `src/lib/billing/storefront.ts` shapes a published version into a
+ * `PlanEntry` and prices it here, so there is still one rounding rule
+ * (`YEARLY_DERIVATION`) and one place that can produce a charge.
+ */
+export function priceEntry(
+  entry: PricablePlan | LifetimeEntry,
+  request: Omit<PriceRequest, 'sku'>,
+  tier: DiscountTier
+): PricedLine {
   const quantity = request.quantity ?? 1;
   if (!Number.isInteger(quantity) || quantity < 1) {
     throw new Error(`Quantity must be a positive integer, got ${request.quantity}`);
@@ -301,7 +337,7 @@ export function priceLine(request: PriceRequest, tier: DiscountTier): PricedLine
     billingCycle,
     amountMinor,
     listAmountMinor,
-    currency: CATALOG_CURRENCY,
+    currency: entry.currency ?? CATALOG_CURRENCY,
     percentOff: tier.percentOff,
     campaignCode: tier.code,
     quantity,
