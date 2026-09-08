@@ -143,13 +143,19 @@ Bu kararın bağlayıcı sonuçları:
    kalır; gerçek mukimlik doğrulaması (`tenant.country` beyanı YETMEZ)
    çözülmeden uygulanmaz.
 
-### Bu kararla KAPANMAYAN, Faz 2'de patrona geri gelecek tek soru
+### TCMB kesintisi — KARARA BAĞLANDI (2026-09-08, patron: EVET)
 
-**TCMB erişilemediğinde ne olacak?** (bakım/kesinti/şema değişikliği)
-Öneri: fatura kesme **durur**, `SystemAlert` üretilir, kuyruk TCMB dönünce
-işlenir — son bilinen kuru "yeterince yakın" diye kullanmak, mali belgeye
-uydurma rakam yazmaktır (CLAUDE.md kural 6: işi kırma, alert üret).
-Karar Faz 2 başlarken alınacak.
+**TCMB'ye ulaşılamadığında fatura kesme DURUR.** `SystemAlert` üretilir, ödeme
+akışı kırılmaz, fatura TCMB dönünce kesilir. **Son bilinen kur KULLANILMAZ** —
+"yeterince yakın" bir kur, mali belgeye uydurma rakam yazmaktır
+(CLAUDE.md kural 6: işi kırma, alert üret; kural 7: kanıtsız rakam yok).
+
+Uygulama notu (Faz 2 / TASK-MTT13PK0Z4ZLB):
+- Kur çekilemezse `Invoice` satırı **yazılmaz** — yarım fatura üretilmez.
+- `SystemAlert` tekrar koruması var (TASK-MTS79IGFJ6KRF); her denemede yeni
+  satır yazılmamalı, aynı uyarı tekrarlanmamalı.
+- Kesinti giderilince fatura kesilebilmeli — yani ödeme, faturasız kalmış
+  olarak tekrar ele alınabilir durumda kaydedilmeli.
 
 ### Faz 2'de yapılacaklar — 2026-09-08 ağaç ölçümü
 
