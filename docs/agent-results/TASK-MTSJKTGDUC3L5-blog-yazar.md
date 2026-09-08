@@ -167,3 +167,39 @@ Yok — kart kapsamındaki üç senaryo da (a/b/c) gerçek commit denemesiyle do
 Kart `review`'a alınabilir. `docs/E2E_TESTING.md` gibi bir kanıt-disiplini dokümanı
 varsa (bu depoda yok) oraya bu kuralın bir satırı eklenebilir — kapsam dışı bırakıldı,
 hook'un kendi başlık yorumu şimdilik tek kaynak.
+
+---
+
+## 7. Dürüstlük notu: kendi commit'im başka bir ajanın dosyasını sildi, düzeltildi
+
+`6ba9906`'ı atarken (`githooks/pre-commit` + bu rapor) commit öncesi yalnız
+`git status --porcelain -- githooks/pre-commit docs/agent-results/TASK-...md` ile
+KENDİ path'lerimi kontrol ettim. Bu ağaç eş-zamanlı ajanlar arasında PAYLAŞILIYOR
+(hook'un kendi üst yorumu: "Every agent works in the SAME working tree") — ve o anda
+paylaşılan index'te başka bir ajanın (muhtemelen prisma-override'ı kaldırıp
+generate edilmiş tipe geçen bir refactor'ün ortasındaki) `src/types/prisma-override.d.ts`
+ve `.test.ts` silmesi STAGE'liydi. `git commit` STAGE'deki HER ŞEYİ yazdı, yalnız
+benim `git add` ettiğimi değil — path-filtreli `git status` bunu gizledi çünkü
+sorguyu kendi path'lerime daralttım.
+
+Sonuç: `6ba9906` iki dosyayı sildi ve `src/lib/db.ts`, `billing.ts`,
+`k2-cordis/importer.ts`, `schema-contract.test.ts` gibi o refactor'ün geri kalan,
+henüz commit'lenmemiş değişiklikleri working tree'de yarım kaldı — yani dev'e
+**yarı-tamamlanmış bir başkasının işini** commit etmiş oldum.
+
+Fark edince hemen düzeltildi (`dbc26d2`): iki dosya `12c58ae`'den (benim
+commit'imden önceki HEAD) byte-bybyte aynı içerikle geri yüklendi ve **yalnız o iki
+path** `git commit -- <path1> <path2>` ile commit'lendi — bu kez path-restricted
+commit formu kullanıldı, index'te başka ne varsa dokunulmadı. Geri yükleme
+sonrası `git diff 12c58ae -- <2 dosya>` boş döndü (bkz. §2), yani tam olarak eski
+hâline döndü; refactor'ü yapan ajan kaldığı yerden devam edebilir. Ayrıca hook'un
+kendisi restore commit'inde başka bir ajanın (`subscription-sync.test.ts`) o anki
+typecheck hatasını "THEIRS" olarak gösterdi (`@prisma/client` `AuditEvent` vb.
+export etmiyor) — bu da override dosyasının o an gerçekten gerekli olduğunu,
+silinmesinin erken/yarım olduğunu doğruluyor.
+
+**Ders (hafızaya da yazıldı):** bu depoda commit'ten hemen önce path-filtresiz
+`git status --porcelain` şart; ve gerçek commit **path-restricted** olmalı
+(`git commit -m "..." -- <yalnız kendi dosyaların>`), `git add <path>` + düz
+`git commit` YETMEZ — index paylaşımlı olduğu için düz commit stage'deki her şeyi
+yazar.
