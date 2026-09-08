@@ -15,7 +15,10 @@ farklı vakadır, tek kural uygulanmaz:
   BEKLEMİYOR (patron: "şimdi"). Kart: TASK-MTT1VEUF8Z9SH.
 - **`Relationship.ownerUserId` → nullable + imhada koparılır.** Gerekçe: yalnız bir iş
   ataması; dış taraf zaten `counterpartName`/`counterpartEmail`'de; hiçbir kural bu
-  id'ye dayanmıyor. Kart: TASK-MTT1XL9NP2QYU (migration kilidi açılınca).
+  id'ye dayanmıyor. Kart: TASK-MTT1XL9NP2QYU — **uygulandı 2026-09-08** (commit `e2d90cc`):
+  sütun `String?`, `prisma/migrations/relationship-owner-nullable.sql`, `purgeDueUsers()`
+  imhada `NULL`'a çekiyor, canlı DB testiyle doğrulandı. Karardan çıkan mühendislik
+  kuralı: [[fabrika-purge-detach-vs-retain-per-column]].
 
 **Neden "ikisini de nullable yap" (A) reddedildi — bu asıl ders:** `DualApprovalStep`'te
 `actorName` aynı satırda kalıp ekranda görünmeye devam ederdi; yalnız id'yi koparmak

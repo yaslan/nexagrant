@@ -209,3 +209,9 @@
 
 - [fabrika-shared-worktree-git-add-is-not-atomic](fabrika-shared-worktree-git-add-is-not-atomic.md) — Fabrika'da paralel kartlar aynı worktree'yi paylaşıyor — `git add <yol>` + `git commit` atomik değil, başka bir ajanın commit'i senin stage'ini kendi mesajının altına süpürebilir
 - [fabrika-two-rag-files-src-lib-rag-vs-ai-rag](fabrika-two-rag-files-src-lib-rag-vs-ai-rag.md) — İki ayrı RAG dosyası var — src/lib/rag.ts (concept-notes, admin/cordis) ve src/lib/ai/rag.ts (M2 server actions, admin/documents/upload) — llm.ts ikizi hikâyesine benzeyen henüz doğrulanmamış bir şüphe
+
+- [fabrika-erasure-decision-split-the-two-not-null-columns](fabrika-erasure-decision-split-the-two-not-null-columns.md) — Patron kararı (A4/Seçenek C) — DualApprovalStep saklanır ve adıyla beyan edilir, Relationship.ownerUserId nullable yapılıp imhada koparılır
+- [fabrika-prices-are-vat-exclusive-per-country](fabrika-prices-are-vat-exclusive-per-country.md) — Patron kararı — ilan edilen fiyatlar KDV HARİÇ; KDV faturada müşterinin ülkesine göre eklenir (TR %20, KW %0), bilinmeyen ülkede fatura kesilmez
+- [fabrika-shared-worktree-commits-are-not-atomic](fabrika-shared-worktree-commits-are-not-atomic.md) — Aynı worktree'de aynı anda commit atan iki ajanın stage'i karışır — bir ajanın commit'i diğerinin dosyalarını yutar; commit mesajı yanıltıcı kalır
+
+- [fabrika-legal-claims-retention-basis-kvkk-5-2-e-gdpr-17-3-e](fabrika-legal-claims-retention-basis-kvkk-5-2-e-gdpr-17-3-e.md) — Bir kaydın kullanıcı silinse/imha edilse dahi silinmemesi gerektiğini savunurken kullanılacak bent eşleşmesi — KVKK md.5/2-e ile GDPR art.17(3)(e) birbirinin tam karşılığı

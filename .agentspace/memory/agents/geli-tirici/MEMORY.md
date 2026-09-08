@@ -31,3 +31,5 @@
 
 - [fabrika-no-psql-use-prisma-queryraw](fabrika-no-psql-use-prisma-queryraw.md) — Fabrika kutusunda psql YOK — gerçek SQL kanıtı için tek satırlık bir tsx script'ten prisma.$queryRawUnsafe kullan; ölçüm fixture'ını kendi kiracısında kur ve mutlaka geri al
 - [fabrika-topicmatch-is-keyed-per-topic-not-per-opportunity](fabrika-topicmatch-is-keyed-per-topic-not-per-opportunity.md) — Fabrika'da G0 kanıt kaydı TopicMatch konu başına anahtarlı ama puan fırsat başına değişir — aynı konuda iki fırsat panoda birbirinin puanını gösterir; "kanıta bağla" düzeltmelerinde anahtarın granülerliğini kontrol et
+
+- [fabrika-recard-verify-then-file-the-followups](fabrika-recard-verify-then-file-the-followups.md) — Bir kart ikinci kez düştüğünde işi tekrarlama — HEAD'de hâlâ çalıştığını ölç ve ilk raporun "ayrı kart şart" dediklerini board'da gerçekten açık mı diye KONTROL ET
