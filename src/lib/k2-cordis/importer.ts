@@ -302,7 +302,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
             },
           });
         }
-      } catch (err) {
+      } catch {
         // Ignore DB update error in dry-run mode
       }
 

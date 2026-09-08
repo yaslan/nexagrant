@@ -26,7 +26,6 @@ import {
   Building2, 
   Check,
   Bell,
-  Sparkles,
   Sun,
   Moon,
   Monitor

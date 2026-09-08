@@ -116,7 +116,6 @@ const dateToUTC = (dateStr: string, timeStr: string): Date => {
 };
 
 export function MeetingBriefsClient({
-  opportunityId,
   locale,
   workspace,
   opportunityTitle,

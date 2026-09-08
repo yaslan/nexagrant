@@ -16,7 +16,7 @@ import {
   Eye,
   X,
 } from 'lucide-react';
-import { generateStandardDoc, signDocument, createNewVersion, submitDualApprovalAction, departmentApproveAction } from '@/modules/m10/server/actions';
+import { generateStandardDoc, signDocument, createNewVersion } from '@/modules/m10/server/actions';
 import { Landmark } from 'lucide-react';
 
 export interface DocItem {
