@@ -56,7 +56,7 @@ Test Files  122 passed | 2 skipped (124)
 - **Yurt dışı aktarım için imzalı sözleşme yok** (§21): Anthropic, OpenAI, Google, Microsoft, Stripe, Resend, Cloudflare — hiçbiri için repoda bir SCC eki/imzalı DPA bulunamadı. Bu, denetimde en büyük tekil hukuki risk.
 - **VKN/TCKN saklama süresi tanımsız** (§5) — Türk vergi mevzuatına göre mali müşavir onayı gerekir, kod/doküman bunu belirtmiyor.
 - **`AuditEvent.actorId` kimliksizleştirilmiyor** — `docs/legal/dpa-en.md` §6'nın "denetim kayıtları kimliksizleştirilmiş tutulur" iddiasıyla çelişiyor; bu bir doküman/kod tutarsızlığı.
-- **PostHog/Sentry doküman-kod tutarsızlığı**: DPA ve SECURITY_COMPLIANCE.md bunları alt işleyen olarak sayıyor ama kodda yok — ya belge düzeltilmeli ya entegrasyon tamamlanmalı.
+- **PostHog/Sentry doküman-kod tutarsızlığı**: DPA ve SECURITY_COMPLIANCE.md bunları alt işleyen olarak sayıyor ama kodda yok. Sentry için bu bir eksiklik değil — hafızada bulunan patron kararı (2026-09-07, `fabrika-no-sentry-systemalert-decision`) Sentry'yi tam da KVKK/GDPR veri-dışarı-çıkmasın gerekçesiyle kaldırmış. Yani `docs/SECURITY_COMPLIANCE.md` satır 102 ve `dpa-en.md`/`dpa-tr.md` §7 bu kararla ÇELİŞİYOR ve güncellenmemiş — bu üç belgenin senkronize edilmesi ayrı bir doküman kartı olmalı.
 - **İki ayrı RAG dosyası** (`src/lib/rag.ts` ve `src/lib/ai/rag.ts`) aynı işlevi görüyor gibi duruyor — CLAUDE.md kural 5'in anlattığı eski `src/lib/ai/llm.ts` ikizi hikâyesine benziyor. Bu kartın kapsamı dışında (kod değişikliği yasak), adıyla bildiriyorum.
 
 ## 5. Açık sorular

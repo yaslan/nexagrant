@@ -267,9 +267,9 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 `docs/SECURITY_COMPLIANCE.md` satır 102, alt işleyen listesine **PostHog** ve **Sentry**'yi dahil ediyor. Bu kart kapsamında koda bakıldığında:
 
 - **PostHog:** `src/lib/analytics.ts` tamamı bir stub — `track`/`identify` yalnızca `NODE_ENV === 'development'` iken `console.log` yapıyor, hiçbir ağ çağrısı yok. **Bugün hiçbir kişisel veri PostHog'a gitmiyor.**
-- **Sentry:** Depoda `@sentry/*` paketi, `sentry.*.config.ts` dosyası veya `Sentry.init` çağrısı **bulunamadı**. **Bugün hiçbir hata verisi Sentry'ye gitmiyor.**
+- **Sentry:** Depoda `@sentry/*` paketi, `sentry.*.config.ts` dosyası veya `Sentry.init` çağrısı **bulunamadı**. Bu bir eksiklik değil, **bilinçli bir karar**: patron 2026-09-07'de "Sentry kullanılmayacak, hata/geri bildirim izleme tamamen kendi içimizde `SystemAlert` üzerinden" kararını verdi — gerekçe tam olarak bu envanterin konusu: "veri dışarı çıkmasın (çok kiracılı Avrupa fonları SaaS'ı, KVKK/GDPR yüzeyi)". `src/lib/observability/sentry.ts` bilinçli olarak silindi (`TASK-MTQUN8VV6DK8C`). **Bugün hiçbir hata verisi üçüncü bir tarafa gitmiyor.**
 
-Bu iki sağlayıcı envanterden **çıkarılmıştır** çünkü aktif bir işleme faaliyeti temsil etmiyorlar; entegrasyon yapıldığı gün bu belgeye yeni bir madde olarak eklenmeleri gerekir. `docs/SECURITY_COMPLIANCE.md`'nin bu satırı bugünkü kod durumuyla çelişiyor — düzeltme önerisi sonuç raporunda.
+Bu iki sağlayıcı envanterden **çıkarılmıştır** çünkü aktif bir işleme faaliyeti temsil etmiyorlar. Sentry için bu durum kalıcı bir mimari karardır; entegrasyon yeniden gündeme gelirse bu envantere yeni bir madde eklenmesi gerekir. `docs/SECURITY_COMPLIANCE.md` satır 102 ve `docs/legal/dpa-en.md`/`dpa-tr.md` §7'nin alt işleyen listesi **her ikisi de bu kararla çelişiyor ve güncellenmemiş** — düzeltme önerisi sonuç raporunda.
 
 ---
 
