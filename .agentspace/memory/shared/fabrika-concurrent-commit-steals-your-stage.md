@@ -3,7 +3,7 @@ name: fabrika-concurrent-commit-steals-your-stage
 description: Fabrika'da index paylaşıldığı için başka bir ajanın commit'i senin stage'lediğin dosyaları kendi commit'ine alabilir — commit çağrın "no changes added" derse işin kaybolmadı, HEAD'e bak
 metadata:
   type: project
-updatedAt: 2026-09-07
+updatedAt: 2026-09-08
 ---
 
 Paralel ajanlar tek çalışma ağacını **ve tek git index'ini** paylaşıyor. `git add <yollarım>`
@@ -73,3 +73,25 @@ git update-index --cacheinfo 100644,$SHA,messages/tr.json
 ```
 
 İlgili: [[fabrika-agents-share-one-working-tree]] · [[fabrika-parallel-agent-file-race]]
+
+## Ters yön: `git reset --soft` + yeniden commit SENİN commit'ine BAŞKASININ dosyalarını alır (2026-09-08, yaşandı)
+
+Yukarısı "başkasının commit'i benim dosyalarımı yuttu" yönünü anlatıyor. Aynı paylaşılan
+index **ters yönde** de ısırıyor ve tetikleyicisi farklı:
+
+`git commit` mesajını düzeltmek / hook'u doğru koşturmak için `git reset --soft HEAD~1`
+yapıp yeniden commit ettim. `reset --soft` commit'in içeriğini **index'e** geri koyar;
+`git commit` (yol argümanı olmadan) **index'in tamamını** commit eder. Reset ile commit
+arasındaki saniyelerde başka bir ajan `git add` yaptıysa, onun dosyaları da senin
+commit'ine girer. Ölçüldü: 15 dosya stage'lemiştim, commit **20** dosyayla çıktı — beşi
+başka bir ajanın ESR calibration işiydi (`scripts/esr-calibration.ts`,
+`tests/esr-calibration.test.ts`, `src/lib/beta/esr-readiness.ts`, iki doküman).
+
+**Kural:** `git commit` çağırmadan **hemen önce** `git diff --cached --name-only` koş ve
+listeyi gözünle doğrula — `reset --soft` sonrası dahil, özellikle o zaman. Liste
+şişmişse `git restore --staged <onların-yolları>` ile ayıkla, kendi commit'ini al, sonra
+onların dosyalarını `git add` ile **buldğun hâle** geri koy (onların çalışması silinmez,
+yalnız index'e geri konur).
+
+**Düzeltmesi:** `git reset --soft HEAD~1` → `git restore --staged <onların>` →
+`git commit` → `git add <onların>`. Çalışma ağacındaki içerikleri hiç değişmez.
