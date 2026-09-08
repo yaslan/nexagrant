@@ -121,6 +121,21 @@ describe('blog posts — the sourced-sounding statistics are gone', () => {
   });
 });
 
+describe('public footer — the win-rate promise carries no record, digits or not', () => {
+  // TASK-MTS6MRKDP168Q follow-up: "kazanma oranınızı katlayın" / "Accelerate
+  // your win rates" is the same unsourced-uplift claim already removed from
+  // the landing page's %40 figure, spelled without a digit. PublicFooter.tsx
+  // renders on every public page (including both blog surfaces), so a digit
+  // sweep of blog.ts alone would never have caught it.
+  const source = readCode('src/components/PublicFooter.tsx');
+
+  test('no multiply/accelerate win-rate claim survives, in either locale', () => {
+    expect(source).not.toMatch(/katla/i);
+    expect(source).not.toMatch(/kazanma oran/i);
+    expect(source).not.toMatch(/win rate/i);
+  });
+});
+
 describe('public pricing card — the plan feature quotes no dataset size', () => {
   test.each(['tr', 'en'] as const)('%s ultra plan f3 carries no count', (locale) => {
     const messages = JSON.parse(read(`messages/${locale}.json`)) as {

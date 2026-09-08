@@ -21,8 +21,8 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
             </div>
             <p className="text-muted text-xs leading-relaxed max-w-sm">
               {isTr
-                ? 'Horizon Europe, Digital Europe ve Eurostars fonlama süreçlerinde fikirden teslimata uçtan uca akıllı yönetim platformu. CORDIS ağ analitiği ve hakem simülasyonu ile kazanma oranınızı katlayın.'
-                : 'End-to-end intelligent proposal and consortium management platform for Horizon Europe, Digital Europe, and Eurostars. Accelerate your win rates with CORDIS graph analytics and AI evaluator simulation.'}
+                ? 'Horizon Europe, Digital Europe ve Eurostars fonlama süreçlerinde fikirden teslimata uçtan uca akıllı yönetim platformu. CORDIS ağ analitiği ve hakem simülasyonu ile teklifinizi güçlendirin.'
+                : 'End-to-end intelligent proposal and consortium management platform for Horizon Europe, Digital Europe, and Eurostars. Strengthen your proposal with CORDIS graph analytics and AI evaluator simulation.'}
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-2 text-muted">
               <span className="flex items-center gap-1 text-[11px] bg-surface border border-border px-2.5 py-1 rounded-md text-ok font-mono">
