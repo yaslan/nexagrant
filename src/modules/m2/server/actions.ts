@@ -99,7 +99,7 @@ export async function generateConceptNoteDraft(
   for (const section of schema) {
     // Basic RAG search
     const searchQuery = `${opp.title} ${topic?.title || ''} ${section.promptKey}`;
-    const ragResults = await semanticSearch(searchQuery, tenantId, 3);
+    const ragResults = await semanticSearch(searchQuery, tenantId, 3, { userId });
     
     let contextStr = '';
     if (ragResults && Array.isArray(ragResults)) {

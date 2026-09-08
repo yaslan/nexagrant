@@ -96,7 +96,7 @@ export async function generateSectionDraft(
 
   // Build RAG-augmented context
   const ragQuery = `${opportunityTitle} — section: ${sectionLabel}`;
-  const ragPrompt = await buildRagPrompt(ragQuery, tenantId);
+  const ragPrompt = await buildRagPrompt(ragQuery, tenantId, undefined, { userId });
 
   const messages: LlmMessage[] = [
     {

@@ -82,6 +82,18 @@ const envSchema = z.object({
   EFATURA_INTEGRATOR_PASSWORD: z.string().optional(),
   EFATURA_INTEGRATOR_TEST_MODE: z.string().optional(),
   /**
+   * LLM provider credentials. Both optional and without a default: an
+   * unconfigured provider must leave the app importable rather than throw at
+   * module load. The call sites decide what "unset" means — `src/lib/rag.ts`
+   * falls back to a deterministic mock embedding for dev/demo, while
+   * `src/lib/ai/rag.ts` refuses to ingest. Neither ever ships a placeholder key
+   * to a real endpoint: `sk-mock-key-for-testing` used to be handed to the
+   * OpenAI SDK, which turned a missing credential into a 401 at request time
+   * instead of a clear configuration error (TASK-MTSWVADF7RQ1B).
+   */
+  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  /**
    * 256-bit AES-GCM encryption key for sensitive tokens in CalendarConnection.
    * If unset, token encryption/decryption will fail with 503 (CalendarEncryptionNotConfiguredError).
    */

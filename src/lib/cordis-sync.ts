@@ -362,6 +362,9 @@ export async function syncCordisBigData(
         }
       }
 
+      // No tenant argument: the CORDIS corpus is shared public data
+      // (`Document.tenantId IS NULL`). The embedding calls are still logged —
+      // under PLATFORM_SCOPE_TENANT_ID; see `embedText` in src/lib/llm.ts.
       await ingestDocument(
         `CORDIS Project: ${record.acronym ?? record.projectId} - ${record.title}`,
         buildCordisRagBody(record),

@@ -10,6 +10,7 @@
 
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
+import { embedText, AiUsageLogWriteError, type AiCallAttribution } from '@/lib/llm';
 
 /** One row of the pgvector similarity search over `Chunk`. */
 interface ChunkMatch {
@@ -20,6 +21,18 @@ interface ChunkMatch {
 
 const CHUNK_SIZE = 1500;  // characters per chunk
 const CHUNK_OVERLAP = 200;
+/** Must match the `vector(1536)` column `Chunk.embedding` is declared as. */
+const EMBEDDING_DIMENSIONS = 1536;
+
+/** The shared AI layer these calls are booked against in `AiUsageLog`. */
+const RAG_MODULE = 'K6';
+const PURPOSE_INGEST = 'rag_ingest_embedding';
+const PURPOSE_SEARCH = 'rag_search_embedding';
+
+/** Who triggered a RAG call, when a user session is available. */
+export interface RagActor {
+  userId?: string;
+}
 
 /**
  * Split a long text into overlapping chunks.
@@ -39,32 +52,28 @@ export function splitText(text: string): string[] {
 
 /**
  * Generate an embedding vector for a text string.
- * In production, calls OpenAI text-embedding-3-large (1536 dimensions).
- * Here we provide a mock fallback for environments without an API key.
+ *
+ * Goes through `embedText` in the LLM adapter so the provider call lands in
+ * `AiUsageLog` (CLAUDE.md rule 5). It used to `fetch` OpenAI straight from
+ * here, which sent the chunk text and recorded nothing.
+ *
+ * `attribution` is required, not optional: the whole point is that no caller
+ * can reach the provider without saying who the call belongs to.
+ *
+ * The mock fallback for key-less dev/demo environments stays. It is reached
+ * only when nothing was sent — a failed *log* write is rethrown, because by
+ * then the text has already gone to OpenAI and pretending otherwise would put
+ * the unrecorded-processing hole straight back.
  */
-export async function getEmbedding(text: string): Promise<number[]> {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (apiKey) {
-    try {
-      const res = await fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'text-embedding-3-large',
-          input: text,
-          dimensions: 1536,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        return data.data[0].embedding;
-      }
-    } catch {}
+export async function getEmbedding(
+  text: string,
+  attribution: AiCallAttribution
+): Promise<number[]> {
+  try {
+    return await embedText(text, attribution, { dimensions: EMBEDDING_DIMENSIONS });
+  } catch (e) {
+    if (e instanceof AiUsageLogWriteError) throw e;
+    console.warn(`[getEmbedding] falling back to mock embedding: ${errorMessage(e)}`);
   }
 
   return mockEmbedding(text);
@@ -90,7 +99,8 @@ export async function ingestDocument(
   title: string,
   text: string,
   kind: string,
-  tenantId?: string
+  tenantId?: string,
+  actor?: RagActor
 ): Promise<string> {
   let docId = `doc-${Date.now()}`;
   try {
@@ -102,7 +112,12 @@ export async function ingestDocument(
     const chunks = splitText(text);
 
     for (let i = 0; i < chunks.length; i++) {
-      const embedding = await getEmbedding(chunks[i]);
+      const embedding = await getEmbedding(chunks[i], {
+        tenantId: tenantId ?? null,
+        userId: actor?.userId,
+        module: RAG_MODULE,
+        purpose: PURPOSE_INGEST,
+      });
       const embeddingStr = `[${embedding.join(',')}]`;
 
       // Use raw SQL to insert vector type
@@ -117,6 +132,10 @@ export async function ingestDocument(
       );
     }
   } catch (e) {
+    // An unwritten usage record is not a "bypassable" DB hiccup: the chunk text
+    // has already gone to OpenAI, so this has to surface rather than be logged
+    // away as a skipped ingestion.
+    if (e instanceof AiUsageLogWriteError) throw e;
     console.warn(`[ingestDocument] DB ingestion bypassed: ${errorMessage(e)}`);
   }
 
@@ -130,10 +149,16 @@ export async function ingestDocument(
 export async function retrieveChunks(
   query: string,
   topK: number = 5,
-  tenantId?: string
+  tenantId?: string,
+  actor?: RagActor
 ): Promise<{ text: string; score: number; documentId: string }[]> {
   try {
-    const queryEmbedding = await getEmbedding(query);
+    const queryEmbedding = await getEmbedding(query, {
+      tenantId: tenantId ?? null,
+      userId: actor?.userId,
+      module: RAG_MODULE,
+      purpose: PURPOSE_SEARCH,
+    });
     const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
     // Shared docs (tenantId IS NULL) plus this tenant's. The tenant id is a
@@ -163,6 +188,8 @@ export async function retrieveChunks(
       }));
     }
   } catch (e) {
+    // Same rule as ingestDocument: the query text has already been sent.
+    if (e instanceof AiUsageLogWriteError) throw e;
     console.warn(`[retrieveChunks] DB retrieval bypassed: ${errorMessage(e)}`);
   }
 
@@ -192,9 +219,10 @@ export async function retrieveChunks(
 export async function buildRagPrompt(
   userQuery: string,
   tenantId?: string,
-  topK: number = 5
+  topK: number = 5,
+  actor?: RagActor
 ): Promise<string> {
-  const chunks = await retrieveChunks(userQuery, topK, tenantId);
+  const chunks = await retrieveChunks(userQuery, topK, tenantId, actor);
 
   if (chunks.length === 0) {
     return userQuery;

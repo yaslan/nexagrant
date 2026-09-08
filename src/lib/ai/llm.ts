@@ -2,9 +2,14 @@ import { prisma } from '@/lib/db';
 import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
 import { errorStatus } from '@/lib/errors';
+import { env } from '@/lib/env';
 
+// `|| 'mock-key'` is kept deliberately: this client is constructed at module
+// load, and throwing here would take down every route that imports it. The key
+// itself is read through `src/lib/env.ts`, not the raw environment (CLAUDE.md
+// "Yapma" list).
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || 'mock-key',
+  apiKey: env.ANTHROPIC_API_KEY || 'mock-key',
 });
 
 // Helper for exponential backoff retry

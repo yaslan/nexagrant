@@ -294,6 +294,7 @@ export async function fetchLiveCordisDelta(
         continue;
       }
 
+      // Shared public corpus, same as cordis-sync: logged at platform scope.
       await ingestDocument(
         `CORDIS Live Delta: ${item.acronym ?? item.projectId} - ${item.title}`,
         item.updatedAt

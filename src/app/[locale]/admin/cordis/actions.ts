@@ -77,6 +77,9 @@ export async function handleGetCordisDeltaLogs() {
 }
 
 export async function handleTestRagQuery(query: string, topK: number = 3) {
+  // Platform scope: this searches the shared corpus (`Chunk.tenantId IS NULL`),
+  // so the embedding call is logged under PLATFORM_SCOPE_TENANT_ID rather than
+  // against a tenant. See `embedText` in src/lib/llm.ts.
   const chunks = await retrieveChunks(query, topK);
   const ragPrompt = await buildRagPrompt(query, undefined, topK);
   return { chunks, ragPrompt };

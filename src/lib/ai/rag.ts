@@ -1,17 +1,39 @@
 import { prisma } from '@/lib/db';
-import OpenAI from 'openai';
 import { PDFParse } from 'pdf-parse';
+import { embedText } from '@/lib/llm';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'sk-mock-key-for-testing',
-});
+/**
+ * These two functions used to hold their own OpenAI SDK client, built with
+ * `process.env.OPENAI_API_KEY || 'sk-mock-key-for-testing'`, and call the
+ * embeddings endpoint directly — so the full text of an uploaded PDF went to
+ * OpenAI in 1000-character chunks with no `AiUsageLog` row behind it: no
+ * tenant, no promptHash, no record of the processing at all
+ * (TASK-MTSWVADF7RQ1B). They now go through `embedText`, the same choke point
+ * `generateWithAI` uses, which logs every call. Two consequences worth naming:
+ *
+ * - the embedding is now requested at 1536 dimensions, which is what the
+ *   `Chunk.embedding` column is declared as. The old call asked for
+ *   text-embedding-3-large's default 3072, so a successful response could never
+ *   have been inserted here.
+ * - a missing key now fails as a configuration error instead of being sent to
+ *   the provider as a fake key and coming back 401.
+ */
+
+/** The shared AI layer these calls are booked against in `AiUsageLog`. */
+const RAG_MODULE = 'K6';
+
+/** Who triggered the call, when a user session is available. */
+export interface RagActor {
+  userId?: string;
+}
 
 export async function processPdfAndStore(
   fileBuffer: Buffer,
   tenantId: string | null,
   kind: string,
   title: string,
-  sourceUrl?: string
+  sourceUrl?: string,
+  actor?: RagActor
 ) {
   // pdf-parse v2 exports the PDFParse class and no callable default, so the
   // v1-style `pdfParse(buffer)` this used to `require()` could only ever throw.
@@ -39,12 +61,13 @@ export async function processPdfAndStore(
     // Skip empty chunks
     if (chunkStr.trim().length === 0) continue;
     
-    const embeddingResponse = await openai.embeddings.create({
-      model: 'text-embedding-3-large',
-      input: chunkStr,
+    const embedding = await embedText(chunkStr, {
+      tenantId,
+      userId: actor?.userId,
+      module: RAG_MODULE,
+      purpose: 'rag_ingest_embedding',
     });
-    
-    const embedding = embeddingResponse.data[0].embedding;
+
     // Format embedding array to pgvector string format: '[0.1, 0.2, ...]'
     const embeddingStr = `[${embedding.join(',')}]`;
     
@@ -58,13 +81,19 @@ export async function processPdfAndStore(
   return doc;
 }
 
-export async function semanticSearch(query: string, tenantId?: string | null, topK = 5) {
-  const embeddingResponse = await openai.embeddings.create({
-    model: 'text-embedding-3-large',
-    input: query,
+export async function semanticSearch(
+  query: string,
+  tenantId?: string | null,
+  topK = 5,
+  actor?: RagActor
+) {
+  const embedding = await embedText(query, {
+    tenantId: tenantId ?? null,
+    userId: actor?.userId,
+    module: RAG_MODULE,
+    purpose: 'rag_search_embedding',
   });
-  
-  const embedding = embeddingResponse.data[0].embedding;
+
   const embeddingStr = `[${embedding.join(',')}]`;
   
   // Use cosine distance (<=>)
