@@ -1,42 +1,29 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from 'next-intl/plugin';
-import { execSync } from 'child_process';
+import { PHASE_PRODUCTION_BUILD } from 'next/constants';
+import { execFileSync } from 'child_process';
 
 const withNextIntl = createNextIntlPlugin();
 
-// Pre-build i18n check: warn if translation gaps exist
+/**
+ * Pre-build i18n gate (CLAUDE.md rule 8).
+ *
+ * This used to be a try/catch that turned any failure into "⚠️  Could not run i18n check"
+ * and let the build continue. scripts/i18n-check.ts exited 1 on every run — it read the
+ * 28 template-literal `t(`ns.${value}`)` calls as literal keys — so that warning fired on
+ * every single build and the gate never once ran to a verdict. A gate that cannot fail is
+ * not a gate, so nothing is caught here any more: a non-zero exit throws and takes the
+ * build down with it.
+ *
+ * `next dev` is deliberately exempt (see the phase check at the bottom of this file):
+ * a missing translation should not stop someone from starting the dev server, and the
+ * check costs a couple of seconds on every restart. `next build`, `pnpm gate` and the
+ * i18n-check GitHub workflow are the three places that block.
+ */
 function checkI18n() {
-  try {
-    console.log('\n🌐 Checking i18n translations...');
-    const output = execSync('tsx scripts/i18n-check.ts', { encoding: 'utf-8' });
-    // Extract JSON from output
-    const jsonMatch = output.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const report = JSON.parse(jsonMatch[0]);
-      const { summary } = report;
-      if (summary.missingInBoth.length > 0) {
-        console.warn(
-          `⚠️  i18n gaps found:\n` +
-          `   Missing in BOTH: ${summary.missingInBoth.length}\n` +
-          `   Build will proceed but fix these before shipping.`
-        );
-      } else if (summary.missingInTurkish.length > 0 || summary.missingInEnglish.length > 0) {
-        console.warn(
-          `⚠️  Partial translation gaps:\n` +
-          `   Missing in Turkish: ${summary.missingInTurkish.length}\n` +
-          `   Missing in English: ${summary.missingInEnglish.length}`
-        );
-      } else {
-        console.log('✅ All translations complete!');
-      }
-    }
-  } catch (error) {
-    console.warn('⚠️  Could not run i18n check:', error instanceof Error ? error.message : String(error));
-    // Don't block build on check failure
-  }
+  console.log('\n🌐 Checking i18n translations...');
+  execFileSync('tsx', ['scripts/i18n-check.ts'], { stdio: 'inherit' });
 }
-
-checkI18n();
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -116,4 +103,10 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+// Phase-aware so the gate blocks `next build` without blocking `next dev`.
+const config = (phase: string) => {
+  if (phase === PHASE_PRODUCTION_BUILD) checkI18n();
+  return withNextIntl(nextConfig);
+};
+
+export default config;

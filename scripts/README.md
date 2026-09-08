@@ -4,7 +4,7 @@
 |---|---|---|
 | `stripe-sync.ts` | — | Plan/eklenti kataloğunu Stripe ürün ve fiyatlarıyla eşitler. |
 | `check-rls.ts` | `pnpm rls:check` | Kiracıya özel her tabloda RLS politikası var mı denetler. |
-| `i18n-check.ts` | `pnpm i18n:check` | `messages/tr.json` ↔ `messages/en.json` anahtar farkını çıkarır. |
+| `i18n-check.ts` | `pnpm i18n:check` | CLAUDE.md kural 8 kapısı. Üçü de bloklayıcı: `messages/tr.json` ↔ `messages/en.json` anahtar eşitliği; `src/` içindeki her `t('literal')` anahtarının iki katalogda da çözülmesi; her `t(`ns.${'${x}'}`)` şablon çağrısının şekline uyan en az bir anahtarın iki katalogda da bulunması. Kullanılmayan anahtarlar yalnız bilgi amaçlı listelenir, koşuyu düşürmez. `--json` makine okunur rapor basar (CI yorumu bunu kullanır). `pnpm gate` ve `next build` içinde koşar; `next dev` muaftır. |
 | `cordis-import.ts` | — | CORDIS dökümünü içe aktarır. |
 | `create-superadmin.ts` | — | Platform yöneticisi kullanıcısı oluşturur. |
 | `beta-onboarding.ts` | `pnpm beta:onboard` | E11 beta ortaklarını açar (kiracı, davet, ICS). Varsayılan **dry-run**; yazmak için `--apply`, göndermek için `--send`. Geri alma: `pnpm beta:rollback --apply`. |

@@ -28,9 +28,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # continue-on-error so the PR still gets the comment below explaining WHAT is
+      # missing; the final step re-raises the failure.
       - name: Run i18n audit
         id: audit
-        run: pnpm i18n:check
+        run: pnpm i18n:check --json > i18n-report.json
         continue-on-error: true
 
       - name: Comment on PR
@@ -39,64 +41,51 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const path = require('path');
 
-            // Run the audit and capture JSON output
-            const { execSync } = require('child_process');
+            // The report is read from disk, not from a second `execSync('pnpm i18n:check')`.
+            // That call threw the moment the audit exited non-zero — i.e. in exactly the
+            // situation this step exists for — so the catch swallowed it and no comment was
+            // ever posted on a failing PR.
+            let report;
             try {
-              const output = execSync('pnpm i18n:check 2>&1', { encoding: 'utf8' });
-              // Extract JSON from output
-              const jsonStart = output.indexOf('{');
-              const jsonEnd = output.lastIndexOf('}') + 1;
-              const report = JSON.parse(output.substring(jsonStart, jsonEnd));
-
-              const { summary } = report;
-              let comment = '## 🌍 i18n Translation Audit\n\n';
-
-              if (summary.missingInBoth.length > 0) {
-                comment += `### ❌ Missing in BOTH languages (${summary.missingInBoth.length})\n`;
-                comment += summary.missingInBoth.slice(0, 20).map(k => `- ${k}`).join('\n');
-                if (summary.missingInBoth.length > 20) {
-                  comment += `\n- ... and ${summary.missingInBoth.length - 20} more\n`;
-                }
-                comment += '\n';
-              }
-
-              if (summary.missingInTurkish.length > 0) {
-                comment += `### ⚠️ Missing in Turkish (${summary.missingInTurkish.length})\n`;
-                comment += summary.missingInTurkish.slice(0, 20).map(k => `- ${k}`).join('\n');
-                if (summary.missingInTurkish.length > 20) {
-                  comment += `\n- ... and ${summary.missingInTurkish.length - 20} more\n`;
-                }
-                comment += '\n';
-              }
-
-              if (summary.missingInEnglish.length > 0) {
-                comment += `### ⚠️ Missing in English (${summary.missingInEnglish.length})\n`;
-                comment += summary.missingInEnglish.slice(0, 20).map(k => `- ${k}`).join('\n');
-                if (summary.missingInEnglish.length > 20) {
-                  comment += `\n- ... and ${summary.missingInEnglish.length - 20} more\n`;
-                }
-                comment += '\n';
-              }
-
-              if (summary.missingInBoth.length === 0 &&
-                  summary.missingInTurkish.length === 0 &&
-                  summary.missingInEnglish.length === 0) {
-                comment += '✅ All translation keys are present in both languages!\n\n';
-              }
-
-              comment += `\n**Stats:** ${summary.totalKeysInCode} used | ${summary.totalKeysInTurkish} TR | ${summary.totalKeysInEnglish} EN`;
-
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
+              report = JSON.parse(fs.readFileSync('i18n-report.json', 'utf8'));
             } catch (error) {
-              console.error('Failed to parse audit output', error);
+              core.warning(`Could not read i18n-report.json: ${error.message}`);
+              return;
             }
+
+            const { summary } = report;
+            const section = (heading, keys) => {
+              if (!keys || keys.length === 0) return '';
+              let out = `### ${heading} (${keys.length})\n`;
+              out += keys.slice(0, 20).map(k => `- \`${k}\``).join('\n');
+              if (keys.length > 20) out += `\n- ... and ${keys.length - 20} more`;
+              return out + '\n\n';
+            };
+
+            let comment = '## 🌍 i18n Translation Audit\n\n';
+            comment += section('❌ In `tr.json` but not in `en.json`', summary.onlyInTurkish);
+            comment += section('❌ In `en.json` but not in `tr.json`', summary.onlyInEnglish);
+            comment += section('❌ Used in code, missing in BOTH languages', summary.missingInBoth);
+            comment += section('❌ Used in code, missing in Turkish', summary.missingInTurkish);
+            comment += section('❌ Used in code, missing in English', summary.missingInEnglish);
+            comment += section('❌ Dynamic key shape matches nothing in Turkish', summary.unmatchedPatternsTurkish);
+            comment += section('❌ Dynamic key shape matches nothing in English', summary.unmatchedPatternsEnglish);
+
+            if (comment === '## 🌍 i18n Translation Audit\n\n') {
+              comment += '✅ All translation keys are present in both languages!\n\n';
+            }
+
+            comment += `\n**Stats:** ${summary.totalKeysInCode} static keys used | `;
+            comment += `${summary.totalDynamicPatterns} dynamic patterns | `;
+            comment += `${summary.totalKeysInTurkish} TR | ${summary.totalKeysInEnglish} EN`;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
 
       - name: Fail if gaps found
         if: steps.audit.outcome == 'failure'

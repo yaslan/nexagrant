@@ -31,7 +31,7 @@
     "beta:esr-calibration:rollback": "tsx scripts/esr-calibration.ts --rollback",
     "a11y:check": "tsx scripts/a11y-check.ts",
     "jobs:g0-rescore": "tsx scripts/rescore-g0.ts",
-    "gate": "pnpm lint && pnpm typecheck && pnpm test && pnpm rls:check && pnpm rls:verify",
+    "gate": "pnpm lint && pnpm typecheck && pnpm test && pnpm i18n:check && pnpm rls:check && pnpm rls:verify",
     "hooks:install": "git config core.hooksPath githooks && echo \"core.hooksPath=githooks ayarlandi\""
   },
   "dependencies": {
