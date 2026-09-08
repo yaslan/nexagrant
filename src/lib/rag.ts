@@ -221,17 +221,7 @@ export async function retrieveChunks(
   ].slice(0, topK);
 }
 
-/**
- * Build a RAG-augmented prompt by prepending relevant context chunks.
- */
-export async function buildRagPrompt(
-  userQuery: string,
-  tenantId?: string,
-  topK: number = 5,
-  actor?: RagActor
-): Promise<string> {
-  const chunks = await retrieveChunks(userQuery, topK, tenantId, actor);
-
+export function formatRagPrompt(userQuery: string, chunks: { text: string; score: number }[]): string {
   if (chunks.length === 0) {
     return userQuery;
   }
@@ -245,4 +235,17 @@ ${context}
 ---END CONTEXT---
 
 Question: ${userQuery}`;
+}
+
+/**
+ * Build a RAG-augmented prompt by prepending relevant context chunks.
+ */
+export async function buildRagPrompt(
+  userQuery: string,
+  tenantId?: string,
+  topK: number = 5,
+  actor?: RagActor
+): Promise<string> {
+  const chunks = await retrieveChunks(userQuery, topK, tenantId, actor);
+  return formatRagPrompt(userQuery, chunks);
 }

@@ -5,7 +5,7 @@ import { runCordisImport } from '@/lib/k2-cordis/importer';
 import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
 import { syncCordisBigData, aggregateCordisMetrics } from '@/lib/cordis-sync';
 import { fetchLiveCordisDelta, getCordisLiveStreamLogs } from '@/lib/cordis-delta';
-import { retrieveChunks, buildRagPrompt } from '@/lib/rag';
+import { retrieveChunks, formatRagPrompt } from '@/lib/rag';
 
 export async function handleRunCordisImportAction(dataset: 'HORIZON' | 'H2020', limit?: number) {
   const importRes = await runCordisImport({ dataset, limit });
@@ -81,6 +81,6 @@ export async function handleTestRagQuery(query: string, topK: number = 3) {
   // so the embedding call is logged under PLATFORM_SCOPE_TENANT_ID rather than
   // against a tenant. See `embedText` in src/lib/llm.ts.
   const chunks = await retrieveChunks(query, topK);
-  const ragPrompt = await buildRagPrompt(query, undefined, topK);
+  const ragPrompt = formatRagPrompt(query, chunks);
   return { chunks, ragPrompt };
 }
