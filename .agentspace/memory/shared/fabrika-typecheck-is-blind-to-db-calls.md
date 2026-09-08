@@ -1,6 +1,6 @@
 ---
 name: fabrika-typecheck-is-blind-to-db-calls
-description: pnpm typecheck artık hayalet MODEL çağrısını yakalıyor (delegate adları sayılı) — ama hayalet SÜTUN/İLİŞKİ'ye hâlâ kör, onu yalnız src/ tarayan schema-contract testi görüyor
+description: pnpm typecheck artık hayalet MODEL çağrısını yakalıyor (delegate adları sayılı) — ama hayalet SÜTUN/İLİŞKİ'ye hâlâ kör, onu schema-contract testi görüyor (2026-09-08'den beri src/ + prisma/ + scripts/, git indeksiyle sınırlı)
 metadata:
   type: project
   updatedAt: 2026-09-08
@@ -66,3 +66,11 @@ Yani `prisma/seed-*.ts` içindeki hayalet **sütunlar** hâlâ hiçbir kapıya t
 Nöbetçi: `src/types/prisma-override.test.ts` birleşimi şemadan yeniden türetir; şemaya model
 eklerken bu listeyi de güncellemen gerekir (test eksik adı yazarak kırmızıya döner). Mekanizma
 düzeltmesi: [[fabrika-prisma-generate-alone-changes-nothing]]
+
+## Güncelleme 2026-09-08 (TASK-MTSJK8VVG9MKM)
+
+Hayalet SÜTUN kapısı artık yalnız `src/` değil, **`src/` + `prisma/` + `scripts/`** tarıyor —
+kapsam git İNDEKSİYLE sınırlı (takipsiz sonda betikleri taranmaz):
+[[fabrika-gate-scope-follows-the-git-index]]. Genişletme `prisma/seed-m6-evaluations.ts`'te üç
+hayalet sütun buldu (`Opportunity.callId`, `Proposal.status`, `Proposal.title`) — düzeltildi.
+`tests/` (e2e `.spec.ts`) HÂLÂ taranmıyor ve orada doğrudan Prisma yazan fikstürler var; ayrı kart.
