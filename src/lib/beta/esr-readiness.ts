@@ -21,6 +21,12 @@ export const ESR_EXPECTED_SAMPLES = 20;
 /** E11.3 acceptance criterion: G0 ↔ ESR agreement. */
 export const ESR_REQUIRED_ACCURACY = 0.85;
 
+/**
+ * The blocked checks that form a single causal chain, head first. Each one is a precondition of the
+ * next, so the whole tail clears from one human action at the head.
+ */
+export const CHAIN: readonly string[] = ['roster', 'survey-sent', 'responses', 'accuracy'];
+
 export type ReadinessSeverity = 'ok' | 'warn' | 'blocked';
 
 export interface ReadinessCheck {
@@ -211,7 +217,7 @@ export function evaluateEsrReadiness(input: EsrReadinessInput): EsrReadinessRepo
       label: `Accuracy ≥ ${(ESR_REQUIRED_ACCURACY * 100).toFixed(0)}%`,
       severity: 'blocked',
       detail: `rule A ${(input.accuracy * 100).toFixed(1)}% < ${(ESR_REQUIRED_ACCURACY * 100).toFixed(0)}%`,
-      fix: 'Do NOT move the threshold to fit 20 fixture rows — that is overfitting, not calibration. Close açık karar #8 (rule A vs rule B) and re-measure on partner-confirmed labels.',
+      fix: 'Rule B is NOT an escape hatch: açık karar #8 closed on 2026-09-06 (patron approval) — the gate rule is rule A (composite ≥ 70 + hard rules) and SPEC_LITERAL_G0_RULES is comparison-only. The only honest route to ≥85% is ESR-confirmed labels, i.e. the blockers above. Moving minScore to fit 20 fixture rows is overfitting and would need a NEW boss decision, not a re-read of #8.',
     });
   } else {
     checks.push(ok('accuracy', `Accuracy ≥ ${(ESR_REQUIRED_ACCURACY * 100).toFixed(0)}%`, `rule A ${(input.accuracy * 100).toFixed(1)}%`));
@@ -241,8 +247,22 @@ export function evaluateEsrReadiness(input: EsrReadinessInput): EsrReadinessRepo
 
   const blockers = checks.filter((c) => c.severity === 'blocked');
   const warnings = checks.filter((c) => c.severity === 'warn');
+
+  // Checks 3–7 are one chain, not four independent problems: no survey reaches a roster that cannot
+  // receive mail, no verdicts come back from a survey nobody got, and — since açık karar #8 closed on
+  // 2026-09-06 — the only honest route to ≥85% is verdict-confirmed labels. Naming the head keeps the
+  // card from being read as four items needing four owners when one human action clears all of them.
+  const chained = blockers.filter((b) => CHAIN.includes(b.id));
+  const chainNote =
+    chained.length > 1 && chained[0]?.id === CHAIN[0]
+      ? ` — one chain, head: ${CHAIN[0]} (human action); ${chained
+          .slice(1)
+          .map((c) => c.id)
+          .join(', ')} cannot clear before it does`
+      : '';
+
   const summary = blockers.length
-    ? `E11.3 BLOCKED — ${blockers.length} blocker(s): ${blockers.map((b) => b.id).join(', ')}`
+    ? `E11.3 BLOCKED — ${blockers.length} blocker(s): ${blockers.map((b) => b.id).join(', ')}${chainNote}`
     : warnings.length
       ? `E11.3 has no blockers, ${warnings.length} warning(s): ${warnings.map((w) => w.id).join(', ')}`
       : 'E11.3 acceptance criterion can be closed — every check passes';

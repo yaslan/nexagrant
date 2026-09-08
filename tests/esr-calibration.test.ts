@@ -369,6 +369,39 @@ describe('E11.3 readiness gate', () => {
     for (const blocker of report.blockers) expect(blocker.fix).not.toBe('');
   });
 
+  // Açık karar #8 closed on 2026-09-06: rule A is the gate rule, rule B is comparison-only. The
+  // remediation text used to send the operator off to "close #8", which both was already done and
+  // implied rule B's higher number could close the criterion. It cannot.
+  test('the accuracy blocker does not offer rule B as a way out', () => {
+    const report = evaluateEsrReadiness({ ...READY, accuracy: 0.8 });
+    const check = report.checks.find((c) => c.id === 'accuracy')!;
+    expect(check.severity).toBe('blocked');
+    expect(check.fix).toMatch(/#8 closed on 2026-09-06/);
+    expect(check.fix).toMatch(/NOT an escape hatch/);
+    expect(check.fix).not.toMatch(/Close açık karar #8/);
+  });
+
+  test('the summary names the head of the blocked chain, not four separate problems', () => {
+    const report = evaluateEsrReadiness({
+      ...READY,
+      isFixture: true,
+      undeliverable: 10,
+      sendReceipt: null,
+      responseCount: 0,
+      accuracy: 0.8,
+      today: '2026-09-08',
+      deadline: '2026-09-21',
+    });
+    expect(report.summary).toMatch(/one chain, head: roster \(human action\)/);
+    expect(report.summary).toMatch(/survey-sent, responses, accuracy cannot clear before it does/);
+  });
+
+  test('a lone blocker is not dressed up as a chain', () => {
+    const report = evaluateEsrReadiness({ ...READY, undeliverable: 10 });
+    expect(report.blockers.map((b) => b.id)).toEqual(['roster']);
+    expect(report.summary).not.toMatch(/one chain/);
+  });
+
   test('the self-test response file cannot close the criterion even when it scores ≥ 85%', () => {
     const report = evaluateEsrReadiness({ ...READY, responsesAreSelfTest: true, responseCount: 8, accuracy: 0.85 });
     expect(report.checks.find((c) => c.id === 'accuracy')?.severity).toBe('ok');

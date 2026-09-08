@@ -1,7 +1,7 @@
 # CORDIS örnek seti — G0 ↔ ESR kalibrasyonu
 
 > Üretilmiş dosya. Elle düzenlemeyin; `pnpm tsx scripts/esr-calibration.ts` yeniden üretir.
-> Üretim zamanı: 2026-09-08T17:05:16.611Z · Kural sürümü: `g0-canonical-1.0` · Örnek seti: `docs/BETA_DATA/esr-calibration-samples.csv`
+> Üretim zamanı: 2026-09-08T17:14:34.106Z · Kural sürümü: `g0-canonical-1.0` · Örnek seti: `docs/BETA_DATA/esr-calibration-samples.csv`
 
 > ⚠️ **Bu koşu KÜRATE EDİLMİŞ bir fixture üzerinde yapıldı** (tüm `cordisProjectId` değerleri rezerve
 > `SAMPLE-*` ad alanında). Buradaki doğruluk oranı **kalibrasyon hattının** çalıştığını gösterir;
@@ -124,7 +124,9 @@ Bu setde inceleme bandına 3 örnek düşüyor (S04, S07, S10); bunların 3 tane
 
 Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban oran %26). Yüksek taban oranlı çağrı tipleri bileşik skoru şişiriyor; `baseRate` ağırlığının çağrı tipine göre sınırlandırılması ayrı bir iş olarak açılmalı.
 
-**Karar bekleyen belirsizlik:** PROJECT.md:75 kapıyı üç sert kural olarak tanımlıyor, ayarlar ekranı aynı sayıyı "Minimum AI Alignment Score" diye etiketliyor, `gates/evaluate.ts` ise bileşik skora uyguluyor. Üçü aynı şey değil: bu koşuda A ile B okuması arasında **10.0 puanlık** doğruluk farkı çıkıyor. docs/ROADMAP.md · Açık kararlar #8'de kayıtlı; kapatılmadan eşik değiştirilmemeli.
+**Karar KAPANDI (2026-09-06, patron onayı — docs/ROADMAP.md · Açık kararlar #8):** eşik **bileşik skora** uygulanır; kapı kuralı **A**'dır (`DEFAULT_G0_RULES`). **B kapıda kullanılmaz, yalnız karşılaştırma içindir** (`SPEC_LITERAL_G0_RULES`). Bu koşuda A ile B arasında **10.0 puanlık** doğruluk farkı çıkıyor; bu bir seçenek değil, iki kural setinin ölçüm farkıdır — **E11.3 doğruluk kriteri B'ye geçilerek kapatılamaz.** Eşiği değiştirmek yeni bir patron kararı gerektirir, #8'in yeniden okunmasını değil.
+
+**Kalan tutarsızlık (karar değil, etiket hatası):** `/settings/gates` aynı sayıyı hâlâ "Minimum AI Alignment Score" diye etiketliyor (`src/app/[locale]/(app)/[workspace]/settings/gates/page.tsx:35`, alan `minG0Score`), oysa `gates/evaluate.ts` onu bileşik skora uyguluyor. #8'in öngördüğü etiket düzeltmesi yapılmadı; sahibi board **TASK-MTQ63RR8Z0G8E**. Kalibrasyonu etkilemez, kullanıcıya yanlış şeyi söyler.
 
 ## 6. Yanlış sınıflandırılan örnekler (A kuralı)
 
