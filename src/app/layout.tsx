@@ -34,6 +34,7 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{
             __html: themeInitScript,
           }}
+          suppressHydrationWarning
         />
       </head>
       <body className="min-h-screen bg-background text-ink antialiased">

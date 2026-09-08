@@ -25,3 +25,6 @@
 - [fabrika-verification-script-gotchas](fabrika-verification-script-gotchas.md) — Fabrika'da elle doğrulama betiği yazarken dört tuzak — betiği worktree köküne koy, `@playwright/test`ten import et, dev sunucusunda networkidle bekleme, Prisma 7 için çıplak PrismaClient yerine pg ya da tsx
 
 - [fabrika-verification-recipe-mutation-and-counterfactual](fabrika-verification-recipe-mutation-and-counterfactual.md) — Fabrika'da bir kapanmış kartı bağımsız doğrularken yeşil test kanıt DEĞİLDİR — kusuru kendin geri koy (mutasyon) ve bağımlılık için paketi node_modules'tan çıkar (karşı-olgusal build); ikisi de ucuz ve ikisi de kartı gerçekten sınar
+
+- [fabrika-getbyrole-alert-hits-feedbackwidget](fabrika-getbyrole-alert-hits-feedbackwidget.md) — Fabrika e2e'sinde sayfa geneli getByRole('alert')/('status') kullanma — FeedbackWidget her uygulama sayfasında kendi role=alert düğümünü mount ediyor ve testin çalışan özelliği kırmızı gösteriyor
+- [mutation-must-actually-narrow](mutation-must-actually-narrow.md) — Mutasyon testinde YEŞİL sonuç önce mutasyonu suçlar, testi değil — kusuru gerçekten sokup sokmadığını doğrula (fikstür satırının alanı zaten null'sa "lastRunAt: null" hiçbir şeyi daraltmaz)

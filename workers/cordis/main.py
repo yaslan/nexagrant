@@ -545,3 +545,34 @@ async def cordis_run_status(
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+def cleanup_temp_files(temp_dir: str = "/tmp/cordis") -> int:
+    """Removes temporary zip and parquet files left behind by import runs."""
+    if not os.path.exists(temp_dir):
+        return 0
+    removed = 0
+    for root, _, files in os.walk(temp_dir):
+        for f in files:
+            if f.endswith((".zip", ".csv", ".parquet", ".tmp")):
+                try:
+                    os.remove(os.path.join(root, f))
+                    removed += 1
+                except OSError:
+                    pass
+    return removed
+
+
+@app.post("/cleanup")
+async def trigger_temp_cleanup(
+    authorization: Optional[str] = Header(default=None),
+) -> JSONResponse:
+    """Purges leftover temporary files from worker disk."""
+    denied = check_token(authorization)
+    if denied is not None:
+        return denied
+    removed_count = cleanup_temp_files()
+    return JSONResponse(
+        status_code=200,
+        content={"success": True, "message": f"Purged {removed_count} temp files", "removedCount": removed_count},
+    )

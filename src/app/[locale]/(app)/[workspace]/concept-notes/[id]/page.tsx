@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import ConceptNoteEditor from './editor';
 import { errorMessage } from '@/lib/errors';
 import type { ConceptNoteRow, ConceptTemplateRow, ConceptTemplateSchema } from '@/modules/m2/types';
@@ -44,36 +45,8 @@ export default async function ConceptNoteDetailPage({
     console.warn(`[ConceptNoteDetail] DB query bypassed: ${errorMessage(e)}`);
   }
 
-  // Fallback demo note if DB is unseeded/offline
   if (!note) {
-    note = {
-      id,
-      templateId: 't1',
-      opportunityId: 'demo-opp-1',
-      version: 1,
-      status: 'draft',
-      content: {
-        excellence: 'This concept addresses zero-emission hydrogen storage using innovative metal-organic frameworks.',
-        impact: 'Reduces industrial carbon footprint by 40% across European pilot sites.',
-        implementation: 'Consortium of 8 partners across 5 countries over 36 months.',
-      },
-    };
-
-    template = {
-      id: 't1',
-      key: 'he_stage1_blind',
-      name: 'Horizon Europe Stage 1 (Blind)',
-      version: '1.0',
-      schema: {
-        sections: [
-          { key: 'excellence', labelKey: 'Excellence & Innovation', maxWords: 1000 },
-          { key: 'impact', labelKey: 'Expected Impact', maxWords: 800 },
-          { key: 'implementation', labelKey: 'Implementation Plan', maxWords: 600 },
-        ],
-      },
-    };
-
-    opportunity = { title: 'HORIZON-CL5-2026-D3-01: Hydrogen Storage Systems' };
+    notFound();
   }
 
   const schema = (template?.schema || {

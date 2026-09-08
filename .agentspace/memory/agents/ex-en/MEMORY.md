@@ -29,3 +29,6 @@
 - [phantom-dependency-proof-by-hiding-it](phantom-dependency-proof-by-hiding-it.md) — node_modules'ta olup package.json/lock'ta olmayan bir paketi ve onun hangi rotaları kirlettiğini kanıtlamanın yolu — paketi gizleyip build'i tekrar koş, derleyicinin import izlerini oku
 
 - [erasure-gap-lives-in-columns-without-a-foreign-key](erasure-gap-lives-in-columns-without-a-foreign-key.md) — Bir imha/purge işini denetlerken kodu değil ŞEMAYI sorgula — FK'sı olmayan userId kolonları hiçbir cascade'e yakalanmaz ve her tamamlanmış silmeden sağ çıkar; Fabrika'da 10 kolondan 8'i böyleydi
+
+- [fabrika-i18n-gate-now-blocks-three-ways](fabrika-i18n-gate-now-blocks-three-ways.md) — Fabrika i18n kapısı 2026-09-08'de gerçekten bloklar hâle geldi — tr↔en parite + kodda-kullanılan-anahtar + şablon-şekli; next dev muaf, pnpm build turbopack yüzünden ayrıca kırık, güvenilir nokta pnpm gate
+- [mutate-then-revert-with-byte-backups-not-git](mutate-then-revert-with-byte-backups-not-git.md) — Fabrika'da mutasyon testini geri alırken git checkout KULLANMA — paralel ajanlar aynı ağaçta aynı dosyayı yazıyor; bayt yedeği al, onu geri koy, kalıntıyı grep ile doğrula

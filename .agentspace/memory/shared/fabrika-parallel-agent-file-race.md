@@ -100,3 +100,24 @@ Tek satırlık `git add X && git commit` zincirleri de aynı riski taşır — i
 olsa da araya başka bir ajanın `add`'i girebilir. `add` ile `commit` arasında **her zaman**
 bir `git diff --cached --name-only` kontrolü olsun, dosya sayısı ne kadar az/açık olursa
 olsun.
+
+## Yeni varyant (2026-09-08, TASK-MTSHP3BMTAD3Y): `git merge-file` (a) yöntemini kurtarmaz
+
+Bu dosyanın (a) tarifi ("hunk'lar ayrıksa") `git apply --cached` ile patch uygulamayı
+öneriyor — doğru. Ama kurtarma sırasında üç-taraflı `git merge-file <ours> <base> <other>`
+ile "otomatik birleştir" denedim (patch elle ayıklamak yerine) ve bu **sessizce başarısız
+oldu**: `prisma/schema.prisma`'da benim değişikliğim (2 satırlık bir yorum) ile başka bir
+ajanın değişikliği (yeni bir modele alan ekleme, farklı bir bölge) aynı dosyadaydı ama
+`merge-file` exit 0 (conflict YOK) döndürdü ve **benim hunk'ımı sessizce base'e geri
+döndürdü** — diğer ajanın hunk'ı büyük olduğu için diff hizalaması onu "kazandırdı".
+Conflict marker olmadığı için fark edilmesi zor; yalnız commit sonrası `grep` ile
+`accessToken` satırının hâlâ eski TODO metnini taşıdığını görünce anlaşıldı.
+
+**How to apply:** Bu sınıftaki bir kurtarmada `git merge-file`'a **güvenme** — exit kodu
+0 olsa bile hunk'ının sessizce kaybolmuş olabileceğini varsay. Bunun yerine: (1) dosyayı
+canlı haliyle **taze `Read`/`cat`** et (herhangi bir backup/cp/merge çıktısından değil),
+(2) kendi hedef metnini o taze içeriğe karşı **yeniden** `Edit`/`sed` ile uygula, (3)
+`git diff -- <yol>` ile sonucu gözle doğrula, (4) commit'ten hemen önce
+`git diff --cached -- <yol> | grep <kendi eklediğin metin>` ile son kez kanıtla. Elle patch
+ayıklamak (bu dosyanın (a) tarifi) hâlâ en güvenilir yol; "otomatik" 3 taraflı birleştirme
+bu ofiste güvenilir değil.

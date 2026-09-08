@@ -23,3 +23,6 @@
 - [fabrika-threshold-rate-tile-is-not-the-export-success-rate](fabrika-threshold-rate-tile-is-not-the-export-success-rate.md) — Fabrika panosunda "Eşik Üstü Oranı" kutucuğunun paydası GÖNDERİLEN TEKLİFLER, dışa aktarımdaki "Başarı Oranı"nınki FIRSAT SAYISI — iki farklı sayı, kart metinleri bunları sürekli karıştırıyor
 
 - [fabrika-empty-tenant-audit-needs-module-and-plan-rows](fabrika-empty-tenant-audit-needs-module-and-plan-rows.md) — "Kaydı olmayan kullanıcıyla gez" denen uydurma-veri denetimi Fabrika'da doğrudan yapılamaz — boş kiracı her sayfada modül/plan kapısına takılır; geçici ModuleState + Subscription satırı aç, gez, birebir sil
+
+- [fabrika-first-matching-element-is-the-hidden-mobile-one](fabrika-first-matching-element-is-the-hidden-mobile-one.md) — Fabrika app shell mounts UserMenu twice (mobile md:hidden FIRST, desktop second) — a Playwright .first() resolves to the invisible mobile copy and click times out
+- [fabrika-negative-only-assertions-pass-on-a-screen-that-never-opened](fabrika-negative-only-assertions-pass-on-a-screen-that-never-opened.md) — An anti-fabrication e2e block built only from not.toContain() also passes when the panel never opened — always add one positive assertion that the surface is really on screen

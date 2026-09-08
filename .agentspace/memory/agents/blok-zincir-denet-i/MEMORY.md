@@ -23,3 +23,6 @@
 
 - [fabrika-gitignore-does-not-hide-a-file-from-the-gate](fabrika-gitignore-does-not-hide-a-file-from-the-gate.md) — .gitignore'daki geçici script yine de eslint ve tsc tarafından okunur ve pnpm gate'i repo genelinde kırar — probe dosyanı koştuktan sonra SİL, ve yabancı bir kalıntıya dokunmadan kapıyı hariç-tutarak ölç
 - [fabrika-superuser-hides-missing-withtenant](fabrika-superuser-hides-missing-withtenant.md) — Kiracı tablosunu withTenant DIŞINDA okumak yerelde DOĞRU görünür — DATABASE_URL SUPERUSER; hatayı görmek için aynı fonksiyonu fabrika_app rolüne bağlı client'la koştur
+
+- [fabrika-a-built-feature-with-no-caller-is-not-shipped](fabrika-a-built-feature-with-no-caller-is-not-shipped.md) — Yeşil birim testi ve temiz typecheck bir özelliğin ÇALIŞTIĞINI kanıtlar, KULLANILDIĞINI değil — bitmiş saydığın her yeni fonksiyon için `grep -rn <isim> src` ile üretim çağıranını ara
+- [fabrika-hiding-a-card-is-not-refusing-a-purchase](fabrika-hiding-a-card-is-not-refusing-a-purchase.md) — Görünürlük kusurlarında listeyi ve satın almayı AYRI ölç — kart gizlendiği hâlde endpoint sku'yu elle kabul edebilir; ayrıca "yok" ile "senin değil" tek mesajla cevaplanmalı

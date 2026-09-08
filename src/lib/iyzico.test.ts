@@ -12,6 +12,7 @@ vi.mock('@/lib/db', () => {
   const prisma: Record<string, unknown> = {
     tenant: { findUnique: vi.fn() },
     plan: { findUnique: vi.fn() },
+    planVersion: { findFirst: vi.fn() },
     subscription: { findUnique: vi.fn(), upsert: vi.fn() },
     creditLedger: { create: vi.fn() },
     moduleState: { upsert: vi.fn() },

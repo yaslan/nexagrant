@@ -68,3 +68,16 @@ test-artifacts/
 # ad-hoc agent verification scratch (not part of the build)
 .qa-scratch/
 .tmp-qa-en/
+
+# CORDIS bulk archives land here at runtime (src/lib/k2-cordis/importer.ts,
+# CORDIS_TMP_DIR). The real dataset is a ~500 MB zip; it must never be committed.
+tmp_cordis/
+
+# cPanel Production Backups & Database Dumps (TASK-MTJ1D7K5TBS0B)
+cpanel-backup/
+production_backup/
+production_backup.zip
+*.dump.sql
+*.sql.gz
+cpanel_*.tar.gz
+

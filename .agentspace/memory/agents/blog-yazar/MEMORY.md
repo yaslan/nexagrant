@@ -12,3 +12,5 @@
 - [fabrika-unsourced-claims-hide-in-shared-components](fabrika-unsourced-claims-hide-in-shared-components.md) — kaynaksız iddia taraması hedef dosyanın dışına, sayfanın render ettiği paylaşımlı bileşenlere (footer/navbar) de bakmalı; rakamsız kelime-kalıpları ("katlayın"/"accelerate") dijit-regex'ini atlatır
 
 - [fabrika-verification-card-workflow](fabrika-verification-card-workflow.md) — How to independently verify a "review" card that claims a bug is fixed, without trusting the existing test's own assertions or leaving debug code in the repo
+
+- [agentspace-browser-date-input-digits-only](agentspace-browser-date-input-digits-only.md) — In AgentSpace's internal browser tool, typing a dash-separated string ("2026-10-24") into an HTML <input type="date"> silently fails to set the value AND wipes sibling React-controlled fields already filled on the same form — type digits only, in the locale's segment order.

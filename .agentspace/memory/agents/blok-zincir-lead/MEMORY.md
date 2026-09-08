@@ -37,3 +37,14 @@
 
 - [fabrika-idle-pane-failure-means-nothing-ran](fabrika-idle-pane-failure-means-nothing-ran.md) — `tespit=idle` ("boş prompt'ta bekliyor") ölü pane'den FARKLIDIR — iş hiç başlamamıştır, ağaçta arayacak yarım kod yoktur
 - [fabrika-review-pile-is-the-real-backlog](fabrika-review-pile-is-the-real-backlog.md) — `review`de bekleyen kart bitmiş iş değil — dağıtılacak iş arıyorsan gerçek kuyruk orada, backlog'da değil
+
+- [fabrika-workers-cannot-read-card-bodies](fabrika-workers-cannot-read-card-bodies.md) — Worker panodan kartın GÖVDESİNİ okuyamıyor — list_tasks yalnız başlık döndürüyor, bu yüzden bütün detay dağıtım metnine yazılmalı
+
+- [fabrika-cross-verification-needs-a-falsifying-probe](fabrika-cross-verification-needs-a-falsifying-probe.md) — Doğrulama görevi "raporu oku + komutu tekrar koş" ile yazılırsa hiçbir şey kanıtlamaz — her doğrulama kartına iddiayı ÇÜRÜTMEYE çalışan bir sonda adımı konur
+- [fabrika-next-round-comes-from-report-open-questions](fabrika-next-round-comes-from-report-open-questions.md) — Sıradaki delegasyon turunun gerçek kaynağı pano değil, biten raporların "Açık sorular" bölümüdür — panodaki review yığını bitmiş işi gösterir, açık işi değil
+- [fabrika-verification-round-waits-for-an-empty-tree](fabrika-verification-round-waits-for-an-empty-tree.md) — review kartlarının doğrulama turu ancak ekip boştayken koşulur — 7 ajan ortak ağacı düzenlerken koşan gate/e2e, kartların iddiasını değil worker'ların yarım işini ölçer
+
+- [fabrika-data-loading-verification-breaks-empty-table-specs](fabrika-data-loading-verification-breaks-empty-table-specs.md) — Gerçek veri yükleyen bir doğrulama turu, "tablo boş" diyen kardeş spec'leri sonradan kırar — kapatma turunda spec dosyasının TAMAMINI koştur
+- [fabrika-verification-cards-orphan-when-target-closes](fabrika-verification-cards-orphan-when-target-closes.md) — Hedef kartı done yaparken eşleşen DOĞRULAMA kartı todo'da öksüz kalıyor — ikisini birlikte kapat
+
+- [fabrika-green-gate-does-not-prove-a-clean-clone](fabrika-green-gate-does-not-prove-a-clean-clone.md) — Yerelde yeşil kapı (typecheck/lint/test) temiz klonu KANITLAMAZ — untracked dosyalar suiti ayakta tutabilir; durum kontrolünde git status'a da bak

@@ -1,4 +1,5 @@
 import { getTranslations } from 'next-intl/server';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { Metadata } from 'next';
@@ -29,7 +30,12 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { region, locale } = await params;
   const regionInfo = REGIONS[region as RegionParam];
-  const regionLabel = regionInfo?.name || region;
+  if (!regionInfo) {
+    return {
+      title: locale === 'tr' ? 'Sayfa Bulunamadı — Fabrika' : 'Page Not Found — Fabrika',
+    };
+  }
+  const regionLabel = regionInfo.name;
   const description = locale === 'tr'
     ? `${regionLabel}'deki açık Horizon çağrıları. Deadline, bütçe ve uygunluk bilgisi.`
     : `Open Horizon calls in ${regionLabel}. Deadlines, budgets, and eligibility information.`;
@@ -60,7 +66,10 @@ type TopicRow = {
 export default async function CallsPage({ params }: PageProps) {
   const { region, locale } = await params;
   const regionInfo = REGIONS[region as RegionParam];
-  const regionLabel = regionInfo?.name || region;
+  if (!regionInfo) {
+    notFound();
+  }
+  const regionLabel = regionInfo.name;
 
   const t = await getTranslations('calls_region');
 

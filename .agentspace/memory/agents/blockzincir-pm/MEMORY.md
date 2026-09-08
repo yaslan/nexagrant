@@ -49,3 +49,5 @@
 - [fabrika-approvals-screen-is-a-stub](fabrika-approvals-screen-is-a-stub.md) — Fabrika /approvals ekranı gerçek ApprovalRequest satırlarını listeliyor ama Onayla/Reddet düğmeleri hiçbir şey yazmayan stub'lara bağlı — ApprovalRequest'i "kullanımda" sanma
 - [fabrika-prisma-migrations-are-hand-applied](fabrika-prisma-migrations-are-hand-applied.md) — Fabrika'da şema değişikliği reçetesi — klasörlü migration + prisma migrate deploy + pnpm db:rls; migrate dev KULLANMA, RLS'i hem rls.sql'e hem migration'a yaz
 - [fabrika-server-email-locale-pattern](fabrika-server-email-locale-pattern.md) — Sunucu e-postaları next-intl kullanamaz — emsal invite-email.ts'in COPY={tr,en} tablosu; alerts-daily.ts hâlâ sabit İngilizce (bilinen, düzeltilmemiş gap)
+
+- [calendar-connection-token-gate-decision](calendar-connection-token-gate-decision.md) — CalendarConnection token şifreleme kararı KAPANDI — B (ertele+kilitle), makine gate'i src/lib/db.ts'te canlı; M9 OAuth PR'ı bunu bilmeden ilerlemesin

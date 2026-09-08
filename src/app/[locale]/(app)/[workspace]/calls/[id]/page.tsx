@@ -1,48 +1,82 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { AlertTriangle } from 'lucide-react';
-import { createOpportunity } from '../../pipeline/actions';
+import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
+import { prisma } from '@/lib/db';
+import { SediaAdapter } from '@/lib/adapters/sedia';
+import AddToPipelineButton from './add-button';
 
-export default function CallDetailsPage({ params }: { params: Promise<{ id: string, workspace: string, locale: string }> }) {
-  const resolvedParams = React.use(params);
-  const { id, workspace, locale } = resolvedParams;
+export default async function CallDetailsPage({
+  params,
+}: {
+  params: Promise<{ id: string; workspace: string; locale: string }>;
+}) {
+  const { id, workspace, locale } = await params;
   const isTr = locale === 'tr';
-  const t = useTranslations('callDetails');
-  const call = {
-    id,
-    title: t('mockTitle'),
-    programme: t('mockProgramme'),
-    status: t('mockStatus'),
-    typeOfAction: 'RIA (Research & Innovation Action)',
-    budgetPerProjectCents: 500000000,
-    numProjects: 3,
-    deadlines: [
-      { stage: 1, at: '2026-09-15T17:00:00Z' },
-      { stage: 2, at: '2027-02-15T17:00:00Z' }
-    ],
-    description: t('mockDescription'),
-    keywords: t('mockKeywords').split(',').map((kw) => kw.trim()),
-  };
-  const router = useRouter();
-  const [isPending, setIsPending] = React.useState(false);
-  const [addError, setAddError] = React.useState<string | null>(null);
+  const t = await getTranslations('callDetails');
 
-  const handleAddToPipeline = async () => {
-    setIsPending(true);
-    setAddError(null);
-    try {
-      await createOpportunity({ workspaceSlug: workspace, title: call.title, topicId: call.id });
-      router.push(`/${locale}/${workspace}/firsatlar`);
-    } catch (e) {
-      console.error(e);
-      setAddError(t('addError'));
-      setIsPending(false);
+  let call: {
+    id: string;
+    title: string;
+    programme: string;
+    status: string;
+    typeOfAction: string;
+    budgetPerProjectCents: number;
+    numProjects: number;
+    deadlines: Array<{ stage: number; at: string }>;
+    description: string;
+    keywords: string[];
+  } | null = null;
+
+  try {
+    const dbTopic = await prisma.topic.findFirst({
+      where: { OR: [{ id }, { identifier: id }] },
+      include: { call: { include: { programme: true } } },
+    });
+
+    if (dbTopic) {
+      call = {
+        id: dbTopic.identifier,
+        title: dbTopic.title,
+        programme: dbTopic.call?.programme?.name || 'Horizon Europe',
+        status: dbTopic.status,
+        typeOfAction: dbTopic.typeOfAction || 'RIA (Research & Innovation Action)',
+        budgetPerProjectCents: 500000000,
+        numProjects: 3,
+        deadlines: (dbTopic.deadlines as Array<{ stage: number; at: string }>) || [],
+        description: t('mockDescription'),
+        keywords: t('mockKeywords').split(',').map((kw) => kw.trim()),
+      };
+    } else {
+      // Try live SEDIA fetch for valid topic identifier
+      const adapter = new SediaAdapter();
+      const result = await adapter.searchSedia({ text: id, pageSize: 5 });
+      const matched = result.topics.find(
+        (top) => top.identifier.toLowerCase() === id.toLowerCase()
+      );
+
+      if (matched) {
+        call = {
+          id: matched.identifier,
+          title: matched.title,
+          programme: matched.frameworkProgramme || 'Horizon Europe',
+          status: matched.status,
+          typeOfAction: matched.typeOfAction || 'RIA (Research & Innovation Action)',
+          budgetPerProjectCents: matched.budgetPerProjectCents || 500000000,
+          numProjects: matched.numProjects || 3,
+          deadlines: matched.deadlines?.map((d) => ({ stage: d.stage, at: d.at })) || [],
+          description: matched.description || t('mockDescription'),
+          keywords: matched.keywords || t('mockKeywords').split(',').map((kw) => kw.trim()),
+        };
+      }
     }
-  };
+  } catch (e) {
+    console.warn(`[CallDetailsPage] Topic resolution warning for ${id}:`, e);
+  }
+
+  if (!call) {
+    notFound();
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8">
@@ -54,16 +88,6 @@ export default function CallDetailsPage({ params }: { params: Promise<{ id: stri
           ← {t('backToCalls')}
         </Link>
       </div>
-
-      {addError && (
-        <div
-          role="alert"
-          className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800 flex items-start gap-2 mb-6"
-        >
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>{addError}</span>
-        </div>
-      )}
 
       <div className="bg-surface p-6 md:p-8 rounded-xl shadow-xs border border-border">
         <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
@@ -83,13 +107,15 @@ export default function CallDetailsPage({ params }: { params: Promise<{ id: stri
             <p className="text-muted font-mono text-xs sm:text-sm">{call.id}</p>
           </div>
 
-          <button
-            disabled={isPending}
-            onClick={handleAddToPipeline}
-            className="bg-accent hover:opacity-90 disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-lg transition shadow-2xs shrink-0 text-xs sm:text-sm"
-          >
-            {isPending ? t('addingButton') : t('addButton')}
-          </button>
+          <AddToPipelineButton
+            workspace={workspace}
+            locale={locale}
+            title={call.title}
+            topicId={call.id}
+            buttonLabel={t('addButton')}
+            addingLabel={t('addingButton')}
+            errorLabel={t('addError')}
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-t border-b border-border py-6">
@@ -111,9 +137,10 @@ export default function CallDetailsPage({ params }: { params: Promise<{ id: stri
               {t('deadlinesTitle')}
             </h3>
             <ul className="space-y-2 text-xs sm:text-sm text-ink-2 font-mono">
-              {call.deadlines.map(d => (
+              {call.deadlines.map((d) => (
                 <li key={d.stage}>
-                  <strong className="text-ink font-sans">{t('stageLabel', { stage: d.stage })}</strong> {new Date(d.at).toLocaleDateString(isTr ? 'tr-TR' : 'en-US')}
+                  <strong className="text-ink font-sans">{t('stageLabel', { stage: d.stage })}</strong>{' '}
+                  {new Date(d.at).toLocaleDateString(isTr ? 'tr-TR' : 'en-US')}
                 </li>
               ))}
             </ul>
@@ -134,7 +161,7 @@ export default function CallDetailsPage({ params }: { params: Promise<{ id: stri
             {t('keywordsTitle')}
           </h3>
           <div className="flex flex-wrap gap-2">
-            {call.keywords.map(kw => (
+            {call.keywords.map((kw) => (
               <span key={kw} className="bg-ground border border-border text-ink-2 px-3 py-1 rounded-full text-xs font-medium">
                 {kw}
               </span>
