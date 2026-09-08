@@ -41,12 +41,34 @@ import { describe, it, expect } from 'vitest';
  * and `@@id` blocks, registers the key name they generate, and validates the
  * fields *inside* the key object against the same model.
  *
+ * TASK-MTS8002I6YD3L widened it once more. The field-level check only read
+ * `where`/`select`/`include`/`orderBy`, so the *write* half of every query was
+ * unguarded: `create({ data: { titel } })` and every nested
+ * `create` / `connect` / `connectOrCreate` / `upsert` under a relation could name
+ * a column the schema does not have and walk through the gate — the same
+ * PrismaClientValidationError, on a save instead of a read. The check now walks
+ * write bodies too, with the nested-write grammar Prisma actually uses: a
+ * relation's `create`/`update`/`upsert`/`createMany` value is the *related*
+ * model's write body, its `connect`/`disconnect`/`set`/`delete` value is a
+ * `where` on that model, and a scalar's `{ increment: 1 }` is an operator, not a
+ * field object. 548 write-body field references in `src/` are validated this
+ * way; none of them was broken when the check went in, so this closes the hole
+ * rather than fixing a live bug.
+ *
  * So there are now two guards, both repo-wide over `src/`:
  *
  * 1. The field-level check — model, relation *and* column names, including
- *    compound-key members. KNOWN_UNKNOWN_FIELD_REFS is its ledger.
+ *    compound-key members, in read arguments *and* write bodies.
+ *    KNOWN_UNKNOWN_FIELD_REFS is its ledger.
  * 2. The model-level sweep: no file may call a Prisma model the schema does not
  *    declare. KNOWN_UNKNOWN_MODEL_CALLS is its ledger.
+ *
+ * Known limit, measured under TASK-MTS8002I6YD3L and deliberately left: an
+ * object literal's shorthand properties (`data: { tenantId, title }`) carry no
+ * `key:` token, so topLevelEntries does not see them — 212 of the 760 write-body
+ * references in `src/` today. Teaching it shorthand would also make a
+ * `where: { OR: [baseFilter, extra] }` read as two unknown fields, so closing
+ * that gap is its own task, not a side effect of this one.
  *
  * Both ledgers may only shrink: a fixed entry fails a staleness test, and an
  * unlisted problem fails the check.
@@ -103,6 +125,30 @@ const QUERY_METHODS = [
 const FIELD_BEARING = new Set(['where', 'select', 'include', 'orderBy']);
 /** Logical combinators inside `where`; their contents belong to the same model. */
 const LOGICAL = new Set(['AND', 'OR', 'NOT']);
+
+/**
+ * Argument keys whose value is a *write body* — an object of model fields on the
+ * write side — per query method. `upsert` carries two of them and no `data`.
+ */
+const WRITE_BEARING: Record<string, string[]> = {
+  create: ['data'],
+  createMany: ['data'],
+  update: ['data'],
+  updateMany: ['data'],
+  upsert: ['create', 'update'],
+};
+
+/**
+ * Nested-write operators under a relation whose value is the *related* model's
+ * write body. `connectOrCreate`, `upsert`, `update` and `createMany` are shaped
+ * differently again and are handled by name in checkWriteObject.
+ */
+const NESTED_WRITE_DATA = new Set(['create', 'createMany', 'update', 'updateMany', 'upsert', 'connectOrCreate']);
+/**
+ * Nested-write operators whose value is a `where` on the related model — they
+ * point at rows that already exist rather than describing new ones.
+ */
+const NESTED_WRITE_WHERE = new Set(['connect', 'disconnect', 'delete', 'deleteMany', 'set']);
 
 interface Field {
   name: string;
@@ -337,6 +383,147 @@ function checkFieldObject(
   }
 }
 
+/**
+ * How many write bodies the last `scan()` walked. A write check whose parser
+ * silently read nothing would report a clean repo and make the assertion over
+ * `src/` vacuous, exactly the way a mocked client did before this file existed.
+ */
+let writeBodiesWalked = 0;
+
+/**
+ * One `{...}` body, or each element of an `[{...}, {...}]` list.
+ *
+ * `createMany({ data: [row, row] })` and `seats: { create: [a, b] }` are as
+ * ordinary as the single-object form, and reading only the first shape would
+ * leave every bulk write unchecked.
+ */
+function objectBodies(value: string): string[] {
+  if (!value.trim().startsWith('{')) return [value];
+  const out: string[] = [];
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        out.push(value.slice(start + 1, i));
+        start = -1;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The write-side twin of checkFieldObject: every top-level key of a `data`
+ * (or `upsert`'s `create`/`update`) body is a field of `model`, and a relation's
+ * value is a nested write whose grammar decides which model its contents belong
+ * to.
+ *
+ * A scalar's value is never walked — `views: { increment: 1 }` and
+ * `tags: { set: [...] }` are operators, not field objects, and reading them as
+ * fields would report a working query as broken.
+ */
+function checkWriteObject(
+  body: string,
+  model: string,
+  models: Map<string, Map<string, Field>>,
+  file: string,
+  problems: Problem[],
+  path: string
+) {
+  const fields = models.get(model);
+  if (!fields) return;
+
+  for (const { key, value } of topLevelEntries(body)) {
+    const field = fields.get(key);
+    if (!field) {
+      problems.push({
+        file,
+        path: `${path}.${key}`,
+        message: `${path}.${key} — \`${key}\` is not a field of model \`${model}\` in prisma/schema.prisma`,
+      });
+      continue;
+    }
+    if (!field.relationTo || !value) continue;
+
+    const target = field.relationTo;
+    for (const nested of objectBodies(value)) {
+      for (const op of topLevelEntries(nested)) {
+        if (!op.value) continue;
+        const opPath = `${path}.${key}.${op.key}`;
+
+        // `{ where, create }` and `{ where, create, update }` — a lookup and a
+        // write body side by side, each read in its own grammar.
+        if (op.key === 'connectOrCreate' || op.key === 'upsert') {
+          for (const inner of objectBodies(op.value)) {
+            for (const part of topLevelEntries(inner)) {
+              if (!part.value) continue;
+              if (part.key === 'where') {
+                checkFieldObject(part.value, target, models, file, problems, `${opPath}.where`);
+              } else if (part.key === 'create' || part.key === 'update') {
+                for (const b of objectBodies(part.value)) {
+                  checkWriteObject(b, target, models, file, problems, `${opPath}.${part.key}`);
+                }
+              }
+            }
+          }
+          continue;
+        }
+
+        // `createMany: { data: [...] }` — one level of indirection before the rows.
+        if (op.key === 'createMany') {
+          for (const inner of objectBodies(op.value)) {
+            for (const part of topLevelEntries(inner)) {
+              if (part.key !== 'data' || !part.value) continue;
+              for (const b of objectBodies(part.value)) {
+                checkWriteObject(b, target, models, file, problems, `${opPath}.data`);
+              }
+            }
+          }
+          continue;
+        }
+
+        // To-many `update: { where, data }`; to-one `update: { …fields }`.
+        if (op.key === 'update' || op.key === 'updateMany') {
+          for (const inner of objectBodies(op.value)) {
+            const parts = topLevelEntries(inner).filter((e) => e.key === 'where' || e.key === 'data');
+            if (parts.length === 0) {
+              checkWriteObject(inner, target, models, file, problems, opPath);
+              continue;
+            }
+            for (const part of parts) {
+              if (!part.value) continue;
+              if (part.key === 'where') {
+                checkFieldObject(part.value, target, models, file, problems, `${opPath}.where`);
+              } else {
+                for (const b of objectBodies(part.value)) {
+                  checkWriteObject(b, target, models, file, problems, `${opPath}.data`);
+                }
+              }
+            }
+          }
+          continue;
+        }
+
+        if (NESTED_WRITE_DATA.has(op.key)) {
+          for (const b of objectBodies(op.value)) {
+            checkWriteObject(b, target, models, file, problems, opPath);
+          }
+        } else if (NESTED_WRITE_WHERE.has(op.key)) {
+          for (const b of objectBodies(op.value)) {
+            checkFieldObject(b, target, models, file, problems, opPath);
+          }
+        }
+      }
+    }
+  }
+}
+
 const CALL_SOURCE = `\\b(?:prisma|tx)\\.([a-z][A-Za-z0-9_]*)\\.(${QUERY_METHODS.join('|')})\\s*\\(`;
 
 /** Every file the field-level check walks. */
@@ -388,15 +575,24 @@ function scanSource(
     if (objOpen === -1) continue;
     const objBody = balanced(literal, objOpen, ['{', '}']);
 
+    const writeKeys = WRITE_BEARING[m[2] ?? ''] ?? [];
     for (const { key, value } of topLevelEntries(objBody)) {
-      if (!FIELD_BEARING.has(key) || !value) continue;
-      checkFieldObject(value, model, models, rel, problems, `${delegate}.${m[2]}.${key}`);
+      if (!value) continue;
+      if (FIELD_BEARING.has(key)) {
+        checkFieldObject(value, model, models, rel, problems, `${delegate}.${m[2]}.${key}`);
+      } else if (writeKeys.includes(key)) {
+        for (const b of objectBodies(value)) {
+          writeBodiesWalked++;
+          checkWriteObject(b, model, models, rel, problems, `${delegate}.${m[2]}.${key}`);
+        }
+      }
     }
   }
   return problems;
 }
 
 function scan(models: Map<string, Map<string, Field>>): Problem[] {
+  writeBodiesWalked = 0;
   return scannedFiles().flatMap((file) =>
     scanSource(stripComments(readFileSync(file, 'utf8')), file.slice(REPO.length + 1), models)
   );
@@ -479,6 +675,91 @@ describe('every Prisma query in src/ matches prisma/schema.prisma', () => {
     expect(scanSource(broken, 'fixture.ts', models).map((p) => p.path)).toEqual([
       'savedSearch.findMany.include.tenant',
     ]);
+  });
+
+  it('reads the write body, not just the read arguments', () => {
+    // TASK-MTS8002I6YD3L. `where`/`select`/`include`/`orderBy` were the whole
+    // check, so a column that does not exist was caught on a read and waved
+    // through on a save — the same PrismaClientValidationError, one click later.
+    const sound =
+      "await prisma.opportunity.create({ data: { tenantId: t, workspaceId: w, title: 'x' } });";
+    expect(scanSource(sound, 'fixture.ts', models)).toEqual([]);
+
+    const broken = "await prisma.opportunity.create({ data: { titel: 'x' } });";
+    expect(scanSource(broken, 'fixture.ts', models).map((p) => p.path)).toEqual([
+      'opportunity.create.data.titel',
+    ]);
+
+    // `upsert` carries two write bodies and no `data` at all.
+    const upsert =
+      "await prisma.opportunity.upsert({ where: { id: 'o1' }, " +
+      "create: { titel: 'x' }, update: { stagee: 'G1' } });";
+    expect(scanSource(upsert, 'fixture.ts', models).map((p) => p.path)).toEqual([
+      'opportunity.upsert.create.titel',
+      'opportunity.upsert.update.stagee',
+    ]);
+
+    // A bulk write is a list of write bodies; reading only the first shape
+    // would leave every `createMany` unchecked.
+    const many =
+      "await prisma.consortiumSeat.createMany({ data: [{ roleKey: 'coordinator' }, { roleKy: 'x' }] });";
+    expect(scanSource(many, 'fixture.ts', models).map((p) => p.path)).toEqual([
+      'consortiumSeat.createMany.data.roleKy',
+    ]);
+  });
+
+  it('reads nested create, connect and connectOrCreate against the related model', () => {
+    // The relation's value is not a field object of the parent — each
+    // nested-write operator decides which model its contents belong to, and
+    // getting that wrong is how `include: { organization: true }` shipped.
+    const soundCreate =
+      "await prisma.opportunity.create({ data: { title: 'x', " +
+      "seats: { create: [{ roleKey: 'coordinator' }, { roleKey: 'research' }] } } });";
+    expect(scanSource(soundCreate, 'fixture.ts', models)).toEqual([]);
+
+    const brokenCreate =
+      "await prisma.opportunity.create({ data: { seats: { create: { orgId: 'p' } } } });";
+    expect(scanSource(brokenCreate, 'fixture.ts', models).map((p) => p.path)).toEqual([
+      'opportunity.create.data.seats.create.orgId',
+    ]);
+
+    // `connect` points at a row that exists, so its body is a `where` on
+    // ConsortiumSeat — `organization` is the relation this module invented.
+    const brokenConnect =
+      "await prisma.opportunity.update({ where: { id: 'o1' }, " +
+      "data: { seats: { connect: { organization: 'p' } } } });";
+    expect(scanSource(brokenConnect, 'fixture.ts', models).map((p) => p.path)).toEqual([
+      'opportunity.update.data.seats.connect.organization',
+    ]);
+
+    // `connectOrCreate` is a lookup and a write body side by side; both halves
+    // are read, each in its own grammar.
+    const brokenBoth =
+      "await prisma.opportunity.update({ where: { id: 'o1' }, data: { seats: { " +
+      "connectOrCreate: { where: { seatId: 's' }, create: { roleKy: 'x' } } } } });";
+    expect(scanSource(brokenBoth, 'fixture.ts', models).map((p) => p.path)).toEqual([
+      'opportunity.update.data.seats.connectOrCreate.where.seatId',
+      'opportunity.update.data.seats.connectOrCreate.create.roleKy',
+    ]);
+  });
+
+  it('does not read a scalar update operator as a field object', () => {
+    // `{ increment: 1 }` and `{ set: [...] }` are operators on the column, not
+    // fields of a model. Walking them would report working queries as broken
+    // and the noise would bury the real ones — the failure mode compound keys
+    // caused before the parser learned them.
+    const ops =
+      "await prisma.opportunity.update({ where: { id: 'o1' }, " +
+      "data: { g0Score: { increment: 1 }, notes: { set: 'x' } } });";
+    expect(scanSource(ops, 'fixture.ts', models)).toEqual([]);
+  });
+
+  it('actually walks the write bodies in src/', () => {
+    // Same guard as the read side: a parser that silently walked nothing would
+    // report a clean repo. src/ has ~148 write calls; pin it well under that so
+    // the number is a floor, not a moving target.
+    scan(models);
+    expect(writeBodiesWalked).toBeGreaterThan(100);
   });
 
   it('names only models, relations and columns that exist', () => {
