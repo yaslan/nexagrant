@@ -25,3 +25,15 @@ above. Also watch for Tailwind class collisions across unrelated elements — e.
 instead (no visible error, just no effect); `button.border-accent.text-accent` — the pair only the
 save button has — fixed it. When a click "succeeds" but nothing changes, suspect a same-class
 collision before suspecting the handler.
+
+**Cookie-consent modal blocks the Playwright fallback's login click (TASK-MTRD91ZLKEQ3A rerun,
+2026-09-08):** `/tr/giris` mounts `src/components/CookieConsent.tsx`, a client-only modal
+(`role="alertdialog"`) gated on `localStorage.fabrika_cookie_consent`, which appears a beat after
+hydration — so a plain `page.click()` on a demo-login button times out waiting for the modal to
+stop intercepting pointer events, and even `{ force: true }` dispatches the click but it silently
+does nothing (the button hadn't actually hydrated its handler yet when force skipped the
+actionability wait). Fix: before `page.goto`, call
+`page.addInitScript(() => localStorage.setItem('fabrika_cookie_consent', JSON.stringify({accepted:true, time:new Date().toISOString(), level:'all'})))`
+— the modal never mounts, and a normal (non-forced) `page.click('button:has(div:text("admin@yasinaslan.com.tr"))')`
+followed by `page.waitForURL(u => !u.pathname.includes('/giris'))` works first try. Applies to any
+Playwright-fallback script that starts from `/tr/giris` or any other page `CookieConsent` mounts on.
