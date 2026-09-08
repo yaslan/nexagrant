@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   FileText,
   ShieldCheck,
@@ -11,13 +12,21 @@ import {
   FileSignature,
   Sparkles,
   FileCode,
+  Landmark,
   Plus,
   RotateCw,
   Eye,
   X,
 } from 'lucide-react';
-import { generateStandardDoc, signDocument, createNewVersion } from '@/modules/m10/server/actions';
-import { Landmark } from 'lucide-react';
+import {
+  generateStandardDoc,
+  signDocument,
+  createNewVersion,
+  submitDualApprovalAction,
+  departmentApproveAction,
+} from '@/modules/m10/server/actions';
+import type { ApprovalStage, Department, DualApprovalState } from '@/lib/dual-approval';
+import { errorMessage } from '@/lib/errors';
 
 export interface DocItem {
   id: string;
@@ -35,15 +44,42 @@ interface DocumentsClientProps {
   documents: DocItem[];
 }
 
+/**
+ * How far the four-step banner is lit.
+ *
+ * The banner used to be static markup: four coloured boxes that read
+ * "2. Finans Onayı" / "3. Hukuk Onayı" whatever the documents underneath were,
+ * for a tenant that had never approved anything — while
+ * `submitDualApprovalAction` and `departmentApproveAction` had no caller at all
+ * outside their unit test. It is now driven by the state those two actions
+ * return, so a lit step means a real call with a real session actor behind it,
+ * and no document in the flow means no step is lit.
+ */
+const STAGE_INDEX: Record<ApprovalStage, number> = {
+  DRAFT: 0,
+  PENDING_FINANCE_APPROVAL: 1,
+  PENDING_LEGAL_APPROVAL: 2,
+  APPROVED_AND_SIGNED: 3,
+  REJECTED: 0,
+};
+
 export function DocumentsClient({
   opportunityId,
   opportunityTitle,
   documents: initialDocs,
 }: DocumentsClientProps) {
+  const t = useTranslations('m10');
+  const locale = useLocale();
   const [docs, setDocs] = useState<DocItem[]>(initialDocs);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'LEGAL' | 'COMMITMENT' | 'AWARD'>('ALL');
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<DocItem | null>(null);
+  const [approval, setApproval] = useState<DualApprovalState | null>(null);
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
+
+  const formatDate = (value: Date | string) => new Date(value).toLocaleDateString(locale);
+  const formatDateTime = (value: Date | string) => new Date(value).toLocaleString(locale);
 
   const handleGenerateDoc = async (kind: 'NDA' | 'LOI' | 'COMMITMENT' | 'ESR_DEBRIEF' | 'AWARD_PACK') => {
     setIsGenerating(true);
@@ -101,6 +137,46 @@ export function DocumentsClient({
     }
   };
 
+  /** Puts one real document into the workflow. The actor comes from the session. */
+  const handleSubmitForApproval = async (docId: string) => {
+    setApprovalBusy(true);
+    setApprovalError(null);
+    try {
+      const res = await submitDualApprovalAction(docId);
+      setApproval(res.approvalState);
+    } catch (err) {
+      setApprovalError(errorMessage(err, t('approval.error')));
+    } finally {
+      setApprovalBusy(false);
+    }
+  };
+
+  /**
+   * One department sign-off. The legal step completes the workflow, and that
+   * outcome is written down: `signDocument` is the only durable record this
+   * screen can produce, so step 4 means the document really is signed in the
+   * database and survives a reload.
+   */
+  const handleDepartmentApprove = async (department: Department) => {
+    if (!approval) return;
+    setApprovalBusy(true);
+    setApprovalError(null);
+    try {
+      const res = await departmentApproveAction(approval, department);
+      const next = res.approvalState;
+      if (next.stage === 'APPROVED_AND_SIGNED') {
+        await signDocument(next.docId);
+        const signedAt = new Date().toISOString();
+        setDocs((prev) => prev.map((d) => (d.id === next.docId ? { ...d, signedAt } : d)));
+      }
+      setApproval(next);
+    } catch (err) {
+      setApprovalError(errorMessage(err, t('approval.error')));
+    } finally {
+      setApprovalBusy(false);
+    }
+  };
+
   const filteredDocs = docs.filter((d) => {
     if (activeFilter === 'LEGAL') return d.kind === 'NDA' || d.kind === 'LOI';
     if (activeFilter === 'COMMITMENT') return d.kind === 'COMMITMENT';
@@ -108,21 +184,52 @@ export function DocumentsClient({
     return true;
   });
 
-  const getDocKindBadge = (kind: string) => {
+  const docKindLabel = (kind: string) => {
     switch (kind) {
       case 'NDA':
-        return <span className="bg-blue-100 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full font-bold text-xs">NDA (Gizlilik Anlaşması)</span>;
       case 'LOI':
-        return <span className="bg-indigo-100 text-indigo-800 border border-indigo-200 px-2.5 py-0.5 rounded-full font-bold text-xs">LOI (Niyet Mektubu)</span>;
       case 'COMMITMENT':
-        return <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold text-xs">Ortak Taahhüt Formu</span>;
       case 'AWARD_PACK':
-        return <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold text-xs">TÜBİTAK Eşik Üstü Paketi</span>;
       case 'ESR_DEBRIEF':
-        return <span className="bg-purple-100 text-purple-800 border border-purple-200 px-2.5 py-0.5 rounded-full font-bold text-xs">ESR Sonrası Özet</span>;
+        return t(`kinds.${kind}`);
       default:
-        return <span className="bg-surface-hover text-ink px-2.5 py-0.5 rounded-full font-bold text-xs">{kind}</span>;
+        return kind;
     }
+  };
+
+  const getDocKindBadge = (kind: string) => {
+    const label = docKindLabel(kind);
+    switch (kind) {
+      case 'NDA':
+        return <span className="bg-blue-100 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full font-bold text-xs">{label}</span>;
+      case 'LOI':
+        return <span className="bg-indigo-100 text-indigo-800 border border-indigo-200 px-2.5 py-0.5 rounded-full font-bold text-xs">{label}</span>;
+      case 'COMMITMENT':
+        return <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold text-xs">{label}</span>;
+      case 'AWARD_PACK':
+        return <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold text-xs">{label}</span>;
+      case 'ESR_DEBRIEF':
+        return <span className="bg-purple-100 text-purple-800 border border-purple-200 px-2.5 py-0.5 rounded-full font-bold text-xs">{label}</span>;
+      default:
+        return <span className="bg-surface-hover text-ink px-2.5 py-0.5 rounded-full font-bold text-xs">{label}</span>;
+    }
+  };
+
+  const approvalDoc = approval ? docs.find((d) => d.id === approval.docId) : undefined;
+  const currentStep = approval ? STAGE_INDEX[approval.stage] : -1;
+  const steps = [t('approval.stage1'), t('approval.stage2'), t('approval.stage3'), t('approval.stage4')];
+
+  const stepState = (index: number): 'done' | 'active' | 'idle' => {
+    if (currentStep < 0) return 'idle';
+    if (index < currentStep) return 'done';
+    if (index === currentStep) return 'active';
+    return 'idle';
+  };
+
+  const STEP_CLASS: Record<'done' | 'active' | 'idle', string> = {
+    done: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+    active: 'bg-amber-50 border-amber-300 text-amber-900 ring-2 ring-amber-300',
+    idle: 'bg-ground border-border text-muted',
   };
 
   return (
@@ -133,19 +240,19 @@ export function DocumentsClient({
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-blue-400 font-semibold tracking-wider uppercase mb-1">
               <FileSignature className="w-4 h-4 text-blue-400" />
-              <span>Modül 10 — Follow-up Documents</span>
+              <span>{t('header.module')}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-white">
-              Takip Belgeleri & Eşik Üstü Ödül Paketi
+              {t('header.title')}
             </h1>
             <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl">
-              Fırsat: <strong className="text-slate-200">{opportunityTitle}</strong>
+              {t('header.opportunity')}: <strong className="text-slate-200">{opportunityTitle}</strong>
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-xs bg-slate-800 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-full font-mono font-bold">
-              {docs.length} Doküman Mevcut
+              {t('header.docCount', { count: docs.length })}
             </span>
           </div>
         </div>
@@ -157,10 +264,8 @@ export function DocumentsClient({
               <Award className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="font-bold text-xs text-amber-300">TÜBİTAK Eşik Üstü Ödülü Desteği</h4>
-              <p className="text-[11px] text-slate-300">
-                Ufuk Avrupa değerlendirmesinden eşik üstü (≥ 12.0/15) alan projeler için TÜBİTAK Ödül paketi tek tıkla üretilir.
-              </p>
+              <h4 className="font-bold text-xs text-amber-300">{t('award.title')}</h4>
+              <p className="text-[11px] text-slate-300">{t('award.description')}</p>
             </div>
           </div>
 
@@ -170,53 +275,142 @@ export function DocumentsClient({
             className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold px-4 py-2 rounded-xl transition text-xs shadow-md shrink-0 flex items-center gap-1.5"
           >
             <Sparkles className="w-4 h-4" />
-            <span>TÜBİTAK Ödül Paketi Üret</span>
+            <span>{t('award.generate')}</span>
           </button>
         </div>
       </div>
 
       {/* ──────────────────────── DUAL APPROVAL STEPPER BANNER ──────────────────────── */}
-      <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm space-y-3">
+      <div
+        data-testid="dual-approval-banner"
+        data-approval-stage={approval?.stage ?? 'NONE'}
+        className="bg-surface border border-border rounded-2xl p-5 shadow-sm space-y-3"
+      >
         <div className="flex items-center justify-between border-b pb-2">
           <div className="flex items-center gap-2">
             <Landmark className="w-4 h-4 text-purple-600" />
             <h3 className="font-bold text-xs text-ink uppercase tracking-wider">
-              Çift Onaylı Kurumsal Yetki Akışı (Dual Approval Workflow)
+              {t('approval.title')}
             </h3>
           </div>
           <span className="text-[11px] bg-purple-50 text-purple-800 border border-purple-200 px-2.5 py-0.5 rounded-full font-semibold">
-            Finans & Hukuk Çift Onayı
+            {t('approval.badge')}
           </span>
         </div>
 
+        {approval && approvalDoc ? (
+          <p className="text-[11px] text-ink-2" data-testid="approval-subject">
+            {t('approval.inFlow', {
+              doc: docKindLabel(approvalDoc.kind),
+              version: approvalDoc.version,
+              actor: approval.submittedBy,
+            })}
+          </p>
+        ) : (
+          <p className="text-[11px] text-muted" data-testid="approval-idle">
+            {t('approval.idle')}
+          </p>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs pt-1">
-          <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 font-bold flex flex-col items-center gap-1">
-            <span className="text-[10px] uppercase text-blue-600">Aşama 1</span>
-            <span>1. Taslak Üretimi</span>
-          </div>
-
-          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 font-bold flex flex-col items-center gap-1">
-            <span className="text-[10px] uppercase text-amber-600">Aşama 2</span>
-            <span>2. Finans Onayı</span>
-          </div>
-
-          <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold flex flex-col items-center gap-1">
-            <span className="text-[10px] uppercase text-indigo-600">Aşama 3</span>
-            <span>3. Hukuk Onayı</span>
-          </div>
-
-          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 font-bold flex flex-col items-center gap-1">
-            <span className="text-[10px] uppercase text-emerald-600">Aşama 4</span>
-            <span>4. İmzalı & Onaylı</span>
-          </div>
+          {steps.map((label, index) => {
+            const state = stepState(index);
+            return (
+              <div
+                key={label}
+                data-testid={`approval-step-${index + 1}`}
+                data-state={state}
+                className={`p-2.5 rounded-xl border font-bold flex flex-col items-center gap-1 ${STEP_CLASS[state]}`}
+              >
+                <span className="text-[10px] uppercase opacity-70">
+                  {t('approval.stageLabel', { n: index + 1 })}
+                </span>
+                <span>{label}</span>
+                <span className="text-[10px] font-semibold opacity-80">
+                  {t(`approval.status.${state}`)}
+                </span>
+              </div>
+            );
+          })}
         </div>
+
+        {approval && (
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {approval.stage === 'PENDING_FINANCE_APPROVAL' && (
+              <button
+                data-testid="approve-finance"
+                onClick={() => handleDepartmentApprove('FINANCE')}
+                disabled={approvalBusy}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white rounded-lg transition font-semibold text-xs"
+              >
+                {t('approval.approveFinance')}
+              </button>
+            )}
+
+            {approval.stage === 'PENDING_LEGAL_APPROVAL' && (
+              <button
+                data-testid="approve-legal"
+                onClick={() => handleDepartmentApprove('LEGAL')}
+                disabled={approvalBusy}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg transition font-semibold text-xs"
+              >
+                {t('approval.approveLegal')}
+              </button>
+            )}
+
+            {approval.stage === 'APPROVED_AND_SIGNED' && (
+              <span
+                data-testid="approval-complete"
+                className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full text-xs font-bold"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                {t('approval.completed')}
+              </span>
+            )}
+
+            <button
+              data-testid="approval-close"
+              onClick={() => {
+                setApproval(null);
+                setApprovalError(null);
+              }}
+              className="px-3 py-1.5 bg-surface-hover hover:bg-slate-200 text-ink rounded-lg transition font-semibold text-xs"
+            >
+              {t('approval.close')}
+            </button>
+          </div>
+        )}
+
+        {approvalError && (
+          <p data-testid="approval-error" className="text-[11px] text-red-700 font-semibold">
+            {approvalError}
+          </p>
+        )}
+
+        {approval && approval.auditTrail.length > 0 && (
+          <div className="pt-2 border-t border-border space-y-1">
+            <h4 className="text-[11px] font-bold text-ink-2 uppercase tracking-wider">
+              {t('approval.auditTitle')}
+            </h4>
+            <ul className="space-y-1" data-testid="approval-audit">
+              {approval.auditTrail.map((entry) => (
+                <li key={entry.id} className="text-[11px] text-muted font-mono">
+                  {formatDateTime(entry.timestamp)} · {entry.department} · {entry.actorName}
+                  {entry.note ? ` — ${entry.note}` : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <p className="text-[10px] text-muted pt-1">{t('approval.note')}</p>
       </div>
 
       {/* ──────────────────────── QUICK ACTIONS & GENERATORS ──────────────────────── */}
       <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm space-y-4">
         <h2 className="font-bold text-sm text-ink flex items-center gap-2">
           <Plus className="w-4 h-4 text-blue-600" />
-          <span>Yeni İdari / Yasal Doküman Üret (AI Draft Generator)</span>
+          <span>{t('generate.title')}</span>
         </h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -226,7 +420,7 @@ export function DocumentsClient({
             className="p-3 bg-blue-50/70 hover:bg-blue-100/80 border border-blue-200 text-blue-900 rounded-xl transition text-xs font-semibold flex flex-col items-start gap-1"
           >
             <ShieldCheck className="w-4 h-4 text-blue-600" />
-            <span>+ NDA Gizlilik Anlaşması</span>
+            <span>{t('generate.nda')}</span>
           </button>
 
           <button
@@ -235,7 +429,7 @@ export function DocumentsClient({
             className="p-3 bg-indigo-50/70 hover:bg-indigo-100/80 border border-indigo-200 text-indigo-900 rounded-xl transition text-xs font-semibold flex flex-col items-start gap-1"
           >
             <FileText className="w-4 h-4 text-indigo-600" />
-            <span>+ LOI Niyet Mektubu</span>
+            <span>{t('generate.loi')}</span>
           </button>
 
           <button
@@ -244,7 +438,7 @@ export function DocumentsClient({
             className="p-3 bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-900 rounded-xl transition text-xs font-semibold flex flex-col items-start gap-1"
           >
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>+ Ortak Taahhüt Formu</span>
+            <span>{t('generate.commitment')}</span>
           </button>
 
           <button
@@ -253,7 +447,7 @@ export function DocumentsClient({
             className="p-3 bg-purple-50/70 hover:bg-purple-100/80 border border-purple-200 text-purple-900 rounded-xl transition text-xs font-semibold flex flex-col items-start gap-1"
           >
             <FileCode className="w-4 h-4 text-purple-600" />
-            <span>+ ESR Sonrası Özet</span>
+            <span>{t('generate.esr')}</span>
           </button>
         </div>
       </div>
@@ -269,7 +463,7 @@ export function DocumentsClient({
                 : 'border-transparent text-muted hover:text-ink'
             }`}
           >
-            Tüm Dokümanlar ({docs.length})
+            {t('filters.all', { count: docs.length })}
           </button>
 
           <button
@@ -280,7 +474,7 @@ export function DocumentsClient({
                 : 'border-transparent text-muted hover:text-ink'
             }`}
           >
-            Yasal Anlaşmalar (NDA / LOI)
+            {t('filters.legal')}
           </button>
 
           <button
@@ -291,7 +485,7 @@ export function DocumentsClient({
                 : 'border-transparent text-muted hover:text-ink'
             }`}
           >
-            Ortak Taahhütleri
+            {t('filters.commitment')}
           </button>
 
           <button
@@ -302,7 +496,7 @@ export function DocumentsClient({
                 : 'border-transparent text-muted hover:text-ink'
             }`}
           >
-            TÜBİTAK Ödül Paketi
+            {t('filters.award')}
           </button>
         </div>
 
@@ -311,11 +505,11 @@ export function DocumentsClient({
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-ground border-b border-border text-ink-2 font-bold uppercase tracking-wider text-[11px]">
-                <th className="p-4">Doküman Türü</th>
-                <th className="p-4">Sürüm</th>
-                <th className="p-4">Oluşturulma</th>
-                <th className="p-4">İmza / Onay Durumu</th>
-                <th className="p-4 text-right">Eylemler</th>
+                <th className="p-4">{t('table.kind')}</th>
+                <th className="p-4">{t('table.version')}</th>
+                <th className="p-4">{t('table.created')}</th>
+                <th className="p-4">{t('table.status')}</th>
+                <th className="p-4 text-right">{t('table.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -328,18 +522,18 @@ export function DocumentsClient({
                     v{doc.version}
                   </td>
                   <td className="p-4 text-muted font-mono">
-                    {new Date(doc.createdAt).toLocaleDateString('tr-TR')}
+                    {formatDate(doc.createdAt)}
                   </td>
                   <td className="p-4">
                     {doc.signedAt ? (
                       <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full text-xs font-bold">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        İmzalandı ({new Date(doc.signedAt).toLocaleDateString('tr-TR')})
+                        {t('table.signed', { date: formatDate(doc.signedAt) })}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-full text-xs font-bold">
                         <Clock className="w-3.5 h-3.5 text-amber-600" />
-                        Bekliyor (İmzasız)
+                        {t('table.pending')}
                       </span>
                     )}
                   </td>
@@ -351,7 +545,19 @@ export function DocumentsClient({
                           className="px-2.5 py-1 bg-surface-hover hover:bg-slate-200 text-ink rounded-lg transition font-semibold text-xs flex items-center gap-1"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>Önizle</span>
+                          <span>{t('table.preview')}</span>
+                        </button>
+                      )}
+
+                      {!doc.signedAt && approval?.docId !== doc.id && (
+                        <button
+                          data-testid={`submit-approval-${doc.id}`}
+                          onClick={() => handleSubmitForApproval(doc.id)}
+                          disabled={approvalBusy}
+                          className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 disabled:opacity-60 rounded-lg transition font-semibold text-xs flex items-center gap-1"
+                        >
+                          <Landmark className="w-3.5 h-3.5" />
+                          <span>{t('table.submitForApproval')}</span>
                         </button>
                       )}
 
@@ -361,17 +567,17 @@ export function DocumentsClient({
                           className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"
                         >
                           <FileSignature className="w-3.5 h-3.5" />
-                          <span>Elektronik İmzala</span>
+                          <span>{t('table.sign')}</span>
                         </button>
                       )}
 
                       <button
                         onClick={() => handleCreateNewVersion(doc.id)}
                         className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg transition font-semibold text-xs flex items-center gap-1"
-                        title="Yeni Revizyon Sürümü Oluştur"
+                        title={t('table.revisionTitle')}
                       >
                         <RotateCw className="w-3.5 h-3.5" />
-                        <span>Revizyon v{doc.version + 1}</span>
+                        <span>{t('table.revision', { version: doc.version + 1 })}</span>
                       </button>
 
                       <a
@@ -379,10 +585,10 @@ export function DocumentsClient({
                         target="_blank"
                         rel="noreferrer"
                         className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"
-                        title="Resmî Word .docx Şablonu İndir"
+                        title={t('table.docxTitle')}
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span>.DOCX</span>
+                        <span>{t('table.docx')}</span>
                       </a>
 
                       <a
@@ -390,10 +596,10 @@ export function DocumentsClient({
                         target="_blank"
                         rel="noreferrer"
                         className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"
-                        title="Resmî PDF / Baskı Şablonu Aç"
+                        title={t('table.pdfTitle')}
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span>PDF / Baskı</span>
+                        <span>{t('table.pdf')}</span>
                       </a>
                     </div>
                   </td>
@@ -403,7 +609,7 @@ export function DocumentsClient({
               {filteredDocs.length === 0 && (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-muted text-xs">
-                    Bu filtreye uygun doküman bulunmuyor. Yukarıdaki butonlarla yeni bir doküman üretebilirsiniz.
+                    {t('table.empty')}
                   </td>
                 </tr>
               )}
@@ -423,6 +629,7 @@ export function DocumentsClient({
               </div>
               <button
                 onClick={() => setPreviewDoc(null)}
+                aria-label={t('preview.close')}
                 className="p-1 rounded-lg hover:bg-surface-hover text-muted"
               >
                 <X className="w-5 h-5" />
@@ -438,7 +645,7 @@ export function DocumentsClient({
                 onClick={() => setPreviewDoc(null)}
                 className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-semibold"
               >
-                Kapat
+                {t('preview.close')}
               </button>
             </div>
           </div>

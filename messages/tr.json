@@ -938,10 +938,7 @@
     "metaLabel": "Ayrıntı",
     "privacyNote": "Uyarılar kiracı içeriği taşımaz; yalnız kayıt referansı ve sınıflandırma bilgisi tutulur. Geri bildirim metnini görmek için Geri Bildirim Triyajı ekranını kullanın.",
     "feedbackLink": "Geri Bildirim Triyajı",
-    "highlighted": "Bağlantıyla açılan uyarı",
-    "repeatLabel": "Tekrar",
-    "repeatNote": "Aynı uyarı açık kaldığı sürece yeni satır açılmaz; sayaç artar. Çözüldü işaretlenirse sonraki oluşum yeni satır olur.",
-    "lastSeen": "Son görülme"
+    "highlighted": "Bağlantıyla açılan uyarı"
   },
   "ModuleGate": {
     "title": "Bu modül şu anda kullanılamıyor",
@@ -1482,83 +1479,5 @@
     "title": "Sayfa Bulunamadı",
     "description": "Aradığınız sayfa veya geçerli bağlantı mevcut değil ya da kaldırılmış olabilir.",
     "backHome": "Ana Sayfaya Dön"
-  },
-  "m10": {
-    "header": {
-      "module": "Modül 10 — Follow-up Documents",
-      "title": "Takip Belgeleri & Eşik Üstü Ödül Paketi",
-      "opportunity": "Fırsat",
-      "docCount": "{count} Doküman Mevcut"
-    },
-    "award": {
-      "title": "TÜBİTAK Eşik Üstü Ödülü Desteği",
-      "description": "Ufuk Avrupa değerlendirmesinden eşik üstü (≥ 12.0/15) alan projeler için TÜBİTAK Ödül paketi tek tıkla üretilir.",
-      "generate": "TÜBİTAK Ödül Paketi Üret"
-    },
-    "approval": {
-      "title": "Çift Onaylı Kurumsal Yetki Akışı (Dual Approval Workflow)",
-      "badge": "Finans & Hukuk Çift Onayı",
-      "idle": "Şu anda onay akışında doküman yok. Aşağıdaki listede bir dokümanın “Onaya Gönder” düğmesiyle akışı başlatın.",
-      "inFlow": "Akıştaki doküman: {doc} v{version} — akışa alan: {actor}",
-      "stageLabel": "Aşama {n}",
-      "stage1": "1. Taslak Üretimi",
-      "stage2": "2. Finans Onayı",
-      "stage3": "3. Hukuk Onayı",
-      "stage4": "4. İmzalı & Onaylı",
-      "status": {
-        "done": "Tamamlandı",
-        "active": "Sırada",
-        "idle": "Başlamadı"
-      },
-      "approveFinance": "Finans Onayı Ver",
-      "approveLegal": "Hukuk Onayı Ver",
-      "completed": "Akış tamamlandı ve doküman imzalandı",
-      "close": "Akışı Kapat",
-      "auditTitle": "Onay Kaydı",
-      "note": "Ara onay adımları yalnız bu oturumda tutulur; kalıcı olarak yazılan kayıt son adımdaki imzadır. Onayı veren kişi her zaman oturumdan okunur.",
-      "error": "Onay adımı tamamlanamadı."
-    },
-    "generate": {
-      "title": "Yeni İdari / Yasal Doküman Üret (AI Draft Generator)",
-      "nda": "+ NDA Gizlilik Anlaşması",
-      "loi": "+ LOI Niyet Mektubu",
-      "commitment": "+ Ortak Taahhüt Formu",
-      "esr": "+ ESR Sonrası Özet"
-    },
-    "kinds": {
-      "NDA": "NDA (Gizlilik Anlaşması)",
-      "LOI": "LOI (Niyet Mektubu)",
-      "COMMITMENT": "Ortak Taahhüt Formu",
-      "AWARD_PACK": "TÜBİTAK Eşik Üstü Paketi",
-      "ESR_DEBRIEF": "ESR Sonrası Özet"
-    },
-    "filters": {
-      "all": "Tüm Dokümanlar ({count})",
-      "legal": "Yasal Anlaşmalar (NDA / LOI)",
-      "commitment": "Ortak Taahhütleri",
-      "award": "TÜBİTAK Ödül Paketi"
-    },
-    "table": {
-      "kind": "Doküman Türü",
-      "version": "Sürüm",
-      "created": "Oluşturulma",
-      "status": "İmza / Onay Durumu",
-      "actions": "Eylemler",
-      "signed": "İmzalandı ({date})",
-      "pending": "Bekliyor (İmzasız)",
-      "preview": "Önizle",
-      "submitForApproval": "Onaya Gönder",
-      "sign": "Elektronik İmzala",
-      "revision": "Revizyon v{version}",
-      "revisionTitle": "Yeni Revizyon Sürümü Oluştur",
-      "docx": ".DOCX",
-      "docxTitle": "Resmî Word .docx Şablonu İndir",
-      "pdf": "PDF / Baskı",
-      "pdfTitle": "Resmî PDF / Baskı Şablonu Aç",
-      "empty": "Bu filtreye uygun doküman bulunmuyor. Yukarıdaki butonlarla yeni bir doküman üretebilirsiniz."
-    },
-    "preview": {
-      "close": "Kapat"
-    }
   }
 }
