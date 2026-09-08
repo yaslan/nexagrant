@@ -39,6 +39,17 @@ insan aksiyonunu adıyla yazar. Bugünkü çıktısı: `roster`, `survey-sent`, 
 üretiyor** — kriteri kapatmış gibi görünür. Kapı onu başlığındaki `HARNESS SELF-TEST` işaretinden
 (dosya adından DEĞİL) tanıyıp reddediyor.
 
+**Gönderim günü için (2026-09-08, commit `fb337a3`):** `--send` artık **devam eder, tekrarlamaz** —
+makbuzda kayıtlı ortakları atlar, teslim edilecek kimse kalmadıysa reddeder (`--resend` bilinçli
+override). Yarıda kesilen bir gönderimden sonra aynı komutu tekrar çalıştırmak güvenli. Ama makbuz
+gitignore'lu bir dizinde, yani **makineye özel**: "makbuz yok" yalnız *bu makinede kayıt yok* demek,
+"gönderilmedi" demek değil. Başka bir makineden gönderim yapılmış olabilir — `--send` öncesi teyit et.
+Ayrıntı: [[fabrika-idempotent-covers-the-db-not-the-mailbox]].
+
+**Deadline:** `ESR_SURVEY_DEADLINE = 2026-09-21` artık matematiksel olarak tutulamaz (ortaklara
+`ESR_SURVEY_WINDOW_DAYS = 14` gün borçlu, 2026-09-08'de 13 gün kaldı). Kapı bunu kendisi söylüyor;
+gönderim günü + 14 olarak yeniden çivilenmeli.
+
 **İlgili:** [[fabrika-esr-calibration-fixture-lost-in-s10-rebuild]],
 [[fabrika-turn-a-stale-blocker-note-into-an-exit-coded-gate]],
 [[fabrika-generated-report-can-tick-its-own-criterion-green]], [[fabrika-board-cards-go-stale]]
