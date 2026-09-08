@@ -166,22 +166,32 @@ seçicinin yanlışlıkla açabileceği kontrol tam olarak o.
 
 ### 2.6 Kanıt klasörü korundu
 
+Varsayılan bir koşudan (ortam değişkeni **yok**) sonra:
+
 ```
+$ npx playwright test tests/e2e/st6-empty-tenant-no-fabrication.spec.ts
+  7 passed (4.3s)
+
 $ git status --short docs/agent-results
-?? docs/agent-results/TASK-MTQYXISOPUJ53-screenshots/st6-application-empty-tenant.png
-?? docs/agent-results/TASK-MTQYXISOPUJ53-screenshots/st6-bell-empty-tenant.png
-?? docs/agent-results/TASK-MTQYXISOPUJ53-screenshots/st6-dashboard-empty-tenant.png
-?? docs/agent-results/TASK-MTQYXISOPUJ53-screenshots/st6-notifications-empty-tenant.png
+?? docs/agent-results/TASK-MTSHTIYJWTQKO-blockzincir-pm.md      ← başka ajanın dosyası
+
+$ ls test-artifacts/TASK-MTQYXISOPUJ53-screenshots/
+st6-application-empty-tenant.png   st6-bell-empty-tenant.png
+st6-dashboard-empty-tenant.png     st6-notifications-empty-tenant.png
 ```
 
-**` M` satırı yok** — koşu commit'li tek bir kanıt dosyasını ezmedi. Dört satır da `??`,
-yani bu koşunun *yeni* kareleri. Çalışan mekanizma dse'nin `shotsDir()`'ü: varsayılan kök
-git-ignore'lu `test-artifacts/`; kartın klasörüne yazmak bilinçli bir eylem
-(`E2E_SHOTS_ROOT=docs/agent-results npx playwright test …`), ki bu koşuda onu kullandım.
+**Tek bir ` M` satırı yok.** Kareler git-ignore'lu `test-artifacts/` altına gitti; commit'li
+kanıta dokunulmadı. Çalışan mekanizma dse'nin `shotsDir()`'ü (TASK-MTSHUZUMVLTBF).
+
+**Önemli ayrım — yayımlama bilinçli bir eylemdir.** `E2E_SHOTS_ROOT=docs/agent-results` ile
+koşarsam kareler kartın klasörüne yazılır ve **o zaman ` M` satırı çıkar**; bu koşuda §2.5'teki
+kareyi yayımlamak için bir kez öyle koştum, sonra `git checkout -- ` ile geri alıp
+commit'lediğim baytları geri koydum. Yani ` M` yokluğu, varsayılan koşunun kanıtı ezmediğinin
+ölçümüdür — ki kuralın koruduğu şey tam olarak budur.
 
 > Şeffaflık: oturum başında `docs/agent-results/TASK-MTQYXISOPUJ53-customer-support-2.md`
-> zaten ` M` idi — bu benim önceki görevimden kalan, **koşudan önce** var olan bir rapor
-> düzenlemesiydi, e2e'nin ezmesi değil. Bu commit'le kapatıldı.
+> zaten ` M` idi — önceki görevimden kalan, **bu koşudan önce** var olan bir rapor
+> düzenlemesiydi, e2e'nin ezmesi değil. `156510f` ile kapatıldı.
 
 ### 2.7 Kapılar
 
@@ -224,6 +234,14 @@ arkasındaki 52 tip hatası"). Dokunmadım.
    `'Tümü Okundu'` — `UserMenu.tsx` bugün i18n anahtarı değil gömülü `isTr ? … : …` üçlüsü
    kullanıyor. Bu dizgeler `t('...')`'e taşınırsa spec'in de güncellenmesi gerekir.
    (Gömülü metin CLAUDE.md §8 ihlali; **benim kartımın kapsamı değil**, aşağıya not düştüm.)
+4. **Paylaşılan index yarışı yine vurdu.** Commit'imi (`156510f`) ayrık bir index'le
+   (`GIT_INDEX_FILE`) attım — paylaşılan `.git/index` başka ajanların elinde. Ref'i
+   ilerlettikten sonra paylaşılan index bayat kaldı ve **yeni commit'lediğim 8 dosya
+   `D ` (staged deletion) olarak göründü**; o anda başka bir ajan `git commit` atsaydı
+   dosyalarım silinmiş olarak commit'lenirdi. `git reset -- <yalnız kendi yollarım>` ile
+   onardım. Ayrık index commit'i güvenli; **ardından index'i HEAD'e hizalamak da onun
+   parçası olmalı.** Hafızaya yazıldı.
+
 3. Fixture'ın API anahtarı depoda düz metin (`fp_st6_fixture_key_do_not_use_in_production`).
    Yalnız `--rollback`'in sildiği tek kullanımlık kiracıyı doğruluyor; seed dosyasında gerekçesi
    yazılı. Yeni bir risk değil, devraldığım tasarım.

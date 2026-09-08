@@ -32,6 +32,16 @@ git reset -q HEAD -- <aynı yollar>       # working tree'ye dokunmaz, index'i HE
 git status --porcelain -- <yollar>       # boş çıkmalı
 ```
 
+**Belirtinin nasıl göründüğü (2026-09-08 / TASK-MTSJJOR63M63R).** `update-ref` sonrası
+`git status --short` **yeni commit'lediğin dosyaları `D ` (staged deletion) olarak**
+listeler — "silinmiş" gibi görünürler ama diskte dururlar (aynı yollar ayrıca `??` olarak
+da çıkar). 8 dosyalık commit'imin 8'i birden böyle göründü. O anda başka bir ajan
+pathspec'siz `git commit` atsaydı **dosyalarımı silinmiş olarak** commit'lerdi. `D ` +
+`??` çiftini gördüğün an bu odur; panikleyip `git checkout` ile dosyaları geri koymaya
+çalışma — dosyalar zaten yerinde, **bayat olan index**. Çözüm aşağıdaki `git reset -q
+HEAD -- <yollar>`, yalnız kendi yollarınla (pathspec'siz `git reset` başka ajanın
+stage'ini siler).
+
 2026-09-08 / TASK-MTS6LZOD715WM: commit anında index'te başka bir ajanın 13 dosyası
 (`src/app/not-found.tsx`, `UserMenu.tsx`, `briefs/client.tsx`, kendi hafıza + rapor
 dosyaları) duruyordu; bu yöntemle 11 dosyalık kendi commit'im (`22b5406`) hiçbirini almadı.
