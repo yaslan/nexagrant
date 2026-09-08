@@ -1,0 +1,38 @@
+$ node .qa-rls-proof.mjs   (temp role NOBYPASSRLS NOSUPERUSER; every INSERT rolled back)
+
+ROLE (dev DB): {"usr":"fabrika","rolbypassrls":true,"rolsuper":true}
+  -> prisma/rls.sql line 2: "App role must NOT have BYPASSRLS."
+
+┌─────────┬──────────────┬────────┬────────┐
+│ (index) │ relname      │ rls_on │ forced │
+├─────────┼──────────────┼────────┼────────┤
+│ 0       │ 'AiUsageLog' │ true   │ true   │
+│ 1       │ 'Chunk'      │ true   │ false  │
+│ 2       │ 'Document'   │ true   │ false  │
+└─────────┴──────────────┴────────┴────────┘
+
+policy tenant_isolation ON "AiUsageLog"
+  WITH CHECK ("tenantId" = current_setting('app.tenant_id'::text, true))
+
+=== embedText writes AiUsageLog via the GLOBAL prisma client (never withTenant) ===
+    => app.tenant_id is NEVER set for that INSERT.
+
+  A. platform scope,  app.tenant_id UNSET   <-- what embedText does TODAY
+     -> BLOCKED [42501]: new row violates row-level security policy for table "AiUsageLog"
+  B. tenant scope,    app.tenant_id UNSET   <-- what embedText does TODAY
+     -> BLOCKED [42501]: new row violates row-level security policy for table "AiUsageLog"
+
+--- positive controls (prove the probe works and the policy is real) ---
+  C. platform scope,  app.tenant_id='__platform__'
+     -> INSERT SUCCEEDED
+  D. tenant scope,    app.tenant_id='demo-tenant'
+     -> INSERT SUCCEEDED
+  E. cross-tenant     app.tenant_id='other'  (isolation must hold)
+     -> BLOCKED [42501]: new row violates row-level security policy for table "AiUsageLog"
+
+=== shared corpus (Document/Chunk, tenantId = NULL) ===
+policy tenant_or_shared WITH CHECK ("tenantId" = current_setting(...))  -- no NULL branch
+  F. shared Document (tenantId NULL), app.tenant_id='demo-tenant'
+     -> BLOCKED [42501]: new row violates row-level security policy for table "Document"
+  G. tenant Document (tenantId set),  app.tenant_id='demo-tenant'
+     -> SUCCEEDED

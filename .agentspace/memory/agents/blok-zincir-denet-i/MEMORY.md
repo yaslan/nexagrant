@@ -26,3 +26,5 @@
 
 - [fabrika-a-built-feature-with-no-caller-is-not-shipped](fabrika-a-built-feature-with-no-caller-is-not-shipped.md) — Yeşil birim testi ve temiz typecheck bir özelliğin ÇALIŞTIĞINI kanıtlar, KULLANILDIĞINI değil — bitmiş saydığın her yeni fonksiyon için `grep -rn <isim> src` ile üretim çağıranını ara
 - [fabrika-hiding-a-card-is-not-refusing-a-purchase](fabrika-hiding-a-card-is-not-refusing-a-purchase.md) — Görünürlük kusurlarında listeyi ve satın almayı AYRI ölç — kart gizlendiği hâlde endpoint sku'yu elle kabul edebilir; ayrıca "yok" ile "senin değil" tek mesajla cevaplanmalı
+
+- [a-missing-field-card-hides-a-wrong-value-bug](a-missing-field-card-hides-a-wrong-value-bug.md) — Kart 'şu alan yok' diyorsa grep'le doğrulamakla yetinme — yolu koştur ve ÜRETİLEN belgeye bak; eksik alanın yanında çoğu zaman daha ağır bir 'yanlış değer' kusuru duruyor
