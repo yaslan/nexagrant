@@ -1,6 +1,6 @@
 ---
 name: fabrika-schema-contract-guard-misses-relation-names
-description: schema-contract.test.ts artık alan/ilişki adlarını da repo geneli (src/) kontrol ediyor — kalan kör noktaları create/update'in data: bloğu, import edilen sorgu nesnesi ve dinamik kurulan where
+description: schema-contract.test.ts alan/ilişki adlarını repo geneli (src/) hem okuma argümanlarında hem yazma gövdesinde kontrol ediyor — kalan kör noktaları kısa-yazım (shorthand) alanlar, `db.` takma adı, import edilen sorgu nesnesi ve dinamik kurulan where
 metadata:
   type: project
   updatedAt: 2026-09-08
@@ -22,13 +22,16 @@ Sentetik anahtar gerçek bir kolonu gölgelemiyor.
 
 **Kalan kör noktalar — bunlara güvenme, elle doğrula:**
 
-1. **`create`/`update`'in `data:` bloğu taranmıyor.** `FIELD_BEARING` yalnız
-   `where` / `select` / `include` / `orderBy`. `data: { hayaletKolon: … }` runtime'da
-   patlar, kapı görmez. **DENEYLE ÖLÇÜLDÜ (2026-09-08, TASK-MTRK9FMKE3GSB):** izole
-   worktree'de `cordis-sync.ts`'in `upsert`'üne uydurma bir kolon enjekte edildi —
-   `create: { …, totallyBogusColumn }` → `11 passed`, kapı YAKALAMADI;
-   aynı kolon `where: { …, totallyBogusColumn }` → `1 failed`, YAKALADI. Kör nokta
-   teorik değil, bugün hâlâ açık.
+1. ~~`create`/`update`'in `data:` bloğu taranmıyor.~~ **KAPANDI — 2026-09-08,
+   TASK-MTS8002I6YD3L.** Kapı artık yazma gövdesini de yürüyor: `create`/`createMany`/
+   `update`/`updateMany`'nin `data`'sı, `upsert`'ün `create`+`update`'i, ve ilişki
+   altındaki iç içe yazımlar. Gramer taklit ediliyor, `data` sıradan bir alan nesnesi
+   gibi okunmuyor: bir ilişkinin `create`/`update`/`upsert`/`createMany` değeri
+   **hedef modelin** yazma gövdesi, `connect`/`disconnect`/`set`/`delete` değeri o model
+   üzerinde bir `where`, skalerin `{ increment: 1 }`'i ise operatör (yürünmez).
+   `data: [satır, satır]` toplu biçimi de listedir. `src/`'de bu yolla doğrulanan
+   **548 yazma referansı** var, hiçbiri bozuk değildi — delik kapandı, canlı bug yoktu.
+   Fikstür kanıtı: eski tarayıcı 6 bozuk yazma biçiminin **6'sını da kaçırıyordu**.
 2. **Sorgu nesnesi BAŞKA dosyadan import edilirse görünmez.** Tarayıcı, çağrı argümanı
    çıplak bir tanımlayıcıysa **aynı dosyadaki** `const <ad> = { ... }` bildirimini çözer
    (alerts-daily.ts'in `SAVED_SEARCH_ALERT_QUERY`'si böyle kapsandı) — ama import
@@ -36,6 +39,23 @@ Sentetik anahtar gerçek bir kolonu gölgelemiyor.
    metin tabanlı statik kapıların kapsamını daraltır.** Refactor ederken bunu hesaba kat.
 3. **Dinamik kurulan `where`** (spread, koşullu nesne) okunamaz. `topLevelEntries`
    okuyamadığını *atlar*, tahmin etmez — yani yanlış negatif üretir, yanlış pozitif değil.
+4. **Kısa yazım (shorthand) alanlar görünmez.** `data: { tenantId, title }` içinde
+   `key:` jetonu yok, ayrıştırıcı da `key:` arıyor. ÖLÇÜM (2026-09-08): `src/`'deki
+   760 yazma referansının **212'si** böyle. Kapatmak tek satırlık değil — `where:
+   { OR: [temelFiltre, ek] }` gibi dizi içindeki çıplak tanımlayıcıları da alan sanar,
+   yani yanlış pozitif üretir. Ayrı bir kart olarak yapılmalı.
+5. **`db.` takma adıyla yapılan çağrılar HİÇ taranmıyor.** Tarayıcının deseni
+   `\b(?:prisma|tx)\.` — istemciyi `db` diye içe aktaran dosyalar iki muhafızın da
+   dışında. ÖLÇÜM (2026-09-08): test dışı **16 çağrı yeri / 3 dosya** —
+   `src/modules/m6/server/scoring.ts` (6), `src/modules/m6/server/comparison.ts` (5),
+   `src/lib/observability/system-alert.ts` (5). Desene `db` eklenince tarama
+   **0 bulgu** veriyor (113 dosya), yani kapatmak bugün risksiz; TASK-MTS8002I6YD3L
+   kapsam dışı olduğu için yapılmadı.
+6. **`data: <değişken>`** (sorgu gövdesi bir üst satırda kurulup değişkenle veriliyor)
+   çözülmez. Tarayıcı yalnız `findMany(SABIT)` biçiminde, argümanın TAMAMI çıplak bir
+   tanımlayıcıysa aynı dosyadaki bildirimi çözer. Test dışı 2 yer:
+   `src/lib/inngest/jobs/k1-daily-calls.ts:262` (`data: topicData`, ~20 alan) ve
+   `src/lib/observability/system-alert.ts:280` (`data: row`).
 
 **Nasıl uygula:** `include: { <isim>: true }` yazarken hâlâ `prisma/schema.prisma`'da
 o modelin gerçek bir **relation field**'ı olduğunu doğrula; skaler `xId` kolonunun
