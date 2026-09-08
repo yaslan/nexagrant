@@ -32,3 +32,5 @@
 - [fabrika-widen-a-narrow-gate-to-size-and-find](fabrika-widen-a-narrow-gate-to-size-and-find.md) — Dar kapsamlı bir kapıyı GEÇİCİ olarak repo geneline açıp koşmak, hem kartı ölçüyor hem panoda gizemli duran bir P0'ın kök nedenini veriyor — dağıtmadan önce yap
 
 - [fabrika-zero-warnings-can-mean-rule-is-off](fabrika-zero-warnings-can-mean-rule-is-off.md) — Bir lint kuralı için 0 uyarı görmek kodun temiz olduğu anlamına GELMEZ — Fabrika'da react-hooks/set-state-in-effect hiç yapılandırılmamıştı; kartı dağıtmadan önce eslint.config.mjs'te kuralın AÇIK olduğunu doğrula
+
+- [fabrika-delegation-verdict-wrong-both-directions](fabrika-delegation-verdict-wrong-both-directions.md) — Delegasyon defterinin hükmü İKİ YÖNDE de yanlış olabilir — "failed" biten işi gizler, "tespit=marker" ise hiç kanıt olmadığı demektir

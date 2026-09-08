@@ -24,3 +24,16 @@ yol — GÖR, DOKUNMA, ADINI VER — ikisini de veriyor. Gelen başlıkları kar
 ürün kararı içereni (metin mi veri mi düzelecek) kodlamaya verme, karar kartı
 olarak patrona bırak. [[fabrika-boss-prefers-clean-chain-over-busy-team]]
 [[fabrika-billing-ui-lives-in-two-namespaces]]
+
+**2026-09-08 ek — o bölüm artık backlog'un EN İYİ kaynağı.** geli-tirici'nin
+`TASK-MTS6MFER9LQZR` raporundaki "§4 Yol üstünde görülen, DÜZELTİLMEYEN şeyler" tek başına
+üç kart doğurdu: demo-tenant'taki iki kalıntı fırsat (tam id'leriyle), rollback çağırmayan iki
+e2e spec, ve 404 üzerinden yeşil yanan m10 probe'u. Aynı gün dse'nin doğrulama raporunun
+"AÇIK KALAN" maddeleri iki P0 çıkardı (`resend` beyan edilmemiş bağımlılık; `documents/export`
+rotasında auth+kiracı yok).
+
+Pratik sonuç: yeni dalga planlarken **önce bir önceki dalganın raporlarındaki "düzeltmedim,
+bildiriyorum" bölümlerini oku** — kart uydurmaya gerek kalmıyor, üstelik bu maddeler zaten
+ölçülmüş (id'ler, satır numaraları, komut çıktısı hazır), yani görev metni bir okumada yazılıyor.
+Worker'a "adıyla bildir" demenin getirisi kusuru bulmak değil, **bir sonraki sprintin
+hazır ve kanıtlı gündemi** olması.

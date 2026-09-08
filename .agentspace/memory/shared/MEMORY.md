@@ -153,3 +153,5 @@
 - [fabrika-live-postgres-for-evidence](fabrika-live-postgres-for-evidence.md) — Canli Postgres kaniti icin docker postgres-vector kabini kullan — kabin ici POSTGRES_USER/PASSWORD .env'deki DATABASE_URL ile AYNI DEGIL; TCP baglantisi .env parolasini ister, docker exec psql soket-guveniyle gecer
 - [fabrika-parallel-dev-server-needs-a-worktree](fabrika-parallel-dev-server-needs-a-worktree.md) — Next 16 aynı dizinde ikinci `next dev`'i reddediyor — paralel e2e için `git worktree` + node_modules/.env symlink + kendi portun; ölçülmüş kurulum burada
 - [fabrika-prisma-client-side-defaults-are-not-db-defaults](fabrika-prisma-client-side-defaults-are-not-db-defaults.md) — Prisma'da @updatedAt ve @default(cuid()) veritabaninda DEFAULT birakmaz — Prisma disindan (Python worker, ham SQL, psql) yazan her istemci bu sutunlari kendi doldurmali
+
+- [zsh-does-not-word-split-unquoted-vars](zsh-does-not-word-split-unquoted-vars.md) — Bash aracının kabuğu zsh — `CMD $LISTE` tek bir argüman olur, bash'teki gibi bölünmez; dosya listesini değişkende taşıma, satır içi yaz ya da `${=LISTE}` kullan

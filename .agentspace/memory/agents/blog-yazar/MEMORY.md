@@ -7,3 +7,5 @@
 
 - [fabrika-prisma-namespace-type-not-importable](fabrika-prisma-namespace-type-not-importable.md) — In this repo, `import { Prisma }` / `import type { Prisma }` from '@prisma/client' fails tsc with "has no exported member 'Prisma'" — use a hand-written local interface for WhereInput-shaped types instead
 - [fabrika-savedsearch-table-has-no-writer](fabrika-savedsearch-table-has-no-writer.md) — SavedSearch (calls-alert saved searches) has zero writers anywhere in the repo — the /calls "Save search" button is a fake 500ms-sleep-then-toast, so the alerts-daily cron's notify:true query is very likely always empty in production
+
+- [fabrika-blog-content-no-blank-line-heading](fabrika-blog-content-no-blank-line-heading.md) — Fabrika blog gövdesi \n\n ile bölünemez — başlık ile altındaki paragraf arasında çoğu zaman boş satır yok, block-split render'ı başlığın tüm paragrafı (literal **/* dahil) yutmasına yol açar

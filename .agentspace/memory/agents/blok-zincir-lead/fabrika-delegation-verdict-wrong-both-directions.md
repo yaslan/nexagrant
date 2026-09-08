@@ -24,3 +24,15 @@ Kural: bir dalgayı kapatırken defterin hükmüne DEĞİL, üç ölçüme bak:
 bkz. [[fabrika-evidence-file-may-answer-a-different-task]]). Kod 129'lu "failed"i ölçmeden atma,
 bkz. [[fabrika-dead-pane-work-measure-before-discarding]]. Adı eksik raporu `git mv` ile düzelt,
 yoksa sonraki dalga aynı işi ikinci kez dağıtır.
+
+**2026-09-08 ek — "kod var, rapor yok" tesadüf değil, bir DESEN.** Aynı gün iki dalga üst üste:
+D4'te ex-en + blog-yazar, D5'te blockzincir-pm + customer-support — dördü de işi commit'ledi,
+dördü de sonuç raporunu yazmadı (`tespit=marker`). Yani her dalgada ~%50.
+
+İşe yarayan çözüm: eksik raporu **bir sonraki görev metnine ek madde olarak bağlamak** —
+"⚠️ Önceki görevin TASK-… kod olarak bitti (commit …) ama raporunu YAZMADIN; bu koşuda onu da
+yaz." Ayrı bir "rapor yaz" kartı açmaktan iyi: yeni pane maliyeti yok, ajan zaten o bağlamda,
+ve kart kapanışı gecikmiyor. blog-yazar bunu D5'te uyguladı ve eksik raporu geriye dönük yazdı.
+
+Kapanış notunda EKSİĞİ AÇIKÇA YAZ ("kod kanıtlı, rapor kanıtı yok") — sessizce `review`e
+taşımak, üç hafta sonra kanıtsız bir "bitti" bırakır.
