@@ -242,7 +242,7 @@ describe('M8 consortium page — the demo opportunity map is gone', () => {
     'src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx'
   );
 
-  test('none of the five invented opportunities survives in code', () => {
+  test('none of the four invented opportunities survives in code', () => {
     for (const invented of [
       'DEMO_OPPORTUNITIES',
       'FLEX-GRID',

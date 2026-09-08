@@ -30,8 +30,8 @@ interface ConsortiumOpportunity {
 /**
  * TASK-MTQYXISOPUJ53 — fabricated fallbacks.
  *
- * A `DEMO_OPPORTUNITIES` map used to sit here: five invented opportunities keyed
- * by the ids the demo seed happens to use (`demo-opp-1` … `demo-opp-5`), each
+ * A `DEMO_OPPORTUNITIES` map used to sit here: four invented opportunities keyed
+ * by the ids the demo seed happens to use (`demo-opp-1` … `demo-opp-4`), each
  * with a title, a stage and a G0 score ("FLEX-GRID: Decarbonised Smart Grid
  * Flexibility Solutions", G0, 88). When the tenant-scoped query below returned
  * nothing — an id belonging to another tenant, a deleted row, a failed query —

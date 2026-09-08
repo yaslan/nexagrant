@@ -51,7 +51,7 @@ $ select 'Opportunity', count(*) … where "tenantId"='cmtrma93m000e93xk2ivjowpv
 Beş noktayı ölçerken aynı ailenin **client** tarafında yaşayan bir üyesini canlı yakaladım:
 
 **`src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx`** — `DEMO_OPPORTUNITIES`
-sabiti. Beş uydurma fırsat, demo seed'in kullandığı id'lerle (`demo-opp-1` … `demo-opp-5`)
+sabiti. Dört uydurma fırsat, demo seed'in kullandığı id'lerle (`demo-opp-1` … `demo-opp-4`)
 anahtarlanmış. Kiracıya daraltılmış sorgu boş dönünce (başka kiracının id'si, silinmiş satır,
 patlayan sorgu) sayfa bunlardan birini **o kiracının kendi fırsatıymış gibi** servis ediyordu.
 `try/catch` de yalnız `console.warn` yazıp aynı fallback'e düşüyordu — yani kalıcı olarak
@@ -251,7 +251,7 @@ değil; §5.4).
 
 ## 5. Riskler
 
-1. **Konsorsiyum sayfası artık 404 verebiliyor.** Daha önce `demo-opp-1` … `demo-opp-5`
+1. **Konsorsiyum sayfası artık 404 verebiliyor.** Daha önce `demo-opp-1` … `demo-opp-4`
    id'leriyle gelen HERHANGİ bir kiracı dolu bir sayfa görüyordu. Demo turu bu id'lerden
    birine link veriyorsa artık 404 görecek — istenen davranış bu, ama satış demosu bu
    linki kullanıyorsa haberdar edilmeli.
