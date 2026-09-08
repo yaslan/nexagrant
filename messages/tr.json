@@ -535,6 +535,8 @@
     },
     "calendar": {
       "title": "Takvim Bağlantıları",
+      "breadcrumbHome": "Panel",
+      "breadcrumbSettings": "Ayarlar",
       "description": "Takvim sağlayıcınızı bağlayarak toplantı briflerini ve kararları otomatik olarak senkronize edin.",
       "connected": "Bağlı",
       "lastSync": "Son senkronizasyon: {date}",

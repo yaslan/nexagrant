@@ -272,7 +272,13 @@ export function MeetingBriefsClient({
       t('ics.eventTitle', { partner: activeBrief.partnerName || t('ics.defaultPartner') }),
       stripTemplateMarker(activeBrief.content).substring(0, 200),
       startDate,
-      endDate
+      endDate,
+      // The brief row's own id, so re-downloading one meeting updates the event
+      // the user already imported instead of adding a duplicate. The UID used to
+      // be a fresh `randomUUID()` on every click (RFC 5545 3.8.4.7). The row id
+      // survives regeneration: generateMeetingBrief updates the existing row
+      // matched on (interactionId, tenantId) rather than inserting a new one.
+      `brief-${activeBrief.id}@fabrika.app`
     );
 
     const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });

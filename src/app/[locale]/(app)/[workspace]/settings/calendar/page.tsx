@@ -24,6 +24,10 @@ export async function generateMetadata({
 export default async function CalendarSettingsPage({ params }: { params: Promise<{ locale: string; workspace: string }> }) {
   const { locale, workspace } = await params;
   const { tenantId, userId } = await requireTenantAction();
+  // The breadcrumb was three `locale === 'tr' ? … : …` literals — user-visible
+  // text outside the message catalogue (CLAUDE.md rule 8), which is the same
+  // defect this card's i18n complaint names one line further up the page.
+  const t = await getTranslations({ locale, namespace: 'settings.calendar' });
 
   const connections = await prisma.calendarConnection.findMany({
     where: { tenantId, userId },
@@ -33,14 +37,14 @@ export default async function CalendarSettingsPage({ params }: { params: Promise
     <div className="max-w-4xl mx-auto py-8 px-4">
       <div className="flex items-center gap-2 text-xs font-medium text-muted mb-4">
         <a href={getWorkspaceRoute('dashboard', locale, workspace)} className="hover:text-ink transition-colors">
-          {locale === 'tr' ? 'Panel' : 'Dashboard'}
+          {t('breadcrumbHome')}
         </a>
         <span>/</span>
         <a href={getWorkspaceRoute('settingsModules', locale, workspace)} className="hover:text-ink transition-colors">
-          {locale === 'tr' ? 'Ayarlar' : 'Settings'}
+          {t('breadcrumbSettings')}
         </a>
         <span>/</span>
-        <span className="text-accent font-semibold">{locale === 'tr' ? 'Takvim Bağlantıları' : 'Calendar Connections'}</span>
+        <span className="text-accent font-semibold">{t('title')}</span>
       </div>
 
       <CalendarClient connections={connections} locale={locale} workspace={workspace} />

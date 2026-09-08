@@ -39,18 +39,27 @@ function foldIcsLine(line: string): string {
   return chunks.join('\r\n ');
 }
 
+/**
+ * `uid` is the calendar component's persistent identity (RFC 5545 §3.8.4.7): a
+ * client that already holds an event with this UID *updates* it on re-import
+ * instead of adding a second one. A caller that owns a durable record — the
+ * meeting brief row, say — must pass its own stable id, or the same meeting
+ * downloaded twice lands in the user's calendar twice. The `randomUUID()`
+ * default only fits a one-off export that nothing will ever supersede.
+ */
 export function generateIcsContent(
   title: string,
   description: string,
   start: Date,
-  end: Date
+  end: Date,
+  uid?: string
 ): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Fabrika SaaS//EN',
     'BEGIN:VEVENT',
-    `UID:${randomUUID()}@fabrika.app`,
+    `UID:${escapeIcsText(uid ?? `${randomUUID()}@fabrika.app`)}`,
     `DTSTAMP:${formatIcsDate(new Date())}`,
     `DTSTART:${formatIcsDate(start)}`,
     `DTEND:${formatIcsDate(end)}`,
@@ -71,8 +80,9 @@ export function createIcsDataUrl(
   title: string,
   description: string,
   start: Date,
-  end: Date
+  end: Date,
+  uid?: string
 ): string {
-  const content = generateIcsContent(title, description, start, end);
+  const content = generateIcsContent(title, description, start, end, uid);
   return `data:text/calendar;charset=utf8,${encodeURIComponent(content)}`;
 }

@@ -535,6 +535,8 @@
     },
     "calendar": {
       "title": "Calendar Connections",
+      "breadcrumbHome": "Dashboard",
+      "breadcrumbSettings": "Settings",
       "description": "Connect your calendar provider to automatically sync meeting briefs and decisions.",
       "connected": "Connected",
       "lastSync": "Last sync: {date}",

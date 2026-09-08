@@ -109,6 +109,23 @@ describe('generateIcsContent', () => {
     expect(first).not.toEqual(second);
   });
 
+  it('keeps the caller-supplied UID stable across calls, so a re-download updates one event', () => {
+    // RFC 5545 §3.8.4.7: the UID is the component's persistent identity. Without
+    // one supplied, every download of the *same* meeting brief carried a fresh
+    // `randomUUID()`, so importing twice left two events in the user's calendar
+    // instead of updating the one already there.
+    const uid = 'brief-clx0m9e2e0001@fabrika.app';
+    const first = unfold(generateIcsContent('A', 'x', start, end, uid)).find((l) =>
+      l.startsWith('UID:')
+    );
+    const second = unfold(generateIcsContent('A', 'x', start, end, uid)).find((l) =>
+      l.startsWith('UID:')
+    );
+    expect(first).toBe(`UID:${uid}`);
+    expect(second).toBe(first);
+    expect(rfc5545Violations(generateIcsContent('A', 'x', start, end, uid))).toEqual([]);
+  });
+
   it('escapes commas, semicolons and backslashes in TEXT values', () => {
     const ics = generateIcsContent(
       'Görüşme: Fraunhofer Institute; Munich, DE',
