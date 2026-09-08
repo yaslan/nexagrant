@@ -8,7 +8,8 @@ teknik cevapları görüşmeye gelmeden almak.
 teklif turu yapılmayacak). Aday henüz seçilmedi; seçilir seçilmez bu metin gider.
 
 **Gönderen bilgileri patron tarafından verildi (2026-09-08) ve metne işlendi.**
-Tek eksik: imza satırındaki **unvan** — patron belirtmedi, uydurulmadı.
+İmza **unvansız** gidecek — patron kararı, 2026-09-08. Metin gönderilmeye hazır;
+tek bekleyen, entegratör adayının seçilmesi.
 
 Bağlam: `docs/EFATURA_SETUP.md` · Kart: `TASK-MTRJSOWFH6B45`
 

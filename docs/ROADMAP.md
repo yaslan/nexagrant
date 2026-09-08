@@ -140,6 +140,19 @@ Durum (S9–S10 dalgası, ölçüldü 2026-09-07 — kartların çoğu **`review
 14. **`MeetingBrief` fırsata (`Opportunity`) bağlanacak mı?** — Şemada `opportunityId` alanı yok; `/opportunities/[id]/briefs` rotası fırsata göre filtrelemiyor, kiracının tüm brief'lerini her fırsat sayfasında listeliyor (kod/şema seviyesinde kesin, P0-1 nedeniyle ampirik doğrulanamadı — tablo şu an 0 satır). Rota bu haliyle kaldığı sürece alan eklenmesi gerekiyor. Kanıt: `docs/agent-results/TASK-MTQU053U24RYH-customer-support.md` §2 P2-7, `prisma/schema.prisma:998`.
 15. **Toplantı-sonrası notların sessizce kaybolması (P1-3) ne zaman düzeltilecek?** — `savePostMeetingNotes` başarısız (`{success:false}`) dönüyor ama `client.tsx` dönüş değerine bakmadan formu temizliyor; kullanıcı kararlar + notlar + aksiyon maddelerini kaybediyor, hiçbir hata görmüyor. Şu an `TASK-MTQURC2H4E0WF`'e (P0 kartı) iliştirilmiş değil — ayrı mı ele alınacak yoksa aynı kart mı genişletilecek, netleşmedi. Kanıt: `docs/agent-results/TASK-MTQU053U24RYH-customer-support.md` §2 P1-3.
 
+### E10 kapanışına bırakılan uyum boşlukları (patron kararı, 2026-09-08)
+
+`docs/legal/processing-register.md` §22, envanteri çıkarırken bulunan **8 açık boşluğu**
+listeliyor (VKN/TCKN saklama süresi tanımsız · `Document`/`Chunk` silme akışı yok ·
+`AuditEvent.actorId` kimliksizleştirilmiyor · `CalendarConnection` token'ları açık metin, vb.).
+
+**Karar: bunlar için ayrı kart AÇILMAYACAK; E10 kapanışında topluca ele alınacak.**
+Kayıt burada tutuluyor ki kapanışta unutulmasın — tek kaynak §22'dir, liste burada
+kopyalanmaz (kopyalanan liste bayatlar).
+
+Ayrıca §21: Anthropic, OpenAI, Google, Microsoft, Stripe, Resend, Cloudflare için repoda
+**imzalı SCC/ek sözleşme bulunamadı** — bu da kapanış kapsamında.
+
 ## Riskler (teknik)
 - F&T API'si resmî değil → adaptör + yedek kaynak + alarm (E4).
 - CORDIS dosya adları/sütunları değişebilir → worker'da sütun eşleme tablosu + test fixture'ları.
