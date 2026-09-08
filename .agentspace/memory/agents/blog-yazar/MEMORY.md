@@ -9,3 +9,4 @@
 - [fabrika-savedsearch-table-has-no-writer](fabrika-savedsearch-table-has-no-writer.md) — SavedSearch (calls-alert saved searches) has zero writers anywhere in the repo — the /calls "Save search" button is a fake 500ms-sleep-then-toast, so the alerts-daily cron's notify:true query is very likely always empty in production
 
 - [fabrika-blog-content-no-blank-line-heading](fabrika-blog-content-no-blank-line-heading.md) — Fabrika blog gövdesi \n\n ile bölünemez — başlık ile altındaki paragraf arasında çoğu zaman boş satır yok, block-split render'ı başlığın tüm paragrafı (literal **/* dahil) yutmasına yol açar
+- [fabrika-unsourced-claims-hide-in-shared-components](fabrika-unsourced-claims-hide-in-shared-components.md) — kaynaksız iddia taraması hedef dosyanın dışına, sayfanın render ettiği paylaşımlı bileşenlere (footer/navbar) de bakmalı; rakamsız kelime-kalıpları ("katlayın"/"accelerate") dijit-regex'ini atlatır
