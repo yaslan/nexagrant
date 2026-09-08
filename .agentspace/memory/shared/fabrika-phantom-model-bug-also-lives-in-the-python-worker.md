@@ -1,9 +1,9 @@
 ---
 name: fabrika-phantom-model-bug-also-lives-in-the-python-worker
-description: TS tarafında temizlenen "olmayan modele yazma" hatası workers/cordis/main.py içinde HÂLÂ duruyor — Organization/Participation/Project tabloları şemada yok
+description: "Olmayan modele yazma" hatası workers/cordis/main.py icinde 2026-09-08de kapatildi (766944e) — hayalet tablo aramanin dogru yolu canli information_schema sayimidir
 metadata:
   type: project
-  updatedAt: 2026-09-07
+  updatedAt: 2026-09-08
 ---
 
 `prisma.organization` hatası (şemada `model Organization` yok, `src/types/prisma-override.d.ts`
@@ -27,3 +27,25 @@ K2'yi gerçekten kanıtlaman istenirse SIRA: (1) `pip install -r workers/cordis/
 (2) main.py'deki tablo adlarını düzelt, (3) sonra `pnpm jobs:k2 -- --month YYYY-MM`.
 
 Bkz. [[fabrika-db-mock-invents-the-model]], [[fabrika-fabricated-fallback-antipattern]]
+
+
+## Durum: KAPATILDI (766944e, 2026-09-08)
+
+`workers/cordis/main.py` artık gerçek temel tablolara yazıyor: `CordisProject`,
+`CordisOrganization`, `CordisParticipation`, `CordisProjectTopic` — TS içe aktarıcısıyla
+(`src/lib/k2-cordis/importer.ts`) aynı normalize yüzey. Türetilmiş katman
+(`CordisPartnerProfile`, `CordisCoParticipation`) worker'a ait değil; tek sahibi
+`generatePartnerProfiles()`.
+
+Düzeltirken çıkan iki somut tuzak:
+
+- Şema `organisationId` yazıyor (İngiliz imlası). Amerikan imlası `organizationId` sessizce
+  var olmayan bir sütunu hedefler.
+- `BigInt` para sütunları **tam EUR** tutar, cent değil — TS'teki `parseBigIntEur()` ile aynı
+  ölçek. Eski worker cent yazıyordu.
+
+**Nasıl uygula:** Hayalet tablo/sütun şüphesini kodu okuyarak değil, canlı şemayı sayarak
+kapat:
+`SELECT table_name FROM information_schema.tables WHERE table_schema='public'`.
+
+İlgili: [[fabrika-k2-worker-200-is-not-proof]] · [[fabrika-live-postgres-for-evidence]]
