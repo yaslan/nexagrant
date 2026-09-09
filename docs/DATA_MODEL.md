@@ -480,12 +480,16 @@ tek yolu bir mükellef **uydurmaktı**; TASK-MTRD9QBJ2G32E bu depodan tam olarak
 - **Bu satırı bugün hiçbir ürün ekranı doldurmuyor** — toplama arayüzü ayrı bir kart.
   O ekran yazılana kadar canlıda kesilecek fatura sayısı sıfırdır (aşağıya bakın).
 
-**KDV: `INVOICE_VAT_RATE`.** Varsayılanı **yoktur** ve satıcı kimliğiyle aynı gerekçeyle:
-bir satışın hangi oranda vergilendiği satıcıya ve ürüne dair mali bir olgudur, kodun
-seçebileceği bir sabit değil. Bu depoda ilan edilen fiyatların KDV **dahil mi hariç mi**
-olduğunu söyleyen hiçbir kayıt yok. Değişken boşken fatura kesilmez (`SystemAlert`,
-değişkeni adıyla anar); ödeme etkilenmez. `0` geçerli bir değerdir ve "KDV'ye tabi değil"
-demektir — "kimse ayarlamamış" ile aynı şey **değildir**.
+**KDV: ortam değişkeni değil, alıcının ülkesi.** Bir satışın hangi oranda
+vergilendiği satıcıya, ürüne ve **alıcıya** dair mali bir olgudur; kodun ya da bir
+sunucu ayarının seçebileceği bir sabit değil. Patron kararı (2026-09-08): fiyatlar
+KDV **hariç** ilan edilir, oran alıcının ülkesinden gelir ve tek kaynağı
+`src/lib/billing/vat-rates.ts`'tir — her satır oranın yanında kaynağını, yürürlük
+tarihini ve rejimini taşır. Ülkenin kaynaklı satırı yoksa **fatura kesilmez**
+(`SystemAlert: invoice_vat_country_unknown`); ödeme etkilenmez. `%0` geçerli ve
+çözülmüş bir cevaptır (Kuveyt) — "oran bilinmiyor" ile aynı şey **değildir**.
+Bunu belirleyen `INVOICE_VAT_RATE` ayarı 2026-09-09'da tamamen **kaldırıldı**
+(TASK-MTTTMECDO7RC8); ne şemada ne preflight'ta bir izi kalmıştır.
 
 Tahsil edilen tutar **KDV dahil** kabul edilip ayrıştırılır, çünkü değişmez şudur:
 **faturanın genel toplamı tahsil edilen parayla birebir aynı olmak zorundadır.**
@@ -626,7 +630,10 @@ Migration: `prisma/migrations/add-plan-versioning/migration.sql` (additive +
 idempotent, RLS politikaları dosyanın içinde) — geri alma: aynı klasördeki
 `down.sql` (**yıkıcı**: sürüm tarihçesini ve atamaları siler). Depodaki düz
 `prisma/migrations/*.sql` dosyaları `prisma migrate deploy`'un gözüne görünmez;
-yalnızca klasörlü olanlar uygulanır.
+yalnızca klasörlü olanlar uygulanır. Bu yüzden **elle** uygulanmaları gerekir ve
+sayıları `docs/RELEASE_CHECKLIST.md` §1'de sayılarak listelenir (2026-09-09
+ölçümü: 12 düz dosya, 5 klasörlü; veritabanı Prisma'ya göre yalnız 5'ini
+uygulanmış biliyor).
 
 **Bugünkü sınır (bilinçli):** `plansVisibleToTenant` ve `listPublicPlans`
 hazırdır ama fiyat sayfası, ayarlar faturalama paneli ve checkout hâlâ statik

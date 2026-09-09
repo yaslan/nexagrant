@@ -1,4 +1,4 @@
-import { resolveVatRate, retiredVatRateSetting } from '../src/lib/billing/vat-rate';
+import { resolveVatRate } from '../src/lib/billing/vat-rate';
 import { chargeableVatCountries } from '../src/lib/billing/vat-rates';
 import { env } from '../src/lib/env';
 
@@ -45,21 +45,20 @@ const OPTIONAL_SUPPLIER_VARS = [
  * document fails; without a usable VAT rate `createInvoiceForPayment` stops
  * before writing anything, so there is no row to export in the first place.
  *
- * What this block checks changed on 2026-09-08. It used to check one variable,
- * `INVOICE_VAT_RATE`. The boss decided the rate follows the **buyer's country**
- * (Türkiye 20%, Kuveyt 0%), so a server-wide percentage cannot be the answer and
- * the variable no longer decides anything.
+ * What this block checks changed on 2026-09-08. It used to check one server-wide
+ * percentage. The boss decided the rate follows the **buyer's country**
+ * (Türkiye 20%, Kuveyt 0%), so a single setting cannot be the answer; that
+ * setting was removed from the schema on 2026-09-09 (TASK-MTTTMECDO7RC8) and
+ * this block no longer reads any environment variable at all.
  *
  * The gate therefore asks the question the writer will actually ask, through the
  * very same resolver: can `src/lib/billing/vat-rates.ts` price a sale to the
  * supplier's own country? If it cannot, no domestic customer can be invoiced,
- * and that is worth failing go-live over. `INVOICE_VAT_RATE` is still listed —
- * as *ignored* — because a deployment that still sets it would otherwise keep
- * believing it works (TASK-MTT1WUUS7MN7R).
+ * and that is worth failing go-live over.
+ *
+ * `DEFAULT_SUPPLIER_COUNTRY` is where the supplier is established: the country
+ * every domestic sale is taxed in, and the one this block prices.
  */
-const RETIRED_VAT_VARS = ['INVOICE_VAT_RATE'] as const;
-
-/** Where the supplier is established; the country every domestic sale is taxed in. */
 const DEFAULT_SUPPLIER_COUNTRY = 'Türkiye';
 
 const REQUIRED_INTEGRATOR_VARS = [
@@ -124,8 +123,8 @@ export function evaluatePreflight(envSource: Partial<Record<string, string | und
   const missingVatVars: string[] = [];
   if (supplierVat.status !== 'resolved') {
     // Named as a *table row*, not a variable, because that is what has to be
-    // added to fix it. An operator told to "set INVOICE_VAT_RATE" here would
-    // set it and stay broken.
+    // added to fix it. There is no environment variable to set here any more,
+    // and an operator sent looking for one would stay broken.
     missingVatVars.push(`vat-rates.ts:${supplierCountry}`);
   }
   results.push({
@@ -138,19 +137,6 @@ export function evaluatePreflight(envSource: Partial<Record<string, string | und
         ? `%${supplierVat.ratePercent} (${supplierVat.country})`
         : '(kaynaklı satır yok)',
   });
-
-  // Reported, never required. A set value is a false belief worth naming.
-  for (const v of RETIRED_VAT_VARS) {
-    const val = envSource[v as keyof typeof envSource];
-    const stillSet = retiredVatRateSetting(val) !== null || Boolean(val && val.trim().length > 0);
-    results.push({
-      variable: v,
-      block: 'Vergi (KDV)',
-      required: false,
-      status: stillSet ? 'GEÇERSİZ' : 'EKSİK',
-      valueMasked: stillSet ? `${val} (YOK SAYILIR)` : '(kullanılmıyor)',
-    });
-  }
 
   const missingIntegratorVars: string[] = [];
   for (const v of REQUIRED_INTEGRATOR_VARS) {
@@ -245,8 +231,8 @@ export function printPreflightReport(report: PreflightReport): void {
   console.log('--- BLOK DEĞERLENDİRMESİ ---');
   console.log(`1. Satıcı Kimliği Bloğu : ${report.supplierConfigured ? '✅ TANIMLI (Fatura belgesi üretilebilir)' : `❌ EKSİK (${report.missingSupplierVars.join(', ')})`}`);
   console.log(`2. Vergi (KDV) Bloğu    : ${report.vatConfigured ? '✅ TANIMLI (Fatura kaydı yazılabilir)' : `❌ EKSİK (${report.missingVatVars.join(', ')})`}`);
-  console.log(`   ↳ KDV oranı artık ALICININ ÜLKESİNDEN gelir (kaynaklı ülkeler: ${chargeableVatCountries().join(', ')}).`);
-  console.log('     INVOICE_VAT_RATE yok sayılır; kaynaklı satırı olmayan ülkeye fatura KESİLMEZ.');
+  console.log(`   ↳ KDV oranı ALICININ ÜLKESİNDEN gelir (kaynaklı ülkeler: ${chargeableVatCountries().join(', ')}).`);
+  console.log('     Kaynaklı satırı olmayan ülkeye fatura KESİLMEZ; ortam değişkeniyle ayarlanamaz.');
   console.log(`3. Entegratör Bloğu     : ${report.integratorConfigured ? '✅ TANIMLI (Entegratör bağlantısı kurulabilir)' : `❌ EKSİK (${report.missingIntegratorVars.join(', ')})`}`);
 
   console.log('\n--- SONUÇ HÜKMÜ ---');

@@ -57,9 +57,10 @@ içindir; ödeme sağlayıcısına asla gönderilmez — gerekçesi katalog dosy
 
 ### 1.2 KDV — alıcının ülkesine göre (patron kararı, 2026-09-08)
 
-Fiyatlar KDV hariçtir ve KDV **alıcının ülkesine** göre eklenir. Tek bir sunucu
-ayarı (`INVOICE_VAT_RATE`) bunu ifade edemez: en fazla bir ülke için doğru olur,
-geri kalan her ülke için sessizce yanlıştır.
+Fiyatlar KDV hariçtir ve KDV **alıcının ülkesine** göre eklenir. Bunu tek bir
+sunucu ayarı ifade edemez: en fazla bir ülke için doğru olur, geri kalan her ülke
+için sessizce yanlıştır. Karardan önce tam olarak öyle bir ayar vardı
+(`INVOICE_VAT_RATE`) ve 2026-09-09'da koddan kaldırıldı — aşağıya bakın.
 
 **Oranın tek kaynağı `src/lib/billing/vat-rates.ts`'tir.** Her satır oranın
 yanında **kaynağını**, **yürürlük/veri tarihini** ve **rejimini** taşır; kaynağı
@@ -113,10 +114,14 @@ demek olurdu. Fatura kimliği olmayan kiracıya zaten fatura kesilmiyor
 | Fiyat ekranları | `billingPanels.*.vatExclusiveNote` — "Fiyatlar KDV hariçtir…" ibaresi (tr + en) |
 | `pnpm efatura:preflight` | KDV bloğu artık env değişkeni değil, satıcının ülkesi için tabloda kaynaklı satır olup olmadığını sorar |
 
-**`INVOICE_VAT_RATE` emekliye ayrıldı.** Artık hiçbir oranı belirlemiyor.
-Şemadan silinmedi ve preflight tablosunda **"YOK SAYILIR"** olarak
-raporlanıyor: hâlâ set eden bir kurulum, sessizlik yüzünden o sayının
-çalıştığını sanmaya devam ederdi.
+**`INVOICE_VAT_RATE` kaldırıldı** (2026-09-09, TASK-MTTTMECDO7RC8). 2026-09-08
+kararıyla hiçbir oranı belirlemez olmuştu; bir süre şemada tutulup preflight
+tablosunda **"YOK SAYILIR"** diye raporlandı, ki hâlâ set eden bir kurulum o
+sayının çalıştığını sanmasın. Artık şemada, preflight çıktısında, `.env.example`
+içinde ve testlerde **hiç yok**: KDV bloğu tek bir ortam değişkeni bile okumaz.
+Bir ortam yöneticisinde artık kalmışsa etkisizdir ve silinebilir. Oranı
+değiştirmenin tek yolu `src/lib/billing/vat-rates.ts` tablosuna **kaynaklı** bir
+satır eklemektir.
 
 **Aritmetik tek yerde:** `vatOnNetMinor` / `grossFromNetMinor`
 (`src/lib/money.ts`), minor unit tam sayı, yarım-yukarı yuvarlama. Belge, kayıt

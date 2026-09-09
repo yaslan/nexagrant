@@ -19,17 +19,18 @@ import {
  * (TASK-MTSYAKDK5LV9E). That property is why the answer moved *into* this file
  * rather than a second resolver appearing next to the new country table.
  *
- * ## What changed on 2026-09-08, and what `INVOICE_VAT_RATE` is now
+ * ## What changed on 2026-09-08: the rate follows the buyer
  *
  * The boss decided that catalogue prices are VAT-exclusive and that VAT is
  * added according to the **buyer's country** (Türkiye 20%, Kuveyt 0%). A single
  * server-wide percentage cannot express that: it is right for at most one
  * country and silently wrong for every other.
  *
- * So `resolveVatRate` is now the only way an invoice gets a rate, and it reads
- * `./vat-rates`. `INVOICE_VAT_RATE` no longer decides anything — see
- * `retiredVatRateSetting` below for why the variable is still parsed rather
- * than deleted, and how an operator is told it is ignored.
+ * So `resolveVatRate` is the only way an invoice gets a rate, and it reads
+ * `./vat-rates`. The server setting that used to decide it was **removed** on
+ * 2026-09-09 (TASK-MTTTMECDO7RC8): it had stopped deciding anything on
+ * 2026-09-08, and a variable that is parsed but powerless is a standing
+ * invitation to configure a tax rate that never reaches an invoice.
  */
 
 /**
@@ -118,20 +119,4 @@ export function resolveVatRate(rawCountry: string | null | undefined): VatRateRe
     source: row.source,
     effectiveFrom: row.effectiveFrom,
   };
-}
-
-/**
- * Whether `INVOICE_VAT_RATE` is still set, so a gate can say it is ignored.
- *
- * The variable is kept in the schema and parsed here on purpose. Deleting it
- * would let a deployment that still sets it go quiet: the operator would keep
- * believing a number they configured is the tax on their invoices, when the
- * buyer's country has decided it since 2026-09-08. Reporting "set, and ignored"
- * is louder than reporting nothing.
- *
- * Returns the parsed value when one is present, or null when it is unset or
- * unusable — the caller only needs to know whether to warn.
- */
-export function retiredVatRateSetting(raw: string | undefined): number | null {
-  return parseVatRate(raw);
 }

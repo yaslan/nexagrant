@@ -65,23 +65,6 @@ const envSchema = z.object({
   INVOICE_SUPPLIER_COUNTRY: z.string().optional(),
   INVOICE_SUPPLIER_EMAIL: z.string().optional(),
   /**
-   * The VAT (KDV) rate, in percent, that a subscription charge is issued under.
-   *
-   * Optional and without a default, for the same reason as the supplier
-   * identity above: the rate a sale is taxed at is a fiscal fact about the
-   * seller and the product, not a constant this code may choose. Nothing in
-   * this repo states whether the advertised prices include KDV, and a wrong
-   * rate on an invoice is a wrong tax figure, not a cosmetic slip.
-   *
-   * While it is unset no invoice is issued at all: the payment still completes
-   * and a SystemAlert names this variable (`src/lib/billing/invoice-writer.ts`).
-   *
-   * The charged amount is treated as VAT-INCLUSIVE and decomposed at this rate,
-   * so an issued invoice's grand total always equals what the card was actually
-   * charged. `0` is a legitimate value and means the sale is not subject to VAT.
-   */
-  INVOICE_VAT_RATE: z.string().optional(),
-  /**
    * The GİB e-invoice integrator (özel entegratör) Fabrika files through.
    *
    * Optional, like everything else here, and for the same reason: an

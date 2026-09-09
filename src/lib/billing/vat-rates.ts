@@ -3,8 +3,9 @@
  *
  * Boss decision, 2026-09-08: **catalogue prices are VAT-exclusive, and VAT is
  * added according to the buyer's country** — "Türkiye %20, Kuveyt %0". Before
- * it, one server setting (`INVOICE_VAT_RATE`) decided the tax on every invoice
+ * it, a single server-wide percentage decided the tax on every invoice
  * regardless of who bought, which can only be right for one country at a time.
+ * That setting was removed from the schema on 2026-09-09 (TASK-MTTTMECDO7RC8).
  *
  * ## Why this is a table with sources and not a lookup someone typed
  *

@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-vi.hoisted(() => {
-  // `env` is parsed at import time, so the VAT rate the invoice writer reads
-  // has to exist before the module graph loads.
-  process.env.INVOICE_VAT_RATE = '20';
-});
-
 // `vi.mock` is hoisted above ordinary declarations, so the spy it closes over
 // has to be created in a hoisted block too.
 const { retrieve } = vi.hoisted(() => ({ retrieve: vi.fn() }));

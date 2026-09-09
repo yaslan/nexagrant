@@ -24,7 +24,7 @@ eksik alanları adıyla sayar. Uydurma VKN yazılmaz.
 
 ⚠️ **Go-live için açık iş:** bu satırı dolduran bir ürün ekranı **henüz yok**. O ekran
 (ya da bir toplu içe aktarma) yazılana kadar canlıda kesilecek fatura sayısı **sıfırdır** —
-`INVOICE_SUPPLIER_*` ve `INVOICE_VAT_RATE` doldurulsa bile. Ayrı kart gerekiyor.
+`INVOICE_SUPPLIER_*` ve `EFATURA_INTEGRATOR_*` doldurulsa bile. Ayrı kart gerekiyor.
 
 ⚠️ **`profileId` bugün varsayım.** Alıcının GİB'de e-Fatura mükellefi olup olmadığı
 entegratör sorgusu ister; sözleşme yokken bilinemiyor. `EARSIVFATURA` yazılıyor ve her
@@ -42,7 +42,6 @@ değeri taşıyan satırlar mükellef sorgusuyla yeniden profillenmeli.
 | `INVOICE_SUPPLIER_CITY` | Merkez adresin ili | `Ankara` | evet |
 | `INVOICE_SUPPLIER_COUNTRY` | Ülke | `Türkiye` (boşsa varsayılan) | hayır |
 | `INVOICE_SUPPLIER_EMAIL` | Muhasebe e-postası (UBL-TR zorunlu kılmaz) | `muhasebe@ornek.com` | hayır |
-| `INVOICE_VAT_RATE` | Aboneliğin KDV oranı (yüzde). Mali müşavire sorulur — depoda ilan edilen fiyatların KDV **dahil mi hariç mi** olduğunu söyleyen kayıt yok. Boşken **fatura kesilmez**. `0` = KDV'ye tabi değil (boş bırakmakla aynı şey değildir). | `20` | evet |
 | `EFATURA_INTEGRATOR_PROVIDER` | Sözleşme yapılan özel entegratörün adı | `uyumsoft` | evet* |
 | `EFATURA_INTEGRATOR_BASE_URL` | Entegratörün verdiği API adresi (test/canlı ayrı) | `https://efatura-test.ornek.com` | evet* |
 | `EFATURA_INTEGRATOR_USERNAME` | Entegratörün açtığı API kullanıcısı | `fabrika_api` | evet* |
@@ -103,9 +102,10 @@ davranıştır.
 - `src/app/api/billing/invoices/[id]/export/invoice-document.ts` — satıcı kimliği çözümü, eksikse `SupplierNotConfiguredError`
 - `src/lib/efatura-integrator.ts` — entegratör arayüzü ve hata yolları
 - `src/lib/efatura.ts` — UBL-TR XML ve yazdırılabilir belge; zarf numarası yoksa "mali değeri yoktur" damgası
-- `src/lib/billing/vat-rate.ts` — `INVOICE_VAT_RATE` kabul kuralının tek kaynağı; hem fatura yazıcısı hem preflight bunu çağırır
+- `src/lib/billing/vat-rate.ts` — KDV oranı kuralının tek kaynağı (alıcının ülkesi → oran); hem fatura yazıcısı hem preflight bunu çağırır
+- `src/lib/billing/vat-rates.ts` — ülke tablosu: oran + kaynak + yürürlük tarihi + rejim; oran **buradan** değişir, ortam değişkeninden değil
 - `src/lib/fx/tcmb.ts` — TCMB günlük bülteni; alış kuru, hafta sonu/tatil kayması, kesintide geriye kaymama kuralı (ADR-0002)
-- `scripts/efatura-preflight.ts` — ön denetim komutu (`pnpm efatura:preflight`); 13 değişken, 3 blok
+- `scripts/efatura-preflight.ts` — ön denetim komutu (`pnpm efatura:preflight`); 12 değişken, 3 blok
 - `tests/efatura-unit.test.ts`, `tests/efatura-integrator.test.ts`, `tests/invoice-document.test.ts` — entegrasyon testleri
 - `tests/efatura-foreign-currency.test.ts` — yabancı para birimi kuralları (belge kendi para birimini yazar; TRY dışı belge gönderilemez)
 - `tests/invoice-fx-tcmb.test.ts` — TCMB istemcisi + fatura yazıcısının kur adımı (kesinti fatura kesmeyi durdurur, eski kur kullanılmaz)
@@ -117,7 +117,7 @@ Patron veya operatör tarafından sırayla takip edilecek adımlar:
 
 ### ⚠️ Adım 0: Entegratörden BU cevapları da alın (yoksa Pazartesi ikinci tur gerekir)
 
-13 değişkeni doldurmak **gönderim için yetmez**: `ADAPTERS`
+12 değişkeni doldurmak **gönderim için yetmez**: `ADAPTERS`
 (`src/lib/efatura-integrator.ts`) bugün yalnız `sandbox` içeriyor — seçilen
 satıcıya özel adaptör henüz YAZILMADI, o yüzden kimlik bilgileri tam olsa bile
 sonuç `provider_unsupported` döner ("gönderildi" ASLA denmez). Adaptörün
@@ -132,9 +132,12 @@ Pazartesi tek turda yazılabilmesi için görüşmede şunlar da istenmeli:
 - **Hata/durum kodları listesi** ve tekrar gönderim (idempotency) kuralı.
 - **Yabancı para birimi**: `PricingExchangeRate` / `TaxExchangeRate` bloklarını kabul ediyor mu? (ADR-0002 Seçenek b gereği USD fatura kesilecek)
 
-### Adım 1: 13 Değişkeni Ortam Yöneticisine (Secrets/Vercel/.env) Girin
+### Adım 1: 12 Değişkeni Ortam Yöneticisine (Secrets/Vercel/.env) Girin
 - `INVOICE_SUPPLIER_*` (5 adet zorunlu: unvan, VKN, vergi dairesi, adres, il).
-- `INVOICE_VAT_RATE` (zorunlu — mali müşavirden alınır; boşken hiç fatura kesilmez).
+- **KDV için girilecek değişken YOKTUR.** Oran alıcının ülkesinden gelir
+  (`src/lib/billing/vat-rates.ts`; patron kararı 2026-09-08). `INVOICE_VAT_RATE`
+  2026-09-09'da koddan tamamen **kaldırıldı** (TASK-MTTTMECDO7RC8) — bir ortam
+  yöneticisinde hâlâ duruyorsa silinebilir, hiçbir şeye etkisi yoktur.
 - `EFATURA_INTEGRATOR_*` (4 adet zorunlu: provider, API adresi, kullanıcı adı, parola).
 - İlk aşamada test ortamında `EFATURA_INTEGRATOR_TEST_MODE=true` bırakılır.
 
@@ -151,18 +154,20 @@ pnpm efatura:preflight
 - 🛑 **Hangi durumda DURULUR:** Herhangi bir zorunlu değişken `EKSİK` ya da `GEÇERSİZ`
   olarak listelenirse veya sonuç cümlesinde `oluşturulmaz` / `üretilmez` / `gönderilmez`
   yazıyorsa **DURULUR**. Eksik değişken giderilmeden bir sonraki adıma geçilmez.
-- ℹ️ **Üç blok, üç ayrı durak.** `INVOICE_VAT_RATE` boş ya da 0-100 dışındaysa
-  `createInvoiceForPayment` hiç satır yazmaz (`SystemAlert: vat_rate_not_configured`);
-  ödeme yine de tamamlanır. Satıcı kimliği eksikse satır yazılır ama belge (UBL-TR/PDF)
-  üretilemez. İkisi aynı şey değildir; preflight hangisinde durduğunu cümleyle söyler.
-  Preflight, KDV oranını fatura yazıcısıyla **aynı** kuraldan geçirir
-  (`src/lib/billing/vat-rate.ts`), bu yüzden burada yeşil olan bir değeri yazıcı reddedemez.
+- ℹ️ **Üç blok, üç ayrı durak.** Alıcının ülkesi için `vat-rates.ts` içinde kaynaklı
+  bir satır yoksa `createInvoiceForPayment` hiç satır yazmaz
+  (`SystemAlert: invoice_vat_country_unknown`); ödeme yine de tamamlanır. Satıcı kimliği
+  eksikse satır yazılır ama belge (UBL-TR/PDF) üretilemez. İkisi aynı şey değildir;
+  preflight hangisinde durduğunu cümleyle söyler. Preflight, KDV oranını fatura
+  yazıcısıyla **aynı** kuraldan geçirir (`src/lib/billing/vat-rate.ts`), bu yüzden
+  burada yeşil olan bir oranı yazıcı reddedemez. Bu blok **hiçbir ortam değişkeni
+  okumaz**: düzeltme bir değişken doldurmak değil, tabloya kaynaklı satır eklemektir.
 
 ### Adım 3: Otomatik Testleri Koşturun
 ```bash
 pnpm test tests/efatura-unit.test.ts tests/efatura-integrator.test.ts
 ```
-- **Beklenen Çıktı:** Tüm testlerin yeşil (`PASSED`) olması (33/33 test).
+- **Beklenen Çıktı:** Tüm testlerin yeşil (`PASSED`) olması (29/29 test).
 - 🛑 **Hangi durumda DURULUR:** Herhangi bir test `FAILED` verirse **DURULUR**.
 
 ### Adım 4: Örnek Fatura Belgesini Doğrulayın

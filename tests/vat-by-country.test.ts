@@ -7,7 +7,7 @@ import {
   normaliseCountryKey,
   supportedVatCountries,
 } from '@/lib/billing/vat-rates';
-import { resolveVatRate, parseVatRate, retiredVatRateSetting } from '@/lib/billing/vat-rate';
+import { resolveVatRate } from '@/lib/billing/vat-rate';
 import { vatOnNetMinor, grossFromNetMinor } from '@/lib/money';
 import { calculateInvoiceTotals } from '@/lib/efatura';
 import { totalsForLines } from '@/lib/billing/invoice-list';
@@ -142,16 +142,6 @@ describe('resolveVatRate — the single resolver both the writer and the gate re
 
   test.each([undefined, null, '', '   '])('a missing country (%j) is its own reason', (raw) => {
     expect(resolveVatRate(raw).status).toBe('country_missing');
-  });
-});
-
-describe('INVOICE_VAT_RATE after the decision', () => {
-  test('the parser still works — it just no longer decides anything', () => {
-    // Kept so a gate can say "set, and ignored" rather than saying nothing.
-    expect(parseVatRate('20')).toBe(20);
-    expect(retiredVatRateSetting('20')).toBe(20);
-    expect(retiredVatRateSetting('abc')).toBeNull();
-    expect(retiredVatRateSetting(undefined)).toBeNull();
   });
 });
 

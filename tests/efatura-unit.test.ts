@@ -274,7 +274,6 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
       // Türkiye. There is no longer a variable to forget here — which is the
       // point of moving the rate out of the environment.
       expect(report.vatConfigured).toBe(true);
-      expect(report.allMissingVars).not.toContain('INVOICE_VAT_RATE');
 
       // A record can be written; the document and the filing still cannot.
       expect(report.invoiceRecordVerdict).toBe('Fatura kaydı oluşturulur');
@@ -291,7 +290,6 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
         INVOICE_SUPPLIER_TAX_OFFICE: 'Doğanbey V.D.',
         INVOICE_SUPPLIER_ADDRESS: 'Kızılırmak Mah. No:3',
         INVOICE_SUPPLIER_CITY: 'Ankara',
-        INVOICE_VAT_RATE: '20',
       };
 
       const report = evaluatePreflight(supplierOnlyEnv);
@@ -311,7 +309,6 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
         INVOICE_SUPPLIER_TAX_OFFICE: 'Doğanbey V.D.',
         INVOICE_SUPPLIER_ADDRESS: 'Kızılırmak Mah. No:3',
         INVOICE_SUPPLIER_CITY: 'Ankara',
-        INVOICE_VAT_RATE: '20',
         EFATURA_INTEGRATOR_PROVIDER: 'sandbox',
         EFATURA_INTEGRATOR_BASE_URL: 'https://efatura-test.ornek.com',
         EFATURA_INTEGRATOR_USERNAME: 'fabrika_api',
@@ -337,11 +334,12 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
     // same; what decides the rate is not.
     //
     // Since 2026-09-08 (TASK-MTT1WUUS7MN7R) the rate comes from the *buyer's*
-    // country, so `INVOICE_VAT_RATE` cannot be the thirteenth required variable
-    // — it is not required at all, and setting it changes nothing. The property
-    // worth pinning is unchanged: the gate and the writer read one rule, so the
-    // gate cannot go green on a sale the writer will refuse.
-    describe('the VAT block follows the buyer country table, not INVOICE_VAT_RATE', () => {
+    // country, so no environment variable can be the thirteenth required one —
+    // and the setting that used to be was deleted on 2026-09-09
+    // (TASK-MTTTMECDO7RC8). The property worth pinning is unchanged: the gate
+    // and the writer read one rule, so the gate cannot go green on a sale the
+    // writer will refuse.
+    describe('the VAT block follows the buyer country table, not the environment', () => {
       const everythingElse = {
         INVOICE_SUPPLIER_NAME: 'Fabrika Yazılım A.Ş.',
         INVOICE_SUPPLIER_VKN: '3810459281',
@@ -355,7 +353,7 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
         EFATURA_INTEGRATOR_TEST_MODE: 'true',
       };
 
-      test('with no INVOICE_VAT_RATE at all the gate is green: Türkiye has a sourced rate', () => {
+      test('with no tax variable at all the gate is green: Türkiye has a sourced rate', () => {
         const report = evaluatePreflight(everythingElse);
 
         expect(report.supplierConfigured).toBe(true);
@@ -365,26 +363,19 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
         expect(report.gibSendVerdict).toBe("GİB'e gönderilir");
       });
 
-      test.each(['abc', '-1', '101', '', '   ', 'NaN', '1e999', '20', '0'])(
-        'INVOICE_VAT_RATE=%j changes nothing — it no longer decides the rate',
-        (raw) => {
-          const report = evaluatePreflight({ ...everythingElse, INVOICE_VAT_RATE: raw });
+      test('the tax block offers no variable to set — one row, and it is the country rate', () => {
+        // What the operator reads is the point. While a retired variable was
+        // still listed here (as "ignored"), the boss's own setup document kept
+        // calling it required. One row, named after the country and not after
+        // an environment variable, is what leaves no second thing to configure.
+        const report = evaluatePreflight({ ...everythingElse, SOME_RETIRED_TAX_VAR: '20' });
 
-          expect(report.vatConfigured).toBe(true);
-          expect(report.allMissingVars).toEqual([]);
-        }
-      );
-
-      test('a set INVOICE_VAT_RATE is reported as ignored rather than passed over', () => {
-        // Silence would leave an operator believing a number they configured is
-        // the tax on their invoices. The row says otherwise, in the table they
-        // are already reading.
-        const report = evaluatePreflight({ ...everythingElse, INVOICE_VAT_RATE: '20' });
-
-        const row = report.variableResults.find((r) => r.variable === 'INVOICE_VAT_RATE');
-        expect(row).toBeDefined();
-        expect(row?.required).toBe(false);
-        expect(row?.valueMasked).toContain('YOK SAYILIR');
+        const vatRows = report.variableResults.filter((r) => r.block === 'Vergi (KDV)');
+        expect(vatRows).toHaveLength(1);
+        expect(vatRows[0]?.variable).toBe('KDV oranı (Türkiye)');
+        expect(vatRows[0]?.status).toBe('dolu');
+        expect(report.vatConfigured).toBe(true);
+        expect(report.allMissingVars).toEqual([]);
       });
 
       test('the resolved domestic rate is shown, so the operator can check it', () => {

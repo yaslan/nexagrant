@@ -6,9 +6,6 @@ vi.hoisted(() => {
   process.env.IYZICO_API_KEY = 'test-api-key';
   process.env.IYZICO_SECRET_KEY = 'test-secret-key';
   process.env.IYZICO_BASE_URL = 'https://sandbox-api.example.test';
-  // Same reason: the invoice writer reads the VAT rate through the parsed `env`,
-  // so it has to be present before the module graph loads.
-  process.env.INVOICE_VAT_RATE = '20';
 });
 
 vi.mock('@/lib/db', () => {
