@@ -240,6 +240,29 @@ GATE_EXIT=0
 
 İki uyarı da bildirilen kalıntı dosyalar; sayı artmadı, yeni uyarı gelmedi.
 
+### K7 — Commit SONRASI, kendi commit'im HEAD'deyken kapı yine yeşil
+
+Yukarıdaki koşu karışık bir ağacı ölçmüştü (R1). Commit'ten sonra tekrarlandı:
+
+```
+$ git log --oneline -1
+e011561 chore(billing): remove the retired INVOICE_VAT_RATE setting outright
+
+$ pnpm gate
+GATE_EXIT=0
+✖ 2 problems (0 errors, 2 warnings)
+ Test Files  132 passed | 2 skipped (134)
+      Tests  1559 passed | 8 skipped (1567)
+✅ SUCCESS: All 43 tenant-scoped models have RLS policies registered.
+✅ 43 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü
+
+$ grep -rn "INVOICE_VAT_RATE" src scripts tests || echo "0 hits"
+0 hits
+```
+
+Ayrıca pre-commit kapısı (`githooks/`) staged kapsamda `eslint` + `tsc --noEmit`
+koştu: `✓ Kapı temiz (staged kapsamı).`
+
 ---
 
 ## 3. Değişen dosyalar
@@ -275,8 +298,10 @@ Ayrıca `.env.example` (depoda **takip edilmiyor**, commit'e giremez — R2).
 `src/app/[locale]/(app)/[workspace]/relationships/*` — üçüncü kart). Kanıt: iki kapı koşusu
 3 dakika arayla **1550** ve **1559** test saydı; HEAD de `984ba39` → `3558018` ilerledi.
 Kendi dilimimi ayrıca izole ölçtüm (K2/K3/K4: dokunduğum her test dosyası + preflight'ın
-gerçek koşusu) ama "kapı yeşil" ifadesi **karışık bir ağacın** ölçümüdür. Kesin
-atıf isteniyorsa üç kart birleştikten sonra tek bir temiz kapı koşusu gerekir.
+gerçek koşusu). **Kısmen kapandı:** stopaj/yuvarlama kartı bu arada commit'lendi
+(`6bbd1c3`) ve kapı benim commit'im (`e011561`) HEAD'deyken tekrar exit 0 verdi (K7).
+Ağaçta hâlâ yalnız üçüncü kartın (`relationships/*`) commit'lenmemiş işi var; tam temiz
+atıf için o da birleştikten sonra bir koşu daha gerekir.
 
 **R2 — `.env.example` depoda hiç takip edilmiyor** (`.gitignore:34` → `.env*`).
 Bu dosyadaki düzeltmem bu makinede duruyor, commit'e **giremiyor**; başka bir geliştirici
@@ -327,4 +352,5 @@ cümlesi yazıldı; go-live gününde ortam yöneticisinden **elle** silinmesi �
    mali müşavirden KDV oranı istemeye gerek yok; oran `vat-rates.ts`'te kaynaklı.
 2. **Lider:** R2 (`.env.example` takip edilmiyor), R3 (`parseVatRate` ölü + yanlış
    yorum, `invoice-writer.ts`), R4 (`tsconfig.exen-probe.json` kalıntısı) için kart.
-3. Üç paralel kart birleştikten sonra **tek bir temiz `pnpm gate`** koşusu (R1).
+3. Üçüncü kart (`relationships/*`) da birleştikten sonra **tek bir temiz `pnpm gate`**
+   koşusu (R1) — ikisi bu raporda zaten kapandı.
