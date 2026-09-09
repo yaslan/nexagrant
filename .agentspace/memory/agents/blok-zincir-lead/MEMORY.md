@@ -62,3 +62,14 @@
 - [fabrika-purge-detach-vs-retain-per-column](fabrika-purge-detach-vs-retain-per-column.md) — Fabrika imha kuralı — FK'siz her User.id sütunu kendi gerekçesine göre karara bağlanır (özne verisi sil / kiracı kaydı NULL'la / imza sakla), toplu tek kural uygulanmaz
 
 - [fabrika-a-warning-on-a-read-only-gate-does-not-guard-the-irreversible-command](fabrika-a-warning-on-a-read-only-gate-does-not-guard-the-irreversible-command.md) — Ayrı bir salt-okunur kapının ⚠️ uyarısı, geri alınamaz komutu DURDURMAZ — muhafız eylemin kendi yolunda olmalı; ve muhafızı kanıtlarken kimlik bilgisini boşaltıp iki sonucu da güvenli hale getir
+
+- [fabrika-a-green-gate-may-predate-the-commit-it-closes](fabrika-a-green-gate-may-predate-the-commit-it-closes.md) — Kapatacağın kartın kapı koşusu, kartın kendi commit'inden ESKİ bir ağaçta alınmış olabilir — kapıyı yeşil görmek yetmez, hangi commit'te koştuğunu sor
+
+- [fabrika-local-run-recipe](fabrika-local-run-recipe.md) — Fabrika'yi lokalde ayaga kaldirma tarifi ve acilistaki BILLING_ACTIVE_TIER uyarisinin zararsiz oldugu
+
+- [fabrika-a-passing-test-can-be-satisfied-by-a-second-mechanism](fabrika-a-passing-test-can-be-satisfied-by-a-second-mechanism.md) — Kod tabaninda ayni etkiyi ureten IKINCI bir mekanizma varsa test yesil kalir ama hicbir sey olcmez — kapiyi kabul etmeden once "korudugum sey silinse bu test kirmizi olur mu" diye sor
+- [fabrika-boss-repeats-an-error-instead-of-answering](fabrika-boss-repeats-an-error-instead-of-answering.md) — Patron acik soruya cevap vermek yerine ayni hata metnini tekrar yapistiriyor — bu "kabul edelim" onerisinin REDDIDIR, soruyu tekrarlama, kalici cozume gec
+- [fabrika-name-the-browser-tool-in-the-card](fabrika-name-the-browser-tool-in-the-card.md) — Worker "CLI'da tarayicim yok" diyip gercek tarayici DoD'unu insana devrediyor — karta Playwright'i ADIYLA ve recete olarak yazmak bu mazereti kaldiriyor
+- [fabrika-read-the-library-source-before-round-three](fabrika-read-the-library-source-before-round-three.md) — Kutuphane uyarisini iki tur tahminle kovaladiktan sonra kaynagi okumak kosulu 10 dakikada verdi — ucuncu turdan once node_modules'u ac
+
+- [fabrika-give-workers-a-case-not-a-verdict](fabrika-give-workers-a-case-not-a-verdict.md) — Karta somut test vakasi yazarken onu KENDIN dogrula — uydurdugum "%20'de float sapiyor" vakasi matematiksel olarak sapmiyordu, worker duzeltti

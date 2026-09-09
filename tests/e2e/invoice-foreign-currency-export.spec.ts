@@ -118,24 +118,20 @@ test.describe('a foreign-currency invoice export', () => {
     request.get(path, { headers: { Cookie: `${COOKIE_NAME}=${cookie}` } });
 
   /**
-   * The seller identity is configuration. Where it is unset the route emits no
-   * document at all (503) — that is a pass, and it is asserted rather than
-   * skipped, so the spec cannot go quietly green in an environment that never
-   * rendered anything. Set INVOICE_SUPPLIER_* to exercise the rendering branch.
+   * The seller identity is configuration. The route MUST produce a real
+   * document (HTTP 200 with XML/HTML content) when the config is set. If env
+   * vars are missing and a 503 is returned, the test fails — that is the
+   * intended outcome. Set INVOICE_SUPPLIER_* to exercise the rendering branch.
    */
   async function documentOrConfigRefusal(
     request: APIRequestContext,
     number: string,
     format: 'html' | 'xml'
-  ): Promise<string | null> {
+  ): Promise<string> {
     const res = await authed(request, `/api/billing/invoices/${number}/export?format=${format}`);
     const body = await res.text();
-    if (res.status() === 503) {
-      expect(body).toContain('supplier_identity_not_configured');
-      expect(body).toContain('INVOICE_SUPPLIER_VKN');
-      return null;
-    }
     expect(res.status()).toBe(200);
+    expect(body.length).toBeGreaterThan(0);
     return body;
   }
 
@@ -144,7 +140,6 @@ test.describe('a foreign-currency invoice export', () => {
   }) => {
     const usd = await documentOrConfigRefusal(request, usdNumber, 'html');
     const lira = await documentOrConfigRefusal(request, tryNumber, 'html');
-    test.skip(usd === null, 'INVOICE_SUPPLIER_* unset on the server under test — the rendering branch cannot be reached; set them (and use a free E2E_PORT) to run these assertions');
 
     expect(usd).toContain('Para Birimi:</strong> USD');
     expect(usd).not.toContain('₺');
@@ -158,18 +153,16 @@ test.describe('a foreign-currency invoice export', () => {
 
   test('the XML declares one currency and uses it on every amount', async ({ request }) => {
     const xml = await documentOrConfigRefusal(request, usdNumber, 'xml');
-    test.skip(xml === null, 'INVOICE_SUPPLIER_* unset on the server under test — the rendering branch cannot be reached; set them (and use a free E2E_PORT) to run these assertions');
 
     expect(xml).toContain('<cbc:DocumentCurrencyCode>USD</cbc:DocumentCurrencyCode>');
     // No amount may carry a currencyID the document did not declare.
-    const declared = [...xml!.matchAll(/currencyID="([A-Z]{3})"/g)].map((m) => m[1]);
+    const declared = [...xml.matchAll(/currencyID="([A-Z]{3})"/g)].map((m) => m[1]);
     expect(declared.length).toBeGreaterThan(0);
     expect([...new Set(declared)]).toEqual(['USD']);
   });
 
   test('the XML carries the TCMB rate the row was issued at', async ({ request }) => {
     const xml = await documentOrConfigRefusal(request, usdNumber, 'xml');
-    test.skip(xml === null, 'INVOICE_SUPPLIER_* unset on the server under test — the rendering branch cannot be reached; set them (and use a free E2E_PORT) to run these assertions');
 
     // VUK 215/280/385: the rate and the TL side travel with the document, and
     // they come off the stored row rather than being recomputed at export time.
@@ -219,7 +212,6 @@ test.describe('a foreign-currency invoice export', () => {
 
     const shown = await page.goto(`/api/billing/invoices/${usdNumber}/export?format=html`);
     await page.screenshot({ path: `${SHOTS}/01-usd-invoice-html.png`, fullPage: true });
-    test.skip(shown?.status() === 503, 'INVOICE_SUPPLIER_* unset on the server under test — the rendering branch cannot be reached; set them (and use a free E2E_PORT) to run these assertions');
     expect(shown?.status()).toBe(200);
 
     // Read out of the rendered page, not out of the response string.

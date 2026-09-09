@@ -152,6 +152,51 @@ export function convertCurrencyMinor(amountMinor: number, rate: number): number 
 }
 
 /**
+ * The net (VAT-exclusive) amount of one invoice line, in minor units.
+ *
+ * The single rounding rule for a line's own matrah in this codebase. It stood
+ * as two copies of `Math.round(line.quantity * line.unitPriceMinor)` —
+ * `efatura.ts` (`invoiceTotalsMinor`), which produces every figure on the
+ * document that is filed with GİB, and `billing/invoice-list.ts`
+ * (`totalsForLines`), which produces the ones the billing panel shows. They
+ * read the same stored row and agreed on every input the product produces, but
+ * by coincidence: nothing tied them together, and the next edit to either one
+ * was free to move it. The line's net is what the VAT and the withholding are
+ * then computed from, so a kuruş of drift there moves three figures on one
+ * sale.
+ *
+ * The rounding is reachable, not theoretical: `unitPriceMinor` is already an
+ * integer in the currency's minor unit, so the product is only fractional when
+ * `quantity` is — and `invoiceLineSchema` permits that (`z.number().positive()`
+ * — half a day, a third of a month). 0.5 × 113 kuruş is 56.5, and the line has
+ * to print one or the other.
+ *
+ * `Math.round`, not the `Math.floor(x + 0.5)` the tax helpers below are written
+ * with, and deliberately so: the two are the same for every ordinary amount but
+ * not for every double. `Math.round(0.49999999999999994)` is 0, while adding
+ * 0.5 to that value rounds up to exactly 1 in binary floating point and floors
+ * to 1. A fractional `quantity` puts arbitrary doubles into this product, so
+ * this keeps `Math.round` — the rule both call sites already ran — rather than
+ * silently changing a filed document's arithmetic to match a house style.
+ */
+export function lineNetMinor(quantity: number, unitPriceMinor: number): number {
+  if (!Number.isInteger(unitPriceMinor)) {
+    throw new Error(`Minor-unit amounts must be integers, got ${unitPriceMinor}`);
+  }
+  if (unitPriceMinor < 0) {
+    throw new Error(`A line's unit price is non-negative, got ${unitPriceMinor}`);
+  }
+  if (!Number.isFinite(quantity) || quantity < 0) {
+    throw new Error(`A line's quantity must be a non-negative finite number, got ${quantity}`);
+  }
+  const netMinor = Math.round(quantity * unitPriceMinor);
+  if (!Number.isSafeInteger(netMinor)) {
+    throw new Error(`Line net out of safe integer range: ${quantity} × ${unitPriceMinor}`);
+  }
+  return netMinor;
+}
+
+/**
  * The VAT on a VAT-exclusive price, in minor units.
  *
  * The single rounding rule for tax in this codebase. It existed in three places
@@ -166,7 +211,10 @@ export function convertCurrencyMinor(amountMinor: number, rate: number): number 
  * on a major-unit float until TASK-MTTUSEJFOSPI. So for a while the same
  * document carried both rules, and they disagree by a kuruş at 1%, 10% and 18%
  * — the totals said one thing and the lines that add up to them said another.
- * Every amount on that document now comes out of this function.
+ * Every *tax* figure on that document — each line's, each rate's subtotal and
+ * the document total — now comes out of this function. The nets those figures
+ * are computed on come out of `lineNetMinor` above, which is a separate rule
+ * and was itself a second copy until TASK-MTU27KSLSJZ9I.
  *
  * Half-up on the exact product, like `convertCurrencyMinor`: `Math.round` in
  * JavaScript rounds .5 towards +Infinity, which is the same thing for the

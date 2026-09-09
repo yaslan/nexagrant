@@ -6,6 +6,7 @@
 import {
   currencyExponent,
   formatMoney,
+  lineNetMinor,
   toDecimalString,
   vatOnNetMinor,
   withholdingOnVatMinor,
@@ -233,12 +234,11 @@ export function invoiceTotalsMinor(lines: InvoiceLineItem[]): TaxTotalsMinor {
   let totalWithholdingMinor = 0;
 
   const lineTotals: InvoiceLineTotalsMinor[] = lines.map((line) => {
-    // Integers all the way: `unitPriceMinor` is already in the currency's minor
-    // unit, so this rounds only when `quantity` is fractional — which
-    // `invoiceLineSchema` permits (half a month, a quarter day). Written the
-    // same way `totalsForLines` in src/lib/billing/invoice-list.ts writes it,
-    // on the same stored line, so the document and the panel state the same net.
-    const netMinor = Math.round(line.quantity * line.unitPriceMinor);
+    // The one rounding rule for a line's own matrah (`lineNetMinor`), not a
+    // local `Math.round`: `totalsForLines` in src/lib/billing/invoice-list.ts
+    // reads the same stored line for the billing panel, and until
+    // TASK-MTU27KSLSJZ9I each of the two spelled the rule out for itself.
+    const netMinor = lineNetMinor(line.quantity, line.unitPriceMinor);
     // The one rounding rule for tax in this codebase (`vatOnNetMinor`), not a
     // local `Math.round`: this document and the billing panel quote the same
     // sale, and a rule copied into each of them agrees only by coincidence.

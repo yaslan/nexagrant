@@ -11,6 +11,22 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = Number(process.env.E2E_PORT ?? 3000);
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
+/**
+ * Test environment variables for e2e tests. INVOICE_SUPPLIER_* must be set so the
+ * invoice export route produces a real document; otherwise tests that assert on
+ * HTTP 200 and XML/HTML content will fail (TASK-MTU26XBVZ6H1O).
+ *
+ * These are test data only — clearly fake values that cannot be mistaken for
+ * real taxpayer identity.
+ */
+const testEnv = {
+  INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.',
+  INVOICE_SUPPLIER_VKN: '1000000000',
+  INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD',
+  INVOICE_SUPPLIER_ADDRESS: 'TEST CAD NO:1',
+  INVOICE_SUPPLIER_CITY: 'Ankara',
+};
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 60_000,
@@ -27,8 +43,11 @@ export default defineConfig({
   webServer: {
     command: `pnpm dev --port ${PORT}`,
     url: BASE_URL,
-    // A dev server already running locally is reused rather than fighting for the port.
     reuseExistingServer: true,
     timeout: 180_000,
+    env: {
+      ...process.env,
+      ...testEnv,
+    },
   },
 });

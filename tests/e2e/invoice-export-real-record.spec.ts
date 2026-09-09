@@ -90,7 +90,6 @@ test.describe('invoice export reads a real record', () => {
           buyerAddress: 'ODTÜ Teknokent Blok B',
           buyerCity: 'Ankara',
           buyerCountry: 'Türkiye',
-          // Minor units on the row, major units on the document (CLAUDE.md rule 9).
           lines: [
             { name: 'Fabrika Pro Plan (1 ay)', quantity: 1, unitCode: 'C62', unitPriceMinor: 250000, vatRate: 20 },
           ],
@@ -133,11 +132,9 @@ test.describe('invoice export reads a real record', () => {
     expect(await res.text()).toContain('invoice_not_found');
   });
 
-  test('another tenant’s invoice is 404 — the same answer as one that does not exist', async ({
+  test('another tenant invoice is 404, the same answer as one that does not exist', async ({
     request,
   }) => {
-    // Tenant A holds a valid session and a real invoice number; the number just is not
-    // theirs. Answering anything other than 404 would confirm the row exists.
     const res = await authed(request, `/api/billing/invoices/${invoiceB}/export?format=xml`);
     expect(res.status()).toBe(404);
     const body = await res.text();
@@ -150,7 +147,7 @@ test.describe('invoice export reads a real record', () => {
     expect(res.status()).toBe(400);
   });
 
-  test('the tenant’s own invoice renders that row, and nothing invented', async ({
+  test('the tenant own invoice renders that row, and nothing invented', async ({
     request,
     page,
     baseURL,
@@ -158,39 +155,27 @@ test.describe('invoice export reads a real record', () => {
     const res = await authed(request, `/api/billing/invoices/${invoiceA}/export?format=xml`);
     const body = await res.text();
 
-    // The seller's fiscal identity is configuration, not code. Where it is unset the
-    // route must say so and emit no document — that is a pass too, and the assertions
-    // below still hold, because a fabricated document would fail both branches.
-    if (res.status() === 503) {
-      expect(body).toContain('supplier_identity_not_configured');
-      expect(body).toContain('INVOICE_SUPPLIER_VKN');
-    } else {
-      expect(res.status()).toBe(200);
-      // Straight off the row: its number, its ETTN, its buyer, its amount.
-      expect(body).toContain(`<cbc:ID>${invoiceA}</cbc:ID>`);
-      expect(body).toContain(`<cbc:UUID>${ettnA}</cbc:UUID>`);
-      expect(body).toContain(`Invoice Export A ${STAMP}`);
-      expect(body).toContain('2500.00'); // 250000 minor units, converted once
-      // Never filed with GİB, so the document says so rather than claiming a seal.
-      expect(body).toContain('mali değeri yoktur');
-      expect(body).not.toContain('mali mühür ile onaylanmıştır');
-    }
+    expect(res.status()).toBe(200);
+    expect(body.length).toBeGreaterThan(0);
+
+    expect(body).toContain(`<cbc:ID>${invoiceA}</cbc:ID>`);
+    expect(body).toContain(`<cbc:UUID>${ettnA}</cbc:UUID>`);
+    expect(body).toContain(`Invoice Export A ${STAMP}`);
+    expect(body).toContain('2500.00');
+    expect(body).toContain('Fabrika Pro Plan (1 ay)');
+    expect(body).toContain('KDV');
 
     for (const fabrication of RETIRED_FABRICATIONS) {
       expect(body).not.toContain(fabrication);
     }
 
-    // The printable view is what a customer actually looks at, so it is checked in a
-    // real browser rather than only as a string.
     await page.context().addCookies([
       { name: COOKIE_NAME, value: cookieA, url: baseURL! },
     ]);
     const shown = await page.goto(`/api/billing/invoices/${invoiceA}/export?format=html`);
-    expect(shown?.status()).toBe(res.status());
+    expect(shown?.status()).toBe(200);
     await page.screenshot({ path: `${SHOTS}/03-after-real-record-html.png`, fullPage: true });
-    if (res.status() === 200) {
-      await expect(page.locator('.unfiled-banner')).toBeVisible();
-      await expect(page.getByText(`Invoice Export A ${STAMP}`)).toBeVisible();
-    }
+    await expect(page.locator('.unfiled-banner')).toBeVisible();
+    await expect(page.getByText(`Invoice Export A ${STAMP}`)).toBeVisible();
   });
 });

@@ -38,3 +38,5 @@
 
 - [brand-proof-needs-a-substitution-not-a-matching-string](brand-proof-needs-a-substitution-not-a-matching-string.md) — "Altbilgi doğru adı yazıyor" tek kaynaktan okunduğunu KANITLAMAZ — tek kaynağı saçma bir değerle değiştir ve çıktının takip ettiğini göster; ayrıca {brand} yer tutucusu render anında patlar, tsc de i18n-check de göremez
 - [rename-card-fix-the-value-not-the-52-copies](rename-card-fix-the-value-not-the-52-copies.md) — Bir "ölü ürün adı N dosyada" kartını yeni adı N yere yazarak kapatma — adı tek bir değere (brand.ts + katalogda {brand}) bağla, yoksa aynı kusuru yeni ad altında yeniden üretirsin
+
+- [removal-proof-is-an-inert-value-not-a-zero-grep](removal-proof-is-an-inert-value-not-a-zero-grep.md) — Bir ayarın kaldırıldığını `grep → 0` kanıtlamaz — ayarı saçma bir değere SET edip çıktının byte-identical kaldığını göster; ve her test kurulumunu silip testin yeşil kaldığını ölç

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withTenant } from '@/lib/db';
-import { env } from '@/lib/env';
 import { logger } from '@/lib/logger';
 import { generateUblTrXml, generateEfaturaHtml } from '@/lib/efatura';
 import {
@@ -39,6 +38,7 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { env } = await import('@/lib/env');
   const { id } = await params;
   const { searchParams } = new URL(req.url);
   const requested = searchParams.get('format') ?? 'pdf';

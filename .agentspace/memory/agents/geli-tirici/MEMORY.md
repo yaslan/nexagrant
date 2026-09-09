@@ -1,5 +1,6 @@
 # Memory Index
 
+- [fabrika-beforeinteractive-queued-not-parse-time](fabrika-beforeinteractive-queued-not-parse-time.md) — Next.js Script strategy="beforeInteractive" __next_s kuyruğuna gidiyor; paint-öncesi için klasik blocking `<script src>` tag kullan
 - [m6-scoring-complete](m6-scoring-complete.md) — M6.3 Scoring Logic tamamlandı — puanlama motor, ESR comparison, validation + tests all passing, gate clean
 
 - [fabrika-tsx-script-must-live-in-repo-root](fabrika-tsx-script-must-live-in-repo-root.md) — Fabrika'da tek seferlik DB sorgusu için tsx script'i scratchpad'e değil repo köküne yaz — Prisma client generated/prisma/client'ta ve driver adapter istiyor, dışarıdan import çözülmez
@@ -39,3 +40,9 @@
 - [fabrika-verify-a-memory-notes-data-before-shipping-it](fabrika-verify-a-memory-notes-data-before-shipping-it.md) — Başka bir ajanın hafıza notu "27 AB oranını iki kaynakta doğruladım" dese bile oranları KENDİN çek — not kararı taşır, veriyi taşımaz; kaynağı ve veri tarihini koda yaz
 
 - [fabrika-a-refactor-docstring-claims-work-that-may-not-exist](fabrika-a-refactor-docstring-claims-work-that-may-not-exist.md) — "Bu kural artık tek yerde / N kopya birleştirildi" diyen docstring bir İDDİADIR — kaldırdığını söylediği kalıbı grep'le doğrula; ayrıca sayısal olarak ÖZDEŞ bir kopyayı hiçbir değer testi yakalayamaz
+
+- [fabrika-measure-build-in-a-git-worktree](fabrika-measure-build-in-a-git-worktree.md) — Paylaşılan :3000 dev sunucusunu öldürmeden önce/sonra pnpm build ölçmenin çalışan tarifi — git worktree + kendi pnpm install'ı (symlink node_modules Turbopack'i panikletir) + prisma generate
+- [fabrika-script-in-jsx-hydration](fabrika-script-in-jsx-hydration.md) — React warns when script tags are inside JSX component tree, not about head/body placement
+- [fabrika-test-timing-e2e-parse-time-measurement](fabrika-test-timing-e2e-parse-time-measurement.md) — E2E test'te parse-time initialization ölçmek için chunk delay stratejisi, bidirectional kanıt
+- [fabrika-theme-is-a-server-resolved-cookie](fabrika-theme-is-a-server-resolved-cookie.md) — Fabrika'da tema artık fabrika-theme çerezinden SUNUCUDA çözülüyor ve html etiketine basılıyor; theme-init.js yok, localStorage yok — Next kendi Vary'sini yazdığı için config'teki Vary satırı boşa gidiyor
+- [next-script-beforeinteractive](next-script-beforeinteractive.md) — next/script ile beforeInteractive stratejisi, head'te dangerouslySetInnerHTML script'ini React uyarısı olmadan inject eder
