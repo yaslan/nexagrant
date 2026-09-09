@@ -32,3 +32,9 @@
 
 - [fabrika-i18n-gate-now-blocks-three-ways](fabrika-i18n-gate-now-blocks-three-ways.md) — Fabrika i18n kapısı 2026-09-08'de gerçekten bloklar hâle geldi — tr↔en parite + kodda-kullanılan-anahtar + şablon-şekli; next dev muaf, pnpm build turbopack yüzünden ayrıca kırık, güvenilir nokta pnpm gate
 - [mutate-then-revert-with-byte-backups-not-git](mutate-then-revert-with-byte-backups-not-git.md) — Fabrika'da mutasyon testini geri alırken git checkout KULLANMA — paralel ajanlar aynı ağaçta aynı dosyayı yazıyor; bayt yedeği al, onu geri koy, kalıntıyı grep ile doğrula
+
+- [stale-audit-report-reframes-before-it-is-reused](stale-audit-report-reframes-before-it-is-reused.md) — Kendi önceki denetim raporumu yeniden kullanmadan önce ölçmeliyim — Fabrika'da bir gün içinde risk çerçevesi eskiyor ve alarmı tekrarlamak kanıtsız 'bitti' kadar zararlı
+- [type-gate-proof-needs-a-rejection-not-zero-errors](type-gate-proof-needs-a-rejection-not-zero-errors.md) — Tip güvenliği kartlarında 'typecheck 0 hata' kanıt değildir — kanıt, geçmemesi gereken kodun REDDEDİLDİĞİNİ göstermektir
+
+- [brand-proof-needs-a-substitution-not-a-matching-string](brand-proof-needs-a-substitution-not-a-matching-string.md) — "Altbilgi doğru adı yazıyor" tek kaynaktan okunduğunu KANITLAMAZ — tek kaynağı saçma bir değerle değiştir ve çıktının takip ettiğini göster; ayrıca {brand} yer tutucusu render anında patlar, tsc de i18n-check de göremez
+- [rename-card-fix-the-value-not-the-52-copies](rename-card-fix-the-value-not-the-52-copies.md) — Bir "ölü ürün adı N dosyada" kartını yeni adı N yere yazarak kapatma — adı tek bir değere (brand.ts + katalogda {brand}) bağla, yoksa aynı kusuru yeni ad altında yeniden üretirsin

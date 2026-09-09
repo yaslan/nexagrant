@@ -37,3 +37,9 @@
 - [live-db-probe-beats-a-mocked-prisma-for-filter-shape-bugs](live-db-probe-beats-a-mocked-prisma-for-filter-shape-bugs.md) — Fabrika'da sorgu-şekli kusurlarını yalnız canlı Postgres sondası yakalar — kalıcı `*.live.test.ts` kalıbı, kendi fixture'ı, `describe.skipIf(!HAS_DB)`, sonda kalıntısı bırakma
 - [prisma-json-equals-compares-the-whole-document](prisma-json-equals-compares-the-whole-document.md) — Prisma'da Json kolonda `data: { equals: { key: v } }` TÜM belgeyi karşılaştırır — tek alan için `path: ['key'], equals: v` şart; bu kalıp sessizce hiç eşleşmeyen muhafızlar üretir
 - [shared-worktree-red-must-be-attributed-before-it-is-reported](shared-worktree-red-must-be-attributed-before-it-is-reported.md) — Paylaşılan ağaçta süit iki koşuda farklı kırmızı veriyorsa suç senin değil olabilir — kendi dosyanı `git stash push -- <file>` ile HEAD'e alıp aynı testi tekrar koş, sonucu rapora KANITLA
+
+- [a-record-is-not-a-document](a-record-is-not-a-document.md) — Bir alanın satıra ve makine formatına yazılması onu BELGEYE yazmaz — insanın eline geçen PDF/HTML'i ayrıca üret ve içine bak
+- [my-own-verification-report-goes-stale](my-own-verification-report-goes-stale.md) — Bir kart "QA doğruladı" notuyla geri geldiyse önce doğruladığın commit ile HEAD arasına bak — arada tam o kartın işi inmiş olabilir
+
+- [a-probes-own-format-assumption-fakes-a-red](a-probes-own-format-assumption-fakes-a-red.md) — Sondayı tekrar koşup "regresyon" görürsen önce sondanın kendi iddiasını oku — biçim varsayımı (nokta/virgül, \b sınırı) sahte kırmızı üretir; hükmü SAKLANMIŞ yeşil koşuyla karşılaştırarak ver
+- [my-probe-residue-can-block-a-not-valid-constraint](my-probe-residue-can-block-a-not-valid-constraint.md) — Bir CHECK kısıtı NOT VALID kaldıysa suçlu çoğu zaman kendi sondamın bıraktığı satırlardır — satırlara BAK, kalıntıysa sil ve VALIDATE koş; bu bir yayın adımını kapatır

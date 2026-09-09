@@ -51,3 +51,8 @@
 - [fabrika-server-email-locale-pattern](fabrika-server-email-locale-pattern.md) — Sunucu e-postaları next-intl kullanamaz — emsal invite-email.ts'in COPY={tr,en} tablosu; alerts-daily.ts hâlâ sabit İngilizce (bilinen, düzeltilmemiş gap)
 
 - [calendar-connection-token-gate-decision](calendar-connection-token-gate-decision.md) — CalendarConnection token şifreleme kararı KAPANDI — B (ertele+kilitle), makine gate'i src/lib/db.ts'te canlı; M9 OAuth PR'ı bunu bilmeden ilerlemesin
+
+- [fabrika-no-prod-db-from-this-env](fabrika-no-prod-db-from-this-env.md) — Bu ajan ortamından Fabrika üretim veritabanına erişim yok — DATABASE_URL yerel/dev'e işaret ediyor; "canlı DB'ye sor" diyen kartlarda bunu açıkça işaretle
+- [fabrika-tcmb-fx-invoice-vuk-rule](fabrika-tcmb-fx-invoice-vuk-rule.md) — Fabrika'da yabancı para faturası için VUK kuralı ne istiyor (TL karşılığı, hangi kur, hangi tarih) ve karar ADR-0002'de bekliyor
+
+- [fabrika-cross-border-transfers-have-no-signed-dpa](fabrika-cross-border-transfers-have-no-signed-dpa.md) — Fabrika 7 yurt dışı alıcıya (Anthropic, OpenAI, Google, Microsoft, Stripe, Resend, Cloudflare) kişisel veri gönderiyor ama hiçbiri için imzalı SCC/DPA eki repoda yok — GDPR md.30 envanterinin en büyük tekil boşluğu

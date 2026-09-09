@@ -28,3 +28,10 @@
 
 - [fabrika-getbyrole-alert-hits-feedbackwidget](fabrika-getbyrole-alert-hits-feedbackwidget.md) — Fabrika e2e'sinde sayfa geneli getByRole('alert')/('status') kullanma — FeedbackWidget her uygulama sayfasında kendi role=alert düğümünü mount ediyor ve testin çalışan özelliği kırmızı gösteriyor
 - [mutation-must-actually-narrow](mutation-must-actually-narrow.md) — Mutasyon testinde YEŞİL sonuç önce mutasyonu suçlar, testi değil — kusuru gerçekten sokup sokmadığını doğrula (fikstür satırının alanı zaten null'sa "lastRunAt: null" hiçbir şeyi daraltmaz)
+
+- [fabrika-e2e-probe-rows-must-be-deleted-and-labelled](fabrika-e2e-probe-rows-must-be-deleted-and-labelled.md) — Fabrika'da canlı DB'ye karşı e2e kanıt üretirken sağlayıcıyı taklit ettiysen ürettiğin satırların rakamları ÖLÇÜM DEĞİLDİR — raporda bunu yaz ve satırları sonra sil, yoksa bir sonraki okuyan onları gerçek kullanım sanır
+- [fabrika-fallback-catch-swallows-the-fix-you-just-made](fabrika-fallback-catch-swallows-the-fix-you-just-made.md) — Fabrika'da mock/demo geri düşüşü olan bir fonksiyona zorunlu bir yan etki (kayıt yazma) eklersen geniş catch onu sessizce yutar — ayrı hata sınıfı yaz ve her catch'te rethrow et, yoksa test yeşil kalırken delik geri gelir
+- [fabrika-importer-count-is-not-caller-count](fabrika-importer-count-is-not-caller-count.md) — Fabrika'da eski bir denetim raporunun "çağıran sayısı" rakamı modülü import edenleri saymış olabilir — göç kartına başlamadan önce sembolü `await X(` ile ayrı say, yoksa kapsamı fazla tahmin edersin
+- [fabrika-split-a-card-blocked-on-a-price-decision](fabrika-split-a-card-blocked-on-a-price-decision.md) — Fiyat/iş kararı bekleyen bir kartta durma — mimari yarısını, HİÇBİR müşterinin fiyatını artırmayan seçenekle yap ve kararı tek bir saf fonksiyona indir
+
+- [flat-scratchpad-backup-collides-on-basename](flat-scratchpad-backup-collides-on-basename.md) — A/B ölçümü için dosyaları düz bir scratchpad'e basename ile yedekleme — bu repoda src/lib/rag.ts ve src/lib/ai/rag.ts aynı adı taşıyor ve geri yükleme yanlış içeriği yazdı

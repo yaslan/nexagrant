@@ -4,3 +4,5 @@
 
 - [fabrika-a-count-is-not-coverage](fabrika-a-count-is-not-coverage.md) — Bir kapı "N kayıt işlendi" sayısına bakıyorsa hâlâ kör — sayı KAPSAM değildir; teyit edilen birim / toplam birim ölç
 - [fabrika-silently-dropped-input-inflates-a-success-count](fabrika-silently-dropped-input-inflates-a-success-count.md) — `.find` ile eşleştirilen girdi satırı eşleşmezse sessizce düşer ama sayaçta kalır — anlaşılmayan girdi ya reddedilmeli ya raporlanmalı, asla atlanmamalı
+
+- [a-mock-that-omits-an-export-is-a-structural-guard](a-mock-that-omits-an-export-is-a-structural-guard.md) — Bir modül mock'undan yasak export'u ÇIKARMAK, "şu istemciyi kullanma" kuralını yorum yerine teste bağlar — regresyon üretimde değil süitte kırmızı olur

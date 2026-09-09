@@ -56,3 +56,9 @@
 - [fabrika-remeasure-before-handing-work-to-another-driver](fabrika-remeasure-before-handing-work-to-another-driver.md) — Devir paketini yazmadan HEMEN ÖNCE ağacı yeniden ölç — pane'i kapattığım worker kapanmadan önce işi bitirip commit'lemişti, paket bir saat içinde bayatladı
 - [fabrika-split-a-sequenced-card-at-its-file-boundary](fabrika-split-a-sequenced-card-at-its-file-boundary.md) — Şema çakışması yüzünden sıraya alınan kart, dosyaya dokunmayan araştırma/ADR fazına bölünüp paralel koşturulabilir
 - [fabrika-verify-the-tree-not-just-the-report](fabrika-verify-the-tree-not-just-the-report.md) — Bir worker "kod değiştirmedim, kapıda durdum" diyebilir ve ağaçta o işin tamamı commit'siz durabilir — raporu okuduktan sonra git status/diff ile ağacı da oku
+
+- [fabrika-sendmessage-to-workers-is-not-a-reliable-relay](fabrika-sendmessage-to-workers-is-not-a-reliable-relay.md) — Koşan worker'a karar iletmenin güvenilir yolu SendMessage değil — mesaj alıcı onayında takılıyor; kararı görev kartına ve ADR'ye yaz
+
+- [fabrika-purge-detach-vs-retain-per-column](fabrika-purge-detach-vs-retain-per-column.md) — Fabrika imha kuralı — FK'siz her User.id sütunu kendi gerekçesine göre karara bağlanır (özne verisi sil / kiracı kaydı NULL'la / imza sakla), toplu tek kural uygulanmaz
+
+- [fabrika-a-warning-on-a-read-only-gate-does-not-guard-the-irreversible-command](fabrika-a-warning-on-a-read-only-gate-does-not-guard-the-irreversible-command.md) — Ayrı bir salt-okunur kapının ⚠️ uyarısı, geri alınamaz komutu DURDURMAZ — muhafız eylemin kendi yolunda olmalı; ve muhafızı kanıtlarken kimlik bilgisini boşaltıp iki sonucu da güvenli hale getir
