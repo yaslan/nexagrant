@@ -13,6 +13,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+// NOTE: This value must match the key used in public/theme-init.js
 const THEME_STORAGE_KEY = 'fabrika-theme';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -95,19 +96,3 @@ export function useTheme() {
   return context;
 }
 
-// Inline script to prevent theme flashing before React hydrates
-export const themeInitScript = `
-(function() {
-  try {
-    var stored = localStorage.getItem('${THEME_STORAGE_KEY}');
-    var isDark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      document.documentElement.setAttribute('data-theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.setAttribute('data-theme', 'light');
-    }
-  } catch {}
-})();
-`;
