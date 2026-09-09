@@ -156,11 +156,12 @@ test('a payment issues one invoice, and the export route serves it', async ({ re
   );
   expect(total).toBe(PAID_MINOR);
 
-  // And the export route now answers for this row instead of 404. Whether it
-  // returns the document or 503 depends on the *seller* identity, which is
-  // configuration and unset until go-live; both are passes, and neither is the
-  // 404 that every paying customer used to get. A 404 here would mean the row
-  // is not reachable, which is the whole defect this card fixes.
+  // And the export route now answers for this row instead of 404. The seller
+  // identity is configuration: with INVOICE_SUPPLIER_* set the route has to
+  // render the document, so 200 is the only pass here — a 503 means the
+  // environment is unconfigured and this gate goes red rather than shrugging.
+  // The not-404 assertion below stays because 404 is the original defect: the
+  // row issued, but unreachable by the customer who paid for it.
   const xml = await request.get(
     `/api/billing/invoices/${invoice!.number}/export?format=xml`,
     { headers: { Cookie: `${COOKIE_NAME}=${cookie}` } }

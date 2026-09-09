@@ -58,6 +58,24 @@ async function sessionCookie(tenantId: string, userId: string): Promise<string> 
   });
 }
 
+/**
+ * The `<tr>` blocks of a rendered document that mention `needle`. The totals
+ * table is flat, so splitting on the row tag is enough — and it lets an
+ * assertion say *where* a currency sign is allowed to appear rather than only
+ * whether it appears at all.
+ */
+function rowsMentioning(html: string, needle: string): string[] {
+  return html
+    .split('<tr')
+    .slice(1)
+    .filter((row) => row.includes(needle));
+}
+
+/** How many times `needle` occurs in `haystack`. */
+function occurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
 test.describe('a foreign-currency invoice export', () => {
   let tenantId: string;
   let usdNumber: string;
@@ -135,20 +153,51 @@ test.describe('a foreign-currency invoice export', () => {
     return body;
   }
 
-  test('the USD document never prints a lira sign, and the TRY one still does', async ({
+  /**
+   * VUK 215 and 385 Sıra No.lu Genel Tebliğ require a foreign-currency invoice
+   * to *also* show its lira equivalent, and this repo enforces that in both
+   * directions: `foreignCurrencyFilingBlock` (src/lib/efatura.ts) refuses to
+   * file a USD document carrying no TL figure, and 8118b54 put that figure on
+   * the printed page. So "the USD document never prints ₺" was never the rule —
+   * it was this assertion outliving the feature. The rule is that the two
+   * currencies may not MIX: every amount of the sale itself is in dollars, and
+   * the one lira figure is the stated equivalent, in its own labelled row.
+   */
+  test('the USD document prices the sale in dollars and shows lira only as the stated equivalent', async ({
     request,
   }) => {
     const usd = await documentOrConfigRefusal(request, usdNumber, 'html');
     const lira = await documentOrConfigRefusal(request, tryNumber, 'html');
 
     expect(usd).toContain('Para Birimi:</strong> USD');
-    expect(usd).not.toContain('₺');
-    expect(usd).toContain('$99,00');
+    expect(usd).toContain('$99,00'); // the line, and the net below it
+    expect(usd).toContain('$19,80'); // %20 KDV
     expect(usd).toContain('$118,80'); // 99.00 + 20% KDV, in dollars
+
+    // Exactly one ₺ on the whole document, and it sits in the row that names
+    // itself as the equivalent. The original defect — every money cell printed
+    // with a hard-coded ₺ under a "Para Birimi: USD" header — fails this.
+    expect(occurrences(usd, '₺')).toBe(1);
+    const equivalentRows = rowsMentioning(usd, '₺');
+    expect(equivalentRows).toHaveLength(1);
+    expect(equivalentRows[0]).toContain('TL karşılığı');
+    // Read off the stored row (grandTotalTryMinor 408222 above), not recomputed
+    // at export time.
+    expect(equivalentRows[0]).toContain('₺4.082,22');
+
+    // And no amount of the sale itself may be restated in lira anywhere.
+    for (const amount of ['99,00', '19,80', '118,80']) {
+      expect(usd).not.toContain(`₺${amount}`);
+    }
+
+    // The rate line names TRY as a word, so it introduces no second sign.
+    expect(usd).toContain(`1 USD = ${FIXTURE_RATE.toFixed(4).replace('.', ',')} TRY`);
 
     expect(lira).toContain('Para Birimi:</strong> TRY');
     expect(lira).toContain('₺99,00');
     expect(lira).not.toContain('$');
+    // A lira invoice needs no equivalent of itself and must not grow one.
+    expect(lira).not.toContain('TL karşılığı');
   });
 
   test('the XML declares one currency and uses it on every amount', async ({ request }) => {
@@ -218,8 +267,14 @@ test.describe('a foreign-currency invoice export', () => {
     await expect(page.getByText('Para Birimi:')).toBeVisible();
     const rendered = await page.locator('body').innerText();
     expect(rendered).toContain('USD');
-    expect(rendered).not.toContain('₺');
     expect(rendered).toContain('$118,80');
+
+    // The same rule as the test above, read off the painted page: one lira
+    // figure, on the line that declares itself the equivalent (VUK 215).
+    const equivalentLines = rendered.split('\n').filter((line) => line.includes('₺'));
+    expect(equivalentLines).toHaveLength(1);
+    expect(equivalentLines[0]).toContain('TL karşılığı');
+    expect(equivalentLines[0]).toContain('₺4.082,22');
 
     await page.goto(`/api/billing/invoices/${tryNumber}/export?format=html`);
     await page.screenshot({ path: `${SHOTS}/02-try-invoice-html.png`, fullPage: true });
