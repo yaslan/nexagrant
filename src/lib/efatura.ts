@@ -271,6 +271,19 @@ export function invoiceTotalsMinor(lines: InvoiceLineItem[]): TaxTotalsMinor {
 }
 
 /**
+ * Derive the human-readable fraction string from a withholding rate decimal.
+ * (0.9 → "9/10", 0.5 → "5/10", 0.7 → "7/10")
+ *
+ * One place for the conversion rule, so the label and any validation read
+ * the same format and changes don't scatter.
+ */
+export function withholdingRateLabel(rate: number): string {
+  if (rate <= 0 || rate > 1) return '';
+  const numerator = Math.round(rate * 10);
+  return `${numerator}/10`;
+}
+
+/**
  * The same totals as major-unit numbers, for the readers that still want them.
  *
  * A view over `invoiceTotalsMinor`, not a second computation: every figure
@@ -571,6 +584,19 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
     .map((rate) => `%${rate}`)
     .join(' + ');
 
+  // The withholding rates actually charged on lines that have withholding,
+  // so the label reflects what the document computed (not a hard-coded "9/10").
+  const withholdingRates = [
+    ...new Set(
+      invoice.lines
+        .filter((l) => typeof l.withholdingRate === 'number' && l.withholdingRate > 0)
+        .map((l) => l.withholdingRate!)
+    ),
+  ]
+    .sort((a, b) => b - a) // Descending order (consistency with VAT display)
+    .map((rate) => withholdingRateLabel(rate))
+    .join(' + ');
+
   const linesHtml = invoice.lines
     .map(
       (l, idx) => `
@@ -697,7 +723,7 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
     ${
       totals.totalWithholdingMinor > 0
         ? `<tr>
-      <td class="label" style="color: #b91c1c;">Tevkifat Tutarı (9/10):</td>
+      <td class="label" style="color: #b91c1c;">Tevkifat Tutarı (${withholdingRates}):</td>
       <td style="text-align: right; font-family: monospace; color: #b91c1c;">-${money(totals.totalWithholdingMinor)}</td>
     </tr>`
         : ''

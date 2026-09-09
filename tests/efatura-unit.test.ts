@@ -6,6 +6,7 @@ import {
   generateUblTrXml,
   generateEfaturaHtml,
   isFiledWithGib,
+  withholdingRateLabel,
   UNFILED_NOTICE,
   type EfaturaDocument,
 } from '../src/lib/efatura';
@@ -172,6 +173,107 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
       const html = generateEfaturaHtml(mockDocument);
       expect(html).toContain(UNFILED_NOTICE);
       expect(html).toContain('ÖRNEK BELGE');
+    });
+
+    test('withholdingRateLabel converts decimal rates to fraction strings', () => {
+      expect(withholdingRateLabel(0.9)).toBe('9/10');
+      expect(withholdingRateLabel(0.5)).toBe('5/10');
+      expect(withholdingRateLabel(0.7)).toBe('7/10');
+      expect(withholdingRateLabel(1.0)).toBe('10/10');
+      expect(withholdingRateLabel(0.1)).toBe('1/10');
+    });
+
+    test('generateEfaturaHtml shows dynamic withholding rate label for 9/10', () => {
+      const doc: EfaturaDocument = {
+        ...mockDocument,
+        lines: [
+          {
+            id: '1',
+            name: 'Consulting Service',
+            quantity: 1,
+            unitCode: 'C62',
+            unitPriceMinor: 1_000_000,
+            vatRate: 20,
+            withholdingCode: '604',
+            withholdingRate: 0.9,
+          },
+        ],
+      };
+
+      const html = generateEfaturaHtml(doc);
+      expect(html).toContain('Tevkifat Tutarı (9/10):');
+    });
+
+    test('generateEfaturaHtml shows dynamic withholding rate label for 5/10', () => {
+      const doc: EfaturaDocument = {
+        ...mockDocument,
+        lines: [
+          {
+            id: '1',
+            name: 'Consulting Service',
+            quantity: 1,
+            unitCode: 'C62',
+            unitPriceMinor: 1_000_000,
+            vatRate: 20,
+            withholdingCode: '604',
+            withholdingRate: 0.5,
+          },
+        ],
+      };
+
+      const html = generateEfaturaHtml(doc);
+      expect(html).toContain('Tevkifat Tutarı (5/10):');
+    });
+
+    test('generateEfaturaHtml omits withholding label when no withholding present', () => {
+      const doc: EfaturaDocument = {
+        ...mockDocument,
+        lines: [
+          {
+            id: '1',
+            name: 'Regular Service',
+            quantity: 1,
+            unitCode: 'C62',
+            unitPriceMinor: 1_000_000,
+            vatRate: 20,
+          },
+        ],
+      };
+
+      const html = generateEfaturaHtml(doc);
+      expect(html).not.toContain('Tevkifat Tutarı');
+    });
+
+    test('generateEfaturaHtml shows combined labels for mixed withholding rates', () => {
+      const doc: EfaturaDocument = {
+        ...mockDocument,
+        lines: [
+          {
+            id: '1',
+            name: 'Consulting Service',
+            quantity: 1,
+            unitCode: 'C62',
+            unitPriceMinor: 500_000,
+            vatRate: 20,
+            withholdingCode: '604',
+            withholdingRate: 0.9,
+          },
+          {
+            id: '2',
+            name: 'Other Service',
+            quantity: 1,
+            unitCode: 'C62',
+            unitPriceMinor: 500_000,
+            vatRate: 20,
+            withholdingCode: '605',
+            withholdingRate: 0.5,
+          },
+        ],
+      };
+
+      const html = generateEfaturaHtml(doc);
+      // Expect both rates to appear in order (descending: 9/10 + 5/10)
+      expect(html).toContain('Tevkifat Tutarı (9/10 + 5/10):');
     });
   });
 
