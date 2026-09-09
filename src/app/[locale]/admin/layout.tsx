@@ -11,11 +11,8 @@ import Link from 'next/link';
 import UserMenu from '@/components/UserMenu';
 import AdminSidebarNav from '@/components/AdminSidebarNav';
 import {
-  ShieldCheck,
-  Activity,
   ChevronRight,
   ExternalLink,
-  Lock,
 } from 'lucide-react';
 
 import MobileAdminHeader from '@/components/MobileAdminHeader';
@@ -88,22 +85,11 @@ export default async function AdminLayout({
           </Link>
 
           <ChevronRight className="w-4 h-4 text-ink-2" />
-
-          {/* System Health Badge */}
-          <div className="hidden md:flex items-center space-x-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1 rounded-full text-xs text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-medium text-[11px]">Sistem Durumu: <strong className="text-emerald-400">Aktif (%100 Operational)</strong></span>
-          </div>
         </div>
 
         {/* Header Right Actions & User Menu */}
         <div className="flex items-center space-x-3">
-          <div className="hidden lg:flex items-center space-x-1.5 bg-blue-950/80 border border-blue-800/60 text-blue-300 px-2.5 py-1 rounded-md text-xs font-mono">
-            <Lock className="w-3.5 h-3.5 text-blue-400" />
-            <span>RLS Protected</span>
-          </div>
-
-          <UserMenu 
+          <UserMenu
             locale={locale} 
             userName={userName}
             userEmail={userEmail}
@@ -127,24 +113,6 @@ export default async function AdminLayout({
 
             <AdminSidebarNav locale={locale} />
           </div>
-
-          {/* Quick System Metric Box in Side Panel */}
-          <div className="bg-slate-900 text-white rounded-xl p-4 space-y-2.5 border border-slate-800 shadow-sm">
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-blue-400" />
-                <span>Sistem Sağlığı</span>
-              </span>
-              <span className="text-emerald-400 font-mono">100% OK</span>
-            </div>
-            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-emerald-500 h-full w-full rounded-full" />
-            </div>
-            <div className="text-[11px] text-muted flex justify-between pt-1 font-mono">
-              <span>RLS Güvenlik:</span>
-              <span className="text-white font-semibold">30 / 30 Tablo</span>
-            </div>
-          </div>
         </aside>
 
         {/* ───────────────────────── CONTENT AREA ───────────────────────── */}
@@ -161,11 +129,6 @@ export default async function AdminLayout({
           </Link>
           <span>•</span>
           <span>Platform Admin Console v1.1.0</span>
-          <span>•</span>
-          <span className="flex items-center text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[11px]">
-            <ShieldCheck className="w-3 h-3 mr-1 text-emerald-600" />
-            RLS Policy %100 Enforced
-          </span>
         </div>
 
         <div className="flex items-center space-x-4">

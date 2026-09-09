@@ -38,7 +38,7 @@ const DEFAULT_PROVIDER: LlmProvider = 'anthropic';
  * move to Opus-class is a separate, measured decision — not a side effect of
  * deleting a duplicate file.
  */
-const DEFAULT_MODELS: Record<LlmProvider, string> = {
+export const DEFAULT_MODELS: Record<LlmProvider, string> = {
   anthropic: 'claude-sonnet-5',
   openai: 'gpt-4o',
 };

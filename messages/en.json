@@ -1515,6 +1515,11 @@
       "plansEmpty": "No plan is currently on offer to your organisation."
     }
   },
+  "adminSettings": {
+    "defaultLlmModelLabel": "Default LLM Model:",
+    "defaultPlanCreditsLabel": "Default Plan Credits:",
+    "creditsUnit": "Credits"
+  },
   "adminPlans": {
     "title": "Plan Management",
     "subtitle": "Manage plans, versions and tenant-specific assignments. A published version is immutable; editing creates a new version.",

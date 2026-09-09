@@ -1515,6 +1515,11 @@
       "plansEmpty": "Kuruluşunuza şu anda açık bir paket yok."
     }
   },
+  "adminSettings": {
+    "defaultLlmModelLabel": "Varsayılan LLM Model:",
+    "defaultPlanCreditsLabel": "Varsayılan Plan Kredisi:",
+    "creditsUnit": "Kredi"
+  },
   "adminPlans": {
     "title": "Paket Yönetimi",
     "subtitle": "Paketleri, sürümleri ve kiracıya özel atamaları yönetin. Yayınlanan sürüm değişmez; düzenleme yeni sürüm yaratır.",
