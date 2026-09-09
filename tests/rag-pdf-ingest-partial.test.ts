@@ -62,10 +62,21 @@ const prismaStub = {
   },
 };
 
-vi.mock('../src/lib/db', () => ({ prisma: prismaStub }));
+vi.mock('../src/lib/db', () => ({
+  prisma: prismaStub,
+  // TASK-MTU6KE36HAFJR — `processPdfAndStore` moved into src/lib/rag.ts and
+  // its writes now go through `withTenant`, one short transaction each, so
+  // `app.tenant_id` is set for them. The double hands the same stub straight
+  // back: what these tests pin is the corpus the ingest leaves behind, not
+  // the tenant plumbing.
+  withTenant: async (_tenantId: string, fn: (tx: typeof prismaStub) => Promise<unknown>) => fn(prismaStub),
+}));
 
 const embedTextMock = vi.hoisted(() => vi.fn());
-vi.mock('../src/lib/llm', () => ({ embedText: embedTextMock }));
+vi.mock('../src/lib/llm', async () => {
+  const actual = await vi.importActual<typeof import('../src/lib/llm')>('../src/lib/llm');
+  return { ...actual, embedText: embedTextMock };
+});
 
 type AlertInput = { level: string; source: string; message: string; meta: Record<string, unknown> };
 const recordAlertMock = vi.hoisted(() =>
@@ -76,7 +87,7 @@ const recordAlertMock = vi.hoisted(() =>
 );
 vi.mock('../src/lib/observability/system-alert', () => ({ recordAlert: recordAlertMock }));
 
-const { processPdfAndStore } = await import('../src/lib/ai/rag');
+const { processPdfAndStore } = await import('../src/lib/rag');
 
 beforeEach(() => {
   store.documents = [];

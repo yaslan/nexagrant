@@ -37,13 +37,13 @@ vi.mock('@/lib/llm', () => ({
   generateText: vi.fn().mockResolvedValue('generated section text'),
 }));
 
-vi.mock('@/lib/ai/rag', () => ({
-  semanticSearch: vi.fn().mockResolvedValue([]),
+vi.mock('@/lib/rag', () => ({
+  retrieveChunks: vi.fn().mockResolvedValue([]),
 }));
 
 import { generateConceptNoteDraft, exportToDocx } from './actions';
 import { prisma } from '@/lib/db';
-import { semanticSearch } from '@/lib/ai/rag';
+import { retrieveChunks } from '@/lib/rag';
 
 describe('m2 actions — phantom relation regression', () => {
   beforeEach(() => {
@@ -91,7 +91,7 @@ describe('m2 actions — phantom relation regression', () => {
       });
 
       // the topic's title reached the RAG search and the generated prompt
-      expect(vi.mocked(semanticSearch).mock.calls[0][0]).toContain('HORIZON-CL5-2026');
+      expect(vi.mocked(retrieveChunks).mock.calls[0][0]).toContain('HORIZON-CL5-2026');
     });
 
     it('skips the topic lookup and still drafts when the opportunity has no topicId', async () => {

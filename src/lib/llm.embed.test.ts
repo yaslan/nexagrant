@@ -3,7 +3,8 @@ import crypto from 'crypto';
 
 /**
  * TASK-MTSWVADF7RQ1B — the RAG path used to call OpenAI's embeddings endpoint
- * directly from src/lib/rag.ts and src/lib/ai/rag.ts. The full text of every
+ * directly from src/lib/rag.ts and its since-merged twin src/lib/ai/rag.ts.
+ * The full text of every
  * uploaded document left in 1000-character chunks and *nothing* was written
  * back: no tenant, no promptHash, no AiUsageLog row at all. That breaks
  * CLAUDE.md rule 5 and GDPR art. 30's record of processing activities.

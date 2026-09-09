@@ -84,12 +84,13 @@ const envSchema = z.object({
   /**
    * LLM provider credentials. Both optional and without a default: an
    * unconfigured provider must leave the app importable rather than throw at
-   * module load. The call sites decide what "unset" means — `src/lib/rag.ts`
-   * falls back to a deterministic mock embedding for dev/demo, while
-   * `src/lib/ai/rag.ts` refuses to ingest. Neither ever ships a placeholder key
-   * to a real endpoint: `sk-mock-key-for-testing` used to be handed to the
-   * OpenAI SDK, which turned a missing credential into a 401 at request time
-   * instead of a clear configuration error (TASK-MTSWVADF7RQ1B).
+   * module load. The call sites decide what "unset" means, and for the RAG path
+   * (`src/lib/rag.ts`) it means refusing: it used to fall back to a
+   * deterministic mock embedding, which wrote meaningless vectors into the real
+   * `Chunk` table (TASK-MTUH5L8MJ6S8E). No placeholder key ever ships to a real
+   * endpoint either: `sk-mock-key-for-testing` used to be handed to the OpenAI
+   * SDK, which turned a missing credential into a 401 at request time instead
+   * of a clear configuration error (TASK-MTSWVADF7RQ1B).
    */
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),

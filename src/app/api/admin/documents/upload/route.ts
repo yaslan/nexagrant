@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { processPdfAndStore } from '@/lib/ai/rag';
+import { processPdfAndStore } from '@/lib/rag';
 import { errorMessage } from '@/lib/errors';
 import { requirePlatformAdminApi } from '@/lib/tenant';
 
 export async function POST(req: NextRequest) {
   try {
     // This route stores the document with `tenantId: null` — the shared corpus
-    // that `retrieveChunks`/`semanticSearch` mix into *every* tenant's RAG
+    // that `retrieveChunks` mixes into *every* tenant's RAG
     // context, embedded at the platform's expense. So it is platform staff
     // only, and the gate runs before the body is read: a rejected request must
     // not parse a PDF or spend an embedding call.

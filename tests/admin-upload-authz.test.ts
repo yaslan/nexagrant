@@ -4,8 +4,8 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
  * TASK-MTSXG31NGW48D — "the document upload route has no authorization check".
  *
  * `POST /api/admin/documents/upload` calls `processPdfAndStore(buffer, null, …)`.
- * `tenantId: null` is the *shared* corpus: `retrieveChunks`/`semanticSearch`
- * mix those chunks into every tenant's RAG context, and the embedding calls are
+ * `tenantId: null` is the *shared* corpus: `retrieveChunks`
+ * mixes those chunks into every tenant's RAG context, and the embedding calls are
  * billed to the platform. The route carried a `KNOWN GAP` comment instead of a
  * check, and the repo has no `middleware.ts`, so an anonymous POST reached the
  * handler directly — RAG context poisoning plus someone else's OpenAI bill.
@@ -21,7 +21,7 @@ const { authMock, processPdfAndStoreMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/ai/rag', () => ({ processPdfAndStore: processPdfAndStoreMock }));
+vi.mock('@/lib/rag', () => ({ processPdfAndStore: processPdfAndStoreMock }));
 
 const { POST } = await import('@/app/api/admin/documents/upload/route');
 const { requirePlatformAdminApi } = await import('@/lib/tenant');

@@ -3,7 +3,7 @@
 import { prisma, withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
-import { semanticSearch } from '@/lib/ai/rag';
+import { retrieveChunks } from '@/lib/rag';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 import { PRODUCT_NAME } from '@/lib/brand';
 
@@ -100,7 +100,7 @@ export async function generateConceptNoteDraft(
   for (const section of schema) {
     // Basic RAG search
     const searchQuery = `${opp.title} ${topic?.title || ''} ${section.promptKey}`;
-    const ragResults = await semanticSearch(searchQuery, tenantId, 3, { userId });
+    const ragResults = await retrieveChunks(searchQuery, 3, tenantId, { userId });
     
     let contextStr = '';
     if (ragResults && Array.isArray(ragResults)) {
