@@ -9,6 +9,20 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: fabrika
+          POSTGRES_USER: fabrika
+          POSTGRES_PASSWORD: fabrika
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
     - uses: actions/checkout@v4
     
@@ -45,3 +59,17 @@ jobs:
       
     - name: Test
       run: pnpm test
+
+    - name: Install Playwright browsers
+      run: pnpm dlx playwright install --with-deps
+
+    - name: E2E Test
+      run: pnpm test:e2e
+      env:
+        CI: 'true'
+        DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
+        INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.'
+        INVOICE_SUPPLIER_VKN: '1000000000'
+        INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD'
+        INVOICE_SUPPLIER_ADDRESS: 'TEST CAD NO:1'
+        INVOICE_SUPPLIER_CITY: 'Ankara'
