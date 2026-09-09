@@ -140,7 +140,9 @@ describe('zero-rated and withheld lines', () => {
 
     // 10005 × 20 / 100 = 2001 exactly; 2001 × 0.9 = 1800.9, half-up → 1801;
     // payable VAT 2001 − 1801 = 200; grand total 10005 + 200 = 10205.
-    expect(lineValues(xml, 'TaxAmount')).toEqual(['20.01', '20.01']);
+    // Line TaxTotal has three TaxAmount elements now: brüt vergi (KDV+tevkifat),
+    // KDV TaxSubtotal, and Tevkifat TaxSubtotal.
+    expect(lineValues(xml, 'TaxAmount')).toEqual(['38.02', '20.01', '18.01']);
     expect(documentTaxBlock(xml)).toContain('<cbc:TaxAmount currencyID="TRY">2.00</cbc:TaxAmount>');
     expect(totalValue(xml, 'PayableAmount')).toBe('102.05');
 

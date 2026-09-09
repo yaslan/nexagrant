@@ -272,14 +272,21 @@ export function invoiceTotalsMinor(lines: InvoiceLineItem[]): TaxTotalsMinor {
 
 /**
  * Derive the human-readable fraction string from a withholding rate decimal.
- * (0.9 → "9/10", 0.5 → "5/10", 0.7 → "7/10")
+ * (0.9 → "9/10", 0.5 → "5/10")
+ *
+ * Turkish withholding rates are tenths (0.1, 0.2, ..., 0.9, 1.0).
+ * Rates that are not exact tenths (e.g. 0.67) return empty string; they are
+ * invalid and must not be silently rounded — the invoice will not claim
+ * a withholding rate it cannot express (CLAUDE.md #7).
  *
  * One place for the conversion rule, so the label and any validation read
  * the same format and changes don't scatter.
  */
 export function withholdingRateLabel(rate: number): string {
   if (rate <= 0 || rate > 1) return '';
-  const numerator = Math.round(rate * 10);
+  const numerator = rate * 10;
+  // Valid rates are exact tenths; anything else is invalid and gets no label.
+  if (!Number.isInteger(numerator)) return '';
   return `${numerator}/10`;
 }
 
@@ -389,13 +396,7 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
   const linesXml = invoice.lines
     .map((line, idx) => {
       const lineTotals = totals.lines[idx]!;
-      return `
-    <cac:InvoiceLine>
-      <cbc:ID>${idx + 1}</cbc:ID>
-      <cbc:InvoicedQuantity unitCode="${line.unitCode}">${line.quantity}</cbc:InvoicedQuantity>
-      <cbc:LineExtensionAmount currencyID="${invoice.currency}">${amount(lineTotals.netMinor)}</cbc:LineExtensionAmount>
-      <cac:TaxTotal>
-        <cbc:TaxAmount currencyID="${invoice.currency}">${amount(lineTotals.vatMinor)}</cbc:TaxAmount>
+      const vatTaxSubtotal = `
         <cac:TaxSubtotal>
           <cbc:TaxableAmount currencyID="${invoice.currency}">${amount(lineTotals.netMinor)}</cbc:TaxableAmount>
           <cbc:TaxAmount currencyID="${invoice.currency}">${amount(lineTotals.vatMinor)}</cbc:TaxAmount>
@@ -406,7 +407,33 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
               <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
             </cac:TaxScheme>
           </cac:TaxCategory>
-        </cac:TaxSubtotal>
+        </cac:TaxSubtotal>`;
+
+      const withholding =
+        line.withholdingRate && line.withholdingRate > 0
+          ? `
+        <cac:TaxSubtotal>
+          <cbc:TaxableAmount currencyID="${invoice.currency}">${amount(lineTotals.vatMinor)}</cbc:TaxableAmount>
+          <cbc:TaxAmount currencyID="${invoice.currency}">${amount(lineTotals.withholdingMinor)}</cbc:TaxAmount>
+          <cbc:Percent>${percent(line.withholdingRate * 100)}</cbc:Percent>
+          <cac:TaxCategory>
+            <cac:TaxScheme>
+              <cbc:Name>Tevkifat</cbc:Name>
+              <cbc:TaxTypeCode>${line.withholdingCode || '000'}</cbc:TaxTypeCode>
+            </cac:TaxScheme>
+          </cac:TaxCategory>
+        </cac:TaxSubtotal>`
+          : '';
+
+      const totalTaxAmount = lineTotals.vatMinor + lineTotals.withholdingMinor;
+
+      return `
+    <cac:InvoiceLine>
+      <cbc:ID>${idx + 1}</cbc:ID>
+      <cbc:InvoicedQuantity unitCode="${line.unitCode}">${line.quantity}</cbc:InvoicedQuantity>
+      <cbc:LineExtensionAmount currencyID="${invoice.currency}">${amount(lineTotals.netMinor)}</cbc:LineExtensionAmount>
+      <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="${invoice.currency}">${amount(totalTaxAmount)}</cbc:TaxAmount>${vatTaxSubtotal}${withholding}
       </cac:TaxTotal>
       <cac:Item>
         <cbc:Name>${line.name}</cbc:Name>
