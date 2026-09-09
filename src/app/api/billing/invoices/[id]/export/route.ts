@@ -117,11 +117,13 @@ export async function GET(
     });
   } catch (error) {
     if (error instanceof SupplierNotConfiguredError) {
-      // Deliberately loud and specific: an operator reading this knows exactly
-      // which variables to fill in, and no document goes out meanwhile.
+      // Deliberately loud and specific in the log: an operator reading it
+      // knows exactly which variables to fill in. The response body stays
+      // generic — `missing` used to ship the env var names straight to the
+      // customer's browser (TASK-MTUH6YKP6OQAX).
       logger.error('invoice supplier identity not configured', { missing: error.missing });
       return NextResponse.json(
-        { error: 'supplier_identity_not_configured', missing: error.missing },
+        { error: 'supplier_identity_not_configured' },
         { status: 503 }
       );
     }

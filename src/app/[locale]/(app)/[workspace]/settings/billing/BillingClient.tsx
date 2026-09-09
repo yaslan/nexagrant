@@ -107,10 +107,78 @@ export function BillingClient({
   const { addToCart } = useCart();
   const [billingCycle, setBillingCycle] = useState<Exclude<BillingCycle, 'one-time'>>('yearly');
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
 
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToast({ text, type });
     setTimeout(() => setToast(null), 4000);
+  };
+
+  /**
+   * Maps the export route's error code (route.ts) to a user-facing message.
+   * Ranked by support-call volume in TASK-MTU64Y932HF96 (§4): the code names
+   * below never reach the customer — they used to, as raw JSON, because the
+   * download links were plain `<a href>` with no fetch and no error handling.
+   */
+  const invoiceExportMessage = (code: string | undefined, invoiceNumber: string): string => {
+    switch (code) {
+      case 'supplier_identity_not_configured':
+        return t('invoiceExportUnavailable');
+      case 'invoice_not_found':
+        return t('invoiceExportNotFound', { number: invoiceNumber });
+      case 'unsupported_format':
+        return t('invoiceExportUnsupportedFormat');
+      case 'unauthorized':
+        return t('invoiceExportUnauthorized');
+      case 'no_tenant':
+        return t('invoiceExportNoTenant');
+      case 'invoice_lookup_failed':
+      case 'invoice_lines_invalid':
+        return t('invoiceExportSystemError');
+      default:
+        return t('invoiceExportGenericError');
+    }
+  };
+
+  const handleInvoiceDownload = async (invoiceNumber: string, format: 'xml' | 'pdf') => {
+    const key = `${invoiceNumber}:${format}`;
+    setDownloadingKey(key);
+    // Opened before the fetch so the browser attributes it to the click and
+    // does not treat it as an unrequested popup once the response arrives.
+    const previewWindow = format === 'pdf' ? window.open('', '_blank', 'noopener,noreferrer') : null;
+    try {
+      const res = await fetch(
+        `/api/billing/invoices/${encodeURIComponent(invoiceNumber)}/export?format=${format}`
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        previewWindow?.close();
+        showToast(invoiceExportMessage(body?.error, invoiceNumber), 'error');
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      if (format === 'pdf') {
+        if (previewWindow) {
+          previewWindow.location.href = url;
+        } else {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${invoiceNumber}_UBL_TR.xml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch {
+      previewWindow?.close();
+      showToast(t('invoiceExportGenericError'), 'error');
+    } finally {
+      setDownloadingKey(null);
+    }
   };
 
   // Anything that was not measured renders as a dash. `?? 0` would have been a
@@ -707,20 +775,22 @@ export function BillingClient({
                       )}
                     </td>
                     <td className="p-3 text-right space-x-2 whitespace-nowrap">
-                      <a
-                        href={`/api/billing/invoices/${encodeURIComponent(invoice.number)}/export?format=xml`}
-                        className="text-[11px] font-bold text-blue-600 hover:underline"
+                      <button
+                        type="button"
+                        onClick={() => handleInvoiceDownload(invoice.number, 'xml')}
+                        disabled={downloadingKey === `${invoice.number}:xml`}
+                        className="text-[11px] font-bold text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-wait cursor-pointer"
                       >
-                        {t('invoiceXml')}
-                      </a>
-                      <a
-                        href={`/api/billing/invoices/${encodeURIComponent(invoice.number)}/export?format=pdf`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] font-bold text-blue-600 hover:underline"
+                        {downloadingKey === `${invoice.number}:xml` ? t('invoiceDownloading') : t('invoiceXml')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInvoiceDownload(invoice.number, 'pdf')}
+                        disabled={downloadingKey === `${invoice.number}:pdf`}
+                        className="text-[11px] font-bold text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-wait cursor-pointer"
                       >
-                        {t('invoicePdf')}
-                      </a>
+                        {downloadingKey === `${invoice.number}:pdf` ? t('invoiceDownloading') : t('invoicePdf')}
+                      </button>
                     </td>
                   </tr>
                 ))}

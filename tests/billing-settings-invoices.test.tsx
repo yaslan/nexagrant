@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 
 import trMessages from '../messages/tr.json';
@@ -86,7 +86,18 @@ function renderPanel(
   );
 }
 
-afterEach(cleanup);
+beforeEach(() => {
+  if (!('createObjectURL' in window.URL)) {
+    // jsdom does not implement these; the download handler calls them
+    // unconditionally after a successful export fetch.
+    Object.assign(window.URL, { createObjectURL: () => 'blob:mock', revokeObjectURL: () => {} });
+  }
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe('billing settings — invoice history', () => {
   it('shows an empty state, and none of the retired demo rows, when nothing was issued', () => {
@@ -105,7 +116,7 @@ describe('billing settings — invoice history', () => {
     expect(document.body.textContent).not.toContain('Demo Ar-Ge');
   });
 
-  it('lists a real invoice with its stored total and both export links', () => {
+  it('lists a real invoice with its stored total and both export buttons', () => {
     renderPanel({ invoices: [INVOICE] });
 
     const table = within(screen.getByTestId('billing-invoices'));
@@ -114,14 +125,59 @@ describe('billing settings — invoice history', () => {
     // ₺8,950.00 base + ₺1,790.00 VAT = ₺10,740.00, straight off the stored lines.
     expect(table.getByText('₺10.740,00')).toBeTruthy();
 
-    const xml = screen.getByRole('link', { name: trMessages.billingPanels.settings.invoiceXml });
-    expect(xml.getAttribute('href')).toBe(
-      '/api/billing/invoices/FB-2026-000001/export?format=xml'
+    expect(
+      screen.getByRole('button', { name: trMessages.billingPanels.settings.invoiceXml })
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: trMessages.billingPanels.settings.invoicePdf })
+    ).toBeTruthy();
+  });
+
+  it('fetches the export route rather than navigating to it directly', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['<xml/>']),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPanel({ invoices: [INVOICE] });
+    fireEvent.click(screen.getByRole('button', { name: trMessages.billingPanels.settings.invoiceXml }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/billing/invoices/FB-2026-000001/export?format=xml'
+      )
     );
-    const pdf = screen.getByRole('link', { name: trMessages.billingPanels.settings.invoicePdf });
-    expect(pdf.getAttribute('href')).toBe(
-      '/api/billing/invoices/FB-2026-000001/export?format=pdf'
+  });
+
+  /**
+   * The export route (route.ts) answers a failed download with one of seven
+   * JSON error codes. Before TASK-MTUH6YKP6OQAX these went straight to a plain
+   * `<a href>` link with no fetch and no error handling, so the customer saw
+   * the raw JSON (or, worst case, the `missing` array naming env vars) instead
+   * of any Turkish text. This pins that every code now maps to a translated
+   * toast, and that `missing` is never read back out of the response.
+   */
+  it('shows a translated toast instead of the raw error code on a failed export', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({
+        error: 'supplier_identity_not_configured',
+        missing: ['INVOICE_SUPPLIER_VKN'],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPanel({ invoices: [INVOICE] });
+    fireEvent.click(screen.getByRole('button', { name: trMessages.billingPanels.settings.invoicePdf }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(trMessages.billingPanels.settings.invoiceExportUnavailable)
+      ).toBeTruthy()
     );
+    expect(document.body.textContent).not.toContain('INVOICE_SUPPLIER_VKN');
+    expect(document.body.textContent).not.toContain('supplier_identity_not_configured');
   });
 
   it('marks a document as filed with GİB only when it carries an envelope id', () => {
