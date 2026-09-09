@@ -1,8 +1,10 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import { cookies, headers } from 'next/headers';
 import { getLocale } from 'next-intl/server';
 import { env } from '@/lib/env';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { parseTheme, THEME_COOKIE_NAME, type ResolvedTheme, type Theme } from '@/lib/theme';
 import './globals.css';
 
 /**
@@ -16,6 +18,30 @@ export const metadata: Metadata = {
   metadataBase: new URL(env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
 };
 
+/**
+ * Decide the theme before a single byte of HTML is sent.
+ *
+ * The preference is a cookie (see ThemeProvider) precisely so this can happen on
+ * the server: the class goes straight onto <html>, so there is no parse-time
+ * <script> to write it and therefore no React "Encountered a script tag" warning.
+ *
+ * When no explicit preference exists, `Sec-CH-Prefers-Color-Scheme` is the only
+ * thing the server has to go on. Chrome and Edge send it once `Accept-CH` has
+ * asked for it (next.config.ts); Safari and Firefox do not implement client hints
+ * and never will send it, so a system-dark user there gets one light first paint
+ * and ThemeProvider corrects it after hydration. From their next visit onwards a
+ * cookie exists and the server is right again. That single flash is the accepted
+ * price of removing the script.
+ */
+async function resolveTheme(): Promise<{ theme: Theme; resolved: ResolvedTheme }> {
+  const cookieStore = await cookies();
+  const theme = parseTheme(cookieStore.get(THEME_COOKIE_NAME)?.value);
+  if (theme !== 'system') return { theme, resolved: theme };
+
+  const hint = (await headers()).get('sec-ch-prefers-color-scheme');
+  return { theme, resolved: hint === 'dark' ? 'dark' : 'light' };
+}
+
 export default async function RootLayout({
   children,
 }: {
@@ -26,15 +52,17 @@ export default async function RootLayout({
   // screen readers and translation tools fall back to guessing (Lighthouse:
   // "html-has-lang"). Non-localised routes get the default locale.
   const locale = await getLocale();
+  const { theme, resolved } = await resolveTheme();
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <head>
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script src="/theme-init.js" suppressHydrationWarning></script>
-      </head>
+    <html
+      lang={locale}
+      className={resolved === 'dark' ? 'dark' : undefined}
+      data-theme={resolved}
+      suppressHydrationWarning
+    >
       <body className="min-h-screen bg-background text-ink antialiased">
-        <ThemeProvider>
+        <ThemeProvider initialTheme={theme} initialResolvedTheme={resolved}>
           {children}
         </ThemeProvider>
       </body>

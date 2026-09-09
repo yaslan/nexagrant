@@ -1,6 +1,29 @@
 import { test, expect } from '@playwright/test';
 
-test('theme initialization runs during HTML parsing, before chunk JS loads', async ({ page }) => {
+/**
+ * The theme must be on <html> before any JavaScript runs.
+ *
+ * The measurement is unchanged — chunks are stalled for three seconds and the class
+ * is read after `domcontentloaded`, so nothing client-side can have applied it. What
+ * changed is the mechanism under test: a parse-time <script> used to write the class
+ * from localStorage; now the server reads the `fabrika-theme` cookie and renders the
+ * class into the HTML itself (src/app/layout.tsx). The preference is therefore set
+ * as a cookie here, not in localStorage — that is the only edit to these two tests.
+ *
+ * Still two-way: delete the `className`/`data-theme` on <html> in the root layout and
+ * both tests go red, because ThemeProvider's effect cannot run while chunks are held.
+ */
+
+const BASE_URL = 'http://localhost:3000';
+
+async function setThemeCookie(
+  context: import('@playwright/test').BrowserContext,
+  value: 'light' | 'dark' | 'system'
+) {
+  await context.addCookies([{ name: 'fabrika-theme', value, url: BASE_URL }]);
+}
+
+test('the theme is in the server HTML, before chunk JS loads', async ({ page, context }) => {
   const chunksBlockedUntil = Date.now() + 3000;
 
   // Block all JS chunks for 3 seconds
@@ -13,19 +36,17 @@ test('theme initialization runs during HTML parsing, before chunk JS loads', asy
   });
 
   // Set dark theme before page load
-  await page.addInitScript(() => {
-    localStorage.setItem('fabrika-theme', 'dark');
-  });
+  await setThemeCookie(context, 'dark');
 
   // Navigate and wait for dom content loaded (HTML parsed)
   // Chunks are still blocked at this point
-  await page.goto('http://localhost:3000/tr', {
+  await page.goto(`${BASE_URL}/tr`, {
     waitUntil: 'domcontentloaded'
   });
 
   // Measure: is dark class present BEFORE chunks load?
-  // If theme-init.js ran at parse time, dark class should exist
-  // If only ThemeProvider (useEffect) applies it, dark class won't exist
+  // If the server resolved the cookie, the class arrived with the document.
+  // If only ThemeProvider (useEffect) applies it, dark class won't exist.
   const isDarkBeforeChunks = await page.evaluate(() => {
     return document.documentElement.classList.contains('dark');
   });
@@ -33,7 +54,7 @@ test('theme initialization runs during HTML parsing, before chunk JS loads', asy
   expect(isDarkBeforeChunks).toBe(true);
 });
 
-test('theme applies immediately on both locales before chunks load', async ({ page }) => {
+test('theme applies immediately on both locales before chunks load', async ({ page, context }) => {
   // Test both Turkish and English locales with chunks delayed
 
   // Dark theme test
@@ -46,11 +67,9 @@ test('theme applies immediately on both locales before chunks load', async ({ pa
     route.continue().catch(() => {});
   });
 
-  await page.addInitScript(() => {
-    localStorage.setItem('fabrika-theme', 'dark');
-  });
+  await setThemeCookie(context, 'dark');
 
-  await page.goto('http://localhost:3000/tr', { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE_URL}/tr`, { waitUntil: 'domcontentloaded' });
   const isDarkBeforeChunks = await page.evaluate(() =>
     document.documentElement.classList.contains('dark')
   );
@@ -68,11 +87,9 @@ test('theme applies immediately on both locales before chunks load', async ({ pa
     route.continue().catch(() => {});
   });
 
-  await page.addInitScript(() => {
-    localStorage.setItem('fabrika-theme', 'light');
-  });
+  await setThemeCookie(context, 'light');
 
-  await page.goto('http://localhost:3000/en', { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE_URL}/en`, { waitUntil: 'domcontentloaded' });
   const isDarkBeforeChunks2 = await page.evaluate(() =>
     document.documentElement.classList.contains('dark')
   );

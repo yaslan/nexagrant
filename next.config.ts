@@ -45,6 +45,38 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [{ protocol: 'https', hostname: 'images.unsplash.com' }],
   },
+  /**
+   * Ask the browser for the OS colour-scheme preference on every request.
+   *
+   * The root layout resolves the theme server-side (src/app/layout.tsx). A returning
+   * visitor has the `fabrika-theme` cookie and needs nothing else; a first-time
+   * visitor has no cookie, and `Sec-CH-Prefers-Color-Scheme` is the only signal the
+   * server can read. `Accept-CH` opts into the hint; `Critical-CH` makes the browser
+   * retry the very first navigation with it attached, so even the first paint is
+   * right instead of the second.
+   *
+   * Chrome and Edge send it. Safari and Firefox implement no client hints and ignore
+   * both headers — there the fallback is light, corrected after hydration.
+   *
+   * No `Vary: Sec-CH-Prefers-Color-Scheme` here, deliberately: it was tried and
+   * measured away. Next.js writes its own `Vary` on every app-router response
+   * (`rsc, next-router-state-tree, …, Accept-Encoding`) and replaces the configured
+   * one, so the line looked like cache protection while providing none. Nothing
+   * caches these documents today — every app route is `ƒ` and carries
+   * `Cache-Control: no-cache, must-revalidate` — but a CDN put in front of this app
+   * has to be told to vary on the hint, because one URL now has two bodies.
+   */
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'Accept-CH', value: 'Sec-CH-Prefers-Color-Scheme' },
+          { key: 'Critical-CH', value: 'Sec-CH-Prefers-Color-Scheme' },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       // ─── Migrate locale-less marketing pages to [locale] ───
