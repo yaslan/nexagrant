@@ -82,6 +82,49 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 export type TenantTx = Prisma.TransactionClient;
 
 /**
+ * Thrown when a tenant-scoped read or write is attempted with no tenant.
+ *
+ * "No tenant" is never a wider query in this codebase — it is a refusal. The
+ * recurring leak this guards is a `where` clause built as
+ * `tenantId ? { tenantId } : {}`: a session without a tenant does not narrow
+ * the query, it *removes the filter*, and the screen renders every tenant's
+ * rows (TASK-MTRKV9JGY7OQY, TASK-MTUGJTD5HZDW0). The single-row twin,
+ * `{ id, tenantId } : { id }`, is worse — a lookup by a known id across
+ * tenants. Prisma produces the same result from `tenantId: undefined`, because
+ * it treats an undefined field in a `where` clause as *not written*.
+ *
+ * `src/lib/tenant.ts` refuses at the request boundary (redirect / 401 / throw);
+ * this one refuses at the query boundary, so a loader called directly — by a
+ * job, a test, or a future caller that skipped the boundary — still cannot
+ * reach the database without a tenant.
+ */
+export class MissingTenantScopeError extends Error {
+  readonly code = 'TENANT_SCOPE_REQUIRED';
+
+  constructor(context: string) {
+    super(`${context} was called without a tenant; refusing to query.`);
+    this.name = 'MissingTenantScopeError';
+  }
+}
+
+/**
+ * Narrows an untrusted `tenantId` to a non-empty string, or throws.
+ *
+ * Rejects `''` and whitespace as well as `null`/`undefined`: an empty string is
+ * falsy in the ternary that caused the leak, and `set_config('app.tenant_id',
+ * '')` would hand Postgres a tenant that matches no RLS policy while a
+ * superuser connection (the local default role) ignores RLS entirely.
+ */
+export function assertTenantScope(
+  tenantId: unknown,
+  context: string
+): asserts tenantId is string {
+  if (typeof tenantId !== 'string' || tenantId.trim().length === 0) {
+    throw new MissingTenantScopeError(context);
+  }
+}
+
+/**
  * Same as {@link withTenant}, but on an explicitly supplied client. Keeps the
  * tenant-scoping logic in exactly one place when a caller (a test, a job) needs
  * a connection other than the singleton.
@@ -91,6 +134,11 @@ export async function withTenantOn<T>(
   tenantId: string,
   callback: (tx: TenantTx) => Promise<T>
 ): Promise<T> {
+  // Before the connection is touched: every caller of this function is asking
+  // for a tenant-scoped transaction, so a missing tenant is a bug in the
+  // caller, not a request for an unscoped one.
+  assertTenantScope(tenantId, 'withTenantOn');
+
   return client.$transaction(async (tx) => {
     // Set the tenant context for this transaction.
     // `SET LOCAL app.tenant_id = $1` is a syntax error in Postgres — SET does not take

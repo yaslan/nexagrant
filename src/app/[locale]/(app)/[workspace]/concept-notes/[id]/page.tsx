@@ -1,12 +1,22 @@
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ConceptNoteEditor from './editor';
 import { errorMessage } from '@/lib/errors';
-import type { ConceptNoteRow, ConceptTemplateRow, ConceptTemplateSchema } from '@/modules/m2/types';
+import type { ConceptTemplateSchema } from '@/modules/m2/types';
 import { moduleGate } from '@/lib/modules/guard';
+import { requireTenantPage } from '@/lib/tenant';
+import { loadConceptNoteDetail, type ConceptNoteDetailData } from './data';
 
+/**
+ * One concept note (M2).
+ *
+ * The tenant used to come in as `session?.tenantId` and go into
+ * `where: tenantId ? { id, tenantId } : { id }` — with no tenant the note was
+ * fetched by id alone, so one known id read another tenant's draft
+ * (TASK-MTUGJTD5HZDW0). Resolution now goes through `requireTenantPage`, which
+ * never returns without a tenant, and the read lives in `./data.ts`, where
+ * `tenantId` is a required `string` re-checked before Prisma is touched.
+ */
 export default async function ConceptNoteDetailPage({
   params,
 }: {
@@ -15,39 +25,25 @@ export default async function ConceptNoteDetailPage({
   const { id, locale, workspace } = await params;
   const locked = await moduleGate('M2', locale);
   if (locked) return locked;
-  const session = await auth();
-  const tenantId = session?.tenantId;
+  // Redirects an anonymous visitor to login and a signed-in user with no
+  // membership to /no-workspace. It cannot hand back a null or empty tenant.
+  const { tenantId } = await requireTenantPage(locale);
 
-  let note: Omit<ConceptNoteRow, 'updatedAt'> | null = null;
-  let template: ConceptTemplateRow | null = null;
-  let opportunity: { title: string } | null = null;
-
+  let data: ConceptNoteDetailData | null = null;
   try {
-    const rawNote = await prisma.conceptNote.findFirst({
-      where: tenantId ? { id, tenantId } : { id },
-    });
-    note = (rawNote as unknown as Omit<ConceptNoteRow, 'updatedAt'>) || null;
-
-    if (note) {
-      const rawTemplate = await prisma.conceptTemplate.findUnique({
-        where: { id: note.templateId },
-      });
-      template = (rawTemplate as unknown as ConceptTemplateRow) || null;
-
-      if (note.opportunityId) {
-        opportunity = await prisma.opportunity.findUnique({
-          where: { id: note.opportunityId },
-          select: { title: true },
-        });
-      }
-    }
+    data = await loadConceptNoteDetail(tenantId, id);
   } catch (e) {
+    // Kept so an offline database 404s instead of crashing. The failure mode is
+    // "not found", never "another tenant's note".
     console.warn(`[ConceptNoteDetail] DB query bypassed: ${errorMessage(e)}`);
   }
 
-  if (!note) {
+  // Another tenant's id and a non-existent id give the same 404 on purpose.
+  if (!data) {
     notFound();
   }
+
+  const { note, template, opportunity } = data;
 
   const schema = (template?.schema || {
     sections: [

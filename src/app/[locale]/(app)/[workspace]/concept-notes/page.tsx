@@ -1,10 +1,20 @@
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
 import Link from 'next/link';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
+import { requireTenantPage } from '@/lib/tenant';
 import type { ConceptNoteRow, ConceptTemplateRow } from '@/modules/m2/types';
+import { loadConceptNotesIndex } from './data';
 
+/**
+ * The concept-note list (M2).
+ *
+ * The tenant used to come in as `session?.tenantId` and go into
+ * `where: tenantId ? { tenantId } : {}` — a tenantless session listed every
+ * tenant's concept notes (TASK-MTUGJTD5HZDW0). Resolution now goes through
+ * `requireTenantPage`, which never returns without a tenant, and the reads live
+ * in `./data.ts`, where `tenantId` is a required `string` re-checked before
+ * Prisma is touched.
+ */
 export default async function ConceptNotesListPage({
   params,
 }: {
@@ -14,24 +24,20 @@ export default async function ConceptNotesListPage({
   const locked = await moduleGate('M2', locale);
   if (locked) return locked;
 
-  const session = await auth();
-  const tenantId = session?.tenantId;
+  // Redirects an anonymous visitor to login and a signed-in user with no
+  // membership to /no-workspace. It cannot hand back a null or empty tenant.
+  const { tenantId } = await requireTenantPage(locale);
 
   let notes: ConceptNoteRow[] = [];
   let templates: ConceptTemplateRow[] = [];
 
   try {
-    const rawNotes = await prisma.conceptNote.findMany({
-      where: tenantId ? { tenantId } : {},
-      orderBy: { updatedAt: 'desc' },
-    });
-    notes = rawNotes as unknown as ConceptNoteRow[];
-
-    const rawTemplates = await prisma.conceptTemplate.findMany({
-      where: tenantId ? { OR: [{ tenantId: null }, { tenantId }] } : { tenantId: null },
-    });
-    templates = rawTemplates as unknown as ConceptTemplateRow[];
+    // Templates still include the platform rows (`tenantId` NULL) on purpose —
+    // see the comment on `loadConceptNotesIndex`.
+    ({ notes, templates } = await loadConceptNotesIndex(tenantId));
   } catch (e) {
+    // Kept so an offline or unseeded database renders the empty state instead
+    // of a crash. The failure mode is "no rows", never "other tenants' rows".
     console.warn(`[ConceptNotes] DB query bypassed: ${errorMessage(e)}`);
   }
 

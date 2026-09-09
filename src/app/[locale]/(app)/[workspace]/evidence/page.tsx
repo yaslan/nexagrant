@@ -1,9 +1,19 @@
-import { prisma } from '@/lib/db';
-import { auth } from '@/lib/auth';
 import EvidenceClient, { type EvidenceItemData } from './evidence-client';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
+import { requireTenantPage } from '@/lib/tenant';
+import { loadEvidenceItems } from './data';
 
+/**
+ * The Evidence Pack (M3).
+ *
+ * The tenant used to come in as `session?.tenantId` and go into
+ * `where: tenantId ? { tenantId } : {}` — a tenantless session read the whole
+ * Evidence table across tenants (TASK-MTUGJTD5HZDW0). Resolution now goes
+ * through `requireTenantPage`, which never returns without a tenant, and the
+ * read itself lives in `./data.ts`, where `tenantId` is a required `string`
+ * re-checked before Prisma is touched.
+ */
 export default async function EvidencePage({
   params
 }: {
@@ -13,21 +23,16 @@ export default async function EvidencePage({
   const locked = await moduleGate('M3', locale);
   if (locked) return locked;
 
-  const session = await auth();
-  const tenantId = session?.tenantId;
+  // Redirects an anonymous visitor to login and a signed-in user with no
+  // membership to /no-workspace. It cannot hand back a null or empty tenant.
+  const { tenantId } = await requireTenantPage(locale);
 
   let evidence: EvidenceItemData[] = [];
   try {
-    const rawItems = await prisma.evidence.findMany({
-      where: tenantId ? { tenantId } : {},
-      // The detail drawer distinguishes "no claim is linked" from "claims were not
-      // loaded", so the links have to come with the first render, not only from
-      // getEvidenceItemsAction.
-      include: { claimLinks: { include: { claim: true } } },
-      orderBy: { createdAt: 'desc' }
-    });
-    evidence = rawItems as unknown as EvidenceItemData[];
+    evidence = await loadEvidenceItems(tenantId);
   } catch (e) {
+    // Kept so an offline or unseeded database renders an empty pack instead of
+    // a crash. The failure mode is now "no rows", never "other tenants' rows".
     console.warn(`[Evidence] DB query bypassed: ${errorMessage(e)}`);
   }
 
