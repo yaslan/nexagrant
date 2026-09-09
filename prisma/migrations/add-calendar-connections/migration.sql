@@ -22,9 +22,10 @@ CREATE INDEX "CalendarConnection_userId" ON "CalendarConnection"("userId");
 
 -- RLS policy: users see only their own connections within their tenant
 ALTER TABLE "CalendarConnection" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "CalendarConnection" FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY "tenant_isolation" ON "CalendarConnection" AS RESTRICTIVE
-    USING (
-        (current_setting('app.tenant_id')::text != '' AND "tenantId" = current_setting('app.tenant_id')::text)
-        OR (SELECT current_setting('is_system')::boolean)
-    );
+DROP POLICY IF EXISTS tenant_isolation ON "CalendarConnection";
+
+CREATE POLICY tenant_isolation ON "CalendarConnection"
+    USING ("tenantId" = current_setting('app.tenant_id', true))
+    WITH CHECK ("tenantId" = current_setting('app.tenant_id', true));
