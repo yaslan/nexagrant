@@ -39,6 +39,7 @@ export default async function RelationshipsPage({
           organizationId: true,
           partnerOrgId: true,
           kind: true,
+          ownerUserId: true,
           counterpartName: true,
           counterpartEmail: true,
           warmth: true,

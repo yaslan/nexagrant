@@ -24,6 +24,11 @@ const opportunityUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const feedbackUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const proposalUsageUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const relationshipUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+// A run that could not finish an erasure has to raise an operator-visible
+// alarm, so `recordAlert`'s three calls are part of the client under test.
+const alertCreate = vi.fn().mockResolvedValue({ id: 'alert-1' });
+const alertFindMany = vi.fn().mockResolvedValue([]);
+const alertUpdate = vi.fn().mockResolvedValue({});
 
 vi.mock('../src/lib/db', () => ({
   prisma: {
@@ -43,6 +48,11 @@ vi.mock('../src/lib/db', () => ({
     feedback: { updateMany: (...args: unknown[]) => feedbackUpdateMany(...args) },
     proposalUsage: { updateMany: (...args: unknown[]) => proposalUsageUpdateMany(...args) },
     relationship: { updateMany: (...args: unknown[]) => relationshipUpdateMany(...args) },
+    systemAlert: {
+      create: (...args: unknown[]) => alertCreate(...args),
+      findMany: (...args: unknown[]) => alertFindMany(...args),
+      update: (...args: unknown[]) => alertUpdate(...args),
+    },
   },
 }));
 
@@ -50,7 +60,10 @@ vi.mock('../src/lib/storage', () => ({
   deleteUserFilesFromR2: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { purgeDueUsers } = await import('../src/lib/inngest/jobs/users-scheduled-deletion');
+const { purgeDueUsers, buildPurgeFailureAlert } = await import(
+  '../src/lib/inngest/jobs/users-scheduled-deletion'
+);
+const { alertIdentity } = await import('../src/lib/observability/system-alert');
 
 const daysAgo = (n: number) => {
   const d = new Date();
@@ -61,6 +74,8 @@ const daysAgo = (n: number) => {
 beforeEach(() => {
   vi.clearAllMocks();
   findMany.mockResolvedValue([]);
+  alertFindMany.mockResolvedValue([]);
+  alertCreate.mockResolvedValue({ id: 'alert-1' });
 });
 
 describe('purgeDueUsers — grace period', () => {
@@ -194,5 +209,95 @@ describe('purgeDueUsers — erasure', () => {
     expect(result.errors?.[0]).toMatchObject({ userId: 'bad', message: 'FK violation' });
     // The failed subject must not get an "erased" record it did not earn.
     expect(auditCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * TASK-MTTOUDNQ97X83 F-1. A missed statutory erasure deadline used to leave one
+ * trace: a `console.error` on a server nobody tails. The debt could grow in
+ * silence, which is the failure mode that matters here — not the failure itself.
+ */
+describe('purgeDueUsers — a failed run raises an alarm', () => {
+  const requestedAt = daysAgo(40);
+
+  test('writes a SystemAlert when an erasure could not be completed', async () => {
+    findMany.mockResolvedValue([
+      { id: 'bad', deletionRequestedAt: requestedAt, deletionReason: null, memberships: [] },
+    ]);
+    userDelete.mockRejectedValueOnce(Object.assign(new Error('Null constraint violation'), {
+      code: 'P2011',
+    }));
+
+    const result = await purgeDueUsers(30);
+
+    expect(result.failedCount).toBe(1);
+    expect(alertCreate).toHaveBeenCalledTimes(1);
+    const row = alertCreate.mock.calls[0][0].data;
+    expect(row.level).toBe('error');
+    expect(row.source).toBe('users-scheduled-deletion');
+    expect(row.meta).toMatchObject({
+      failedCount: 1,
+      failedUserIds: ['bad'],
+      failureKinds: ['P2011'],
+    });
+  });
+
+  test('a clean run writes no alert', async () => {
+    findMany.mockResolvedValue([
+      { id: 'ok', deletionRequestedAt: requestedAt, deletionReason: null, memberships: [] },
+    ]);
+
+    const result = await purgeDueUsers(30);
+
+    expect(result.failedCount).toBe(0);
+    expect(alertCreate).not.toHaveBeenCalled();
+  });
+
+  test('the alert body carries no personal data — only ids and error codes', () => {
+    const alert = buildPurgeFailureAlert([{ userId: 'u1', kind: 'P2011' }]);
+    const body = JSON.stringify(alert);
+    for (const key of ['email', 'name', 'password', 'token', 'reason', 'message']) {
+      expect(Object.keys(alert.meta)).not.toContain(key);
+    }
+    // The subject is referenced by id; nothing that reads like an address or a
+    // human name may appear anywhere in the row.
+    expect(body).not.toMatch(/@/);
+  });
+
+  test('the same failure two nights running is the same alert', () => {
+    // `recordAlert` folds a repeat into the open row only when the identity —
+    // level, source, message and meta — compares equal. Order must not matter.
+    const monday = buildPurgeFailureAlert([
+      { userId: 'a', kind: 'P2011' },
+      { userId: 'b', kind: 'P2011' },
+    ]);
+    const tuesday = buildPurgeFailureAlert([
+      { userId: 'b', kind: 'P2011' },
+      { userId: 'a', kind: 'P2011' },
+    ]);
+    expect(alertIdentity(tuesday)).toBe(alertIdentity(monday));
+
+    // A different account failing is a different fact and must open its own row.
+    const wednesday = buildPurgeFailureAlert([{ userId: 'c', kind: 'P2011' }]);
+    expect(alertIdentity(wednesday)).not.toBe(alertIdentity(monday));
+  });
+
+  test('a second failing night folds into the open alert instead of a new row', async () => {
+    findMany.mockResolvedValue([
+      { id: 'bad', deletionRequestedAt: requestedAt, deletionReason: null, memberships: [] },
+    ]);
+    userDelete.mockRejectedValue(Object.assign(new Error('Null constraint violation'), {
+      code: 'P2011',
+    }));
+    // The row last night's run left behind.
+    alertFindMany.mockResolvedValue([
+      { id: 'alert-1', meta: buildPurgeFailureAlert([{ userId: 'bad', kind: 'P2011' }]).meta },
+    ]);
+
+    await purgeDueUsers(30);
+
+    expect(alertCreate).not.toHaveBeenCalled();
+    expect(alertUpdate).toHaveBeenCalledTimes(1);
+    expect(alertUpdate.mock.calls[0][0].data.meta.alertRepeatCount).toBe(2);
   });
 });

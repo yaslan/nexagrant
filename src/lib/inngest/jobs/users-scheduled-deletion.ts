@@ -2,12 +2,64 @@ import { createHash } from 'node:crypto';
 import { inngest } from '../client';
 import { prisma } from '@/lib/db';
 import { deleteUserFilesFromR2 } from '@/lib/storage';
+import { errorCode } from '@/lib/errors';
+import { recordAlert } from '@/lib/observability/system-alert';
 import {
   UsersScheduledDeletionOutputSchema,
   type UsersScheduledDeletionOutput,
 } from '../events';
 
 const DEFAULT_GRACE_PERIOD_DAYS = 30;
+
+/**
+ * Identity of the "erasure did not finish" alert.
+ *
+ * `source` and `message` are constants and the meta below is derived only from
+ * *which* accounts failed and *how*, never from anything that varies run to
+ * run. That is deliberate: `recordAlert` identifies an alert by
+ * (level, source, message, meta) and folds a repeat into the open row
+ * (TASK-MTS80DUAF39Z8). A timestamp, an attempt counter or a raw error string
+ * in `meta` would silently defeat that and go back to one row per night.
+ */
+const PURGE_ALERT_SOURCE = 'users-scheduled-deletion';
+const PURGE_ALERT_MESSAGE = 'Scheduled erasure did not complete for every due account';
+
+/** One account the purge could not finish, reduced to what an alert may carry. */
+export interface PurgeFailure {
+  userId: string;
+  /** `P2011`, `ENOENT`, or the error class name — never the message text. */
+  kind: string;
+}
+
+/**
+ * The alert a failed purge run writes, built without touching the database so
+ * the shape can be pinned in a unit test.
+ *
+ * `SystemAlert` has no tenant column and no RLS policy, so nothing here may be
+ * personal data or tenant content: the subject is referenced by the `User.id`
+ * an operator can look up under tenant scope, and the reason is reduced to an
+ * error *code*. The messages themselves stay in the job output and the server
+ * log, which are already tenant-privileged.
+ */
+export function buildPurgeFailureAlert(failures: PurgeFailure[]): {
+  level: 'error';
+  source: string;
+  message: string;
+  meta: Record<string, unknown>;
+} {
+  return {
+    level: 'error',
+    source: PURGE_ALERT_SOURCE,
+    message: PURGE_ALERT_MESSAGE,
+    meta: {
+      failedCount: failures.length,
+      // Sorted, because `stableStringify` treats array order as meaningful and
+      // the same two accounts failing in the other order is the same alert.
+      failedUserIds: [...new Set(failures.map((f) => f.userId))].sort(),
+      failureKinds: [...new Set(failures.map((f) => f.kind))].sort(),
+    },
+  };
+}
 
 /**
  * Finds every account whose erasure grace period has expired and purges it.
@@ -37,6 +89,7 @@ export async function purgeDueUsers(
   let purgedCount = 0;
   let failedCount = 0;
   const errors: Array<{ userId: string; message: string }> = [];
+  const failures: PurgeFailure[] = [];
 
   for (const user of dueUsers) {
     const userId = user.id;
@@ -111,6 +164,10 @@ export async function purgeDueUsers(
       console.error(`[users-scheduled-deletion] failed for user ${userId}:`, error);
       failedCount++;
       errors.push({ userId, message });
+      failures.push({
+        userId,
+        kind: errorCode(error) ?? (error instanceof Error ? error.name : 'UnknownError'),
+      });
     }
   }
 
@@ -122,6 +179,14 @@ export async function purgeDueUsers(
   };
 
   if (errors.length > 0) output.errors = errors;
+
+  // A statutory erasure deadline that was missed must not be visible only as a
+  // `console.error` and a number in a return value nobody reads. `recordAlert`
+  // never throws, so a failure to raise the alarm cannot make the job worse
+  // than it already is.
+  if (failures.length > 0) {
+    await recordAlert(buildPurgeFailureAlert(failures));
+  }
 
   return UsersScheduledDeletionOutputSchema.parse(output);
 }

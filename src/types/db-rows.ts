@@ -38,6 +38,8 @@ export interface RelationshipRow {
   organizationId: string | null;
   partnerOrgId: string | null;
   kind: string;
+  /** Internal focal point. `null` = unassigned, or the owner was erased. */
+  ownerUserId: string | null;
   counterpartName: string | null;
   counterpartEmail: string | null;
   warmth: string;
