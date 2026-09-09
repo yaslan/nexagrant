@@ -33,3 +33,7 @@
 - [fabrika-topicmatch-is-keyed-per-topic-not-per-opportunity](fabrika-topicmatch-is-keyed-per-topic-not-per-opportunity.md) — Fabrika'da G0 kanıt kaydı TopicMatch konu başına anahtarlı ama puan fırsat başına değişir — aynı konuda iki fırsat panoda birbirinin puanını gösterir; "kanıta bağla" düzeltmelerinde anahtarın granülerliğini kontrol et
 
 - [fabrika-recard-verify-then-file-the-followups](fabrika-recard-verify-then-file-the-followups.md) — Bir kart ikinci kez düştüğünde işi tekrarlama — HEAD'de hâlâ çalıştığını ölç ve ilk raporun "ayrı kart şart" dediklerini board'da gerçekten açık mı diye KONTROL ET
+
+- [fabrika-retire-a-setting-loudly-not-silently](fabrika-retire-a-setting-loudly-not-silently.md) — Bir ortam değişkeni işlevsiz kaldığında şemadan silme — "set edilmiş ve YOK SAYILIYOR" diye raporla; sessizce silmek, hâlâ set eden kurulumun o sayının çalıştığını sanmasına yol açar
+- [fabrika-shared-tree-red-clears-when-its-owner-commits](fabrika-shared-tree-red-clears-when-its-owner-commits.md) — Paylaşılan ağaçta kırmızıyı `git status`'taki SAHİPLİK + import grafiğiyle atfet, sonra sahibi commit ettikten sonra tekrar koş — kırmızının kendiliğinden kapanması atfın kanıtıdır
+- [fabrika-verify-a-memory-notes-data-before-shipping-it](fabrika-verify-a-memory-notes-data-before-shipping-it.md) — Başka bir ajanın hafıza notu "27 AB oranını iki kaynakta doğruladım" dese bile oranları KENDİN çek — not kararı taşır, veriyi taşımaz; kaynağı ve veri tarihini koda yaz
