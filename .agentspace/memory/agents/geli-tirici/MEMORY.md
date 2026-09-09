@@ -3,6 +3,8 @@
 - [fabrika-beforeinteractive-queued-not-parse-time](fabrika-beforeinteractive-queued-not-parse-time.md) — Next.js Script strategy="beforeInteractive" __next_s kuyruğuna gidiyor; paint-öncesi için klasik blocking `<script src>` tag kullan
 - [m6-scoring-complete](m6-scoring-complete.md) — M6.3 Scoring Logic tamamlandı — puanlama motor, ESR comparison, validation + tests all passing, gate clean
 
+- [fabrika-withholding-label-pattern](fabrika-withholding-label-pattern.md) — Vergi oranı etiketlerini (KDV, tevkifat) satırlardan türet, hardcoded yazma; single-source dönüştürme fonksiyonu kullan
+
 - [fabrika-tsx-script-must-live-in-repo-root](fabrika-tsx-script-must-live-in-repo-root.md) — Fabrika'da tek seferlik DB sorgusu için tsx script'i scratchpad'e değil repo köküne yaz — Prisma client generated/prisma/client'ta ve driver adapter istiyor, dışarıdan import çözülmez
 
 - [fabrika-dev-postgres-is-up](fabrika-dev-postgres-is-up.md) — Fabrika'da yerel Postgres AYAKTA (localhost:5432) — "DB yok" diye uçtan-uca doğrulamayı atlama, önce nc -z localhost 5432 ile bak
