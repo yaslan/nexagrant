@@ -1,0 +1,24 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+◇ injected env (46) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+--- A. Does the LIVE database carry a nullable column? ---
+[{"column_name":"counterpartEmail","is_nullable":"YES","data_type":"text"},{"column_name":"counterpartName","is_nullable":"YES","data_type":"text"},{"column_name":"ownerUserId","is_nullable":"YES","data_type":"text"}]
+column comment: [{"description":"Internal focal point (User.id, no FK). NULL = unassigned. Detached by the KVKK/GDPR purge: a work assignment has no retention basis once the person is erased (A4 option C, 2026-09-08)."}]
+
+--- B. Before the purge ---
+[{"id":"qa-rel-r1-mttokwlf","ownerUserId":"qa-rel-subj-mttokwlf","counterpartName":"Partner mttokwlf","counterpartEmail":"partner-mttokwlf@x.invalid"},{"id":"qa-rel-r2-mttokwlf","ownerUserId":"qa-rel-other-mttokwlf","counterpartName":"NCP mttokwlf","counterpartEmail":"ncp-mttokwlf@x.invalid"}]
+
+--- C. Real purgeDueUsers() ---
+[R2 Cleanup] Storage not configured, skipping cleanup.
+{"success":true,"dueCount":1,"purgedCount":1,"failedCount":0}
+
+--- D. After the purge ---
+[{"id":"qa-rel-r1-mttokwlf","ownerUserId":null,"counterpartName":"Partner mttokwlf","counterpartEmail":"partner-mttokwlf@x.invalid"},{"id":"qa-rel-r2-mttokwlf","ownerUserId":"qa-rel-other-mttokwlf","counterpartName":"NCP mttokwlf","counterpartEmail":"ncp-mttokwlf@x.invalid"}]
+subject user row still present? false
+subject id left in ANY Relationship row? 0
+untouched colleague still assigned? true
+tenant's partner record survived (row + counterpart)? true
+
+--- E. Raw scan: does the erased id survive anywhere in Relationship? ---
+[{"hits":0}]
+
+(fixture removed)
