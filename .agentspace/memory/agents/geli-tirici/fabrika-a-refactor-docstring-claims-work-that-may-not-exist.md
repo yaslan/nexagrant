@@ -46,4 +46,23 @@ Mutasyonla ölç, ne yakaladığını öğren ([[fabrika-verify-a-memory-notes-d
 Raporda bu sınırı açıkça yaz. Test farklı bir yuvarlama kuralını yakalar; kuralın
 tek kaynaktan geldiğini ise yalnız çağrının kendisi garanti eder.
 
-İlgili: [[fabrika-fabrication-audit-must-cover-defaults]] · [[fabrika-photograph-degraded-state-by-renaming-function]]
+## Güncelleme (2026-09-09, TASK-MTTUSEJFOSPI): dosya YARIM dönüşmüş olabilir
+Aynı docstring'e ikinci kez döndüm. Bu sefer iddia *yanlış* değil, **eksik**ti:
+birleştirme `efatura.ts`'e ULAŞMIŞTI — `invoiceTotalsMinor` gerçekten
+`vatOnNetMinor`/`withholdingOnVatMinor` çağırıyordu. Ama **aynı dosyanın 150 satır
+aşağısındaki `generateUblTrXml`**, belgenin SATIRLARINI hâlâ major-unit float +
+`toFixed(2)` ile basıyordu. Yani tek belgede: toplamlar birleşik kural, o toplamları
+oluşturan satırlar ayrı kural.
+
+**Ders:** "şu dosya dönüştürüldü mü" yanlış soru. Bir modülde **hesaplayıcı**
+(`invoiceTotalsMinor`) ile **basıcı/render** (`generateUblTrXml`, HTML şablonu) ayrı
+yerlerdir ve refactor genelde ilkinde durur. Grep'i dosya adıyla değil kalıpla ve
+DOSYA İÇİNDE yap:
+```bash
+grep -n "toFixed(2)\|/ 100" src/lib/efatura.ts   # şablon içindeki para hesabını görürsün
+```
+Yapısal çare (bunu uyguladım): hesaplayıcı satır kırılımını da döndürsün
+(`TaxTotalsMinor.lines`), render onu OKUSUN — yeniden hesaplamasın. O zaman
+"satır toplamı = alt toplam" iki hesabın tesadüfen anlaşması değil, inşa gereği olur.
+
+İlgili: [[fabrika-fabrication-audit-must-cover-defaults]] · [[fabrika-photograph-degraded-state-by-renaming-function]] · [[fabrika-20-percent-vat-hides-rounding-bugs]]
