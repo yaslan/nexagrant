@@ -1,9 +1,9 @@
 ---
 name: fabrika-concurrent-commit-steals-your-stage
-description: Fabrika'da index paylaşıldığı için başka bir ajanın commit'i senin stage'lediğin dosyaları kendi commit'ine alabilir — commit çağrın "no changes added" derse işin kaybolmadı, HEAD'e bak
+description: Fabrika'da başka bir ajanın commit'i senin stage'lediğin VE hiç stage etmediğin dosyaları kendi commit'ine alabilir — "commit etmezsem güvendeyim" yanlış; kaynak değişikliğini doğrulamayı beklemeden erken commit et
 metadata:
   type: project
-updatedAt: 2026-09-08
+updatedAt: 2026-09-09
 ---
 
 Paralel ajanlar tek çalışma ağacını **ve tek git index'ini** paylaşıyor. `git add <yollarım>`
@@ -95,3 +95,24 @@ yalnız index'e geri konur).
 
 **Düzeltmesi:** `git reset --soft HEAD~1` → `git restore --staged <onların>` →
 `git commit` → `git add <onların>`. Çalışma ağacındaki içerikleri hiç değişmez.
+
+## Stage ETMEMEK de korumaz (2026-09-09, TASK-MTU27KSLSJZ9I)
+
+Yukarısı *stage'lediğin* dosyaların kapılmasını anlatıyor. Daha kötüsü de oluyor:
+**hiç stage etmediğin** çalışma-ağacı değişikliklerin de başkasının commit'ine girebilir.
+
+`src/lib/money.ts`, `src/lib/efatura.ts`, `src/lib/billing/invoice-list.ts` dosyalarını
+düzenledim, sonra ~10 dakika test yazıp `pnpm test`/`typecheck`/`lint` koştum — hiçbirini
+`git add` etmemiştim. O sırada başka bir worker (blok-zincir-dev) commit aldı ve
+`cfe54af test(billing): fail the invoice export gate…` benim üç dosyamı da (+85 satır)
+kendi içine aldı. `git status` bana temiz göründü; fark ancak `git diff --stat`'ın yalnız
+test dosyalarımı göstermesiyle anlaşıldı.
+
+Sonuç: "commit etmezsem güvendeyim" YANLIŞ. Paylaşılan ağaçta tek koruma **erken commit**:
+kaynak değişikliği tutarlı hale gelir gelmez, doğrulama fazını BEKLEMEDEN
+`git commit <yol> -F -` ile kendi mesajınla al. Doğrulama kırmızı çıkarsa üstüne ikinci bir
+commit atarsın; alternatifi işinin yanlış mesajla tarihe geçmesi.
+
+Kapıldıysa: `git show --stat <sha>` ile hangi dosyaların nereye gittiğini doğrula, paylaşılan
+`dev`'de `--amend`/rebase DENEME, sonuç raporunun "Riskler" bölümüne "kodum şu sha'da, mesaj
+bana ait değil" satırını yaz.
