@@ -81,3 +81,22 @@ select migration_name from _prisma_migrations order by finished_at;
 Adın orada yoksa iş bitmemiştir. Klasöre taşımak yetti (`<ad>/migration.sql`) → "4 migrations
 found / Applying migration `add-plan-versioning`". Dosyayı `IF NOT EXISTS` ile idempotent
 yazarsan zaten uygulanmış bir DB'de de sorunsuz koşar, `migrate resolve` gerekmez.
+
+**2026-09-09 eklemesi — kodun elle uygulanan bir migration'a bağlanması SESSİZ kusur üretir.**
+TASK-MTT1XL9NP2QYU'da imha işi (`purgeDueUsers`) `Relationship.ownerUserId`'ye NULL yazmaya
+başladı; kolonu nullable yapan `relationship-owner-nullable.sql` yine **başıboş** bir dosya ve bu
+depoda onu uygulayan hiçbir araç yok. Kolonu ölçüm için eski hâline (NOT NULL) alıp aynı işi
+koşunca:
+
+```
+purgeDueUsers -> {"dueCount":1,"purgedCount":0,"failedCount":1,
+                  "errors":[{"message":"...relationship.updateMany... Null constraint violation"}]}
+subject user row still present? true      subject id still in Relationship? 1
+SystemAlert rows written by the failure: 0
+```
+
+Yani migration koşulmazsa imha yapılmaz, kişinin kimliği kalır ve **hiçbir alarm üretilmez** —
+tek iz `console.error` ve iş çıktısındaki `failedCount`. Kural: bir kart hem şema hem kod
+değiştiriyorsa, **migration'sız yolu da ölç** ("kod önce çıkarsa ne olur?") ve başarısızlığın
+görünür olup olmadığını raporla. Sonda: `docs/agent-results/TASK-MTT1XL9NP2QYU-evidence/probe-migration-ordering.mts`
+(kolonu geçici değiştirir, `finally` ile geri alır — YALNIZ yerel dev DB).
