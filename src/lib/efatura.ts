@@ -409,8 +409,14 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
           </cac:TaxCategory>
         </cac:TaxSubtotal>`;
 
+      // Only generate withholding TaxSubtotal if the rate is valid (exact tenth).
+      // withholdingRateLabel returns empty string for invalid rates (CLAUDE.md #7),
+      // so we check it here too: the document may not claim a withholding rate
+      // it cannot express.
       const withholding =
-        line.withholdingRate && line.withholdingRate > 0
+        line.withholdingRate &&
+        line.withholdingRate > 0 &&
+        withholdingRateLabel(line.withholdingRate) !== ''
           ? `
         <cac:TaxSubtotal>
           <cbc:TaxableAmount currencyID="${invoice.currency}">${amount(lineTotals.vatMinor)}</cbc:TaxableAmount>
