@@ -73,3 +73,50 @@ for (const locale of ['tr', 'en']) {
     expect(offenders.length, offenders.join('\n')).toBe(0);
   });
 }
+
+/**
+ * The cart must survive a page reload. If the `isHydrated` guard in CartContext.tsx
+ * is removed, the pre-hydration empty placeholder would write back to localStorage
+ * on every render during hydration, erasing the customer's cart on reload.
+ * This test verifies the guard actually prevents that data loss.
+ */
+test('cart persists across page reload', async ({ page }) => {
+  await page.addInitScript(
+    ([cartKey, consentKey, cart]) => {
+      try {
+        localStorage.setItem(cartKey as string, cart as string);
+        localStorage.removeItem(consentKey as string);
+      } catch {
+        // Storage unavailable would make the seeding pointless, but not this test wrong.
+      }
+    },
+    [CART_STORAGE_KEY, CONSENT_STORAGE_KEY, JSON.stringify(SEEDED_CART)] as const
+  );
+
+  await page.goto('/tr', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+
+  // Verify the cart is present before reload
+  await expect(page.getByRole('button', { name: CART_BUTTON_LABEL.tr })).toBeVisible();
+
+  // Reload the page
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+
+  // Verify the cart button is still visible after reload
+  // (this means the cart data was not erased on re-hydration)
+  await expect(page.getByRole('button', { name: CART_BUTTON_LABEL.tr })).toBeVisible();
+
+  // Verify the cart items in localStorage were not wiped
+  const cartAfterReload = await page.evaluate(() => {
+    try {
+      const stored = localStorage.getItem('fonbridge_cart_items_v2');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  expect(cartAfterReload).not.toBeNull();
+  expect(Array.isArray(cartAfterReload)).toBe(true);
+  expect(cartAfterReload.length).toBeGreaterThan(0);
+});
