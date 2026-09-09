@@ -8,10 +8,10 @@ BEGIN
     'Membership','Workspace','TenantProfile','ModuleState','Subscription','AddOn','CreditLedger',
     'LifetimeLicence','Invoice','TenantBillingIdentity',
     'TopicMatch','SavedSearch','Opportunity','GateDecision','ConsortiumSeat','PartnerOrg','Proposal','Effort',
-    'Evidence','ConceptNote','Relationship','Interaction','SeatCandidate','AiUsageLog','AuditEvent',
+    'Evidence','ConceptNote','Relationship','Interaction','SeatCandidate','AiUsageLog',
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
     'TtoPortfolioItem','MarketplaceListing','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
-    'PlanAssignment'
+    'PlanAssignment','ClaimEvidenceLink','EvidenceReminder'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
@@ -22,18 +22,36 @@ BEGIN
   END LOOP;
 END $$;
 
--- Tables with nullable tenantId (shared rows visible to all): Document, Chunk, ConceptTemplate
+-- Tables with nullable tenantId: Document, Chunk, ConceptTemplate, AuditEvent.
+--
+-- For the first three, NULL means "platform row, visible to every tenant".
+-- For AuditEvent it means "this event belongs to no tenant" — a KVKK/GDPR
+-- erasure request from a user with no membership
+-- (src/actions/user/request-deletion.ts). Under `tenant_isolation` that row was
+-- unwritable and unreadable, because in SQL `NULL = 'x'` is NULL, not true, so
+-- the audit trail for exactly those subjects was dropped silently
+-- (TASK-MTU6HUB8FUHMG C-2). The DROP of tenant_isolation below removes the
+-- policy AuditEvent carried until then; a permissive policy left in place would
+-- OR with this one and outlive the fix in every already-migrated database.
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['Document','Chunk','ConceptTemplate'] LOOP
+  FOREACH t IN ARRAY ARRAY['Document','Chunk','ConceptTemplate','AuditEvent'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I', t);
     EXECUTE format('DROP POLICY IF EXISTS tenant_or_shared ON %I', t);
     EXECUTE format($p$CREATE POLICY tenant_or_shared ON %I
       USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.tenant_id', true))
       WITH CHECK ("tenantId" IS NULL OR "tenantId" = current_setting('app.tenant_id', true))$p$, t);
   END LOOP;
 END $$;
+
+-- AuditEvent had FORCE from the tenant_isolation loop it just left; the shared
+-- loop above does not FORCE, so re-state it here rather than let the C-2 fix
+-- quietly exempt the table owner. Only AuditEvent: adding FORCE to Document /
+-- Chunk / ConceptTemplate would change how seeds and importers write them, and
+-- that is not this change.
+ALTER TABLE "AuditEvent" FORCE ROW LEVEL SECURITY;
 
 -- The public pricing page counts lifetime licences from outside any tenant, so
 -- under `tenant_isolation` it would read zero and report "no owners yet" while

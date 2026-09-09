@@ -8,6 +8,8 @@ Kaynak: `prisma/schema.prisma` (bağlayıcı). Bu dosya niyeti ve ilişkileri a�
 - `Membership(tenant, user, role, workspaceIds[])`; boş `workspaceIds` = tüm çalışma alanları.
 - **Paylaşımlı (tenant-agnostik) tablolar:** `Programme, Call, Topic, TopicStat, Organization, Project, Participation, OrgTopicStat, Collab, ModuleCatalog, Plan, AddOnCatalog, Document(tenantId=null), RawFetch, SystemAlert`. RLS: herkese okuma, yalnızca sistem yazma.
 - **Kiracıya özel:** geri kalan tümü; `tenantId` zorunlu, RLS `tenant_id = current_setting('app.tenant_id')`.
+  Tek istisna sınıfı `tenantId String?` taşıyan tablolardır (`Document`, `Chunk`, `ConceptTemplate`,
+  `AuditEvent`) — bkz. §1.1; onlar `tenant_or_shared` politikasını alır.
 - ⚠️ **`SystemAlert` kiracı içeriği taşımaz.** Tabloda `tenantId` yoktur ve `prisma/rls.sql`
   içinde **hiçbir politikası yoktur** — buraya yazılan her şey kiracı yalıtımının dışındadır.
   Uyarılara başlık, gövde, e-posta, sayfa adresi veya `tenantId` yazılmaz; yalnızca
@@ -17,6 +19,37 @@ Kaynak: `prisma/schema.prisma` (bağlayıcı). Bu dosya niyeti ve ilişkileri a�
   Okuyucu: `/[locale]/admin/alerts` (yalnız platform-admin).
   İndeksler: `[createdAt]`, `[source, createdAt]`, `[resolvedAt, createdAt]`
   (`prisma/migrations/add-systemalert-console-indexes.sql`).
+
+### 1.1 RLS politika sınıfları (TASK-MTU6HUB8FUHMG)
+
+Her tablo üç sınıftan **birine** girer. Sınıf `scripts/rls-models.ts` içinde tanımlıdır ve iki
+kapı da (statik `pnpm rls:check`, canlı `pnpm rls:verify`) aynı listeyi okur.
+
+| Sınıf | Politika | `rls-models.ts` | Anlamı |
+|---|---|---|---|
+| Kiracıya özel | `tenant_isolation` (+ FORCE) | listede yok (varsayılan) | `tenantId` **zorunlu**; yalnız kendi kiracısı okur/yazar |
+| Kiracısı olmayabilen | `tenant_or_shared` | `NULLABLE_TENANT` | `tenantId` **`String?`**; `NULL` satır herkese açık |
+| Sistem tablosu | politika yok | `SYSTEM_WIDE` | tabloda `tenantId` **hiç yok** |
+
+- ⚠️ `SYSTEM_WIDE` **iki kapıdan da muafiyettir.** Oraya konan bir tablo için kapı asla kırmızı
+  yanmaz. Bu yüzden bir tablo oraya "kiracısı yok" olduğu için girer, "kapı sussun" diye değil.
+  `ClaimEvidenceLink` ve `EvidenceReminder` bu listede duruyordu; ikisi de bir kiracının
+  `Claim`/`Evidence` satırlarını birbirine bağlıyor, `EvidenceReminder.recipientEmails` ise
+  o kiracının insanlarının e-posta adresi. İkisine de `tenantId String` eklendi
+  (`prisma/migrations/add-evidence-link-tenant-id.sql`), `tenant_isolation` kapsamına alındı,
+  `SYSTEM_WIDE`'dan çıkarıldı. RLS satırdaki **kolonu** okur; yabancı anahtarı takip edip
+  `Evidence.tenantId`'ye gitmez — bu yüzden kolon tabloda bulunmak zorundadır.
+- ⚠️ **`tenantId` `String?` ise `tenant_isolation` YANLIŞ politikadır.** SQL'de `NULL = 'x'`
+  sonucu `true` değil `NULL`'dur, yani `tenantId`'si boş satır ne `USING` ne `WITH CHECK`
+  koşulunu geçer: yazılamaz ve okunamaz, üstelik sessizce. `AuditEvent.tenantId` `String?` olduğu
+  hâlde sıkı politikadaydı; `src/actions/user/request-deletion.ts` hiçbir kiracıya üye olmayan bir
+  kullanıcının KVKK/GDPR silme talebi için tam da böyle bir satır yazıyor, o iz kayboluyordu.
+  `AuditEvent` artık `Document`/`Chunk`/`ConceptTemplate` ile aynı `tenant_or_shared` desenini
+  kullanıyor (`prisma/migrations/auditevent-tenant-or-shared.sql`); `tenantId` **dolu** satırlar
+  için hiçbir gevşeme yok, yalnız boş olanlar yaşayabiliyor. Tablo, sıkı döngüden çıkarken
+  kaybettiği `FORCE ROW LEVEL SECURITY`'yi ayrı bir satırla koruyor.
+- Sınırlar `tests/rls-coverage.test.ts` ile bağlanmıştır: `SYSTEM_WIDE` üyesi hiçbir modelde
+  `tenantId` olamaz, `NULLABLE_TENANT` üyesinin `tenantId`'si `String?` olmak zorundadır.
 
 ## 2. Ana akış (K5)
 

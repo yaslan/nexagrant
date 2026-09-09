@@ -937,8 +937,13 @@ model Claim {
   @@index([tenantId])
 }
 
+// Every row is a join between one tenant's Claim and that same tenant's
+// Evidence, so it is tenant data even though it looks like a pure link table.
+// `tenantId` is carried on the row itself: RLS reads a column, it does not
+// follow a foreign key (TASK-MTU6HUB8FUHMG B-1).
 model ClaimEvidenceLink {
   id                 String               @id @default(cuid())
+  tenantId           String
   claimId            String
   evidenceId         String
   isPrimary          Boolean              @default(true)
@@ -948,6 +953,7 @@ model ClaimEvidenceLink {
   evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
 
   @@unique([claimId, evidenceId])
+  @@index([tenantId])
 }
 
 model ProposalUsage {
@@ -964,14 +970,21 @@ model ProposalUsage {
   @@index([tenantId, opportunityId])
 }
 
+// `recipientEmails` is personal data, so a row here is tenant data twice over:
+// it hangs off one tenant's Evidence and it names that tenant's people. Carried
+// on the row so RLS can see it (TASK-MTU6HUB8FUHMG B-1).
 model EvidenceReminder {
   id                 String               @id @default(cuid())
+  tenantId           String
   evidenceId         String
   notifyAt           DateTime
   sent               Boolean              @default(false)
   recipientEmails    String[]
 
   evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([sent, notifyAt])
 }
 
 // ───────────────────────── M2 Concept Note ─────────────────────────
@@ -1101,6 +1114,12 @@ model Chunk {
 
 // ───────────────────────── Audit ─────────────────────────
 
+// `tenantId` is nullable on purpose: a KVKK/GDPR erasure request from a user
+// who belongs to no tenant still has to leave a trail
+// (src/actions/user/request-deletion.ts). So this table takes the
+// `tenant_or_shared` policy, not `tenant_isolation` — under strict isolation
+// `NULL = 'x'` is not true and that row could be neither written nor read
+// (TASK-MTU6HUB8FUHMG C-2).
 model AuditEvent {
   id        String   @id @default(cuid())
   tenantId  String?
