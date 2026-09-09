@@ -44,6 +44,19 @@ describe('totalsForLines', () => {
     expect(totals.totalMinor).toBe(24_000);
   });
 
+  it('rounds a fractional quantity the way the document does: 0.5 × 113 = 56.5 → 57', () => {
+    // `invoiceLineSchema` permits a fractional `quantity`, so the panel has to
+    // round the line's own net. It and `invoiceTotalsMinor` in src/lib/efatura.ts
+    // each spelled that rounding out for themselves until TASK-MTU27KSLSJZ9I;
+    // both now read `lineNetMinor`. 57 kuruş net, 20% of that is 11.4 → 11.
+    const totals = totalsForLines([
+      { name: 'yarım gün', quantity: 0.5, unitCode: 'C62', unitPriceMinor: 113, vatRate: 20 },
+    ]);
+    expect(totals.subtotalMinor).toBe(57);
+    expect(totals.vatMinor).toBe(11);
+    expect(totals.totalMinor).toBe(68);
+  });
+
   it('subtracts withholding from the VAT the buyer actually pays', () => {
     const totals = totalsForLines([
       {

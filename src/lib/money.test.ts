@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyPercentDiscount, currencyExponent, formatMoney, sameAmount, toDecimalString, toMinorUnits } from './money';
+import { applyPercentDiscount, currencyExponent, formatMoney, lineNetMinor, sameAmount, toDecimalString, toMinorUnits } from './money';
 
 describe('toMinorUnits', () => {
   it('parses provider decimal strings', () => {
@@ -94,5 +94,75 @@ describe('formatMoney', () => {
 
   it('refuses a non-integer amount rather than rendering a rounded one', () => {
     expect(() => formatMoney(26.105, 'USD', 'en')).toThrow();
+  });
+});
+
+describe('lineNetMinor', () => {
+  // Every expectation is a kuruş figure computed by hand in the test name.
+  // Nothing here compares the function with a second expression of the same
+  // rule — that would prove only that the rule agrees with itself.
+
+  it('multiplies an integer quantity out exactly, with nothing to round', () => {
+    expect(lineNetMinor(3, 1999)).toBe(5997);
+    expect(lineNetMinor(1, 895_000)).toBe(895_000);
+    expect(lineNetMinor(2, 10_000)).toBe(20_000);
+  });
+
+  it('rounds a fractional quantity half-up: 0.5 × 113 = 56.5 → 57', () => {
+    // The case `invoiceLineSchema` actually permits (`z.number().positive()`):
+    // half a day of a ₺1.13 unit. The line has to print 0.56 or 0.57.
+    expect(lineNetMinor(0.5, 113)).toBe(57);
+  });
+
+  it('rounds a half-kuruş tie up, not to even: 0.5 × 111 = 55.5 → 56', () => {
+    // Banker's rounding would give 56 here too, but 55.5 → 56 and 56.5 → 57
+    // together rule it out: half-to-even would send 56.5 down to 56.
+    expect(lineNetMinor(0.5, 111)).toBe(56);
+    expect(lineNetMinor(0.5, 113)).toBe(57);
+  });
+
+  it('handles a third of a month: 0.333 × 89500 = 29803.5 → 29804', () => {
+    expect(lineNetMinor(0.333, 89_500)).toBe(29_804);
+  });
+
+  it('handles one and a half units: 1.5 × 4501 = 6751.5 → 6752', () => {
+    expect(lineNetMinor(1.5, 4501)).toBe(6752);
+  });
+
+  it('is Math.round, not floor(x + 0.5) — they differ on a real double', () => {
+    // 0.49999999999999994 is the largest double below 0.5; adding 0.5 to it
+    // rounds up to exactly 1 in binary floating point, so `floor(x + 0.5)`
+    // returns 1 where `Math.round` returns 0. A fractional quantity puts
+    // arbitrary doubles into this product, and the two call sites this
+    // function replaced both ran `Math.round` (TASK-MTU27KSLSJZ9I).
+    expect(Math.floor(0.49999999999999994 + 0.5)).toBe(1);
+    expect(lineNetMinor(0.49999999999999994, 1)).toBe(0);
+  });
+
+  it('gives 0 for a free line, at any quantity', () => {
+    // A zero unit price is a real line (a bundled item), not a missing price.
+    expect(lineNetMinor(2, 0)).toBe(0);
+    expect(lineNetMinor(0.5, 0)).toBe(0);
+    expect(lineNetMinor(0, 895_000)).toBe(0);
+  });
+
+  it('refuses a negative amount rather than putting a credit on a sale', () => {
+    expect(() => lineNetMinor(1, -100)).toThrow();
+    expect(() => lineNetMinor(-1, 100)).toThrow();
+  });
+
+  it('refuses a unit price that is not already in whole minor units', () => {
+    // A major-unit float reaching here is the TASK-MTTUSEJFOSPI bug returning.
+    expect(() => lineNetMinor(1, 8.95)).toThrow();
+    expect(() => lineNetMinor(1, Number.NaN)).toThrow();
+  });
+
+  it('refuses a quantity that is not a finite number', () => {
+    expect(() => lineNetMinor(Number.NaN, 100)).toThrow();
+    expect(() => lineNetMinor(Number.POSITIVE_INFINITY, 100)).toThrow();
+  });
+
+  it('refuses a product outside the safe integer range', () => {
+    expect(() => lineNetMinor(1e10, Number.MAX_SAFE_INTEGER)).toThrow();
   });
 });
