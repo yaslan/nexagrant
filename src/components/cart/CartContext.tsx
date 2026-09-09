@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { useIsHydrated } from '@/lib/hooks/use-is-hydrated';
 import {
   type BillingCycle,
   type DiscountTier,
@@ -86,6 +87,9 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
  */
 const CART_STORAGE_KEY = 'fonbridge_cart_items_v2';
 
+/** One shared empty cart, so the pre-hydration snapshot keeps a stable identity. */
+const EMPTY_ITEMS: CartItem[] = [];
+
 /** Drops anything that is not a `{sku, quantity}` line of the current shape. */
 function readStoredItems(): CartItem[] {
   try {
@@ -113,23 +117,52 @@ export function CartProvider({
   /** Comes from `getActiveTier()` in the server layout — never chosen here. */
   activeTier: DiscountTier;
 }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>(readStoredItems);
+  /**
+   * `readStoredItems` used to be the `useState` initialiser, and an initialiser runs
+   * *during* render — on the server too, where there is no `localStorage`. So the server
+   * rendered an empty cart while the client's very first render already held the stored
+   * one; `CartDrawer` only emits its floating button when `itemCount > 0`, so the server
+   * HTML had no button where the client tree had one and React reported "Hydration failed
+   * because the server rendered HTML didn't match the client".
+   *
+   * `useIsHydrated` is `false` on the server and through the whole hydration pass, `true`
+   * from the first client-only render onwards. The storage read now waits for it: server
+   * and hydration agree on an empty cart, and the real cart arrives one frame later.
+   */
+  const isHydrated = useIsHydrated();
+  const restoredItems = useMemo(
+    () => (isHydrated ? readStoredItems() : EMPTY_ITEMS),
+    [isHydrated]
+  );
+
+  /** What this session has changed. `null` while the cart is still exactly what was stored. */
+  const [editedItems, setEditedItems] = useState<CartItem[] | null>(null);
+  const cartItems = editedItems ?? restoredItems;
+
   const [isOpen, setIsOpen] = useState(false);
 
+  /** Every mutation edits the stored cart, not the pre-hydration placeholder. */
+  const updateItems = (update: (prev: CartItem[]) => CartItem[]) => {
+    setEditedItems((prev) => update(prev ?? restoredItems));
+  };
+
   useEffect(() => {
+    // Before hydration `cartItems` is the empty placeholder rather than the customer's
+    // cart, and writing that back would erase the stored cart on every page load.
+    if (!isHydrated) return;
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
     } catch {
       // A blocked or full localStorage must not break the cart itself.
     }
-  }, [cartItems]);
+  }, [cartItems, isHydrated]);
 
   const openCart = () => setIsOpen(true);
   const closeCart = () => setIsOpen(false);
   const toggleCart = () => setIsOpen((prev) => !prev);
 
   const addToCart = (newItem: CartItem) => {
-    setCartItems((prevItems) => {
+    updateItems((prevItems) => {
       // A subscription plan or a lifetime licence replaces any other one.
       if (newItem.type === 'plan' || newItem.type === 'lifetime') {
         const others = prevItems.filter((i) => i.type !== 'plan' && i.type !== 'lifetime');
@@ -149,10 +182,10 @@ export function CartProvider({
   };
 
   const removeFromCart = (sku: string) => {
-    setCartItems((prev) => prev.filter((item) => item.sku !== sku));
+    updateItems((prev) => prev.filter((item) => item.sku !== sku));
   };
 
-  const clearCart = () => setCartItems([]);
+  const clearCart = () => updateItems(() => []);
 
   /**
    * The cart, as a stable string. Used to tell a quote that belongs to what is

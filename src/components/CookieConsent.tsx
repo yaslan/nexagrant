@@ -1,35 +1,50 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
+import { useIsHydrated } from '@/lib/hooks/use-is-hydrated';
+
+const CONSENT_STORAGE_KEY = 'fabrika_cookie_consent';
+
+/** Whether this browser has already answered. Client-only: the server cannot see storage. */
+function hasStoredConsent(): boolean {
+  try {
+    return Boolean(localStorage.getItem(CONSENT_STORAGE_KEY));
+  } catch {
+    // Storage disabled (private mode, blocked site data): treat it as unanswered.
+    return false;
+  }
+}
 
 export default function CookieConsent() {
-  const [visible, setVisible] = useState(() => {
-    try {
-      const consent = localStorage.getItem('fabrika_cookie_consent');
-      return !consent;
-    } catch {
-      return false;
-    }
-  });
+  /**
+   * The banner used to decide its own visibility from a `useState` initialiser that read
+   * `localStorage` — during render, so the server (no storage) rendered nothing while the
+   * client's first render already rendered the dialog, and the trees diverged. The read now
+   * waits for `useIsHydrated`, which is `false` on the server and through hydration.
+   */
+  const isHydrated = useIsHydrated();
+  const answered = useMemo(() => (isHydrated ? hasStoredConsent() : false), [isHydrated]);
+  const [dismissed, setDismissed] = useState(false);
+  const visible = isHydrated && !answered && !dismissed;
   const locale = useLocale();
 
   const handleAccept = () => {
-    localStorage.setItem('fabrika_cookie_consent', JSON.stringify({
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({
       accepted: true,
       time: new Date().toISOString(),
       level: 'all',
     }));
-    setVisible(false);
+    setDismissed(true);
   };
 
   const handleReject = () => {
-    localStorage.setItem('fabrika_cookie_consent', JSON.stringify({
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({
       accepted: false,
       time: new Date().toISOString(),
       level: 'essential',
     }));
-    setVisible(false);
+    setDismissed(true);
   };
 
   if (!visible) return null;
