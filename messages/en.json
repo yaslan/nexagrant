@@ -861,6 +861,88 @@
       "errorRetry": "Try again"
     }
   },
+  "m8": {
+    "badge": {
+      "consultancy": "Consulting & Coaching",
+      "patentLicense": "Patent Licensing",
+      "service": "R&D & Lab Service"
+    },
+    "header": {
+      "moduleLabel": "Module 8 — Expert & Consultant Marketplace",
+      "title": "R&D Expert Marketplace & Partner API",
+      "subtitle": "Independent Horizon Europe writers, certified M6 reviewers, and TTO patent licenses.",
+      "apiFeeBadge": "Open API & 10% Fee Engine",
+      "metrics": {
+        "activeListings": "Active Marketplace Listings",
+        "listingUnit": "Listing",
+        "verifiedReviewer": "Certified M6 Reviewer",
+        "verifiedBadge": "Certified",
+        "commissionRate": "Platform Commission Rate",
+        "commissionUnit": "Payout",
+        "activeApiKeys": "Active Partner API Keys",
+        "keyUnit": "Key"
+      }
+    },
+    "tabs": {
+      "listings": "Marketplace Listings ({count})",
+      "post": "Post New Service Listing",
+      "apikeys": "Partner Intelligence API Keys"
+    },
+    "filter": {
+      "label": "Filter:",
+      "all": "All Services ({count})",
+      "consultancy": "Consulting & Coaching",
+      "patentLicense": "Patent Licensing",
+      "service": "R&D & Lab"
+    },
+    "listing": {
+      "priceTbd": "Negotiable",
+      "verifiedBadge": "Certified M6 Reviewer Badge",
+      "orderButton": "Request Service / Order"
+    },
+    "postForm": {
+      "heading": "Publish New Service or Expertise Listing",
+      "subtitle": "Showcase your independent writer, TTO, or R&D lab to Horizon Europe consortia.",
+      "titleLabel": "Listing Title",
+      "titlePlaceholder": "e.g. Horizon Europe Grant Proposal Pre-evaluation & Proofreading",
+      "typeLabel": "Listing Type",
+      "typeConsultancy": "Consulting & Coaching",
+      "typePatentLicense": "Patent Licensing",
+      "typeService": "R&D Service / Lab Testing",
+      "priceLabel": "Service Fee (€)",
+      "pricePlaceholder": "e.g. €1,500 / Proposal",
+      "detailsLabel": "Service Details & Scope",
+      "detailsPlaceholder": "Scope of service, delivery time, and the expert's EU project experience...",
+      "commissionNoteLabel": "Platform Commission Note:",
+      "commissionNoteBody": "A 10% service fee is deducted from consulting payments completed through the platform.",
+      "publishing": "Publishing...",
+      "submit": "Publish Listing to Marketplace"
+    },
+    "apiKeys": {
+      "generateHeading": "Generate New API Key",
+      "nameLabel": "API Key Label / App Name",
+      "namePlaceholder": "e.g. ERP Integration, CRM Bot",
+      "generating": "Generating...",
+      "generateButton": "Generate API Key (fp_live_...)",
+      "newKeyWarning": "⚠️ Newly Generated Secret API Key (Shown Only Once):",
+      "listHeading": "Current API Keys ({count})",
+      "tableName": "API Key Name",
+      "tablePrefix": "Prefix",
+      "tableCreated": "Created",
+      "tableStatus": "Status",
+      "statusActive": "Active"
+    },
+    "orderModal": {
+      "heading": "Service Request / Order",
+      "confirmedHeading": "Your Order Is Confirmed!",
+      "orderNumber": "Order No: {id}",
+      "totalAmount": "Total Amount: €{amount} (Platform Fee Included)",
+      "selectedService": "Selected Service:",
+      "escrowNote": "🔒 Secure escrow payment protects the fee until the consultant delivers the work.",
+      "ordering": "Submitting Order...",
+      "confirmButton": "Confirm Order and Start"
+    }
+  },
   "m9": {
     "alerts": {
       "dismiss": "Dismiss"

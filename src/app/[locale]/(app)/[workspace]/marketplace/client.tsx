@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  Store, 
-  Key, 
-  Plus, 
-  Award, 
-  CheckCircle2, 
-  Sparkles, 
-  Copy, 
-  Check, 
+import { useTranslations } from 'next-intl';
+import {
+  Store,
+  Key,
+  Plus,
+  Award,
+  CheckCircle2,
+  Sparkles,
+  Copy,
+  Check,
   X
 } from 'lucide-react';
 import { createMarketplaceListing, orderMarketplaceService, generateApiKey } from '@/modules/marketplace/server/actions';
@@ -56,6 +57,7 @@ export function MarketplaceClient({
   listings: initialListings,
   apiKeys: initialApiKeys,
 }: MarketplaceClientProps) {
+  const t = useTranslations('m8');
   const [listings, setListings] = useState<ListingItem[]>(initialListings);
   const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>(initialApiKeys);
   const [activeTab, setActiveTab] = useState<'listings' | 'post' | 'apikeys'>('listings');
@@ -169,11 +171,11 @@ export function MarketplaceClient({
   const getKindBadge = (k: string) => {
     switch (k) {
       case 'consultancy':
-        return <span className="bg-purple-500/15 text-purple-400 border border-purple-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">Danışmanlık & Koçluk</span>;
+        return <span className="bg-purple-500/15 text-purple-400 border border-purple-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('badge.consultancy')}</span>;
       case 'patent_license':
-        return <span className="bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">Patent Lisanslama</span>;
+        return <span className="bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('badge.patentLicense')}</span>;
       case 'service':
-        return <span className="bg-accent/15 text-accent border border-accent/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">Ar-Ge & Lab Hizmeti</span>;
+        return <span className="bg-accent/15 text-accent border border-accent/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('badge.service')}</span>;
       default:
         return <span className="bg-surface-hover text-ink border border-border px-2.5 py-0.5 rounded-full font-bold text-[11px]">{k}</span>;
     }
@@ -187,19 +189,19 @@ export function MarketplaceClient({
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-accent font-semibold tracking-wider uppercase mb-1">
               <Store className="w-4 h-4 text-accent" />
-              <span>Modül 8 — Expert & Consultant Marketplace</span>
+              <span>{t('header.moduleLabel')}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-ink">
-              Ar-Ge Uzman Pazaryeri & Partner API
+              {t('header.title')}
             </h1>
             <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl">
-              Ufuk Avrupa bağımsız yazarları, onaylı M6 değerlendiricileri ve TTO patent lisansları.
+              {t('header.subtitle')}
             </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-xs bg-accent/10 border border-accent/20 text-accent-ink px-3.5 py-1.5 rounded-full font-mono font-bold">
-              Open API & %10 Fee Engine
+              {t('header.apiFeeBadge')}
             </span>
           </div>
         </div>
@@ -207,31 +209,31 @@ export function MarketplaceClient({
         {/* Metric Cards Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-border text-xs">
           <div className="bg-ground border border-border rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Aktif Pazaryeri İlanı</span>
+            <span className="text-muted block text-[11px]">{t('header.metrics.activeListings')}</span>
             <span className="text-xl font-bold text-ink font-mono mt-0.5 block">
-              {listings.length} <span className="text-xs text-muted">İlan</span>
+              {listings.length} <span className="text-xs text-muted">{t('header.metrics.listingUnit')}</span>
             </span>
           </div>
 
           <div className="bg-ground border border-border rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Onaylı M6 Değerlendirici</span>
+            <span className="text-muted block text-[11px]">{t('header.metrics.verifiedReviewer')}</span>
             <span className="text-xl font-bold text-emerald-500 font-mono mt-0.5 block flex items-center gap-1">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Sertifikalı
+              {t('header.metrics.verifiedBadge')}
             </span>
           </div>
 
           <div className="bg-ground border border-border rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Platform Komisyon Oranı</span>
+            <span className="text-muted block text-[11px]">{t('header.metrics.commissionRate')}</span>
             <span className="text-xl font-bold text-accent font-mono mt-0.5 block">
-              %10 <span className="text-xs text-muted">Hak Ediş</span>
+              %10 <span className="text-xs text-muted">{t('header.metrics.commissionUnit')}</span>
             </span>
           </div>
 
           <div className="bg-ground border border-border rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Aktif Partner API Key</span>
+            <span className="text-muted block text-[11px]">{t('header.metrics.activeApiKeys')}</span>
             <span className="text-xl font-bold text-purple-400 font-mono mt-0.5 block">
-              {apiKeys.length} <span className="text-xs text-muted">Anahtar</span>
+              {apiKeys.length} <span className="text-xs text-muted">{t('header.metrics.keyUnit')}</span>
             </span>
           </div>
         </div>
@@ -248,7 +250,7 @@ export function MarketplaceClient({
           }`}
         >
           <Store className="w-4 h-4" />
-          <span>Pazar Yeri İlanları ({listings.length})</span>
+          <span>{t('tabs.listings', { count: listings.length })}</span>
         </button>
 
         <button
@@ -260,7 +262,7 @@ export function MarketplaceClient({
           }`}
         >
           <Plus className="w-4 h-4" />
-          <span>Yeni Hizmet İlanı Ver</span>
+          <span>{t('tabs.post')}</span>
         </button>
 
         <button
@@ -272,7 +274,7 @@ export function MarketplaceClient({
           }`}
         >
           <Key className="w-4 h-4" />
-          <span>Partner Intelligence API Anahtarları</span>
+          <span>{t('tabs.apikeys')}</span>
         </button>
       </div>
 
@@ -281,7 +283,7 @@ export function MarketplaceClient({
         <div className="space-y-6">
           {/* Category Filter Buttons */}
           <div className="flex items-center gap-2 text-xs flex-wrap">
-            <span className="font-semibold text-muted mr-2">Filtrele:</span>
+            <span className="font-semibold text-muted mr-2">{t('filter.label')}</span>
             <button
               onClick={() => setKindFilter('ALL')}
               className={`px-3 py-1.5 rounded-xl font-semibold transition border ${
@@ -290,7 +292,7 @@ export function MarketplaceClient({
                   : 'bg-surface border-border text-ink-2 hover:bg-surface-hover'
               }`}
             >
-              Tüm Hizmetler ({listings.length})
+              {t('filter.all', { count: listings.length })}
             </button>
 
             <button
@@ -301,7 +303,7 @@ export function MarketplaceClient({
                   : 'bg-purple-500/10 text-purple-400 border-purple-500/20 hover:bg-purple-500/20'
               }`}
             >
-              Danışmanlık & Koçluk
+              {t('filter.consultancy')}
             </button>
 
             <button
@@ -312,7 +314,7 @@ export function MarketplaceClient({
                   : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20'
               }`}
             >
-              Patent Lisanslama
+              {t('filter.patentLicense')}
             </button>
 
             <button
@@ -323,7 +325,7 @@ export function MarketplaceClient({
                   : 'bg-accent/10 text-accent border-accent/20 hover:bg-accent/20'
               }`}
             >
-              Ar-Ge & Lab
+              {t('filter.service')}
             </button>
           </div>
 
@@ -341,7 +343,7 @@ export function MarketplaceClient({
                       <h3 className="font-bold text-base text-ink mt-2">{item.title}</h3>
                     </div>
                     <span className="font-mono font-bold text-emerald-500 bg-emerald-500/15 px-3 py-1 rounded-xl text-xs border border-emerald-500/30 shrink-0">
-                      {item.price || 'Görüşülecek'}
+                      {item.price || t('listing.priceTbd')}
                     </span>
                   </div>
 
@@ -350,7 +352,7 @@ export function MarketplaceClient({
                   {item.kind === 'consultancy' && (
                     <div className="inline-flex items-center gap-1.5 bg-accent/10 text-accent border border-accent/20 px-3 py-1 rounded-lg text-xs font-semibold">
                       <Award className="w-4 h-4 text-accent" />
-                      <span>Onaylı M6 Değerlendirici Rozeti</span>
+                      <span>{t('listing.verifiedBadge')}</span>
                     </div>
                   )}
                 </div>
@@ -360,7 +362,7 @@ export function MarketplaceClient({
                     onClick={() => setSelectedOrderListing(item)}
                     className="px-4 py-2 bg-accent hover:opacity-90 text-white rounded-xl font-semibold text-xs transition shadow-2xs flex items-center gap-1.5"
                   >
-                    <span>Hizmet Talebi / Sipariş Al</span>
+                    <span>{t('listing.orderButton')}</span>
                     <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                   </button>
                 </div>
@@ -376,21 +378,21 @@ export function MarketplaceClient({
           <div>
             <h2 className="text-base font-bold text-ink flex items-center gap-2">
               <Plus className="w-5 h-5 text-accent" />
-              <span>Yeni Hizmet veya Uzmanlık İlanı Yayınla</span>
+              <span>{t('postForm.heading')}</span>
             </h2>
             <p className="text-muted text-xs mt-1">
-              Bağımsız yazar, TTO ve Ar-Ge laboratuvarınızı Ufuk Avrupa konsorsiyumlarına tanıtın.
+              {t('postForm.subtitle')}
             </p>
           </div>
 
           <form onSubmit={handlePublishListing} className="space-y-4 text-xs">
             <div>
-              <label className="font-semibold text-ink-2 block mb-1">İlan Başlığı</label>
+              <label className="font-semibold text-ink-2 block mb-1">{t('postForm.titleLabel')}</label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Örn: Horizon Europe Grant Proposal Pre-evaluation & Proofreading"
+                placeholder={t('postForm.titlePlaceholder')}
                 required
                 className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-hidden bg-ground font-semibold text-ink"
               />
@@ -398,45 +400,45 @@ export function MarketplaceClient({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="font-semibold text-ink-2 block mb-1">İlan Türü</label>
+                <label className="font-semibold text-ink-2 block mb-1">{t('postForm.typeLabel')}</label>
                 <select
                   value={kind}
                   onChange={(e) => setKind(e.target.value)}
                   className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-hidden bg-ground text-ink"
                 >
-                  <option value="consultancy">Danışmanlık & Koçluk</option>
-                  <option value="patent_license">Patent Lisanslama</option>
-                  <option value="service">Ar-Ge Hizmeti / Laboratuvar Testi</option>
+                  <option value="consultancy">{t('postForm.typeConsultancy')}</option>
+                  <option value="patent_license">{t('postForm.typePatentLicense')}</option>
+                  <option value="service">{t('postForm.typeService')}</option>
                 </select>
               </div>
 
               <div>
-                <label className="font-semibold text-ink-2 block mb-1">Hizmet Bedeli (€)</label>
+                <label className="font-semibold text-ink-2 block mb-1">{t('postForm.priceLabel')}</label>
                 <input
                   type="text"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  placeholder="Örn: €1,500 / Proposal"
+                  placeholder={t('postForm.pricePlaceholder')}
                   className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-hidden bg-ground font-mono font-bold text-ink"
                 />
               </div>
             </div>
 
             <div>
-              <label className="font-semibold text-ink-2 block mb-1">Hizmet Detayları ve Kapsamı</label>
+              <label className="font-semibold text-ink-2 block mb-1">{t('postForm.detailsLabel')}</label>
               <textarea
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Hizmet kapsamı, teslim süresi ve uzmanın AB proje deneyimi..."
+                placeholder={t('postForm.detailsPlaceholder')}
                 required
                 className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-hidden bg-ground text-ink"
               />
             </div>
 
             <div className="bg-ground p-3.5 rounded-xl border border-border text-[11px] text-ink-2 space-y-1">
-              <span className="font-bold text-ink">Platform Komisyonu Notu:</span>
-              <p>Platform üzerinden tamamlanan danışmanlık ödemelerinden %10 hizmet bedeli kesilmektedir.</p>
+              <span className="font-bold text-ink">{t('postForm.commissionNoteLabel')}</span>
+              <p>{t('postForm.commissionNoteBody')}</p>
             </div>
 
             <button
@@ -444,7 +446,7 @@ export function MarketplaceClient({
               disabled={isPublishing}
               className="w-full bg-accent hover:opacity-90 text-white font-bold py-2.5 rounded-xl transition shadow-2xs text-xs"
             >
-              {isPublishing ? 'Yayınlanıyor...' : 'İlanı Pazaryerinde Yayınla'}
+              {isPublishing ? t('postForm.publishing') : t('postForm.submit')}
             </button>
           </form>
         </div>
@@ -459,17 +461,17 @@ export function MarketplaceClient({
               <div className="bg-surface border border-border rounded-2xl p-5 shadow-xs space-y-4">
                 <div className="flex items-center gap-2 border-b border-border pb-3">
                   <Key className="w-4 h-4 text-purple-400" />
-                  <h3 className="font-bold text-sm text-ink">Yeni API Anahtarı Üret</h3>
+                  <h3 className="font-bold text-sm text-ink">{t('apiKeys.generateHeading')}</h3>
                 </div>
 
                 <form onSubmit={handleGenerateKey} className="space-y-3 text-xs">
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">API Key Tanımı / Uygulama Adı</label>
+                    <label className="font-semibold text-ink-2 block mb-1">{t('apiKeys.nameLabel')}</label>
                     <input
                       type="text"
                       value={keyName}
                       onChange={(e) => setKeyName(e.target.value)}
-                      placeholder="Örn: ERP Entegrasyonu, CRM Botu"
+                      placeholder={t('apiKeys.namePlaceholder')}
                       required
                       className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-hidden bg-ground text-ink"
                     />
@@ -480,13 +482,13 @@ export function MarketplaceClient({
                     disabled={isGeneratingKey}
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 rounded-xl transition shadow-2xs text-xs"
                   >
-                    {isGeneratingKey ? 'Üretiliyor...' : 'API Key Üret (fp_live_...)'}
+                    {isGeneratingKey ? t('apiKeys.generating') : t('apiKeys.generateButton')}
                   </button>
                 </form>
 
                 {newCreatedKey && (
                   <div className="bg-purple-950 text-purple-100 p-3.5 rounded-xl border border-purple-800 space-y-2 text-xs">
-                    <span className="font-bold text-amber-400 block text-[11px]">⚠️ Yeni Üretilen Gizli API Key (Sadece Bir Kez Gösterilir):</span>
+                    <span className="font-bold text-amber-400 block text-[11px]">{t('apiKeys.newKeyWarning')}</span>
                     <div className="flex items-center justify-between font-mono bg-black/50 p-2 rounded-lg text-[11px] text-purple-300 break-all">
                       <span>{newCreatedKey}</span>
                       <button
@@ -507,16 +509,16 @@ export function MarketplaceClient({
 
             {/* Right: API Keys List & Documentation (7 cols) */}
             <div className="lg:col-span-7 space-y-4">
-              <h3 className="font-bold text-sm text-ink">Mevcut API Key Anahtarları ({apiKeys.length})</h3>
+              <h3 className="font-bold text-sm text-ink">{t('apiKeys.listHeading', { count: apiKeys.length })}</h3>
 
               <div className="bg-surface border border-border rounded-2xl shadow-2xs overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs min-w-[500px]">
                   <thead>
                     <tr className="bg-ground border-b border-border text-ink-2 font-bold uppercase tracking-wider text-[11px]">
-                      <th className="p-3.5">API Key Adı</th>
-                      <th className="p-3.5">Önek (Prefix)</th>
-                      <th className="p-3.5">Oluşturulma</th>
-                      <th className="p-3.5 text-right">Durum</th>
+                      <th className="p-3.5">{t('apiKeys.tableName')}</th>
+                      <th className="p-3.5">{t('apiKeys.tablePrefix')}</th>
+                      <th className="p-3.5">{t('apiKeys.tableCreated')}</th>
+                      <th className="p-3.5 text-right">{t('apiKeys.tableStatus')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -529,7 +531,7 @@ export function MarketplaceClient({
                         </td>
                         <td className="p-3.5 text-right">
                           <span className="bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[11px] font-bold">
-                            Aktif
+                            {t('apiKeys.statusActive')}
                           </span>
                         </td>
                       </tr>
@@ -547,7 +549,7 @@ export function MarketplaceClient({
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-border">
             <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="font-bold text-base text-ink">Hizmet Talebi / Sipariş</h3>
+              <h3 className="font-bold text-base text-ink">{t('orderModal.heading')}</h3>
               <button
                 onClick={() => {
                   setSelectedOrderListing(null);
@@ -562,20 +564,20 @@ export function MarketplaceClient({
             {orderConfirmed ? (
               <div className="bg-emerald-500/10 border border-emerald-500/20 text-ink p-4 rounded-xl space-y-2 text-xs">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-                <h4 className="font-bold text-sm text-emerald-500">Siparişiniz Onaylandı!</h4>
-                <p className="font-mono text-[11px] text-ink-2">Sipariş No: {orderConfirmed.id}</p>
-                <p className="text-ink-2">Toplam Tutar: €{orderConfirmed.totalAmountEUR} (Platform Ücreti Dahil)</p>
+                <h4 className="font-bold text-sm text-emerald-500">{t('orderModal.confirmedHeading')}</h4>
+                <p className="font-mono text-[11px] text-ink-2">{t('orderModal.orderNumber', { id: orderConfirmed.id })}</p>
+                <p className="text-ink-2">{t('orderModal.totalAmount', { amount: orderConfirmed.totalAmountEUR })}</p>
               </div>
             ) : (
               <div className="space-y-4 text-xs">
                 <div className="bg-ground p-3.5 rounded-xl border border-border space-y-1">
-                  <span className="text-muted block text-[11px]">Seçilen Hizmet:</span>
+                  <span className="text-muted block text-[11px]">{t('orderModal.selectedService')}</span>
                   <h4 className="font-bold text-ink">{selectedOrderListing.title}</h4>
                   <p className="font-mono text-emerald-500 font-bold text-sm">{selectedOrderListing.price}</p>
                 </div>
 
                 <div className="bg-accent/10 border border-accent/20 p-3 rounded-xl text-accent-ink text-[11px]">
-                  <span>🔒 Güvenli Emanet (Escrow) ödemesi ile danışman işi teslim edene kadar ücret güvendedir.</span>
+                  <span>{t('orderModal.escrowNote')}</span>
                 </div>
 
                 <button
@@ -583,7 +585,7 @@ export function MarketplaceClient({
                   disabled={isOrdering}
                   className="w-full bg-accent hover:opacity-90 text-white font-bold py-2.5 rounded-xl transition text-xs shadow-2xs"
                 >
-                  {isOrdering ? 'Sipariş İletiliyor...' : 'Siparişi Onayla ve İşlemi Başlat'}
+                  {isOrdering ? t('orderModal.ordering') : t('orderModal.confirmButton')}
                 </button>
               </div>
             )}

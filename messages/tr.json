@@ -861,6 +861,88 @@
       "errorRetry": "Tekrar dene"
     }
   },
+  "m8": {
+    "badge": {
+      "consultancy": "Danışmanlık & Koçluk",
+      "patentLicense": "Patent Lisanslama",
+      "service": "Ar-Ge & Lab Hizmeti"
+    },
+    "header": {
+      "moduleLabel": "Modül 8 — Expert & Consultant Marketplace",
+      "title": "Ar-Ge Uzman Pazaryeri & Partner API",
+      "subtitle": "Ufuk Avrupa bağımsız yazarları, onaylı M6 değerlendiricileri ve TTO patent lisansları.",
+      "apiFeeBadge": "Open API & %10 Fee Engine",
+      "metrics": {
+        "activeListings": "Aktif Pazaryeri İlanı",
+        "listingUnit": "İlan",
+        "verifiedReviewer": "Onaylı M6 Değerlendirici",
+        "verifiedBadge": "Sertifikalı",
+        "commissionRate": "Platform Komisyon Oranı",
+        "commissionUnit": "Hak Ediş",
+        "activeApiKeys": "Aktif Partner API Key",
+        "keyUnit": "Anahtar"
+      }
+    },
+    "tabs": {
+      "listings": "Pazar Yeri İlanları ({count})",
+      "post": "Yeni Hizmet İlanı Ver",
+      "apikeys": "Partner Intelligence API Anahtarları"
+    },
+    "filter": {
+      "label": "Filtrele:",
+      "all": "Tüm Hizmetler ({count})",
+      "consultancy": "Danışmanlık & Koçluk",
+      "patentLicense": "Patent Lisanslama",
+      "service": "Ar-Ge & Lab"
+    },
+    "listing": {
+      "priceTbd": "Görüşülecek",
+      "verifiedBadge": "Onaylı M6 Değerlendirici Rozeti",
+      "orderButton": "Hizmet Talebi / Sipariş Al"
+    },
+    "postForm": {
+      "heading": "Yeni Hizmet veya Uzmanlık İlanı Yayınla",
+      "subtitle": "Bağımsız yazar, TTO ve Ar-Ge laboratuvarınızı Ufuk Avrupa konsorsiyumlarına tanıtın.",
+      "titleLabel": "İlan Başlığı",
+      "titlePlaceholder": "Örn: Horizon Europe Grant Proposal Pre-evaluation & Proofreading",
+      "typeLabel": "İlan Türü",
+      "typeConsultancy": "Danışmanlık & Koçluk",
+      "typePatentLicense": "Patent Lisanslama",
+      "typeService": "Ar-Ge Hizmeti / Laboratuvar Testi",
+      "priceLabel": "Hizmet Bedeli (€)",
+      "pricePlaceholder": "Örn: €1,500 / Proposal",
+      "detailsLabel": "Hizmet Detayları ve Kapsamı",
+      "detailsPlaceholder": "Hizmet kapsamı, teslim süresi ve uzmanın AB proje deneyimi...",
+      "commissionNoteLabel": "Platform Komisyonu Notu:",
+      "commissionNoteBody": "Platform üzerinden tamamlanan danışmanlık ödemelerinden %10 hizmet bedeli kesilmektedir.",
+      "publishing": "Yayınlanıyor...",
+      "submit": "İlanı Pazaryerinde Yayınla"
+    },
+    "apiKeys": {
+      "generateHeading": "Yeni API Anahtarı Üret",
+      "nameLabel": "API Key Tanımı / Uygulama Adı",
+      "namePlaceholder": "Örn: ERP Entegrasyonu, CRM Botu",
+      "generating": "Üretiliyor...",
+      "generateButton": "API Key Üret (fp_live_...)",
+      "newKeyWarning": "⚠️ Yeni Üretilen Gizli API Key (Sadece Bir Kez Gösterilir):",
+      "listHeading": "Mevcut API Key Anahtarları ({count})",
+      "tableName": "API Key Adı",
+      "tablePrefix": "Önek (Prefix)",
+      "tableCreated": "Oluşturulma",
+      "tableStatus": "Durum",
+      "statusActive": "Aktif"
+    },
+    "orderModal": {
+      "heading": "Hizmet Talebi / Sipariş",
+      "confirmedHeading": "Siparişiniz Onaylandı!",
+      "orderNumber": "Sipariş No: {id}",
+      "totalAmount": "Toplam Tutar: €{amount} (Platform Ücreti Dahil)",
+      "selectedService": "Seçilen Hizmet:",
+      "escrowNote": "🔒 Güvenli Emanet (Escrow) ödemesi ile danışman işi teslim edene kadar ücret güvendedir.",
+      "ordering": "Sipariş İletiliyor...",
+      "confirmButton": "Siparişi Onayla ve İşlemi Başlat"
+    }
+  },
   "m9": {
     "alerts": {
       "dismiss": "Kapat"
