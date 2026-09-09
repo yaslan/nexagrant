@@ -9,6 +9,8 @@ import {
 } from '@/lib/billing/vat-rates';
 import { resolveVatRate, parseVatRate, retiredVatRateSetting } from '@/lib/billing/vat-rate';
 import { vatOnNetMinor, grossFromNetMinor } from '@/lib/money';
+import { calculateInvoiceTotals } from '@/lib/efatura';
+import { totalsForLines } from '@/lib/billing/invoice-list';
 
 /**
  * TASK-MTT1WUUS7MN7R — VAT follows the buyer's country.
@@ -187,5 +189,73 @@ describe('vatOnNetMinor — one rounding rule for the whole system', () => {
     expect(() => vatOnNetMinor(100, 101)).toThrow(/between 0 and 100/);
     expect(() => vatOnNetMinor(100, -1)).toThrow(/between 0 and 100/);
     expect(() => vatOnNetMinor(100, Number.NaN)).toThrow(/between 0 and 100/);
+  });
+});
+
+/**
+ * The three places a customer can read the VAT on one sale: the stored row and
+ * the billing panel (`totalsForLines`), and the document that is filed
+ * (`calculateInvoiceTotals`). Each used to round with its own
+ * `Math.round((net * rate) / 100)`; they agreed by coincidence, not by
+ * construction, and a tax figure that differs by a kuruş between the document
+ * and the panel is two different claims about one sale.
+ *
+ * Both now call `vatOnNetMinor`. This locks that: if someone reintroduces a
+ * local rounding step, the fractional rate is where it shows up first.
+ */
+describe('the document and the panel round the tax the same way', () => {
+  // Finland, 25.5% — the rate that breaks an integer-only schema, and the one a
+  // hand-rolled copy is most likely to disagree on.
+  const FRACTIONAL_RATE = 25.5;
+
+  test('document, panel and helper agree on every net from 1 to 2000', () => {
+    for (const rate of [0, 17, 19, 20, 25, FRACTIONAL_RATE, 27]) {
+      for (let net = 1; net <= 2000; net += 1) {
+        const expected = vatOnNetMinor(net, rate);
+
+        const document = calculateInvoiceTotals(
+          [
+            {
+              id: 'l1',
+              name: 'Fabrika — abonelik',
+              quantity: 1,
+              unitCode: 'MON',
+              // `calculateInvoiceTotals` takes a major-unit price; TRY has two
+              // decimals, so this is the same `net` minor units.
+              unitPrice: net / 100,
+              vatRate: rate,
+            },
+          ],
+          'TRY'
+        );
+
+        const panel = totalsForLines([
+          {
+            name: 'Fabrika — abonelik',
+            quantity: 1,
+            unitCode: 'MON',
+            unitPriceMinor: net,
+            vatRate: rate,
+          },
+        ]);
+
+        // `calculateInvoiceTotals` reports major units (TRY has two decimals),
+        // so it is scaled back to minor units to be compared with the other two.
+        expect(Math.round(document.totalVat * 100), `document @ ${rate}% on ${net}`).toBe(
+          expected
+        );
+        expect(panel.vatMinor, `panel @ ${rate}% on ${net}`).toBe(expected);
+      }
+    }
+  });
+
+  test('a zero-VAT country produces a zero tax, not a missing one', () => {
+    const panel = totalsForLines([
+      { name: 'Fabrika', quantity: 1, unitCode: 'MON', unitPriceMinor: 4500, vatRate: 0 },
+    ]);
+    expect(panel.vatMinor).toBe(0);
+    expect(panel.subtotalMinor).toBe(4500);
+    // Kuveyt pays the list price and nothing more.
+    expect(panel.totalMinor).toBe(4500);
   });
 });

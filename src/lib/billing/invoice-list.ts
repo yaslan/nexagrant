@@ -2,6 +2,7 @@ import {
   invoiceLinesSchema,
   type StoredInvoiceLine,
 } from '@/app/api/billing/invoices/[id]/export/invoice-document';
+import { vatOnNetMinor } from '@/lib/money';
 
 /**
  * The invoice history the billing panel shows.
@@ -76,9 +77,14 @@ export interface InvoiceBuyerIdentity {
  * Totals for one set of stored lines, in minor units.
  *
  * Same arithmetic as `calculateInvoiceTotals` in src/lib/efatura.ts — subtotal,
- * VAT per line, withholding as a fraction of that line's VAT — but carried out
- * on integers so the list and the exported document cannot disagree by a
- * rounding step.
+ * VAT per line, withholding as a fraction of that line's VAT — and the VAT step
+ * is literally the same function (`vatOnNetMinor`), not a second copy of it, so
+ * the list and the exported document cannot disagree by a rounding step.
+ *
+ * Every caller reaches this through `invoiceLinesSchema`, which already bounds
+ * `vatRate` to 0–100 and `unitPriceMinor` to a non-negative integer; that is why
+ * the guards inside `vatOnNetMinor` cannot fire here and an unreadable payload
+ * renders as no total (`amounts: null`) rather than a thrown page.
  */
 export function totalsForLines(lines: StoredInvoiceLine[]): InvoiceAmounts {
   let subtotalMinor = 0;
@@ -87,7 +93,7 @@ export function totalsForLines(lines: StoredInvoiceLine[]): InvoiceAmounts {
 
   for (const line of lines) {
     const lineMinor = Math.round(line.quantity * line.unitPriceMinor);
-    const lineVatMinor = Math.round((lineMinor * line.vatRate) / 100);
+    const lineVatMinor = vatOnNetMinor(lineMinor, line.vatRate);
     subtotalMinor += lineMinor;
     vatMinor += lineVatMinor;
     if (line.withholdingRate && line.withholdingRate > 0) {

@@ -3,7 +3,7 @@
  * UBL-TR 1.2.1 XML Standartları, VKN/TCKN Algoritmik Doğrulaması, KDV & Tevkifat Hesaplamaları
  */
 
-import { currencyExponent, toMinorUnits } from './money';
+import { currencyExponent, toMinorUnits, vatOnNetMinor } from './money';
 
 export interface InvoiceParty {
   name: string;
@@ -182,7 +182,10 @@ export function calculateInvoiceTotals(
 
   for (const line of lines) {
     const lineTotalMinor = toMinorUnits(line.quantity * line.unitPrice, currency);
-    const vatMinor = Math.round((lineTotalMinor * line.vatRate) / 100);
+    // The one rounding rule for tax in this codebase (`vatOnNetMinor`), not a
+    // local `Math.round`: this document and the billing panel quote the same
+    // sale, and a rule copied into each of them agrees only by coincidence.
+    const vatMinor = vatOnNetMinor(lineTotalMinor, line.vatRate);
     let withholdingMinor = 0;
 
     if (line.withholdingRate && line.withholdingRate > 0) {

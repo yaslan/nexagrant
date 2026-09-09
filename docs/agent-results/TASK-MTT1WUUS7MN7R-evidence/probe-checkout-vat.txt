@@ -1,0 +1,42 @@
+◇ injected env (46) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+
+buyerCountry = Türkiye  → HTTP 200
+{
+  "totalMinor": 4500,
+  "tax": {
+    "country": "TR",
+    "ratePercent": 20,
+    "vatMinor": 900,
+    "resolved": true
+  },
+  "grossTotalMinor": 5400,
+  "currency": "USD"
+}
+
+buyerCountry = Kuveyt  → HTTP 200
+{
+  "totalMinor": 4500,
+  "tax": {
+    "country": "KW",
+    "ratePercent": 0,
+    "vatMinor": 0,
+    "resolved": true
+  },
+  "grossTotalMinor": 4500,
+  "currency": "USD"
+}
+
+buyerCountry = Belçika  → HTTP 200
+{
+  "totalMinor": 4500,
+  "tax": {
+    "country": null,
+    "ratePercent": 0,
+    "vatMinor": 0,
+    "resolved": false
+  },
+  "grossTotalMinor": 4500,
+  "currency": "USD"
+}
+
+(probe billing identity deleted; table back to: 0 rows)
