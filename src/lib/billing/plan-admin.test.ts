@@ -325,6 +325,122 @@ describe('plan admin write layer', () => {
     expect(await countLiveSubscriptions(planId)).toBe(0);
   });
 
+  // TASK-MTUI9R0FOOY2J: the shared dev DB was found with exactly this shape —
+  // `Subscription.planId` said one plan, `planVersionId` (a different concept,
+  // the entitlement-terms version — src/lib/billing/entitlement-source.ts) still
+  // pointed at another plan's version, because a test helper
+  // (tests/e2e/plan-entitlement.spec.ts `setPlan()`) writes `planId` alone. The
+  // guard counts by `planId`, which is the field every write path (Stripe
+  // subscription-sync, iyzico, `getEntitlements`, `publishVersion`'s
+  // subscription move) treats as "the plan this subscription is on" — these two
+  // tests lock that it stays correct even when `planVersionId` disagrees, rather
+  // than the guard being switched to key off `planVersionId` (which is nullable
+  // and lags by design on a plan change with no published version, and would
+  // have gotten this exact case backwards).
+  it('refuses to delete a plan with a live subscription even when that subscription\'s planVersionId points at a different, empty plan', async () => {
+    const emptyPlanId = `padm-empty-${suffix()}`;
+    await prisma.plan.create({
+      data: {
+        id: emptyPlanId,
+        name: 'Empty Plan',
+        monthlyCents: 5000,
+        yearlyCents: 50000,
+        currency: 'USD',
+        seats: 5,
+        workspaces: 1,
+        aiCreditsMonthly: 100,
+        modules: ['M1'],
+        visibility: 'public',
+      },
+    });
+    const emptyVersion = await prisma.planVersion.create({
+      data: {
+        planId: emptyPlanId,
+        version: 1,
+        status: 'published',
+        monthlyCents: 5000,
+        yearlyCents: 50000,
+        currency: 'USD',
+        seats: 5,
+        workspaces: 1,
+        aiCreditsMonthly: 100,
+        modules: ['M1'],
+        publishedAt: new Date(),
+      },
+    });
+
+    try {
+      // Live on `planId`, but planVersionId misleadingly points at emptyPlanId's version.
+      await prisma.subscription.create({
+        data: { tenantId, planId, status: 'ACTIVE', planVersionId: emptyVersion.id },
+      });
+
+      expect(await countLiveSubscriptions(planId)).toBe(1);
+      expect(await countLiveSubscriptions(emptyPlanId)).toBe(0);
+
+      await expect(deletePlan(planId, 'admin-1')).rejects.toBeInstanceOf(PlanInUseError);
+      expect(await prisma.plan.findUnique({ where: { id: planId } })).not.toBeNull();
+
+      // the actually-empty plan stays safely deletable
+      await deletePlan(emptyPlanId, 'admin-1');
+      expect(await prisma.plan.findUnique({ where: { id: emptyPlanId } })).toBeNull();
+    } finally {
+      await prisma.plan.deleteMany({ where: { id: emptyPlanId } });
+    }
+  });
+
+  it('deletes an empty plan even when another tenant\'s stale planVersionId points at one of its versions', async () => {
+    const liveTenant = await prisma.tenant.create({
+      data: { name: 'Other Live Tenant', slug: `padm-other-${suffix()}`, country: 'TR', orgType: 'SME' },
+    });
+    const liveOtherPlanId = `padm-other-${suffix()}`;
+    await prisma.plan.create({
+      data: {
+        id: liveOtherPlanId,
+        name: 'Other Live Plan',
+        monthlyCents: 5000,
+        yearlyCents: 50000,
+        currency: 'USD',
+        seats: 5,
+        workspaces: 1,
+        aiCreditsMonthly: 100,
+        modules: ['M1'],
+        visibility: 'public',
+      },
+    });
+
+    try {
+      const [ourVersion] = await listVersionHistory(planId);
+
+      // Live subscription on a DIFFERENT plan, but its planVersionId still points
+      // at our (about-to-be-deleted) plan's published version — the shape a
+      // planId-only write leaves behind.
+      await prisma.subscription.create({
+        data: {
+          tenantId: liveTenant.id,
+          planId: liveOtherPlanId,
+          status: 'ACTIVE',
+          planVersionId: ourVersion!.id,
+        },
+      });
+
+      expect(await countLiveSubscriptions(planId)).toBe(0);
+
+      await deletePlan(planId, 'admin-1');
+      expect(await prisma.plan.findUnique({ where: { id: planId } })).toBeNull();
+
+      // history isn't broken: the stray subscription is untouched, only its
+      // dangling version pointer is nulled by the FK — the delete never blocked on it.
+      const strayNow = await prisma.subscription.findUnique({ where: { tenantId: liveTenant.id } });
+      expect(strayNow?.planId).toBe(liveOtherPlanId);
+      expect(strayNow?.planVersionId).toBeNull();
+    } finally {
+      await prisma.subscription.deleteMany({ where: { tenantId: liveTenant.id } });
+      await prisma.plan.deleteMany({ where: { id: liveOtherPlanId } });
+      await prisma.tenant.deleteMany({ where: { id: liveTenant.id } });
+    }
+  });
+
   // ── (f) every publish writes an audit record with before/after ──
 
   it('writes an audit record carrying who, when and before/after', async () => {
