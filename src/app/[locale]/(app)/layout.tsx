@@ -14,6 +14,29 @@ import { listSessionWorkspaces } from '@/lib/workspaces';
 import MobileAppHeader from '@/components/MobileAppHeader';
 import FeedbackWidget from '@/components/FeedbackWidget';
 
+/**
+ * No `loading.tsx` may sit anywhere under `(app)`.
+ *
+ * A route-level `loading.tsx` is a Suspense boundary, and a Suspense boundary
+ * makes Next flush the shell before the page has finished deciding what it is.
+ * That has now cost two defects, both measured:
+ *
+ *   • TASK-MTRNO3LBZB2Q7 — the status line goes out with the shell, so a
+ *     `notFound()` reached afterwards can only swap the body: 404 became 200.
+ *     Fixed by moving the skeleton down to the sections with no `[param]` child.
+ *   • TASK-MTU4AYW5R9DGL — moving it down did not help the second defect. The
+ *     page then streams out of order: the server parks the whole page in a
+ *     `<div hidden id="S:0">` at the end of <body> while the client renders the
+ *     same subtree in place, so the document holds TWO copies of every id and
+ *     every heading. Measured on `next dev` AND on a production build, and the
+ *     duplicate outlives `load` (readyState=complete at 568 ms, second copy
+ *     dropped ~156 ms later) — no amount of waiting in a test avoids it.
+ *
+ * So the boundary is gone rather than relocated, and
+ * tests/app-shell-no-loading-boundary.test.ts fails if one is re-added.
+ * A section that wants a loading affordance renders it inside its own page,
+ * client-side, where it costs no server flush.
+ */
 export default async function AppLayout({
   children,
   params

@@ -20,9 +20,13 @@ import { shotsDir } from './fixtures/shots';
  * The cause was a single `loading.tsx` at `[locale]/(app)/[workspace]`: a
  * Suspense boundary above every workspace route makes Next flush the shell —
  * and the 200 status line — before the page has decided whether the record
- * exists. The skeleton now lives on the sections that have no lookup-decided
- * child; a `loading.tsx` re-added above a `[param]` segment turns these
- * assertions red, which is the point.
+ * exists. The skeleton was first moved down to the sections with no
+ * lookup-decided child; TASK-MTU4AYW5R9DGL then removed it from those too,
+ * because the same early flush also leaves a hidden duplicate of the whole
+ * page in the DOM. There is now no `loading.tsx` under `(app)` at all —
+ * tests/app-shell-no-loading-boundary.test.ts keeps it that way, and a
+ * boundary re-added above a `[param]` segment turns these assertions red,
+ * which is the point.
  */
 
 const MISSING = 'nf-e2e-does-not-exist';

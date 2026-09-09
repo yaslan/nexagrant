@@ -114,7 +114,9 @@ test.describe('M9 briefs — persistence and the unknown opportunity', () => {
     // put a Suspense boundary above every workspace route, so Next flushed the
     // shell — and the 200 status line — before this page decided whether the
     // opportunity exists. The skeleton was moved down to the sections with no
-    // lookup-decided child (TASK-MTRNO3LBZB2Q7); the tree-wide sweep lives in
+    // lookup-decided child (TASK-MTRNO3LBZB2Q7) and then removed outright
+    // (TASK-MTU4AYW5R9DGL), because the same early flush also left a hidden
+    // duplicate of the whole page in the DOM; the tree-wide sweep lives in
     // tests/e2e/notfound-status.spec.ts.
     expect(response?.status()).toBe(404);
   });

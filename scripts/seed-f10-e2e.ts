@@ -72,6 +72,15 @@ async function seatTenant(t: {
     create: { id: t.workspaceId, tenantId: t.tenantId, name: t.workspaceSlug, slug: t.workspaceSlug },
   });
 
+  // The upsert keys on the fixed id, but `email` is unique too, so a row holding
+  // this address under a *different* id makes the upsert throw
+  // `User_email_key` and the whole suite fails in beforeAll. That row is not
+  // hypothetical: signing in creates a user from the e-mail, so any run whose
+  // rollback did not complete leaves one behind and every later run is blocked
+  // until someone clears it by hand. Claiming the address first is what makes
+  // the seed genuinely re-runnable.
+  await prisma.user.deleteMany({ where: { email: t.email, id: { not: t.userId } } });
+
   await prisma.user.upsert({
     where: { id: t.userId },
     update: { email: t.email },
