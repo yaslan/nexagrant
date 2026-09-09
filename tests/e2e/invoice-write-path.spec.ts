@@ -168,16 +168,12 @@ test('a payment issues one invoice, and the export route serves it', async ({ re
   expect(xml.status(), 'the issued invoice must be reachable').not.toBe(404);
   const body = await xml.text();
 
-  if (xml.status() === 503) {
-    expect(body).toContain('supplier_identity_not_configured');
-  } else {
-    expect(xml.status()).toBe(200);
-    expect(body).toContain(invoice!.ettn);
-    expect(body).toContain(BUYER.buyerVknTckn);
-    expect(body).toContain('1000.00'); // the net the charge decomposed to
-    // Nothing was filed, so the document says so instead of claiming a seal.
-    expect(body).toContain('mali değeri yoktur');
-  }
+  expect(xml.status()).toBe(200);
+  expect(body).toContain(invoice!.ettn);
+  expect(body).toContain(BUYER.buyerVknTckn);
+  expect(body).toContain('1000.00'); // the net the charge decomposed to
+  // Nothing was filed, so the document says so instead of claiming a seal.
+  expect(body).toContain('mali değeri yoktur');
 });
 
 test('a redelivered webhook does not issue a second invoice', async () => {
