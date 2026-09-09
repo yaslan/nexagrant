@@ -145,11 +145,18 @@ describe('syncCordisBigData counts stored rows, not attempts', () => {
   });
 });
 
-describe('getEmbedding keeps the mock vector for key-less environments only', () => {
-  test('falls back to the mock vector when no key is configured — nothing was sent', async () => {
+describe('getEmbedding never substitutes a vector of its own', () => {
+  test('refuses when no key is configured, instead of inventing one', async () => {
+    // TASK-MTUH5L8MJ6S8E — this used to resolve with a 1536-long vector built
+    // from the character codes of the text, and `ingestDocument` wrote it into
+    // the real Chunk table as though it were an embedding. A key-less
+    // environment now cannot ingest at all; a test that needs a vector supplies
+    // one at the provider boundary (tests/helpers/fake-embedding.ts).
     embedTextMock.mockRejectedValue(new Error('OPENAI_API_KEY not set'));
 
-    await expect(getEmbedding('text', { tenantId: null, module: 'K6', purpose: 'p' })).resolves.toHaveLength(1536);
+    await expect(
+      getEmbedding('text', { tenantId: null, module: 'K6', purpose: 'p' })
+    ).rejects.toThrow(/OPENAI_API_KEY not set/);
   });
 
   test('rethrows a provider failure when a key IS configured', async () => {

@@ -1,7 +1,23 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createCordisPrismaStub, type CordisPrismaStub } from './helpers/cordis-prisma-stub';
+import { fakeEmbedding } from './helpers/fake-embedding';
 
 const db: CordisPrismaStub = createCordisPrismaStub();
+
+/**
+ * TASK-MTUH5L8MJ6S8E — every ingest in this file used to be carried by the
+ * mock-embedding fallback inside `getEmbedding`, because the suite runs with no
+ * `OPENAI_API_KEY`. That fallback is gone: production code no longer invents a
+ * vector when the provider is unreachable, so the fake now enters at the
+ * provider boundary, named as one. Nothing here asserts relevance or ranking —
+ * `fakeEmbedding` could not support such a claim; these tests are about which
+ * rows the delta writes.
+ */
+const embedTextMock = vi.hoisted(() => vi.fn());
+vi.mock('../src/lib/llm', async () => {
+  const actual = await vi.importActual<typeof import('../src/lib/llm')>('../src/lib/llm');
+  return { ...actual, embedText: embedTextMock };
+});
 
 // `withTenant` has to be mocked too, not just `prisma`: `ingestDocument` runs
 // its writes inside it. While the mock omitted it, every ingest in this file
@@ -47,7 +63,10 @@ function stubFeed(payload: unknown, ok = true, status = 200) {
 }
 
 describe('fetchLiveCordisDelta', () => {
-  beforeEach(() => db.reset());
+  beforeEach(() => {
+    db.reset();
+    embedTextMock.mockReset().mockImplementation(async (text: string) => fakeEmbedding(text));
+  });
   afterEach(() => vi.unstubAllGlobals());
 
   test('writes the feed into the real CORDIS tables', async () => {

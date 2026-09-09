@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
@@ -340,5 +340,76 @@ describe('M10 generateStandardDoc — a failed generation is an error, not a doc
     expect(source).not.toContain('**Partner Name:** Fraunhofer Institute / SME Partner');
     expect(source).not.toContain('**5. Ödül Beyanı:**');
     expect(source).not.toContain('High excellence score (4.5)');
+  });
+});
+
+/**
+ * TASK-MTUH5L8MJ6S8E — the sweep above reads M1/M8/M10 *pages*. That is where
+ * this class of bug had been found so far, and it is why the worst instance of
+ * it went unnoticed for the length of this file's existence: `retrieveChunks`
+ * in `src/lib/rag.ts` answered a failed or empty vector search with three
+ * hard-coded "CORDIS projects", and nothing here ever opened a library.
+ *
+ * A page that invents a row shows a wrong number to one user on one screen. A
+ * library that invents a row feeds it to every caller — here, straight into an
+ * LLM prompt via `formatRagPrompt`, labelled `[Source 1 | Score: 94.0%]`, and
+ * back out as a concept note citing projects that do not exist. The blast
+ * radius is larger, so the guard is now wider than the pages.
+ */
+describe('src/lib — the shared libraries are swept too, not just the pages', () => {
+  /** Every .ts module under src/lib, excluding tests. */
+  function libSources(): string[] {
+    const out: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(resolve(REPO, dir), { withFileTypes: true })) {
+        const rel = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) walk(rel);
+        else if (entry.name.endsWith('.ts') && !entry.name.includes('.test.')) out.push(rel);
+      }
+    };
+    walk('src/lib');
+    return out;
+  }
+
+  test('the library tree is actually being read — the guard cannot pass by scanning nothing', () => {
+    const files = libSources();
+    expect(files.length).toBeGreaterThan(20);
+    expect(files).toContain('src/lib/rag.ts');
+  });
+
+  test('no library serves the invented CORDIS dataset', () => {
+    // These acronyms, grants and document ids were never in CORDIS; they were
+    // written by hand as a "preview/demo mode" fallback. Comments are stripped
+    // first, so the note in rag.ts explaining what was removed is allowed to
+    // name them — no executable line may.
+    const invented = [
+      'ZERO-EMISSION-EV]',
+      'HYDROGEN-CATALYST',
+      'RECYCLED-COMPOSITE',
+      '€4,500,000',
+      '€3,200,000',
+      '€5,800,000',
+      'doc-cordis-1',
+      'doc-cordis-2',
+      'doc-cordis-3',
+    ];
+
+    for (const file of libSources()) {
+      const code = readCode(file);
+      for (const needle of invented) {
+        expect(`${file}: ${code.includes(needle)}`).toBe(`${file}: false`);
+      }
+    }
+  });
+
+  test('the RAG retrieval path has no fallback catch left to hide a failure', () => {
+    const source = readCode('src/lib/rag.ts');
+    // The removed shape was `catch (e) { console.warn(...) }` followed by a
+    // return of the demo rows — a swallowed error that reads as a result.
+    expect(source).not.toMatch(/catch[\s\S]{0,120}console\.warn/);
+    expect(source).not.toContain('mockEmbedding');
+    // An empty corpus must stay expressible as empty, so the caller can tell
+    // "nothing matched" from "something broke".
+    expect(source).toContain('return [];');
   });
 });

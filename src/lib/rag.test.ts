@@ -1,12 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * TASK-MTSWVADF7RQ1B — `getEmbedding` keeps its mock-embedding fallback for
- * key-less dev/demo environments, but the fallback must only cover the case
- * where *nothing was sent*. A failed AiUsageLog write happens after the chunk
- * text has already reached OpenAI; falling back there would put the
+ * TASK-MTSWVADF7RQ1B — every provider call must go through the logging choke
+ * point, and no failure may be answered with something that looks like a
+ * result. A failed AiUsageLog write happens *after* the chunk text has already
+ * reached OpenAI; answering it with a vector would put the
  * unrecorded-processing hole straight back.
+ *
+ * TASK-MTUH5L8MJ6S8E — the two fabrications this module used to contain are
+ * locked out here, behaviourally rather than by grep:
+ *
+ *   - `getEmbedding` invented a `mockEmbedding` — a vector of the first 1536
+ *     character codes of the text — whenever no `OPENAI_API_KEY` was set, and
+ *     `ingestDocument` wrote it into the real `Chunk` table.
+ *   - `retrieveChunks` answered a failed or empty search with three hard-coded
+ *     "CORDIS projects" (ZERO-EMISSION-EV / €4,500,000, HYDROGEN-CATALYST /
+ *     €3,200,000, RECYCLED-COMPOSITE / €5,800,000) at fixed scores of
+ *     0.94 / 0.88 / 0.81. `formatRagPrompt` labels whatever it is handed
+ *     `[Source N | Score: 94.0%]`, so those went into the LLM prompt behind
+ *     `generateSectionDraft` as retrieved evidence, and out again as a concept
+ *     note grounded in projects that do not exist (CLAUDE.md rule 7).
  */
+
+/** The exact rows the demo fallback used to serve. None may ever come back. */
+const FABRICATED = [
+  'ZERO-EMISSION-EV',
+  'HYDROGEN-CATALYST',
+  'RECYCLED-COMPOSITE',
+  '€4,500,000',
+  '€3,200,000',
+  '€5,800,000',
+  'doc-cordis-1',
+  'doc-cordis-2',
+  'doc-cordis-3',
+];
 
 const mockPrisma = vi.hoisted(() => ({
   document: { create: vi.fn() },
@@ -24,7 +51,7 @@ vi.mock('@/lib/llm', async () => {
   return { ...actual, embedText: embedTextMock };
 });
 
-import { getEmbedding, ingestDocument, retrieveChunks } from './rag';
+import { getEmbedding, ingestDocument, retrieveChunks, buildRagPrompt } from './rag';
 import { AiUsageLogWriteError } from './llm';
 
 const attribution = { tenantId: 'tenant_1', module: 'K6', purpose: 'rag_search_embedding' };
@@ -43,12 +70,37 @@ describe('getEmbedding — the fallback may not hide an unlogged call', () => {
     expect(embedTextMock.mock.calls[0][1]).toEqual(attribution);
   });
 
-  it('falls back to the mock vector when the provider was never reached', async () => {
+  it('refuses to invent a vector when no key is configured', async () => {
+    // TASK-MTUH5L8MJ6S8E — this used to resolve with a 1536-long vector built
+    // from the character codes of the text, which `ingestDocument` then wrote
+    // into the real Chunk table as an embedding.
     embedTextMock.mockRejectedValue(new Error('OPENAI_API_KEY not set'));
 
-    const vec = await getEmbedding('some query', attribution);
+    await expect(getEmbedding('some query', attribution)).rejects.toThrow(/OPENAI_API_KEY not set/);
+  });
 
-    expect(vec).toHaveLength(1536);
+  it('refuses to invent a vector when the provider fails mid-call', async () => {
+    embedTextMock.mockRejectedValue(new Error('OpenAI embeddings error 429: rate limited'));
+
+    await expect(getEmbedding('some query', attribution)).rejects.toThrow(/429/);
+  });
+
+  it('asks for the number of dimensions the Chunk column is declared as', async () => {
+    embedTextMock.mockResolvedValue(new Array(1536).fill(0.5));
+
+    await getEmbedding('some query', attribution);
+
+    expect(embedTextMock.mock.calls[0][2]).toEqual({ dimensions: 1536 });
+  });
+
+  it('does not write a chunk when the embedding call fails', async () => {
+    // The half a careless fix breaks: throwing is only worth anything if the
+    // INSERT never runs.
+    mockPrisma.document.create.mockResolvedValue({ id: 'doc_1' });
+    embedTextMock.mockRejectedValue(new Error('OPENAI_API_KEY not set'));
+
+    await expect(ingestDocument('title', 'body text', 'tenant_upload', 'tenant_1')).rejects.toThrow();
+    expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
   });
 
   it('rethrows a failed usage-log write rather than falling back', async () => {
@@ -99,5 +151,102 @@ describe('getEmbedding — the fallback may not hide an unlogged call', () => {
     await ingestDocument('CORDIS row', 'body text', 'CORDIS_PROJECT');
 
     expect(embedTextMock.mock.calls[0][1].tenantId).toBeNull();
+  });
+});
+
+/**
+ * TASK-MTUH5L8MJ6S8E — the retrieval half. These run the real `retrieveChunks`
+ * and `buildRagPrompt` against a stubbed `Chunk` query, so they measure what
+ * the function returns rather than what the file contains.
+ */
+describe('retrieveChunks — a failed or empty search may not become evidence', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    embedTextMock.mockResolvedValue(new Array(1536).fill(0.5));
+  });
+
+  it('propagates a failed Chunk query instead of answering with demo projects', async () => {
+    mockPrisma.$queryRawUnsafe.mockRejectedValue(
+      new Error('Raw query failed. Code: `42P01`. Message: `relation "Chunk" does not exist`')
+    );
+
+    await expect(retrieveChunks('battery', 3, 'tenant_1')).rejects.toThrow(/42P01/);
+  });
+
+  it('reports an empty corpus as empty, not as three CORDIS projects', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+    await expect(retrieveChunks('battery', 3, 'tenant_1')).resolves.toEqual([]);
+  });
+
+  it('returns the rows the database matched, with their measured scores', async () => {
+    // The half a careless fix breaks: refusing to invent must not stop real
+    // matches from coming back.
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([
+      { text: 'a real ingested chunk', documentId: 'doc_real', score: 0.71 },
+    ]);
+
+    await expect(retrieveChunks('battery', 3, 'tenant_1')).resolves.toEqual([
+      { text: 'a real ingested chunk', documentId: 'doc_real', score: 0.71 },
+    ]);
+  });
+
+  it('never emits any of the invented rows, whatever the database does', async () => {
+    for (const outcome of [
+      () => mockPrisma.$queryRawUnsafe.mockResolvedValue([]),
+      () => mockPrisma.$queryRawUnsafe.mockResolvedValue(null),
+      () => mockPrisma.$queryRawUnsafe.mockRejectedValue(new Error('connection refused')),
+    ]) {
+      vi.clearAllMocks();
+      embedTextMock.mockResolvedValue(new Array(1536).fill(0.5));
+      outcome();
+
+      const chunks = await retrieveChunks('battery', 5, 'tenant_1').catch(() => []);
+      const serialised = JSON.stringify(chunks);
+      for (const invented of FABRICATED) {
+        expect(serialised).not.toContain(invented);
+      }
+    }
+  });
+});
+
+describe('buildRagPrompt — an unaugmented prompt says so by carrying no context', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    embedTextMock.mockResolvedValue(new Array(1536).fill(0.5));
+  });
+
+  it('sends the bare question through when the corpus matched nothing', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+    const prompt = await buildRagPrompt('How do we manage battery heat?', 'tenant_1', 5);
+
+    // No fabricated context, and no `[Source N | Score: …%]` header claiming
+    // evidence that does not exist.
+    expect(prompt).toBe('How do we manage battery heat?');
+    expect(prompt).not.toContain('RETRIEVED CONTEXT');
+    expect(prompt).not.toContain('Score:');
+  });
+
+  it('does not reach the model at all when retrieval fails', async () => {
+    // The concept-note path (`generateSectionDraft`) awaits this before it
+    // builds its messages, so a throw here is what stops a draft from being
+    // written on top of nothing.
+    mockPrisma.$queryRawUnsafe.mockRejectedValue(new Error('connection refused'));
+
+    await expect(buildRagPrompt('How do we manage battery heat?', 'tenant_1', 5)).rejects.toThrow(
+      /connection refused/
+    );
+  });
+
+  it('labels real retrieved chunks with the score the database measured', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([
+      { text: 'a real ingested chunk', documentId: 'doc_real', score: 0.71 },
+    ]);
+
+    const prompt = await buildRagPrompt('battery', 'tenant_1', 5);
+
+    expect(prompt).toContain('[Source 1 | Score: 71.0%]');
+    expect(prompt).toContain('a real ingested chunk');
   });
 });

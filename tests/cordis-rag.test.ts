@@ -1,5 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { createCordisPrismaStub, type CordisPrismaStub } from './helpers/cordis-prisma-stub';
+import { fakeEmbedding } from './helpers/fake-embedding';
 
 const db: CordisPrismaStub = createCordisPrismaStub();
 
@@ -8,8 +9,29 @@ vi.mock('../src/lib/db', () => ({
   withTenant: async (_tenantId: string, fn: (tx: typeof db.prisma) => Promise<unknown>) => fn(db.prisma),
 }));
 
+/**
+ * TASK-MTUH5L8MJ6S8E — this file used to run with a real `embedText` and no
+ * `OPENAI_API_KEY`, which meant every ingest and every search here was quietly
+ * carried by the mock-embedding fallback inside `getEmbedding`. That fallback
+ * is gone: production code no longer invents a vector for anything. The fake
+ * now enters where a fake belongs, at the provider boundary, named as one.
+ *
+ * Nothing below asserts relevance or ranking — `fakeEmbedding` cannot support
+ * such a claim. The vector search itself is stubbed
+ * (`createCordisPrismaStub`), so these tests cover the plumbing around it.
+ */
+const embedTextMock = vi.hoisted(() => vi.fn());
+vi.mock('../src/lib/llm', async () => {
+  const actual = await vi.importActual<typeof import('../src/lib/llm')>('../src/lib/llm');
+  return { ...actual, embedText: embedTextMock };
+});
+
 const { syncCordisBigData, aggregateCordisMetrics } = await import('../src/lib/cordis-sync');
 const { retrieveChunks, buildRagPrompt, splitText } = await import('../src/lib/rag');
+
+beforeEach(() => {
+  embedTextMock.mockReset().mockImplementation(async (text: string) => fakeEmbedding(text));
+});
 
 /** A record with every field the importer maps, so drift tests are unambiguous. */
 function record(overrides: Record<string, unknown> = {}) {
