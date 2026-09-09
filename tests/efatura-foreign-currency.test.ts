@@ -93,7 +93,7 @@ describe('a foreign-currency invoice states its own currency', () => {
     const doc = buildInvoiceDocument(USD_RECORD, SUPPLIER);
     // `unitPriceTRY` was the name that let a USD amount be printed as lira.
     expect(doc.lines[0]).not.toHaveProperty('unitPriceTRY');
-    expect(doc.lines[0]!.unitPrice).toBe(99);
+    expect(doc.lines[0]!.unitPriceMinor).toBe(9900);
   });
 
   test('totals are rounded in the invoice currency, not always in kuruş', () => {

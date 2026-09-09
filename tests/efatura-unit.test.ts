@@ -60,7 +60,7 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
           name: 'Platform Subscription',
           quantity: 2,
           unitCode: 'C62',
-          unitPrice: 2500, // 5000.00 TRY total
+          unitPriceMinor: 250_000, // 5000.00 TRY total for quantity 2
           vatRate: 20,
         },
       ];
@@ -80,7 +80,7 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
           name: 'Consulting Service',
           quantity: 1,
           unitCode: 'C62',
-          unitPrice: 10000,
+          unitPriceMinor: 1_000_000,
           vatRate: 20,
           withholdingCode: '604',
           withholdingRate: 0.9,
@@ -127,7 +127,7 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
           name: 'EU Horizon Europe Advisory Service',
           quantity: 1,
           unitCode: 'MON',
-          unitPrice: 15000,
+          unitPriceMinor: 1_500_000,
           vatRate: 20,
         },
       ],
@@ -208,7 +208,7 @@ describe('e-Fatura Engine — Comprehensive Unit Tests', () => {
         city: 'İstanbul',
         country: 'Türkiye',
       },
-      lines: [{ id: '1', name: 'Test Service', quantity: 1, unitCode: 'C62', unitPrice: 1000, vatRate: 20 }],
+      lines: [{ id: '1', name: 'Test Service', quantity: 1, unitCode: 'C62', unitPriceMinor: 100_000, vatRate: 20 }],
     };
 
     test('resolves sandbox adapter from ADAPTERS registry', () => {

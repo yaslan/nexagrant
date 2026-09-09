@@ -40,9 +40,9 @@ function documentLine(netMinor: number, vatRate: number, rate: number): InvoiceL
     name: 'Danışmanlık — ön değerlendirme',
     quantity: 1,
     unitCode: 'MON',
-    // The document takes a major-unit price; TRY has two decimals, so this is
-    // the same `netMinor` the panel is given below.
-    unitPrice: netMinor / 100,
+    // Both sides now take the same minor-unit integer; the document used to
+    // take a major-unit float and convert it back (TASK-MTTUSEJFOSPI).
+    unitPriceMinor: netMinor,
     vatRate,
     withholdingCode: '604',
     withholdingRate: rate,
@@ -56,7 +56,7 @@ describe('the document and the panel withhold the same amount', () => {
         for (let net = 1; net <= 3000; net += 1) {
           const label = `net ${net} @ ${vatRate}% VAT, ${rate} withholding`;
 
-          const document = invoiceTotalsMinor([documentLine(net, vatRate, rate)], 'TRY');
+          const document = invoiceTotalsMinor([documentLine(net, vatRate, rate)]);
           const panel = totalsForLines([
             {
               name: 'Danışmanlık — ön değerlendirme',
@@ -92,7 +92,7 @@ describe('the document and the panel withhold the same amount', () => {
     // 10005 kuruş at 20% is 2001 kuruş of VAT; 9/10 of that is 1800.9, which
     // `Math.floor` would report as 1800. This is the input a floor/half-up
     // disagreement shows up on first.
-    const document = invoiceTotalsMinor([documentLine(10_005, 20, 0.9)], 'TRY');
+    const document = invoiceTotalsMinor([documentLine(10_005, 20, 0.9)]);
     const panel = totalsForLines([
       {
         name: 'Danışmanlık',
@@ -115,17 +115,16 @@ describe('the document and the panel withhold the same amount', () => {
   test('the major-unit view reports the same withholding the minor-unit core did', () => {
     const lines = [documentLine(10_005, 20, 0.9)];
     const view = calculateInvoiceTotals(lines, 'TRY');
-    const core = invoiceTotalsMinor(lines, 'TRY');
+    const core = invoiceTotalsMinor(lines);
 
     expect(Math.round(view.totalWithholding * 100)).toBe(core.totalWithholdingMinor);
     expect(Math.round(view.grandTotal * 100)).toBe(core.grandTotalMinor);
   });
 
   test('a line with no withholding withholds nothing, on both sides', () => {
-    const document = invoiceTotalsMinor(
-      [{ id: 'l1', name: 'Abonelik', quantity: 1, unitCode: 'MON', unitPrice: 450, vatRate: 20 }],
-      'TRY'
-    );
+    const document = invoiceTotalsMinor([
+      { id: 'l1', name: 'Abonelik', quantity: 1, unitCode: 'MON', unitPriceMinor: 45_000, vatRate: 20 },
+    ]);
     const panel = totalsForLines([
       { name: 'Abonelik', quantity: 1, unitCode: 'MON', unitPriceMinor: 45_000, vatRate: 20 },
     ]);

@@ -210,9 +210,9 @@ describe('the document and the panel round the tax the same way', () => {
               name: 'Fabrika — abonelik',
               quantity: 1,
               unitCode: 'MON',
-              // `calculateInvoiceTotals` takes a major-unit price; TRY has two
-              // decimals, so this is the same `net` minor units.
-              unitPrice: net / 100,
+              // Both sides take the same minor-unit integer since
+              // TASK-MTTUSEJFOSPI; the document no longer round-trips a float.
+              unitPriceMinor: net,
               vatRate: rate,
             },
           ],

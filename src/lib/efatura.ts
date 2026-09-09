@@ -5,8 +5,8 @@
 
 import {
   currencyExponent,
+  formatMoney,
   toDecimalString,
-  toMinorUnits,
   vatOnNetMinor,
   withholdingOnVatMinor,
 } from './money';
@@ -27,7 +27,17 @@ export interface InvoiceLineItem {
   name: string;
   quantity: number;
   unitCode: string; // 'C62' (Adet), 'MON' (Ay)
-  unitPrice: number;
+  /**
+   * Unit price in the invoice currency's minor unit (kuruş, cent), as an
+   * integer — the shape the stored row already has (`unitPriceMinor` on
+   * `invoiceLineSchema`) and the only shape CLAUDE.md rule 9 allows.
+   *
+   * It was a major-unit float until TASK-MTTUSEJFOSPI, which meant the caller
+   * converted every stored integer out of minor units on the way in and the XML
+   * generator then rounded the float back with `toFixed(2)` — a second rounding
+   * rule, disagreeing with `vatOnNetMinor` by a kuruş at 1%, 10% and 18%.
+   */
+  unitPriceMinor: number;
   vatRate: number; // 20 for 20%
   withholdingCode?: string; // e.g. '604' (Danışmanlık 9/10)
   withholdingRate?: number; // 0.9 for 9/10
@@ -98,6 +108,29 @@ export interface TaxTotalsMinor {
   /** VAT actually payable: charged VAT less any withholding. */
   payableVatMinor: number;
   grandTotalMinor: number;
+  /**
+   * What each line contributed, in document order — the figures the XML line
+   * block prints.
+   *
+   * They are carried out of here rather than recomputed by the generator so
+   * that the sum of the printed `LineExtensionAmount`s *is* the printed
+   * `LegalMonetaryTotal`, and the sum of the printed line `TaxAmount`s *is* the
+   * printed document `TaxTotal`, by construction rather than by two
+   * computations happening to agree. They did not agree: the generator used to
+   * round the line with `toFixed(2)` on a float while the totals came from
+   * `vatOnNetMinor` (TASK-MTTUSEJFOSPI).
+   */
+  lines: InvoiceLineTotalsMinor[];
+}
+
+/** One line's contribution to the document totals, in minor units. */
+export interface InvoiceLineTotalsMinor {
+  /** Quantity times unit price — the line's VAT-exclusive amount. */
+  netMinor: number;
+  /** VAT charged on that net, at the line's own rate. */
+  vatMinor: number;
+  /** The part of that VAT withheld (tevkifat); 0 when the line carries none. */
+  withholdingMinor: number;
 }
 
 /**
@@ -186,24 +219,30 @@ export type InvoiceCurrency = EfaturaDocument['currency'];
  * KDV, Tevkifat ve Toplam Tutar Hesaplayıcı
  * Tutarlar Int minor unit bazında hesaplanır (CLAUDE.md #9).
  *
- * The currency is an argument because the minor unit is not always kuruş: the
- * rounding step belongs to the invoice's own currency, and this used to round
- * every invoice as if it were TRY.
+ * The single arithmetic behind every figure on the document: the totals block,
+ * the per-line block of the XML, and the printed page all read this result.
+ *
+ * It no longer takes a currency. It used to, because it received a major-unit
+ * float and had to know how many decimals to round it back to; now the prices
+ * arrive as minor units of the invoice's own currency and the arithmetic is
+ * integer throughout, so there is nothing left for an exponent to decide.
  */
-export function invoiceTotalsMinor(
-  lines: InvoiceLineItem[],
-  currency: InvoiceCurrency = 'TRY'
-): TaxTotalsMinor {
+export function invoiceTotalsMinor(lines: InvoiceLineItem[]): TaxTotalsMinor {
   let subtotalMinor = 0;
   let totalVatMinor = 0;
   let totalWithholdingMinor = 0;
 
-  for (const line of lines) {
-    const lineTotalMinor = toMinorUnits(line.quantity * line.unitPrice, currency);
+  const lineTotals: InvoiceLineTotalsMinor[] = lines.map((line) => {
+    // Integers all the way: `unitPriceMinor` is already in the currency's minor
+    // unit, so this rounds only when `quantity` is fractional — which
+    // `invoiceLineSchema` permits (half a month, a quarter day). Written the
+    // same way `totalsForLines` in src/lib/billing/invoice-list.ts writes it,
+    // on the same stored line, so the document and the panel state the same net.
+    const netMinor = Math.round(line.quantity * line.unitPriceMinor);
     // The one rounding rule for tax in this codebase (`vatOnNetMinor`), not a
     // local `Math.round`: this document and the billing panel quote the same
     // sale, and a rule copied into each of them agrees only by coincidence.
-    const vatMinor = vatOnNetMinor(lineTotalMinor, line.vatRate);
+    const vatMinor = vatOnNetMinor(netMinor, line.vatRate);
     // Same argument one step further down, and the same shared rule
     // (`withholdingOnVatMinor`): the withholding on this line is the figure the
     // billing panel prints for the same sale, so the two read one function
@@ -212,10 +251,12 @@ export function invoiceTotalsMinor(
       ? withholdingOnVatMinor(vatMinor, line.withholdingRate)
       : 0;
 
-    subtotalMinor += lineTotalMinor;
+    subtotalMinor += netMinor;
     totalVatMinor += vatMinor;
     totalWithholdingMinor += withholdingMinor;
-  }
+
+    return { netMinor, vatMinor, withholdingMinor };
+  });
 
   const payableVatMinor = totalVatMinor - totalWithholdingMinor;
 
@@ -225,6 +266,7 @@ export function invoiceTotalsMinor(
     totalWithholdingMinor,
     payableVatMinor,
     grandTotalMinor: subtotalMinor + payableVatMinor,
+    lines: lineTotals,
   };
 }
 
@@ -244,7 +286,7 @@ export function calculateInvoiceTotals(
   lines: InvoiceLineItem[],
   currency: InvoiceCurrency = 'TRY'
 ): TaxCalculationResult {
-  const totals = invoiceTotalsMinor(lines, currency);
+  const totals = invoiceTotalsMinor(lines);
   const majorUnit = 10 ** currencyExponent(currency);
 
   return {
@@ -257,8 +299,8 @@ export function calculateInvoiceTotals(
 }
 
 /**
- * Renders an amount in the invoice's own currency, in the Turkish number
- * format the printed document uses.
+ * Renders a minor-unit amount in the invoice's own currency, in the Turkish
+ * number format the printed document uses.
  *
  * The lira sign used to be hard-coded into every money cell while the box two
  * rows above said "Para Birimi: USD": a $99.00 subscription printed as a lira
@@ -266,12 +308,11 @@ export function calculateInvoiceTotals(
  * understated it by whatever the day's rate was (TASK-MTSWLWDONWA3W). The
  * symbol now comes from the same field as that box.
  */
-export function formatInvoiceAmount(amount: number, currency: InvoiceCurrency): string {
-  return new Intl.NumberFormat('tr-TR', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: currencyExponent(currency),
-  }).format(amount);
+export function formatInvoiceAmount(amountMinor: number, currency: InvoiceCurrency): string {
+  // `formatMoney` is money.ts's display side and already pins the fraction
+  // digits to the currency's exponent; keeping a second `Intl` call here was
+  // one more place a money format could drift from the rest of the product.
+  return formatMoney(amountMinor, currency, 'tr-TR');
 }
 
 /**
@@ -320,25 +361,32 @@ export function exchangeRateStatement(
 }
 
 export function generateUblTrXml(invoice: EfaturaDocument): string {
-  // Minor units, not the major-unit view: the amounts below are added together
-  // (`TaxInclusiveAmount`) and this is a fiscal document, so the arithmetic
-  // stays in integers and only the rendering step leaves them (CLAUDE.md #9).
-  const totals = invoiceTotalsMinor(invoice.lines, invoice.currency);
+  // One computation for the whole document. Every amount printed below — the
+  // line block, the tax block and the monetary totals — is a figure out of this
+  // result, so the document adds up by construction. The line block used to do
+  // its own float arithmetic and round it with `toFixed(2)`, which is a second
+  // rounding rule and disagreed with `vatOnNetMinor` by a kuruş at 1%, 10% and
+  // 18% VAT — on a document filed with GİB (TASK-MTTUSEJFOSPI, CLAUDE.md #9).
+  const totals = invoiceTotalsMinor(invoice.lines);
   const amount = (minor: number) => toDecimalString(minor, invoice.currency);
+  // A VAT rate is a percentage, not money: two decimals so 25.5% survives, and
+  // never `formatMoney`.
+  const percent = (rate: number) => rate.toFixed(2);
 
   const linesXml = invoice.lines
-    .map(
-      (line, idx) => `
+    .map((line, idx) => {
+      const lineTotals = totals.lines[idx]!;
+      return `
     <cac:InvoiceLine>
       <cbc:ID>${idx + 1}</cbc:ID>
       <cbc:InvoicedQuantity unitCode="${line.unitCode}">${line.quantity}</cbc:InvoicedQuantity>
-      <cbc:LineExtensionAmount currencyID="${invoice.currency}">${(line.quantity * line.unitPrice).toFixed(2)}</cbc:LineExtensionAmount>
+      <cbc:LineExtensionAmount currencyID="${invoice.currency}">${amount(lineTotals.netMinor)}</cbc:LineExtensionAmount>
       <cac:TaxTotal>
-        <cbc:TaxAmount currencyID="${invoice.currency}">${((line.quantity * line.unitPrice * line.vatRate) / 100).toFixed(2)}</cbc:TaxAmount>
+        <cbc:TaxAmount currencyID="${invoice.currency}">${amount(lineTotals.vatMinor)}</cbc:TaxAmount>
         <cac:TaxSubtotal>
-          <cbc:TaxableAmount currencyID="${invoice.currency}">${(line.quantity * line.unitPrice).toFixed(2)}</cbc:TaxableAmount>
-          <cbc:TaxAmount currencyID="${invoice.currency}">${((line.quantity * line.unitPrice * line.vatRate) / 100).toFixed(2)}</cbc:TaxAmount>
-          <cbc:Percent>${line.vatRate}</cbc:Percent>
+          <cbc:TaxableAmount currencyID="${invoice.currency}">${amount(lineTotals.netMinor)}</cbc:TaxableAmount>
+          <cbc:TaxAmount currencyID="${invoice.currency}">${amount(lineTotals.vatMinor)}</cbc:TaxAmount>
+          <cbc:Percent>${percent(line.vatRate)}</cbc:Percent>
           <cac:TaxCategory>
             <cac:TaxScheme>
               <cbc:Name>KDV</cbc:Name>
@@ -351,9 +399,41 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
         <cbc:Name>${line.name}</cbc:Name>
       </cac:Item>
       <cac:Price>
-        <cbc:PriceAmount currencyID="${invoice.currency}">${line.unitPrice.toFixed(2)}</cbc:PriceAmount>
+        <cbc:PriceAmount currencyID="${invoice.currency}">${amount(line.unitPriceMinor)}</cbc:PriceAmount>
       </cac:Price>
-    </cac:InvoiceLine>`
+    </cac:InvoiceLine>`;
+    })
+    .join('');
+
+  // One `cac:TaxSubtotal` per VAT rate actually charged, in the order the rates
+  // first appear, each summed from the same per-line figures the block above
+  // printed. The document used to declare a single subtotal at a hard-coded
+  // `20.00` percent, which was a false statement on every invoice that is not
+  // all-20% — a zero-rated (Kuveyt) sale claimed 20% VAT of 0.00 (CLAUDE.md #7:
+  // no figure on the document that is not computed from the sale).
+  const byRate = new Map<number, { taxableMinor: number; taxMinor: number }>();
+  invoice.lines.forEach((line, idx) => {
+    const lineTotals = totals.lines[idx]!;
+    const bucket = byRate.get(line.vatRate) ?? { taxableMinor: 0, taxMinor: 0 };
+    bucket.taxableMinor += lineTotals.netMinor;
+    bucket.taxMinor += lineTotals.vatMinor;
+    byRate.set(line.vatRate, bucket);
+  });
+
+  const taxSubtotalsXml = [...byRate.entries()]
+    .map(
+      ([rate, bucket]) => `
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="${invoice.currency}">${amount(bucket.taxableMinor)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="${invoice.currency}">${amount(bucket.taxMinor)}</cbc:TaxAmount>
+      <cbc:Percent>${percent(rate)}</cbc:Percent>
+      <cac:TaxCategory>
+        <cac:TaxScheme>
+          <cbc:Name>KDV</cbc:Name>
+          <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>`
     )
     .join('');
 
@@ -454,18 +534,7 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
 
   <!-- Vergi Toplamı -->
   <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="${invoice.currency}">${amount(totals.payableVatMinor)}</cbc:TaxAmount>
-    <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${invoice.currency}">${amount(totals.subtotalMinor)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${invoice.currency}">${amount(totals.totalVatMinor)}</cbc:TaxAmount>
-      <cbc:Percent>20.00</cbc:Percent>
-      <cac:TaxCategory>
-        <cac:TaxScheme>
-          <cbc:Name>KDV</cbc:Name>
-          <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
-        </cac:TaxScheme>
-      </cac:TaxCategory>
-    </cac:TaxSubtotal>
+    <cbc:TaxAmount currencyID="${invoice.currency}">${amount(totals.payableVatMinor)}</cbc:TaxAmount>${taxSubtotalsXml}
   </cac:TaxTotal>
 
   <!-- Parasal Toplamlar -->
@@ -489,8 +558,18 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
  * kendini `UNFILED_NOTICE` ile mali değeri olmayan bir örnek olarak işaretler.
  */
 export function generateEfaturaHtml(invoice: EfaturaDocument): string {
-  const totals = calculateInvoiceTotals(invoice.lines, invoice.currency);
-  const money = (amount: number) => formatInvoiceAmount(amount, invoice.currency);
+  // The same minor-unit result the XML prints, not the major-unit float view:
+  // the page and the filed document describe one sale and must not round it
+  // two different ways (CLAUDE.md #9).
+  const totals = invoiceTotalsMinor(invoice.lines);
+  const money = (amountMinor: number) => formatInvoiceAmount(amountMinor, invoice.currency);
+
+  // The rates this invoice actually charges, for the totals row. It read
+  // "%20" no matter what the lines said, so a zero-rated or mixed-rate sale
+  // labelled its own VAT wrongly on the page the buyer receives.
+  const vatRateLabel = [...new Set(invoice.lines.map((l) => l.vatRate))]
+    .map((rate) => `%${rate}`)
+    .join(' + ');
 
   const linesHtml = invoice.lines
     .map(
@@ -499,9 +578,9 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${idx + 1}</td>
       <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>${l.name}</strong></td>
       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${l.quantity} Adet</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${money(l.unitPrice)}</td>
+      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${money(l.unitPriceMinor)}</td>
       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">%${l.vatRate}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace; font-weight: bold;">${money(l.quantity * l.unitPrice)}</td>
+      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace; font-weight: bold;">${money(totals.lines[idx]!.netMinor)}</td>
     </tr>
   `
     )
@@ -609,23 +688,23 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
   <table class="totals-table">
     <tr>
       <td class="label">Ara Toplam (Matrah):</td>
-      <td style="text-align: right; font-family: monospace;">${money(totals.subtotal)}</td>
+      <td style="text-align: right; font-family: monospace;">${money(totals.subtotalMinor)}</td>
     </tr>
     <tr>
-      <td class="label">Hesaplanan KDV (%20):</td>
-      <td style="text-align: right; font-family: monospace;">${money(totals.totalVat)}</td>
+      <td class="label">Hesaplanan KDV (${vatRateLabel}):</td>
+      <td style="text-align: right; font-family: monospace;">${money(totals.totalVatMinor)}</td>
     </tr>
     ${
-      totals.totalWithholding > 0
+      totals.totalWithholdingMinor > 0
         ? `<tr>
       <td class="label" style="color: #b91c1c;">Tevkifat Tutarı (9/10):</td>
-      <td style="text-align: right; font-family: monospace; color: #b91c1c;">-${money(totals.totalWithholding)}</td>
+      <td style="text-align: right; font-family: monospace; color: #b91c1c;">-${money(totals.totalWithholdingMinor)}</td>
     </tr>`
         : ''
     }
     <tr class="grand-total">
       <td class="label">ÖDENECEK GENEL TOPLAM:</td>
-      <td style="text-align: right; font-family: monospace; color: #047857;">${money(totals.grandTotal)}</td>
+      <td style="text-align: right; font-family: monospace; color: #047857;">${money(totals.grandTotalMinor)}</td>
     </tr>${
       // VUK 215: a foreign-currency invoice has to show its lira equivalent on
       // the document itself. The row below is the only place a ₺ may appear on
@@ -641,7 +720,7 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
       }:</td>
       <td style="text-align: right; font-family: monospace;">${
         typeof invoice.exchangeRate.tryEquivalentMinor === 'number'
-          ? formatInvoiceAmount(invoice.exchangeRate.tryEquivalentMinor / 100, 'TRY')
+          ? formatInvoiceAmount(invoice.exchangeRate.tryEquivalentMinor, 'TRY')
           : '—'
       }</td>
     </tr>

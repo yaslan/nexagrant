@@ -42,7 +42,7 @@ describe('Turkish E-Invoice (GİB / UBL-TR) Module', () => {
           name: 'SaaS Subscription',
           quantity: 1,
           unitCode: 'C62',
-          unitPrice: 10000,
+          unitPriceMinor: 1_000_000,
           vatRate: 20,
         },
       ];
@@ -62,7 +62,7 @@ describe('Turkish E-Invoice (GİB / UBL-TR) Module', () => {
           name: 'Horizon Europe Proposal Pre-Evaluation',
           quantity: 1,
           unitCode: 'C62',
-          unitPrice: 10000,
+          unitPriceMinor: 1_000_000,
           vatRate: 20,
           withholdingCode: '604',
           withholdingRate: 0.9, // 9/10
@@ -109,7 +109,7 @@ describe('Turkish E-Invoice (GİB / UBL-TR) Module', () => {
           name: 'Platform Subscription',
           quantity: 1,
           unitCode: 'C62',
-          unitPrice: 5000,
+          unitPriceMinor: 500_000,
           vatRate: 20,
         },
       ],

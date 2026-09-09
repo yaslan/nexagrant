@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { toDecimalString } from '@/lib/money';
 import type { EfaturaDocument, InvoiceLineItem, InvoiceParty } from '@/lib/efatura';
 
 /**
@@ -9,8 +8,8 @@ import type { EfaturaDocument, InvoiceLineItem, InvoiceParty } from '@/lib/efatu
  * identity, so the rules below are unit-testable without a database:
  *   - nothing about a party is invented; a missing setting is an error, and the
  *     error names the setting,
- *   - amounts come out of the row as minor units and are converted once, here
- *     (CLAUDE.md rule 9),
+ *   - amounts stay in the minor units the row stores them in; nothing here
+ *     converts money to a float (CLAUDE.md rule 9),
  *   - the document is never marked as filed with GİB unless the row carries the
  *     envelope id GİB returned.
  *
@@ -221,9 +220,11 @@ export function buildInvoiceDocument(
     name: line.name,
     quantity: line.quantity,
     unitCode: line.unitCode,
-    // The row holds minor units; the document renders major ones. One
-    // conversion, in one place, through the shared money helper.
-    unitPrice: Number(toDecimalString(line.unitPriceMinor, currency)),
+    // Straight through: the row holds minor units and the document now carries
+    // minor units too. This used to convert to a major-unit float here, which
+    // the XML generator then rounded back with its own `toFixed(2)` — the same
+    // sale rounded by two rules (TASK-MTTUSEJFOSPI, CLAUDE.md rule 9).
+    unitPriceMinor: line.unitPriceMinor,
     vatRate: line.vatRate,
     ...(line.withholdingCode ? { withholdingCode: line.withholdingCode } : {}),
     ...(line.withholdingRate ? { withholdingRate: line.withholdingRate } : {}),

@@ -160,6 +160,14 @@ export function convertCurrencyMinor(amountMinor: number, rate: number): number 
  * construction. A tax figure that differs by a kuruş between the document, the
  * stored row and the billing panel is three different claims about one sale.
  *
+ * That consolidation reached `invoiceTotalsMinor`, which is where `efatura.ts`
+ * computes the *totals*, and stopped there: the UBL-TR line block right below
+ * it kept computing each line's tax as `((q * price * rate) / 100).toFixed(2)`
+ * on a major-unit float until TASK-MTTUSEJFOSPI. So for a while the same
+ * document carried both rules, and they disagree by a kuruş at 1%, 10% and 18%
+ * — the totals said one thing and the lines that add up to them said another.
+ * Every amount on that document now comes out of this function.
+ *
  * Half-up on the exact product, like `convertCurrencyMinor`: `Math.round` in
  * JavaScript rounds .5 towards +Infinity, which is the same thing for the
  * non-negative amounts a sale can have, but saying it here means the rule does
@@ -208,7 +216,9 @@ export function grossFromNetMinor(
  * The counterpart to `vatOnNetMinor`, and there for the same reason. This rule
  * stood as two `Math.round(vat * rate)` copies — `efatura.ts`, which computes
  * the totals on the document that is filed, and `billing/invoice-list.ts`,
- * which computes the ones the billing panel shows. They agreed on every input
+ * which computes the ones the billing panel shows. (Unlike the VAT rule, this
+ * one had no third copy hiding in the XML line block: those lines simply never
+ * printed a withholding figure — they still do not, see TASK-MTTUSEJFOSPI.) They agreed on every input
  * the product produces today, but by coincidence: nothing tied them together,
  * and the next edit to one of them was free to move it. Withholding is the part
  * of the VAT the buyer pays to the tax office instead of to the seller, so a
