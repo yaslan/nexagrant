@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import Stripe from 'stripe';
-import { auth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import {
@@ -12,6 +11,7 @@ import {
 import { PlanNotAvailableError, priceLineForTenant } from '@/lib/billing/storefront';
 import { tierForTenant } from '@/lib/billing/tenant-tier';
 import { taxLineForTenant } from '@/lib/billing/checkout-tax';
+import { requireTenantApi } from '@/lib/tenant';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const isLiveStripe = Boolean(stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.startsWith('sk_'));
@@ -80,8 +80,18 @@ function collectClientPriceFields(body: unknown): string[] {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-    const tenantId = session?.tenantId || 'default-tenant';
+    // The gate comes first, before the body is read and before anything is
+    // priced. Creating a Stripe Checkout Session is a *chargeable* act, so it
+    // belongs to a tenant or to nobody. The route used to fall back to
+    // `'default-tenant'` — an id that exists in no seed, no script and no
+    // schema — which made an anonymous POST create a real, payable session
+    // whose webhook could never be recorded: `lifetime-licence.ts` refuses the
+    // unknown tenant, Stripe retries the 500 forever, and the money has no home.
+    // `requireTenantApi` is the same 401 gate the other tenant routes use
+    // (`src/lib/tenant.ts`): no session tenant, no fallback tenant.
+    const scope = await requireTenantApi();
+    if (!scope.ok) return scope.response;
+    const { tenantId } = scope.scope;
 
     const rawBody: unknown = await req.json();
 

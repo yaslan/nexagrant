@@ -43,8 +43,8 @@ const CATALOGUE_MONTHLY_TEXT = /147[.,]00/;
 
 let ultraBefore: { monthlyCents: number; yearlyCents: number } | null = null;
 
-async function signIn(page: Page, baseURL: string): Promise<void> {
-  const value = await encode({
+async function sessionToken(): Promise<string> {
+  return encode({
     token: {
       sub: 'demo-user-admin',
       id: 'demo-user-admin',
@@ -58,7 +58,22 @@ async function signIn(page: Page, baseURL: string): Promise<void> {
     salt: COOKIE_NAME,
     maxAge: 60 * 60,
   });
-  await page.context().addCookies([{ name: COOKIE_NAME, value, url: baseURL }]);
+}
+
+async function signIn(page: Page, baseURL: string): Promise<void> {
+  await page.context().addCookies([{ name: COOKIE_NAME, value: await sessionToken(), url: baseURL }]);
+}
+
+/**
+ * The `request` fixture carries no browser cookies, so a bare POST to
+ * `/api/billing/checkout` is an *anonymous* one. Since TASK-MTUI9F5YBHTDC that
+ * route answers 401 — creating a payable Stripe session is not something an
+ * unauthenticated caller may do — so these API-level checks, which are about
+ * *pricing* and not about the gate, sign in the same demo tenant the browser
+ * tests use. The gate itself is pinned in `tests/billing-checkout-auth.test.ts`.
+ */
+async function tenantHeaders(): Promise<Record<string, string>> {
+  return { cookie: `${COOKIE_NAME}=${await sessionToken()}` };
 }
 
 function consent(page: Page) {
@@ -144,6 +159,7 @@ test.describe('the studio price is the price the shopfront quotes and charges', 
 
   test('checkout charges the published version, and ignores a price the client names', async ({ request }) => {
     const response = await request.post('/api/billing/checkout', {
+      headers: await tenantHeaders(),
       data: {
         items: [
           {
@@ -207,6 +223,7 @@ test.describe('a private plan is neither shown nor sold to a tenant it was not a
     // `totalMinor: 4500`.
     for (const sku of ['plan-basic', 'basic', 'BASIC']) {
       const response = await request.post('/api/billing/checkout', {
+        headers: await tenantHeaders(),
         data: { items: [{ sku, billingCycle: 'monthly' }] },
       });
       expect(response.status(), `sku ${sku}`).toBe(400);
@@ -220,6 +237,7 @@ test.describe('a private plan is neither shown nor sold to a tenant it was not a
     // The refusal above must be about visibility, not about the endpoint having
     // stopped working.
     const response = await request.post('/api/billing/checkout', {
+      headers: await tenantHeaders(),
       data: { items: [{ sku: 'plan-pro', billingCycle: 'monthly' }] },
     });
     expect(response.status()).toBe(200);

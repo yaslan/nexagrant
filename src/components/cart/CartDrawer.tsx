@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { ShoppingBag, X, Trash2, ShieldCheck, ArrowRight, CreditCard, Layers } from 'lucide-react';
 import { useCart } from './CartContext';
 import { formatMoney } from '@/lib/money';
+import { getPublicRoute } from '@/lib/routes';
 import { errorMessage as toErrorMessage } from '@/lib/errors';
 
 interface CartDrawerProps {
@@ -74,6 +75,23 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
           workspace,
         }),
       });
+
+      // A signed-out visitor cannot start a payment: since TASK-MTUI9F5YBHTDC the
+      // route answers 401 instead of inventing a tenant for the charge. Printing
+      // the server's word ("Unauthorized") into a Turkish drawer would be a dead
+      // end, so the click does what the visitor meant by it — go and sign in, then
+      // come back to this page. The cart lives in localStorage, so it survives the
+      // round trip and the visitor returns to the same lines.
+      if (response.status === 401) {
+        const returnTo =
+          typeof window !== 'undefined'
+            ? `${window.location.pathname}${window.location.search}`
+            : getPublicRoute('pricing', locale);
+        setIsSubmitting(false);
+        closeCart();
+        router.push(`${getPublicRoute('login', locale)}?callbackUrl=${encodeURIComponent(returnTo)}`);
+        return;
+      }
 
       const data = await response.json();
 
