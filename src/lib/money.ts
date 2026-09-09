@@ -201,3 +201,43 @@ export function grossFromNetMinor(
   const vatMinor = vatOnNetMinor(netMinor, ratePercent);
   return { netMinor, vatMinor, grossMinor: netMinor + vatMinor };
 }
+
+/**
+ * The withholding (tevkifat) held back from a line's VAT, in minor units.
+ *
+ * The counterpart to `vatOnNetMinor`, and there for the same reason. This rule
+ * stood as two `Math.round(vat * rate)` copies — `efatura.ts`, which computes
+ * the totals on the document that is filed, and `billing/invoice-list.ts`,
+ * which computes the ones the billing panel shows. They agreed on every input
+ * the product produces today, but by coincidence: nothing tied them together,
+ * and the next edit to one of them was free to move it. Withholding is the part
+ * of the VAT the buyer pays to the tax office instead of to the seller, so a
+ * kuruş of drift between the document and the panel is two different claims
+ * about who owes what on one sale.
+ *
+ * `rate` is a fraction of the VAT, not a percentage: `0.9` is the 9/10 of
+ * withholding code 604, which is how `withholdingRate` is carried on both
+ * `invoiceLineSchema` and `InvoiceLineItem`. Zero is legitimate and returns 0 —
+ * a line that carries no withholding, which is not the same as a rate nobody
+ * configured.
+ *
+ * Half-up on the exact product, written as `Math.floor(x + 0.5)` exactly as
+ * `vatOnNetMinor` writes it, so the two tax steps of one line round the same
+ * way by construction rather than because both happened to call `Math.round`.
+ *
+ * There is deliberately no safe-integer check, unlike `vatOnNetMinor`: `rate`
+ * is bounded to 0–1, so the result can never exceed `vatMinor`, and the caller
+ * already holds that as a safe integer.
+ */
+export function withholdingOnVatMinor(vatMinor: number, rate: number): number {
+  if (!Number.isInteger(vatMinor)) {
+    throw new Error(`Minor-unit amounts must be integers, got ${vatMinor}`);
+  }
+  if (vatMinor < 0) {
+    throw new Error(`Withholding is computed on a non-negative VAT, got ${vatMinor}`);
+  }
+  if (!Number.isFinite(rate) || rate < 0 || rate > 1) {
+    throw new Error(`Withholding rate must be a fraction between 0 and 1, got ${rate}`);
+  }
+  return Math.floor(vatMinor * rate + 0.5);
+}

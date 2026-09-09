@@ -3,7 +3,13 @@
  * UBL-TR 1.2.1 XML Standartları, VKN/TCKN Algoritmik Doğrulaması, KDV & Tevkifat Hesaplamaları
  */
 
-import { currencyExponent, toMinorUnits, vatOnNetMinor } from './money';
+import {
+  currencyExponent,
+  toDecimalString,
+  toMinorUnits,
+  vatOnNetMinor,
+  withholdingOnVatMinor,
+} from './money';
 
 export interface InvoiceParty {
   name: string;
@@ -79,6 +85,19 @@ export interface TaxCalculationResult {
   totalWithholding: number;
   payableVat: number;
   grandTotal: number;
+}
+
+/**
+ * The same totals in the currency's minor unit — the shape everything that does
+ * arithmetic on them should take (CLAUDE.md rule 9).
+ */
+export interface TaxTotalsMinor {
+  subtotalMinor: number;
+  totalVatMinor: number;
+  totalWithholdingMinor: number;
+  /** VAT actually payable: charged VAT less any withholding. */
+  payableVatMinor: number;
+  grandTotalMinor: number;
 }
 
 /**
@@ -171,14 +190,13 @@ export type InvoiceCurrency = EfaturaDocument['currency'];
  * rounding step belongs to the invoice's own currency, and this used to round
  * every invoice as if it were TRY.
  */
-export function calculateInvoiceTotals(
+export function invoiceTotalsMinor(
   lines: InvoiceLineItem[],
   currency: InvoiceCurrency = 'TRY'
-): TaxCalculationResult {
+): TaxTotalsMinor {
   let subtotalMinor = 0;
   let totalVatMinor = 0;
   let totalWithholdingMinor = 0;
-  const majorUnit = 10 ** currencyExponent(currency);
 
   for (const line of lines) {
     const lineTotalMinor = toMinorUnits(line.quantity * line.unitPrice, currency);
@@ -186,11 +204,13 @@ export function calculateInvoiceTotals(
     // local `Math.round`: this document and the billing panel quote the same
     // sale, and a rule copied into each of them agrees only by coincidence.
     const vatMinor = vatOnNetMinor(lineTotalMinor, line.vatRate);
-    let withholdingMinor = 0;
-
-    if (line.withholdingRate && line.withholdingRate > 0) {
-      withholdingMinor = Math.round(vatMinor * line.withholdingRate);
-    }
+    // Same argument one step further down, and the same shared rule
+    // (`withholdingOnVatMinor`): the withholding on this line is the figure the
+    // billing panel prints for the same sale, so the two read one function
+    // rather than each keeping its own `Math.round`.
+    const withholdingMinor = line.withholdingRate
+      ? withholdingOnVatMinor(vatMinor, line.withholdingRate)
+      : 0;
 
     subtotalMinor += lineTotalMinor;
     totalVatMinor += vatMinor;
@@ -198,14 +218,41 @@ export function calculateInvoiceTotals(
   }
 
   const payableVatMinor = totalVatMinor - totalWithholdingMinor;
-  const grandTotalMinor = subtotalMinor + payableVatMinor;
 
   return {
-    subtotal: subtotalMinor / majorUnit,
-    totalVat: totalVatMinor / majorUnit,
-    totalWithholding: totalWithholdingMinor / majorUnit,
-    payableVat: payableVatMinor / majorUnit,
-    grandTotal: grandTotalMinor / majorUnit,
+    subtotalMinor,
+    totalVatMinor,
+    totalWithholdingMinor,
+    payableVatMinor,
+    grandTotalMinor: subtotalMinor + payableVatMinor,
+  };
+}
+
+/**
+ * The same totals as major-unit numbers, for the readers that still want them.
+ *
+ * A view over `invoiceTotalsMinor`, not a second computation: every figure
+ * here is that function's integer divided by the currency's major unit, so
+ * there is one arithmetic and one rounding path behind both shapes.
+ *
+ * The float is the part CLAUDE.md rule 9 does not want, and it survives because
+ * `tests/vat-by-country.test.ts` reads `document.totalVat` as a major-unit
+ * number (`Math.round(document.totalVat * 100)`); the printed document reads
+ * these fields for display only. New callers should take `invoiceTotalsMinor`.
+ */
+export function calculateInvoiceTotals(
+  lines: InvoiceLineItem[],
+  currency: InvoiceCurrency = 'TRY'
+): TaxCalculationResult {
+  const totals = invoiceTotalsMinor(lines, currency);
+  const majorUnit = 10 ** currencyExponent(currency);
+
+  return {
+    subtotal: totals.subtotalMinor / majorUnit,
+    totalVat: totals.totalVatMinor / majorUnit,
+    totalWithholding: totals.totalWithholdingMinor / majorUnit,
+    payableVat: totals.payableVatMinor / majorUnit,
+    grandTotal: totals.grandTotalMinor / majorUnit,
   };
 }
 
@@ -273,7 +320,11 @@ export function exchangeRateStatement(
 }
 
 export function generateUblTrXml(invoice: EfaturaDocument): string {
-  const totals = calculateInvoiceTotals(invoice.lines, invoice.currency);
+  // Minor units, not the major-unit view: the amounts below are added together
+  // (`TaxInclusiveAmount`) and this is a fiscal document, so the arithmetic
+  // stays in integers and only the rendering step leaves them (CLAUDE.md #9).
+  const totals = invoiceTotalsMinor(invoice.lines, invoice.currency);
+  const amount = (minor: number) => toDecimalString(minor, invoice.currency);
 
   const linesXml = invoice.lines
     .map(
@@ -403,10 +454,10 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
 
   <!-- Vergi Toplamı -->
   <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="${invoice.currency}">${totals.payableVat.toFixed(2)}</cbc:TaxAmount>
+    <cbc:TaxAmount currencyID="${invoice.currency}">${amount(totals.payableVatMinor)}</cbc:TaxAmount>
     <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${invoice.currency}">${totals.subtotal.toFixed(2)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${invoice.currency}">${totals.totalVat.toFixed(2)}</cbc:TaxAmount>
+      <cbc:TaxableAmount currencyID="${invoice.currency}">${amount(totals.subtotalMinor)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="${invoice.currency}">${amount(totals.totalVatMinor)}</cbc:TaxAmount>
       <cbc:Percent>20.00</cbc:Percent>
       <cac:TaxCategory>
         <cac:TaxScheme>
@@ -419,10 +470,10 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
 
   <!-- Parasal Toplamlar -->
   <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="${invoice.currency}">${totals.subtotal.toFixed(2)}</cbc:LineExtensionAmount>
-    <cbc:TaxExclusiveAmount currencyID="${invoice.currency}">${totals.subtotal.toFixed(2)}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="${invoice.currency}">${(totals.subtotal + totals.totalVat).toFixed(2)}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="${invoice.currency}">${totals.grandTotal.toFixed(2)}</cbc:PayableAmount>
+    <cbc:LineExtensionAmount currencyID="${invoice.currency}">${amount(totals.subtotalMinor)}</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="${invoice.currency}">${amount(totals.subtotalMinor)}</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="${invoice.currency}">${amount(totals.subtotalMinor + totals.totalVatMinor)}</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="${invoice.currency}">${amount(totals.grandTotalMinor)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
 
   <!-- Fatura Kalemleri -->
