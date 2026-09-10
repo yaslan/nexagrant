@@ -3,12 +3,17 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { getEntitlements } from '@/lib/billing';
 import { BillingClient } from './BillingClient';
+import { BillingIdentityForm, type BillingIdentityValuesOnFile } from './BillingIdentityForm';
 import { errorMessage } from '@/lib/errors';
 import { getActiveTier } from '@/lib/billing/active-tier';
 import { countLifetimeLicences, lifetimeScarcity } from '@/lib/billing/lifetime-licence';
 import { effectiveTier, isQuotedOnLock, priceLockDefect, readPriceLock } from '@/lib/billing/price-lock';
 import { resolvePlanId, FALLBACK_PLAN_ID, NO_DISCOUNT_TIER } from '@/lib/billing/catalog';
 import { readStorefront } from '@/lib/billing/storefront';
+import { can } from '@/lib/rbac';
+import { Role } from '@prisma/client';
+import { maskVknTckn } from '@/lib/billing/billing-identity';
+import { COUNTRY_VAT_RATES } from '@/lib/billing/vat-rates';
 import {
   buildInvoiceList,
   latestBuyerIdentity,
@@ -60,7 +65,13 @@ export default async function BillingSettingsPage({
   // The tenant comes from the session and nowhere else. Re-resolving it from
   // "the first membership of this user" quietly picked a different tenant than
   // the one the session was issued for.
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId, role } = await requireTenantPage(locale);
+
+  // Who may see and write the buyer's fiscal identity: `manage_billing`, which
+  // `src/lib/rbac.ts` grants to TENANT_OWNER alone. The gate is applied to the
+  // *read* as well as the form, so a member's page never carries a VKN/TCKN in
+  // its payload — a hidden section still ships the data it hides.
+  const canEditIdentity = can(role as Role, 'manage_billing');
 
   // Null until the tenant row is actually read. It used to default to
   // "FonBridge Demo Kuruluşu", so a failed query greeted a paying customer with
@@ -212,6 +223,59 @@ export default async function BillingSettingsPage({
     console.warn(`[BillingSettings] invoice history unreadable: ${errorMessage(err)}`);
   }
 
+  // The buyer's fiscal identity, read from the row `invoice-writer.ts` demands
+  // before it will issue anything (TASK-MTSY71BUMBLWM). Distinct from the
+  // `buyerIdentity` above: that one is copied off the newest *invoice*, so a
+  // tenant that has never been invoiced has none, which is exactly the tenant
+  // that needs this form.
+  let identityOnFile: BillingIdentityValuesOnFile | null = null;
+  if (canEditIdentity) {
+    try {
+      const row = await withTenant<{
+        buyerName: string;
+        buyerVknTckn: string;
+        buyerTaxOffice: string;
+        buyerAddress: string;
+        buyerCity: string;
+        buyerCountry: string;
+      } | null>(tenantId, (tx) =>
+        tx.tenantBillingIdentity.findUnique({
+          where: { tenantId },
+          select: {
+            buyerName: true,
+            buyerVknTckn: true,
+            buyerTaxOffice: true,
+            buyerAddress: true,
+            buyerCity: true,
+            buyerCountry: true,
+          },
+        })
+      );
+      if (row) {
+        identityOnFile = {
+          buyerName: row.buyerName,
+          // Masked on the server. The stored number is never serialised into the
+          // page, so it cannot be read out of the HTML or a React payload.
+          buyerVknTcknMasked: maskVknTckn(row.buyerVknTckn),
+          buyerTaxOffice: row.buyerTaxOffice,
+          buyerAddress: row.buyerAddress,
+          buyerCity: row.buyerCity,
+          buyerCountry: row.buyerCountry,
+        };
+      }
+    } catch (err) {
+      console.warn(`[BillingSettings] billing identity unreadable: ${errorMessage(err)}`);
+    }
+  }
+
+  // The picker offers every country the VAT table knows, flagged by whether it
+  // can be invoiced today — the 27 EU rows are `regime: 'unknown'` and would
+  // save happily while still producing no invoice.
+  const identityCountries = COUNTRY_VAT_RATES.map((row) => ({
+    code: row.country,
+    invoiceable: row.regime === 'standard',
+  }));
+
   // The limited run is a global count, not a tenant one: the same
   // `public.lifetime_licence_count()` the public pricing page reads, so both
   // panels can never disagree about how many licences are left. When it cannot
@@ -238,6 +302,7 @@ export default async function BillingSettingsPage({
   const storefront = await readStorefront(tenantId, quotedTier, NO_DISCOUNT_TIER);
 
   return (
+    <>
     <BillingClient
       workspace={workspace}
       locale={locale}
@@ -254,5 +319,14 @@ export default async function BillingSettingsPage({
       invoicesMeasured={invoicesMeasured}
       buyerIdentity={buyerIdentity}
     />
+    <div className="max-w-6xl mx-auto pb-16">
+      <BillingIdentityForm
+        locale={locale}
+        onFile={identityOnFile}
+        canEdit={canEditIdentity}
+        countries={identityCountries}
+      />
+    </div>
+    </>
   );
 }

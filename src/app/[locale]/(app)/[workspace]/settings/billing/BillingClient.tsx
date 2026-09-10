@@ -677,6 +677,13 @@ export function BillingClient({
             </div>
             <p className="text-xs text-muted mt-0.5">{t('invoiceBody')}</p>
           </div>
+          {/* The block below reports who the *last invoice* was made out to, so
+              a tenant that has never been invoiced sees "ölçülmedi" and no way
+              forward. This points at the form that fills the identity in
+              (TASK-MTSY71BUMBLWM). */}
+          <a href="#billing-identity" className="text-xs font-bold text-blue-600 hover:underline whitespace-nowrap">
+            {t('identityEditLink')} →
+          </a>
         </div>
 
         {!invoicesMeasured && (
