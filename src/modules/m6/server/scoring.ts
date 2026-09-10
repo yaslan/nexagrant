@@ -86,6 +86,25 @@ export type ConsensusOutcome = 'solid' | 'divergent' | 'not-measured';
  */
 export type PanelScoreUnmeasuredReason = 'no-submitted-marks' | 'no-weighted-criterion';
 
+/**
+ * Has this reviewer actually marked anything?
+ *
+ * An empty `scores` object is the absence of a submission, not a submission of nothing,
+ * and the two consumers of a roster both have to treat it that way — otherwise the mean
+ * of no marks (`0 / 0`) enters the arithmetic as `NaN`. `NaN` never surfaces as `NaN`:
+ * `Math.abs(NaN - x) <= 1` is `false`, so the unmarked reviewer is counted as one who
+ * agrees with nobody and the dashboard prints a confident, wrong verdict.
+ *
+ * Excluded rather than scored 0: a mark is {@link PANEL_SCALE_MIN}..{@link PANEL_SCALE_MAX},
+ * so 0 is off the scale, exactly as it is for `panelAverage` below. And the rule is not
+ * new — `getPanelScoresForProposal` already drops these rows before calling in. It lived
+ * in one caller instead of in the functions, so the exported entry points disagreed with
+ * the module's own read path about who is seated at the panel.
+ */
+function hasSubmittedMarks(reviewer: ReviewerScores): boolean {
+  return Object.keys(reviewer.scores).length > 0;
+}
+
 export interface PanelScoreResult {
   /** Weighted 1–5 average, or null when it could not be computed. Never 0 as a stand-in. */
   panelAverage: number | null;
@@ -132,10 +151,17 @@ export function calculatePanelScore(
   reviewerScores: ReviewerScores[],
   criterionWeights: Record<string, number>,
 ): PanelScoreResult {
+  const submitted = reviewerScores.filter(hasSubmittedMarks);
+
   // No marks is a state, not a crash. This used to throw, which meant the only two
   // things a caller could do were guard the call itself or take down the page — and
   // the one caller that forgot the guard would have written a fabricated number.
-  if (reviewerScores.length === 0) {
+  //
+  // A roster of reviewers who have all submitted nothing is the same state as an empty
+  // roster, and has to name the same absence: it used to fall through to the weighting
+  // loop, come out with `weightSum === 0` and tell the dashboard `no-weighted-criterion`
+  // — "marks exist, but they land on unweighted axes" — about marks that do not exist.
+  if (submitted.length === 0) {
     return {
       panelAverage: null,
       unmeasuredReason: 'no-submitted-marks',
@@ -152,7 +178,7 @@ export function calculatePanelScore(
     scoresByCriterion[criterion] = [];
   }
 
-  for (const reviewer of reviewerScores) {
+  for (const reviewer of submitted) {
     for (const [criterion, score] of Object.entries(reviewer.scores)) {
       if (!scoresByCriterion[criterion]) {
         scoresByCriterion[criterion] = [];
@@ -184,14 +210,14 @@ export function calculatePanelScore(
   // Absence leaves here as absence (CLAUDE.md §7).
   const panelAverage = weightSum > 0 ? weightedSum / weightSum : null;
 
-  const consensus = calculateConsensusOutcome(reviewerScores);
+  const consensus = calculateConsensusOutcome(submitted);
 
   return {
     panelAverage,
     unmeasuredReason: panelAverage === null ? 'no-weighted-criterion' : null,
     consensusOutcome: consensus.outcome,
     criterionAverages,
-    reviewerCount: reviewerScores.length,
+    reviewerCount: submitted.length,
     agreementPercentage: consensus.agreementPercentage,
   };
 }
@@ -209,13 +235,20 @@ export function calculatePanelScore(
 export function calculateConsensusOutcome(
   reviewerScores: ReviewerScores[],
 ): { outcome: ConsensusOutcome; agreementPercentage: number | null } {
-  if (reviewerScores.length <= 1) {
+  // Reviewers who have submitted nothing are not seated: see {@link hasSubmittedMarks}.
+  // Filtered before the pair count, so a panel that is one real reviewer plus an unmarked
+  // one reports `not-measured` — the same answer as one reviewer alone — instead of
+  // `divergent`, which asserts that two people looked at the proposal and disagreed.
+  const seated = reviewerScores.filter(hasSubmittedMarks);
+
+  if (seated.length <= 1) {
     return { outcome: 'not-measured', agreementPercentage: null };
   }
 
   // Calculate each reviewer's average score
-  const reviewerAverages = reviewerScores.map((r) => {
+  const reviewerAverages = seated.map((r) => {
     const scores = Object.values(r.scores);
+    // `scores.length > 0` holds by the filter above, so this is a real mean.
     return scores.reduce((a, b) => a + b, 0) / scores.length;
   });
 

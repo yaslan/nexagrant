@@ -618,3 +618,90 @@ describe('M6 Scoring — consensus counts every reviewer pair', () => {
     expect(Number.isNaN(outcome.agreementPercentage ?? Number.NaN)).toBe(false);
   });
 });
+
+/**
+ * A reviewer who has submitted no marks is not a dissenting reviewer.
+ *
+ * `Object.values({}).reduce(sum) / 0` is `NaN`, and `NaN` never reaches a screen —
+ * `Math.abs(NaN - x) <= 1` is simply `false`, so the empty reviewer is silently
+ * counted as a person who agrees with nobody. The output is not a visible `NaN` but a
+ * plausible wrong number: a unanimous panel is reported at 33.33% and `divergent`, and
+ * a panel where exactly one person voted is reported as a disagreement between two.
+ * That is the same fabrication the `not-measured` outcome was introduced to stop, one
+ * layer down (CLAUDE.md §7: no ratio without a record, and an empty `scores` object is
+ * the absence of a record).
+ *
+ * Excluded rather than counted as 0: a mark is 1..5, so 0 is off the scale, and
+ * `getPanelScoresForProposal` already drops these reviewers before calling in — the
+ * rule exists, it just lived in one caller's memory instead of in the function.
+ */
+describe('M6 Scoring — a reviewer with no marks is not seated', () => {
+  const standardWeights = { crit1: 0.3, crit2: 0.2, crit3: 0.3, crit4: 0.2 };
+  const five = (id: string): ReviewerScores => ({
+    reviewerId: id,
+    scores: { crit1: 5, crit2: 5, crit3: 5, crit4: 5 },
+  });
+
+  it('does not let an unmarked reviewer turn a unanimous panel divergent', () => {
+    const outcome = calculateConsensusOutcome([five('r1'), five('r2'), { reviewerId: 'r3', scores: {} }]);
+
+    // Two people voted, identically. The verdict is about those two.
+    expect(outcome.outcome).toBe('solid');
+    expect(outcome.agreementPercentage).toBe(100);
+  });
+
+  it('reports one real reviewer plus an unmarked one as not measured', () => {
+    // Only r1 voted. Calling this `divergent` asserts two people disagreed.
+    const outcome = calculateConsensusOutcome([
+      { reviewerId: 'r1', scores: { crit1: 4, crit2: 4, crit3: 4, crit4: 4 } },
+      { reviewerId: 'r2', scores: {} },
+    ]);
+
+    expect(outcome.outcome).toBe('not-measured');
+    expect(outcome.agreementPercentage).toBeNull();
+  });
+
+  it('reports a panel where nobody has marked anything as no-submitted-marks', () => {
+    // The dashboard names which absence it is looking at. `no-weighted-criterion`
+    // tells the owner "marks exist but land off the weighted axes" — here no mark exists.
+    const result = calculatePanelScore(
+      [
+        { reviewerId: 'r1', scores: {} },
+        { reviewerId: 'r2', scores: {} },
+      ],
+      standardWeights,
+    );
+
+    expect(result.panelAverage).toBeNull();
+    expect(result.unmeasuredReason).toBe('no-submitted-marks');
+    expect(result.consensusOutcome).toBe('not-measured');
+    expect(result.agreementPercentage).toBeNull();
+    expect(result.reviewerCount).toBe(0);
+  });
+
+  it('keeps the score of the reviewers who did mark, and counts only them', () => {
+    const result = calculatePanelScore([five('r1'), five('r2'), { reviewerId: 'r3', scores: {} }], standardWeights);
+
+    expect(result.panelAverage).toBeCloseTo(5, 5);
+    expect(result.reviewerCount).toBe(2);
+    expect(result.consensusOutcome).toBe('solid');
+    expect(result.agreementPercentage).toBe(100);
+  });
+
+  it('never produces NaN from an unmarked reviewer', () => {
+    for (const roster of [
+      [{ reviewerId: 'r1', scores: {} }],
+      [
+        { reviewerId: 'r1', scores: {} },
+        { reviewerId: 'r2', scores: {} },
+      ],
+      [five('r1'), { reviewerId: 'r2', scores: {} }],
+    ] as ReviewerScores[][]) {
+      const { agreementPercentage } = calculateConsensusOutcome(roster);
+      expect(Number.isNaN(agreementPercentage ?? 0)).toBe(false);
+      const panel = calculatePanelScore(roster, standardWeights);
+      expect(Number.isNaN(panel.panelAverage ?? 0)).toBe(false);
+      expect(Number.isNaN(panel.agreementPercentage ?? 0)).toBe(false);
+    }
+  });
+});
