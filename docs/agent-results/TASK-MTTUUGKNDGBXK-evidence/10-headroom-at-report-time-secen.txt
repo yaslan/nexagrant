@@ -1,0 +1,19 @@
+probe run at            : 2026-09-10T11:19:05.163Z
+total rows              : 263
+open                    : 263
+resolved                : 0
+console MAX_ROWS        : 300
+headroom left           : 37 rows
+
+=== growth rate (rows created in the window) ===
+  last 1h  :   18 rows  (18.0/h)
+  last 6h  :  114 rows  (19.0/h)
+  last 24h :  192 rows  (8.0/h)
+  last 72h :  263 rows  (3.7/h)
+
+=== do the tenants named in meta.tenantId still exist? ===
+open rows carrying meta.tenantId : 232
+  distinct tenantIds             : 230
+  tenants that STILL EXIST       : 1 -> demo-tenant
+  rows whose tenant IS GONE      : 229  <- can never become true again
+  rows whose tenant is alive     : 3
