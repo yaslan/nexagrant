@@ -114,9 +114,19 @@ Daha önceki bir geçiş (`docs/agent-results/TASK-MTQ2KL3JO4MK2-blok-zincir-dev
 
 ---
 
-## 5. Kapsam dışı ama ilişkili — sadece not (dokunulmadı)
+## 5. Kapsam dışı ama ilişkili — bir düzeltme (dokunulmadı, sadece not)
 
-`docs/ROADMAP.md` Açık kararlar #9: `decideG0()`/`scoreG0()` (bu kalibrasyonun ölçtüğü kanonik fonksiyon) **üretimde hiçbir çağrı noktasında kullanılmıyor** — `Opportunity.g0Score` seed'den sabit veya demo'da `Math.random()`. Board `TASK-MTQ63RR8Z0G8E` (açık, ayrı kart). Bunun E11.3 için anlamı: kalibrasyon %85'i geçse bile, bu bugün **gerçek G0 kapı kararlarını** etkilemiyor — ayrı bir bağlama işi var. Bu görevin kapsamı dışında, sadece patronun "E11.3 kapandı = artık gerçek kararları etkiliyor" sanmaması için not düşüyorum.
+İlk taslakta `docs/ROADMAP.md` Açık kararlar #9'a dayanarak "kanonik `decideG0()`/`scoreG0()` üretimde hiç çağrılmıyor" diye yazmıştım — bunu **kendim kodda doğrulamadan** dokümandan aktarmıştım, bu da tam olarak "doğrulamadan önce doğrula" kuralının ihlali olurdu. Kodu kontrol ettim, **bu iddia güncel değil**:
+
+```
+src/app/[locale]/(app)/[workspace]/pipeline/actions.ts:241  → rescoreOpportunityG0(tenantId, created.id)
+src/lib/gates/evaluate.ts:108                                → computeG0ForOpportunity(tx, tenantId, opportunityId)
+src/lib/scoring/g0-compute.ts                                → son değişiklik 2026-09-10 09:59 (bugün, aktif geliştiriliyor)
+```
+
+Yani `decideG0()`/`scoreG0()` **üretime bağlı** (kendi hafızamdaki `g0-scoring-production-hooked.md`, 2026-09-07, bunu zaten doğru kaydetmiş). `docs/ROADMAP.md` Açık kararlar #9 (satır 132) ise hâlâ "hiçbir üretim çağrı noktasında kullanılmıyor" diyor — **bu satır artık yanlış/güncel değil**, muhtemelen düzeltme commit'inden önce yazılmış ve sonradan güncellenmemiş. ROADMAP.md'ye bu turda dokunmadım (kapsam dışı, ve dosya "üretim kodu" değil ama bu görevin işi değil) — ama takımın bunu görmesi gerekiyor: **Açık karar #9 muhtemelen kapanmış, ROADMAP güncellenmeli.**
+
+E11.3 için pratik sonuç: kalibrasyon %85'i geçtiğinde bu **gerçekten** üretimdeki G0 kapı kararlarını etkileyecek (bağlantı zaten var) — önceki taslağımın aksine, ayrı bir "bağlama işi" beklemeye gerek yok.
 
 ---
 
