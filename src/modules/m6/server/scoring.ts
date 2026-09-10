@@ -9,7 +9,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { prisma, withTenant } from '@/lib/db';
+import { assertTenantScope, withTenant } from '@/lib/db';
 import { ScoreValue } from '../types';
 
 /**
@@ -361,10 +361,24 @@ export async function getPanelScoresForProposal(
 /**
  * Calculate the average score for a single criterion across all submitted reviews.
  * Used for per-criterion analytics and UI display.
+ *
+ * Why `tenantId` is required in *both* overloads (TASK-MTUIPYSSNLVWG): it used to
+ * be optional on the two-argument form, and a call that omitted it did not narrow
+ * the query — it **dropped the tenant condition entirely** and ran on the global
+ * `prisma` client, which in this deployment connects as a role that RLS does not
+ * constrain. No caller ever took that branch, which is exactly what made it
+ * dangerous: `pnpm typecheck` stayed green, so the next developer to write
+ * `calculateCriterionAverage('crit-1')` would have been told nothing and would
+ * have averaged every tenant's scores into one number.
+ *
+ * The branch is gone rather than fixed: a tenant-less call now fails to compile,
+ * and {@link assertTenantScope} — the repo's existing query-boundary guard from
+ * `src/lib/db.ts` — refuses `''`, `null` and anything arriving from untyped code
+ * before a query is issued. Behaviour for a tenant-scoped call is unchanged.
  */
 export async function calculateCriterionAverage(
   criterionId: string,
-  tenantId?: string,
+  tenantId: string,
 ): Promise<number>;
 export async function calculateCriterionAverage(
   db: TenantScopedDb,
@@ -379,26 +393,25 @@ export async function calculateCriterionAverage(
   if (typeof dbOrCriterionId === 'string') {
     const criterionId = dbOrCriterionId;
     const tenantId = criterionIdOrTenantId;
-    if (tenantId) {
-      return withTenant(tenantId, (tx) => calculateCriterionAverageInternal(tx, criterionId, tenantId));
-    }
-    return calculateCriterionAverageInternal(prisma as unknown as TenantScopedDb, criterionId);
+    assertTenantScope(tenantId, 'calculateCriterionAverage');
+    return withTenant(tenantId, (tx) => calculateCriterionAverageInternal(tx, criterionId, tenantId));
   }
   const db = dbOrCriterionId;
   const criterionId = criterionIdOrTenantId!;
   const tenantId = tenantIdParam;
+  assertTenantScope(tenantId, 'calculateCriterionAverage');
   return calculateCriterionAverageInternal(db, criterionId, tenantId);
 }
 
 async function calculateCriterionAverageInternal(
   db: TenantScopedDb,
   criterionId: string,
-  tenantId?: string,
+  tenantId: string,
 ): Promise<number> {
   const scores = await db.score.findMany({
     where: {
       criterionId,
-      ...(tenantId ? { reviewer: { tenantId } } : {}),
+      reviewer: { tenantId },
       submittedAt: { not: null }, // only count submitted scores
     },
     select: { score: true },
@@ -412,10 +425,14 @@ async function calculateCriterionAverageInternal(
 
 /**
  * Calculate weighted overall evaluation score (1-5 range) across all criteria.
+ *
+ * `tenantId` is required on both overloads for the reason spelled out on
+ * {@link calculateCriterionAverage}: the optional form used to remove the tenant
+ * condition instead of narrowing it.
  */
 export async function calculateEvaluationScore(
   evaluationId: string,
-  tenantId?: string,
+  tenantId: string,
 ): Promise<number>;
 export async function calculateEvaluationScore(
   db: TenantScopedDb,
@@ -430,25 +447,24 @@ export async function calculateEvaluationScore(
   if (typeof dbOrEvaluationId === 'string') {
     const evaluationId = dbOrEvaluationId;
     const tenantId = evaluationIdOrTenantId;
-    if (tenantId) {
-      return withTenant(tenantId, (tx) => calculateEvaluationScoreInternal(tx, evaluationId, tenantId));
-    }
-    return calculateEvaluationScoreInternal(prisma as unknown as TenantScopedDb, evaluationId);
+    assertTenantScope(tenantId, 'calculateEvaluationScore');
+    return withTenant(tenantId, (tx) => calculateEvaluationScoreInternal(tx, evaluationId, tenantId));
   }
   const db = dbOrEvaluationId;
   const evaluationId = evaluationIdOrTenantId!;
   const tenantId = tenantIdParam;
+  assertTenantScope(tenantId, 'calculateEvaluationScore');
   return calculateEvaluationScoreInternal(db, evaluationId, tenantId);
 }
 
 async function calculateEvaluationScoreInternal(
   db: TenantScopedDb,
   evaluationId: string,
-  tenantId?: string,
+  tenantId: string,
 ): Promise<number> {
   const scores = await db.score.findMany({
     where: {
-      reviewer: { evaluationId, ...(tenantId ? { tenantId } : {}) },
+      reviewer: { evaluationId, tenantId },
       submittedAt: { not: null },
     },
     include: {
@@ -504,10 +520,14 @@ async function calculateEvaluationScoreInternal(
 /**
  * Get the distribution of scores for a criterion: how many reviewers gave each mark (1-5).
  * Returns { 5: 2, 4: 1, 3: 0, 2: 0, 1: 0 } format.
+ *
+ * `tenantId` is required on both overloads for the reason spelled out on
+ * {@link calculateCriterionAverage}: the optional form used to remove the tenant
+ * condition instead of narrowing it.
  */
 export async function getScoreDistribution(
   criterionId: string,
-  tenantId?: string,
+  tenantId: string,
 ): Promise<Record<number, number>>;
 export async function getScoreDistribution(
   db: TenantScopedDb,
@@ -522,26 +542,25 @@ export async function getScoreDistribution(
   if (typeof dbOrCriterionId === 'string') {
     const criterionId = dbOrCriterionId;
     const tenantId = criterionIdOrTenantId;
-    if (tenantId) {
-      return withTenant(tenantId, (tx) => getScoreDistributionInternal(tx, criterionId, tenantId));
-    }
-    return getScoreDistributionInternal(prisma as unknown as TenantScopedDb, criterionId);
+    assertTenantScope(tenantId, 'getScoreDistribution');
+    return withTenant(tenantId, (tx) => getScoreDistributionInternal(tx, criterionId, tenantId));
   }
   const db = dbOrCriterionId;
   const criterionId = criterionIdOrTenantId!;
   const tenantId = tenantIdParam;
+  assertTenantScope(tenantId, 'getScoreDistribution');
   return getScoreDistributionInternal(db, criterionId, tenantId);
 }
 
 async function getScoreDistributionInternal(
   db: TenantScopedDb,
   criterionId: string,
-  tenantId?: string,
+  tenantId: string,
 ): Promise<Record<number, number>> {
   const scores = await db.score.findMany({
     where: {
       criterionId,
-      ...(tenantId ? { reviewer: { tenantId } } : {}),
+      reviewer: { tenantId },
       submittedAt: { not: null },
     },
     select: { score: true },
