@@ -563,3 +563,58 @@ describe('M6 Scoring — the not-measured contract', () => {
     expect(storedPanelAverage(4.75)).toBe(4.75);
   });
 });
+
+/**
+ * The pair denominator in `calculateConsensusOutcome`.
+ *
+ * Consensus is counted over every unordered pair of reviewer averages in a bounded
+ * nested loop. Under `noUncheckedIndexedAccess` both index reads are `number | undefined`,
+ * and a guard placed one line too early — skipping the iteration before `totalPairs++`
+ * rather than after — silently shrinks the denominator and turns a divergent panel into a
+ * solid one. Two reviewers give one pair, which the cases above already cover; only three
+ * or more make the denominator visible, so these pin it.
+ */
+describe('M6 Scoring — consensus counts every reviewer pair', () => {
+  it('counts all three pairs of a three-reviewer panel', () => {
+    // Averages 2, 3, 5. Pairs: (2,3) agree, (2,5) no, (3,5) no → 1/3 = 33.33%.
+    const outcome = calculateConsensusOutcome([
+      { reviewerId: 'r1', scores: { crit1: 2 } },
+      { reviewerId: 'r2', scores: { crit1: 3 } },
+      { reviewerId: 'r3', scores: { crit1: 5 } },
+    ]);
+
+    expect(outcome.outcome).toBe('divergent');
+    expect(outcome.agreementPercentage).toBeCloseTo(100 / 3, 5);
+    // A denominator of 1 or 2 instead of 3 would read 100% or 50% here.
+    expect(outcome.agreementPercentage).not.toBeCloseTo(50, 5);
+    expect(outcome.agreementPercentage).not.toBe(100);
+  });
+
+  it('counts all six pairs of a four-reviewer panel', () => {
+    // Averages 4, 4, 4, 1. Pairs: three among the 4s agree, three against the 1 do not
+    // → 3/6 = 50%, below the 70% bar.
+    const outcome = calculateConsensusOutcome([
+      { reviewerId: 'r1', scores: { crit1: 4 } },
+      { reviewerId: 'r2', scores: { crit1: 4 } },
+      { reviewerId: 'r3', scores: { crit1: 4 } },
+      { reviewerId: 'r4', scores: { crit1: 1 } },
+    ]);
+
+    expect(outcome.agreementPercentage).toBeCloseTo(50, 5);
+    expect(outcome.outcome).toBe('divergent');
+  });
+
+  it('reports a unanimous three-reviewer panel as solid at exactly 100%', () => {
+    const outcome = calculateConsensusOutcome([
+      { reviewerId: 'r1', scores: { crit1: 4 } },
+      { reviewerId: 'r2', scores: { crit1: 4 } },
+      { reviewerId: 'r3', scores: { crit1: 4 } },
+    ]);
+
+    expect(outcome.outcome).toBe('solid');
+    expect(outcome.agreementPercentage).toBe(100);
+    // Never NaN: a dropped pair with a kept denominator, or an undefined average
+    // reaching Math.abs, both surface here.
+    expect(Number.isNaN(outcome.agreementPercentage ?? Number.NaN)).toBe(false);
+  });
+});

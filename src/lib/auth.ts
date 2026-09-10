@@ -205,8 +205,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const demoProfile = DEMO_PROFILES[email];
         // Derived from the address the user typed, never from a profile table.
-        const computedName = email
-          .split("@")[0]
+        // `email` is non-empty (checked above) and `String.split` always yields at
+        // least one element, so the local part is never undefined; `?? email` is the
+        // type checker's fallback, not a behaviour change.
+        const computedName = (email.split("@")[0] ?? email)
           .replace(/[._]/g, " ")
           .replace(/\b\w/g, (c) => c.toUpperCase());
         const isSuperadmin = email === "admin@yasinaslan.com.tr" || !!demoProfile?.isPlatformAdmin;
@@ -374,8 +376,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
           if (dbUser) {
             if (dbUser.isPlatformAdmin) token.isPlatformAdmin = true;
-            if (dbUser.memberships.length > 0) {
-              const activeMembership = dbUser.memberships[0];
+            // Narrowed off the element itself rather than off `.length`: an absent
+            // first membership must leave the token tenantless, which is the same
+            // safe outcome the catch below documents.
+            const activeMembership = dbUser.memberships[0];
+            if (activeMembership) {
               token.tenantId = activeMembership.tenantId;
               token.role = activeMembership.role;
               token.workspaceIds = activeMembership.workspaceIds;

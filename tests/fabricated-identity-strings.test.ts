@@ -74,7 +74,12 @@ describe('auth.ts — the demo profile seeds an organisation, not a person', () 
   });
 
   test('the display name is derived from the address the user signed in with', () => {
-    expect(source).toContain('const computedName = email');
+    // Matched as a pattern, not as an exact line: the point is that the name is
+    // computed from `email` and from nothing else. The expression around it has
+    // changed once already (a `?? email` fallback for the local part), and an
+    // exact-string assertion turned that into a failure about formatting rather
+    // than about invented identities.
+    expect(source).toMatch(/const computedName\s*=\s*\(?\s*email\b/);
     expect(source).not.toMatch(/demoProfile\?\.name/);
   });
 

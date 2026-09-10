@@ -14,4 +14,14 @@ Bu desenin somut örnekleri: `src/lib/auth.ts:379` (`dbUser.memberships[0]`, üs
 
 **Why:** Bu ayrım olmadan "171 hata" rakamı yanıltıcı görünür ve bayrağı açmak korkutucu gelir; oysa gerçek dikkat gerektiren yer sadece 2 dosya (`EvidenceForm.tsx` boş FileList, `board.tsx` state tip uyuşmazlığı).
 
-**How to apply:** Bu flag'i açma işine kim girerse girsin, önce `docs/agent-results/TASK-MTSWAKD31LS49-blok-zincir-dse.md`'deki 4 dilim planını ve kova ayrımını oku — sıfırdan saymaya gerek yok. Flag **tek global tsconfig bayrağı** (bu depoda proje referansı/alt-tsconfig yok) — dizin bazlı kısmi açılamaz; kalıcı açılış ancak TÜM dilimler bitince, tek commit'te olmalı, aksi halde eşzamanlı çalışan diğer ajanların `pnpm typecheck`'i kırılır. [[fabrika-concurrent-commit-steals-your-stage]]
+**Düzeltme (TASK-MTVPNUTNI54ZW, Dilim 3 uygulandığında ölçüldü):** "yanlış-pozitif" demek
+`!` ile susturulabilir demek DEĞİL. Karar/puan/kapı kodunda `!` NaN üretir ve "ölçülemedi"yi
+"ölçüldü ve kaldı"ya çevirir — daraltmayı elemandan yap:
+[[narrow-off-the-element-not-off-length]]. Ayrıca bu dosyadaki iki teşhis Dilim 3'te
+tazelenince yanlış çıktı: `m5/server/queries.ts` bir `Date` control-flow yanlış pozitifi
+değil, düpedüz `.split('T')[0]`; `auth.ts` 3 değil 4 hata (ayrıca `email.split("@")[0]`).
+Satır numaraları da kaymıştı — bayrağı açan kişi kendi ölçümünü almalı, bu listeyi ezber
+olarak kullanmamalı.
+
+**How to apply:** Bu flag'i açma işine kim girerse girsin, önce `docs/agent-results/TASK-MTSWAKD31LS49-blok-zincir-dse.md`'deki 4 dilim planını ve kova ayrımını oku — sıfırdan saymaya gerek yok. Flag **tek global tsconfig bayrağı** (bu depoda proje referansı/alt-tsconfig yok) — dizin bazlı kısmi açılamaz; kalıcı açılış ancak TÜM dilimler bitince, tek commit'te olmalı, aksi halde eşzamanlı çalışan diğer ajanların `pnpm typecheck`'i kırılır. Ölçüm için bayrağı
+`tsconfig.json`'a yazma bile: [[measure-a-compiler-flag-with-a-sibling-config-not-by-editing-the-shared-one]] [[fabrika-concurrent-commit-steals-your-stage]]

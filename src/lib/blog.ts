@@ -181,6 +181,9 @@ export function updateBlogPost(slug: string, updated: Partial<BlogPost>): BlogPo
   if (index === -1) return undefined;
 
   const current = BLOG_POSTS[index];
+  // `findIndex` already ruled out -1, so this is unreachable; returning undefined
+  // keeps the "no such post" contract rather than merging into a hole.
+  if (!current) return undefined;
   // A partial update that carries no author leaves the recorded one alone; one
   // that carries an author replaces it. Neither path invents a name.
   const mergedAuthor = updated.author

@@ -186,8 +186,8 @@ export async function ingestDocument(
     });
 
     let stored = 0;
-    for (let i = 0; i < chunks.length; i++) {
-      const embedding = await getEmbedding(chunks[i], {
+    for (const [i, chunk] of chunks.entries()) {
+      const embedding = await getEmbedding(chunk, {
         tenantId: tenantId ?? null,
         userId: actor?.userId,
         module: RAG_MODULE,
@@ -202,7 +202,7 @@ export async function ingestDocument(
         doc.id,
         tenantId || null,
         i,
-        chunks[i],
+        chunk,
         embeddingStr
       );
     }
@@ -291,9 +291,7 @@ export async function processPdfAndStore(
   // Simple batching to respect rate limits
   let stored = 0;
   try {
-    for (let i = 0; i < chunks.length; i++) {
-      const chunkStr = chunks[i];
-
+    for (const [i, chunkStr] of chunks.entries()) {
       const embedding = await getEmbedding(chunkStr, {
         tenantId,
         userId: actor?.userId,

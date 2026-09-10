@@ -296,3 +296,76 @@ describe('Gate Evaluation Engine — tenant isolation', () => {
     expect(prisma.opportunity.update).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * G3 — evaluation-score gate. CLAUDE.md ("her kapı kuralı ... için birim test zorunlu")
+ * asks for a unit test per gate rule and G3 had none.
+ *
+ * The branch these pin is the empty `evaluations` list. G3 reads the *last* element of
+ * that list; under `noUncheckedIndexedAccess` that read is `T | undefined`, and the
+ * tempting one-line fix (`evaluations[len - 1]!`) would send an empty list straight into
+ * `Math.min(undefined, undefined, undefined)` — NaN, which compares false against every
+ * threshold and files a GateDecision reading "Criterion score NaN is below minimum".
+ * A proposal nobody has evaluated would be recorded as one that was evaluated and failed.
+ * The guard narrows off the element instead, so an empty list keeps taking the
+ * `mockEvaluation` branch it always took.
+ */
+describe('Gate Evaluation Engine — G3 evaluation scores', () => {
+  beforeEach(() => {
+    vi.mocked(prisma.gateDecision.create).mockClear();
+  });
+
+  const lastDecisionInputs = (): Record<string, unknown> => {
+    const calls = vi.mocked(prisma.gateDecision.create).mock.calls as {
+      data: { inputs: Record<string, unknown> };
+    }[][];
+    return calls[calls.length - 1]![0]!.data.inputs;
+  };
+
+  test('passes when the latest evaluation clears both thresholds', async () => {
+    // 4.5 / 4.5 / 4.0 → min 4.0 (≥ 4.0) and total 13.0 (≥ 12.0).
+    const result = await evaluateGate('opp-pass', 'G3', 'tenant-1');
+    expect(result.passed).toBe(true);
+    expect(result.reasons).toEqual([]);
+    const inputs = lastDecisionInputs();
+    expect(inputs.minCriterionScore).toBe(4.0);
+    expect(inputs.totalScore).toBe(13.0);
+  });
+
+  test('fails and names both thresholds when the latest evaluation is short', async () => {
+    // 2.0 / 3.0 / 2.5 → min 2.0 (< 4.0) and total 7.5 (< 12.0).
+    const result = await evaluateGate('opp-fail', 'G3', 'tenant-1');
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some((r) => r.includes('Criterion score 2'))).toBe(true);
+    expect(result.reasons.some((r) => r.includes('below minimum required 12'))).toBe(true);
+  });
+
+  test('an unevaluated opportunity is not scored at all, not scored as NaN', async () => {
+    // `opp-unscored` carries `evaluations: []`. This is the case the guard covers.
+    const result = await evaluateGate('opp-unscored', 'G3', 'tenant-2');
+
+    const inputs = lastDecisionInputs();
+    expect(inputs.mockEvaluation).toBe(true);
+    // Nothing was measured, so no measurement is filed.
+    expect(inputs.minCriterionScore).toBeUndefined();
+    expect(inputs.totalScore).toBeUndefined();
+    expect(result.passed).toBe(true);
+    expect(result.reasons).toEqual([]);
+  });
+
+  test('no gate reason ever reports a NaN score', async () => {
+    // The exact string a `!` on the index read would produce.
+    for (const [id, tenant] of [
+      ['opp-pass', 'tenant-1'],
+      ['opp-fail', 'tenant-1'],
+      ['opp-unscored', 'tenant-2'],
+    ] as const) {
+      const result = await evaluateGate(id, 'G3', tenant);
+      expect(result.reasons.join(' ')).not.toContain('NaN');
+      const inputs = lastDecisionInputs();
+      for (const key of ['minCriterionScore', 'totalScore'] as const) {
+        if (inputs[key] !== undefined) expect(Number.isNaN(inputs[key] as number)).toBe(false);
+      }
+    }
+  });
+});

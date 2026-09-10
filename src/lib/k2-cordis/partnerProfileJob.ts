@@ -85,7 +85,12 @@ export async function generatePartnerProfiles(): Promise<PartnerProfileJobResult
 
     for (let i = 0; i < orgs.length; i++) {
       for (let j = i + 1; j < orgs.length; j++) {
-        const [orgA, orgB] = orgs[i] < orgs[j] ? [orgs[i], orgs[j]] : [orgs[j], orgs[i]];
+        const a = orgs[i];
+        const b = orgs[j];
+        // Both loops are bounded by `orgs.length`, so neither can be undefined;
+        // the guard exists for the type checker and skips nothing in practice.
+        if (a === undefined || b === undefined) continue;
+        const [orgA, orgB] = a < b ? [a, b] : [b, a];
         const key = `${orgA}:${orgB}`;
 
         if (!coPartMap.has(key)) {

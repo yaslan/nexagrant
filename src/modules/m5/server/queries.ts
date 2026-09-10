@@ -252,7 +252,9 @@ export async function getKpiTrend(
       const successRate =
         g0ScoredCount > 0 ? (submittedCount / g0ScoredCount) * 100 : 0;
 
-      const dateStr = current.toISOString().split('T')[0];
+      // `slice` rather than `split('T')[0]`: identical output for an ISO string,
+      // and it is typed `string`. Same idiom as src/lib/fx/tcmb.ts.
+      const dateStr = current.toISOString().slice(0, 10);
 
       data.push({
         date: dateStr,

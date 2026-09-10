@@ -155,8 +155,12 @@ async function runGate(
     }
     case 'G3': {
       const rules = DEFAULT_GATE_RULES.G3;
-      if (opp.evaluations.length > 0) {
-        const latestEval = opp.evaluations[opp.evaluations.length - 1];
+      // Narrowed off the element, not off `.length`: an evaluations list that is
+      // empty — or whose last slot is missing — must take the same "nothing to
+      // score against" branch below rather than compare against undefined and
+      // let NaN decide a gate. Behaviour for a populated list is unchanged.
+      const latestEval = opp.evaluations[opp.evaluations.length - 1];
+      if (latestEval) {
         const minScore = Math.min(latestEval.excellence, latestEval.impact, latestEval.implementation);
         const totalScore = latestEval.excellence + latestEval.impact + latestEval.implementation;
         

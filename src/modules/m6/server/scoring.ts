@@ -226,7 +226,12 @@ export function calculateConsensusOutcome(
   for (let i = 0; i < reviewerAverages.length; i++) {
     for (let j = i + 1; j < reviewerAverages.length; j++) {
       totalPairs++;
-      if (Math.abs(reviewerAverages[i] - reviewerAverages[j]) <= 1.0) {
+      const a = reviewerAverages[i];
+      const b = reviewerAverages[j];
+      // Both loops are bounded by `reviewerAverages.length`, so neither is
+      // undefined; the guard is for the type checker and skips no real pair.
+      if (a === undefined || b === undefined) continue;
+      if (Math.abs(a - b) <= 1.0) {
         agreeingPairs++;
       }
     }
