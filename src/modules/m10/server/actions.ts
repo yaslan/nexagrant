@@ -106,6 +106,13 @@ export async function generateStandardDoc(
       // No tenantId/userId: SystemAlert has no RLS policy. The opportunity id is
       // the tenant-scoped handle an admin can join back.
       meta: { module: 'M10', kind, opportunityId },
+      // The document kind is what an operator debugs — a broken prompt or a
+      // model that will not answer is per kind — while `opportunityId` and the
+      // LLM error text name the occurrence. Note this folds across tenants,
+      // which is acceptable only because the alert never carried a tenant id
+      // to begin with (the privacy rule above forbids it), so no tenant
+      // separation is being given up here.
+      dedupeKey: `m10-doc-generation-failed:${kind}`,
     });
     throw new Error(`Document generation failed for ${kind}. No document was created and no credit was charged.`);
   }
@@ -117,6 +124,9 @@ export async function generateStandardDoc(
       source: 'm10_document_generation_empty',
       message: `Follow-up document generation returned empty text for kind ${kind}.`,
       meta: { module: 'M10', kind, opportunityId },
+      // Same reasoning as above: kind identifies the problem, the opportunity
+      // identifies the occurrence.
+      dedupeKey: `m10-doc-generation-empty:${kind}`,
     });
     throw new Error(`Document generation returned no content for ${kind}. No document was created and no credit was charged.`);
   }

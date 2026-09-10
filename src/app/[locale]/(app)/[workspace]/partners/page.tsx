@@ -117,6 +117,10 @@ export default async function PartnersPage({
       source: 'partners_profile_query_failed',
       message: `CordisPartnerProfile lookup failed: ${errorMessage(e)}`,
       meta: { module: 'M1', table: 'CordisPartnerProfile' },
+      // Meta is already constant; only the error text in the message moved, so
+      // two renders of the same outage could still open two rows. Page-render
+      // alerts fan out with traffic, not with the fault.
+      dedupeKey: 'partners-page:profile-query-failed',
     });
   }
 
@@ -170,6 +174,9 @@ export default async function PartnersPage({
         source: 'partners_organization_query_failed',
         message: `CordisOrganization lookup failed: ${errorMessage(e)}`,
         meta: { module: 'M1', table: 'CordisOrganization' },
+        // Kept separate from the profile-table alert above: they are two
+        // different reads and only one of them failing is a real distinction.
+        dedupeKey: 'partners-page:organization-query-failed',
       });
     }
   }

@@ -498,6 +498,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           source: 'auth-registration-consent',
           message: 'Account created without a disclosure acknowledgement record',
           meta: { userId, path: 'oauth-createUser' },
+          // A new `userId` every registration meant one alert per affected
+          // account and a console that grew with signup volume. The
+          // registration path is the problem an operator fixes, so it is the
+          // key. Folding costs nothing recoverable: the affected accounts are
+          // exactly the `User` rows with no matching `Consent` row, which is a
+          // query, not something the alert trail has to carry.
+          dedupeKey: 'auth-registration-consent:oauth-createUser',
         });
       }
     },

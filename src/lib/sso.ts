@@ -89,6 +89,10 @@ export async function configureEnterpriseSso(
       source: 'sso-configure',
       message: `Enterprise SSO configuration could not be saved: ${errorMessage(e)}`,
       meta: { providerType, enabled },
+      // Which provider type could not be saved is the problem; the database
+      // error text embedded in the message is what changes between attempts
+      // and is what kept two tries at the same broken save apart.
+      dedupeKey: `sso-configure:${providerType}`,
     });
     return { success: false, reason: 'not_persisted' };
   }
@@ -160,6 +164,11 @@ export async function resolveSsoProviderForDomain(
       level: 'error',
       source: 'sso-resolve',
       message: `SSO domain lookup failed: ${errorMessage(e)}`,
+      // The error text is the entire identity here — there is no meta — so
+      // this alert folded only when two failures happened to stringify
+      // identically. It fires on a sign-in path, so the fan-out follows
+      // traffic rather than the fault.
+      dedupeKey: 'sso-resolve:domain-lookup-failed',
     });
     // Fail closed: an unresolved domain signs in with a password, it does not
     // get sent to an identity provider we could not confirm.

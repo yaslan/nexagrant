@@ -162,6 +162,11 @@ export async function persistCordisRecord(record: CordisProjectRecord): Promise<
       source: CORDIS_SYNC_ALERT_SOURCE,
       message: 'CORDIS record skipped: missing project id or title',
       meta: { projectId: projectId ?? null, hasTitle: Boolean(title) },
+      // Fires once per unkeyable record, so a feed with 400 bad rows used to
+      // open 400 alerts. The defect is one — the feed carries records this
+      // importer cannot key — and `projectId` only names whichever record
+      // happened to hit it; it stays on the row as display detail.
+      dedupeKey: 'cordis-sync:record-missing-id-or-title',
     });
     return false;
   }
@@ -174,6 +179,12 @@ export async function persistCordisRecord(record: CordisProjectRecord): Promise<
       source: CORDIS_SYNC_ALERT_SOURCE,
       message: 'CORDIS record carried fields this importer does not map',
       meta: { projectId, unknownFields: Object.keys(drift) },
+      // The *set of unmapped fields* is the problem: a new field appearing
+      // upstream is a new alert an operator has to map. Which project carried
+      // it is not — every project in a drifted feed carries the same drift, so
+      // keying on `projectId` opened one row per record. Sorted, because the
+      // key must not fork on the order the payload happened to list them in.
+      dedupeKey: `cordis-sync:schema-drift:${Object.keys(drift).sort().join(',')}`,
     });
   }
 
@@ -248,6 +259,10 @@ export async function persistCordisRecord(record: CordisProjectRecord): Promise<
       source: CORDIS_SYNC_ALERT_SOURCE,
       message: 'CORDIS coordinator has no organisation id (PIC); participation not written',
       meta: { projectId },
+      // Per record again: the defect is that the feed ships coordinators with
+      // no PIC, and the count of affected projects is what an operator needs —
+      // `alertRepeatCount` carries that better than N separate rows did.
+      dedupeKey: 'cordis-sync:coordinator-without-pic',
     });
   }
 
@@ -384,6 +399,10 @@ export async function syncCordisBigData(
         source: CORDIS_SYNC_ALERT_SOURCE,
         message: `CORDIS record failed to sync: ${errorMessage(e)}`,
         meta: { projectId: record.projectId },
+        // Both halves of the old identity moved per occurrence: the record id
+        // and the error text. Neither says what the problem *is* — that
+        // records are failing to persist — so neither belongs in the key.
+        dedupeKey: 'cordis-sync:record-sync-failed',
       });
     }
   }

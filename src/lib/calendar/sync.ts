@@ -166,6 +166,12 @@ export async function syncMeetingBriefToCalendar(
           connectionId: conn.id,
           provider: conn.provider,
         },
+        // Keyed on the connection, which is exactly where the over-folding
+        // trap is avoided: `CalendarConnection` is tenant-scoped, so two
+        // tenants with expired tokens stay two alerts, while one expired token
+        // stops opening a row per brief it is synced into. `briefId` and the
+        // provider error text are the per-occurrence halves.
+        dedupeKey: `calendar-sync-failed:${conn.id}`,
       });
     }
   }

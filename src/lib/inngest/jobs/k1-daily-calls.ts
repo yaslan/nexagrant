@@ -6,6 +6,7 @@ import { SediaAdapter } from '@/lib/adapters/sedia';
 import { EurostarsAdapter } from '@/lib/adapters/eurostars';
 import { TubitakAdapter } from '@/lib/adapters/tubitak';
 import type { AdapterResult, BaseTopic } from '@/lib/adapters/schemas/common';
+import { recordAlert } from '@/lib/observability/system-alert';
 import {
   K1DailyCallsOutputSchema,
   type K1DailyCallsOutput,
@@ -146,34 +147,37 @@ export async function syncK1Topics(
   // A feed that answered twice for one identifier is an upstream signal, not a
   // data error: the run still lands, an operator gets told which ids collided.
   if (duplicateIdentifiers.length > 0) {
-    await prisma.systemAlert
-      .create({
-        data: {
-          level: 'warn',
-          source: 'k1_daily_calls',
-          message:
-            `K1 sources returned ${duplicateIdentifiers.length} identifier(s) more than once ` +
-            'in a single run; only the last record for each was kept.',
-          meta: { duplicateIdentifiers: duplicateIdentifiers.slice(0, 20) },
-        },
-      })
-      .catch(() => {});
+    // Was a direct `prisma.systemAlert.create`, which skipped the single
+    // writer altogether: no dedup of any kind, no meta sanitising. Both the
+    // count in the message and the id list in `meta` change every run, so this
+    // alert could never have folded even on the default identity — measured at
+    // 6 open `k1_daily_calls` warn rows. The defect is one: a feed answered
+    // twice for an identifier. This run's ids stay on the row as detail.
+    await recordAlert({
+      level: 'warn',
+      source: 'k1_daily_calls',
+      message:
+        `K1 sources returned ${duplicateIdentifiers.length} identifier(s) more than once ` +
+        'in a single run; only the last record for each was kept.',
+      meta: { duplicateIdentifiers: duplicateIdentifiers.slice(0, 20) },
+      dedupeKey: 'k1:duplicate-identifiers',
+    });
   }
   let insertedCount = 0;
   let updatedCount = 0;
 
   // A source that came back `error` is an operational alert, not a data error.
   for (const s of sources.filter((s) => s.status === 'error')) {
-    await prisma.systemAlert
-      .create({
-        data: {
-          level: 'error',
-          source: 'k1_daily_calls',
-          message: `K1 source "${s.source}" failed: ${s.reason ?? 'unknown reason'}`,
-          meta: { source: s.source, reason: s.reason },
-        },
-      })
-      .catch(() => {});
+    // Which of the three feeds failed is the problem and stays in the key —
+    // a broken SEDIA is not a broken TÜBİTAK. The failure text is not: it
+    // changes between attempts against the same dead feed.
+    await recordAlert({
+      level: 'error',
+      source: 'k1_daily_calls',
+      message: `K1 source "${s.source}" failed: ${s.reason ?? 'unknown reason'}`,
+      meta: { source: s.source, reason: s.reason },
+      dedupeKey: `k1:source-failed:${s.source}`,
+    });
   }
 
   for (const t of allTopics) {
@@ -274,16 +278,16 @@ export async function syncK1Topics(
 
   const drift = sources.flatMap((s) => s.schemaDrift);
   if (drift.length > 0) {
-    await prisma.systemAlert
-      .create({
-        data: {
-          level: 'warn',
-          source: 'k1_daily_calls',
-          message: `API schema change detected in ${drift.length} place(s) across K1 sources.`,
-          meta: { drift: drift.slice(0, 10) },
-        },
-      })
-      .catch(() => {});
+    // The count in the message and the sample in `meta` both move as the
+    // upstream payload evolves; that K1's contract has drifted is one standing
+    // item until an operator maps the new fields and resolves it.
+    await recordAlert({
+      level: 'warn',
+      source: 'k1_daily_calls',
+      message: `API schema change detected in ${drift.length} place(s) across K1 sources.`,
+      meta: { drift: drift.slice(0, 10) },
+      dedupeKey: 'k1:schema-drift',
+    });
   }
 
   const output: K1DailyCallsOutput = {

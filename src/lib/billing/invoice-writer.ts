@@ -506,6 +506,14 @@ export async function createInvoiceForPayment(
           : `A payment was taken in ${currency}, which no invoice can be denominated in: the TL equivalent required by VUK 215/385 cannot be established for it. No invoice was issued and the payment is unaffected.`,
       // Names the currency and the failure, never the buyer or the amount.
       meta: { provider, currency, reason: fxResult.reason, detail: fxResult.detail },
+      // The currency and the failure kind are the problem — an unsupported
+      // currency is a code change, an unavailable rate is a wait. `detail`
+      // carries the TCMB failure text for the date it tried, which moves every
+      // day the rate stays unreachable. This is the only alert in this file
+      // whose identity was unstable; the other six carry constant meta and
+      // fold already (`invoice_profile_assumed` folded 231 occurrences into
+      // one row), so they are deliberately left as they are.
+      dedupeKey: `invoice-fx:${currency}:${fxResult.reason}`,
     });
     return { status: 'skipped', reason: fxResult.reason };
   }

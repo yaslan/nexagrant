@@ -64,6 +64,13 @@ export async function runK2MonthlyCordis(
       source: 'k2_monthly_cordis',
       message: `CORDIS worker unreachable: ${msg}`,
       meta: { month, host: safeHost(workerUrl) },
+      // `month` is this job's run identifier, not part of what is wrong: a
+      // worker that is down in September is the same outage in October, and
+      // it is why every K2 alert opened a fresh row every month. The host
+      // stays in the key because two hosts are two outages. Resolving the
+      // alert still reopens the window, so a fixed-then-broken-again worker
+      // is not hidden behind a counter.
+      dedupeKey: `k2:worker-unreachable:${safeHost(workerUrl)}`,
     });
     return K2MonthlyCordisOutputSchema.parse({ success: false, message: msg, error: msg });
   }
@@ -95,6 +102,10 @@ export async function runK2MonthlyCordis(
       source: 'k2_monthly_cordis',
       message: `CORDIS worker returned HTTP ${response.status}`,
       meta: { month, host: safeHost(workerUrl), status: response.status, rawFetch: rawFetch.status },
+      // The status code is the problem — a 401 is a credential to fix and a
+      // 503 is a wait — so it is in the key alongside the host. `month` and
+      // the RawFetch outcome are per-run bookkeeping.
+      dedupeKey: `k2:worker-http:${safeHost(workerUrl)}:${response.status}`,
     });
     return K2MonthlyCordisOutputSchema.parse({
       success: false,
@@ -114,6 +125,10 @@ export async function runK2MonthlyCordis(
       source: 'k2_monthly_cordis',
       message,
       meta: { month, host: safeHost(workerUrl), contentType: response.headers.get('content-type') },
+      // Deliberately not keyed on `contentType`: an error page served as
+      // text/html one run and text/plain the next is the same defect, and
+      // folding them is the point. Host in, month out.
+      dedupeKey: `k2:worker-body-not-json:${safeHost(workerUrl)}`,
     });
     return K2MonthlyCordisOutputSchema.parse({ success: false, message, error: message });
   }
@@ -133,6 +148,10 @@ export async function runK2MonthlyCordis(
       source: 'k2_monthly_cordis',
       message: 'CORDIS worker response is missing fields this job expects',
       meta: { month, missingFields: missing, host: safeHost(workerUrl) },
+      // The set of absent fields is the contract change an operator has to
+      // answer; a further field dropping out next month is genuinely a new
+      // alert. Sorted so the key cannot fork on ordering.
+      dedupeKey: `k2:worker-missing-fields:${[...missing].sort().join(',')}`,
     });
   }
 
@@ -149,6 +168,9 @@ export async function runK2MonthlyCordis(
       source: 'k2_monthly_cordis',
       message,
       meta: { month, host: safeHost(workerUrl), rowCounts: reported.rowCounts ?? null },
+      // `rowCounts` differs on every run by construction and the failure
+      // detail is free text from the worker; both are display, not identity.
+      dedupeKey: `k2:pipeline-failed:${safeHost(workerUrl)}`,
     });
     return K2MonthlyCordisOutputSchema.parse({
       success: false,

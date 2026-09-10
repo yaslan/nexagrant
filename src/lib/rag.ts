@@ -348,6 +348,12 @@ async function discardPartialDocument(
       source: RAG_UPLOAD_ALERT_SOURCE,
       message: 'PDF ingest failed and its partial document could not be removed',
       meta: { documentId, cleanupError: errorMessage(cleanupError) },
+      // Every field of the old identity was per-occurrence — a fresh document
+      // id and a cleanup error string — so this alert opened a row per orphan.
+      // The defect is that the cleanup path cannot delete; `alertRepeatCount`
+      // is then how many orphans are outstanding. No id is lost: the
+      // `console.error` on the next line names each one individually.
+      dedupeKey: 'rag-pdf-ingest:orphan-not-removed',
     });
     console.error(`[processPdfAndStore] orphan document ${documentId} ("${title}") left behind`);
   }

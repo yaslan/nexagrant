@@ -96,6 +96,9 @@ export default async function PersonDaysReportPage({
       source: 'person_days_report_query_failed',
       message: `Effort lookup failed: ${errorMessage(e)}`,
       meta: { module: 'M5', table: 'Effort' },
+      // Same shape as the partners page: constant meta, moving error text, and
+      // a fan-out that follows how often the report is opened.
+      dedupeKey: 'person-days-report:effort-query-failed',
     });
   }
 

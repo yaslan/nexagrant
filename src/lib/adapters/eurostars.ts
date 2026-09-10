@@ -150,7 +150,11 @@ export class EurostarsAdapter {
         await createAdapterAlert(
           EUROSTARS_SOURCE,
           'error',
-          `Failed to fetch Eurostars calls: ${reason}`
+          `Failed to fetch Eurostars calls: ${reason}`,
+          undefined,
+          // Same defect on both paths (a non-ok response and a thrown fetch),
+          // and the reason text is the only thing that moved between them.
+          `${EUROSTARS_SOURCE}:fetch-failed`
         );
         return adapterError<EurostarsTopic>(EUROSTARS_SOURCE, reason);
       }
@@ -173,7 +177,9 @@ export class EurostarsAdapter {
       await createAdapterAlert(
         EUROSTARS_SOURCE,
         'error',
-        `Failed to fetch Eurostars calls: ${reason}`
+        `Failed to fetch Eurostars calls: ${reason}`,
+        undefined,
+        `${EUROSTARS_SOURCE}:fetch-failed`
       );
       return adapterError<EurostarsTopic>(EUROSTARS_SOURCE, reason);
     }

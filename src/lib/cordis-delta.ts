@@ -212,6 +212,11 @@ async function fetchDeltaPayload(
       source: CORDIS_DELTA_ALERT_SOURCE,
       message: `CORDIS delta feed unreachable: ${errorMessage(e)}`,
       meta: { host: url.host, path: url.pathname },
+      // The host is what an operator acts on and two hosts are two problems,
+      // so it stays in the key. The transport error text (ETIMEDOUT one
+      // attempt, ENOTFOUND the next) changes without changing that the feed
+      // cannot be reached, so it does not.
+      dedupeKey: `cordis-delta:feed-unreachable:${url.host}`,
     });
     return { items: [], reached: false };
   }
@@ -238,6 +243,10 @@ export async function fetchLiveCordisDelta(
       source: CORDIS_DELTA_ALERT_SOURCE,
       message: 'CORDIS delta run skipped: no delta feed endpoint configured',
       meta: { sinceDays },
+      // A missing endpoint is one configuration gap however wide a window the
+      // run asked for; `sinceDays` is a parameter of the caller, not of the
+      // problem, and it is what kept this alert from ever folding.
+      dedupeKey: 'cordis-delta:no-endpoint-configured',
     });
     return {
       success: false,
@@ -266,6 +275,11 @@ export async function fetchLiveCordisDelta(
         source: CORDIS_DELTA_ALERT_SOURCE,
         message: `CORDIS delta item skipped: ${parsed.reason}`,
         meta: { sinceDays },
+        // `parsed.reason` comes from a closed set and names the defect, so it
+        // is the key; `sinceDays` and the item's position in the feed only say
+        // which run and which item noticed it. This fires inside the item
+        // loop, so it was the widest per-run fan-out in this file.
+        dedupeKey: `cordis-delta:item-skipped:${parsed.reason}`,
       });
       continue;
     }
@@ -314,6 +328,9 @@ export async function fetchLiveCordisDelta(
         source: CORDIS_DELTA_ALERT_SOURCE,
         message: `CORDIS delta item failed to ingest: ${errorMessage(e)}`,
         meta: { projectId: item.projectId },
+        // Per item: the project id and the error text both move every
+        // occurrence, and neither distinguishes the problem from itself.
+        dedupeKey: 'cordis-delta:item-ingest-failed',
       });
     }
   }

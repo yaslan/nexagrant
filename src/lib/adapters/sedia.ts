@@ -418,7 +418,15 @@ export class SediaAdapter {
     } catch (e) {
       const reason = errorMessage(e);
       logger.error('[SediaAdapter] fetchSediaTopics failed:', e);
-      await createAdapterAlert(SEDIA_SOURCE, 'error', `SEDIA fetch failed: ${reason}`);
+      // The fetch-failure text changes between attempts against the same dead
+      // endpoint; that the fetch is failing does not.
+      await createAdapterAlert(
+        SEDIA_SOURCE,
+        'error',
+        `SEDIA fetch failed: ${reason}`,
+        undefined,
+        `${SEDIA_SOURCE}:fetch-failed`
+      );
       return adapterError<SediaTopic>(SEDIA_SOURCE, reason);
     }
   }

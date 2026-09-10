@@ -175,7 +175,11 @@ export class TubitakAdapter {
         await createAdapterAlert(
           TUBITAK_SOURCE,
           'error',
-          `Failed to fetch TÜBİTAK calls: ${reason}`
+          `Failed to fetch TÜBİTAK calls: ${reason}`,
+          undefined,
+          // Same defect on both paths (a non-ok response and a thrown fetch),
+          // and the reason text is the only thing that moved between them.
+          `${TUBITAK_SOURCE}:fetch-failed`
         );
         return adapterError<TubitakTopic>(TUBITAK_SOURCE, reason);
       }
@@ -197,7 +201,9 @@ export class TubitakAdapter {
       await createAdapterAlert(
         TUBITAK_SOURCE,
         'error',
-        `Failed to fetch TÜBİTAK calls: ${reason}`
+        `Failed to fetch TÜBİTAK calls: ${reason}`,
+        undefined,
+        `${TUBITAK_SOURCE}:fetch-failed`
       );
       return adapterError<TubitakTopic>(TUBITAK_SOURCE, reason);
     }

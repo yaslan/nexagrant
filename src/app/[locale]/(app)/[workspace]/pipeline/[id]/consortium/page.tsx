@@ -136,6 +136,12 @@ export default async function ConsortiumPage({
       source: 'consortium_page_query_failed',
       message: `Consortium lookup failed: ${errorMessage(e)}`,
       meta: { module: 'M8', table: 'Opportunity', opportunityId: id },
+      // This runs on every render of the page, so with `opportunityId` in the
+      // identity a database that is down for an hour wrote one alert per page
+      // view. A failed read of the Opportunity table is one infrastructure
+      // fault; the opportunity that happened to be open when it was noticed
+      // stays on the row as detail.
+      dedupeKey: 'consortium-page-query-failed',
     });
     queryFailed = true;
   }
