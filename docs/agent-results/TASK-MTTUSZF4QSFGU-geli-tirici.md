@@ -207,11 +207,11 @@ $ pnpm rls:verify  → ✅ 44 tabloda izolasyon fabrika_app rolüyle GERÇEKTEN 
 
 ### 2.8 Commit
 
-`b60a88f` — `i18n(invoice): translate the printed invoice, keep the GİB terms Turkish`
+`c7dab14` — `i18n(invoice): translate the printed invoice, keep the GİB terms Turkish`
 
 ```
 $ git show --name-only --oneline HEAD
-b60a88f i18n(invoice): translate the printed invoice, keep the GİB terms Turkish
+c7dab14 i18n(invoice): translate the printed invoice, keep the GİB terms Turkish
 docs/agent-results/TASK-MTTUSZF4QSFGU-geli-tirici.md
 docs/agent-results/TASK-MTTUSZF4QSFGU-screenshots/invoice-9-10-en.png
 docs/agent-results/TASK-MTTUSZF4QSFGU-screenshots/invoice-9-10-tr.png
@@ -221,6 +221,9 @@ src/lib/efatura.ts
 tests/e2e/invoice-export-locale.spec.ts
 tests/invoice-i18n.test.ts
 ```
+
+(Bu satır, raporun kendisi commit'e dahil olduğu için bir `--amend` turu sonrası
+düzeltildi; kod içeriği değişmedi, yalnız hash satırı `c7dab14`'e getirildi.)
 
 Commit'te **yalnız kendi dosyalarım** var; `messages/*.json` yok, çünkü içeriği
 zaten §6.3'te anlatılan `6513085` ile HEAD'e girmişti. Commit öncesi
