@@ -9,6 +9,13 @@ import { prisma } from "./db";
 import { env } from "./env";
 import { errorMessage } from '@/lib/errors';
 import { PRODUCT_NAME } from './brand';
+import { acknowledgementMatchesCurrent } from './legal/consent-documents';
+import { readRegistrationAcknowledgement } from './legal/registration-ack-cookie';
+import { recordAlert } from './observability/system-alert';
+import {
+  bindTransactionToTenant,
+  writeRegistrationConsent,
+} from './legal/registration-consent';
 
 /**
  * TASK-MTRNQHC3IV2BE — the demo sign-in seeds an ORGANISATION, never a person.
@@ -183,10 +190,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        // The versions of the privacy notice and terms that were on screen when
+        // the box was ticked — not a bare "true". A stale tab that showed an
+        // older notice sends an older stamp and is refused, because accepting
+        // it would record agreement to a text the person never read.
+        // See src/lib/legal/consent-documents.ts.
+        acknowledgement: { label: "Acknowledgement", type: "text" },
       },
       async authorize(credentials) {
         const email = (credentials?.email as string)?.trim()?.toLowerCase();
         if (!email) return null;
+
+        const acknowledgement = credentials?.acknowledgement;
 
         const demoProfile = DEMO_PROFILES[email];
         // Derived from the address the user typed, never from a profile table.
@@ -207,6 +222,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           let user = await prisma.user.findUnique({ where: { email } });
 
           if (!user) {
+            // TASK-MTSWLANXSU0IG (A3) — this branch is the registration. Signing
+            // in with an address nobody has used before does not authenticate
+            // anyone; it CREATES an account, a tenant and an owner membership.
+            // Until now it did that without ever telling the person what would
+            // be done with their data, and without leaving a trace that it had.
+            //
+            // The check sits here, before the transaction, because refusing is
+            // only meaningful while there is still nothing to undo. An existing
+            // user signing in is untouched: they acknowledged the notice when
+            // they registered, and demanding it again on every sign-in would
+            // teach people to tick past it.
+            if (!acknowledgementMatchesCurrent(acknowledgement)) {
+              console.warn(
+                '[Auth.authorize] registration refused: privacy notice and terms were not acknowledged, or the version acknowledged is no longer current'
+              );
+              return null;
+            }
+
             // Auto create user and organization
             user = await prisma.$transaction(async (tx) => {
               const newUser = await tx.user.create({
@@ -227,6 +260,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 },
               });
 
+              // Everything below this line writes a tenant-scoped table, so the
+              // transaction has to carry a tenant from here on. See
+              // bindTransactionToTenant for why registration cannot use
+              // `withTenant` and what was silently relying on a superuser
+              // connection before this call existed.
+              await bindTransactionToTenant(tx, tenant.id);
+
               const workspace = await tx.workspace.create({
                 data: {
                   tenantId: tenant.id,
@@ -242,6 +282,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   role: demoProfile?.role || "TENANT_OWNER",
                   workspaceIds: [workspace.id],
                 },
+              });
+
+              // In the SAME transaction as the account it is about. If this
+              // write fails, the user, tenant, workspace and membership all
+              // roll back with it — an account whose disclosure cannot be
+              // proven is exactly the state this card exists to remove, so it
+              // must not be reachable by a partial failure either.
+              await writeRegistrationConsent(tx, {
+                tenantId: tenant.id,
+                userId: newUser.id,
+                locale: "tr",
               });
 
               return newUser;
@@ -373,6 +424,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const userId = user.id;
       if (!userId) return;
 
+      // TASK-MTSWLANXSU0IG (A3) — the OAuth half of registration. Read before
+      // the transaction opens: `cookies()` wants the request context, and
+      // holding a transaction open across it buys nothing.
+      const acknowledged = await readRegistrationAcknowledgement();
+
       try {
         await prisma.$transaction(async (tx) => {
           const tenant = await tx.tenant.create({
@@ -383,6 +439,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               orgType: "SME",
             },
           });
+
+          // As in `authorize` above: tenant-scoped writes need the tenant bound
+          // to the transaction, or RLS refuses them off a superuser connection.
+          await bindTransactionToTenant(tx, tenant.id);
 
           const workspace = await tx.workspace.create({
             data: {
@@ -400,9 +460,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               workspaceIds: [workspace.id],
             },
           });
+
+          // Only when the acknowledgement really travelled with this sign-up.
+          // Writing the row unconditionally would be the worst outcome
+          // available here: a record asserting that someone was shown a notice
+          // when nothing knows whether they were. A missing record is a known
+          // gap; a fabricated one is a false answer to an audit.
+          if (acknowledged) {
+            await writeRegistrationConsent(tx, {
+              tenantId: tenant.id,
+              userId,
+              // The OAuth round trip does not carry the locale the person was
+              // reading in, and guessing it from an e-mail domain would be a
+              // guess recorded as a fact. `tr` is the app's default locale
+              // (src/i18n/routing.ts) and is what the registration page serves
+              // unless a locale prefix says otherwise.
+              locale: "tr",
+            });
+          }
         });
       } catch (err) {
         console.warn(`[Auth.createUser] DB error: ${errorMessage(err)}`);
+      }
+
+      // Outside the transaction: an account that exists without a disclosure
+      // record is a compliance defect, not a reason to undo the registration.
+      // The alert is what makes it visible — silence here is what let the gap
+      // live unmeasured until this card.
+      if (!acknowledged) {
+        await recordAlert({
+          level: 'warn',
+          source: 'auth-registration-consent',
+          message: 'Account created without a disclosure acknowledgement record',
+          meta: { userId, path: 'oauth-createUser' },
+        });
       }
     },
   },

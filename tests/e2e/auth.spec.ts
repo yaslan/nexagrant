@@ -36,7 +36,18 @@ test.describe('Authentication and Tenant Provisioning', () => {
   // Below is a structural test of the auth endpoint.
   test('should redirect to auth provider on click', async ({ page }) => {
     await page.goto('/tr/register');
-    
+    // While the page streams, Next holds a second, `hidden` copy of this form,
+    // so a bare getByTestId can hit strict mode instead of waiting.
+    await page.waitForLoadState('networkidle');
+
+    // TASK-MTSWLANXSU0IG — on the REGISTER tab, the OAuth buttons now go through
+    // the same disclosure step as the e-mail form. An OAuth sign-up creates the
+    // account inside the provider callback, where the form no longer exists, so
+    // the acknowledgement has to be taken before the redirect starts or there is
+    // nothing left to take it from. Ticking the box is now part of "clicking
+    // Google" on this page, and the test says so rather than working around it.
+    await page.locator('form').filter({ visible: true }).getByTestId('disclosure-ack').check();
+
     // We catch the navigation to prevent actually leaving localhost in the test if desired,
     // or we verify the redirect URL.
     const [request] = await Promise.all([
@@ -48,5 +59,26 @@ test.describe('Authentication and Tenant Provisioning', () => {
     // Google's authorize URL, depending on how fast NextAuth redirects; both mean the
     // provider flow started, which is what this test is checking.
     expect(request.url()).toMatch(/\/api\/auth\/signin|accounts\.google\.com/);
+  });
+
+  test('the provider flow does not start until the disclosure is acknowledged', async ({ page }) => {
+    // The other half of the rule above: without the tick, clicking Google must
+    // not begin an OAuth sign-up at all.
+    await page.goto('/tr/register');
+    await page.waitForLoadState('networkidle');
+    await expect(
+      page.locator('form').filter({ visible: true }).getByTestId('disclosure-ack')
+    ).not.toBeChecked();
+
+    let startedProviderFlow = false;
+    page.on('request', (req) => {
+      if (req.url().includes('accounts.google.com') || req.url().includes('/api/auth/signin')) {
+        startedProviderFlow = true;
+      }
+    });
+
+    await page.getByRole('button', { name: /Google ile Devam Et/ }).click();
+    await expect(page.getByText(/onaylamanız gerekir/i)).toBeVisible();
+    expect(startedProviderFlow, 'an unacknowledged click started an OAuth sign-up').toBe(false);
   });
 });

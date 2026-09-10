@@ -168,6 +168,7 @@ yalnız kişiye giden bağ koparılır.
 | `AiUsageLog.userId`, `AuditEvent.actorId`, `Opportunity.ownerId`, `Feedback.userId`, `ProposalUsage.usedByUserId` | `NULL` | kayıt kiracının; yalnız bağ kopar |
 | `Relationship.ownerUserId` | `NULL` | **aşağıya bakınız** |
 | `DualApprovalStep.actorUserId` (+ `actorName`) | **saklanır** | imza kaydı; `@@unique([followupDocId, actorUserId])` buna dayanır. Saklama `docs/legal/processing-register.md` §12'de **adıyla** beyan edilir |
+| `Consent.userId` | **saklanır** | aydınlatma/onay kaydı; bkz. §15. Bağı koparmak kaydın var olma sebebini yok eder — "birine gösterildi" ispatı, kimin olduğu silinince ispat olmaktan çıkar. Aynı dayanak: KVKK md.5/2-e / GDPR md.17(3)(e) |
 
 **`Relationship.ownerUserId` — 2026-09-08 kararı (A4, Seçenek C).** Migration:
 `prisma/migrations/relationship-owner-nullable.sql` · geri alma:
@@ -712,3 +713,52 @@ satıra çöker, yani geri alınan bozuk davranışın kendisi).
 
 **RLS.** Yeni tablo yok; `TopicMatch` `tenant_isolation` politikasını `prisma/rls.sql`'den almaya
 devam eder ve yeni sütun kiracı anahtarı değildir.
+
+## 15. `Consent` — aydınlatma ve rıza kaydı (TASK-MTSWLANXSU0IG)
+
+Migration: `prisma/migrations/add-consent-record.sql` · geri alma: `add-consent-record.down.sql`
+(geri alma **kaydı yok eder** ve başka hiçbir tablodan yeniden üretilemez — dosyanın başındaki
+dışa aktarma uyarısına bakın). RLS: `tenant_isolation` (`prisma/rls.sql` FOREACH dizisi).
+
+**Neden var.** 2026-09-10'a kadar `grep -n "Consent" prisma/schema.prisma` sıfır sonuç
+veriyordu: bir kullanıcının hangi metne, ne zaman, hangi sürümüne onay verdiği hiçbir yerde
+kayıtlı değildi. GDPR md.5(2) ispat yükünü veri sorumlusuna verir; ispatlanamayan bir
+aydınlatma, yapılmış olsa bile yapılmamış sayılır.
+
+**Kapsamı envanter belirler, tercih değil.** `docs/legal/processing-register.md` 18 işleme
+faaliyeti sayar. Bunlardan **yalnız biri** açık rızaya dayanır: §11 (Google/Outlook takvim
+OAuth, KVKK md.5/1 / GDPR md.6(1)(a)) — ve o faaliyet bugün hiç veri yazmıyor. Hesap
+oluşturma (§1) **sözleşme** temellidir (md.5/2-c / md.6(1)(b)). Bu yüzden kayıt formundaki
+kutu "rıza veriyorum" demez: sözleşmeye dayanan bir işleme için rıza istemek, dayandığımız
+hukuki sebebi yanlış beyan etmek ve var olmayan bir geri çekme hakkı ima etmek olurdu.
+
+| Sütun | Not |
+|---|---|
+| `tenantId` | CLAUDE.md kural 1. Aydınlatma Fabrika'ya verilir ama satır, hesabın açıldığı kiracıya kapsanır — kiracı sahibi kendi üyelerinin kaydını denetleyebilir, başkasınınkini göremez |
+| `userId` | FK **değil**, imhada **silinmez** (§7.1.1) |
+| `kind` | `DISCLOSURE_ACK` (md.10 / md.13 aydınlatma — hukuki sebep DEĞİL) · `TERMS_ACCEPTANCE` (sözleşmenin kurulması) · `EXPLICIT_CONSENT` (md.6(1)(a) — yalnız bunda geri çekme anlamlı) |
+| `purpose` | `ACCOUNT_REGISTRATION` (§1) · `CALENDAR_OAUTH` (§11, henüz satır yok) |
+| `documentId` + `documentVersion` | Metnin **kendisi saklanmaz**; kimliği ve sürümü saklanır. Metin `messages/{tr,en}.json` içinde `t()` anahtarı olarak yaşar, `src/app/[locale]/privacy` ve `/terms` sunar. Sürüm `src/lib/legal/consent-documents.ts`'te tek yerde beyan edilir; metin değişince **aynı commit'te** sürüm artırılır, eski satırlar eski sürümde kalır ve doğruyu söylemeye devam eder |
+| `withdrawnAt` | Geri çekme **işaretlenir, silinmez**. Silinmiş bir geri çekme, hiç olmamış bir geri çekmeden ayırt edilemez |
+| `ipAddress` / `userAgent` | **Bilerek yok.** İspat kaydına uyan saklama süresi §12'nin `DualApprovalStep` için savunduğu süredir (md.17(3)(e) — hesabın ömrünün ötesinde). Süresiz saklanan bir ağ tanımlayıcısı, envanterin kendi §22 boşluk #1'ine yeni bir madde ekler. İspat için gereken dört sütun zaten var: kim, hangi belge, hangi sürüm, ne zaman |
+
+**Yazma yolu — iki tane var, ikisi de kapsanır.** Bir Fabrika hesabı iki ayrı yerde doğar:
+
+1. `authorize` (`src/lib/auth.ts`) — e-posta/şifre formu. Onay, kimlik bilgileriyle **birlikte**
+   gelir, yani hesap var olmadan **önce** doğrulanır; onaysız kayıt reddedilir (`null` döner).
+   Onay satırı hesabın açıldığı **aynı transaction** içinde yazılır: yazım düşerse kullanıcı,
+   kiracı, çalışma alanı ve üyelik de geri alınır.
+2. `events.createUser` (`src/lib/auth.ts`) — Google/Microsoft OAuth. Adaptör kullanıcıyı zaten
+   yaratmış olduğu için burada reddetmek mümkün değil; onay, `signIn` öncesinde sunucu
+   tarafında kurulan kısa ömürlü httpOnly çerezle taşınır
+   (`src/lib/legal/registration-ack-cookie.ts`). Çerez yoksa satır **yazılmaz** — uydurulmuş
+   bir kayıt, eksik kayıttan kötüdür — ve `SystemAlert` (`auth-registration-consent`) üretilir.
+
+**`bindTransactionToTenant`.** Kayıt akışı `withTenant`'ı kullanamayan tek akıştır: kiracı,
+ona ihtiyaç duyan transaction'ın ortasında doğar, dolayısıyla transaction açılırken
+kapsanacak bir kiracı yoktur. `set_config('app.tenant_id', …, is_local => true)` kiracı id'si
+oluşur oluşmaz uygulanır — `withTenantOn`'un kullandığı mekanizmanın aynısı
+(`src/lib/db.ts`). Bu çağrı eklenene kadar `Membership` ve `Workspace` bu transaction'da
+`app.tenant_id` hiç kurulmadan yazılıyordu; yerel SUPERUSER rolüyle çalıştığı için görünmüyordu,
+`fabrika_app` (NOBYPASSRLS) rolüyle `tenant_isolation` hepsini reddederdi.
+

@@ -265,6 +265,37 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 
 ---
 
+## 18b. Aydınlatma ve rıza kaydı (`Consent`) — TASK-MTSWLANXSU0IG
+
+| Alan | Değer |
+|---|---|
+| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu |
+| **Veri kategorileri** | `userId`, kiracı kimliği, onaylanan belgenin kimliği ve **sürümü**, belgenin dili, onay zamanı, geri çekme zamanı. Metnin kendisi ve ağ tanımlayıcısı (IP / user-agent) **saklanmaz** |
+| **İlgili kişi kategorileri** | Platform kullanıcıları |
+| **Amaç** | KVKK md.10 / GDPR md.13 aydınlatma yükümlülüğünün ve — ileride §11 için — GDPR md.7(1) rıza ispatının yerine getirildiğini **gösterebilmek** |
+| **Hukuki sebep** | KVKK md.5/2-ç (hukuki yükümlülük) / GDPR art.6(1)(c) ile art.5(2) (hesap verebilirlik). Bu kaydın kendisi rızaya dayanmaz: aydınlatma yaptığını ispat etmek bir yükümlülüktür, tercih değil |
+| **Alıcı ve yurt dışı aktarım** | Yok |
+| **Saklama süresi** | **Hesabın ömrünü aşar.** İmha işi (`purgeDueUsers`) bu satırı silmez ve `userId`'yi NULL'lamaz — dayanak §12'nin `DualApprovalStep` için kurduğu dayanağın aynısı: KVKK md.5/2-e / GDPR art.17(3)(e), bir hakkın tesisi, kullanılması veya korunması. Bağı koparmak kaydı ispat olmaktan çıkarır |
+| **Teknik-idari tedbir** | RLS (`tenant_isolation`, FORCE); yazım kaydın konusu olan hesapla **aynı transaction** içinde, böylece hesabı olup kaydı olmayan bir durum doğamaz |
+| **Kaynak dosya yolu** | `prisma/schema.prisma` (`Consent`), `src/lib/legal/consent-documents.ts` (sürüm beyanı), `src/lib/legal/registration-consent.ts` (yazım), `src/lib/auth.ts` (iki kayıt yolu) |
+
+**Kapsam notu — hangi faaliyetler rıza gerektirir.** Bu envanterdeki 18 faaliyetin hukuki
+sebepleri tarandığında **yalnız §11 (takvim OAuth)** açık rızaya (KVKK md.5/1 / GDPR
+art.6(1)(a)) dayanıyor; o da bugün hiç veri yazmıyor. Diğerlerinin tamamı sözleşme
+(§1, §2, §3, §4, §15), hukuki yükümlülük (§3, §5, §13) veya meşru menfaat
+(§6, §7, §8, §9, §10, §12, §14, §18) temellidir. Bu yüzden kayıt formundaki kutu **rıza
+değil aydınlatma teyidi + sözleşme kabulüdür**; `Consent.kind` bu üçünü kayıt üzerinde
+ayrı tutar. Sözleşmeye dayanan bir işleme için rıza istemek hukuki sebebi yanlış beyan
+etmek ve var olmayan bir geri çekme hakkı ima etmek olurdu.
+
+**Açık kalan (bu kartın kapsamı dışı):** metinlerin hukuki **içeriği** TASK-MTSWIFJKGTYC'ye
+bağlıdır ve hukuk girdisi beklemektedir. Bu kart yalnız yapıyı kurar (anahtar + sürüm +
+tür + amaç); içerik geldiğinde yapılacak iş bir kopya değişikliği ve
+`src/lib/legal/consent-documents.ts`'te bir sürüm artırımıdır — şema veya kod değişikliği
+gerekmez.
+
+---
+
 ## 19. Ürün analitiği ve hata izleme — beyan edilmişti ama kodda karşılığı yoktu (TASK-MTT1VEUF8Z9SH ile düzeltildi)
 
 `docs/SECURITY_COMPLIANCE.md` satır 102, alt işleyen listesine **PostHog** ve **Sentry**'yi dahil ediyor. Bu kart kapsamında koda bakıldığında:
@@ -296,6 +327,7 @@ Aşağıda `prisma/schema.prisma`'daki **tüm modeller** tarandı; kişisel veri
 | ApprovalRequest, DualApprovalStep | ✅ (requesterId/approverId/actorName) | §12 |
 | AuditEvent | ✅ (actorId) | §13 |
 | Feedback | ✅ (userId, ekran görüntüsü) | §14 |
+| Consent | ✅ (userId) | §18b |
 | ApiKey | ❌ | Kişisel veri değil — kiracı düzeyinde servis kimlik bilgisi (`keyHash`), bir gerçek kişiye değil `tenantId`'ye bağlı. **Envantere dahil edilmedi, gerekçeyle.** |
 | SeatCandidate | ❌ | `organizationId`/`partnerOrgId` — kurum düzeyinde skor, gerçek kişi yok. |
 | Tenant, Workspace, TenantProfile, ModuleState, ModuleCatalog, Plan*, AddOn*, CreditLedger, LifetimeLicence | ❌ | Kiracı/tüzel kişi ve ürün konfigürasyon verisi; gerçek kişiye ait değil. |

@@ -3,17 +3,28 @@
 import { signIn, signOut } from '@/lib/auth';
 import { AuthError } from 'next-auth';
 import { isNextRedirectError } from '@/lib/errors';
+import { setRegistrationAcknowledgementCookie } from '@/lib/legal/registration-ack-cookie';
 
+/**
+ * @param acknowledgement The version stamp of the privacy notice and terms the
+ *   form had on screen when the box was ticked, or `undefined` when it was not.
+ *   Passed straight through to `authorize`, which needs it only when this
+ *   address has no account yet — that is the registration, and TASK-MTSWLANXSU0IG
+ *   refuses one that cannot be shown to have been disclosed. Signing in to an
+ *   existing account never needs it.
+ */
 export async function loginWithCredentialsAction(
   email: string,
   password: string,
   redirectTo: string,
-  locale: string = 'tr'
+  locale: string = 'tr',
+  acknowledgement?: string
 ) {
   try {
     await signIn('credentials', {
       email,
       password: password || 'demo1234',
+      acknowledgement: acknowledgement ?? '',
       redirect: false,
     });
     return { success: true };
@@ -49,11 +60,24 @@ export async function loginWithCredentialsAction(
   }
 }
 
+/**
+ * @param acknowledgement The same version stamp as above. The browser is about
+ *   to leave for Google/Microsoft and will come back into NextAuth's callback
+ *   route, where nothing of ours can see the form any more — so if the box was
+ *   ticked, the stamp is parked in an httpOnly cookie here, on the server, and
+ *   `events.createUser` picks it up on the way back
+ *   (src/lib/legal/registration-ack-cookie.ts).
+ */
 export async function loginWithSocialAction(
   provider: 'google' | 'microsoft-entra-id',
-  redirectTo: string
+  redirectTo: string,
+  acknowledgement?: string
 ) {
   try {
+    // Set before `signIn`, which redirects and never returns.
+    if (acknowledgement) {
+      await setRegistrationAcknowledgementCookie();
+    }
     await signIn(provider, { redirectTo });
   } catch (error) {
     if (

@@ -1466,3 +1466,110 @@ enum FeedbackStatus {
   RESOLVED
   WONT_FIX
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Consent / disclosure record — TASK-MTSWLANXSU0IG (A3)
+//
+// Until this table existed, nothing recorded WHICH legal text a person was
+// shown, WHEN, or at WHICH VERSION. `grep -n "Consent" prisma/schema.prisma`
+// returned nothing on 2026-09-10, so a KVKK md.10 / GDPR art.13 disclosure and
+// a GDPR art.7(1) consent were equally unprovable: the obligation may well have
+// been discharged, but the controller could not demonstrate it, and art.5(2)
+// makes demonstrating it the obligation.
+//
+// SCOPE COMES FROM THE REGISTER, NOT FROM A GUESS.
+// docs/legal/processing-register.md lists 18 processing activities with their
+// legal bases. Exactly ONE of them rests on explicit consent — §11, the
+// Google/Outlook calendar OAuth (KVKK md.5/1 / GDPR art.6(1)(a)) — and that
+// one writes no data yet. Account creation (§1) rests on art.6(1)(b), the
+// contract. So asking a registering user to "consent" to it would be a false
+// statement about the basis we actually rely on, and would imply a right to
+// withdraw that does not exist for contract-basis processing. `kind` is what
+// keeps those three cases apart on the record instead of flattening them into
+// one word.
+//
+// NO `ipAddress` / `userAgent` COLUMN, deliberately.
+// The card offered them "if the retention period is compatible with the
+// register". It is not. The retention that fits a proof-of-compliance record is
+// the one §12 already argues for `DualApprovalStep` — KVKK md.5/2-e /
+// GDPR art.17(3)(e), kept so a right can be exercised or defended, i.e. beyond
+// the account's own life. A permanently retained network identifier is a new
+// undefined-retention item of personal data, which is open gap #1 in the
+// register's own §22. The proof does not need it: who, which document, which
+// version, when — those four columns carry it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Which legal instrument a `Consent` row records. These are not
+/// interchangeable: only EXPLICIT_CONSENT is a legal basis under art.6(1)(a)
+/// and only it is withdrawable.
+enum ConsentKind {
+  /// KVKK md.10 / GDPR art.13 — the notice was presented and acknowledged.
+  /// An information duty, NOT a legal basis, and nothing to withdraw.
+  DISCLOSURE_ACK
+
+  /// Acceptance of the terms of service. This is how the art.6(1)(b) contract
+  /// is formed; it is not consent to processing either.
+  TERMS_ACCEPTANCE
+
+  /// KVKK md.5/1 / GDPR art.6(1)(a) — freely given, specific, informed,
+  /// unambiguous. The only kind `withdrawnAt` is truly meaningful for.
+  EXPLICIT_CONSENT
+}
+
+/// The processing activity a `Consent` row belongs to, keyed to the section
+/// numbers in docs/legal/processing-register.md. Only activities that really
+/// exist appear here — the register's own rule is that no imagined activity is
+/// written down, and the same discipline applies to this enum.
+enum ConsentPurpose {
+  /// §1 — account creation and authentication.
+  ACCOUNT_REGISTRATION
+
+  /// §11 — Google/Outlook calendar OAuth. The one genuinely consent-based
+  /// activity in the register. No row can exist for it yet: the OAuth writer
+  /// flow is not built (`connectCalendar` refuses with
+  /// CALENDAR_OAUTH_NOT_CONFIGURED). It is declared so that the flow, when it
+  /// is built, has a place to record consent rather than inventing one.
+  CALENDAR_OAUTH
+}
+
+model Consent {
+  id       String @id @default(cuid())
+  /// CLAUDE.md rule 1. The subject gives the disclosure to Fabrika, but the row
+  /// is scoped to the tenant the account was provisioned into, so a tenant
+  /// owner can audit their own members' records and no one else's.
+  tenantId String
+
+  /// Deliberately NOT a foreign key, and deliberately NOT nulled on erasure —
+  /// the same call, on the same basis, that §12 makes for
+  /// `DualApprovalStep.actorUserId`. Detaching the person from the record would
+  /// destroy the only thing the record exists to prove.
+  /// See src/lib/inngest/jobs/users-scheduled-deletion.ts.
+  userId String
+
+  kind    ConsentKind
+  purpose ConsentPurpose
+
+  /// Stable identity of the text (e.g. `privacy-notice`), and the version of it
+  /// that was actually on screen. The TEXT ITSELF is not stored: it lives in
+  /// messages/{tr,en}.json behind a `t()` key and is served from
+  /// src/app/[locale]/privacy. Storing a version rather than a copy is the
+  /// whole point — when the text changes, the version changes, and an old row
+  /// then says exactly what it should say: this person agreed to something
+  /// else. A stored copy could not say that; it would just look current.
+  documentId      String
+  documentVersion String
+
+  /// Which language the person actually read.
+  locale String @default("tr")
+
+  grantedAt   DateTime  @default(now())
+  /// Withdrawal is recorded, never deleted — an erased withdrawal is
+  /// indistinguishable from a withdrawal that never happened.
+  withdrawnAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, userId, purpose])
+  @@index([tenantId, purpose, documentVersion])
+  @@index([userId, grantedAt])
+}

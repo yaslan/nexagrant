@@ -319,7 +319,10 @@
     "signIn": "Sign In",
     "signOut": "Sign Out",
     "register": "Register",
-    "signInTitle": "Sign In to {brand}"
+    "signInTitle": "Sign In to {brand}",
+    "disclosureAck": "I have read the <privacy>Privacy Policy and Data Protection Notice</privacy> and I accept the <terms>Terms of Service</terms>.",
+    "disclosureRequired": "To continue, please confirm that you have read the privacy notice and accept the terms of service.",
+    "disclosureVersion": "Version you are accepting: {version}"
   },
   "NoWorkspace": {
     "title": "You do not have a workspace yet",

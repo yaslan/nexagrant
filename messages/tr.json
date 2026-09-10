@@ -319,7 +319,10 @@
     "signIn": "Giriş Yap",
     "signOut": "Çıkış Yap",
     "register": "Kayıt Ol",
-    "signInTitle": "{brand} Platformuna Giriş"
+    "signInTitle": "{brand} Platformuna Giriş",
+    "disclosureAck": "Kişisel verilerimin işlenmesine ilişkin <privacy>Gizlilik Politikası ve KVKK Aydınlatma Metni</privacy>'ni okudum ve <terms>Kullanım Koşulları</terms>'nı kabul ediyorum.",
+    "disclosureRequired": "Devam edebilmek için aydınlatma metnini okuduğunuzu ve kullanım koşullarını kabul ettiğinizi onaylamanız gerekir.",
+    "disclosureVersion": "Onayladığınız metin sürümü: {version}"
   },
   "NoWorkspace": {
     "title": "Henüz bir çalışma alanınız yok",

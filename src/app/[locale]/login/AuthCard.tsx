@@ -7,6 +7,11 @@ import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions
 import { useTranslations } from 'next-intl';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { errorMessage as toErrorMessage, isNextRedirectError } from '@/lib/errors';
+import {
+  PRIVACY_NOTICE,
+  TERMS_OF_SERVICE,
+  registrationAcknowledgementToken,
+} from '@/lib/legal/consent-documents';
 
 /**
  * The one place this file spells a demo address. Each seat used to write its
@@ -52,12 +57,43 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  /**
+   * TASK-MTSWLANXSU0IG (A3) — never pre-ticked, and never persisted across a
+   * reload. A box that arrives already ticked records nothing about what the
+   * person did; the whole value of the record is that the tick was an act.
+   *
+   * This gates registration only. Signing in to an account that already exists
+   * does not need it — the acknowledgement was made when that account was
+   * created, and asking again every time trains people to click past it. The
+   * server enforces the same rule and does not take this component's word for
+   * it: `authorize` demands the stamp only on the branch that creates a user.
+   */
+  const [acknowledged, setAcknowledged] = useState(false);
+  const isRegistering = mode === 'register';
+
+  /**
+   * The versions actually on screen, sent with the form. The server refuses a
+   * stamp that no longer matches the current documents, so a tab left open
+   * across a change to the notice cannot acknowledge the old text.
+   */
+  const acknowledgementToken = acknowledged ? registrationAcknowledgementToken() : undefined;
+
+  /** Shown next to the box so the screenshot of a consent shows what it covered. */
+  const documentVersionLabel = `${PRIVACY_NOTICE.id}@${PRIVACY_NOTICE.version} · ${TERMS_OF_SERVICE.id}@${TERMS_OF_SERVICE.version}`;
+
   // Social Sign-In
   const handleSocialLogin = async (provider: 'google' | 'microsoft-entra-id') => {
+    // An OAuth sign-up creates the account inside the provider callback, where
+    // this form is long gone — so the tick has to be taken before the redirect
+    // starts, or there is nothing left to take it from.
+    if (isRegistering && !acknowledged) {
+      setErrorMessage(tAuthCard('disclosureRequired'));
+      return;
+    }
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      await loginWithSocialAction(provider, rawCallbackUrl);
+      await loginWithSocialAction(provider, rawCallbackUrl, acknowledgementToken);
     } catch (err) {
       if (isNextRedirectError(err)) {
         return;
@@ -72,6 +108,15 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
     e.preventDefault();
     if (!email.trim()) return;
 
+    // The button is disabled in this state too; this is the second line, for a
+    // submit that arrives by keyboard or with the attribute stripped. Neither
+    // is the real gate — `authorize` refuses to create an account without the
+    // stamp regardless of what this component sends.
+    if (isRegistering && !acknowledged) {
+      setErrorMessage(tAuthCard('disclosureRequired'));
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -80,7 +125,8 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
         email.trim(), 
         password || 'demo1234', 
         rawCallbackUrl, 
-        locale
+        locale,
+        acknowledgementToken
       );
       
       if (res?.error) {
@@ -293,10 +339,75 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
           />
         </div>
 
+        {/*
+          TASK-MTSWLANXSU0IG (A3) — the disclosure step.
+
+          It says "I have read ... and I accept ...", NOT "I consent to the
+          processing of my data". That wording is not politeness, it is the
+          register: docs/legal/processing-register.md §1 puts account creation
+          on KVKK md.5/2-c / GDPR art.6(1)(b), the contract. Asking for consent
+          to processing that runs on a contract basis would misdescribe the
+          basis and imply a right to withdraw that does not exist here — of the
+          register's 18 activities, exactly one (§11, calendar OAuth) rests on
+          consent, and it writes no data yet. So this box records an art.13
+          disclosure and a terms acceptance, and `Consent.kind` keeps them
+          distinct from consent on the record.
+        */}
+        {isRegistering && (
+          <div className="rounded-xl border border-border bg-ground/60 p-3 space-y-1.5">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                name="disclosureAck"
+                data-testid="disclosure-ack"
+                // No `defaultChecked`, and no value restored from storage.
+                checked={acknowledged}
+                onChange={(e) => {
+                  setAcknowledged(e.target.checked);
+                  if (e.target.checked) setErrorMessage(null);
+                }}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-accent cursor-pointer"
+              />
+              <span className="text-[11px] leading-relaxed text-ink-2">
+                {tAuthCard.rich('disclosureAck', {
+                  privacy: (chunks) => (
+                    <a
+                      href={PRIVACY_NOTICE.href(locale)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-accent underline underline-offset-2"
+                    >
+                      {chunks}
+                    </a>
+                  ),
+                  terms: (chunks) => (
+                    <a
+                      href={TERMS_OF_SERVICE.href(locale)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-accent underline underline-offset-2"
+                    >
+                      {chunks}
+                    </a>
+                  ),
+                })}
+              </span>
+            </label>
+            {/*
+              The version is on screen because it is what gets stored. A
+              screenshot of this box is then evidence of a specific text, not of
+              a tick against whatever the notice happens to say today.
+            */}
+            <p className="text-[10px] font-mono text-muted pl-6.5" data-testid="disclosure-version">
+              {tAuthCard('disclosureVersion', { version: documentVersionLabel })}
+            </p>
+          </div>
+        )}
+
         <button
           type="submit"
-          disabled={isLoading}
-          className="w-full bg-accent hover:opacity-90 text-white font-bold text-xs sm:text-sm py-3 rounded-xl shadow-2xs transition disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2"
+          disabled={isLoading || (isRegistering && !acknowledged)}
+          className="w-full bg-accent hover:opacity-90 text-white font-bold text-xs sm:text-sm py-3 rounded-xl shadow-2xs transition disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
         >
           {isLoading ? (
             <>

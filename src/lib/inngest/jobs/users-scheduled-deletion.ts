@@ -144,6 +144,19 @@ export async function purgeDueUsers(
       //     id *and* `actorName` — in docs/legal/processing-register.md §12.
       //     Decided 2026-09-08 (A4, option C); the two columns were separate
       //     cases and got separate answers.
+      //
+      //     `Consent.userId` is retained for the same reason and on the same
+      //     basis (TASK-MTSWLANXSU0IG). It is the eleventh FK-less `User.id`
+      //     column and it is named here so that it is *decided* rather than
+      //     merely unlisted: the row proves that this person was told what
+      //     would be done with their data. Nulling the id would leave a record
+      //     proving that somebody was told something, which proves nothing, and
+      //     deleting it would destroy the controller's own art.5(2) evidence at
+      //     the request of the one person it is evidence about. Declared in
+      //     docs/legal/processing-register.md §18b and docs/DATA_MODEL.md §7.1.1.
+      //     The row carries no network identifier, so retaining it does not
+      //     retain an IP address — see the `Consent` model comment for why that
+      //     column does not exist.
 
       // 4. Finally the user row; cascades clear accounts, sessions,
       //    memberships and requested approvals, and null out approver/

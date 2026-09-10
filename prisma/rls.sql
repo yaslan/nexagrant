@@ -11,7 +11,7 @@ BEGIN
     'Evidence','ConceptNote','Relationship','Interaction','SeatCandidate','AiUsageLog',
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
     'TtoPortfolioItem','MarketplaceListing','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
-    'PlanAssignment','ClaimEvidenceLink','EvidenceReminder'
+    'PlanAssignment','ClaimEvidenceLink','EvidenceReminder','Consent'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
