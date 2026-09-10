@@ -34,6 +34,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],
+  globalSetup: require.resolve('./tests/e2e/global-setup.ts'),
   use: {
     baseURL: BASE_URL,
     trace: 'retain-on-failure',
@@ -43,7 +44,7 @@ export default defineConfig({
   webServer: {
     command: `pnpm dev --port ${PORT}`,
     url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 180_000,
     env: {
       ...process.env,
