@@ -66,11 +66,12 @@ function unescapeXml(value: string): string {
  */
 async function docxParagraphs(path: string): Promise<string[]> {
   const xml = await docxText(path);
-  return [...xml.matchAll(/<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g)].map(([, body]) =>
-    [...body.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)]
-      .map(([, run]) => unescapeXml(run))
-      .join(''),
-  );
+  return [...xml.matchAll(/<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g)].map(([, body]) => {
+    if (body === undefined) return '';
+    return [...body.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)]
+      .map(([, run]) => (run === undefined ? '' : unescapeXml(run)))
+      .join('');
+  });
 }
 
 /** The Turkish labels the DOCX prints its identity fields under, at `locale=tr`. */

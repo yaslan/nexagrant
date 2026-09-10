@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { checkModuleAccess } from '@/lib/modules/access';
 import { getManifest } from '@/lib/modules/registry';
 import type { ModuleId } from '@/lib/modules/types';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 /**
  * Page-side module gate.
@@ -56,9 +57,11 @@ export async function moduleGate(
           // extra parameter. An empty list would leave a dangling "included in ."
           // sentence, so a module no plan sells falls back to the em dash.
           plans: access.requiredPlans?.length ? access.requiredPlans.join(', ') : '—',
+          // Only `DEV_INTERNAL_ONLY` renders it; the other reasons ignore the extra parameter.
+          brand: PRODUCT_NAME,
         })}
       </p>
-      <p className="mt-6 text-sm text-slate-500 dark:text-slate-500">{t('askAdmin')}</p>
+      <p className="mt-6 text-sm text-slate-500 dark:text-slate-500">{t('askAdmin', { brand: PRODUCT_NAME })}</p>
     </section>
   );
 }

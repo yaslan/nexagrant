@@ -19,7 +19,7 @@ export async function generateMetadata({
 
   return {
     title: `${t('title')} — ${PRODUCT_NAME}`,
-    description: t('metaDescription'),
+    description: t('metaDescription', { brand: PRODUCT_NAME }),
     // KPI figures are tenant data; keep the page out of every index.
     robots: { index: false, follow: false },
   };

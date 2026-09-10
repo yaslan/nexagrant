@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+import { PRODUCT_NAME } from '@/lib/brand';
 import React from 'react';
 import PricingClient from './PricingClient';
 import { auth } from '@/lib/auth';
@@ -21,8 +22,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'pricing' });
-  const title = t('metaTitle');
-  const description = t('metaDescription');
+  const title = t('metaTitle', { brand: PRODUCT_NAME });
+  const description = t('metaDescription', { brand: PRODUCT_NAME });
 
   return {
     title,

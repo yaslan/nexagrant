@@ -101,6 +101,8 @@ interface AuditReport {
     unusedInEnglish: string[];
   };
   hardcoded: HardcodedReport;
+  /** Check 5: a placeholder-bearing key called as `t('key')` with no value at all. */
+  placeholderViolations: PlaceholderViolation[];
 }
 
 interface HardcodedReport {
@@ -383,6 +385,103 @@ function extractTranslationKeysFromCode(): Extraction {
   };
 }
 
+// ── Placeholder-bearing keys called without a value (check 5) ────────────────────────
+//
+// next-intl does not throw when `t('key')` resolves to a message like "{brand} Pricing"
+// and no `brand` is supplied: it logs a FORMATTING_ERROR and falls back to rendering the
+// key path itself ("pricing.metaTitle") in its place — a 200 response with a broken
+// <title> or, worse, broken on-screen copy. Checks 1-3 only ask whether a key resolves,
+// so they are blind to this; TASK-MTVTIU3LAYFOA found six such call sites with nothing
+// but a live curl and a grep. This check makes the failure static instead of something a
+// crawler discovers first: a plain `t('key')` call — no second argument at all — is
+// blocking when the resolved message needs at least one `{var}` interpolation in either
+// catalog.
+//
+// Scope, deliberately: only the literal-key form (`t('key')`, not a template literal —
+// those are dynamic and already handled by checks 3), and only "zero arguments" (a call
+// that passes a params object missing just one of several needed variables — as
+// `ModuleGate.reason.DEV_INTERNAL_ONLY` did until this task fixed it — is not caught,
+// since that needs matching the object's actual keys against the message's variables, not
+// just detecting an object literal exists). And only simple `{var}` interpolation is
+// recognised — ICU plural/select forms ("{count, plural, ...}") need real ICU parsing to
+// tell apart from a literal brace, so they are left alone rather than risking a false
+// positive on day one.
+
+interface PlaceholderViolation {
+  key: string;
+  file: string;
+  line: number;
+  placeholders: string[];
+}
+
+function collectPlaceholders(obj: Record<string, unknown>, prefix: string, out: Map<string, string[]>): void {
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (typeof value === 'string') {
+      const vars = Array.from(value.matchAll(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g)).map(m => m[1]).filter((v): v is string => v !== undefined);
+      if (vars.length > 0) {
+        const existing = out.get(fullKey) ?? [];
+        out.set(fullKey, Array.from(new Set([...existing, ...vars])));
+      }
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      collectPlaceholders(value as Record<string, unknown>, fullKey, out);
+    }
+  }
+}
+
+/** Message keys (in either catalog) whose value contains at least one simple `{var}`. */
+function placeholderKeys(): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const lang of ['tr', 'en'] as const) {
+    const messageFile = path.join(process.cwd(), 'messages', `${lang}.json`);
+    const parsed = JSON.parse(fs.readFileSync(messageFile, 'utf-8')) as Record<string, unknown>;
+    collectPlaceholders(parsed, '', map);
+  }
+  return map;
+}
+
+function scanPlaceholderCalls(): PlaceholderViolation[] {
+  const needsValue = placeholderKeys();
+  const srcDir = path.join(process.cwd(), 'src');
+  const files = findFiles(srcDir);
+  const violations: PlaceholderViolation[] = [];
+
+  for (const file of files) {
+    const raw = fs.readFileSync(file, 'utf-8');
+    if (!raw.includes('useTranslations') && !raw.includes('getTranslations')) continue;
+
+    const content = stripComments(raw);
+    const bindings = collectNamespaceBindings(content);
+    if (bindings.length === 0) continue;
+
+    const variables = new Set(bindings.map(b => b.variable));
+    for (const variable of variables) {
+      // Plain string-literal key only, e.g. `t('key')` or `t("key")` — a template-literal
+      // key is a dynamic call and out of scope here.
+      const callRe = new RegExp(`(?:^|[^\\w.$])${variable}\\(\\s*(['"])([^'"]*)\\1`, 'g');
+      let m: RegExpExecArray | null;
+      while ((m = callRe.exec(content)) !== null) {
+        const key = m[2];
+        if (!key) continue;
+        const namespace = namespaceAt(bindings, variable, m.index);
+        if (namespace === undefined) continue;
+        const full = qualify(namespace, key);
+        const placeholders = needsValue.get(full);
+        if (!placeholders) continue;
+
+        const afterKey = m.index + m[0].length;
+        const next = content.slice(afterKey).match(/^\s*([),])/);
+        const hasSecondArg = next?.[1] === ',';
+        if (!hasSecondArg) {
+          const line = content.slice(0, m.index).split('\n').length;
+          violations.push({ key: full, file: path.relative(process.cwd(), file), line, placeholders });
+        }
+      }
+    }
+  }
+  return violations;
+}
+
 // ── Audit ──────────────────────────────────────────────────────────────────────────────
 
 function audit(): AuditReport {
@@ -419,6 +518,7 @@ function audit(): AuditReport {
   return {
     timestamp: new Date().toISOString(),
     hardcoded: auditHardcoded(),
+    placeholderViolations: scanPlaceholderCalls(),
     summary: {
       totalKeysInCode: staticKeys.length,
       totalDynamicPatterns: dynamicPatterns.length,
@@ -466,6 +566,14 @@ function displayReport(report: AuditReport): void {
   list('❌ Dynamic key shape matches nothing in Turkish', s.unmatchedPatternsTurkish);
   list('❌ Dynamic key shape matches nothing in English', s.unmatchedPatternsEnglish);
   list('💤 In the catalogs but not reached from src/ (informational)', s.unusedInTurkish, 10);
+
+  if (report.placeholderViolations.length > 0) {
+    console.log(`❌ Placeholder key called with no value — next-intl will render the key path, not the message (${report.placeholderViolations.length}):`);
+    for (const v of report.placeholderViolations) {
+      console.log(`   - ${v.file}:${v.line}  ${v.key}  needs { ${v.placeholders.join(', ')} }`);
+    }
+    console.log();
+  }
 
   displayHardcoded(report.hardcoded);
 }
@@ -529,7 +637,8 @@ function hasBlockingGaps(report: AuditReport): boolean {
     s.unmatchedPatternsEnglish.length > 0 ||
     // Check 4 is a ratchet: growth blocks, shrinkage does not.
     report.hardcoded.regressions.length > 0 ||
-    report.hardcoded.newOffenders.length > 0
+    report.hardcoded.newOffenders.length > 0 ||
+    report.placeholderViolations.length > 0
   );
 }
 

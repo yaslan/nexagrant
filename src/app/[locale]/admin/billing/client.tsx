@@ -19,6 +19,7 @@ import {
 } from '@/lib/billing/catalog';
 import type { StorefrontPlanCards } from '@/lib/billing/storefront';
 import { formatMoney } from '@/lib/money';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 interface BillingSsoClientProps {
   locale: string;
@@ -403,7 +404,7 @@ export function BillingSsoClient({
                 type="text"
                 value={ssoAcsUrl}
                 onChange={(e) => setSsoAcsUrl(e.target.value)}
-                placeholder={t('ssoAcsPlaceholder')}
+                placeholder={t('ssoAcsPlaceholder', { brand: PRODUCT_NAME })}
                 required
                 className="w-full border border-line rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-none bg-ground text-ink font-mono"
               />
