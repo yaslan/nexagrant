@@ -35,3 +35,14 @@
 - [fabrika-split-a-card-blocked-on-a-price-decision](fabrika-split-a-card-blocked-on-a-price-decision.md) — Fiyat/iş kararı bekleyen bir kartta durma — mimari yarısını, HİÇBİR müşterinin fiyatını artırmayan seçenekle yap ve kararı tek bir saf fonksiyona indir
 
 - [flat-scratchpad-backup-collides-on-basename](flat-scratchpad-backup-collides-on-basename.md) — A/B ölçümü için dosyaları düz bir scratchpad'e basename ile yedekleme — bu repoda src/lib/rag.ts ve src/lib/ai/rag.ts aynı adı taşıyor ve geri yükleme yanlış içeriği yazdı
+
+- [fabrika-vitest-runs-keyless-and-hides-console](fabrika-vitest-runs-keyless-and-hides-console.md) — Fabrika'da vitest .env'i process.env'e taşımaz — OPENAI_API_KEY tüm süitte unset, yani her "anahtar yoksa uydur" dalı sessizce koşuluyor ve testler ona bel bağlıyor; ölçmek için --reporter=verbose şart, varsayılan reporter geçen testin console çıktısını GİZLER
+
+- [fabrika-401-is-a-flow-step-not-an-error-state](fabrika-401-is-a-flow-step-not-an-error-state.md) — Bir API'ye 401 kapısı eklerken o cevabı gösteren istemciyi de tasarla — Fabrika'da sepet çekmecesi ham "Unauthorized" basıyordu; doğru davranış giriş sayfasına callbackUrl ile gitmek (sepet localStorage'da yaşadığı için kayıp yok)
+- [fabrika-api-route-session-gate-is-requiretenantapi](fabrika-api-route-session-gate-is-requiretenantapi.md) — Fabrika'da bir API rotasına oturum kapısı koyarken tek doğru desen requireTenantApi() (src/lib/tenant.ts) ve kapı gövde okunmadan/fiyatlama yapılmadan ÖNCE gelir — reddin maliyeti sıfır olmalı
+- [fabrika-jsdom-tests-have-no-localstorage](fabrika-jsdom-tests-have-no-localstorage.md) — Fabrika'nın vitest/jsdom ortamında localStorage TANIMSIZ ve @testing-library/user-event kurulu değil — bileşen testinde Storage'ı elle kur, tıklama için fireEvent kullan
+
+- [fabrika-type-level-tenant-guard-and-ts-expect-error-test](fabrika-type-level-tenant-guard-and-ts-expect-error-test.md) — Fabrika'da opsiyonel tenantId taşıyan bir aşırı yükleme bug sınıfıdır — parametreyi zorunlu yap + assertTenantScope koy, ve "artık derlenmiyor"u @ts-expect-error ile teste yaz (tsconfig **/*.ts içerdiği için pnpm typecheck bunu zorlar)
+
+- [branded-type-fails-where-as-unknown-as-already-lives](branded-type-fails-where-as-unknown-as-already-lives.md) — Bir yapısal tipi markalamanın (nominal) getirisi, o tipin çağrı yerlerinde kaç `as unknown as` olduğuyla ters orantılıdır — markayı ölçmenin doğru yolu hata SAYISI değil hataların KİMDE olduğudur.
+- [dead-overload-that-still-teaches](dead-overload-that-still-teaches.md) — Bir hata düzeltmesi "opsiyonel parametreyi zorunlu yaptım" diye kapandığında ölü aşırı yükleme geride kalır — silinmesi bedelsizdir ve @ts-expect-error negatif muhafızları silmeden sonra da tatmin olur; ama ikizi komşu dosyada hâlâ açık olabilir.
