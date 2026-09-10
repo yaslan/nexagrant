@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import unzipper from 'unzipper';
 
+import { PRODUCT_NAME } from '../../src/lib/brand';
 import { prisma } from '../../src/lib/db';
 import { DOC_E2E, seed, rollback } from '../../scripts/seed-doc-export-e2e';
 import { shotsDir } from './fixtures/shots';
@@ -44,6 +45,36 @@ async function docxText(path: string): Promise<string> {
   expect(document, `${path} is not an OOXML package: no word/document.xml`).toBeTruthy();
   return (await document!.buffer()).toString('utf-8');
 }
+
+function unescapeXml(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+/**
+ * The document's paragraphs, each as the plain text of its runs — the LINES a reader sees.
+ *
+ * A label and its value are two separate `w:r` runs of one `w:p`, so `docxText().toContain(x)`
+ * cannot tell "the organisation field holds x" from "x appears somewhere in the file". These
+ * tests need the difference: TASK-MTVT0VLF4AP19 found the file asserting `not.toContain('FonBridge')`
+ * over the whole document, which the product's own name in the provenance sentence satisfied —
+ * a red that said nothing about whether the organisation field was right (it was).
+ */
+async function docxParagraphs(path: string): Promise<string[]> {
+  const xml = await docxText(path);
+  return [...xml.matchAll(/<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g)].map(([, body]) =>
+    [...body.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)]
+      .map(([, run]) => unescapeXml(run))
+      .join(''),
+  );
+}
+
+/** The Turkish labels the DOCX prints its identity fields under, at `locale=tr`. */
+const DOCX_IDENTITY_LABELS = ['Kuruluş', 'Proje Başlığı', 'Doküman Ref'] as const;
 
 const exportUrl = (partId: string) =>
   `/api/documents/export?type=PART_B&format=docx&partId=${partId}&title=Part_B_Technical_Proposal&locale=tr`;
@@ -94,7 +125,7 @@ test.describe('Document export — session required, tenant scoped, no invented 
     await page.screenshot({ path: `${SHOTS}/01-anonymous-401.png`, fullPage: true });
   });
 
-  test('tenant A clicks "Resmî DOCX İndir" and gets its OWN organisation, not FonBridge', async ({
+  test('tenant A clicks "Resmî DOCX İndir" and every identity field is its OWN, not an invented organisation', async ({
     page,
   }) => {
     await signIn(page, DOC_E2E.email, APPLICATION_URL);
@@ -116,11 +147,36 @@ test.describe('Document export — session required, tenant scoped, no invented 
     expect(text).toContain(DOC_E2E.opportunityTitle);
     expect(text).toContain(DOC_E2E.sectionText);
 
-    // What used to be printed on every tenant's document.
-    expect(text).not.toContain('FonBridge');
+    // Each identity field EQUALS the tenant's stored row — `toContain` over the whole file
+    // would still pass on a letterhead reading "FonBridge Teknoloji A.Ş. / Doc Export E2E
+    // Kiracı A", which is the exact defect this test exists for.
+    const paragraphs = await docxParagraphs(saved);
+    const field = (label: string) => paragraphs.find((p) => p.startsWith(`${label}: `));
+    expect(field('Kuruluş')).toBe(`Kuruluş: ${DOC_E2E.tenantName}`);
+    expect(field('Proje Başlığı')).toBe(`Proje Başlığı: ${DOC_E2E.opportunityTitle}`);
+    expect(field('Doküman Ref')).toBe(`Doküman Ref: ${DOC_E2E.partId}`);
+
+    // The PRODUCT's name is not an IDENTITY. It belongs in the provenance sentence that says
+    // who prepared the draft and where; it may never stand in a field that names the
+    // applicant, the call or the document. Read from `src/lib/brand.ts` rather than re-typed:
+    // this assertion used to be a literal `not.toContain('FonBridge')` over the whole file, so
+    // when 9af3f63 restored `PRODUCT_NAME = 'FonBridge'` the provenance sentence tripped it and
+    // the suite went red over a document that was entirely correct (TASK-MTVT0VLF4AP19).
+    for (const label of DOCX_IDENTITY_LABELS) {
+      expect(field(label), `${label} must not be the product's name`).not.toContain(PRODUCT_NAME);
+    }
+    const provenance = paragraphs.find((p) => p.includes('resmî bir belge DEĞİLDİR'));
+    expect(provenance, 'the provenance notice must be on the document').toBeTruthy();
+    expect(provenance).toContain(`${DOC_E2E.tenantName} tarafından ${PRODUCT_NAME}`);
+
+    // The organisation the route used to stamp on every tenant's document. Spelled out, not
+    // derived from PRODUCT_NAME: a future rename does not retire this string — it stays a
+    // fixture organisation nobody's document may carry.
+    expect(text).not.toContain('FonBridge Teknoloji');
     expect(text).not.toContain('HORIZON-CL5-2026-D3-01');
-    // And nothing of tenant B's.
+    // And nothing of tenant B's — neither its prose nor its name.
     expect(text).not.toContain(DOC_E2E.otherSectionText);
+    expect(text).not.toContain(DOC_E2E.otherTenantName);
 
     // The bytes really are an OOXML package — `docxText` above would have thrown otherwise —
     // and the file starts with the ZIP magic instead of `<?xml`.
@@ -195,7 +251,10 @@ test.describe('Document export — session required, tenant scoped, no invented 
     writeFileSync(`${SHOTS}/06-nda-print-en.html`, en);
     // The body used to open with "OFFICIAL APPLICATION DOCUMENT … produced in line with the
     // official Horizon Europe … standards" on a document nobody official had seen.
-    expect(en).toContain('This document is a draft produced in Fabrika');
+    // The product's name is read from `src/lib/brand.ts`, not re-typed: this line held the
+    // literal `… produced in Fabrika` and went red the day 9af3f63 renamed the product back
+    // to FonBridge, over a document that said exactly what it should (TASK-MTVT0VLF4AP19).
+    expect(en).toContain(`This document is a draft produced in ${PRODUCT_NAME}`);
     expect(en).toContain('Parties and rights');
     expect(en).not.toContain('OFFICIAL APPLICATION DOCUMENT');
     expect(en).not.toContain('kuruluşun kendi başvuru çalışması');
