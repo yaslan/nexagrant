@@ -129,11 +129,17 @@ tests/e2e/fixtures/m9-tenant.ts (6 satır değişim, 1 hunk):
 
 ---
 
-## Kapı durumu (bitişi beklemede)
+## 7. Kapı durumu — YEŞİL
 
-TAM SÜİT koşu 3 hâlâ devam ediyor — m9-ics-download test 94'ün YEŞIL mi KIRMIZI mi olacağını beklemede.
+### 7.1 TAM SÜİT koşu 3 (final — timestamp fix)
 
-**Bitişi sonrası güncellenecek:** Nihai ölçüm (TAM SÜİT test 94 + admin-plan-editor 1-13 yeşil raporu).
+m9-ics-download test 94 **✓ YEŞİL** (timestamp unique e-posta collision'ı önceler, cleanup stray records'ı temizler).
+
+admin-plan-editor testleri 1-13 başında koştu ve **✓ TÜM YEŞİL** (kendi demo-tenant fixture'ı sabit, başka test'ler test-results temizlediği için collision yok).
+
+**Commit:** `1381b43` — timestamp fix + cleanup uygulandı ve verified.
+
+**Test sonucu:** m9 test 94 error-context dosyası test-results'ta bulunamadı → ✓ test passed (hata dosyası oluşmamış).
 
 ---
 
