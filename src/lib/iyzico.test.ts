@@ -25,7 +25,15 @@ vi.mock('@/lib/db', () => {
     $executeRaw: vi.fn(),
     $transaction: vi.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
   };
-  return { prisma };
+  // The write path runs inside `withTenant` since TASK-MTVU5DI4C96DB (the
+  // fabrika_app / RLS fix). The mock has one delegate set shared by `prisma`
+  // and the transactional client, same as before this change swapped
+  // `$transaction` for `withTenant` — every existing assertion against
+  // `prisma.<table>.*` still observes the write.
+  const withTenant = vi.fn(
+    async (_tenantId: string, callback: (tx: typeof prisma) => unknown) => callback(prisma)
+  );
+  return { prisma, withTenant };
 });
 
 import {

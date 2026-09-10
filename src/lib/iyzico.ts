@@ -1,11 +1,12 @@
 import crypto from 'crypto';
-import { prisma } from './db';
+import { prisma, withTenant } from './db';
 import { env } from './env';
 import { toDecimalString, toMinorUnits } from './money';
 import { resolvePlanId } from './billing/catalog';
 import { IYZICO_SOLD_TIER, priceLockOnActivation } from './billing/price-lock';
 import { publishedVersionIdFor } from './billing/plan-repository';
 import { createInvoiceForPayment } from './billing/invoice-writer';
+import { recordAlert } from './observability/system-alert';
 
 /**
  * iyzico billing (BILLING.md §4 — phase 2, TRY).
@@ -499,6 +500,38 @@ export interface HandleIyzicoWebhookOptions {
 }
 
 /**
+ * A verified, authentic notification that this function still could not act
+ * on: the conversationId does not name a tenant we minted, the tenant or plan
+ * it names no longer exists, or the provider's own record points somewhere
+ * else. CLAUDE.md rule 6 — an upstream contract or attribution problem raises
+ * an alert and lets the job fall through, it never breaks the job. The caller
+ * (`route.ts`) already returns 200 for every one of these outcomes so iyzico
+ * does not retry a delivery that will never succeed; without this, that 200
+ * was also silence — a payment came in and nothing operator-visible recorded
+ * that it went nowhere.
+ *
+ * Never throws (the sole contract `recordAlert` gives), so a failure to write
+ * the alert cannot turn an already-graceful decline into a webhook error.
+ */
+async function alertTenantUnresolved(
+  reason: string,
+  message: string,
+  eventId?: string,
+  tenantId?: string
+): Promise<void> {
+  await recordAlert({
+    level: 'warn',
+    source: 'iyzico_webhook_unattributed',
+    message: `iyzico notification could not be synced: ${message}`,
+    meta: { reason, eventId, tenantId },
+    // Identity is the failure kind plus which tenant it points at (or none) —
+    // not the eventId, which is different on every delivery and would defeat
+    // dedup for what is usually the same misconfiguration repeating.
+    dedupeKey: `${reason}:${tenantId ?? 'none'}`,
+  });
+}
+
+/**
  * Processes one verified iyzico notification. The caller MUST have checked the
  * signature first — this function assumes authenticity and only enforces
  * attribution, idempotency and consistency.
@@ -509,6 +542,7 @@ export async function handleIyzicoWebhook(
 ): Promise<IyzicoWebhookResult> {
   const eventId = notificationEventId(notification);
   if (!eventId) {
+    await alertTenantUnresolved('missing_reference', 'Notification carries neither a reference code nor a payment id');
     return {
       success: false,
       outcome: 'not_attributable',
@@ -521,6 +555,7 @@ export async function handleIyzicoWebhook(
     // The tenant is never read from the notification body; a conversationId we
     // did not mint is an unattributable payment notification, and activating a
     // subscription on a guess would activate it on somebody else's account.
+    await alertTenantUnresolved('unparseable_conversation_id', 'conversationId does not identify a tenant', eventId);
     return {
       success: false,
       outcome: 'not_attributable',
@@ -531,6 +566,7 @@ export async function handleIyzicoWebhook(
   const { tenantId, planId, interval } = conversation;
 
   if (!notification.token) {
+    await alertTenantUnresolved('missing_token', 'Notification carries no checkout token', eventId, tenantId);
     return {
       success: false,
       outcome: 'not_attributable',
@@ -543,6 +579,12 @@ export async function handleIyzicoWebhook(
   const detail = await retrieve(notification.token, notification.paymentConversationId);
 
   if (detail.conversationId && detail.conversationId !== notification.paymentConversationId) {
+    await alertTenantUnresolved(
+      'conversation_mismatch',
+      'Provider payment belongs to a different conversation',
+      eventId,
+      tenantId
+    );
     return {
       success: false,
       outcome: 'not_attributable',
@@ -567,6 +609,7 @@ export async function handleIyzicoWebhook(
 
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) {
+    await alertTenantUnresolved('unknown_tenant', `Tenant not found: ${tenantId}`, eventId, tenantId);
     return {
       success: false,
       outcome: 'unknown_tenant',
@@ -577,6 +620,7 @@ export async function handleIyzicoWebhook(
 
   const plan = await prisma.plan.findUnique({ where: { id: planId } });
   if (!plan) {
+    await alertTenantUnresolved('unknown_plan', `Plan not found: ${planId}`, eventId, tenantId);
     return {
       success: false,
       outcome: 'unknown_plan',
@@ -588,8 +632,31 @@ export async function handleIyzicoWebhook(
 
   const paymentId = detail.paymentId != null ? String(detail.paymentId) : notification.token;
 
-  return prisma.$transaction(async (tx) => {
-    // Serialise duplicate deliveries of the same event before reading.
+  // Every write below is tenant-scoped (Subscription, CreditLedger,
+  // ModuleState, AuditEvent, Invoice all carry `tenantId` and a `tenant_*`
+  // RLS policy — prisma/rls.sql). `prisma.$transaction` never set
+  // `app.tenant_id`, so under the `fabrika_app` role (NOBYPASSRLS) the very
+  // first write — the subscription upsert — was refused outright:
+  //
+  //   Database error. Code: `42501`. Message: `new row violates row-level
+  //   security policy for table "Subscription"`
+  //
+  // measured with the production handler on the `fabrika_app` connection
+  // (TASK-MTVU5DI4C96DB). Locally the app connects as `fabrika`
+  // (SUPERUSER, BYPASSRLS), which is why this never failed in dev. `withTenant`
+  // is the same fix TASK-MTVSBEO7VX6Y4 applied to the Stripe path.
+  return withTenant(tenantId, async (tx) => {
+    // Serialise duplicate deliveries of the same event before reading. Unlike
+    // the Stripe path before ADR-0003, this lock already closes the
+    // concurrent-delivery race on its own: `pg_advisory_xact_lock` blocks a
+    // second transaction on the same eventId until the first commits or rolls
+    // back, so the "already processed?" read below can never run concurrently
+    // with the write that makes it true. Measured under `fabrika_app`
+    // (TASK-MTVU5DI4C96DB §2.4): 8 simultaneous deliveries of one event still
+    // write exactly one subscription and one credit grant. A second
+    // idempotency table (`StripeEventLog`'s UNIQUE-constraint pattern) closes
+    // a gap this handler does not have; adding one here would duplicate, not
+    // fix, a guard that already holds.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${advisoryLockKey(eventId)})`;
 
     const alreadyProcessed = await tx.auditEvent.findFirst({
