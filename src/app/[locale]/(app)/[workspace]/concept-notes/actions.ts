@@ -1,12 +1,12 @@
 'use server';
 
-import { prisma, withTenant } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateCompletion, LlmMessage } from '@/lib/llm';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { buildRagPrompt } from '@/lib/rag';
 import { revalidatePath } from 'next/cache';
-import type { ConceptTemplateSchema } from '@/modules/m2/types';
+import { findAccessibleTemplate, templateSections } from '@/modules/m2/server/templates';
 
 /**
  * `tenantId` was read as `session.tenantId` with no null check. Prisma
@@ -24,15 +24,15 @@ export async function createConceptNote(
 ) {
   const { tenantId, userId } = await requireTenantAction();
 
-  const template = await prisma.conceptTemplate.findUnique({
-    where: { id: templateId },
-  });
+  // A platform template or one this tenant owns — `templateId` is a server
+  // action argument, so an unscoped lookup by id read another tenant's row
+  // (TASK-MTVTU103F11XJ).
+  const template = await findAccessibleTemplate(templateId, tenantId);
   if (!template) throw new Error('Template not found');
 
   // Initialize empty content from template schema
-  const schema = template.schema as unknown as ConceptTemplateSchema;
   const content: Record<string, string> = {};
-  for (const section of schema.sections) {
+  for (const section of templateSections(template.schema)) {
     content[section.key] = '';
   }
 

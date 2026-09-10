@@ -226,10 +226,12 @@ const CATALOGUE_REASONS: Record<string, string> = {
   ConceptTemplate:
     'tenantId is String? and null means "platform template"; it is in NULLABLE_TENANT and carries ' +
     'the tenant_or_shared policy, not tenant_isolation. Unlike Topic it DOES have a tenant column, ' +
-    'and every read of it takes a client-supplied id with no tenant arm in the where clause. All 7 ' +
-    'rows are platform rows today (measured 2026-09-10), so nothing leaks yet; the day a tenant owns ' +
-    'a template it breaks both ways at once. Structurally outside this gate — a different rule, ' +
-    'about the where clause rather than the client. TASK-MTVTU103F11XJ.',
+    'so a read by a client-supplied id alone returned another tenant\'s template — measured, not ' +
+    'hypothetical (TASK-MTVTU103F11XJ: tenant A created a ConceptNote against tenant B\'s template). ' +
+    'The RLS policy did not stop it because the app role is BYPASSRLS. Fixed by routing every read ' +
+    'through src/modules/m2/server/templates.ts, which ANDs the id with OR[tenantId NULL, tenantId]. ' +
+    'Still structurally outside this gate, which judges the client rather than the where clause: ' +
+    'src/modules/m2/server/templates.test.ts is the gate for this rule.',
   AuditEvent:
     'tenantId is String? — an erasure request from a tenant-less user writes exactly that row, which ' +
     'strict isolation refuses. In NULLABLE_TENANT since TASK-MTU6HUB8FUHMG C-2.',
@@ -294,7 +296,17 @@ export function scan(cwd = process.cwd()): ScanResult {
   const files = gitTrackedSources(cwd);
   const findings: Finding[] = [];
   const testFindings: Finding[] = [];
-  const catalogueCounts = new Map<string, number>();
+  /**
+   * Seeded at zero for every model that has a written reason, because the note
+   * is documentation of an absence and a counter that only grows when a call
+   * site exists cannot report one. TASK-MTVTU103F11XJ took `ConceptTemplate`
+   * from five bare call sites to none — and with a Map that only gained entries
+   * on a match, the table and its recorded reason vanished from the report
+   * entirely, which is the opposite of what §5.3 asked the note to do.
+   */
+  const catalogueCounts = new Map<string, number>(
+    Object.keys(CATALOGUE_REASONS).map((model) => [model, 0])
+  );
 
   for (const file of files) {
     const raw = readFileSync(resolve(cwd, file), 'utf8');

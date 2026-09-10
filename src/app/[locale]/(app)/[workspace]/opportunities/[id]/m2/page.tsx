@@ -1,9 +1,14 @@
-import { prisma, withTenant } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { requireTenantPage } from '@/lib/tenant';
 import ConceptNoteEditor from '@/modules/m2/ui/ConceptNoteEditor';
 import type { ModuleStateRow } from '@/types/db-rows';
 import { moduleGate } from '@/lib/modules/guard';
+import {
+  findAccessibleTemplate,
+  findAccessibleTemplateByKey,
+  templateSections,
+} from '@/modules/m2/server/templates';
 
 export default async function OpportunityM2Page({
   params
@@ -52,12 +57,13 @@ export default async function OpportunityM2Page({
     })
   );
 
-  // ConceptTemplate is shared platform catalogue data, not tenant data.
+  // `ConceptTemplate` is half platform catalogue: `tenantId` NULL means a
+  // platform template, a non-NULL row belongs to one tenant. Both lookups below
+  // used to ignore that, so tenant B's `generic` template could be handed to
+  // tenant A (TASK-MTVTU103F11XJ).
   let templateId = note?.templateId;
   if (!templateId) {
-    const genericTemplate = await prisma.conceptTemplate.findFirst({
-      where: { key: 'generic' }
-    });
+    const genericTemplate = await findAccessibleTemplateByKey('generic', tenantId);
     templateId = genericTemplate?.id;
   }
 
@@ -65,16 +71,14 @@ export default async function OpportunityM2Page({
     return <div>No template found in system. Please run seed.</div>;
   }
 
-  const template = await prisma.conceptTemplate.findUnique({
-    where: { id: templateId }
-  });
+  const template = await findAccessibleTemplate(templateId, tenantId);
 
   return (
     <div className="p-6 max-w-4xl mx-auto mt-6 bg-surface border rounded-lg shadow-sm">
       <ConceptNoteEditor
         opportunityId={opp.id}
         templateId={templateId}
-        schema={(template?.schema ?? []) as unknown as Parameters<typeof ConceptNoteEditor>[0]['schema']}
+        schema={templateSections(template?.schema) as Parameters<typeof ConceptNoteEditor>[0]['schema']}
         initialContent={(note?.content as unknown as Record<string, string>) || {}}
         noteId={note?.id}
       />

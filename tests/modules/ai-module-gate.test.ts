@@ -43,7 +43,7 @@ const h = vi.hoisted(() => {
     creditLedgerCreate: vi.fn(),
     creditLedgerAggregate: vi.fn(),
     opportunityFindFirst: vi.fn(),
-    conceptTemplateFindUnique: vi.fn(),
+    conceptTemplateFindFirst: vi.fn(),
     topicFindUnique: vi.fn(),
     conceptNoteCreate: vi.fn(),
     conceptNoteFindFirst: vi.fn(),
@@ -90,10 +90,17 @@ vi.mock('@/lib/tenant', () => {
 
 vi.mock('@/lib/auth', () => ({ auth: h.auth }));
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/db')>();
+  return {
+  // The real `assertTenantScope`: `findAccessibleTemplate` calls it, and this
+  // file's whole point is that a refusal happens before any side effect.
+  assertTenantScope: actual.assertTenantScope,
+  MissingTenantScopeError: actual.MissingTenantScopeError,
   prisma: {
     moduleState: { findUnique: h.moduleStateFindUnique },
-    conceptTemplate: { findUnique: h.conceptTemplateFindUnique },
+    // `findFirst`: the template lookup carries a tenant arm (TASK-MTVTU103F11XJ).
+    conceptTemplate: { findFirst: h.conceptTemplateFindFirst },
     topic: { findUnique: h.topicFindUnique },
   },
   // `as never` hands the fake client to callbacks typed against the real
@@ -114,7 +121,8 @@ vi.mock('@/lib/db', () => ({
       },
       followupDoc: { create: h.followupDocCreate },
     } as never),
-}));
+  };
+});
 
 vi.mock('@/lib/billing', () => ({ getEntitlements: h.getEntitlements }));
 
@@ -205,7 +213,7 @@ beforeEach(() => {
   h.creditLedgerCreate.mockResolvedValue({ id: 'ledger-1' });
 
   h.opportunityFindFirst.mockResolvedValue({ id: 'opp-1', title: 'Smart Grids', topicId: null });
-  h.conceptTemplateFindUnique.mockResolvedValue({
+  h.conceptTemplateFindFirst.mockResolvedValue({
     id: 'tpl-1',
     schema: [{ key: 'summary', labelKey: 'Summary', maxWords: 100, promptKey: 'Write a summary' }],
     sections: [{ key: 'summary', labelKey: 'Summary', maxWords: 100, promptKey: 'x' }],

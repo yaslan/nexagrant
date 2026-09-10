@@ -18,16 +18,26 @@ import { partialRow } from '../../../../tests/helpers/partial-row';
 const mockPrisma = vi.hoisted(() => ({
   opportunity: { findFirst: vi.fn() },
   topic: { findUnique: vi.fn() },
-  conceptTemplate: { findUnique: vi.fn() },
+  // `findFirst`, not `findUnique`: the template lookup carries a tenant arm as
+  // of TASK-MTVTU103F11XJ, and a unique selector cannot (see
+  // src/modules/m2/server/templates.ts).
+  conceptTemplate: { findFirst: vi.fn() },
   conceptNote: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   aiUsageLog: { findMany: vi.fn() },
 }));
 
-vi.mock('@/lib/db', () => ({
-  prisma: mockPrisma,
-  withTenant: (_tenantId: string, callback: (tx: typeof mockPrisma) => unknown) =>
-    callback(mockPrisma),
-}));
+vi.mock('@/lib/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/db')>();
+  return {
+    // `assertTenantScope` is the real one: `findAccessibleTemplate` calls it, and
+    // a stub would hide the refusal it exists to produce.
+    assertTenantScope: actual.assertTenantScope,
+    MissingTenantScopeError: actual.MissingTenantScopeError,
+    prisma: mockPrisma,
+    withTenant: (_tenantId: string, callback: (tx: typeof mockPrisma) => unknown) =>
+      callback(mockPrisma),
+  };
+});
 
 vi.mock('@/lib/tenant', () => ({
   requireTenantAction: vi.fn().mockResolvedValue({ tenantId: 'tenant_1', userId: 'user_1' }),
@@ -70,7 +80,7 @@ describe('m2 actions — phantom relation regression', () => {
           identifier: 'HORIZON-CL5-2026-09-D4-01',
         })
       );
-      vi.mocked(prisma.conceptTemplate.findUnique).mockResolvedValue(
+      vi.mocked(prisma.conceptTemplate.findFirst).mockResolvedValue(
         partialRow<ConceptTemplate>({
           id: 'tpl_1',
           schema: [
@@ -109,7 +119,7 @@ describe('m2 actions — phantom relation regression', () => {
           topicId: null,
         })
       );
-      vi.mocked(prisma.conceptTemplate.findUnique).mockResolvedValue(
+      vi.mocked(prisma.conceptTemplate.findFirst).mockResolvedValue(
         partialRow<ConceptTemplate>({
           id: 'tpl_1',
           schema: [
@@ -147,7 +157,7 @@ describe('m2 actions — phantom relation regression', () => {
       vi.mocked(prisma.opportunity.findFirst).mockResolvedValue(
         partialRow<Opportunity>({ title: 'Smart Grids for Rural Regions' })
       );
-      vi.mocked(prisma.conceptTemplate.findUnique).mockResolvedValue(
+      vi.mocked(prisma.conceptTemplate.findFirst).mockResolvedValue(
         partialRow<ConceptTemplate>({
           id: 'tpl_1',
           schema: [{ key: 'summary', labelKey: 'Summary', maxWords: 100, promptKey: 'x' }],

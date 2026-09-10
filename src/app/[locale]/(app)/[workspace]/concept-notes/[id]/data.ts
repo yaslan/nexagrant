@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 
 import { prisma, withTenantOn, assertTenantScope } from '@/lib/db';
+import { findAccessibleTemplate } from '@/modules/m2/server/templates';
 import type { ConceptNoteRow, ConceptTemplateRow } from '@/modules/m2/types';
 
 /**
@@ -46,12 +47,12 @@ export async function loadConceptNoteDetail(
     const note = (rawNote as unknown as Omit<ConceptNoteRow, 'updatedAt'>) || null;
     if (!note) return null;
 
-    // Reached only through a note this tenant owns. The template may be a
-    // platform row (`tenantId` NULL), which is why it is not filtered by tenant
-    // here — see the note on `loadConceptNotesIndex`.
-    const rawTemplate = await tx.conceptTemplate.findUnique({
-      where: { id: note.templateId },
-    });
+    // Reached only through a note this tenant owns, but the rule is still
+    // "platform row or mine" rather than "no filter": `tenantId` is nullable,
+    // so an unfiltered lookup also matches a row another tenant owns
+    // (TASK-MTVTU103F11XJ). Runs on `tx`, so the query stays inside the scope
+    // this loader opened.
+    const rawTemplate = await findAccessibleTemplate(note.templateId, tenantId, tx);
     const template = (rawTemplate as unknown as ConceptTemplateRow) || null;
 
     let opportunity: { title: string } | null = null;

@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 
 import { prisma, withTenantOn, assertTenantScope } from '@/lib/db';
+import { accessibleTemplateWhere } from '@/modules/m2/server/templates';
 import type { ConceptNoteRow, ConceptTemplateRow } from '@/modules/m2/types';
 
 /**
@@ -38,14 +39,13 @@ export async function loadConceptNotesIndex(
 
     // Deliberately *not* tenant-only. `ConceptTemplate.tenantId` is nullable and
     // a NULL means "platform template, offered to every tenant" — the schema
-    // says so on the column, and prisma/rls.sql gives the table the
-    // `tenant_or_shared` policy (`tenantId IS NULL OR tenantId = app.tenant_id`)
-    // rather than `tenant_isolation`. Reading the shared rows is the feature,
-    // not a leak: no tenant's data is in them. What changed is that the tenant
-    // half of the OR can no longer disappear, because `tenantId` is now a
-    // required non-empty string.
+    // says so on the column. Reading the shared rows is the feature, not a leak:
+    // no tenant's data is in them. The clause is built by
+    // `accessibleTemplateWhere` rather than written here, because this was the
+    // only call site that had it right and five others did not
+    // (TASK-MTVTU103F11XJ).
     const templates = await tx.conceptTemplate.findMany({
-      where: { OR: [{ tenantId: null }, { tenantId }] },
+      where: accessibleTemplateWhere(tenantId, 'loadConceptNotesIndex'),
     });
 
     return {

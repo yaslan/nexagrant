@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma, withTenant } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { findAccessibleTemplate, templateSections } from '@/modules/m2/server/templates';
 import { auth } from '@/lib/auth';
 import HTMLtoDOCX from 'html-to-docx';
 
@@ -16,10 +17,12 @@ export async function GET(
   }
 
   // Both tenant-scoped reads share one scope. The `conceptTemplate` lookup
-  // below is deliberately NOT in it: templates are the shared platform
-  // catalogue, carry no `tenantId` column and no RLS policy, so opening a
-  // tenant scope around them would claim a guarantee that table does not have
-  // (TASK-MTSZ0AL4QP2CT §3.6 bucket F).
+  // below is outside it, but it is no longer unfiltered: that comment used to
+  // say templates "carry no `tenantId` column and no RLS policy", and both
+  // halves were wrong — `ConceptTemplate.tenantId` is `String?` and the table
+  // carries `tenant_or_shared` (prisma/rls.sql:44). A NULL means "platform
+  // template"; a non-NULL row belongs to one tenant. `findAccessibleTemplate`
+  // applies that rule (TASK-MTVTU103F11XJ).
   const found = await withTenant(tenantId, async (tx) => {
     const note = await tx.conceptNote.findFirst({
       where: { id, tenantId },
@@ -44,15 +47,13 @@ export async function GET(
 
   const { note, opportunity } = found;
 
-  const template = await prisma.conceptTemplate.findUnique({
-    where: { id: note.templateId },
-  });
+  const template = await findAccessibleTemplate(note.templateId, tenantId);
 
   if (!template) {
     return new NextResponse('Template Not Found', { status: 404 });
   }
 
-  const schema = template.schema as { sections: { key: string; labelKey: string }[] };
+  const sections = templateSections(template.schema);
   const content = note.content as Record<string, string>;
 
   // Build the HTML document
@@ -69,7 +70,7 @@ export async function GET(
         <hr />
   `;
 
-  for (const section of schema.sections) {
+  for (const section of sections) {
     htmlString += `<h3>${section.labelKey}</h3>`;
     htmlString += `<div>${content[section.key] || '<p>No content provided.</p>'}</div>`;
     htmlString += `<br />`;

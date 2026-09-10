@@ -16,20 +16,31 @@ import { partialRow } from '../../../../../../tests/helpers/partial-row';
 const mockPrisma = vi.hoisted(() => ({
   conceptNote: { findFirst: vi.fn() },
   opportunity: { findFirst: vi.fn() },
-  conceptTemplate: { findUnique: vi.fn() },
+  // `findFirst`, not `findUnique`: the template lookup carries a tenant arm as
+  // of TASK-MTVTU103F11XJ, and a unique selector cannot.
+  conceptTemplate: { findFirst: vi.fn() },
 }));
 
 /**
  * `withTenant` hands the callback the same fake client `prisma` resolves to, so
  * the assertions below keep watching the same `vi.fn()`s after the route moved
- * its two tenant-scoped reads into a tenant scope (TASK-MTVR9T834EPUC). The
- * `conceptTemplate` lookup stays on `prisma` — it is the shared catalogue.
+ * its two tenant-scoped reads into a tenant scope (TASK-MTVR9T834EPUC).
+ *
+ * The `conceptTemplate` lookup stays on `prisma` but is no longer unfiltered:
+ * `ConceptTemplate.tenantId` is nullable, not absent, so the row is read as
+ * "platform or mine" (TASK-MTVTU103F11XJ). `assertTenantScope` is the real one,
+ * because `findAccessibleTemplate` depends on it to refuse a missing tenant.
  */
-vi.mock('@/lib/db', () => ({
-  prisma: mockPrisma,
-  withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
-    cb(mockPrisma as never),
-}));
+vi.mock('@/lib/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/db')>();
+  return {
+    assertTenantScope: actual.assertTenantScope,
+    MissingTenantScopeError: actual.MissingTenantScopeError,
+    prisma: mockPrisma,
+    withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
+      cb(mockPrisma as never),
+  };
+});
 vi.mock('@/lib/auth', () => ({ auth: vi.fn() }));
 
 import { GET } from './route';
@@ -58,7 +69,7 @@ describe('GET /api/concept-notes/[id]/export — phantom relation regression', (
     vi.mocked(prisma.opportunity.findFirst).mockResolvedValue(
       partialRow<Opportunity>({ title: 'Smart Grids for Rural Regions' })
     );
-    vi.mocked(prisma.conceptTemplate.findUnique).mockResolvedValue(
+    vi.mocked(prisma.conceptTemplate.findFirst).mockResolvedValue(
       partialRow<ConceptTemplate>({
         id: 'tpl_1',
         name: 'Standard Template',
@@ -101,7 +112,7 @@ describe('GET /api/concept-notes/[id]/export — phantom relation regression', (
       })
     );
     vi.mocked(prisma.opportunity.findFirst).mockResolvedValue(null);
-    vi.mocked(prisma.conceptTemplate.findUnique).mockResolvedValue(
+    vi.mocked(prisma.conceptTemplate.findFirst).mockResolvedValue(
       partialRow<ConceptTemplate>({
         id: 'tpl_1',
         name: 'Standard Template',

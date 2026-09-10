@@ -7,6 +7,7 @@ import { assertModuleAccess } from '@/lib/modules/access';
 import { retrieveChunks } from '@/lib/rag';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 import { PRODUCT_NAME } from '@/lib/brand';
+import { findAccessibleTemplate, templateSections } from './templates';
 
 /**
  * M2 concept notes.
@@ -16,20 +17,12 @@ import { PRODUCT_NAME } from '@/lib/brand';
  * another tenant's concept note, and bill the AI call to whichever tenant the
  * caller named. Both now come from the session.
  *
- * `ConceptTemplate` is deliberately still read off the shared `prisma` client:
- * it is platform catalogue data, not tenant data.
+ * `ConceptTemplate` was read off the shared `prisma` client as "platform
+ * catalogue data". Only half of it is: `tenantId` is nullable, NULL means
+ * "platform template" and a non-NULL row belongs to one tenant. A lookup by the
+ * client-supplied `templateId` alone therefore read another tenant's template
+ * (TASK-MTVTU103F11XJ). Both lookups now go through `findAccessibleTemplate`.
  */
-
-/**
- * One section of a ConceptTemplate. The template's `schema` Json column holds
- * an array of these — see the comment on the column in prisma/schema.prisma.
- */
-interface ConceptTemplateSection {
-  key: string;
-  labelKey: string;
-  maxWords: number;
-  promptKey: string;
-}
 
 /** `ConceptNote.content`: the drafted markdown, keyed by section. */
 type ConceptNoteContent = Record<string, string>;
@@ -90,17 +83,17 @@ export async function generateConceptNoteDraft(
       })
     : null;
 
-  // 2. Get the template (shared catalogue, not tenant-scoped)
-  const template = await prisma.conceptTemplate.findUnique({
-    where: { id: templateId }
-  });
+  // 2. Get the template — a platform row, or one this tenant owns. Refused
+  // before the first LLM call, which would otherwise bill credits for a draft
+  // built from another tenant's template.
+  const template = await findAccessibleTemplate(templateId, tenantId);
 
   if (!template) throw new Error('Template not found');
 
   // 3. For each section, search RAG for context and generate text
   const content: Record<string, string> = {};
-  const schema = template.schema as unknown as ConceptTemplateSection[];
-  
+  const schema = templateSections(template.schema);
+
   for (const section of schema) {
     // Basic RAG search
     const searchQuery = `${opp.title} ${topic?.title || ''} ${section.promptKey}`;
@@ -193,11 +186,11 @@ export async function exportToDocx(noteId: string) {
 
   if (!opportunity) throw new Error('Opportunity not found for concept note');
 
-  const template = await prisma.conceptTemplate.findUnique({
-    where: { id: note.templateId }
-  });
+  // `note` is this tenant's, but its `templateId` is still only as trustworthy
+  // as whatever created it — so the same rule applies on the way out.
+  const template = await findAccessibleTemplate(note.templateId, tenantId);
 
-  const schema = (template?.schema ?? []) as unknown as ConceptTemplateSection[];
+  const schema = templateSections(template?.schema);
 
   const children = [
     new Paragraph({
