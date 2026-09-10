@@ -14,7 +14,7 @@
  * The score is an internal pre-assessment, not an official evaluation.
  */
 
-import { prisma } from '../src/lib/db';
+import { prisma, type TenantTx } from '../src/lib/db';
 import { computeG0ForOpportunity, persistG0 } from '../src/lib/scoring/g0-compute';
 
 /**
@@ -70,7 +70,16 @@ async function main(): Promise<void> {
   let unscorable = 0;
 
   for (const opp of opportunities) {
-    const computation = await computeG0ForOpportunity(prisma, opp.tenantId, opp.id);
+    // This backfill script runs as an admin job with app.tenant_id not set
+    // (no RLS enforcement on this connection). The tenant scoping comes from the
+    // tenantId argument passed to computeG0ForOpportunity. Nominal type brand
+    // expects a transaction opened inside withTenantOn; we bypass RLS here and
+    // prove tenantId correctness manually, so cast is justified.
+    const computation = await computeG0ForOpportunity(
+      prisma as unknown as TenantTx, // admin script, RLS bypassed, tenant passed explicitly
+      opp.tenantId,
+      opp.id,
+    );
     if (!computation) {
       console.log(`  ${opp.id}  SKIPPED (not readable under tenant ${opp.tenantId})`);
       continue;
@@ -94,7 +103,8 @@ async function main(): Promise<void> {
       continue;
     }
     if (opts.apply) {
-      await persistG0(prisma, computation);
+      // Same as computeG0ForOpportunity call above: admin backfill, RLS bypassed.
+      await persistG0(prisma as unknown as TenantTx, computation);
       changed++;
     }
   }
