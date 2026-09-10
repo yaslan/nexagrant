@@ -100,6 +100,10 @@ vi.mock('@/lib/db', () => ({
   // TenantTx without widening either side to `any`.
   withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
     cb({
+      // `checkModuleAccess` reads its ModuleState row inside a tenant scope as
+      // of TASK-MTVR9T834EPUC — same spy as the `prisma` entry above, so a test
+      // that stubs one sees it whichever way the gate reaches the row.
+      moduleState: { findUnique: h.moduleStateFindUnique },
       aiUsageLog: { create: h.aiUsageLogCreate },
       creditLedger: { create: h.creditLedgerCreate, aggregate: h.creditLedgerAggregate },
       opportunity: { findFirst: h.opportunityFindFirst },

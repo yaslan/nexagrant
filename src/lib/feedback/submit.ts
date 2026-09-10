@@ -18,7 +18,7 @@
  * Feedback row.
  */
 
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { putObjectToR2 } from '@/lib/storage';
 import { recordAlert, type AlertLevel } from '@/lib/observability/system-alert';
 import { logger } from '@/lib/logger';
@@ -114,26 +114,28 @@ export async function submitFeedback(
     body: input.body,
   });
 
-  const created = await prisma.feedback.create({
-    data: {
-      tenantId: input.tenantId,
-      userId: input.userId ?? null,
-      workspaceSlug: input.workspaceSlug ?? null,
-      category: input.category as never,
-      impact: input.impact as never,
-      priority: verdict.priority as never,
-      autoPriority: verdict.priority as never,
-      status: 'NEW' as never,
-      title: input.title,
-      body: input.body,
-      triageReason: verdict.reason,
-      pageUrl: input.pageUrl ?? null,
-      userAgent: input.userAgent ?? null,
-      appVersion: input.appVersion ?? null,
-      locale: input.locale ?? 'tr',
-    },
-    select: { id: true },
-  });
+  const created = await withTenant(input.tenantId, (tx) =>
+    tx.feedback.create({
+      data: {
+        tenantId: input.tenantId,
+        userId: input.userId ?? null,
+        workspaceSlug: input.workspaceSlug ?? null,
+        category: input.category as never,
+        impact: input.impact as never,
+        priority: verdict.priority as never,
+        autoPriority: verdict.priority as never,
+        status: 'NEW' as never,
+        title: input.title,
+        body: input.body,
+        triageReason: verdict.reason,
+        pageUrl: input.pageUrl ?? null,
+        userAgent: input.userAgent ?? null,
+        appVersion: input.appVersion ?? null,
+        locale: input.locale ?? 'tr',
+      },
+      select: { id: true },
+    })
+  );
 
   let screenshotKey: string | null = null;
   let screenshotOutcome: ScreenshotOutcome = 'none';
@@ -186,15 +188,28 @@ export async function submitFeedback(
   // turn a saved report into a user-visible error — the same promise steps 3 and
   // 4 make. (Observed for real: a stale client rejected the renamed columns and
   // the reporter was told their report had not been saved, when it had.)
+  //
+  // A second `withTenant` rather than one spanning the whole function: steps 3
+  // and 4 above are network calls (R2, the alert writer), and holding a
+  // database transaction open across them would trade a bookkeeping risk for a
+  // connection-pool one. The documented order — persist, screenshot, alert,
+  // stamp — is unchanged.
+  //
+  // Note this `where` carries only `id`, not `tenantId` (the id is one this
+  // function just minted for this tenant, so it is not caller-supplied). The
+  // scope opened here is what confines the update to the tenant's own rows;
+  // see the task report §4.
   try {
-    await prisma.feedback.update({
-      where: { id: created.id },
-      data: {
-        screenshotKey,
-        alertStatus: alert.status,
-        alertId: alert.id ?? null,
-      },
-    });
+    await withTenant(input.tenantId, (tx) =>
+      tx.feedback.update({
+        where: { id: created.id },
+        data: {
+          screenshotKey,
+          alertStatus: alert.status,
+          alertId: alert.id ?? null,
+        },
+      })
+    );
   } catch (error) {
     logger.error('feedback outcome stamp failed; the report itself is saved', error, {
       feedbackId: created.id,

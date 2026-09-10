@@ -52,8 +52,17 @@ const TEST_API_KEY_ROW = {
   keyHash: TEST_API_KEY_HASH,
 };
 
-vi.mock('../../src/lib/db', () => ({
-  prisma: {
+/**
+ * The fake client is built inside the factory (the `vi.mock` hoist puts it above
+ * the fixture consts) and parked in this box so `withTenant` can hand the very
+ * same object to its callback — `/api/v1/opportunities` moved its query into a
+ * tenant scope in TASK-MTVR9T834EPUC, and the assertions here must keep
+ * watching one client, not two.
+ */
+const dbBox = vi.hoisted(() => ({ client: undefined as unknown }));
+
+vi.mock('../../src/lib/db', () => {
+  const client = {
     apiKey: {
       // Keyed on the hash the production code actually computes, so the test
       // exercises the real lookup rather than a stand-in constant.
@@ -80,8 +89,14 @@ vi.mock('../../src/lib/db', () => ({
     opportunity: {
       findMany: vi.fn().mockResolvedValue([]),
     },
-  },
-}));
+  };
+  dbBox.client = client;
+  return {
+    prisma: client,
+    withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
+      cb(dbBox.client as never),
+  };
+});
 
 describe('Partner Intelligence REST API (v1)', () => {
   test('authenticateApiKey rejects request without API key (401)', async () => {

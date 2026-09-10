@@ -24,6 +24,11 @@ vi.mock('@/lib/auth', () => ({ auth: h.auth }));
 
 vi.mock('@/lib/db', () => ({
   prisma: { moduleState: { findUnique: h.moduleStateFindUnique } },
+  // The gate reads its ModuleState row inside a tenant scope as of
+  // TASK-MTVR9T834EPUC. `as never` hands the fake client to a callback typed
+  // against the real TenantTx without widening either side to `any`.
+  withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
+    cb({ moduleState: { findUnique: h.moduleStateFindUnique } } as never),
 }));
 
 vi.mock('@/lib/billing', () => ({ getEntitlements: h.getEntitlements }));

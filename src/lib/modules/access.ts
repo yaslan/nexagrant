@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getEntitlements } from '@/lib/billing';
 import { planNamesGrantingModule } from '@/lib/billing/catalog';
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { tenantScopeOf } from '@/lib/tenant';
 import { canAccessStatus, type ModuleDenyReason } from '@/lib/modules/state-machine';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
@@ -85,10 +85,12 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
 
   // Both facts are independent reads; neither gates the other's query.
   const [state, entitlements] = await Promise.all([
-    prisma.moduleState.findUnique({
-      where: { tenantId_moduleId: { tenantId: scope.tenantId, moduleId } },
-      select: { status: true },
-    }),
+    withTenant(scope.tenantId, (tx) =>
+      tx.moduleState.findUnique({
+        where: { tenantId_moduleId: { tenantId: scope.tenantId, moduleId } },
+        select: { status: true },
+      })
+    ),
     getEntitlements(scope.tenantId),
   ]);
 

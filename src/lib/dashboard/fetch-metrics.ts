@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { isAboveThreshold, isFunded } from '@/lib/proposal-outcome';
 import type { Opportunity } from '@prisma/client';
 
@@ -54,10 +54,12 @@ export async function fetchDashboardMetrics(filters: MetricsFilters) {
     if (to) (where.createdAt as Record<string, Date>).lte = to;
   }
 
-  const opportunities = (await prisma.opportunity.findMany({
-    where,
-    include: { proposal: true, efforts: true },
-  })) as OppWithRelations[];
+  const opportunities = (await withTenant(tenantId, (tx) =>
+    tx.opportunity.findMany({
+      where,
+      include: { proposal: true, efforts: true },
+    })
+  )) as OppWithRelations[];
 
   // Calculate KPIs
   const totalOpps = opportunities.length;
@@ -81,9 +83,11 @@ export async function fetchDashboardMetrics(filters: MetricsFilters) {
       ) / g2Opps.length
     : 0;
 
-  const activeModules = await prisma.moduleState.count({
-    where: { tenantId, status: { in: ['ON', 'PILOT'] } },
-  });
+  const activeModules = await withTenant(tenantId, (tx) =>
+    tx.moduleState.count({
+      where: { tenantId, status: { in: ['ON', 'PILOT'] } },
+    })
+  );
 
   return {
     totalOpps,

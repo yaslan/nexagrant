@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authenticateApiKey } from '@/lib/api-auth';
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 
 /**
@@ -41,19 +41,21 @@ export async function GET(req: Request) {
   let opportunities: OpportunityApiRow[];
 
   try {
-    opportunities = await prisma.opportunity.findMany({
-      // Archived opportunities (`deletedAt` set) are hidden from the product, so the public
-      // API must not be the one place they are still readable.
-      where: { tenantId, deletedAt: null },
-      include: {
-        gateDecisions: {
-          orderBy: { decidedAt: 'desc' },
-          take: 3,
+    opportunities = await withTenant(tenantId, (tx) =>
+      tx.opportunity.findMany({
+        // Archived opportunities (`deletedAt` set) are hidden from the product, so the public
+        // API must not be the one place they are still readable.
+        where: { tenantId, deletedAt: null },
+        include: {
+          gateDecisions: {
+            orderBy: { decidedAt: 'desc' },
+            take: 3,
+          },
+          proposal: true,
         },
-        proposal: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      })
+    );
   } catch (e) {
     // Reported, not replaced with invented rows. The old catch fell through to
     // a demo array, so a permanently broken query would have answered 200 OK

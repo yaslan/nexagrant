@@ -19,7 +19,17 @@ const mockPrisma = vi.hoisted(() => ({
   conceptTemplate: { findUnique: vi.fn() },
 }));
 
-vi.mock('@/lib/db', () => ({ prisma: mockPrisma }));
+/**
+ * `withTenant` hands the callback the same fake client `prisma` resolves to, so
+ * the assertions below keep watching the same `vi.fn()`s after the route moved
+ * its two tenant-scoped reads into a tenant scope (TASK-MTVR9T834EPUC). The
+ * `conceptTemplate` lookup stays on `prisma` — it is the shared catalogue.
+ */
+vi.mock('@/lib/db', () => ({
+  prisma: mockPrisma,
+  withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
+    cb(mockPrisma as never),
+}));
 vi.mock('@/lib/auth', () => ({ auth: vi.fn() }));
 
 import { GET } from './route';

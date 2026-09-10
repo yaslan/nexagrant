@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import ApprovalsClient, { type ApprovalRequestItem } from './client';
 import { Role } from '@prisma/client';
@@ -20,18 +20,20 @@ export default async function ApprovalsPage({
   let requests: ApprovalRequestItem[] = [];
   try {
     if (tenantId) {
-      const rawRequests = await prisma.approvalRequest.findMany({
-        where: { tenantId },
-        include: {
-          requester: {
-            select: { id: true, name: true, email: true },
+      const rawRequests = await withTenant(tenantId, (tx) =>
+        tx.approvalRequest.findMany({
+          where: { tenantId },
+          include: {
+            requester: {
+              select: { id: true, name: true, email: true },
+            },
+            approver: {
+              select: { id: true, name: true, email: true },
+            },
           },
-          approver: {
-            select: { id: true, name: true, email: true },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+          orderBy: { createdAt: 'desc' },
+        })
+      );
       requests = rawRequests as unknown as ApprovalRequestItem[];
     }
   } catch (e) {

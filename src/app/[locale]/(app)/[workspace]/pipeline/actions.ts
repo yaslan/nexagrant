@@ -207,19 +207,23 @@ export async function createOpportunity({
 
   try {
     // Both lookups carry `tenantId`, so a workspace slug from another tenant
-    // resolves to nothing instead of to that tenant's workspace.
-    let workspace = await prisma.workspace.findFirst({
-      where: {
-        tenantId,
-        ...(workspaceSlug && workspaceSlug !== 'default' ? { slug: workspaceSlug } : {})
+    // resolves to nothing instead of to that tenant's workspace. The two reads
+    // and the write share one tenant scope, so the row is created under the
+    // same scope that proved the workspace belongs to this tenant.
+    const created = await withTenant(tenantId, async (tx) => {
+      let workspace = await tx.workspace.findFirst({
+        where: {
+          tenantId,
+          ...(workspaceSlug && workspaceSlug !== 'default' ? { slug: workspaceSlug } : {})
+        }
+      });
+      if (!workspace) {
+        workspace = await tx.workspace.findFirst({ where: { tenantId } });
       }
-    });
-    if (!workspace) {
-      workspace = await prisma.workspace.findFirst({ where: { tenantId } });
-    }
 
-    if (workspace) {
-      const created = await prisma.opportunity.create({
+      if (!workspace) return null;
+
+      return tx.opportunity.create({
         data: {
           tenantId,
           workspaceId: workspace.id,
@@ -233,7 +237,15 @@ export async function createOpportunity({
           notes: notes || null
         }
       });
+    });
 
+    if (created) {
+      // Deliberately outside the scope above, and it must stay outside:
+      // `rescoreOpportunityG0` opens its own `withTenant`, i.e. its own
+      // transaction on another connection. Called from inside the block it
+      // would be unable to see the not-yet-committed opportunity, find nothing
+      // to score, and leave every new opportunity silently unscored.
+      //
       // Derive the G0 score from what is actually on file for this tenant and topic — the K1 topic
       // match, the imported success rate, the tenant's CORDIS history, the call's budget and
       // flags — and store the per-feature breakdown alongside it (CLAUDE.md §7). An opportunity
@@ -292,10 +304,12 @@ export async function assignOpportunityOwner({
   try {
     // updateMany + tenantId, not update by id: `update` on a guessable id would
     // reassign an opportunity belonging to another tenant.
-    await prisma.opportunity.updateMany({
-      where: { id: opportunityId, tenantId },
-      data: { ownerId },
-    });
+    await withTenant(tenantId, (tx) =>
+      tx.opportunity.updateMany({
+        where: { id: opportunityId, tenantId },
+        data: { ownerId },
+      })
+    );
   } catch (err) {
     console.warn(`[assignOpportunityOwner] DB update bypassed: ${errorMessage(err)}`);
   }
@@ -359,10 +373,12 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
   try {
     // `tenantId` is always part of the filter — an empty tenant clause here used
     // to update the row whatever tenant it belonged to.
-    await prisma.opportunity.updateMany({
-      where: { id: opportunityId, tenantId },
-      data: { stage: newStage }
-    });
+    await withTenant(tenantId, (tx) =>
+      tx.opportunity.updateMany({
+        where: { id: opportunityId, tenantId },
+        data: { stage: newStage }
+      })
+    );
   } catch (err) {
     console.warn(`[moveOpportunityStage] DB update bypassed: ${errorMessage(err)}`);
   }

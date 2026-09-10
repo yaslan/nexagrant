@@ -42,19 +42,31 @@ const OPPORTUNITY_ROW = {
   proposal: null,
 };
 
-vi.mock('../../src/lib/db', () => ({
-  prisma: {
-    apiKey: {
-      findUnique: vi.fn().mockImplementation(async ({ where }) =>
-        where.keyHash === TEST_API_KEY_HASH ? TEST_API_KEY_ROW : null
-      ),
-      update: vi.fn().mockResolvedValue({}),
-    },
-    opportunity: {
-      findMany: vi.fn(),
-    },
+const mockDb = vi.hoisted(() => ({
+  apiKey: {
+    findUnique: vi.fn(),
+    update: vi.fn().mockResolvedValue({}),
+  },
+  opportunity: {
+    findMany: vi.fn(),
   },
 }));
+
+/**
+ * `withTenant` hands the callback the same fake client `prisma` resolves to, so
+ * `opportunityFindMany()` below still watches the one `vi.fn()` after the route
+ * moved its query into a tenant scope (TASK-MTVR9T834EPUC). The API-key lookup
+ * stays on `prisma`: it is the auth boundary, before any tenant is known.
+ */
+vi.mock('../../src/lib/db', () => ({
+  prisma: mockDb,
+  withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
+    cb(mockDb as never),
+}));
+
+mockDb.apiKey.findUnique.mockImplementation(async ({ where }: { where: { keyHash: string } }) =>
+  where.keyHash === TEST_API_KEY_HASH ? TEST_API_KEY_ROW : null
+);
 
 async function opportunityFindMany() {
   const { prisma } = await import('../../src/lib/db');

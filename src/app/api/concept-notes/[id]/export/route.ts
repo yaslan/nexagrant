@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import HTMLtoDOCX from 'html-to-docx';
 
@@ -15,21 +15,34 @@ export async function GET(
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
-  const note = await prisma.conceptNote.findFirst({
-    where: { id, tenantId },
+  // Both tenant-scoped reads share one scope. The `conceptTemplate` lookup
+  // below is deliberately NOT in it: templates are the shared platform
+  // catalogue, carry no `tenantId` column and no RLS policy, so opening a
+  // tenant scope around them would claim a guarantee that table does not have
+  // (TASK-MTSZ0AL4QP2CT §3.6 bucket F).
+  const found = await withTenant(tenantId, async (tx) => {
+    const note = await tx.conceptNote.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!note) return null;
+
+    // ConceptNote.opportunityId has no `opportunity` relation in the Prisma
+    // schema — fetch it separately rather than `include: { opportunity: true }`,
+    // which throws PrismaClientValidationError.
+    const opportunity = await tx.opportunity.findFirst({
+      where: { id: note.opportunityId, tenantId },
+      select: { title: true },
+    });
+
+    return { note, opportunity };
   });
 
-  if (!note) {
+  if (!found) {
     return new NextResponse('Not Found', { status: 404 });
   }
 
-  // ConceptNote.opportunityId has no `opportunity` relation in the Prisma
-  // schema — fetch it separately rather than `include: { opportunity: true }`,
-  // which throws PrismaClientValidationError.
-  const opportunity = await prisma.opportunity.findFirst({
-    where: { id: note.opportunityId, tenantId },
-    select: { title: true },
-  });
+  const { note, opportunity } = found;
 
   const template = await prisma.conceptTemplate.findUnique({
     where: { id: note.templateId },
