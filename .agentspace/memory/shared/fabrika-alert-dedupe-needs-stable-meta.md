@@ -1,10 +1,23 @@
 ---
 name: fabrika-alert-dedupe-needs-stable-meta
-description: SystemAlert dedupe'u (level,source,message,meta) kimliğine dayanır — meta'sında koşudan koşuya değişen veri taşıyan uyarı ASLA katlanmaz; K1'in duplicateIdentifiers listesi böyle
+description: SystemAlert dedupe kimliği varsayılan olarak (level,source,message,meta) — oynak meta katlamayı öldürür; ARTIK çözüm meta'yı kısırlaştırmak değil dedupeKey vermek (2026-09-10 itibarıyla 21 üretim çağıranında bağlı)
 metadata:
   type: project
-  updatedAt: 2026-09-08
+  updatedAt: 2026-09-10
 ---
+
+> **GÜNCELLEME 2026-09-10 (TASK-MTVFL8IJALB2H + TASK-MTVRBLKRUUEUM).** Aşağıdaki
+> "değişken ayrıntıyı meta'dan çıkar ya da yeni satırı kabul et" ikilemi ARTIK
+> geçerli değil: `RecordAlertInput.dedupeKey` üçüncü yolu açtı. Verildiğinde kimlik
+> `(level, source, dedupeKey)` olur, `message` ve meta'nın geri kalanı yalnız
+> görüntü detayı sayılır. Aşağıda "katlanmaz, yeni satır DOĞRU davranış" denen
+> `k1_daily_calls` örneği de dahil 21 üretim çağıranı artık anahtar veriyor — yani
+> o cümledeki hüküm ters çevrildi: K1'in duplicateIdentifiers listesi
+> `k1:duplicate-identifiers` anahtarıyla **katlanıyor**, çünkü listenin değişmesi
+> problemi ("bir besleme aynı id için iki kez cevap verdi") değiştirmiyor.
+> Yeni bir çağıran yazarken önce şunu sor: bu alanın değişmesi **problemi mi**
+> değiştiriyor, yoksa yalnız **oluşumu mu**? İkincisiyse anahtar ver.
+> Ayrıntı: [[fabrika-dedupe-candidate-limit-caps-the-fold]]
 
 `recordAlert()` (TASK-MTS80DUAF39Z8) aynı uyarıyı yeni satır açmak yerine AÇIK satırın
 üstünde sayaçlar (`alertRepeatCount` / `alertLastSeenAt`). Kimlik:
