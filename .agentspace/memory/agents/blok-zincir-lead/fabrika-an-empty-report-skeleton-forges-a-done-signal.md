@@ -1,39 +1,34 @@
 ---
 name: fabrika-an-empty-report-skeleton-forges-a-done-signal
-description: "Önce raporun iskeletini yaz" talimatım sahte BİTTİ sinyali üretti — denetim defteri tamamlanmayı DOSYA VARLIĞINDAN okuyor, içeriğinden değil
+description: Denetim defteri "BİTTİ"yi YARIM yazılmış bir rapor dosyasına da basabiliyor — ince rapor tek başına terk edilmişlik kanıtı DEĞİL, pane ölü mü diye bak
 metadata:
   type: feedback
   updatedAt: 2026-09-10
 ---
 
-`TASK-MTTUUGKNDGBXK` üç kez rapor üretmeden düştüğü için dördüncü dağıtıma şu talimatı
-koydum: *"Bu sefer İLK yazacağın şey sonuç dosyasının iskeleti olsun, sonra doldur —
-kanıtsız düşmemek için."* Worker iskeleti yazdı ve tam orada durdu. Diskte kalan:
+`TASK-MTTUUGKNDGBXK` dördüncü dağıtımında denetim defteri "BİTTİ · kanıt:
+…-customer-support.md" dedi. Dosyayı açtım: **22 satır, altı başlık, hepsi
+`_(doldurulacak)_`**. "Worker iskeleti yazıp öldü, sahte tamamlanma" diye hüküm verdim,
+kartı `todo`'ya çektim ve yeniden dağıttım.
 
-```
-# TASK-MTTUUGKNDGBXK — Alarm konsolu boğulmuş
-**Durum:** IN PROGRESS (iskelet — dolduruluyor)
-## 1. Ne yapıldı
-_(doldurulacak)_
-## 2. Kanıt
-_(doldurulacak)_
-...
-```
+**Hüküm YANLIŞTI.** Dosyayı worker YAZARKEN yakalamışım. Aynı dosya bir saat sonra
+**339 satır, 0 yer tutucu**, `47e764b` ile commit'li: on bölüm, gerçek tarayıcı ölçümü,
+kareler, kapı çıktısı. Yeniden dağıttığım iş zaten koşuyordu; iki worker aynı kartı
+paralel bitirdi (iki rapor: `-customer-support.md` 339 satır ve `-blockzincir-pm.md` 226).
+İkinci worker bunu bana yüzüme söyledi ve haklıydı.
 
-22 satır, altı başlık, sıfır kanıt. Denetim defteri bunu **`tespit=evidence` → done** olarak
-raporladı ve kuyruk kartı bitmiş sayıp ilerletti. Yani talimatım, önlemeye çalıştığım şeyin
-tam tersini üretti: kanıtsız sessiz ölüm yerine **kanıtsız GÜRÜLTÜLÜ "başarı"**. İkincisi
-daha kötü, çünkü ilki beni uyarır, ikincisi kartı kapattırır.
+**Doğru olan yarısı:** denetim defteri tamamlanmayı dosyanın VARLIĞINDAN okuyor, içeriğinden
+değil. Yarım yazılmış bir sonuç `.md`'si gerçekten erken "BİTTİ" bastırıyor. Bu kısım gerçek.
 
-**Kök neden:** tamamlanma tespiti dosyanın VARLIĞINA bakıyor, İÇERİĞİNE değil. Sonuç `.md`
-dosyası bu ofiste bir "bitti" bayrağıdır — erken dikilirse yalan söyler.
+**Yanlış olan yarısı — ve asıl ders:** ince rapor, işin BİTTİĞİNİN olduğu kadar
+İŞİN SÜRDÜĞÜNÜN de işareti olabilir. Dosya bir durum değil, bir AKIŞ; tek karesine bakıp
+"terk edilmiş" denmez.
 
-**Nasıl uygulanır:** Karta "önce iskeleti yaz" YAZMA. Bunun yerine:
-> Ara notların gerekirse `docs/agent-results/<TASK-ID>-evidence/` altına `.txt` olarak koy.
-> Sonuç `.md` dosyasını ANCAK içinde gerçek kanıt varken oluştur.
+**Nasıl uygulanır — iki koşul, ikisi birden aranır:**
+1. Rapor ince ya da yer tutuculu (`wc -l`, `grep -c 'doldurulacak\|IN PROGRESS'`), **VE**
+2. Pane ÖLÜ (`agentspace_delegation_status` → `pane AYAKTA` YOKSA).
 
-Kanıt dizini bayrak değildir, güvenle erken yazılır. Ve bir kart "bitti" geldiğinde raporu
-`wc -l` + `grep -c 'doldurulacak\|IN PROGRESS\|TODO'` ile bir saniyede ele: ince rapor
-(<40 satır) ya da yer tutucu içeren rapor kart KAPATMAZ.
-Bkz. [[fabrika-delegation-verdict-wrong-both-directions]] — bu, "done + kanıt dosyası"nın
-yanlış olabildiği en ucuz tespit edilebilir hâli.
+İkisi birden yoksa kart `todo`'ya ÇEKİLMEZ, yeniden DAĞITILMAZ — bir Monitor vuruşu
+beklenir ([[fabrika-paused-is-not-dead-check-before-adopting-wip]]). Karta hâlâ
+"önce boş iskelet yazma, sonuç `.md`'sini ancak kanıt varken oluştur; ara notlar
+`-evidence/` altına `.txt`" yazmak doğrudur — erken bayrak dikmek yine de gürültü üretir.
