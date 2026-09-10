@@ -216,6 +216,13 @@ $ pnpm test
 
 1757 yeşil — kartın bildirdiği taban ile birebir aynı, regresyon yok.
 
+**Sonradan ortaya çıkan, bana ait OLMAYAN typecheck hatası.** Yukarıdaki `pnpm typecheck` ölçümü
+temizdi (14:08). Commit anında pre-commit kancası `tests/billing-identity-action.test.ts` içinde
+dört TS hatası bildirdi (TS2352/TS2493, satır 82 ve 99) — bu dosyaya dokunmadım, ölçümümden sonra
+paylaşımlı ağaçta belirdi; kanca da "ağaçta senin OLMAYAN typecheck hataları var" diyerek aynı
+teşhisi koydu ve staged kapsamını temiz bularak commit'i geçirdi. Kendi dosyalarım temiz; ağacın
+o anki bütünü değil. Bunu düzeltmek bu kartın işi değil, ama sessiz geçmiyorum.
+
 ### Ölçüm ortamı hakkında bir not (dürüstlük gereği)
 
 Playwright'ın `webServer`'ı ana ağaçta başlatılamadı: Next 16 dizin başına tek `next dev`
