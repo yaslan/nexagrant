@@ -213,6 +213,25 @@ only in prose). The m9 failures are a fixture collision —
 sit on `src/lib/efatura.ts` / the invoice export route, which were dirty in the tree from a
 neighbour's card when the gate started and were committed mid-run.
 
+### 2.7 Commit `733e854`, and what the pre-commit hook saw
+
+The commit carries exactly ten paths, all mine (`git show --name-only`). The repo's pre-commit hook
+re-ran the gate over the staged scope and reported **"✓ Kapı temiz (staged kapsamı)"**, while
+separately naming type errors that exist in the tree but not in my files:
+
+```
+⚠ Ağaçta senin OLMAYAN typecheck hataları var (başka bir ajan yazıyor olabilir):
+src/modules/m6/server/comparison.ts(14,8): TS2305 ... has no exported member 'TenantScopedDb'
+tests/modules/m6/comparison-tenant-scope.test.ts(3,15), (68,5)
+tests/e2e/playwright-config.spec.ts(10,30), (14,39)
+  Bunlar commit'ini engellemiyor.
+```
+
+Those belong to TASK-MTV5GFB75N43S / TASK-MTV5H4HCGGGQ5, in flight in a neighbouring pane. The
+`typecheck ✅` above is accurate **as of the moment I ran it** — the tree acquired those errors
+afterwards, from work that is not mine. This is the shared-worktree hazard, stated plainly rather
+than hidden behind a green tick.
+
 ---
 
 ## 3. Changed files
