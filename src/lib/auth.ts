@@ -33,10 +33,16 @@ const DEMO_PROFILES: Record<string, { orgName: string; orgType: OrgType; role: R
     role: "TENANT_OWNER",
     isPlatformAdmin: true,
   },
-  // RFC 2606 reserves example.com for exactly this: a demo seat printed on the
-  // public login page must not name a domain anyone owns. This one used to be
-  // on the retired brand's domain (TASK-MTV5ESBVAHUEV).
-  "mehmet@example.com": {
+  // The rule this seat has to satisfy is unchanged: a demo address printed on
+  // the public login page must never look like a real mailbox at a company we
+  // do not control. It was parked on the domain RFC 2606 reserves for
+  // documentation while the brand domain was in flux (TASK-MTV5ESBVAHUEV);
+  // usfinbridge.com is our own domain, so a seat on it names nobody else's
+  // mailbox and reads as ours rather than as a placeholder (owner's decision,
+  // 2026-09-10, TASK-MTV69TO4K8NVZ). If this ever has to move off a domain the
+  // company owns, move it back to that reserved domain — never invent a
+  // plausible third-party one.
+  "demo@usfinbridge.com": {
     orgName: `${PRODUCT_NAME} SME Ar-Ge Ltd.`,
     orgType: "SME",
     role: "TENANT_OWNER",

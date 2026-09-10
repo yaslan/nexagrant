@@ -83,7 +83,7 @@ test.describe('identity strings', () => {
     const body = page.locator('body');
     await expect(body.getByText('KOBİ Ar-Ge Koordinatörü').first()).toBeVisible();
     await expect(body.getByText('Üniversite TTO Lideri').first()).toBeVisible();
-    await expect(body.getByText('mehmet@example.com').first()).toBeVisible();
+    await expect(body.getByText('demo@usfinbridge.com').first()).toBeVisible();
 
     const text = await body.innerText();
     for (const invented of INVENTED) {

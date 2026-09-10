@@ -8,6 +8,25 @@ import { useTranslations } from 'next-intl';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { errorMessage as toErrorMessage, isNextRedirectError } from '@/lib/errors';
 
+/**
+ * The one place this file spells a demo address. Each seat used to write its
+ * address twice — once as the handler argument, once as the visible line — so a
+ * rename could change the button's label while it still signed in as the old
+ * address, or the reverse (TASK-MTV69TO4K8NVZ).
+ *
+ * The keys of `DEMO_PROFILES` in src/lib/auth.ts are the real source of truth,
+ * but that module pulls in NextAuth, the Prisma adapter and the database client,
+ * so a `'use client'` component cannot import from it without dragging the whole
+ * server auth stack into the browser bundle. Until the addresses live in a
+ * server-free module of their own, these two lists have to be kept in step by
+ * hand — one list per side, not one per button.
+ */
+const DEMO_SEATS = {
+  platformAdmin: 'admin@yasinaslan.com.tr',
+  sme: 'demo@usfinbridge.com',
+  tto: 'ayse@tto.edu.tr',
+} as const;
+
 interface AuthCardProps {
   locale: string;
   defaultMode?: 'login' | 'register';
@@ -315,14 +334,14 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
         <div className="grid grid-cols-1 gap-1.5">
           <button
             type="button"
-            onClick={() => handleDemoLogin('admin@yasinaslan.com.tr')}
+            onClick={() => handleDemoLogin(DEMO_SEATS.platformAdmin)}
             className="p-2 bg-accent/10 hover:bg-accent/20 border border-accent/30 rounded-xl text-left transition flex items-center justify-between group cursor-pointer"
           >
             <div className="flex items-center gap-2">
               <span className="text-sm">👑</span>
               <div>
                 <div className="font-bold text-xs text-accent-ink">{tDemo('rolePlatformAdmin')}</div>
-                <div className="text-[10px] text-muted font-mono">admin@yasinaslan.com.tr</div>
+                <div className="text-[10px] text-muted font-mono">{DEMO_SEATS.platformAdmin}</div>
               </div>
             </div>
             <span className="text-xs font-bold text-accent group-hover:translate-x-0.5 transition-transform">Giriş →</span>
@@ -331,24 +350,24 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
           <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"
-              onClick={() => handleDemoLogin('mehmet@example.com')}
+              onClick={() => handleDemoLogin(DEMO_SEATS.sme)}
               className="p-2 bg-ground hover:bg-surface border border-border rounded-xl text-left transition flex items-center justify-between group cursor-pointer"
             >
               <div>
                 <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">{tDemo('roleSme')}</div>
-                <div className="text-[10px] text-muted font-mono">mehmet@example.com</div>
+                <div className="text-[10px] text-muted font-mono">{DEMO_SEATS.sme}</div>
               </div>
               <span className="text-xs text-muted group-hover:text-accent">→</span>
             </button>
 
             <button
               type="button"
-              onClick={() => handleDemoLogin('ayse@tto.edu.tr')}
+              onClick={() => handleDemoLogin(DEMO_SEATS.tto)}
               className="p-2 bg-ground hover:bg-surface border border-border rounded-xl text-left transition flex items-center justify-between group cursor-pointer"
             >
               <div>
                 <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">{tDemo('roleTto')}</div>
-                <div className="text-[10px] text-muted font-mono">ayse@tto.edu.tr</div>
+                <div className="text-[10px] text-muted font-mono">{DEMO_SEATS.tto}</div>
               </div>
               <span className="text-xs text-muted group-hover:text-accent">→</span>
             </button>
