@@ -1,6 +1,10 @@
 import { describe, test, expect } from 'vitest';
 import unzipper from 'unzipper';
 import { generateDocxBuffer, generatePdfHtml } from '../src/lib/document-exporter';
+import { withBrand } from '../src/lib/brand';
+
+/** The name the platform used to ship under; see `tests/retired-brand-name.test.ts`. */
+const RETIRED_BRAND = 'Fabrika';
 
 /**
  * Every export used to be headed `EUROPEAN COMMISSION - HORIZON EUROPE` (or, for one document
@@ -34,12 +38,22 @@ describe('document provenance', () => {
   });
 
   test('states that no funding body issued the document, in both languages', () => {
+    // The sentence is pinned; the product name inside it is not re-typed here. `withBrand`
+    // resolves `{brand}` the same way the exporter does, so a rename moves this expectation
+    // with it — the footer of a downloaded document is exactly where a stale literal used to
+    // survive. RETIRED_BRAND keeps that freedom from also letting the dead name through.
     expect(generatePdfHtml(draft)).toContain(
-      "Bu belge Küçük Danışmanlık Ltd. tarafından Fabrika'da hazırlanmıştır."
+      withBrand("Bu belge Küçük Danışmanlık Ltd. tarafından {brand}'da hazırlanmıştır.")
     );
-    expect(generatePdfHtml({ ...draft, locale: 'en' })).toContain(
-      'This document was prepared by Küçük Danışmanlık Ltd. in Fabrika. It is NOT an official document'
+    expect(generatePdfHtml(draft)).not.toContain(RETIRED_BRAND);
+
+    const en = generatePdfHtml({ ...draft, locale: 'en' });
+    expect(en).toContain(
+      withBrand(
+        'This document was prepared by Küçük Danışmanlık Ltd. in {brand}. It is NOT an official document'
+      )
     );
+    expect(en).not.toContain(RETIRED_BRAND);
   });
 });
 

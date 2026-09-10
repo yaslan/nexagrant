@@ -24,6 +24,15 @@ import { PRODUCT_NAME } from '@/lib/brand';
  */
 const CATALOGUES = { tr: trMessages, en: enMessages } as const;
 
+/**
+ * The name the platform used to ship under. `tests/retired-brand-name.test.ts` guards the
+ * sources and the catalogues against it; this file guards what the browser actually paints,
+ * which is the only place a caller-side interpolation bug can show up. It is written as a
+ * literal on purpose: a retired name is a fact of history, not a value that follows
+ * `PRODUCT_NAME`.
+ */
+const RETIRED_BRAND = 'Fabrika';
+
 afterEach(cleanup);
 
 describe('brand surfaces', () => {
@@ -38,7 +47,7 @@ describe('brand surfaces', () => {
     expect(copyright.textContent).toContain(PRODUCT_NAME);
     // The year is interpolated as a string: ICU would otherwise group it as "2.026".
     expect(copyright.textContent).not.toMatch(/[.,]\d{3}/);
-    expect(copyright.textContent).not.toContain('FonBridge');
+    expect(copyright.textContent).not.toContain(RETIRED_BRAND);
 
     expect(screen.getByAltText(new RegExp(PRODUCT_NAME))).toBeDefined();
   });
