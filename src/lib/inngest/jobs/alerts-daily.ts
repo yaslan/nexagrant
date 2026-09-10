@@ -151,17 +151,17 @@ export const alertsDaily = inngest.createFunction(
           const subject = `New Call Opportunities: ${search.name} (${matchCount} new)`;
           const appUrl = env.NEXT_PUBLIC_APP_URL || 'https://app.fabrika.io';
           const html = `
-            <h2>Fabrika Saved Search Alert</h2>
+            <h2>FonBridge Saved Search Alert</h2>
             <p>Hi there,</p>
             <p>We checked for new opportunities matching your saved search <strong>${search.name}</strong>.</p>
             <p>Found <strong>${matchCount} new opportunities</strong>. <a href="${appUrl}/calls?search=${search.id}">View them now</a></p>
-            <p>Happy hunting!<br/>Fabrika Team</p>
+            <p>Happy hunting!<br/>FonBridge Team</p>
           `;
 
           const resendClient = getResend();
           if (resendClient && env.RESEND_API_KEY) {
             await resendClient.emails.send({
-              from: env.EMAIL_FROM || 'Fabrika <no-reply@fabrika.app>',
+              from: env.EMAIL_FROM || 'FonBridge <no-reply@fabrika.app>',
               to: [ownerEmail],
               subject,
               html,

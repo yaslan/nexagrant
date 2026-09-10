@@ -92,7 +92,7 @@ async function defaultSender(): Promise<DigestRunOptions['sender'] | null> {
   const client = new Resend(env.RESEND_API_KEY);
   return async ({ to, subject, html }) => {
     await client.emails.send({
-      from: env.EMAIL_FROM || 'Fabrika <no-reply@fabrika.app>',
+      from: env.EMAIL_FROM || 'FonBridge <no-reply@fabrika.app>',
       to: [to],
       subject,
       html,

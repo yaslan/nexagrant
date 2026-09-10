@@ -17,6 +17,7 @@ import type { BetaPartner } from './roster';
 import type { EsrSample } from './esr-samples';
 import type { G0Decision } from '../scoring/g0-canonical';
 import type { RenderedEmail } from './invite-email';
+import { PRODUCT_NAME } from '../brand';
 
 export type SurveyLocale = 'tr' | 'en';
 
@@ -88,11 +89,11 @@ export function coveragePerSample(assignments: SurveyAssignment[]): Map<string, 
 
 const COPY = {
   tr: {
-    subject: 'Fabrika Beta — G0 skoru doğrulama anketi (5 dakika)',
+    subject: 'FonBridge Beta — G0 skoru doğrulama anketi (5 dakika)',
     greeting: (name: string) => `Merhaba ${name},`,
     intro: (n: number) =>
-      `Fabrika'nın G0 triyaj skorunu gerçek değerlendirme sonuçlarıyla kalibre ediyoruz. ` +
-      `Aşağıda ${n} örnek fırsat var; her biri için Fabrika'nın verdiği skoru ve kararı görüyorsunuz.`,
+      `FonBridge'nin G0 triyaj skorunu gerçek değerlendirme sonuçlarıyla kalibre ediyoruz. ` +
+      `Aşağıda ${n} örnek fırsat var; her biri için FonBridge'nin verdiği skoru ve kararı görüyorsunuz.`,
     ask: 'Tek sorumuz şu: siz olsanız aynı kararı verir miydiniz?',
     howTitle: 'Nasıl yanıtlanır',
     how: [
@@ -100,8 +101,8 @@ const COPY = {
       'Katılmıyorsanız kendi kararınızı yazın: GO (peşinden gidilir) ya da NO_GO (geçilir).',
       'Bir cümlelik gerekçe bizim için en değerli kısım — "taban oran bu çağrıda yanıltıcı" gibi.',
     ],
-    scoreLabel: 'Fabrika skoru',
-    decisionLabel: 'Fabrika kararı',
+    scoreLabel: `${PRODUCT_NAME} skoru`,
+    decisionLabel: `${PRODUCT_NAME} kararı`,
     reasonsLabel: 'Gerekçe',
     noReasons: 'Tüm G0 kuralları geçildi',
     deadline: (label: string) => `Yanıtlarınızı ${label} tarihine kadar bekliyoruz.`,
@@ -110,16 +111,16 @@ const COPY = {
       'Bu ankette yer alan örnekler kalibrasyon içindir; kendi tekliflerinizin değerlendirme raporlarını ' +
       'bizimle paylaşmak zorunda değilsiniz. Paylaşmak isterseniz ayrıca yazın, ayrı bir onayla ilerleriz.',
     disclaimer:
-      'Fabrika skoru bir iç ön değerlendirmedir; Avrupa Komisyonu\'nun resmî puanı değildir.',
-    signoff: 'Teşekkürler,\nFabrika ekibi',
+      `${PRODUCT_NAME} skoru bir iç ön değerlendirmedir; Avrupa Komisyonu\'nun resmî puanı değildir.`,
+    signoff: `Teşekkürler,\n${PRODUCT_NAME} ekibi`,
     support: (email: string) => `Soru olursa ${email} adresine yazın.`,
   },
   en: {
-    subject: 'Fabrika Beta — G0 score validation survey (5 minutes)',
+    subject: `${PRODUCT_NAME} Beta — G0 score validation survey (5 minutes)`,
     greeting: (name: string) => `Hello ${name},`,
     intro: (n: number) =>
-      `We are calibrating Fabrika's G0 triage score against real evaluation outcomes. ` +
-      `Below are ${n} sample opportunities, each with the score and the decision Fabrika produced.`,
+      `We are calibrating ${PRODUCT_NAME}'s G0 triage score against real evaluation outcomes. ` +
+      `Below are ${n} sample opportunities, each with the score and the decision ${PRODUCT_NAME} produced.`,
     ask: 'Our only question: would you have made the same call?',
     howTitle: 'How to answer',
     how: [
@@ -127,8 +128,8 @@ const COPY = {
       'If you disagree, give your own verdict: GO (worth pursuing) or NO_GO (skip it).',
       'A one-sentence reason is the most valuable part — e.g. "the base rate misleads on this call".',
     ],
-    scoreLabel: 'Fabrika score',
-    decisionLabel: 'Fabrika decision',
+    scoreLabel: `${PRODUCT_NAME} score`,
+    decisionLabel: `${PRODUCT_NAME} decision`,
     reasonsLabel: 'Reasons',
     noReasons: 'All G0 rules passed',
     deadline: (label: string) => `We are collecting answers until ${label}.`,
@@ -137,8 +138,8 @@ const COPY = {
       'These samples exist for calibration; you are not asked to share your own evaluation summary ' +
       'reports. If you would like to, tell us separately and we will agree a basis first.',
     disclaimer:
-      "Fabrika's score is an internal pre-assessment, not the European Commission's official score.",
-    signoff: 'Thanks,\nThe Fabrika team',
+      `${PRODUCT_NAME}'s score is an internal pre-assessment, not the European Commission's official score.`,
+    signoff: `Thanks,\nThe ${PRODUCT_NAME} team`,
     support: (email: string) => `Questions? Write to ${email}.`,
   },
 } as const;
@@ -284,7 +285,7 @@ export function buildResponseTemplateCsv(assignment: SurveyAssignment): string {
     [assignment.partner.slug, item.sampleId, '', '', ''].join(','),
   );
   return [
-    '# Fabrika ESR calibration survey — one row per sample.',
+    '# FonBridge ESR calibration survey — one row per sample.',
     '# agrees: true|false   verdict: GO|NO_GO (required only when agrees=false)   comment: free text',
     header,
     ...rows,

@@ -48,7 +48,7 @@
     "activeModules": "Açık Modüller",
     "aiCredits": "YZ Kredisi",
     "pipelineFunnel": "Pipeline Hunisi",
-    "metaDescription": "Fabrika pipeline KPI paneli — teklif sayısı, eşik üstü oranı, isabet oranı ve G2 süresi tek ekranda.",
+    "metaDescription": "{brand} pipeline KPI paneli — teklif sayısı, eşik üstü oranı, isabet oranı ve G2 süresi tek ekranda.",
     "accessDeniedTitle": "Erişim Reddedildi",
     "accessDeniedBody": "Bu sayfayı görmek için Pipeline Yöneticisi veya daha yüksek izne ihtiyacınız var.",
     "sessionErrorTitle": "Oturum Bulunamadı",
@@ -418,7 +418,7 @@
   "landing": {
     "hero": {
       "title": "Avrupa Fon Çağrıları Yönetin",
-      "subtitle": "Fabrika ile HE, Eurostars ve ulusal fonları keşfedin. Konsorsiyum oluşturun, projelerinizi değerlendirin.",
+      "subtitle": "{brand} ile HE, Eurostars ve ulusal fonları keşfedin. Konsorsiyum oluşturun, projelerinizi değerlendirin.",
       "cta": "Fiyatlandırmayı Gör",
       "secondary": "Çağrıları Gözat",
       "image_alt": "Platform Pano"
@@ -478,13 +478,13 @@
       "compliance": "Uyum",
       "contact": "İletişim"
     },
-    "metaTitle": "Fabrika — AB Finansman Platformu (Horizon Europe, Eurostars)",
-    "metaDescription": "Fabrika: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya.",
+    "metaTitle": "{brand} — AB Finansman Platformu (Horizon Europe, Eurostars)",
+    "metaDescription": "{brand}: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya.",
     "ecosystemSubtitle": "İster bağımsız bir danışman olun, ister büyük bir üniversite; {brand} iş akışınızı hızlandırır.",
     "closingSubtitle": "{brand} ile teklif hazırlama sürenizi kısaltın; CORDIS ağ analitiği ve hakem bakış açısıyla teklifinizi güçlendirin."
   },
   "pricing": {
-    "title": "Fabrika Fiyatlandırması",
+    "title": "{brand} Fiyatlandırması",
     "subtitle": "Takımınız için mükemmel planı seçin",
     "starter": "Başlangıç",
     "starter_desc": "Küçük kuruluşlar ve başlayanlar",
@@ -537,8 +537,8 @@
     "cta_title": "Hazır mısınız?",
     "cta_subtitle": "Bugün başlayın — ücretsiz deneme deneyin",
     "contact_us": "İletişim",
-    "metaTitle": "Fiyatlandırma — Fabrika AI-Powered EU Funding Platform",
-    "metaDescription": "Fabrika fiyatlandırması: Başlangıç, Profesyonel ve İşletme planları. Ücretsiz deneme, aylık veya yıllık faturalandırma, kurumsal çözümler."
+    "metaTitle": "Fiyatlandırma — {brand} AI-Powered EU Funding Platform",
+    "metaDescription": "{brand} fiyatlandırması: Başlangıç, Profesyonel ve İşletme planları. Ücretsiz deneme, aylık veya yıllık faturalandırma, kurumsal çözümler."
   },
   "settings": {
     "privacy": {
@@ -601,11 +601,11 @@
   },
   "legal": {
     "privacy": {
-      "metaTitle": "Gizlilik Politikası ve KVKK Aydınlatma Metni — Fabrika",
-      "metaDescription": "Fabrika'nın KVKK ve GDPR uyumlu gizlilik politikası: işlenen veriler, işleme amaçları, saklama süreleri ve veri sahibi hakları.",
+      "metaTitle": "Gizlilik Politikası ve KVKK Aydınlatma Metni — {brand}",
+      "metaDescription": "{brand}'nın KVKK ve GDPR uyumlu gizlilik politikası: işlenen veriler, işleme amaçları, saklama süreleri ve veri sahibi hakları.",
       "heading": "Gizlilik Politikası ve KVKK Aydınlatma Metni",
       "controllerHeading": "1. Veri Sorumlusu",
-      "controllerBody": "Fabrika SaaS Platformu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) ve AB Genel Veri Koruma Tüzüğü (“GDPR”) uyarınca kişisel verilerinizin güvenliğine azami özen göstermekteyiz.",
+      "controllerBody": "{brand} SaaS Platformu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) ve AB Genel Veri Koruma Tüzüğü (“GDPR”) uyarınca kişisel verilerinizin güvenliğine azami özen göstermekteyiz.",
       "dataHeading": "2. İşlenen Veriler ve Toplama Amaçları",
       "dataBody": "Kullanıcı hesabı açma, oturum doğrulama, AB hibe çağrılarıyla eşleştirme, yapay zeka destekli teklif taslağı oluşturma ve abonelik faturalandırması süreçlerinde ad, e-posta, şirket/kurum bilgileri ve ödeme kayıtları işlenmektedir.",
       "rightsHeading": "3. Veri Sahibi Hakları (Dışa Aktarma ve Silme)",
@@ -615,13 +615,13 @@
       "securityBody": "Verileriniz çok kiracılı veritabanında PostgreSQL Row-Level Security (RLS) ile diğer kiracılardan yalıtılmış olup, dosya ekleriniz şifreli bulut depolama (R2/S3) üzerinde saklanır."
     },
     "terms": {
-      "metaTitle": "Kullanım Koşulları ve Hizmet Sözleşmesi — Fabrika",
-      "metaDescription": "Fabrika hizmetinin kapsamı, yapay zeka çıktılarına ilişkin sorumluluk reddi, abonelik ve kredi koşulları.",
+      "metaTitle": "Kullanım Koşulları ve Hizmet Sözleşmesi — {brand}",
+      "metaDescription": "{brand} hizmetinin kapsamı, yapay zeka çıktılarına ilişkin sorumluluk reddi, abonelik ve kredi koşulları.",
       "scopeBody": "{brand}, Horizon Europe ve diğer uluslararası Ar-Ge fonları için çağrı keşfi, konsorsiyum eşleştirme ve yapay zeka destekli başvuru hazırlama yazılımı sunar."
     },
     "dpa": {
-      "metaTitle": "Veri İşleme Sözleşmesi (DPA) — Fabrika",
-      "metaDescription": "Fabrika ile kurumsal müşteriler arasındaki KVKK/GDPR uyumlu veri işleme sözleşmesi."
+      "metaTitle": "Veri İşleme Sözleşmesi (DPA) — {brand}",
+      "metaDescription": "{brand} ile kurumsal müşteriler arasındaki KVKK/GDPR uyumlu veri işleme sözleşmesi."
     }
   },
   "feedback": {
@@ -1083,11 +1083,11 @@
   },
   "ModuleGate": {
     "title": "Bu modül şu anda kullanılamıyor",
-    "askAdmin": "Erişim gerekiyorsa çalışma alanı yöneticinizle ya da Fabrika ekibiyle görüşün.",
+    "askAdmin": "Erişim gerekiyorsa çalışma alanı yöneticinizle ya da {brand} ekibiyle görüşün.",
     "reason": {
       "MODULE_OFF": "{module} modülü kiracınızda kapalı.",
       "PLAN_UPGRADE_REQUIRED": "{module} modülü aboneliğinizin kapsamı dışında. Şu planlarda yer alıyor: {plans}.",
-      "DEV_INTERNAL_ONLY": "{module} modülü geliştirme aşamasında ve şu an yalnızca Fabrika ekibine açık.",
+      "DEV_INTERNAL_ONLY": "{module} modülü geliştirme aşamasında ve şu an yalnızca {brand} ekibine açık.",
       "PILOT_MANAGERS_ONLY": "{module} modülü pilot aşamasında; yalnızca çalışma alanı yöneticileri kullanabilir.",
       "NO_TENANT": "Oturumunuz bir çalışma alanına bağlı değil.",
       "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor."
@@ -1379,7 +1379,7 @@
       "ssoCertLabel": "x509 güvenlik sertifikası (PEM açık anahtar)",
       "ssoHint": "Alan adı kullanıcıları oturum açarken doğrudan kimlik sağlayıcıya yönlendirilir.",
       "ssoIssuerPlaceholder": "Örn: https://sso.kurumunuz.edu.tr/idp/shibboleth",
-      "ssoAcsPlaceholder": "Örn: https://fabrika.app/api/auth/saml/acs",
+      "ssoAcsPlaceholder": "Örn: https://{brand}.app/api/auth/saml/acs",
       "ssoCertPlaceholder": "-----BEGIN CERTIFICATE----- ile başlayan PEM içeriğini yapıştırın",
       "ssoSaveFailed": "SAML SSO ayarları kaydedilemedi. Lütfen tekrar deneyin.",
       "ssoSaved": "SAML SSO ayarları kaydedildi.",

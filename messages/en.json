@@ -48,7 +48,7 @@
     "activeModules": "Active Modules",
     "aiCredits": "AI Credits",
     "pipelineFunnel": "Pipeline Funnel",
-    "metaDescription": "Fabrika pipeline KPI dashboard — proposal count, above-threshold rate, hit rate and time to G2 on one screen.",
+    "metaDescription": "{brand} pipeline KPI dashboard — proposal count, above-threshold rate, hit rate and time to G2 on one screen.",
     "accessDeniedTitle": "Access Denied",
     "accessDeniedBody": "You need Pipeline Manager permission or higher to view this page.",
     "sessionErrorTitle": "Session Not Found",
@@ -418,7 +418,7 @@
   "landing": {
     "hero": {
       "title": "Manage European Fund Calls",
-      "subtitle": "Discover HE, Eurostars, and national funding with Fabrika. Build consortia, evaluate projects.",
+      "subtitle": "Discover HE, Eurostars, and national funding with {brand}. Build consortia, evaluate projects.",
       "cta": "View Pricing",
       "secondary": "Browse Calls",
       "image_alt": "Platform Dashboard"
@@ -478,13 +478,13 @@
       "compliance": "Compliance",
       "contact": "Contact"
     },
-    "metaTitle": "Fabrika — AI-Powered EU Funding Platform for Horizon Europe & Eurostars",
-    "metaDescription": "Fabrika: End-to-end platform for EU research proposals. Consortium matching, AI evaluator simulation, CORDIS network intelligence. From concept to funding.",
+    "metaTitle": "{brand} — AI-Powered EU Funding Platform for Horizon Europe & Eurostars",
+    "metaDescription": "{brand}: End-to-end platform for EU research proposals. Consortium matching, AI evaluator simulation, CORDIS network intelligence. From concept to funding.",
     "ecosystemSubtitle": "From high-growth SMEs to university TTOs and international research consortia.",
     "closingSubtitle": "Shorten your proposal timeline with CORDIS network analytics and an evaluator’s reading of your draft."
   },
   "pricing": {
-    "title": "Fabrika Pricing",
+    "title": "{brand} Pricing",
     "subtitle": "Choose the perfect plan for your team",
     "starter": "Starter",
     "starter_desc": "For small organizations and startups",
@@ -537,8 +537,8 @@
     "cta_title": "Ready to get started?",
     "cta_subtitle": "Start today — try free for 14 days",
     "contact_us": "Contact Us",
-    "metaTitle": "Pricing — Fabrika AI-Powered EU Funding Platform",
-    "metaDescription": "Fabrika pricing: Starter, Professional and Enterprise plans. Free trial, monthly or yearly billing, custom enterprise solutions available."
+    "metaTitle": "Pricing — {brand} AI-Powered EU Funding Platform",
+    "metaDescription": "{brand} pricing: Starter, Professional and Enterprise plans. Free trial, monthly or yearly billing, custom enterprise solutions available."
   },
   "settings": {
     "privacy": {
@@ -601,11 +601,11 @@
   },
   "legal": {
     "privacy": {
-      "metaTitle": "Privacy Policy & GDPR Disclosure — Fabrika",
-      "metaDescription": "Fabrika's GDPR and KVKK compliant privacy policy: what we process, why, how long we keep it, and the rights you can exercise.",
+      "metaTitle": "Privacy Policy & GDPR Disclosure — {brand}",
+      "metaDescription": "{brand}'s GDPR and KVKK compliant privacy policy: what we process, why, how long we keep it, and the rights you can exercise.",
       "heading": "Privacy Policy & GDPR Disclosure",
       "controllerHeading": "1. Data Controller",
-      "controllerBody": "Fabrika SaaS Platform, in compliance with GDPR and applicable national laws, prioritizes the security and privacy of all user data.",
+      "controllerBody": "{brand} SaaS Platform, in compliance with GDPR and applicable national laws, prioritizes the security and privacy of all user data.",
       "dataHeading": "2. Data Processed & Collection Purposes",
       "dataBody": "Account registration, session authentication, EU funding call matching, AI-assisted concept note drafting, and subscription billing processes involve processing names, emails, organization profiles, and payment metadata.",
       "rightsHeading": "3. Data Subject Rights (Export & Deletion)",
@@ -615,13 +615,13 @@
       "securityBody": "Your data is partitioned via PostgreSQL Row-Level Security (RLS) in a multi-tenant environment, and uploaded files are protected in encrypted cloud object storage (R2/S3)."
     },
     "terms": {
-      "metaTitle": "Terms of Service — Fabrika",
-      "metaDescription": "Scope of the Fabrika service, the disclaimer covering AI-generated output, and the subscription and credit terms.",
+      "metaTitle": "Terms of Service — {brand}",
+      "metaDescription": "Scope of the {brand} service, the disclaimer covering AI-generated output, and the subscription and credit terms.",
       "scopeBody": "{brand} provides discovery, consortium matching, and AI-assisted proposal preparation tools for Horizon Europe and international research funding."
     },
     "dpa": {
-      "metaTitle": "Data Processing Agreement (DPA) — Fabrika",
-      "metaDescription": "The GDPR-compliant data processing agreement between Fabrika and its customers."
+      "metaTitle": "Data Processing Agreement (DPA) — {brand}",
+      "metaDescription": "The GDPR-compliant data processing agreement between {brand} and its customers."
     }
   },
   "feedback": {
@@ -1083,11 +1083,11 @@
   },
   "ModuleGate": {
     "title": "This module is not available",
-    "askAdmin": "If you need access, talk to your workspace administrator or the Fabrika team.",
+    "askAdmin": "If you need access, talk to your workspace administrator or the {brand} team.",
     "reason": {
       "MODULE_OFF": "The {module} module is turned off for your workspace.",
       "PLAN_UPGRADE_REQUIRED": "The {module} module is outside your subscription. It is included in: {plans}.",
-      "DEV_INTERNAL_ONLY": "The {module} module is in development and is open to the Fabrika team only.",
+      "DEV_INTERNAL_ONLY": "The {module} module is in development and is open to the {brand} team only.",
       "PILOT_MANAGERS_ONLY": "The {module} module is in pilot and is limited to workspace managers.",
       "NO_TENANT": "Your session is not linked to a workspace.",
       "NOT_AUTHENTICATED": "You need to sign in to see this page."
@@ -1379,7 +1379,7 @@
       "ssoCertLabel": "x509 certificate (PEM public key)",
       "ssoHint": "Users on this domain are sent straight to the identity provider when they sign in.",
       "ssoIssuerPlaceholder": "e.g. https://sso.your-org.edu/idp/shibboleth",
-      "ssoAcsPlaceholder": "e.g. https://fabrika.app/api/auth/saml/acs",
+      "ssoAcsPlaceholder": "e.g. https://{brand}.app/api/auth/saml/acs",
       "ssoCertPlaceholder": "Paste the PEM content starting with -----BEGIN CERTIFICATE-----",
       "ssoSaveFailed": "The SAML SSO settings could not be saved. Please try again.",
       "ssoSaved": "SAML SSO settings saved.",

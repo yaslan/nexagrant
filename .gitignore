@@ -85,3 +85,9 @@ cpanel_*.tar.gz
 # Throwaway compile probe from tests/prisma-delegate-types-are-real.test.ts —
 # removed by the test itself; ignored so a killed run leaves nothing tracked.
 .prisma-delegate-probe/
+
+# .claude/worktrees — isolated development environments created by CLI tools.
+# They are internal project directories not part of the main codebase and should
+# not be tested or tracked; test runners must exclude **/.claude/worktrees/** to
+# avoid collecting test files from stale/diverged worktrees.
+.claude/worktrees/
