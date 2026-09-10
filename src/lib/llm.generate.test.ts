@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import crypto from 'crypto';
 
 /**
- * TASK-MTSXGXBCJ007W — Fabrika used to carry two LLM adapters. Both wrote
+ * TASK-MTSXGXBCJ007W — FonBridge used to carry two LLM adapters. Both wrote
  * `AiUsageLog` and both moved `CreditLedger`, with different formulas: the same
  * 4.000-in / 1.000-out call cost **1** credit through `src/lib/ai/llm.ts` and
  * **7** through `src/lib/llm.ts`, inside the same module (M2), decided purely by

@@ -1,5 +1,5 @@
 /**
- * Centralized SEO-Friendly Localized Route Resolver for Fabrika
+ * Centralized SEO-Friendly Localized Route Resolver for FonBridge
  * Generates canonical, language-aware URLs for both public marketing and in-app workspace pages.
  */
 

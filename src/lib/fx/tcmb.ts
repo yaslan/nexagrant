@@ -41,7 +41,7 @@ import { env } from '@/lib/env';
  * the shift is visible on the record rather than implied.
  */
 
-/** Currencies Fabrika can invoice in that are not already TRY. */
+/** Currencies FonBridge can invoice in that are not already TRY. */
 export type ConvertibleCurrency = 'USD' | 'EUR';
 
 export interface TcmbRate {

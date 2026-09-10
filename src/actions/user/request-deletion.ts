@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import { env } from '@/lib/env';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 /**
  * KVKK md.7 & md.11 / GDPR art.17 — right to erasure.
@@ -196,7 +197,7 @@ async function notifySubject(email: string, locale: string, purgeAt: Date): Prom
 
   try {
     await client.emails.send({
-      from: 'Fabrika <noreply@fabrika.app>',
+      from: `${PRODUCT_NAME} <noreply@usfinbridge.com>`,
       to: email,
       subject: isTr ? 'Hesap silme talebiniz alındı' : 'Your account deletion request',
       text: isTr

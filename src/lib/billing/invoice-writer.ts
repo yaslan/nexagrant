@@ -227,7 +227,7 @@ export function nextSequence(latestNumber: string | null, year: number): number 
  * The correct value depends on whether the *buyer* is registered with GİB as an
  * e-Fatura taxpayer: `TICARIFATURA` if they are, `EARSIVFATURA` if they are not.
  * Answering that requires a query against the GİB register through a licensed
- * integrator, and Fabrika has no integrator contract yet — so today the answer
+ * integrator, and FonBridge has no integrator contract yet — so today the answer
  * is genuinely unknown.
  *
  * `EARSIVFATURA` is written, and every invoice issued this way also raises a

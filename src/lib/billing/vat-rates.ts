@@ -20,7 +20,7 @@
  * There is no default and no nearest neighbour. A country missing from this
  * table means "we do not know what this sale is taxed at", and the invoice
  * writer refuses to issue rather than assuming 20% (or 0%). Assuming 20% would
- * overcharge a buyer in a country with no VAT; assuming 0% would leave Fabrika
+ * overcharge a buyer in a country with no VAT; assuming 0% would leave FonBridge
  * owing a tax it never collected. Both are inventions on a fiscal document —
  * the same rule the TCMB outage decision applies to exchange rates (ADR-0002).
  *
@@ -28,7 +28,7 @@
  *
  * One row, with a source a person can check and the date the rate took effect.
  * Do not add a country from memory, and do not copy a rate from a blog post.
- * "Reduced" and sector-specific rates are deliberately not modelled: Fabrika
+ * "Reduced" and sector-specific rates are deliberately not modelled: FonBridge
  * sells one kind of thing (a SaaS subscription), so one standard rate per
  * country is the whole question here. If that stops being true, this table
  * grows a product dimension — it does not grow a special case in a caller.
@@ -91,7 +91,7 @@ export interface CountryVatRate {
 }
 
 /**
- * Every country Fabrika can currently work out the VAT for.
+ * Every country FonBridge can currently work out the VAT for.
  *
  * Two rows today, and that is the honest size of what has been sourced. The
  * table is deliberately short rather than deliberately complete: a long list of

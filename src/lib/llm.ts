@@ -1,5 +1,5 @@
 /**
- * LLM adapter — the ONE entry point every Fabrika LLM call goes through
+ * LLM adapter — the ONE entry point every FonBridge LLM call goes through
  * (CLAUDE.md rule 5).
  *
  * Until TASK-MTSXGXBCJ007W there were two: this file and `src/lib/ai/llm.ts`.
@@ -430,8 +430,9 @@ export async function generateText(options: LlmGenerateOptions): Promise<string>
 // ─────────────────────────────────────────────────────────────────────────────
 // Embeddings
 //
-// The RAG path used to call OpenAI directly from `src/lib/rag.ts` and
-// `src/lib/ai/rag.ts`, so the full text of every uploaded document left the
+// The RAG path used to call OpenAI directly from `src/lib/rag.ts` and its twin
+// `src/lib/ai/rag.ts` (merged away in TASK-MTU6KE36HAFJR), so the full text of
+// every uploaded document left the
 // building in 1000-character chunks and left *zero* rows behind: no tenant, no
 // promptHash, no record at all (TASK-MTSWVADF7RQ1B). That breaks CLAUDE.md rule
 // 5 and, because a document upload is personal data processing, GDPR art. 30's

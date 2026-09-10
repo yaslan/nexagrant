@@ -79,7 +79,7 @@ export function getDisableCascade(
 export interface ModuleViewer {
   /** Tenant role, as stored on `Membership.role`. */
   role: string;
-  /** Fabrika staff — the only people a `DEV` module is for. */
+  /** FonBridge staff — the only people a `DEV` module is for. */
   isPlatformAdmin: boolean;
 }
 
@@ -114,7 +114,7 @@ const PILOT_ROLES = ['TENANT_OWNER', 'TENANT_ADMIN', 'PIPELINE_MANAGER'];
  * `docs/adr/ADR-0001-module-state-access-gate.md`.
  *
  *   OFF   → nobody, platform admins included. "This tenant does not have it."
- *   DEV   → Fabrika staff only. Work in progress; the tenant's own owner is *not*
+ *   DEV   → FonBridge staff only. Work in progress; the tenant's own owner is *not*
  *           an insider, which is exactly the case the previous `role === 'TENANT_OWNER'`
  *           test got wrong: every tenant has an owner, so DEV let everyone in.
  *   PILOT → the tenant's managers, plus staff.

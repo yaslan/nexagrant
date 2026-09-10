@@ -123,7 +123,7 @@ export function exchangeRateFromRecord(
 
 /**
  * The seller's fiscal identity, read from configuration rather than the
- * database: it describes Fabrika itself, is the same on every tenant's invoice,
+ * database: it describes FonBridge itself, is the same on every tenant's invoice,
  * and is not the application's to choose.
  */
 export interface SupplierSettings {
@@ -179,7 +179,7 @@ export function resolveSupplier(settings: SupplierSettings): InvoiceParty {
     city: settings.city!.trim(),
     country: settings.country?.trim() || 'Türkiye',
     ...(settings.email?.trim() ? { email: settings.email.trim() } : {}),
-    // Whether Fabrika is a registered e-invoice taxpayer is a fact about its
+    // Whether FonBridge is a registered e-invoice taxpayer is a fact about its
     // GİB registration, not a flag this code may assert. It is left unset until
     // something actually checks the register.
   };

@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import type { SubStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { getActiveTier } from '@/lib/billing/active-tier';
 import { CATALOG_CURRENCY, priceLine, UnknownSkuError } from '@/lib/billing/catalog';
 import {
@@ -621,7 +622,7 @@ export async function logInvoicePayment(
     },
   });
 
-  // The invoice document Fabrika issues for this payment, shared with the
+  // The invoice document FonBridge issues for this payment, shared with the
   // iyzico path (TASK-MTSWL8ADKZKDM). Stripe's own hosted invoice is a receipt
   // from Stripe; it is not a Turkish e-Fatura and cannot be filed with GİB.
   //
@@ -666,8 +667,12 @@ export async function logInvoicePayment(
  * that is the wording the customer saw at checkout. When Stripe sends no
  * description the line falls back to naming the period rather than inventing a
  * plan name — the invoice may be vague about the product, never wrong about it.
+ *
+ * TODO: fallback text is hard-coded English; should be bound to locale
+ * and catalogued in messages/<locale>.json once createInvoiceForPayment
+ * receives tenant locale.
  */
 function invoiceLineDescription(invoice: Stripe.Invoice): string {
   const first = invoice.lines?.data?.[0]?.description?.trim();
-  return first && first.length > 0 ? first : 'Fabrika abonelik dönemi';
+  return first && first.length > 0 ? first : `${PRODUCT_NAME} subscription period`;
 }

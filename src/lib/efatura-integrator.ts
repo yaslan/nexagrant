@@ -1,12 +1,12 @@
 import { UNFILED_NOTICE, foreignCurrencyFilingBlock, type EfaturaDocument } from '@/lib/efatura';
 
 /**
- * The seam between Fabrika and a GİB e-invoice integrator.
+ * The seam between FonBridge and a GİB e-invoice integrator.
  *
  * Turkey does not let an application file an invoice with GİB directly: filing
  * goes through a licensed integrator (özel entegratör), which issues the
  * credentials and returns the envelope id that makes a document fiscally real.
- * Fabrika has no such contract yet, so **no invoice is filed anywhere today**.
+ * FonBridge has no such contract yet, so **no invoice is filed anywhere today**.
  *
  * What this module is for is making that state unmistakable instead of
  * invisible:
@@ -111,7 +111,7 @@ export type FilingOutcome =
   /** The integrator answered, and refused the document. */
   | { status: 'rejected'; code: string; message: string }
   /**
-   * Fabrika refused to send the document at all, because it is not yet fit to
+   * FonBridge refused to send the document at all, because it is not yet fit to
    * be filed. Unlike `rejected`, nothing left this process: no integrator was
    * called, so this outcome costs nothing and can be re-evaluated once the
    * missing figures exist.
