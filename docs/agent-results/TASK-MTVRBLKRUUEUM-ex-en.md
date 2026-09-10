@@ -272,6 +272,14 @@ zzk1 Topic: 0
 ZZPROBE Call: 0
 ```
 
+**Dürüstlük notu:** commit'ten sonraki son kontrolde tablo 34 değil **36** gösterdi.
+İki satırın ikisi de `beta-feedback`, `2026-09-10T17:16:23Z` damgalı — benim son
+temizliğimden (17:14) ve son test koşumdan **sonra**, bir komşu ajanın test koşusundan
+gelmiş. `alertDedupeKey` taşımıyorlar, yani bu kartın ürettiği satırlar değil. Başka
+bir ajanın verisini silmedim; bu zaten bilinen ve kayıtlı bir sorun
+(`.live.test.ts` dosyaları operatör konsoluna kalıcı satır bırakıyor). Bu kartın kendi
+doğrulama çöpü **sıfır**: yukarıdaki taramada `with alertDedupeKey=0`.
+
 ### 2.6 Kapılar
 
 ```
