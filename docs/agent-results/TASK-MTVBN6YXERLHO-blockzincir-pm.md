@@ -346,11 +346,34 @@ Tüm komut çıktıları yukarıda ilgili bölümlerde yapıştırıldı. `git d
  1 file changed, 6 insertions(+)
 ```
 
+### Commit kaydı — dosyalarım başka bir ajanın commit'ine süpürüldü
+
+`docs/ROADMAP.md` ve bu rapor, ben kendi commit'imi atmadan önce paralel çalışan bir ajanın
+geniş commit'ine dahil oldu:
+
+```
+$ git log --oneline -1 -- docs/ROADMAP.md
+4ac3847 docs(agent-results): TASK-MTVBJW8ATMD3G — i18n gate sees hard-coded text
+```
+
+İçerik **kayıpsız** — commit'lenmiş hâle karşı doğrulandı: `git show 4ac3847:docs/ROADMAP.md`
+üç karar maddesini de içeriyor (18/19/20), ve o commit'in ROADMAP'e eklediği başka hiçbir satır
+yok (yalnız benim üç maddem). Rapor da tam. Yani sonuç doğru, ama **atıf yanlış**: bu iş
+`4ac3847`'nin mesajında görünmüyor. Kayıt burada tutuluyor ki karar maddelerinin kaynağı
+izlenebilsin.
+
+`TASK-MTSYCMWFL22CA-blok-zincir-dse.md`'ye eklenmek istenen işaretçi ise ayrı bir dosyaya
+alındı — deponun `pre-commit` hook'u var olan bir kanıt dosyasının değiştirilmesini reddetti
+ve `-<n>.md` sonekini şart koştu:
+`docs/agent-results/TASK-MTSYCMWFL22CA-blok-zincir-dse-2.md`. Orijinal rapor değiştirilmedi
+(400 satır, `git diff` boş).
+
 ## Değişen dosyalar
 
 - `docs/ROADMAP.md` — "Açık kararlar" bölümüne 18/19/20 maddeleri (yalnız ekleme, 6 satır)
 - `docs/agent-results/TASK-MTVBN6YXERLHO-blockzincir-pm.md` — bu dosya
-- **Kod tabanına dokunulmadı** — `git show --name-only` çıktısı aşağıda (§Riskler sonrası commit bölümünde)
+- `docs/agent-results/TASK-MTSYCMWFL22CA-blok-zincir-dse-2.md` — kaynak rapora işaretçi (orijinal dosya değiştirilmedi)
+- **Kod tabanına dokunulmadı** — `git show --name-only` çıktısı §Kanıt'ta
 
 ## Riskler
 
