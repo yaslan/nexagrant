@@ -10,6 +10,9 @@ Kaynak: `prisma/schema.prisma` (bağlayıcı). Bu dosya niyeti ve ilişkileri a�
 - **Kiracıya özel:** geri kalan tümü; `tenantId` zorunlu, RLS `tenant_id = current_setting('app.tenant_id')`.
   Tek istisna sınıfı `tenantId String?` taşıyan tablolardır (`Document`, `Chunk`, `ConceptTemplate`,
   `AuditEvent`) — bkz. §1.1; onlar `tenant_or_shared` politikasını alır.
+  ⚠️ `AuditEvent`'in bu sınıfta olması, onu bir idempotency anahtarı olarak kullanmayı
+  imkânsız kılar: kiracısı olan bir satır, kiracı bağlamı dışında ne yazılabilir ne okunabilir.
+  Stripe webhook'u bu yüzden ayrı bir tabloya taşındı — §17.
 - ⚠️ **`SystemAlert` kiracı içeriği taşımaz.** Tabloda `tenantId` yoktur ve `prisma/rls.sql`
   içinde **hiçbir politikası yoktur** — buraya yazılan her şey kiracı yalıtımının dışındadır.
   Uyarılara başlık, gövde, e-posta, sayfa adresi veya `tenantId` yazılmaz; yalnızca
@@ -787,3 +790,44 @@ girmemiş olsa bile. `SYSTEM_WIDE` / `NULLABLE_TENANT` istisnaları yine
 `scripts/rls-models.ts`'ten okunur, böylece üç kapı "kapsandı"nın ne demek
 olduğu konusunda ayrışamaz. Muafiyet listesi **yoktur**: bir tabloyu listeye
 yazmak, kartın kapattığı pencereyi kalıcı hâle getirmek olurdu.
+
+## 17. `StripeEventLog` — webhook idempotency anahtarı (TASK-MTVSBEO7VX6Y4 · ADR-0003)
+
+Stripe webhook'unun "bu olayı zaten işledim" kaydı. Üç handler
+(`syncStripeSubscription`, `handleSubscriptionCancellation`, `logInvoicePayment`)
+her teslimatın başında bu tabloyu okur ve parayı yazan transaction'ın **ilk**
+ifadesinde satırı ekler.
+
+| Sütun | Tip | Not |
+|---|---|---|
+| `id` | `String @id @default(cuid())` | Geriye dönük dolumla gelen satırlar `gen_random_uuid()` taşır |
+| `tenantId` | `String` (NOT NULL) | `tenant_isolation` politikasını almasının sebebi bu |
+| `stripeEventId` | `String @unique` | Kilidi veritabanına devreden kısıt |
+| `handler` | `String` | `subscription.sync` \| `subscription.cancel` \| `invoice.payment` |
+| `processedAt` | `DateTime @default(now())` | Dolumda kaynak `AuditEvent.createdAt` |
+
+**Neden `AuditEvent` yetmedi.** Anahtar önceden bir `AuditEvent` satırıydı ve
+`data->>'stripeEventId'` ile aranıyordu. `AuditEvent.tenantId` nullable olduğu
+için o tablo §1.1'deki `tenant_or_shared` sınıfındadır: kiracısı **olan** bir
+satır ancak `app.tenant_id` o kiracıya ayarlıyken yazılabilir ve okunabilir.
+Anahtar ise en sonda, paradan sonra, `withTenant`'ın **dışında** yazılıyordu.
+Bugün uygulama BYPASSRLS bir rolle (`fabrika`) bağlandığı için bu görünmüyor;
+`fabrika_app` altında ölçüldü: para yazıldı (`Subscription=1 CreditLedger=1`),
+anahtar yazılamadı (`AuditEvent=0`), guard okuması kör
+(`no tenant set: 0`), ve iptal edilmiş bir abonelik bayat bir `active`
+olayının tekrar gönderimiyle ACTIVE'e dönüp aylık tahsisi ikinci kez aldı.
+
+**Neden UNIQUE.** Oku-sonra-yaz guard'ı tekrar gönderimi çözer, aynı olayın iki
+**eşzamanlı** teslimatını çözmez. Ölçüldü: kısıt kaldırıldığında 8 eşzamanlı
+teslimat 8 anahtar + 8 kredi satırı yazıyor (777 yerine 6216 kredi); kısıt
+yerindeyken 1 + 1. Kilit artık denetim izinden ayrıdır — `AuditEvent` satırları
+yazılmaya devam eder, ama birinin silinmesi bir tekrar oynatmanın kilidini
+açmaz.
+
+**Büyüme ve budama.** Webhook başına bir satır, satır ~150 bayt. Budama işi
+**bugün yok**; Stripe üç gün tekrar gönderdiği için 90 günden eski satırlar
+güvenle silinebilir, ama o ayrı bir kart (bkz. ADR-0003 §Riskler).
+
+RLS: politika `prisma/rls.sql` tenant-scoped dizisinde **ve** kendi
+migration'ında (`prisma/migrations/add-stripe-event-log/migration.sql`) —
+§16'nın kuralı. Geri alma: aynı dizinde `down.sql`.

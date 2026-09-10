@@ -43,6 +43,7 @@ model Tenant {
   invoices      Invoice[]
   billingIdentity TenantBillingIdentity?
   planAssignments PlanAssignment[]
+  stripeEvents  StripeEventLog[]
   @@index([deletedAt])
 }
 
@@ -1130,6 +1131,37 @@ model AuditEvent {
   createdAt DateTime @default(now())
   tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   @@index([tenantId, createdAt])
+}
+
+// The idempotency key of a payment-provider webhook delivery (ADR-0003).
+//
+// This used to be an `AuditEvent` row, found by `data->>'stripeEventId'`. That
+// worked only because the app connects as a BYPASSRLS role: `AuditEvent` carries
+// the `tenant_or_shared` policy, so under `fabrika_app` the key could neither be
+// written nor read outside a tenant transaction — and it was written last, after
+// the money. A webhook therefore granted credits, failed to record the key, and
+// Stripe's redelivery re-ran the whole handler (TASK-MTVSBEO7VX6Y4, measured).
+//
+// Three things changed here, and each one is the reason a column exists:
+//   • `tenantId` is NOT NULL, so this table takes the plain `tenant_isolation`
+//     policy and lives inside `withTenant` with the money it guards.
+//   • `stripeEventId` is UNIQUE, so a *second* concurrent delivery of the same
+//     event is refused by Postgres rather than by a read-then-write guard that
+//     both deliveries pass. That race was the open gap the old guard's own
+//     docstring admitted to.
+//   • the lock is no longer the audit trail. `AuditEvent` rows are still written
+//     for every event; deleting one no longer unlocks a replay.
+//
+// `handler` names which webhook wrote it, so a replay can be attributed without
+// joining back to the audit trail.
+model StripeEventLog {
+  id            String   @id @default(cuid())
+  tenantId      String
+  stripeEventId String   @unique
+  handler       String   // subscription.sync | subscription.cancel | invoice.payment
+  processedAt   DateTime @default(now())
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId, processedAt])
 }
 
 // ───────────────────────── v1.1+ (M6, M9, M10, M11, M7, marketplace) ─────────────────────────

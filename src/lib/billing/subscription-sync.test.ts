@@ -18,17 +18,35 @@ vi.mock('@/lib/db', () => {
     tenantBillingIdentity: { findUnique: vi.fn() },
     systemAlert: { create: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   };
-  return { prisma };
+
+  // The idempotency key and the audit row are written inside a tenant
+  // transaction since ADR-0003, so this file has to hand `logInvoicePayment` a
+  // `withTenant` too. The transactional client carries only what runs in there:
+  // the claim and the audit row. The invoice document is written *outside* the
+  // transaction (it fetches a TCMB rate and raises SystemAlerts through the
+  // bare client), which is why `invoice` stays on `prisma` above — if a future
+  // change moved it inside, the tests here would fail on a missing delegate
+  // rather than pass quietly.
+  const tx: Record<string, unknown> = {
+    stripeEventLog: { create: vi.fn(), findUnique: vi.fn() },
+    auditEvent: { create: vi.fn() },
+  };
+  const withTenant = vi.fn(
+    async (_tenantId: string, callback: (client: typeof tx) => Promise<unknown>) => callback(tx)
+  );
+  return { prisma, withTenant, __tx: tx };
 });
 
 import { logInvoicePayment } from './subscription-sync';
 import { prisma } from '@/lib/db';
+import * as dbModule from '@/lib/db';
 import { PRODUCT_NAME } from '@/lib/brand';
 import trMessages from '../../../messages/tr.json';
 import enMessages from '../../../messages/en.json';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const db = prisma as any;
+const tx = (dbModule as any).__tx;
 
 const TENANT = 'tenant_stripe_1';
 
@@ -59,6 +77,9 @@ beforeEach(() => {
   retrieve.mockResolvedValue({ metadata: { tenantId: TENANT } });
   db.auditEvent.findFirst.mockResolvedValue(null);
   db.auditEvent.create.mockResolvedValue({ id: 'audit_1' });
+  tx.stripeEventLog.findUnique.mockResolvedValue(null);
+  tx.stripeEventLog.create.mockResolvedValue({ id: 'sel_1' });
+  tx.auditEvent.create.mockResolvedValue({ id: 'audit_1' });
   db.invoice.findFirst.mockResolvedValue(null);
   db.invoice.create.mockResolvedValue({
     id: 'inv_1',
@@ -110,7 +131,10 @@ describe('logInvoicePayment', () => {
     await logInvoicePayment(paidInvoice(), 'evt_2');
 
     // The sale happened and stays recorded; only the document is withheld.
-    expect(db.auditEvent.create).toHaveBeenCalledTimes(1);
+    // The audit row goes through the tenant transaction since ADR-0003, which
+    // is the only scope `AuditEvent`'s policy accepts a tenant row in.
+    expect(tx.auditEvent.create).toHaveBeenCalledTimes(1);
+    expect(db.auditEvent.create).not.toHaveBeenCalled();
     expect(db.invoice.create).not.toHaveBeenCalled();
   });
 
@@ -127,7 +151,7 @@ describe('logInvoicePayment', () => {
     db.invoice.findFirst.mockRejectedValue(new Error('database is down'));
 
     await expect(logInvoicePayment(paidInvoice(), 'evt_4')).resolves.toBeUndefined();
-    expect(db.auditEvent.create).toHaveBeenCalledTimes(1);
+    expect(tx.auditEvent.create).toHaveBeenCalledTimes(1);
   });
 
   /**
@@ -183,7 +207,7 @@ describe('logInvoicePayment', () => {
       db.tenant.findUnique.mockRejectedValue(new Error('database is down'));
 
       await expect(logInvoicePayment(noDescription(), 'evt_loc_down')).resolves.toBeUndefined();
-      expect(db.auditEvent.create).toHaveBeenCalledTimes(1);
+      expect(tx.auditEvent.create).toHaveBeenCalledTimes(1);
     });
 
     it('never translates the description Stripe itself sent', async () => {
@@ -200,7 +224,46 @@ describe('logInvoicePayment', () => {
 
     await logInvoicePayment(paidInvoice(), 'evt_5');
 
-    expect(db.auditEvent.create).not.toHaveBeenCalled();
+    expect(tx.auditEvent.create).not.toHaveBeenCalled();
+    expect(tx.stripeEventLog.create).not.toHaveBeenCalled();
+    expect(db.invoice.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ADR-0003 — the idempotency key is claimed in the same transaction as the
+   * audit row, and a claim that loses the race writes nothing.
+   */
+  it('claims the event in the tenant transaction before recording it', async () => {
+    await logInvoicePayment(paidInvoice(), 'evt_claim_1');
+
+    expect(tx.stripeEventLog.create).toHaveBeenCalledTimes(1);
+    expect(tx.stripeEventLog.create.mock.calls[0][0].data).toEqual({
+      tenantId: TENANT,
+      stripeEventId: 'evt_claim_1',
+      handler: 'invoice.payment',
+    });
+  });
+
+  it('records nothing when a concurrent delivery already claimed the event', async () => {
+    // What Postgres raises when the UNIQUE index on `stripeEventId` refuses the
+    // second of two simultaneous deliveries.
+    tx.stripeEventLog.create.mockRejectedValue(
+      Object.assign(new Error('Unique constraint failed'), { code: 'P2002' })
+    );
+
+    await expect(logInvoicePayment(paidInvoice(), 'evt_claim_2')).resolves.toBeUndefined();
+
+    expect(tx.auditEvent.create).not.toHaveBeenCalled();
+    expect(db.invoice.create).not.toHaveBeenCalled();
+  });
+
+  it('skips the whole handler when the fast-path read finds the event', async () => {
+    tx.stripeEventLog.findUnique.mockResolvedValue({ id: 'sel_old' });
+
+    await logInvoicePayment(paidInvoice(), 'evt_claim_3');
+
+    expect(tx.stripeEventLog.create).not.toHaveBeenCalled();
+    expect(tx.auditEvent.create).not.toHaveBeenCalled();
     expect(db.invoice.create).not.toHaveBeenCalled();
   });
 });
