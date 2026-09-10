@@ -230,6 +230,52 @@ async function main() {
     });
   }
 
+  // 2b. PlanVersion v1 — kept in lockstep with the Plan row above.
+  //
+  // `add-plan-versioning`'s migration created v1 of every plan by copying
+  // whatever was in `Plan` at the moment the migration ran, once, and never
+  // again (`WHERE NOT EXISTS`). PlanVersion is otherwise only written by
+  // `publishVersion` (the studio's draft → published flow) — nothing kept v1
+  // itself in sync with `Plan`/`catalog.ts` on a reseed. Measured on this
+  // database on 2026-09-10: `Plan.pro` was 8_700/74_700 (correct, because the
+  // upsert above always resets it) while `PlanVersion` v1 for `pro` sat at
+  // 12_345/123_450 — a value that appears nowhere in catalog.ts, left behind
+  // by a test fixture (`tests/plan-storefront.spec.ts`) that reprices this
+  // exact row in `beforeAll` and did not reach its `afterAll` restore. Every
+  // customer-facing price (pricing page, billing panel, checkout) reads
+  // `PlanVersion`, not `Plan` — see `src/lib/billing/storefront.ts` — so that
+  // divergence reached real surfaces while `Plan` looked fine.
+  //
+  // This only ever touches version 1. A plan the studio has actually
+  // repriced carries a higher, separately published version (`publishVersion`
+  // archives v1 when it publishes v2), so this reset cannot clobber real
+  // studio pricing — it only heals drift on the baseline version a reseed is
+  // supposed to guarantee.
+  for (const p of plans) {
+    const versionId = `pv_${p.id}_1`;
+    const versionData = {
+      monthlyCents: p.monthlyCents,
+      yearlyCents: p.yearlyCents,
+      currency: p.currency,
+      seats: p.seats,
+      workspaces: p.workspaces,
+      aiCreditsMonthly: p.aiCreditsMonthly,
+      modules: p.modules,
+    };
+    await prisma.planVersion.upsert({
+      where: { planId_version: { planId: p.id, version: 1 } },
+      update: versionData,
+      create: {
+        id: versionId,
+        planId: p.id,
+        version: 1,
+        status: 'published',
+        publishedAt: new Date(),
+        ...versionData,
+      },
+    });
+  }
+
   // Retired EUR plan rows. `prisma migrate` moved the subscriptions off them
   // (prisma/migrations/retire-eur-plan-ladder.sql); this keeps a database that
   // is re-seeded without replaying the migration from growing them back.
