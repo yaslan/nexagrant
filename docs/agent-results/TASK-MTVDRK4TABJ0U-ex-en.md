@@ -216,6 +216,14 @@ Sonuç: `isTr ? 'TR' : 'EN'` deseni **29 dosyada** yaşıyor (`src/app/[locale]/
 
 **Paylaşımlı ağaç gürültüsü (bu kartın kusuru değil):** çalışma sırasında kardeş ajan(lar) `BillingIdentityForm.tsx` + `billing-identity-action.test.ts` ekledi; ara koşularda i18n kapısı 24 eksik `billingPanels.settings.identity*` anahtarıyla, typecheck 4 hatayla kırmızıydı, sonra kendiliğinden düzeldi. Katalog yazarken okuma-yaz yarışı kontrol edildi: kardeşin 31 `identity*` anahtarı **korundu** (`identity* keys present: 31`, iki dilde). Ayrıca `tests/withholding-rounding.test.ts` ve `invoice-writer.test.ts` tam suit yükü altında `Test timed out in 5000ms` ile düştü, **izole koşuda 33/33 geçti** — yük kaynaklı flake, bu kartla ilgisiz.
 
+**R-5 · Bu kartın commit'i bana ait değil (provenans, düşük ama iz bırakır)**
+Dört dosyam da (`CookieConsent.tsx`, `messages/tr.json`, `messages/en.json`, bu rapor)
+kardeş bir ajanın geniş `git add`'i ile **`301ce22 docs(qa): the alert pile is 90% debris…`**
+commit'ine karıştı. İçerik doğrulandı — `git diff HEAD` dört dosyada da boş, commit'teki
+gövde benim doğruladığım gövdeyle birebir (yukarıdaki `git show HEAD:` çıktıları). Kayıp yok,
+ama commit mesajı bu değişikliği anlatmıyor: çerez banner'ı düzeltmesi git geçmişinde
+"alert pile" başlığı altında aranacak.
+
 ---
 
 ## 5. Açık sorular
