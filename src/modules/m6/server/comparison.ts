@@ -5,7 +5,7 @@
  * for score integrity, reviewer access, and tenant isolation.
  */
 
-import { prisma, withTenant } from '@/lib/db';
+import { assertTenantScope, withTenant } from '@/lib/db';
 import {
   compareWithEsr,
   esrScoreFromProposal,
@@ -25,12 +25,33 @@ export interface M6EsrComparisonResult extends EsrComparisonResult {
  * Compare M6 panel score to ESR for a specific evaluation.
  * Fetches the evaluation and proposal, validates reviewer access, then returns comparison.
  *
+ * Why `tenantId` is required in *both* overloads (TASK-MTV5GFB75N43S): this is the
+ * exact twin of the scoring defect closed in TASK-MTUIPYSSNLVWG, one file over.
+ * The two-argument form used to accept no tenant, and omitting it did not narrow
+ * the lookup — it handed `compareM6ToESRInternal` the global `prisma` client
+ * (which connects as a role RLS does not constrain) and then short-circuited the
+ * ownership check below, because the guard read `tenantId && evaluation.tenantId
+ * !== tenantId`. With no tenant, `findUnique({ where: { id } })` is a lookup by a
+ * known id *across tenants*: any caller holding an evaluation id would have been
+ * handed that evaluation's panel scores, reviewer roster and ESR comparison.
+ *
+ * No caller in the repo took that branch, so nothing leaked; the defect was the
+ * signature, which kept `pnpm typecheck` green for whoever wrote
+ * `compareM6ToESR('eval-1')` next.
+ *
+ * The branch is gone rather than fixed: a tenant-less call no longer compiles,
+ * and {@link assertTenantScope} — the repo's query-boundary guard in
+ * `src/lib/db.ts` — refuses `''`, whitespace, `null` and `undefined` arriving
+ * from untyped code before any query is issued. The ownership guard is now
+ * unconditional. Behaviour for a tenant-scoped call is unchanged.
+ *
+ * @throws MissingTenantScopeError if called without a tenant
  * @throws EvaluationNotFoundError if evaluation or proposal not found
  * @throws UnauthorizedError if reviewer lacks access
  */
 export async function compareM6ToESR(
   evaluationId: string,
-  tenantId?: string,
+  tenantId: string,
 ): Promise<M6EsrComparisonResult>;
 export async function compareM6ToESR(
   db: TenantScopedDb,
@@ -47,28 +68,22 @@ export async function compareM6ToESR(
   if (typeof dbOrEvaluationId === 'string') {
     const evaluationId = dbOrEvaluationId;
     const tenantId = evaluationIdOrTenantId;
-    if (tenantId) {
-      return withTenant(tenantId, (tx) =>
-        compareM6ToESRInternal(tx, evaluationId, tenantId, currentUserId)
-      );
-    }
-    return compareM6ToESRInternal(
-      prisma as unknown as TenantScopedDb,
-      evaluationId,
-      undefined,
-      currentUserId
+    assertTenantScope(tenantId, 'compareM6ToESR');
+    return withTenant(tenantId, (tx) =>
+      compareM6ToESRInternal(tx, evaluationId, tenantId, currentUserId)
     );
   }
   const db = dbOrEvaluationId;
   const evaluationId = evaluationIdOrTenantId!;
   const tenantId = tenantIdParam;
+  assertTenantScope(tenantId, 'compareM6ToESR');
   return compareM6ToESRInternal(db, evaluationId, tenantId, currentUserId);
 }
 
 async function compareM6ToESRInternal(
   db: TenantScopedDb,
   evaluationId: string,
-  tenantId?: string,
+  tenantId: string,
   currentUserId?: string,
 ): Promise<M6EsrComparisonResult> {
   const evaluation = await db.evaluation.findUnique({
@@ -86,7 +101,7 @@ async function compareM6ToESRInternal(
     },
   });
 
-  if (!evaluation || (tenantId && evaluation.tenantId !== tenantId)) {
+  if (!evaluation || evaluation.tenantId !== tenantId) {
     throw new Error(`Evaluation ${evaluationId} not found or access denied`);
   }
 
