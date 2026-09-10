@@ -95,7 +95,7 @@ function payment(overrides: Partial<PaymentForInvoice> = {}): PaymentForInvoice 
     paymentRef: 'pay_1',
     amountMinor: 120_000,
     currency: 'TRY',
-    description: 'Fabrika Pro (1 ay)',
+    description: 'FonBridge Pro (1 ay)',
     paidAt: new Date('2026-09-08T10:00:00.000Z'),
     provider: 'iyzico',
     ...overrides,
@@ -336,7 +336,7 @@ describe('createInvoiceForPayment — when an invoice is issued', () => {
     // ₺1200 charged at 20% is stored as ₺1000 net; the exporter adds the VAT back.
     expect(row.lines).toEqual([
       {
-        name: 'Fabrika Pro (1 ay)',
+        name: 'FonBridge Pro (1 ay)',
         quantity: 1,
         unitCode: 'MON',
         unitPriceMinor: 100_000,
@@ -355,7 +355,7 @@ describe('createInvoiceForPayment — when an invoice is issued', () => {
 
     expect(result).toMatchObject({ status: 'issued' });
     expect(db.created[0]!.lines).toEqual([
-      { name: 'Fabrika Pro (1 ay)', quantity: 1, unitCode: 'MON', unitPriceMinor: 2, vatRate: 20 },
+      { name: 'FonBridge Pro (1 ay)', quantity: 1, unitCode: 'MON', unitPriceMinor: 2, vatRate: 20 },
       { name: ROUNDING_LINE_NAME, quantity: 1, unitCode: 'C62', unitPriceMinor: 1, vatRate: 0 },
     ]);
   });

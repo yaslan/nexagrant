@@ -45,7 +45,7 @@ function paidInvoice(overrides: Record<string, unknown> = {}) {
     amount_paid: 120_000,
     currency: 'try',
     hosted_invoice_url: 'https://stripe.test/i/1',
-    lines: { data: [{ description: 'Fabrika Pro — aylık' }] },
+    lines: { data: [{ description: 'FonBridge Pro — aylık' }] },
     ...overrides,
   } as never;
 }
@@ -90,7 +90,7 @@ describe('logInvoicePayment', () => {
       gibEnvelopeId: null,
     });
     // The line text is Stripe's own, so the invoice says what the customer saw.
-    expect(row.lines[0].name).toBe('Fabrika Pro — aylık');
+    expect(row.lines[0].name).toBe('FonBridge Pro — aylık');
     // Adding the VAT back must return exactly the amount that was charged.
     const total = (row.lines as Array<{ unitPriceMinor: number; vatRate: number }>).reduce(
       (sum, l) => sum + l.unitPriceMinor + Math.round((l.unitPriceMinor * l.vatRate) / 100),

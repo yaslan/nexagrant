@@ -144,7 +144,7 @@ export class EurostarsAdapter {
     try {
       logger.info('[EurostarsAdapter] Fetching Eurostars calls');
 
-      const response = await fetch(this.callsUrl, { headers: { 'User-Agent': 'Fabrika/1.0' } });
+      const response = await fetch(this.callsUrl, { headers: { 'User-Agent': 'FonBridge/1.0' } });
       if (!response.ok) {
         const reason = `HTTP ${response.status}: ${response.statusText}`;
         await createAdapterAlert(
