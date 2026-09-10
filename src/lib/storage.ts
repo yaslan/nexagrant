@@ -8,6 +8,7 @@ import {
   DeleteObjectCommand
 } from '@aws-sdk/client-s3';
 import { errorMessage } from '@/lib/errors';
+import { env } from '@/lib/env';
 
 const s3 = process.env.R2_ACCOUNT_ID ? new S3Client({
   region: 'auto',
@@ -18,7 +19,32 @@ const s3 = process.env.R2_ACCOUNT_ID ? new S3Client({
   },
 }) : null;
 
-const BUCKET = process.env.R2_BUCKET || 'fonbridge-evidence';
+/**
+ * The R2 bucket every object in this module is read from and written to, and
+ * the value `Evidence.fileBucket` records. Exported because it is the single
+ * source: a caller that hard-codes the name drifts away from `R2_BUCKET` the
+ * moment the deployment sets it (TASK-MTV5ESBVAHUEV).
+ *
+ * The default is the historical bucket, deliberately unchanged — every stored
+ * object lives under it, and renaming a bucket orphans its contents.
+ */
+export const EVIDENCE_BUCKET = env.R2_BUCKET || 'fonbridge-evidence';
+
+/** Public origin serving R2 objects, trailing slash stripped; null when unset. */
+const PUBLIC_HOST = env.R2_PUBLIC_HOST ? env.R2_PUBLIC_HOST.replace(/\/+$/, '') : null;
+
+/**
+ * The public URL of a stored object — the only place one is built.
+ *
+ * Returns `null` when `R2_PUBLIC_HOST` is unset, because with no configured
+ * origin there is no URL that would work. A link is not invented to fill the
+ * gap: the evidence row is then written with `fileUrl = null` and the UI simply
+ * offers no download button, instead of handing the user an address that
+ * resolves nowhere. The file is still identified by its object key.
+ */
+export function publicObjectUrl(objectKey: string): string | null {
+  return PUBLIC_HOST ? `${PUBLIC_HOST}/${objectKey}` : null;
+}
 
 /**
  * Generates an R2 Object Key following the specification bucket path structure:
@@ -49,9 +75,9 @@ export async function getPresignedUploadUrl(
   category: string,
   fileName: string,
   mimeType: string
-): Promise<{ uploadUrl: string; objectKey: string; publicUrl: string }> {
+): Promise<{ uploadUrl: string; objectKey: string; publicUrl: string | null }> {
   const objectKey = generateR2ObjectKey(tenantId, organisationId, category, fileName);
-  const publicUrl = `https://storage.fonbridge.app/${objectKey}`;
+  const publicUrl = publicObjectUrl(objectKey);
 
   if (!s3) {
     // Dev Mode Fallback: Simulated presigned URL
@@ -66,7 +92,7 @@ export async function getPresignedUploadUrl(
   try {
     const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
     const command = new PutObjectCommand({
-      Bucket: BUCKET,
+      Bucket: EVIDENCE_BUCKET,
       Key: objectKey,
       ContentType: mimeType,
     });
@@ -85,31 +111,31 @@ export async function getPresignedUploadUrl(
  * Generates a Presigned GET URL for secure downloading of evidence documents.
  * Valid for 1 hour.
  */
-export async function getPresignedDownloadUrl(objectKey: string): Promise<string> {
+export async function getPresignedDownloadUrl(objectKey: string): Promise<string | null> {
   if (!s3) {
-    return `https://storage.fonbridge.app/${objectKey}`;
+    return publicObjectUrl(objectKey);
   }
 
   try {
     const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
     const command = new GetObjectCommand({
-      Bucket: BUCKET,
+      Bucket: EVIDENCE_BUCKET,
       Key: objectKey,
     });
     return await getSignedUrl(s3, command, { expiresIn: 3600 });
   } catch {
-    return `https://storage.fonbridge.app/${objectKey}`;
+    return publicObjectUrl(objectKey);
   }
 }
 
 /**
  * Uploads a File directly (Server-side helper).
  */
-export async function uploadFileToR2(file: File, tenantId: string): Promise<string> {
+export async function uploadFileToR2(file: File, tenantId: string): Promise<string | null> {
   await new Promise(resolve => setTimeout(resolve, 300));
   const ext = file.name.split('.').pop() || 'pdf';
   const key = `${tenantId}/org-default/general/${new Date().getFullYear()}/${uuidv4().slice(0, 8)}.${ext}`;
-  return `https://storage.fonbridge.app/${key}`;
+  return publicObjectUrl(key);
 }
 
 /**
@@ -122,12 +148,16 @@ export async function deleteFileFromR2(objectKeyOrUrl: string): Promise<boolean>
   }
 
   try {
-    const key = objectKeyOrUrl.startsWith('http') 
-      ? objectKeyOrUrl.replace('https://storage.fonbridge.app/', '')
+    // Any absolute URL yields its path, whatever origin it carries: rows written
+    // before R2_PUBLIC_HOST existed still name the retired storage domain, and a
+    // replace() pinned to one host would leave those keys unstripped and delete
+    // nothing.
+    const key = objectKeyOrUrl.startsWith('http')
+      ? new URL(objectKeyOrUrl).pathname.replace(/^\/+/, '')
       : objectKeyOrUrl;
 
     await s3.send(new DeleteObjectCommand({
-      Bucket: BUCKET,
+      Bucket: EVIDENCE_BUCKET,
       Key: key,
     }));
     return true;
@@ -149,14 +179,14 @@ export async function deleteUserFilesFromR2(userId: string): Promise<void> {
   try {
     const prefix = `users/${userId}/`;
     const listedObjects = await s3.send(new ListObjectsV2Command({
-      Bucket: BUCKET,
+      Bucket: EVIDENCE_BUCKET,
       Prefix: prefix
     }));
 
     if (!listedObjects.Contents || listedObjects.Contents.length === 0) return;
 
     const deleteParams = {
-      Bucket: BUCKET,
+      Bucket: EVIDENCE_BUCKET,
       Delete: {
         Objects: listedObjects.Contents.map((obj) => ({ Key: obj.Key }))
       }
@@ -184,7 +214,7 @@ export async function putObjectToR2(
 
   try {
     await s3.send(new PutObjectCommand({
-      Bucket: BUCKET,
+      Bucket: EVIDENCE_BUCKET,
       Key: objectKey,
       Body: data,
       ContentType: contentType,

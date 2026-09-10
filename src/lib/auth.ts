@@ -33,7 +33,10 @@ const DEMO_PROFILES: Record<string, { orgName: string; orgType: OrgType; role: R
     role: "TENANT_OWNER",
     isPlatformAdmin: true,
   },
-  "mehmet@fonbridge.app": {
+  // RFC 2606 reserves example.com for exactly this: a demo seat printed on the
+  // public login page must not name a domain anyone owns. This one used to be
+  // on the retired brand's domain (TASK-MTV5ESBVAHUEV).
+  "mehmet@example.com": {
     orgName: `${PRODUCT_NAME} SME Ar-Ge Ltd.`,
     orgType: "SME",
     role: "TENANT_OWNER",

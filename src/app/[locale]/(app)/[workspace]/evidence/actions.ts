@@ -7,6 +7,8 @@ import {
   getPresignedUploadUrl,
   deleteFileFromR2,
   uploadFileToR2,
+  publicObjectUrl,
+  EVIDENCE_BUCKET,
 } from '@/lib/storage';
 import { extractEvidenceMetadata } from '@/lib/evidence-ai';
 import { calculateEvidenceHealthScore, HealthScoreResult, MinimalEvidenceItem } from '@/lib/evidence-health';
@@ -89,7 +91,11 @@ export async function confirmEvidenceUploadAction(data: {
 }) {
   const { tenantId, userId } = await requireTenantAction();
 
-  const publicUrl = `https://storage.fonbridge.app/${data.objectKey}`;
+  // Built by the storage module, not here: this line used to concatenate the
+  // storage host itself, which put the same literal in two places and meant the
+  // URL survived every change made in src/lib/storage.ts. `null` when no public
+  // origin is configured — the row then carries no link rather than a dead one.
+  const publicUrl = publicObjectUrl(data.objectKey);
 
   // No reader runs over the file yet, so this reports nothing rather than guessing.
   const extracted = await extractEvidenceMetadata();
@@ -117,7 +123,7 @@ export async function confirmEvidenceUploadAction(data: {
         // and the list badges it as unverified until someone actually checks it.
         status: 'UNVERIFIED',
         r2ObjectKey: data.objectKey,
-        fileBucket: 'fonbridge-evidence',
+        fileBucket: EVIDENCE_BUCKET,
         fileName: data.fileName,
         fileSizeBytes: data.fileSizeBytes,
         mimeType: data.mimeType,

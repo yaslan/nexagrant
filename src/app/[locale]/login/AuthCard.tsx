@@ -331,12 +331,12 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
           <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"
-              onClick={() => handleDemoLogin('mehmet@fonbridge.app')}
+              onClick={() => handleDemoLogin('mehmet@example.com')}
               className="p-2 bg-ground hover:bg-surface border border-border rounded-xl text-left transition flex items-center justify-between group cursor-pointer"
             >
               <div>
                 <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">{tDemo('roleSme')}</div>
-                <div className="text-[10px] text-muted font-mono">mehmet@fonbridge.app</div>
+                <div className="text-[10px] text-muted font-mono">mehmet@example.com</div>
               </div>
               <span className="text-xs text-muted group-hover:text-accent">→</span>
             </button>
