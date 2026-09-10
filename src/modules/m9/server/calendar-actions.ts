@@ -1,7 +1,7 @@
 'use server';
 
 import { requireTenantAction } from '@/lib/tenant';
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { CalendarProviderSchema, type CalendarProviderType } from '@/lib/calendar/provider';
 import { CalendarActionError, SELF_SERVE_PROVIDERS } from '@/lib/calendar/errors';
 
@@ -28,23 +28,40 @@ import { CalendarActionError, SELF_SERVE_PROVIDERS } from '@/lib/calendar/errors
 export async function disconnectCalendar(connectionId: string) {
   const { tenantId, userId } = await requireTenantAction();
 
-  const connection = await prisma.calendarConnection.findUnique({
-    where: { id: connectionId },
+  return withTenant(tenantId, async (tx) => {
+    const connection = await tx.calendarConnection.findUnique({
+      where: { id: connectionId },
+    });
+
+    if (!connection) {
+      throw new CalendarActionError('CALENDAR_CONNECTION_NOT_FOUND');
+    }
+
+    if (connection.tenantId !== tenantId || connection.userId !== userId) {
+      throw new CalendarActionError('CALENDAR_FORBIDDEN');
+    }
+
+    // `deleteMany` with the owner in the `where`, not `delete({ where: { id } })`:
+    // the check above reads the row and the delete writes it, and only the
+    // predicate that travels *with the write* is enforced by the database. The
+    // JS check stays — it is what produces the translatable CALENDAR_FORBIDDEN
+    // the screen shows — but it is no longer the only thing standing between a
+    // foreign `connectionId` and a deleted row (TASK-MTSZ0AL4QP2CT §3.9).
+    const { count } = await tx.calendarConnection.deleteMany({
+      where: { id: connectionId, tenantId, userId },
+    });
+
+    if (count === 0) {
+      // Reachable only if the row was removed between the read and the write,
+      // which is exactly when `delete({ where: { id } })` used to raise Prisma
+      // P2025. That error carried no CALENDAR_* code, so `calendarErrorCode`
+      // returned null and the screen showed `errors.unknown`. This message
+      // carries no code either, so the user-visible outcome is unchanged.
+      throw new Error('Calendar connection delete matched no row');
+    }
+
+    return { success: true };
   });
-
-  if (!connection) {
-    throw new CalendarActionError('CALENDAR_CONNECTION_NOT_FOUND');
-  }
-
-  if (connection.tenantId !== tenantId || connection.userId !== userId) {
-    throw new CalendarActionError('CALENDAR_FORBIDDEN');
-  }
-
-  await prisma.calendarConnection.delete({
-    where: { id: connectionId },
-  });
-
-  return { success: true };
 }
 
 /**
@@ -68,31 +85,33 @@ export async function connectCalendar(
     throw new CalendarActionError('CALENDAR_OAUTH_NOT_CONFIGURED');
   }
 
-  const existing = await prisma.calendarConnection.findUnique({
-    where: { tenantId_userId_provider: { tenantId, userId, provider: providerType } },
-  });
+  return withTenant(tenantId, async (tx) => {
+    const existing = await tx.calendarConnection.findUnique({
+      where: { tenantId_userId_provider: { tenantId, userId, provider: providerType } },
+    });
 
-  if (existing) {
-    throw new CalendarActionError('CALENDAR_ALREADY_CONNECTED');
-  }
+    if (existing) {
+      throw new CalendarActionError('CALENDAR_ALREADY_CONNECTED');
+    }
 
-  const connection = await prisma.calendarConnection.create({
-    data: {
-      tenantId,
-      userId,
+    const connection = await tx.calendarConnection.create({
+      data: {
+        tenantId,
+        userId,
+        provider: providerType,
+        // `.ics` needs no authorisation step, so this row is true the moment it
+        // is written. It used to be `false` under a `{ success: true }`.
+        isConnected: true,
+        externalId: null,
+        accessToken: null,
+        refreshToken: null,
+      },
+    });
+
+    return {
+      connectionId: connection.id,
       provider: providerType,
-      // `.ics` needs no authorisation step, so this row is true the moment it
-      // is written. It used to be `false` under a `{ success: true }`.
-      isConnected: true,
-      externalId: null,
-      accessToken: null,
-      refreshToken: null,
-    },
+      isConnected: connection.isConnected,
+    };
   });
-
-  return {
-    connectionId: connection.id,
-    provider: providerType,
-    isConnected: connection.isConnected,
-  };
 }

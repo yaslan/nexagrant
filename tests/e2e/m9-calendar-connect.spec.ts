@@ -131,4 +131,51 @@ test.describe('M9 calendar connections', () => {
     expect(row?.isConnected).toBe(true);
     expect(row?.lastSyncAt).toBeNull();
   });
+
+  test('.ics disconnects for real and the row leaves the database', async ({ page }) => {
+    // TASK-MTVR7W9ZXO7M — the disconnect half of the same screen, after both
+    // queries moved inside `withTenant` and the delete gained the owner in its
+    // `where`. The row-level guarantees are pinned in
+    // `tests/m9-calendar-tenant-scope.live.test.ts`; what this test proves is
+    // that the happy path still works from a real click.
+    //
+    // The connected row is seeded rather than clicked into place: the connect
+    // flow ends in `window.location.reload()`, and starting a second click while
+    // that reload is in flight raced the button out from under Playwright.
+    // Connecting by click is already covered by the test above.
+    // The connect test above leaves its `.ics` row behind, and
+    // `@@unique([tenantId, userId, provider])` would reject a second one.
+    await clearConnections();
+    const seeded = await prisma.calendarConnection.create({
+      data: {
+        tenantId: F10.full.tenantId,
+        userId: F10.full.userId,
+        provider: 'ics',
+        isConnected: true,
+      },
+    });
+
+    await acceptCookies(page);
+    // The Disconnect button is behind `confirm()`; Playwright dismisses dialogs
+    // by default, which would make this test pass without ever disconnecting.
+    page.on('dialog', (dialog) => dialog.accept());
+    await signIn(page, F10.full.email, calendarSettingsUrl(F10.full.workspaceSlug));
+
+    const icsCard = providerCard(page, '.ics File Import');
+    await expect(icsCard.getByText('Bağlı', { exact: true })).toBeVisible({ timeout: 15_000 });
+
+    await icsCard.getByRole('button', { name: 'Bağlantısını Kes' }).click();
+
+    // The screen returns to its unconnected state — the action reloads the page,
+    // so this waits for the fresh document.
+    await expect(
+      providerCard(page, '.ics File Import').getByRole('button', { name: 'Bağla' }),
+    ).toBeVisible({ timeout: 15_000 });
+    await shot(page, 'disconnect-ics-removed');
+
+    // Asked of the database, not of the return value: `deleteMany` must have
+    // matched the row, not reported a count over an untouched table.
+    const survivor = await prisma.calendarConnection.findUnique({ where: { id: seeded.id } });
+    expect(survivor).toBeNull();
+  });
 });

@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { getWorkspaceRoute } from '@/lib/routes';
 import { requireTenantAction } from '@/lib/tenant';
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { CalendarClient } from './client';
 
@@ -30,9 +30,11 @@ export default async function CalendarSettingsPage({ params }: { params: Promise
   // defect this card's i18n complaint names one line further up the page.
   const t = await getTranslations({ locale, namespace: 'settings.calendar' });
 
-  const connections = await prisma.calendarConnection.findMany({
-    where: { tenantId, userId },
-  });
+  const connections = await withTenant(tenantId, (tx) =>
+    tx.calendarConnection.findMany({
+      where: { tenantId, userId },
+    })
+  );
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
