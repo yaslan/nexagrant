@@ -286,7 +286,13 @@ alındı. (`evaluationsCount: 0` + `passed: true` aynı satırda duruyor — kay
   denetim kaydı üretmeye ve bunu genel API'den yaymaya devam eder.
 - **B / probe kiracı satırı yazdı.** Temizlendi ve temizlik canlı sorguyla doğrulandı
   (§2-B1). Yine de paylaşılan dev DB'ye yazıldığı için not düşülüyor.
-- **Paylaşılan ağaç.** Aynı worktree'de başka ajanlar çalışıyor; commit dar yapıldı.
+- **Paylaşılan ağaç.** Aynı worktree'de başka ajanlar çalışıyor; commit dar yapıldı
+  (`git show --name-only`: tam olarak 6 dosya, komşu işi yok). Commit anında pre-commit
+  kapısı ağaçta **bana ait olmayan** 3 typecheck hatası bildirdi —
+  `tests/e2e/pipeline-note-author.spec.ts` (henüz **untracked**, başka bir ajan yazıyor)
+  şemada bulunmayan `prisma.opportunityNote` modelini çağırıyor
+  (`grep -c OpportunityNote prisma/schema.prisma` → 0). Atfedildi, benim değil:
+  `npx tsc --noEmit | grep -c "src/modules/m6"` → **0**.
 
 ---
 
