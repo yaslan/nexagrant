@@ -98,6 +98,18 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   // Scoped to this run's tenant only; nothing pre-existing is touched.
+  //
+  // `SystemAlert` first, and by `meta.tenantId` rather than by a column: the
+  // table is deliberately tenant-agnostic and carries no `tenantId` of its own
+  // (see src/lib/observability/system-alert.ts), so a "delete everything of
+  // mine" sweep that walks tenant-scoped tables cannot reach it. This spec
+  // asserts that the writer *raises* an alert, which means every run leaves one
+  // behind; without this line the row outlives the tenant it names and becomes
+  // an orphan nobody can resolve. Measured before this line existed: 234 of 268
+  // open alerts named tenants that no longer existed (TASK-MTVFWYKIZXRB1).
+  await prisma.systemAlert.deleteMany({
+    where: { meta: { path: ['tenantId'], equals: tenantId } },
+  });
   await prisma.invoice.deleteMany({ where: { tenantId } });
   await prisma.tenantBillingIdentity.deleteMany({ where: { tenantId } });
   await prisma.tenant.deleteMany({ where: { id: tenantId } });

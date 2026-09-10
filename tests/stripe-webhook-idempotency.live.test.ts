@@ -100,6 +100,16 @@ async function auditRowsFor(eventId: string): Promise<number> {
 }
 
 async function cleanUp(): Promise<void> {
+  // `SystemAlert` is tenant-agnostic by design and has no `tenantId` column
+  // (src/lib/observability/system-alert.ts), so the tenant-scoped sweep below
+  // cannot reach it. `logInvoicePayment` raises `invoice_buyer_identity_missing`
+  // for this fixture — it never supplies a `TenantBillingIdentity` — and the
+  // alert names this run's tenant in `meta`, so it must be matched that way or
+  // it outlives the tenant. 164 of the 234 orphaned alerts measured in
+  // TASK-MTVFWYKIZXRB1 came from this file.
+  await prisma.systemAlert.deleteMany({
+    where: { meta: { path: ['tenantId'], equals: TENANT_ID } },
+  });
   await prisma.auditEvent.deleteMany({ where: { tenantId: TENANT_ID } });
   await prisma.creditLedger.deleteMany({ where: { tenantId: TENANT_ID } });
   await prisma.addOn.deleteMany({ where: { tenantId: TENANT_ID } });
