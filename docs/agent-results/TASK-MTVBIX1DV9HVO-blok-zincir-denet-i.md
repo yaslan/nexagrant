@@ -241,6 +241,20 @@ SONRA: $ pnpm lint 2>&1 | grep -c '^/Users/macbook/AgentSpace/fabrika/.claude'
 ```
 ✅ 465 → 0. Kaynak, iç içe worktree'lerin `.next` derleme çıktılarıydı.
 
+**Bu düşüş komşu kartın eslint düzeltmesinden DEĞİL — zaman damgasıyla:**
+```
+lint-before.txt yazıldı : 12:28:56   ← 465 satır
+worktree'ler kaldırıldı : ~12:30:00
+lint-after.txt  yazıldı : 12:30:21   ← 0 satır
+eslint.config.mjs mtime : 12:30:49   ← SONRA dokunuldu
+```
+`036d6b6 chore(lint): scope eslint to our own source` (TASK-MTVBI1DP4DQGQ) benim **sonra**
+ölçümüm bittikten yaklaşık 28 saniye sonra ağaca geldi; ayrıca ÖNCE ölçümüm 465 satır gördüğüne
+göre o sırada eslint kapsamı henüz daraltılmamıştı. Yani 465→0 farkının sebebi kaldırma işlemidir.
+İki iş birbirini **tamamlıyor**: ben kaynağı (iç içe repo kopyaları) kaldırdım, o kart tarayıcının
+kapsamını daralttı — biri diğerini gereksiz kılmaz, çünkü kapsam daraltma repo-içi yeni bir
+worktree'yi yine dışarıda tutar, kaldırma ise mevcut 465 satırı bugünden siler.
+
 ### 4.3 `pnpm test` süit sayısı
 
 ```
@@ -301,6 +315,14 @@ Kod değişikliği **yok**. Yapılan işlem dosya sistemi + git meta düzeyinde:
 | `worktree-e2e-fix`, `worktree-zztest-validation` dalları | **korundu, silinmedi** |
 
 Yedekler (kalıcı değil, oturum scratchpad'i): `e2e-fix.patch`, `e2e-fix-untracked-report.md`, `zztest-validation.patch`, `lint-before.txt`, `lint-after.txt`.
+
+**Commit notu (paylaşılan ağaç):** Bu raporu ve 4 hafıza dosyasını stage'ledim, ancak commit
+atmadan önce komşu bir ajanın süpüren `git add`/`git commit`'i araya girdi ve beşini birden
+**`4ac3847` (`docs(agent-results): TASK-MTVBJW8ATMD3G — i18n gate sees hard-coded text`)**
+altında commit'ledi. İçerik **kayıpsız** — beş dosyanın da `git diff HEAD --stat` çıktısı boş.
+Geri alınmadı ([[fabrika-parallel-agent-file-race]] kuralı: üzerine yazılmışsan geri alma,
+başkasının işini silersin); yalnız yanlış commit mesajı altında görünüyorlar. Bu satır, ileride
+"bu rapor hangi commit'te" diye arayan için buradadır.
 
 ---
 
