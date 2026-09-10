@@ -1,0 +1,46 @@
+
+### cordis-delta [error]
+  n=1  CORDIS delta item failed to ingest: OPENAI_API_KEY not set
+
+### cordis-delta [warn]
+  n=2  CORDIS delta feed returned HTTP 404
+  n=1  CORDIS delta run skipped: no delta feed endpoint configured
+  n=1  CORDIS delta item skipped: item has no projectId
+
+### cordis-sync [error]
+  n=2  CORDIS record failed to sync: OPENAI_API_KEY not set
+
+### cordis-sync [warn]
+  n=2  CORDIS record carried fields this importer does not map
+  n=1  CORDIS coordinator has no organisation id (PIC); participation not written
+  n=1  CORDIS record skipped: missing project id or title
+
+### invoice_buyer_identity_missing [error]
+  n=227  A payment was taken but no invoice could be issued: the tenant's billing identity is incomplete (buyerName, buyerVknTckn, buyerTaxOffice, buyerAddress
+
+### invoice_not_issued [error]
+  n=2  A payment was taken in USD but the TCMB buying rate for its issue date could not be established, so no invoice was issued. A foreign-currency invoice 
+  n=1  INVOICE_VAT_RATE is not set to a percentage between 0 and 100, so the tax on a sale is unknown and no invoice can be issued. Payments are unaffected.
+
+### invoice_profile_assumed [warn]
+  n=1  Invoices are being issued as EARSIVFATURA without checking whether the buyer is a registered e-Fatura taxpayer; that check needs an integrator contrac
+
+### invoice_vat_country_unknown [error]
+  n=2  A payment was taken but no invoice could be issued: there is no sourced VAT rate for the buyer's country. A rate is a legal fact about a country, so i
+
+### k1_daily_calls [error]
+  n=1  K1 source "sedia" failed: Page 1 fetch error: fetch failed
+
+### k1_daily_calls [warn]
+  n=3  K1 sources returned 7 identifier(s) more than once in a single run; only the last record for each was kept.
+  n=3  K1 sources returned 2 identifier(s) more than once in a single run; only the last record for each was kept.
+
+### k2_monthly_cordis [error]
+  n=5  CORDIS worker unreachable: fetch failed
+
+### k2_monthly_cordis [warn]
+  n=2  CORDIS worker returned HTTP 401
+  n=1  CORDIS worker returned HTTP 500
+
+### m10_document_generation_failed [error]
+  n=1  Follow-up document generation failed for kind NDA: Insufficient AI credits. Please purchase more credits or upgrade your plan.
