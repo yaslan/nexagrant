@@ -121,3 +121,29 @@ canlı haliyle **taze `Read`/`cat`** et (herhangi bir backup/cp/merge çıktıs�
 `git diff --cached -- <yol> | grep <kendi eklediğin metin>` ile son kez kanıtla. Elle patch
 ayıklamak (bu dosyanın (a) tarifi) hâlâ en güvenilir yol; "otomatik" 3 taraflı birleştirme
 bu ofiste güvenilir değil.
+
+## Yeni varyant (2026-09-10): bir ARAÇ paylaşılan defter dosyasını yeniden yazıyor
+
+`pnpm rls:bypass-check --prune` `scripts/tenant-bypass-baseline.json`'u yeniden
+yazıyor — ve kapının kendi çıktısı "commit it with the change that closed them"
+diyor. Ben kendi borç satırımı kapatıp prune koşturdum; `git diff` dosyada
+**devop-fb'nin commit edilmemiş işini** de gösterdi (marketplace borç satırını
+kaldırmış + `$comment` bloğunu güncellemiş). `git commit -- <yol>` çalışma
+ağacının TAMAMINI alır, hunk seçemez: o commit komşunun yarım işini taşıyacaktı.
+
+Prune'u geri aldım (HEAD'den kendi girdimi okuyup aynı indekse geri koydum),
+dosyayı komşuya bıraktım ve raporda kimin neyi borçlu olduğunu yazdım. Kapı zaten
+her koşuda `(fixed — prune me)` yazıyor, yani satır sessizleşemez —
+devredilmiş bir bulgu değil, her koşuda bağıran bir satır.
+
+**Why:** Paylaşılan defter dosyalarına (baseline JSON, snapshot, envanter) yazan
+araçlar dosyayı **bütün olarak** yeniden üretir; senin bir satırlık iyileşmen
+komşunun on satırlık taslağıyla aynı diff'e girer.
+
+**How to apply:** Böyle bir aracı koşturmadan ÖNCE `git status --porcelain <yol>`
+bak. ` M` görüyorsan:
+- Aracı koştur, `git diff` ile **yalnız senin satırın mı değişti** diye bak.
+- Değilse geri al ve dosyayı sahibine bırak; borcu raporda ADIYLA devret.
+- Ya da bu dosyanın hâlâ geçerli olduğunu kanıtla ve blob-stage yolunu kullan
+  (yukarıdaki (b) tarifi) — ama defter dosyasında bu genelde gereksiz risk:
+  ratchet dosyaları düşen sayıyı UYARI olarak raporlar, kırmızı yapmaz.
