@@ -17,9 +17,16 @@
  *          to be reachable (m10-audit-identity).
  *   flip   the tenant whose plan IS the subject. `module-plan-gate` moves it between
  *          `pro` and `ultra` on purpose; owning the tenant is what makes that safe.
+ *   lens   the settings-page counterpart, for `plan-entitlement`. That spec was the
+ *          third one still flipping `demo-tenant` (`basic` → `ultra`) and restoring it
+ *          in `afterAll` — the same borrowed-row bug, left behind when the other two
+ *          moved out (TASK-MTUI9ZBK7W4JY). Seeded at `basic`, whose catalogue grant is
+ *          M2/M3/M5, so M6 (Evaluator Lens) starts genuinely outside the plan.
  *
- * Kept apart deliberately: one tenant for both would put the flipping spec and the
- * reading spec back on the same row, which is the failure this fixture exists to end.
+ * Kept apart deliberately: one tenant for several would put the flipping specs and the
+ * reading specs back on the same row, which is the failure this fixture exists to end.
+ * `flip` and `lens` are two flipping specs, and they do not share a tenant either —
+ * they start from different plans and would each re-seed the other's row mid-suite.
  *
  * Idempotent: every write is an upsert on a fixed id. `--rollback` deletes exactly these
  * ids and nothing else.
@@ -42,6 +49,13 @@ interface PlanFixture {
   /** The plan the fixture is seeded at; `flip` moves away from it and back. */
   planId: string;
   role: Role;
+  /**
+   * Modules switched `ON` for this fixture. Defaults to M10 — what the two M10 specs
+   * point a browser at. `lens` overrides it with none: its subject is a module the
+   * plan does *not* sell, and seeding an `ON` row for a module outside the plan would
+   * put a contradiction on the settings page it reads.
+   */
+  modules?: readonly string[];
 }
 
 export const PLAN_E2E = {
@@ -65,16 +79,29 @@ export const PLAN_E2E = {
     planId: 'pro',
     role: 'TENANT_OWNER',
   },
+  lens: {
+    tenantId: 'plan-e2e-lens-tenant',
+    workspaceId: 'plan-e2e-lens-workspace',
+    workspaceSlug: 'plan-e2e-lens-ws',
+    userId: 'plan-e2e-lens-user',
+    email: 'plan-e2e-lens@fabrika.test',
+    opportunityId: 'plan-e2e-lens-opp',
+    planId: 'basic',
+    role: 'TENANT_OWNER',
+    modules: [],
+  },
 } as const satisfies Record<string, PlanFixture>;
 
-const FIXTURES: readonly PlanFixture[] = [PLAN_E2E.ultra, PLAN_E2E.flip];
+const FIXTURES: readonly PlanFixture[] = [PLAN_E2E.ultra, PLAN_E2E.flip, PLAN_E2E.lens];
 
 /**
- * M10 (Follow-up Documents) is what both specs point a browser at, and it is the only
+ * M10 (Follow-up Documents) is what the two M10 specs point a browser at, and the only
  * module either of them needs switched on. Entitlement is two facts — this row plus the
- * plan — which is exactly the pair the specs are about.
+ * plan — which is exactly the pair those specs are about. A fixture whose subject is a
+ * module outside its plan (`lens`) sets `modules: []` and leaves the row absent, which
+ * `checkModuleAccess` already reads as `OFF`.
  */
-const MODULES = ['M10'] as const;
+const DEFAULT_MODULES = ['M10'] as const;
 
 async function seatFixture(f: PlanFixture) {
   await prisma.tenant.upsert({
@@ -147,7 +174,7 @@ async function seatFixture(f: PlanFixture) {
     },
   });
 
-  for (const moduleId of MODULES) {
+  for (const moduleId of f.modules ?? DEFAULT_MODULES) {
     await prisma.moduleState.upsert({
       where: { tenantId_moduleId: { tenantId: f.tenantId, moduleId } },
       update: { status: 'ON' },
@@ -174,7 +201,8 @@ export async function seed() {
   for (const f of FIXTURES) await seatFixture(f);
   console.log(
     `[seed-plan-e2e] ready — ultra=${PLAN_E2E.ultra.workspaceSlug} (${PLAN_E2E.ultra.planId}) ` +
-      `flip=${PLAN_E2E.flip.workspaceSlug} (${PLAN_E2E.flip.planId})`,
+      `flip=${PLAN_E2E.flip.workspaceSlug} (${PLAN_E2E.flip.planId}) ` +
+      `lens=${PLAN_E2E.lens.workspaceSlug} (${PLAN_E2E.lens.planId})`,
   );
 }
 

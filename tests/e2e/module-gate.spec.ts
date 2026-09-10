@@ -1,45 +1,108 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Module Gate Access Control', () => {
-  test.beforeEach(async ({ page }) => {
-    // Navigate to app (demo session — no auth required if seed data exists)
-    await page.goto('http://localhost:3000/en/default/dashboard');
-    // Wait for page load
-    await page.waitForLoadState('networkidle');
+import {
+  MG_WORKSPACE,
+  setupModuleGateTenant,
+  signInAsModuleGateUser,
+  teardownModuleGateTenant,
+} from './fixtures/module-gate-tenant';
+
+/**
+ * The status half of the module gate — TASK-MTUI9ZBK7W4JY.
+ *
+ * What this file used to be: three tests that opened `/en/default/…` with no
+ * session and asserted `expect(bodyText).toBeTruthy()` or that *some* `h1` was
+ * visible. Measured on 2026-09-09, all three URLs answered `307` to the login
+ * route (`src/app/[locale]/(app)/layout.tsx:50`, in since c915bc43 on 06-09), and
+ * the sign-in screen carries an `<h1>` — so all three passed on the login page and
+ * none of them had reached a module page in three days. The test named "gated page
+ * shows lock screen" said so in its own comment: "In a real scenario, the module
+ * would need to be set to OFF via DB/admin".
+ *
+ * So the spec now owns the tenant whose switches it is reading
+ * (`fixtures/module-gate-tenant.ts`), and every assertion names a specific
+ * outcome rather than the existence of a page:
+ *
+ *   1. anonymous  — a module page is not served at all; the redirect and its
+ *                   target are asserted, per locale.
+ *   2. M5 `ON`    — the pipeline board really renders, and the `/firsatlar` alias
+ *                   renders the same module.
+ *   3. M3 `OFF`   — the real 🔒 refusal, and it blames the switch, not the plan.
+ *
+ * Both modules are inside the fixture's `basic` plan, so nothing here can pass or
+ * fail for an entitlement reason. That other half of the gate is
+ * `module-plan-gate.spec.ts`, which owns a tenant it flips on purpose.
+ */
+
+const PIPELINE_URL = `/en/${MG_WORKSPACE}/pipeline`;
+const FIRSATLAR_URL = `/tr/${MG_WORKSPACE}/firsatlar`;
+const EVIDENCE_URL = `/en/${MG_WORKSPACE}/evidence`;
+
+/** Rendered by `pipeline/board.tsx`, and re-exported unchanged by `firsatlar`. */
+const PIPELINE_HEADING = 'Fırsat & Teklif Boru Hattı';
+
+test.describe('module gate — the ModuleState switch decides, inside one plan', () => {
+  test.beforeAll(setupModuleGateTenant);
+  test.afterAll(teardownModuleGateTenant);
+
+  test('a module page is never served without a session', async ({ page }) => {
+    // The exact thing the old file could not see. `maxRedirects: 0` reads the
+    // answer itself instead of following it to a page that looks fine.
+    for (const [url, login] of [
+      [PIPELINE_URL, '/en/login'],
+      [EVIDENCE_URL, '/en/login'],
+      [FIRSATLAR_URL, '/tr/giris'],
+    ] as const) {
+      const res = await page.request.get(url, { maxRedirects: 0 });
+      expect(res.status(), `${url} must not serve a module page anonymously`).toBe(307);
+      expect(new URL(res.headers()['location']!, 'http://x').pathname).toBe(login);
+    }
+
+    // And following it lands on sign-in with nothing of the module on the page —
+    // a redirect that leaked the board would still be a leak.
+    await page.goto(PIPELINE_URL);
+    await expect(page).toHaveURL(/\/en\/login/);
+    await expect(page.locator('body')).not.toContainText(PIPELINE_HEADING);
   });
 
-  test('pipeline page loads successfully (M5 accessible by default)', async ({ page }) => {
-    await page.goto('http://localhost:3000/en/default/pipeline');
-    await page.waitForLoadState('networkidle');
+  test('M5 is ON, so the pipeline board renders — and /firsatlar is the same module', async ({
+    page,
+  }) => {
+    await signInAsModuleGateUser(page, PIPELINE_URL);
 
-    // Check that page content is visible (not locked)
-    const content = await page.locator('h1, [role="main"]').first().isVisible();
-    expect(content).toBeTruthy();
+    const main = page.getByRole('main');
+    await expect(main).toContainText(PIPELINE_HEADING);
+    // Not the gate: an ON module inside the plan must show no refusal at all.
+    await expect(main).not.toContainText('This module is not available');
+
+    // `firsatlar/page.tsx` re-exports `PipelinePage`, so the alias is proven by the
+    // alias route rendering the board — not by it returning some HTML.
+    await page.goto(FIRSATLAR_URL);
+    await expect(page.getByRole('main')).toContainText(PIPELINE_HEADING);
+    await expect(page).toHaveURL(new RegExp(`${MG_WORKSPACE}/firsatlar`));
   });
 
-  test('gated page shows lock screen when module is unavailable (simulate)', async ({ page }) => {
-    // This test checks the gate UI structure by verifying the lock icon exists
-    // In a real scenario, the module would need to be set to OFF via DB/admin
+  test('M3 is OFF, so the Evidence Pack is refused — and the reason is the switch', async ({
+    page,
+  }) => {
+    await signInAsModuleGateUser(page, PIPELINE_URL);
+    await page.goto(EVIDENCE_URL);
 
-    // Navigate to a gated page
-    await page.goto('http://localhost:3000/en/default/evidence');
-    await page.waitForLoadState('networkidle');
+    // The gate renders a role="alert" *section*, not a <main> — `main` is the
+    // layout's. Located by element as well as role because Next.js's own route
+    // announcer (`#__next-route-announcer__`) is a role="alert" div on every page.
+    const gate = page.locator('section[role="alert"]');
+    await expect(gate).toContainText('This module is not available');
+    // `MODULE_OFF`, named by module — the tenant owns M3 on `basic`, so telling it
+    // to upgrade would be a lie and `PLAN_UPGRADE_REQUIRED` would be the wrong copy.
+    await expect(gate).toContainText('The Evidence Pack module is turned off for your workspace.');
+    await expect(gate).not.toContainText('outside your subscription');
 
-    // Page should load (module enabled by default)
-    // If testing module OFF, the page would show lock emoji and gate message
-    const bodyText = await page.textContent('body');
-
-    // Either the page content OR the gate lock screen should be present
-    // (Depending on module state in this run)
-    expect(bodyText).toBeTruthy();
-  });
-
-  test('firsatlar alias routes to same module as pipeline (M5)', async ({ page }) => {
-    // Test that TR alias points to correct module
-    await page.goto('http://localhost:3000/tr/default/firsatlar');
-    await page.waitForLoadState('networkidle');
-
-    const content = await page.locator('h1, [role="main"]').first().isVisible();
-    expect(content).toBeTruthy();
+    // Nothing behind the gate rendered. The marker is the page's own body copy, not
+    // the words "Evidence Pack": the refusal names the module on purpose, so a
+    // `not.toContainText('Evidence Pack')` here would forbid correct output.
+    await expect(page.locator('body')).not.toContainText(
+      "Centralize your organization's core capabilities",
+    );
   });
 });
