@@ -38,3 +38,18 @@ kanıtı gider). Kod dosyalarını sahiplenmek ayrı bir karardır ve ancak pane
 
 İlgili: [[fabrika-red-gate-may-be-a-live-worker-wip]] (aynı yanılgının kapı yüzü) ·
 [[fabrika-delegation-verdict-wrong-both-directions]] · [[fabrika-remeasure-before-handing-work-to-another-driver]]
+
+**Ek — canlılık testi için sonda yazma, bir Monitor vuruşu bekle (2026-09-10).**
+`TASK-MTVDSSJTZCY4T` işini **stage'lemiş ama commit'lememişti** (11 dosya, `git diff --cached`
+temiz ve tamamen kendi kartına ait). Paylaşılan index'te bekleyen iş süpürülme riski taşıyor,
+o yüzden "sahiplenip commit'leyeyim mi" diye düşündüm. Sahibinin canlı olup olmadığını dosya
+mtime'larından anlamaya çalıştım — **sonda işe yaramadı**, boş çıktı verdi. İki dakika sonra
+Monitor sahibinin kendi commit'ini bildirdi (`f29b209`): worker canlıydı, yalnız commit
+adımındaydı. Beklemek doğruydu.
+
+**Ders:** Bu soruya cevap veren şey zaten kurulu — `git log`/`docs/agent-results` izleyen
+Monitor. Zekice bir canlılık sondası yazma; **bir vuruş bekle.** Sahibi canlıysa commit'i
+gelir, ölüyse gelmez ve bir sonraki uyanışta sahiplenirsin. Stage'de bekleyen iş görünce
+acele etme — commit ederek sahibiyle yarışmanın kazancı, yanlış zamanda araya girmenin
+maliyetinden küçük (bkz. yasal sayfalar kartı: benim commit'im pre-commit muhafızına takıldı,
+sahibininki saniyeler sonra indi).
