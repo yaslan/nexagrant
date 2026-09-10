@@ -4,16 +4,26 @@ import { PRODUCT_NAME } from '@/lib/brand';
 import React, { useState } from 'react';
 import { Mail, Check, Send, ShieldCheck, Server, Lock, AlertCircle, RefreshCw } from 'lucide-react';
 
-const SMTP_FROM_ADDRESS = process.env.NEXT_PUBLIC_SMTP_FROM_ADDRESS || 'noreply@usfinbridge.com';
-
-export function SmtpSettingsForm() {
+/**
+ * The outgoing "from" address is validated once, in `src/lib/env.ts`, and reaches this component
+ * as a prop from the server page that renders it.
+ *
+ * The environment is never read directly here (CLAUDE.md "Yapma"), and the address carries no
+ * fallback of its own: the default lives only in the zod schema. Two copies of one default is a
+ * silent bug waiting for them to drift. The value arrives by prop rather than by importing
+ * `@/lib/env` because that module validates the whole environment object at import time and a
+ * browser bundle has no such object — Next.js inlines only the individual `NEXT_PUBLIC_*` member
+ * expressions it can see — so on the client the schema would parse nothing and hand back its
+ * default no matter how the environment is configured.
+ */
+export function SmtpSettingsForm({ fromAddress }: { fromAddress: string }) {
   const [host, setHost] = useState('smtp.gmail.com');
   const [port, setPort] = useState('587');
   const [secure, setSecure] = useState(false);
-  const [user, setUser] = useState(SMTP_FROM_ADDRESS);
+  const [user, setUser] = useState(fromAddress);
   const [password, setPassword] = useState('••••••••••••');
   const [fromName, setFromName] = useState(`${PRODUCT_NAME} SaaS`);
-  const [fromEmail, setFromEmail] = useState(SMTP_FROM_ADDRESS);
+  const [fromEmail, setFromEmail] = useState(fromAddress);
 
   const [testEmail, setTestEmail] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -126,7 +136,7 @@ export function SmtpSettingsForm() {
               type="text"
               value={user}
               onChange={(e) => setUser(e.target.value)}
-              placeholder={SMTP_FROM_ADDRESS}
+              placeholder={fromAddress}
               required
               className="w-full bg-ground border border-border rounded-xl px-3 py-2 text-xs text-ink font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
@@ -167,7 +177,7 @@ export function SmtpSettingsForm() {
               type="email"
               value={fromEmail}
               onChange={(e) => setFromEmail(e.target.value)}
-              placeholder={SMTP_FROM_ADDRESS}
+              placeholder={fromAddress}
               required
               className="w-full bg-ground border border-border rounded-xl px-3 py-2 text-xs text-ink font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />

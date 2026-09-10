@@ -197,7 +197,7 @@ async function notifySubject(email: string, locale: string, purgeAt: Date): Prom
 
   try {
     await client.emails.send({
-      from: `${PRODUCT_NAME} <noreply@usfinbridge.com>`,
+      from: `${PRODUCT_NAME} <${env.NEXT_PUBLIC_SMTP_FROM_ADDRESS}>`,
       to: email,
       subject: isTr ? 'Hesap silme talebiniz alındı' : 'Your account deletion request',
       text: isTr
