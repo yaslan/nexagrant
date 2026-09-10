@@ -48,10 +48,16 @@ export default async function AdminAlertsPage({
   // admin layout and the resolve action re-checks the platform-admin role.
   let rows: SystemAlertRecord[] = [];
   let loadError = false;
+  let totalCount = 0;
+  let unresolvedCount = 0;
   try {
     rows = await prisma.systemAlert.findMany({
       orderBy: { createdAt: 'desc' },
       take: MAX_ROWS,
+    });
+    totalCount = await prisma.systemAlert.count();
+    unresolvedCount = await prisma.systemAlert.count({
+      where: { resolvedAt: null },
     });
   } catch (e) {
     console.error(`[AdminAlertsPage] DB query failed: ${errorMessage(e)}`);
@@ -78,6 +84,9 @@ export default async function AdminAlertsPage({
       rows={data}
       highlightId={highlightId ?? null}
       loadError={loadError}
+      totalCount={totalCount}
+      unresolvedCount={unresolvedCount}
+      isTruncated={totalCount > MAX_ROWS}
       labels={{
         title: t('title'),
         subtitle: t('subtitle'),
@@ -113,6 +122,7 @@ export default async function AdminAlertsPage({
         repeatLabel: t('repeatLabel'),
         repeatNote: t('repeatNote'),
         lastSeen: t('lastSeen'),
+        truncatedNote: t('truncatedNote'),
       }}
     />
   );

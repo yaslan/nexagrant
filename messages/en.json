@@ -1089,7 +1089,8 @@
     "highlighted": "Alert opened from a link",
     "repeatLabel": "Repeats",
     "repeatNote": "While an alert stays open, a repeat increases the counter instead of adding a row. After you mark it resolved, the next occurrence starts a new row.",
-    "lastSeen": "Last seen"
+    "lastSeen": "Last seen",
+    "truncatedNote": "More than 300 alerts are in the system; here we show the newest ones. As you resolve alerts, older ones will appear."
   },
   "ModuleGate": {
     "title": "This module is not available",

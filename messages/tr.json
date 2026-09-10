@@ -1089,7 +1089,8 @@
     "highlighted": "Bağlantıyla açılan uyarı",
     "repeatLabel": "Tekrar",
     "repeatNote": "Aynı uyarı açık kaldığı sürece yeni satır açılmaz; sayaç artar. Çözüldü işaretlenirse sonraki oluşum yeni satır olur.",
-    "lastSeen": "Son görülme"
+    "lastSeen": "Son görülme",
+    "truncatedNote": "300 uyarıdan fazlası varsa burada gösterilenler en yenileridir; daha eskilerini görmek için eski uyarıları çözdüğünüzde sayaç azalacak."
   },
   "ModuleGate": {
     "title": "Bu modül şu anda kullanılamıyor",

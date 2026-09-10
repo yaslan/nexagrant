@@ -63,12 +63,18 @@ export default function AlertsConsoleClient({
   rows,
   highlightId,
   loadError,
+  totalCount,
+  unresolvedCount,
+  isTruncated,
   labels,
 }: {
   locale: string;
   rows: AlertRow[];
   highlightId: string | null;
   loadError: boolean;
+  totalCount: number;
+  unresolvedCount: number;
+  isTruncated: boolean;
   labels: Labels;
 }) {
   const [levelFilter, setLevelFilter] = useState<string>('ALL');
@@ -155,11 +161,11 @@ export default function AlertsConsoleClient({
         <dl className="flex shrink-0 gap-4 text-xs">
           <div className="rounded-lg border border-border bg-ground px-3 py-2">
             <dt className="text-muted">{labels.total}</dt>
-            <dd className="text-lg font-bold text-ink">{rows.length}</dd>
+            <dd className="text-lg font-bold text-ink">{totalCount}</dd>
           </div>
           <div className="rounded-lg border border-border bg-ground px-3 py-2">
             <dt className="text-muted">{labels.openCount}</dt>
-            <dd className="text-lg font-bold text-ink">{counts.open}</dd>
+            <dd className="text-lg font-bold text-ink">{unresolvedCount}</dd>
           </div>
           <div className="rounded-lg border border-border bg-ground px-3 py-2">
             <dt className="text-muted">{labels.errorCount}</dt>
@@ -184,6 +190,15 @@ export default function AlertsConsoleClient({
           </Link>
         </span>
       </p>
+
+      {isTruncated && (
+        <p className="flex items-start gap-2 rounded-lg border border-amber bg-amber/5 p-3 text-xs text-ink">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
+          <span>
+            {labels.truncatedNote}
+          </span>
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-surface p-3">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-muted">
