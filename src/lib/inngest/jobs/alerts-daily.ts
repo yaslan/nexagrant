@@ -1,6 +1,6 @@
 import { inngest } from '../client';
 import { env } from '@/lib/env';
-import { prisma } from '@/lib/db';
+import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { Resend } from 'resend';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
@@ -87,6 +87,145 @@ export function ownerEmailQuery(tenantId: string) {
 }
 
 /**
+ * `withTenant`'s shape, injected so a caller can run this loop over a
+ * connection other than the singleton. The test needs exactly that: locally
+ * `prisma` connects as `fabrika` (SUPERUSER + BYPASSRLS), which sees every
+ * tenant's rows no matter what the loop scoped to, so isolation asserted
+ * through it proves nothing. `withTenantOn(rlsClient, ...)` (src/lib/db.ts)
+ * satisfies this type over the NOBYPASSRLS `fabrika_app` role, where the
+ * policies actually apply.
+ */
+export type TenantRunner = <T>(
+  tenantId: string,
+  callback: (tx: TenantTx) => Promise<T>
+) => Promise<T>;
+
+/**
+ * One saved search as `fetch-saved-searches` hands it back. `step.run`
+ * memoises through JSON, so on a replay the timestamps arrive as ISO strings
+ * rather than `Date`s; `new Date(...)` accepts both.
+ */
+export interface SavedSearchAlertRow {
+  id: string;
+  tenantId: string;
+  name: string;
+  filters: unknown;
+  lastRunAt: Date | string | null;
+  createdAt: Date | string;
+}
+
+export interface SavedSearchAlertResult {
+  emailsSent: number;
+  emailsFailed: number;
+  emailsSkipped: number;
+  errors: Array<{ searchId: string; reason: string }>;
+}
+
+/** Advance `lastRunAt` so the next run's `since` starts where this one stopped. */
+function touchLastRun(tx: TenantTx, searchId: string) {
+  return tx.savedSearch.update({ where: { id: searchId }, data: { lastRunAt: new Date() } });
+}
+
+/**
+ * The per-search loop, lifted out of the inngest handler so it can be run
+ * against a real two-tenant fixture (the pattern `sweepOrphanTenantAlerts`
+ * already sets in alerts-sweep.ts).
+ *
+ * TASK-MTVR8KK92G0GA: every tenant-scoped read and write in here used to go
+ * through the bare `prisma` singleton. That is invisible today only because
+ * the local role bypasses RLS — under the production `fabrika_app` role the
+ * owner lookup returns nothing and both `lastRunAt` writes raise
+ * "record not found", and a cron job nobody watches would have gone on
+ * reporting `emailsFailed` into the void.
+ */
+export async function sendSavedSearchAlerts(
+  savedSearches: SavedSearchAlertRow[],
+  runTenant: TenantRunner = withTenant
+): Promise<SavedSearchAlertResult> {
+  let emailsSent = 0;
+  let emailsFailed = 0;
+  let emailsSkipped = 0;
+  const errors: Array<{ searchId: string; reason: string }> = [];
+
+  for (const search of savedSearches) {
+    // Bound once per iteration and used everywhere below. `for...of` with
+    // `const` already gives each iteration its own binding, so this is not a
+    // fix — it is a guard against the edit that would break it: reaching for a
+    // tenant id that outlived the iteration does not crash here, it writes one
+    // tenant's row under another tenant's scope.
+    const { id: searchId, tenantId, name } = search;
+
+    try {
+      const ownerEmail = await runTenant(tenantId, async (tx) => {
+        const owners = await tx.membership.findMany(ownerEmailQuery(tenantId));
+        return owners[0]?.user?.email;
+      });
+
+      if (!ownerEmail) {
+        emailsFailed++;
+        errors.push({ searchId, reason: 'no_owner_email' });
+        continue;
+      }
+
+      const since = new Date(search.lastRunAt ?? search.createdAt);
+
+      // Deliberately NOT tenant-scoped, and the second such exception in this
+      // file (the other is the fan-out in `fetch-saved-searches`). `Topic` is
+      // the shared CORDIS catalogue: it carries no `tenantId` column and the
+      // database has row security switched off on it — 0 policies, measured on
+      // the live schema 2026-09-10. Counting one tenant's matches necessarily
+      // reads every tenant's topics, because "this tenant's topics" does not
+      // exist. Wrapping it would narrow nothing and cost a transaction.
+      const matchCount = await prisma.topic.count(matchCountQuery(search.filters, since));
+
+      // No new matches: skip the send entirely rather than mail a "(no new)"
+      // notification every morning. `lastRunAt` still advances — this was a
+      // real check, not a failure.
+      if (matchCount === 0) {
+        await runTenant(tenantId, (tx) => touchLastRun(tx, searchId));
+        emailsSkipped++;
+        continue;
+      }
+
+      const subject = `New Call Opportunities: ${name} (${matchCount} new)`;
+      const appUrl = env.NEXT_PUBLIC_APP_URL || 'https://app.fabrika.io';
+      const html = `
+            <h2>FonBridge Saved Search Alert</h2>
+            <p>Hi there,</p>
+            <p>We checked for new opportunities matching your saved search <strong>${name}</strong>.</p>
+            <p>Found <strong>${matchCount} new opportunities</strong>. <a href="${appUrl}/calls?search=${searchId}">View them now</a></p>
+            <p>Happy hunting!<br/>FonBridge Team</p>
+          `;
+
+      // Outside the tenant transaction on purpose: `runTenant` opens a real
+      // Postgres transaction, and holding one across a network round trip to
+      // Resend would pin a connection for the length of the send.
+      const resendClient = getResend();
+      if (resendClient && env.RESEND_API_KEY) {
+        await resendClient.emails.send({
+          from: env.EMAIL_FROM || 'FonBridge <no-reply@fabrika.app>',
+          to: [ownerEmail],
+          subject,
+          html,
+        });
+      }
+
+      await runTenant(tenantId, (tx) => touchLastRun(tx, searchId));
+
+      emailsSent++;
+    } catch (error) {
+      // Covers the owner lookup and the match-count query too: a broken query
+      // here must not silently report 0 matches and skip the send as if the
+      // check had actually run clean (CLAUDE.md rule 6).
+      emailsFailed++;
+      errors.push({ searchId, reason: errorMessage(error) });
+    }
+  }
+
+  return { emailsSent, emailsFailed, emailsSkipped, errors };
+}
+
+/**
  * Alerts Daily — 8 AM UTC
  * Sends saved search alerts to subscribed users.
  *
@@ -114,77 +253,7 @@ export const alertsDaily = inngest.createFunction(
 
     // One step for the whole loop, as in credits-monthly-grant: counters
     // mutated across many memoized steps would replay back to zero.
-    const result = await step.run('send-alerts', async () => {
-      let emailsSent = 0;
-      let emailsFailed = 0;
-      let emailsSkipped = 0;
-      const errors: Array<{ searchId: string; reason: string }> = [];
-
-      for (const search of savedSearches) {
-        try {
-          const owners = await prisma.membership.findMany(ownerEmailQuery(search.tenantId));
-
-          const ownerEmail = owners[0]?.user?.email;
-          if (!ownerEmail) {
-            emailsFailed++;
-            errors.push({ searchId: search.id, reason: 'no_owner_email' });
-            continue;
-          }
-
-          // `step.run` hands back the JSON it memoised, so the two timestamps
-          // arrive as ISO strings, not `Date`s — re-hydrate before the query.
-          const since = new Date(search.lastRunAt ?? search.createdAt);
-          const matchCount = await prisma.topic.count(matchCountQuery(search.filters, since));
-
-          // No new matches: skip the send entirely rather than mail a "(no new)"
-          // notification every morning. `lastRunAt` still advances below — this
-          // was a real check, not a failure.
-          if (matchCount === 0) {
-            await prisma.savedSearch.update({
-              where: { id: search.id },
-              data: { lastRunAt: new Date() },
-            });
-            emailsSkipped++;
-            continue;
-          }
-
-          const subject = `New Call Opportunities: ${search.name} (${matchCount} new)`;
-          const appUrl = env.NEXT_PUBLIC_APP_URL || 'https://app.fabrika.io';
-          const html = `
-            <h2>FonBridge Saved Search Alert</h2>
-            <p>Hi there,</p>
-            <p>We checked for new opportunities matching your saved search <strong>${search.name}</strong>.</p>
-            <p>Found <strong>${matchCount} new opportunities</strong>. <a href="${appUrl}/calls?search=${search.id}">View them now</a></p>
-            <p>Happy hunting!<br/>FonBridge Team</p>
-          `;
-
-          const resendClient = getResend();
-          if (resendClient && env.RESEND_API_KEY) {
-            await resendClient.emails.send({
-              from: env.EMAIL_FROM || 'FonBridge <no-reply@fabrika.app>',
-              to: [ownerEmail],
-              subject,
-              html,
-            });
-          }
-
-          await prisma.savedSearch.update({
-            where: { id: search.id },
-            data: { lastRunAt: new Date() },
-          });
-
-          emailsSent++;
-        } catch (error) {
-          // Covers the owner lookup and the match-count query too: a broken
-          // query here must not silently report 0 matches and skip the send
-          // as if the check had actually run clean (CLAUDE.md rule 6).
-          emailsFailed++;
-          errors.push({ searchId: search.id, reason: errorMessage(error) });
-        }
-      }
-
-      return { emailsSent, emailsFailed, emailsSkipped, errors };
-    });
+    const result = await step.run('send-alerts', async () => sendSavedSearchAlerts(savedSearches));
 
     if (result.errors.length > 0) {
       // `SystemAlert` has no tenant isolation (see system-alert.ts): row ids
