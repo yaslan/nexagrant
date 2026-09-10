@@ -1,6 +1,7 @@
 import React from 'react';
-import { prisma, withTenant } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
+import { listTenantListings } from '@/modules/marketplace/server/listings';
 import { MarketplaceClient, type ApiKeyItem, type ListingItem } from './client';
 import { errorMessage } from '@/lib/errors';
 
@@ -16,11 +17,14 @@ export default async function MarketplacePage({
   let apiKeys: ApiKeyItem[] = [];
 
   try {
-    // MarketplaceListing is a cross-tenant catalogue by design, so it stays on
-    // the unscoped client; ApiKey is tenant data and goes through withTenant.
-    listings = await prisma.marketplaceListing.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    // MarketplaceListing is NOT a cross-tenant catalogue: `tenantId` is non-null
+    // in schema.prisma and the table carries a `tenant_isolation` policy, which
+    // is why writes always went through `withTenant`. The read used to be a bare
+    // `prisma.marketplaceListing.findMany` with no `where` clause, so it
+    // returned every tenant's rows on the BYPASSRLS role the app connects as
+    // (TASK-MTVTQTJIQ5SDB). Both halves of the scoping now live in
+    // `listTenantListings`.
+    listings = await listTenantListings(tenantId);
     apiKeys = await withTenant(tenantId, (tx) =>
       tx.apiKey.findMany({
         where: { tenantId },

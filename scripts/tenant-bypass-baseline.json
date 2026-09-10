@@ -20,7 +20,7 @@
     "",
     "Every `debt` entry has a real card on the board, opened by TASK-MTVRAZSUVLL9R:",
     "  TASK-MTVTMZXYT84RZ  wrap the two scopable billing calls (K1)",
-    "  TASK-MTVTQTJIQ5SDB  MarketplaceListing: catalogue or tenant data? (K3)",
+    "  TASK-MTVTQTJIQ5SDB  CLOSED 2026-09-10: not a catalogue. The read is tenant-\n                      scoped in src/modules/marketplace/server/listings.ts; the\n                      cross-tenant shop-window question is a product decision,\n                      open in docs/agent-results/TASK-MTVTQTJIQ5SDB-devop-fb.md.",
     "  TASK-MTVTRNORO1ES8  fabricated tenant ids: esr-parser, storefront (K4+K5)",
     "  TASK-MTVSBEO7VX6Y4  the surviving subscription-sync fallback (that card owns the file)",
     "",
@@ -320,16 +320,6 @@
       "class": "wrappable",
       "card": "TASK-MTVTMZXYT84RZ",
       "reason": "Writes data: { tenantId, ... } with the tenant in hand. Unlike its two findFirst siblings in the same file this one is scopable, and under fabrika_app an unscoped INSERT is REFUSED by the WITH CHECK clause — a paid lifetime licence would fail to record."
-    },
-    {
-      "check": "A",
-      "file": "src/app/[locale]/(app)/[workspace]/marketplace/page.tsx",
-      "subject": "marketplaceListing.findMany",
-      "count": 1,
-      "kind": "debt",
-      "class": "contradiction",
-      "card": "TASK-MTVTQTJIQ5SDB",
-      "reason": "The line's comment calls MarketplaceListing 'a cross-tenant catalogue by design', but the model carries a non-null tenantId in prisma/schema.prisma and therefore HAS a tenant_isolation policy. Catalogue and policy contradict each other: either the column and policy are wrong, or this read leaks one tenant's listings to another. Unlike Topic and ConceptTemplate this cannot be settled by an exemption — the schema has to decide."
     },
     {
       "check": "B1",
