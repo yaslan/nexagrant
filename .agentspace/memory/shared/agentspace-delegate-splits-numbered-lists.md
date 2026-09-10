@@ -24,3 +24,29 @@ Kural:
   dosya yarışı çıkar (bkz. [[fabrika-parallel-agent-file-race]]).
 - Tek ajan hedefliyorsan `workers: [{agentId}]` ver; ama agentId **kendi takımından** olmalı, yoksa
   502 ile reddedilir (bkz. [[agentspace-cross-team-delegation-grant]]).
+
+## Ölçülen olay 2 (2026-09-09, fabrika/cekirdek): ORTAK KURALLAR başlığı işçileri yedi
+
+8 maddelik bir objective'in başına 6 madde işaretli "ORTAK KURALLAR" bloğu (çakışma kuralı, commit
+yetkisi, kanıt disiplini...) yazıldı ve `workers` dizisi 8 ajanla, madde sırasına EŞLEŞECEK biçimde verildi.
+Bölücü preamble maddelerini de alt-görev saydı: ilk 6 worker'a **kural cümleleri** görev olarak düştü
+(pane başlıkları kanıt: "COMMIT: yalnız blok-zincir-dev ve geli-tirici commit atabil…", "ÇAKIŞMA
+KURALI: `pnpm dev`…"), gerçek 1. ve 2. madde listenin SONUNDAKİ iki ajana gitti:
+
+- P0 kapı düzeltmesi (opus için yazılmıştı) → **blog-yazar/haiku**
+- UBL-TR tevkifat birim testleri (opus için yazılmıştı) → **customer-support/haiku**
+- 3-8. maddeler **hiç dağıtılmadı**; kural cümlesi alan 6 ajan kendi board kartlarına doğru
+  doğaçlama yaptı ve şaşırtıcı biçimde kullanışlı çıktı üretti (kural-5 denetimi, i18n denetimi,
+  destek metin envanteri) — ama rapor dosyaları BEKLENEN ajan adıyla değil, işi FİİLEN yapanın
+  adıyla düştü (TASK-MTU64GP6UIC44-**blok-zincir-dev**.md gibi).
+
+Sonuç zararsız çıktı (haiku'nun commit'i ce14101 bağımsız koşumda 7/7 yeşildi ve gerçek bir ürün
+hatasını kapattı), ama model seçimi tamamen ıskalandı.
+
+Kural (ek):
+- `objective` içinde **madde işareti/numara YALNIZ gerçek alt-görevler için** kullanılır. Ortak kural,
+  bağlam, uyarı → maddesiz düz paragraf; ya da daha iyisi **her kuralı ilgili maddenin İÇİNE** yaz.
+  Madde başındaki `[agentId]` etiketi ajanı SEÇMEZ, yalnız worker'a kendini tanıtır.
+- Dağıtımdan hemen sonra `agentspace_pane action=list` ile **pane başlıklarını oku**: başlık, o pane'e
+  fiilen düşen metnin ilk satırıdır — eşleşme kaymasını 30 saniyede yakalatır. `delegation_status`
+  bunu göstermez.

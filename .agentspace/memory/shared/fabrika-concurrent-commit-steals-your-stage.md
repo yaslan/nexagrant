@@ -3,7 +3,7 @@ name: fabrika-concurrent-commit-steals-your-stage
 description: Fabrika'da başka bir ajanın commit'i senin stage'lediğin VE hiç stage etmediğin dosyaları kendi commit'ine alabilir — "commit etmezsem güvendeyim" yanlış; kaynak değişikliğini doğrulamayı beklemeden erken commit et
 metadata:
   type: project
-updatedAt: 2026-09-09
+updatedAt: 2026-09-10
 ---
 
 Paralel ajanlar tek çalışma ağacını **ve tek git index'ini** paylaşıyor. `git add <yollarım>`
@@ -116,3 +116,35 @@ commit atarsın; alternatifi işinin yanlış mesajla tarihe geçmesi.
 Kapıldıysa: `git show --stat <sha>` ile hangi dosyaların nereye gittiğini doğrula, paylaşılan
 `dev`'de `--amend`/rebase DENEME, sonuç raporunun "Riskler" bölümüne "kodum şu sha'da, mesaj
 bana ait değil" satırını yaz.
+
+## En kötü kombinasyon: senin mesajın BAŞKASININ diff'ini taşıdı, senin diff'in HİÇ commit'lenmedi (2026-09-10, TASK-MTSY7HZRYWWEL ↔ TASK-MTVFKK8UZS5BF, commit `14c04f3`)
+
+Yukarıdaki vakalar hep "commit ALDIM ama beklediğimden fazla/az dosya içeriyor" şeklinde —
+en azından bir commit var, doğrulanabilir. Bu daha sinsi bir varyant: **commit'in mesajı
+senin işini anlatıyor, ama `git show <sha>`'nın gerçek diff'i tamamen başka bir ajanın işi.**
+Senin gerçek değişikliğin ise index'e hiç girmemiş, çalışma ağacında commit'lenmemiş (`M`)
+olarak kalmış — `git commit -m "..."` çağrısı o an index'te DURAN (başkasının stage'lediği)
+içeriği aldı, senin mesajınla etiketledi.
+
+Ölçülen durum: `14c04f3` mesajı *"require buyer identity from TenantBillingIdentity for
+iyzico"* (TASK-MTSY7HZRYWWEL, iyzico'nun uydurma VKN göndermesini engelleme), gövdesi de bunu
+ayrıntılı anlatıyor ("createIyzicoCheckout now throws...", "All 1804 tests pass"). Ama
+`git show 14c04f3`'ün gerçek diff'i `messages/{tr,en}.json` + `admin/alerts/{client,page}.tsx`
+— **başka bir görevin** (TASK-MTVFKK8UZS5BF, alarm konsolu 300 satır kırpma düzeltmesi, bkz.
+[[fabrika-alert-console-row-limit]]) işi. `src/lib/iyzico.ts`'e bu commit hiç dokunmuyor
+(`git log -- src/lib/iyzico.ts` bu sha'yı listelemiyor). Gerçek iyzico değişikliği
+(`identityNumber: buyer.identityNumber ?? '11111111111'` → zorunlu hale getirme) ölçüldüğü anda
+hâlâ çalışma ağacında `M` olarak duruyordu — hiçbir commit'te değil.
+
+Sonuç: board'da TASK-MTSY7HZRYWWEL `[done]` görünüyordu ama dayandığı commit o işi YAPMIYOR.
+Kod doğru ve çalışıyordu (çalışma ağacında), fakat commit'lenmemiş bir güvenlik/doğruluk
+düzeltmesi bir `git clean`/`git checkout --`/stash kaybıyla **sessizce** geri dönebilirdi —
+üstelik testi de (`iyzico.test.ts`) aynı commit'lenmemiş diff'in içindeydi, yani regresyonu
+yakalayacak test de kayboluyor.
+
+**Kural — commit attıktan HEMEN sonra, mesaja değil `git show --stat HEAD`'in dosya
+listesine güven:** mesajın anlattığı dosya o listede yoksa, o commit SENİN işini taşımıyor
+demektir — mesaj yanlış etiketlenmiş, kodun hâlâ çalışma ağacında aranmalı
+(`git status --short -- <beklediğin dosyalar>`). Bu, "bir görevin doğrulama talimatı sana
+belirli bir sha gösteriyorsa, o sha'nın mesajını değil **diff'ini** oku" kuralının kaynağı —
+bkz. [[fabrika-verification-recipe-mutation-and-counterfactual]].
