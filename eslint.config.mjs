@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Not our source: nested git worktrees checked out by agents, and the
+    // evidence scripts attached to task reports. Mirrors the exclusions in
+    // vitest.config.mts.
+    ".claude/worktrees/**",
+    "docs/agent-results/**",
   ]),
   {
     files: ["**/*.ts", "**/*.tsx"],
