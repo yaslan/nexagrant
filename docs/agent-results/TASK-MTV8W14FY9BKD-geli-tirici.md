@@ -278,7 +278,27 @@ değişikliğim değil — hem HEAD'de hem değişikliğimle **tek başına koş
 
 ### 2.7 Commit
 
-Bkz. §7 (rapor commit'e dahil olduğu için hash orada).
+**`ee4d60b`** — `i18n(billing): bind the Stripe invoice fallback line to the tenant locale`
+
+```
+$ git show --name-only --oneline HEAD
+ee4d60b i18n(billing): bind the Stripe invoice fallback line to the tenant locale
+docs/agent-results/TASK-MTV8W14FY9BKD-evidence/invoice-line-fallback.evidence.ts
+docs/agent-results/TASK-MTV8W14FY9BKD-geli-tirici.md
+messages/en.json
+messages/tr.json
+src/lib/billing/subscription-sync.test.ts
+src/lib/billing/subscription-sync.ts
+src/lib/efatura.ts
+```
+
+Commit'te yalnız kendi dosyalarım var; `git add -A` kullanılmadı, yollar tek tek
+verildi. Commit öncesi `git log --oneline -3` ve `git diff --cached`, sonrası
+`git show --name-only` koşturuldu. Pre-commit kapısı (`eslint` staged + `tsc --noEmit`):
+`✓ Kapı temiz (staged kapsamı).`
+
+(Bu hash satırı, rapor commit'in kendisinde yer aldığı için hemen ardından gelen
+küçük bir takip commit'iyle dolduruldu; kod içeriği değişmedi.)
 
 ---
 
