@@ -40,3 +40,34 @@ DEĞİL.
 Not: stage ettikten sonra bile commit'in senin olacağının garantisi yok —
 [[fabrika-concurrent-commit-steals-your-stage]]. Commit sonrası
 `git show HEAD:<dosya>` ile içeriğin indiğini DOĞRULA.
+
+## 2026-09-10 — lider bu kuralın ÜSTÜNE bir istisna koydu (SPRINT-S12)
+
+Aynı turda `messages/*.json` üzerinde iki ajan çalışırken lider (LEED-EN) açık talimat verdi
+ve bu dosyadaki hunk filtrelemenin **tersini** söyledi:
+
+> "commit'ten HEMEN önce `git diff --cached -- messages/*.json` çalıştır ve kendi ad alanın
+> dışında satır varsa **DURMA/geri alma** — commit'i at, sonra raporuna 'bu commit'e ayrıca
+> şu anahtarlar da girdi' diye NOT DÜŞ. Paylaşılan `dev` dalında `git reset` ile geçmişi
+> düzeltmeye ÇALIŞMA."
+
+Gerekçesi: yanlış atıf **veri kaybı değildir**; paylaşılan dalda index/geçmiş düzeltmeye
+kalkışmak ise gerçek kayıp riskidir. TASK-MTV4YSO4SEMGG'de aynen bu oldu — `6513085`
+commit'ime geli-tirici'nin commit'siz `invoice.*` bloğu (iki dilde ~30 anahtar) girdi;
+geri almadım, rapora yazdım.
+
+### Nasıl uzlaştırılır
+
+İkisi çelişmiyor, farklı maliyet hesapları:
+
+| durum | yap |
+|---|---|
+| Hunk filtreleme güvenle uygulanabiliyor, o turda aksi bir talimat yok | Bu dosyanın ana yöntemi: `git apply --cached` |
+| Lider/kart o tur için açıkça "commit'i at, not düş" demiş | Talimata uy, **rapora yaz** |
+| Her iki durumda da | `git diff --cached` ile commit ÖNCESİ BAK — bakmamak asla doğru değil |
+
+Değişmeyen çekirdek: **paylaşılan dosyayı commit'lemeden önce staged diff'e bakmak zorunludur.**
+Değişen: baktıktan sonra yabancı satırı ayıklamak mı, yoksa alıp bildirmek mi — bu o turun
+talimatına bağlıdır, kendi başına karar verme.
+
+Not: `git add` ile `git commit` arasına başka komut koyma, art arda çağır (yarış penceresi).
