@@ -5,6 +5,7 @@
  * copy sits next to the code with both locales in one table.
  */
 
+import { PRODUCT_NAME } from '../brand';
 import { BETA_FEEDBACK_EMAIL } from './constants';
 import type { SurveyLocale } from './pricing-survey';
 
@@ -28,10 +29,10 @@ export interface RenderedSurveyEmail {
 
 const COPY = {
   tr: {
-    subject: 'Fabrika Beta — fiyat doğrulama anketi (8 dakika)',
+    subject: `${PRODUCT_NAME} Beta — fiyat doğrulama anketi (8 dakika)`,
     greeting: (name: string) => `Merhaba ${name},`,
     intro: (org: string) =>
-      `Beta’nın 7. haftasındayız ve sıra en açık sorumuzda: Fabrika ${org} için ne kadar eder? ` +
+      `Beta’nın 7. haftasındayız ve sıra en açık sorumuzda: ${PRODUCT_NAME} ${org} için ne kadar eder? ` +
       'Fiyatı sizinle birlikte belirlemek istiyoruz, size sunmadan önce.',
     whyTitle: 'Neden soruyoruz?',
     whyBody:
@@ -44,14 +45,14 @@ const COPY = {
     workshop: (label: string) => `Atölye: ${label}. Anketi atölyeden önce doldurmanız sonuçları birlikte konuşmamızı sağlar.`,
     due: (label: string) => `Son yanıt tarihi: ${label}.`,
     cta: 'Anketi doldur (8 dk)',
-    signoff: 'Teşekkürler,\nFabrika ekibi',
+    signoff: `Teşekkürler,\n${PRODUCT_NAME} ekibi`,
     footer: (email: string) => `Soru ya da itirazınız olursa ${email} adresine yazın; anket dışı da konuşuruz.`,
   },
   en: {
-    subject: 'Fabrika Beta — pricing validation survey (8 minutes)',
+    subject: `${PRODUCT_NAME} Beta — pricing validation survey (8 minutes)`,
     greeting: (name: string) => `Hello ${name},`,
     intro: (org: string) =>
-      `We are in week 7 of the beta, and it is time for our most direct question: what is Fabrika worth ` +
+      `We are in week 7 of the beta, and it is time for our most direct question: what is ${PRODUCT_NAME} worth ` +
       `to ${org}? We would rather set the price with you than present it to you.`,
     whyTitle: 'Why we are asking',
     whyBody:
@@ -64,7 +65,7 @@ const COPY = {
     workshop: (label: string) => `Workshop: ${label}. Answering before it lets us discuss the results together.`,
     due: (label: string) => `Please answer by ${label}.`,
     cta: 'Take the survey (8 min)',
-    signoff: 'Thank you,\nThe Fabrika team',
+    signoff: `Thank you,\nThe ${PRODUCT_NAME} team`,
     footer: (email: string) => `Write to ${email} with any question or objection — we are happy to talk outside the form.`,
   },
 } satisfies Record<SurveyLocale, unknown>;
