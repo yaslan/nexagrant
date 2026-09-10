@@ -5,6 +5,13 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
+    // Index and record reads hand back `T | undefined`, because that is what
+    // they can return. Turned on after the 171 pre-existing violations were
+    // closed in four slices (TASK-MTSWAKD31LS49 plan; slices
+    // TASK-MTVPOBU1CQATT / TASK-MTVPOR2CMV1RT / TASK-MTVPNUTNI54ZW /
+    // TASK-MTVPPDW8NXKLD) — without the flag, every one of them could come
+    // straight back on the next commit.
+    "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
