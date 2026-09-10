@@ -1,12 +1,13 @@
 /**
  * The product name, in one place.
  *
- * The platform shipped under the name "FonBridge" and no longer carries it. The rename found
- * the old name copied as a literal into 32 source files — page copy, logo alt text, the SMTP
- * "from" default, the evidence-pack download filename, the generated-document footer — so the
- * name had to be corrected 52 times and any site that was missed kept printing the dead brand
- * onto a customer's document. That is the defect this module exists to prevent: the name is a
- * value read from here, never a string re-typed at the call site.
+ * The platform shipped under the name "FonBridge", was renamed to "Fabrika" in 2026-Q1, and
+ * returned to "FonBridge" on 2026-09-10 per patron directive. The rename history exposed a defect:
+ * when changed before, the old name was copied as a literal into 32 source files — page copy, logo
+ * alt text, the SMTP "from" default, the evidence-pack download filename, the generated-document
+ * footer — and had to be corrected 52 times. Any site that was missed kept printing the dead
+ * brand onto a customer's document. That is the defect this module exists to prevent: the name is
+ * a value read from here, never a string re-typed at the call site.
  *
  * User-visible SENTENCES still belong in `messages/<locale>.json` (CLAUDE.md rule 8). The
  * catalogue entries that mention the product carry a `{brand}` placeholder and the caller
@@ -14,7 +15,7 @@
  */
 
 /** The product name as it is written to users, in both languages. */
-export const PRODUCT_NAME = 'Fabrika';
+export const PRODUCT_NAME = 'FonBridge';
 
 /**
  * Substitutes `{brand}` in a catalogue string with {@link PRODUCT_NAME}.

@@ -8,10 +8,10 @@ export function SmtpSettingsForm() {
   const [host, setHost] = useState('smtp.gmail.com');
   const [port, setPort] = useState('587');
   const [secure, setSecure] = useState(false);
-  const [user, setUser] = useState('noreply@fonbridge.app');
+  const [user, setUser] = useState('noreply@usfinbridge.com');
   const [password, setPassword] = useState('••••••••••••');
   const [fromName, setFromName] = useState(`${PRODUCT_NAME} SaaS`);
-  const [fromEmail, setFromEmail] = useState('noreply@fonbridge.app');
+  const [fromEmail, setFromEmail] = useState('noreply@usfinbridge.com');
 
   const [testEmail, setTestEmail] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -124,7 +124,7 @@ export function SmtpSettingsForm() {
               type="text"
               value={user}
               onChange={(e) => setUser(e.target.value)}
-              placeholder="noreply@fonbridge.app"
+              placeholder="noreply@usfinbridge.com"
               required
               className="w-full bg-ground border border-border rounded-xl px-3 py-2 text-xs text-ink font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
@@ -165,7 +165,7 @@ export function SmtpSettingsForm() {
               type="email"
               value={fromEmail}
               onChange={(e) => setFromEmail(e.target.value)}
-              placeholder="noreply@fonbridge.app"
+              placeholder="noreply@usfinbridge.com"
               required
               className="w-full bg-ground border border-border rounded-xl px-3 py-2 text-xs text-ink font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
