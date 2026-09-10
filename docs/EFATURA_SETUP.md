@@ -142,6 +142,16 @@ Pazartesi tek turda yazılabilmesi için görüşmede şunlar da istenmeli:
 - İlk aşamada test ortamında `EFATURA_INTEGRATOR_TEST_MODE=true` bırakılır.
 
 ### Adım 2: Preflight Kontrolünü Çalıştırın
+
+**Tek komutla duman testi (Adım 2 + 3 birlikte):**
+```bash
+pnpm efatura:preflight && pnpm test tests/efatura-unit.test.ts tests/efatura-integrator.test.ts tests/invoice-document.test.ts
+```
+`&&` yüzünden ikinci komut yalnız preflight `0` ile çıkarsa çalışır — kapı kırmızıyken
+testler hiç koşmaz, bu istenen davranıştır. Başarılı sonuç: preflight tablosunda üç
+blok da `✅ TANIMLI`, ardından `Test Files  3 passed (3)`. Başarısız olursa aşağıdaki
+Adım 2/3 alt maddelerine bakıp hangi bloğun veya testin kırmızı olduğunu bulun.
+
 ```bash
 pnpm efatura:preflight
 ```
@@ -165,9 +175,9 @@ pnpm efatura:preflight
 
 ### Adım 3: Otomatik Testleri Koşturun
 ```bash
-pnpm test tests/efatura-unit.test.ts tests/efatura-integrator.test.ts
+pnpm test tests/efatura-unit.test.ts tests/efatura-integrator.test.ts tests/invoice-document.test.ts
 ```
-- **Beklenen Çıktı:** Tüm testlerin yeşil (`PASSED`) olması (29/29 test).
+- **Beklenen Çıktı:** Tüm testlerin yeşil (`PASSED`) olması (43/43 test — 2026-09-10'da doğrulandı; sayı zamanla artabilir, önemli olan `FAILED` olmaması).
 - 🛑 **Hangi durumda DURULUR:** Herhangi bir test `FAILED` verirse **DURULUR**.
 
 ### Adım 4: Örnek Fatura Belgesini Doğrulayın
