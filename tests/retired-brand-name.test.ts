@@ -9,11 +9,12 @@ import { generatePdfHtml, templateBodyText } from '@/lib/document-exporter';
  * TASK-MTSWM36QWC36Z — the retired product name stays retired, and the live one is read
  * from one place.
  *
- * The platform shipped as "FonBridge". The rename found that name copied as a literal into
- * 32 source files, including the footer of every document a customer downloads, so a single
- * missed site kept printing a dead brand onto a customer's paperwork. Re-typing "Fabrika" at
- * those 52 sites would have reproduced the same defect under a new name, so the name is a
- * value read from `src/lib/brand.ts` and interpolated into `{brand}` in the catalogues.
+ * The platform shipped as "FonBridge", was renamed to "Fabrika" in 2026-Q1, and returned to
+ * "FonBridge" on 2026-09-10. The rename history showed that a brand name copied as a literal
+ * into 32 source files — including the footer of every document a customer downloads — means a
+ * single missed site keeps printing a dead brand onto a customer's paperwork. So the name is a
+ * value read from `src/lib/brand.ts` and interpolated into `{brand}` in the catalogues, never
+ * re-typed at the call site.
  *
  * Two things are therefore pinned here: no live source file names the retired brand, and the
  * generated document follows `PRODUCT_NAME` rather than a string that merely happens to match
@@ -21,7 +22,7 @@ import { generatePdfHtml, templateBodyText } from '@/lib/document-exporter';
  */
 
 const ROOT = resolve(__dirname, '..');
-const RETIRED = 'FonBridge';
+const RETIRED = 'Fabrika';
 
 /**
  * Comments that name the retired brand ON PURPOSE, as the record of a defect that removed it.
