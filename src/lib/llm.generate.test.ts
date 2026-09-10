@@ -43,6 +43,7 @@ import {
   creditsForUsage,
   resolveCredits,
   UnpricedAiActionError,
+  AiUsageLogWriteError,
 } from './llm';
 
 /** Stands in for what a tenant actually sends: the prompt must never be stored. */
@@ -614,5 +615,89 @@ describe('credits and failures', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(mockPrisma.aiUsageLog.create).not.toHaveBeenCalled();
     expect(mockPrisma.creditLedger.create).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * TASK-MTVBM0C2QWPCL — `embedText` already names this failure; the generation
+ * path, which spends 3x the credits, did not. Once `callProvider` returns, the
+ * tenant's prompt has reached Anthropic and the bill is incurred, so a thrown
+ * raw Prisma error is indistinguishable from one raised *before* the call — the
+ * caller cannot tell "nothing happened" from "we paid and recorded nothing".
+ *
+ * These tests hold the two branches apart. Mirror of `llm.embed.test.ts`.
+ */
+describe('generateCompletion — an unrecorded paid call is named, not raw', () => {
+  it('reports a failed AiUsageLog write as AiUsageLogWriteError', async () => {
+    // The prompt has already reached the provider at this point. A bare
+    // `Error: db down` here reads exactly like a pre-call database fault.
+    stubAnthropic();
+    mockPrisma.aiUsageLog.create.mockRejectedValue(new Error('db down'));
+
+    await expect(generateCompletion(baseOptions)).rejects.toBeInstanceOf(AiUsageLogWriteError);
+  });
+
+  it('reports a failed CreditLedger write as AiUsageLogWriteError too', async () => {
+    // Same hole from the other side: the call is paid for and unbilled.
+    stubAnthropic();
+    mockPrisma.creditLedger.create.mockRejectedValue(new Error('db down'));
+
+    await expect(generateCompletion(baseOptions)).rejects.toBeInstanceOf(AiUsageLogWriteError);
+  });
+
+  it('reports an RLS refusal on the bookkeeping transaction as a log-write failure', async () => {
+    // What production throws when `app.tenant_id` is not set for the write.
+    stubAnthropic();
+    const refusal = Object.assign(
+      new Error('new row violates row-level security policy for table "AiUsageLog"'),
+      { code: 'P2039' }
+    );
+    mockPrisma.withTenant.mockImplementation(
+      async (_tenantId: string, cb: (tx: unknown) => Promise<unknown>) => {
+        // The balance read must still succeed — only the post-call write fails,
+        // otherwise this would be testing a pre-call fault again.
+        if (mockPrisma.withTenant.mock.calls.length > 1) throw refusal;
+        return cb({ aiUsageLog: mockPrisma.aiUsageLog, creditLedger: mockPrisma.creditLedger });
+      }
+    );
+
+    await expect(generateCompletion(baseOptions)).rejects.toBeInstanceOf(AiUsageLogWriteError);
+  });
+
+  it('carries the original database error as `cause`', async () => {
+    stubAnthropic();
+    const original = Object.assign(new Error('db down'), { code: 'P2002' });
+    mockPrisma.aiUsageLog.create.mockRejectedValue(original);
+
+    await expect(generateCompletion(baseOptions)).rejects.toMatchObject({ cause: original });
+  });
+
+  it('does NOT name a pre-call database failure as AiUsageLogWriteError', async () => {
+    // The distinguishing test. `getCreditBalance` fails the same way, through
+    // the same `withTenant` wrapper, but nothing has been paid for yet — so
+    // treating it as an unrecorded-paid-call would be a false alarm, and a
+    // blanket try/catch around the whole function would produce exactly that.
+    const fetchMock = stubAnthropic();
+    mockPrisma.creditLedger.aggregate.mockRejectedValue(new Error('db down'));
+
+    const error = await generateCompletion(baseOptions).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(AiUsageLogWriteError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does NOT name a provider rejection as AiUsageLogWriteError', async () => {
+    // Nothing was charged and nothing needed logging: a 400 is a caller fault,
+    // not a bookkeeping fault.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 400, text: async () => 'bad request' })
+    );
+
+    const error = await generateCompletion(baseOptions).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(AiUsageLogWriteError);
   });
 });

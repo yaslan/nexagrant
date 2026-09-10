@@ -354,6 +354,12 @@ export async function getCreditBalance(tenantId: string): Promise<number> {
  * request after retries. Returns the usage the call actually produced —
  * including the credits charged — so a caller that wants to show the cost reads
  * it from here instead of recomputing the formula.
+ *
+ * Throws {@link AiUsageLogWriteError} — and only then — when the model answered
+ * but the `AiUsageLog` row or the `CreditLedger` deduction could not be written:
+ * the one failure where the tenant's prompt has already left the building and
+ * the provider is owed for it. Any other throw from this function means nothing
+ * was spent (TASK-MTVBM0C2QWPCL).
  */
 export async function generateCompletion(options: LlmGenerateOptions): Promise<LlmCompletion> {
   const balance = await getCreditBalance(options.tenantId);
@@ -385,35 +391,50 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
 
   const promptHash = hashMessages(messages);
 
-  // `withTenant`, not a bare `$transaction`: both tables below are FORCE RLS
-  // and their WITH CHECK compares "tenantId" to app.tenant_id, which only
-  // `withTenant` sets. A bare transaction is refused outright (42501).
-  await withTenant(options.tenantId, async (tx: TenantTx) => {
-    await tx.aiUsageLog.create({
-      data: {
-        tenantId: options.tenantId,
-        userId: options.userId,
-        module: options.module,
-        purpose: options.purpose,
-        provider: result.provider,
-        model: result.model,
-        promptHash,
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
-        credits,
-        proposalId: options.proposalId,
-        section: options.section,
-      },
+  // The provider has been called and the bill is incurred — the record and the
+  // deduction are now mandatory, not best-effort. Everything from here down is
+  // wrapped so a failure arrives as AiUsageLogWriteError: above this line a
+  // database fault means nothing was spent, below it the prompt has already
+  // reached the provider, and a raw Prisma error cannot tell the two apart.
+  // The try starts *here* deliberately — widening it upwards would label the
+  // balance read's own failure as a paid-but-unrecorded call.
+  try {
+    // `withTenant`, not a bare `$transaction`: both tables below are FORCE RLS
+    // and their WITH CHECK compares "tenantId" to app.tenant_id, which only
+    // `withTenant` sets. A bare transaction is refused outright (42501).
+    await withTenant(options.tenantId, async (tx: TenantTx) => {
+      await tx.aiUsageLog.create({
+        data: {
+          tenantId: options.tenantId,
+          userId: options.userId,
+          module: options.module,
+          purpose: options.purpose,
+          provider: result.provider,
+          model: result.model,
+          promptHash,
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+          credits,
+          proposalId: options.proposalId,
+          section: options.section,
+        },
+      });
+      await tx.creditLedger.create({
+        data: {
+          tenantId: options.tenantId,
+          delta: -credits,
+          reason: `usage:${options.module}`,
+          refId: options.proposalId,
+        },
+      });
     });
-    await tx.creditLedger.create({
-      data: {
-        tenantId: options.tenantId,
-        delta: -credits,
-        reason: `usage:${options.module}`,
-        refId: options.proposalId,
-      },
-    });
-  });
+  } catch (e) {
+    console.error('[generateCompletion] AiUsageLog write failed after a provider call', e);
+    throw new AiUsageLogWriteError(
+      'Completion call completed but its AiUsageLog row and credit deduction could not be written',
+      e
+    );
+  }
 
   return { ...result, credits };
 }
@@ -479,6 +500,11 @@ export interface AiCallAttribution {
  * written. Kept distinct so a caller with an embedding fallback (`getEmbedding`)
  * cannot quietly swallow it: data has already left for the provider at that
  * point, and silently continuing would recreate the unrecorded-processing hole.
+ *
+ * Both provider paths raise it — {@link embedText} and
+ * {@link generateCompletion}. It is the marker for "we paid and recorded
+ * nothing"; a failure raised *before* the provider is reached must never wear
+ * it, or the distinction it exists for is gone.
  */
 export class AiUsageLogWriteError extends Error {
   constructor(message: string, readonly cause?: unknown) {
