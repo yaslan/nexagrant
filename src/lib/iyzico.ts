@@ -256,6 +256,11 @@ interface IyzicoInitResponse {
 /**
  * Opens an iyzico hosted checkout form (3-D Secure) for a plan subscription.
  * The price is read from {@link TRY_PLAN_PRICES}, never from the caller.
+ *
+ * The buyer's identity number (TCKN for natural persons, VKN for enterprises)
+ * is required and must come from `TenantBillingIdentity`. Calls without an
+ * identity number will throw; the caller must ensure the tenant has filled in
+ * the fiscal identity form before initiating checkout.
  */
 export async function createIyzicoCheckout(
   params: IyzicoCheckoutParams
@@ -263,6 +268,12 @@ export async function createIyzicoCheckout(
   const { tenantId, interval, buyer, callbackUrl } = params;
 
   if (!tenantId) throw new Error('createIyzicoCheckout requires a tenantId');
+
+  if (!buyer.identityNumber) {
+    throw new Error(
+      'createIyzicoCheckout requires buyer.identityNumber from TenantBillingIdentity'
+    );
+  }
 
   const config = getIyzicoConfig();
   if (!config) throw new Error('iyzico is not configured (IYZICO_API_KEY / IYZICO_SECRET_KEY)');
@@ -296,8 +307,8 @@ export async function createIyzicoCheckout(
       name: buyer.name,
       surname: buyer.surname,
       email: buyer.email,
-      identityNumber: buyer.identityNumber ?? '11111111111',
-      registrationAddress: buyer.registrationAddress ?? '-',
+      identityNumber: buyer.identityNumber,
+      registrationAddress: buyer.registrationAddress ?? 'Not provided',
       city: buyer.city ?? 'Istanbul',
       country: buyer.country ?? 'Turkey',
       ip: buyer.ip ?? '0.0.0.0',

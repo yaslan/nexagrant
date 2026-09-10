@@ -161,6 +161,18 @@ describe('buildAuthorizationHeader', () => {
 });
 
 describe('createIyzicoCheckout', () => {
+  it('requires the buyer identity number from TenantBillingIdentity', async () => {
+    await expect(
+      createIyzicoCheckout({
+        tenantId: TENANT,
+        planId: 'pro',
+        interval: 'month',
+        buyer: { id: 'u1', name: 'Ada', surname: 'Yılmaz', email: 'ada@example.com' },
+        callbackUrl: 'https://app.example.com/return',
+      })
+    ).rejects.toThrow(/requires buyer.identityNumber/);
+  });
+
   it('sends the server-side price, not a caller-supplied one', async () => {
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({ status: 'success', token: 'tok_9', paymentPageUrl: 'https://pay/tok_9' }),
@@ -172,7 +184,7 @@ describe('createIyzicoCheckout', () => {
       tenantId: TENANT,
       planId: 'pro',
       interval: 'month',
-      buyer: { id: 'u1', name: 'Ada', surname: 'Yılmaz', email: 'ada@example.com' },
+      buyer: { id: 'u1', name: 'Ada', surname: 'Yılmaz', email: 'ada@example.com', identityNumber: '2840958172' },
       callbackUrl: 'https://app.example.com/tr/billing/iyzico/return',
     });
 
@@ -189,6 +201,7 @@ describe('createIyzicoCheckout', () => {
     expect(sent.price).toBe('7850.00');
     expect(sent.paidPrice).toBe('7850.00');
     expect(sent.currency).toBe('TRY');
+    expect(sent.buyer.identityNumber).toBe('2840958172');
     expect(parseConversationId(sent.conversationId)).toMatchObject({ tenantId: TENANT, planId: 'pro' });
   });
 
@@ -202,7 +215,7 @@ describe('createIyzicoCheckout', () => {
       tenantId: TENANT,
       planId: 'pro',
       interval: 'month',
-      buyer: { id: 'u1', name: 'Ada', surname: 'Yılmaz', email: 'ada@example.com' },
+      buyer: { id: 'u1', name: 'Ada', surname: 'Yılmaz', email: 'ada@example.com', identityNumber: '2840958172' },
       callbackUrl: 'https://app.example.com/return',
     });
 
@@ -217,7 +230,7 @@ describe('createIyzicoCheckout', () => {
         tenantId: TENANT,
         planId: 'free',
         interval: 'month',
-        buyer: { id: 'u1', name: 'Ada', surname: 'Yılmaz', email: 'ada@example.com' },
+        buyer: { id: 'u1', name: 'Ada', surname: 'Yılmaz', email: 'ada@example.com', identityNumber: '2840958172' },
         callbackUrl: 'https://app.example.com/return',
       })
     ).rejects.toThrow(/No TRY price/);
