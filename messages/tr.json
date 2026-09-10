@@ -625,6 +625,13 @@
     "dpa": {
       "metaTitle": "Veri İşleme Sözleşmesi (DPA) — {brand}",
       "metaDescription": "{brand} ile kurumsal müşteriler arasındaki KVKK/GDPR uyumlu veri işleme sözleşmesi."
+    },
+    "cookieConsent": {
+      "title": "Çerez Tercihleri",
+      "description": "Yalnızca sitenin çalışması için gereken çerezleri ve tarayıcı depolamasını kullanıyoruz: oturumunuz, dil ve tema tercihiniz, sepetiniz. Analitik ya da üçüncü taraf takip çerezi kullanmıyoruz. Ayrıntılar için bkz. ",
+      "privacyLink": "Gizlilik Bildirimi",
+      "acceptAll": "Tümünü Kabul Et",
+      "essentialOnly": "Gerekli Çerezler"
     }
   },
   "feedback": {
@@ -1531,7 +1538,38 @@
         }
       },
       "plansUnavailable": "Paket listesi şu anda okunamıyor. Yanlış bir fiyat göstermemek için burada rakam vermiyoruz; birazdan tekrar deneyin.",
-      "plansEmpty": "Kuruluşunuza şu anda açık bir paket yok."
+      "plansEmpty": "Kuruluşunuza şu anda açık bir paket yok.",
+      "identityBadge": "FATURA KİMLİĞİ",
+      "identityTitle": "Fatura kimliği (alıcı bilgileri)",
+      "identityBody": "Faturalarınız bu bilgilerle düzenlenir. Kimlik girilmeden ödeme alınsa bile resmî fatura kesilemez.",
+      "identityLockedBody": "Fatura kimliğini yalnızca kuruluş sahibi görüntüleyebilir ve düzenleyebilir. Bu alan vergi kimlik numarası içerdiği için erişim bilinçli olarak dardır.",
+      "identityMissingWarning": "Bu kuruluş için fatura kimliği kayıtlı değil. Bu bilgiler girilene kadar tahsil edilen ödemeler için fatura düzenlenemez.",
+      "identityFieldName": "Fatura unvanı",
+      "identityFieldVknTckn": "VKN / TCKN",
+      "identityFieldTaxOffice": "Vergi dairesi",
+      "identityFieldAddress": "Fatura adresi",
+      "identityFieldCity": "İl / şehir",
+      "identityFieldCountry": "Ülke",
+      "identityVknHint": "Tüzel kişi için 10 haneli VKN, şahıs için 11 haneli TCKN.",
+      "identityVknPlaceholder": "10 hane (VKN) veya 11 hane (TCKN)",
+      "identityMaskedHint": "Yalnız son 4 hane gösterilir.",
+      "identityPrivacyNote": "Bu numara yalnızca fatura düzenlemek için kullanılır; ekranda ve kayıtlarda tam olarak gösterilmez.",
+      "identitySave": "Fatura kimliğini kaydet",
+      "identitySaving": "Kaydediliyor...",
+      "identitySaved": "Fatura kimliği kaydedildi. Bundan sonraki ödemeler için fatura düzenlenebilir.",
+      "identitySavedNotChargeable": "Fatura kimliği kaydedildi. Ancak {country} için KDV rejimi henüz belirlenmediğinden fatura düzenlenemiyor; bu, mali müşavir kararı bekleyen bir konudur.",
+      "identityCountryPending": "fatura henüz düzenlenemiyor",
+      "identityCountryPendingHint": "Seçtiğiniz ülke için KDV rejimi henüz belirlenmedi. Bilgileriniz kaydedilir, fakat fatura düzenlenmesi bu karara bağlıdır.",
+      "identityErrValidation": "Bilgiler kaydedilmedi. İşaretli alanları düzeltip tekrar deneyin.",
+      "identityErrRequired": "Bu alan zorunludur.",
+      "identityErrTooLong": "Bu alan çok uzun.",
+      "identityErrDigits": "Yalnızca rakam girin.",
+      "identityErrLength": "VKN 10 hane, TCKN 11 hane olmalıdır.",
+      "identityErrChecksum": "Girilen numara geçerli bir VKN/TCKN değil. Lütfen kontrol edin.",
+      "identityErrCountry": "Bu ülke için kayıtlı bir KDV oranı yok; fatura düzenlenemez.",
+      "identityErrForbidden": "Bu bilgileri değiştirme yetkiniz yok.",
+      "identityErrWrite": "Bilgiler kaydedilemedi. Kısa süre sonra tekrar deneyin.",
+      "identityEditLink": "Fatura kimliğini düzenle"
     }
   },
   "adminSettings": {

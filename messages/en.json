@@ -625,6 +625,13 @@
     "dpa": {
       "metaTitle": "Data Processing Agreement (DPA) — {brand}",
       "metaDescription": "The GDPR-compliant data processing agreement between {brand} and its customers."
+    },
+    "cookieConsent": {
+      "title": "Cookie Preferences",
+      "description": "We only use the cookies and browser storage the site needs to work: your session, your language and theme preference, and your cart. We do not use analytics or third-party tracking cookies. For details, see our ",
+      "privacyLink": "Privacy Policy",
+      "acceptAll": "Accept All",
+      "essentialOnly": "Essential Only"
     }
   },
   "feedback": {
@@ -1531,7 +1538,38 @@
         }
       },
       "plansUnavailable": "The plan list cannot be read right now. Rather than show a price that may be wrong we are showing none; please try again shortly.",
-      "plansEmpty": "No plan is currently on offer to your organisation."
+      "plansEmpty": "No plan is currently on offer to your organisation.",
+      "identityBadge": "BILLING IDENTITY",
+      "identityTitle": "Billing identity (buyer details)",
+      "identityBody": "Your invoices are made out to these details. Without them a payment can be taken but no official invoice can be issued.",
+      "identityLockedBody": "Only the organisation owner can view and edit the billing identity. Access is deliberately narrow because this section holds a tax identity number.",
+      "identityMissingWarning": "No billing identity is on file for this organisation. Until these details are entered, no invoice can be issued for payments already taken.",
+      "identityFieldName": "Legal invoice name",
+      "identityFieldVknTckn": "VKN / TCKN",
+      "identityFieldTaxOffice": "Tax office",
+      "identityFieldAddress": "Billing address",
+      "identityFieldCity": "City",
+      "identityFieldCountry": "Country",
+      "identityVknHint": "10 digits (VKN) for a company, 11 digits (TCKN) for a sole trader.",
+      "identityVknPlaceholder": "10 digits (VKN) or 11 digits (TCKN)",
+      "identityMaskedHint": "Only the last 4 digits are shown.",
+      "identityPrivacyNote": "This number is used only to issue invoices; it is never shown or logged in full.",
+      "identitySave": "Save billing identity",
+      "identitySaving": "Saving...",
+      "identitySaved": "Billing identity saved. Invoices can be issued for payments from now on.",
+      "identitySavedNotChargeable": "Billing identity saved. Invoicing for {country} is still on hold: its VAT treatment has not been decided and needs a tax adviser's ruling.",
+      "identityCountryPending": "invoicing on hold",
+      "identityCountryPendingHint": "The VAT treatment for the country you picked has not been decided yet. Your details are saved, but issuing an invoice depends on that ruling.",
+      "identityErrValidation": "Nothing was saved. Correct the marked fields and try again.",
+      "identityErrRequired": "This field is required.",
+      "identityErrTooLong": "This field is too long.",
+      "identityErrDigits": "Digits only.",
+      "identityErrLength": "A VKN is 10 digits and a TCKN is 11.",
+      "identityErrChecksum": "That is not a valid VKN/TCKN. Please check it.",
+      "identityErrCountry": "There is no sourced VAT rate for this country, so it cannot be invoiced.",
+      "identityErrForbidden": "You do not have permission to change these details.",
+      "identityErrWrite": "The details could not be saved. Please try again shortly.",
+      "identityEditLink": "Edit billing identity"
     }
   },
   "adminSettings": {

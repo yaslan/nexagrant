@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useIsHydrated } from '@/lib/hooks/use-is-hydrated';
 
 const CONSENT_STORAGE_KEY = 'fabrika_cookie_consent';
@@ -28,6 +28,7 @@ export default function CookieConsent() {
   const [dismissed, setDismissed] = useState(false);
   const visible = isHydrated && !answered && !dismissed;
   const locale = useLocale();
+  const t = useTranslations('legal.cookieConsent');
 
   const handleAccept = () => {
     localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({
@@ -49,15 +50,6 @@ export default function CookieConsent() {
 
   if (!visible) return null;
 
-  const isTr = locale === 'tr';
-  const title = isTr ? 'Çerez Tercihleri' : 'Cookie Preferences';
-  const description = isTr
-    ? 'Web sitesini geliştirmek ve analitik verilerini toplama için çerezleri kullanıyoruz. Tercihlerinizi ayarlayabilir veya '
-    : 'We use cookies to improve your experience and collect analytics data. You can adjust your preferences or read our ';
-  const privacyLabel = isTr ? 'Gizlilik Bildirimi' : 'Privacy Policy';
-  const accept = isTr ? 'Tümünü Kabul Et' : 'Accept All';
-  const reject = isTr ? 'Gerekli Çerezler' : 'Essential Only';
-
   return (
     <div
       className="fixed inset-0 z-50 bg-black/50"
@@ -70,33 +62,33 @@ export default function CookieConsent() {
         <div className="space-y-4">
           <div>
             <h2 id="cookie-title" className="text-base font-semibold text-ink">
-              {title}
+              {t('title')}
             </h2>
             <p id="cookie-description" className="text-sm text-ink-2 mt-2">
-              {description}
+              {t('description')}
               <a
                 href={`/${locale}/privacy`}
                 className="text-accent underline font-medium hover:no-underline focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:outline-none rounded"
-                aria-label={`${privacyLabel}`}
+                aria-label={t('privacyLink')}
               >
-                {privacyLabel}
+                {t('privacyLink')}
               </a>
             </p>
           </div>
           <div className="flex gap-3 flex-col sm:flex-row">
             <button
               onClick={handleReject}
-              aria-label={reject}
+              aria-label={t('essentialOnly')}
               className="text-xs font-semibold border border-border px-4 py-2 rounded-lg text-ink-2 hover:bg-surface-hover hover:text-ink focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:outline-none transition-colors"
             >
-              {reject}
+              {t('essentialOnly')}
             </button>
             <button
               onClick={handleAccept}
-              aria-label={accept}
+              aria-label={t('acceptAll')}
               className="text-xs font-semibold bg-accent-strong text-white px-4 py-2 rounded-lg hover:opacity-90 focus:ring-2 focus:ring-offset-2 focus:ring-white focus:outline-none shadow-2xs transition-opacity"
             >
-              {accept}
+              {t('acceptAll')}
             </button>
           </div>
         </div>
