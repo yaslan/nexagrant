@@ -11,6 +11,65 @@ import {
   vatOnNetMinor,
   withholdingOnVatMinor,
 } from './money';
+import trMessages from '../../messages/tr.json';
+import enMessages from '../../messages/en.json';
+
+/** The locales the printed document can be rendered in (`src/i18n/routing.ts`). */
+export type InvoiceLocale = 'tr' | 'en';
+
+/**
+ * The `invoice` namespace of each message catalogue.
+ *
+ * `generateEfaturaHtml` is a synchronous, non-React function called from a route
+ * handler, so it can use neither `useTranslations()` nor `await getTranslations()`.
+ * Reading the namespace straight out of the same `messages/<locale>.json` files that
+ * `src/i18n/request.ts` loads keeps the strings in one place and in both languages
+ * (CLAUDE.md rule 8), and a key missing from one catalogue is a type error here rather
+ * than a Turkish string leaking onto an English page. Same pattern, and for the same
+ * reason, as `CATALOGS` in `src/lib/document-exporter.ts`.
+ */
+const INVOICE_CATALOGS = { tr: trMessages.invoice, en: enMessages.invoice };
+
+function invoiceLabels(locale?: InvoiceLocale) {
+  return INVOICE_CATALOGS[locale === 'en' ? 'en' : 'tr'];
+}
+
+/**
+ * Turkish terms that stay Turkish in **every** locale, because they are not product
+ * copy: they are the names GİB and UBL-TR 1.2.1 give to things, and a translated one
+ * would name something that does not exist in the legislation.
+ *
+ * This is the (A) half of TASK-MTTUSZF4QSFGU. The (B) half — the labels around them,
+ * which describe the page rather than the fiscal record — lives in `messages/*.json`
+ * under `invoice.*` and does get translated.
+ *
+ * Deliberately Turkish, and their evidence:
+ *   - `VKN` / `TCKN`  — Vergi Kimlik Numarası / T.C. Kimlik Numarası. Printed as the
+ *     `schemeID` of `cac:PartyIdentification` in the filed XML; the page has to use the
+ *     same word the XML does or the two documents label the same number differently.
+ *   - `ETTN`          — Evrensel Tekil Tanımlama Numarası, the document's UUID under
+ *     UBL-TR. There is no English name for it in the GİB schema.
+ *   - `e-Fatura` / `e-Arşiv Fatura` — the two document types themselves, and the value
+ *     `profileId` selects between. "e-Invoice" would name a different (unregulated) thing.
+ *   - `KDV` / `Tevkifat` — the `cac:TaxScheme/cbc:Name` values the XML files. They are
+ *     NOT read from here by the XML generator (which keeps its own literals a few lines
+ *     down, so this module cannot change what is filed by editing a label); they are
+ *     listed so the deliberate set is greppable in one place.
+ *
+ * `TICARIFATURA` / `TEMELFATURA` / `EARSIVFATURA` and `SATIS` / `ISTISNA` / `TEVKIFAT`
+ * belong to the same set. They are not repeated here because they are printed straight
+ * off the document (`invoice.profileId`, `invoice.invoiceType`) — code values, never
+ * mapped through a label table.
+ */
+export const GIB_TURKISH_TERMS = {
+  vkn: 'VKN',
+  tckn: 'TCKN',
+  ettn: 'ETTN',
+  eFatura: 'e-Fatura',
+  eArsivFatura: 'e-Arşiv Fatura',
+  kdvSchemeName: 'KDV',
+  withholdingSchemeName: 'Tevkifat',
+} as const;
 
 export interface InvoiceParty {
   name: string;
@@ -597,13 +656,52 @@ export function generateUblTrXml(invoice: EfaturaDocument): string {
 }
 
 /**
+ * A VAT rate as the reader's language writes a percentage.
+ *
+ * Turkish puts the sign first ("%20"), English last ("20%"). The number itself is the
+ * line's own `vatRate` — never a literal: this cell read a hard-coded "%20" until the
+ * rate started coming from the buyer's country (`src/lib/billing/vat-rates.ts`), which
+ * made a 0% Kuwait sale print 20% on the page the buyer receives.
+ */
+function percentLabel(rate: number, locale: InvoiceLocale): string {
+  return locale === 'en' ? `${rate}%` : `%${rate}`;
+}
+
+/**
+ * The unit a quantity is counted in, from the line's own UN/ECE `unitCode`.
+ *
+ * Every row printed the word "Adet" (pieces) regardless of `unitCode`, so a monthly
+ * subscription line — `unitCode: 'MON'`, which is what `invoice-writer.ts` writes for
+ * every subscription invoice — was billed on the page as "1 Adet" while the filed XML
+ * said `unitCode="MON"`. The two documents described the same sale differently.
+ *
+ * A code with no catalogue entry prints the raw code rather than a guessed word: an
+ * unrecognised unit is something nobody has translated, not something that is "pieces"
+ * (the same rule the VAT table applies to an unsourced country).
+ */
+function unitLabel(unitCode: string, locale: InvoiceLocale): string {
+  const labels = invoiceLabels(locale);
+  const known: Record<string, string> = { C62: labels.unitC62, MON: labels.unitMON };
+  return known[unitCode] ?? unitCode;
+}
+
+/**
  * GİB UBL-TR düzenine göre biçimlenmiş, yazdırılabilir HTML / PDF görünümü.
  *
  * "Onaylı" değildir ve öyle demez: bu şablon bir belgeyi biçimlendirir, GİB'e
  * göndermez. Gönderildiğini yalnız `gibEnvelopeId` kanıtlar; o yoksa çıktı
  * kendini `UNFILED_NOTICE` ile mali değeri olmayan bir örnek olarak işaretler.
  */
-export function generateEfaturaHtml(invoice: EfaturaDocument): string {
+export function generateEfaturaHtml(
+  invoice: EfaturaDocument,
+  locale: InvoiceLocale = 'tr'
+): string {
+  // Every fixed word on the page comes from `messages/<locale>.json` under
+  // `invoice.*`. It used to be a Turkish literal in this template, so an English
+  // session downloaded a Turkish invoice (CLAUDE.md rule 8, TASK-MTTUSZF4QSFGU).
+  // `tr` is the default and its catalogue entries are the literals this template
+  // used to carry, character for character — the Turkish page did not change.
+  const t = invoiceLabels(locale);
   // The same minor-unit result the XML prints, not the major-unit float view:
   // the page and the filed document describe one sale and must not round it
   // two different ways (CLAUDE.md #9).
@@ -614,7 +712,7 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
   // "%20" no matter what the lines said, so a zero-rated or mixed-rate sale
   // labelled its own VAT wrongly on the page the buyer receives.
   const vatRateLabel = [...new Set(invoice.lines.map((l) => l.vatRate))]
-    .map((rate) => `%${rate}`)
+    .map((rate) => percentLabel(rate, locale))
     .join(' + ');
 
   // The withholding rates actually charged on lines that have withholding,
@@ -636,9 +734,9 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
     <tr>
       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${idx + 1}</td>
       <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>${l.name}</strong></td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${l.quantity} Adet</td>
+      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${l.quantity} ${unitLabel(l.unitCode, locale)}</td>
       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${money(l.unitPriceMinor)}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">%${l.vatRate}</td>
+      <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${percentLabel(l.vatRate, locale)}</td>
       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace; font-weight: bold;">${money(totals.lines[idx]!.netMinor)}</td>
     </tr>
   `
@@ -646,10 +744,10 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
     .join('');
 
   return `<!DOCTYPE html>
-<html lang="tr">
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8">
-  <title>${isFiledWithGib(invoice) ? '' : 'ÖRNEK — '}E-Fatura - ${invoice.id}</title>
+  <title>${isFiledWithGib(invoice) ? '' : t.samplePrefix}${t.pageTitle.replace('{number}', invoice.id)}</title>
   <style>
     @page { size: A4; margin: 15mm; }
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0f172a; font-size: 10pt; line-height: 1.5; }
@@ -684,11 +782,14 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
   ${
     isFiledWithGib(invoice)
       ? ''
-      : `<div class="unfiled-banner">${UNFILED_NOTICE}</div>`
+      // The page says this in the reader's language; `UNFILED_NOTICE` stays the
+      // Turkish `cbc:Note` the XML carries, so translating the banner cannot
+      // change a word of what would be filed with GİB.
+      : `<div class="unfiled-banner">${t.unfiledNotice}</div>`
   }
   <div class="no-print" style="background:#f1f5f9; padding:10px; text-align:right; margin-bottom:15px;">
     <button onclick="window.print()" style="background:#1e3a8a; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">
-      🖨️ Faturayı Yazdır / PDF İndir
+      ${t.printButton}
     </button>
   </div>
 
@@ -697,46 +798,52 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
       <div class="company-title">${invoice.supplier.name}</div>
       <div style="font-size: 8.5pt; color: #475569; margin-top: 4px;">
         ${invoice.supplier.address} - ${invoice.supplier.city} / ${invoice.supplier.country}<br>
-        Vergi Dairesi: ${invoice.supplier.taxOffice} | VKN: ${invoice.supplier.vknTckn}
+        ${t.taxOffice}: ${invoice.supplier.taxOffice} | ${GIB_TURKISH_TERMS.vkn}: ${invoice.supplier.vknTckn}
       </div>
     </div>
     <div>
-      <div class="doc-type">${invoice.profileId === 'EARSIVFATURA' ? 'e-Arşiv Fatura' : 'e-Fatura'}</div>
+      <div class="doc-type">${
+        invoice.profileId === 'EARSIVFATURA'
+          ? GIB_TURKISH_TERMS.eArsivFatura
+          : GIB_TURKISH_TERMS.eFatura
+      }</div>
       <div style="font-size: 9pt; font-family: monospace; text-align: right; color: #334155;">
-        <strong>Fatura No:</strong> ${invoice.id}<br>
-        <strong>Tarih:</strong> ${invoice.issueDate}<br>
-        <strong>ETTN:</strong> ${invoice.uuid}
+        <strong>${t.invoiceNumber}:</strong> ${invoice.id}<br>
+        <strong>${t.issueDate}:</strong> ${invoice.issueDate}<br>
+        <strong>${GIB_TURKISH_TERMS.ettn}:</strong> ${invoice.uuid}
       </div>
     </div>
   </div>
 
   <div class="meta-grid">
     <div class="party-box">
-      <div class="party-title">SAYIN (ALICI)</div>
+      <div class="party-title">${t.buyerBoxTitle}</div>
       <strong>${invoice.customer.name}</strong><br>
       ${invoice.customer.address} - ${invoice.customer.city} / ${invoice.customer.country}<br>
-      <strong>Vergi Dairesi:</strong> ${invoice.customer.taxOffice}<br>
-      <strong>${invoice.customer.vknTckn.length === 11 ? 'TCKN' : 'VKN'}:</strong> ${invoice.customer.vknTckn}
+      <strong>${t.taxOffice}:</strong> ${invoice.customer.taxOffice}<br>
+      <strong>${
+        invoice.customer.vknTckn.length === 11 ? GIB_TURKISH_TERMS.tckn : GIB_TURKISH_TERMS.vkn
+      }:</strong> ${invoice.customer.vknTckn}
     </div>
 
     <div class="party-box">
-      <div class="party-title">FATURA DETAYLARI</div>
-      <strong>Senaryo:</strong> ${invoice.profileId}<br>
-      <strong>Fatura Tipi:</strong> ${invoice.invoiceType}<br>
-      <strong>Düzenleme Zamanı:</strong> ${invoice.issueDate} ${invoice.issueTime}<br>
-      <strong>Para Birimi:</strong> ${invoice.currency}
+      <div class="party-title">${t.detailsBoxTitle}</div>
+      <strong>${t.scenario}:</strong> ${invoice.profileId}<br>
+      <strong>${t.invoiceTypeLabel}:</strong> ${invoice.invoiceType}<br>
+      <strong>${t.issuedAt}:</strong> ${invoice.issueDate} ${invoice.issueTime}<br>
+      <strong>${t.currencyLabel}:</strong> ${invoice.currency}
     </div>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th style="width: 5%; text-align: center;">Sıra</th>
-        <th style="width: 45%;">Hizmet / Ürün Açıklaması</th>
-        <th style="width: 10%; text-align: center;">Miktar</th>
-        <th style="width: 15%; text-align: right;">Birim Fiyat</th>
-        <th style="width: 10%; text-align: center;">KDV Oranı</th>
-        <th style="width: 15%; text-align: right;">Toplam Tutar</th>
+        <th style="width: 5%; text-align: center;">${t.columnIndex}</th>
+        <th style="width: 45%;">${t.columnDescription}</th>
+        <th style="width: 10%; text-align: center;">${t.columnQuantity}</th>
+        <th style="width: 15%; text-align: right;">${t.columnUnitPrice}</th>
+        <th style="width: 10%; text-align: center;">${t.columnVatRate}</th>
+        <th style="width: 15%; text-align: right;">${t.columnLineTotal}</th>
       </tr>
     </thead>
     <tbody>
@@ -746,23 +853,23 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
 
   <table class="totals-table">
     <tr>
-      <td class="label">Ara Toplam (Matrah):</td>
+      <td class="label">${t.totalSubtotal}:</td>
       <td style="text-align: right; font-family: monospace;">${money(totals.subtotalMinor)}</td>
     </tr>
     <tr>
-      <td class="label">Hesaplanan KDV (${vatRateLabel}):</td>
+      <td class="label">${t.totalVat.replace('{rates}', vatRateLabel)}:</td>
       <td style="text-align: right; font-family: monospace;">${money(totals.totalVatMinor)}</td>
     </tr>
     ${
       totals.totalWithholdingMinor > 0
         ? `<tr>
-      <td class="label" style="color: #b91c1c;">Tevkifat Tutarı (${withholdingRates}):</td>
+      <td class="label" style="color: #b91c1c;">${t.totalWithholding.replace('{rates}', withholdingRates)}:</td>
       <td style="text-align: right; font-family: monospace; color: #b91c1c;">-${money(totals.totalWithholdingMinor)}</td>
     </tr>`
         : ''
     }
     <tr class="grand-total">
-      <td class="label">ÖDENECEK GENEL TOPLAM:</td>
+      <td class="label">${t.totalGrand}:</td>
       <td style="text-align: right; font-family: monospace; color: #047857;">${money(totals.grandTotalMinor)}</td>
     </tr>${
       // VUK 215: a foreign-currency invoice has to show its lira equivalent on
@@ -772,10 +879,10 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
       invoice.exchangeRate && invoice.currency !== 'TRY'
         ? `
     <tr>
-      <td class="label">TL karşılığı${
+      <td class="label">${
         typeof invoice.exchangeRate.tryEquivalentMinor === 'number'
-          ? ''
-          : ' (kayıtlı tutar yok)'
+          ? t.tryEquivalent
+          : t.tryEquivalentUnrecorded
       }:</td>
       <td style="text-align: right; font-family: monospace;">${
         typeof invoice.exchangeRate.tryEquivalentMinor === 'number'
@@ -793,8 +900,8 @@ export function generateEfaturaHtml(invoice: EfaturaDocument): string {
   <div class="footer">
     ${
       isFiledWithGib(invoice)
-        ? `İşbu fatura 213 sayılı Vergi Usul Kanunu ve Gelir İdaresi Başkanlığı e-Fatura mevzuatına uygun olarak elektronik ortamda düzenlenmiş ve GİB'e iletilmiştir. Zarf No: ${invoice.gibEnvelopeId}`
-        : UNFILED_NOTICE
+        ? t.footerFiled.replace('{envelope}', invoice.gibEnvelopeId!)
+        : t.unfiledNotice
     }
   </div>
 </body>

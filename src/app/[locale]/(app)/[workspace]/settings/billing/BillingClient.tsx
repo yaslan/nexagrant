@@ -147,8 +147,12 @@ export function BillingClient({
     // does not treat it as an unrequested popup once the response arrives.
     const previewWindow = format === 'pdf' ? window.open('', '_blank', 'noopener,noreferrer') : null;
     try {
+      // The printed page is rendered in the language the user is reading the app
+      // in; the XML is the document filed with GİB and has no locale, so the
+      // parameter is only sent for the page (TASK-MTTUSZF4QSFGU).
+      const localeParam = format === 'pdf' ? `&locale=${encodeURIComponent(locale)}` : '';
       const res = await fetch(
-        `/api/billing/invoices/${encodeURIComponent(invoiceNumber)}/export?format=${format}`
+        `/api/billing/invoices/${encodeURIComponent(invoiceNumber)}/export?format=${format}${localeParam}`
       );
       if (!res.ok) {
         const body = await res.json().catch(() => null);

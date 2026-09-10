@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { withTenant } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { env } from '@/lib/env';
-import { generateUblTrXml, generateEfaturaHtml } from '@/lib/efatura';
+import { generateUblTrXml, generateEfaturaHtml, type InvoiceLocale } from '@/lib/efatura';
 import {
   buildInvoiceDocument,
   InvoiceLinesInvalidError,
@@ -50,6 +50,15 @@ export async function GET(
     );
   }
   const format = requested as Format;
+
+  // Which language the *printed page* is rendered in. Same shape as
+  // `src/app/api/documents/export/route.ts`, and Turkish unless English is asked
+  // for explicitly, so a link without the parameter keeps rendering what it did.
+  //
+  // It reaches only `generateEfaturaHtml`. The XML is the document filed with GİB
+  // and has no locale: its element names and `cbc:Note` are fixed by UBL-TR, so
+  // this parameter cannot change a byte of what is filed (TASK-MTTUSZF4QSFGU).
+  const locale: InvoiceLocale = searchParams.get('locale') === 'en' ? 'en' : 'tr';
 
   const session = await auth();
   if (!session?.user?.id) {
@@ -145,7 +154,7 @@ export async function GET(
     });
   }
 
-  return new NextResponse(generateEfaturaHtml(document), {
+  return new NextResponse(generateEfaturaHtml(document, locale), {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
