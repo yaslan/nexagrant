@@ -37,7 +37,9 @@
 -- RLS: `TenantBillingIdentity` is added to the tenant_isolation list in
 -- prisma/rls.sql in this same change. Its `tenantId` is the primary key, which
 -- the existing policy expression matches unchanged, exactly as `TenantProfile`
--- already does.
+-- already does. The same policy is stated at the foot of this file, so the
+-- VKN/TCKN and billing address it holds are never briefly readable across
+-- tenants between this migration and `pnpm db:rls` (TASK-MTVDSSJTZCY4T).
 --
 -- Down migration: add-invoice-write-path.down.sql.
 
@@ -73,5 +75,19 @@ ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "paymentRef" TEXT;
 -- because a payment id is only unique within one provider's account.
 CREATE UNIQUE INDEX IF NOT EXISTS "Invoice_tenantId_paymentRef_key"
   ON "Invoice" ("tenantId", "paymentRef");
+
+-- Row level security, stated here as well as in prisma/rls.sql. prisma/rls.sql
+-- stays the source of truth and re-creates this on every `pnpm db:rls`; it is
+-- repeated here so applying this file alone leaves no window where the table
+-- exists without a policy. That window is the release procedure, not a
+-- hypothesis: docs/RELEASE_CHECKLIST.md §1 has a human apply these flat .sql
+-- files by hand before the code ships, and `pnpm db:rls` is a separate step
+-- (TASK-MTVDSSJTZCY4T). Wording is byte-identical to prisma/rls.sql:19-21.
+ALTER TABLE "TenantBillingIdentity" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "TenantBillingIdentity" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "TenantBillingIdentity";
+CREATE POLICY tenant_isolation ON "TenantBillingIdentity"
+  USING ("tenantId" = current_setting('app.tenant_id', true))
+  WITH CHECK ("tenantId" = current_setting('app.tenant_id', true));
 
 COMMIT;

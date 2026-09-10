@@ -47,6 +47,11 @@ rows Prisma has recorded as applied: 5       (yalnız klasörlü olanlar)
 - [ ] `ls prisma/migrations/*.sql | grep -v "\.down\.sql$" | wc -l` çıktısı
       yeniden sayıldı; 12'den büyükse yeni gelen dosyalar da uygulandı.
 
+**RLS bu pencerede:** bu dosyaların her biri kurduğu kiracı tablosunun
+`tenant_isolation` politikasını kendi içinde taşır, çünkü `pnpm db:rls` ayrı bir
+adımdır ve arada tablo politikasız durur (kural ve ölçüm: `docs/DATA_MODEL.md`
+§16; kapı: `pnpm rls:check` → CHECK 4b).
+
 **Neden bloklayıcı:** kod önce çıkarsa, o kolonu bekleyen iş kırılır.
 Ölçülmüş örnek: `relationship-owner-nullable.sql` uygulanmadan imha işi
 (`purgeDueUsers`) `P2011` ile düşer, kişi silinmez ve yasal imha borcu büyür

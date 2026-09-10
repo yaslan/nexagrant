@@ -18,6 +18,9 @@
 --
 -- RLS: added to the tenant_isolation list in prisma/rls.sql in the same change,
 -- so a tenant cannot read another tenant's invoice even by guessing its number.
+-- The same policy is stated at the foot of this file, so the table is never
+-- briefly readable across tenants between this migration and `pnpm db:rls`
+-- (TASK-MTVDSSJTZCY4T).
 --
 -- Down migration: add-invoice.down.sql (drops the table — destructive).
 
@@ -60,5 +63,19 @@ BEGIN
       FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
   END IF;
 END $$;
+
+-- Row level security, stated here as well as in prisma/rls.sql. prisma/rls.sql
+-- stays the source of truth and re-creates this on every `pnpm db:rls`; it is
+-- repeated here so applying this file alone leaves no window where the table
+-- exists without a policy. That window is the release procedure, not a
+-- hypothesis: docs/RELEASE_CHECKLIST.md §1 has a human apply these flat .sql
+-- files by hand before the code ships, and `pnpm db:rls` is a separate step
+-- (TASK-MTVDSSJTZCY4T). Wording is byte-identical to prisma/rls.sql:19-21.
+ALTER TABLE "Invoice" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Invoice" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "Invoice";
+CREATE POLICY tenant_isolation ON "Invoice"
+  USING ("tenantId" = current_setting('app.tenant_id', true))
+  WITH CHECK ("tenantId" = current_setting('app.tenant_id', true));
 
 COMMIT;

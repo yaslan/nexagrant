@@ -1,6 +1,13 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import {
+  canonicalPolicyClauses,
+  forwardMigrationFiles,
+  scanMigrations,
+  stripSqlComments,
+} from '../scripts/rls-migrations';
 import { NULLABLE_TENANT, SYSTEM_WIDE, tenantScopedModels } from '../scripts/rls-models';
 
 /**
@@ -154,5 +161,90 @@ describe('C-2 — AuditEvent may have no tenant and must still be writable', () 
       /auditEvent\.create\(\{\s*data:\s*\{(?![^}]*tenantId)[^}]*\}/s.test(src) ||
       /\.\.\.\(tenantId \? \{ tenantId \} : \{\}\)/.test(src);
     expect(writesWithoutTenant).toBe(true);
+  });
+});
+
+/**
+ * CHECK 4b — a migration protects the table it creates (TASK-MTVDSSJTZCY4T).
+ *
+ * The red/green gate lives in `scripts/check-rls.ts` so `pnpm rls:check` is the
+ * command that fails; these tests guard the scanner it calls. A checker that
+ * silently stops seeing things is worse than no checker, so the mutation probe
+ * that proved it bites is kept here as a test rather than left in a report:
+ * a synthetic migration creating an unprotected tenant table must be found.
+ */
+describe('4b — every migration protects the tenant table it creates', () => {
+  test('no forward migration creates a tenant table it leaves unprotected', () => {
+    const { findings } = scanMigrations();
+    expect(findings.map((f) => `${f.file}:${f.line} ${f.problem}`)).toEqual([]);
+  });
+
+  test('the scan actually sees tables — including the three it once missed', () => {
+    // A green check that inspects nothing is not a green check.
+    const names = scanMigrations().tables.map((t) => t.table);
+    expect(names).toContain('Feedback'); // convention A from the start
+    expect(names).toContain('Invoice');
+    expect(names).toContain('TenantBillingIdentity');
+    expect(names).toContain('MeetingBrief'); // the folder-shaped one
+    expect(names.length).toBeGreaterThanOrEqual(12);
+  });
+
+  test('probe B — a table whose policy is in its own migration is no violation', () => {
+    const { tables, findings } = scanMigrations();
+    const feedback = tables.find((t) => t.table === 'Feedback');
+    expect(feedback?.file).toBe('prisma/migrations/add-feedback.sql');
+    expect(findings.filter((f) => f.table === 'Feedback')).toEqual([]);
+  });
+
+  test('both migration shapes are read, and no down migration is', () => {
+    const files = forwardMigrationFiles();
+    expect(files).toContain('prisma/migrations/add-feedback.sql');
+    expect(files).toContain('prisma/migrations/add-m9-meeting-schedule/migration.sql');
+    expect(files.some((f) => f.endsWith('.down.sql') || f.endsWith('/down.sql'))).toBe(false);
+  });
+
+  test('a commented-out CREATE TABLE is not counted as a table', () => {
+    // add-lifetime-licence.sql:11 describes its idempotency with the words
+    // "CREATE TABLE / INDEX IF NOT EXISTS" inside a comment; a plain grep reads
+    // that file as creating two tables.
+    const raw = readFileSync(resolve(process.cwd(), 'prisma/migrations/add-lifetime-licence.sql'), 'utf8');
+    expect(raw.match(/CREATE TABLE/g)?.length).toBe(2);
+    expect(stripSqlComments(raw).match(/CREATE TABLE/g)?.length).toBe(1);
+  });
+
+  test('the canonical wording is read from prisma/rls.sql, not copied', () => {
+    const canon = canonicalPolicyClauses();
+    expect(canon.using).toBe(`"tenantId" = current_setting('app.tenant_id', true)`);
+    expect(canon.check).toBe(canon.using);
+    expect(rlsSql).toContain(`USING (${canon.using})`);
+  });
+
+  test('mutation probe — an unprotected tenant table in a fake migration is caught', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rls-4b-'));
+    mkdirSync(join(root, 'prisma', 'migrations'), { recursive: true });
+    writeFileSync(join(root, 'prisma', 'rls.sql'), rlsSql);
+    writeFileSync(
+      join(root, 'prisma', 'migrations', 'add-probe.sql'),
+      `CREATE TABLE "ProbeSecret" (\n  "id" TEXT NOT NULL, "tenantId" TEXT NOT NULL\n);\n`
+    );
+
+    const { findings } = scanMigrations(root);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.table).toBe('ProbeSecret');
+    expect(findings[0]?.problem).toContain('no policy in the same file');
+
+    // …and the same file with the policy stated is clean.
+    writeFileSync(
+      join(root, 'prisma', 'migrations', 'add-probe.sql'),
+      `CREATE TABLE "ProbeSecret" (\n  "id" TEXT NOT NULL, "tenantId" TEXT NOT NULL\n);\n` +
+        `ALTER TABLE "ProbeSecret" ENABLE ROW LEVEL SECURITY;\n` +
+        `ALTER TABLE "ProbeSecret" FORCE ROW LEVEL SECURITY;\n` +
+        `CREATE POLICY tenant_isolation ON "ProbeSecret"\n` +
+        `  USING ("tenantId" = current_setting('app.tenant_id', true))\n` +
+        `  WITH CHECK ("tenantId" = current_setting('app.tenant_id', true));\n`
+    );
+    expect(scanMigrations(root).findings).toEqual([]);
+
+    rmSync(root, { recursive: true, force: true });
   });
 });

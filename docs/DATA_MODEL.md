@@ -762,3 +762,28 @@ oluşur oluşmaz uygulanır — `withTenantOn`'un kullandığı mekanizmanın ay
 `app.tenant_id` hiç kurulmadan yazılıyordu; yerel SUPERUSER rolüyle çalıştığı için görünmüyordu,
 `fabrika_app` (NOBYPASSRLS) rolüyle `tenant_isolation` hepsini reddederdi.
 
+
+## 16. Yeni kiracı tablosunun RLS'i nereye yazılır (TASK-MTVDSSJTZCY4T)
+
+Kural tek cümle: **kiracıya özel bir tablo kuran migration, o tablonun
+politikasını aynı dosyada kurar** — `ENABLE` + `FORCE` + `tenant_isolation`,
+sözcüğü sözcüğüne `prisma/rls.sql:19-21`'deki ifadeyle. `prisma/rls.sql` tek
+doğruluk kaynağı olmayı sürdürür ve `pnpm db:rls` her koşuşta politikayı
+yeniden kurar (`DROP POLICY IF EXISTS` + `CREATE`, idempotent); migration'daki
+kopya yalnız aradaki pencereyi kapatır. O pencere varsayım değil, yayın
+yönteminin kendisidir: `docs/RELEASE_CHECKLIST.md` §1 düz
+`prisma/migrations/*.sql` dosyalarının kod yayınından önce **elle, tek tek**
+uygulanmasını ister ve `pnpm db:rls` ayrı bir adımdır. Arada tablo, üstünde
+satır düzeyi güvenlik **açık bile olmadan**, bir kiracının satırlarını tutar —
+ölçüldü (2026-09-10, temiz veritabanı, üç migration uygulandı, `db:rls`
+koşulmadı): `Invoice`, `TenantBillingIdentity` ve `MeetingBrief` için
+`relrowsecurity=f`, politika sayısı 0; `app.tenant_id='tenant-a'` kurulu bir
+`fabrika_app` benzeri rol `MeetingBrief`'te **iki kiracının** satırını da
+okudu. Kapı bunu `pnpm rls:check` içindeki CHECK 4b ile kontrol eder
+(`scripts/rls-migrations.ts`): migration'ın kendi `CREATE TABLE` gövdesinde
+`tenantId` gören ve aynı dosyada politika bulamayan her tablo için kırmızı
+yanar, tablo adını ve satırı söyleyerek — tablo `schema.prisma`'ya daha
+girmemiş olsa bile. `SYSTEM_WIDE` / `NULLABLE_TENANT` istisnaları yine
+`scripts/rls-models.ts`'ten okunur, böylece üç kapı "kapsandı"nın ne demek
+olduğu konusunda ayrışamaz. Muafiyet listesi **yoktur**: bir tabloyu listeye
+yazmak, kartın kapattığı pencereyi kalıcı hâle getirmek olurdu.
