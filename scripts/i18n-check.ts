@@ -10,6 +10,25 @@
  *   2. STATIC KEYS     every `t('some.key')` in src/ must resolve in both catalogs.
  *   3. DYNAMIC KEYS    every `t(`some.${variable}.key`)` must have at least one catalog
  *      entry matching its shape, in both catalogs (see "Dynamic keys" below).
+ *   4. HARD-CODED TEXT no NEW user-facing literal may be written straight into a .tsx
+ *      under src/app/** or src/modules/**, measured against i18n-baseline.json.
+ *
+ * ── Why check 4 exists ────────────────────────────────────────────────────────────────
+ * Checks 1-3 only ask whether the keys that ARE used resolve. A file that never calls
+ * `t()` was skipped on the first line of the scan loop, so the gate could not see the
+ * violation that matters most: text written straight into the JSX. That is how
+ * marketplace/client.tsx carried 41 Turkish literals under a green gate and kept
+ * TASK-MTU6I7SO2BD28 false-closed for a sprint (TASK-MTU64MMEQC0WV §B-01). Rule 8 was
+ * being enforced backwards — bind a string to `t()` and you got audited, hard-code it and
+ * you became invisible.
+ *
+ * ── Why a baseline, and not a flat ban ────────────────────────────────────────────────
+ * Turning the rule on unconditionally paints the gate red today: 325 literals across 37
+ * files are already in the tree, and a gate that is red on arrival gets switched off
+ * rather than obeyed. So i18n-baseline.json records the debt per file and check 4 is a
+ * RATCHET: a file may not gain literals, and a file absent from the baseline may not have
+ * any at all. Paying debt down is always green — the run just prints a note that the
+ * baseline is now looser than reality and can be refreshed with --update-baseline.
  *
  * Unused catalog keys are reported for information only and never fail the run: the
  * extractor cannot see keys reached from outside src/ (docs, seed data, e-mail templates),
@@ -48,7 +67,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { countByFile, scanHardcoded, type Violation } from './i18n-hardcoded';
+
 type Lang = 'tr' | 'en';
+
+/** Repo-root ledger of pre-existing hard-coded literals: file → count. */
+const BASELINE_FILE = 'i18n-baseline.json';
 
 interface DynamicPattern {
   /** Source text of the key, e.g. "Pipeline.detail.tab.${tab}" — used in reports. */
@@ -76,6 +100,70 @@ interface AuditReport {
     unusedInTurkish: string[];
     unusedInEnglish: string[];
   };
+  hardcoded: HardcodedReport;
+}
+
+interface HardcodedReport {
+  /** Every literal found today, so --json consumers can diff without re-scanning. */
+  violations: Violation[];
+  /** file → count, as measured now. */
+  current: Record<string, number>;
+  /** file → count, as recorded in i18n-baseline.json (empty when the file is absent). */
+  baseline: Record<string, number>;
+  /** BLOCKING — a baselined file gained literals. */
+  regressions: { file: string; baseline: number; current: number }[];
+  /** BLOCKING — a file with no baseline entry carries literals. */
+  newOffenders: { file: string; current: number }[];
+  /** Informational — debt was paid down; the baseline is now looser than reality. */
+  improvements: { file: string; baseline: number; current: number }[];
+  /** Informational — a baselined file is fully clean and can leave the ledger. */
+  cleared: string[];
+}
+
+// ── Hard-coded text (check 4) ──────────────────────────────────────────────────────────
+
+function loadBaseline(): Record<string, number> {
+  const file = path.join(process.cwd(), BASELINE_FILE);
+  if (!fs.existsSync(file)) return {};
+  const parsed: unknown = JSON.parse(fs.readFileSync(file, 'utf-8'));
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`${BASELINE_FILE} must be an object of "<file path>": <violation count>`);
+  }
+  const out: Record<string, number> = {};
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+      throw new Error(`${BASELINE_FILE}: "${key}" must map to a non-negative integer, got ${String(value)}`);
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+function writeBaseline(current: Record<string, number>): void {
+  fs.writeFileSync(path.join(process.cwd(), BASELINE_FILE), `${JSON.stringify(current, null, 2)}\n`, 'utf-8');
+}
+
+function auditHardcoded(): HardcodedReport {
+  const violations = scanHardcoded();
+  const current = countByFile(violations);
+  const baseline = loadBaseline();
+
+  const regressions: HardcodedReport['regressions'] = [];
+  const newOffenders: HardcodedReport['newOffenders'] = [];
+  const improvements: HardcodedReport['improvements'] = [];
+  const cleared: string[] = [];
+
+  for (const [file, count] of Object.entries(current)) {
+    const allowed = baseline[file];
+    if (allowed === undefined) newOffenders.push({ file, current: count });
+    else if (count > allowed) regressions.push({ file, baseline: allowed, current: count });
+    else if (count < allowed) improvements.push({ file, baseline: allowed, current: count });
+  }
+  for (const file of Object.keys(baseline)) {
+    if (current[file] === undefined) cleared.push(file);
+  }
+
+  return { violations, current, baseline, regressions, newOffenders, improvements, cleared: cleared.sort() };
 }
 
 // ── Catalogs ───────────────────────────────────────────────────────────────────────────
@@ -330,6 +418,7 @@ function audit(): AuditReport {
 
   return {
     timestamp: new Date().toISOString(),
+    hardcoded: auditHardcoded(),
     summary: {
       totalKeysInCode: staticKeys.length,
       totalDynamicPatterns: dynamicPatterns.length,
@@ -377,6 +466,56 @@ function displayReport(report: AuditReport): void {
   list('❌ Dynamic key shape matches nothing in Turkish', s.unmatchedPatternsTurkish);
   list('❌ Dynamic key shape matches nothing in English', s.unmatchedPatternsEnglish);
   list('💤 In the catalogs but not reached from src/ (informational)', s.unusedInTurkish, 10);
+
+  displayHardcoded(report.hardcoded);
+}
+
+function displayHardcoded(h: HardcodedReport): void {
+  const total = Object.values(h.current).reduce((a, b) => a + b, 0);
+  const allowed = Object.values(h.baseline).reduce((a, b) => a + b, 0);
+
+  console.log('Hard-coded user-facing text (src/app, src/modules — *.tsx):');
+  console.log(`  Literals found:   ${total} in ${Object.keys(h.current).length} file(s)`);
+  console.log(`  Baseline allows:  ${allowed} in ${Object.keys(h.baseline).length} file(s)\n`);
+
+  if (h.newOffenders.length > 0) {
+    console.log(`❌ Not in ${BASELINE_FILE} — a file may not introduce hard-coded text (${h.newOffenders.length}):`);
+    for (const o of h.newOffenders) {
+      console.log(`   - ${o.file}  (${o.current} literal${o.current === 1 ? '' : 's'})`);
+      for (const v of h.violations.filter(v => v.file === o.file).slice(0, 5)) {
+        console.log(`       ${v.line}  [${v.kind}]  ${JSON.stringify(v.text)}`);
+      }
+      if (o.current > 5) console.log(`       ... and ${o.current - 5} more`);
+    }
+    console.log();
+  }
+
+  if (h.regressions.length > 0) {
+    console.log(`❌ More hard-coded text than the baseline allows (${h.regressions.length}):`);
+    for (const r of h.regressions) {
+      console.log(`   - ${r.file}  ${r.baseline} → ${r.current}  (+${r.current - r.baseline})`);
+      // A count cannot say WHICH literal is the new one — the baseline stores numbers, not
+      // texts. So list the file's literals and let the author recognise their own addition;
+      // printing only a slice would point at the wrong line most of the time.
+      const inFile = h.violations.filter(v => v.file === r.file);
+      for (const v of inFile.slice(0, 12)) {
+        console.log(`       ${v.line}  [${v.kind}]  ${JSON.stringify(v.text)}`);
+      }
+      if (inFile.length > 12) console.log(`       ... and ${inFile.length - 12} more in this file`);
+    }
+    console.log();
+  }
+
+  if (h.improvements.length > 0 || h.cleared.length > 0) {
+    const paid =
+      h.improvements.reduce((sum, i) => sum + (i.baseline - i.current), 0) +
+      h.cleared.reduce((sum, f) => sum + (h.baseline[f] ?? 0), 0);
+    console.log(`⚠️  Baseline is looser than reality — ${paid} literal(s) paid down. Refresh it with:`);
+    console.log(`      pnpm i18n:check --update-baseline`);
+    for (const i of h.improvements) console.log(`   - ${i.file}  ${i.baseline} → ${i.current}`);
+    for (const f of h.cleared) console.log(`   - ${f}  ${h.baseline[f]} → 0  (clean — remove from the baseline)`);
+    console.log();
+  }
 }
 
 function hasBlockingGaps(report: AuditReport): boolean {
@@ -387,13 +526,25 @@ function hasBlockingGaps(report: AuditReport): boolean {
     s.missingInTurkish.length > 0 ||
     s.missingInEnglish.length > 0 ||
     s.unmatchedPatternsTurkish.length > 0 ||
-    s.unmatchedPatternsEnglish.length > 0
+    s.unmatchedPatternsEnglish.length > 0 ||
+    // Check 4 is a ratchet: growth blocks, shrinkage does not.
+    report.hardcoded.regressions.length > 0 ||
+    report.hardcoded.newOffenders.length > 0
   );
 }
 
 function main(): void {
   const wantsJson = process.argv.includes('--json');
+  const updateBaseline = process.argv.includes('--update-baseline');
   const report = audit();
+
+  if (updateBaseline) {
+    writeBaseline(report.hardcoded.current);
+    const total = Object.values(report.hardcoded.current).reduce((a, b) => a + b, 0);
+    console.log(`✍️  ${BASELINE_FILE} rewritten: ${total} literal(s) in ${Object.keys(report.hardcoded.current).length} file(s).`);
+    console.log('   Commit it with the change that moved the text, so the ledger only ever shrinks.\n');
+    process.exit(0);
+  }
 
   if (wantsJson) {
     console.log(JSON.stringify(report, null, 2));
@@ -403,12 +554,12 @@ function main(): void {
 
   if (hasBlockingGaps(report)) {
     if (!wantsJson) {
-      console.error('\n❌ i18n check FAILED — see the entries above. CLAUDE.md rule 8: a key ships in both languages.\n');
+      console.error('\n❌ i18n check FAILED — see the entries above. CLAUDE.md rule 8: no hard-coded user-facing text, and a key ships in both languages.\n');
     }
     process.exit(1);
   }
 
-  if (!wantsJson) console.log('✅ i18n check passed: both catalogs agree and every key used in src/ resolves.\n');
+  if (!wantsJson) console.log('✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.\n');
   process.exit(0);
 }
 
