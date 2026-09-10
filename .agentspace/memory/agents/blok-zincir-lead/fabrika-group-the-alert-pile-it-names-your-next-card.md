@@ -1,41 +1,38 @@
 ---
 name: fabrika-group-the-alert-pile-it-names-your-next-card
-description: Alarm yığınını kaynağa göre grupla — tepedeki kaynak, backlog'da bekleyen kartın adını söylüyor; ve düşen bir delegasyonun kanıt dizini bunu zaten ölçmüş olabilir
+description: Alarm yığınını kaynağa göre grupla — ama gruplamadan SONRA "bu satırlar hâlâ var olan bir şeye mi ait" diye sor; Fabrika'da %87'si silinmiş tenant'lara aitti
 metadata:
   type: feedback
   updatedAt: 2026-09-10
 ---
 
-`TASK-MTTUUGKNDGBXK` (alarm konsolu) iki kez denendi, iki kez **rapor üretmeden düştü**.
-Yeniden dağıtmadan önce kanıt dizinine baktım — düşen ilk koşu ölçümü ZATEN yapmış ve
-diske bırakmıştı (`01-alert-pile-before.txt`, `probe-alert-pile.mts`). İçinde şu vardı:
+`TASK-MTTUUGKNDGBXK`'nın düşen ilk koşusu kanıt dizinine bir ölçüm bırakmıştı: `SystemAlert`
+106 satır, 106'sı açık, ve **%77.4'ü tek kaynak** (`invoice_buyer_identity_missing`). O kaynağı
+üreten satırı buldum (`src/lib/billing/invoice-writer.ts:400`), panoda karşılığı olan kartı
+buldum (`TASK-MTSY71BUMBLWM` — fatura alıcı kimliği ekranı yok), backlog'dan çıkarıp P0
+olarak dağıttım ve gerekçe olarak "açık alarmların %77'sinin kökü" dedim.
 
-```
-total rows : 106     open : 106     resolved : 0
-  82  (77.4%)  invoice_buyer_identity_missing
-   8  ( 7.5%)  k2_monthly_cordis
-   7  ( 6.6%)  k1_daily_calls
-   ...
-```
+**Gerekçe yanlıştı.** İki bağımsız triyaj aynı gün ölçtü: satırların **229/263'ü SİLİNMİŞ
+tenant'lara ait**. Sebep, e2e temizliğinin "benim tenant'ıma ait her şeyi sil" deseni —
+ve `SystemAlert` bu desenin ulaşamadığı tek tablo, çünkü tasarım gereği `tenantId` kolonu
+yok (`src/lib/observability/system-alert.ts`). Yani her e2e koşusu alarmını arkada bırakıyor.
+Yığın ben kart yazarken bile büyüyordu: dört dakikada 260→263, ve benim "bilinen gerçek"
+diye karta yazdığım 106 sayısı **2,5 kat bayattı**.
 
-İki şey birden çıktı. Birincisi: kartın başlığındaki **"62 alarm" sayısı bayattı**, bugün 106.
-İkincisi ve asıl olan: yığının **%77'si tek kaynak**, ve o kaynak
-(`invoice_buyer_identity_missing`, `src/lib/billing/invoice-writer.ts:400`) tam olarak
-**backlog'da el sürülmemiş bekleyen bir P0'ın** adı — `TASK-MTSY71BUMBLWM`
-("TenantBillingIdentity'yi dolduran ekran yok"). Teyit ettim: `grep -rln TenantBillingIdentity src/`
-yalnız üç `src/lib/billing/*` dosyası döndürüyor, `src/app/` altında o tabloyu YAZAN hiçbir
-sayfa/form/rota yok. Kartı backlog'dan çıkarıp P0 olarak dağıttım.
+**Sonuç:** `TASK-MTSY71BUMBLWM` bitse bile yığın büyümeye devam eder. İki ayrı iş vardı,
+ben tekini görüp diğerinin gerekçesi sandım. (Kart yine de geçerli — hiçbir ekranın
+`TenantBillingIdentity` yazmadığını kendim ölçtüm ve fatura kesmenin önünde duruyor —
+ama önceliğini alarm sayısına dayandırmam yanlıştı.)
 
-**Neden önemli:** Alarm yığını "gürültü, temizlenecek" diye okunuyor — oysa kaynağa göre
-gruplanmış hâli bir **önceliklendirme ölçümüdür**. Operatörün konsolunu boğan şey rastgele
-106 olay değil, yapılmamış TEK bir işti. Backlog sıralamamın yanlış olduğunu bana panodaki
-hiçbir kart söylemedi; alarm tablosunun `GROUP BY source` çıktısı söyledi.
+**Doğru kalan yarısı:** yığını `GROUP BY source` ile açmak hâlâ doğru ilk adım; tepedeki
+kaynağı üreten kod satırını bulmak da öyle.
 
-**Nasıl uygulanır:** Bir alarm/hata yığını kartı dağıtırken ilk adım "temizle" değil,
-`GROUP BY source` + "her grup hâlâ geçerli mi" olsun; tepedeki kaynağı üreten kod satırını
-bul ve panoda ona karşılık gelen kart var mı diye BAK — çoğu zaman vardır ve yanlış yerde
-durur. Ayrıca: **düşen bir delegasyon iş bırakmış olabilir.** Yeniden dağıtmadan önce
-`docs/agent-results/<TASK-ID>-evidence/` ve `-screenshots/` dizinlerine bak; bulduğunu yeni
-görev metnine ÖLÇÜLMÜŞ GERÇEK olarak yaz ki worker sıfırdan ölçmesin ve kartın kendi bayat
-sayısına aldanmasın. Bu, [[fabrika-delegation-verdict-wrong-both-directions]]'ın pratik yüzü:
-"failed" damgası işin yapılmadığı anlamına gelmiyor.
+**Eksik olan adım — bundan sonra ZORUNLU:** gruplamadan sonra **satırların hâlâ var olan bir
+şeye ait olup olmadığını** sor. Somut sorgu: alarmın işaret ettiği tenant/kayıt bugün DB'de
+duruyor mu? Durmuyorsa o satır bir ürün kusurunu değil, **test çöpünü** ölçüyor. Ayrıca
+yığının BÜYÜME HIZINI ölç (iki zaman damgası yeter) — sabit bir sayı geçmişi, artan bir sayı
+canlı bir üreticiyi anlatır ve ikisi bambaşka kartlardır.
+
+Ve devralınan sayıyı karta "bilinen gerçek, tekrarlama" diye YAZMA
+([[fabrika-an-audit-goes-stale-while-you-write-the-card]]): bu kartta tam da o talimat
+yüzünden worker'a bayat bir taban dayatmıştım; uymayıp yeniden ölçtüğü için doğruyu bulduk.
