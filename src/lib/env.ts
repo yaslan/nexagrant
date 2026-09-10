@@ -136,6 +136,43 @@ const envSchema = z.object({
    */
   R2_PUBLIC_HOST: optionalUrl,
   R2_BUCKET: z.string().optional(),
+  /**
+   * How many *consecutive* failed runs of the daily orphan-alert sweep
+   * (`src/lib/inngest/jobs/alerts-sweep.ts`) it takes before an `error`-level
+   * alert is raised for the operator.
+   *
+   * A threshold rather than a constant because the right number is an
+   * operations decision, not a code fact: a deployment whose database is
+   * briefly unreachable during a nightly maintenance window wants a higher
+   * number, one that runs the sweep manually wants 1. It is a setting and not
+   * a literal for the same reason the sweep's own age floor is documented
+   * rather than assumed — see that file.
+   *
+   * Default 3: the sweep runs once a day, so three runs is three days of the
+   * orphan pile growing unattended, which is well inside the window before the
+   * console's 300-row cap starts hiding real alerts, and comfortably outside a
+   * single transient connection failure.
+   *
+   * Minimum 1 (= alert on the first failure); 0 and non-numeric text are
+   * rejected at boot rather than silently meaning "never", because a threshold
+   * that disables the alarm must be an explicit decision somewhere other than
+   * an env var typo.
+   *
+   * Validated here but kept as a *string*, with the numeric view exported
+   * separately below. Every other member of this object is a string, and
+   * `scripts/efatura-preflight.ts` passes the whole `env` where a
+   * `Partial<Record<string, string | undefined>>` is expected; a single number
+   * field breaks `pnpm typecheck` at a call site that has nothing to do with
+   * alerts. Measured, not guessed — that is exactly what happened when this
+   * shipped as `z.coerce.number()`.
+   */
+  ALERTS_SWEEP_FAILURE_THRESHOLD: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z
+      .string()
+      .regex(/^[1-9][0-9]*$/, 'must be a positive integer (1 = alert on the first failure)')
+      .default('3')
+  ),
 });
 
 const _env = envSchema.safeParse(process.env);
@@ -150,3 +187,10 @@ if (!_env.success) {
 }
 
 export const env = _env.data;
+
+/**
+ * The numeric view of `ALERTS_SWEEP_FAILURE_THRESHOLD`, converted once here so
+ * no caller has to remember to. The schema above has already rejected anything
+ * that is not a positive integer, so this cannot be `NaN`.
+ */
+export const alertsSweepFailureThreshold = Number(env.ALERTS_SWEEP_FAILURE_THRESHOLD);

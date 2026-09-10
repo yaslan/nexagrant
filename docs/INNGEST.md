@@ -14,6 +14,8 @@ INNGEST_SIGNING_KEY=       # For local development and production webhook signin
 RESEND_API_KEY=            # For email sending
 WORKER_URL=http://localhost:8000  # Python worker for CORDIS processing
 WORKER_TOKEN=              # Token for Python worker authentication
+
+ALERTS_SWEEP_FAILURE_THRESHOLD=3   # Consecutive failed alerts-sweep runs before an error alert
 ```
 
 **Getting Inngest Credentials:**
@@ -180,6 +182,37 @@ pnpm tsx scripts/run-feedback-digest.ts --out digest.html   # render to a file
 pnpm tsx scripts/run-feedback-digest.ts --send --to ops@example.org
 ```
 
+### 8. Alerts Sweep (`alerts-sweep`) — stale-alert sweeper + its own health
+
+| | |
+|---|---|
+| **Trigger** | Cron `15 4 * * *` (04:15 UTC — between K2's 04:00 and alerts-daily's 08:00) |
+| **Reads** | `SystemAlert` (open rows older than 1 h), `Tenant` |
+| **Writes** | `resolvedAt` on alerts naming a tenant that no longer exists |
+| **Output** | `{ success, scanned, closed }` |
+
+Closes open alerts whose `meta.tenantId` names a deleted tenant — rows no operator can ever act
+on, which `pnpm alerts:check` treats as invalid by definition. It never deletes a row and never
+touches an alert whose tenant still exists. The one-hour age floor keeps it from closing a leak
+that the gate is supposed to fail on in the same CI run.
+
+**Its own failures are visible (TASK-MTVRC1UGA3B6Y).** The job never throws, so Inngest marks
+even a failed run SUCCEEDED; before this it wrote `success: false` to a console line and nothing
+else. It now records its health in the table it maintains, and an operator reads it at
+`/admin/alerts` under source `alerts-sweep`:
+
+| Row | Level | When |
+|---|---|---|
+| `Orphan-alert sweep did not complete` | `info` | Every failed run. Repeats **fold into this one row**; the `×N` badge is the consecutive-failure count. |
+| `Orphan-alert sweep has failed N or more consecutive runs` | `error` | Once the count reaches `ALERTS_SWEEP_FAILURE_THRESHOLD` (default 3). |
+
+A successful run resolves both, so a single transient failure self-heals and never pages anyone.
+`meta` carries the failing stage (`scan` / `tenant-lookup` / `close`) and the error's *class*
+only — never the driver's message, which can carry the connection string and `SystemAlert` has
+no RLS policy. The full message stays in the job log.
+
+Run it by hand with `pnpm jobs:alerts-sweep`.
+
 ## Testing
 
 ### Run Unit Tests
@@ -291,6 +324,7 @@ Job execution logs appear in:
 | Worker call fails (K2) | Python worker unreachable | Check `WORKER_URL`, ensure worker is running |
 | Resend errors (Alerts) | Missing `RESEND_API_KEY` | Get key from https://resend.com and add to `.env` |
 | RLS errors in job | Using wrong query context | Ensure queries include explicit `tenantId` |
+| `alerts-sweep` error alert on the console | The sweep has failed `ALERTS_SWEEP_FAILURE_THRESHOLD` runs in a row | Read `meta.stage` on the `info` row, then the job log for the full driver message |
 
 ## Roadmap
 
