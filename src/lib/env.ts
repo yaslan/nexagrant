@@ -45,7 +45,12 @@ const envSchema = z.object({
    */
   BILLING_ACTIVE_TIER: z.string().optional(),
   /**
-   * Who Fabrika is on an invoice it issues: the seller's own fiscal identity.
+   * Email address used for outgoing mail (invitations, system notifications).
+   * Defaults to noreply@usfinbridge.com; can be overridden per environment.
+   */
+  NEXT_PUBLIC_SMTP_FROM_ADDRESS: z.string().default('noreply@usfinbridge.com'),
+  /**
+   * Who FonBridge is on an invoice it issues: the seller's own fiscal identity.
    *
    * Every one of these is optional and has no default, deliberately. A supplier
    * VKN and tax office are facts about a registered company, not something an
@@ -65,7 +70,7 @@ const envSchema = z.object({
   INVOICE_SUPPLIER_COUNTRY: z.string().optional(),
   INVOICE_SUPPLIER_EMAIL: z.string().optional(),
   /**
-   * The GİB e-invoice integrator (özel entegratör) Fabrika files through.
+   * The GİB e-invoice integrator (özel entegratör) FonBridge files through.
    *
    * Optional, like everything else here, and for the same reason: an
    * unconfigured integration must leave billing working rather than take the

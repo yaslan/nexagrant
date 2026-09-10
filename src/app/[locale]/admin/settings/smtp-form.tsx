@@ -4,14 +4,16 @@ import { PRODUCT_NAME } from '@/lib/brand';
 import React, { useState } from 'react';
 import { Mail, Check, Send, ShieldCheck, Server, Lock, AlertCircle, RefreshCw } from 'lucide-react';
 
+const SMTP_FROM_ADDRESS = process.env.NEXT_PUBLIC_SMTP_FROM_ADDRESS || 'noreply@usfinbridge.com';
+
 export function SmtpSettingsForm() {
   const [host, setHost] = useState('smtp.gmail.com');
   const [port, setPort] = useState('587');
   const [secure, setSecure] = useState(false);
-  const [user, setUser] = useState('noreply@usfinbridge.com');
+  const [user, setUser] = useState(SMTP_FROM_ADDRESS);
   const [password, setPassword] = useState('••••••••••••');
   const [fromName, setFromName] = useState(`${PRODUCT_NAME} SaaS`);
-  const [fromEmail, setFromEmail] = useState('noreply@usfinbridge.com');
+  const [fromEmail, setFromEmail] = useState(SMTP_FROM_ADDRESS);
 
   const [testEmail, setTestEmail] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -124,7 +126,7 @@ export function SmtpSettingsForm() {
               type="text"
               value={user}
               onChange={(e) => setUser(e.target.value)}
-              placeholder="noreply@usfinbridge.com"
+              placeholder={SMTP_FROM_ADDRESS}
               required
               className="w-full bg-ground border border-border rounded-xl px-3 py-2 text-xs text-ink font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
@@ -165,7 +167,7 @@ export function SmtpSettingsForm() {
               type="email"
               value={fromEmail}
               onChange={(e) => setFromEmail(e.target.value)}
-              placeholder="noreply@usfinbridge.com"
+              placeholder={SMTP_FROM_ADDRESS}
               required
               className="w-full bg-ground border border-border rounded-xl px-3 py-2 text-xs text-ink font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
