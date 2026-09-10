@@ -13,6 +13,7 @@ import {
   BETA_FEEDBACK_EMAIL,
   BETA_SUPPORT_EMAIL,
 } from './constants';
+import { PRODUCT_NAME } from '../brand';
 
 export type BetaLocale = 'tr' | 'en';
 
@@ -36,11 +37,11 @@ export interface RenderedEmail {
 
 const COPY = {
   tr: {
-    subject: 'Fabrika Beta — Sizi davet ediyoruz',
+    subject: `${PRODUCT_NAME} Beta — Sizi davet ediyoruz`,
     greeting: (name: string) => `Merhaba ${name},`,
     intro: (org: string) =>
-      `${org} adına Fabrika'nın 8 haftalık kapalı betasına tasarım ortağı olarak davet ediyoruz. ` +
-      'Fabrika, Avrupa fonları için çağrı takibi, konsept not üretimi ve teklif hattı yönetimini tek yerde toplayan çok kiracılı bir platform.',
+      `${org} adına ${PRODUCT_NAME}'nin 8 haftalık kapalı betasına tasarım ortağı olarak davet ediyoruz. ` +
+      `${PRODUCT_NAME}, Avrupa fonları için çağrı takibi, konsept not üretimi ve teklif hattı yönetimini tek yerde toplayan çok kiracılı bir platform.`,
     whatIsBeta: 'Beta nedir?',
     whatIsBetaBody: (weeks: number) =>
       `${weeks} hafta boyunca tüm modüller hesabınızda "pilot" durumunda açık olur. Ücret alınmaz. ` +
@@ -62,16 +63,16 @@ const COPY = {
     linkGuide: 'Başlangıç kılavuzu',
     linkFeedback: 'Geri bildirim formu',
     support: (email: string) => `Takıldığınız her yerde ${email} adresine yazın; aynı gün dönüyoruz.`,
-    signoff: 'Teşekkürler,\nFabrika ekibi',
+    signoff: `Teşekkürler,\n${PRODUCT_NAME} ekibi`,
     footer: (email: string) =>
       `Bu davet size özel gönderildi. Katılmak istemiyorsanız bu e-postayı yanıtlayın ya da ${email} adresine yazın.`,
   },
   en: {
-    subject: 'Fabrika Beta — you are invited',
+    subject: `${PRODUCT_NAME} Beta — you are invited`,
     greeting: (name: string) => `Hello ${name},`,
     intro: (org: string) =>
-      `We would like ${org} to join Fabrika's 8-week closed beta as a design partner. ` +
-      'Fabrika is a multi-tenant platform that brings call monitoring, concept-note drafting and proposal pipeline management for European funding into one place.',
+      `We would like ${org} to join ${PRODUCT_NAME}'s 8-week closed beta as a design partner. ` +
+      `${PRODUCT_NAME} is a multi-tenant platform that brings call monitoring, concept-note drafting and proposal pipeline management for European funding into one place.`,
     whatIsBeta: 'What is the beta?',
     whatIsBetaBody: (weeks: number) =>
       `For ${weeks} weeks every module is switched on in "pilot" state in your account, at no cost. ` +
@@ -93,7 +94,7 @@ const COPY = {
     linkGuide: 'Getting-started guide',
     linkFeedback: 'Feedback form',
     support: (email: string) => `Write to ${email} whenever you get stuck; we answer the same day.`,
-    signoff: 'Thank you,\nThe Fabrika team',
+    signoff: `Thank you,\nThe ${PRODUCT_NAME} team`,
     footer: (email: string) =>
       `This invitation was sent to you personally. If you would rather not take part, reply to this email or write to ${email}.`,
   },

@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { auth } from '@/lib/auth';
 import { can } from '@/lib/rbac';
 import { Role } from '@prisma/client';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { Dashboard } from '@/modules/m5/ui/Dashboard';
 import { getKpiMetrics, getKpiTrend } from '@/modules/m5/server/queries';
 import { resolveDashboardRange, toRangeParam } from '@/modules/m5/server/range';
@@ -17,7 +18,7 @@ export async function generateMetadata({
   const t = await getTranslations({ locale, namespace: 'Dashboard' });
 
   return {
-    title: `${t('title')} — Fabrika`,
+    title: `${t('title')} — ${PRODUCT_NAME}`,
     description: t('metaDescription'),
     // KPI figures are tenant data; keep the page out of every index.
     robots: { index: false, follow: false },

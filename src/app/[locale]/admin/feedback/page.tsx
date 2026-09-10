@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
 import { PRIORITY_SLA_HOURS, type FeedbackPriorityValue } from '@/lib/feedback/triage';
 import type { FeedbackRecord, TenantNameRow, UserContactRow } from '@/lib/feedback/types';
+import { PRODUCT_NAME } from '@/lib/brand';
 import FeedbackTriageClient, { type TriageRow } from './client';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export async function generateMetadata({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'adminFeedback' });
-  return { title: `${t('title')} · Fabrika Admin` };
+  return { title: `${t('title')} · ${PRODUCT_NAME} Admin` };
 }
 
 const OPEN_STATUSES = ['NEW', 'TRIAGED', 'IN_PROGRESS'];

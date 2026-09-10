@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { requireTenantAction } from '@/lib/tenant';
 import { prisma } from '@/lib/db';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { CalendarClient } from './client';
 
 /**
@@ -18,7 +19,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'settings.calendar' });
-  return { title: `${t('title')} — Fabrika` };
+  return { title: `${t('title')} — ${PRODUCT_NAME}` };
 }
 
 export default async function CalendarSettingsPage({ params }: { params: Promise<{ locale: string; workspace: string }> }) {

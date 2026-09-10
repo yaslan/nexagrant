@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 interface CallCardProps {
   call: {
@@ -88,7 +89,7 @@ export default async function CallsPage({ params }: PageProps) {
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-slate-200">
         <nav className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link href={`/${locale}`} className="text-2xl font-bold text-slate-900">
-            Fabrika
+            {PRODUCT_NAME}
           </Link>
           <Link href={`/${locale}`} className="text-slate-600 hover:text-slate-900 font-medium">
             Back

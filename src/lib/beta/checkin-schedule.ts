@@ -18,6 +18,7 @@ import {
   BETA_CHECKIN_WEEKS,
   BETA_MEETING_URL,
 } from './constants';
+import { PRODUCT_NAME } from '../brand';
 
 export interface CheckinSlot {
   /** IANA timezone the wall-clock time is expressed in. */
@@ -199,14 +200,14 @@ export function buildCheckinIcs(
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Fabrika SaaS//Beta Check-in//EN',
+    `PRODID:-//${PRODUCT_NAME} SaaS//Beta Check-in//EN`,
     'CALSCALE:GREGORIAN',
     'METHOD:REQUEST',
   ];
 
   for (const occ of occurrences) {
     const description = [
-      `Fabrika Beta weekly check-in — week ${occ.week}/${occurrences.length}.`,
+      `${PRODUCT_NAME} Beta weekly check-in — week ${occ.week}/${occurrences.length}.`,
       `${occ.localDate} ${occ.localTime} ${timezone} (UTC${occ.utcOffset}).`,
       'Agenda: what you tried, what broke, what is missing, one pricing question.',
       `Join: ${meetingUrl}`,
@@ -219,11 +220,11 @@ export function buildCheckinIcs(
       `DTSTART:${icsStamp(occ.start)}`,
       `DTEND:${icsStamp(occ.end)}`,
       'SEQUENCE:0',
-      `SUMMARY:${icsText(`Fabrika Beta check-in — week ${occ.week}`)}`,
+      `SUMMARY:${icsText(`${PRODUCT_NAME} Beta check-in — week ${occ.week}`)}`,
       `DESCRIPTION:${icsText(description)}`,
       `LOCATION:${icsText(meetingUrl)}`,
       `URL:${meetingUrl}`,
-      `ORGANIZER;CN=Fabrika Beta:mailto:${options.organizerEmail}`,
+      `ORGANIZER;CN=${PRODUCT_NAME} Beta:mailto:${options.organizerEmail}`,
       ...(options.attendees ?? []).map(
         (email) => `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${email}`
       ),

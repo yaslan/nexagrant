@@ -5,6 +5,7 @@ import {
   firstWeekdayOnOrAfter,
   zonedTimeToUtc,
 } from '@/lib/beta/checkin-schedule';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 const START = '2026-09-07'; // Monday
 
@@ -144,7 +145,7 @@ describe('buildCheckinIcs', () => {
   });
 
   it('carries organizer and attendee', () => {
-    expect(unfold(ics)).toContain('ORGANIZER;CN=Fabrika Beta:mailto:support@fabrika.dev');
+    expect(unfold(ics)).toContain(`ORGANIZER;CN=${PRODUCT_NAME} Beta:mailto:support@fabrika.dev`);
     expect(unfold(ics)).toContain(
       'ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:partner01@example.invalid'
     );

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { Metadata } from 'next';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 const REGIONS: Record<string, { name: string; code: string }> = {
   turkey: { name: 'Türkiye', code: 'TR' },
@@ -32,7 +33,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const regionInfo = REGIONS[region as RegionParam];
   if (!regionInfo) {
     return {
-      title: locale === 'tr' ? 'Sayfa Bulunamadı — Fabrika' : 'Page Not Found — Fabrika',
+      title: locale === 'tr' ? `Sayfa Bulunamadı — ${PRODUCT_NAME}` : `Page Not Found — ${PRODUCT_NAME}`,
     };
   }
   const regionLabel = regionInfo.name;
@@ -41,11 +42,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     : `Open Horizon calls in ${regionLabel}. Deadlines, budgets, and eligibility information.`;
 
   return {
-    title: `${regionLabel} — Fabrika`,
+    title: `${regionLabel} — ${PRODUCT_NAME}`,
     description,
     alternates: { canonical: `/${locale}/calls/${region}` },
     openGraph: {
-      title: `${regionLabel} — Fabrika`,
+      title: `${regionLabel} — ${PRODUCT_NAME}`,
       description,
       type: 'website',
       locale: locale === 'tr' ? 'tr_TR' : 'en_GB',

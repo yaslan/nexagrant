@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderBetaInviteEmail } from '@/lib/beta/invite-email';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 const base = {
   contactName: 'Jane Doe',
@@ -13,13 +14,13 @@ const base = {
 describe('renderBetaInviteEmail', () => {
   it('uses the Turkish subject required by the brief', () => {
     expect(renderBetaInviteEmail({ ...base, locale: 'tr' }).subject).toBe(
-      'Fabrika Beta — Sizi davet ediyoruz'
+      `${PRODUCT_NAME} Beta — Sizi davet ediyoruz`
     );
   });
 
   it('uses a distinct English subject', () => {
     expect(renderBetaInviteEmail({ ...base, locale: 'en' }).subject).toBe(
-      'Fabrika Beta — you are invited'
+      `${PRODUCT_NAME} Beta — you are invited`
     );
   });
 

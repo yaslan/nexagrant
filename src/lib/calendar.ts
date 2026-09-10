@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { withBrand } from './brand';
 
 const ICS_LINE_MAX_OCTETS = 75;
 
@@ -57,7 +58,7 @@ export function generateIcsContent(
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Fabrika SaaS//EN',
+    `PRODID:-//${withBrand('{brand}')} SaaS//EN`,
     'BEGIN:VEVENT',
     `UID:${escapeIcsText(uid ?? `${randomUUID()}@fabrika.app`)}`,
     `DTSTAMP:${formatIcsDate(new Date())}`,
