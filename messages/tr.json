@@ -184,6 +184,14 @@
       }
     }
   },
+  "pipeline": {
+    "breadcrumb": {
+      "dashboard": "Dashboard",
+      "current": "Stage-Gate Pipeline"
+    },
+    "heading": "Fırsat & Teklif Boru Hattı",
+    "subtitle": "G0 Triage fizibilitesinden G4 nihai başvuru teslimine kadar çalışma grubunuzdaki kullanıcılarla tekliflerinizi yönetin."
+  },
   "Evidence": {
     "title": "Kanıt Çekmecesi",
     "addEvidence": "Kanıt Ekle",
@@ -1738,5 +1746,35 @@
     "preview": {
       "close": "Kapat"
     }
+  },
+  "invoice": {
+    "pageTitle": "E-Fatura - {number}",
+    "samplePrefix": "ÖRNEK — ",
+    "unfiledNotice": "ÖRNEK BELGE — GİB'e gönderilmemiştir, mali mühür taşımaz ve mali değeri yoktur.",
+    "printButton": "🖨️ Faturayı Yazdır / PDF İndir",
+    "taxOffice": "Vergi Dairesi",
+    "invoiceNumber": "Fatura No",
+    "issueDate": "Tarih",
+    "buyerBoxTitle": "SAYIN (ALICI)",
+    "detailsBoxTitle": "FATURA DETAYLARI",
+    "scenario": "Senaryo",
+    "invoiceTypeLabel": "Fatura Tipi",
+    "issuedAt": "Düzenleme Zamanı",
+    "currencyLabel": "Para Birimi",
+    "columnIndex": "Sıra",
+    "columnDescription": "Hizmet / Ürün Açıklaması",
+    "columnQuantity": "Miktar",
+    "columnUnitPrice": "Birim Fiyat",
+    "columnVatRate": "KDV Oranı",
+    "columnLineTotal": "Toplam Tutar",
+    "unitC62": "Adet",
+    "unitMON": "Ay",
+    "totalSubtotal": "Ara Toplam (Matrah)",
+    "totalVat": "Hesaplanan KDV ({rates})",
+    "totalWithholding": "Tevkifat Tutarı ({rates})",
+    "totalGrand": "ÖDENECEK GENEL TOPLAM",
+    "tryEquivalent": "TL karşılığı",
+    "tryEquivalentUnrecorded": "TL karşılığı (kayıtlı tutar yok)",
+    "footerFiled": "İşbu fatura 213 sayılı Vergi Usul Kanunu ve Gelir İdaresi Başkanlığı e-Fatura mevzuatına uygun olarak elektronik ortamda düzenlenmiş ve GİB'e iletilmiştir. Zarf No: {envelope}"
   }
 }

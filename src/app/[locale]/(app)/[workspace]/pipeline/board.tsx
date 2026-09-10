@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Gate } from '@prisma/client';
 import {
   moveOpportunityStage,
@@ -49,6 +50,7 @@ export default function KanbanBoard({
   workspace = 'default',
   locale = 'tr',
 }: KanbanBoardProps) {
+  const t = useTranslations('pipeline');
   const [opps, setOpps] = useState<OpportunityItem[]>(initialOpps);
   const [isPending, startTransition] = useTransition();
 
@@ -319,17 +321,13 @@ export default function KanbanBoard({
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-muted mb-1">
             <Link href={`/${locale}/${workspace}/dashboard`} className="hover:text-ink transition-colors">
-              Dashboard
+              {t('breadcrumb.dashboard')}
             </Link>
             <span>/</span>
-            <span className="text-accent-ink font-semibold">Stage-Gate Pipeline</span>
+            <span className="text-accent-ink font-semibold">{t('breadcrumb.current')}</span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold font-heading text-ink">
-            Fırsat & Teklif Boru Hattı
-          </h1>
-          <p className="text-xs md:text-sm text-muted mt-0.5">
-            G0 Triage fizibilitesinden G4 nihai başvuru teslimine kadar çalışma grubunuzdaki kullanıcılarla tekliflerinizi yönetin.
-          </p>
+          <h1 className="text-2xl md:text-3xl font-bold font-heading text-ink">{t('heading')}</h1>
+          <p className="text-xs md:text-sm text-muted mt-0.5">{t('subtitle')}</p>
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end flex-wrap">

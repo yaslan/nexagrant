@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+import enMessages from '../../messages/en.json';
+import trMessages from '../../messages/tr.json';
 import {
   MG_WORKSPACE,
   setupModuleGateTenant,
@@ -38,8 +40,22 @@ const PIPELINE_URL = `/en/${MG_WORKSPACE}/pipeline`;
 const FIRSATLAR_URL = `/tr/${MG_WORKSPACE}/firsatlar`;
 const EVIDENCE_URL = `/en/${MG_WORKSPACE}/evidence`;
 
-/** Rendered by `pipeline/board.tsx`, and re-exported unchanged by `firsatlar`. */
-const PIPELINE_HEADING = 'Fırsat & Teklif Boru Hattı';
+/**
+ * Rendered by `pipeline/board.tsx`, and re-exported unchanged by `firsatlar`.
+ *
+ * Read out of the catalogues rather than written here as a literal
+ * (TASK-MTV4YSO4SEMGG). The heading used to be a Turkish string embedded in the
+ * component, so this file could hold the same string and both locales matched
+ * it — `/en/…` rendered Turkish. Now that the board goes through `t()`, an
+ * English page shows English, and a literal here would have to be one language
+ * or the other. Taking the value from `messages/*.json` also means the
+ * assertion follows a copy edit instead of going red on one: what this spec is
+ * measuring is that the *module* rendered, not how its title is worded.
+ */
+const PIPELINE_HEADING = {
+  en: enMessages.pipeline.heading,
+  tr: trMessages.pipeline.heading,
+} as const;
 
 test.describe('module gate — the ModuleState switch decides, inside one plan', () => {
   test.beforeAll(setupModuleGateTenant);
@@ -62,7 +78,9 @@ test.describe('module gate — the ModuleState switch decides, inside one plan',
     // a redirect that leaked the board would still be a leak.
     await page.goto(PIPELINE_URL);
     await expect(page).toHaveURL(/\/en\/login/);
-    await expect(page.locator('body')).not.toContainText(PIPELINE_HEADING);
+    for (const heading of Object.values(PIPELINE_HEADING)) {
+      await expect(page.locator('body')).not.toContainText(heading);
+    }
   });
 
   test('M5 is ON, so the pipeline board renders — and /firsatlar is the same module', async ({
@@ -71,14 +89,14 @@ test.describe('module gate — the ModuleState switch decides, inside one plan',
     await signInAsModuleGateUser(page, PIPELINE_URL);
 
     const main = page.getByRole('main');
-    await expect(main).toContainText(PIPELINE_HEADING);
+    await expect(main).toContainText(PIPELINE_HEADING.en);
     // Not the gate: an ON module inside the plan must show no refusal at all.
     await expect(main).not.toContainText('This module is not available');
 
     // `firsatlar/page.tsx` re-exports `PipelinePage`, so the alias is proven by the
     // alias route rendering the board — not by it returning some HTML.
     await page.goto(FIRSATLAR_URL);
-    await expect(page.getByRole('main')).toContainText(PIPELINE_HEADING);
+    await expect(page.getByRole('main')).toContainText(PIPELINE_HEADING.tr);
     await expect(page).toHaveURL(new RegExp(`${MG_WORKSPACE}/firsatlar`));
   });
 

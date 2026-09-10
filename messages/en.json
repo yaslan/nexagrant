@@ -184,6 +184,14 @@
       }
     }
   },
+  "pipeline": {
+    "breadcrumb": {
+      "dashboard": "Dashboard",
+      "current": "Stage-Gate Pipeline"
+    },
+    "heading": "Opportunity & Proposal Pipeline",
+    "subtitle": "Manage your proposals with the people in your workspace, from G0 triage feasibility through to G4 final submission."
+  },
   "Evidence": {
     "title": "Evidence Pack",
     "addEvidence": "Add Evidence",
@@ -1738,5 +1746,35 @@
     "preview": {
       "close": "Close"
     }
+  },
+  "invoice": {
+    "pageTitle": "e-Invoice - {number}",
+    "samplePrefix": "SAMPLE — ",
+    "unfiledNotice": "SAMPLE DOCUMENT — not submitted to GİB, carries no fiscal seal and has no fiscal value.",
+    "printButton": "🖨️ Print invoice / Download PDF",
+    "taxOffice": "Tax office",
+    "invoiceNumber": "Invoice no",
+    "issueDate": "Date",
+    "buyerBoxTitle": "BILL TO (BUYER)",
+    "detailsBoxTitle": "INVOICE DETAILS",
+    "scenario": "Scenario",
+    "invoiceTypeLabel": "Invoice type",
+    "issuedAt": "Issued at",
+    "currencyLabel": "Currency",
+    "columnIndex": "No",
+    "columnDescription": "Service / product description",
+    "columnQuantity": "Quantity",
+    "columnUnitPrice": "Unit price",
+    "columnVatRate": "VAT rate",
+    "columnLineTotal": "Line total",
+    "unitC62": "pcs",
+    "unitMON": "month",
+    "totalSubtotal": "Subtotal (taxable base)",
+    "totalVat": "VAT charged ({rates})",
+    "totalWithholding": "Withholding — tevkifat ({rates})",
+    "totalGrand": "TOTAL PAYABLE",
+    "tryEquivalent": "Lira equivalent",
+    "tryEquivalentUnrecorded": "Lira equivalent (no recorded amount)",
+    "footerFiled": "This invoice was issued electronically in accordance with Tax Procedure Law no. 213 (Vergi Usul Kanunu) and the e-invoice legislation of the Turkish Revenue Administration (Gelir İdaresi Başkanlığı), and submitted to GİB. Envelope no: {envelope}"
   }
 }
