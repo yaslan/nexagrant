@@ -107,7 +107,8 @@ async function seedM6Evaluations() {
 
   for (let e = 1; e <= 10; e++) {
     const proposalIndex = e % 2; // Alternate between 2 proposals
-    const proposal = proposals[proposalIndex];
+    // proposals has exactly 2 entries (the p=1..2 loop above); e % 2 is always 0 or 1.
+    const proposal = proposals[proposalIndex]!;
 
     const evaluation = await prisma.evaluation.create({
       data: {
@@ -184,8 +185,10 @@ async function seedM6Evaluations() {
     const evalScores = scoreVariations[e] || [3, 3, 3];
 
     for (let r = 0; r < reviewers.length; r++) {
-      const reviewer = reviewers[r];
-      const baseScore = evalScores[r];
+      // r < reviewers.length (loop bound); evalScores is always length 3 (scoreVariations
+      // entries and the [3,3,3] fallback), and reviewers.length is at most 3.
+      const reviewer = reviewers[r]!;
+      const baseScore = evalScores[r]!;
 
       for (const criterion of criterionRecords) {
         // Vary score within ±1 per criterion

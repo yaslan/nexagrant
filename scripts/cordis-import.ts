@@ -14,12 +14,14 @@ function parseArgs() {
 
   for (const arg of args) {
     if (arg.startsWith('--dataset=')) {
-      const val = arg.split('=')[1].toUpperCase();
+      // startsWith('--dataset=') guarantees an '=' is present, so split('=')[1] exists.
+      const val = arg.split('=')[1]!.toUpperCase();
       if (val === 'H2020' || val === 'HORIZON') {
         dataset = val;
       }
     } else if (arg.startsWith('--limit=')) {
-      limit = parseInt(arg.split('=')[1], 10);
+      // startsWith('--limit=') guarantees an '=' is present, so split('=')[1] exists.
+      limit = parseInt(arg.split('=')[1]!, 10);
     } else if (arg === '--dry-run') {
       dryRun = true;
     } else if (arg.startsWith('--local-zip=')) {

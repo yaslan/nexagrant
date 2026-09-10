@@ -228,8 +228,10 @@ if (require.main === module) {
     process.exit(1);
   }
 
-  const prodDir = path.resolve(args[0]);
-  const localDir = path.resolve(args[1]);
+  // args.length < 2 already exits above, so args[0] and args[1] exist here;
+  // TS can't correlate the length check with index safety on its own.
+  const prodDir = path.resolve(args[0]!);
+  const localDir = path.resolve(args[1]!);
   const reportPath = args[2] ? path.resolve(args[2]) : null;
 
   console.log(`Comparing Production (${prodDir}) vs Local (${localDir})...`);

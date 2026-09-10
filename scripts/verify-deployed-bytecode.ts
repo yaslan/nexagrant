@@ -87,7 +87,8 @@ export function keccak256(input: string | Buffer): string {
 
   while (offset + blockSize <= data.length) {
     for (let i = 0; i < blockSize / 8; i++) {
-      state[i] ^= data.readBigUInt64LE(offset + i * 8);
+      // i < blockSize/8 (17) is always within state's fixed length (25).
+      state[i] = state[i]! ^ data.readBigUInt64LE(offset + i * 8);
     }
     permute(state);
     offset += blockSize;
@@ -97,10 +98,12 @@ export function keccak256(input: string | Buffer): string {
   const rem = data.length - offset;
   data.copy(pad, 0, offset, data.length);
   pad[rem] = 0x01;
-  pad[blockSize - 1] |= 0x80;
+  // blockSize - 1 is the last valid index of pad (Buffer.alloc(blockSize)).
+  pad[blockSize - 1] = pad[blockSize - 1]! | 0x80;
 
   for (let i = 0; i < blockSize / 8; i++) {
-    state[i] ^= pad.readBigUInt64LE(i * 8);
+    // Same bound as above: i < blockSize/8 (17) fits state's length (25).
+    state[i] = state[i]! ^ pad.readBigUInt64LE(i * 8);
   }
   permute(state);
 
@@ -114,36 +117,43 @@ export function keccak256(input: string | Buffer): string {
     for (let round = 0; round < 24; round++) {
       const C = new BigUint64Array(5);
       for (let x = 0; x < 5; x++) {
-        C[x] = S[x] ^ S[x + 5] ^ S[x + 10] ^ S[x + 15] ^ S[x + 20];
+        // x in [0,4]; max index x+20 = 24, within S's fixed length (25).
+        C[x] = S[x]! ^ S[x + 5]! ^ S[x + 10]! ^ S[x + 15]! ^ S[x + 20]!;
       }
       const D = new BigUint64Array(5);
       for (let x = 0; x < 5; x++) {
-        D[x] = C[(x + 4) % 5] ^ rot64(C[(x + 1) % 5], 1);
+        // (x+k) % 5 always yields an index in [0,4], within C's fixed length (5).
+        D[x] = C[(x + 4) % 5]! ^ rot64(C[(x + 1) % 5]!, 1);
       }
       for (let i = 0; i < 25; i++) {
-        S[i] ^= D[i % 5];
+        // i < 25 fits S's length; i % 5 is in [0,4], within D's length (5).
+        S[i] = S[i]! ^ D[i % 5]!;
       }
 
       const B = new BigUint64Array(25);
       for (let x = 0; x < 5; x++) {
         for (let y = 0; y < 5; y++) {
-          B[((2 * x + 3 * y) % 5) + y * 5] = rot64(S[x + y * 5], R[y + x * 5]);
+          // x,y in [0,4]: x+y*5 in [0,24] fits S/B (25); y+x*5 in [0,24] fits R (25).
+          B[((2 * x + 3 * y) % 5) + y * 5] = rot64(S[x + y * 5]!, R[y + x * 5]!);
         }
       }
 
       for (let x = 0; x < 5; x++) {
         for (let y = 0; y < 5; y++) {
-          S[x + y * 5] = B[x + y * 5] ^ ((~B[((x + 1) % 5) + y * 5]) & B[((x + 2) % 5) + y * 5]);
+          // Same bound as above: all B/S indices stay within [0,24].
+          S[x + y * 5] = B[x + y * 5]! ^ ((~B[((x + 1) % 5) + y * 5]!) & B[((x + 2) % 5) + y * 5]!);
         }
       }
 
-      S[0] ^= RC[round];
+      // RC has exactly 24 entries and round < 24 (the outer loop bound).
+      S[0] = S[0]! ^ RC[round]!;
     }
   }
 
   const res = Buffer.alloc(32);
   for (let i = 0; i < 4; i++) {
-    res.writeBigUInt64LE(state[i], i * 8);
+    // i < 4 is within state's fixed length (25).
+    res.writeBigUInt64LE(state[i]!, i * 8);
   }
   return res.toString('hex');
 }
