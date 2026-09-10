@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import type { SubStatus } from '@prisma/client';
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { getActiveTier } from '@/lib/billing/active-tier';
 import { CATALOG_CURRENCY, priceLine, UnknownSkuError } from '@/lib/billing/catalog';
@@ -278,10 +278,18 @@ export async function syncStripeSubscription(
   // Extract add-ons from subscription
   const incomingAddOns = await extractAddOnsFromSubscription(subscription);
 
-  // Fetch existing subscription to detect changes
-  const existingSubscription = await prisma.subscription.findUnique({
-    where: { tenantId },
-  });
+  // Fetch existing subscription to detect changes.
+  //
+  // Its own wrapper, not the write transaction below: the version lookup
+  // between the two goes through the bare singleton, and holding a transaction
+  // across it would take a second pool connection while the first is still
+  // held. This read already stood in its own autocommit before this change, so
+  // the window between reading it and writing over it is exactly the one that
+  // was there yesterday — see the transaction-boundary measurement in
+  // docs/agent-results/TASK-MTVRACMDFRGKV-customer-support.md.
+  const existingSubscription = await withTenant(tenantId, (tx) =>
+    tx.subscription.findUnique({ where: { tenantId } })
+  );
 
   // Upsert subscription
   const stripeSubscription = subscription as {
@@ -314,117 +322,15 @@ export async function syncStripeSubscription(
   const versionId = planChanged ? await publishedVersionIdFor(planId) : null;
   const versionColumn = versionId ? { planVersionId: versionId } : {};
 
-  await prisma.subscription.upsert({
-    where: { tenantId },
-    create: {
-      tenantId,
-      planId,
-      status: mapStripeStatus(subscription.status),
-      billingInterval,
-      provider: 'stripe',
-      providerCustomerId: subscription.customer as string,
-      providerSubId: subscription.id,
-      currentPeriodEnd,
-      ...versionColumn,
-      ...(lockColumns ?? {}),
-    },
-    update: {
-      planId,
-      status: mapStripeStatus(subscription.status),
-      currentPeriodEnd,
-      ...versionColumn,
-      ...(lockColumns ?? {}),
-    },
-  });
-
-  // Sync add-ons
-  const addedAddOns: string[] = [];
-  const removedAddOns: string[] = [];
-
-  // Get current active add-ons
-  const currentAddOns = await prisma.addOn.findMany({
-    where: { tenantId, endedAt: null },
-  });
-
-  const currentAddOnSkus = new Set(
-    currentAddOns.map((a: typeof currentAddOns[0]) => a.sku)
-  );
-  const incomingAddOnSkus = new Set(incomingAddOns.map((a) => a.sku));
-
-  // Find removed add-ons
-  for (const sku of currentAddOnSkus) {
-    const skuStr = sku as string;
-    if (!incomingAddOnSkus.has(skuStr)) {
-      removedAddOns.push(skuStr);
-      // Mark as ended
-      await prisma.addOn.updateMany({
-        where: { tenantId, sku: skuStr, endedAt: null },
-        data: { endedAt: new Date() },
-      });
-    }
-  }
-
-  // Add new add-ons or update existing ones
-  for (const addon of incomingAddOns) {
-    const existing = await prisma.addOn.findFirst({
-      where: { tenantId, sku: addon.sku, endedAt: null },
-    });
-
-    if (!existing) {
-      addedAddOns.push(addon.sku);
-      await prisma.addOn.create({
-        data: {
-          tenantId,
-          sku: addon.sku,
-          quantity: addon.quantity,
-          providerItemId: addon.itemId,
-        },
-      });
-    } else if (existing.quantity !== addon.quantity) {
-      // Update quantity if changed
-      await prisma.addOn.update({
-        where: { id: existing.id },
-        data: { quantity: addon.quantity },
-      });
-    }
-  }
-
-  // Grant credits on successful subscription (only on initial setup or re-activation)
-  let creditsGranted = 0;
-
-  if (!existingSubscription && subscription.status === 'active') {
-    // New subscription — grant initial monthly allowance
-    creditsGranted = plan.aiCreditsMonthly;
-
-    await prisma.creditLedger.create({
-      data: {
-        tenantId,
-        delta: creditsGranted,
-        reason: 'monthly_grant',
-        refId: subscription.id,
-      },
-    });
-  } else if (
-    existingSubscription &&
-    existingSubscription.status !== 'ACTIVE' &&
-    subscription.status === 'active'
-  ) {
-    // Re-activation after cancellation — grant fresh monthly allowance
-    creditsGranted = plan.aiCreditsMonthly;
-
-    await prisma.creditLedger.create({
-      data: {
-        tenantId,
-        delta: creditsGranted,
-        reason: 'monthly_grant',
-        refId: subscription.id,
-      },
-    });
-  }
-
-  // Handle downgrade: if plan changed to a lower tier, mark module state changes
+  // Which modules the new plan no longer carries.
+  //
+  // Read here rather than inside the transaction below: `Plan` is a platform
+  // table reached through the bare singleton, and asking for it while a tenant
+  // transaction holds a pool connection needs a second one. At the pool size
+  // this app runs (pg default, max=10) that is how a burst of webhooks
+  // deadlocks itself rather than merely queueing.
+  const modulesToTurnOff: string[] = [];
   if (existingSubscription && existingSubscription.planId !== planId) {
-    // Find modules that are no longer in the new plan
     const oldPlan = await prisma.plan.findUnique({
       where: { id: existingSubscription.planId },
     });
@@ -436,16 +342,159 @@ export async function syncStripeSubscription(
       for (const moduleId of oldModules) {
         const moduleIdStr = moduleId as string;
         if (!newModules.has(moduleIdStr)) {
-          // Turn off module
-          await prisma.moduleState.upsert({
-            where: { tenantId_moduleId: { tenantId, moduleId: moduleIdStr } },
-            create: { tenantId, moduleId: moduleIdStr, status: 'OFF' },
-            update: { status: 'OFF' },
-          });
+          modulesToTurnOff.push(moduleIdStr);
         }
       }
     }
   }
+
+  // Every tenant-scoped write this handler makes, in one wrapper.
+  //
+  // `withTenant` sets `app.tenant_id` for the transaction it opens, which is
+  // what the RLS policies read; before this change these queries ran on the
+  // bare client and were tenant-safe only because each `where` happened to
+  // carry `tenantId` by hand (TASK-MTSZ0AL4QP2CT §3.3).
+  //
+  // One wrapper rather than eleven: eleven would mean eleven `set_config`
+  // round-trips for one webhook, and it would leave the subscription row, the
+  // add-on rows and the credit grant able to land separately — the state a
+  // half-applied plan change leaves behind. Nothing inside reaches the bare
+  // singleton, so the transaction never waits on a second connection.
+  //
+  // The audit row that makes a redelivery a no-op stays *outside*, exactly
+  // where it was: it is written last, after this commits. Moving it inside
+  // would change what a crash mid-handler leaves behind, and this card is an
+  // access-layer move, not a change to idempotency.
+  const { addedAddOns, removedAddOns, creditsGranted } = await withTenant(
+    tenantId,
+    async (tx) => {
+      await tx.subscription.upsert({
+        where: { tenantId },
+        create: {
+          tenantId,
+          planId,
+          status: mapStripeStatus(subscription.status),
+          billingInterval,
+          provider: 'stripe',
+          providerCustomerId: subscription.customer as string,
+          providerSubId: subscription.id,
+          currentPeriodEnd,
+          ...versionColumn,
+          ...(lockColumns ?? {}),
+        },
+        update: {
+          planId,
+          status: mapStripeStatus(subscription.status),
+          currentPeriodEnd,
+          ...versionColumn,
+          ...(lockColumns ?? {}),
+        },
+      });
+
+      // Sync add-ons
+      const added: string[] = [];
+      const removed: string[] = [];
+
+      // Get current active add-ons
+      const currentAddOns = await tx.addOn.findMany({
+        where: { tenantId, endedAt: null },
+      });
+
+      const currentAddOnSkus = new Set(
+        currentAddOns.map((a: typeof currentAddOns[0]) => a.sku)
+      );
+      const incomingAddOnSkus = new Set(incomingAddOns.map((a) => a.sku));
+
+      // Find removed add-ons
+      for (const sku of currentAddOnSkus) {
+        const skuStr = sku as string;
+        if (!incomingAddOnSkus.has(skuStr)) {
+          removed.push(skuStr);
+          // Mark as ended
+          await tx.addOn.updateMany({
+            where: { tenantId, sku: skuStr, endedAt: null },
+            data: { endedAt: new Date() },
+          });
+        }
+      }
+
+      // Add new add-ons or update existing ones
+      for (const addon of incomingAddOns) {
+        const existing = await tx.addOn.findFirst({
+          where: { tenantId, sku: addon.sku, endedAt: null },
+        });
+
+        if (!existing) {
+          added.push(addon.sku);
+          await tx.addOn.create({
+            data: {
+              tenantId,
+              sku: addon.sku,
+              quantity: addon.quantity,
+              providerItemId: addon.itemId,
+            },
+          });
+        } else if (existing.quantity !== addon.quantity) {
+          // Update quantity if changed.
+          //
+          // `updateMany` with the tenant in the predicate rather than
+          // `update({ where: { id } })`: the id came from the `findFirst`
+          // three lines up, inside this same transaction and already filtered
+          // by `tenantId`, so the row count is always 1 and nothing observable
+          // changes — but the tenant now travels with the write as well as
+          // with the read, which is what the rest of this file already does.
+          await tx.addOn.updateMany({
+            where: { id: existing.id, tenantId },
+            data: { quantity: addon.quantity },
+          });
+        }
+      }
+
+      // Grant credits on successful subscription (only on initial setup or re-activation)
+      let granted = 0;
+
+      if (!existingSubscription && subscription.status === 'active') {
+        // New subscription — grant initial monthly allowance
+        granted = plan.aiCreditsMonthly;
+
+        await tx.creditLedger.create({
+          data: {
+            tenantId,
+            delta: granted,
+            reason: 'monthly_grant',
+            refId: subscription.id,
+          },
+        });
+      } else if (
+        existingSubscription &&
+        existingSubscription.status !== 'ACTIVE' &&
+        subscription.status === 'active'
+      ) {
+        // Re-activation after cancellation — grant fresh monthly allowance
+        granted = plan.aiCreditsMonthly;
+
+        await tx.creditLedger.create({
+          data: {
+            tenantId,
+            delta: granted,
+            reason: 'monthly_grant',
+            refId: subscription.id,
+          },
+        });
+      }
+
+      // Handle downgrade: modules the new plan no longer carries are turned off
+      for (const moduleId of modulesToTurnOff) {
+        await tx.moduleState.upsert({
+          where: { tenantId_moduleId: { tenantId, moduleId } },
+          create: { tenantId, moduleId, status: 'OFF' },
+          update: { status: 'OFF' },
+        });
+      }
+
+      return { addedAddOns: added, removedAddOns: removed, creditsGranted: granted };
+    }
+  );
 
   // Log audit event
   await prisma.auditEvent.create({
@@ -517,40 +566,58 @@ export async function handleSubscriptionCancellation(
     };
   }
 
-  // Update subscription status, and drop the price lock with it: the locked
-  // rate belongs to the subscription that just ended, not to the tenant. Coming
-  // back means joining again, at whatever campaign is running then — which is
-  // what `priceLockOnActivation` does with a CANCELED row.
-  await prisma.subscription.update({
-    where: { tenantId },
-    data: { status: 'CANCELED', ...clearedPriceLock() },
-  });
-
-  // End all add-ons
-  await prisma.addOn.updateMany({
-    where: { tenantId, endedAt: null },
-    data: { endedAt: new Date() },
-  });
-
-  // Turn off non-free modules
+  // The free plan and the module catalogue are platform tables — no tenant
+  // column, no RLS policy — and they are read here, before the wrapper, so the
+  // tenant transaction below never has to reach for a second pool connection
+  // while holding one. They were read after the subscription update before this
+  // change; a lookup that throws still throws, and these two reads write
+  // nothing, so the only difference is that a cancellation which fails on a
+  // missing subscription row now costs two harmless SELECTs first.
   const freePlan = await prisma.plan.findUnique({
     where: { id: 'free' },
   });
 
+  const modulesToTurnOff: string[] = [];
   if (freePlan) {
     const freeModules = new Set(freePlan.modules);
     const allModules = await prisma.moduleCatalog.findMany();
 
     for (const moduleCatalog of allModules) {
       if (!freeModules.has(moduleCatalog.id)) {
-        await prisma.moduleState.upsert({
-          where: { tenantId_moduleId: { tenantId, moduleId: moduleCatalog.id } },
-          create: { tenantId, moduleId: moduleCatalog.id, status: 'OFF' },
-          update: { status: 'OFF' },
-        });
+        modulesToTurnOff.push(moduleCatalog.id);
       }
     }
   }
+
+  // Every tenant-scoped write of a cancellation, in one wrapper — see the note
+  // on the same wrapper in `syncStripeSubscription`. The audit row again stays
+  // outside it, written after this commits, so a redelivery is settled by the
+  // same guard as before.
+  await withTenant(tenantId, async (tx) => {
+    // Update subscription status, and drop the price lock with it: the locked
+    // rate belongs to the subscription that just ended, not to the tenant. Coming
+    // back means joining again, at whatever campaign is running then — which is
+    // what `priceLockOnActivation` does with a CANCELED row.
+    await tx.subscription.update({
+      where: { tenantId },
+      data: { status: 'CANCELED', ...clearedPriceLock() },
+    });
+
+    // End all add-ons
+    await tx.addOn.updateMany({
+      where: { tenantId, endedAt: null },
+      data: { endedAt: new Date() },
+    });
+
+    // Turn off non-free modules
+    for (const moduleId of modulesToTurnOff) {
+      await tx.moduleState.upsert({
+        where: { tenantId_moduleId: { tenantId, moduleId } },
+        create: { tenantId, moduleId, status: 'OFF' },
+        update: { status: 'OFF' },
+      });
+    }
+  });
 
   // Log audit event
   await prisma.auditEvent.create({
