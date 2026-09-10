@@ -14,8 +14,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'legal.terms' });
-  const title = t('metaTitle');
-  const description = t('metaDescription');
+  const title = t('metaTitle', { brand: PRODUCT_NAME });
+  const description = t('metaDescription', { brand: PRODUCT_NAME });
 
   return {
     title,

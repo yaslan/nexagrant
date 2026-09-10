@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { getWorkspaceRoute } from '@/lib/routes';
 
 /**
@@ -15,8 +16,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'legal.privacy' });
-  const title = t('metaTitle');
-  const description = t('metaDescription');
+  const title = t('metaTitle', { brand: PRODUCT_NAME });
+  const description = t('metaDescription', { brand: PRODUCT_NAME });
 
   return {
     title,
@@ -46,7 +47,7 @@ export default async function PrivacyPage({
   // tooling and could not be revised without a code change. It now reads the
   // same keys the metadata above already declared it would.
   const sections = [
-    { heading: t('controllerHeading'), body: t('controllerBody') },
+    { heading: t('controllerHeading'), body: t('controllerBody', { brand: PRODUCT_NAME }) },
     { heading: t('dataHeading'), body: t('dataBody') },
     { heading: t('rightsHeading'), body: t('rightsBody'), href: getWorkspaceRoute('settingsPrivacy', locale, 'default') },
     { heading: t('securityHeading'), body: t('securityBody') },

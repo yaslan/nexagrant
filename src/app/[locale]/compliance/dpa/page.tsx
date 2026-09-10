@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { MarkdownView } from './markdown-view';
 
 /**
@@ -16,8 +17,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'legal.dpa' });
-  const title = t('metaTitle');
-  const description = t('metaDescription');
+  const title = t('metaTitle', { brand: PRODUCT_NAME });
+  const description = t('metaDescription', { brand: PRODUCT_NAME });
 
   return {
     title,
