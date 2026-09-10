@@ -3,8 +3,8 @@ import {
   calculateCriterionAverage,
   calculateEvaluationScore,
   getScoreDistribution,
-  type TenantScopedDb,
 } from '../../../src/modules/m6/server/scoring';
+import type { TenantTx } from '../../../src/lib/db';
 import {
   compareM6ToESR,
   validateScoreRange,
@@ -23,7 +23,7 @@ describe('M6 Scoring Engine & ESR Comparison', () => {
           { score: 3 },
         ]),
       },
-    } as unknown as TenantScopedDb;
+    } as unknown as TenantTx;
 
     const avg = await calculateCriterionAverage(mockDb, 'crit-1', 'tenant-a');
     expect(avg).toBe(4.0);
@@ -63,7 +63,7 @@ describe('M6 Scoring Engine & ESR Comparison', () => {
           },
         ]),
       },
-    } as unknown as TenantScopedDb;
+    } as unknown as TenantTx;
 
     const score = await calculateEvaluationScore(mockDb, 'eval-1', 'tenant-a');
     expect(score).toBe(4.2);
@@ -78,7 +78,7 @@ describe('M6 Scoring Engine & ESR Comparison', () => {
           { score: 4 },
         ]),
       },
-    } as unknown as TenantScopedDb;
+    } as unknown as TenantTx;
 
     const dist = await getScoreDistribution(mockDb, 'crit-1', 'tenant-a');
     expect(dist).toEqual({ 1: 0, 2: 0, 3: 0, 4: 1, 5: 2 });
@@ -96,7 +96,7 @@ describe('M6 Scoring Engine & ESR Comparison', () => {
           reviewers: [{ id: 'rev-1', userId: 'user-1', status: 'completed' }],
         }),
       },
-    } as unknown as TenantScopedDb;
+    } as unknown as TenantTx;
 
     const result = await compareM6ToESR(mockDb, 'eval-1', 'tenant-a');
     expect(result.m6Score).toBe(4.0);
@@ -117,7 +117,7 @@ describe('M6 Scoring Engine & ESR Comparison', () => {
           reviewers: [{ id: 'rev-1', userId: 'user-1', status: 'completed' }],
         }),
       },
-    } as unknown as TenantScopedDb;
+    } as unknown as TenantTx;
 
     const result = await compareM6ToESR(mockDb, 'eval-2', 'tenant-a');
     expect(result.m6Score).toBe(4.8);
@@ -139,7 +139,7 @@ describe('M6 Scoring Engine & ESR Comparison', () => {
       reviewer: {
         findFirst: vi.fn().mockResolvedValue(null),
       },
-    } as unknown as TenantScopedDb;
+    } as unknown as TenantTx;
 
     // Comparing evaluation for tenant-a should fail because evaluation belongs to tenant-b
     await expect(compareM6ToESR(mockDb, 'eval-b', 'tenant-a')).rejects.toThrow(
@@ -155,7 +155,7 @@ describe('M6 Scoring Engine & ESR Comparison', () => {
       reviewer: {
         findFirst: vi.fn().mockResolvedValue(null), // User is not in reviewer table
       },
-    } as unknown as TenantScopedDb;
+    } as unknown as TenantTx;
 
     const hasAccess = await validateReviewerAccess(mockDb, 'eval-1', 'unseated-user', 'tenant-a');
     expect(hasAccess).toBe(false);
@@ -169,7 +169,7 @@ describe('M6 Scoring Engine & ESR Comparison', () => {
       score: {
         findFirst: vi.fn().mockResolvedValue({ id: 'existing-score-id' }),
       },
-    } as unknown as TenantScopedDb;
+    } as unknown as TenantTx;
 
     const canSubmit = await checkNoDuplicateScore(mockDb, 'rev-1', 'crit-1');
     expect(canSubmit).toBe(false); // Duplicate score detected, submission blocked

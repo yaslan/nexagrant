@@ -60,8 +60,6 @@ export interface G0Subject {
   seats: G0SeatSnapshot[];
 }
 
-type Client = TenantTx;
-
 // ───────────────────────── snapshot loading ─────────────────────────
 
 function toNumberOrNull(value: unknown): number | null {
@@ -118,7 +116,7 @@ function pickBaseRatePct(
 }
 
 async function loadCordisSnapshot(
-  client: Client,
+  client: TenantTx,
   pic: string | null,
   topicIdentifier: string | null,
 ): Promise<G0CordisSnapshot | null> {
@@ -163,7 +161,7 @@ async function loadCordisSnapshot(
  * score that says so.
  */
 export async function loadG0Snapshot(
-  client: Client,
+  client: TenantTx,
   tenantId: string,
   subject: G0Subject,
 ): Promise<G0Snapshot> {
@@ -302,7 +300,7 @@ export function computeG0FromSnapshot(
 
 /** Load + score, without writing anything. */
 export async function computeG0(
-  client: Client,
+  client: TenantTx,
   tenantId: string,
   subject: G0Subject,
 ): Promise<G0Computation> {
@@ -323,7 +321,7 @@ export async function computeG0(
 
 /** Load + score an opportunity that already exists. `null` when it is not this tenant's. */
 export async function computeG0ForOpportunity(
-  client: Client,
+  client: TenantTx,
   tenantId: string,
   opportunityId: string,
 ): Promise<G0Computation | null> {
@@ -409,7 +407,7 @@ export function g0EvidencePayload(computation: G0Computation): JsonObject {
  * opportunity's record rather than the topic's. A computation with no score writes nothing.
  */
 export async function persistG0(
-  client: Client,
+  client: TenantTx,
   computation: G0Computation,
 ): Promise<boolean> {
   if (computation.score === null || !computation.opportunityId) return false;

@@ -79,6 +79,29 @@ export const prisma: PrismaClient = globalForPrisma.prisma ?? createDbClient(con
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
+/**
+ * The client shape {@link withTenant} hands its callback: a Prisma client with
+ * the connection- and transaction-level methods removed, because inside a
+ * transaction they are not available.
+ *
+ * **This guarantee is structural, not nominal (TASK-MTV4ZJEECXNDE §2.3).** The
+ * name says "I came from a tenant-scoped transaction", but the *type* only says
+ * "I have the query methods" — so a bare `prisma`, which connects as a role RLS
+ * does not constrain, satisfies it and compiles. `scripts/rescore-g0.ts` passes
+ * exactly that today and typechecks green. Read a `TenantTx` parameter as a
+ * request to the caller, not as a proof about the caller.
+ *
+ * Closing that gap needs a nominal brand minted in one place — `withTenantOn`,
+ * beside the `set_config` line — and it is deliberately NOT done here:
+ * TASK-MTV5E5PUAJYSS carries it. The measurement behind that split is in
+ * `docs/agent-results/TASK-MTV4ZJEECXNDE-blok-zincir-dse.md`: a brand catches
+ * 6 of 19 argument positions, because the other 13 reach these functions through
+ * `as unknown as`, which walks past a brand as easily as past a structural type.
+ *
+ * Until then, the tenant guarantee is carried by {@link assertTenantScope} at the
+ * query boundary and by RLS in the database — both of which check a *value*,
+ * which is why they hold where the type does not.
+ */
 export type TenantTx = Prisma.TransactionClient;
 
 /**

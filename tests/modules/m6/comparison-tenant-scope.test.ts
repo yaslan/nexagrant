@@ -1,7 +1,6 @@
 import { describe, test, expect, vi } from 'vitest';
 import { compareM6ToESR } from '../../../src/modules/m6/server/comparison';
-import type { TenantScopedDb } from '../../../src/modules/m6/server/scoring';
-import { MissingTenantScopeError } from '../../../src/lib/db';
+import { MissingTenantScopeError, type TenantTx } from '../../../src/lib/db';
 
 /**
  * TASK-MTV5GFB75N43S — `compareM6ToESR` and the tenant it may not be called
@@ -50,7 +49,7 @@ function tenantAEvaluation() {
 function crossTenantDb() {
   return {
     evaluation: { findUnique: vi.fn().mockResolvedValue(tenantAEvaluation()) },
-  } as unknown as TenantScopedDb;
+  } as unknown as TenantTx;
 }
 
 describe('compareM6ToESR cannot be called without a tenant', () => {
@@ -63,7 +62,7 @@ describe('compareM6ToESR cannot be called without a tenant', () => {
   const _tenantlessCallsMustNotCompile = () => {
     const db = crossTenantDb();
 
-    // @ts-expect-error tenantId is required: the one-argument form used to run unscoped.
+    // @ts-expect-error there is no form that takes an id without a db: a string is not a TenantTx.
     void compareM6ToESR('eval-1');
     // @ts-expect-error tenantId is required on the db form too.
     void compareM6ToESR(db, 'eval-1');
@@ -85,7 +84,7 @@ describe('compareM6ToESR cannot be called without a tenant', () => {
     test(`refuses ${label} without querying`, async () => {
       const db = crossTenantDb();
       const call = compareM6ToESR as unknown as (
-        db: TenantScopedDb,
+        db: TenantTx,
         evaluationId: string,
         tenantId: unknown
       ) => Promise<unknown>;
@@ -98,7 +97,7 @@ describe('compareM6ToESR cannot be called without a tenant', () => {
   test('the refusal names the caller and carries the repo-wide code', async () => {
     const db = crossTenantDb();
     const call = compareM6ToESR as unknown as (
-      db: TenantScopedDb,
+      db: TenantTx,
       evaluationId: string,
       tenantId: unknown
     ) => Promise<unknown>;

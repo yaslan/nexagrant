@@ -8,20 +8,8 @@
  * - Database queries for panel scores and reviewer stats
  */
 
-import { PrismaClient } from '@prisma/client';
-import { assertTenantScope, withTenant } from '@/lib/db';
+import { assertTenantScope, type TenantTx } from '@/lib/db';
 import { ScoreValue } from '../types';
-
-/**
- * The client shape `withTenant()` hands its callback: a PrismaClient without the
- * connection/transaction methods. Every query below takes this rather than a bare
- * `PrismaClient` so it can only be called from inside a tenant-scoped transaction
- * (CLAUDE.md §1) — a plain `prisma` still satisfies it structurally.
- */
-export type TenantScopedDb = Omit<
-  PrismaClient,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
->;
 
 /** An ESR panel total is scored out of 15 (3 criteria x 5.0). */
 export const ESR_TOTAL_MAX = 15;
@@ -32,10 +20,10 @@ export const PANEL_SCALE_MAX = 5;
  * Map an official ESR total (0..15) onto the 1..5 panel scale so the two can be
  * compared on one axis: 0 -> 1, 15 -> 5.
  *
- * This lived inline in three places (`compareWithEsr`, `getPanelScoresForProposal`,
- * `getCalibrationMatrix`). Three copies of one conversion is three chances for the
- * dashboard and the calibration report to disagree about the same proposal, so the
- * formula now exists once.
+ * This lived inline in three places (`compareWithEsr`, `getPanelScoresForProposal`
+ * and the since-deleted `getCalibrationMatrix`). Three copies of one conversion is
+ * three chances for two screens to disagree about the same proposal, so the formula
+ * exists once.
  */
 export function esrTotalToPanelScale(total: number, maxTotal: number = ESR_TOTAL_MAX): number | null {
   if (!Number.isFinite(total) || maxTotal <= 0) return null;
@@ -292,7 +280,7 @@ export function compareWithEsr(
  * Used for dashboard and calibration reporting.
  */
 export async function getPanelScoresForProposal(
-  db: TenantScopedDb,
+  db: TenantTx,
   tenantId: string,
   proposalId: string,
 ): Promise<PanelScoreQueryResult[]> {
@@ -377,34 +365,16 @@ export async function getPanelScoresForProposal(
  * before a query is issued. Behaviour for a tenant-scoped call is unchanged.
  */
 export async function calculateCriterionAverage(
+  db: TenantTx,
   criterionId: string,
   tenantId: string,
-): Promise<number>;
-export async function calculateCriterionAverage(
-  db: TenantScopedDb,
-  criterionId: string,
-  tenantId: string,
-): Promise<number>;
-export async function calculateCriterionAverage(
-  dbOrCriterionId: TenantScopedDb | string,
-  criterionIdOrTenantId?: string,
-  tenantIdParam?: string,
 ): Promise<number> {
-  if (typeof dbOrCriterionId === 'string') {
-    const criterionId = dbOrCriterionId;
-    const tenantId = criterionIdOrTenantId;
-    assertTenantScope(tenantId, 'calculateCriterionAverage');
-    return withTenant(tenantId, (tx) => calculateCriterionAverageInternal(tx, criterionId, tenantId));
-  }
-  const db = dbOrCriterionId;
-  const criterionId = criterionIdOrTenantId!;
-  const tenantId = tenantIdParam;
   assertTenantScope(tenantId, 'calculateCriterionAverage');
   return calculateCriterionAverageInternal(db, criterionId, tenantId);
 }
 
 async function calculateCriterionAverageInternal(
-  db: TenantScopedDb,
+  db: TenantTx,
   criterionId: string,
   tenantId: string,
 ): Promise<number> {
@@ -431,34 +401,16 @@ async function calculateCriterionAverageInternal(
  * condition instead of narrowing it.
  */
 export async function calculateEvaluationScore(
+  db: TenantTx,
   evaluationId: string,
   tenantId: string,
-): Promise<number>;
-export async function calculateEvaluationScore(
-  db: TenantScopedDb,
-  evaluationId: string,
-  tenantId: string,
-): Promise<number>;
-export async function calculateEvaluationScore(
-  dbOrEvaluationId: TenantScopedDb | string,
-  evaluationIdOrTenantId?: string,
-  tenantIdParam?: string,
 ): Promise<number> {
-  if (typeof dbOrEvaluationId === 'string') {
-    const evaluationId = dbOrEvaluationId;
-    const tenantId = evaluationIdOrTenantId;
-    assertTenantScope(tenantId, 'calculateEvaluationScore');
-    return withTenant(tenantId, (tx) => calculateEvaluationScoreInternal(tx, evaluationId, tenantId));
-  }
-  const db = dbOrEvaluationId;
-  const evaluationId = evaluationIdOrTenantId!;
-  const tenantId = tenantIdParam;
   assertTenantScope(tenantId, 'calculateEvaluationScore');
   return calculateEvaluationScoreInternal(db, evaluationId, tenantId);
 }
 
 async function calculateEvaluationScoreInternal(
-  db: TenantScopedDb,
+  db: TenantTx,
   evaluationId: string,
   tenantId: string,
 ): Promise<number> {
@@ -526,34 +478,16 @@ async function calculateEvaluationScoreInternal(
  * condition instead of narrowing it.
  */
 export async function getScoreDistribution(
+  db: TenantTx,
   criterionId: string,
   tenantId: string,
-): Promise<Record<number, number>>;
-export async function getScoreDistribution(
-  db: TenantScopedDb,
-  criterionId: string,
-  tenantId: string,
-): Promise<Record<ScoreValue, number>>;
-export async function getScoreDistribution(
-  dbOrCriterionId: TenantScopedDb | string,
-  criterionIdOrTenantId?: string,
-  tenantIdParam?: string,
-): Promise<Record<number, number>> {
-  if (typeof dbOrCriterionId === 'string') {
-    const criterionId = dbOrCriterionId;
-    const tenantId = criterionIdOrTenantId;
-    assertTenantScope(tenantId, 'getScoreDistribution');
-    return withTenant(tenantId, (tx) => getScoreDistributionInternal(tx, criterionId, tenantId));
-  }
-  const db = dbOrCriterionId;
-  const criterionId = criterionIdOrTenantId!;
-  const tenantId = tenantIdParam;
+): Promise<Record<ScoreValue, number>> {
   assertTenantScope(tenantId, 'getScoreDistribution');
   return getScoreDistributionInternal(db, criterionId, tenantId);
 }
 
 async function getScoreDistributionInternal(
-  db: TenantScopedDb,
+  db: TenantTx,
   criterionId: string,
   tenantId: string,
 ): Promise<Record<number, number>> {
@@ -581,7 +515,7 @@ async function getScoreDistributionInternal(
  * Called after a reviewer submits their scores.
  */
 export async function updateEvaluationScore(
-  db: TenantScopedDb,
+  db: TenantTx,
   evaluationId: string,
   tenantId: string,
 ): Promise<void> {
@@ -631,61 +565,4 @@ export async function updateEvaluationScore(
       updatedAt: new Date(),
     },
   });
-}
-
-/**
- * Get accuracy matrix: panel score vs ESR for all completed evaluations.
- * Used to assess calibration of the M6 panel against official scoring.
- */
-export async function getCalibrationMatrix(
-  db: TenantScopedDb,
-  tenantId: string,
-): Promise<Array<{
-  evaluationId: string;
-  panelScore: number;
-  esrScore: number;
-  deltaAbsolute: number;
-  deltaPercent: number;
-}>> {
-  const evaluations = await db.evaluation.findMany({
-    where: {
-      tenantId,
-      readerType: 'PANEL',
-      status: 'completed',
-      avgScore: { not: null },
-    },
-    include: { proposal: { select: { esrScores: true } } },
-  });
-
-  const results: Array<{
-    evaluationId: string;
-    panelScore: number;
-    esrScore: number;
-    deltaAbsolute: number;
-    deltaPercent: number;
-  }> = [];
-
-  for (const eval_ of evaluations) {
-    // A calibration point needs both halves to be real. `storedPanelAverage` also
-    // drops legacy rows holding the old fabricated 0, which would otherwise enter the
-    // matrix as a 4-point miss and drag the reported drift of the whole model.
-    const panelScore = storedPanelAverage(eval_.avgScore);
-    if (panelScore === null || !eval_.proposal?.esrScores) continue;
-
-    const esrScore = esrScoreFromProposal(eval_.proposal.esrScores);
-    if (esrScore === null) continue;
-
-    const deltaAbsolute = esrScore - panelScore;
-    const deltaPercent = (deltaAbsolute / esrScore) * 100;
-
-    results.push({
-      evaluationId: eval_.id,
-      panelScore,
-      esrScore,
-      deltaAbsolute,
-      deltaPercent,
-    });
-  }
-
-  return results;
 }

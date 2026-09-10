@@ -4,8 +4,10 @@
  * TASK-MTPZHMSPMDA66: Tests for ESR comparison, score validation, and access control.
  *
  * Async validation functions (validateEvaluationTenant, validateReviewerAccess,
- * checkNoDuplicateScore, validateReviewersTenant) are tested via integration tests
- * in actions.test.ts alongside server action flows, as they require a database.
+ * checkNoDuplicateScore) are tested via integration tests in actions.test.ts
+ * alongside server action flows, as they require a database. A fourth,
+ * `validateReviewersTenant`, was named here but never had a caller anywhere in the
+ * repo — including that integration suite — and was deleted in TASK-MTV5H4HCGGGQ5.
  */
 
 import { describe, it, expect } from 'vitest';

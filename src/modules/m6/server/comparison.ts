@@ -5,13 +5,12 @@
  * for score integrity, reviewer access, and tenant isolation.
  */
 
-import { assertTenantScope, withTenant } from '@/lib/db';
+import { assertTenantScope, type TenantTx } from '@/lib/db';
 import {
   compareWithEsr,
   esrScoreFromProposal,
   storedPanelAverage,
   type EsrComparisonResult,
-  type TenantScopedDb,
 } from './scoring';
 
 export interface M6EsrComparisonResult extends EsrComparisonResult {
@@ -25,9 +24,10 @@ export interface M6EsrComparisonResult extends EsrComparisonResult {
  * Compare M6 panel score to ESR for a specific evaluation.
  * Fetches the evaluation and proposal, validates reviewer access, then returns comparison.
  *
- * Why `tenantId` is required in *both* overloads (TASK-MTV5GFB75N43S): this is the
- * exact twin of the scoring defect closed in TASK-MTUIPYSSNLVWG, one file over.
- * The two-argument form used to accept no tenant, and omitting it did not narrow
+ * Why `tenantId` is required, and why there is no longer a form without a `db`
+ * (TASK-MTV5GFB75N43S, then TASK-MTV5H4HCGGGQ5): this is the exact twin of the
+ * scoring defect closed in TASK-MTUIPYSSNLVWG, one file over. A two-argument form
+ * used to accept no tenant, and omitting it did not narrow
  * the lookup — it handed `compareM6ToESRInternal` the global `prisma` client
  * (which connects as a role RLS does not constrain) and then short-circuited the
  * ownership check below, because the guard read `tenantId && evaluation.tenantId
@@ -43,45 +43,26 @@ export interface M6EsrComparisonResult extends EsrComparisonResult {
  * and {@link assertTenantScope} — the repo's query-boundary guard in
  * `src/lib/db.ts` — refuses `''`, whitespace, `null` and `undefined` arriving
  * from untyped code before any query is issued. The ownership guard is now
- * unconditional. Behaviour for a tenant-scoped call is unchanged.
+ * unconditional. The string-first overload that carried the unscoped branch was
+ * deleted outright in TASK-MTV5H4HCGGGQ5; it had no callers. Behaviour for a
+ * tenant-scoped call is unchanged.
  *
  * @throws MissingTenantScopeError if called without a tenant
  * @throws EvaluationNotFoundError if evaluation or proposal not found
  * @throws UnauthorizedError if reviewer lacks access
  */
 export async function compareM6ToESR(
+  db: TenantTx,
   evaluationId: string,
   tenantId: string,
-): Promise<M6EsrComparisonResult>;
-export async function compareM6ToESR(
-  db: TenantScopedDb,
-  evaluationId: string,
-  tenantId: string,
-  currentUserId?: string,
-): Promise<M6EsrComparisonResult>;
-export async function compareM6ToESR(
-  dbOrEvaluationId: TenantScopedDb | string,
-  evaluationIdOrTenantId?: string,
-  tenantIdParam?: string,
   currentUserId?: string,
 ): Promise<M6EsrComparisonResult> {
-  if (typeof dbOrEvaluationId === 'string') {
-    const evaluationId = dbOrEvaluationId;
-    const tenantId = evaluationIdOrTenantId;
-    assertTenantScope(tenantId, 'compareM6ToESR');
-    return withTenant(tenantId, (tx) =>
-      compareM6ToESRInternal(tx, evaluationId, tenantId, currentUserId)
-    );
-  }
-  const db = dbOrEvaluationId;
-  const evaluationId = evaluationIdOrTenantId!;
-  const tenantId = tenantIdParam;
   assertTenantScope(tenantId, 'compareM6ToESR');
   return compareM6ToESRInternal(db, evaluationId, tenantId, currentUserId);
 }
 
 async function compareM6ToESRInternal(
-  db: TenantScopedDb,
+  db: TenantTx,
   evaluationId: string,
   tenantId: string,
   currentUserId?: string,
@@ -172,7 +153,7 @@ export function validateScoreRange(score: number): boolean {
  * DB enforces via UNIQUE(reviewerId, criterionId), but check in app code too.
  */
 export async function checkNoDuplicateScore(
-  db: TenantScopedDb,
+  db: TenantTx,
   reviewerId: string,
   criterionId: string,
 ): Promise<boolean> {
@@ -186,7 +167,7 @@ export async function checkNoDuplicateScore(
  * Validation: reviewer has access to the evaluation (is listed as a reviewer).
  */
 export async function validateReviewerAccess(
-  db: TenantScopedDb,
+  db: TenantTx,
   evaluationId: string,
   userId: string,
   tenantId: string,
@@ -205,7 +186,7 @@ export async function validateReviewerAccess(
  * Validation: evaluation belongs to the tenant (tenant isolation).
  */
 export async function validateEvaluationTenant(
-  db: TenantScopedDb,
+  db: TenantTx,
   evaluationId: string,
   tenantId: string,
 ): Promise<boolean> {
@@ -214,27 +195,4 @@ export async function validateEvaluationTenant(
     select: { tenantId: true },
   });
   return evaluation?.tenantId === tenantId;
-}
-
-/**
- * Validation: all reviewers for an evaluation are from the same tenant.
- * Used as a sanity check after batch operations.
- */
-export async function validateReviewersTenant(
-  db: TenantScopedDb,
-  evaluationId: string,
-  expectedTenantId: string,
-): Promise<boolean> {
-  const evaluation = await db.evaluation.findUnique({
-    where: { id: evaluationId },
-    include: { reviewers: { select: { tenantId: true } } },
-  });
-
-  if (!evaluation || evaluation.tenantId !== expectedTenantId) {
-    return false;
-  }
-
-  return evaluation.reviewers.every(
-    (r: { tenantId: string }) => r.tenantId === expectedTenantId,
-  );
 }
