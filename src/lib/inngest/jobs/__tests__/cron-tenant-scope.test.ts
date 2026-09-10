@@ -31,6 +31,29 @@ import { grantCreditsToTenants } from '../credits-monthly-grant';
  */
 const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
 
+/**
+ * Decided before `describe` so the whole file skips itself when there is no
+ * Postgres to measure against — the way tests/rls.spec.ts and
+ * tests/m9-calendar-tenant-scope.live.test.ts already do. A missing database is
+ * an absent measurement, not a failing one, and reddening `pnpm gate` on every
+ * machine without `docker compose up` would be the wrong alarm.
+ *
+ * Note what does NOT skip: when the database IS reachable, the first test
+ * asserts the probe role is genuinely NOBYPASSRLS and fails hard if it is not.
+ * A role that silently bypasses the policies is a false green, and that is the
+ * one thing this file exists to refuse.
+ */
+const dbReachable =
+  RLS_URL !== undefined &&
+  (await prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
+
+if (!dbReachable) {
+  console.warn(
+    'cron tenant-scope test skipped: needs Postgres and DATABASE_URL_RLS_TEST ' +
+      '(`docker compose up -d` then `pnpm db:rls-role`).'
+  );
+}
+
 /** Every row this file creates carries it, so cleanup can never over-reach. */
 const RUN = `tvr8kk-${Date.now()}`;
 
@@ -43,7 +66,7 @@ interface Fixture {
   email: string;
 }
 
-describe('cron jobs write under the tenant they are iterating (TASK-MTVR8KK92G0GA)', () => {
+describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterating', () => {
   let rls: PrismaClient;
   let a: Fixture;
   let b: Fixture;
@@ -123,15 +146,9 @@ describe('cron jobs write under the tenant they are iterating (TASK-MTVR8KK92G0G
   }
 
   beforeAll(async () => {
-    if (!RLS_URL) {
-      skipReason =
-        'DATABASE_URL_RLS_TEST is not set. Run `pnpm db:rls-role` to create the NOBYPASSRLS role.';
-      console.warn(`cron tenant-scope test skipped: ${skipReason}`);
-      return;
-    }
     try {
       await prisma.$connect();
-      rls = createDbClient(RLS_URL);
+      rls = createDbClient(RLS_URL!);
       await rls.$connect();
       a = await makeTenant('a');
       b = await makeTenant('b');

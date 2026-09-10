@@ -147,7 +147,34 @@ meta: { modelName: 'CreditLedger',
   at grantCreditsToTenants (src/lib/inngest/jobs/credits-monthly-grant.ts:41:9)
 ```
 
-### 2.4 Kapı çıktıları (sayıyla)
+### 2.4 Veritabanı yokken ne oluyor — konvansiyona hizalandı
+
+İlk yazdığım halde test, Postgres bulunamazsa **sert düşüyordu**. Bu yanlıştı: depoda
+yerleşik konvansiyon (`tests/rls.spec.ts`, kardeş dilimin
+`tests/m9-calendar-tenant-scope.live.test.ts`, ve `check-rls-live.ts`'in kendi docstring'i —
+"skipped loudly — a missing database is an absent measurement, not a passing one") veritabanı
+yoksa **atlamak**. Benim halim, docker-compose ayakta olmayan her makinede `pnpm gate`'i
+kırardı — ağacı paylaştığım 5 ajanın hepsinde. `describe.skipIf(!dbReachable)` ile hizaladım.
+
+Atlamanın sahte-yeşile dönüşmediğini koruyan şey: veritabanı **erişilebilirse** ilk test
+rolün gerçekten NOBYPASSRLS olduğunu doğruluyor ve değilse sert düşüyor. Yani "ölçüm yok"
+ile "ölçüm yapıldı ve geçti" birbirine karışmıyor. Üç davranış da ölçüldü:
+
+```
+=== green with DB ===
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+=== skips without DB ===
+ Test Files  1 skipped (1)
+      Tests  6 skipped (6)
+=== mutant still caught after the skip refactor? (credits -> bare prisma) ===
+     × credits-monthly-grant: each ledger row lands in the tenant of its own iteration 36ms
+     × credits-monthly-grant: a stale tenant id is refused by the database, not misfiled 16ms
+      Tests  2 failed | 4 passed (6)
+restored: IDENTICAL
+```
+
+### 2.5 Kapı çıktıları (sayıyla)
 
 ```
 $ pnpm typecheck
@@ -172,7 +199,7 @@ açık SystemAlert satırı            : 34
 (denet-i, `src/modules/m6/**`) commit edilmemiş düzenlemesiydi, HEAD sürümünde o isim hiç
 geçmiyor. Dokunmadım; yukarıdaki temiz çıktı o ajan kendi düzeltmesini yaptıktan sonra alındı.
 
-### 2.5 Ürettiğim doğrulama satırlarının temizliği — ayrı sayımla
+### 2.6 Ürettiğim doğrulama satırlarının temizliği — ayrı sayımla
 
 Fixture'lar `afterAll`'da siliniyor. Tüm koşumlardan (fixture + 4 mutant koşumu + elle
 sondalar) sonra kalıntı sayımı:
@@ -248,9 +275,12 @@ kiracıda bu bir yeniden değerlendirme konusu olur.
    karar gerekiyor. Dilim 5'e mi, yoksa yeni bir karta mı?
 2. `getEntitlements`'ın `Subscription` include'u (§4) — `src/lib/billing.ts` sahibine mi
    devredilsin?
-3. Kardeş dilim TASK-MTVR7W9ZXO7M'in raporu bu iş biterken henüz yoktu. `withTenant`/
-   `withTenantOn` çiftini kullandım (deponun mevcut imzası); dse farklı bir imza kurduysa
-   hizalama gerekebilir — ama ikinci bir stil çıkarmamaya dikkat ettim.
+3. ~~Kardeş dilimin imzası~~ — **çözüldü.** TASK-MTVR7W9ZXO7M bu iş biterken commit edildi
+   (135f028); okudum. Aynı imzayı kullanmışız: `withTenant(tenantId, async (tx) => …)`,
+   `prisma.` → `tx.`. Tek bilinçli fark: dse "okuma+yazmayı tek `withTenant`'ta tut"
+   diyor (atomiklik); `alerts-daily`'de sahip okuması ile `lastRunAt` yazması arasında
+   **Resend'e giden ağ turu** var, o yüzden orada iki ayrı kapsam kullandım ve gerekçesini
+   koda yazdım. İkinci bir stil çıkarılmadı.
 
 ---
 
