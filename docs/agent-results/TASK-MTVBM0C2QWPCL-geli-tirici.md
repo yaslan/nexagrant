@@ -198,5 +198,6 @@ bozulup bozulmadığı ancak yukarıdaki stash karşılaştırmasıyla söyleneb
 
 ## 6. Sonraki adım
 
-- Commit: `fix(llm): name a post-provider log-write failure in generateCompletion`
+- Commit: `47228c9` — `fix(llm): name a post-provider log-write failure in generateCompletion`
+  (pre-commit kapısı temiz: eslint + `tsc --noEmit`)
 - M9 yutma kartı için lidere bildir (§5-1).
