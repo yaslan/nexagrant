@@ -3,6 +3,7 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
+import { assertModuleAccess } from '@/lib/modules/access';
 import {
   submitForDualApproval,
   approveByDepartment,
@@ -41,6 +42,9 @@ export async function generateStandardDoc(
   opportunityId: string,
   kind: 'NDA' | 'LOI' | 'COMMITMENT' | 'ESR_DEBRIEF' | 'AWARD_PACK' | string
 ) {
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M10');
   const { tenantId, userId } = await requireTenantAction();
 
   const opp = await withTenant<{ title: string } | null>(tenantId, (tx) =>

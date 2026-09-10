@@ -37,6 +37,11 @@ vi.mock('@/lib/llm', () => ({
   generateText: vi.fn().mockResolvedValue('generated section text'),
 }));
 
+vi.mock('@/lib/modules/access', async () => {
+  const m = await import('../../../../tests/helpers/tenant-scope-mock');
+  return m.moduleAccessStub();
+});
+
 vi.mock('@/lib/rag', () => ({
   retrieveChunks: vi.fn().mockResolvedValue([]),
 }));

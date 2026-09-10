@@ -3,6 +3,7 @@
 import { prisma, withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
+import { assertModuleAccess } from '@/lib/modules/access';
 import { retrieveChunks } from '@/lib/rag';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 import { PRODUCT_NAME } from '@/lib/brand';
@@ -66,6 +67,9 @@ export async function generateConceptNoteDraft(
   templateId: string,
   inputs: Record<string, string>
 ) {
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M2');
   const { tenantId, userId } = await requireTenantAction();
 
   // 1. Get the opportunity — scoped to the session tenant

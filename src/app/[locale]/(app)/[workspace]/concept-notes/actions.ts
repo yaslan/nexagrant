@@ -3,6 +3,7 @@
 import { prisma, withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateCompletion, LlmMessage } from '@/lib/llm';
+import { assertModuleAccess } from '@/lib/modules/access';
 import { buildRagPrompt } from '@/lib/rag';
 import { revalidatePath } from 'next/cache';
 import type { ConceptTemplateSchema } from '@/modules/m2/types';
@@ -92,6 +93,9 @@ export async function generateSectionDraft(
   maxWords: number,
   opportunityTitle: string
 ) {
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M2');
   const { tenantId, userId } = await requireTenantAction();
 
   // Build RAG-augmented context

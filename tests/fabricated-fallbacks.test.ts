@@ -211,6 +211,13 @@ vi.mock('@/lib/tenant', () => ({
 vi.mock('@/lib/observability/system-alert', () => ({ recordAlert: recordAlertMock }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/auth', () => ({ auth: vi.fn() }));
+// The M10 action opens with the module gate (CLAUDE.md §4). It is stubbed open
+// here so these tests stay about the fabricated fallback; the gate itself is
+// asserted in tests/modules/ai-module-gate.test.ts.
+vi.mock('@/lib/modules/access', async () => {
+  const m = await import('./helpers/tenant-scope-mock');
+  return m.moduleAccessStub();
+});
 
 const { generateStandardDoc } = await import('@/modules/m10/server/actions');
 

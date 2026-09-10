@@ -11,6 +11,11 @@ vi.mock('../../src/lib/tenant', async () => {
   return m.tenantModuleStub();
 });
 
+vi.mock('../../src/lib/modules/access', async () => {
+  const m = await import('../helpers/tenant-scope-mock');
+  return m.moduleAccessStub();
+});
+
 vi.mock('../../src/lib/db', async () => {
   const m = await import('../helpers/tenant-scope-mock');
   return m.dbModuleStub({

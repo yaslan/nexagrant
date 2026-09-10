@@ -3,6 +3,7 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
+import { assertModuleAccess } from '@/lib/modules/access';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
 import type { TtoPortfolioItemRow } from '@/types/db-rows';
@@ -105,6 +106,9 @@ export async function generateIpChecklist({
   trl: number;
   patentStatus: string;
 }) {
+  // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
+  // and debits CreditLedger, so a closed module checked later still costs credits.
+  await assertModuleAccess('M7');
   const { tenantId, userId } = await requireTenantAction();
 
   const prompt = `Generate a university Tech Transfer Office (TTO) IP & Licensing Checklist for:

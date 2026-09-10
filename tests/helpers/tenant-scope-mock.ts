@@ -87,3 +87,54 @@ export function dbModuleStub(tx: unknown) {
     ),
   };
 }
+
+/**
+ * Shared stub for `@/lib/modules/access` in unit tests.
+ *
+ * Every AI server action now opens with `assertModuleAccess()` (CLAUDE.md §4 —
+ * the module has to be both sold and switched on before an LLM call spends the
+ * tenant's credits), and the real module reaches next-auth through `@/lib/auth`,
+ * which does not resolve under the vitest node environment. Action tests that
+ * are about something else stub it open and stay about that something else; the
+ * gate's own behaviour — open, closed, and outside the plan — is asserted
+ * end-to-end against the real implementation in tests/modules/ai-module-gate.test.ts.
+ */
+export class FakeModuleAccessError extends Error {
+  readonly code = 'MODULE_ACCESS_DENIED';
+
+  constructor(
+    readonly moduleId: string,
+    readonly status: string,
+    readonly reason: string
+  ) {
+    super(`Module ${moduleId} is not available (${status}/${reason}).`);
+    this.name = 'ModuleAccessError';
+  }
+}
+
+/** Mutable so a test can close the module and assert the action refuses. */
+export const moduleAccessState: { open: boolean } = { open: true };
+
+export function setModuleOpen(open: boolean): void {
+  moduleAccessState.open = open;
+}
+
+export function resetModuleAccess(): void {
+  moduleAccessState.open = true;
+}
+
+export function moduleAccessStub() {
+  return {
+    ModuleAccessError: FakeModuleAccessError,
+    checkModuleAccess: vi.fn(async () =>
+      moduleAccessState.open
+        ? { allowed: true, status: 'ON' }
+        : { allowed: false, status: 'OFF', reason: 'MODULE_OFF' }
+    ),
+    assertModuleAccess: vi.fn(async (moduleId: string) => {
+      if (!moduleAccessState.open) {
+        throw new FakeModuleAccessError(moduleId, 'OFF', 'MODULE_OFF');
+      }
+    }),
+  };
+}
