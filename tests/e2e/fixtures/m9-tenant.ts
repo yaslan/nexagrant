@@ -21,7 +21,9 @@ export const M9_WORKSPACE_ID = 'm9-e2e-workspace';
 export const M9_WORKSPACE = 'm9-e2e';
 export const M9_OPPORTUNITY = 'm9-e2e-opportunity';
 export const M9_USER_ID = 'm9-e2e-user';
-export const M9_EMAIL = 'm9-e2e@fabrika.test';
+// Use a timestamp suffix to prevent collisions from failed teardowns: if test N's cleanup
+// fails and test N+1 runs, they won't share the same email unique constraint.
+export const M9_EMAIL = `m9-e2e-${Date.now()}@fabrika.test`;
 export const M9_BRIEFS_URL = `/tr/${M9_WORKSPACE}/opportunities/${M9_OPPORTUNITY}/briefs`;
 
 export async function setupM9Tenant() {
@@ -58,6 +60,8 @@ export async function setupM9Tenant() {
     create: { id: M9_WORKSPACE_ID, tenantId: M9_TENANT, name: 'M9 E2E', slug: M9_WORKSPACE },
     update: {},
   });
+  // Clean up any stray user with this email from a failed teardown.
+  await prisma.user.deleteMany({ where: { email: M9_EMAIL, id: { not: M9_USER_ID } } });
   await prisma.user.upsert({
     where: { id: M9_USER_ID },
     create: { id: M9_USER_ID, email: M9_EMAIL, name: 'M9 E2E', locale: 'tr' },
