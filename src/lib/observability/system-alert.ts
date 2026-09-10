@@ -31,6 +31,21 @@
  *   being written. Resolving an alert closes the window: the next occurrence
  *   opens a fresh row, so an operator who ticked something off still sees the
  *   problem come back rather than watching a counter tick behind their back.
+ *
+ * Dedup key override (TASK-MTVFL8IJALB2H):
+ *   The default identity above folds in the caller's *entire* meta, which
+ *   silently defeats dedup whenever meta carries something that changes every
+ *   occurrence but does not distinguish the underlying problem — a request
+ *   uuid, a timestamp, a run counter, a temp file path. Measured case:
+ *   `invoice_profile_assumed`, whose meta is a constant, folded 231
+ *   occurrences into one row; alerts with a per-run identifier in meta never
+ *   fold at all (docs/agent-results/TASK-MTTUUGKNDGBXK-customer-support.md
+ *   §2, §"Dedup neden 221'i katlamadı").
+ *   `RecordAlertInput.dedupeKey` lets a caller name the stable identity
+ *   explicitly: when set, the alert's identity is (level, source, dedupeKey)
+ *   and the rest of meta — including whatever varies run to run — is kept
+ *   only as display detail on the row, never compared. Omit it and the old
+ *   (level, source, message, meta) identity applies unchanged.
  */
 
 import { prisma } from '@/lib/db';
@@ -47,6 +62,18 @@ export interface RecordAlertInput {
   source: string;
   message: string;
   meta?: Record<string, unknown>;
+  /**
+   * Overrides the dedup identity to (level, source, dedupeKey), ignoring
+   * `message` and the rest of `meta` when deciding whether this occurrence is
+   * "the same alert" as an already-open one. Set this when `meta` (or a
+   * dynamic `message`) carries something that changes every occurrence
+   * without changing what the problem *is* — a request uuid, a timestamp, a
+   * run counter, a file path. Leave unset for the default identity, which is
+   * correct whenever meta is either constant or itself part of what makes two
+   * occurrences the same problem (e.g. a per-tenant alert, where a different
+   * tenant is genuinely a different problem).
+   */
+  dedupeKey?: string;
 }
 
 export interface AlertRecord {
@@ -90,10 +117,21 @@ const MAX_MESSAGE_LENGTH = 500;
  * before anything is compared or written, so a job that echoes an alert's own
  * meta back into a new alert cannot inflate a counter or fake a last-seen time.
  */
-const RESERVED_META_KEYS = ['alertRepeatCount', 'alertLastSeenAt'] as const;
+const RESERVED_META_KEYS = [
+  'alertRepeatCount',
+  'alertLastSeenAt',
+  'alertDedupeKey',
+  'alertResolvedBy',
+] as const;
 
 export const ALERT_REPEAT_COUNT_KEY = 'alertRepeatCount';
 export const ALERT_LAST_SEEN_KEY = 'alertLastSeenAt';
+/** Where `RecordAlertInput.dedupeKey` is stored on the row, so a stored alert
+ *  and the next occurrence's freshly-built row compare on the same key. */
+export const ALERT_DEDUPE_KEY_KEY = 'alertDedupeKey';
+/** Stamped by `resolveAlerts` on the row it closes, so an operator reading a
+ *  resolved alert can tell it closed itself rather than being ticked off. */
+export const ALERT_RESOLVED_BY_KEY = 'alertResolvedBy';
 
 function isSensitiveKey(key: string): boolean {
   const lower = key.toLowerCase();
@@ -189,14 +227,21 @@ export function buildAlertRow(input: RecordAlertInput): {
     message: input.message.slice(0, MAX_MESSAGE_LENGTH),
   };
   const sanitized = sanitizeMeta(input.meta);
-  const meta = sanitized ? stripReserved(sanitized) : undefined;
-  if (meta && Object.keys(meta).length > 0) row.meta = meta;
+  const meta = sanitized ? stripReserved(sanitized) : {};
+  if (input.dedupeKey) meta[ALERT_DEDUPE_KEY_KEY] = input.dedupeKey;
+  if (Object.keys(meta).length > 0) row.meta = meta;
   return row;
 }
 
 /**
- * The identity of an alert for deduplication: level, source, message and the
- * caller's own meta, with this module's bookkeeping keys ignored.
+ * The identity of an alert for deduplication.
+ *
+ * When the row's meta carries a dedupe key (`RecordAlertInput.dedupeKey`,
+ * stored under `ALERT_DEDUPE_KEY_KEY`), identity is (level, source,
+ * dedupeKey) — `message` and the rest of `meta` are ignored, because the
+ * caller has already said those parts vary without changing what the alert
+ * is. Otherwise identity falls back to (level, source, message, caller meta),
+ * with this module's own bookkeeping keys ignored either way.
  *
  * Exported so the unit test can assert what does and does not count as "the
  * same alert" without going near a database.
@@ -207,7 +252,16 @@ export function alertIdentity(row: {
   message: string;
   meta?: unknown;
 }): string {
-  return stableStringify([row.level, row.source, row.message, stripReserved(asObject(row.meta))]);
+  const meta = asObject(row.meta);
+  const dedupeKey = dedupeKeyOf(meta);
+  if (dedupeKey) return stableStringify([row.level, row.source, dedupeKey]);
+  return stableStringify([row.level, row.source, row.message, stripReserved(meta)]);
+}
+
+/** The stored dedupe key on a row's meta, or null when it has none. */
+function dedupeKeyOf(meta: Record<string, unknown>): string | null {
+  const raw = meta[ALERT_DEDUPE_KEY_KEY];
+  return typeof raw === 'string' && raw.length > 0 ? raw : null;
 }
 
 /** How many occurrences a stored row stands for. An absent counter means one. */
@@ -229,7 +283,7 @@ export function lastSeenAtOf(meta: unknown): string | null {
 export interface AlertDbClient {
   systemAlert: {
     create: (args: unknown) => Promise<{ id: string }>;
-    findMany?: (args: unknown) => Promise<Array<{ id: string; meta: unknown }>>;
+    findMany?: (args: unknown) => Promise<Array<{ id: string; meta: unknown; message?: string }>>;
     update?: (args: unknown) => Promise<unknown>;
   };
 }
@@ -300,21 +354,96 @@ async function findOpenDuplicate(
 ): Promise<{ id: string; meta: unknown } | null> {
   if (!db.systemAlert.findMany) return null;
 
+  const hasDedupeKey = dedupeKeyOf(asObject(row.meta)) !== null;
+
   const candidates = await db.systemAlert.findMany({
     where: {
       level: row.level,
       source: row.source,
-      message: row.message,
       resolvedAt: null,
+      // A dedupe key is allowed to outlive a change in `message` (that is the
+      // point of it), so only the default identity may narrow the query on it
+      // too — narrowing here for a dedupeKey row would miss the very rows it
+      // is meant to fold into.
+      ...(hasDedupeKey ? {} : { message: row.message }),
     },
     orderBy: { createdAt: 'desc' },
     take: DEDUPE_CANDIDATE_LIMIT,
-    select: { id: true, meta: true },
+    select: { id: true, meta: true, message: true },
   });
 
   const identity = alertIdentity(row);
   for (const candidate of candidates) {
-    if (alertIdentity({ ...row, meta: candidate.meta }) === identity) return candidate;
+    // Built from the *candidate's own* stored message, never `row.message`:
+    // when a dedupe key is in play the query above no longer guarantees the
+    // two messages match, so borrowing `row.message` here would compute a
+    // false identity for a legacy candidate that has no dedupe key of its own.
+    const candidateIdentity = alertIdentity({
+      level: row.level,
+      source: row.source,
+      message: candidate.message ?? row.message,
+      meta: candidate.meta,
+    });
+    if (candidateIdentity === identity) return { id: candidate.id, meta: candidate.meta };
   }
   return null;
+}
+
+/** What `resolveAlerts` matches an open alert against. */
+export interface ResolveAlertsSelector {
+  source: string;
+  /** Only close alerts whose meta contains every one of these key/value pairs. */
+  meta?: Record<string, unknown>;
+}
+
+function metaContains(actual: Record<string, unknown>, expected: Record<string, unknown>): boolean {
+  return Object.entries(expected).every(([key, value]) => actual[key] === value);
+}
+
+/**
+ * Close every open alert matching `selector` — the producer side of
+ * TASK-MTVFJTNW6OW11. `resolvedAt` was, until this, written only by a human
+ * clicking "mark resolved" in the admin console
+ * (`src/app/[locale]/admin/alerts/actions.ts`), so an alert whose underlying
+ * condition already cleared stayed open forever. Call this from the same
+ * code path that raised the alert, once it observes the condition is no
+ * longer true — see `createInvoiceForPayment` for the shape.
+ *
+ * Same contract as `recordAlert`: never throws, never logs a secret. A
+ * resolve that cannot run (client lacks `findMany`/`update`, or the query
+ * fails) simply resolves nothing; it must not turn a successful run into a
+ * failed one.
+ */
+export async function resolveAlerts(
+  selector: ResolveAlertsSelector,
+  options: { client?: AlertDbClient } = {}
+): Promise<{ resolved: number }> {
+  const db: AlertDbClient = options.client ?? (prisma as unknown as AlertDbClient);
+  if (!db.systemAlert.findMany || !db.systemAlert.update) return { resolved: 0 };
+
+  try {
+    const candidates = await db.systemAlert.findMany({
+      where: { source: selector.source, resolvedAt: null },
+      select: { id: true, meta: true },
+    });
+
+    const matches = selector.meta
+      ? candidates.filter((c) => metaContains(asObject(c.meta), selector.meta!))
+      : candidates;
+
+    for (const row of matches) {
+      await db.systemAlert.update({
+        where: { id: row.id },
+        data: {
+          resolvedAt: new Date(),
+          meta: { ...asObject(row.meta), [ALERT_RESOLVED_BY_KEY]: 'producer' },
+        },
+      });
+    }
+
+    return { resolved: matches.length };
+  } catch (error) {
+    console.error(`[resolveAlerts] could not resolve SystemAlert rows: ${errorMessage(error)}`);
+    return { resolved: 0 };
+  }
 }
