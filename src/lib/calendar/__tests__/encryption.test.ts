@@ -12,6 +12,21 @@ const SAMPLE_HEX_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef01234567
 const SAMPLE_PASSPHRASE = 'fabrika-super-secret-calendar-passphrase-2026';
 const SAMPLE_TOKEN = 'ya29.a0ARrdaM-GoogleOAuthAccessTokenSample_987654321_secret';
 
+/**
+ * The three hex fields of an envelope payload (`<iv>:<tag>:<cipher>`). The
+ * envelope layout is itself part of what these tests assert, so a payload that
+ * does not carry exactly three fields is a failure worth naming — not an
+ * `undefined` that silently flows into a tampering fixture and turns a
+ * "tamper is rejected" test into a test of the string "undefined".
+ */
+function envelopeParts(payload: string): { iv: string; tag: string; cipher: string } {
+  const [iv, tag, cipher, ...rest] = payload.split(':');
+  if (iv === undefined || tag === undefined || cipher === undefined || rest.length > 0) {
+    throw new Error(`expected exactly 3 envelope fields, got "${payload}"`);
+  }
+  return { iv, tag, cipher };
+}
+
 describe('Calendar token AES-256-GCM encryption', () => {
   describe('key resolution', () => {
     it('resolves 64-char hex key to 32 bytes', () => {
@@ -79,12 +94,13 @@ describe('Calendar token AES-256-GCM encryption', () => {
       const parts = payload.split(':');
 
       expect(parts.length).toBe(3);
+      const { iv, tag, cipher } = envelopeParts(payload);
       // IV is 12 bytes = 24 hex characters
-      expect(parts[0].length).toBe(24);
+      expect(iv.length).toBe(24);
       // AuthTag is 16 bytes = 32 hex characters
-      expect(parts[1].length).toBe(32);
+      expect(tag.length).toBe(32);
       // Ciphertext hex is non-empty
-      expect(parts[2].length).toBeGreaterThan(0);
+      expect(cipher.length).toBeGreaterThan(0);
     });
   });
 
@@ -122,7 +138,7 @@ describe('Calendar token AES-256-GCM encryption', () => {
     it('fails decryption if ciphertext is tampered with', () => {
       const encrypted = encryptCalendarToken(SAMPLE_TOKEN, SAMPLE_HEX_KEY);
       const payload = encrypted.slice(ENVELOPE_PREFIX.length);
-      const [iv, tag, cipher] = payload.split(':');
+      const { iv, tag, cipher } = envelopeParts(payload);
 
       // Flip the first byte of ciphertext
       const tamperedCipher = (cipher.startsWith('00') ? 'ff' : '00') + cipher.slice(2);
@@ -136,7 +152,7 @@ describe('Calendar token AES-256-GCM encryption', () => {
     it('fails decryption if auth tag is tampered with', () => {
       const encrypted = encryptCalendarToken(SAMPLE_TOKEN, SAMPLE_HEX_KEY);
       const payload = encrypted.slice(ENVELOPE_PREFIX.length);
-      const [iv, tag, cipher] = payload.split(':');
+      const { iv, tag, cipher } = envelopeParts(payload);
 
       const tamperedTag = (tag.startsWith('00') ? 'ff' : '00') + tag.slice(2);
       const tamperedEnvelope = `${ENVELOPE_PREFIX}${iv}:${tamperedTag}:${cipher}`;

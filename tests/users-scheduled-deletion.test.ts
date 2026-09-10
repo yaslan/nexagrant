@@ -71,6 +71,19 @@ const daysAgo = (n: number) => {
   return d;
 };
 
+/**
+ * The first argument of a recorded mock call. `mock.calls[0][0]` is two
+ * unchecked index reads whose safety comes from the `toHaveBeenCalled…`
+ * assertion above; this makes that check real, so a purge that never wrote the
+ * row fails naming the missing call instead of dying inside `expect`.
+ */
+type RecordedCalls = { mock: { calls: unknown[][] } };
+function firstCallArg<T>(fn: RecordedCalls): T {
+  const call = fn.mock.calls[0];
+  if (!call) throw new Error(`expected at least 1 call, recorded ${fn.mock.calls.length}`);
+  return call[0] as T;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   findMany.mockResolvedValue([]);
@@ -133,7 +146,8 @@ describe('purgeDueUsers — grace period', () => {
   test('honours a custom grace period', async () => {
     await purgeDueUsers(7);
 
-    const cutoff: Date = findMany.mock.calls[0][0].where.deletionRequestedAt.lte;
+    const cutoff: Date = firstCallArg<{ where: { deletionRequestedAt: { lte: Date } } }>(findMany)
+      .where.deletionRequestedAt.lte;
     expect(Math.abs(cutoff.getTime() - daysAgo(7).getTime())).toBeLessThan(1000);
   });
 });
@@ -192,8 +206,9 @@ describe('purgeDueUsers — erasure', () => {
     await purgeDueUsers(30);
 
     expect(auditCreate).toHaveBeenCalledTimes(1);
-    expect(auditCreate.mock.calls[0][0].data.tenantId).toBeUndefined();
-    expect(auditCreate.mock.calls[0][0].data.data.reason).toBe('subject_request');
+    const audit = firstCallArg<{ data: { tenantId?: string; data: { reason: string } } }>(auditCreate);
+    expect(audit.data.tenantId).toBeUndefined();
+    expect(audit.data.data.reason).toBe('subject_request');
   });
 
   test('one failed purge does not abort the rest of the batch', async () => {
@@ -232,7 +247,7 @@ describe('purgeDueUsers — a failed run raises an alarm', () => {
 
     expect(result.failedCount).toBe(1);
     expect(alertCreate).toHaveBeenCalledTimes(1);
-    const row = alertCreate.mock.calls[0][0].data;
+    const row = firstCallArg<{ data: Record<string, unknown> }>(alertCreate).data;
     expect(row.level).toBe('error');
     expect(row.source).toBe('users-scheduled-deletion');
     expect(row.meta).toMatchObject({
@@ -298,6 +313,8 @@ describe('purgeDueUsers — a failed run raises an alarm', () => {
 
     expect(alertCreate).not.toHaveBeenCalled();
     expect(alertUpdate).toHaveBeenCalledTimes(1);
-    expect(alertUpdate.mock.calls[0][0].data.meta.alertRepeatCount).toBe(2);
+    expect(
+      firstCallArg<{ data: { meta: { alertRepeatCount: number } } }>(alertUpdate).data.meta.alertRepeatCount
+    ).toBe(2);
   });
 });

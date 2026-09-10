@@ -87,10 +87,10 @@ test.describe('Row Level Security (RLS) Isolation', () => {
     });
 
     expect(wsFromA).toHaveLength(1);
-    expect(wsFromA[0].id).toBe(wsA.id);
+    expect(wsFromA[0]?.id).toBe(wsA.id);
 
     expect(wsFromB).toHaveLength(1);
-    expect(wsFromB[0].id).toBe(wsB.id);
+    expect(wsFromB[0]?.id).toBe(wsB.id);
   });
 
   test('RLS policy blocks cross-tenant access at database level', async () => {

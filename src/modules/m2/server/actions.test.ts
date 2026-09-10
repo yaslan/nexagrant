@@ -96,7 +96,9 @@ describe('m2 actions — phantom relation regression', () => {
       });
 
       // the topic's title reached the RAG search and the generated prompt
-      expect(vi.mocked(retrieveChunks).mock.calls[0][0]).toContain('HORIZON-CL5-2026');
+      const ragCall = vi.mocked(retrieveChunks).mock.calls[0];
+      expect(ragCall, 'retrieveChunks was never called').toBeDefined();
+      expect(ragCall?.[0]).toContain('HORIZON-CL5-2026');
     });
 
     it('skips the topic lookup and still drafts when the opportunity has no topicId', async () => {
@@ -157,7 +159,12 @@ describe('m2 actions — phantom relation regression', () => {
       expect(typeof base64).toBe('string');
       expect(base64.length).toBeGreaterThan(0);
 
-      const noteFindArgs = vi.mocked(prisma.conceptNote.findFirst).mock.calls[0][0];
+      const noteFindCall = vi.mocked(prisma.conceptNote.findFirst).mock.calls[0];
+      expect(noteFindCall, 'conceptNote.findFirst was never called').toBeDefined();
+      const noteFindArgs = noteFindCall?.[0];
+      // Without this the next assertion would pass on `undefined` — nothing has
+      // the property "include", least of all a call that never happened.
+      expect(noteFindArgs).toBeDefined();
       expect(noteFindArgs).not.toHaveProperty('include');
 
       expect(prisma.opportunity.findFirst).toHaveBeenCalledWith({

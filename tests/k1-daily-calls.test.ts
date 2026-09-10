@@ -24,8 +24,10 @@ live('K1 Adapters', () => {
       const adapter = new SediaAdapter();
       const result = await adapter.searchSedia({ pageSize: 1, maxPages: 1 });
 
-      if (result.topics.length > 0) {
-        const topic = result.topics[0];
+      // Narrow on the element, not on `.length`: the adapter may legitimately
+      // return nothing, and only the element itself proves there is one to read.
+      const topic = result.topics[0];
+      if (topic) {
         expect(topic).toHaveProperty('identifier');
         expect(topic).toHaveProperty('title');
         expect(['FORTHCOMING', 'OPEN', 'CLOSED']).toContain(topic.status);

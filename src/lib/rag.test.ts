@@ -56,6 +56,23 @@ import { AiUsageLogWriteError } from './llm';
 
 const attribution = { tenantId: 'tenant_1', module: 'K6', purpose: 'rag_search_embedding' };
 
+/**
+ * One recorded argument of a mock call. Reading `mock.calls[0][1]` inline is an
+ * unchecked index read; what makes it safe is the "the call happened" assertion
+ * above it, so the missing-call case is checked here and reported by name. The
+ * argument itself is returned as-is — when the production code passes the wrong
+ * value (`undefined` included) the caller's `toEqual` must show that as a diff,
+ * not be pre-empted by a throw from this helper.
+ */
+type RecordedCalls = { mock: { calls: unknown[][] } };
+function callArg<T>(fn: RecordedCalls, callIndex: number, argIndex: number): T {
+  const call = fn.mock.calls[callIndex];
+  if (!call) {
+    throw new Error(`expected at least ${callIndex + 1} call(s), recorded ${fn.mock.calls.length}`);
+  }
+  return call[argIndex] as T;
+}
+
 describe('getEmbedding — the fallback may not hide an unlogged call', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -67,7 +84,7 @@ describe('getEmbedding — the fallback may not hide an unlogged call', () => {
     await getEmbedding('some query', attribution);
 
     expect(embedTextMock).toHaveBeenCalledTimes(1);
-    expect(embedTextMock.mock.calls[0][1]).toEqual(attribution);
+    expect(callArg<unknown>(embedTextMock, 0, 1)).toEqual(attribution);
   });
 
   it('refuses to invent a vector when no key is configured', async () => {
@@ -90,7 +107,7 @@ describe('getEmbedding — the fallback may not hide an unlogged call', () => {
 
     await getEmbedding('some query', attribution);
 
-    expect(embedTextMock.mock.calls[0][2]).toEqual({ dimensions: 1536 });
+    expect(callArg<unknown>(embedTextMock, 0, 2)).toEqual({ dimensions: 1536 });
   });
 
   it('does not write a chunk when the embedding call fails', async () => {
@@ -135,7 +152,7 @@ describe('getEmbedding — the fallback may not hide an unlogged call', () => {
 
     await ingestDocument('title', 'body text', 'tenant_upload', 'tenant_1', { userId: 'user_1' });
 
-    expect(embedTextMock.mock.calls[0][1]).toEqual({
+    expect(callArg<unknown>(embedTextMock, 0, 1)).toEqual({
       tenantId: 'tenant_1',
       userId: 'user_1',
       module: 'K6',
@@ -150,7 +167,7 @@ describe('getEmbedding — the fallback may not hide an unlogged call', () => {
 
     await ingestDocument('CORDIS row', 'body text', 'CORDIS_PROJECT');
 
-    expect(embedTextMock.mock.calls[0][1].tenantId).toBeNull();
+    expect(callArg<{ tenantId: string | null }>(embedTextMock, 0, 1).tenantId).toBeNull();
   });
 });
 

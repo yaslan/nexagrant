@@ -352,19 +352,35 @@ describe('plan card copy matches grantsFor() exactly (tr + en)', () => {
     return /sınırsız|unlimited/i.test(label);
   }
 
+  /** The three copy lines a plan card renders, as the message catalogue stores them. */
+  type PlanCardCopy = { seats: string; credits: string; modules: string };
+
+  /**
+   * A missing plan card is a real failure, not a type nuisance: the message
+   * catalogue is keyed by plan id and a plan with no card ships a blank panel.
+   * Under `noUncheckedIndexedAccess` the lookup is honestly `… | undefined`, so
+   * the check that used to be a `toBeDefined()` assertion is done here — it
+   * still fails the test that needs the card, still names which locale/plan is
+   * missing, and now narrows the value for the rest of the test body.
+   */
+  function requireCard(card: PlanCardCopy | undefined, label: string): PlanCardCopy {
+    if (!card) throw new Error(`plan card missing for "${label}"`);
+    return card;
+  }
+
   for (const [locale, messages] of [
     ['tr', trMessages],
     ['en', enMessages],
   ] as const) {
-    const cards = (messages as { billingPanels: { settings: { plans: Record<string, { seats: string; credits: string; modules: string }> } } })
+    const cards = (messages as { billingPanels: { settings: { plans: Record<string, PlanCardCopy> } } })
       .billingPanels.settings.plans;
 
     for (const planId of PLAN_IDS) {
       const grant = grantsFor(planId)!;
-      const card = cards[planId];
+      const maybeCard = cards[planId];
 
       it(`${locale}/${planId}: modules line names exactly grantsFor('${planId}').moduleIds`, () => {
-        expect(card, `${locale} plan card missing for "${planId}"`).toBeDefined();
+        const card = requireCard(maybeCard, `${locale}/${planId}`);
         const named = parseModuleIds(card.modules);
         const grantedSet = [...grant.moduleIds].sort();
         expect(
@@ -374,6 +390,7 @@ describe('plan card copy matches grantsFor() exactly (tr + en)', () => {
       });
 
       it(`${locale}/${planId}: seats/credits figures match grantsFor('${planId}')`, () => {
+        const card = requireCard(maybeCard, `${locale}/${planId}`);
         expect(claimsUnlimited(card.seats) ? Infinity : parseCount(card.seats)).toBe(
           claimsUnlimited(card.seats) ? Infinity : grant.seats
         );

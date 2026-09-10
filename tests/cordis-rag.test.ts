@@ -186,13 +186,13 @@ describe('RAG helpers', () => {
     const text = 'A'.repeat(4000);
     const chunks = splitText(text);
     expect(chunks.length).toBeGreaterThan(2);
-    expect(chunks[0].length).toBe(1500);
+    expect(chunks[0]?.length).toBe(1500);
   });
 
   test('retrieveChunks returns top-K vector search matches with similarity scores', async () => {
     const chunks = await retrieveChunks('Zero-emission battery', 3);
     expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks[0].score).toBeGreaterThan(0.5);
+    expect(chunks[0]?.score).toBeGreaterThan(0.5);
   });
 
   test('buildRagPrompt formats retrieved chunks into LLM prompt', async () => {

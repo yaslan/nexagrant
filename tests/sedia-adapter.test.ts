@@ -25,9 +25,10 @@ live('SediaAdapter & Live SEDIA Search API', () => {
     expect(result.topics.length).toBeGreaterThan(0);
 
     const firstTopic = result.topics[0];
-    expect(firstTopic.identifier).toBeDefined();
-    expect(firstTopic.title).toBeDefined();
-    expect(['FORTHCOMING', 'OPEN', 'CLOSED']).toContain(firstTopic.status);
+    expect(firstTopic).toBeDefined();
+    expect(firstTopic?.identifier).toBeDefined();
+    expect(firstTopic?.title).toBeDefined();
+    expect(['FORTHCOMING', 'OPEN', 'CLOSED']).toContain(firstTopic?.status);
   }, 10000);
 
   it('should format framework programme filters correctly', async () => {

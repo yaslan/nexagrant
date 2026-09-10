@@ -14,7 +14,8 @@ describe('Translation Utility', () => {
     ];
 
     const translated = await translateTopicsBatch(topics, 'tr');
-    expect(translated[0].title).not.toEqual('Digital democracy and civic engagement');
-    expect(translated[1].title).not.toEqual('Quantum computing algorithms for SMEs');
+    expect(translated).toHaveLength(2);
+    expect(translated[0]?.title).not.toEqual('Digital democracy and civic engagement');
+    expect(translated[1]?.title).not.toEqual('Quantum computing algorithms for SMEs');
   });
 });

@@ -58,6 +58,26 @@ const attribution = {
   purpose: 'rag_ingest_embedding',
 };
 
+/**
+ * One recorded argument of a mock call. `fn.mock.calls[0][0]` reads two
+ * unchecked indexes; both are guaranteed here only by the `toHaveBeenCalled…`
+ * assertion above the read, so this turns that guarantee into a check. A missing
+ * call now fails the test saying so, rather than throwing
+ * "Cannot read properties of undefined" from inside `expect`.
+ */
+type RecordedCalls = { mock: { calls: unknown[][] } };
+function callArg<T>(fn: RecordedCalls, callIndex: number, argIndex = 0): T {
+  const call = fn.mock.calls[callIndex];
+  if (!call) {
+    throw new Error(`expected at least ${callIndex + 1} call(s), recorded ${fn.mock.calls.length}`);
+  }
+  const arg = call[argIndex];
+  if (arg === undefined) {
+    throw new Error(`call #${callIndex} has no argument #${argIndex}`);
+  }
+  return arg as T;
+}
+
 describe('embedText — every provider call leaves an AiUsageLog row', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -86,7 +106,7 @@ describe('embedText — every provider call leaves an AiUsageLog row', () => {
 
     await embedText(SECRET_TEXT, attribution);
 
-    const { data } = mockPrisma.aiUsageLog.create.mock.calls[0][0];
+    const { data } = callArg<{ data: Record<string, unknown> }>(mockPrisma.aiUsageLog.create, 0);
     expect(data).toMatchObject({
       tenantId: 'tenant_1',
       userId: 'user_1',
@@ -104,7 +124,7 @@ describe('embedText — every provider call leaves an AiUsageLog row', () => {
 
     await embedText(SECRET_TEXT, attribution);
 
-    const { data } = mockPrisma.aiUsageLog.create.mock.calls[0][0];
+    const { data } = callArg<{ data: Record<string, unknown> }>(mockPrisma.aiUsageLog.create, 0);
     const expectedHash = crypto
       .createHash('sha256')
       .update(SECRET_TEXT)
@@ -130,7 +150,7 @@ describe('embedText — every provider call leaves an AiUsageLog row', () => {
       purpose: 'rag_ingest_embedding',
     });
 
-    const { data } = mockPrisma.aiUsageLog.create.mock.calls[0][0];
+    const { data } = callArg<{ data: Record<string, unknown> }>(mockPrisma.aiUsageLog.create, 0);
     expect(data.tenantId).toBe(PLATFORM_SCOPE_TENANT_ID);
     expect(data.userId).toBeUndefined();
   });
@@ -143,7 +163,7 @@ describe('embedText — every provider call leaves an AiUsageLog row', () => {
 
     await embedText(SECRET_TEXT, attribution);
 
-    expect(mockPrisma.aiUsageLog.create.mock.calls[0][0].data.credits).toBe(0);
+    expect(callArg<{ data: { credits: number } }>(mockPrisma.aiUsageLog.create, 0).data.credits).toBe(0);
   });
 
   it('requests 1536 dimensions, matching the Chunk.embedding column', async () => {
@@ -151,7 +171,7 @@ describe('embedText — every provider call leaves an AiUsageLog row', () => {
 
     await embedText(SECRET_TEXT, attribution);
 
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const body = JSON.parse(callArg<{ body: string }>(fetchMock, 0, 1).body);
     expect(body.dimensions).toBe(1536);
   });
 

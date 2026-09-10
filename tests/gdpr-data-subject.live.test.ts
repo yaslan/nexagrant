@@ -261,8 +261,8 @@ describe.skipIf(!HAS_DB)('GDPR export — live', () => {
 
     // Present: the subject's own rows.
     expect(tables.User).toHaveLength(1);
-    expect((tables.User[0] as { id: string }).id).toBe(ids.subject);
-    expect(tables.Opportunity.map((o) => (o as { id: string }).id)).toEqual([ids.oppSubject]);
+    expect((tables.User?.[0] as { id: string } | undefined)?.id).toBe(ids.subject);
+    expect((tables.Opportunity ?? []).map((o) => (o as { id: string }).id)).toEqual([ids.oppSubject]);
     expect(tables.Effort).toHaveLength(1);
     expect(tables.Evaluation).toHaveLength(1);
     expect(tables.AiUsageLog).toHaveLength(1);

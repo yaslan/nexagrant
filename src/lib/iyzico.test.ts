@@ -46,14 +46,49 @@ const SECRET = 'test-secret-key';
 const TENANT = 'tenant_try_1';
 
 /**
- * The mocked client, typed loosely on purpose: every leaf is a `vi.fn()` and
- * the tests only ever read `.mock.calls`, so mirroring PrismaClient's real
- * types here would add noise without catching anything.
+ * The mocked client. Every leaf is a `vi.fn()` and the tests only ever read
+ * `.mock.calls`, so mirroring PrismaClient's real argument types here would add
+ * noise without catching anything. The *table* list, however, is spelled out
+ * instead of an index signature: under `noUncheckedIndexedAccess` a
+ * `Record<string, …>` hands back `… | undefined` on every lookup, and the honest
+ * answer is that `db.tenant` is never undefined — the fake above defines it. An
+ * explicit shape says that, and additionally makes a typo (`db.tenat`) a compile
+ * error instead of a silent `undefined`.
  */
 type MockFn = ReturnType<typeof vi.fn>;
-type MockedPrisma = Record<string, Record<string, MockFn> & MockFn>;
+type MockModel<K extends string> = Record<K, MockFn>;
+type MockedPrisma = {
+  tenant: MockModel<'findUnique'>;
+  plan: MockModel<'findUnique'>;
+  planVersion: MockModel<'findFirst'>;
+  subscription: MockModel<'findUnique' | 'upsert'>;
+  creditLedger: MockModel<'create'>;
+  moduleState: MockModel<'upsert'>;
+  auditEvent: MockModel<'findFirst' | 'create'>;
+  invoice: MockModel<'findFirst' | 'create'>;
+  tenantBillingIdentity: MockModel<'findUnique'>;
+  systemAlert: MockModel<'create' | 'findMany' | 'update'>;
+  $executeRaw: MockFn;
+  $transaction: MockFn;
+};
 
 const db = prisma as unknown as MockedPrisma;
+
+/**
+ * The first argument of the `index`-th recorded call. Reading
+ * `fn.mock.calls[index][0]` inline is an unchecked index read; the reason it is
+ * safe at every call site below is the `toHaveBeenCalledTimes` assertion that
+ * precedes it, so this makes that reason executable. When the call is missing
+ * the test fails naming what it expected, instead of dying on
+ * "Cannot read properties of undefined".
+ */
+function nthCallArg<T>(fn: MockFn, index: number): T {
+  const call: unknown[] | undefined = fn.mock.calls[index];
+  if (!call) {
+    throw new Error(`expected at least ${index + 1} call(s), recorded ${fn.mock.calls.length}`);
+  }
+  return call[0] as T;
+}
 
 function planRow(id: string, credits: number, modules: string[]) {
   return { id, name: id, monthlyCents: 0, yearlyCents: 0, currency: 'USD', seats: 3, workspaces: 1, aiCreditsMonthly: credits, modules };
@@ -256,7 +291,7 @@ describe('handleIyzicoWebhook', () => {
     });
 
     expect(db.subscription.upsert).toHaveBeenCalledTimes(1);
-    const upsert = db.subscription.upsert.mock.calls[0][0];
+    const upsert = nthCallArg<{ where: unknown; create: Record<string, unknown> }>(db.subscription.upsert, 0);
     expect(upsert.where).toEqual({ tenantId: TENANT });
     expect(upsert.create).toMatchObject({ provider: 'iyzico', status: 'ACTIVE', planId: 'pro' });
 
@@ -267,7 +302,7 @@ describe('handleIyzicoWebhook', () => {
     );
     expect(auditTypes).toEqual(['subscription.updated', 'invoice.payment_succeeded']);
 
-    const invoice = db.auditEvent.create.mock.calls[1][0].data.data;
+    const invoice = nthCallArg<{ data: { data: { amountMinor: number } } }>(db.auditEvent.create, 1).data.data;
     expect(invoice).toMatchObject({ amountMinor: 785_000, currency: 'TRY', provider: 'iyzico' });
     expect(Number.isInteger(invoice.amountMinor)).toBe(true);
   });
@@ -300,7 +335,7 @@ describe('handleIyzicoWebhook', () => {
 
     expect(result).toMatchObject({ success: true, invoiceNumber: 'FB-2026-000001' });
     expect(db.invoice.create).toHaveBeenCalledTimes(1);
-    const row = db.invoice.create.mock.calls[0][0].data;
+    const row = nthCallArg<{ data: Record<string, unknown> }>(db.invoice.create, 0).data;
     expect(row).toMatchObject({
       tenantId: TENANT,
       buyerVknTckn: '2840958172',
