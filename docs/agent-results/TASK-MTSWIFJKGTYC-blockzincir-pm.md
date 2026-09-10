@@ -308,3 +308,12 @@ Geçici dosyalar (`brandprobe.tmp.mjs`, dev sunucu günlüğü) silindi / scratc
 ### Commit kanıtı
 
 Bkz. aşağıya eklenen `git show --name-only` çıktısı.
+
+```
+$ git show --name-only --oneline HEAD
+c07c71b docs(legal): measure the privacy notice against KVKK art.10, leave the gaps named
+docs/agent-results/TASK-MTSWIFJKGTYC-blockzincir-pm.md
+docs/legal/privacy-notice-gap-analysis.md
+```
+
+Yalnızca iki doküman; ürün kodu, `messages/*.json`, `prisma/` ve Task Board dokunulmadan kaldı.
