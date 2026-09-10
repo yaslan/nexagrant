@@ -4,6 +4,7 @@
 - [m6-scoring-complete](m6-scoring-complete.md) — M6.3 Scoring Logic tamamlandı — puanlama motor, ESR comparison, validation + tests all passing, gate clean
 
 - [fabrika-withholding-label-pattern](fabrika-withholding-label-pattern.md) — Vergi oranı etiketlerini (KDV, tevkifat) satırlardan türet, hardcoded yazma; single-source dönüştürme fonksiyonu kullan
+- [fabrika-ubl-tr-withholding-line-subtotal](fabrika-ubl-tr-withholding-line-subtotal.md) — UBL-TR satır seviyesinde tevkifat TaxSubtotal; yapı, doğrulama, geçersiz oran gotchası
 
 - [fabrika-tsx-script-must-live-in-repo-root](fabrika-tsx-script-must-live-in-repo-root.md) — Fabrika'da tek seferlik DB sorgusu için tsx script'i scratchpad'e değil repo köküne yaz — Prisma client generated/prisma/client'ta ve driver adapter istiyor, dışarıdan import çözülmez
 
@@ -48,3 +49,12 @@
 - [fabrika-test-timing-e2e-parse-time-measurement](fabrika-test-timing-e2e-parse-time-measurement.md) — E2E test'te parse-time initialization ölçmek için chunk delay stratejisi, bidirectional kanıt
 - [fabrika-theme-is-a-server-resolved-cookie](fabrika-theme-is-a-server-resolved-cookie.md) — Fabrika'da tema artık fabrika-theme çerezinden SUNUCUDA çözülüyor ve html etiketine basılıyor; theme-init.js yok, localStorage yok — Next kendi Vary'sini yazdığı için config'teki Vary satırı boşa gidiyor
 - [next-script-beforeinteractive](next-script-beforeinteractive.md) — next/script ile beforeInteractive stratejisi, head'te dangerouslySetInnerHTML script'ini React uyarısı olmadan inject eder
+
+- [fabrika-rls-audit-check-four-things-not-one](fabrika-rls-audit-check-four-things-not-one.md) — RLS kapsam denetiminde schema-vs-rls.sql isim karsilastirmasi yetmez - FK-ile-bagli tablolar, nullable tenantId ile politika uyusmazligi ve migration-vs-rls.sql sapmasi ayrica bakilir
+
+- [fabrika-fiscal-document-i18n-split](fabrika-fiscal-document-i18n-split.md) — Mali bir belgeyi i18n'lerken metni ikiye ayır — GİB/UBL-TR'nin bir şeye verdiği ad (VKN, ETTN, e-Fatura, KDV, Tevkifat, TICARIFATURA) her dilde Türkçe kalır, sayfayı anlatan etiket katalogdan okunur; XML üretici etiket tablosunu OKUMAMALI
+
+- [fabrika-e2e-fixture-email-collision-timestamp](fabrika-e2e-fixture-email-collision-timestamp.md) — E2E fixture'lar sabit e-posta kullanırsa başka test'in failed teardown'undan collision; timestamp unique + paranoid cleanup çözer (TASK-MTV65O6EUHJ52)
+
+- [fabrika-webhook-paths-have-no-locale-context](fabrika-webhook-paths-have-no-locale-context.md) — Fabrika'da webhook/arka-plan yollarinda kullaniciya giden metnin dili YALNIZ Tenant.locale'den gelir (istek yok, next-intl yok) — ve o DB okumasi handler'in try blogunun ICINE konur
+- [fabrika-verification-garbage-needs-a-signature](fabrika-verification-garbage-needs-a-signature.md) — Elle DB doğrulaması yapan her fixture benzersiz bir imza taşımalı + aynı oturumda dar kapsamlı silinmeli; yoksa gerçek veriden ayrılamaz kalıcı çöp olur (TASK-MTVN8M702FU5A)
