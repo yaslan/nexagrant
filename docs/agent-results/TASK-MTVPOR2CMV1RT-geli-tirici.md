@@ -217,6 +217,23 @@ $ npx vitest run  → exit 0
       Tests  1841 passed | 8 skipped (1849)
 ```
 
+### 3.7 Commit sonrası not — ağaç kırmızıysa bu dilim değil
+
+Commit anında (`01ae1be`) kapılar yeşildi ve `githooks/pre-commit` (eslint + tsc)
+temiz geçti. Birkaç dakika sonra ağaçta `pnpm typecheck` ve `npx vitest run` kırmızıya
+döndü; kaynağı **komşunun henüz commit'lenmemiş dosyası**:
+
+```
+$ git status --porcelain -- tests/pipeline-surface-tenant-scope.live.test.ts
+?? tests/pipeline-surface-tenant-scope.live.test.ts
+
+tests/pipeline-surface-tenant-scope.live.test.ts(208,21): error TS2339:
+  Property 'feedbackId' does not exist on type 'SubmitFeedbackResult'.
+```
+
+Bu dilimin 8 kaynak + 3 test dosyasının hiçbiri listede yok, ve kendi testlerim
+yeşil kalıyor (`7 passed (7)`). Kırmızı, dosyanın sahibi commit'leyince kapanır.
+
 ---
 
 ## 4) Değişen dosyalar
