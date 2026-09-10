@@ -11,6 +11,7 @@ import {
   vatOnNetMinor,
   withholdingOnVatMinor,
 } from './money';
+import { withBrand } from './brand';
 import trMessages from '../../messages/tr.json';
 import enMessages from '../../messages/en.json';
 
@@ -32,6 +33,23 @@ const INVOICE_CATALOGS = { tr: trMessages.invoice, en: enMessages.invoice };
 
 function invoiceLabels(locale?: InvoiceLocale) {
   return INVOICE_CATALOGS[locale === 'en' ? 'en' : 'tr'];
+}
+
+/**
+ * What an invoice line says when the payment provider sent no description of its own.
+ *
+ * Lives here because the wording belongs to the `invoice` namespace this module already
+ * owns, and because the writers that need it — the Stripe webhook in
+ * `src/lib/billing/subscription-sync.ts` — are synchronous, non-React callers that can use
+ * neither `useTranslations()` nor `await getTranslations()`. Exported rather than copied so
+ * the namespace keeps one reader of {@link INVOICE_CATALOGS}.
+ *
+ * Takes a plain string because the caller's locale comes out of `Tenant.locale`, a free
+ * text column: an unrecognised value falls to Turkish, the column's own default, rather
+ * than throwing on a document that a customer has already paid for.
+ */
+export function invoiceLinePeriodFallback(locale?: string | null): string {
+  return withBrand(invoiceLabels(locale === 'en' ? 'en' : 'tr').linePeriodFallback);
 }
 
 /**

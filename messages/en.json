@@ -1775,6 +1775,7 @@
     "totalGrand": "TOTAL PAYABLE",
     "tryEquivalent": "Lira equivalent",
     "tryEquivalentUnrecorded": "Lira equivalent (no recorded amount)",
-    "footerFiled": "This invoice was issued electronically in accordance with Tax Procedure Law no. 213 (Vergi Usul Kanunu) and the e-invoice legislation of the Turkish Revenue Administration (Gelir İdaresi Başkanlığı), and submitted to GİB. Envelope no: {envelope}"
+    "footerFiled": "This invoice was issued electronically in accordance with Tax Procedure Law no. 213 (Vergi Usul Kanunu) and the e-invoice legislation of the Turkish Revenue Administration (Gelir İdaresi Başkanlığı), and submitted to GİB. Envelope no: {envelope}",
+    "linePeriodFallback": "{brand} subscription period"
   }
 }

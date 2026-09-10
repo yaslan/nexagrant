@@ -2,7 +2,6 @@ import Stripe from 'stripe';
 import type { SubStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { PRODUCT_NAME } from '@/lib/brand';
 import { getActiveTier } from '@/lib/billing/active-tier';
 import { CATALOG_CURRENCY, priceLine, UnknownSkuError } from '@/lib/billing/catalog';
 import {
@@ -13,6 +12,7 @@ import {
 } from '@/lib/billing/price-lock';
 import { publishedVersionIdFor } from '@/lib/billing/plan-repository';
 import { createInvoiceForPayment } from '@/lib/billing/invoice-writer';
+import { invoiceLinePeriodFallback } from '@/lib/efatura';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
@@ -637,6 +637,21 @@ export async function logInvoicePayment(
   // before this line, and the constraint stops a payment reaching the writer
   // twice by any other route.
   try {
+    // The language the fallback line is written in, when Stripe sends no
+    // description of its own. `Tenant.locale` is the only place this is recorded:
+    // a Stripe webhook carries no user and no request, so there is no
+    // Accept-Language and no next-intl context to inherit here.
+    //
+    // Read inside the `try` on purpose: this is a second database round-trip on a
+    // path whose whole point is that a database failure must not fail a payment
+    // that already succeeded. Outside it, a tenant lookup that threw would replay
+    // the webhook Stripe retries — the exact thing the catch below exists to stop.
+    // Read after the idempotency guard, so a redelivered event does not pay for it.
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { locale: true },
+    });
+
     await createInvoiceForPayment(
       prisma,
       {
@@ -644,7 +659,7 @@ export async function logInvoicePayment(
         paymentRef: invoice.id ?? eventId,
         amountMinor: invoice.amount_paid,
         currency: invoice.currency.toUpperCase(),
-        description: invoiceLineDescription(invoice),
+        description: invoiceLineDescription(invoice, tenant?.locale ?? null),
         paidAt: new Date(),
         provider: 'stripe',
       }
@@ -668,11 +683,16 @@ export async function logInvoicePayment(
  * description the line falls back to naming the period rather than inventing a
  * plan name — the invoice may be vague about the product, never wrong about it.
  *
- * TODO: fallback text is hard-coded English; should be bound to locale
- * and catalogued in messages/<locale>.json once createInvoiceForPayment
- * receives tenant locale.
+ * That fallback is printed onto a document the customer downloads, so it is
+ * catalogued in both languages like any other user-visible sentence (CLAUDE.md
+ * rule 8) and carries `{brand}` rather than the product name as a literal.
+ *
+ * The description Stripe itself sends is passed through untranslated on purpose:
+ * it is the wording the buyer accepted at checkout, and restating a line the
+ * customer agreed to in words we chose would make the invoice disagree with the
+ * sale. Only the sentence we author is ours to translate.
  */
-function invoiceLineDescription(invoice: Stripe.Invoice): string {
+function invoiceLineDescription(invoice: Stripe.Invoice, locale: string | null): string {
   const first = invoice.lines?.data?.[0]?.description?.trim();
-  return first && first.length > 0 ? first : `${PRODUCT_NAME} subscription period`;
+  return first && first.length > 0 ? first : invoiceLinePeriodFallback(locale);
 }

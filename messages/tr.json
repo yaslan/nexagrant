@@ -1775,6 +1775,7 @@
     "totalGrand": "ÖDENECEK GENEL TOPLAM",
     "tryEquivalent": "TL karşılığı",
     "tryEquivalentUnrecorded": "TL karşılığı (kayıtlı tutar yok)",
-    "footerFiled": "İşbu fatura 213 sayılı Vergi Usul Kanunu ve Gelir İdaresi Başkanlığı e-Fatura mevzuatına uygun olarak elektronik ortamda düzenlenmiş ve GİB'e iletilmiştir. Zarf No: {envelope}"
+    "footerFiled": "İşbu fatura 213 sayılı Vergi Usul Kanunu ve Gelir İdaresi Başkanlığı e-Fatura mevzuatına uygun olarak elektronik ortamda düzenlenmiş ve GİB'e iletilmiştir. Zarf No: {envelope}",
+    "linePeriodFallback": "{brand} abonelik dönemi"
   }
 }

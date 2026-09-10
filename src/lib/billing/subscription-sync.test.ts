@@ -14,6 +14,7 @@ vi.mock('@/lib/db', () => {
   const prisma: Record<string, unknown> = {
     auditEvent: { findFirst: vi.fn(), create: vi.fn() },
     invoice: { findFirst: vi.fn(), create: vi.fn() },
+    tenant: { findUnique: vi.fn() },
     tenantBillingIdentity: { findUnique: vi.fn() },
     systemAlert: { create: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   };
@@ -22,6 +23,9 @@ vi.mock('@/lib/db', () => {
 
 import { logInvoicePayment } from './subscription-sync';
 import { prisma } from '@/lib/db';
+import { PRODUCT_NAME } from '@/lib/brand';
+import trMessages from '../../../messages/tr.json';
+import enMessages from '../../../messages/en.json';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const db = prisma as any;
@@ -64,6 +68,7 @@ beforeEach(() => {
   db.systemAlert.create.mockResolvedValue({ id: 'alert_1' });
   db.systemAlert.findMany.mockResolvedValue([]);
   db.tenantBillingIdentity.findUnique.mockResolvedValue(IDENTITY);
+  db.tenant.findUnique.mockResolvedValue({ locale: 'tr' });
 });
 
 /**
@@ -123,6 +128,71 @@ describe('logInvoicePayment', () => {
 
     await expect(logInvoicePayment(paidInvoice(), 'evt_4')).resolves.toBeUndefined();
     expect(db.auditEvent.create).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * TASK-MTV8W14FY9BKD — the line Stripe does not send is a line we author, and
+   * it is printed onto a document the customer downloads. It must therefore be
+   * catalogued in both languages, and it must be the tenant's language.
+   *
+   * The locale is read from `Tenant.locale`: a Stripe webhook carries no user
+   * and no request, so there is no Accept-Language and no next-intl context to
+   * inherit from.
+   */
+  describe('when Stripe sends no line description', () => {
+    /** A paid invoice whose line carries no description at all. */
+    const noDescription = () => paidInvoice({ lines: { data: [{ description: '' }] } });
+
+    async function issuedLineName(locale: unknown, invoice = noDescription()) {
+      db.tenant.findUnique.mockResolvedValue(locale === undefined ? null : { locale });
+      await logInvoicePayment(invoice, `evt_loc_${String(locale)}`);
+      return db.invoice.create.mock.calls[0][0].data.lines[0].name;
+    }
+
+    it('writes the Turkish sentence for a Turkish tenant', async () => {
+      expect(await issuedLineName('tr')).toBe('FonBridge abonelik dönemi');
+    });
+
+    it('writes the English sentence for an English tenant', async () => {
+      expect(await issuedLineName('en')).toBe('FonBridge subscription period');
+    });
+
+    it('falls to Turkish — the column default — for a locale it does not know', async () => {
+      // `Tenant.locale` is a free-text column. An unrecognised value must not
+      // throw on an invoice the customer has already paid for.
+      expect(await issuedLineName('de')).toBe('FonBridge abonelik dönemi');
+    });
+
+    it('falls to Turkish when the tenant row cannot be read', async () => {
+      expect(await issuedLineName(undefined)).toBe('FonBridge abonelik dönemi');
+    });
+
+    it('carries the product name from PRODUCT_NAME, never as a catalogue literal', () => {
+      // The rename in 2026-Q1 was copied as a literal into 32 files. Neither
+      // catalogue may spell the brand out; both must carry the placeholder.
+      expect(trMessages.invoice.linePeriodFallback).toContain('{brand}');
+      expect(enMessages.invoice.linePeriodFallback).toContain('{brand}');
+      expect(trMessages.invoice.linePeriodFallback).not.toContain(PRODUCT_NAME);
+      expect(enMessages.invoice.linePeriodFallback).not.toContain(PRODUCT_NAME);
+    });
+
+    it('lets the payment stand when the tenant lookup itself fails', async () => {
+      // The locale read is a second database round-trip on a path whose whole
+      // point is that a database failure must not fail a payment that already
+      // succeeded. It must be caught like every other write here.
+      db.tenant.findUnique.mockRejectedValue(new Error('database is down'));
+
+      await expect(logInvoicePayment(noDescription(), 'evt_loc_down')).resolves.toBeUndefined();
+      expect(db.auditEvent.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('never translates the description Stripe itself sent', async () => {
+      // The wording the buyer accepted at checkout is passed through as-is, in
+      // any locale: an invoice that restates the sale in our words disagrees
+      // with the sale.
+      const name = await issuedLineName('en', paidInvoice());
+      expect(name).toBe('FonBridge Pro — aylık');
+    });
   });
 
   it('writes nothing at all when the subscription carries no tenant', async () => {
