@@ -207,6 +207,17 @@ src/lib/auth.ts:0
 src/app/[locale]/login/AuthCard.tsx:0
 ```
 
+### 2.7 The commit
+
+```
+38d2215 fix(auth): move the SME demo seat onto the company's own domain
+```
+
+The `githooks/pre-commit` gate ran on it and passed on the staged scope
+(`→ eslint (staged files)`, `→ tsc --noEmit`, `✓ Kapı temiz (staged kapsamı)`), which is the same
+result as 2.5 read one file at a time: this change is clean, the repo-wide gate is red for reasons
+that predate it.
+
 ---
 
 ## 3. Files changed
