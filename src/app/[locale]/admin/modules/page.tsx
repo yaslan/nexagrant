@@ -27,10 +27,12 @@ export default async function AdminModulesPage() {
 
     const allModuleStates = await prisma.moduleState.findMany();
     for (const s of allModuleStates) {
-      if (!initialStates[s.tenantId]) {
-        initialStates[s.tenantId] = {};
-      }
-      initialStates[s.tenantId][s.moduleId] = s.status as ModuleStatus;
+      // The per-tenant bucket is held in a local rather than re-read from the
+      // map: assigning through `initialStates[s.tenantId]` immediately after the
+      // `if (!...)` init does not narrow it back to a defined value.
+      const tenantStates = initialStates[s.tenantId] ?? {};
+      tenantStates[s.moduleId] = s.status as ModuleStatus;
+      initialStates[s.tenantId] = tenantStates;
     }
   } catch (error) {
     console.error(`[AdminModulesPage] DB query failed: ${errorMessage(error)}`);

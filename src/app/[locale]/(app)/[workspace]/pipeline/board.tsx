@@ -45,6 +45,38 @@ const GATES: { key: Gate; subtitle: string; color: string }[] = [
   { key: 'G4', subtitle: 'AB Portalına Teslim & Onay', color: 'border-t-emerald-500' },
 ];
 
+/**
+ * One card's note draft. `authorId` is REQUIRED, deliberately: the author
+ * `<select>` below is controlled on this field, and React downgrades a
+ * controlled select to an uncontrolled one the moment its `value` is
+ * `undefined`. Making the field optional would legalise that; keeping it total
+ * pushes the burden onto whoever writes the record — which is where it belongs.
+ */
+export type NoteInput = { text: string; authorId: string };
+
+/**
+ * Clear a card's note text after the note has been posted, without dropping who
+ * was writing it.
+ *
+ * This used to be `{ ...prev[oppId], text: '' }` inline. `prev[oppId]` is
+ * `NoteInput | undefined`, and spreading the undefined case produced
+ * `{ text: '' }` with no `authorId`. That object is truthy, so the
+ * `noteInputs[opp.id] || { text: '', authorId: ... }` repair further down never
+ * fired; the missing field reached the controlled select as `value={undefined}`
+ * and made the card's next note fall back to `members[0]` — silently posting it
+ * under the wrong name.
+ */
+export function clearNoteText(
+  prev: Record<string, NoteInput>,
+  oppId: string,
+  fallbackAuthorId: string
+): Record<string, NoteInput> {
+  return {
+    ...prev,
+    [oppId]: { text: '', authorId: prev[oppId]?.authorId ?? fallbackAuthorId },
+  };
+}
+
 export default function KanbanBoard({
   opportunities: initialOpps,
   workspace = 'default',
@@ -210,10 +242,7 @@ export default function KanbanBoard({
           );
 
           // Clear note input text for this card
-          setNoteInputs((prev) => ({
-            ...prev,
-            [oppId]: { ...prev[oppId], text: '' },
-          }));
+          setNoteInputs((prev) => clearNoteText(prev, oppId, author.id));
 
           showToast(`${author.name} kullanıcısının notu eklendi!`, 'success');
         }
@@ -567,6 +596,7 @@ export default function KanbanBoard({
                                 {notesList.map((note) => (
                                   <div
                                     key={note.id}
+                                    data-testid={`pipeline-note-item-${opp.id}`}
                                     className="bg-ground/70 border border-border rounded-lg p-2 text-[11px] space-y-1"
                                   >
                                     <div className="flex items-center justify-between text-[10px] text-muted font-medium">
@@ -591,6 +621,7 @@ export default function KanbanBoard({
                               <div className="flex items-center justify-between gap-1 text-[10px]">
                                 <span className="text-muted font-semibold">Not Yazan:</span>
                                 <select
+                                  data-testid={`pipeline-note-author-${opp.id}`}
                                   value={cardNoteInput.authorId}
                                   onChange={(e) =>
                                     setNoteInputs((prev) => ({
@@ -613,6 +644,7 @@ export default function KanbanBoard({
 
                               <div className="flex items-center gap-1.5">
                                 <input
+                                  data-testid={`pipeline-note-text-${opp.id}`}
                                   type="text"
                                   placeholder="Not veya güncelleme yazın..."
                                   value={cardNoteInput.text}
@@ -634,6 +666,7 @@ export default function KanbanBoard({
                                   className="w-full text-[11px] bg-surface border border-border rounded-lg px-2.5 py-1.5 text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
                                 />
                                 <button
+                                  data-testid={`pipeline-note-add-${opp.id}`}
                                   type="button"
                                   onClick={() => handleAddNote(opp.id)}
                                   disabled={!cardNoteInput.text.trim()}

@@ -17,8 +17,11 @@ export default function SidebarNav({ locale, isPlatformAdmin = false }: SidebarN
 
   // Extract current workspace from URL if present (e.g. /tr/demo-sme/calls -> demo-sme)
   const segments = pathname ? pathname.split('/').filter(Boolean) : [];
-  const workspaceSlug = (segments.length > 1 && !['admin', 'pricing', 'fiyatlandirma', 'register', 'kayit', 'login', 'giris', 'privacy', 'terms', 'dpa', 'acik-cagrilar', 'open-calls'].includes(segments[1]))
-    ? segments[1]
+  // Read once into a local: `segments.length > 1` does not narrow a later index
+  // read, and the slug was being computed from the same expression twice.
+  const secondSegment = segments[1];
+  const workspaceSlug = (secondSegment !== undefined && !['admin', 'pricing', 'fiyatlandirma', 'register', 'kayit', 'login', 'giris', 'privacy', 'terms', 'dpa', 'acik-cagrilar', 'open-calls'].includes(secondSegment))
+    ? secondSegment
     : 'default';
 
   const navItems = [

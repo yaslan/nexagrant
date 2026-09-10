@@ -10,6 +10,21 @@ type Props = {
   onCancel: () => void;
 };
 
+/**
+ * First selected file, or null when nothing is selected.
+ *
+ * This used to be inline as `e.target.files && setFile(e.target.files[0])`. A
+ * FileList is an object, so an EMPTY one is truthy: the guard let an
+ * out-of-range read through and pushed `undefined` into state declared
+ * `File | null`. An empty list is not hypothetical — clearing a selection
+ * delivers `files.length === 0` to this same handler.
+ */
+export function firstFileOrNull(files: FileList | null): File | null {
+  // `files[0]` is `File | undefined`; normalise to the `null` the state expects
+  // so no reader ever has to distinguish "no file" from "no file".
+  return files?.[0] ?? null;
+}
+
 export function EvidenceForm({ onSave, onCancel }: Props) {
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<EvidenceKind>('prior_result');
@@ -92,7 +107,7 @@ export function EvidenceForm({ onSave, onCancel }: Props) {
               type="file" 
               className="hidden" 
               id="file-upload" 
-              onChange={e => e.target.files && setFile(e.target.files[0])} 
+              onChange={e => setFile(firstFileOrNull(e.target.files))} 
             />
             <label htmlFor="file-upload" className="cursor-pointer text-accent text-xs font-semibold hover:underline">
               {file ? file.name : 'Click to select a file or drag and drop'}

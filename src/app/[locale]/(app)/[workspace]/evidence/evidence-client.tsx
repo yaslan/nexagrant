@@ -68,7 +68,10 @@ const TAXONOMY_CATEGORIES = [
   { code: 'CAT-06', key: 'ETHICS_LEGAL', labelTr: 'Etik & Yasal Uyum', labelEn: 'Ethics & Legal', descTr: 'GEP (Gender Equality Plan), GDPR, Etik Onay', icon: '⚖️' },
   { code: 'CAT-07', key: 'PARTNER_DOCS', labelTr: 'Ortak Belgeleri', labelEn: 'Partner Documents', descTr: 'Letter of Intent (LOI), NDA, Ortaklık Yazıları', icon: '🤝' },
   { code: 'CAT-08', key: 'PERSONNEL', labelTr: 'Personel & CV', labelEn: 'Personnel & CVs', descTr: 'Kilit Personel Europass CV, Yetki Belgeleri', icon: '👤' },
-];
+] as const;
+// `as const` rather than a non-null assertion at the CAT-03 fallback below: it
+// makes this a fixed 8-element tuple, so the compiler itself proves index 2
+// exists instead of being told to trust it. The list is read-only everywhere.
 
 export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceClientProps) {
   const [items, setItems] = useState<EvidenceItemData[]>(initialData || []);

@@ -76,6 +76,9 @@ function renderBlogContent(content: string): React.ReactNode[] {
       continue;
     }
 
+    // Each pattern below has exactly one group, `(.*)`, which is not optional
+    // and matches the empty string — so on a successful match group 1 always
+    // participated. `?? ''` states that for the compiler without an assertion.
     const h3 = line.match(/^###\s+(.*)$/);
     const h2 = line.match(/^##\s+(.*)$/);
     const h1 = line.match(/^#\s+(.*)$/);
@@ -87,7 +90,7 @@ function renderBlogContent(content: string): React.ReactNode[] {
       flushList();
       blocks.push(
         <h4 key={blocks.length} className="text-lg font-bold text-accent font-heading pt-2">
-          {renderInline(h3[1])}
+          {renderInline(h3[1] ?? '')}
         </h4>
       );
     } else if (h2) {
@@ -95,7 +98,7 @@ function renderBlogContent(content: string): React.ReactNode[] {
       flushList();
       blocks.push(
         <h3 key={blocks.length} className="text-xl font-bold text-ink font-heading pt-3 pb-1">
-          {renderInline(h2[1])}
+          {renderInline(h2[1] ?? '')}
         </h3>
       );
     } else if (h1) {
@@ -103,19 +106,19 @@ function renderBlogContent(content: string): React.ReactNode[] {
       flushList();
       blocks.push(
         <h2 key={blocks.length} className="text-2xl font-bold text-ink font-heading pt-4 pb-2 border-b border-border">
-          {renderInline(h1[1])}
+          {renderInline(h1[1] ?? '')}
         </h2>
       );
     } else if (ulItem) {
       flushParagraph();
       if (listType !== 'ul') flushList();
       listType = 'ul';
-      listItems.push(ulItem[1]);
+      listItems.push(ulItem[1] ?? '');
     } else if (olItem) {
       flushParagraph();
       if (listType !== 'ol') flushList();
       listType = 'ol';
-      listItems.push(olItem[1]);
+      listItems.push(olItem[1] ?? '');
     } else {
       flushList();
       paragraphLines.push(line);

@@ -76,8 +76,11 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
   const [candidateMap, setCandidateMap] = useState<Record<string, SeatCandidate[]>>(() => {
     const map: Record<string, SeatCandidate[]> = {};
     for (const c of initCandidates) {
-      if (!map[c.seatId]) map[c.seatId] = [];
-      map[c.seatId].push(c);
+      // Same reason as the admin module map: the bucket is held in a local
+      // because writing it back through the index does not narrow the read.
+      const seatCandidates = map[c.seatId] ?? [];
+      seatCandidates.push(c);
+      map[c.seatId] = seatCandidates;
     }
     return map;
   });

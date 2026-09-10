@@ -100,8 +100,11 @@ export default function UserMenu({
   // route ("/tr/admin", "/tr/pricing") no workspace is active, and pretending
   // 'demo-sme' is would tick a workspace the session may not even belong to.
   const segments = pathname ? pathname.split('/').filter(Boolean) : [];
-  const activeWorkspace = (segments.length > 1 && !['admin', 'pricing', 'register'].includes(segments[1]))
-    ? segments[1]
+  // Read once into a local: `segments.length > 1` does not narrow a later index
+  // read, and the slug was being computed from the same expression twice.
+  const secondSegment = segments[1];
+  const activeWorkspace = (secondSegment !== undefined && !['admin', 'pricing', 'register'].includes(secondSegment))
+    ? secondSegment
     : null;
 
   // Where the menu's workspace-scoped links (settings, notifications) point. On a
@@ -140,10 +143,15 @@ export default function UserMenu({
       .trim()
       .split(' ')
       .filter(Boolean);
-    if (cleanWords.length >= 2) {
-      return (cleanWords[0][0] + cleanWords[cleanWords.length - 1][0]).toUpperCase();
+    // Both ends read once. `.length >= 2` does not narrow an index read, and
+    // `.filter(Boolean)` above already dropped empty strings, so a word that is
+    // present necessarily has a first character.
+    const firstWord = cleanWords[0];
+    const lastWord = cleanWords[cleanWords.length - 1];
+    if (firstWord && lastWord) {
+      return ((firstWord[0] ?? '') + (lastWord[0] ?? '')).toUpperCase();
     }
-    return (cleanWords[0]?.[0] || 'U').toUpperCase();
+    return (firstWord?.[0] || 'U').toUpperCase();
   };
 
   const handleLogout = async () => {
