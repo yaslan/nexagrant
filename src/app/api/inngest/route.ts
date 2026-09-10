@@ -8,6 +8,7 @@ import {
   m4WeeklySummary,
   usersScheduledDeletion,
   feedbackWeeklyDigest,
+  alertsSweep,
 } from '@/lib/inngest/jobs';
 
 export const { GET, POST, PUT } = serve({
@@ -20,5 +21,6 @@ export const { GET, POST, PUT } = serve({
     m4WeeklySummary,
     usersScheduledDeletion,
     feedbackWeeklyDigest,
+    alertsSweep,
   ],
 });

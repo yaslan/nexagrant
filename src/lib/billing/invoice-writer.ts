@@ -7,7 +7,7 @@ import {
   type TcmbRateResult,
 } from '@/lib/fx/tcmb';
 import { convertCurrencyMinor, vatOnNetMinor } from '@/lib/money';
-import { recordAlert } from '@/lib/observability/system-alert';
+import { recordAlert, resolveAlerts } from '@/lib/observability/system-alert';
 
 import { resolveVatRate } from './vat-rate';
 
@@ -403,6 +403,13 @@ export async function createInvoiceForPayment(
     });
     return { status: 'skipped', reason: 'buyer_identity_missing', missing: [...missing] };
   }
+
+  // The buyer's identity is complete for this run, which is exactly the
+  // condition the alert above names. Close any earlier open one for this
+  // tenant now rather than leaving it for a human to notice the gap was
+  // filled (TASK-MTVFJTNW6OW11) — an operator who fixed the identity should
+  // not also have to go click "resolve".
+  await resolveAlerts({ source: 'invoice_buyer_identity_missing', meta: { tenantId } });
 
   // VAT by the buyer's country (boss decision, 2026-09-08). Read from the
   // fiscal identity and never from `Tenant.country`, which is an unverified

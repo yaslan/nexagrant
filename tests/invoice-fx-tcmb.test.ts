@@ -10,8 +10,14 @@ import {
   toIsoDate,
 } from '@/lib/fx/tcmb';
 
-const { recordAlertMock } = vi.hoisted(() => ({ recordAlertMock: vi.fn() }));
-vi.mock('@/lib/observability/system-alert', () => ({ recordAlert: recordAlertMock }));
+const { recordAlertMock, resolveAlertsMock } = vi.hoisted(() => ({
+  recordAlertMock: vi.fn(),
+  resolveAlertsMock: vi.fn().mockResolvedValue({ resolved: 0 }),
+}));
+vi.mock('@/lib/observability/system-alert', () => ({
+  recordAlert: recordAlertMock,
+  resolveAlerts: resolveAlertsMock,
+}));
 
 const { createInvoiceForPayment, resolveInvoiceFx } = await import('@/lib/billing/invoice-writer');
 

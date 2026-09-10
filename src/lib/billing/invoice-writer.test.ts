@@ -15,11 +15,17 @@ import {
 /** `meta` is part of what an alert has to prove: it names the gap without naming the taxpayer. */
 type CapturedAlert = { level: string; source: string; message: string; meta?: Record<string, unknown> };
 const alerts: CapturedAlert[] = [];
+type CapturedResolve = { source: string; meta?: Record<string, unknown> };
+const resolves: CapturedResolve[] = [];
 
 vi.mock('@/lib/observability/system-alert', () => ({
   recordAlert: vi.fn(async (input: CapturedAlert) => {
     alerts.push(input);
     return { status: 'recorded', id: 'alert-1' };
+  }),
+  resolveAlerts: vi.fn(async (selector: CapturedResolve) => {
+    resolves.push(selector);
+    return { resolved: 0 };
   }),
 }));
 
@@ -104,6 +110,7 @@ function payment(overrides: Partial<PaymentForInvoice> = {}): PaymentForInvoice 
 
 beforeEach(() => {
   alerts.length = 0;
+  resolves.length = 0;
 });
 
 describe('parseVatRate', () => {
@@ -228,6 +235,9 @@ describe('createInvoiceForPayment — when no invoice may be issued', () => {
     });
     expect(db.created).toHaveLength(0);
     expect(alerts.map((a) => a.source)).toContain('invoice_buyer_identity_missing');
+    // The identity is still missing, so there is nothing to resolve — a
+    // producer must not close an alert whose condition is still true.
+    expect(resolves).toHaveLength(0);
   });
 
   it('treats a blank field as unset rather than invoicing a blank taxpayer', async () => {
@@ -366,6 +376,17 @@ describe('createInvoiceForPayment — when an invoice is issued', () => {
     await createInvoiceForPayment(db, payment());
 
     expect(alerts.map((a) => a.source)).toContain('invoice_profile_assumed');
+  });
+
+  it('closes any earlier open buyer_identity_missing alert for this tenant now that identity is complete (TASK-MTVFJTNW6OW11)', async () => {
+    const db = fakeDb();
+
+    await createInvoiceForPayment(db, payment({ tenantId: 'tenant-9' }));
+
+    expect(resolves).toContainEqual({
+      source: 'invoice_buyer_identity_missing',
+      meta: { tenantId: 'tenant-9' },
+    });
   });
 
   it('continues the tenant’s existing series', async () => {

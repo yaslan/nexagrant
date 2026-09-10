@@ -35,6 +35,7 @@
     "beta:esr-preflight": "tsx scripts/esr-calibration.ts --preflight",
     "a11y:check": "tsx scripts/a11y-check.ts",
     "jobs:g0-rescore": "tsx scripts/rescore-g0.ts",
+    "jobs:alerts-sweep": "tsx scripts/run-alerts-sweep.ts",
     "db:backfill-plan-version": "tsx scripts/backfill-subscription-plan-version.ts",
     "gate:bytecode": "tsx scripts/verify-deployed-bytecode.ts",
     "gate": "pnpm db:generate && pnpm lint && pnpm typecheck && pnpm test && pnpm i18n:check && pnpm rls:check && pnpm rls:verify && pnpm test:e2e && pnpm alerts:check",
