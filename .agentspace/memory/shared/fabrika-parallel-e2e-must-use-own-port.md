@@ -1,9 +1,9 @@
 ---
 name: fabrika-parallel-e2e-must-use-own-port
-description: Aynı anda e2e koşan iki ajan tek dev sunucuyu paylaşır (reuseExistingServer) — her worker'a kendi E2E_PORT'unu ver, yoksa başkasının build'ini ölçer
+description: playwright.config artık reuseExistingServer:false — paylaşılan dev sunucusu ayaktayken e2e DOĞRUDAN düşer; çözüm E2E_PORT, ama dört spec 3000'i sabit yazdığı için o yol 4 yanlış kırmızı verir
 metadata:
   type: reference
-updatedAt: 2026-09-08
+updatedAt: 2026-09-11
 ---
 
 `playwright.config.ts` şunu diyor:
@@ -27,3 +27,24 @@ Kanıt okurken: raporda hangi portta koşulduğu yazmıyorsa, o e2e sonucu kimin
 
 İlgili: [[fabrika-agents-share-one-working-tree]] · [[fabrika-e2e-own-fixture-hides-route-bugs]] ·
 [[fabrika-prove-the-fix-against-the-real-database]]
+
+---
+
+## 2026-09-11 güncellemesi (TASK-MTVTPVTEBCF5Z) — iki şey değişti
+
+**1. `reuseExistingServer` artık `false`.** Yukarıdaki "B, A'nın sunucusunu sessizce
+ölçer" tuzağı KAPANDI; yerine gürültülü bir hata geldi. Paylaşılan bir `next dev`
+ayaktayken `pnpm test:e2e` şununla düşer:
+
+```
+[WebServer] ⨯ Another next dev server is already running.
+Error: Process from config.webServer was not able to start. Exit code: 1
+```
+
+Next, dizin başına tek dev sunucusuna izin verir; komşunun sürecini öldürmek yasak.
+Çözüm hâlâ `E2E_PORT` — ama aşağıdaki uyarıyla.
+
+**2. `E2E_PORT` yolu dört yanlış kırmızı üretiyor.** Dört spec `http://localhost:3000`'i
+sabit yazmış; ikisi oraya `page.goto` yaptığı için başka portta `ERR_CONNECTION_REFUSED`
+veriyor. Ayrıntı ve kanıt: [[fabrika-e2e-specs-pin-localhost-3000]] (kart
+TASK-MTWOWRIXRMSW1). Port boşsa varsayılan `:3000`'den koşmak hâlâ en temiz yol.

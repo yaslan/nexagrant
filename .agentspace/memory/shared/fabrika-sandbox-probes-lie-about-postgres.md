@@ -36,3 +36,30 @@ Sonuç — raporda "DB yok, e2e koşulamadı" yazmadan önce:
 Ben bu yüzden önce "Postgres yok" diye rapor yazdım; hafızadaki
 [[fabrika-dev-postgres-is-up]] notu uyarmasa gerçek e2e hiç koşmayacaktı. Kapsayıcı/parola
 ayrıntıları: [[fabrika-live-postgres-for-evidence]].
+
+---
+
+## Tersi de oluyor: bazen Postgres GERÇEKTEN kapalıdır (2026-09-11, TASK-MTVTPVTEBCF5Z)
+
+Bu notu okuyup "sondalar yalan söyler, DB ayaktadır" diye geçme. Aynı gün, aynı depoda
+`pnpm test` **40 kırmızı** verdi (`Test Files 6 failed | 147 passed`) ve hepsi canlı-DB
+testiydi. Bu kez sondalar doğru söylüyordu: Docker daemon gerçekten kapalıydı.
+
+İki tuzak:
+
+1. **Vitest, Prisma'nın hata mesajını BOŞ basıyor.** Çıktıda yalnız
+   `PrismaClientKnownRequestError:` ve arkasından yığın izi var — hata kodu yok. Kodu
+   görmek için çağrıyı repo kökünden tek başına koşturmak gerekti:
+   `NAME= PrismaClientKnownRequestError CODE= ECONNREFUSED`. Yani "40 test kırmızı"
+   ilk bakışta kod regresyonuna benziyor.
+2. Sonda betiğini **repo kökünde** (`.probe.mts`) yaz: scratchpad'den koşarsan
+   `MODULE_NOT_FOUND`, `@prisma/client`'ı doğrudan kurarsan Prisma 7 driver-adapter
+   hatası alırsın. Doğru yol `import { prisma } from './src/lib/db'`.
+
+Ayırt etme kuralı: **gerçek bir Prisma sorgusu** koştur (bu notun zaten önerdiği şey).
+`ECONNREFUSED` dönüyorsa DB gerçekten kapalıdır — `open -a Docker`, daemon'u bekle,
+`docker compose up -d` → `postgres-vector Up (healthy)`. Aynı süit tek değişiklik olarak
+DB ayakta: **1926 passed, 0 failed**. Kırmızıların hiçbiri kodla ilgili değildi.
+
+İlgili: [[fabrika-live-postgres-for-evidence]] · [[fabrika-docker-broken-symlink]] ·
+[[fabrika-known-failing-tests]]
