@@ -8,10 +8,10 @@
 unseeded/offline" bloğu kaldırıldı: üç uydurma ilan (`list-demo-1..3`, €1.800 / €4.500 / €2.200) ve bir
 uydurma API anahtarı (`key-demo-1`, `fp_live_9a8b`) artık hiçbir koşulda üretilmiyor.
 
-Tehlike kaydın anlattığı gibiydi: `src/modules/marketplace/server/listings.ts` yorumuna göre NOBYPASSRLS
-rolünde kiracı kapsamı ayarlanmadan yapılan okuma **hata değil, sıfır satır** döndürür. Eski kod tam o
-noktada devreye girip fiyatlı, sipariş edilebilir sahte ilanlar basıyordu — yani kiracı izolasyonu
-arızası "dolu bir pazar yeri" olarak görünüyordu.
+Tehlike kartın anlattığı gibiydi: `src/modules/marketplace/server/listings.ts` yorumundaki ölçüme göre
+NOBYPASSRLS rolünde kiracı kapsamı ayarlanmadan yapılan okuma **hata değil, sıfır satır** döndürür. Eski kod
+tam o noktada devreye girip fiyatlı, sipariş edilebilir sahte ilanlar basıyordu — yani kiracı izolasyonu
+arızası ekranda "dolu bir pazar yeri" olarak görünüyordu.
 
 Yerine üç durum birbirinden ayrıldı:
 
@@ -22,18 +22,66 @@ Yerine üç durum birbirinden ayrıldı:
 | (iii) veri var | liste; boş/hata kartı yok |
 
 Ek olarak iki okuma tek `try/catch`'i paylaşıyordu: ilan okuması patlayınca API anahtarı listesi de
-"boş" diye raporlanıyordu. Artık ayrı okunuyor ve ayrı raporlanıyor. **İki okuma da** başarısızsa
-sayfa yalnız hata kartını basıyor, `MarketplaceClient` hiç render edilmiyor — çünkü o formlar da aynı
-şekilde hata verirdi ve kullanıcıyı boşa yazmaya davet etmenin anlamı yok.
+"boş" diye raporlanıyordu. Artık ayrı okunuyor ve ayrı raporlanıyor. **İki okuma da** başarısızsa sayfa
+yalnız hata kartını basıyor, `MarketplaceClient` hiç render edilmiyor — o formlar da aynı şekilde hata
+verirdi, kullanıcıyı boşa yazmaya davet etmenin anlamı yok.
 
-Tüm metinler `t('...')` üzerinden; `m8.state.*` anahtarları **hem tr hem en** kataloğuna eklendi.
+Tüm metinler `t('...')` üzerinden; `m8.state.*` (11 anahtar) **hem tr hem en** kataloğuna eklendi.
 "Yeniden dene" bağlantısı `getWorkspaceRoute('marketplace', locale, workspace)` ile üretiliyor
-(tr → `/tr/<ws>/pazar-yeri`, en → `/en/<ws>/marketplace`; `next.config.ts:125` rewrite'ı ile eşleşiyor)
-ve düz `<a href>`; soft navigation değil, sunucuda sorgunun yeniden koşması için tam istek.
+(tr → `/tr/<ws>/pazar-yeri`, en → `/en/<ws>/marketplace`; `next.config.ts:125` rewrite'ı ile eşleşiyor) ve
+düz `<a href>` — soft navigation değil, sorgunun sunucuda yeniden koşması için tam istek.
 
 ## 2. Kanıt (kopyalanmış çıktı)
 
-### 2.1 Birim testi — üç dal da koşturuldu (yeni: `tests/marketplace-page-states.test.ts`)
+### 2.1 Gerçek uygulama e2e'si — gerçek tarayıcı, gerçek giriş, gerçek Postgres
+
+`tests/e2e/marketplace-demo-fallback.spec.ts` (yeni). Dev sunucu Playwright tarafından ayağa kaldırıldı
+(`next dev --port 3181`), gerçek `/tr/giris` formu dolduruldu, `/tr/gate-e2e-ws-a/marketplace`'e gidildi.
+
+```
+$ E2E_PORT=3181 E2E_SHOTS_ROOT=docs/agent-results npx playwright test tests/e2e/marketplace-demo-fallback.spec.ts
+[e2e-gate] Dev server info: PID=60850
+[seed-gate-e2e] ready — tenantA=gate-e2e-tenant-a oppA=gate-e2e-opportunity-a …
+[TASK-MTVUQ775Y9YIL] fixture tenant emptied: listings=0 apiKeys=0
+  ✓  1 … › an empty tenant gets the empty state, not three priced offers (2.0s)
+  ✓  2 … › a real row replaces the empty state (897ms)
+  2 passed (9.3s)
+```
+
+Testler `document.body.innerText` üzerinden ölçüyor (HTML üzerinden değil: next-intl tüm katalogu her
+sayfaya gömdüğü için markup'ta `not.toContain` yanıltır) ve şunları doğruluyor: boş kiracıda "Henüz ilan
+yok" + "Henüz API anahtarı yok" görünür, kaldırılan sekiz demo metninin (üç başlık, üç fiyat, `fp_live_9a8b`,
+"ERP Enterprise Integration Key") **hiçbiri** ekranda değil; gerçek satır eklenince ilan görünür ve boş durum
+kaybolur. Karşı-olgu olarak veritabanı sayımı da yapılıyor (kiracının 0 ilanı olduğu doğrulanıyor), yoksa
+"yok" demek "sayfa hiç render olmadı" ile karışırdı.
+
+Kareler: `docs/agent-results/TASK-MTVUQ775Y9YIL-screenshots/01-empty-state.png` (uygulamanın kendi stiliyle,
+"0 İlan / 0 Anahtar" metrikleri dahil) ve `02-real-listing.png`.
+
+### 2.2 Aynı e2e, eski sayfaya karşı KIRMIZI (karşı-olgu)
+
+`HEAD~1`'deki demo-fallback'li sayfa geçici olarak yerine kondu, test tekrar koşturuldu, sonra yeni sürüm
+geri alındı (`git status` temiz):
+
+```
+=== E2E counterfactual against the demo-fallback page ===
+  1 failed
+    [chromium] › … › an empty tenant gets the empty state, not three priced offers
+
+Error: expect(locator).toBeVisible() failed
+Locator: locator('main').getByText('Henüz ilan yok')
+Expected: visible
+Error: element(s) not found
+```
+
+Yani test, düzeltmeyi gerçekten ölçüyor.
+
+### 2.3 Birim testi — hata dalları (tarayıcıda zorlanamayan yarısı)
+
+`tests/marketplace-page-states.test.ts` (yeni). Okumaları fırlatarak üç dal da koşturuluyor: ilan okuması
+patlarsa hata kartı + retry, anahtar okuması patlarsa yalnız o liste "hatalı" işaretleniyor (eskiden "boş"
+diyordu), ikisi de patlarsa sayfa seviyesi hata ve client hiç yok. `t()` çağrıları **gerçek katalogdan**
+cevaplanıyor, böylece katalogda olmayan bir anahtar testi düşürür.
 
 ```
 $ pnpm vitest run tests/marketplace-page-states.test.ts
@@ -41,76 +89,41 @@ $ pnpm vitest run tests/marketplace-page-states.test.ts
       Tests  6 passed (6)
 ```
 
-### 2.2 Karşı-olgu: aynı test HEAD'deki (demo fallback'li) sayfaya karşı KIRMIZI
-
-Eski dosya geçici olarak yerine kondu, test koşturuldu, sonra yeni sürüm geri alındı:
+Karşı-olgu (aynı test, HEAD'deki eski sayfaya karşı):
 
 ```
-=== counterfactual: HEAD (demo fallback) version in place ===
-     × no rows: empty state, and not one invented listing or key 7ms
-     × listing read throws: error notice plus a retry link, never a fabricated row 1ms
-     × key read throws while listings load: the failure is reported on the key list alone 1ms
-     × both reads down: the page-level error, and no client to type into 0ms
-     × english locale answers from the english catalogue and keeps the /en route 0ms
+     × no rows: empty state, and not one invented listing or key
+     × listing read throws: error notice plus a retry link, never a fabricated row
+     × key read throws while listings load: the failure is reported on the key list alone
+     × both reads down: the page-level error, and no client to type into
+     × english locale answers from the english catalogue and keeps the /en route
 AssertionError: expected '<div class="max-w-6xl mx-auto p-6 spa…' to contain 'Henüz ilan yok'
       Tests  5 failed | 1 passed (6)
 === restored; re-run ===
- Test Files  1 passed (1)
       Tests  6 passed (6)
 ```
 
-### 2.3 Gerçek Chromium — dört durumun DOM'u + "Yeniden dene" tıklaması
+### 2.4 Hata durumu + "Yeniden dene" tıklaması, gerçek Chromium'da
 
-Gerçek sunucu bileşeninin ürettiği HTML, gerçek Chromium'da (Playwright) açıldı; `document.body.innerText`
-üzerinden ölçüldü (HTML üzerinden değil: next-intl tüm katalogu sayfaya gömüyor). 38 kontrolün tamamı geçti;
-son satırlar:
+Hata dalı gerçek uygulamada ancak veritabanını bozarak görülebilirdi (aynı DB'de dört ajan daha çalışıyor),
+bu yüzden sunucu bileşeninin **gerçek çıktısı** dört durum için HTML'e dökülüp gerçek Chromium'da açıldı ve
+retry bağlantısına gerçekten tıklandı; istek yerel bir sunucu tarafından karşılandı:
 
 ```
-PASS  01-empty: shows "Henüz ilan yok"
-PASS  01-empty: shows "Henüz API anahtarı yok"
-PASS  01-empty: no fabricated copy "Horizon Europe Proposal Coaching"
-PASS  01-empty: no fabricated copy "fp_live_9a8b"
-PASS  02-populated: shows "• Gercek ilan"
-PASS  02-populated: does not show "Henüz ilan yok"
 PASS  03-listings-error: shows "İlanlar yüklenemedi"
 PASS  04-both-down: shows "Pazar yeri yüklenemedi"
 PASS  04-both-down: does not show "MarketplaceClient"
-PASS  retry link is visible
 PASS  retry href is the marketplace route
 PASS  click navigated to http://127.0.0.1:60937/tr/ws-a/pazar-yeri
 PASS  the server received a fresh request for the marketplace route
-server hits: ["/state/01-empty.html","/state/02-populated.html","/state/03-listings-error.html","/state/04-both-down.html","/state/03-listings-error.html","/tr/ws-a/pazar-yeri"]
-ALL BROWSER CHECKS PASSED
+server hits: [… ,"/state/03-listings-error.html","/tr/ws-a/pazar-yeri"]
+ALL BROWSER CHECKS PASSED   (38/38)
 ```
 
-Kareler: `docs/agent-results/TASK-MTVUQ775Y9YIL-screenshots/01-empty.png`, `02-populated.png`,
-`03-listings-error.png`, `04-both-down.png`, `05-retry-click.png`.
-
-**Bu kanıtın sınırı, açıkça:** kareler uygulamanın kendi Tailwind CSS'i ile değil, karşılaştırma için
-eklenen küçük bir CSS ile render edildi — metin ve DOM gerçek, görsel stil değil. Nedeni 2.4'te.
-
-### 2.4 Tam uygulama e2e'si KOŞULAMADI — sebebi ölçüldü
-
-```
-$ lsof -ti:5432 ...            → no 5432
-$ brew services list           → mysql started / php none   (postgres yok)
-$ docker ps                    → failed to connect to the docker API … daemon çalışmıyor
-$ which psql postgres pg_ctl   → psql not found / postgres not found / pg_ctl not found
-DB FAIL: Invalid `prisma.$queryRawUnsafe()` invocation  (DATABASE_URL → postgresql://localhost:5432/fabrika)
-```
-
-Bu makinede Postgres yok; giriş (`requireTenantPage` → `auth()`) de veritabanına bağlı olduğu için
-tarayıcıda tam akış (login → /pazar-yeri) koşturulamadı. Spec yine de yazıldı ve repoda duruyor —
-veritabanı olan ortamda çalışacak; burada yalnız derlenip listelendiği doğrulandı:
-
-```
-$ E2E_PORT=3181 npx playwright test --list tests/e2e/marketplace-demo-fallback.spec.ts
-  [chromium] › marketplace-demo-fallback.spec.ts:67:7 › … › an empty tenant gets the empty state, not three priced offers
-  [chromium] › marketplace-demo-fallback.spec.ts:98:7 › … › a real row replaces the empty state
-Total: 2 tests in 1 file
-```
-
-`pnpm test:e2e` bu ortamda koşulmadı (DB yok) — "geçti" demiyorum.
+Kareler: `03-listings-error.png`, `04-both-down.png`, `05-retry-click.png`, ayrıca karşılaştırma için
+`01-empty.png` / `02-populated.png`. **Sınırı açıkça:** bu beş kare uygulamanın Tailwind CSS'i ile değil,
+harness'in küçük CSS'i ile render edildi — metin ve DOM gerçek, görsel stil değil. Uygulama stiliyle çekilmiş
+kareler 2.1'dekiler (`01-empty-state.png`, `02-real-listing.png`).
 
 ### 2.5 Kapılar
 
@@ -127,41 +140,45 @@ $ pnpm i18n:check
 ✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
 ```
 
+Commit öncesi kapı (githooks): `✓ Kapı temiz (staged kapsamı).` — commit `58e8936`.
+`pnpm gate`'in tamamı koşturulmadı (paylaşımlı worktree'de dört ajan daha çalışıyor); koştuğunu iddia etmiyorum.
+
 ## 3. Değişen dosyalar
 
 - `src/app/[locale]/(app)/[workspace]/marketplace/page.tsx` — demo satırlar silindi; üç durum ayrıldı;
   iki okuma ayrı try/catch; `StateNotice` (server, JS'siz) + retry bağlantısı.
 - `messages/tr.json`, `messages/en.json` — `m8.state.*` (11 anahtar, iki dilde birebir).
-- `tests/marketplace-page-states.test.ts` (yeni) — altı dal testi, karşı-olgu ile doğrulandı.
-- `tests/e2e/marketplace-demo-fallback.spec.ts` (yeni) — gerçek tarayıcı spec'i (DB'li ortam için).
-- `docs/agent-results/TASK-MTVUQ775Y9YIL-screenshots/*.png` (yeni) — 5 kare.
+- `tests/e2e/marketplace-demo-fallback.spec.ts` (yeni) — gerçek tarayıcı, gerçek DB; 2 test.
+- `tests/marketplace-page-states.test.ts` (yeni) — 6 dal testi, karşı-olgu ile doğrulandı.
+- `docs/agent-results/TASK-MTVUQ775Y9YIL-screenshots/*.png` (yeni) — 7 kare.
 
 `actions.ts` ve `client.tsx`'e **dokunulmadı** (de-fb'nin sipariş akışı).
 
 ## 4. Riskler
 
-- Boş durum kartları sayfanın en üstünde, `MarketplaceClient`'ın kendi başlığının üzerinde çıkıyor;
-  client'a dokunma izni olmadığı için kartın listenin tam içine yerleştirilmesi yapılmadı. Görsel yerleşim
-  tercihi değişirse tek satırlık bir taşıma işi (client sahibi ile).
-- API anahtarı boş durumu, kullanıcı "İlanlar" sekmesindeyken de görünüyor (sayfa seviyesinde). Gürültü
-  sayılırsa client içine taşınmalı.
-- `tests/e2e/marketplace-demo-fallback.spec.ts` bu makinede koşturulamadı; DB'li ilk koşuda sürprizi
-  olabilir (fixture kiracısının ilan/anahtar satırlarını `beforeAll`'da siliyor — yalnız `gate-e2e-tenant-a`).
+- Boş/hata kartları sayfanın en üstünde, `MarketplaceClient`'ın kendi başlık bandının **üzerinde** çıkıyor
+  (bkz. `01-empty-state.png`). Kartın listenin tam içine yerleşmesi client'a dokunmayı gerektirir; bu kartın
+  kapsamı dışıydı. Görsel yerleşim tercih edilirse client sahibiyle tek adımlık bir taşıma işi.
+- API anahtarı boş durumu, kullanıcı "İlanlar" sekmesindeyken de görünüyor (karar sayfa seviyesinde).
+  Gürültü sayılırsa aynı taşıma işine dahil edilmeli.
+- e2e spec'i `beforeAll`'da fixture kiracısının (`gate-e2e-tenant-a`) ilan ve API anahtarı satırlarını siliyor.
+  Bu kiracı zaten her koşuda seed edilip `rollback()` ile düşürülen tek kullanımlık fixture; başka kiracıya
+  dokunulmuyor.
 
 ## 5. Açık sorular
 
-- Pazar yeri "kendi ilanlarım" mı yoksa kiracılar arası vitrin mi? (listings.ts'teki açık ürün sorusu.)
+- Pazar yeri "kendi ilanlarım" mı, kiracılar arası vitrin mi? (`listings.ts`'te duran açık ürün sorusu.)
   Vitrin cevabı kazanırsa boş durum metni de değişir ("henüz ilan yok" → "vitrin boş").
 
 ## 6. Sonraki adım
 
-- DB'li bir ortamda `npx playwright test tests/e2e/marketplace-demo-fallback.spec.ts` koşturulup kareler
-  gerçek uygulama stiliyle yenilensin.
+- Kart `review`'a alınabilir. Ek iş: boş/hata kartlarının client'ın liste bölümüne taşınması (client sahibiyle).
 
 ## Platform beyanı
 
-Doğrulama **macOS 15 (darwin 25.6.0, arm64)** üzerinde yapıldı: vitest 6/6 + 13/13, Chromium 38/38, typecheck,
-lint, i18n:check. Dokunulan kodun platforma bağlı hiçbir yanı yok — sunucu tarafı React render'ı, Prisma
-okuması ve JSON katalog metni; süreç öldürme, dosya yolu, kabuk/ikili adı, kısayol metni, ekran/DPI veya
-cihaz izni içermiyor, dolayısıyla Windows ve Linux'ta aynı çalışır (kod okumasıyla söylüyorum, o platformlarda
-koşmadım). Tam uygulama e2e'si hiçbir platformda koşturulmadı; sebebi §2.4'te ölçülü olarak yazıldı (Postgres yok).
+Doğrulama **macOS 15 (darwin 25.6.0, arm64)** üzerinde yapıldı: Playwright e2e 2/2 (gerçek dev sunucu + gerçek
+Postgres `localhost:5432/fabrika`), vitest 6/6 ve 13/13, Chromium DOM/tıklama kontrolü 38/38, typecheck, lint,
+i18n:check. Windows ve Linux'ta **koşulmadı** (bu makinede o platformlar yok). Dokunulan kodun platforma bağlı
+hiçbir yanı yok — sunucu tarafı React render'ı, Prisma okuması, JSON katalog metni ve bir `<a href>`; süreç
+öldürme, dosya yolu, kabuk/ikili adı, kısayol metni, ekran/DPI veya cihaz izni geçmiyor. Bunu kodu okuyarak
+söylüyorum: davranış o platformlarda da aynı olmalı.
