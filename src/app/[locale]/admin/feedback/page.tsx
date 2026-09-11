@@ -1,6 +1,7 @@
 import React from 'react';
 import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { PRIORITY_SLA_HOURS, type FeedbackPriorityValue } from '@/lib/feedback/triage';
 import type { FeedbackRecord, TenantNameRow, UserContactRow } from '@/lib/feedback/types';
 import { PRODUCT_NAME } from '@/lib/brand';
@@ -42,10 +43,17 @@ export default async function AdminFeedbackPage({
   // Platform admins triage across tenants, so this read is intentionally
   // cross-tenant and does not go through withTenant(). The route is gated by
   // the admin layout and each action re-checks the role.
-  const rows: FeedbackRecord[] = await prisma.feedback.findMany({
-    orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
-    take: 200,
-  });
+  // Under `fabrika_app` this read returns nothing and the triage console renders
+  // an empty, entirely convincing "no feedback" screen.
+  const rows: FeedbackRecord[] = await withSystemScope(
+    'platform-admin',
+    'admin-feedback.triageList',
+    (tx) =>
+      tx.feedback.findMany({
+        orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+        take: 200,
+      })
+  );
 
   const userIds = Array.from(
     new Set(rows.map((r) => r.userId).filter((id): id is string => Boolean(id)))

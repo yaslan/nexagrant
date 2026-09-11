@@ -14,6 +14,7 @@
  */
 
 import { prisma, withTenant } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 
 export interface PublishedPlanVersion {
   id: string;
@@ -371,11 +372,15 @@ export async function listPlansForAdmin(): Promise<AdminPlanRow[]> {
     },
   });
 
-  const counts = await prisma.subscription.groupBy({
-    by: ['planId'],
-    where: { status: { in: [...LIVE_SUB_STATUSES] } },
-    _count: { _all: true },
-  });
+  // "How many live subscriptions does each plan have" is a cross-tenant count by
+  // definition — the answer is a number per plan, never one tenant's rows.
+  const counts = await withSystemScope('platform-aggregate', 'plan-admin.liveCountByPlan', (tx) =>
+    tx.subscription.groupBy({
+      by: ['planId'],
+      where: { status: { in: [...LIVE_SUB_STATUSES] } },
+      _count: { _all: true },
+    })
+  );
   const liveByPlan = new Map<string, number>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     counts.map((row: any) => [row.planId as string, row._count._all as number])
@@ -582,9 +587,15 @@ export async function computePublishImpact(versionId: string): Promise<PublishIm
   const draft = await prisma.planVersion.findUnique({ where: { id: versionId } });
   if (!draft) throw new Error(`Plan version ${versionId} not found`);
 
-  const liveTenantCount = await prisma.subscription.count({
-    where: { planId: draft.planId, status: { in: [...LIVE_SUB_STATUSES] } },
-  });
+  // How many tenants a publish would touch: a question about the whole estate.
+  const liveTenantCount = await withSystemScope(
+    'platform-aggregate',
+    'plan-admin.publishImpactCount',
+    (tx) =>
+      tx.subscription.count({
+        where: { planId: draft.planId, status: { in: [...LIVE_SUB_STATUSES] } },
+      })
+  );
 
   const current = await prisma.planVersion.findFirst({
     where: { planId: draft.planId, status: 'published' },
@@ -750,9 +761,9 @@ export async function discardDraftVersion(versionId: string): Promise<void> {
 
 /** How many tenants are actually living on a plan right now. */
 export async function countLiveSubscriptions(planId: string): Promise<number> {
-  return prisma.subscription.count({
-    where: { planId, status: { in: [...LIVE_SUB_STATUSES] } },
-  });
+  return withSystemScope('platform-aggregate', 'plan-admin.countLiveSubscriptions', (tx) =>
+    tx.subscription.count({ where: { planId, status: { in: [...LIVE_SUB_STATUSES] } } })
+  );
 }
 
 /**

@@ -98,6 +98,16 @@ vi.mock('../../src/lib/db', () => {
   };
 });
 
+/**
+ * The cross-tenant path hands its callback the same fake client as `withTenant`
+ * above, so the API-key discovery read in src/lib/api-auth.ts keeps watching the
+ * one `vi.fn()` after TASK-MTVTPVTEBCF5Z moved it onto `withSystemScope`.
+ */
+vi.mock('../../src/lib/system-scope', () => ({
+  withSystemScope: async <T,>(_purpose: string, _context: string, cb: (tx: never) => Promise<T> | T) =>
+    cb(dbBox.client as never),
+}));
+
 describe('Partner Intelligence REST API (v1)', () => {
   test('authenticateApiKey rejects request without API key (401)', async () => {
     const req = new Request('http://localhost:3000/api/v1/partners');

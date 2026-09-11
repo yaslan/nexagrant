@@ -537,13 +537,19 @@ export async function addBudgetLineByToken(
 
   const requestedTotal = await calculateLumpSumBudget(pm, countryCoefficient, subcontracting, travel);
 
-  const { prisma } = await import('@/lib/db');
+  const { withSystemScope } = await import('@/lib/system-scope');
 
   // Resolved by token, then re-scoped to that row's own tenant for the write.
-  const part = await prisma.applicationPart.findUnique({
-    where: { magicToken },
-    select: { id: true, tenantId: true, part: true, content: true },
-  });
+  // The token is the only credential a partner has — there is no session and no
+  // tenant to scope to until this row comes back — so the read runs on the
+  // sanctioned cross-tenant path. Under `fabrika_app` an unscoped read returns
+  // nothing and every partner link 404s.
+  const part = await withSystemScope('tenant-discovery', 'm11.partByMagicToken', (tx) =>
+    tx.applicationPart.findUnique({
+      where: { magicToken },
+      select: { id: true, tenantId: true, part: true, content: true },
+    })
+  );
 
   if (!part || part.part !== 'PART_A') {
     return { success: false };

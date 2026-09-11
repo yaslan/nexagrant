@@ -45,6 +45,28 @@
  *   (withTenantOn, beside set_config); any other mint is a claim of tenant
  *   scope that nothing checked.
  *
+ * CHECK D — a sanctioned cross-tenant escape, counted so it stays sanctioned.
+ *
+ *   `withSystemScope(purpose, context, cb)` (src/lib/system-scope.ts) opens the
+ *   `system_scope` RLS policy for one transaction, which is how the 35 call
+ *   sites recorded as `allowed` here return rows at all under a NOBYPASSRLS
+ *   role. Moving a call onto it takes the call OUT of CHECK A: the accessor
+ *   becomes `tx.`, not `prisma.`, and the baseline entry falls to zero.
+ *
+ *   Without this check that is a mute button — the escape hatch would be the
+ *   one way to make a finding disappear. So every `withSystemScope(` in src/**
+ *   is a finding in its own right, keyed by file and purpose, and has to be
+ *   recorded in the baseline with `kind: "system-scope"` and a written reason.
+ *   The gate refuses a check-D entry recorded under any other kind, and refuses
+ *   a check-A/B/C entry recorded as "system-scope", so a bypass cannot be
+ *   relabelled into the quiet list. A call does not leave the ratchet by moving
+ *   onto the sanctioned path; it changes which ratchet holds it.
+ *
+ *   The purpose is read from the RAW source, not the comment-blanked copy,
+ *   because blanking removes string literals — and this file's own docstring
+ *   would otherwise be a call site. The call POSITION still comes from the
+ *   blanked copy, so a `withSystemScope(` quoted in prose is not a finding.
+ *
  * ---------------------------------------------------------------------------
  * Two deliberate limits, stated rather than hidden
  * ---------------------------------------------------------------------------
@@ -65,7 +87,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { NULLABLE_TENANT, SYSTEM_WIDE, tenantScopedModels } from './rls-models';
 
-export type CheckId = 'A' | 'B1' | 'B2' | 'C';
+export type CheckId = 'A' | 'B1' | 'B2' | 'C' | 'D';
 
 export interface Finding {
   check: CheckId;
@@ -288,6 +310,24 @@ const ALLOWED_FALLBACKS: ReadonlySet<string> = new Set([
 /** Any mint of the TenantTx brand. */
 const BRAND_CAST = /\bas\s+(?:unknown\s+as\s+)?TenantTx\b/g;
 
+/** Any use of the sanctioned cross-tenant path. */
+const SYSTEM_SCOPE_CALL = /\bwithSystemScope(?:On)?\s*\(/g;
+/**
+ * The purpose literal, read out of the raw source within a short window of the
+ * call — a window rather than the same line because prettier wraps a three-
+ * argument call, and `withSystemScopeOn` puts a client in front of the purpose.
+ */
+const SYSTEM_SCOPE_PURPOSE = /['"]([a-z][a-z-]*)['"]/;
+const KNOWN_PURPOSES: ReadonlySet<string> = new Set([
+  'tenant-discovery',
+  'subject-scoped',
+  'platform-admin',
+  'platform-aggregate',
+  'cross-tenant-job',
+]);
+/** Where the path is defined; its own internal delegation is not a call site. */
+const SYSTEM_SCOPE_HOME = 'src/lib/system-scope.ts';
+
 export function scan(cwd = process.cwd()): ScanResult {
   const models = tenantScopedModels();
   const accessors = new Map<string, string>();
@@ -357,6 +397,27 @@ export function scan(cwd = process.cwd()): ScanResult {
         }
       }
     });
+
+    // CHECK D — whole-file, because the purpose can sit on the next line.
+    if (file !== SYSTEM_SCOPE_HOME) {
+      const blanked = codeLines.join('\n');
+      for (const m of blanked.matchAll(SYSTEM_SCOPE_CALL)) {
+        const at = m.index ?? 0;
+        const line = blanked.slice(0, at).split('\n').length;
+        // The window starts at the same offset in the raw text: blankNonCode
+        // preserves length byte for byte, which is what makes this sound.
+        const window = raw.slice(at, at + 200);
+        const found = SYSTEM_SCOPE_PURPOSE.exec(window)?.[1];
+        const purpose = found && KNOWN_PURPOSES.has(found) ? found : 'unreadable-purpose';
+        sink.push({
+          check: 'D',
+          file,
+          line,
+          subject: `system-scope:${purpose}`,
+          text: (rawLines[line - 1] ?? '').trim(),
+        });
+      }
+    }
   }
 
   const catalogue: CatalogueNote[] = [...catalogueCounts.entries()]

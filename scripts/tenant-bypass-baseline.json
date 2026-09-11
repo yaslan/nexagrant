@@ -4,302 +4,186 @@
     "",
     "This is a RATCHET, not a mute button. The gate is red when a key is missing",
     "here (a new bypass), red when a key's count goes UP (a new call site on an",
-    "already-known file), and red when a count goes DOWN (an entry someone fixed",
-    "and forgot to remove). Only an exact match is green. `--prune` lowers the",
-    "counts for you when work lands; nothing lowers them silently.",
+    "already-known file), and warns when a count goes DOWN (an entry someone fixed",
+    "and forgot to remove). `--prune` lowers the counts for you when work lands;",
+    "nothing lowers them silently.",
     "",
-    "kind = 'allowed'  the call site is correct as written and is expected to stay.",
-    "kind = 'debt'     the call site is wrong; `card` names who closes it. The gate",
-    "                  prints the outstanding debt on every run, green or red, so a",
-    "                  deferred finding cannot go quiet the way the ones in",
-    "                  TASK-MTSHUZUMVLTBF did.",
+    "kind = 'allowed'       the call site is correct as written and is expected to stay.",
+    "kind = 'system-scope'  the call site LEAVES its tenant scope on purpose, through",
+    "                       withSystemScope (src/lib/system-scope.ts), and the reason",
+    "                       is written down. CHECK D counts these.",
+    "kind = 'debt'          the call site is wrong; `card` names who closes it. The gate",
+    "                       prints the outstanding debt on every run, green or red, so a",
+    "                       deferred finding cannot go quiet the way the ones in",
+    "                       TASK-MTSHUZUMVLTBF did.",
     "",
-    "Measured on 2026-09-10 against dev @ c3c8e9c by TASK-MTVRAZSUVLL9R.",
-    "Every 'allowed' reason below was read out of the file it names, not inferred",
-    "from the path. See docs/agent-results/TASK-MTVRAZSUVLL9R-de-fb.md §3.",
+    "The kind and the check must agree: CHECK D entries are 'system-scope' and no",
+    "other check may be. Without that rule the sanctioned path WOULD be the mute",
+    "button — moving a call onto withSystemScope takes it out of CHECK A (the",
+    "accessor becomes `tx.`), so it has to land in CHECK D or it lands nowhere.",
     "",
-    "Every `debt` entry has a real card on the board, opened by TASK-MTVRAZSUVLL9R:",
+    "Measured on 2026-09-10 against dev by TASK-MTVTPVTEBCF5Z (slice 6).",
+    "Every reason below was read out of the file it names, not inferred from the",
+    "path. See docs/agent-results/TASK-MTVTPVTEBCF5Z-de-fb.md.",
+    "",
+    "History: TASK-MTVRAZSUVLL9R recorded 31 'allowed' entries covering 35 call",
+    "sites. All 35 were correct as tenant scoping and returned ZERO ROWS under the",
+    "NOBYPASSRLS role fabrika_app — measured, not feared. Slice 6 moved them onto",
+    "the sanctioned path, where they became 22 call sites in 16 entries: batches",
+    "that shared a purpose were collapsed into one scope each (the GDPR export's",
+    "six reads, the erasure sweep's eight writes, the digest's two), and one turned",
+    "out to be plainly scopable and is now withTenant.",
+    "",
+    "Every `debt` entry has a real card on the board:",
     "  TASK-MTVTMZXYT84RZ  wrap the two scopable billing calls (K1)",
-    "  TASK-MTVTQTJIQ5SDB  CLOSED 2026-09-10: not a catalogue. The read is tenant-\n                      scoped in src/modules/marketplace/server/listings.ts; the\n                      cross-tenant shop-window question is a product decision,\n                      open in docs/agent-results/TASK-MTVTQTJIQ5SDB-devop-fb.md.",
-    "  TASK-MTVTRNORO1ES8  fabricated tenant ids: esr-parser, storefront (K4+K5)",
-    "  TASK-MTVSBEO7VX6Y4  the surviving subscription-sync fallback (that card owns the file)",
-    "",
-    "The 35 `allowed` entries are NOT fabrika_app-ready — they are correct as",
-    "tenant scoping and return zero rows under a NOBYPASSRLS role. Slice 6,",
-    "TASK-MTVTPVTEBCF5Z, gives them a sanctioned cross-tenant path."
+    "  TASK-MTVSBEO7VX6Y4  the surviving subscription-sync fallback (that card owns the file)"
   ],
   "measuredAt": "2026-09-10",
-  "measuredAgainst": "c3c8e9c",
+  "measuredAgainst": "dev @ TASK-MTVTPVTEBCF5Z",
   "entries": [
     {
-      "check": "A",
+      "check": "D",
       "file": "src/lib/api-auth.ts",
-      "subject": "apiKey.findUnique",
+      "subject": "system-scope:tenant-discovery",
       "count": 1,
-      "kind": "allowed",
+      "kind": "system-scope",
       "class": "tenant-discovery",
-      "reason": "The SHA-256 key hash IS the credential and this lookup is what DISCOVERS the tenant. There is no tenant to scope to until the row comes back, so withTenant cannot wrap it — the argument it needs is this call's result."
+      "reason": "The SHA-256 key hash IS the credential and this lookup is what DISCOVERS the tenant, so withTenant cannot wrap it: the argument it needs is this call's result. Measured under fabrika_app: the unscoped read returns no row, so every API key on the platform stops authenticating. The lastUsedAt write that follows is now withTenant(keyRecord.tenantId) — only the read had to cross tenants."
     },
     {
-      "check": "A",
+      "check": "D",
       "file": "src/app/[locale]/portal/partner/[token]/page.tsx",
-      "subject": "applicationPart.findUnique",
+      "subject": "system-scope:tenant-discovery",
       "count": 2,
-      "kind": "allowed",
+      "kind": "system-scope",
       "class": "tenant-discovery",
-      "reason": "Magic-token partner portal: there is no session at all. The token is the credential and the row names its own tenant. Same discovery shape as api-auth.ts; the file's own header points at src/modules/m11/server/actions.ts for the reasoning."
+      "reason": "Magic-token partner portal: there is no session at all. The token is the credential and the row names its own tenant. Two call sites, generateMetadata and the page body, both reading the same row by magicToken. Same discovery shape as api-auth.ts."
     },
     {
-      "check": "A",
+      "check": "D",
       "file": "src/modules/m11/server/actions.ts",
-      "subject": "applicationPart.findUnique",
+      "subject": "system-scope:tenant-discovery",
       "count": 1,
-      "kind": "allowed",
+      "kind": "system-scope",
       "class": "tenant-discovery",
-      "reason": "The comment on the line says it: 'Resolved by token, then re-scoped to that row's own tenant for the write.' The read discovers the tenant; the write that follows is scoped."
+      "reason": "addBudgetLineByToken. The comment on the line says it: 'Resolved by token, then re-scoped to that row's own tenant for the write.' The read discovers the tenant; savePartContent(part.tenantId, ...) that follows is scoped."
     },
     {
-      "check": "A",
+      "check": "D",
       "file": "src/app/api/billing/portal/route.ts",
-      "subject": "membership.findFirst",
+      "subject": "system-scope:tenant-discovery",
       "count": 1,
-      "kind": "allowed",
+      "kind": "system-scope",
       "class": "tenant-discovery",
-      "reason": "Answers 'which tenant does this signed-in user own?'. Scoped by session.user.id and role; the tenantId it returns is what createPortalSession is then given."
+      "reason": "Answers 'which tenant does this signed-in user own?'. Scoped by session.user.id and role; the tenantId it returns is what createPortalSession is then given. Nothing narrower exists to scope to yet."
     },
     {
-      "check": "A",
-      "file": "src/actions/user/export-data.ts",
-      "subject": "membership.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "GDPR Art. 15/20 portability export, scoped by userId across every tenant the data subject belongs to. A single tenant scope would silently under-deliver the export."
-    },
-    {
-      "check": "A",
-      "file": "src/actions/user/export-data.ts",
-      "subject": "evaluation.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same export, where: { userId }. The subject's own rows, wherever they live."
-    },
-    {
-      "check": "A",
-      "file": "src/actions/user/export-data.ts",
-      "subject": "effort.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same export, where: { userId, deletedAt: null } — soft-deleted rows are deliberately excluded so the file cannot resurrect data already asked to be erased."
-    },
-    {
-      "check": "A",
-      "file": "src/actions/user/export-data.ts",
-      "subject": "aiUsageLog.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same export, where: { userId }."
-    },
-    {
-      "check": "A",
-      "file": "src/actions/user/export-data.ts",
-      "subject": "approvalRequest.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same export, where: { OR: [{ requesterId }, { approverId }] } — both sides are the subject."
-    },
-    {
-      "check": "A",
-      "file": "src/actions/user/export-data.ts",
-      "subject": "opportunity.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same export, where: { ownerId: userId }. The file's comment is explicit that it is scoped by ownerId and never by tenantId, because the rest of a tenant's pipeline is not this subject's personal data."
-    },
-    {
-      "check": "A",
-      "file": "src/actions/user/request-deletion.ts",
-      "subject": "membership.count",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "GDPR Art. 17: warns when the subject is the last TENANT_OWNER. The question is per-tenant but asked for every tenant the subject is in, so it cannot sit inside one scope."
-    },
-    {
-      "check": "A",
-      "file": "src/actions/user/request-deletion.ts",
-      "subject": "membership.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Cancels a pending deletion; lists the subject's tenants to revalidate them. where: { userId }."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/inngest/jobs/users-scheduled-deletion.ts",
-      "subject": "aiUsageLog.updateMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Erasure sweep after the grace period: detaches the subject from every tenant at once, where: { userId }. Wrapping it per tenant would mean enumerating tenants from the row set it is about to change."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/inngest/jobs/users-scheduled-deletion.ts",
-      "subject": "effort.deleteMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same erasure sweep, where: { userId }."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/inngest/jobs/users-scheduled-deletion.ts",
-      "subject": "calendarConnection.deleteMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same erasure sweep, where: { userId }. Calendar tokens are the subject's own credentials."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/inngest/jobs/users-scheduled-deletion.ts",
-      "subject": "savedSearch.deleteMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same erasure sweep, where: { userId }."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/inngest/jobs/users-scheduled-deletion.ts",
-      "subject": "opportunity.updateMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same erasure sweep: nulls ownerId so the tenant keeps its pipeline while the subject is detached."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/inngest/jobs/users-scheduled-deletion.ts",
-      "subject": "feedback.updateMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same erasure sweep: nulls userId on the subject's feedback rows."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/inngest/jobs/users-scheduled-deletion.ts",
-      "subject": "proposalUsage.updateMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same erasure sweep: nulls usedByUserId."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/inngest/jobs/users-scheduled-deletion.ts",
-      "subject": "relationship.updateMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "subject-scoped",
-      "reason": "Same erasure sweep: nulls ownerUserId."
-    },
-    {
-      "check": "A",
-      "file": "src/app/[locale]/admin/feedback/page.tsx",
-      "subject": "feedback.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "platform-admin",
-      "reason": "Platform admins triage across tenants. The file states it and the route is gated by the admin layout; each action re-checks the role with requirePlatformAdmin()."
-    },
-    {
-      "check": "A",
-      "file": "src/app/[locale]/admin/feedback/actions.ts",
-      "subject": "feedback.update",
-      "count": 1,
-      "kind": "allowed",
-      "class": "platform-admin",
-      "reason": "The triage write behind requirePlatformAdmin(). Updates one row by id in whichever tenant raised it."
-    },
-    {
-      "check": "A",
-      "file": "src/app/[locale]/admin/modules/page.tsx",
-      "subject": "moduleState.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "platform-admin",
-      "reason": "The module console renders a tenant x module grid; the read is unfiltered on purpose and the page groups by s.tenantId afterwards."
-    },
-    {
-      "check": "A",
-      "file": "src/app/[locale]/admin/modules/actions.ts",
-      "subject": "moduleState.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "platform-admin",
-      "reason": "Behind requirePlatformAdmin(); reads one named tenant's states (where: { tenantId }) to evaluate the dependency graph before flipping a module. Wrappable in principle — kept with its sibling read on the same console rather than split across two access styles; see the proposed card K-2."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/billing/plan-repository.ts",
-      "subject": "subscription.groupBy",
-      "count": 1,
-      "kind": "allowed",
-      "class": "platform-aggregate",
-      "reason": "'How many live subscriptions does each plan have' is a cross-tenant count by definition; it feeds the platform plan console."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/billing/plan-repository.ts",
-      "subject": "subscription.count",
-      "count": 2,
-      "kind": "allowed",
-      "class": "platform-aggregate",
-      "reason": "computePublishImpact and countLiveSubscriptions: how many tenants a plan change would touch. Both are questions about the whole estate."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/feedback/digest-run.ts",
-      "subject": "feedback.findMany",
-      "count": 2,
-      "kind": "allowed",
-      "class": "platform-aggregate",
-      "reason": "The function's own docstring: 'Reads the window and everything still open, both cross-tenant.' It builds the platform's beta digest, not a tenant's."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/inngest/jobs/m4-weekly-summary.ts",
-      "subject": "relationship.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "cross-tenant-job",
-      "reason": "Cron fan-out: reads every tenant's due relationship actions, then groups by focal point. The tenant set is the query's OUTPUT, so no single scope exists to run it in."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/inngest/jobs/alerts-daily.ts",
-      "subject": "savedSearch.findMany",
-      "count": 1,
-      "kind": "allowed",
-      "class": "cross-tenant-job",
-      "reason": "Same fan-out shape: the daily job reads every tenant's alert-enabled saved searches before mailing each one."
-    },
-    {
-      "check": "A",
+      "check": "D",
       "file": "src/lib/billing/lifetime-licence.ts",
-      "subject": "lifetimeLicence.findFirst",
+      "subject": "system-scope:tenant-discovery",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "tenant-discovery",
+      "reason": "findRecorded(): the idempotency lookup by providerEventId, which runs BEFORE the tenant is known — exactly the api-auth.ts shape. Empty under fabrika_app means every Stripe webhook retry is treated as a new sale."
+    },
+    {
+      "check": "D",
+      "file": "src/actions/user/export-data.ts",
+      "subject": "system-scope:subject-scoped",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "subject-scoped",
+      "reason": "GDPR Art. 15/20 portability export. ONE scope around the whole Promise.all batch, replacing six separate unscoped reads (user, membership, account, evaluation, effort, aiUsageLog, approvalRequest, opportunity): every row is selected by userId or ownerId across every tenant the data subject belongs to, and a single tenant scope would silently under-deliver the export. One transaction also makes the export a consistent snapshot."
+    },
+    {
+      "check": "D",
+      "file": "src/actions/user/request-deletion.ts",
+      "subject": "system-scope:subject-scoped",
+      "count": 3,
+      "kind": "system-scope",
+      "class": "subject-scoped",
+      "reason": "Three GDPR Art. 17 reads. (1) The subject row WITH its nested `memberships` select — a nested read of the tenant-scoped Membership table obeys RLS exactly like a top-level one, so outside a scope it returns [] and the sole-owner warning below silently stops warning; this shape is invisible to CHECK A, which reads the accessor. (2) The sole-owner count, asked per tenant but for EVERY tenant the subject is in, one scope around the whole loop so N tenants do not mean N transactions. (3) cancelAccountDeletion listing the subject's tenants to revalidate them, where: { userId }."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/inngest/jobs/users-scheduled-deletion.ts",
+      "subject": "system-scope:subject-scoped",
       "count": 2,
-      "kind": "allowed",
+      "kind": "system-scope",
+      "class": "subject-scoped",
+      "reason": "The erasure sweep. (1) dueUsers, again for its nested `memberships` select: empty under fabrika_app means every erasure audit is written with no tenant attribution — a silently weaker audit trail, not an error. (2) One scope around the eight detach/delete statements, all `where: { userId }` with no tenantId anywhere, so scoping per tenant would mean enumerating tenants from the row set about to change. Under fabrika_app each reports count: 0 and the sweep announces a completed erasure having deleted nothing. One transaction also means a crash halfway cannot leave a half-erased person. The per-tenant erasure audit write is NOT here: it knows its tenant and now uses withTenant."
+    },
+    {
+      "check": "D",
+      "file": "src/app/[locale]/admin/feedback/page.tsx",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "Platform admins triage across tenants. The file states it and the route is gated by the admin layout; each action re-checks the role with requirePlatformAdmin(). Under fabrika_app the board renders an empty and entirely convincing 'no feedback' screen."
+    },
+    {
+      "check": "D",
+      "file": "src/app/[locale]/admin/feedback/actions.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "The triage write behind requirePlatformAdmin(), updating one row by id in whichever tenant raised it. Under fabrika_app an unscoped update matches no row and Prisma raises P2025, so the console reports update_failed for every entry."
+    },
+    {
+      "check": "D",
+      "file": "src/app/[locale]/admin/modules/page.tsx",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "The module console renders a tenant x module grid; the read is unfiltered on purpose and the page groups by s.tenantId afterwards. Under fabrika_app it returns nothing and every cell renders as 'off' — a wrong grid, not an empty one. Its former sibling in admin/modules/actions.ts turned out to be a different question (one named tenant) and is now plain withTenant, closing the proposed card K-2."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/billing/plan-repository.ts",
+      "subject": "system-scope:platform-aggregate",
+      "count": 3,
+      "kind": "system-scope",
       "class": "platform-aggregate",
-      "reason": "Two genuinely global reads: the highest `seq` across the whole estate (the licence number is a platform-wide scarce resource, capped at LIFETIME_LICENCE_CAP), and findRecorded(), the idempotency lookup by providerEventId — which runs BEFORE the tenant is known, exactly like api-auth.ts."
+      "reason": "Three counts about the whole estate, never about one tenant's rows: subscription.groupBy for 'how many live subscriptions does each plan have' (the platform plan console), and subscription.count twice — computePublishImpact and countLiveSubscriptions, both asking how many tenants a plan change would touch."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/billing/lifetime-licence.ts",
+      "subject": "system-scope:platform-aggregate",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-aggregate",
+      "reason": "The highest `seq` across the whole estate. The licence number is a platform-wide scarce resource capped at LIFETIME_LICENCE_CAP; under fabrika_app this reads null, every buyer is handed seq 1 and the cap stops counting."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/feedback/digest-run.ts",
+      "subject": "system-scope:platform-aggregate",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-aggregate",
+      "reason": "The function's own docstring: 'Reads the window and everything still open, both cross-tenant.' It builds the PLATFORM's beta digest, not a tenant's. One scope around the pair, so the two reads share a snapshot and the gate counts one escape."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/inngest/jobs/m4-weekly-summary.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "Cron fan-out: reads every tenant's due relationship actions, then groups by focal point. The tenant set is the query's OUTPUT, so no single scope exists to run it in. Under fabrika_app it returns nothing, so the job mails no one and reports success."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/inngest/jobs/alerts-daily.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "Same fan-out shape: the daily job reads every tenant's alert-enabled saved searches before mailing each one. Empty under fabrika_app is reported as totalSearches: 0 — the false success the job's own docstring says it refuses."
     },
     {
       "check": "A",
@@ -332,16 +216,6 @@
     },
     {
       "check": "B2",
-      "file": "src/lib/billing/storefront.ts",
-      "subject": "tenantId-fallback",
-      "count": 1,
-      "kind": "debt",
-      "class": "fabricated-id",
-      "card": "TASK-MTVTRNORO1ES8",
-      "reason": "`tenantId: tenantId ?? 'anonymous'` in a logger.error payload. Not a query, so nothing leaks — but it puts an id in the observability record that matches no Tenant row, which is how the ghost-alert pile in scripts/check-orphan-alerts.ts got started. src/lib/llm.ts already has the right answer for this position: the declared PLATFORM_SCOPE_TENANT_ID, not an ad-hoc word."
-    },
-    {
-      "check": "B2",
       "file": "src/lib/billing/subscription-sync.ts",
       "subject": "tenantId-fallback",
       "count": 1,
@@ -349,16 +223,6 @@
       "class": "fabricated-id",
       "card": "TASK-MTVSBEO7VX6Y4",
       "reason": "`tenantId: (subscription.metadata?.tenantId as string) ?? ''` in a logger.warn payload. The empty string is exactly what assertTenantScope rejects, so the log line names a tenant that can never be looked up. This file had TWO of these when the baseline was written; TASK-MTVSBEO7VX6Y4 removed the second (a `|| ''` in the handler's return value on the already-processed path) while this card was running, and the gate reported the fall as a warning rather than blocking that agent's push. The survivor belongs to the same card."
-    },
-    {
-      "check": "B2",
-      "file": "src/modules/m6/server/esr-parser.ts",
-      "subject": "tenantId-fallback",
-      "count": 1,
-      "kind": "debt",
-      "class": "fabricated-id",
-      "card": "TASK-MTVTRNORO1ES8",
-      "reason": "`tenantId: tenantId || 'system'` is passed to generateText, which writes AiUsageLog.tenantId and charges credits (src/lib/llm.ts:405-424). AiUsageLog IS tenant-scoped, so a fabricated 'system' lands a usage row against a tenant that does not exist. The repo already declares the correct value for this case — PLATFORM_SCOPE_TENANT_ID ('__platform__'), whose docstring says in as many words that it is 'a declared scope, not a stand-in for a tenant we failed to look up' and that its underscore form cannot collide with a cuid or slug. 'system' can."
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { inngest } from '../client';
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { deleteUserFilesFromR2 } from '@/lib/storage';
 import { errorCode } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
@@ -76,15 +77,23 @@ export async function purgeDueUsers(
 
   // Memberships are read here, before the purge: they cascade away with the
   // user row, and the audit trail needs to know which tenants were touched.
-  const dueUsers = await prisma.user.findMany({
-    where: { deletionRequestedAt: { not: null, lte: cutoff } },
-    select: {
-      id: true,
-      deletionRequestedAt: true,
-      deletionReason: true,
-      memberships: { select: { tenantId: true } },
-    },
-  });
+  //
+  // `memberships` is a NESTED read of the tenant-scoped Membership table, and a
+  // nested read obeys RLS exactly like a top-level one. Outside a scope it comes
+  // back empty under `fabrika_app`, and then every erasure audit below is
+  // written with no tenant attribution at all — a silently weaker audit trail,
+  // not an error. Hence the system scope on a query whose own model is unpoliced.
+  const dueUsers = await withSystemScope('subject-scoped', 'erasure-sweep.dueUsers', (tx) =>
+    tx.user.findMany({
+      where: { deletionRequestedAt: { not: null, lte: cutoff } },
+      select: {
+        id: true,
+        deletionRequestedAt: true,
+        deletionReason: true,
+        memberships: { select: { tenantId: true } },
+      },
+    })
+  );
 
   let purgedCount = 0;
   let failedCount = 0;
@@ -97,66 +106,77 @@ export async function purgeDueUsers(
       // 1. Object storage first — a failed DB delete must not orphan files.
       await deleteUserFilesFromR2(userId);
 
-      // 2. Anonymise records the tenant must keep for billing/audit.
-      await prisma.aiUsageLog.updateMany({
-        where: { userId },
-        data: { userId: null },
+      // 2-3. Everything below detaches or removes the subject across EVERY tenant
+      //      they belong to at once — `where: { userId }`, no tenantId anywhere —
+      //      so scoping it per tenant would mean enumerating tenants from the row
+      //      set it is about to change. Under `fabrika_app` each of these matches
+      //      nothing and reports `count: 0`: the sweep would announce a completed
+      //      erasure having deleted not one row.
+      //
+      //      One system scope around the whole subject rather than one per
+      //      statement, so a crash halfway cannot leave a half-erased person.
+      await withSystemScope('subject-scoped', 'erasure-sweep.detachSubject', async (tx) => {
+        // 2. Anonymise records the tenant must keep for billing/audit.
+        await tx.aiUsageLog.updateMany({
+          where: { userId },
+          data: { userId: null },
+        });
+
+        // 3. Remove person-level rows that have no FK cascade.
+        await tx.effort.deleteMany({ where: { userId } });
+
+        // 3b. Ten columns in this schema hold a `User.id` without a foreign key,
+        //     so `DELETE FROM "User"` cannot reach any of them and the erased
+        //     person survives in every one the job does not name here.
+        //
+        //     Two of them are the subject's own data and are removed outright.
+        //     `CalendarConnection` matters most: it stores a Google/Outlook
+        //     access and refresh token in clear text, so leaving the row behind
+        //     leaves a working credential for the mailbox of someone the
+        //     platform has just promised to forget.
+        await tx.calendarConnection.deleteMany({ where: { userId } });
+        await tx.savedSearch.deleteMany({ where: { userId } });
+
+        //     The rest are the tenant's records, not the subject's. Erasure must
+        //     not delete the tenant's opportunities, bug reports or audit trail,
+        //     so those rows stay and only the link to the person is dropped —
+        //     the same choice already made for `AiUsageLog` above and for the
+        //     hashed subject reference in the erasure audit below.
+        await tx.auditEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
+        await tx.opportunity.updateMany({ where: { ownerId: userId }, data: { ownerId: null } });
+        await tx.feedback.updateMany({ where: { userId }, data: { userId: null } });
+        await tx.proposalUsage.updateMany({ where: { usedByUserId: userId }, data: { usedByUserId: null } });
+
+        //     `Relationship.ownerUserId` is the same kind of row — the tenant's
+        //     record, not the subject's — but it needed a migration first: it was
+        //     NOT NULL until `relationship-owner-nullable.sql`. Detaching it is
+        //     complete erasure for this table, because the only person named on a
+        //     relationship apart from the focal point is the external counterpart
+        //     (`counterpartName`/`counterpartEmail`), who is not the subject. The
+        //     relationship stays and becomes unassigned.
+        await tx.relationship.updateMany({ where: { ownerUserId: userId }, data: { ownerUserId: null } });
+
+        //     Not handled here, and deliberately so: `DualApprovalStep.actorUserId`
+        //     is retained. An approval is a signature and `@@unique([followupDocId,
+        //     actorUserId])` enforces the four-eyes rule over it, so the row must
+        //     outlive the user it names. That retention is declared by name — the
+        //     id *and* `actorName` — in docs/legal/processing-register.md §12.
+        //     Decided 2026-09-08 (A4, option C); the two columns were separate
+        //     cases and got separate answers.
+        //
+        //     `Consent.userId` is retained for the same reason and on the same
+        //     basis (TASK-MTSWLANXSU0IG). It is the eleventh FK-less `User.id`
+        //     column and it is named here so that it is *decided* rather than
+        //     merely unlisted: the row proves that this person was told what
+        //     would be done with their data. Nulling the id would leave a record
+        //     proving that somebody was told something, which proves nothing, and
+        //     deleting it would destroy the controller's own art.5(2) evidence at
+        //     the request of the one person it is evidence about. Declared in
+        //     docs/legal/processing-register.md §18b and docs/DATA_MODEL.md §7.1.1.
+        //     The row carries no network identifier, so retaining it does not
+        //     retain an IP address — see the `Consent` model comment for why that
+        //     column does not exist.
       });
-
-      // 3. Remove person-level rows that have no FK cascade.
-      await prisma.effort.deleteMany({ where: { userId } });
-
-      // 3b. Ten columns in this schema hold a `User.id` without a foreign key,
-      //     so `DELETE FROM "User"` cannot reach any of them and the erased
-      //     person survives in every one the job does not name here.
-      //
-      //     Two of them are the subject's own data and are removed outright.
-      //     `CalendarConnection` matters most: it stores a Google/Outlook
-      //     access and refresh token in clear text, so leaving the row behind
-      //     leaves a working credential for the mailbox of someone the
-      //     platform has just promised to forget.
-      await prisma.calendarConnection.deleteMany({ where: { userId } });
-      await prisma.savedSearch.deleteMany({ where: { userId } });
-
-      //     The rest are the tenant's records, not the subject's. Erasure must
-      //     not delete the tenant's opportunities, bug reports or audit trail,
-      //     so those rows stay and only the link to the person is dropped —
-      //     the same choice already made for `AiUsageLog` above and for the
-      //     hashed subject reference in the erasure audit below.
-      await prisma.auditEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
-      await prisma.opportunity.updateMany({ where: { ownerId: userId }, data: { ownerId: null } });
-      await prisma.feedback.updateMany({ where: { userId }, data: { userId: null } });
-      await prisma.proposalUsage.updateMany({ where: { usedByUserId: userId }, data: { usedByUserId: null } });
-
-      //     `Relationship.ownerUserId` is the same kind of row — the tenant's
-      //     record, not the subject's — but it needed a migration first: it was
-      //     NOT NULL until `relationship-owner-nullable.sql`. Detaching it is
-      //     complete erasure for this table, because the only person named on a
-      //     relationship apart from the focal point is the external counterpart
-      //     (`counterpartName`/`counterpartEmail`), who is not the subject. The
-      //     relationship stays and becomes unassigned.
-      await prisma.relationship.updateMany({ where: { ownerUserId: userId }, data: { ownerUserId: null } });
-
-      //     Not handled here, and deliberately so: `DualApprovalStep.actorUserId`
-      //     is retained. An approval is a signature and `@@unique([followupDocId,
-      //     actorUserId])` enforces the four-eyes rule over it, so the row must
-      //     outlive the user it names. That retention is declared by name — the
-      //     id *and* `actorName` — in docs/legal/processing-register.md §12.
-      //     Decided 2026-09-08 (A4, option C); the two columns were separate
-      //     cases and got separate answers.
-      //
-      //     `Consent.userId` is retained for the same reason and on the same
-      //     basis (TASK-MTSWLANXSU0IG). It is the eleventh FK-less `User.id`
-      //     column and it is named here so that it is *decided* rather than
-      //     merely unlisted: the row proves that this person was told what
-      //     would be done with their data. Nulling the id would leave a record
-      //     proving that somebody was told something, which proves nothing, and
-      //     deleting it would destroy the controller's own art.5(2) evidence at
-      //     the request of the one person it is evidence about. Declared in
-      //     docs/legal/processing-register.md §18b and docs/DATA_MODEL.md §7.1.1.
-      //     The row carries no network identifier, so retaining it does not
-      //     retain an IP address — see the `Consent` model comment for why that
-      //     column does not exist.
 
       // 4. Finally the user row; cascades clear accounts, sessions,
       //    memberships and requested approvals, and null out approver/
@@ -233,10 +253,16 @@ async function writeErasureAudit(user: PurgedUser): Promise<void> {
     return;
   }
 
+  // The tenant is known here, so this is a scoped write, not a system-scoped
+  // one. It matters: AuditEvent carries `tenant_or_shared`, whose WITH CHECK
+  // REFUSES an insert naming a tenantId outside that tenant's scope — under
+  // `fabrika_app` these creates would throw rather than quietly do nothing.
   for (const tenantId of tenantIds) {
-    await prisma.auditEvent.create({
-      data: { tenantId, type: 'user.erased', target: subjectRef, data },
-    });
+    await withTenant(tenantId, (tx) =>
+      tx.auditEvent.create({
+        data: { tenantId, type: 'user.erased', target: subjectRef, data },
+      })
+    );
   }
 }
 

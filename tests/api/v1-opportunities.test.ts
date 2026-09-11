@@ -64,6 +64,16 @@ vi.mock('../../src/lib/db', () => ({
     cb(mockDb as never),
 }));
 
+/**
+ * The cross-tenant path hands its callback the same fake client as `withTenant`
+ * above, so the API-key discovery read in src/lib/api-auth.ts keeps watching the
+ * one `vi.fn()` after TASK-MTVTPVTEBCF5Z moved it onto `withSystemScope`.
+ */
+vi.mock('../../src/lib/system-scope', () => ({
+  withSystemScope: async <T,>(_purpose: string, _context: string, cb: (tx: never) => Promise<T> | T) =>
+    cb(mockDb as never),
+}));
+
 mockDb.apiKey.findUnique.mockImplementation(async ({ where }: { where: { keyHash: string } }) =>
   where.keyHash === TEST_API_KEY_HASH ? TEST_API_KEY_ROW : null
 );

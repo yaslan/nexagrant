@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { PRODUCT_NAME } from '@/lib/brand';
-import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { notFound } from 'next/navigation';
 import { addBudgetLineByToken } from '@/modules/m11/server/actions';
 import { getTranslations } from 'next-intl/server';
@@ -33,10 +33,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   let part: PartnerPortalPart | null = null;
   try {
-    const rawPart = await prisma.applicationPart.findUnique({
-      where: { magicToken: token },
-      include: { opportunity: true }
-    });
+    const rawPart = await withSystemScope('tenant-discovery', 'partner-portal.partByToken', (tx) =>
+      tx.applicationPart.findUnique({
+        where: { magicToken: token },
+        include: { opportunity: true },
+      })
+    );
     part = rawPart as unknown as PartnerPortalPart | null;
   } catch {
     return {
@@ -70,10 +72,12 @@ export default async function PartnerPortalPage({ params }: PageProps) {
 
   let part: PartnerPortalPart | null = null;
   try {
-    const rawPart = await prisma.applicationPart.findUnique({
-      where: { magicToken: token },
-      include: { opportunity: true }
-    });
+    const rawPart = await withSystemScope('tenant-discovery', 'partner-portal.partByToken', (tx) =>
+      tx.applicationPart.findUnique({
+        where: { magicToken: token },
+        include: { opportunity: true },
+      })
+    );
     part = rawPart as unknown as PartnerPortalPart | null;
   } catch (e) {
     console.warn(`[PartnerPortalPage] DB query failed: ${errorMessage(e)}`);

@@ -1,5 +1,5 @@
 import { inngest } from '../client';
-import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { M4WeeklySummaryOutputSchema, type M4WeeklySummaryOutput } from '../events';
 
 /**
@@ -59,23 +59,29 @@ export const m4WeeklySummary = inngest.createFunction(
     const pendingActions = await step.run('fetch-pending-actions', async () => {
       const oneWeekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      return await prisma.relationship.findMany({
-        where: {
-          nextStepDue: {
-            not: null,
-            lte: oneWeekFromNow,
+      // Cron fan-out: reads EVERY tenant's due relationship actions and then
+      // groups by focal point below. The tenant set is this query's OUTPUT, so
+      // there is no single scope to run it in — and under `fabrika_app` it
+      // returns nothing, so the job would mail no one and report success.
+      return await withSystemScope('cross-tenant-job', 'm4-weekly.dueActions', (tx) =>
+        tx.relationship.findMany({
+          where: {
+            nextStepDue: {
+              not: null,
+              lte: oneWeekFromNow,
+            },
           },
-        },
-        select: {
-          id: true,
-          tenantId: true,
-          ownerUserId: true,
-          counterpartName: true,
-          nextStep: true,
-          nextStepDue: true,
-          warmth: true,
-        },
-      });
+          select: {
+            id: true,
+            tenantId: true,
+            ownerUserId: true,
+            counterpartName: true,
+            nextStep: true,
+            nextStepDue: true,
+            warmth: true,
+          },
+        })
+      );
     });
 
     const result = await step.run('group-and-notify', async () => {

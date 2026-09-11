@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { requirePlatformAdmin } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
 
@@ -42,17 +42,23 @@ export async function triageFeedbackEntry(input: unknown): Promise<TriageActionR
   const { id, priority, status, note } = parsed.data;
 
   try {
-    await prisma.feedback.update({
-      where: { id },
-      data: {
-        priority: priority as never,
-        status: status as never,
-        triageNote: note && note.length > 0 ? note : null,
-        triagedById: userId,
-        triagedAt: new Date(),
-        resolvedAt: status === 'RESOLVED' || status === 'WONT_FIX' ? new Date() : null,
-      },
-    });
+    // The triage write behind requirePlatformAdmin(), updating one row by id in
+    // whichever tenant raised it. Under `fabrika_app` an unscoped update matches
+    // no row and Prisma raises P2025 "record not found", so the console would
+    // report `update_failed` for every entry on the board.
+    await withSystemScope('platform-admin', 'admin-feedback.triageWrite', (tx) =>
+      tx.feedback.update({
+        where: { id },
+        data: {
+          priority: priority as never,
+          status: status as never,
+          triageNote: note && note.length > 0 ? note : null,
+          triagedById: userId,
+          triagedAt: new Date(),
+          resolvedAt: status === 'RESOLVED' || status === 'WONT_FIX' ? new Date() : null,
+        },
+      })
+    );
   } catch (error) {
     logger.error('feedback triage update failed', error, { feedbackId: id });
     return { ok: false, error: 'update_failed' };

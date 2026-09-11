@@ -30,7 +30,17 @@ const alertCreate = vi.fn().mockResolvedValue({ id: 'alert-1' });
 const alertFindMany = vi.fn().mockResolvedValue([]);
 const alertUpdate = vi.fn().mockResolvedValue({});
 
-vi.mock('../src/lib/db', () => ({
+/**
+ * The one fake client, parked in a hoisted box so the scope helpers below hand it
+ * to their callbacks BY REFERENCE. Not `await import('../src/lib/db')` inside the
+ * helper: a dynamic import of a mocked module re-runs this factory and mints a
+ * fresh set of `vi.fn()`s, so an assertion on `.mock.calls` would watch a
+ * different object than the code under test just called (TASK-MTVTPVTEBCF5Z).
+ */
+const dbBox = vi.hoisted(() => ({ client: undefined as unknown }));
+
+vi.mock('../src/lib/db', () => {
+  const mod = {
   prisma: {
     user: {
       findMany: (...args: unknown[]) => findMany(...args),
@@ -54,6 +64,25 @@ vi.mock('../src/lib/db', () => ({
       update: (...args: unknown[]) => alertUpdate(...args),
     },
   },
+  // The per-tenant erasure audit write knows its tenant and is scoped, so it goes
+  // through withTenant rather than the cross-tenant path (TASK-MTVTPVTEBCF5Z).
+  withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
+    cb(dbBox.client as never),
+  };
+  dbBox.client = mod.prisma;
+  return mod;
+});
+
+/**
+ * The cross-tenant path hands its callback the same fake client `prisma`
+ * resolves to, exactly as the `withTenant` mocks in this suite do — so the
+ * assertions below keep watching the one `vi.fn()` after the code under test
+ * moved its query onto `withSystemScope` (TASK-MTVTPVTEBCF5Z). Resolved lazily
+ * because `vi.mock` is hoisted above the fixture consts.
+ */
+vi.mock('../src/lib/system-scope', () => ({
+  withSystemScope: async <T,>(_purpose: string, _context: string, cb: (tx: never) => Promise<T> | T) =>
+    cb(dbBox.client as never),
 }));
 
 vi.mock('../src/lib/storage', () => ({

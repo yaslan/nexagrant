@@ -49,8 +49,20 @@ const TOPIC_ROW = {
   },
 };
 
-vi.mock('../../src/lib/db', () => ({
-  prisma: {
+/**
+ * The one fake client, parked in a hoisted box so the two scope helpers below
+ * can hand it to their callbacks BY REFERENCE.
+ *
+ * Not `await import('../../src/lib/db')` inside the helper: a dynamic import of a
+ * mocked module re-runs this factory, which mints a fresh set of `vi.fn()`s, and
+ * `topicFindMany()` then watches a different object than the route just called.
+ * Measured — it cost the `filters programme through the call relation` assertion
+ * its recorded calls while every other test in the file stayed green.
+ */
+const dbBox = vi.hoisted(() => ({ client: undefined as unknown }));
+
+vi.mock('../../src/lib/db', () => {
+  const client = {
     apiKey: {
       findUnique: vi.fn().mockImplementation(async ({ where }) =>
         where.keyHash === TEST_API_KEY_HASH ? TEST_API_KEY_ROW : null
@@ -60,7 +72,25 @@ vi.mock('../../src/lib/db', () => ({
     topic: {
       findMany: vi.fn(),
     },
-  },
+  };
+  dbBox.client = client;
+  return {
+    prisma: client,
+    withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
+      cb(dbBox.client as never),
+  };
+});
+
+/**
+ * The cross-tenant path hands its callback the same fake client `prisma`
+ * resolves to, exactly as the `withTenant` mocks in this suite do — so the
+ * assertions below keep watching the one `vi.fn()` after the code under test
+ * moved its query onto `withSystemScope` (TASK-MTVTPVTEBCF5Z). Resolved lazily
+ * because `vi.mock` is hoisted above the fixture consts.
+ */
+vi.mock('../../src/lib/system-scope', () => ({
+  withSystemScope: async <T,>(_purpose: string, _context: string, cb: (tx: never) => Promise<T> | T) =>
+    cb(dbBox.client as never),
 }));
 
 async function topicFindMany() {

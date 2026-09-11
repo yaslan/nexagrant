@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto';
 import { Resend } from 'resend';
 import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { auth } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { PRODUCT_NAME } from '@/lib/brand';
@@ -48,17 +49,25 @@ export async function requestAccountDeletion(): Promise<DeletionRequestResult> {
       return { success: false, error: 'Unauthorized' };
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        locale: true,
-        deletionRequestedAt: true,
-        memberships: { select: { tenantId: true, role: true } },
-      },
-    });
+    // `User` carries no tenantId and no policy, but `memberships` is a NESTED
+    // read of the tenant-scoped Membership table — and a nested read obeys RLS
+    // exactly like a top-level one. Outside a scope it comes back as `[]`, so
+    // the sole-owner warning below silently stops warning. The gate cannot see
+    // this shape at all: CHECK A matches on the accessor (`prisma.user.…`),
+    // which names a model it does not police. See §5 of this card's report.
+    const user = await withSystemScope('subject-scoped', 'request-deletion.subjectAndMemberships', (tx) =>
+      tx.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          locale: true,
+          deletionRequestedAt: true,
+          memberships: { select: { tenantId: true, role: true } },
+        },
+      })
+    );
 
     if (!user) {
       return { success: false, error: 'User not found' };
@@ -73,19 +82,29 @@ export async function requestAccountDeletion(): Promise<DeletionRequestResult> {
       };
     }
 
-    // Warn (do not block) when the subject is the last owner of a tenant.
-    const soleOwnerOf: string[] = [];
-    for (const membership of user.memberships) {
-      if (membership.role !== 'TENANT_OWNER') continue;
-      const otherOwners = await prisma.membership.count({
-        where: {
-          tenantId: membership.tenantId,
-          role: 'TENANT_OWNER',
-          userId: { not: userId },
-        },
-      });
-      if (otherOwners === 0) soleOwnerOf.push(membership.tenantId);
-    }
+    // Warn (do not block) when the subject is the last owner of a tenant. The
+    // question is per-tenant but asked for EVERY tenant the subject is in, so it
+    // cannot sit inside one scope. One system scope around the whole loop rather
+    // than one per iteration: N tenants must not mean N transactions.
+    const soleOwnerOf = await withSystemScope(
+      'subject-scoped',
+      'request-deletion.soleOwnerCheck',
+      async (tx) => {
+        const owned: string[] = [];
+        for (const membership of user.memberships) {
+          if (membership.role !== 'TENANT_OWNER') continue;
+          const otherOwners = await tx.membership.count({
+            where: {
+              tenantId: membership.tenantId,
+              role: 'TENANT_OWNER',
+              userId: { not: userId },
+            },
+          });
+          if (otherOwners === 0) owned.push(membership.tenantId);
+        }
+        return owned;
+      }
+    );
 
     const requestedAt = new Date();
     await prisma.user.update({
@@ -132,10 +151,14 @@ export async function cancelAccountDeletion(): Promise<DeletionRequestResult> {
       return { success: false, error: 'Unauthorized' };
     }
 
-    const memberships = await prisma.membership.findMany({
-      where: { userId },
-      select: { tenantId: true },
-    });
+    // Lists the subject's tenants so each one can be revalidated after the
+    // cancellation. Scoped by userId across all of them, so there is no single
+    // tenant to run it in.
+    const memberships = await withSystemScope(
+      'subject-scoped',
+      'cancel-deletion.subjectTenants',
+      (tx) => tx.membership.findMany({ where: { userId }, select: { tenantId: true } })
+    );
 
     await prisma.user.update({
       where: { id: userId },

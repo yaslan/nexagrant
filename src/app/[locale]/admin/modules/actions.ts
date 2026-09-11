@@ -1,6 +1,6 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 import { requirePlatformAdmin } from '@/lib/tenant';
 import { getManifest } from '@/lib/modules/registry';
 import { ModuleId, ModuleStatus } from '@/lib/modules/types';
@@ -31,10 +31,14 @@ export async function updateTenantModuleStatus(
     throw new Error(`Module ${moduleId} not found in catalog.`);
   }
 
-  // Fetch current active module states for this tenant
-  const currentStates: ModuleStateRow[] = await prisma.moduleState.findMany({
-    where: { tenantId }
-  });
+  // Fetch current active module states for this tenant. The tenant is named in
+  // the argument list, so this is a plain scoped read — no cross-tenant path
+  // needed. It was recorded as `allowed` with the note "wrappable in principle,
+  // kept with its sibling read"; the sibling turned out to be a different
+  // question (the whole tenant x module grid) so the two are separated here.
+  const currentStates: ModuleStateRow[] = await withTenant(tenantId, (tx) =>
+    tx.moduleState.findMany({ where: { tenantId } })
+  );
 
   const activeModuleIds = currentStates
     .filter((s: { status: string }) => s.status === 'ON' || s.status === 'PILOT')
@@ -63,7 +67,12 @@ export async function updateTenantModuleStatus(
 
   // Perform database updates
   try {
-    await prisma.$transaction(async (tx) => {
+    // `prisma.$transaction` hands back a transaction with no `app.tenant_id` set
+    // — the tenant scope is what withTenant adds beside it. Under `fabrika_app`
+    // every upsert and every AuditEvent insert below is REFUSED by the policies'
+    // WITH CHECK, so the console would fail on every flip. Invisible to
+    // `rls:bypass-check`, whose CHECK A reads the accessor and sees only `tx.`.
+    await withTenant(tenantId, async (tx) => {
       if (targetStatus === 'OFF') {
         for (const modId of modulesToTurnOff) {
           await tx.moduleState.upsert({

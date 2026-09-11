@@ -1,6 +1,7 @@
 import { inngest } from '../client';
 import { env } from '@/lib/env';
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { Resend } from 'resend';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
@@ -240,7 +241,13 @@ export const alertsDaily = inngest.createFunction(
   async ({ step }): Promise<AlertsDailyOutput> => {
     const savedSearches = await step.run('fetch-saved-searches', async () => {
       try {
-        return await prisma.savedSearch.findMany(SAVED_SEARCH_ALERT_QUERY);
+        // Same fan-out shape as m4-weekly: every tenant's alert-enabled saved
+        // searches, read before each one is mailed. Empty under `fabrika_app`,
+        // which this job would report as `totalSearches: 0` — a false success
+        // of exactly the kind the docstring above says it refuses.
+        return await withSystemScope('cross-tenant-job', 'alerts-daily.enabledSearches', (tx) =>
+          tx.savedSearch.findMany(SAVED_SEARCH_ALERT_QUERY)
+        );
       } catch (error) {
         await recordAlert({
           level: 'error',

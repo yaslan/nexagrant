@@ -92,3 +92,105 @@ BEGIN
     EXECUTE format('CREATE POLICY platform_no_delete ON %I FOR DELETE USING (false)', t);
   END LOOP;
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- Sanctioned cross-tenant scope (TASK-MTVTPVTEBCF5Z, slice 6).
+--
+-- The policies above answer "which tenant is asking". Thirty-five call sites in
+-- src/** have no answer to give and are still correct: the API-key lookup that
+-- DISCOVERS the tenant, the GDPR export that spans every tenant a data subject
+-- belongs to, the platform-admin consoles, the cron fan-outs whose tenant set is
+-- the query's OUTPUT. Every one of them is recorded, with a reason read out of
+-- its own file, in scripts/tenant-bypass-baseline.json.
+--
+-- Under the local `fabrika` role (SUPERUSER, BYPASSRLS) they work by accident.
+-- Under `fabrika_app` (NOBYPASSRLS) they return ZERO ROWS — measured, not
+-- feared: 17 Membership rows across 7 tenants read back as 0. So the day the
+-- app stops being BYPASSRLS is the day API-key auth, the magic-token partner
+-- portal, GDPR export and the daily alert fan-out all fail silently.
+--
+-- This gives them a door instead of a hole:
+--
+--   * `system_scope` is a SEPARATE, PERMISSIVE policy. Permissive policies OR
+--     together, so `tenant_isolation` is not touched, not reworded, and not
+--     weakened — which also keeps every migration's copy of its wording valid
+--     (scripts/rls-migrations.ts compares them byte for byte).
+--   * It opens only while `app.system_scope` is 'on', and that GUC is set with
+--     is_local => true, so it dies with the transaction that set it.
+--   * The only way to set it is enter_system_scope(purpose), which validates the
+--     purpose against a closed list and is EXECUTE-granted to the app role by
+--     name. `REVOKE EXECUTE` closes the door in one statement, with no deploy.
+--
+-- What it is NOT: a boundary against a compromised app process. The app role can
+-- call the function, so RLS remains a guard against FORGETTING to scope, not
+-- against an attacker who already runs our code. A hard boundary needs a second
+-- connection under a role the tenant path does not hold — see
+-- docs/agent-results/TASK-MTVTPVTEBCF5Z-de-fb.md §6 (1-3-1), which is a decision
+-- for a human, not for this file.
+--
+-- Deploy order: this is applied by `pnpm db:rls`. Code that calls
+-- withSystemScope() reads zero rows until it has run, exactly like every other
+-- policy change in this file.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.enter_system_scope(purpose text)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+BEGIN
+  -- The closed list is duplicated in src/lib/system-scope.ts on purpose: the
+  -- application refuses an unknown purpose before the round trip, and the
+  -- database refuses it again for anything that reaches it another way.
+  -- tests/system-scope.live.test.ts asserts the two lists are identical.
+  IF purpose IS NULL OR purpose NOT IN (
+    'tenant-discovery',
+    'subject-scoped',
+    'platform-admin',
+    'platform-aggregate',
+    'cross-tenant-job'
+  ) THEN
+    RAISE EXCEPTION 'enter_system_scope: unknown purpose %', coalesce(purpose, '<null>')
+      USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
+  -- is_local => true: transaction-scoped. There is deliberately no
+  -- exit_system_scope() — COMMIT and ROLLBACK are the exit, so a caller cannot
+  -- leak the scope by forgetting to close it.
+  PERFORM set_config('app.system_scope', 'on', true);
+  PERFORM set_config('app.system_scope_purpose', purpose, true);
+  RETURN purpose;
+END
+$fn$;
+
+COMMENT ON FUNCTION public.enter_system_scope(text) IS
+  'Opens the system_scope RLS policy for the current transaction only. Single entry point for the cross-tenant call sites recorded in scripts/tenant-bypass-baseline.json. REVOKE EXECUTE to close it.';
+
+-- Nobody by default; the app role by name. Guarded because prisma/rls.sql runs
+-- on databases where `pnpm db:rls-role` has not been run yet, and the grant is
+-- re-asserted from prisma/rls-app-role.sql for the opposite order.
+REVOKE ALL ON FUNCTION public.enter_system_scope(text) FROM PUBLIC;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app') THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.enter_system_scope(text) TO fabrika_app';
+  END IF;
+END $$;
+
+-- The policy itself, over every table that already carries one of the two
+-- tenant policies. Derived from pg_policies rather than a third hand-kept table
+-- array: a list that can drift from the two above is a list that will.
+DO $$
+DECLARE t text;
+BEGIN
+  FOR t IN
+    SELECT DISTINCT tablename FROM pg_policies
+    WHERE schemaname = 'public' AND policyname IN ('tenant_isolation', 'tenant_or_shared')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS system_scope ON %I', t);
+    EXECUTE format($p$CREATE POLICY system_scope ON %I
+      USING (current_setting('app.system_scope', true) = 'on')
+      WITH CHECK (current_setting('app.system_scope', true) = 'on')$p$, t);
+  END LOOP;
+END $$;

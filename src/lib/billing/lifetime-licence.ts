@@ -17,6 +17,7 @@
  */
 import type Stripe from 'stripe';
 import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { logger } from '@/lib/logger';
 import { LIFETIME_LICENCE_CAP } from './catalog';
 
@@ -173,10 +174,13 @@ export async function recordLifetimeLicence(
     return { status: 'duplicate', tenantId: already.tenantId, seq: already.seq, licenceId: already.id };
   }
 
-  const highest = await prisma.lifetimeLicence.findFirst({
-    orderBy: { seq: 'desc' },
-    select: { seq: true },
-  });
+  // The licence number is a platform-wide scarce resource capped at
+  // LIFETIME_LICENCE_CAP, so the highest `seq` is a question about the whole
+  // estate. Under `fabrika_app` this reads null, every buyer is handed seq 1,
+  // and the cap stops counting.
+  const highest = await withSystemScope('platform-aggregate', 'lifetime-licence.highestSeq', (tx) =>
+    tx.lifetimeLicence.findFirst({ orderBy: { seq: 'desc' }, select: { seq: true } })
+  );
   const seq = (highest?.seq ?? 0) + 1;
 
   try {
@@ -220,5 +224,10 @@ async function findRecorded(eventId: string, sessionId: string | undefined) {
     { providerEventId: eventId },
   ];
   if (sessionId) or.push({ providerSessionId: sessionId });
-  return prisma.lifetimeLicence.findFirst({ where: { OR: or } });
+  // The idempotency lookup by providerEventId, which runs BEFORE the tenant is
+  // known — the same discovery shape as src/lib/api-auth.ts. Empty under
+  // `fabrika_app` means every Stripe webhook retry is treated as a new sale.
+  return withSystemScope('tenant-discovery', 'lifetime-licence.findRecorded', (tx) =>
+    tx.lifetimeLicence.findFirst({ where: { OR: or } })
+  );
 }

@@ -9,7 +9,16 @@ const auth = vi.fn().mockResolvedValue({
 
 vi.mock('../src/lib/auth', () => ({ auth: () => auth() }));
 
-vi.mock('../src/lib/db', () => ({
+/**
+ * The one fake client, parked in a hoisted box so `withTenant` hands it to its
+ * callback BY REFERENCE rather than through a dynamic import of the mocked
+ * module, which re-runs this factory and mints fresh `vi.fn()`s
+ * (TASK-MTVTPVTEBCF5Z).
+ */
+const dbBox = vi.hoisted(() => ({ client: undefined as unknown }));
+
+vi.mock('../src/lib/db', () => {
+  const mod = {
   prisma: {
     moduleState: {
       findMany: vi.fn().mockImplementation(({ where }) => {
@@ -33,7 +42,26 @@ vi.mock('../src/lib/db', () => ({
       };
       return await cb(tx);
     })
-  }
+  },
+  // The action reads and writes one NAMED tenant, so it is plain tenant scope,
+  // not the cross-tenant path (TASK-MTVTPVTEBCF5Z). Same fake client either way.
+  withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
+    cb(dbBox.client as never)
+  };
+  dbBox.client = mod.prisma;
+  return mod;
+});
+
+/**
+ * The cross-tenant path hands its callback the same fake client `prisma`
+ * resolves to, exactly as the `withTenant` mocks in this suite do — so the
+ * assertions below keep watching the one `vi.fn()` after the code under test
+ * moved its query onto `withSystemScope` (TASK-MTVTPVTEBCF5Z). Resolved lazily
+ * because `vi.mock` is hoisted above the fixture consts.
+ */
+vi.mock('../src/lib/system-scope', () => ({
+  withSystemScope: async <T,>(_purpose: string, _context: string, cb: (tx: never) => Promise<T> | T) =>
+    cb(dbBox.client as never),
 }));
 
 describe('Admin Module Actions', () => {

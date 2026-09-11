@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { NextResponse } from 'next/server';
 import { errorMessage } from '@/lib/errors';
 
@@ -38,9 +39,14 @@ export async function authenticateApiKey(req: Request): Promise<
   const keyHash = crypto.createHash('sha256').update(apiKeyHeader).digest('hex');
 
   try {
-    const keyRecord = await prisma.apiKey.findUnique({
-      where: { keyHash },
-    });
+    // The SHA-256 hash IS the credential, and this lookup is what DISCOVERS the
+    // tenant — withTenant cannot wrap it, because the argument it needs is this
+    // call's result. Under `fabrika_app` (NOBYPASSRLS) the unscoped read returns
+    // no row at all and every API key on the platform stops authenticating, so
+    // the discovery runs on the sanctioned cross-tenant path instead.
+    const keyRecord = await withSystemScope('tenant-discovery', 'api-auth.keyByHash', (tx) =>
+      tx.apiKey.findUnique({ where: { keyHash } })
+    );
 
     if (!keyRecord) {
       // An unknown key is rejected, full stop. There used to be a prefix
@@ -61,13 +67,31 @@ export async function authenticateApiKey(req: Request): Promise<
       };
     }
 
-    // Update lastUsedAt asynchronously
-    prisma.apiKey
-      .update({
-        where: { id: keyRecord.id },
-        data: { lastUsedAt: new Date() },
-      })
-      .catch(() => {});
+    // Update lastUsedAt asynchronously. The tenant is known by now, so this one
+    // is scoped rather than system-scoped: only the read had to be cross-tenant.
+    //
+    // It was invisible to `pnpm rls:bypass-check` until this card, because CHECK
+    // A matches `prisma.<model>.<op>(` on one line and this call was written
+    // across three. It is the only tenant-scoped call in src/** in that shape —
+    // measured, see docs/agent-results/TASK-MTVTPVTEBCF5Z-de-fb.md §5.
+    // Fire-and-forget, and it must STAY fire-and-forget: `.catch()` alone only
+    // catches a rejected promise, so a synchronous throw here (a helper that is
+    // undefined under a partial test double, a pool that refuses a connection)
+    // would escape into the try block above and turn a valid key into
+    // AUTH_INTERNAL_ERROR. A last-used timestamp must never fail an
+    // authentication — measured: it did, in tests/api/v1-calls.test.ts.
+    void (async () => {
+      try {
+        await withTenant(keyRecord.tenantId, (tx) =>
+          tx.apiKey.update({
+            where: { id: keyRecord.id, tenantId: keyRecord.tenantId },
+            data: { lastUsedAt: new Date() },
+          })
+        );
+      } catch {
+        // best effort
+      }
+    })();
 
     return {
       authenticated: true,

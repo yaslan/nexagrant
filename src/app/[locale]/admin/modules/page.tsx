@@ -1,5 +1,6 @@
 import React from 'react';
 import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { AdminModulesClient } from './client';
 import { ModuleStatus } from '@/lib/modules/types';
 import { errorMessage } from '@/lib/errors';
@@ -25,7 +26,15 @@ export default async function AdminModulesPage() {
       },
     });
 
-    const allModuleStates = await prisma.moduleState.findMany();
+    // The console renders a tenant x module grid, so this read is unfiltered on
+    // purpose and the loop below groups by s.tenantId. Under `fabrika_app` it
+    // returns nothing and every cell renders as "off" — a wrong grid, not an
+    // empty one.
+    const allModuleStates = await withSystemScope(
+      'platform-admin',
+      'admin-modules.stateGrid',
+      (tx) => tx.moduleState.findMany()
+    );
     for (const s of allModuleStates) {
       // The per-tenant bucket is held in a local rather than re-read from the
       // map: assigning through `initialStates[s.tenantId]` immediately after the

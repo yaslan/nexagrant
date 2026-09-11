@@ -2,6 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { auth } from '@/lib/auth';
 
 /**
@@ -37,6 +38,15 @@ export async function exportUserData(): Promise<ExportResult> {
       return { success: false, error: 'Unauthorized' };
     }
 
+    // GDPR Art. 15/20 is a question about a PERSON, not about a tenant: the
+    // subject's rows are collected across every tenant they belong to, and a
+    // single tenant scope would silently under-deliver the export. Under
+    // `fabrika_app` the unscoped reads return nothing at all, which would hand
+    // the subject an empty — and therefore wrong — portability file.
+    //
+    // One system scope around the whole batch rather than one per table: it is
+    // a single transaction, so the export is a consistent snapshot, and the
+    // gate counts one recorded escape instead of six.
     const [
       user,
       memberships,
@@ -46,8 +56,9 @@ export async function exportUserData(): Promise<ExportResult> {
       aiUsage,
       approvals,
       opportunities,
-    ] = await Promise.all([
-        prisma.user.findUnique({
+    ] = await withSystemScope('subject-scoped', 'gdpr-export.subjectRows', (tx) =>
+      Promise.all([
+        tx.user.findUnique({
           where: { id: userId },
           select: {
             id: true,
@@ -64,7 +75,7 @@ export async function exportUserData(): Promise<ExportResult> {
             deletionReason: true,
           },
         }),
-        prisma.membership.findMany({
+        tx.membership.findMany({
           where: { userId },
           select: {
             id: true,
@@ -75,7 +86,7 @@ export async function exportUserData(): Promise<ExportResult> {
           },
         }),
         // Provider linkage only — refresh_token / access_token / id_token are secrets.
-        prisma.account.findMany({
+        tx.account.findMany({
           where: { userId },
           select: {
             provider: true,
@@ -83,19 +94,19 @@ export async function exportUserData(): Promise<ExportResult> {
             createdAt: true,
           },
         }),
-        prisma.evaluation.findMany({ where: { userId } }),
+        tx.evaluation.findMany({ where: { userId } }),
         // Soft-deleted rows are excluded: they are pending erasure, so handing
         // them back in a portability file would resurrect data the subject or
         // the tenant already asked to remove.
-        prisma.effort.findMany({ where: { userId, deletedAt: null } }),
-        prisma.aiUsageLog.findMany({ where: { userId } }),
-        prisma.approvalRequest.findMany({
+        tx.effort.findMany({ where: { userId, deletedAt: null } }),
+        tx.aiUsageLog.findMany({ where: { userId } }),
+        tx.approvalRequest.findMany({
           where: { OR: [{ requesterId: userId }, { approverId: userId }] },
         }),
         // Opportunities the subject personally owns, with the linked proposal.
         // Scoped by ownerId, never by tenantId: the rest of the tenant's
         // pipeline is not this subject's personal data.
-        prisma.opportunity.findMany({
+        tx.opportunity.findMany({
           where: { ownerId: userId, deletedAt: null },
           select: {
             id: true,
@@ -121,7 +132,8 @@ export async function exportUserData(): Promise<ExportResult> {
             },
           },
         }),
-      ]);
+      ])
+    );
 
     // Split the nested proposal out so each table reads as its own list.
     const proposals = opportunities

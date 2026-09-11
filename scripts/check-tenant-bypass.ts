@@ -75,7 +75,7 @@ interface BaselineEntry {
   file: string;
   subject: string;
   count: number;
-  kind: 'allowed' | 'debt';
+  kind: 'allowed' | 'debt' | 'system-scope';
   class: string;
   reason: string;
   card?: string;
@@ -94,6 +94,7 @@ const CHECK_TITLES: Record<CheckId, string> = {
   B1: '`tenantId ? {…} : {…}` — the filter disappears instead of narrowing',
   B2: '`tenantId: x ?? …` / `x || …` — an invented tenant instead of a refusal',
   C: '`as unknown as TenantTx` — the brand minted outside withTenantOn',
+  D: '`withSystemScope(…)` — a sanctioned cross-tenant escape, counted so it stays sanctioned',
 };
 
 const HOW_TO_FIX: Record<CheckId, string> = {
@@ -115,6 +116,13 @@ const HOW_TO_FIX: Record<CheckId, string> = {
     'The brand is minted in exactly one place — withTenantOn, beside\n' +
     '  set_config(\'app.tenant_id\', …). A cast elsewhere claims a tenant scope that\n' +
     '  nothing set. Call withTenant/withTenantOn and use the `tx` it hands you.',
+  D:
+    'Leaving a tenant scope is allowed, and is never silent. Record it in\n' +
+    `  ${BASELINE_PATH} with kind "system-scope" and a reason read out of the file —\n` +
+    '  the same standard the 35 `allowed` entries were held to. If the purpose reads\n' +
+    '  as "unreadable-purpose", pass one of the five literals from\n' +
+    '  SYSTEM_SCOPE_PURPOSES directly at the call site instead of a variable: a\n' +
+    '  purpose the gate cannot read is a purpose nobody reviews.',
 };
 
 function keyOf(f: { check: string; file: string; subject: string }): string {
@@ -150,6 +158,16 @@ function main(): void {
   const introduced: Finding[] = [];
   const grown: { entry: BaselineEntry; found: Finding[] }[] = [];
   const shrunk: { entry: BaselineEntry; found: number }[] = [];
+
+  /**
+   * The kind and the check have to agree, or the sanctioned path becomes the
+   * mute button it was built not to be: relabel a CHECK A bypass as
+   * "system-scope" and it would slide into the quiet list without ever going
+   * through withSystemScope. Structural, so nobody has to remember it.
+   */
+  const mislabelled = baseline.entries.filter((e) =>
+    e.check === 'D' ? e.kind !== 'system-scope' : e.kind === 'system-scope'
+  );
 
   for (const [key, found] of actual) {
     const entry = expected.get(key);
@@ -209,6 +227,20 @@ function main(): void {
   );
 
   let failed = false;
+
+  if (mislabelled.length > 0) {
+    failed = true;
+    console.error(`\n❌ ${mislabelled.length} baseline entr${mislabelled.length === 1 ? 'y has' : 'ies have'} a kind that does not match its check:`);
+    for (const e of mislabelled) {
+      console.error(`  ${e.file} — ${e.subject} (check ${e.check}, kind "${e.kind}")`);
+    }
+    console.error(
+      '  CHECK D is the sanctioned cross-tenant path and is recorded as kind\n' +
+        '  "system-scope"; every other check records a bypass and must not be. A\n' +
+        '  bypass relabelled into the sanctioned list is the mute button this gate\n' +
+        '  exists to prevent.'
+    );
+  }
 
   if (introduced.length > 0) {
     failed = true;
@@ -270,6 +302,34 @@ function main(): void {
     }
   }
 
+  // The sanctioned escapes, measured. Printed on every run for the same reason
+  // the debt block is: a list of places where isolation is deliberately off is
+  // exactly the list that must not go quiet.
+  const escapes = baseline.entries
+    .filter((e) => e.kind === 'system-scope')
+    .map((e) => ({ entry: e, live: actual.get(keyOf(e))?.length ?? 0 }));
+  const escapeCount = escapes.reduce((a, e) => a + e.live, 0);
+  if (escapes.length > 0) {
+    console.log(
+      `\nSanctioned cross-tenant escapes: ${escapeCount} call site(s) via withSystemScope, measured.`
+    );
+    const byPurpose = new Map<string, { files: number; sites: number }>();
+    for (const e of escapes) {
+      const purpose = e.entry.subject.replace(/^system-scope:/, '');
+      const acc = byPurpose.get(purpose) ?? { files: 0, sites: 0 };
+      acc.files += 1;
+      acc.sites += e.live;
+      byPurpose.set(purpose, acc);
+    }
+    for (const [purpose, acc] of [...byPurpose].sort()) {
+      console.log(`  ${purpose.padEnd(20)} ${acc.sites} call site(s) in ${acc.files} file(s)`);
+    }
+    console.log(
+      '  Each one is recorded with a reason, ratcheted like a bypass, and opens the\n' +
+        '  `system_scope` RLS policy for one transaction only (prisma/rls.sql).'
+    );
+  }
+
   // Measured, never recorded: a debt list that can overstate is a debt list
   // people stop reading.
   const debt = baseline.entries
@@ -295,7 +355,7 @@ function main(): void {
     .reduce((a, e) => a + (actual.get(keyOf(e))?.length ?? 0), 0);
   console.log(
     `\n✅ SUCCESS: no new tenant bypass. ${allowed} call site(s) allowed with a recorded reason, ` +
-      `${owed} still owed.`
+      `${escapeCount} on the sanctioned cross-tenant path, ${owed} still owed.`
   );
   console.log('   (Shape only — `pnpm rls:verify` asks the database whether isolation actually holds.)');
 }

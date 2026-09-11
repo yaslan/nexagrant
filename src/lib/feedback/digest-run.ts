@@ -7,6 +7,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { env } from '@/lib/env';
 import { logger } from '@/lib/logger';
 import {
@@ -45,18 +46,26 @@ export async function collectDigestRows(
   windowStart: Date,
   windowEnd: Date
 ): Promise<{ windowRows: DigestRow[]; allOpen: DigestRow[] }> {
-  const [inWindow, open]: [FeedbackRecord[], FeedbackRecord[]] = await Promise.all([
-    prisma.feedback.findMany({
-      where: { createdAt: { gte: windowStart, lte: windowEnd } },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    }),
-    prisma.feedback.findMany({
-      where: { status: { in: OPEN_STATUSES as never } },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    }),
-  ]);
+  // Both reads are cross-tenant by construction — this builds the PLATFORM's
+  // beta digest, not a tenant's. One scope around the pair: same transaction,
+  // same snapshot, one recorded escape instead of two.
+  const [inWindow, open]: [FeedbackRecord[], FeedbackRecord[]] = await withSystemScope(
+    'platform-aggregate',
+    'feedback-digest.windowAndOpen',
+    (tx) =>
+      Promise.all([
+        tx.feedback.findMany({
+          where: { createdAt: { gte: windowStart, lte: windowEnd } },
+          orderBy: { createdAt: 'desc' },
+          take: 500,
+        }),
+        tx.feedback.findMany({
+          where: { status: { in: OPEN_STATUSES as never } },
+          orderBy: { createdAt: 'desc' },
+          take: 500,
+        }),
+      ])
+  );
 
   const tenantIds = Array.from(
     new Set([...inWindow, ...open].map((r) => r.tenantId))

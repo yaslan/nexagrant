@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { createPortalSession } from '@/lib/billing/create-portal-session';
 
 export async function POST(request: NextRequest) {
@@ -10,14 +10,25 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    // Hoisted: the narrowing above does not survive into the callback below.
+    const userId = session.user.id;
 
-    const membership = await prisma.membership.findFirst({
-      where: {
-        userId: session.user.id,
-        role: { in: ['TENANT_OWNER', 'TENANT_ADMIN'] },
-      },
-      include: { tenant: true },
-    });
+    // Answers "which tenant does this signed-in user own?" — scoped by
+    // session.user.id and role, and the tenantId it returns is what
+    // createPortalSession is then given. Nothing narrower exists to scope to
+    // yet, so this is the discovery read, not a bypass.
+    const membership = await withSystemScope(
+      'tenant-discovery',
+      'billing-portal.ownedTenantForUser',
+      (tx) =>
+        tx.membership.findFirst({
+          where: {
+            userId,
+            role: { in: ['TENANT_OWNER', 'TENANT_ADMIN'] },
+          },
+          include: { tenant: true },
+        })
+    );
 
     if (!membership?.tenantId) {
       return NextResponse.json(
