@@ -959,6 +959,25 @@
       "escrowNote": "🔒 Güvenli Emanet (Escrow) ödemesi ile danışman işi teslim edene kadar ücret güvendedir.",
       "ordering": "Sipariş İletiliyor...",
       "confirmButton": "Siparişi Onayla ve İşlemi Başlat"
+    },
+    "state": {
+      "retry": "Yeniden dene",
+      "page": {
+        "errorTitle": "Pazar yeri yüklenemedi",
+        "errorBody": "Ne ilanlar ne de API anahtarları okunabildi. Doğrulayamadığımız veriyi göstermek yerine hiçbir şey gösterilmiyor. Yeniden deneyin; sorun sürerse yöneticinize bildirin."
+      },
+      "listings": {
+        "emptyTitle": "Henüz ilan yok",
+        "emptyBody": "Pazar yerinize henüz ilan yayımlanmadı. İlkini eklemek için Yeni Hizmet İlanı Ver sekmesini açın.",
+        "errorTitle": "İlanlar yüklenemedi",
+        "errorBody": "İlanlarınız okunamadı. Bu bir okuma hatasıdır, pazar yerinizin boş olduğu anlamına gelmez — hiçbir ilan silinmedi. Yeniden deneyin; sorun sürerse yöneticinize bildirin."
+      },
+      "apiKeys": {
+        "emptyTitle": "Henüz API anahtarı yok",
+        "emptyBody": "Bu çalışma alanı için henüz partner API anahtarı üretilmedi. Oluşturmak için Partner Intelligence API Anahtarları sekmesini açın.",
+        "errorTitle": "API anahtarları yüklenemedi",
+        "errorBody": "API anahtarı listesi okunamadı. Var olan anahtarlarınız bundan etkilenmedi — liste yeniden yüklenene kadar yenisini üretmeyin."
+      }
     }
   },
   "m9": {

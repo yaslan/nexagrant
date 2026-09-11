@@ -959,6 +959,25 @@
       "escrowNote": "🔒 Secure escrow payment protects the fee until the consultant delivers the work.",
       "ordering": "Submitting Order...",
       "confirmButton": "Confirm Order and Start"
+    },
+    "state": {
+      "retry": "Try again",
+      "page": {
+        "errorTitle": "The marketplace could not be loaded",
+        "errorBody": "Neither the listings nor the API keys could be read. Nothing is shown rather than data we cannot verify. Try again, and tell your administrator if this keeps happening."
+      },
+      "listings": {
+        "emptyTitle": "No listings yet",
+        "emptyBody": "Nothing has been published to your marketplace yet. Open the Post New Service Listing tab to add the first one.",
+        "errorTitle": "Listings could not be loaded",
+        "errorBody": "Your listings could not be read. This is a read error, not an empty marketplace — nothing has been removed. Try again, and tell your administrator if this keeps happening."
+      },
+      "apiKeys": {
+        "emptyTitle": "No API keys yet",
+        "emptyBody": "No partner API key has been generated for this workspace. Open the Partner Intelligence API Keys tab to create one.",
+        "errorTitle": "API keys could not be loaded",
+        "errorBody": "The API key list could not be read. Your existing keys are unaffected — do not generate a replacement until the list loads again."
+      }
     }
   },
   "m9": {
