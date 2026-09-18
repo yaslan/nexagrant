@@ -16,17 +16,25 @@ vi.mock('../../src/lib/tenant', () => ({
   requireTenantAction: h.requireTenantAction,
 }));
 
-vi.mock('../../src/lib/db', () => ({
-  prisma: {},
-  withTenant: vi.fn(async (_tenantId: string, cb: (tx: unknown) => Promise<unknown>) =>
-    cb({
-      proposal: {
-        findFirst: h.proposalFindFirst,
-        update: h.proposalUpdate,
-      },
-    })
-  ),
-}));
+vi.mock('../../src/lib/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/db')>();
+  return {
+    // The real `assertTenantScope`/`MissingTenantScopeError`: the parser's
+    // refusal of a missing tenant is what this file has to prove, so it must be
+    // the shipped rule that refuses, not a stub written to agree with it.
+    assertTenantScope: actual.assertTenantScope,
+    MissingTenantScopeError: actual.MissingTenantScopeError,
+    prisma: {},
+    withTenant: vi.fn(async (_tenantId: string, cb: (tx: unknown) => Promise<unknown>) =>
+      cb({
+        proposal: {
+          findFirst: h.proposalFindFirst,
+          update: h.proposalUpdate,
+        },
+      })
+    ),
+  };
+});
 
 describe('ESR AI Document Parser', () => {
   beforeEach(() => {
@@ -62,7 +70,21 @@ describe('ESR AI Document Parser', () => {
   });
 
   test('parseEsrDocumentText rejects empty ESR text', async () => {
-    await expect(parseEsrDocumentText('')).rejects.toThrow(/empty/i);
+    await expect(parseEsrDocumentText('', 'tenant-1')).rejects.toThrow(/empty/i);
+    expect(h.generateText).not.toHaveBeenCalled();
+  });
+
+  // TASK-MTVTRNORO1ES8. The parser used to send `tenantId || 'system'` to
+  // generateText, which books an AiUsageLog row and a CreditLedger deduction
+  // against whatever id it is handed. A missing tenant must stop the call, not
+  // rename it: nothing may reach the provider and nothing may be charged.
+  test.each([
+    ['empty string', ''],
+    ['whitespace', '   '],
+  ])('parseEsrDocumentText refuses a %s tenant instead of inventing one', async (_label, tenantId) => {
+    await expect(parseEsrDocumentText('Evaluation Summary Report. Total: 13.0', tenantId)).rejects.toThrow(
+      /tenant/i
+    );
     expect(h.generateText).not.toHaveBeenCalled();
   });
 

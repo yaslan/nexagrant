@@ -274,8 +274,15 @@ export async function readStorefront(
       measured: true,
     };
   } catch (error) {
+    // `tenantId` verbatim, including `null`. It used to log `?? 'anonymous'`,
+    // which put a word in the tenant field of an observability record that
+    // matches no `Tenant` row — the shape that seeded the orphan pile
+    // scripts/check-orphan-alerts.ts now sweeps up. An explicit `null` is the
+    // honest reading of the one case that produces it (a signed-out visitor on
+    // the public list) and stays distinguishable from a field that went
+    // missing, because JSON keeps the key.
     logger.error('Storefront could not be read; the page will say so rather than quote a price', error, {
-      tenantId: tenantId ?? 'anonymous',
+      tenantId,
     });
     return { cards: [], schedule: [], measured: false };
   }

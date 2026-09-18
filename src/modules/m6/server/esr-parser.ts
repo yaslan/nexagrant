@@ -1,5 +1,5 @@
 import { generateText } from '@/lib/llm';
-import { withTenant, type TenantTx } from '@/lib/db';
+import { withTenant, assertTenantScope, type TenantTx } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { z } from 'zod';
 
@@ -45,20 +45,35 @@ ESR Document Text:
 
 /**
  * Parses ESR text content using LLM and returns structured scores.
+ *
+ * `tenantId` is required and is asserted, never defaulted. This used to pass
+ * `tenantId || 'system'`, and an ESR parse is charged work: `generateText`
+ * writes an `AiUsageLog` row (tenant-scoped, FORCE RLS) and a `CreditLedger`
+ * row for the same tenant, so a fabricated id books usage against a tenant that
+ * does not exist. `PLATFORM_SCOPE_TENANT_ID` is deliberately NOT used here
+ * either — it is declared for the zero-credit `embedText` path, and its own
+ * docstring rests on "no CreditLedger row is ever written against it"
+ * (`CreditLedger.tenantId` is a real FK to `Tenant`). On this path it would
+ * fail twice over: the balance read returns 0 and the caller is told it is out
+ * of credits, and were it ever funded the ledger insert would break the FK
+ * *after* the provider had been paid. Every caller has a tenant — the session
+ * one, or an explicit override — so the missing case is a caller bug, refused
+ * before the model is called and before anything is spent.
  */
 export async function parseEsrDocumentText(
   documentText: string,
-  tenantId?: string,
+  tenantId: string,
   userId?: string
 ): Promise<ParsedEsrScores> {
   if (!documentText || documentText.trim().length === 0) {
     throw new Error('ESR document text is empty');
   }
+  assertTenantScope(tenantId, 'parseEsrDocumentText');
 
   const prompt = ESR_PARSER_PROMPT.replace('{{documentText}}', documentText.slice(0, 8000));
 
   const resultStr = await generateText({
-    tenantId: tenantId || 'system',
+    tenantId,
     userId,
     module: 'M6',
     purpose: 'esr-parser',
