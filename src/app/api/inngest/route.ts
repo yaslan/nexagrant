@@ -9,6 +9,7 @@ import {
   usersScheduledDeletion,
   feedbackWeeklyDigest,
   alertsSweep,
+  stripeEventCleanup,
 } from '@/lib/inngest/jobs';
 
 export const { GET, POST, PUT } = serve({
@@ -22,5 +23,6 @@ export const { GET, POST, PUT } = serve({
     usersScheduledDeletion,
     feedbackWeeklyDigest,
     alertsSweep,
+    stripeEventCleanup,
   ],
 });
