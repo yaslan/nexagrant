@@ -34,22 +34,22 @@ export async function grantCreditsToTenants(
     const tenantId = tenant.id;
 
     try {
-      const entitlements = await getEntitlements(tenantId);
-      const creditsToGrant = entitlements.aiCreditsMonthly || 0;
+      await runTenant(tenantId, async (tx) => {
+        const entitlements = await getEntitlements(tenantId, tx);
+        const creditsToGrant = entitlements.aiCreditsMonthly || 0;
 
-      if (creditsToGrant > 0) {
-        await runTenant(tenantId, (tx) =>
-          tx.creditLedger.create({
+        if (creditsToGrant > 0) {
+          await tx.creditLedger.create({
             data: {
               tenantId,
               delta: creditsToGrant,
               reason: 'monthly_grant',
             },
-          })
-        );
-        grantedCount++;
-        totalCredits += creditsToGrant;
-      }
+          });
+          grantedCount++;
+          totalCredits += creditsToGrant;
+        }
+      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error(`Failed to grant credits for tenant ${tenantId}:`, error);
