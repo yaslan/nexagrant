@@ -40,3 +40,6 @@
 - [rename-card-fix-the-value-not-the-52-copies](rename-card-fix-the-value-not-the-52-copies.md) — Bir "ölü ürün adı N dosyada" kartını yeni adı N yere yazarak kapatma — adı tek bir değere (brand.ts + katalogda {brand}) bağla, yoksa aynı kusuru yeni ad altında yeniden üretirsin
 
 - [removal-proof-is-an-inert-value-not-a-zero-grep](removal-proof-is-an-inert-value-not-a-zero-grep.md) — Bir ayarın kaldırıldığını `grep → 0` kanıtlamaz — ayarı saçma bir değere SET edip çıktının byte-identical kaldığını göster; ve her test kurulumunu silip testin yeşil kaldığını ölç
+
+- [a-method-chain-split-across-lines-hides-callers-from-grep](a-method-chain-split-across-lines-hides-callers-from-grep.md) — Bir kullanım denetiminde satır-bazlı grep, iki satıra kırılmış metot zincirlerini KAÇIRIR — metodu değil nesneyi ara; Fabrika'da alarm yazan iki bypass böyle görünmezdi
+- [a-varying-field-can-be-deliberate-identity](a-varying-field-can-be-deliberate-identity.md) — Bir alanın koşudan koşuya değişmesi onu otomatik olarak gürültü yapmaz — katlamadan önce testlerde o ayrımı KASTEN koyan bir karar var mı diye bak; Fabrika'da purge alarmı böyle geri alındı
