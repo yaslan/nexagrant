@@ -78,3 +78,11 @@ oluşta taze satır açılır.
 
 - [ ] `pnpm gate` hedef ağaçta exit 0 (lint + typecheck + test + i18n + rls).
 - [ ] `pnpm rls:verify` gerçek `fabrika_app` rolüyle ölçüldü (BYPASSRLS yok).
+- [ ] `pnpm alerts:check` exit 0 — hiçbir açık `SystemAlert`, silinmiş bir
+      kiracıyı göstermiyor. `SystemAlert` tenant-agnostiktir ve `tenantId`
+      kolonu yoktur, bu yüzden "kiracıma ait her şeyi sil" desenini kullanan
+      test fixture'larının ulaşamadığı tek tablodur; ulaşamadığında alarm
+      kiracısından uzun yaşar ve konsolun 300 satırlık penceresini gerçek
+      alarmların önünden iter (TASK-MTVFWYKIZXRB1: 268 satırın 234'ü böyleydi).
+      Kapı `test:e2e`'den SONRA koşar; kırmızıysa hangi fixture'ın sızdırdığını
+      yazar.

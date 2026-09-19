@@ -222,3 +222,119 @@
 [14:24:29] DONE: st1 → geli-tirici: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU04TNPTCTQ-geli-tirici.md
 [14:55:19] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU1CM8ITW6VH-blok-zincir-dev.md
 [15:10:49] DONE: st1 → geli-tirici: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTTUSEJFOSPI-geli-tirici.md
+[15:25:20] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU26XBVZ6H1O-blok-zincir-dev.md
+[15:28:12] DONE: st1 → geli-tirici: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU27KSLSJZ9I-geli-tirici.md
+[15:39:35] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU26XBVZ6H1O-blok-zincir-dev-2.md
+[15:48:35] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU26XBVZ6H1O-blok-zincir-dev-3.md
+[15:55:51] FAIL: st1 (geli-tirici: pane exited (code 129) ve beklenen çıktı yok: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU27KSLSJZ9I-geli-tirici-2.md)
+[15:55:51] REPORT: dlg-1788958259103-1 (0/1 alt-görev ok — eksik/başarısız var)
+[16:08:28] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU3J768HN45U-blok-zincir-dev.md
+[16:16:52] REPORT: dlg-1788958671127-1 (0/1 alt-görev ok — eksik/başarısız var)
+[16:59:54] FAIL: st1 (blok-zincir-dev: pane exited (code 129) ve beklenen çıktı yok: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU3J768HN45U-blok-zincir-dev-2.md)
+[16:59:54] REPORT: dlg-1788959548689-1 (0/1 alt-görev ok — eksik/başarısız var)
+[17:08:17] DONE: st5 → ex-en: YOL ÜSTÜNDE GÖRDÜĞÜN BAŞKA HATA: DÜZELTME, kapsamını genişl…
+[17:09:02] DONE: 3 görev bitti: st6, st1, st8 → blockzincir-pm, blok-zincir-dev, customer-support
+[17:10:20] DONE: st3 → blok-zincir-denet-i: COMMIT: yalnız blok-zincir-dev ve geli-tirici commit atabil…
+[17:10:59] DONE: st4 → blok-zincir-dse: KANIT DİSİPLİNİ: rapora yazdığın her "yeşil/geçti" satırını…
+[17:12:03] DONE: st2 → geli-tirici: ÇAKIŞMA KURALI: `pnpm dev`, `pnpm test:e2e`, `pnpm gate`, `…
+[17:19:20] DONE: st4 → customer-support: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU64MMEQC0WV-evidence/03-hardcoded-strings.txt
+[17:32:28] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/B-1-blok-zincir-dev.md
+[18:07:58] FAIL: st7 (worker 17 dakikadır sessiz ve boş prompt'ta bekliyor — alt-görev KOŞMUYOR, tamamlanma sinyali yok)
+[18:07:58] REPORT: dlg-1788962680434-1 (7/8 alt-görev ok — eksik/başarısız var)
+[21:58:36] DONE: st3 → blok-zincir-denet-i: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUGK2OUVAFDN-blok-zincir-denet-i.md
+[22:00:09] DONE: st4 → customer-support: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUGKEF9KENK-customer-support.md
+[22:04:14] DONE: st2 → blok-zincir-dse: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUGJTD5HZDW0-blok-zincir-dse.md
+[22:09:57] DONE: st1 → blok-zincir-denet-i: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU6KE36HAFJR-blok-zincir-denet-i.md
+[22:11:06] DONE: st2 → customer-support: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUGU8O95B925-customer-support.md
+[22:12:38] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU4AYW5R9DGL-blok-zincir-dev-4.md
+[22:21:36] DONE: st3 → customer-support: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUH6YKP6OQAX-customer-support.md
+[22:28:12] DONE: st1 → blok-zincir-dse: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUH5L8MJ6S8E-blok-zincir-dse.md
+[22:30:46] DONE: st2 → blok-zincir-denet-i: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUH7CF87SGRR-blok-zincir-denet-i.md
+[22:34:49] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU4AYW5R9DGL-blok-zincir-dev-4-2.md
+[22:47:50] DONE: st4 → customer-support: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUH6YKP6OQAX-customer-support-commit.md
+[22:52:06] DONE: st2 → blok-zincir-dse: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUI9F5YBHTDC-blok-zincir-dse.md
+[22:54:07] FAIL: 2 görev BAŞARISIZ: st1, st3 (uygulama yeniden başladı, pane kayboldu ve kanıt yok)
+[22:57:51] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUI9ZBK7W4JY-blok-zincir-dev.md
+[22:59:23] DONE: st1 → blok-zincir-denet-i: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUI9R0FOOY2J-blok-zincir-denet-i.md
+[23:01:35] DONE: st2 → blok-zincir-dse: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTUIPYSSNLVWG-blok-zincir-dse.md
+[09:30:32] DONE: st2 → blok-zincir-dse: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTV4ZJEECXNDE-blok-zincir-dse.md
+[09:32:02] DONE: 2 görev bitti: st7, st5 → blog-yazar, customer-support
+[09:35:13] DONE: st6 → blockzincir-pm: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU64P5DPWC4A-blockzincir-pm.md
+[09:37:18] DONE: st3 → blok-zincir-denet-i: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTV50DQCQDB7B-blok-zincir-denet-i.md
+[09:40:42] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTV4YSO4SEMGG-blok-zincir-dev.md
+[09:45:42] DONE: st4 → geli-tirici: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTTUSZF4QSFGU-geli-tirici.md
+[09:50:01] FAIL: st1 (blok-zincir-dev: pane exited (code 143) ve beklenen çıktı yok: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTV5UO42C5KGE-blok-zincir-dev.md)
+[09:50:44] DONE: st2 → customer-support: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTV5ESBVAHUEV-customer-support.md
+[09:53:32] DONE: st2 → blok-zincir-denet-i: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTV5VKH24Y8G-blok-zincir-denet-i.md
+[09:53:32] REPORT: dlg-1789022674151-1 (1/2 alt-görev ok — eksik/başarısız var)
+[09:57:32] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTV5UO42C5KGE-blok-zincir-dev.md
+[10:06:38] DONE: st1 → customer-support: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTV69TO4K8NVZ-customer-support.md
+[10:07:46] DONE: st1 → blok-zincir-dse: blok-zincir-dse — İKİ KART, SIRAYLA. Önce TASK-MTV5GFB75N43…
+[10:09:51] DONE: st2 → geli-tirici: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTV65O6EUHJ52-geli-tirici.md
+[10:40:16] DONE: st2 → blok-zincir-denet-i: blok-zincir-denet-i — TASK-MTV7JX13NGLJY (P1): `reuseExisti…
+[10:41:06] DONE: st1 → blok-zincir-dev: blok-zincir-dev — TASK-MTV7J3PNVC7U0 (P1): Marka dönüşünün …
+[10:58:52] DONE: st3 → blok-zincir-denet-i: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTV8FU2OG6VKQ-blok-zincir-denet-i.md
+[11:04:18] FAIL: st1 (blok-zincir-dev: pane exited (code 129) — bu motorda sıfır-dışı çıkışın hata OLDUĞU ölçülmedi, kanıt hedefi de yok)
+[11:04:18] REPORT: dlg-1789026987228-1 (2/3 alt-görev ok — eksik/başarısız var)
+[11:24:09] DONE: st1 → blok-zincir-dev: blok-zincir-dev — TASK-MTV8VEB2D63J2 (P1): Önceki turda pan…
+[11:27:58] DONE: st2 → customer-support: customer-support — TASK-MTV8WPLBFQNAO: SMTP env işini yaptı…
+[11:35:58] DONE: st3 → geli-tirici: geli-tirici — TASK-MTV8W14FY9BKD: `src/lib/billing/subscrip…
+[12:31:29] DONE: st5 → blok-zincir-denet-i: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVBM0C2QWPCL-geli-tirici.md
+[12:32:59] DONE: st1 → n8n-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVBI1DP4DQGQ-blok-zincir-dev.md
+[12:35:11] DONE: st2 → sec-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVBIX1DV9HVO-blok-zincir-denet-i.md
+[12:36:58] DONE: st7 → se-yuyt: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTSYCMWFL22CA-blok-zincir-dse.md
+[12:37:29] DONE: st3 → seo-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU64MMEQC0WV-blok-zincir-denet-i-2.md
+[12:43:17] DONE: st4 → cr-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVBL9HBML1ZH-blok-zincir-dse.md
+[12:48:58] FAIL: st6 (de-yuyt: worker bitti dedi ama beklenen çıktı yok — hedef pane taze açılmıştı, TAZE pane açılıp tekrar denendi: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTTUUGKNDGBXK-customer-support.md)
+[12:48:58] REPORT: dlg-1789032420573-1 (6/7 alt-görev ok — eksik/başarısız var)
+[12:52:41] DONE: st1 → sec-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVBX3348JNPN-blok-zincir-dev.md
+[12:59:38] DONE: st3 → seo-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTSWIFJKGTYC-blockzincir-pm.md
+[13:46:06] FAIL: st4 (worker 15 dakikadır sessiz ve boş prompt'ta bekliyor — alt-görev KOŞMUYOR, beklenen çıktı hiçbir adayda yok: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTSY71BUMBLWM-geli-tirici.md | /Users/macbook/AgentSpace/fabrika/agentdesk/docs/agent-results/TASK-MTSY71BUMBLWM-geli-tirici.md)
+[13:54:06] FAIL: st5 (worker 15 dakikadır sessiz ve boş prompt'ta bekliyor — alt-görev KOŞMUYOR, beklenen çıktı hiçbir adayda yok: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTTUUGKNDGBXK-customer-support.md | /Users/macbook/AgentSpace/fabrika/agentdesk/docs/agent-results/TASK-MTTUUGKNDGBXK-customer-suppor)
+[14:07:06] DONE: st2 → n8n-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTSWLANXSU0IG-blok-zincir-dse.md
+[14:10:54] DONE: 2 görev bitti: st2, st1 → de-yuyt, sec-en
+[14:15:57] DONE: st2 → seo-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVDSSJTZCY4T-blok-zincir-denet-i.md
+[14:21:49] DONE: 2 görev bitti: st2, st1 → de-yuyt, sec-en
+[14:22:58] DONE: st3 → cr-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVDRK4TABJ0U-ex-en.md
+[14:22:58] REPORT: dlg-1789036064848-1 (4/5 alt-görev ok — eksik/başarısız var)
+[14:27:07] DONE: st4 → de-yuyt: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTSY71BUMBLWM-geli-tirici.md
+[14:42:23] FAIL: st1 (n8n-en: pane exited (code 129) ve beklenen çıktı yok: docs/agent-results/TASK-MTTUUGKNDGBXK-evidence/01-alert-pile-before.txt)
+[14:42:23] REPORT: dlg-1789038579084-1 (1/2 alt-görev ok — eksik/başarısız var)
+[14:44:28] DONE: st1 → sec-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVFWYKIZXRB1-blok-zincir-denet-i.md
+[14:48:17] DONE: st2 → n8n-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTSY7HZRYWWEL-geli-tirici.md
+[14:49:59] DONE: st1 → sec-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVFKK8UZS5BF-blok-zincir-dev.md
+[15:04:10] FAIL: 2 görev BAŞARISIZ: st1, st2 (sec-en, n8n-en)
+[15:04:10] REPORT: dlg-1789041103351-1 (0/2 alt-görev ok — eksik/başarısız var)
+[15:13:13] DONE: 2 görev bitti: st2, st3 → blok-zincir-denet-i, blok-zincir-dse
+[17:48:28] FAIL: 2 görev BAŞARISIZ: st1, st4 (blok-zincir-dev, blockzincir-pm)
+[17:48:28] REPORT: dlg-1789042020946-1 (2/4 alt-görev ok — eksik/başarısız var)
+[17:55:54] DONE: 2 görev bitti: st3, st2 → blok-zincir-dse, customer-support
+[17:56:18] DONE: st1 → geli-tirici: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVN8M702FU5A-geli-tirici.md
+[17:58:26] DONE: st4 → blok-zincir-denet-i: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTQ2KL3JO4MK2-denetim.md
+[19:05:48] DONE: st1 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVFL8IJALB2H-blok-zincir-dev.md
+[19:08:37] DONE: st3 → blok-zincir-dse: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTSWAKD31LS49-blok-zincir-dse-2.md
+[19:39:00] FAIL: st2 (blockzincir-pm: pane exited (code 129) ve beklenen çıktı yok: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTU6I3V2R30M8-blok-zincir-denet-i-2.md)
+[19:39:00] REPORT: dlg-1789056014149-1 (2/3 alt-görev ok — eksik/başarısız var)
+[19:52:09] DONE: st4 → customer-support: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTSWAKD31LS49-blok-zincir-dse-3.md
+[19:55:06] DONE: st5 → blok-zincir-denet-i: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVR9F6VLZ1WM-blok-zincir-denet-i.md
+[19:56:34] DONE: st1 → blok-zincir-dse: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVR7W9ZXO7M-blok-zincir-dse.md
+[19:58:15] DONE: st2 → blok-zincir-dev: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVR8KK92G0GA-blok-zincir-dev.md
+[20:00:34] DONE: st3 → geli-tirici: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVPOR2CMV1RT-geli-tirici.md
+[20:15:07] DONE: st2 → customer-support: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVRACMDFRGKV-customer-support.md
+[20:17:55] DONE: st3 → ex-en: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVRBLKRUUEUM-ex-en.md
+[20:20:55] DONE: st1 → blockzincir-pm: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTSZ0AL4QP2CT-blockzincir-pm-2.md
+[20:49:02] DONE: st5 → cs-fb: TASK-MTVT0VLF4AP19 — Sahipsiz e2e kırmızısı: DOCX dışa akta…
+[20:54:59] DONE: st4 → devop-fb: TASK-MTVRC1UGA3B6Y — `alertsSweep` sessizce başarısız oluyo…
+[20:55:13] DONE: st2 → fe-fb: TASK-MTVPPDW8NXKLD — `noUncheckedIndexedAccess` Dilim 4 (SO…
+[21:01:13] DONE: st3 → de-fb: TASK-MTVRAZSUVLL9R — Tenant-bypass Dilim 5 (SON): kalıcı st…
+[21:11:44] DONE: st1 → fe-fb: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVTIU3LAYFOA-fe-fb.md
+[21:13:30] DONE: st1 → be-fb: TASK-MTVSBEO7VX6Y4 — Stripe webhook idempotency `fabrika_ap…
+[21:26:31] DONE: st3 → fe-fb: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVU65CL8RPS2-fe-fb.md
+[21:29:29] DONE: st2 → cs-fb: Regresyon testi ZORUNLU: önce KIRMIZI olduğunu göster (RED)…
+[21:30:24] DONE: st2 → be-fb: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVSBEO7VX6Y4-be-fb-2.md
+[21:42:39] FAIL: st3 (fe-fb: pane exited (code 129) — bu motorda sıfır-dışı çıkışın hata OLDUĞU ölçülmedi, kanıt hedefi de yok)
+[21:43:02] FAIL: 2 görev BAŞARISIZ: st4, st2 (devop-fb, cs-fb)
+[11:09:20] DONE: st1 → be-fb: Yalnız MADDENDE yazan dosyalara dokun. Başka bir maddedeki …
+[11:10:05] FAIL: st1 (be-fb: pane exited (code 129) — bu motorda sıfır-dışı çıkışın hata OLDUĞU ölçülmedi, kanıt hedefi de yok)
+[11:10:05] REPORT: dlg-1789113395825-1 (0/1 alt-görev ok — eksik/başarısız var)
+[11:21:56] DONE: st1 → de-fb: /Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTVTPVTEBCF5Z-de-fb.md

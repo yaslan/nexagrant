@@ -44,3 +44,20 @@ E11.2 ve E11.4 üçer, E11.3 iki, E10-seed iki kart.
 KOŞ (`check-rls.ts`, `i18n-check.ts`), dosyanın/cron'un varlığına bak, `git log`'a bak.
 Bitmişse iş dağıtma; kartı `review`'a al ve kanıtı yaz. `docs/ROADMAP.md` de aynı şekilde
 uzun süre hiç işaretlenmemişti — bkz. [[fabrika-team-handover-cekirdek]].
+
+## `todo` kartlar da bayat olur — ve en ucuz kanıt `git log -- <teslimat dosyası>`
+
+2026-09-10: `TASK-MTVRAZSUVLL9R` ("Tenant-bypass Dilim 5 — kalıcı statik kapı") panoda **todo**
+duruyordu. Oysa iş inmişti:
+
+```
+git log --oneline -- scripts/check-tenant-bypass.ts
+80ee229 feat(gate): TASK-MTVRAZSUVLL9R — tenant-bypass slice 5, a static gate ...
+git log --oneline -S "rls:bypass-check" -- package.json   # aynı commit → gate'e de bağlanmış
+```
+
+Ders: bayatlık `in_progress` sütununa özgü değil. Bir karta iş dağıtmadan önce, kartın
+**teslimatı hangi dosyaysa** ona `git log --oneline -- <dosya>` at; kart kodu commit
+mesajında çıkıyorsa iş inmiştir. Bir kapı kartıysa ikinci soru şu: `package.json`'daki
+`gate` zincirine gerçekten eklenmiş mi (`git log -S "<script adı>" -- package.json`).
+Bu iki komut, o karta boşuna bir pane açmaktan ucuzdur.
