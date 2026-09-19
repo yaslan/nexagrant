@@ -73,3 +73,44 @@
 - [fabrika-read-the-library-source-before-round-three](fabrika-read-the-library-source-before-round-three.md) — Kutuphane uyarisini iki tur tahminle kovaladiktan sonra kaynagi okumak kosulu 10 dakikada verdi — ucuncu turdan once node_modules'u ac
 
 - [fabrika-give-workers-a-case-not-a-verdict](fabrika-give-workers-a-case-not-a-verdict.md) — Karta somut test vakasi yazarken onu KENDIN dogrula — uydurdugum "%20'de float sapiyor" vakasi matematiksel olarak sapmiyordu, worker duzeltti
+
+- [fabrika-a-checked-box-that-confesses](fabrika-a-checked-box-that-confesses.md) — Isaretli bir DoD kutusunun ICINDE "ama sorun var" cumlesi varsa kart kapanmaz — raporu okurken once kutularin ICINE bak
+
+- [fabrika-unskipping-a-test-inherits-its-stale-assertions](fabrika-unskipping-a-test-inherits-its-stale-assertions.md) — test.skip kaldiran kart, o testin ESKIMIS iddialarini da devralir — skip suresince urun degismis olabilir, suiti butun kostur
+
+- [fabrika-boss-keeps-a-red-gate-rather-than-hiding-it](fabrika-boss-keeps-a-red-gate-rather-than-hiding-it.md) — Patron, gercek bir hatayi gosteren kapiyi gecici olarak gevsetmek yerine KIRMIZI birakmayi secti — kapsami kismak bir secenek olarak sunulmasin
+- [fabrika-supervisor-failed-verdict-may-be-a-derived-path-miss](fabrika-supervisor-failed-verdict-may-be-a-derived-path-miss.md) — Supervisor "BASARISIZ · beklenen cikti yok" derken ESKI gorev kodundan turetilmis bir yola bakiyor olabilir — is aslinda bitmis olabilir, dosyayi ve git log'u kendin kontrol et
+
+- [fabrika-rls-green-on-a-bypassrls-connection](fabrika-rls-green-on-a-bypassrls-connection.md) — Fabrika'da RLS politikaları yeşil olsa da ana DATABASE_URL BYPASSRLS bir rolle bağlanıyor — RLS kartlarını kapatırken hangi bağlantıda ölçüldüğünü sor
+
+- [fabrika-report-that-stops-before-the-gate-line](fabrika-report-that-stops-before-the-gate-line.md) — Bir worker raporu teşhis ve düzeltmeyle bitip doğrulama koşusuna hiç gelmeden kesilebilir — kartı kapatmadan önce raporun SON başlığına bak
+
+- [fabrika-worker-may-finish-the-next-card-uninvited](fabrika-worker-may-finish-the-next-card-uninvited.md) — Bir worker verilmemiş bitişik kartı da yapıp commit edebilir — sonuç doğru olsa bile kapsam kararı sorulmadan alınır, kapı ölçümü kayar
+
+- [fabrika-a-type-gate-is-void-where-casts-already-escape](fabrika-a-type-gate-is-void-where-casts-already-escape.md) — Nominal/markalı tip önermeden ÖNCE çağrı yerlerinin kaçta kaçının zaten `as unknown as` ile kaçtığını say — m6'da 19 konumun 13'ü (%68) kaçıyordu, marka onları görmüyor
+- [fabrika-preapproval-covers-the-goal-not-the-sequence](fabrika-preapproval-covers-the-goal-not-the-sequence.md) — Patron spike'ı görmeden "sayılar gelince sevk et" dedi; ölçüm önerilen seçeneği değiştirdi — onayı yeniden açma, hedefi koru sırayı ölçüme uydur ve tek cümleyle söyle
+- [fabrika-recall-before-delegating-not-after](fabrika-recall-before-delegating-not-after.md) — Hafızayı dalgayı dağıttıktan SONRA aradım ve paylaşılan katalog tuzağını kaçırdım — arama, alt-görev metinlerini YAZMADAN önce yapılmalı
+
+- [fabrika-a-one-line-copy-request-can-be-a-52-surface-decision](fabrika-a-one-line-copy-request-can-be-a-52-surface-decision.md) — Patron "şu başlığı değiştir" dediğinde önce o metnin tek-kaynaklı bir sabitten gelip gelmediğine bak — Fabrika'da giriş başlığı PRODUCT_NAME'den geliyordu, istek 52 yüzeyi kapsayan marka kararıydı
+- [fabrika-prove-a-single-source-constant-with-a-sentinel](fabrika-prove-a-single-source-constant-with-a-sentinel.md) — Bir sabitin gerçekten tek kaynak olduğunu kanıtlamanın ucuz yolu — değerini geçici olarak ZZTEST gibi bir nöbetçiye çevir, hangi yüzeyin onu GÖSTERMEDİĞİNE bak; göstermeyen yerde değer kopyalanmıştır
+
+- [fabrika-a-killed-pane-may-leave-the-work-or-the-sentinel](fabrika-a-killed-pane-may-leave-the-work-or-the-sentinel.md) — "failed" bir pane işin yapılmadığı anlamına gelmez — kartı yeniden vermeden ÖNCE çalışma ağacına bak; hele kart geçici bir nöbetçi (ZZTEST gibi) söylüyorsa nöbetçi ağaçta kalmış olabilir
+- [fabrika-a-reversed-premise-invalidates-work-already-shipped](fabrika-a-reversed-premise-invalidates-work-already-shipped.md) — Patron bir öncülü tersine çevirdiğinde (marka geri döndü) yeni kararı ileriye uygulamak YETMEZ — eski öncüle göre az önce sevk edilmiş işi geri tara, özellikle gerekçesi YORUMA yazılmış olanları
+
+- [fabrika-conflict-avoidance-must-not-shrink-a-directive](fabrika-conflict-avoidance-must-not-shrink-a-directive.md) — Çakışma korkusuyla kartı iki dosyaya daralttım ve patronun marka direktifi %5 tamamlandı — tek-kaynaklı bir değerin dönüşünde ÖNCE tam yüzeyi say, sonra kapsamı böl
+
+- [fabrika-a-todo-in-code-is-a-card-that-never-got-opened](fabrika-a-todo-in-code-is-a-card-that-never-got-opened.md) — Worker gerçek bir engele çarpınca kodda TODO bırakıp kartı kapattı — engel bir KART olur, yorum olmaz; kalması şartsa TODO kart kodunu taşımalı
+
+- [fabrika-a-blocker-three-reports-name-is-a-card-nobody-opened](fabrika-a-blocker-three-reports-name-is-a-card-nobody-opened.md) — Üç ayrı rapor aynı çevresel engeli bağımsız bildirdi ama hiçbiri kart açmadı — herkesin "başkasının sorunu" dediği engel lidere düşer
+
+- [fabrika-an-audit-goes-stale-while-you-write-the-card](fabrika-an-audit-goes-stale-while-you-write-the-card.md) — Paralel ofiste denetim raporu saatler içinde bayatlıyor — karta "devralınan iddiaları ÖNCE kendi ölçümünle doğrula" adımını koy; S12'de 4 iddiadan 2'si yanlış çıktı
+
+- [fabrika-an-empty-report-skeleton-forges-a-done-signal](fabrika-an-empty-report-skeleton-forges-a-done-signal.md) — Denetim defteri "BİTTİ"yi YARIM yazılmış bir rapor dosyasına da basabiliyor — ince rapor tek başına terk edilmişlik kanıtı DEĞİL, pane ölü mü diye bak
+- [fabrika-group-the-alert-pile-it-names-your-next-card](fabrika-group-the-alert-pile-it-names-your-next-card.md) — Alarm yığınını kaynağa göre grupla — ama gruplamadan SONRA "bu satırlar hâlâ var olan bir şeye mi ait" diye sor; Fabrika'da %87'si silinmiş tenant'lara aitti
+- [fabrika-one-read-of-a-live-tree-is-a-frame-not-a-fact](fabrika-one-read-of-a-live-tree-is-a-frame-not-a-fact.md) — Worker'lar koşarken yapılan TEK okuma (git status, rapor dosyası, satır sayısı) hareketli bir filmin karesidir — bugün aynı hataya üç ayrı kılıkta düştüm
+- [fabrika-paused-is-not-dead-check-before-adopting-wip](fabrika-paused-is-not-dead-check-before-adopting-wip.md) — Commit'siz işi sahiplenmeden önce pane CANLI mı ÖLÜ mü ölç — limit duraklatması ölüme benziyor ama worker geri dönüp kendi commit'ini atacak
+
+- [fabrika-a-rejected-cards-blockers-may-be-cleared-by-a-later-card](fabrika-a-rejected-cards-blockers-may-be-cleared-by-a-later-card.md) — Denetimin "KAPANAMAZ" dediği kart todo'da beklerken şartlarını BAŞKA bir kart kapatmış olabilir — yeniden dağıtmadan önce denetimin şart listesini bugünkü ağaca karşı oku
+
+- [fabrika-cross-cutting-card-must-be-intersected-with-live-panes](fabrika-cross-cutting-card-must-be-intersected-with-live-panes.md) — Çağrı yeri tabanlı (cross-cutting) bir kartı dağıtmadan önce dosya listesini CANLI pane'lerin tuttuklarıyla kesiştir — çakışan dosyalar "ölç ama DÖNÜŞTÜRME" olarak karta girer
+- [fabrika-g3-passes-an-unevaluated-proposal-boss-decision-pending](fabrika-g3-passes-an-unevaluated-proposal-boss-decision-pending.md) — G3 kapısı hiç değerlendirilmemiş teklifte passed:true dönüyor ve bu genel API'ye sızıyor — denetim ölçtü (2026-09-10), patron kararı BEKLİYOR, öneri Seçenek 2
