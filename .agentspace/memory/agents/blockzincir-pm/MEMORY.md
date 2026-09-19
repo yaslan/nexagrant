@@ -56,3 +56,12 @@
 - [fabrika-tcmb-fx-invoice-vuk-rule](fabrika-tcmb-fx-invoice-vuk-rule.md) — Fabrika'da yabancı para faturası için VUK kuralı ne istiyor (TL karşılığı, hangi kur, hangi tarih) ve karar ADR-0002'de bekliyor
 
 - [fabrika-cross-border-transfers-have-no-signed-dpa](fabrika-cross-border-transfers-have-no-signed-dpa.md) — Fabrika 7 yurt dışı alıcıya (Anthropic, OpenAI, Google, Microsoft, Stripe, Resend, Cloudflare) kişisel veri gönderiyor ama hiçbiri için imzalı SCC/DPA eki repoda yok — GDPR md.30 envanterinin en büyük tekil boşluğu
+
+- [fabrika-invoice-export-errors-leak-raw-json](fabrika-invoice-export-errors-leak-raw-json.md) — Fatura indirme linkleri (BillingClient.tsx) düz <a href> — export route'un 7 farklı hata JSON'u (env var adları dahil) kullanıcıya ham İngilizce/JSON olarak düşüyor, hiç Türkçeye çevrilmiyor
+
+- [fabrika-board-audit-report-may-be-misfiled-not-missing](fabrika-board-audit-report-may-be-misfiled-not-missing.md) — Before calling a done card "KANIT YOK", content-grep the task ID across ALL agent-results files, not just filename-match — verification/DOĞRULAMA cards and some closing reports are filed under a DIFFERENT ID (the original card they verify, an ADR name, or a pre-convention name).
+- [fabrika-i18n-card-closed-with-zero-report-defect-survived](fabrika-i18n-card-closed-with-zero-report-defect-survived.md) — Concrete confirmed case of a "done" card with zero evidence whose bug survived until an unrelated audit found it — proof that report-existence checks catch real fake closures, not just theoretical ones.
+
+- [fabrika-tenant-bypass-audit-baseline-drifts](fabrika-tenant-bypass-audit-baseline-drifts.md) — withTenant sarmalayıcısız prisma.* çağrılarının sayısı (98/101) sabit bir baseline değil — prisma/rls.sql'deki tenant-model kümesi büyüyor (43→48), yeniden ölçüm yapmadan eski raporun sayısını kullanma
+
+- [fabrika-my-own-bucket-claim-was-wrong-per-line](fabrika-my-own-bucket-claim-was-wrong-per-line.md) — Envanterimde "bu kovadaki her satırda tenantId zaten where'de" dediğim toplu iddia bir satırda YANLIŞTI — kovaya alırken satır satır doğrula, dilimi uygulayan ajan (ben bile olsam) premise'i tekrar ölçmeli
