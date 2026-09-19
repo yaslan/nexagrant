@@ -1,137 +1,165 @@
-# TASK-MTQ2KL3JO4MK2: E11.3 ESR Calibration — Fixture Yeniden Üretildi
+# TASK-MTQ2KL3JO4MK2: E11.3 ESR Calibration — Preflight Diagnostik (3. Geçiş)
 
 **Ajan:** Backend Mühendisi (BE-EN)  
-**Çalıştırılan:** 2026-09-07  
-**Durum:** Fixture tamamlandı — Kriter henüz karşılanmıyor, anket bekleniyor  
-**Rapor:** docs/CORDIS-SAMPLE-CALIBRATION.md
+**Çalıştırılan:** 2026-09-10  
+**Durum:** 🔴 **BLOKE** — 4 bloker; başı: insan aksiyonu (roster)  
+**Rapor:** Preflight kapısı RED (çıkış kodu 1)
 
 ---
 
 ## Ne Yapıldı
 
-1. **Fixture Seed:** 20 örnek (SAMPLE-* id'leriyle) esr-calibration kiracısına seed edildi
-   - esr-calibration tenant + workspace oluşturuldu
-   - CordisProject (20 × SAMPLE-*) ve Proposal (20 ×), GateDecision (20 ×) yazıldı
-   - İdempotent script (2. koşu: before = after = 20)
+**Durum ölçümü:** `pnpm beta:esr-preflight` (salt okunur kapı) çalıştırıldı.  
+**Sonuç:** 4 bloker tespit edildi; bir zincir halinde kilitli.
 
-2. **Puanlama & Doğruluk Ölçümü**
-   - Rule A (composite ≥ 70 + hard rules): **80.0%** (16/20 doğru)
-   - Rule B (PROJECT.md:75 literal, composite yok): **90.0%** (18/20 doğru)
-   - Best threshold (eşik taraması): 54 → 95.0% (fakat n=20 için overfit riski)
+### Bloker Zinciri
 
-3. **Beta Anketi Render**
-   - 10 ortağa (4 örnek × ortak) anket sayfası render edildi
-   - docs/BETA_DATA/generated/esr-calibration/survey/ altında HTML + TXT + CSV
-   - E-mail gönderilmedi (placeholder @.invalid adresler)
+| # | Bloker | Neden | Bloke Tür | Bağımlı |
+|---|--------|-------|-----------|---------|
+| 1️⃣ | **roster** | 10/10 adres `.invalid`; `--send` reddediyor | **İNSAN AKSİYONU** | Başı |
+| 2️⃣ | survey-sent | Roster yok → gönderim yapılamadı | Otomatik | #1 bloker durumunda geçilmez |
+| 3️⃣ | responses | Partner verdictleri alınmadı (anket gönderilmediği için) | Otomatik | #2 bloker durumunda geçilmez |
+| 4️⃣ | accuracy | %80 < %85 (provisional labels) | Otomatik | #3 bloker durumunda geçilmez |
 
-4. **Raporlama**
-   - docs/CORDIS-SAMPLE-CALIBRATION.md: Tam kalibrasyon raporu (confusion matrix, sweep, öneriler)
-   - docs/BETA_DATA/generated/esr-calibration/calibration-summary.json: Makinece okunabilir sonuç
+**Mimari:** #1 çözüldüğünde zincirbağı çözülür; #2–4 otomatik açılır (ön koşul fark etmiş durumda).
+
+### Ölçüm Detayları
+
+- ✅ **Fixture:** 20/20 örnek DB'de (SAMPLE-* id'leri)
+- ✅ **Sample set:** 20/20 ayrıştırılmış
+- ❌ **Design-partner roster:** 10/10 adres `.invalid` domain (test data); gerçek e-postalar gerekli
+- ❌ **Survey send:** Makine üzerinde gönderim makbuzu yok
+- ❌ **Partner responses:** Sıfır verdicts; etiketler henüz provisional
+- ❌ **Accuracy:** Rule A 80.0% (16/20) < 85% kriter
+
+### Deadline Durumu (Açık Risk)
+
+- **Target:** 2026-09-21 (11 gün kaldı)
+- **Gerekli pencere:** Gönderim günü + 14 gün (ESR katılımı)
+- **Hazırlık süresi:** ~1 gün (survey teknik render + test)
+- **Sonuç:** Deadline zaten kaymış — yeniden çivileme gerekli (`ESR_SURVEY_DEADLINE` src/lib/beta/constants.ts'te)
 
 ---
 
 ## Kanıt
 
-### Script Çıktısı
+### Preflight Çıktısı (2026-09-10)
+
 ```
-🎯 ESR calibration (E11.3)
-   mode      : APPLY
-   samples   : docs/BETA_DATA/esr-calibration-samples.csv
-   report    : docs/CORDIS-SAMPLE-CALIBRATION.md
+pnpm beta:esr-preflight
 
-  [samples] 20 parsed — CURATED FIXTURE (SAMPLE-* ids)
-  [score] rule A (composite ≥ 70): accuracy 80.0%
-  [score] rule B (spec literal, no composite): accuracy 90.0%
-  [sweep] best threshold 54 → accuracy 95.0%
-  [survey] beta-anadolu-teknoloji: rendered 4 items → survey/beta-anadolu-teknoloji.html (not sent)
-  [survey] beta-ege-arge: rendered 4 items → survey/beta-ege-arge.html (not sent)
-  [survey] beta-bogazici-tto: rendered 4 items → survey/beta-bogazici-tto.html (not sent)
-  [survey] beta-odtu-arge: rendered 4 items → survey/beta-odtu-arge.html (not sent)
-  [survey] beta-marmara-danismanlik: rendered 4 items → survey/beta-marmara-danismanlik.html (not sent)
-  [survey] beta-ankara-kume: rendered 4 items → survey/beta-ankara-kume.html (not sent)
-  [survey] beta-izmir-belediye: rendered 4 items → survey/beta-izmir-belediye.html (not sent)
-  [survey] beta-benelux-innov: rendered 4 items → survey/beta-benelux-innov.html (not sent)
-  [survey] beta-iberia-research: rendered 4 items → survey/beta-iberia-research.html (not sent)
-  [survey] beta-nordic-consulting: rendered 4 items → survey/beta-nordic-consulting.html (not sent)
-  [db] before: {"opportunities":20,"proposals":20,"gateDecisions":20,"cordisProjects":20}
-  [db] after : {"opportunities":20,"proposals":20,"gateDecisions":20,"cordisProjects":20}
-  [report] written → docs/CORDIS-SAMPLE-CALIBRATION.md
-  [report] written → docs/BETA_DATA/generated/esr-calibration/calibration-summary.json
+✅ Sample set parsed — 20/20 samples
+✅ Fixture rows in the database — 20/20/20/20
+
+❌ Design-partner roster is deliverable — 10/10 addresses sit on a reserved, undeliverable domain — --send refuses
+      → HUMAN ACTION: supply the real design-partner addresses.
+      → Keep them out of git: docs/BETA_DATA/beta-partners.local.csv (gitignored)
+
+❌ Survey actually sent — no send receipt on this machine
+      → After the roster is real, with explicit approval: pnpm beta:esr-calibration --roster=<real> --survey --send
+
+❌ Partner verdicts ingested — no verdicts ingested — labels are still provisional
+
+⚠️  Labels are ESR-confirmed — sample ids are the curated SAMPLE-* fixture; any accuracy below is provisional
+
+❌ Accuracy ≥ 85% — rule A 80.0% < 85%
+
+⚠️  Deadline is a real commitment — 2026-09-21 is only 11 day(s) away and nothing has been sent
+
+❌ E11.3 BLOCKED — 4 blocker(s): roster, survey-sent, responses, accuracy
 ```
 
-### Doğruluk Matrisi (Rule A — Uygulanan)
+### Accuracy Durum (Provisional — Fixture Üzerinden)
 
-| | Gerçek: GO | Gerçek: NO_GO |
-|---|---:|---:|
-| **Tahmin: GO** | 9 (TP) | 1 (FP) |
-| **Tahmin: NO_GO** | 3 (FN) | 7 (TN) |
+- **Rule A** (composite ≥ 70 + hard rules): 80.0% (16/20)
+  - Kriter: ≥85% — **KARŞILANMIYOR** ❌
+- **Rule B** (PROJECT.md:75 literal): 90.0% (18/20)
+  - Başarılı görünüyor, ama karar #8 Rule A'ya bağlıyor
 
-- **Accuracy:** 80.0% (Wilson %95 GA: 58.4% – 91.9%) — **KRITER KARŞILANMIYOR** ❌
-- **Precision:** 90.0%
-- **Recall:** 75.0%
-- **F1:** 81.8%
-
-### Doğruluk Matrisi (Rule B — Spec Literal)
-
-| | Gerçek: GO | Gerçek: NO_GO |
-|---|---:|---:|
-| **Tahmin: GO** | 12 (TP) | 2 (FP) |
-| **Tahmin: NO_GO** | 0 (FN) | 6 (TN) |
-
-- **Accuracy:** 90.0% ✅
-- **Precision:** 85.7%
-- **Recall:** 100.0%
-- **F1:** 92.3%
+**Not:** Bu oranlar kurate edilmiş fixture verisi (SAMPLE-* id'leri) üzerine — ESR anket yanıtları geldiğinde yeniden ölçülecek.
 
 ---
 
 ## Değişen Dosyalar
 
-- ✅ docs/CORDIS-SAMPLE-CALIBRATION.md (yeni)
-- ✅ docs/BETA_DATA/generated/esr-calibration/calibration-summary.json (yeni)
-- ✅ docs/BETA_DATA/generated/esr-calibration/survey/* (10 ortak × 3 dosya = 30 dosya, yeni)
-- ✅ DB: tenant esr-calibration, 20 opportunity + 20 proposal + 20 gateDecision + 20 cordisProject
+Yok (salt okunur ölçüm — preflight hiçbir durum değişmedi).
+
+**Mevcut durum:** Fixture DB'de 20/20/20/20; anket sayfaları hazır (docs/BETA_DATA/generated/esr-calibration/survey/) fakat **gönderilmemiş** (roster eksik).
 
 ---
 
 ## Riskler
 
-1. **Fixture Üzerinden Ölçüm:** Doğruluk oranı kurate edilmiş örnek seti üzerinden. Gerçek ESR verileri gelince değişebilir.
-2. **Rule A vs B Uyuşmazlığı:** 10 puanlık fark (A: 80%, B: 90%). PROJECT.md:75 ile uygulama (gates/evaluate.ts) arasında anlamsal fark var — Açık Karar #8 çözülmeyince eşik değiştirilmemeli.
-3. **Anket Deadline:** 2026-09-21 (14 gün). Yanıt az olursa Wilson aralığı geniş kalacak.
+1. **Deadline Kayması:** 2026-09-21 artık geçerli bir son tarih değil. Anket gönderimi için min. 14 gün pencere şart. Hazırlık 1 gün + gönderim + yanıt süresi → yeniden çivileme zorunlu.
+2. **Insan Aksiyonu Belirsizliği:** Roster (10 gerçek partner e-postu) kim sağlayacak, ne zaman? PM operasyonu — net süre ve sorumlu kişi bulunmadı.
+3. **Mail Teslimatı Kanıtı:** Başka makine üzerinde `--send` yapılırsa, bu makine preflight'ının receipt'ı görmesi değildir → merkezi receipt yönetimi veya tek makine politikası gerekli.
+4. **Provisional Accuracy:** Fixture doğruluğu 80% < 85% — kriter karşılanmadı. Gerçek ESR yanıtları geldiğinde ≥85% garantisi yok (ESR örnekleri farklı dağılımda olabilir).
+5. **Rule A/B Uyuşmazlığı:** Açık karar #8 Rule A'ya bağlı (%85 kriter), ama B (%90) daha iyi görünüyor. Eşik değişim tekrar talep edilmemeli.
 
 ---
 
 ## Açık Sorular
 
-1. **Hangi ölçüm kesin sayılacak?**
-   - Fixture doğruluğu kalibrasyon hattını doğrular (pipeline işliyor).
-   - Gerçek ESR doğruluğu için anket yanıtları gerekli.
-   - İkisi arasında hangisi "acceptance criteria"ye bağlı?
-
-2. **Rule A vs B kararı:**
-   - B okuması daha iyi (%90), ama PROJECT.md:75'i doğru mu anlamışız?
-   - Eşiği 54'e çekmek (best threshold) overfit mi, yoksa gerçek optimum mi?
+1. **Roster Sorumluluğu:** Gerçek design-partner kayıtları kim üretecek, kim doğrulayacak? (PM? Partner Manager? Pazarlama?) Beklenen teslimat tarihi?
+2. **Deadline Yeniden Çivileme:** ESR_SURVEY_DEADLINE gönderim günü + 14 gün olarak yeniden ayarlanacak mı? Patron onayı?
+3. **Anket Gönderimi Onayı:** `pnpm beta:esr-calibration --roster=<real> --survey --send` kimden explicit onay alacak? (Patron? PM?)
+4. **Mail Teslimatı:** Receipt merkezi mi (R2?) yoksa lokal? (`docs/BETA_DATA/generated/` gitignored) — başka makine çalıştırılırsa sorun.
+5. **ESR Katılım Oranı:** 10 ortak × 4 örnek = 40 karar, kaçı "gerçek" kabul edilecek? (Minimum response rate?) — Fixture 20/20 karardan tamamıydı, gerçek katılım tahmini?
 
 ---
 
-## Sonraki Adım
+## Sonraki Adımlar (Zincir Sırası)
 
-Anket yanıtları 2026-09-21'den sonra geldiğinde:
+### 1️⃣ İnsan Aksiyonu: Roster Sağla
+```
+Kimin: PM / Partner Manager  
+Ne: 10 gerçek design-partner adı + e-posta (test değil)  
+Nereye: docs/BETA_DATA/beta-partners.local.csv (gitignore'deki) veya /secure/path/partners.csv  
+Beklenti: ASAP (deadline basıyor)
+```
+
+### 2️⃣ Deadline Yeniden Çivile
+Roster sağlandığında:
 ```bash
-pnpm tsx scripts/esr-calibration.ts \
+# src/lib/beta/constants.ts dosyasını düzenle
+ESR_SURVEY_DEADLINE = TODAY + 14 gün  # (gönderim gününe göre güncelle)
+```
+
+### 3️⃣ Anket Gönder (Patron Onayı Gerekli)
+Roster + deadline hazır olduğunda:
+```bash
+pnpm beta:esr-calibration --roster=/secure/path/partners.csv --survey --send
+```
+**Not:** `--send` geri alınamaz (canlı e-mail). Kimden explicit onay alacak?
+
+### 4️⃣ Anket Yanıtlarını Topla (2026-09-21 + sonrası)
+Ortak verdictleri:
+```bash
+docs/BETA_DATA/partner-responses.csv dosyası (merkezi veya local)
+```
+
+### 5️⃣ Accuracy Yeniden Ölçümü
+Yanıtlar geldiğinde:
+```bash
+pnpm beta:esr-calibration \
   --responses=docs/BETA_DATA/partner-responses.csv \
   --apply
 ```
-
-Bu komut:
-- Ortak çoğunluğunun etiketi ile örneği yeniden etiketleyecek
-- Doğruluk yeniden ölçülecek
-- docs/CORDIS-SAMPLE-CALIBRATION.md güncellenecek
-- Kriter (≥85%) karşılanıp karşılanmadığı netleşecek
+**Sonuç:** Doğruluk yeniden ölçülür, ≥85% kriter karşılanıp karşılanmadığı açığa çıkar.
 
 ---
 
 ## Kaydedilen Bilgi
 
-Hafızaya yazılacak: E11.3 durumu fixture tamamlandı, Rule A 80% (kriter karşılanmıyor), anket 2026-09-21 bekleniyor.
+Hafızaya yazılacak: E11.3 durumu BLOKE, 4 bloker zinciri — başı insan aksiyonu (roster eksik). Fixture 20/20 hazır, Rule A 80% (kriter ≥85% karşılanmıyor, provisional). Deadline 2026-09-21 zaten kaymış — yeniden çivileme gerekli.
+
+---
+
+## Rapor Özeti
+
+**Durum:** 🔴 **BLOKE** (EXIT KOD 1)  
+**Bloke Başı:** Roster (insan aksiyonu) — 10/10 adres `.invalid` domain'dedir, test verisi.  
+**Çıkış Kriteri:** Roster → survey send → responses → accuracy ≥85%.  
+**Fixture Accuracy (Provisional):** 80% (kriter karşılanmıyor).  
+**Deadline:** 2026-09-21 kaymış — yeniden çivileme + patron onayı gerekli.  
+**Bloke Kalınacak Süre:** Roster sağlanana kadar (kimin, ne zaman? belirsiz).

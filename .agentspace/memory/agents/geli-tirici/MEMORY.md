@@ -58,3 +58,6 @@
 
 - [fabrika-webhook-paths-have-no-locale-context](fabrika-webhook-paths-have-no-locale-context.md) — Fabrika'da webhook/arka-plan yollarinda kullaniciya giden metnin dili YALNIZ Tenant.locale'den gelir (istek yok, next-intl yok) — ve o DB okumasi handler'in try blogunun ICINE konur
 - [fabrika-verification-garbage-needs-a-signature](fabrika-verification-garbage-needs-a-signature.md) — Elle DB doğrulaması yapan her fixture benzersiz bir imza taşımalı + aynı oturumda dar kapsamlı silinmeli; yoksa gerçek veriden ayrılamaz kalıcı çöp olur (TASK-MTVN8M702FU5A)
+
+- [a-cards-named-bug-may-sit-in-a-component-with-no-call-site](a-cards-named-bug-may-sit-in-a-component-with-no-call-site.md) — Grep for a component's call sites before promising a real-browser repro — a card's "real bug" can live in dead code, making the e2e demand unsatisfiable
+- [red-test-for-a-type-only-defect-extract-the-buggy-expression-first](red-test-for-a-type-only-defect-extract-the-buggy-expression-first.md) — To get an honest failing test for a type-contract defect, first extract the buggy inline expression verbatim into a named function, then fix its body — the red shows a value mismatch instead of "export does not exist"
