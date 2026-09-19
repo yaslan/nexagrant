@@ -26,3 +26,24 @@
 
 - [fabrika-first-matching-element-is-the-hidden-mobile-one](fabrika-first-matching-element-is-the-hidden-mobile-one.md) — Fabrika app shell mounts UserMenu twice (mobile md:hidden FIRST, desktop second) — a Playwright .first() resolves to the invisible mobile copy and click times out
 - [fabrika-negative-only-assertions-pass-on-a-screen-that-never-opened](fabrika-negative-only-assertions-pass-on-a-screen-that-never-opened.md) — An anti-fabrication e2e block built only from not.toContain() also passes when the panel never opened — always add one positive assertion that the surface is really on screen
+
+- [fabrika-withholding-rate-validation-logic-duplicate](fabrika-withholding-rate-validation-logic-duplicate.md) — Withholding rate validation happens in two places separately (withholdingRateLabel + generateUblTrXml guard) — consolidate into single helper to prevent consistency drift
+
+- [fabrika-admin-shell-compliance-badges-were-fiction](fabrika-admin-shell-compliance-badges-were-fiction.md) — Fabrika admin layout carried three hardcoded "RLS enforced" badges that contradicted the measured reality (BYPASSRLS role) — grep the app shell for compliance-sounding UI text, not just data-fake screens
+
+- [fabrika-evidence-audit-duplicates-and-drift](fabrika-evidence-audit-duplicates-and-drift.md) — Fabrika kanıt-disiplini (CLAUDE.md kural 7) taraması bir dosyada bitmez — aynı sahte iddia başka dosyada kopyalanmış olabilir, ve hardcoded "config facts" da zamanla koddan sapabilir
+
+- [fabrika-payment-taken-no-invoice-is-silent](fabrika-payment-taken-no-invoice-is-silent.md) — Fabrika'da ödeme alınıp fatura kesilemediğinde kullanıcıya HİÇBİR ŞEY söylenmiyor — faturalama ekranı "henüz fatura düzenlenmedi" diyor; TenantBillingIdentity'ye yazan hiçbir kod yok
+- [fabrika-text-inventory-must-hunt-missing-messages](fabrika-text-inventory-must-hunt-missing-messages.md) — Kullanıcı-metni envanterinde asıl bulgu "kötü metin" değil "hiç metin olmayan yol"dur — ve aynı görev-ID'li eski rapor bayat olabilir, iddialarını koda karşı doğrula
+
+- [fabrika-ignored-result-claim-needs-a-destination-trace](fabrika-ignored-result-claim-needs-a-destination-trace.md) — "Dönüş değeri kullanılmıyor" iddiasını atama arayarak kurma — atanmış olabilir ama varış noktası kullanıcı değil bir webhook gövdesi olabilir; sinyali gideceği yere kadar izle
+
+- [fabrika-guard-test-scan-reach-is-the-first-thing-to-audit](fabrika-guard-test-scan-reach-is-the-first-thing-to-audit.md) — Yeşil bir kaynak-koruma testi ürün hakkında değil, testin TARAMA ERİŞİMİ hakkında kanıttır — büyük/küçük harf, uzantı filtresi ve kök listesi üçünü de ölç
+
+- [fabrika-demo-seat-address-is-a-map-key](fabrika-demo-seat-address-is-a-map-key.md) — Fabrika'da giriş sayfasındaki demo adresini değiştirmek görünen bir metin değil — DEMO_PROFILES'ın ANAHTARI; eşleşme kaçarsa giriş yine başarılı olur ve sessizce jenerik kuruluşa düşer, kanıt tenant.name'dir
+- [fabrika-prove-a-red-gate-is-not-yours-by-reverting-only-your-files](fabrika-prove-a-red-gate-is-not-yours-by-reverting-only-your-files.md) — Paylaşılan ağaçta kırmızı bir kapının senin olmadığını KANITLAMANIN yolu — stash değil, yalnız KENDİ dosyalarını HEAD'e döndürüp aynı testleri tekrar koşmak
+
+- [fabrika-efatura-support-surface-already-clean-2026-09-10](fabrika-efatura-support-surface-already-clean-2026-09-10.md) — 2026-09-10 itibarıyla e-Fatura'nın destek yüzeyi (env şeması, hata metinleri, runbook) zaten tamam — bu kart yeniden gelirse sıfırdan başlama, önce koda karşı hızlı yeniden-doğrula
+- [fabrika-piping-a-cli-to-head-masks-its-exit-code](fabrika-piping-a-cli-to-head-masks-its-exit-code.md) — $? sonrası bir CLI'ın çıkış kodunu ölçerken çıktısını head/tail'e borulamak $?'yi borunun SON komutuna (head) maskeler — ayrı dosyaya yönlendir ya da PIPESTATUS kullan
+
+- [fabrika-measure-a-transaction-boundary-at-the-wire](fabrika-measure-a-transaction-boundary-at-the-wire.md) — Bir fonksiyonun kaç SQL transaction açtığını pg_stat_database.xact_commit ile ÖLÇEMEZSİN (aralıklı flush, hep 0 okur) — pg.Client.prototype.query'yi yamayıp BEGIN/COMMIT'i tel seviyesinde kaydet
