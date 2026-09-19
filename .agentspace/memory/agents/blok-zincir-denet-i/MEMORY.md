@@ -48,3 +48,35 @@
 - [an-alert-body-that-changes-every-run-defeats-its-own-dedupe](an-alert-body-that-changes-every-run-defeats-its-own-dedupe.md) — Yeni bir SystemAlert çağıranı yazarken meta'yı SABİT tut ve dizileri SIRALA — zaman damgası/hata metni koyan çağıran TASK-MTS80DUAF39Z8'in tekrar korumasını sessizce kapatır; ayrıca satırın ekrana ulaştığını tıklayarak kanıtla
 - [prisma-migrate-applies-only-5-of-17-migrations-here](prisma-migrate-applies-only-5-of-17-migrations-here.md) — Fabrika'da prisma migrate hiçbir düz .sql'i uygulamaz — 17 ileri migration'ın 12'si elle koşulmak zorunda ve DB yalnız 5'ini bilir; "migration var" demek "kolon var" DEMEK DEĞİL
 - [publishing-e2e-shots-overwrites-a-closed-cards-evidence](publishing-e2e-shots-overwrites-a-closed-cards-evidence.md) — E2E_SHOTS_ROOT=docs/agent-results ile KENDİ spec'inden başkasını koşarsan kapanmış kartların commit'li kanıt karelerini üzerine yazarsın — regresyon paketini bu değişken OLMADAN koştur
+
+- [a-conformance-check-cannot-see-absence](a-conformance-check-cannot-see-absence.md) — Doğru API'nin VARLIĞINA bakarak çalışan her denetçi, o API'nin YOKLUĞUNU göremez — yeşil kapıyı gördüğünde "kaç dosya bu kapıya hiç girmiyor" diye ölç
+
+- [fabrika-main-db-connection-bypasses-rls](fabrika-main-db-connection-bypasses-rls.md) — Fabrika'nın ana DATABASE_URL bağlantısı (fabrika rolü) SUPERUSER+BYPASSRLS'dir — prisma/rls.sql politikaları üretim trafiğinde fiilen etkisizdir, yalnızca ayrı fabrika_app test rolüyle doğrulanır
+- [fabrika-tenantid-ternary-fallback-bug-class](fabrika-tenantid-ternary-fallback-bug-class.md) — Fabrika'da tekrarlayan hata sınıfı — session?.tenantId'yi requireTenantPage/Action yerine ham okuyup "tenantId ? {tenantId} : {}" ile filtreyi düşürmek; iki kez düzeltilmiş, üç yerde hâlâ canlı bulundu
+
+- [fabrika-rls-migration-scan-widened-clean-plus-grep-gotcha](fabrika-rls-migration-scan-widened-clean-plus-grep-gotcha.md) — TASK-MTUGK2OUVAFDN sonucu — CalendarConnection'daki 4 RLS sapmasi diger 7 migration dosyasinda TEKRARLANMADI (izole hataydi); ayrica cift-bosluklu FORCE deyimi tek-bosluk grep'i atlatir
+
+- [a-a-twins-failure-mode-does-not-repeat](a-a-twins-failure-mode-does-not-repeat.md) — "Şu dosya çifti, daha önce patlayan ikize benziyor" diye başlayan kart, o ikizin HATA BİÇİMİNİ de miras aldığını varsayar — benzerliği yol deseninden değil, her ekseni tek tek ölçerek doğrula
+
+- [a-green-run-belongs-to-a-file-state-not-a-file](a-green-run-belongs-to-a-file-state-not-a-file.md) — Paylaşımlı ağaçta "1649 test geçti" bir DOSYAYA değil bir dosya DURUMUNA aittir — yeşili md5 ile çivile, ve altında beliren "regresyonu" komşunun mutasyon testi olabileceği için raporlamadan ÖNCE sor
+- [fabrika-tenantid-sweep-residue-m6-overload-and-checkout](fabrika-tenantid-sweep-residue-m6-overload-and-checkout.md) — Depo geneli tenantId-filtre-düşürme süpürmesi bitti (TASK-MTUH7CF87SGRR) — canlı 4 satır kaldı ve ikisi de HENÜZ DÜZELTİLMEDİ: m6/scoring.ts'in 2-argümanlı aşırı yüklemesi ve checkout rotasının 'default-tenant' fallback'i
+
+- [a-suggested-fix-can-encode-the-same-bug-it-targets](a-suggested-fix-can-encode-the-same-bug-it-targets.md) — A handed-down fix hypothesis for a money/plan bug ("probably switch to column Y") can itself be the inverted-behavior bug — measure every write path before implementing, especially when the "more specific"-sounding field is the less reliable one
+
+- [a-gate-run-belongs-to-a-tree-not-a-commit](a-gate-run-belongs-to-a-tree-not-a-commit.md) — Paylaşılan ağaçta "kapı X commit'inde yeşil" cümlesi yanlıştır — kapı ağacı ölçer, commit'i değil; kartı kapatan commit'in kendisi hiç ölçülmemiş olabilir
+- [fabrika-shared-tree-gate-red-from-a-foreign-dev-server](fabrika-shared-tree-gate-red-from-a-foreign-dev-server.md) — Fabrika'da pnpm gate'in e2e aşaması, makinede başkasının açtığı next dev sunucusunu yeniden kullanır ve testEnv hiç uygulanmaz — 7 fatura testi 503'le yalancı kırmızı verir
+- [fabrika-playwright-reuseexistingserver-lokal-risk](fabrika-playwright-reuseexistingserver-lokal-risk.md) — Dev'in CI guard'ına rağmen lokal'de yabancı sunucu env loss riski kalıyor — çözüm: reuseExistingServer: false yapıp tüm ortamlarda yeni sunucu başlat
+
+- [fabrika-error-wrap-needs-a-negative-test](fabrika-error-wrap-needs-a-negative-test.md) — Bir try/catch'in DAR tutulduğunu ancak negatif test kanıtlar — pozitif "doğru tipi fırlatıyor" testi, fonksiyonun tamamını saran aşırı-düzeltmede de yeşil kalır
+- [fabrika-named-error-throw-is-half-the-contract](fabrika-named-error-throw-is-half-the-contract.md) — Adlandırılmış hata tipi fırlatmak sözleşmenin yarısıdır — çağıranın blanket catch'i onu yutuyorsa delik hâlâ açık; her yeni throw'da çağıran taraması ZORUNLU
+
+- [a-writing-the-report-is-not-delivering-it](a-writing-the-report-is-not-delivering-it.md) — Paylaşılan ağaçta rapor dosyasını yazmak teslim etmek değildir — commit'le ve git ls-tree ile ağaçta olduğunu doğrula
+- [fabrika-systemalert-resolvedat-has-one-writer](fabrika-systemalert-resolvedat-has-one-writer.md) — Fabrika SystemAlert.resolvedAt'i yalnız konsoldaki insan yazıyor — üretici/süpürücü yok, o yüzden 0 alarm çözülmüş
+
+- [a-cleanup-claim-in-a-report-is-a-claim-not-a-fact](a-cleanup-claim-in-a-report-is-a-claim-not-a-fact.md) — A report saying "test data was removed" often means the seed SCRIPT file was deleted, not that the DB rows it wrote were deleted — check live state, not prose
+
+- [fabrika-esr-roster-blocker-confirmed-genuine](fabrika-esr-roster-blocker-confirmed-genuine.md) — E11.3 (TASK-MTQ2KL3JO4MK2) ESR calibration roster blocker independently audited — confirmed genuine external/human dependency, not a hidden code bug
+
+- [a-check-whether-the-invariant-already-lives-in-a-caller](a-check-whether-the-invariant-already-lives-in-a-caller.md) — Dışa açık bir fonksiyonda kusur bulduğunda, düzeltmeden önce ÇAĞIRANLARI oku — kural çoğu zaman zaten orada elle uygulanıyordur; bu hem doğru düzeltmenin kanıtı hem de "üretimde ulaşılabilir mi" sorusunun cevabıdır
+- [a-nan-that-never-reaches-the-screen-is-the-dangerous-kind](a-nan-that-never-reaches-the-screen-is-the-dangerous-kind.md) — "NaN kullanıcıya ulaşıyor mu?" diye sorulan kartta doğru cevap çoğu zaman "hayır, daha kötüsü" — karşılaştırma NaN'ı sessizce false'a çevirip makul görünen YANLIŞ bir karar üretir; testi Number.isNaN'a değil ürün anlamına yaz
+- [a-product-question-cards-need-the-reachability-path-not-just-the-branch](a-product-question-cards-need-the-reachability-path-not-just-the-branch.md) — "Bu dal yanlış davranıyor" tipi ürün-sorusu kartında asıl iş dalı göstermek değil, kullanıcının o dala GERÇEKTEN nasıl vardığını bulmaktır — Fabrika'da cevap kapıların kendisinde değil, aşamayı kapı koşmadan yazan iki UI yolundaydı
