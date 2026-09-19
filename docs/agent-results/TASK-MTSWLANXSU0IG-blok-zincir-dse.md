@@ -271,6 +271,44 @@ içinde düştü — Next sayfayı akıtırken formun ikinci, `hidden` bir kopya
 `getByTestId` strict-mode ihlaline düşüyor. Locator görünür kopyaya kapsandı (`.filter({
 visible: true })` + `networkidle`), yani yarış seyrekleştirilmedi, **kaldırıldı**.
 
+### 2.7 Commit hijyeni — paylaşımlı ağaçta iki tuzak yakalandı
+
+**Commit:** `5dce7ec8` (amend sonrası) — 24 dosya.
+
+**Tuzak 1: `messages/*.json`'da başka ajanların işi duruyordu.** `git diff` üç ayrı kaynak
+gösterdi: benim `Auth.disclosure*` anahtarlarım, başka bir ajanın `legal.cookieConsent`
+bloğu, bir başkasının `plansEmpty`/`identityBadge`/`identityTitle` anahtarları. Yalnız kendi
+hunk'ım `git apply --cached` ile indexe alındı (`git add -p` bu ortamda interaktif olduğu için
+yok) ve doğrulandı:
+```
+$ git diff --cached -- messages/*.json | grep -c "cookieConsent|acceptAll|essentialOnly"
+0   → OK: no foreign keys staged
+```
+
+**Tuzak 2 (YENİ, ve ilk commit'i bozdu): `git commit -- <yollar>` INDEX'İ ATLAR.** Yolları
+argüman olarak vermek, o yolların **çalışma ağacı** hâlini commit'ler — özenle hazırlanmış
+index yok sayılır. İlk commit bu yüzden `messages/en.json | 45 ++-` gösterdi (benim 4 satırım
+yerine), yani diğer ajanların işini de içeri aldı. Yakalandı ve düzeltildi:
+```
+$ git show --stat HEAD | grep messages      # amend sonrası
+ messages/en.json  | 5 +-
+ messages/tr.json  | 5 +-
+$ git show HEAD -- messages/*.json | grep -c "cookieConsent|plansEmpty|identityBadge"
+0   → OK: commit carries only my keys
+```
+Diğer ajanların işi çalışma ağacına **geri kondu** ve commit'siz duruyor (`git diff --stat
+-- messages/` → 78 satır, hepsi onların). Hiçbir şey kaybolmadı.
+
+**`tests/billing-identity-action.test.ts` — 4 typecheck hatası, BENİM DEĞİL.**
+```
+$ pnpm typecheck 2>&1 | grep "error TS" | sed 's/(.*//' | sort | uniq -c
+   4 tests/billing-identity-action.test.ts
+```
+Dosya **takipsiz** (`??`), commit'imde yok, oturumum sırasında ağaca düştü (yukarıdaki
+`identityBadge` i18n anahtarlarıyla aynı ajanın devam eden işi). Benim dokunduğum hiçbir
+dosyada typecheck hatası yok; commit anındaki pre-commit kapısı da staged kapsamda temiz
+geçti (`✓ Kapı temiz (staged kapsamı)`).
+
 ---
 
 ## 3. Değişen dosyalar

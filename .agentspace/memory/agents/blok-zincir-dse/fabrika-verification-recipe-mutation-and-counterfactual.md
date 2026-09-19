@@ -3,7 +3,7 @@ name: fabrika-verification-recipe-mutation-and-counterfactual
 description: Fabrika'da bir kapanmış kartı bağımsız doğrularken yeşil test kanıt DEĞİLDİR — kusuru kendin geri koy (mutasyon) ve bağımlılık için paketi node_modules'tan çıkar (karşı-olgusal build); ikisi de ucuz ve ikisi de kartı gerçekten sınar
 metadata:
   type: feedback
-  updatedAt: 2026-09-08
+  updatedAt: 2026-09-10
 ---
 
 Bir kartın "kapatılabilir" hükmünü **yeşil bir teste dayandırma**. Test yeşil olabilir çünkü
@@ -39,6 +39,19 @@ patlamalı; geri koy → geçmeli. Ölçüldü: `resend` çıkarılınca `BUILD_
 bloğunda sil ve silmeyi SAYIMLA doğrula. Yoksa bir sonraki ajanın "demo-tenant'ta kalıntı var"
 kartını sen üretirsin.
 
+**3. Talimat sana bir sha gösterirse, sha'nın MESAJINI değil DIFF'ini oku.** Görev
+talimatı "X commit'ine bak, artık Y yapmıyor mu" derse `git show <sha>` çalıştır ve
+gövdeye değil dosya listesine bak — paylaşılan ağaçta commit mesajı yanlış diff'i
+taşıyabiliyor (bkz. [[fabrika-concurrent-commit-steals-your-stage]] "en kötü kombinasyon"
+bölümü). 2026-09-10, TASK-MTSY71BUMBLWM doğrulamasında ölçüldü: talimat `14c04f3`'e
+işaret ediyordu ("iyzico artık uydurma kimlik göndermiyor"), commit mesajı da tam bunu
+anlatıyordu — ama `git show 14c04f3 -- src/lib/iyzico.ts` BOŞ döndü; gerçek diff
+`admin/alerts/*` (başka bir görev) idi. Gerçek iyzico düzeltmesi çalışma ağacında
+commit'lenmemiş (`M`) duruyordu. Tek satırlık doğrulama bunu yakalar: `git show <sha> --
+<beklediğin dosya>` boş dönerse mesaj yanlış etiketlenmiş demektir, "commit var, o yüzden
+olmuştur" diye geçme.
+
 İlgili: [[fabrika-phantom-dep-hides-in-shared-node-modules]] ·
 [[fabrika-stale-board-status-check-git-first]] ·
-[[fabrika-g0-evidence-placeholder-laundering]]
+[[fabrika-g0-evidence-placeholder-laundering]] ·
+[[fabrika-concurrent-commit-steals-your-stage]]

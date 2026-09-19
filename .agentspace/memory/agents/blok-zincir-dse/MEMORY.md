@@ -52,3 +52,8 @@
 - [fabrika-e2e-env-comes-from-playwright-not-dotenv](fabrika-e2e-env-comes-from-playwright-not-dotenv.md) — Fabrika e2e'si 503/eksik-config veriyorsa .env'e bakma — playwright.config.ts testEnv'i KENDİ başlattığı sunucuya enjekte eder; kırmızı, başkasının başlattığı sunucuya bağlanmaktan gelir
 - [fabrika-prove-a-red-gate-is-not-yours-by-counterfactual](fabrika-prove-a-red-gate-is-not-yours-by-counterfactual.md) — Paylaşılan ağaçta kapı kırmızıysa "benim değil" DEME, ÖLÇ — aynı spec'i değişikliğin geri alınmış ve geri konmuş haliyle koş; ayrıca depo İÇİNDEKİ yabancı worktree'ler pnpm test/lint sayılarını üçe katlar
 - [fabrika-noUncheckedIndexedAccess-false-positive-pattern](fabrika-noUncheckedIndexedAccess-false-positive-pattern.md) — 171 hatanın çoğu tek desen: length-check sonrası index erişimi, TS daraltamıyor; bayrak tek global tsconfig anahtarı, TÜM dilimler bitene kadar açılamaz
+
+- [measure-a-compiler-flag-with-a-sibling-config-not-by-editing-the-shared-one](measure-a-compiler-flag-with-a-sibling-config-not-by-editing-the-shared-one.md) — Paylaşılan bir ağaçta derleyici bayrağı ölçerken tsconfig.json'ı düzenleyip geri alma — kardeş bir "extends" config kullan; komşunun kapısı hiç kırılmaz
+- [narrow-off-the-element-not-off-length](narrow-off-the-element-not-off-length.md) — noUncheckedIndexedAccess düzeltirken `.length > 0` kontrolünü koruyup `!` eklemek karar mantığını NaN'a açar — daraltmayı elemanın kendisinden yap
+
+- [fabrika-withtenant-migration-pattern-d1-d6](fabrika-withtenant-migration-pattern-d1-d6.md) — Fabrika'da sarmalayıcısız prisma çağrısını withTenant'a taşırken izlenen altı maddelik desen — sarmalayıcı kiracı sınırını verir ama satır sahipliğini VERMEZ, o yüzden sahiplik yüklemi yazının where'inde de durmalıdır.
