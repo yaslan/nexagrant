@@ -19,7 +19,7 @@ Dil: arayüz **Türkçe (varsayılan) ve İngilizce**; kod, tablo/alan adları v
 6. Yönetici konsolu: modül durumları (kapalı/geliştirmede/pilot/açık), bağımlılık kontrolü, kademeli kapanış, olay kaydı, plan/eklenti eşlemesi.
 7. Faturalama: planlar, eklentiler, koltuk, YZ kredileri, yıllık indirim; Stripe (EUR) + iyzico (TL, faz 2).
 
-**MVP sonrası (v1.1–v1.3):** M6 Evaluator Lens, M9 Meeting Briefs, M10 Follow-up Documents, M11 Full Application Production, M7 TTO Accelerator, pazar yeri, API lisansı.
+**MVP sonrası (v1.1–v1.3):** M6 Evaluator Lens, M9 Meeting Briefs, M10 Follow-up Documents, M11 Full Application Production, M7 TTO Accelerator, API lisansı. (Pazar yeri kaldırıldı — ADR-0005.)
 
 **Hedef olmayanlar:** Funding & Tenders portalına otomatik gönderim (yasak/desteklenmiyor — kullanıcı portalda kendisi gönderir); proje yürütme/muhasebe (EMDESK alanı; entegrasyon olarak düşünülür); hakemlik otomasyonu (YZ yalnızca iç ön değerlendirme; Komisyon kuralı).
 

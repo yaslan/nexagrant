@@ -32,9 +32,9 @@ Yıl 1 hedef: Türkiye'de öncelik 1 segmentleri (ADR-0004 ile belediye/kamu + k
 - Danışmanlık: "Teklif başına 100–150 saat tasarruf" — çoklu müşteri çalışma alanı, Evidence Pack ve blok kütüphanesi, Evaluator Lens ile ön değerlendirme.
 - TTO: "Araştırmacı–çağrı eşleştirmesini otomatikleştirin, koordinatör sayınızı artırın" — Partner Intelligence + TTO Accelerator + raporlama.
 
-## 5. Gelir modeli — beş kalem
+## 5. Gelir modeli — dört kalem
 
-### 5.1 Abonelik (çekirdek gelir, hedef: toplam gelirin %65'i)
+### 5.1 Abonelik (çekirdek gelir, hedef: toplam gelirin %69'u)
 
 Modül temelli, koltuk sınırlı katmanlar. Yıllık ödemede %20 indirim. Fiyatlar KDV hariç.
 
@@ -51,7 +51,7 @@ Kurallar:
 - YZ kullanımı kredi tabanlı (Ekip 500 kredi/ay, İşletme 2.000, Kurumsal sözleşmeye göre); 1 kredi ≈ 1 concept note taslağı ya da 1 sahte değerlendirme. Ek kredi paketi €49 / 250 kredi.
 - Ek koltuk: Başlangıç €19, Ekip €29, İşletme €39 / ay.
 
-### 5.2 Modül eklentileri (hedef: %12)
+### 5.2 Modül eklentileri (hedef: %13)
 
 Plan dışı modüllerin tek tek açılması; yöneticinin konsoldan "satın al ve aç" akışı.
 
@@ -63,7 +63,7 @@ Plan dışı modüllerin tek tek açılması; yöneticinin konsoldan "satın al 
 | M8 Consortium Matching Pro | €79 | Başlangıç | Rol matrisi + çakışma uyarısı |
 | Ek çalışma alanı (müşteri) | €49 | İşletme | Danışmanlıklar için |
 
-### 5.3 Hizmet paketleri ve başarı primi (hedef: %13)
+### 5.3 Hizmet paketleri ve başarı primi (hedef: %14)
 
 İnsan destekli hizmetler, platform üzerinde takip edilir (M5 iş akışı, M10 belgeler).
 
@@ -75,11 +75,9 @@ Plan dışı modüllerin tek tek açılması; yöneticinin konsoldan "satın al 
 | Başarı primi | Hibenin %3–5'i, kademeli, tavanlı | **AB kurallarına göre uygun maliyet değildir**; sözleşmede açıkça belirtilir, müşteri kendi kaynağından öder |
 | Kurumsal eğitim / onboarding | €1.500 / gün | TTO ve ajanslar |
 
-### 5.4 Pazar yeri komisyonu (hedef: %6, Yıl 2'den itibaren)
+### 5.4 Pazar yeri — kaldırıldı (ADR-0005)
 
-- Doğrulanmış danışman ve uzman hakem havuzu; müşteri platform içinden görev açar, ödeme platform üzerinden, **%12 komisyon** (danışmandan).
-- Konsorsiyum koltuğu ilanları: "koltuk arayan/koltuk sunan" eşleşmesi; premium ilan €99 / çağrı; kurumsal planlarda ücretsiz.
-- Pilot sahası / kent ortağı eşleşmesi (Mission kentleri, OSB'ler) — Yıl 3.
+Patron kararı (2026-09-29): pazar yeri ve kurumlar arası satış yok. Bu kalem ve %6 hedefi kaldırıldı (`docs/adr/ADR-0005-remove-marketplace.md`). Kalan dört kalemin yüzde hedefleri, eski oranları korunarak %100'e yeniden ölçeklendi (65/94, 12/94, 13/94, 4/94 → %69 / %13 / %14 / %4). Numaralandırma, ADR'nin bu bölüme verdiği atıf bozulmasın diye korunuyor.
 
 ### 5.5 Veri ve API lisansı (hedef: %4, Yıl 2'den itibaren)
 
@@ -116,10 +114,12 @@ Maliyet sürücüleri: LLM çağrıları (kredi tabanlı olduğu için marj koru
 | MRR (yıl sonu) | €23 K | €105 K | €330 K |
 | Abonelik + eklenti geliri | €150 K | €800 K | €2,6 M |
 | Hizmet + başarı primi | €60 K | €250 K | €600 K |
-| Pazar yeri + veri | €0 | €60 K | €300 K |
-| **Toplam gelir** | **€210 K** | **€1,1 M** | **€3,5 M** |
+| Veri/API | €0 | €24 K | €120 K |
+| **Toplam gelir** | **€210 K** | **€1,07 M** | **€3,32 M** |
 | Ekip (FTE) | 5 | 12 | 25 |
 | Nakit başabaş | — | Q4 2028 | ✓ |
+
+Veri/API satırı eski "pazar yeri + veri" satırının veri payıdır (5.5'in %4'ü, eski %10'un 4/10'u); pazar yeri payı ADR-0005 ile düşüldü. MRR ve başabaş satırları yeniden hesaplanmadı.
 
 Kötümser senaryo (Türkiye FP10 asosiyasyonunda gecikme): Yıl 2 geliri €650 K; karşı önlem: widening ülkelerine erken açılım ve Eurostars/Eureka odaklı paket.
 

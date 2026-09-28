@@ -113,7 +113,7 @@ Durum (S9–S10 dalgası, ölçüldü 2026-09-07 — kartların çoğu **`review
 **CI/kalite kapısı riski (bu fazı etkiler):** Lint kapısı kırmızı — 777 sorun / 561 hata (ölçüldü 2026-09-06, board TASK-MTQ60SGW45T0X, todo). CI kapısı henüz bunu kırmıyor; sıfırlanana kadar yeni PR'larda regresyon sessizce birikebilir.
 
 ## Faz C — v1.2 (S13–S16): M10 Follow-up Documents, M11 Full Application Production (ortak portalı, bütçe/lump-sum, Gantt), e-fatura.
-## Faz D — v1.3 (S17–S20): M7 TTO Accelerator, pazar yeri (Stripe Connect), Partner Intelligence API, İngilizce pazar açılışı.
+## Faz D — v1.3 (S17–S20): M7 TTO Accelerator, Partner Intelligence API, İngilizce pazar açılışı. (Pazar yeri kaldırıldı — ADR-0005.)
 
 ## Açık kararlar (yanıtlanmadan varsayılmaz)
 1. Marka adı ve alan adı (çalışma adı "Fabrika").

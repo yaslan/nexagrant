@@ -131,7 +131,7 @@ yazıldı (`2a83253`).
 - **Pazaryeri (M8) istemci bileşeninde `t()` kullanımı sıfırdı**, 41'den fazla kullanıcıya
   görünen Türkçe metin doğrudan koda gömülüydü — İngilizce locale'de sessizce Türkçe
   gösteriyordu. Tümü `messages/tr.json` / `messages/en.json`'da yeni bir `m8` isim alanına
-  taşındı (`a7c8483`).
+  taşındı (`a7c8483`). *Sonradan: pazar yeri ve `m8` isim alanı ADR-0005 ile kaldırıldı (2026-09-29).*
 
 ### Sepet & Ön Yüz
 - **Sepet, sayfa yenilendiğinde artık silinmiyor.** Sepet ve çerez bildirimi bileşenleri
@@ -307,7 +307,7 @@ experiments. Fix: the 18 `loading.tsx` boundaries under `(app)` and the now-unus
 - **The marketplace (M8) client component had zero `t()` usage**, with 41+ user-facing
   Turkish strings baked into the code — silently showing Turkish under the English locale.
   All of them moved into a new `m8` namespace in `messages/tr.json` and `messages/en.json`
-  (`a7c8483`).
+  (`a7c8483`). *Later: the marketplace and the `m8` namespace were removed by ADR-0005 (2026-09-29).*
 
 ### Cart & Frontend
 - **The cart is no longer wiped on page reload.** The cart and cookie-consent components

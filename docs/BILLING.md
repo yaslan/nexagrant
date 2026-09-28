@@ -308,9 +308,9 @@ Aynı `Subscription.provider='iyzico'`; TL liste `src/lib/iyzico.ts`
   fatura hibe sözleşmesi imzalandığında.
 - Uyum notu: EIC Board danışman kılavuzu — başarı primi uygun maliyet değildir.
 
-## 6. Pazar yeri ve API (v1.3)
+## 6. API (v1.3)
 
-- `MarketplaceListing`, `Engagement`, `Commission` (%12, Stripe Connect).
+- Pazar yeri (ilan, sipariş, komisyon, Stripe Connect) kaldırıldı — ADR-0005.
 - `ApiKey` (tenant, scope, rate limit) → `/api/v1/partners/*`, €299/ay 10.000
   çağrı; aşımda 429 + üst paket önerisi. *(Bu iki rakam da `ADDON-USD-1`
   kapsamında EUR kaldı.)*

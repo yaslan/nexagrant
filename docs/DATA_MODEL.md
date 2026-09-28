@@ -200,7 +200,7 @@ uyarıya bakın).
 
 ## 8. v1.1+ tablolar (şemada yorum olarak)
 
-`Evaluation` (M6), `MeetingBrief` (M9), `FollowupDoc` (M10), `ApplicationPart` (M11), `TtoPortfolioItem` (M7), `MarketplaceListing/Engagement/Commission`, `ApiKey`.
+`Evaluation` (M6), `MeetingBrief` (M9), `FollowupDoc` (M10), `ApplicationPart` (M11), `TtoPortfolioItem` (M7), `ApiKey`. (Pazar yeri tabloları kaldırıldı — ADR-0005, `prisma/migrations/drop-marketplace.sql`.)
 
 ### 8.1 M6 Evaluator Lens — değerlendirme paneli
 
