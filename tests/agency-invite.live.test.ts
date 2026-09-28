@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, withTenantOn } from '@/lib/db';
 import {
@@ -21,9 +21,11 @@ import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpe
  * (fabrika) only builds fixtures and reads the ground truth.
  *
  * `.live`: needs the docker-compose Postgres with add-agency-invite-code.sql and
- * `pnpm db:rls` applied; skips itself when either is missing. A missing
- * connection string fails in CI, and a BYPASSRLS role fails everywhere
- * (tests/helpers/live-db-role.ts).
+ * `pnpm db:rls` applied (`scripts/apply-migrations.sh` applies the former).
+ * Locally a missing database or migration marks every test here as skipped;
+ * in CI either one fails the file, and a BYPASSRLS role fails everywhere
+ * (tests/helpers/live-db-role.ts). TASK-MULU7SAA4EPP8: the missing-migration
+ * branch used to return early from each test, which vitest counts as passed.
  */
 
 const SUITE = 'agency-invite.live';
@@ -102,15 +104,23 @@ beforeAll(async () => {
   }
   // Outside the try: a BYPASSRLS role must fail the file, not skip it.
   await assertRlsSubjectRole(rls, SUITE);
+  let fnCount: number | undefined;
   try {
     const fn = await admin.$queryRaw<Array<{ n: number }>>`
       SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'redeem_agency_invite'`;
-    if (fn[0]?.n !== 1) {
-      skipReason = 'add-agency-invite-code.sql is not applied.';
-      console.warn(`agency-invite live test skipped: ${skipReason}`);
-      return;
-    }
-
+    fnCount = fn[0]?.n;
+  } catch (e) {
+    skipReason = `database unavailable: ${e instanceof Error ? e.message : String(e)}`;
+    skipOrFailInCi(SUITE, skipReason);
+    return;
+  }
+  // Outside the try, so that in CI the throw reaches vitest under its own message.
+  if (fnCount !== 1) {
+    skipReason = 'add-agency-invite-code.sql is not applied (scripts/apply-migrations.sh)';
+    skipOrFailInCi(SUITE, skipReason);
+    return;
+  }
+  try {
     ids.agencyA = await newTenant('AGENCY', 'agency-a');
     ids.agencyB = await newTenant('AGENCY', 'agency-b');
     ids.org = await newTenant('ORGANIZATION', 'org');
@@ -126,6 +136,11 @@ beforeAll(async () => {
   }
 });
 
+// A real skip: an early `return` inside the test would be reported as passed.
+beforeEach((ctx) => {
+  if (!ready) ctx.skip(skipReason);
+});
+
 afterAll(async () => {
   if (admin && tenants.length) {
     // Cascades to AgencyInviteCode, Workspace and the tenants' AuditEvent rows.
@@ -137,7 +152,6 @@ afterAll(async () => {
 
 describe('redeeming an agency invite code (fabrika_app)', () => {
   test('a valid code returns the agency, counts one use, and links the new tenant', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const { id, code } = await makeCode(ids.agencyA, 5);
     const t = await newTenant('ORGANIZATION', 'linked');
     const agency = await rls!.$transaction(async (tx) => {
@@ -153,7 +167,6 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
   });
 
   test('a use inside a transaction that rolls back is not counted', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const { id, code } = await makeCode(ids.agencyA, 1);
     await expect(
       rls!.$transaction(async (tx) => {
@@ -166,7 +179,6 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
   });
 
   test('the limit holds: maxUses successes, then NULL', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const { id, code } = await makeCode(ids.agencyA, 2);
     expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
     expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
@@ -175,7 +187,6 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
   });
 
   test('race for the last use: two connections, exactly one wins', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const { id, code } = await makeCode(ids.agencyA, 1);
     // The first holds the row lock (uncommitted) for 400 ms; the second starts
     // inside that window, waits on the lock, then re-checks and finds it spent.
@@ -189,7 +200,6 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
   });
 
   test('a burst of 12 parallel registrations on a 5-use code yields exactly 5', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const { id, code } = await makeCode(ids.agencyA, 5);
     const results = await Promise.all(
       Array.from({ length: 12 }, (_, i) => redeemAsNewTenant(i % 2 ? rls2! : rls!, code))
@@ -199,7 +209,6 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
   });
 
   test('a revoked code is refused; revoking twice is a no-op', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const { id, code } = await makeCode(ids.agencyA, 5);
     const revoke = () =>
       withTenantOn(rls!, ids.agencyA, (tx) =>
@@ -212,14 +221,12 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
   });
 
   test('an expired code is refused', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const { id, code } = await makeCode(ids.agencyA, 5);
     await admin!.agencyInviteCode.update({ where: { id }, data: { expiresAt: new Date(Date.now() - 1000) } });
     expect(await redeemAsNewTenant(rls!, code)).toBeNull();
   });
 
   test('a code of a tenant that is no longer an agency, or is deleted, is refused', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const c = await newTenant('AGENCY', 'agency-c');
     const { code } = await makeCode(c, 5);
     await admin!.tenant.update({ where: { id: c }, data: { kind: 'ORGANIZATION' } });
@@ -229,21 +236,18 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
   });
 
   test('unknown and malformed codes are refused the same way', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     expect(await redeemAsNewTenant(rls!, 'ABCD-EFGH-JKMN')).toBeNull();
     expect(await redeemAsNewTenant(rls!, 'not a code')).toBeNull();
     expect(await redeemAsNewTenant(rls!, '')).toBeNull();
   });
 
   test('only an agency can create codes', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     await expect(makeCode(ids.org, 5)).rejects.toThrow(/Only an agency/);
   });
 });
 
 describe('the function does not leak its system scope', () => {
   test('after a normal call the caller scope is what it was', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const { code } = await makeCode(ids.agencyA, 5);
     const after = await rls!.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.system_scope', 'off', true)`;
@@ -259,7 +263,6 @@ describe('the function does not leak its system scope', () => {
   });
 
   test('after the function fails mid-call the scope is not left open', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const { code } = await makeCode(ids.agencyA, 5);
     // Connection 1 holds the code's row lock; connection 2 gives up waiting
     // (lock_timeout) INSIDE redeem_agency_invite, i.e. while the function's
@@ -290,7 +293,6 @@ describe('the function does not leak its system scope', () => {
 
 describe('the agency link grants no read on the linked organisation', () => {
   test('agency scope: the linked org content is invisible and unwritable', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     await admin!.tenant.update({ where: { id: ids.org }, data: { agencyId: ids.agencyA } });
 
     // Counterfactual first: the row exists and its own tenant sees it.
@@ -315,7 +317,6 @@ describe('the agency link grants no read on the linked organisation', () => {
   });
 
   test('agency B neither sees nor revokes agency A codes', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const { id, code } = await makeCode(ids.agencyA, 5);
     const bList = await withTenantOn(rls!, ids.agencyB, (tx) => listInviteCodesIn(tx, ids.agencyB));
     expect(bList.find((c) => c.id === id)).toBeUndefined();
@@ -331,7 +332,6 @@ describe('the agency link grants no read on the linked organisation', () => {
   });
 
   test('the registrant cannot read codes either: no tenant scope, zero rows', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     await makeCode(ids.agencyA, 5);
     expect(await rls!.agencyInviteCode.count()).toBe(0);
   });
@@ -339,7 +339,6 @@ describe('the agency link grants no read on the linked organisation', () => {
 
 describe('refused attempts are counted without the code', () => {
   test('a spent code is filed under its agency, an unknown one under no tenant', async () => {
-    if (!ready) return expect(skipReason).toBeTruthy();
     const since = new Date(Date.now() - 1000);
     const { code } = await makeCode(ids.agencyA, 1);
     expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
