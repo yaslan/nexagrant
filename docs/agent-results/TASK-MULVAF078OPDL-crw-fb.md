@@ -1,6 +1,6 @@
 # TASK-MULVAF078OPDL — FB İNCELEME-4: kamu dokümanları + repo güvence kapanışı (CRW-FB)
 
-Sprint FB-KAMU-2 · dal `dev` (HEAD `9b373fb4`) · 29.09.2026 · Kod değiştirilmedi.
+Sprint FB-KAMU-2 · dal `dev` (inceleme başı `9b373fb4`; B2 huni kodu `df1d2341` ile aynı satırlarda) · 29.09.2026 · Kod değiştirilmedi.
 
 Önem kodları: **B** = bloke eden (kart kapanmaz) · **Ö** = önemli (kapanmadan önce düzeltilmeli ya da sahibine açıkça devredilmeli) · **K** = küçük / öneri.
 
@@ -39,7 +39,7 @@ Ekin kendi kuralı: "Kod bu metinden farklı davranırsa metin yanlış olur" (:
 | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | :45, :104, :151 — kırılımlar **il**, kurum türü, **program**                                       | Yalnız `orgType` (`funnel.ts:34-44`, `agency_funnel_counts` → `org_type`). `Tenant`'ta il alanı yok (yalnız `country`). Program kırılımı yok                                                 |
 | :93 / :140 — "Kurum türünüz ve **iliniz**" işlenir                                                 | İl toplanmıyor. Kayıt `country: "TR"` yazıyor (`auth.ts:295`)                                                                                                                                |
-| :39 — "Ortalama karne puanı"; :38 "Karnesini tamamlayan"                                           | `readiness` = `unmeasured` (`funnel.ts:60`). Ortalama puan hiç yok                                                                                                                           |
+| :39 — "Ortalama karne puanı"; :38 "Karnesini tamamlayan"                                           | `readiness` = `unmeasured` (`funnel.ts:59`). Ortalama puan hiç yok                                                                                                                           |
 | :90 / :137 — "Kullandığınız davet kodu" işlenir; taslak :16 "kullanılan davet kodunun kaydına bağ" | Kiracıda yalnız `agencyId` var. Hangi kodun kullanıldığı kiracıya bağlanmıyor (`auth.ts:300`, redeemed kaydında yalnız `agencyId`, `:345`). Kod yalnız kayıt anında özetlenip eşleştiriliyor |
 | taslak :16 — "bağın kaldırılma zamanı"; ek §4 md.10 "bağı kaldırma"                                | Böyle bir alan ya da özellik yok (şemada `agencyLinkedAt`/`unlinkedAt` yok)                                                                                                                  |
 
