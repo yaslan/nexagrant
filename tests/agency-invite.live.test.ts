@@ -9,6 +9,7 @@ import {
   revokeInviteCodeIn,
 } from '@/lib/agency/codes';
 import { envValue } from './helpers/dotenv';
+import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * TASK-MULRQJQYM0NAM (FB KAMU B1) — agency invite codes, measured on the role
@@ -20,9 +21,12 @@ import { envValue } from './helpers/dotenv';
  * (fabrika) only builds fixtures and reads the ground truth.
  *
  * `.live`: needs the docker-compose Postgres with add-agency-invite-code.sql and
- * `pnpm db:rls` applied; skips itself when either is missing.
+ * `pnpm db:rls` applied; skips itself when either is missing. A missing
+ * connection string fails in CI, and a BYPASSRLS role fails everywhere
+ * (tests/helpers/live-db-role.ts).
  */
 
+const SUITE = 'agency-invite.live';
 const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
 const ADMIN_URL = envValue('DATABASE_URL');
 const RUN = `b1-${Date.now().toString(36)}`;
@@ -79,21 +83,26 @@ async function usedCount(id: string): Promise<number> {
 }
 
 beforeAll(async () => {
-  if (!RLS_URL || !ADMIN_URL) {
+  // Before the try, so that in CI a missing variable fails instead of being caught.
+  const rlsUrl = requireRlsTestUrl(RLS_URL, SUITE);
+  if (!ADMIN_URL) skipOrFailInCi(SUITE, 'DATABASE_URL is not set');
+  if (!rlsUrl || !ADMIN_URL) {
     skipReason = 'DATABASE_URL_RLS_TEST / DATABASE_URL not set. Run `pnpm db:rls-role`.';
-    console.warn(`agency-invite live test skipped: ${skipReason}`);
     return;
   }
+  rls = createDbClient(rlsUrl);
+  rls2 = createDbClient(rlsUrl);
+  admin = createDbClient(ADMIN_URL);
   try {
-    rls = createDbClient(RLS_URL);
-    rls2 = createDbClient(RLS_URL);
-    admin = createDbClient(ADMIN_URL);
-    const caps = await rls.$queryRaw<Array<{ bypass: boolean }>>`
-      SELECT rolbypassrls AS bypass FROM pg_roles WHERE rolname = current_user`;
-    if (caps[0]?.bypass !== false) {
-      skipReason = 'the test role is BYPASSRLS; nothing here would be measuring RLS.';
-      return;
-    }
+    await rls.$connect();
+  } catch (e) {
+    skipReason = `database unavailable: ${e instanceof Error ? e.message : String(e)}`;
+    skipOrFailInCi(SUITE, skipReason);
+    return;
+  }
+  // Outside the try: a BYPASSRLS role must fail the file, not skip it.
+  await assertRlsSubjectRole(rls, SUITE);
+  try {
     const fn = await admin.$queryRaw<Array<{ n: number }>>`
       SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'redeem_agency_invite'`;
     if (fn[0]?.n !== 1) {
@@ -113,7 +122,7 @@ beforeAll(async () => {
     ready = true;
   } catch (e) {
     skipReason = `database unavailable: ${e instanceof Error ? e.message : String(e)}`;
-    console.warn(`agency-invite live test skipped: ${skipReason}`);
+    skipOrFailInCi(SUITE, skipReason);
   }
 });
 
