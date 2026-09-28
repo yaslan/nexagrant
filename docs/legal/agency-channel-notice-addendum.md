@@ -65,11 +65,11 @@ Toplu sayı her zaman anonim değildir. Örnek: rapor "Çorum · belediye · kar
 
 Taslak kural (B3 ve B2 kartlarına kabul ölçütü olarak önerilir):
 
-- Bir kırılım hücresinde sayı **3'ten küçükse** değer yazılmaz, **"<3"** yazılır.
-- "<3" hücresi, satır ve sütun toplamlarından geri hesaplanamamalıdır (ikinci hücre de gizlenir ya da toplam yuvarlanır).
-- Ortalama karne puanı, **en az 3 kurumun** olduğu hücrede gösterilir.
+- Bir kırılım hücresinde sayı **5'ten küçükse** değer yazılmaz, **"<5"** yazılır.
+- "<5" hücresi, satır ve sütun toplamlarından geri hesaplanamamalıdır (ikinci hücre de gizlenir ya da toplam yuvarlanır).
+- Ortalama karne puanı, **en az 5 kurumun** olduğu hücrede gösterilir.
 
-**[HUKUK-5]** Eşik (3) bir öneridir, dış kaynaktan gelen bir değer değildir. KVKK'nın anonimleştirme rehberindeki ölçütlerle hukukçu teyit etmelidir. Kural uygulanmazsa §2'deki "anonim" iddiası ve [HUKUK-2]'deki "ajans alıcı değildir" varsayımı **düşer**.
+**[HUKUK-5]** Eşik (5) bir öneridir, dış kaynaktan gelen bir değer değildir. B2 ve B3 kartlarıyla tek eşik kullanılır; ikisinden daha katı olan (5) seçildi (leed-fb kararı, 29.09.2026). KVKK'nın anonimleştirme rehberindeki ölçütlerle hukukçu teyit etmelidir. Kural uygulanmazsa §2'deki "anonim" iddiası ve [HUKUK-2]'deki "ajans alıcı değildir" varsayımı **düşer**.
 
 ## 4. Kullanıcıya gösterilecek ek metin — TR (taslak)
 
@@ -101,7 +101,7 @@ Kurumunuzu, sizi davet eden ajansın kanalına bağlamak ve ajansa, bölgesindek
 `<<HUKUK-3: md.5/2-f meşru menfaat mi, md.5/2-c sözleşmenin ifası mı; dengeleme testi gerekiyor mu>>`
 
 **6. Ajans neyi görür?**
-Ajans **yalnız toplu sayıları** görür: kodla kaç kurumun kayıt olduğu, kaç kurumun karnesini tamamladığı, kaç kurumun çağrı seçtiği, kaç kurumun başvuru yaptığını beyan ettiği ve sonuçlar. Bu sayılar il, kurum türü ve program kırılımıyla verilir. Bir kırılımda 3'ten az kurum varsa sayı gösterilmez, "<3" yazılır. `<<HUKUK-5: eşik teyidi>>`
+Ajans **yalnız toplu sayıları** görür: kodla kaç kurumun kayıt olduğu, kaç kurumun karnesini tamamladığı, kaç kurumun çağrı seçtiği, kaç kurumun başvuru yaptığını beyan ettiği ve sonuçlar. Bu sayılar il, kurum türü ve program kırılımıyla verilir. Bir kırılımda 5'ten az kurum varsa sayı gösterilmez, "<5" yazılır. `<<HUKUK-5: eşik teyidi>>`
 
 **7. Ajans neyi görmez?**
 Ajans; adınızı, e-postanızı, `<<HUKUK-4 / S4: kurumunuzun adını>>`, karne cevaplarınızı, tek başına kurumunuzun puanını, konsept notlarınızı, yüklediğiniz belgeleri, kayıtlı aramalarınızı ve fatura bilgilerinizi **görmez**. FonBridge bu verileri ajansa aktarmaz.
@@ -148,7 +148,7 @@ To link your organisation to the channel of the agency that invited you, and to 
 `<<LEGAL-3: legitimate interest (GDPR art.6(1)(f)) or performance of a contract (art.6(1)(b)); balancing test needed?>>`
 
 **6. What the agency sees**
-The agency sees **aggregate numbers only**: how many organisations signed up with the code, how many completed the readiness scorecard, how many picked a call, how many said they applied, and the results. The numbers are broken down by province, organisation type and programme. If a breakdown has fewer than 3 organisations, the number is not shown; the report shows "<3". `<<LEGAL-5: threshold>>`
+The agency sees **aggregate numbers only**: how many organisations signed up with the code, how many completed the readiness scorecard, how many picked a call, how many said they applied, and the results. The numbers are broken down by province, organisation type and programme. If a breakdown has fewer than 5 organisations, the number is not shown; the report shows "<5". `<<LEGAL-5: threshold>>`
 
 **7. What the agency does not see**
 The agency does **not** see your name, your email, `<<LEGAL-4 / S4: your organisation's name>>`, your scorecard answers, your organisation's own score, your concept notes, the documents you upload, your saved searches or your billing data. FonBridge does not give this data to the agency.
@@ -182,7 +182,7 @@ Your rights are listed in the main notice. In addition, an admin of your organis
 | HUKUK-2  | Yalnız anonim toplu sayı alan ajans, KVKK anlamında "alıcı" mıdır? Ortak veri sorumlusu olabilir mi (kodu dağıtan, kanalı yöneten taraf olarak)?                        | Cevap "evet" ise ek bir **aktarım** bölümü ve md.8 dayanağı gerekir                         |
 | HUKUK-3  | Ajans bağının kurulması ve sayıların üretilmesi için hukuki sebep hangisi (md.5/2-f / md.5/2-c)? Dengeleme testi gerekir mi?                                            | Kayıt ekranındaki kutunun "rıza" değil "aydınlatma teyidi" olarak kalması buna bağlı        |
 | HUKUK-4  | Ajansa kurum adı gösterilirse (S4), KOBİ şahıs şirketleri için ayrı bir aydınlatma ya da hukuki sebep gerekir mi?                                                       | Kurum adı, şahıs şirketinde gerçek kişiyi tanıtır                                           |
-| HUKUK-5  | "<3" eşiği ve geri hesaplamayı engelleme kuralı, anonimleştirme için yeterli mi?                                                                                        | Anonimlik iddiası ve HUKUK-2 varsayımı buna dayanır                                         |
+| HUKUK-5  | "<5" eşiği ve geri hesaplamayı engelleme kuralı, anonimleştirme için yeterli mi?                                                                                        | Anonimlik iddiası ve HUKUK-2 varsayımı buna dayanır                                         |
 | HUKUK-6  | Raporun ajansa ulaştırılma kanalı (pano indirme / e-posta) bu ekte yazılmalı mı?                                                                                        | E-posta sağlayıcısı yurt dışındadır (envanter §21, Resend); rapor anonimse etkisiz olabilir |
 | HUKUK-7  | Bağ kaldırıldıktan sonra bağ kaydının saklama süresi ne olmalı?                                                                                                         | Envanter satırında boş bırakıldı                                                            |
 | HUKUK-8  | Bağı kaldırma bir md.11 hakkı olarak mı, sözleşmesel bir seçenek olarak mı anlatılmalı? Kaldırma sırasında geçmiş raporlar için ne denmeli?                             | Yanlış çerçeve, olmayan bir hak vaat edebilir                                               |
