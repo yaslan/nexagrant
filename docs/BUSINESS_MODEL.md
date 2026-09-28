@@ -22,7 +22,7 @@ Fabrika, KOBİ'lerin, üniversite proje ofislerinin ve danışmanlık firmaları
 | **Danışmanlık / proje yazım firması** | ~150 firma TR; binlerce AB'de | Çok müşteri, çok teklif; hız ve tekrar kullanım; ortak bulma | Yüksek (€500–2.000/ay) | 1 |
 | **Üniversite TTO / proje ofisi** | 200+ üniversite; 80+ TTO | Araştırmacılara çağrı eşleştirme, koordinatör destek, raporlama | Orta-yüksek (kurumsal satın alma, yıllık) | 2 |
 | **Kümelenme / OSB / kalkınma ajansı / EEN düğümü** | 26 kalkınma ajansı, 50+ EEN ortağı, 100+ kümelenme | Üyelerine hizmet; ortak eşleştirme; raporlama | Yüksek (üye başına lisans) | 1 (kalkınma ajansı: kamu segmentinin dağıtım kanalı, ADR-0004); diğerleri 2 |
-| **Belediye / Mission kentleri** | ~1.390 belediye (30 büyükşehir dahil) | Deneyimsizlik; CERV, Erasmus+, LIFE, Cities Mission, NEB, Interreg/IPA çağrıları | Orta (kamu ihalesi / doğrudan temin) | 1 (ADR-0004, 29.09.2026; pilot: İlkadım Belediyesi) |
+| **Belediye / Mission kentleri** | ~1.390 belediye (30 büyükşehir dahil) | Deneyimsizlik; Erasmus+, Cities Mission, NEB, Interreg/IPA, kalkınma ajansı çağrıları (CERV/LIFE Türkiye'ye kapalı) | Orta (kamu ihalesi / doğrudan temin) | 1 (ADR-0004, 29.09.2026; pilot: İlkadım Belediyesi) |
 
 Yıl 1 hedef: Türkiye'de öncelik 1 segmentleri (ADR-0004 ile belediye/kamu + kalkınma ajansı kanalı eklendi); Yıl 2: segment 2 + widening ülkeleri (İngilizce); Yıl 3: AB geneli.
 

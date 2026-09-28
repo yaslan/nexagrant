@@ -24,7 +24,7 @@
 İlk teslimatlar (FB-KAMU-1):
 
 1. Fon Hazırlık Karnesi: kayıtsız, ücretsiz, kullanıcı kazanımının ana aracı.
-2. Belediye çağrı radarı: CERV, Erasmus+, LIFE, Missions, Interreg/IPA ve kalkınma ajansı programları.
+2. Belediye çağrı radarı: Erasmus+, Missions/NEB, Interreg/IPA ve kalkınma ajansı programları. **Düzeltme (29.09.2026, TASK-MULR4ATI5T158):** CERV ve LIFE resmî katılımcı ülke listelerinde Türkiye yok; Türk başvuru sahiplerine kapalı. Radar kataloğunda (`819aff09`) bu şekilde işaretli.
 3. İlkadım pilot planı + OKA kanal önerisi.
 
 ## Sonuçlar
