@@ -234,7 +234,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const computedName = (email.split("@")[0] ?? email)
           .replace(/[._]/g, " ")
           .replace(/\b\w/g, (c) => c.toUpperCase());
-        const isSuperadmin = isPlatformAdminDemoEmail(email) || !!demoProfile?.isPlatformAdmin;
 
         try {
           // Find or create user. No `include: { memberships: true }`: nothing in
@@ -272,7 +271,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   email,
                   name: computedName,
                   locale: "tr",
-                  isPlatformAdmin: isSuperadmin,
+                  // No `isPlatformAdmin` here, ever. A demo seat's admin right
+                  // is the `demoAdmin` claim (jwt callback), which dies with the
+                  // flag. Written to the row it outlived the flag, and with
+                  // `allowDangerousEmailAccountLinking` the Google account on
+                  // that address became a platform admin (TASK-MULU7GVFBTRXX K-2).
                 },
               });
 
@@ -346,17 +349,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
               return newUser;
             });
-          } else {
-            // Ensure superadmin flag and name are updated
-            if (isSuperadmin && !user.isPlatformAdmin) {
-              // Only the flag. Writing `name` here overwrote the name the user
-              // had chosen with one derived from their e-mail on every sign-in.
-              user = await prisma.user.update({
-                where: { id: user.id },
-                data: { isPlatformAdmin: true },
-              });
-            }
           }
+          // An existing user is signed in as they are: no write. This branch
+          // used to set `User.isPlatformAdmin = true` for the demo admin seat
+          // (and `name` before that) — see the create call above for why not.
 
           // `user` is `User | null` all the way down this branch: the lookup can
           // miss and the create path is an assignment TypeScript does not carry
@@ -417,38 +413,58 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.image = user.image;
       }
 
-      // With demo sign-in off, an e-mail address grants nothing: platform admin
-      // comes only from `User.isPlatformAdmin`, read below (TASK-MULSCEK4JHK8X).
-      if (demoLoginEnabled && token.email) {
-        const emailLower = token.email.toLowerCase();
-        const demo = DEMO_PROFILES[emailLower];
-        // The platform-admin grant only. `token.name = demo.name` used to run
-        // here on every refresh, so the DB name lost to a hardcoded one.
-        if ((demo?.isPlatformAdmin || isPlatformAdminDemoEmail(emailLower))) {
-          token.isPlatformAdmin = true;
-        }
-      }
+      // Two claims, two sources, both recomputed on EVERY call (TASK-MULU7GVFBTRXX Ö-2).
+      // They used to share `isPlatformAdmin`, which was only ever set to true:
+      // a token minted while demo sign-in was on stayed admin after the flag
+      // went off, and a crafted claim on a non-admin user was believed.
+      //
+      // `demoAdmin` — the demo seat's grant. With demo sign-in off an e-mail
+      // address grants nothing, and the session callback ignores this claim.
+      // (`token.name = demo.name` used to run here on every refresh, so the DB
+      // name lost to a hardcoded one; only the grant is left.)
+      const emailLower = typeof token.email === "string" ? token.email.toLowerCase() : null;
+      token.demoAdmin =
+        demoLoginEnabled &&
+        emailLower !== null &&
+        (DEMO_PROFILES[emailLower]?.isPlatformAdmin === true || isPlatformAdminDemoEmail(emailLower));
 
-      if (token.id && (!token.tenantId || trigger === "signIn")) {
+      // `isPlatformAdmin` — the database's answer, read below. Fail closed: no
+      // user id, no row, or no database means no platform admin for this call.
+      const claimedAdmin = token.isPlatformAdmin === true;
+      token.isPlatformAdmin = false;
+
+      if (typeof token.id === "string") {
+        const refreshMembership = !token.tenantId || trigger === "signIn";
         try {
-          const dbUser = await prisma.user.findUnique({
-            where: { id: token.id as string },
-            include: { memberships: true },
-          });
-          if (dbUser) {
-            if (dbUser.isPlatformAdmin) token.isPlatformAdmin = true;
+          // One query either way: the membership join only when the token
+          // has no tenant yet or a sign-in just happened, the flag always.
+          if (refreshMembership) {
+            const dbUser = await prisma.user.findUnique({
+              where: { id: token.id },
+              include: { memberships: true },
+            });
+            token.isPlatformAdmin = dbUser?.isPlatformAdmin === true;
             // Narrowed off the element itself rather than off `.length`: an absent
             // first membership must leave the token tenantless, which is the same
             // safe outcome the catch below documents.
-            const activeMembership = dbUser.memberships[0];
-            if (activeMembership) {
+            const activeMembership = dbUser?.memberships[0];
+            if (dbUser && activeMembership) {
               token.tenantId = activeMembership.tenantId;
               token.role = activeMembership.role;
               token.workspaceIds = activeMembership.workspaceIds;
               if (dbUser.name) token.name = dbUser.name;
             }
+          } else {
+            const dbUser = await prisma.user.findUnique({
+              where: { id: token.id },
+              select: { isPlatformAdmin: true },
+            });
+            token.isPlatformAdmin = dbUser?.isPlatformAdmin === true;
           }
         } catch (e) {
+          if (claimedAdmin) {
+            console.warn(`[Auth.jwt] platform-admin lookup failed, admin withheld for this request: ${errorMessage(e)}`);
+          }
           // No fallback tenant here on purpose. A hardcoded demo tenant id
           // used to be assigned when the membership lookup failed, which
           // handed the session a tenant it was never granted — and some of
@@ -479,9 +495,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.workspaceIds = Array.isArray(token.workspaceIds)
           ? token.workspaceIds.filter((id): id is string => typeof id === "string")
           : [];
+        // `demoAdmin` counts only while demo sign-in is on, so a token minted
+        // before the flag went off carries it to nothing (TASK-MULU7GVFBTRXX Ö-2).
         session.isPlatformAdmin =
-          token.isPlatformAdmin === true ||
-          isPlatformAdminDemoEmail(typeof token.email === "string" ? token.email : null);
+          token.isPlatformAdmin === true || (demoLoginEnabled && token.demoAdmin === true);
       }
       return session;
     },
