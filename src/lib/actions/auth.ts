@@ -1,7 +1,8 @@
 'use server';
 
 import { signIn, signOut } from '@/lib/auth';
-import { AuthError } from 'next-auth';
+import { AuthError, CredentialsSignin } from 'next-auth';
+import { INVALID_INVITE_CODE } from '@/lib/agency/invite-signin-error';
 import { isNextRedirectError } from '@/lib/errors';
 import { setRegistrationAcknowledgementCookie } from '@/lib/legal/registration-ack-cookie';
 
@@ -18,17 +19,29 @@ export async function loginWithCredentialsAction(
   password: string,
   redirectTo: string,
   locale: string = 'tr',
-  acknowledgement?: string
+  acknowledgement?: string,
+  inviteCode?: string
 ) {
   try {
     await signIn('credentials', {
       email,
       password: password || 'demo1234',
       acknowledgement: acknowledgement ?? '',
+      inviteCode: inviteCode ?? '',
       redirect: false,
     });
     return { success: true };
   } catch (error) {
+    // FB KAMU B1 — one message for every unusable invite code, so the reply
+    // never tells a guesser which codes exist (TASK-MULRQJQYM0NAM).
+    if (error instanceof CredentialsSignin && error.code === INVALID_INVITE_CODE) {
+      return {
+        error:
+          locale === 'tr'
+            ? 'Davet kodu geçersiz ya da artık kullanılamıyor.'
+            : 'This invite code is invalid or can no longer be used.',
+      };
+    }
     if (error instanceof AuthError) {
       switch (error.type) {
         case 'CredentialsSignin':

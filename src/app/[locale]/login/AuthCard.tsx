@@ -39,7 +39,14 @@ interface AuthCardProps {
 
 export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProps) {
   const searchParams = useSearchParams();
-  const initialMode = searchParams.get('mode') === 'register' ? 'register' : defaultMode;
+  /**
+   * FB KAMU B1 (TASK-MULRQJQYM0NAM) — `/kayit?kod=…` from an agency. Shown as
+   * typed and sent as typed: the server normalises it and is the only judge of
+   * whether it is usable, so nothing here can hint that a code exists.
+   */
+  const inviteCode = (searchParams.get('kod') ?? '').trim().slice(0, 32) || null;
+  const initialMode =
+    inviteCode || searchParams.get('mode') === 'register' ? 'register' : defaultMode;
   
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const isTr = locale === 'tr';
@@ -126,7 +133,8 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
         password || 'demo1234', 
         rawCallbackUrl, 
         locale,
-        acknowledgementToken
+        acknowledgementToken,
+        isRegistering ? inviteCode ?? undefined : undefined
       );
       
       if (res?.error) {
@@ -237,7 +245,27 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
         </div>
       )}
 
-      {/* Social Sign-In Buttons */}
+      {inviteCode && (
+        <div
+          data-testid="invite-code-banner"
+          className="p-3 bg-accent/10 border border-accent/30 text-ink text-xs rounded-xl space-y-1"
+        >
+          <p className="font-bold">
+            {isTr ? 'Davet koduyla kayıt' : 'Registering with an invite code'}:{' '}
+            <span className="font-mono">{inviteCode}</span>
+          </p>
+          <p className="text-muted">
+            {isTr
+              ? 'Hesabınız ücretsiz Keşif planıyla açılır ve sizi davet eden kalkınma ajansına bağlanır.'
+              : 'Your account opens on the free Discover plan, linked to the development agency that invited you.'}
+          </p>
+        </div>
+      )}
+
+      {/* Social Sign-In Buttons. Hidden with an invite code: the code travels
+          only with the e-mail form (B1 decision S2-a — the OAuth round trip
+          would drop it and open an unlinked account). */}
+      {!inviteCode && (<>
       <div className="space-y-2.5">
         <button
           onClick={() => handleSocialLogin('google')}
@@ -275,6 +303,7 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
           {isTr ? 'veya e-posta ile' : 'or with email'}
         </span>
       </div>
+      </>)}
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-3.5">

@@ -12,7 +12,7 @@ BEGIN
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
     'TtoPortfolioItem','MarketplaceListing','MarketplaceOrder','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
     'PlanAssignment','ClaimEvidenceLink','EvidenceReminder','Consent',
-    'StripeEventLog'
+    'StripeEventLog','AgencyInviteCode'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);

@@ -44,7 +44,45 @@ model Tenant {
   billingIdentity TenantBillingIdentity?
   planAssignments PlanAssignment[]
   stripeEvents  StripeEventLog[]
+  // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
+  // tenant opened with its invite code carries its id in agencyId, written once
+  // at registration. The link grants the agency no read on this tenant's rows —
+  // no RLS policy consults agencyId. Migration: add-agency-invite-code.sql.
+  kind          TenantKind @default(ORGANIZATION)
+  agencyId      String?
+  agency        Tenant?  @relation("AgencyMembers", fields: [agencyId], references: [id], onDelete: SetNull)
+  agencyMembers Tenant[] @relation("AgencyMembers")
+  agencyInviteCodes AgencyInviteCode[]
   @@index([deletedAt])
+  @@index([agencyId])
+}
+
+enum TenantKind {
+  ORGANIZATION
+  AGENCY
+}
+
+/// A multi-use code an agency tenant hands out (FB KAMU B1, TASK-MULRQJQYM0NAM).
+/// `tenantId` is the AGENCY — named so tenant_isolation covers it unchanged.
+/// The code itself is never stored: only its SHA-256 (src/lib/agency/invite-code.ts).
+/// Used only through public.redeem_agency_invite(), which increments usedCount
+/// atomically and returns the agency id or NULL.
+model AgencyInviteCode {
+  id        String    @id @default(cuid())
+  tenantId  String
+  codeHash  String    @unique
+  codeHint  String
+  label     String?
+  maxUses   Int
+  usedCount Int       @default(0)
+  expiresAt DateTime
+  revokedAt DateTime?
+  revokedBy String?
+  createdBy String
+  createdAt DateTime  @default(now())
+  agency    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
 }
 
 enum OrgType {

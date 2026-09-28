@@ -16,6 +16,8 @@ import {
   bindTransactionToTenant,
   writeRegistrationConsent,
 } from './legal/registration-consent';
+import { InviteCodeRejectedError, noteInviteRejection, redeemInviteCode } from './agency/codes';
+import { InvalidInviteCodeSignin } from './agency/invite-signin-error';
 
 /**
  * TASK-MTRNQHC3IV2BE — the demo sign-in seeds an ORGANISATION, never a person.
@@ -199,12 +201,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // it would record agreement to a text the person never read.
         // See src/lib/legal/consent-documents.ts.
         acknowledgement: { label: "Acknowledgement", type: "text" },
+        // FB KAMU B1 (TASK-MULRQJQYM0NAM): an agency invite code from
+        // /kayit?kod=…. Only the registration branch reads it; signing in to an
+        // existing account ignores it (linking an existing tenant is not B1).
+        inviteCode: { label: "Invite code", type: "text" },
       },
       async authorize(credentials) {
         const email = (credentials?.email as string)?.trim()?.toLowerCase();
         if (!email) return null;
 
         const acknowledgement = credentials?.acknowledgement;
+        const inviteCode =
+          typeof credentials?.inviteCode === "string" && credentials.inviteCode.trim()
+            ? credentials.inviteCode
+            : null;
 
         const demoProfile = DEMO_PROFILES[email];
         // Derived from the address the user typed, never from a profile table.
@@ -256,12 +266,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 },
               });
 
+              // FB KAMU B1 — the code is used in THIS transaction, so a
+              // registration that fails later gives the use back. Every kind
+              // of unusable code comes back as null and ends the registration
+              // the same way: no account, one uniform message.
+              let agencyId: string | null = null;
+              if (inviteCode) {
+                agencyId = await redeemInviteCode(tx, inviteCode);
+                if (!agencyId) throw new InviteCodeRejectedError();
+              }
+
               const tenant = await tx.tenant.create({
                 data: {
                   name: demoProfile?.orgName || `${computedName} Kuruluşu`,
                   slug: `org-${newUser.id.slice(-6)}`,
                   country: "TR",
                   orgType: demoProfile?.orgType || "SME",
+                  // No plan is written: a tenant without a subscription is on
+                  // Discover (FALLBACK_PLAN_ID), which is what a code grants.
+                  agencyId,
                 },
               });
 
@@ -300,6 +323,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 locale: "tr",
               });
 
+              if (agencyId) {
+                await tx.auditEvent.create({
+                  data: {
+                    tenantId: tenant.id,
+                    actorId: newUser.id,
+                    type: "agency.invite.redeemed",
+                    data: { agencyId },
+                  },
+                });
+              }
+
               return newUser;
             });
           } else {
@@ -334,6 +368,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             image: user.image,
           };
         } catch (error) {
+          // FB KAMU B1 — the transaction has rolled back (no user, no tenant,
+          // no use of the code). Count the refusal on its own connection, then
+          // refuse with the one message every unusable code gets. This must
+          // come before the demo fallback below, which would otherwise sign
+          // the person in as a demo user.
+          if (error instanceof InviteCodeRejectedError) {
+            await noteInviteRejection(prisma, inviteCode).catch((e) =>
+              console.warn(`[Auth.authorize] could not record a refused invite code: ${errorMessage(e)}`)
+            );
+            throw new InvalidInviteCodeSignin();
+          }
           // Signing in against a fabricated user id is a development
           // convenience only: in production a database outage must fail the
           // sign-in, not mint a session for an account nobody verified.

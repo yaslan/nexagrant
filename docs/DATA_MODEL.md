@@ -831,3 +831,35 @@ güvenle silinebilir, ama o ayrı bir kart (bkz. ADR-0003 §Riskler).
 RLS: politika `prisma/rls.sql` tenant-scoped dizisinde **ve** kendi
 migration'ında (`prisma/migrations/add-stripe-event-log/migration.sql`) —
 §16'nın kuralı. Geri alma: aynı dizinde `down.sql`.
+
+## 18. Ajans ↔ kurum bağı ve toplu davet kodu (TASK-MULRQJQYM0NAM · FB KAMU B1)
+
+Migration: `prisma/migrations/add-agency-invite-code.sql` · geri alma: `add-agency-invite-code.down.sql`
+(geri alma tüm kodları ve tüm ajans bağlarını siler; kurumların hesabı ve verisi kalır).
+Sonrasında `pnpm db:rls` koşulmalı.
+
+**Model.** Ajans ayrı bir model değildir: `Tenant.kind = AGENCY` olan bir kiracıdır (varsayılan
+`ORGANIZATION`). Ajans personeli o kiracının sıradan `Membership`'idir. Kodla açılan kiracı
+`Tenant.agencyId` ile ajansa bağlanır; bu alan yalnız kayıtta, kodun kullanıldığı transaction'da
+yazılır. Ajans silinirse bağ `SET NULL` olur.
+
+**`AgencyInviteCode`.** `tenantId` = ajans (bu ad sayesinde `tenant_isolation` ve tüm RLS
+araçları tabloyu olduğu gibi kapsar). Kodun kendisi saklanmaz: yalnız normalize edilmiş halinin
+SHA-256'sı (`codeHash`) ve gösterim için son 4 karakter (`codeHint`). Kod 12 karakter,
+0/O/1/I/L/U içermeyen 30 harflik alfabeden (`src/lib/agency/invite-code.ts`).
+`CHECK (usedCount BETWEEN 0 AND maxUses)`.
+
+**Kullanım.** Kayıt olan kişinin kiracısı olmadığı için koda `tenant_isolation` üzerinden
+ulaşamaz. Tek kapı `public.redeem_agency_invite(code_hash)` (SECURITY DEFINER,
+`search_path = public, pg_temp`): tek `UPDATE … SET usedCount = usedCount + 1 WHERE …
+usedCount < maxUses … RETURNING tenantId`. Satır kilidi + kilitten sonra koşulun yeniden
+değerlendirilmesi, son kullanım yarışında yalnız birinin geçmesini sağlar. Fonksiyon ajans
+id'si ya da NULL döndürür; kodun var olup olmadığı, süresinin dolup dolmadığı dışarıdan ayırt
+edilemez. `app.system_scope` fonksiyon düzeyinde açılır, çıkışta (hata dahil) geri alınır.
+Reddedilen denemeler `public.note_agency_invite_rejection(code_hash)` ile `AuditEvent`'e
+yalnız sebep olarak yazılır (`agency.invite.rejected`; kod, hash ve kişi yok).
+
+**Ajans kurumun içeriğini okuyamaz.** Hiçbir RLS politikası `agencyId`'ye bakmaz. Ajans oturumu
+`app.tenant_id = ajans` ile çalışır; bağlı kurumun satırları 0 döner, yazma 42501 alır
+(`tests/agency-invite.live.test.ts`, `fabrika_app` ile). B2/B3'teki toplu sayılar, satır değil
+sayı döndüren SECURITY DEFINER fonksiyonlarla gelecek.
