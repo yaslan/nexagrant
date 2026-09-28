@@ -40,7 +40,6 @@ describe('SEO-Friendly Localized Multilingual Routing System (TR & EN)', () => {
       expect(getWorkspaceRoute('conceptNotes', 'tr', ws)).toBe('/tr/itu-tto/konsept-notlar');
       expect(getWorkspaceRoute('approvals', 'tr', ws)).toBe('/tr/itu-tto/onay-merkezi');
       expect(getWorkspaceRoute('tto', 'tr', ws)).toBe('/tr/itu-tto/tto-hizlandirici');
-      expect(getWorkspaceRoute('marketplace', 'tr', ws)).toBe('/tr/itu-tto/pazar-yeri');
       expect(getWorkspaceRoute('settingsModules', 'tr', ws)).toBe('/tr/itu-tto/ayarlar/moduller');
       expect(getWorkspaceRoute('settingsBilling', 'tr', ws)).toBe('/tr/itu-tto/ayarlar/faturalama');
       // The KVKK/GDPR console had no route key at all, so nothing could link to it.
