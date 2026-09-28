@@ -1844,6 +1844,228 @@
     "footerFiled": "İşbu fatura 213 sayılı Vergi Usul Kanunu ve Gelir İdaresi Başkanlığı e-Fatura mevzuatına uygun olarak elektronik ortamda düzenlenmiş ve GİB'e iletilmiştir. Zarf No: {envelope}",
     "linePeriodFallback": "{brand} abonelik dönemi"
   },
+  "readiness": {
+    "meta_title": "Fon Hazırlık Karnesi — AB fonuna hazır mısınız?",
+    "meta_description": "Belediyeler ve kamu kurumları için 15 soruluk ücretsiz test: hazırlık puanınız, size uygun 3 AB programı ve eksik adımlarınız. Kayıt gerekmez.",
+    "badge": "Ücretsiz · Kayıt gerekmez · Yaklaşık 10 dakika",
+    "title": "Fon Hazırlık Karnesi",
+    "intro": "15 soruyu yanıtlayın; kurumunuzun AB fonlarına ne kadar hazır olduğunu, hangi programlarla başlamanın mantıklı olduğunu ve eksiklerinizi kapatmak için atmanız gereken adımları görün. Cevaplarınız sunucuya kaydedilmez.",
+    "orgType_legend": "Kurumunuzun türü",
+    "orgTypes": {
+      "municipality": "İlçe / il belediyesi",
+      "metropolitan": "Büyükşehir belediyesi",
+      "development_agency": "Kalkınma ajansı",
+      "union_of_municipalities": "Belediye birliği"
+    },
+    "start": "Teste başla",
+    "step_of": "Adım {current} / {total}",
+    "progress_label": "Test ilerlemesi",
+    "back": "Geri",
+    "next": "İleri",
+    "finish": "Sonucu gör",
+    "unanswered": "Devam etmek için bu adımdaki tüm soruları yanıtlayın.",
+    "orgType_required": "Başlamak için kurum türünü seçin.",
+    "dimensions": {
+      "registration": "Kurumsal kayıt",
+      "capacity": "Kapasite",
+      "finance": "Finansman",
+      "partnership": "Ortaklık",
+      "idea": "Proje fikri"
+    },
+    "dimension_hint": {
+      "registration": "AB Fon ve İhale Portalı'nda kurumunuzun tanınması ve imza yetkisi.",
+      "capacity": "Projeyi yazacak ve yürütecek insan kaynağı.",
+      "finance": "Hibenin karşılamadığı payı ve nakit akışını yönetebilme.",
+      "partnership": "Yurt içi ve yurt dışı ortak bulabilme.",
+      "idea": "Projeyi stratejiye ve veriye dayandırabilme."
+    },
+    "questions": {
+      "pic": {
+        "label": "Kurumunuzun AB Fon ve İhale Portalı'nda PIC (katılımcı kimlik kodu) numarası var mı?",
+        "options": {
+          "0": "Yok / bilmiyoruz",
+          "1": "Başvurduk, doğrulama sürüyor",
+          "2": "Var ve doğrulandı"
+        }
+      },
+      "lear": {
+        "label": "Portalda kurumunuzu temsil edecek LEAR (yasal temsilci) atandı mı?",
+        "options": {
+          "0": "Hayır",
+          "1": "Kimin olacağı belli ama atanmadı",
+          "2": "Atandı ve onaylandı"
+        }
+      },
+      "signatory": {
+        "label": "Başvuru ve sözleşmeyi imzalayacak yetkili ile yetki belgesi hazır mı?",
+        "options": {
+          "0": "Belli değil",
+          "1": "Yetkili belli, yetki belgesi yok",
+          "2": "Yetkili ve belgesi hazır"
+        }
+      },
+      "projectUnit": {
+        "label": "Proje yazıp yürütecek bir biriminiz ya da personeliniz var mı?",
+        "options": {
+          "0": "Yok",
+          "1": "Bir-iki kişi, yarı zamanlı",
+          "2": "Kadrolu bir proje birimi var"
+        }
+      },
+      "englishWriting": {
+        "label": "Başvuruyu İngilizce yazabilecek biri var mı?",
+        "options": {
+          "0": "Yok",
+          "1": "Dışarıdan destekle yazabiliriz",
+          "2": "Ekibimizde var"
+        }
+      },
+      "pastProjects": {
+        "label": "Daha önce hibe projesi yürüttünüz mü?",
+        "options": {
+          "0": "Hiç yürütmedik",
+          "1": "Ulusal hibe (kalkınma ajansı, bakanlık vb.)",
+          "2": "AB projesi yürüttük"
+        }
+      },
+      "cofinancing": {
+        "label": "Projenin hibe dışında kalan payı (eş finansman) için bütçe ayırabilir misiniz?",
+        "options": {
+          "0": "Ayıramayız",
+          "1": "Toplamın yaklaşık %20'sine kadar",
+          "2": "%20'den fazla ayırabiliriz"
+        }
+      },
+      "cashflow": {
+        "label": "Hibe ödemeleri gelene kadar harcamaları kendi kaynağınızdan karşılayabilir misiniz?",
+        "options": {
+          "0": "Hayır",
+          "1": "Kısmen, kısa süre için",
+          "2": "Evet"
+        }
+      },
+      "budgetApproval": {
+        "label": "Proje için meclis kararı veya bütçe onayı alma süreciniz hazır mı?",
+        "options": {
+          "0": "Süreci bilmiyoruz",
+          "1": "Süreç belli, gerekince alınır",
+          "2": "Karar/onay hazır ya da önceden alındı"
+        }
+      },
+      "twinCity": {
+        "label": "Yurt dışında kardeş şehriniz ya da düzenli ilişkide olduğunuz bir kurum var mı?",
+        "options": {
+          "0": "Yok",
+          "1": "Var ama ilişki aktif değil",
+          "2": "Var ve ilişki aktif"
+        }
+      },
+      "network": {
+        "label": "Avrupa'daki bir belediye ya da iklim ağına (ör. Belediye Başkanları Sözleşmesi) üye misiniz?",
+        "options": {
+          "0": "Hayır",
+          "1": "Üyelik süreci başladı / ağı tanıyoruz",
+          "2": "Üyeyiz"
+        }
+      },
+      "localStakeholders": {
+        "label": "Yerel paydaşlarla (üniversite, STK, meslek odası) iş birliğiniz var mı?",
+        "options": {
+          "0": "Yok",
+          "1": "Gayriresmî ilişkimiz var",
+          "2": "Protokollü ya da düzenli iş birliğimiz var"
+        }
+      },
+      "strategicPlan": {
+        "label": "Stratejik planınız ya da iklim eylem planınız (SECAP) var mı?",
+        "options": {
+          "0": "Yok",
+          "1": "Stratejik plan var, iklim planı yok",
+          "2": "İklim eylem planı (SECAP) da var"
+        }
+      },
+      "concreteNeed": {
+        "label": "Proje fikriniz ne kadar somut?",
+        "options": {
+          "0": "Genel bir fikir",
+          "1": "İhtiyaç tanımlı",
+          "2": "İhtiyaç, hedef grup ve beklenen çıktılar net"
+        }
+      },
+      "data": {
+        "label": "Fikrinizi destekleyecek veriniz (istatistik, anket, gösterge) var mı?",
+        "options": {
+          "0": "Yok",
+          "1": "Var ama dağınık",
+          "2": "Güncel ve derli toplu"
+        }
+      }
+    },
+    "gaps": {
+      "pic": "Kurumunuzu AB Fon ve İhale Portalı'nda kaydedip PIC numarası alın. Kayıt ücretsizdir; doğrulama birkaç hafta sürebildiği için ilk iş olarak başlatın.",
+      "lear": "Kurumunuzu portalda temsil edecek kişiyi LEAR olarak atayın ve gerekli belgeleri portala yükleyin.",
+      "signatory": "Başvuru ve hibe sözleşmesini kimin imzalayacağını belirleyin, yetki belgesini (ör. meclis/encümen kararı) önceden hazırlayın.",
+      "projectUnit": "En az bir kişiyi AB projelerinden sorumlu olarak görevlendirin; Ulusal Ajans ve kalkınma ajansı eğitimlerine katılmasını sağlayın.",
+      "englishWriting": "Başvuruyu İngilizce yazacak kişiyi belirleyin ya da yazım desteği için bütçe ve takvim ayırın.",
+      "pastProjects": "Küçük ölçekli bir ulusal hibe ya da kolay bir AB programıyla (ör. kardeş şehir projesi) deneyim kazanın.",
+      "cofinancing": "Hibenin karşılamadığı payı hesaplayıp bütçenize ödenek olarak koyun; çoğu programda bu pay zorunludur.",
+      "cashflow": "Ödemeler gelene kadar harcamaları karşılayacak bir nakit akışı planı yapın; ön ödeme genellikle bütçenin tamamını karşılamaz.",
+      "budgetApproval": "Proje başvurusu ve eş finansman için meclis kararının nasıl ve ne kadar sürede alınacağını netleştirin.",
+      "twinCity": "Mevcut kardeş şehir ilişkinizi canlandırın ya da ortak arayışı için Avrupa'daki belediyelerle temas kurun.",
+      "network": "Belediye Başkanları Sözleşmesi gibi bir Avrupa ağına katılın; ağlar ortak bulmayı kolaylaştırır.",
+      "localStakeholders": "Üniversite, STK ve meslek odalarıyla bir iş birliği protokolü imzalayın; birçok program yerel ortak ister.",
+      "strategicPlan": "Projeyi stratejik planınıza bağlayın; iklim ve enerji projeleri için bir iklim eylem planı (SECAP) hazırlayın.",
+      "concreteNeed": "Çözmek istediğiniz sorunu, hedef grubu ve ölçülebilir çıktıları bir sayfada yazın.",
+      "data": "İhtiyacınızı gösteren güncel verileri (istatistik, anket, gösterge) tek bir dosyada toplayın."
+    },
+    "result_title": "Hazırlık sonucunuz",
+    "result_orgType": "Kurum türü: {orgType}",
+    "score_label": "Hazırlık puanı",
+    "score_out_of": "{score} / 100",
+    "levels": {
+      "baslangic": "Başlangıç",
+      "gelisen": "Gelişen",
+      "hazir": "Hazır"
+    },
+    "level_text": {
+      "baslangic": "Temel adımlar eksik. Önce kurumsal kaydı tamamlayıp kolay programlarla deneyim kazanmanız öneriliyor.",
+      "gelisen": "İyi bir başlangıç noktasındasınız. Aşağıdaki eksikleri kapatırsanız daha büyük programlara başvurabilirsiniz.",
+      "hazir": "Kurumunuz AB projelerine başvurmaya hazır görünüyor. Büyük ölçekli programları değerlendirebilirsiniz."
+    },
+    "internal_note": "Bu karne bir iç ön değerlendirmedir; resmî bir uygunluk kararı değildir.",
+    "dimensions_title": "Boyutlara göre puan",
+    "recommended_title": "Size önerilen 3 program",
+    "recommended_empty": "Kurum türünüze uygun program bulunamadı.",
+    "difficulty": "Zorluk: {level} / 3",
+    "cofinancing_pct": "Eş finansman: %{pct}",
+    "cofinancing_unknown": "Eş finansman: bilgi yok",
+    "official_page": "Resmî sayfa",
+    "see_calls": "Belediyelere açık çağrıları gör",
+    "gaps_title": "Eksikleriniz ve atmanız gereken adımlar",
+    "gaps_empty": "Eksik görünmüyor. Açık çağrılara göz atabilirsiniz.",
+    "gap_critical": "Öncelikli",
+    "gap_improve": "Geliştirilmeli",
+    "gap_guide": "Nasıl yapılır? (resmî kaynak)",
+    "share_title": "Sonucu paylaşın",
+    "share_hint": "Bu bağlantı yalnızca cevaplarınızı içerir; kişisel veri taşımaz ve sunucuya kaydedilmez.",
+    "share_link_label": "Paylaşım bağlantısı",
+    "copy_link": "Bağlantıyı kopyala",
+    "copied": "Bağlantı kopyalandı",
+    "print": "Yazdır / PDF",
+    "restart": "Testi yeniden başlat",
+    "cta_title": "Bir sonraki adım",
+    "cta_text": "Ücretsiz Keşif hesabıyla size uygun çağrıları takip edin ve eksiklerinizi adım adım kapatın.",
+    "cta_signup": "Ücretsiz hesap aç",
+    "shared_notice": "Paylaşılan bir sonucu görüntülüyorsunuz.",
+    "province_label": "İliniz (isteğe bağlı)",
+    "province_hint": "Yalnızca belirli illere açık programlar (ör. OKA, Interreg) için kullanılır. Seçmezseniz bu programlar önerilmez.",
+    "province_none": "Seçmek istemiyorum",
+    "turkey": {
+      "partial": "Türkiye kısmen katılıyor",
+      "check_call": "Türkiye katılımı çağrıya göre değişir",
+      "not_eligible": "Türkiye katılmıyor"
+    }
+  },
   "publicSectorCalls": {
     "meta_title": "Belediye Çağrı Radarı — Belediyelere Uygun AB Hibe Çağrıları",
     "meta_description": "Türk belediyelerinin ve kamu kurumlarının girebileceği AB ve ulusal hibe çağrıları: son tarih, zorluk, eş finansman ve 3 soruluk uygunluk testi.",

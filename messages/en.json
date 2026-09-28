@@ -1844,6 +1844,228 @@
     "footerFiled": "This invoice was issued electronically in accordance with Tax Procedure Law no. 213 (Vergi Usul Kanunu) and the e-invoice legislation of the Turkish Revenue Administration (Gelir İdaresi Başkanlığı), and submitted to GİB. Envelope no: {envelope}",
     "linePeriodFallback": "{brand} subscription period"
   },
+  "readiness": {
+    "meta_title": "Funding Readiness Scorecard — are you ready for EU funding?",
+    "meta_description": "A free 15-question check for municipalities and public bodies: your readiness score, 3 EU programmes that fit you and the steps you are missing. No sign-up needed.",
+    "badge": "Free · No sign-up · About 10 minutes",
+    "title": "Funding Readiness Scorecard",
+    "intro": "Answer 15 questions to see how ready your organisation is for EU funding, which programmes make sense as a start, and the steps that close your gaps. Your answers are not stored on our servers.",
+    "orgType_legend": "Your organisation type",
+    "orgTypes": {
+      "municipality": "Municipality (district / province)",
+      "metropolitan": "Metropolitan municipality",
+      "development_agency": "Development agency",
+      "union_of_municipalities": "Union of municipalities"
+    },
+    "start": "Start the check",
+    "step_of": "Step {current} of {total}",
+    "progress_label": "Check progress",
+    "back": "Back",
+    "next": "Next",
+    "finish": "See the result",
+    "unanswered": "Answer every question on this step to continue.",
+    "orgType_required": "Choose your organisation type to start.",
+    "dimensions": {
+      "registration": "Registration",
+      "capacity": "Capacity",
+      "finance": "Finance",
+      "partnership": "Partnership",
+      "idea": "Project idea"
+    },
+    "dimension_hint": {
+      "registration": "Your organisation is known on the EU Funding & Tenders Portal and can sign.",
+      "capacity": "People who can write and run the project.",
+      "finance": "You can carry the share the grant does not cover, and the cash flow.",
+      "partnership": "You can find partners at home and abroad.",
+      "idea": "The project rests on a strategy and on data."
+    },
+    "questions": {
+      "pic": {
+        "label": "Does your organisation have a PIC (Participant Identification Code) on the EU Funding & Tenders Portal?",
+        "options": {
+          "0": "No / we do not know",
+          "1": "We applied, validation is in progress",
+          "2": "Yes, and it is validated"
+        }
+      },
+      "lear": {
+        "label": "Has a LEAR (Legal Entity Appointed Representative) been appointed on the portal?",
+        "options": {
+          "0": "No",
+          "1": "We know who, but not appointed yet",
+          "2": "Appointed and approved"
+        }
+      },
+      "signatory": {
+        "label": "Is the person who signs the application and the grant agreement, and their mandate, ready?",
+        "options": {
+          "0": "Not decided",
+          "1": "Person known, no written mandate",
+          "2": "Person and mandate ready"
+        }
+      },
+      "projectUnit": {
+        "label": "Do you have a unit or staff who can write and run projects?",
+        "options": {
+          "0": "No",
+          "1": "One or two people, part time",
+          "2": "A permanent project unit"
+        }
+      },
+      "englishWriting": {
+        "label": "Can someone write the application in English?",
+        "options": {
+          "0": "No",
+          "1": "With outside help",
+          "2": "Yes, in our team"
+        }
+      },
+      "pastProjects": {
+        "label": "Have you run a grant project before?",
+        "options": {
+          "0": "Never",
+          "1": "A national grant (development agency, ministry, etc.)",
+          "2": "An EU project"
+        }
+      },
+      "cofinancing": {
+        "label": "Can you set aside budget for the share the grant does not cover (co-financing)?",
+        "options": {
+          "0": "No",
+          "1": "Up to about 20% of the total",
+          "2": "More than 20%"
+        }
+      },
+      "cashflow": {
+        "label": "Can you pay project costs from your own funds until grant payments arrive?",
+        "options": {
+          "0": "No",
+          "1": "Partly, for a short time",
+          "2": "Yes"
+        }
+      },
+      "budgetApproval": {
+        "label": "Is your process for a council decision or budget approval for the project ready?",
+        "options": {
+          "0": "We do not know the process",
+          "1": "Process known, done when needed",
+          "2": "Decision ready or already taken"
+        }
+      },
+      "twinCity": {
+        "label": "Do you have a twin town abroad or an institution you work with regularly?",
+        "options": {
+          "0": "No",
+          "1": "Yes, but the relationship is inactive",
+          "2": "Yes, and it is active"
+        }
+      },
+      "network": {
+        "label": "Are you a member of a European network of cities or a climate network (e.g. the Covenant of Mayors)?",
+        "options": {
+          "0": "No",
+          "1": "Joining / we know the network",
+          "2": "We are a member"
+        }
+      },
+      "localStakeholders": {
+        "label": "Do you work with local stakeholders (university, NGO, chamber)?",
+        "options": {
+          "0": "No",
+          "1": "Informally",
+          "2": "Under a protocol or regularly"
+        }
+      },
+      "strategicPlan": {
+        "label": "Do you have a strategic plan or a climate action plan (SECAP)?",
+        "options": {
+          "0": "No",
+          "1": "Strategic plan, no climate plan",
+          "2": "A climate action plan (SECAP) too"
+        }
+      },
+      "concreteNeed": {
+        "label": "How concrete is your project idea?",
+        "options": {
+          "0": "A general idea",
+          "1": "The need is defined",
+          "2": "Need, target group and expected results are clear"
+        }
+      },
+      "data": {
+        "label": "Do you have data (statistics, surveys, indicators) that supports your idea?",
+        "options": {
+          "0": "No",
+          "1": "Yes, but scattered",
+          "2": "Up to date and in one place"
+        }
+      }
+    },
+    "gaps": {
+      "pic": "Register your organisation on the EU Funding & Tenders Portal and get a PIC. Registration is free; validation can take weeks, so start it first.",
+      "lear": "Appoint the person who represents your organisation on the portal as LEAR and upload the required documents.",
+      "signatory": "Decide who signs the application and the grant agreement, and prepare the written mandate (e.g. a council decision) in advance.",
+      "projectUnit": "Make at least one person responsible for EU projects and send them to National Agency or development agency trainings.",
+      "englishWriting": "Name the person who writes the application in English, or plan budget and time for writing support.",
+      "pastProjects": "Build experience with a small national grant or an easy EU programme (e.g. a town-twinning project).",
+      "cofinancing": "Calculate the share the grant does not cover and put it in your budget; most programmes require it.",
+      "cashflow": "Make a cash-flow plan to pay costs until payments arrive; the pre-financing usually does not cover the full budget.",
+      "budgetApproval": "Find out how and how fast you can get a council decision for the application and the co-financing.",
+      "twinCity": "Revive your twin-town relationship, or contact European municipalities to find partners.",
+      "network": "Join a European network such as the Covenant of Mayors; networks make it easier to find partners.",
+      "localStakeholders": "Sign a cooperation protocol with universities, NGOs and chambers; many programmes ask for local partners.",
+      "strategicPlan": "Link the project to your strategic plan; for climate and energy projects, prepare a climate action plan (SECAP).",
+      "concreteNeed": "Write the problem, the target group and measurable results on one page.",
+      "data": "Collect current data (statistics, surveys, indicators) that shows the need in one file."
+    },
+    "result_title": "Your readiness result",
+    "result_orgType": "Organisation type: {orgType}",
+    "score_label": "Readiness score",
+    "score_out_of": "{score} / 100",
+    "levels": {
+      "baslangic": "Starting",
+      "gelisen": "Developing",
+      "hazir": "Ready"
+    },
+    "level_text": {
+      "baslangic": "Basic steps are missing. Complete your registration first and build experience with easier programmes.",
+      "gelisen": "You have a good starting point. Close the gaps below and you can apply to larger programmes.",
+      "hazir": "Your organisation looks ready to apply for EU projects. You can consider large-scale programmes."
+    },
+    "internal_note": "This scorecard is an internal pre-assessment, not an official eligibility decision.",
+    "dimensions_title": "Score by dimension",
+    "recommended_title": "3 programmes for you",
+    "recommended_empty": "No programme found for your organisation type.",
+    "difficulty": "Difficulty: {level} / 3",
+    "cofinancing_pct": "Co-financing: {pct}%",
+    "cofinancing_unknown": "Co-financing: unknown",
+    "official_page": "Official page",
+    "see_calls": "See calls open to municipalities",
+    "gaps_title": "Your gaps and the next steps",
+    "gaps_empty": "No gaps found. Have a look at the open calls.",
+    "gap_critical": "Priority",
+    "gap_improve": "To improve",
+    "gap_guide": "How to do it (official source)",
+    "share_title": "Share the result",
+    "share_hint": "This link only carries your answers; it holds no personal data and nothing is stored on our servers.",
+    "share_link_label": "Share link",
+    "copy_link": "Copy link",
+    "copied": "Link copied",
+    "print": "Print / PDF",
+    "restart": "Start again",
+    "cta_title": "Next step",
+    "cta_text": "With a free Explorer account, follow the calls that fit you and close your gaps step by step.",
+    "cta_signup": "Create a free account",
+    "shared_notice": "You are viewing a shared result.",
+    "province_label": "Your province (optional)",
+    "province_hint": "Only used for programmes open to certain provinces (e.g. OKA, Interreg). If you skip it, those programmes are not recommended.",
+    "province_none": "I prefer not to say",
+    "turkey": {
+      "partial": "Türkiye takes part in part of it",
+      "check_call": "Türkiye's participation depends on the call",
+      "not_eligible": "Türkiye does not take part"
+    }
+  },
   "publicSectorCalls": {
     "meta_title": "Municipal Call Radar — EU Grant Calls for Municipalities",
     "meta_description": "EU and national grant calls Turkish municipalities and public bodies can enter: deadline, difficulty, co-financing and a 3-question fit check.",
