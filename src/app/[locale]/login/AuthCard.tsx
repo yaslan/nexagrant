@@ -12,6 +12,7 @@ import {
   TERMS_OF_SERVICE,
   registrationAcknowledgementToken,
 } from '@/lib/legal/consent-documents';
+import type { OAuthProviderAvailability } from '@/lib/demo-login';
 
 /**
  * The one place this file spells a demo address. Each seat used to write its
@@ -35,9 +36,22 @@ const DEMO_SEATS = {
 interface AuthCardProps {
   locale: string;
   defaultMode?: 'login' | 'register';
+  /**
+   * TASK-MULSCEK4JHK8X — DEMO_LOGIN_ENABLED as the server resolved it. Off, the
+   * e-mail form and the demo seats are not rendered at all: the server has no
+   * provider behind them (src/lib/demo-login.ts).
+   */
+  demoLoginEnabled: boolean;
+  /** Which OAuth providers have credentials. Off-demo, only these get a button. */
+  oauthProviders: OAuthProviderAvailability;
 }
 
-export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProps) {
+export default function AuthCard({
+  locale,
+  defaultMode = 'login',
+  demoLoginEnabled,
+  oauthProviders,
+}: AuthCardProps) {
   const searchParams = useSearchParams();
   /**
    * FB KAMU B1 (TASK-MULRQJQYM0NAM) — `/kayit?kod=…` from an agency. Shown as
@@ -77,6 +91,15 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
    */
   const [acknowledged, setAcknowledged] = useState(false);
   const isRegistering = mode === 'register';
+
+  // Demo mode keeps every button, as before. Otherwise a button for a provider
+  // with no credentials would only lead to an Auth.js error page.
+  const showGoogle = demoLoginEnabled || oauthProviders.google;
+  const showMicrosoft = demoLoginEnabled || oauthProviders.microsoft;
+  // Invite-code registrations never offer OAuth (B1 decision S2-a, below).
+  const showOAuth = !inviteCode && (showGoogle || showMicrosoft);
+  // With neither the e-mail form nor an OAuth button there is no way in.
+  const noSignInMethod = !demoLoginEnabled && !showOAuth;
 
   /**
    * The versions actually on screen, sent with the form. The server refuses a
@@ -262,11 +285,31 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
         </div>
       )}
 
+      {noSignInMethod && (
+        <div
+          data-testid="signin-not-configured"
+          role="alert"
+          className="p-3 bg-amber/10 border border-amber/30 text-ink text-xs rounded-xl space-y-1"
+        >
+          <p className="font-bold">
+            {inviteCode
+              ? (isTr ? 'Davet koduyla kayıt bu ortamda şu an kapalı.' : 'Registering with an invite code is not available in this environment.')
+              : (isTr ? 'Giriş yapılandırılmamış.' : 'Sign-in is not configured.')}
+          </p>
+          <p className="text-muted">
+            {isTr
+              ? 'Bu ortamda etkin bir giriş yöntemi yok. Lütfen yöneticinize başvurun.'
+              : 'No sign-in method is enabled in this environment. Please contact your administrator.'}
+          </p>
+        </div>
+      )}
+
       {/* Social Sign-In Buttons. Hidden with an invite code: the code travels
           only with the e-mail form (B1 decision S2-a — the OAuth round trip
           would drop it and open an unlinked account). */}
-      {!inviteCode && (<>
+      {showOAuth && (<>
       <div className="space-y-2.5">
+        {showGoogle && (
         <button
           onClick={() => handleSocialLogin('google')}
           disabled={isLoading}
@@ -280,7 +323,9 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
           </svg>
           <span>{isTr ? 'Google ile Devam Et' : 'Continue with Google'}</span>
         </button>
+        )}
 
+        {showMicrosoft && (
         <button
           onClick={() => handleSocialLogin('microsoft-entra-id')}
           disabled={isLoading}
@@ -294,19 +339,25 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
           </svg>
           <span>{isTr ? 'Microsoft Kurumsal ile Giriş' : 'Sign in with Microsoft'}</span>
         </button>
+        )}
       </div>
 
       {/* Divider */}
+      {demoLoginEnabled && (
       <div className="relative flex items-center justify-center">
         <div className="border-t border-border w-full"></div>
         <span className="bg-surface px-3 text-[11px] text-muted uppercase font-mono">
           {isTr ? 'veya e-posta ile' : 'or with email'}
         </span>
       </div>
+      )}
       </>)}
 
-      {/* Form */}
+      {/* Form. Without demo sign-in only the disclosure box is left in it, for
+          an OAuth registration (TASK-MULSCEK4JHK8X). */}
+      {(demoLoginEnabled || (isRegistering && showOAuth)) && (
       <form onSubmit={handleSubmit} className="space-y-3.5">
+        {demoLoginEnabled && (<>
         {mode === 'register' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in duration-200">
             <div>
@@ -367,6 +418,7 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
             className="w-full text-xs bg-ground border border-border rounded-xl p-2.5 text-ink placeholder:text-muted focus:outline-hidden focus:ring-2 focus:ring-accent"
           />
         </div>
+        </>)}
 
         {/*
           TASK-MTSWLANXSU0IG (A3) — the disclosure step.
@@ -433,6 +485,7 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
           </div>
         )}
 
+        {demoLoginEnabled && (
         <button
           type="submit"
           disabled={isLoading || (isRegistering && !acknowledged)}
@@ -451,7 +504,9 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
             </span>
           )}
         </button>
+        )}
       </form>
+      )}
 
       {/*
         TASK-MTRNQHC3IV2BE — the demo buttons name a ROLE, not a person.
@@ -464,7 +519,8 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
         with, so that is what it shows. src/lib/user-display.ts states the same
         rule for the app frame.
       */}
-      {/* ─── QUICK 1-CLICK DEMO ACCOUNTS ─── */}
+      {/* ─── QUICK 1-CLICK DEMO ACCOUNTS ─── (demo sign-in only) */}
+      {demoLoginEnabled && (
       <div className="pt-3 border-t border-border space-y-2">
         <div className="text-[11px] font-bold text-muted uppercase tracking-wider flex items-center justify-between">
           <span>{isTr ? '⚡ Hızlı Demo Giriş Rolleri' : '⚡ One-Click Demo Profiles'}</span>
@@ -514,6 +570,7 @@ export default function AuthCard({ locale, defaultMode = 'login' }: AuthCardProp
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

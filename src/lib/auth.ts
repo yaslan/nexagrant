@@ -18,6 +18,13 @@ import {
 } from './legal/registration-consent';
 import { InviteCodeRejectedError, noteInviteRejection, redeemInviteCode } from './agency/codes';
 import { InvalidInviteCodeSignin } from './agency/invite-signin-error';
+import { PLATFORM_ADMIN_DEMO_EMAIL, isDemoLoginEnabled, isPlatformAdminDemoEmail } from './demo-login';
+
+/**
+ * TASK-MULSCEK4JHK8X — read once per process. Off unless DEMO_LOGIN_ENABLED=true
+ * outside production; see src/lib/demo-login.ts for what "off" closes.
+ */
+const demoLoginEnabled = isDemoLoginEnabled();
 
 /**
  * TASK-MTRNQHC3IV2BE — the demo sign-in seeds an ORGANISATION, never a person.
@@ -36,7 +43,7 @@ import { InvalidInviteCodeSignin } from './agency/invite-signin-error';
  * User row holds.
  */
 const DEMO_PROFILES: Record<string, { orgName: string; orgType: OrgType; role: Role; isPlatformAdmin?: boolean }> = {
-  "admin@yasinaslan.com.tr": {
+  [PLATFORM_ADMIN_DEMO_EMAIL]: {
     orgName: `${PRODUCT_NAME} HQ`,
     orgType: "CONSULTANCY",
     role: "TENANT_OWNER",
@@ -190,7 +197,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // used. Changing that is a deployment decision, not a lint fix.
       allowDangerousEmailAccountLinking: true,
     }),
-    Credentials({
+    // TASK-MULSCEK4JHK8X — this provider checks no password, so it is only
+    // registered when demo sign-in is on. Off, `/api/auth/callback/credentials`
+    // has no provider to sign anyone in with.
+    ...(demoLoginEnabled ? [Credentials({
       name: "Email / Demo",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -224,7 +234,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const computedName = (email.split("@")[0] ?? email)
           .replace(/[._]/g, " ")
           .replace(/\b\w/g, (c) => c.toUpperCase());
-        const isSuperadmin = email === "admin@yasinaslan.com.tr" || !!demoProfile?.isPlatformAdmin;
+        const isSuperadmin = isPlatformAdminDemoEmail(email) || !!demoProfile?.isPlatformAdmin;
 
         try {
           // Find or create user. No `include: { memberships: true }`: nothing in
@@ -380,22 +390,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             throw new InvalidInviteCodeSignin();
           }
           // Signing in against a fabricated user id is a development
-          // convenience only: in production a database outage must fail the
-          // sign-in, not mint a session for an account nobody verified.
-          if (env.NODE_ENV === "production") {
+          // convenience only: in production — or with demo sign-in off, where
+          // this provider is not even registered — a database outage must fail
+          // the sign-in, not mint a session for an account nobody verified.
+          if (env.NODE_ENV === "production" || !demoLoginEnabled) {
             console.error(`[Auth.authorize] sign-in refused, database unavailable: ${errorMessage(error)}`);
             return null;
           }
           console.warn(`[Auth.authorize] DB fallback for demo: ${errorMessage(error)}`);
           // Deliberately tenantless — see the jwt callback below.
           return {
-            id: email === "admin@yasinaslan.com.tr" ? "superadmin-yasin" : "demo-user-mehmet",
+            id: email === PLATFORM_ADMIN_DEMO_EMAIL ? "superadmin-yasin" : "demo-user-mehmet",
             email,
             name: computedName,
           };
         }
       },
-    }),
+    })] : []),
   ],
   callbacks: {
     async jwt({ token, user, trigger }) {
@@ -406,12 +417,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.image = user.image;
       }
 
-      if (token.email) {
+      // With demo sign-in off, an e-mail address grants nothing: platform admin
+      // comes only from `User.isPlatformAdmin`, read below (TASK-MULSCEK4JHK8X).
+      if (demoLoginEnabled && token.email) {
         const emailLower = token.email.toLowerCase();
         const demo = DEMO_PROFILES[emailLower];
         // The platform-admin grant only. `token.name = demo.name` used to run
         // here on every refresh, so the DB name lost to a hardcoded one.
-        if ((demo?.isPlatformAdmin || emailLower === "admin@yasinaslan.com.tr")) {
+        if ((demo?.isPlatformAdmin || isPlatformAdminDemoEmail(emailLower))) {
           token.isPlatformAdmin = true;
         }
       }
@@ -467,7 +480,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           ? token.workspaceIds.filter((id): id is string => typeof id === "string")
           : [];
         session.isPlatformAdmin =
-          token.isPlatformAdmin === true || token.email === "admin@yasinaslan.com.tr";
+          token.isPlatformAdmin === true ||
+          isPlatformAdminDemoEmail(typeof token.email === "string" ? token.email : null);
       }
       return session;
     },

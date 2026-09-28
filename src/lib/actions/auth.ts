@@ -5,6 +5,7 @@ import { AuthError, CredentialsSignin } from 'next-auth';
 import { INVALID_INVITE_CODE } from '@/lib/agency/invite-signin-error';
 import { isNextRedirectError } from '@/lib/errors';
 import { setRegistrationAcknowledgementCookie } from '@/lib/legal/registration-ack-cookie';
+import { isDemoLoginEnabled } from '@/lib/demo-login';
 
 /**
  * @param acknowledgement The version stamp of the privacy notice and terms the
@@ -22,6 +23,16 @@ export async function loginWithCredentialsAction(
   acknowledgement?: string,
   inviteCode?: string
 ) {
+  // TASK-MULSCEK4JHK8X — no Credentials provider is registered with demo sign-in
+  // off; say so plainly instead of letting `signIn` fail with a configuration error.
+  if (!isDemoLoginEnabled()) {
+    return {
+      error:
+        locale === 'tr'
+          ? 'E-posta ile giriş bu ortamda kapalı.'
+          : 'E-mail sign-in is disabled in this environment.',
+    };
+  }
   try {
     await signIn('credentials', {
       email,

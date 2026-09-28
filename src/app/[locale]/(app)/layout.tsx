@@ -5,6 +5,7 @@ import SidebarNav from '@/components/SidebarNav';
 import UserMenu from '@/components/UserMenu';
 import ThemeToggle from '@/components/ThemeToggle';
 import { auth } from '@/lib/auth';
+import { isPlatformAdminDemoEmail } from '@/lib/demo-login';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { PRODUCT_NAME } from '@/lib/brand';
@@ -74,7 +75,7 @@ export default async function AppLayout({
   const isPlatformAdmin = Boolean(
     session?.isPlatformAdmin ||
     session?.user?.isPlatformAdmin ||
-    userEmail === 'admin@yasinaslan.com.tr' ||
+    isPlatformAdminDemoEmail(userEmail) ||
     roleName === 'SUPER_ADMIN' ||
     roleName === 'PLATFORM_ADMIN'
   );

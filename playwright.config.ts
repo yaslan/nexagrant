@@ -31,6 +31,8 @@ process.env.AUTH_SECRET = E2E_AUTH_SECRET;
 
 const testEnv = {
   AUTH_SECRET: E2E_AUTH_SECRET,
+  // The specs sign in through the demo seats; off by default (TASK-MULSCEK4JHK8X).
+  DEMO_LOGIN_ENABLED: 'true',
   INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.',
   INVOICE_SUPPLIER_VKN: '1000000000',
   INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD',

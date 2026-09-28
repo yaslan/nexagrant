@@ -13,6 +13,17 @@ const optionalUrl = z.preprocess(
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: optionalUrl,
+  /**
+   * Password-less e-mail and demo-seat sign-in (src/lib/demo-login.ts). Only the
+   * literal `true` turns it on; unset or blank is off. Anything else is rejected
+   * at boot, so a typo such as `ture` or `1` cannot leave an operator believing
+   * it is off while guessing what "on" means. With NODE_ENV=production the server
+   * refuses to start while it is `true` (TASK-MULSCEK4JHK8X).
+   */
+  DEMO_LOGIN_ENABLED: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.enum(['true', 'false']).optional()
+  ),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: optionalUrl,
   INNGEST_API_KEY: z.string().optional(),

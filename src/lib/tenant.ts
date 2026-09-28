@@ -143,8 +143,9 @@ export async function requireTenantApi(): Promise<TenantApiResult> {
  * Platform-admin scope. A platform admin acts *across* tenants, so it is a
  * separate check from {@link tenantScopeOf} — never a stronger version of it.
  *
- * `auth.ts` already resolves the flag (from the User row, the demo profile or
- * the superadmin email) and puts it on the session, so this reads the claim and
+ * `auth.ts` already resolves the flag (from the User row; the demo profile and
+ * the superadmin email count only while DEMO_LOGIN_ENABLED is on, see
+ * src/lib/demo-login.ts) and puts it on the session, so this reads the claim and
  * does not re-derive it from an email address.
  */
 export function isPlatformAdminSession(session: SessionLike): boolean {
