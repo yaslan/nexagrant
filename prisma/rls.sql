@@ -10,7 +10,7 @@ BEGIN
     'TopicMatch','SavedSearch','Opportunity','GateDecision','ConsortiumSeat','PartnerOrg','Proposal','Effort',
     'Evidence','ConceptNote','Relationship','Interaction','SeatCandidate','AiUsageLog',
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
-    'TtoPortfolioItem','MarketplaceListing','MarketplaceOrder','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
+    'TtoPortfolioItem','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
     'PlanAssignment','ClaimEvidenceLink','EvidenceReminder','Consent',
     'StripeEventLog','AgencyInviteCode'
   ] LOOP
