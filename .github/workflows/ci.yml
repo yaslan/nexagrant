@@ -13,6 +13,10 @@ jobs:
     # the e2e run all reach the same service container.
     env:
       DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
+      # RLS-subject role (NOSUPERUSER NOBYPASSRLS) for the live RLS suites.
+      # `pnpm db:rls-role` creates fabrika_app with this password. A throwaway
+      # service-container credential like the one above, not a secret.
+      DATABASE_URL_RLS_TEST: postgresql://fabrika_app:fabrika_app_ci@localhost:5432/fabrika
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -64,9 +68,17 @@ jobs:
     # interactive `migrate dev`, `db:rls` installs the tenant policies and the
     # system-scope functions, and the seed adds the demo tenant and the module
     # catalogue that the database-backed tests read.
+    #
+    # `db:rls-role` sits between them on purpose. It needs the tables from
+    # `db push` for its grants, and `db:rls` grants EXECUTE on
+    # enter_system_scope() to fabrika_app only if the role already exists.
+    # Created after `db:rls`, the role gets "permission denied for function
+    # enter_system_scope" and the live RLS suites fail. Without the role at all
+    # they fail with "refusing to skip in CI" (tests/helpers/live-db-role.ts).
     - name: Prepare database
       run: |
         pnpm exec prisma db push
+        pnpm db:rls-role
         pnpm db:rls
         pnpm db:seed
 
