@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
+import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * Live KVKK/GDPR data-subject tests — real Postgres, real Prisma, real queries.
@@ -61,6 +62,11 @@ const { purgeDueUsers } = await import('@/lib/inngest/jobs/users-scheduled-delet
 // rather than trusting the value the code under test just returned.
 const pool = new pg.Pool({ connectionString: CONNECTION });
 const db = new PrismaClient({ adapter: new PrismaPg(pool) });
+
+// Measured as the app's own role on purpose (see tests/helpers/live-db-role.ts):
+// over an RLS-subject role the policies, not the code, would do the refusing.
+if (HAS_DB) await assertAppOwnerRole(db, 'gdpr data-subject live test');
+else skipOrFailInCi('gdpr data-subject live test', 'Postgres is unreachable (`docker compose up -d`)');
 
 const RUN = randomBytes(4).toString('hex');
 const ids = {

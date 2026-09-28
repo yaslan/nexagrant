@@ -56,21 +56,24 @@ vi.mock('stripe', () => {
   return { default: MockStripe };
 });
 
-import { createDbClient, withTenant } from '@/lib/db';
+import { createDbClient, prisma, withTenant } from '@/lib/db';
 import { createPortalSession } from '@/lib/billing/create-portal-session';
 import { recordLifetimeLicence, LIFETIME_SKU } from '@/lib/billing/lifetime-licence';
+import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 
-const HAS_DB =
-  RLS_URL !== undefined && (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
+const SUITE = 'billing K1 tenant-scope test';
 
-if (!HAS_DB) {
-  console.warn(
-    'billing K1 tenant-scope test skipped: needs Postgres and DATABASE_URL_RLS_TEST ' +
-      '(`docker compose up -d` then `pnpm db:rls-role`).'
-  );
-}
+const HAS_DB =
+  requireRlsTestUrl(RLS_URL, SUITE) !== undefined &&
+  (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
+
+if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
+
+// The calls under test go through the swapped singleton: it must be a role the
+// policies apply to, or every refusal below is green by accident.
+if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 
 const RUN = `mulqk-${Date.now()}`;
 const TENANT_A = `t-k1-a-${RUN}`;

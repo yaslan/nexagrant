@@ -49,20 +49,23 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
   return { rlsUrl, ownerUrl };
 });
 
-import { createDbClient } from '@/lib/db';
+import { createDbClient, prisma } from '@/lib/db';
 import { pruneOldStripeEvents, STRIPE_EVENT_RETENTION_DAYS } from '@/lib/billing/stripe-event-retention';
+import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 
-const HAS_DB =
-  RLS_URL !== undefined && (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
+const SUITE = 'stripe event retention test';
 
-if (!HAS_DB) {
-  console.warn(
-    'stripe event retention test skipped: needs Postgres and DATABASE_URL_RLS_TEST ' +
-      '(`docker compose up -d` then `pnpm db:rls-role`).'
-  );
-}
+const HAS_DB =
+  requireRlsTestUrl(RLS_URL, SUITE) !== undefined &&
+  (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
+
+if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
+
+// The prune runs over the swapped singleton; on a BYPASSRLS role it would
+// delete across tenants and the fix this file pins would be invisible.
+if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 
 // Unique run ID to isolate this test's data
 const RUN = Math.random().toString(36).slice(2, 10);

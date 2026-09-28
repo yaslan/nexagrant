@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach, afterAll } from 'vitest';
 
 import { prisma } from '@/lib/db';
+import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * TASK-MTVR7W9ZXO7M — the M9 calendar slice of the tenant-bypass inventory
@@ -39,6 +40,11 @@ const dbReachable = await prisma
   .$queryRaw`SELECT 1`
   .then(() => true)
   .catch(() => false);
+
+// The ownership check under test is the action's own; over an RLS-subject role
+// the policy would keep the foreign row alive and the test would pass regardless.
+if (dbReachable) await assertAppOwnerRole(prisma, 'm9 calendar tenant-scope live test');
+else skipOrFailInCi('m9 calendar tenant-scope live test', 'Postgres is unreachable (`docker compose up -d`)');
 
 /** Reads the row straight out of Postgres, past Prisma's model layer. */
 async function rowExists(id: string): Promise<boolean> {

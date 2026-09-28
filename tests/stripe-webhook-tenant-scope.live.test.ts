@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll, vi } from 'vitest';
 import type Stripe from 'stripe';
 import pg from 'pg';
+import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
 import { prisma } from '@/lib/db';
 import {
   syncStripeSubscription,
@@ -54,6 +55,11 @@ async function dbReachable(): Promise<boolean> {
 }
 
 const HAS_DB = await dbReachable();
+
+// Measured as the app's own role on purpose (see tests/helpers/live-db-role.ts):
+// over an RLS-subject role the policies, not the code, would do the refusing.
+if (HAS_DB) await assertAppOwnerRole(prisma, 'stripe webhook tenant-scope live test');
+else skipOrFailInCi('stripe webhook tenant-scope live test', 'Postgres is unreachable (`docker compose up -d`)');
 
 const RUN = Math.random().toString(36).slice(2, 10);
 const TENANT_ID = `t-scope-${RUN}`;

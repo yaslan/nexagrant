@@ -8,6 +8,7 @@ import {
 } from '../src/lib/legal/registration-consent';
 import { registrationConsentRows } from '../src/lib/legal/consent-documents';
 import { envValue } from './helpers/dotenv';
+import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * TASK-MTSWLANXSU0IG (A3), against a real database.
@@ -23,6 +24,7 @@ import { envValue } from './helpers/dotenv';
  *   (NOBYPASSRLS), because the default `fabrika` role is SUPERUSER + BYPASSRLS
  *   and an isolation assertion made through it passes vacuously.
  */
+const SUITE = 'registration-consent.live';
 const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
 const STAMP = Date.now();
 
@@ -36,6 +38,8 @@ describe('registration disclosure record (live)', () => {
   const userIds: string[] = [];
 
   beforeAll(async () => {
+    // Before the try, so that in CI the missing variable fails instead of being caught.
+    const rlsUrl = requireRlsTestUrl(RLS_URL, `${SUITE} (isolation arm)`);
     try {
       await prisma.$connect();
       for (const slug of [TENANT_A, TENANT_B]) {
@@ -44,17 +48,17 @@ describe('registration disclosure record (live)', () => {
         });
         tenantIds.push(t.id);
       }
-      if (RLS_URL) {
-        rls = createDbClient(RLS_URL);
+      if (rlsUrl) {
+        rls = createDbClient(rlsUrl);
         await rls.$connect();
       }
       ready = true;
     } catch (e) {
-      console.warn(
-        `registration-consent.live skipped: ${e instanceof Error ? e.message : String(e)}`
-      );
       ready = false;
+      skipOrFailInCi(SUITE, e instanceof Error ? e.message : String(e));
     }
+    // Outside the try: a BYPASSRLS role must fail the file, not skip it.
+    if (rls) await assertRlsSubjectRole(rls, SUITE);
   });
 
   afterAll(async () => {

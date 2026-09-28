@@ -6,6 +6,7 @@ import {
   saveCalendarConnectionTokens,
 } from '@/lib/calendar/sync';
 import { PlaintextCalendarTokenError } from '@/lib/calendar/token-envelope';
+import { assertAppOwnerRole } from './helpers/live-db-role';
 
 const PROBE_TENANT = 'probe-encryption-tenant';
 const PROBE_USER = 'probe-user-token-test';
@@ -16,8 +17,11 @@ const TEST_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
 describe('Calendar token live database encryption verification', () => {
   let createdConnectionId: string | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     process.env.CALENDAR_ENCRYPTION_KEY = TEST_KEY;
+    // The raw read-back below goes through the singleton unscoped, which only
+    // sees the row on the app's own BYPASSRLS role.
+    await assertAppOwnerRole(prisma, 'calendar token live test');
   });
 
   afterAll(async () => {

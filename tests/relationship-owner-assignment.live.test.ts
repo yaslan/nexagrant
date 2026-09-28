@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
+import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * Live tests for the focal-point assignment (TASK-MTTOUDNQ97X83, F-2).
@@ -49,6 +50,11 @@ const { updateRelationship } = await import(
 
 const pool = new pg.Pool({ connectionString: CONNECTION });
 const db = new PrismaClient({ adapter: new PrismaPg(pool) });
+
+// Measured as the app's own role on purpose (see tests/helpers/live-db-role.ts):
+// over an RLS-subject role the policies, not the code, would do the refusing.
+if (HAS_DB) await assertAppOwnerRole(db, 'relationship owner-assignment live test');
+else skipOrFailInCi('relationship owner-assignment live test', 'Postgres is unreachable (`docker compose up -d`)');
 
 const RUN = randomBytes(4).toString('hex');
 const ids = {

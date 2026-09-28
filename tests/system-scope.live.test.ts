@@ -5,6 +5,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createDbClient } from '@/lib/db';
 import { SYSTEM_SCOPE_PURPOSES, withSystemScopeOn } from '@/lib/system-scope';
 import { envValue } from './helpers/dotenv';
+import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * TASK-MTVTPVTEBCF5Z — the sanctioned cross-tenant path, measured where it is
@@ -44,35 +45,37 @@ let skipReason = '';
 /** A table with rows in at least two tenants, chosen at runtime from the seed. */
 let probeTenants: string[] = [];
 
+const SUITE = 'system-scope live test';
+
 beforeAll(async () => {
-  if (!RLS_URL) {
+  if (!requireRlsTestUrl(RLS_URL, SUITE)) {
     skipReason = 'DATABASE_URL_RLS_TEST is not set. Run `pnpm db:rls-role`.';
-    console.warn(`system-scope live test skipped: ${skipReason}`);
     return;
   }
-  try {
-    rls = createDbClient(RLS_URL);
-    admin = createDbClient(ADMIN_URL ?? '');
-    const caps = await rls.$queryRaw<Array<{ bypass: boolean }>>`
-      SELECT rolbypassrls AS bypass FROM pg_roles WHERE rolname = current_user`;
-    if (caps[0]?.bypass !== false) {
-      skipReason = 'the test role is BYPASSRLS; nothing here would be measuring RLS.';
-      console.warn(`system-scope live test skipped: ${skipReason}`);
-      return;
-    }
-    // Which tenants own Membership rows, asked over the privileged handle so the
-    // expectation is built from the truth rather than from the thing under test.
-    const rows = await admin.$queryRaw<Array<{ tenantId: string }>>`
-      SELECT DISTINCT "tenantId" FROM "Membership" LIMIT 5`;
-    probeTenants = rows.map((r) => r.tenantId);
-    ready = probeTenants.length >= 2;
-    if (!ready) {
-      skipReason = `needs Membership rows in 2+ tenants; found ${probeTenants.length}. Run \`pnpm db:seed\`.`;
-      console.warn(`system-scope live test skipped: ${skipReason}`);
-    }
-  } catch (e) {
-    skipReason = `database unavailable: ${e instanceof Error ? e.message : String(e)}`;
-    console.warn(`system-scope live test skipped: ${skipReason}`);
+  rls = createDbClient(RLS_URL!);
+  admin = createDbClient(ADMIN_URL ?? '');
+  const reachable = await rls.$queryRaw`SELECT 1`.then(() => true).catch(() => false);
+  if (!reachable) {
+    skipReason = 'database unavailable';
+    skipOrFailInCi(SUITE, skipReason);
+    return;
+  }
+  // A BYPASSRLS role used to be a skip here, and every test below reported
+  // green through `expect(skipReason).toBeTruthy()`. It is a failure now.
+  await assertRlsSubjectRole(rls, SUITE);
+  // Which tenants own Membership rows, asked over the privileged handle so the
+  // expectation is built from the truth rather than from the thing under test.
+  const rows = await admin.$queryRaw<Array<{ tenantId: string }>>`
+    SELECT DISTINCT "tenantId" FROM "Membership" LIMIT 5`
+    .catch((e: unknown) => {
+      skipReason = `database unavailable: ${e instanceof Error ? e.message : String(e)}`;
+      return [];
+    });
+  probeTenants = rows.map((r) => r.tenantId);
+  ready = probeTenants.length >= 2;
+  if (!ready) {
+    skipReason ||= `needs Membership rows in 2+ tenants; found ${probeTenants.length}. Run \`pnpm db:seed\`.`;
+    skipOrFailInCi(SUITE, skipReason);
   }
 });
 

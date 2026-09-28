@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, withTenantOn } from '@/lib/db';
 import { envValue } from './helpers/dotenv';
+import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * TASK-MTVR9T834EPUC — slice 2 of the tenant-bypass inventory
@@ -51,17 +52,14 @@ const ADMIN_URL = envValue('DATABASE_URL');
  */
 const admin: PrismaClient | undefined = ADMIN_URL ? createDbClient(ADMIN_URL) : undefined;
 
+const SUITE = 'pipeline-surface tenant-scope test';
+
 const dbReachable =
-  RLS_URL !== undefined &&
+  requireRlsTestUrl(RLS_URL, SUITE) !== undefined &&
   admin !== undefined &&
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 
-if (!dbReachable) {
-  console.warn(
-    'pipeline-surface tenant-scope test skipped: needs Postgres and ' +
-      'DATABASE_URL_RLS_TEST (`docker compose up -d` then `pnpm db:rls-role`).'
-  );
-}
+if (RLS_URL && !dbReachable) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
 /**
  * The RLS-subject client every call under test runs over.
@@ -72,6 +70,9 @@ if (!dbReachable) {
 const box = vi.hoisted(() => ({ client: undefined as PrismaClient | undefined }));
 const rls: PrismaClient | undefined = dbReachable ? createDbClient(RLS_URL!) : undefined;
 box.client = rls;
+
+// Fails the whole file, not just the guard test below, when the probe role bypasses RLS.
+if (rls) await assertRlsSubjectRole(rls, SUITE);
 
 /** Privileged handle, for seeding and for reading rows back past the policies. */
 const db = (): PrismaClient => admin!;

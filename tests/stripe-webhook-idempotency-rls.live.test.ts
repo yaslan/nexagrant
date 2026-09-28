@@ -49,7 +49,7 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
     return undefined;
   };
   const ownerUrl = process.env.DATABASE_URL ?? read('DATABASE_URL');
-  const rlsUrl = read('DATABASE_URL_RLS_TEST');
+  const rlsUrl = process.env.DATABASE_URL_RLS_TEST ?? read('DATABASE_URL_RLS_TEST');
   if (rlsUrl) process.env.DATABASE_URL = rlsUrl;
   return { rlsUrl, ownerUrl };
 });
@@ -72,21 +72,23 @@ import {
   syncStripeSubscription,
   handleSubscriptionCancellation,
 } from '@/lib/billing/subscription-sync';
+import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 /** Fixtures and counts go through the owning role; only the handlers run as fabrika_app. */
 const PRIV_URL = OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika';
 const admin = createDbClient(PRIV_URL);
 
+const SUITE = 'stripe webhook RLS idempotency test';
+
 const HAS_DB =
-  RLS_URL !== undefined &&
+  requireRlsTestUrl(RLS_URL, SUITE) !== undefined &&
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 
-if (!HAS_DB) {
-  console.warn(
-    'stripe webhook RLS idempotency test skipped: needs Postgres and ' +
-      'DATABASE_URL_RLS_TEST (`docker compose up -d` then `pnpm db:rls-role`).'
-  );
-}
+if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
+
+// Checked before any test runs, so a BYPASSRLS role fails the whole file rather
+// than one assertion next to many vacuous greens.
+if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 
 const RUN = `mtvsbe-${Date.now()}`;
 const TENANT = `t-rls-${RUN}`;

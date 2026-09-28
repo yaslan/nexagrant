@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
-import { createDbClient } from '@/lib/db';
+import { createDbClient, prisma } from '@/lib/db';
 import { envValue } from './helpers/dotenv';
+import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * TASK-MTVTU103F11XJ — `ConceptTemplate` reads took a client-supplied id with no
@@ -39,11 +40,12 @@ const dbReachable =
   admin !== undefined &&
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 
-if (!dbReachable) {
-  console.warn(
-    'concept-template tenant-scope test skipped: needs Postgres (`docker compose up -d`).'
-  );
-}
+const SUITE = 'concept-template tenant-scope test';
+
+// The header above is the reason: this file must run as the BYPASSRLS app role,
+// where the policy is inert and only the code's own tenant arm can refuse.
+if (dbReachable) await assertAppOwnerRole(prisma, SUITE);
+else skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
 /** Mutable so each arm can act as a different tenant. */
 const scope = vi.hoisted(() => ({ tenantId: '', userId: 'user-cs-fb' }));
