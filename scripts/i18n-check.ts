@@ -17,7 +17,7 @@
  * Checks 1-3 only ask whether the keys that ARE used resolve. A file that never calls
  * `t()` was skipped on the first line of the scan loop, so the gate could not see the
  * violation that matters most: text written straight into the JSX. That is how
- * marketplace/client.tsx carried 41 Turkish literals under a green gate and kept
+ * one workspace page's client.tsx carried 41 Turkish literals under a green gate and kept
  * TASK-MTU6I7SO2BD28 false-closed for a sprint (TASK-MTU64MMEQC0WV §B-01). Rule 8 was
  * being enforced backwards — bind a string to `t()` and you got audited, hard-code it and
  * you became invisible.

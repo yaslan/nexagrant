@@ -6,14 +6,14 @@
  * catalogs?". A file that never calls `t()` was skipped on its first line
  * (`if (!raw.includes('useTranslations') ...) continue`), so the gate was structurally
  * blind to the violation that actually matters: text written straight into the JSX.
- * That blindness let src/app/[locale]/(app)/[workspace]/marketplace/client.tsx carry 41
+ * That blindness let a workspace page's client.tsx (since removed, ADR-0005) carry 41
  * Turkish literals with a green gate, and kept TASK-MTU6I7SO2BD28 false-closed for a
  * sprint (audited in TASK-MTU64MMEQC0WV §B-01).
  *
  * ── What counts as a violation ────────────────────────────────────────────────────────
  * Inside src/app/** and src/modules/** `.tsx` files, a string literal that reaches the
  * user as prose:
- *   - a JSX text node            <span>Aktif Pazaryeri İlanı</span>
+ *   - a JSX text node            <span>Aktif Hibe Çağrısı</span>
  *   - a text-carrying prop       title= / label= / placeholder= / aria-label=
  * and that is either Turkish (carries ç ğ ı İ ö ş ü) or two or more words. A single
  * ASCII word ("Save") is deliberately NOT a violation: at one word the signal is too weak
@@ -128,7 +128,7 @@ export function isUserFacing(text: string): boolean {
   return t.split(/\s+/).filter(w => /[A-Za-zÇĞİÖŞÜçğıöşü]/.test(w)).length >= 2;
 }
 
-/** JSX text node between two tags: `>Aktif Pazaryeri İlanı<`. */
+/** JSX text node between two tags: `>Aktif Hibe Çağrısı<`. */
 const JSX_TEXT = /> *([^<>{}\n][^<>{}\n]{1,199}?) *</g;
 
 export function scanSource(relPath: string, raw: string): Violation[] {

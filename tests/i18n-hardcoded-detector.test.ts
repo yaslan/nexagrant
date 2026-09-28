@@ -11,8 +11,8 @@ import { isUserFacing, looksTechnical, scanSource } from '../scripts/i18n-hardco
  */
 describe('hard-coded text detector — what counts', () => {
   it('reports a Turkish JSX text node', () => {
-    const found = scanSource('a.tsx', '<span>Aktif Pazaryeri İlanı</span>');
-    expect(found.map(v => v.text)).toEqual(['Aktif Pazaryeri İlanı']);
+    const found = scanSource('a.tsx', '<span>Aktif Hibe Çağrısı</span>');
+    expect(found.map(v => v.text)).toEqual(['Aktif Hibe Çağrısı']);
   });
 
   it('reports a two-word English JSX text node', () => {

@@ -9,7 +9,6 @@
     "conceptNotes": "Konsept Notlar",
     "tto": "TTO Hızlandırıcısı (M7)",
     "approvals": "Onay Merkezi (4-Eyes)",
-    "marketplace": "Pazar Yeri & API",
     "apiKeys": "Partner REST API",
     "settings": "Ayarlar",
     "adminModules": "Yönetici Konsolu",
@@ -877,112 +876,6 @@
       "errorTitle": "Panel açılamadı",
       "errorBody": "Bu değerlendirme paneli yüklenirken bir hata oluştu. Sorun sürerse çalışma alanı yöneticinize başvurun.",
       "errorRetry": "Tekrar dene"
-    }
-  },
-  "m8": {
-    "badge": {
-      "consultancy": "Danışmanlık & Koçluk",
-      "patentLicense": "Patent Lisanslama",
-      "service": "Ar-Ge & Lab Hizmeti"
-    },
-    "header": {
-      "moduleLabel": "Modül 8 — Expert & Consultant Marketplace",
-      "title": "Ar-Ge Uzman Pazaryeri & Partner API",
-      "subtitle": "Ufuk Avrupa bağımsız yazarları, onaylı M6 değerlendiricileri ve TTO patent lisansları.",
-      "apiFeeBadge": "Open API & %10 Fee Engine",
-      "metrics": {
-        "activeListings": "Aktif Pazaryeri İlanı",
-        "listingUnit": "İlan",
-        "verifiedReviewer": "Onaylı M6 Değerlendirici",
-        "verifiedBadge": "Sertifikalı",
-        "commissionRate": "Platform Komisyon Oranı",
-        "commissionUnit": "Hak Ediş",
-        "activeApiKeys": "Aktif Partner API Key",
-        "keyUnit": "Anahtar"
-      }
-    },
-    "tabs": {
-      "listings": "Pazar Yeri İlanları ({count})",
-      "post": "Yeni Hizmet İlanı Ver",
-      "apikeys": "Partner Intelligence API Anahtarları"
-    },
-    "filter": {
-      "label": "Filtrele:",
-      "all": "Tüm Hizmetler ({count})",
-      "consultancy": "Danışmanlık & Koçluk",
-      "patentLicense": "Patent Lisanslama",
-      "service": "Ar-Ge & Lab"
-    },
-    "listing": {
-      "priceTbd": "Görüşülecek",
-      "verifiedBadge": "Onaylı M6 Değerlendirici Rozeti",
-      "orderButton": "Hizmet Talebi / Sipariş Al"
-    },
-    "postForm": {
-      "heading": "Yeni Hizmet veya Uzmanlık İlanı Yayınla",
-      "subtitle": "Bağımsız yazar, TTO ve Ar-Ge laboratuvarınızı Ufuk Avrupa konsorsiyumlarına tanıtın.",
-      "titleLabel": "İlan Başlığı",
-      "titlePlaceholder": "Örn: Horizon Europe Grant Proposal Pre-evaluation & Proofreading",
-      "typeLabel": "İlan Türü",
-      "typeConsultancy": "Danışmanlık & Koçluk",
-      "typePatentLicense": "Patent Lisanslama",
-      "typeService": "Ar-Ge Hizmeti / Laboratuvar Testi",
-      "priceLabel": "Hizmet Bedeli (€)",
-      "pricePlaceholder": "Örn: €1,500 / Proposal",
-      "detailsLabel": "Hizmet Detayları ve Kapsamı",
-      "detailsPlaceholder": "Hizmet kapsamı, teslim süresi ve uzmanın AB proje deneyimi...",
-      "commissionNoteLabel": "Platform Komisyonu Notu:",
-      "commissionNoteBody": "Platform üzerinden tamamlanan danışmanlık ödemelerinden %10 hizmet bedeli kesilmektedir.",
-      "publishing": "Yayınlanıyor...",
-      "submit": "İlanı Pazaryerinde Yayınla"
-    },
-    "apiKeys": {
-      "generateHeading": "Yeni API Anahtarı Üret",
-      "nameLabel": "API Key Tanımı / Uygulama Adı",
-      "namePlaceholder": "Örn: ERP Entegrasyonu, CRM Botu",
-      "generating": "Üretiliyor...",
-      "generateButton": "API Key Üret (fp_live_...)",
-      "newKeyWarning": "⚠️ Yeni Üretilen Gizli API Key (Sadece Bir Kez Gösterilir):",
-      "listHeading": "Mevcut API Key Anahtarları ({count})",
-      "tableName": "API Key Adı",
-      "tablePrefix": "Önek (Prefix)",
-      "tableCreated": "Oluşturulma",
-      "tableStatus": "Durum",
-      "statusActive": "Aktif"
-    },
-    "orderModal": {
-      "heading": "Hizmet Talebi / Sipariş",
-      "confirmedHeading": "Siparişiniz Onaylandı!",
-      "orderNumber": "Sipariş No: {id}",
-      "totalAmount": "Toplam Tutar: {amount} (Platform Ücreti Dahil)",
-      "selectedService": "Seçilen Hizmet:",
-      "escrowNote": "🔒 Güvenli Emanet (Escrow) ödemesi ile danışman işi teslim edene kadar ücret güvendedir.",
-      "ordering": "Sipariş İletiliyor...",
-      "confirmButton": "Siparişi Onayla ve İşlemi Başlat",
-      "refused": {
-        "notFound": "Bu ilan artık yayında değil.",
-        "ownListing": "Kendi ilanınızı sipariş edemezsiniz.",
-        "priceNotFixed": "Bu ilanın sabit bir fiyatı yok. Fiyat için satıcıyla görüşün."
-      }
-    },
-    "state": {
-      "retry": "Yeniden dene",
-      "page": {
-        "errorTitle": "Pazar yeri yüklenemedi",
-        "errorBody": "Ne ilanlar ne de API anahtarları okunabildi. Doğrulayamadığımız veriyi göstermek yerine hiçbir şey gösterilmiyor. Yeniden deneyin; sorun sürerse yöneticinize bildirin."
-      },
-      "listings": {
-        "emptyTitle": "Henüz ilan yok",
-        "emptyBody": "Pazar yerinize henüz ilan yayımlanmadı. İlkini eklemek için Yeni Hizmet İlanı Ver sekmesini açın.",
-        "errorTitle": "İlanlar yüklenemedi",
-        "errorBody": "İlanlarınız okunamadı. Bu bir okuma hatasıdır, pazar yerinizin boş olduğu anlamına gelmez — hiçbir ilan silinmedi. Yeniden deneyin; sorun sürerse yöneticinize bildirin."
-      },
-      "apiKeys": {
-        "emptyTitle": "Henüz API anahtarı yok",
-        "emptyBody": "Bu çalışma alanı için henüz partner API anahtarı üretilmedi. Oluşturmak için Partner Intelligence API Anahtarları sekmesini açın.",
-        "errorTitle": "API anahtarları yüklenemedi",
-        "errorBody": "API anahtarı listesi okunamadı. Var olan anahtarlarınız bundan etkilenmedi — liste yeniden yüklenene kadar yenisini üretmeyin."
-      }
     }
   },
   "m9": {
