@@ -34,9 +34,9 @@
     "six reads, the erasure sweep's eight writes, the digest's two), and one turned",
     "out to be plainly scopable and is now withTenant.",
     "",
-    "Every `debt` entry has a real card on the board:",
-    "  TASK-MTVTMZXYT84RZ  wrap the two scopable billing calls (K1)",
-    "  TASK-MTVSBEO7VX6Y4  the surviving subscription-sync fallback (that card owns the file)"
+    "Debt cards, both closed by TASK-MULQKFER4MF0Y (2026-09-29) and pruned:",
+    "  TASK-MTVTMZXYT84RZ  the two scopable billing calls, now withTenant (K1)",
+    "  TASK-MTVSBEO7VX6Y4  the subscription-sync fallback, removed by that card"
   ],
   "measuredAt": "2026-09-10",
   "measuredAgainst": "dev @ TASK-MTVTPVTEBCF5Z",
@@ -186,24 +186,13 @@
       "reason": "Same fan-out shape: the daily job reads every tenant's alert-enabled saved searches before mailing each one. Empty under fabrika_app is reported as totalSearches: 0 — the false success the job's own docstring says it refuses."
     },
     {
-      "check": "A",
-      "file": "src/lib/billing/create-portal-session.ts",
-      "subject": "subscription.findUnique",
+      "check": "D",
+      "file": "src/lib/billing/stripe-event-retention.ts",
+      "subject": "system-scope:cross-tenant-job",
       "count": 1,
-      "kind": "debt",
-      "class": "wrappable",
-      "card": "TASK-MTVTMZXYT84RZ",
-      "reason": "tenantId is already a parameter of this function — nothing discovers it, nothing aggregates. This is a plain unwrapped tenant read that slices 1-4 did not reach because src/lib/billing/** was fenced off for another card."
-    },
-    {
-      "check": "A",
-      "file": "src/lib/billing/lifetime-licence.ts",
-      "subject": "lifetimeLicence.create",
-      "count": 1,
-      "kind": "debt",
-      "class": "wrappable",
-      "card": "TASK-MTVTMZXYT84RZ",
-      "reason": "Writes data: { tenantId, ... } with the tenant in hand. Unlike its two findFirst siblings in the same file this one is scopable, and under fabrika_app an unscoped INSERT is REFUSED by the WITH CHECK clause — a paid lifetime licence would fail to record."
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "pruneOldStripeEvents(), run nightly by the stripe-event-cleanup cron: deletes every tenant's StripeEventLog rows older than the retention window. The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant. Measured under fabrika_app (TASK-MULQKFER4MF0Y): the unscoped deleteMany saw no rows, deleted 0 and the job reported success while every row stayed."
     },
     {
       "check": "B1",
@@ -213,16 +202,6 @@
       "kind": "allowed",
       "class": "nullable-column",
       "reason": "`...(tenantId ? { tenantId } : {})` on an auditEvent.create DATA object, not a where clause. AuditEvent.tenantId is String? (NULLABLE_TENANT since TASK-MTU6HUB8FUHMG C-2) and a tenant-less subject legitimately writes NULL; the spread omits a column rather than widening a filter. The rule is kept position-blind on purpose — deciding 'is this a where or a data' needs context the scanner does not have, and one documented exemption is cheaper than a rule that guesses."
-    },
-    {
-      "check": "B2",
-      "file": "src/lib/billing/subscription-sync.ts",
-      "subject": "tenantId-fallback",
-      "count": 1,
-      "kind": "debt",
-      "class": "fabricated-id",
-      "card": "TASK-MTVSBEO7VX6Y4",
-      "reason": "`tenantId: (subscription.metadata?.tenantId as string) ?? ''` in a logger.warn payload. The empty string is exactly what assertTenantScope rejects, so the log line names a tenant that can never be looked up. This file had TWO of these when the baseline was written; TASK-MTVSBEO7VX6Y4 removed the second (a `|| ''` in the handler's return value on the already-processed path) while this card was running, and the gate reported the fall as a warning rather than blocking that agent's push. The survivor belongs to the same card."
     }
   ]
 }

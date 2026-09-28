@@ -954,11 +954,16 @@
       "heading": "Hizmet Talebi / Sipariş",
       "confirmedHeading": "Siparişiniz Onaylandı!",
       "orderNumber": "Sipariş No: {id}",
-      "totalAmount": "Toplam Tutar: €{amount} (Platform Ücreti Dahil)",
+      "totalAmount": "Toplam Tutar: {amount} (Platform Ücreti Dahil)",
       "selectedService": "Seçilen Hizmet:",
       "escrowNote": "🔒 Güvenli Emanet (Escrow) ödemesi ile danışman işi teslim edene kadar ücret güvendedir.",
       "ordering": "Sipariş İletiliyor...",
-      "confirmButton": "Siparişi Onayla ve İşlemi Başlat"
+      "confirmButton": "Siparişi Onayla ve İşlemi Başlat",
+      "refused": {
+        "notFound": "Bu ilan artık yayında değil.",
+        "ownListing": "Kendi ilanınızı sipariş edemezsiniz.",
+        "priceNotFixed": "Bu ilanın sabit bir fiyatı yok. Fiyat için satıcıyla görüşün."
+      }
     },
     "state": {
       "retry": "Yeniden dene",

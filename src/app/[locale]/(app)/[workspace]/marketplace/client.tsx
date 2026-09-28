@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Store,
   Key,
@@ -14,6 +14,8 @@ import {
   X
 } from 'lucide-react';
 import { createMarketplaceListing, orderMarketplaceService, generateApiKey } from '@/modules/marketplace/server/actions';
+import type { MarketplaceOrderRefusal } from '@/modules/marketplace/server/orders';
+import { formatMoney } from '@/lib/money';
 
 export interface ListingItem {
   id: string;
@@ -42,14 +44,15 @@ interface MarketplaceClientProps {
 /** The order `orderMarketplaceService` returns, as the confirmation modal reads it. */
 interface ConfirmedOrder {
   id: string;
-  listingId: string;
-  buyerTenantId: string;
-  totalAmountEUR: number;
-  platformFeeEUR: number;
-  consultantPayoutEUR: number;
-  status: string;
-  createdAt: Date;
+  totalAmountMinor: number;
+  currency: string;
 }
+
+const REFUSAL_KEY: Record<MarketplaceOrderRefusal, string> = {
+  LISTING_NOT_FOUND: 'orderModal.refused.notFound',
+  OWN_LISTING: 'orderModal.refused.ownListing',
+  PRICE_NOT_FIXED: 'orderModal.refused.priceNotFixed',
+};
 
 export function MarketplaceClient({
   tenantId: _tenantId,
@@ -58,6 +61,7 @@ export function MarketplaceClient({
   apiKeys: initialApiKeys,
 }: MarketplaceClientProps) {
   const t = useTranslations('m8');
+  const locale = useLocale();
   const [listings, setListings] = useState<ListingItem[]>(initialListings);
   const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>(initialApiKeys);
   const [activeTab, setActiveTab] = useState<'listings' | 'post' | 'apikeys'>('listings');
@@ -80,6 +84,7 @@ export function MarketplaceClient({
   const [selectedOrderListing, setSelectedOrderListing] = useState<ListingItem | null>(null);
   const [isOrdering, setIsOrdering] = useState(false);
   const [orderConfirmed, setOrderConfirmed] = useState<ConfirmedOrder | null>(null);
+  const [orderRefusal, setOrderRefusal] = useState<MarketplaceOrderRefusal | null>(null);
 
   const handlePublishListing = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,13 +154,15 @@ export function MarketplaceClient({
   const handleOrderService = async (listing: ListingItem) => {
     setIsOrdering(true);
     try {
-      const priceNum = parseInt((listing.price || '').replace(/[^0-9]/g, ''), 10) || 1500;
-      const res = await orderMarketplaceService({
-        listingId: listing.id,
-        priceAmountEUR: priceNum,
-      });
+      // No price is sent: the server reads it from the listing.
+      const res = await orderMarketplaceService({ listingId: listing.id });
 
-      setOrderConfirmed(res.order);
+      if (res.success) {
+        setOrderRefusal(null);
+        setOrderConfirmed(res.order);
+      } else {
+        setOrderRefusal(res.code);
+      }
     } catch (err) {
       console.error('Error ordering service:', err);
     } finally {
@@ -359,7 +366,10 @@ export function MarketplaceClient({
 
                 <div className="pt-3 border-t border-border flex justify-end">
                   <button
-                    onClick={() => setSelectedOrderListing(item)}
+                    onClick={() => {
+                      setOrderRefusal(null);
+                      setSelectedOrderListing(item);
+                    }}
                     className="px-4 py-2 bg-accent hover:opacity-90 text-white rounded-xl font-semibold text-xs transition shadow-2xs flex items-center gap-1.5"
                   >
                     <span>{t('listing.orderButton')}</span>
@@ -554,6 +564,7 @@ export function MarketplaceClient({
                 onClick={() => {
                   setSelectedOrderListing(null);
                   setOrderConfirmed(null);
+                  setOrderRefusal(null);
                 }}
                 className="p-1 rounded-lg hover:bg-surface-hover text-muted"
               >
@@ -566,7 +577,9 @@ export function MarketplaceClient({
                 <CheckCircle2 className="w-6 h-6 text-emerald-500" />
                 <h4 className="font-bold text-sm text-emerald-500">{t('orderModal.confirmedHeading')}</h4>
                 <p className="font-mono text-[11px] text-ink-2">{t('orderModal.orderNumber', { id: orderConfirmed.id })}</p>
-                <p className="text-ink-2">{t('orderModal.totalAmount', { amount: orderConfirmed.totalAmountEUR })}</p>
+                <p className="text-ink-2">{t('orderModal.totalAmount', {
+                    amount: formatMoney(orderConfirmed.totalAmountMinor, orderConfirmed.currency, locale),
+                  })}</p>
               </div>
             ) : (
               <div className="space-y-4 text-xs">
@@ -579,6 +592,12 @@ export function MarketplaceClient({
                 <div className="bg-accent/10 border border-accent/20 p-3 rounded-xl text-accent-ink text-[11px]">
                   <span>{t('orderModal.escrowNote')}</span>
                 </div>
+
+                {orderRefusal && (
+                  <div role="alert" className="bg-red-500/10 border border-red-500/40 p-3 rounded-xl text-red-700 text-[11px]">
+                    {t(REFUSAL_KEY[orderRefusal])}
+                  </div>
+                )}
 
                 <button
                   onClick={() => handleOrderService(selectedOrderListing)}

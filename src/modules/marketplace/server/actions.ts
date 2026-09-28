@@ -1,9 +1,10 @@
 'use server';
 
-import { withTenant } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
+import { placeMarketplaceOrderOn, type MarketplaceOrderResult } from './orders';
 
 /**
  * Marketplace listings, orders and API keys.
@@ -48,37 +49,29 @@ export async function createMarketplaceListing({
   return listing;
 }
 
+/**
+ * Orders a listing for the signed-in tenant. There is no price argument: the
+ * amount is read from the listing and the commission computed on the server
+ * (src/modules/marketplace/server/orders.ts). A refusal comes back as
+ * `{ success: false, code }`, not a throw, so the modal can say why.
+ */
 export async function orderMarketplaceService({
   listingId,
-  priceAmountEUR = 1500,
 }: {
   listingId: string;
-  priceAmountEUR?: number;
-}) {
+}): Promise<MarketplaceOrderResult> {
   // The buyer is whoever is signed in, never a tenant id sent by the browser.
   const { tenantId: buyerTenantId } = await requireTenantAction();
 
-  // Platform fee standard: 10% platform commission fee
-  const platformFeeEUR = Math.round(priceAmountEUR * 0.10);
-  const consultantPayoutEUR = priceAmountEUR - platformFeeEUR;
+  const result = await placeMarketplaceOrderOn(prisma, buyerTenantId, listingId);
 
-  const orderId = `order-${crypto.randomBytes(8).toString('hex')}`;
-  const createdAt = new Date();
+  if (result.success) {
+    try {
+      revalidatePath('/[locale]/(app)/[workspace]/marketplace', 'page');
+    } catch {}
+  }
 
-  return {
-    success: true,
-    order: {
-      id: orderId,
-      listingId,
-      buyerTenantId,
-      totalAmountEUR: priceAmountEUR,
-      platformFeeEUR,
-      consultantPayoutEUR,
-      status: 'CONFIRMED',
-      createdAt,
-    },
-    message: `Order ${orderId} created successfully with 10% platform fee (€${platformFeeEUR})`,
-  };
+  return result;
 }
 
 export async function generateApiKey({ name }: { name: string }) {

@@ -954,11 +954,16 @@
       "heading": "Service Request / Order",
       "confirmedHeading": "Your Order Is Confirmed!",
       "orderNumber": "Order No: {id}",
-      "totalAmount": "Total Amount: €{amount} (Platform Fee Included)",
+      "totalAmount": "Total Amount: {amount} (Platform Fee Included)",
       "selectedService": "Selected Service:",
       "escrowNote": "🔒 Secure escrow payment protects the fee until the consultant delivers the work.",
       "ordering": "Submitting Order...",
-      "confirmButton": "Confirm Order and Start"
+      "confirmButton": "Confirm Order and Start",
+      "refused": {
+        "notFound": "This listing is no longer available.",
+        "ownListing": "You cannot order your own listing.",
+        "priceNotFixed": "This listing has no fixed price. Contact the seller to agree one."
+      }
     },
     "state": {
       "retry": "Try again",
