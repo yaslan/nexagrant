@@ -2057,5 +2057,119 @@
       "readiness_link": "Fon Hazırlık Karnesi ile eksiklerinizi çıkarın",
       "reset": "Yeniden cevapla"
     }
+  },
+  "Forbidden": {
+    "title": "Bu sayfaya erişiminiz yok",
+    "description": "Bu sayfa yalnız kalkınma ajansı hesaplarının üyelerine açıktır. Erişim gerektiğini düşünüyorsanız kurum yöneticinize başvurun.",
+    "backHome": "Ana Sayfaya Dön"
+  },
+  "agency": {
+    "title": "Ajans panosu",
+    "intro": "Davet kodunuzla kayıt olan kurumların ilerleyişini toplu sayılarla izleyin ve davet kodlarınızı yönetin. Kurumların adı, içeriği ve kişisel verileri bu panoda gösterilmez.",
+    "funnel": {
+      "title": "Bölge başvuru hunisi",
+      "description": "Seçilen dönemde kodunuzla kayıt olan kurumlar ve bu kurumların ulaştığı adımlar. Adım sayıları kurum sayısıdır; başvuru ve sonuç sayıları başvuru sayısıdır.",
+      "orgTypeLabel": "Kurum türü",
+      "allTypes": "Tüm kurum türleri",
+      "provinceLabel": "İl",
+      "allProvinces": "Tüm iller",
+      "provinceNotCollected": "İl bilgisi henüz toplanmıyor.",
+      "windowLabel": "Dönem",
+      "windowDays": "Son {days} gün",
+      "stepNumber": "Adım {n}",
+      "unmeasured": "Henüz ölçülmüyor",
+      "smallHint": "5'ten az kurum: kurumları tanıtmamak için sayı gösterilmez.",
+      "smallSr": "5'ten az; sayı gizlendi",
+      "privacyNote": "<5: Bu grupta 5'ten az değer var ya da sayı, başka bir sayıdan geri hesaplanabiliyor. Kurumları tanıtmamak için değer gizlenir.",
+      "steps": {
+        "registered": {
+          "title": "Davet koduyla kayıt",
+          "hint": "Kodla açılan kurum hesabı"
+        },
+        "readiness": {
+          "title": "Karne tamamlandı",
+          "hint": "Karne ile hesap henüz bağlı değil"
+        },
+        "savedSearch": {
+          "title": "Radar'da kayıtlı arama",
+          "hint": "En az 1 kayıtlı araması olan kurum"
+        },
+        "pipeline": {
+          "title": "Çağrı G0'a alındı",
+          "hint": "En az 1 çağrıyı pipeline'a alan kurum"
+        },
+        "conceptNote": {
+          "title": "Konsept not üretildi",
+          "hint": "En az 1 konsept notu olan kurum"
+        },
+        "submitted": {
+          "title": "Başvuru gönderildi",
+          "hint": "Kurumların beyan ettiği başvuru sayısı"
+        },
+        "accepted": {
+          "title": "Kabul edildi",
+          "hint": "Kabul beyan edilen başvuru sayısı"
+        },
+        "rejected": {
+          "title": "Reddedildi",
+          "hint": "Red beyan edilen başvuru sayısı"
+        }
+      }
+    },
+    "orgType": {
+      "MUNICIPALITY": "Belediye",
+      "PUBLIC": "Kamu kurumu",
+      "SME": "KOBİ",
+      "LARGE": "Büyük işletme",
+      "UNIVERSITY": "Üniversite",
+      "RESEARCH": "Araştırma kurumu",
+      "NGO": "Sivil toplum kuruluşu",
+      "CONSULTANCY": "Danışmanlık",
+      "CLUSTER": "Küme"
+    },
+    "codes": {
+      "title": "Davet kodları",
+      "description": "Kod ile kayıt olan her kurum ücretsiz bir Keşif hesabı açar ve ajansınıza bağlanır. Kodun kendisi yalnız üretildiğinde bir kez gösterilir.",
+      "maxUses": "Kullanım sayısı",
+      "expiresOn": "Son geçerlilik günü",
+      "label": "Etiket",
+      "optional": "(isteğe bağlı)",
+      "labelPlaceholder": "Örn. Samsun bilgilendirme günü",
+      "create": "Kod üret",
+      "creating": "Üretiliyor…",
+      "readOnly": "Kod üretmek ve iptal etmek için kurum yöneticisi yetkisi gerekir. Kodları görüntüleyebilirsiniz.",
+      "createdTitle": "Yeni davet kodu",
+      "createdOnce": "Bu kod yalnız şimdi gösterilir; sayfadan ayrılınca bir daha görüntülenemez. Kopyalayıp saklayın.",
+      "copyCode": "Kodu kopyala",
+      "copyLink": "Kayıt bağlantısını kopyala",
+      "hideCode": "Kodu gizle",
+      "copied": "Kopyalandı.",
+      "empty": "Henüz davet kodu yok. İlk kodu yukarıdaki formla üretin.",
+      "tableCaption": "Davet kodları: ipucu, etiket, kullanım, son tarih ve durum",
+      "colCode": "Kod",
+      "colLabel": "Etiket",
+      "colUsage": "Kullanım",
+      "colExpires": "Son geçerlilik",
+      "colStatus": "Durum",
+      "colActions": "İşlemler",
+      "hintSr": "{hint} ile biten kod",
+      "usage": "{used} / {max} kullanıldı · {left} kaldı",
+      "status": {
+        "active": "Etkin",
+        "revoked": "İptal edildi",
+        "expired": "Süresi doldu",
+        "exhausted": "Tükendi"
+      },
+      "revoke": "İptal et",
+      "revokeSr": "{hint} ile biten kodu iptal et",
+      "revokeConfirm": "{hint} ile biten kod iptal edilsin mi? İptal edilen kodla artık kayıt olunamaz; kayıtlı kurumlar etkilenmez.",
+      "errors": {
+        "forbidden": "Bu işlem için kurum yöneticisi yetkisi gerekir.",
+        "invalidMaxUses": "Kullanım sayısı 1 ile 10.000 arasında bir tam sayı olmalı.",
+        "invalidExpiry": "Son geçerlilik günü yarından sonra ve en fazla bir yıl sonra olmalı.",
+        "notAgency": "Bu hesap bir ajans hesabı değil.",
+        "failed": "İşlem tamamlanamadı. Lütfen tekrar deneyin."
+      }
+    }
   }
 }

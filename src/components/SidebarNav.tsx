@@ -20,7 +20,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false }: SidebarN
   // Read once into a local: `segments.length > 1` does not narrow a later index
   // read, and the slug was being computed from the same expression twice.
   const secondSegment = segments[1];
-  const workspaceSlug = (secondSegment !== undefined && !['admin', 'pricing', 'fiyatlandirma', 'register', 'kayit', 'login', 'giris', 'privacy', 'terms', 'dpa', 'acik-cagrilar', 'open-calls'].includes(secondSegment))
+  const workspaceSlug = (secondSegment !== undefined && !['admin', 'pricing', 'fiyatlandirma', 'register', 'kayit', 'login', 'giris', 'privacy', 'terms', 'dpa', 'acik-cagrilar', 'open-calls', 'ajans', 'agency'].includes(secondSegment))
     ? secondSegment
     : 'default';
 

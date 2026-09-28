@@ -1,0 +1,108 @@
+'use server';
+
+/**
+ * Invite-code actions of the agency dashboard, over B1's database half
+ * (src/lib/agency/codes.ts). Known refusals come back as result values, because
+ * a server action that throws reaches the browser as a generic error in
+ * production and the form could not say what was wrong.
+ */
+import { revalidatePath } from 'next/cache';
+import { withTenant } from '@/lib/db';
+import { asRole, can } from '@/lib/rbac';
+import { requireTenantAction } from '@/lib/tenant';
+import { AgencyInviteError, createInviteCodeIn, listInviteCodesIn, revokeInviteCodeIn } from '@/lib/agency/codes';
+
+/**
+ * Same rules as src/lib/agency/actions.ts (B1): create and revoke need
+ * `manage_users`, listing is open to the agency's members. That module cannot be
+ * imported from here: it exports an Error class, and a 'use server' module may
+ * export only async functions, so importing it fails the whole route at build.
+ */
+class AgencyPermissionError extends Error {}
+
+async function managerScope() {
+  const scope = await requireTenantAction();
+  if (!can(asRole(scope.role), 'manage_users')) throw new AgencyPermissionError();
+  return scope;
+}
+
+export type InviteActionError = 'forbidden' | 'invalidMaxUses' | 'invalidExpiry' | 'notAgency' | 'failed';
+
+function errorCode(e: unknown): InviteActionError {
+  if (e instanceof AgencyPermissionError) return 'forbidden';
+  if (e instanceof AgencyInviteError) {
+    if (e.code === 'INVALID_MAX_USES') return 'invalidMaxUses';
+    if (e.code === 'INVALID_EXPIRY') return 'invalidExpiry';
+    return 'notAgency';
+  }
+  return 'failed';
+}
+
+function revalidate() {
+  revalidatePath('/[locale]/ajans', 'page');
+  revalidatePath('/[locale]/agency', 'page');
+}
+
+export async function createInviteCode(input: {
+  maxUses: number;
+  /** yyyy-mm-dd; the code stays valid through the end of that day (UTC). */
+  expiresOn: string;
+  label: string;
+}): Promise<
+  | { ok: true; code: string; hint: string; maxUses: number; expiresAt: string }
+  | { ok: false; error: InviteActionError }
+> {
+  const expiresAt = /^\d{4}-\d{2}-\d{2}$/.test(input.expiresOn)
+    ? new Date(`${input.expiresOn}T23:59:59.000Z`)
+    : new Date(NaN);
+  try {
+    const scope = await managerScope();
+    const created = await withTenant(scope.tenantId, (tx) =>
+      createInviteCodeIn(tx, {
+        tenantId: scope.tenantId,
+        createdBy: scope.userId,
+        maxUses: input.maxUses,
+        expiresAt,
+        label: input.label.slice(0, 80),
+      })
+    );
+    revalidate();
+    return {
+      ok: true,
+      code: created.code,
+      hint: created.hint,
+      maxUses: created.maxUses,
+      expiresAt: created.expiresAt.toISOString(),
+    };
+  } catch (e) {
+    return { ok: false, error: errorCode(e) };
+  }
+}
+
+export async function revokeInviteCode(id: string): Promise<{ ok: true; revoked: boolean } | { ok: false; error: InviteActionError }> {
+  try {
+    const scope = await managerScope();
+    const revoked = await withTenant(scope.tenantId, (tx) =>
+      revokeInviteCodeIn(tx, { tenantId: scope.tenantId, id, revokedBy: scope.userId })
+    );
+    revalidate();
+    return { ok: true, revoked };
+  } catch (e) {
+    return { ok: false, error: errorCode(e) };
+  }
+}
+
+export async function listInviteCodes() {
+  const scope = await requireTenantAction();
+  const rows = await withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId));
+  return rows.map((c) => ({
+    id: c.id,
+    hint: c.hint,
+    label: c.label,
+    maxUses: c.maxUses,
+    usedCount: c.usedCount,
+    expiresAt: c.expiresAt.toISOString(),
+    revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
+    createdAt: c.createdAt.toISOString(),
+  }));
+}

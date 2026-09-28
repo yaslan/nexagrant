@@ -35,3 +35,4 @@ add-marketplace-order.sql
 add-agency-invite-code.sql
 drop-marketplace.sql
 fix-agency-invite-rejection-audit.sql
+add-agency-funnel.sql

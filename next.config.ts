@@ -27,6 +27,15 @@ function checkI18n() {
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  /**
+   * `forbidden()` (next/navigation) is still behind this flag in Next 16. It lets a
+   * page answer a signed-in user who may never see it with a real 403 instead of a
+   * 404 or a redirect — first used by the agency dashboard (TASK-MULRQSJFB8RWJ).
+   * The screen is src/app/forbidden.tsx.
+   */
+  experimental: {
+    authInterrupts: true,
+  },
   serverExternalPackages: ['pg', 'pdf-parse', 'inngest'],
   /**
    * Hosts `next/image` is allowed to optimise from.
