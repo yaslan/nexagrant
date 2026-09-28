@@ -57,28 +57,32 @@ export default function FitCheck({
           }
           return (
             <fieldset key={q} className="space-y-2">
-              <legend id={groupId} className="text-sm text-ink">
-                {t(`fit.${QUESTION_KEY[q]}`)}
-              </legend>
-              <div className="flex gap-2" role="radiogroup" aria-labelledby={groupId}>
+              <legend className="text-sm text-ink">{t(`fit.${QUESTION_KEY[q]}`)}</legend>
+              {/* Native radios (as in fon-hazirlik): one tab stop per group and
+                  arrow keys move the choice, which role="radio" buttons lacked. */}
+              <div className="flex gap-2">
                 {([true, false] as const).map((value) => {
                   const selected = answers[q] === value;
+                  const answer = `${q}-${value ? 'yes' : 'no'}`;
                   return (
-                    <button
-                      key={String(value)}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      data-answer={`${q}-${value ? 'yes' : 'no'}`}
-                      onClick={() => setAnswers((prev) => ({ ...prev, [q]: value }))}
-                      className={`rounded-md border px-4 py-1.5 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-accent ${
+                    <label
+                      key={answer}
+                      className={`cursor-pointer rounded-md border px-4 py-1.5 text-sm font-medium transition has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
                         selected
-                          ? 'border-accent bg-accent text-white'
+                          ? 'border-accent-strong bg-accent-strong text-white'
                           : 'border-border bg-surface text-ink hover:border-accent'
                       }`}
                     >
+                      <input
+                        type="radio"
+                        name={groupId}
+                        checked={selected}
+                        data-answer={answer}
+                        onChange={() => setAnswers((prev) => ({ ...prev, [q]: value }))}
+                        className="sr-only"
+                      />
                       {value ? t('fit.yes') : t('fit.no')}
-                    </button>
+                    </label>
                   );
                 })}
               </div>
@@ -86,20 +90,29 @@ export default function FitCheck({
           );
         })}
 
-        {result && (
-          <div
-            role="status"
-            data-verdict={result.verdict}
-            className={`rounded-md border p-3 text-sm ${
-              result.verdict === 'fit' ? 'border-ok/30 bg-ok/10' : 'border-amber/40 bg-amber/10'
-            }`}
-          >
-            {result.verdict === 'fit' ? (
+        {/* Mounted from the start and empty until every question is answered:
+            many screen readers skip a status region that is inserted together
+            with its text, so only the content inside changes. The link and the
+            reset button sit outside it so they are not read as part of the
+            announcement. */}
+        <div
+          data-verdict={result?.verdict}
+          className={
+            result
+              ? `rounded-md border p-3 text-sm ${
+                  result.verdict === 'fit' ? 'border-ok/30 bg-ok/10' : 'border-amber/40 bg-amber/10'
+                }`
+              : undefined
+          }
+        >
+          <div role="status">
+            {result?.verdict === 'fit' && (
               <>
                 <p className="font-bold text-ok">{t('fit.result_fit')}</p>
                 <p className="mt-1 text-ink">{t('fit.result_fit_detail')}</p>
               </>
-            ) : (
+            )}
+            {result && result.verdict !== 'fit' && (
               <>
                 <p className="font-bold text-ink">{t('fit.result_prepare')}</p>
                 <p className="mt-1 text-ink">{t('fit.result_prepare_detail')}</p>
@@ -108,14 +121,18 @@ export default function FitCheck({
                     <li key={g}>{t(`fit.gap.${g}`)}</li>
                   ))}
                 </ul>
-                <a
-                  href={readinessHref}
-                  className="mt-2 inline-block font-semibold text-accent-ink underline underline-offset-2"
-                >
-                  {t('fit.readiness_link')}
-                </a>
               </>
             )}
+          </div>
+          {result && result.verdict !== 'fit' && (
+            <a
+              href={readinessHref}
+              className="mt-2 inline-block font-semibold text-accent-ink underline underline-offset-2"
+            >
+              {t('fit.readiness_link')}
+            </a>
+          )}
+          {result && (
             <button
               type="button"
               onClick={() => setAnswers({})}
@@ -123,8 +140,8 @@ export default function FitCheck({
             >
               {t('fit.reset')}
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </details>
   );

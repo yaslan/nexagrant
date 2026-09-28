@@ -2027,7 +2027,7 @@
       "check_call": "Türkiye'nin katılımı çağrıya göre değişir"
     },
     "turkey_regions": "Uygun iller: {regions}",
-    "not_eligible_note": "Resmî ülke listesine göre Türk kurumları bu programda başvuru sahibi ya da ortak olamaz. Program AB'li ortaklarınızın projelerine katılım için yine de takip edilebilir.",
+    "not_eligible_note": "Resmî ülke listesine göre Türk kurumları bu programda başvuru sahibi ya da fonlanan ortak olamaz. AB'li ortakların projelerinde fonsuz/ilişkili ortak olarak yer almak mümkün olabilir; program rehberini kontrol edin.",
     "deadline_official": "Son tarih ({tz})",
     "deadline_local": "Sizin saatinizle",
     "deadline_none": "Kayıtlı değil",

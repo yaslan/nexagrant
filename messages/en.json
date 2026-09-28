@@ -2027,7 +2027,7 @@
       "check_call": "Türkiye's participation depends on the call"
     },
     "turkey_regions": "Eligible provinces: {regions}",
-    "not_eligible_note": "According to the official country list, Turkish organisations cannot be applicants or partners in this programme. It is still worth following for joining your EU partners' projects.",
+    "not_eligible_note": "According to the official country list, Turkish organisations cannot be applicants or funded partners in this programme. Taking part in EU partners' projects as an unfunded or associated partner may be possible; check the programme guide.",
     "deadline_official": "Deadline ({tz})",
     "deadline_local": "Your time",
     "deadline_none": "Not recorded",

@@ -287,7 +287,7 @@ export default async function BelediyeCagrilariPage({
                 aria-current={o === orgType ? 'page' : undefined}
                 className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                   o === orgType
-                    ? 'border-accent bg-accent text-white'
+                    ? 'border-accent-strong bg-accent-strong text-white'
                     : 'border-border bg-surface text-ink hover:border-accent'
                 }`}
               >
