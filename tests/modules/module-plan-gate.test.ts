@@ -135,7 +135,7 @@ describe('checkModuleAccess — plan entitlement and module status together', ()
 
     await checkModuleAccess('M8');
 
-    expect(h.getEntitlements).toHaveBeenCalledWith('tenant-1');
+    expect(h.getEntitlements).toHaveBeenCalledWith('tenant-1', expect.any(Object));
     expect(h.moduleStateFindUnique).toHaveBeenCalledWith({
       where: { tenantId_moduleId: { tenantId: 'tenant-1', moduleId: 'M8' } },
       select: { status: true },

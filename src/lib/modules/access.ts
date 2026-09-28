@@ -91,7 +91,9 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
         select: { status: true },
       })
     ),
-    getEntitlements(scope.tenantId),
+    withTenant(scope.tenantId, (tx) =>
+      getEntitlements(scope.tenantId, tx)
+    ),
   ]);
 
   const status = (state?.status ?? 'OFF') as ModuleStatus;

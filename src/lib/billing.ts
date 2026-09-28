@@ -1,4 +1,4 @@
-import { prisma } from './db';
+import { prisma, type TenantTx } from './db';
 import { logger } from './logger';
 import {
   CATALOG_CURRENCY,
@@ -77,8 +77,9 @@ export interface Entitlements {
  * replacement (`team` → `pro`) instead of throwing, so a row the migration did
  * not reach is served rather than locked out.
  */
-export async function getEntitlements(tenantId: string): Promise<Entitlements> {
-  const tenant = await prisma.tenant.findUnique({
+export async function getEntitlements(tenantId: string, client?: TenantTx): Promise<Entitlements> {
+  const db = client ?? prisma;
+  const tenant = await db.tenant.findUnique({
     where: { id: tenantId },
     include: {
       subscription: {
@@ -142,7 +143,7 @@ export async function getEntitlements(tenantId: string): Promise<Entitlements> {
     
     if (activeAddOns.length > 0) {
       const addOnSkus = activeAddOns.map((a) => a.sku);
-      const catalog: AddOnCatalogRow[] = await prisma.addOnCatalog.findMany({
+      const catalog: AddOnCatalogRow[] = await db.addOnCatalog.findMany({
         where: { sku: { in: addOnSkus } }
       });
       const catalogMap = new Map(catalog.map((c) => [c.sku, c]));
