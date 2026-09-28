@@ -5,5 +5,12 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
   const { assertAuthSecretConfigured } = await import('./lib/auth-secret');
-  assertAuthSecretConfigured();
+  try {
+    assertAuthSecretConfigured();
+  } catch (error) {
+    // Throwing here only logs: Next keeps listening and answers every request
+    // with a 500, which a port health check reads as a running server. Exit.
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
 }
