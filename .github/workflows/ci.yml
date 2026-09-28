@@ -9,6 +9,10 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # Job-wide so the DB preparation, the vitest suites that hit Postgres and
+    # the e2e run all reach the same service container.
+    env:
+      DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -26,22 +30,26 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    # No `version:` here: action-setup reads `packageManager` from package.json,
+    # so CI runs the same pnpm as a developer. A pinned `version: 9` could not
+    # parse pnpm-workspace.yaml (no `packages:` field) and failed the cache step.
     - name: Install pnpm
-      uses: pnpm/action-setup@v3
-      with:
-        version: 9
-        
+      uses: pnpm/action-setup@v4
+
+    # pnpm 11 requires Node >= 22.13; on Node 20 it cannot start.
     - name: Use Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: 22
         cache: 'pnpm'
         
     - name: Install dependencies
       run: pnpm install
       
+    # `pnpm exec`, not `pnpm dlx`: dlx downloads the newest prisma from the
+    # registry instead of the pinned one, and prisma 8+ has no `validate`.
     - name: Validate Prisma schema
-      run: pnpm dlx prisma validate
+      run: pnpm exec prisma validate
 
     # `prisma generate` writes into node_modules only, so a fresh checkout has no
     # client and `@prisma/client` resolves to src/types/prisma-override.d.ts,
@@ -50,6 +58,17 @@ jobs:
     # instead of `unknown`. It needs no database and no DATABASE_URL.
     - name: Generate Prisma client
       run: pnpm db:generate
+
+    # The README setup (`db:migrate && db:rls && db:seed`) for a throwaway CI
+    # database: `db push` builds the schema from schema.prisma without the
+    # interactive `migrate dev`, `db:rls` installs the tenant policies and the
+    # system-scope functions, and the seed adds the demo tenant and the module
+    # catalogue that the database-backed tests read.
+    - name: Prepare database
+      run: |
+        pnpm exec prisma db push
+        pnpm db:rls
+        pnpm db:seed
 
     - name: Lint
       run: pnpm lint
@@ -60,14 +79,14 @@ jobs:
     - name: Test
       run: pnpm test
 
+    # Same reason: the browsers must match the pinned @playwright/test.
     - name: Install Playwright browsers
-      run: pnpm dlx playwright install --with-deps
+      run: pnpm exec playwright install --with-deps
 
     - name: E2E Test
       run: pnpm test:e2e
       env:
         CI: 'true'
-        DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
         INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.'
         INVOICE_SUPPLIER_VKN: '1000000000'
         INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD'

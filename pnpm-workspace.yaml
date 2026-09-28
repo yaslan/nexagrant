@@ -3,6 +3,9 @@ allowBuilds:
   '@prisma/engines': true
   '@swc/core': true
   prisma: true
-  protobufjs: set this to true or false
+  # protobufjs (transitive: inngest > @opentelemetry/sdk-node > @grpc/proto-loader)
+  # has a postinstall that only prints a version-scheme warning for packages that
+  # depend on protobufjs directly. We do not, so the script has nothing to do.
+  protobufjs: false
   sharp: false
   unrs-resolver: false
