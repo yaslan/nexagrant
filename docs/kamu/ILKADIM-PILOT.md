@@ -112,9 +112,9 @@ Belediyenin bizi ihalesiz alabilmesi için tutarın 4734 sayılı Kanun md. 22/d
 
 Güncelleme oranı 2025 Aralık Yİ-ÜFE yıllık değişimi olan %27,67'dir [K2]. İlkadım, Samsun Büyükşehir sınırları içindedir; üst satır geçerlidir. **Dikkat:** OKA bölgesinde Tokat, Çorum ve Amasya belediyeleri için hangi satırın geçerli olduğu her kurum için ayrıca kontrol edilir (büyükşehir statüsü olmayan illerde alt satır geçerlidir). Sınırlar her yıl 1 Şubat'ta güncellenir; teklif tarihi 31.01.2027'den sonraysa yeni tebliğ okunur.
 
-### 6.2 Önerilen paketler (patron kararı bekler)
+### 6.2 Kamu paketleri (patron onaylı, 29.09.2026)
 
-Aşağıdaki TL tutarları bir **öneridir**, olgu değildir. Amaç: KDV dahil tutar bile en düşük sınırın altında kalsın. Böylece "sınır KDV hariç mi dahil mi" sorusu (açık soru S1) sonucu değiştirmez.
+Aşağıdaki TL tutarları patron tarafından 29.09.2026'da **onaylandı** (plan tanımı: B11 kartı). Belediye Kurum paketi KDV dahil 576.000 TL ile büyükşehir dışı idarelerin 22/d sınırının üstünde kalır; bu idareler için doğrudan temin yerine ihale ya da daha küçük paket gerekir. Amaç: KDV dahil tutar bile en düşük sınırın altında kalsın. Böylece "sınır KDV hariç mi dahil mi" sorusu (açık soru S1) sonucu değiştirmez.
 
 | Paket              | İçerik                                                             | Yıllık (KDV hariç) | KDV dahil (%20)\* | 340.391 TL sınırı | 1.021.827 TL sınırı |
 | ------------------ | ------------------------------------------------------------------ | ------------------ | ----------------- | ----------------- | ------------------- |
