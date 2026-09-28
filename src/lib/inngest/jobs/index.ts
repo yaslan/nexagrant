@@ -7,3 +7,4 @@ export { m4WeeklySummary } from './m4-weekly-summary';
 export { usersScheduledDeletion } from './users-scheduled-deletion';
 export { feedbackWeeklyDigest } from './feedback-weekly-digest';
 export { alertsSweep } from './alerts-sweep';
+export { stripeEventCleanup } from './stripe-event-cleanup';
