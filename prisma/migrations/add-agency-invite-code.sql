@@ -69,12 +69,26 @@ CREATE TABLE IF NOT EXISTS "AgencyInviteCode" (
   "createdBy" TEXT NOT NULL,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  CONSTRAINT "AgencyInviteCode_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "AgencyInviteCode_maxUses_positive" CHECK ("maxUses" > 0),
+  CONSTRAINT "AgencyInviteCode_pkey" PRIMARY KEY ("id")
+);
+
+-- The CHECKs stand apart from CREATE TABLE (TASK-MULU7SAA4EPP8): where
+-- `prisma db push` built the table first, which is how CI and a README setup
+-- start, CREATE TABLE IF NOT EXISTS is skipped and inline CHECKs never land.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AgencyInviteCode_maxUses_positive'
+                   AND conrelid = '"AgencyInviteCode"'::regclass) THEN
+    ALTER TABLE "AgencyInviteCode" ADD CONSTRAINT "AgencyInviteCode_maxUses_positive" CHECK ("maxUses" > 0);
+  END IF;
   -- Second line behind redeem_agency_invite()'s WHERE clause: even a writer
   -- that bypasses the function cannot push the counter past the limit.
-  CONSTRAINT "AgencyInviteCode_usedCount_bounds" CHECK ("usedCount" >= 0 AND "usedCount" <= "maxUses")
-);
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AgencyInviteCode_usedCount_bounds'
+                   AND conrelid = '"AgencyInviteCode"'::regclass) THEN
+    ALTER TABLE "AgencyInviteCode" ADD CONSTRAINT "AgencyInviteCode_usedCount_bounds"
+      CHECK ("usedCount" >= 0 AND "usedCount" <= "maxUses");
+  END IF;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "AgencyInviteCode_codeHash_key" ON "AgencyInviteCode" ("codeHash");
 CREATE INDEX IF NOT EXISTS "AgencyInviteCode_tenantId_createdAt_idx" ON "AgencyInviteCode" ("tenantId", "createdAt");

@@ -41,10 +41,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS "DualApprovalStep_followupDocId_actorUserId_ke
 CREATE INDEX IF NOT EXISTS "DualApprovalStep_tenantId_followupDocId_idx"
     ON "DualApprovalStep"("tenantId", "followupDocId");
 
-ALTER TABLE "DualApprovalStep"
-  ADD CONSTRAINT "DualApprovalStep_followupDocId_fkey"
-  FOREIGN KEY ("followupDocId") REFERENCES "FollowupDoc"("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
+-- ADD CONSTRAINT has no IF NOT EXISTS, hence the guard (TASK-MULU7SAA4EPP8):
+-- without it a second run, or a run after `prisma db push`, fails here.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conname = 'DualApprovalStep_followupDocId_fkey'
+                   AND conrelid = '"DualApprovalStep"'::regclass) THEN
+    ALTER TABLE "DualApprovalStep"
+      ADD CONSTRAINT "DualApprovalStep_followupDocId_fkey"
+      FOREIGN KEY ("followupDocId") REFERENCES "FollowupDoc"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
 -- Tenant isolation. prisma/rls.sql is the source of truth and re-creates this
 -- policy on every `pnpm db:rls`; it is stated here too so a database built from

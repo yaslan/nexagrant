@@ -1,6 +1,9 @@
 -- CalendarConnection: tenant-scoped calendar provider tokens and sync state
+--
+-- Idempotent (TASK-MULU7SAA4EPP8): re-running this file, or running it on a
+-- database whose table `prisma db push` already built, is a no-op.
 
-CREATE TABLE "CalendarConnection" (
+CREATE TABLE IF NOT EXISTS "CalendarConnection" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "tenantId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -17,8 +20,8 @@ CREATE TABLE "CalendarConnection" (
     UNIQUE("tenantId", "userId", "provider")
 );
 
-CREATE INDEX "CalendarConnection_tenantId" ON "CalendarConnection"("tenantId");
-CREATE INDEX "CalendarConnection_userId" ON "CalendarConnection"("userId");
+CREATE INDEX IF NOT EXISTS "CalendarConnection_tenantId" ON "CalendarConnection"("tenantId");
+CREATE INDEX IF NOT EXISTS "CalendarConnection_userId" ON "CalendarConnection"("userId");
 
 -- RLS policy: users see only their own connections within their tenant
 ALTER TABLE "CalendarConnection" ENABLE ROW LEVEL SECURITY;

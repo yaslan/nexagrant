@@ -63,7 +63,14 @@ CREATE INDEX IF NOT EXISTS "Feedback_createdAt_idx"                   ON "Feedba
 
 COMMENT ON COLUMN "Feedback"."autoPriority"  IS 'What the triage rules decided. Kept when a human overrides priority, so rule accuracy is measurable.';
 COMMENT ON COLUMN "Feedback"."triageReason"  IS 'Which rule fired (e.g. impact:BLOCKER, keyword:data-loss). Auditability for the P0-P3 verdict.';
-COMMENT ON COLUMN "Feedback"."sentryStatus"  IS 'sent | skipped (no DSN) | failed. The DB row is the record of truth either way.';
+-- rename-feedback-alert-columns.sql later renames this column to "alertStatus",
+-- so on a second run it is gone and an unguarded COMMENT fails the file.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = current_schema() AND table_name = 'Feedback' AND column_name = 'sentryStatus') THEN
+    COMMENT ON COLUMN "Feedback"."sentryStatus" IS 'sent | skipped (no DSN) | failed. The DB row is the record of truth either way.';
+  END IF;
+END $$;
 COMMENT ON COLUMN "Feedback"."screenshotKey" IS 'R2 object key. Never a public URL — the download URL is signed on demand.';
 
 -- Tenant isolation. Same shape as every other tenant-scoped table in

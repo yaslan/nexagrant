@@ -41,9 +41,14 @@ CREATE TABLE IF NOT EXISTS "MarketplaceOrder" (
   CONSTRAINT "MarketplaceOrder_pkey" PRIMARY KEY ("id")
 );
 
+-- "MarketplaceListing" came from schema.prisma, never from a migration, and left
+-- it with ADR-0005. On a database built from today's schema it does not exist,
+-- so the key is added only where the table is (TASK-MULU7SAA4EPP8). Nothing is
+-- lost: drop-marketplace.sql, later in prisma/migrations/apply-order.txt, drops
+-- this table again.
 DO $$
 BEGIN
-  IF NOT EXISTS (
+  IF to_regclass('"MarketplaceListing"') IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'MarketplaceOrder_listingId_fkey'
   ) THEN
     ALTER TABLE "MarketplaceOrder"
