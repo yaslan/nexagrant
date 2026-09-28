@@ -4,13 +4,13 @@ Repo `/Users/macbook/alan/FONBRIDGE`, dal `dev`, inceleme anında HEAD `91f4752a
 
 ## Karar özeti
 
-| Kart                                                  | Karar                                                                                                                        | B   | Ö   | K   |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --- | --- | --- |
-| (1) TASK-MULSCEK4JHK8X — DEMO_LOGIN_ENABLED (be-fb)   | **DÜZELTME GEREKLİ.** Bayrak `NODE_ENV=test` ile üretim derlemesinde atlatılıyor (Ö-1). Admin claim'i token'da kalıcı (Ö-2). | 0   | 2   | 2   |
-| (2) TASK-MULRTOTG9IKIM — imza anahtarı (se-fb)        | **ONAY.** Ö-4 ve K-9 kapandı.                                                                                                | 0   | 0   | 3   |
-| (3) TASK-MULRQJQYM0NAM — B1 davet kodu (be-fb)        | **ONAY.** Onayın üç koşulu da sağlanmış ve kendi SQL denememle doğrulandı.                                                   | 0   | 0   | 4   |
+| Kart                                                    | Karar                                                                                                                        | B   | Ö   | K   |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --- | --- | --- |
+| (1) TASK-MULSCEK4JHK8X — DEMO_LOGIN_ENABLED (be-fb)     | **DÜZELTME GEREKLİ.** Bayrak `NODE_ENV=test` ile üretim derlemesinde atlatılıyor (Ö-1). Admin claim'i token'da kalıcı (Ö-2). | 0   | 2   | 2   |
+| (2) TASK-MULRTOTG9IKIM — imza anahtarı (se-fb)          | **ONAY.** Ö-4 ve K-9 kapandı.                                                                                                | 0   | 0   | 3   |
+| (3) TASK-MULRQJQYM0NAM — B1 davet kodu (be-fb)          | **ONAY.** Onayın üç koşulu da sağlanmış ve kendi SQL denememle doğrulandı.                                                   | 0   | 0   | 4   |
 | (4) TASK-MULSMUB1XU9 — B1 canlı test yardımcısı (fe-fb) | **ONAY.** Ö-3 için takip kartı açılmalı: CI migration'ı uygulamıyor, test orada boş yere yeşil.                              | 0   | 1   | 1   |
-| (5) TASK-MULSEGTKZ7O7D — pazar yeri kaldırma (fe-fb)  | **ONAY**                                                                                                                     | 0   | 0   | 2   |
+| (5) TASK-MULSEGTKZ7O7D — pazar yeri kaldırma (fe-fb)    | **ONAY**                                                                                                                     | 0   | 0   | 2   |
 
 Bloklayan (B) bulgu yok. Ürün düzeyinde bir engel var, kod kusuru değil: bayrak kapalıyken davet koduyla kayıt tamamen kapalı. Yani B1 üretimde çalışmıyor (be-fb raporu §4, patron kararı bekliyor).
 
