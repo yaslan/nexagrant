@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   encryptCalendarToken,
   decryptCalendarToken,
@@ -7,6 +7,18 @@ import {
 } from '../encryption';
 import { ENVELOPE_PREFIX, isEnvelopedToken } from '../token-envelope';
 import { CalendarEncryptionNotConfiguredError } from '../errors';
+
+/**
+ * `@/lib/env` parses `process.env` once, at import, and `resolveEncryptionKey`
+ * consults it before `process.env`. With a real CALENDAR_ENCRYPTION_KEY in the
+ * loaded .env, that frozen value won over anything a test set, so these tests
+ * passed or failed depending on the shell. Blanking it here leaves
+ * `process.env` — which each test sets with `vi.stubEnv` — as the only source.
+ */
+vi.mock('@/lib/env', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/env')>();
+  return { ...actual, env: { ...actual.env, CALENDAR_ENCRYPTION_KEY: undefined } };
+});
 
 const SAMPLE_HEX_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const SAMPLE_PASSPHRASE = 'fabrika-super-secret-calendar-passphrase-2026';
@@ -28,6 +40,14 @@ function envelopeParts(payload: string): { iv: string; tag: string; cipher: stri
 }
 
 describe('Calendar token AES-256-GCM encryption', () => {
+  beforeEach(() => {
+    vi.stubEnv('CALENDAR_ENCRYPTION_KEY', undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   describe('key resolution', () => {
     it('resolves 64-char hex key to 32 bytes', () => {
       const key = resolveEncryptionKey(SAMPLE_HEX_KEY);
@@ -47,16 +67,11 @@ describe('Calendar token AES-256-GCM encryption', () => {
     });
 
     it('reports whether calendar encryption key is configured', () => {
-      const orig = process.env.CALENDAR_ENCRYPTION_KEY;
-      try {
-        process.env.CALENDAR_ENCRYPTION_KEY = SAMPLE_HEX_KEY;
-        expect(hasCalendarEncryptionKey()).toBe(true);
+      vi.stubEnv('CALENDAR_ENCRYPTION_KEY', SAMPLE_HEX_KEY);
+      expect(hasCalendarEncryptionKey()).toBe(true);
 
-        delete process.env.CALENDAR_ENCRYPTION_KEY;
-        expect(hasCalendarEncryptionKey()).toBe(false);
-      } finally {
-        if (orig) process.env.CALENDAR_ENCRYPTION_KEY = orig;
-      }
+      vi.stubEnv('CALENDAR_ENCRYPTION_KEY', undefined);
+      expect(hasCalendarEncryptionKey()).toBe(false);
     });
   });
 
@@ -106,23 +121,17 @@ describe('Calendar token AES-256-GCM encryption', () => {
 
   describe('missing key behavior (503 pattern)', () => {
     it('throws CalendarEncryptionNotConfiguredError (503) when key is unset on encrypt', () => {
-      const origKey = process.env.CALENDAR_ENCRYPTION_KEY;
+      expect(() => encryptCalendarToken(SAMPLE_TOKEN, '')).toThrow(
+        CalendarEncryptionNotConfiguredError
+      );
       try {
-        delete process.env.CALENDAR_ENCRYPTION_KEY;
-        expect(() => encryptCalendarToken(SAMPLE_TOKEN, '')).toThrow(
-          CalendarEncryptionNotConfiguredError
+        encryptCalendarToken(SAMPLE_TOKEN, '');
+      } catch (err) {
+        expect(err).toBeInstanceOf(CalendarEncryptionNotConfiguredError);
+        expect((err as CalendarEncryptionNotConfiguredError).status).toBe(503);
+        expect((err as CalendarEncryptionNotConfiguredError).code).toBe(
+          'CALENDAR_ENCRYPTION_NOT_CONFIGURED'
         );
-        try {
-          encryptCalendarToken(SAMPLE_TOKEN, '');
-        } catch (err) {
-          expect(err).toBeInstanceOf(CalendarEncryptionNotConfiguredError);
-          expect((err as CalendarEncryptionNotConfiguredError).status).toBe(503);
-          expect((err as CalendarEncryptionNotConfiguredError).code).toBe(
-            'CALENDAR_ENCRYPTION_NOT_CONFIGURED'
-          );
-        }
-      } finally {
-        if (origKey) process.env.CALENDAR_ENCRYPTION_KEY = origKey;
       }
     });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import {
   syncMeetingBriefToCalendar,
   saveCalendarConnectionTokens,
@@ -19,6 +19,16 @@ vi.mock('@/lib/observability/system-alert', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/observability/system-alert')>()),
   recordAlert,
 }));
+
+/**
+ * `@/lib/env` freezes `process.env` at import and the key resolver reads it
+ * first, so a CALENDAR_ENCRYPTION_KEY from a loaded .env overrode the key these
+ * tests set. Blank it so `vi.stubEnv` below is the only source of the key.
+ */
+vi.mock('@/lib/env', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/env')>();
+  return { ...actual, env: { ...actual.env, CALENDAR_ENCRYPTION_KEY: undefined } };
+});
 
 /** Closed port: Prisma validates arguments before it uses the connection. */
 const UNREACHABLE_DB = 'postgresql://nobody:nobody@127.0.0.1:1/does-not-exist';
@@ -243,8 +253,15 @@ describe('syncMeetingBriefToCalendar', () => {
   describe('token encryption read & write paths', () => {
     const testKey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
+    beforeEach(() => {
+      vi.stubEnv('CALENDAR_ENCRYPTION_KEY', testKey);
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     it('saveCalendarConnectionTokens encrypts tokens before updating DB', async () => {
-      process.env.CALENDAR_ENCRYPTION_KEY = testKey;
       mockTx.calendarConnection.update.mockResolvedValue({});
 
       await saveCalendarConnectionTokens(asTx(), 'conn:1', {
@@ -262,7 +279,6 @@ describe('syncMeetingBriefToCalendar', () => {
     });
 
     it('getDecryptedCalendarTokens decrypts encrypted tokens correctly', () => {
-      process.env.CALENDAR_ENCRYPTION_KEY = testKey;
       const encryptedAccess = encryptCalendarToken('secret-token-abc', testKey);
       const encryptedRefresh = encryptCalendarToken('secret-refresh-xyz', testKey);
 
@@ -276,7 +292,6 @@ describe('syncMeetingBriefToCalendar', () => {
     });
 
     it('syncMeetingBriefToCalendar decrypts encrypted connection tokens on read', async () => {
-      process.env.CALENDAR_ENCRYPTION_KEY = testKey;
       const encryptedAccess = encryptCalendarToken('access-token-live', testKey);
 
       mockTx.calendarConnection.findMany.mockResolvedValue([
