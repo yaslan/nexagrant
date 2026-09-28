@@ -75,10 +75,25 @@ jobs:
     # Created after `db:rls`, the role gets "permission denied for function
     # enter_system_scope" and the live RLS suites fail. Without the role at all
     # they fail with "refusing to skip in CI" (tests/helpers/live-db-role.ts).
+    #
+    # scripts/apply-migrations.sh then applies prisma/migrations in the order
+    # listed in apply-order.txt (TASK-MULU7SAA4EPP8). `db push` builds only what
+    # schema.prisma describes; SECURITY DEFINER functions (redeem_agency_invite),
+    # CHECK constraints and the per-file policies live only in the migrations,
+    # and without them tests/agency-invite.live.test.ts had nothing to measure.
+    # It runs after `db push`, not instead of it: the migrations never create
+    # the base tables (Tenant, User, …). After `db:rls-role`, so their
+    # `GRANT … TO fabrika_app` guards find the role. Twice, because re-running
+    # is how production applies them (docs/RELEASE_CHECKLIST.md §1) and the
+    # second pass is the idempotency check; either pass failing fails the job.
+    # psql comes preinstalled on ubuntu-latest.
     - name: Prepare database
       run: |
         pnpm exec prisma db push
         pnpm db:rls-role
+        psql --version
+        scripts/apply-migrations.sh
+        scripts/apply-migrations.sh
         pnpm db:rls
         pnpm db:seed
 
