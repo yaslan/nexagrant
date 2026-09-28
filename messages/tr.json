@@ -1843,5 +1843,78 @@
     "tryEquivalentUnrecorded": "TL karşılığı (kayıtlı tutar yok)",
     "footerFiled": "İşbu fatura 213 sayılı Vergi Usul Kanunu ve Gelir İdaresi Başkanlığı e-Fatura mevzuatına uygun olarak elektronik ortamda düzenlenmiş ve GİB'e iletilmiştir. Zarf No: {envelope}",
     "linePeriodFallback": "{brand} abonelik dönemi"
+  },
+  "publicSectorCalls": {
+    "meta_title": "Belediye Çağrı Radarı — Belediyelere Uygun AB Hibe Çağrıları",
+    "meta_description": "Türk belediyelerinin ve kamu kurumlarının girebileceği AB ve ulusal hibe çağrıları: son tarih, zorluk, eş finansman ve 3 soruluk uygunluk testi.",
+    "badge": "Belediye çağrı radarı",
+    "title": "Belediyeniz hangi çağrıya girebilir?",
+    "intro": "Funding & Tenders portalından her gün toplanan çağrılar içinden belediyelere ve kamu kurumlarına uygun olanları seçtik. Her kartta son tarih, zorluk ve eş finansman oranı var; \"Size uygun mu?\" kutusundaki 3 soruyla kendi durumunuzu hemen görebilirsiniz.",
+    "org_type_label": "Kurum türü",
+    "org_type": {
+      "municipality": "Belediye",
+      "metropolitan": "Büyükşehir belediyesi",
+      "development_agency": "Kalkınma ajansı",
+      "union_of_municipalities": "Belediyeler birliği"
+    },
+    "section_open": "Açık ve yakında açılacak çağrılar ({count})",
+    "section_closed": "Son turu yeni kapanan çağrılar",
+    "section_closed_hint": "Bu programlar her yıl yeniden çağrı açar. Son tarihi son {days} gün içinde geçen turları burada gösteriyoruz; bir sonraki tura şimdiden hazırlanabilirsiniz.",
+    "closed_group": "{count} konu, son tarih {date}",
+    "section_catalog": "Portalda olmayan programlar",
+    "section_catalog_hint": "Bu programların çağrıları Funding & Tenders portalında yayımlanmaz; resmî sitelerini takip edin.",
+    "phase": {
+      "open": "Açık",
+      "forthcoming": "Yakında",
+      "recently_closed": "Kapandı"
+    },
+    "difficulty_label": "Zorluk",
+    "difficulty": {
+      "1": "Kolay giriş",
+      "2": "Orta",
+      "3": "Deneyim ister"
+    },
+    "cofinancing_pct": "Eş finansman: %{pct}",
+    "cofinancing_none": "Eş finansman yok (%100'e kadar destek)",
+    "cofinancing_unknown": "Eş finansman: çağrı belgesine bakın",
+    "grant_range": "Tipik hibe: {min} – {max}",
+    "grant_min": "Tipik hibe: en az {min}",
+    "turkey": {
+      "eligible": "Türkiye katılabilir",
+      "partial": "Türkiye kısmen katılabilir",
+      "not_eligible": "Türkiye bu programa katılmıyor",
+      "check_call": "Türkiye'nin katılımı çağrıya göre değişir"
+    },
+    "turkey_regions": "Uygun iller: {regions}",
+    "not_eligible_note": "Resmî ülke listesine göre Türk kurumları bu programda başvuru sahibi ya da ortak olamaz. Program AB'li ortaklarınızın projelerine katılım için yine de takip edilebilir.",
+    "deadline_official": "Son tarih ({tz})",
+    "deadline_local": "Sizin saatinizle",
+    "deadline_none": "Kayıtlı değil",
+    "view_call": "Çağrıyı portalda aç",
+    "official_site": "Resmî site",
+    "source": "Kaynak",
+    "empty_title": "Bu kurum türü için şu anda listelenecek çağrı yok.",
+    "empty_hint": "Liste her gün güncellenir. Aşağıdaki portal dışı programlara da göz atın.",
+    "disclaimer": "Bu sayfa bir iç ön değerlendirmedir, resmî uygunluk kararı değildir. Başvurmadan önce çağrı belgesini okuyun.",
+    "fit": {
+      "summary": "Size uygun mu? 3 soru",
+      "q_pic": "Kurumunuzun Funding & Tenders portalında PIC numarası var mı?",
+      "q_partner": "Bu proje için en az bir ortak kurumunuz hazır mı?",
+      "q_cofinancing": "Kendi bütçenizden eş finansman ayırabilir misiniz?",
+      "yes": "Evet",
+      "no": "Hayır",
+      "not_needed": "Bu program için gerekli değil",
+      "result_fit": "Uygun",
+      "result_fit_detail": "Bu çağrının temel ön koşullarını karşılıyorsunuz. Sıradaki adım çağrı belgesini okumak.",
+      "result_prepare": "Hazırlık gerekli",
+      "result_prepare_detail": "Başvurmadan önce şunları tamamlamanız gerekiyor:",
+      "gap": {
+        "pic": "PIC kaydı (Funding & Tenders portalı, Participant Register)",
+        "partner": "Ortak bulma",
+        "cofinancing": "Eş finansman için bütçe ayırma"
+      },
+      "readiness_link": "Fon Hazırlık Karnesi ile eksiklerinizi çıkarın",
+      "reset": "Yeniden cevapla"
+    }
   }
 }

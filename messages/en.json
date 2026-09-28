@@ -1843,5 +1843,78 @@
     "tryEquivalentUnrecorded": "Lira equivalent (no recorded amount)",
     "footerFiled": "This invoice was issued electronically in accordance with Tax Procedure Law no. 213 (Vergi Usul Kanunu) and the e-invoice legislation of the Turkish Revenue Administration (Gelir İdaresi Başkanlığı), and submitted to GİB. Envelope no: {envelope}",
     "linePeriodFallback": "{brand} subscription period"
+  },
+  "publicSectorCalls": {
+    "meta_title": "Municipal Call Radar — EU Grant Calls for Municipalities",
+    "meta_description": "EU and national grant calls Turkish municipalities and public bodies can enter: deadline, difficulty, co-financing and a 3-question fit check.",
+    "badge": "Municipal call radar",
+    "title": "Which calls can your municipality enter?",
+    "intro": "From the calls collected daily from the Funding & Tenders portal, we picked those suited to municipalities and public bodies. Each card shows the deadline, difficulty and co-financing rate; the 3 questions in the \"Is it a fit?\" box show where you stand.",
+    "org_type_label": "Organisation type",
+    "org_type": {
+      "municipality": "Municipality",
+      "metropolitan": "Metropolitan municipality",
+      "development_agency": "Development agency",
+      "union_of_municipalities": "Union of municipalities"
+    },
+    "section_open": "Open and upcoming calls ({count})",
+    "section_closed": "Calls whose last round just closed",
+    "section_closed_hint": "These programmes open a new call every year. Rounds whose deadline passed in the last {days} days are shown here so you can prepare for the next one.",
+    "closed_group": "{count, plural, one {# topic} other {# topics}}, deadline {date}",
+    "section_catalog": "Programmes not on the portal",
+    "section_catalog_hint": "These programmes do not publish on the Funding & Tenders portal; follow their official sites.",
+    "phase": {
+      "open": "Open",
+      "forthcoming": "Upcoming",
+      "recently_closed": "Closed"
+    },
+    "difficulty_label": "Difficulty",
+    "difficulty": {
+      "1": "Easy entry",
+      "2": "Medium",
+      "3": "Needs experience"
+    },
+    "cofinancing_pct": "Co-financing: {pct}%",
+    "cofinancing_none": "No co-financing (up to 100% funded)",
+    "cofinancing_unknown": "Co-financing: see the call document",
+    "grant_range": "Typical grant: {min} – {max}",
+    "grant_min": "Typical grant: at least {min}",
+    "turkey": {
+      "eligible": "Türkiye can take part",
+      "partial": "Türkiye can partly take part",
+      "not_eligible": "Türkiye does not take part in this programme",
+      "check_call": "Türkiye's participation depends on the call"
+    },
+    "turkey_regions": "Eligible provinces: {regions}",
+    "not_eligible_note": "According to the official country list, Turkish organisations cannot be applicants or partners in this programme. It is still worth following for joining your EU partners' projects.",
+    "deadline_official": "Deadline ({tz})",
+    "deadline_local": "Your time",
+    "deadline_none": "Not recorded",
+    "view_call": "Open the call on the portal",
+    "official_site": "Official site",
+    "source": "Source",
+    "empty_title": "No calls to list for this organisation type right now.",
+    "empty_hint": "The list is refreshed daily. Also look at the off-portal programmes below.",
+    "disclaimer": "This page is an internal preliminary assessment, not an official eligibility decision. Read the call document before applying.",
+    "fit": {
+      "summary": "Is it a fit? 3 questions",
+      "q_pic": "Does your organisation have a PIC on the Funding & Tenders portal?",
+      "q_partner": "Do you have at least one partner organisation ready for this project?",
+      "q_cofinancing": "Can you reserve co-financing from your own budget?",
+      "yes": "Yes",
+      "no": "No",
+      "not_needed": "Not needed for this programme",
+      "result_fit": "A fit",
+      "result_fit_detail": "You meet the basic prerequisites of this call. Next step: read the call document.",
+      "result_prepare": "Preparation needed",
+      "result_prepare_detail": "Before applying you need to complete:",
+      "gap": {
+        "pic": "PIC registration (Funding & Tenders portal, Participant Register)",
+        "partner": "Finding a partner",
+        "cofinancing": "Reserving budget for co-financing"
+      },
+      "readiness_link": "List your gaps with the Funding Readiness Scorecard",
+      "reset": "Answer again"
+    }
   }
 }
