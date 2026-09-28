@@ -2,6 +2,11 @@ allowBuilds:
   '@parcel/watcher': true
   '@prisma/engines': true
   '@swc/core': true
+  # esbuild (via tsx and vite/vitest): its postinstall checks that the platform
+  # binary from @esbuild/<os>-<arch> matches and repairs it if that optional
+  # package was skipped. tsx (scripts, db:rls, db:seed) and vitest need it.
+  # Unlisted, pnpm 11 fails `pnpm install` in CI with ERR_PNPM_IGNORED_BUILDS.
+  esbuild: true
   prisma: true
   # protobufjs (transitive: inngest > @opentelemetry/sdk-node > @grpc/proto-loader)
   # has a postinstall that only prints a version-scheme warning for packages that
