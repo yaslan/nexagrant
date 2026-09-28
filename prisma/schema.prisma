@@ -1362,7 +1362,37 @@ model MarketplaceListing {
   status      String   @default("active") // active | unlisted | fulfilled
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  orders      MarketplaceOrder[]
   @@index([tenantId, kind])
+}
+
+/**
+ * A confirmed marketplace order. TASK-MTVUQXSYL0X2H: `orderMarketplaceService`
+ * used to mint a random id, never write a row, and trust a client-supplied
+ * price — this is the persisted, tenant-scoped record that replaces that.
+ *
+ * `tenantId` is the BUYER's tenant (the row owner for RLS: `withTenant` is
+ * opened with the session tenant, `tenant_isolation` below enforces it).
+ * `sellerTenantId` is `listing.tenantId` at order time, denormalized so a
+ * seller-side query never needs to join across the RLS boundary. Amounts are
+ * `Int` minor units + `currency` per CLAUDE.md rule 9 (src/lib/money.ts);
+ * `totalAmountMinor` is read from the listing server-side, never from the
+ * caller.
+ */
+model MarketplaceOrder {
+  id                String             @id @default(cuid())
+  tenantId          String
+  listingId         String
+  listing           MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  sellerTenantId    String
+  totalAmountMinor  Int
+  platformFeeMinor  Int
+  payoutAmountMinor Int
+  currency          String             @default("EUR")
+  status            String             @default("CONFIRMED") // CONFIRMED | CANCELLED
+  createdAt         DateTime           @default(now())
+  @@index([tenantId])
+  @@index([listingId])
 }
 
 model ApiKey {
