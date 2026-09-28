@@ -70,6 +70,15 @@
     },
     {
       "check": "D",
+      "file": "src/modules/marketplace/server/orders.ts",
+      "subject": "system-scope:tenant-discovery",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "tenant-discovery",
+      "reason": "placeMarketplaceOrderOn (TASK-MULQK8IRX9GSN). The listing belongs to the SELLER's tenant and the buyer has no scope over it; the listing id is what names that tenant. Under fabrika_app the read inside the buyer's withTenant returns null (measured in tests/marketplace-order.live.test.ts), so every order would be refused. The read selects id, tenantId, status and price only; the MarketplaceOrder write that follows is withTenantOn(buyerTenantId)."
+    },
+    {
+      "check": "D",
       "file": "src/app/api/billing/portal/route.ts",
       "subject": "system-scope:tenant-discovery",
       "count": 1,
