@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { AlertTriangle, Archive, CheckCircle2 } from 'lucide-react';
 import type { Gate } from '@prisma/client';
 
-import { archiveOpportunity, evaluateOpportunityGate } from '../actions';
+import { archiveOpportunity, declareApplication, evaluateOpportunityGate } from '../actions';
 import { errorMessage } from '@/lib/errors';
 import { EffortTracker, type EffortEntry } from './effort';
 
@@ -128,6 +128,29 @@ export function OpportunityDetailClient({
       }
     });
   };
+
+  const [declareError, setDeclareError] = useState<string | null>(null);
+  const [isDeclaring, startDeclareTransition] = useTransition();
+
+  /** B7: the institution's own "gönderildi / kabul / red" declaration. The server applies the rule. */
+  const handleDeclare = (declaration: 'submitted' | 'accepted' | 'rejected') => {
+    setDeclareError(null);
+    startDeclareTransition(async () => {
+      try {
+        const res = await declareApplication({ opportunityId: opportunity.id, declaration });
+        if (!res.success) {
+          setDeclareError(t(`detail.application.error.${res.error}`));
+          return;
+        }
+        router.refresh();
+      } catch (err) {
+        setDeclareError(errorMessage(err, t('detail.application.error.DECLARE_FAILED')));
+      }
+    });
+  };
+
+  const isSubmitted = ['SUBMITTED', 'FUNDED', 'REJECTED'].includes(opportunity.status);
+  const isDecided = opportunity.status === 'FUNDED' || opportunity.status === 'REJECTED';
 
   const scoreKnown = g0.score !== null;
 
@@ -337,6 +360,67 @@ export function OpportunityDetailClient({
                   </p>
                 </div>
               </div>
+
+              <section
+                className="bg-ground border border-border p-4 rounded-xl"
+                aria-labelledby="application-declaration-title"
+                data-testid="pipeline-application"
+              >
+                <h3
+                  id="application-declaration-title"
+                  className="text-xs font-semibold text-muted uppercase tracking-wider mb-1"
+                >
+                  {t('detail.application.title')}
+                </h3>
+                <p className="text-lg font-bold text-ink" data-testid="pipeline-application-status">
+                  {t(`detail.application.current.${opportunity.status}`)}
+                </p>
+                <p className="text-xs text-muted mt-1">{t('detail.application.hint')}</p>
+                {canArchive && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {!isDecided && (
+                      <button
+                        onClick={() => handleDeclare('submitted')}
+                        disabled={isDeclaring || opportunity.status === 'SUBMITTED'}
+                        data-testid="pipeline-declare-submitted"
+                        className="border border-border text-ink font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
+                      >
+                        {t('detail.application.submitted')}
+                      </button>
+                    )}
+                    {isSubmitted && (
+                      <>
+                        <button
+                          onClick={() => handleDeclare('accepted')}
+                          disabled={isDeclaring || opportunity.status === 'FUNDED'}
+                          data-testid="pipeline-declare-accepted"
+                          className="bg-emerald-700 hover:opacity-90 text-white font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
+                        >
+                          {t('detail.application.accepted')}
+                        </button>
+                        <button
+                          onClick={() => handleDeclare('rejected')}
+                          disabled={isDeclaring || opportunity.status === 'REJECTED'}
+                          data-testid="pipeline-declare-rejected"
+                          className="bg-rose-700 hover:opacity-90 text-white font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
+                        >
+                          {t('detail.application.rejected')}
+                        </button>
+                      </>
+                    )}
+                    {isDeclaring && (
+                      <span className="text-xs text-muted self-center" role="status">
+                        {t('detail.application.saving')}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {declareError && (
+                  <p role="alert" data-testid="pipeline-application-error" className="mt-2 text-xs text-rose-800">
+                    {declareError}
+                  </p>
+                )}
+              </section>
 
               {g0.reasons.length > 0 && (
                 <div className="bg-ground border border-border p-4 rounded-xl">

@@ -180,6 +180,32 @@
         "TENANT_SCOPE_REQUIRED": "Your session is not attached to a workspace. Please sign in again.",
         "OPPORTUNITY_NOT_FOUND": "This opportunity was not found in the database; the gate cannot be evaluated.",
         "GATE_EVALUATION_FAILED": "The gate could not be evaluated. Please try again."
+      },
+      "application": {
+        "title": "Application declaration",
+        "hint": "Mark here when you submit your application and when you learn the result. This is your organisation's own declaration; it goes into the agency report in aggregated form.",
+        "current": {
+          "ACTIVE": "Not submitted yet",
+          "SUBMITTED": "Submitted, awaiting result",
+          "FUNDED": "Accepted",
+          "REJECTED": "Rejected",
+          "WITHDRAWN": "Withdrawn",
+          "ABOVE_THRESHOLD": "Above threshold"
+        },
+        "submitted": "Mark as submitted",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "saving": "Saving…",
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Your session is not attached to a workspace. Sign in again.",
+          "INVALID_INPUT": "Invalid declaration.",
+          "OPPORTUNITY_NOT_FOUND": "This opportunity was not found or has been archived.",
+          "DECLARE_FORBIDDEN": "Only pipeline managers or the opportunity's owner can make this declaration.",
+          "NOT_SUBMITTED": "Mark the application as submitted before recording a result.",
+          "ALREADY_DECIDED": "An application with a recorded result cannot be marked as submitted again.",
+          "WITHDRAWN": "A withdrawn opportunity cannot take a declaration.",
+          "DECLARE_FAILED": "The declaration could not be saved. Try again."
+        }
       }
     }
   },

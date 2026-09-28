@@ -20,6 +20,12 @@ import { rescoreOpportunityG0 } from '@/lib/scoring/g0-compute';
 import { withTenant } from '@/lib/db';
 import { evaluateGate } from '@/lib/gates/evaluate';
 import { canArchiveOpportunity } from '@/lib/pipeline/archive';
+import {
+  APPLICATION_DECLARATIONS,
+  nextApplicationStatus,
+  type ApplicationDeclaration,
+  type DeclarationRefusal,
+} from '@/lib/k5-pipeline/applicationOutcome';
 
 /**
  * The tenant of a server action comes from the session and from nowhere else.
@@ -54,6 +60,12 @@ const EffortInput = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   hours: z.number().finite().gt(0).max(MAX_EFFORT_HOURS),
   note: z.string().max(500).optional(),
+});
+
+/** B7 declaration input. */
+const DeclareInput = z.object({
+  opportunityId: z.string().min(1),
+  declaration: z.enum(APPLICATION_DECLARATIONS as [ApplicationDeclaration, ...ApplicationDeclaration[]]),
 });
 
 /**
@@ -620,5 +632,105 @@ export async function logEffort({
   } catch (err) {
     console.warn(`[logEffort] failed: ${errorMessage(err)}`);
     return { success: false, error: 'EFFORT_SAVE_FAILED' };
+  }
+}
+
+/**
+ * Records the institution's own declaration that it submitted an application, or what the
+ * result was (FB KAMU B7, TASK-MULRRU63LWC6E).
+ *
+ * Nothing in the product used to write `Proposal.submittedAt` or the `SUBMITTED` / `FUNDED` /
+ * `REJECTED` statuses, so the "başvuru gönderildi" and "sonuç" steps of the agency funnel had no
+ * source. The transition rule lives in `nextApplicationStatus` (pure, tested); this action only
+ * loads the row, applies the rule and writes it, with an audit row in the same transaction.
+ *
+ * Who may declare: the same people who may archive — the pipeline roles, or the card's owner.
+ * A GUEST_PARTNER reading the board must not be able to move the tenant's reported numbers.
+ */
+export async function declareApplication({
+  opportunityId,
+  declaration,
+}: {
+  opportunityId: string;
+  declaration: ApplicationDeclaration;
+}): Promise<
+  | { success: true; status: string }
+  | {
+      success: false;
+      error:
+        | 'TENANT_SCOPE_REQUIRED'
+        | 'INVALID_INPUT'
+        | 'OPPORTUNITY_NOT_FOUND'
+        | 'DECLARE_FORBIDDEN'
+        | DeclarationRefusal
+        | 'DECLARE_FAILED';
+    }
+> {
+  const parsed = DeclareInput.safeParse({ opportunityId, declaration });
+  if (!parsed.success) return { success: false, error: 'INVALID_INPUT' };
+
+  const scope = await sessionScope();
+  if (!scope) return NO_TENANT;
+  const { tenantId, userId, role } = scope;
+
+  try {
+    const result = await withTenant<
+      { ok: true; status: string } | { ok: false; error: 'OPPORTUNITY_NOT_FOUND' | 'DECLARE_FORBIDDEN' | DeclarationRefusal }
+    >(tenantId, async (tx) => {
+      const opp = await tx.opportunity.findFirst({
+        where: { id: parsed.data.opportunityId, tenantId, deletedAt: null },
+        select: { id: true, status: true, ownerId: true, proposal: { select: { id: true, submittedAt: true } } },
+      });
+      if (!opp) return { ok: false, error: 'OPPORTUNITY_NOT_FOUND' };
+      if (!canArchiveOpportunity(role, opp.ownerId, userId)) return { ok: false, error: 'DECLARE_FORBIDDEN' };
+
+      const next = nextApplicationStatus(opp.status, Boolean(opp.proposal?.submittedAt), parsed.data.declaration);
+      if ('refused' in next) return { ok: false, error: next.refused };
+
+      if (parsed.data.declaration === 'submitted') {
+        // The first submission date is the one that counts; declaring again does not move it.
+        if (!opp.proposal) {
+          await tx.proposal.create({
+            data: { tenantId, opportunityId: opp.id, submittedAt: new Date() },
+          });
+        } else if (!opp.proposal.submittedAt) {
+          await tx.proposal.updateMany({
+            where: { id: opp.proposal.id, tenantId, submittedAt: null },
+            data: { submittedAt: new Date() },
+          });
+        }
+      }
+
+      if (next.status !== opp.status) {
+        await tx.opportunity.updateMany({
+          where: { id: opp.id, tenantId, deletedAt: null },
+          data: { status: next.status },
+        });
+        await tx.auditEvent.create({
+          data: {
+            tenantId,
+            actorId: userId,
+            type: 'opportunity.application_declared',
+            target: opp.id,
+            data: { declaration: parsed.data.declaration, from: opp.status, to: next.status },
+          },
+        });
+      }
+
+      return { ok: true, status: next.status };
+    });
+
+    if (!result.ok) return { success: false, error: result.error };
+
+    try {
+      revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
+      revalidatePath('/[locale]/(app)/[workspace]/pipeline/[id]', 'page');
+      revalidatePath('/[locale]/(app)/[workspace]/dashboard', 'page');
+    } catch {}
+
+    return { success: true, status: result.status };
+  } catch (err) {
+    console.warn(`[declareApplication] failed: ${errorMessage(err)}`);
+    return { success: false, error: 'DECLARE_FAILED' };
   }
 }

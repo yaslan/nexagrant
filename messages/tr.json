@@ -180,6 +180,32 @@
         "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Lütfen yeniden giriş yapın.",
         "OPPORTUNITY_NOT_FOUND": "Bu fırsat veritabanında bulunamadı; kapı değerlendirilemez.",
         "GATE_EVALUATION_FAILED": "Kapı değerlendirilemedi. Lütfen tekrar deneyin."
+      },
+      "application": {
+        "title": "Başvuru beyanı",
+        "hint": "Başvurunuzu gönderdiğinizde ve sonucu öğrendiğinizde buradan işaretleyin. Bu, kurumunuzun kendi beyanıdır; toplulaştırılmış olarak ajans raporuna girer.",
+        "current": {
+          "ACTIVE": "Henüz gönderilmedi",
+          "SUBMITTED": "Gönderildi, sonuç bekleniyor",
+          "FUNDED": "Kabul edildi",
+          "REJECTED": "Reddedildi",
+          "WITHDRAWN": "Geri çekildi",
+          "ABOVE_THRESHOLD": "Eşik üstü"
+        },
+        "submitted": "Gönderildi olarak işaretle",
+        "accepted": "Kabul edildi",
+        "rejected": "Reddedildi",
+        "saving": "Kaydediliyor…",
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Yeniden giriş yapın.",
+          "INVALID_INPUT": "Geçersiz beyan.",
+          "OPPORTUNITY_NOT_FOUND": "Bu fırsat bulunamadı ya da arşivlenmiş.",
+          "DECLARE_FORBIDDEN": "Bu beyanı yalnız pipeline yöneticileri ya da fırsatın sahibi yapabilir.",
+          "NOT_SUBMITTED": "Sonuç girmeden önce başvuruyu gönderildi olarak işaretleyin.",
+          "ALREADY_DECIDED": "Sonuç girilmiş bir başvuru yeniden gönderildi yapılamaz.",
+          "WITHDRAWN": "Geri çekilmiş bir fırsat için beyan yapılamaz.",
+          "DECLARE_FAILED": "Beyan kaydedilemedi. Tekrar deneyin."
+        }
       }
     }
   },
