@@ -31,8 +31,12 @@ import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpe
  *
  * `.live` because it needs the Postgres in docker-compose; it skips itself when
  * the database is unreachable rather than reddening the gate on a machine that
- * has none. It writes NOTHING: fixtures are two tenants' worth of rows that the
- * seed already provides, and the reads are counts.
+ * has none (and refuses to skip in CI). Arm 2 needs Membership rows in two
+ * tenants, so the suite brings its own (TASK-MULT5YZUFQR5F): two throwaway
+ * tenants, each with one user and one membership, written over the owning
+ * handle in `beforeAll` and removed in `afterAll`. It used to borrow them from
+ * the seed, which creates one tenant, so on a fresh CI database the suite could
+ * not run at all. A fixture that cannot be written is an error, not a skip.
  */
 
 const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
@@ -42,10 +46,18 @@ let rls: PrismaClient | undefined;
 let admin: PrismaClient | undefined;
 let ready = false;
 let skipReason = '';
-/** A table with rows in at least two tenants, chosen at runtime from the seed. */
-let probeTenants: string[] = [];
-
 const SUITE = 'system-scope live test';
+
+const RUN = `sysscope-${Date.now()}-${process.pid}`;
+const FIXTURE_TENANTS = [`t-sysscope-a-${RUN}`, `t-sysscope-b-${RUN}`];
+const FIXTURE_USERS = FIXTURE_TENANTS.map((t) => `u-${t}`);
+let fixtureWritten = false;
+
+/** Memberships go with their tenant and user (onDelete: Cascade). */
+async function wipeFixture(db: PrismaClient): Promise<void> {
+  await db.tenant.deleteMany({ where: { id: { in: FIXTURE_TENANTS } } });
+  await db.user.deleteMany({ where: { id: { in: FIXTURE_USERS } } });
+}
 
 beforeAll(async () => {
   if (!requireRlsTestUrl(RLS_URL, SUITE)) {
@@ -63,23 +75,36 @@ beforeAll(async () => {
   // A BYPASSRLS role used to be a skip here, and every test below reported
   // green through `expect(skipReason).toBeTruthy()`. It is a failure now.
   await assertRlsSubjectRole(rls, SUITE);
-  // Which tenants own Membership rows, asked over the privileged handle so the
-  // expectation is built from the truth rather than from the thing under test.
-  const rows = await admin.$queryRaw<Array<{ tenantId: string }>>`
-    SELECT DISTINCT "tenantId" FROM "Membership" LIMIT 5`
-    .catch((e: unknown) => {
-      skipReason = `database unavailable: ${e instanceof Error ? e.message : String(e)}`;
-      return [];
+  // The two-tenant fixture, over the owning handle: the RLS role could not
+  // write a second tenant's rows, and that is the point. No catch — if this
+  // fails the file goes red with the database's own error.
+  fixtureWritten = true;
+  await wipeFixture(admin);
+  for (const [i, tenantId] of FIXTURE_TENANTS.entries()) {
+    const userId = FIXTURE_USERS[i]!;
+    await admin.tenant.create({
+      data: { id: tenantId, name: `system-scope probe ${RUN}`, slug: tenantId, country: 'TR' },
     });
-  probeTenants = rows.map((r) => r.tenantId);
-  ready = probeTenants.length >= 2;
-  if (!ready) {
-    skipReason ||= `needs Membership rows in 2+ tenants; found ${probeTenants.length}. Run \`pnpm db:seed\`.`;
-    skipOrFailInCi(SUITE, skipReason);
+    await admin.user.create({ data: { id: userId, email: `${userId}@system-scope.test` } });
+    await admin.membership.create({ data: { tenantId, userId } });
   }
+  // Read back over the privileged handle, so the expectation is built from the
+  // truth rather than from the thing under test.
+  const rows = await admin.membership.groupBy({
+    by: ['tenantId'],
+    where: { tenantId: { in: FIXTURE_TENANTS } },
+    _count: true,
+  });
+  if (rows.length !== FIXTURE_TENANTS.length) {
+    throw new Error(
+      `${SUITE}: fixture wrote memberships in ${rows.length} of ${FIXTURE_TENANTS.length} tenants`
+    );
+  }
+  ready = true;
 });
 
 afterAll(async () => {
+  if (fixtureWritten && admin) await wipeFixture(admin);
   await rls?.$disconnect().catch(() => {});
   await admin?.$disconnect().catch(() => {});
 });
@@ -94,15 +119,22 @@ describe('withSystemScope over a NOBYPASSRLS role', () => {
   test('inside the path, the same read spans tenants', async () => {
     if (!ready || !rls || !admin) return expect(skipReason).toBeTruthy();
 
-    const truth = await admin.membership.count();
+    // Counted over the fixture's tenants, not the whole table: the other live
+    // files write Membership rows concurrently, and a whole-table count taken
+    // before the scoped read raced them. No tenant is set on this connection,
+    // so seeing both tenants' rows is still the cross-tenant property.
+    const where = { tenantId: { in: FIXTURE_TENANTS } };
+    const truth = await admin.membership.count({ where });
     const seen = await withSystemScopeOn(rls, 'platform-aggregate', 'test.membershipCount', (tx) =>
-      tx.membership.findMany({ select: { tenantId: true } })
+      tx.membership.findMany({ where, select: { tenantId: true } })
     );
 
     expect(seen.length).toBe(truth);
     // Not just "more than zero": rows from more than one tenant is the property
     // that distinguishes an open scope from a lucky single-tenant read.
-    expect(new Set(seen.map((m) => m.tenantId)).size).toBeGreaterThan(1);
+    const seenTenants = new Set(seen.map((m) => m.tenantId));
+    expect(seenTenants.size).toBeGreaterThan(1);
+    for (const t of FIXTURE_TENANTS) expect(seenTenants.has(t)).toBe(true);
   });
 
   test('the scope dies with its transaction', async () => {
