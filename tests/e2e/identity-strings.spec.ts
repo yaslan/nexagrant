@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { shotsDir } from './fixtures/shots';
+import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
  * TASK-MTRNQHC3IV2BE — no invented person, organisation or byline on screen.
@@ -17,8 +18,7 @@ import { shotsDir } from './fixtures/shots';
 
 const SHOTS = shotsDir('TASK-MTRNQHC3IV2BE-screenshots');
 const COOKIE_NAME = 'authjs.session-token';
-const SECRET =
-  process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
+const SECRET = e2eAuthSecret();
 
 /** Assembled so the spec file does not itself contain the invented names. */
 const MEHMET = ['Dr.', 'Mehmet', 'Yılmaz'].join(' ');

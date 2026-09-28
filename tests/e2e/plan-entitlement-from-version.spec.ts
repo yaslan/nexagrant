@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
  * TASK-MTSJH8NMAXPRM — publishing a seat change in the plan studio must reach
@@ -27,7 +28,7 @@ import { shotsDir } from './fixtures/shots';
 
 const SHOTS = shotsDir('TASK-MTSJH8NMAXPRM-screenshots');
 const COOKIE_NAME = 'authjs.session-token';
-const SECRET = process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
+const SECRET = e2eAuthSecret();
 const TENANT_ID = 'demo-tenant';
 const ADMIN_URL = '/tr/admin/billing/plans';
 const BILLING_URL = '/tr/main/settings/billing';

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { shotsDir } from './fixtures/shots';
+import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
  * TASK-MTR5BGKNELCO2 — the app frame must never invent who is signed in.
@@ -20,8 +21,7 @@ const SHOTS = shotsDir('TASK-MTR5BGKNELCO2-screenshots');
 const WORKSPACE = 'fabrika-beta';
 const PANEL_URL = `/tr/${WORKSPACE}/panel`;
 const COOKIE_NAME = 'authjs.session-token';
-const SECRET =
-  process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
+const SECRET = e2eAuthSecret();
 
 /** The two identities the frame used to invent, in every casing the UI could render. */
 const INVENTED = ['Ayşe Kaya', 'Mehmet Yılmaz', 'mehmet@fabrika.app'];

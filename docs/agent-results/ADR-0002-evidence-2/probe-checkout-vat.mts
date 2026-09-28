@@ -16,7 +16,9 @@ import { prisma } from '../../../src/lib/db';
 
 const BASE = process.env.PROBE_BASE_URL ?? 'http://localhost:3000';
 const COOKIE_NAME = 'authjs.session-token';
-const SECRET = process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
+// Must be the running server's key; there is no literal fallback (TASK-MULRTOTG9IKIM).
+const SECRET = process.env.AUTH_SECRET;
+if (!SECRET) throw new Error('AUTH_SECRET is not set');
 
 async function main() {
   const tenant = await prisma.tenant.findFirstOrThrow({ select: { id: true } });

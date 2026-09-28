@@ -5,6 +5,7 @@ import { encode } from 'next-auth/jwt';
 
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
  * TASK-MTRD9QBJ2G32E — an invoice export may only describe an invoice that exists.
@@ -25,8 +26,7 @@ import { shotsDir } from './fixtures/shots';
 
 const STAMP = `e2e-inv-${Date.now()}`;
 const COOKIE_NAME = 'authjs.session-token';
-const SECRET =
-  process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
+const SECRET = e2eAuthSecret();
 const SHOTS = shotsDir('TASK-MTRD9QBJ2G32E-screenshots');
 
 /**

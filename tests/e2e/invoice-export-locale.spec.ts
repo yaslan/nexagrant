@@ -5,6 +5,7 @@ import { encode } from 'next-auth/jwt';
 
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
  * TASK-MTTUSZF4QSFGU — the printed invoice in the language the reader is using,
@@ -22,8 +23,7 @@ import { shotsDir } from './fixtures/shots';
 
 const STAMP = `e2e-invloc-${Date.now()}`;
 const COOKIE_NAME = 'authjs.session-token';
-const SECRET =
-  process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
+const SECRET = e2eAuthSecret();
 const SHOTS = shotsDir('TASK-MTTUSZF4QSFGU-screenshots');
 
 const connectionString =

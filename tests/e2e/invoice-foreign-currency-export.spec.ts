@@ -5,6 +5,7 @@ import { encode } from 'next-auth/jwt';
 
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
  * TASK-MTSWLWDONWA3W — the exported invoice must state its own currency.
@@ -35,8 +36,7 @@ const STAMP = `e2e-fx-${Date.now()}`;
 /** A fixed stand-in for a published TCMB buying rate; see the header comment. */
 const FIXTURE_RATE = 41.2345;
 const COOKIE_NAME = 'authjs.session-token';
-const SECRET =
-  process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
+const SECRET = e2eAuthSecret();
 const SHOTS = shotsDir('TASK-MTSWLWDONWA3W-screenshots');
 
 const connectionString =

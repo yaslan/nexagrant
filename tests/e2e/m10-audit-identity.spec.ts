@@ -5,6 +5,7 @@ import type { Role } from '@prisma/client';
 import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
 import { shotsDir } from './fixtures/shots';
+import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
  * TASK-MTS9C907G4YNW — this spec used to hand out a false pass.
@@ -51,8 +52,7 @@ const ULTRA = PLAN_E2E.ultra;
 const FLIP = PLAN_E2E.flip;
 const DOCS_URL = `/tr/${ULTRA.workspaceSlug}/opportunities/${ULTRA.opportunityId}/documents`;
 const COOKIE_NAME = 'authjs.session-token';
-const SECRET =
-  process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
+const SECRET = e2eAuthSecret();
 
 /** The name the workflow used to sign records with, spelled out only here. */
 const FABRICATED = ['Dr.', 'Mehmet', 'Yılmaz'].join(' ');

@@ -13,7 +13,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://fabrika:fabrika_pass@postgres-vector:5432/fabrika_db?schema=public
-      - AUTH_SECRET=fabrika-secret-key-horizon-europe-2026-super-secure
+      - AUTH_SECRET=${AUTH_SECRET:?set AUTH_SECRET (openssl rand -base64 32)}
       - NEXTAUTH_URL=http://localhost:3000
     depends_on:
       postgres-vector:

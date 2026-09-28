@@ -5,6 +5,7 @@ import { encode } from 'next-auth/jwt';
 
 import { createDbClient } from '../../src/lib/db';
 import { handleIyzicoWebhook } from '../../src/lib/iyzico';
+import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
  * TASK-MTSWL8ADKZKDM — a successful payment must actually issue an invoice.
@@ -26,8 +27,7 @@ import { handleIyzicoWebhook } from '../../src/lib/iyzico';
 
 const STAMP = `e2e-iwp-${Date.now()}`;
 const COOKIE_NAME = 'authjs.session-token';
-const SECRET =
-  process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
+const SECRET = e2eAuthSecret();
 
 const connectionString =
   process.env.DATABASE_URL || 'postgresql://fabrika:fabrika@localhost:5432/fabrika';

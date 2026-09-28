@@ -19,7 +19,18 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
  * These are test data only — clearly fake values that cannot be mistaken for
  * real taxpayer identity.
  */
+/**
+ * Session-signing key for the dev server and for the cookies the specs mint
+ * (tests/e2e/fixtures/auth-secret.ts). A test-only value, never the key in .env:
+ * process.env beats .env in Next, so the server started below verifies with this
+ * one. Set E2E_AUTH_SECRET to use another (TASK-MULRTOTG9IKIM).
+ */
+const E2E_AUTH_SECRET = process.env.E2E_AUTH_SECRET || 'test-e2e-auth-secret-fixture-not-for-any-deployment';
+// Workers inherit the runner's environment, so the specs read the same value.
+process.env.AUTH_SECRET = E2E_AUTH_SECRET;
+
 const testEnv = {
+  AUTH_SECRET: E2E_AUTH_SECRET,
   INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.',
   INVOICE_SUPPLIER_VKN: '1000000000',
   INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD',

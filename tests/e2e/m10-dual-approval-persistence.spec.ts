@@ -5,6 +5,7 @@ import type { Role } from '@prisma/client';
 import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
 import { shotsDir } from './fixtures/shots';
+import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
  * TASK-MTSAIWF4ENUSL — the two middle steps of the M10 dual approval used to live
@@ -32,8 +33,7 @@ const SHOTS = shotsDir('TASK-MTSAIWF4ENUSL-screenshots');
 const ULTRA = PLAN_E2E.ultra;
 const DOCS_URL = `/tr/${ULTRA.workspaceSlug}/opportunities/${ULTRA.opportunityId}/documents`;
 const COOKIE_NAME = 'authjs.session-token';
-const SECRET =
-  process.env.AUTH_SECRET || 'fabrika-secret-key-horizon-europe-2026-super-secure';
+const SECRET = e2eAuthSecret();
 
 const RUN = Date.now().toString(36);
 const ACTOR_A = `E2E Submitter ${RUN}`;
