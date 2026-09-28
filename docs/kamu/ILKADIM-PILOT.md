@@ -29,14 +29,14 @@ Pilotun amacı özellik göstermek değil. Beta programındaki ilke burada da ge
 
 ### 2.1 Koltuk dağılımı (öneri)
 
-| Koltuk | Birim                     | Rol (üründe)      | Neden                                               |
-| ------ | ------------------------- | ----------------- | --------------------------------------------------- |
-| 1      | Dış İlişkiler / AB birimi | Kiracı yöneticisi | Pilotun sahibi; davetleri ve modülleri yönetir      |
-| 2      | Dış İlişkiler / AB birimi | Üye               | Konsept notu yazan kişi                             |
-| 3      | Çevre                     | Üye               | LIFE ve iklim/çevre çağrıları için konu sahibi      |
-| 4      | Kültür (ve Sosyal İşler)  | Üye               | Erasmus+ gençlik/yetişkin eğitimi, kültür çağrıları |
-| 5      | Strateji Geliştirme       | Üye               | Stratejik plan uyumu, bütçe, raporlama              |
-| 6      | `[Belediyenin seçeceği]`  | Üye / gözlemci    | Ör. Başkan Yardımcısı ofisi ya da Mali Hizmetler    |
+| Koltuk | Birim                     | Rol (üründe)      | Neden                                                                |
+| ------ | ------------------------- | ----------------- | -------------------------------------------------------------------- |
+| 1      | Dış İlişkiler / AB birimi | Kiracı yöneticisi | Pilotun sahibi; davetleri ve modülleri yönetir                       |
+| 2      | Dış İlişkiler / AB birimi | Üye               | Konsept notu yazan kişi                                              |
+| 3      | Çevre                     | Üye               | Çevre/iklim çağrıları için konu sahibi (LIFE Türkiye'ye kapalı [K8]) |
+| 4      | Kültür (ve Sosyal İşler)  | Üye               | Erasmus+ gençlik/yetişkin eğitimi, kültür çağrıları                  |
+| 5      | Strateji Geliştirme       | Üye               | Stratejik plan uyumu, bütçe, raporlama                               |
+| 6      | `[Belediyenin seçeceği]`  | Üye / gözlemci    | Ör. Başkan Yardımcısı ofisi ya da Mali Hizmetler                     |
 
 ### 2.2 Açık modüller
 
@@ -59,10 +59,10 @@ Bu iki kart bitmeden pilot başlamaz. Başlangıç tarihi bu iki kartın `done` 
 
 Kart metni hafta 5–8 için "CERV **veya** Erasmus+" diyor. Resmî kaynaklarla kontrol edildi:
 
-- **CERV:** Komisyonun katılımcı ülke listesinde (V10.0, 01.08.2025) Türkiye **yok**. Listede AB dışından yalnız Arnavutluk, Bosna-Hersek, Kosova, Moldova, Karadağ, Kuzey Makedonya, Sırbistan ve Ukrayna var [K3]. Yani İlkadım Belediyesi bugün CERV'e **başvuru sahibi ya da ortak olarak** giremez. Bu nedenle pilotta CERV hedeflenmez. Radar kartı (TASK-MULR39X1K5K6C) bu bilgiyi "Size uygun mu?" kutusunda göstermelidir.
+- **CERV:** Komisyonun katılımcı ülke listesinde (V10.0, 01.08.2025) Türkiye **yok**. Listede AB dışından yalnız Arnavutluk, Bosna-Hersek, Kosova, Moldova, Karadağ, Kuzey Makedonya, Sırbistan ve Ukrayna var [K3]. Yani İlkadım Belediyesi bugün CERV'e **başvuru sahibi ya da ortak olarak** giremez. Bu nedenle pilotta CERV hedeflenmez. Radar kataloğu (TASK-MULR39X1K5K6C, `src/lib/public-sector/catalog.ts`) da CERV'i Türk başvuru sahiplerine kapalı olarak işaretliyor.
 - **Erasmus+:** Türkiye, programa ortak (associated) üçüncü ülkedir [K4]. Küçük ölçekli ortaklıklarda (KA210) yerel yönetimler katılabilir, hibe iki sabit tutardan biridir (30.000 € ya da 60.000 €), en az iki farklı ülkeden iki kurum gerekir, süre 6–24 aydır, başvuru başvuran kurumun ülkesindeki Ulusal Ajansa yapılır (Türkiye için Türkiye Ulusal Ajansı) [K5].
 
-**Karar önerisi:** Hafta 5–8 konsept notu **Erasmus+** (KA210 ya da uygunsa KA220) için yazılır. İkinci aday çağrı radarın "Türkiye'ye açık" filtresinden seçilir (LIFE, Missions, Interreg/IPA, OKA programları). Bu programların Türkiye için uygunluğu bu belgede doğrulanmadı; radar kartı her çağrı için kaynağıyla doğrular. Doğrulanmayan program pilotta önerilmez.
+**Karar önerisi:** Hafta 5–8 konsept notu **Erasmus+** (KA210 ya da uygunsa KA220) için yazılır. İkinci aday çağrı radarın "Türkiye'ye açık" filtresinden seçilir (ör. Cities Mission, Interreg/IPA, OKA programları; radar kataloğu `src/lib/public-sector/catalog.ts`). **LIFE da seçilmez:** katılımcı ülke listesinde (V10.0, 01.03.2026) Türkiye yok [K8]. Bu belgede yalnız CERV, LIFE ve Erasmus+ doğrulandı; diğer programların uygunluğunu radar kataloğu kaynağıyla gösterir. Doğrulanmayan program pilotta önerilmez.
 
 ## 4. Haftalık akış
 
@@ -158,6 +158,7 @@ Erişim tarihi: 29.09.2026 (tümü).
 - **[K1]** Resmî Gazete, 22.01.2026, sayı 33145 — Kamu İhale Tebliği (No: 2026/1): <https://www.resmigazete.gov.tr/eskiler/2026/01/20260122-3.htm> · Not: Bu adrese araçtan erişimde TLS sertifika hatası alındı; tutarlar K2'deki tam metin aktarımından okundu. Görüşme öncesi patron K1'den teyit eder.
 - **[K2]** Hukuki Haber, "Kamu İhale Tebliği (No: 2026/1)" tam metin aktarımı (22/d tutarları 800.366→1.021.827 TL ve 266.618→340.391 TL; Yİ-ÜFE %27,67; yürürlük 01.02.2026): <https://www.hukukihaber.net/kamu-ihale-tebligi-no-20261>
 - **[K3]** European Commission, "EU Grants: List of participating countries (CERV)", V10.0 – 01.08.2025: <https://ec.europa.eu/info/funding-tenders/opportunities/docs/2021-2027/cerv/guidance/list-3rd-country-participation_cerv_en.pdf>
+- **[K8]** European Commission, "EU Grants: List of participating countries (LIFE)", V10.0 – 01.03.2026 (Türkiye listede yok): <https://ec.europa.eu/info/funding-tenders/opportunities/docs/2021-2027/life/guidance/list-3rd-country-participation_life_en.pdf>
 - **[K4]** Erasmus+ Programme Guide, Part A — Eligible countries (Türkiye, programa ortak üçüncü ülkeler arasında): <https://erasmus-plus.ec.europa.eu/programme-guide/part-a/eligible-countries>
 - **[K5]** Erasmus+ Programme Guide, Part B — Small-scale partnerships (30.000 € / 60.000 € sabit tutar; en az 2 kurum, 2 ülke; 6–24 ay; Ulusal Ajansa başvuru; 5 Mart 12:00): <https://erasmus-plus.ec.europa.eu/programme-guide/part-b/key-action-2/small-scale-partnerships>
 - İç kaynaklar: `docs/BUSINESS_MODEL.md` §5.1 (plan içerikleri, koltuk sayıları), `docs/adr/ADR-0004-public-sector-segment-priority.md`, `docs/EFATURA_SETUP.md`, `docs/legal/processing-register.md`, `docs/legal/privacy-notice-gap-analysis.md`, `docs/BETA_GUIDE.md`.

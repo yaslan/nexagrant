@@ -52,7 +52,7 @@ Aylık, PDF ve CSV olarak. Kişisel veri içermez; kurum düzeyinde toplulaştı
 | 6. Başvuru gönderildi     | Kurumun kendi beyanı                                                   | B7 (beyan alanı yok)                    |
 | 7. Sonuç                  | Kabul / red (kurumun beyanı)                                           | B7                                      |
 
-**Program kırılımı:** Her adım program bazında da verilir (Erasmus+, LIFE, Interreg/IPA, OKA programları). CERV bu listede yer almaz: Türkiye CERV'e katılan ülkeler arasında değildir [K3].
+**Program kırılımı:** Her adım program bazında da verilir (Erasmus+, Cities Mission, Interreg/IPA, OKA programları). CERV ve LIFE bu listede yer almaz: Türkiye iki programın katılımcı ülke listesinde de yoktur [K3][K8].
 
 ## 5. Ajansın kazancı ve ticari seçenekler
 
@@ -123,6 +123,7 @@ Bu hedefler bizim önerimizdir, dış kaynaktan gelen bir oran değildir. İlk 2
 Erişim tarihi: 29.09.2026 (tümü).
 
 - **[K3]** European Commission, "EU Grants: List of participating countries (CERV)", V10.0 – 01.08.2025 (Türkiye listede yok): <https://ec.europa.eu/info/funding-tenders/opportunities/docs/2021-2027/cerv/guidance/list-3rd-country-participation_cerv_en.pdf>
+- **[K8]** European Commission, "EU Grants: List of participating countries (LIFE)", V10.0 – 01.03.2026 (Türkiye listede yok): <https://ec.europa.eu/info/funding-tenders/opportunities/docs/2021-2027/life/guidance/list-3rd-country-participation_life_en.pdf>
 - **[K6]** T.C. Sanayi ve Teknoloji Bakanlığı Kalkınma Ajansları portalı — "Orta Karadeniz Kalkınma Ajansı — Uluslararası İşbirlikleri" (iller: Samsun, Amasya, Çorum, Tokat; 2009'dan bu yana 15 proje, 57 milyon €'nun üzerinde AB kaynağı): <https://ka.gov.tr/en/pages/orta-karadeniz-kalkinma-ajansi-uluslararasi-isbirlikleri--8-737>
 - **[K7]** OKA resmî sitesi: <https://oka.gov.tr/>
 - 4734 s. 22/d sınırları için kaynaklar: `ILKADIM-PILOT.md` [K1][K2].
