@@ -33,7 +33,6 @@ export default function SidebarNav({ locale, isPlatformAdmin = false }: SidebarN
     { key: 'evidence', href: getWorkspaceRoute('evidence', locale, workspaceSlug), label: t('evidence') },
     { key: 'tto', href: getWorkspaceRoute('tto', locale, workspaceSlug), label: t('tto') },
     { key: 'approvals', href: getWorkspaceRoute('approvals', locale, workspaceSlug), label: t('approvals') },
-    { key: 'marketplace', href: getWorkspaceRoute('marketplace', locale, workspaceSlug), label: t('marketplace') },
     { key: 'apiKeys', href: getWorkspaceRoute('settingsApiKeys', locale, workspaceSlug), label: t('apiKeys') },
     { key: 'settings', href: getWorkspaceRoute('settingsModules', locale, workspaceSlug), label: t('settings') },
   ];

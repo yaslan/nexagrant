@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Lock,
 } from 'lucide-react';
-import { generateApiKey, revokeApiKey } from '@/modules/marketplace/server/actions';
+import { generateApiKey, revokeApiKey } from './actions';
 
 export interface ApiKeyRecord {
   id: string;

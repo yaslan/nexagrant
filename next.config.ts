@@ -122,7 +122,6 @@ const nextConfig: NextConfig = {
       { source: '/tr/:workspace/konsept-notlar/:id', destination: '/tr/:workspace/concept-notes/:id' },
       { source: '/tr/:workspace/onay-merkezi', destination: '/tr/:workspace/approvals' },
       { source: '/tr/:workspace/tto-hizlandirici', destination: '/tr/:workspace/tto' },
-      { source: '/tr/:workspace/pazar-yeri', destination: '/tr/:workspace/marketplace' },
       { source: '/tr/:workspace/ayarlar', destination: '/tr/:workspace/settings/modules' },
       { source: '/tr/:workspace/ayarlar/profil', destination: '/tr/:workspace/settings/profile' },
       { source: '/tr/:workspace/ayarlar/moduller', destination: '/tr/:workspace/settings/modules' },

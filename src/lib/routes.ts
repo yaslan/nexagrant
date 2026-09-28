@@ -29,7 +29,6 @@ export type WorkspaceRouteKey =
   | 'conceptNoteDetail'
   | 'approvals'
   | 'tto'
-  | 'marketplace'
   | 'notifications'
   | 'settingsProfile'
   | 'settingsModules'
@@ -109,8 +108,6 @@ export function getWorkspaceRoute(
       return isTr ? `/${locale}/${workspace}/onay-merkezi` : `/${locale}/${workspace}/approvals`;
     case 'tto':
       return isTr ? `/${locale}/${workspace}/tto-hizlandirici` : `/${locale}/${workspace}/tto`;
-    case 'marketplace':
-      return isTr ? `/${locale}/${workspace}/pazar-yeri` : `/${locale}/${workspace}/marketplace`;
     case 'notifications':
       return isTr ? `/${locale}/${workspace}/bildirimler` : `/${locale}/${workspace}/notifications`;
     case 'settingsProfile':

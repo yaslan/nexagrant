@@ -104,32 +104,6 @@ export interface FollowupDocRow {
   createdAt: Date;
 }
 
-/** `model MarketplaceListing`. */
-export interface MarketplaceListingRow {
-  id: string;
-  tenantId: string;
-  kind: string;
-  title: string;
-  description: string;
-  price: string;
-  status: string;
-  createdAt: Date;
-}
-
-/** `model MarketplaceOrder`. Amounts are Int minor units (src/lib/money.ts). */
-export interface MarketplaceOrderRow {
-  id: string;
-  tenantId: string;
-  listingId: string;
-  sellerTenantId: string;
-  totalAmountMinor: number;
-  platformFeeMinor: number;
-  payoutAmountMinor: number;
-  currency: string;
-  status: string;
-  createdAt: Date;
-}
-
 /** `model ApiKey` — never carries the raw key, only its hash and prefix. */
 export interface ApiKeyRow {
   id: string;

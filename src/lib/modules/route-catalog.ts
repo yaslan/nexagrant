@@ -23,7 +23,6 @@ export const WORKSPACE_ROUTE_CATALOG = [
   'concept-notes/[id]',
   'dashboard',
   'evidence',
-  'marketplace',
   'notifications',
   'opportunities/[id]/application',
   'opportunities/[id]/briefs',
@@ -73,7 +72,6 @@ export const WORKSPACE_ROUTE_ALIASES: Record<string, WorkspaceRoutePath> = {
   'onay-merkezi': 'approvals',
   ortaklar: 'partners',
   panel: 'dashboard',
-  'pazar-yeri': 'marketplace',
   'tto-hizlandirici': 'tto',
 };
 
