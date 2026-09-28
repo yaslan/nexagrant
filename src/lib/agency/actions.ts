@@ -18,13 +18,7 @@ import {
   type CreatedInviteCode,
   type InviteCodeSummary,
 } from './codes';
-
-export class AgencyPermissionError extends Error {
-  constructor() {
-    super('Managing invite codes needs the manage_users permission');
-    this.name = 'AgencyPermissionError';
-  }
-}
+import { AgencyPermissionError } from './errors';
 
 export async function createAgencyInviteCodeAction(input: {
   maxUses: number;

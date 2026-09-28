@@ -11,15 +11,12 @@ import { withTenant } from '@/lib/db';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
 import { AgencyInviteError, createInviteCodeIn, listInviteCodesIn, revokeInviteCodeIn } from '@/lib/agency/codes';
+import { AgencyPermissionError } from '@/lib/agency/errors';
 
 /**
  * Same rules as src/lib/agency/actions.ts (B1): create and revoke need
- * `manage_users`, listing is open to the agency's members. That module cannot be
- * imported from here: it exports an Error class, and a 'use server' module may
- * export only async functions, so importing it fails the whole route at build.
+ * `manage_users`, listing is open to the agency's members.
  */
-class AgencyPermissionError extends Error {}
-
 async function managerScope() {
   const scope = await requireTenantAction();
   if (!can(asRole(scope.role), 'manage_users')) throw new AgencyPermissionError();
