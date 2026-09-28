@@ -1,0 +1,16 @@
+import { chromium } from '@playwright/test';
+const OUT = process.argv[2];
+const b = await chromium.launch({ channel: 'chrome' });
+const p = await (await b.newContext({ viewport: { width: 360, height: 780 } })).newPage();
+await p.goto('http://localhost:3000/tr/fon-hazirlik', { waitUntil: 'networkidle' });
+const d = p.getByRole('alertdialog'); if (await d.count()) await d.getByRole('button').first().click();
+await p.screenshot({ path: `${OUT}/05-mobile-intro-360.png` });
+await p.getByLabel('İlçe / il belediyesi').check();
+await p.getByRole('button', { name: 'Teste başla' }).click();
+await p.locator('fieldset').first().locator('input[value="1"]').click();
+await p.screenshot({ path: `${OUT}/06-mobile-step-360.png` });
+console.log('overflow', await p.evaluate(() => document.documentElement.scrollWidth - innerWidth));
+await p.goto('http://localhost:3000/en/funding-readiness?kurum=municipality&cevap=012012012012012&il=Samsun', { waitUntil: 'networkidle' });
+await p.screenshot({ path: `${OUT}/07-mobile-en-shared-360.png` });
+console.log('en h1', await p.locator('h1').innerText());
+await b.close();
