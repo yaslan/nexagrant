@@ -34,3 +34,4 @@ add-stripe-event-log/migration.sql
 add-marketplace-order.sql
 add-agency-invite-code.sql
 drop-marketplace.sql
+fix-agency-invite-rejection-audit.sql

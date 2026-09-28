@@ -338,9 +338,43 @@ describe('the agency link grants no read on the linked organisation', () => {
 });
 
 describe('refused attempts are counted without the code', () => {
-  test('a spent code is filed under its agency, an unknown one under no tenant', async () => {
+  // TASK-MULU7GVFBTRXX K-6 — an unknown code is counted on one platform-only
+  // SystemAlert row (fix-agency-invite-rejection-audit.sql), never as a
+  // tenant-readable AuditEvent. The counter row is shared with real attempts,
+  // so this test puts it back exactly as it found it.
+  const UNKNOWN_KEY = 'agency.invite.rejected.unknown';
+  let counterBefore: { id: string; meta: unknown } | null | undefined;
+
+  async function openCounter(): Promise<{ id: string; meta: unknown } | null> {
+    const rows = await admin!.$queryRaw<Array<{ id: string; meta: unknown }>>`
+      SELECT "id", "meta" FROM "SystemAlert"
+       WHERE "level" = 'info' AND "source" = 'agency.invite' AND "resolvedAt" IS NULL
+         AND "meta" ->> 'alertDedupeKey' = ${UNKNOWN_KEY}
+       ORDER BY "createdAt" DESC LIMIT 1`;
+    return rows[0] ?? null;
+  }
+  function repeats(row: { meta: unknown } | null): number {
+    const n = (row?.meta as Record<string, unknown> | undefined)?.alertRepeatCount;
+    return row ? (typeof n === 'number' ? n : 1) : 0;
+  }
+
+  afterAll(async () => {
+    if (!admin || counterBefore === undefined) return;
+    const now = await openCounter();
+    if (!now) return;
+    if (counterBefore === null) {
+      await admin.systemAlert.delete({ where: { id: now.id } }).catch(() => {});
+    } else {
+      await admin.systemAlert
+        .update({ where: { id: counterBefore.id }, data: { meta: counterBefore.meta as object } })
+        .catch(() => {});
+    }
+  });
+
+  test('a spent code is filed under its agency; an unknown one leaves no tenant-readable row', async () => {
     const since = new Date(Date.now() - 1000);
-    const { code } = await makeCode(ids.agencyA, 1);
+    counterBefore = await openCounter();
+    const { id, code } = await makeCode(ids.agencyA, 1);
     expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
     await noteInviteRejection(rls!, code);
     await noteInviteRejection(rls!, 'ZZZZ-ZZZZ-ZZZZ');
@@ -349,13 +383,22 @@ describe('refused attempts are counted without the code', () => {
       where: { tenantId: ids.agencyA, type: 'agency.invite.rejected', createdAt: { gte: since } },
       select: { data: true, actorId: true, target: true },
     });
-    expect(mine).toEqual([{ data: { reason: 'exhausted' }, actorId: null, target: null }]);
+    expect(mine).toEqual([{ data: { reason: 'exhausted', codeId: id }, actorId: null, target: null }]);
 
-    const orphan = await admin!.auditEvent.findMany({
+    const orphan = await admin!.auditEvent.count({
       where: { tenantId: null, type: 'agency.invite.rejected', createdAt: { gte: since } },
-      select: { data: true },
     });
-    expect(orphan.length).toBeGreaterThanOrEqual(1);
-    expect(orphan.every((r) => JSON.stringify(r.data) === '{"reason":"unknown"}')).toBe(true);
+    expect(orphan).toBe(0);
+
+    // Another tenant's session sees none of it.
+    const seenByOrg = await withTenantOn(rls!, ids.org, (tx) =>
+      tx.auditEvent.count({ where: { type: 'agency.invite.rejected', createdAt: { gte: since } } })
+    );
+    expect(seenByOrg).toBe(0);
+
+    const counter = await openCounter();
+    expect(counter).not.toBeNull();
+    expect(repeats(counter)).toBeGreaterThanOrEqual(repeats(counterBefore) + 1);
+    expect(JSON.stringify(counter!.meta)).not.toContain('ZZZZ');
   });
 });
