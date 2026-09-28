@@ -26,11 +26,12 @@ Commit'ler (`dev`'e push'landı):
 
 ### 2.1 CI koşuları (push / dev)
 
-| Koşu                                                                        | Commit     | Sonuç                                                                                                              |
-| --------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| [36486306027](https://github.com/yaslan/fonbridge/actions/runs/36486306027) | `130a44d6` | ❌ "Use Node.js" (`packages field missing or empty`). Başlangıç durumu                                             |
-| [36487054398](https://github.com/yaslan/fonbridge/actions/runs/36487054398) | `6a89e764` | ❌ "Install dependencies": `[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.28.2` → düzeltme 2b         |
-| [36487348931](https://github.com/yaslan/fonbridge/actions/runs/36487348931) | `218abbab` | ❌ yalnız "Test": `1 failed \| 161 passed \| 10 skipped (172)`, tek dosya `tests/plan-entitlement-version.spec.ts` |
+| Koşu                                                                        | Commit     | Sonuç                                                                                                                                                 |
+| --------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [36486306027](https://github.com/yaslan/fonbridge/actions/runs/36486306027) | `130a44d6` | ❌ "Use Node.js" (`packages field missing or empty`). Başlangıç durumu                                                                                |
+| [36487054398](https://github.com/yaslan/fonbridge/actions/runs/36487054398) | `6a89e764` | ❌ "Install dependencies": `[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.28.2` → düzeltme 2b                                            |
+| [36487348931](https://github.com/yaslan/fonbridge/actions/runs/36487348931) | `218abbab` | ❌ yalnız "Test": `1 failed \| 161 passed \| 10 skipped (172)`, tek dosya `tests/plan-entitlement-version.spec.ts`                                    |
+| [36488340685](https://github.com/yaslan/fonbridge/actions/runs/36488340685) | `9193f9be` | ❌ yalnız "Test": `1 failed \| 164 passed \| 10 skipped (175)`, aynı tek dosya (TASK-MULRTOTG9IKIM'in AUTH_SECRET commit'leri dahil, durum değişmedi) |
 
 Son koşunun adım dökümü (`gh run watch 36487348931 --exit-status`):
 
