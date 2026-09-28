@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# The template is tracked: every setting a new checkout needs (DEMO_LOGIN_ENABLED,
+# INVOICE_SUPPLIER_*, ...) lives here with placeholder values only. Never put a
+# real secret in it (TASK-MULRUCLPGIVIL).
+!.env.example
 
 # vercel
 .vercel
@@ -95,3 +99,12 @@ cpanel_*.tar.gz
 # Local planning/business folder (TASK-MULQJZNB7U3QN) — holds a Google OAuth
 # client secret, .docx and .zip; not production code. Never commit.
 /AB Project SaaS/
+
+# Credential files wherever they land, not only under /AB Project SaaS/
+# (TASK-MULRUCLPGIVIL, crw-fb K-8): Google OAuth client secrets, GCP service
+# account keys, PKCS#12 bundles and private keys. *.pem is covered above.
+client_secret*.json
+service-account*.json
+*.p12
+*.key
+*.pfx
