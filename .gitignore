@@ -91,3 +91,7 @@ cpanel_*.tar.gz
 # not be tested or tracked; test runners must exclude **/.claude/worktrees/** to
 # avoid collecting test files from stale/diverged worktrees.
 .claude/worktrees/
+
+# Local planning/business folder (TASK-MULQJZNB7U3QN) — holds a Google OAuth
+# client secret, .docx and .zip; not production code. Never commit.
+/AB Project SaaS/
