@@ -4,7 +4,7 @@
 
 ## 0. Özet
 
-**Fabrika**, KOBİ'lerin, danışmanlık firmalarının ve üniversite proje ofislerinin Avrupa fonlarına (Ufuk Avrupa, EIC, Eurostars/Eureka, CETPartnership, DUT, Erasmus+, Digital Europe, EIT, NEB, Missions) sürekli ve sistematik başvurmasını sağlayan çok kiracılı (multi-tenant) bir web SaaS'ıdır. Çekirdek altı veri katmanı (K1–K6) ve on bir iş modülü (M1–M11) içerir; modüller kiracı yöneticisi tarafından plana/eklentiye göre açılıp kapatılır. Gelir modeli: abonelik + modül eklentileri + hizmet paketleri + pazar yeri komisyonu + veri/API lisansı (`docs/BUSINESS_MODEL.md`).
+**Fabrika**, KOBİ'lerin, danışmanlık firmalarının ve üniversite proje ofislerinin Avrupa fonlarına (Ufuk Avrupa, EIC, Eurostars/Eureka, CETPartnership, DUT, Erasmus+, Digital Europe, EIT, NEB, Missions) sürekli ve sistematik başvurmasını sağlayan çok kiracılı (multi-tenant) bir web SaaS'ıdır. Çekirdek altı veri katmanı (K1–K6) ve on bir iş modülü (M1–M11) içerir; modüller kiracı yöneticisi tarafından plana/eklentiye göre açılıp kapatılır. Gelir modeli: abonelik + modül eklentileri + hizmet paketleri + veri/API lisansı (`docs/BUSINESS_MODEL.md`; pazar yeri kaldırıldı — ADR-0005).
 
 Dil: arayüz **Türkçe (varsayılan) ve İngilizce**; kod, tablo/alan adları ve commit mesajları **İngilizce**.
 
@@ -135,7 +135,7 @@ fabrika/
 
 ## 10. Çalışma sırası (epik düzeyi; ayrıntı `docs/ROADMAP.md`)
 
-E0 İskelet ve altyapı → E1 Kiracı/auth/RLS → E2 Faturalama ve yetkilendirme → E3 Modül çekirdeği + yönetici konsolu → E4 K1 çağrı toplama + kayıtlı arama + uyarı → E5 K5/M5 pipeline ve kapılar → E6 K2/M1 CORDIS ve ortak kartları → E7 M3 Evidence Pack → E8 K6 YZ + M2 Concept Note → E9 M4 + M8 → E10 KPI panosu, i18n, erişilebilirlik, KVKK → E11 Beta (tasarım ortakları) → v1.1+ M6, M9, M10, M11, M7, pazar yeri, API.
+E0 İskelet ve altyapı → E1 Kiracı/auth/RLS → E2 Faturalama ve yetkilendirme → E3 Modül çekirdeği + yönetici konsolu → E4 K1 çağrı toplama + kayıtlı arama + uyarı → E5 K5/M5 pipeline ve kapılar → E6 K2/M1 CORDIS ve ortak kartları → E7 M3 Evidence Pack → E8 K6 YZ + M2 Concept Note → E9 M4 + M8 → E10 KPI panosu, i18n, erişilebilirlik, KVKK → E11 Beta (tasarım ortakları) → v1.1+ M6, M9, M10, M11, M7, API.
 
 ## 11. Kaynak dosya
 
