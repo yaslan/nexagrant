@@ -10,7 +10,8 @@ import { pruneOldStripeEvents, STRIPE_EVENT_RETENTION_DAYS } from '@/lib/billing
  * Retention is set to 30 days (well beyond the 24h idempotency window)
  * to allow for forensics and replay debugging if a webhook processing fails.
  *
- * Runs daily at 2 AM UTC. No tenant isolation: all logs are system-wide.
+ * Runs daily at 2 AM UTC. Sweeps every tenant's log, so the delete runs under
+ * withSystemScope('cross-tenant-job') — see pruneOldStripeEvents.
  * Idempotent: re-running the same hour deletes nothing (WHERE clause filters by date).
  */
 export const stripeEventCleanup = inngest.createFunction(

@@ -19,6 +19,9 @@ vi.mock('@/lib/db', () => {
     tenant: { findUnique: vi.fn() },
     lifetimeLicence: { findFirst: vi.fn(), create: vi.fn() },
   },
+  // The licence write runs in the buyer's tenant scope (TASK-MULQKFER4MF0Y);
+  // hand the callback the same fake client so `create` stays observable.
+  withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) => cb(dbBox.client as never),
   };
   dbBox.client = mod.prisma;
   return mod;

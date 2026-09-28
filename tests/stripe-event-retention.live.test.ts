@@ -1,7 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import pg from 'pg';
-import { prisma } from '@/lib/db';
-import { pruneOldStripeEvents, STRIPE_EVENT_RETENTION_DAYS } from '@/lib/billing/stripe-event-retention';
+import { describe, test, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 
 /**
  * Live Stripe event retention pruning — real Postgres, real Prisma.
@@ -12,63 +9,100 @@ import { pruneOldStripeEvents, STRIPE_EVENT_RETENTION_DAYS } from '@/lib/billing
  * - Events older than retention boundary are deleted
  * - Events newer than retention boundary are preserved
  * - Pruning is idempotent and counts correctly
+ * - The sweep reaches EVERY tenant's rows under the RLS role (TASK-MULQKFER4MF0Y)
  *
  * This is not a unit test: the retention logic is database-dependent
  * (DateTime comparisons in Postgres). A mocked Prisma client cannot
  * validate the WHERE clause filter semantics.
+ *
+ * Runs as `fabrika_app` (NOBYPASSRLS), not the `fabrika` superuser: on the
+ * superuser every RLS policy is skipped, so the unscoped deleteMany this file
+ * used to exercise passed here and deleted nothing in production. Measured on
+ * fabrika_app before the fix: `pruneOldStripeEvents()` returned 0 with old rows
+ * in two tenants. The singleton is pointed at the RLS role before `@/lib/db`
+ * loads (same swap as stripe-webhook-idempotency-rls.live.test.ts); fixtures and
+ * counts go through the owning role.
+ *
+ * All estate-wide pruning lives in this ONE file on purpose: the prune deletes
+ * every old row, so a second file seeding old rows in parallel would inflate
+ * the exact counts asserted below.
  */
+const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
+  const { readFileSync, existsSync } = await import('node:fs');
+  const { resolve } = await import('node:path');
+  const path = resolve(process.cwd(), '.env');
+  const read = (key: string): string | undefined => {
+    if (!existsSync(path)) return undefined;
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+      const t = line.trim();
+      const i = t.indexOf('=');
+      if (i > 0 && t.slice(0, i) === key) {
+        const v = t.slice(i + 1).replace(/^["']|["']$/g, '');
+        return v || undefined;
+      }
+    }
+    return undefined;
+  };
+  const ownerUrl = process.env.DATABASE_URL ?? read('DATABASE_URL');
+  const rlsUrl = process.env.DATABASE_URL_RLS_TEST ?? read('DATABASE_URL_RLS_TEST');
+  if (rlsUrl) process.env.DATABASE_URL = rlsUrl;
+  return { rlsUrl, ownerUrl };
+});
 
-const CONNECTION =
-  process.env.DATABASE_URL || 'postgresql://fabrika:fabrika@localhost:5432/fabrika';
+import { createDbClient } from '@/lib/db';
+import { pruneOldStripeEvents, STRIPE_EVENT_RETENTION_DAYS } from '@/lib/billing/stripe-event-retention';
 
-async function dbReachable(): Promise<boolean> {
-  const pool = new pg.Pool({ connectionString: CONNECTION, connectionTimeoutMillis: 2000 });
-  try {
-    await pool.query('select 1');
-    return true;
-  } catch {
-    return false;
-  } finally {
-    await pool.end().catch(() => {});
-  }
+const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
+
+const HAS_DB =
+  RLS_URL !== undefined && (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
+
+if (!HAS_DB) {
+  console.warn(
+    'stripe event retention test skipped: needs Postgres and DATABASE_URL_RLS_TEST ' +
+      '(`docker compose up -d` then `pnpm db:rls-role`).'
+  );
 }
-
-const HAS_DB = await dbReachable();
 
 // Unique run ID to isolate this test's data
 const RUN = Math.random().toString(36).slice(2, 10);
 const TENANT_ID = `t-retention-${RUN}`;
+const OTHER_TENANT_ID = `t-retention-b-${RUN}`;
+const TENANTS = [TENANT_ID, OTHER_TENANT_ID];
 
 async function cleanUp(): Promise<void> {
-  await prisma.stripeEventLog.deleteMany({ where: { tenantId: TENANT_ID } });
-  await prisma.tenant.deleteMany({ where: { id: TENANT_ID } });
+  await admin.stripeEventLog.deleteMany({ where: { tenantId: { in: TENANTS } } });
+  await admin.tenant.deleteMany({ where: { id: { in: TENANTS } } });
 }
 
 beforeAll(async () => {
   if (!HAS_DB) return;
   await cleanUp();
-  await prisma.tenant.create({
-    data: { id: TENANT_ID, name: `Retention probe ${RUN}`, slug: TENANT_ID, country: 'TR' },
-  });
+  for (const id of TENANTS) {
+    await admin.tenant.create({
+      data: { id, name: `Retention probe ${RUN}`, slug: id, country: 'TR' },
+    });
+  }
 });
 
 afterEach(async () => {
   if (!HAS_DB) return;
   // Clean up between tests to isolate them
-  await prisma.stripeEventLog.deleteMany({ where: { tenantId: TENANT_ID } });
+  await admin.stripeEventLog.deleteMany({ where: { tenantId: { in: TENANTS } } });
 });
 
 afterAll(async () => {
   if (!HAS_DB) return;
   // Report cleanup count for visibility
-  const remaining = await prisma.stripeEventLog.count({ where: { tenantId: TENANT_ID } });
+  const remaining = await admin.stripeEventLog.count({ where: { tenantId: TENANT_ID } });
   if (remaining > 0) {
     console.log(`[cleanup] ${remaining} StripeEventLog rows remain in tenant ${TENANT_ID}`);
   }
   await cleanUp();
+  await admin.$disconnect();
 });
 
-describe.skipIf(!HAS_DB)('stripe event retention pruning (live database)', () => {
+describe.skipIf(!HAS_DB)('stripe event retention pruning (live database, fabrika_app)', () => {
   test('prunes events older than 30 days, preserves newer ones', async () => {
     const now = new Date();
 
@@ -84,7 +118,7 @@ describe.skipIf(!HAS_DB)('stripe event retention pruning (live database)', () =>
     const today = now;
 
     // Create test events
-    await prisma.stripeEventLog.createMany({
+    await admin.stripeEventLog.createMany({
       data: [
         {
           tenantId: TENANT_ID,
@@ -108,7 +142,7 @@ describe.skipIf(!HAS_DB)('stripe event retention pruning (live database)', () =>
     });
 
     // Verify all three events exist before pruning
-    const countBefore = await prisma.stripeEventLog.count({ where: { tenantId: TENANT_ID } });
+    const countBefore = await admin.stripeEventLog.count({ where: { tenantId: TENANT_ID } });
     expect(countBefore).toBe(3);
 
     // Run pruning
@@ -116,14 +150,14 @@ describe.skipIf(!HAS_DB)('stripe event retention pruning (live database)', () =>
     await expect(deletedCount).resolves.toBe(1);
 
     // Verify results: only 31-day-old event deleted
-    const remaining = await prisma.stripeEventLog.findMany({ where: { tenantId: TENANT_ID } });
+    const remaining = await admin.stripeEventLog.findMany({ where: { tenantId: TENANT_ID } });
     expect(remaining).toHaveLength(2);
     expect(remaining.map((r) => r.stripeEventId).sort()).toEqual(
       [`evt-recent-${RUN}`, `evt-today-${RUN}`].sort()
     );
 
     // Verify 31-day-old event is gone
-    const deleted = await prisma.stripeEventLog.findUnique({
+    const deleted = await admin.stripeEventLog.findUnique({
       where: { stripeEventId: `evt-old-${RUN}` },
     });
     expect(deleted).toBeNull();
@@ -134,7 +168,7 @@ describe.skipIf(!HAS_DB)('stripe event retention pruning (live database)', () =>
     const thirtyOneDaysAgo = new Date(now);
     thirtyOneDaysAgo.setDate(thirtyOneDaysAgo.getDate() - 31);
 
-    await prisma.stripeEventLog.create({
+    await admin.stripeEventLog.create({
       data: {
         tenantId: TENANT_ID,
         stripeEventId: `evt-idem-${RUN}`,
@@ -163,7 +197,7 @@ describe.skipIf(!HAS_DB)('stripe event retention pruning (live database)', () =>
     const fiveDaysAgo = new Date(now);
     fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
 
-    await prisma.stripeEventLog.createMany({
+    await admin.stripeEventLog.createMany({
       data: [
         {
           tenantId: TENANT_ID,
@@ -184,10 +218,35 @@ describe.skipIf(!HAS_DB)('stripe event retention pruning (live database)', () =>
     const deleted = await pruneOldStripeEvents(10);
     expect(deleted).toBe(1);
 
-    const remaining = await prisma.stripeEventLog.findMany({
+    const remaining = await admin.stripeEventLog.findMany({
       where: { tenantId: TENANT_ID, stripeEventId: `evt-cust-5-${RUN}` },
     });
     expect(remaining).toHaveLength(1);
+  });
+
+  test('sweeps every tenant under the RLS role, not just the one in scope (TASK-MULQKFER4MF0Y)', async () => {
+    const old = new Date();
+    old.setDate(old.getDate() - (STRIPE_EVENT_RETENTION_DAYS + 5));
+    const fresh = new Date();
+
+    await admin.stripeEventLog.createMany({
+      data: [
+        { tenantId: TENANT_ID, stripeEventId: `evt-x-a-old-${RUN}`, handler: 'subscription.sync', processedAt: old },
+        { tenantId: OTHER_TENANT_ID, stripeEventId: `evt-x-b-old-${RUN}`, handler: 'invoice.payment', processedAt: old },
+        { tenantId: OTHER_TENANT_ID, stripeEventId: `evt-x-b-new-${RUN}`, handler: 'invoice.payment', processedAt: fresh },
+      ],
+    });
+
+    // The production function, on the fabrika_app singleton, with no tenant set.
+    // Unscoped, RLS hides every row: it returns 0 and both old rows survive.
+    const deleted = await pruneOldStripeEvents(STRIPE_EVENT_RETENTION_DAYS);
+    expect(deleted).toBe(2);
+
+    const left = await admin.stripeEventLog.findMany({
+      where: { tenantId: { in: TENANTS } },
+      select: { stripeEventId: true },
+    });
+    expect(left.map((r) => r.stripeEventId)).toEqual([`evt-x-b-new-${RUN}`]);
   });
 
   test('fails gracefully if database is unavailable', async () => {

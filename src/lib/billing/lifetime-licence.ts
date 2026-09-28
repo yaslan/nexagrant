@@ -16,7 +16,7 @@
  * yet, N owners, sold out) are unit-testable without a database.
  */
 import type Stripe from 'stripe';
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { logger } from '@/lib/logger';
 import { LIFETIME_LICENCE_CAP } from './catalog';
@@ -184,21 +184,26 @@ export async function recordLifetimeLicence(
   const seq = (highest?.seq ?? 0) + 1;
 
   try {
-    const licence = await prisma.lifetimeLicence.create({
-      data: {
-        tenantId,
-        seq,
-        sku: LIFETIME_SKU,
-        // What was charged, not the list price: the campaign that was running is
-        // part of the record.
-        amountMinor: session.amount_total ?? 0,
-        currency: (session.currency ?? 'usd').toUpperCase(),
-        provider: 'stripe',
-        providerEventId: eventId,
-        providerSessionId: session.id ?? null,
-        purchasedAt: session.created ? new Date(session.created * 1000) : new Date(),
-      },
-    });
+    // The tenant is in hand, so the write is scoped to it. Unscoped under
+    // `fabrika_app` the INSERT is refused by tenant_isolation's WITH CHECK and a
+    // paid licence is never recorded (TASK-MULQKFER4MF0Y).
+    const licence = await withTenant(tenantId, (tx) =>
+      tx.lifetimeLicence.create({
+        data: {
+          tenantId,
+          seq,
+          sku: LIFETIME_SKU,
+          // What was charged, not the list price: the campaign that was running is
+          // part of the record.
+          amountMinor: session.amount_total ?? 0,
+          currency: (session.currency ?? 'usd').toUpperCase(),
+          provider: 'stripe',
+          providerEventId: eventId,
+          providerSessionId: session.id ?? null,
+          purchasedAt: session.created ? new Date(session.created * 1000) : new Date(),
+        },
+      })
+    );
 
     if (seq > LIFETIME_LICENCE_CAP) {
       // Recorded anyway — an unrecorded sale is the failure we are fixing. The

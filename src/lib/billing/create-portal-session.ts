@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { prisma } from '@/lib/db';
+import { withTenant } from '@/lib/db';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
@@ -12,9 +12,11 @@ export async function createPortalSession(
   returnUrl: string
 ): Promise<string> {
   // Get tenant subscription
-  const subscription = await prisma.subscription.findUnique({
-    where: { tenantId },
-  });
+  const subscription = await withTenant(tenantId, (tx) =>
+    tx.subscription.findUnique({
+      where: { tenantId },
+    })
+  );
 
   if (!subscription?.providerCustomerId) {
     throw new Error(
