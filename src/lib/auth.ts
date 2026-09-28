@@ -167,17 +167,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: safeAdapter,
   session: { strategy: "jwt" },
   trustHost: true,
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "fabrika-secret-key-horizon-europe-2026-super-secure",
+  // No fallback: a literal here was a signing key anyone with the repository
+  // could use to mint a session for any user, and it silenced Auth.js's own
+  // MissingSecret check. Startup refuses to run without it (src/instrumentation.ts).
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   basePath: "/api/auth",
   providers: [
     Google({
-      clientId: process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID || "demo-google-id",
-      clientSecret: process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET || "demo-google-secret",
+      clientId: process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET,
       allowDangerousEmailAccountLinking: true,
     }),
     MicrosoftEntraID({
-      clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID || "demo-entra-id",
-      clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET || "demo-entra-secret",
+      clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
+      clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
       // Directory (tenant) scoping belongs in `issuer`
       // (https://login.microsoftonline.com/<tenant>/v2.0). A `tenantId` option
       // used to be passed here behind an `as any`; the provider never read it,
