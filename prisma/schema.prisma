@@ -277,7 +277,7 @@ model PlanVersion {
   publishedAt   DateTime?      // when this version was published (immutable after)
   subscriptions Subscription[]
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  updatedAt     DateTime @default(now()) @updatedAt
 
   @@unique([planId, version])
 }
@@ -293,7 +293,7 @@ model PlanFeature {
   textTr        String?         // if kind='text': Turkish label or description
   textEn        String?         // if kind='text': English label or description
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  updatedAt     DateTime @default(now()) @updatedAt
 
   @@index([planVersionId, order])
 }
@@ -308,7 +308,7 @@ model PlanAssignment {
   assignedAt    DateTime @default(now())
   note          String?        // reason or memo
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  updatedAt     DateTime @default(now()) @updatedAt
 
   @@unique([planId, tenantId])
 }
