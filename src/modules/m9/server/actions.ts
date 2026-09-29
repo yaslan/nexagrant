@@ -4,6 +4,8 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { generateText } from '@/lib/llm';
+import { renderPrompt } from '@/lib/ai/prompts';
+import { promptLocale } from '@/lib/ai/prompts/locale';
 import { revalidatePath } from 'next/cache';
 import { syncMeetingBriefToCalendar } from '@/lib/calendar/sync';
 import { errorMessage } from '@/lib/errors';
@@ -37,25 +39,8 @@ export async function generateMeetingBrief({
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M9');
   const { tenantId, userId } = await requireTenantAction();
-  const prompt = `Generate a 1-page pre-meeting briefing note for a Horizon Europe consortium discussion.
-  Partner Name: ${partnerName}
-  Call Topic: ${callTopic}
-
-  Include the following structured sections in Markdown:
-  ### 1. Partner Background & EU Track Record
-  - Partner profile, PIC overview, EU framework programme experience.
-  
-  ### 2. Strategic Complementarity for ${callTopic}
-  - Synergies between partner core capabilities and proposal requirements.
-  
-  ### 3. Suggested Work Package & Role Allocation
-  - Recommended Work Package leadership (e.g. WP3 Pilot Demo or WP5 Dissemination) and estimated Person-Months effort.
-  
-  ### 4. 3 Strategic Questions to Ask in Meeting
-  - 3 targeted, high-impact questions to clarify TRL readiness, pilot sites, and effort commitment.
-  
-  ### 5. Risk Points & Red Flags to Clarify
-  - Background IP constraints, competitor overlaps, and budget expectations.`;
+  const locale = await promptLocale();
+  const prompt = renderPrompt('m9/meeting-brief', { partnerName, callTopic }, locale);
 
   // `aiGenerated` decides two things below: whether an AI credit is debited, and
   // whether the brief is stored as a template draft. A brief the model never
@@ -69,7 +54,7 @@ export async function generateMeetingBrief({
       module: 'M9',
       purpose: 'meeting_brief',
       prompt,
-      system: 'You are an expert EU Horizon Europe coordinator preparing pre-meeting briefs for strategic partners.',
+      system: renderPrompt('m9/meeting-brief-system', {}, locale),
     });
   } catch (e) {
     console.warn('[M9 generateMeetingBrief] LLM call fallback:', errorMessage(e));

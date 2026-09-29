@@ -6,6 +6,8 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { generateText } from '@/lib/llm';
+import { renderPrompt } from '@/lib/ai/prompts';
+import { promptLocale } from '@/lib/ai/prompts/locale';
 
 import {
   getPanelScoresForProposal,
@@ -57,14 +59,6 @@ function revalidateQuietly(path: string) {
 
 // ───────────────────────────── AI single-reader lens ─────────────────────────────
 
-const AI_EVALUATION_PROMPT = `Perform a rigorous EU Horizon Europe expert evaluation for opportunity {{opportunityId}} based on official REA criteria:
-  1. Excellence (0.0 - 5.0): Clarity of objectives, soundness of methodology, open science, gender dimension.
-  2. Impact (0.0 - 5.0): Credibility of outcomes/impacts, scale and significance, dissemination & exploitation plan (DEC).
-  3. Quality and efficiency of implementation (0.0 - 5.0): Work plan structure, WPs, milestone risk management, consortium capacity.
-
-  Return ONLY valid JSON with keys: excellence (number), impact (number), implementation (number),
-  strengths (string[]), weaknesses (string[]), recommendations (string[]).`;
-
 /**
  * Run the AI reader over an opportunity and record the result.
  *
@@ -81,14 +75,15 @@ export async function generateAiEvaluation(opportunityId: string): Promise<AiEva
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M6');
   const { tenantId, userId } = await requireTenantAction();
+  const locale = await promptLocale();
 
   const resultStr = await generateText({
     tenantId,
     userId,
     module: 'M6',
     purpose: 'evaluation',
-    prompt: AI_EVALUATION_PROMPT.replace('{{opportunityId}}', oppId),
-    system: 'You are an official European Commission Horizon Europe Proposal Evaluator. Return ONLY valid JSON.',
+    prompt: renderPrompt('m6/evaluation', { opportunityId: oppId }, locale),
+    system: renderPrompt('m6/evaluation-system', {}, locale),
   });
 
   let raw: unknown;

@@ -5,6 +5,8 @@ import { requireTenantAction } from '@/lib/tenant';
 import { generateCompletion, LlmMessage } from '@/lib/llm';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { buildRagPrompt } from '@/lib/rag';
+import { renderPrompt } from '@/lib/ai/prompts';
+import { promptLocale } from '@/lib/ai/prompts/locale';
 import { revalidatePath } from 'next/cache';
 import { findAccessibleTemplate, templateSections } from '@/modules/m2/server/templates';
 
@@ -100,28 +102,17 @@ export async function generateSectionDraft(
 
   // Build RAG-augmented context
   const ragQuery = `${opportunityTitle} — section: ${sectionLabel}`;
-  const ragPrompt = await buildRagPrompt(ragQuery, tenantId, undefined, { userId });
+  const locale = await promptLocale();
+  const ragPrompt = await buildRagPrompt(ragQuery, tenantId, undefined, { userId }, locale);
 
   const messages: LlmMessage[] = [
     {
       role: 'system',
-      content: `You are an expert proposal writer for EU Horizon Europe funding applications. 
-Write compelling, evidence-based content that follows EU evaluation criteria. 
-Be specific, quantitative where possible, and reference the applicant's capabilities.
-Always write in English unless specifically requested otherwise.
-Maximum word count: ${maxWords} words.`,
+      content: renderPrompt('m2/section-draft-system', { maxWords }, locale),
     },
     {
       role: 'user',
-      content: `Write the "${sectionLabel}" section for a concept note targeting: "${opportunityTitle}".
-
-${ragPrompt}
-
-Requirements:
-- Maximum ${maxWords} words
-- Use formal academic/proposal writing style
-- Include specific, measurable objectives where appropriate
-- Reference relevant prior work and capabilities from the context provided`,
+      content: renderPrompt('m2/section-draft-user', { sectionLabel, opportunityTitle, ragPrompt, maxWords }, locale),
     },
   ];
 

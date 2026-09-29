@@ -3,6 +3,8 @@
 import { prisma, withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
+import { renderPrompt } from '@/lib/ai/prompts';
+import { promptLocale } from '@/lib/ai/prompts/locale';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { retrieveChunks } from '@/lib/rag';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
@@ -91,6 +93,7 @@ export async function generateConceptNoteDraft(
   if (!template) throw new Error('Template not found');
 
   // 3. For each section, search RAG for context and generate text
+  const locale = await promptLocale();
   const content: Record<string, string> = {};
   const schema = templateSections(template.schema);
 
@@ -104,19 +107,21 @@ export async function generateConceptNoteDraft(
       contextStr = ragResults.map(r => r.text).join('\n\n');
     }
 
-    const prompt = `
-      You are an expert grant writer for EU funding (Horizon Europe, etc.).
-      Topic: ${topic?.title} (${topic?.identifier})
-      Project Idea/Title: ${opp.title}
-      Additional Inputs: ${JSON.stringify(inputs)}
-      
-      Background Context from Documents:
-      ${contextStr}
-      
-      Task:
-      ${section.promptKey}
-      Write around ${section.maxWords} words.
-    `;
+    // `String(...)` keeps what the template literal printed for a missing topic or
+    // promptKey ("undefined") — the move is byte-for-byte, not a fix.
+    const prompt = renderPrompt(
+      'm2/concept-note-section',
+      {
+        topicTitle: String(topic?.title),
+        topicIdentifier: String(topic?.identifier),
+        opportunityTitle: opp.title,
+        inputsJson: JSON.stringify(inputs),
+        context: contextStr,
+        task: String(section.promptKey),
+        maxWords: section.maxWords,
+      },
+      locale
+    );
 
     const generatedText = await generateText({
       tenantId,

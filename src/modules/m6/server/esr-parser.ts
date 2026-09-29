@@ -2,6 +2,8 @@ import { generateText } from '@/lib/llm';
 import { withTenant, assertTenantScope, type TenantTx } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { z } from 'zod';
+import { renderPrompt } from '@/lib/ai/prompts';
+import { promptLocale } from '@/lib/ai/prompts/locale';
 
 export interface ParsedEsrScores {
   excellence: number;
@@ -24,24 +26,6 @@ export const parsedEsrScoresSchema = z.object({
   strengths: z.array(z.string()).default([]),
   weaknesses: z.array(z.string()).default([]),
 });
-
-const ESR_PARSER_PROMPT = `Analyze the following EU Horizon Europe Evaluation Summary Report (ESR) text.
-Extract the criteria marks and qualitative comments.
-
-Return ONLY valid JSON with keys:
-- excellence: number (0.0 to 5.0)
-- impact: number (0.0 to 5.0)
-- implementation: number (0.0 to 5.0)
-- total: number (0.0 to 15.0)
-- threshold: number (default 10.0)
-- passed: boolean (true if total >= threshold and all subcriteria >= 3.0)
-- strengths: string[]
-- weaknesses: string[]
-
-ESR Document Text:
-"""
-{{documentText}}
-"""`;
 
 /**
  * Parses ESR text content using LLM and returns structured scores.
@@ -70,7 +54,8 @@ export async function parseEsrDocumentText(
   }
   assertTenantScope(tenantId, 'parseEsrDocumentText');
 
-  const prompt = ESR_PARSER_PROMPT.replace('{{documentText}}', documentText.slice(0, 8000));
+  const locale = await promptLocale();
+  const prompt = renderPrompt('m6/esr-parse', { documentText: documentText.slice(0, 8000) }, locale);
 
   const resultStr = await generateText({
     tenantId,
@@ -78,7 +63,7 @@ export async function parseEsrDocumentText(
     module: 'M6',
     purpose: 'esr-parser',
     prompt,
-    system: 'You are an EU Horizon Europe ESR document parser. Return ONLY valid JSON.',
+    system: renderPrompt('m6/esr-parse-system', {}, locale),
   });
 
   let raw: unknown;

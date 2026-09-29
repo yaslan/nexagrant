@@ -32,6 +32,7 @@
  *     now two arguments to one chunker instead of two constants in two files.
  */
 
+import { renderPrompt } from '@/lib/ai/prompts';
 import { withTenant } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 import { embedText, PLATFORM_SCOPE_TENANT_ID, type AiCallAttribution } from '@/lib/llm';
@@ -421,20 +422,18 @@ export async function retrieveChunks(
   }));
 }
 
-export function formatRagPrompt(userQuery: string, chunks: { text: string; score: number }[]): string {
+export function formatRagPrompt(
+  userQuery: string,
+  chunks: { text: string; score: number }[],
+  locale?: string
+): string {
   if (chunks.length === 0) {
     return userQuery;
   }
 
   const context = chunks.map((c, i) => `[Source ${i + 1} | Score: ${(c.score * 100).toFixed(1)}%]\n${c.text}`).join('\n\n');
 
-  return `Use the following retrieved EU CORDIS context to answer the question.
-
----RETRIEVED CONTEXT---
-${context}
----END CONTEXT---
-
-Question: ${userQuery}`;
+  return renderPrompt('rag/retrieved-context', { context, question: userQuery }, locale);
 }
 
 /**
@@ -444,8 +443,9 @@ export async function buildRagPrompt(
   userQuery: string,
   tenantId?: string,
   topK: number = 5,
-  actor?: RagActor
+  actor?: RagActor,
+  locale?: string
 ): Promise<string> {
   const chunks = await retrieveChunks(userQuery, topK, tenantId, actor);
-  return formatRagPrompt(userQuery, chunks);
+  return formatRagPrompt(userQuery, chunks, locale);
 }

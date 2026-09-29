@@ -3,6 +3,8 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
+import { renderPrompt } from '@/lib/ai/prompts';
+import { promptLocale } from '@/lib/ai/prompts/locale';
 import { assertModuleAccess } from '@/lib/modules/access';
 import {
   submitForDualApproval,
@@ -60,16 +62,8 @@ export async function generateStandardDoc(
 
   const oppTitle = opp.title || 'Ufuk Avrupa Proje Başvurusu';
 
-  const prompt = `Generate an official, legally structured EU Horizon Europe ${kind} document for:
-  Opportunity: ${oppTitle}
-  Document Kind: ${kind}
-
-  Return structured Markdown text for this document type:
-  - If NDA: Mutual Non-Disclosure Agreement clauses, IP confidentiality, 5-year duration.
-  - If LOI: Letter of Intent confirming institutional commitment to join the proposal.
-  - If COMMITMENT: Consortium Partner Commitment Form specifying Person-Months & Background IP.
-  - If ESR_DEBRIEF: Post-evaluation ESR score debrief, strengths, weaknesses & resubmission strategy.
-  - If AWARD_PACK: TÜBİTAK Eşik Üstü Ödülü (Threshold Award) package application form & company declaration.`;
+  const locale = await promptLocale();
+  const prompt = renderPrompt('m10/standard-doc', { kind, opportunityTitle: oppTitle }, locale);
 
   // TASK-MTQYXISOPUJ53 — fabricated fallbacks.
   //
@@ -95,7 +89,7 @@ export async function generateStandardDoc(
       module: 'M10',
       purpose: `document_generation_${kind.toLowerCase()}`,
       prompt,
-      system: 'You are an expert EU Horizon Europe legal & administrative document generator.'
+      system: renderPrompt('m10/standard-doc-system', {}, locale)
     });
   } catch (e) {
     console.error(`[m10 generateStandardDoc] generation failed for ${kind}: ${errorMessage(e)}`);

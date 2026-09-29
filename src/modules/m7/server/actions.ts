@@ -3,6 +3,8 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
+import { renderPrompt } from '@/lib/ai/prompts';
+import { promptLocale } from '@/lib/ai/prompts/locale';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
@@ -111,16 +113,8 @@ export async function generateIpChecklist({
   await assertModuleAccess('M7');
   const { tenantId, userId } = await requireTenantAction();
 
-  const prompt = `Generate a university Tech Transfer Office (TTO) IP & Licensing Checklist for:
-  Technology Title: ${title}
-  Current TRL: TRL ${trl}
-  Patent Status: ${patentStatus}
-
-  Include 4 structured checklist categories in Turkish:
-  1. Arka Plan Fikri Mülkiyet (Background IP) Beyanı
-  2. Ön Plan Fikri Mülkiyet (Foreground IP) ve Lisanslama Stratejisi
-  3. Spin-off / Ticari Pazar Açılım Adımları
-  4. AB Konsorsiyum Anlaşması (Consortium Agreement) Özel Maddeleri`;
+  const locale = await promptLocale();
+  const prompt = renderPrompt('m7/ip-checklist', { title, trl, patentStatus }, locale);
 
   let content = '';
   try {
@@ -130,7 +124,7 @@ export async function generateIpChecklist({
       module: 'M7',
       purpose: 'tto_ip_checklist',
       prompt,
-      system: 'You are an expert University Technology Transfer Office (TTO) IP legal specialist for EU Horizon Europe.',
+      system: renderPrompt('m7/ip-checklist-system', {}, locale),
     });
   } catch (e) {
     console.warn('[generateIpChecklist] LLM fallback:', errorMessage(e));
