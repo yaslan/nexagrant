@@ -194,8 +194,8 @@ sertifika adı `mail.fonbridge.com`'u kapsamazsa gönderim `ESOCKET` ile düşer
 SMTP_HOST=mail.fonbridge.com       # sertifika adıyla eşleşmeli; IP yazma (TLS doğrulaması düşer)
 SMTP_PORT=465
 SMTP_SECURE=                       # boş: port 465 ⇒ örtük TLS (mailer.ts:69)
-SMTP_USER=info@fonbridge.com
-SMTP_PASS=<posta kutusu parolası — yalnız sunucu .env / sır kasası>
+SMTP_USER=info@fonbridge.com       # S-1 (§8 madde 4) açık: ayrı gönderim kutusu seçilirse ör. bildirim@fonbridge.com
+SMTP_PASS=<S-1'de seçilen gönderim kutusunun parolası — yalnız sunucu .env / sır kasası>
 SMTP_FROM="FonBridge <info@fonbridge.com>"
 NEXT_PUBLIC_APP_URL=https://fonbridge.com   # davet bağlantıları From ile aynı alanda
 ```
@@ -231,7 +231,8 @@ Gönderici zinciri:
 29.09 ölçümü (bu ofis ağından, mac, `nc -G 5 -vz`): `77.92.144.187:465` ve `:587` **açık**; `:25` erişilemedi — bu ağdan
 dışarı 25 zaten kapalı (ISS), Vulut hakkında hüküm değil. Vulut sunucusunda doğrulama:
 ```sh
-# uygulamanın koşacağı Vulut VPS'inde (Linux: nc -w; mac'teki -G yok):
+# uygulamanın koşacağı Vulut VPS'inde. Linux (OpenBSD nc): -w bağlantı kurma süresini de sınırlar.
+# mac (BSD nc): -w bağlantı kurmayı SINIRLAMAZ — kapalı portta ~75 sn bekler (30.09 ölçümü); mac'te -G 5 ekle.
 nc -vz -w 5 mail.fonbridge.com 465        # A için şart
 nc -vz -w 5 gmail-smtp-in.l.google.com 25 # B/C için şart; "timed out" = Vulut 25'i kapatmış
 openssl s_client -connect mail.fonbridge.com:465 -servername mail.fonbridge.com </dev/null | head -5
@@ -308,7 +309,7 @@ parolayı düz gönderebilir — ve bu parola uygulamanın `SMTP_PASS`'ı ile ay
 ```sh
 # a) TLS'siz EHLO'da AUTH OLMAMALI (beklenen: yalnız 250-STARTTLS; AUTH satırı yok → çıktı boş)
 { sleep 2; printf 'EHLO probe.example\r\n'; sleep 2; printf 'QUIT\r\n'; sleep 1; } \
-  | nc -w 5 mail.fonbridge.com 587 | tr -d '\r' | grep AUTH          # mac: nc -G 5
+  | nc -w 5 mail.fonbridge.com 587 | tr -d '\r' | grep AUTH          # mac: -G 5 de ekle (port kapalıysa -w tek başına ~75 sn bekletir)
 # b) STARTTLS sonrası AUTH OLMALI (beklenen: 250-AUTH PLAIN LOGIN)
 { sleep 2; printf 'EHLO probe.example\r\n'; sleep 2; printf 'QUIT\r\n'; sleep 1; } \
   | openssl s_client -quiet -starttls smtp -connect mail.fonbridge.com:587 -servername mail.fonbridge.com 2>/dev/null \
@@ -324,7 +325,7 @@ cPanel'in "Posta İstemcisi Yapılandırma" ekranındaki **"Güvenli SSL/TLS Aya
 
 ## 7. Canlıya geçiş kontrol listesi
 
-### 7.0 Doğrulama komutları (DNS yayıldıktan sonra; hepsi salt-okur, son ikisi tek deneme iletisi gönderir)
+### 7.0 Doğrulama komutları (DNS yayıldıktan sonra; hepsi salt-okur — yalnız adım 4–5 tek deneme iletisi gönderir, adım 7–9 ileti bırakmaz)
 ```sh
 # 1) Bölge yetkili NS'de var mı (yayılmayı beklemeden, ilk bakılacak yer)
 dig SOA fonbridge.com @ns1.iyisunucu.com.tr +norec | grep status   # NOERROR olmalı (bugün REFUSED)
@@ -335,7 +336,7 @@ openssl s_client -connect mail.fonbridge.com:465 -servername mail.fonbridge.com 
   | openssl x509 -noout -subject -enddate -text | grep -E 'subject=|notAfter|DNS:'
 openssl s_client -starttls smtp -connect mail.fonbridge.com:587 -servername mail.fonbridge.com </dev/null 2>/dev/null \
   | openssl x509 -noout -subject -text | grep -E 'subject=|DNS:'
-openssl s_client -starttls smtp -connect mail.fonbridge.com:25 -servername mail.fonbridge.com </dev/null 2>/dev/null | head -3   # ofis ağında 25 kapalı; VPS'ten koş
+openssl s_client -starttls smtp -connect mail.fonbridge.com:25 -servername mail.fonbridge.com </dev/null 2>/dev/null | head -3   # 25'e çıkış gerekir: önce adım 7-ön (25 çıkışı ön kontrolü)
 #    beklenen: DNS:mail.fonbridge.com (bugün CN=autoconfig.srv.iyisunucu.com.tr)
 # 4) Uçtan uca test gönderimi (swaks; brew install swaks / apt install swaks). Parola komut satırına YAZILMAZ:
 #    --auth-password verilmezse swaks sorar; geçmişe ve `ps` çıktısına düşmez.
@@ -358,35 +359,70 @@ Parola ne komutta ne kabuk geçmişinde ne de bu repoda durur; swaks'ın sorduğ
 
 Güvenlik kontrolleri (İNCELEME-41; hiçbiri ileti bırakmaz, hiçbiri parola göndermez):
 ```sh
-# 7) AÇIK RELAY TESTİ (B-1) — UYGULAMA VPS'inden (25/tcp ofis ağında ISS tarafından kapalı), KİMLİK DOĞRULAMASIZ.
+# 7) AÇIK RELAY TESTİ (B-1) — KİMLİK DOĞRULAMASIZ, ileti BIRAKMAZ.
 #    --quit-after RCPT: DATA'ya hiç geçmez, ileti GÖNDERİLMEZ. example.org/net RFC 2606 alanları, kimseye ait değil.
-#    a) yabancı gönderici → yabancı alıcı (klasik açık relay)
+#    Önkoşul: `info@` kutusu AÇIK (§8 madde 4). Kutu yokken (b) ve (d) 550 "No Such User Here"/"Sender verify failed",
+#    bölge yokken 451 alır — ikisi de relay hakkında bir şey söylemez.
+#
+#  7-ön) ÖN KONTROL — bu makineden 25'e çıkış var mı? (Açık relay tehlikesi 25'te; a/b/d 25 ister.)
+#    Uygulama VPS'inde denenir; Vulut VPS'lerinde 25 çıkışı kapalı olabilir (§6.1) ve A seçildiği için açtırılmadı (§8 7d).
+nc -vz -w 5 mail.fonbridge.com 25                  # Linux. mac: nc -vz -G 5 mail.fonbridge.com 25
+#    AÇIK   → Linux "Connection to mail.fonbridge.com (77.92.144.187) 25 port [tcp/smtp] succeeded!"
+#             (RHEL ncat: "Ncat: Connected to …") → a–d'yi BU makinede koş.
+#    KAPALI → "… timed out" / "Operation timed out" / "Ncat: TIMEOUT." (~5 sn) → a–d burada KOŞULAMAZ; swaks da
+#             `*** Error connecting …` ile biter ve relay hakkında HİÇBİR ŞEY söylemez. Şu sırayla alternatif:
+#      (i)   25 çıkışı açık başka bir makine: geçici bir bulut VM'i (saatlik, iş bitince silinir), 25'i açık bir ev/ofis
+#            hattı. Önce aynı ön kontrol; AÇIK çıkarsa a–d aynen orada koşulur. (Bu ofis ağında 25 kapalı — 30.09 ölçümü.)
+#      (ii)  Çevrimiçi test: MXToolbox → SMTP Diagnostics (https://mxtoolbox.com/diagnostic.aspx), sunucu
+#            `mail.fonbridge.com`. Kendi ağından 25'e bağlanıp açık relay dener; "SMTP Open Relay" satırı yeşil
+#            (not an open relay) olmalı, kırmızıysa aşağıdaki DUR kuralı. Tek deneme yapar (yalnız ≈ a); sonucun ekran
+#            görüntüsü madde 15'e kanıt olarak eklenir. (Aracı biz koşmadık — bölge henüz yok.)
+#      (iii) §8 7a biletine ekle: "test için uygulama VPS'inden 25 çıkışı birkaç dakikalığına açılabilir mi?"
+#      (iv)  Hiçbiri yoksa: yalnız (c) koşulur. (c) YEDEK DEĞİL, yalnız ipucudur — 587'de ret, 25'te de ret demek
+#            değildir (farklı dinleyici/ACL olabilir). Madde 15 "kısmi — 25 ölçülemedi, açık risk" diye yazılır ve
+#            §8 7g'deki Vulut teyidine dayanılır.
+#
+#    a) yabancı gönderici → yabancı alıcı (klasik açık relay) — 25
 swaks --server mail.fonbridge.com --port 25 --quit-after RCPT \
       --from probe@example.org --to probe@example.net
-#    b) KENDİ alanımızdan sahte gönderici → dış alıcı (kimlik doğrulamasız "bizim adımıza" gönderim)
+#    b) KENDİ alanımızdan sahte gönderici → dış alıcı (kimlik doğrulamasız "bizim adımıza" gönderim) — 25
 swaks --server mail.fonbridge.com --port 25 --quit-after RCPT \
       --from info@fonbridge.com --to probe@example.net
-#    c) aynı iki deneme 587'de de (gönderim portu da kimliksiz relay yapmamalı):
+#    c) gönderim portu da kimliksiz relay yapmamalı — 587 (25 kapalı bir yerden de koşar; tek başına yetmez, bkz. iv)
 swaks --server mail.fonbridge.com --port 587 --tls --tls-verify --quit-after RCPT \
       --from info@fonbridge.com --to probe@example.net
-#    BEKLENEN (üçünde de): RCPT TO'ya 5xx red, ör.
-#      <** 550 relay not permitted      ya da   <** 550-… Relaying denied / authentication required
-#    Bu Exim relay kararından ÖNCE göndericiyi doğrular (sender verify): (a) büyük olasılıkla
-#    `550 Sender verify failed` alır — o da geçer, önemli olan 250 DÖNMEMESİ. Relay politikasının KENDİSİNİ (b) sınar;
-#    bu yüzden (b) `info@` kutusu AÇILDIKTAN sonra koşulur (kutu yokken 550 "No Such User" ya da bölge yokken 451 alır,
-#    ikisi de relay hakkında bir şey söylemez). 29.09 ön ölçümü (587, STARTTLS, DATA yok): (a) → 550 Sender verify
-#    failed; (b) → 451 Temporary local problem (fonbridge.com bölgesi yok) → relay politikası henüz ÖLÇÜLEMEDİ.
-#    `<~ 250 Accepted` / `<- 250 Accepted` görülürse: DUR, gönderimi açma, Vulut'a acil bilet (sunucu açık relay;
+#    BEKLENEN (a/b/c): RCPT TO'ya 5xx red. swaks ret satırını TLS'siz oturumda `<**`, TLS'li oturumda (c) `<~*` ile
+#    işaretler, ör.   <** 550 relay not permitted   ·   <~* 550-… Relaying denied / authentication required
+#    Exim relay kararından ÖNCE göndericiyi doğrular (sender verify): (a) büyük olasılıkla `550 Sender verify failed`
+#    alır — o da geçer, önemli olan 250 DÖNMEMESİ. Relay politikasının KENDİSİNİ (b) sınar (gönderici geçerli yerel adres).
+#    29.09 ön ölçümü (587, STARTTLS, DATA yok): (a) → `<~* 550 Sender verify failed`; (b) → `<~* 451 Temporary local
+#    problem` (fonbridge.com bölgesi yok) → relay politikası henüz ÖLÇÜLEMEDİ.
+#    a/b/c'de `<~ 250 Accepted` / `<- 250 Accepted` görülürse: DUR, gönderimi açma, Vulut'a acil bilet (sunucu açık relay;
 #    paylaşımlı IP 77.92.144.187 kara listeye girer ve fonbridge.com postası da düşer). 4xx (451/421) = geçici ret,
-#    sonuç anlamsız → birkaç dakika sonra tekrarla. Karşılaştırma (pozitif kontrol): kendi alanımıza teslim
-#    `--to info@fonbridge.com` ile 25'te 250 dönmeli — yoksa test yanlış sunucuya/porta gidiyordur.
+#    sonuç anlamsız → birkaç dakika sonra tekrarla.
+#
+#    d) POZİTİF KONTROL (B-2) — testin doğru sunucuya gittiğini ve 25'in bu makineden gerçekten çalıştığını kanıtlar.
+#       Gönderici de alıcı da YEREL ve VAR OLAN kutu (`info@`); relay yok, kimlik yok, DATA yok:
+swaks --server mail.fonbridge.com --port 25 --quit-after RCPT \
+      --from info@fonbridge.com --to info@fonbridge.com
+#       BEKLENEN: `<-  220-srv.iyisunucu.com.tr ESMTP Exim 4.100.1 …` (bu karşılama 587'de 29.09'da ölçüldü; 25'in
+#       aynı Exim olması beklenir) ve RCPT TO'ya `<-  250 …` (Exim'de genelde `250 Accepted`; ölçülemedi — kutu yok).
+#       GÖNDERİCİYİ DEĞİŞTİRME: (a)'daki `--from probe@example.org` ile koşulursa doğru sunucuda da
+#       `550 Sender verify failed` döner (29.09 ölçüldü) ve yanlışlıkla "yanlış sunucu" sanılır. Yerel ama VAR OLMAYAN
+#       gönderici de aynı 550'yi verir (30.09 ölçüldü: usfinbridge.com'da var olmayan kutu → `550-No Such User Here` /
+#       `550 Sender verify failed`) → 550 görülürse önce `info@` kutusu açık mı bak.
+#       Teşhis: 220 satırında `srv.iyisunucu.com.tr` YOKSA yanlış sunucu/DNS (adım 2); bağlantı yoksa 25 çıkışı (7-ön);
+#       220 doğru + 550 Sender verify / No Such User = kutu yok (§8 madde 4). Pozitif kontrol 250 vermeden a/b'nin 5xx'i
+#       "relay yok" diye OKUNMAZ.
 #
 # 8) DKIM ANAHTAR BOYU (B-2) — her yerden koşar (yalnız DNS). Birden çok "…" parçaya bölünmüş TXT'yi de birleştirir.
 dig +short TXT default._domainkey.fonbridge.com | tr -d '" ' | sed 's/.*p=//;s/;.*//' | fold -w64 \
   | { echo '-----BEGIN PUBLIC KEY-----'; cat; echo '-----END PUBLIC KEY-----'; } \
   | openssl pkey -pubin -noout -text | head -1
-#    BEKLENEN: RSA Public-Key: (2048 bit)   ·  (1024 bit) → §3.1 "DKIM anahtar boyu" adımı
-#    Boş/`Could not read` = kayıt henüz yok ya da bozuk. Komut 29.09'da doğrulandı: usfinbridge.com → (2048 bit);
+#    BEKLENEN: `Public-Key: (2048 bit)` (OpenSSL 3, Linux VPS) ya da `RSA Public-Key: (2048 bit)` (LibreSSL/OpenSSL 1.1, mac)
+#    · `(1024 bit)` → §3.1 "DKIM anahtar boyu" adımı.
+#    Boş çıktı ya da hata satırı = kayıt henüz yok ya da bozuk (OpenSSL 3: `Could not find private key of Public Key
+#    from <stdin>`; LibreSSL: `unable to load Public Key`). Komut 29.09'da doğrulandı: usfinbridge.com → (2048 bit);
 #    yerelde üretilen 1024/2048 bitlik anahtarlarla bilinen-negatif/pozitif → (1024 bit)/(2048 bit).
 #
 # 9) AUTH YALNIZ TLS SONRASI (B-3) — §6.6 "Doğrulama" komutları (a)/(b)/(c).
@@ -406,7 +442,10 @@ dig +short TXT default._domainkey.fonbridge.com | tr -d '" ' | sed 's/.*p=//;s/;
 12. [ ] Outlook/Hotmail'e deneme (paylaşımlı IP'de en sık spam'e düşen yer); spam'deyse B'yi değerlendir.
 13. [ ] 2–4 hafta sonra DMARC raporları → `p=quarantine`.
 14. [ ] Web: §10.3 — `www` ve `http` üç istek de tek sıçramayla `301 https://fonbridge.com/…`; iki adın sertifikası geçerli.
-15. [ ] **Açık relay yok** (§7.0 adım 7, uygulama VPS'inden): a/b/c üçünde de RCPT'ye 5xx; pozitif kontrol 250.
+15. [ ] **Açık relay yok** (§7.0 adım 7): ön kontrol 7-ön hangi makinede AÇIK çıktıysa orada (uygulama VPS'i ya da
+    alternatif i) pozitif kontrol (d) `250`, a/b/c üçünde de RCPT'ye 5xx; ya da (ii) MXToolbox "SMTP Open Relay" yeşil
+    + ekran görüntüsü. 25 hiçbir yerden ölçülemediyse kutu **işaretlenmez**: "kısmi — yalnız (c)" yazılır, açık risk
+    olarak kalır ve §8 7g teyidi beklenir.
 16. [ ] **AUTH yalnız TLS sonrası** (§6.6 doğrulama a/b/c) — ya da Vulut reddettiyse: `info@` kutusunu kullanan herkes
     istemcisini 465/993 SSL/TLS ile kurdu (§6.6 son paragraf).
 17. [ ] (Önerilen) Google Postmaster Tools'a fonbridge.com kaydı (Microsoft SNDS'in Google karşılığı; §6.3).
@@ -429,9 +468,14 @@ başlatınca sıra şudur:
    (ör. `bildirim@`, ayrı parola) mı? `SMTP_USER=info@` iken uygulama sunucusundaki `.env` sızarsa saldırgan yalnız
    göndermez, `info@`'ya gelen müşteri yazışmalarını ve DMARC raporlarını da okur. Öneri: ayrı kutu; `info@` insanlara.
 5. SSL/TLS Status → AutoSSL'i çalıştır; `mail.fonbridge.com` kapsansın.
-6. `info@` parolasını üretim sunucusu `.env`'ine (`SMTP_PASS`) bizzat koy; repoya/sohbete yazma. Diğer satırlar §5.
+6. **S-1'de seçilen gönderim kutusunun** kullanıcı adını `SMTP_USER`'a, parolasını `SMTP_PASS`'a üretim sunucusu
+   `.env`'inde bizzat koy (`info@` seçilirse `info@`, ayrı kutu seçilirse ör. `bildirim@`); repoya/sohbete yazma. Diğer
+   satırlar §5. Ayrı kutu seçilse de `SMTP_FROM` `FonBridge <info@fonbridge.com>` kalabilir: gönderim kutusu aynı alanda
+   olduğu için DKIM `d=fonbridge.com` ve DMARC hizası bozulmaz (Exim'in kimlikli kullanıcıya başka yerel adresle
+   From izni verdiği §7.0 adım 4'te `--from info@` + `--auth-user bildirim@` ile ölçülür).
 7. **Vulut'a tek bilet** — sorulacaklar/istenecekler:
-   a. Uygulamanın koşacağı VPS'ten `mail.fonbridge.com:465` (ve 587) çıkışı açık mı?
+   a. Uygulamanın koşacağı VPS'ten `mail.fonbridge.com:465` (ve 587) çıkışı açık mı? VPS'ten giden 25 kapalıysa:
+      yalnız açık relay testi (§7.0 adım 7) için birkaç dakikalığına açılabilir mi? (Kalıcı 25 istemiyoruz — A'da gerekmez.)
    b. cPanel posta sunucusunun saatlik/günlük gönderim sınırı; dış IP'den (uygulama VPS'i) SMTP AUTH'a izin. cPHulk
       beyaz listesini **varsayılan olarak isteme** (beyaz listedeki IP kaba kuvvet korumasından muaf olur); yalnız gerçek
       bir kilitlenme yaşanırsa uygulama VPS IP'si için iste.
@@ -446,7 +490,7 @@ başlatınca sıra şudur:
    f. (Yalnız §7.0 adım 8 `1024 bit` gösterir ve cPanel ekranında yeniden üretme yoksa) "fonbridge.com DKIM anahtarını
       2048 bit olarak yeniden üretir misiniz?"
    g. Sunucunun açık relay olmadığı (kimliksiz dış teslimi reddettiği) teyidi — biz de §7.0 adım 7 ile ölçeriz.
-7b. Uygulama sunucusunda §10.1 ters vekili (Caddy önerisi) — `www` → kök 301 ve iki adın sertifikası. **Şimdilik
+7-web. Uygulama sunucusunda §10.1 ters vekili (Caddy önerisi) — `www` → kök 301 ve iki adın sertifikası. **Şimdilik
    yapılmıyor (patron 29.09).** Başlatılınca onayla biz kurabiliriz; SSH erişimi gerekir.
 8. Bunlar bitince haber ver; §7 listesinin ölçümlerini (dig, openssl, mail-tester, kara liste, Gmail başlıkları) biz koşarız.
 
