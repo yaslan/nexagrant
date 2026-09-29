@@ -710,6 +710,12 @@ export async function handleIyzicoWebhook(
     const versionId = planChanged ? await publishedVersionIdFor(planId) : null;
     const versionColumn = versionId ? { planVersionId: versionId } : {};
 
+    // TODO(TASK-MUMABL78X5JLX, review Ö-3): no free-pilot guard here yet. The
+    // Stripe path refuses to overwrite a `provider: 'pilot'` row
+    // (subscription-sync.ts: `lockPilotRow` + `isPilotSubscription` inside the
+    // write transaction). Unreachable today — `createIyzicoCheckout` has no
+    // caller and is the only source of a conversationId — but the day iyzico
+    // checkout opens, add the same guard before this upsert.
     await tx.subscription.upsert({
       where: { tenantId },
       create: {

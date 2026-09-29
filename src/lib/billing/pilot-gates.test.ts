@@ -6,7 +6,8 @@
  *   - an expired pilot makes every server action (`requireTenantAction`) and
  *     every write route (`requireTenantApi({ write: true })`) refuse, while
  *     reads still pass;
- *   - checkout is closed to a pilot tenant, running or expired.
+ *   - checkout is closed to a pilot tenant, running or expired;
+ *   - the session-less M11 partner portal (magic token) is refused the same way.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
@@ -21,6 +22,7 @@ import { upsertPublicSectorPlans } from './public-sector-plans';
 import { PilotExpiredError, grantPilot } from './pilot';
 import { grantPilotAction } from '@/app/[locale]/admin/billing/plans/actions';
 import { POST as checkout } from '@/app/api/billing/checkout/route';
+import { addBudgetLineByToken } from '@/modules/m11/server/actions';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const DAY = 86_400_000;
@@ -98,5 +100,28 @@ describe('pilot gates', () => {
     );
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ code: 'PILOT_CHECKOUT_CLOSED' });
+  });
+
+  it('the partner portal token cannot write into an expired pilot; a running one can', async () => {
+    const workspace = await prisma.workspace.create({ data: { tenantId, name: 'Pilot WS', slug: `pilot-ws-${suffix()}` } });
+    const opp = await prisma.opportunity.create({ data: { tenantId, workspaceId: workspace.id, title: 'Pilot opp' } });
+    const magicToken = `pilot-gate-token-${suffix()}`;
+    const part = await prisma.applicationPart.create({
+      data: { tenantId, opportunityId: opp.id, part: 'PART_A', content: {}, magicToken },
+    });
+    const budgetOf = async () =>
+      ((await prisma.applicationPart.findUniqueOrThrow({ where: { id: part.id } })).content as { budget?: unknown[] })
+        .budget ?? [];
+
+    // Session-less: the token is the only credential.
+    session.current = null;
+
+    await grantPilot(tenantId, 'admin-1', { now: new Date(Date.now() - 91 * DAY) });
+    await expect(addBudgetLineByToken(magicToken, 'Probe Partner', 3)).resolves.toEqual({ success: false });
+    expect(await budgetOf()).toEqual([]);
+
+    await grantPilot(tenantId, 'admin-1', { extend: true });
+    await expect(addBudgetLineByToken(magicToken, 'Probe Partner', 3)).resolves.toMatchObject({ success: true });
+    expect(await budgetOf()).toHaveLength(1);
   });
 });

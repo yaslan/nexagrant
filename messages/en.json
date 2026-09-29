@@ -1668,7 +1668,8 @@
       "outcome": {
         "granted": "Pilot granted.",
         "extended": "Pilot extended by 90 days.",
-        "unchanged": "This tenant already has a running pilot; the end date did not change. Tick the box to extend."
+        "unchanged": "This tenant already has a running pilot; the end date did not change. Tick the box to extend.",
+        "stale": "The pilot was changed from another session in the meantime; the end date did not change. Check the current end and try again."
       }
     }
   },

@@ -16,8 +16,10 @@
  *   - granting it (platform admin only, idempotent, audited) — `grantPilot`;
  *   - reading whether it has run out — `pilotStateOf` / `getPilotState`;
  *   - read-only after the end — `assertTenantWritable`, called by
- *     `requireTenantAction` (every server action) and by the write route
- *     handlers. Data is kept and stays readable; writes are refused.
+ *     `requireTenantAction` (every server action), by the write route
+ *     handlers and by the session-less M11 partner portal
+ *     (`addBudgetLineByToken`). Data is kept and stays readable; writes are
+ *     refused.
  *
  * `provider: 'pilot'` is what tells a pilot from a Stripe trial: a Stripe
  * TRIALING row never carries `trialEndsAt` (subscription-sync.ts does not write
@@ -25,6 +27,7 @@
  * alone (`isPilotSubscription` in subscription-sync.ts).
  */
 
+import { createHash } from 'crypto';
 import { withTenant, type TenantTx } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { clearedPriceLock } from '@/lib/billing/price-lock';
@@ -148,9 +151,29 @@ export class ContractSubscriptionError extends Error {
   }
 }
 
+/** Advisory-lock key for one tenant's pilot row (same derivation as iyzico.ts `advisoryLockKey`). */
+function pilotLockKey(tenantId: string): bigint {
+  return createHash('sha256').update(`billing.pilot:${tenantId}`).digest().readBigInt64BE(0);
+}
+
+/**
+ * Takes the tenant's pilot lock for the rest of `tx` (freed at commit/rollback).
+ * Anything that decides "is this a pilot?" and then writes the Subscription row
+ * takes it first — `grantPilot` and the Stripe sync/cancellation — so the
+ * decision and the write cannot interleave with a grant. A row lock cannot do
+ * this: a first grant has no Subscription row to lock.
+ */
+export async function lockPilotRow(tx: TenantTx, tenantId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${pilotLockKey(tenantId)})`;
+}
+
 export interface GrantPilotResult {
-  /** `unchanged`: a pilot was already running and no extension was asked for. */
-  outcome: 'granted' | 'extended' | 'unchanged';
+  /**
+   * `unchanged`: a pilot was already running and no extension was asked for.
+   * `stale`: an extension was asked for against an end that is no longer the
+   * current one — another grant got there first; nothing was written.
+   */
+  outcome: 'granted' | 'extended' | 'unchanged' | 'stale';
   endsAt: Date;
 }
 
@@ -162,6 +185,11 @@ export interface GrantPilotResult {
  * takes `extend: true`, which moves the end 90 days past the later of now and
  * the current end, and is audited as `billing.pilot.extended`.
  *
+ * `expectedEndsAt` is the end the admin was looking at (null: no pilot). When
+ * it is given and the row has moved on since, the call is `stale` and writes
+ * nothing — two tabs clicking "extend" on the same screen extend once, with
+ * one audit row, instead of +180 days (review Ö-2).
+ *
  * Refused over a live Stripe/iyzico subscription (the tenant is paying) and
  * over a live contract package (the tenant has bought one) — the pilot is for
  * a tenant that has neither. The caller is the platform-admin action; this
@@ -170,13 +198,19 @@ export interface GrantPilotResult {
 export async function grantPilot(
   tenantId: string,
   actorId: string | null,
-  opts: { extend?: boolean; now?: Date } = {}
+  opts: { extend?: boolean; now?: Date; expectedEndsAt?: Date | null } = {}
 ): Promise<GrantPilotResult> {
   const now = opts.now ?? new Date();
   const planVersionId = await publishedVersionIdFor(PILOT_PLAN_ID);
   if (!planVersionId) throw new NoPublishedVersionError(PILOT_PLAN_ID);
 
   return withTenant(tenantId, async (tx) => {
+    // Serialise grants for this tenant before reading the row: two concurrent
+    // grants would otherwise both read "no pilot" and write two audit rows, and
+    // two extensions would both read the same end (review Ö-2). Read-committed:
+    // the read below sees the row the lock's previous holder committed.
+    await lockPilotRow(tx, tenantId);
+
     const existing = (await tx.subscription.findUnique({
       where: { tenantId },
       select: { planId: true, status: true, provider: true, providerSubId: true, trialEndsAt: true },
@@ -193,6 +227,13 @@ export async function grantPilot(
     const state = pilotStateOf(existing, now);
     if (state.kind === 'active' && !opts.extend) {
       return { outcome: 'unchanged' as const, endsAt: state.endsAt };
+    }
+    if (opts.extend && opts.expectedEndsAt !== undefined) {
+      const current = state.kind === 'none' ? null : state.endsAt.getTime();
+      const expected = opts.expectedEndsAt === null ? null : opts.expectedEndsAt.getTime();
+      if (current !== expected && state.kind !== 'none') {
+        return { outcome: 'stale' as const, endsAt: state.endsAt };
+      }
     }
 
     const extending = state.kind !== 'none' && opts.extend === true;

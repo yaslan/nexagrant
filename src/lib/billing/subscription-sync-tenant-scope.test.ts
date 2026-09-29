@@ -90,6 +90,8 @@ vi.mock('@/lib/db', () => {
   });
 
   const tx = {
+    // The pilot advisory lock (`lockPilotRow`), taken after the claim.
+    $executeRaw: step('$executeRaw', () => 1),
     stripeEventLog: {
       findUnique: step('stripeEventLog.findUnique', () => null as { id: string } | null),
       create: step('stripeEventLog.create', () => ({ id: 'sel_1' })),

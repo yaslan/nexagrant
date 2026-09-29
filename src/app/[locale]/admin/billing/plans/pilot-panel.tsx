@@ -17,7 +17,7 @@ export function PilotPanel({
   pilots,
 }: {
   tenants: Array<{ id: string; name: string }>;
-  pilots: Array<{ tenantId: string; tenantName: string; lastDay: string; expired: boolean }>;
+  pilots: Array<{ tenantId: string; tenantName: string; lastDay: string; endsAt: string; expired: boolean }>;
 }) {
   const t = useTranslations('adminPlans');
   const router = useRouter();
@@ -29,7 +29,10 @@ export function PilotPanel({
   const submit = () => {
     setNotice(null);
     startTransition(async () => {
-      const res = await grantPilotAction(tenantId, extend);
+      // The end on screen: a second tab extending the same pilot comes back
+      // `stale` instead of adding another 90 days.
+      const seen = pilots.find((p) => p.tenantId === tenantId)?.endsAt ?? null;
+      const res = await grantPilotAction(tenantId, extend, extend ? seen : undefined);
       if (res.ok) {
         setNotice({ kind: 'ok', text: t(`pilot.outcome.${res.data.outcome}`) });
         setExtend(false);

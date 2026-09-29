@@ -1668,7 +1668,8 @@
       "outcome": {
         "granted": "Pilot atandı.",
         "extended": "Pilot 90 gün uzatıldı.",
-        "unchanged": "Bu kiracının pilotu zaten sürüyor; süre değişmedi. Uzatmak için kutuyu işaretleyin."
+        "unchanged": "Bu kiracının pilotu zaten sürüyor; süre değişmedi. Uzatmak için kutuyu işaretleyin.",
+        "stale": "Pilot bu arada başka bir oturumdan değiştirilmiş; süre değişmedi. Güncel bitişi görüp yeniden deneyin."
       }
     }
   },

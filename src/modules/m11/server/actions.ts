@@ -2,6 +2,7 @@
 
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
+import { assertTenantWritable, PilotExpiredError } from '@/lib/billing/pilot';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
 
@@ -553,6 +554,17 @@ export async function addBudgetLineByToken(
 
   if (!part || part.part !== 'PART_A') {
     return { success: false };
+  }
+
+  // No session here, so `requireTenantAction` — which makes an expired free
+  // pilot read-only for every other action — never runs. The token's tenant
+  // gets the same gate (TASK-MUMABL78X5JLX, review B-1): a partner link handed
+  // out during the pilot must not keep writing into the workspace after it.
+  try {
+    await assertTenantWritable(part.tenantId);
+  } catch (e) {
+    if (e instanceof PilotExpiredError) return { success: false };
+    throw e;
   }
 
   const content = readPartContent(part.content);

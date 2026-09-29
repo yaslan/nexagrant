@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import type Stripe from 'stripe';
-import { prisma, withTenant } from '@/lib/db';
+import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
 import { grantsFor } from './catalog';
 import { assignPlanToTenant, LiveProviderSubscriptionError } from './plan-repository';
@@ -17,6 +17,7 @@ import {
   assertTenantWritable,
   getPilotState,
   grantPilot,
+  lockPilotRow,
   pilotEndsAt,
   pilotStateOf,
 } from './pilot';
@@ -137,6 +138,30 @@ describe('grantPilot (live DB)', () => {
     expect((event?.data as Record<string, unknown>).previousEndsAt).toBe('2026-12-29T21:00:00.000Z');
   });
 
+  it('two concurrent first grants write one pilot and one audit row (advisory lock)', async () => {
+    const now = new Date('2026-10-01T09:00:00Z');
+    const results = await Promise.all([
+      grantPilot(tenantId, 'admin-1', { now }),
+      grantPilot(tenantId, 'admin-2', { now }),
+    ]);
+    expect(results.map((r) => r.outcome).sort()).toEqual(['granted', 'unchanged']);
+    expect(await prisma.auditEvent.count({ where: { tenantId, type: { startsWith: 'billing.pilot.' } } })).toBe(1);
+  });
+
+  it('two concurrent extensions from the same screen extend once, with one audit row', async () => {
+    const now = new Date('2026-10-01T09:00:00Z');
+    const first = await grantPilot(tenantId, 'admin-1', { now });
+    const later = new Date(now.getTime() + 10 * DAY);
+    const results = await Promise.all([
+      grantPilot(tenantId, 'admin-1', { now: later, extend: true, expectedEndsAt: first.endsAt }),
+      grantPilot(tenantId, 'admin-2', { now: later, extend: true, expectedEndsAt: first.endsAt }),
+    ]);
+    expect(results.map((r) => r.outcome).sort()).toEqual(['extended', 'stale']);
+    const sub = await prisma.subscription.findUnique({ where: { tenantId } });
+    expect(sub?.trialEndsAt?.toISOString()).toBe('2027-03-29T21:00:00.000Z'); // +90, not +180
+    expect(await prisma.auditEvent.count({ where: { tenantId, type: 'billing.pilot.extended' } })).toBe(1);
+  });
+
   it('refuses over a live Stripe subscription and over a contract package', async () => {
     await prisma.subscription.create({
       data: { tenantId, planId: 'pro', status: 'ACTIVE', provider: 'stripe', providerSubId: 'sub_pilot_test' },
@@ -186,5 +211,56 @@ describe('grantPilot (live DB)', () => {
     });
     expect(after?.trialEndsAt?.toISOString()).toBe(before!.trialEndsAt!.toISOString());
     expect((await getPilotState(tenantId)).kind).toBe('active');
+  });
+
+  it('a grant landing after the Stripe fast-path read is still caught inside the sync transaction (Ö-4)', async () => {
+    // Holds the pilot lock with an uncommitted pilot row, so the sync's fast-path
+    // read (its own autocommit) sees no pilot and the sync walks into its write
+    // transaction. Only once it is waiting on the lock does the grant commit.
+    const waitingOnPilotLock = async () => {
+      for (let i = 0; i < 200; i++) {
+        const [row] = await prisma.$queryRaw<{ n: bigint }[]>`
+          SELECT count(*) AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted`;
+        if (Number(row!.n) > 0) return;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      throw new Error('the sync never waited on the pilot lock');
+    };
+    const endsAt = pilotEndsAt(new Date());
+    let sync: ReturnType<typeof syncStripeSubscription> | undefined;
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+        await lockPilotRow(tx as TenantTx, tenantId);
+        await tx.subscription.create({
+          data: {
+            tenantId,
+            planId: 'public-team',
+            status: 'TRIALING',
+            provider: PILOT_PROVIDER,
+            billingInterval: 'year',
+            currentPeriodEnd: endsAt,
+            trialEndsAt: endsAt,
+          },
+        });
+        const fake = {
+          id: 'sub_race_pilot',
+          status: 'active',
+          customer: 'cus_race',
+          metadata: { tenantId },
+          items: { data: [] },
+        } as unknown as Stripe.Subscription;
+        sync = syncStripeSubscription(fake, `evt_pilot_race_${suffix()}`);
+        sync.catch(() => {});
+        await waitingOnPilotLock();
+      },
+      { timeout: 15_000 }
+    );
+
+    await expect(sync!).resolves.toMatchObject({ status: 'skipped', error: 'PILOT_PROTECTED' });
+    const after = await prisma.subscription.findUnique({ where: { tenantId } });
+    expect(after).toMatchObject({ status: 'TRIALING', provider: PILOT_PROVIDER, providerSubId: null });
+    // Rolled back with the claim, so the event can be replayed after the pilot.
+    expect(await prisma.stripeEventLog.count({ where: { tenantId } })).toBe(0);
   });
 });

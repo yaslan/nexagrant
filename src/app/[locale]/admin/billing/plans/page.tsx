@@ -64,6 +64,7 @@ export default async function AdminPlansPage({
           tenantId: p.tenantId,
           tenantName: p.tenantName,
           lastDay: pilotLastDayLabel(p.endsAt, locale),
+          endsAt: p.endsAt.toISOString(),
           expired: p.expired,
         }))}
       />

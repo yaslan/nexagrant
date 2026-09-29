@@ -199,11 +199,16 @@ export async function unassignPlanAction(planId: string, tenantId: string): Prom
  */
 export async function grantPilotAction(
   tenantId: string,
-  extend: boolean
-): Promise<ActionResult<{ outcome: 'granted' | 'extended' | 'unchanged'; endsAt: string }>> {
+  extend: boolean,
+  /** The end the admin saw (ISO), or null for none; omitted → no staleness check. */
+  expectedEndsAt?: string | null
+): Promise<ActionResult<{ outcome: 'granted' | 'extended' | 'unchanged' | 'stale'; endsAt: string }>> {
   try {
     const { userId } = await requirePlatformAdmin();
-    const result = await grantPilot(tenantId, userId, { extend });
+    const expected =
+      expectedEndsAt === undefined ? undefined : expectedEndsAt === null ? null : new Date(expectedEndsAt);
+    // An unparseable date compares unequal to any end, so it answers `stale` and writes nothing.
+    const result = await grantPilot(tenantId, userId, { extend, expectedEndsAt: expected });
     revalidate();
     return { ok: true, data: { outcome: result.outcome, endsAt: result.endsAt.toISOString() } };
   } catch (e) {

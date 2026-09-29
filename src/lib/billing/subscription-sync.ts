@@ -12,7 +12,7 @@ import {
 } from '@/lib/billing/price-lock';
 import { publishedVersionIdFor } from '@/lib/billing/plan-repository';
 import { createInvoiceForPayment } from '@/lib/billing/invoice-writer';
-import { isPilotSubscription, PILOT_PLAN_ID } from '@/lib/billing/pilot';
+import { isPilotSubscription, lockPilotRow, PILOT_PLAN_ID } from '@/lib/billing/pilot';
 import { invoiceLinePeriodFallback } from '@/lib/efatura';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
@@ -484,6 +484,17 @@ export async function syncStripeSubscription(
       throw new StripeEventAlreadyClaimed();
     }
 
+    // The pilot guard above is a fast path read in its own autocommit; this is
+    // the authority (review Ö-4). Under the pilot lock and in the transaction
+    // that writes, so a grant cannot land between the check and the upsert.
+    // Throwing rolls the claim back too, as on the cancellation path.
+    await lockPilotRow(tx, tenantId);
+    const current = await tx.subscription.findUnique({
+      where: { tenantId },
+      select: { status: true, provider: true, trialEndsAt: true },
+    });
+    if (isPilotSubscription(current)) throw new PilotSubscriptionProtected();
+
     await tx.subscription.upsert({
       where: { tenantId },
       create: {
@@ -644,8 +655,26 @@ export async function syncStripeSubscription(
     return { addedAddOns: added, removedAddOns: removed, creditsGranted: granted };
   }).catch((error: unknown) => {
     if (error instanceof StripeEventAlreadyClaimed) return null;
+    if (error instanceof PilotSubscriptionProtected) return 'pilot' as const;
     throw error;
   });
+
+  if (outcome === 'pilot') {
+    logger.error('Stripe subscription names a tenant on the free pilot; not synced', {
+      tenantId,
+      eventId,
+      stripeSubscriptionId: subscription.id,
+    });
+    return {
+      tenantId,
+      planId: PILOT_PLAN_ID,
+      status: 'skipped',
+      addedAddOns: [],
+      removedAddOns: [],
+      creditsGranted: 0,
+      error: 'PILOT_PROTECTED',
+    };
+  }
 
   // `null` means the claim lost the race; the delivery that won it did the work.
   if (outcome === null) {
@@ -732,9 +761,11 @@ export async function handleSubscriptionCancellation(
     }
 
     // The same guard as in `syncStripeSubscription`: a Stripe cancellation must
-    // not cancel a free pilot it never sold. Read in this transaction, so no
-    // grant can land between the check and the update; throwing rolls the
-    // claim back too, so the event can be replayed once the pilot is ended.
+    // not cancel a free pilot it never sold. Read in this transaction under the
+    // pilot lock, so no grant can land between the check and the update;
+    // throwing rolls the claim back too, so the event can be replayed once the
+    // pilot is ended.
+    await lockPilotRow(tx, tenantId);
     const current = await tx.subscription.findUnique({
       where: { tenantId },
       select: { status: true, provider: true, trialEndsAt: true },
