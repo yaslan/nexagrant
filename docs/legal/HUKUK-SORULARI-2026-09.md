@@ -7,7 +7,7 @@
 >
 > **Bu belge hukuki bir metin değildir.** Ürün ekibinin bugünkü durumu anlattığı bir soru listesidir. Hiçbir cümlesi hukuken onaylı değildir.
 >
-> **Bugünkü durumun kaynağı kodun kendisidir**, planlar ya da eski belgeler değildir. Her teknik iddia 29.09.2026'da `dev` dalının `0ce53b6a` commit'inde kaynak kodda kontrol edildi (sürüm 1.0 `858c139a`'da kontrol edilmişti; sürüm 1.1'de bütün kanıt satırları bu commit'e göre yeniden kontrol edildi). Kod yolları her bölümün sonunda "Kanıt" satırında verilir. Bu satırlar ürün ekibi içindir; okumanız gerekmez.
+> **Bugünkü durumun kaynağı kodun kendisidir**, planlar ya da eski belgeler değildir. Her teknik iddia 29.09.2026'da `dev` dalının `84d11af4` commit'inde kaynak kodda kontrol edildi (sürüm 1.0 `858c139a`'da kontrol edilmişti; sürüm 1.1'de bütün kanıt satırları bu commit'e göre yeniden kontrol edildi). Kod yolları her bölümün sonunda "Kanıt" satırında verilir. Bu satırlar ürün ekibi içindir; okumanız gerekmez.
 
 ---
 
