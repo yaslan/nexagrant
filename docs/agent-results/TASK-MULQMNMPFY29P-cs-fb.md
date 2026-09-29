@@ -63,6 +63,7 @@ Koddan doğrulananlar:
 ## 6. Sonraki adım
 
 - leed-fb: yukarıdaki önerileri patrona iletsin. Onay gelirse board'da kartları yeniden açsın ve başlıklarını düzeltsin (bu kart board'da statü değiştirmedi).
+- Çalışırken iki commit düştü ve ROADMAP'e işlendi: `50d7e8a9` (TASK-MUM187B5EN9LZ, K3 DoS) ve `b11ed48b` (TASK-MUM17YBJVAHRR, pilot kapısı a). İkisi de board'da hâlâ `in_progress`.
 - Pilot kapıları (a) TASK-MUM17YBJVAHRR ve (b) TASK-MULWCFBTHDYZI kapandığında ROADMAP'teki tablo güncellensin.
 
 **Platform beyanı:** yalnız doküman işi. macOS'ta (Darwin 27) hazırlandı. Kod yolu değişmedi, bu yüzden Windows/Linux için davranış farkı yok. Lint/typecheck ölçümleri macOS'ta koşuldu.
