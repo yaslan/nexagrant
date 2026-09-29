@@ -371,12 +371,20 @@ export function priceEntry(
  */
 export const FALLBACK_PLAN_ID = 'free';
 
-export type EntitlementPlanId = PlanId | typeof FALLBACK_PLAN_ID;
+/** FB KAMU B11 — the three public-sector packages, sold by contract only. */
+export type PublicSectorPlanId = 'public-starter' | 'public-team' | 'public-institution';
+
+export type EntitlementPlanId = PlanId | typeof FALLBACK_PLAN_ID | PublicSectorPlanId;
 
 export interface PlanGrant {
   planId: EntitlementPlanId;
   name: string;
-  /** False for `free`: a state a tenant falls into, not a thing it can buy. */
+  /**
+   * True only for a plan a tenant can buy by itself at checkout. False for
+   * `free` (a state a tenant falls into) and for the public-sector packages
+   * (sold by contract, assigned by a platform admin — see
+   * `PUBLIC_SECTOR_PLANS`).
+   */
   purchasable: boolean;
   seats: number;
   workspaces: number;
@@ -399,7 +407,7 @@ const ALL_MODULE_IDS = [
   'M11',
 ] as const;
 
-export const PLAN_GRANTS: readonly PlanGrant[] = [
+const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
   {
     planId: 'free',
     name: 'Discover',
@@ -436,6 +444,111 @@ export const PLAN_GRANTS: readonly PlanGrant[] = [
     aiCreditsMonthly: 2_000,
     moduleIds: ALL_MODULE_IDS,
   },
+];
+
+// ─────────────────────── Public-sector packages (FB KAMU B11) ───────────────────────
+//
+// Owner-approved on 2026-09-29 (docs/kamu/ILKADIM-PILOT.md §6.2). A
+// municipality buys a year by contract under 4734 md. 22/d, so these plans are
+// never on the shopfront and never reach Stripe or iyzico: a platform admin
+// assigns one to a tenant in /admin/billing/plans, which writes the tenant's
+// `Subscription` (`assignPlanToTenant`). No invoice is issued from here — that
+// waits for e-Fatura (TASK-MTRJSOWFH6B45).
+//
+// Each package opens exactly what its base plan opens ("Başlangıç / Ekip /
+// İşletme planı yetkileri" in §6.2, which are `basic` / `pro` / `ultra` since
+// the EUR ladder was retired — see `RETIRED_PLAN_IDS`). The grant is derived
+// from the base plan rather than re-typed, so the two cannot drift; only the
+// seat count is stated here, because it is part of what the contract sells.
+
+/** Currency every public-sector package is contracted in. */
+export const PUBLIC_SECTOR_CURRENCY = 'TRY';
+
+/** How often the package includes a written usage report. */
+export type ReportCadence = 'quarterly' | 'monthly';
+
+/**
+ * The service half of a contract — delivered by people, recorded here as plan
+ * metadata so a proposal and the product quote the same terms. Nothing
+ * schedules or counts these days automatically.
+ */
+export interface PublicSectorServiceTerms {
+  /** Onboarding days on site or online (Başlangıç, Ekip). */
+  onboardingDays: number;
+  /** Training days (Kurum). */
+  trainingDays: number;
+  /** Written usage report, or `null` when the package has none. */
+  reportCadence: ReportCadence | null;
+}
+
+export interface PublicSectorPlan {
+  planId: PublicSectorPlanId;
+  name: string;
+  /** The self-serve plan whose modules, workspaces and credits this opens. */
+  basePlanId: PlanId;
+  seats: number;
+  /** Price of one contract year, VAT excluded, in kuruş (CLAUDE.md rule 9). */
+  yearlyListMinor: number;
+  currency: typeof PUBLIC_SECTOR_CURRENCY;
+  services: PublicSectorServiceTerms;
+}
+
+export const PUBLIC_SECTOR_PLANS: readonly PublicSectorPlan[] = [
+  {
+    planId: 'public-starter',
+    name: 'Belediye Başlangıç',
+    basePlanId: 'basic',
+    seats: 2,
+    yearlyListMinor: 9_000_000, // 90.000,00 TL / year, VAT excluded
+    currency: PUBLIC_SECTOR_CURRENCY,
+    services: { onboardingDays: 1, trainingDays: 0, reportCadence: null },
+  },
+  {
+    planId: 'public-team',
+    name: 'Belediye Ekip',
+    basePlanId: 'pro',
+    seats: 6,
+    yearlyListMinor: 24_000_000, // 240.000,00 TL / year, VAT excluded
+    currency: PUBLIC_SECTOR_CURRENCY,
+    services: { onboardingDays: 2, trainingDays: 0, reportCadence: 'quarterly' },
+  },
+  {
+    planId: 'public-institution',
+    name: 'Belediye Kurum',
+    basePlanId: 'ultra',
+    seats: 15,
+    yearlyListMinor: 48_000_000, // 480.000,00 TL / year, VAT excluded
+    currency: PUBLIC_SECTOR_CURRENCY,
+    services: { onboardingDays: 0, trainingDays: 4, reportCadence: 'monthly' },
+  },
+];
+
+/** The public-sector package with this id, or `null` for any other plan. */
+export function publicSectorPlan(planId: string): PublicSectorPlan | null {
+  const wanted = planId.trim().toLowerCase();
+  return PUBLIC_SECTOR_PLANS.find((plan) => plan.planId === wanted) ?? null;
+}
+
+/** True for a plan sold by contract and assigned by an admin, never at checkout. */
+export function isContractPlan(planId: string): boolean {
+  return publicSectorPlan(planId) !== null;
+}
+
+function publicSectorGrant(plan: PublicSectorPlan): PlanGrant {
+  const base = SELF_SERVE_GRANTS.find((grant) => grant.planId === plan.basePlanId);
+  if (!base) throw new Error(`Public-sector plan ${plan.planId} names unknown base ${plan.basePlanId}`);
+  return {
+    ...base,
+    planId: plan.planId,
+    name: plan.name,
+    purchasable: false,
+    seats: plan.seats,
+  };
+}
+
+export const PLAN_GRANTS: readonly PlanGrant[] = [
+  ...SELF_SERVE_GRANTS,
+  ...PUBLIC_SECTOR_PLANS.map(publicSectorGrant),
 ];
 
 /**

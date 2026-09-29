@@ -1600,6 +1600,7 @@
     "assign": {
       "title": "Özel pakete kiracı atama",
       "hint": "Özel paket listelerde görünmez; yalnızca atanan kiracılar görür.",
+      "contractHint": "Kamu paketi sözleşmeyle satılır: atama, kiracının aboneliğini bu pakete (yıllık, ACTIVE, sağlayıcı: sözleşme) geçirir; modüller ve koltuk sınırı hemen uygulanır. Fatura kesilmez.",
       "tenant": "Kiracı",
       "pickTenant": "Kiracı seçin",
       "note": "Not",
@@ -1612,6 +1613,8 @@
       "IMPACT_NOT_ACKNOWLEDGED": "Yayın reddedildi: etkilenen kiracı sayısı değişmiş. Etkiyi yeniden hesaplayın.",
       "MODULE_NOT_GRANTED": "Kart maddesi, paketin vermediği bir modülü gösteriyor.",
       "PLAN_IN_USE": "Aktif aboneliği olan paket silinemez — arşivleyin.",
+      "LIVE_PROVIDER_SUBSCRIPTION": "Kiracının Stripe/iyzico üzerinden aktif aboneliği var. Kamu paketi atamadan önce o aboneliği iptal edin.",
+      "NO_PUBLISHED_VERSION": "Paketin yayınlanmış sürümü yok; atanamaz.",
       "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekir.",
       "UNKNOWN": "İşlem başarısız: {detail}"
     }

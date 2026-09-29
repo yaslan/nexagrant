@@ -37,6 +37,7 @@ import {
   priceEntry,
   priceLine,
   findEntry,
+  isContractPlan,
   type BillingCycle,
   type DiscountTier,
   type PricablePlan,
@@ -115,9 +116,14 @@ function toStorefrontPlan(row: {
  * The free tier is a state a tenant falls into, never a thing it can buy — the
  * rule `catalog.ts` already states for `CATALOG`, applied to the database list
  * so the studio's `Plan` row for it cannot become a $0 "buy" button.
+ *
+ * A contract plan (the public-sector packages, FB KAMU B11) is excluded for the
+ * same reason from the other side: it is assigned by an admin, and the
+ * assignment that makes it visible to the tenant must not turn it into a
+ * Stripe checkout button.
  */
 function purchasable(plan: StorefrontPlan): boolean {
-  return plan.planId !== FALLBACK_PLAN_ID;
+  return plan.planId !== FALLBACK_PLAN_ID && !isContractPlan(plan.planId);
 }
 
 /**

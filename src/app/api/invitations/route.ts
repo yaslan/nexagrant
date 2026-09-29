@@ -3,6 +3,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantApi } from '@/lib/tenant';
 import { randomBytes } from 'crypto';
 import type { InvitationRow } from '@/types/db-rows';
+import { assertSeatAvailable, SeatLimitReachedError, type SeatUsage } from '@/lib/billing/seat-limit';
 
 /**
  * Invites a user into the caller's own tenant.
@@ -56,7 +57,11 @@ export async function POST(req: Request) {
     const token = randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    const result = await withTenant<{ conflict: boolean; invitation: InvitationRow | null }>(tenantId, async (tx) => {
+    const result = await withTenant<{
+      conflict: boolean;
+      seatLimit: SeatUsage | null;
+      invitation: InvitationRow | null;
+    }>(tenantId, async (tx) => {
       const existingMembership = await tx.membership.findFirst({
         where: {
           tenantId,
@@ -65,7 +70,18 @@ export async function POST(req: Request) {
       });
 
       if (existingMembership) {
-        return { conflict: true, invitation: null };
+        return { conflict: true, seatLimit: null, invitation: null };
+      }
+
+      // The plan's seat limit (src/lib/billing/seat-limit.ts): members plus
+      // pending invitations may not exceed it.
+      try {
+        await assertSeatAvailable(tx, tenantId, email);
+      } catch (error) {
+        if (error instanceof SeatLimitReachedError) {
+          return { conflict: false, seatLimit: error.usage, invitation: null };
+        }
+        throw error;
       }
 
       const invitation = await tx.invitation.upsert({
@@ -74,13 +90,27 @@ export async function POST(req: Request) {
         create: { email, tenantId, token, role, expires },
       });
 
-      return { conflict: false, invitation };
+      return { conflict: false, seatLimit: null, invitation };
     });
 
     if (result.conflict) {
       return NextResponse.json(
         { error: 'Bu e-posta adresi zaten bu kurumun üyesidir.' },
         { status: 400 }
+      );
+    }
+
+    if (result.seatLimit) {
+      const { limit, members, pendingInvitations } = result.seatLimit;
+      return NextResponse.json(
+        {
+          error:
+            `Planınızın koltuk sınırına ulaşıldı (${limit} koltuk: ${members} üye, ` +
+            `${pendingInvitations} bekleyen davet). Yeni davet için koltuk ekleyin ya da planınızı yükseltin.`,
+          code: 'SEAT_LIMIT_REACHED',
+          seats: { limit, members, pendingInvitations },
+        },
+        { status: 403 }
       );
     }
 

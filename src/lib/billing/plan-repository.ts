@@ -15,6 +15,7 @@
 
 import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
+import { isContractPlan } from '@/lib/billing/catalog';
 
 export interface PublishedPlanVersion {
   id: string;
@@ -299,6 +300,31 @@ export class PlanInUseError extends Error {
     this.name = 'PlanInUseError';
   }
 }
+
+/**
+ * A contract plan was assigned to a tenant that is paying through a provider.
+ * Overwriting that row would detach a live Stripe/iyzico subscription from the
+ * tenant while the provider keeps charging it; the operator cancels it first.
+ */
+export class LiveProviderSubscriptionError extends Error {
+  readonly code = 'LIVE_PROVIDER_SUBSCRIPTION';
+  constructor(readonly tenantId: string, readonly provider: string) {
+    super(`Tenant ${tenantId} has a live ${provider} subscription; cancel it before assigning a contract plan.`);
+    this.name = 'LiveProviderSubscriptionError';
+  }
+}
+
+/** A contract plan with no published version has no terms to put a tenant on. */
+export class NoPublishedVersionError extends Error {
+  readonly code = 'NO_PUBLISHED_VERSION';
+  constructor(readonly planId: string) {
+    super(`Plan ${planId} has no published version to assign.`);
+    this.name = 'NoPublishedVersionError';
+  }
+}
+
+/** `Subscription.provider` for a plan sold by contract, not through a PSP. */
+export const CONTRACT_PROVIDER = 'contract';
 
 /** The editable body of a version — everything a draft may change. */
 export interface PlanVersionDraftInput {
@@ -825,41 +851,110 @@ export async function setPlanVisibility(
   });
 }
 
-/** Give a private plan to one tenant. Idempotent on (plan, tenant). */
+/**
+ * Give a private plan to one tenant. Idempotent on (plan, tenant).
+ *
+ * For an ordinary private plan this only makes the plan *visible* to the tenant
+ * — the tenant still buys it at checkout. A contract plan (the public-sector
+ * packages, `isContractPlan`) is never bought at checkout, so assigning it is
+ * the sale: the same transaction puts the tenant's `Subscription` on the plan's
+ * published version, `ACTIVE`, yearly, provider `contract`. That row is what
+ * `getEntitlements` reads, so the modules and the seat limit follow at once.
+ * No invoice is issued here (e-Fatura, TASK-MTRJSOWFH6B45).
+ */
 export async function assignPlanToTenant(
   planId: string,
   tenantId: string,
   actorId: string | null,
   note?: string | null
 ): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  const contract = isContractPlan(planId);
+  const planVersionId = contract ? await publishedVersionIdFor(planId) : null;
+  if (contract && !planVersionId) throw new NoPublishedVersionError(planId);
+
+  // PlanAssignment, Subscription and AuditEvent are tenant-scoped, so the
+  // writes run inside withTenant (CLAUDE.md rule 1) — one tenant, one scope.
+  await withTenant(tenantId, async (tx) => {
     await tx.planAssignment.upsert({
       where: { planId_tenantId: { planId, tenantId } },
       create: { planId, tenantId, assignedBy: actorId, note: note ?? null },
       update: { assignedBy: actorId, note: note ?? null },
     });
+
+    let previousPlanId: string | null = null;
+    if (contract) {
+      const existing = (await tx.subscription.findUnique({
+        where: { tenantId },
+        select: { planId: true, status: true, provider: true, providerSubId: true },
+      })) as { planId: string; status: string; provider: string; providerSubId: string | null } | null;
+      previousPlanId = existing?.planId ?? null;
+      if (
+        existing &&
+        existing.provider !== CONTRACT_PROVIDER &&
+        existing.providerSubId &&
+        (LIVE_SUB_STATUSES as readonly string[]).includes(existing.status)
+      ) {
+        throw new LiveProviderSubscriptionError(tenantId, existing.provider);
+      }
+
+      const terms = {
+        planId,
+        planVersionId,
+        status: 'ACTIVE' as const,
+        billingInterval: 'year',
+        provider: CONTRACT_PROVIDER,
+        providerSubId: null,
+        trialEndsAt: null,
+      };
+      await tx.subscription.upsert({
+        where: { tenantId },
+        create: { tenantId, ...terms },
+        update: terms,
+      });
+    }
+
     await tx.auditEvent.create({
       data: {
         type: 'plan.assigned',
         actorId,
         tenantId,
         target: planId,
-        data: { planId, tenantId, note: note ?? null },
+        data: contract
+          ? { planId, tenantId, note: note ?? null, contract: true, planVersionId, previousPlanId }
+          : { planId, tenantId, note: note ?? null },
       },
     });
   });
 }
 
-/** Take a private plan away from a tenant. */
+/**
+ * Take a private plan away from a tenant. For a contract plan the tenant's
+ * subscription on it is cancelled too, which drops it back to the fallback
+ * plan's entitlements; a subscription the tenant has since moved to another
+ * plan or provider is left alone.
+ */
 export async function unassignPlanFromTenant(
   planId: string,
   tenantId: string,
   actorId: string | null
 ): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  const contract = isContractPlan(planId);
+  await withTenant(tenantId, async (tx) => {
     await tx.planAssignment.deleteMany({ where: { planId, tenantId } });
+    const cancelled = contract
+      ? ((await tx.subscription.updateMany({
+          where: { tenantId, planId, provider: CONTRACT_PROVIDER, status: { not: 'CANCELED' } },
+          data: { status: 'CANCELED' },
+        })) as { count: number }).count
+      : 0;
     await tx.auditEvent.create({
-      data: { type: 'plan.unassigned', actorId, tenantId, target: planId, data: { planId, tenantId } },
+      data: {
+        type: 'plan.unassigned',
+        actorId,
+        tenantId,
+        target: planId,
+        data: contract ? { planId, tenantId, contract: true, cancelledSubscriptions: cancelled } : { planId, tenantId },
+      },
     });
   });
 }

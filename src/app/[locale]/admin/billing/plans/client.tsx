@@ -18,6 +18,7 @@ import {
   Save,
 } from 'lucide-react';
 import { formatMoney } from '@/lib/money';
+import { isContractPlan } from '@/lib/billing/catalog';
 import type { AdminPlanRow, AdminPlanVersionRow, PublishImpact } from '@/lib/billing/plan-repository';
 import {
   createDraftAction,
@@ -678,6 +679,11 @@ export function PlanAdminClient({ locale, plans, modules, tenants, loadError }: 
                   <Users className="w-4 h-4" /> {t('assign.title')}
                 </h3>
                 <p className="text-xs text-muted">{t('assign.hint')}</p>
+                {isContractPlan(plan.id) && (
+                  <p className="text-xs text-ink-2" data-testid="assign-contract-hint">
+                    {t('assign.contractHint')}
+                  </p>
+                )}
 
                 <div className="flex flex-wrap gap-2 items-end">
                   <label className="text-xs text-ink-2 space-y-1">

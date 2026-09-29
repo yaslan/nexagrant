@@ -1600,6 +1600,7 @@
     "assign": {
       "title": "Assign tenants to a private plan",
       "hint": "A private plan is unlisted; only assigned tenants can see it.",
+      "contractHint": "Public-sector package, sold by contract: assigning it moves the tenant's subscription onto this package (yearly, ACTIVE, provider: contract); modules and the seat limit apply at once. No invoice is issued.",
       "tenant": "Tenant",
       "pickTenant": "Pick a tenant",
       "note": "Note",
@@ -1612,6 +1613,8 @@
       "IMPACT_NOT_ACKNOWLEDGED": "Publish refused: the affected-tenant count moved. Recompute the impact.",
       "MODULE_NOT_GRANTED": "A card bullet names a module this plan does not grant.",
       "PLAN_IN_USE": "A plan with live subscriptions cannot be deleted — archive it.",
+      "LIVE_PROVIDER_SUBSCRIPTION": "This tenant has a live Stripe/iyzico subscription. Cancel it before assigning a public-sector package.",
+      "NO_PUBLISHED_VERSION": "This package has no published version and cannot be assigned.",
       "PLATFORM_ADMIN_REQUIRED": "This action requires a platform administrator.",
       "UNKNOWN": "Action failed: {detail}"
     }

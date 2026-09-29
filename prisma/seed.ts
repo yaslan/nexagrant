@@ -5,8 +5,10 @@ import {
   CATALOG_CURRENCY,
   PLAN_GRANTS,
   findEntry,
+  isContractPlan,
   plansGrantingModule,
 } from '../src/lib/billing/catalog';
+import { upsertPublicSectorPlans } from '../src/lib/billing/public-sector-plans';
 import { rescoreOpportunityG0 } from '../src/lib/scoring/g0-compute';
 import { DEFAULT_CRITERIA } from '../src/modules/m6/types';
 import seedTenantWorkspace from './seed-tenant-workspace';
@@ -203,7 +205,9 @@ async function main() {
   // The amounts stored are **list** prices. The rolling campaign discount is
   // applied at checkout by `getActiveTier()`, so a discounted amount must never
   // be persisted onto a plan row — see docs/BILLING.md §3.
-  const plans = PLAN_GRANTS.map((grant) => {
+  // The public-sector packages (FB KAMU B11) are TRY, yearly-only and private;
+  // `upsertPublicSectorPlans` below writes them.
+  const plans = PLAN_GRANTS.filter((grant) => !isContractPlan(grant.planId)).map((grant) => {
     const entry = findEntry(grant.planId);
     const priced = entry && entry.kind === 'plan' ? entry : null;
     if (grant.purchasable && !priced) {
@@ -276,11 +280,14 @@ async function main() {
     });
   }
 
+  // 2c. Public-sector packages — Plan + PlanVersion v1 + service-term bullets.
+  const publicSectorPlanIds = await upsertPublicSectorPlans(prisma);
+
   // Retired EUR plan rows. `prisma migrate` moved the subscriptions off them
   // (prisma/migrations/retire-eur-plan-ladder.sql); this keeps a database that
   // is re-seeded without replaying the migration from growing them back.
   const retired = await prisma.plan.deleteMany({
-    where: { id: { notIn: plans.map((p) => p.id) } },
+    where: { id: { notIn: [...plans.map((p) => p.id), ...publicSectorPlanIds] } },
   });
   if (retired.count > 0) {
     console.log(`  Plan: removed ${retired.count} retired row(s)`);
