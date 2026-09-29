@@ -32,20 +32,31 @@ Pilotun amacı özellik göstermek değil. Beta programındaki ilke burada da ge
 
 ### 2.1 Koltuk dağılımı (öneri)
 
-| Koltuk | Birim                     | Rol (üründe)      | Neden                                                                |
-| ------ | ------------------------- | ----------------- | -------------------------------------------------------------------- |
-| 1      | Dış İlişkiler / AB birimi | Kiracı yöneticisi | Pilotun sahibi; davetleri ve modülleri yönetir                       |
-| 2      | Dış İlişkiler / AB birimi | Üye               | Konsept notu yazan kişi                                              |
-| 3      | Çevre                     | Üye               | Çevre/iklim çağrıları için konu sahibi (LIFE Türkiye'ye kapalı [K8]) |
-| 4      | Kültür (ve Sosyal İşler)  | Üye               | Erasmus+ gençlik/yetişkin eğitimi, kültür çağrıları                  |
-| 5      | Strateji Geliştirme       | Üye               | Stratejik plan uyumu, bütçe, raporlama                               |
-| 6      | `[Belediyenin seçeceği]`  | Üye / gözlemci    | Ör. Başkan Yardımcısı ofisi ya da Mali Hizmetler                     |
+| Koltuk | Birim                     | Rol (üründe)                | Neden                                                                                         |
+| ------ | ------------------------- | --------------------------- | --------------------------------------------------------------------------------------------- |
+| 1      | Dış İlişkiler / AB birimi | Kurum sahibi (Tenant Owner) | Pilotun sahibi; davetleri ve modülleri yönetir (modülleri yalnız kurum sahibi açabilir, §2.2) |
+| 2      | Dış İlişkiler / AB birimi | Üye                         | Konsept notu yazan kişi                                                                       |
+| 3      | Çevre                     | Üye                         | Çevre/iklim çağrıları için konu sahibi (LIFE Türkiye'ye kapalı [K8])                          |
+| 4      | Kültür (ve Sosyal İşler)  | Üye                         | Erasmus+ gençlik/yetişkin eğitimi, kültür çağrıları                                           |
+| 5      | Strateji Geliştirme       | Üye                         | Stratejik plan uyumu, bütçe, raporlama                                                        |
+| 6      | `[Belediyenin seçeceği]`  | Üye / gözlemci              | Ör. Başkan Yardımcısı ofisi ya da Mali Hizmetler                                              |
 
 ### 2.2 Açık modüller
 
 Pilot, **Belediye Ekip** paketinin (`public-team`) açtığı bütün modülleri açar. Paketin temel planı `pro`'dur: **M1, M2, M3, M4, M5, M6, M8** (`src/lib/billing/catalog.ts`, `src/lib/billing/pilot.ts`). Çekirdek özellikler (K1–K6) `docs/BUSINESS_MODEL.md` §5.1'deki Ekip satırı gibidir. Pilotta yoğun kullanılacaklar: K1 çağrı tarama, M2 konsept not, M4 Focal Point (birimlerden fikir toplama), M5 başvuru iş akışı.
 
 **M6 Evaluator Lens pilotta açıktır** (patron kararı, 29.09.2026; ADR-0007 madde 6). **Not:** `docs/BUSINESS_MODEL.md` §5.1'de M6 Ekip planına dahil değildir; §5.2'de Ekip için €99/ay'lık bir eklentidir. Kamu paketinde bu kural uygulanmaz: Belediye Ekip M6'yı ek ücret olmadan içerir. Pilot sonrası teklif (§6.2) de M6'yı pakete dahil yazar.
+
+**Kurulum adımı — pilot atandıktan sonra modülleri açın.** Pilot ataması modülleri kendiliğinden açmaz. Atama yalnız aboneliği yazar, modül durumu yazmaz. Bu yüzden kurum sahibi modül sayfasını ilk açtığında **hiçbir modülü aktif görmez**. Bu bir hata değildir. Kurulum sırası:
+
+1. Platform yöneticisi pilotu kiracıya atar (yönetici paneli, TASK-MUMABL78X5JLX).
+2. **Kurum sahibi** sol menüden **Ayarlar**'a girer. Bu bağlantı modül sayfasını açar (`/ayarlar/moduller`).
+3. Kurum sahibi pilotta kullanılacak modülleri tek tek **etkinleştirir**. M4 ve M8, M1'e bağlıdır: önce M1 açılır.
+4. Bu sayfayı yalnız kurum sahibi kullanabilir. Kiracı yöneticisi ve üyeler "Erişim Reddedildi" görür. Kaydı açan kişi kurum sahibi olur.
+
+Bu adım hafta 1 onboarding oturumunda birlikte yapılır (§4). Sayfada M7, M9, M10 ve M11 kartlarında "Planı Yükselt" düğmesi görünür. Bu modüller Belediye Ekip paketinde yoktur. Pilotta plan yükseltme kapalıdır: düğme yalnız bir bilgi sayfasına gider.
+
+_Kanıt:_ `src/lib/billing/pilot.ts:259` (atama yalnız `subscription.upsert` + denetim kaydı yazar, `ModuleState` yazmaz); `src/components/SidebarNav.tsx:37` (`Ayarlar` → `settingsModules`), `src/lib/routes.ts:115-116`; `src/app/[locale]/(app)/[workspace]/settings/modules/page.tsx:18` ve `actions.ts:32` (`manage_modules`), `src/lib/rbac.ts:17-40` (`manage_modules` yalnız `TENANT_OWNER`'da); `src/modules/m4/manifest.ts:14`, `src/modules/m8/manifest.ts:14` (`requires: ['M1']`); `src/lib/oauth-registration.ts:251` (kaydı açan `TENANT_OWNER`); "Planı Yükselt" ve pilotta faturalama sayfası: İNCELEME-18 K-4b, N-4c (`docs/agent-results/TASK-MUMIIMRN92JDQ-crw-fb.md` §4).
 
 Pilotun **öncelikli yüzeyleri** üç tanedir. "Öncelikli", "yalnız bunlar açık" demek değildir; yukarıdaki modüllerin hepsi açıktır (ADR-0007 madde 2):
 
@@ -74,16 +85,16 @@ Kart metni hafta 5–8 için "CERV **veya** Erasmus+" diyor. Resmî kaynaklarla 
 
 ## 4. Haftalık akış
 
-| Hafta | Aşama                    | Belediyenin yapacağı                                               | Fabrika'nın yapacağı                                           | Hafta sonu kanıtı                             |
-| ----- | ------------------------ | ------------------------------------------------------------------ | -------------------------------------------------------------- | --------------------------------------------- |
-| 1     | Karne + onboarding       | 4 birim karneyi doldurur; 6 kullanıcı hesabını açar                | 60 dk onboarding oturumu; kiracıyı ve davetleri hazırlar       | 4 karne sonucu; 6 aktif hesap                 |
-| 2     | Radar taraması           | AB birimi radarı birimlerle birlikte tarar; ilgi listesi çıkarır   | Karne eksiklerine göre radarda filtre önerir                   | Kayıtlı arama ve 5–10 çağrılık ilgi listesi   |
-| 3     | Aday çağrı seçimi        | Birimler çağrıları stratejik planla karşılaştırır; 2 aday seçer    | Her aday için uygunluk notu (ülke, kurum türü, tarih)          | 2 çağrı G0 aşamasına alınmış                  |
-| 4     | Fikir toplama            | M4 Focal Point ile birimlerden proje fikri toplar                  | Fikirleri seçilen çağrılarla eşleştirmeye yardım eder          | Her aday çağrı için en az 1 fikir kartı       |
-| 5–6   | Konsept not (M2) taslağı | AB birimi M2 ile taslak üretir; konu birimi içerik ekler           | Haftalık 30 dk inceleme; eksik kanıt listesi (M3)              | Konsept not taslağı v1                        |
-| 7–8   | Ortak arama + revizyon   | M8 ile yabancı ortak adaylarını listeler; taslağı günceller        | Ortak adaylarını yorumlar; not v2'yi değerlendirir             | Konsept not v2 + en az 2 ortak adayı          |
-| 9–10  | Başvuruya geçiş kararı   | Başkanlık / Strateji ile "başvuralım mı?" kararı                   | Karar notu şablonu (maliyet, iş yükü, takvim)                  | Yazılı karar (evet / hayır / sonraki dönem)   |
-| 11–12 | Başvuru / kapanış        | Evet ise başvuru formuna geçer; son tarih pilot içindeyse gönderir | Kapanış raporu, başarı ölçütleri tablosu, pilot sonrası teklif | Kapanış raporu; varsa başvuru gönderim kanıtı |
+| Hafta | Aşama                    | Belediyenin yapacağı                                               | Fabrika'nın yapacağı                                                                            | Hafta sonu kanıtı                             |
+| ----- | ------------------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| 1     | Karne + onboarding       | 4 birim karneyi doldurur; 6 kullanıcı hesabını açar                | 60 dk onboarding oturumu; kiracıyı ve davetleri hazırlar; kurum sahibiyle modülleri açar (§2.2) | 4 karne sonucu; 6 aktif hesap                 |
+| 2     | Radar taraması           | AB birimi radarı birimlerle birlikte tarar; ilgi listesi çıkarır   | Karne eksiklerine göre radarda filtre önerir                                                    | Kayıtlı arama ve 5–10 çağrılık ilgi listesi   |
+| 3     | Aday çağrı seçimi        | Birimler çağrıları stratejik planla karşılaştırır; 2 aday seçer    | Her aday için uygunluk notu (ülke, kurum türü, tarih)                                           | 2 çağrı G0 aşamasına alınmış                  |
+| 4     | Fikir toplama            | M4 Focal Point ile birimlerden proje fikri toplar                  | Fikirleri seçilen çağrılarla eşleştirmeye yardım eder                                           | Her aday çağrı için en az 1 fikir kartı       |
+| 5–6   | Konsept not (M2) taslağı | AB birimi M2 ile taslak üretir; konu birimi içerik ekler           | Haftalık 30 dk inceleme; eksik kanıt listesi (M3)                                               | Konsept not taslağı v1                        |
+| 7–8   | Ortak arama + revizyon   | M8 ile yabancı ortak adaylarını listeler; taslağı günceller        | Ortak adaylarını yorumlar; not v2'yi değerlendirir                                              | Konsept not v2 + en az 2 ortak adayı          |
+| 9–10  | Başvuruya geçiş kararı   | Başkanlık / Strateji ile "başvuralım mı?" kararı                   | Karar notu şablonu (maliyet, iş yükü, takvim)                                                   | Yazılı karar (evet / hayır / sonraki dönem)   |
+| 11–12 | Başvuru / kapanış        | Evet ise başvuru formuna geçer; son tarih pilot içindeyse gönderir | Kapanış raporu, başarı ölçütleri tablosu, pilot sonrası teklif                                  | Kapanış raporu; varsa başvuru gönderim kanıtı |
 
 **Takvim notu:** KA210 için rehberde yazan son tarih 5 Mart 12:00 (Brüksel saati) [K5]. Pilot Ekim–Kasım 2026'da başlarsa 12. hafta bu tarihten önce biter. Bu durumda "başvuru gönderildi" yerine "başvuru formu hazır" ölçülür (§5, Ö5). Gerçek son tarih, başvuru yılının rehberinden ve Türkiye Ulusal Ajansı duyurusundan yeniden doğrulanır.
 
