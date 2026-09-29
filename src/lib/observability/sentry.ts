@@ -87,8 +87,48 @@ export function scrubText(value: string): string {
   return value.replace(EMAIL_PATTERN, '[email]');
 }
 
+/** `Invalid \`prisma.user.findFirst()\` invocation` — fixed shape, carries no values. */
+const PRISMA_INVOCATION = /^Invalid `([\w$]+(?:\.[\w$]+)*\(\))` invocation\b/;
+const CALL_TOKEN = /^[\w$]+(?:\.[\w$]+)*\(\)$/;
+
+/**
+ * What an error text may carry to Sentry (TASK-MUMJ9STRA6RJK, İNCELEME-18 K-3a).
+ *
+ * `error` alerts append `errorMessage(e)`, and a Prisma error message quotes the
+ * query arguments with their values over many lines (a name, a national id, an
+ * e-mail) plus, for request errors, a source excerpt with file paths.
+ * `scrubText` only knows e-mails, so free text is cut down instead:
+ *   - first non-empty line only (a leading "\n" is how Prisma messages start);
+ *     when a Prisma invocation header sits further down, its call name is kept,
+ *     because that line has a fixed shape with no values in it;
+ *   - every quoted literal ("…", '…', `…`) is masked, except a bare call token
+ *     such as `prisma.user.findFirst()`;
+ *   - Postgres key details `=(…)` and digit runs of 6+ (national id, phone,
+ *     IBAN body) are masked, then e-mails, then the length cap.
+ * The full text stays in the `SystemAlert` row, inside the deployment.
+ */
+export function scrubErrorText(value: string, maxLength = 500): string {
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  let text = lines[0] ?? '';
+  const invocation = lines.slice(1).map((line) => PRISMA_INVOCATION.exec(line)).find(Boolean);
+  if (invocation && !PRISMA_INVOCATION.test(text)) text = `${text} [${invocation[1]}]`;
+  if (lines.length > 1) text = `${text} […]`;
+
+  text = text
+    .replace(/"[^"]*"/g, '"[redacted]"')
+    // An apostrophe inside a word ("Can't") does not open a quote.
+    .replace(/(?<![\p{L}\d])'[^']*'/gu, "'[redacted]'")
+    .replace(/`([^`]*)`/g, (match, inner: string) => (CALL_TOKEN.test(inner) ? match : '`[redacted]`'))
+    .replace(/=\([^)]*\)/g, '=([redacted])')
+    .replace(/\d{6,}/g, '[number]');
+  return scrubText(text).slice(0, maxLength);
+}
+
 function scrubValue(value: unknown, depth = 0): unknown {
-  if (typeof value === 'string') return scrubText(value).slice(0, 500);
+  if (typeof value === 'string') return scrubErrorText(value);
   if (value === null || typeof value !== 'object' || depth > 3) {
     return typeof value === 'object' && value !== null ? '[depth]' : value;
   }
@@ -111,9 +151,9 @@ export function buildSentryEvent(input: SentryAlertInput, eventId: string, sentA
     platform: 'node',
     level: SENTRY_LEVEL[input.level],
     logger: input.source.slice(0, 100),
-    message: { formatted: scrubText(input.message).slice(0, 500) },
+    message: { formatted: scrubErrorText(input.message) },
     // One issue per (source, message) — the same grouping SystemAlert dedup uses.
-    fingerprint: [input.source, scrubText(input.message).slice(0, 200)],
+    fingerprint: [input.source, scrubErrorText(input.message, 200)],
     tags: { source: input.source.slice(0, 100), ...(input.alertId ? { alert_id: input.alertId } : {}) },
     extra: (scrubValue(input.meta ?? {}) as Record<string, unknown>),
     environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',

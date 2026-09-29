@@ -15,8 +15,11 @@ import {
   buildSentryEvent,
   captureAlertToSentry,
   parseSentryDsn,
+  scrubErrorText,
   sentryEnvelopeUrl,
 } from '@/lib/observability/sentry';
+import { createDbClient } from '@/lib/db';
+import { errorMessage } from '@/lib/errors';
 import { recordAlert, type AlertDbClient } from '@/lib/observability/system-alert';
 
 interface Received {
@@ -154,4 +157,79 @@ describe('recordAlert → Sentry', () => {
     await recordAlert({ level: 'info', source: 's', message: 'm' }, { client: fakeDb() });
     expect(cap.received).toHaveLength(0);
   });
+});
+
+/**
+ * TASK-MUMJ9STRA6RJK (İNCELEME-18 K-3a): `error` alerts append `errorMessage(e)`,
+ * and a Prisma error quotes the query's values. The errors below are real —
+ * thrown by a Prisma client pointed at a closed port — not hand-written strings.
+ */
+describe('Prisma error text → Sentry', () => {
+  const PERSONAL = ['Ayşe', 'Yılmaz', '12345678901', 'ayse@example.org', 'bogusField', 'nopass', 'prisma-err'];
+  // Nothing listens on port 1: validation errors fail before connecting, request errors fail to connect.
+  const db = createDbClient('postgresql://nobody:nopass@127.0.0.1:1/none');
+
+  async function caught(run: () => Promise<unknown>): Promise<unknown> {
+    try {
+      await run();
+    } catch (error) {
+      return error;
+    }
+    throw new Error('expected the query to throw');
+  }
+
+  async function sentFor(message: string): Promise<string> {
+    const cap = await captureServer();
+    open = cap.server;
+    vi.stubEnv('SENTRY_DSN', `http://pubkey@127.0.0.1:${cap.port}/7`);
+    const result = await recordAlert(
+      { level: 'error', source: 'sso-configure', message, meta: { cause: message } },
+      { client: fakeDb() }
+    );
+    expect(result.status).toBe('recorded');
+    expect(cap.received).toHaveLength(1);
+    return cap.received[0]?.body ?? '';
+  }
+
+  it('a validation error carrying a name, national id and e-mail leaves only its first line, masked', async () => {
+    const error = await caught(() =>
+      db.user.findFirst({
+        // @ts-expect-error — an unknown field makes Prisma echo the whole `where` back
+        where: { name: 'Ayşe Yılmaz', email: 'ayse@example.org', bogusField: 'TC 12345678901' },
+      })
+    );
+    expect((error as Error).constructor.name).toBe('PrismaClientValidationError');
+    const message = `SSO domain lookup failed: ${errorMessage(error)}`;
+    // Precondition: the raw text really does carry the personal data.
+    for (const needle of ['Ayşe Yılmaz', '12345678901', 'ayse@example.org']) expect(message).toContain(needle);
+
+    const body = await sentFor(message);
+    for (const needle of PERSONAL) expect(body).not.toContain(needle);
+    const event = JSON.parse(body.split('\n')[2] ?? '{}');
+    expect(event.message.formatted).toBe('SSO domain lookup failed: [db.user.findFirst()] […]');
+    expect(event.extra.cause).toBe(event.message.formatted);
+    expect(event.fingerprint).toEqual(['sso-configure', event.message.formatted]);
+  });
+
+  it('a request error drops the source excerpt, file path and connection string', async () => {
+    const error = await caught(() => db.user.findFirst({ where: { email: 'ayse@example.org' } }));
+    expect((error as { code?: string }).code).toBe('P1001');
+    const message = `Saved-search fetch failed: ${errorMessage(error)}`;
+    expect(message).toContain('observability-sentry.test.ts');
+
+    const body = await sentFor(message);
+    for (const needle of [...PERSONAL, 'observability-sentry.test.ts', '/Users/', 'createDbClient']) {
+      expect(body).not.toContain(needle);
+    }
+    const event = JSON.parse(body.split('\n')[2] ?? '{}');
+    expect(event.message.formatted).toBe('Saved-search fetch failed: [db.user.findFirst()] […]');
+  });
+
+  it.each([
+    ['Unique constraint failed on the fields: (`email`)', 'Unique constraint failed on the fields: (`[redacted]`)'],
+    ['Key (email)=(a.b@c.io) already exists', 'Key (email)=([redacted]) already exists'],
+    ["lookup 'Ayşe' failed, TC 12345678901", "lookup '[redacted]' failed, TC [number]"],
+    ["Can't reach database server at db:5432", "Can't reach database server at db:5432"],
+    ['Invalid `prisma.user.create()` invocation:\n{ data: { name: "x" } }', 'Invalid `prisma.user.create()` invocation: […]'],
+  ])('scrubErrorText(%j)', (input, expected) => expect(scrubErrorText(input)).toBe(expected));
 });
