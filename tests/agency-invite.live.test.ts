@@ -11,6 +11,7 @@ import {
 import { envValue } from './helpers/dotenv';
 import { requireId } from './helpers/teardown-guard';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { AGENCY_INVITE_CODE_DDL_LOCK, UNKNOWN_INVITE_COUNTER_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
  * TASK-MULRQJQYM0NAM (FB KAMU B1) — agency invite codes, measured on the role
@@ -300,33 +301,36 @@ describe('the function does not leak its system scope', () => {
     expect(after.visible).toBe(0);
   });
 
-  test('after the function fails mid-call the scope is not left open', async () => {
-    const { code } = await makeCode(ids.agencyA);
-    // Connection 1 holds the code's row lock; connection 2 gives up waiting
-    // (lock_timeout) INSIDE redeem_agency_invite, i.e. while the function's
-    // `SET app.system_scope = 'on'` is in force.
-    const holder = redeemAsNewTenant(rls!, code, 800);
-    await new Promise((r) => setTimeout(r, 150));
-    const observed = await rls2!.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT set_config('lock_timeout', '100ms', true)`;
-      await tx.$executeRaw`SAVEPOINT before_redeem`;
-      let failed = '';
-      try {
-        await redeemInviteCode(tx, code);
-      } catch (e) {
-        failed = e instanceof Error ? e.message : String(e);
-        await tx.$executeRaw`ROLLBACK TO SAVEPOINT before_redeem`;
-      }
-      const [row] = await tx.$queryRaw<Array<{ s: string | null }>>`
-        SELECT current_setting('app.system_scope', true) AS s`;
-      const visible = await tx.agencyInviteCode.count();
-      return { failed, s: row?.s ?? null, visible };
-    });
-    await holder;
-    expect(observed.failed).toMatch(/lock timeout/i);
-    expect(observed.s).not.toBe('on');
-    expect(observed.visible).toBe(0);
-  });
+  test('after the function fails mid-call the scope is not left open', async () =>
+    // Under a 100 ms lock_timeout, so not while tests/oauth-registration.live.test.ts
+    // creates or drops its trigger on this table (TASK-MUN7B4ZIEBJML).
+    withTestDbLock(ADMIN_URL!, AGENCY_INVITE_CODE_DDL_LOCK, async () => {
+      const { code } = await makeCode(ids.agencyA);
+      // Connection 1 holds the code's row lock; connection 2 gives up waiting
+      // (lock_timeout) INSIDE redeem_agency_invite, i.e. while the function's
+      // `SET app.system_scope = 'on'` is in force.
+      const holder = redeemAsNewTenant(rls!, code, 800);
+      await new Promise((r) => setTimeout(r, 150));
+      const observed = await rls2!.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT set_config('lock_timeout', '100ms', true)`;
+        await tx.$executeRaw`SAVEPOINT before_redeem`;
+        let failed = '';
+        try {
+          await redeemInviteCode(tx, code);
+        } catch (e) {
+          failed = e instanceof Error ? e.message : String(e);
+          await tx.$executeRaw`ROLLBACK TO SAVEPOINT before_redeem`;
+        }
+        const [row] = await tx.$queryRaw<Array<{ s: string | null }>>`
+          SELECT current_setting('app.system_scope', true) AS s`;
+        const visible = await tx.agencyInviteCode.count();
+        return { failed, s: row?.s ?? null, visible };
+      });
+      await holder;
+      expect(observed.failed).toMatch(/lock timeout/i);
+      expect(observed.s).not.toBe('on');
+      expect(observed.visible).toBe(0);
+    }));
 });
 
 describe('the agency link grants no read on the linked organisation', () => {
@@ -379,10 +383,11 @@ describe('the agency link grants no read on the linked organisation', () => {
 describe('refused attempts are counted without the code', () => {
   // TASK-MULU7GVFBTRXX K-6 — an unknown code is counted on one platform-only
   // SystemAlert row (fix-agency-invite-rejection-audit.sql), never as a
-  // tenant-readable AuditEvent. The counter row is shared with real attempts,
-  // so this test puts it back exactly as it found it.
+  // tenant-readable AuditEvent. The counter row is shared with real attempts
+  // and with tests/oauth-registration.live.test.ts, so this test holds
+  // UNKNOWN_INVITE_COUNTER_LOCK from its snapshot until it has put the row back
+  // exactly as it found it (TASK-MUN7B4ZIEBJML).
   const UNKNOWN_KEY = 'agency.invite.rejected.unknown';
-  let counterBefore: { id: string; meta: unknown } | null | undefined;
 
   async function openCounter(): Promise<{ id: string; meta: unknown } | null> {
     const rows = await admin!.$queryRaw<Array<{ id: string; meta: unknown }>>`
@@ -397,58 +402,57 @@ describe('refused attempts are counted without the code', () => {
     return row ? (typeof n === 'number' ? n : 1) : 0;
   }
 
-  afterAll(async () => {
-    if (!admin || counterBefore === undefined) return;
-    const now = await openCounter();
-    if (!now) return;
-    if (counterBefore === null) {
-      await admin.systemAlert.delete({ where: { id: now.id } }).catch(() => {});
-    } else {
-      await admin.systemAlert
-        .update({ where: { id: counterBefore.id }, data: { meta: counterBefore.meta as object } })
-        .catch(() => {});
-    }
-  });
+  test('a revoked code is filed under its agency; no "exhausted" reason; an unknown one leaves no tenant-readable row', async () =>
+    withTestDbLock(ADMIN_URL!, UNKNOWN_INVITE_COUNTER_LOCK, async () => {
+      const since = new Date(Date.now() - 1000);
+      const counterBefore = await openCounter();
+      try {
+        const { id, code } = await makeCode(ids.agencyA);
+        expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
+        await withTenantOn(rls!, ids.agencyA, (tx) =>
+          revokeInviteCodeIn(tx, { tenantId: ids.agencyA, id, revokedBy: ids.staff })
+        );
+        await noteInviteRejection(rls!, code);
+        // A code past its old limit is live. Were a refusal noted on it (a lost
+        // race), the reason is not 'exhausted' (TASK-MUM4WVYLSH9IT).
+        const legacy = await makeLegacyCodePastItsLimit(ids.agencyA);
+        await noteInviteRejection(rls!, legacy.code);
+        await noteInviteRejection(rls!, 'ZZZZ-ZZZZ-ZZZZ');
 
-  test('a revoked code is filed under its agency; no "exhausted" reason; an unknown one leaves no tenant-readable row', async () => {
-    const since = new Date(Date.now() - 1000);
-    counterBefore = await openCounter();
-    const { id, code } = await makeCode(ids.agencyA);
-    expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
-    await withTenantOn(rls!, ids.agencyA, (tx) =>
-      revokeInviteCodeIn(tx, { tenantId: ids.agencyA, id, revokedBy: ids.staff })
-    );
-    await noteInviteRejection(rls!, code);
-    // A code past its old limit is live. Were a refusal noted on it (a lost
-    // race), the reason is not 'exhausted' (TASK-MUM4WVYLSH9IT).
-    const legacy = await makeLegacyCodePastItsLimit(ids.agencyA);
-    await noteInviteRejection(rls!, legacy.code);
-    await noteInviteRejection(rls!, 'ZZZZ-ZZZZ-ZZZZ');
+        const mine = await admin!.auditEvent.findMany({
+          where: { tenantId: ids.agencyA, type: 'agency.invite.rejected', createdAt: { gte: since } },
+          select: { data: true, actorId: true, target: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        expect(mine).toEqual([
+          { data: { reason: 'revoked', codeId: id }, actorId: null, target: null },
+          { data: { reason: 'lost_race', codeId: legacy.id }, actorId: null, target: null },
+        ]);
 
-    const mine = await admin!.auditEvent.findMany({
-      where: { tenantId: ids.agencyA, type: 'agency.invite.rejected', createdAt: { gte: since } },
-      select: { data: true, actorId: true, target: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    expect(mine).toEqual([
-      { data: { reason: 'revoked', codeId: id }, actorId: null, target: null },
-      { data: { reason: 'lost_race', codeId: legacy.id }, actorId: null, target: null },
-    ]);
+        const orphan = await admin!.auditEvent.count({
+          where: { tenantId: null, type: 'agency.invite.rejected', createdAt: { gte: since } },
+        });
+        expect(orphan).toBe(0);
 
-    const orphan = await admin!.auditEvent.count({
-      where: { tenantId: null, type: 'agency.invite.rejected', createdAt: { gte: since } },
-    });
-    expect(orphan).toBe(0);
+        // Another tenant's session sees none of it.
+        const seenByOrg = await withTenantOn(rls!, ids.org, (tx) =>
+          tx.auditEvent.count({ where: { type: 'agency.invite.rejected', createdAt: { gte: since } } })
+        );
+        expect(seenByOrg).toBe(0);
 
-    // Another tenant's session sees none of it.
-    const seenByOrg = await withTenantOn(rls!, ids.org, (tx) =>
-      tx.auditEvent.count({ where: { type: 'agency.invite.rejected', createdAt: { gte: since } } })
-    );
-    expect(seenByOrg).toBe(0);
-
-    const counter = await openCounter();
-    expect(counter).not.toBeNull();
-    expect(repeats(counter)).toBeGreaterThanOrEqual(repeats(counterBefore) + 1);
-    expect(JSON.stringify(counter!.meta)).not.toContain('ZZZZ');
-  });
+        const counter = await openCounter();
+        expect(counter).not.toBeNull();
+        expect(repeats(counter)).toBeGreaterThanOrEqual(repeats(counterBefore) + 1);
+        expect(JSON.stringify(counter!.meta)).not.toContain('ZZZZ');
+      } finally {
+        const now = await openCounter();
+        if (now && counterBefore === null) {
+          await admin!.systemAlert.delete({ where: { id: now.id } }).catch(() => {});
+        } else if (now && counterBefore) {
+          await admin!.systemAlert
+            .update({ where: { id: counterBefore.id }, data: { meta: counterBefore.meta as object } })
+            .catch(() => {});
+        }
+      }
+    }));
 });

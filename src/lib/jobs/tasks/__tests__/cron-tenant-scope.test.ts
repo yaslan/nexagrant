@@ -13,6 +13,7 @@ import {
 import { MailSendError, type Mailer, type MailMessage } from '@/lib/email/mailer';
 import { grantCreditsToTenants } from '../credits-monthly-grant';
 import { requireId } from '../../../../../tests/helpers/teardown-guard';
+import { skipUnlessSeeded } from '../../../../../tests/helpers/seed';
 
 /**
  * TASK-MTVR8KK92G0GA — do the two cron jobs write under the tenant they are
@@ -164,11 +165,13 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
    * The no-provider tests below only mean something if the searches HAVE
    * matches: with zero matches the job skips the send and advances
    * `lastRunAt` on purpose, and "lastRunAt did not move" would never be
-   * reached. So assert the precondition instead of trusting it.
+   * reached. So check the precondition instead of trusting it: the Topic rows
+   * come from `pnpm db:seed` — without them the test is skipped locally and
+   * fails in CI (tests/helpers/seed.ts).
    */
-  async function assertMatchesExist() {
+  async function assertMatchesExist(ctx: { skip: (note?: string) => void }) {
     const topics = await prisma.topic.count({ where: { fetchedAt: { gt: LONG_AGO } } });
-    expect(topics, 'no Topic rows locally — every search would be skipped, not mailed').toBeGreaterThan(0);
+    skipUnlessSeeded(ctx, 'cron tenant-scope test', topics > 0, 'no Topic rows, so every search would be skipped, not mailed');
   }
 
   async function resetLastRun() {
@@ -460,10 +463,10 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     expect(everywhere).toEqual([{ tenantId: a.tenantId }]);
   });
 
-  it('alerts-daily: every search advances lastRunAt under its own tenant', async () => {
+  it('alerts-daily: every search advances lastRunAt under its own tenant', async (ctx) => {
     expect(ready, skipReason).toBe(true);
 
-    await assertMatchesExist();
+    await assertMatchesExist(ctx);
     const runner = recordingRunner();
     const mail = recordingMailer();
     const result = await sendSavedSearchAlerts(
@@ -491,8 +494,9 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     }
   });
 
-  it('alerts-daily: a stale tenant id fails the search rather than touching the other tenant', async () => {
+  it('alerts-daily: a stale tenant id fails the search rather than touching the other tenant', async (ctx) => {
     expect(ready, skipReason).toBe(true);
+    await assertMatchesExist(ctx);
     await prisma.savedSearch.updateMany({
       where: { id: { in: [a.searchId, b.searchId] } },
       data: { lastRunAt: LONG_AGO },
@@ -531,9 +535,9 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
   });
   // TASK-MUMH6NZ128QZ1 — no mail provider used to mean "count it as sent and
   // move lastRunAt past the matches", so they were never mailed at all.
-  it('alerts-daily: with no mail provider, nothing is counted sent and lastRunAt stays put', async () => {
+  it('alerts-daily: with no mail provider, nothing is counted sent and lastRunAt stays put', async (ctx) => {
     expect(ready, skipReason).toBe(true);
-    await assertMatchesExist();
+    await assertMatchesExist(ctx);
     await resetLastRun();
 
     const runner = recordingRunner();
@@ -552,9 +556,9 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     expect(await lastRunOf(b.searchId)).toEqual(LONG_AGO);
   });
 
-  it('alerts-daily: a send the provider refuses fails that search and keeps its matches', async () => {
+  it('alerts-daily: a send the provider refuses fails that search and keeps its matches', async (ctx) => {
     expect(ready, skipReason).toBe(true);
-    await assertMatchesExist();
+    await assertMatchesExist(ctx);
     await resetLastRun();
 
     // A refuses (what smtpMailer throws on a 550), B goes through.

@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import type { PrismaClient } from '@prisma/client';
 
 import { skipOrFailInCi, assertRlsSubjectRole, requireRlsTestUrl } from './helpers/live-db-role';
+import { AGENCY_INVITE_CODE_DDL_LOCK, UNKNOWN_INVITE_COUNTER_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
  * TASK-MUM676F010E9G (ADR-0006) — an OAuth registration, end to end through the
@@ -299,54 +300,57 @@ describe('OAuth registration with an agency invite code (fake provider, fabrika_
     expect(jar.has(lib.cookie.REGISTRATION_INVITE_COOKIE)).toBe(false);
   });
 
-  test('an unknown code and a revoked code get the same message, no user, the refusal is counted', async () => {
-    // fix-agency-invite-rejection-audit.sql: a known code's refusal is an
-    // AuditEvent under its agency; an unknown one only bumps one shared
-    // SystemAlert counter. That counter is put back exactly as found.
-    const UNKNOWN_KEY = 'agency.invite.rejected.unknown';
-    const counter = async () =>
-      (
-        await admin!.$queryRaw<Array<{ id: string; meta: Record<string, unknown> }>>`
-          SELECT "id", "meta" FROM "SystemAlert"
-           WHERE "level" = 'info' AND "source" = 'agency.invite' AND "resolvedAt" IS NULL
-             AND "meta" ->> 'alertDedupeKey' = ${UNKNOWN_KEY}
-           ORDER BY "createdAt" DESC LIMIT 1`
-      )[0] ?? null;
-    const repeats = (row: { meta: Record<string, unknown> } | null) =>
-      row ? (typeof row.meta.alertRepeatCount === 'number' ? row.meta.alertRepeatCount : 1) : 0;
+  test('an unknown code and a revoked code get the same message, no user, the refusal is counted', async () =>
+    withTestDbLock(env.admin!, UNKNOWN_INVITE_COUNTER_LOCK, async () => {
+      // fix-agency-invite-rejection-audit.sql: a known code's refusal is an
+      // AuditEvent under its agency; an unknown one only bumps one shared
+      // SystemAlert counter. That counter is put back exactly as found, under
+      // the lock tests/agency-invite.live.test.ts takes for the same row
+      // (TASK-MUN7B4ZIEBJML).
+      const UNKNOWN_KEY = 'agency.invite.rejected.unknown';
+      const counter = async () =>
+        (
+          await admin!.$queryRaw<Array<{ id: string; meta: Record<string, unknown> }>>`
+            SELECT "id", "meta" FROM "SystemAlert"
+             WHERE "level" = 'info' AND "source" = 'agency.invite' AND "resolvedAt" IS NULL
+               AND "meta" ->> 'alertDedupeKey' = ${UNKNOWN_KEY}
+             ORDER BY "createdAt" DESC LIMIT 1`
+        )[0] ?? null;
+      const repeats = (row: { meta: Record<string, unknown> } | null) =>
+        row ? (typeof row.meta.alertRepeatCount === 'number' ? row.meta.alertRepeatCount : 1) : 0;
 
-    const counterBefore = await counter();
-    const agencyRejectionsBefore = await admin!.auditEvent.count({
-      where: { tenantId: agencyId, type: 'agency.invite.rejected' },
-    });
-    const redirects: Array<string | null> = [];
-    try {
-      for (const [tag, code] of [
-        ['unknown', 'ZZZZ-ZZZZ-ZZZZ'],
-        ['revoked', (await makeCode({ revoked: true })).code],
-      ] as const) {
-        const email = newEmail(`bad-${tag}`);
-        parkInvite(code, lib.consent.registrationAcknowledgementToken({ agency: true }));
-        const res = await callback('google', { sub: `${RUN}-bad-${tag}`, email, email_verified: true });
-        redirects.push(res.location);
-        expect(res.sessionSet).toBe(false);
-        expect(await userByEmail(email)).toBeNull();
+      const counterBefore = await counter();
+      const agencyRejectionsBefore = await admin!.auditEvent.count({
+        where: { tenantId: agencyId, type: 'agency.invite.rejected' },
+      });
+      const redirects: Array<string | null> = [];
+      try {
+        for (const [tag, code] of [
+          ['unknown', 'ZZZZ-ZZZZ-ZZZZ'],
+          ['revoked', (await makeCode({ revoked: true })).code],
+        ] as const) {
+          const email = newEmail(`bad-${tag}`);
+          parkInvite(code, lib.consent.registrationAcknowledgementToken({ agency: true }));
+          const res = await callback('google', { sub: `${RUN}-bad-${tag}`, email, email_verified: true });
+          redirects.push(res.location);
+          expect(res.sessionSet).toBe(false);
+          expect(await userByEmail(email)).toBeNull();
+        }
+        expect(redirects[0]).toMatch(/\/tr\/kayit\?error=invite_invalid$/);
+        expect(redirects[1]).toBe(redirects[0]);
+        expect(repeats(await counter())).toBe(repeats(counterBefore) + 1);
+        expect(
+          await admin!.auditEvent.count({ where: { tenantId: agencyId, type: 'agency.invite.rejected' } })
+        ).toBe(agencyRejectionsBefore + 1);
+      } finally {
+        const now = await counter();
+        if (now && counterBefore === null) await admin!.systemAlert.delete({ where: { id: now.id } }).catch(() => {});
+        else if (now && counterBefore)
+          await admin!.systemAlert
+            .update({ where: { id: counterBefore.id }, data: { meta: counterBefore.meta as object } })
+            .catch(() => {});
       }
-      expect(redirects[0]).toMatch(/\/tr\/kayit\?error=invite_invalid$/);
-      expect(redirects[1]).toBe(redirects[0]);
-      expect(repeats(await counter())).toBe(repeats(counterBefore) + 1);
-      expect(
-        await admin!.auditEvent.count({ where: { tenantId: agencyId, type: 'agency.invite.rejected' } })
-      ).toBe(agencyRejectionsBefore + 1);
-    } finally {
-      const now = await counter();
-      if (now && counterBefore === null) await admin!.systemAlert.delete({ where: { id: now.id } }).catch(() => {});
-      else if (now && counterBefore)
-        await admin!.systemAlert
-          .update({ where: { id: counterBefore.id }, data: { meta: counterBefore.meta as object } })
-          .catch(() => {});
-    }
-  });
+    }));
 
   test('linking to an existing account: refused without a verified e-mail, linked with one; a code is ignored', async () => {
     const email = newEmail('link');
@@ -585,24 +589,28 @@ describe("crw-fb M2: adapter throws after the signIn probe", () => {
     fn: () => Promise<void>,
   ): Promise<void> {
     const tag = `${RUN.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}_${id.slice(-6).toLowerCase()}`;
-    await admin!.$executeRawUnsafe(
-      `CREATE SEQUENCE IF NOT EXISTS crw_m2_${tag}`,
-    );
-    await admin!
-      .$executeRawUnsafe(`CREATE OR REPLACE FUNCTION crw_m2_${tag}() RETURNS trigger LANGUAGE plpgsql AS $$
-      BEGIN IF nextval('crw_m2_${tag}') > 1 THEN RETURN NULL; END IF; RETURN NEW; END $$`);
-    await admin!
-      .$executeRawUnsafe(`CREATE TRIGGER crw_m2_${tag} BEFORE UPDATE ON "AgencyInviteCode"
-      FOR EACH ROW WHEN (NEW."id" = '${id}') EXECUTE FUNCTION crw_m2_${tag}()`);
-    try {
-      await fn();
-    } finally {
+    // The trigger DDL locks the whole table: tests/agency-invite.live.test.ts
+    // keeps its lock_timeout test out of the way (TASK-MUN7B4ZIEBJML).
+    await withTestDbLock(env.admin!, AGENCY_INVITE_CODE_DDL_LOCK, async () => {
       await admin!.$executeRawUnsafe(
-        `DROP TRIGGER IF EXISTS crw_m2_${tag} ON "AgencyInviteCode"`,
+        `CREATE SEQUENCE IF NOT EXISTS crw_m2_${tag}`,
       );
-      await admin!.$executeRawUnsafe(`DROP FUNCTION IF EXISTS crw_m2_${tag}()`);
-      await admin!.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS crw_m2_${tag}`);
-    }
+      await admin!
+        .$executeRawUnsafe(`CREATE OR REPLACE FUNCTION crw_m2_${tag}() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN IF nextval('crw_m2_${tag}') > 1 THEN RETURN NULL; END IF; RETURN NEW; END $$`);
+      await admin!
+        .$executeRawUnsafe(`CREATE TRIGGER crw_m2_${tag} BEFORE UPDATE ON "AgencyInviteCode"
+        FOR EACH ROW WHEN (NEW."id" = '${id}') EXECUTE FUNCTION crw_m2_${tag}()`);
+      try {
+        await fn();
+      } finally {
+        await admin!.$executeRawUnsafe(
+          `DROP TRIGGER IF EXISTS crw_m2_${tag} ON "AgencyInviteCode"`,
+        );
+        await admin!.$executeRawUnsafe(`DROP FUNCTION IF EXISTS crw_m2_${tag}()`);
+        await admin!.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS crw_m2_${tag}`);
+      }
+    });
   }
 
   /** The browser following Auth.js's error redirect to `pages.error`. */

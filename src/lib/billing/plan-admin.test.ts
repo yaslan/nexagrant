@@ -26,10 +26,17 @@ import {
   PlanInUseError,
 } from './plan-repository';
 import { requireId } from '../../../tests/helpers/teardown-guard';
+import { skipUnlessSeeded } from '../../../tests/helpers/seed';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 describe('plan admin write layer', () => {
+  /** Saving a module bullet checks it against ModuleCatalog, which only `pnpm db:seed` fills. */
+  async function needsModuleCatalog(ctx: { skip: (note?: string) => void }) {
+    const known = await prisma.moduleCatalog.count({ where: { id: 'M6' } });
+    skipUnlessSeeded(ctx, 'plan admin write layer', known > 0, 'ModuleCatalog has no M6 row');
+  }
+
   let planId: string;
   let tenantId: string;
 
@@ -135,7 +142,8 @@ describe('plan admin write layer', () => {
     expect(drafts).toHaveLength(1);
   });
 
-  it('publishing archives the previous version and keeps it readable', async () => {
+  it('publishing archives the previous version and keeps it readable', async (ctx) => {
+    await needsModuleCatalog(ctx);
     const draft = await createDraftVersion(planId);
     await publishVersion(draft.id, 'admin-1', 0);
 
@@ -266,7 +274,8 @@ describe('plan admin write layer', () => {
     ).rejects.toBeInstanceOf(ModuleNotGrantedError);
   });
 
-  it('accepts a card bullet inside the grant', async () => {
+  it('accepts a card bullet inside the grant', async (ctx) => {
+    await needsModuleCatalog(ctx);
     const draft = await createDraftVersion(planId);
     const saved = await updateDraftVersion(
       draft.id,

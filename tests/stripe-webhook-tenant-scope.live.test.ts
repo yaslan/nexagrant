@@ -2,6 +2,7 @@ import { describe, test, expect, beforeAll, afterAll, vi } from 'vitest';
 import type Stripe from 'stripe';
 import pg from 'pg';
 import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
+import { skipUnlessSeeded } from './helpers/seed';
 import { prisma } from '@/lib/db';
 import {
   syncStripeSubscription,
@@ -251,7 +252,11 @@ describe.skipIf(!HAS_DB)('stripe webhook tenant scope (live database)', () => {
     expect(afterSecond.creditBalance).toBe(before.creditBalance);
   });
 
-  test('a redelivered cancellation ends the add-ons exactly once', async () => {
+  test('a redelivered cancellation ends the add-ons exactly once', async (ctx) => {
+    // A cancellation turns off every ModuleCatalog module outside the free
+    // plan; with no catalog (unseeded) there is nothing to turn off.
+    const catalog = await prisma.moduleCatalog.count();
+    skipUnlessSeeded(ctx, 'stripe webhook tenant-scope live test', catalog > 0, 'ModuleCatalog is empty');
     const eventId = `evt-scope-cancel-${RUN}`;
 
     await handleSubscriptionCancellation(fakeSubscription(), eventId);

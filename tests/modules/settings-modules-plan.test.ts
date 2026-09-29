@@ -24,6 +24,7 @@ import { canEnableEntitled } from '@/lib/modules/state-machine';
 import { readModulesPlanView } from '@/app/[locale]/(app)/[workspace]/settings/modules/plan-view';
 import { toggleModuleState } from '@/app/[locale]/(app)/[workspace]/settings/modules/actions';
 import { requireId } from '../helpers/teardown-guard';
+import { PUBLIC_SECTOR_PLANS_LOCK, withTestDbLock } from '../helpers/test-db-lock';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const DAY = 86_400_000;
@@ -45,7 +46,7 @@ describe('modules settings — plan and state from entitlements', () => {
   let tenantId: string;
 
   beforeAll(async () => {
-    await upsertPublicSectorPlans(prisma);
+    await withTestDbLock(process.env.DATABASE_URL!, PUBLIC_SECTOR_PLANS_LOCK, () => upsertPublicSectorPlans(prisma));
   });
 
   beforeEach(async () => {

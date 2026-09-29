@@ -28,6 +28,7 @@ vi.mock('@/lib/env', async (orig) => {
 });
 
 import { prisma, withTenant } from '@/lib/db';
+import { seededOrSkipping } from './helpers/seed';
 
 const balance = () =>
   withTenant(TENANT, (tx) => tx.creditLedger.aggregate({ where: { tenantId: TENANT }, _sum: { delta: true } }))
@@ -42,7 +43,14 @@ const debitsSince = (since: Date) =>
     })
   );
 
-describe('Double Charge Prevention & Single Debit Enforcement', () => {
+// The suite runs on the seeded demo tenant and its demo opportunity.
+const seeded = seededOrSkipping(
+  'double charge prevention',
+  await prisma.tenant.count({ where: { id: TENANT } }).then((n) => n > 0),
+  `the demo tenant '${TENANT}' is missing`
+);
+
+describe.skipIf(!seeded)('Double Charge Prevention & Single Debit Enforcement', () => {
   beforeAll(async () => {
     // Grant credits to demo tenant
     await withTenant(TENANT, (tx) =>

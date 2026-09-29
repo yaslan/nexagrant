@@ -17,6 +17,7 @@ import { upsertPublicSectorPlans } from './public-sector-plans';
 import { SeatLimitReachedError, assertSeatAvailable, readSeatUsage } from './seat-limit';
 import { storefrontPlans } from './storefront';
 import { presentIds, requireId } from '../../../tests/helpers/teardown-guard';
+import { PUBLIC_SECTOR_PLANS_LOCK, withTestDbLock } from '../../../tests/helpers/test-db-lock';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -25,7 +26,7 @@ describe('public-sector package assignment', () => {
   const userIds: string[] = [];
 
   beforeAll(async () => {
-    await upsertPublicSectorPlans(prisma);
+    await withTestDbLock(process.env.DATABASE_URL!, PUBLIC_SECTOR_PLANS_LOCK, () => upsertPublicSectorPlans(prisma));
   });
 
   beforeEach(async () => {
@@ -45,21 +46,23 @@ describe('public-sector package assignment', () => {
     await prisma.user.deleteMany({ where: { id: { in: presentIds(userIds.splice(0)) } } });
   });
 
-  it('seeding twice leaves the same rows (idempotent)', async () => {
-    await upsertPublicSectorPlans(prisma);
-    const ids = ['public-starter', 'public-team', 'public-institution'];
-    const versions = await prisma.planVersion.findMany({
-      where: { planId: { in: ids } },
-      include: { _count: { select: { features: true } } },
-      orderBy: { yearlyCents: 'asc' },
-    });
-    expect(versions.map((v: { planId: string }) => v.planId)).toEqual(ids);
-    expect(versions.map((v: { yearlyCents: number }) => v.yearlyCents)).toEqual([9_000_000, 24_000_000, 48_000_000]);
-    expect(versions.every((v: { currency: string; status: string }) => v.currency === 'TRY' && v.status === 'published')).toBe(true);
-    expect(versions.map((v: { _count: { features: number } }) => v._count.features)).toEqual([3, 4, 4]);
-    const plans = await prisma.plan.findMany({ where: { id: { in: ids } }, select: { visibility: true } });
-    expect(plans.map((p: { visibility: string }) => p.visibility)).toEqual(['private', 'private', 'private']);
-  });
+  it('seeding twice leaves the same rows (idempotent)', async () =>
+    // Other files seed the same rows in parallel (TASK-MUN7B4ZIEBJML).
+    withTestDbLock(process.env.DATABASE_URL!, PUBLIC_SECTOR_PLANS_LOCK, async () => {
+      await upsertPublicSectorPlans(prisma);
+      const ids = ['public-starter', 'public-team', 'public-institution'];
+      const versions = await prisma.planVersion.findMany({
+        where: { planId: { in: ids } },
+        include: { _count: { select: { features: true } } },
+        orderBy: { yearlyCents: 'asc' },
+      });
+      expect(versions.map((v: { planId: string }) => v.planId)).toEqual(ids);
+      expect(versions.map((v: { yearlyCents: number }) => v.yearlyCents)).toEqual([9_000_000, 24_000_000, 48_000_000]);
+      expect(versions.every((v: { currency: string; status: string }) => v.currency === 'TRY' && v.status === 'published')).toBe(true);
+      expect(versions.map((v: { _count: { features: number } }) => v._count.features)).toEqual([3, 4, 4]);
+      const plans = await prisma.plan.findMany({ where: { id: { in: ids } }, select: { visibility: true } });
+      expect(plans.map((p: { visibility: string }) => p.visibility)).toEqual(['private', 'private', 'private']);
+    }));
 
   it('assigning public-team puts the tenant on it: pro modules, 6 seats, contract provider', async () => {
     const before = await getEntitlements(tenantId);

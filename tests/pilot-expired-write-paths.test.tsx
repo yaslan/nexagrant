@@ -113,6 +113,16 @@ function withIntl(node: React.ReactNode, locale: 'tr' | 'en' = 'tr') {
   );
 }
 
+/**
+ * A button stays disabled while its action is pending, and React drops a click
+ * on a disabled button. The alert can render before the pending flag clears,
+ * so a second click has to wait for the button (TASK-MUN7B4ZIEBJML).
+ */
+async function enabled(button: HTMLElement): Promise<HTMLElement> {
+  await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+  return button;
+}
+
 beforeEach(() => {
   pilot.expired = false;
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -240,7 +250,8 @@ describe('İNCELEME-30: M8 matching', () => {
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(PILOT_TR));
 
     vi.mocked(computeSeatCandidatesForm).mockResolvedValueOnce({ status: 'error', message: 'Seat not found.' });
-    fireEvent.click(screen.getByRole('button', { name: trMessages.Consortium.findCandidates }));
+    // While pending the button reads "computing", so find it by its idle name.
+    fireEvent.click(await enabled(await screen.findByRole('button', { name: trMessages.Consortium.findCandidates })));
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toBe(`${trMessages.Consortium.computeFailed} Seat not found.`)
     );
@@ -254,7 +265,7 @@ describe('İNCELEME-30: M8 matching', () => {
     expect(vi.mocked(inviteCandidateToSeat)).toHaveBeenCalledWith('s-1', '999', 'o-1');
 
     vi.mocked(inviteCandidateToSeat).mockRejectedValueOnce(Object.assign(new Error('x'), { digest: '4242' }));
-    fireEvent.click(screen.getByRole('button', { name: enMessages.Consortium.invite }));
+    fireEvent.click(await enabled(screen.getByRole('button', { name: enMessages.Consortium.invite })));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   });
 });
@@ -297,18 +308,20 @@ describe('TASK-MUN3W76B4XEJE: consortium page', () => {
     vi.mocked(assignSeat).mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true });
     render(withIntl(<ConsortiumManager opportunityId="o-1" seats={[seat]} candidates={[]} orgMap={{}} />));
     fireEvent.click(screen.getByRole('button', { name: new RegExp(trMessages.Consortium.findCandidates) }));
-    // Generous waits: under the full suite the default 1 s timed out once.
-    const wait = { timeout: 5000 };
-    const invite = await screen.findByRole('button', { name: 'Invite' }, wait);
+    // The candidate list renders while the search transition still awaits
+    // getConflicts(), so "Invite" first appears disabled; a click then is
+    // dropped and assignSeat never runs. Click only once it is enabled
+    // (TASK-MUN7B4ZIEBJML: the full-suite "timed out in 5000ms").
+    const invite = await enabled(await screen.findByRole('button', { name: 'Invite' }));
 
     fireEvent.click(invite);
-    await waitFor(() => expect(vi.mocked(assignSeat)).toHaveBeenCalledTimes(1), wait);
-    await waitFor(() => expect((invite as HTMLButtonElement).disabled).toBe(false), wait);
+    await waitFor(() => expect(vi.mocked(assignSeat)).toHaveBeenCalledTimes(1));
+    await enabled(invite);
     expect(vi.mocked(assignSeat)).toHaveBeenCalledWith('s-1', 'org-new');
     expect(screen.getByText(status.OPEN)).toBeTruthy();
     expect(screen.queryByText(status.INVITED)).toBeNull();
 
     fireEvent.click(invite);
-    await waitFor(() => expect(screen.getByText(status.INVITED)).toBeTruthy(), wait);
+    await waitFor(() => expect(screen.getByText(status.INVITED)).toBeTruthy());
   });
 });

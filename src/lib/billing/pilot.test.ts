@@ -24,6 +24,7 @@ import {
 import { handleSubscriptionCancellation, syncStripeSubscription } from './subscription-sync';
 import { readSeatUsage } from './seat-limit';
 import { requireId } from '../../../tests/helpers/teardown-guard';
+import { PUBLIC_SECTOR_PLANS_LOCK, withTestDbLock } from '../../../tests/helpers/test-db-lock';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const DAY = 86_400_000;
@@ -59,7 +60,7 @@ describe('grantPilot (live DB)', () => {
   let tenantId: string;
 
   beforeAll(async () => {
-    await upsertPublicSectorPlans(prisma);
+    await withTestDbLock(process.env.DATABASE_URL!, PUBLIC_SECTOR_PLANS_LOCK, () => upsertPublicSectorPlans(prisma));
   });
 
   beforeEach(async () => {
