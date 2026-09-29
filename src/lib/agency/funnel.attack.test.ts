@@ -9,6 +9,7 @@ import {
   type FunnelCell,
 } from './funnel';
 import type { TrProvince } from '@/lib/readiness/provinces';
+import { inviteCodeRow, MIN_MAX_USES } from './codes';
 
 /**
  * TASK-MULZATEX4G92H (FB KAMU B2 sızıntı-2) — the gate for the small-cell rule
@@ -31,10 +32,18 @@ import type { TrProvince } from '@/lib/readiness/provinces';
  *   - which provinces hold organisations at all (stronger than the page tells:
  *     a province nobody gave is shown as "<5" like any other).
  *
+ *   - (TASK-MUM17YBJVAHRR, crw-fb Ö-1) the invite-code panel of the same page,
+ *     exactly as `inviteCodeRow` sends it, and how codes relate to the funnel:
+ *     every organisation of the cohort registered with one use of one code, so
+ *     R (registered, all) ≤ Σ used; used ≤ maxUses; "exhausted" ⇒ used = maxUses.
+ *     Uses whose organisation was since deleted are the slack: Σ used = R + D.
+ *     It knows the rule too: a code that could show "exhausted" and does not
+ *     has used ≤ maxUses − 1.
+ *
  * It must not learn, for any hidden count whose true value is 1..4 — a masked
  * number, a type × province cell that is never published, the organisations
- * with no province, or a difference between two steps — that it lies in 1..4
- * (its exact value included).
+ * with no province, a difference between two steps, or the uses of one code —
+ * that it lies in 1..4 (its exact value included).
  */
 
 const STEPS = ['registered', 'savedSearch', 'pipeline', 'conceptNote', 'submitted', 'accepted', 'rejected'] as const;
@@ -107,12 +116,73 @@ interface Leak {
   hi: number;
 }
 
+/** One invite code as the database holds it. */
+interface TrueCode {
+  maxUses: number;
+  used: number;
+  revoked?: boolean;
+  expired?: boolean;
+}
+
+/** A code as the attacker has it: the true uses (for scoring only) and what the panel lets it bound them to. */
+interface CodeKnowledge {
+  truth: number;
+  lo: number;
+  hi: number;
+}
+
+const NOW = Date.UTC(2026, 8, 29, 12);
+/** The uses whose organisation was deleted since (Σ used − R). Not a funnel group: see the open test below. */
+const DELETED = 'codes|deleted';
+
+/**
+ * The invite-code panel: every code of the agency through `inviteCodeRow`, the
+ * one function whose output reaches the page props and the list actions, then
+ * through JSON as the browser receives it. The attacker reads whatever is there.
+ */
+function publishCodes(codes: TrueCode[]): CodeKnowledge[] {
+  return codes.map((c, i) => {
+    const row = JSON.parse(
+      JSON.stringify(
+        inviteCodeRow(
+          {
+            id: `code-${i}`,
+            hint: 'ABCD',
+            label: null,
+            maxUses: c.maxUses,
+            usedCount: c.used,
+            expiresAt: new Date(NOW + (c.expired ? -1 : 30) * 86_400_000),
+            revokedAt: c.revoked ? new Date(NOW - 60_000) : null,
+            createdAt: new Date(NOW - 86_400_000),
+          },
+          NOW
+        )
+      )
+    ) as Record<string, unknown>;
+    const max = row.maxUses as number;
+    let lo = 0;
+    let hi = max;
+    if (typeof row.usedCount === 'number') lo = hi = row.usedCount;
+    else if (row.usedCount === null) hi = Math.min(hi, SMALL_CELL_THRESHOLD - 1); // "<5"
+    const status =
+      (row.status as string | undefined) ??
+      (row.revokedAt ? 'revoked' : Date.parse(row.expiresAt as string) <= NOW ? 'expired' : row.exhausted ? 'exhausted' : 'active');
+    if (status === 'exhausted') lo = Math.max(lo, max);
+    if (status === 'active' && max >= MIN_MAX_USES) hi = Math.min(hi, max - 1);
+    return { truth: c.used, lo, hi };
+  });
+}
+
 /**
  * Integer interval propagation. Variables: every step × (type | all) ×
  * (province | no province | all), plus `parent − child` for every subset
  * relation at every level. Equations: every total = Σ its parts.
  */
-function attack(table: Table, published: Published, { rounded = true } = {}): Leak[] {
+function attack(
+  table: Table,
+  published: Published,
+  { rounded = true, codes }: { rounded?: boolean; codes?: CodeKnowledge[] } = {}
+): Leak[] {
   const provinces = [...table.keys()];
   const types: string[] = [...ORG_TYPES, ALL];
   const places = [...provinces, ALL];
@@ -156,6 +226,23 @@ function attack(table: Table, published: Published, { rounded = true } = {}): Le
   for (const s of lineNames) {
     for (const t of types) eqs.push([v(id(s, t, ALL)), ...provinces.map((p) => v(id(s, t, p)))]);
     for (const p of places) eqs.push([v(id(s, ALL, p)), ...ORG_TYPES.map((t) => v(id(s, t, p)))]);
+  }
+  if (codes) {
+    // Σ used = R + D: R ≤ Σ used, D the uses of organisations deleted since.
+    const sum = v('codes|Σused');
+    const deleted = v(DELETED);
+    const parts = codes.map((c, k) => {
+      const i = v(`code#${k}`);
+      truth[i] = c.truth;
+      lo[i] = c.lo;
+      hi[i] = c.hi;
+      return i;
+    });
+    const registered = v(id('registered', ALL, ALL));
+    truth[sum] = codes.reduce((n, c) => n + c.truth, 0);
+    truth[deleted] = truth[sum]! - truth[registered]!;
+    if (truth[deleted]! < 0) throw new Error('more organisations than code uses');
+    eqs.push([sum, ...parts], [sum, registered, deleted]);
   }
   for (const [key, value] of published) {
     if (value === null) continue;
@@ -268,6 +355,55 @@ describe('crw-fb examples (TASK-MULYGTXCZNCOP-crw-fb.md Kart 1 B-1)', () => {
   });
 });
 
+describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', () => {
+  test('A = 7, B = "<5", funnel total "10" (R 8..12): B is not read back as 1..4', () => {
+    // Before TASK-MUM17YBJVAHRR the panel sent A's 7: B ≥ 8 − 7 = 1 and "<5" says B ≤ 4.
+    const t = tableOf({ Samsun: { SME: [10, 10, 10, 10, 0, 0, 0] } });
+    const codes = publishCodes([
+      { maxUses: 25, used: 7 },
+      { maxUses: 25, used: 3 },
+    ]);
+    expect(attack(t, publish(t), { codes })).toEqual([]);
+  });
+
+  test('one code, used up: the panel says "exhausted", never how many', () => {
+    const t = tableOf({ Samsun: { SME: [8, 6, 8, 3, 2, 1, 0] } });
+    expect(attack(t, publish(t), { codes: publishCodes([{ maxUses: 8, used: 8 }]) })).toEqual([]);
+  });
+
+  test('"active" must not mean "under 5" either: a new code allows at least 6 uses', () => {
+    // A code that can show "exhausted" and shows "active" has used ≤ maxUses − 1. With two
+    // 5-use codes and a funnel of 5, that is 1..4 each (5 − 4 ≥ 1): hence 6, not 5.
+    expect(MIN_MAX_USES - 1).toBeGreaterThanOrEqual(SMALL_CELL_THRESHOLD);
+    const t = tableOf({ Samsun: { SME: [5, 5, 5, 5, 0, 0, 0] } });
+    const codes = publishCodes([
+      { maxUses: MIN_MAX_USES, used: 3 },
+      { maxUses: MIN_MAX_USES, used: 2 },
+    ]);
+    expect(attack(t, publish(t), { codes })).toEqual([]);
+  });
+
+  test('open (leed-fb / HUKUK-5): all codes used up + funnel "5" bound the deleted organisations to 1..3', () => {
+    // One 8-use code, used up; 2 of its 8 organisations deleted since: R = 6, shown "5" (5..7).
+    // Σ used = 8 exactly ("exhausted"), so D = 8 − R ∈ [1, 3]. Only "exhausted" gives Σ used a
+    // lower bound; the card keeps that status, so this is reported, not fixed here.
+    const t = tableOf({ Samsun: { SME: [6, 6, 6, 6, 0, 0, 0] } });
+    const leaks = attack(t, publish(t), { codes: publishCodes([{ maxUses: 8, used: 8 }]) });
+    expect(leaks).toEqual([{ target: DELETED, truth: 2, lo: 1, hi: 3 }]);
+  });
+
+  test('known residual: codes made before the minimum (maxUses < 5) still bound their uses to 1..4', () => {
+    // The agency knows the limit it set. Two 4-use codes and a funnel of 5 give each ≥ 1.
+    // Not fixable on the panel; such codes are listed in the report for revocation.
+    const t = tableOf({ Samsun: { SME: [5, 5, 5, 5, 0, 0, 0] } });
+    const codes = publishCodes([
+      { maxUses: 4, used: 3, revoked: true },
+      { maxUses: 4, used: 2 },
+    ]);
+    expect(attack(t, publish(t), { codes }).map((l) => l.target)).toEqual(['code#0', 'code#1']);
+  });
+});
+
 describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92H gate)', () => {
   const PROVINCES = ['Samsun', 'Tokat', 'Amasya', 'Çorum'];
 
@@ -290,21 +426,53 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
     return tableOf(spec);
   }
 
-  for (const seed of [1, 7, 42]) {
-    test(`seed ${seed}: 300 random small tables, every view joined`, () => {
-      // mulberry32: independent streams per seed (an LCG mod 2^31 repeated tables across seeds).
-      let s = seed >>> 0;
-      const rand = () => {
-        s = (s + 0x6d2b79f5) >>> 0;
-        let x = Math.imul(s ^ (s >>> 15), 1 | s);
-        x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
-        return ((x ^ (x >>> 14)) >>> 0) / 2 ** 32;
+  /** mulberry32: independent streams per seed (an LCG mod 2^31 repeated tables across seeds). */
+  function stream(seed: number): () => number {
+    let s = seed >>> 0;
+    return () => {
+      s = (s + 0x6d2b79f5) >>> 0;
+      let x = Math.imul(s ^ (s >>> 15), 1 | s);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 2 ** 32;
+    };
+  }
+
+  /**
+   * The agency's codes behind `table`: its R organisations spread over 1..3 codes that a
+   * create call accepts today (maxUses ≥ MIN_MAX_USES), plus 0..3 uses whose organisation
+   * was deleted. About a third are used up; some revoked or expired.
+   */
+  function randomCodes(table: Table, rand: () => number): TrueCode[] {
+    const ri = (a: number, b: number) => a + Math.floor(rand() * (b - a + 1));
+    let registered = 0;
+    for (const byType of table.values()) for (const ty of ORG_TYPES) registered += byType[ty].registered;
+    const used = Array.from({ length: ri(1, 3) }, () => 0);
+    for (let n = registered + ri(0, 3); n > 0; n--) used[ri(0, used.length - 1)]!++;
+    return used.map((u) => {
+      const floor = Math.max(u, MIN_MAX_USES);
+      const r = rand();
+      return {
+        maxUses: rand() < 0.35 ? floor : floor + ri(1, 12),
+        used: u,
+        revoked: r < 0.1,
+        expired: r >= 0.1 && r < 0.2,
       };
+    });
+  }
+
+  for (const seed of [1, 7, 42]) {
+    test(`seed ${seed}: 300 random small tables, every view and the code panel joined`, () => {
+      const rand = stream(seed);
+      // A stream of its own, so the tables are the same ones the funnel-only gate saw.
+      const codeRand = stream(seed + 1000);
       const found: string[] = [];
       let tablesWithLeak = 0;
       for (let k = 0; k < 300; k++) {
         const t = randomTable(rand);
-        const leaks = attack(t, publish(t));
+        // DELETED is the open question above; every funnel group and every code's uses are gated.
+        const leaks = attack(t, publish(t), { codes: publishCodes(randomCodes(t, codeRand)) }).filter(
+          (l) => l.target !== DELETED
+        );
         if (leaks.length) tablesWithLeak++;
         for (const l of leaks.slice(0, 2)) found.push(`#${k} ${l.target}=${l.truth} ∈ [${l.lo}, ${l.hi}]`);
       }

@@ -15,7 +15,7 @@ import {
   createInviteCodeIn,
   listInviteCodesIn,
   revokeInviteCodeIn,
-  shownUsedCount,
+  type InviteCodeSummary,
 } from '@/lib/agency/codes';
 import { AgencyPermissionError } from '@/lib/agency/errors';
 
@@ -95,19 +95,8 @@ export async function revokeInviteCode(id: string): Promise<{ ok: true; revoked:
   }
 }
 
-export async function listInviteCodes() {
+/** B-1 (TASK-MUM17YBJVAHRR): each code's status, never its use count. */
+export async function listInviteCodes(): Promise<InviteCodeSummary[]> {
   const scope = await requireTenantAction();
-  const rows = await withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId));
-  return rows.map((c) => ({
-    id: c.id,
-    hint: c.hint,
-    label: c.label,
-    maxUses: c.maxUses,
-    // K-1: under 5 is "<5"; the status still needs to know a code is used up.
-    usedCount: shownUsedCount(c.usedCount),
-    exhausted: c.usedCount >= c.maxUses,
-    expiresAt: c.expiresAt.toISOString(),
-    revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
-    createdAt: c.createdAt.toISOString(),
-  }));
+  return withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId));
 }

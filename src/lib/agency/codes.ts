@@ -19,8 +19,10 @@ import {
   inviteCodeHint,
   normalizeInviteCode,
 } from './invite-code';
+import { MAX_USES_LIMIT, MIN_MAX_USES } from './code-limits';
 
-export const MAX_USES_LIMIT = 10_000;
+export { MAX_USES_LIMIT, MIN_MAX_USES };
+
 /** A code outliving a year of events is a code nobody is watching. */
 export const MAX_VALIDITY_DAYS = 366;
 
@@ -43,7 +45,30 @@ export interface CreatedInviteCode {
   expiresAt: Date;
 }
 
+/**
+ * B-1 (TASK-MUM0M211WDIW5-crw-fb, leed-fb 29.09): what the agency is told of a
+ * code is its status, never a use count. A count — even "<5" beside the others —
+ * joined with the funnel's rounded total (every organisation of the cohort used
+ * one code: R ≤ Σ used) read a code's 1..4 uses back; with a single code it was
+ * the exact registration total. src/lib/agency/funnel.attack.test.ts joins
+ * this panel with the funnel.
+ */
+export type InviteCodeStatus = 'active' | 'exhausted' | 'revoked' | 'expired';
+
+/** One code as it leaves the server: the dashboard's props and every list action. No count. */
 export interface InviteCodeSummary {
+  id: string;
+  hint: string;
+  label: string | null;
+  maxUses: number;
+  status: InviteCodeStatus;
+  expiresAt: string;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+/** A code row as the database holds it. Stays on the server. */
+export interface InviteCodeRecord {
   id: string;
   hint: string;
   label: string | null;
@@ -55,15 +80,29 @@ export interface InviteCodeSummary {
 }
 
 /**
- * K-1 (TASK-MULZATEX4G92H, crw-fb): what the dashboard shows of a code's use.
- * A count under 5 is "<5" (null), like every other count on the page: with a
- * code handed to a single organisation, "1 used" is the moment that
- * organisation registered. §3.1 threshold (SMALL_CELL_THRESHOLD in funnel.ts).
+ * "exhausted" says used = maxUses, so it is only said when maxUses is at least
+ * MIN_MAX_USES (≥ 5). A code made before that minimum reads "active" when used
+ * up: telling the agency it is spent would tell it the 1..4 uses.
  */
-export const USED_COUNT_THRESHOLD = 5;
+export function inviteCodeStatus(c: InviteCodeRecord, now: number): InviteCodeStatus {
+  if (c.revokedAt) return 'revoked';
+  if (c.expiresAt.getTime() <= now) return 'expired';
+  if (c.usedCount >= c.maxUses && c.maxUses >= MIN_MAX_USES) return 'exhausted';
+  return 'active';
+}
 
-export function shownUsedCount(usedCount: number): number | null {
-  return usedCount >= USED_COUNT_THRESHOLD ? usedCount : null;
+/** The only way a code leaves the server: `usedCount` does not come along. */
+export function inviteCodeRow(c: InviteCodeRecord, now: number): InviteCodeSummary {
+  return {
+    id: c.id,
+    hint: c.hint,
+    label: c.label,
+    maxUses: c.maxUses,
+    status: inviteCodeStatus(c, now),
+    expiresAt: c.expiresAt.toISOString(),
+    revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
+    createdAt: c.createdAt.toISOString(),
+  };
 }
 
 /** Validates the inputs a create call brings, before anything is written. */
@@ -71,8 +110,11 @@ export function validateInviteCodeInput(
   input: { maxUses: number; expiresAt: Date },
   now: Date = new Date()
 ): void {
-  if (!Number.isInteger(input.maxUses) || input.maxUses < 1 || input.maxUses > MAX_USES_LIMIT) {
-    throw new AgencyInviteError('INVALID_MAX_USES', `maxUses must be an integer between 1 and ${MAX_USES_LIMIT}`);
+  if (!Number.isInteger(input.maxUses) || input.maxUses < MIN_MAX_USES || input.maxUses > MAX_USES_LIMIT) {
+    throw new AgencyInviteError(
+      'INVALID_MAX_USES',
+      `maxUses must be an integer between ${MIN_MAX_USES} and ${MAX_USES_LIMIT}`
+    );
   }
   const t = input.expiresAt instanceof Date ? input.expiresAt.getTime() : NaN;
   if (!Number.isFinite(t) || t <= now.getTime() || t > now.getTime() + MAX_VALIDITY_DAYS * 86_400_000) {
@@ -142,7 +184,11 @@ export async function revokeInviteCodeIn(
   return count > 0;
 }
 
-export async function listInviteCodesIn(tx: TenantTx, tenantId: string): Promise<InviteCodeSummary[]> {
+export async function listInviteCodesIn(
+  tx: TenantTx,
+  tenantId: string,
+  now: number = Date.now()
+): Promise<InviteCodeSummary[]> {
   const rows = await tx.agencyInviteCode.findMany({
     where: { tenantId },
     orderBy: { createdAt: 'desc' },
@@ -158,7 +204,8 @@ export async function listInviteCodesIn(tx: TenantTx, tenantId: string): Promise
       createdAt: true,
     },
   });
-  return rows.map(({ codeHint, ...r }) => ({ ...r, hint: codeHint }));
+  // usedCount is read for the status only; inviteCodeRow drops it.
+  return rows.map(({ codeHint, ...r }) => inviteCodeRow({ ...r, hint: codeHint }, now));
 }
 
 /**

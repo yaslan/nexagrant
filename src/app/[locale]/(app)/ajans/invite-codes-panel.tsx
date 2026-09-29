@@ -2,22 +2,12 @@
 
 import { useId, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
+import { MAX_USES_LIMIT, MIN_MAX_USES } from '@/lib/agency/code-limits';
+import type { InviteCodeStatus, InviteCodeSummary } from '@/lib/agency/codes';
 import { createInviteCode, listInviteCodes, revokeInviteCode, type InviteActionError } from './actions';
 
-export interface InviteCodeRow {
-  id: string;
-  hint: string;
-  label: string | null;
-  maxUses: number;
-  /** K-1 (TASK-MULZATEX4G92H): null when under 5 — shown as "<5", never as a number. */
-  usedCount: number | null;
-  exhausted: boolean;
-  expiresAt: string;
-  revokedAt: string | null;
-  createdAt: string;
-}
-
-type Status = 'active' | 'revoked' | 'expired' | 'exhausted';
+/** B-1 (TASK-MUM17YBJVAHRR): the server sends each code's status, never its use count. */
+export type InviteCodeRow = InviteCodeSummary;
 
 const focusRing =
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
@@ -25,14 +15,7 @@ const primaryButton = `inline-flex min-h-11 items-center justify-center rounded-
 const secondaryButton = `inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-surface-hover disabled:opacity-60 ${focusRing}`;
 const input = `min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink ${focusRing}`;
 
-function statusOf(c: InviteCodeRow, now: number): Status {
-  if (c.revokedAt) return 'revoked';
-  if (new Date(c.expiresAt).getTime() <= now) return 'expired';
-  if (c.exhausted) return 'exhausted';
-  return 'active';
-}
-
-const STATUS_CLASS: Record<Status, string> = {
+const STATUS_CLASS: Record<InviteCodeStatus, string> = {
   active: 'border-ok text-ok',
   revoked: 'border-bad text-bad',
   expired: 'border-border text-ink-2',
@@ -119,6 +102,7 @@ export default function InviteCodesPanel({
           {t('title')}
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-ink-2">{t('description')}</p>
+        <p className="mt-1 max-w-2xl text-sm text-ink-2">{t('countsNote')}</p>
       </div>
 
       {canManage ? (
@@ -129,14 +113,14 @@ export default function InviteCodesPanel({
         >
           <div className="flex flex-col gap-1">
             <label htmlFor={ids.max} className="text-xs font-semibold text-ink-2">
-              {t('maxUses')}
+              {t('maxUses')} <span className="font-normal text-muted">{t('maxUsesHint', { min: MIN_MAX_USES })}</span>
             </label>
             <input
               id={ids.max}
               type="number"
               inputMode="numeric"
-              min={1}
-              max={10000}
+              min={MIN_MAX_USES}
+              max={MAX_USES_LIMIT}
               required
               value={maxUses}
               onChange={(e) => setMaxUses(e.target.value)}
@@ -230,7 +214,7 @@ export default function InviteCodesPanel({
               <tr>
                 <th scope="col" className="px-4 py-3">{t('colCode')}</th>
                 <th scope="col" className="px-4 py-3">{t('colLabel')}</th>
-                <th scope="col" className="px-4 py-3">{t('colUsage')}</th>
+                <th scope="col" className="px-4 py-3">{t('colLimit')}</th>
                 <th scope="col" className="px-4 py-3">{t('colExpires')}</th>
                 <th scope="col" className="px-4 py-3">{t('colStatus')}</th>
                 <th scope="col" className="px-4 py-3">
@@ -240,24 +224,14 @@ export default function InviteCodesPanel({
             </thead>
             <tbody>
               {codes.map((c) => {
-                const status = statusOf(c, now);
+                const status = c.status;
                 return (
                   <tr key={c.id} className="border-b border-border last:border-0" data-testid={`invite-row-${c.hint}`}>
                     <td className="px-4 py-3 font-mono text-ink">
                       <span aria-label={t('hintSr', { hint: c.hint })}>••••-••••-{c.hint}</span>
                     </td>
                     <td className="px-4 py-3 text-ink-2">{c.label ?? '—'}</td>
-                    <td className="px-4 py-3 tabular-nums text-ink">
-                      {c.usedCount === null ? (
-                        <>
-                          {/* K-1: "left" would give the used count back, so it goes too. */}
-                          <span aria-hidden="true">{t('usageSmall', { max: c.maxUses })}</span>
-                          <span className="sr-only">{t('usageSmallSr', { max: c.maxUses })}</span>
-                        </>
-                      ) : (
-                        t('usage', { used: c.usedCount, max: c.maxUses, left: Math.max(0, c.maxUses - c.usedCount) })
-                      )}
-                    </td>
+                    <td className="px-4 py-3 tabular-nums text-ink">{t('limit', { max: c.maxUses })}</td>
                     <td className="px-4 py-3 text-ink-2">{dateFmt.format(new Date(c.expiresAt))}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_CLASS[status]}`}>

@@ -4,6 +4,7 @@ import { createDbClient, withTenantOn } from '@/lib/db';
 import {
   createInviteCodeIn,
   listInviteCodesIn,
+  MIN_MAX_USES,
   noteInviteRejection,
   redeemInviteCode,
   revokeInviteCodeIn,
@@ -53,16 +54,23 @@ async function newTenant(kind: 'AGENCY' | 'ORGANIZATION', suffix: string): Promi
   return t.id;
 }
 
+/**
+ * A create call refuses a limit under MIN_MAX_USES (TASK-MUM17YBJVAHRR). The
+ * redemption tests below need 1-, 2- and 5-use codes, as made before that rule:
+ * those are created at the minimum and lowered as the owner, like `expiresAt` below.
+ */
 async function makeCode(agency: string, maxUses: number, days = 30): Promise<{ id: string; code: string }> {
-  return withTenantOn(rls!, agency, (tx) =>
+  const created = await withTenantOn(rls!, agency, (tx) =>
     createInviteCodeIn(tx, {
       tenantId: agency,
       createdBy: ids.staff,
-      maxUses,
+      maxUses: Math.max(maxUses, MIN_MAX_USES),
       expiresAt: new Date(Date.now() + days * 86_400_000),
       label: RUN,
     })
   );
+  if (maxUses < MIN_MAX_USES) await admin!.agencyInviteCode.update({ where: { id: created.id }, data: { maxUses } });
+  return created;
 }
 
 /** Redeem as registration does: inside a transaction bound to a fresh tenant. */
@@ -323,6 +331,7 @@ describe('the agency link grants no read on the linked organisation', () => {
     const aList = await withTenantOn(rls!, ids.agencyA, (tx) => listInviteCodesIn(tx, ids.agencyA));
     expect(aList.find((c) => c.id === id)).toBeDefined();
     expect(JSON.stringify(aList)).not.toMatch(/[0-9a-f]{64}/); // no hash in the list
+    expect(JSON.stringify(aList)).not.toMatch(/usedCount|"used/); // B-1: status, no use count
 
     const revokedByB = await withTenantOn(rls!, ids.agencyB, (tx) =>
       revokeInviteCodeIn(tx, { tenantId: ids.agencyB, id, revokedBy: 'intruder' })

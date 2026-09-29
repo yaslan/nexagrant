@@ -4,10 +4,10 @@ import { requireTenantPage } from '@/lib/tenant';
 import { asRole, can } from '@/lib/rbac';
 import { withTenant } from '@/lib/db';
 import { getAgencyFunnel, isAgencyTenant, type FunnelBreakdown } from '@/lib/agency/funnel';
-import { listInviteCodesIn, shownUsedCount } from '@/lib/agency/codes';
+import { listInviteCodesIn } from '@/lib/agency/codes';
 import { parseProvince } from '@/lib/readiness/share';
 import FunnelPanel from './funnel-panel';
-import InviteCodesPanel, { type InviteCodeRow } from './invite-codes-panel';
+import InviteCodesPanel from './invite-codes-panel';
 
 /**
  * TASK-MULZATEX4G92H — one breakdown per request: `?kirilim=tur` (organisation
@@ -47,24 +47,13 @@ export default async function AgencyPage({
   const t = await getTranslations({ locale, namespace: 'agency' });
   const breakdown = parseBreakdown(kirilim, il);
 
+  const renderedAt = requestTime();
   const [funnel, codes] = await Promise.all([
     // TASK-MULXF0AVMD8MN — one cohort, no date window: an old `?gun=` link is ignored.
     getAgencyFunnel(scope.tenantId, { breakdown }),
-    withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId)),
+    // B-1 (TASK-MUM17YBJVAHRR): status per code, no use count.
+    withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId, renderedAt)),
   ]);
-  const renderedAt = requestTime();
-  const rows: InviteCodeRow[] = codes.map((c) => ({
-    id: c.id,
-    hint: c.hint,
-    label: c.label,
-    maxUses: c.maxUses,
-    // K-1: under 5 is "<5"; the status still needs to know a code is used up.
-    usedCount: shownUsedCount(c.usedCount),
-    exhausted: c.usedCount >= c.maxUses,
-    expiresAt: c.expiresAt.toISOString(),
-    revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
-    createdAt: c.createdAt.toISOString(),
-  }));
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 py-4 sm:py-8">
@@ -77,7 +66,7 @@ export default async function AgencyPage({
 
       <InviteCodesPanel
         locale={locale}
-        initialCodes={rows}
+        initialCodes={codes}
         canManage={can(asRole(scope.role), 'manage_users')}
         now={renderedAt}
       />
