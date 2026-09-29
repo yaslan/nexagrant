@@ -8,9 +8,5 @@ allowBuilds:
   # Unlisted, pnpm 11 fails `pnpm install` in CI with ERR_PNPM_IGNORED_BUILDS.
   esbuild: true
   prisma: true
-  # protobufjs (transitive: inngest > @opentelemetry/sdk-node > @grpc/proto-loader)
-  # has a postinstall that only prints a version-scheme warning for packages that
-  # depend on protobufjs directly. We do not, so the script has nothing to do.
-  protobufjs: false
   sharp: false
   unrs-resolver: false

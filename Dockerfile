@@ -8,7 +8,9 @@ RUN corepack enable
 
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml carries `allowBuilds`: without it pnpm 11 stops with
+# ERR_PNPM_IGNORED_BUILDS (prisma, esbuild, …) and no image builds.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
