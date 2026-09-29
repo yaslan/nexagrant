@@ -2448,6 +2448,49 @@
       "bad_prefixes": "Yeniden hesaplanacak konu listesi geçersiz."
     }
   },
+  "adminDocuments": {
+    "title": "Belgeler (K6 RAG)",
+    "subtitle": "Çalışma programı ve konu PDF'lerini paylaşılan RAG belleğine yükleyin. Metin parçalara ayrılır, her parça OpenAI ile gömülür (maliyet platforma yazılır) ve tüm kiracıların aramasında kullanılır.",
+    "uploadHeading": "PDF yükle",
+    "fileLabel": "PDF dosyası",
+    "fileHint": "Yalnızca metin katmanı olan PDF, en fazla {maxMb} MB. Taranmış (yalnız görüntü) PDF kabul edilmez.",
+    "kindLabel": "Belge türü",
+    "titleLabel": "Başlık",
+    "uploadButton": "Yükle ve göm",
+    "working": "Yükleniyor…",
+    "workingDetail": "PDF ayrıştırılıyor ve parçalar gömülüyor. Büyük bir çalışma programı birkaç dakika sürebilir; sayfayı kapatmayın.",
+    "costNote": "Her yükleme gömme maliyeti doğurur; aynı belgeyi iki kez yüklemeyin.",
+    "uploadAnyway": "Yine de yükle",
+    "duplicateDetail": "Mevcut kayıt: {chunks} parça, yüklenme {date}. Yeniden yüklemek tüm parçaları tekrar gömer ve bu belgenin aramadaki ağırlığını ikiye katlar.",
+    "successHeading": "Belge kaydedildi",
+    "successDetail": "“{title}” için {chunks} parça kaydedildi.",
+    "docIdLabel": "Belge kimliği",
+    "currentHeading": "Yüklenen belgeler ({total})",
+    "listCaption": "Son {shown} belge gösteriliyor, toplam {total}.",
+    "empty": "Henüz yüklenmiş çalışma programı veya konu belgesi yok.",
+    "loadError": "Belge listesi okunamadı.",
+    "kinds": {
+      "work_programme": "Çalışma programı",
+      "topic": "Konu (topic)"
+    },
+    "cols": {
+      "title": "Başlık",
+      "kind": "Tür",
+      "chunks": "Parça",
+      "uploaded": "Yüklenme"
+    },
+    "errors": {
+      "bad_form": "Form okunamadı. Sayfayı yenileyip tekrar deneyin.",
+      "no_file": "Bir PDF dosyası seçin.",
+      "too_large": "Dosya çok büyük; en fazla {maxMb} MB.",
+      "not_pdf": "Bu dosya PDF değil.",
+      "bad_kind": "Geçersiz belge türü.",
+      "bad_title": "Başlık boş olamaz ve en fazla {maxLength} karakter olabilir.",
+      "duplicate": "Bu tür ve başlıkla bir belge zaten var.",
+      "no_text": "PDF'te okunabilir metin yok (taranmış veya yalnız görüntü). Hiçbir şey kaydedilmedi.",
+      "upload_failed": "Yükleme başarısız oldu; hiçbir parça kaydedilmedi."
+    }
+  },
   "coBrand": {
     "with": "{agency} iş birliğiyle",
     "logoAlt": "{agency} logosu"

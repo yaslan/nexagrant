@@ -12,7 +12,8 @@ import {
   Newspaper,
   MessageSquareWarning,
   ShieldAlert,
-  Percent
+  Percent,
+  FileText
 } from 'lucide-react';
 
 interface AdminSidebarNavProps {
@@ -70,6 +71,14 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       desc: 'Horizon Dashboard xlsx → TopicStat',
       icon: Percent,
       badge: 'K3',
+    },
+    {
+      key: 'documents',
+      href: `/${locale}/admin/documents`,
+      label: locale === 'tr' ? 'Belgeler (K6 RAG)' : 'Documents (K6 RAG)',
+      desc: locale === 'tr' ? 'Çalışma programı PDF → paylaşılan RAG' : 'Work programme PDF → shared RAG',
+      icon: FileText,
+      badge: 'K6',
     },
     {
       key: 'audit',

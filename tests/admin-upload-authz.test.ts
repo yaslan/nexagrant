@@ -15,13 +15,19 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
  * a gate that runs *after* the body is parsed still pays for the embedding.
  */
 
-const { authMock, processPdfAndStoreMock } = vi.hoisted(() => ({
+const { authMock, processPdfAndStoreMock, findSharedDocumentByTitleMock, NoTextError } = vi.hoisted(() => ({
   authMock: vi.fn(),
   processPdfAndStoreMock: vi.fn(),
+  findSharedDocumentByTitleMock: vi.fn(),
+  NoTextError: class NoExtractableTextError extends Error {},
 }));
 
 vi.mock('@/lib/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/rag', () => ({ processPdfAndStore: processPdfAndStoreMock }));
+vi.mock('@/lib/rag', () => ({
+  processPdfAndStore: processPdfAndStoreMock,
+  findSharedDocumentByTitle: findSharedDocumentByTitleMock,
+  NoExtractableTextError: NoTextError,
+}));
 
 const { POST } = await import('@/app/api/admin/documents/upload/route');
 const { requirePlatformAdminApi } = await import('@/lib/tenant');
@@ -43,11 +49,18 @@ const MEMBER_SESSION = {
 };
 
 /** A multipart POST exactly as the admin upload form sends one. */
-function uploadRequest(): Request {
+function uploadRequest(
+  overrides: { file?: File | null; kind?: string; title?: string; allowDuplicate?: string } = {}
+): Request {
   const body = new FormData();
-  body.set('file', new File([Buffer.from('%PDF-1.4 fake')], 'probe.pdf', { type: 'application/pdf' }));
-  body.set('kind', 'test');
-  body.set('title', 'authz-probe');
+  const file =
+    overrides.file === undefined
+      ? new File([Buffer.from('%PDF-1.4 fake')], 'probe.pdf', { type: 'application/pdf' })
+      : overrides.file;
+  if (file) body.set('file', file);
+  body.set('kind', overrides.kind ?? 'work_programme');
+  body.set('title', overrides.title ?? 'authz-probe');
+  if (overrides.allowDuplicate) body.set('allowDuplicate', overrides.allowDuplicate);
   return new Request('http://localhost:3000/api/admin/documents/upload', {
     method: 'POST',
     body,
@@ -57,6 +70,7 @@ function uploadRequest(): Request {
 beforeEach(() => {
   authMock.mockReset();
   processPdfAndStoreMock.mockReset().mockResolvedValue({ doc: { id: 'doc-1' }, storedChunks: 3 });
+  findSharedDocumentByTitleMock.mockReset().mockResolvedValue(null);
 });
 
 describe('POST /api/admin/documents/upload', () => {
@@ -92,7 +106,7 @@ describe('POST /api/admin/documents/upload', () => {
     const [buffer, tenantId, kind, title, sourceUrl, actor] = processPdfAndStoreMock.mock.calls[0]!;
     expect(Buffer.isBuffer(buffer)).toBe(true);
     expect(tenantId).toBeNull();
-    expect(kind).toBe('test');
+    expect(kind).toBe('work_programme');
     expect(title).toBe('authz-probe');
     expect(sourceUrl).toBeUndefined();
     // Attribution is no longer best-effort: the gate identified the actor.
@@ -106,6 +120,95 @@ describe('POST /api/admin/documents/upload', () => {
 
     expect(res.status).toBe(500);
     expect(processPdfAndStoreMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/admin/documents/upload — input validation (TASK-MULQL8QB679LQ)', () => {
+  beforeEach(() => authMock.mockResolvedValue(ADMIN_SESSION));
+
+  async function expectRefused(req: Request, status: number, error: string) {
+    const res = await POST(req as never);
+    expect(res.status).toBe(status);
+    await expect(res.json()).resolves.toMatchObject({ error });
+    expect(processPdfAndStoreMock).not.toHaveBeenCalled();
+  }
+
+  test('no file → 400 no_file', () => expectRefused(uploadRequest({ file: null }), 400, 'no_file'));
+
+  test('a kind outside the allowlist → 400 bad_kind', async () => {
+    await expectRefused(uploadRequest({ kind: 'tenant_upload' }), 400, 'bad_kind');
+    await expectRefused(uploadRequest({ kind: '' }), 400, 'bad_kind');
+  });
+
+  test('empty or over-long title → 400 bad_title', async () => {
+    await expectRefused(uploadRequest({ title: '   ' }), 400, 'bad_title');
+    await expectRefused(uploadRequest({ title: 'x'.repeat(201) }), 400, 'bad_title');
+  });
+
+  test('a non-PDF body → 415 not_pdf, even when it claims application/pdf', () =>
+    expectRefused(
+      uploadRequest({ file: new File([Buffer.from('hello')], 'fake.pdf', { type: 'application/pdf' }) }),
+      415,
+      'not_pdf'
+    ));
+
+  test('a file over the size limit → 413 too_large', () =>
+    expectRefused(
+      uploadRequest({
+        file: new File([Buffer.concat([Buffer.from('%PDF-'), Buffer.alloc(20 * 1024 * 1024)])], 'big.pdf', {
+          type: 'application/pdf',
+        }),
+      }),
+      413,
+      'too_large'
+    ));
+
+  test('same kind + title already in the shared corpus → 409 duplicate, nothing embedded', async () => {
+    findSharedDocumentByTitleMock.mockResolvedValue({
+      id: 'doc-old',
+      kind: 'work_programme',
+      title: 'authz-probe',
+      createdAt: new Date('2026-09-01T00:00:00Z'),
+      chunks: 7,
+    });
+
+    const res = await POST(uploadRequest() as never);
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: 'duplicate', existing: { id: 'doc-old', chunks: 7 } });
+    expect(findSharedDocumentByTitleMock).toHaveBeenCalledWith('work_programme', 'authz-probe');
+    expect(processPdfAndStoreMock).not.toHaveBeenCalled();
+  });
+
+  test('allowDuplicate=true stores it anyway without looking the title up', async () => {
+    const res = await POST(uploadRequest({ allowDuplicate: 'true' }) as never);
+
+    expect(res.status).toBe(200);
+    expect(findSharedDocumentByTitleMock).not.toHaveBeenCalled();
+    expect(processPdfAndStoreMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('the title is stored trimmed', async () => {
+    await POST(uploadRequest({ title: '  WP 2026  ' }) as never);
+    expect(processPdfAndStoreMock.mock.calls[0]![3]).toBe('WP 2026');
+  });
+
+  test('a PDF with no text layer → 422 no_text, not a generic 500', async () => {
+    processPdfAndStoreMock.mockRejectedValue(new NoTextError('no text'));
+
+    const res = await POST(uploadRequest() as never);
+
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toEqual({ error: 'no_text' });
+  });
+
+  test('an ingest failure → 500 upload_failed', async () => {
+    processPdfAndStoreMock.mockRejectedValue(new Error('provider down'));
+
+    const res = await POST(uploadRequest() as never);
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: 'upload_failed' });
   });
 });
 

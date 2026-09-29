@@ -2448,6 +2448,49 @@
       "bad_prefixes": "The topic list to rescore is invalid."
     }
   },
+  "adminDocuments": {
+    "title": "Documents (K6 RAG)",
+    "subtitle": "Upload work programme and topic PDFs into the shared RAG corpus. The text is split into chunks, each chunk is embedded with OpenAI (billed to the platform) and used in every tenant's retrieval.",
+    "uploadHeading": "Upload a PDF",
+    "fileLabel": "PDF file",
+    "fileHint": "PDFs with a text layer only, up to {maxMb} MB. Scanned (image-only) PDFs are not accepted.",
+    "kindLabel": "Document type",
+    "titleLabel": "Title",
+    "uploadButton": "Upload and embed",
+    "working": "Uploading…",
+    "workingDetail": "Parsing the PDF and embedding its chunks. A large work programme can take several minutes; keep this page open.",
+    "costNote": "Every upload costs embedding calls; do not upload the same document twice.",
+    "uploadAnyway": "Upload anyway",
+    "duplicateDetail": "Existing record: {chunks} chunks, uploaded {date}. Uploading again embeds every chunk again and doubles this document's weight in retrieval.",
+    "successHeading": "Document stored",
+    "successDetail": "{chunks} chunks stored for “{title}”.",
+    "docIdLabel": "Document ID",
+    "currentHeading": "Uploaded documents ({total})",
+    "listCaption": "Showing the latest {shown} of {total} documents.",
+    "empty": "No work programme or topic documents have been uploaded yet.",
+    "loadError": "The document list could not be read.",
+    "kinds": {
+      "work_programme": "Work programme",
+      "topic": "Topic"
+    },
+    "cols": {
+      "title": "Title",
+      "kind": "Type",
+      "chunks": "Chunks",
+      "uploaded": "Uploaded"
+    },
+    "errors": {
+      "bad_form": "The form could not be read. Reload the page and try again.",
+      "no_file": "Choose a PDF file.",
+      "too_large": "The file is too large; the limit is {maxMb} MB.",
+      "not_pdf": "This file is not a PDF.",
+      "bad_kind": "Invalid document type.",
+      "bad_title": "The title must not be empty and may be at most {maxLength} characters.",
+      "duplicate": "A document with this type and title already exists.",
+      "no_text": "The PDF has no readable text (scanned or image-only). Nothing was stored.",
+      "upload_failed": "The upload failed; no chunks were stored."
+    }
+  },
   "coBrand": {
     "with": "In collaboration with {agency}",
     "logoAlt": "{agency} logo"

@@ -66,6 +66,83 @@ export interface RagActor {
   userId?: string;
 }
 
+/**
+ * A PDF with no text layer (scanned, image-only) — nothing was written. Its own
+ * class so the upload route can tell the admin "this file has no text" instead
+ * of a generic failure.
+ */
+export class NoExtractableTextError extends Error {
+  constructor(title: string) {
+    super(`No extractable text in "${title}" — nothing was stored`);
+    this.name = 'NoExtractableTextError';
+  }
+}
+
+/** A shared-corpus document as the admin console lists it. */
+export interface SharedDocumentSummary {
+  id: string;
+  kind: string;
+  title: string;
+  createdAt: Date;
+  chunks: number;
+}
+
+/**
+ * The most recent shared (`tenantId: null`) documents of the given kinds, with
+ * their stored chunk counts. Read under the platform scope, which the
+ * `tenant_or_shared` policy lets see exactly the NULL-tenant rows.
+ */
+export async function listSharedDocuments(
+  kinds: readonly string[],
+  take: number = 50
+): Promise<{ documents: SharedDocumentSummary[]; total: number }> {
+  return withTenant(PLATFORM_SCOPE_TENANT_ID, async (tx) => {
+    const where = { tenantId: null, kind: { in: [...kinds] } };
+    const [rows, total] = await Promise.all([
+      tx.document.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take,
+        select: { id: true, kind: true, title: true, createdAt: true, _count: { select: { chunks: true } } },
+      }),
+      tx.document.count({ where }),
+    ]);
+    return {
+      documents: rows.map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        title: r.title,
+        createdAt: r.createdAt,
+        chunks: r._count.chunks,
+      })),
+      total,
+    };
+  });
+}
+
+/**
+ * A shared document of the same kind already carrying this title (case- and
+ * surrounding-space-insensitive), or null. `Document` stores no content hash,
+ * so the title is the only handle an admin re-uploading the same file gives us —
+ * and a second upload of the same PDF embeds every chunk again, at the
+ * platform's expense, and doubles its weight in every tenant's retrieval.
+ */
+export async function findSharedDocumentByTitle(
+  kind: string,
+  title: string
+): Promise<SharedDocumentSummary | null> {
+  return withTenant(PLATFORM_SCOPE_TENANT_ID, async (tx) => {
+    const row = await tx.document.findFirst({
+      where: { tenantId: null, kind, title: { equals: title.trim(), mode: 'insensitive' } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, kind: true, title: true, createdAt: true, _count: { select: { chunks: true } } },
+    });
+    return row
+      ? { id: row.id, kind: row.kind, title: row.title, createdAt: row.createdAt, chunks: row._count.chunks }
+      : null;
+  });
+}
+
 /** What an upload actually put into the corpus. */
 export interface PdfIngestResult {
   doc: { id: string };
@@ -273,7 +350,7 @@ export async function processPdfAndStore(
     // Nothing was written yet, so there is nothing to undo — and nothing to
     // report as a successful upload either. A scanned or image-only PDF lands
     // here; answering 200 for it is how "stored nothing" passes for success.
-    throw new Error(`No extractable text in "${title}" — nothing was stored`);
+    throw new NoExtractableTextError(title);
   }
 
   // Save document
