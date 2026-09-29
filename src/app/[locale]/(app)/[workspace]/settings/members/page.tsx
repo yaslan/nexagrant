@@ -41,7 +41,8 @@ export default function MembersSettingsPage() {
       // mailed less than 10 minutes ago, so no mail went out and no link comes
       // back — the token was kept and the link in that mail still works;
       // daily_limit = the tenant's daily invitation email limit is used up, and
-      // the link below is the one to pass on by hand.
+      // the link below is the one to pass on by hand; role_change_blocked =
+      // recently_sent with another role, which the mailed link keeps.
       const notSent =
         data.reason === 'daily_limit'
           ? isTr
@@ -51,7 +52,11 @@ export default function MembersSettingsPage() {
             ? 'Davet oluşturuldu ancak e-posta gönderilemedi; bağlantıyı elle iletin'
             : 'Invitation created but the email could not be sent; share this link yourself';
       setMessage(
-        data.reason === 'recently_sent'
+        data.reason === 'role_change_blocked'
+          ? isTr
+            ? 'Davet az önce gönderildi; rolü değiştirmek için 10 dakika sonra yeniden davet edin'
+            : 'The invitation was sent a moment ago; to change the role, invite again in 10 minutes'
+          : data.reason === 'recently_sent'
           ? isTr
             ? 'Davet e-postası az önce gönderildi; davetli e-postadaki bağlantıyı kullanabilir'
             : 'The invitation email was sent a moment ago; the invitee can use the link in that email'
@@ -61,6 +66,8 @@ export default function MembersSettingsPage() {
               : `Invitation email sent. Link: ${data.inviteLink}`
             : `${notSent}: ${data.inviteLink}`
       );
+      // Nothing was changed, so it is not shown as a success.
+      setMessageIsError(data.reason === 'role_change_blocked');
       setEmail('');
     } catch (error) {
       setMessage(errorText(error, () => `${isTr ? 'Hata' : 'Error'}: ${errorMessage(error)}`));

@@ -86,7 +86,9 @@ vi.mock('@/lib/observability/system-alert', () => ({ recordAlert }));
 
 const { createDbClient } = await import('@/lib/db');
 const { POST } = await import('@/app/api/invitations/route');
-const { INVITATION_MAIL_DAILY_LIMIT, INVITATION_MAIL_SENT } = await import('@/lib/email/invitation-mail-policy');
+const { INVITATION_MAIL_DAILY_LIMIT, INVITATION_MAIL_SENT, INVITATION_ROLE_CHANGE_BLOCKED } = await import(
+  '@/lib/email/invitation-mail-policy'
+);
 const { hashSecretToken } = await import('@/lib/secret-token');
 
 let admin: PrismaClient | undefined;
@@ -95,7 +97,13 @@ let skipReason = '';
 let tenantId = '';
 let seq = 0;
 
-type Body = { success?: boolean; emailSent?: boolean; reason?: string; inviteLink?: string; invitation?: { id: string } };
+type Body = {
+  success?: boolean;
+  emailSent?: boolean;
+  reason?: string;
+  inviteLink?: string;
+  invitation?: { id: string; role: string };
+};
 
 async function invite(email: string, role = 'MEMBER'): Promise<{ status: number; body: Body }> {
   const res = await POST(
@@ -185,15 +193,15 @@ describe('POST /api/invitations — mail limits', () => {
     expect(first.body.inviteLink).toContain(mailed);
 
     // İNCELEME-26 Ö-1: the double click neither rotates the token the mail
-    // holds nor hands the inviter a link; the role and expiry still update.
+    // holds nor hands the inviter a link; the expiry still updates.
     const before = await admin!.invitation.findUnique({ where: { email_tenantId: { email, tenantId } } });
-    const second = await invite(email, 'WRITER');
+    const second = await invite(email);
     expect(second).toMatchObject({ status: 200, body: { success: true, emailSent: false, reason: 'recently_sent' } });
     expect(second.body).not.toHaveProperty('inviteLink');
     expect(send).toHaveBeenCalledTimes(1);
     expect(await tokenIsCurrent(email, mailed)).toBe(true);
     const after = await admin!.invitation.findUnique({ where: { email_tenantId: { email, tenantId } } });
-    expect(after).toMatchObject({ id: before!.id, role: 'WRITER' });
+    expect(after).toMatchObject({ id: before!.id, role: 'MEMBER' });
     expect(after!.expires.getTime()).toBeGreaterThanOrEqual(before!.expires.getTime());
 
     // The row the limit counts names the invitation, never the address.
@@ -201,6 +209,99 @@ describe('POST /api/invitations — mail limits', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ target: first.body.invitation!.id, actorId: `${RUN}-owner` });
     expect(JSON.stringify(rows)).not.toContain(email);
+  });
+
+  test('within the cooldown a re-invite with another role leaves the mailed invitation as it is and is recorded', async () => {
+    // İNCELEME-32 Ö-1: an OWNER mails MEMBER, an ADMIN re-invites as
+    // TENANT_ADMIN 5 minutes later; the link in the mail must still make a MEMBER.
+    const email = nextEmail();
+    const first = await invite(email, 'MEMBER');
+    const mailed = mailedToken(0);
+    await admin!.auditEvent.updateMany({
+      where: { tenantId: requireId(tenantId, 'tenantId') },
+      data: { createdAt: new Date(Date.now() - 5 * 60 * 1000) },
+    });
+    const before = await admin!.invitation.findUnique({ where: { email_tenantId: { email, tenantId } } });
+
+    state.scope = { ...state.scope, userId: `${RUN}-admin`, role: 'TENANT_ADMIN' };
+    let second;
+    try {
+      second = await invite(email, 'TENANT_ADMIN');
+    } finally {
+      state.scope = { ...state.scope, userId: `${RUN}-owner`, role: 'TENANT_OWNER' };
+    }
+    expect(second).toMatchObject({
+      status: 200,
+      body: { success: false, emailSent: false, reason: 'role_change_blocked', invitation: { id: first.body.invitation!.id, role: 'MEMBER' } },
+    });
+    expect(second.body).not.toHaveProperty('inviteLink');
+    expect(send).toHaveBeenCalledTimes(1);
+
+    // Role, token and expiry are exactly as mailed.
+    const after = await admin!.invitation.findUnique({ where: { email_tenantId: { email, tenantId } } });
+    expect(after).toEqual(before);
+    expect(await tokenIsCurrent(email, mailed)).toBe(true);
+
+    const blocked = await admin!.auditEvent.findMany({ where: { tenantId, type: INVITATION_ROLE_CHANGE_BLOCKED } });
+    expect(blocked).toHaveLength(1);
+    expect(blocked[0]).toMatchObject({
+      actorId: `${RUN}-admin`,
+      target: first.body.invitation!.id,
+      data: { from: 'MEMBER', to: 'TENANT_ADMIN' },
+    });
+    expect(JSON.stringify(blocked)).not.toContain(email);
+    // The blocked attempt sent nothing, so it does not count toward the limits.
+    expect(await admin!.auditEvent.count({ where: { tenantId, type: INVITATION_MAIL_SENT } })).toBe(1);
+
+    // After the cooldown the role change goes through, with a fresh mail.
+    await admin!.auditEvent.updateMany({
+      where: { tenantId: requireId(tenantId, 'tenantId') },
+      data: { createdAt: new Date(Date.now() - 11 * 60 * 1000) },
+    });
+    const third = await invite(email, 'TENANT_ADMIN');
+    expect(third.body).toMatchObject({ success: true, emailSent: true, invitation: { role: 'TENANT_ADMIN' } });
+    expect(await tokenIsCurrent(email, mailedToken(1))).toBe(true);
+  });
+
+  test('within the cooldown a re-invite with the same role pushes the expiry out and keeps the token', async () => {
+    // İNCELEME-32 Ö-3 (mutant Y3): the kept-token update still sets `expires`.
+    const email = nextEmail();
+    await invite(email, 'WRITER');
+    const soon = new Date(Date.now() + 60 * 60 * 1000);
+    await admin!.invitation.update({ where: { email_tenantId: { email, tenantId } }, data: { expires: soon } });
+
+    const again = await invite(email, 'WRITER');
+    expect(again.body).toMatchObject({ success: true, emailSent: false, reason: 'recently_sent' });
+    const row = await admin!.invitation.findUnique({ where: { email_tenantId: { email, tenantId } } });
+    expect(row!.role).toBe('WRITER');
+    // A fresh 7 days, not the hour left on the row.
+    expect(row!.expires.getTime()).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
+    expect(await tokenIsCurrent(email, mailedToken(0))).toBe(true);
+  });
+
+  test('an address inside its cooldown is recently_sent even when the tenant is at the daily limit', async () => {
+    // İNCELEME-32 Ö-2 (mutant Y11): the cooldown is checked before the daily
+    // limit. The other way round this re-invite reads daily_limit, rotates the
+    // token and kills the link mailed 2 minutes ago.
+    const email = nextEmail();
+    await invite(email);
+    await admin!.auditEvent.updateMany({
+      where: { tenantId: requireId(tenantId, 'tenantId') },
+      data: { createdAt: new Date(Date.now() - 2 * 60 * 1000) },
+    });
+    await admin!.auditEvent.createMany({
+      data: Array.from({ length: INVITATION_MAIL_DAILY_LIMIT - 1 }, (_, i) => ({
+        tenantId,
+        type: INVITATION_MAIL_SENT,
+        target: `${RUN}-both-${i}`,
+        createdAt: new Date(Date.now() - 60 * 60 * 1000),
+      })),
+    });
+    const res = await invite(email);
+    expect(res.body).toMatchObject({ emailSent: false, reason: 'recently_sent' });
+    expect(res.body).not.toHaveProperty('inviteLink');
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await tokenIsCurrent(email, mailedToken(0))).toBe(true);
   });
 
   test('after the cooldown the same address is mailed again', async () => {
@@ -255,6 +356,23 @@ describe('POST /api/invitations — mail limits', () => {
     expect([a.body.emailSent, b.body.emailSent].sort()).toEqual([false, true]);
     expect(send).toHaveBeenCalledTimes(1);
     // The request that lost the race must not rotate the token just mailed.
+    expect(await tokenIsCurrent(email, mailedToken(0))).toBe(true);
+  });
+
+  test('two concurrent invitations with different roles leave the mailed role in place', async () => {
+    // İNCELEME-32 §2.4: the request that lost the race used to write its role
+    // last, under the winner's mailed link.
+    const email = nextEmail();
+    state.barrier = { size: 2, ms: 500, waiting: [] };
+    const [a, b] = await Promise.all([invite(email, 'MEMBER'), invite(email, 'WRITER')]).finally(() => {
+      state.barrier = null;
+    });
+    const [won, lost] = a.body.emailSent ? [a, b] : [b, a];
+    expect(won.body.emailSent).toBe(true);
+    expect(lost.body).toMatchObject({ emailSent: false, reason: 'role_change_blocked' });
+    expect(send).toHaveBeenCalledTimes(1);
+    const row = await admin!.invitation.findUnique({ where: { email_tenantId: { email, tenantId } } });
+    expect(row!.role).toBe(won.body.invitation!.role);
     expect(await tokenIsCurrent(email, mailedToken(0))).toBe(true);
   });
 

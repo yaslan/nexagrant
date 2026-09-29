@@ -10,6 +10,7 @@ import {
   INVITATION_MAIL_DAILY_LIMIT,
   INVITATION_MAIL_FAILED,
   INVITATION_MAIL_SENT,
+  INVITATION_ROLE_CHANGE_BLOCKED,
   invitationMailBaseUrl,
   invitationMailSkipReason,
   lockInvitationMail,
@@ -83,6 +84,7 @@ export async function POST(req: Request) {
       invitation: InvitationRow | null;
       tenantName: string | null;
       mailSkip: InvitationMailSkip | null;
+      roleChangeBlocked?: boolean;
     }>(tenantId, async (tx) => {
       const existingMembership = await tx.membership.findFirst({
         where: {
@@ -111,9 +113,25 @@ export async function POST(req: Request) {
         await lockInvitationMail(tx, tenantId);
         const existing = await tx.invitation.findUnique({
           where: { email_tenantId: { email, tenantId } },
-          select: { id: true },
+          select: { id: true, email: true, tenantId: true, role: true, expires: true },
         });
         mailSkip = await invitationMailSkipReason(tx, tenantId, existing?.id ?? null);
+
+        // The mail that just went out names a role; within the cooldown no new
+        // mail can say otherwise, so the link keeps it (İNCELEME-32 Ö-1). The
+        // row is left as mailed, expiry included, and the attempt is recorded.
+        if (mailSkip === 'recently_sent' && existing && existing.role !== role) {
+          await tx.auditEvent.create({
+            data: {
+              tenantId,
+              actorId: userId,
+              type: INVITATION_ROLE_CHANGE_BLOCKED,
+              target: existing.id,
+              data: { from: existing.role, to: role },
+            },
+          });
+          return { conflict: false, seatLimit: null, invitation: existing, tenantName: null, mailSkip, roleChangeBlocked: true };
+        }
       }
 
       // Within the cooldown the invitee already holds a mail with a link, and no
@@ -163,6 +181,15 @@ export async function POST(req: Request) {
         },
         { status: 403 }
       );
+    }
+
+    if (result.roleChangeBlocked) {
+      return NextResponse.json({
+        success: false,
+        invitation: result.invitation,
+        emailSent: false,
+        reason: 'role_change_blocked',
+      });
     }
 
     // The response keeps the old localhost fallback so a local inviter still

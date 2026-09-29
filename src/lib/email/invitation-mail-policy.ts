@@ -26,7 +26,9 @@ import { env } from '@/lib/env';
  * Skipping the mail never blocks the invitation. On `daily_limit` the route
  * rotates the token and returns the link, with `emailSent: false` and the
  * reason. On `recently_sent` it keeps the token, so the link in the mail that
- * just went out stays valid, and returns no link (İNCELEME-26 Ö-1).
+ * just went out stays valid, and returns no link (İNCELEME-26 Ö-1). If that
+ * re-invite asks for another role, the row is left as mailed and the response
+ * says `role_change_blocked` (İNCELEME-32 Ö-1).
  */
 
 export const INVITATION_MAIL_COOLDOWN_MS = 10 * 60 * 1000;
@@ -42,6 +44,13 @@ export const INVITATION_MAIL_DAILY_LIMIT = 50;
 
 export const INVITATION_MAIL_SENT = 'invitation.email_sent';
 export const INVITATION_MAIL_FAILED = 'invitation.email_failed';
+/**
+ * A re-invite within the cooldown that asked for a different role (İNCELEME-32
+ * Ö-1). The mailed link keeps the role it was sent with; this row records who
+ * tried to change it (actorId), on which invitation (target) and from/to which
+ * role (data). Never the address. The limits above do not count it.
+ */
+export const INVITATION_ROLE_CHANGE_BLOCKED = 'invitation.role_change_blocked';
 
 export type InvitationMailSkip = 'recently_sent' | 'daily_limit';
 
