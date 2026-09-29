@@ -10,6 +10,7 @@ import {
 } from '../alerts-daily';
 import { MailSendError, type Mailer, type MailMessage } from '@/lib/email/mailer';
 import { grantCreditsToTenants } from '../credits-monthly-grant';
+import { requireId } from '../../../../../tests/helpers/teardown-guard';
 
 /**
  * TASK-MTVR8KK92G0GA — do the two cron jobs write under the tenant they are
@@ -193,11 +194,11 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     // Written with the privileged role, and narrowed to this run's marker only.
     for (const f of [a, b]) {
       if (!f) continue;
-      await prisma.savedSearch.deleteMany({ where: { tenantId: f.tenantId } });
-      await prisma.creditLedger.deleteMany({ where: { tenantId: f.tenantId } });
+      await prisma.savedSearch.deleteMany({ where: { tenantId: requireId(f.tenantId, 'f.tenantId') } });
+      await prisma.creditLedger.deleteMany({ where: { tenantId: requireId(f.tenantId, 'f.tenantId') } });
       // Membership cascades from both sides; the tenant delete takes it.
-      await prisma.tenant.deleteMany({ where: { id: f.tenantId } });
-      await prisma.user.deleteMany({ where: { email: f.email } });
+      await prisma.tenant.deleteMany({ where: { id: requireId(f.tenantId, 'f.tenantId') } });
+      await prisma.user.deleteMany({ where: { email: requireId(f.email, 'f.email') } });
     }
     await rls?.$disconnect();
     await prisma.$disconnect();

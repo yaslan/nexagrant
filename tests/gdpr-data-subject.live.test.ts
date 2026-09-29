@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
+import { requireId } from './helpers/teardown-guard';
 
 /**
  * Live KVKK/GDPR data-subject tests — real Postgres, real Prisma, real queries.
@@ -373,7 +374,7 @@ describe.skipIf(!HAS_DB)('GDPR accountability audit — live', () => {
   const subjectRef = createHash('sha256').update(ids.subject).digest('hex');
 
   test('an export writes a record that counts rows but copies none of them', async () => {
-    await db.auditEvent.deleteMany({ where: { target: subjectRef, type: 'user.data.exported' } });
+    await db.auditEvent.deleteMany({ where: { target: requireId(subjectRef, 'subjectRef'), type: 'user.data.exported' } });
 
     currentSession = { user: { id: ids.subject }, tenantId: ids.tenantA };
     await exportUserData();
@@ -398,7 +399,7 @@ describe.skipIf(!HAS_DB)('GDPR accountability audit — live', () => {
     // The erasure block above already exercised this subject, so start from a
     // clean slate: this test asserts one record per action, not a running total.
     await db.auditEvent.deleteMany({
-      where: { target: subjectRef, type: { in: ['user.erasure.requested', 'user.erasure.cancelled'] } },
+      where: { target: requireId(subjectRef, 'subjectRef'), type: { in: ['user.erasure.requested', 'user.erasure.cancelled'] } },
     });
 
     currentSession = { user: { id: ids.subject }, tenantId: ids.tenantA };
