@@ -3,6 +3,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { ApiKeysClient, type ApiKeyRecord } from './client';
 import { errorMessage } from '@/lib/errors';
+import { appUrl } from '@/lib/app-url';
 
 /**
  * Placeholder rows for the empty state — the timestamps are relative to the
@@ -56,7 +57,7 @@ export default async function ApiKeysSettingsPage({
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <ApiKeysClient apiKeys={apiKeys} />
+      <ApiKeysClient apiKeys={apiKeys} apiBaseUrl={appUrl()} />
     </div>
   );
 }

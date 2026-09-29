@@ -29,12 +29,14 @@ const ACTION_ERROR_TEXT: Record<ApiKeyActionError, string> = {
 
 interface ApiKeysClientProps {
   apiKeys: ApiKeyRecord[];
+  /** The app's own origin for the code samples (NEXT_PUBLIC_APP_URL, TASK-MUN3OAFIVW9NA). */
+  apiBaseUrl: string;
 }
 
 // The tenant and user are not props: `generateApiKey` resolves both from the session,
 // and a client component that carries a tenant id is one prop away from naming someone
 // else's workspace. Both were passed in and never read.
-export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
+export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl }: ApiKeysClientProps) {
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>(initialKeys);
   const [keyName, setKeyName] = useState('');
   const [newRawKey, setNewRawKey] = useState<string | null>(null);
@@ -322,15 +324,15 @@ export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
           {activeCodeTab === 'curl' && (
             <pre className="text-slate-200">
 {`# 1. CORDIS Ortak Arama (Almanya & Türkiye Araştırma Kuruluşları)
-curl -X GET "https://fabrika.app/api/v1/partners?country=DE&limit=10" \
+curl -X GET "${apiBaseUrl}/api/v1/partners?country=DE&limit=10" \
   -H "x-api-key: ${sampleKey}"
 
 # 2. Açık Ufuk Avrupa ve TÜBİTAK Çağrılarını Listeleme
-curl -X GET "https://fabrika.app/api/v1/calls?status=OPEN" \
+curl -X GET "${apiBaseUrl}/api/v1/calls?status=OPEN" \
   -H "Authorization: Bearer ${sampleKey}"
 
 # 3. Kiracı Fırsat Pipeline Sorgulama
-curl -X GET "https://fabrika.app/api/v1/opportunities" \
+curl -X GET "${apiBaseUrl}/api/v1/opportunities" \
   -H "x-api-key: ${sampleKey}"`}
             </pre>
           )}
@@ -341,7 +343,7 @@ curl -X GET "https://fabrika.app/api/v1/opportunities" \
 const API_KEY = '${sampleKey}';
 
 async function fetchPartners() {
-  const response = await fetch('https://fabrika.app/api/v1/partners?country=TR', {
+  const response = await fetch('${apiBaseUrl}/api/v1/partners?country=TR', {
     headers: {
       'x-api-key': API_KEY,
       'Content-Type': 'application/json'
@@ -367,7 +369,7 @@ headers = {
     "Content-Type": "application/json"
 }
 
-response = requests.get("https://fabrika.app/api/v1/partners?limit=5", headers=headers)
+response = requests.get("${apiBaseUrl}/api/v1/partners?limit=5", headers=headers)
 if response.status_code == 200:
     partners = response.json().get("data", [])
     for p in partners:

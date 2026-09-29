@@ -9,7 +9,8 @@ export interface CalendarEvent {
 }
 
 export interface CalendarProvider {
-  connect(): Promise<{ authUrl: string }>;
+  /** `state` is the CSRF value the OAuth callback must match; absent when there is no redirect. */
+  connect(): Promise<{ authUrl: string; state?: string }>;
   disconnect(): Promise<void>;
   createEvent(event: CalendarEvent): Promise<{ externalId: string }>;
   updateEvent(externalId: string, event: CalendarEvent): Promise<void>;

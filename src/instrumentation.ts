@@ -17,4 +17,7 @@ export async function register() {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
   }
+  // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
+  const { reportAppUrlProblem } = await import('./lib/app-url-alert');
+  await reportAppUrlProblem();
 }

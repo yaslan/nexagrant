@@ -17,6 +17,7 @@ import {
   type InvitationMailSkip,
 } from '@/lib/email/invitation-mail-policy';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { appUrl } from '@/lib/app-url';
 
 /**
  * Invites a user into the caller's own tenant.
@@ -192,10 +193,11 @@ export async function POST(req: Request) {
       });
     }
 
-    // The response keeps the old localhost fallback so a local inviter still
-    // gets a usable link; a mail is only ever built from `mailBaseUrl`.
+    // The response link falls back through `appUrl()` (localhost only outside
+    // production) so a local inviter still gets a usable link; a mail is only
+    // ever built from `mailBaseUrl`.
     const acceptPath = `/tr/accept-invite?token=${token}`;
-    const inviteLink = `${mailBaseUrl ?? (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')}${acceptPath}`;
+    const inviteLink = `${mailBaseUrl ?? appUrl()}${acceptPath}`;
     // The address itself is personal data; log that an invite went out, not to whom.
     console.log(`[Invitations] invitation issued for tenant ${tenantId}`);
 

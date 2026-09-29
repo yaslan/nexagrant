@@ -76,14 +76,47 @@ describe('CalendarProvider', () => {
   describe('GoogleCalendarProvider', () => {
     let provider: GoogleCalendarProvider;
 
+    const live = { NODE_ENV: 'production' as const, NEXT_PUBLIC_APP_URL: 'https://fonbridge.com/' };
+
     beforeEach(() => {
-      provider = new GoogleCalendarProvider('client123', 'secret123');
+      provider = new GoogleCalendarProvider('client123', 'secret123', live);
     });
 
-    it('should generate auth URL with client ID', async () => {
+    it('builds the auth URL from NEXT_PUBLIC_APP_URL, not a fixed localhost (TASK-MUN3OAFIVW9NA)', async () => {
       const result = await provider.connect();
-      expect(result.authUrl).toContain('client_id=client123');
-      expect(result.authUrl).toContain('scope=calendar');
+      const url = new URL(result.authUrl);
+      expect(url.origin + url.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth');
+      expect(url.searchParams.get('client_id')).toBe('client123');
+      expect(url.searchParams.get('redirect_uri')).toBe('https://fonbridge.com/api/calendar/callback');
+      expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/calendar.events');
+      expect(url.searchParams.get('response_type')).toBe('code');
+      expect(result.authUrl).not.toContain('localhost');
+      // Encoded, not pasted raw into the query string.
+      expect(result.authUrl).toContain('redirect_uri=https%3A%2F%2Ffonbridge.com%2Fapi%2Fcalendar%2Fcallback');
+    });
+
+    it('follows NEXT_PUBLIC_APP_URL in development', async () => {
+      const dev = new GoogleCalendarProvider('client123', undefined, {
+        NODE_ENV: 'development',
+        NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
+      });
+      const url = new URL((await dev.connect()).authUrl);
+      expect(url.searchParams.get('redirect_uri')).toBe('http://localhost:3000/api/calendar/callback');
+    });
+
+    it('carries a fresh CSRF state and returns it to the caller', async () => {
+      const first = await provider.connect();
+      const second = await provider.connect();
+      expect(first.state).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect(new URL(first.authUrl).searchParams.get('state')).toBe(first.state);
+      expect(second.state).not.toBe(first.state);
+    });
+
+    it('refuses to build a redirect_uri without a usable NEXT_PUBLIC_APP_URL', async () => {
+      for (const NEXT_PUBLIC_APP_URL of [undefined, '  ', 'http://localhost:3000', 'not a url']) {
+        const p = new GoogleCalendarProvider('client123', undefined, { NODE_ENV: 'production', NEXT_PUBLIC_APP_URL });
+        await expect(p.connect()).rejects.toThrow('NEXT_PUBLIC_APP_URL not configured');
+      }
     });
 
     it('should throw when client ID is missing', async () => {

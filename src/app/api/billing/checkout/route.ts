@@ -13,6 +13,7 @@ import { tierForTenant } from '@/lib/billing/tenant-tier';
 import { taxLineForTenant } from '@/lib/billing/checkout-tax';
 import { requireTenantApi } from '@/lib/tenant';
 import { getPilotState } from '@/lib/billing/pilot';
+import { appUrl as resolveAppUrl } from '@/lib/app-url';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const isLiveStripe = Boolean(stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.startsWith('sk_'));
@@ -282,7 +283,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = resolveAppUrl();
 
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = priced.map((line) => ({
       price_data: {

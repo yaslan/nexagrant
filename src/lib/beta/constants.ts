@@ -14,6 +14,7 @@
  */
 
 import type { ModuleId } from '../modules/types';
+import { appUrl } from '@/lib/app-url';
 
 /**
  * Module grants, listed in dependency-safe order (every `requires[]` entry comes
@@ -48,7 +49,7 @@ export const BETA_CHECKIN_DURATION_MIN = 45;
 
 export const BETA_SUPPORT_EMAIL = process.env.BETA_SUPPORT_EMAIL ?? 'support@fabrika.dev';
 export const BETA_FEEDBACK_EMAIL = process.env.BETA_FEEDBACK_EMAIL ?? 'feedback@fabrika.dev';
-export const BETA_APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.fabrika.dev';
+export const BETA_APP_URL = appUrl();
 export const BETA_MEETING_URL = process.env.BETA_MEETING_URL ?? 'https://meet.google.com/fabrika-beta-checkin';
 
 /**

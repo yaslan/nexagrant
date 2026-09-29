@@ -2,7 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { cookies, headers } from 'next/headers';
 import { getLocale } from 'next-intl/server';
-import { env } from '@/lib/env';
+import { appUrl } from '@/lib/app-url';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { parseTheme, THEME_COOKIE_NAME, type ResolvedTheme, type Theme } from '@/lib/theme';
@@ -16,7 +16,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: PRODUCT_NAME,
   description: 'Avrupa fonları için proje pipeline SaaS',
-  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
+  metadataBase: new URL(appUrl()),
 };
 
 /**

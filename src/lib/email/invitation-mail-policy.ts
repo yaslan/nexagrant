@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type { TenantTx } from '@/lib/db';
 import { env } from '@/lib/env';
+import { appBaseUrl } from '@/lib/app-url';
 
 /**
  * How often POST /api/invitations may actually send mail (TASK-MUMO2XIQEHGUD,
@@ -110,28 +111,7 @@ export async function invitationMailSkipReason(
  * (mailpit) is allowed.
  */
 export function invitationMailBaseUrl(source: Pick<typeof env, 'NODE_ENV' | 'NEXT_PUBLIC_APP_URL'> = env): string | null {
-  const raw = source.NEXT_PUBLIC_APP_URL?.trim();
-  if (!raw) return null;
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return null;
-  }
-  if (source.NODE_ENV === 'production' && isLoopback(url.hostname)) return null;
-  return raw.replace(/\/+$/, '');
-}
-
-function isLoopback(hostname: string): boolean {
-  // `localhost.` (a trailing root dot) resolves like `localhost` (İNCELEME-26 Ö-3).
-  const h = hostname.toLowerCase().replace(/\.$/, '');
-  return (
-    h === 'localhost' ||
-    h.endsWith('.localhost') ||
-    h === '[::1]' ||
-    h === '0.0.0.0' ||
-    h.startsWith('127.') ||
-    // IPv4-mapped loopback: WHATWG URL writes [::ffff:127.0.0.1] as [::ffff:7f00:1].
-    /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(h)
-  );
+  // The rules live in src/lib/app-url.ts now, shared with every other link the
+  // app builds to itself (TASK-MUN3OAFIVW9NA).
+  return appBaseUrl(source);
 }

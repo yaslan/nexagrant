@@ -9,6 +9,7 @@
 import { prisma } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { env } from '@/lib/env';
+import { appUrl } from '@/lib/app-url';
 import { logger } from '@/lib/logger';
 import {
   summariseFeedback,
@@ -115,7 +116,7 @@ export async function runFeedbackDigest(
   const { windowRows, allOpen } = await collectDigestRows(windowStart, windowEnd);
   const summary = summariseFeedback(windowRows, allOpen, windowStart, windowEnd);
   const subject = renderDigestSubject(summary);
-  const html = renderDigestHtml(summary, env.NEXT_PUBLIC_APP_URL || 'https://app.fabrika.io');
+  const html = renderDigestHtml(summary, appUrl());
 
   const recipient = options.to || env.FEEDBACK_DIGEST_TO;
   const base: DigestRunResult = { summary, subject, html, emailStatus: 'skipped' };

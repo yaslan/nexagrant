@@ -1,5 +1,5 @@
 import { defineJob } from '../define';
-import { env } from '@/lib/env';
+import { appUrl as resolveAppUrl } from '@/lib/app-url';
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { smtpMailer, type Mailer } from '@/lib/email/mailer';
@@ -188,7 +188,7 @@ export async function sendSavedSearchAlerts(
       }
 
       const subject = `New Call Opportunities: ${name} (${matchCount} new)`;
-      const appUrl = env.NEXT_PUBLIC_APP_URL || 'https://app.fabrika.io';
+      const appUrl = resolveAppUrl();
       const html = `
             <h2>FonBridge Saved Search Alert</h2>
             <p>Hi there,</p>
