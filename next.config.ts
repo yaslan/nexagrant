@@ -84,6 +84,16 @@ const nextConfig: NextConfig = {
           { key: 'Critical-CH', value: 'Sec-CH-Prefers-Color-Scheme' },
         ],
       },
+      // TASK-MUN2793A57Z9I (se-fb (d)) — the invitation link carries a bearer
+      // token in its query. The GET handler moves it into a cookie at once;
+      // these pages still never send a Referer and are never cached.
+      {
+        source: '/:locale(tr|en)/accept-invite/:path*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
     ];
   },
   async redirects() {

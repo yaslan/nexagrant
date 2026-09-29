@@ -61,6 +61,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/invitations/accept.ts",
+      "subject": "system-scope:tenant-discovery",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "tenant-discovery",
+      "reason": "Tenant invitation accept (TASK-MUN2793A57Z9I): lookupInvitation() reads the Invitation row by tokenHash (SHA-256 of the e-mailed token, TASK-MULQLL2T8ZJX4). The token is the credential and the row names its own tenant; the person accepting has no membership in it yet (or no account at all), so there is no tenant to scope to. Same discovery shape as the partner portal. Everything after the read — the conditional acceptedAt UPDATE, Membership, AuditEvent, Consent — runs in withTenant(invitation.tenantId) or a transaction bound to it."
+    },
+    {
+      "check": "D",
       "file": "src/modules/m11/server/actions.ts",
       "subject": "system-scope:tenant-discovery",
       "count": 1,

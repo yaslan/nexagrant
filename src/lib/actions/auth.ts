@@ -14,6 +14,7 @@ import { setRegistrationInviteCookie } from '@/lib/agency/registration-invite-co
 import { setRegistrationProvinceCookie } from '@/lib/registration-province-cookie';
 import { setRegistrationReadinessCookie } from '@/lib/registration-readiness-cookie';
 import { isDemoLoginEnabled } from '@/lib/demo-login';
+import { clearInvitationAcceptCookie } from '@/lib/invitations/accept-cookie';
 
 /**
  * @param acknowledgement The version stamp of the privacy notice and terms the
@@ -160,6 +161,10 @@ export async function loginWithSocialAction(
     await setRegistrationInviteCookie(
       code ? { code, acknowledgement: acknowledgement as string, locale: locale === 'en' ? 'en' : 'tr' } : null
     );
+    // TASK-MUN2793A57Z9I — a tenant invitation rides only on the start from its
+    // own accept screen (startInvitationSignInAction). Left in place, one opened
+    // and abandoned earlier would turn this sign-up into a join attempt.
+    await clearInvitationAcceptCookie();
     const registering = acknowledged || Boolean(code);
     await setRegistrationProvinceCookie(registering ? province : null);
     await setRegistrationReadinessCookie(registering ? readiness : null);

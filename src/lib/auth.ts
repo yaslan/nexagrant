@@ -35,6 +35,8 @@ import {
   probeInviteCode,
   registerOAuthUserWithInvite,
 } from './oauth-registration';
+import { readParkedInvitation } from './invitations/accept-cookie';
+import { readInvitationForSignIn, registerInvitedOAuthUser } from './invitations/accept';
 import {
   PLATFORM_ADMIN_DEMO_EMAIL,
   isDemoLoginEnabled,
@@ -117,7 +119,9 @@ const baseAdapter = PrismaAdapter(prisma);
  * the entry is set by the adapter and removed by the event.
  *
  * - 'pending': a plain registration; the event builds the tenant.
- * - 'bootstrapped': an invite-code registration; the adapter already built it.
+ * - 'bootstrapped': an invite-code registration (the adapter already built the
+ *   tenant) or a tenant-invitation registration (the adapter joined the
+ *   inviting tenant; there is no tenant to build, TASK-MUN2793A57Z9I).
  */
 const createdByAdapter = new Map<string, 'pending' | 'bootstrapped'>();
 
@@ -137,6 +141,32 @@ async function clearRegistrationChoiceCookies(): Promise<void> {
 const safeAdapter: Adapter = {
   ...baseAdapter,
   async createUser(user: AdapterUser) {
+    // TASK-MUN2793A57Z9I — a Google registration started from a tenant
+    // invitation's accept screen joins the inviting tenant and opens none of
+    // its own. The signIn callback let it through only with a verified,
+    // matching address and a current acknowledgement (decideOAuthSignIn);
+    // registerInvitedOAuthUser checks the invitation again and does user,
+    // membership, spent link and consent rows in one transaction. No fake-user
+    // fallback: a failure here must not become an account without the join.
+    // The invitation cookie stays: the accept screen it returns to reads it.
+    const parkedInvitation = await readParkedInvitation();
+    if (parkedInvitation) {
+      await clearRegistrationInviteCookie();
+      await clearRegistrationChoiceCookies();
+      try {
+        const created = await registerInvitedOAuthUser(prisma, {
+          user,
+          token: parkedInvitation.token,
+          locale: parkedInvitation.locale,
+        });
+        // 'bootstrapped': the adapter already did everything; events.createUser
+        // must not build a tenant for this user.
+        createdByAdapter.set(created.id, 'bootstrapped');
+        return created as AdapterUser;
+      } finally {
+        await clearRegistrationAcknowledgementCookie();
+      }
+    }
     // ADR-0006 — an OAuth registration with an agency invite code. The signIn
     // callback has already refused a bad code, a stale cookie and a missing
     // acknowledgement; this is where the code is actually used, atomically
@@ -563,6 +593,7 @@ export const authConfig = {
           probeInviteCode: (code) => probeInviteCode(prisma, code),
           noteRejection: (code) => noteInviteRejection(prisma, code),
           clearInvite: clearRegistrationInviteCookie,
+          readInvitation: readInvitationForSignIn,
         }
       );
       // İNCELEME-13 B-1 — the plain acknowledgement belongs to the one

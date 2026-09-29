@@ -123,7 +123,9 @@ export async function POST(req: Request) {
       const keepToken = mailSkip === 'recently_sent';
       const invitation = await tx.invitation.upsert({
         where: { email_tenantId: { email, tenantId } },
-        update: keepToken ? { role, expires } : { tokenHash, role, expires },
+        // A fresh token also reopens an invitation that was accepted before
+        // (the member has since left): `acceptedAt` goes back to NULL with it.
+        update: keepToken ? { role, expires } : { tokenHash, role, expires, acceptedAt: null },
         create: { email, tenantId, tokenHash, role, expires },
         select: { id: true, email: true, tenantId: true, role: true, expires: true },
       });

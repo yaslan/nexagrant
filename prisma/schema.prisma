@@ -1438,6 +1438,9 @@ model Invitation {
   // never stored (src/lib/secret-token.ts, TASK-MULQLL2T8ZJX4).
   tokenHash String   @unique
   expires   DateTime
+  // Set when the link is accepted (single use, TASK-MUN2793A57Z9I); NULL while
+  // pending. A re-invite of the same address clears it with the new token.
+  acceptedAt DateTime?
   createdAt DateTime @default(now())
   
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)

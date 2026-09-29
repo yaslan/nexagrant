@@ -8,7 +8,8 @@
  * contract; it is enforced here, at the one place a tenant grows: issuing an
  * invitation.
  *
- * A seat is taken by a member and by a pending (unexpired) invitation. Counting
+ * A seat is taken by a member and by a pending (unexpired, not yet accepted)
+ * invitation. Counting
  * the invitations is what stops a tenant at 1/2 from sending five links at once
  * and having them all accepted. Re-inviting an address that already holds a
  * pending invitation refreshes that one and takes no new seat.
@@ -53,7 +54,8 @@ export async function readSeatUsage(tx: TenantTx, tenantId: string, email: strin
   const entitlements = await getEntitlements(tenantId, tx);
   const members = await tx.membership.count({ where: { tenantId } });
   const pendingInvitations = await tx.invitation.count({
-    where: { tenantId, expires: { gt: new Date() }, NOT: { email } },
+    // An accepted invitation's seat is the member it became (TASK-MUN2793A57Z9I).
+    where: { tenantId, expires: { gt: new Date() }, acceptedAt: null, NOT: { email } },
   });
   return { limit: entitlements.seats, members, pendingInvitations };
 }

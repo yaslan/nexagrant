@@ -22,6 +22,7 @@ import type { Prisma, PrismaClient, User } from '@prisma/client';
 
 import { InviteCodeRejectedError, redeemInviteCode } from './agency/codes';
 import type { RegistrationInviteRead } from './agency/registration-invite-cookie';
+import type { InvitationSignInView } from './invitations/accept';
 import { acknowledgementMatchesCurrent } from './legal/consent-documents';
 import { bindTransactionToTenant, writeRegistrationConsent } from './legal/registration-consent';
 import { readinessSettings } from './readiness/account';
@@ -32,6 +33,10 @@ export const OAUTH_SIGNIN_ERROR = {
   inviteInvalid: 'invite_invalid',
   disclosureRequired: 'disclosure_required',
   emailUnverified: 'email_unverified',
+  /** TASK-MUN2793A57Z9I — a registration from an invitation link, with a different Google address. */
+  emailMismatch: 'email_mismatch',
+  /** TASK-MUN2793A57Z9I — the inviting tenant's free pilot has ended; joining it is a write. */
+  pilotExpired: 'pilot_expired',
 } as const;
 
 export type OAuthSignInError = (typeof OAUTH_SIGNIN_ERROR)[keyof typeof OAUTH_SIGNIN_ERROR];
@@ -87,6 +92,12 @@ export interface OAuthSignInDeps {
   probeInviteCode(code: string): Promise<boolean>;
   noteRejection(code: string): Promise<void>;
   clearInvite(): Promise<void>;
+  /**
+   * TASK-MUN2793A57Z9I — the tenant invitation parked by the accept screen
+   * (src/lib/invitations/accept.ts `readInvitationForSignIn`). Optional so a
+   * caller without one behaves as before.
+   */
+  readInvitation?(): Promise<InvitationSignInView>;
 }
 
 /**
@@ -110,6 +121,17 @@ export function oauthRefusalPath(locale: string, page: 'kayit' | 'giris', error:
 
 function refuse(locale: string, page: 'kayit' | 'giris', error: OAuthSignInError): OAuthSignInDecision {
   return { allow: false, redirect: oauthRefusalPath(locale, page, error) };
+}
+
+/**
+ * Where a refused registration from an invitation link lands: back on the
+ * accept screen, which reads the invitation from its cookie again. No error
+ * for an invitation that is no longer usable — the screen says which state it
+ * is in (expired, used, …) by itself.
+ */
+export function invitationRefusalPath(locale: string, error?: OAuthSignInError): string {
+  const safeLocale = locale === 'en' ? 'en' : 'tr';
+  return `/${safeLocale}/accept-invite/continue${error ? `?error=${error}` : ''}`;
 }
 
 /**
@@ -146,6 +168,29 @@ export async function decideOAuthSignIn(
   }
 
   // A registration.
+
+  // TASK-MUN2793A57Z9I — started from a tenant invitation's accept screen. It
+  // joins the inviting tenant (the adapter's createUser) and never falls
+  // through to a plain registration, which would open a tenant of its own:
+  // every way out of this branch is either that join or a refusal back to the
+  // accept screen, before any row exists. An agency code cannot ride along.
+  const invitation: InvitationSignInView = deps.readInvitation ? await deps.readInvitation() : { status: 'none' };
+  if (invitation.status !== 'none') {
+    await deps.clearInvite();
+    const back = (error?: OAuthSignInError): OAuthSignInDecision => ({
+      allow: false,
+      redirect: invitationRefusalPath(invitation.locale, error),
+    });
+    if (invitation.status === 'unusable') return back();
+    // The address decides which invitation this account may accept, so it has
+    // to be one Google vouches for (se-fb (c)).
+    if (!providerVerifiedEmail(input.provider, input.profile, email)) return back(OAUTH_SIGNIN_ERROR.emailUnverified);
+    if (email !== invitation.email.trim().toLowerCase()) return back(OAUTH_SIGNIN_ERROR.emailMismatch);
+    if (invitation.readOnly) return back(OAUTH_SIGNIN_ERROR.pilotExpired);
+    if (!(await deps.readAcknowledged())) return back(OAUTH_SIGNIN_ERROR.disclosureRequired);
+    return { allow: true };
+  }
+
   if (invite.status === 'invalid') {
     await deps.clearInvite();
     return refuse(locale, 'kayit', OAUTH_SIGNIN_ERROR.inviteInvalid);
