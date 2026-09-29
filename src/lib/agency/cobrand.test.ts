@@ -73,7 +73,8 @@ describe('sanitizeLogoPng', () => {
     const good = png(4, 4);
     expect(sanitizeLogoPng(good.subarray(0, good.length - 6))).toEqual({ ok: false, error: 'badPng' });
     const bad = Buffer.from(good);
-    bad[bad.length - 20] ^= 0xff;
+    const at = bad.length - 20;
+    bad.writeUInt8(bad.readUInt8(at) ^ 0xff, at);
     expect(sanitizeLogoPng(bad)).toEqual({ ok: false, error: 'badPng' });
   });
 
