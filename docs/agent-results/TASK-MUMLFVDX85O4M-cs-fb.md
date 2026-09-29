@@ -1,6 +1,6 @@
 # TASK-MUMLFVDX85O4M — cs-fb — 29.09 patron kararları ROADMAP'e ve hukuk paketine (1.2)
 
-**Kart:** TASK-MUMLFVDX85O4M (FB-KAMU-2) · **Dal:** dev · **Taban:** `e46d9798`
+**Kart:** TASK-MUMLFVDX85O4M (FB-KAMU-2) · **Dal:** dev · **Taban:** `e46d9798`; commit anında HEAD `89eab729` (se-fb Sentry kaldırma commit'i) — belgeler ikinci commit'te buna göre düzeltildi
 
 > **Kart tanımı okunamadı.** Worker pane'de `list_tasks` yalnız başlığı döndürüyor. İş, kart başlığına, delegasyon metnine ve board'daki ilgili kartların başlıklarına göre yapıldı. Kaçırdığım bir madde varsa lider bildirsin (§5).
 
@@ -48,6 +48,13 @@ AuthCard.tsx:158     const showMicrosoft = oauthProviders.microsoft;
 ```
 
 Resend / Sentry / Inngest kodu `e46d9798`'de hâlâ duruyor ("sürüyor" dilinin gerekçesi): `src/lib/email/resend-mailer.ts`, `src/lib/observability/sentry.ts`, `src/lib/inngest/`. `withTenant` `src/lib/db.ts`'de var (ROADMAP #16 satırı).
+
+HEAD commit sırasında `89eab729`'a ilerledi (se-fb, TASK-MUMLEUIQWSI59: `sentry.ts` 210 satır silindi, `SENTRY_DSN` `env.ts` ve `.env.example`'dan çıktı). Paketin kod yolları bu aralıkta değişmedi:
+```
+$ git diff --stat e46d9798 89eab729 -- src/lib/auth.ts src/lib/oauth-registration.ts src/lib/analytics.ts src/app/[locale]/login/AuthCard.tsx src/lib/email src/lib/inngest
+(boş)
+```
+Belgelerdeki Sentry satırları "`89eab729` ile silindi, kart inceleme bekliyor" diye düzeltildi. Microsoft satırlarındaki numaralar commit'lenmiş `89eab729`'a göre; çalışma ağacında fe-fb'nin commit'siz `auth.ts` / `AuthCard.tsx` değişikliği var, TASK-MUMLFLB2OPLY3 düşünce bu satırlar da güncellenmeli.
 
 Biçim kontrolü: her iki dosyanın HEAD hâli prettier-temizdi. Düzenlemeden sonra `prettier --write` koşuldu:
 ```

@@ -7,7 +7,7 @@
 >
 > **Bu belge hukuki bir metin değildir.** Ürün ekibinin bugünkü durumu anlattığı bir soru listesidir. Hiçbir cümlesi hukuken onaylı değildir.
 >
-> **Bugünkü durumun kaynağı kodun kendisidir**, planlar ya da eski belgeler değildir. Her teknik iddia 29.09.2026'da `dev` dalının `84d11af4` commit'inde kaynak kodda kontrol edildi (sürüm 1.0 `858c139a`'da kontrol edilmişti; sürüm 1.1'de bütün kanıt satırları bu commit'e göre yeniden kontrol edildi). **Sürüm 1.2:** kanıt satırlarındaki dosyalar `e46d9798`'e kadar tarandı; yalnız `oauth-registration.ts` satır numaraları kaydı, onlar düzeltildi. 1.2'de eklenen §2.0 giriş satırı ve §5 madde 3 kod değil **karardır**: 29.09.2026 akşamı ürün sahibi dört dış hizmeti üründen çıkardı. Kod değişikliği o gün sürüyordu (kart kodları ilgili satırlarda). Kod yolları her bölümün sonunda "Kanıt" satırında verilir. Bu satırlar ürün ekibi içindir; okumanız gerekmez.
+> **Bugünkü durumun kaynağı kodun kendisidir**, planlar ya da eski belgeler değildir. Her teknik iddia 29.09.2026'da `dev` dalının `84d11af4` commit'inde kaynak kodda kontrol edildi (sürüm 1.0 `858c139a`'da kontrol edilmişti; sürüm 1.1'de bütün kanıt satırları bu commit'e göre yeniden kontrol edildi). **Sürüm 1.2:** kanıt satırlarındaki dosyalar `89eab729`'a kadar tarandı; yalnız `oauth-registration.ts` satır numaraları kaydı, onlar düzeltildi. 1.2'de eklenen §2.0 giriş satırı ve §5 madde 3 kod değil **karardır**: 29.09.2026 akşamı ürün sahibi dört dış hizmeti üründen çıkardı. Kod değişikliği o gün sürüyordu (kart kodları ilgili satırlarda). Kod yolları her bölümün sonunda "Kanıt" satırında verilir. Bu satırlar ürün ekibi içindir; okumanız gerekmez.
 
 ---
 
@@ -45,7 +45,7 @@ Cevaplarınızı §7'deki cevap tablosuna yazabilirsiniz.
 - Kurum kayıt olurken bu kodu kullanırsa kurumun hesabı ajansa **bağlanır**. Ajans, kendi kodlarıyla gelen kurumlar hakkında **yalnız toplu sayılar** görür: kaç kurum kayıt oldu, kaç kurum bir çağrıyı takibe aldı, kaç kurumun başvurusu kabul edildi gibi.
 - **Fon hazırlık karnesi**, sitede kayıt olmadan doldurulabilen 15 soruluk bir öz değerlendirmedir. Kurum türü, cevaplar ve isteğe bağlı olarak il seçilir.
 - **Giriş yalnız Google hesabıyla yapılır.** Microsoft ile giriş seçeneği ürün sahibinin 29.09.2026 kararıyla **kaldırıldı**; açılması planlanmıyor. Şifreyle giriş yoktur (ADR-0006, 29.09.2026).
-  - _Kanıt:_ karar kaydı TASK-MUMLFLB2OPLY3. Uygulama TASK-MUMLFLB2OPLY3'te sürüyor: `e46d9798`'de `src/lib/auth.ts:3` ve `:316-317` Microsoft sağlayıcısını hâlâ içeriyor. Sağlayıcı yalnız anahtarı tanımlıysa kayda girer, anahtar yoksa düğme görünmez (`auth.ts:311-316`, `AuthCard.tsx:158`, `:573`); anahtar tanımlanmadı ve tanımlanmayacak.
+  - _Kanıt:_ karar kaydı TASK-MUMLFLB2OPLY3. Uygulama TASK-MUMLFLB2OPLY3'te sürüyor: `89eab729`'da `src/lib/auth.ts:3` ve `:316-317` Microsoft sağlayıcısını hâlâ içeriyor. Sağlayıcı yalnız anahtarı tanımlıysa kayda girer, anahtar yoksa düğme görünmez (`auth.ts:311-316`, `AuthCard.tsx:158`, `:573`); anahtar tanımlanmadı ve tanımlanmayacak.
 
 ### 2.1 Belgelerde "henüz yok" yazan ama artık kodda olanlar
 
@@ -323,13 +323,13 @@ Ana aydınlatma metnini hukuk ekibinin yazması bekleniyor (TASK-MTSWIFJKGTYC). 
 
    _Çıkanlar (alıcı olmayacak):_
    - **Microsoft (giriş):** Microsoft ile giriş kaldırıldı (§2.0). Uygulama TASK-MUMLFLB2OPLY3'te sürüyor.
-   - **Sentry (hata iletimi):** hata kayıtları yalnız kendi veritabanımızdaki sistem uyarıları tablosunda tutulacak, dışarı gönderilmeyecek. Sürüm 1.1'deki Sentry açıklaması geçersizdir. Uygulama TASK-MUMLEUIQWSI59'da sürüyor.
+   - **Sentry (hata iletimi):** hata kayıtları yalnız kendi veritabanımızdaki sistem uyarıları tablosunda tutulacak, dışarı gönderilmeyecek. Sürüm 1.1'deki Sentry açıklaması geçersizdir. Gönderen kod `89eab729` ile silindi; uygulama TASK-MUMLEUIQWSI59'da sürüyor (inceleme bekliyor).
    - **Resend (e-posta iletimi):** e-postalar kendi SMTP sunucumuzdan gidecek. Uygulama TASK-MUMLF57HOYFSB'de sürüyor.
    - **Inngest (zamanlanmış işler):** zamanlanmış işler kendi iş kuyruğumuza taşınacak. Uygulama TASK-MUMLFDTNQ53VJ'de sürüyor (önce teknik karar kaydı ve deneme).
 
    _Sizden istediğimiz ek görüş:_ kendi SMTP sunucumuz ve iş kuyruğumuz bir barındırma sağlayıcısının sunucusunda çalışacak. O sağlayıcının hangi ülkede olduğu **henüz belli değil**. Barındırma sağlayıcısını alıcı ya da veri işleyen olarak ayrıca yazmamız gerekir mi?
 
-   - _Kanıt:_ karar: patron anahtar kartı TASK-MULQM3LFB4KRA (29.09'da yalnız Anthropic + OpenAI + Google izin ekranı adıyla daraltıldı). PostHog: `src/lib/analytics.ts:28`, `:119-122`. `e46d9798`'de Sentry (`src/lib/observability/sentry.ts`), Resend (`src/lib/email/resend-mailer.ts`), Inngest (`src/lib/inngest/`) ve Microsoft (`src/lib/auth.ts:317`) kodu hâlâ duruyor; kaldırma yukarıdaki kartlarda sürüyor. Envanterdeki alıcı satırları (`processing-register.md` §1, §17, §18, §19a, §21) kod değişince güncellenecek (§8 madde 6).
+   - _Kanıt:_ karar: patron anahtar kartı TASK-MULQM3LFB4KRA (29.09'da yalnız Anthropic + OpenAI + Google izin ekranı adıyla daraltıldı). PostHog: `src/lib/analytics.ts:28`, `:119-122`. Sentry gönderici dosyası `src/lib/observability/sentry.ts` ve `SENTRY_DSN` `89eab729`'da silindi. `89eab729`'da Resend (`src/lib/email/resend-mailer.ts`), Inngest (`src/lib/inngest/`) ve Microsoft (`src/lib/auth.ts:317`) kodu hâlâ duruyor; kaldırma yukarıdaki kartlarda sürüyor. Envanterdeki alıcı satırları (`processing-register.md` §1, §17, §18, §19a, §21) kod değişince güncellenecek (§8 madde 6).
 
 4. **Toplama yöntemi ve hukuki sebep:** her amaç için sebep (envanterde beş ayrı sebep kullanılıyor); meşru menfaat için dengeleme testi (sekiz faaliyet md.5/2-f'ye dayanıyor); çerez aydınlatması ayrı belge mi.
 5. **Haklar:** md.11 bentlerinin tam listesi; otomatik analiz (md.11/g) için ürüne özel açıklama (YZ ön değerlendirme puanı); başvuru usulü; hesabı olmayan kişi için kanal; Kurul'a şikâyet cümlesi.
