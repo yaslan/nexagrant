@@ -7,7 +7,7 @@ import { crc32, deflateSync } from 'node:zlib';
  * post the action; it must refuse before anything is stored.
  */
 const scope = { tenantId: 'agency-a', userId: 'u1', role: 'TENANT_OWNER' };
-const isAgency = vi.fn(async () => true);
+const isAgency = vi.fn(async (_id: string) => true);
 const save = vi.fn(async (_id: string, input: { name: string }) => ({
   logoKey: 'agency-a/agency/cobrand/0f8fad5b-d9cb-469f-a165-70867728950e.png',
   name: input.name,
