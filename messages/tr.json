@@ -2182,6 +2182,65 @@
         "notAgency": "Bu hesap bir ajans hesabı değil.",
         "failed": "İşlem tamamlanamadı. Lütfen tekrar deneyin."
       }
+    },
+    "reports": {
+      "title": "Raporlar",
+      "description": "Bölge raporu her ayın 1'inde hazırlanır. Rapor, panodaki güvenli sayıların o günkü kopyasıdır: aynı maskeleme (<5) ve aynı 5'e yuvarlama. Kişisel veri içermez. E-postayla gönderilmez; yalnız buradan indirilir.",
+      "empty": "Henüz rapor yok. İlk rapor ayın 1'inde hazırlanır.",
+      "listLabel": "Hazırlanmış raporlar",
+      "period": "Dönem",
+      "generatedAt": "Hazırlandı",
+      "downloadCsv": "CSV indir",
+      "downloadPrint": "Yazdırılabilir rapor (PDF olarak kaydedin)",
+      "doc": {
+        "title": "Bölge başvuru hunisi raporu",
+        "periodLabel": "Dönem",
+        "generatedAtLabel": "Hazırlanma",
+        "cohortNote": "Sayılar kümülatiftir: ajansın kodlarıyla bugüne kadar kayıt olan tüm kurumlar, raporun hazırlandığı gün itibarıyla. Tüm adımlarda kurum sayısı verilir.",
+        "separateNote": "İl tablosu ile kurum türü tablosu ayrı kırılımlardır. İl × kurum türü çapraz tablo verilmez. Yalnızca ilini bildiren kurumlar il bazında sayılır.",
+        "totalsTable": "Tüm kurumlar",
+        "orgTypeTable": "Kurum türüne göre (tüm iller)",
+        "provinceTable": "İle göre (tüm kurum türleri)",
+        "provinceOmitted": "Listelenmeyen illerde tüm adımlar <5.",
+        "provinceNone": "Hiçbir il için gösterilebilir sayı yok: tüm illerde tüm adımlar <5.",
+        "groupColumn": "Grup",
+        "small": "<5",
+        "unmeasured": "Henüz ölçülmüyor",
+        "printHint": "PDF için tarayıcınızın yazdırma penceresinde \"PDF olarak kaydet\"i seçin.",
+        "footer": "{brand} — ajans bölge raporu. Toplulaştırılmış kurum sayıları; kişisel veri içermez.",
+        "csvPeriod": "Dönem",
+        "csvTable": "Tablo",
+        "csvGroup": "Grup",
+        "csvStep": "Adım",
+        "csvValue": "Değer"
+      }
+    },
+    "cobrand": {
+      "title": "Ortak marka",
+      "description": "Ajansınızla bağlanan kurumlar, uygulamanın üst çubuğunda ajansınızın logosunu ve \"<ajans> iş birliğiyle\" satırını görür. Uygulamanın kendi logosu yerinde kalır. Bağlı olmayan kurumlar bunu görmez.",
+      "name": "Ajansın kısa adı",
+      "namePlaceholder": "Örn. OKA",
+      "nameHint": "Boş bırakılırsa hesap adı kullanılır. En fazla 40 karakter.",
+      "logo": "Logo",
+      "logoHint": "Yalnız PNG; en fazla 200 KB ve kenar başına 1024 piksel. SVG kabul edilmez. Dosyadaki metin ve EXIF bilgileri kaldırılarak saklanır.",
+      "currentLogo": "Şu anki logo",
+      "noLogo": "Logo yüklenmedi.",
+      "removeLogo": "Logoyu kaldır",
+      "preview": "Kurumların göreceği satır",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor…",
+      "saved": "Kaydedildi. Bağlı kurumlar bir sonraki sayfa açılışında görür.",
+      "readOnly": "Ortak markayı yalnız ajans hesabının sahibi ve yöneticileri değiştirebilir.",
+      "errors": {
+        "tooLarge": "Dosya 200 KB'tan büyük.",
+        "notPng": "Dosya bir PNG değil. Yalnız PNG yüklenebilir; SVG kabul edilmez.",
+        "badPng": "PNG dosyası bozuk ya da içinde fazladan veri var.",
+        "tooWide": "Görsel çok büyük: her kenar en fazla 1024 piksel olmalı.",
+        "forbidden": "Bu işlem için ajans hesabının sahibi ya da yöneticisi olmanız gerekir.",
+        "notAgency": "Bu hesap bir ajans hesabı değil.",
+        "storage": "Logo şu an saklanamıyor. Lütfen daha sonra tekrar deneyin.",
+        "failed": "İşlem tamamlanamadı. Lütfen tekrar deneyin."
+      }
     }
   },
   "tenantProvince": {
@@ -2297,5 +2356,9 @@
       "rescore_failed": "G0 yeniden hesaplanamadı.",
       "bad_prefixes": "Yeniden hesaplanacak konu listesi geçersiz."
     }
+  },
+  "coBrand": {
+    "with": "{agency} iş birliğiyle",
+    "logoAlt": "{agency} logosu"
   }
 }

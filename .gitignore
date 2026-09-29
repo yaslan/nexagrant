@@ -108,3 +108,6 @@ service-account*.json
 *.p12
 *.key
 *.pfx
+
+# FB KAMU B4 — local stand-in for R2 in development (src/lib/storage.ts)
+/.dev-objects/

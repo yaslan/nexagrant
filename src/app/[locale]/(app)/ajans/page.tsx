@@ -8,6 +8,9 @@ import { listInviteCodesIn } from '@/lib/agency/codes';
 import { parseProvince } from '@/lib/readiness/share';
 import FunnelPanel from './funnel-panel';
 import InviteCodesPanel from './invite-codes-panel';
+import CoBrandPanel from './cobrand-panel';
+import { getAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-store';
+import { COBRAND_NAME_MAX } from '@/lib/agency/cobrand';
 
 /**
  * TASK-MULZATEX4G92H — one breakdown per request: `?kirilim=tur` (organisation
@@ -48,11 +51,13 @@ export default async function AgencyPage({
   const breakdown = parseBreakdown(kirilim, il);
 
   const renderedAt = requestTime();
-  const [funnel, codes] = await Promise.all([
+  const [funnel, codes, cobrand] = await Promise.all([
     // TASK-MULXF0AVMD8MN — one cohort, no date window: an old `?gun=` link is ignored.
     getAgencyFunnel(scope.tenantId, { breakdown }),
     // B-1 (TASK-MUM17YBJVAHRR): status per code, no use count.
     withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId, renderedAt)),
+    // B4 (TASK-MULRRNIHVZM1Z): the agency's own co-brand entry.
+    getAgencyCoBrand(scope.tenantId),
   ]);
 
   return (
@@ -69,6 +74,14 @@ export default async function AgencyPage({
         initialCodes={codes}
         canManage={can(asRole(scope.role), 'manage_users')}
         now={renderedAt}
+      />
+
+      <CoBrandPanel
+        canManage={scope.role === 'TENANT_OWNER' || scope.role === 'TENANT_ADMIN'}
+        initialName={cobrand?.entry?.name ?? ''}
+        fallbackName={cobrand?.tenantName ?? ''}
+        initialLogoSrc={toShellCoBrand(cobrand?.entry ?? null)?.logoSrc ?? null}
+        nameMax={COBRAND_NAME_MAX}
       />
     </div>
   );

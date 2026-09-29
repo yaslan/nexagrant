@@ -11,6 +11,9 @@ import { getTranslations } from 'next-intl/server';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { displayUserName } from '@/lib/user-display';
 import { listSessionWorkspaces } from '@/lib/workspaces';
+import { tenantScopeOf } from '@/lib/tenant';
+import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-store';
+import CoBrandBadge from '@/components/CoBrandBadge';
 
 import MobileAppHeader from '@/components/MobileAppHeader';
 import FeedbackWidget from '@/components/FeedbackWidget';
@@ -71,6 +74,10 @@ export default async function AppLayout({
   // to carry two names written into the component ("Demo SME Consultancy",
   // "Horizon Research Lab") that no session was ever a member of.
   const workspaces = await listSessionWorkspaces(session);
+  // FB KAMU B4 (TASK-MULRRNIHVZM1Z): the agency co-brand, only for a tenant an
+  // agency brought in. Unlinked tenants — and the agency itself — get null.
+  const tenantId = tenantScopeOf(session)?.tenantId;
+  const cobrand = tenantId ? toShellCoBrand(await getLinkedAgencyCoBrand(tenantId)) : null;
 
   const isPlatformAdmin = Boolean(
     session?.isPlatformAdmin ||
@@ -91,6 +98,7 @@ export default async function AppLayout({
         roleName={roleName}
         isPlatformAdmin={isPlatformAdmin}
         workspaces={workspaces}
+        cobrand={cobrand}
       />
 
       {/* Desktop Sidebar Navigation */}
@@ -116,7 +124,8 @@ export default async function AppLayout({
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Desktop Header */}
         <header className="hidden md:flex h-14 border-b border-border bg-surface items-center px-6 justify-between shadow-2xs shrink-0">
-          <div className="flex items-center space-x-3">
+          <div className="flex min-w-0 items-center space-x-3">
+            {cobrand ? <CoBrandBadge cobrand={cobrand} /> : null}
           </div>
           <div className="flex items-center space-x-3">
             <ThemeToggle variant="button" locale={locale} />

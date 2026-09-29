@@ -2182,6 +2182,65 @@
         "notAgency": "This account is not an agency account.",
         "failed": "The action could not be completed. Please try again."
       }
+    },
+    "reports": {
+      "title": "Reports",
+      "description": "The region report is prepared on the 1st of each month. It is a copy of the dashboard's safe numbers on that day: the same masking (<5) and the same rounding to 5. It holds no personal data. It is not sent by e-mail; you download it here.",
+      "empty": "No report yet. The first report is prepared on the 1st of the month.",
+      "listLabel": "Prepared reports",
+      "period": "Period",
+      "generatedAt": "Prepared",
+      "downloadCsv": "Download CSV",
+      "downloadPrint": "Printable report (save as PDF)",
+      "doc": {
+        "title": "Regional application funnel report",
+        "periodLabel": "Period",
+        "generatedAtLabel": "Prepared",
+        "cohortNote": "Numbers are cumulative: every organisation that has registered with the agency's codes so far, as of the day the report was prepared. Every step counts organisations.",
+        "separateNote": "The province table and the organisation type table are separate breakdowns. There is no province × type table. Only organisations that gave a province are counted per province.",
+        "totalsTable": "All organisations",
+        "orgTypeTable": "By organisation type (all provinces)",
+        "provinceTable": "By province (all organisation types)",
+        "provinceOmitted": "Every step is <5 in the provinces not listed.",
+        "provinceNone": "No province has a number that can be shown: every step is <5 in every province.",
+        "groupColumn": "Group",
+        "small": "<5",
+        "unmeasured": "Not measured yet",
+        "printHint": "For a PDF, choose \"Save as PDF\" in your browser's print dialog.",
+        "footer": "{brand} — agency region report. Aggregated organisation counts; no personal data.",
+        "csvPeriod": "Period",
+        "csvTable": "Table",
+        "csvGroup": "Group",
+        "csvStep": "Step",
+        "csvValue": "Value"
+      }
+    },
+    "cobrand": {
+      "title": "Co-branding",
+      "description": "Organisations linked to your agency see your agency's logo and an \"in collaboration with <agency>\" line in the app's top bar. The app's own logo stays in place. Organisations that are not linked do not see it.",
+      "name": "Agency short name",
+      "namePlaceholder": "E.g. OKA",
+      "nameHint": "If left empty, the account name is used. Up to 40 characters.",
+      "logo": "Logo",
+      "logoHint": "PNG only; up to 200 KB and 1024 pixels per side. SVG is not accepted. Text and EXIF data in the file are removed before it is stored.",
+      "currentLogo": "Current logo",
+      "noLogo": "No logo uploaded.",
+      "removeLogo": "Remove logo",
+      "preview": "The line organisations will see",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved. Linked organisations see it the next time a page opens.",
+      "readOnly": "Only the agency account's owner and admins can change co-branding.",
+      "errors": {
+        "tooLarge": "The file is larger than 200 KB.",
+        "notPng": "The file is not a PNG. Only PNG can be uploaded; SVG is not accepted.",
+        "badPng": "The PNG file is damaged or carries extra data.",
+        "tooWide": "The image is too large: each side must be at most 1024 pixels.",
+        "forbidden": "You need to be an owner or admin of the agency account.",
+        "notAgency": "This account is not an agency account.",
+        "storage": "The logo cannot be stored right now. Please try again later.",
+        "failed": "The action could not be completed. Please try again."
+      }
     }
   },
   "tenantProvince": {
@@ -2297,5 +2356,9 @@
       "rescore_failed": "G0 could not be rescored.",
       "bad_prefixes": "The topic list to rescore is invalid."
     }
+  },
+  "coBrand": {
+    "with": "In collaboration with {agency}",
+    "logoAlt": "{agency} logo"
   }
 }

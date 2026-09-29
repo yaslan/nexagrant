@@ -225,3 +225,70 @@ export async function putObjectToR2(
     return { stored: false, reason: 'r2_put_failed' };
   }
 }
+
+/**
+ * Local stand-in for R2 while developing (FB KAMU B4, TASK-MULRRNIHVZM1Z).
+ * Only outside production: a production server without R2 refuses the write
+ * instead of keeping a customer's file on an instance disk that is not backed
+ * up and not shared between instances.
+ */
+const DEV_OBJECT_DIR = '.dev-objects';
+
+/** Keys are built by our own code; this still refuses anything that could leave the directory. */
+function devObjectPath(objectKey: string): string | null {
+  if (process.env.NODE_ENV === 'production') return null;
+  if (!/^[A-Za-z0-9_/.-]+$/.test(objectKey) || objectKey.split('/').some((p) => p === '' || p === '.' || p === '..')) {
+    return null;
+  }
+  return `${process.cwd()}/${DEV_OBJECT_DIR}/${objectKey}`;
+}
+
+/**
+ * Stores `bytes` under `objectKey`. Returns false when there is nowhere to put
+ * them (no R2 in production) or the write failed — the caller must then not
+ * record the key.
+ */
+export async function putObjectBytes(objectKey: string, bytes: Buffer, contentType: string): Promise<boolean> {
+  if (s3) {
+    try {
+      await s3.send(new PutObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: objectKey, Body: bytes, ContentType: contentType }));
+      return true;
+    } catch (err) {
+      console.error(`[R2 Storage] Put error: ${errorMessage(err)}`);
+      return false;
+    }
+  }
+  const path = devObjectPath(objectKey);
+  if (!path) return false;
+  const { mkdir, writeFile } = await import('node:fs/promises');
+  const { dirname } = await import('node:path');
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, bytes);
+  return true;
+}
+
+/** The stored bytes of `objectKey`, or null when absent or unreadable. */
+export async function getObjectBytes(objectKey: string): Promise<Buffer | null> {
+  if (s3) {
+    try {
+      const out = await s3.send(new GetObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: objectKey }));
+      return out.Body ? Buffer.from(await out.Body.transformToByteArray()) : null;
+    } catch {
+      return null;
+    }
+  }
+  const path = devObjectPath(objectKey);
+  if (!path) return null;
+  const { readFile } = await import('node:fs/promises');
+  return readFile(path).catch(() => null);
+}
+
+/** Removes `objectKey`; true when it is gone (or never existed). */
+export async function deleteObjectBytes(objectKey: string): Promise<boolean> {
+  if (s3) return deleteFileFromR2(objectKey);
+  const path = devObjectPath(objectKey);
+  if (!path) return false;
+  const { rm } = await import('node:fs/promises');
+  await rm(path, { force: true });
+  return true;
+}

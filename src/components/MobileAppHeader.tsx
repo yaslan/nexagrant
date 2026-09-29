@@ -9,6 +9,8 @@ import ThemeToggle from './ThemeToggle';
 import { Menu, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { PRODUCT_NAME } from '@/lib/brand';
+import CoBrandBadge from './CoBrandBadge';
+import type { ShellCoBrand } from '@/lib/agency/cobrand-store';
 
 interface MobileAppHeaderProps {
   locale: string;
@@ -19,6 +21,8 @@ interface MobileAppHeaderProps {
   isPlatformAdmin?: boolean;
   /** Real workspaces of the session, resolved server-side. See UserMenu. */
   workspaces?: UserMenuWorkspace[];
+  /** FB KAMU B4: the agency co-brand of a linked tenant; null elsewhere. */
+  cobrand?: ShellCoBrand | null;
 }
 
 export default function MobileAppHeader({
@@ -29,6 +33,7 @@ export default function MobileAppHeader({
   roleName,
   isPlatformAdmin = false,
   workspaces = [],
+  cobrand = null,
 }: MobileAppHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const tCommon = useTranslations('Common');
@@ -55,6 +60,7 @@ export default function MobileAppHeader({
               className="object-contain"
             />
           </Link>
+          {cobrand ? <CoBrandBadge cobrand={cobrand} compact /> : null}
         </div>
 
         <div className="flex items-center space-x-2">
