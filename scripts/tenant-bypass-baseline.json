@@ -90,28 +90,28 @@
       "check": "D",
       "file": "src/actions/user/export-data.ts",
       "subject": "system-scope:subject-scoped",
-      "count": 1,
+      "count": 2,
       "kind": "system-scope",
       "class": "subject-scoped",
-      "reason": "GDPR Art. 15/20 portability export. ONE scope around the whole Promise.all batch, replacing six separate unscoped reads (user, membership, account, evaluation, effort, aiUsageLog, approvalRequest, opportunity): every row is selected by userId or ownerId across every tenant the data subject belongs to, and a single tenant scope would silently under-deliver the export. One transaction also makes the export a consistent snapshot."
+      "reason": "GDPR Art. 15/20 portability export. ONE scope around the whole Promise.all batch, replacing six separate unscoped reads (user, membership, account, evaluation, effort, aiUsageLog, approvalRequest, opportunity): every row is selected by userId or ownerId across every tenant the data subject belongs to, and a single tenant scope would silently under-deliver the export. One transaction also makes the export a consistent snapshot. TASK-MULUJ8O4JH1PF: (2) the access-audit row for a session with no tenant. AuditEvent is strict now and that row belongs to no tenant, so it can only be written — and read back — in system scope; under the old shared policy every tenant could read it. A session WITH a tenant writes its row via withTenant instead."
     },
     {
       "check": "D",
       "file": "src/actions/user/request-deletion.ts",
       "subject": "system-scope:subject-scoped",
-      "count": 3,
+      "count": 4,
       "kind": "system-scope",
       "class": "subject-scoped",
-      "reason": "Three GDPR Art. 17 reads. (1) The subject row WITH its nested `memberships` select — a nested read of the tenant-scoped Membership table obeys RLS exactly like a top-level one, so outside a scope it returns [] and the sole-owner warning below silently stops warning; this shape is invisible to CHECK A, which reads the accessor. (2) The sole-owner count, asked per tenant but for EVERY tenant the subject is in, one scope around the whole loop so N tenants do not mean N transactions. (3) cancelAccountDeletion listing the subject's tenants to revalidate them, where: { userId }."
+      "reason": "Three GDPR Art. 17 reads. (1) The subject row WITH its nested `memberships` select — a nested read of the tenant-scoped Membership table obeys RLS exactly like a top-level one, so outside a scope it returns [] and the sole-owner warning below silently stops warning; this shape is invisible to CHECK A, which reads the accessor. (2) The sole-owner count, asked per tenant but for EVERY tenant the subject is in, one scope around the whole loop so N tenants do not mean N transactions. (3) cancelAccountDeletion listing the subject's tenants to revalidate them, where: { userId }. TASK-MULUJ8O4JH1PF: (4) the erasure requested/cancelled AuditEvent for a subject with no tenant. AuditEvent is strict now; the tenant-less row belongs to no tenant and is written only in system scope, where /admin/audit reads it. The per-tenant rows are withTenant."
     },
     {
       "check": "D",
       "file": "src/lib/inngest/jobs/users-scheduled-deletion.ts",
       "subject": "system-scope:subject-scoped",
-      "count": 2,
+      "count": 3,
       "kind": "system-scope",
       "class": "subject-scoped",
-      "reason": "The erasure sweep. (1) dueUsers, again for its nested `memberships` select: empty under fabrika_app means every erasure audit is written with no tenant attribution — a silently weaker audit trail, not an error. (2) One scope around the eight detach/delete statements, all `where: { userId }` with no tenantId anywhere, so scoping per tenant would mean enumerating tenants from the row set about to change. Under fabrika_app each reports count: 0 and the sweep announces a completed erasure having deleted nothing. One transaction also means a crash halfway cannot leave a half-erased person. The per-tenant erasure audit write is NOT here: it knows its tenant and now uses withTenant."
+      "reason": "The erasure sweep. (1) dueUsers, again for its nested `memberships` select: empty under fabrika_app means every erasure audit is written with no tenant attribution — a silently weaker audit trail, not an error. (2) One scope around the eight detach/delete statements, all `where: { userId }` with no tenantId anywhere, so scoping per tenant would mean enumerating tenants from the row set about to change. Under fabrika_app each reports count: 0 and the sweep announces a completed erasure having deleted nothing. One transaction also means a crash halfway cannot leave a half-erased person. The per-tenant erasure audit write is NOT here: it knows its tenant and now uses withTenant. TASK-MULUJ8O4JH1PF: (3) the user.erased AuditEvent for a subject with no tenant — the record that an irreversible purge happened (docs/DATA_MODEL.md §1). Strict AuditEvent refuses a NULL tenantId outside system scope, and before this card every tenant could read it."
     },
     {
       "check": "D",
@@ -142,12 +142,30 @@
     },
     {
       "check": "D",
+      "file": "src/app/[locale]/admin/audit/page.tsx",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "The platform audit log: the latest 50 AuditEvent rows across every tenant plus the tenant-less ones (plan admin, KVKK/GDPR erasure). Gated by the admin layout's isPlatformAdminSession(). AuditEvent is strict since TASK-MULUJ8O4JH1PF; without the scope a NOBYPASSRLS role reads zero rows and the page shows 'no events'."
+    },
+    {
+      "check": "D",
       "file": "src/lib/billing/plan-repository.ts",
       "subject": "system-scope:platform-aggregate",
       "count": 3,
       "kind": "system-scope",
       "class": "platform-aggregate",
       "reason": "Three counts about the whole estate, never about one tenant's rows: subscription.groupBy for 'how many live subscriptions does each plan have' (the platform plan console), and subscription.count twice — computePublishImpact and countLiveSubscriptions, both asking how many tenants a plan change would touch."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/billing/plan-repository.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 4,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "Four platform-admin plan writes — publishVersion, archivePlan, deletePlan, setPlanVisibility — each one transaction that also writes an AuditEvent with no tenantId (plan.version.published / plan.archived / plan.deleted / plan.visibility.changed). AuditEvent is strict since TASK-MULUJ8O4JH1PF, so that tenant-less row is writable only in system scope; before it, every tenant could read all of them (331 rows measured). publishVersion's subscription.updateMany is estate-wide by design (every live tenant on the plan moves to the new version) and needs the same scope. Callers sit behind requirePlatformAdmin() in the admin plan console."
     },
     {
       "check": "D",
@@ -193,15 +211,6 @@
       "kind": "system-scope",
       "class": "cross-tenant-job",
       "reason": "pruneOldStripeEvents(), run nightly by the stripe-event-cleanup cron: deletes every tenant's StripeEventLog rows older than the retention window. The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant. Measured under fabrika_app (TASK-MULQKFER4MF0Y): the unscoped deleteMany saw no rows, deleted 0 and the job reported success while every row stayed."
-    },
-    {
-      "check": "B1",
-      "file": "src/actions/user/export-data.ts",
-      "subject": "tenantId-collapse-ternary",
-      "count": 1,
-      "kind": "allowed",
-      "class": "nullable-column",
-      "reason": "`...(tenantId ? { tenantId } : {})` on an auditEvent.create DATA object, not a where clause. AuditEvent.tenantId is String? (NULLABLE_TENANT since TASK-MTU6HUB8FUHMG C-2) and a tenant-less subject legitimately writes NULL; the spread omits a column rather than widening a filter. The rule is kept position-blind on purpose — deciding 'is this a where or a data' needs context the scanner does not have, and one documented exemption is cheaper than a rule that guesses."
     }
   ]
 }

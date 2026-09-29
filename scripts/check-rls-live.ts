@@ -220,6 +220,8 @@ interface Populated {
   table: string;
   tenantId: string;
   rows: number;
+  /** Rows whose tenantId is NULL — they belong to no tenant (AuditEvent). */
+  nullRows: number;
 }
 
 /** Tenant-scoped tables that actually hold rows, with one real tenant id each. */
@@ -231,12 +233,19 @@ async function populatedTables(
   const out: Populated[] = [];
   for (const t of models) {
     if (!existing.has(t)) continue;
-    const { rows } = await admin.query<{ tid: string | null; n: string }>(
-      `select "tenantId" as tid, count(*)::int as n from ${quoteIdent(t)}
-        group by 1 order by 2 desc limit 1`
+    // The tenant is the busiest NON-null one: on AuditEvent the NULL group is
+    // the largest (plan admin events), and picking it skipped the whole table.
+    const { rows } = await admin.query<{ tid: string | null; total: string; nulls: string }>(
+      `select (select "tenantId" from ${quoteIdent(t)} where "tenantId" is not null
+                group by 1 order by count(*) desc limit 1) as tid,
+              count(*)::int as total,
+              count(*) filter (where "tenantId" is null)::int as nulls
+         from ${quoteIdent(t)}`
     );
     const first = rows[0];
-    if (first && first.tid) out.push({ table: t, tenantId: first.tid, rows: Number(first.n) });
+    if (first && first.tid) {
+      out.push({ table: t, tenantId: first.tid, rows: Number(first.total), nullRows: Number(first.nulls) });
+    }
   }
   return out;
 }
@@ -303,6 +312,61 @@ async function probeIsolation(
       } else {
         checks.push(`okuma (pozitif): ${sample.table} kendi kiracısı bağlamında ${seen} satır döndü`);
       }
+    } finally {
+      await m.query('ROLLBACK');
+    }
+  }
+
+  // 2b. Rows with a NULL tenantId belong to NO tenant (TASK-MULUJ8O4JH1PF).
+  //     A tenant session must not see them; system scope must (positive
+  //     control — otherwise "0 visible" could just be a missing GRANT). Under
+  //     the old AuditEvent `tenant_or_shared` policy tenant A read all 331.
+  for (const p of populated.filter((x) => x.nullRows > 0)) {
+    await m.query('BEGIN');
+    try {
+      await m.query(`select set_config('app.tenant_id', $1, true)`, [p.tenantId]);
+      const { rows } = await m.query<{ n: string }>(
+        `select count(*)::int as n from ${quoteIdent(p.table)} where "tenantId" is null`
+      );
+      const seen = Number(rows[0]?.n ?? -1);
+      if (seen !== 0) {
+        failures.push(
+          `${p.table}: kiracı bağlamında tenantId NULL olan ${seen} satır okunuyor (tabloda ${p.nullRows}) — kiracısız satırlar her kiracıya açık.`
+        );
+      } else {
+        checks.push(`okuma (NULL): ${p.table} kiracı bağlamında ${p.nullRows} kiracısız satırın hiçbirini görmedi`);
+      }
+    } finally {
+      await m.query('ROLLBACK');
+    }
+
+    await m.query('BEGIN');
+    try {
+      await m.query(`select enter_system_scope('platform-admin')`);
+      const { rows } = await m.query<{ n: string }>(
+        `select count(*)::int as n from ${quoteIdent(p.table)} where "tenantId" is null`
+      );
+      const seen = Number(rows[0]?.n ?? 0);
+      if (seen !== p.nullRows) {
+        failures.push(
+          `${p.table}: system scope'ta ${seen}/${p.nullRows} kiracısız satır okunuyor — platform görünümü eksik, ölçüm geçersiz.`
+        );
+      } else {
+        checks.push(`okuma (NULL, pozitif): ${p.table} system scope'ta ${seen} kiracısız satırın hepsini gördü`);
+      }
+    } catch (e) {
+      // The throwaway probe role (acquireMeasurer, option 3) holds no EXECUTE on
+      // enter_system_scope; fabrika_app does. That is a missing control, said
+      // out loud, not a leak — the negative read above already ran.
+      if (e instanceof Error && /permission denied/i.test(e.message)) {
+        checks.push(`okuma (NULL, pozitif): ${p.table} ATLANDI — ölçüm rolünün enter_system_scope yetkisi yok`);
+        continue;
+      }
+      failures.push(
+        `${p.table}: enter_system_scope başarısız — NULL satırların pozitif kontrolü yapılamadı: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
     } finally {
       await m.query('ROLLBACK');
     }

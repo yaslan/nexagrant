@@ -1,5 +1,5 @@
 import React from 'react';
-import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { ScrollText } from 'lucide-react';
 import { errorMessage } from '@/lib/errors';
 
@@ -20,10 +20,16 @@ export default async function AdminAuditPage() {
   let auditEvents: AuditEventRow[] = [];
   let loadError: string | null = null;
   try {
-    auditEvents = await prisma.auditEvent.findMany({
-      take: 50,
-      orderBy: { createdAt: 'desc' }
-    });
+    // Every tenant's events and the tenant-less ones (plan admin, KVKK/GDPR
+    // erasure) — the platform-admin view, behind the admin layout's check.
+    // AuditEvent is strict (TASK-MULUJ8O4JH1PF): outside system scope a
+    // non-BYPASSRLS role reads zero rows here.
+    auditEvents = await withSystemScope('platform-admin', 'admin-audit.list', (tx) =>
+      tx.auditEvent.findMany({
+        take: 50,
+        orderBy: { createdAt: 'desc' }
+      })
+    );
   } catch (e) {
     console.error(`[AdminAuditPage] DB query failed: ${errorMessage(e)}`);
     loadError = 'Denetim kayıtları okunamadı (veritabanına ulaşılamıyor).';

@@ -246,17 +246,23 @@ async function writeErasureAudit(user: PurgedUser): Promise<void> {
 
   const tenantIds = [...new Set(user.memberships.map((m) => m.tenantId))];
 
+  // A subject with no tenant: the record belongs to no tenant, so it is written
+  // through system scope. AuditEvent is under strict tenant_isolation
+  // (TASK-MULUJ8O4JH1PF), which refuses a NULL tenantId from any tenant session
+  // and hides it from every tenant — the erasure record is kept, not published.
   if (tenantIds.length === 0) {
-    await prisma.auditEvent.create({
-      data: { type: 'user.erased', target: subjectRef, data },
-    });
+    await withSystemScope('subject-scoped', 'erasure-sweep.erasureAudit', (tx) =>
+      tx.auditEvent.create({
+        data: { type: 'user.erased', target: subjectRef, data },
+      })
+    );
     return;
   }
 
   // The tenant is known here, so this is a scoped write, not a system-scoped
-  // one. It matters: AuditEvent carries `tenant_or_shared`, whose WITH CHECK
-  // REFUSES an insert naming a tenantId outside that tenant's scope — under
-  // `fabrika_app` these creates would throw rather than quietly do nothing.
+  // one. It matters: AuditEvent's tenant_isolation WITH CHECK REFUSES an insert
+  // naming a tenantId outside that tenant's scope — under `fabrika_app` these
+  // creates would throw rather than quietly do nothing.
   for (const tenantId of tenantIds) {
     await withTenant(tenantId, (tx) =>
       tx.auditEvent.create({

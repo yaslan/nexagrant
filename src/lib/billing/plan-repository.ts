@@ -676,7 +676,11 @@ export async function publishVersion(
     orderBy: { version: 'desc' },
   });
 
-  const published = await prisma.$transaction(async (tx) => {
+  // System scope, not a bare transaction: the AuditEvent below has no tenant,
+  // and strict tenant_isolation refuses that row outside system scope
+  // (TASK-MULUJ8O4JH1PF). The subscription move is estate-wide for the same
+  // reason.
+  const published = await withSystemScope('platform-admin', 'plan-admin.publishVersion', async (tx) => {
     if (previous) {
       await tx.planVersion.update({ where: { id: previous.id }, data: { status: 'archived' } });
     }
@@ -776,7 +780,9 @@ export async function countLiveSubscriptions(planId: string): Promise<number> {
  * refused here if a live subscription appears between the screen and the call.
  */
 export async function archivePlan(planId: string, actorId: string | null): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  // Platform event, no tenant: its AuditEvent is written in system scope
+  // (TASK-MULUJ8O4JH1PF). Same for deletePlan and setPlanVisibility below.
+  await withSystemScope('platform-admin', 'plan-admin.archivePlan', async (tx) => {
     await tx.plan.update({ where: { id: planId }, data: { visibility: 'archived' } });
     await tx.auditEvent.create({
       data: { type: 'plan.archived', actorId, target: planId, data: { planId } },
@@ -789,7 +795,7 @@ export async function deletePlan(planId: string, actorId: string | null): Promis
   const live = await countLiveSubscriptions(planId);
   if (live > 0) throw new PlanInUseError(planId, live);
 
-  await prisma.$transaction(async (tx) => {
+  await withSystemScope('platform-admin', 'plan-admin.deletePlan', async (tx) => {
     await tx.planAssignment.deleteMany({ where: { planId } });
     await tx.planVersion.deleteMany({ where: { planId } });
     await tx.plan.delete({ where: { id: planId } });
@@ -806,7 +812,7 @@ export async function setPlanVisibility(
   actorId: string | null
 ): Promise<void> {
   const before = await prisma.plan.findUnique({ where: { id: planId }, select: { visibility: true } });
-  await prisma.$transaction(async (tx) => {
+  await withSystemScope('platform-admin', 'plan-admin.setPlanVisibility', async (tx) => {
     await tx.plan.update({ where: { id: planId }, data: { visibility } });
     await tx.auditEvent.create({
       data: {

@@ -1,7 +1,7 @@
 'use server';
 
 import { createHash } from 'node:crypto';
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { auth } from '@/lib/auth';
 
@@ -224,14 +224,22 @@ async function recordAccessAudit(
       Object.entries(tables).map(([table, rows]) => [table, rows.length])
     );
 
-    await prisma.auditEvent.create({
-      data: {
-        ...(tenantId ? { tenantId } : {}),
-        type: 'user.data.exported',
-        target: subjectRef,
-        data: { subjectRef, rowCounts },
-      },
-    });
+    const data = { subjectRef, rowCounts };
+
+    // AuditEvent is strict (TASK-MULUJ8O4JH1PF): a row for the session's tenant
+    // is written in that tenant's scope; a tenant-less one belongs to no tenant
+    // and goes through system scope, the only place it can be read back.
+    if (tenantId) {
+      await withTenant(tenantId, (tx) =>
+        tx.auditEvent.create({
+          data: { tenantId, type: 'user.data.exported', target: subjectRef, data },
+        })
+      );
+      return;
+    }
+    await withSystemScope('subject-scoped', 'gdpr-export.accessAudit', (tx) =>
+      tx.auditEvent.create({ data: { type: 'user.data.exported', target: subjectRef, data } })
+    );
   } catch (error) {
     console.warn('[export-data] audit write failed:', error);
   }

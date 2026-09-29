@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { Resend } from 'resend';
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { auth } from '@/lib/auth';
 import { env } from '@/lib/env';
@@ -243,6 +243,12 @@ async function notifySubject(email: string, locale: string, purgeAt: Date): Prom
  * purge does not re-create the erased identifier.
  *
  * Best-effort: an audit failure must not block the subject's request.
+ *
+ * AuditEvent is under strict tenant_isolation (TASK-MULUJ8O4JH1PF): the
+ * tenant-less row belongs to NO tenant, so it is written through system scope
+ * and is readable only there — never by every tenant, as it was under the
+ * shared policy. The per-tenant rows are written in that tenant's scope; bare
+ * `prisma` had no tenant context and the policy's WITH CHECK refused them.
  */
 async function recordErasureAudit(
   userId: string,
@@ -256,12 +262,16 @@ async function recordErasureAudit(
     const unique = [...new Set(tenantIds)];
 
     if (unique.length === 0) {
-      await prisma.auditEvent.create({ data: { type, target: subjectRef, data } });
+      await withSystemScope('subject-scoped', 'request-deletion.erasureAudit', (tx) =>
+        tx.auditEvent.create({ data: { type, target: subjectRef, data } })
+      );
       return;
     }
 
     for (const tenantId of unique) {
-      await prisma.auditEvent.create({ data: { tenantId, type, target: subjectRef, data } });
+      await withTenant(tenantId, (tx) =>
+        tx.auditEvent.create({ data: { tenantId, type, target: subjectRef, data } })
+      );
     }
   } catch (error) {
     console.warn(`[request-deletion] audit write failed for ${type}:`, error);

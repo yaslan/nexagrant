@@ -12,7 +12,7 @@ BEGIN
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
     'TtoPortfolioItem','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
     'PlanAssignment','ClaimEvidenceLink','EvidenceReminder','Consent',
-    'StripeEventLog','AgencyInviteCode'
+    'StripeEventLog','AgencyInviteCode','AuditEvent'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
@@ -23,21 +23,12 @@ BEGIN
   END LOOP;
 END $$;
 
--- Tables with nullable tenantId: Document, Chunk, ConceptTemplate, AuditEvent.
---
--- For the first three, NULL means "platform row, visible to every tenant".
--- For AuditEvent it means "this event belongs to no tenant" — a KVKK/GDPR
--- erasure request from a user with no membership
--- (src/actions/user/request-deletion.ts). Under `tenant_isolation` that row was
--- unwritable and unreadable, because in SQL `NULL = 'x'` is NULL, not true, so
--- the audit trail for exactly those subjects was dropped silently
--- (TASK-MTU6HUB8FUHMG C-2). The DROP of tenant_isolation below removes the
--- policy AuditEvent carried until then; a permissive policy left in place would
--- OR with this one and outlive the fix in every already-migrated database.
+-- Tables with nullable tenantId: Document, Chunk, ConceptTemplate.
+-- NULL means "platform row, visible to every tenant" — that is the point of it.
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['Document','Chunk','ConceptTemplate','AuditEvent'] LOOP
+  FOREACH t IN ARRAY ARRAY['Document','Chunk','ConceptTemplate'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I', t);
     EXECUTE format('DROP POLICY IF EXISTS tenant_or_shared ON %I', t);
@@ -47,12 +38,25 @@ BEGIN
   END LOOP;
 END $$;
 
--- AuditEvent had FORCE from the tenant_isolation loop it just left; the shared
--- loop above does not FORCE, so re-state it here rather than let the C-2 fix
--- quietly exempt the table owner. Only AuditEvent: adding FORCE to Document /
--- Chunk / ConceptTemplate would change how seeds and importers write them, and
--- that is not this change.
-ALTER TABLE "AuditEvent" FORCE ROW LEVEL SECURITY;
+-- AuditEvent is in the strict loop above, although its tenantId is nullable
+-- (TASK-MULUJ8O4JH1PF). A NULL there means "this event belongs to NO tenant" —
+-- plan publish / archive / delete / visibility changes by a platform admin, and
+-- a KVKK/GDPR erasure or export by a user with no membership. Under the shared
+-- policy it carried from TASK-MTU6HUB8FUHMG C-2 to here, `"tenantId" IS NULL`
+-- made every one of those rows readable by EVERY tenant (measured: 331 of 331
+-- NULL rows, with the platform admin's actorId, visible to tenant A through
+-- fabrika_app) and let any tenant INSERT a forged NULL row into the platform
+-- audit log.
+--
+-- Under strict isolation `NULL = 'x'` is NULL, so a tenant session neither sees
+-- nor writes those rows. They are written and read through the `system_scope`
+-- policy below — withSystemScope() in the three erasure/export writers, in
+-- plan-repository's platform writes, and at /admin/audit — which is what C-2
+-- actually needed: the erasure record is kept, it is just no longer public.
+-- The C-2 policy must be DROPPED, not left beside this one: permissive policies
+-- OR together, so a leftover tenant_or_shared would keep the leak open.
+-- Mirrored in prisma/migrations/auditevent-null-system-only.sql.
+DROP POLICY IF EXISTS tenant_or_shared ON "AuditEvent";
 
 -- The public pricing page counts lifetime licences from outside any tenant, so
 -- under `tenant_isolation` it would read zero and report "no owners yet" while

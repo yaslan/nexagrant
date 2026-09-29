@@ -32,14 +32,18 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Nullable tenantId: covered by the shared policy, not tenant_isolation.
+ * Nullable tenantId where NULL means "shared with every tenant": covered by the
+ * tenant_or_shared policy, not tenant_isolation.
  *
- * `AuditEvent` joined this set in TASK-MTU6HUB8FUHMG C-2 — its tenantId is
- * `String?` and an erasure request from a tenant-less user writes exactly that
- * row, which strict isolation refused (`NULL = 'x'` is not true).
+ * `AuditEvent` is NOT here, although its tenantId is `String?`. It sat here from
+ * TASK-MTU6HUB8FUHMG C-2 until TASK-MULUJ8O4JH1PF, and the shared policy made
+ * its NULL rows — platform plan events and tenant-less KVKK/GDPR erasure
+ * records, which belong to NO tenant — readable and writable by every tenant.
+ * It is strict now; its NULL rows go through withSystemScope. A table belongs
+ * here only if its NULL rows are meant to be public to all tenants.
  */
 export const NULLABLE_TENANT: ReadonlySet<string> = new Set([
-  'Document', 'Chunk', 'ConceptTemplate', 'AuditEvent',
+  'Document', 'Chunk', 'ConceptTemplate',
 ]);
 
 export function tenantScopedModels(): string[] {

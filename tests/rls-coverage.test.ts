@@ -109,58 +109,69 @@ describe('B-1 — ClaimEvidenceLink and EvidenceReminder are tenant data', () =>
   });
 });
 
-describe('C-2 — AuditEvent may have no tenant and must still be writable', () => {
+describe('AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH1PF)', () => {
   test('its tenantId is optional in schema.prisma', () => {
     const body = modelBodies().get('AuditEvent') as string;
     expect(/^\s*tenantId\s+String\?/m.test(body)).toBe(true);
   });
 
-  test('it takes tenant_or_shared, never tenant_isolation', () => {
-    // Under `tenant_isolation`, `NULL = current_setting(...)` evaluates to NULL,
-    // so a tenant-less erasure audit row is neither readable nor writable.
-    expect(policyTables('tenant_or_shared')).toContain('AuditEvent');
-    expect(policyTables('tenant_isolation')).not.toContain('AuditEvent');
+  test('it takes strict tenant_isolation, never tenant_or_shared', () => {
+    // Under tenant_or_shared (C-2), `"tenantId" IS NULL` opened every
+    // tenant-less row — plan admin events, KVKK/GDPR erasure records — to every
+    // tenant, and let any tenant insert one. The rows now live behind
+    // system_scope, which rls.sql derives for every tenant_isolation table.
+    expect(policyTables('tenant_isolation')).toContain('AuditEvent');
+    expect(policyTables('tenant_or_shared')).not.toContain('AuditEvent');
   });
 
-  test('the shared loop drops the strict policy it used to carry', () => {
-    // Permissive policies OR together: a leftover tenant_isolation on an
-    // already-migrated database would outlive this fix.
-    const block = rlsSql
-      .split('DO $$')
-      .find((b) => b.includes('CREATE POLICY tenant_or_shared ON %I')) as string;
-    expect(block).toContain("DROP POLICY IF EXISTS tenant_isolation ON %I");
+  test('rls.sql drops the C-2 policy on already-migrated databases', () => {
+    // Permissive policies OR together: a leftover tenant_or_shared would keep
+    // the leak open next to the strict policy.
+    expect(rlsSql).toMatch(/DROP POLICY IF EXISTS tenant_or_shared ON "AuditEvent";/);
   });
 
-  test('it keeps FORCE ROW LEVEL SECURITY after leaving the strict loop', () => {
-    // The strict loop FORCEs; the shared loop does not. Without this line the
-    // C-2 fix would silently exempt the table owner.
-    expect(rlsSql).toMatch(/ALTER TABLE "AuditEvent" FORCE ROW LEVEL SECURITY/);
+  test('its migration drops tenant_or_shared and restates both remaining policies', () => {
+    const sql = stripSqlComments(
+      readFileSync(resolve(process.cwd(), 'prisma/migrations/auditevent-null-system-only.sql'), 'utf8')
+    );
+    expect(sql).toMatch(/DROP POLICY IF EXISTS tenant_or_shared ON "AuditEvent";/);
+    expect(sql).toMatch(/ALTER TABLE "AuditEvent" FORCE ROW LEVEL SECURITY;/);
+    const canon = canonicalPolicyClauses();
+    const norm = sql.replace(/\s+/g, ' ');
+    expect(norm).toContain(`CREATE POLICY tenant_isolation ON "AuditEvent" USING (${canon.using}) WITH CHECK (${canon.check});`);
+    expect(norm).toMatch(/CREATE POLICY system_scope ON "AuditEvent"/);
   });
 
-  test('it is classified as nullable-tenant, not strict and not exempt', () => {
-    expect(NULLABLE_TENANT.has('AuditEvent')).toBe(true);
+  test('it is classified strict, not nullable-shared and not exempt', () => {
+    expect(NULLABLE_TENANT.has('AuditEvent')).toBe(false);
     expect(SYSTEM_WIDE.has('AuditEvent')).toBe(false);
-    expect(tenantScopedModels()).not.toContain('AuditEvent');
+    expect(tenantScopedModels()).toContain('AuditEvent');
   });
 
   /**
-   * Three writers produce a tenant-less AuditEvent row, and `tenant_isolation`
-   * was dropping all three. The one in users-scheduled-deletion is the record
-   * that an irreversible purge happened — docs/DATA_MODEL.md §1 requires it.
-   * If a call ever moves, the policy above stops being justified by it, so the
-   * pairing is asserted rather than left in a comment.
+   * Three writers still produce a tenant-less AuditEvent row — the erasure
+   * request, the erasure itself (docs/DATA_MODEL.md §1) and the data export —
+   * and strict isolation refuses that row outside system scope. The audit trail
+   * must not be lost, so each tenant-less write is asserted to sit inside
+   * withSystemScope rather than on the bare client.
    */
   test.each([
-    ['src/actions/user/request-deletion.ts', 'user.erasure.requested / .cancelled'],
-    ['src/lib/inngest/jobs/users-scheduled-deletion.ts', 'user.erased'],
-    ['src/actions/user/export-data.ts', 'user.data.exported'],
-  ])('%s still writes an AuditEvent with no tenantId (%s)', (file) => {
+    ['src/actions/user/request-deletion.ts', 'request-deletion.erasureAudit'],
+    ['src/lib/inngest/jobs/users-scheduled-deletion.ts', 'erasure-sweep.erasureAudit'],
+    ['src/actions/user/export-data.ts', 'gdpr-export.accessAudit'],
+  ])('%s writes its tenant-less AuditEvent in system scope (%s)', (file, context) => {
     const src = readFileSync(resolve(process.cwd(), file), 'utf8');
-    // A create() whose data has no `tenantId` key: the row C-2 rescued.
-    const writesWithoutTenant =
-      /auditEvent\.create\(\{\s*data:\s*\{(?![^}]*tenantId)[^}]*\}/s.test(src) ||
-      /\.\.\.\(tenantId \? \{ tenantId \} : \{\}\)/.test(src);
-    expect(writesWithoutTenant).toBe(true);
+    expect(src).not.toMatch(/\bprisma\.auditEvent\./);
+    const call = new RegExp(
+      `withSystemScope\\(\\s*'subject-scoped',\\s*'${context.replace(/\./g, '\\.')}',[\\s\\S]{0,120}?tx\\.auditEvent\\.create\\(`
+    );
+    expect(call.test(src)).toBe(true);
+  });
+
+  test('the platform audit page reads through system scope', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/app/[locale]/admin/audit/page.tsx'), 'utf8');
+    expect(src).not.toMatch(/\bprisma\.auditEvent\./);
+    expect(src).toMatch(/withSystemScope\('platform-admin', 'admin-audit\.list'/);
   });
 });
 

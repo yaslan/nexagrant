@@ -35,7 +35,7 @@
  *      "no tenant" is a refusal in this codebase, never a wider query and never
  *      an invented name; `assertTenantScope` rejects `''` for that reason.
  *      `?? null` / `?? undefined` are NOT flagged: a nullable tenantId column
- *      (ConceptTemplate, AuditEvent, Document, Chunk) is an honest absence.
+ *      (ConceptTemplate, Document, Chunk) is an honest absence.
  *
  * CHECK C — `prisma as unknown as TenantTx` outside src/lib/db.ts.
  *
@@ -254,9 +254,6 @@ const CATALOGUE_REASONS: Record<string, string> = {
     'through src/modules/m2/server/templates.ts, which ANDs the id with OR[tenantId NULL, tenantId]. ' +
     'Still structurally outside this gate, which judges the client rather than the where clause: ' +
     'src/modules/m2/server/templates.test.ts is the gate for this rule.',
-  AuditEvent:
-    'tenantId is String? — an erasure request from a tenant-less user writes exactly that row, which ' +
-    'strict isolation refuses. In NULLABLE_TENANT since TASK-MTU6HUB8FUHMG C-2.',
   Document: 'tenantId is String?; in NULLABLE_TENANT.',
   Chunk: 'tenantId is String?; in NULLABLE_TENANT.',
 };
