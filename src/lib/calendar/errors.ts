@@ -68,8 +68,9 @@ export function calendarErrorCode(error: unknown): CalendarActionCode | null {
  * Providers that can be connected in this deployment right now.
  *
  * Not a feature flag: a statement about what exists. `.ics` needs no
- * authorisation — the user downloads the file — while Google and Outlook have
- * no OAuth client configured and no callback route to return to. Add a provider
+ * authorisation — the user downloads the file — while Google has no OAuth
+ * client configured and no callback route to return to. Outlook was removed
+ * (owner decision 29.09, TASK-MUMMIHYY2F4KB): M9 is Google Calendar + .ics. Add a provider
  * here when its OAuth client and callback route exist, not before.
  */
 export const SELF_SERVE_PROVIDERS: readonly CalendarProviderType[] = ['ics'];

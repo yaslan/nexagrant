@@ -130,7 +130,7 @@ export async function purgeDueUsers(
         //     person survives in every one the job does not name here.
         //
         //     Two of them are the subject's own data and are removed outright.
-        //     `CalendarConnection` matters most: it stores a Google/Outlook
+        //     `CalendarConnection` matters most: it stores a Google calendar
         //     access and refresh token in clear text, so leaving the row behind
         //     leaves a working credential for the mailbox of someone the
         //     platform has just promised to forget.

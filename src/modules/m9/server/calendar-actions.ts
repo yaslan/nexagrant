@@ -18,11 +18,12 @@ import { CalendarActionError, SELF_SERVE_PROVIDERS } from '@/lib/calendar/errors
  *     `{ success: true }`. Nothing was connected; the caller was told it was.
  *
  * What is actually true today: `.ics` works without any authorisation — the
- * user downloads the file from the brief screen — while Google and Outlook have
- * no OAuth client configured and no `/api/calendar/callback` route to come back
- * to (`find src/app/api -ipath '*calendar*'` returns nothing). So `ics` really
- * connects, and the other two refuse with a code the UI can translate rather
- * than storing a row that claims otherwise.
+ * user downloads the file from the brief screen — while Google has no OAuth
+ * client configured and no `/api/calendar/callback` route to come back to
+ * (`find src/app/api -ipath '*calendar*'` returns nothing). So `ics` really
+ * connects, and Google refuses with a code the UI can translate rather than
+ * storing a row that claims otherwise. Outlook is not a provider at all (owner
+ * decision 29.09, TASK-MUMMIHYY2F4KB) and is refused as CALENDAR_UNKNOWN_PROVIDER.
  */
 
 export async function disconnectCalendar(connectionId: string) {

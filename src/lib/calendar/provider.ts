@@ -16,15 +16,14 @@ export interface CalendarProvider {
   deleteEvent(externalId: string): Promise<void>;
 }
 
-export type CalendarProviderType = 'google' | 'outlook' | 'ics';
+export type CalendarProviderType = 'google' | 'ics';
 
-export const CalendarProviderSchema = z.enum(['google', 'outlook', 'ics']);
+export const CalendarProviderSchema = z.enum(['google', 'ics']);
 
 /**
  * Thrown by a provider whose remote half does not exist yet.
  *
- * TASK-MTQUTBH8Q9VMK — `GoogleCalendarProvider.createEvent` and its Outlook
- * twin used to `console.log('[MOCK] …')` and return
+ * TASK-MTQUTBH8Q9VMK — `GoogleCalendarProvider.createEvent` used to `console.log('[MOCK] …')` and return
  * `{ externalId: "google:" + Math.random().toString(36) }`. `syncMeetingBriefToCalendar`
  * takes that as success: it writes the id and stamps `lastSyncAt`, and the
  * calendar settings screen then tells the user "Son senkronizasyon: <date>"

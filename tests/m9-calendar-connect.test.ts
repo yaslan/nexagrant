@@ -91,13 +91,15 @@ describe('connectCalendar', () => {
     });
   });
 
-  test.each(['google', 'outlook'])(
-    'refuses %s instead of storing a connection that can never carry an event',
-    async (provider) => {
-      await expect(connectCalendar(provider)).rejects.toThrow('CALENDAR_OAUTH_NOT_CONFIGURED');
-      expect(createMock).not.toHaveBeenCalled();
-    }
-  );
+  test('refuses google instead of storing a connection that can never carry an event', async () => {
+    await expect(connectCalendar('google')).rejects.toThrow('CALENDAR_OAUTH_NOT_CONFIGURED');
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects outlook as an unknown provider (removed, owner decision 29.09)', async () => {
+    await expect(connectCalendar('outlook')).rejects.toThrow('CALENDAR_UNKNOWN_PROVIDER');
+    expect(createMock).not.toHaveBeenCalled();
+  });
 
   test('rejects an unknown provider rather than writing an unrecognised row', async () => {
     await expect(connectCalendar('fantasy-cal')).rejects.toThrow('CALENDAR_UNKNOWN_PROVIDER');
@@ -204,8 +206,8 @@ describe('calendarErrorCode', () => {
 
 describe('SELF_SERVE_PROVIDERS', () => {
   test('lists only what this deployment can actually connect', () => {
-    // Google and Outlook have no OAuth client and no callback route
-    // (`find src/app/api -ipath '*calendar*'` is empty). When either gains one,
+    // Google has no OAuth client and no callback route
+    // (`find src/app/api -ipath '*calendar*'` is empty). When it gains one,
     // this list is where it is added — and this test is what makes that a
     // deliberate change.
     expect([...SELF_SERVE_PROVIDERS]).toEqual(['ics']);

@@ -10,7 +10,6 @@ import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 const PROVIDERS = {
   google: { label: 'Google Calendar', color: 'blue' },
-  outlook: { label: 'Microsoft Outlook Calendar', color: 'cyan' },
   ics: { label: '.ics File Import', color: 'green' },
 } as const;
 

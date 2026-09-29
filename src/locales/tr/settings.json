@@ -2,7 +2,7 @@
   "settings": {
     "calendar": {
       "title": "Takvim Bağlantıları",
-      "description": "Google Calendar, Microsoft Outlook veya .ics dosyası üzerinden takvim entegrasyonlarını yönetin. Meeting briefiniz otomatik olarak seçili takvim uygulamanıza senkronize edilecektir.",
+      "description": "Google Calendar veya .ics dosyası üzerinden takvim entegrasyonlarını yönetin. Meeting briefiniz otomatik olarak seçili takvim uygulamanıza senkronize edilecektir.",
       "connected": "Bağlı",
       "notConnected": "Bağlı Değil",
       "lastSync": "Son senkronizasyon: {date}",

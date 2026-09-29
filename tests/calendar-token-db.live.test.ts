@@ -104,7 +104,7 @@ describe('Calendar token live database encryption verification', () => {
         data: {
           tenantId: PROBE_TENANT,
           userId: PROBE_USER,
-          provider: 'outlook',
+          provider: 'google',
           isConnected: true,
           accessToken: 'unencrypted-plaintext-token',
         },

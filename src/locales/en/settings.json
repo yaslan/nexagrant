@@ -2,7 +2,7 @@
   "settings": {
     "calendar": {
       "title": "Calendar Connections",
-      "description": "Manage your calendar integrations with Google Calendar, Microsoft Outlook, or .ics file exports. Your meeting briefs will automatically synchronize to your selected calendar application.",
+      "description": "Manage your calendar integrations with Google Calendar or .ics file exports. Your meeting briefs will automatically synchronize to your selected calendar application.",
       "connected": "Connected",
       "notConnected": "Not Connected",
       "lastSync": "Last synced: {date}",
