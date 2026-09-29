@@ -87,6 +87,7 @@ vi.mock('@/lib/observability/system-alert', () => ({ recordAlert }));
 const { createDbClient } = await import('@/lib/db');
 const { POST } = await import('@/app/api/invitations/route');
 const { INVITATION_MAIL_DAILY_LIMIT, INVITATION_MAIL_SENT } = await import('@/lib/email/invitation-mail-policy');
+const { hashSecretToken } = await import('@/lib/secret-token');
 
 let admin: PrismaClient | undefined;
 let ready = false;
@@ -96,18 +97,35 @@ let seq = 0;
 
 type Body = { success?: boolean; emailSent?: boolean; reason?: string; inviteLink?: string; invitation?: { id: string } };
 
-async function invite(email: string): Promise<{ status: number; body: Body }> {
+async function invite(email: string, role = 'MEMBER'): Promise<{ status: number; body: Body }> {
   const res = await POST(
     new Request('http://localhost/api/invitations', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, role: 'MEMBER' }),
+      body: JSON.stringify({ email, role }),
     })
   );
   return { status: res.status, body: (await res.json()) as Body };
 }
 
 const nextEmail = () => `${RUN}-${++seq}@example.invalid`;
+
+/** The token in the n-th mailed link (0-based). */
+function mailedToken(n: number): string {
+  const text = send.mock.calls[n]![0].text ?? '';
+  const token = /accept-invite\?token=([0-9a-f]{64})/.exec(text)?.[1];
+  if (!token) throw new Error(`mail ${n} carries no invitation link`);
+  return token;
+}
+
+/** Whether `token` is the one the invitation row for `email` currently accepts. */
+async function tokenIsCurrent(email: string, token: string): Promise<boolean> {
+  const row = await admin!.invitation.findUnique({
+    where: { email_tenantId: { email, tenantId } },
+    select: { tokenHash: true },
+  });
+  return row?.tokenHash === hashSecretToken(token);
+}
 
 beforeAll(async () => {
   const rlsUrl = requireRlsTestUrl(RLS_URL, SUITE);
@@ -158,17 +176,25 @@ afterAll(async () => {
 });
 
 describe('POST /api/invitations — mail limits', () => {
-  test('a second invitation to the same address within 10 minutes sends no mail but still returns a link', async () => {
+  test('a second invitation to the same address within 10 minutes sends no mail and keeps the mailed link valid', async () => {
     const email = nextEmail();
     const first = await invite(email);
     expect(first).toMatchObject({ status: 200, body: { success: true, emailSent: true } });
     expect(first.body.reason).toBeUndefined();
+    const mailed = mailedToken(0);
+    expect(first.body.inviteLink).toContain(mailed);
 
-    const second = await invite(email);
+    // İNCELEME-26 Ö-1: the double click neither rotates the token the mail
+    // holds nor hands the inviter a link; the role and expiry still update.
+    const before = await admin!.invitation.findUnique({ where: { email_tenantId: { email, tenantId } } });
+    const second = await invite(email, 'WRITER');
     expect(second).toMatchObject({ status: 200, body: { success: true, emailSent: false, reason: 'recently_sent' } });
-    expect(second.body.inviteLink).toMatch(/^https:\/\/app\.example\.invalid\/tr\/accept-invite\?token=/);
-    expect(second.body.inviteLink).not.toBe(first.body.inviteLink);
+    expect(second.body).not.toHaveProperty('inviteLink');
     expect(send).toHaveBeenCalledTimes(1);
+    expect(await tokenIsCurrent(email, mailed)).toBe(true);
+    const after = await admin!.invitation.findUnique({ where: { email_tenantId: { email, tenantId } } });
+    expect(after).toMatchObject({ id: before!.id, role: 'WRITER' });
+    expect(after!.expires.getTime()).toBeGreaterThanOrEqual(before!.expires.getTime());
 
     // The row the limit counts names the invitation, never the address.
     const rows = await admin!.auditEvent.findMany({ where: { tenantId, type: INVITATION_MAIL_SENT } });
@@ -187,6 +213,24 @@ describe('POST /api/invitations — mail limits', () => {
     const again = await invite(email);
     expect(again.body).toMatchObject({ emailSent: true });
     expect(send).toHaveBeenCalledTimes(2);
+    // A new mail carries a new token; that one is valid, the old one is not.
+    expect(mailedToken(1)).not.toBe(mailedToken(0));
+    expect(await tokenIsCurrent(email, mailedToken(1))).toBe(true);
+    expect(await tokenIsCurrent(email, mailedToken(0))).toBe(false);
+  });
+
+  test('9 minutes after a mail the same address is still cooling down', async () => {
+    // Pins the 10-minute constant from below (İNCELEME-26 Ö-2, mutant X2).
+    const email = nextEmail();
+    await invite(email);
+    await admin!.auditEvent.updateMany({
+      where: { tenantId: requireId(tenantId, 'tenantId') },
+      data: { createdAt: new Date(Date.now() - 9 * 60 * 1000) },
+    });
+    const again = await invite(email);
+    expect(again.body).toMatchObject({ emailSent: false, reason: 'recently_sent' });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await tokenIsCurrent(email, mailedToken(0))).toBe(true);
   });
 
   test('a send the SMTP server refused does not start a cooldown', async () => {
@@ -210,6 +254,8 @@ describe('POST /api/invitations — mail limits', () => {
     expect([a.status, b.status]).toEqual([200, 200]);
     expect([a.body.emailSent, b.body.emailSent].sort()).toEqual([false, true]);
     expect(send).toHaveBeenCalledTimes(1);
+    // The request that lost the race must not rotate the token just mailed.
+    expect(await tokenIsCurrent(email, mailedToken(0))).toBe(true);
   });
 
   test('past the daily limit no mail is sent, the invitation is still issued, and a warning is raised', async () => {
@@ -229,6 +275,46 @@ describe('POST /api/invitations — mail limits', () => {
     expect(recordAlert).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'warn', dedupeKey: `invitation-mail-daily-limit:${tenantId}` })
     );
+  });
+
+  test('past the daily limit a re-invitation still gets a fresh link that works', async () => {
+    // Only `recently_sent` keeps the token; with no mail going out at all the
+    // inviter's link is the only one, so it must be the stored one.
+    const email = nextEmail();
+    await invite(email);
+    await admin!.auditEvent.updateMany({
+      where: { tenantId: requireId(tenantId, 'tenantId') },
+      data: { createdAt: new Date(Date.now() - 11 * 60 * 1000) },
+    });
+    await admin!.auditEvent.createMany({
+      data: Array.from({ length: INVITATION_MAIL_DAILY_LIMIT }, (_, i) => ({
+        tenantId,
+        type: INVITATION_MAIL_SENT,
+        target: `${RUN}-full-${i}`,
+        createdAt: new Date(Date.now() - 60 * 60 * 1000),
+      })),
+    });
+    const res = await invite(email);
+    expect(res.body).toMatchObject({ emailSent: false, reason: 'daily_limit' });
+    const token = /token=([0-9a-f]{64})$/.exec(res.body.inviteLink ?? '')?.[1];
+    expect(token).toBeDefined();
+    expect(token).not.toBe(mailedToken(0));
+    expect(await tokenIsCurrent(email, token!)).toBe(true);
+  });
+
+  test('rows 23 hours old still count toward the daily limit', async () => {
+    // Pins the 24-hour window from below (İNCELEME-26 Ö-2, mutant X6).
+    await admin!.auditEvent.createMany({
+      data: Array.from({ length: INVITATION_MAIL_DAILY_LIMIT }, (_, i) => ({
+        tenantId,
+        type: INVITATION_MAIL_SENT,
+        target: `${RUN}-day-${i}`,
+        createdAt: new Date(Date.now() - 23 * 60 * 60 * 1000),
+      })),
+    });
+    const res = await invite(nextEmail());
+    expect(res.body).toMatchObject({ emailSent: false, reason: 'daily_limit' });
+    expect(send).not.toHaveBeenCalled();
   });
 
   test('rows older than 24 hours do not count toward the daily limit', async () => {

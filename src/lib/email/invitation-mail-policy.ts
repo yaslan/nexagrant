@@ -23,8 +23,10 @@ import { env } from '@/lib/env';
  * may retry at once) but still counts toward the daily limit, which counts
  * attempts, not deliveries.
  *
- * Skipping the mail never blocks the invitation: the route still rotates the
- * token and returns the link, with `emailSent: false` and the reason.
+ * Skipping the mail never blocks the invitation. On `daily_limit` the route
+ * rotates the token and returns the link, with `emailSent: false` and the
+ * reason. On `recently_sent` it keeps the token, so the link in the mail that
+ * just went out stays valid, and returns no link (İNCELEME-26 Ö-1).
  */
 
 export const INVITATION_MAIL_COOLDOWN_MS = 10 * 60 * 1000;
@@ -112,6 +114,15 @@ export function invitationMailBaseUrl(source: Pick<typeof env, 'NODE_ENV' | 'NEX
 }
 
 function isLoopback(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return h === 'localhost' || h.endsWith('.localhost') || h === '[::1]' || h === '0.0.0.0' || h.startsWith('127.');
+  // `localhost.` (a trailing root dot) resolves like `localhost` (İNCELEME-26 Ö-3).
+  const h = hostname.toLowerCase().replace(/\.$/, '');
+  return (
+    h === 'localhost' ||
+    h.endsWith('.localhost') ||
+    h === '[::1]' ||
+    h === '0.0.0.0' ||
+    h.startsWith('127.') ||
+    // IPv4-mapped loopback: WHATWG URL writes [::ffff:127.0.0.1] as [::ffff:7f00:1].
+    /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(h)
+  );
 }

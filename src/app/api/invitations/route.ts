@@ -116,9 +116,14 @@ export async function POST(req: Request) {
         mailSkip = await invitationMailSkipReason(tx, tenantId, existing?.id ?? null);
       }
 
+      // Within the cooldown the invitee already holds a mail with a link, and no
+      // new mail is going out: keep that link's token (İNCELEME-26 Ö-1). Only a
+      // mail that is actually sent, or a link handed to the inviter because no
+      // mail can go out at all, gets a fresh token.
+      const keepToken = mailSkip === 'recently_sent';
       const invitation = await tx.invitation.upsert({
         where: { email_tenantId: { email, tenantId } },
-        update: { tokenHash, role, expires },
+        update: keepToken ? { role, expires } : { tokenHash, role, expires },
         create: { email, tenantId, tokenHash, role, expires },
         select: { id: true, email: true, tenantId: true, role: true, expires: true },
       });
@@ -182,11 +187,13 @@ export async function POST(req: Request) {
 
     // The link is still returned when the mail did not go out, so the inviter
     // can pass it on by hand; `emailSent` says which of the two happened and
-    // `reason` why not.
+    // `reason` why not. The exception is `recently_sent`: the token was kept, so
+    // the link in the earlier mail is the valid one and `token` above was never
+    // stored — returning it would hand out a dead link.
     return NextResponse.json({
       success: true,
       invitation: result.invitation,
-      inviteLink,
+      ...(result.mailSkip === 'recently_sent' ? {} : { inviteLink }),
       emailSent: mail.sent,
       ...(mail.sent ? {} : { reason: mail.reason }),
     });

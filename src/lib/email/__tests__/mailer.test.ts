@@ -231,7 +231,16 @@ describe('invitationMailBaseUrl', () => {
   });
 
   it('is null for a loopback URL in production', () => {
-    for (const url of ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000', 'http://app.localhost']) {
+    for (const url of [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://[::1]:3000',
+      'http://app.localhost',
+      // İNCELEME-26 Ö-3: a trailing root dot, and IPv4-mapped loopback.
+      'http://localhost.:3000',
+      'http://app.localhost./',
+      'http://[::ffff:127.0.0.1]:3000',
+    ]) {
       expect(invitationMailBaseUrl({ NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: url })).toBeNull();
     }
   });
