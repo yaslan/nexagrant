@@ -5,6 +5,7 @@ import {
   CATALOG_CURRENCY,
   PLAN_GRANTS,
   findEntry,
+  grantsFor,
   isContractPlan,
   plansGrantingModule,
 } from '../src/lib/billing/catalog';
@@ -387,6 +388,7 @@ async function main() {
 
   // E10 Seed Data
   await seedTenantWorkspace();
+  await seedDemoModuleStates();
   await seedCalls();
   await seedOpportunities();
   await seedG0DemoEvidence();
@@ -399,6 +401,42 @@ async function main() {
   await seedE11Feedback();
 
   console.log('Seeding completed with E10 data.');
+}
+
+/**
+ * The demo tenant's `ModuleState` rows — TASK-MUMSUA77J1C6Q.
+ *
+ * The comment on `modules` above has always promised these rows, but the loop
+ * that wrote them was dropped in dcbd0863. Without a row the gate reads `OFF`
+ * (src/lib/modules/access.ts), so a freshly seeded demo tenant showed "this
+ * module is not available" on every module page, Fırsatlar included.
+ *
+ * ON is exactly what the tenant's plan grants (`grantsFor`, the catalogue —
+ * never re-typed), OFF for the rest; the gate checks the plan as well, so an ON
+ * row cannot open more than the plan sells. Upserted on (tenantId, moduleId):
+ * a second run rewrites the same eleven rows.
+ */
+async function seedDemoModuleStates() {
+  const TENANT_ID = 'demo-tenant';
+  const subscription = await prisma.subscription.findUnique({
+    where: { tenantId: TENANT_ID },
+    select: { planId: true },
+  });
+  if (!subscription) {
+    console.log('Skipping demo ModuleState seed (demo-tenant has no subscription).');
+    return;
+  }
+  const granted = new Set(grantsFor(subscription.planId)?.moduleIds ?? []);
+
+  for (const m of modules) {
+    const status = granted.has(m.id) ? 'ON' : 'OFF';
+    await prisma.moduleState.upsert({
+      where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: m.id } },
+      update: { status },
+      create: { tenantId: TENANT_ID, moduleId: m.id, status },
+    });
+  }
+  console.log(`Demo ModuleState seeded (${subscription.planId}: ${[...granted].sort().join(', ')} ON).`);
 }
 
 /**
