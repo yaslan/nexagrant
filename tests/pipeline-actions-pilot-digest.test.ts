@@ -62,8 +62,9 @@ import {
   moveOpportunityStage,
 } from '@/app/[locale]/(app)/[workspace]/pipeline/actions';
 import {
-  assignCandidateToSeat,
   computeSeatCandidates,
+  confirmSeatAssignment,
+  inviteCandidateToSeat,
   computeSeatCandidatesForm,
 } from '@/modules/m8/server/actions';
 import { generateSeatCandidates } from '@/modules/m8/server/matching';
@@ -107,7 +108,8 @@ describe('pipeline write actions: an expired pilot leaves with the PILOT_EXPIRED
  */
 const M8_WRITES: Array<[string, () => Promise<unknown>]> = [
   ['computeSeatCandidates', () => computeSeatCandidates('o-1', 's-1')],
-  ['assignCandidateToSeat', () => assignCandidateToSeat('s-1', '999', 'INVITED', 'o-1')],
+  ['inviteCandidateToSeat', () => inviteCandidateToSeat('s-1', '999', 'o-1')],
+  ['confirmSeatAssignment', () => confirmSeatAssignment('s-1', 'o-1')],
 ];
 
 describe('M8 matching write actions: an expired pilot is refused before anything runs', () => {

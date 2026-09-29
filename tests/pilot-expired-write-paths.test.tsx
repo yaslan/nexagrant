@@ -54,7 +54,7 @@ vi.mock('@/modules/m11/server/actions', () => ({
 }));
 vi.mock('@/modules/m8/server/actions', () => ({
   computeSeatCandidatesForm: vi.fn(),
-  assignCandidateToSeat: vi.fn(),
+  inviteCandidateToSeat: vi.fn(),
 }));
 vi.mock('@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions', () => ({
   addSeat: vi.fn(),
@@ -93,10 +93,10 @@ import { PartBCollaborativeEditor } from '@/modules/m11/ui/PartBCollaborativeEdi
 import MembersSettingsPage from '@/app/[locale]/(app)/[workspace]/settings/members/page';
 import CallsPage from '@/app/[locale]/(app)/[workspace]/calls/page';
 import PartnerPortalPage from '@/app/[locale]/portal/partner/[token]/page';
-import { assignCandidateToSeat, computeSeatCandidatesForm } from '@/modules/m8/server/actions';
+import { computeSeatCandidatesForm, inviteCandidateToSeat } from '@/modules/m8/server/actions';
 import FindCandidatesButton from '@/modules/m8/components/find-candidates-button';
 import InviteCandidateButton from '@/modules/m8/components/invite-candidate-button';
-import { findCandidates } from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions';
+import { assignSeat, findCandidates } from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions';
 import ConsortiumManager from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/manager';
 
 const PILOT_TR = trMessages.Common.pilotExpired;
@@ -247,13 +247,13 @@ describe('İNCELEME-30: M8 matching', () => {
   });
 
   test('"Davet Et" (en): a refused invite shows the pilot sentence instead of nothing; other failures stay silent', async () => {
-    vi.mocked(assignCandidateToSeat).mockRejectedValueOnce(refused());
+    vi.mocked(inviteCandidateToSeat).mockRejectedValueOnce(refused());
     render(withIntl(<InviteCandidateButton seatId="s-1" organizationId="999" opportunityId="o-1" />, 'en'));
     fireEvent.click(screen.getByRole('button', { name: enMessages.Consortium.invite }));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(PILOT_EN));
-    expect(vi.mocked(assignCandidateToSeat)).toHaveBeenCalledWith('s-1', '999', 'INVITED', 'o-1');
+    expect(vi.mocked(inviteCandidateToSeat)).toHaveBeenCalledWith('s-1', '999', 'o-1');
 
-    vi.mocked(assignCandidateToSeat).mockRejectedValueOnce(Object.assign(new Error('x'), { digest: '4242' }));
+    vi.mocked(inviteCandidateToSeat).mockRejectedValueOnce(Object.assign(new Error('x'), { digest: '4242' }));
     fireEvent.click(screen.getByRole('button', { name: enMessages.Consortium.invite }));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   });
@@ -287,5 +287,28 @@ describe('TASK-MUN3W76B4XEJE: consortium page', () => {
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(sentence));
     expect(vi.mocked(findCandidates)).toHaveBeenCalledWith('s-1');
     expect(screen.getByText('org-kept')).toBeTruthy();
+  });
+
+  test('"Invite": a refused invite (success: false) does not show the seat as INVITED (TASK-MUN509G2ICKWI)', async () => {
+    const status = trMessages.Consortium.status;
+    vi.mocked(findCandidates).mockResolvedValueOnce([
+      { organizationId: 'org-new', rank: 1, score: { total: 3 } },
+    ] as unknown as Awaited<ReturnType<typeof findCandidates>>);
+    vi.mocked(assignSeat).mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true });
+    render(withIntl(<ConsortiumManager opportunityId="o-1" seats={[seat]} candidates={[]} orgMap={{}} />));
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(trMessages.Consortium.findCandidates) }));
+    // Generous waits: under the full suite the default 1 s timed out once.
+    const wait = { timeout: 5000 };
+    const invite = await screen.findByRole('button', { name: 'Invite' }, wait);
+
+    fireEvent.click(invite);
+    await waitFor(() => expect(vi.mocked(assignSeat)).toHaveBeenCalledTimes(1), wait);
+    await waitFor(() => expect((invite as HTMLButtonElement).disabled).toBe(false), wait);
+    expect(vi.mocked(assignSeat)).toHaveBeenCalledWith('s-1', 'org-new');
+    expect(screen.getByText(status.OPEN)).toBeTruthy();
+    expect(screen.queryByText(status.INVITED)).toBeNull();
+
+    fireEvent.click(invite);
+    await waitFor(() => expect(screen.getByText(status.INVITED)).toBeTruthy(), wait);
   });
 });

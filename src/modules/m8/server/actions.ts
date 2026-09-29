@@ -7,6 +7,7 @@ import { isPresentId } from '@/lib/required-id';
 import { PILOT_EXPIRED_CODE, isPilotExpired, type PilotExpiredCode } from '@/lib/pilot-expired';
 import { revalidatePath } from 'next/cache';
 import { generateSeatCandidates } from './matching';
+import { canConfirmSeat, inviteSeatCandidate } from './seat-transitions';
 
 /**
  * M8 consortium matching.
@@ -46,10 +47,16 @@ export async function computeSeatCandidates(opportunityId: string, seatId: strin
   return created;
 }
 
-export async function assignCandidateToSeat(
+/**
+ * "Davet Et": invites one of the seat's candidates. The status is always
+ * `INVITED` and the organisation must be on the seat's own candidate list; a
+ * confirmed seat is not overwritten (src/modules/m8/server/seat-transitions.ts,
+ * TASK-MUN509G2ICKWI). It used to take `status` from the client, so any member
+ * could post `CONFIRMED` with a made-up PIC.
+ */
+export async function inviteCandidateToSeat(
   seatId: string,
   organizationId: string,
-  status: 'CANDIDATE' | 'INVITED' | 'CONFIRMED',
   opportunityId: string
 ) {
   const { tenantId } = await requireTenantAction();
@@ -59,62 +66,89 @@ export async function assignCandidateToSeat(
     throw new Error('Seat not found in this workspace.');
   }
 
+  const updated = await withTenant<number>(tenantId, (tx) =>
+    inviteSeatCandidate(tx, { tenantId, seatId, organizationId, opportunityId })
+  );
+  if (updated === 0) {
+    throw new Error(`Seat ${seatId} cannot be offered to this organisation in this workspace.`);
+  }
+
+  revalidatePath(MATCHING_PATH, 'page');
+}
+
+/**
+ * Confirms the organisation already invited to a seat. Only a role with
+ * `manage_approvals` (owner, admin, pipeline manager) may; the organisation is
+ * read from the seat, not taken from the client.
+ */
+export async function confirmSeatAssignment(seatId: string, opportunityId: string) {
+  const { tenantId, role } = await requireTenantAction();
+  if (!canConfirmSeat(role)) {
+    throw new Error('Your role cannot confirm consortium seats.');
+  }
+  if (!isPresentId(seatId) || !isPresentId(opportunityId)) {
+    throw new Error('Seat not found in this workspace.');
+  }
+
   const updated = await withTenant<number>(tenantId, async (tx) => {
-    if (status === 'CONFIRMED') {
-      const opp = await tx.opportunity.findFirst({
-        where: { id: opportunityId, tenantId },
-        select: { id: true, topicId: true }
+    const seat = await tx.consortiumSeat.findFirst({
+      where: { id: seatId, opportunityId, tenantId, status: 'INVITED' },
+      select: { organizationId: true },
+    });
+    const organizationId = seat?.organizationId;
+    if (!organizationId) return 0;
+
+    const opp = await tx.opportunity.findFirst({
+      where: { id: opportunityId, tenantId },
+      select: { id: true, topicId: true }
+    });
+
+    if (!opp) return 0;
+
+    // `Opportunity` carries a `topicId` column but no `topic` relation and no
+    // `callId`, so the call is resolved in two steps rather than included —
+    // `include: { topic: true }` threw PrismaClientValidationError here.
+    const topic = opp.topicId
+      ? await tx.topic.findUnique({ where: { id: opp.topicId }, select: { callId: true } })
+      : null;
+
+    if (topic?.callId) {
+      const siblingTopics: { id: string }[] = await tx.topic.findMany({
+        where: { callId: topic.callId },
+        select: { id: true }
       });
 
-      if (!opp) throw new Error(`Opportunity ${opportunityId} not found in this workspace.`);
-
-      // `Opportunity` carries a `topicId` column but no `topic` relation and no
-      // `callId`, so the call is resolved in two steps rather than included —
-      // `include: { topic: true }` threw PrismaClientValidationError here.
-      const topic = opp.topicId
-        ? await tx.topic.findUnique({ where: { id: opp.topicId }, select: { callId: true } })
-        : null;
-
-      if (topic?.callId) {
-        const siblingTopics: { id: string }[] = await tx.topic.findMany({
-          where: { callId: topic.callId },
-          select: { id: true }
-        });
-
-        // The conflict check stays inside the tenant: another tenant's
-        // consortium is none of this tenant's business and must not leak a
-        // partner name through the error message.
-        const conflict = await tx.consortiumSeat.findFirst({
-          where: {
-            tenantId,
-            organizationId,
-            status: 'CONFIRMED',
-            opportunity: {
-              topicId: { in: siblingTopics.map((t) => t.id) },
-              id: { not: opportunityId },
-              status: 'ACTIVE'
-            }
-          },
-          include: { opportunity: true }
-        });
-        if (conflict) {
-          throw new Error(`Conflict: Organization is already CONFIRMED in another active opportunity for the same call (${conflict.opportunity.title}).`);
-        }
+      // The conflict check stays inside the tenant: another tenant's
+      // consortium is none of this tenant's business and must not leak a
+      // partner name through the error message.
+      const conflict = await tx.consortiumSeat.findFirst({
+        where: {
+          tenantId,
+          organizationId,
+          status: 'CONFIRMED',
+          opportunity: {
+            topicId: { in: siblingTopics.map((t) => t.id) },
+            id: { not: opportunityId },
+            status: 'ACTIVE'
+          }
+        },
+        include: { opportunity: true }
+      });
+      if (conflict) {
+        throw new Error(`Conflict: Organization is already CONFIRMED in another active opportunity for the same call (${conflict.opportunity.title}).`);
       }
     }
 
-    // `updateMany` so the tenant stays in the WHERE clause.
+    // The status and organisation read above are part of the WHERE clause, so a
+    // re-invite between the read and this write confirms nothing.
     const result = await tx.consortiumSeat.updateMany({
-      where: { id: seatId, opportunityId, tenantId },
-      data: {
-        organizationId,
-        status
-      }
+      where: { id: seatId, opportunityId, tenantId, status: 'INVITED', organizationId },
+      data: { status: 'CONFIRMED' }
     });
     return result.count;
   });
 
-  if (updated === 0) throw new Error(`Seat ${seatId} not found in this workspace.`);
+  if (updated === 0) throw new Error(`Seat ${seatId} has no invited organisation to confirm in this workspace.`);
 
   revalidatePath(MATCHING_PATH, 'page');
 }

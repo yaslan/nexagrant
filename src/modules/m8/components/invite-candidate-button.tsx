@@ -3,14 +3,14 @@
 import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 
-import { assignCandidateToSeat } from '@/modules/m8/server/actions';
+import { inviteCandidateToSeat } from '@/modules/m8/server/actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 /**
  * "Davet Et" — invites one candidate to a seat.
  *
  * This was an inline `'use server'` form on the matching page whose catch only
- * logged: `assignCandidateToSeat` refused an expired pilot and the user saw
+ * logged: the invite action refused an expired pilot and the user saw
  * nothing, so they clicked again (İNCELEME-30 B-2, TASK-MUN39FIAKFY2R). The
  * refusal now reaches the browser with its `PILOT_EXPIRED` digest and is shown
  * as `Common.pilotExpired`. Any other failure stays silent, as before — the
@@ -39,7 +39,7 @@ export default function InviteCandidateButton({
           startTransition(async () => {
             setError(null);
             try {
-              await assignCandidateToSeat(seatId, organizationId, 'INVITED', opportunityId);
+              await inviteCandidateToSeat(seatId, organizationId, opportunityId);
             } catch (e) {
               setError(errorText(e, null));
             }

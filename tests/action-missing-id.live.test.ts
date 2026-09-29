@@ -274,10 +274,12 @@ const CASES: Case[] = [
   ['pipeline moveOpportunityStage', (id) => pipeline.moveOpportunityStage(id, 'G3' as never), refused],
   ['pipeline archiveOpportunity', (id) => pipeline.archiveOpportunity({ opportunityId: id }), refused],
   ['pipeline evaluateOpportunityGate', (id) => pipeline.evaluateOpportunityGate({ opportunityId: id, gate: 'G1' } as never), refused],
-  ['consortium assignSeat', (id) => consortium.assignSeat(id, 'org-x'), refused],
+  ['consortium assignSeat', (id) => consortium.assignSeat(id, `${RUN}-org-1`), refused],
   ['consortium findCandidates', (id) => consortium.findCandidates(id), refused],
-  ['m8 assignCandidateToSeat (seat)', (id) => m8.assignCandidateToSeat(id, 'org-x', 'INVITED', ids.opp[0]!), refused],
-  ['m8 assignCandidateToSeat (opportunity)', (id) => m8.assignCandidateToSeat(ids.seat[0]!, 'org-x', 'INVITED', id), refused],
+  ['m8 inviteCandidateToSeat (seat)', (id) => m8.inviteCandidateToSeat(id, `${RUN}-org-1`, ids.opp[0]!), refused],
+  ['m8 inviteCandidateToSeat (opportunity)', (id) => m8.inviteCandidateToSeat(ids.seat[0]!, `${RUN}-org-1`, id), refused],
+  ['m8 confirmSeatAssignment (seat)', (id) => m8.confirmSeatAssignment(id, ids.opp[0]!), refused],
+  ['m8 confirmSeatAssignment (opportunity)', (id) => m8.confirmSeatAssignment(ids.seat[0]!, id), refused],
   ['m8 computeSeatCandidates', (id) => m8.computeSeatCandidates(ids.opp[0]!, id), refused],
   ['relationships updateRelationship', (id) => updateRelationship(id, { notes: 'overwritten' }), refused],
   ['m4 updateNextStep', (id) => updateNextStep(id, 'overwritten', null), refused],
@@ -350,7 +352,8 @@ describe('the same paths still write one row when given a real id', () => {
     expect(await updateNextStep(ids.rel[0]!, 'written', null)).toEqual({ success: true });
     expect(await admin!.relationship.count({ where: { tenantId: t, nextStep: 'written' } })).toBe(1);
 
-    expect(await consortium.assignSeat(ids.seat[0]!, 'org-y')).toEqual({ success: true });
-    expect(await admin!.consortiumSeat.count({ where: { tenantId: t, organizationId: 'org-y' } })).toBe(1);
+    // Only a candidate of the seat can be invited (TASK-MUN509G2ICKWI).
+    expect(await consortium.assignSeat(ids.seat[0]!, `${RUN}-org-1`)).toEqual({ success: true });
+    expect(await admin!.consortiumSeat.count({ where: { tenantId: t, organizationId: `${RUN}-org-1` } })).toBe(1);
   });
 });

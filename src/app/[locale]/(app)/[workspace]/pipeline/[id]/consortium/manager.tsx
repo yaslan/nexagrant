@@ -149,7 +149,10 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
     setActionError(null);
     startTransition(async () => {
       try {
-        await assignSeat(seatId, orgId);
+        // `success: false` is a refused invite (not a candidate of this seat,
+        // or the seat is confirmed): the row must not turn INVITED on screen.
+        const { success } = await assignSeat(seatId, orgId);
+        if (!success) return;
       } catch (err) {
         refuse(err);
         return;

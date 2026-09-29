@@ -6,6 +6,7 @@ import { isPresentId } from '@/lib/required-id';
 import { scoreCandidatesForSeat, detectConflicts } from '@/lib/scoring/consortium';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
+import { inviteSeatCandidate } from '@/modules/m8/server/seat-transitions';
 
 /**
  * M8 consortium seats.
@@ -95,17 +96,15 @@ export async function assignSeat(seatId: string, organizationId: string) {
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
   if (!isPresentId(seatId)) return { success: false };
 
-  // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
-  // unique selector and would let a guessed seat id reassign another tenant's seat.
-  const updated = await withTenant<{ count: number }>(tenantId, (tx) =>
-    tx.consortiumSeat.updateMany({
-      where: { id: seatId, tenantId },
-      data: { organizationId, status: 'INVITED' },
-    })
+  // The organisation must be one of this seat's candidates and a confirmed seat
+  // is not overwritten; any PIC the client made up used to be written as
+  // INVITED (TASK-MUN509G2ICKWI). The write is `updateMany` on (id, tenantId).
+  const updated = await withTenant<number>(tenantId, (tx) =>
+    inviteSeatCandidate(tx, { tenantId, seatId, organizationId })
   );
 
   revalidatePath(PIPELINE_PATH, 'page');
-  return { success: updated.count > 0 };
+  return { success: updated > 0 };
 }
 
 export async function getConflicts(opportunityId: string) {
