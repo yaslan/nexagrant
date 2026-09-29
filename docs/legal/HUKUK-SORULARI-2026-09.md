@@ -1,13 +1,13 @@
 # FonBridge — Hukukçuya Soru Paketi (Eylül 2026)
 
-> **Sürüm 1.1** · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MUMH7OISNJ5OV (FB-KAMU-2, pilot kapısı d); 1.1 eki: TASK-MUMJA8VJJ8YP0 (PostHog ve Sentry)
+> **Sürüm 1.2** · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MUMH7OISNJ5OV (FB-KAMU-2, pilot kapısı d); 1.1 eki: TASK-MUMJA8VJJ8YP0 (PostHog ve Sentry); 1.2 eki: TASK-MUMLFVDX85O4M (29.09 ürün sahibi kararları: dış hizmet listesi daraldı, Microsoft girişi kaldırıldı)
 >
 > **Kime:** FonBridge'in KVKK / veri koruma danışmanı.
 > **Ne istiyoruz:** Bu belgedeki sorulara yazılı görüş. Her sorunun altında "cevaba göre ne değişir" bölümü var. Cevabınız, hangi metnin ve hangi ürün davranışının değişeceğini doğrudan belirler.
 >
 > **Bu belge hukuki bir metin değildir.** Ürün ekibinin bugünkü durumu anlattığı bir soru listesidir. Hiçbir cümlesi hukuken onaylı değildir.
 >
-> **Bugünkü durumun kaynağı kodun kendisidir**, planlar ya da eski belgeler değildir. Her teknik iddia 29.09.2026'da `dev` dalının `84d11af4` commit'inde kaynak kodda kontrol edildi (sürüm 1.0 `858c139a`'da kontrol edilmişti; sürüm 1.1'de bütün kanıt satırları bu commit'e göre yeniden kontrol edildi). Kod yolları her bölümün sonunda "Kanıt" satırında verilir. Bu satırlar ürün ekibi içindir; okumanız gerekmez.
+> **Bugünkü durumun kaynağı kodun kendisidir**, planlar ya da eski belgeler değildir. Her teknik iddia 29.09.2026'da `dev` dalının `84d11af4` commit'inde kaynak kodda kontrol edildi (sürüm 1.0 `858c139a`'da kontrol edilmişti; sürüm 1.1'de bütün kanıt satırları bu commit'e göre yeniden kontrol edildi). **Sürüm 1.2:** kanıt satırlarındaki dosyalar `e46d9798`'e kadar tarandı; yalnız `oauth-registration.ts` satır numaraları kaydı, onlar düzeltildi. 1.2'de eklenen §2.0 giriş satırı ve §5 madde 3 kod değil **karardır**: 29.09.2026 akşamı ürün sahibi dört dış hizmeti üründen çıkardı. Kod değişikliği o gün sürüyordu (kart kodları ilgili satırlarda). Kod yolları her bölümün sonunda "Kanıt" satırında verilir. Bu satırlar ürün ekibi içindir; okumanız gerekmez.
 
 ---
 
@@ -44,7 +44,8 @@ Cevaplarınızı §7'deki cevap tablosuna yazabilirsiniz.
 - **Kalkınma ajansı** (ör. Orta Karadeniz Kalkınma Ajansı, OKA) FonBridge'de ayrı bir hesap türüdür. Ajans **davet kodu** üretir ve bölgesindeki kurumlara dağıtır.
 - Kurum kayıt olurken bu kodu kullanırsa kurumun hesabı ajansa **bağlanır**. Ajans, kendi kodlarıyla gelen kurumlar hakkında **yalnız toplu sayılar** görür: kaç kurum kayıt oldu, kaç kurum bir çağrıyı takibe aldı, kaç kurumun başvurusu kabul edildi gibi.
 - **Fon hazırlık karnesi**, sitede kayıt olmadan doldurulabilen 15 soruluk bir öz değerlendirmedir. Kurum türü, cevaplar ve isteğe bağlı olarak il seçilir.
-- **Giriş yalnız Google hesabıyla yapılır** (ileride Microsoft da açılabilir). Şifreyle giriş yoktur (ADR-0006, 29.09.2026).
+- **Giriş yalnız Google hesabıyla yapılır.** Microsoft ile giriş seçeneği ürün sahibinin 29.09.2026 kararıyla **kaldırıldı**; açılması planlanmıyor. Şifreyle giriş yoktur (ADR-0006, 29.09.2026).
+  - _Kanıt:_ karar kaydı TASK-MUMLFLB2OPLY3. Uygulama TASK-MUMLFLB2OPLY3'te sürüyor: `e46d9798`'de `src/lib/auth.ts:3` ve `:316-317` Microsoft sağlayıcısını hâlâ içeriyor. Sağlayıcı yalnız anahtarı tanımlıysa kayda girer, anahtar yoksa düğme görünmez (`auth.ts:311-316`, `AuthCard.tsx:158`, `:573`); anahtar tanımlanmadı ve tanımlanmayacak.
 
 ### 2.1 Belgelerde "henüz yok" yazan ama artık kodda olanlar
 
@@ -82,7 +83,7 @@ Hukuki önemi şudur:
 - Kurum adı bugün ajansa **gösterilmez** (HUKUK-4). Ama kurum hesabının adı, varsayılan olarak **bir gerçek kişinin adıdır**. "Kurum verisi" ile "kişi verisi" ayrımı (HUKUK-11) yalnız şahıs şirketleri için değil, bu varsayılan ad yüzünden **her kurum hesabı için** gündemdedir.
 - Ajansa giden "kurum türü" kırılımı bugün fiilen tek bir grup (KOBİ) gösterir. Bu anonimliği azaltmaz (bütün kurumlar aynı grupta durur), ama ekteki "kurum türü" anlatımı gerçekle örtüşmüyor. Bu bir ürün hatası olarak ayrıca bildirildi (§8); sizden bir cevap beklemiyor. HUKUK-5 değerlendirmesinde tür kırılımı düzeltilince yeniden devreye gireceğini bilmeniz yeterlidir.
 
-_Kanıt:_ `src/lib/oauth-registration.ts:228` (`name: \`${input.userName || 'My'} Organization\``) ve `:231` (`orgType: 'SME'`). Ürün içinde `Tenant` kaydını güncelleyen yerler yalnız il (`settings/profile/actions.ts:40`), ajans türü, ortak marka ve SSO alanıdır; ad ve tür için yoktur (`grep "tenant.update" src`).
+_Kanıt:_ `src/lib/oauth-registration.ts:236` (`name: \`${input.userName || 'My'} Organization\``) ve `:239` (`orgType: 'SME'`). Ürün içinde `Tenant` kaydını güncelleyen yerler yalnız il (`settings/profile/actions.ts:40`), ajans türü, ortak marka ve SSO alanıdır; ad ve tür için yoktur (`grep "tenant.update" src`).
 
 ### 2.4 Ana aydınlatma metni bu akışlardan hiç söz etmiyor
 
@@ -309,10 +310,27 @@ Ana aydınlatma metnini hukuk ekibinin yazması bekleniyor (TASK-MTSWIFJKGTYC). 
 
 1. **Veri sorumlusu:** unvan, MERSİS, VKN, adres, KEP, başvuru e-postası, temsilci; AB temsilcisi ve DPO gerekli mi (GDPR art.27/37).
 2. **Kapsam:** envanterdeki 18 faaliyetin hangileri tek tek, hangileri kategori altında anlatılacak; TCKN/VKN için ayrı paragraf; YZ işlemesi için ayrı paragraf; üçüncü kişi (CRM muhatapları) için ayrı aydınlatma; çift onay kaydı beyan cümlesi.
-3. **Alıcılar ve yurt dışı aktarım:** alıcılar adıyla mı kategoriyle mi; aktarım mekanizması (açık rıza mı, md.9 güvenceleri mi — repoda hiçbir alıcı için imzalı standart sözleşme yok); açık rıza seçilirse rızanın alınacağı ekran; her alıcı için amaç. Kodda bugün kapalı duran ama anahtar girildiği an alıcı olacak iki hizmet de bu listeye girmeli (envanter §19a, §21):
-   - **PostHog (ürün analitiği):** yalnız çerez onayı veren ziyaretçinin anonim olayları (§3.3 madde 1). Varsayılan AB bölgesi; ABD bölgesi seçilirse yurt dışı aktarım olur. DPA imzalı değil.
-   - **Sentry (hata iletimi):** yalnız yeni açılan "hata" seviyesindeki sistem uyarıları. Gidenler: uyarının kaynağı, mesajı ve ek bilgileri. E-posta adresleri maskelenir; **mesajdaki öteki serbest metin bugün maskelenmez** (ör. bir veritabanı hata mesajı sorgudaki bir adı taşıyabilir; düzeltme, hizmet açılmadan önce yapılacak). Bölge, hizmet adresindeki ayara bağlıdır. Açılması ayrıca ürün sahibinin onayına bağlıdır. DPA imzalı değil.
-   - _Kanıt:_ `src/lib/analytics.ts:28`, `:119-122`; `src/lib/observability/sentry.ts:86-88` (`scrubText` yalnız e-postayı maskeler), `:106-120` (gönderilen olay), `:132` (`SENTRY_DSN` boşsa kapalı); `src/lib/observability/system-alert.ts:340` (yalnız yeni `error` satırı); inceleme bulgusu K-3a: `docs/agent-results/TASK-MUMIIMRN92JDQ-crw-fb.md` §3.
+3. **Alıcılar ve yurt dışı aktarım:** alıcılar adıyla mı kategoriyle mi; aktarım mekanizması (açık rıza mı, md.9 güvenceleri mi — repoda hiçbir alıcı için imzalı standart sözleşme yok); açık rıza seçilirse rızanın alınacağı ekran; her alıcı için amaç.
+
+   **Sürüm 1.2 — liste daraldı (ürün sahibi kararı, 29.09.2026).** Ürün sahibi dört dış hizmeti üründen çıkardı. Aşağıdaki "çıkanlar" alıcı listesine **girmemeli**. Kod değişikliği sürüyor; o hizmetlerin anahtarları girilmeyecek.
+
+   _Kalanlar (alıcı listesine girmeli):_
+   - **Google (giriş):** kullanıcı Google hesabıyla girer (OAuth). Tek giriş yolu budur.
+   - **Anthropic (yapay zekâ metin üretimi):** kullanıcının YZ özelliklerine yazdığı ve seçtiği metinler.
+   - **OpenAI (metin vektörü / "embedding"):** arama ve eşleştirme için belge metni sayısal vektöre çevrilir. Ürün sahibi 29.09'da bu hizmette **OpenAI'da kalma** kararı verdi.
+   - **Cloudflare R2 (dosya depolama):** yüklenen dosyalar ve geri bildirim ekran görüntüleri. Pilotta isteğe bağlı.
+   - **PostHog (ürün analitiği), bugün kapalı:** anahtar girilirse, yalnız çerez onayı veren ziyaretçinin anonim olayları gider (§3.3 madde 1). Varsayılan AB bölgesi; ABD bölgesi seçilirse yurt dışı aktarım olur. DPA imzalı değil.
+
+   _Çıkanlar (alıcı olmayacak):_
+   - **Microsoft (giriş):** Microsoft ile giriş kaldırıldı (§2.0). Uygulama TASK-MUMLFLB2OPLY3'te sürüyor.
+   - **Sentry (hata iletimi):** hata kayıtları yalnız kendi veritabanımızdaki sistem uyarıları tablosunda tutulacak, dışarı gönderilmeyecek. Sürüm 1.1'deki Sentry açıklaması geçersizdir. Uygulama TASK-MUMLEUIQWSI59'da sürüyor.
+   - **Resend (e-posta iletimi):** e-postalar kendi SMTP sunucumuzdan gidecek. Uygulama TASK-MUMLF57HOYFSB'de sürüyor.
+   - **Inngest (zamanlanmış işler):** zamanlanmış işler kendi iş kuyruğumuza taşınacak. Uygulama TASK-MUMLFDTNQ53VJ'de sürüyor (önce teknik karar kaydı ve deneme).
+
+   _Sizden istediğimiz ek görüş:_ kendi SMTP sunucumuz ve iş kuyruğumuz bir barındırma sağlayıcısının sunucusunda çalışacak. O sağlayıcının hangi ülkede olduğu **henüz belli değil**. Barındırma sağlayıcısını alıcı ya da veri işleyen olarak ayrıca yazmamız gerekir mi?
+
+   - _Kanıt:_ karar: patron anahtar kartı TASK-MULQM3LFB4KRA (29.09'da yalnız Anthropic + OpenAI + Google izin ekranı adıyla daraltıldı). PostHog: `src/lib/analytics.ts:28`, `:119-122`. `e46d9798`'de Sentry (`src/lib/observability/sentry.ts`), Resend (`src/lib/email/resend-mailer.ts`), Inngest (`src/lib/inngest/`) ve Microsoft (`src/lib/auth.ts:317`) kodu hâlâ duruyor; kaldırma yukarıdaki kartlarda sürüyor. Envanterdeki alıcı satırları (`processing-register.md` §1, §17, §18, §19a, §21) kod değişince güncellenecek (§8 madde 6).
+
 4. **Toplama yöntemi ve hukuki sebep:** her amaç için sebep (envanterde beş ayrı sebep kullanılıyor); meşru menfaat için dengeleme testi (sekiz faaliyet md.5/2-f'ye dayanıyor); çerez aydınlatması ayrı belge mi.
 5. **Haklar:** md.11 bentlerinin tam listesi; otomatik analiz (md.11/g) için ürüne özel açıklama (YZ ön değerlendirme puanı); başvuru usulü; hesabı olmayan kişi için kanal; Kurul'a şikâyet cümlesi.
 6. **Saklama:** her kategori için süre (beş kalem açık: VKN/TCKN, belgeler, denetim kayıtları, geri bildirim, onay kaydı); saklama ve imha politikası ayrı belge mi.
@@ -358,9 +376,11 @@ Cevaplarınızı buraya ya da ayrı bir yazıyla verebilirsiniz. Her cevapta day
 Bu paketi hazırlarken kodda, belgelerin söylediğinden farklı olan şunlar bulundu. Hukuk cevabını beklemeden düzeltilebilirler:
 
 1. **Ek taslağı bayat.** `agency-channel-notice-addendum.md` §0, §2.2 ve §6 madde 5-6, B3 raporunun ve kayıt ekranındaki ek onayının "kodda olmadığını" söylüyor. İkisi de kodda (`d091cf72`, `9fbc81f8`). Envanter §18c de B3 raporunu (ajansın kayıt alanında saklanan aylık kopya) içermeli.
-2. **Kurum türü her kayıtta "KOBİ".** `src/lib/oauth-registration.ts:231` Google ile açılan her kurumu `SME` yapıyor. Karnedeki tür kullanılmıyor, türü değiştiren bir ekran yok. Ajans panosunun "kurum türü" kırılımı üretimde anlamsız (her kurum KOBİ), belediye pilotunda belediye KOBİ görünür.
-3. **Kurum adı kişinin adı.** `src/lib/oauth-registration.ts:228` kurum adını `<Google adı> Organization` yapıyor (İngilizce, Türkçe arayüzde de). Ad değiştirme ekranı yok.
+2. **Kurum türü her kayıtta "KOBİ".** `src/lib/oauth-registration.ts:239` Google ile açılan her kurumu `SME` yapıyor. Karnedeki tür kullanılmıyor, türü değiştiren bir ekran yok. Ajans panosunun "kurum türü" kırılımı üretimde anlamsız (her kurum KOBİ), belediye pilotunda belediye KOBİ görünür.
+3. **Kurum adı kişinin adı.** `src/lib/oauth-registration.ts:236` kurum adını `<Google adı> Organization` yapıyor (İngilizce, Türkçe arayüzde de). Ad değiştirme ekranı yok.
 4. **İl açıklaması kodsuz kayıtta yanlış yönlendiriyor.** `Auth.provinceHint` her kayıtta "kalkınma ajansı raporlarında kullanılır" diyor.
 5. **Kayıt ekranı kısa metni eksik.** `Auth.agencyInvite.sees` ajansın gördüğü sekiz adımdan yalnız üçünü sayıyor; kırılım, yuvarlama ve rapordan söz etmiyor (§2.2).
+
+6. **Envanter 29.09 kararlarının gerisinde (sürüm 1.2).** `processing-register.md` §1 (Microsoft), §17 ve §18 (Resend), §19a (Sentry) ve §21 alt işleyen tablosu (Microsoft, Resend) bugünkü kodu anlatıyor. Kaldırma kartları (TASK-MUMLFLB2OPLY3, TASK-MUMLEUIQWSI59, TASK-MUMLF57HOYFSB, TASK-MUMLFDTNQ53VJ) `done` olunca bu satırlar güncellenmeli. Kod değişmeden "kaldırıldı" yazmak envanteri yanlış yapar.
 
 Bu maddeler için ayrı kartlar açılmalı. Bu belgenin kapsamı yalnız soru paketidir.
