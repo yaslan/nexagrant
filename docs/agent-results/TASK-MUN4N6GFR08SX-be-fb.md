@@ -126,6 +126,8 @@ Canlı dosya, verbose:
 ✓ the job purges by its cron tick and reports the result
 ```
 
+**İnceleme sırasında `dev` ilerledi.** Commit anında `13c40556..HEAD` aralığında incelenen dosyalara (`app-url*`, `calendar/`, `invitations/`, `jobs/`, `instrumentation.ts`, `.env.example`) dokunan tek commit `1b8598d1` çıktı. Bu commit `.env.example`'da yalnız SMTP satırlarını değiştiriyor. B-1'in alıntıladığı cümle ve `app-url.ts:67` HEAD'de aynı duruyor, yani bulgular geçerli.
+
 ### 2.4 Temizlik
 Scratch worktree ve `befb-mun4n` konteyneri (yalnız benim açtığım) iş sonunda kaldırıldı. §3'te komut çıktısı var.
 
