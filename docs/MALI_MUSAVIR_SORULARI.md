@@ -71,7 +71,8 @@ Stripe, Google, Microsoft, Resend, Cloudflare.** Bu alımlar için **sorumlu
 sıfatıyla KDV (2 No.lu KDV beyannamesi)** yükümlülüğümüz doğuyor mu? Doğuyorsa
 hangi kalemler kapsamda ve beyan/ödeme ritmi ne olmalı? (Bu yükümlülüğü bugüne
 kadar sistem tarafında hiç modellemedik; eksikse en kısa sürede kapatmak
-istiyoruz.)
+istiyoruz.) _Güncel 29.09.2026: Microsoft ve Resend üründen çıktı (Resend `fe9fd31c`);
+e-posta kurumsal e-posta hesabının SMTP'sinden gidecek, sağlayıcıyı patron belirleyecek._
 
 ### 6. Döviz faturası, TCMB kuru ve TL karşılığı
 Fiyat kataloğumuz USD olduğu için faturaların çoğu **döviz** cinsinden kesilecek.

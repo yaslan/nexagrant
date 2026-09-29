@@ -50,8 +50,11 @@ pnpm test                      # .env'i vitest.config.mts kendisi yükler; `sour
   `.env`'den okur). `.env.example`'daki URL'ler varsayılan 5433'ü gösterir; portu değiştirirsen
   `.env`'deki 3 URL'yi (`DATABASE_URL`, `DATABASE_URL_MIGRATE`, `DATABASE_URL_RLS_TEST`) de çevir.
 - **Redis ve Mailpit.** Compose ikisini de kaldırır ama uygulama bugün ikisini de kullanmıyor:
-  `src/` `REDIS_URL` okumuyor, e-posta yalnız Resend API'siyle gidiyor (SMTP taşıyıcısı yok).
-  Mailpit'e düşen e-posta beklemeyin; `RESEND_API_KEY` boşsa e-posta hiç gönderilmez.
+  `src/` `REDIS_URL` okumuyor. E-posta 29.09.2026'dan beri kendi SMTP'mizden (nodemailer,
+  `src/lib/email/mailer.ts`, `fe9fd31c`) gidiyor; Resend kaldırıldı. Ayarlar `SMTP_*` env'inde
+  (`.env.example`). Yerelde Mailpit'e göndermek için `SMTP_HOST=localhost`, `SMTP_PORT=1025`
+  (arayüz :8025). `SMTP_HOST` boşsa e-posta gönderilmez ve üretimde `SystemAlert` yazılır.
+  Canlıdaki SMTP sağlayıcısı: kurumsal e-posta hesabı, patron belirleyecek.
 - **Sabit adlar.** Konteyner adları (`fabrika-postgres`…) ve volume adları (`fabrika_pgdata`,
   `fabrika_redisdata`) sabit; `-p` ile başka proje adı vermek bunları **değiştirmez**. İkinci,
   izole bir yığın (ör. temiz klonda deneme) için adları da değiştiren ek bir `-f` dosyası kullan,

@@ -11,7 +11,8 @@ Add to `.env` (or `.env.local` for development):
 ```bash
 INNGEST_API_KEY=           # From Inngest dashboard (https://app.inngest.com)
 INNGEST_SIGNING_KEY=       # For local development and production webhook signing
-RESEND_API_KEY=            # For email sending
+SMTP_HOST=                 # Outgoing mail over our own SMTP (nodemailer); blank = no mail
+SMTP_PORT=587              # Full SMTP_* list in .env.example (Resend removed 29.09.2026, fe9fd31c)
 WORKER_URL=http://localhost:8000  # Python worker for CORDIS processing
 WORKER_TOKEN=              # Token for Python worker authentication
 
@@ -99,7 +100,7 @@ All jobs are defined in `src/lib/inngest/jobs/` directory.
 **What it does:**
 - Fetches all `SavedSearch` records with `notify: true`
 - For each search, finds tenant owner email
-- Sends email via Resend with matching opportunities
+- Sends email over our own SMTP (`src/lib/email/mailer.ts`) with matching opportunities
 - Updates `lastRunAt` timestamp
 
 **Expected result:**
@@ -163,16 +164,18 @@ All jobs are defined in `src/lib/inngest/jobs/` directory.
 |---|---|
 | **Trigger** | Cron `0 6 * * 1` (Mondays 06:00 UTC) |
 | **Reads** | `Feedback` (last 7 days + everything still open), `Tenant` (names) |
-| **Sends** | One HTML digest to `FEEDBACK_DIGEST_TO` via Resend |
+| **Sends** | One HTML digest to `FEEDBACK_DIGEST_TO` over our own SMTP (`SMTP_*`) |
 | **Output** | `{ newCount, openCount, overdueCount, byPriority, emailStatus }` |
 
 The report covers two windows on purpose: reports filed in the last seven days, **and** every
 still-open report past its response-time budget regardless of age — a P0 that has been sitting
 for three weeks is exactly what a weekly digest is for.
 
-Delivery is best effort. With no `RESEND_API_KEY` or no recipient the job still runs and still
-returns the counts, reporting `emailStatus: "skipped"` with a named reason, so the numbers are
-visible in the run history before email is wired up.
+Delivery is best effort. With no recipient the job still runs and still returns the counts,
+reporting `emailStatus: "skipped"` with a named reason, so the numbers are visible in the run
+history before email is wired up. With a recipient but no `SMTP_HOST` the digest is not sent: in
+production that is `emailStatus: "failed"` plus a `SystemAlert` (source `mail`), elsewhere
+`"skipped"` (since `fe9fd31c`, when Resend was replaced by SMTP).
 
 The logic lives in `src/lib/feedback/digest-run.ts`, not in the job — so it can be run by hand:
 
@@ -322,7 +325,7 @@ Job execution logs appear in:
 | `Error 401` from Inngest | Missing/invalid `INNGEST_API_KEY` | Check dashboard, regenerate if needed |
 | Job not running | Server offline or not registered | Verify `pnpm dev` running, check dashboard registration |
 | Worker call fails (K2) | Python worker unreachable | Check `WORKER_URL`, ensure worker is running |
-| Resend errors (Alerts) | Missing `RESEND_API_KEY` | Get key from https://resend.com and add to `.env` |
+| Mail not sent (Alerts, digest) | `SMTP_HOST` blank, or the SMTP server refuses | Fill `SMTP_*` in `.env` (production: the organisation's mail account, chosen by the owner; locally Mailpit `localhost:1025`). With `SMTP_HOST` blank, production writes a `SystemAlert` with source `mail` |
 | RLS errors in job | Using wrong query context | Ensure queries include explicit `tenantId` |
 | `alerts-sweep` error alert on the console | The sweep has failed `ALERTS_SWEEP_FAILURE_THRESHOLD` runs in a row | Read `meta.stage` on the `info` row, then the job log for the full driver message |
 

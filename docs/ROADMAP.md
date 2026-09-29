@@ -49,6 +49,11 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 > `0fdbcb8d` ile ayar formu, action, `src/lib/sso.ts` ve testleri silindi (`src` altında `sso`/`saml` 0 geçiş);
 > kart TASK-MUML0QZAZ5M80 inceleme bekliyor (be-fb). Ek durum: (5)'teki Microsoft girişi kodda kaldırıldı (`acc35b07`; TASK-MUMLFLB2OPLY3 review).
 > Hukuk paketi 1.3: `docs/legal/HUKUK-SORULARI-2026-09.md`.
+>
+> **Güncel 29.09 — Resend (3) kodda kaldırıldı (TASK-MUMO301VCLCWR, İNCELEME-21 K-4).** `fe9fd31c`: e-posta
+> `SMTP_*` env ile nodemailer'dan (`src/lib/email/mailer.ts`); `resend` paketi, `RESEND_API_KEY` ve `EMAIL_FROM`
+> silindi. Kart TASK-MUMLF57HOYFSB `review`; İNCELEME-21 düzeltmeleri TASK-MUMO2XIQEHGUD'de sürüyor. SMTP
+> sağlayıcısı: kurumsal e-posta hesabı, **patron belirleyecek**. Hukuk paketi 1.4.
 
 ## Faz A — MVP (S1–S8)
 
@@ -109,6 +114,7 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
       **karar 29.09:** embedding sağlayıcısı OpenAI'da kalıyor (Açık karar #4 kapandı); şema 1536 boyutla değişmez.
 - [x] `SavedSearch` + günlük diff e-postası (Resend, tr/en) (`SavedSearch` modeli, `src/lib/inngest/jobs/alerts-daily.ts`, Resend kullanımı `src/actions`/`src/lib/feedback` içinde doğrulandı).
       **karar 29.09 — Resend kaldırılıyor:** e-posta kendi SMTP'mizden (nodemailer) gidecek; `RESEND_API_KEY` patron kartından çıktı. Bugün (`e46d9798`) gönderim hâlâ `src/lib/email/resend-mailer.ts` üzerinden. Uygulama **TASK-MUMLF57HOYFSB**'de sürüyor (be-fb). Posta sağlayıcısı yoksa arama başarısız sayılır kuralı (`f108eaaa`) yeni gönderici için de geçerli kalmalı.
+      **güncel 29.09 — kodda kaldırıldı:** `fe9fd31c` ile gönderim `src/lib/email/mailer.ts` (SMTP, nodemailer); `resend-mailer.ts` ve `RESEND_API_KEY` yok. `SMTP_HOST` boşsa gönderim yapılmaz, üretimde `SystemAlert`. Kart **TASK-MUMLF57HOYFSB** `review`. SMTP sağlayıcısı: kurumsal e-posta hesabı, patron belirleyecek.
 - Kabul: ≥500 konu **(karşılandı: 1214)**; uyarı 24 saat içinde; API şeması değişince alarm **(zarf zod doğrulaması → `SystemAlert`; testle kanıtlandı)**.
 
 ### E5 · K5/M5 pipeline ve kapılar (S4–S5)
@@ -361,7 +367,7 @@ Kayıt burada tutuluyor ki kapanışta unutulmasın — tek kaynak §22'dir, lis
 kopyalanmaz (kopyalanan liste bayatlar).
 
 Ayrıca §21: Anthropic, OpenAI, Google, Microsoft, Stripe, Resend, Cloudflare için repoda
-**imzalı SCC/ek sözleşme bulunamadı** — bu da kapanış kapsamında. **karar 29.09:** Microsoft, Resend ve Sentry üründen çıkıyor (kart kodları yukarıda, uygulama sürüyor); kalan dış hizmetler Google, Anthropic, OpenAI, Cloudflare (R2, pilotta isteğe bağlı), anahtara bağlı PostHog; Stripe pilotta yok. Envanter §21 kod değişince güncellenir.
+**imzalı SCC/ek sözleşme bulunamadı** — bu da kapanış kapsamında. **karar 29.09:** Microsoft, Resend ve Sentry üründen çıkıyor (kart kodları yukarıda, uygulama sürüyor); kalan dış hizmetler Google, Anthropic, OpenAI, Cloudflare (R2, pilotta isteğe bağlı), anahtara bağlı PostHog; Stripe pilotta yok. Envanter §21 kod değişince güncellenir. **güncel 29.09:** Resend kodda kaldırıldı (`fe9fd31c`); envanter §17, §18, §21 e-posta satırları "kendi SMTP, sağlayıcı patron belirleyecek" diye güncellendi (TASK-MUMO301VCLCWR).
 
 ## Riskler (teknik)
 

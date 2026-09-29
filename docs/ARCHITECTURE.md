@@ -11,7 +11,7 @@
                    └───────┬───────────────┬─────────────────────┘          │
                            │               │                                │
                     Inngest (jobs)     Python worker (Fly.io)        R2 (dosyalar, ham veri)
-                    K1 günlük, uyarı,  CORDIS CSV→Parquet→DB,        Resend (e-posta)
+                    K1 günlük, uyarı,  CORDIS CSV→Parquet→DB,        SMTP (e-posta, kendi)
                     Stripe webhook     graf metrikleri, DuckDB       Stripe / iyzico
                                                                       Anthropic / OpenAI
 ```
@@ -58,7 +58,7 @@ export const manifest: ModuleManifest = {
 - **Performans:** konu başına `topicDetails/<id>.json` çağrısı **kaldırıldı** — açıklama (`descriptionByte`) ve uygunluk koşulları (`topicConditions`) zaten arama yanıtında geliyor. Günlük çekim 1214 konu / ~12 sn. `enrichFromTopicDetails` seçeneğiyle opsiyonel ve üst-sınırlı olarak geri açılabilir.
 - **Elle tetikleme:** `pnpm jobs:k1` (yazar) · `pnpm jobs:k1 -- --dry-run` (hiçbir tabloya dokunmaz).
 - **Uyum skoru (G0 girdisi):** `TenantProfile` (yetkinlik metni, NACE, TRL, önceki projeler, hedef roller) embedding'i ile `Topic` embedding'i kosinüs + kural tabanlı düzeltmeler (ülke uygunluğu, KOBİ rolü). Skor `TopicMatch` tablosunda; gece yeniden hesaplanır.
-- **Kayıtlı arama ve uyarı:** `SavedSearch` (filtre JSON) → günlük diff → e-posta (Resend, tr/en şablon).
+- **Kayıtlı arama ve uyarı:** `SavedSearch` (filtre JSON) → günlük diff → e-posta (tr/en şablon; kendi SMTP'mizden, nodemailer — Resend 29.09.2026'da kaldırıldı, `fe9fd31c`).
 
 ## 5. K2 — CORDIS ve M1
 
