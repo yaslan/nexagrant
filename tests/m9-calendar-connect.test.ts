@@ -88,6 +88,8 @@ describe('connectCalendar', () => {
         provider: 'ics',
         isConnected: true,
       }),
+      // The token columns are never read back (TASK-MUMT3KVHJTYX0).
+      select: { id: true, isConnected: true },
     });
   });
 
@@ -129,6 +131,7 @@ describe('connectCalendar', () => {
           provider: 'ics',
         },
       },
+      select: { id: true },
     });
   });
 });
