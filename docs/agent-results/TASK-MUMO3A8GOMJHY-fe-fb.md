@@ -97,3 +97,13 @@ list_tasks FB-KAMU-2: MUMLFLB2OPLY3 done · MUML0QZAZ5M80 review · MUMMIHYY2F4K
 - fe-fb/be-fb: `prisma/schema.prisma:1326-1327`'deki `'outlook'` yorumu (B-5, kod tarafı).
 
 **Platform beyanı:** yalnız belge ↔ kod incelemesi; macOS'ta (darwin, zsh) `git` ve `/usr/bin/grep` ile doğrulandı. Çalıştırılan ya da değiştirilen bir kod yolu yok. İncelenen iddialar platforma bağlı değil (OAuth sağlayıcı listesi, RBAC, metin dosyaları). Windows/Linux'ta koşulmadı çünkü koşulacak bir şey yok; sonuç orada da aynı olur.
+
+## Ek — `77f557e7` sonrası yeniden kontrol (15:47, TASK-MUMO301VCLCWR, cs-fb)
+
+Bu inceleme yazılırken dev'e `77f557e7` geldi: hukuk paketi **1.4**, Resend temizliği. Bu commit'e göre yeniden kontrol:
+- **B-2 Resend kısmı KAPANDI.** `HUKUK:334` artık "Sürüm 1.4: kodda kaldırıldı (`fe9fd31c`)" diyor. `:391`'e "1.4'te Resend kısmı kapandı — §17, §18, §21" eklendi.
+- **B-2 Sentry kısmı AÇIK.** `processing-register.md:338` hâlâ "`SENTRY_DSN` boş, kod ağ çağrısı yapmıyor" diyor. `:403` Sentry'yi "bugün kapalı" alt işleyen olarak sayıyor. `HUKUK:391` §19a'yı da "bugünkü kodu anlatıyor" diye listelemeye devam ediyor. Oysa Sentry kodu `89eab729`'dan beri yok.
+- **B-1 AÇIK.** `77f557e7` `ILKADIM-PILOT.md`'de yalnız bir satırı değiştirdi; `:57`'deki "Planı Yükselt" cümlesi aynen duruyor.
+- B-3…B-8 bu commit'ten etkilenmedi.
+
+**Karar değişmedi: DÜZELTME GEREKLİ** (B-1, B-2 Sentry kısmı, B-3…B-6).
