@@ -142,6 +142,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/k3-topic-stats/importer.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "rescoreG0ForPrefixes (TASK-MULQKV3BJT6VM): after a Horizon Dashboard import the admin rescores G0 for every live opportunity whose topic is in the touched families. Opportunities of every tenant qualify, so FINDING them (id + tenantId only) is a cross-tenant read; each rescore then runs in its own tenant through rescoreOpportunityG0/withTenant. Only caller is POST /api/admin/topic-stats/rescore behind requirePlatformAdminApi(). Under fabrika_app without the scope the read returns 0 rows and the button reports '0 opportunities' — a convincing no-op."
+    },
+    {
+      "check": "D",
       "file": "src/app/[locale]/admin/audit/page.tsx",
       "subject": "system-scope:platform-admin",
       "count": 1,

@@ -11,7 +11,8 @@ import {
   Sliders, 
   Newspaper,
   MessageSquareWarning,
-  ShieldAlert
+  ShieldAlert,
+  Percent
 } from 'lucide-react';
 
 interface AdminSidebarNavProps {
@@ -61,6 +62,14 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       desc: 'Hata ve geri bildirim uyarıları, çözüldü takibi',
       icon: ShieldAlert,
       badge: 'Alerts',
+    },
+    {
+      key: 'topic-stats',
+      href: `/${locale}/admin/topic-stats`,
+      label: locale === 'tr' ? 'Taban Oranlar (K3)' : 'Base Rates (K3)',
+      desc: 'Horizon Dashboard xlsx → TopicStat',
+      icon: Percent,
+      badge: 'K3',
     },
     {
       key: 'audit',
