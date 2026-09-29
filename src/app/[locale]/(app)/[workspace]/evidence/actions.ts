@@ -248,6 +248,11 @@ export async function createEvidence(formData: FormData) {
  */
 export async function deleteEvidence(evidenceId: string) {
   const { tenantId } = await requireTenantAction();
+  // A server action's arguments come from the client, whatever the signature
+  // says. Prisma drops an `undefined` key from `where`, so without this a call
+  // with no id would find "any evidence" and then delete every row of the
+  // tenant (TASK-MUMSUA77J1C6Q).
+  if (typeof evidenceId !== 'string' || evidenceId === '') return { success: false };
 
   let deleted = 0;
   try {

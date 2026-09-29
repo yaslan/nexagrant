@@ -22,6 +22,11 @@ const MATCHING_PATH = '/[locale]/(app)/[workspace]/opportunities/[id]/matching';
 
 export async function computeSeatCandidates(opportunityId: string, seatId: string) {
   const { tenantId } = await requireTenantAction({ readOnly: true });
+  // Client-supplied: with `seatId` undefined the lookup below matches any seat
+  // and the rewrite clears every seat's candidates (TASK-MUMSUA77J1C6Q).
+  if (typeof seatId !== 'string' || seatId === '' || typeof opportunityId !== 'string' || opportunityId === '') {
+    throw new Error('Seat not found in this workspace.');
+  }
 
   const seat = await withTenant<{ id: string } | null>(tenantId, (tx) =>
     tx.consortiumSeat.findFirst({

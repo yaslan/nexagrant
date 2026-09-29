@@ -71,6 +71,9 @@ export async function revokeApiKey(
 ): Promise<{ success: boolean } | { success: false; error: 'forbidden' }> {
   const { tenantId, role } = await requireTenantAction();
   if (!can(asRole(role), 'manage_users')) return { success: false, error: 'forbidden' };
+  // Client-supplied: an `undefined` id would drop out of the `where` below and
+  // revoke every key of the tenant (TASK-MUMSUA77J1C6Q).
+  if (typeof keyId !== 'string' || keyId === '') return { success: false };
 
   // `deleteMany` so the tenant is part of the WHERE clause; `delete` takes only
   // a unique selector and would revoke another tenant's key.
