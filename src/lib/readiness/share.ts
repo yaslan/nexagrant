@@ -92,7 +92,10 @@ export function municipalCallsPath(locale: string): string {
  * the org type so one parameter is the whole result. It travels in the URL only;
  * the server stores it on the new tenant when, and only when, the person ticks
  * "add my result to my account" on the registration form. Anything that does
- * not decode exactly is null — a hand-edited code imports nothing.
+ * not decode exactly is null, so a malformed code imports nothing. A code that is
+ * well-formed decodes whoever wrote it: a hand-edited but valid code imports
+ * those answers, and the score stays the organisation's own statement (K-1,
+ * İNCELEME-12).
  */
 export const SIGNUP_PARAM_READINESS = 'karne';
 

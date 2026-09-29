@@ -4,7 +4,7 @@ import { requireTenantPage } from '@/lib/tenant';
 import { asRole, can } from '@/lib/rbac';
 import { withTenant } from '@/lib/db';
 import { getAgencyFunnel, isAgencyTenant, type FunnelBreakdown } from '@/lib/agency/funnel';
-import { listInviteCodesIn } from '@/lib/agency/codes';
+import { lastExpiryDay, listInviteCodesIn } from '@/lib/agency/codes';
 import { parseProvince } from '@/lib/readiness/share';
 import FunnelPanel from './funnel-panel';
 import InviteCodesPanel from './invite-codes-panel';
@@ -80,6 +80,7 @@ export default async function AgencyPage({
         initialCodes={codes}
         canManage={can(asRole(scope.role), 'manage_users')}
         now={renderedAt}
+        maxExpiresOn={lastExpiryDay(renderedAt)}
       />
 
       <CoBrandPanel

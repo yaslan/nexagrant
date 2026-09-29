@@ -10,7 +10,8 @@
  * When: once, in the registration transaction, and only when the person ticked
  * "add my result to my account" (KVKK: nothing leaves the browser without it;
  * the scorecard itself writes nothing). Everything read back goes through
- * decodeReadinessCode, so a hand-made value can only ever be a valid result.
+ * decodeReadinessCode, so a malformed value imports nothing; a hand-made but
+ * well-formed one is a valid result and is accepted as such (K-1, İNCELEME-12).
  *
  * Server-free: the registration form and the dashboard both import it.
  */

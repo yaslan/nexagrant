@@ -2,7 +2,9 @@ import { describe, expect, test } from 'vitest';
 import {
   AgencyInviteError,
   createInviteCodeIn,
+  expiryFromDay,
   inviteCodeRow,
+  lastExpiryDay,
   listInviteCodesIn,
   MAX_VALIDITY_DAYS,
   validateInviteCodeInput,
@@ -69,6 +71,30 @@ describe('validateInviteCodeInput: end date only (TASK-MUM4WVYLSH9IT)', () => {
   });
   test('a year is the ceiling: MAX_VALIDITY_DAYS covers a leap year, no more', () => {
     expect(MAX_VALIDITY_DAYS).toBe(366);
+  });
+});
+
+describe('lastExpiryDay: the date field max comes from MAX_VALIDITY_DAYS (K-7, İNCELEME-12)', () => {
+  const dayAfter = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) + DAY).toISOString().slice(0, 10);
+  test('the offered last day is accepted and the day after it is refused, at any time of day', () => {
+    const midnight = Date.UTC(2026, 8, 29);
+    for (const offset of [0, 1, 60_000, 12 * 3_600_000, DAY - 1_001, DAY - 1_000, DAY - 1]) {
+      const now = midnight + offset;
+      const last = lastExpiryDay(now);
+      expect(() => validateInviteCodeInput({ expiresAt: expiryFromDay(last) }, new Date(now))).not.toThrow();
+      expect(() => validateInviteCodeInput({ expiresAt: expiryFromDay(dayAfter(last)) }, new Date(now))).toThrow(
+        AgencyInviteError
+      );
+    }
+  });
+  test('usually today + 365: the code runs to the end of the chosen day', () => {
+    expect(lastExpiryDay(NOW)).toBe('2027-09-29');
+  });
+  test('expiryFromDay: the last second of that UTC day; anything else is invalid', () => {
+    expect(expiryFromDay('2026-10-29').toISOString()).toBe('2026-10-29T23:59:59.000Z');
+    for (const bad of ['', '2026-10-2', '29.10.2026', '2026-10-29T00:00']) {
+      expect(Number.isNaN(expiryFromDay(bad).getTime())).toBe(true);
+    }
   });
 });
 

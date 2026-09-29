@@ -33,12 +33,15 @@ export default function InviteCodesPanel({
   initialCodes,
   canManage,
   now,
+  maxExpiresOn,
 }: {
   locale: string;
   initialCodes: InviteCodeRow[];
   canManage: boolean;
   /** Server render time (ms). Status and date bounds are computed from it, so render stays pure. */
   now: number;
+  /** Latest day the server accepts (lastExpiryDay, from MAX_VALIDITY_DAYS); K-7. */
+  maxExpiresOn: string;
 }) {
   const t = useTranslations('agency.codes');
   const [codes, setCodes] = useState(initialCodes);
@@ -122,7 +125,7 @@ export default function InviteCodesPanel({
               type="date"
               required
               min={isoDay(now, 1)}
-              max={isoDay(now, 365)}
+              max={maxExpiresOn}
               value={expiresOn}
               onChange={(e) => setExpiresOn(e.target.value)}
               className={input}

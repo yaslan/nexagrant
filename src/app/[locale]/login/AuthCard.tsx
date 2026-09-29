@@ -468,7 +468,10 @@ export default function AuthCard({
               </span>
             </label>
             <p id={readinessHintId} className="text-[10px] text-muted pl-6.5">
-              {tAuthCard('readinessImportHint', { score: readiness.total })}
+              {/* Ö-2 (İNCELEME-12): the agency is named only when there is one — the box shows without a code too. */}
+              {agencyRegistration
+                ? tAuthCard('readinessImportHint', { score: readiness.total })
+                : tAuthCard('readinessImportHintNoCode', { score: readiness.total })}
             </p>
           </div>
         )}

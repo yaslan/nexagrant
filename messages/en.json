@@ -358,6 +358,7 @@
     "provinceHint": "Used only as a count per province in development agency reports; you can change it later in your organisation settings.",
     "readinessImportLabel": "Add my scorecard result to my account",
     "readinessImportHint": "Your scorecard result: {score} / 100. If ticked, your answers are saved to your organisation account and shown on your dashboard; an inviting development agency sees this only as an aggregate count. If not ticked, no answer is saved.",
+    "readinessImportHintNoCode": "Your scorecard result: {score} / 100. If ticked, your answers are saved to your organisation account and shown on your dashboard. If not ticked, no answer is saved.",
     "agencyInvite": {
       "title": "You are signing up with an invite code from a development agency",
       "body": "With this code, your organisation is linked to the channel of the agency that invited you. Your account opens on the free Discover plan. The agency sees aggregate numbers only. It does not see you or your organisation's work.",
@@ -2120,7 +2121,7 @@
           "hint": "Organisation accounts opened with a code"
         },
         "readiness": {
-          "title": "Readiness card completed",
+          "title": "Scorecard result added",
           "hint": "Organisations that added their scorecard result"
         },
         "savedSearch": {

@@ -22,6 +22,29 @@ import {
 /** A code outliving a year of events is a code nobody is watching. */
 export const MAX_VALIDITY_DAYS = 366;
 
+const DAY_MS = 86_400_000;
+/** 23:59:59 — the last second of a UTC day, from its midnight. */
+const END_OF_DAY_MS = DAY_MS - 1_000;
+
+/**
+ * The panel picks a day (yyyy-mm-dd); the code stays valid through that day's
+ * last second, UTC. Anything else is an invalid date, which validation refuses.
+ */
+export function expiryFromDay(day: string): Date {
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T23:59:59.000Z`) : new Date(NaN);
+}
+
+/**
+ * The latest day the panel may offer (K-7, İNCELEME-12): the last day whose end
+ * (expiryFromDay) is still within MAX_VALIDITY_DAYS of `now`. Derived from the
+ * same constant validation uses, so the date field and the server cannot drift
+ * apart. Because the code runs to the end of the chosen day, this is usually
+ * today + 365 and today + 366 only in the final second of a UTC day.
+ */
+export function lastExpiryDay(now: number): string {
+  return new Date(now + MAX_VALIDITY_DAYS * DAY_MS - END_OF_DAY_MS).toISOString().slice(0, 10);
+}
+
 export class AgencyInviteError extends Error {
   constructor(
     readonly code: 'NOT_AN_AGENCY' | 'INVALID_EXPIRY',
@@ -108,7 +131,7 @@ export function validateInviteCodeInput(
   now: Date = new Date()
 ): void {
   const t = input.expiresAt instanceof Date ? input.expiresAt.getTime() : NaN;
-  if (!Number.isFinite(t) || t <= now.getTime() || t > now.getTime() + MAX_VALIDITY_DAYS * 86_400_000) {
+  if (!Number.isFinite(t) || t <= now.getTime() || t > now.getTime() + MAX_VALIDITY_DAYS * DAY_MS) {
     throw new AgencyInviteError('INVALID_EXPIRY', `expiresAt must be in the future and at most ${MAX_VALIDITY_DAYS} days away`);
   }
 }

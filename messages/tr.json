@@ -358,6 +358,7 @@
     "provinceHint": "Kalkınma ajansı raporlarında yalnızca il bazında sayı olarak kullanılır; sonradan kurum ayarlarından değiştirebilirsiniz.",
     "readinessImportLabel": "Karne sonucumu hesabıma ekle",
     "readinessImportHint": "Karne puanınız: {score} / 100. İşaretlerseniz yanıtlarınız kurum hesabınıza kaydedilir ve panonuzda görünür; davet eden kalkınma ajansı bunu yalnızca toplu sayı olarak görür. İşaretlemezseniz hiçbir yanıt kaydedilmez.",
+    "readinessImportHintNoCode": "Karne puanınız: {score} / 100. İşaretlerseniz yanıtlarınız kurum hesabınıza kaydedilir ve panonuzda görünür. İşaretlemezseniz hiçbir yanıt kaydedilmez.",
     "agencyInvite": {
       "title": "Bir kalkınma ajansının davet koduyla kayıt oluyorsunuz",
       "body": "Kurumunuz bu kodla sizi davet eden ajansın kanalına bağlanır. Hesabınız ücretsiz Keşif planıyla açılır. Ajans yalnız toplu sayıları görür, sizi ve kurumunuzun çalışmalarını görmez.",
@@ -2120,7 +2121,7 @@
           "hint": "Kodla açılan kurum hesabı"
         },
         "readiness": {
-          "title": "Karne tamamlandı",
+          "title": "Karne sonucu eklendi",
           "hint": "Karne sonucunu hesabına ekleyen kurum"
         },
         "savedSearch": {

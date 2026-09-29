@@ -13,6 +13,7 @@ import { requireTenantAction } from '@/lib/tenant';
 import {
   AgencyInviteError,
   createInviteCodeIn,
+  expiryFromDay,
   listInviteCodesIn,
   revokeInviteCodeIn,
   type InviteCodeSummary,
@@ -53,9 +54,7 @@ export async function createInviteCode(input: {
   | { ok: true; code: string; hint: string; expiresAt: string }
   | { ok: false; error: InviteActionError }
 > {
-  const expiresAt = /^\d{4}-\d{2}-\d{2}$/.test(input.expiresOn)
-    ? new Date(`${input.expiresOn}T23:59:59.000Z`)
-    : new Date(NaN);
+  const expiresAt = expiryFromDay(input.expiresOn);
   try {
     const scope = await managerScope();
     const created = await withTenant(scope.tenantId, (tx) =>
