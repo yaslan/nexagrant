@@ -21,6 +21,7 @@ import {
 import { TR_PROVINCES, type TrProvince } from '@/lib/readiness/provinces';
 import {
   buildShareQuery,
+  encodeReadinessCode,
   parseProvince,
   municipalCallsPath,
   readinessPath,
@@ -585,7 +586,9 @@ function ResultView({
         </h2>
         <p className="mt-1 text-sm text-ink">{t('cta_text')}</p>
         <Link
-          href={readinessSignupPath(locale, province)}
+          // B6 (TASK-MULRR8P7HIII4): the result rides along in the URL only. It is
+          // stored on the new account only if the person ticks the box on the form.
+          href={readinessSignupPath(locale, province, encodeReadinessCode(orgType, answers))}
           className={`${primaryButton} mt-4`}
           onClick={() =>
             analytics.track('readiness_signup_clicked', {

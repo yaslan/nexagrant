@@ -52,7 +52,18 @@ import { inviteCodeRow, MIN_MAX_USES } from './codes';
  * that it lies in 1..4 (its exact value included).
  */
 
-const STEPS = ['registered', 'savedSearch', 'pipeline', 'conceptNote', 'submitted', 'accepted', 'rejected'] as const;
+// `readiness` last (B6, TASK-MULRR8P7HIII4), so the positional rows of the fixed
+// examples below keep their meaning; a row without it has no stored result.
+const STEPS = [
+  'registered',
+  'savedSearch',
+  'pipeline',
+  'conceptNote',
+  'submitted',
+  'accepted',
+  'rejected',
+  'readiness',
+] as const;
 type Step = (typeof STEPS)[number];
 type Counts = Record<Step, number>;
 type Table = Map<string, Record<OrgType, Counts>>;
@@ -65,6 +76,7 @@ const SUBSETS: readonly [Step, Step][] = [
   ['registered', 'submitted'],
   ['registered', 'accepted'],
   ['registered', 'rejected'],
+  ['registered', 'readiness'],
   ['pipeline', 'conceptNote'],
   ['submitted', 'accepted'],
   ['submitted', 'rejected'],
@@ -459,8 +471,10 @@ describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', ()
 describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92H gate)', () => {
   const PROVINCES = ['Samsun', 'Tokat', 'Amasya', 'Çorum'];
 
-  function randomTable(rand: () => number): Table {
-    const ri = (a: number, b: number) => a + Math.floor(rand() * (b - a + 1));
+  const ri2 = (r: () => number, a: number, b: number) => a + Math.floor(r() * (b - a + 1));
+
+  function randomTable(rand: () => number, readinessRand?: () => number): Table {
+    const ri = (a: number, b: number) => ri2(rand, a, b);
     const provinces = PROVINCES.slice(0, ri(1, 4));
     if (rand() < 0.7) provinces.push(NO_PROVINCE);
     const types = [...ORG_TYPES].sort(() => rand() - 0.5).slice(0, ri(1, 4));
@@ -472,7 +486,11 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
         const reg = ri(0, rand() < 0.5 ? 6 : 14);
         const pipeline = ri(0, reg);
         const submitted = ri(0, reg);
-        spec[p]![ty] = [reg, ri(0, reg), pipeline, ri(0, pipeline), submitted, ri(0, submitted), ri(0, submitted)];
+        const row = [reg, ri(0, reg), pipeline, ri(0, pipeline), submitted, ri(0, submitted), ri(0, submitted)];
+        // B6: organisations with a stored scorecard result, a subset of registered. Drawn
+        // from its own stream so the other steps are the tables the earlier gate saw.
+        row.push(readinessRand ? (reg === 0 ? 0 : ri2(readinessRand, 0, reg)) : 0);
+        spec[p]![ty] = row;
       }
     }
     return tableOf(spec);
@@ -535,10 +553,12 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
           const rand = stream(seed);
           // A stream of its own, so the tables are the same ones the funnel-only gate saw.
           const codeRand = stream(seed + 1000);
+          // B6: the readiness step on its own stream, same reason.
+          const readinessRand = stream(seed + 2000);
           const found: string[] = [];
           let tablesWithLeak = 0;
           for (let k = 0; k < 300; k++) {
-            const t = randomTable(rand);
+            const t = randomTable(rand, readinessRand);
             // Every funnel group, every code's uses, and the deleted organisations are gated.
             const leaks = attack(t, publish(t), {
               codes: publishCodes(randomCodes(t, codeRand, noneDeleted, sequential)),

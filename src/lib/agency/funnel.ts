@@ -14,8 +14,12 @@
  *     TRUSTS the tenant list it is given.
  *     The list is derived here, on the server, from `Tenant.agencyId` of the
  *     session's own agency tenant — never from a parameter a browser can set.
- *   - Step 2 (readiness card completed) has no data yet (B6) and is reported as
- *     `unmeasured`, never as a number.
+ *   - Step 2 (readiness card completed, FB KAMU B6 / TASK-MULRR8P7HIII4) counts
+ *     the cohort's organisations whose `Tenant.settings.readiness` holds a
+ *     result — stored only when the person ticked "add my result to my account"
+ *     at registration (src/lib/readiness/account.ts). Counted here from the same
+ *     cohort list; the settings never leave the server, only the count does,
+ *     masked like every other step.
  *
  * One cohort only (TASK-MULXF0AVMD8MN, leed-fb 29.09): every organisation ever
  * registered with the agency's codes, cumulative. There is no 30/90-day
@@ -50,6 +54,7 @@ import type { OrgType } from '@prisma/client';
 import { prisma, withTenant } from '@/lib/db';
 import { countApplicationOutcomes } from '@/lib/k5-pipeline/applicationOutcome';
 import { TR_PROVINCES, type TrProvince } from '@/lib/readiness/provinces';
+import { readTenantReadiness } from '@/lib/readiness/account';
 
 /** docs/legal/agency-channel-notice-addendum.md §3.1 (HUKUK-5): one threshold for B2 and B3. */
 export const SMALL_CELL_THRESHOLD = 5;
@@ -78,8 +83,12 @@ export const FUNNEL_STEPS = [
 ] as const;
 export type FunnelStep = (typeof FUNNEL_STEPS)[number];
 
-/** Steps with no data source yet. Shown as "not measured yet", never as 0. */
-const UNMEASURED: ReadonlySet<FunnelStep> = new Set<FunnelStep>(['readiness']);
+/**
+ * Steps with no data source yet. Shown as "not measured yet", never as 0.
+ * Empty since B6 (TASK-MULRR8P7HIII4) measured `readiness`; the state stays for
+ * the next step that ships before its data does.
+ */
+const UNMEASURED: ReadonlySet<FunnelStep> = new Set<FunnelStep>();
 
 export type FunnelCell =
   | { state: 'count'; value: number }
@@ -108,7 +117,7 @@ export interface AgencyFunnel {
     | { dimension: 'orgType'; byOrgType: Record<OrgType, FunnelView> };
 }
 
-type MeasuredStep = Exclude<FunnelStep, 'readiness'>;
+type MeasuredStep = FunnelStep;
 type RawCounts = Record<MeasuredStep, number>;
 const MEASURED_STEPS = FUNNEL_STEPS.filter((s) => !UNMEASURED.has(s)) as MeasuredStep[];
 
@@ -126,6 +135,7 @@ const MEASURED_STEPS = FUNNEL_STEPS.filter((s) => !UNMEASURED.has(s)) as Measure
  * is skipped.
  */
 const NESTED_STEPS: readonly { parent: MeasuredStep; child: MeasuredStep }[] = [
+  { parent: 'registered', child: 'readiness' },
   { parent: 'registered', child: 'savedSearch' },
   { parent: 'registered', child: 'pipeline' },
   { parent: 'registered', child: 'conceptNote' },
@@ -442,7 +452,7 @@ export async function getAgencyFunnel(
   // list countApplicationOutcomes is ever given. Ids stay on the server.
   const cohort = await prisma.tenant.findMany({
     where: { agencyId: agencyTenantId, deletedAt: null },
-    select: { id: true, orgType: true, province: true },
+    select: { id: true, orgType: true, province: true, settings: true },
   });
   const outcomes = deps.outcomes ?? countApplicationOutcomes;
   const groups = new Map<string, { table: RawCounts; ids: string[] }>();
@@ -451,6 +461,9 @@ export async function getAgencyFunnel(
     let g = groups.get(k);
     if (!g) groups.set(k, (g = { table: tableOf(c.province)[c.orgType], ids: [] }));
     g.ids.push(c.id);
+    // Step 2 (B6): a stored scorecard result that still decodes. A subset of
+    // `registered` — the same cohort — which NESTED_STEPS masks as one.
+    if (readTenantReadiness(c.settings)) g.table.readiness += 1;
   }
   for (const { table, ids } of groups.values()) {
     // No `since`: everything the cohort has applied for counts, so the steps

@@ -3,6 +3,10 @@ import type { PrismaClient } from '@prisma/client';
 import { createDbClient, withTenantOn } from '@/lib/db';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { readinessSettings } from '@/lib/readiness/account';
+
+/** TASK-MULRR8P7HIII4 (B6): a valid scorecard result code. */
+const READINESS_CODE = 'municipality.012120201012120';
 
 /**
  * TASK-MULRQSJFB8RWJ (FB KAMU B2) — the agency funnel returns numbers only,
@@ -54,11 +58,14 @@ async function newTenant(
   kind: 'AGENCY' | 'ORGANIZATION',
   agencyId: string | null = null,
   orgType: 'SME' | 'MUNICIPALITY' = 'SME',
-  province: string | null = null
+  province: string | null = null,
+  /** FB KAMU B6: a stored scorecard result, as registration writes it. */
+  readiness = false
 ): Promise<string> {
   const n = ++seq;
+  const settings = readiness ? readinessSettings(READINESS_CODE) : undefined;
   const t = await admin!.tenant.create({
-    data: { name: `${RUN} secret-name-${n}`, slug: `${RUN}-${n}`, country: 'TR', kind, agencyId, orgType, province },
+    data: { name: `${RUN} secret-name-${n}`, slug: `${RUN}-${n}`, country: 'TR', kind, agencyId, orgType, province, settings },
     select: { id: true },
   });
   tenants.push(t.id);
@@ -134,15 +141,16 @@ beforeAll(async () => {
     // TASK-MULV3JXS1AW5X: all of A's organisations are in Samsun, so the
     // province view has a number to show (a no-province remainder of 1..4
     // would, correctly, mask it).
-    const t = await newTenant('ORGANIZATION', ids.agencyA, 'SME', 'Samsun');
+    // B6: every one of A's organisations added its scorecard result.
+    const t = await newTenant('ORGANIZATION', ids.agencyA, 'SME', 'Samsun', true);
     linkedA.push(t);
     // 6 organisations submitted, 5 funded; the first one has 3 applications (TASK-MULZATEX4G92H
     // Ö-1: 8 applications, but 6 organisations).
     await giveContent(t, i === 0 ? 3 : 1, i < 5);
   }
-  for (let i = 0; i < 2; i++) linkedA.push(await newTenant('ORGANIZATION', ids.agencyA, 'MUNICIPALITY', 'Samsun'));
-  // B's organisation is busy: 10 submitted proposals. None may reach A.
-  ids.orgB = await newTenant('ORGANIZATION', ids.agencyB, 'SME');
+  for (let i = 0; i < 2; i++) linkedA.push(await newTenant('ORGANIZATION', ids.agencyA, 'MUNICIPALITY', 'Samsun', true));
+  // B's organisation is busy: 10 submitted proposals and a scorecard result. None may reach A.
+  ids.orgB = await newTenant('ORGANIZATION', ids.agencyB, 'SME', null, true);
   await giveContent(ids.orgB, 10, true);
   ids.orphan = await newTenant('ORGANIZATION');
   await giveContent(ids.orphan, 3);
@@ -236,7 +244,10 @@ describe('getAgencyFunnel (fabrika_app, with B7 outcomes)', () => {
     expect(f.all.submitted).toEqual({ state: 'small' });
     expect(f.all.accepted).toEqual({ state: 'small' });
     expect(f.all.rejected).toEqual({ state: 'small' });
-    expect(f.all.readiness).toEqual({ state: 'unmeasured' });
+    // B6 (TASK-MULRR8P7HIII4): all 8 of A's organisations stored a result (shown rounded: 10);
+    // 8 − 8 = 0 without one, so nothing is given away. B's result is not in it.
+    expect(f.all.readiness).toEqual({ state: 'count', value: 10 });
+    expect(f.breakdown.byOrgType.SME.readiness).toEqual({ state: 'small' });
     const text = JSON.stringify(f);
     expect(text).not.toContain('secret');
     for (const t of [...linkedA, ids.orgB]) expect(text).not.toContain(t);

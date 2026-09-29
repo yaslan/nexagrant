@@ -98,7 +98,12 @@
     "emptyThresholdRate": "No proposals have been submitted yet, so there is no ratio to report.",
     "emptyAverageScore": "No pre-assessment has been completed yet.",
     "emptyPersonDays": "No proposal yet, so effort per proposal cannot be calculated.",
-    "emptyAvgDaysG2": "No opportunity has both a G0 and a G2 decision yet."
+    "emptyAvgDaysG2": "No opportunity has both a G0 and a G2 decision yet.",
+    "readinessTitle": "Funding readiness",
+    "readinessImportedAt": "scorecard result added on {date}",
+    "readinessMoreGaps": "{count} more gaps; see the full result for all of them.",
+    "readinessViewResult": "View the full result",
+    "readinessRetake": "Retake the scorecard"
   },
   "Pipeline": {
     "title": "Opportunity Pipeline",
@@ -350,7 +355,9 @@
     "disclosureVersion": "Version you are accepting: {version}",
     "provinceLabel": "Organisation's province in Türkiye (optional)",
     "provinceNone": "Not selected",
-    "provinceHint": "Used only as a count per province in development agency reports; you can change it later in your organisation settings."
+    "provinceHint": "Used only as a count per province in development agency reports; you can change it later in your organisation settings.",
+    "readinessImportLabel": "Add my scorecard result to my account",
+    "readinessImportHint": "Your scorecard result: {score} / 100. If ticked, your answers are saved to your organisation account and shown on your dashboard; an inviting development agency sees this only as an aggregate count. If not ticked, no answer is saved."
   },
   "NoWorkspace": {
     "title": "You do not have a workspace yet",
@@ -2097,7 +2104,7 @@
         },
         "readiness": {
           "title": "Readiness card completed",
-          "hint": "The card is not linked to accounts yet"
+          "hint": "Organisations that added their scorecard result"
         },
         "savedSearch": {
           "title": "Saved search on the radar",

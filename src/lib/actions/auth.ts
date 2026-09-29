@@ -6,6 +6,7 @@ import { INVALID_INVITE_CODE } from '@/lib/agency/invite-signin-error';
 import { isNextRedirectError } from '@/lib/errors';
 import { setRegistrationAcknowledgementCookie } from '@/lib/legal/registration-ack-cookie';
 import { setRegistrationProvinceCookie } from '@/lib/registration-province-cookie';
+import { setRegistrationReadinessCookie } from '@/lib/registration-readiness-cookie';
 import { isDemoLoginEnabled } from '@/lib/demo-login';
 
 /**
@@ -24,7 +25,13 @@ export async function loginWithCredentialsAction(
   acknowledgement?: string,
   inviteCode?: string,
   /** TASK-MULV3JXS1AW5X — optional; `authorize` keeps it only if it is one of TR_PROVINCES. */
-  province?: string
+  province?: string,
+  /**
+   * FB KAMU B6 (TASK-MULRR8P7HIII4) — the scorecard result code, only when the
+   * "add my result to my account" box was ticked. `authorize` stores it on a
+   * NEW tenant only; signing in to an existing account ignores it.
+   */
+  readiness?: string
 ) {
   // TASK-MULSCEK4JHK8X — no Credentials provider is registered with demo sign-in
   // off; say so plainly instead of letting `signIn` fail with a configuration error.
@@ -43,6 +50,7 @@ export async function loginWithCredentialsAction(
       acknowledgement: acknowledgement ?? '',
       inviteCode: inviteCode ?? '',
       province: province ?? '',
+      readiness: readiness ?? '',
       redirect: false,
     });
     return { success: true };
@@ -105,7 +113,9 @@ export async function loginWithSocialAction(
    * written or cleared on every OAuth start, so an earlier choice never carries
    * over to this one.
    */
-  province?: string
+  province?: string,
+  /** FB KAMU B6 — as above: written or cleared on every OAuth start. */
+  readiness?: string
 ) {
   try {
     // Set before `signIn`, which redirects and never returns.
@@ -113,6 +123,7 @@ export async function loginWithSocialAction(
       await setRegistrationAcknowledgementCookie();
     }
     await setRegistrationProvinceCookie(acknowledgement ? province : null);
+    await setRegistrationReadinessCookie(acknowledgement ? readiness : null);
     await signIn(provider, { redirectTo });
   } catch (error) {
     if (

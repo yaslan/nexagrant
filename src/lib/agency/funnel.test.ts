@@ -24,7 +24,16 @@ import {
  * gate for both lives in funnel.attack.test.ts.
  */
 
-const STEPS = ['registered', 'savedSearch', 'pipeline', 'conceptNote', 'submitted', 'accepted', 'rejected'] as const;
+const STEPS = [
+  'registered',
+  'readiness',
+  'savedSearch',
+  'pipeline',
+  'conceptNote',
+  'submitted',
+  'accepted',
+  'rejected',
+] as const;
 type Step = (typeof STEPS)[number];
 type Counts = Record<Step, number>;
 const zero = (): Counts => Object.fromEntries(STEPS.map((s) => [s, 0])) as Counts;
@@ -54,10 +63,21 @@ describe('display', () => {
     expect([5, 6, 7, 8, 12, 13, 22].map(roundToFive)).toEqual([5, 5, 5, 10, 10, 15, 20]);
   });
 
-  test('readiness is reported as not measured, never as a number', () => {
-    const f = buildFunnel(types({ SME: { registered: 12 } }));
-    expect(f.all.readiness).toEqual({ state: 'unmeasured' });
-    expect(byType(f).SME.readiness).toEqual({ state: 'unmeasured' });
+  test('readiness is a measured step since B6 (TASK-MULRR8P7HIII4): counted, rounded and masked like the others', () => {
+    const f = buildFunnel(types({ SME: { registered: 12, readiness: 7 }, MUNICIPALITY: { registered: 9, readiness: 9 } }));
+    expect(f.all.readiness).toEqual({ state: 'count', value: 15 });
+    expect(byType(f).SME.readiness).toEqual({ state: 'count', value: 5 });
+    // 9 − 9 = 0 without a result: nothing to hide.
+    expect(byType(f).MUNICIPALITY.readiness).toEqual({ state: 'count', value: 10 });
+    const small = buildFunnel(types({ SME: { registered: 12, readiness: 3 } }));
+    expect(small.all.readiness).toEqual({ state: 'small' });
+  });
+
+  test('readiness: registered − readiness of 1..4 masks readiness (nested line)', () => {
+    // 12 registered, 10 with a result: showing both would give away the 2 without one.
+    const f = buildFunnel(types({ SME: { registered: 12, readiness: 10 } }));
+    expect(f.all.registered).toEqual({ state: 'count', value: 10 });
+    expect(f.all.readiness).toEqual({ state: 'small' });
   });
 
   test('numbers of 5 and more come through, rounded; under 5 (0 included) are "<5"', () => {

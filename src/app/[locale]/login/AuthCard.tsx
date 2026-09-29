@@ -14,7 +14,8 @@ import {
 } from '@/lib/legal/consent-documents';
 import type { OAuthProviderAvailability } from '@/lib/demo-login';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
-import { SHARE_PARAM_PROVINCE } from '@/lib/readiness/share';
+import { SHARE_PARAM_PROVINCE, SIGNUP_PARAM_READINESS, decodeReadinessCode } from '@/lib/readiness/share';
+import { READINESS_ORG_TYPES, scoreReadiness } from '@/lib/readiness/score';
 import { toTenantProvince } from '@/lib/province';
 
 /**
@@ -93,6 +94,22 @@ export default function AuthCard({
   const provinceHintId = useId();
 
   /**
+   * FB KAMU B6 (TASK-MULRR8P7HIII4) — `/kayit?kaynak=fon-hazirlik&karne=<code>`
+   * from the scorecard. The result is only offered: the box starts unticked and
+   * is not remembered, and the code is sent to the server only when it is
+   * ticked (KVKK — the scorecard itself writes nothing). The server decodes it
+   * again and stores it on a NEW tenant only.
+   */
+  const [readiness] = useState(() => {
+    const decoded = decodeReadinessCode(searchParams.get(SIGNUP_PARAM_READINESS), READINESS_ORG_TYPES);
+    return decoded
+      ? { code: decoded.code, total: scoreReadiness(decoded.answers, decoded.orgType).total0to100 }
+      : null;
+  });
+  const [importReadiness, setImportReadiness] = useState(false);
+  const readinessHintId = useId();
+
+  /**
    * TASK-MTSWLANXSU0IG (A3) — never pre-ticked, and never persisted across a
    * reload. A box that arrives already ticked records nothing about what the
    * person did; the whole value of the record is that the tick was an act.
@@ -105,6 +122,8 @@ export default function AuthCard({
    */
   const [acknowledged, setAcknowledged] = useState(false);
   const isRegistering = mode === 'register';
+  /** B6 — what goes to the server: the code only with the tick, only on a registration. */
+  const readinessToSend = isRegistering && readiness && importReadiness ? readiness.code : undefined;
 
   // Demo mode keeps every button, as before. Otherwise a button for a provider
   // with no credentials would only lead to an Auth.js error page.
@@ -141,7 +160,8 @@ export default function AuthCard({
         provider,
         rawCallbackUrl,
         acknowledgementToken,
-        isRegistering ? province || undefined : undefined
+        isRegistering ? province || undefined : undefined,
+        readinessToSend
       );
     } catch (err) {
       if (isNextRedirectError(err)) {
@@ -177,7 +197,8 @@ export default function AuthCard({
         locale,
         acknowledgementToken,
         isRegistering ? inviteCode ?? undefined : undefined,
-        isRegistering ? province || undefined : undefined
+        isRegistering ? province || undefined : undefined,
+        readinessToSend
       );
       
       if (res?.error) {
@@ -477,6 +498,29 @@ export default function AuthCard({
             </select>
             <p id={provinceHintId} className="text-[10px] text-muted mt-1">
               {tAuthCard('provinceHint')}
+            </p>
+          </div>
+        )}
+
+        {isRegistering && readiness && (
+          <div className="rounded-xl border border-border bg-ground/60 p-3 space-y-1.5">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                name="readinessImport"
+                data-testid="readiness-import"
+                aria-describedby={readinessHintId}
+                // Unticked by default: importing the result is the person's act.
+                checked={importReadiness}
+                onChange={(e) => setImportReadiness(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-accent cursor-pointer"
+              />
+              <span className="text-[11px] leading-relaxed text-ink-2">
+                {tAuthCard('readinessImportLabel')}
+              </span>
+            </label>
+            <p id={readinessHintId} className="text-[10px] text-muted pl-6.5">
+              {tAuthCard('readinessImportHint', { score: readiness.total })}
             </p>
           </div>
         )}

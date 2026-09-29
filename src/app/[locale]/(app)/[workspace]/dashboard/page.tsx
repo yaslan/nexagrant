@@ -8,6 +8,7 @@ import { PRODUCT_NAME } from '@/lib/brand';
 import { Dashboard } from '@/modules/m5/ui/Dashboard';
 import { getKpiMetrics, getKpiTrend } from '@/modules/m5/server/queries';
 import { resolveDashboardRange, toRangeParam } from '@/modules/m5/server/range';
+import { ReadinessCard } from './readiness-card';
 
 export async function generateMetadata({
   params,
@@ -42,7 +43,7 @@ export default async function DashboardPage({
   params: Promise<{ locale: string; workspace: string }>;
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
-  await params;
+  const { locale } = await params;
   const { from, to } = await searchParams;
   const t = await getTranslations('Dashboard');
 
@@ -83,6 +84,7 @@ export default async function DashboardPage({
         trendData={trendData}
         from={toRangeParam(fromDate)}
         to={toRangeParam(toDate)}
+        aside={<ReadinessCard tenantId={tenantId} locale={locale} />}
       />
     </div>
   );

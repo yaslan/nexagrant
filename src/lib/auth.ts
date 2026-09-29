@@ -12,6 +12,8 @@ import { PRODUCT_NAME } from './brand';
 import { acknowledgementMatchesCurrent } from './legal/consent-documents';
 import { readRegistrationAcknowledgement } from './legal/registration-ack-cookie';
 import { readRegistrationProvince } from './registration-province-cookie';
+import { readRegistrationReadiness } from './registration-readiness-cookie';
+import { readinessSettings, toReadinessCode } from './readiness/account';
 import { toTenantProvince } from './province';
 import { recordAlert } from './observability/system-alert';
 import {
@@ -220,6 +222,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // TASK-MULV3JXS1AW5X — optional province of the new organisation. Read
         // on the registration branch only, and only one of TR_PROVINCES counts.
         province: { label: "Province", type: "text" },
+        // FB KAMU B6 (TASK-MULRR8P7HIII4) — the scorecard result code, sent
+        // only when the person ticked "add my result to my account". Read on
+        // the registration branch only; an existing account is never changed.
+        readiness: { label: "Readiness result", type: "text" },
       },
       async authorize(credentials) {
         const email = (credentials?.email as string)?.trim()?.toLowerCase();
@@ -233,6 +239,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Every account opened here is a TR tenant (below), so the province is
         // judged against "TR". A value outside the list is dropped, not refused.
         const province = toTenantProvince(credentials?.province, "TR");
+        // B6 — a code that does not decode exactly is dropped, not refused.
+        const readiness = toReadinessCode(credentials?.readiness);
 
         const demoProfile = DEMO_PROFILES[email];
         // Derived from the address the user typed, never from a profile table.
@@ -304,6 +312,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   country: "TR",
                   orgType: demoProfile?.orgType || "SME",
                   province,
+                  // B6 — the scorecard result, only with the person's tick.
+                  settings: readinessSettings(readiness),
                   // No plan is written: a tenant without a subscription is on
                   // Discover (FALLBACK_PLAN_ID), which is what a code grants.
                   agencyId,
@@ -523,6 +533,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const acknowledged = await readRegistrationAcknowledgement();
       // TASK-MULV3JXS1AW5X — the optional province, parked the same way.
       const province = await readRegistrationProvince();
+      // FB KAMU B6 — the scorecard result, parked only when the box was ticked.
+      const readiness = await readRegistrationReadiness();
 
       try {
         await prisma.$transaction(async (tx) => {
@@ -533,6 +545,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               country: "TR",
               orgType: "SME",
               province,
+              settings: readinessSettings(readiness),
             },
           });
 

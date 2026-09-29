@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { KpiCard } from './KpiCard';
@@ -24,6 +24,8 @@ export interface DashboardProps {
   /** Applied range — resolved on the server from the `from`/`to` search params. */
   from: string;
   to: string;
+  /** Rendered under the page header, above the tabs (the B6 readiness card). */
+  aside?: ReactNode;
 }
 
 type Tab = 'overview' | 'trends' | 'export';
@@ -36,7 +38,7 @@ function toParam(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-export function Dashboard({ metrics, trendData, from, to }: DashboardProps) {
+export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProps) {
   const t = useTranslations('Dashboard');
   const locale = useLocale();
   const router = useRouter();
@@ -138,6 +140,8 @@ export function Dashboard({ metrics, trendData, from, to }: DashboardProps) {
           onChange={handleRangeChange}
         />
       </div>
+
+      {aside}
 
       <div role="tablist" className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
         {tabs.map((tab) => (

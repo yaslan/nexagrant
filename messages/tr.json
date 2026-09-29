@@ -98,7 +98,12 @@
     "emptyThresholdRate": "Henüz hiç teklif gönderilmemiş; oran hesaplanamıyor.",
     "emptyAverageScore": "Henüz tamamlanmış bir ön değerlendirme yok.",
     "emptyPersonDays": "Henüz teklif yok; teklif başına efor hesaplanamıyor.",
-    "emptyAvgDaysG2": "Henüz hem G0 hem G2 kararı olan fırsat yok."
+    "emptyAvgDaysG2": "Henüz hem G0 hem G2 kararı olan fırsat yok.",
+    "readinessTitle": "Hazırlık durumu",
+    "readinessImportedAt": "karne sonucu {date} tarihinde eklendi",
+    "readinessMoreGaps": "{count} eksik adım daha var; tamamı ayrıntılı sonuçta.",
+    "readinessViewResult": "Ayrıntılı sonucu gör",
+    "readinessRetake": "Karneyi yeniden yap"
   },
   "Pipeline": {
     "title": "Fırsat Pipeline",
@@ -350,7 +355,9 @@
     "disclosureVersion": "Onayladığınız metin sürümü: {version}",
     "provinceLabel": "Kurumun ili (isteğe bağlı)",
     "provinceNone": "Seçilmedi",
-    "provinceHint": "Kalkınma ajansı raporlarında yalnızca il bazında sayı olarak kullanılır; sonradan kurum ayarlarından değiştirebilirsiniz."
+    "provinceHint": "Kalkınma ajansı raporlarında yalnızca il bazında sayı olarak kullanılır; sonradan kurum ayarlarından değiştirebilirsiniz.",
+    "readinessImportLabel": "Karne sonucumu hesabıma ekle",
+    "readinessImportHint": "Karne puanınız: {score} / 100. İşaretlerseniz yanıtlarınız kurum hesabınıza kaydedilir ve panonuzda görünür; davet eden kalkınma ajansı bunu yalnızca toplu sayı olarak görür. İşaretlemezseniz hiçbir yanıt kaydedilmez."
   },
   "NoWorkspace": {
     "title": "Henüz bir çalışma alanınız yok",
@@ -2097,7 +2104,7 @@
         },
         "readiness": {
           "title": "Karne tamamlandı",
-          "hint": "Karne ile hesap henüz bağlı değil"
+          "hint": "Karne sonucunu hesabına ekleyen kurum"
         },
         "savedSearch": {
           "title": "Radar'da kayıtlı arama",

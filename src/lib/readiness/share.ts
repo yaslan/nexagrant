@@ -86,13 +86,48 @@ export function municipalCallsPath(locale: string): string {
 }
 
 /**
+ * FB KAMU B6 (TASK-MULRR8P7HIII4) — the scorecard result carried to the sign-up.
+ *
+ * `karne=<orgType>.<15 digits>`: the same answers string as `cevap`, prefixed by
+ * the org type so one parameter is the whole result. It travels in the URL only;
+ * the server stores it on the new tenant when, and only when, the person ticks
+ * "add my result to my account" on the registration form. Anything that does
+ * not decode exactly is null — a hand-edited code imports nothing.
+ */
+export const SIGNUP_PARAM_READINESS = 'karne';
+
+export function encodeReadinessCode(orgType: string, answers: ReadinessAnswers): string | null {
+  const encoded = encodeAnswers(answers);
+  return encoded === null ? null : `${orgType}.${encoded}`;
+}
+
+export function decodeReadinessCode<T extends string>(
+  raw: string | null | undefined,
+  orgTypes: readonly T[],
+): { orgType: T; answers: ReadinessAnswers; code: string } | null {
+  if (typeof raw !== 'string') return null;
+  const dot = raw.indexOf('.');
+  if (dot < 0) return null;
+  const orgType = orgTypes.find((o) => o === raw.slice(0, dot));
+  const answers = decodeAnswers(raw.slice(dot + 1));
+  if (!orgType || !answers) return null;
+  return { orgType, answers, code: raw };
+}
+
+/**
  * Sign-up with the funnel source, so the account can be attributed to this page.
  * The province answered on the scorecard travels as `il` and pre-fills the
- * optional province of the new organisation (TASK-MULV3JXS1AW5X).
+ * optional province of the new organisation (TASK-MULV3JXS1AW5X). The result
+ * travels as `karne` (B6); carrying it imports nothing by itself.
  */
-export function readinessSignupPath(locale: string, province?: TrProvince | null): string {
+export function readinessSignupPath(
+  locale: string,
+  province?: TrProvince | null,
+  readinessCode?: string | null,
+): string {
   const base = locale === 'tr' ? `/${locale}/kayit` : `/${locale}/register`;
   const params = new URLSearchParams({ kaynak: 'fon-hazirlik' });
   if (province) params.set(SHARE_PARAM_PROVINCE, province);
+  if (readinessCode) params.set(SIGNUP_PARAM_READINESS, readinessCode);
   return `${base}?${params.toString()}`;
 }

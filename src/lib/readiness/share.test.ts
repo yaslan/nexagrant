@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { READINESS_QUESTIONS, type ReadinessAnswers } from './questions';
-import { buildShareQuery, decodeAnswers, encodeAnswers, parseShareQuery, readinessSignupPath } from './share';
+import {
+  buildShareQuery,
+  decodeAnswers,
+  decodeReadinessCode,
+  encodeAnswers,
+  encodeReadinessCode,
+  parseShareQuery,
+  readinessSignupPath,
+} from './share';
 
 const ORG_TYPES = ['municipality', 'metropolitan'] as const;
 
@@ -51,5 +59,37 @@ describe('readinessSignupPath (TASK-MULV3JXS1AW5X)', () => {
     expect(readinessSignupPath('en', null)).toBe('/en/register?kaynak=fon-hazirlik');
     expect(readinessSignupPath('tr', 'İstanbul')).toBe('/tr/kayit?kaynak=fon-hazirlik&il=%C4%B0stanbul');
     expect(new URL(readinessSignupPath('tr', 'Şanlıurfa'), 'http://x').searchParams.get('il')).toBe('Şanlıurfa');
+  });
+});
+
+describe('readiness code on the sign-up link (TASK-MULRR8P7HIII4, B6)', () => {
+  it('round-trips org type and answers as one parameter', () => {
+    const code = encodeReadinessCode('municipality', answers);
+    expect(code).toBe('municipality.012012012012012');
+    expect(decodeReadinessCode(code, ORG_TYPES)).toEqual({ orgType: 'municipality', answers, code });
+    const url = new URL(readinessSignupPath('tr', 'Samsun', code), 'http://x');
+    expect(url.pathname).toBe('/tr/kayit');
+    expect(url.searchParams.get('kaynak')).toBe('fon-hazirlik');
+    expect(url.searchParams.get('karne')).toBe(code);
+  });
+
+  it('refuses anything that is not exactly a known org type and 15 answers', () => {
+    for (const bad of [
+      null,
+      undefined,
+      '',
+      '012012012012012',
+      'municipality',
+      'municipality.',
+      'municipality.01201201201201',
+      'municipality.0120120120120123',
+      'municipality.012012012012013',
+      'SME.012012012012012',
+      'municipality.012012012012012.x',
+      '.012012012012012',
+    ]) {
+      expect(decodeReadinessCode(bad, ORG_TYPES)).toBeNull();
+    }
+    expect(encodeReadinessCode('municipality', {})).toBeNull();
   });
 });
