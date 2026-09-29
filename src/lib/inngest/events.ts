@@ -83,7 +83,11 @@ export const CreditsMonthlyGrantEventSchema = z.object({});
 export const CreditsMonthlyGrantOutputSchema = z.object({
   success: z.boolean(),
   totalTenants: z.number(),
+  /** `YYYY-MM` the run granted for; one grant per tenant per period. */
+  period: z.string(),
   grantedCount: z.number(),
+  /** Tenants that already had this period's grant, so got nothing this run. */
+  alreadyGrantedCount: z.number(),
   failedCount: z.number(),
   totalCreditsGranted: z.number(),
   errors: z.array(z.object({

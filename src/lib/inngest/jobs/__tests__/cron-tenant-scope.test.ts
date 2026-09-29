@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
-import { createDbClient, prisma, withTenantOn } from '@/lib/db';
+import { createDbClient, prisma, withTenant, withTenantOn } from '@/lib/db';
 import { envValue } from '../../../../../tests/helpers/dotenv';
 import {
   NO_MAIL_PROVIDER,
@@ -239,6 +239,59 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     // The point of the whole slice: neither tenant can reach the other's grant.
     expect(seenByA.map((r) => r.tenantId)).not.toContain(b.tenantId);
     expect(seenByB.map((r) => r.tenantId)).not.toContain(a.tenantId);
+  });
+
+  it('credits-monthly-grant: a second run for the same month grants nothing (ADR-0008 §6.2)', async () => {
+    expect(ready, skipReason).toBe(true);
+    await prisma.creditLedger.deleteMany({ where: { tenantId: { in: [a.tenantId, b.tenantId] } } });
+    const tenants = [{ id: a.tenantId }, { id: b.tenantId }];
+    const run: TenantRunner = (tenantId, cb) => withTenantOn(rls, tenantId, cb);
+
+    const first = await grantCreditsToTenants(tenants, run, '2031-05');
+    expect(first).toMatchObject({ period: '2031-05', grantedCount: 2, alreadyGrantedCount: 0, failedCount: 0 });
+
+    // A retry, a manual re-run, or the same tick in two schedulers at once.
+    const [again, racing] = await Promise.all([
+      grantCreditsToTenants(tenants, run, '2031-05'),
+      grantCreditsToTenants(tenants, run, '2031-05'),
+    ]);
+    for (const r of [again, racing]) {
+      expect(r).toMatchObject({ grantedCount: 0, alreadyGrantedCount: 2, failedCount: 0, totalCreditsGranted: 0 });
+    }
+
+    const rows = await prisma.creditLedger.findMany({
+      where: { tenantId: { in: [a.tenantId, b.tenantId] } },
+      select: { tenantId: true, grantPeriod: true, refId: true, reason: true },
+      orderBy: { tenantId: 'asc' },
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.grantPeriod)).toEqual(['2031-05', '2031-05']);
+    expect(rows.map((r) => r.refId)).toEqual(['monthly_grant:2031-05', 'monthly_grant:2031-05']);
+
+    // The next month is a new grant.
+    const next = await grantCreditsToTenants(tenants, run, '2031-06');
+    expect(next).toMatchObject({ grantedCount: 2, alreadyGrantedCount: 0 });
+    expect(await prisma.creditLedger.count({ where: { tenantId: { in: [a.tenantId, b.tenantId] } } })).toBe(4);
+  });
+
+  it('credits-monthly-grant: rows without a grant period stay unconstrained', async () => {
+    expect(ready, skipReason).toBe(true);
+    // usage rows reuse refId (llm.ts: proposalId) and re-activation grants reuse
+    // the subscription id (subscription-sync.ts); neither sets grantPeriod.
+    await prisma.creditLedger.createMany({
+      data: [
+        { tenantId: a.tenantId, delta: -1, reason: 'usage:M2', refId: `${RUN}-p` },
+        { tenantId: a.tenantId, delta: -1, reason: 'usage:M2', refId: `${RUN}-p` },
+        { tenantId: a.tenantId, delta: 5, reason: 'monthly_grant', refId: `${RUN}-sub` },
+        { tenantId: a.tenantId, delta: 5, reason: 'monthly_grant', refId: `${RUN}-sub` },
+      ],
+    });
+    expect(await prisma.creditLedger.count({ where: { tenantId: a.tenantId, refId: { startsWith: RUN } } })).toBe(4);
+  });
+
+  it('credits-monthly-grant: a period that is not YYYY-MM is refused before any write', async () => {
+    expect(ready, skipReason).toBe(true);
+    await expect(grantCreditsToTenants([{ id: a.tenantId }], withTenant, '2031-13')).rejects.toThrow(/YYYY-MM/);
   });
 
   it('credits-monthly-grant: a stale tenant id is refused by the database, not misfiled', async () => {

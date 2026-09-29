@@ -483,9 +483,14 @@ model CreditLedger {
   delta     Int      // + grant, - usage
   reason    String   // monthly_grant | purchase | usage:M2 | refund
   refId     String?
+  /// `YYYY-MM` of the scheduled monthly grant (credits-monthly-grant job) and
+  /// NULL on every other row. The unique key makes that job one grant per
+  /// tenant per month however often it runs (ADR-0008 §6.2, TASK-MUMT3PGX5OK8P).
+  grantPeriod String?
   createdAt DateTime @default(now())
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   @@index([tenantId, createdAt])
+  @@unique([tenantId, grantPeriod])
 }
 
 // ───────────────────────── K1 Calls (shared, not tenant-scoped) ─────────────────────────

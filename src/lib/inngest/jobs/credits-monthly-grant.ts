@@ -17,11 +17,29 @@ import type { TenantRunner } from './alerts-daily';
  * month, at 6 AM, in a job with no human watching it. Locally the role is
  * SUPERUSER + BYPASSRLS, which is why it looked fine.
  */
+/** `YYYY-MM` (UTC) of the month a grant run belongs to. */
+export function creditGrantPeriod(at: Date = new Date()): string {
+  return at.toISOString().slice(0, 7);
+}
+
+/**
+ * One grant per tenant per `period`, however often this runs (ADR-0008 §6.2,
+ * TASK-MUMT3PGX5OK8P). The row carries `grantPeriod` and the table has
+ * `@@unique([tenantId, grantPeriod])`, so the insert is ON CONFLICT DO NOTHING:
+ * a retry, a manual re-run or the same tick firing in two schedulers adds no
+ * second grant. It used to add one per run. A tenant that already has this
+ * month's grant counts as `alreadyGrantedCount`, not as granted.
+ */
 export async function grantCreditsToTenants(
   tenants: Array<{ id: string }>,
-  runTenant: TenantRunner = withTenant
+  runTenant: TenantRunner = withTenant,
+  period: string = creditGrantPeriod()
 ): Promise<CreditsMonthlyGrantOutput> {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+    throw new Error(`credits-monthly-grant: period must be YYYY-MM, got ${JSON.stringify(period)}`);
+  }
   let grantedCount = 0;
+  let alreadyGrantedCount = 0;
   let failedCount = 0;
   let totalCredits = 0;
   const errors: Array<{ tenantId: string; message: string }> = [];
@@ -39,15 +57,24 @@ export async function grantCreditsToTenants(
         const creditsToGrant = entitlements.aiCreditsMonthly || 0;
 
         if (creditsToGrant > 0) {
-          await tx.creditLedger.create({
-            data: {
-              tenantId,
-              delta: creditsToGrant,
-              reason: 'monthly_grant',
-            },
+          const { count } = await tx.creditLedger.createMany({
+            data: [
+              {
+                tenantId,
+                delta: creditsToGrant,
+                reason: 'monthly_grant',
+                refId: `monthly_grant:${period}`,
+                grantPeriod: period,
+              },
+            ],
+            skipDuplicates: true,
           });
-          grantedCount++;
-          totalCredits += creditsToGrant;
+          if (count === 0) {
+            alreadyGrantedCount++;
+          } else {
+            grantedCount++;
+            totalCredits += creditsToGrant;
+          }
         }
       });
     } catch (error) {
@@ -61,7 +88,9 @@ export async function grantCreditsToTenants(
   const output: CreditsMonthlyGrantOutput = {
     success: true,
     totalTenants: tenants.length,
+    period,
     grantedCount,
+    alreadyGrantedCount,
     failedCount,
     totalCreditsGranted: totalCredits,
   };
