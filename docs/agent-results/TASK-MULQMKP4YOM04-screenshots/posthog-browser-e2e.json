@@ -1,0 +1,38 @@
+[
+  {
+    "label": "01-key-set-essential-only",
+    "base": "http://localhost:3917",
+    "consentButton": "Gerekli Çerezler",
+    "outbound": [],
+    "storage": {
+      "consent": "{\"accepted\":false,\"time\":\"2026-09-29T09:56:30.449Z\",\"level\":\"essential\"}",
+      "anonId": null
+    }
+  },
+  {
+    "label": "02-key-set-accept-all",
+    "base": "http://localhost:3917",
+    "consentButton": "Tümünü Kabul Et",
+    "outbound": [
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:47811/i/v0/e/",
+        "body": "{\"api_key\":\"phc_local_fake_key\",\"event\":\"readiness_started\",\"distinct_id\":\"cbaf846b-9271-4083-ba66-b21da3bf9ff1\",\"timestamp\":\"2026-09-29T09:56:33.721Z\",\"properties\":{\"orgType\":\"municipality\",\"$lib\":\"fonbridge-web\",\"$process_person_profile\":false,\"$geoip_disable\":true}}"
+      }
+    ],
+    "storage": {
+      "consent": "{\"accepted\":true,\"time\":\"2026-09-29T09:56:33.640Z\",\"level\":\"all\"}",
+      "anonId": "cbaf846b-9271-4083-ba66-b21da3bf9ff1"
+    }
+  },
+  {
+    "label": "03-no-key-accept-all",
+    "base": "http://localhost:3000",
+    "consentButton": "Tümünü Kabul Et",
+    "outbound": [],
+    "storage": {
+      "consent": "{\"accepted\":true,\"time\":\"2026-09-29T09:56:36.878Z\",\"level\":\"all\"}",
+      "anonId": null
+    }
+  }
+]
