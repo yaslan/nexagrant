@@ -4,6 +4,7 @@ import { prisma } from '../../src/lib/db';
 import { registrationAcknowledgementToken } from '../../src/lib/legal/consent-documents';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { presentIds, requireId } from '../helpers/teardown-guard';
 
 /**
  * TASK-MTSWLANXSU0IG (A3) — the disclosure step, in a real browser.
@@ -56,15 +57,15 @@ test.afterAll(async () => {
   const users = await prisma.user.findMany({ where: { email: { in: emails } }, select: { id: true } });
   const ids = users.map((u) => u.id);
   if (ids.length) {
-    await prisma.consent.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.consent.deleteMany({ where: { userId: { in: presentIds(ids) } } });
     const memberships = await prisma.membership.findMany({
       where: { userId: { in: ids } },
       select: { tenantId: true },
     });
-    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    await prisma.user.deleteMany({ where: { id: { in: presentIds(ids) } } });
     const tenantIds = memberships.map((m) => m.tenantId);
     if (tenantIds.length) {
-      await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
+      await prisma.tenant.deleteMany({ where: { id: { in: presentIds(tenantIds) } } });
     }
   }
   await prisma.$disconnect();
@@ -198,7 +199,7 @@ test('the refusal is in the server, not in the form', async ({ page }) => {
     where: { userId: accepted!.id },
     select: { tenantId: true },
   });
-  await prisma.consent.deleteMany({ where: { userId: accepted!.id } });
+  await prisma.consent.deleteMany({ where: { userId: requireId(accepted!.id, 'accepted.id') } });
   await prisma.user.delete({ where: { id: accepted!.id } });
-  await prisma.tenant.deleteMany({ where: { id: { in: memberships.map((m) => m.tenantId) } } });
+  await prisma.tenant.deleteMany({ where: { id: { in: presentIds(memberships.map((m) => m.tenantId)) } } });
 });

@@ -6,6 +6,7 @@ import { encode } from 'next-auth/jwt';
 import { createDbClient } from '../../src/lib/db';
 import { handleIyzicoWebhook } from '../../src/lib/iyzico';
 import { e2eAuthSecret } from './fixtures/auth-secret';
+import { requireId } from '../helpers/teardown-guard';
 
 /**
  * TASK-MTSWL8ADKZKDM — a successful payment must actually issue an invoice.
@@ -108,11 +109,11 @@ test.afterAll(async () => {
   // an orphan nobody can resolve. Measured before this line existed: 234 of 268
   // open alerts named tenants that no longer existed (TASK-MTVFWYKIZXRB1).
   await prisma.systemAlert.deleteMany({
-    where: { meta: { path: ['tenantId'], equals: tenantId } },
+    where: { meta: { path: ['tenantId'], equals: requireId(tenantId, 'tenantId') } },
   });
-  await prisma.invoice.deleteMany({ where: { tenantId } });
-  await prisma.tenantBillingIdentity.deleteMany({ where: { tenantId } });
-  await prisma.tenant.deleteMany({ where: { id: tenantId } });
+  await prisma.invoice.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+  await prisma.tenantBillingIdentity.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+  await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
   await prisma.$disconnect();
 });
 

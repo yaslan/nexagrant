@@ -6,6 +6,7 @@ import {
   plansVisibleToTenant,
   getVersionById,
 } from './plan-repository';
+import { requireId } from '../../../tests/helpers/teardown-guard';
 
 describe('Plan Repository', () => {
   let testTenantId: string;
@@ -47,12 +48,12 @@ describe('Plan Repository', () => {
     // The prefixes are every `id:` literal the cases below create.
     const PLAN_PREFIXES = ['plan-test-', 'private-', 'assigned-', 'other-', 'pub-', 'fetch-'];
     for (const prefix of PLAN_PREFIXES) {
-      await prisma.planAssignment.deleteMany({ where: { planId: { startsWith: prefix } } });
-      await prisma.planVersion.deleteMany({ where: { planId: { startsWith: prefix } } });
-      await prisma.plan.deleteMany({ where: { id: { startsWith: prefix } } });
+      await prisma.planAssignment.deleteMany({ where: { planId: { startsWith: requireId(prefix, 'prefix') } } });
+      await prisma.planVersion.deleteMany({ where: { planId: { startsWith: requireId(prefix, 'prefix') } } });
+      await prisma.plan.deleteMany({ where: { id: { startsWith: requireId(prefix, 'prefix') } } });
     }
-    await prisma.planAssignment.deleteMany({ where: { tenantId: testTenantId } });
-    await prisma.tenant.deleteMany({ where: { id: testTenantId } });
+    await prisma.planAssignment.deleteMany({ where: { tenantId: requireId(testTenantId, 'testTenantId') } });
+    await prisma.tenant.deleteMany({ where: { id: requireId(testTenantId, 'testTenantId') } });
   });
 
   describe('getPublishedVersion', () => {

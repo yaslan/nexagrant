@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma } from '@/lib/db';
 import { envValue } from './helpers/dotenv';
 import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
+import { presentIds, requireId } from './helpers/teardown-guard';
 
 /**
  * FB KAMU B7 (TASK-MULRRU63LWC6E) — `declareApplication` writes the declaration and
@@ -74,10 +75,10 @@ describe.skipIf(!dbReachable)('B7 application declaration → countApplicationOu
   afterAll(async () => {
     if (!dbReachable) return;
     const tenants = [a, b, c].filter(Boolean).map((t) => t.tenantId);
-    await db().auditEvent.deleteMany({ where: { tenantId: { in: tenants } } });
-    await db().proposal.deleteMany({ where: { tenantId: { in: tenants } } });
-    await db().opportunity.deleteMany({ where: { tenantId: { in: tenants } } });
-    await db().workspace.deleteMany({ where: { tenantId: { in: tenants } } });
+    await db().auditEvent.deleteMany({ where: { tenantId: { in: presentIds(tenants) } } });
+    await db().proposal.deleteMany({ where: { tenantId: { in: presentIds(tenants) } } });
+    await db().opportunity.deleteMany({ where: { tenantId: { in: presentIds(tenants) } } });
+    await db().workspace.deleteMany({ where: { tenantId: { in: presentIds(tenants) } } });
     await db().tenant.deleteMany({ where: { slug: { startsWith: RUN } } });
     await db().$disconnect();
   });
@@ -134,7 +135,7 @@ describe.skipIf(!dbReachable)('B7 application declaration → countApplicationOu
       accepted: 0,
       rejected: 0,
     });
-    await db().proposal.updateMany({ where: { opportunityId: at(a.opps, 0) }, data: { submittedAt: new Date('2020-01-01') } });
+    await db().proposal.updateMany({ where: { opportunityId: requireId(at(a.opps, 0), 'at(a.opps, 0)') }, data: { submittedAt: new Date('2020-01-01') } });
     expect(await countApplicationOutcomes([a.tenantId, b.tenantId], new Date('2021-01-01'))).toEqual({
       submitted: 3,
       accepted: 0,

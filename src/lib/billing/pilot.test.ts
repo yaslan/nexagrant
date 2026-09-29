@@ -23,6 +23,7 @@ import {
 } from './pilot';
 import { handleSubscriptionCancellation, syncStripeSubscription } from './subscription-sync';
 import { readSeatUsage } from './seat-limit';
+import { requireId } from '../../../tests/helpers/teardown-guard';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const DAY = 86_400_000;
@@ -69,11 +70,11 @@ describe('grantPilot (live DB)', () => {
   });
 
   afterEach(async () => {
-    await prisma.auditEvent.deleteMany({ where: { tenantId } });
-    await prisma.stripeEventLog.deleteMany({ where: { tenantId } });
-    await prisma.subscription.deleteMany({ where: { tenantId } });
-    await prisma.planAssignment.deleteMany({ where: { tenantId } });
-    await prisma.tenant.deleteMany({ where: { id: tenantId } });
+    await prisma.auditEvent.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.stripeEventLog.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.subscription.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.planAssignment.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
   });
 
   it('puts the tenant on Ekip for 90 days: TRIALING, pilot provider, no PSP id, 6 seats, audited', async () => {
@@ -167,7 +168,7 @@ describe('grantPilot (live DB)', () => {
       data: { tenantId, planId: 'pro', status: 'ACTIVE', provider: 'stripe', providerSubId: 'sub_pilot_test' },
     });
     await expect(grantPilot(tenantId, 'admin-1')).rejects.toBeInstanceOf(LiveProviderSubscriptionError);
-    await prisma.subscription.deleteMany({ where: { tenantId } });
+    await prisma.subscription.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
 
     await assignPlanToTenant('public-team', tenantId, 'admin-1', null);
     await expect(grantPilot(tenantId, 'admin-1')).rejects.toBeInstanceOf(ContractSubscriptionError);

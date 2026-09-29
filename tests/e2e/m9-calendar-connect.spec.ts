@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
 import { shotsDir } from './fixtures/shots';
+import { requireId } from '../helpers/teardown-guard';
 
 /**
  * TASK-MTQUTBH8Q9VMK — the calendar connect flow, in a real browser.
@@ -51,7 +52,7 @@ const shot = (page: Page, name: string) =>
 /** The fixture user must start with no calendar connection, and end with none. */
 async function clearConnections() {
   await prisma.calendarConnection.deleteMany({
-    where: { tenantId: F10.full.tenantId, userId: F10.full.userId },
+    where: { tenantId: requireId(F10.full.tenantId, 'F10.full.tenantId'), userId: requireId(F10.full.userId, 'F10.full.userId') },
   });
 }
 

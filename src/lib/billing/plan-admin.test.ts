@@ -25,6 +25,7 @@ import {
   ModuleNotGrantedError,
   PlanInUseError,
 } from './plan-repository';
+import { requireId } from '../../../tests/helpers/teardown-guard';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -72,13 +73,13 @@ describe('plan admin write layer', () => {
   });
 
   afterEach(async () => {
-    await prisma.auditEvent.deleteMany({ where: { target: { startsWith: planId } } });
-    await prisma.auditEvent.deleteMany({ where: { tenantId } });
-    await prisma.subscription.deleteMany({ where: { tenantId } });
-    await prisma.planAssignment.deleteMany({ where: { planId } });
-    await prisma.planVersion.deleteMany({ where: { planId } });
-    await prisma.plan.deleteMany({ where: { id: planId } });
-    await prisma.tenant.deleteMany({ where: { id: tenantId } });
+    await prisma.auditEvent.deleteMany({ where: { target: { startsWith: requireId(planId, 'planId') } } });
+    await prisma.auditEvent.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.subscription.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.planAssignment.deleteMany({ where: { planId: requireId(planId, 'planId') } });
+    await prisma.planVersion.deleteMany({ where: { planId: requireId(planId, 'planId') } });
+    await prisma.plan.deleteMany({ where: { id: requireId(planId, 'planId') } });
+    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
   });
 
   // ── (b) a published version is immutable; editing makes a new version ──
@@ -290,7 +291,7 @@ describe('plan admin write layer', () => {
   it('refuses an ungranted bullet at publish time too, not only on save', async () => {
     const draft = await createDraftVersion(planId);
     // Write the bad row past the save-time check, straight into the table.
-    await prisma.planFeature.deleteMany({ where: { planVersionId: draft.id } });
+    await prisma.planFeature.deleteMany({ where: { planVersionId: requireId(draft.id, 'draft.id') } });
     await prisma.planVersion.update({ where: { id: draft.id }, data: { modules: ['M1'] } });
     await prisma.planFeature.create({
       data: { planVersionId: draft.id, order: 1, kind: 'module', moduleId: 'M6' },
@@ -435,9 +436,9 @@ describe('plan admin write layer', () => {
       expect(strayNow?.planId).toBe(liveOtherPlanId);
       expect(strayNow?.planVersionId).toBeNull();
     } finally {
-      await prisma.subscription.deleteMany({ where: { tenantId: liveTenant.id } });
+      await prisma.subscription.deleteMany({ where: { tenantId: requireId(liveTenant.id, 'liveTenant.id') } });
       await prisma.plan.deleteMany({ where: { id: liveOtherPlanId } });
-      await prisma.tenant.deleteMany({ where: { id: liveTenant.id } });
+      await prisma.tenant.deleteMany({ where: { id: requireId(liveTenant.id, 'liveTenant.id') } });
     }
   });
 

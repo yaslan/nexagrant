@@ -24,6 +24,7 @@ import { PilotExpiredError, grantPilot } from './pilot';
 import { grantPilotAction } from '@/app/[locale]/admin/billing/plans/actions';
 import { POST as checkout } from '@/app/api/billing/checkout/route';
 import { addBudgetLineByToken } from '@/modules/m11/server/actions';
+import { requireId } from '../../../tests/helpers/teardown-guard';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const DAY = 86_400_000;
@@ -48,9 +49,9 @@ describe('pilot gates', () => {
   });
 
   afterEach(async () => {
-    await prisma.auditEvent.deleteMany({ where: { tenantId } });
-    await prisma.subscription.deleteMany({ where: { tenantId } });
-    await prisma.tenant.deleteMany({ where: { id: tenantId } });
+    await prisma.auditEvent.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.subscription.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
   });
 
   it('only a platform admin can grant a pilot', async () => {

@@ -8,6 +8,7 @@ import {
   handleSubscriptionCancellation,
   logInvoicePayment,
 } from '@/lib/billing/subscription-sync';
+import { requireId } from './helpers/teardown-guard';
 
 /**
  * TASK-MTVRACMDFRGKV — what a Stripe redelivery leaves behind, counted in the
@@ -126,15 +127,15 @@ async function wipe(tenantIds: string[]): Promise<void> {
     // tenant — the tenant-scoped sweep below cannot reach it, and an alert left
     // behind outlives its tenant and shows up in `pnpm alerts:check`
     // (TASK-MTVFWYKIZXRB1).
-    await prisma.systemAlert.deleteMany({ where: { meta: { path: ['tenantId'], equals: tenantId } } });
-    await prisma.auditEvent.deleteMany({ where: { tenantId } });
-    await prisma.creditLedger.deleteMany({ where: { tenantId } });
-    await prisma.addOn.deleteMany({ where: { tenantId } });
-    await prisma.moduleState.deleteMany({ where: { tenantId } });
-    await prisma.invoice.deleteMany({ where: { tenantId } });
-    await prisma.tenantBillingIdentity.deleteMany({ where: { tenantId } });
-    await prisma.subscription.deleteMany({ where: { tenantId } });
-    await prisma.tenant.deleteMany({ where: { id: tenantId } });
+    await prisma.systemAlert.deleteMany({ where: { meta: { path: ['tenantId'], equals: requireId(tenantId, 'tenantId') } } });
+    await prisma.auditEvent.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.creditLedger.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.addOn.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.moduleState.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.invoice.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.tenantBillingIdentity.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.subscription.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
   }
   await prisma.addOnCatalog.deleteMany({ where: { sku: ADDON_SKU } });
   await prisma.plan.deleteMany({ where: { id: PLAN_ID } });

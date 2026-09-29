@@ -10,6 +10,7 @@ import {
   updateDraftVersion,
 } from '../src/lib/billing/plan-repository';
 import { envValue } from './helpers/dotenv';
+import { requireId } from './helpers/teardown-guard';
 
 /**
  * TASK-MTSJH8NMAXPRM — publishing a plan version must reach the tenants on it.
@@ -99,8 +100,8 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ready) {
     for (const id of [liveTenantId, cancelledTenantId, proTenantId]) {
-      await prisma.subscription.deleteMany({ where: { tenantId: id } });
-      await prisma.tenant.deleteMany({ where: { id } });
+      await prisma.subscription.deleteMany({ where: { tenantId: requireId(id, 'id') } });
+      await prisma.tenant.deleteMany({ where: { id: requireId(id, 'id') } });
     }
     await prisma.$executeRawUnsafe(`DELETE FROM "PlanVersion" WHERE "planId" = $1`, PLAN_ID);
     await prisma.$executeRawUnsafe(`DELETE FROM "Plan" WHERE "id" = $1`, PLAN_ID);

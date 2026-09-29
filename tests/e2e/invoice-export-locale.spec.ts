@@ -6,6 +6,7 @@ import { encode } from 'next-auth/jwt';
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
+import { requireId } from '../helpers/teardown-guard';
 
 /**
  * TASK-MTTUSZF4QSFGU — the printed invoice in the language the reader is using,
@@ -105,8 +106,8 @@ test.describe('the printed invoice follows the reader language', () => {
   });
 
   test.afterAll(async () => {
-    await prisma.invoice.deleteMany({ where: { tenantId } });
-    await prisma.tenant.deleteMany({ where: { id: tenantId } });
+    await prisma.invoice.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
     await prisma.$disconnect();
   });
 

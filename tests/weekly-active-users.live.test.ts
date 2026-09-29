@@ -5,6 +5,7 @@ import { createDbClient, withTenantOn } from '@/lib/db';
 import { getWeeklyActiveUsersIn } from '@/lib/metrics/weekly-active-users';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { requireId } from './helpers/teardown-guard';
 
 /**
  * TASK-MULRS12Y8F087 — the Ö1 weekly-active-user count against Postgres.
@@ -114,9 +115,9 @@ afterAll(async () => {
     // decisions and audit events; the tables without a Tenant relation go by hand.
     for (const t of [ids.tenantA, ids.tenantB]) {
       await withTenantOn(admin, t, async (tx) => {
-        await tx.conceptNote.deleteMany({ where: { tenantId: t } });
-        await tx.aiUsageLog.deleteMany({ where: { tenantId: t } });
-        await tx.savedSearch.deleteMany({ where: { tenantId: t } });
+        await tx.conceptNote.deleteMany({ where: { tenantId: requireId(t, 't') } });
+        await tx.aiUsageLog.deleteMany({ where: { tenantId: requireId(t, 't') } });
+        await tx.savedSearch.deleteMany({ where: { tenantId: requireId(t, 't') } });
       });
     }
     await admin.tenant.deleteMany({ where: { id: { in: [ids.tenantA, ids.tenantB] } } });

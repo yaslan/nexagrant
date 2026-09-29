@@ -6,6 +6,7 @@ import { createDbClient } from '@/lib/db';
 import { SYSTEM_SCOPE_PURPOSES, withSystemScopeOn } from '@/lib/system-scope';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { presentIds } from './helpers/teardown-guard';
 
 /**
  * TASK-MTVTPVTEBCF5Z — the sanctioned cross-tenant path, measured where it is
@@ -56,7 +57,7 @@ let fixtureWritten = false;
 /** Memberships go with their tenant and user (onDelete: Cascade). */
 async function wipeFixture(db: PrismaClient): Promise<void> {
   await db.tenant.deleteMany({ where: { id: { in: FIXTURE_TENANTS } } });
-  await db.user.deleteMany({ where: { id: { in: FIXTURE_USERS } } });
+  await db.user.deleteMany({ where: { id: { in: presentIds(FIXTURE_USERS) } } });
 }
 
 beforeAll(async () => {

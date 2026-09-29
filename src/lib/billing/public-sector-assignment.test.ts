@@ -16,6 +16,7 @@ import {
 import { upsertPublicSectorPlans } from './public-sector-plans';
 import { SeatLimitReachedError, assertSeatAvailable, readSeatUsage } from './seat-limit';
 import { storefrontPlans } from './storefront';
+import { presentIds, requireId } from '../../../tests/helpers/teardown-guard';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -35,13 +36,13 @@ describe('public-sector package assignment', () => {
   });
 
   afterEach(async () => {
-    await prisma.auditEvent.deleteMany({ where: { tenantId } });
-    await prisma.invitation.deleteMany({ where: { tenantId } });
-    await prisma.membership.deleteMany({ where: { tenantId } });
-    await prisma.subscription.deleteMany({ where: { tenantId } });
-    await prisma.planAssignment.deleteMany({ where: { tenantId } });
-    await prisma.tenant.deleteMany({ where: { id: tenantId } });
-    await prisma.user.deleteMany({ where: { id: { in: userIds.splice(0) } } });
+    await prisma.auditEvent.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.invitation.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.membership.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.subscription.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.planAssignment.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
+    await prisma.user.deleteMany({ where: { id: { in: presentIds(userIds.splice(0)) } } });
   });
 
   it('seeding twice leaves the same rows (idempotent)', async () => {

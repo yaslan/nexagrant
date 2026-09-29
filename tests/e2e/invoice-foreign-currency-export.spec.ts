@@ -6,6 +6,7 @@ import { encode } from 'next-auth/jwt';
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
+import { requireId } from '../helpers/teardown-guard';
 
 /**
  * TASK-MTSWLWDONWA3W — the exported invoice must state its own currency.
@@ -127,8 +128,8 @@ test.describe('a foreign-currency invoice export', () => {
   });
 
   test.afterAll(async () => {
-    await prisma.invoice.deleteMany({ where: { tenantId } });
-    await prisma.tenant.deleteMany({ where: { id: tenantId } });
+    await prisma.invoice.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
     await prisma.$disconnect();
   });
 

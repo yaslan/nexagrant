@@ -23,6 +23,7 @@ import { upsertPublicSectorPlans } from '@/lib/billing/public-sector-plans';
 import { canEnableEntitled } from '@/lib/modules/state-machine';
 import { readModulesPlanView } from '@/app/[locale]/(app)/[workspace]/settings/modules/plan-view';
 import { toggleModuleState } from '@/app/[locale]/(app)/[workspace]/settings/modules/actions';
+import { requireId } from '../helpers/teardown-guard';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const DAY = 86_400_000;
@@ -56,10 +57,10 @@ describe('modules settings — plan and state from entitlements', () => {
   });
 
   afterEach(async () => {
-    await prisma.auditEvent.deleteMany({ where: { tenantId } });
-    await prisma.moduleState.deleteMany({ where: { tenantId } });
-    await prisma.subscription.deleteMany({ where: { tenantId } });
-    await prisma.tenant.deleteMany({ where: { id: tenantId } });
+    await prisma.auditEvent.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.moduleState.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.subscription.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
   });
 
   it('no subscription: Discover, nothing active, Pro module refused and not written', async () => {

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { requireId } from './helpers/teardown-guard';
 
 /**
  * TASK-MUMO2XIQEHGUD (B-1 of TASK-MUMMERMBJF1LM) — POST /api/invitations must
@@ -146,8 +147,8 @@ beforeEach(async (ctx) => {
   recordAlert.mockClear();
   envOverride.NEXT_PUBLIC_APP_URL = 'https://app.example.invalid';
   // One pending invitation at a time keeps every test inside the seat limit.
-  await admin!.invitation.deleteMany({ where: { tenantId } });
-  await admin!.auditEvent.deleteMany({ where: { tenantId } });
+  await admin!.invitation.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+  await admin!.auditEvent.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
 });
 
 afterAll(async () => {
@@ -180,7 +181,7 @@ describe('POST /api/invitations — mail limits', () => {
     const email = nextEmail();
     await invite(email);
     await admin!.auditEvent.updateMany({
-      where: { tenantId },
+      where: { tenantId: requireId(tenantId, 'tenantId') },
       data: { createdAt: new Date(Date.now() - 11 * 60 * 1000) },
     });
     const again = await invite(email);
@@ -253,7 +254,7 @@ describe('POST /api/invitations — mail limits', () => {
       expect(recordAlert).toHaveBeenCalledWith(
         expect.objectContaining({ level: 'error', dedupeKey: 'invitation-mail-app-url-missing' })
       );
-      await admin!.invitation.deleteMany({ where: { tenantId } });
+      await admin!.invitation.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
     }
     expect(send).not.toHaveBeenCalled();
     // Nothing was attempted, so nothing counts toward the limits.

@@ -22,6 +22,7 @@ import { hashSecretToken } from '@/lib/secret-token';
 import { POST as invite } from '@/app/api/invitations/route';
 import { issuePartnerPortalLink } from '@/modules/m11/server/partner-link';
 import { addBudgetLineByToken } from '@/modules/m11/server/actions';
+import { requireId } from './helpers/teardown-guard';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -42,7 +43,7 @@ describe('bearer tokens are stored as SHA-256 only (live DB)', () => {
 
   afterEach(async () => {
     session.current = null;
-    await prisma.tenant.deleteMany({ where: { id: tenantId } });
+    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
   });
 
   it('an invitation stores the hash of the link token, and the response does not carry the row\'s secret', async () => {

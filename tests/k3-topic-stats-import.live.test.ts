@@ -11,6 +11,7 @@ import {
   RAW_FETCH_SOURCE,
 } from '@/lib/k3-topic-stats/importer';
 import { loadG0Snapshot } from '@/lib/scoring/g0-compute';
+import { requireId } from './helpers/teardown-guard';
 
 /**
  * TASK-MULQKV3BJT6VM — K3 import against the real database.
@@ -99,12 +100,12 @@ describe.skipIf(!dbReachable)('K3 Horizon Dashboard import → TopicStat', () =>
   afterAll(async () => {
     if (!dbReachable) return;
     await db().topicStat.deleteMany({ where: { topicPrefix: { in: [FAMILY, OTHER_FAMILY] } } });
-    await db().rawFetch.deleteMany({ where: { source: RAW_FETCH_SOURCE, key: { startsWith: RUN } } });
+    await db().rawFetch.deleteMany({ where: { source: requireId(RAW_FETCH_SOURCE, 'RAW_FETCH_SOURCE'), key: { startsWith: RUN } } });
     if (tenantId) {
-      await db().topicMatch.deleteMany({ where: { tenantId } });
-      await db().opportunity.deleteMany({ where: { tenantId } });
-      await db().workspace.deleteMany({ where: { tenantId } });
-      await db().tenant.deleteMany({ where: { id: tenantId } });
+      await db().topicMatch.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+      await db().opportunity.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+      await db().workspace.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+      await db().tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
     }
     await db().topic.deleteMany({ where: { identifier: { startsWith: `HORIZON-${RUN}-` } } });
     await db().call.deleteMany({ where: { callIdentifier: { startsWith: `HORIZON-${RUN}-` } } });

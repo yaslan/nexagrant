@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { presentIds } from '../helpers/teardown-guard';
 
 /**
  * M8 "Aday Bul" — a real browser, a real database, a real click.
@@ -168,10 +169,10 @@ async function rollback() {
   await prisma.consortiumSeat.deleteMany({ where: { opportunityId: OPP } });
   await prisma.opportunity.deleteMany({ where: { id: OPP } });
   await prisma.relationship.deleteMany({ where: { id: 'm8-e2e-rel' } });
-  await prisma.cordisParticipation.deleteMany({ where: { organisationId: { in: pics } } });
+  await prisma.cordisParticipation.deleteMany({ where: { organisationId: { in: presentIds(pics) } } });
   await prisma.cordisCoParticipation.deleteMany({ where: { OR: [{ orgA: { in: pics } }, { orgB: { in: pics } }] } });
-  await prisma.cordisPartnerProfile.deleteMany({ where: { organisationId: { in: pics } } });
-  await prisma.cordisOrganization.deleteMany({ where: { organisationId: { in: pics } } });
+  await prisma.cordisPartnerProfile.deleteMany({ where: { organisationId: { in: presentIds(pics) } } });
+  await prisma.cordisOrganization.deleteMany({ where: { organisationId: { in: presentIds(pics) } } });
   await prisma.cordisProject.deleteMany({ where: { id: { in: PROJECTS } } });
 }
 
