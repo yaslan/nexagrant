@@ -1,8 +1,8 @@
 # ADR-0008 — Inngest yerine kendi iş kuyruğumuz: graphile-worker (Postgres)
 
-- **Durum:** ÖNERİ. Araç seçimini patron onaylar. "Inngest kalkıyor" kararı 29.09.2026'da verildi (ROADMAP açık karar #3).
+- **Durum:** KABUL (patron onayı 29.09.2026). **Uygulandı:** TASK-MUMT3PGX5OK8P (commit'ler `2c20324f`, `fbf23850`, `5ed2261a`; ayrıntı §9). "Inngest kalkıyor" kararı 29.09.2026'da verildi (ROADMAP açık karar #3). Barındırma kararı (§4) hâlâ açık.
 - **Tarih:** 2026-09-29
-- **Kart:** TASK-MUMLFDTNQ53VJ (FB-GAP-1). Bu kart karar ve deneme içindir. İşleri taşıma işi ayrı kartlarda yapılacak (§7).
+- **Kart:** TASK-MUMLFDTNQ53VJ (FB-GAP-1, karar ve deneme). Taşıma: TASK-MUMT3PGX5OK8P (tek kart, §9).
 - **Hazırlayan:** DEVOP-FB
 - **Deneme dalı:** `spike/job-queue`. Deneme kodu dev'e girmez.
 
@@ -159,3 +159,50 @@ Toplam tahmin 3-3,5 iş günü. Buna barındırma kararı ve canlıya kurulum da
 ## 8. Platform
 
 Deneme **mac**'te koşuldu. Worker saf Node + `pg` + Postgres kullanır; dosya yolu, kabuk ya da ikili dosyaya bağlı kod yolu yoktur. Bu nedenle üretim hedefi olan **Linux**'ta aynı kod koşar (**koşulamadı**: elde Linux sunucu yok, barındırma kararı bekleniyor). **Windows** hedef değildir. Kodda platforma bağlı tek nokta düzgün kapanmadır: graphile-worker SIGTERM ve SIGINT'i dinler. Windows'ta SIGTERM gönderilemez, yalnız Ctrl+C (SIGINT) ile düzgün kapanır.
+
+## 9. Uygulama ve inceleme ekleri (TASK-MUMT3PGX5OK8P, 29.09.2026)
+
+İnceleme İNCELEME-22 (`docs/agent-results/TASK-MUMO33QXYL420-crw-fb.md`, Kart 3) üç açık bıraktı. Üçü de taşımadan **önce** kapatıldı. §7'deki A/B1/B2/B3/C kart bölmesi yerine taşıma tek kartta, üç commit'te yapıldı; B kartlarının amacı (iki sistemin aynı işi hiçbir an birlikte koşturmaması) §9.2 ile sağlanıyor.
+
+### 9.1 Ö-1: `credits-monthly-grant` idempotent (commit `2c20324f`)
+
+- `CreditLedger.grantPeriod` (`YYYY-MM`, işin yazdığı satırda dolu, diğer her satırda NULL) ve `@@unique([tenantId, grantPeriod])`. Migration: `prisma/migrations/credit-ledger-grant-period.sql` (idempotent, `apply-order.txt` sonunda).
+- Kısmi index kullanılmadı: repo şemayı `db push` ile eşitliyor ve Prisma kısmi index ifade edemiyor (`add-soft-delete.sql`). Postgres NULL'ları ayrı saydığı için `refId`'yi tekrar kullanan satırlar (LLM kullanımı `proposalId`, Stripe/iyzico yeniden etkinleştirme `subscription.id`) kısıta takılmaz.
+- İş `createMany … skipDuplicates` ile yazar; aynı ay ikinci koşu `alreadyGrantedCount` sayar, satır eklemez. Ay, cron tikinin ayıdır (`payload._cron.ts`); geç koşan bir tekrar deneme bir sonraki aya kaymaz.
+- Kanıt: RLS rolüyle (`fabrika_app`) test, aynı ay iki kez ve paralel iki kez → kiracı başına 1 satır; mutant (yazımdan `grantPeriod` düşürülünce) testi düşürüyor.
+
+### 9.2 Ö-2: dağıtım sırası ve kilit
+
+Sorun: worker ile Next.js ayrı süreçler, ayrı zamanlarda dağıtılır; eski barındırılan zamanlayıcı da işin tanımını uygulama yeniden senkronlanana kadar tutar. Worker yeni crontab'la önce kalkar ve eski web sürümü hâlâ canlıysa aynı tik iki sistemde koşar.
+
+**Kural (uygulandı):** `JOBS_CRON_ENABLED` üretimde **açıkça** `true` ya da `false` olmak zorunda. Değişken yoksa üretim worker'ı başlamaz (`JobsCronUnsetInProductionError`, `src/lib/env.ts` `jobsCronEnabled`). `false` iken worker yalnız elle eklenen işleri koşar, hiçbir cron tikini zamanlamaz ve `job-queue:cron-disabled` uyarı alarmı yazar. Üretim dışında değişken yoksa açık sayılır.
+
+**Dağıtım sırası:**
+
+1. Web uygulamasını bu sürümle dağıt (Inngest route'u kalkar; `/api/inngest` 404 döner).
+2. Inngest panosunda uygulamayı yeniden senkronla ya da arşivle; "Functions" listesinin boş olduğunu ve son 10 dakikada koşu olmadığını gör. Bu adımdan önce eski zamanlayıcı hâlâ tetikleyebilir.
+3. Worker'ı `JOBS_CRON_ENABLED=false` ile kaldır (şemayı kurar, elle eklenen işleri koşar).
+4. 2. adım doğrulanınca worker'ı `JOBS_CRON_ENABLED=true` ile yeniden başlat.
+5. İlk günlük tikten sonra (en geç 02:00 UTC) `SystemAlert`'te `job-queue` kaynağına ve worker loguna bak.
+
+Geri dönüşte sıra tersine: önce worker'ı durdur (ya da `false` ile başlat), sonra Inngest'li sürümü geri al ve Inngest'te senkronla. Aylık kredi işi Ö-1 sayesinde yanlış sırada bile ikinci kez kredi vermez; diğer işler (e-posta gönderenler dahil) bu korumaya sahip değildir, bu yüzden sıra kuraldır.
+
+### 9.3 Ö-3: kaçırılmış tik alarmı
+
+`job-queue-health` (her saat :05 UTC, `src/lib/jobs/tasks/job-queue-health.ts`) üç şeyi `SystemAlert`'e yazar:
+
+- **Kaçırılmış tik:** her iş için `now − 10 dk` anındaki son beklenen tik, `_private_known_crontabs.last_execution`'dan yeniyse ve crontab o tikten önce tescil edilmişse (`known_since`), `error` alarmı yazar (`job-queue:<iş>:missed-tick`). graphile-worker `last_execution`'ı tik zamanlanınca (canlı ya da `fill` içinde geriye dönük) yazar; `fill` penceresini aşan kesintide yazmaz. Bu yüzden sessiz kayıp artık görünür. Elle telafi: `pnpm jobs:enqueue -- <iş>`.
+- **Tükenmiş iş:** son denemesini kullanmış, tabloda `last_error` ile kalan iş (`job-queue:<iş>:exhausted`; iş sarmalayıcısı son denemede aynı anahtarla zaten yazar, bu ikinci yazıcıdır).
+- **Takılmış iş:** 4 saatten uzun kilitli iş (`job-queue:<iş>:stuck`, `warn`).
+
+Sağlık işi her saat koştuğu için aylık bir işin kaçan tiki bir sonraki tike kadar her gün görünür kalır; günlük işlerde worker döndükten sonraki ilk saatte görünür.
+
+### 9.4 Uygulanan tasarım (özet)
+
+- Tek tablo: `src/lib/jobs/schedule.ts` (crontab, görev listesi ve kaçırılmış tik kontrolü buradan türer). Cron ifadeleri Inngest'tekiyle aynı; `max=5` (Inngest varsayılanı: 1 + 4 tekrar); `fill` günlükte `6h`, haftalık/aylıkta `1d`; `agency-monthly-report` `queue=agency`.
+- Sarmalayıcı: `src/lib/jobs/define.ts` (`defineJob`). `{ success: false }` loglanır, tekrar denenmez (§6.3); fırlatılan hata tekrar denenir; son denemede `job-queue` alarmı.
+- Elle tetikleme: `pnpm jobs:enqueue -- <iş> [--period|--month|--payload|--force]` (`jobKey` + `unsafe_dedupe`, §6.5). Inngest'in `agency/report.generate` olayı ve pano "Invoke"u bunun yerine geçti; ajans dönemi kuyruğa girmeden doğrulanır.
+- Worker: `pnpm jobs:worker` (`scripts/jobs-worker.ts`, ilk satır `import 'dotenv/config'`). DB rolü (§6.6): worker kendi şeması için `JOBS_DATABASE_URL`'i (yoksa `DATABASE_URL`) kullanır; şemayı ilk açılışta kurabilecek bir rol gerekir. İş gövdeleri her zaman `DATABASE_URL` + `withSystemScope`/`withTenant` ile çalışır.
+- Dağıtım: `Dockerfile` tabanı `node:22-alpine` (graphile-worker ≥ 22.18), `worker` hedefi (`docker build --target worker`); `docker-compose.yml` `fabrika-worker` servisi (`app` profili).
+- Kalktı: `inngest` paketi, `src/lib/inngest/client.ts`, `/api/inngest`, `INNGEST_*` ortam değişkenleri ve `assertInngestDevModeAllowed`. Inngest hesabı ve anahtarları §7'deki kurala göre canlıda bir tam ay geçene kadar silinmez.
+
