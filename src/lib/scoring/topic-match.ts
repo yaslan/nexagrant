@@ -15,10 +15,10 @@ import { isPresentId } from '@/lib/required-id';
  * which `loadG0Snapshot` then reads as the measured alignment feature.
  *
  * What is deliberately not here:
- *   - No embedding is generated. Neither column is written anywhere yet (the
- *     profile form is a mock save, TASK-MULQM3LFB4KRA holds the OpenAI key), and
- *     an embedding is a paid provider call that has its own card. A pair with
- *     either vector missing gets no row, and the run counts it: a keyword
+ *   - No embedding is generated here. The `k1-embeddings` job fills both
+ *     columns (src/lib/scoring/embeddings.ts, TASK-MUN7C48UHPOGI) at 02:15,
+ *     before this run. A pair with either vector missing gets no row, and the
+ *     run counts it: a keyword
  *     overlap passed off as a K1 match would turn G0's documented fallback
  *     (`TenantProfile.keywords ∩ Topic.keywords`) into "measured".
  *   - No KOBİ-role correction. Nothing in the schema says which role a topic
@@ -93,8 +93,11 @@ export async function candidatePage(
   tx: TenantTx,
   tenantId: string,
   cursor: string,
-  pageSize: number
+  pageSize: number,
+  /** Only these topics (a live test's own fixtures); undefined = every topic. */
+  topicIds?: readonly string[]
 ): Promise<TopicMatchCandidate[]> {
+  const only = topicIds ? [...topicIds] : null;
   const rows = await tx.$queryRaw<Array<{ topicId: string; eligibility: unknown; similarity: number | null }>>`
     SELECT t.id AS "topicId", t.eligibility,
            (1 - (t.embedding <=> p.embedding))::float8 AS similarity
@@ -104,6 +107,7 @@ export async function candidatePage(
        AND t.embedding IS NOT NULL
        AND t.status <> 'CLOSED'
        AND t.id > ${cursor}
+       AND (${only}::text[] IS NULL OR t.id = ANY(${only}::text[]))
      ORDER BY t.id
      LIMIT ${pageSize}`;
   return rows.map((r) => ({ topicId: r.topicId, eligibility: r.eligibility, similarity: r.similarity === null ? null : Number(r.similarity) }));
@@ -183,7 +187,7 @@ async function writePage(
  */
 export async function recomputeTenantTopicMatches(
   tenantId: string,
-  options: { now?: Date; pageSize?: number; runTenant?: typeof withTenant } = {}
+  options: { now?: Date; pageSize?: number; runTenant?: typeof withTenant; topicIds?: readonly string[] } = {}
 ): Promise<TenantTopicMatchResult> {
   if (!isPresentId(tenantId)) throw new Error('topic-match: tenantId is missing');
   const now = options.now ?? new Date();
@@ -209,7 +213,7 @@ export async function recomputeTenantTopicMatches(
   for (;;) {
     const page = await runTenant(tenantId, async (tx) => {
       await assertTenantWritable(tenantId, tx, now);
-      const candidates = await candidatePage(tx, tenantId, cursor, pageSize);
+      const candidates = await candidatePage(tx, tenantId, cursor, pageSize, options.topicIds);
       const scored: Array<{ topicId: string; score: TopicMatchScore }> = [];
       let unscorable = 0;
       let ineligible = 0;
@@ -282,7 +286,14 @@ export interface TopicMatchRunResult {
  * the run moves on.
  */
 export async function recomputeAllTopicMatches(
-  options: { now?: Date; pageSize?: number; runTenant?: typeof withTenant; tenantIds?: readonly string[] } = {}
+  options: {
+    now?: Date;
+    pageSize?: number;
+    runTenant?: typeof withTenant;
+    tenantIds?: readonly string[];
+    /** Narrows the topics each tenant is scored against (a live test's own fixtures). */
+    topicIds?: readonly string[];
+  } = {}
 ): Promise<TopicMatchRunResult> {
   const started = Date.now();
   const pageSize = options.pageSize ?? TOPIC_MATCH_PAGE_SIZE;

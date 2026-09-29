@@ -51,6 +51,7 @@ describe('schedule (ADR-0008 §2)', () => {
       'invitation-cleanup': '30 3 * * *',
       'public-lead-cleanup': '45 3 * * *',
       'k1-topic-match': '30 2 * * *',
+      'k1-embeddings': '15 2 * * *',
       'm4-stale-relationships': '0 7 * * *',
       'job-queue-health': '5 * * * *',
     });
@@ -70,6 +71,7 @@ describe('schedule (ADR-0008 §2)', () => {
     expect(lines).toContain('30 3 * * * invitation-cleanup ?id=invitation-cleanup&max=5&fill=6h');
     expect(lines).toContain('45 3 * * * public-lead-cleanup ?id=public-lead-cleanup&max=5&fill=6h');
     expect(lines).toContain('30 2 * * * k1-topic-match ?id=k1-topic-match&max=5&fill=6h&queue=k1-topic-match');
+    expect(lines).toContain('15 2 * * * k1-embeddings ?id=k1-embeddings&max=5&fill=6h&queue=k1-embeddings');
     expect(lines).toContain('0 7 * * * m4-stale-relationships ?id=m4-stale-relationships&max=5&fill=6h&queue=m4-stale-relationships');
   });
 });

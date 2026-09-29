@@ -92,6 +92,12 @@ const TOPICS = {
 type TopicKey = keyof typeof TOPICS;
 const topicId = (k: TopicKey) => `tp-tm-${k}-${RUN}`;
 const MY_TOPICS = (Object.keys(TOPICS) as TopicKey[]).map(topicId);
+/**
+ * Every run scores against these topics only: parallel live files (e.g.
+ * tests/k1-embeddings.live.test.ts) add embedded open topics of their own,
+ * which would otherwise change this file's created/updated counts mid-run.
+ */
+const MINE = { topicIds: MY_TOPICS };
 
 async function k1Rows(tenantId: string) {
   const rows = await admin.topicMatch.findMany({
@@ -149,7 +155,7 @@ afterAll(async () => {
 
 describe.skipIf(!HAS_DB)('K1 TopicMatch nightly recompute (live, fabrika_app)', () => {
   test('scores cosine × 100 on the K1 row, zeroes an ineligible country, skips closed / vectorless / zero-vector topics', async () => {
-    const r = await recomputeTenantTopicMatches(T_TR, { pageSize: 2 });
+    const r = await recomputeTenantTopicMatches(T_TR, { ...MINE, pageSize: 2 });
     expect(r.status).toBe('done');
     expect(r.pages).toBeGreaterThanOrEqual(3); // 5 scorable-or-not open topics of ours in pages of 2
 
@@ -170,14 +176,14 @@ describe.skipIf(!HAS_DB)('K1 TopicMatch nightly recompute (live, fabrika_app)', 
   });
 
   test('the same topic is eligible for an EU tenant', async () => {
-    await recomputeTenantTopicMatches(T_DE);
+    await recomputeTenantTopicMatches(T_DE, MINE);
     expect((await k1Rows(T_DE)).get(topicId('euOnly'))?.fitScore).toBe(100);
   });
 
   test('is idempotent: a second run changes nothing and writes no second row or audit', async () => {
     const before = await k1Rows(T_TR);
     const auditsBefore = await admin.auditEvent.count({ where: { tenantId: T_TR, type: TOPIC_MATCH_AUDIT } });
-    const r = await recomputeTenantTopicMatches(T_TR, { pageSize: 3 });
+    const r = await recomputeTenantTopicMatches(T_TR, { ...MINE, pageSize: 3 });
     expect(r.created).toBe(0);
     expect(r.updated).toBe(0);
     expect(r.unchanged).toBeGreaterThanOrEqual(4);
@@ -190,11 +196,11 @@ describe.skipIf(!HAS_DB)('K1 TopicMatch nightly recompute (live, fabrika_app)', 
 
   test('a changed embedding updates the existing row in place', async () => {
     await admin.$executeRaw`UPDATE "Topic" SET embedding = ${vec({ 1: 1 })}::vector WHERE id = ${topicId('diag')}`;
-    const r = await recomputeTenantTopicMatches(T_TR);
+    const r = await recomputeTenantTopicMatches(T_TR, MINE);
     expect(r.updated).toBe(1);
     expect((await k1Rows(T_TR)).get(topicId('diag'))?.fitScore).toBe(0);
     await admin.$executeRaw`UPDATE "Topic" SET embedding = ${vec({ 0: 1, 1: 1 })}::vector WHERE id = ${topicId('diag')}`;
-    await recomputeTenantTopicMatches(T_TR);
+    await recomputeTenantTopicMatches(T_TR, MINE);
   });
 
   test('the audit row carries counts only', async () => {
@@ -206,14 +212,14 @@ describe.skipIf(!HAS_DB)('K1 TopicMatch nightly recompute (live, fabrika_app)', 
   });
 
   test('a tenant with no profile embedding and an expired pilot get no row', async () => {
-    expect((await recomputeTenantTopicMatches(T_NOPROF)).status).toBe('no_profile_embedding');
-    expect((await recomputeTenantTopicMatches(T_PILOT)).status).toBe('pilot_expired');
+    expect((await recomputeTenantTopicMatches(T_NOPROF, MINE)).status).toBe('no_profile_embedding');
+    expect((await recomputeTenantTopicMatches(T_PILOT, MINE)).status).toBe('pilot_expired');
     expect((await k1Rows(T_NOPROF)).size).toBe(0);
     expect((await k1Rows(T_PILOT)).size).toBe(0);
   });
 
   test('the all-tenant run skips a deleted tenant, counts each outcome and never crosses tenants', async () => {
-    const r = await recomputeAllTopicMatches({ tenantIds: TENANTS, pageSize: 2 });
+    const r = await recomputeAllTopicMatches({ ...MINE, tenantIds: TENANTS, pageSize: 2 });
     expect(r.tenants).toBe(4); // T_DELETED is not read
     expect(r.pilotExpired).toBe(1);
     expect(r.noProfileEmbedding).toBe(1);

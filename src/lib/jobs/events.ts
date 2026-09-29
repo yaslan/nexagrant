@@ -229,6 +229,34 @@ export const K1TopicMatchOutputSchema = z.object({
 
 export type K1TopicMatchOutput = z.infer<typeof K1TopicMatchOutputSchema>;
 
+// K1: Topic + TenantProfile embeddings (TASK-MUN7C48UHPOGI). `tenantId` = one
+// profile, queued when it is saved; no payload = the nightly sweep.
+export const K1EmbeddingsEventSchema = z.object({ tenantId: z.string().min(1).optional() });
+
+/** Counts only: `errors` is stripped so a provider message never reaches the job log summary. */
+export const K1EmbeddingsOutputSchema = z.object({
+  success: z.boolean(),
+  skipped: z.enum(['no_api_key']).optional(),
+  topicsScanned: z.number(),
+  topicsEmbedded: z.number(),
+  topicsUpToDate: z.number(),
+  topicsEmpty: z.number(),
+  profilesScanned: z.number(),
+  profilesEmbedded: z.number(),
+  profilesUpToDate: z.number(),
+  profilesEmpty: z.number(),
+  profilesPilotExpired: z.number(),
+  raced: z.number(),
+  failed: z.number(),
+  estimatedUsd: z.number(),
+  maxUsd: z.number(),
+  budgetExhausted: z.boolean(),
+  aborted: z.boolean(),
+  durationMs: z.number(),
+});
+
+export type K1EmbeddingsOutput = z.infer<typeof K1EmbeddingsOutputSchema>;
+
 // M4: daily "no contact for 60 days" digest (TASK-MULQL2NYKRGJX)
 export const M4StaleRelationshipsOutputSchema = z.object({
   success: z.boolean(),

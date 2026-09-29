@@ -2,6 +2,7 @@ import { makeWorkerUtils, type Job } from 'graphile-worker';
 import { requestedReportPeriod } from '@/lib/agency/report';
 import { JOB_IDS, queueFor, SCHEDULE, type JobId } from './schedule';
 import { jobsConnectionString } from './worker';
+import { isPresentId } from '@/lib/required-id';
 
 export function isJobId(value: string): value is JobId {
   return (JOB_IDS as readonly string[]).includes(value);
@@ -36,6 +37,10 @@ export async function enqueueJob(
     // can only fail. The job checks it again when it runs.
     const period = requestedReportPeriod(payload, new Date());
     key = `agency-report:${period}`;
+  } else if (id === 'k1-embeddings' && payload.tenantId !== undefined) {
+    // One key per tenant: saving a profile five times queues one embedding.
+    if (!isPresentId(payload.tenantId)) throw new Error('k1-embeddings: tenantId must be a non-empty string');
+    key = `k1-embeddings:profile:${payload.tenantId}`;
   }
   const maxAttempts = SCHEDULE.find((j) => j.id === id)?.maxAttempts ?? 5;
   const utils = await makeWorkerUtils({ connectionString: opts.connectionString ?? jobsConnectionString() });
@@ -60,4 +65,18 @@ export async function enqueueJob(
   } finally {
     await utils.release();
   }
+}
+
+/**
+ * Queue a re-embedding of one tenant's profile (TASK-MUN7C48UHPOGI). Call it
+ * after a profile save commits; the request itself never calls the provider.
+ * Repeated saves while one is queued add nothing (one key per tenant), and the
+ * job embeds only if the profile text actually changed (content hash).
+ */
+export async function enqueueTenantProfileEmbedding(
+  tenantId: string,
+  opts: { connectionString?: string } = {}
+): Promise<EnqueueResult> {
+  if (!isPresentId(tenantId)) throw new Error('enqueueTenantProfileEmbedding: tenantId is missing');
+  return enqueueJob('k1-embeddings', { tenantId }, opts);
 }

@@ -146,6 +146,17 @@ const envSchema = z.object({
    * of a clear configuration error (TASK-MTSWVADF7RQ1B).
    */
   OPENAI_API_KEY: z.string().optional(),
+  /**
+   * Spend ceiling, in USD, for one run of the `k1-embeddings` job
+   * (src/lib/scoring/embeddings.ts). The run stops before the call that would
+   * cross it; the rows left over are embedded by the next run. Low by default so
+   * a misconfigured catalogue cannot turn one night into a bill — raise it on
+   * the worker for a one-off backfill.
+   */
+  K1_EMBEDDING_MAX_USD_PER_RUN: z
+    .string()
+    .regex(/^(0|[1-9][0-9]*)(\.[0-9]+)?$/, 'K1_EMBEDDING_MAX_USD_PER_RUN must be a non-negative number of USD')
+    .default('0.05'),
   ANTHROPIC_API_KEY: z.string().optional(),
   /**
    * 256-bit AES-GCM encryption key for sensitive tokens in CalendarConnection.

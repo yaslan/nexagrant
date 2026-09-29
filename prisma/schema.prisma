@@ -213,6 +213,7 @@ model TenantProfile {
   preferredRoles String[] // coordinator, tech_provider, pilot_site, dissemination...
   priorProjects Json     @default("[]")
   embedding     Unsupported("vector(1536)")?
+  embeddingHash String?  // sha256 of the text `embedding` was made from (src/lib/scoring/embeddings.ts)
   updatedAt     DateTime @updatedAt
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
@@ -535,6 +536,7 @@ model Topic {
   sourceUrl      String?
   rawHash        String?
   embedding      Unsupported("vector(1536)")?
+  embeddingHash  String?  // sha256 of the text `embedding` was made from (src/lib/scoring/embeddings.ts)
   fetchedAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   call           Call     @relation(fields: [callId], references: [id])
