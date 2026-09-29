@@ -328,6 +328,32 @@ Bu iki sağlayıcı envanterden **çıkarılmıştır** çünkü aktif bir işle
 
 **Düzeltildi (bu kart, TASK-MTT1VEUF8Z9SH):** `docs/SECURITY_COMPLIANCE.md` satır 102 ve satır 145'teki PostHog/Sentry ifadeleri Sentry'nin kaldırılma gerekçesiyle birlikte güncellendi; `docs/legal/dpa-en.md` ve `docs/legal/dpa-tr.md` §7'deki "error monitoring"/"hata izleme" alt işleyen kategorisi kaldırılıp yerine bunun bugün üçüncü tarafa gitmediğini açıklayan bir not eklendi. Üç belge artık kodla tutarlı. Kanıt: `grep -rn "posthog\|@sentry\|Sentry.init" src/` → sonuç yok.
 
+
+**Güncel 29.09 (TASK-MULQMKP4YOM04):** iki sağlayıcı için de kod yazıldı, ama ikisi de **anahtar girilene kadar kapalı**. Bugünkü durum ve açıldıklarında ne gideceği §19a'da.
+
+---
+
+## 19a. Ürün analitiği (PostHog) ve isteğe bağlı hata iletimi (Sentry): anahtara bağlı, varsayılan KAPALI (TASK-MULQMKP4YOM04)
+
+**Bugün (anahtar yok) hiçbir veri gitmiyor.** `NEXT_PUBLIC_POSTHOG_KEY` ve `SENTRY_DSN` boş. Kod iki durumda da ağ çağrısı yapmıyor; bunu birim testi ve gerçek tarayıcı kanıtlıyor (`docs/agent-results/TASK-MULQMKP4YOM04-se-fb.md`). Aşağıdaki satırlar **anahtar girildiği an** geçerli olur. PostHog için bu satır o andan itibaren geçerli bir alt işleyen kaydıdır. Sentry için ise ayrıca patron kararı gerekir (aşağıya bakın).
+
+| Alan | PostHog (ürün analitiği) | Sentry (hata iletimi) |
+| --- | --- | --- |
+| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu; PostHog Inc. = alt işleyen | Fabrika = veri sorumlusu; Functional Software Inc. (Sentry) = alt işleyen |
+| **Açılma koşulu** | `NEXT_PUBLIC_POSTHOG_KEY` dolu **ve** ziyaretçi çerez bandında "Tümünü Kabul Et" dedi. "Gerekli Çerezler", yanıtsız ya da bozuk kayıt olursa hiçbir şey gönderilmez ve tanımlayıcı yazılmaz | `SENTRY_DSN` dolu. Yalnız **yeni** açılan `error` seviyesindeki `SystemAlert` satırı iletilir. `warn`/`info` ve tekrar sayacına katlanan tekrarlar iletilmez |
+| **Veri kategorileri** | Olay adı (ör. `readiness_started`), kapalı kümeden değerler (ör. `orgType`, puan, seviye) ve tarayıcı başına rastgele üretilmiş anonim kimlik (`fabrika_analytics_anon_id`, localStorage). **Gönderilmeyenler:** kullanıcı kimliği, e-posta, ad, kurum adı, URL, referrer, sayfa başlığı. Kişi profili ve IP'den konum çıkarma kapalı (`$process_person_profile:false`, `$geoip_disable:true`) | Uyarı seviyesi, kaynak (`source`), mesaj ve `sanitizeMeta`'dan geçmiş meta. E-posta biçimindeki metin `[email]` olarak maskelenir. `SystemAlert` satır kimliği etiket olarak gider. **Gönderilmeyenler:** user, request, headers, sunucu adı, IP, stack locals (SDK kullanılmıyor) |
+| **İlgili kişi kategorileri** | Açık sayfaların ziyaretçileri (bugün yalnız `/fon-hazirlik` olayları) | Dolaylı. Uyarı mesajları kurala göre kiracı içeriği taşımaz |
+| **Amaç** | Huni ölçümü (hazırlık testine başlama, testi tamamlama, kayda tıklama) | Operatörü hata anında uyarmak (amplifikatör, kaydın aslı `SystemAlert`) |
+| **Hukuki sebep** | Açık rıza (çerez bandı, KVKK md.5/1 / ePrivacy) | KVKK md.5/2-f / GDPR art.6(1)(f) meşru menfaat |
+| **Alıcı ve yurt dışı aktarım** | Varsayılan uç `https://eu.i.posthog.com` (AB bölgesi). ABD sunucusu seçilirse yurt dışı aktarım kapsamına girer | DSN'deki ingest bölgesine bağlı (AB için `*.ingest.de.sentry.io`) |
+| **Saklama süresi** | PostHog proje ayarı (**açık**, anahtar açılırken belirlenmeli) | Sentry proje ayarı (**açık**) |
+| **Teknik-idari tedbir** | SDK yok; tek `fetch`, `credentials:'omit'`. Özellik süzgeci (`sanitizeProperties`): en fazla 20 skaler, dize 64 karakter, kimlik biçimli anahtarlar (email/name/kurum/user/phone/…) ve e-posta biçimli değerler düşer | SDK yok; zarf alan alan kurulur, 2 sn zaman aşımı, hiç exception fırlatmaz, DSN hiçbir yerde loglanmaz |
+| **Kaynak dosya yolu** | `src/lib/analytics.ts`, `src/lib/cookie-consent.ts`, `src/components/CookieConsent.tsx` | `src/lib/observability/sentry.ts`, `src/lib/observability/system-alert.ts` (`recordAlert`) |
+
+**Sentry için karar çelişkisi (açık):** patronun 07.09 kararı "hata verisi dışarı çıkmasın" diyor (§19, TASK-MTQUN8VV6DK8C). Bu kart ise "Sentry DSN ile uçtan uca olay kanıtı" istiyor. Kod iki tarafı da bozmayacak şekilde yazıldı: DSN boşken 07.09 kararı aynen geçerli. **`SENTRY_DSN`'i doldurmak 07.09 kararını geri almak anlamına gelir.** Bu adım patron onayı olmadan atılmamalı. Onay verilirse `docs/legal/dpa-*.md` §7 ile `docs/kamu/VERI-YERLESIMI.md` satırı da güncellenmeli.
+
+**Anahtar açılırken yapılacaklar:** (1) PostHog projesinde "Discard client IP data" açılmalı. Olay başına `$geoip_disable` gönderiliyor, ama IP'nin hiç saklanmaması proje ayarıyla sağlanır. (2) PostHog DPA'sı imzalanmalı ve §21'e eklenmeli. (3) Çerez metninde (`legal.cookieConsent`) analitik amacı adıyla geçmeli. (4) Onayı geri alma yolu yok: bant bir kez yanıtlanınca yeniden açılmıyor (**açık**, KVKK md.7 / GDPR art.7(3)).
+
 ---
 
 ## 20. Ters kontrol — şemadaki kişisel veri taşıyan modeller vs. bu envanter
@@ -372,6 +398,8 @@ Aşağıda `prisma/schema.prisma`'daki **tüm modeller** tarandı; kişisel veri
 | Resend                | ABD (belirsiz — repoda bölge bilgisi yok) | E-posta adresi (§17, §18)                        | **YOK — açık**                                                                                  |
 | Cloudflare, Inc.      | Bölge hesap ayarına bağlı                 | Dosya/ekran görüntüsü (§15)                      | **YOK — açık**                                                                                  |
 | iyzico                | Türkiye                                   | Ödeme (§4)                                       | Yurt dışı aktarım değil                                                                         |
+| PostHog Inc.          | AB (`eu.i.posthog.com`, varsayılan)        | Anonim ürün olayı (§19a), **bugün kapalı**        | AB bölgesi. ABD seçilirse **YOK — açık**                                                      |
+| Sentry (Functional Software) | DSN bölgesine bağlı              | Hata uyarısı (§19a), **bugün kapalı**             | Patron onayı + DPA **YOK — açık**                                                               |
 
 Hiçbiri için repo içinde imzalı bir Standart Sözleşme Hükümleri (SCC) eki veya açık rıza akışı **bulunamadı** — `docs/legal/dpa-en.md` §7 yalnızca kategori bazında "alt işleyen kullanılıyor" diyor, sözleşme metni yok. Bu, envanterin en büyük tekil boşluğudur.
 
@@ -385,7 +413,7 @@ Hiçbiri için repo içinde imzalı bir Standart Sözleşme Hükümleri (SCC) ek
 4. `CalendarConnection` token'ları plaintext (§11) — henüz veri yazılmadığı için bugün risk gerçekleşmiyor ama OAuth akışı açılmadan önce şifreleme şart.
 5. Muhatap (üçüncü kişi) için ayrı silme talebi formu iddia ediliyor (`docs/SECURITY_COMPLIANCE.md` satır 101) ama kod tabanında bulunamadı (§10).
 6. Hiçbir yurt dışı aktarım için imzalı SCC/ek sözleşme repoda yok (§21).
-7. PostHog ve Sentry, DPA'nın alt işleyen listesinde ama kodda hiç bağlı değil (§19) — ya kaldırılmalı ya da entegre edilip envantere eklenmeli.
+7. PostHog ve Sentry, DPA'nın alt işleyen listesinde ama kodda hiç bağlı değil (§19) — ya kaldırılmalı ya da entegre edilip envantere eklenmeli. **Güncel 29.09:** ikisi de entegre edildi ama anahtar girilene kadar kapalı (§19a). Açık kalanlar: Sentry için patron onayı (07.09 kararıyla çelişiyor), PostHog DPA'sı ve IP ayarı, çerez onayını geri alma yolu.
 8. `src/lib/rag.ts` ve `src/lib/ai/rag.ts` iki ayrı dosya aynı işlevi (RAG) görüyor gibi duruyor; hangisinin gerçek üretim yolunda olduğu bu kart kapsamında netleştirilmedi (§7 dipnotu, sonuç raporunda ayrıca bildirildi).
 9. Ajans kanalı (§18c): kodlu kayıtta ek aydınlatma gösterilmiyor, `Consent`'e ek belge yazılmıyor. Ek yayına girmeden kodlu kayıt gerçek kullanıcıya açılmamalı (`agency-channel-notice-addendum.md` §6).
 10. Ajans bağını kaldırma özelliği yok; kaldırma sonrası saklama süresi tanımsız (HUKUK-7).

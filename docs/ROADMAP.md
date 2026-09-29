@@ -35,6 +35,7 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
       doğrudan kontrol et. **PostHog ise yalnız bir stub** (`src/lib/analytics.ts` — `console.log`
       yapıyor, gerçek PostHog SDK/API çağrısı yok) — bu yüzden kutu tam işaretlenmedi.
       **güncel 29.09 — hâlâ açık:** `src/lib/analytics.ts` hâlâ `console.log` stub'ı (koddan doğrulandı). Kart: **TASK-MULQMKP4YOM04** (backlog; PostHog + Sentry DSN ile uçtan uca olay kanıtı). Sentry DSN anahtarı: **TASK-MULQM3LFB4KRA** (patron).
+      **güncel 29.09 akşam — kod tamam, anahtar bekliyor:** PostHog gerçek capture'a çevrildi (anahtar + çerez onayı olmadan no-op, kişisel veri yok). Sentry iletimi yeniden eklendi (SDK'sız envelope, yalnız yeni `error` SystemAlert). *Düzeltme:* yukarıdaki "Sentry gerçekten var" notu eskiydi; dosya 07.09'da patron kararıyla silinmişti (TASK-MTQUN8VV6DK8C), şimdi DSN'e bağlı ve varsayılan kapalı olarak geri geldi. İkisi de yerel sahte uca uçtan uca kanıtlandı. Gerçek anahtarla doğrulama ve Sentry için patron onayı açık (TASK-MULQMKP4YOM04 raporu, processing-register §19a).
 - [x] `docs/UI_GUIDE.md`'ye göre tema tokenleri; boş sayfa kabuğu (sol nav, üst çubuk, çalışma alanı seçici).
 - [x] `npx prisma validate` + ilk migration (`prisma/schema.prisma` hazırlandığı ortamda çevrimdışı olduğu için henüz doğrulanmadı; hata çıkarsa şemayı düzelt ve `docs/DATA_MODEL.md`'yi güncelle).
 - Kabul: CI yeşil; `pnpm dev` ile tr/en boş kabuk.
