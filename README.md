@@ -75,7 +75,7 @@ koşar. Yerelde iki şey gerekir: `.env`'de `INNGEST_DEV=1` (`.env.example`'da h
 sunucusu.
 
 ```bash
-grep -q '^INNGEST_DEV=' .env || echo 'INNGEST_DEV=1' >> .env   # eski .env'ler için; sonra pnpm dev'i yeniden başlat
+grep -q '^INNGEST_DEV=' .env || printf '\nINNGEST_DEV=1\n' >> .env   # eski .env'ler için; sonra pnpm dev'i yeniden başlat
 curl -s -o /dev/null -w '%{http_code}\n' localhost:3000/api/inngest   # 200 olmalı
 npx --yes inngest-cli@latest dev -u http://localhost:3000/api/inngest   # arayüz: http://localhost:8288
 ```
@@ -94,6 +94,10 @@ npx --yes inngest-cli@latest dev -u http://localhost:3000/api/inngest   # arayü
   zamanında da koşar.
 - **Canlı/staging.** `INNGEST_DEV`'i kaldır (ya da `0`), `INNGEST_SIGNING_KEY` ve
   `INNGEST_EVENT_KEY`'i Inngest panelinden doldur. Anahtarları `.env.example`'a yazma.
+- **Üretim derlemesi dev kipine girmez.** `next build` çıktısında istemci her zaman bulut kipindedir
+  (`src/lib/inngest/client.ts`, imzasız istek 401) ve `INNGEST_DEV` açıkken sunucu hiç başlamaz
+  (`src/lib/env.ts`). Yerelde `pnpm build && pnpm start` için `INNGEST_DEV=0 pnpm start`.
+  Docker imajına `.env` girmez (`.dockerignore`); ayarlar konteyner ortamından gelir.
 
 ### Elle kurulmuş fabrika-postgres'i compose'a devretme
 

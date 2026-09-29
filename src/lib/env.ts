@@ -35,6 +35,12 @@ const envSchema = z.object({
   SENTRY_ENVIRONMENT: z.string().optional(),
   INNGEST_API_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
+  /**
+   * Inngest dev mode for local work (README "Yerel Inngest"). The SDK reads it
+   * itself; it is listed here so {@link assertInngestDevModeAllowed} can refuse
+   * a production server that has it on.
+   */
+  INNGEST_DEV: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   WORKER_URL: z.string().optional(),
   WORKER_TOKEN: z.string().optional(),
@@ -212,3 +218,45 @@ export const env = _env.data;
  * that is not a positive integer, so this cannot be `NaN`.
  */
 export const alertsSweepFailureThreshold = Number(env.ALERTS_SWEEP_FAILURE_THRESHOLD);
+
+/**
+ * Whether this code was BUILT for production. Next replaces a direct
+ * `process.env.NODE_ENV` read with a literal at build time, so starting a
+ * production build with NODE_ENV=test cannot change it (same reasoning as
+ * BUILT_FOR_PRODUCTION in src/lib/demo-login.ts). Keep it a direct member access.
+ */
+export const INNGEST_BUILT_FOR_PRODUCTION = process.env.NODE_ENV === 'production';
+
+/** Values the Inngest SDK treats as "not dev mode" (its parseAsBoolean, plus blank). */
+const INNGEST_DEV_OFF = new Set(['', '0', 'false', 'undefined']);
+
+export class InngestDevModeInProductionError extends Error {
+  constructor() {
+    super(
+      '❌ INNGEST_DEV is on in a production server. Dev mode skips request signature checks on ' +
+        '/api/inngest, so anyone could run the scheduled jobs. Remove INNGEST_DEV (or set it to 0) ' +
+        'and set INNGEST_SIGNING_KEY. For a local `pnpm start`, run it as `INNGEST_DEV=0 pnpm start`.'
+    );
+    this.name = 'InngestDevModeInProductionError';
+  }
+}
+
+/**
+ * Run once at server start (src/instrumentation.ts). A production server — a
+ * production build, whatever NODE_ENV the process was started with, or
+ * NODE_ENV=production — refuses to start while INNGEST_DEV is on. The client
+ * (src/lib/inngest/client.ts) already forces cloud mode in a production build;
+ * this makes the misconfiguration visible instead of silently ignored.
+ *
+ * @param builtForProduction the build-time half; a parameter only so the tests
+ *   (which run unbuilt, under NODE_ENV=test) can exercise a production build.
+ */
+export function assertInngestDevModeAllowed(
+  source: { INNGEST_DEV?: string; NODE_ENV?: string } = env,
+  builtForProduction: boolean = INNGEST_BUILT_FOR_PRODUCTION
+): void {
+  const devValue = (source.INNGEST_DEV ?? '').trim().toLowerCase();
+  if (!INNGEST_DEV_OFF.has(devValue) && (builtForProduction || source.NODE_ENV === 'production')) {
+    throw new InngestDevModeInProductionError();
+  }
+}

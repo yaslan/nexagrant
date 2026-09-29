@@ -8,9 +8,11 @@ export async function register() {
   try {
     assertAuthSecretConfigured();
     // Imported inside the try: loading it validates the environment (src/lib/env.ts),
-    // and an invalid DEMO_LOGIN_ENABLED has to stop the server the same way.
+    // and an invalid DEMO_LOGIN_ENABLED (or INNGEST_DEV on in production) has to stop the server the same way.
     const { assertDemoLoginAllowed } = await import('./lib/demo-login');
     assertDemoLoginAllowed();
+    const { assertInngestDevModeAllowed } = await import('./lib/env');
+    assertInngestDevModeAllowed();
   } catch (error) {
     // Throwing here only logs: Next keeps listening and answers every request
     // with a 500, which a port health check reads as a running server. Exit.
