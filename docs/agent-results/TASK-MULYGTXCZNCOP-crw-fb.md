@@ -4,13 +4,13 @@ Repo `/Users/macbook/alan/FONBRIDGE`, dal `dev`, HEAD `68fdec03`. Kod değiştir
 
 ## Kararlar
 
-| #   | Kart                                          | Commit                | Karar                                  |
-| --- | --------------------------------------------- | --------------------- | -------------------------------------- |
-| 1   | TASK-MULXF0AVMD8MN pano sızıntısı (PİLOT KAPISI) | `ef8627b0` `68fdec03` | **DÜZELTME GEREKLİ** (B-1)            |
-| 2   | TASK-MULV3JXS1AW5X Tenant.province            | `49bf9138` `8b4b2654` | **ONAY** (il görünümü Kart 1 B-1'e bağlı) |
-| 3   | TASK-MULUJ8O4JH1PF AuditEvent NULL satırlar   | `12aacc7d` `849d7708` | **ONAY**                               |
-| 4   | TASK-MULRSG6T55LO0 B11 kamu TL paketleri      | `2c35e535`            | **ONAY** (Ö-1 bloke etmiyor)           |
-| 5   | TASK-MULXYY4DPRBCF M9 takvim e2e              | `965c2c2f` `ed2d1ec6` | **ONAY** (e2e'yi ben koşamadım, aşağıda) |
+| #   | Kart                                             | Commit                | Karar                                     |
+| --- | ------------------------------------------------ | --------------------- | ----------------------------------------- |
+| 1   | TASK-MULXF0AVMD8MN pano sızıntısı (PİLOT KAPISI) | `ef8627b0` `68fdec03` | **DÜZELTME GEREKLİ** (B-1)                |
+| 2   | TASK-MULV3JXS1AW5X Tenant.province               | `49bf9138` `8b4b2654` | **ONAY** (il görünümü Kart 1 B-1'e bağlı) |
+| 3   | TASK-MULUJ8O4JH1PF AuditEvent NULL satırlar      | `12aacc7d` `849d7708` | **ONAY**                                  |
+| 4   | TASK-MULRSG6T55LO0 B11 kamu TL paketleri         | `2c35e535`            | **ONAY** (Ö-1 bloke etmiyor)              |
+| 5   | TASK-MULXYY4DPRBCF M9 takvim e2e                 | `965c2c2f` `ed2d1ec6` | **ONAY** (e2e'yi ben koşamadım, aşağıda)  |
 
 Bloke eden tek bulgu Kart 1 B-1. Pano, bu düzeltme gelmeden pilota açılmamalı.
 
@@ -24,17 +24,17 @@ Bloke eden tek bulgu Kart 1 B-1. Pano, bu düzeltme gelmeden pilota açılmamal�
 
 ## 2. Kapı çıktıları (bu oturumda, HEAD 68fdec03)
 
-| Kapı                          | Sonuç                                                                                                                                         |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm typecheck`              | rc=0                                                                                                                                          |
-| `pnpm lint`                   | rc=0                                                                                                                                          |
-| `pnpm test`                   | rc=0 — `Test Files 185 passed \| 2 skipped (187)`, `Tests 2105 passed \| 8 skipped (2113)`                                                     |
-| Kartların testleri (verbose)  | `agency-funnel.live`, `auditevent-null-system-only.live`, `funnel.test`, `province.test`, `public-sector*`, `calendar-token-db.live` → `Test Files 7 passed (7)`, `Tests 58 passed (58)`. Canlı testler atlanmadı, gerçekten koştu. |
-| `pnpm rls:check`              | rc=0 — 47 model, CHECK 4b 15 tablo ENABLE+FORCE+tenant_isolation                                                                               |
-| `pnpm rls:verify`             | rc=0 — "AuditEvent kiracı bağlamında 349 kiracısız satırın hiçbirini görmedi", "system scope'ta 349 kiracısız satırın hepsini gördü"           |
-| `pnpm rls:bypass-check`       | rc=0 — "no new tenant bypass … 31 on the sanctioned cross-tenant path, 0 still owed"                                                          |
-| `pnpm i18n:check`             | rc=0 — 325/325 literal, baseline içinde                                                                                                        |
-| `apply-migrations.sh --list`  | son üç satır: `auditevent-null-system-only.sql`, `add-tenant-province.sql`, `add-agency-funnel-province.sql`                                   |
+| Kapı                         | Sonuç                                                                                                                                                                                                                               |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm typecheck`             | rc=0                                                                                                                                                                                                                                |
+| `pnpm lint`                  | rc=0                                                                                                                                                                                                                                |
+| `pnpm test`                  | rc=0 — `Test Files 185 passed \| 2 skipped (187)`, `Tests 2105 passed \| 8 skipped (2113)`                                                                                                                                          |
+| Kartların testleri (verbose) | `agency-funnel.live`, `auditevent-null-system-only.live`, `funnel.test`, `province.test`, `public-sector*`, `calendar-token-db.live` → `Test Files 7 passed (7)`, `Tests 58 passed (58)`. Canlı testler atlanmadı, gerçekten koştu. |
+| `pnpm rls:check`             | rc=0 — 47 model, CHECK 4b 15 tablo ENABLE+FORCE+tenant_isolation                                                                                                                                                                    |
+| `pnpm rls:verify`            | rc=0 — "AuditEvent kiracı bağlamında 349 kiracısız satırın hiçbirini görmedi", "system scope'ta 349 kiracısız satırın hepsini gördü"                                                                                                |
+| `pnpm rls:bypass-check`      | rc=0 — "no new tenant bypass … 31 on the sanctioned cross-tenant path, 0 still owed"                                                                                                                                                |
+| `pnpm i18n:check`            | rc=0 — 325/325 literal, baseline içinde                                                                                                                                                                                             |
+| `apply-migrations.sh --list` | son üç satır: `auditevent-null-system-only.sql`, `add-tenant-province.sql`, `add-agency-funnel-province.sql`                                                                                                                        |
 
 **Migration denemesi (geçici DB, iki geçiş).** Durum sütunları sırayla şunlar: AuditEvent politikaları · `Tenant.province` var mı · `agency_funnel_counts_by_province` var mı.
 
