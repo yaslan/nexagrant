@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { createDbClient } from '@/lib/db';
-import { SAVED_SEARCH_ALERT_QUERY, ownerEmailQuery, matchCountQuery } from '../alerts-daily';
+import {
+  NO_MAIL_PROVIDER,
+  SAVED_SEARCH_ALERT_QUERY,
+  alertsRunReport,
+  matchCountQuery,
+  ownerEmailQuery,
+} from '../alerts-daily';
 
 /**
  * These assertions run against the REAL generated Prisma client, not a mock.
@@ -105,5 +111,49 @@ describe('alerts-daily match-count query', () => {
     expect(matchCountQuery({ status: ['OPEN'] }, since)).toEqual({
       where: { fetchedAt: { gt: since }, status: { in: ['OPEN'] } },
     });
+  });
+});
+
+describe('alerts-daily run report (TASK-MUMH6NZ128QZ1)', () => {
+  it('a clean run is a success and raises no alert', () => {
+    const { output, alert } = alertsRunReport(
+      { emailsSent: 2, emailsFailed: 0, emailsSkipped: 1, errors: [] },
+      3
+    );
+    expect(output).toEqual({
+      success: true,
+      totalSearches: 3,
+      emailsSent: 2,
+      emailsFailed: 0,
+      emailsSkipped: 1,
+    });
+    expect(alert).toBeNull();
+  });
+
+  it('no mail provider fails the run with its reason and an error-level alert', () => {
+    const errors = [{ searchId: 'ss_1', reason: NO_MAIL_PROVIDER }];
+    const { output, alert } = alertsRunReport(
+      { emailsSent: 0, emailsFailed: 1, emailsSkipped: 0, errors },
+      1
+    );
+    expect(output.success).toBe(false);
+    expect(output.reason).toBe(NO_MAIL_PROVIDER);
+    expect(output.emailsSent).toBe(0);
+    expect(output.errors).toEqual(errors);
+    expect(alert?.level).toBe('error');
+    expect(alert?.message).toMatch(/RESEND_API_KEY unset/);
+    // No key may contain "email": recordAlert would strip it as PII.
+    expect(Object.keys(alert?.meta ?? {}).filter((k) => /email/i.test(k))).toEqual([]);
+    expect(alert?.meta).toMatchObject({ sent: 0, failed: 1 });
+  });
+
+  it('any other per-search failure still fails the run, at warn level', () => {
+    const { output, alert } = alertsRunReport(
+      { emailsSent: 1, emailsFailed: 1, emailsSkipped: 0, errors: [{ searchId: 'ss_2', reason: 'no_owner_email' }] },
+      2
+    );
+    expect(output.success).toBe(false);
+    expect(output.reason).toBe('send_failed');
+    expect(alert?.level).toBe('warn');
   });
 });

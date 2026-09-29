@@ -2,19 +2,17 @@ import { inngest } from '../client';
 import { env } from '@/lib/env';
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
-import { Resend } from 'resend';
+import { resendMailer, type Mailer } from '@/lib/email/resend-mailer';
 import { errorMessage } from '@/lib/errors';
-import { recordAlert } from '@/lib/observability/system-alert';
+import { recordAlert, type RecordAlertInput } from '@/lib/observability/system-alert';
 import { AlertsDailyOutputSchema, type AlertsDailyOutput } from '../events';
 import { parseSavedSearchFilters } from '@/lib/saved-search-filters';
 
-let resend: Resend | null = null;
-function getResend(): Resend | null {
-  if (!resend && env.RESEND_API_KEY) {
-    resend = new Resend(env.RESEND_API_KEY);
-  }
-  return resend;
-}
+/**
+ * Why a search's alert did not go out, when the reason is the mail provider
+ * itself rather than that one search. The job reports it as its `reason`.
+ */
+export const NO_MAIL_PROVIDER = 'no_mail_provider';
 
 /**
  * `SavedSearch` carries a bare `tenantId` scalar and declares no `tenant`
@@ -141,7 +139,8 @@ function touchLastRun(tx: TenantTx, searchId: string) {
  */
 export async function sendSavedSearchAlerts(
   savedSearches: SavedSearchAlertRow[],
-  runTenant: TenantRunner = withTenant
+  runTenant: TenantRunner = withTenant,
+  mailer: Mailer | null = resendMailer()
 ): Promise<SavedSearchAlertResult> {
   let emailsSent = 0;
   let emailsFailed = 0;
@@ -198,18 +197,23 @@ export async function sendSavedSearchAlerts(
             <p>Happy hunting!<br/>FonBridge Team</p>
           `;
 
+      // TASK-MUMH6NZ128QZ1: with no mail provider the send used to be skipped
+      // silently while `lastRunAt` still advanced and `emailsSent` still
+      // counted it, so the matches in this window were never mailed and never
+      // would be. Now it is a failure, and `lastRunAt` stays put so the next
+      // run with a working provider picks the same matches up again.
+      if (!mailer) {
+        emailsFailed++;
+        errors.push({ searchId, reason: NO_MAIL_PROVIDER });
+        continue;
+      }
+
       // Outside the tenant transaction on purpose: `runTenant` opens a real
       // Postgres transaction, and holding one across a network round trip to
-      // Resend would pin a connection for the length of the send.
-      const resendClient = getResend();
-      if (resendClient && env.RESEND_API_KEY) {
-        await resendClient.emails.send({
-          from: env.EMAIL_FROM || 'FonBridge <no-reply@fabrika.app>',
-          to: [ownerEmail],
-          subject,
-          html,
-        });
-      }
+      // Resend would pin a connection for the length of the send. A rejected
+      // send throws (see resendMailer) and lands in the catch below before
+      // `lastRunAt` moves.
+      await mailer({ to: ownerEmail, subject, html });
 
       await runTenant(tenantId, (tx) => touchLastRun(tx, searchId));
 
@@ -224,6 +228,53 @@ export async function sendSavedSearchAlerts(
   }
 
   return { emailsSent, emailsFailed, emailsSkipped, errors };
+}
+
+/**
+ * What a finished run reports: the job output, and the `SystemAlert` to write
+ * when any alert did not go out. Pure, so the verdict is testable without a
+ * scheduler.
+ *
+ * TASK-MUMH6NZ128QZ1: `success` used to be a constant `true`. A run in which
+ * any alert did not go out is not a success, and says why.
+ */
+export function alertsRunReport(
+  result: SavedSearchAlertResult,
+  totalSearches: number
+): { output: AlertsDailyOutput; alert: RecordAlertInput | null } {
+  const output: AlertsDailyOutput = {
+    success: result.emailsFailed === 0,
+    totalSearches,
+    emailsSent: result.emailsSent,
+    emailsFailed: result.emailsFailed,
+    emailsSkipped: result.emailsSkipped,
+  };
+  if (result.errors.length === 0) return { output, alert: null };
+
+  const noMailProvider = result.errors.some((e) => e.reason === NO_MAIL_PROVIDER);
+  output.reason = noMailProvider ? NO_MAIL_PROVIDER : 'send_failed';
+  output.errors = result.errors;
+
+  // `SystemAlert` has no tenant isolation (see system-alert.ts): row ids only,
+  // never the tenant id or the address the mail was going to. A missing
+  // provider fails every search with matches, every morning, until someone
+  // sets RESEND_API_KEY: that is an outage, not a blip.
+  const alert: RecordAlertInput = {
+    level: noMailProvider ? 'error' : 'warn',
+    source: 'alerts-daily',
+    message: noMailProvider
+      ? `No mail provider (RESEND_API_KEY unset): ${result.emailsFailed} of ${totalSearches} saved-search alerts not sent`
+      : `${result.emailsFailed} of ${totalSearches} saved-search alerts failed`,
+    // Not `emailsSent`/`emailsFailed`: recordAlert strips any meta key that
+    // contains "email" as a possible personal identifier, so under those
+    // names the counts never reached the alert (seen in the dev run).
+    meta: {
+      sent: result.emailsSent,
+      failed: result.emailsFailed,
+      failures: result.errors,
+    },
+  };
+  return { output, alert };
 }
 
 /**
@@ -262,33 +313,12 @@ export const alertsDaily = inngest.createFunction(
     // mutated across many memoized steps would replay back to zero.
     const result = await step.run('send-alerts', async () => sendSavedSearchAlerts(savedSearches));
 
-    if (result.errors.length > 0) {
-      // `SystemAlert` has no tenant isolation (see system-alert.ts): row ids
-      // only, never the tenant id or the address the mail was going to.
+    const { output, alert } = alertsRunReport(result, savedSearches.length);
+
+    if (alert) {
       await step.run('record-failure-alert', async () => {
-        await recordAlert({
-          level: 'warn',
-          source: 'alerts-daily',
-          message: `${result.emailsFailed} of ${savedSearches.length} saved-search alerts failed`,
-          meta: {
-            emailsSent: result.emailsSent,
-            emailsFailed: result.emailsFailed,
-            failures: result.errors,
-          },
-        });
+        await recordAlert(alert);
       });
-    }
-
-    const output: AlertsDailyOutput = {
-      success: true,
-      totalSearches: savedSearches.length,
-      emailsSent: result.emailsSent,
-      emailsFailed: result.emailsFailed,
-      emailsSkipped: result.emailsSkipped,
-    };
-
-    if (result.errors.length > 0) {
-      output.errors = result.errors;
     }
 
     return AlertsDailyOutputSchema.parse(output);

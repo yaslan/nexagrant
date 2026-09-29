@@ -219,7 +219,9 @@ async function notifySubject(email: string, locale: string, purgeAt: Date): Prom
   const formatted = purgeAt.toISOString().split('T')[0];
 
   try {
-    await client.emails.send({
+    // resend v6 resolves `{ error }` on an API failure instead of throwing
+    // (TASK-MUMH6NZ128QZ1), so the catch below alone never saw a refusal.
+    const { error } = await client.emails.send({
       from: `${PRODUCT_NAME} <${env.NEXT_PUBLIC_SMTP_FROM_ADDRESS}>`,
       to: email,
       subject: isTr ? 'Hesap silme talebiniz alındı' : 'Your account deletion request',
@@ -227,6 +229,7 @@ async function notifySubject(email: string, locale: string, purgeAt: Date): Prom
         ? `Hesabınız ${formatted} tarihinde kalıcı olarak silinecektir. Bu tarihe kadar giriş yapıp talebi iptal edebilirsiniz.`
         : `Your account will be permanently deleted on ${formatted}. You can sign in and cancel the request until then.`,
     });
+    if (error) console.warn('[request-deletion] notification email refused:', error.name);
   } catch (error) {
     console.warn('[request-deletion] notification email failed:', error);
   }

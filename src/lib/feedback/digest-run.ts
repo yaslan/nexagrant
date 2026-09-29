@@ -92,21 +92,13 @@ export async function collectDigestRows(
 }
 
 /**
- * Build a Resend-backed sender, or null when no API key is configured. Kept
- * lazy so importing this module never constructs a client.
+ * The Resend-backed sender, or null when no API key is configured. It throws
+ * when Resend answers with `{ error }` (TASK-MUMH6NZ128QZ1): the previous
+ * inline sender ignored that result, so a rejected digest reported 'sent'.
  */
 async function defaultSender(): Promise<DigestRunOptions['sender'] | null> {
-  if (!env.RESEND_API_KEY) return null;
-  const { Resend } = await import('resend');
-  const client = new Resend(env.RESEND_API_KEY);
-  return async ({ to, subject, html }) => {
-    await client.emails.send({
-      from: env.EMAIL_FROM || 'FonBridge <no-reply@fabrika.app>',
-      to: [to],
-      subject,
-      html,
-    });
-  };
+  const { resendMailer } = await import('@/lib/email/resend-mailer');
+  return resendMailer();
 }
 
 export async function runFeedbackDigest(

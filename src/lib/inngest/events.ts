@@ -66,6 +66,8 @@ export const AlertsDailyOutputSchema = z.object({
   emailsSent: z.number(),
   emailsFailed: z.number(),
   emailsSkipped: z.number(), // no new matches since lastRunAt — no "(no new)" spam sent
+  // Set whenever success is false: 'no_mail_provider' or 'send_failed'.
+  reason: z.string().optional(),
   errors: z.array(z.object({
     searchId: z.string(),
     reason: z.string(),

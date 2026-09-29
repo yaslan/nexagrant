@@ -38,8 +38,10 @@ export const feedbackWeeklyDigest = inngest.createFunction(
       };
     });
 
+    // 'skipped' (no key or no recipient) is the documented best-effort case
+    // above; 'failed' means Resend refused the mail and is not a success.
     const output: FeedbackWeeklyDigestOutput = {
-      success: true,
+      success: result.emailStatus !== 'failed',
       windowStart: result.windowStart,
       windowEnd: result.windowEnd,
       newCount: result.newCount,

@@ -2,7 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenantOn } from '@/lib/db';
 import { envValue } from '../../../../../tests/helpers/dotenv';
-import { sendSavedSearchAlerts, type SavedSearchAlertRow, type TenantRunner } from '../alerts-daily';
+import {
+  NO_MAIL_PROVIDER,
+  sendSavedSearchAlerts,
+  type SavedSearchAlertRow,
+  type TenantRunner,
+} from '../alerts-daily';
+import { MailSendError, type Mailer, type MailMessage } from '@/lib/email/resend-mailer';
 import { grantCreditsToTenants } from '../credits-monthly-grant';
 
 /**
@@ -145,6 +151,30 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
       .then((r) => r.lastRunAt);
   }
 
+  /** A mailer that accepts everything and remembers who it was asked to mail. */
+  function recordingMailer(): { send: Mailer; sent: MailMessage[] } {
+    const sent: MailMessage[] = [];
+    return { sent, send: async (m) => void sent.push(m) };
+  }
+
+  /**
+   * The no-provider tests below only mean something if the searches HAVE
+   * matches: with zero matches the job skips the send and advances
+   * `lastRunAt` on purpose, and "lastRunAt did not move" would never be
+   * reached. So assert the precondition instead of trusting it.
+   */
+  async function assertMatchesExist() {
+    const topics = await prisma.topic.count({ where: { fetchedAt: { gt: LONG_AGO } } });
+    expect(topics, 'no Topic rows locally — every search would be skipped, not mailed').toBeGreaterThan(0);
+  }
+
+  async function resetLastRun() {
+    await prisma.savedSearch.updateMany({
+      where: { id: { in: [a.searchId, b.searchId] } },
+      data: { lastRunAt: LONG_AGO },
+    });
+  }
+
   beforeAll(async () => {
     try {
       await prisma.$connect();
@@ -244,8 +274,14 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
   it('alerts-daily: every search advances lastRunAt under its own tenant', async () => {
     expect(ready, skipReason).toBe(true);
 
+    await assertMatchesExist();
     const runner = recordingRunner();
-    const result = await sendSavedSearchAlerts([rowFor(a, 'a'), rowFor(b, 'b')], runner.run);
+    const mail = recordingMailer();
+    const result = await sendSavedSearchAlerts(
+      [rowFor(a, 'a'), rowFor(b, 'b')],
+      runner.run,
+      mail.send
+    );
 
     expect(result.errors).toEqual([]);
     expect(result.emailsFailed).toBe(0);
@@ -254,10 +290,10 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     // every one of them the tenant of the search being processed. A run that
     // reached for a stale id, or skipped the wrapper, cannot produce this.
     expect(runner.scopes).toEqual([a.tenantId, a.tenantId, b.tenantId, b.tenantId]);
-    // No RESEND_API_KEY under vitest, so the send is a no-op — but the owner
-    // lookup resolved (otherwise this would be `no_owner_email`) and the write
-    // after the send is the one being exercised.
-    expect(result.emailsSent + result.emailsSkipped).toBe(2);
+    // Each owner was mailed once, and only after the mailer accepted it was
+    // the search counted as sent.
+    expect(mail.sent.map((m) => m.to)).toEqual([a.email, b.email]);
+    expect(result.emailsSent).toBe(2);
 
     for (const f of [a, b]) {
       const lastRunAt = await lastRunOf(f.searchId);
@@ -280,7 +316,9 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
       return withTenantOn(rls, useThis, callback);
     };
 
-    const result = await sendSavedSearchAlerts([rowFor(a, 'a'), rowFor(b, 'b')], stale);
+    const mail = recordingMailer();
+    const result = await sendSavedSearchAlerts([rowFor(a, 'a'), rowFor(b, 'b')], stale, mail.send);
+    expect(mail.sent.map((m) => m.to)).toEqual([a.email]);
 
     // Search B is looked up under tenant A's scope, so its owner membership is
     // invisible and the search fails before it can mail or write anything.
@@ -301,5 +339,49 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
         tx.savedSearch.update({ where: { id: a.searchId }, data: { lastRunAt: new Date() } })
       )
     ).rejects.toThrow();
+  });
+  // TASK-MUMH6NZ128QZ1 — no mail provider used to mean "count it as sent and
+  // move lastRunAt past the matches", so they were never mailed at all.
+  it('alerts-daily: with no mail provider, nothing is counted sent and lastRunAt stays put', async () => {
+    expect(ready, skipReason).toBe(true);
+    await assertMatchesExist();
+    await resetLastRun();
+
+    const runner = recordingRunner();
+    const result = await sendSavedSearchAlerts([rowFor(a, 'a'), rowFor(b, 'b')], runner.run, null);
+
+    expect(result.emailsSent).toBe(0);
+    expect(result.emailsSkipped).toBe(0);
+    expect(result.emailsFailed).toBe(2);
+    expect(result.errors).toEqual([
+      { searchId: a.searchId, reason: NO_MAIL_PROVIDER },
+      { searchId: b.searchId, reason: NO_MAIL_PROVIDER },
+    ]);
+    // Owner lookups only — no `lastRunAt` write was attempted for either.
+    expect(runner.scopes).toEqual([a.tenantId, b.tenantId]);
+    expect(await lastRunOf(a.searchId)).toEqual(LONG_AGO);
+    expect(await lastRunOf(b.searchId)).toEqual(LONG_AGO);
+  });
+
+  it('alerts-daily: a send the provider refuses fails that search and keeps its matches', async () => {
+    expect(ready, skipReason).toBe(true);
+    await assertMatchesExist();
+    await resetLastRun();
+
+    // A refuses (what resendMailer throws on `{ error }`), B goes through.
+    const refusingForA: Mailer = async (m) => {
+      if (m.to === a.email) throw new MailSendError('validation_error', 422);
+    };
+    const result = await sendSavedSearchAlerts(
+      [rowFor(a, 'a'), rowFor(b, 'b')],
+      recordingRunner().run,
+      refusingForA
+    );
+
+    expect(result.emailsSent).toBe(1);
+    expect(result.emailsFailed).toBe(1);
+    expect(result.errors).toEqual([{ searchId: a.searchId, reason: 'resend:validation_error:422' }]);
+    expect(await lastRunOf(a.searchId)).toEqual(LONG_AGO);
+    expect((await lastRunOf(b.searchId))!.getTime()).toBeGreaterThan(LONG_AGO.getTime());
   });
 });
