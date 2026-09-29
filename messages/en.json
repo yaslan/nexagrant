@@ -583,12 +583,15 @@
       "privacy": "Privacy Policy",
       "terms": "Terms of Service",
       "compliance": "Compliance",
-      "contact": "Contact"
+      "contact": "Contact",
+      "residencyBadge": "● GDPR Compliant",
+      "dataResidency": "🇹🇷 Database hosted in Türkiye"
     },
     "metaTitle": "{brand} — AI-Powered EU Funding Platform for Horizon Europe & Eurostars",
     "metaDescription": "{brand}: End-to-end platform for EU research proposals. Consortium matching, AI evaluator simulation, CORDIS network intelligence. From concept to funding.",
     "ecosystemSubtitle": "From high-growth SMEs to university TTOs and international research consortia.",
-    "closingSubtitle": "Shorten your proposal timeline with CORDIS network analytics and an evaluator’s reading of your draft."
+    "closingSubtitle": "Shorten your proposal timeline with CORDIS network analytics and an evaluator’s reading of your draft.",
+    "heroCompliance": "GDPR / KVKK-Compliant Secure Cloud"
   },
   "pricing": {
     "title": "{brand} Pricing",

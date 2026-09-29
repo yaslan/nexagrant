@@ -12,6 +12,7 @@ interface PublicFooterProps {
 export default function PublicFooter({ locale }: PublicFooterProps) {
   const isTr = locale === 'tr';
   const tCommon = useTranslations('Common');
+  const tFooter = useTranslations('landing.footer');
 
   return (
     <footer className="bg-ground border-t border-border text-muted text-xs transition-colors">
@@ -29,7 +30,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-2 text-muted">
               <span className="flex items-center gap-1 text-[11px] bg-surface border border-border px-2.5 py-1 rounded-md text-ok font-mono">
-                ● EU Cloud & GDPR Compliant
+                {tFooter('residencyBadge')}
               </span>
               <span className="text-[11px] bg-surface border border-border px-2.5 py-1 rounded-md text-muted font-mono">
                 CORDIS 2026 Ready
@@ -132,7 +133,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
                 </Link>
               </li>
               <li>
-                <a href="mailto:info@usfinbridge.com" className="hover:text-ink transition">
+                <a href="mailto:info@fonbridge.com" className="hover:text-ink transition">
                   {isTr ? 'İletişim & Demo Talebi' : 'Contact Support'}
                 </a>
               </li>
@@ -146,7 +147,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
             {tCommon('copyright', { year: String(new Date().getFullYear()), brand: PRODUCT_NAME })}
           </div>
           <div className="flex items-center gap-6">
-            <span>🇪🇺 Frankfurt & Istanbul Data Centers</span>
+            <span>{tFooter('dataResidency')}</span>
             <span>256-bit AES Encryption</span>
           </div>
         </div>

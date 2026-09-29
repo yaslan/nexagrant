@@ -191,6 +191,10 @@ aynı sitede duran** iki iddia envanterle çelişiyor ve hukukçunun bilmesi ger
    (`/tr` render'ında doğrulandı). Envanter §15 ise Cloudflare R2 için _"kod düzeyinde AB
    bölgesi zorlaması **YOK — açık**, … 'AB bölgesi (Frankfurt) varsayılan' iddiası repoda
    doğrulanamadı"_ diyor. Kullanıcıya gösterilen konum iddiası envanterde doğrulanmamıştır.
+   **Güncel 29.09.2026 (TASK-MUN2UXWTAX1AQ):** iddia kaldırıldı. Barındırma kararı Vulut,
+   Türkiye (patron). Altbilgi artık _"🇹🇷 Veritabanı Türkiye'de barındırılır"_ / _"🇹🇷 Database
+   hosted in Türkiye"_ diyor (i18n `landing.footer.dataResidency`); "EU Cloud" rozeti ve açılış
+   sayfasındaki "GDPR & EU Cloud Ready" da kaldırıldı. "256-bit AES Encryption" hâlâ doğrulanmadı.
 2. Çerez banner'ı analitik çerez topladığını söylüyor; envanter §19 analitiğin ağ çağrısı
    yapmayan bir stub olduğunu ölçmüş (bkz. §1.4).
 
@@ -211,7 +215,7 @@ Bu ikisi **eksiklik değil, fazla/yanlış beyan**dır ve düzeltmeleri hukuk gi
 | **Merkez adresi**      | `docs/EFATURA_SETUP.md:41-42`         | Örnek `Kızılırmak Mah. 1450. Cad. No:3` / `Ankara`                                                              | **YOK**                                                                                                                                                                                          |
 | **MERSİS**             | —                                     | Repoda hiç geçmiyor (0 eşleşme)                                                                                 | **YOK**                                                                                                                                                                                          |
 | **KEP adresi**         | —                                     | Repoda hiç geçmiyor (`messages/*.json`'daki tek "kep" eşleşmesi İngilizce _"kept"_ kelimesinden yanlış pozitif) | **YOK**                                                                                                                                                                                          |
-| **İletişim e-postası** | `src/components/PublicFooter.tsx:135` | `info@usfinbridge.com` — **kodda gömülü**, i18n katalogunda değil                                               | **YOK** — üstelik `/[locale]/privacy` sayfası PublicFooter'ı **render etmiyor** (üç yasal sayfanın üçünde de `info@usfinbridge.com` yok), yani metnin üzerinde hiçbir iletişim kanalı görünmüyor |
+| **İletişim e-postası** | `src/components/PublicFooter.tsx:136` | ~~`info@usfinbridge.com`~~ → `info@fonbridge.com` (**29.09.2026:** canlı alan adı `fonbridge.com`; `usfinbridge.com` iptal) — **kodda gömülü**, i18n katalogunda değil                                               | **YOK** — üstelik `/[locale]/privacy` sayfası PublicFooter'ı **render etmiyor** (üç yasal sayfanın üçünde de `info@usfinbridge.com` yok), yani metnin üzerinde hiçbir iletişim kanalı görünmüyor |
 
 `INVOICE_SUPPLIER_*` ortam değişkenleri **bir kimlik taşıyor** (`src/lib/env.ts:65-71`: NAME,
 VKN, TAX_OFFICE, ADDRESS, CITY, COUNTRY, EMAIL) ve fatura belgesine basılıyor
@@ -234,7 +238,11 @@ okunmadı (ve okunmamalı).
    metni `{brand}` (=FonBridge), footer "FonBridge (FonBridge SaaS)", DPA "Fabrika" diyor.
    **Sözleşmenin tarafı adıyla belirsizdir.**
 3. **Dört ayrı alan adı, tek kanonik kimlik yok.** Test/örnek dosyaları hariç `src/` içinde:
-   `usfinbridge.com` (`info@`, `demo@`, `noreply@` — `src/lib/env.ts:49` varsayılan gönderen),
+   `usfinbridge.com` (`info@`, `demo@`, `noreply@` — o gün `src/lib/env.ts:49` varsayılan gönderen),
+   **29.09.2026 notu:** canlı alan adı `fonbridge.com`; `usfinbridge.com` iptal. Varsayılan gönderen
+   artık `info@fonbridge.com` (`src/lib/env.ts:99`, `NEXT_PUBLIC_SMTP_FROM_ADDRESS`); altbilgi iletişim
+   adresi de `info@fonbridge.com`. `usfinbridge.com` yalnız demo hesaplarında kaldı
+   (`src/lib/auth.ts:84`, `src/app/[locale]/login/AuthCard.tsx:37`).
    `fabrika.app` (API örnekleri, `docs.fabrika.app`, takvim UID'leri),
    `fabrika.dev` (`support@`, `feedback@`, `app.fabrika.dev` — `src/lib/beta/constants.ts:49-51`),
    `yasinaslan.com.tr` (`admin@` — platform yöneticisi kimliği, `src/lib/auth.ts:30`).
@@ -358,7 +366,8 @@ yanındaki cümle **hukukçudan tam olarak ne istendiğini** söyler.
       hizalanmış.
 - [ ] Kayıt/giriş akışında aydınlatma metnine bağlantı var (bugün 0 — §1.4).
 - [ ] Kullanıcıya gösterilen doğrulanmamış iddialar temizlenmiş: PublicFooter'daki
-      "Frankfurt & Istanbul Data Centers" ya kanıtlanmış ya kaldırılmış; çerez banner'ı i18n'e
+      "Frankfurt & Istanbul Data Centers" ya kanıtlanmış ya kaldırılmış (**kaldırıldı 29.09.2026,
+      TASK-MUN2UXWTAX1AQ**; "256-bit AES Encryption" açık); çerez banner'ı i18n'e
       taşınmış ve envanterle tutarlı hâle gelmiş (§3.3).
 - [ ] `processing-register.md` §12 madde 10'daki "aydınlatma metni durumu: TASLAK — yayında değil"
       satırı güncellenmiş.

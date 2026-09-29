@@ -134,7 +134,7 @@ export default async function HomePage({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-ok font-bold text-sm">✓</span>
-                  <span>{isTr ? 'GDPR / KVKK Uyumlu Güvenli Bulut' : 'GDPR & EU Cloud Ready'}</span>
+                  <span>{tLanding('heroCompliance')}</span>
                 </div>
               </div>
             </div>

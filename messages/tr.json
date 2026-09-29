@@ -583,12 +583,15 @@
       "privacy": "Gizlilik Politikası",
       "terms": "Kullanım Koşulları",
       "compliance": "Uyum",
-      "contact": "İletişim"
+      "contact": "İletişim",
+      "residencyBadge": "● GDPR Uyumlu",
+      "dataResidency": "🇹🇷 Veritabanı Türkiye'de barındırılır"
     },
     "metaTitle": "{brand} — AB Finansman Platformu (Horizon Europe, Eurostars)",
     "metaDescription": "{brand}: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya.",
     "ecosystemSubtitle": "İster bağımsız bir danışman olun, ister büyük bir üniversite; {brand} iş akışınızı hızlandırır.",
-    "closingSubtitle": "{brand} ile teklif hazırlama sürenizi kısaltın; CORDIS ağ analitiği ve hakem bakış açısıyla teklifinizi güçlendirin."
+    "closingSubtitle": "{brand} ile teklif hazırlama sürenizi kısaltın; CORDIS ağ analitiği ve hakem bakış açısıyla teklifinizi güçlendirin.",
+    "heroCompliance": "GDPR / KVKK Uyumlu Güvenli Bulut"
   },
   "pricing": {
     "title": "{brand} Fiyatlandırması",
