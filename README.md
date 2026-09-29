@@ -68,6 +68,33 @@ pnpm test                      # .env'i vitest.config.mts kendisi yükler; `sour
 - **Uygulama konteyneri.** `fabrika-web` `app` profilinde: `docker compose --profile app up -d`.
   Varsayılan `up` onu başlatmaz, çünkü :3000 dev sunucusunda.
 
+### Yerel Inngest (cron'lar ve elle tetikleme)
+
+Zamanlanmış işler (`src/lib/inngest/jobs/`, ör. `agency-monthly-report`) `/api/inngest` üzerinden
+koşar. Yerelde iki şey gerekir: `.env`'de `INNGEST_DEV=1` (`.env.example`'da hazır) ve Inngest dev
+sunucusu.
+
+```bash
+grep -q '^INNGEST_DEV=' .env || echo 'INNGEST_DEV=1' >> .env   # eski .env'ler için; sonra pnpm dev'i yeniden başlat
+curl -s -o /dev/null -w '%{http_code}\n' localhost:3000/api/inngest   # 200 olmalı
+npx --yes inngest-cli@latest dev -u http://localhost:3000/api/inngest   # arayüz: http://localhost:8288
+```
+
+- **INNGEST_DEV yoksa 500.** SDK varsayılan olarak bulut kipindedir; boş `INNGEST_SIGNING_KEY` ile
+  `/api/inngest` her istekte `{"code":"internal_server_error"}` döner ve yerelde hiçbir cron çalışmaz.
+  `.env` değişikliği ayaktaki `pnpm dev`'e yansımaz, sunucu yeniden başlamalı.
+- **Portlar.** Dev sunucusu :8288 (arayüz + API) ve :8289 (bağlantı); başka portta çalışan uygulama
+  için `-u http://localhost:<port>/api/inngest`. Dev sunucusu kapalıyken de uç 200 döner, yalnız
+  fonksiyonlar tetiklenmez.
+- **Elle tetikleme.** Arayüzde Functions → `agency-monthly-report` → **Invoke** (veri `{}` kalabilir):
+  cron yolu koşar, dönem son kapanan aydır. Belirli dönem için **Send test event** ile
+  `{"name":"agency/report.generate","data":{"period":"YYYY-MM"}}` gönder; yalnız son kapanan ay kabul
+  edilir. Runs sekmesi koşu kimliğini ve çıktısını gösterir (ör. `{"generated":7,"period":"2026-08"}`;
+  ikinci koşu `skipped` sayar). Koşu yerel DB'ye gerçekten yazar. Cron'lar dev sunucusu açıkken
+  zamanında da koşar.
+- **Canlı/staging.** `INNGEST_DEV`'i kaldır (ya da `0`), `INNGEST_SIGNING_KEY` ve
+  `INNGEST_EVENT_KEY`'i Inngest panelinden doldur. Anahtarları `.env.example`'a yazma.
+
 ### Elle kurulmuş fabrika-postgres'i compose'a devretme
 
 Bu makinedeki `fabrika-postgres` konteyneri compose'suz, elle kuruldu (aynı imaj, host :5433,
