@@ -2,6 +2,9 @@ import { PRODUCT_NAME } from '@/lib/brand';
 import { escapeHtml } from '@/lib/feedback/digest';
 import type { MailMessage } from './mailer';
 
+/** Longest tenant name, in characters (ellipsis included), the Subject carries. */
+export const SUBJECT_ORG_MAX = 80;
+
 /**
  * The mail a tenant invitation sends (POST /api/invitations,
  * TASK-MUMLF57HOYFSB). Turkish first, English below, because the invitee has
@@ -18,6 +21,13 @@ export function renderInvitationEmail(params: {
 }): MailMessage {
   // Newlines out as well: `org` also goes into the Subject header.
   const org = params.tenantName?.replace(/[\r\n]+/g, ' ').trim() || PRODUCT_NAME;
+  // The name is free text chosen at registration; in the Subject it is the
+  // first thing a recipient sees, so it is cut at SUBJECT_ORG_MAX characters
+  // (TASK-MUMO2XIQEHGUD, B-1). Code points, not UTF-16 units, so a cut never
+  // splits a surrogate pair.
+  const orgChars = Array.from(org);
+  const subjectOrg =
+    orgChars.length > SUBJECT_ORG_MAX ? `${orgChars.slice(0, SUBJECT_ORG_MAX - 1).join('').trimEnd()}…` : org;
   const until = params.expires.toISOString().slice(0, 10);
   const link = escapeHtml(params.inviteLink);
   const orgHtml = escapeHtml(org);
@@ -42,7 +52,7 @@ export function renderInvitationEmail(params: {
 
   return {
     to: params.to,
-    subject: `${org} — ${PRODUCT_NAME} daveti / invitation`,
+    subject: `${subjectOrg} — ${PRODUCT_NAME} daveti / invitation`,
     html,
     text,
   };

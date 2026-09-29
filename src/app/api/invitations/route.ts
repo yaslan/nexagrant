@@ -4,8 +4,17 @@ import { requireTenantApi } from '@/lib/tenant';
 import { issueSecretToken } from '@/lib/secret-token';
 import type { InvitationRow } from '@/types/db-rows';
 import { assertSeatAvailable, SeatLimitReachedError, type SeatUsage } from '@/lib/billing/seat-limit';
-import { reportMailNotConfigured, smtpMailer } from '@/lib/email/mailer';
+import { reportMailNotConfigured, smtpMailer, type Mailer } from '@/lib/email/mailer';
 import { renderInvitationEmail } from '@/lib/email/invitation-email';
+import {
+  INVITATION_MAIL_DAILY_LIMIT,
+  INVITATION_MAIL_FAILED,
+  INVITATION_MAIL_SENT,
+  invitationMailBaseUrl,
+  invitationMailSkipReason,
+  lockInvitationMail,
+  type InvitationMailSkip,
+} from '@/lib/email/invitation-mail-policy';
 import { recordAlert } from '@/lib/observability/system-alert';
 
 /**
@@ -36,7 +45,7 @@ export async function POST(req: Request) {
     const scope = await requireTenantApi({ write: true });
     if (!scope.ok) return scope.response;
 
-    const { tenantId, role: callerRole } = scope.scope;
+    const { tenantId, userId, role: callerRole } = scope.scope;
 
     if (!CAN_INVITE.has(callerRole)) {
       return NextResponse.json(
@@ -62,11 +71,18 @@ export async function POST(req: Request) {
     const { raw: token, hash: tokenHash } = issueSecretToken();
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
+    // Whether a mail can go out at all is known before the transaction; only
+    // then does it take the lock and write the row the limits count
+    // (src/lib/email/invitation-mail-policy.ts).
+    const mailer = smtpMailer();
+    const mailBaseUrl = invitationMailBaseUrl();
+
     const result = await withTenant<{
       conflict: boolean;
       seatLimit: SeatUsage | null;
       invitation: InvitationRow | null;
       tenantName: string | null;
+      mailSkip: InvitationMailSkip | null;
     }>(tenantId, async (tx) => {
       const existingMembership = await tx.membership.findFirst({
         where: {
@@ -76,7 +92,7 @@ export async function POST(req: Request) {
       });
 
       if (existingMembership) {
-        return { conflict: true, seatLimit: null, invitation: null, tenantName: null };
+        return { conflict: true, seatLimit: null, invitation: null, tenantName: null, mailSkip: null };
       }
 
       // The plan's seat limit (src/lib/billing/seat-limit.ts): members plus
@@ -85,9 +101,19 @@ export async function POST(req: Request) {
         await assertSeatAvailable(tx, tenantId, email);
       } catch (error) {
         if (error instanceof SeatLimitReachedError) {
-          return { conflict: false, seatLimit: error.usage, invitation: null, tenantName: null };
+          return { conflict: false, seatLimit: error.usage, invitation: null, tenantName: null, mailSkip: null };
         }
         throw error;
+      }
+
+      let mailSkip: InvitationMailSkip | null = null;
+      if (mailer && mailBaseUrl) {
+        await lockInvitationMail(tx, tenantId);
+        const existing = await tx.invitation.findUnique({
+          where: { email_tenantId: { email, tenantId } },
+          select: { id: true },
+        });
+        mailSkip = await invitationMailSkipReason(tx, tenantId, existing?.id ?? null);
       }
 
       const invitation = await tx.invitation.upsert({
@@ -97,9 +123,18 @@ export async function POST(req: Request) {
         select: { id: true, email: true, tenantId: true, role: true, expires: true },
       });
 
+      // Written before the send, under the lock: the limits count attempts, and
+      // a concurrent request must see this one. Target is the invitation id,
+      // never the address.
+      if (mailer && mailBaseUrl && !mailSkip) {
+        await tx.auditEvent.create({
+          data: { tenantId, actorId: userId, type: INVITATION_MAIL_SENT, target: invitation.id },
+        });
+      }
+
       const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
 
-      return { conflict: false, seatLimit: null, invitation, tenantName: tenant?.name ?? null };
+      return { conflict: false, seatLimit: null, invitation, tenantName: tenant?.name ?? null, mailSkip };
     });
 
     if (result.conflict) {
@@ -123,49 +158,101 @@ export async function POST(req: Request) {
       );
     }
 
-    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/tr/accept-invite?token=${token}`;
+    // The response keeps the old localhost fallback so a local inviter still
+    // gets a usable link; a mail is only ever built from `mailBaseUrl`.
+    const acceptPath = `/tr/accept-invite?token=${token}`;
+    const inviteLink = `${mailBaseUrl ?? (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')}${acceptPath}`;
     // The address itself is personal data; log that an invite went out, not to whom.
     console.log(`[Invitations] invitation issued for tenant ${tenantId}`);
 
-    const emailSent = await sendInvitationEmail({
-      to: email,
-      tenantName: result.tenantName,
-      inviteLink,
-      expires,
-      invitationId: result.invitation?.id ?? null,
+    const invitationId = result.invitation?.id ?? null;
+    const mail = await deliverInvitationEmail({
+      mailer,
+      mailBaseUrl,
+      skip: result.mailSkip,
+      tenantId,
+      invitationId,
+      message: {
+        to: email,
+        tenantName: result.tenantName,
+        inviteLink: mailBaseUrl ? `${mailBaseUrl}${acceptPath}` : '',
+        expires,
+      },
     });
 
     // The link is still returned when the mail did not go out, so the inviter
-    // can pass it on by hand; `emailSent` says which of the two happened.
-    return NextResponse.json({ success: true, invitation: result.invitation, inviteLink, emailSent });
+    // can pass it on by hand; `emailSent` says which of the two happened and
+    // `reason` why not.
+    return NextResponse.json({
+      success: true,
+      invitation: result.invitation,
+      inviteLink,
+      emailSent: mail.sent,
+      ...(mail.sent ? {} : { reason: mail.reason }),
+    });
   } catch (error) {
     console.error('Error creating invitation:', error);
     return NextResponse.json({ error: 'İç Sunucu Hatası' }, { status: 500 });
   }
 }
 
+type MailOutcome =
+  | { sent: true }
+  | {
+      sent: false;
+      reason: InvitationMailSkip | 'smtp_not_configured' | 'app_url_not_configured' | 'send_failed';
+    };
+
 /**
- * Mails the invitation (TASK-MUMLF57HOYFSB). Best effort: the invitation row is
- * already written and the link is in the response, so a mail failure must not
- * turn the request into an error — but it is never silent either. No SMTP is
- * reported through `reportMailNotConfigured`; a refused send becomes a warning
- * `SystemAlert` that names the invitation by id, never by address.
+ * Mails the invitation (TASK-MUMLF57HOYFSB), or says why it did not. Best
+ * effort: the invitation row is already written and the link is in the
+ * response, so a mail that does not go out must not turn the request into an
+ * error — but it is never silent either:
+ *   • no SMTP → `reportMailNotConfigured`;
+ *   • no usable NEXT_PUBLIC_APP_URL → an error SystemAlert, because the only
+ *     link we could mail is a localhost one (TASK-MUMO2XIQEHGUD, K-3);
+ *   • the tenant's daily limit → a warning SystemAlert, one open row per tenant;
+ *   • a refused send → a warning SystemAlert that names the invitation by id,
+ *     never by address, and an `invitation.email_failed` row that ends the
+ *     cooldown so the inviter can retry.
  */
-async function sendInvitationEmail(params: {
-  to: string;
-  tenantName: string | null;
-  inviteLink: string;
-  expires: Date;
+async function deliverInvitationEmail(params: {
+  mailer: Mailer | null;
+  mailBaseUrl: string | null;
+  skip: InvitationMailSkip | null;
+  tenantId: string;
   invitationId: string | null;
-}): Promise<boolean> {
-  const mailer = smtpMailer();
+  message: { to: string; tenantName: string | null; inviteLink: string; expires: Date };
+}): Promise<MailOutcome> {
+  const { mailer, tenantId, invitationId } = params;
   if (!mailer) {
     await reportMailNotConfigured('invitations');
-    return false;
+    return { sent: false, reason: 'smtp_not_configured' };
   }
+  if (!params.mailBaseUrl) {
+    console.error('[Invitations] NEXT_PUBLIC_APP_URL is unset or loopback — invitation email not sent');
+    await recordAlert({
+      level: 'error',
+      source: 'invitations',
+      message: 'NEXT_PUBLIC_APP_URL is unset (or a loopback address in production): invitation emails are not being sent',
+      dedupeKey: 'invitation-mail-app-url-missing',
+    });
+    return { sent: false, reason: 'app_url_not_configured' };
+  }
+  if (params.skip === 'daily_limit') {
+    await recordAlert({
+      level: 'warn',
+      source: 'invitations',
+      message: `Tenant reached the daily invitation email limit (${INVITATION_MAIL_DAILY_LIMIT}); further invitation emails are skipped`,
+      meta: { tenantId },
+      dedupeKey: `invitation-mail-daily-limit:${tenantId}`,
+    });
+  }
+  if (params.skip) return { sent: false, reason: params.skip };
+
   try {
-    await mailer(renderInvitationEmail(params));
-    return true;
+    await mailer(renderInvitationEmail(params.message));
+    return { sent: true };
   } catch (error) {
     // MailSendError's message is the SMTP codes only (see mailer.ts).
     const reason = error instanceof Error ? error.message : 'unknown_error';
@@ -174,8 +261,19 @@ async function sendInvitationEmail(params: {
       level: 'warn',
       source: 'invitations',
       message: 'Invitation email was not delivered to the SMTP server',
-      meta: { invitationId: params.invitationId, reason },
+      meta: { invitationId, reason },
     });
-    return false;
+    if (invitationId) {
+      try {
+        await withTenant(tenantId, (tx) =>
+          tx.auditEvent.create({ data: { tenantId, type: INVITATION_MAIL_FAILED, target: invitationId } })
+        );
+      } catch {
+        // Without the row the cooldown simply runs its 10 minutes. Nothing from
+        // the error is logged: a connection error can carry the database URL.
+        console.error('[Invitations] could not record the failed send');
+      }
+    }
+    return { sent: false, reason: 'send_failed' };
   }
 }
