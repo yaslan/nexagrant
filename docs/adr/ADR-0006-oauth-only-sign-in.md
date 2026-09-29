@@ -15,3 +15,7 @@
 - **KVKK:** Kayıt ekranında (OAuth butonlarından önce) aydınlatma, ajans eki ve açık onay kutusu gösterilir. Onay, Consent kaydına belge sürümüyle yazılır (pilot kapısı TASK-MULWCFBTHDYZI).
 - **Hesap bağlama:** `allowDangerousEmailAccountLinking` yeniden değerlendirilir. Aynı e-postanın farklı sağlayıcılarla bağlanması yalnız doğrulanmış e-postayla olmalıdır.
 - **Anahtarlar:** Gerçek doğrulama için Google ve Entra istemci anahtarları gerekir (patron kartı TASK-MULQM3LFB4KRA).
+
+## Güncelleme (29.09.2026, patron)
+
+İlk aşamada yalnız **Google** açılır. Microsoft Entra kodu kalır ama yapılandırmaya bağlıdır: `AUTH_MICROSOFT_ENTRA_ID_*` anahtarları tanımlı değilse sağlayıcı kaydedilmez ve buton görünmez. Anahtarlar eklendiğinde Entra kod değişikliği olmadan açılır.
