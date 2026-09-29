@@ -116,8 +116,15 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
 
   const handleFindCandidates = async (seatId: string) => {
     setExpandedSeat(seatId);
+    setActionError(null);
     startTransition(async () => {
-      const results = await findCandidates(seatId);
+      let results: Awaited<ReturnType<typeof findCandidates>>;
+      try {
+        results = await findCandidates(seatId);
+      } catch (err) {
+        refuse(err);
+        return;
+      }
       setCandidateMap(prev => ({
         ...prev,
         [seatId]: results.map((r) => ({

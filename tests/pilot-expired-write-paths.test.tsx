@@ -24,6 +24,8 @@ import enMessages from '../messages/en.json';
  * İNCELEME-30 (TASK-MUN39FIAKFY2R) adds M8 matching: "Aday Bul" (a
  * value-returning form action, `code: 'pilotExpired'`) and "Davet Et" (was an
  * inline server-component form that only logged the refusal).
+ * TASK-MUN3W76B4XEJE adds the consortium page's "Aday Bul", which had no catch
+ * at all: a refusal went to the error boundary.
  */
 
 const pilot = vi.hoisted(() => ({ expired: false }));
@@ -53,6 +55,12 @@ vi.mock('@/modules/m11/server/actions', () => ({
 vi.mock('@/modules/m8/server/actions', () => ({
   computeSeatCandidatesForm: vi.fn(),
   assignCandidateToSeat: vi.fn(),
+}));
+vi.mock('@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions', () => ({
+  addSeat: vi.fn(),
+  findCandidates: vi.fn(),
+  assignSeat: vi.fn(),
+  getConflicts: vi.fn(async () => []),
 }));
 vi.mock('@/modules/m11/server/partner-link', () => ({ issuePartnerPortalLink: vi.fn() }));
 vi.mock('@/lib/system-scope', () => ({
@@ -88,6 +96,8 @@ import PartnerPortalPage from '@/app/[locale]/portal/partner/[token]/page';
 import { assignCandidateToSeat, computeSeatCandidatesForm } from '@/modules/m8/server/actions';
 import FindCandidatesButton from '@/modules/m8/components/find-candidates-button';
 import InviteCandidateButton from '@/modules/m8/components/invite-candidate-button';
+import { findCandidates } from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions';
+import ConsortiumManager from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/manager';
 
 const PILOT_TR = trMessages.Common.pilotExpired;
 const PILOT_EN = enMessages.Common.pilotExpired;
@@ -246,5 +256,36 @@ describe('İNCELEME-30: M8 matching', () => {
     vi.mocked(assignCandidateToSeat).mockRejectedValueOnce(Object.assign(new Error('x'), { digest: '4242' }));
     fireEvent.click(screen.getByRole('button', { name: enMessages.Consortium.invite }));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+});
+
+describe('TASK-MUN3W76B4XEJE: consortium page', () => {
+  const seat = {
+    id: 's-1',
+    tenantId: 't-1',
+    opportunityId: 'o-1',
+    role: null,
+    roleKey: 'research',
+    required: true,
+    organizationId: null,
+    status: 'OPEN',
+    notes: null,
+    invitedAt: null,
+    confirmedAt: null,
+  };
+  const kept = { id: 'c-1', seatId: 's-1', organizationId: 'org-kept', rank: 1, score: 2 };
+
+  test.each([
+    ['tr', trMessages, PILOT_TR],
+    ['en', enMessages, PILOT_EN],
+  ] as const)('"Aday Bul" (%s): a refused search says the pilot ended and keeps the listed candidates', async (locale, messages, sentence) => {
+    vi.mocked(findCandidates).mockRejectedValueOnce(refused());
+    render(
+      withIntl(<ConsortiumManager opportunityId="o-1" seats={[seat]} candidates={[kept]} orgMap={{}} />, locale)
+    );
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(messages.Consortium.findCandidates) }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(sentence));
+    expect(vi.mocked(findCandidates)).toHaveBeenCalledWith('s-1');
+    expect(screen.getByText('org-kept')).toBeTruthy();
   });
 });

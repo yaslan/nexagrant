@@ -51,7 +51,11 @@ export async function addSeat(opportunityId: string, roleKey: string, required: 
 }
 
 export async function findCandidates(seatId: string) {
-  const { tenantId } = await requireTenantAction({ readOnly: true });
+  // Not `readOnly`: the scorer deletes the seat's SeatCandidate rows and writes
+  // new ones, and the flag only skips the pilot check. An expired pilot is
+  // refused here, before anything is read or deleted (TASK-MUN3W76B4XEJE; the
+  // M8 twin is İNCELEME-30 B-1).
+  const { tenantId } = await requireTenantAction();
   // Client-supplied: with `seatId` missing the lookup finds any seat and the
   // scorer's clear wipes every seat's candidates (TASK-MUN2KUHP1BP18).
   if (!isPresentId(seatId)) return [];

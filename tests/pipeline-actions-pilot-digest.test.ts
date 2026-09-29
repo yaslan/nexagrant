@@ -34,6 +34,14 @@ vi.mock('@/modules/m8/server/matching', () => ({
     throw new Error('the matcher must not run for a refused write');
   }),
 }));
+// TASK-MUN3W76B4XEJE: the consortium scorer deletes and rewrites a seat's
+// candidates too, so reaching it on an expired pilot is the same bug.
+vi.mock('@/lib/scoring/consortium', () => ({
+  scoreCandidatesForSeat: vi.fn(async () => {
+    throw new Error('the scorer must not run for a refused write');
+  }),
+  detectConflicts: vi.fn(async () => []),
+}));
 vi.mock('@/lib/db', () => {
   const unreachable = () => {
     throw new Error('the database must not be reached for a refused write');
@@ -59,6 +67,12 @@ import {
   computeSeatCandidatesForm,
 } from '@/modules/m8/server/actions';
 import { generateSeatCandidates } from '@/modules/m8/server/matching';
+import {
+  addSeat,
+  assignSeat,
+  findCandidates,
+} from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions';
+import { scoreCandidatesForSeat } from '@/lib/scoring/consortium';
 
 beforeEach(() => {
   session.current = { user: { id: 'u-1' }, tenantId: 't-1', role: 'TENANT_OWNER' };
@@ -116,5 +130,29 @@ describe('M8 matching write actions: an expired pilot is refused before anything
       code: 'pilotExpired',
     });
     expect(vi.mocked(generateSeatCandidates)).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * TASK-MUN3W76B4XEJE — the consortium page (pipeline/[id]/consortium). Its
+ * "Aday Bul" (`findCandidates`) was `readOnly` like M8's was, and the scorer
+ * deletes and rewrites the seat's SeatCandidate rows. The live proof against a
+ * real pilot row is tests/consortium-find-candidates-pilot.live.test.ts.
+ */
+const CONSORTIUM_WRITES: Array<[string, () => Promise<unknown>]> = [
+  ['addSeat', () => addSeat('o-1', 'research')],
+  ['findCandidates', () => findCandidates('s-1')],
+  ['assignSeat', () => assignSeat('s-1', '999')],
+];
+
+describe('consortium write actions: an expired pilot is refused before anything runs', () => {
+  test.each(CONSORTIUM_WRITES)('%s', async (_name, call) => {
+    const err = await call().then(
+      (value) => ({ resolved: value }),
+      (e: unknown) => e
+    );
+    expect(err).toBeInstanceOf(PilotExpiredError);
+    expect((err as { digest?: string }).digest).toBe(PILOT_EXPIRED_DIGEST);
+    expect(vi.mocked(scoreCandidatesForSeat)).not.toHaveBeenCalled();
   });
 });
