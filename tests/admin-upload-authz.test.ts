@@ -15,11 +15,20 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
  * a gate that runs *after* the body is parsed still pays for the embedding.
  */
 
-const { authMock, processPdfAndStoreMock, findSharedDocumentByTitleMock, NoTextError } = vi.hoisted(() => ({
+const { authMock, processPdfAndStoreMock, findSharedDocumentByTitleMock, NoTextError, LimitError } = vi.hoisted(() => ({
   authMock: vi.fn(),
   processPdfAndStoreMock: vi.fn(),
   findSharedDocumentByTitleMock: vi.fn(),
   NoTextError: class NoExtractableTextError extends Error {},
+  // Same shape as `PdfLimitError` in src/lib/rag.ts.
+  LimitError: class PdfLimitError extends Error {
+    constructor(
+      readonly code: string,
+      readonly detail: Record<string, number>
+    ) {
+      super(code);
+    }
+  },
 }));
 
 vi.mock('@/lib/auth', () => ({ auth: authMock }));
@@ -27,6 +36,7 @@ vi.mock('@/lib/rag', () => ({
   processPdfAndStore: processPdfAndStoreMock,
   findSharedDocumentByTitle: findSharedDocumentByTitleMock,
   NoExtractableTextError: NoTextError,
+  PdfLimitError: LimitError,
 }));
 
 const { POST } = await import('@/app/api/admin/documents/upload/route');
@@ -200,6 +210,57 @@ describe('POST /api/admin/documents/upload — input validation (TASK-MULQL8QB67
 
     expect(res.status).toBe(422);
     await expect(res.json()).resolves.toEqual({ error: 'no_text' });
+  });
+
+  test('a PDF over the page, chunk or cost limit → 413 with the measured value and the limit', async () => {
+    processPdfAndStoreMock.mockRejectedValueOnce(new LimitError('too_many_pages', { pages: 30000, maxPages: 1000 }));
+    let res = await POST(uploadRequest() as never);
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toEqual({ error: 'too_many_pages', pages: 30000, maxPages: 1000 });
+
+    processPdfAndStoreMock.mockRejectedValueOnce(new LimitError('too_many_chunks', { chunks: 2501, maxChunks: 2500 }));
+    res = await POST(uploadRequest() as never);
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toMatchObject({ error: 'too_many_chunks', maxChunks: 2500 });
+
+    processPdfAndStoreMock.mockRejectedValueOnce(new LimitError('over_budget', { estimatedUsd: 0.3, maxUsd: 0.2 }));
+    res = await POST(uploadRequest() as never);
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toMatchObject({ error: 'over_budget', maxUsd: 0.2 });
+  });
+
+  // İNCELEME-45 Ö-1: the three mutants that stayed green.
+  test('the signature is all five bytes: "%PDF" without the dash → 415 not_pdf (M9)', () =>
+    expectRefused(
+      uploadRequest({ file: new File([Buffer.from('%PDF1.4 x')], 'x.pdf', { type: 'application/pdf' }) }),
+      415,
+      'not_pdf'
+    ));
+
+  test('only allowDuplicate=true overrides the duplicate check, not any value (M7)', async () => {
+    findSharedDocumentByTitleMock.mockResolvedValue({
+      id: 'doc-old',
+      kind: 'work_programme',
+      title: 'authz-probe',
+      createdAt: new Date('2026-09-01T00:00:00Z'),
+      chunks: 7,
+    });
+    await expectRefused(uploadRequest({ allowDuplicate: 'yes' }), 409, 'duplicate');
+    await expectRefused(uploadRequest({ allowDuplicate: '1' }), 409, 'duplicate');
+  });
+
+  test('an oversized declared content-length → 413 before the body is read (M10)', async () => {
+    const formData = vi.fn();
+    const req = {
+      headers: new Headers({ 'content-length': String(21 * 1024 * 1024) }),
+      formData,
+    };
+
+    const res = await POST(req as never);
+
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toMatchObject({ error: 'too_large' });
+    expect(formData).not.toHaveBeenCalled();
   });
 
   test('an ingest failure → 500 upload_failed', async () => {

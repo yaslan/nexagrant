@@ -37,6 +37,7 @@ import { withTenant } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 import { embedText, PLATFORM_SCOPE_TENANT_ID, type AiCallAttribution } from '@/lib/llm';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { estimateEmbeddingUsd, hasMeaningfulText, RAG_UPLOAD_LIMITS } from '@/lib/rag-upload';
 
 /** One row of the pgvector similarity search over `Chunk`. */
 export interface ChunkMatch {
@@ -75,6 +76,87 @@ export class NoExtractableTextError extends Error {
   constructor(title: string) {
     super(`No extractable text in "${title}" — nothing was stored`);
     this.name = 'NoExtractableTextError';
+  }
+}
+
+/**
+ * A PDF over one of the upload's work limits (`RAG_UPLOAD_LIMITS`), refused
+ * before the first embedding call and before any row is written. `code` is the
+ * upload route's error code; `detail` carries the measured value and the limit.
+ */
+export class PdfLimitError extends Error {
+  constructor(
+    readonly code: 'too_many_pages' | 'too_many_chunks' | 'over_budget',
+    readonly detail: Record<string, number>
+  ) {
+    super(`PDF refused (${code}): ${JSON.stringify(detail)} — nothing was stored`);
+    this.name = 'PdfLimitError';
+  }
+}
+
+/** Pages extracted between two turns of the event loop. */
+const PDF_PAGES_PER_SLICE = 20;
+
+/** The text of a PDF, one entry per page, without pdf-parse's page separators. */
+export interface ExtractedPdf {
+  pages: number;
+  text: string;
+}
+
+/**
+ * Extract a PDF's text within the upload limits (İNCELEME-45 B-1, B-2).
+ *
+ * - The page count is read first (`getInfo`, no text extraction): 30 000 pages
+ *   are refused in ~0.2 s instead of being parsed for 4.5 minutes.
+ * - pdf.js runs on the main thread in Node, and one `getText()` over the whole
+ *   document answered no other request until it finished. Pages are extracted
+ *   `PDF_PAGES_PER_SLICE` at a time with a `setImmediate` between slices, so
+ *   the rest of the server gets a turn every few tens of milliseconds.
+ * - Extraction stops as soon as the text is past what `maxChunks` could hold,
+ *   so an oversized document is not parsed to the end only to be refused.
+ * - Pages are joined here from `pages[].text`, never from pdf-parse's `text`:
+ *   that one carries `-- N of M --` after every page (its default
+ *   `pageJoiner`), which made a scan with no text layer look like a text PDF
+ *   and got the separator embedded, one paid chunk per page. `pageJoiner: ''`
+ *   only saves building that string.
+ */
+export async function extractPdfText(fileBuffer: Buffer): Promise<ExtractedPdf> {
+  // pdf-parse v2 exports the PDFParse class and no callable default, so the
+  // v1-style `pdfParse(buffer)` this used to `require()` could only ever throw.
+  // Imported here rather than at module scope: this module is now also on the
+  // path of the CORDIS sync jobs and the concept-note actions, none of which
+  // parse a PDF.
+  const { PDFParse } = await import('pdf-parse');
+  const parser = new PDFParse({ data: fileBuffer });
+  try {
+    const { total } = await parser.getInfo();
+    if (total > RAG_UPLOAD_LIMITS.maxPages) {
+      throw new PdfLimitError('too_many_pages', { pages: total, maxPages: RAG_UPLOAD_LIMITS.maxPages });
+    }
+
+    // Past this length `chunkText` yields more than `maxChunks` chunks.
+    const maxChars = RAG_UPLOAD_LIMITS.maxChunks * (PDF_CHUNK_SIZE - CHUNK_OVERLAP) + CHUNK_OVERLAP;
+    const pageTexts: string[] = [];
+    let length = 0;
+    for (let first = 1; first <= total; first += PDF_PAGES_PER_SLICE) {
+      const last = Math.min(first + PDF_PAGES_PER_SLICE - 1, total);
+      const slice = await parser.getText({ first, last, pageJoiner: '' });
+      for (const page of slice.pages) {
+        pageTexts.push(page.text);
+        length += page.text.length + 2;
+      }
+      if (length > maxChars) {
+        throw new PdfLimitError('too_many_chunks', {
+          pagesRead: last,
+          pages: total,
+          maxChunks: RAG_UPLOAD_LIMITS.maxChunks,
+        });
+      }
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    return { pages: total, text: pageTexts.join('\n\n') };
+  } finally {
+    await parser.destroy();
   }
 }
 
@@ -333,24 +415,31 @@ export async function processPdfAndStore(
 ): Promise<PdfIngestResult> {
   const scope = tenantId ?? PLATFORM_SCOPE_TENANT_ID;
 
-  // pdf-parse v2 exports the PDFParse class and no callable default, so the
-  // v1-style `pdfParse(buffer)` this used to `require()` could only ever throw.
-  // Imported here rather than at module scope: this module is now also on the
-  // path of the CORDIS sync jobs and the concept-note actions, none of which
-  // parse a PDF.
-  const { PDFParse } = await import('pdf-parse');
-  const parser = new PDFParse({ data: fileBuffer });
-  const { text } = await parser.getText();
+  const { text, pages } = await extractPdfText(fileBuffer);
+
+  // Nothing was written yet, so there is nothing to undo — and nothing to
+  // report as a successful upload either. A scanned or image-only PDF lands
+  // here; answering 200 for it is how "stored nothing" passes for success.
+  // "No text" means no *readable* text: a blank-chunk check alone let a scan
+  // through on its page separators and a stamped page number (İNCELEME-45 B-2).
+  if (!hasMeaningfulText(text, pages)) {
+    throw new NoExtractableTextError(title);
+  }
 
   // Basic text chunking. Blank chunks are dropped *here* rather than skipped
   // inside the loop, so `ordinal` stays contiguous and `chunks.length` is the
   // number of rows this ingest is supposed to produce.
   const chunks = chunkText(text, PDF_CHUNK_SIZE, CHUNK_OVERLAP).filter((c) => c.trim().length > 0);
   if (chunks.length === 0) {
-    // Nothing was written yet, so there is nothing to undo — and nothing to
-    // report as a successful upload either. A scanned or image-only PDF lands
-    // here; answering 200 for it is how "stored nothing" passes for success.
     throw new NoExtractableTextError(title);
+  }
+  // `extractPdfText` stops early on length; this is the exact count.
+  if (chunks.length > RAG_UPLOAD_LIMITS.maxChunks) {
+    throw new PdfLimitError('too_many_chunks', { chunks: chunks.length, maxChunks: RAG_UPLOAD_LIMITS.maxChunks });
+  }
+  const estimatedUsd = estimateEmbeddingUsd(chunks.reduce((sum, c) => sum + c.length, 0));
+  if (estimatedUsd > RAG_UPLOAD_LIMITS.maxEmbeddingUsd) {
+    throw new PdfLimitError('over_budget', { estimatedUsd, maxUsd: RAG_UPLOAD_LIMITS.maxEmbeddingUsd });
   }
 
   // Save document

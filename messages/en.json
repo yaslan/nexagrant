@@ -2537,6 +2537,9 @@
       "bad_title": "The title must not be empty and may be at most {maxLength} characters.",
       "duplicate": "A document with this type and title already exists.",
       "no_text": "The PDF has no readable text (scanned or image-only). Nothing was stored.",
+      "too_many_pages": "The PDF is too long: {pages} pages, the limit is {maxPages}. Split it into parts and upload them one by one. Nothing was stored.",
+      "too_many_chunks": "The PDF has too much text for one upload (at most {maxChunks} chunks). Split it into parts and upload them one by one. Nothing was stored.",
+      "over_budget": "The estimated embedding cost of this document is over the per-upload limit ({maxUsd} USD). Split it into parts and upload them one by one. Nothing was stored.",
       "upload_failed": "The upload failed; no chunks were stored."
     }
   },

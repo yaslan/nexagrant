@@ -40,6 +40,8 @@ interface UploadError {
   code: RagUploadError;
   message?: string;
   existing?: { id: string; chunks: number; createdAt: string };
+  /** The page count the route measured, on `too_many_pages`. */
+  pages?: number;
 }
 
 const MAX_MB = RAG_UPLOAD_LIMITS.maxFileBytes / (1024 * 1024);
@@ -73,7 +75,14 @@ export default function DocumentUploadClient({
 
   const kindText = (k: string) => (isRagUploadKind(k) ? t(`kinds.${k}`) : k);
   const errorText = (e: UploadError) =>
-    t(`errors.${e.code}`, { maxMb: MAX_MB, maxLength: RAG_UPLOAD_LIMITS.maxTitleLength });
+    t(`errors.${e.code}`, {
+      maxMb: MAX_MB,
+      maxLength: RAG_UPLOAD_LIMITS.maxTitleLength,
+      maxPages: RAG_UPLOAD_LIMITS.maxPages,
+      maxChunks: RAG_UPLOAD_LIMITS.maxChunks,
+      maxUsd: RAG_UPLOAD_LIMITS.maxEmbeddingUsd,
+      pages: e.pages ?? '?',
+    });
 
   function clientCheck(): RagUploadError | null {
     if (!file) return 'no_file';
@@ -107,7 +116,12 @@ export default function DocumentUploadClient({
         const code = (RAG_UPLOAD_ERRORS as readonly string[]).includes(body.error)
           ? (body.error as RagUploadError)
           : 'upload_failed';
-        setError({ code, message: body.message, existing: body.existing });
+        setError({
+          code,
+          message: body.message,
+          existing: body.existing,
+          pages: typeof body.pages === 'number' ? body.pages : undefined,
+        });
         return;
       }
       setResult({ docId: String(body.docId), chunks: Number(body.chunks), title: title.trim() });

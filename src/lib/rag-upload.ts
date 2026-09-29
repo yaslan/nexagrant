@@ -24,7 +24,83 @@ export const RAG_UPLOAD_LIMITS = {
   /** A Horizon Europe work programme part is a few MB; 20 MB leaves room without inviting a book. */
   maxFileBytes: 20 * 1024 * 1024,
   maxTitleLength: 200,
+  /**
+   * The byte cap alone does not bound the work: pages can share one content
+   * stream, so 4.8 MB held 30 000 pages and 240 699 chunks (İNCELEME-45 B-1).
+   * A work programme part is a few hundred pages; 1000 is twice the largest
+   * with room left. The count is read before any text is extracted.
+   */
+  maxPages: 1000,
+  /**
+   * One embedding call per chunk, made one after another inside the request.
+   * 2500 chunks ≈ 2 M characters ≈ a 600-page dense work programme, and at
+   * ~0.2 s a call already keeps the admin waiting for about eight minutes.
+   */
+  maxChunks: 2500,
+  /**
+   * Ceiling on the estimated cost of one upload's embeddings. With 1000-char
+   * chunks `maxChunks` binds first (≤ 0.11 USD by the estimate below); this
+   * holds on its own if the chunk size, the model or `maxChunks` changes.
+   */
+  maxEmbeddingUsd: 0.2,
 } as const;
+
+/**
+ * How the upload estimates what its embeddings will cost, before the first
+ * call. text-embedding-3-large is 0.13 USD per million input tokens. Three
+ * characters per token over-counts English (~4) on purpose, so Turkish text
+ * and numbers are not under-estimated.
+ */
+export const RAG_EMBEDDING_COST = {
+  usdPerMillionTokens: 0.13,
+  charsPerTokenEstimate: 3,
+} as const;
+
+export function estimateEmbeddingUsd(totalChars: number): number {
+  const tokens = Math.ceil(totalChars / RAG_EMBEDDING_COST.charsPerTokenEstimate);
+  return (tokens * RAG_EMBEDDING_COST.usdPerMillionTokens) / 1_000_000;
+}
+
+/**
+ * The least text a PDF must yield to be worth embedding (İNCELEME-45 B-2).
+ * Only letters and digits count: whitespace, page separators and the stray
+ * symbols a scan's broken text layer produces do not. A real work programme
+ * page carries thousands of them; a scanned page carries none, or a stamped
+ * page number.
+ */
+export const RAG_TEXT_THRESHOLDS = {
+  /** In the whole document. */
+  minMeaningfulChars: 200,
+  /** On average per page — a 300-page scan with a typed cover page is still a scan. */
+  minMeaningfulCharsPerPage: 100,
+  /** Share of the non-whitespace characters that are letters or digits. */
+  minMeaningfulRatio: 0.5,
+} as const;
+
+export interface TextSignal {
+  meaningfulChars: number;
+  nonWhitespaceChars: number;
+}
+
+export function measureText(text: string): TextSignal {
+  return {
+    // Counted by deletion, not `match`: a 2 M-character text would otherwise
+    // allocate an array of 2 M one-character strings.
+    meaningfulChars: text.replace(/[^\p{L}\p{N}]/gu, '').length,
+    nonWhitespaceChars: text.replace(/\s/gu, '').length,
+  };
+}
+
+/** Whether `text`, extracted from `pages` pages, is readable text rather than a scan. */
+export function hasMeaningfulText(text: string, pages: number): boolean {
+  const { meaningfulChars, nonWhitespaceChars } = measureText(text);
+  const t = RAG_TEXT_THRESHOLDS;
+  return (
+    meaningfulChars >= t.minMeaningfulChars &&
+    meaningfulChars >= t.minMeaningfulCharsPerPage * Math.max(1, pages) &&
+    meaningfulChars >= t.minMeaningfulRatio * nonWhitespaceChars
+  );
+}
 
 /** Error codes the upload route answers with; the admin form has a message for each. */
 export const RAG_UPLOAD_ERRORS = [
@@ -36,6 +112,9 @@ export const RAG_UPLOAD_ERRORS = [
   'bad_title',
   'duplicate',
   'no_text',
+  'too_many_pages',
+  'too_many_chunks',
+  'over_budget',
   'upload_failed',
 ] as const;
 export type RagUploadError = (typeof RAG_UPLOAD_ERRORS)[number];

@@ -2537,6 +2537,9 @@
       "bad_title": "Başlık boş olamaz ve en fazla {maxLength} karakter olabilir.",
       "duplicate": "Bu tür ve başlıkla bir belge zaten var.",
       "no_text": "PDF'te okunabilir metin yok (taranmış veya yalnız görüntü). Hiçbir şey kaydedilmedi.",
+      "too_many_pages": "PDF çok uzun: {pages} sayfa, sınır {maxPages} sayfa. Belgeyi bölümlere ayırıp ayrı yükleyin. Hiçbir şey kaydedilmedi.",
+      "too_many_chunks": "PDF'teki metin tek yüklemede işlenemeyecek kadar uzun (en çok {maxChunks} parça). Belgeyi bölümlere ayırıp ayrı yükleyin. Hiçbir şey kaydedilmedi.",
+      "over_budget": "Bu belgenin tahmini gömme maliyeti tek yükleme sınırını ({maxUsd} USD) aşıyor. Belgeyi bölümlere ayırıp ayrı yükleyin. Hiçbir şey kaydedilmedi.",
       "upload_failed": "Yükleme başarısız oldu; hiçbir parça kaydedilmedi."
     }
   },

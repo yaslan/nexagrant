@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findSharedDocumentByTitle, NoExtractableTextError, processPdfAndStore } from '@/lib/rag';
+import { findSharedDocumentByTitle, NoExtractableTextError, PdfLimitError, processPdfAndStore } from '@/lib/rag';
 import {
   hasPdfSignature,
   isRagUploadKind,
@@ -18,7 +18,16 @@ function refuse(error: RagUploadError, status: number, extra: Record<string, unk
  * (one of RAG_UPLOAD_KINDS), `title` (1..maxTitleLength after trimming), and
  * optionally `allowDuplicate=true` to store a document whose kind and title the
  * shared corpus already holds. Every refusal is `{ error: RagUploadError }`
- * and happens before the first embedding call.
+ * and happens before the first embedding call — including the ones only the
+ * parsed PDF can decide: over `maxPages`, `maxChunks` or `maxEmbeddingUsd`
+ * (413) and no readable text (422).
+ *
+ * Parsing and embedding stay inside this request rather than in a
+ * graphile-worker job (ADR-0008): a job needs the PDF bytes stored somewhere
+ * the worker can read (a table or file store this card does not add) and a
+ * status the page can poll, and the worker's hosting is still open
+ * (ADR-0008 §4). The limits bound what one request can cost instead, and
+ * `extractPdfText` yields the event loop between page slices.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -94,6 +103,11 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof NoExtractableTextError) {
       return refuse('no_text', 422);
+    }
+    // Too many pages, too many chunks or over the embedding budget: refused
+    // before the first embedding call and before any row was written.
+    if (error instanceof PdfLimitError) {
+      return refuse(error.code, 413, error.detail);
     }
     console.error('Upload error:', error);
     return NextResponse.json({ error: 'upload_failed' satisfies RagUploadError, message: errorMessage(error) }, { status: 500 });

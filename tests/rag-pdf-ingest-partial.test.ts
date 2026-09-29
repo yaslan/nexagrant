@@ -16,13 +16,27 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
 const pdfText = { value: 'x'.repeat(2400) };
+// One page holding `pdfText.value`, in the two calls `extractPdfText` makes:
+// `getInfo` for the page count, then `getText` over a page range.
 vi.mock('pdf-parse', () => ({
   PDFParse: class {
-    async getText(): Promise<{ text: string }> {
-      return { text: pdfText.value };
+    async getInfo(): Promise<{ total: number }> {
+      return { total: 1 };
     }
+    async getText(): Promise<{ total: number; text: string; pages: { num: number; text: string }[] }> {
+      return { total: 1, text: pdfText.value, pages: [{ num: 1, text: pdfText.value }] };
+    }
+    async destroy(): Promise<void> {}
   },
 }));
+
+// The limits are the real ones unless a test lowers one.
+const limits = vi.hoisted(() => ({ current: {} as Record<string, number> }));
+vi.mock('../src/lib/rag-upload', async () => {
+  const actual = await vi.importActual<typeof import('../src/lib/rag-upload')>('../src/lib/rag-upload');
+  limits.current = { ...actual.RAG_UPLOAD_LIMITS };
+  return { ...actual, RAG_UPLOAD_LIMITS: limits.current };
+});
 
 interface DocRow { id: string; title: string }
 
@@ -87,7 +101,8 @@ const recordAlertMock = vi.hoisted(() =>
 );
 vi.mock('../src/lib/observability/system-alert', () => ({ recordAlert: recordAlertMock }));
 
-const { processPdfAndStore } = await import('../src/lib/rag');
+const { processPdfAndStore, PdfLimitError } = await import('../src/lib/rag');
+const actualUpload = await vi.importActual<typeof import('../src/lib/rag-upload')>('../src/lib/rag-upload');
 
 beforeEach(() => {
   store.documents = [];
@@ -95,6 +110,7 @@ beforeEach(() => {
   store.deleteThrows = false;
   sequence = 0;
   pdfText.value = 'x'.repeat(2400);
+  Object.assign(limits.current, actualUpload.RAG_UPLOAD_LIMITS);
   documentDelete.mockClear();
   recordAlertMock.mockClear();
   embedTextMock.mockReset().mockResolvedValue(new Array(1536).fill(0.5));
@@ -153,5 +169,50 @@ describe('processPdfAndStore leaves the corpus consistent', () => {
     // SystemAlert has no RLS: the orphan is referenced by id, never by content.
     expect(alert.meta.documentId).toBe('doc-0');
     expect(JSON.stringify(alert.meta)).not.toContain('A paper');
+  });
+});
+
+describe('processPdfAndStore refuses a PDF over the limits before any embedding call (İNCELEME-45 B-1)', () => {
+  test('exactly maxChunks chunks is stored', async () => {
+    // chunkText at 1000 / 200 yields ceil(length / 800) chunks.
+    pdfText.value = 'x'.repeat(actualUpload.RAG_UPLOAD_LIMITS.maxChunks * 800);
+
+    const res = await processPdfAndStore(Buffer.from('%PDF'), null, 'SHARED_PDF', 'At the limit');
+
+    expect(res.storedChunks).toBe(actualUpload.RAG_UPLOAD_LIMITS.maxChunks);
+  });
+
+  test('one chunk over maxChunks stores nothing and embeds nothing', async () => {
+    pdfText.value = 'x'.repeat(actualUpload.RAG_UPLOAD_LIMITS.maxChunks * 800 + 1);
+
+    const refused = processPdfAndStore(Buffer.from('%PDF'), null, 'SHARED_PDF', 'One over');
+    await expect(refused).rejects.toBeInstanceOf(PdfLimitError);
+    await expect(refused).rejects.toMatchObject({
+      code: 'too_many_chunks',
+      detail: { chunks: actualUpload.RAG_UPLOAD_LIMITS.maxChunks + 1 },
+    });
+    expect(embedTextMock).not.toHaveBeenCalled();
+    expect(store.documents).toHaveLength(0);
+  });
+
+  test('an estimate over maxEmbeddingUsd stores nothing and embeds nothing', async () => {
+    // 2400 characters → chunks of 1000 + 1000 + 800 = 2800 characters →
+    // 934 estimated tokens → 0.000121 USD.
+    limits.current.maxEmbeddingUsd = 0.0001;
+
+    await expect(
+      processPdfAndStore(Buffer.from('%PDF'), null, 'SHARED_PDF', 'Too dear')
+    ).rejects.toMatchObject({ code: 'over_budget' });
+    expect(embedTextMock).not.toHaveBeenCalled();
+    expect(store.documents).toHaveLength(0);
+
+    limits.current.maxEmbeddingUsd = 0.00013;
+    const res = await processPdfAndStore(Buffer.from('%PDF'), null, 'SHARED_PDF', 'Just affordable');
+    expect(res.storedChunks).toBe(3);
+  });
+
+  test('at the default limits a full maxChunks upload is estimated under the budget', () => {
+    const { maxChunks, maxEmbeddingUsd } = actualUpload.RAG_UPLOAD_LIMITS;
+    expect(actualUpload.estimateEmbeddingUsd(maxChunks * 1000)).toBeLessThanOrEqual(maxEmbeddingUsd);
   });
 });
