@@ -40,16 +40,20 @@ function forbiddenClient(): PrismaClient & { touched: number } {
 
 describe('M4 relationship detail — tenant scope', () => {
   let ready = false;
-  let skipReason = '';
 
+  // TASK-MULQKN4K7SRN0 — no database, the wrong database answering, or a
+  // failed login are all a failed run, never a skip (K-6: CI does not skip).
+  // The old `expect(skipReason).toBe('__no_database__')` guard could never
+  // match, so it already failed — but it said "skipped" and buried the cause.
   beforeAll(async () => {
     try {
       await prisma.$connect();
       await seed();
       ready = true;
     } catch (e) {
-      skipReason = e instanceof Error ? e.message : String(e);
-      console.warn(`relationship tenant-scope tests skipped, no database: ${skipReason}`);
+      const reason = e instanceof Error ? e.message : String(e);
+      const target = (process.env.DATABASE_URL ?? '(unset: src/lib/db.ts default)').replace(/:\/\/[^@]*@/, '://***@');
+      throw new Error(`relationship tenant-scope needs a live FB database at ${target}: ${reason}`);
     }
   }, 60_000);
 
@@ -59,7 +63,6 @@ describe('M4 relationship detail — tenant scope', () => {
   });
 
   test('the leak is real: Prisma drops an undefined tenantId from the where clause', async () => {
-    if (!ready) return expect(skipReason).toBe('__no_database__');
 
     // Exactly the shape the old page produced when the session had no tenant.
     const undefinedTenant = undefined as unknown as string;
@@ -82,7 +85,6 @@ describe('M4 relationship detail — tenant scope', () => {
   });
 
   test('tenant A cannot load tenant B’s relationship', async () => {
-    if (!ready) return expect(skipReason).toBe('__no_database__');
 
     const stolen = await loadRelationshipDetail(REL_E2E.tenantId, REL_E2E.otherRelationshipId);
     expect(stolen).toBeNull();
@@ -96,7 +98,6 @@ describe('M4 relationship detail — tenant scope', () => {
   });
 
   test('tenant A still loads its own relationship and interactions', async () => {
-    if (!ready) return expect(skipReason).toBe('__no_database__');
 
     const own = await loadRelationshipDetail(REL_E2E.tenantId, REL_E2E.relationshipId);
     expect(own).not.toBeNull();
@@ -107,7 +108,6 @@ describe('M4 relationship detail — tenant scope', () => {
   });
 
   test('interactions never cross tenants even when the relationship id is known', async () => {
-    if (!ready) return expect(skipReason).toBe('__no_database__');
 
     const b = await loadRelationshipDetail(REL_E2E.otherTenantId, REL_E2E.otherRelationshipId);
     expect(b).not.toBeNull();

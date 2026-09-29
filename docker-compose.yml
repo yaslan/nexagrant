@@ -1,43 +1,84 @@
-version: '3.8'
+# Local development stack. See README "Yerel çalıştırma".
+#
+# The project name is pinned to `fabrika` because the existing data volume
+# `fabrika_pgdata` carries the labels of compose project "fabrika", volume
+# "pgdata"; any other project name makes compose refuse or duplicate it.
+name: fabrika
 
 services:
-  # Next.js 16 Web Application
+  # Next.js 16 web application (production image). Behind the `app` profile so
+  # `docker compose up -d` does not take host port 3000, which the shared
+  # `pnpm dev` server already uses. Start with `--profile app`.
   fabrika-web:
+    profiles: ["app"]
     build:
       context: .
       dockerfile: Dockerfile
     container_name: fabrika-web
-    restart: always
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${FABRIKA_WEB_PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://fabrika:fabrika_pass@postgres-vector:5432/fabrika_db?schema=public
+      - DATABASE_URL=postgresql://fabrika:${FABRIKA_PG_PASSWORD:-fabrika}@postgres-vector:5432/fabrika?schema=public
+      - REDIS_URL=redis://redis:6379
       - AUTH_SECRET=${AUTH_SECRET:?set AUTH_SECRET (openssl rand -base64 32)}
-      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_URL=http://localhost:${FABRIKA_WEB_PORT:-3000}
     depends_on:
       postgres-vector:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
-  # PostgreSQL Database with pgvector extension
+  # PostgreSQL 16 + pgvector. Host port 5433 by default: 5432 on this machine
+  # belongs to another project's Postgres. The POSTGRES_* values only matter
+  # when the volume is empty; an existing volume keeps its roles and passwords.
   postgres-vector:
     image: pgvector/pgvector:pg16
-    container_name: postgres-vector
-    restart: always
+    container_name: fabrika-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: fabrika
-      POSTGRES_PASSWORD: fabrika_pass
-      POSTGRES_DB: fabrika_db
+      POSTGRES_PASSWORD: ${FABRIKA_PG_PASSWORD:-fabrika}
+      POSTGRES_DB: fabrika
     ports:
-      - "5432:5432"
+      - "${FABRIKA_PG_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fabrika -d fabrika_db"]
+      test: ["CMD-SHELL", "pg_isready -U fabrika -d fabrika"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  # REDIS_URL in .env.example (redis://localhost:6379).
+  redis:
+    image: redis:7-alpine
+    container_name: fabrika-redis
+    restart: unless-stopped
+    ports:
+      - "${FABRIKA_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Catches outgoing mail locally: SMTP on 1025, web UI on http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: fabrika-mailpit
+    restart: unless-stopped
+    ports:
+      - "${FABRIKA_SMTP_PORT:-1025}:1025"
+      - "${FABRIKA_MAILPIT_PORT:-8025}:8025"
+
 volumes:
+  # Fixed name so compose reuses the volume the hand-made fabrika-postgres
+  # container already writes to, instead of creating an empty one.
   pgdata:
-    driver: local
+    name: fabrika_pgdata
+  redisdata:
+    name: fabrika_redisdata
