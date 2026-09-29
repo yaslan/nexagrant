@@ -4,8 +4,8 @@
  * TASK-MTSWLANXSU0IG (A3). The credentials form can hand the acknowledgement
  * straight to `authorize` alongside the e-mail, so that path verifies it before
  * an account exists. Google and Microsoft cannot: the browser leaves for the
- * provider and comes back into NextAuth's own callback route, and by the time
- * any of our own code runs, the adapter has already created the `User` row.
+ * provider and comes back into NextAuth's own callback route, where the form
+ * and everything the person ticked on it are gone.
  *
  * So the tick is parked in a short-lived, httpOnly cookie that only our own
  * server action sets, and only after a real click on a ticked form. It is not
@@ -14,13 +14,14 @@
  * difference between recording something true and recording nothing at all,
  * and it is set server-side so a page script cannot forge it.
  *
- * WHAT THIS DELIBERATELY DOES NOT DO: refuse the sign-in when the cookie is
- * missing. The refusal would have to happen after the account already exists,
- * so it would mean deleting a freshly created user mid-flow — a way to lock
- * people out of registering, on a path that cannot be exercised end to end
- * against real Google/Microsoft credentials in this repo. The missing record is
- * raised as a SystemAlert instead (CLAUDE.md rule 6: alert, do not break the
- * flow), which leaves it visible and fixable rather than silent.
+ * Refusing a registration without it: since ADR-0006 (TASK-MUM676F010E9G)
+ * the `signIn` callback does that, BEFORE the adapter creates anything — see
+ * decideOAuthSignIn in src/lib/oauth-registration.ts. The SystemAlert in
+ * `events.createUser` stays as the net for a record that still goes missing.
+ *
+ * An invite-code registration does not use this cookie: its acknowledgement
+ * (which must name the agency addendum) travels inside the signed invite
+ * cookie, src/lib/agency/registration-invite-cookie.ts.
  */
 import { cookies } from 'next/headers';
 
@@ -65,5 +66,15 @@ export async function readRegistrationAcknowledgement(): Promise<boolean> {
     return value === registrationAcknowledgementToken();
   } catch {
     return false;
+  }
+}
+
+/** Single use: cleared once the registration has recorded it. Best effort. */
+export async function clearRegistrationAcknowledgementCookie(): Promise<void> {
+  try {
+    const jar = await cookies();
+    jar.delete(REGISTRATION_ACK_COOKIE);
+  } catch {
+    // No request context: nothing to clear.
   }
 }

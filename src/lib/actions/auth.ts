@@ -5,6 +5,8 @@ import { AuthError, CredentialsSignin } from 'next-auth';
 import { INVALID_INVITE_CODE } from '@/lib/agency/invite-signin-error';
 import { isNextRedirectError } from '@/lib/errors';
 import { setRegistrationAcknowledgementCookie } from '@/lib/legal/registration-ack-cookie';
+import { acknowledgementMatchesCurrent } from '@/lib/legal/consent-documents';
+import { setRegistrationInviteCookie } from '@/lib/agency/registration-invite-cookie';
 import { setRegistrationProvinceCookie } from '@/lib/registration-province-cookie';
 import { setRegistrationReadinessCookie } from '@/lib/registration-readiness-cookie';
 import { isDemoLoginEnabled } from '@/lib/demo-login';
@@ -101,8 +103,10 @@ export async function loginWithCredentialsAction(
  *   to leave for Google/Microsoft and will come back into NextAuth's callback
  *   route, where nothing of ours can see the form any more — so if the box was
  *   ticked, the stamp is parked in an httpOnly cookie here, on the server, and
- *   `events.createUser` picks it up on the way back
+ *   the signIn callback and `events.createUser` pick it up on the way back
  *   (src/lib/legal/registration-ack-cookie.ts).
+ * @returns `{ error }` when the redirect is refused before it starts; otherwise
+ *   it redirects and does not return.
  */
 export async function loginWithSocialAction(
   provider: 'google' | 'microsoft-entra-id',
@@ -115,15 +119,43 @@ export async function loginWithSocialAction(
    */
   province?: string,
   /** FB KAMU B6 — as above: written or cleared on every OAuth start. */
-  readiness?: string
-) {
+  readiness?: string,
+  /**
+   * TASK-MUM676F010E9G (ADR-0006) — the agency invite code of a registration
+   * from `/kayit?kod=…`. Carried to the callback in a signed cookie together
+   * with the acknowledgement, which must then name the agency addendum.
+   */
+  inviteCode?: string,
+  locale: string = 'tr'
+): Promise<{ error: string } | void> {
+  const code = typeof inviteCode === 'string' ? inviteCode.trim().slice(0, 32) : '';
+  // A code without the addendum-bearing tick never leaves for the provider:
+  // "onaysız OAuth başlatılamaz". The callback checks again (the addendum could
+  // be republished during the round trip), but refusing here costs nobody a
+  // trip to Google to learn it.
+  if (code && !acknowledgementMatchesCurrent(acknowledgement, { agency: true })) {
+    return {
+      error:
+        locale === 'tr'
+          ? 'Devam edebilmek için aydınlatma metnini ve ajans kanalı ekini okuduğunuzu, kullanım koşullarını kabul ettiğinizi onaylamanız gerekir.'
+          : 'To continue, please confirm that you have read the privacy notice and the agency channel addendum, and that you accept the terms of service.',
+    };
+  }
+  // Without a code only a current stamp counts; anything else is "not ticked".
+  const acknowledged = !code && acknowledgementMatchesCurrent(acknowledgement);
   try {
-    // Set before `signIn`, which redirects and never returns.
-    if (acknowledgement) {
+    // Set before `signIn`, which redirects and never returns. Every cookie is
+    // written or cleared on every start, so nothing from an earlier attempt on
+    // a shared machine rides along.
+    if (acknowledged) {
       await setRegistrationAcknowledgementCookie();
     }
-    await setRegistrationProvinceCookie(acknowledgement ? province : null);
-    await setRegistrationReadinessCookie(acknowledgement ? readiness : null);
+    await setRegistrationInviteCookie(
+      code ? { code, acknowledgement: acknowledgement as string, locale: locale === 'en' ? 'en' : 'tr' } : null
+    );
+    const registering = acknowledged || Boolean(code);
+    await setRegistrationProvinceCookie(registering ? province : null);
+    await setRegistrationReadinessCookie(registering ? readiness : null);
     await signIn(provider, { redirectTo });
   } catch (error) {
     if (

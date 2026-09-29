@@ -357,7 +357,22 @@
     "provinceNone": "Not selected",
     "provinceHint": "Used only as a count per province in development agency reports; you can change it later in your organisation settings.",
     "readinessImportLabel": "Add my scorecard result to my account",
-    "readinessImportHint": "Your scorecard result: {score} / 100. If ticked, your answers are saved to your organisation account and shown on your dashboard; an inviting development agency sees this only as an aggregate count. If not ticked, no answer is saved."
+    "readinessImportHint": "Your scorecard result: {score} / 100. If ticked, your answers are saved to your organisation account and shown on your dashboard; an inviting development agency sees this only as an aggregate count. If not ticked, no answer is saved.",
+    "agencyInvite": {
+      "title": "You are signing up with an invite code from a development agency",
+      "body": "With this code, your organisation is linked to the channel of the agency that invited you. Your account opens on the free Discover plan. The agency sees aggregate numbers only. It does not see you or your organisation's work.",
+      "seesTitle": "What does the agency see?",
+      "sees": "Aggregate numbers for the organisations that signed up with its codes: how many signed up, how many tracked a call, how many marked an application as submitted. Numbers under 5 are not shown.",
+      "notSeesTitle": "What does the agency not see?",
+      "notSees": "Your name, your email, your organisation's name, your scorecard answers, your concept notes, your documents and your billing data."
+    },
+    "disclosureAckAgency": "I have read the <privacy>Privacy Policy and Data Protection Notice</privacy> and the <addendum>Agency Channel Privacy Notice Addendum</addendum> above, and I accept the <terms>Terms of Service</terms>.",
+    "disclosureRequiredAgency": "To continue, please confirm that you have read the privacy notice and the agency channel addendum, and that you accept the terms of service.",
+    "signInError": {
+      "invite_invalid": "This invite code is invalid or can no longer be used.",
+      "disclosure_required": "To open a new account, first confirm on the Sign up tab that you have read the privacy notice.",
+      "email_unverified": "An account with this email already exists, but the provider you signed in with did not report the address as verified. Sign in with the method you first used."
+    }
   },
   "NoWorkspace": {
     "title": "You do not have a workspace yet",

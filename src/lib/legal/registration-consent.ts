@@ -56,13 +56,14 @@ export async function bindTransactionToTenant(
  * with no account is a claim about nobody. Handing this function its own
  * connection would make both possible, so it cannot have one.
  *
- * `createMany` here writes one row per document (privacy notice, terms) rather
+ * `createMany` here writes one row per document (privacy notice, terms, and with an invite
+ * code the agency channel addendum) rather
  * than one row for the pair, because the two carry different `kind`s and will
  * version independently.
  */
 export async function writeRegistrationConsent(
   tx: Prisma.TransactionClient,
-  input: { tenantId: string; userId: string; locale: string }
+  input: { tenantId: string; userId: string; locale: string; agency?: boolean }
 ): Promise<number> {
   const rows = registrationConsentRows(input);
   const { count } = await tx.consent.createMany({ data: rows });

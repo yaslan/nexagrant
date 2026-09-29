@@ -357,7 +357,22 @@
     "provinceNone": "Seçilmedi",
     "provinceHint": "Kalkınma ajansı raporlarında yalnızca il bazında sayı olarak kullanılır; sonradan kurum ayarlarından değiştirebilirsiniz.",
     "readinessImportLabel": "Karne sonucumu hesabıma ekle",
-    "readinessImportHint": "Karne puanınız: {score} / 100. İşaretlerseniz yanıtlarınız kurum hesabınıza kaydedilir ve panonuzda görünür; davet eden kalkınma ajansı bunu yalnızca toplu sayı olarak görür. İşaretlemezseniz hiçbir yanıt kaydedilmez."
+    "readinessImportHint": "Karne puanınız: {score} / 100. İşaretlerseniz yanıtlarınız kurum hesabınıza kaydedilir ve panonuzda görünür; davet eden kalkınma ajansı bunu yalnızca toplu sayı olarak görür. İşaretlemezseniz hiçbir yanıt kaydedilmez.",
+    "agencyInvite": {
+      "title": "Bir kalkınma ajansının davet koduyla kayıt oluyorsunuz",
+      "body": "Kurumunuz bu kodla sizi davet eden ajansın kanalına bağlanır. Hesabınız ücretsiz Keşif planıyla açılır. Ajans yalnız toplu sayıları görür, sizi ve kurumunuzun çalışmalarını görmez.",
+      "seesTitle": "Ajans ne görür?",
+      "sees": "Kodlarıyla kayıt olan kurumların toplu sayıları: kaç kurum kayıt oldu, kaç kurum bir çağrıyı takibe aldı, kaç kurum başvurusunu gönderildi olarak işaretledi. 5'ten az olan sayılar gösterilmez.",
+      "notSeesTitle": "Ajans neyi görmez?",
+      "notSees": "Adınızı, e-postanızı, kurumunuzun adını, karne cevaplarınızı, konsept notlarınızı, belgelerinizi ve fatura bilgilerinizi."
+    },
+    "disclosureAckAgency": "<privacy>Gizlilik Politikası ve KVKK Aydınlatma Metni</privacy>'ni ve yukarıdaki <addendum>Ajans Kanalı Aydınlatma Eki</addendum>'ni okudum; <terms>Kullanım Koşulları</terms>'nı kabul ediyorum.",
+    "disclosureRequiredAgency": "Devam edebilmek için aydınlatma metnini ve ajans kanalı ekini okuduğunuzu, kullanım koşullarını kabul ettiğinizi onaylamanız gerekir.",
+    "signInError": {
+      "invite_invalid": "Davet kodu geçersiz ya da artık kullanılamıyor.",
+      "disclosure_required": "Yeni hesap açmak için önce Kayıt Ol sekmesinde aydınlatma metnini okuduğunuzu onaylamanız gerekir.",
+      "email_unverified": "Bu e-posta adresiyle açılmış bir hesap var, ancak giriş yaptığınız sağlayıcı adresi doğrulanmış olarak bildirmedi. Hesabı ilk açtığınız yöntemle giriş yapın."
+    }
   },
   "NoWorkspace": {
     "title": "Henüz bir çalışma alanınız yok",

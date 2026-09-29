@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { errorMessage as toErrorMessage, isNextRedirectError } from '@/lib/errors';
 import {
+  AGENCY_CHANNEL_ADDENDUM,
   PRIVACY_NOTICE,
   TERMS_OF_SERVICE,
   registrationAcknowledgementToken,
@@ -80,7 +81,18 @@ export default function AuthCard({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /**
+   * TASK-MUM676F010E9G — the signIn callback refuses an OAuth sign-in by
+   * redirecting here with `?error=<code>` (src/lib/oauth-registration.ts).
+   * Only the known codes become a message; anything else in the URL is ignored,
+   * so a crafted link cannot put arbitrary text on the page.
+   */
+  const [errorMessage, setErrorMessage] = useState<string | null>(() => {
+    const code = searchParams.get('error');
+    return code === 'invite_invalid' || code === 'disclosure_required' || code === 'email_unverified'
+      ? tAuthCard(`signInError.${code}`)
+      : null;
+  });
   /**
    * TASK-MULV3JXS1AW5X — optional province of the new organisation. Every
    * account opened here is a TR tenant (src/lib/auth.ts), so the question is
@@ -122,15 +134,23 @@ export default function AuthCard({
    */
   const [acknowledged, setAcknowledged] = useState(false);
   const isRegistering = mode === 'register';
+  /**
+   * ADR-0006 — a registration with a code. Only the registration branch reads
+   * the code; on the sign-in tab it is not sent anywhere (an existing account
+   * is never linked to an agency from here, HUKUK-10).
+   */
+  const agencyRegistration = isRegistering && inviteCode !== null;
   /** B6 — what goes to the server: the code only with the tick, only on a registration. */
   const readinessToSend = isRegistering && readiness && importReadiness ? readiness.code : undefined;
 
-  // Demo mode keeps every button, as before. Otherwise a button for a provider
-  // with no credentials would only lead to an Auth.js error page.
-  const showGoogle = demoLoginEnabled || oauthProviders.google;
-  const showMicrosoft = demoLoginEnabled || oauthProviders.microsoft;
-  // Invite-code registrations never offer OAuth (B1 decision S2-a, below).
-  const showOAuth = !inviteCode && (showGoogle || showMicrosoft);
+  // A button only for a provider with credentials, demo or not: without them it
+  // could only lead to an Auth.js error page (owner decision 29.09 — Entra
+  // appears once its keys are set).
+  const showGoogle = oauthProviders.google;
+  const showMicrosoft = oauthProviders.microsoft;
+  // ADR-0006: an invite code no longer hides OAuth (B1 decision S2-a is void) —
+  // the code rides to the callback in a signed cookie.
+  const showOAuth = showGoogle || showMicrosoft;
   // With neither the e-mail form nor an OAuth button there is no way in.
   const noSignInMethod = !demoLoginEnabled && !showOAuth;
 
@@ -139,10 +159,21 @@ export default function AuthCard({
    * stamp that no longer matches the current documents, so a tab left open
    * across a change to the notice cannot acknowledge the old text.
    */
-  const acknowledgementToken = acknowledged ? registrationAcknowledgementToken() : undefined;
+  const acknowledgementToken = acknowledged
+    ? registrationAcknowledgementToken({ agency: agencyRegistration })
+    : undefined;
+  const disclosureRequiredMessage = tAuthCard(
+    agencyRegistration ? 'disclosureRequiredAgency' : 'disclosureRequired'
+  );
 
   /** Shown next to the box so the screenshot of a consent shows what it covered. */
-  const documentVersionLabel = `${PRIVACY_NOTICE.id}@${PRIVACY_NOTICE.version} · ${TERMS_OF_SERVICE.id}@${TERMS_OF_SERVICE.version}`;
+  const documentVersionLabel = [
+    PRIVACY_NOTICE,
+    TERMS_OF_SERVICE,
+    ...(agencyRegistration ? [AGENCY_CHANNEL_ADDENDUM] : []),
+  ]
+    .map((d) => `${d.id}@${d.version}`)
+    .join(' · ');
 
   // Social Sign-In
   const handleSocialLogin = async (provider: 'google' | 'microsoft-entra-id') => {
@@ -150,19 +181,26 @@ export default function AuthCard({
     // this form is long gone — so the tick has to be taken before the redirect
     // starts, or there is nothing left to take it from.
     if (isRegistering && !acknowledged) {
-      setErrorMessage(tAuthCard('disclosureRequired'));
+      setErrorMessage(disclosureRequiredMessage);
       return;
     }
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      await loginWithSocialAction(
+      const res = await loginWithSocialAction(
         provider,
         rawCallbackUrl,
         acknowledgementToken,
         isRegistering ? province || undefined : undefined,
-        readinessToSend
+        readinessToSend,
+        agencyRegistration ? inviteCode ?? undefined : undefined,
+        locale
       );
+      // Only a refusal returns; a started sign-in redirects.
+      if (res?.error) {
+        setErrorMessage(res.error);
+        setIsLoading(false);
+      }
     } catch (err) {
       if (isNextRedirectError(err)) {
         return;
@@ -182,7 +220,7 @@ export default function AuthCard({
     // is the real gate — `authorize` refuses to create an account without the
     // stamp regardless of what this component sends.
     if (isRegistering && !acknowledged) {
-      setErrorMessage(tAuthCard('disclosureRequired'));
+      setErrorMessage(disclosureRequiredMessage);
       return;
     }
 
@@ -309,21 +347,36 @@ export default function AuthCard({
         </div>
       )}
 
-      {inviteCode && (
-        <div
+      {/*
+        ADR-0006 / TASK-MUM676F010E9G — the agency channel addendum, short form
+        (docs/legal/agency-channel-notice-addendum.md, cs-fb TASK-MULRRHM9N7XPM
+        §3–4). Before the provider buttons and before anything is typed: KVKK
+        md.10 wants the notice at the moment of collection. Open, not behind an
+        accordion. No agency name: it would have to come from the server's
+        reading of the code, and one typed into a URL would let anybody print
+        "agency X invites you" on this page.
+      */}
+      {agencyRegistration && (
+        <section
+          id="agency-channel-notice"
           data-testid="invite-code-banner"
-          className="p-3 bg-accent/10 border border-accent/30 text-ink text-xs rounded-xl space-y-1"
+          aria-labelledby="agency-channel-notice-title"
+          className="p-3 bg-accent/10 border border-accent/30 text-ink text-xs rounded-xl space-y-2"
         >
-          <p className="font-bold">
-            {isTr ? 'Davet koduyla kayıt' : 'Registering with an invite code'}:{' '}
+          <p id="agency-channel-notice-title" className="font-bold">
+            {tAuthCard('agencyInvite.title')}:{' '}
             <span className="font-mono">{inviteCode}</span>
           </p>
-          <p className="text-muted">
-            {isTr
-              ? 'Hesabınız ücretsiz Keşif planıyla açılır ve sizi davet eden kalkınma ajansına bağlanır.'
-              : 'Your account opens on the free Discover plan, linked to the development agency that invited you.'}
-          </p>
-        </div>
+          <p className="text-ink-2">{tAuthCard('agencyInvite.body')}</p>
+          <div>
+            <p className="font-semibold">{tAuthCard('agencyInvite.seesTitle')}</p>
+            <p className="text-ink-2">{tAuthCard('agencyInvite.sees')}</p>
+          </div>
+          <div>
+            <p className="font-semibold">{tAuthCard('agencyInvite.notSeesTitle')}</p>
+            <p className="text-ink-2">{tAuthCard('agencyInvite.notSees')}</p>
+          </div>
+        </section>
       )}
 
       {noSignInMethod && (
@@ -333,7 +386,7 @@ export default function AuthCard({
           className="p-3 bg-amber/10 border border-amber/30 text-ink text-xs rounded-xl space-y-1"
         >
           <p className="font-bold">
-            {inviteCode
+            {agencyRegistration
               ? (isTr ? 'Davet koduyla kayıt bu ortamda şu an kapalı.' : 'Registering with an invite code is not available in this environment.')
               : (isTr ? 'Giriş yapılandırılmamış.' : 'Sign-in is not configured.')}
           </p>
@@ -345,9 +398,142 @@ export default function AuthCard({
         </div>
       )}
 
-      {/* Social Sign-In Buttons. Hidden with an invite code: the code travels
-          only with the e-mail form (B1 decision S2-a — the OAuth round trip
-          would drop it and open an unlinked account). */}
+      {/*
+        ADR-0006 — on the registration tab everything the person decides comes
+        BEFORE the provider buttons: the notice, the optional province and
+        scorecard result, and the single acknowledgement box. Its own form, so
+        Enter in it submits nothing; the demo e-mail form below reads the same
+        state.
+      */}
+      {isRegistering && (
+      <form
+        data-testid="registration-disclosure"
+        onSubmit={(e) => e.preventDefault()}
+        className="space-y-3.5"
+      >
+        {/*
+          TASK-MTSWLANXSU0IG (A3) — the disclosure step.
+
+          It says "I have read ... and I accept ...", NOT "I consent to the
+          processing of my data". That wording is not politeness, it is the
+          register: docs/legal/processing-register.md §1 puts account creation
+          on KVKK md.5/2-c / GDPR art.6(1)(b), the contract. Asking for consent
+          to processing that runs on a contract basis would misdescribe the
+          basis and imply a right to withdraw that does not exist here — of the
+          register's 18 activities, exactly one (§11, calendar OAuth) rests on
+          consent, and it writes no data yet. So this box records an art.13
+          disclosure and a terms acceptance, and `Consent.kind` keeps them
+          distinct from consent on the record.
+        */}
+        <div>
+            <label htmlFor={provinceId} className="block text-xs font-bold text-ink mb-1">
+              {tAuthCard('provinceLabel')}
+            </label>
+            <select
+              id={provinceId}
+              name="province"
+              data-testid="register-province"
+              aria-describedby={provinceHintId}
+              value={province}
+              onChange={(e) => setProvince(e.target.value)}
+              className="w-full text-xs bg-ground border border-border rounded-xl p-2.5 text-ink focus:outline-hidden focus:ring-2 focus:ring-accent cursor-pointer"
+            >
+              <option value="">{tAuthCard('provinceNone')}</option>
+              {TR_PROVINCES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            <p id={provinceHintId} className="text-[10px] text-muted mt-1">
+              {tAuthCard('provinceHint')}
+            </p>
+        </div>
+
+        {readiness && (
+          <div className="rounded-xl border border-border bg-ground/60 p-3 space-y-1.5">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                name="readinessImport"
+                data-testid="readiness-import"
+                aria-describedby={readinessHintId}
+                // Unticked by default: importing the result is the person's act.
+                checked={importReadiness}
+                onChange={(e) => setImportReadiness(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-accent cursor-pointer"
+              />
+              <span className="text-[11px] leading-relaxed text-ink-2">
+                {tAuthCard('readinessImportLabel')}
+              </span>
+            </label>
+            <p id={readinessHintId} className="text-[10px] text-muted pl-6.5">
+              {tAuthCard('readinessImportHint', { score: readiness.total })}
+            </p>
+          </div>
+        )}
+
+          <div className="rounded-xl border border-border bg-ground/60 p-3 space-y-1.5">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                name="disclosureAck"
+                data-testid="disclosure-ack"
+                // No `defaultChecked`, and no value restored from storage.
+                checked={acknowledged}
+                onChange={(e) => {
+                  setAcknowledged(e.target.checked);
+                  if (e.target.checked) setErrorMessage(null);
+                }}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-accent cursor-pointer"
+              />
+              <span className="text-[11px] leading-relaxed text-ink-2">
+                {tAuthCard.rich(agencyRegistration ? 'disclosureAckAgency' : 'disclosureAck', {
+                  addendum: (chunks) => (
+                    <a
+                      href="#agency-channel-notice"
+                      className="font-semibold text-accent underline underline-offset-2"
+                    >
+                      {chunks}
+                    </a>
+                  ),
+                  privacy: (chunks) => (
+                    <a
+                      href={PRIVACY_NOTICE.href(locale)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-accent underline underline-offset-2"
+                    >
+                      {chunks}
+                    </a>
+                  ),
+                  terms: (chunks) => (
+                    <a
+                      href={TERMS_OF_SERVICE.href(locale)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-accent underline underline-offset-2"
+                    >
+                      {chunks}
+                    </a>
+                  ),
+                })}
+              </span>
+            </label>
+            {/*
+              The version is on screen because it is what gets stored. A
+              screenshot of this box is then evidence of a specific text, not of
+              a tick against whatever the notice happens to say today.
+            */}
+            <p className="text-[10px] font-mono text-muted pl-6.5" data-testid="disclosure-version">
+              {tAuthCard('disclosureVersion', { version: documentVersionLabel })}
+            </p>
+          </div>
+      </form>
+      )}
+
+      {/* Social Sign-In Buttons. With an invite code too (ADR-0006): the code
+          rides to the callback in a signed cookie. */}
       {showOAuth && (<>
       <div className="space-y-2.5">
         {showGoogle && (
@@ -394,9 +580,8 @@ export default function AuthCard({
       )}
       </>)}
 
-      {/* Form. Without demo sign-in only the disclosure box is left in it, for
-          an OAuth registration (TASK-MULSCEK4JHK8X). */}
-      {(demoLoginEnabled || (isRegistering && showOAuth)) && (
+      {/* Demo e-mail form (TASK-MULSCEK4JHK8X): only with demo sign-in on. */}
+      {demoLoginEnabled && (
       <form onSubmit={handleSubmit} className="space-y-3.5">
         {demoLoginEnabled && (<>
         {mode === 'register' && (
@@ -460,121 +645,6 @@ export default function AuthCard({
           />
         </div>
         </>)}
-
-        {/*
-          TASK-MTSWLANXSU0IG (A3) — the disclosure step.
-
-          It says "I have read ... and I accept ...", NOT "I consent to the
-          processing of my data". That wording is not politeness, it is the
-          register: docs/legal/processing-register.md §1 puts account creation
-          on KVKK md.5/2-c / GDPR art.6(1)(b), the contract. Asking for consent
-          to processing that runs on a contract basis would misdescribe the
-          basis and imply a right to withdraw that does not exist here — of the
-          register's 18 activities, exactly one (§11, calendar OAuth) rests on
-          consent, and it writes no data yet. So this box records an art.13
-          disclosure and a terms acceptance, and `Consent.kind` keeps them
-          distinct from consent on the record.
-        */}
-        {isRegistering && (
-          <div>
-            <label htmlFor={provinceId} className="block text-xs font-bold text-ink mb-1">
-              {tAuthCard('provinceLabel')}
-            </label>
-            <select
-              id={provinceId}
-              name="province"
-              data-testid="register-province"
-              aria-describedby={provinceHintId}
-              value={province}
-              onChange={(e) => setProvince(e.target.value)}
-              className="w-full text-xs bg-ground border border-border rounded-xl p-2.5 text-ink focus:outline-hidden focus:ring-2 focus:ring-accent cursor-pointer"
-            >
-              <option value="">{tAuthCard('provinceNone')}</option>
-              {TR_PROVINCES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-            <p id={provinceHintId} className="text-[10px] text-muted mt-1">
-              {tAuthCard('provinceHint')}
-            </p>
-          </div>
-        )}
-
-        {isRegistering && readiness && (
-          <div className="rounded-xl border border-border bg-ground/60 p-3 space-y-1.5">
-            <label className="flex items-start gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                name="readinessImport"
-                data-testid="readiness-import"
-                aria-describedby={readinessHintId}
-                // Unticked by default: importing the result is the person's act.
-                checked={importReadiness}
-                onChange={(e) => setImportReadiness(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-accent cursor-pointer"
-              />
-              <span className="text-[11px] leading-relaxed text-ink-2">
-                {tAuthCard('readinessImportLabel')}
-              </span>
-            </label>
-            <p id={readinessHintId} className="text-[10px] text-muted pl-6.5">
-              {tAuthCard('readinessImportHint', { score: readiness.total })}
-            </p>
-          </div>
-        )}
-
-        {isRegistering && (
-          <div className="rounded-xl border border-border bg-ground/60 p-3 space-y-1.5">
-            <label className="flex items-start gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                name="disclosureAck"
-                data-testid="disclosure-ack"
-                // No `defaultChecked`, and no value restored from storage.
-                checked={acknowledged}
-                onChange={(e) => {
-                  setAcknowledged(e.target.checked);
-                  if (e.target.checked) setErrorMessage(null);
-                }}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-accent cursor-pointer"
-              />
-              <span className="text-[11px] leading-relaxed text-ink-2">
-                {tAuthCard.rich('disclosureAck', {
-                  privacy: (chunks) => (
-                    <a
-                      href={PRIVACY_NOTICE.href(locale)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-accent underline underline-offset-2"
-                    >
-                      {chunks}
-                    </a>
-                  ),
-                  terms: (chunks) => (
-                    <a
-                      href={TERMS_OF_SERVICE.href(locale)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-accent underline underline-offset-2"
-                    >
-                      {chunks}
-                    </a>
-                  ),
-                })}
-              </span>
-            </label>
-            {/*
-              The version is on screen because it is what gets stored. A
-              screenshot of this box is then evidence of a specific text, not of
-              a tick against whatever the notice happens to say today.
-            */}
-            <p className="text-[10px] font-mono text-muted pl-6.5" data-testid="disclosure-version">
-              {tAuthCard('disclosureVersion', { version: documentVersionLabel })}
-            </p>
-          </div>
-        )}
 
         {demoLoginEnabled && (
         <button

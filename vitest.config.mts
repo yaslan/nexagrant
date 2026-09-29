@@ -41,5 +41,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(root, './src'),
     },
+    // TASK-MUM676F010E9G — next-auth's ESM imports `next/server` without an
+    // extension, which Node's resolver refuses when the package is loaded
+    // externally. Inlined, vite resolves it; tests/oauth-registration.live.test.ts
+    // runs the real Auth.js callback through it.
+    server: { deps: { inline: ['next-auth'] } },
   },
 });

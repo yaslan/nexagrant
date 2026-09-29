@@ -76,6 +76,37 @@ export const TERMS_OF_SERVICE: ConsentDocument = {
 };
 
 /**
+ * The agency channel addendum (TASK-MUM676F010E9G, ADR-0006) — shown on the
+ * registration screen only when the person arrived with an agency invite code
+ * (`/kayit?kod=…`), and acknowledged in the same single box as the two above.
+ *
+ * An information duty on top of the privacy notice, so DISCLOSURE_ACK, and the
+ * purpose stays ACCOUNT_REGISTRATION: the link to the agency is made at
+ * registration and nowhere else. `documentId` is what tells it apart, which is
+ * why no schema change was needed.
+ *
+ * What the person reads is the short text under `messageKey`, on the
+ * registration screen itself. The full addendum
+ * (docs/legal/agency-channel-notice-addendum.md §4/§5) is not published until
+ * legal signs it off (§6 there), so `href` points at the box on the screen, not
+ * at a page that does not exist yet. When that page ships: copy change, version
+ * bump, `href` to `/${locale}/privacy/agency-channel`.
+ */
+export const AGENCY_CHANNEL_ADDENDUM: ConsentDocument = {
+  id: 'agency-channel-addendum',
+  version: '2026-09-29.1',
+  messageKey: 'Auth.agencyInvite',
+  href: (locale) => `/${locale}/kayit#agency-channel-notice`,
+  kind: 'DISCLOSURE_ACK',
+  purpose: 'ACCOUNT_REGISTRATION',
+};
+
+/** Whether this registration carries an agency invite code. */
+export interface RegistrationScope {
+  readonly agency?: boolean;
+}
+
+/**
  * Everything a single registration must put on the record.
  *
  * One tick of one box covers both documents, and both are named in the label
@@ -87,6 +118,11 @@ export const REGISTRATION_DOCUMENTS: readonly ConsentDocument[] = [
   TERMS_OF_SERVICE,
 ];
 
+/** The set for one registration: with an invite code, the addendum joins it. */
+export function registrationDocuments(scope: RegistrationScope = {}): readonly ConsentDocument[] {
+  return scope.agency ? [...REGISTRATION_DOCUMENTS, AGENCY_CHANNEL_ADDENDUM] : REGISTRATION_DOCUMENTS;
+}
+
 /**
  * The rows a registration should write. Pure — it touches no database and no
  * clock beyond the one the caller passes in, so the write path can be tested
@@ -96,6 +132,7 @@ export function registrationConsentRows(input: {
   tenantId: string;
   userId: string;
   locale: string;
+  agency?: boolean;
 }): Array<{
   tenantId: string;
   userId: string;
@@ -105,7 +142,7 @@ export function registrationConsentRows(input: {
   documentVersion: string;
   locale: string;
 }> {
-  return REGISTRATION_DOCUMENTS.map((doc) => ({
+  return registrationDocuments({ agency: input.agency }).map((doc) => ({
     tenantId: input.tenantId,
     userId: input.userId,
     kind: doc.kind,
@@ -123,10 +160,12 @@ export function registrationConsentRows(input: {
  * It is a version stamp rather than a bare `true` so that a stale tab cannot
  * acknowledge a text it never showed: the server compares what came back
  * against what is current and refuses a mismatch
- * (see `acknowledgementMatchesCurrent`).
+ * (see `acknowledgementMatchesCurrent`). With an invite code the stamp names
+ * the addendum too, so a registration with a code cannot go through on a stamp
+ * that never showed it.
  */
-export function registrationAcknowledgementToken(): string {
-  return REGISTRATION_DOCUMENTS.map((d) => `${d.id}@${d.version}`).join(',');
+export function registrationAcknowledgementToken(scope: RegistrationScope = {}): string {
+  return registrationDocuments(scope).map((d) => `${d.id}@${d.version}`).join(',');
 }
 
 /**
@@ -138,6 +177,6 @@ export function registrationAcknowledgementToken(): string {
  * the old one, and accepting their tick would put a false version on the
  * record — worse than having no record, because it looks like proof.
  */
-export function acknowledgementMatchesCurrent(token: unknown): boolean {
-  return typeof token === 'string' && token === registrationAcknowledgementToken();
+export function acknowledgementMatchesCurrent(token: unknown, scope: RegistrationScope = {}): boolean {
+  return typeof token === 'string' && token === registrationAcknowledgementToken(scope);
 }

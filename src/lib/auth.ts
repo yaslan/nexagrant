@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { type NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Credentials from "next-auth/providers/credentials";
@@ -10,7 +10,10 @@ import { env } from "./env";
 import { errorMessage } from '@/lib/errors';
 import { PRODUCT_NAME } from './brand';
 import { acknowledgementMatchesCurrent } from './legal/consent-documents';
-import { readRegistrationAcknowledgement } from './legal/registration-ack-cookie';
+import {
+  clearRegistrationAcknowledgementCookie,
+  readRegistrationAcknowledgement,
+} from './legal/registration-ack-cookie';
 import { readRegistrationProvince } from './registration-province-cookie';
 import { readRegistrationReadiness } from './registration-readiness-cookie';
 import { readinessSettings, toReadinessCode } from './readiness/account';
@@ -22,7 +25,22 @@ import {
 } from './legal/registration-consent';
 import { InviteCodeRejectedError, noteInviteRejection, redeemInviteCode } from './agency/codes';
 import { InvalidInviteCodeSignin } from './agency/invite-signin-error';
-import { PLATFORM_ADMIN_DEMO_EMAIL, isDemoLoginEnabled, isPlatformAdminDemoEmail } from './demo-login';
+import {
+  clearRegistrationInviteCookie,
+  readRegistrationInvite,
+} from './agency/registration-invite-cookie';
+import {
+  bootstrapOAuthTenant,
+  decideOAuthSignIn,
+  probeInviteCode,
+  registerOAuthUserWithInvite,
+} from './oauth-registration';
+import {
+  PLATFORM_ADMIN_DEMO_EMAIL,
+  configuredOAuthProviders,
+  isDemoLoginEnabled,
+  isPlatformAdminDemoEmail,
+} from './demo-login';
 
 /**
  * TASK-MULSCEK4JHK8X — read once per process. Off unless DEMO_LOGIN_ENABLED=true
@@ -86,11 +104,64 @@ const baseAdapter = PrismaAdapter(prisma);
  * signed-in session instead of a 500. Typed as `Adapter` rather than `any` so a
  * method whose signature drifts from Auth.js is a build error.
  */
+/**
+ * TASK-MUM676F010E9G — which users the adapter's `createUser` really created in
+ * this process, and whether it already built their tenant.
+ *
+ * Auth.js calls `events.createUser` after linking an OAuth login to an
+ * EXISTING user by e-mail too (@auth/core handle-login.js, the
+ * allowDangerousEmailAccountLinking branch), not only after a new one. The
+ * event used to bootstrap a tenant every time, so linking Google to an
+ * existing account gave that person a second, empty "My Organization" tenant
+ * (found by tests/oauth-registration.live.test.ts). The event now bootstraps
+ * only a user this map says is new, and only once. Same request, same process:
+ * the entry is set by the adapter and removed by the event.
+ *
+ * - 'pending': a plain registration; the event builds the tenant.
+ * - 'bootstrapped': an invite-code registration; the adapter already built it.
+ */
+const createdByAdapter = new Map<string, 'pending' | 'bootstrapped'>();
+
 const safeAdapter: Adapter = {
   ...baseAdapter,
   async createUser(user: AdapterUser) {
+    // ADR-0006 — an OAuth registration with an agency invite code. The signIn
+    // callback has already refused a bad code, a stale cookie and a missing
+    // acknowledgement; this is where the code is actually used, atomically
+    // with the account. No fake-user fallback on this path (see
+    // registerOAuthUserWithInvite).
+    const invite = await readRegistrationInvite();
+    if (invite.status === 'ok') {
+      if (!acknowledgementMatchesCurrent(invite.invite.acknowledgement, { agency: true })) {
+        await clearRegistrationInviteCookie();
+        throw new Error('registration refused: agency addendum not acknowledged');
+      }
+      try {
+        const created = await registerOAuthUserWithInvite(prisma, {
+          user,
+          code: invite.invite.code,
+          province: await readRegistrationProvince(),
+          readiness: await readRegistrationReadiness(),
+        });
+        createdByAdapter.set(created.id, 'bootstrapped');
+        return created as AdapterUser;
+      } catch (e) {
+        if (e instanceof InviteCodeRejectedError) {
+          // Only reachable if the code died between the signIn probe and here.
+          await noteInviteRejection(prisma, invite.invite.code).catch((err) =>
+            console.warn(`[AuthAdapter.createUser] could not record a refused invite code: ${errorMessage(err)}`)
+          );
+        }
+        throw e;
+      } finally {
+        await clearRegistrationInviteCookie();
+        await clearRegistrationAcknowledgementCookie();
+      }
+    }
     try {
-      return await baseAdapter.createUser!(user);
+      const created = await baseAdapter.createUser!(user);
+      createdByAdapter.set(created.id, 'pending');
+      return created;
     } catch (e) {
       console.warn(`[AuthAdapter.createUser] DB error/fallback: ${errorMessage(e)}`);
       return {
@@ -176,7 +247,13 @@ const safeAdapter: Adapter = {
   },
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+/**
+ * The whole configuration, exported so the live test can run the real
+ * callbacks, adapter and events behind a fake OAuth provider
+ * (tests/oauth-registration.live.test.ts, TASK-MUM676F010E9G). Nothing else
+ * should build a second NextAuth from it.
+ */
+export const authConfig = {
   adapter: safeAdapter,
   session: { strategy: "jwt" },
   trustHost: true,
@@ -189,18 +266,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google({
       clientId: process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET,
+      // Linking by e-mail stays on, but the signIn callback lets it happen only
+      // when Google says the address is verified (ADR-0006, providerVerifiedEmail
+      // in src/lib/oauth-registration.ts). Off, a Google login for an address
+      // registered through Microsoft would be refused outright.
       allowDangerousEmailAccountLinking: true,
     }),
-    MicrosoftEntraID({
-      clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
-      clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
-      // Directory (tenant) scoping belongs in `issuer`
-      // (https://login.microsoftonline.com/<tenant>/v2.0). A `tenantId` option
-      // used to be passed here behind an `as any`; the provider never read it,
-      // so it did nothing and the multi-tenant "common" endpoint was always
-      // used. Changing that is a deployment decision, not a lint fix.
-      allowDangerousEmailAccountLinking: true,
-    }),
+    // Owner decision (ADR-0006 follow-up, 29.09): first phase is Google only.
+    // Entra stays in the code and is registered only when both halves of its
+    // credentials are set — without them there is no provider to reach and the
+    // button is not rendered (configuredOAuthProviders), instead of a button
+    // that ends on an Auth.js error page.
+    ...(configuredOAuthProviders().microsoft ? [
+      MicrosoftEntraID({
+        clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
+        clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
+        // Directory (tenant) scoping belongs in `issuer`
+        // (https://login.microsoftonline.com/<tenant>/v2.0). A `tenantId` option
+        // used to be passed here behind an `as any`; the provider never read it,
+        // so it did nothing and the multi-tenant "common" endpoint was always
+        // used. Changing that is a deployment decision, not a lint fix.
+        // As Google above: linking needs a verified-address claim (`xms_edov` or
+        // `verified_primary_email`), checked in the signIn callback.
+        allowDangerousEmailAccountLinking: true,
+      })
+    ] : []),
     // TASK-MULSCEK4JHK8X — this provider checks no password, so it is only
     // registered when demo sign-in is on. Off, `/api/auth/callback/credentials`
     // has no provider to sign anyone in with.
@@ -273,7 +363,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             // user signing in is untouched: they acknowledged the notice when
             // they registered, and demanding it again on every sign-in would
             // teach people to tick past it.
-            if (!acknowledgementMatchesCurrent(acknowledgement)) {
+            // With an invite code the stamp must name the agency addendum too
+            // (TASK-MUM676F010E9G): a stamp from a screen that never showed it
+            // cannot open an account linked to an agency.
+            if (!acknowledgementMatchesCurrent(acknowledgement, { agency: inviteCode !== null })) {
               console.warn(
                 '[Auth.authorize] registration refused: privacy notice and terms were not acknowledged, or the version acknowledged is no longer current'
               );
@@ -353,6 +446,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 tenantId: tenant.id,
                 userId: newUser.id,
                 locale: "tr",
+                agency: agencyId !== null,
               });
 
               if (agencyId) {
@@ -424,6 +518,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     })] : []),
   ],
   callbacks: {
+    /**
+     * ADR-0006 / TASK-MUM676F010E9G — runs after Google/Microsoft answer and
+     * before the adapter writes anything: the one point an OAuth registration
+     * can still be refused cleanly. The rules are in
+     * src/lib/oauth-registration.ts; this only wires them to the database and
+     * the cookie jar. Credentials (demo) sign-ins do their own checks in
+     * `authorize` and pass straight through.
+     */
+    async signIn({ user, account, profile }) {
+      if (!account || (account.type !== "oauth" && account.type !== "oidc")) return true;
+      const decision = await decideOAuthSignIn(
+        {
+          provider: account.provider,
+          providerAccountId: account.providerAccountId,
+          email: user?.email,
+          profile: profile as Record<string, unknown> | undefined,
+        },
+        {
+          accountExists: async (provider, providerAccountId) =>
+            (await prisma.account.findUnique({
+              where: { provider_providerAccountId: { provider, providerAccountId } },
+              select: { userId: true },
+            })) !== null,
+          userExistsByEmail: async (email) =>
+            (await prisma.user.findUnique({ where: { email }, select: { id: true } })) !== null,
+          readInvite: readRegistrationInvite,
+          readAcknowledged: readRegistrationAcknowledgement,
+          probeInviteCode: (code) => probeInviteCode(prisma, code),
+          noteRejection: (code) => noteInviteRejection(prisma, code),
+          clearInvite: clearRegistrationInviteCookie,
+        }
+      );
+      return decision.allow ? true : decision.redirect;
+    },
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
@@ -526,6 +654,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async createUser({ user }) {
       const userId = user.id;
       if (!userId) return;
+      // Only a user the adapter just created (see createdByAdapter): a linked
+      // existing account already has its tenant. An invite-code registration
+      // has one too — the adapter built it with the agency link and the
+      // consent rows in one transaction.
+      const created = createdByAdapter.get(userId);
+      createdByAdapter.delete(userId);
+      if (created !== 'pending') return;
 
       // TASK-MTSWLANXSU0IG (A3) — the OAuth half of registration. Read before
       // the transaction opens: `cookies()` wants the request context, and
@@ -537,60 +672,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const readiness = await readRegistrationReadiness();
 
       try {
-        await prisma.$transaction(async (tx) => {
-          const tenant = await tx.tenant.create({
-            data: {
-              name: `${user.name || "My"} Organization`,
-              slug: `org-${userId.slice(-6)}`,
-              country: "TR",
-              orgType: "SME",
-              province,
-              settings: readinessSettings(readiness),
-            },
-          });
-
-          // As in `authorize` above: tenant-scoped writes need the tenant bound
-          // to the transaction, or RLS refuses them off a superuser connection.
-          await bindTransactionToTenant(tx, tenant.id);
-
-          const workspace = await tx.workspace.create({
-            data: {
-              tenantId: tenant.id,
-              name: "Default Workspace",
-              slug: "default",
-            },
-          });
-
-          await tx.membership.create({
-            data: {
-              userId,
-              tenantId: tenant.id,
-              role: "TENANT_OWNER",
-              workspaceIds: [workspace.id],
-            },
-          });
-
-          // Only when the acknowledgement really travelled with this sign-up.
-          // Writing the row unconditionally would be the worst outcome
-          // available here: a record asserting that someone was shown a notice
-          // when nothing knows whether they were. A missing record is a known
-          // gap; a fabricated one is a false answer to an audit.
-          if (acknowledged) {
-            await writeRegistrationConsent(tx, {
-              tenantId: tenant.id,
-              userId,
-              // The OAuth round trip does not carry the locale the person was
-              // reading in, and guessing it from an e-mail domain would be a
-              // guess recorded as a fact. `tr` is the app's default locale
-              // (src/i18n/routing.ts) and is what the registration page serves
-              // unless a locale prefix says otherwise.
-              locale: "tr",
-            });
-          }
-        });
+        await prisma.$transaction((tx) =>
+          bootstrapOAuthTenant(tx, {
+            userId,
+            userName: user.name,
+            province,
+            readiness,
+            agencyId: null,
+            // Only when the acknowledgement really travelled with this sign-up.
+            // Writing the rows unconditionally would be the worst outcome
+            // available here: a record asserting that someone was shown a
+            // notice when nothing knows whether they were. A missing record is
+            // a known gap; a fabricated one is a false answer to an audit.
+            acknowledged,
+          })
+        );
       } catch (err) {
         console.warn(`[Auth.createUser] DB error: ${errorMessage(err)}`);
       }
+      // Single use: the acknowledgement has been recorded (or found missing).
+      await clearRegistrationAcknowledgementCookie();
 
       // Outside the transaction: an account that exists without a disclosure
       // record is a compliance defect, not a reason to undo the registration.
@@ -613,4 +714,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
     },
   },
-});
+} satisfies NextAuthConfig;
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
