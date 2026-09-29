@@ -3,6 +3,7 @@ import { withTenant } from '@/lib/db';
 import { findAccessibleTemplate, templateSections } from '@/modules/m2/server/templates';
 import { auth } from '@/lib/auth';
 import HTMLtoDOCX from 'html-to-docx';
+import { escapeHtmlText, MAX_TOTAL_IMAGE_BYTES, sanitizeHtmlForDocx } from '@/lib/docx-safe-html';
 
 export async function GET(
   req: Request,
@@ -56,23 +57,30 @@ export async function GET(
   const sections = templateSections(template.schema);
   const content = note.content as Record<string, string>;
 
-  // Build the HTML document
+  // Every interpolated value is tenant-written. html-to-docx downloads any
+  // `<img src="http(s)://…">` from this server, so raw HTML here was a
+  // server-side request forgery (TASK-MUN80RJ96EG0O): names/titles are
+  // escaped as text and section bodies are rebuilt from an allowlist that
+  // lets no URL through as an image source. One image budget per document.
+  const templateName = escapeHtmlText(template.name);
+  const imageBudget = { remaining: MAX_TOTAL_IMAGE_BYTES };
   let htmlString = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>${template.name}</title>
+        <title>${templateName}</title>
     </head>
     <body>
-        <h1>${template.name}</h1>
-        <h2>Opportunity: ${opportunity?.title || 'Untitled'}</h2>
+        <h1>${templateName}</h1>
+        <h2>Opportunity: ${escapeHtmlText(opportunity?.title || 'Untitled')}</h2>
         <hr />
   `;
 
   for (const section of sections) {
-    htmlString += `<h3>${section.labelKey}</h3>`;
-    htmlString += `<div>${content[section.key] || '<p>No content provided.</p>'}</div>`;
+    htmlString += `<h3>${escapeHtmlText(section.labelKey)}</h3>`;
+    const body = content[section.key];
+    htmlString += `<div>${typeof body === 'string' && body ? sanitizeHtmlForDocx(body, imageBudget) : '<p>No content provided.</p>'}</div>`;
     htmlString += `<br />`;
   }
 

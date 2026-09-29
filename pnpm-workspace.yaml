@@ -10,3 +10,12 @@ allowBuilds:
   prisma: true
   sharp: false
   unrs-resolver: false
+
+overrides:
+  # TASK-MUN80RJ96EG0O (O-3): image-size <=2.0.2 loops forever on crafted
+  # HEIF/ICNS/JXL bytes (GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr). NOTE:
+  # html-to-docx 1.8.0 BUNDLES its own copy in dist/ and never requires this
+  # package, so the override only clears the installed (unused) copy from the
+  # audit. The bundled parser is kept out of reach by src/lib/docx-safe-html.ts,
+  # which lets only PNG/JPEG/GIF signatures through to html-to-docx.
+  'html-to-docx>image-size': '>=2.0.3'
