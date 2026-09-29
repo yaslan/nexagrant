@@ -22,17 +22,40 @@ Komutlar: `/new-module`, `/add-table`, `/review-rls`, `/gate-rule`, `/i18n-check
 
 ```bash
 cp .env.example .env           # prisma, vitest ve docker compose .env'i okur (.env.local'ı değil)
-# .env'deki 3 URL'yi (DATABASE_URL, DATABASE_URL_MIGRATE, DATABASE_URL_RLS_TEST) localhost:5433'e çevir
-docker compose up -d           # postgres+pgvector (:5433), redis (:6379), mailpit (smtp :1025, arayüz :8025)
-pnpm install && pnpm db:migrate && pnpm db:rls && pnpm db:seed
+perl -pi -e "s|^AUTH_SECRET=\$|AUTH_SECRET=$(openssl rand -base64 32)|" .env   # boş AUTH_SECRET'i doldurur
+docker compose config -q       # rc=0 olmalı; AUTH_SECRET boşsa burada düşer
+docker compose up -d --wait    # postgres+pgvector (:5433), redis (:6379), mailpit (smtp :1025, arayüz :8025)
+pnpm install && pnpm db:generate
+pnpm exec prisma db push       # boş DB'de temel tablolar (migration'lar bunları kurmaz)
+pnpm db:rls-role               # fabrika_app rolü; parolayı üretip DATABASE_URL_RLS_TEST'i .env'e ekler
+DATABASE_URL="$(sed -n 's/^DATABASE_URL=//p' .env)" scripts/apply-migrations.sh   # host'ta psql ister
+pnpm db:rls && pnpm db:seed
 pnpm dev                       # Next.js :3000
 pnpm test                      # .env'i vitest.config.mts kendisi yükler; `source .env` gerekmez
 ```
 
+- **Kurulum sırası CI ile aynı** (`.github/workflows/ci.yml` "Prepare database"). `pnpm db:migrate`
+  (`prisma migrate dev`) boş DB'de **çalışmaz**: `prisma/migrations` temel tabloları kurmaz,
+  `db push` üstüne yazılmış ek dosyalardır (`add-m10-dual-approval-persistence` → `relation
+  "FollowupDoc" does not exist`). `db:rls-role` `db:rls`'ten önce gelmeli. `apply-migrations.sh`
+  host'ta `psql` ister (macOS: `brew install libpq`); `PSQL=` ile başka ikili verilebilir.
+- **AUTH_SECRET.** En az 32 karakter; yoksa sunucu açılmaz (`src/lib/auth-secret.ts`).
+  `docker compose` da boş `AUTH_SECRET` ile **her** komutta düşer (`required variable AUTH_SECRET
+  is missing a value`), yalnız DB'yi başlatırken bile: compose değişkenleri profil süzgecinden
+  önce bütün dosya için çözer ve `fabrika-web` bunu zorunlu tutar. `perl` satırı yalnız değer boşsa
+  yazar; elle de doldurabilirsin (`openssl rand -base64 32`).
 - **Portlar.** Bu makinede 5432 başka bir projenin Postgres'inde (yuyt-postgres). Fabrika'nın
   Postgres'i host'ta **5433**'te. Portlar env ile değişir: `FABRIKA_PG_PORT`, `FABRIKA_REDIS_PORT`,
   `FABRIKA_SMTP_PORT`, `FABRIKA_MAILPIT_PORT`, `FABRIKA_WEB_PORT` (compose bunları kabuktan ya da
-  `.env`'den okur). Değiştirirsen `.env`'deki URL'leri de aynı porta çevir.
+  `.env`'den okur). `.env.example`'daki URL'ler varsayılan 5433'ü gösterir; portu değiştirirsen
+  `.env`'deki 3 URL'yi (`DATABASE_URL`, `DATABASE_URL_MIGRATE`, `DATABASE_URL_RLS_TEST`) de çevir.
+- **Redis ve Mailpit.** Compose ikisini de kaldırır ama uygulama bugün ikisini de kullanmıyor:
+  `src/` `REDIS_URL` okumuyor, e-posta yalnız Resend API'siyle gidiyor (SMTP taşıyıcısı yok).
+  Mailpit'e düşen e-posta beklemeyin; `RESEND_API_KEY` boşsa e-posta hiç gönderilmez.
+- **Sabit adlar.** Konteyner adları (`fabrika-postgres`…) ve volume adları (`fabrika_pgdata`,
+  `fabrika_redisdata`) sabit; `-p` ile başka proje adı vermek bunları **değiştirmez**. İkinci,
+  izole bir yığın (ör. temiz klonda deneme) için adları da değiştiren ek bir `-f` dosyası kullan,
+  yoksa paylaşılan `fabrika-postgres`/`fabrika_pgdata` ile çakışır.
 - **Testler ve env.** `pnpm test` `.env`'i okur, ama kabukta tanımlı bir değişken `.env`'i ezer
   (CI'da `.env` yok; URL'ler job'un `env:`'inden gelir). `NODE_ENV` `.env`'den alınmaz. Canlı DB
   isteyen testler DB yoksa, yanlış DB cevap verirse ya da kimlik doğrulama düşerse **hata verir**,
