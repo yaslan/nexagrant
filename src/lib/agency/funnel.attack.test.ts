@@ -38,7 +38,13 @@ import { inviteCodeRow, MIN_MAX_USES } from './codes';
  *     R (registered, all) ≤ Σ used; used ≤ maxUses; "exhausted" ⇒ used = maxUses.
  *     Uses whose organisation was since deleted are the slack: Σ used = R + D.
  *     It knows the rule too: a code that could show "exhausted" and does not
- *     has used ≤ maxUses − 1.
+ *     has used ≤ maxUses − 1 (it reads whether the panel can say "exhausted"
+ *     off `inviteCodeRow` itself, see {@link PANEL_SAYS_EXHAUSTED}).
+ *
+ *   - (TASK-MUM2RMN3YIBGC, crw-fb TASK-MUM1OTRM75QS2 Ö-1) optionally, that no
+ *     organisation was ever deleted: D = 0. Deleting an organisation takes a KVKK
+ *     request and a waiting period, so in a pilot's first months it is the usual
+ *     case, and the agency, which invited every one of them, can know it.
  *
  * It must not learn, for any hidden count whose true value is 1..4 — a masked
  * number, a type × province cell that is never published, the organisations
@@ -136,6 +142,26 @@ const NOW = Date.UTC(2026, 8, 29, 12);
 const DELETED = 'codes|deleted';
 
 /**
+ * Whether the panel has an "exhausted" status at all, read off the function that
+ * builds it: a used-up code of the smallest allowed limit. Before TASK-MUM2RMN3YIBGC
+ * it had, and "active" on such a code meant used ≤ maxUses − 1.
+ */
+const PANEL_SAYS_EXHAUSTED =
+  inviteCodeRow(
+    {
+      id: 'probe',
+      hint: 'ABCD',
+      label: null,
+      maxUses: MIN_MAX_USES,
+      usedCount: MIN_MAX_USES,
+      expiresAt: new Date(NOW + 86_400_000),
+      revokedAt: null,
+      createdAt: new Date(NOW - 86_400_000),
+    },
+    NOW
+  ).status === ('exhausted' as string);
+
+/**
  * The invite-code panel: every code of the agency through `inviteCodeRow`, the
  * one function whose output reaches the page props and the list actions, then
  * through JSON as the browser receives it. The attacker reads whatever is there.
@@ -168,7 +194,7 @@ function publishCodes(codes: TrueCode[]): CodeKnowledge[] {
       (row.status as string | undefined) ??
       (row.revokedAt ? 'revoked' : Date.parse(row.expiresAt as string) <= NOW ? 'expired' : row.exhausted ? 'exhausted' : 'active');
     if (status === 'exhausted') lo = Math.max(lo, max);
-    if (status === 'active' && max >= MIN_MAX_USES) hi = Math.min(hi, max - 1);
+    if (PANEL_SAYS_EXHAUSTED && status === 'active' && max >= MIN_MAX_USES) hi = Math.min(hi, max - 1);
     return { truth: c.used, lo, hi };
   });
 }
@@ -181,7 +207,11 @@ function publishCodes(codes: TrueCode[]): CodeKnowledge[] {
 function attack(
   table: Table,
   published: Published,
-  { rounded = true, codes }: { rounded?: boolean; codes?: CodeKnowledge[] } = {}
+  {
+    rounded = true,
+    codes,
+    noneDeleted = false,
+  }: { rounded?: boolean; codes?: CodeKnowledge[]; /** D = 0: Σ used = R. */ noneDeleted?: boolean } = {}
 ): Leak[] {
   const provinces = [...table.keys()];
   const types: string[] = [...ORG_TYPES, ALL];
@@ -242,6 +272,10 @@ function attack(
     truth[sum] = codes.reduce((n, c) => n + c.truth, 0);
     truth[deleted] = truth[sum]! - truth[registered]!;
     if (truth[deleted]! < 0) throw new Error('more organisations than code uses');
+    if (noneDeleted) {
+      if (truth[deleted] !== 0) throw new Error('noneDeleted, but some uses have no organisation');
+      hi[deleted] = 0;
+    }
     eqs.push([sum, ...parts], [sum, registered, deleted]);
   }
   for (const [key, value] of published) {
@@ -383,13 +417,31 @@ describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', ()
     expect(attack(t, publish(t), { codes })).toEqual([]);
   });
 
-  test('open (leed-fb / HUKUK-5): all codes used up + funnel "5" bound the deleted organisations to 1..3', () => {
+  test('the deleted organisations (R-2) are not read back: nothing gives Σ used a lower bound', () => {
     // One 8-use code, used up; 2 of its 8 organisations deleted since: R = 6, shown "5" (5..7).
-    // Σ used = 8 exactly ("exhausted"), so D = 8 − R ∈ [1, 3]. Only "exhausted" gives Σ used a
-    // lower bound; the card keeps that status, so this is reported, not fixed here.
+    // While the panel said "exhausted", Σ used = 8 exactly and D = 8 − R ∈ [1, 3]
+    // (TASK-MUM17YBJVAHRR left this open). Without that status Σ used is only ≥ R.
     const t = tableOf({ Samsun: { SME: [6, 6, 6, 6, 0, 0, 0] } });
     const leaks = attack(t, publish(t), { codes: publishCodes([{ maxUses: 8, used: 8 }]) });
-    expect(leaks).toEqual([{ target: DELETED, truth: 2, lo: 1, hi: 3 }]);
+    expect(leaks).toEqual([]);
+  });
+
+  test('the panel never says "exhausted": a used-up code reads "active" (TASK-MUM2RMN3YIBGC)', () => {
+    expect(PANEL_SAYS_EXHAUSTED).toBe(false);
+  });
+
+  test('D = 0, crw-fb org-global-zero-six #17: 4 used-up 6-use codes + funnel "25", types "15"/"15" do not bound the fifth code to 2..3', () => {
+    // TASK-MUM1OTRM75QS2-crw-fb.md Kart 1 B-1. 27 organisations, none deleted. Types are
+    // disjoint, so R ≥ 13 + 13 = 26; "25" gives R ≤ 27. With "exhausted" ×4, R = 24 + a and
+    // a ∈ [2, 3] (true 3).
+    const t = tableOf({
+      [NO_PROVINCE]: { MUNICIPALITY: [3, 2, 3, 0, 0, 0, 0], UNIVERSITY: [3, 2, 3, 1, 0, 0, 0] },
+      Samsun: { MUNICIPALITY: [6, 4, 6, 2, 1, 0, 0], UNIVERSITY: [5, 2, 5, 1, 1, 1, 0] },
+      Tokat: { MUNICIPALITY: [4, 3, 4, 3, 0, 0, 0], UNIVERSITY: [6, 4, 6, 0, 3, 2, 0] },
+    });
+    const codes = publishCodes([6, 6, 6, 6, 3].map((used) => ({ maxUses: 6, used })));
+    expect(attack(t, publish(t), { codes, noneDeleted: true })).toEqual([]);
+    expect(attack(t, publish(t), { codes })).toEqual([]);
   });
 
   test('known residual: codes made before the minimum (maxUses < 5) still bound their uses to 1..4', () => {
@@ -440,14 +492,26 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
   /**
    * The agency's codes behind `table`: its R organisations spread over 1..3 codes that a
    * create call accepts today (maxUses ≥ MIN_MAX_USES), plus 0..3 uses whose organisation
-   * was deleted. About a third are used up; some revoked or expired.
+   * was deleted (none when `noneDeleted`). About a third are used up; some revoked or expired.
+   *
+   * `sequential`: codes of the smallest limit handed out one after another, each used up
+   * before the next — crw-fb's org-global-zero-six (TASK-MUM1OTRM75QS2), where "exhausted"
+   * leaked the last code's uses under D = 0 (21 of 3,000 tables; 0 with the random spread).
    */
-  function randomCodes(table: Table, rand: () => number): TrueCode[] {
+  function randomCodes(table: Table, rand: () => number, noneDeleted: boolean, sequential: boolean): TrueCode[] {
     const ri = (a: number, b: number) => a + Math.floor(rand() * (b - a + 1));
     let registered = 0;
     for (const byType of table.values()) for (const ty of ORG_TYPES) registered += byType[ty].registered;
+    const total = registered + (noneDeleted ? 0 : ri(0, 3));
+    if (sequential) {
+      const codes: TrueCode[] = [];
+      for (let n = total; n > 0 || !codes.length; n -= MIN_MAX_USES) {
+        codes.push({ maxUses: MIN_MAX_USES, used: Math.max(0, Math.min(MIN_MAX_USES, n)) });
+      }
+      return codes;
+    }
     const used = Array.from({ length: ri(1, 3) }, () => 0);
-    for (let n = registered + ri(0, 3); n > 0; n--) used[ri(0, used.length - 1)]!++;
+    for (let n = total; n > 0; n--) used[ri(0, used.length - 1)]!++;
     return used.map((u) => {
       const floor = Math.max(u, MIN_MAX_USES);
       const r = rand();
@@ -460,23 +524,32 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
     });
   }
 
-  for (const seed of [1, 7, 42]) {
-    test(`seed ${seed}: 300 random small tables, every view and the code panel joined`, () => {
-      const rand = stream(seed);
-      // A stream of its own, so the tables are the same ones the funnel-only gate saw.
-      const codeRand = stream(seed + 1000);
-      const found: string[] = [];
-      let tablesWithLeak = 0;
-      for (let k = 0; k < 300; k++) {
-        const t = randomTable(rand);
-        // DELETED is the open question above; every funnel group and every code's uses are gated.
-        const leaks = attack(t, publish(t), { codes: publishCodes(randomCodes(t, codeRand)) }).filter(
-          (l) => l.target !== DELETED
-        );
-        if (leaks.length) tablesWithLeak++;
-        for (const l of leaks.slice(0, 2)) found.push(`#${k} ${l.target}=${l.truth} ∈ [${l.lo}, ${l.hi}]`);
+  // D ≥ 0: the attacker does not know how many organisations left. D = 0 (TASK-MUM2RMN3YIBGC,
+  // crw-fb Ö-1): it knows none did — the pilot's usual case. Every seed runs in both, with
+  // codes spread at random and with codes handed out one after another.
+  for (const noneDeleted of [false, true]) {
+    for (const sequential of [false, true]) {
+      for (const seed of [1, 7, 42]) {
+        const mode = `${noneDeleted ? 'D = 0' : 'D ≥ 0'}, ${sequential ? 'sequential 6-use codes' : 'random codes'}`;
+        test(`seed ${seed}, ${mode}: 300 random small tables, every view and the code panel joined`, () => {
+          const rand = stream(seed);
+          // A stream of its own, so the tables are the same ones the funnel-only gate saw.
+          const codeRand = stream(seed + 1000);
+          const found: string[] = [];
+          let tablesWithLeak = 0;
+          for (let k = 0; k < 300; k++) {
+            const t = randomTable(rand);
+            // Every funnel group, every code's uses, and the deleted organisations are gated.
+            const leaks = attack(t, publish(t), {
+              codes: publishCodes(randomCodes(t, codeRand, noneDeleted, sequential)),
+              noneDeleted,
+            });
+            if (leaks.length) tablesWithLeak++;
+            for (const l of leaks.slice(0, 2)) found.push(`#${k} ${l.target}=${l.truth} ∈ [${l.lo}, ${l.hi}]`);
+          }
+          expect(found, `${tablesWithLeak}/300 tables leak`).toEqual([]);
+        });
       }
-      expect(found, `${tablesWithLeak}/300 tables leak`).toEqual([]);
-    });
+    }
   }
 });

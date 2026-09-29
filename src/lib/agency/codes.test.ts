@@ -39,20 +39,24 @@ describe('inviteCodeRow', () => {
       expect(Object.keys(row).sort()).toEqual(
         ['createdAt', 'expiresAt', 'hint', 'id', 'label', 'maxUses', 'revokedAt', 'status'].sort()
       );
-      expect(JSON.stringify(row)).not.toMatch(/used|left|exhausted"?:/i);
+      expect(JSON.stringify(row)).not.toMatch(/used|left|exhausted/i);
     }
   });
 
-  test('status: revoked, then expired, then exhausted, else active', () => {
+  test('status: revoked, then expired, else active — a used-up code included', () => {
     expect(inviteCodeRow(record({ usedCount: 3 }), NOW).status).toBe('active');
-    expect(inviteCodeRow(record({ usedCount: 25 }), NOW).status).toBe('exhausted');
+    expect(inviteCodeRow(record({ usedCount: 25 }), NOW).status).toBe('active');
     expect(inviteCodeRow(record({ usedCount: 25, expiresAt: new Date(NOW) }), NOW).status).toBe('expired');
     expect(inviteCodeRow(record({ usedCount: 25, revokedAt: new Date(NOW - 1) }), NOW).status).toBe('revoked');
   });
 
-  test('a code made before the minimum never reads "exhausted": that would be its 1..4 uses', () => {
-    expect(inviteCodeRow(record({ maxUses: 3, usedCount: 3 }), NOW).status).toBe('active');
-    expect(inviteCodeRow(record({ maxUses: MIN_MAX_USES, usedCount: MIN_MAX_USES }), NOW).status).toBe('exhausted');
+  test('no "exhausted" at any limit: it was the exact use count (TASK-MUM2RMN3YIBGC)', () => {
+    for (const maxUses of [3, MIN_MAX_USES, 25]) {
+      for (const usedCount of [0, maxUses - 1, maxUses]) {
+        expect(inviteCodeRow(record({ maxUses, usedCount }), NOW).status).toBe('active');
+      }
+    }
+    expect(inviteCodeRow(record({ usedCount: undefined }), NOW).status).toBe('active');
   });
 });
 
@@ -70,19 +74,25 @@ describe('validateInviteCodeInput: maxUses ≥ MIN_MAX_USES', () => {
 });
 
 describe('listInviteCodesIn', () => {
-  test('reads usedCount for the status, returns none of it', async () => {
+  test('does not select usedCount, returns none of it', async () => {
     const rows = [
       { ...record({ id: 'a', usedCount: 7 }), codeHint: 'AAAA' },
       { ...record({ id: 'b', usedCount: 3 }), codeHint: 'BBBB' },
       { ...record({ id: 'c', usedCount: 25 }), codeHint: 'CCCC' },
     ].map(({ hint: _hint, ...r }) => r);
-    const tx = { agencyInviteCode: { findMany: async () => rows } } as unknown as TenantTx;
+    let select: Record<string, unknown> = {};
+    const tx = {
+      agencyInviteCode: {
+        findMany: async (args: { select: Record<string, unknown> }) => ((select = args.select), rows),
+      },
+    } as unknown as TenantTx;
     const list = await listInviteCodesIn(tx, 'agency', NOW);
     expect(list.map((c) => [c.hint, c.status])).toEqual([
       ['AAAA', 'active'],
       ['BBBB', 'active'],
-      ['CCCC', 'exhausted'],
+      ['CCCC', 'active'],
     ]);
+    expect(select).not.toHaveProperty('usedCount');
     expect(JSON.stringify(list)).not.toMatch(/usedCount|"used/);
   });
 });

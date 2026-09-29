@@ -6,7 +6,10 @@ import { MAX_USES_LIMIT, MIN_MAX_USES } from '@/lib/agency/code-limits';
 import type { InviteCodeStatus, InviteCodeSummary } from '@/lib/agency/codes';
 import { createInviteCode, listInviteCodes, revokeInviteCode, type InviteActionError } from './actions';
 
-/** B-1 (TASK-MUM17YBJVAHRR): the server sends each code's status, never its use count. */
+/**
+ * B-1 (TASK-MUM17YBJVAHRR): the server sends each code's status, never its use count.
+ * No "exhausted" either (TASK-MUM2RMN3YIBGC): a used-up code reads "active".
+ */
 export type InviteCodeRow = InviteCodeSummary;
 
 const focusRing =
@@ -19,7 +22,6 @@ const STATUS_CLASS: Record<InviteCodeStatus, string> = {
   active: 'border-ok text-ok',
   revoked: 'border-bad text-bad',
   expired: 'border-border text-ink-2',
-  exhausted: 'border-amber text-amber',
 };
 
 function isoDay(from: number, offsetDays: number): string {

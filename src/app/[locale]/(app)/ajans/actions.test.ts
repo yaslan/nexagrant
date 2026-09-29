@@ -37,12 +37,12 @@ describe('invite-code list actions', () => {
   ])('%s: status per code, no usedCount in the response', async (_name, call) => {
     const res = await call();
     const wire = JSON.stringify(res);
-    expect(wire).not.toMatch(/usedCount|"used|left|exhausted"?:/);
+    expect(wire).not.toMatch(/usedCount|"used|left|exhausted/);
     expect(wire).not.toMatch(/"(7|3)"|:7\b|:3\b/); // neither 7 nor 3 anywhere as a value
     expect(res.map((c) => [c.hint, c.status])).toEqual([
       ['AAAA', 'active'],
       ['BBBB', 'active'],
-      ['CCCC', 'exhausted'],
+      ['CCCC', 'active'], // used up: no "exhausted" (TASK-MUM2RMN3YIBGC)
     ]);
     // What the select asked for is the database's business; what leaves is not.
     expect(Object.keys(res[0]!).sort()).toEqual(

@@ -2164,12 +2164,11 @@
       "colActions": "Actions",
       "hintSr": "code ending in {hint}",
       "limit": "Up to {max} organisations",
-      "countsNote": "So that no organisation can be identified, how many times a code was used is not shown, only its status. The number of registered organisations is in the panel above.",
+      "countsNote": "So that no organisation can be identified, how many times a code was used is not shown, only its status; a code that has reached its limit still shows “Active”. The number of registered organisations is in the panel above.",
       "status": {
         "active": "Active",
         "revoked": "Revoked",
-        "expired": "Expired",
-        "exhausted": "Used up"
+        "expired": "Expired"
       },
       "revoke": "Revoke",
       "revokeSr": "Revoke the code ending in {hint}",

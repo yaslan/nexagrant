@@ -53,7 +53,7 @@ export interface CreatedInviteCode {
  * the exact registration total. src/lib/agency/funnel.attack.test.ts joins
  * this panel with the funnel.
  */
-export type InviteCodeStatus = 'active' | 'exhausted' | 'revoked' | 'expired';
+export type InviteCodeStatus = 'active' | 'revoked' | 'expired';
 
 /** One code as it leaves the server: the dashboard's props and every list action. No count. */
 export interface InviteCodeSummary {
@@ -73,21 +73,25 @@ export interface InviteCodeRecord {
   hint: string;
   label: string | null;
   maxUses: number;
-  usedCount: number;
+  /** Never read for the panel (TASK-MUM2RMN3YIBGC); allowed here so a full row can be passed. */
+  usedCount?: number;
   expiresAt: Date;
   revokedAt: Date | null;
   createdAt: Date;
 }
 
 /**
- * "exhausted" says used = maxUses, so it is only said when maxUses is at least
- * MIN_MAX_USES (≥ 5). A code made before that minimum reads "active" when used
- * up: telling the agency it is spent would tell it the 1..4 uses.
+ * No "exhausted" (TASK-MUM2RMN3YIBGC, leed-fb 29.09): a used-up code reads
+ * "active". "Exhausted" gave its exact use count (= maxUses); with no
+ * organisation deleted (D = 0, the pilot's usual case) that joined with the
+ * funnel's rounded bounds put the one code still active at 1..4 uses
+ * (TASK-MUM1OTRM75QS2-crw-fb.md B-1), and it pinned the deleted organisations
+ * (R-2). Registration still refuses a used-up code, with the one message every
+ * unusable code gets. `usedCount` is not read here at all.
  */
 export function inviteCodeStatus(c: InviteCodeRecord, now: number): InviteCodeStatus {
   if (c.revokedAt) return 'revoked';
   if (c.expiresAt.getTime() <= now) return 'expired';
-  if (c.usedCount >= c.maxUses && c.maxUses >= MIN_MAX_USES) return 'exhausted';
   return 'active';
 }
 
@@ -198,13 +202,12 @@ export async function listInviteCodesIn(
       codeHint: true,
       label: true,
       maxUses: true,
-      usedCount: true,
       expiresAt: true,
       revokedAt: true,
       createdAt: true,
     },
   });
-  // usedCount is read for the status only; inviteCodeRow drops it.
+  // No usedCount: nothing the panel shows depends on it (TASK-MUM2RMN3YIBGC).
   return rows.map(({ codeHint, ...r }) => inviteCodeRow({ ...r, hint: codeHint }, now));
 }
 
