@@ -78,7 +78,7 @@ test.describe('M9 calendar connections', () => {
     await acceptCookies(page);
     await signIn(page, F10.full.email, calendarSettingsUrl(F10.full.workspaceSlug));
 
-    await providerCard(page, 'Google Calendar').getByRole('button', { name: 'Bağla' }).click();
+    await providerCard(page, 'Google Calendar').getByRole('button', { name: 'Bağla', exact: true }).click();
 
     // The banner, not the card's own description: both carry the same sentence,
     // and asserting on the text alone would pass even if the click did nothing.
@@ -88,7 +88,7 @@ test.describe('M9 calendar connections', () => {
     await expect(banner).toContainText('Bu sağlayıcı henüz bağlanamıyor');
     // The button must return to rest, not stay stuck on "Bağlanıyor…".
     await expect(
-      providerCard(page, 'Google Calendar').getByRole('button', { name: 'Bağla' }),
+      providerCard(page, 'Google Calendar').getByRole('button', { name: 'Bağla', exact: true }),
     ).toBeEnabled();
     await shot(page, 'connect-google-refused');
 
@@ -115,7 +115,7 @@ test.describe('M9 calendar connections', () => {
     await acceptCookies(page);
     await signIn(page, F10.full.email, calendarSettingsUrl(F10.full.workspaceSlug));
 
-    await providerCard(page, '.ics File Import').getByRole('button', { name: 'Bağla' }).click();
+    await providerCard(page, '.ics File Import').getByRole('button', { name: 'Bağla', exact: true }).click();
 
     await expect(page.getByText('Bağlı', { exact: true }).first()).toBeVisible({
       timeout: 15_000,
@@ -168,9 +168,17 @@ test.describe('M9 calendar connections', () => {
 
     // The screen returns to its unconnected state — the action reloads the page,
     // so this waits for the fresh document.
+    //
+    // `exact: true` is what makes this a wait at all (TASK-MULXYY4DPRBCF). A role
+    // name matches as a case-insensitive substring by default, and "Bağla" is a
+    // prefix of "Bağlantısını Kes" — so the button just clicked satisfied this
+    // assertion instantly, the query below ran before the server action had
+    // deleted anything, and `afterAll` then removed the row under the in-flight
+    // action (CI 36499253610: CALENDAR_CONNECTION_NOT_FOUND after "rolled back").
     await expect(
-      providerCard(page, '.ics File Import').getByRole('button', { name: 'Bağla' }),
+      providerCard(page, '.ics File Import').getByRole('button', { name: 'Bağla', exact: true }),
     ).toBeVisible({ timeout: 15_000 });
+    await expect(icsCard.getByText('Bağlı', { exact: true })).toHaveCount(0);
     await shot(page, 'disconnect-ics-removed');
 
     // Asked of the database, not of the return value: `deleteMany` must have
