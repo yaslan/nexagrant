@@ -106,6 +106,9 @@ export function ModulesClient({
   const manifests = getAllManifests();
 
   const [activeModules, setActiveModules] = useState<ModuleId[]>(plan?.activeModules ?? []);
+  // Switched on in ModuleState but outside the plan (left by a downgrade): the
+  // gate refuses them, so the only offer is to switch them off.
+  const [outsidePlanOn, setOutsidePlanOn] = useState<ModuleId[]>(plan?.switchedOnOutsidePlan ?? []);
   const entitledModules = plan?.entitledModules ?? [];
   const badgeTier = plan?.badgeTier ?? null;
   // An unread plan offers nothing; an ended pilot is read-only
@@ -198,6 +201,19 @@ export function ModulesClient({
         showToast(`${id} açılamadı: ${missing}`, 'error');
       }
     }
+  };
+
+  const disableOutsidePlan = (id: ModuleId) => {
+    startTransition(async () => {
+      setOutsidePlanOn((prev) => prev.filter((m) => m !== id));
+      try {
+        await toggleModuleState(id, 'OFF');
+        showToast(`${id} plan dışında açık kalmıştı; kapatıldı.`, 'info');
+      } catch (e) {
+        showToast(errorMessage(e, 'Modül kapatılırken hata oluştu.'), 'error');
+        setOutsidePlanOn((prev) => [...prev, id]); // rollback
+      }
+    });
   };
 
   const confirmDisable = () => {
@@ -405,6 +421,7 @@ export function ModulesClient({
           const meta = MODULE_METADATA[mod.id];
           const check = canEnableEntitled(mod.id, activeModules, entitledModules);
           const isPlanLocked = plan !== null && !entitledModules.includes(mod.id);
+          const isOutsidePlanOn = isPlanLocked && outsidePlanOn.includes(mod.id);
 
           return (
             <div
@@ -526,7 +543,9 @@ export function ModulesClient({
                 <div className="text-xs">
                   {!isActive && !check.allowed && (
                     <span className="text-bad font-medium">
-                      {isPlanLocked
+                      {isOutsidePlanOn
+                        ? 'Plan dışında açık kalmış — kullanılamaz'
+                        : isPlanLocked
                         ? 'Plan yükseltmesi gerektirir'
                         : `Eksik bağımlılık: ${check.missingDependencies?.join(', ')}`}
                     </span>
@@ -535,6 +554,19 @@ export function ModulesClient({
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {isOutsidePlanOn && (
+                    <button
+                      onClick={() => disableOutsidePlan(mod.id)}
+                      disabled={readOnly || isPending}
+                      className={`text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-2xs ${
+                        readOnly
+                          ? 'bg-ground text-muted border border-border cursor-not-allowed'
+                          : 'bg-bad/15 text-bad hover:bg-bad/25 border border-bad/30'
+                      }`}
+                    >
+                      Kapat
+                    </button>
+                  )}
                   {isPlanLocked && !isActive ? (
                     <Link
                       href={`/${locale}/${workspace}/settings/billing`}

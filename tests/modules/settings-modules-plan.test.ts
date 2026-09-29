@@ -79,6 +79,11 @@ describe('modules settings — plan and state from entitlements', () => {
     const v = await view(tenantId);
     expect(v.activeModules).toEqual([]);
     expect(v.switchedOnOutsidePlan).toEqual(['M1']);
+
+    // The page offers "Kapat" for it; the action switches it off.
+    await expect(toggleModuleState('M1', 'OFF')).resolves.toEqual({ success: true });
+    expect((await moduleRow(tenantId, 'M1'))?.status).toBe('OFF');
+    expect((await view(tenantId)).switchedOnOutsidePlan).toEqual([]);
   });
 
   it('running pilot: Belediye Ekip with its last day, Pro grant, M1 can be switched on', async () => {

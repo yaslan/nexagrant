@@ -70,11 +70,32 @@ npx vitest run                           → Test Files 209 passed | 2 skipped (
 ## 4) Riskler
 - **Davranış değişikliği (bilerek yapıldı):** Aboneliği olmayan kiracılar artık yalnız M3 ve M5'i açabiliyor. Daha önce `'pro'` fallback'iyle yazılmış `ON` satırları DB'de duruyor. Bu satırlar sayfada "Kilitli" görünüyor, aktif sayılmıyor, bağımlılığı da karşılamıyor. Satırlar silinmedi. Modül kapısı bu satırları zaten reddediyordu.
 - `plan-view.ts` canlı abonelik kuralını (`TRIALING`/`ACTIVE`) `getEntitlements` ile aynı şekilde kendisi uyguluyor, çünkü `getEntitlements` plan kimliğini döndürmüyor. Bu kural billing.ts'de değişirse burada da değişmesi gerekiyor. Dosyada bununla ilgili bir yorum var. Billing koduna dokunulmadı.
-- Tarayıcı kanıtı için yerel geliştirme DB'sinde 9 test kiracısı ve kullanıcısı oluşturuldu (`fefb-{none,pilot,pilot-expired,pro}-*@example.test`). Bunlar silinmedi.
+- Tarayıcı kanıtı için yerel geliştirme DB'sinde 10 test kiracısı ve kullanıcısı oluşturuldu (`fefb-{none,pilot,pilot-expired,pro,outside}-*@example.test`). Bunlar silinmedi.
 
 ## 5) Açık sorular
-- Plan dışında açık kalan `ModuleState` satırları için sayfada bir "kapat" seçeneği gösterilsin mi? Şu an yalnız "Kilitli" ve "Planı Yükselt" görünüyor. Eylem bu satırlarda `OFF` işlemine izin veriyor.
-- Pilot kiracıda "Planı Değiştir →" bağlantısı fatura sayfasına gidiyor ve orada "Pilot süresince ödeme kapalı" notu çıkıyor. Bu bağlantı pilot süresince gizlensin mi? (Ürün kararı.)
+- Yok. İki soru patron tarafından yanıtlandı (29.09.2026):
+  - Plan dışında açık kalan modüle **"Kapat" düğmesi eklensin** → yapıldı, bkz. §7.
+  - Pilot sürerken **"Planı Değiştir" bağlantısı olduğu gibi kalsın** → dokunulmadı.
 
 ## 6) Sonraki adım
 - İnceleme (review). Push yapılmadı (1 Ekim kuralı).
+
+## 7) Ek: plan dışında açık kalan modül için "Kapat" (patron kararı, 29.09.2026)
+
+**Ne yapıldı.** `client.tsx` içinde `plan.switchedOnOutsidePlan` listesindeki modüllerin kartında şu değişiklikler var:
+- "Plan dışında açık kalmış — kullanılamaz" metni gösteriliyor.
+- "Planı Yükselt" bağlantısının yanına kırmızı bir **Kapat** düğmesi eklendi. Düğme `toggleModuleState(id, 'OFF')` çağırıyor; hata olursa yapılan değişiklik geri alınıyor ve toast gösteriliyor.
+- Pilot bittiyse ya da plan okunamadıysa düğme devre dışı. Eylem tarafında değişiklik yok, `OFF` zaten izinliydi.
+- Pilot kiracıdaki "Planı Değiştir" bağlantısına dokunulmadı.
+
+**Kanıt:**
+- Canlı DB testine şu adımlar eklendi: plan dışı M1=ON satırı → `toggleModuleState('M1','OFF')` → satır `OFF`, `switchedOnOutsidePlan=[]`. Test geçti.
+- `npx vitest run` → 209 dosya geçti, 2 atlandı; 2402 test geçti, 8 atlandı. tsc=0, lint=0.
+- Tarayıcıda denendi: aboneliği olmayan kiracı kaydedildi, DB'ye M1=ON satırı eklendi ve sayfa açıldı.
+  - M1 kartında `Plan dışında açık kalmış — kullanılamaz | Kapat | Planı Yükselt` görünüyor.
+  - Kapat'a tıklandı → toast "M1 plan dışında açık kalmıştı; kapatıldı." çıktı.
+  - Sayfa yenilenince Kapat düğmesi 0 adet.
+  - DB'de `states=[{M1, OFF}]`.
+  - 390 px genişlikte taşma 0 px.
+  - Kareler: `sonra-outside.png`, `sonra-outside-kapat-click.png`, `sonra-outside-mobil.png`.
+- Platform: yalnız macOS'ta doğrulandı. Kodda platforma bağlı bir dal yok.
