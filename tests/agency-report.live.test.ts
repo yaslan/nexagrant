@@ -114,7 +114,7 @@ afterAll(async () => {
 describe('monthly agency report (fabrika_app)', () => {
   test('the run writes one snapshot per agency, in its own tenant, for the month that closed', async () => {
     const { generateAgencyReports, AGENCY_REPORT_EVENT } = await import('@/lib/agency/report');
-    const r = await generateAgencyReports(NOW, { agencies: async () => [{ id: ids.agencyA }, { id: ids.agencyB }] });
+    const r = await generateAgencyReports('2026-09', NOW, { agencies: async () => [{ id: ids.agencyA }, { id: ids.agencyB }] });
     expect(r).toEqual({ agencies: 2, generated: 2, skipped: 0, failed: 0, errors: [] });
     const rows = await admin!.auditEvent.findMany({
       where: { type: AGENCY_REPORT_EVENT, tenantId: { in: [ids.agencyA, ids.agencyB] } },
@@ -168,7 +168,7 @@ describe('monthly agency report (fabrika_app)', () => {
 
   test('a second run for the same month adds nothing', async () => {
     const { generateAgencyReports, AGENCY_REPORT_EVENT } = await import('@/lib/agency/report');
-    const r = await generateAgencyReports(NOW, { agencies: async () => [{ id: ids.agencyA }] });
+    const r = await generateAgencyReports('2026-09', NOW, { agencies: async () => [{ id: ids.agencyA }] });
     expect(r).toMatchObject({ generated: 0, skipped: 1, failed: 0 });
     expect(await admin!.auditEvent.count({ where: { type: AGENCY_REPORT_EVENT, tenantId: ids.agencyA } })).toBe(1);
   });

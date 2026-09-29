@@ -32,6 +32,7 @@ import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { withBrand } from '@/lib/brand';
 import { generateTableReportHtml, toCsv, type ExportLocale } from '@/lib/document-exporter';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
+import { AGENCY_REPORT_GENERATE_EVENT, AgencyReportGenerateEventSchema } from '@/lib/inngest/events';
 import {
   buildAgencyFunnel,
   FUNNEL_STEPS,
@@ -113,10 +114,49 @@ export function buildAgencyReport(raw: RawByProvince, period: string, generatedA
   });
 }
 
-/** The month a run on `now` reports: the day before, in UTC — a run on 1 October closes September. */
+/**
+ * The month a run on `now` reports: the last month that has closed, in UTC. On
+ * 1 October (and on the 2nd, when a retry lands there) that is September; on
+ * 15 October it is still September. Never the open month: a report is the
+ * dashboard's cumulative answer at the moment it is taken, so a snapshot of an
+ * open month would be half a month under that month's name, and the run on the
+ * 1st would then skip it as already made (TASK-MUM97IPC2QSGC, İNCELEME-13 Ö-3).
+ */
 export function reportPeriod(now: Date): string {
-  const d = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** A period the report run refuses to make. Not worth a retry: the same input fails the same way. */
+export class AgencyReportPeriodError extends Error {
+  override name = 'AgencyReportPeriodError';
+}
+
+function assertLastClosedPeriod(period: string, now: Date): void {
+  const closed = reportPeriod(now);
+  if (period !== closed) {
+    // An open or future month would be stored half; an earlier one would carry today's
+    // cumulative numbers under that month's name. Neither can be made right later: the
+    // period is written once and the run on the 1st skips it.
+    throw new AgencyReportPeriodError(
+      `agency report period ${period} refused: only ${closed}, the last closed month, can be generated now`
+    );
+  }
+}
+
+/**
+ * The period an `agency/report.generate` event asks for. The event must name it
+ * (`{ period: "YYYY-MM" }`, nothing else), and it must be the last closed month.
+ */
+export function requestedReportPeriod(data: unknown, now: Date): string {
+  const parsed = AgencyReportGenerateEventSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new AgencyReportPeriodError(
+      `${AGENCY_REPORT_GENERATE_EVENT} needs data.period = "YYYY-MM" (the last closed month, ${reportPeriod(now)})`
+    );
+  }
+  assertLastClosedPeriod(parsed.data.period, now);
+  return parsed.data.period;
 }
 
 export interface AgencyReportRunResult {
@@ -128,17 +168,20 @@ export interface AgencyReportRunResult {
 }
 
 /**
- * The monthly run: one snapshot per live agency and period. A period that
- * already has a report is skipped, so a retried or re-triggered run adds none.
+ * The monthly run: one snapshot per live agency and period. `period` must be
+ * {@link reportPeriod}(now). A period that already has a report is skipped,
+ * so a retried or re-triggered run adds none.
  */
 export async function generateAgencyReports(
+  period: string,
   now: Date,
   deps: {
     agencies?: () => Promise<{ id: string }[]>;
     readRaw?: typeof readAgencyFunnelRaw;
   } = {}
 ): Promise<AgencyReportRunResult> {
-  const period = reportPeriod(now);
+  // Checked here too, so no caller can store an open month under its name.
+  assertLastClosedPeriod(period, now);
   // `Tenant` is the table the scope is derived from (not under RLS), the same fan-out as
   // credits-monthly-grant.ts: which agencies exist is this query's output.
   const agencies =

@@ -6,8 +6,11 @@ import {
   agencyReportCsv,
   agencyReportHtml,
   AgencyReportSnapshotSchema,
+  AgencyReportPeriodError,
   buildAgencyReport,
+  generateAgencyReports,
   reportPeriod,
+  requestedReportPeriod,
   type AgencyReportSnapshot,
 } from './report';
 
@@ -200,9 +203,65 @@ describe('files', () => {
     expect(html).toContain('<td>30</td>');
   });
 
-  test('reportPeriod: a run on the 1st closes the month before', () => {
+  test('reportPeriod: always the last closed month, never the open one', () => {
     expect(reportPeriod(new Date('2026-10-01T06:00:00Z'))).toBe('2026-09');
     expect(reportPeriod(new Date('2027-01-01T06:00:00Z'))).toBe('2026-12');
-    expect(reportPeriod(new Date('2026-09-29T12:00:00Z'))).toBe('2026-09');
+    // TASK-MUM97IPC2QSGC (Ö-3): mid-month is still the month before — September is open on the 29th.
+    expect(reportPeriod(new Date('2026-09-29T12:00:00Z'))).toBe('2026-08');
+    expect(reportPeriod(new Date('2026-10-15T12:00:00Z'))).toBe('2026-09');
+    // A cron retry that lands on the 2nd names the same month as the run on the 1st.
+    expect(reportPeriod(new Date('2026-10-02T00:30:00Z'))).toBe('2026-09');
+    expect(reportPeriod(new Date('2026-10-01T00:00:00Z'))).toBe('2026-09');
+    expect(reportPeriod(new Date('2026-09-30T23:59:59Z'))).toBe('2026-08');
+  });
+});
+
+/**
+ * TASK-MUM97IPC2QSGC (İNCELEME-13 Ö-3): `agency/report.generate` by hand on
+ * 15 October used to store `2026-10` with half a month in it, and the cron on
+ * 1 November then skipped October as "already there". The event now names its
+ * period, and only the month that has closed is accepted.
+ */
+describe('requestedReportPeriod (agency/report.generate payload)', () => {
+  const MID_OCT = new Date('2026-10-15T12:00:00Z');
+
+  test('the last closed month is accepted', () => {
+    expect(requestedReportPeriod({ period: '2026-09' }, MID_OCT)).toBe('2026-09');
+    expect(requestedReportPeriod({ period: '2026-12' }, new Date('2027-01-01T06:00:00Z'))).toBe('2026-12');
+  });
+
+  test('the open month is refused', () => {
+    expect(() => requestedReportPeriod({ period: '2026-10' }, MID_OCT)).toThrow(AgencyReportPeriodError);
+  });
+
+  test('a future month is refused', () => {
+    expect(() => requestedReportPeriod({ period: '2026-11' }, MID_OCT)).toThrow(AgencyReportPeriodError);
+  });
+
+  test('an earlier closed month is refused: the numbers are today\'s, not that month\'s', () => {
+    expect(() => requestedReportPeriod({ period: '2026-08' }, MID_OCT)).toThrow(AgencyReportPeriodError);
+  });
+
+  test('no period, a bad period or an extra key is refused', () => {
+    for (const data of [undefined, null, {}, { period: '' }, { period: '2026-9' }, { period: '2026-13' },
+      { period: 202609 }, { period: '2026-09', tenantId: 'x' }]) {
+      expect(() => requestedReportPeriod(data, MID_OCT)).toThrow(AgencyReportPeriodError);
+    }
+  });
+});
+
+describe('generateAgencyReports refuses a period that is not the last closed month', () => {
+  test('open month: throws before reading or writing anything', async () => {
+    let calls = 0;
+    const deps = {
+      agencies: async () => {
+        calls++;
+        return [{ id: 't1' }];
+      },
+    };
+    await expect(generateAgencyReports('2026-10', new Date('2026-10-15T12:00:00Z'), deps)).rejects.toThrow(
+      AgencyReportPeriodError
+    );
+    expect(calls).toBe(0);
   });
 });

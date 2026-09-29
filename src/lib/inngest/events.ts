@@ -180,8 +180,16 @@ export type AlertsSweepInput = z.infer<typeof AlertsSweepEventSchema>;
 export type AlertsSweepOutput = z.infer<typeof AlertsSweepOutputSchema>;
 
 // FB KAMU B3 (TASK-MULRR08Y9YI77): monthly agency region report, stored as a
-// masked snapshot for the agency to download. `agency/report.generate` runs it by hand.
+// masked snapshot for the agency to download. `agency/report.generate` runs it by hand
+// and names the month it wants; only the last closed month is accepted
+// (TASK-MUM97IPC2QSGC — see requestedReportPeriod in src/lib/agency/report.ts).
 export const AGENCY_REPORT_GENERATE_EVENT = 'agency/report.generate';
+
+export const AgencyReportGenerateEventSchema = z
+  .object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
+  .strict();
+
+export type AgencyReportGenerateInput = z.infer<typeof AgencyReportGenerateEventSchema>;
 
 export const AgencyMonthlyReportOutputSchema = z.object({
   success: z.boolean(),
