@@ -264,10 +264,12 @@ model Plan {                    // projection of src/lib/billing/catalog.ts; see
   assignments   PlanAssignment[]
 }
 
+// Plan* and Subscription.planVersion FKs: onUpdate NoAction mirrors
+// add-plan-versioning/migration.sql, which declares no ON UPDATE clause.
 model PlanVersion {
   id            String  @id    @default(cuid())
   planId        String
-  plan          Plan    @relation(fields: [planId], references: [id], onDelete: Restrict)
+  plan          Plan    @relation(fields: [planId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   version       Int             // semantic version: 1, 2, 3, ...
   status        String  @default("draft") // draft | published | archived
   monthlyCents  Int
@@ -276,7 +278,7 @@ model PlanVersion {
   seats         Int
   workspaces    Int
   aiCreditsMonthly Int
-  modules       String[]       // modules granted by this version
+  modules       String[] @default([]) // modules granted by this version
   features      PlanFeature[]
   publishedBy   String?        // user id who published this version
   publishedAt   DateTime?      // when this version was published (immutable after)
@@ -290,7 +292,7 @@ model PlanVersion {
 model PlanFeature {
   id            String  @id    @default(cuid())
   planVersionId String
-  planVersion   PlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Cascade)
+  planVersion   PlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   order         Int             // display order (1, 2, 3, ...)
   kind          String          // module | limit | text
   moduleId      String?         // if kind='module': module identifier (M1, M8, etc)
@@ -306,9 +308,9 @@ model PlanFeature {
 model PlanAssignment {
   id            String  @id    @default(cuid())
   planId        String
-  plan          Plan    @relation(fields: [planId], references: [id], onDelete: Restrict)
+  plan          Plan    @relation(fields: [planId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   tenantId      String
-  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   assignedBy    String?        // user id who made the assignment
   assignedAt    DateTime @default(now())
   note          String?        // reason or memo
@@ -356,7 +358,7 @@ model Subscription {
   lockedCurrency    String?   // currency of lockedAmountMinor
   priceLockedAt     DateTime? // when the rate was locked
   planVersionId     String?  // current plan version (ADIM 2: checkout writes this)
-  planVersion       PlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: SetNull)
+  planVersion       PlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -468,7 +470,7 @@ model TenantBillingIdentity {
   buyerCity      String
   buyerCountry   String   @default("Türkiye")
   createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime @default(now()) @updatedAt
   tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
@@ -1301,6 +1303,8 @@ model MeetingBrief {
   meetingScheduledAt  DateTime?   // UTC meeting time
   meetingScheduledTz  String      @default("Europe/Brussels")
   createdAt           DateTime    @default(now())
+
+  @@index([tenantId], map: "MeetingBrief_tenantId") // add-m9-meeting-schedule/migration.sql
 }
 
 model CalendarConnection {

@@ -105,11 +105,5 @@
     "undici-types": "^8.10.1",
     "vitest": "^4.1.11"
   },
-  "packageManager": "pnpm@11.25.0",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "@swc/core"
-    ]
-  }
+  "packageManager": "pnpm@11.25.0"
 }
