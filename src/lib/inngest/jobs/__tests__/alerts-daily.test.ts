@@ -141,7 +141,7 @@ describe('alerts-daily run report (TASK-MUMH6NZ128QZ1)', () => {
     expect(output.emailsSent).toBe(0);
     expect(output.errors).toEqual(errors);
     expect(alert?.level).toBe('error');
-    expect(alert?.message).toMatch(/RESEND_API_KEY unset/);
+    expect(alert?.message).toMatch(/SMTP_HOST unset/);
     // No key may contain "email": recordAlert would strip it as PII.
     expect(Object.keys(alert?.meta ?? {}).filter((k) => /email/i.test(k))).toEqual([]);
     expect(alert?.meta).toMatchObject({ sent: 0, failed: 1 });

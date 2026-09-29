@@ -2,7 +2,7 @@ import { inngest } from '../client';
 import { env } from '@/lib/env';
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
-import { resendMailer, type Mailer } from '@/lib/email/resend-mailer';
+import { smtpMailer, type Mailer } from '@/lib/email/mailer';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert, type RecordAlertInput } from '@/lib/observability/system-alert';
 import { AlertsDailyOutputSchema, type AlertsDailyOutput } from '../events';
@@ -140,7 +140,7 @@ function touchLastRun(tx: TenantTx, searchId: string) {
 export async function sendSavedSearchAlerts(
   savedSearches: SavedSearchAlertRow[],
   runTenant: TenantRunner = withTenant,
-  mailer: Mailer | null = resendMailer()
+  mailer: Mailer | null = smtpMailer()
 ): Promise<SavedSearchAlertResult> {
   let emailsSent = 0;
   let emailsFailed = 0;
@@ -210,8 +210,8 @@ export async function sendSavedSearchAlerts(
 
       // Outside the tenant transaction on purpose: `runTenant` opens a real
       // Postgres transaction, and holding one across a network round trip to
-      // Resend would pin a connection for the length of the send. A rejected
-      // send throws (see resendMailer) and lands in the catch below before
+      // the SMTP server would pin a connection for the length of the send. A
+      // rejected send throws (see smtpMailer) and lands in the catch below before
       // `lastRunAt` moves.
       await mailer({ to: ownerEmail, subject, html });
 
@@ -258,12 +258,12 @@ export function alertsRunReport(
   // `SystemAlert` has no tenant isolation (see system-alert.ts): row ids only,
   // never the tenant id or the address the mail was going to. A missing
   // provider fails every search with matches, every morning, until someone
-  // sets RESEND_API_KEY: that is an outage, not a blip.
+  // sets SMTP_HOST: that is an outage, not a blip.
   const alert: RecordAlertInput = {
     level: noMailProvider ? 'error' : 'warn',
     source: 'alerts-daily',
     message: noMailProvider
-      ? `No mail provider (RESEND_API_KEY unset): ${result.emailsFailed} of ${totalSearches} saved-search alerts not sent`
+      ? `No mail provider (SMTP_HOST unset): ${result.emailsFailed} of ${totalSearches} saved-search alerts not sent`
       : `${result.emailsFailed} of ${totalSearches} saved-search alerts failed`,
     // Not `emailsSent`/`emailsFailed`: recordAlert strips any meta key that
     // contains "email" as a possible personal identifier, so under those

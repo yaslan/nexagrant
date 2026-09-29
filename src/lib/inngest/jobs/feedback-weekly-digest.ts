@@ -12,9 +12,10 @@ import {
  * it can be run and tested without a scheduler. Aggregation is cross-tenant on
  * purpose — the recipient is the platform admin running the beta programme.
  *
- * Delivery is best effort. With no RESEND_API_KEY or no recipient the job still
- * runs, still returns the counts, and reports emailStatus 'skipped', so the
- * numbers show up in the Inngest run history even before email is wired.
+ * Delivery is best effort. With no recipient (or, outside production, no
+ * SMTP_HOST) the job still runs, still returns the counts, and reports
+ * emailStatus 'skipped', so the numbers show up in the Inngest run history even
+ * before email is wired. In production a missing SMTP_HOST is 'failed'.
  */
 export const feedbackWeeklyDigest = inngest.createFunction(
   { id: 'feedback-weekly-digest', triggers: [{ cron: '0 6 * * 1' }] },
@@ -39,7 +40,8 @@ export const feedbackWeeklyDigest = inngest.createFunction(
     });
 
     // 'skipped' (no key or no recipient) is the documented best-effort case
-    // above; 'failed' means Resend refused the mail and is not a success.
+    // above; 'failed' means the SMTP server refused the mail (or, in
+    // production, SMTP is not configured) and is not a success.
     const output: FeedbackWeeklyDigestOutput = {
       success: result.emailStatus !== 'failed',
       windowStart: result.windowStart,

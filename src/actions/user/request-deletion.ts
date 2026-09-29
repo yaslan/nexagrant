@@ -1,12 +1,10 @@
 'use server';
 
 import { createHash } from 'node:crypto';
-import { Resend } from 'resend';
 import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { auth } from '@/lib/auth';
-import { env } from '@/lib/env';
-import { PRODUCT_NAME } from '@/lib/brand';
+import { reportMailNotConfigured, smtpMailer } from '@/lib/email/mailer';
 
 /**
  * KVKK md.7 & md.11 / GDPR art.17 — right to erasure.
@@ -30,14 +28,6 @@ export interface DeletionRequestResult {
   /** Set when the subject is the only owner of a tenant that will be left without one */
   soleOwnerOf?: string[];
   error?: string;
-}
-
-let resendClient: Resend | null = null;
-function getResend(): Resend | null {
-  if (!resendClient && env.RESEND_API_KEY) {
-    resendClient = new Resend(env.RESEND_API_KEY);
-  }
-  return resendClient;
 }
 
 export async function requestAccountDeletion(): Promise<DeletionRequestResult> {
@@ -212,26 +202,29 @@ function addDays(from: Date, days: number): Date {
 
 /** Best-effort confirmation email; delivery failure must not fail the request. */
 async function notifySubject(email: string, locale: string, purgeAt: Date): Promise<void> {
-  const client = getResend();
-  if (!client || !env.RESEND_API_KEY) return;
+  const mailer = smtpMailer();
+  if (!mailer) {
+    // Not a silent skip (TASK-MUMLF57HOYFSB): the subject is owed this notice.
+    await reportMailNotConfigured('request-deletion');
+    return;
+  }
 
   const isTr = locale === 'tr';
   const formatted = purgeAt.toISOString().split('T')[0];
+  const text = isTr
+    ? `Hesabınız ${formatted} tarihinde kalıcı olarak silinecektir. Bu tarihe kadar giriş yapıp talebi iptal edebilirsiniz.`
+    : `Your account will be permanently deleted on ${formatted}. You can sign in and cancel the request until then.`;
 
   try {
-    // resend v6 resolves `{ error }` on an API failure instead of throwing
-    // (TASK-MUMH6NZ128QZ1), so the catch below alone never saw a refusal.
-    const { error } = await client.emails.send({
-      from: `${PRODUCT_NAME} <${env.NEXT_PUBLIC_SMTP_FROM_ADDRESS}>`,
+    await mailer({
       to: email,
       subject: isTr ? 'Hesap silme talebiniz alındı' : 'Your account deletion request',
-      text: isTr
-        ? `Hesabınız ${formatted} tarihinde kalıcı olarak silinecektir. Bu tarihe kadar giriş yapıp talebi iptal edebilirsiniz.`
-        : `Your account will be permanently deleted on ${formatted}. You can sign in and cancel the request until then.`,
+      html: `<p>${text}</p>`,
+      text,
     });
-    if (error) console.warn('[request-deletion] notification email refused:', error.name);
   } catch (error) {
-    console.warn('[request-deletion] notification email failed:', error);
+    // MailSendError carries only the SMTP codes, never the address.
+    console.warn('[request-deletion] notification email failed:', error instanceof Error ? error.message : 'unknown_error');
   }
 }
 

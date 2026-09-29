@@ -30,7 +30,7 @@
  *   pnpm tsx scripts/esr-calibration.ts                          # dry run: score + report only
  *   pnpm tsx scripts/esr-calibration.ts --apply                  # …and write the samples to the DB
  *   pnpm tsx scripts/esr-calibration.ts --apply --survey         # …and render the partner survey
- *   pnpm tsx scripts/esr-calibration.ts --apply --survey --send  # …and deliver it via Resend
+ *   pnpm tsx scripts/esr-calibration.ts --apply --survey --send  # …and deliver it via SMTP
  *   pnpm tsx scripts/esr-calibration.ts --responses=<csv>        # re-label from partner verdicts
  *   pnpm tsx scripts/esr-calibration.ts --rollback --apply       # undo
  *
@@ -580,7 +580,7 @@ function buildReport(args: {
   relabelled: string[];
   coverage: Map<string, number>;
   partnerCount: number;
-  /** true only when this run actually handed the survey to Resend. */
+  /** true only when this run actually handed the survey to the SMTP server. */
   surveySent: boolean;
   /** roster addresses on a reserved, undeliverable domain — `--send` refuses while > 0. */
   undeliverable: number;
@@ -1000,22 +1000,22 @@ async function main(): Promise<number> {
       if (opts.send && skip.has(assignment.partner.slug)) {
         log('survey', `${assignment.partner.slug}: already sent ${priorReceipt?.recipients.find((r) => r.slug === assignment.partner.slug)?.sentAt} — skipped`);
       } else if (opts.send) {
-        const apiKey = process.env.RESEND_API_KEY;
-        if (!apiKey) throw new Error('--send requires RESEND_API_KEY in the environment');
-        const { Resend } = await import('resend');
-        const resend = new Resend(apiKey);
-        const { data, error } = await resend.emails.send({
-          from: process.env.EMAIL_FROM ?? `Fabrika Beta <${BETA_SUPPORT_EMAIL}>`,
+        const { smtpConfigFromEnv, createSmtpTransport, sendMail } = await import('../src/lib/email/mailer');
+        const smtp = smtpConfigFromEnv();
+        if (!smtp) throw new Error('--send requires SMTP_HOST in the environment');
+        const data = await sendMail(createSmtpTransport(smtp), smtp, {
+          from: process.env.SMTP_FROM || `Fabrika Beta <${BETA_SUPPORT_EMAIL}>`,
           to: assignment.partner.contactEmail,
           subject: email.subject,
           html: email.html,
           text: email.text,
+        }).catch((error: unknown) => {
+          throw new Error(`SMTP rejected ${maskEmail(assignment.partner.contactEmail)}: ${error instanceof Error ? error.message : error}`);
         });
-        if (error) throw new Error(`Resend rejected ${maskEmail(assignment.partner.contactEmail)}: ${error.message}`);
         const fresh: SurveySendRecipient = {
           slug: assignment.partner.slug,
           emailMasked: maskEmail(assignment.partner.contactEmail),
-          messageId: data?.id ?? null,
+          messageId: data.messageId,
           items: assignment.items.length,
           sentAt: new Date().toISOString(),
         };

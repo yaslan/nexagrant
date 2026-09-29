@@ -16,7 +16,7 @@
 
 ```bash
 pnpm beta:pricing                                          # her şeyi üret, hiçbir şey gönderme
-pnpm beta:pricing --send --form-tr=<url> --form-en=<url>   # Resend ile dağıt (RESEND_API_KEY gerekir)
+pnpm beta:pricing --send --form-tr=<url> --form-en=<url>   # SMTP ile dağıt (SMTP_HOST gerekir)
 pnpm beta:pricing --analyze --responses=<csv>              # raporu yeniden üret
 ```
 

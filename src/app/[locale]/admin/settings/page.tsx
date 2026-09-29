@@ -4,7 +4,23 @@ import { Database, Key } from 'lucide-react';
 import { SmtpSettingsForm } from './smtp-form';
 import { DEFAULT_MODELS } from '@/lib/llm';
 import { PLAN_GRANTS } from '@/lib/billing/catalog';
-import { env } from '@/lib/env';
+import { smtpConfigFromEnv } from '@/lib/email/mailer';
+
+/**
+ * What the SMTP card may show. The password never leaves the server: only
+ * whether one is set.
+ */
+function smtpSummary() {
+  const config = smtpConfigFromEnv();
+  if (!config) return null;
+  return {
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    user: config.auth?.user ?? null,
+    from: config.from,
+  };
+}
 
 export default async function AdminSettingsPage({
   params,
@@ -23,7 +39,7 @@ export default async function AdminSettingsPage({
       </div>
 
       {/* SMTP E-posta Sunucu Ayarları */}
-      <SmtpSettingsForm fromAddress={env.NEXT_PUBLIC_SMTP_FROM_ADDRESS} />
+      <SmtpSettingsForm smtp={smtpSummary()} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4">

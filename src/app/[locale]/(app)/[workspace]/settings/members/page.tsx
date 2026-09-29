@@ -29,7 +29,15 @@ export default function MembersSettingsPage() {
       if (!res.ok) {
         throw new Error(data.error || (isTr ? 'Davet gönderilemedi' : 'Failed to send invite'));
       }
-      setMessage(isTr ? `Davet bağlantısı oluşturuldu! Link: ${data.inviteLink}` : `Invitation sent successfully! Link: ${data.inviteLink}`);
+      setMessage(
+        data.emailSent
+          ? isTr
+            ? `Davet e-postası gönderildi. Bağlantı: ${data.inviteLink}`
+            : `Invitation email sent. Link: ${data.inviteLink}`
+          : isTr
+            ? `Davet oluşturuldu ancak e-posta gönderilemedi; bağlantıyı elle iletin: ${data.inviteLink}`
+            : `Invitation created but the email could not be sent; share this link yourself: ${data.inviteLink}`
+      );
       setEmail('');
     } catch (error) {
       setMessage(`${isTr ? 'Hata' : 'Error'}: ${errorMessage(error)}`);

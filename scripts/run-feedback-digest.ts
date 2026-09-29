@@ -6,7 +6,7 @@
  * report can be checked before a real send and re-sent after an outage.
  *
  * Safe by default: it renders and prints the summary but does NOT send.
- * Sending requires --send, a RESEND_API_KEY and a recipient.
+ * Sending requires --send, SMTP_HOST and a recipient.
  *
  * Usage:
  *   pnpm tsx scripts/run-feedback-digest.ts                        # render only
@@ -65,7 +65,7 @@ async function main() {
   }
 
   if (!send) {
-    console.log('\nRender only. Add --send (with RESEND_API_KEY and a recipient) to deliver it.');
+    console.log('\nRender only. Add --send (with SMTP_HOST and a recipient) to deliver it.');
   }
 }
 

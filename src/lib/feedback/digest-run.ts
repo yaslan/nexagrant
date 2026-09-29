@@ -20,6 +20,9 @@ import {
 import type { FeedbackRecord, TenantNameRow } from './types';
 
 const WEEK_MS = 7 * 24 * 3600 * 1000;
+
+/** `emailReason` when a recipient exists but SMTP_HOST is unset. */
+export const NO_SMTP_CONFIG = 'no_smtp_config';
 const OPEN_STATUSES = ['NEW', 'TRIAGED', 'IN_PROGRESS'];
 
 export interface DigestRunOptions {
@@ -28,7 +31,7 @@ export interface DigestRunOptions {
   to?: string;
   /** false renders the email but does not send it. Default true. */
   send?: boolean;
-  /** Injected in tests; defaults to the Resend client built from env. */
+  /** Injected in tests; defaults to the SMTP mailer built from env. */
   sender?: (message: { to: string; subject: string; html: string }) => Promise<void>;
 }
 
@@ -92,13 +95,13 @@ export async function collectDigestRows(
 }
 
 /**
- * The Resend-backed sender, or null when no API key is configured. It throws
- * when Resend answers with `{ error }` (TASK-MUMH6NZ128QZ1): the previous
- * inline sender ignored that result, so a rejected digest reported 'sent'.
+ * The SMTP sender, or null when SMTP is not configured. It throws when the
+ * server refuses the mail, so a rejected digest never reports 'sent'
+ * (TASK-MUMH6NZ128QZ1).
  */
 async function defaultSender(): Promise<DigestRunOptions['sender'] | null> {
-  const { resendMailer } = await import('@/lib/email/resend-mailer');
-  return resendMailer();
+  const { smtpMailer } = await import('@/lib/email/mailer');
+  return smtpMailer();
 }
 
 export async function runFeedbackDigest(
@@ -127,7 +130,16 @@ export async function runFeedbackDigest(
 
   const sender = options.sender ?? (await defaultSender());
   if (!sender) {
-    return { ...base, emailReason: 'no_resend_api_key' };
+    // TASK-MUMLF57HOYFSB: a digest with a recipient but no SMTP is not sent,
+    // and in production that is a failure (plus a SystemAlert), not a quiet
+    // 'skipped' that looks the same as "nobody to mail".
+    const { reportMailNotConfigured } = await import('@/lib/email/mailer');
+    await reportMailNotConfigured('feedback-digest');
+    return {
+      ...base,
+      emailStatus: env.NODE_ENV === 'production' ? 'failed' : 'skipped',
+      emailReason: NO_SMTP_CONFIG,
+    };
   }
 
   try {

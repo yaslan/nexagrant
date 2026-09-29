@@ -4,6 +4,9 @@ import { requireTenantApi } from '@/lib/tenant';
 import { issueSecretToken } from '@/lib/secret-token';
 import type { InvitationRow } from '@/types/db-rows';
 import { assertSeatAvailable, SeatLimitReachedError, type SeatUsage } from '@/lib/billing/seat-limit';
+import { reportMailNotConfigured, smtpMailer } from '@/lib/email/mailer';
+import { renderInvitationEmail } from '@/lib/email/invitation-email';
+import { recordAlert } from '@/lib/observability/system-alert';
 
 /**
  * Invites a user into the caller's own tenant.
@@ -63,6 +66,7 @@ export async function POST(req: Request) {
       conflict: boolean;
       seatLimit: SeatUsage | null;
       invitation: InvitationRow | null;
+      tenantName: string | null;
     }>(tenantId, async (tx) => {
       const existingMembership = await tx.membership.findFirst({
         where: {
@@ -72,7 +76,7 @@ export async function POST(req: Request) {
       });
 
       if (existingMembership) {
-        return { conflict: true, seatLimit: null, invitation: null };
+        return { conflict: true, seatLimit: null, invitation: null, tenantName: null };
       }
 
       // The plan's seat limit (src/lib/billing/seat-limit.ts): members plus
@@ -81,7 +85,7 @@ export async function POST(req: Request) {
         await assertSeatAvailable(tx, tenantId, email);
       } catch (error) {
         if (error instanceof SeatLimitReachedError) {
-          return { conflict: false, seatLimit: error.usage, invitation: null };
+          return { conflict: false, seatLimit: error.usage, invitation: null, tenantName: null };
         }
         throw error;
       }
@@ -93,7 +97,9 @@ export async function POST(req: Request) {
         select: { id: true, email: true, tenantId: true, role: true, expires: true },
       });
 
-      return { conflict: false, seatLimit: null, invitation };
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
+
+      return { conflict: false, seatLimit: null, invitation, tenantName: tenant?.name ?? null };
     });
 
     if (result.conflict) {
@@ -121,9 +127,55 @@ export async function POST(req: Request) {
     // The address itself is personal data; log that an invite went out, not to whom.
     console.log(`[Invitations] invitation issued for tenant ${tenantId}`);
 
-    return NextResponse.json({ success: true, invitation: result.invitation, inviteLink });
+    const emailSent = await sendInvitationEmail({
+      to: email,
+      tenantName: result.tenantName,
+      inviteLink,
+      expires,
+      invitationId: result.invitation?.id ?? null,
+    });
+
+    // The link is still returned when the mail did not go out, so the inviter
+    // can pass it on by hand; `emailSent` says which of the two happened.
+    return NextResponse.json({ success: true, invitation: result.invitation, inviteLink, emailSent });
   } catch (error) {
     console.error('Error creating invitation:', error);
     return NextResponse.json({ error: 'İç Sunucu Hatası' }, { status: 500 });
+  }
+}
+
+/**
+ * Mails the invitation (TASK-MUMLF57HOYFSB). Best effort: the invitation row is
+ * already written and the link is in the response, so a mail failure must not
+ * turn the request into an error — but it is never silent either. No SMTP is
+ * reported through `reportMailNotConfigured`; a refused send becomes a warning
+ * `SystemAlert` that names the invitation by id, never by address.
+ */
+async function sendInvitationEmail(params: {
+  to: string;
+  tenantName: string | null;
+  inviteLink: string;
+  expires: Date;
+  invitationId: string | null;
+}): Promise<boolean> {
+  const mailer = smtpMailer();
+  if (!mailer) {
+    await reportMailNotConfigured('invitations');
+    return false;
+  }
+  try {
+    await mailer(renderInvitationEmail(params));
+    return true;
+  } catch (error) {
+    // MailSendError's message is the SMTP codes only (see mailer.ts).
+    const reason = error instanceof Error ? error.message : 'unknown_error';
+    console.error(`[Invitations] invitation email failed: ${reason}`);
+    await recordAlert({
+      level: 'warn',
+      source: 'invitations',
+      message: 'Invitation email was not delivered to the SMTP server',
+      meta: { invitationId: params.invitationId, reason },
+    });
+    return false;
   }
 }

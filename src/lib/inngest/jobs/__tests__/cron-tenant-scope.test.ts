@@ -8,7 +8,7 @@ import {
   type SavedSearchAlertRow,
   type TenantRunner,
 } from '../alerts-daily';
-import { MailSendError, type Mailer, type MailMessage } from '@/lib/email/resend-mailer';
+import { MailSendError, type Mailer, type MailMessage } from '@/lib/email/mailer';
 import { grantCreditsToTenants } from '../credits-monthly-grant';
 
 /**
@@ -368,9 +368,9 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     await assertMatchesExist();
     await resetLastRun();
 
-    // A refuses (what resendMailer throws on `{ error }`), B goes through.
+    // A refuses (what smtpMailer throws on a 550), B goes through.
     const refusingForA: Mailer = async (m) => {
-      if (m.to === a.email) throw new MailSendError('validation_error', 422);
+      if (m.to === a.email) throw new MailSendError('EENVELOPE', 550);
     };
     const result = await sendSavedSearchAlerts(
       [rowFor(a, 'a'), rowFor(b, 'b')],
@@ -380,7 +380,7 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
 
     expect(result.emailsSent).toBe(1);
     expect(result.emailsFailed).toBe(1);
-    expect(result.errors).toEqual([{ searchId: a.searchId, reason: 'resend:validation_error:422' }]);
+    expect(result.errors).toEqual([{ searchId: a.searchId, reason: 'smtp:EENVELOPE:550' }]);
     expect(await lastRunOf(a.searchId)).toEqual(LONG_AGO);
     expect((await lastRunOf(b.searchId))!.getTime()).toBeGreaterThan(LONG_AGO.getTime());
   });

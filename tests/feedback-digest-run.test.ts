@@ -50,18 +50,23 @@ vi.mock('@/lib/system-scope', () => ({
     cb(dbBox.client as never),
 }));
 
-vi.mock('@/lib/env', () => ({
-  env: {
-    NODE_ENV: 'test',
-    NEXT_PUBLIC_APP_URL: 'https://app.example.org',
-    // No RESEND_API_KEY and no FEEDBACK_DIGEST_TO: the unconfigured default.
-  },
+const env = vi.hoisted(() => ({
+  NODE_ENV: 'test' as string,
+  NEXT_PUBLIC_APP_URL: 'https://app.example.org',
+  // No SMTP_HOST and no FEEDBACK_DIGEST_TO: the unconfigured default.
 }));
+vi.mock('@/lib/env', () => ({ env }));
+
+const recordAlert = vi.hoisted(() => vi.fn(async () => ({ status: 'recorded', id: 'a1' })));
+vi.mock('@/lib/observability/system-alert', () => ({ recordAlert }));
 
 import { runFeedbackDigest } from '@/lib/feedback/digest-run';
 
 describe('runFeedbackDigest delivery branches', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    env.NODE_ENV = 'test';
+  });
 
   it('renders without sending when send is disabled', async () => {
     const result = await runFeedbackDigest({ send: false, to: 'admin@example.org' });
@@ -78,10 +83,21 @@ describe('runFeedbackDigest delivery branches', () => {
     expect(result.recipient).toBeUndefined();
   });
 
-  it('skips when a recipient exists but Resend is not configured', async () => {
+  it('skips outside production when a recipient exists but SMTP is not configured', async () => {
     const result = await runFeedbackDigest({ send: true, to: 'admin@example.org' });
     expect(result.emailStatus).toBe('skipped');
-    expect(result.emailReason).toBe('no_resend_api_key');
+    expect(result.emailReason).toBe('no_smtp_config');
+    expect(recordAlert).not.toHaveBeenCalled();
+  });
+
+  it('fails with an error SystemAlert in production when SMTP is not configured', async () => {
+    env.NODE_ENV = 'production';
+    const result = await runFeedbackDigest({ send: true, to: 'admin@example.org' });
+    expect(result.emailStatus).toBe('failed');
+    expect(result.emailReason).toBe('no_smtp_config');
+    expect(recordAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'error', source: 'mail', meta: { caller: 'feedback-digest' } })
+    );
   });
 
   it('sends through the injected sender and reports the recipient', async () => {
@@ -104,11 +120,11 @@ describe('runFeedbackDigest delivery branches', () => {
       send: true,
       to: 'admin@example.org',
       sender: async () => {
-        throw new Error('resend is down');
+        throw new Error('smtp is down');
       },
     });
     expect(result.emailStatus).toBe('failed');
-    expect(result.emailReason).toBe('resend is down');
+    expect(result.emailReason).toBe('smtp is down');
     // Even a failed send returns usable numbers.
     expect(result.summary.newCount).toBe(1);
   });

@@ -22,7 +22,7 @@
  * Usage
  *   pnpm tsx scripts/beta-onboarding.ts                       # dry run, prints the plan
  *   pnpm tsx scripts/beta-onboarding.ts --apply               # write DB, render mail to disk
- *   pnpm tsx scripts/beta-onboarding.ts --apply --send        # …and deliver via Resend
+ *   pnpm tsx scripts/beta-onboarding.ts --apply --send        # …and deliver via SMTP
  *   pnpm tsx scripts/beta-onboarding.ts --rollback --apply    # undo
  *
  * Flags
@@ -416,12 +416,11 @@ async function main(): Promise<void> {
 
     let delivery = 'rendered-only';
     if (opts.send) {
-      const apiKey = process.env.RESEND_API_KEY;
-      if (!apiKey) throw new Error('--send requires RESEND_API_KEY in the environment');
-      const { Resend } = await import('resend');
-      const resend = new Resend(apiKey);
-      const { error } = await resend.emails.send({
-        from: process.env.EMAIL_FROM ?? `Fabrika Beta <${BETA_SUPPORT_EMAIL}>`,
+      const { smtpConfigFromEnv, createSmtpTransport, sendMail } = await import('../src/lib/email/mailer');
+      const smtp = smtpConfigFromEnv();
+      if (!smtp) throw new Error('--send requires SMTP_HOST in the environment');
+      await sendMail(createSmtpTransport(smtp), smtp, {
+        from: process.env.SMTP_FROM || `Fabrika Beta <${BETA_SUPPORT_EMAIL}>`,
         to: partner.contactEmail,
         subject: email.subject,
         html: email.html,
@@ -435,11 +434,13 @@ async function main(): Promise<void> {
                 attendees: [partner.contactEmail],
                 timezone: opts.slot.timezone,
               })
-            ).toString('base64'),
+            ),
+            contentType: 'text/calendar',
           },
         ],
+      }).catch((error: unknown) => {
+        throw new Error(`SMTP rejected ${partner.contactEmail}: ${error instanceof Error ? error.message : error}`);
       });
-      if (error) throw new Error(`Resend rejected ${partner.contactEmail}: ${error.message}`);
       delivery = 'sent';
       log('email', `${partner.contactEmail}: sent (${partner.locale})`);
     } else {

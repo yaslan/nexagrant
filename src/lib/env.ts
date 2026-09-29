@@ -10,6 +10,11 @@ const optionalUrl = z.preprocess(
   z.string().url().optional()
 );
 
+/** A present-but-blank variable (`SMTP_HOST=`) counts as unset. */
+function blankToUndefined<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? undefined : value), schema);
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: optionalUrl,
@@ -34,10 +39,24 @@ const envSchema = z.object({
    * a production server that has it on.
    */
   INNGEST_DEV: z.string().optional(),
-  RESEND_API_KEY: z.string().optional(),
+  /**
+   * Outgoing mail over our own SMTP server (src/lib/email/mailer.ts,
+   * TASK-MUMLF57HOYFSB). SMTP_HOST unset or blank = no mail is sent; every
+   * caller reports that (and in production writes a SystemAlert) instead of
+   * counting the mail as sent. SMTP_SECURE unset = implicit TLS only on 465,
+   * STARTTLS otherwise. SMTP_PASS is a credential — env only, never logged.
+   * SMTP_FROM unset = `${PRODUCT_NAME} <NEXT_PUBLIC_SMTP_FROM_ADDRESS>`.
+   */
+  SMTP_HOST: blankToUndefined(z.string().optional()),
+  // A string like every other entry (scripts treat `env` as a string record);
+  // src/lib/email/mailer.ts turns it into a number.
+  SMTP_PORT: blankToUndefined(z.string().regex(/^\d{1,5}$/, 'SMTP_PORT must be a port number').optional()),
+  SMTP_SECURE: blankToUndefined(z.enum(['true', 'false']).optional()),
+  SMTP_USER: blankToUndefined(z.string().optional()),
+  SMTP_PASS: blankToUndefined(z.string().optional()),
+  SMTP_FROM: blankToUndefined(z.string().optional()),
   WORKER_URL: z.string().optional(),
   WORKER_TOKEN: z.string().optional(),
-  EMAIL_FROM: z.string().optional(),
   /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */
   FEEDBACK_DIGEST_TO: z.string().email().optional(),
   NEXT_PUBLIC_APP_URL: z.string().optional(),

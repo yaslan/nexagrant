@@ -73,9 +73,9 @@ services:
       timeout: 3s
       retries: 5
 
-  # SMTP on 1025, web UI on http://localhost:8025. The app does NOT send here
-  # yet: all mail goes through the Resend API (RESEND_API_KEY), and src/ has no
-  # SMTP transport. Blank RESEND_API_KEY = no mail sent at all, not mail caught.
+  # SMTP on 1025, web UI on http://localhost:8025. The app sends here when
+  # SMTP_HOST=localhost and SMTP_PORT=1025 (src/lib/email/mailer.ts); blank
+  # SMTP_HOST = no mail sent at all, not mail caught.
   mailpit:
     image: axllent/mailpit:latest
     container_name: fabrika-mailpit
