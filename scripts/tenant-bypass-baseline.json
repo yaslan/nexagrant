@@ -238,6 +238,15 @@
       "kind": "system-scope",
       "class": "cross-tenant-job",
       "reason": "pruneOldStripeEvents(), run nightly by the stripe-event-cleanup cron: deletes every tenant's StripeEventLog rows older than the retention window. The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant. Measured under fabrika_app (TASK-MULQKFER4MF0Y): the unscoped deleteMany saw no rows, deleted 0 and the job reported success while every row stayed."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/invitations/retention.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "purgeOldInvitations(), run nightly by the invitation-cleanup cron (TASK-MUN2J9LLXNREG): deletes every tenant's Invitation rows accepted, or expired unaccepted, more than 30 days ago, and writes one invitation.purged AuditEvent (count only) per tenant touched. The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; each delete still ANDs the tenantId it groups by. Same shape as pruneOldStripeEvents: unscoped under fabrika_app it would see no rows and report 0."
     }
   ]
 }

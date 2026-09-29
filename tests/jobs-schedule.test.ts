@@ -48,6 +48,7 @@ describe('schedule (ADR-0008 §2)', () => {
       'alerts-sweep': '15 4 * * *',
       'stripe-event-cleanup': '0 2 * * *',
       'agency-monthly-report': '0 6 1 * *',
+      'invitation-cleanup': '30 3 * * *',
       'job-queue-health': '5 * * * *',
     });
   });
@@ -63,6 +64,7 @@ describe('schedule (ADR-0008 §2)', () => {
     expect(lines).toContain('0 6 1 * * agency-monthly-report ?id=agency-monthly-report&max=5&fill=1d&queue=agency');
     expect(lines).toContain('0 2 * * * k1-daily-calls ?id=k1-daily-calls&max=5&fill=6h');
     expect(lines).toContain('5 * * * * job-queue-health ?id=job-queue-health&max=3');
+    expect(lines).toContain('30 3 * * * invitation-cleanup ?id=invitation-cleanup&max=5&fill=6h');
   });
 });
 

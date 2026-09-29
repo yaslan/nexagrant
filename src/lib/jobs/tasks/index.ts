@@ -10,6 +10,7 @@ import { feedbackWeeklyDigestTask } from './feedback-weekly-digest';
 import { alertsSweepTask } from './alerts-sweep';
 import { stripeEventCleanupTask } from './stripe-event-cleanup';
 import { agencyMonthlyReportTask } from './agency-monthly-report';
+import { invitationCleanupTask } from './invitation-cleanup';
 import { jobQueueHealthTask } from './job-queue-health';
 
 /**
@@ -28,5 +29,6 @@ export const taskList: Record<JobId, Task> = {
   'alerts-sweep': alertsSweepTask,
   'stripe-event-cleanup': stripeEventCleanupTask,
   'agency-monthly-report': agencyMonthlyReportTask,
+  'invitation-cleanup': invitationCleanupTask,
   'job-queue-health': jobQueueHealthTask,
 };

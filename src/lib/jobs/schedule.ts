@@ -27,6 +27,7 @@ export const JOB_IDS = [
   'alerts-sweep',
   'stripe-event-cleanup',
   'agency-monthly-report',
+  'invitation-cleanup',
   'job-queue-health',
 ] as const;
 
@@ -61,6 +62,7 @@ export const SCHEDULE: readonly ScheduledJob[] = [
     queue: 'agency',
     missedTickAlert: true,
   },
+  { id: 'invitation-cleanup', cron: '30 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   { id: 'job-queue-health', cron: '5 * * * *', maxAttempts: 3, missedTickAlert: false },
 ];
 
