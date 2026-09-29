@@ -381,4 +381,4 @@ Migration: `prisma/migrations/retire-eur-plan-ladder.sql`
 | `TRY-FX-1` | TL fiyatlarının kuru yok, indirim de uygulanmıyor (§4.2) |
 | `ADDON-USD-1` | Eklenti kataloğu EUR ve eski plan adlarını taşıyor (§1.1) |
 | `BETA-USD-1` | E11 kohortunun GA'da hangi USD planına geçeceği belirsiz (§8) |
-| `PLAN-DEFAULT-1` | Modül ayarları sayfası, aboneliği olmayan kiracıya orta planı (`pro`) varsayıyor — cömert bir varsayılan; `free` olmalı mı? (`settings/modules/actions.ts`) |
+| `PLAN-DEFAULT-1` | ~~Modül ayarları sayfası, aboneliği olmayan kiracıya orta planı (`pro`) varsayıyor~~ — **kapandı (TASK-MUMH6W5I1W9WC, 29.09.2026):** sayfa ve eylem planı/modülleri `getEntitlements` ile okuyor (`settings/modules/plan-view.ts`); aboneliksiz kiracı `free` (Discover) görür |

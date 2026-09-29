@@ -38,6 +38,43 @@ export function canEnable(
 }
 
 /**
+ * `canEnable`, with the plan half answered by what the tenant is actually
+ * entitled to (`getEntitlements().allowedModules`) instead of a plan id.
+ *
+ * TASK-MUMH6W5I1W9WC: the settings page and its action used to feed
+ * `canEnable` a plan id, defaulting to `'pro'` when the tenant had no
+ * subscription — so a tenant without one was offered, and could write, Pro
+ * modules the module gate then refused. A plan id also cannot speak for a
+ * contract package (`public-team`) or the free fallback, neither of which a
+ * manifest's `planTiers` lists; the entitlement list covers both, plus add-ons,
+ * and is the same answer `checkModuleAccess` gives.
+ */
+export function canEnableEntitled(
+  moduleId: ModuleId,
+  activeModules: ModuleId[],
+  entitledModules: readonly string[]
+): CanEnableResult {
+  const manifest = getManifest(moduleId);
+  if (!manifest) {
+    return { allowed: false, reason: 'Module not found.' };
+  }
+
+  if (!entitledModules.includes(moduleId)) {
+    return { allowed: false, reason: 'Plan upgrade required.' };
+  }
+
+  const missingDependencies = manifest.requires.filter(
+    (req) => !activeModules.includes(req)
+  );
+
+  if (missingDependencies.length > 0) {
+    return { allowed: false, reason: 'Missing dependencies.', missingDependencies };
+  }
+
+  return { allowed: true };
+}
+
+/**
  * Returns a list of module IDs that would be disabled as a side effect
  * of disabling the given module (due to dependency constraints).
  * Computes this recursively.

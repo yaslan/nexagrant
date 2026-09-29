@@ -1,6 +1,6 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
-import { ModuleId, PlanTier } from '@/lib/modules/types';
+import { readModulesPlanView, type ModulesPlanView } from './plan-view';
 import { ModulesClient } from './client';
 import { can } from '@/lib/rbac';
 import type { Role } from '@prisma/client';
@@ -29,46 +29,33 @@ export default async function ModulesSettingsPage({
     );
   }
 
-  const state = {
-    // Same permissive fallback as the server action — see actions.ts.
-    currentPlan: 'pro' as PlanTier,
-    activeModules: ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'] as ModuleId[],
-    tenantName: 'Varsayılan Çalışma Alanı'
-  };
+  // No fallback plan and no fallback module list (TASK-MUMH6W5I1W9WC): both
+  // come from the same read the settings action decides on. A read that fails
+  // leaves `plan` null and the client says so instead of inventing a Pro plan.
+  let tenantName: string | null = null;
+  let plan: ModulesPlanView | null = null;
 
   try {
     // Tenant comes from the session only. The old chain (session → workspace
     // slug → `findFirst()`) meant a session without a tenant was shown, and
     // could edit, whichever tenant happened to be first in the table.
-    await withTenant(tenantId, async (tx) => {
+    const read = await withTenant(tenantId, async (tx) => {
       const tenant = await tx.tenant.findFirst({ where: { id: tenantId } });
-      if (!tenant) return;
-      state.tenantName = tenant.name;
-
-      const subscription = await tx.subscription.findFirst({ where: { tenantId } });
-      if (subscription?.planId) {
-        state.currentPlan = subscription.planId.toLowerCase() as PlanTier;
-      }
-
-      const activeStates = await tx.moduleState.findMany({
-        where: {
-          tenantId,
-          status: { in: ['ON', 'PILOT', 'DEV'] }
-        }
-      });
-      if (activeStates.length > 0) {
-        state.activeModules = activeStates.map((s: { moduleId: string }) => s.moduleId as ModuleId);
-      }
+      if (!tenant) return null;
+      return { name: tenant.name as string, plan: await readModulesPlanView(tenantId, tx, locale) };
     });
+    if (read) {
+      tenantName = read.name;
+      plan = read.plan;
+    }
   } catch (err) {
-    console.warn(`[ModulesSettings] DB query bypassed/error: ${errorMessage(err)}`);
+    console.warn(`[ModulesSettings] plan/module read failed: ${errorMessage(err)}`);
   }
 
   return (
-    <ModulesClient 
-      initialActiveModules={state.activeModules} 
-      currentPlan={state.currentPlan}
-      tenantName={state.tenantName}
+    <ModulesClient
+      plan={plan}
+      tenantName={tenantName ?? workspace}
       workspace={workspace}
       locale={locale}
     />

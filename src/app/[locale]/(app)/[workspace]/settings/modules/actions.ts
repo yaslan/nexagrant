@@ -4,11 +4,11 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { can } from '@/lib/rbac';
 import { Role } from '@prisma/client';
-import { ModuleId, PlanTier, ModuleStatus } from '@/lib/modules/types';
-import { canEnable, getDisableCascade } from '@/lib/modules/state-machine';
+import { ModuleId, ModuleStatus } from '@/lib/modules/types';
+import { canEnableEntitled, getDisableCascade } from '@/lib/modules/state-machine';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
-import type { ModuleStateRow } from '@/types/db-rows';
+import { readModulesPlanView, type ModulesPlanView } from './plan-view';
 
 /**
  * Turns a module on or off for the caller's *own* tenant.
@@ -34,37 +34,20 @@ export async function toggleModuleState(
   }
 
   try {
-    // Find active modules for the tenant
-    const activeStates = await withTenant<ModuleStateRow[]>(tenantId, (tx) =>
-      tx.moduleState.findMany({
-        where: {
-          tenantId,
-          status: { in: ['ON', 'PILOT', 'DEV'] }
-        }
-      })
+    // Plan and active modules come from the same read the settings page shows
+    // (./plan-view.ts). There used to be a `'pro'` fallback here for a tenant
+    // with no subscription, so the action wrote `ON` rows for modules the
+    // module gate then refused (TASK-MUMH6W5I1W9WC). "Active" is switched on
+    // *and* entitled, so a row left behind by a downgrade does not satisfy a
+    // dependency either.
+    const view = await withTenant<ModulesPlanView>(tenantId, (tx) =>
+      readModulesPlanView(tenantId, tx, 'tr')
     );
-    
-    const activeModules = activeStates.map((s) => s.moduleId as ModuleId);
-    
-    // Get tenant's current plan
-    // Fallback when the tenant has no subscription row. Kept at the middle
-    // tier the EUR ladder used ('team' → 'pro') so retiring the ladder does not
-    // quietly change who can enable what; that this default is permissive at
-    // all is a separate question — docs/BILLING.md §9, open card.
-    let currentPlan: PlanTier = 'pro';
-    const subscription = await withTenant<{ planId: string } | null>(tenantId, (tx) =>
-      tx.subscription.findFirst({
-        where: { tenantId },
-        include: { addOns: true }
-      })
-    );
-    if (subscription?.planId) {
-      currentPlan = subscription.planId.toLowerCase() as PlanTier;
-    }
+    const activeModules = view.activeModules;
 
     if (targetStatus === 'ON' || targetStatus === 'PILOT' || targetStatus === 'DEV') {
       // Attempting to enable
-      const check = canEnable(moduleId, activeModules, currentPlan);
+      const check = canEnableEntitled(moduleId, activeModules, view.entitledModules);
       if (!check.allowed) {
         throw new Error(`Modül etkinleştirilemez: ${check.reason || 'Gereksinimler karşılanmadı'}`);
       }

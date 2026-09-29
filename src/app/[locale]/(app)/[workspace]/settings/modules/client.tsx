@@ -4,14 +4,15 @@ import { PRODUCT_NAME } from '@/lib/brand';
 import React, { useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
 import { getAllManifests, getManifest } from '@/lib/modules/registry';
-import { canEnable, getDisableCascade } from '@/lib/modules/state-machine';
+import { canEnableEntitled, getDisableCascade } from '@/lib/modules/state-machine';
 import { ModuleId, PlanTier } from '@/lib/modules/types';
+import type { ModulesPlanView } from './plan-view';
 import { toggleModuleState } from './actions';
 import { errorMessage } from '@/lib/errors';
 
 interface ModulesClientProps {
-  initialActiveModules: ModuleId[];
-  currentPlan: PlanTier;
+  /** `null` when the plan could not be read — nothing is shown as active or offered. */
+  plan: ModulesPlanView | null;
   tenantName?: string;
   workspace?: string;
   locale?: string;
@@ -97,15 +98,19 @@ let toastSequence = 0;
 const nextToastId = () => (toastSequence += 1);
 
 export function ModulesClient({
-  initialActiveModules,
-  currentPlan,
+  plan,
   tenantName,
   workspace = 'default',
   locale = 'tr',
 }: ModulesClientProps) {
   const manifests = getAllManifests();
 
-  const [activeModules, setActiveModules] = useState<ModuleId[]>(initialActiveModules);
+  const [activeModules, setActiveModules] = useState<ModuleId[]>(plan?.activeModules ?? []);
+  const entitledModules = plan?.entitledModules ?? [];
+  const badgeTier = plan?.badgeTier ?? null;
+  // An unread plan offers nothing; an ended pilot is read-only
+  // (requireTenantAction refuses the write anyway — this just says so first).
+  const readOnly = !plan || plan.pilot?.expired === true;
   const [cascadeWarning, setCascadeWarning] = useState<{ target: ModuleId; cascading: ModuleId[] } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -174,7 +179,7 @@ export function ModulesClient({
       }
     } else {
       // Trying to enable
-      const check = canEnable(id, activeModules, currentPlan);
+      const check = canEnableEntitled(id, activeModules, entitledModules);
       if (check.allowed) {
         startTransition(async () => {
           setActiveModules((prev) => [...prev, id]);
@@ -259,15 +264,32 @@ export function ModulesClient({
           <div className="flex items-center gap-4 bg-ground border border-border p-4 rounded-xl">
             <div>
               <div className="text-xs text-muted font-medium">Mevcut Abonelik Paketi</div>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex flex-wrap items-center gap-2 mt-1">
                 <span
-                  className={`text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md ${
-                    PLAN_BADGES[currentPlan]?.bg || 'bg-surface text-ink'
+                  className={`text-xs font-bold tracking-wide whitespace-nowrap px-2.5 py-1 rounded-md ${
+                    (badgeTier && PLAN_BADGES[badgeTier]?.bg) || 'bg-surface text-ink border border-border'
                   }`}
                 >
-                  {PLAN_BADGES[currentPlan]?.label || currentPlan}
+                  {plan ? plan.planName : 'Okunamadı'}
                 </span>
+                {plan?.pilot && (
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider whitespace-nowrap px-2 py-0.5 rounded-full border ${
+                      plan.pilot.expired ? 'bg-bad/15 text-bad border-bad/30' : 'bg-amber/15 text-amber border-amber/20'
+                    }`}
+                  >
+                    {plan.pilot.expired ? 'Pilot bitti' : 'Pilot'}
+                  </span>
+                )}
               </div>
+              {plan?.pilot && (
+                <div className="text-[11px] text-muted mt-1">
+                  Son gün: {plan.pilot.lastDay} · yenilenmez
+                </div>
+              )}
+              {plan && !plan.pilot && plan.planId === 'free' && (
+                <div className="text-[11px] text-muted mt-1">Aboneliğiniz yok · ücretsiz paket</div>
+              )}
             </div>
             <Link
               href={`/${locale}/${workspace}/settings/billing`}
@@ -277,6 +299,14 @@ export function ModulesClient({
             </Link>
           </div>
         </div>
+
+        {readOnly && (
+          <div role="status" className="mt-6 rounded-xl border border-bad/30 bg-bad/10 px-4 py-3 text-xs text-ink">
+            {plan
+              ? `Ücretsiz pilot ${plan.pilot?.lastDay} tarihinde sona erdi. Çalışma alanı salt okunur; modüller değiştirilemez.`
+              : 'Plan ve modül durumu şu anda okunamadı. Hiçbir modül açık gösterilmiyor; sayfayı yenileyip tekrar deneyin.'}
+          </div>
+        )}
 
         {/* Stats Row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-border">
@@ -373,8 +403,8 @@ export function ModulesClient({
         {filteredManifests.map((mod) => {
           const isActive = activeModules.includes(mod.id);
           const meta = MODULE_METADATA[mod.id];
-          const check = canEnable(mod.id, activeModules, currentPlan);
-          const isPlanLocked = !mod.planTiers.includes(currentPlan);
+          const check = canEnableEntitled(mod.id, activeModules, entitledModules);
+          const isPlanLocked = plan !== null && !entitledModules.includes(mod.id);
 
           return (
             <div
@@ -473,7 +503,7 @@ export function ModulesClient({
                         <span
                           key={tier}
                           className={`text-[10px] uppercase font-mono px-1.5 py-0.5 rounded border border-border ${
-                            currentPlan === tier
+                            badgeTier === tier
                               ? 'bg-accent/15 text-accent-ink font-bold border-accent/30'
                               : 'bg-ground text-muted'
                           }`}
@@ -515,9 +545,11 @@ export function ModulesClient({
                   ) : (
                     <button
                       onClick={() => handleToggle(mod.id)}
-                      disabled={!isActive && !check.allowed}
+                      disabled={readOnly || (!isActive && !check.allowed)}
                       className={`text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-2xs flex items-center gap-1.5 ${
-                        isActive
+                        readOnly
+                          ? 'bg-ground text-muted border border-border cursor-not-allowed'
+                          : isActive
                           ? 'bg-bad/15 text-bad hover:bg-bad/25 border border-bad/30'
                           : check.allowed
                           ? 'bg-accent hover:opacity-90 text-white'
