@@ -819,6 +819,7 @@ model Opportunity {
   followupDocs FollowupDoc[]
   applicationParts ApplicationPart[]
   evaluations Evaluation[]
+  meetingBriefs MeetingBrief[]
   @@index([deletedAt])
 }
 
@@ -1306,8 +1307,16 @@ model MeetingBrief {
   meetingScheduledAt  DateTime?   // UTC meeting time
   meetingScheduledTz  String      @default("Europe/Brussels")
   createdAt           DateTime    @default(now())
+  // The opportunity the brief was prepared for (add-meeting-brief-opportunity.sql).
+  // NULL = "not linked to an opportunity": every brief written before the column
+  // existed. SetNull, not Cascade: a brief is the user's own text and outlives
+  // a hard-deleted opportunity. The FK does not check tenants (constraint checks
+  // bypass RLS), so generateMeetingBrief refuses an id outside the session tenant.
+  opportunityId       String?
+  opportunity         Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
 
   @@index([tenantId], map: "MeetingBrief_tenantId") // add-m9-meeting-schedule/migration.sql
+  @@index([tenantId, opportunityId])
 }
 
 model CalendarConnection {

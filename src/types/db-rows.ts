@@ -90,6 +90,8 @@ export interface MeetingBriefRow {
   meetingScheduledAt: Date | null;
   meetingScheduledTz: string | null;
   createdAt: Date;
+  /** NULL = not linked to an opportunity (add-meeting-brief-opportunity.sql). */
+  opportunityId: string | null;
 }
 
 /** `model FollowupDoc` — M10 NDA/LOI/award-pack document. */

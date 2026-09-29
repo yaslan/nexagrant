@@ -40,3 +40,4 @@ auditevent-null-system-only.sql
 add-tenant-province.sql
 add-agency-funnel-province.sql
 agency-invite-no-max-uses.sql
+add-meeting-brief-opportunity.sql

@@ -38,7 +38,10 @@ interface MeetingBriefsClientProps {
   locale: string;
   workspace: string;
   opportunityTitle: string;
+  /** Briefs linked to this opportunity. */
   briefs: BriefItem[];
+  /** The tenant's briefs linked to no opportunity (written before the link existed). */
+  unlinkedBriefs?: BriefItem[];
 }
 
 const formatBrusselsTime = (date: Date | string | null, dateLocale: string): string => {
@@ -116,20 +119,25 @@ const dateToUTC = (dateStr: string, timeStr: string): Date => {
 };
 
 export function MeetingBriefsClient({
+  opportunityId,
   locale,
   workspace,
   opportunityTitle,
   briefs: initialBriefs,
+  unlinkedBriefs: initialUnlinkedBriefs = [],
 }: MeetingBriefsClientProps) {
   const t = useTranslations('m9');
   const dateLocale = locale === 'tr' ? 'tr-TR' : 'en-US';
   const [briefs, setBriefs] = useState<BriefItem[]>(initialBriefs);
+  const [unlinkedBriefs, setUnlinkedBriefs] = useState<BriefItem[]>(initialUnlinkedBriefs);
   const [partnerName, setPartnerName] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
   const [meetingTime, setMeetingTime] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const [activeBriefId, setActiveBriefId] = useState<string>(initialBriefs[0]?.id || '');
+  const [activeBriefId, setActiveBriefId] = useState<string>(
+    initialBriefs[0]?.id || initialUnlinkedBriefs[0]?.id || ''
+  );
 
   const [meetingNotes, setMeetingNotes] = useState('');
   const [meetingDecisions, setMeetingDecisions] = useState('');
@@ -155,7 +163,11 @@ export function MeetingBriefsClient({
   const generateButtonRef = useRef<HTMLButtonElement>(null);
   const focusOrphanedRef = useRef(false);
 
-  const activeBrief = briefs.find((b) => b.id === activeBriefId) || briefs[0];
+  const activeBrief =
+    briefs.find((b) => b.id === activeBriefId) ||
+    unlinkedBriefs.find((b) => b.id === activeBriefId) ||
+    briefs[0] ||
+    unlinkedBriefs[0];
   /**
    * A brief the model never wrote is a blank working document, not a briefing.
    * The marker is stored with the content so this survives a reload, a print and
@@ -215,6 +227,7 @@ export function MeetingBriefsClient({
         callTopic: opportunityTitle,
         meetingScheduledAt,
         meetingScheduledTz: 'Europe/Brussels',
+        opportunityId,
       });
 
       if (!res.brief) {
@@ -329,13 +342,15 @@ export function MeetingBriefsClient({
 
       // Only clear form after confirmed success
       if (res.formattedPostNotes) {
-        setBriefs((prev) =>
+        // The active brief sits in one of the two lists; the other map is a no-op.
+        const appendNotes = (prev: BriefItem[]) =>
           prev.map((b) =>
             b.id === activeBrief.id
               ? { ...b, content: b.content + res.formattedPostNotes }
               : b
-          )
-        );
+          );
+        setBriefs(appendNotes);
+        setUnlinkedBriefs(appendNotes);
         // Now safe to clear form input
         setMeetingNotes('');
         setMeetingDecisions('');
@@ -350,6 +365,42 @@ export function MeetingBriefsClient({
     }
   };
 
+
+  /** One entry of a brief list — shared by this opportunity's list and the unlinked one. */
+  const renderBriefButton = (b: BriefItem) => (
+    <button
+      key={b.id}
+      onClick={() => setActiveBriefId(b.id)}
+      className={`w-full text-left p-3.5 rounded-xl border transition flex flex-col gap-1.5 ${
+        b.id === activeBrief?.id
+          ? 'bg-blue-50/80 border-blue-300 text-blue-950 shadow-2xs'
+          : 'bg-surface border-border text-ink-2 hover:bg-ground'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <span className="font-bold text-xs text-ink truncate">
+          {b.partnerName || b.interactionId}
+        </span>
+        <span className="text-[10px] text-muted font-mono flex items-center gap-1">
+          <Clock className="w-3 h-3" />
+          {new Date(b.createdAt).toLocaleDateString(dateLocale)}
+        </span>
+      </div>
+      {b.meetingScheduledAt && (
+        <div className="text-[11px] text-muted font-mono">
+          📅 {formatBrusselsTime(b.meetingScheduledAt, dateLocale)}
+        </div>
+      )}
+      {isTemplateDraft(b.content) && (
+        <span className="self-start rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+          {t('brief.draftBadge')}
+        </span>
+      )}
+      <p className="text-[11px] text-muted line-clamp-2">
+        {stripTemplateMarker(b.content).substring(0, 100)}...
+      </p>
+    </button>
+  );
 
   const handlePrint = () => {
     window.print();
@@ -567,40 +618,7 @@ export function MeetingBriefsClient({
           </h3>
 
           <div className="space-y-2">
-            {briefs.map((b) => (
-              <button
-                key={b.id}
-                onClick={() => setActiveBriefId(b.id)}
-                className={`w-full text-left p-3.5 rounded-xl border transition flex flex-col gap-1.5 ${
-                  b.id === activeBrief?.id
-                    ? 'bg-blue-50/80 border-blue-300 text-blue-950 shadow-2xs'
-                    : 'bg-surface border-border text-ink-2 hover:bg-ground'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-ink truncate">
-                    {b.partnerName || b.interactionId}
-                  </span>
-                  <span className="text-[10px] text-muted font-mono flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {new Date(b.createdAt).toLocaleDateString(dateLocale)}
-                  </span>
-                </div>
-                {b.meetingScheduledAt && (
-                  <div className="text-[11px] text-muted font-mono">
-                    📅 {formatBrusselsTime(b.meetingScheduledAt, dateLocale)}
-                  </div>
-                )}
-                {isTemplateDraft(b.content) && (
-                  <span className="self-start rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
-                    {t('brief.draftBadge')}
-                  </span>
-                )}
-                <p className="text-[11px] text-muted line-clamp-2">
-                  {stripTemplateMarker(b.content).substring(0, 100)}...
-                </p>
-              </button>
-            ))}
+            {briefs.map(renderBriefButton)}
 
             {briefs.length === 0 && (
               <div className="bg-surface border border-border rounded-xl p-6 text-center text-muted text-xs">
@@ -608,6 +626,16 @@ export function MeetingBriefsClient({
               </div>
             )}
           </div>
+
+          {unlinkedBriefs.length > 0 && (
+            <section aria-labelledby="m9-unlinked-briefs" className="space-y-2 pt-3">
+              <h3 id="m9-unlinked-briefs" className="font-bold text-xs text-ink-2 uppercase tracking-wider px-1">
+                {t('list.unlinkedHeading', { count: unlinkedBriefs.length })}
+              </h3>
+              <p className="text-[11px] text-muted px-1">{t('list.unlinkedHint')}</p>
+              <div className="space-y-2">{unlinkedBriefs.map(renderBriefButton)}</div>
+            </section>
+          )}
         </div>
 
         {/* Right: Brief Viewer & Post-Meeting Form */}

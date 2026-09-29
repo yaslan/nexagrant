@@ -949,7 +949,9 @@
     },
     "list": {
       "heading": "Görüşme Kayıtları ({count})",
-      "empty": "Henüz kayıtlı bir görüşme bulunmuyor."
+      "empty": "Henüz kayıtlı bir görüşme bulunmuyor.",
+      "unlinkedHeading": "Fırsata bağlı olmayan kayıtlar ({count})",
+      "unlinkedHint": "Bu kayıtlar fırsat bağlantısı eklenmeden önce oluşturuldu; hangi fırsat için hazırlandıkları bilinmiyor."
     },
     "brief": {
       "createdLabel": "Oluşturulma:",

@@ -247,6 +247,18 @@ Kiracıya özeldir (`tenantId` + `tenant_isolation` RLS politikası).
 `syncMeetingBriefToCalendar()` (`src/lib/calendar/sync.ts`) kiracı kullanıcısının tüm etkin takvim
 bağlantılarına olayı kopyalar. Hata (OAuth token geçerliliği vs.) `SystemAlert` üretiyor, iş kırılmıyor.
 
+**Fırsat bağlantısı (TASK-MULQLQIE3ES6G, ROADMAP Açık karar #14):** `MeetingBrief.opportunityId`
+nullable, `Opportunity(id)`'ye FK, `ON DELETE SET NULL` (brief kullanıcının kendi metni; fırsat
+fiziksel silinse de kalır, bağlantısız görünür) + `@@index([tenantId, opportunityId])`.
+`/opportunities/[id]/briefs` yalnız o fırsatın brief'lerini ve ayrı başlık altında kiracının
+**fırsata bağlı olmayan** brief'lerini listeler (`listBriefsForOpportunity`,
+`src/modules/m9/server/brief-lists.ts`); diğer fırsatların brief'leri okunmaz. Kolondan önce yazılmış
+satırlar NULL kaldı — hangi fırsat için yazıldıkları kayıtlı değildi, tahminle bağlanmadı. FK kiracıyı
+denetlemez (kısıt denetimi RLS'i atlar); `generateMeetingBrief` başka kiracının fırsat id'sini LLM
+çağrısından önce reddeder. RLS değişmedi (`MeetingBrief` zaten `tenant_isolation` listesinde).
+Migration: `prisma/migrations/add-meeting-brief-opportunity.sql` (additive, idempotent) — geri alma:
+`add-meeting-brief-opportunity.down.sql`.
+
 **Sağlayıcı mimarisi:** `CalendarProvider` arayüzü (`src/lib/calendar/provider.ts`) — connect/disconnect/createEvent/updateEvent/deleteEvent.
 Uygulamalar: `IcsProvider` (mevcut generateIcsContent'i wrap), `GoogleCalendarProvider` ve `OutlookCalendarProvider` (mock; OAuth env anahtarları olmadığında).
 

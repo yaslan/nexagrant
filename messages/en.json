@@ -949,7 +949,9 @@
     },
     "list": {
       "heading": "Meeting Records ({count})",
-      "empty": "No meetings have been recorded yet."
+      "empty": "No meetings have been recorded yet.",
+      "unlinkedHeading": "Records not linked to an opportunity ({count})",
+      "unlinkedHint": "These were created before briefs were linked to opportunities, so which opportunity they were for is not known."
     },
     "brief": {
       "createdLabel": "Created:",

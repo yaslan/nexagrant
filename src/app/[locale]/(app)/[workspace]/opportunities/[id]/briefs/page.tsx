@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { moduleGate } from '@/lib/modules/guard';
-import { MeetingBriefsClient, type BriefItem } from './client';
+import { listBriefsForOpportunity } from '@/modules/m9/server/brief-lists';
+import { MeetingBriefsClient } from './client';
 
 export default async function MeetingBriefsPage({
   params,
@@ -36,22 +37,11 @@ export default async function MeetingBriefsPage({
 
   if (!opp) notFound();
 
-  // MeetingBrief carries no opportunityId column, so tenant scope is the
-  // narrowest filter available today.
-  const briefs = await withTenant<BriefItem[]>(tenantId, (tx) =>
-    tx.meetingBrief.findMany({
-      select: {
-        id: true,
-        interactionId: true,
-        partnerName: true,
-        content: true,
-        meetingScheduledAt: true,
-        meetingScheduledTz: true,
-        createdAt: true,
-      },
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-    }),
+  // This opportunity's briefs, and — under their own heading — the tenant's
+  // briefs linked to no opportunity (ROADMAP open decision #14). Briefs of the
+  // tenant's other opportunities are not read.
+  const { linked: briefs, unlinked: unlinkedBriefs } = await withTenant(tenantId, (tx) =>
+    listBriefsForOpportunity(tx, tenantId, opp.id),
   );
 
   return (
@@ -62,6 +52,7 @@ export default async function MeetingBriefsPage({
         workspace={workspace}
         opportunityTitle={opp.title}
         briefs={briefs}
+        unlinkedBriefs={unlinkedBriefs}
       />
     </div>
   );

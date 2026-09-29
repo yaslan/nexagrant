@@ -28,17 +28,34 @@ export async function generateMeetingBrief({
   callTopic,
   meetingScheduledAt,
   meetingScheduledTz = 'Europe/Brussels',
+  opportunityId,
 }: {
   interactionId: string;
   partnerName: string;
   callTopic: string;
   meetingScheduledAt?: Date;
   meetingScheduledTz?: string;
+  /**
+   * The opportunity the brief is for (ROADMAP open decision #14). The briefs
+   * page always passes it; left out, the brief is stored unlinked, which is
+   * what every brief written before the column existed is.
+   */
+  opportunityId?: string;
 }) {
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M9');
   const { tenantId, userId } = await requireTenantAction();
+
+  // The FK only checks that the opportunity exists, not whose it is (constraint
+  // checks run without RLS), and the id comes from the client. Refused here,
+  // before the model is paid for, when it is not an opportunity of this tenant.
+  if (opportunityId !== undefined) {
+    const opp = await withTenant<{ id: string } | null>(tenantId, (tx) =>
+      tx.opportunity.findFirst({ where: { id: opportunityId, tenantId }, select: { id: true } })
+    );
+    if (!opp) throw new Error(`Opportunity ${opportunityId} not found in this workspace.`);
+  }
   const locale = await promptLocale();
   const prompt = renderPrompt('m9/meeting-brief', { partnerName, callTopic }, locale);
 
@@ -80,6 +97,7 @@ export async function generateMeetingBrief({
             partnerName,
             meetingScheduledAt,
             meetingScheduledTz,
+            ...(opportunityId !== undefined ? { opportunityId } : {}),
           },
         });
       }
@@ -92,6 +110,7 @@ export async function generateMeetingBrief({
           partnerName,
           meetingScheduledAt,
           meetingScheduledTz,
+          opportunityId: opportunityId ?? null,
         },
       });
     });
