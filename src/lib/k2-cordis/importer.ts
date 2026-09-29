@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'crypto';
 import unzipper from 'unzipper';
-import { parse } from 'csv-parse';
 import { prisma } from '@/lib/db';
 import {
   mapProjectRow,
@@ -18,6 +17,8 @@ import {
 } from './cordisSchema';
 import { errorMessage } from '@/lib/errors';
 import { recordRawFetch } from './raw-fetch';
+import { parseCordisCsv, type CordisCsvMalformed } from './csv';
+import { recordAlert } from '@/lib/observability/system-alert';
 
 export interface CordisImportOptions {
   dataset: 'HORIZON' | 'H2020';
@@ -25,6 +26,21 @@ export interface CordisImportOptions {
   localZipPath?: string;
   limit?: number;
   dryRun?: boolean;
+  /**
+   * Share of a file's records that may be unreadable or dangling before the run
+   * is failed. Defaults to `MAX_SKIPPED_RATIO`.
+   */
+  maxSkippedRatio?: number;
+}
+
+/** Records one CSV lost, and why, so a run can never lose them quietly. */
+export interface CordisFileSkips {
+  file: string;
+  /** Data records in the file (header excluded). */
+  records: number;
+  skipped: number;
+  /** First few reasons, with the 1-based line when the parser knows it. */
+  samples: Array<{ line?: number; reason: string }>;
 }
 
 export interface CordisImportResult {
@@ -41,7 +57,20 @@ export interface CordisImportResult {
   };
   durationMs: number;
   error?: string;
+  /** Per-file records that were not imported. Present whenever the files were read. */
+  skippedRecords?: CordisFileSkips[];
 }
+
+/**
+ * The default for `maxSkippedRatio`: 0.1 % of a file, i.e. about 23 of the
+ * 23,613 HORIZON projects. The parser reads the whole real dump with nothing
+ * skipped, so anything above this is a format change upstream, and importing
+ * the remainder would hand M1 a quietly incomplete dataset — the run fails
+ * instead and says which file and which lines (TASK-MUMH7CVD8P2J0).
+ */
+export const MAX_SKIPPED_RATIO = 0.001;
+
+const SKIP_SAMPLE_LIMIT = 5;
 
 const DATASET_URLS = {
   HORIZON: 'https://cordis.europa.eu/data/cordis-HORIZONprojects-csv.zip',
@@ -138,43 +167,82 @@ async function getZipFileAndHash(options: CordisImportOptions): Promise<{
 }
 
 /**
- * Parses a CSV stream into structured batch objects using csv-parse
+ * Reads one CSV out of the archive and maps its rows. Nothing is dropped
+ * silently: a record the parser could not split into the header's columns, or
+ * one the mapper refused (no id), is counted in the returned `skips`.
  */
-async function parseCsvStream<T>(
-  stream: fs.ReadStream | NodeJS.ReadableStream,
-  rowMapper: (row: RawCsvRow) => T | null,
-  limit?: number
-): Promise<T[]> {
-  return new Promise((resolve, reject) => {
-    const results: T[] = [];
-    let count = 0;
+async function readCsvEntry<T>(
+  entry: unzipper.File,
+  file: string,
+  rowMapper: (row: RawCsvRow) => T | null
+): Promise<{ items: T[]; skips: CordisFileSkips }> {
+  const { rows, malformed } = parseCordisCsv((await entry.buffer()).toString('utf8'));
+  const skips: CordisFileSkips = {
+    file,
+    records: rows.length + malformed.length,
+    skipped: malformed.length,
+    samples: malformed.slice(0, SKIP_SAMPLE_LIMIT).map((m: CordisCsvMalformed) => ({ ...m })),
+  };
 
-    const parser = stream.pipe(
-      parse({
-        delimiter: ';',
-        columns: true,
-        trim: true,
-        skip_empty_lines: true,
-        relax_quotes: true,
-        relax_column_count: true,
-        escape: '"',
-        quote: '"',
-        skip_records_with_error: true,
-      })
-    );
+  const items: T[] = [];
+  for (const row of rows) {
+    const mapped = rowMapper(row);
+    if (mapped) {
+      items.push(mapped);
+    } else {
+      skips.skipped++;
+      if (skips.samples.length < SKIP_SAMPLE_LIMIT) skips.samples.push({ reason: 'row has no id' });
+    }
+  }
+  return { items, skips };
+}
 
-    parser.on('data', (row: RawCsvRow) => {
-      if (limit && count >= limit) return;
-      const mapped = rowMapper(row);
-      if (mapped) {
-        results.push(mapped);
-        count++;
+/**
+ * Drops rows that point at a project the run did not read — they would break
+ * the whole run on the participation/topic foreign key — and counts them as
+ * skipped in `skips`.
+ */
+function keepKnownProjects<T>(
+  items: T[],
+  projectIdOf: (item: T) => string,
+  knownProjectIds: Set<string>,
+  skips: CordisFileSkips
+): T[] {
+  const kept: T[] = [];
+  for (const item of items) {
+    const projectId = projectIdOf(item);
+    if (knownProjectIds.has(projectId)) {
+      kept.push(item);
+    } else {
+      skips.skipped++;
+      if (skips.samples.length < SKIP_SAMPLE_LIMIT) {
+        skips.samples.push({ reason: `unknown project ${projectId}` });
       }
-    });
+    }
+  }
+  return kept;
+}
 
-    parser.on('end', () => resolve(results));
-    parser.on('error', (err) => reject(err));
-  });
+/** `{ 'project.csv': 0, … }` — the shape kept in `CordisImportRun.rowCounts`. */
+function skippedByFile(skips: CordisFileSkips[]): Record<string, number> {
+  return Object.fromEntries(skips.map((x) => [x.file, x.skipped]));
+}
+
+/** Throws when any file lost more records than the budget allows. */
+function assertSkipBudget(skips: CordisFileSkips[], maxSkippedRatio: number): void {
+  const over = skips.filter((s) => s.skipped > Math.floor(s.records * maxSkippedRatio));
+  if (over.length === 0) return;
+  const detail = over
+    .map(
+      (s) =>
+        `${s.file}: ${s.skipped}/${s.records} skipped (${s.samples
+          .map((x) => (x.line ? `line ${x.line}: ${x.reason}` : x.reason))
+          .join('; ')})`
+    )
+    .join(' | ');
+  throw new Error(
+    `CORDIS dump rejected: skipped records over the ${maxSkippedRatio * 100}% limit — ${detail}`
+  );
 }
 
 /**
@@ -201,6 +269,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
   }
 
   let tempZipName: string | null = null;
+  let fileSkips: CordisFileSkips[] | undefined;
 
   try {
     const { zipPath, tempFileName, fileHash, origin, sizeBytes } = await getZipFileAndHash(options);
@@ -272,27 +341,38 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       throw new Error('Required CORDIS CSV files (project.csv, organization.csv) not found in archive');
     }
 
-    // Parse CSV datasets
-    const projects = await parseCsvStream<ParsedCordisProject>(
-      projectFile.stream(),
-      (row) => mapProjectRow(row, dataset),
-      options.limit
+    // Parse CSV datasets. A limit keeps the first N projects (and a bounded
+    // slice of the other files) for smoke runs; it never hides skipped records.
+    const projectRead = await readCsvEntry<ParsedCordisProject>(projectFile, 'project.csv', (row) =>
+      mapProjectRow(row, dataset)
     );
-
-    const orgAndPartRows = await parseCsvStream<{
+    const orgRead = await readCsvEntry<{
       organization: ParsedCordisOrganization;
       participation: ParsedCordisParticipation;
-    }>(
-      orgFile.stream(),
-      mapOrganizationAndParticipationRow,
-      options.limit ? options.limit * 5 : undefined
-    );
+    }>(orgFile, 'organization.csv', mapOrganizationAndParticipationRow);
+    const topicRead = topicFile
+      ? await readCsvEntry<ParsedCordisTopic>(topicFile, 'topics.csv', mapTopicRow)
+      : null;
+    const scivocRead = scivocFile
+      ? await readCsvEntry<ParsedCordisSciVoc>(scivocFile, 'euroSciVoc.csv', mapSciVocRow)
+      : null;
 
-    // Filter orgs & participations to match parsed projects if limit is specified
+    const projects = options.limit
+      ? projectRead.items.slice(0, options.limit)
+      : projectRead.items;
     const validProjectIds = new Set(projects.map((p) => p.id));
-    const filteredOrgAndPart = options.limit
-      ? orgAndPartRows.filter((op) => validProjectIds.has(op.participation.projectId))
-      : orgAndPartRows;
+
+    // With a limit, rows of projects outside the slice are expected, not skipped.
+    const scoped = <T>(items: T[], projectIdOf: (item: T) => string, skips: CordisFileSkips) =>
+      options.limit
+        ? items.filter((item) => validProjectIds.has(projectIdOf(item)))
+        : keepKnownProjects(items, projectIdOf, validProjectIds, skips);
+
+    const filteredOrgAndPart = scoped(
+      orgRead.items,
+      (op) => op.participation.projectId,
+      orgRead.skips
+    );
 
     const orgsMap = new Map<string, ParsedCordisOrganization>();
     const participations: ParsedCordisParticipation[] = [];
@@ -303,29 +383,17 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
     }
     const organizations = Array.from(orgsMap.values());
 
-    let topics: ParsedCordisTopic[] = [];
-    if (topicFile) {
-      const parsedTopics = await parseCsvStream<ParsedCordisTopic>(
-        topicFile.stream(),
-        mapTopicRow,
-        options.limit ? options.limit * 3 : undefined
-      );
-      topics = options.limit
-        ? parsedTopics.filter((t) => validProjectIds.has(t.projectId))
-        : parsedTopics;
-    }
+    const topics = topicRead ? scoped(topicRead.items, (t) => t.projectId, topicRead.skips) : [];
+    const scivocs = scivocRead
+      ? scoped(scivocRead.items, (sv) => sv.projectId, scivocRead.skips)
+      : [];
 
-    let scivocs: ParsedCordisSciVoc[] = [];
-    if (scivocFile) {
-      const parsedSciVocs = await parseCsvStream<ParsedCordisSciVoc>(
-        scivocFile.stream(),
-        mapSciVocRow,
-        options.limit ? options.limit * 5 : undefined
-      );
-      scivocs = options.limit
-        ? parsedSciVocs.filter((s) => validProjectIds.has(s.projectId))
-        : parsedSciVocs;
-    }
+    const skips = [projectRead.skips, orgRead.skips, topicRead?.skips, scivocRead?.skips].filter(
+      (x): x is CordisFileSkips => Boolean(x)
+    );
+    fileSkips = skips;
+    // Fail before the first write: a partial dataset is worse than last month's.
+    assertSkipBudget(skips, options.maxSkippedRatio ?? MAX_SKIPPED_RATIO);
 
     if (options.dryRun) {
       try {
@@ -342,6 +410,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
                 participations: participations.length,
                 topics: topics.length,
                 scivocs: scivocs.length,
+                skipped: skippedByFile(skips),
                 dryRun: true,
               },
             },
@@ -365,6 +434,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
           scivocs: scivocs.length,
         },
         durationMs: Date.now() - startTime,
+        skippedRecords: skips,
       };
     }
 
@@ -561,8 +631,19 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
           status: 'SUCCESS',
           finishedAt: new Date(),
           fileHash,
-          rowCounts,
+          rowCounts: { ...rowCounts, skipped: skippedByFile(skips) },
         },
+      });
+    }
+
+    // Within budget but not zero: the data landed, an operator still hears of it.
+    if (skips.some((x) => x.skipped > 0)) {
+      await recordAlert({
+        level: 'warn',
+        source: 'k2_cordis_import',
+        message: `CORDIS ${dataset} import skipped some records (within the limit).`,
+        meta: { runId: runRecord?.runId, skipped: skips },
+        dedupeKey: `k2:cordis-import-skipped:${dataset}`,
       });
     }
 
@@ -574,6 +655,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       fileHash,
       rowCounts,
       durationMs: Date.now() - startTime,
+      skippedRecords: skips,
     };
   } catch (error) {
     const errorMsg = errorMessage(error, String(error));
@@ -590,6 +672,16 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       // Ignore DB update error
     }
 
+    if (!options.dryRun) {
+      await recordAlert({
+        level: 'error',
+        source: 'k2_cordis_import',
+        message: `CORDIS ${dataset} import failed; M1 keeps the previous dataset.`,
+        meta: { runId: runRecord?.runId, error: errorMsg.slice(0, 2000) },
+        dedupeKey: `k2:cordis-import-failed:${dataset}`,
+      });
+    }
+
     removeTempZip(tempZipName);
 
     return {
@@ -598,6 +690,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       rowCounts: { projects: 0, organizations: 0, participations: 0, topics: 0, scivocs: 0 },
       durationMs: Date.now() - startTime,
       error: errorMsg,
+      ...(fileSkips ? { skippedRecords: fileSkips } : {}),
     };
   }
 }
