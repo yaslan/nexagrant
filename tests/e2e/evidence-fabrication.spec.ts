@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { evidenceTenant } from './fixtures/evidence-tenant';
 import { shotsDir } from './fixtures/shots';
 
 /**
@@ -17,33 +18,16 @@ import { shotsDir } from './fixtures/shots';
  */
 
 const SHOTS = shotsDir('TASK-MTRH86RCGVEGC-screenshots');
-const WORKSPACE = 'org-1xnfma';
-const TENANT_ID = 'cmtrhjys10001ncxk13gwtbcb';
-const EVIDENCE_URL = `/tr/${WORKSPACE}/evidence`;
-
-// The evidence page is behind moduleGate('M3'), and this tenant has no ModuleState
-// row, which reads as OFF. The fixture turns M3 on for the run and puts the tenant
-// back exactly as it was afterwards.
-let hadModuleRow = false;
+// A tenant of the spec's own (fixtures/evidence-tenant.ts): plan `basic`, M3 on,
+// created before the run and removed after it, uploads included.
+const tenant = evidenceTenant('fabrication');
 
 test.beforeAll(async () => {
-  const existing = await prisma.moduleState.findUnique({
-    where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M3' } },
-    select: { status: true },
-  });
-  hadModuleRow = existing !== null;
-  await prisma.moduleState.upsert({
-    where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M3' } },
-    update: { status: 'ON' },
-    create: { tenantId: TENANT_ID, moduleId: 'M3', status: 'ON' },
-  });
+  await tenant.setup();
 });
 
 test.afterAll(async () => {
-  if (!hadModuleRow) {
-    await prisma.moduleState.deleteMany({ where: { tenantId: TENANT_ID, moduleId: 'M3' } });
-  }
-  await prisma.evidence.deleteMany({ where: { tenantId: TENANT_ID, fileName: PLAIN_FILE.name } });
+  await tenant.teardown();
   await prisma.$disconnect();
 });
 
@@ -56,17 +40,7 @@ const PLAIN_FILE = {
 };
 
 test('an upload with no readable metadata does not gain invented metadata', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
-  });
-
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(EVIDENCE_URL)}`);
-  await page.locator('input[type="email"]').fill('owner@demo.fabrika.test');
-  await page.locator('form button[type="submit"]').click();
-  await page.waitForURL(`**${EVIDENCE_URL}`, { timeout: 30_000 });
+  await tenant.signIn(page);
   await page.waitForLoadState('networkidle');
   await page.screenshot({ path: `${SHOTS}/01-evidence-page.png`, fullPage: true });
 

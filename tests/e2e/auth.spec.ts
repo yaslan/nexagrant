@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+import { expectHydrated, trackInflight } from './fixtures/hydration';
+
 /**
  * These assertions were written against an English sign-in screen that the app no longer
  * renders, and they had never run: there was no playwright.config.ts, so `pnpm test:e2e`
@@ -35,10 +37,15 @@ test.describe('Authentication and Tenant Provisioning', () => {
   // library like @playwright-testing-library/auth or similar test users in Google/MS.
   // Below is a structural test of the auth endpoint.
   test('should redirect to auth provider on click', async ({ page }) => {
+    const inflight = trackInflight(page);
     await page.goto('/tr/register');
     // While the page streams, Next holds a second, `hidden` copy of this form,
-    // so a bare getByTestId can hit strict mode instead of waiting.
-    await page.waitForLoadState('networkidle');
+    // so a bare getByTestId can hit strict mode; the locators below take the
+    // visible copy. What has to be true before the tick and the click is that
+    // React has attached their handlers (fixtures/hydration.ts says why that is
+    // no longer `networkidle`).
+    const google = page.getByRole('button', { name: /Google ile Devam Et/ });
+    await expectHydrated(google, inflight);
 
     // TASK-MTSWLANXSU0IG — on the REGISTER tab, the OAuth buttons now go through
     // the same disclosure step as the e-mail form. An OAuth sign-up creates the
@@ -52,7 +59,7 @@ test.describe('Authentication and Tenant Provisioning', () => {
     // or we verify the redirect URL.
     const [request] = await Promise.all([
       page.waitForRequest(req => req.url().includes('accounts.google.com') || req.url().includes('/api/auth/signin')),
-      page.getByRole('button', { name: /Google ile Devam Et/ }).click(),
+      google.click(),
     ]);
 
     // The click may be observed either at our own sign-in endpoint or already at
@@ -64,8 +71,12 @@ test.describe('Authentication and Tenant Provisioning', () => {
   test('the provider flow does not start until the disclosure is acknowledged', async ({ page }) => {
     // The other half of the rule above: without the tick, clicking Google must
     // not begin an OAuth sign-up at all.
+    const inflight = trackInflight(page);
     await page.goto('/tr/register');
-    await page.waitForLoadState('networkidle');
+    // Hydrated first: a click that lands before React does starts nothing
+    // either, and would pass this test without the rule being in force.
+    const google = page.getByRole('button', { name: /Google ile Devam Et/ });
+    await expectHydrated(google, inflight);
     await expect(
       page.locator('form').filter({ visible: true }).getByTestId('disclosure-ack')
     ).not.toBeChecked();
@@ -77,7 +88,7 @@ test.describe('Authentication and Tenant Provisioning', () => {
       }
     });
 
-    await page.getByRole('button', { name: /Google ile Devam Et/ }).click();
+    await google.click();
     await expect(page.getByText(/onaylamanız gerekir/i)).toBeVisible();
     expect(startedProviderFlow, 'an unacknowledged click started an OAuth sign-up').toBe(false);
   });

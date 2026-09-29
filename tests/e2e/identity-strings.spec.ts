@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
+import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
@@ -48,6 +49,32 @@ async function signInAs(page: Page, token: Record<string, unknown>): Promise<voi
     );
   });
 }
+
+/**
+ * The platform admin the blog-editor test signs in as. Since f7a36779
+ * (TASK-MULU7GVFBTRXX Ö-2) the jwt callback takes `isPlatformAdmin` from the
+ * User row on every call and drops a claim no row backs, so a minted token
+ * saying "admin" is no longer enough. The row exists for this spec only
+ * (TASK-MULU828HTNN4N).
+ */
+const ADMIN = {
+  id: 'e2e-admin-user',
+  email: 'zeynep.editor@e2e.fabrika.test',
+  name: 'Zeynep Aydın',
+} as const;
+
+test.beforeAll(async () => {
+  await prisma.user.upsert({
+    where: { id: ADMIN.id },
+    create: { ...ADMIN, locale: 'tr', isPlatformAdmin: true },
+    update: { email: ADMIN.email, name: ADMIN.name, isPlatformAdmin: true },
+  });
+});
+
+test.afterAll(async () => {
+  await prisma.user.deleteMany({ where: { id: ADMIN.id } });
+  await prisma.$disconnect();
+});
 
 test.describe('identity strings', () => {
   test('the workspace switcher offers no organisation the session is not in', async ({ page }) => {
@@ -115,9 +142,7 @@ test.describe('identity strings', () => {
 
   test('the admin editor opens a new post signed by the admin who is signed in', async ({ page }) => {
     await signInAs(page, {
-      id: 'e2e-admin-user',
-      email: 'zeynep.editor@e2e.fabrika.test',
-      name: 'Zeynep Aydın',
+      ...ADMIN,
       tenantId: 'demo-tenant',
       role: 'TENANT_OWNER',
       isPlatformAdmin: true,

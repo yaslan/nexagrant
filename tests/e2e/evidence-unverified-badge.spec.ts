@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { evidenceTenant } from './fixtures/evidence-tenant';
 import { shotsDir } from './fixtures/shots';
 
 /**
@@ -21,9 +22,10 @@ import { shotsDir } from './fixtures/shots';
 
 const SHOTS = process.env.EVIDENCE_SHOTS
   ?? `${shotsDir('TASK-MTRH86RCGVEGC-screenshots')}/badge-after`;
-const WORKSPACE = 'org-1xnfma';
-const TENANT_ID = 'cmtrhjys10001ncxk13gwtbcb';
-const EVIDENCE_URL = `/tr/${WORKSPACE}/evidence`;
+// A tenant of the spec's own (fixtures/evidence-tenant.ts): plan `basic`, M3 on,
+// and no documents but the ones below, which is what lets the tests count badges.
+const tenant = evidenceTenant('badge');
+const TENANT_ID = tenant.tenantId;
 
 // A row that states, in the column built for it, that nothing has verified it.
 const UNVERIFIED_ROW = {
@@ -42,46 +44,20 @@ const UPLOAD_FILE = {
   buffer: Buffer.from('%PDF-1.4\n% no certificate content\n%%EOF\n'),
 };
 
-let hadModuleRow = false;
-
 test.beforeAll(async () => {
-  const existing = await prisma.moduleState.findUnique({
-    where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M3' } },
-    select: { status: true },
-  });
-  hadModuleRow = existing !== null;
-  await prisma.moduleState.upsert({
-    where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M3' } },
-    update: { status: 'ON' },
-    create: { tenantId: TENANT_ID, moduleId: 'M3', status: 'ON' },
-  });
-
+  await tenant.setup();
+  // The id is fixed; a run from before this tenant existed may still hold it.
   await prisma.evidence.deleteMany({ where: { id: UNVERIFIED_ROW.id } });
   await prisma.evidence.create({ data: UNVERIFIED_ROW });
 });
 
 test.afterAll(async () => {
-  await prisma.evidence.deleteMany({ where: { id: UNVERIFIED_ROW.id } });
-  await prisma.evidence.deleteMany({
-    where: { tenantId: TENANT_ID, fileName: UPLOAD_FILE.name },
-  });
-  if (!hadModuleRow) {
-    await prisma.moduleState.deleteMany({ where: { tenantId: TENANT_ID, moduleId: 'M3' } });
-  }
+  await tenant.teardown();
   await prisma.$disconnect();
 });
 
 async function signIn(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
-  });
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(EVIDENCE_URL)}`);
-  await page.locator('input[type="email"]').fill('owner@demo.fabrika.test');
-  await page.locator('form button[type="submit"]').click();
-  await page.waitForURL(`**${EVIDENCE_URL}`, { timeout: 30_000 });
+  await tenant.signIn(page);
   await page.waitForLoadState('networkidle');
 }
 

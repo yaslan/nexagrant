@@ -35,12 +35,17 @@ const PIC = {
 };
 
 /**
- * Projects already seeded under the HORIZON-CL5-2026 prefix (prisma/seed.ts).
- * The fixture only adds the organisations and participations that were missing —
- * this database has zero CordisOrganization rows, which is itself why the
- * feature had nothing to show even once it stopped throwing.
+ * CORDIS projects of the fixture's own, all under the HORIZON-CL5-2026 call
+ * prefix the opportunity's topic belongs to — that prefix, read through
+ * `CordisProjectTopic.topicCode`, is how both scorers find "experience on this
+ * topic". The spec used to borrow `SAMPLE-0001/0008/0011`, which only
+ * `scripts/esr-calibration.ts` creates; `prisma/seed.ts` does not, so on the CI
+ * database the participations below failed on `CordisParticipation_projectId_fkey`
+ * (TASK-MULU828HTNN4N). Removed again in afterAll; the participations and topic
+ * rows cascade with them.
  */
-const PROJECTS = ['SAMPLE-0001', 'SAMPLE-0008', 'SAMPLE-0011'];
+const PROJECTS = ['M8E2E-PROJ-1', 'M8E2E-PROJ-2', 'M8E2E-PROJ-3'];
+const TOPIC_IDENTIFIER = 'HORIZON-CL5-2026-D4-01';
 
 async function seed() {
   await rollback();
@@ -56,7 +61,7 @@ async function seed() {
     select: { id: true },
   });
   const topic = await prisma.topic.findFirstOrThrow({
-    where: { identifier: 'HORIZON-CL5-2026-D4-01' },
+    where: { identifier: TOPIC_IDENTIFIER },
     select: { id: true },
   });
 
@@ -85,6 +90,18 @@ async function seed() {
       { id: OPEN_SEAT, tenantId: TENANT, opportunityId: OPP, roleKey: 'research', status: 'OPEN' },
       { id: BUILDER_SEAT, tenantId: TENANT, opportunityId: OPP, roleKey: 'widening', status: 'OPEN' },
     ],
+  });
+
+  await prisma.cordisProject.createMany({
+    data: PROJECTS.map((id, i) => ({
+      id,
+      acronym: `M8E2E${i + 1}`,
+      title: `M8E2E project ${i + 1}`,
+      framework: 'HORIZON',
+    })),
+  });
+  await prisma.cordisProjectTopic.createMany({
+    data: PROJECTS.map((projectId) => ({ projectId, topicCode: TOPIC_IDENTIFIER })),
   });
 
   await prisma.cordisOrganization.createMany({
@@ -154,6 +171,7 @@ async function rollback() {
   await prisma.cordisCoParticipation.deleteMany({ where: { OR: [{ orgA: { in: pics } }, { orgB: { in: pics } }] } });
   await prisma.cordisPartnerProfile.deleteMany({ where: { organisationId: { in: pics } } });
   await prisma.cordisOrganization.deleteMany({ where: { organisationId: { in: pics } } });
+  await prisma.cordisProject.deleteMany({ where: { id: { in: PROJECTS } } });
 }
 
 test.describe('M8 consortium matching', () => {
