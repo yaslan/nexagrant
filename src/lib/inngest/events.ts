@@ -178,3 +178,19 @@ export const AlertsSweepOutputSchema = z.object({
 
 export type AlertsSweepInput = z.infer<typeof AlertsSweepEventSchema>;
 export type AlertsSweepOutput = z.infer<typeof AlertsSweepOutputSchema>;
+
+// FB KAMU B3 (TASK-MULRR08Y9YI77): monthly agency region report, stored as a
+// masked snapshot for the agency to download. `agency/report.generate` runs it by hand.
+export const AGENCY_REPORT_GENERATE_EVENT = 'agency/report.generate';
+
+export const AgencyMonthlyReportOutputSchema = z.object({
+  success: z.boolean(),
+  period: z.string(),
+  agencies: z.number(),
+  generated: z.number(),
+  skipped: z.number(),
+  failed: z.number(),
+  errors: z.array(z.object({ tenantId: z.string(), message: z.string() })).optional(),
+});
+
+export type AgencyMonthlyReportOutput = z.infer<typeof AgencyMonthlyReportOutputSchema>;

@@ -8,3 +8,4 @@ export { usersScheduledDeletion } from './users-scheduled-deletion';
 export { feedbackWeeklyDigest } from './feedback-weekly-digest';
 export { alertsSweep } from './alerts-sweep';
 export { stripeEventCleanup } from './stripe-event-cleanup';
+export { agencyMonthlyReport } from './agency-monthly-report';

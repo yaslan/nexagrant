@@ -924,3 +924,38 @@ yerinde bırakıldı; uygulama artık yenisini çağırır. Küçük hücre kura
 alınabildiği için satır (tür toplamı − görünen iller), sütun (il toplamı − görünen türler) ve
 iller arası (genel toplam − görünen il toplamları) farklarının hiçbiri 1..4 olamaz. İli
 bildirilmemiş kurumlar hiçbir il görünümünde yoktur ve her zaman gizli kütle sayılır.
+
+## 20. Ajans bölge raporu — `AuditEvent` anlık görüntüsü (TASK-MULRR08Y9YI77 · FB KAMU B3)
+
+Şema değişikliği yok. Rapor için ayrı bir tablo açılmadı: şema kilidi var ve leed-fb 29.09'da
+**A seçeneğini** onayladı. Aylık rapor, ajansın kendi kiracısında bir `AuditEvent` satırıdır:
+
+| Alan | Değer |
+| --- | --- |
+| `tenantId` | Ajans kiracısı. Asla NULL değildir, asla kurumun kiracısı değildir |
+| `type` | `agency.report.generated` |
+| `target` | Dönem, `YYYY-MM` (1 Ekim'deki koşu `2026-09` üretir) |
+| `data` | `AgencyReportSnapshotSchema` (`src/lib/agency/report.ts`): `version`, `period`, `generatedAt`, `all`, `byOrgType`, `byProvince` |
+| `actorId` | NULL (yazan cron) |
+
+**Neden tasarım ödünü.** `AuditEvent` bir denetim izidir, rapor deposu değildir. Yine de burada
+işe yarıyor, çünkü saklanan şey bir dosya değil, panonun **yayımladığı** güvenli çıktının
+(`buildAgencyFunnel`: maskeli ve 5'e yuvarlanmış) kopyasıdır. Şema katıdır (`.strict()`):
+kiracı id'si, kurum adı, ham sayı ya da il × tür hücresi taşıyan bir `data` doğrulamadan
+geçmez. İndirme anında (`/api/agency/reports/[id]`) yazdırılabilir HTML (PDF'e tarayıcı
+kaydeder) ve CSV (UTF-8 BOM) bu anlık görüntüden üretilir. R2'ye dosya yazılmaz.
+
+**RLS.** `AuditEvent` `tenant_or_shared` kullanır. Satır `withTenant(ajans)` içinde yazılır
+ve okunur; sorguda ayrıca `tenantId = ajans` koşulu vardır. Başka bir ajansın rapor id'si
+404 döner.
+
+**Tekrar.** Aynı `(tenantId, type, target)` zaten varsa koşu yeni satır yazmaz. Bunu tekil
+indeks değil, uygulama kontrolü sağlar (şema kilidi). Inngest işlevi `concurrency: 1` ile
+çalışır.
+
+**Saklama.** §3'teki "AuditEvent 12 ay anonimleştirilmiş" kuralı için bugün bir budama kodu yok.
+Böyle bir iş yazılırsa `agency.report.generated` satırlarını ya dışarıda bırakmalı ya da
+rapor geçmişinin 12 ayla sınırlı olduğunu ajansa söylemelidir.
+
+**İleride (C seçeneği, ayrı onay):** gerçek PDF (yeni bağımlılık), R2'de saklanan dosya ve
+ayrı bir `AgencyReport` tablosu (tekil `(agencyId, period)`).

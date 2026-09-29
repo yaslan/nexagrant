@@ -426,3 +426,99 @@ function plainTextParagraphs(text: string): Paragraph[] {
     .split('\n')
     .map((line) => new Paragraph({ children: [new TextRun({ text: line })] }));
 }
+
+/**
+ * A report made of tables: the agency region report (FB KAMU B3,
+ * src/lib/agency/report.ts). Every string arrives already localised and is
+ * escaped here, cell by cell; nothing in it is markup.
+ */
+export interface TableReportData {
+  locale?: ExportLocale;
+  title: string;
+  /** Letterhead: the organisation the report is for, a stored name. */
+  orgName: string;
+  meta: { label: string; value: string }[];
+  notes: string[];
+  tables: { caption: string; note?: string; columns: string[]; rows: string[][] }[];
+  footer: string;
+}
+
+/**
+ * Print-HTML of a {@link TableReportData}, the same "browser print / save as PDF"
+ * route {@link generatePdfHtml} takes: no PDF library, the browser's print
+ * dialog writes the PDF. Landscape, because a funnel row is nine columns wide.
+ */
+export function generateTableReportHtml(data: TableReportData): string {
+  const L = labels(data.locale);
+  const tablesHtml = data.tables
+    .map(
+      (t) => `
+  <h2>${escapeHtml(t.caption)}</h2>
+  ${t.note ? `<p class="note">${escapeHtml(t.note)}</p>` : ''}
+  ${
+    t.rows.length === 0
+      ? ''
+      : `<table class="data">
+    <thead><tr>${t.columns.map((c) => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+    <tbody>${t.rows
+      .map((r) => `<tr>${r.map((c, i) => (i === 0 ? `<th scope="row">${escapeHtml(c)}</th>` : `<td>${escapeHtml(c)}</td>`)).join('')}</tr>`)
+      .join('')}</tbody>
+  </table>`
+  }`
+    )
+    .join('');
+
+  return `<!DOCTYPE html>
+<html lang="${data.locale === 'en' ? 'en' : 'tr'}">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(data.title)}</title>
+  <style>
+    @page { size: A4 landscape; margin: 15mm; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; font-size: 10pt; line-height: 1.5; }
+    .header { border-bottom: 2px solid #1d4ed8; padding-bottom: 10px; margin-bottom: 16px; }
+    .logo-badge { font-weight: bold; font-size: 14pt; color: #1d4ed8; }
+    h1 { font-size: 17pt; margin: 0 0 8px; color: #0f172a; }
+    h2 { font-size: 12pt; margin: 22px 0 6px; color: #1e40af; }
+    .meta td { padding: 2px 12px 2px 0; }
+    .meta td.label { font-weight: bold; color: #475569; }
+    .note { font-size: 9pt; color: #475569; margin: 4px 0; }
+    table.data { width: 100%; border-collapse: collapse; page-break-inside: avoid; }
+    table.data th, table.data td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums; }
+    table.data thead th { background: #f1f5f9; font-size: 8.5pt; text-align: center; }
+    table.data tbody th { text-align: left; font-weight: 600; }
+    .footer { margin-top: 24px; font-size: 8pt; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 5px; }
+    @media print { .no-print { display: none; } body { margin: 0; } }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="background:#f1f5f9; padding:10px; margin-bottom:16px; text-align:right;">
+    <button onclick="window.print()" style="background:#1d4ed8; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">
+      ${escapeHtml(L.printButton)}
+    </button>
+  </div>
+  <div class="header"><div class="logo-badge">${escapeHtml(data.orgName)}</div></div>
+  <h1>${escapeHtml(data.title)}</h1>
+  <table class="meta">${data.meta
+    .map((m) => `<tr><td class="label">${escapeHtml(m.label)}:</td><td>${escapeHtml(m.value)}</td></tr>`)
+    .join('')}</table>
+  ${data.notes.map((n) => `<p class="note">${escapeHtml(n)}</p>`).join('')}
+  ${tablesHtml}
+  <div class="footer">${escapeHtml(data.footer)}</div>
+</body>
+</html>`;
+}
+
+/**
+ * RFC 4180 CSV with a UTF-8 BOM, so Excel opens Turkish letters as Turkish
+ * letters. A text cell that starts with `= + - @` (or a tab / CR) is prefixed
+ * with `'`, so a spreadsheet does not run it as a formula (CSV injection).
+ */
+export function toCsv(rows: readonly (readonly (string | number)[])[]): string {
+  const cell = (v: string | number): string => {
+    if (typeof v === 'number') return String(v);
+    const s = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return '﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
+}

@@ -418,6 +418,21 @@ export async function getAgencyFunnel(
     outcomes?: typeof countApplicationOutcomes;
   } = {}
 ): Promise<AgencyFunnel> {
+  const raw = await readAgencyFunnelRaw(agencyTenantId, deps);
+  return buildAgencyFunnel(raw, deps.breakdown ?? { dimension: 'none' });
+}
+
+/**
+ * The raw, UNMASKED counts behind {@link getAgencyFunnel}: the one query path of
+ * the dashboard, shared with the region report (FB KAMU B3, src/lib/agency/report.ts)
+ * so the report counts nothing the dashboard does not. What it returns must
+ * never leave the server: its only consumer is {@link buildAgencyFunnel}.
+ * Same contract as getAgencyFunnel: `agencyTenantId` is the caller's own agency.
+ */
+export async function readAgencyFunnelRaw(
+  agencyTenantId: string,
+  deps: { outcomes?: typeof countApplicationOutcomes } = {}
+): Promise<RawByProvince> {
   // Tenant is a system-wide table (not under RLS); the id is the session's own.
   const agency = await prisma.tenant.findUnique({
     where: { id: agencyTenantId },
@@ -477,7 +492,7 @@ export async function getAgencyFunnel(
     table.rejected += o.rejected;
   }
 
-  return buildAgencyFunnel(byProvince, deps.breakdown ?? { dimension: 'none' });
+  return byProvince;
 }
 
 /** Session gate for the page: is this tenant a live agency? */
