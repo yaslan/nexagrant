@@ -75,6 +75,7 @@ import { acquireSectionLock, addBudgetLine, addWorkPackage, updateSectionContent
 import { ApplicationClient } from '@/app/[locale]/(app)/[workspace]/opportunities/[id]/application/client';
 import { PartBCollaborativeEditor } from '@/modules/m11/ui/PartBCollaborativeEditor';
 import MembersSettingsPage from '@/app/[locale]/(app)/[workspace]/settings/members/page';
+import CallsPage from '@/app/[locale]/(app)/[workspace]/calls/page';
 import PartnerPortalPage from '@/app/[locale]/portal/partner/[token]/page';
 
 const PILOT_TR = trMessages.Common.pilotExpired;
@@ -146,6 +147,32 @@ describe('B-1: M11 application screen', () => {
 });
 
 describe('B-2: a 403 PILOT_EXPIRED from a write route', () => {
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const PILOT_BODY = { error: 'Ücretsiz pilot süresi doldu; çalışma alanı salt-okunur. Verileriniz korunuyor.', code: 'PILOT_EXPIRED' };
+
+  test('saved search (calls page): the pilot sentence instead of "… Lütfen tekrar deneyin."', async () => {
+    let saveAnswer = () => json(PILOT_BODY, 403);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === '/api/saved-searches' && init?.method === 'POST') return saveAnswer();
+        if (url === '/api/saved-searches') return json({ success: true, searches: [] });
+        return json({ success: true, topics: [], total: 0 });
+      })
+    );
+    render(withIntl(<CallsPage />));
+    fireEvent.click(screen.getByTestId('calls-save-search'));
+    await waitFor(() => expect(screen.getByTestId('calls-save-search-error').textContent).toBe(PILOT_TR));
+
+    saveAnswer = () => json({ success: false, error: 'db down' }, 500);
+    await waitFor(() => expect((screen.getByTestId('calls-save-search') as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('calls-save-search'));
+    await waitFor(() =>
+      expect(screen.getByTestId('calls-save-search-error').textContent).toBe(trMessages.callsPage.saveSearchError)
+    );
+  });
+
   test('member invite (en): the English pilot sentence, not the Turkish body text', async () => {
     const fetchMock = vi.fn(async () =>
       new Response(
