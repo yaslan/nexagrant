@@ -1,119 +1,259 @@
-# Yayın kontrol listesi (deploy öncesi)
+# Canlı çıkış kontrol listesi (fonbridge.com)
 
-Kaynak: TASK-MTTOUDNQ97X83 / F-1. Bu liste **tek bir soruya** cevap verir: kod
-yayına çıkmadan önce elle koşulması gereken ne var? Ölçüm tarihi **2026-09-09**,
-ölçülen ağaç `984ba39`. Sayılar iddia değil; her maddenin yanında onu üreten
-komut var — yayından önce komutu tekrar koşun, sayı değiştiyse liste eskimiştir.
+Kaynak: TASK-MTTOUDNQ97X83 / F-1 (ilk sürüm, 09.09.2026) → **TASK-MUN66WDHX224 (30.09.2026, tamamen yenilendi)**.
+Ölçülen ağaç: `dev` @ `4bfc20a5` (yerel), `origin/dev` @ `c5aa48d7`. Ölçüm anı: 29.09.2026 21:43 UTC (30.09 00:43 TRT).
 
-## 1. Şema: `prisma migrate deploy`'un görmediği `.sql` dosyaları — **BLOKLAYICI**
+Bu liste tek soruya cevap verir: **bugün canlıya çıkmak için ne hazır, ne eksik, ne patronun elinde?**
+Her maddenin yanında onu üreten komut ya da dosya var. Canlıdan önce komutları yeniden koşun; sayı değiştiyse liste eskimiştir.
+**Bu listeyi yazan kart canlıya hiçbir şey yazmadı** (yalnız salt-okur `dig`, yerel dosya okuma).
 
-`prisma/migrations` altındaki **düz** `.sql` dosyalarını hiçbir komut uygulamaz.
-`pnpm db:migrate` (= `prisma migrate dev`) yalnız klasörlü, `_prisma_migrations`
-tablosuna kaydolan migration'ları uygular; depoda `migration_lock.toml` da yoktur.
+Durum etiketleri: **HAZIR** = repoda var ve kanıtlı · **EKSİK** = bizim (ajan) işimiz, henüz yok · **PATRON** = yalnız patronun yapabileceği iş ya da karar.
 
-Bugünkü sayım:
+## 0. Bugünkü kararlar (bu listenin dayanağı)
+
+| Konu | Karar | Kaynak |
+|---|---|---|
+| Alan adı | `https://fonbridge.com` kanonik; `www` → kök **301** (tek sıçrama) | patron 29.09, `docs/SMTP-SUNUCU.md` §10 |
+| Barındırma | Vulut; cPanel sunucusu `srv.iyisunucu.com.tr` = `77.92.144.187`; DNS `ns1/ns2.iyisunucu.com.tr` | `docs/SMTP-SUNUCU.md` §1.1 |
+| E-posta | Seçenek A: Vulut cPanel/Exim, `mail.fonbridge.com`, gönderici `info@fonbridge.com` | `docs/SMTP-SUNUCU.md` |
+| İş kuyruğu | graphile-worker (Postgres); web ve worker **ayrı imaj/süreç**; `JOBS_CRON_ENABLED` üretimde zorunlu | `docs/adr/ADR-0008-own-job-queue-graphile-worker.md` §9 |
+| Kaldırılanlar | Sentry, Resend, Inngest, Microsoft Entra, Outlook, SAML SSO | patron 29.09 |
+| LLM | Anthropic `claude-sonnet-5` (varsayılan) + OpenAI embedding `text-embedding-3-large` | `src/lib/llm.ts:43`, `:613` |
+| Giriş | Google OAuth — yeni istemci `fonbridges` GCP projesinde (bugünkü istemci `cevreportal` projesine ait) | patron 29.09 |
+| Ücret | Pilot ücretsiz (90 gün Ekip planı); Stripe/iyzico/e-Fatura pilotta **yok** | `docs/adr/ADR-0007-ilkadim-free-pilot.md` |
+| Ziyaretçi formu | 12 ay saklama | `src/lib/leads/public-lead-policy.ts:19` (`PUBLIC_LEAD_RETENTION_DAYS = 365`), iş `public-lead-cleanup` 03:45 UTC |
+
+## 1. Özet tablo
+
+| # | Madde | Durum | Kanıt (kısa) |
+|---|---|---|---|
+| 1.1 | DNS bölgesi `fonbridge.com` | **PATRON** | `dig +norec SOA fonbridge.com @ns1/ns2.iyisunucu.com.tr` → `REFUSED` (29.09 21:43 UTC); aynı NS'de `usfinbridge.com` → `NOERROR`; `@8.8.8.8` A/AAAA/MX/TXT → `SERVFAIL` |
+| 1.2 | Uygulama sunucusu (web + worker + Postgres 16/pgvector) nerede koşacak | **PATRON** | `77.92.144.187` paylaşımlı cPanel/Exim sunucusu; Docker, uzun yaşayan worker süreci ve pgvector'ün orada olup olmadığı **ölçülmedi**. `<APP_IP>` hâlâ yok (`docs/SMTP-SUNUCU.md` §8 madde 2) |
+| 1.3 | Ters vekil + TLS + `www`→kök 301 | **EKSİK** (1.2'ye bağlı) | Caddyfile hazır (`docs/SMTP-SUNUCU.md` §10.1), kurulmadı |
+| 1.4 | SMTP (`mail.fonbridge.com`) | **PATRON** | 1.1'e bağlı; kutular, DKIM, AutoSSL `docs/SMTP-SUNUCU.md` §8 |
+| 2 | Üretim ortam değişkenleri | **EKSİK** (liste hazır, değerler PATRON) | §2 |
+| 3 | Migration sırası + geri dönüş | **HAZIR** (2 not) | §3 |
+| 4 | Yedekleme / felaket kurtarma | **EKSİK** | repoda `pg_dump`/geri yükleme betiği ya da belgesi yok (§4) |
+| 5 | İzleme / alarm | **EKSİK** (kısmi) | `SystemAlert` yalnız `/[locale]/admin/alerts` ekranında; e-posta/push yok; dış kalp atışı yok (§5) |
+| 6 | GitHub push + CI | **PATRON** (push) / **EKSİK** (yerel kanca) | `dev` origin'den **223 commit** ileride; `core.hooksPath` var olmayan dizini gösteriyor (§6) |
+| 7 | Anahtar yenileme (OpenAI) | **PATRON** | anahtar sohbette açığa çıktı → yenile + harcama limiti (§2.3) |
+| 8 | Dosya depolama (R2) | **PATRON** (karar) | R2 yoksa yükleme **sahte presigned URL** döner, dosya saklanmaz (§2.2) |
+
+---
+
+## 2. Üretim ortam değişkenleri
+
+Karşılaştırma: `src/lib/env.ts` (zod şeması, 46 anahtar) ↔ `.env.example` (76 anahtar) ↔ koddaki `process.env.*` okumaları.
+Komut (yeniden üretmek için):
+
+```sh
+grep -oE '^  [A-Z_0-9]+:' src/lib/env.ts | tr -d ' :' | sort > /tmp/schema.txt
+grep -oE '^#?[[:space:]]*[A-Z_0-9]+=' .env.example | sed -E 's/^#?[[:space:]]*//; s/=//' | sort -u > /tmp/example.txt
+comm -23 /tmp/schema.txt /tmp/example.txt      # şemada olup örnekte olmayan → boş (30.09)
+```
+
+Sonuç: **şemadaki her anahtar `.env.example`'da var.** Fark ters yönde ve şemanın dışında (aşağıda).
+
+### 2.1 Zorunlu — boşsa üretim çalışmaz ya da çekirdek işlev düşer
+
+| Değişken | Nerede | Değer / not | Durum |
+|---|---|---|---|
+| `NODE_ENV=production` | env.ts | imajda `Dockerfile` ayarlar | HAZIR |
+| `DATABASE_URL` | env.ts, `src/lib/db.ts` | uygulama rolü **`fabrika_app`** (BYPASSRLS yok) — `pnpm rls:verify` | PATRON (sunucu) |
+| `AUTH_SECRET` | `src/lib/auth-secret.ts` | ≥32 karakter, `openssl rand -base64 32`; eksik/kısa/eski anahtar → sunucu **başlamaz** (`src/instrumentation.ts`) | PATRON |
+| `NEXT_PUBLIC_APP_URL=https://fonbridge.com` | env.ts, `.env.example:6` | davet/e-posta bağlantıları; yanlışsa yalnız uyarı (instrumentation) | PATRON |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | `src/lib/auth.ts:331` | **yeni `fonbridges` GCP istemcisi**; yönlendirme URI'si `https://fonbridge.com/api/auth/callback/google` (`basePath: "/api/auth"`, `trustHost: true`). `GOOGLE_CLIENT_*` yalnız eski ad | PATRON |
+| `DEMO_LOGIN_ENABLED` | env.ts, `src/lib/demo-login.ts` | **boş ya da `false`**; üretimde `true` → sunucu başlamaz | HAZIR (kodla korunuyor) |
+| `JOBS_CRON_ENABLED` (yalnız worker) | env.ts `jobsCronEnabled` | `false` → sonra `true` (§3.3 sırası); boşsa üretim worker'ı **başlamaz** | HAZIR (kodla korunuyor) |
+| `SMTP_HOST=mail.fonbridge.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM="FonBridge <info@fonbridge.com>"` | env.ts, `src/lib/email/mailer.ts` | boşsa hiç posta gitmez ve üretimde `SystemAlert` yazılır; `SMTP_USER` kararı S-1 bekliyor (`info@` mi, ayrı `bildirim@` mi — `docs/SMTP-SUNUCU.md` §8 madde 4) | PATRON |
+| `ANTHROPIC_API_KEY` | env.ts, `src/lib/llm.ts` | `.env`'de var (patron) | PATRON (üretime taşı) |
+| `OPENAI_API_KEY` | env.ts | **açığa çıktı → yenile**, eskisini iptal et, OpenAI panelinde aylık harcama limiti | PATRON |
+
+### 2.2 İşlevsel — boşsa uygulama açılır ama bir özellik sessizce ya da alarmla düşer
+
+| Değişken | Boşsa ne olur | Durum |
+|---|---|---|
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_HOST` | `src/lib/storage.ts:13` istemci `null`; `:82` "Dev Mode Fallback" **sahte presigned URL** üretir → kanıt/dosya yüklemesi başarılı görünür ama dosya **saklanmaz**. Ayrıca `.env.example:109` `R2_BUCKET=fabrika`, kodun varsayılanı `fonbridge-evidence` (`storage.ts`) — biri seçilmeli | **PATRON** (R2 hesabı mı, başka depolama mı) + EKSİK (üretimde sahte URL yerine hata/alarm) |
+| `WORKER_URL`, `WORKER_TOKEN` | `k2-monthly-cordis` (ayda bir, 1'i 04:00 UTC) `http://localhost:8000`'e gider → Python CORDIS servisi (`workers/cordis`) yoksa iş düşer, `job-queue` alarmı | PATRON (pilotta CORDIS aylık yenileme gerekli mi?) |
+| `FEEDBACK_DIGEST_TO` | haftalık geri bildirim özeti hesaplanır, gönderilmez | PATRON (adres) |
+| `JOBS_DATABASE_URL` | boş = `DATABASE_URL`. Worker ilk açılışta `graphile_worker` şemasını **kurar** → bu rolün şema oluşturma yetkisi olmalı; `fabrika_app`'in yoksa ayrı rol gerekir (ADR-0008 §6.6) | EKSİK (rol yetkisi canlı DB'de ölçülecek) |
+| `NEXT_PUBLIC_POSTHOG_KEY/HOST` | analitik yok (zararsız) | isteğe bağlı |
+| `BETA_SUPPORT_EMAIL` | `src/lib/beta/constants.ts:50` varsayılanı **`support@fabrika.dev`** (eski marka) → davet e-postalarında görünür. `info@fonbridge.com` verilmeli | PATRON (değer) / EKSİK (varsayılan düzeltilmeli, ayrı kart) |
+| `NEXT_PUBLIC_SMTP_FROM_ADDRESS` | varsayılan `info@fonbridge.com` (doğru) | HAZIR |
+
+### 2.3 Pilotta boş kalmalı (ADR-0007)
+
+`STRIPE_*`, `IYZICO_*`, `BILLING_ACTIVE_TIER`, `EFATURA_INTEGRATOR_*`, `INVOICE_SUPPLIER_*` → **boş bırakın**. iyzico boşken webhook her teslimi reddeder (env.ts yorumu), demo anahtara düşmez. `IYZICO_BASE_URL` sandbox varsayılanı pilotta önemsiz.
+
+### 2.4 `.env.example`'da olup kodda hiç okunmayan (ölü) anahtarlar
+
+Komut: her anahtar için `grep -rqsw KEY src scripts prisma next.config.* prisma.config.* package.json Dockerfile docker-compose.yml .github`.
+
+`AI_PROVIDER`, `APIFY_TOKEN`, `CORDIS_H2020_ZIP_URL`, `CORDIS_HE_ZIP_URL`, `DATABASE_URL_MIGRATE`, `DEFAULT_LOCALE`, `EMBEDDING_DIM`, `EMBEDDING_MODEL`, `EMBEDDING_PROVIDER`, `SEDIA_API_KEY`, `SEDIA_SEARCH_URL`, `SEDIA_TOPIC_DETAILS_URL`, `UPSTASH_REDIS_REST_TOKEN`, `UPSTASH_REDIS_REST_URL`.
+
+Bunları üretimde doldurmak **hiçbir şeyi değiştirmez** (ör. `EMBEDDING_MODEL` değiştirilse de kod `text-embedding-3-large` kullanır, `src/lib/llm.ts:613`). Ayrıca `REDIS_URL` yalnız `docker-compose.yml`'de geçiyor, kodda okunmuyor. Temizlik ayrı kart (EKSİK, bloklayıcı değil).
+
+Kaldırılan servislerin (Sentry, Resend, Inngest, Entra, Outlook, SAML) hiçbir anahtarı `.env.example` ya da `src/lib/env.ts`'de **yok** (`grep -iE 'inngest|resend|sentry|entra|azure|outlook|saml|microsoft'` → boş). HAZIR.
+
+---
+
+## 3. Şema: migration sırası ve geri dönüş
+
+### 3.1 Uygulama sırası — HAZIR
+
+`prisma migrate deploy` düz `.sql` dosyalarını görmez; tek yol `scripts/apply-migrations.sh` (sıra: `prisma/migrations/apply-order.txt`, `psql -v ON_ERROR_STOP=1`). Liste ile disk uyuşmazsa betik koşmaz.
 
 ```
-$ ls prisma/migrations/*.sql | grep -v "\.down\.sql$" | wc -l
-12
+$ bash scripts/apply-migrations.sh --list | wc -l
+36
+$ bash scripts/apply-migrations.sh --list | tail -5
+hash-bearer-tokens.sql
+credit-ledger-grant-period.sql
+invitation-accepted-at.sql
+add-public-lead.sql
+relationship-stale-reminded-at.sql
 ```
 
+Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workflows/ci.yml:99`):
+
+- [ ] 0. **Önce yedek** (§4.1) — geri dönüşün tek güvenli yolu.
+- [ ] 1. `pnpm exec prisma db push` — **`--accept-data-loss` VERMEYİN**. Veri kaybı gerektiren bir fark varsa komut durur; o durumda dur ve incele.
+- [ ] 2. `pnpm db:rls-role` — `fabrika_app` rolü (sonraki adımların `GRANT … TO fabrika_app` satırları bunu arar).
+- [ ] 3. `DATABASE_URL=<sahip rol> scripts/apply-migrations.sh` — 36 dosya; iki kez koşmak güvenli (CI her push'ta iki kez koşuyor).
+- [ ] 4. `pnpm db:rls` — kiracı politikaları + sistem kapsamı fonksiyonları.
+- [ ] 5. `pnpm rls:verify` gerçek `fabrika_app` ile exit 0.
+- [ ] 6. **Web**'i yeni sürümle kaldır, sonra worker (§3.3).
+
+**Bilinen pencere (İNCELEME-12 K-6):** zincir koşarken 23. dosya (`add-agency-invite-code.sql`) ile 30. dosya (`agency-invite-no-max-uses.sql`) arasında `redeem_agency_invite()` eski gövdededir: `maxUses = NULL` olan davet kodları reddedilir (ölçüm: 23.–30. dosyalar 1,2 sn). Düşük trafik saatinde koşun; zincir yarıda kalırsa pencere açık kalır. Kontrol: `SELECT prosrc LIKE '%maxUses%' FROM pg_proc WHERE proname = 'redeem_agency_invite';` → `false` olmalı. İlk canlı kurulumda (boş DB, kullanıcı yok) bu pencere etkisizdir.
+
+### 3.2 Geri dönüş — HAZIR (2 not)
+
+- Her düz dosyanın yanında `<ad>.down.sql`, klasörlünün yanında `down.sql` vardır; **ters sırayla elle** uygulanır (`scripts/apply-migrations.sh` başlığı).
+- **Not 1 — down dosyası olmayan 3 migration** (ölçüm: listedeki her dosya için `.down.sql`/`down.sql` arandı):
+  - `credit-ledger-grant-period.sql` — geri dönüş dosyanın **başlık yorumunda**: `DROP INDEX IF EXISTS "CreditLedger_tenantId_grantPeriod_key"; ALTER TABLE "CreditLedger" DROP COLUMN IF EXISTS "grantPeriod";`. Kredi miktarı değişmez. Yeniden ileri alındığında dosya kendi damgalarını `refId`'den (`monthly_grant:YYYY-MM`) geri üretir ve eski-iş satırlarını ayıyla işaretler; yani geri-ileri güvenli. **Ama:** geri dönüş penceresinde `credits-monthly-grant` koşarsa (ayın 1'i 06:00 UTC) tekrar koruması yoktur → geri dönüşte worker'ı `JOBS_CRON_ENABLED=false` ile tutun.
+  - `add-calendar-connections/migration.sql`, `add-m9-meeting-schedule/migration.sql` — klasörlü, `down.sql` yok. İkisi de yeni tablo kurar; geri dönüş `DROP TABLE` (veri gider). Canlının ilk kurulumunda geri dönüş zaten "yedekten geri yükle"dir.
+- **Not 2 — pratik kural:** şema geri dönüşü yerine **yedekten geri yükleme** (§4.2) tercih edilir; down dosyaları yalnız tek bir migration'ı geri almak içindir.
+
+### 3.3 Web ve worker dağıtım sırası (ADR-0008 §9.2) — HAZIR
+
+İmajlar: `docker build --target runner .` (web, varsayılan son aşama) ve `docker build --target worker .` (`Dockerfile:36`). Not: hedefin adı `runner`dır, `web` değil.
+
+İlk canlı kurulumda eski Inngest zamanlayıcısı canlıda hiç koşmadığı için 2. adım yalnız "Inngest hesabında bu uygulama kayıtlı değil" kontrolüdür:
+
+- [ ] 1. Web'i kaldır.
+- [ ] 2. Inngest panosunda FonBridge uygulaması yok ya da "Functions" boş (eski zamanlayıcı tik atmıyor).
+- [ ] 3. Worker'ı `JOBS_CRON_ENABLED=false` ile kaldır (şemayı kurar; `job-queue:cron-disabled` uyarısı beklenir).
+- [ ] 4. Worker'ı `JOBS_CRON_ENABLED=true` ile yeniden başlat. **Tek bir** cron'lu worker yeter; iki worker aynı DB'de güvenlidir (her tik bir kez koşar).
+- [ ] 5. İlk günlük tikten sonra (en geç 02:00 UTC `k1-daily-calls`) `/[locale]/admin/alerts`'te `job-queue` kaynağı ve worker logu kontrol.
+
+Geri dönüşte sıra ters: önce worker'ı durdur, sonra web'i geri al.
+
+---
+
+## 4. Yedekleme ve felaket kurtarma — EKSİK
+
+Repoda Postgres yedekleme/geri yükleme betiği, zamanlayıcısı ya da belgesi **yok** (`grep -rE 'pg_dump|pg_restore|pgbackrest|wal-g'` repoda sonuç vermiyor; `scripts/compare-production-backup.ts` bir dosya ağacı karşılaştırıcısı, DB yedeği değil). Uygulama sunucusu belli olmadan (madde 1.2) kurulamaz; plan aşağıda.
+
+### 4.1 Günlük yedek (öneri — sunucu belli olunca EKSİK kartı)
+
+- Yönetilen Postgres seçilirse: sağlayıcının otomatik günlük yedeği + PITR (en az 7 gün). Aşağıdaki mantıksal yedek yine de alınır (sağlayıcı dışı kopya).
+- Kendi sunucumuzda: her gün 01:30 UTC (en erken iş 02:00 UTC'den önce)
+  `pg_dump --format=custom --no-owner --file=fonbridge-$(date -u +%F).dump "$BACKUP_DATABASE_URL"`
+  - `BACKUP_DATABASE_URL`: salt okur ama RLS'i atlayabilen ayrı rol (`fabrika_app` RLS yüzünden kiracı satırlarını **göremez**; onunla alınan yedek boş çıkar).
+  - `graphile_worker` şeması dahil (kuyruk durumu); `pgvector` uzantısı hedefte kurulu olmalı.
+  - Saklama: 7 günlük + 4 haftalık + 12 aylık. **Sunucu dışına** kopya (R2/S3 ya da Vulut yedek alanı), şifreli (`age`/`gpg`); anahtar sunucuda değil, patronun kasasında.
+  - Başarısızlık: betik çıkış kodu ≠ 0 → `SystemAlert(source='db-backup', level='error')` + dış kalp atışı (§5.3).
+- **KVKK notu:** kişisel verinin imhası (`users-scheduled-deletion`, `public-lead-cleanup` 12 ay) yedeklerde saklama süresi kadar gecikir → yedek saklama süresi (en uzun 12 ay) `docs/legal/processing-register.md`'ye yazılmalı. Geri yüklemeden sonra imha işleri bir kez elle koşulur (`pnpm jobs:enqueue -- users-scheduled-deletion`, `-- public-lead-cleanup`) ki geri gelen silinmiş kayıtlar yeniden silinsin.
+
+### 4.2 Geri yükleme testi planı (canlıdan önce bir kez, sonra ayda bir)
+
+1. Boş bir Postgres 16 + pgvector (yerelde `docker compose up -d postgres-vector` ayrı bir veri hacmiyle ya da geçici VM).
+2. `pg_restore --no-owner --dbname=<test> fonbridge-<tarih>.dump`
+3. `pnpm db:rls-role && pnpm db:rls && pnpm rls:verify` → exit 0.
+4. Satır sayıları karşılaştır: `Tenant`, `User`, `CreditLedger`, `AuditEvent` (kaynak ile ± o günün yazımları).
+5. Uygulamayı bu DB'ye bağla, giriş + bir kiracı sayfası açılıyor.
+6. Süreyi yaz (RTO ölçümü). Hedef öneri: **RPO ≤ 24 saat, RTO ≤ 4 saat** (pilot için; patron onaylar).
+
+### 4.3 Felaket kurtarma (sunucu kaybı)
+
+- Kod: GitHub (`origin`) — push edilmemiş commit felakette kaybolur (§6).
+- İmaj: yeniden `docker build` (dış kayıt defteri yok).
+- Sırlar: üretim `.env`'i sunucudan başka **bir yerde de** (patronun parola kasası) tutulmalı; aksi hâlde `AUTH_SECRET` kaybı tüm oturumları, `CALENDAR_ENCRYPTION_KEY` kaybı şifreli takvim bağlantılarını geri dönülmez kılar.
+- DNS: TTL'ler canlı öncesi kısa (300 sn) tutulursa yeni IP'ye geçiş dakikalar sürer.
+
+---
+
+## 5. İzleme — `SystemAlert` kime, nasıl ulaşıyor? — EKSİK (kısmi)
+
+### 5.1 Bugünkü durum (koddan)
+
+- Tek yazıcı `recordAlert()` (`src/lib/observability/system-alert.ts`): satır `SystemAlert` tablosuna yazılır. **Hiçbir şey dışarı gönderilmez** — dosya başlığı: "Alerts now land in the `SystemAlert` table and are read by platform admins at /[locale]/admin/alerts. Nothing leaves the deployment." (Sentry kaldırıldı, yerine bu geldi.)
+- Yani alarm **çekme** (pull) usulü: biri `/[locale]/admin/alerts` ekranını açmadıkça kimse görmez. E-posta, SMS, push **yok**.
+- Tekrar eden hata yeni satır açmaz, `alertRepeatCount` artar (TASK-MTS80DUAF39Z8) — tek satır ≠ az sorun.
+- Worker sağlığı: `job-queue-health` her saat :05 UTC kaçırılmış tik / tükenmiş / takılmış işi `SystemAlert`'e yazar (ADR-0008 §9.3). **Sınır:** cron'lu hiç worker yoksa bu alarm da yazılmaz — sessiz kalır.
+- `pnpm alerts:check`: açık alarmların silinmiş kiracıyı göstermediğini ölçer (kapıda).
+
+### 5.2 Canlıdan önce kapatılması gerekenler
+
+- [ ] **EKSİK — alarm e-postası:** `error` seviyeli yeni (ya da tekrar sayacı eşiği aşan) `SystemAlert` için günlük/saatlik özet e-postası (mevcut `smtpMailer` ile, yeni bir iş `alerts-ops-digest`). Alıcı adresi **PATRON** (öneri: `info@fonbridge.com` ya da ayrı `ops@`). Kişisel veri taşımaz (alarm satırı zaten taşımıyor).
+- [ ] **EKSİK — dış kalp atışı (ADR-0008 §9.3 "henüz yok"):** harici uptime izleyici (ör. UptimeRobot/Better Stack ücretsiz katman — **PATRON** hesap açar):
+  - `https://fonbridge.com/` (ya da bir sağlık ucu) 5 dk'da bir, 200 bekler.
+  - Worker: `graphile_worker._private_known_crontabs` içinde `job-queue-health` `last_execution` 70 dk'dan eskiyse alarm — bunun için web'de yetki gerektiren küçük bir sağlık ucu gerekir (EKSİK kartı).
+  - Yedek betiği (§4.1) bitince bir "check-in" URL'ine ping.
+- [ ] Log toplama: web ve worker stdout'u — Docker `json-file` sürücüsü ile `max-size=50m, max-file=5` (disk dolmasın). Sunucu belli olunca.
+
+### 5.3 Yayından sonraki ilk 24 saat
+
+- [ ] `/[locale]/admin/alerts` → `source='users-scheduled-deletion'` alarmı **yok** (iş 03:00 UTC). Varsa ve `failureKinds` `P2011` ise §3.1 adım 3 atlanmıştır.
+- [ ] `source` `job-queue` ile başlayan `error` alarmı yok; `job-queue:cron-disabled` yok (yani 3.3 adım 4 yapıldı).
+- [ ] SMTP yoksa her gönderim denemesi `SystemAlert` yazar → e-posta ile ilgili alarm yok.
+
+---
+
+## 6. GitHub push (1 Ekim) ve CI
+
+Ölçüm (30.09 00:43 TRT, yerel referanslar; `git fetch` koşulmadı):
+
 ```
-prisma/migrations/add-feedback.sql
-prisma/migrations/add-invoice-fx-rate.sql
-prisma/migrations/add-invoice-write-path.sql
-prisma/migrations/add-invoice.sql
-prisma/migrations/add-lifetime-licence.sql
-prisma/migrations/add-m6-evaluator-lens.sql
-prisma/migrations/add-soft-delete.sql
-prisma/migrations/add-subscription-price-lock.sql
-prisma/migrations/add-systemalert-console-indexes.sql
-prisma/migrations/relationship-owner-nullable.sql
-prisma/migrations/rename-feedback-alert-columns.sql
-prisma/migrations/retire-eur-plan-ladder.sql
+$ git rev-list --count origin/dev..dev
+223
+$ git log -1 --format='%h %aI' origin/dev
+c5aa48d7 2026-09-29T07:26:22+03:00
+$ git remote -v
+origin  https://github.com/yaslan/fonbridge.git
 ```
 
-Karşılaştırma — veritabanının Prisma'ya göre uyguladığı migration sayısı
-(`docs/agent-results/TASK-MTTOUDNQ97X83-evidence/probe-migration-inventory.mts`):
+- **PATRON — push:** patron kararı push 1 Ekim. 223 commit (en eski 29.09 07:27, en yeni 30.09 00:42). Push, kodun makineden çıktığı an; o güne kadar tek kopya bu makine (felaket riski §4.3).
+- **CI — HAZIR:** `.github/workflows/ci.yml` `push`/`pull_request` → `main`, `dev`. Postgres 16 + pgvector servis konteyneri; `db push` → `db:rls-role` → `apply-migrations.sh` **iki kez** (idempotensi kapısı) → `db:rls` → `db:seed` → lint, typecheck, test, `next build`, e2e. **GitHub sırrı gerektirmez** (`grep secrets\. .github/workflows/*.yml` boş), yani push'tan sonra ek ayar olmadan koşar. Ayrıca `check-rls.yml`, `i18n-check.yml`, `a11y-check.yml`.
+- **EKSİK — yerel pre-push kapısı devre dışı:** `git config core.hooksPath` → `/Users/macbook/AgentSpace/fabrika/githooks` — bu dizin **yok** (`ls` → No such file or directory). Repodaki `githooks/pre-push` (`pnpm gate`) bu yüzden push'ta **koşmaz**. Düzeltme (yerel, geri alınabilir): `git config core.hooksPath githooks` — geri alma: eski değeri geri yaz. Push'u yapan makinede ayarlanmalı; bu kart ayarı değiştirmedi (paylaşımlı ağaç, diğer ajanların commit'lerini etkiler — patron/lider onayı).
+- Push öncesi öneri (PATRON ya da lider): temiz bir worktree'de `pnpm gate` bir kez (fe-fb 30.09 ölçümü: install/tsc/lint/i18n/rls/build 0; vitest 2814/2822, 2 bilinen kararsız test — `docs/agent-results/TASK-MUN66PFFWT9MA-fe-fb.md`).
+- İlk push'ta CI kırmızı çıkarsa: `docs/agent-results/` altındaki son kapı ölçümleriyle karşılaştır; kararsız testi yeniden koş (rerun), gerçek kırmızıyı düzelt.
 
-```
-TOTAL forward migrations in the tree: 17     (12 düz + 5 klasörlü)
-prisma/migrations/migration_lock.toml present: false
-rows Prisma has recorded as applied: 5       (yalnız klasörlü olanlar)
-```
+---
 
-- [ ] Yukarıdaki **12** dosya hedef veritabanında **kodun yayınından ÖNCE**
-      uygulandı (her biri idempotent yazılmıştır; sırayla koşulabilir).
-- [ ] `ls prisma/migrations/*.sql | grep -v "\.down\.sql$" | wc -l` çıktısı
-      yeniden sayıldı; 12'den büyükse yeni gelen dosyalar da uygulandı.
+## 7. Diğer notlar (bloklayıcı değil, bilinmeli)
 
-**RLS bu pencerede:** bu dosyaların her biri kurduğu kiracı tablosunun
-`tenant_isolation` politikasını kendi içinde taşır, çünkü `pnpm db:rls` ayrı bir
-adımdır ve arada tablo politikasız durur (kural ve ölçüm: `docs/DATA_MODEL.md`
-§16; kapı: `pnpm rls:check` → CHECK 4b).
+- `src/lib/llm.ts:85` `'M6:evaluation': 'claude-opus-5'` — varsayılan `claude-sonnet-5`, ama M6 değerlendirme görevi Opus'a gidiyor. Karar "claude-sonnet-5" ise bu satır bilinçli bir istisna mı, maliyet açısından patron teyit etmeli (**PATRON**, soru).
+- `src/components/PublicFooter.tsx` ve bazı hukuk belgeleri hâlâ `info@usfinbridge.com` diyor (`docs/SMTP-SUNUCU.md` §9) — fe/cs işi.
+- HSTS Caddyfile'da `max-age=300` ile başlıyor (`docs/SMTP-SUNUCU.md` §10.1); bir hafta sorunsuzsa büyütülür.
 
-**Neden bloklayıcı:** kod önce çıkarsa, o kolonu bekleyen iş kırılır.
-Ölçülmüş örnek: `relationship-owner-nullable.sql` uygulanmadan imha işi
-(`purgeDueUsers`) `P2011` ile düşer, kişi silinmez ve yasal imha borcu büyür
-(TASK-MTT1XL9NP2QYU F-1, tekrar üretimi bu kartın kanıt dizininde).
+---
 
-## 2. Yayından sonra izlenecek alarm
+## 8. Patronun yapacakları — tek sıralı liste
 
-İmha işi artık sessiz düşmüyor: bir hesabı silemezse
-`SystemAlert(level='error', source='users-scheduled-deletion')` yazar ve satır
-`/[locale]/admin/alerts` ekranında görünür. Satır **kişisel veri taşımaz** —
-`failedUserIds` + `failureKinds` (hata kodu) kadarını taşır.
+Sıra bağımlılığa göre; her adım bir öncekini bekler (paralel yapılabilenler aynı numarada harfle).
 
-- [ ] Yayından sonraki ilk 24 saat içinde `source='users-scheduled-deletion'`
-      alarmı **yok** (iş 03:00 UTC koşar).
-- [ ] Alarm varsa: `failureKinds` `P2011` ise madde 1 atlanmıştır — eksik `.sql`
-      uygulanır, iş bir sonraki gece kendiliğinden tekrar dener.
-
-Aynı hata her gece tekrar ederse **yeni satır açılmaz**, açık satırın
-`alertRepeatCount` sayacı artar (TASK-MTS80DUAF39Z8). Yani "tek satır" az sorun
-demek değildir — sayaca bakın. Alarmı **çözmek** pencereyi kapatır: sonraki
-oluşta taze satır açılır.
-
-## 3. Kapı
-
-- [ ] `pnpm gate` hedef ağaçta exit 0 (lint + typecheck + test + i18n + rls).
-- [ ] `pnpm rls:verify` gerçek `fabrika_app` rolüyle ölçüldü (BYPASSRLS yok).
-- [ ] `pnpm alerts:check` exit 0 — hiçbir açık `SystemAlert`, silinmiş bir
-      kiracıyı göstermiyor. `SystemAlert` tenant-agnostiktir ve `tenantId`
-      kolonu yoktur, bu yüzden "kiracıma ait her şeyi sil" desenini kullanan
-      test fixture'larının ulaşamadığı tek tablodur; ulaşamadığında alarm
-      kiracısından uzun yaşar ve konsolun 300 satırlık penceresini gerçek
-      alarmların önünden iter (TASK-MTVFWYKIZXRB1: 268 satırın 234'ü böyleydi).
-      Kapı `test:e2e`'den SONRA koşar; kırmızıysa hangi fixture'ın sızdırdığını
-      yazar.
-
-## 4. Bilinen pencere: zincir koşarken davet kodu reddi (İNCELEME-12 K-6)
-
-`scripts/apply-migrations.sh` her yayında `apply-order.txt`'in **tamamını**
-baştan koşar. 23. dosya `add-agency-invite-code.sql`,
-`redeem_agency_invite()`'ın ilk gövdesini (`"usedCount" < "maxUses"`) yeniden
-yazar. Bu gövdeyi 30. dosya `agency-invite-no-max-uses.sql` kaldırır. İki dosya
-arasında, eski gövde geçerlidir:
-
-- `maxUses = NULL` olan her kod (TASK-MUM4WVYLSH9IT'ten sonra üretilen bütün
-  kodlar) reddedilir, çünkü `< NULL` sonucu NULL'dır. O anda kayıt olan kişi
-  "davet kodu geçersiz" mesajını görür; kod harcanmaz, kişi yeniden deneyebilir.
-- Eski sınırı olan ve sınırın üstünde kullanılmış bir kod o arada reddedilirse,
-  denetim kaydına `reason = 'exhausted'` düşebilir. Bu değer panelde gösterilmez.
-
-Ölçüm (TASK-MUM74FUB1DRCM, yerel Postgres, docker): 23.-30. dosyalar
-**1,2 sn** sürdü, dosya başına 0,08-0,10 sn. Aynı davranış bir `BEGIN … ROLLBACK`
-işlemi içinde kanıtlandı: zincirin sonunda kod kabul ediliyor, 23. dosyadan sonra
-reddediliyor, 30. dosyadan sonra yeniden kabul ediliyor.
-
-- [ ] Zinciri düşük trafik saatinde koşun. Pilotta kayıtlar ajans davetleriyle
-      geldiği için kampanya e-postasının gittiği saatten kaçının.
-- [ ] Zincir yarıda kesilirse (`ON_ERROR_STOP`), 30. dosya uygulanana kadar
-      pencere **açık kalır**. Hatayı giderip zinciri bitirmeden yayını bitmiş
-      saymayın. Kontrol:
-      `SELECT prosrc LIKE '%maxUses%' FROM pg_proc WHERE proname = 'redeem_agency_invite';`
-      sorgusu `false` dönmeli.
-
-Pencereyi tamamen kapatmanın yolu, 23. dosyanın fonksiyonu yalnız hiç yokken
-oluşturmasıdır. Bu bir migration değişikliği olduğu için ayrı bir kartta
-yapılmalıdır. Bu not yalnız bugünkü davranışı anlatıyor.
+1. **Uygulama sunucusu kararı:** web + worker + Postgres 16 (pgvector) nerede koşacak? `77.92.144.187` paylaşımlı cPanel sunucusu; orada Docker/uzun yaşayan süreç/pgvector olup olmadığını Vulut'a sor. Olmuyorsa Vulut VPS (öneri: 2 vCPU / 4 GB / 60 GB SSD) — **`<APP_IP>`**'yi bize ilet.
+2. **fonbridge.com'u `srv.iyisunucu.com.tr` cPanel'ine ekle** (bugün NS'ler `REFUSED`). NS değişmez.
+3. Zone Editor: kök `A` → `<APP_IP>`, `www` → kök, `mail A 77.92.144.187`, MX, SPF, DMARC, DKIM (2048 bit) — tam liste `docs/SMTP-SUNUCU.md` §3.0/§8 madde 3. TTL 300.
+4. Posta kutuları `info@` + `dmarc@`; **S-1 kararı** (uygulama `info@` ile mi, ayrı `bildirim@` ile mi göndersin — öneri ayrı kutu). AutoSSL çalıştır.
+5. Vulut'a tek bilet (`docs/SMTP-SUNUCU.md` §8 madde 7 a–g) + 1. maddedeki sunucu sorusu aynı bilette.
+6. **Google OAuth:** `fonbridges` GCP projesinde OAuth istemcisi (Web). Yetkili yönlendirme URI'si **`https://fonbridge.com/api/auth/callback/google`**, JavaScript kaynağı `https://fonbridge.com`. OAuth izin ekranı: uygulama adı FonBridge, destek e-postası `info@fonbridge.com`, yayın durumu "Üretim" (test modunda yalnız eklenen test kullanıcıları girebilir). `cevreportal` istemcisini üretimde kullanma.
+7. **OpenAI anahtarını yenile:** yeni anahtar üret, açığa çıkanı **iptal et**, projeye aylık harcama limiti koy. Anthropic konsolunda da aylık limit.
+8. **Dosya depolama kararı:** Cloudflare R2 hesabı + bucket (`fonbridge-evidence`) + erişim anahtarı ve public host — ya da pilotta dosya yükleme kapalı. (Karar yoksa yüklemeler sessizce kaybolur, §2.2.)
+9. **Üretim `.env`'ini sunucuda bizzat doldur** (repoya/sohbete yazma): §2.1'in tamamı, §2.2'de seçtiklerin; `AUTH_SECRET` yeni üret (`openssl rand -base64 32`); `DEMO_LOGIN_ENABLED` boş; `JOBS_CRON_ENABLED=false` (worker için). Bir kopyasını parola kasana koy (§4.3).
+10. **Alarm alıcı adresi** (`SystemAlert` özeti için) ve **uptime izleyici hesabı** (§5.2).
+11. **RPO/RTO hedefini onayla** (öneri RPO ≤ 24 sa, RTO ≤ 4 sa) ve yedeğin sunucu dışı konumunu seç (§4.1).
+12. **1 Ekim: GitHub push** (`git push origin dev`) — öncesinde push yapılacak makinede `git config core.hooksPath githooks` (§6). CI yeşilini gör.
+13. 1–11 bitince haber ver → biz (onayla): sunucuya Caddy + Docker kurulumu, §3.1 şema sırası, §3.3 web→worker sırası, §4.2 geri yükleme testi, `docs/SMTP-SUNUCU.md` §7 posta ölçümleri, `docs/SMTP-SUNUCU.md` §10.3 yönlendirme ölçümleri.
+14. **Canlıya geçiş onayı** (açık, yazılı). Onaysız hiçbir adım canlıya yazılmaz.
