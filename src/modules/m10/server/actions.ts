@@ -24,6 +24,7 @@ import { errorMessage } from '@/lib/errors';
 import { isPresentId } from '@/lib/required-id';
 import type { FollowupDocRow } from '@/types/db-rows';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { isLlmUnusableOutcome } from '@/lib/llm-outcome';
 
 /**
  * M10 follow-up documents.
@@ -109,6 +110,10 @@ export async function generateStandardDoc(
       // separation is being given up here.
       dedupeKey: `m10-doc-generation-failed:${kind}`,
     });
+    // A cut-off or declined answer keeps its own error: its digest is what lets
+    // the screen say "cut off at the length limit" instead of nothing
+    // (TASK-MUN4PSBP19RKK). The adapter has already charged nothing for it.
+    if (isLlmUnusableOutcome(e)) throw e;
     throw new Error(`Document generation failed for ${kind}. No document was created and no credit was charged.`);
   }
 

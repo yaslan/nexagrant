@@ -109,6 +109,35 @@ describe('M10 Follow-up Documents Module', () => {
     expect(h.followupDocCreate).not.toHaveBeenCalled();
   });
 
+  // TASK-MUN4PSBP19RKK — a document cut off at the length limit used to be
+  // saved as v1 and charged. The adapter now throws; this action must keep that
+  // error (its digest is what the screen reads) and write nothing.
+  test('generateStandardDoc keeps a cut-off generation\'s error and creates no document', async () => {
+    const cutOff = Object.assign(new Error('cut off at the length limit'), { digest: 'LLM_TRUNCATED' });
+    h.generateText.mockRejectedValue(cutOff);
+
+    const err = await generateStandardDoc('opp-10', 'AWARD_PACK').catch((e: unknown) => e);
+
+    expect(err).toBe(cutOff);
+    expect((err as { digest: string }).digest).toBe('LLM_TRUNCATED');
+    expect(h.followupDocCreate).not.toHaveBeenCalled();
+  });
+
+  test('generateStandardDoc keeps a refused generation\'s error too', async () => {
+    const refused = Object.assign(new Error('declined'), { digest: 'LLM_REFUSED' });
+    h.generateText.mockRejectedValue(refused);
+
+    await expect(generateStandardDoc('opp-10', 'NDA')).rejects.toBe(refused);
+    expect(h.followupDocCreate).not.toHaveBeenCalled();
+  });
+
+  test('generateStandardDoc still reports any other failure generically', async () => {
+    h.generateText.mockRejectedValue(new Error('socket hang up'));
+
+    await expect(generateStandardDoc('opp-10', 'NDA')).rejects.toThrow(/Document generation failed for NDA/);
+    expect(h.followupDocCreate).not.toHaveBeenCalled();
+  });
+
   test('generateStandardDoc operates on the session tenant, not one named by the caller', async () => {
     await generateStandardDoc('opp-10', 'NDA');
 

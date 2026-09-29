@@ -3,6 +3,7 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
+import { isLlmUnusableOutcome } from '@/lib/llm-outcome';
 import { renderPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import { assertModuleAccess } from '@/lib/modules/access';
@@ -127,6 +128,9 @@ export async function generateIpChecklist({
       system: renderPrompt('m7/ip-checklist-system', {}, locale),
     });
   } catch (e) {
+    // A cut-off or declined answer must reach the screen as such, not be
+    // papered over with the canned list below (TASK-MUN4PSBP19RKK).
+    if (isLlmUnusableOutcome(e)) throw e;
     console.warn('[generateIpChecklist] LLM fallback:', errorMessage(e));
     content = `### 📋 TTO IP & Lisanslama Kontrol Listesi
 

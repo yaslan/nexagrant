@@ -19,6 +19,7 @@ import crypto from 'crypto';
 import type { TenantTx } from '@/lib/db';
 import { env } from '@/lib/env';
 import { errorStatus } from '@/lib/errors';
+import { LLM_REFUSED_DIGEST, LLM_TRUNCATED_DIGEST } from '@/lib/llm-outcome';
 
 export type LlmProvider = 'anthropic' | 'openai';
 
@@ -46,6 +47,28 @@ export const DEFAULT_MODELS: Record<LlmProvider, string> = {
 const DEFAULT_MAX_TOKENS = 4096;
 
 /**
+ * Output-token ceilings, keyed `module` or `module:purpose` (the pair wins),
+ * for the actions that write whole documents (TASK-MUN4PSBP19RKK).
+ *
+ * At 4096 the default model cut M10 AWARD_PACK off in 2 of 3 runs, and M7 and
+ * M10 NDA sat at 3.3K–3.8K median — one verbose afternoon from the same cut
+ * (docs/agent-results/TASK-MUN3FWZWT11MX-se-fb.md §2). `max_tokens` is a
+ * ceiling, not a charge: the provider bills the tokens actually generated, so
+ * raising it changes nothing for a call that already finished and costs only
+ * the tail a truncated call used to lose. 8192 is ~2x the longest measured
+ * complete document, and keeps a worst-case non-streaming call near 90 s.
+ */
+const MAX_TOKENS_OVERRIDES: Readonly<Record<string, number>> = {
+  M7: 8192,
+  M10: 8192,
+};
+
+/** Output ceiling for one call: explicit > per-action table > default. */
+export function maxTokensFor(module: string, purpose: string, explicit?: number): number {
+  return explicit || MAX_TOKENS_OVERRIDES[`${module}:${purpose}`] || MAX_TOKENS_OVERRIDES[module] || DEFAULT_MAX_TOKENS;
+}
+
+/**
  * Model overrides, keyed `module` or `module:purpose` (the pair wins).
  *
  * Lives here rather than at the call site so a module never names a model
@@ -71,6 +94,89 @@ export interface LlmCompletion {
   credits: number;
   provider: string;
   model: string;
+  /**
+   * Why the provider stopped, as it reported it (`end_turn`, `stop_sequence`,
+   * OpenAI `stop`, …). A returned completion always *finished*: a truncated
+   * or refused one is thrown as {@link LlmTruncatedError} /
+   * {@link LlmRefusalError} instead, so no caller can mistake half a document
+   * for a whole one. `null` when the provider sent none.
+   */
+  stopReason: string | null;
+}
+
+/** What a generation amounted to, read from the provider's stop reason. */
+type LlmOutcome = 'complete' | 'truncated' | 'refused';
+
+/** One provider answer before billing — the completion plus how it ended. */
+type ProviderResult = Omit<LlmCompletion, 'credits'> & { outcome: LlmOutcome };
+
+/**
+ * Map a provider stop reason onto the three outcomes the adapter acts on.
+ *
+ * Only the reasons that mean "unusable" are listed; everything else —
+ * including an absent reason — is treated as a finished answer, which is how
+ * this adapter behaved for every reason before it read the field at all.
+ * `pause_turn` / `tool_use` cannot occur: no call site sends tools.
+ */
+function outcomeOf(provider: LlmProvider, stopReason: string | null): LlmOutcome {
+  if (provider === 'anthropic') {
+    if (stopReason === 'max_tokens' || stopReason === 'model_context_window_exceeded') return 'truncated';
+    if (stopReason === 'refusal') return 'refused';
+    return 'complete';
+  }
+  if (stopReason === 'length') return 'truncated';
+  if (stopReason === 'content_filter') return 'refused';
+  return 'complete';
+}
+
+/** What an unusable generation reports, whichever of the two it was. */
+interface LlmOutcomeDetail {
+  module: string;
+  purpose: string;
+  provider: string;
+  model: string;
+  stopReason: string | null;
+  outputTokens: number;
+  maxTokens: number;
+}
+
+/**
+ * The model hit the output ceiling before finishing. Nothing was charged; the
+ * call is still in `AiUsageLog` (credits 0), because the prompt did reach the
+ * provider. `digest` is what the browser receives (src/lib/llm-outcome.ts).
+ */
+export class LlmTruncatedError extends Error {
+  readonly digest = LLM_TRUNCATED_DIGEST;
+  readonly code = LLM_TRUNCATED_DIGEST;
+  constructor(readonly detail: LlmOutcomeDetail) {
+    super(
+      `AI output for ${detail.module}:${detail.purpose} was cut off at the length limit ` +
+        `(${detail.outputTokens}/${detail.maxTokens} tokens, stop_reason ${detail.stopReason}). ` +
+        `Nothing was saved and no credit was charged.`
+    );
+    this.name = 'LlmTruncatedError';
+  }
+}
+
+/**
+ * The model or a provider safety classifier declined. Nothing was charged; the
+ * call is still in `AiUsageLog` (credits 0). Not retried: the same prompt is
+ * declined the same way.
+ */
+export class LlmRefusalError extends Error {
+  readonly digest = LLM_REFUSED_DIGEST;
+  readonly code = LLM_REFUSED_DIGEST;
+  constructor(
+    readonly detail: LlmOutcomeDetail,
+    /** `stop_details.category` when the provider gave one — informational only. */
+    readonly category: string | null
+  ) {
+    super(
+      `AI request for ${detail.module}:${detail.purpose} was declined by the model ` +
+        `(stop_reason ${detail.stopReason}${category ? `, category ${category}` : ''}). No credit was charged.`
+    );
+    this.name = 'LlmRefusalError';
+  }
 }
 
 /** What a caller asks for. `prompt`+`system` and `messages` are alternatives. */
@@ -164,7 +270,7 @@ function textFromAnthropicContent(content: unknown): string {
 async function callProvider(
   messages: LlmMessage[],
   opts: { provider: LlmProvider; model: string; maxTokens: number }
-): Promise<Omit<LlmCompletion, 'credits'>> {
+): Promise<ProviderResult & { refusalCategory?: string | null }> {
   const { provider, model, maxTokens } = opts;
 
   if (provider === 'anthropic') {
@@ -199,12 +305,19 @@ async function callProvider(
     }
 
     const data = await res.json();
+    // Read BEFORE the content: a refusal can arrive with an empty `content`,
+    // and a `max_tokens` stop arrives with text that looks like an answer.
+    const stopReason = typeof data?.stop_reason === 'string' ? data.stop_reason : null;
+    const category = data?.stop_details?.category;
     return {
       text: textFromAnthropicContent(data?.content),
       inputTokens: data?.usage?.input_tokens || 0,
       outputTokens: data?.usage?.output_tokens || 0,
       provider: 'anthropic',
       model,
+      stopReason,
+      outcome: outcomeOf('anthropic', stopReason),
+      refusalCategory: typeof category === 'string' ? category : null,
     };
   }
 
@@ -226,12 +339,17 @@ async function callProvider(
     }
 
     const data = await res.json();
+    const finish = data?.choices?.[0]?.finish_reason;
+    const stopReason = typeof finish === 'string' ? finish : null;
     return {
       text: data?.choices?.[0]?.message?.content || '',
       inputTokens: data?.usage?.prompt_tokens || 0,
       outputTokens: data?.usage?.completion_tokens || 0,
       provider: 'openai',
       model,
+      stopReason,
+      outcome: outcomeOf('openai', stopReason),
+      refusalCategory: null,
     };
   }
 
@@ -351,7 +469,10 @@ export async function getCreditBalance(tenantId: string): Promise<number> {
  * Call the model, record the call in `AiUsageLog`, deduct the credits.
  *
  * Throws when the tenant has no credits left, and when the provider rejects the
- * request after retries. Returns the usage the call actually produced —
+ * request after retries. Throws {@link LlmTruncatedError} when the answer hit
+ * the output ceiling and {@link LlmRefusalError} when it was declined — both
+ * after writing a credits-0 usage row and moving no credit. Returns the usage
+ * the call actually produced —
  * including the credits charged — so a caller that wants to show the cost reads
  * it from here instead of recomputing the formula.
  *
@@ -368,7 +489,7 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   }
 
   const provider = options.provider || DEFAULT_PROVIDER;
-  const maxTokens = options.maxTokens || DEFAULT_MAX_TOKENS;
+  const maxTokens = maxTokensFor(options.module, options.purpose, options.maxTokens);
   const messages = toMessages(options);
 
   // Explicit > override table > provider default. The override only applies to
@@ -384,10 +505,18 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   // action with no catalogue entry can be refused while it is still free to
   // refuse it. Resolving afterwards would mean paying the provider for a call
   // we then cannot bill or even log.
-  const { credits } = resolveCredits(options.module, options.purpose);
+  const { credits: price } = resolveCredits(options.module, options.purpose);
 
   requireApiKey(provider);
-  const result = await withRetry(() => callProvider(messages, { provider, model, maxTokens }));
+  const { outcome, refusalCategory, ...result } = await withRetry(() =>
+    callProvider(messages, { provider, model, maxTokens })
+  );
+
+  // A truncated or refused answer is not the product the tenant paid for, so
+  // the ledger does not move (TASK-MUN4PSBP19RKK). The usage row is still
+  // written below with credits 0: the prompt reached the provider either way,
+  // and CLAUDE.md rule 5 / GDPR art. 30 want every such call on record.
+  const credits = outcome === 'complete' ? price : 0;
 
   const promptHash = hashMessages(messages);
 
@@ -419,14 +548,16 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
           section: options.section,
         },
       });
-      await tx.creditLedger.create({
-        data: {
-          tenantId: options.tenantId,
-          delta: -credits,
-          reason: `usage:${options.module}`,
-          refId: options.proposalId,
-        },
-      });
+      if (credits > 0) {
+        await tx.creditLedger.create({
+          data: {
+            tenantId: options.tenantId,
+            delta: -credits,
+            reason: `usage:${options.module}`,
+            refId: options.proposalId,
+          },
+        });
+      }
     });
   } catch (e) {
     console.error('[generateCompletion] AiUsageLog write failed after a provider call', e);
@@ -434,6 +565,22 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
       'Completion call completed but its AiUsageLog row and credit deduction could not be written',
       e
     );
+  }
+
+  if (outcome !== 'complete') {
+    const detail: LlmOutcomeDetail = {
+      module: options.module,
+      purpose: options.purpose,
+      provider: result.provider,
+      model: result.model,
+      stopReason: result.stopReason,
+      outputTokens: result.outputTokens,
+      maxTokens,
+    };
+    // No tenant content: ids and counts only, so an operator can see which
+    // action is hitting the ceiling without reading anyone's document.
+    console.warn('[generateCompletion] unusable outcome', { outcome, ...detail, refusalCategory });
+    throw outcome === 'truncated' ? new LlmTruncatedError(detail) : new LlmRefusalError(detail, refusalCategory ?? null);
   }
 
   return { ...result, credits };

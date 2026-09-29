@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { createTtoItem, matchTtoItemToCalls, generateIpChecklist } from '../../src/modules/m7/server/actions';
 import { resetScope, setScope, FakeTenantScopeError } from '../helpers/tenant-scope-mock';
+import { generateText } from '../../src/lib/llm';
 
 const h = vi.hoisted(() => ({
   ttoCreate: vi.fn(),
@@ -101,5 +102,17 @@ describe('M7 TTO Accelerator Module', () => {
 
     expect(res.success).toBe(true);
     expect(res.checklistContent).toContain('TTO IP & Lisanslama');
+  });
+
+  // TASK-MUN4PSBP19RKK — the catch below the LLM call swaps ANY failure for a
+  // canned checklist. A cut-off or declined answer must not be dressed up as
+  // one: it reaches the screen with its digest instead.
+  test.each(['LLM_TRUNCATED', 'LLM_REFUSED'])('generateIpChecklist rethrows %s instead of the canned list', async (digest) => {
+    const outcome = Object.assign(new Error('unusable'), { digest });
+    vi.mocked(generateText).mockRejectedValueOnce(outcome);
+
+    await expect(
+      generateIpChecklist({ title: 'Solid State Battery Sensor', trl: 5, patentStatus: 'granted' })
+    ).rejects.toBe(outcome);
   });
 });
