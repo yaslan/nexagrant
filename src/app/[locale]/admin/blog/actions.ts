@@ -2,6 +2,14 @@
 
 import { createBlogPost, updateBlogPost, deleteBlogPost, toggleFeaturedBlogPost, BlogPost } from '@/lib/blog';
 import { revalidatePath } from 'next/cache';
+import { requirePlatformAdmin } from '@/lib/tenant';
+
+/**
+ * Blog editor actions. Posts are published on the public site, so every action
+ * is platform-admin only (TASK-MUMJ2ERCFP964): the admin layout 404s other
+ * users, but a server action is its own HTTP entry point, so the role is
+ * checked again here — same pattern as the feedback and alerts actions.
+ */
 
 export async function createBlogPostAction(data: {
   title: string;
@@ -16,6 +24,7 @@ export async function createBlogPostAction(data: {
   image: string;
   featured?: boolean;
 }) {
+  await requirePlatformAdmin();
   const newPost: BlogPost = {
     title: data.title,
     slug: data.slug || '',
@@ -62,6 +71,7 @@ export async function updateBlogPostAction(
     featured: boolean;
   }>
 ) {
+  await requirePlatformAdmin();
   const updated = updateBlogPost(slug, {
     title: data.title,
     excerpt: data.excerpt,
@@ -82,6 +92,7 @@ export async function updateBlogPostAction(
 }
 
 export async function deleteBlogPostAction(slug: string) {
+  await requirePlatformAdmin();
   const success = deleteBlogPost(slug);
   revalidatePath('/[locale]/blog', 'layout');
   revalidatePath('/[locale]/admin/blog', 'page');
@@ -89,6 +100,7 @@ export async function deleteBlogPostAction(slug: string) {
 }
 
 export async function toggleFeaturedBlogPostAction(slug: string) {
+  await requirePlatformAdmin();
   const updated = toggleFeaturedBlogPost(slug);
   revalidatePath('/[locale]/blog', 'layout');
   revalidatePath('/[locale]/admin/blog', 'page');
