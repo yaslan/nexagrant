@@ -1,7 +1,7 @@
 import React from 'react';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
-import { BillingSsoClient } from './client';
+import { BillingClient } from './client';
 import { errorMessage } from '@/lib/errors';
 import { getActiveTier } from '@/lib/billing/active-tier';
 import { NO_DISCOUNT_TIER } from '@/lib/billing/catalog';
@@ -20,7 +20,7 @@ export default async function AdminBillingPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  // The billing screen shows a subscription and opens an SSO portal session, so
+  // The billing screen shows a subscription and opens a Stripe portal session, so
   // a fallback tenant here meant a broken session could manage `demo-tenant-1`'s
   // billing. No session tenant → redirect, never a placeholder.
   const { tenantId } = await requireTenantPage(locale);
@@ -47,9 +47,8 @@ export default async function AdminBillingPage({
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <BillingSsoClient
+      <BillingClient
         locale={locale}
-        tenantId={tenantId}
         tenantName={tenant?.name || ''}
         currentPlanId={subscription?.planId || ''}
         currentProvider="stripe"

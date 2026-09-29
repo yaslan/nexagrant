@@ -37,8 +37,7 @@ export type WorkspaceRouteKey =
   | 'settingsCalendar'
   | 'settingsGates'
   | 'settingsMembers'
-  | 'settingsPrivacy'
-  | 'settingsSso';
+  | 'settingsPrivacy';
 
 /**
  * Returns localized public SEO URL
@@ -126,8 +125,6 @@ export function getWorkspaceRoute(
       return isTr ? `/${locale}/${workspace}/ayarlar/uyeler` : `/${locale}/${workspace}/settings/members`;
     case 'settingsPrivacy':
       return isTr ? `/${locale}/${workspace}/ayarlar/gizlilik` : `/${locale}/${workspace}/settings/privacy`;
-    case 'settingsSso':
-      return isTr ? `/${locale}/${workspace}/ayarlar/sso` : `/${locale}/${workspace}/settings/sso`;
     default:
       return `/${locale}/${workspace}/panel`;
   }

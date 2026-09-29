@@ -87,7 +87,7 @@ export class CoBrandStorageError extends Error {
 
 /**
  * Writes the agency's entry. `logo`: a sanitised PNG to store, `'keep'` the
- * current one, `'remove'` none. Read-then-merge, like src/lib/sso.ts: the
+ * current one, `'remove'` none. Read-then-merge: the
  * column also carries other settings that a wholesale write would delete.
  * The replaced logo object is deleted after the new entry is saved.
  */
