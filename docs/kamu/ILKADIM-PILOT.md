@@ -1,21 +1,23 @@
 # İlkadım Belediyesi (Samsun) — 90 günlük pilot planı
 
-> Sürüm 1.0 · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MULR4ATI5T158 (FB-KAMU-1) · Karar dayanağı: `docs/adr/ADR-0004-public-sector-segment-priority.md`
+> Sürüm 1.0 · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MULR4ATI5T158 (FB-KAMU-1) · Karar dayanağı: `docs/adr/ADR-0004-public-sector-segment-priority.md`, `docs/adr/ADR-0007-ilkadim-free-pilot.md`
+>
+> **Patron kararı — 29.09.2026 (ADR-0007):** Pilot **ücretsiz deneme** olarak yürür: 90 gün, Ekip planı, 6 koltuk; kapsam davet kodu, karne, radar. Ücretli satış ve e-Fatura pilot sonrasına kaldı. e-Fatura artık pilot kapısı değil, ücretli satış kapısı (ROADMAP "Ücretli satış kapısı"). Pilotu kiracıya atama: TASK-MUMABL78X5JLX.
 >
 > **Durum: TASLAK.** Bu belge patronun görüşmeye götüreceği pakettir. Hiçbir kuruma gönderilmedi. Kurumdaki kişi adları, unvanlar ve birim adları bilerek yazılmadı; görüşme öncesi patron doğrular. Köşeli ayraçlı her alan (`[...]`) bir yer tutucudur.
 
 ## 0. Bir bakışta
 
-| Başlık         | Değer                                                                                       |
-| -------------- | ------------------------------------------------------------------------------------------- |
-| Kurum          | İlkadım Belediyesi (Samsun Büyükşehir Belediyesi sınırları içinde ilçe belediyesi)          |
-| Süre           | 90 gün (12 hafta) · başlangıç: `[imza tarihi]`                                              |
-| Ücret          | Pilot boyunca ücretsiz — **Ekip planı** yetkileri (bkz. `docs/BUSINESS_MODEL.md` §5.1)      |
-| Koltuk         | 6 (Ekip planının koltuk sayısı)                                                             |
-| Katılan birim  | Dış İlişkiler / AB birimi, Çevre, Kültür, Strateji Geliştirme (birim adları doğrulanacak)   |
-| Ana çıktı      | En az 1 gerçek AB çağrısı için konsept not + başvuru kararı                                 |
-| Pilot sonrası  | Yıllık TL paketi, doğrudan temin sınırının altında (§5)                                     |
-| Bloke eden dış | e-Fatura/GİB işi (TASK-MTRJSOWFH6B45) açık olduğu için pilot **ücretli başlayamaz** (§6 R4) |
+| Başlık        | Değer                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------- |
+| Kurum         | İlkadım Belediyesi (Samsun Büyükşehir Belediyesi sınırları içinde ilçe belediyesi)                    |
+| Süre          | 90 gün (12 hafta) · başlangıç: `[imza tarihi]`                                                        |
+| Ücret         | Pilot boyunca ücretsiz deneme — **Ekip planı** yetkileri (ADR-0007; `docs/BUSINESS_MODEL.md` §5.1)    |
+| Koltuk        | 6 (Ekip planının koltuk sayısı)                                                                       |
+| Katılan birim | Dış İlişkiler / AB birimi, Çevre, Kültür, Strateji Geliştirme (birim adları doğrulanacak)             |
+| Ana çıktı     | En az 1 gerçek AB çağrısı için konsept not + başvuru kararı                                           |
+| Pilot sonrası | Yıllık TL paketi, doğrudan temin sınırının altında (§6)                                               |
+| Ücretli geçiş | e-Fatura/GİB işi (TASK-MTRJSOWFH6B45) ücretli geçişin ön koşulu; pilotu bloke etmez (ADR-0007, §7 R4) |
 
 ## 1. Pilotun amacı
 
@@ -136,7 +138,7 @@ Aşağıdaki TL tutarları patron tarafından 29.09.2026'da **onaylandı** (plan
 | R1  | Kamuda satın alma süresi           | Pilot bitince ücretli geçiş aylarca gecikebilir; bütçe yılı ve ödenek kalemi gerekir                                                                                                                                   | Pilotun 9. haftasında Strateji ve Mali Hizmetler ile bütçe kalemi konuşulur; teklif 10. haftada verilir                                                                                       |
 | R2  | KVKK                               | Belediye personelinin adı, e-postası ve yazdığı içerik kişisel veri. Aydınlatma metninde eksikler var (`docs/legal/privacy-notice-gap-analysis.md`)                                                                    | Pilot öncesi `docs/legal/dpa-tr.md` imzalanır; aydınlatma metnindeki boşlukları hukuk ekibi kapatır; pilotta vatandaş verisi **yüklenmez** (kurala yazılır)                                   |
 | R3  | Veri yerleşimi / yurt dışı aktarım | İşleme envanterine göre YZ tamamlama (Anthropic, ABD), embedding (OpenAI, ABD) ve e-posta (Resend, ABD) yurt dışına veri aktarıyor; nesne deposunda AB bölgesi kodla zorlanmıyor (`docs/legal/processing-register.md`) | Görüşmede açıkça söylenir, gizlenmez. Belediyeye hangi verinin nereye gittiği tek sayfada verilir. Kamunun "veri Türkiye'de kalsın" şartı çıkarsa bu ürün boşluğu olarak yazılır (OKA §6, B9) |
-| R4  | e-Fatura bağımlılığı               | e-Fatura/GİB entegrasyonu canlı değil; alıcı kimliği ekranı yok (`docs/EFATURA_SETUP.md`). TASK-MTRJSOWFH6B45 insan aksiyonu bekliyor                                                                                  | Pilot ücretsiz yürür (ADR-0004). Ücretli geçiş tarihi e-Fatura açılmadan verilmez                                                                                                             |
+| R4  | e-Fatura bağımlılığı               | e-Fatura/GİB entegrasyonu canlı değil; alıcı kimliği ekranı yok (`docs/EFATURA_SETUP.md`). TASK-MTRJSOWFH6B45 insan aksiyonu bekliyor                                                                                  | Pilot ücretsiz yürür (ADR-0004, ADR-0007). Ücretli geçiş tarihi e-Fatura açılmadan verilmez                                                                                                   |
 | R5  | Radar/karne gecikmesi              | İki kart bitmezse hafta 1–2 yapılamaz                                                                                                                                                                                  | Başlangıç tarihi iki kartın `done` olmasına bağlı                                                                                                                                             |
 | R6  | Program uygunluğu hatası           | Türkiye'nin katılmadığı bir programa (ör. CERV) emek harcanır                                                                                                                                                          | Her aday çağrıda ülke uygunluğu resmî listeden doğrulanır (§3)                                                                                                                                |
 | R7  | Tek kişiye bağımlılık              | AB biriminde tek kişi ayrılırsa pilot durur                                                                                                                                                                            | En az 2 koltuk AB biriminde; kiracı yöneticisi yetkisi 2 kişide                                                                                                                               |
@@ -161,4 +163,4 @@ Erişim tarihi: 29.09.2026 (tümü).
 - **[K8]** European Commission, "EU Grants: List of participating countries (LIFE)", V10.0 – 01.03.2026 (Türkiye listede yok): <https://ec.europa.eu/info/funding-tenders/opportunities/docs/2021-2027/life/guidance/list-3rd-country-participation_life_en.pdf>
 - **[K4]** Erasmus+ Programme Guide, Part A — Eligible countries (Türkiye, programa ortak üçüncü ülkeler arasında): <https://erasmus-plus.ec.europa.eu/programme-guide/part-a/eligible-countries>
 - **[K5]** Erasmus+ Programme Guide, Part B — Small-scale partnerships (30.000 € / 60.000 € sabit tutar; en az 2 kurum, 2 ülke; 6–24 ay; Ulusal Ajansa başvuru; 5 Mart 12:00): <https://erasmus-plus.ec.europa.eu/programme-guide/part-b/key-action-2/small-scale-partnerships>
-- İç kaynaklar: `docs/BUSINESS_MODEL.md` §5.1 (plan içerikleri, koltuk sayıları), `docs/adr/ADR-0004-public-sector-segment-priority.md`, `docs/EFATURA_SETUP.md`, `docs/legal/processing-register.md`, `docs/legal/privacy-notice-gap-analysis.md`, `docs/BETA_GUIDE.md`.
+- İç kaynaklar: `docs/BUSINESS_MODEL.md` §5.1 (plan içerikleri, koltuk sayıları), `docs/adr/ADR-0004-public-sector-segment-priority.md`, `docs/adr/ADR-0007-ilkadim-free-pilot.md`, `docs/EFATURA_SETUP.md`, `docs/legal/processing-register.md`, `docs/legal/privacy-notice-gap-analysis.md`, `docs/BETA_GUIDE.md`.
