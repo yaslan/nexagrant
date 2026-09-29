@@ -43,3 +43,18 @@ export async function readRegistrationReadiness(): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * Single use (İNCELEME-12 Ö-1, TASK-MUM74FUB1DRCM): called by `createUser` right
+ * after the value is read. Left in place, a scorecard result parked for a sign-up that was
+ * abandoned at the consent screen landed on the next registration in the same
+ * browser within 15 minutes.
+ */
+export async function clearRegistrationReadinessCookie(): Promise<void> {
+  try {
+    const jar = await cookies();
+    jar.delete(REGISTRATION_READINESS_COOKIE);
+  } catch {
+    // No request context: nothing to clear.
+  }
+}

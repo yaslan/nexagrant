@@ -86,3 +86,34 @@ oluşta taze satır açılır.
       alarmların önünden iter (TASK-MTVFWYKIZXRB1: 268 satırın 234'ü böyleydi).
       Kapı `test:e2e`'den SONRA koşar; kırmızıysa hangi fixture'ın sızdırdığını
       yazar.
+
+## 4. Bilinen pencere: zincir koşarken davet kodu reddi (İNCELEME-12 K-6)
+
+`scripts/apply-migrations.sh` her yayında `apply-order.txt`'in **tamamını**
+baştan koşar. 23. dosya `add-agency-invite-code.sql`,
+`redeem_agency_invite()`'ın ilk gövdesini (`"usedCount" < "maxUses"`) yeniden
+yazar. Bu gövdeyi 30. dosya `agency-invite-no-max-uses.sql` kaldırır. İki dosya
+arasında, eski gövde geçerlidir:
+
+- `maxUses = NULL` olan her kod (TASK-MUM4WVYLSH9IT'ten sonra üretilen bütün
+  kodlar) reddedilir, çünkü `< NULL` sonucu NULL'dır. O anda kayıt olan kişi
+  "davet kodu geçersiz" mesajını görür; kod harcanmaz, kişi yeniden deneyebilir.
+- Eski sınırı olan ve sınırın üstünde kullanılmış bir kod o arada reddedilirse,
+  denetim kaydına `reason = 'exhausted'` düşebilir. Bu değer panelde gösterilmez.
+
+Ölçüm (TASK-MUM74FUB1DRCM, yerel Postgres, docker): 23.-30. dosyalar
+**1,2 sn** sürdü, dosya başına 0,08-0,10 sn. Aynı davranış bir `BEGIN … ROLLBACK`
+işlemi içinde kanıtlandı: zincirin sonunda kod kabul ediliyor, 23. dosyadan sonra
+reddediliyor, 30. dosyadan sonra yeniden kabul ediliyor.
+
+- [ ] Zinciri düşük trafik saatinde koşun. Pilotta kayıtlar ajans davetleriyle
+      geldiği için kampanya e-postasının gittiği saatten kaçının.
+- [ ] Zincir yarıda kesilirse (`ON_ERROR_STOP`), 30. dosya uygulanana kadar
+      pencere **açık kalır**. Hatayı giderip zinciri bitirmeden yayını bitmiş
+      saymayın. Kontrol:
+      `SELECT prosrc LIKE '%maxUses%' FROM pg_proc WHERE proname = 'redeem_agency_invite';`
+      sorgusu `false` dönmeli.
+
+Pencereyi tamamen kapatmanın yolu, 23. dosyanın fonksiyonu yalnız hiç yokken
+oluşturmasıdır. Bu bir migration değişikliği olduğu için ayrı bir kartta
+yapılmalıdır. Bu not yalnız bugünkü davranışı anlatıyor.

@@ -48,3 +48,18 @@ export async function readRegistrationProvince(): Promise<TrProvince | null> {
     return null;
   }
 }
+
+/**
+ * Single use (İNCELEME-12 Ö-1, TASK-MUM74FUB1DRCM): called by `createUser` right
+ * after the value is read. Left in place, a province parked for a sign-up that was
+ * abandoned at the consent screen landed on the next registration in the same
+ * browser within 15 minutes.
+ */
+export async function clearRegistrationProvinceCookie(): Promise<void> {
+  try {
+    const jar = await cookies();
+    jar.delete(REGISTRATION_PROVINCE_COOKIE);
+  } catch {
+    // No request context: nothing to clear.
+  }
+}

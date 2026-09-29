@@ -625,6 +625,14 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
     });
   }
 
+  /**
+   * İNCELEME-12 K-5 (TASK-MUM74FUB1DRCM): each seed takes 0.6-0.7 s on an idle
+   * machine but 5.4-6.1 s under load, past vitest's 5 s default, so a busy CI
+   * runner reported a leak gate as red with no leak. The bound is generous on
+   * purpose: a genuine hang still fails, a slow runner does not.
+   */
+  const PROPERTY_TIMEOUT_MS = 30_000;
+
   // D ≥ 0: the attacker does not know how many organisations left. D = 0 (TASK-MUM2RMN3YIBGC,
   // crw-fb Ö-1): it knows none did — the pilot's usual case. Every seed runs in both, with
   // codes spread at random and with codes handed out one after another.
@@ -652,7 +660,7 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
             for (const l of leaks.slice(0, 2)) found.push(`#${k} ${l.target}=${l.truth} ∈ [${l.lo}, ${l.hi}]`);
           }
           expect(found, `${tablesWithLeak}/300 tables leak`).toEqual([]);
-        });
+        }, PROPERTY_TIMEOUT_MS);
       }
     }
   }

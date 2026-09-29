@@ -58,6 +58,8 @@ let lib: {
   codes: typeof import('../src/lib/agency/codes');
   db: typeof import('../src/lib/db');
   ack: typeof import('../src/lib/legal/registration-ack-cookie');
+  province: typeof import('../src/lib/registration-province-cookie');
+  readiness: typeof import('../src/lib/registration-readiness-cookie');
 };
 
 let ready = false;
@@ -169,6 +171,8 @@ beforeAll(async () => {
     codes: await import('../src/lib/agency/codes'),
     db: await import('../src/lib/db'),
     ack: await import('../src/lib/legal/registration-ack-cookie'),
+    province: await import('../src/lib/registration-province-cookie'),
+    readiness: await import('../src/lib/registration-readiness-cookie'),
   };
   admin = lib.db.createDbClient(env.admin);
   try {
@@ -393,5 +397,86 @@ describe('OAuth registration with an agency invite code (fake provider, fabrika_
     const docs = await admin!.consent.findMany({ where: { userId: user!.id }, select: { documentId: true } });
     expect(docs.map((d) => d.documentId).sort()).toEqual(['privacy-notice', 'terms-of-service']);
     expect(jar.has(lib.ack.REGISTRATION_ACK_COOKIE)).toBe(false);
+  });
+});
+
+/**
+ * İNCELEME-12 Ö-1 (TASK-MUM74FUB1DRCM) — the province and scorecard cookies are
+ * single use, and Auth.js's own sign-in page no longer starts a flow past
+ * loginWithSocialAction.
+ */
+describe('registration choice cookies are single use (İNCELEME-12 Ö-1)', () => {
+  const READINESS = 'municipality.012120201012120';
+
+  function parkChoices() {
+    jar.set(lib.province.REGISTRATION_PROVINCE_COOKIE, encodeURIComponent('Ankara'));
+    jar.set(lib.readiness.REGISTRATION_READINESS_COOKIE, READINESS);
+  }
+  const choicesLeft = () =>
+    [lib.province.REGISTRATION_PROVINCE_COOKIE, lib.readiness.REGISTRATION_READINESS_COOKIE].filter((n) => jar.has(n));
+
+  test('shared browser: A parks a result, B registers, C registers next — only B gets it', async () => {
+    // A ticked the box and gave up at Google's consent screen: the cookies
+    // are parked, no account exists.
+    parkChoices();
+
+    // B registers in the same browser within 15 minutes.
+    const b = newEmail('choice-b');
+    jar.set(lib.ack.REGISTRATION_ACK_COOKIE, lib.consent.registrationAcknowledgementToken());
+    const resB = await callback('google', { sub: `${RUN}-cb`, email: b, email_verified: true });
+    expect(resB.location ?? '').not.toContain('error=');
+    const tenantB = (await userByEmail(b))!.memberships[0]!.tenant;
+    expect(tenantB.province).toBe('Ankara');
+    expect((tenantB.settings as { readiness?: { code: string } }).readiness?.code).toBe(READINESS);
+    expect(choicesLeft()).toEqual([]);
+
+    // C registers next, without choosing anything: nothing carries over.
+    const c = newEmail('choice-c');
+    jar.set(lib.ack.REGISTRATION_ACK_COOKIE, lib.consent.registrationAcknowledgementToken());
+    const resC = await callback('google', { sub: `${RUN}-cc`, email: c, email_verified: true });
+    expect(resC.location ?? '').not.toContain('error=');
+    const tenantC = (await userByEmail(c))!.memberships[0]!.tenant;
+    expect(tenantC.province).toBeNull();
+    expect((tenantC.settings as { readiness?: unknown }).readiness).toBeUndefined();
+  });
+
+  test('invite-code registration: the choices land on the tenant and the cookies are gone', async () => {
+    const { code } = await makeCode();
+    const email = newEmail('choice-invite');
+    parkInvite(code, lib.consent.registrationAcknowledgementToken({ agency: true }));
+    parkChoices();
+    const res = await callback('google', { sub: `${RUN}-ci`, email, email_verified: true });
+    expect(res.location ?? '').not.toContain('error=');
+    const tenant = (await userByEmail(email))!.memberships[0]!.tenant;
+    expect(tenant.agencyId).toBe(agencyId);
+    expect(tenant.province).toBe('Ankara');
+    expect(choicesLeft()).toEqual([]);
+  });
+
+  test('a refused invite registration spends them too', async () => {
+    const email = newEmail('choice-refused');
+    parkInvite('ZZZZ-ZZZZ-ZZZZ', lib.consent.registrationAcknowledgementToken());
+    parkChoices();
+    // Refused in the signIn callback (no addendum): the adapter never runs.
+    const res = await callback('google', { sub: `${RUN}-cr`, email, email_verified: true });
+    expect(res.location).toMatch(/error=disclosure_required$/);
+    expect(await userByEmail(email)).toBeNull();
+    expect(choicesLeft()).toEqual([]);
+  });
+
+  test('linking to an existing account spends them', async () => {
+    const email = newEmail('choice-link');
+    await admin!.user.create({ data: { email, name: 'Existing' } });
+    parkChoices();
+    const res = await callback('google', { sub: `${RUN}-cl`, email, email_verified: true });
+    expect(res.location ?? '').not.toContain('error=');
+    expect(choicesLeft()).toEqual([]);
+  });
+
+  test("Auth.js's own sign-in page redirects to /tr/giris", async () => {
+    const { handlers } = NextAuthFn!({ ...authConfig!, providers: [fakeProvider('google')] } as never);
+    const res = await handlers.GET(new NextRequestCtor!('http://localhost:3000/api/auth/signin'));
+    expect(res.status).toBe(302);
+    expect(new URL(res.headers.get('location')!, 'http://localhost:3000').pathname).toBe('/tr/giris');
   });
 });

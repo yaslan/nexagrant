@@ -14,8 +14,8 @@ import {
   clearRegistrationAcknowledgementCookie,
   readRegistrationAcknowledgement,
 } from './legal/registration-ack-cookie';
-import { readRegistrationProvince } from './registration-province-cookie';
-import { readRegistrationReadiness } from './registration-readiness-cookie';
+import { clearRegistrationProvinceCookie, readRegistrationProvince } from './registration-province-cookie';
+import { clearRegistrationReadinessCookie, readRegistrationReadiness } from './registration-readiness-cookie';
 import { readinessSettings, toReadinessCode } from './readiness/account';
 import { toTenantProvince } from './province';
 import { recordAlert } from './observability/system-alert';
@@ -122,6 +122,19 @@ const baseAdapter = PrismaAdapter(prisma);
  */
 const createdByAdapter = new Map<string, 'pending' | 'bootstrapped'>();
 
+/**
+ * İNCELEME-12 Ö-1 (TASK-MUM74FUB1DRCM) — the province and scorecard cookies are
+ * single use, like the invite and acknowledgement cookies. Each `createUser`
+ * that could read them clears them straight after, whether or not the
+ * registration then succeeds. They used to be only read, so a result parked
+ * for a sign-up abandoned at Google's consent screen stayed for 15 minutes and
+ * was written onto whichever account registered next in that browser.
+ */
+async function clearRegistrationChoiceCookies(): Promise<void> {
+  await clearRegistrationProvinceCookie();
+  await clearRegistrationReadinessCookie();
+}
+
 const safeAdapter: Adapter = {
   ...baseAdapter,
   async createUser(user: AdapterUser) {
@@ -134,14 +147,18 @@ const safeAdapter: Adapter = {
     if (invite.status === 'ok') {
       if (!acknowledgementMatchesCurrent(invite.invite.acknowledgement, { agency: true })) {
         await clearRegistrationInviteCookie();
+        await clearRegistrationChoiceCookies();
         throw new Error('registration refused: agency addendum not acknowledged');
       }
+      const province = await readRegistrationProvince();
+      const readiness = await readRegistrationReadiness();
+      await clearRegistrationChoiceCookies();
       try {
         const created = await registerOAuthUserWithInvite(prisma, {
           user,
           code: invite.invite.code,
-          province: await readRegistrationProvince(),
-          readiness: await readRegistrationReadiness(),
+          province,
+          readiness,
         });
         createdByAdapter.set(created.id, 'bootstrapped');
         return created as AdapterUser;
@@ -262,6 +279,15 @@ export const authConfig = {
   // MissingSecret check. Startup refuses to run without it (src/instrumentation.ts).
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   basePath: "/api/auth",
+  pages: {
+    // İNCELEME-12 Ö-1 (TASK-MUM74FUB1DRCM) — ADR-0006: an OAuth sign-in starts
+    // only from loginWithSocialAction, which writes or clears every registration
+    // cookie first. Without this, `GET /api/auth/signin` rendered Auth.js's own
+    // page, whose buttons start Google/Microsoft past that action. Auth.js now
+    // redirects that page here, and its sign-in errors (OAuthAccountNotLinked,
+    // OAuthCallbackError, …) land here as `?error=<type>` too.
+    signIn: "/tr/giris",
+  },
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID,
@@ -550,7 +576,11 @@ export const authConfig = {
           clearInvite: clearRegistrationInviteCookie,
         }
       );
-      return decision.allow ? true : decision.redirect;
+      if (decision.allow) return true;
+      // A refused registration is over; the next one starts from
+      // loginWithSocialAction again (İNCELEME-12 Ö-1).
+      await clearRegistrationChoiceCookies();
+      return decision.redirect;
     },
     async jwt({ token, user, trigger }) {
       if (user) {
@@ -660,7 +690,12 @@ export const authConfig = {
       // consent rows in one transaction.
       const created = createdByAdapter.get(userId);
       createdByAdapter.delete(userId);
-      if (created !== 'pending') return;
+      if (created !== 'pending') {
+        // A linked existing account uses none of them; they are spent anyway,
+        // so they cannot wait here for the next registration.
+        await clearRegistrationChoiceCookies();
+        return;
+      }
 
       // TASK-MTSWLANXSU0IG (A3) — the OAuth half of registration. Read before
       // the transaction opens: `cookies()` wants the request context, and
@@ -670,6 +705,7 @@ export const authConfig = {
       const province = await readRegistrationProvince();
       // FB KAMU B6 — the scorecard result, parked only when the box was ticked.
       const readiness = await readRegistrationReadiness();
+      await clearRegistrationChoiceCookies();
 
       try {
         await prisma.$transaction((tx) =>
