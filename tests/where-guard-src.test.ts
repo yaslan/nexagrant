@@ -41,6 +41,7 @@ const KNOWN: Record<string, string> = {
   'src/lib/k3-topic-stats/importer.ts topicId: p.topicId': 'importer row, as above',
   'src/lib/k3-topic-stats/importer.ts country: p.country': 'importer row, as above',
   'src/lib/k3-topic-stats/importer.ts orgType: p.orgType': 'importer row, as above',
+  'src/lib/invitations/accept.ts gt: now': 'both callers pass `input.now ?? new Date()`; a Date, never undefined',
   'src/modules/m10/server/actions.ts followupDocId: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts id: existing.id': DB_ROW,
 };

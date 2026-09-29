@@ -31,6 +31,7 @@
 import type { Prisma, PrismaClient, Role, User } from '@prisma/client';
 
 import { withTenant } from '@/lib/db';
+import { isPresentId } from '@/lib/required-id';
 import { getPilotState } from '@/lib/billing/pilot';
 import { bindTransactionToTenant, writeRegistrationConsent } from '@/lib/legal/registration-consent';
 import { hashSecretToken, secretTokenMatches } from '@/lib/secret-token';
@@ -175,6 +176,9 @@ export async function acceptInvitationIn(
   core: AcceptInvitationCore
 ): Promise<'accepted' | 'already_member' | 'lost'> {
   const { invitationId, tokenHash, tenantId, userId, now } = core;
+  // A missing key would drop out of the UPDATE below and spend every pending
+  // invitation of the tenant (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(invitationId) || !isPresentId(tokenHash) || !isPresentId(tenantId)) return 'lost';
   const claimed = await tx.invitation.updateMany({
     where: { id: invitationId, tenantId, tokenHash, acceptedAt: null, expires: { gt: now } },
     data: { acceptedAt: now },

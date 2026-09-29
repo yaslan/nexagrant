@@ -16,7 +16,7 @@ const CHECKED_METHODS = new Set(['deleteMany', 'updateMany', 'updateManyAndRetur
 const GUARD_CALLS = new Set(['requireId', 'requireActionId']);
 /** `f(x, …)` as a statement that throws on a missing `x`. */
 const ASSERT_CALLS = new Set(['requireId', 'requireActionId', 'assertTenantScope']);
-/** `if (!f(x)) return|throw` — a present-id predicate. */
+/** `if (!f(x)) return|throw` — a present-id predicate. A bare `if (!x)` counts too. */
 const PREDICATE_CALLS = new Set(['isPresentId']);
 /** `withTenant(t, cb)` / `withTenantOn(client, t, cb)` throw on a missing `t` before `cb` runs. */
 const TENANT_WRAPPERS = new Map([
@@ -184,6 +184,8 @@ export function unguardedWheres(source: string, fileName: string): string[] {
       const t = unwrap(term);
       if (!ts.isPrefixUnaryExpression(t) || t.operator !== ts.SyntaxKind.ExclamationToken) return false;
       const call = unwrap(t.operand);
+      // `if (!id) continue;` — undefined, null and '' are all falsy.
+      if (call.getText(sf) === text) return true;
       return (
         ts.isCallExpression(call) &&
         ts.isIdentifier(call.expression) &&
@@ -201,7 +203,9 @@ export function unguardedWheres(source: string, fileName: string): string[] {
     return [e];
   }
   function exits(s: ts.Statement): boolean {
-    if (ts.isReturnStatement(s) || ts.isThrowStatement(s)) return true;
+    if (ts.isReturnStatement(s) || ts.isThrowStatement(s) || ts.isContinueStatement(s) || ts.isBreakStatement(s)) {
+      return true;
+    }
     return ts.isBlock(s) && s.statements.length > 0 && exits(s.statements[s.statements.length - 1]!);
   }
 
@@ -261,7 +265,11 @@ export function unguardedWheres(source: string, fileName: string): string[] {
     const list = decls.get(name);
     if (!list || list.length === 0) return bindingIsTrusted(name, next); // parameter, import, or unknown
     if (reassigned.has(name)) return false;
-    return list.every((d) => isConstDecl(d) && !!d.initializer && valueIsSafe(d.initializer, next, null));
+    // The declaration in scope at `at` when several functions reuse the name; all of them otherwise.
+    const visible = declAt(name, at);
+    return (visible ? [visible] : list).every(
+      (d) => isConstDecl(d) && !!d.initializer && valueIsSafe(d.initializer, next, null)
+    );
   }
 
   /** `key` is the property the value sits under; it decides what an array literal means. */

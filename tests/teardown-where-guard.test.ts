@@ -31,8 +31,9 @@ const REPO_ROOT = path.resolve(__dirname, '..');
  *   - a nested object literal whose own values follow these rules;
  *   - `requireId(x, label)` / `presentIds([...])` (the latter only under `in`)
  *     from tests/helpers/teardown-guard, `requireActionId` from src/lib/required-id;
- *   - a name checked earlier in an enclosing block by `if (!isPresentId(x))
- *     return|throw` or `requireId(x, …);` / `assertTenantScope(x, …);`;
+ *   - a name checked earlier in an enclosing block by `if (!isPresentId(x))`
+ *     or `if (!x)` followed by return / throw / continue / break, or by
+ *     `requireId(x, …);` / `assertTenantScope(x, …);`;
  *   - inside `withTenant(t, cb)`, the same `t` (withTenant asserts it first);
  *   - a field destructured from `requireTenantAction()` / `requireTenantApi()`
  *     / `sessionScope()` — the session, not the client;
@@ -168,6 +169,12 @@ describe('test teardowns cannot run a filterless deleteMany/updateMany', () => {
       async function persist(tx, c: { id: string; tenantId: string }) {
         if (c.score === null || !isPresentId(c.id) || !isPresentId(c.tenantId)) return false;
         await tx.opportunity.updateMany({ where: { id: c.id, tenantId: c.tenantId } });
+      }
+      async function sweep(userIds: (string | undefined)[]) {
+        for (const id of userIds) {
+          if (!id) continue;
+          await admin.consent.deleteMany({ where: { userId: id } });
+        }
       }
       async function prune() {
         const cutoff = new Date();
