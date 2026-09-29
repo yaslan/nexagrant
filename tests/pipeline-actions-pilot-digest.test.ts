@@ -27,6 +27,13 @@ vi.mock('@/lib/billing/pilot', async (importOriginal) => {
     }),
   };
 });
+// İNCELEME-30 B-1: the matcher deletes and rewrites a seat's candidates. Reaching
+// it at all on an expired pilot is the bug, so it throws a different error.
+vi.mock('@/modules/m8/server/matching', () => ({
+  generateSeatCandidates: vi.fn(async () => {
+    throw new Error('the matcher must not run for a refused write');
+  }),
+}));
 vi.mock('@/lib/db', () => {
   const unreachable = () => {
     throw new Error('the database must not be reached for a refused write');
@@ -46,6 +53,12 @@ import {
   logEffort,
   moveOpportunityStage,
 } from '@/app/[locale]/(app)/[workspace]/pipeline/actions';
+import {
+  assignCandidateToSeat,
+  computeSeatCandidates,
+  computeSeatCandidatesForm,
+} from '@/modules/m8/server/actions';
+import { generateSeatCandidates } from '@/modules/m8/server/matching';
 
 beforeEach(() => {
   session.current = { user: { id: 'u-1' }, tenantId: 't-1', role: 'TENANT_OWNER' };
@@ -70,5 +83,38 @@ describe('pipeline write actions: an expired pilot leaves with the PILOT_EXPIRED
     );
     expect(err).toBeInstanceOf(PilotExpiredError);
     expect((err as { digest?: string }).digest).toBe(PILOT_EXPIRED_DIGEST);
+  });
+});
+
+/**
+ * İNCELEME-30 B-1/B-2 (TASK-MUN39FIAKFY2R) — the M8 matching writes. "Aday Bul"
+ * was marked `readOnly`, so an expired pilot skipped the gate and the matcher
+ * deleted and rewrote the seat's candidates. The gate must run before any read.
+ */
+const M8_WRITES: Array<[string, () => Promise<unknown>]> = [
+  ['computeSeatCandidates', () => computeSeatCandidates('o-1', 's-1')],
+  ['assignCandidateToSeat', () => assignCandidateToSeat('s-1', '999', 'INVITED', 'o-1')],
+];
+
+describe('M8 matching write actions: an expired pilot is refused before anything runs', () => {
+  test.each(M8_WRITES)('%s', async (_name, call) => {
+    const err = await call().then(
+      (value) => ({ resolved: value }),
+      (e: unknown) => e
+    );
+    expect(err).toBeInstanceOf(PilotExpiredError);
+    expect((err as { digest?: string }).digest).toBe(PILOT_EXPIRED_DIGEST);
+    expect(vi.mocked(generateSeatCandidates)).not.toHaveBeenCalled();
+  });
+
+  test('computeSeatCandidatesForm answers the pilot code, not an error message', async () => {
+    const fd = new FormData();
+    fd.set('opportunityId', 'o-1');
+    fd.set('seatId', 's-1');
+    await expect(computeSeatCandidatesForm({ status: 'idle' }, fd)).resolves.toEqual({
+      status: 'error',
+      code: 'pilotExpired',
+    });
+    expect(vi.mocked(generateSeatCandidates)).not.toHaveBeenCalled();
   });
 });

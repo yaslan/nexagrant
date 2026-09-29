@@ -20,6 +20,10 @@ import enMessages from '../messages/en.json';
  *   handlers on the calls page use the same three lines);
  * - B-3: the session-less partner portal, whose action only answers
  *   `{ success: false }`.
+ *
+ * İNCELEME-30 (TASK-MUN39FIAKFY2R) adds M8 matching: "Aday Bul" (a
+ * value-returning form action, `code: 'pilotExpired'`) and "Davet Et" (was an
+ * inline server-component form that only logged the refusal).
  */
 
 const pilot = vi.hoisted(() => ({ expired: false }));
@@ -45,6 +49,10 @@ vi.mock('@/modules/m11/server/actions', () => ({
   restoreSectionRevision: vi.fn(),
   updatePresenceHeartbeat: vi.fn(async () => []),
   generateSectionDraftAi: vi.fn(),
+}));
+vi.mock('@/modules/m8/server/actions', () => ({
+  computeSeatCandidatesForm: vi.fn(),
+  assignCandidateToSeat: vi.fn(),
 }));
 vi.mock('@/modules/m11/server/partner-link', () => ({ issuePartnerPortalLink: vi.fn() }));
 vi.mock('@/lib/system-scope', () => ({
@@ -77,6 +85,9 @@ import { PartBCollaborativeEditor } from '@/modules/m11/ui/PartBCollaborativeEdi
 import MembersSettingsPage from '@/app/[locale]/(app)/[workspace]/settings/members/page';
 import CallsPage from '@/app/[locale]/(app)/[workspace]/calls/page';
 import PartnerPortalPage from '@/app/[locale]/portal/partner/[token]/page';
+import { assignCandidateToSeat, computeSeatCandidatesForm } from '@/modules/m8/server/actions';
+import FindCandidatesButton from '@/modules/m8/components/find-candidates-button';
+import InviteCandidateButton from '@/modules/m8/components/invite-candidate-button';
 
 const PILOT_TR = trMessages.Common.pilotExpired;
 const PILOT_EN = enMessages.Common.pilotExpired;
@@ -208,5 +219,32 @@ describe('B-3: partner portal', () => {
     render(await page());
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByRole('button', { name: trMessages.partner_portal.submit_button }).matches(':disabled')).toBe(false);
+  });
+});
+
+describe('İNCELEME-30: M8 matching', () => {
+  test('"Aday Bul": a pilot refusal says the pilot ended; any other failure keeps its own sentence', async () => {
+    vi.mocked(computeSeatCandidatesForm).mockResolvedValueOnce({ status: 'error', code: 'pilotExpired' });
+    render(withIntl(<FindCandidatesButton opportunityId="o-1" seatId="s-1" />));
+    fireEvent.click(screen.getByRole('button', { name: trMessages.Consortium.findCandidates }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(PILOT_TR));
+
+    vi.mocked(computeSeatCandidatesForm).mockResolvedValueOnce({ status: 'error', message: 'Seat not found.' });
+    fireEvent.click(screen.getByRole('button', { name: trMessages.Consortium.findCandidates }));
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe(`${trMessages.Consortium.computeFailed} Seat not found.`)
+    );
+  });
+
+  test('"Davet Et" (en): a refused invite shows the pilot sentence instead of nothing; other failures stay silent', async () => {
+    vi.mocked(assignCandidateToSeat).mockRejectedValueOnce(refused());
+    render(withIntl(<InviteCandidateButton seatId="s-1" organizationId="999" opportunityId="o-1" />, 'en'));
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Consortium.invite }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(PILOT_EN));
+    expect(vi.mocked(assignCandidateToSeat)).toHaveBeenCalledWith('s-1', '999', 'INVITED', 'o-1');
+
+    vi.mocked(assignCandidateToSeat).mockRejectedValueOnce(Object.assign(new Error('x'), { digest: '4242' }));
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Consortium.invite }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   });
 });

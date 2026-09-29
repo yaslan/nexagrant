@@ -4,6 +4,7 @@ import { withTenant } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 import { requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
+import { PILOT_EXPIRED_CODE, isPilotExpired, type PilotExpiredCode } from '@/lib/pilot-expired';
 import { revalidatePath } from 'next/cache';
 import { generateSeatCandidates } from './matching';
 
@@ -22,7 +23,10 @@ import { generateSeatCandidates } from './matching';
 const MATCHING_PATH = '/[locale]/(app)/[workspace]/opportunities/[id]/matching';
 
 export async function computeSeatCandidates(opportunityId: string, seatId: string) {
-  const { tenantId } = await requireTenantAction({ readOnly: true });
+  // Not `readOnly`: the matcher deletes the seat's candidates and writes new
+  // ones (`runSeatMatch`), so an expired pilot is refused here, before anything
+  // is read or deleted (İNCELEME-30 B-1, TASK-MUN39FIAKFY2R).
+  const { tenantId } = await requireTenantAction();
   // Client-supplied: with `seatId` undefined the lookup below matches any seat
   // and the rewrite clears every seat's candidates (TASK-MUMSUA77J1C6Q).
   if (!isPresentId(seatId) || !isPresentId(opportunityId)) {
@@ -127,6 +131,8 @@ export interface SeatCandidateFormState {
   status: 'idle' | 'ok' | 'error';
   message?: string;
   count?: number;
+  /** Set for a pilot refusal: the button shows `Common.pilotExpired` instead of `message`. */
+  code?: PilotExpiredCode;
 }
 
 export async function computeSeatCandidatesForm(
@@ -144,6 +150,9 @@ export async function computeSeatCandidatesForm(
     const created = await computeSeatCandidates(opportunityId, seatId);
     return { status: 'ok', count: created.length };
   } catch (e) {
+    // The refusal is caught here, so its digest never reaches the browser;
+    // the code is what tells the button to say "pilot ended".
+    if (isPilotExpired(e)) return { status: 'error', code: PILOT_EXPIRED_CODE };
     return { status: 'error', message: errorMessage(e) };
   }
 }

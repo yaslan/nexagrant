@@ -2,9 +2,8 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { assignCandidateToSeat } from '@/modules/m8/server/actions';
 import FindCandidatesButton from '@/modules/m8/components/find-candidates-button';
-import { errorMessage } from '@/lib/errors';
+import InviteCandidateButton from '@/modules/m8/components/invite-candidate-button';
 import { moduleGate } from '@/lib/modules/guard';
 import type { MatchBreakdown } from '@/modules/m8/server/matching';
 
@@ -218,22 +217,16 @@ export default async function MatchingPage({
                               </details>
                             </td>
                             <td className="py-2 px-4">
-                              <form action={async () => {
-                                'use server';
-                                // SeatCandidate.organizationId is nullable in the
-                                // schema even though the scorer always writes one.
-                                // Assigning a seat to nothing is not an invite.
-                                if (!c.organizationId) return;
-                                try {
-                                  await assignCandidateToSeat(seat.id, c.organizationId, 'INVITED', opp.id);
-                                } catch (e) {
-                                  console.error(errorMessage(e));
-                                }
-                              }}>
-                                <button type="submit" className="min-h-11 text-xs bg-surface hover:bg-surface-hover dark:bg-gray-800 dark:hover:bg-gray-700 text-ink border border-border px-2 py-1 rounded">
-                                  {t('invite')}
-                                </button>
-                              </form>
+                              {/* SeatCandidate.organizationId is nullable in the
+                                  schema even though the scorer always writes one.
+                                  Assigning a seat to nothing is not an invite. */}
+                              {c.organizationId && (
+                                <InviteCandidateButton
+                                  seatId={seat.id}
+                                  organizationId={c.organizationId}
+                                  opportunityId={opp.id}
+                                />
+                              )}
                             </td>
                           </tr>
                         );
