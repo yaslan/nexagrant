@@ -1,27 +1,39 @@
 # FonBridge — Veriniz nerede? (kamu kurumları için tek sayfa)
 
-> Sürüm 1.0 · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MULRS7WKYEFOP (FB-KAMU-2, B9)
+> Sürüm 1.2 · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MULRS7WKYEFOP (FB-KAMU-2, B9); 1.1: TASK-MUN2UXWTAX1AQ (barındırma kararı: Vulut, Türkiye); 1.2: TASK-MUN2PNAR729H8 (e-posta: `info@fonbridge.com`, sunucu `mail.fonbridge.com`, alan adı `fonbridge.com`)
 >
-> **Durum: TASLAK.** Pilot görüşmesinden önce patron okur. Her satırın kaynağı sağ sütundadır; "K" kodları sonuç raporundaki (`docs/agent-results/TASK-MULRS7WKYEFOP-cs-fb.md`) envanter satırlarıdır. Koddan ya da sağlayıcının resmî belgesinden doğrulayamadığımız her şey **[DOĞRULANMADI]** diye işaretlidir. Bu belgede "tüm veri AB'de" ya da "veri Türkiye'de" demiyoruz, çünkü bugün ikisi de doğru değil.
+> **Durum: TASLAK.** Pilot görüşmesinden önce patron okur. Her satırın kaynağı sağ sütundadır; "K" kodları sonuç raporundaki (`docs/agent-results/TASK-MULRS7WKYEFOP-cs-fb.md`) envanter satırlarıdır. Koddan ya da sağlayıcının resmî belgesinden doğrulayamadığımız her şey **[DOĞRULANMADI]** diye işaretlidir. **1.1 (29.09.2026):** barındırma kararı verildi. Veritabanı, uygulama sunucusu, iş kuyruğu ve e-posta sunucusu Türkiye'de (Vulut). Yurt dışına giden akışlar aşağıda ayrı ve açık yazılıdır. Bu yüzden "tüm veri Türkiye'de" demiyoruz; "veritabanı Türkiye'de" diyoruz.
 
 ## Kısa cevap
 
-1. **Evet, bazı veriler yurt dışına gidiyor.** Bugün hiçbir veri için "Türkiye'de kalır" diyemiyoruz.
-2. **En büyük akış yapay zekâdır (YZ).** Konsept not yazdırdığınızda metin ABD merkezli sağlayıcılara gider. YZ modüllerini kapatırsanız bu akış durur (aşağıda "YZ'siz çalışma").
-3. **Veritabanının ve dosyaların hangi ülkede durduğu kodda sabit değil**, hesap ayarına bağlı. Bunu görüşmeden önce doğrulayıp yazılı vereceğiz.
+1. **Veritabanı Türkiye'de.** Hesaplar, ekip, çağrı listesi, konsept not metinleri, karne, zamanlanmış işler ve e-posta sunucusu, Türkiye'de Vulut'ta durur. Vulut, Bilgi Teknolojileri ve İletişim Kurumu (BTK) lisansıyla çalışan bir yer sağlayıcı ve hosting firmasıdır (patron kararı, 29.09.2026).
+2. **Yurt dışına giden üç akış kalıyor** (aşağıda "Yurt dışına giden akışlar"): YZ metin üretimi (Anthropic, ABD), arama için metin vektörü (OpenAI, ABD) ve Google ile giriş (Google, ABD). YZ modüllerini kapatırsanız ilk ikisi durur (aşağıda "YZ'siz çalışma"). Google ile giriş tek giriş yoludur, kapatılamaz.
+3. **Yüklenen dosyaların deposu (Cloudflare R2) bu kararın dışında.** Deponun bölgesi hesap ayarına bağlı ve henüz doğrulanmadı (aşağıdaki tablo, madde 2).
 
 ## Hangi veri nereye gidiyor?
 
 | Veri                                                          | Nereye gidiyor                                                                | Hangi ülke / bölge                                                                                                       | Kaynak                                                                 |
 | ------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| Hesaplar, ekip, çağrı listesi, konsept not metinleri, karne   | Postgres veritabanı                                                           | **[DOĞRULANMADI]** Barındırma firması ve bölgesi repoda yazılı değil (planda Neon/Vercel geçiyor, bölge yok)             | K1                                                                     |
+| Hesaplar, ekip, çağrı listesi, konsept not metinleri, karne, zamanlanmış işler | Postgres veritabanı ve uygulama sunucusu, Vulut'ta. İş kuyruğu (graphile-worker) ayrı bir bağlantı (`JOBS_DATABASE_URL`) verilmezse aynı veritabanındadır | **Türkiye.** Vulut, BTK lisanslı yer sağlayıcı (patron kararı 29.09.2026, TASK-MUN2UXWTAX1AQ). Yurt dışı aktarım değil. Planda geçen Neon/Vercel seçilmedi | K1 · `src/lib/env.ts:43-45` · envanter §21 |
 | Yüklediğiniz dosyalar (kanıt belgeleri, ekran görüntüleri)    | Cloudflare R2 dosya deposu                                                    | **[DOĞRULANMADI]** Kod, "AB yargı yetkisi" olan bir depo kullanmıyor; depo AB'de olsa bile bu bir tercih (garanti değil) | K2 · `src/lib/storage.ts:14-15` · Cloudflare R2 belgesi                |
 | Konsept not / değerlendirme için yazdığınız metin (YZ açıksa) | Anthropic (Claude)                                                            | Saklama **ABD**. İşlem varsayılan ayarda **herhangi bir ülkede** olabilir; AB seçeneği yok                               | K3 · `src/lib/llm.ts:30,181` · Anthropic veri yerleşimi belgesi        |
 | Arama için metin parçaları (YZ açıksa)                        | OpenAI (embedding)                                                            | **ABD**                                                                                                                  | K4 · `src/lib/llm.ts:545`                                              |
-| E-posta adresi, bildirim e-postası içeriği                    | Kendi SMTP sunucumuz, gönderici `info@usfinbridge.com` (patron kararı 29.09.2026; Resend aynı gün kaldırıldı, `fe9fd31c`) | Ayrı bir e-posta firması yok: sunucu madde 1'deki barındırma sağlayıcısında koşar, e-posta o sağlayıcının kapsamındadır. **[DOĞRULANMADI]** Barındırma firması ve ülkesi hâlâ belli değil (madde 1). Sunucu kurulumu ve DNS (SPF/DKIM/DMARC) sürüyor (TASK-MUN2PKA5AG2IV) | K5 · `src/lib/email/mailer.ts` · `fe9fd31c` |
+| E-posta adresi, bildirim e-postası içeriği                    | Kendi SMTP sunucumuz `mail.fonbridge.com`, gönderici `info@fonbridge.com` (patron kararı 29.09.2026; Resend aynı gün kaldırıldı, `fe9fd31c`) | **Türkiye** (Vulut). Ayrı bir e-posta firması yok: sunucu veritabanıyla aynı barındırmada koşar. Alıcının posta kutusu firması (ör. Gmail) e-postayı görür; bunu alıcı kendisi seçer. Sunucu kurulumu ve DNS (SPF/DKIM/DMARC) sürüyor (TASK-MUN2PKA5AG2IV) | K5 · `src/lib/email/mailer.ts` · `fe9fd31c` |
 | Google ile giriş (tek giriş yolu)                             | Google (Microsoft ile giriş 29.09.2026'da kaldırıldı, `acc35b07`)             | ABD merkezli şirketler                                                                                                   | K8 · `src/lib/auth.ts:2-3`                                             |
 | Ürün analitiği                                                | **Hiçbir yere** (anahtar yok). Anahtar girilirse yalnız çerez onayıyla, anonim olarak PostHog AB'ye gider (§19a)               | —                                                                                                                        | K6 · `src/lib/analytics.ts:5,11`                                       |
 | Hata kayıtları                                                | **Hiçbir yere.** Hatalar yalnız kendi veritabanımızda kalır; dışarı gönderen kod yoktur (Sentry 29.09.2026'da kaldırıldı, `89eab729`) | —                                                                                                                        | K7 · `docs/legal/processing-register.md` §19a · `89eab729`                          |
+
+## Yurt dışına giden akışlar (kalan tek kalemler)
+
+Barındırma kararından sonra yurt dışına kişisel veri götüren üç akış kalıyor. Üçü de ABD merkezli şirketlerdir. Hiçbiri için repoda imzalı bir standart sözleşme (SCC) ya da ek sözleşme yok (envanter §21).
+
+| Akış | Sağlayıcı | Ülke | Giden veri | Nasıl durur | Kaynak |
+| ---- | --------- | ---- | ---------- | ----------- | ------ |
+| **YZ metin üretimi** (konsept not, değerlendirme) | Anthropic PBC | ABD (saklama). İşlem varsayılan ayarda herhangi bir ülkede olabilir | Kullanıcının YZ özelliğine yazdığı ve seçtiği metin | YZ modülünü kapatmak (aşağıda) | K3 · envanter §6 |
+| **Metin vektörü (embedding)** — arama ve eşleştirme | OpenAI, L.L.C. | ABD | Arama için belge metninin parçaları | YZ modülünü kapatmak (aşağıda) | K4 · envanter §7 |
+| **Google ile giriş (OAuth)** | Google LLC | ABD | Ad ve e-posta, giriş sırasında Google'dan alınır | Durmaz: tek giriş yolu budur | K8 · envanter §1 |
+
+Bu üçü dışında Stripe (ödeme) envanterde yurt dışı alıcıdır, ama pilot ücretsizdir ve pilotta ödeme alınmaz. Cloudflare R2'nin bölgesi yukarıdaki tabloda ayrıca yazılıdır.
 
 ## YZ'siz çalışma (bugün mümkün)
 
@@ -32,15 +44,15 @@
 
 ## Taahhüt ETMEDİKLERİMİZ
 
-- "Tüm veri AB'de" — doğrulanmadı.
-- "Veri Türkiye'de kalır" — hiçbir akış için doğru değil. Bu şart çıkarsa ürün boşluğu olarak yazılır.
+- "Tüm veri AB'de" — doğru değil; veritabanı Türkiye'de.
+- "Tüm veri Türkiye'de kalır" — doğru değil. Veritabanı, uygulama ve e-posta Türkiye'de; YZ, embedding ve Google girişi ABD'ye gider, dosya deposunun bölgesi doğrulanmadı. "Hiçbir veri yurt dışına çıkmaz" şartı çıkarsa bu ürün boşluğu olarak yazılır.
 - "YZ verinizle eğitilmez" — sağlayıcı sözleşmesi repoda yok **[DOĞRULANMADI]**.
 - Sitenin altbilgisindeki "Frankfurt & Istanbul Data Centers" ifadesi (`src/components/PublicFooter.tsx:149`) doğrulanmadı. Görüşmede bu ifadeye dayanmayın.
 
 ## Görüşmeden önce kapanması gerekenler [DOĞRULANMADI]
 
-1. Veritabanı ve uygulama sunucusu: hangi firma, hangi bölge (hesap panelinden ekran görüntüsü).
+1. ~~Veritabanı ve uygulama sunucusu: hangi firma, hangi bölge (hesap panelinden ekran görüntüsü).~~ Karar verildi (29.09.2026): Vulut, Türkiye. Kalan: Vulut ile yer sağlayıcı / veri işleyen sözleşmesi (DPA) repoda yok; gerekli olup olmadığı hukukçuya soruldu (`docs/legal/HUKUK-SORULARI-2026-09.md` 1.10, §5 madde 3).
 2. R2 deposu: hangi bölge; "AB yargı yetkisi" var mı (yoksa AB'de yeni bir depo açılması gerekir; mevcut depo taşınamaz).
-3. ~~Resend alan adı: gönderim bölgesi (eu-west-1 mi?).~~ Resend kaldırıldı (29.09.2026, `fe9fd31c`). ~~Yerine: SMTP sağlayıcısı hangi model, hangi firma, hangi ülke.~~ Karar verildi (29.09.2026): kendi SMTP sunucumuz, gönderici `info@usfinbridge.com`; ayrı bir e-posta firması yok. Ülke sorusu madde 1'e (barındırma) bağlandı. Sunucu kurulumu sürüyor (TASK-MUN2PKA5AG2IV).
+3. ~~Resend alan adı: gönderim bölgesi (eu-west-1 mi?).~~ Resend kaldırıldı (29.09.2026, `fe9fd31c`). ~~Yerine: SMTP sağlayıcısı hangi model, hangi firma, hangi ülke.~~ Karar verildi (29.09.2026): kendi SMTP sunucumuz `mail.fonbridge.com`, gönderici `info@fonbridge.com`, canlı uygulama alan adı `fonbridge.com` (patron son kararı 29.09.2026); ayrı bir e-posta firması yok. Ülke madde 1'e bağlıydı: Türkiye (Vulut). Sunucu kurulumu sürüyor (TASK-MUN2PKA5AG2IV).
 4. Anthropic çalışma alanı: varsayılan işlem bölgesi "global" mi, "us" mi.
 5. ~~Zamanlanmış işler (Inngest Cloud): hangi veri ve hangi bölge.~~ Inngest kaldırıldı (29.09.2026, `5ed2261a`). Zamanlanmış işler artık kendi veritabanımızda çalışan iş kuyruğunda; ayrı bir bağlantı (`JOBS_DATABASE_URL`) verilmezse bu kuyruk madde 1'deki veritabanındadır (`src/lib/env.ts:43-45`). Worker (`fabrika-worker`) ayrı bir süreçtir, uygulamayla aynı barındırmada koşar (madde 1; `Dockerfile:52`, `docker-compose.yml:42`).
