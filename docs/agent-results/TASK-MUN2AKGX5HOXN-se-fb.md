@@ -94,10 +94,9 @@ Sprint FB-KAMU-2 · dal `dev` · incelenen commit `631c7d4c` (cs-fb), rapor `doc
 - `docs/agent-results/TASK-MUN2AKGX5HOXN-se-fb.md` (bu rapor). Belgeye ve koda dokunulmadı.
 
 ## 5. Riskler
-- **Çalışma ağacında başkasının commit'lenmemiş işi var.** Dosyalar: `route.ts`, `invitation-mail-policy.ts`, `members/page.tsx`, `Dockerfile`, bir canlı test. İçerik İNCELEME-26 Ö-1 (`recently_sent`'te token korunuyor, link dönmüyor) ve Ö-3 (loopback).
-  - Bu iş commit'lenince §2'deki `route.ts:128-132,163,254,269` ve `policy.ts:101-117` satırları 5-9 satır kayar.
-  - `recently_sent` davranışı da değişir: token korunur, yanıtta link olmaz.
-  - Belge satırları "`3bc74a7b`'ye göre" diye sabitlendiği için bugün yanlış değil. Ama paket 1.7'de bu satırlar yenilenmeli.
+- **İnceleme sırasında `fc763927` düştü** (TASK-MUN23OJ8L9DV0, İNCELEME-26 Ö-1..Ö-3). İçerik: `recently_sent`'te token korunuyor ve yanıtta link dönmüyor; loopback kontrolü genişledi.
+  - `fc763927`'de §2'nin andığı satırlar kaydı: `route.ts:128-132`→`:134-138` (create `:136`), `:163`→`:168`, `:254`→`:261`, `:269`→`:276`. `:72` aynı kaldı. `policy.ts:101-117` da kaydı.
+  - Belge satırları "`3bc74a7b`'ye göre" diye sabitlendiği için bugün yanlış değil. Ama paket 1.7'de hem satırlar hem `recently_sent` davranışı (token korunur, link dönmez) işlenmeli: §8 md.6 ölçütü gereği.
 - B-3 düzeltilmeden hukukçu SMTP'yi "iç sistem" diye okuyabilir.
 
 ## 6. Açık sorular
@@ -106,7 +105,7 @@ Sprint FB-KAMU-2 · dal `dev` · incelenen commit `631c7d4c` (cs-fb), rapor `doc
 
 ## 7. Sonraki adım
 - cs-fb B-1..B-6'yı paket 1.7'de işlesin. B-1, B-2 ve B-3 hukukçuya gitmeden önce yapılmalı.
-- Açık Ö-1 ve Ö-3 işi commit'lenince §2 satır numaraları yenilensin.
+- §2 satır numaraları ve `recently_sent` davranışı `fc763927`'ye göre yenilensin.
 - Belge dışı (a)–(d) maddeleri TASK-MUN2793A57Z9I kartına eklensin.
 
 **Platform beyanı:** yalnız belge incelemesi. mac (Darwin 27) üzerinde `git show/grep/ls-tree/diff` ile doğrulandı. İncelenen kod yolu (SMTP, Postgres, graphile-worker) platforma bağlı değil. Worker Linux konteynerinde koşar (`Dockerfile` `worker` hedefi, Node 22). Windows'ta koşulacak bir şey yok. Linux konteyneri bu incelemede çalıştırılmadı, çünkü iddiaların hepsi statik ve git ile doğrulanabilir.
