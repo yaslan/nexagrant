@@ -1,6 +1,6 @@
 /**
  * Carrying an agency invite code, and the acknowledgement that came with it,
- * across a Google/Microsoft round trip (TASK-MUM676F010E9G, ADR-0006).
+ * across a Google round trip (TASK-MUM676F010E9G, ADR-0006).
  *
  * Until ADR-0006 a code travelled only with the demo e-mail form (B1 decision
  * S2-a), because the OAuth round trip dropped it. Production has no e-mail

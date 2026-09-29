@@ -151,14 +151,12 @@ export default function AuthCard({
   /** B6 — what goes to the server: the code only with the tick, only on a registration. */
   const readinessToSend = isRegistering && readiness && importReadiness ? readiness.code : undefined;
 
-  // A button only for a provider with credentials, demo or not: without them it
-  // could only lead to an Auth.js error page (owner decision 29.09 — Entra
-  // appears once its keys are set).
-  const showGoogle = oauthProviders.google;
-  const showMicrosoft = oauthProviders.microsoft;
+  // The Google button only with credentials, demo or not: without them it could
+  // only lead to an Auth.js error page. Google is the only OAuth provider
+  // (ADR-0006, owner decision 29.09: Microsoft Entra removed).
   // ADR-0006: an invite code no longer hides OAuth (B1 decision S2-a is void) —
   // the code rides to the callback in a signed cookie.
-  const showOAuth = showGoogle || showMicrosoft;
+  const showOAuth = oauthProviders.google;
   // With neither the e-mail form nor an OAuth button there is no way in.
   const noSignInMethod = !demoLoginEnabled && !showOAuth;
 
@@ -184,7 +182,7 @@ export default function AuthCard({
     .join(' · ');
 
   // Social Sign-In
-  const handleSocialLogin = async (provider: 'google' | 'microsoft-entra-id') => {
+  const handleSocialLogin = async (provider: 'google') => {
     // An OAuth sign-up creates the account inside the provider callback, where
     // this form is long gone — so the tick has to be taken before the redirect
     // starts, or there is nothing left to take it from.
@@ -343,7 +341,7 @@ export default function AuthCard({
                 : 'Access your proposal pipeline, CORDIS network graph, and AI modules.')
             : (isTr
                 ? '1 dakika içinde kuruluşunuzu kaydedin ve AI proje araçlarını deneyimleyin.'
-                : 'Start in seconds with Google, Microsoft or work email.')}
+                : 'Start in seconds with Google.')}
         </p>
       </div>
 
@@ -554,7 +552,6 @@ export default function AuthCard({
           rides to the callback in a signed cookie. */}
       {showOAuth && (<>
       <div className="space-y-2.5">
-        {showGoogle && (
         <button
           onClick={() => handleSocialLogin('google')}
           disabled={isLoading}
@@ -568,23 +565,6 @@ export default function AuthCard({
           </svg>
           <span>{isTr ? 'Google ile Devam Et' : 'Continue with Google'}</span>
         </button>
-        )}
-
-        {showMicrosoft && (
-        <button
-          onClick={() => handleSocialLogin('microsoft-entra-id')}
-          disabled={isLoading}
-          className="w-full flex items-center justify-center gap-3 bg-ground hover:bg-surface-hover text-ink font-semibold text-xs sm:text-sm py-2.5 px-4 rounded-xl border border-border shadow-2xs transition disabled:opacity-60 cursor-pointer"
-        >
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 23 23">
-            <path fill="#f35325" d="M1 1h10v10H1z"/>
-            <path fill="#81bc06" d="M12 1h10v10H12z"/>
-            <path fill="#05a6f0" d="M1 12h10v10H1z"/>
-            <path fill="#ffba08" d="M12 12h10v10H12z"/>
-          </svg>
-          <span>{isTr ? 'Microsoft Kurumsal ile Giriş' : 'Sign in with Microsoft'}</span>
-        </button>
-        )}
       </div>
 
       {/* Divider */}

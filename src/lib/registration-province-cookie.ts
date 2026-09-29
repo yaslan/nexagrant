@@ -2,7 +2,7 @@
  * Carrying the optional province (TASK-MULV3JXS1AW5X) across an OAuth sign-up.
  *
  * Same problem and same answer as src/lib/legal/registration-ack-cookie.ts: the
- * browser leaves for Google/Microsoft and the tenant is created in NextAuth's
+ * browser leaves for Google and the tenant is created in NextAuth's
  * `createUser` event, where the form is gone. The choice is parked in a
  * short-lived httpOnly cookie set by our own server action.
  *

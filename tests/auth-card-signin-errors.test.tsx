@@ -31,7 +31,7 @@ function renderCard(locale: 'tr' | 'en', query: string) {
   searchParams.current = new URLSearchParams(query);
   return render(
     <NextIntlClientProvider locale={locale} messages={locale === 'tr' ? trMessages : enMessages}>
-      <AuthCard locale={locale} demoLoginEnabled={false} oauthProviders={{ google: true, microsoft: false }} />
+      <AuthCard locale={locale} demoLoginEnabled={false} oauthProviders={{ google: true }} />
     </NextIntlClientProvider>,
   );
 }

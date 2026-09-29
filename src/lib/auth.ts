@@ -1,6 +1,5 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
-import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Adapter, AdapterAccount, AdapterSession, AdapterUser } from "next-auth/adapters";
@@ -38,7 +37,6 @@ import {
 } from './oauth-registration';
 import {
   PLATFORM_ADMIN_DEMO_EMAIL,
-  configuredOAuthProviders,
   isDemoLoginEnabled,
   isPlatformAdminDemoEmail,
 } from './demo-login';
@@ -288,7 +286,7 @@ export const authConfig = {
     // İNCELEME-12 Ö-1 (TASK-MUM74FUB1DRCM) — ADR-0006: an OAuth sign-in starts
     // only from loginWithSocialAction, which writes or clears every registration
     // cookie first. Without this, `GET /api/auth/signin` rendered Auth.js's own
-    // page, whose buttons start Google/Microsoft past that action. Auth.js now
+    // page, whose buttons start Google past that action. Auth.js now
     // redirects that page here, and its sign-in errors (OAuthAccountNotLinked,
     // OAuthCallbackError, …) land here as `?error=<type>` too.
     signIn: "/tr/giris",
@@ -304,29 +302,10 @@ export const authConfig = {
       clientSecret: process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET,
       // Linking by e-mail stays on, but the signIn callback lets it happen only
       // when Google says the address is verified (ADR-0006, providerVerifiedEmail
-      // in src/lib/oauth-registration.ts). Off, a Google login for an address
-      // registered through Microsoft would be refused outright.
+      // in src/lib/oauth-registration.ts). Google is the only OAuth provider
+      // (ADR-0006, owner decision 29.09: Microsoft Entra removed).
       allowDangerousEmailAccountLinking: true,
     }),
-    // Owner decision (ADR-0006 follow-up, 29.09): first phase is Google only.
-    // Entra stays in the code and is registered only when both halves of its
-    // credentials are set — without them there is no provider to reach and the
-    // button is not rendered (configuredOAuthProviders), instead of a button
-    // that ends on an Auth.js error page.
-    ...(configuredOAuthProviders().microsoft ? [
-      MicrosoftEntraID({
-        clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
-        clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
-        // Directory (tenant) scoping belongs in `issuer`
-        // (https://login.microsoftonline.com/<tenant>/v2.0). A `tenantId` option
-        // used to be passed here behind an `as any`; the provider never read it,
-        // so it did nothing and the multi-tenant "common" endpoint was always
-        // used. Changing that is a deployment decision, not a lint fix.
-        // As Google above: linking needs a verified-address claim (`xms_edov` or
-        // `verified_primary_email`), checked in the signIn callback.
-        allowDangerousEmailAccountLinking: true,
-      })
-    ] : []),
     // TASK-MULSCEK4JHK8X — this provider checks no password, so it is only
     // registered when demo sign-in is on. Off, `/api/auth/callback/credentials`
     // has no provider to sign anyone in with.
@@ -555,7 +534,7 @@ export const authConfig = {
   ],
   callbacks: {
     /**
-     * ADR-0006 / TASK-MUM676F010E9G — runs after Google/Microsoft answer and
+     * ADR-0006 / TASK-MUM676F010E9G — runs after Google answers and
      * before the adapter writes anything: the one point an OAuth registration
      * can still be refused cleanly. The rules are in
      * src/lib/oauth-registration.ts; this only wires them to the database and

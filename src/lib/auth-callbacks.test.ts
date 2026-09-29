@@ -33,7 +33,6 @@ vi.mock('next-auth', () => ({
   },
 }));
 vi.mock('next-auth/providers/google', () => ({ default: () => ({ id: 'google' }) }));
-vi.mock('next-auth/providers/microsoft-entra-id', () => ({ default: () => ({ id: 'microsoft-entra-id' }) }));
 vi.mock('next-auth/providers/credentials', () => ({
   default: (c: { authorize: (x: Record<string, unknown>) => Promise<unknown> }) => ({ id: 'credentials', authorize: c.authorize }),
 }));
@@ -152,19 +151,15 @@ describe('demo sign-in writes no admin row (TASK-MULU7GVFBTRXX K-2)', () => {
   });
 
   it('the Credentials provider is not registered with the flag off', async () => {
-    vi.stubEnv('AUTH_MICROSOFT_ENTRA_ID_ID', '');
-    vi.stubEnv('AUTH_MICROSOFT_ENTRA_ID_SECRET', '');
     const off = await loadConfig('false');
     expect(off.providers.map((p) => p.id)).toEqual(['google']);
   });
 
-  // Owner decision 29.09 (TASK-MUM676F010E9G): Entra stays in the code and is
-  // registered only once both halves of its credentials are set.
-  it('Microsoft Entra is registered only with both of its keys', async () => {
+  // ADR-0006, owner decision 29.09 (TASK-MUMLFLB2OPLY3): Microsoft Entra was
+  // removed. Its old keys left in an environment must not bring it back.
+  it('Microsoft Entra is not registered, even with its old keys set', async () => {
     vi.stubEnv('AUTH_MICROSOFT_ENTRA_ID_ID', 'entra-client');
-    vi.stubEnv('AUTH_MICROSOFT_ENTRA_ID_SECRET', '');
-    expect((await loadConfig('false')).providers.map((p) => p.id)).toEqual(['google']);
     vi.stubEnv('AUTH_MICROSOFT_ENTRA_ID_SECRET', 'entra-secret');
-    expect((await loadConfig('false')).providers.map((p) => p.id)).toEqual(['google', 'microsoft-entra-id']);
+    expect((await loadConfig('false')).providers.map((p) => p.id)).toEqual(['google']);
   });
 });

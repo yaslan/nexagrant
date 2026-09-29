@@ -104,7 +104,7 @@ export async function loginWithCredentialsAction(
 
 /**
  * @param acknowledgement The same version stamp as above. The browser is about
- *   to leave for Google/Microsoft and will come back into NextAuth's callback
+ *   to leave for Google and will come back into NextAuth's callback
  *   route, where nothing of ours can see the form any more — so if the box was
  *   ticked, the stamp is parked in an httpOnly cookie here, on the server, and
  *   the signIn callback and `events.createUser` pick it up on the way back
@@ -113,7 +113,7 @@ export async function loginWithCredentialsAction(
  *   it redirects and does not return.
  */
 export async function loginWithSocialAction(
-  provider: 'google' | 'microsoft-entra-id',
+  provider: 'google',
   redirectTo: string,
   acknowledgement?: string,
   /**

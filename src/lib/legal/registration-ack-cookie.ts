@@ -3,7 +3,7 @@
  *
  * TASK-MTSWLANXSU0IG (A3). The credentials form can hand the acknowledgement
  * straight to `authorize` alongside the e-mail, so that path verifies it before
- * an account exists. Google and Microsoft cannot: the browser leaves for the
+ * an account exists. Google cannot: the browser leaves for the
  * provider and comes back into NextAuth's own callback route, where the form
  * and everything the person ticked on it are gone.
  *

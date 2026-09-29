@@ -30,7 +30,8 @@ test.describe('Authentication and Tenant Provisioning', () => {
 
     // 3. Verify OAuth options exist
     await expect(page.getByRole('button', { name: /Google ile Devam Et/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Microsoft Kurumsal ile Giriş/ })).toBeVisible();
+    // ADR-0006 (owner decision 29.09): Google is the only OAuth provider.
+    await expect(page.getByRole('button', { name: /Microsoft/ })).toHaveCount(0);
   });
 
   // Note: Full E2E for OAuth requires mocking the provider or using a specialized

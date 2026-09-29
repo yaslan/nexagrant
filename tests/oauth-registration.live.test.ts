@@ -9,7 +9,7 @@ import { skipOrFailInCi, assertRlsSubjectRole, requireRlsTestUrl } from './helpe
  * TASK-MUM676F010E9G (ADR-0006) — an OAuth registration, end to end through the
  * REAL Auth.js callback route with the app's own `authConfig` (signIn callback,
  * adapter, events), against a FAKE provider: a local HTTP server that plays
- * Google's / Entra's token and userinfo endpoints. No real Google or Microsoft
+ * Google's token and userinfo endpoints. No real Google
  * credentials are involved (TASK-MULQM3LFB4KRA); the provider id is what the
  * app's rules key on, so the fake carries the real ids.
  *
@@ -86,7 +86,7 @@ function fakeProvider(id: 'google' | 'microsoft-entra-id') {
 
 /**
  * One trip back from the provider: `GET /api/auth/callback/<id>?code=…`, the
- * request Google or Microsoft would redirect the browser to.
+ * request Google would redirect the browser to.
  */
 async function callback(
   provider: 'google' | 'microsoft-entra-id',
@@ -268,19 +268,6 @@ describe('OAuth registration with an agency invite code (fake provider, fabrika_
     expect(jar.has(lib.cookie.REGISTRATION_INVITE_COOKIE)).toBe(false);
   });
 
-  test('Entra (fake): the same flow is provider-independent', async () => {
-    const { code } = await makeCode();
-    const email = newEmail('entra-ok');
-    parkInvite(code, lib.consent.registrationAcknowledgementToken({ agency: true }));
-
-    const res = await callback('microsoft-entra-id', { sub: `${RUN}-m1`, email, name: 'Entra Kayıt' });
-    expect(res.location ?? '').not.toContain('error=');
-
-    const user = await userByEmail(email);
-    expect(user?.memberships[0]?.tenant.agencyId).toBe(agencyId);
-    expect(await admin!.consent.count({ where: { userId: user!.id } })).toBe(3);
-  });
-
   test('without the addendum in the acknowledgement: refused, no user', async () => {
     const { code } = await makeCode();
     const email = newEmail('no-addendum');
@@ -369,6 +356,7 @@ describe('OAuth registration with an agency invite code (fake provider, fabrika_
     expect(refused.location).toMatch(/\/tr\/giris\?error=email_unverified$/);
     expect(await admin!.account.count({ where: { userId: existing.id } })).toBe(0);
 
+    // Entra was removed (ADR-0006, 29.09): a login under its id links nothing.
     const entraPlain = await callback('microsoft-entra-id', { sub: `${RUN}-m5`, email });
     expect(entraPlain.location).toMatch(/\/tr\/giris\?error=email_unverified$/);
     expect(await admin!.account.count({ where: { userId: existing.id } })).toBe(0);

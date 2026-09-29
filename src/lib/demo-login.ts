@@ -95,12 +95,13 @@ export function assertDemoLoginAllowed(
   }
 }
 
-export type OAuthProviderAvailability = { google: boolean; microsoft: boolean };
+export type OAuthProviderAvailability = { google: boolean };
 
 /**
  * Which OAuth providers have both halves of their credentials set — the same
  * variables src/lib/auth.ts hands to the providers. A button for a provider
- * without them only leads to an Auth.js error page.
+ * without them only leads to an Auth.js error page. Google is the only one
+ * (ADR-0006, owner decision 29.09: Microsoft Entra removed).
  */
 export function configuredOAuthProviders(
   source: Record<string, string | undefined> = process.env
@@ -109,7 +110,5 @@ export function configuredOAuthProviders(
   return {
     google:
       set('AUTH_GOOGLE_ID', 'GOOGLE_CLIENT_ID') && set('AUTH_GOOGLE_SECRET', 'GOOGLE_CLIENT_SECRET'),
-    microsoft:
-      set('AUTH_MICROSOFT_ENTRA_ID_ID') && set('AUTH_MICROSOFT_ENTRA_ID_SECRET'),
   };
 }

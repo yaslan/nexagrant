@@ -103,15 +103,13 @@ describe('providerVerifiedEmail — what account linking rests on', () => {
     ).toBe(false);
   });
 
-  test('Entra: the plain `email` claim is not enough; xms_edov or verified_primary_email is', () => {
+  // ADR-0006 (owner decision 29.09): Entra was removed, so none of its claims —
+  // even the verified-address ones — let a login link to an existing account.
+  test('Entra (removed): no claim counts as verified', () => {
     expect(providerVerifiedEmail('microsoft-entra-id', { email }, email)).toBe(false);
-    expect(providerVerifiedEmail('microsoft-entra-id', { email, email_verified: true }, email)).toBe(false);
-    expect(providerVerifiedEmail('microsoft-entra-id', { email, xms_edov: true }, email)).toBe(true);
+    expect(providerVerifiedEmail('microsoft-entra-id', { email, xms_edov: true }, email)).toBe(false);
     expect(
       providerVerifiedEmail('microsoft-entra-id', { verified_primary_email: ['person@example.com'] }, email)
-    ).toBe(true);
-    expect(
-      providerVerifiedEmail('microsoft-entra-id', { verified_primary_email: ['x@example.com'] }, email)
     ).toBe(false);
   });
 

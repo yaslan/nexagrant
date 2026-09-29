@@ -9,7 +9,7 @@
  *   1. `authorize` in src/lib/auth.ts — the e-mail/credentials form. The
  *      acknowledgement travels with the credentials, so it is verified BEFORE
  *      the account exists and the account is refused without it.
- *   2. `events.createUser` in src/lib/auth.ts — Google/Microsoft OAuth, where
+ *   2. `events.createUser` in src/lib/auth.ts — Google OAuth, where
  *      the adapter has already created the user by the time anything of ours
  *      runs. Nothing there can refuse, so that path records what it can and
  *      raises a SystemAlert when it cannot (CLAUDE.md rule 6: raise the alert,

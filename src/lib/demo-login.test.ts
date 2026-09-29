@@ -70,11 +70,12 @@ describe('demo sign-in flag (TASK-MULSCEK4JHK8X)', () => {
   });
 
   it('lists an OAuth provider only when both id and secret are set', () => {
-    expect(configuredOAuthProviders({})).toEqual({ google: false, microsoft: false });
+    expect(configuredOAuthProviders({})).toEqual({ google: false });
     expect(configuredOAuthProviders({ AUTH_GOOGLE_ID: 'id', AUTH_GOOGLE_SECRET: ' ' })).toEqual({
       google: false,
-      microsoft: false,
     });
+    // ADR-0006 (owner decision 29.09): Microsoft Entra was removed — its old
+    // keys, if still in an environment, list nothing.
     expect(
       configuredOAuthProviders({
         GOOGLE_CLIENT_ID: 'id',
@@ -82,6 +83,6 @@ describe('demo sign-in flag (TASK-MULSCEK4JHK8X)', () => {
         AUTH_MICROSOFT_ENTRA_ID_ID: 'id',
         AUTH_MICROSOFT_ENTRA_ID_SECRET: 's',
       })
-    ).toEqual({ google: true, microsoft: true });
+    ).toEqual({ google: true });
   });
 });

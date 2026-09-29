@@ -1,5 +1,5 @@
 /**
- * Google/Microsoft registration — the rules ADR-0006 puts on the only sign-in
+ * Google registration — the rules ADR-0006 puts on the only sign-in
  * production has (TASK-MUM676F010E9G).
  *
  * Two halves, both called from src/lib/auth.ts:
@@ -40,18 +40,15 @@ export type OAuthSignInError = (typeof OAUTH_SIGNIN_ERROR)[keyof typeof OAUTH_SI
  * Has the provider itself vouched that this person controls `email`?
  *
  * This is what `allowDangerousEmailAccountLinking` is allowed to rest on
- * (ADR-0006). Auth.js links a new Google/Microsoft login to an existing User
+ * (ADR-0006). Auth.js links a new Google login to an existing User
  * purely because the addresses match; if the provider hands out addresses it
  * never verified, whoever claims the address takes over the account.
  *
  * - Google: the ID token's `email_verified`. Google sets it for Gmail and for
  *   Workspace addresses it has verified.
- * - Microsoft Entra ID: `email` is an unverified, admin-editable claim in v2
- *   tokens — Microsoft's own guidance is not to use it for authorisation. The
- *   verified forms are the optional claims `xms_edov` (the domain owner is
- *   verified) and `verified_primary_email`. Neither is sent unless the app
- *   registration asks for it, so until it does, Entra logins do NOT link to an
- *   existing account by e-mail. A first Entra login still registers normally.
+ * - Microsoft Entra ID was removed (ADR-0006, owner decision 29.09); its
+ *   plain `email` claim is unverified and admin-editable, so bringing it back
+ *   needs `xms_edov` / `verified_primary_email` checked here first.
  *
  * Anything else — an unknown provider, a missing or non-true claim — is "not
  * verified". Failing closed costs a person one extra step; failing open costs
@@ -67,14 +64,6 @@ export function providerVerifiedEmail(
   if (provider === 'google') {
     const claimed = typeof profile.email === 'string' ? profile.email.trim().toLowerCase() : null;
     return profile.email_verified === true && claimed === address;
-  }
-  if (provider === 'microsoft-entra-id') {
-    if (profile.xms_edov === true || profile.xms_edov === 1 || profile.xms_edov === '1') return true;
-    const verified = profile.verified_primary_email;
-    return (
-      Array.isArray(verified) &&
-      verified.some((v) => typeof v === 'string' && v.trim().toLowerCase() === address)
-    );
   }
   return false;
 }
