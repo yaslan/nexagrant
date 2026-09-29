@@ -9,8 +9,9 @@
  *     (prisma/migrations/add-agency-funnel-province.sql), a SECURITY DEFINER
  *     function that takes the agency from the caller's `app.tenant_id` and
  *     returns integers per organisation type and province. No tenant row leaves it.
- *   - Steps 6 and 7 (applications, outcomes) come from be-fb's
- *     `countApplicationOutcomes` (B7), which TRUSTS the tenant list it is given.
+ *   - Steps 6 and 7 (organisations that applied, got an outcome) come from
+ *     be-fb's `countApplicationOutcomes` (B7) in its organisation mode, which
+ *     TRUSTS the tenant list it is given.
  *     The list is derived here, on the server, from `Tenant.agencyId` of the
  *     session's own agency tenant — never from a parameter a browser can set.
  *   - Step 2 (readiness card completed) has no data yet (B6) and is reported as
@@ -22,11 +23,18 @@
  * of the two views described the organisations of days 31-90 — one of them,
  * in crw-fb's example (TASK-MULWCLZHRTRK5-crw-fb.md Ö-1).
  *
+ * One breakdown at a time (TASK-MULZATEX4G92H, leed-fb 29.09): a response
+ * carries the totals plus either one province (every type) or every type
+ * (every province), never a type × province cell. Every step counts
+ * organisations — steps 6-7 too — so one threshold means one unit.
+ *
  * Every number then goes through the small-cell rule (§3.1) with complementary
- * suppression over the whole type × province × step table at once
- * ({@link suppressedCells}): every province view is one request away, so no
- * number a reader can subtract from another may leave a group of 1..4.
- * Masking happens here, so the browser never receives a count under 5.
+ * suppression over every breakdown at once ({@link suppressedCells}): each is
+ * one request away, so no number a reader can combine with another may leave
+ * a group of 1..4. src/lib/agency/funnel.attack.test.ts is the gate: an
+ * integer attacker joining every view. Every number shown is then rounded to
+ * a multiple of 5 ({@link roundToFive}, HUKUK-5). Masking and rounding happen
+ * here, so the browser never receives a count under 5 nor an exact count.
  */
 import type { OrgType } from '@prisma/client';
 import { prisma, withTenant } from '@/lib/db';
@@ -70,13 +78,24 @@ export type FunnelCell =
 
 export type FunnelView = Record<FunnelStep, FunnelCell>;
 
+/**
+ * The one breakdown a response carries (TASK-MULZATEX4G92H, leed-fb 29.09):
+ * none, one province (every type together) or every organisation type (every
+ * province together). There is no type × province table: its cells were what
+ * crw-fb's attacker read back (TASK-MULYGTXCZNCOP-crw-fb.md Kart 1 B-1).
+ */
+export type FunnelBreakdown =
+  | { dimension: 'none' }
+  | { dimension: 'province'; province: TrProvince }
+  | { dimension: 'orgType' };
+
 export interface AgencyFunnel {
-  /** The province the view is limited to; null = every organisation, with or without one. */
-  province: TrProvince | null;
-  /** Funnel over every organisation type. */
+  /** Every organisation, with or without a province. */
   all: FunnelView;
-  /** Funnel for one organisation type. Every type is present, masked alike. */
-  byOrgType: Record<OrgType, FunnelView>;
+  breakdown:
+    | { dimension: 'none' }
+    | { dimension: 'province'; province: TrProvince; view: FunnelView }
+    | { dimension: 'orgType'; byOrgType: Record<OrgType, FunnelView> };
 }
 
 type MeasuredStep = Exclude<FunnelStep, 'readiness'>;
@@ -84,20 +103,28 @@ type RawCounts = Record<MeasuredStep, number>;
 const MEASURED_STEPS = FUNNEL_STEPS.filter((s) => !UNMEASURED.has(s)) as MeasuredStep[];
 
 /**
- * Steps that count a subset of another step of the same group, so that
- * `parent − Σ children` is itself a group a reader can compute: organisations
- * with no saved search, applications still waiting for an outcome, …
+ * Steps that count a subset of the organisations of another step of the same
+ * group, so that `parent − child` is itself a group a reader can compute:
+ * organisations with no saved search, organisations that applied but have no
+ * accepted application yet, …
  *
+ * Every step counts organisations (TASK-MULZATEX4G92H Ö-1), so each one is a
+ * subset of `registered`. `accepted` and `rejected` are not disjoint (one
+ * organisation can have both), so each is its own line under `submitted`.
  * `pipeline ⊇ conceptNote` holds except for a concept note on a deleted
  * opportunity; where the difference is negative the line is not a group and
  * is skipped.
  */
-const NESTED_STEPS: readonly { parent: MeasuredStep; children: MeasuredStep[] }[] = [
-  { parent: 'registered', children: ['savedSearch'] },
-  { parent: 'registered', children: ['pipeline'] },
-  { parent: 'registered', children: ['conceptNote'] },
-  { parent: 'pipeline', children: ['conceptNote'] },
-  { parent: 'submitted', children: ['accepted', 'rejected'] },
+const NESTED_STEPS: readonly { parent: MeasuredStep; child: MeasuredStep }[] = [
+  { parent: 'registered', child: 'savedSearch' },
+  { parent: 'registered', child: 'pipeline' },
+  { parent: 'registered', child: 'conceptNote' },
+  { parent: 'registered', child: 'submitted' },
+  { parent: 'registered', child: 'accepted' },
+  { parent: 'registered', child: 'rejected' },
+  { parent: 'pipeline', child: 'conceptNote' },
+  { parent: 'submitted', child: 'accepted' },
+  { parent: 'submitted', child: 'rejected' },
 ];
 
 export class NotAnAgencyError extends Error {
@@ -108,8 +135,21 @@ export class NotAnAgencyError extends Error {
   }
 }
 
+/**
+ * HUKUK-5 fallback (TASK-MULZATEX4G92H, leed-fb 29.09 decision 4): every number
+ * shown is rounded to the nearest multiple of 5, each on its own (totals are
+ * rounded separately, so the parts need not add up to the total). The rule
+ * based suppression alone still left a small group readable in about one of
+ * a thousand random tables (the wider run in the report); rounding leaves a
+ * reader intervals of width 4 instead of exact numbers. The threshold holds:
+ * only a number of 5 or more is shown, so a shown 5 is 5..7, never 3.
+ */
+export function roundToFive(value: number): number {
+  return Math.round(value / SMALL_CELL_THRESHOLD) * SMALL_CELL_THRESHOLD;
+}
+
 function cell(value: number, masked: boolean): FunnelCell {
-  return masked ? { state: 'small' } : { state: 'count', value };
+  return masked ? { state: 'small' } : { state: 'count', value: roundToFive(value) };
 }
 
 function zeroCounts(): RawCounts {
@@ -128,6 +168,27 @@ export const ALL = '*';
 /** Raw counts per province (TR_PROVINCES name, or {@link NO_PROVINCE}) and type. */
 export type RawByProvince = ReadonlyMap<string, Record<OrgType, RawCounts>>;
 
+function isProvince(p: string): p is TrProvince {
+  return (TR_PROVINCES as readonly string[]).includes(p);
+}
+
+/**
+ * K-2 (crw-fb): a key outside TR_PROVINCES is counted as "no province", never
+ * dropped. Dropped, its organisations would be missing from the province line
+ * while still inside the grand total, which is the hidden mass the masking
+ * has to see.
+ */
+export function normalizeProvinces(byProvince: RawByProvince): RawByProvince {
+  const out = new Map<string, Record<OrgType, RawCounts>>();
+  for (const [key, table] of byProvince) {
+    const p = isProvince(key) ? key : NO_PROVINCE;
+    let into = out.get(p);
+    if (!into) out.set(p, (into = zeroTable()));
+    for (const t of ORG_TYPES) for (const s of MEASURED_STEPS) into[t][s] += table[t][s];
+  }
+  return out;
+}
+
 export function sumProvinces(byProvince: RawByProvince): Record<OrgType, RawCounts> {
   const sum = zeroTable();
   for (const table of byProvince.values()) {
@@ -136,113 +197,116 @@ export function sumProvinces(byProvince: RawByProvince): Record<OrgType, RawCoun
   return sum;
 }
 
-/** A published number: one step, for one type (or {@link ALL}) in one province (or {@link ALL}). */
+/**
+ * A published number: one step, for every type in one province, for one type
+ * over every province, or for everyone. Never one type in one province.
+ */
 export function cellId(step: MeasuredStep, type: OrgType | typeof ALL, province: string): string {
   return `${step}|${type}|${province}`;
 }
 
 /**
- * `total = Σ parts`. `rebuildable` is false when a part is never published
- * (the remainder of a {@link NESTED_STEPS} line), so a hidden total can never
- * be summed back from visible parts.
+ * `total = Σ parts`. `nested` lines are a step against a step it contains:
+ * their second part (the remainder) is never published, it is a difference.
  */
 interface Line {
   total: string;
   parts: string[];
-  rebuildable: boolean;
+  nested: boolean;
 }
 
 /**
  * The small-cell rule with complementary suppression, over every number the
- * dashboard can publish: for each measured step, the type × province table
- * with its row totals (a type over every province), column totals (every type
- * in a province) and grand total. Every province view is one request away, so
- * the whole table is masked at once, not the one view asked for.
+ * dashboard can publish in any breakdown — per step: the grand total, each
+ * province (every type), each type (every province). The breakdowns are one
+ * request apart and share the grand total, so they are masked together.
  *
  * A reader holding every view can subtract along a line:
- *   - across types: a total minus its visible types;
- *   - across provinces: a total over every province minus the visible ones;
+ *   - across provinces: the grand total minus the visible provinces (the
+ *     organisations without a province are part of it, never published);
+ *   - across types: the grand total minus the visible types;
  *   - across steps: a step minus a step that counts a subset of it
- *     ({@link NESTED_STEPS}: registered − saved search, submitted − accepted
- *     − rejected, …).
- * Each such difference must be 0 or at least 5. So, until nothing changes:
+ *     ({@link NESTED_STEPS}).
+ * So, until nothing changes:
  *   - primary: a number under 5 (0 included, so "<5" does not tell "none" from
  *     "a few") is masked;
- *   - organisations without a province are always hidden mass: their numbers
- *     are never published;
- *   - complementary: in a line whose visible total leaves a hidden sum of 1..4,
- *     the smallest visible part is masked too; where the total is itself
- *     hidden but could be summed back from its parts, the hidden parts must
- *     reach 5;
+ *   - organisations without a province are always hidden;
+ *   - across provinces and types (TASK-MULZATEX4G92H): what a visible total
+ *     leaves hidden is either nothing, or at least TWO hidden parts above 0
+ *     that sum to 5 or more. A zero is no cover — a reader can prove it from
+ *     another line (22 = 13 + 9 proves every other type empty) — and a single
+ *     hidden part is its total minus the visible ones. Otherwise the smallest
+ *     visible part is masked too. Where the total is itself hidden, the same
+ *     holds for the parts, so it cannot be summed back;
+ *   - across steps: `parent − child` is 0 or at least 5, else the child is
+ *     masked;
  *   - a group whose `registered` is masked shows no step at all.
  *
  * Returns the masked {@link cellId}s. A province nobody gave has no id here;
  * all of it is masked.
  */
-export function suppressedCells(byProvince: RawByProvince): Set<string> {
+export function suppressedCells(raw: RawByProvince): Set<string> {
+  const byProvince = normalizeProvinces(raw);
   // A province with no organisation is 0 everywhere and hidden everywhere: it
   // adds nothing to any sum, so only provinces that occur are walked.
-  const provinces = [...TR_PROVINCES.filter((p) => byProvince.has(p)), NO_PROVINCE];
-  /** Views a reader can ask for: each named province, and every province at once. */
-  const views = [...provinces.filter((p) => p !== NO_PROVINCE), ALL];
-  const types: (OrgType | typeof ALL)[] = [...ORG_TYPES, ALL];
+  const named = TR_PROVINCES.filter((p) => byProvince.has(p));
+  const provinces: string[] = [...named, NO_PROVINCE];
+  const types: OrgType[] = [...ORG_TYPES];
+  /** Every published group: everyone, each province, each type. */
+  const groups: [OrgType | typeof ALL, string][] = [
+    [ALL, ALL],
+    ...named.map((p): [typeof ALL, string] => [ALL, p]),
+    ...types.map((t): [OrgType, string] => [t, ALL]),
+  ];
 
   const value = new Map<string, number>();
   const hidden = new Set<string>();
+  const total = sumProvinces(byProvince);
   for (const s of MEASURED_STEPS) {
-    for (const t of ORG_TYPES) {
-      let rowTotal = 0;
-      for (const p of provinces) {
-        const v = byProvince.get(p)?.[t][s] ?? 0;
-        value.set(cellId(s, t, p), v);
-        rowTotal += v;
-      }
-      value.set(cellId(s, t, ALL), rowTotal);
+    value.set(cellId(s, ALL, ALL), ORG_TYPES.reduce((n, t) => n + total[t][s], 0));
+    for (const t of types) value.set(cellId(s, t, ALL), total[t][s]);
+    for (const p of provinces) {
+      const table = byProvince.get(p);
+      value.set(cellId(s, ALL, p), table ? ORG_TYPES.reduce((n, t) => n + table[t][s], 0) : 0);
     }
-    for (const p of [...provinces, ALL]) {
-      value.set(cellId(s, ALL, p), ORG_TYPES.reduce((n, t) => n + value.get(cellId(s, t, p))!, 0));
-      if (p === NO_PROVINCE) for (const t of types) hidden.add(cellId(s, t, p));
-    }
+    hidden.add(cellId(s, ALL, NO_PROVINCE));
   }
 
   const lines: Line[] = [];
   for (const s of MEASURED_STEPS) {
-    for (const p of views) {
-      lines.push({ total: cellId(s, ALL, p), parts: ORG_TYPES.map((t) => cellId(s, t, p)), rebuildable: true });
-    }
-    for (const t of types) {
-      lines.push({ total: cellId(s, t, ALL), parts: provinces.map((p) => cellId(s, t, p)), rebuildable: true });
-    }
+    lines.push({ total: cellId(s, ALL, ALL), parts: provinces.map((p) => cellId(s, ALL, p)), nested: false });
+    lines.push({ total: cellId(s, ALL, ALL), parts: types.map((t) => cellId(s, t, ALL)), nested: false });
   }
-  NESTED_STEPS.forEach(({ parent, children }, i) => {
-    for (const t of types) {
-      for (const p of views) {
-        const rest =
-          value.get(cellId(parent, t, p))! - children.reduce((n, c) => n + value.get(cellId(c, t, p))!, 0);
-        if (rest < 0) continue;
-        const remainder = `~${i}|${t}|${p}`;
-        value.set(remainder, rest);
-        hidden.add(remainder);
-        lines.push({
-          total: cellId(parent, t, p),
-          parts: [...children.map((c) => cellId(c, t, p)), remainder],
-          rebuildable: false,
-        });
-      }
+  NESTED_STEPS.forEach(({ parent, child }, i) => {
+    for (const [t, p] of groups) {
+      const rest = value.get(cellId(parent, t, p))! - value.get(cellId(child, t, p))!;
+      if (rest < 0) continue;
+      const remainder = `~${i}|${t}|${p}`;
+      value.set(remainder, rest);
+      hidden.add(remainder);
+      lines.push({ total: cellId(parent, t, p), parts: [cellId(child, t, p), remainder], nested: true });
     }
   });
 
   for (const [id, v] of value) if (v < SMALL_CELL_THRESHOLD) hidden.add(id);
 
-  /** Masks the smallest visible part of a line whose hidden sum would give a small group away. */
-  function protectLine({ total, parts, rebuildable }: Line): boolean {
-    const hiddenSum = parts.filter((id) => hidden.has(id)).reduce((n, id) => n + value.get(id)!, 0);
-    const exposed = !hidden.has(total)
-      ? hiddenSum > 0 && hiddenSum < SMALL_CELL_THRESHOLD
-      : rebuildable && hiddenSum < SMALL_CELL_THRESHOLD;
+  /** Masks the smallest visible part of a line whose hidden parts would give a small group away. */
+  function protectLine({ total: t, parts, nested }: Line): boolean {
+    const visible = parts.filter((id) => !hidden.has(id));
+    if (visible.length === 0) return false;
+    const cover = parts.filter((id) => hidden.has(id) && value.get(id)! > 0);
+    const hiddenSum = cover.reduce((n, id) => n + value.get(id)!, 0);
+    let exposed: boolean;
+    if (nested) {
+      // parent − child: the remainder is read off when both are shown.
+      exposed = !hidden.has(t) && hiddenSum > 0 && hiddenSum < SMALL_CELL_THRESHOLD;
+    } else {
+      exposed = hidden.has(t)
+        ? cover.length < 2 || hiddenSum < SMALL_CELL_THRESHOLD
+        : cover.length > 0 && (cover.length < 2 || hiddenSum < SMALL_CELL_THRESHOLD);
+    }
     if (!exposed) return false;
-    const smallest = parts.filter((id) => !hidden.has(id)).sort((a, b) => value.get(a)! - value.get(b)!)[0];
-    if (!smallest) return false;
+    const smallest = visible.sort((a, b) => value.get(a)! - value.get(b)!)[0]!;
     hidden.add(smallest);
     return true;
   }
@@ -251,15 +315,13 @@ export function suppressedCells(byProvince: RawByProvince): Set<string> {
   while (changed) {
     changed = false;
     // A group under the threshold shows no step at all.
-    for (const t of types) {
-      for (const p of views) {
-        if (!hidden.has(cellId('registered', t, p))) continue;
-        for (const s of MEASURED_STEPS) {
-          const id = cellId(s, t, p);
-          if (!hidden.has(id)) {
-            hidden.add(id);
-            changed = true;
-          }
+    for (const [t, p] of groups) {
+      if (!hidden.has(cellId('registered', t, p))) continue;
+      for (const s of MEASURED_STEPS) {
+        const id = cellId(s, t, p);
+        if (!hidden.has(id)) {
+          hidden.add(id);
+          changed = true;
         }
       }
     }
@@ -268,32 +330,45 @@ export function suppressedCells(byProvince: RawByProvince): Set<string> {
   return hidden;
 }
 
-/** Pure: the masked view of one province, or of every organisation (`province` null). Exported for tests. */
-export function buildProvinceFunnel(byProvince: RawByProvince, province: TrProvince | null): AgencyFunnel {
+/**
+ * Pure: the masked funnel with one breakdown. Exported for tests. Only the
+ * breakdown asked for leaves this function, but the masking is the one of
+ * every breakdown at once ({@link suppressedCells}).
+ */
+export function buildAgencyFunnel(raw: RawByProvince, breakdown: FunnelBreakdown): AgencyFunnel {
+  const byProvince = normalizeProvinces(raw);
   const hidden = suppressedCells(byProvince);
-  const p = province ?? ALL;
-  // A province nobody gave is not in the table at all: all of it is "<5".
-  const known = province === null || byProvince.has(province);
-  const table = province === null ? sumProvinces(byProvince) : byProvince.get(province);
-  const view = (t: OrgType | typeof ALL): FunnelView =>
+  const total = sumProvinces(byProvince);
+  const view = (value: (s: MeasuredStep) => number, t: OrgType | typeof ALL, p: string, known = true): FunnelView =>
     Object.fromEntries(
       FUNNEL_STEPS.map((s) => {
         if (UNMEASURED.has(s)) return [s, { state: 'unmeasured' }];
         const m = s as MeasuredStep;
-        const v = !table ? 0 : t === ALL ? ORG_TYPES.reduce((n, ot) => n + table[ot][m], 0) : table[t][m];
-        return [s, cell(v, !known || hidden.has(cellId(m, t, p)))];
+        return [s, cell(value(m), !known || hidden.has(cellId(m, t, p)))];
       })
     ) as FunnelView;
-  return {
-    province,
-    all: view(ALL),
-    byOrgType: Object.fromEntries(ORG_TYPES.map((t) => [t, view(t)])) as Record<OrgType, FunnelView>,
-  };
+  const all = view((s) => ORG_TYPES.reduce((n, t) => n + total[t][s], 0), ALL, ALL);
+
+  if (breakdown.dimension === 'province') {
+    const { province } = breakdown;
+    const table = byProvince.get(province);
+    // A province nobody gave is not in the table at all: all of it is "<5".
+    const v = view((s) => (table ? ORG_TYPES.reduce((n, t) => n + table[t][s], 0) : 0), ALL, province, !!table);
+    return { all, breakdown: { dimension: 'province', province, view: v } };
+  }
+  if (breakdown.dimension === 'orgType') {
+    const byOrgType = Object.fromEntries(ORG_TYPES.map((t) => [t, view((s) => total[t][s], t, ALL)])) as Record<
+      OrgType,
+      FunnelView
+    >;
+    return { all, breakdown: { dimension: 'orgType', byOrgType } };
+  }
+  return { all, breakdown: { dimension: 'none' } };
 }
 
-/** Pure: raw per-type counts in (no province split), the masked view out. Exported for tests. */
+/** Pure: raw per-type counts in (no province split), the masked funnel by type out. Exported for tests. */
 export function buildFunnel(raw: Record<OrgType, RawCounts>): AgencyFunnel {
-  return buildProvinceFunnel(new Map([[NO_PROVINCE, raw]]), null);
+  return buildAgencyFunnel(new Map([[NO_PROVINCE, raw]]), { dimension: 'orgType' });
 }
 
 interface FunnelRow {
@@ -311,14 +386,14 @@ interface FunnelRow {
  * {@link NotAnAgencyError} when that tenant is not a live agency.
  *
  * One cohort: every organisation ever registered with the agency's codes
- * (no date window, see the file comment). `province` limits the view to one
- * province (null = all organisations).
+ * (no date window, see the file comment). `breakdown` picks the one breakdown
+ * the response carries (default: none).
  * `outcomes` is injectable for tests; production uses be-fb's B7 function.
  */
 export async function getAgencyFunnel(
   agencyTenantId: string,
   deps: {
-    province?: TrProvince | null;
+    breakdown?: FunnelBreakdown;
     outcomes?: typeof countApplicationOutcomes;
   } = {}
 ): Promise<AgencyFunnel> {
@@ -332,7 +407,7 @@ export async function getAgencyFunnel(
   const byProvince = new Map<string, Record<OrgType, RawCounts>>();
   const tableOf = (province: string | null) => {
     // The CHECK on Tenant.province allows TR_PROVINCES only; anything else would be a bug, counted as "none".
-    const p = TR_PROVINCES.includes(province as TrProvince) ? (province as string) : NO_PROVINCE;
+    const p = province !== null && isProvince(province) ? province : NO_PROVINCE;
     let table = byProvince.get(p);
     if (!table) byProvince.set(p, (table = zeroTable()));
     return table;
@@ -369,14 +444,16 @@ export async function getAgencyFunnel(
   }
   for (const { table, ids } of groups.values()) {
     // No `since`: everything the cohort has applied for counts, so the steps
-    // describe one group.
-    const o = await outcomes(ids);
+    // describe one group. Organisations, not applications (TASK-MULZATEX4G92H
+    // Ö-1): one organisation with six applications is one, so the small-cell
+    // rule counts the same unit on every step.
+    const o = await outcomes(ids, undefined, { unit: 'organisation' });
     table.submitted += o.submitted;
     table.accepted += o.accepted;
     table.rejected += o.rejected;
   }
 
-  return buildProvinceFunnel(byProvince, deps.province ?? null);
+  return buildAgencyFunnel(byProvince, deps.breakdown ?? { dimension: 'none' });
 }
 
 /** Session gate for the page: is this tenant a live agency? */

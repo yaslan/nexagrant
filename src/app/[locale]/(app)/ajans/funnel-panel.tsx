@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { AgencyFunnel, FunnelCell, FunnelStep } from '@/lib/agency/funnel';
+import type { AgencyFunnel, FunnelCell, FunnelStep, FunnelView } from '@/lib/agency/funnel';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
 
 const focusRing =
@@ -45,13 +45,34 @@ export default function FunnelPanel({
 }) {
   const t = useTranslations('agency.funnel');
   const tType = useTranslations('agency.orgType');
-  const [orgType, setOrgType] = useState<string>('ALL');
-  const typeId = useId();
-  const provinceId = useId();
-  const provinceNoteId = useId();
-  const orgTypes = Object.keys(funnel.byOrgType);
-  const view = orgType === 'ALL' ? funnel.all : funnel.byOrgType[orgType as keyof typeof funnel.byOrgType];
+  const [group, setGroup] = useState<string>('ALL');
+  const breakdownId = useId();
+  const breakdownNoteId = useId();
+  const groupId = useId();
   const path = locale === 'tr' ? `/${locale}/ajans` : `/${locale}/agency`;
+  const { breakdown } = funnel;
+
+  /** The groups this response carries: the totals, then the one breakdown's rows. */
+  const groups: { key: string; label: string; view: FunnelView }[] = [
+    {
+      key: 'ALL',
+      label:
+        breakdown.dimension === 'orgType'
+          ? t('allTypes')
+          : breakdown.dimension === 'province'
+            ? t('allProvinces')
+            : t('allOrganisations'),
+      view: funnel.all,
+    },
+  ];
+  if (breakdown.dimension === 'province') {
+    groups.push({ key: breakdown.province, label: breakdown.province, view: breakdown.view });
+  } else if (breakdown.dimension === 'orgType') {
+    for (const [ot, view] of Object.entries(breakdown.byOrgType)) groups.push({ key: ot, label: tType(ot), view });
+  }
+  const shown = groups.find((g) => g.key === group) ?? groups[0]!;
+  const selected =
+    breakdown.dimension === 'orgType' ? 'tur' : breakdown.dimension === 'province' ? breakdown.province : '';
 
   return (
     <section aria-labelledby="agency-funnel-title" className="space-y-4">
@@ -64,81 +85,89 @@ export default function FunnelPanel({
         </div>
 
         <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
-          <div className="flex flex-col gap-1">
-            <label htmlFor={typeId} className="text-xs font-semibold text-ink-2">
-              {t('orgTypeLabel')}
-            </label>
-            <select
-              id={typeId}
-              value={orgType}
-              onChange={(e) => setOrgType(e.target.value)}
-              data-testid="agency-orgtype-filter"
-              className={`min-h-11 rounded-lg border border-border bg-surface px-3 text-sm text-ink ${focusRing}`}
-            >
-              <option value="ALL">{t('allTypes')}</option>
-              {orgTypes.map((ot) => (
-                <option key={ot} value={ot}>
-                  {tType(ot)}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/*
-            TASK-MULV3JXS1AW5X — a GET form, not an onChange redirect: the
-            province is counted on the server (the masking needs every
-            province's numbers), and a select that navigates on change would
-            reload the page on each arrow key. Works without JavaScript.
+            TASK-MULZATEX4G92H — one breakdown at a time: a province (every
+            type) or the organisation types (every province), never both.
+            Counted and masked on the server, so a GET form: a select that
+            navigated on change would reload on each arrow key. Works
+            without JavaScript.
           */}
-          <form method="get" action={path} className="flex flex-col gap-1" data-testid="agency-province-form">
-            <label htmlFor={provinceId} className="text-xs font-semibold text-ink-2">
-              {t('provinceLabel')}
+          <form method="get" action={path} className="flex flex-col gap-1" data-testid="agency-breakdown-form">
+            <label htmlFor={breakdownId} className="text-xs font-semibold text-ink-2">
+              {t('breakdownLabel')}
             </label>
             <div className="flex gap-2">
               <select
-                id={provinceId}
-                name="il"
-                defaultValue={funnel.province ?? ''}
-                aria-describedby={provinceNoteId}
-                data-testid="agency-province-filter"
-                className={`min-h-11 rounded-lg border border-border bg-surface px-3 text-sm text-ink ${focusRing}`}
+                id={breakdownId}
+                name="kirilim"
+                defaultValue={selected}
+                aria-describedby={breakdownNoteId}
+                data-testid="agency-breakdown-filter"
+                className={`min-h-11 max-w-[16rem] rounded-lg border border-border bg-surface px-3 text-sm text-ink ${focusRing}`}
               >
-                <option value="">{t('allProvinces')}</option>
-                {TR_PROVINCES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
+                <option value="">{t('breakdownNone')}</option>
+                <option value="tur">{t('breakdownOrgType')}</option>
+                <optgroup label={t('breakdownProvince')}>
+                  {TR_PROVINCES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
               <button
                 type="submit"
-                data-testid="agency-province-apply"
+                data-testid="agency-breakdown-apply"
                 className={`min-h-11 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-ink hover:bg-surface-hover ${focusRing}`}
               >
-                {t('provinceApply')}
+                {t('apply')}
               </button>
             </div>
-            <span id={provinceNoteId} className="max-w-xs text-xs text-ink-2">
-              {t('provinceNote')}
+            <span id={breakdownNoteId} className="max-w-sm text-xs text-ink-2">
+              {t('breakdownNote')}
             </span>
           </form>
 
+          {groups.length > 1 ? (
+            <div className="flex flex-col gap-1">
+              <label htmlFor={groupId} className="text-xs font-semibold text-ink-2">
+                {t('groupLabel')}
+              </label>
+              <select
+                id={groupId}
+                value={shown.key}
+                onChange={(e) => setGroup(e.target.value)}
+                data-testid="agency-group-filter"
+                className={`min-h-11 rounded-lg border border-border bg-surface px-3 text-sm text-ink ${focusRing}`}
+              >
+                {groups.map((g) => (
+                  <option key={g.key} value={g.key}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
         </div>
       </div>
 
-      <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="agency-funnel">
+      <ol
+        aria-label={shown.label}
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+        data-testid="agency-funnel"
+      >
         {STEPS.map((step, i) => (
           <li
             key={step}
             data-testid={`funnel-${step}`}
-            data-state={view[step].state}
+            data-state={shown.view[step].state}
             className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-surface p-4"
           >
             <div>
               <span className="text-xs font-semibold text-muted">{t('stepNumber', { n: i + 1 })}</span>
               <h3 className="mt-0.5 text-sm font-semibold text-ink">{t(`steps.${step}.title`)}</h3>
             </div>
-            <CellValue cell={view[step]} />
+            <CellValue cell={shown.view[step]} />
             <p className="text-xs text-ink-2">{t(`steps.${step}.hint`)}</p>
           </li>
         ))}

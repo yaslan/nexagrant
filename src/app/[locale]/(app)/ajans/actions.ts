@@ -10,7 +10,13 @@ import { revalidatePath } from 'next/cache';
 import { withTenant } from '@/lib/db';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
-import { AgencyInviteError, createInviteCodeIn, listInviteCodesIn, revokeInviteCodeIn } from '@/lib/agency/codes';
+import {
+  AgencyInviteError,
+  createInviteCodeIn,
+  listInviteCodesIn,
+  revokeInviteCodeIn,
+  shownUsedCount,
+} from '@/lib/agency/codes';
 import { AgencyPermissionError } from '@/lib/agency/errors';
 
 /**
@@ -97,7 +103,9 @@ export async function listInviteCodes() {
     hint: c.hint,
     label: c.label,
     maxUses: c.maxUses,
-    usedCount: c.usedCount,
+    // K-1: under 5 is "<5"; the status still needs to know a code is used up.
+    usedCount: shownUsedCount(c.usedCount),
+    exhausted: c.usedCount >= c.maxUses,
     expiresAt: c.expiresAt.toISOString(),
     revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
     createdAt: c.createdAt.toISOString(),

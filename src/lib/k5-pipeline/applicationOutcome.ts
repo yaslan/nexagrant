@@ -87,6 +87,13 @@ async function countForTenant(
 }
 
 /**
+ * What {@link countApplicationOutcomes} counts: applications (the default), or organisations with
+ * at least one (TASK-MULZATEX4G92H — the agency funnel's small-cell rule counts organisations, so
+ * one organisation with six applications must be one).
+ */
+export type OutcomeUnit = 'application' | 'organisation';
+
+/**
  * Submitted / accepted / rejected applications, summed over `tenantIds`.
  *
  * SECURITY: `tenantIds` MUST be derived server-side from the caller's authorised scope
@@ -102,19 +109,25 @@ async function countForTenant(
  *   another to keep one pooled connection per call, whatever the size of the list.
  * - Duplicates are counted once; an empty list is zeros. An empty or blank id throws
  *   (`MissingTenantScopeError`) rather than widening the query.
+ * - `unit: 'organisation'` counts each tenant at most once per number: tenants with at least one
+ *   submitted / accepted / rejected application. `accepted` and `rejected` then overlap (one
+ *   tenant can have both), but each stays a subset of `submitted`.
  */
 export async function countApplicationOutcomes(
   tenantIds: string[],
   since?: Date,
+  options: { unit?: OutcomeUnit } = {},
 ): Promise<ApplicationOutcomeCounts> {
+  const perOrganisation = options.unit === 'organisation';
   const total: ApplicationOutcomeCounts = { submitted: 0, accepted: 0, rejected: 0 };
   for (const tenantId of new Set(tenantIds)) {
     const c = await withTenant<ApplicationOutcomeCounts>(tenantId, (tx) =>
       countForTenant(tx, tenantId, since),
     );
-    total.submitted += c.submitted;
-    total.accepted += c.accepted;
-    total.rejected += c.rejected;
+    const n = (x: number) => (perOrganisation ? Math.min(x, 1) : x);
+    total.submitted += n(c.submitted);
+    total.accepted += n(c.accepted);
+    total.rejected += n(c.rejected);
   }
   return total;
 }

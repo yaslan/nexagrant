@@ -9,7 +9,9 @@ export interface InviteCodeRow {
   hint: string;
   label: string | null;
   maxUses: number;
-  usedCount: number;
+  /** K-1 (TASK-MULZATEX4G92H): null when under 5 — shown as "<5", never as a number. */
+  usedCount: number | null;
+  exhausted: boolean;
   expiresAt: string;
   revokedAt: string | null;
   createdAt: string;
@@ -26,7 +28,7 @@ const input = `min-h-11 w-full rounded-lg border border-border bg-surface px-3 t
 function statusOf(c: InviteCodeRow, now: number): Status {
   if (c.revokedAt) return 'revoked';
   if (new Date(c.expiresAt).getTime() <= now) return 'expired';
-  if (c.usedCount >= c.maxUses) return 'exhausted';
+  if (c.exhausted) return 'exhausted';
   return 'active';
 }
 
@@ -246,7 +248,15 @@ export default function InviteCodesPanel({
                     </td>
                     <td className="px-4 py-3 text-ink-2">{c.label ?? '—'}</td>
                     <td className="px-4 py-3 tabular-nums text-ink">
-                      {t('usage', { used: c.usedCount, max: c.maxUses, left: Math.max(0, c.maxUses - c.usedCount) })}
+                      {c.usedCount === null ? (
+                        <>
+                          {/* K-1: "left" would give the used count back, so it goes too. */}
+                          <span aria-hidden="true">{t('usageSmall', { max: c.maxUses })}</span>
+                          <span className="sr-only">{t('usageSmallSr', { max: c.maxUses })}</span>
+                        </>
+                      ) : (
+                        t('usage', { used: c.usedCount, max: c.maxUses, left: Math.max(0, c.maxUses - c.usedCount) })
+                      )}
                     </td>
                     <td className="px-4 py-3 text-ink-2">{dateFmt.format(new Date(c.expiresAt))}</td>
                     <td className="px-4 py-3">

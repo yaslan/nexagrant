@@ -136,7 +136,9 @@ beforeAll(async () => {
     // would, correctly, mask it).
     const t = await newTenant('ORGANIZATION', ids.agencyA, 'SME', 'Samsun');
     linkedA.push(t);
-    await giveContent(t, 1, i < 5); // 6 submitted, 5 funded
+    // 6 organisations submitted, 5 funded; the first one has 3 applications (TASK-MULZATEX4G92H
+    // Ö-1: 8 applications, but 6 organisations).
+    await giveContent(t, i === 0 ? 3 : 1, i < 5);
   }
   for (let i = 0; i < 2; i++) linkedA.push(await newTenant('ORGANIZATION', ids.agencyA, 'MUNICIPALITY', 'Samsun'));
   // B's organisation is busy: 10 submitted proposals. None may reach A.
@@ -217,20 +219,21 @@ describe('agency_funnel_counts (fabrika_app)', () => {
 describe('getAgencyFunnel (fabrika_app, with B7 outcomes)', () => {
   test('A’s funnel counts A’s organisations only, masked, with B7 numbers from A’s cohort', async () => {
     const { getAgencyFunnel } = await import('@/lib/agency/funnel');
-    const f = await getAgencyFunnel(ids.agencyA);
-    // 8 organisations: 6 SMEs + 2 municipalities. Municipalities are a group of 2 → "<5",
-    // and the total would give them away, so SME is suppressed as well.
-    expect(f.all.registered).toEqual({ state: 'count', value: 8 });
-    expect(f.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
-    expect(f.byOrgType.SME.registered).toEqual({ state: 'small' });
+    const f = await getAgencyFunnel(ids.agencyA, { breakdown: { dimension: 'orgType' } });
+    if (f.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
+    // 8 organisations (shown rounded: 10): 6 SMEs + 2 municipalities. Municipalities are a
+    // group of 2 → "<5", and the total would give them away, so SME is suppressed as well.
+    expect(f.all.registered).toEqual({ state: 'count', value: 10 });
+    expect(f.breakdown.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
+    expect(f.breakdown.byOrgType.SME.registered).toEqual({ state: 'small' });
     // TASK-MULXF0AVMD8MN: 6 of 8 would give away "2 organisations with no saved search /
     // pipeline / concept note", so those steps are masked too.
     expect(f.all.savedSearch).toEqual({ state: 'small' });
     expect(f.all.pipeline).toEqual({ state: 'small' });
     expect(f.all.conceptNote).toEqual({ state: 'small' });
-    // B7: 6 submitted, 5 funded, 0 rejected — B's 10 proposals are not in it. Showing
-    // "accepted 5" beside "submitted 6" bounded rejected to {0, 1} (crw-fb K-6): masked.
-    expect(f.all.submitted).toEqual({ state: 'count', value: 6 });
+    // B7 in organisations (TASK-MULZATEX4G92H Ö-1): 6 applied, 5 funded — B's 10 proposals are
+    // not in it. 8 − 6 = 2 did not apply and 6 − 5 = 1 has no accepted one: both masked.
+    expect(f.all.submitted).toEqual({ state: 'small' });
     expect(f.all.accepted).toEqual({ state: 'small' });
     expect(f.all.rejected).toEqual({ state: 'small' });
     expect(f.all.readiness).toEqual({ state: 'unmeasured' });
@@ -255,9 +258,11 @@ describe('getAgencyFunnel (fabrika_app, with B7 outcomes)', () => {
   test('the B7 list is derived from the agency link: A never receives B’s organisation', async () => {
     const { getAgencyFunnel } = await import('@/lib/agency/funnel');
     const seen: string[][] = [];
+    const units: unknown[] = [];
     await getAgencyFunnel(ids.agencyA, {
-      outcomes: async (tenantIds) => {
+      outcomes: async (tenantIds, _since, options) => {
         seen.push([...tenantIds]);
+        units.push(options?.unit);
         return { submitted: 0, accepted: 0, rejected: 0 };
       },
     });
@@ -265,6 +270,18 @@ describe('getAgencyFunnel (fabrika_app, with B7 outcomes)', () => {
     expect(all.sort()).toEqual([...linkedA].sort());
     expect(all).not.toContain(ids.orgB);
     expect(all).not.toContain(ids.orphan);
+    // TASK-MULZATEX4G92H Ö-1: the funnel always asks for organisations.
+    expect(new Set(units)).toEqual(new Set(['organisation']));
+  });
+
+  test('Ö-1: B7 in organisations counts 6 who applied where applications count 8', async () => {
+    const { countApplicationOutcomes } = await import('@/lib/k5-pipeline/applicationOutcome');
+    expect(await countApplicationOutcomes(linkedA)).toEqual({ submitted: 8, accepted: 7, rejected: 0 });
+    expect(await countApplicationOutcomes(linkedA, undefined, { unit: 'organisation' })).toEqual({
+      submitted: 6,
+      accepted: 5,
+      rejected: 0,
+    });
   });
 });
 
@@ -282,8 +299,8 @@ describe('one cohort, no date window (TASK-MULXF0AVMD8MN, fabrika_app)', () => {
           return { submitted: 0, accepted: 0, rejected: 0 };
         },
       });
-      // Steps 1, 3-5 (SQL, since = NULL) and the B7 cohort (Prisma) both still hold it.
-      expect(f.all.registered).toEqual({ state: 'count', value: 8 });
+      // Steps 1, 3-5 (SQL, since = NULL) and the B7 cohort (Prisma) both still hold it (8, shown 10).
+      expect(f.all.registered).toEqual({ state: 'count', value: 10 });
       expect(seen).toContain(old);
     } finally {
       await admin!.tenant.update({ where: { id: old }, data: { createdAt: before.createdAt } });
@@ -309,17 +326,20 @@ describe('province (TASK-MULV3JXS1AW5X, fabrika_app)', () => {
     expect(await byProvinceAs(linkedA[0]!)).toEqual([]);
   });
 
-  test('getAgencyFunnel with a province: that province’s cohort, masked; an empty one is all "<5"', async () => {
+  test('getAgencyFunnel with a province: that province over every type, masked; an empty one is all "<5"', async () => {
     const { getAgencyFunnel } = await import('@/lib/agency/funnel');
-    const samsun = await getAgencyFunnel(ids.agencyA, { province: 'Samsun' });
-    expect(samsun.province).toBe('Samsun');
-    expect(samsun.all.registered).toEqual({ state: 'count', value: 8 });
-    expect(samsun.all.submitted).toEqual({ state: 'count', value: 6 });
-    expect(samsun.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
-    expect(samsun.byOrgType.SME.registered).toEqual({ state: 'small' });
-    const tokat = await getAgencyFunnel(ids.agencyA, { province: 'Tokat' });
+    const samsun = await getAgencyFunnel(ids.agencyA, { breakdown: { dimension: 'province', province: 'Samsun' } });
+    if (samsun.breakdown.dimension !== 'province') throw new Error('no province breakdown');
+    expect(samsun.breakdown.province).toBe('Samsun');
+    // All 8 gave Samsun: nothing is hidden behind the province line, so Samsun shows (rounded).
+    expect(samsun.breakdown.view.registered).toEqual({ state: 'count', value: 10 });
+    expect(samsun.all.registered).toEqual({ state: 'count', value: 10 });
+    // TASK-MULZATEX4G92H: one breakdown per response — no type inside the province view.
+    expect(JSON.stringify(samsun)).not.toMatch(/byOrgType|MUNICIPALITY|SME/);
+    const tokat = await getAgencyFunnel(ids.agencyA, { breakdown: { dimension: 'province', province: 'Tokat' } });
+    if (tokat.breakdown.dimension !== 'province') throw new Error('no province breakdown');
     for (const s of ['registered', 'savedSearch', 'pipeline', 'conceptNote', 'submitted', 'accepted', 'rejected'] as const) {
-      expect(tokat.all[s]).toEqual({ state: 'small' });
+      expect(tokat.breakdown.view[s]).toEqual({ state: 'small' });
     }
     const text = JSON.stringify(samsun);
     for (const t of [...linkedA, ids.orgB]) expect(text).not.toContain(t);

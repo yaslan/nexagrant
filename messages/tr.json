@@ -2074,18 +2074,22 @@
     "intro": "Davet kodunuzla kayıt olan kurumların ilerleyişini toplu sayılarla izleyin ve davet kodlarınızı yönetin. Kurumların adı, içeriği ve kişisel verileri bu panoda gösterilmez.",
     "funnel": {
       "title": "Bölge başvuru hunisi",
-      "description": "Kodunuzla bugüne kadar kayıt olan tüm kurumlar ve bu kurumların ulaştığı adımlar. Sayılar kümülatiftir; dönem seçilmez. Adım sayıları kurum sayısıdır; başvuru ve sonuç sayıları başvuru sayısıdır.",
-      "orgTypeLabel": "Kurum türü",
+      "description": "Kodunuzla bugüne kadar kayıt olan tüm kurumlar ve bu kurumların ulaştığı adımlar. Sayılar kümülatiftir; dönem seçilmez. Tüm adımlarda kurum sayısı gösterilir, başvuru sayısı gösterilmez.",
+      "breakdownLabel": "Kırılım",
+      "breakdownNone": "Kırılım yok (yalnız toplam)",
+      "breakdownOrgType": "Kurum türüne göre (tüm iller)",
+      "breakdownProvince": "İle göre (tüm kurum türleri)",
+      "apply": "Uygula",
+      "breakdownNote": "Pano aynı anda tek bir kırılım gösterir: ya bir il ya da kurum türleri; il ile kurum türü birlikte gösterilmez. Yalnızca ilini bildiren kurumlar il bazında sayılır.",
+      "groupLabel": "Gösterilen grup",
+      "allOrganisations": "Tüm kurumlar",
       "allTypes": "Tüm kurum türleri",
-      "provinceLabel": "İl",
       "allProvinces": "Tüm iller",
-      "provinceApply": "Uygula",
-      "provinceNote": "Yalnızca ilini bildiren kurumlar il bazında sayılır; ilini bildirmeyenler yalnızca “Tüm iller” görünümünde yer alır. İller arasında da 5'ten küçük sayılar <5 olarak gizlenir.",
       "stepNumber": "Adım {n}",
       "unmeasured": "Henüz ölçülmüyor",
       "smallHint": "5'ten az kurum: kurumları tanıtmamak için sayı gösterilmez.",
       "smallSr": "5'ten az; sayı gizlendi",
-      "privacyNote": "<5: Bu grupta 5'ten az değer var ya da sayı, başka bir sayıdan (toplam, başka bir tür, başka bir il ya da başka bir adım) geri hesaplanabiliyor. Kurumları tanıtmamak için değer gizlenir.",
+      "privacyNote": "Gösterilen sayılar 5'in katına yuvarlanır; her sayı ayrı yuvarlandığı için parçaların toplamı toplamı tutmayabilir. <5: Bu grupta 5'ten az kurum var ya da sayı, başka sayılarla birlikte (toplam, başka bir tür, başka bir il ya da başka bir adım) geri hesaplanabiliyor. Kurumları tanıtmamak için değer gizlenir.",
       "steps": {
         "registered": {
           "title": "Davet koduyla kayıt",
@@ -2109,15 +2113,15 @@
         },
         "submitted": {
           "title": "Başvuru gönderildi",
-          "hint": "Kurumların beyan ettiği başvuru sayısı"
+          "hint": "En az 1 başvurusunu gönderildi olarak beyan eden kurum"
         },
         "accepted": {
           "title": "Kabul edildi",
-          "hint": "Kabul beyan edilen başvuru sayısı"
+          "hint": "En az 1 başvurusu kabul edildi olarak beyan edilen kurum"
         },
         "rejected": {
           "title": "Reddedildi",
-          "hint": "Red beyan edilen başvuru sayısı"
+          "hint": "En az 1 başvurusu reddedildi olarak beyan edilen kurum"
         }
       }
     },
@@ -2159,6 +2163,8 @@
       "colActions": "İşlemler",
       "hintSr": "{hint} ile biten kod",
       "usage": "{used} / {max} kullanıldı · {left} kaldı",
+      "usageSmall": "<5 / {max} kullanıldı",
+      "usageSmallSr": "5'ten az / {max} kullanıldı; kurumları tanıtmamak için sayı gösterilmez",
       "status": {
         "active": "Etkin",
         "revoked": "İptal edildi",

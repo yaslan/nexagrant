@@ -3,11 +3,22 @@ import { getTranslations } from 'next-intl/server';
 import { requireTenantPage } from '@/lib/tenant';
 import { asRole, can } from '@/lib/rbac';
 import { withTenant } from '@/lib/db';
-import { getAgencyFunnel, isAgencyTenant } from '@/lib/agency/funnel';
-import { listInviteCodesIn } from '@/lib/agency/codes';
+import { getAgencyFunnel, isAgencyTenant, type FunnelBreakdown } from '@/lib/agency/funnel';
+import { listInviteCodesIn, shownUsedCount } from '@/lib/agency/codes';
 import { parseProvince } from '@/lib/readiness/share';
 import FunnelPanel from './funnel-panel';
 import InviteCodesPanel, { type InviteCodeRow } from './invite-codes-panel';
+
+/**
+ * TASK-MULZATEX4G92H — one breakdown per request: `?kirilim=tur` (organisation
+ * types, every province) or `?kirilim=<province>` (one province, every type).
+ * An old `?il=` link still opens that province. Anything else is no breakdown.
+ */
+function parseBreakdown(kirilim: string | undefined, il: string | undefined): FunnelBreakdown {
+  if (kirilim === 'tur') return { dimension: 'orgType' };
+  const province = parseProvince(kirilim ?? il);
+  return province ? { dimension: 'province', province } : { dimension: 'none' };
+}
 
 /** Once per request, on the server; the client computes nothing from its own clock. */
 function requestTime(): number {
@@ -26,20 +37,19 @@ export default async function AgencyPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ il?: string }>;
+  searchParams: Promise<{ il?: string; kirilim?: string }>;
 }) {
   const { locale } = await params;
-  const { il } = await searchParams;
+  const { il, kirilim } = await searchParams;
   const scope = await requireTenantPage(locale);
   if (!(await isAgencyTenant(scope.tenantId))) forbidden();
 
   const t = await getTranslations({ locale, namespace: 'agency' });
-  // TASK-MULV3JXS1AW5X — one of TR_PROVINCES, anything else is "all provinces".
-  const province = parseProvince(il);
+  const breakdown = parseBreakdown(kirilim, il);
 
   const [funnel, codes] = await Promise.all([
     // TASK-MULXF0AVMD8MN — one cohort, no date window: an old `?gun=` link is ignored.
-    getAgencyFunnel(scope.tenantId, { province }),
+    getAgencyFunnel(scope.tenantId, { breakdown }),
     withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId)),
   ]);
   const renderedAt = requestTime();
@@ -48,7 +58,9 @@ export default async function AgencyPage({
     hint: c.hint,
     label: c.label,
     maxUses: c.maxUses,
-    usedCount: c.usedCount,
+    // K-1: under 5 is "<5"; the status still needs to know a code is used up.
+    usedCount: shownUsedCount(c.usedCount),
+    exhausted: c.usedCount >= c.maxUses,
     expiresAt: c.expiresAt.toISOString(),
     revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
     createdAt: c.createdAt.toISOString(),

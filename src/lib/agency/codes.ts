@@ -54,6 +54,18 @@ export interface InviteCodeSummary {
   createdAt: Date;
 }
 
+/**
+ * K-1 (TASK-MULZATEX4G92H, crw-fb): what the dashboard shows of a code's use.
+ * A count under 5 is "<5" (null), like every other count on the page: with a
+ * code handed to a single organisation, "1 used" is the moment that
+ * organisation registered. §3.1 threshold (SMALL_CELL_THRESHOLD in funnel.ts).
+ */
+export const USED_COUNT_THRESHOLD = 5;
+
+export function shownUsedCount(usedCount: number): number | null {
+  return usedCount >= USED_COUNT_THRESHOLD ? usedCount : null;
+}
+
 /** Validates the inputs a create call brings, before anything is written. */
 export function validateInviteCodeInput(
   input: { maxUses: number; expiresAt: Date },

@@ -2074,18 +2074,22 @@
     "intro": "Follow the progress of the organisations that registered with your invite codes, as aggregated numbers, and manage your invite codes. Organisation names, content and personal data are not shown here.",
     "funnel": {
       "title": "Regional application funnel",
-      "description": "Every organisation that has registered with your codes so far, and the steps they reached. Numbers are cumulative; there is no period to choose. Step numbers count organisations; application and outcome numbers count applications.",
-      "orgTypeLabel": "Organisation type",
+      "description": "Every organisation that has registered with your codes so far, and the steps they reached. Numbers are cumulative; there is no period to choose. Every step counts organisations, not applications.",
+      "breakdownLabel": "Breakdown",
+      "breakdownNone": "No breakdown (totals only)",
+      "breakdownOrgType": "By organisation type (all provinces)",
+      "breakdownProvince": "By province (all organisation types)",
+      "apply": "Apply",
+      "breakdownNote": "The dashboard shows one breakdown at a time: one province or the organisation types, never province and type together. Only organisations that gave a province are counted per province.",
+      "groupLabel": "Group shown",
+      "allOrganisations": "All organisations",
       "allTypes": "All organisation types",
-      "provinceLabel": "Province",
       "allProvinces": "All provinces",
-      "provinceApply": "Apply",
-      "provinceNote": "Only organisations that gave a province are counted per province; the others appear only under “All provinces”. Numbers under 5 are hidden as <5 across provinces too.",
       "stepNumber": "Step {n}",
       "unmeasured": "Not measured yet",
       "smallHint": "Fewer than 5 organisations: the number is hidden so that no organisation can be identified.",
       "smallSr": "fewer than 5; number hidden",
-      "privacyNote": "<5: this group has fewer than 5, or the number could be worked out from another number (a total, another type, another province or another step). The value is hidden so that no organisation can be identified.",
+      "privacyNote": "Numbers shown are rounded to a multiple of 5; each is rounded on its own, so the parts may not add up to the total. <5: this group has fewer than 5 organisations, or the number could be worked out together with other numbers (a total, another type, another province or another step). The value is hidden so that no organisation can be identified.",
       "steps": {
         "registered": {
           "title": "Registered with a code",
@@ -2109,15 +2113,15 @@
         },
         "submitted": {
           "title": "Application submitted",
-          "hint": "Applications the organisations declared"
+          "hint": "Organisations that declared at least 1 application submitted"
         },
         "accepted": {
           "title": "Accepted",
-          "hint": "Applications declared accepted"
+          "hint": "Organisations with at least 1 application declared accepted"
         },
         "rejected": {
           "title": "Rejected",
-          "hint": "Applications declared rejected"
+          "hint": "Organisations with at least 1 application declared rejected"
         }
       }
     },
@@ -2159,6 +2163,8 @@
       "colActions": "Actions",
       "hintSr": "code ending in {hint}",
       "usage": "{used} / {max} used · {left} left",
+      "usageSmall": "<5 / {max} used",
+      "usageSmallSr": "fewer than 5 / {max} used; the number is hidden so that no organisation can be identified",
       "status": {
         "active": "Active",
         "revoked": "Revoked",
