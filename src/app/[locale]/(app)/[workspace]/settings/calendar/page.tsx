@@ -30,9 +30,15 @@ export default async function CalendarSettingsPage({ params }: { params: Promise
   // defect this card's i18n complaint names one line further up the page.
   const t = await getTranslations({ locale, namespace: 'settings.calendar' });
 
+  // Explicit `select`: the row carries accessToken/refreshToken, and every
+  // prop handed to <CalendarClient> is serialised into the RSC payload the
+  // browser receives. Only the four fields the client renders leave the server
+  // (İNCELEME-23 Ö-2, TASK-MUMT3KVHJTYX0; guarded by
+  // tests/secret-model-select-guard.test.ts).
   const connections = await withTenant(tenantId, (tx) =>
     tx.calendarConnection.findMany({
       where: { tenantId, userId },
+      select: { id: true, provider: true, isConnected: true, lastSyncAt: true },
     })
   );
 
