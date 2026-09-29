@@ -80,7 +80,7 @@ errors []   (pageerror + console.error yok)
 
 ## 4) Riskler
 - Üretimde `Tenant.settings.sso` kaydı varsa artık okunmayan ölü veri olarak kalır. Güvenlik etkisi yok, çünkü hiçbir kod yolu okumuyor.
-- `docs/` altında SSO/SAML anlatan belgeler olabilir (ROADMAP, ADR vb.). Kural gereği dokunmadım, belge sahibinin işi.
+- `docs/` altındaki SSO/SAML anlatımlarına kural gereği dokunmadım. Belge tarafını komşu commit `7955009e` (TASK-MUMNAUBUDL5E7) güncelledi: ROADMAP, hukuk paketi, SECURITY_COMPLIANCE ve ADR-0006 notu.
 - `client.tsx` diff'i girinti yüzünden büyük görünüyor (438 satır). `git diff -w` ile gerçek değişiklik yalnız silme.
 
 ## 5) Açık sorular
