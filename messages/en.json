@@ -1547,7 +1547,10 @@
       "pilotTitle": "Free pilot",
       "pilotBody": "Your organisation is on a free pilot with the Municipal Team plan until {date} (inclusive).",
       "pilotExpiredBody": "The free pilot ended on {date}. The workspace is read-only; your data is kept.",
-      "pilotNoSale": "Payment and plan upgrades are closed during the pilot. The annual package opens by contract after the pilot."
+      "pilotNoSale": "Payment and plan upgrades are closed during the pilot. The annual package opens by contract after the pilot.",
+      "metricPilot": "PILOT",
+      "metricPilotExpired": "PILOT ENDED",
+      "metricPilotTerm": "Last day: {date} · does not renew"
     }
   },
   "adminSettings": {

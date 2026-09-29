@@ -1547,7 +1547,10 @@
       "pilotTitle": "Ücretsiz pilot",
       "pilotBody": "Kurumunuz {date} tarihine kadar (bu gün dahil) ücretsiz pilotta, Belediye Ekip planı yetkileriyle.",
       "pilotExpiredBody": "Ücretsiz pilot {date} tarihinde sona erdi. Çalışma alanı salt-okunur; verileriniz korunuyor.",
-      "pilotNoSale": "Pilot süresince ödeme ve plan yükseltme kapalıdır. Yıllık paket, pilot sonrasında sözleşmeyle açılır."
+      "pilotNoSale": "Pilot süresince ödeme ve plan yükseltme kapalıdır. Yıllık paket, pilot sonrasında sözleşmeyle açılır.",
+      "metricPilot": "PİLOT",
+      "metricPilotExpired": "PİLOT BİTTİ",
+      "metricPilotTerm": "Son gün: {date} · yenilenmez"
     }
   },
   "adminSettings": {

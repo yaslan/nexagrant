@@ -307,10 +307,12 @@ export function BillingClient({
             <div className="text-xl font-bold text-ink uppercase tracking-tight flex items-center gap-2">
               <span>{activePlan}</span>
               <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-mono font-bold">
-                {t('metricPlanActive')}
+                {pilot ? (pilot.expired ? t('metricPilotExpired') : t('metricPilot')) : t('metricPlanActive')}
               </span>
             </div>
-            <div className="text-[11px] text-muted">{t('metricPlanTerm')}</div>
+            <div className="text-[11px] text-muted">
+              {pilot ? t('metricPilotTerm', { date: pilot.lastDay }) : t('metricPlanTerm')}
+            </div>
           </div>
 
           <div className="p-4 bg-ground border border-border rounded-2xl space-y-2">
