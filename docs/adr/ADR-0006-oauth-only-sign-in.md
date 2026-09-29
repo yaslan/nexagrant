@@ -29,4 +29,5 @@ Microsoft Entra ID ile giriş **kaldırıldı**; tek OAuth sağlayıcısı Googl
 - **Hesap bağlama:** Aynı e-postayla var olan hesaba bağlanma yalnız Google'ın `email_verified` beyanıyla olur. Tanınmayan her sağlayıcı kimliği (eski `microsoft-entra-id` dahil) "doğrulanmamış" sayılır ve bağlanmaz.
 - **Var olan Entra hesapları:** Daha önce Microsoft ile açılmış bir hesap aynı e-postanın Google hesabıyla girebilir (Google adresi doğruluyorsa bağlanır). Google hesabı olmayan kişi için giriş yolu yoktur; pilot öncesi böyle bir kullanıcı yoksa ek iş gerekmez.
 - **Kapsam dışı:** Kiracı SSO (SAML / Okta / Entra ID, TASK-MUML0QZAZ5M80) ve Outlook takvim bağlantısı bu karardan etkilenmez; bunlar giriş sağlayıcısı değildir.
+  - **Not (29.09.2026, patron):** kurumsal SSO/SAML kaldırıldı (ayar girişte hiç kullanılmıyordu; `0fdbcb8d`, TASK-MUML0QZAZ5M80).
 - **Diğer belgeler:** KVKK / yurt dışı aktarım metinlerindeki "Google / Microsoft ile giriş" satırları (`docs/kamu/VERI-YERLESIMI.md`, `docs/legal/processing-register.md` vb.) ayrı kartta güncellenir (cs-fb).

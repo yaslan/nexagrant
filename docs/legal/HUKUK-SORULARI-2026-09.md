@@ -1,13 +1,15 @@
 # FonBridge — Hukukçuya Soru Paketi (Eylül 2026)
 
-> **Sürüm 1.2** · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MUMH7OISNJ5OV (FB-KAMU-2, pilot kapısı d); 1.1 eki: TASK-MUMJA8VJJ8YP0 (PostHog ve Sentry); 1.2 eki: TASK-MUMLFVDX85O4M (29.09 ürün sahibi kararları: dış hizmet listesi daraldı, Microsoft girişi kaldırıldı)
+> **Sürüm 1.3** · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MUMH7OISNJ5OV (FB-KAMU-2, pilot kapısı d); 1.1 eki: TASK-MUMJA8VJJ8YP0 (PostHog ve Sentry); 1.2 eki: TASK-MUMLFVDX85O4M (29.09 ürün sahibi kararları: dış hizmet listesi daraldı, Microsoft girişi kaldırıldı); 1.3 eki: TASK-MUMNAUBUDL5E7 (Outlook takvimi ve kurumsal SSO kaldırıldı)
 >
 > **Kime:** FonBridge'in KVKK / veri koruma danışmanı.
 > **Ne istiyoruz:** Bu belgedeki sorulara yazılı görüş. Her sorunun altında "cevaba göre ne değişir" bölümü var. Cevabınız, hangi metnin ve hangi ürün davranışının değişeceğini doğrudan belirler.
 >
 > **Bu belge hukuki bir metin değildir.** Ürün ekibinin bugünkü durumu anlattığı bir soru listesidir. Hiçbir cümlesi hukuken onaylı değildir.
 >
-> **Bugünkü durumun kaynağı kodun kendisidir**, planlar ya da eski belgeler değildir. Her teknik iddia 29.09.2026'da `dev` dalının `84d11af4` commit'inde kaynak kodda kontrol edildi (sürüm 1.0 `858c139a`'da kontrol edilmişti; sürüm 1.1'de bütün kanıt satırları bu commit'e göre yeniden kontrol edildi). **Sürüm 1.2:** kanıt satırlarındaki dosyalar `89eab729`'a kadar tarandı; yalnız `oauth-registration.ts` satır numaraları kaydı, onlar düzeltildi. 1.2'de eklenen §2.0 giriş satırı ve §5 madde 3 kod değil **karardır**: 29.09.2026 akşamı ürün sahibi dört dış hizmeti üründen çıkardı. Kod değişikliği o gün sürüyordu (kart kodları ilgili satırlarda). Kod yolları her bölümün sonunda "Kanıt" satırında verilir. Bu satırlar ürün ekibi içindir; okumanız gerekmez.
+> **Bugünkü durumun kaynağı kodun kendisidir**, planlar ya da eski belgeler değildir. Her teknik iddia 29.09.2026'da `dev` dalının `84d11af4` commit'inde kaynak kodda kontrol edildi (sürüm 1.0 `858c139a`'da kontrol edilmişti; sürüm 1.1'de bütün kanıt satırları bu commit'e göre yeniden kontrol edildi). **Sürüm 1.2:** kanıt satırlarındaki dosyalar `89eab729`'a kadar tarandı; yalnız `oauth-registration.ts` satır numaraları kaydı, onlar düzeltildi. 1.2'de eklenen §2.0 giriş satırı ve §5 madde 3 kod değil **karardır**: 29.09.2026 akşamı ürün sahibi dört dış hizmeti üründen çıkardı. Kod değişikliği o gün sürüyordu (kart kodları ilgili satırlarda). **Sürüm 1.3 (değişiklik notu):** (a) Takvim bağlantısında Outlook (Microsoft) seçeneği kaldırıldı; takvim yalnız Google Takvim ve `.ics` dosyasıyla çalışır (§2.0, §5 madde 3). (b) Kurumsal tek oturum açma (SSO / SAML) ayarı üründen kaldırıldı; bu ayar hiçbir zaman girişte kullanılmamıştı (§2.0, §2.3 kanıtı). (c) Microsoft girişinin kaldırılması artık kodda (`acc35b07`); §2.0 ve §5 madde 3 kanıt satırları buna göre düzeltildi. Kanıt satırları `9a9aa6ef`'e göre; SSO kaldırması `0fdbcb8d`. Soruların hiçbiri değişmedi.
+
+Kod yolları her bölümün sonunda "Kanıt" satırında verilir. Bu satırlar ürün ekibi içindir; okumanız gerekmez.
 
 ---
 
@@ -45,7 +47,11 @@ Cevaplarınızı §7'deki cevap tablosuna yazabilirsiniz.
 - Kurum kayıt olurken bu kodu kullanırsa kurumun hesabı ajansa **bağlanır**. Ajans, kendi kodlarıyla gelen kurumlar hakkında **yalnız toplu sayılar** görür: kaç kurum kayıt oldu, kaç kurum bir çağrıyı takibe aldı, kaç kurumun başvurusu kabul edildi gibi.
 - **Fon hazırlık karnesi**, sitede kayıt olmadan doldurulabilen 15 soruluk bir öz değerlendirmedir. Kurum türü, cevaplar ve isteğe bağlı olarak il seçilir.
 - **Giriş yalnız Google hesabıyla yapılır.** Microsoft ile giriş seçeneği ürün sahibinin 29.09.2026 kararıyla **kaldırıldı**; açılması planlanmıyor. Şifreyle giriş yoktur (ADR-0006, 29.09.2026).
-  - _Kanıt:_ karar kaydı TASK-MUMLFLB2OPLY3. Uygulama TASK-MUMLFLB2OPLY3'te sürüyor: `89eab729`'da `src/lib/auth.ts:3` ve `:316-317` Microsoft sağlayıcısını hâlâ içeriyor. Sağlayıcı yalnız anahtarı tanımlıysa kayda girer, anahtar yoksa düğme görünmez (`auth.ts:311-316`, `AuthCard.tsx:158`, `:573`); anahtar tanımlanmadı ve tanımlanmayacak.
+  - _Kanıt:_ karar kaydı TASK-MUMLFLB2OPLY3. **Sürüm 1.3:** Microsoft sağlayıcısı `acc35b07` ile koddan çıktı (kart inceleme bekliyor). `9a9aa6ef`'te `src/lib/auth.ts` yalnız `Google` ve yerel demo için `Credentials` sağlayıcısını içeriyor (`auth.ts:2-3`, `:300`); giriş ekranında yalnız Google düğmesi var (`AuthCard.tsx:159`).
+- **Takvim bağlantısı yalnız Google Takvim ve `.ics` dosyasıyla çalışır.** Outlook (Microsoft) takvim seçeneği ürün sahibinin 29.09.2026 kararıyla **kaldırıldı**. Takvim bağlantısı bugün hiç veri yazmıyor (Google anahtarı tanımlı değil).
+  - _Kanıt:_ `15313bc6` (`src/lib/calendar/outlook.ts` silindi, sağlayıcı listesinden çıktı), `4dc067ef` (ekran metni). Kart TASK-MUMMIHYY2F4KB inceleme bekliyor. `src` altında Outlook yalnız "kaldırıldı" yorumlarında ve testte geçiyor.
+- **Kurumsal tek oturum açma (SSO / SAML) yok.** Ürünün yönetim ekranında bir SSO ayar formu vardı, ama kaydedilen ayar girişte hiç kullanılmıyordu. Ürün sahibi 29.09.2026'da bu ayarı tamamen kaldırdı. Giriş yalnız Google.
+  - _Kanıt:_ `9a9aa6ef`'te ayar `Tenant.settings.sso` JSON alanına yazılıyor (`src/lib/sso.ts:49-59`); okuyan `resolveSsoProviderForDomain` (`sso.ts:133`) yalnız testlerde çağrılıyor (`git grep resolveSsoProviderForDomain` → `sso.ts`, `sso.test.ts`, `tests/billing-iyzico-sso.test.ts`). `0fdbcb8d` ile form, action, `sso.ts` ve testleri silindi; `src` altında `sso`/`saml` 0 geçiş. Kart TASK-MUML0QZAZ5M80 inceleme bekliyor.
 
 ### 2.1 Belgelerde "henüz yok" yazan ama artık kodda olanlar
 
@@ -83,7 +89,7 @@ Hukuki önemi şudur:
 - Kurum adı bugün ajansa **gösterilmez** (HUKUK-4). Ama kurum hesabının adı, varsayılan olarak **bir gerçek kişinin adıdır**. "Kurum verisi" ile "kişi verisi" ayrımı (HUKUK-11) yalnız şahıs şirketleri için değil, bu varsayılan ad yüzünden **her kurum hesabı için** gündemdedir.
 - Ajansa giden "kurum türü" kırılımı bugün fiilen tek bir grup (KOBİ) gösterir. Bu anonimliği azaltmaz (bütün kurumlar aynı grupta durur), ama ekteki "kurum türü" anlatımı gerçekle örtüşmüyor. Bu bir ürün hatası olarak ayrıca bildirildi (§8); sizden bir cevap beklemiyor. HUKUK-5 değerlendirmesinde tür kırılımı düzeltilince yeniden devreye gireceğini bilmeniz yeterlidir.
 
-_Kanıt:_ `src/lib/oauth-registration.ts:236` (`name: \`${input.userName || 'My'} Organization\``) ve `:239` (`orgType: 'SME'`). Ürün içinde `Tenant` kaydını güncelleyen yerler yalnız il (`settings/profile/actions.ts:40`), ajans türü, ortak marka ve SSO alanıdır; ad ve tür için yoktur (`grep "tenant.update" src`).
+_Kanıt:_ `src/lib/oauth-registration.ts:236` (`name: \`${input.userName || 'My'} Organization\``) ve `:239` (`orgType: 'SME'`). Ürün içinde `Tenant` kaydını güncelleyen yerler yalnız il (`settings/profile/actions.ts:40`), ajans türü, ortak marka ve SSO alanıdır; ad ve tür için yoktur (`grep "tenant.update" src`). (Sürüm 1.3: SSO alanı `0fdbcb8d` ile kaldırıldı, TASK-MUML0QZAZ5M80.)
 
 ### 2.4 Ana aydınlatma metni bu akışlardan hiç söz etmiyor
 
@@ -322,14 +328,15 @@ Ana aydınlatma metnini hukuk ekibinin yazması bekleniyor (TASK-MTSWIFJKGTYC). 
    - **PostHog (ürün analitiği), bugün kapalı:** anahtar girilirse, yalnız çerez onayı veren ziyaretçinin anonim olayları gider (§3.3 madde 1). Varsayılan AB bölgesi; ABD bölgesi seçilirse yurt dışı aktarım olur. DPA imzalı değil.
 
    _Çıkanlar (alıcı olmayacak):_
-   - **Microsoft (giriş):** Microsoft ile giriş kaldırıldı (§2.0). Uygulama TASK-MUMLFLB2OPLY3'te sürüyor.
+   - **Microsoft (giriş):** Microsoft ile giriş kaldırıldı (§2.0). Kodda kaldırıldı (`acc35b07`); kart TASK-MUMLFLB2OPLY3 inceleme bekliyor.
+   - **Microsoft (Outlook takvimi):** sürüm 1.3 — takvim bağlantısında Outlook seçeneği kaldırıldı; takvim yalnız Google (§2.0). Kodda kaldırıldı (`15313bc6`); kart TASK-MUMMIHYY2F4KB inceleme bekliyor. Böylece Microsoft hiçbir amaçla alıcı değildir.
    - **Sentry (hata iletimi):** hata kayıtları yalnız kendi veritabanımızdaki sistem uyarıları tablosunda tutulacak, dışarı gönderilmeyecek. Sürüm 1.1'deki Sentry açıklaması geçersizdir. Gönderen kod `89eab729` ile silindi; uygulama TASK-MUMLEUIQWSI59'da sürüyor (inceleme bekliyor).
    - **Resend (e-posta iletimi):** e-postalar kendi SMTP sunucumuzdan gidecek. Uygulama TASK-MUMLF57HOYFSB'de sürüyor.
    - **Inngest (zamanlanmış işler):** zamanlanmış işler kendi iş kuyruğumuza taşınacak. Uygulama TASK-MUMLFDTNQ53VJ'de sürüyor (önce teknik karar kaydı ve deneme).
 
    _Sizden istediğimiz ek görüş:_ kendi SMTP sunucumuz ve iş kuyruğumuz bir barındırma sağlayıcısının sunucusunda çalışacak. O sağlayıcının hangi ülkede olduğu **henüz belli değil**. Barındırma sağlayıcısını alıcı ya da veri işleyen olarak ayrıca yazmamız gerekir mi?
 
-   - _Kanıt:_ karar: patron anahtar kartı TASK-MULQM3LFB4KRA (29.09'da yalnız Anthropic + OpenAI + Google izin ekranı adıyla daraltıldı). PostHog: `src/lib/analytics.ts:28`, `:119-122`. Sentry gönderici dosyası `src/lib/observability/sentry.ts` ve `SENTRY_DSN` `89eab729`'da silindi. `89eab729`'da Resend (`src/lib/email/resend-mailer.ts`), Inngest (`src/lib/inngest/`) ve Microsoft (`src/lib/auth.ts:317`) kodu hâlâ duruyor; kaldırma yukarıdaki kartlarda sürüyor. Envanterdeki alıcı satırları (`processing-register.md` §1, §17, §18, §19a, §21) kod değişince güncellenecek (§8 madde 6).
+   - _Kanıt:_ karar: patron anahtar kartı TASK-MULQM3LFB4KRA (29.09'da yalnız Anthropic + OpenAI + Google izin ekranı adıyla daraltıldı). PostHog: `src/lib/analytics.ts:28`, `:119-122`. Sentry gönderici dosyası `src/lib/observability/sentry.ts` ve `SENTRY_DSN` `89eab729`'da silindi. `89eab729`'da Resend (`src/lib/email/resend-mailer.ts`), Inngest (`src/lib/inngest/`) ve Microsoft (`src/lib/auth.ts:317`) kodu hâlâ duruyor; kaldırma yukarıdaki kartlarda sürüyor. **Sürüm 1.3:** Microsoft girişi `acc35b07`, Outlook takvimi `15313bc6` ile koddan çıktı; envanter §1, §11, §21 Microsoft satırları buna göre güncellendi. Envanterdeki alıcı satırları (`processing-register.md` §1, §17, §18, §19a, §21) kod değişince güncellenecek (§8 madde 6).
 
 4. **Toplama yöntemi ve hukuki sebep:** her amaç için sebep (envanterde beş ayrı sebep kullanılıyor); meşru menfaat için dengeleme testi (sekiz faaliyet md.5/2-f'ye dayanıyor); çerez aydınlatması ayrı belge mi.
 5. **Haklar:** md.11 bentlerinin tam listesi; otomatik analiz (md.11/g) için ürüne özel açıklama (YZ ön değerlendirme puanı); başvuru usulü; hesabı olmayan kişi için kanal; Kurul'a şikâyet cümlesi.
@@ -381,6 +388,6 @@ Bu paketi hazırlarken kodda, belgelerin söylediğinden farklı olan şunlar bu
 4. **İl açıklaması kodsuz kayıtta yanlış yönlendiriyor.** `Auth.provinceHint` her kayıtta "kalkınma ajansı raporlarında kullanılır" diyor.
 5. **Kayıt ekranı kısa metni eksik.** `Auth.agencyInvite.sees` ajansın gördüğü sekiz adımdan yalnız üçünü sayıyor; kırılım, yuvarlama ve rapordan söz etmiyor (§2.2).
 
-6. **Envanter 29.09 kararlarının gerisinde (sürüm 1.2).** `processing-register.md` §1 (Microsoft), §17 ve §18 (Resend), §19a (Sentry) ve §21 alt işleyen tablosu (Microsoft, Resend) bugünkü kodu anlatıyor. Kaldırma kartları (TASK-MUMLFLB2OPLY3, TASK-MUMLEUIQWSI59, TASK-MUMLF57HOYFSB, TASK-MUMLFDTNQ53VJ) `done` olunca bu satırlar güncellenmeli. Kod değişmeden "kaldırıldı" yazmak envanteri yanlış yapar.
+6. **Envanter 29.09 kararlarının gerisinde (sürüm 1.2; 1.3'te Microsoft kısmı kapandı — §1, §11, §21 Microsoft satırları `acc35b07` ve `15313bc6` sonrası güncellendi).** `processing-register.md` §1 (Microsoft), §17 ve §18 (Resend), §19a (Sentry) ve §21 alt işleyen tablosu (Microsoft, Resend) bugünkü kodu anlatıyor. Kaldırma kartları (TASK-MUMLFLB2OPLY3, TASK-MUMLEUIQWSI59, TASK-MUMLF57HOYFSB, TASK-MUMLFDTNQ53VJ) `done` olunca bu satırlar güncellenmeli. Kod değişmeden "kaldırıldı" yazmak envanteri yanlış yapar.
 
 Bu maddeler için ayrı kartlar açılmalı. Bu belgenin kapsamı yalnız soru paketidir.
