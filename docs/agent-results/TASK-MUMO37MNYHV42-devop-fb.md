@@ -172,3 +172,39 @@ NOTICE: no rows left   → tenants 0 | users 42 (başlangıç değerleri)
 - be-fb veya devop: B-4 için kök neden ve seed kartı açılsın.
 
 **Platform beyanı:** Doğrulama **mac** üzerinde yapıldı (Darwin 27, Node 26.5, `next dev` :3000, Docker Postgres `fabrika-postgres`, Chromium headless-shell 1243). İncelenen kod sunucu tarafında TS ve React istemcisi. Süreç, dosya yolu, kabuk ya da DPI bağımlılığı yok. `digest` ve HTTP 403 platformdan bağımsız, Windows ve Linux'ta aynı davranış beklenir. Bu iki platform **koşulamadı**, çünkü makinede yalnız macOS var.
+
+---
+
+## Ek — B-4 takibi (patron: "kök neden kartı aç, db:seed ile geri yükle", 29.09)
+
+**Kök neden kartı:** TASK-MUMSUA77J1C6Q (todo, FB-KAMU-2, atanmamış).
+- İzole bir DB'de kanıt koşusu yapılacak.
+- Değişkenle çağrılan `deleteMany` teardown'larına koruma eklenecek.
+- Aynı hatanın geri gelmesini engelleyen bir guard ve mutant kanıtı istenecek.
+- Seed'in ModuleState açığı kapatılacak.
+
+**Geri yükleme:** `pnpm db:seed` koşuldu (exit 0).
+- Seed idempotent, upsert tabanlı.
+- Tek silme yan etkisi, listede olmayan `Plan` satırlarını emekliye ayırması. Bu yüzden Plan/PlanVersion önceden yedeklendi: scratchpad'de `plan-backup.sql`, 56 satır.
+```
+            önce  sonra
+Tenant        0     1   (demo-tenant "Fabrika Beta")
+User         42    42
+Workspace     0     1
+Membership    0    11
+Subscription  0     1   (pro ACTIVE)
+Opportunity   0     5
+Call        444   444
+Plan          7     7   PLANS_UNCHANGED (id listesi aynı)
+```
+Seed logu: 10 koltuk ve superadmin, 20 çağrı, 5 fırsat, 15 kapı kararı, 3 teklif, 10 efor, M6 değerlendirmesi, E11 geri bildirimi.
+- Uyarı: `demo-topic-1..6` bulunamadığı için 5 K1 eşleşmesi atlandı. G0 hizalaması seed'lenmedi, bu seed'in kendi davranışı.
+
+**Gerçek tarayıcı:** `alice@fabrika.test` ile giriş yapıldı → `/tr/default/dashboard`, h1 "Panel", pageerror 0.
+
+**Açık, seed tam geri getirmedi:** `ModuleState` tablosu 0 satır.
+- `prisma/seed.ts:22`'deki yorum bu satırları türettiğini söylüyor, ama seed ModuleState yazmıyor.
+- Sonuç: demo-tenant'ta modüller kapalı. Fırsatlar sayfası "Bu modül şu anda kullanılamıyor" gösteriyor. Kare `04-seed-sonrasi-pipeline.png`.
+- Silinen diğer test kiracıları (Crwfb-Pilot, Fefb-Pilot-Mumip77s, Kamu B11) seed kapsamında değil, geri gelmedi.
+
+**Geri alma:** `DELETE FROM "Tenant" WHERE id='demo-tenant'` (kaskad), sonra gerekirse `plan-backup.sql`.
