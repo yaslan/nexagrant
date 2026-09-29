@@ -26,13 +26,6 @@ const envSchema = z.object({
   ),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: optionalUrl,
-  /**
-   * Optional Sentry forwarding of error-level SystemAlert rows
-   * (src/lib/observability/sentry.ts). Unset or blank = nothing leaves the
-   * deployment (decision of 2026-09-07). A DSN is a credential — env only.
-   */
-  SENTRY_DSN: optionalUrl,
-  SENTRY_ENVIRONMENT: z.string().optional(),
   INNGEST_API_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
   /**

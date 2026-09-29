@@ -50,7 +50,6 @@
 
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
-import { captureAlertToSentry, isSentryEnabled } from '@/lib/observability/sentry';
 
 /** Mirrors the vocabulary the `SystemAlert.level` column documents. */
 export type AlertLevel = 'info' | 'warn' | 'error';
@@ -333,13 +332,6 @@ export async function recordAlert(
     }
 
     const created = await db.systemAlert.create({ data: row, select: { id: true } });
-    // Only a *new* error row is forwarded: a folded repeat is already an open
-    // Sentry issue. Off unless SENTRY_DSN is set (src/lib/observability/sentry.ts);
-    // awaited so a serverless runtime does not freeze before it leaves, bounded by
-    // the forwarder's own timeout, and it never throws.
-    if (row.level === 'error' && isSentryEnabled()) {
-      await captureAlertToSentry({ ...row, alertId: created.id });
-    }
     return { status: 'recorded', id: created.id };
   } catch (error) {
     // Console only. Re-raising would break the caller, and the message could
