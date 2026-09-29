@@ -26,6 +26,10 @@ vi.mock('next/headers', () => ({
   }),
   headers: async () => new Headers(),
 }));
+// Stands in for the redirect to Google: what is checked is the cookie jar the
+// action leaves behind at the moment it hands over.
+const signIn = vi.hoisted(() => vi.fn(async (_provider: string, _options: { redirectTo: string }) => {}));
+vi.mock('@/lib/auth', () => ({ signIn, signOut: vi.fn() }));
 
 test('a code without the addendum tick: refused before the redirect, in the reader’s language, nothing parked', async () => {
   const { loginWithSocialAction } = await import('../src/lib/actions/auth');
@@ -34,4 +38,28 @@ test('a code without the addendum tick: refused before the redirect, in the read
     expect(res).toEqual({ error: (locale === 'en' ? en : tr).Auth.disclosureRequiredAgency });
   }
   expect([...jar.keys()]).toEqual([]);
+});
+
+/**
+ * TASK-MUN2793A57Z9I (İNCELEME-34 B-1, mutant N2) — a tenant invitation rides
+ * only on the start from its own accept screen. The plain `/giris` / `/kayit`
+ * Google start clears a parked one, else an accept screen opened and abandoned
+ * in this browser turns the next Google sign-up into a join attempt.
+ */
+test('a plain Google start clears a parked tenant invitation before handing over to Google', async () => {
+  const { loginWithSocialAction } = await import('../src/lib/actions/auth');
+  const { INVITATION_ACCEPT_COOKIE, encodeParkedInvitation } = await import('../src/lib/invitations/accept-cookie');
+  const { registrationAcknowledgementToken } = await import('../src/lib/legal/consent-documents');
+  for (const acknowledgement of [undefined, registrationAcknowledgementToken()]) {
+    jar.clear();
+    signIn.mockClear();
+    jar.set(INVITATION_ACCEPT_COOKIE, encodeParkedInvitation({ token: 'a'.repeat(64), locale: 'tr' }));
+    let parkedAtHandover: boolean | undefined;
+    signIn.mockImplementationOnce(async () => {
+      parkedAtHandover = jar.has(INVITATION_ACCEPT_COOKIE);
+    });
+    await loginWithSocialAction('google', '/tr/dashboard', acknowledgement, undefined, undefined, undefined, 'tr');
+    expect(signIn).toHaveBeenCalledTimes(1);
+    expect(parkedAtHandover).toBe(false);
+  }
 });

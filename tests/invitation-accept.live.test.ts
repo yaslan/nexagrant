@@ -398,6 +398,34 @@ describe('an existing account accepts (acceptInvitation, fabrika_app)', () => {
     expect(await memberships(userId)).toEqual([]);
   });
 
+  test('the core refuses a link rotated after the caller looked: lost, row still pending, no membership', async () => {
+    // İNCELEME-34 B-2 (mutant N3): acceptInvitation read the row under the old
+    // link's hash; before its transaction ran, a re-invitation gave the row a
+    // new token. The spend matches on tokenHash, so the old link spends nothing
+    // and the new one stays usable.
+    const tenantId = await makeTenant('rot');
+    const address = email('rot');
+    const userId = await makeUser(address);
+    const old = await invite(tenantId, address);
+    const fresh = lib.token.issueSecretToken();
+    await admin!.invitation.update({ where: { id: old.id }, data: { tokenHash: fresh.hash } });
+    const result = await lib.db.withTenant(tenantId, (tx) =>
+      lib.accept.acceptInvitationIn(tx, {
+        invitationId: old.id,
+        tokenHash: lib.token.hashSecretToken(old.raw),
+        tenantId,
+        role: 'WRITER',
+        userId,
+        now: new Date(),
+      })
+    );
+    expect(result).toBe('lost');
+    expect(await memberships(userId)).toEqual([]);
+    const row = await admin!.invitation.findUniqueOrThrow({ where: { id: old.id }, select: { acceptedAt: true } });
+    expect(row.acceptedAt).toBeNull();
+    expect(await admin!.auditEvent.count({ where: { tenantId, type: lib.accept.INVITATION_ACCEPTED } })).toBe(0);
+  });
+
   test('seat limit: an accepted invitation is no longer a pending seat', async () => {
     const tenantId = await makeTenant('seat');
     const address = email('seat');

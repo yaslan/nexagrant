@@ -320,6 +320,31 @@ describe('POST /api/invitations — mail limits', () => {
     expect(await tokenIsCurrent(email, mailedToken(0))).toBe(false);
   });
 
+  test('re-inviting an address whose earlier invitation was accepted reopens it with a fresh link', async () => {
+    // İNCELEME-34 B-3 (mutant N1): the person was a member and has left (no
+    // membership now). A new link without `acceptedAt: null` would open on
+    // "this invitation was already used" and never let them rejoin.
+    const email = nextEmail();
+    await invite(email);
+    await admin!.invitation.update({
+      where: { email_tenantId: { email, tenantId } },
+      data: { acceptedAt: new Date() },
+    });
+    await admin!.auditEvent.updateMany({
+      where: { tenantId: requireId(tenantId, 'tenantId') },
+      data: { createdAt: new Date(Date.now() - 11 * 60 * 1000) },
+    });
+    const again = await invite(email);
+    expect(again).toMatchObject({ status: 200, body: { success: true, emailSent: true } });
+    const row = await admin!.invitation.findUniqueOrThrow({
+      where: { email_tenantId: { email, tenantId } },
+      select: { acceptedAt: true },
+    });
+    expect(row.acceptedAt).toBeNull();
+    expect(await tokenIsCurrent(email, mailedToken(1))).toBe(true);
+    expect(await tokenIsCurrent(email, mailedToken(0))).toBe(false);
+  });
+
   test('9 minutes after a mail the same address is still cooling down', async () => {
     // Pins the 10-minute constant from below (İNCELEME-26 Ö-2, mutant X2).
     const email = nextEmail();
