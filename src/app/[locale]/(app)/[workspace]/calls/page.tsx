@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 interface SediaTopic {
   identifier: string;
@@ -63,6 +64,7 @@ export default function CallsPage({
   const [savingSearch, setSavingSearch] = useState(false);
   const [savedSearchMessage, setSavedSearchMessage] = useState<string | null>(null);
   const [savedSearchError, setSavedSearchError] = useState<string | null>(null);
+  const errorText = useActionErrorText();
   const [selectedTopic, setSelectedTopic] = useState<SediaTopic | null>(null);
 
   interface SavedSearchEntry {
@@ -240,14 +242,15 @@ export default function CallsPage({
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'save failed');
+        throw Object.assign(new Error(data.error || 'save failed'), { code: data.code });
       }
       setSavedSearchMessage(t('savedSearchMessage', { query: debouncedSearch || t('allSearchesFallback') }));
       setTimeout(() => setSavedSearchMessage(null), 5000);
       await loadSavedSearches();
     } catch (err) {
       console.error('Failed to save search:', err);
-      setSavedSearchError(t('saveSearchError'));
+      // A 403 PILOT_EXPIRED says so instead of "try again" (İNCELEME-24 B-2).
+      setSavedSearchError(errorText(err, t('saveSearchError')));
       setTimeout(() => setSavedSearchError(null), 5000);
     } finally {
       setSavingSearch(false);
@@ -259,12 +262,12 @@ export default function CallsPage({
       const res = await fetch(`/api/saved-searches/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'delete failed');
+        throw Object.assign(new Error(data.error || 'delete failed'), { code: data.code });
       }
       setSavedSearches((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       console.error('Failed to delete saved search:', err);
-      setSavedSearchError(t('saveSearchError'));
+      setSavedSearchError(errorText(err, t('saveSearchError')));
       setTimeout(() => setSavedSearchError(null), 5000);
     }
   };
@@ -279,12 +282,12 @@ export default function CallsPage({
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'update failed');
+        throw Object.assign(new Error(data.error || 'update failed'), { code: data.code });
       }
     } catch (err) {
       console.error('Failed to update saved search:', err);
       setSavedSearches((prev) => prev.map((s) => (s.id === id ? { ...s, notify: !notify } : s)));
-      setSavedSearchError(t('saveSearchError'));
+      setSavedSearchError(errorText(err, t('saveSearchError')));
       setTimeout(() => setSavedSearchError(null), 5000);
     }
   };

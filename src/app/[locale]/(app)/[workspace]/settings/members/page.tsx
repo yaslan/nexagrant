@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { errorMessage } from '@/lib/errors';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 export default function MembersSettingsPage() {
   const params = useParams();
@@ -13,11 +14,14 @@ export default function MembersSettingsPage() {
   const [role, setRole] = useState('MEMBER');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageIsError, setMessageIsError] = useState(false);
+  const errorText = useActionErrorText();
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+    setMessageIsError(false);
 
     try {
       const res = await fetch('/api/invitations', {
@@ -27,7 +31,11 @@ export default function MembersSettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || (isTr ? 'Davet gönderilemedi' : 'Failed to send invite'));
+        // `code` carries a 403 PILOT_EXPIRED through to `errorText` below (İNCELEME-24 B-2):
+        // the body's `error` is a Turkish sentence, shown as is in every locale before.
+        throw Object.assign(new Error(data.error || (isTr ? 'Davet gönderilemedi' : 'Failed to send invite')), {
+          code: data.code,
+        });
       }
       // `reason` (POST /api/invitations): recently_sent = this address was
       // mailed less than 10 minutes ago; daily_limit = the tenant's daily
@@ -54,7 +62,8 @@ export default function MembersSettingsPage() {
       );
       setEmail('');
     } catch (error) {
-      setMessage(`${isTr ? 'Hata' : 'Error'}: ${errorMessage(error)}`);
+      setMessage(errorText(error, () => `${isTr ? 'Hata' : 'Error'}: ${errorMessage(error)}`));
+      setMessageIsError(true);
     } finally {
       setLoading(false);
     }
@@ -109,7 +118,10 @@ export default function MembersSettingsPage() {
           </button>
         </form>
         {message && (
-          <div className={`mt-4 p-3 rounded-xl text-xs font-medium ${message.startsWith('Hata') || message.startsWith('Error') ? 'bg-bad/15 text-bad border border-bad/30' : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'}`}>
+          <div
+            role={messageIsError ? 'alert' : 'status'}
+            className={`mt-4 p-3 rounded-xl text-xs font-medium ${messageIsError ? 'bg-bad/15 text-bad border border-bad/30' : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'}`}
+          >
             {message}
           </div>
         )}
