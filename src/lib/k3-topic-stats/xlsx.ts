@@ -16,7 +16,12 @@
  *    that declares a `<!DOCTYPE` is refused outright, and only the five predefined entities and
  *    numeric character references are decoded.
  *  - **Size.** Rows and columns are capped, so a sheet that claims `XFD1048576` cannot allocate
- *    a million-row array.
+ *    a million-row array; every row and padded cell slot is charged to one workbook-wide budget,
+ *    and a worksheet part that several `<sheet>` entries point at is read and parsed once.
+ *  - **Time.** No backtracking regex runs over a whole part. Elements are found by an `indexOf`
+ *    cursor that only moves forward, and an element whose close tag is missing is refused as
+ *    MALFORMED after one search, so the scan stays linear in the part's size
+ *    (TASK-MUM187B5EN9LZ: 160 000 unclosed `<row>` used to take ~35 s).
  */
 import unzipper from 'unzipper';
 
@@ -30,6 +35,11 @@ export const XLSX_LIMITS = {
   maxTotalBytes: 120 * 1024 * 1024,
   maxRows: 100_000,
   maxColumns: 200,
+  /** Row slots plus (padded) cell slots allocated across all worksheets, together. */
+  maxCells: 2_000_000,
+  maxSharedStrings: 1_000_000,
+  /** A real start tag is a few hundred bytes; a longer one is not a spreadsheet. */
+  maxTagBytes: 16 * 1024,
 } as const;
 
 export class XlsxReadError extends Error {
@@ -85,18 +95,97 @@ export function decodeXmlText(s: string): string {
   });
 }
 
-function attr(tag: string, name: string): string | null {
-  const m = new RegExp(`\\s${name}\\s*=\\s*("([^"]*)"|'([^']*)')`).exec(tag);
-  return m ? decodeXmlText(m[2] ?? m[3] ?? '') : null;
+const isSpace = (ch: string | undefined) => ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r';
+
+/**
+ * Value of attribute `name` in a start tag's attribute text, read in one forward pass.
+ * (A regex here re-scans to the end for every unclosed quote, so it goes quadratic.)
+ */
+function attr(head: string, name: string): string | null {
+  let i = 0;
+  while (i < head.length) {
+    while (i < head.length && isSpace(head[i])) i++;
+    const nameStart = i;
+    while (i < head.length && head[i] !== '=' && !isSpace(head[i])) i++;
+    const key = head.slice(nameStart, i);
+    while (i < head.length && isSpace(head[i])) i++;
+    if (head[i] !== '=') {
+      if (i === nameStart) i++; // stray character, step over it
+      continue;
+    }
+    i++;
+    while (i < head.length && isSpace(head[i])) i++;
+    const quote = head[i];
+    if (quote !== '"' && quote !== "'") continue;
+    const close = head.indexOf(quote, i + 1);
+    if (close < 0) return null;
+    if (key === name) return decodeXmlText(head.slice(i + 1, close));
+    i = close + 1;
+  }
+  return null;
+}
+
+interface XmlElement {
+  /** Attribute text of the start tag, without the tag name and a self-closing `/`. */
+  head: string;
+  /** Text between the start and end tag; `null` for a self-closing element. */
+  body: string | null;
+}
+
+/**
+ * Every `<tag …>…</tag>` and `<tag …/>` in `xml`, in order, found with a forward-only cursor.
+ * Like the lazy regex it replaces, the body ends at the first `</tag>` (no nesting), but a
+ * missing `</tag>` or `>` is one failed search and a MALFORMED error, never a re-scan per
+ * opening tag.
+ */
+function* elements(xml: string, tag: string): Generator<XmlElement> {
+  const open = `<${tag}`;
+  const close = `</${tag}>`;
+  let pos = 0;
+  for (;;) {
+    const at = xml.indexOf(open, pos);
+    if (at < 0) return;
+    const after = xml[at + open.length];
+    if (!(after === '>' || after === '/' || isSpace(after))) {
+      pos = at + open.length; // <rowBreaks>, <cols> … — a longer name, not this tag
+      continue;
+    }
+    const gt = xml.indexOf('>', at + open.length);
+    if (gt < 0) throw new XlsxReadError('MALFORMED', `<${tag}> start tag is never closed.`);
+    if (gt - at > XLSX_LIMITS.maxTagBytes) {
+      throw new XlsxReadError('MALFORMED', `<${tag}> start tag is longer than ${XLSX_LIMITS.maxTagBytes} bytes.`);
+    }
+    if (xml[gt - 1] === '/') {
+      yield { head: xml.slice(at + open.length, gt - 1), body: null };
+      pos = gt + 1;
+      continue;
+    }
+    const end = xml.indexOf(close, gt + 1);
+    if (end < 0) throw new XlsxReadError('MALFORMED', `<${tag}> has no matching ${close}.`);
+    yield { head: xml.slice(at + open.length, gt), body: xml.slice(gt + 1, end) };
+    pos = end + close.length;
+  }
+}
+
+function firstElement(xml: string, tag: string): XmlElement | undefined {
+  for (const el of elements(xml, tag)) return el;
+  return undefined;
 }
 
 /** Concatenated text of every `<t>` in a fragment, skipping phonetic (`<rPh>`) runs. */
 function textRuns(fragment: string): string {
-  const withoutPhonetic = fragment.replace(/<rPh\b[\s\S]*?<\/rPh>/g, '');
   let out = '';
-  for (const m of withoutPhonetic.matchAll(/<t\b[^>]*?(?:\/>|>([\s\S]*?)<\/t>)/g)) {
-    out += decodeXmlText(m[1] ?? '');
+  let rest = fragment;
+  // Phonetic runs hold their own <t>; cut them out segment by segment, in one pass.
+  for (;;) {
+    const at = rest.indexOf('<rPh');
+    if (at < 0) break;
+    const end = rest.indexOf('</rPh>', at);
+    if (end < 0) throw new XlsxReadError('MALFORMED', '<rPh> has no matching </rPh>.');
+    for (const t of elements(rest.slice(0, at), 't')) out += decodeXmlText(t.body ?? '');
+    rest = rest.slice(end + '</rPh>'.length);
   }
+  for (const t of elements(rest, 't')) out += decodeXmlText(t.body ?? '');
   return out;
 }
 
@@ -109,41 +198,59 @@ function columnNumber(letters: string): number {
 
 function parseSharedStrings(xml: string): string[] {
   const out: string[] = [];
-  for (const m of xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>|<si\b[^>]*\/>/g)) out.push(textRuns(m[1] ?? ''));
+  for (const si of elements(xml, 'si')) {
+    if (out.length >= XLSX_LIMITS.maxSharedStrings) {
+      throw new XlsxReadError('TOO_LARGE', `Workbook has more than ${XLSX_LIMITS.maxSharedStrings} shared strings.`);
+    }
+    out.push(si.body === null ? '' : textRuns(si.body));
+  }
   return out;
 }
 
-function parseSheet(xml: string, shared: string[]): string[][] {
+/** Row and cell slots still allowed across the workbook; `charge` throws once it runs out. */
+interface CellBudget {
+  left: number;
+}
+
+function charge(budget: CellBudget, slots: number): void {
+  budget.left -= slots;
+  if (budget.left < 0) {
+    throw new XlsxReadError('TOO_LARGE', `Workbook allocates more than ${XLSX_LIMITS.maxCells} row and cell slots.`);
+  }
+}
+
+function parseSheet(xml: string, shared: string[], budget: CellBudget): string[][] {
   const rows: string[][] = [];
   let nextRow = 0;
-  for (const rm of xml.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
-    const rAttr = attr(rm[1] ?? '', 'r');
+  for (const row of elements(xml, 'row')) {
+    const rAttr = attr(row.head, 'r');
     const rowIndex = rAttr ? parseInt(rAttr, 10) - 1 : nextRow;
     if (!Number.isFinite(rowIndex) || rowIndex < 0) throw new XlsxReadError('MALFORMED', `Bad row reference "${rAttr}".`);
     if (rowIndex >= XLSX_LIMITS.maxRows) {
       throw new XlsxReadError('TOO_LARGE', `Sheet has more than ${XLSX_LIMITS.maxRows} rows.`);
     }
     nextRow = rowIndex + 1;
+    // Holes up to this row become empty rows below, so they are paid for now.
+    if (rowIndex >= rows.length) charge(budget, rowIndex + 1 - rows.length);
 
     const cells: string[] = [];
     let nextCol = 0;
-    for (const cm of (rm[2] ?? '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
-      const head = cm[1] ?? '';
-      const ref = attr(head, 'r');
+    for (const c of elements(row.body ?? '', 'c')) {
+      const ref = attr(c.head, 'r');
       const letters = ref ? /^([A-Z]{1,3})/.exec(ref)?.[1] : undefined;
       const col = letters ? columnNumber(letters) - 1 : nextCol;
       nextCol = col + 1;
       if (col >= XLSX_LIMITS.maxColumns) continue; // far-right junk is ignored, not allocated
 
-      const body = cm[2] ?? '';
-      const type = attr(head, 't');
-      const v = /<v\b[^>]*>([\s\S]*?)<\/v>/.exec(body)?.[1];
+      const body = c.body ?? '';
+      const type = attr(c.head, 't');
+      const v = firstElement(body, 'v')?.body ?? undefined;
       let value = '';
       if (type === 's') {
         const idx = v === undefined ? NaN : parseInt(v, 10);
         value = Number.isInteger(idx) && idx >= 0 && idx < shared.length ? shared[idx]! : '';
       } else if (type === 'inlineStr') {
-        const is = /<is\b[^>]*>([\s\S]*?)<\/is>/.exec(body)?.[1];
+        const is = firstElement(body, 'is')?.body;
         value = is ? textRuns(is) : '';
       } else if (type === 'b') {
         value = v === '1' ? 'TRUE' : v === '0' ? 'FALSE' : '';
@@ -151,6 +258,8 @@ function parseSheet(xml: string, shared: string[]): string[][] {
         // 'n', 'str' (formula result), 'e' (error text such as #N/A) and untyped cells.
         value = v === undefined ? '' : decodeXmlText(v);
       }
+      // Padding to a far column is allocation too: 200 columns × every row is the memory bomb.
+      if (col >= cells.length) charge(budget, col + 1 - cells.length);
       while (cells.length < col) cells.push('');
       cells[col] = value;
     }
@@ -212,9 +321,9 @@ export async function readXlsx(bytes: Buffer): Promise<XlsxSheet[]> {
 
   const rels = (await readPart('xl/_rels/workbook.xml.rels')) ?? '';
   const targets = new Map<string, string>();
-  for (const m of rels.matchAll(/<Relationship\b[^>]*>/g)) {
-    const id = attr(m[0], 'Id');
-    const target = attr(m[0], 'Target');
+  for (const rel of elements(rels, 'Relationship')) {
+    const id = attr(rel.head, 'Id');
+    const target = attr(rel.head, 'Target');
     if (id && target) targets.set(id, resolveTarget(target));
   }
 
@@ -222,13 +331,21 @@ export async function readXlsx(bytes: Buffer): Promise<XlsxSheet[]> {
   const shared = sharedXml ? parseSharedStrings(sharedXml) : [];
 
   const sheets: XlsxSheet[] = [];
-  for (const m of workbook.matchAll(/<sheet\b[^>]*>/g)) {
-    const name = attr(m[0], 'name') ?? `Sheet${sheets.length + 1}`;
-    const rid = attr(m[0], 'r:id');
+  const cellBudget: CellBudget = { left: XLSX_LIMITS.maxCells };
+  // Several <sheet> entries may name the same part; it is inflated and parsed once and the
+  // entries share the grid, so repeating a sheet costs neither bytes nor cells.
+  const parsed = new Map<string, string[][] | null>();
+  for (const el of elements(workbook, 'sheet')) {
+    const name = attr(el.head, 'name') ?? `Sheet${sheets.length + 1}`;
+    const rid = attr(el.head, 'r:id');
     const path = (rid && targets.get(rid)) || `xl/worksheets/sheet${sheets.length + 1}.xml`;
-    const xml = await readPart(path);
-    if (xml === null) continue; // chart sheets and dangling references have no cell grid
-    sheets.push({ name, rows: parseSheet(xml, shared) });
+    if (!parsed.has(path)) {
+      const xml = await readPart(path);
+      parsed.set(path, xml === null ? null : parseSheet(xml, shared, cellBudget));
+    }
+    const rows = parsed.get(path);
+    if (!rows) continue; // chart sheets and dangling references have no cell grid
+    sheets.push({ name, rows });
   }
   if (sheets.length === 0) throw new XlsxReadError('MALFORMED', 'Workbook has no readable worksheet.');
   return sheets;

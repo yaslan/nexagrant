@@ -222,6 +222,13 @@ export function parseRateCell(raw: string): RawRate | null | undefined {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+const TOPIC_CODE = /^[A-Z0-9][A-Z0-9-]{2,120}$/;
+
+/** A normalised code cell that can become a data row (not empty, not a total, well-formed). */
+function isDataCode(code: string): boolean {
+  return code !== '' && !AGGREGATE.has(code.toLowerCase()) && TOPIC_CODE.test(code);
+}
+
 /**
  * Finds the first worksheet with a recognisable header and turns it into rows.
  * Throws {@link HorizonLayoutError} when no sheet carries the required columns.
@@ -261,20 +268,39 @@ function parseBody(sheet: XlsxSheet, headerIndex: number, mapping: Map<TopicStat
 
   // Scale of bare numbers in the rate column, decided once for the whole column: a success-rate
   // column whose every bare value is ≤ 1 is fractions (Excel stores 8% as 0.08). Per-cell
-  // guessing would read "0.5" as 50% in one row and 0.5% in the next.
+  // guessing would read "0.5" as 50% in one row and 0.5% in the next. Only rows that can become
+  // data vote — a "Total" row or a note under the table does not decide the column's scale.
   const bare: number[] = [];
+  let crossCheckable = false;
   for (let r = headerIndex + 1; r < sheet.rows.length; r++) {
-    const rate = parseRateCell(cell(sheet.rows[r] ?? [], 'successRate'));
-    if (rate && rate.kind === 'bare') bare.push(rate.value);
+    const row = sheet.rows[r] ?? [];
+    if (!isDataCode(cell(row, 'topicCode').trim().toUpperCase())) continue;
+    const rate = parseRateCell(cell(row, 'successRate'));
+    if (!rate || rate.kind !== 'bare') continue;
+    bare.push(rate.value);
+    const proposals = parseCount(cell(row, 'proposals'));
+    if (typeof proposals === 'number' && proposals > 0 && typeof parseCount(cell(row, 'funded')) === 'number') {
+      crossCheckable = true;
+    }
   }
   // A header that says "%" settles it without looking at the values.
-  const rateHeaderIsPercent = (header[mapping.get('successRate') ?? -1] ?? '').includes('%');
+  const rateHeader = header[mapping.get('successRate') ?? -1] ?? '';
+  const rateHeaderIsPercent = rateHeader.includes('%');
   const rateScale: HorizonDashboardParse['rateScale'] =
     bare.length === 0
       ? 'n/a'
       : rateHeaderIsPercent || !bare.every((v) => v >= 0 && v <= 1)
         ? 'percent'
         : 'fraction';
+  // Values ≤ 1 with no "%" in the header are fractions only by guess: "0.5" may be 50% or 0.5%.
+  // With counts on the row, a wrong guess shows up as rateMismatch; without them nothing would
+  // catch it, so the file is refused rather than written at the wrong scale (TASK-MUM187B5EN9LZ K-2).
+  if (rateScale === 'fraction' && !crossCheckable && bare.some((v) => v > 0)) {
+    throw new HorizonLayoutError(
+      `Sheet "${sheet.name}": the rate column "${rateHeader.trim()}" holds only values between 0 and 1 and the header has no "%", so "0.5" could be 50% or 0.5%. Put "%" in the header (values are percent) or write the rates as "8%", or include the proposal and funded counts so the rate can be checked.`,
+      header.filter((c) => c.trim()),
+    );
+  }
 
   const rows: ParsedTopicStatRow[] = [];
   const rejected: RejectedRow[] = [];
@@ -300,7 +326,7 @@ function parseBody(sheet: XlsxSheet, headerIndex: number, mapping: Map<TopicStat
       reject('aggregateRow');
       continue;
     }
-    if (!/^[A-Z0-9][A-Z0-9-]{2,120}$/.test(codeRaw)) {
+    if (!TOPIC_CODE.test(codeRaw)) {
       reject('badCode');
       continue;
     }

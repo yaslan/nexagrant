@@ -66,6 +66,135 @@ describe('readXlsx', () => {
     big.writeUInt32LE(0x04034b50, 0);
     await expect(readXlsx(big)).rejects.toBeInstanceOf(XlsxReadError);
   });
+
+  it('reads self-closing rows and cells, skips phonetic runs and does not mistake <rowBreaks> for a row', async () => {
+    const sheets = await readXlsx(
+      zip([
+        { name: 'xl/workbook.xml', data: Buffer.from(WORKBOOK_ONE) },
+        { name: 'xl/_rels/workbook.xml.rels', data: Buffer.from(RELS_ONE) },
+        {
+          name: 'xl/sharedStrings.xml',
+          data: Buffer.from('<sst><si><r><t>Kan</t></r><rPh sb="0" eb="1"><t>KANA</t></rPh><r><t xml:space="preserve">ji</t></r></si><si/></sst>'),
+        },
+        {
+          name: 'xl/worksheets/sheet1.xml',
+          data: Buffer.from(
+            `<worksheet><sheetData><row r="1" spans="1:3"><c r="A1" t="s"><v>0</v></c><c r="B1"/><c r="C1" t='s'><v>1</v></c></row><row r="2"/><row r="3"><c r="B3" t="b"><v>1</v></c></row></sheetData><rowBreaks count="1"><brk id="1"/></rowBreaks></worksheet>`,
+          ),
+        },
+      ]),
+    );
+    expect(sheets[0]!.rows).toEqual([['Kanji', '', ''], [], ['', 'TRUE']]);
+  });
+});
+
+// TASK-MUM187B5EN9LZ — the hostile-bytes cases the review measured (Ö-1, Ö-2).
+const WORKBOOK_ONE = '<workbook><sheets><sheet name="S" r:id="rId1"/></sheets></workbook>';
+const RELS_ONE = '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>';
+
+function oneSheet(sheetXml: string): Buffer {
+  return zip([
+    { name: 'xl/workbook.xml', data: Buffer.from(WORKBOOK_ONE) },
+    { name: 'xl/_rels/workbook.xml.rels', data: Buffer.from(RELS_ONE) },
+    { name: 'xl/worksheets/sheet1.xml', data: Buffer.from(sheetXml) },
+  ]);
+}
+
+async function timed(bytes: Buffer): Promise<{ ms: number; error: unknown }> {
+  const t0 = performance.now();
+  let error: unknown = null;
+  try {
+    await readXlsx(bytes);
+  } catch (err) {
+    error = err;
+  }
+  return { ms: performance.now() - t0, error };
+}
+
+describe('readXlsx under hostile bytes', () => {
+  it('refuses unclosed <row> tags in linear time (was O(k·n): 160 000 took ~35 s)', async () => {
+    // 2^14 → 2^18 unclosed rows. The old regex re-scanned to the end per opening tag, so the
+    // largest step alone would have taken minutes; now each size is one failed search.
+    const curve: number[] = [];
+    for (const n of [1 << 14, 1 << 16, 1 << 18]) {
+      const bytes = oneSheet('<worksheet><sheetData>' + '<row>'.repeat(n));
+      expect(bytes.length).toBeLessThan(8 * 1024);
+      const { ms, error } = await timed(bytes);
+      expect(error).toMatchObject({ code: 'MALFORMED' });
+      curve.push(ms);
+    }
+    expect(Math.max(...curve)).toBeLessThan(1_000);
+  });
+
+  it('refuses unclosed <c>, <si> and <rPh> the same way, after one search', async () => {
+    const cells = oneSheet('<worksheet><sheetData><row r="1">' + '<c r="A1">'.repeat(1 << 16) + '</row></sheetData></worksheet>');
+    const strings = zip([
+      { name: 'xl/workbook.xml', data: Buffer.from(WORKBOOK_ONE) },
+      { name: 'xl/sharedStrings.xml', data: Buffer.from('<sst>' + '<si>'.repeat(1 << 16)) },
+    ]);
+    const phonetic = zip([
+      { name: 'xl/workbook.xml', data: Buffer.from(WORKBOOK_ONE) },
+      { name: 'xl/sharedStrings.xml', data: Buffer.from('<sst><si>' + '<rPh>'.repeat(1 << 16) + '</si></sst>') },
+    ]);
+    for (const bytes of [cells, strings, phonetic]) {
+      const { ms, error } = await timed(bytes);
+      expect(error).toMatchObject({ code: 'MALFORMED' });
+      expect(ms).toBeLessThan(1_000);
+    }
+  });
+
+  it('refuses a start tag longer than the cap instead of scanning its attributes', async () => {
+    const quotes = "<row a='".repeat(4_000);
+    const { error } = await timed(oneSheet(`<worksheet><sheetData>${quotes}></row></sheetData></worksheet>`));
+    expect(error).toMatchObject({ code: 'MALFORMED' });
+  });
+
+  it('reads a worksheet part once however many <sheet> entries point at it', async () => {
+    const part = '<worksheet><sheetData>' + '<row><c r="B1"><v>1</v></c></row>'.repeat(1_000) + '</sheetData></worksheet>';
+    const ids = Array.from({ length: 50 }, (_, i) => `rId${i + 1}`);
+    const bytes = zip([
+      { name: 'xl/workbook.xml', data: Buffer.from(`<workbook><sheets>${ids.map((id, i) => `<sheet name="S${i}" r:id="${id}"/>`).join('')}</sheets></workbook>`) },
+      {
+        name: 'xl/_rels/workbook.xml.rels',
+        data: Buffer.from(`<Relationships>${ids.map((id) => `<Relationship Id="${id}" Target="worksheets/sheet1.xml"/>`).join('')}</Relationships>`),
+      },
+      { name: 'xl/worksheets/sheet1.xml', data: Buffer.from(part) },
+    ]);
+    const sheets = await readXlsx(bytes);
+    expect(sheets).toHaveLength(50);
+    expect(sheets.map((s) => s.name).slice(0, 2)).toEqual(['S0', 'S1']);
+    // One grid, shared: 50 entries cost the cells of one.
+    expect(new Set(sheets.map((s) => s.rows)).size).toBe(1);
+    expect(sheets[0]!.rows).toHaveLength(1_000);
+    expect(sheets[0]!.rows[0]).toEqual(['', '1']);
+  });
+
+  it('stops a column-padding bomb at the cell budget, not at the heap', async () => {
+    // Every row pads to the last allowed column: rows × maxColumns slots from a ~2 KB file.
+    const rows = Math.ceil(XLSX_LIMITS.maxCells / XLSX_LIMITS.maxColumns) + 1;
+    const bytes = oneSheet('<worksheet><sheetData>' + '<row><c r="GR1"><v>1</v></c></row>'.repeat(rows) + '</sheetData></worksheet>');
+    expect(bytes.length).toBeLessThan(16 * 1024);
+    const { ms, error } = await timed(bytes);
+    expect(error).toMatchObject({ code: 'TOO_LARGE' });
+    expect(ms).toBeLessThan(2_000);
+  });
+
+  it('charges row holes to the same budget (<row r="100000"/> in many parts)', async () => {
+    const parts = Math.ceil(XLSX_LIMITS.maxCells / XLSX_LIMITS.maxRows) + 1;
+    const ids = Array.from({ length: parts }, (_, i) => i + 1);
+    const bytes = zip([
+      { name: 'xl/workbook.xml', data: Buffer.from(`<workbook><sheets>${ids.map((i) => `<sheet name="S${i}" r:id="rId${i}"/>`).join('')}</sheets></workbook>`) },
+      {
+        name: 'xl/_rels/workbook.xml.rels',
+        data: Buffer.from(`<Relationships>${ids.map((i) => `<Relationship Id="rId${i}" Target="worksheets/sheet${i}.xml"/>`).join('')}</Relationships>`),
+      },
+      ...ids.map((i) => ({
+        name: `xl/worksheets/sheet${i}.xml`,
+        data: Buffer.from(`<worksheet><sheetData><row r="${XLSX_LIMITS.maxRows}"/></sheetData></worksheet>`),
+      })),
+    ]);
+    await expect(readXlsx(bytes)).rejects.toMatchObject({ code: 'TOO_LARGE' });
+  });
 });
 
 describe('value parsers', () => {
@@ -133,14 +262,53 @@ describe('parseHorizonDashboard', () => {
     expect(res.rateScale).toBe('fraction');
   });
 
-  it('reads "8%" and "0.08" as the same 8% (fraction column)', async () => {
+  it('reads "8%" and "0.08" as the same 8% (fraction column, checked against the counts)', async () => {
     const res = await parse([
-      ['Topic', 'Success rate'],
-      ['HORIZON-A-2026-01-X-01', '8%'],
-      ['HORIZON-A-2026-01-X-02', 0.08],
+      ['Topic', 'Eligible proposals', 'Retained proposals', 'Success rate'],
+      ['HORIZON-A-2026-01-X-01', 100, 8, '8%'],
+      ['HORIZON-A-2026-01-X-02', 100, 8, 0.08],
     ]);
+    expect(res.rateScale).toBe('fraction');
     expect(res.rows.map((r) => r.successRate)).toEqual([8, 8]);
     expect(res.rejected).toEqual([]);
+  });
+
+  it('refuses a rate column whose scale can only be guessed (values ≤ 1, no "%", no counts)', async () => {
+    // "0.5" here may be 50% or 0.5%. Before TASK-MUM187B5EN9LZ this was read as 50% silently.
+    const run = parse([
+      ['Topic', 'Success rate'],
+      ['HORIZON-A-2026-01-X-01', 0.5],
+      ['HORIZON-A-2026-01-X-02', 0.08],
+    ]);
+    await expect(run).rejects.toBeInstanceOf(HorizonLayoutError);
+    await expect(run).rejects.toThrow(/could be 50% or 0\.5%/);
+
+    // Counts in the header but on no row do not check anything either.
+    await expect(
+      parse([
+        ['Topic', 'Eligible proposals', 'Retained proposals', 'Success rate'],
+        ['HORIZON-A-2026-01-X-01', null, null, 0.5],
+      ]),
+    ).rejects.toBeInstanceOf(HorizonLayoutError);
+
+    // An all-zero column is 0% either way — nothing to guess.
+    const zero = await parse([
+      ['Topic', 'Success rate'],
+      ['HORIZON-A-2026-01-X-01', 0],
+    ]);
+    expect(zero.rows[0]!.successRate).toBe(0);
+  });
+
+  it('decides the rate scale from data rows only, not from a total or a note row', async () => {
+    // The "Total" row's bare 12 used to make the whole column percent, so 0.08 became 0.08%.
+    const res = await parse([
+      ['Topic', 'Eligible proposals', 'Retained proposals', 'Success rate'],
+      ['HORIZON-A-2026-01-X-01', 100, 8, 0.08],
+      ['Total', 100, 12, 12],
+    ]);
+    expect(res.rateScale).toBe('fraction');
+    expect(res.rows.map((r) => r.successRate)).toEqual([8]);
+    expect(res.rejected.map((r) => r.reason)).toEqual(['aggregateRow']);
   });
 
   it('reads bare numbers > 1 as percentages, and a "(%)" header as percent whatever the values', async () => {
