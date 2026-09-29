@@ -38,9 +38,7 @@ const SRC_DIR = path.join(REPO_ROOT, 'src');
  * of them occurs in src/ today; tests/secret-model-props.test.tsx is the
  * runtime half of this pin and catches what reaches a client prop or action
  * result through them:
- *   - bracket access `tx['calendarConnection'].findMany(…)`,
  *   - an aliased delegate `const cc = tx.calendarConnection; cc.findMany(…)`,
- *   - optional chaining `tx.calendarConnection?.findMany(…)`,
  *   - raw SQL (`$queryRaw`) and `aggregate({ _max: { accessToken: true } })`,
  *   - a relation whose arguments are a variable (`applicationParts: partArgs`),
  *   - a whole row returned from a src/lib helper to a component.
@@ -234,15 +232,20 @@ export function findOffences(code: string, file: string): Offence[] {
   const offences: Offence[] = [];
   const lineOf = (index: number | undefined) => code.slice(0, index).split('\n').length;
 
-  const call = new RegExp(`\\.\\s*(${Object.keys(SECRET_MODELS).join('|')})\\s*\\.\\s*(${ROW_OPS.join('|')})\\s*\\(`, 'g');
+  // `.model.op(`, `['model'].op(` and `.model?.op(` (İNCELEME-29 E3/E9).
+  const models = Object.keys(SECRET_MODELS).join('|');
+  const call = new RegExp(
+    `(?:\\.\\s*(${models})|\\[\\s*['"\`](${models})['"\`]\\s*\\])\\s*\\??\\.\\s*(${ROW_OPS.join('|')})\\s*\\(`,
+    'g'
+  );
   for (const m of code.matchAll(call)) {
-    const model = m[1] ?? '';
+    const model = m[1] ?? m[2] ?? '';
     const open = (m.index ?? 0) + m[0].length - 1;
     const problem = selectProblem(callArgument(code, open), model, code, file);
     if (problem) {
       offences.push({
         file,
-        what: `${model}.${m[2]} ${problem} (line ${lineOf(m.index)}; exposes ${SECRET_MODELS[model]?.join(', ')})`,
+        what: `${model}.${m[3]} ${problem} (line ${lineOf(m.index)}; exposes ${SECRET_MODELS[model]?.join(', ')})`,
       });
     }
   }
@@ -310,6 +313,8 @@ describe('secret-bearing models are read with select where the result reaches th
     ['relation with select: undefined', 'tx.opportunity.findFirst({ include: { applicationParts: { select: undefined } } })', 1],
     ['relation select naming the secret', 'tx.opportunity.findFirst({ include: { applicationParts: { select: { id: true, magicTokenHash: true } } } })', 1],
     ['relation under an outer select', 'tx.tenant.findFirst({ select: { id: true, invitations: true } })', 1],
+    ['E3 bracket accessor', "tx['calendarConnection'].findMany({ where: { tenantId } })", 1],
+    ['E9 optional-chained op', 'tx.calendarConnection?.findMany({ where: { tenantId } })', 1],
     ['E6 select: undefined', 'tx.calendarConnection.findMany({ where: { tenantId }, select: undefined })', 1],
     ['E7 conditional select', 'tx.calendarConnection.findMany({ select: full ? undefined : { id: true } })', 1],
     ['E8 select naming the secret', 'tx.calendarConnection.findMany({ select: { id: true, accessToken: true } })', 1],
