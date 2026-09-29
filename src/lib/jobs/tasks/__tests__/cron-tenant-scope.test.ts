@@ -331,6 +331,23 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     expect(await prisma.creditLedger.count({ where: { tenantId: b.tenantId, grantPeriod: '2031-07' } })).toBe(1);
   });
 
+  /**
+   * The migration's backfill UPDATEs, in file order, as the file runs them on
+   * re-apply. Comment lines are dropped first so the header cannot match.
+   */
+  const backfill = async () => {
+    const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/credit-ledger-grant-period.sql'), 'utf8')
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('--'))
+      .join('\n');
+    const updates = sql
+      .split(';')
+      .map((st) => st.trim())
+      .filter((st) => st.startsWith('UPDATE "CreditLedger"'));
+    expect(updates.length, 'the backfill statements are gone from the migration').toBeGreaterThan(0);
+    for (const st of updates) await prisma.$executeRawUnsafe(st);
+  };
+
   it('credit-ledger-grant-period.sql: the backfill stamps old job rows only, once per month, and re-runs clean', async () => {
     expect(ready, skipReason).toBe(true);
     await prisma.creditLedger.deleteMany({ where: { tenantId: { in: [a.tenantId, b.tenantId] } } });
@@ -342,15 +359,21 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
         // November already has a stamped row: the old one stays NULL, no key clash.
         { id: `${RUN}-nov-old`, tenantId: a.tenantId, delta: 10, reason: 'monthly_grant', createdAt: new Date('2031-11-01T06:00:03Z') },
         { id: `${RUN}-nov-new`, tenantId: a.tenantId, delta: 10, reason: 'monthly_grant', refId: 'monthly_grant:2031-11', grantPeriod: '2031-11', createdAt: new Date('2031-11-01T06:00:05Z') },
+        // The new job's own row after a rollback (DROP COLUMN) and re-apply:
+        // its month comes back from the refId (İNCELEME-44 N-1).
+        { id: `${RUN}-oct-new`, tenantId: a.tenantId, delta: 10, reason: 'monthly_grant', refId: 'monthly_grant:2031-10', createdAt: new Date('2031-10-01T06:00:05Z') },
+        // A month that is stamped already: the unstamped job row stays NULL
+        // rather than clash with the key.
+        { id: `${RUN}-oct-b-set`, tenantId: b.tenantId, delta: 10, reason: 'monthly_grant', grantPeriod: '2031-10', createdAt: new Date('2031-10-01T06:00:03Z') },
+        { id: `${RUN}-oct-b-new`, tenantId: b.tenantId, delta: 10, reason: 'monthly_grant', refId: 'monthly_grant:2031-10', createdAt: new Date('2031-10-01T06:00:05Z') },
+        // Both jobs granted August (the old one ran after a rollback): the
+        // new job's row takes the month, the old one stays NULL.
+        { id: `${RUN}-aug-b-old`, tenantId: b.tenantId, delta: 10, reason: 'monthly_grant', createdAt: new Date('2031-08-01T06:00:03Z') },
+        { id: `${RUN}-aug-b-new`, tenantId: b.tenantId, delta: 10, reason: 'monthly_grant', refId: 'monthly_grant:2031-08', createdAt: new Date('2031-08-01T06:00:05Z') },
         // An activation grant: same reason, has a payment id, never stamped.
         { id: `${RUN}-pay`, tenantId: b.tenantId, delta: 10, reason: 'monthly_grant', refId: `${RUN}-pay`, createdAt: new Date('2031-12-03T10:00:00Z') },
       ],
     });
-    const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/credit-ledger-grant-period.sql'), 'utf8');
-    const start = sql.indexOf('UPDATE "CreditLedger"');
-    const backfill = sql.slice(start, sql.indexOf(';', start));
-    expect(start, 'the backfill statement is gone from the migration').toBeGreaterThan(0);
-
     const periods = async () =>
       Object.fromEntries(
         (
@@ -360,11 +383,11 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
           })
         ).map((r) => [r.id.slice(RUN.length + 1), r.grantPeriod])
       );
-    const expected = { dec1: '2031-12', dec2: null, 'nov-old': null, 'nov-new': '2031-11', pay: null };
+    const expected = { dec1: '2031-12', dec2: null, 'nov-old': null, 'nov-new': '2031-11', 'oct-new': '2031-10', 'oct-b-set': '2031-10', 'oct-b-new': null, 'aug-b-old': null, 'aug-b-new': '2031-08', pay: null };
 
-    await prisma.$executeRawUnsafe(backfill);
+    await backfill();
     expect(await periods()).toEqual(expected);
-    await prisma.$executeRawUnsafe(backfill);
+    await backfill();
     expect(await periods()).toEqual(expected);
 
     // The key now covers December: the new job's insert for it is a no-op.
@@ -373,6 +396,38 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
       skipDuplicates: true,
     });
     expect(count).toBe(0);
+  });
+
+  it('credit-ledger-grant-period.sql: rollback, re-apply and a re-run of the same month add no second grant (İNCELEME-44 N-1)', async () => {
+    expect(ready, skipReason).toBe(true);
+    await prisma.creditLedger.deleteMany({ where: { tenantId: { in: [a.tenantId, b.tenantId] } } });
+    // September is the old Inngest job's, October the new job's own.
+    await prisma.creditLedger.create({
+      data: { tenantId: a.tenantId, delta: 10, reason: 'monthly_grant', createdAt: new Date('2031-09-01T06:00:03Z') },
+    });
+    const run: TenantRunner = (tenantId, cb) => withTenantOn(rls, tenantId, cb);
+    expect(await grantCreditsToTenants([{ id: a.tenantId }], run, '2031-10')).toMatchObject({ grantedCount: 1 });
+
+    // The header's rollback drops the column; re-applying adds it back empty.
+    // What that leaves on these rows is every grantPeriod NULL.
+    await prisma.$executeRaw`UPDATE "CreditLedger" SET "grantPeriod" = NULL WHERE "tenantId" = ${a.tenantId}`;
+    await backfill();
+
+    const stamped = await prisma.creditLedger.findMany({
+      where: { tenantId: a.tenantId, reason: 'monthly_grant' },
+      select: { grantPeriod: true },
+    });
+    expect(stamped.map((r) => r.grantPeriod).sort()).toEqual(['2031-09', '2031-10']);
+
+    // The same month again: a manual enqueue, --force, a retry or two workers.
+    const again = await grantCreditsToTenants([{ id: a.tenantId }], run, '2031-10');
+    expect(again).toMatchObject({ grantedCount: 0, alreadyGrantedCount: 1, totalCreditsGranted: 0 });
+    // The job's rows carry the run's clock, not the period, so count by refId.
+    const october = await prisma.creditLedger.aggregate({
+      where: { tenantId: a.tenantId, reason: 'monthly_grant', refId: 'monthly_grant:2031-10' },
+      _sum: { delta: true },
+    });
+    expect(october._sum.delta).toBe(10);
   });
 
   it('credits-monthly-grant: a stale tenant id is refused by the database, not misfiled', async () => {
