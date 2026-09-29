@@ -93,9 +93,10 @@ const envSchema = z.object({
   BILLING_ACTIVE_TIER: z.string().optional(),
   /**
    * Email address used for outgoing mail (invitations, system notifications).
-   * Defaults to noreply@usfinbridge.com; can be overridden per environment.
+   * Defaults to info@fonbridge.com (owner's decision 29.09.2026,
+   * TASK-MUN2PKA5AG2IV); can be overridden per environment.
    */
-  NEXT_PUBLIC_SMTP_FROM_ADDRESS: z.string().default('noreply@usfinbridge.com'),
+  NEXT_PUBLIC_SMTP_FROM_ADDRESS: z.string().default('info@fonbridge.com'),
   /**
    * Who FonBridge is on an invoice it issues: the seller's own fiscal identity.
    *
