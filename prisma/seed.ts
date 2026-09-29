@@ -432,7 +432,10 @@ async function seedDemoModuleStates() {
     const status = granted.has(m.id) ? 'ON' : 'OFF';
     await prisma.moduleState.upsert({
       where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: m.id } },
-      update: { status },
+      // The seed sets the state, so the seed is the last change: a re-seeded row
+      // must not keep the date and author of a toggle it just overwrote
+      // (İNCELEME-27 Ö-2). `changedBy: null` is "the system", as on create.
+      update: { status, changedAt: new Date(), changedBy: null },
       create: { tenantId: TENANT_ID, moduleId: m.id, status },
     });
   }
