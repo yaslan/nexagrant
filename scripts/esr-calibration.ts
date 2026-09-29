@@ -51,11 +51,10 @@
  *                       list, and refuses outright when there is nobody left to deliver to.
  */
 
+import 'dotenv/config';
+
 import fs from 'fs';
 import path from 'path';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 import { prisma } from '../src/lib/db';
 import { DEFAULT_SCORING_WEIGHTS } from '../src/lib/scoring/defaults';

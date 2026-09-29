@@ -7,6 +7,8 @@
  * come back untyped; every result is given a row shape here rather than inferred,
  * the same reason src/lib/dashboard/fetch-metrics.ts declares `OppWithRelations`.
  */
+import 'dotenv/config';
+
 import { writeFileSync } from 'node:fs';
 
 import { prisma } from '../src/lib/db';

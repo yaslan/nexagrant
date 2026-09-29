@@ -15,8 +15,7 @@
  * It exits 1 when the worker could not be reached or refused the job — that is
  * a real failure to report, not a reason to print a success line.
  */
-import dotenv from 'dotenv';
-dotenv.config();
+import 'dotenv/config';
 
 import { runK2MonthlyCordis } from '../src/lib/jobs/tasks/k2-monthly-cordis';
 

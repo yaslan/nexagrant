@@ -29,6 +29,8 @@
  *   pnpm db:backfill-plan-version -- --dry-run   # report, write nothing
  *   pnpm db:backfill-plan-version                # write
  */
+import 'dotenv/config';
+
 import { prisma } from '@/lib/db';
 import { grantsFor, resolvePlanId } from '@/lib/billing/catalog';
 import { publishedVersionIdFor } from '@/lib/billing/plan-repository';

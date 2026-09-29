@@ -14,6 +14,8 @@
  * The score is an internal pre-assessment, not an official evaluation.
  */
 
+import 'dotenv/config';
+
 import { prisma, type TenantTx } from '../src/lib/db';
 import { computeG0ForOpportunity, persistG0 } from '../src/lib/scoring/g0-compute';
 

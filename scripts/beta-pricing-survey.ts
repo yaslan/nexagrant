@@ -32,11 +32,10 @@
  *   --anchor=<planId>   plan the price questions are anchored on (default team)
  */
 
+import 'dotenv/config';
+
 import path from 'path';
 import fs from 'fs';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 import { parseBetaRoster, isPlaceholderEmail, type BetaPartner } from '../src/lib/beta/roster';
 import {

@@ -7,8 +7,7 @@
  *
  *   pnpm jobs:alerts-sweep
  */
-import dotenv from 'dotenv';
-dotenv.config();
+import 'dotenv/config';
 
 import { prisma } from '../src/lib/db';
 import { sweepOrphanTenantAlerts, type AlertsSweepDb } from '../src/lib/jobs/tasks/alerts-sweep';

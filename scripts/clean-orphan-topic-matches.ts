@@ -16,6 +16,8 @@
  *   pnpm tsx scripts/clean-orphan-topic-matches.ts -- --apply    # deletes them
  */
 
+import 'dotenv/config';
+
 import { prisma } from '../src/lib/db';
 
 const PLACEHOLDER_FLAG = 'g0ScorerPlaceholderFitScore';

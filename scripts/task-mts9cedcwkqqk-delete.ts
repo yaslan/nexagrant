@@ -9,6 +9,8 @@
  * The backup taken by `task-mts9cedcwkqqk-audit.ts` is the way back.
  * Run with --confirm; without it the script only reports what it would do.
  */
+import 'dotenv/config';
+
 import { prisma } from '../src/lib/db';
 
 const IDS = ['cmtrmwgmy001493xkt7gyg4mm', 'cmtrmxtin0002d9xk0cif5ky6'];

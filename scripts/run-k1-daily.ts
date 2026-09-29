@@ -12,6 +12,8 @@
  * There is nothing to roll back: every write is an idempotent upsert keyed on the
  * upstream identifier, so re-running restores the same rows.
  */
+import 'dotenv/config';
+
 import { SediaAdapter } from '../src/lib/adapters/sedia';
 import { EurostarsAdapter } from '../src/lib/adapters/eurostars';
 import { TubitakAdapter } from '../src/lib/adapters/tubitak';

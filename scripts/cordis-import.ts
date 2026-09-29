@@ -1,6 +1,5 @@
 #!/usr/bin/env tsx
-import dotenv from 'dotenv';
-dotenv.config();
+import 'dotenv/config';
 
 import { runCordisImport } from '../src/lib/k2-cordis/importer';
 import { generatePartnerProfiles } from '../src/lib/k2-cordis/partnerProfileJob';

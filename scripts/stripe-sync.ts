@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 import { prisma } from '../src/lib/db';
 import Stripe from 'stripe';
 

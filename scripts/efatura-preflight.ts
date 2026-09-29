@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 import { resolveVatRate } from '../src/lib/billing/vat-rate';
 import { chargeableVatCountries } from '../src/lib/billing/vat-rates';
 import { env } from '../src/lib/env';

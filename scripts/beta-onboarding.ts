@@ -40,12 +40,11 @@
  *   --modules=mvp --day=4 --time=14:00 --tz=Europe/Istanbul   # guide's design
  */
 
+import 'dotenv/config';
+
 import path from 'path';
 import fs from 'fs';
-import dotenv from 'dotenv';
 import { issueSecretToken } from '../src/lib/secret-token';
-
-dotenv.config();
 
 import { prisma } from '../src/lib/db';
 import { parseBetaRoster, isPlaceholderEmail, type BetaPartner } from '../src/lib/beta/roster';
