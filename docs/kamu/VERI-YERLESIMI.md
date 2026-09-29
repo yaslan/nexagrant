@@ -47,7 +47,7 @@ Bu üçü dışında Stripe (ödeme) envanterde yurt dışı alıcıdır, ama pi
 - "Tüm veri AB'de" — doğru değil; veritabanı Türkiye'de.
 - "Tüm veri Türkiye'de kalır" — doğru değil. Veritabanı, uygulama ve e-posta Türkiye'de; YZ, embedding ve Google girişi ABD'ye gider, dosya deposunun bölgesi doğrulanmadı. "Hiçbir veri yurt dışına çıkmaz" şartı çıkarsa bu ürün boşluğu olarak yazılır.
 - "YZ verinizle eğitilmez" — sağlayıcı sözleşmesi repoda yok **[DOĞRULANMADI]**.
-- Sitenin altbilgisindeki "Frankfurt & Istanbul Data Centers" ifadesi (`src/components/PublicFooter.tsx:149`) doğrulanmadı. Görüşmede bu ifadeye dayanmayın.
+- ~~Sitenin altbilgisindeki "Frankfurt & Istanbul Data Centers" ifadesi (`src/components/PublicFooter.tsx:149`) doğrulanmadı. Görüşmede bu ifadeye dayanmayın.~~ **Düzeltildi (`9a683b39`, 29.09.2026, TASK-MUN2UXWTAX1AQ):** Frankfurt'ta veri merkezi yok. Altbilgi artık "🇹🇷 Veritabanı Türkiye'de barındırılır" / "Database hosted in Türkiye" diyor; "EU Cloud" rozeti ve açılış sayfasındaki "GDPR & EU Cloud Ready" de kaldırıldı. Altbilgideki "256-bit AES Encryption" ifadesi hâlâ doğrulanmadı; görüşmede ona da dayanmayın.
 
 ## Görüşmeden önce kapanması gerekenler [DOĞRULANMADI]
 
