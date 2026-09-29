@@ -66,6 +66,7 @@ gen=0 tc=0 lint=0 test=0
 Paylaşılan ağaçta `pnpm typecheck` şu an rc=2 veriyor. Tek hata `src/modules/m5/ui/Dashboard.tsx(144,8): Cannot find name 'aside'`. Bu dosya başka bir ajanın commit'lenmemiş, yarım kalmış düzenlemesi ve bu işin kapsamı dışında. O dosya olmadan (izole worktree'de) typecheck 0 dönüyor. Aynı paylaşılan ağaçta, o düzenleme gelmeden önce de typecheck 0, lint 0 ve test 0 (191 passed) almıştım.
 
 `pnpm db:generate` koşuldu. :3000'in yeniden başlatılması leed-fb'den (alan-c2) SendMessage ile istendi. İkinci bir next dev sunucusu açılmadı.
+leed-fb teyidi: :3000 yeni Prisma istemcisiyle yeniden başlatıldı; `/tr`, `/tr/giris` ve `/tr/kayit` 200 döndü. Dashboard.tsx hatası fe-fb'ye iletildi.
 
 ## 3. Değişen dosyalar
 
