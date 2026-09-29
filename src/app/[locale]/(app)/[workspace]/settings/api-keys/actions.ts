@@ -1,6 +1,8 @@
 'use server';
 
+import type { ApiKey } from '@prisma/client';
 import { withTenant } from '@/lib/db';
+import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
@@ -14,10 +16,31 @@ import crypto from 'crypto';
  * could mint a live API key *for another tenant* and then use it against the
  * partner API. `revokeApiKey` deleted by key id alone, so any tenant's key
  * could be destroyed. Both are session-scoped now.
+ *
+ * A key reads the whole tenant through the partner API, so minting and revoking
+ * one needs `manage_users` (owner / admin), the bar the other organisation-level
+ * settings use (settings/profile/actions.ts). TASK-MULU88PPI3HY3, review K-12.
+ * Refusals come back as values; a missing session still throws.
  */
 
-export async function generateApiKey({ name }: { name: string }) {
-  const { tenantId } = await requireTenantAction();
+// Not exported: a 'use server' module may export async functions only.
+const API_KEY_NAME_MAX = 100;
+
+export type ApiKeyActionError = 'forbidden' | 'invalidName';
+
+export async function generateApiKey({
+  name,
+}: {
+  name: string;
+}): Promise<{ apiKeyRecord: ApiKey; rawKey: string } | { error: ApiKeyActionError }> {
+  const { tenantId, role } = await requireTenantAction();
+  if (!can(asRole(role), 'manage_users')) return { error: 'forbidden' };
+
+  // The action is a public POST endpoint: `name` is whatever the caller sent.
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  if (trimmed.length === 0 || trimmed.length > API_KEY_NAME_MAX) {
+    return { error: 'invalidName' };
+  }
 
   const rawKey = `fp_live_${crypto.randomBytes(24).toString('hex')}`;
   const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
@@ -29,7 +52,7 @@ export async function generateApiKey({ name }: { name: string }) {
     tx.apiKey.create({
       data: {
         tenantId,
-        name,
+        name: trimmed,
         keyHash,
         prefix,
       },
@@ -43,8 +66,11 @@ export async function generateApiKey({ name }: { name: string }) {
   return { apiKeyRecord, rawKey };
 }
 
-export async function revokeApiKey(keyId: string) {
-  const { tenantId } = await requireTenantAction();
+export async function revokeApiKey(
+  keyId: string
+): Promise<{ success: boolean } | { success: false; error: 'forbidden' }> {
+  const { tenantId, role } = await requireTenantAction();
+  if (!can(asRole(role), 'manage_users')) return { success: false, error: 'forbidden' };
 
   // `deleteMany` so the tenant is part of the WHERE clause; `delete` takes only
   // a unique selector and would revoke another tenant's key.

@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Lock,
 } from 'lucide-react';
-import { generateApiKey, revokeApiKey } from './actions';
+import { generateApiKey, revokeApiKey, type ApiKeyActionError } from './actions';
 
 export interface ApiKeyRecord {
   id: string;
@@ -20,6 +20,11 @@ export interface ApiKeyRecord {
   lastUsedAt?: string | Date | null;
   createdAt: string | Date;
 }
+
+const ACTION_ERROR_TEXT: Record<ApiKeyActionError, string> = {
+  forbidden: 'API anahtarlarını yalnızca kurum sahibi veya yöneticisi yönetebilir.',
+  invalidName: 'Anahtar adı 1 ile 100 karakter arasında olmalı.',
+};
 
 interface ApiKeysClientProps {
   apiKeys: ApiKeyRecord[];
@@ -34,6 +39,7 @@ export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
   const [newRawKey, setNewRawKey] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [activeCodeTab, setActiveCodeTab] = useState<'curl' | 'javascript' | 'python'>('curl');
 
   const handleGenerateKey = async (e: React.FormEvent) => {
@@ -41,12 +47,15 @@ export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
     if (!keyName.trim()) return;
 
     setIsGenerating(true);
+    setActionError(null);
     try {
       const res = await generateApiKey({
         name: keyName.trim(),
       });
 
-      if (res.rawKey) {
+      if ('error' in res) {
+        setActionError(ACTION_ERROR_TEXT[res.error]);
+      } else if (res.rawKey) {
         setNewRawKey(res.rawKey);
         setApiKeys((prev) => [
           {
@@ -69,7 +78,12 @@ export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
 
   const handleRevokeKey = async (id: string, name: string) => {
     if (confirm(`"${name}" adlı API anahtarını iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) {
-      await revokeApiKey(id);
+      setActionError(null);
+      const res = await revokeApiKey(id);
+      if ('error' in res && res.error) {
+        setActionError(ACTION_ERROR_TEXT[res.error]);
+        return;
+      }
       setApiKeys((prev) => prev.filter((k) => k.id !== id));
     }
   };
@@ -153,6 +167,7 @@ export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
                   onChange={(e) => setKeyName(e.target.value)}
                   placeholder="Örn: SAP ERP Pipeline Senkronu"
                   required
+                  maxLength={100}
                   className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none bg-ground font-semibold"
                 />
               </div>
@@ -164,6 +179,12 @@ export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
                 </span>
                 <p>Üretilen anahtar yalnızca bir kez tam olarak gösterilir. Lütfen güvenli bir ortamda saklayın.</p>
               </div>
+
+              {actionError && (
+                <p role="alert" className="text-red-600 font-semibold">
+                  {actionError}
+                </p>
+              )}
 
               <button
                 type="submit"
