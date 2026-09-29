@@ -12,6 +12,8 @@ import { stripeEventCleanupTask } from './stripe-event-cleanup';
 import { agencyMonthlyReportTask } from './agency-monthly-report';
 import { invitationCleanupTask } from './invitation-cleanup';
 import { publicLeadCleanupTask } from './public-lead-cleanup';
+import { k1TopicMatchTask } from './k1-topic-match';
+import { m4StaleRelationshipsTask } from './m4-stale-relationships';
 import { jobQueueHealthTask } from './job-queue-health';
 
 /**
@@ -32,5 +34,7 @@ export const taskList: Record<JobId, Task> = {
   'agency-monthly-report': agencyMonthlyReportTask,
   'invitation-cleanup': invitationCleanupTask,
   'public-lead-cleanup': publicLeadCleanupTask,
+  'k1-topic-match': k1TopicMatchTask,
+  'm4-stale-relationships': m4StaleRelationshipsTask,
   'job-queue-health': jobQueueHealthTask,
 };

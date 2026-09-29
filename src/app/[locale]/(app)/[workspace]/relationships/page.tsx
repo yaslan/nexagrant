@@ -5,6 +5,7 @@ import { errorMessage } from '@/lib/errors';
 import type { RelationshipRow } from '@/types/db-rows';
 import { requireTenantPage } from '@/lib/tenant';
 import { moduleGate } from '@/lib/modules/guard';
+import { isStaleRelationship } from '@/lib/relationships/stale';
 
 /** Whole days between `d` and now, or null when there is no date. */
 const daysSince = (d: Date | null) => {
@@ -84,7 +85,8 @@ export default async function RelationshipsPage({
       <div className="space-y-4">
         {relationships.map((rel) => {
           const days = daysSince(rel.lastContactAt);
-          const stale = days !== null && days > 60;
+          // Same 60-day line as the daily reminder mail (src/lib/relationships/stale.ts).
+          const stale = isStaleRelationship(rel.lastContactAt);
 
           return (
             <Link

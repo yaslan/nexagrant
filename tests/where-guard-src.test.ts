@@ -46,6 +46,8 @@ const KNOWN: Record<string, string> = {
     '`tenantId` is a `groupBy` key of Invitation rows (non-null column); `due` comes from purgeableInvitationWhere, which throws on an invalid cutoff; cron input, no client',
   'src/lib/leads/public-lead.ts where: due (not a const object literal)':
     '`due` comes from purgeablePublicLeadWhere, which throws on an invalid cutoff and returns `{ createdAt: { lt: cutoff } }`; cron input, no client (TASK-MULR765AR5G0C)',
+  'src/lib/relationships/stale-reminder.ts in: ids':
+    '`string[]` of Relationship primary keys read by collectTenant in the same run, never undefined; `in: []` matches nothing, and the call returns before it on an empty list; `tenantId` beside it is guarded by isPresentId; cron input, no client',
   'src/modules/m10/server/actions.ts followupDocId: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts id: existing.id': DB_ROW,
 };

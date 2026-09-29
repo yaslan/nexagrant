@@ -2618,5 +2618,14 @@
         "body": "Sayın {institution} ekibi,\n\n{callCode} çağrısı için \"{projectTitle}\" teklifine katılımınızla ilgili önceki mesajımızı takip etmek istedik. Son başvuru tarihi yaklaştığı için ilginizi kısa süre içinde öğrenebilirsek planlamamızı buna göre yapacağız.\n\nSorularınız için memnuniyetle görüşmeye hazırız.\n\nSaygılarımızla,\n[Adınız Soyadınız]\n[Kurumunuz]"
       }
     }
+  },
+  "staleRelationshipsEmail": {
+    "subject": "{product}: {count} ilişkiyle 60 gündür temas yok",
+    "heading": "60 gündür temas kurulmamış ilişkiler",
+    "intro": "Sorumlusu olduğunuz aşağıdaki ilişkilerde son temasın üzerinden 60 gün ya da daha fazla geçti.",
+    "lastContact": "son temas {date} ({days} gün önce)",
+    "more": "ve {count} ilişki daha",
+    "cta": "İlişkileri aç",
+    "footer": "Bu özet günde en çok bir kez gönderilir. Aynı ilişki, yeni bir temas da 60 gün eskiyene kadar yeniden hatırlatılmaz."
   }
 }

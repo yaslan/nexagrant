@@ -2618,5 +2618,14 @@
         "body": "Dear {institution} team,\n\nWe are following up on our earlier message about your participation in the \"{projectTitle}\" proposal for {callCode}. The deadline is close, so a quick reply about your interest would help us plan.\n\nWe are happy to talk if you have questions.\n\nKind regards,\n[Your name]\n[Your organisation]"
       }
     }
+  },
+  "staleRelationshipsEmail": {
+    "subject": "{product}: no contact with {count} relationships for 60 days",
+    "heading": "Relationships with no contact for 60 days",
+    "intro": "You are the focal point for the relationships below. Their last contact was 60 or more days ago.",
+    "lastContact": "last contact {date} ({days} days ago)",
+    "more": "and {count} more",
+    "cta": "Open relationships",
+    "footer": "This digest is sent at most once a day. A relationship is not named again until a newer contact is also 60 days old."
   }
 }

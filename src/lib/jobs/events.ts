@@ -209,3 +209,44 @@ export const AgencyMonthlyReportOutputSchema = z.object({
 });
 
 export type AgencyMonthlyReportOutput = z.infer<typeof AgencyMonthlyReportOutputSchema>;
+
+// K1: nightly TopicMatch recompute (TASK-MULQL2NYKRGJX)
+export const K1TopicMatchOutputSchema = z.object({
+  success: z.boolean(),
+  tenants: z.number(),
+  done: z.number(),
+  noProfileEmbedding: z.number(),
+  pilotExpired: z.number(),
+  failed: z.number(),
+  scored: z.number(),
+  created: z.number(),
+  updated: z.number(),
+  unchanged: z.number(),
+  ineligible: z.number(),
+  topicsWithoutEmbedding: z.number(),
+  durationMs: z.number(),
+});
+
+export type K1TopicMatchOutput = z.infer<typeof K1TopicMatchOutputSchema>;
+
+// M4: daily "no contact for 60 days" digest (TASK-MULQL2NYKRGJX)
+export const M4StaleRelationshipsOutputSchema = z.object({
+  success: z.boolean(),
+  reason: z.enum(['no_mail_provider', 'send_failed']).optional(),
+  tenants: z.number(),
+  tenantsPilotExpired: z.number(),
+  tenantsModuleClosed: z.number(),
+  tenantsFailed: z.number(),
+  relationshipsDue: z.number(),
+  relationshipsReminded: z.number(),
+  skippedUnassigned: z.number(),
+  skippedNeverContacted: z.number(),
+  skippedAlreadyReminded: z.number(),
+  skippedRecipient: z.number(),
+  skippedMailedToday: z.number(),
+  digestsSent: z.number(),
+  digestsFailed: z.number(),
+  durationMs: z.number(),
+});
+
+export type M4StaleRelationshipsOutput = z.infer<typeof M4StaleRelationshipsOutputSchema>;

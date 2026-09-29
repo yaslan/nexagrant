@@ -1126,6 +1126,10 @@ model Relationship {
   nextStep       String?
   nextStepDue    DateTime?
   notes          String?
+  /// When the `m4-stale-relationships` job last put this relationship in its owner's
+  /// "no contact for 60 days" digest. A reminder is due again only after a newer
+  /// contact (`lastContactAt` > this) has gone stale in turn. relationship-stale-reminded-at.sql
+  staleRemindedAt DateTime?
   updatedAt      DateTime @updatedAt
   @@index([tenantId, ownerUserId])
   @@index([tenantId, lastContactAt])

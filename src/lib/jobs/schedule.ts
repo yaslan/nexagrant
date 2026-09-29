@@ -29,6 +29,8 @@ export const JOB_IDS = [
   'agency-monthly-report',
   'invitation-cleanup',
   'public-lead-cleanup',
+  'k1-topic-match',
+  'm4-stale-relationships',
   'job-queue-health',
 ] as const;
 
@@ -65,6 +67,26 @@ export const SCHEDULE: readonly ScheduledJob[] = [
   },
   { id: 'invitation-cleanup', cron: '30 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   { id: 'public-lead-cleanup', cron: '45 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
+  // After k1-daily-calls (02:00) has landed the day's topics. Own queue: a job
+  // added by hand waits for the cron's run instead of racing it on the same rows.
+  {
+    id: 'k1-topic-match',
+    cron: '30 2 * * *',
+    maxAttempts: 5,
+    fill: '6h',
+    queue: 'k1-topic-match',
+    missedTickAlert: true,
+  },
+  // 10:00 Istanbul. Own queue for the same reason: two overlapping runs could
+  // both mail one owner before either stamped the rows.
+  {
+    id: 'm4-stale-relationships',
+    cron: '0 7 * * *',
+    maxAttempts: 5,
+    fill: '6h',
+    queue: 'm4-stale-relationships',
+    missedTickAlert: true,
+  },
   { id: 'job-queue-health', cron: '5 * * * *', maxAttempts: 3, missedTickAlert: false },
 ];
 
