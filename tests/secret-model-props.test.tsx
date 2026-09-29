@@ -10,7 +10,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
  * `CalendarConnection` rows — `accessToken` and `refreshToken` included — to
  * <CalendarClient>; the API-key screen and `generateApiKey` sent `keyHash`;
  * `addBudgetLine` / `addWorkPackage` / `createApplicationPart` returned
- * `magicTokenHash`.
+ * `magicTokenHash`; the application page read its parts whole and kept the
+ * hash out of <ApplicationClient> with a destructure nothing pinned
+ * (İNCELEME-29 B-2, TASK-MUN2TQ1W6WP8E).
  *
  * The fake client below answers like Prisma does: the whole row, unless the
  * call carries a `select`, in which case only those fields. The rows carry
@@ -23,7 +25,7 @@ const SECRET_COLUMNS = ['accessToken', 'refreshToken', 'keyHash', 'magicTokenHas
 type Row = Record<string, unknown>;
 type Select = Record<string, unknown>;
 
-/** Prisma's `select` semantics, far enough for these rows: absent → whole row. */
+/** Prisma's `select` semantics, far enough for these rows: absent (or undefined) → whole row. */
 function project(row: Row, select?: Select): Row {
   if (!select) return { ...row };
   const out: Row = {};
@@ -63,6 +65,7 @@ const h = vi.hoisted(() => ({
     lastUsedAt: null,
     createdAt: new Date('2026-09-01T00:00:00Z'),
   },
+  OPPORTUNITY_ROW: { id: 'opp-1', tenantId: 'tenant-1', title: 'District renovation pilot' },
   PART_ROW: {
     id: 'part-1',
     tenantId: 'tenant-1',
@@ -91,8 +94,17 @@ vi.mock('@/lib/db', () => {
         project({ ...h.API_KEY_ROW, ...args.data }, args.select)
       ),
     },
-    opportunity: { findFirst: vi.fn(async () => ({ id: 'opp-1' })) },
+    opportunity: {
+      // A relation included as `true` comes back whole, as `{ select }` projected.
+      findFirst: vi.fn(async (args: { include?: { applicationParts?: true | { select?: Select } } }) => {
+        const rel = args.include?.applicationParts;
+        if (!rel) return { id: 'opp-1' };
+        const select = rel === true ? undefined : rel.select;
+        return { ...h.OPPORTUNITY_ROW, applicationParts: [project(h.PART_ROW, select)] };
+      }),
+    },
     applicationPart: {
+      findMany: vi.fn(async (args: { select?: Select }) => [project(h.PART_ROW, args.select)]),
       findFirst: vi.fn(async (args: { select?: Select }) => project(h.PART_ROW, args.select)),
       create: vi.fn(async (args: { data: Row; select?: Select }) =>
         project({ ...h.PART_ROW, ...args.data }, args.select)
@@ -112,6 +124,8 @@ vi.mock('next-intl/server', () => ({
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
+vi.mock('@/lib/modules/guard', () => ({ moduleGate: vi.fn(async () => null) }));
+
 // The client components are replaced by named stubs: the test reads the props
 // the page gives them, which is exactly what the RSC payload would carry.
 vi.mock('@/app/[locale]/(app)/[workspace]/settings/calendar/client', () => ({
@@ -125,8 +139,16 @@ vi.mock('@/app/[locale]/(app)/[workspace]/settings/api-keys/client', () => ({
   },
 }));
 
+vi.mock('@/app/[locale]/(app)/[workspace]/opportunities/[id]/application/client', () => ({
+  ApplicationClient: function ApplicationClient() {
+    return null;
+  },
+}));
+
 import CalendarSettingsPage from '@/app/[locale]/(app)/[workspace]/settings/calendar/page';
 import ApiKeysSettingsPage from '@/app/[locale]/(app)/[workspace]/settings/api-keys/page';
+import ApplicationPage from '@/app/[locale]/(app)/[workspace]/opportunities/[id]/application/page';
+import { ApplicationClient } from '@/app/[locale]/(app)/[workspace]/opportunities/[id]/application/client';
 import { CalendarClient } from '@/app/[locale]/(app)/[workspace]/settings/calendar/client';
 import { ApiKeysClient } from '@/app/[locale]/(app)/[workspace]/settings/api-keys/client';
 import { generateApiKey } from '@/app/[locale]/(app)/[workspace]/settings/api-keys/actions';
@@ -187,6 +209,16 @@ describe('secret columns stay on the server', () => {
     expect(res.rawKey).toMatch(/^fp_live_/);
     expectNoSecrets(res.apiKeyRecord);
     expect(res.apiKeyRecord).not.toHaveProperty('tenantId');
+  });
+
+  test('application page: <ApplicationClient> learns a portal link exists, never its hash', async () => {
+    const tree = await ApplicationPage({ params: Promise.resolve({ locale: 'en', workspace: 'ws', id: 'opp-1' }) });
+    const client = findElement(tree, ApplicationClient);
+    expect(client).not.toBeNull();
+    // Still what the client renders — the part and its link flag.
+    expect(client!.props.partA).toMatchObject({ id: 'part-1', part: 'PART_A', hasPortalLink: true });
+    expect(client!.props.partA).toHaveProperty('content');
+    expectNoSecrets(client!.props);
   });
 
   test('M11 part actions return no portal-token hash', async () => {

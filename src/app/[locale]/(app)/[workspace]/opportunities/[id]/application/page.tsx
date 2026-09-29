@@ -22,20 +22,29 @@ export default async function ApplicationPage({
   // to render a hard-coded "Fraunhofer Institute" budget and work-package plan,
   // which the user cannot tell apart from their own data. A missing row is a
   // 404; an unreadable database is an error (global-error.tsx).
-  const opp = await withTenant(tenantId, (tx) =>
-    tx.opportunity.findFirst({
+  //
+  // The portal token's hash never enters this page (TASK-MULQLL2T8ZJX4,
+  // TASK-MUN2TQ1W6WP8E): the parts are read with an explicit select, and the
+  // client only learns whether a link exists, from a filter on the hash.
+  const found = await withTenant(tenantId, async (tx) => {
+    const opportunity = await tx.opportunity.findFirst({
       where: { id, tenantId },
-      include: { applicationParts: true }
-    })
-  );
+      include: { applicationParts: { select: { id: true, part: true, content: true } } }
+    });
+    if (!opportunity) return null;
+    const linked = await tx.applicationPart.findMany({
+      where: { opportunityId: opportunity.id, tenantId, magicTokenHash: { not: null } },
+      select: { id: true }
+    });
+    return { opportunity, linkedPartIds: new Set(linked.map((p) => p.id)) };
+  });
 
-  if (!opp) notFound();
+  if (!found) notFound();
+  const { opportunity: opp, linkedPartIds } = found;
 
-  // The portal token's hash stays on the server (TASK-MULQLL2T8ZJX4): the client
-  // only learns whether a link exists.
-  const parts: ApplicationPartItem[] = opp.applicationParts.map(({ magicTokenHash, ...part }) => ({
+  const parts: ApplicationPartItem[] = opp.applicationParts.map((part) => ({
     ...(part as unknown as ApplicationPartItem),
-    hasPortalLink: magicTokenHash !== null,
+    hasPortalLink: linkedPartIds.has(part.id),
   }));
   const partA = parts.find((p) => p.part === 'PART_A');
   const partB = parts.find((p) => p.part === 'PART_B');
