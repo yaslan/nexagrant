@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { inngest } from '@/lib/inngest/client';
+import { defineJob, monthOf } from '../define';
 import { env } from '@/lib/env';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { recordRawFetch } from '@/lib/k2-cordis/raw-fetch';
@@ -23,7 +23,7 @@ const REQUIRED_WORKER_FIELDS = ['message'] as const;
 /**
  * Ask the Python worker to run the monthly CORDIS pipeline.
  *
- * Split out of the Inngest step so `pnpm jobs:k2` and the unit tests drive the
+ * Split out of the job wrapper so `pnpm jobs:k2` and the unit tests drive the
  * exact same path — the same shape `syncK1Topics` has.
  *
  * CLAUDE.md rule 6 in three parts, all of which this used to miss:
@@ -199,9 +199,11 @@ function safeHost(url: string): string {
 /**
  * K2 Monthly CORDIS Sync — 1st of month, 04:00 UTC.
  * Triggers the Python worker, which does the DuckDB transform and the upsert.
+ * The month is the tick's month (a retried or backfilled run keeps it), or
+ * `payload.month` for a run added by hand. Never throws, so the queue never
+ * retries it — the same as under the old scheduler (ADR-0008 §6.3).
  */
-export const k2MonthlyCordis = inngest.createFunction(
-  { id: 'k2-monthly-cordis', triggers: [{ cron: '0 4 1 * *' }] },
-  async ({ step }): Promise<K2MonthlyCordisOutput> =>
-    step.run('trigger-cordis-worker', async () => runK2MonthlyCordis())
-);
+export const k2MonthlyCordisTask = defineJob('k2-monthly-cordis', async ({ payload, tick }): Promise<K2MonthlyCordisOutput> => {
+  const month = typeof payload.month === 'string' ? payload.month : monthOf(tick);
+  return runK2MonthlyCordis({ month });
+});

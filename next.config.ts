@@ -36,7 +36,7 @@ const nextConfig: NextConfig = {
   experimental: {
     authInterrupts: true,
   },
-  serverExternalPackages: ['pg', 'pdf-parse', 'inngest'],
+  serverExternalPackages: ['pg', 'pdf-parse', 'graphile-worker'],
   /**
    * Hosts `next/image` is allowed to optimise from.
    *

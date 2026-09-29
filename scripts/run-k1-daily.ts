@@ -1,7 +1,7 @@
 /**
  * Manual trigger for the K1 daily call sync (`pnpm jobs:k1`).
  *
- * Runs the exact code path the Inngest cron runs at 02:00 UTC, so a failing
+ * Runs the exact code path the scheduled job runs at 02:00 UTC, so a failing
  * nightly job can be reproduced locally without waiting for the schedule.
  *
  *   pnpm jobs:k1                 fetch + persist

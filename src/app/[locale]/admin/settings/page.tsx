@@ -1,5 +1,6 @@
 import React from 'react';
 import { getTranslations } from 'next-intl/server';
+import { SCHEDULE } from '@/lib/jobs/schedule';
 import { Database, Key } from 'lucide-react';
 import { SmtpSettingsForm } from './smtp-form';
 import { DEFAULT_MODELS } from '@/lib/llm';
@@ -76,8 +77,8 @@ export default async function AdminSettingsPage({
               </div>
             )}
             <div className="flex justify-between p-2 bg-ground rounded-xl border border-border">
-              <span>Inngest Cron Suite:</span>
-              <strong className="text-ink font-mono">7 Aktif Görev</strong>
+              <span>{t('scheduledJobsLabel')}</span>
+              <strong className="text-ink font-mono">{t('scheduledJobsValue', { count: SCHEDULE.length })}</strong>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
-import { inngest } from '@/lib/inngest/client';
+import { defineJob } from '../define';
 import { runFeedbackDigest } from '@/lib/feedback/digest-run';
 import {
+  FeedbackWeeklyDigestEventSchema,
   FeedbackWeeklyDigestOutputSchema,
   type FeedbackWeeklyDigestOutput,
 } from '../events';
@@ -14,15 +15,16 @@ import {
  *
  * Delivery is best effort. With no recipient (or, outside production, no
  * SMTP_HOST) the job still runs, still returns the counts, and reports
- * emailStatus 'skipped', so the numbers show up in the Inngest run history even
+ * emailStatus 'skipped', so the numbers show up in the worker log even
  * before email is wired. In production a missing SMTP_HOST is 'failed'.
  */
-export const feedbackWeeklyDigest = inngest.createFunction(
-  { id: 'feedback-weekly-digest', triggers: [{ cron: '0 6 * * 1' }] },
-  async ({ event, step }): Promise<FeedbackWeeklyDigestOutput> => {
-    const data = (event?.data ?? {}) as { sinceIso?: string; to?: string };
+export const feedbackWeeklyDigestTask = defineJob(
+  'feedback-weekly-digest',
+  async ({ payload }): Promise<FeedbackWeeklyDigestOutput> => {
+    // `sinceIso` / `to` only on a job added by hand; the cron sends neither.
+    const data = FeedbackWeeklyDigestEventSchema.parse(payload);
 
-    const result = await step.run('build-and-send-digest', async () => {
+    const result = await (async () => {
       const run = await runFeedbackDigest({
         ...(data.sinceIso ? { sinceIso: data.sinceIso } : {}),
         ...(data.to ? { to: data.to } : {}),
@@ -37,7 +39,7 @@ export const feedbackWeeklyDigest = inngest.createFunction(
         emailStatus: run.emailStatus,
         emailReason: run.emailReason,
       };
-    });
+    })();
 
     // 'skipped' (no key or no recipient) is the documented best-effort case
     // above; 'failed' means the SMTP server refused the mail (or, in

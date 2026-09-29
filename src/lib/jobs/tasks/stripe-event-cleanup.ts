@@ -1,4 +1,4 @@
-import { inngest } from '@/lib/inngest/client';
+import { defineJob } from '../define';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { errorMessage } from '@/lib/errors';
 import { pruneOldStripeEvents, STRIPE_EVENT_RETENTION_DAYS } from '@/lib/billing/stripe-event-retention';
@@ -14,41 +14,32 @@ import { pruneOldStripeEvents, STRIPE_EVENT_RETENTION_DAYS } from '@/lib/billing
  * withSystemScope('cross-tenant-job') — see pruneOldStripeEvents.
  * Idempotent: re-running the same hour deletes nothing (WHERE clause filters by date).
  */
-export const stripeEventCleanup = inngest.createFunction(
-  { id: 'stripe-event-cleanup', triggers: [{ cron: '0 2 * * *' }] },
-  async ({ step }) => {
-    try {
-      const deletedCount = await step.run('delete-old-events', async () => {
-        return await pruneOldStripeEvents();
-      });
+export const stripeEventCleanupTask = defineJob('stripe-event-cleanup', async () => {
+  try {
+    const deletedCount = await pruneOldStripeEvents();
 
-      if (deletedCount > 0) {
-        await step.run('record-cleanup-stat', async () => {
-          await recordAlert({
-            level: 'info',
-            source: 'stripe-event-cleanup',
-            message: `Deleted ${deletedCount} Stripe event log entries older than ${STRIPE_EVENT_RETENTION_DAYS} days`,
-            meta: {
-              deletedCount,
-              retentionDays: STRIPE_EVENT_RETENTION_DAYS,
-            },
-          });
-        });
-      }
-
-      return {
-        success: true,
-        deletedCount,
-      };
-    } catch (error) {
-      await step.run('record-error-alert', async () => {
-        await recordAlert({
-          level: 'error',
-          source: 'stripe-event-cleanup',
-          message: `Stripe event log cleanup failed: ${errorMessage(error)}`,
-        });
+    if (deletedCount > 0) {
+      await recordAlert({
+        level: 'info',
+        source: 'stripe-event-cleanup',
+        message: `Deleted ${deletedCount} Stripe event log entries older than ${STRIPE_EVENT_RETENTION_DAYS} days`,
+        meta: {
+          deletedCount,
+          retentionDays: STRIPE_EVENT_RETENTION_DAYS,
+        },
       });
-      throw error;
     }
+
+    return {
+      success: true,
+      deletedCount,
+    };
+  } catch (error) {
+    await recordAlert({
+      level: 'error',
+      source: 'stripe-event-cleanup',
+      message: `Stripe event log cleanup failed: ${errorMessage(error)}`,
+    });
+    throw error;
   }
-);
+});

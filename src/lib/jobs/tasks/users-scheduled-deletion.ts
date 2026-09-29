@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
-import { inngest } from '@/lib/inngest/client';
+import { defineJob } from '../define';
 import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { deleteUserFilesFromR2 } from '@/lib/storage';
 import { errorCode } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
 import {
+  UsersScheduledDeletionEventSchema,
   UsersScheduledDeletionOutputSchema,
   type UsersScheduledDeletionOutput,
 } from '../events';
@@ -65,8 +66,8 @@ export function buildPurgeFailureAlert(failures: PurgeFailure[]): {
 /**
  * Finds every account whose erasure grace period has expired and purges it.
  *
- * Exported separately from the Inngest wrapper so the rule can be unit-tested
- * and run on demand without an Inngest runtime — the scheduled function below
+ * Exported separately from the job wrapper so the rule can be unit-tested
+ * and run on demand without a queue — the scheduled function below
  * is only a trigger around this.
  */
 export async function purgeDueUsers(
@@ -279,13 +280,11 @@ async function writeErasureAudit(user: PurgedUser): Promise<void> {
  * `requestAccountDeletion` only soft-deletes; this job is the single place where
  * the irreversible purge happens, so a subject can still cancel until it runs.
  */
-export const usersScheduledDeletion = inngest.createFunction(
-  { id: 'users-scheduled-deletion', triggers: [{ cron: '0 3 * * *' }] },
-  async ({ event, step }): Promise<UsersScheduledDeletionOutput> => {
-    const gracePeriodDays =
-      (event?.data as { gracePeriodDays?: number } | undefined)?.gracePeriodDays ??
-      DEFAULT_GRACE_PERIOD_DAYS;
-
-    return await step.run('purge-due-users', () => purgeDueUsers(gracePeriodDays));
+export const usersScheduledDeletionTask = defineJob(
+  'users-scheduled-deletion',
+  async ({ payload }): Promise<UsersScheduledDeletionOutput> => {
+    // A job added by hand may shorten the grace period (tests only); the cron never does.
+    const { gracePeriodDays } = UsersScheduledDeletionEventSchema.parse(payload);
+    return purgeDueUsers(gracePeriodDays ?? DEFAULT_GRACE_PERIOD_DAYS);
   }
 );

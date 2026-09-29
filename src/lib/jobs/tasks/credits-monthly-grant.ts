@@ -1,11 +1,11 @@
-import { inngest } from '@/lib/inngest/client';
+import { defineJob, monthOf } from '../define';
 import { prisma, withTenant } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
 import { CreditsMonthlyGrantOutputSchema, type CreditsMonthlyGrantOutput } from '../events';
 import type { TenantRunner } from './alerts-daily';
 
 /**
- * The per-tenant grant loop, lifted out of the inngest handler so it can be
+ * The per-tenant grant loop, lifted out of the job handler so it can be
  * run against a real two-tenant fixture — the seam `sweepOrphanTenantAlerts`
  * (alerts-sweep.ts) already established in this directory.
  *
@@ -103,22 +103,20 @@ export async function grantCreditsToTenants(
 }
 
 /**
- * Credits Monthly Grant — 1st of month, 6 AM UTC
- * Grants AI credits to active tenants based on their plan entitlements
+ * Credits Monthly Grant — 1st of month, 6 AM UTC.
+ * Grants AI credits to active tenants based on their plan entitlements, for
+ * the tick's month (`payload.period` on a job added by hand). A second run for
+ * the same month grants nothing (see grantCreditsToTenants).
  */
-export const creditsMonthlyGrant = inngest.createFunction(
-  { id: 'credits-monthly-grant', triggers: [{ cron: '0 6 1 * *' }] },
-  async ({ step }): Promise<CreditsMonthlyGrantOutput> => {
+export const creditsMonthlyGrantTask = defineJob(
+  'credits-monthly-grant',
+  async ({ payload, tick }): Promise<CreditsMonthlyGrantOutput> => {
+    const period = typeof payload.period === 'string' ? payload.period : monthOf(tick);
     // Deliberately NOT tenant-scoped: this is the fan-out that discovers which
     // tenants exist, so no tenant id is known yet — the same intentional
     // exception as `fetch-saved-searches` in alerts-daily.ts. `Tenant` is the
     // table the scope is derived *from*; every query below it is scoped.
-    const tenants = await step.run('fetch-active-tenants', async () => {
-      return await prisma.tenant.findMany({
-        select: { id: true },
-      });
-    });
-
-    return await step.run('grant-credits', async () => grantCreditsToTenants(tenants));
+    const tenants = await prisma.tenant.findMany({ select: { id: true } });
+    return grantCreditsToTenants(tenants, withTenant, period);
   }
 );

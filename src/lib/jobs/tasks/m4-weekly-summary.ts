@@ -1,4 +1,4 @@
-import { inngest } from '@/lib/inngest/client';
+import { defineJob } from '../define';
 import { withSystemScope } from '@/lib/system-scope';
 import { M4WeeklySummaryOutputSchema, type M4WeeklySummaryOutput } from '../events';
 
@@ -22,8 +22,8 @@ export interface PendingAction {
  * invent one shared recipient out of unrelated rows — across tenants, at that —
  * so they are counted and left out of the grouping.
  *
- * Exported separately from the Inngest wrapper so the rule can be unit-tested
- * without an Inngest runtime, the same way `purgeDueUsers()` is.
+ * Exported separately from the job wrapper so the rule can be unit-tested
+ * without a queue, the same way `purgeDueUsers()` is.
  */
 export function groupPendingActionsByFocalPoint<T extends PendingAction>(
   actions: T[]
@@ -53,10 +53,10 @@ export function groupPendingActionsByFocalPoint<T extends PendingAction>(
  * Sends relationship management summaries and due actions to focal points
  * Groups pending actions by focal point and notifies them
  */
-export const m4WeeklySummary = inngest.createFunction(
-  { id: 'm4-weekly-summary', triggers: [{ cron: '0 9 * * 1' }] },
-  async ({ step }): Promise<M4WeeklySummaryOutput> => {
-    const pendingActions = await step.run('fetch-pending-actions', async () => {
+export const m4WeeklySummaryTask = defineJob(
+  'm4-weekly-summary',
+  async (): Promise<M4WeeklySummaryOutput> => {
+    const pendingActions = await (async () => {
       const oneWeekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       // Cron fan-out: reads EVERY tenant's due relationship actions and then
@@ -82,9 +82,9 @@ export const m4WeeklySummary = inngest.createFunction(
           },
         })
       );
-    });
+    })();
 
-    const result = await step.run('group-and-notify', async () => {
+    const result = await (async () => {
       const errors: Array<{ focalPointId: string; reason: string }> = [];
       const { grouped, unassignedCount } = groupPendingActionsByFocalPoint(pendingActions);
 
@@ -113,7 +113,7 @@ export const m4WeeklySummary = inngest.createFunction(
       }
 
       return M4WeeklySummaryOutputSchema.parse(output);
-    });
+    })();
 
     return result;
   }

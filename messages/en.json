@@ -1547,6 +1547,8 @@
   "adminSettings": {
     "defaultLlmModelLabel": "Default LLM Model:",
     "defaultPlanCreditsLabel": "Default Plan Credits:",
+    "scheduledJobsLabel": "Scheduled jobs (graphile-worker):",
+    "scheduledJobsValue": "{count} scheduled jobs",
     "creditsUnit": "Credits"
   },
   "adminPlans": {

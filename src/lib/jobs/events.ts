@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 /**
- * Inngest event schemas — strongly typed input/output for all jobs
+ * Job payload and output schemas — strongly typed input/output for every
+ * scheduled job (src/lib/jobs/schedule.ts)
  * Each event corresponds to a trigger or inter-job communication
  */
 

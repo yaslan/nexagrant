@@ -1,7 +1,7 @@
 /**
  * Manual trigger for the alert sweeper (`pnpm jobs:alerts-sweep`).
  *
- * Runs the exact code the Inngest cron runs at 04:15 UTC, so the pile of
+ * Runs the exact code the scheduled job runs at 04:15 UTC, so the pile of
  * tenant-orphaned SystemAlert rows (TASK-MTVFJTNW6OW11) can be cleared or
  * inspected without waiting for the schedule.
  *

@@ -1547,6 +1547,8 @@
   "adminSettings": {
     "defaultLlmModelLabel": "Varsayılan LLM Model:",
     "defaultPlanCreditsLabel": "Varsayılan Plan Kredisi:",
+    "scheduledJobsLabel": "Zamanlanmış işler (graphile-worker):",
+    "scheduledJobsValue": "{count} zamanlanmış iş",
     "creditsUnit": "Kredi"
   },
   "adminPlans": {

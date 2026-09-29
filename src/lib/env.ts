@@ -31,14 +31,25 @@ const envSchema = z.object({
   ),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: optionalUrl,
-  INNGEST_API_KEY: z.string().optional(),
-  INNGEST_SIGNING_KEY: z.string().optional(),
   /**
-   * Inngest dev mode for local work (README "Yerel Inngest"). The SDK reads it
-   * itself; it is listed here so {@link assertInngestDevModeAllowed} can refuse
-   * a production server that has it on.
+   * Scheduled jobs (graphile-worker, `pnpm jobs:worker`, ADR-0008).
+   *
+   * JOBS_CRON_ENABLED decides whether this worker schedules the crontab. It
+   * must be set to `true` or `false` explicitly when NODE_ENV=production: the
+   * switch from the old hosted scheduler is only safe once that one has stopped
+   * firing, and a default would let a new worker and the old scheduler run the
+   * same tick (ADR-0008 Ö-2, {@link jobsCronEnabled}). Outside production
+   * unset means on. `false` still runs jobs added by hand.
+   * JOBS_DATABASE_URL is the connection the worker uses for its own
+   * `graphile_worker` schema (it creates and migrates it on start); unset =
+   * DATABASE_URL. Job bodies always use DATABASE_URL through src/lib/db.ts.
+   * JOBS_CONCURRENCY: jobs one worker process runs at once (default 2).
    */
-  INNGEST_DEV: z.string().optional(),
+  JOBS_CRON_ENABLED: blankToUndefined(z.enum(['true', 'false']).optional()),
+  JOBS_DATABASE_URL: optionalUrl,
+  JOBS_CONCURRENCY: blankToUndefined(
+    z.string().regex(/^[1-9][0-9]*$/, 'JOBS_CONCURRENCY must be a positive integer').default('2')
+  ),
   /**
    * Outgoing mail over our own SMTP server (src/lib/email/mailer.ts,
    * TASK-MUMLF57HOYFSB). SMTP_HOST unset or blank = no mail is sent; every
@@ -231,44 +242,26 @@ export const env = _env.data;
  */
 export const alertsSweepFailureThreshold = Number(env.ALERTS_SWEEP_FAILURE_THRESHOLD);
 
-/**
- * Whether this code was BUILT for production. Next replaces a direct
- * `process.env.NODE_ENV` read with a literal at build time, so starting a
- * production build with NODE_ENV=test cannot change it (same reasoning as
- * BUILT_FOR_PRODUCTION in src/lib/demo-login.ts). Keep it a direct member access.
- */
-export const INNGEST_BUILT_FOR_PRODUCTION = process.env.NODE_ENV === 'production';
-
-/** Values the Inngest SDK treats as "not dev mode" (its parseAsBoolean, plus blank). */
-const INNGEST_DEV_OFF = new Set(['', '0', 'false', 'undefined']);
-
-export class InngestDevModeInProductionError extends Error {
+export class JobsCronUnsetInProductionError extends Error {
   constructor() {
     super(
-      '❌ INNGEST_DEV is on in a production server. Dev mode skips request signature checks on ' +
-        '/api/inngest, so anyone could run the scheduled jobs. Remove INNGEST_DEV (or set it to 0) ' +
-        'and set INNGEST_SIGNING_KEY. For a local `pnpm start`, run it as `INNGEST_DEV=0 pnpm start`.'
+      '❌ JOBS_CRON_ENABLED is not set on a production worker. Set it to `false` until the old ' +
+        'scheduler has stopped firing (deploy the web app first, see ADR-0008 §7 "Dağıtım sırası"), ' +
+        'then to `true`. A default here could run the same tick twice.'
     );
-    this.name = 'InngestDevModeInProductionError';
+    this.name = 'JobsCronUnsetInProductionError';
   }
 }
 
 /**
- * Run once at server start (src/instrumentation.ts). A production server — a
- * production build, whatever NODE_ENV the process was started with, or
- * NODE_ENV=production — refuses to start while INNGEST_DEV is on. The client
- * (src/lib/inngest/client.ts) already forces cloud mode in a production build;
- * this makes the misconfiguration visible instead of silently ignored.
- *
- * @param builtForProduction the build-time half; a parameter only so the tests
- *   (which run unbuilt, under NODE_ENV=test) can exercise a production build.
+ * Whether a worker schedules the crontab (ADR-0008 Ö-2). Production refuses to
+ * guess; anywhere else unset means on.
  */
-export function assertInngestDevModeAllowed(
-  source: { INNGEST_DEV?: string; NODE_ENV?: string } = env,
-  builtForProduction: boolean = INNGEST_BUILT_FOR_PRODUCTION
-): void {
-  const devValue = (source.INNGEST_DEV ?? '').trim().toLowerCase();
-  if (!INNGEST_DEV_OFF.has(devValue) && (builtForProduction || source.NODE_ENV === 'production')) {
-    throw new InngestDevModeInProductionError();
-  }
+export function jobsCronEnabled(
+  source: { JOBS_CRON_ENABLED?: string; NODE_ENV?: string } = env
+): boolean {
+  if (source.JOBS_CRON_ENABLED === 'true') return true;
+  if (source.JOBS_CRON_ENABLED === 'false') return false;
+  if (source.NODE_ENV === 'production') throw new JobsCronUnsetInProductionError();
+  return true;
 }

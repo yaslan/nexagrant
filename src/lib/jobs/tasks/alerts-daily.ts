@@ -1,4 +1,4 @@
-import { inngest } from '@/lib/inngest/client';
+import { defineJob } from '../define';
 import { env } from '@/lib/env';
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
@@ -100,7 +100,7 @@ export type TenantRunner = <T>(
 ) => Promise<T>;
 
 /**
- * One saved search as `fetch-saved-searches` hands it back. `step.run`
+ * One saved search as `fetch-saved-searches` hands it back. The old scheduler's `step.run`
  * memoises through JSON, so on a replay the timestamps arrive as ISO strings
  * rather than `Date`s; `new Date(...)` accepts both.
  */
@@ -126,7 +126,7 @@ function touchLastRun(tx: TenantTx, searchId: string) {
 }
 
 /**
- * The per-search loop, lifted out of the inngest handler so it can be run
+ * The per-search loop, lifted out of the job handler so it can be run
  * against a real two-tenant fixture (the pattern `sweepOrphanTenantAlerts`
  * already sets in alerts-sweep.ts).
  *
@@ -287,10 +287,10 @@ export function alertsRunReport(
  * alerted and then re-thrown — reporting `totalSearches: 0` for a query that
  * never ran would be a false success.
  */
-export const alertsDaily = inngest.createFunction(
-  { id: 'alerts-daily', triggers: [{ cron: '0 8 * * *' }] },
-  async ({ step }): Promise<AlertsDailyOutput> => {
-    const savedSearches = await step.run('fetch-saved-searches', async () => {
+export const alertsDailyTask = defineJob(
+  'alerts-daily',
+  async (): Promise<AlertsDailyOutput> => {
+    const savedSearches = await (async () => {
       try {
         // Same fan-out shape as m4-weekly: every tenant's alert-enabled saved
         // searches, read before each one is mailed. Empty under `fabrika_app`,
@@ -307,18 +307,14 @@ export const alertsDaily = inngest.createFunction(
         });
         throw error;
       }
-    });
+    })();
 
-    // One step for the whole loop, as in credits-monthly-grant: counters
-    // mutated across many memoized steps would replay back to zero.
-    const result = await step.run('send-alerts', async () => sendSavedSearchAlerts(savedSearches));
+    const result = await sendSavedSearchAlerts(savedSearches);
 
     const { output, alert } = alertsRunReport(result, savedSearches.length);
 
     if (alert) {
-      await step.run('record-failure-alert', async () => {
-        await recordAlert(alert);
-      });
+      await recordAlert(alert);
     }
 
     return AlertsDailyOutputSchema.parse(output);

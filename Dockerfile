@@ -1,6 +1,7 @@
 # Multi-stage production Dockerfile for Avrupa Proje Fabrikası (Next.js 16)
 
-FROM node:20-alpine AS base
+# Node 22: graphile-worker 0.18 needs >= 22.18 (ADR-0008); CI already runs 22.
+FROM node:22-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -40,3 +41,17 @@ USER nextjs
 EXPOSE 3000
 
 CMD ["node", "server.js"]
+
+# Scheduled-job worker (ADR-0008): `docker build --target worker`.
+# A long-running process next to the web container; it runs TypeScript through
+# tsx, so it keeps the full dependency tree instead of the standalone bundle.
+# Needs DATABASE_URL, and JOBS_CRON_ENABLED set explicitly (true/false): a
+# production worker refuses to start without it (src/lib/env.ts jobsCronEnabled).
+FROM base AS worker
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN node_modules/.bin/prisma generate
+USER node
+CMD ["node_modules/.bin/tsx", "scripts/jobs-worker.ts"]

@@ -2,7 +2,7 @@
 /**
  * run-feedback-digest.ts — run the E11.2 weekly digest on demand.
  *
- * Same code path as the Monday 06:00 UTC Inngest job, callable by hand so the
+ * Same code path as the Monday 06:00 UTC scheduled job, callable by hand so the
  * report can be checked before a real send and re-sent after an outage.
  *
  * Safe by default: it renders and prints the summary but does NOT send.

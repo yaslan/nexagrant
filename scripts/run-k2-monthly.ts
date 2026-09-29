@@ -4,7 +4,7 @@
  * CLAUDE.md documents this command; the script behind it did not exist, so the
  * documented way to reproduce a failed monthly run was unrunnable. This is the
  * K1 runner's twin: it drives `runK2MonthlyCordis`, the exact function the
- * Inngest cron runs at 04:00 UTC on the 1st.
+ * scheduled job (src/lib/jobs/schedule.ts) runs at 04:00 UTC on the 1st.
  *
  *   pnpm jobs:k2                          current month
  *   pnpm jobs:k2 -- --month 2026-09

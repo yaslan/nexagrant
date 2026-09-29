@@ -1,7 +1,7 @@
 /**
  * E11.2 — weekly feedback digest: the pure half.
  *
- * Aggregation and HTML rendering live here, away from Inngest and Resend, so
+ * Aggregation and HTML rendering live here, away from the job scheduler and the mailer, so
  * the numbers and the escaping are unit-testable without a scheduler or an
  * outbound email.
  */

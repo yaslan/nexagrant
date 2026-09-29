@@ -1,7 +1,7 @@
 /**
  * E11.2 — the weekly digest as a plain async function.
  *
- * The Inngest job is a thin cron wrapper around this; a script and a test can
+ * The scheduled job (src/lib/jobs/tasks/feedback-weekly-digest.ts) is a thin cron wrapper around this; a script and a test can
  * run the same code against the real database. Keeping the logic out of the
  * scheduler is what makes "the digest works" a claim we can actually check.
  */

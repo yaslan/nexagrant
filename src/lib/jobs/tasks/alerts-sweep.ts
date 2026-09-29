@@ -1,4 +1,4 @@
-import { inngest } from '@/lib/inngest/client';
+import { defineJob } from '../define';
 import { prisma } from '@/lib/db';
 import { alertsSweepFailureThreshold } from '@/lib/env';
 import { errorMessage } from '@/lib/errors';
@@ -59,7 +59,7 @@ const MIN_AGE_MS = 60 * 60 * 1000;
  * Measured before this was written: every failure inside the sweep returned
  * `{ success: false, scanned: 0, closed: 0 }` and left exactly one trace — a
  * `console.error` line in the invocation's stdout. `step.run` does not treat a
- * returned `success: false` as a failure, so Inngest marked the run SUCCEEDED;
+ * returned `success: false` as a failure, so the old scheduler marked the run SUCCEEDED;
  * the table this job maintains held 0 rows with `source = 'alerts-sweep'` (38
  * open alerts, none of them from here); there is no `JobRun` model, so nothing
  * else records that the job ran at all. A daily cron could therefore have been
@@ -309,10 +309,7 @@ export async function sweepOrphanTenantAlerts(
  * Alerts Sweep — daily, 04:15 UTC (between K2's 04:00 trigger and
  * alerts-daily's 08:00, so it never races either).
  */
-export const alertsSweep = inngest.createFunction(
-  { id: 'alerts-sweep', triggers: [{ cron: '15 4 * * *' }] },
-  async ({ step }): Promise<AlertsSweepOutput> =>
-    step.run('sweep-orphan-tenant-alerts', async () =>
-      sweepOrphanTenantAlerts(prisma as unknown as AlertsSweepDb)
-    )
+export const alertsSweepTask = defineJob(
+  'alerts-sweep',
+  async (): Promise<AlertsSweepOutput> => sweepOrphanTenantAlerts(prisma as unknown as AlertsSweepDb)
 );

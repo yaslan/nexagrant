@@ -36,6 +36,26 @@ services:
       redis:
         condition: service_healthy
 
+  # Scheduled-job worker (graphile-worker, ADR-0008). Same profile and database
+  # as the web app; any number of copies is safe (each cron tick runs once).
+  # This stack has no other scheduler, so cron defaults to on here.
+  fabrika-worker:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: fabrika-worker
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://fabrika:${FABRIKA_PG_PASSWORD:-fabrika}@postgres-vector:5432/fabrika?schema=public
+      - JOBS_CRON_ENABLED=${JOBS_CRON_ENABLED:-true}
+      - AUTH_SECRET=${AUTH_SECRET:?set AUTH_SECRET (openssl rand -base64 32)}
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+
   # PostgreSQL 16 + pgvector. Host port 5433 by default: 5432 on this machine
   # belongs to another project's Postgres. The POSTGRES_* values only matter
   # when the volume is empty; an existing volume keeps its roles and passwords.
@@ -58,7 +78,7 @@ services:
       retries: 5
 
   # REDIS_URL in .env.example (redis://localhost:6379). Nothing in src/ reads
-  # REDIS_URL yet (jobs run on Inngest); nothing breaks if it is down.
+  # REDIS_URL yet (jobs run on graphile-worker in Postgres); nothing breaks if it is down.
   redis:
     image: redis:7-alpine
     container_name: fabrika-redis

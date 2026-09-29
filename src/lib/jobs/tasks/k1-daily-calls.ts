@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { inngest } from '@/lib/inngest/client';
+import { defineJob } from '../define';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { SediaAdapter } from '@/lib/adapters/sedia';
@@ -108,31 +108,19 @@ function dedupeByIdentifier(topics: BaseTopic[]): {
  * A source that fails is reported in `sources[]` and alerted on; the other
  * sources still land (CLAUDE.md rule 6 — never break the job on upstream drift).
  */
-export const k1DailyCalls = inngest.createFunction(
-  { id: 'k1-daily-calls', triggers: [{ cron: '0 2 * * *' }] },
-  async ({ step }): Promise<K1DailyCallsOutput> => {
-    const sedia = await step.run('fetch-sedia-topics', async () =>
-      new SediaAdapter().fetchSediaTopics()
-    );
-
-    const eurostars = await step.run('fetch-eurostars-topics', async () =>
-      new EurostarsAdapter().fetchEurostarsTopics()
-    );
-
-    const tubitak = await step.run('fetch-tubitak-topics', async () =>
-      new TubitakAdapter().fetchTubitakTopics()
-    );
-
-    return step.run('normalize-and-upsert', async () =>
-      syncK1Topics([sedia, eurostars, tubitak] as AdapterResult<BaseTopic>[])
-    );
-  }
-);
+export const k1DailyCallsTask = defineJob('k1-daily-calls', async (): Promise<K1DailyCallsOutput> => {
+  // No step memo under graphile-worker: a retry fetches all three sources
+  // again. The upsert is idempotent, so that costs time, not data (ADR-0008 §6.2).
+  const sedia = await new SediaAdapter().fetchSediaTopics();
+  const eurostars = await new EurostarsAdapter().fetchEurostarsTopics();
+  const tubitak = await new TubitakAdapter().fetchTubitakTopics();
+  return syncK1Topics([sedia, eurostars, tubitak] as AdapterResult<BaseTopic>[]);
+});
 
 /**
  * Normalize + persist the topics an adapter run produced.
  *
- * Split out of the Inngest step so `pnpm jobs:k1` and the unit tests can drive
+ * Split out of the job wrapper so `pnpm jobs:k1` and the unit tests can drive
  * the exact same code path. Idempotent by construction: `Call` upserts on
  * `callIdentifier`, `Topic` on `identifier`.
  */
