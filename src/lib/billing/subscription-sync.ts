@@ -12,6 +12,7 @@ import {
 } from '@/lib/billing/price-lock';
 import { publishedVersionIdFor } from '@/lib/billing/plan-repository';
 import { createInvoiceForPayment } from '@/lib/billing/invoice-writer';
+import { isPilotSubscription, PILOT_PLAN_ID } from '@/lib/billing/pilot';
 import { invoiceLinePeriodFallback } from '@/lib/efatura';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
@@ -274,6 +275,14 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+/** Thrown inside a cancellation's transaction to roll it back over a free pilot row. */
+class PilotSubscriptionProtected extends Error {
+  constructor() {
+    super('Subscription row is a free pilot; Stripe does not own it.');
+    this.name = 'PilotSubscriptionProtected';
+  }
+}
+
 /**
  * Thrown inside a `withTenant` callback to roll the transaction back when the
  * claim above lost the race. Not an error the caller reports: the outcome is
@@ -361,6 +370,29 @@ export async function syncStripeSubscription(
   const existingSubscription = await withTenant(tenantId, (tx) =>
     tx.subscription.findUnique({ where: { tenantId } })
   );
+
+  // A free pilot is not Stripe's to overwrite (TASK-MUMABL78X5JLX). Checkout is
+  // closed for a pilot tenant, so a Stripe subscription naming one is either a
+  // sale that got past that gate or a forged `metadata.tenantId`; both need a
+  // person, not an upsert that would turn 90 free days into whatever Stripe
+  // says. The event is not claimed, so it can be replayed once the pilot has
+  // been ended by the platform admin.
+  if (isPilotSubscription(existingSubscription)) {
+    logger.error('Stripe subscription names a tenant on the free pilot; not synced', {
+      tenantId,
+      eventId,
+      stripeSubscriptionId: subscription.id,
+    });
+    return {
+      tenantId,
+      planId: existingSubscription!.planId,
+      status: 'skipped',
+      addedAddOns: [],
+      removedAddOns: [],
+      creditsGranted: 0,
+      error: 'PILOT_PROTECTED',
+    };
+  }
 
   // Upsert subscription
   const stripeSubscription = subscription as {
@@ -699,6 +731,16 @@ export async function handleSubscriptionCancellation(
       throw new StripeEventAlreadyClaimed();
     }
 
+    // The same guard as in `syncStripeSubscription`: a Stripe cancellation must
+    // not cancel a free pilot it never sold. Read in this transaction, so no
+    // grant can land between the check and the update; throwing rolls the
+    // claim back too, so the event can be replayed once the pilot is ended.
+    const current = await tx.subscription.findUnique({
+      where: { tenantId },
+      select: { status: true, provider: true, trialEndsAt: true },
+    });
+    if (isPilotSubscription(current)) throw new PilotSubscriptionProtected();
+
     // Update subscription status, and drop the price lock with it: the locked
     // rate belongs to the subscription that just ended, not to the tenant. Coming
     // back means joining again, at whatever campaign is running then — which is
@@ -739,8 +781,26 @@ export async function handleSubscriptionCancellation(
     return true;
   }).catch((error: unknown) => {
     if (error instanceof StripeEventAlreadyClaimed) return false;
+    if (error instanceof PilotSubscriptionProtected) return 'pilot' as const;
     throw error;
   });
+
+  if (claimed === 'pilot') {
+    logger.error('Stripe cancellation names a tenant on the free pilot; not applied', {
+      tenantId,
+      eventId,
+      stripeSubscriptionId: subscription.id,
+    });
+    return {
+      tenantId,
+      planId: PILOT_PLAN_ID,
+      status: 'skipped',
+      addedAddOns: [],
+      removedAddOns: [],
+      creditsGranted: 0,
+      error: 'PILOT_PROTECTED',
+    };
+  }
 
   if (!claimed) {
     return {

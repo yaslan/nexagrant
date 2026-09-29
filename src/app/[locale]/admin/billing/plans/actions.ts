@@ -34,6 +34,7 @@ import {
   type PublishImpact,
   type AdminPlanVersionRow,
 } from '@/lib/billing/plan-repository';
+import { grantPilot } from '@/lib/billing/pilot';
 
 export type ActionResult<T = undefined> =
   | ({ ok: true } & (T extends undefined ? { data?: undefined } : { data: T }))
@@ -186,6 +187,25 @@ export async function unassignPlanAction(planId: string, tenantId: string): Prom
     await unassignPlanFromTenant(planId, tenantId, userId);
     revalidate();
     return { ok: true };
+  } catch (e) {
+    return toFailure(e);
+  }
+}
+
+/**
+ * Put a tenant on the free 90-day pilot (TASK-MUMABL78X5JLX), or — with
+ * `extend` — add 90 days to the one it has. Granting again without `extend`
+ * changes nothing and says so (`outcome: 'unchanged'`).
+ */
+export async function grantPilotAction(
+  tenantId: string,
+  extend: boolean
+): Promise<ActionResult<{ outcome: 'granted' | 'extended' | 'unchanged'; endsAt: string }>> {
+  try {
+    const { userId } = await requirePlatformAdmin();
+    const result = await grantPilot(tenantId, userId, { extend });
+    revalidate();
+    return { ok: true, data: { outcome: result.outcome, endsAt: result.endsAt.toISOString() } };
   } catch (e) {
     return toFailure(e);
   }

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getPublicRoute } from '@/lib/routes';
+import { assertTenantWritable, PilotExpiredError } from '@/lib/billing/pilot';
 
 /**
  * Tenant resolution — the single place a request's tenant is decided.
@@ -86,9 +87,20 @@ export function assertTenant(session: SessionLike): TenantScope {
   return scope;
 }
 
-/** Convenience for server actions that do their own `auth()` call. */
-export async function requireTenantAction(): Promise<TenantScope> {
-  return assertTenant((await auth()) as SessionLike);
+/**
+ * Convenience for server actions that do their own `auth()` call.
+ *
+ * A server action is a write by default, so this is also where a tenant whose
+ * free pilot has ended is made read-only (TASK-MUMABL78X5JLX,
+ * src/lib/billing/pilot.ts): it throws `PilotExpiredError` before the action
+ * body runs. An action that only reads passes `{ readOnly: true }`. Failing
+ * closed is deliberate — a new action nobody marked is refused for an expired
+ * pilot, which is visible; the other default would let it write.
+ */
+export async function requireTenantAction(opts: { readOnly?: boolean } = {}): Promise<TenantScope> {
+  const scope = assertTenant((await auth()) as SessionLike);
+  if (!opts.readOnly) await assertTenantWritable(scope.tenantId);
+  return scope;
 }
 
 /**
@@ -119,7 +131,7 @@ export type TenantApiResult =
  * For route handlers. Returns a 401 response object rather than throwing, so
  * the handler can `return result.response` and keep its own error contract.
  */
-export async function requireTenantApi(): Promise<TenantApiResult> {
+export async function requireTenantApi(opts: { write?: boolean } = {}): Promise<TenantApiResult> {
   const scope = tenantScopeOf((await auth()) as SessionLike);
 
   if (!scope) {
@@ -134,6 +146,28 @@ export async function requireTenantApi(): Promise<TenantApiResult> {
         { status: 401 }
       ),
     };
+  }
+
+  // A write handler (`{ write: true }`) of a tenant whose free pilot has ended
+  // answers 403 — see requireTenantAction above.
+  if (opts.write) {
+    try {
+      await assertTenantWritable(scope.tenantId);
+    } catch (error) {
+      if (!(error instanceof PilotExpiredError)) throw error;
+      return {
+        ok: false,
+        response: NextResponse.json(
+          {
+            // `error` is the sentence: the member form shows `data.error` as is.
+            error: 'Ücretsiz pilot süresi doldu; çalışma alanı salt-okunur. Verileriniz korunuyor.',
+            code: 'PILOT_EXPIRED',
+            endsAt: error.endsAt.toISOString(),
+          },
+          { status: 403 }
+        ),
+      };
+    }
   }
 
   return { ok: true, scope };

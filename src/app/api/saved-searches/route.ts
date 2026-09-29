@@ -53,7 +53,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const scope = await requireTenantApi();
+  const scope = await requireTenantApi({ write: true });
   if (!scope.ok) return scope.response;
   const { tenantId, userId } = scope.scope;
 

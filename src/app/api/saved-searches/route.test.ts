@@ -18,6 +18,12 @@ const mockWithTenant = vi.fn((_tenantId: string, cb: (tx: typeof mockTx) => unkn
 
 vi.mock('@/lib/db', () => ({ withTenant: (...args: [string, (tx: typeof mockTx) => unknown]) => mockWithTenant(...args) }));
 vi.mock('@/lib/auth', () => ({ auth: vi.fn() }));
+// The free-pilot write gate reads the Subscription row, which this faked
+// transaction does not carry; it has its own tests (src/lib/billing/pilot-gates.test.ts).
+vi.mock('@/lib/billing/pilot', () => ({
+  assertTenantWritable: vi.fn(async () => undefined),
+  PilotExpiredError: class PilotExpiredError extends Error {},
+}));
 
 import { GET, POST } from './route';
 import { auth } from '@/lib/auth';

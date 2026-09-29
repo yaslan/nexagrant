@@ -10,6 +10,8 @@ import {
   type AdminPlanRow,
 } from '@/lib/billing/plan-repository';
 import { PlanAdminClient } from './client';
+import { PilotPanel } from './pilot-panel';
+import { listPilots, pilotLastDayLabel, type PilotRow } from '@/lib/billing/pilot';
 
 /**
  * Platform plan editor.
@@ -31,13 +33,15 @@ export default async function AdminPlansPage({
   let plans: AdminPlanRow[] = [];
   let modules: Array<{ id: string; name: string }> = [];
   let tenants: Array<{ id: string; name: string }> = [];
+  let pilots: PilotRow[] = [];
   let loadError: string | null = null;
 
   try {
-    [plans, modules, tenants] = await Promise.all([
+    [plans, modules, tenants, pilots] = await Promise.all([
       listPlansForAdmin(),
       listCatalogModules(),
       listTenantsForAssignment(),
+      listPilots(),
     ]);
   } catch (e) {
     // An empty editor is recoverable; an editor showing invented plans is not.
@@ -46,12 +50,23 @@ export default async function AdminPlansPage({
   }
 
   return (
-    <PlanAdminClient
-      locale={locale}
-      plans={plans}
-      modules={modules}
-      tenants={tenants}
-      loadError={loadError}
-    />
+    <>
+      <PlanAdminClient
+        locale={locale}
+        plans={plans}
+        modules={modules}
+        tenants={tenants}
+        loadError={loadError}
+      />
+      <PilotPanel
+        tenants={tenants}
+        pilots={pilots.map((p) => ({
+          tenantId: p.tenantId,
+          tenantName: p.tenantName,
+          lastDay: pilotLastDayLabel(p.endsAt, locale),
+          expired: p.expired,
+        }))}
+      />
+    </>
   );
 }

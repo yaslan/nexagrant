@@ -146,7 +146,7 @@ export async function updateRelationship(
  * tenant-scoped and already skips soft-deleted users.
  */
 export async function getAssignableMembers(): Promise<{ success: boolean; members: WorkspaceMember[] }> {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ readOnly: true });
   return { success: true, members: await getWorkspaceMembers(tenantId) };
 }
 

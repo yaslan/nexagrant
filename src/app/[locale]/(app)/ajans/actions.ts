@@ -92,6 +92,6 @@ export async function revokeInviteCode(id: string): Promise<{ ok: true; revoked:
 
 /** B-1 (TASK-MUM17YBJVAHRR): each code's status, never its use count. */
 export async function listInviteCodes(): Promise<InviteCodeSummary[]> {
-  const scope = await requireTenantAction();
+  const scope = await requireTenantAction({ readOnly: true });
   return withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId));
 }

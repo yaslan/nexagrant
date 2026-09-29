@@ -12,6 +12,7 @@ import { PlanNotAvailableError, priceLineForTenant } from '@/lib/billing/storefr
 import { tierForTenant } from '@/lib/billing/tenant-tier';
 import { taxLineForTenant } from '@/lib/billing/checkout-tax';
 import { requireTenantApi } from '@/lib/tenant';
+import { getPilotState } from '@/lib/billing/pilot';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const isLiveStripe = Boolean(stripeSecretKey && !stripeSecretKey.includes('mock') && stripeSecretKey.startsWith('sk_'));
@@ -92,6 +93,21 @@ export async function POST(req: Request) {
     const scope = await requireTenantApi();
     if (!scope.ok) return scope.response;
     const { tenantId } = scope.scope;
+
+    // A tenant on the free pilot buys nothing until the pilot is over: no
+    // e-Fatura yet, so no sale may start (TASK-MUMABL78X5JLX). Running or run
+    // out, the answer is the same — the conversion is a contract package the
+    // platform admin assigns, not a card payment.
+    if ((await getPilotState(tenantId)).kind !== 'none') {
+      return NextResponse.json(
+        {
+          error: 'Checkout closed during the pilot',
+          message: 'Pilot süresince ödeme ve plan yükseltme kapalıdır; pilot sonrasında açılır.',
+          code: 'PILOT_CHECKOUT_CLOSED',
+        },
+        { status: 403 }
+      );
+    }
 
     const rawBody: unknown = await req.json();
 

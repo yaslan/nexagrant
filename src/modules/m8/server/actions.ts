@@ -21,7 +21,7 @@ import { generateSeatCandidates } from './matching';
 const MATCHING_PATH = '/[locale]/(app)/[workspace]/opportunities/[id]/matching';
 
 export async function computeSeatCandidates(opportunityId: string, seatId: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   const seat = await withTenant<{ id: string } | null>(tenantId, (tx) =>
     tx.consortiumSeat.findFirst({

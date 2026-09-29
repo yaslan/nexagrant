@@ -97,7 +97,7 @@ export async function createApplicationPart(opportunityId: string, part: string)
 }
 
 export async function getPartBData(partId: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   try {
     const part = await loadPart(tenantId, partId);
@@ -365,7 +365,7 @@ export async function updatePresenceHeartbeat(
     lastSeenAt: new Date().toISOString(),
   };
 
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   try {
     const part = await loadPart(tenantId, partId);

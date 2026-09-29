@@ -46,7 +46,7 @@ export async function revokeAgencyInviteCodeAction(id: string): Promise<{ revoke
 }
 
 export async function listAgencyInviteCodesAction(): Promise<InviteCodeSummary[]> {
-  const scope = await requireTenantAction();
+  const scope = await requireTenantAction({ readOnly: true });
   return withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId));
 }
 

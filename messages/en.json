@@ -1543,7 +1543,11 @@
       "identityErrCountry": "There is no sourced VAT rate for this country, so it cannot be invoiced.",
       "identityErrForbidden": "You do not have permission to change these details.",
       "identityErrWrite": "The details could not be saved. Please try again shortly.",
-      "identityEditLink": "Edit billing identity"
+      "identityEditLink": "Edit billing identity",
+      "pilotTitle": "Free pilot",
+      "pilotBody": "Your organisation is on a free pilot with the Municipal Team plan until {date} (inclusive).",
+      "pilotExpiredBody": "The free pilot ended on {date}. The workspace is read-only; your data is kept.",
+      "pilotNoSale": "Payment and plan upgrades are closed during the pilot. The annual package opens by contract after the pilot."
     }
   },
   "adminSettings": {
@@ -1646,7 +1650,23 @@
       "LIVE_PROVIDER_SUBSCRIPTION": "This tenant has a live Stripe/iyzico subscription. Cancel it before assigning a public-sector package.",
       "NO_PUBLISHED_VERSION": "This package has no published version and cannot be assigned.",
       "PLATFORM_ADMIN_REQUIRED": "This action requires a platform administrator.",
-      "UNKNOWN": "Action failed: {detail}"
+      "UNKNOWN": "Action failed: {detail}",
+      "PILOT_OVER_CONTRACT": "The tenant is already on a contracted public-sector package; a pilot cannot be granted."
+    },
+    "pilot": {
+      "title": "Free pilot (90 days, Municipal Team)",
+      "hint": "The tenant is kept on the Municipal Team plan (6 seats) for 90 days with no payment and no invoice. When it ends the workspace becomes read-only. Granting the same tenant again does not extend it; tick the box to extend.",
+      "extend": "Extend by 90 days",
+      "submit": "Grant pilot",
+      "submitExtend": "Extend pilot",
+      "empty": "No tenant is on a pilot.",
+      "until": "Last day: {date}",
+      "expiredOn": "Ended (last day {date})",
+      "outcome": {
+        "granted": "Pilot granted.",
+        "extended": "Pilot extended by 90 days.",
+        "unchanged": "This tenant already has a running pilot; the end date did not change. Tick the box to extend."
+      }
     }
   },
   "calls_turkey": {
@@ -2380,5 +2400,11 @@
   "coBrand": {
     "with": "In collaboration with {agency}",
     "logoAlt": "{agency} logo"
+  },
+  "pilot": {
+    "activeTitle": "Free pilot.",
+    "activeBody": "The Municipal Team plan is open until {date} (inclusive). Nothing is charged during the pilot.",
+    "expiredTitle": "The pilot has ended.",
+    "expiredBody": "The last day of the pilot was {date}. Your data is kept and can be viewed; new records and edits are closed. Talk to your account manager to continue."
   }
 }

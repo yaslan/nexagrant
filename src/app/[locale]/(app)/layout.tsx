@@ -14,6 +14,7 @@ import { listSessionWorkspaces } from '@/lib/workspaces';
 import { tenantScopeOf } from '@/lib/tenant';
 import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-store';
 import CoBrandBadge from '@/components/CoBrandBadge';
+import PilotBanner from '@/components/PilotBanner';
 
 import MobileAppHeader from '@/components/MobileAppHeader';
 import FeedbackWidget from '@/components/FeedbackWidget';
@@ -139,6 +140,8 @@ export default async function AppLayout({
             />
           </div>
         </header>
+
+        {tenantId ? <PilotBanner tenantId={tenantId} locale={locale} /> : null}
 
         <main className="flex-1 overflow-auto bg-background p-4 sm:p-6">
           {children}

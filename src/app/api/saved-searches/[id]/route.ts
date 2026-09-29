@@ -10,7 +10,7 @@ const UpdateSavedSearchSchema = z.object({
 
 /** Toggles the `notify` flag on one of the caller's own saved searches. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const scope = await requireTenantApi();
+  const scope = await requireTenantApi({ write: true });
   if (!scope.ok) return scope.response;
   const { tenantId, userId } = scope.scope;
   const { id } = await params;
@@ -53,7 +53,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 /** Deletes one of the caller's own saved searches. Scoped by tenantId + userId, not id alone. */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const scope = await requireTenantApi();
+  const scope = await requireTenantApi({ write: true });
   if (!scope.ok) return scope.response;
   const { tenantId, userId } = scope.scope;
   const { id } = await params;

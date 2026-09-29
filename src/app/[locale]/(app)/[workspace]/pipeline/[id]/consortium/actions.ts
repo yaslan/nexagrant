@@ -50,7 +50,7 @@ export async function addSeat(opportunityId: string, roleKey: string, required: 
 }
 
 export async function findCandidates(seatId: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   const seat = await withTenant<{ id: string; opportunityId: string } | null>(tenantId, (tx) =>
     tx.consortiumSeat.findFirst({
@@ -99,7 +99,7 @@ export async function assignSeat(seatId: string, organizationId: string) {
 }
 
 export async function getConflicts(opportunityId: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   const opp = await withTenant<{ id: string } | null>(tenantId, (tx) =>
     tx.opportunity.findFirst({

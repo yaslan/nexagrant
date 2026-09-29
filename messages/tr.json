@@ -1543,7 +1543,11 @@
       "identityErrCountry": "Bu ülke için kayıtlı bir KDV oranı yok; fatura düzenlenemez.",
       "identityErrForbidden": "Bu bilgileri değiştirme yetkiniz yok.",
       "identityErrWrite": "Bilgiler kaydedilemedi. Kısa süre sonra tekrar deneyin.",
-      "identityEditLink": "Fatura kimliğini düzenle"
+      "identityEditLink": "Fatura kimliğini düzenle",
+      "pilotTitle": "Ücretsiz pilot",
+      "pilotBody": "Kurumunuz {date} tarihine kadar (bu gün dahil) ücretsiz pilotta, Belediye Ekip planı yetkileriyle.",
+      "pilotExpiredBody": "Ücretsiz pilot {date} tarihinde sona erdi. Çalışma alanı salt-okunur; verileriniz korunuyor.",
+      "pilotNoSale": "Pilot süresince ödeme ve plan yükseltme kapalıdır. Yıllık paket, pilot sonrasında sözleşmeyle açılır."
     }
   },
   "adminSettings": {
@@ -1646,7 +1650,23 @@
       "LIVE_PROVIDER_SUBSCRIPTION": "Kiracının Stripe/iyzico üzerinden aktif aboneliği var. Kamu paketi atamadan önce o aboneliği iptal edin.",
       "NO_PUBLISHED_VERSION": "Paketin yayınlanmış sürümü yok; atanamaz.",
       "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekir.",
-      "UNKNOWN": "İşlem başarısız: {detail}"
+      "UNKNOWN": "İşlem başarısız: {detail}",
+      "PILOT_OVER_CONTRACT": "Kiracı zaten sözleşmeli bir kamu paketinde; pilot atanamaz."
+    },
+    "pilot": {
+      "title": "Ücretsiz pilot (90 gün, Belediye Ekip)",
+      "hint": "Kiracı ödeme ve fatura olmadan 90 gün Belediye Ekip planında (6 koltuk) tutulur. Süre dolunca çalışma alanı salt-okunur olur. Aynı kiracıya tekrar atamak süreyi uzatmaz; uzatmak için kutuyu işaretleyin.",
+      "extend": "Süreyi 90 gün uzat",
+      "submit": "Pilot ata",
+      "submitExtend": "Pilotu uzat",
+      "empty": "Pilotta kiracı yok.",
+      "until": "Son gün: {date}",
+      "expiredOn": "Süresi doldu (son gün {date})",
+      "outcome": {
+        "granted": "Pilot atandı.",
+        "extended": "Pilot 90 gün uzatıldı.",
+        "unchanged": "Bu kiracının pilotu zaten sürüyor; süre değişmedi. Uzatmak için kutuyu işaretleyin."
+      }
     }
   },
   "calls_turkey": {
@@ -2380,5 +2400,11 @@
   "coBrand": {
     "with": "{agency} iş birliğiyle",
     "logoAlt": "{agency} logosu"
+  },
+  "pilot": {
+    "activeTitle": "Ücretsiz pilot.",
+    "activeBody": "Belediye Ekip planı {date} tarihine kadar (bu gün dahil) açık. Pilot süresince ödeme alınmaz.",
+    "expiredTitle": "Pilot süresi doldu.",
+    "expiredBody": "Pilotun son günü {date} idi. Verileriniz korunuyor ve görüntülenebilir; yeni kayıt ve düzenleme kapalı. Devam etmek için hesap yöneticinizle görüşün."
   }
 }

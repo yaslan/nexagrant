@@ -297,7 +297,7 @@ export async function listPanelScores(proposalId: string): Promise<PanelScoreQue
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M6');
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   return withTenant(tenantId, async (tx) => {
     const proposal = await tx.proposal.findFirst({

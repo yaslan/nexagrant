@@ -30,7 +30,7 @@ const CAN_INVITE = new Set(['TENANT_OWNER', 'TENANT_ADMIN']);
 
 export async function POST(req: Request) {
   try {
-    const scope = await requireTenantApi();
+    const scope = await requireTenantApi({ write: true });
     if (!scope.ok) return scope.response;
 
     const { tenantId, role: callerRole } = scope.scope;

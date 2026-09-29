@@ -19,7 +19,7 @@ import type { EvidenceItemData } from './evidence-client';
  * Retrieves all Evidence items for active tenant
  */
 export async function getEvidenceItemsAction(categoryFilter?: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   try {
     const whereClause: Record<string, unknown> = { tenantId };
@@ -304,7 +304,7 @@ export async function verifyEvidenceAction(evidenceId: string, status: string) {
  * Generates Evidence Pack Health Score (0-100) for tenant
  */
 export async function getHealthScoreAction(): Promise<HealthScoreResult> {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   try {
     const items = await withTenant<MinimalEvidenceItem[]>(tenantId, (tx) =>

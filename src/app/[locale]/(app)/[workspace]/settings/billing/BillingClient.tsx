@@ -75,6 +75,13 @@ interface BillingClientProps {
   plans: StorefrontPlanCards[];
   /** False when the plan list could not be read — not the same as "none". */
   plansMeasured: boolean;
+  /**
+   * Set for a tenant on the free pilot (src/lib/billing/pilot.ts). Nothing is
+   * sold during a pilot — no e-Fatura yet — so the plan grid, the lifetime
+   * offer and the portal button give way to a "after the pilot" notice.
+   * `lastDay` is the last day of the pilot, already formatted in Istanbul.
+   */
+  pilot?: { lastDay: string; expired: boolean } | null;
 }
 
 /**
@@ -102,6 +109,7 @@ export function BillingClient({
   buyerIdentity,
   plans,
   plansMeasured,
+  pilot = null,
 }: BillingClientProps) {
   const t = useTranslations('billingPanels.settings');
   const { addToCart } = useCart();
@@ -279,6 +287,7 @@ export function BillingClient({
             <p className="text-xs md:text-sm text-ink-2 mt-1">{t('subtitle', { tenant: tenantName ?? workspace })}</p>
           </div>
 
+          {!pilot && (
           <div className="flex items-center gap-3">
             <button
               onClick={handleStripePortal}
@@ -288,6 +297,7 @@ export function BillingClient({
               <span>{t('portalCta')}</span>
             </button>
           </div>
+          )}
         </div>
 
         {/* ─── METRIC CARDS ROW ─── */}
@@ -385,7 +395,19 @@ export function BillingClient({
         </div>
       </div>
 
-      {/* ─── SUBSCRIPTION PLANS GRID ─── */}
+      {/* ─── SUBSCRIPTION PLANS GRID — or, on the free pilot, why there is none ─── */}
+      {pilot ? (
+        <div
+          data-testid="billing-pilot-notice"
+          className="bg-surface border border-indigo-200 dark:border-indigo-900 rounded-2xl p-6 shadow-xs space-y-2"
+        >
+          <h2 className="text-xl font-bold font-heading text-ink">{t('pilotTitle')}</h2>
+          <p className="text-sm text-ink-2">
+            {pilot.expired ? t('pilotExpiredBody', { date: pilot.lastDay }) : t('pilotBody', { date: pilot.lastDay })}
+          </p>
+          <p className="text-xs text-muted">{t('pilotNoSale')}</p>
+        </div>
+      ) : (
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -548,9 +570,10 @@ export function BillingClient({
           })}
         </div>
       </div>
+      )}
 
       {/* ─── LIFETIME OFFER BANNER ─── */}
-      {lifetime && (
+      {lifetime && !pilot && (
         <div className="bg-[#0b1426] text-white border-2 border-cyan-400/80 rounded-2xl p-6 shadow-lg space-y-4 font-sans relative overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3 font-mono text-xs">
             <div className="flex items-center gap-2 font-bold text-cyan-400 uppercase tracking-widest">

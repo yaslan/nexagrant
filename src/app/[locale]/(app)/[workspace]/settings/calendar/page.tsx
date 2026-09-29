@@ -24,7 +24,7 @@ export async function generateMetadata({
 
 export default async function CalendarSettingsPage({ params }: { params: Promise<{ locale: string; workspace: string }> }) {
   const { locale, workspace } = await params;
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ readOnly: true });
   // The breadcrumb was three `locale === 'tr' ? … : …` literals — user-visible
   // text outside the message catalogue (CLAUDE.md rule 8), which is the same
   // defect this card's i18n complaint names one line further up the page.

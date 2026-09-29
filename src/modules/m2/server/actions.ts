@@ -170,7 +170,7 @@ export async function saveConceptNoteDraft(noteId: string, content: ConceptNoteC
 }
 
 export async function exportToDocx(noteId: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   const note = await withTenant(tenantId, (tx) =>
     tx.conceptNote.findFirst({

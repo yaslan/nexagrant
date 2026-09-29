@@ -10,6 +10,7 @@ import { countLifetimeLicences, lifetimeScarcity } from '@/lib/billing/lifetime-
 import { effectiveTier, isQuotedOnLock, priceLockDefect, readPriceLock } from '@/lib/billing/price-lock';
 import { resolvePlanId, FALLBACK_PLAN_ID, NO_DISCOUNT_TIER } from '@/lib/billing/catalog';
 import { readStorefront } from '@/lib/billing/storefront';
+import { pilotLastDayLabel, pilotStateOf, type PilotSubscriptionRow } from '@/lib/billing/pilot';
 import { can } from '@/lib/rbac';
 import { Role } from '@prisma/client';
 import { maskVknTckn } from '@/lib/billing/billing-identity';
@@ -52,7 +53,7 @@ type TenantBillingRow = {
         lockedAmountMinor: number | null;
         lockedCurrency: string | null;
         priceLockedAt: Date | null;
-      })
+      } & PilotSubscriptionRow)
     | null;
 };
 
@@ -83,6 +84,8 @@ export default async function BillingSettingsPage({
   // plan comes from, so the panel can never quote a plan and a rate that
   // belong to different subscriptions.
   let priceLock: ReturnType<typeof readPriceLock> = null;
+  // The free pilot, running or run out — nothing is sold to it (pilot.ts).
+  let pilot: { lastDay: string; expired: boolean } | null = null;
 
   try {
     const tenant = await withTenant<TenantBillingRow | null>(tenantId, (tx) =>
@@ -101,6 +104,10 @@ export default async function BillingSettingsPage({
         console.warn(`[BillingSettings] price lock not honoured: ${defect}`);
       }
       priceLock = readPriceLock(tenant.subscription);
+      const pilotState = pilotStateOf(tenant.subscription);
+      if (pilotState.kind !== 'none') {
+        pilot = { lastDay: pilotLastDayLabel(pilotState.endsAt, locale), expired: pilotState.kind === 'expired' };
+      }
     }
   } catch (err) {
     console.warn(`[BillingSettings] DB query bypassed: ${errorMessage(err)}`);
@@ -315,6 +322,7 @@ export default async function BillingSettingsPage({
       entitlements={entitlements}
       plans={storefront.cards}
       plansMeasured={storefront.measured}
+      pilot={pilot}
       invoices={invoices}
       invoicesMeasured={invoicesMeasured}
       buyerIdentity={buyerIdentity}
