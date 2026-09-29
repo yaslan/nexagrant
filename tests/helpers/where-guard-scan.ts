@@ -64,7 +64,8 @@ export function unguardedWheres(source: string, fileName: string): string[] {
   const out: string[] = [];
   const lineOf = (node: ts.Node) => sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
   const flat = (node: ts.Node) => node.getText(sf).replace(/\s+/g, ' ');
-  const rel = () => path.relative(REPO_ROOT, fileName) || fileName;
+  // POSIX separators on every platform: tests/where-guard-src.test.ts keys KNOWN by this path.
+  const rel = () => (path.relative(REPO_ROOT, fileName) || fileName).split(path.sep).join('/');
   const report = (node: ts.Node, text: string) => out.push(`${rel()}:${lineOf(node)} ${text}`);
 
   // Every variable declaration and destructured binding by name, every name that
