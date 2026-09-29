@@ -42,7 +42,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-const { runK2MonthlyCordis } = await import('../src/lib/inngest/jobs/k2-monthly-cordis');
+const { runK2MonthlyCordis } = await import('../src/lib/jobs/tasks/k2-monthly-cordis');
 
 const WORKER = 'http://worker.invalid:8000';
 

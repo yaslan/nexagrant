@@ -1,4 +1,4 @@
-import { inngest } from '../client';
+import { inngest } from '@/lib/inngest/client';
 import { withSystemScope } from '@/lib/system-scope';
 import { M4WeeklySummaryOutputSchema, type M4WeeklySummaryOutput } from '../events';
 

@@ -32,7 +32,7 @@ import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { withBrand } from '@/lib/brand';
 import { generateTableReportHtml, toCsv, type ExportLocale } from '@/lib/document-exporter';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
-import { AGENCY_REPORT_GENERATE_EVENT, AgencyReportGenerateEventSchema } from '@/lib/inngest/events';
+import { AGENCY_REPORT_GENERATE_EVENT, AgencyReportGenerateEventSchema } from '@/lib/jobs/events';
 import {
   buildAgencyFunnel,
   FUNNEL_STEPS,

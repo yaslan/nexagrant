@@ -76,7 +76,7 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-const { syncK1Topics } = await import('../src/lib/inngest/jobs/k1-daily-calls');
+const { syncK1Topics } = await import('../src/lib/jobs/tasks/k1-daily-calls');
 
 function topic(identifier: string, overrides: Partial<BaseTopic> = {}): BaseTopic {
   return {

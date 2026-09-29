@@ -1,5 +1,5 @@
 import { NonRetriableError } from 'inngest';
-import { inngest } from '../client';
+import { inngest } from '@/lib/inngest/client';
 import { AgencyReportPeriodError, generateAgencyReports, reportPeriod, requestedReportPeriod } from '@/lib/agency/report';
 import {
   AGENCY_REPORT_GENERATE_EVENT,

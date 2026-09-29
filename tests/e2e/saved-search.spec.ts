@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
-import { SAVED_SEARCH_ALERT_QUERY } from '../../src/lib/inngest/jobs/alerts-daily';
+import { SAVED_SEARCH_ALERT_QUERY } from '../../src/lib/jobs/tasks/alerts-daily';
 import { parseSavedSearchFilters } from '../../src/lib/saved-search-filters';
 import { SAVED_SEARCH_E2E, seed, rollback } from '../../scripts/seed-saved-search-e2e';
 import { shotsDir } from './fixtures/shots';

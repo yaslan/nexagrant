@@ -173,7 +173,7 @@ export type FeedbackWeeklyDigestOutput = z.infer<typeof FeedbackWeeklyDigestOutp
 
 // TASK-MTVFJTNW6OW11: close open SystemAlert rows that name a tenant that no
 // longer exists — they can never become true again and nothing else clears
-// them (see src/lib/inngest/jobs/alerts-sweep.ts for the age-threshold reasoning).
+// them (see src/lib/jobs/tasks/alerts-sweep.ts for the age-threshold reasoning).
 export const AlertsSweepEventSchema = z.object({});
 
 export const AlertsSweepOutputSchema = z.object({

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { inngest } from '../client';
+import { inngest } from '@/lib/inngest/client';
 import { env } from '@/lib/env';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { recordRawFetch } from '@/lib/k2-cordis/raw-fetch';

@@ -5,7 +5,7 @@ import {
   alertsDaily,
   creditsMonthlyGrant,
   m4WeeklySummary,
-} from '../src/lib/inngest/jobs';
+} from '../src/lib/jobs/tasks';
 
 describe('Inngest Job Functions', () => {
   test('All Inngest job functions are properly exported and defined', () => {

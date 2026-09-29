@@ -1,4 +1,4 @@
-import { inngest } from '../client';
+import { inngest } from '@/lib/inngest/client';
 import { env } from '@/lib/env';
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';

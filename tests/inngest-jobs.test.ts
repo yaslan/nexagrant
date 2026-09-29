@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import * as jobs from '../src/lib/inngest/jobs';
+import * as jobs from '../src/lib/jobs/tasks';
 
 describe('Inngest Job Schemas', () => {
   describe('All 5 jobs are properly exported', () => {

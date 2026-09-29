@@ -4,7 +4,7 @@ import { prisma } from '../../src/lib/db';
 import {
   sweepOrphanTenantAlerts,
   type AlertsSweepDb,
-} from '../../src/lib/inngest/jobs/alerts-sweep';
+} from '../../src/lib/jobs/tasks/alerts-sweep';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
 

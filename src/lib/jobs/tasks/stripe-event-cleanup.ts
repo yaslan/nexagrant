@@ -1,4 +1,4 @@
-import { inngest } from '../client';
+import { inngest } from '@/lib/inngest/client';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { errorMessage } from '@/lib/errors';
 import { pruneOldStripeEvents, STRIPE_EVENT_RETENTION_DAYS } from '@/lib/billing/stripe-event-retention';

@@ -127,7 +127,7 @@ const KNOWN_UNKNOWN_MODEL_CALLS = new Map<string, string[]>([]);
  *
  * **It is empty, and the intent is that it stays empty.** The one reference that
  * was still broken when the field check went repo-wide —
- * `savedSearch.findMany.include.tenant` in src/lib/inngest/jobs/alerts-daily.ts,
+ * `savedSearch.findMany.include.tenant` in src/lib/jobs/tasks/alerts-daily.ts,
  * a `tenant` relation `model SavedSearch` does not have — was fixed under
  * TASK-MTRKWBLXUYSHS in the same wave, so its entry is gone with it.
  */
@@ -709,7 +709,7 @@ describe('every Prisma query in src/, prisma/ and scripts/ matches prisma/schema
     const walked = new Set(scannedFiles().map((f) => f.slice(REPO.length + 1)));
     expect(walked.size).toBeGreaterThan(200);
     expect(walked.has('src/modules/m8/server/matching.ts')).toBe(true);
-    expect(walked.has('src/lib/inngest/jobs/alerts-daily.ts')).toBe(true);
+    expect(walked.has('src/lib/jobs/tasks/alerts-daily.ts')).toBe(true);
     expect(walked.has('src/modules/m2/server/actions.ts')).toBe(true);
     // TASK-MTSJK8VVG9MKM. Pin one file per added root: a `SCANNED` entry that
     // silently resolved to nothing would leave the new coverage imaginary.
@@ -736,7 +736,7 @@ describe('every Prisma query in src/, prisma/ and scripts/ matches prisma/schema
   });
 
   it('follows a query hoisted into a const', () => {
-    // src/lib/inngest/jobs/alerts-daily.ts moved its query into
+    // src/lib/jobs/tasks/alerts-daily.ts moved its query into
     // SAVED_SEARCH_ALERT_QUERY. If the scanner only read inline literals, then
     // lifting a query out of the call would be all it took to leave the gate.
     const sound =

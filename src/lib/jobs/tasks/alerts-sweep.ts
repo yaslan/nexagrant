@@ -1,4 +1,4 @@
-import { inngest } from '../client';
+import { inngest } from '@/lib/inngest/client';
 import { prisma } from '@/lib/db';
 import { alertsSweepFailureThreshold } from '@/lib/env';
 import { errorMessage } from '@/lib/errors';

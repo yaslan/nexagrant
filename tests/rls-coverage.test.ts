@@ -157,7 +157,7 @@ describe('AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH
    */
   test.each([
     ['src/actions/user/request-deletion.ts', 'request-deletion.erasureAudit'],
-    ['src/lib/inngest/jobs/users-scheduled-deletion.ts', 'erasure-sweep.erasureAudit'],
+    ['src/lib/jobs/tasks/users-scheduled-deletion.ts', 'erasure-sweep.erasureAudit'],
     ['src/actions/user/export-data.ts', 'gdpr-export.accessAudit'],
   ])('%s writes its tenant-less AuditEvent in system scope (%s)', (file, context) => {
     const src = readFileSync(resolve(process.cwd(), file), 'utf8');

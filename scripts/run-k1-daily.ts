@@ -16,7 +16,7 @@ import { SediaAdapter } from '../src/lib/adapters/sedia';
 import { EurostarsAdapter } from '../src/lib/adapters/eurostars';
 import { TubitakAdapter } from '../src/lib/adapters/tubitak';
 import type { AdapterResult, BaseTopic } from '../src/lib/adapters/schemas/common';
-import { syncK1Topics } from '../src/lib/inngest/jobs/k1-daily-calls';
+import { syncK1Topics } from '../src/lib/jobs/tasks/k1-daily-calls';
 
 function flagValue(name: string): string | undefined {
   const idx = process.argv.indexOf(`--${name}`);

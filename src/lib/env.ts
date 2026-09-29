@@ -174,7 +174,7 @@ const envSchema = z.object({
   R2_BUCKET: z.string().optional(),
   /**
    * How many *consecutive* failed runs of the daily orphan-alert sweep
-   * (`src/lib/inngest/jobs/alerts-sweep.ts`) it takes before an `error`-level
+   * (`src/lib/jobs/tasks/alerts-sweep.ts`) it takes before an `error`-level
    * alert is raised for the operator.
    *
    * A threshold rather than a constant because the right number is an

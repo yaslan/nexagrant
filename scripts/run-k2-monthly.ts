@@ -18,7 +18,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { runK2MonthlyCordis } from '../src/lib/inngest/jobs/k2-monthly-cordis';
+import { runK2MonthlyCordis } from '../src/lib/jobs/tasks/k2-monthly-cordis';
 
 function flagValue(name: string): string | undefined {
   const idx = process.argv.indexOf(`--${name}`);

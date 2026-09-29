@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
-import { purgeDueUsers } from '../../src/lib/inngest/jobs/users-scheduled-deletion';
+import { purgeDueUsers } from '../../src/lib/jobs/tasks/users-scheduled-deletion';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
 

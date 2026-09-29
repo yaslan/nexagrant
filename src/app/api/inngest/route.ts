@@ -11,7 +11,7 @@ import {
   alertsSweep,
   stripeEventCleanup,
   agencyMonthlyReport,
-} from '@/lib/inngest/jobs';
+} from '@/lib/jobs/tasks';
 
 export const { GET, POST, PUT } = serve({
   client: inngest,

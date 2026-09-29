@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * `SavedSearch.filters` şeması — `POST /api/saved-searches` (yazıcı) ile
- * `src/lib/inngest/jobs/alerts-daily.ts` (okuyucu) arasındaki tek sözleşme.
+ * `src/lib/jobs/tasks/alerts-daily.ts` (okuyucu) arasındaki tek sözleşme.
  *
  * Kendi dosyasında duruyor çünkü rota bunu eskiden cron iş dosyasından import
  * ediyordu; o zincir `resend` gibi yalnızca cron'un ihtiyacı olan paketleri bir

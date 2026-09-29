@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { inngest } from '../client';
+import { inngest } from '@/lib/inngest/client';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { SediaAdapter } from '@/lib/adapters/sedia';

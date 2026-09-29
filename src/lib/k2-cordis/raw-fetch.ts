@@ -4,7 +4,7 @@
  * CLAUDE.md rule 6 asks that the raw upstream answer be kept before it is
  * normalized, so an import that produced odd rows can be re-read against what
  * the feed actually said. K1 already did this inline
- * (src/lib/inngest/jobs/k1-daily-calls.ts); no CORDIS path did — measured
+ * (src/lib/jobs/tasks/k1-daily-calls.ts); no CORDIS path did — measured
  * 2026-09-07, `RawFetch` held 0 rows for any CORDIS source.
  *
  * Two rules the CORDIS side needs and K1's inline copy does not:

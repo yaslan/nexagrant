@@ -1,4 +1,4 @@
-import { inngest } from '../client';
+import { inngest } from '@/lib/inngest/client';
 import { prisma, withTenant } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
 import { CreditsMonthlyGrantOutputSchema, type CreditsMonthlyGrantOutput } from '../events';

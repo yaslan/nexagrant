@@ -11,7 +11,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { prisma } from '../src/lib/db';
-import { sweepOrphanTenantAlerts, type AlertsSweepDb } from '../src/lib/inngest/jobs/alerts-sweep';
+import { sweepOrphanTenantAlerts, type AlertsSweepDb } from '../src/lib/jobs/tasks/alerts-sweep';
 
 async function main() {
   console.log(`[jobs:alerts-sweep] start ${new Date().toISOString()}`);

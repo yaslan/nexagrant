@@ -56,7 +56,7 @@ const { exportUserData } = await import('@/actions/user/export-data');
 const { requestAccountDeletion, cancelAccountDeletion, getDeletionStatus } = await import(
   '@/actions/user/request-deletion'
 );
-const { purgeDueUsers } = await import('@/lib/inngest/jobs/users-scheduled-deletion');
+const { purgeDueUsers } = await import('@/lib/jobs/tasks/users-scheduled-deletion');
 
 // A separate client for assertions, so the test observes the database directly
 // rather than trusting the value the code under test just returned.

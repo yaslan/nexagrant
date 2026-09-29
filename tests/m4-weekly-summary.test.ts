@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { groupPendingActionsByFocalPoint } from '../src/lib/inngest/jobs/m4-weekly-summary';
+import { groupPendingActionsByFocalPoint } from '../src/lib/jobs/tasks/m4-weekly-summary';
 
 /**
  * A relationship can be unassigned since `Relationship.ownerUserId` became

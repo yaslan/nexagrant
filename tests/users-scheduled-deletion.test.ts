@@ -90,7 +90,7 @@ vi.mock('../src/lib/storage', () => ({
 }));
 
 const { purgeDueUsers, buildPurgeFailureAlert } = await import(
-  '../src/lib/inngest/jobs/users-scheduled-deletion'
+  '../src/lib/jobs/tasks/users-scheduled-deletion'
 );
 const { alertIdentity } = await import('../src/lib/observability/system-alert');
 

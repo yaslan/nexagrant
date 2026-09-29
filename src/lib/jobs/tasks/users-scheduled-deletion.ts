@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { inngest } from '../client';
+import { inngest } from '@/lib/inngest/client';
 import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { deleteUserFilesFromR2 } from '@/lib/storage';
