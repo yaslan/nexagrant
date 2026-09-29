@@ -440,6 +440,10 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
 
     // ──────────────── Batch Ingestion in FK Sequence ────────────────
     const BATCH_SIZE = 1000;
+    // Prisma's 5 s default is for interactive work, not a 1,000-row upsert
+    // batch: on the real dump one participation batch took 5.7 s under load and
+    // the whole run failed on "expired transaction" (TASK-MUMH7CVD8P2J0).
+    const BATCH_TX = { maxWait: 30_000, timeout: 120_000 };
 
     // 1. Projects
     for (let i = 0; i < projects.length; i += BATCH_SIZE) {
@@ -482,7 +486,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
               rawJson: p.rawJson || {},
             },
           })
-        )
+        ),
+        BATCH_TX
       );
     }
 
@@ -523,7 +528,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
               rawJson: o.rawJson || {},
             },
           })
-        )
+        ),
+        BATCH_TX
       );
     }
 
@@ -559,7 +565,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
               active: pt.active,
             },
           })
-        )
+        ),
+        BATCH_TX
       );
     }
 
@@ -584,7 +591,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
               topicTitle: t.topicTitle,
             },
           })
-        )
+        ),
+        BATCH_TX
       );
     }
 
@@ -611,7 +619,8 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
               scivocTitle: s.scivocTitle,
             },
           })
-        )
+        ),
+        BATCH_TX
       );
     }
 
@@ -676,7 +685,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       await recordAlert({
         level: 'error',
         source: 'k2_cordis_import',
-        message: `CORDIS ${dataset} import failed; M1 keeps the previous dataset.`,
+        message: `CORDIS ${dataset} import failed. Rows are upserts, so a re-run after the fix is safe.`,
         meta: { runId: runRecord?.runId, error: errorMsg.slice(0, 2000) },
         dedupeKey: `k2:cordis-import-failed:${dataset}`,
       });
