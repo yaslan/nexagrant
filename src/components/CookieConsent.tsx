@@ -3,8 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useIsHydrated } from '@/lib/hooks/use-is-hydrated';
-
-const CONSENT_STORAGE_KEY = 'fabrika_cookie_consent';
+import { CONSENT_STORAGE_KEY } from '@/lib/cookie-consent';
 
 /** Whether this browser has already answered. Client-only: the server cannot see storage. */
 function hasStoredConsent(): boolean {
