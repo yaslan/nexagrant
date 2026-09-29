@@ -43,4 +43,4 @@
 2. R2 deposu: hangi bölge; "AB yargı yetkisi" var mı (yoksa AB'de yeni bir depo açılması gerekir; mevcut depo taşınamaz).
 3. ~~Resend alan adı: gönderim bölgesi (eu-west-1 mi?).~~ Resend kaldırıldı (29.09.2026, `fe9fd31c`). Yerine: SMTP sağlayıcısı (kurumsal e-posta hesabı) hangi firma, hangi ülke — patron belirleyecek.
 4. Anthropic çalışma alanı: varsayılan işlem bölgesi "global" mi, "us" mi.
-5. Zamanlanmış işler (Inngest Cloud): hangi veri ve hangi bölge.
+5. ~~Zamanlanmış işler (Inngest Cloud): hangi veri ve hangi bölge.~~ Inngest kaldırıldı (29.09.2026, `5ed2261a`). Zamanlanmış işler artık kendi veritabanımızda çalışan iş kuyruğunda; ayrı bir bağlantı (`JOBS_DATABASE_URL`) verilmezse bu kuyruk madde 1'deki veritabanındadır (`src/lib/env.ts:43-45`).

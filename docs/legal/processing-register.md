@@ -27,14 +27,14 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 | Alan                           | Değer                                                                                                                        |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu (üyelik/rol), kiracı = veri sorumlusu (davet edilen kişinin e-postası kiracının ekip kararıdır)     |
-| **Veri kategorileri**          | Rol, çalışma alanı erişim listesi, davet edilen kişinin e-postası, davet token'ı                                             |
+| **Veri kategorileri**          | Rol, çalışma alanı erişim listesi, davet edilen kişinin e-postası, davet token'ı (veritabanında yalnız özeti, `tokenHash`); davet e-postasının içeriği: davetlinin adresi, kurum adı, token'lı kabul bağlantısı, bağlantının son geçerlilik tarihi; gönderim kaydı (`AuditEvent` `invitation.email_sent` / `invitation.email_failed`: davet eden `actorId`, hedef = davet id'si — **adres yazılmaz**) |
 | **İlgili kişi kategorileri**   | Kiracı kullanıcıları, davet edilen (henüz hesabı olmayan) kişiler                                                            |
 | **Amaç**                       | Ekip yönetimi, rol bazlı erişim kontrolü                                                                                     |
 | **Hukuki sebep**               | KVKK md.5/2-c / GDPR art.6(1)(b)                                                                                             |
-| **Alıcı ve yurt dışı aktarım** | Yok — yalnızca iç veritabanı                                                                                                 |
+| **Alıcı ve yurt dışı aktarım** | **Kendi SMTP sunucumuz** (`src/lib/email/mailer.ts`, `fe9fd31c`'den beri): davetliye e-posta gider — davetlinin adresi, kurum adı, token'lı ve 7 gün geçerli kabul bağlantısı (`src/app/api/invitations/route.ts:72,163,254`, `src/lib/email/invitation-email.ts`). _Not (`3bc74a7b`): bağlantının açtığı `/tr/accept-invite` sayfası kodda yoktur; token'ı kullanan bir kabul yolu bulunamadı — ürün hatası olarak ayrıca bildirildi._ SMTP sağlayıcısı kurumsal e-posta hesabıdır, **patron belirleyecek** — ülke **açık** (§21). Üyelik ve rol verisi yalnız iç veritabanındadır. |
 | **Saklama süresi**             | `Membership`: hesap/kiracı ömrü + 30 gün; `Invitation`: `expires` alanına kadar (kod düzeyinde otomatik temizlik yok — açık) |
-| **Teknik-idari tedbir**        | RBAC (`src/lib/authz`), RLS                                                                                                  |
-| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`Membership`, `Invitation`, `Role`)                                                                  |
+| **Teknik-idari tedbir**        | RBAC (`src/lib/authz`), RLS. Davet e-postası sınırı (`1c6b3e70`): aynı davete 10 dakika içinde ikinci e-posta gitmez; kiracı başına kayan 24 saatte en çok 50 e-posta; sayım `AuditEvent` satırlarından yapılır ve satırda adres tutulmaz; `NEXT_PUBLIC_APP_URL` yoksa (üretimde loopback ise) e-posta hiç gönderilmez; konu satırındaki kurum adı 80 karakterde kesilir, HTML'de kaçışlanır (`invitation-mail-policy.ts:30,39,51-91,101-117`, `invitation-email.ts:6,23-33`, `route.ts:128-132,269`) |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`Membership`, `Invitation`, `Role`, `AuditEvent`), `src/app/api/invitations/route.ts`, `src/lib/email/invitation-email.ts`, `src/lib/email/invitation-mail-policy.ts` (satırlar `3bc74a7b`'ye göre) |
 
 ## 3. Faturalama ve ödeme — Stripe (EUR abonelik)
 
@@ -116,9 +116,9 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 | **Amaç**                       | YZ kullanım şeffaflığı (Komisyon kuralı — başvuranın hangi YZ aracını nasıl kullandığını beyan edebilmesi), kredi faturalama                                        |
 | **Hukuki sebep**               | KVKK md.5/2-f (meşru menfaat + şeffaflık) / GDPR art.6(1)(f)                                                                                                        |
 | **Alıcı ve yurt dışı aktarım** | Yok — yalnızca iç veritabanı                                                                                                                                        |
-| **Saklama süresi**             | Kalıcı; silme talebinde `userId` NULL'lanır, satır silinmez (`docs/SECURITY_COMPLIANCE.md` satır 115; `src/lib/inngest/jobs/users-scheduled-deletion.ts` satır ~50) |
+| **Saklama süresi**             | Kalıcı; silme talebinde `userId` NULL'lanır, satır silinmez (`docs/SECURITY_COMPLIANCE.md` satır 115; `src/lib/jobs/tasks/users-scheduled-deletion.ts:121-123`) |
 | **Teknik-idari tedbir**        | Anonimleştirme (userId NULL) ile kimliksizleştirme                                                                                                                  |
-| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`AiUsageLog`), `src/lib/inngest/jobs/users-scheduled-deletion.ts`                                                                           |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`AiUsageLog`), `src/lib/jobs/tasks/users-scheduled-deletion.ts`                                                                           |
 
 ## 9. İç ön değerlendirme (M6 Evaluator Lens — panel ve tekil değerlendirme)
 
@@ -217,7 +217,7 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 | **Amaç**                       | Belge/kanıt saklama                                                                                                                                                                                                                                                                |
 | **Hukuki sebep**               | KVKK md.5/2-c / GDPR art.6(1)(b)                                                                                                                                                                                                                                                   |
 | **Alıcı ve yurt dışı aktarım** | **Cloudflare, Inc.** (R2 nesne depolama; bölge `R2_ACCOUNT_ID`'ye bağlı, kod düzeyinde AB bölgesi zorlaması **YOK — açık**, `docs/SECURITY_COMPLIANCE.md` satır 103'teki "AB bölgesi (Frankfurt) varsayılan" iddiası repoda doğrulanamadı — bu bir altyapı/hesap ayarı, kod değil) |
-| **Saklama süresi**             | Kullanıcı silme akışında R2 dosyaları önce silinir (`deleteUserFilesFromR2`, `src/lib/inngest/jobs/users-scheduled-deletion.ts` adım 1)                                                                                                                                            |
+| **Saklama süresi**             | Kullanıcı silme akışında R2 dosyaları önce silinir (`deleteUserFilesFromR2`, `src/lib/jobs/tasks/users-scheduled-deletion.ts` adım 1)                                                                                                                                            |
 | **Teknik-idari tedbir**        | Nesne anahtarı `{tenantId}/{organisationId}/...` yoluyla izole edilir (`src/lib/storage.ts`)                                                                                                                                                                                       |
 | **Kaynak dosya yolu**          | `src/lib/storage.ts`                                                                                                                                                                                                                                                               |
 
@@ -247,7 +247,7 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 | **Alıcı ve yurt dışı aktarım** | Bildirim e-postası **kendi SMTP sunucumuzdan** gönderilir (`src/lib/email/mailer.ts`). SMTP sağlayıcısı kurumsal e-posta hesabıdır, **patron belirleyecek**; sağlayıcı ve ülkesi belli olunca buraya ve §21'e yazılır (**açık**). _29.09.2026'ya kadar Resend (ABD) idi; `fe9fd31c` ile kaldırıldı._ |
 | **Saklama süresi**             | 30 gün bekleme, sonra kalıcı imha (`DELETION_GRACE_PERIOD_DAYS`)                                                                                                          |
 | **Teknik-idari tedbir**        | Sıralı imha (önce dosya, sonra DB), e-posta hatası talebi bloke etmez                                                                                                     |
-| **Kaynak dosya yolu**          | `src/actions/user/request-deletion.ts`, `src/lib/inngest/jobs/users-scheduled-deletion.ts`                                                                                |
+| **Kaynak dosya yolu**          | `src/actions/user/request-deletion.ts`, `src/lib/jobs/tasks/users-scheduled-deletion.ts`                                                                                |
 
 ## 18. Kayıtlı arama uyarı e-postaları (K1)
 
@@ -261,7 +261,7 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 | **Alıcı ve yurt dışı aktarım** | **Kendi SMTP sunucumuz** (`src/lib/email/mailer.ts`); sağlayıcı kurumsal e-posta hesabı, **patron belirleyecek** — ülke **açık**. _29.09.2026'ya kadar Resend (ABD); `fe9fd31c` ile kaldırıldı._ |
 | **Saklama süresi**             | N/A (e-posta gönderimi anlık; `SavedSearch` kalıcı, kullanıcı silinene kadar) |
 | **Teknik-idari tedbir**        | —                                                                             |
-| **Kaynak dosya yolu**          | `src/lib/inngest/jobs/alerts-daily.ts`, `src/lib/email/mailer.ts`             |
+| **Kaynak dosya yolu**          | `src/lib/jobs/tasks/alerts-daily.ts`, `src/lib/email/mailer.ts`             |
 
 ---
 
@@ -396,7 +396,7 @@ Aşağıda `prisma/schema.prisma`'daki **tüm modeller** tarandı; kişisel veri
 | ~~Microsoft Corporation~~ | ABD                                   | **Alıcı değil (29.09.2026):** giriş `acc35b07`, Outlook takvimi `15313bc6` ile koddan çıktı | —                                                                                               |
 | Stripe, Inc.          | ABD                                       | Ödeme (§3)                                       | Stripe'ın kendi DPA'sı — Fabrika tarafı ek **YOK — açık**                                       |
 | ~~Resend~~            | ABD                                       | **Alıcı değil (29.09.2026):** e-posta `fe9fd31c` ile kendi SMTP'mize geçti | —                                                                                               |
-| SMTP sağlayıcısı (kurumsal e-posta hesabı) | **Açık — patron belirleyecek** | E-posta adresi, e-posta içeriği (§17, §18) | Sağlayıcı belli olunca yazılır — **YOK — açık**                                                 |
+| SMTP sağlayıcısı (kurumsal e-posta hesabı) | **Açık — patron belirleyecek** | E-posta adresi, e-posta içeriği (§2 davet e-postası, §17, §18) | Sağlayıcı belli olunca yazılır — **YOK — açık**                                                 |
 | Cloudflare, Inc.      | Bölge hesap ayarına bağlı                 | Dosya/ekran görüntüsü (§15)                      | **YOK — açık**                                                                                  |
 | iyzico                | Türkiye                                   | Ödeme (§4)                                       | Yurt dışı aktarım değil                                                                         |
 | PostHog Inc.          | AB (`eu.i.posthog.com`, varsayılan)        | Anonim ürün olayı (§19a), **bugün kapalı**        | AB bölgesi. ABD seçilirse **YOK — açık**                                                      |
@@ -421,3 +421,4 @@ Hiçbiri için repo içinde imzalı bir Standart Sözleşme Hükümleri (SCC) ek
 11. Ajansın alıcı / ortak veri sorumlusu durumu ve küçük sayı kuralının (eşik 5, tamamlayıcı gizleme, 5'e yuvarlama, tek kırılım, tek pencere) yeterliliği hukukça teyitsiz (HUKUK-2, HUKUK-5). Birikimli sayıların yuvarlama sınırını geçtiği an (zaman kanalı) açık risk olarak pilotta kabul edildi (ek §3.1 K-1).
 12. `Tenant.province` her kayıtta (kodsuz da) soruluyor; ana aydınlatma metninde yazılıp yazılmayacağı ve şahıs şirketinde niteliği açık (HUKUK-11).
 13. S4 (ajans kurum adını görecek mi) açık. Bugün görmüyor; cevap "evet" olursa §18c yeniden yazılır.
+14. Davet e-postası (§2) davetliye token'lı bir `/tr/accept-invite` bağlantısı gönderiyor, ama bu sayfa ve token'ı kullanan bir kabul yolu kodda yok (`3bc74a7b`). Davetlinin adresi SMTP sağlayıcısına gidiyor, davetli ise daveti kabul edemiyor. Ürün hatası olarak bildirildi; kabul yolu yazılınca §2 güncellenir.
