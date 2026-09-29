@@ -592,6 +592,40 @@ model SystemAlert {
   @@index([resolvedAt, createdAt])
 }
 
+/// FB KAMU (TASK-MULR765AR5G0C) — a contact request an anonymous visitor leaves on
+/// the funding-readiness result screen (/tr/fon-hazirlik). Platform data: it belongs
+/// to no tenant, so it has no tenantId and sits in scripts/rls-models.ts SYSTEM_WIDE.
+/// Written only by src/lib/leads/public-lead.ts, read only by /admin/leads (platform
+/// admin), deleted by the nightly `public-lead-cleanup` job PUBLIC_LEAD_RETENTION_DAYS
+/// after `createdAt`. docs/legal/processing-register.md §18d.
+model PublicLead {
+  id             String   @id @default(cuid())
+  name           String
+  /// Trimmed and lower-cased, so the per-address rate limit cannot be dodged by case.
+  email          String
+  organisation   String
+  province       String?
+  district       String?
+  /// `<orgType>.<15 answers>` (src/lib/readiness/share.ts); total and level are
+  /// recomputed from it on the server, never taken from the client.
+  readinessCode  String?
+  readinessTotal Int?
+  readinessLevel String?
+  /// Version of the explicit-consent text the visitor ticked (src/lib/leads/public-lead.ts).
+  consentVersion String
+  consentAt      DateTime
+  /// Funnel page the request came from, e.g. `fon-hazirlik`.
+  source         String
+  locale         String
+  /// HMAC-SHA256 of the client IP under AUTH_SECRET — the per-IP rate limit only;
+  /// the address itself is never stored. Deleted with the row.
+  ipHash         String?
+  createdAt      DateTime @default(now())
+  @@index([createdAt])
+  @@index([email, createdAt])
+  @@index([ipHash, createdAt])
+}
+
 // ───────────────────────── K1 tenant-scoped ─────────────────────────
 
 /// Two kinds of row live here, told apart by `opportunityId`:

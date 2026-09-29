@@ -29,6 +29,10 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   'CordisProjectTopic', 'CordisProjectSciVoc', 'CordisImportRun',
   'CordisPartnerProfile', 'CordisCoParticipation',
   'SystemAlert',
+  // TASK-MULR765AR5G0C: a contact request from an anonymous visitor of the
+  // readiness scorecard. No account, hence no tenant; read by platform admins
+  // only (/admin/leads), same standing as User. See prisma/migrations/add-public-lead.sql.
+  'PublicLead',
 ]);
 
 /**

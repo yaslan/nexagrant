@@ -27,6 +27,7 @@ import {
   readinessPath,
   readinessSignupPath,
 } from '@/lib/readiness/share';
+import LeadForm from './lead-form';
 
 type Phase = { kind: 'intro' } | { kind: 'step'; index: number } | { kind: 'result' };
 
@@ -600,6 +601,14 @@ function ResultView({
           {t('cta_signup')}
         </Link>
       </section>
+
+      <LeadForm
+        locale={locale}
+        orgType={orgType}
+        level={result.level}
+        province={province}
+        readinessCode={encodeReadinessCode(orgType, answers)}
+      />
 
       <section aria-labelledby="share-heading" className="print:hidden">
         <h2 id="share-heading" className="font-heading text-xl font-semibold text-ink">

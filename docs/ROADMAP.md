@@ -222,7 +222,7 @@ Durum (S9–S10 dalgası, ölçüldü 2026-09-07 — kartların çoğu **`review
 ### FB-KAMU-1 (board, 29.09: 4/4 `done`)
 
 - [x] Belediye çağrı radarı + kamuya açık `/belediye-cagrilari` sayfası — TASK-MULR39X1K5K6C (`819aff09`, `e0198dd5`). A11y düzeltmesi TASK-MULV9NYQ1M2R0 (`3a174f32`).
-- [x] Fon Hazırlık Karnesi `/fon-hazirlik` — TASK-MULR3TQ24ZZ7N (`959c1e80`). Kayıtsız ziyaretçi lead formu ertelendi: **TASK-MULR765AR5G0C** (backlog).
+- [x] Fon Hazırlık Karnesi `/fon-hazirlik` — TASK-MULR3TQ24ZZ7N (`959c1e80`). Kayıtsız ziyaretçi lead formu: **TASK-MULR765AR5G0C** (`review`, 30.09) — `PublicLead` + sonuç ekranı formu (açık rıza, honeypot, hız sınırı) + `/admin/leads` + gece silme işi; saklama süresi (öneri 12 ay) **KARAR GEREKLİ**.
 - [x] İlkadım pilot + OKA kanal paketi `docs/kamu/` (`ILKADIM-PILOT.md`, `OKA-KANAL-ONERISI.md`, `SUNUM-METNI.md`, `EPOSTA-TASLAKLARI.md`) — TASK-MULR4ATI5T158 (`cc9ebbd3`, `dfef5822`, TL paketleri `f94277ee`).
 - [x] ADR-0004 — TASK-MULR4EOGWKAGX (`6dfd76e5`, `b1cf6e6b`).
 

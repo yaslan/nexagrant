@@ -293,7 +293,11 @@ function main(): void {
   // The catalogue note. TASK-MTSZ0AL4QP2CT §5.3 asked for this by name: Topic is
   // in none of the audit's buckets, and an absence with no explanation reads as a
   // missing row in the inventory rather than a deliberate exclusion.
-  const catalogue = result.catalogue.filter((c) => c.hasTenantColumn || c.model === 'Topic');
+  // PublicLead (TASK-MULR765AR5G0C) is printed for the same reason as Topic: it
+  // holds personal data and is SYSTEM_WIDE, so its absence must be explained.
+  const catalogue = result.catalogue.filter(
+    (c) => c.hasTenantColumn || c.model === 'Topic' || c.model === 'PublicLead'
+  );
   if (catalogue.length > 0) {
     console.log('\nShared catalogues this gate does not police (by construction, not by allowlist):');
     for (const c of catalogue) {

@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { 
   Puzzle, 
   Building2, 
@@ -13,7 +14,8 @@ import {
   MessageSquareWarning,
   ShieldAlert,
   Percent,
-  FileText
+  FileText,
+  Inbox
 } from 'lucide-react';
 
 interface AdminSidebarNavProps {
@@ -22,6 +24,7 @@ interface AdminSidebarNavProps {
 
 export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
   const pathname = usePathname();
+  const tLeads = useTranslations('adminLeads');
 
   const adminNavItems = [
     {
@@ -79,6 +82,14 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       desc: locale === 'tr' ? 'Çalışma programı PDF → paylaşılan RAG' : 'Work programme PDF → shared RAG',
       icon: FileText,
       badge: 'K6',
+    },
+    {
+      key: 'leads',
+      href: `/${locale}/admin/leads`,
+      label: tLeads('nav_label'),
+      desc: tLeads('nav_desc'),
+      icon: Inbox,
+      badge: 'Lead',
     },
     {
       key: 'audit',

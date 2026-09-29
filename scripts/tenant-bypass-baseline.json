@@ -247,6 +247,15 @@
       "kind": "system-scope",
       "class": "cross-tenant-job",
       "reason": "purgeOldInvitations(), run nightly by the invitation-cleanup cron (TASK-MUN2J9LLXNREG): deletes every tenant's Invitation rows accepted, or expired unaccepted, more than 30 days ago, and writes one invitation.purged AuditEvent (count only) per tenant touched. The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; each delete still ANDs the tenantId it groups by. Same shape as pruneOldStripeEvents: unscoped under fabrika_app it would see no rows and report 0."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/public-lead.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "purgeOldPublicLeads(), run nightly by the public-lead-cleanup cron (TASK-MULR765AR5G0C): deletes PublicLead rows (platform data, no tenantId, SYSTEM_WIDE) older than PUBLIC_LEAD_RETENTION_DAYS by one createdAt < cutoff filter, and writes one public_lead.purged AuditEvent with tenantId NULL and the count only. A NULL-tenant AuditEvent is writable only under system_scope (auditevent-null-system-only.sql), so delete and audit share this one transaction. No tenant row is read or written."
     }
   ]
 }

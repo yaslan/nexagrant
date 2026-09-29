@@ -254,6 +254,12 @@ const CATALOGUE_REASONS: Record<string, string> = {
     'through src/modules/m2/server/templates.ts, which ANDs the id with OR[tenantId NULL, tenantId]. ' +
     'Still structurally outside this gate, which judges the client rather than the where clause: ' +
     'src/modules/m2/server/templates.test.ts is the gate for this rule.',
+  PublicLead:
+    'contact request an anonymous visitor leaves on the readiness result screen (TASK-MULR765AR5G0C). ' +
+    'The visitor has no account, so the row belongs to no tenant and has no tenantId; it is in ' +
+    'SYSTEM_WIDE like User. Written only by src/lib/leads/public-lead.ts (public form), read only ' +
+    'by /admin/leads behind requirePlatformAdmin(), deleted by the nightly public-lead-cleanup job. ' +
+    'No tenant code path touches it.',
   Document: 'tenantId is String?; in NULLABLE_TENANT.',
   Chunk: 'tenantId is String?; in NULLABLE_TENANT.',
 };
