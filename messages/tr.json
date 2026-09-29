@@ -372,7 +372,9 @@
     "signInError": {
       "invite_invalid": "Davet kodu geçersiz ya da artık kullanılamıyor.",
       "disclosure_required": "Yeni hesap açmak için önce Kayıt Ol sekmesinde aydınlatma metnini okuduğunuzu onaylamanız gerekir.",
-      "email_unverified": "Bu e-posta adresiyle açılmış bir hesap var, ancak giriş yaptığınız sağlayıcı adresi doğrulanmış olarak bildirmedi. Hesabı ilk açtığınız yöntemle giriş yapın."
+      "email_unverified": "Bu e-posta adresiyle açılmış bir hesap var, ancak giriş yaptığınız sağlayıcı adresi doğrulanmış olarak bildirmedi. Hesabı ilk açtığınız yöntemle giriş yapın.",
+      "OAuthAccountNotLinked": "Bu e-posta adresiyle başka bir giriş yöntemiyle açılmış bir hesap var. Hesabı ilk açtığınız yöntemle (e-posta ve şifre ya da diğer sağlayıcı) giriş yapın.",
+      "generic": "Giriş tamamlanamadı. Lütfen tekrar deneyin; sorun sürerse başka bir giriş yöntemi kullanın."
     }
   },
   "NoWorkspace": {

@@ -372,7 +372,9 @@
     "signInError": {
       "invite_invalid": "This invite code is invalid or can no longer be used.",
       "disclosure_required": "To open a new account, first confirm on the Sign up tab that you have read the privacy notice.",
-      "email_unverified": "An account with this email already exists, but the provider you signed in with did not report the address as verified. Sign in with the method you first used."
+      "email_unverified": "An account with this email already exists, but the provider you signed in with did not report the address as verified. Sign in with the method you first used.",
+      "OAuthAccountNotLinked": "An account with this email was opened with a different sign-in method. Sign in with the method you first used (email and password, or the other provider).",
+      "generic": "Sign-in could not be completed. Please try again; if the problem continues, use another sign-in method."
     }
   },
   "NoWorkspace": {

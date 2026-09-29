@@ -84,14 +84,22 @@ export default function AuthCard({
   /**
    * TASK-MUM676F010E9G — the signIn callback refuses an OAuth sign-in by
    * redirecting here with `?error=<code>` (src/lib/oauth-registration.ts).
-   * Only the known codes become a message; anything else in the URL is ignored,
-   * so a crafted link cannot put arbitrary text on the page.
+   * Auth.js sends its own sign-in errors here the same way (pages.signIn in
+   * src/lib/auth.ts): OAuthAccountNotLinked gets its own message, and every
+   * other code — OAuthCallbackError, Configuration, anything unrecognised —
+   * gets the generic one (İNCELEME-14 K-3, TASK-MUMAC1VT7DT5Q). The code only
+   * picks a message; its text is never shown, so a crafted link cannot put
+   * arbitrary text on the page.
    */
   const [errorMessage, setErrorMessage] = useState<string | null>(() => {
     const code = searchParams.get('error');
-    return code === 'invite_invalid' || code === 'disclosure_required' || code === 'email_unverified'
+    if (!code) return null;
+    return code === 'invite_invalid' ||
+      code === 'disclosure_required' ||
+      code === 'email_unverified' ||
+      code === 'OAuthAccountNotLinked'
       ? tAuthCard(`signInError.${code}`)
-      : null;
+      : tAuthCard('signInError.generic');
   });
   /**
    * TASK-MULV3JXS1AW5X — optional province of the new organisation. Every
@@ -341,9 +349,16 @@ export default function AuthCard({
 
       {/* Error Alert */}
       {errorMessage && (
-        <div className="p-3 bg-bad/15 border border-bad/30 text-bad text-xs rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+        <div role="alert" className="p-3 bg-bad/15 border border-bad/30 text-bad text-xs rounded-xl flex items-center justify-between animate-in fade-in duration-200">
           <span>{errorMessage}</span>
-          <button onClick={() => setErrorMessage(null)} className="font-bold text-bad ml-2">✕</button>
+          <button
+            type="button"
+            onClick={() => setErrorMessage(null)}
+            aria-label={isTr ? 'Kapat' : 'Close'}
+            className="font-bold text-bad ml-2"
+          >
+            ✕
+          </button>
         </div>
       )}
 
