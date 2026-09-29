@@ -105,6 +105,8 @@ Geri alma: `git revert 9d03f474`. Tek commit, iki dosya, veri ya da şema etkisi
 
 ## 6. Sonraki adım: se-fb devir listesi
 
+> **Güncelleme:** Rapor yazılırken se-fb taşımayı yaptı: `056e83f6` "wait for hydration or a locator, never networkidle; lint-ban it" ve `959bf02c` saved-search hidrasyon (TASK-MUM033NPP7UFI). Aşağıdaki liste `9d03f474` anındaki durumu gösteriyor. Etkisini sonraki push koşularının E2E sonucu gösterecek.
+
 leed-fb, networkidle kullananların `tests/e2e/fixtures/hydration.ts` (`expectHydrated` + `InflightRequests`) ile değiştirilmesi için se-fb'ye ayrı kart açıyor. `grep -rc networkidle tests/e2e` → **36 dosya, 64 kullanım** (dosya başına sayı parantez içinde):
 
 - `tests/e2e/alert-console-truncation.spec.ts` (1)
