@@ -1,13 +1,18 @@
-# E-posta: kendi SMTP sunucumuz (fonbridge.com)
+# E-posta: fonbridge.com SMTP — Vulut cPanel/Exim (Seçenek A)
 
 Karar (patron, 29.09.2026, **güncellendi**): e-posta kendi SMTP sunucumuzdan çıkar.
 - Gönderici: **`info@fonbridge.com`** (önceki `info@usfinbridge.com` kararının yerini aldı)
 - SMTP sunucusu: **`mail.fonbridge.com`**
 - Canlı uygulama alan adı: **`fonbridge.com`**; barındırma: **Vulut**
+- **SMTP modeli — Karar: A (patron 29.09.2026, TASK-MUN4U4PR3DWMT):** Vulut cPanel/Exim (`srv.iyisunucu.com.tr`,
+  `77.92.144.187`). Posta Vulut'un cPanel e-posta hizmetiyle çıkar; sunucunun bakımı ve güncellemeleri Vulut'ta.
+  PTR `srv.iyisunucu.com.tr` olarak kalır. **B (kendi MTA / docker-mailserver) ve C seçilmedi** (§2).
+- **Şimdilik yapılmıyor (patron 29.09):** canlı kurulum (cPanel, DNS, posta kutusu) ve uygulama sunucusuna Caddy
+  kurulumu (§10.1). Bu belge patron başlatınca izlenecek plandır.
 
 Kod tarafı: `src/lib/email/mailer.ts` (nodemailer), ayarlar yalnız ortamdan (`SMTP_*`, `.env.example`).
 Görev: TASK-MUN2PKA5AG2IV. **Canlı sunucu kurulumu ve DNS değişikliği patron onayı olmadan yapılmaz.**
-Patronun yapacakları: §8. Web tarafı (`www` → kök 301, `fonbridge.com` + `www` TLS): §10.
+Patronun yapacakları: §8 — **ilk adım fonbridge.com'u `srv.iyisunucu.com.tr` cPanel'ine alan adı olarak eklemek**. Web tarafı (`www` → kök 301, `fonbridge.com` + `www` TLS): §10.
 
 **Plan çerçevesi (güncelleme-2, 29.09):** patron "`mail.fonbridge.com` Vulut'ta **kurulu**" diyor. Bu yüzden plan
 "sıfırdan kur" değil, **"mevcut sunucuyu doğrula ve DNS'i tamamla"**: (1) kurulu sunucunun hangisi olduğunu ve IP'sini
@@ -35,6 +40,10 @@ netleştir (§1.1), (2) bölgeyi o sunucuyu yöneten ad sunucusunda aç ve §3.0
    ekranına (NS'ler oraya bakmıyorken) girmek, "girdim ama görünmüyor" durumunun en sık sebebidir — lider ölçümündeki
    "patron kurulu diyor ama NS1 boş dönüyor" tablosu tam da buna uyar.
 
+**Karar A ile (29.09):** olasılık 1'in yolu izlenir — fonbridge.com `srv.iyisunucu.com.tr` cPanel'ine eklenir, NS
+değişmez, `<MAIL_IP>` = `77.92.144.187`. Aşağıdaki soru yalnız patron başka bir Vulut hizmetinde yarım bir kurulum
+biliyorsa geçerlidir (o kurulum kullanılmaz; karar cPanel/Exim).
+
 Patrondan istenecek tek bilgi: **Vulut panelinde `mail.fonbridge.com`'un kurulu olduğu hizmetin adı ve IP'si**
 (cPanel ise sağ sütunda "Paylaşılan IP Adresi"; VPS ise panelde sunucu IP'si). Bu IP `<MAIL_IP>` olur.
 
@@ -58,11 +67,14 @@ Sonuç: fonbridge.com için **sıfırdan** kurulum gerekiyor; ilk adım alan ad�
 
 | | Seçenek | Artı | Eksi |
 |---|---|---|---|
-| **A** | Vulut cPanel/Exim (`77.92.144.187`); fonbridge.com cPanel'e eklenir, `info@` posta kutusu açılır, `mail.fonbridge.com` → bu IP. Uygulama 465'te kimlik doğrulayıp gönderir | Kurulum yok; DKIM/TLS (AutoSSL) cPanel'den otomatik; gelen kutusu + bounce aynı yerde; usfinbridge.com ile aynı, çalıştığı ölçülmüş sunucu | Paylaşımlı IP itibarı komşulara bağlı; saatlik gönderim sınırı Vulut'ta; **PTR bizim adımız olamaz** (`srv.iyisunucu.com.tr` kalır) |
-| **B** | Vulut VPS'te `docker-mailserver` (Postfix + Dovecot + OpenDKIM + Rspamd), `mail.fonbridge.com` → VPS IP | Tam denetim, kendi IP'miz, PTR `mail.fonbridge.com` | VPS'te 25 çıkışı açtırılmalı + PTR istenmeli; **yeni alan + yeni IP = sıfır itibar**, haftalarca ısıtma; güncelleme/izleme yükü bizde |
-| **C** | Vulut VPS'te yalnız gönderim: Postfix + OpenDKIM; MX cPanel'de kalır | B'den hafif | B'nin itibar/PTR/25 sorunları aynen; bounce ile gönderim iki ayrı yerde |
+| **A** ✅ **seçildi** | Vulut cPanel/Exim (`77.92.144.187`); fonbridge.com cPanel'e eklenir, `info@` posta kutusu açılır, `mail.fonbridge.com` → bu IP. Uygulama 465'te kimlik doğrulayıp gönderir | Kurulum yok; DKIM/TLS (AutoSSL) cPanel'den otomatik; gelen kutusu + bounce aynı yerde; usfinbridge.com ile aynı, çalıştığı ölçülmüş sunucu | Paylaşımlı IP itibarı komşulara bağlı; saatlik gönderim sınırı Vulut'ta; **PTR bizim adımız olamaz** (`srv.iyisunucu.com.tr` kalır) |
+| **B** _(seçilmedi)_ | Vulut VPS'te `docker-mailserver` (Postfix + Dovecot + OpenDKIM + Rspamd), `mail.fonbridge.com` → VPS IP | Tam denetim, kendi IP'miz, PTR `mail.fonbridge.com` | VPS'te 25 çıkışı açtırılmalı + PTR istenmeli; **yeni alan + yeni IP = sıfır itibar**, haftalarca ısıtma; güncelleme/izleme yükü bizde |
+| **C** _(seçilmedi)_ | Vulut VPS'te yalnız gönderim: Postfix + OpenDKIM; MX cPanel'de kalır | B'den hafif | B'nin itibar/PTR/25 sorunları aynen; bounce ile gönderim iki ayrı yerde |
 
-**Öneri: A.** Alan adı bugün alındı; ona bir de sıfır-itibarlı yeni IP eklemek (B/C) spam kutusu riskini katlar.
+**Karar: A (patron 29.09.2026, TASK-MUN4U4PR3DWMT).** B ve C **seçilmedi**; aşağıdaki satırlar yalnız ileride
+geçiş gerekirse diye duruyor.
+
+**Öneri (karardan önce yazıldı): A.** Alan adı bugün alındı; ona bir de sıfır-itibarlı yeni IP eklemek (B/C) spam kutusu riskini katlar.
 A'da IP'nin temiz geçmişi (§6.3) ve cPanel'in hazır DKIM/AutoSSL'i var; patronun işi birkaç tıklama. Hacim
 (günde yüzlerce+) artarsa ya da mail-tester skoru paylaşımlı IP yüzünden düşerse B'ye geçilir — kayıtlar §3.2'de hazır.
 "PTR = mail.fonbridge.com" mutlak şartsa A olmaz, B/C gerekir (paylaşımlı IP'nin PTR'ı tek bir müşteri adını taşıyamaz).
@@ -90,7 +102,7 @@ TTL: canlıya geçiş haftasında **300**, oturunca 3600.
 
 Ek kayıt gerekmez: `autoconfig`/`autodiscover`/`cpanel`/`webmail` alt adlarını cPanel kendisi ekler, zararsızdır.
 
-### 3.1 A seçeneği
+### 3.1 A seçeneği (seçilen)
 ```
 ; --- web (uygulama) ---
 fonbridge.com.            A      <APP_VPS_IP>        ; uygulamanın koştuğu Vulut VPS (patron verir)
@@ -113,7 +125,7 @@ Exim IP'sini kapsıyor (ölçüldü: `ip4:77.92.144.0/24 …`).
 DMARC: `dmarc@fonbridge.com` kutusu (ya da `info@`'ya yönlendirme) açılmalı. 2–4 hafta rapor temizse
 `p=quarantine; pct=25` → `p=quarantine` → `p=reject`.
 
-### 3.2 B / C seçeneği (Vulut VPS, IP = `<VPS_IP>`)
+### 3.2 B / C seçeneği (Vulut VPS, IP = `<VPS_IP>`) — seçilmedi, yalnız ileride geçiş için
 ```
 mail.fonbridge.com.       A      <VPS_IP>
 ; PTR: Vulut'tan talep (§6.2)  <VPS_IP> → mail.fonbridge.com   — DNS'ten DEĞİL
@@ -298,10 +310,13 @@ Parola ne komutta ne kabuk geçmişinde ne de bu repoda durur; swaks'ın sorduğ
 14. [ ] Web: §10.3 — `www` ve `http` üç istek de tek sıçramayla `301 https://fonbridge.com/…`; iki adın sertifikası geçerli.
 
 ## 8. Patronun yapacakları (sırayla; hiçbirini biz yapmadık)
-0. **Bilgi:** Vulut panelinde `mail.fonbridge.com`'un "kurulu" olduğu hizmet hangisi, IP'si ne (§1.1)? Uygulama hangi
-   sunucuda koşacak, IP'si (`<APP_IP>`, varsa IPv6) ne? Bu ikisi gelmeden §3.0 tablosundaki yer tutucular doldurulamaz.
-1. **Karar:** A (Vulut cPanel/Exim) mı, B (Vulut VPS'te docker-mailserver) mı? Öneri A. "PTR = mail.fonbridge.com" şartsa B.
-2. Vulut cPanel'e **fonbridge.com**'u ekle (yeni hesap ya da mevcut hesaba addon domain). Bugün NS'ler bu alan için REFUSED dönüyor.
+**Karar verildi: A (Vulut cPanel/Exim), patron 29.09.2026.** B seçilmedi. Canlı kurulum şimdilik yapılmıyor; patron
+başlatınca sıra şudur:
+1. **İLK ADIM:** **fonbridge.com**'u `srv.iyisunucu.com.tr` cPanel'ine **alan adı olarak ekle** (yeni hesap ya da mevcut
+   hesaba addon domain). Bugün NS'ler bu alan için REFUSED dönüyor; bu adım olmadan aşağıdakilerin hiçbiri yayına çıkmaz.
+   NS değişmez (`ns1/ns2.iyisunucu.com.tr`), `<MAIL_IP>` = `77.92.144.187`.
+2. **Bilgi:** uygulama hangi sunucuda koşacak, IP'si (`<APP_IP>`, varsa IPv6) ne? Bu gelmeden §3.0'daki kök `A` kaydı
+   (satır 1–2) doldurulamaz; posta kayıtları (satır 4–9) bunu beklemez.
 3. Zone Editor'da §3.1 kayıtları: kök `A` → uygulama VPS IP'si (cPanel'in yazdığını değiştir), `mail A 77.92.144.187`,
    `MX 10 mail.fonbridge.com`, SPF, DMARC (`rua=mailto:dmarc@fonbridge.com`). DKIM'i "E-posta Teslim Edilebilirliği"nden kur.
 4. `info@fonbridge.com` ve `dmarc@fonbridge.com` (ya da `info@`'ya yönlendirme) posta kutularını aç.
@@ -312,10 +327,10 @@ Parola ne komutta ne kabuk geçmişinde ne de bu repoda durur; swaks'ın sorduğ
    b. cPanel posta sunucusunun saatlik/günlük gönderim sınırı; dış IP'den (uygulama VPS'i) SMTP AUTH'a izin — cPHulk/firewall
       beyaz listesine uygulama VPS IP'si.
    c. Paylaşımlı sunucunun giden posta IP'si sabit mi (`77.92.144.187`)? Değişirse haber verilsin.
-   d. (Yalnız B/C) VPS'ten giden **TCP 25**'in açılması ve `<VPS_IP> → mail.fonbridge.com` **PTR** (metin §6.2).
-      Yeni IP verilirse önce kara liste kontrolü için bize iletin.
-7b. Uygulama sunucusunda §10.1 ters vekili (Caddy önerisi) — `www` → kök 301 ve iki adın sertifikası. Bunu da
-   onay gelince biz kurabiliriz; SSH erişimi gerekir.
+   d. ~~(Yalnız B/C) VPS'ten giden **TCP 25**'in açılması ve `<VPS_IP> → mail.fonbridge.com` **PTR** (metin §6.2).
+      Yeni IP verilirse önce kara liste kontrolü için bize iletin.~~ **A seçildi → gerekmez.** PTR `srv.iyisunucu.com.tr` kalır.
+7b. Uygulama sunucusunda §10.1 ters vekili (Caddy önerisi) — `www` → kök 301 ve iki adın sertifikası. **Şimdilik
+   yapılmıyor (patron 29.09).** Başlatılınca onayla biz kurabiliriz; SSH erişimi gerekir.
 8. Bunlar bitince haber ver; §7 listesinin ölçümlerini (dig, openssl, mail-tester, kara liste, Gmail başlıkları) biz koşarız.
 
 ## 9. usfinbridge.com ne oluyor?
@@ -341,6 +356,8 @@ bitirmesi gerekir; bunu zaten vekil yapıyor, ikinci bir yönlendirme noktası d
 `mail.fonbridge.com` web'e yönlendirilmez (cPanel'in webmail/autoconfig'i orada kalabilir).
 
 ### 10.1 Uygulama bir Vulut VPS'inde (Docker) — önerilen: Caddy
+**Şimdilik kurulmuyor (patron 29.09.2026).** Aşağıdaki yapılandırma, kurulum başlatılınca kullanılacak plandır.
+
 Caddy sertifikayı (Let's Encrypt) `fonbridge.com` ve `www` için kendisi alır ve yeniler. `/etc/caddy/Caddyfile`:
 ```
 fonbridge.com {
