@@ -2,7 +2,7 @@
 
 > Sürüm 1.0 · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MULR4ATI5T158 (FB-KAMU-1) · Karar dayanağı: `docs/adr/ADR-0004-public-sector-segment-priority.md`, `docs/adr/ADR-0007-ilkadim-free-pilot.md`
 >
-> **Patron kararı — 29.09.2026 (ADR-0007):** Pilot **ücretsiz deneme** olarak yürür: 90 gün, Ekip planı, 6 koltuk; kapsam davet kodu, karne, radar. Ücretli satış ve e-Fatura pilot sonrasına kaldı. e-Fatura artık pilot kapısı değil, ücretli satış kapısı (ROADMAP "Ücretli satış kapısı"). Pilotu kiracıya atama: TASK-MUMABL78X5JLX.
+> **Patron kararı — 29.09.2026 (ADR-0007):** Pilot **ücretsiz deneme** olarak yürür: 90 gün, Ekip planı (bütün Ekip modülleri, M6 dahil), 6 koltuk; öncelikli yüzeyler davet kodu, karne, radar. Süre dolunca çalışma alanı salt-okunur olur (ek karar, TASK-MUMI52B8UW21O). Ücretli satış ve e-Fatura pilot sonrasına kaldı. e-Fatura artık pilot kapısı değil, ücretli satış kapısı (ROADMAP "Ücretli satış kapısı"). Pilotu kiracıya atama: TASK-MUMABL78X5JLX.
 >
 > **Durum: TASLAK.** Bu belge patronun görüşmeye götüreceği pakettir. Hiçbir kuruma gönderilmedi. Kurumdaki kişi adları, unvanlar ve birim adları bilerek yazılmadı; görüşme öncesi patron doğrular. Köşeli ayraçlı her alan (`[...]`) bir yer tutucudur.
 
@@ -14,6 +14,7 @@
 | Süre          | 90 gün (12 hafta) · başlangıç: `[imza tarihi]`                                                        |
 | Ücret         | Pilot boyunca ücretsiz deneme — **Ekip planı** yetkileri (ADR-0007; `docs/BUSINESS_MODEL.md` §5.1)    |
 | Koltuk        | 6 (Ekip planının koltuk sayısı)                                                                       |
+| Süre dolunca  | Salt-okunur: veri silinmez ve okunur, yazma kapalı; uzatmayı yalnız yönetici yapar (90'ar gün)        |
 | Katılan birim | Dış İlişkiler / AB birimi, Çevre, Kültür, Strateji Geliştirme (birim adları doğrulanacak)             |
 | Ana çıktı     | En az 1 gerçek AB çağrısı için konsept not + başvuru kararı                                           |
 | Pilot sonrası | Yıllık TL paketi, doğrudan temin sınırının altında (§6)                                               |
@@ -42,14 +43,19 @@ Pilotun amacı özellik göstermek değil. Beta programındaki ilke burada da ge
 
 ### 2.2 Açık modüller
 
-Ekip planıyla gelen modüller açık olur (`docs/BUSINESS_MODEL.md` §5.1): K1–K6, M1, M2, M3, M4, M5, M8. Pilotta yoğun kullanılacaklar: K1 çağrı tarama, M2 konsept not, M4 Focal Point (birimlerden fikir toplama), M5 başvuru iş akışı.
+Pilot, **Belediye Ekip** paketinin (`public-team`) açtığı bütün modülleri açar. Paketin temel planı `pro`'dur: **M1, M2, M3, M4, M5, M6, M8** (`src/lib/billing/catalog.ts`, `src/lib/billing/pilot.ts`). Çekirdek özellikler (K1–K6) `docs/BUSINESS_MODEL.md` §5.1'deki Ekip satırı gibidir. Pilotta yoğun kullanılacaklar: K1 çağrı tarama, M2 konsept not, M4 Focal Point (birimlerden fikir toplama), M5 başvuru iş akışı.
 
-Pilotta kullanılacak iki yeni kamu yüzeyi, aynı sprintte paralel kartlarda geliştiriliyor:
+**M6 Evaluator Lens pilotta açıktır** (patron kararı, 29.09.2026; ADR-0007 madde 6). **Not:** `docs/BUSINESS_MODEL.md` §5.1'de M6 Ekip planına dahil değildir; §5.2'de Ekip için €99/ay'lık bir eklentidir. Kamu paketinde bu kural uygulanmaz: Belediye Ekip M6'yı ek ücret olmadan içerir. Pilot sonrası teklif (§6.2) de M6'yı pakete dahil yazar.
 
+Pilotun **öncelikli yüzeyleri** üç tanedir. "Öncelikli", "yalnız bunlar açık" demek değildir; yukarıdaki modüllerin hepsi açıktır (ADR-0007 madde 2):
+
+- **Davet koduyla kayıt** (B1) — ajans davet koduyla belediye kiracısının açılması
 - **Fon Hazırlık Karnesi** — `/fon-hazirlik` (TASK-MULR3TQ24ZZ7N)
 - **Belediye çağrı radarı** — `/belediye-cagrilari` (TASK-MULR39X1K5K6C)
 
-Bu iki kart bitmeden pilot başlamaz. Başlangıç tarihi bu iki kartın `done` olmasına bağlıdır.
+Bu üç yüzey modül kapısına bağlı değildir (`moduleGate` / `assertModuleAccess` çağırmazlar). Plan onları açmaz ve kapatmaz. Karne ve radar kartlarının `done` olması pilotun başlama koşuludur.
+
+**Süre dolunca (ADR-0007 madde 5):** Çalışma alanı salt-okunur olur. Veri silinmez ve okunmaya devam eder. Yazma sunucuda reddedilir. Sayfanın üstünde turuncu bir bant "Pilot süresi doldu" der. Satın alma pilot boyunca da sonrasında da kapalıdır. Süreyi yalnız platform yöneticisi yönetici panelinden 90'ar gün uzatır. Otomatik uzatma yok; ücretsiz Keşif planına düşme yok.
 
 ### 2.3 Kapsam dışı
 
@@ -118,15 +124,15 @@ Güncelleme oranı 2025 Aralık Yİ-ÜFE yıllık değişimi olan %27,67'dir [K2
 
 Aşağıdaki TL tutarları patron tarafından 29.09.2026'da **onaylandı** (plan tanımı: B11 kartı). Belediye Kurum paketi KDV dahil 576.000 TL ile büyükşehir dışı idarelerin 22/d sınırının üstünde kalır; bu idareler için doğrudan temin yerine ihale ya da daha küçük paket gerekir. Amaç: KDV dahil tutar bile en düşük sınırın altında kalsın. Böylece "sınır KDV hariç mi dahil mi" sorusu (açık soru S1) sonucu değiştirmez.
 
-| Paket              | İçerik                                                             | Yıllık (KDV hariç) | KDV dahil (%20)\* | 340.391 TL sınırı | 1.021.827 TL sınırı |
-| ------------------ | ------------------------------------------------------------------ | ------------------ | ----------------- | ----------------- | ------------------- |
-| Belediye Başlangıç | Başlangıç planı yetkileri, 2 koltuk, 1 onboarding günü             | 90.000 TL          | 108.000 TL        | Altında           | Altında             |
-| Belediye Ekip      | Ekip planı yetkileri, 6 koltuk, 2 onboarding günü, çeyreklik rapor | 240.000 TL         | 288.000 TL        | Altında           | Altında             |
-| Belediye Kurum     | İşletme planı yetkileri, 15 koltuk, 4 eğitim günü, aylık rapor     | 480.000 TL         | 576.000 TL        | **Üstünde**       | Altında             |
+| Paket              | İçerik                                                                              | Yıllık (KDV hariç) | KDV dahil (%20)\* | 340.391 TL sınırı | 1.021.827 TL sınırı |
+| ------------------ | ----------------------------------------------------------------------------------- | ------------------ | ----------------- | ----------------- | ------------------- |
+| Belediye Başlangıç | Başlangıç planı yetkileri, 2 koltuk, 1 onboarding günü                              | 90.000 TL          | 108.000 TL        | Altında           | Altında             |
+| Belediye Ekip      | Ekip planı yetkileri (M6 dahil, §2.2), 6 koltuk, 2 onboarding günü, çeyreklik rapor | 240.000 TL         | 288.000 TL        | Altında           | Altında             |
+| Belediye Kurum     | İşletme planı yetkileri, 15 koltuk, 4 eğitim günü, aylık rapor                      | 480.000 TL         | 576.000 TL        | **Üstünde**       | Altında             |
 
 \* KDV oranı açık soru S2'de mali müşavire sorulur; tablo %20 varsayımıyla hesaplandı.
 
-- İlkadım için önerilen paket: **Belediye Ekip** (pilotta kullanılan yapı ile aynı).
+- İlkadım için önerilen paket: **Belediye Ekip** (pilotta kullanılan yapı ile aynı; modüller M1, M2, M3, M4, M5, M6, M8).
 - **Belediye Kurum** yalnız büyükşehir sınırındaki idarelere önerilir.
 - TL tutarları EUR liste fiyatlarından (`docs/BUSINESS_MODEL.md` §5.1) kurla türetilmedi. Kamu paketi ayrı bir TL fiyat listesidir; hangi kurla karşılaştırılacağı patron kararıdır.
 - Fiyat, radar ve karne kartları bittikten ve e-Fatura açıldıktan sonra kesinleşir.
