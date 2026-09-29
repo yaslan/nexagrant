@@ -217,18 +217,21 @@ describe('agency_funnel_counts (fabrika_app)', () => {
 describe('getAgencyFunnel (fabrika_app, with B7 outcomes)', () => {
   test('A’s funnel counts A’s organisations only, masked, with B7 numbers from A’s cohort', async () => {
     const { getAgencyFunnel } = await import('@/lib/agency/funnel');
-    const f = await getAgencyFunnel(ids.agencyA, 30);
+    const f = await getAgencyFunnel(ids.agencyA);
     // 8 organisations: 6 SMEs + 2 municipalities. Municipalities are a group of 2 → "<5",
     // and the total would give them away, so SME is suppressed as well.
     expect(f.all.registered).toEqual({ state: 'count', value: 8 });
     expect(f.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
     expect(f.byOrgType.SME.registered).toEqual({ state: 'small' });
-    expect(f.all.savedSearch).toEqual({ state: 'count', value: 6 });
-    expect(f.all.pipeline).toEqual({ state: 'count', value: 6 });
-    expect(f.all.conceptNote).toEqual({ state: 'count', value: 6 });
-    // B7: 6 submitted, 5 funded, 0 rejected — B's 10 proposals are not in it.
+    // TASK-MULXF0AVMD8MN: 6 of 8 would give away "2 organisations with no saved search /
+    // pipeline / concept note", so those steps are masked too.
+    expect(f.all.savedSearch).toEqual({ state: 'small' });
+    expect(f.all.pipeline).toEqual({ state: 'small' });
+    expect(f.all.conceptNote).toEqual({ state: 'small' });
+    // B7: 6 submitted, 5 funded, 0 rejected — B's 10 proposals are not in it. Showing
+    // "accepted 5" beside "submitted 6" bounded rejected to {0, 1} (crw-fb K-6): masked.
     expect(f.all.submitted).toEqual({ state: 'count', value: 6 });
-    expect(f.all.accepted).toEqual({ state: 'count', value: 5 });
+    expect(f.all.accepted).toEqual({ state: 'small' });
     expect(f.all.rejected).toEqual({ state: 'small' });
     expect(f.all.readiness).toEqual({ state: 'unmeasured' });
     const text = JSON.stringify(f);
@@ -238,21 +241,21 @@ describe('getAgencyFunnel (fabrika_app, with B7 outcomes)', () => {
 
   test('B’s funnel: one organisation is a small group, so nothing is shown, not B’s 10 nor A’s 6', async () => {
     const { getAgencyFunnel } = await import('@/lib/agency/funnel');
-    const f = await getAgencyFunnel(ids.agencyB, 90);
+    const f = await getAgencyFunnel(ids.agencyB);
     expect(f.all.registered).toEqual({ state: 'small' });
     expect(f.all.submitted).toEqual({ state: 'small' });
   });
 
   test('an organisation cannot read a funnel', async () => {
     const { getAgencyFunnel, NotAnAgencyError } = await import('@/lib/agency/funnel');
-    await expect(getAgencyFunnel(linkedA[0]!, 30)).rejects.toBeInstanceOf(NotAnAgencyError);
-    await expect(getAgencyFunnel(ids.orphan, 30)).rejects.toBeInstanceOf(NotAnAgencyError);
+    await expect(getAgencyFunnel(linkedA[0]!)).rejects.toBeInstanceOf(NotAnAgencyError);
+    await expect(getAgencyFunnel(ids.orphan)).rejects.toBeInstanceOf(NotAnAgencyError);
   });
 
   test('the B7 list is derived from the agency link: A never receives B’s organisation', async () => {
     const { getAgencyFunnel } = await import('@/lib/agency/funnel');
     const seen: string[][] = [];
-    await getAgencyFunnel(ids.agencyA, 90, {
+    await getAgencyFunnel(ids.agencyA, {
       outcomes: async (tenantIds) => {
         seen.push([...tenantIds]);
         return { submitted: 0, accepted: 0, rejected: 0 };
@@ -262,6 +265,29 @@ describe('getAgencyFunnel (fabrika_app, with B7 outcomes)', () => {
     expect(all.sort()).toEqual([...linkedA].sort());
     expect(all).not.toContain(ids.orgB);
     expect(all).not.toContain(ids.orphan);
+  });
+});
+
+describe('one cohort, no date window (TASK-MULXF0AVMD8MN, fabrika_app)', () => {
+  test('an organisation registered 400 days ago is counted like one registered today', async () => {
+    const { getAgencyFunnel } = await import('@/lib/agency/funnel');
+    const old = linkedA[0]!;
+    const before = await admin!.tenant.findUniqueOrThrow({ where: { id: old }, select: { createdAt: true } });
+    await admin!.tenant.update({ where: { id: old }, data: { createdAt: new Date(Date.now() - 400 * 86_400_000) } });
+    try {
+      const seen: string[] = [];
+      const f = await getAgencyFunnel(ids.agencyA, {
+        outcomes: async (tenantIds) => {
+          seen.push(...tenantIds);
+          return { submitted: 0, accepted: 0, rejected: 0 };
+        },
+      });
+      // Steps 1, 3-5 (SQL, since = NULL) and the B7 cohort (Prisma) both still hold it.
+      expect(f.all.registered).toEqual({ state: 'count', value: 8 });
+      expect(seen).toContain(old);
+    } finally {
+      await admin!.tenant.update({ where: { id: old }, data: { createdAt: before.createdAt } });
+    }
   });
 });
 
@@ -285,13 +311,13 @@ describe('province (TASK-MULV3JXS1AW5X, fabrika_app)', () => {
 
   test('getAgencyFunnel with a province: that province’s cohort, masked; an empty one is all "<5"', async () => {
     const { getAgencyFunnel } = await import('@/lib/agency/funnel');
-    const samsun = await getAgencyFunnel(ids.agencyA, 30, { province: 'Samsun' });
+    const samsun = await getAgencyFunnel(ids.agencyA, { province: 'Samsun' });
     expect(samsun.province).toBe('Samsun');
     expect(samsun.all.registered).toEqual({ state: 'count', value: 8 });
     expect(samsun.all.submitted).toEqual({ state: 'count', value: 6 });
     expect(samsun.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
     expect(samsun.byOrgType.SME.registered).toEqual({ state: 'small' });
-    const tokat = await getAgencyFunnel(ids.agencyA, 30, { province: 'Tokat' });
+    const tokat = await getAgencyFunnel(ids.agencyA, { province: 'Tokat' });
     for (const s of ['registered', 'savedSearch', 'pipeline', 'conceptNote', 'submitted', 'accepted', 'rejected'] as const) {
       expect(tokat.all[s]).toEqual({ state: 'small' });
     }

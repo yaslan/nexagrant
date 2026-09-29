@@ -1,7 +1,6 @@
 'use client';
 
 import { useId, useState } from 'react';
-import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import type { AgencyFunnel, FunnelCell, FunnelStep } from '@/lib/agency/funnel';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
@@ -40,11 +39,9 @@ function CellValue({ cell }: { cell: FunnelCell }) {
 export default function FunnelPanel({
   locale,
   funnel,
-  windows,
 }: {
   locale: string;
   funnel: AgencyFunnel;
-  windows: number[];
 }) {
   const t = useTranslations('agency.funnel');
   const tType = useTranslations('agency.orgType');
@@ -52,7 +49,6 @@ export default function FunnelPanel({
   const typeId = useId();
   const provinceId = useId();
   const provinceNoteId = useId();
-  const provinceQuery = funnel.province ? `&il=${encodeURIComponent(funnel.province)}` : '';
   const orgTypes = Object.keys(funnel.byOrgType);
   const view = orgType === 'ALL' ? funnel.all : funnel.byOrgType[orgType as keyof typeof funnel.byOrgType];
   const path = locale === 'tr' ? `/${locale}/ajans` : `/${locale}/agency`;
@@ -95,7 +91,6 @@ export default function FunnelPanel({
             reload the page on each arrow key. Works without JavaScript.
           */}
           <form method="get" action={path} className="flex flex-col gap-1" data-testid="agency-province-form">
-            <input type="hidden" name="gun" value={funnel.windowDays} />
             <label htmlFor={provinceId} className="text-xs font-semibold text-ink-2">
               {t('provinceLabel')}
             </label>
@@ -128,29 +123,6 @@ export default function FunnelPanel({
             </span>
           </form>
 
-          <nav aria-label={t('windowLabel')} className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-ink-2" aria-hidden="true">
-              {t('windowLabel')}
-            </span>
-            <div className="flex rounded-lg border border-border bg-surface p-0.5">
-              {windows.map((w) => {
-                const active = w === funnel.windowDays;
-                return (
-                  <Link
-                    key={w}
-                    href={`${path}?gun=${w}${provinceQuery}`}
-                    aria-current={active ? 'page' : undefined}
-                    scroll={false}
-                    className={`inline-flex min-h-10 min-w-20 items-center justify-center rounded-md px-3 text-sm font-semibold transition ${focusRing} ${
-                      active ? 'bg-accent-strong text-white' : 'text-ink hover:bg-surface-hover'
-                    }`}
-                  >
-                    {t('windowDays', { days: w })}
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
         </div>
       </div>
 

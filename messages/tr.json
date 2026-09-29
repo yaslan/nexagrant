@@ -2074,20 +2074,18 @@
     "intro": "Davet kodunuzla kayıt olan kurumların ilerleyişini toplu sayılarla izleyin ve davet kodlarınızı yönetin. Kurumların adı, içeriği ve kişisel verileri bu panoda gösterilmez.",
     "funnel": {
       "title": "Bölge başvuru hunisi",
-      "description": "Seçilen dönemde kodunuzla kayıt olan kurumlar ve bu kurumların ulaştığı adımlar. Adım sayıları kurum sayısıdır; başvuru ve sonuç sayıları başvuru sayısıdır.",
+      "description": "Kodunuzla bugüne kadar kayıt olan tüm kurumlar ve bu kurumların ulaştığı adımlar. Sayılar kümülatiftir; dönem seçilmez. Adım sayıları kurum sayısıdır; başvuru ve sonuç sayıları başvuru sayısıdır.",
       "orgTypeLabel": "Kurum türü",
       "allTypes": "Tüm kurum türleri",
       "provinceLabel": "İl",
       "allProvinces": "Tüm iller",
       "provinceApply": "Uygula",
       "provinceNote": "Yalnızca ilini bildiren kurumlar il bazında sayılır; ilini bildirmeyenler yalnızca “Tüm iller” görünümünde yer alır. İller arasında da 5'ten küçük sayılar <5 olarak gizlenir.",
-      "windowLabel": "Dönem",
-      "windowDays": "Son {days} gün",
       "stepNumber": "Adım {n}",
       "unmeasured": "Henüz ölçülmüyor",
       "smallHint": "5'ten az kurum: kurumları tanıtmamak için sayı gösterilmez.",
       "smallSr": "5'ten az; sayı gizlendi",
-      "privacyNote": "<5: Bu grupta 5'ten az değer var ya da sayı, başka bir sayıdan geri hesaplanabiliyor. Kurumları tanıtmamak için değer gizlenir.",
+      "privacyNote": "<5: Bu grupta 5'ten az değer var ya da sayı, başka bir sayıdan (toplam, başka bir tür, başka bir il ya da başka bir adım) geri hesaplanabiliyor. Kurumları tanıtmamak için değer gizlenir.",
       "steps": {
         "registered": {
           "title": "Davet koduyla kayıt",
