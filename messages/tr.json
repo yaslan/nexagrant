@@ -2219,7 +2219,7 @@
     },
     "cobrand": {
       "title": "Ortak marka",
-      "description": "Ajansınızla bağlanan kurumlar, uygulamanın üst çubuğunda ajansınızın logosunu ve \"<ajans> iş birliğiyle\" satırını görür. Uygulamanın kendi logosu yerinde kalır. Bağlı olmayan kurumlar bunu görmez.",
+      "description": "Ajansınızla bağlanan kurumlar, uygulamanın üst çubuğunda ajansınızın logosunu ve \"OKA iş birliğiyle\" gibi bir satır görür. Uygulamanın kendi logosu yerinde kalır. Bağlı olmayan kurumlar bunu görmez.",
       "name": "Ajansın kısa adı",
       "namePlaceholder": "Örn. OKA",
       "nameHint": "Boş bırakılırsa hesap adı kullanılır. En fazla 40 karakter.",
