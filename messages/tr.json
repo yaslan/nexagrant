@@ -599,7 +599,9 @@
   },
   "settings": {
     "modules": {
-      "noSubscription": "Aboneliğiniz yok · ücretsiz paket"
+      "noSubscription": "Aboneliğiniz yok · ücretsiz paket",
+      "pilotLocked": "Pilotta kapalı · kurum paketinde açılır",
+      "upgradeCta": "Planı Yükselt"
     },
     "privacy": {
       "title": "Gizlilik ve Verilerim",

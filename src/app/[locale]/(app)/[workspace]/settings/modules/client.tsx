@@ -571,12 +571,15 @@ export function ModulesClient({
                       Kapat
                     </button>
                   )}
-                  {isPlanLocked && !isActive ? (
+                  {isPlanLocked && !isActive && plan?.pilot ? (
+                    // A pilot cannot change plan (billing says so), so no upgrade offer here.
+                    <span className="text-xs font-medium text-muted text-right">{t('pilotLocked')}</span>
+                  ) : isPlanLocked && !isActive ? (
                     <Link
                       href={`/${locale}/${workspace}/settings/billing`}
                       className="text-xs font-bold bg-amber hover:opacity-90 text-white px-3 py-1.5 rounded-lg transition shadow-2xs"
                     >
-                      Planı Yükselt
+                      {t('upgradeCta')}
                     </Link>
                   ) : (
                     <button

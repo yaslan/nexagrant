@@ -599,7 +599,9 @@
   },
   "settings": {
     "modules": {
-      "noSubscription": "No subscription · free plan"
+      "noSubscription": "No subscription · free plan",
+      "pilotLocked": "Off during the pilot · available with an institution plan",
+      "upgradeCta": "Upgrade Plan"
     },
     "privacy": {
       "title": "Privacy & My Data",
