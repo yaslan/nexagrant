@@ -2500,5 +2500,74 @@
     "activeBody": "Belediye Ekip planı {date} tarihine kadar (bu gün dahil) açık. Pilot süresince ödeme alınmaz.",
     "expiredTitle": "Pilot süresi doldu.",
     "expiredBody": "Pilotun son günü {date} idi. Verileriniz korunuyor ve görüntülenebilir; yeni kayıt ve düzenleme kapalı. Devam etmek için hesap yöneticinizle görüşün."
+  },
+  "PartnerOutreach": {
+    "title": "Dış kaynaklarda ortak ara",
+    "intro": "Bu kurumu ve konusunu dış ortak arama sitelerinde arayın. Bağlantılar yeni sekmede açılır; bağlantıya yalnız kurum adı, ülke ve konu eklenir, kişisel veri eklenmez.",
+    "topicLabel": "Konu",
+    "topicNone": "Konu seçilmedi",
+    "prefilled": "Arama bağlantıda hazır",
+    "notPrefilled": "Bu site bağlantıdan arama almıyor; metni kopyalayıp sitenin arama kutusuna yapıştırın.",
+    "searchTextLabel": "Arama metni",
+    "open": "Aç",
+    "openAria": "{source} sitesinde ara (yeni sekmede açılır)",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı",
+    "copyFailed": "Kopyalanamadı. Metni seçip elle kopyalayın.",
+    "sources": {
+      "ft": {
+        "name": "F&T Portal — Partner Search",
+        "hint": "AB Fon ve İhale Portalı'nın resmî ortak arama aracı. Kurum adıyla arar."
+      },
+      "een": {
+        "name": "Enterprise Europe Network (EEN)",
+        "hint": "İş birliği ve teknoloji profilleri. Konu ve ülkeyle arayın."
+      },
+      "idealist": {
+        "name": "Ideal-ist",
+        "hint": "Dijital (Küme 4) ortak arama ilanları. Konu koduyla süzer."
+      },
+      "greenet": {
+        "name": "GREENET",
+        "hint": "Küme 5 (iklim, enerji, ulaşım) NCP ağının ortak arama topluluğu. Üyelik gerekir."
+      },
+      "linkedin": {
+        "name": "LinkedIn",
+        "hint": "Şirket sayfası araması. LinkedIn girişi gerekir."
+      }
+    },
+    "emailTitle": "İlk temas e-posta şablonları",
+    "emailIntro": "Şablonu seçin, alanları doldurun, sonra kopyalayın ya da kendi e-posta programınızda açın. Uygulama e-posta göndermez; alıcıyı siz yazarsınız.",
+    "templateLabel": "Şablon",
+    "templateLangLabel": "Şablon dili",
+    "langTr": "Türkçe",
+    "langEn": "İngilizce",
+    "institutionLabel": "Kurum adı",
+    "callCodeLabel": "Çağrı kodu",
+    "callCodePlaceholder": "ör. HORIZON-CL5-2025-D3-01",
+    "projectTitleLabel": "Proje başlığı",
+    "subjectLabel": "Konu satırı",
+    "bodyLabel": "E-posta metni",
+    "copyEmail": "Metni kopyala",
+    "openMail": "E-posta programında aç",
+    "templateNames": {
+      "invite": "Konsorsiyum daveti",
+      "info": "Bilgi isteği",
+      "followup": "Takip"
+    },
+    "templates": {
+      "invite": {
+        "subject": "{callCode} çağrısı için konsorsiyum daveti — {projectTitle}",
+        "body": "Sayın {institution} ekibi,\n\n{callCode} çağrısına \"{projectTitle}\" başlıklı bir teklifle başvurmayı planlıyoruz. {institution} kurumunun bu alandaki deneyimini inceledik ve konsorsiyumumuza ortak olarak katılmanızı öneriyoruz.\n\nİlgilenirseniz, projenin kısa özetini ve önerdiğimiz rol dağılımını paylaşabilir, önümüzdeki iki hafta içinde kısa bir görüntülü görüşme yapabiliriz.\n\nSaygılarımızla,\n[Adınız Soyadınız]\n[Kurumunuz]"
+      },
+      "info": {
+        "subject": "{callCode} — iş birliği hakkında bilgi isteği",
+        "body": "Sayın {institution} ekibi,\n\n{callCode} çağrısı kapsamında \"{projectTitle}\" konusunda bir teklif hazırlıyoruz. Kurumunuzun bu çağrıya başvurmayı düşünüp düşünmediğini ve bir konsorsiyuma katılmaya açık olup olmadığını öğrenmek isteriz.\n\nUygunsa ilgili ekibinizin iletişim bilgisini ve ilgi alanlarınızı paylaşmanızı rica ederiz.\n\nSaygılarımızla,\n[Adınız Soyadınız]\n[Kurumunuz]"
+      },
+      "followup": {
+        "subject": "Takip: {callCode} — {projectTitle}",
+        "body": "Sayın {institution} ekibi,\n\n{callCode} çağrısı için \"{projectTitle}\" teklifine katılımınızla ilgili önceki mesajımızı takip etmek istedik. Son başvuru tarihi yaklaştığı için ilginizi kısa süre içinde öğrenebilirsek planlamamızı buna göre yapacağız.\n\nSorularınız için memnuniyetle görüşmeye hazırız.\n\nSaygılarımızla,\n[Adınız Soyadınız]\n[Kurumunuz]"
+      }
+    }
   }
 }

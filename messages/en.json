@@ -2500,5 +2500,74 @@
     "activeBody": "The Municipal Team plan is open until {date} (inclusive). Nothing is charged during the pilot.",
     "expiredTitle": "The pilot has ended.",
     "expiredBody": "The last day of the pilot was {date}. Your data is kept and can be viewed; new records and edits are closed. Talk to your account manager to continue."
+  },
+  "PartnerOutreach": {
+    "title": "Search for partners on external sites",
+    "intro": "Search for this organisation and its topic on external partner-search sites. The links open in a new tab. They carry only the organisation name, country and topic, never personal data.",
+    "topicLabel": "Topic",
+    "topicNone": "No topic selected",
+    "prefilled": "Search is in the link",
+    "notPrefilled": "This site does not take a search from the link. Copy the text and paste it into the site's search box.",
+    "searchTextLabel": "Search text",
+    "open": "Open",
+    "openAria": "Search on {source} (opens in a new tab)",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Could not copy. Select the text and copy it manually.",
+    "sources": {
+      "ft": {
+        "name": "F&T Portal — Partner Search",
+        "hint": "The official partner search of the EU Funding & Tenders Portal. Searches by organisation name."
+      },
+      "een": {
+        "name": "Enterprise Europe Network (EEN)",
+        "hint": "Business and technology cooperation profiles. Search by topic and country."
+      },
+      "idealist": {
+        "name": "Ideal-ist",
+        "hint": "Partner search requests for digital (Cluster 4) calls. Filters by topic code."
+      },
+      "greenet": {
+        "name": "GREENET",
+        "hint": "Partner search community of the Cluster 5 (climate, energy, mobility) NCP network. Sign-up required."
+      },
+      "linkedin": {
+        "name": "LinkedIn",
+        "hint": "Company page search. LinkedIn sign-in required."
+      }
+    },
+    "emailTitle": "First-contact e-mail templates",
+    "emailIntro": "Pick a template, fill in the fields, then copy it or open it in your own e-mail program. The app does not send e-mail; you add the recipient.",
+    "templateLabel": "Template",
+    "templateLangLabel": "Template language",
+    "langTr": "Turkish",
+    "langEn": "English",
+    "institutionLabel": "Organisation name",
+    "callCodeLabel": "Call code",
+    "callCodePlaceholder": "e.g. HORIZON-CL5-2025-D3-01",
+    "projectTitleLabel": "Project title",
+    "subjectLabel": "Subject line",
+    "bodyLabel": "E-mail text",
+    "copyEmail": "Copy text",
+    "openMail": "Open in e-mail program",
+    "templateNames": {
+      "invite": "Consortium invitation",
+      "info": "Request for information",
+      "followup": "Follow-up"
+    },
+    "templates": {
+      "invite": {
+        "subject": "Consortium invitation for {callCode} — {projectTitle}",
+        "body": "Dear {institution} team,\n\nWe plan to apply to {callCode} with a proposal titled \"{projectTitle}\". We have looked at the experience of {institution} in this field and would like to invite you to join our consortium as a partner.\n\nIf you are interested, we can share a short summary of the project and the roles we propose, and set up a short video call in the next two weeks.\n\nKind regards,\n[Your name]\n[Your organisation]"
+      },
+      "info": {
+        "subject": "{callCode} — request for information on cooperation",
+        "body": "Dear {institution} team,\n\nWe are preparing a proposal on \"{projectTitle}\" for {callCode}. We would like to know if your organisation plans to apply to this call and if you are open to joining a consortium.\n\nIf so, please send us the contact details of the relevant team and your areas of interest.\n\nKind regards,\n[Your name]\n[Your organisation]"
+      },
+      "followup": {
+        "subject": "Follow-up: {callCode} — {projectTitle}",
+        "body": "Dear {institution} team,\n\nWe are following up on our earlier message about your participation in the \"{projectTitle}\" proposal for {callCode}. The deadline is close, so a quick reply about your interest would help us plan.\n\nWe are happy to talk if you have questions.\n\nKind regards,\n[Your name]\n[Your organisation]"
+      }
+    }
   }
 }

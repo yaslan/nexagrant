@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
+import { getTranslations } from 'next-intl/server';
+import { PartnerOutreach, type PartnerOutreachProps } from '@/modules/m1/ui/PartnerOutreach';
 
 interface OrgDetail {
   id: string;
@@ -38,6 +40,7 @@ export default async function PartnerDetailPage({
   const isTr = locale === 'tr';
 
   let org: OrgDetail | null = null;
+  let topics: PartnerOutreachProps['topics'] = [];
   try {
     const cordisOrg = await prisma.cordisOrganization.findUnique({
       where: { organisationId: pic },
@@ -63,12 +66,38 @@ export default async function PartnerDetailPage({
         ecContributionSum: ecSum,
         participations,
       };
+
+      // K4 outreach: the organisation's topics, most frequent first, to seed external searches.
+      const projectTopics = await prisma.cordisProjectTopic.findMany({
+        where: { projectId: { in: participations.map((p) => p.projectId) } },
+        select: { topicCode: true, topicTitle: true },
+      });
+      const topicCounts = new Map<string, { code: string; title: string | null; count: number }>();
+      for (const tp of projectTopics) {
+        const entry = topicCounts.get(tp.topicCode) ?? { code: tp.topicCode, title: tp.topicTitle, count: 0 };
+        entry.count += 1;
+        topicCounts.set(tp.topicCode, entry);
+      }
+      topics = [...topicCounts.values()]
+        .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
+        .slice(0, 15)
+        .map(({ code, title }) => ({ code, title }));
     }
   } catch (e) {
     console.warn(`[PartnerDetailPage] Failed to fetch organization: ${errorMessage(e)}`);
   }
 
   if (!org) return notFound();
+
+  // Both languages' templates: the user may write to a foreign partner from a Turkish UI.
+  const [tTr, tEn] = await Promise.all([
+    getTranslations({ locale: 'tr', namespace: 'PartnerOutreach' }),
+    getTranslations({ locale: 'en', namespace: 'PartnerOutreach' }),
+  ]);
+  const templates: PartnerOutreachProps['templates'] = {
+    tr: tTr.raw('templates') as PartnerOutreachProps['templates']['tr'],
+    en: tEn.raw('templates') as PartnerOutreachProps['templates']['en'],
+  };
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4">
@@ -130,6 +159,16 @@ export default async function PartnerDetailPage({
               ? `[CORDIS Etkileşim Grafiği] — Kurumun Horizon Europe ve H2020 projeleriyle ortaklık ağı.`
               : `[Interactive Collaboration Graph] — This organization's network within Horizon Europe and H2020 projects.`}
           </div>
+        </div>
+
+        <div className="mb-8">
+          <PartnerOutreach
+            orgName={org.name}
+            country={org.country}
+            topics={topics}
+            templates={templates}
+            locale={locale}
+          />
         </div>
 
         <div>
