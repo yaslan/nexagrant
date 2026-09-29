@@ -72,7 +72,7 @@ M6 m11 calculateLumpSumBudget guard kaldırıldı (m11.test.ts)  → Tests 1 fai
 **Admin dışında istemci tenantId'si:** `export async function …(…tenantId…)` ve `input/data/params.tenantId` desenleriyle 34 dosyayı taradım. Tek eşleşme `admin/billing/plans/actions.ts:184 unassignPlanAction(planId, tenantId)`. Bu, platform yöneticisinin kiracılar arası işlemi ve `requirePlatformAdmin` ile korunuyor, yani tasarım gereği. Bulgu değil. Admin dışında istemciden tenantId alan action bulmadım.
 
 **Bulgular**
-- **K-1 (belge):** be-fb raporunun §5'inde "m11 action'ları korunsun mu?" sorusu açık duruyor. `4e5ea9e1` bu soruyu kapattı ama raporda bir satır olarak yer almıyor. Rapora bir güncelleme satırı eklenmeli.
+- ~~**K-1 (belge):** be-fb raporunun §5'inde m11 sorusu açık~~ → **kapandı:** be-fb'nin 2. tur raporu `TASK-MUMJ2ERCFP964-be-fb-2.md` (`611cab22`, bu raporla aynı anda geldi) `4e5ea9e1`'i belgeliyor. SSO'yu kiracının kendisinin yapılandırması ayrı karta (TASK-MUML0QZAZ5M80) taşındı.
 - **Not (kapsam dışı, önceden var):** `configureEnterpriseSso` yazmayı `withTenant` olmadan düz `prisma.tenant` ile yapıyor. be-fb bunu §4'te kendisi yazmış. RLS rolüyle bu yazmanın çalıştığı doğrulanmadı. SSO gerçekten kullanılmaya başlamadan önce ayrı bir kartta canlı denenmeli.
 
 ## 4. Kart 3 — Pilot CTA (`a50f53ac`) + B-5 (`4627049d`) — ONAY
@@ -124,7 +124,6 @@ Atlananların hepsi dış API (SEDIA/Eurostars/TÜBİTAK) testleri. Canlı RLS t
 ## 9. Sonraki adım
 - Üç kart `done`'a alınabilir.
 - se-fb için küçük bir takip kartı: Ö-1 (sayı/anahtar maskesi) + Ö-2 (gruplu hane deseni ya da yorum düzeltmesi) + K-1 (açık tırnak). DSN açılmadan önce yapılmalı.
-- be-fb raporuna `4e5ea9e1` satırı eklenmeli (Kart 2 K-1).
 
 ## Platform beyanı
 - **Doğrulandı: yalnız macOS** (Darwin 27.0.0, Node, vitest, Next build; ayrık worktree).
