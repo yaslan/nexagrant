@@ -445,6 +445,8 @@ export async function evaluateOpportunityGate({
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
   const { tenantId, userId } = scope;
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(opportunityId)) return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
 
   try {
     const owned = await withTenant<{ id: string } | null>(tenantId, (tx) =>

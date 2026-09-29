@@ -209,7 +209,7 @@ export function unguardedWheres(source: string, fileName: string): string[] {
   function isTenantWrapperArg(at: ts.Node, text: string): boolean {
     if (reassigned.has(text.split('.')[0]!)) return false;
     for (let n: ts.Node | undefined = at; n?.parent; n = n.parent) {
-      const call = n.parent;
+      const call: ts.Node = n.parent;
       if (!(ts.isArrowFunction(n) || ts.isFunctionExpression(n)) || !ts.isCallExpression(call)) continue;
       const callee = unwrap(call.expression);
       const name = ts.isIdentifier(callee)
@@ -485,10 +485,15 @@ export function unguardedWheres(source: string, fileName: string): string[] {
       }
     }
     // `const { deleteMany } = prisma.tenant` — the call site can no longer be read.
+    // Only off a model delegate (`a.b`, `a['b']`); `const { updateMany } = makeFake()` is not one.
     if (ts.isBindingElement(node)) {
       const bound = node.propertyName && ts.isIdentifier(node.propertyName) ? node.propertyName.text
         : ts.isIdentifier(node.name) ? node.name.text : '';
-      if (CHECKED_METHODS.has(bound)) report(node, `destructured ${bound} (call cannot be checked)`);
+      let decl: ts.Node = node;
+      while (ts.isBindingElement(decl) || ts.isObjectBindingPattern(decl) || ts.isArrayBindingPattern(decl)) decl = decl.parent;
+      const from = ts.isVariableDeclaration(decl) && decl.initializer ? unwrap(decl.initializer) : undefined;
+      const offDelegate = !!from && (ts.isPropertyAccessExpression(from) || ts.isElementAccessExpression(from));
+      if (CHECKED_METHODS.has(bound) && offDelegate) report(node, `destructured ${bound} (call cannot be checked)`);
     }
     ts.forEachChild(node, visit);
   };
