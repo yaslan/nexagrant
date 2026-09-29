@@ -23,6 +23,14 @@ const RUN = `im-${Date.now().toString(36)}`;
 
 const state = vi.hoisted(() => ({
   rls: undefined as PrismaClient | undefined,
+  /**
+   * When set, every transaction waits before its `invitation.upsert` until
+   * `barrier.size` transactions have arrived there (or `barrier.ms` passed).
+   * Two requests racing without the advisory lock both arrive and pass the
+   * limit check together; with the lock the second never gets there while the
+   * first holds it, so the first goes on after the timeout.
+   */
+  barrier: null as null | { size: number; ms: number; waiting: Array<() => void> },
   scope: { tenantId: '', userId: '', role: 'TENANT_OWNER', workspaceIds: [] as string[], isPlatformAdmin: false },
 }));
 const send = vi.hoisted(() => vi.fn(async (_message: { to: string; subject: string; text?: string }) => {}));
@@ -40,7 +48,25 @@ vi.mock('@/lib/db', async (importOriginal) => {
   return {
     ...actual,
     withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1]) =>
-      actual.withTenantOn(state.rls!, tenantId, cb),
+      actual.withTenantOn(state.rls!, tenantId, (tx) => {
+        const barrier = state.barrier;
+        if (!barrier) return cb(tx);
+        const upsert = tx.invitation.upsert.bind(tx.invitation);
+        const gated = new Proxy(tx.invitation, {
+          get: (target, key, receiver) =>
+            key === 'upsert'
+              ? async (...args: Parameters<typeof upsert>) => {
+                  await new Promise<void>((resolve) => {
+                    barrier.waiting.push(resolve);
+                    if (barrier.waiting.length >= barrier.size) barrier.waiting.splice(0).forEach((r) => r());
+                    else setTimeout(resolve, barrier.ms);
+                  });
+                  return upsert(...args);
+                }
+              : Reflect.get(target, key, receiver),
+        });
+        return cb(new Proxy(tx, { get: (t, k, r) => (k === 'invitation' ? gated : Reflect.get(t, k, r)) }));
+      }),
   };
 });
 vi.mock('@/lib/email/mailer', async (importOriginal) => {
@@ -176,7 +202,10 @@ describe('POST /api/invitations — mail limits', () => {
 
   test('two concurrent invitations to one address send one mail', async () => {
     const email = nextEmail();
-    const [a, b] = await Promise.all([invite(email), invite(email)]);
+    state.barrier = { size: 2, ms: 500, waiting: [] };
+    const [a, b] = await Promise.all([invite(email), invite(email)]).finally(() => {
+      state.barrier = null;
+    });
     expect([a.status, b.status]).toEqual([200, 200]);
     expect([a.body.emailSent, b.body.emailSent].sort()).toEqual([false, true]);
     expect(send).toHaveBeenCalledTimes(1);
