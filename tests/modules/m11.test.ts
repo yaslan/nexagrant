@@ -192,6 +192,14 @@ describe('M11 Application Production & Collaborative Editing Module', () => {
     await expect(issuePartnerPortalLink('part-111')).rejects.toBeInstanceOf(FakeTenantScopeError);
   });
 
+  test('calculateLumpSumBudget and generateSectionDraftAi refuse a caller without a session tenant', async () => {
+    setScope(null);
+    await expect(calculateLumpSumBudget(12, 1.0, 0, 2000)).rejects.toBeInstanceOf(FakeTenantScopeError);
+    await expect(
+      generateSectionDraftAi('part-111', '1.1_objectives', '1.1 Objectives', 'Topic')
+    ).rejects.toBeInstanceOf(FakeTenantScopeError);
+  });
+
   test('calculateLumpSumBudget computes 25% overhead and direct personnel cost', async () => {
     const total = await calculateLumpSumBudget(12, 1.0, 0, 2000);
     // Base 5500 * 12 = 66000 direct personnel. Travel 2000. Overhead (66000 + 2000) * 0.25 = 17000. Total = 85000

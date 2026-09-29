@@ -401,6 +401,9 @@ export async function generateSectionDraftAi(
   topicTitle: string,
   focusNotes: string = ''
 ) {
+  // No data and no cost today (a fixed template), but it is an unauthenticated
+  // endpoint the moment a real model call lands here (TASK-MUMJ2ERCFP964).
+  await requireTenantAction({ readOnly: true });
   // Horizon Europe Section Prompt Generator logic
   const generatedDraft = `### ${sectionTitle}
 
@@ -420,12 +423,17 @@ ${focusNotes ? `*Key Co-Author Focus Notes:* ${focusNotes}\n` : ''}
   return generatedDraft;
 }
 
-export async function calculateLumpSumBudget(
+/**
+ * The lump-sum arithmetic, kept out of the exported action so the partner
+ * portal (`addBudgetLineByToken`, no session) can price a line without the
+ * session check the public action needs.
+ */
+function lumpSumTotal(
   personMonths: number,
-  countryCoefficient: number = 1.0,
-  subcontractingCost: number = 0,
-  travelCost: number = 0
-) {
+  countryCoefficient: number,
+  subcontractingCost: number,
+  travelCost: number
+): number {
   const BASE_MONTHLY_RATE = 5500;
   const directPersonnelCosts = BASE_MONTHLY_RATE * personMonths * countryCoefficient;
   const directOtherCosts = travelCost;
@@ -433,6 +441,18 @@ export async function calculateLumpSumBudget(
   const totalRequestedBudget = directPersonnelCosts + directOtherCosts + indirectCosts + subcontractingCost;
 
   return Math.round(totalRequestedBudget);
+}
+
+export async function calculateLumpSumBudget(
+  personMonths: number,
+  countryCoefficient: number = 1.0,
+  subcontractingCost: number = 0,
+  travelCost: number = 0
+) {
+  // Arithmetic only, but a server action is a public HTTP entry point; the
+  // session check keeps it in line with every other M11 action (TASK-MUMJ2ERCFP964).
+  await requireTenantAction({ readOnly: true });
+  return lumpSumTotal(personMonths, countryCoefficient, subcontractingCost, travelCost);
 }
 
 export async function addBudgetLine(
@@ -444,7 +464,7 @@ export async function addBudgetLine(
   travel: number = 0
 ) {
   const { tenantId } = await requireTenantAction();
-  const requestedTotal = await calculateLumpSumBudget(pm, countryCoefficient, subcontracting, travel);
+  const requestedTotal = lumpSumTotal(pm, countryCoefficient, subcontracting, travel);
 
   let updatedPart: ApplicationPartRow | null = null;
   try {
@@ -537,7 +557,7 @@ export async function addBudgetLineByToken(
     return { success: false };
   }
 
-  const requestedTotal = await calculateLumpSumBudget(pm, countryCoefficient, subcontracting, travel);
+  const requestedTotal = lumpSumTotal(pm, countryCoefficient, subcontracting, travel);
 
   const { withSystemScope } = await import('@/lib/system-scope');
 
