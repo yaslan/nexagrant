@@ -5,6 +5,7 @@ import { SAVED_SEARCH_ALERT_QUERY } from '../../src/lib/inngest/jobs/alerts-dail
 import { parseSavedSearchFilters } from '../../src/lib/saved-search-filters';
 import { SAVED_SEARCH_E2E, seed, rollback } from '../../scripts/seed-saved-search-e2e';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTSHUZUMVLTBF — the "Aramayı Kaydet" button, clicked, and the row it wrote.
@@ -85,7 +86,12 @@ test.describe('Saved search — the button writes a row the alert job can read',
       (r) => new URL(r.url()).searchParams.get('q') === QUERY,
       { timeout: 30_000 },
     );
-    await page.locator('input[type="text"]').first().fill(QUERY);
+    // The box is a controlled input: text typed into the server-rendered markup is reset
+    // to '' when React hydrates it, and no debounced request ever leaves (CI run
+    // 36508751097 — the failure screenshot shows the box empty and focused).
+    const searchBox = page.locator('input[type="text"]').first();
+    await expectHydrated(searchBox);
+    await searchBox.fill(QUERY);
     await debouncedQuery;
 
     await expect(button).toBeEnabled();

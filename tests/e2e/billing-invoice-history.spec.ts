@@ -50,7 +50,7 @@ async function signIn(page: Page) {
   await page.locator('input[type="email"]').fill('admin@yasinaslan.com.tr');
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${BILLING_URL}`, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
+  // Every caller asserts on a locator next; that auto-wait is the synchronisation.
 }
 
 /** The card holding the invoice history — what the evidence screenshots frame. */

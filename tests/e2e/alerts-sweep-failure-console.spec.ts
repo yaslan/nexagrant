@@ -6,6 +6,7 @@ import {
   type AlertsSweepDb,
 } from '../../src/lib/inngest/jobs/alerts-sweep';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTVRC1UGA3B6Y — a failing sweep must reach the operator's screen.
@@ -111,7 +112,6 @@ test.describe('a repeatedly failing alerts sweep reaches the alerts console', ()
     await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${target}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
 
     // Scoped to the table body: the source name also exists as an <option> in
     // the filter, and matching that would prove the filter was built, not that
@@ -133,10 +133,9 @@ test.describe('a repeatedly failing alerts sweep reaches the alerts console', ()
 
     // `meta` is behind the row, so opening it is part of the operator workflow
     // this alert is supposed to support.
-    await page
-      .getByText('Orphan-alert sweep did not complete', { exact: false })
-      .first()
-      .click();
+    const failedRow = page.getByText('Orphan-alert sweep did not complete', { exact: false }).first();
+    await expectHydrated(failedRow);
+    await failedRow.click();
     await expect(page.getByText('"stage"', { exact: false }).first()).toBeVisible();
     await expect(page.getByText('PrismaClientValidationError', { exact: false }).first()).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/02-alert-detail.png`, fullPage: true });

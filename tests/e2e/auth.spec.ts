@@ -43,7 +43,7 @@ test.describe('Authentication and Tenant Provisioning', () => {
     // so a bare getByTestId can hit strict mode; the locators below take the
     // visible copy. What has to be true before the tick and the click is that
     // React has attached their handlers (fixtures/hydration.ts says why that is
-    // no longer `networkidle`).
+    // no longer a network-idle wait).
     const google = page.getByRole('button', { name: /Google ile Devam Et/ });
     await expectHydrated(google, inflight);
 

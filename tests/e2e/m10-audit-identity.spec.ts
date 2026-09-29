@@ -246,7 +246,7 @@ test.describe('M10 dual approval identity', () => {
   test('an identity-less visitor never reaches the approval surface', async ({ page }) => {
     await page.context().clearCookies();
     await page.goto(DOCS_URL);
-    // The redirect itself is the thing being waited for. `networkidle` stood here and is a
+    // The redirect itself is the thing being waited for. A network-idle wait stood here and is a
     // race on a loaded dev server, which never goes quiet for the 500 ms it wants.
     await page.waitForURL(/\/(giris|login)\b/, { timeout: 30_000 });
 

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTQV1JYGMGU6V — the components that carried inline `eslint-disable` exceptions,
@@ -52,12 +53,11 @@ test.describe('render-purity refactor — the three formerly suppressed componen
     const errors = watchConsole(page);
     await consent(page);
     await page.goto('/tr');
-    await page.waitForLoadState('networkidle');
 
     // `useIsHydrated` replaced `useState(false)` + `useEffect(setMounted)`. If it returned the
     // wrong snapshot the toggle would never appear at all, so its visibility is the assertion.
     const toggle = page.getByRole('button', { name: /moda geç/i }).first();
-    await expect(toggle).toBeVisible();
+    await expectHydrated(toggle);
     await page.screenshot({ path: `${SHOTS}/01-public-page-light.png`, fullPage: false, caret: 'initial' });
 
     const before = await page.evaluate(() => document.documentElement.className);

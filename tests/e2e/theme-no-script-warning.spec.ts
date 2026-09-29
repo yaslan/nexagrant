@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * The console must be clean of React's "Encountered a script tag" warning.
@@ -19,9 +20,11 @@ for (const locale of ['tr', 'en']) {
     page.on('console', (msg) => logs.push(`[${msg.type()}] ${msg.text()}`));
     page.on('pageerror', (error) => logs.push(`[pageerror] ${error.message}`));
 
-    await page.goto(`http://localhost:3000/${locale}`, { waitUntil: 'networkidle' });
-    // The warning is emitted during hydration, which starts once the chunks have
-    // run — after `networkidle`, not before it. Give React the room to finish.
+    await page.goto(`http://localhost:3000/${locale}`);
+    // The warning is emitted during hydration, so wait for hydration itself: <body>
+    // carrying React's props key (fixtures/hydration.ts). Then give React the room
+    // to finish the rest of the tree.
+    await expectHydrated(page.locator('body'));
     await page.waitForTimeout(1500);
 
     const offenders = logs.filter((line) => line.includes('Encountered a script tag'));

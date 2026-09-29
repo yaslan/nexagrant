@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { evidenceTenant } from './fixtures/evidence-tenant';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTRH86RCGVEGC — the evidence module invented accreditation.
@@ -41,11 +42,13 @@ const PLAIN_FILE = {
 
 test('an upload with no readable metadata does not gain invented metadata', async ({ page }) => {
   await tenant.signIn(page);
-  await page.waitForLoadState('networkidle');
+  // The upload button opens the form through React state; it is the first thing clicked.
+  const upload = page.getByRole('button', { name: /Belge Yükle|Upload/ }).first();
+  await expectHydrated(upload);
   await page.screenshot({ path: `${SHOTS}/01-evidence-page.png`, fullPage: true });
 
   // ── Real upload through the real form.
-  await page.getByRole('button', { name: /Belge Yükle|Upload/ }).first().click();
+  await upload.click();
   await page.locator('input[type="file"]').setInputFiles(PLAIN_FILE);
   await page.screenshot({ path: `${SHOTS}/02-upload-form.png`, fullPage: true });
   await page.getByRole('button', { name: /Cloudflare R2/ }).click();

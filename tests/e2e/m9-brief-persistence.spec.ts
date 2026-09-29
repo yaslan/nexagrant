@@ -90,7 +90,7 @@ test.describe('M9 briefs — persistence and the unknown opportunity', () => {
 
     // Reload: the list is rendered on the server from `MeetingBrief`, so a brief
     // that only ever lived in React state disappears here.
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload();
     await expect(page.getByRole('main').getByText(PARTNER).first()).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/persist-03-after-reload.png`, fullPage: true });
   });
@@ -100,7 +100,8 @@ test.describe('M9 briefs — persistence and the unknown opportunity', () => {
   }) => {
     await signInAsM9User(page, M9_BRIEFS_URL);
 
-    const response = await page.goto(MISSING_URL, { waitUntil: 'networkidle' });
+    // The not-found heading is asserted first below, so the absences after it are real.
+    const response = await page.goto(MISSING_URL);
 
     // What the user sees: the not-found screen. No generator, no brief list, no
     // partner invented for an opportunity that does not exist.

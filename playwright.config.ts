@@ -29,10 +29,22 @@ const E2E_AUTH_SECRET = process.env.E2E_AUTH_SECRET || 'test-e2e-auth-secret-fix
 // Workers inherit the runner's environment, so the specs read the same value.
 process.env.AUTH_SECRET = E2E_AUTH_SECRET;
 
+/**
+ * Which server the specs run against (TASK-MULXYMNTUELIK): `dev` (default, locally and
+ * on every CI push) or `start`, a `next start` of an existing `next build` output
+ * (CI builds it first; `workflow_dispatch` input `e2e_server` in ci.yml).
+ *
+ * `start` cannot carry DEMO_LOGIN_ENABLED: a production build refuses to boot with it
+ * (src/lib/demo-login.ts assertDemoLoginAllowed, called from src/instrumentation.ts),
+ * so under `start` the specs that sign in through the demo seats fail by design.
+ * That lock is deliberate and is not bypassed here.
+ */
+const E2E_WEB_SERVER = process.env.E2E_WEB_SERVER === 'start' ? 'start' : 'dev';
+
 const testEnv = {
   AUTH_SECRET: E2E_AUTH_SECRET,
   // The specs sign in through the demo seats; off by default (TASK-MULSCEK4JHK8X).
-  DEMO_LOGIN_ENABLED: 'true',
+  ...(E2E_WEB_SERVER === 'dev' ? { DEMO_LOGIN_ENABLED: 'true' } : {}),
   INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.',
   INVOICE_SUPPLIER_VKN: '1000000000',
   INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD',
@@ -46,7 +58,8 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,
-  reporter: [['list']],
+  // The HTML report is what CI uploads on failure (ci.yml); locally `list` is enough.
+  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   globalSetup: require.resolve('./tests/e2e/global-setup.ts'),
   use: {
     baseURL: BASE_URL,
@@ -55,7 +68,7 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: `pnpm dev --port ${PORT}`,
+    command: E2E_WEB_SERVER === 'start' ? `pnpm start --port ${PORT}` : `pnpm dev --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: false,
     timeout: 180_000,

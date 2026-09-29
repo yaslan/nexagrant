@@ -30,6 +30,23 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // TASK-MUM033NPP7UFI — E2E runs against `next dev`, whose HMR websocket keeps
+    // the page from ever going network-idle, so a `networkidle` wait is a race that
+    // ends in a 60 s timeout on whichever spec loses it. Wait for what the test
+    // needs instead: tests/e2e/fixtures/hydration.ts, a locator, or a response.
+    files: ["tests/e2e/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value='networkidle']",
+          message:
+            "Do not wait for 'networkidle' in E2E: next dev never goes idle (HMR websocket). Use expectHydrated() from tests/e2e/fixtures/hydration.ts, expect(locator), or page.waitForResponse() — docs/E2E_TESTING.md §3.4.",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

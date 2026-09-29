@@ -5,6 +5,15 @@ on:
     branches: [ "main", "dev" ]
   pull_request:
     branches: [ "main", "dev" ]
+  # Manual runs, to measure the e2e suite against another server without a commit
+  # (TASK-MULXYMNTUELIK). Pushes and PRs always use `dev`.
+  workflow_dispatch:
+    inputs:
+      e2e_server:
+        description: 'Server the e2e suite runs against (see playwright.config.ts)'
+        type: choice
+        options: [ dev, start ]
+        default: dev
 
 jobs:
   build-and-test:
@@ -110,12 +119,34 @@ jobs:
     - name: Install Playwright browsers
       run: pnpm exec playwright install --with-deps
 
+    # Only for a manual `e2e_server: start` run: `next start` serves this build.
+    # Its own step so the build time shows up on its own in the run summary.
+    - name: Build for E2E (next build)
+      if: ${{ inputs.e2e_server == 'start' }}
+      run: pnpm build
+
     - name: E2E Test
       run: pnpm test:e2e
       env:
         CI: 'true'
+        E2E_WEB_SERVER: ${{ inputs.e2e_server || 'dev' }}
         INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.'
         INVOICE_SUPPLIER_VKN: '1000000000'
         INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD'
         INVOICE_SUPPLIER_ADDRESS: 'TEST CAD NO:1'
         INVOICE_SUPPLIER_CITY: 'Ankara'
+
+    # trace: 'retain-on-failure' (playwright.config.ts) writes a trace.zip per failed
+    # test into test-results/, and the HTML report into playwright-report/; without this
+    # step they died with the runner and a CI timeout could not be looked into
+    # (TASK-MULXYMNTUELIK). `gh run download <run-id> -n e2e-results-<run-id>-<attempt>`.
+    - name: Upload E2E traces and report
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-results-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |
+          test-results/
+          playwright-report/
+        if-no-files-found: ignore
+        retention-days: 14

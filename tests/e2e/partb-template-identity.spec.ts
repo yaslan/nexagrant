@@ -147,7 +147,7 @@ async function signInAndOpenPartB(page: Page, locale: string) {
   await page.locator('input[type="email"]').fill(M11_E2E.email);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${url}`, { timeout: 60_000 });
-  await page.waitForLoadState('networkidle');
+  // The caller asserts on a locator next; that auto-wait is the synchronisation.
   return page.getByRole('main');
 }
 

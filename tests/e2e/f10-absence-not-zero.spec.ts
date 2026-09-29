@@ -35,7 +35,7 @@ async function acceptCookies(page: Page) {
 }
 
 /**
- * `waitForLoadState('networkidle')` used to close this helper and timed the suite out
+ * A network-idle wait used to close this helper and timed the suite out
  * whenever the machine was busy: "no requests for 500 ms" never comes true on a dev server
  * under load, so it is a race rather than a signal. Every caller asserts on a locator
  * straight afterwards, and Playwright's auto-waiting is the synchronisation.

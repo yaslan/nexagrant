@@ -76,7 +76,6 @@ test.describe('alert console reports real totals past the row cap', () => {
     await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${target}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
 
     // The header "total" tile is the first <dl><div> — see AlertsConsoleClient.
     const totalTileText = await page.locator('dl div').first().locator('dd').innerText();

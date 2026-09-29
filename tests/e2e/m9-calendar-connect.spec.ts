@@ -37,7 +37,7 @@ async function signIn(page: Page, email: string, target: string) {
   await page.locator('input[type="email"]').fill(email);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
-  // No `waitForLoadState('networkidle')` — see docs/E2E_TESTING.md §3.4: on a dev server
+  // No network-idle wait — see docs/E2E_TESTING.md §3.4: on a dev server
   // "no requests for 500 ms" is a race, not a signal. The assertions below do the waiting.
 }
 
