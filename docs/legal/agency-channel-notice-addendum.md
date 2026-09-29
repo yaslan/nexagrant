@@ -1,12 +1,12 @@
 # Ajans Kanalı Aydınlatma Eki — TASLAK (TR + EN)
 
-> Sürüm **0.2-taslak** · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MULRRHM9N7XPM (FB-KAMU-2, B12) · Kodla hizalama: TASK-MULWC74HGLY9T
+> Sürüm **0.3-taslak** · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MULRRHM9N7XPM (FB-KAMU-2, B12) · Kodla hizalama: TASK-MULWC74HGLY9T, TASK-MULXXDG4O483Y (il, tek pencere, tek kırılım, yuvarlama)
 >
 > **Durum: TASLAK. Hukuk onayı YOK. Yayında DEĞİL.** Bu belge bir hukuki metin değildir; hukuk ekibinin önüne konacak bir çalışma taslağıdır. Hukuk incelemesi gereken her yer **[HUKUK]** diye işaretlidir. İşaretsiz bir cümle de hukuken onaylı sayılmaz.
 >
 > Dayanak: `docs/kamu/OKA-KANAL-ONERISI.md` §2, §4, §6 (B1, B2, B3, B6, B12) · `docs/legal/processing-register.md` §1, §2, §13, §18b, §18c · `docs/legal/privacy-notice-gap-analysis.md` §4, §6 · `src/lib/legal/consent-documents.ts`.
 >
-> Kod dayanağı: `prisma/schema.prisma` (`Tenant.agencyId`, `AgencyInviteCode`) · `src/lib/auth.ts` (kodla kayıt) · `src/lib/agency/codes.ts` · `src/lib/agency/funnel.ts` · `prisma/migrations/add-agency-invite-code.sql`, `add-agency-funnel.sql`, `fix-agency-invite-rejection-audit.sql`.
+> Kod dayanağı: `prisma/schema.prisma` (`Tenant.agencyId`, `Tenant.province`, `AgencyInviteCode`) · `src/lib/auth.ts` (kodla kayıt, il) · `src/lib/province.ts` · `src/app/[locale]/(app)/[workspace]/settings/profile/actions.ts` (il düzenleme) · `src/lib/agency/codes.ts`, `code-limits.ts` · `src/lib/agency/funnel.ts`, `funnel.attack.test.ts` · `prisma/migrations/add-agency-invite-code.sql`, `add-agency-funnel.sql`, `fix-agency-invite-rejection-audit.sql`, `add-tenant-province.sql`, `add-agency-funnel-province.sql`.
 >
 > İşleme envanteri satırı: `docs/legal/processing-register.md` §18c.
 
@@ -20,7 +20,7 @@
 **Ne değildir:**
 
 - Ana aydınlatma metninin yerine geçmez. Ana metnin hukuki içeriği hâlâ hukuk girdisi bekliyor (TASK-MTSWIFJKGTYC, `privacy-notice-gap-analysis.md` §6). Bu ek, ana metnin veri sorumlusu kimliği gibi boşluklarını **kapatmaz**; aynı boşlukları kendi içinde de taşır.
-- Planı anlatmaz, **bugünkü kodu** anlatır (29.09.2026, `dev`). B1 (davet kodu, kodla kayıt) ve B2 (ajans panosu) kodda. B3 (aylık bölge raporu) ve B6 (karne ile hesap bağı) henüz kodda **yok**. Bunlara bağlı maddeler "**B3 ile gelecek**" ya da "**B6 ile gelecek**" diye ayrı işaretlidir. Bu maddeler bugün işlenen ya da ajansa giden veri **değildir** ve kullanıcı metnine (§4, §5) girmez. Kod bu metinden farklı davranırsa **metin yanlış olur**. Kodla eşleşme tablosu: `docs/agent-results/TASK-MULWC74HGLY9T-cs-fb.md` §2.
+- Planı anlatmaz, **bugünkü kodu** anlatır (29.09.2026, `dev`). B1 (davet kodu, kodla kayıt) ve B2 (ajans panosu) kodda. B3 (aylık bölge raporu) ve B6 (karne ile hesap bağı) henüz kodda **yok**. Bunlara bağlı maddeler "**B3 ile gelecek**" ya da "**B6 ile gelecek**" diye ayrı işaretlidir. Bu maddeler bugün işlenen ya da ajansa giden veri **değildir** ve kullanıcı metnine (§4, §5) girmez. Kod bu metinden farklı davranırsa **metin yanlış olur**. Kodla eşleşme tablosu (güncel): `docs/agent-results/TASK-MULXXDG4O483Y-cs-fb.md` §2; ilk sürüm: `TASK-MULWC74HGLY9T-cs-fb.md` §2.
 
 ## 1. Taraflar ve roller (taslak)
 
@@ -32,7 +32,12 @@
 
 ## 2. Ajansa GİDEN veri — tam liste
 
-Kaynak: kod (`src/lib/agency/funnel.ts`, `src/app/[locale]/(app)/ajans/page.tsx`). Tamamı **toplu sayıdır**; kişi düzeyinde veri ve kurum kimliği yoktur. Sayılar ajans panosunda (B2), ajansın seçtiği dönem için (son 30 ya da 90 gün) gösterilir. Dönem, kurumun kayıt tarihine göre seçilir.
+Kaynak: kod (`src/lib/agency/funnel.ts`, `src/app/[locale]/(app)/ajans/page.tsx`). Tamamı **toplu sayıdır**; kişi düzeyinde veri ve kurum kimliği yoktur. Sayılar yalnız ajans panosunda (B2) görünür ve şu kurallarla gider:
+
+- **Tek, birikimli pencere.** Sayılar, ajansın kodlarıyla bugüne kadar kayıt olmuş bütün kurumları kapsar. Dönem seçici (30 / 90 gün) **yoktur**: iki pencerenin farkı, 31-90. günlerde kayıt olan kurumları tek tek gösterebiliyordu.
+- **Her adım kurum sayısıdır.** Başvuru adımları da "en az bir başvurusu olan kurum" sayısıdır (her kurum bir kez sayılır); başvuru sayısı gönderilmez.
+- **Bir yanıtta tek kırılım.** Toplamın yanında ya **tek bir il** (bütün kurum türleri birlikte) ya da **kurum türleri** (bütün iller birlikte) gösterilir. İl × kurum türü çapraz tablosu **yoktur**.
+- **Küçük sayı kuralı ve yuvarlama** (§3.1): 5'ten küçük ya da başka sayılardan geri hesaplanabilen sayı "<5" olur; gösterilen her sayı 5'in katına yuvarlanır. Bu yüzden parçaların toplamı toplamı tutmayabilir.
 
 ### 2.1 Bugün giden (kodda var)
 
@@ -42,11 +47,14 @@ Kaynak: kod (`src/lib/agency/funnel.ts`, `src/app/[locale]/(app)/ajans/page.tsx`
 | En az 1 kayıtlı araması olan kurum sayısı                                                                                                | Kurum sayısı                  | Ajans panosu                                                        |
 | En az 1 çağrıyı takibe (pipeline) alan kurum sayısı                                                                                      | Kurum sayısı                  | Ajans panosu                                                        |
 | En az 1 konsept not üreten kurum sayısı                                                                                                  | Kurum sayısı                  | Ajans panosu                                                        |
-| Bu kurumların gönderdiği başvuru sayısı                                                                                                  | **Başvuru** sayısı            | Ajans panosu                                                        |
-| Bu başvurulardan kurumun kabul ya da red olarak işaretlediği başvuru sayısı                                                              | **Başvuru** sayısı            | Ajans panosu                                                        |
-| Kırılım: **yalnız kurum türü** (belediye, kamu, KOBİ, …)                                                                                 | Yukarıdaki sayıların dağılımı | Ajans panosu                                                        |
+| En az 1 başvurusunu gönderildi olarak işaretleyen kurum sayısı                                                                           | Kurum sayısı                  | Ajans panosu                                                        |
+| En az 1 başvurusu kabul edildi olarak işaretlenen kurum sayısı                                                                           | Kurum sayısı                  | Ajans panosu                                                        |
+| En az 1 başvurusu reddedildi olarak işaretlenen kurum sayısı                                                                             | Kurum sayısı                  | Ajans panosu                                                        |
+| Kırılım (bir seferde **biri**): **kurum türü** (belediye, kamu, KOBİ, …) **ya da** seçilen **tek bir il**                                | Yukarıdaki sayıların dağılımı | Ajans panosu                                                        |
 | Ajansın kendi davet kodları: etiket, son 4 karakter, üst sınır, son tarih, durum (etkin / iptal / süresi doldu). **Kullanım sayısı yok** | Kodun kendisine ait bilgi     | Pano (kod yönetimi)                                                 |
 | Davet kodunuzla yapılan reddedilmiş denemelerin sayısı ve nedeni (kişi bilgisi yok)                                                      | Deneme kaydı, kişi yok        | Ajansın kendi kayıt alanı (denetim kaydı). Bugün panoda gösterilmez |
+
+İl kırılımında yalnız ilini bildiren kurumlar ilde sayılır. İlini bildirmeyen kurumlar toplamda vardır ama ayrı bir grup olarak **hiç** gösterilmez.
 
 Son satır hakkında: bilinen ama kullanılamayan bir kod (süresi dolmuş, hakkı bitmiş, iptal edilmiş) denendiğinde, ajansın kendi kiracısına bir denetim kaydı yazılır: neden, kodun kayıt kimliği ve zaman. Deneyen kişi, kod ve kodun özeti yazılmaz. Hiç var olmayan bir kod ajansa yazılmaz; yalnız platform yöneticisinin gördüğü bir sayaç artar.
 
@@ -54,15 +62,27 @@ Son satır hakkında: bilinen ama kullanılamayan bir kod (süresi dolmuş, hakk
 
 ### 2.2 Bugün GİTMEYEN, ileride gelebilecek (B3 / B6 ile gelecek)
 
-Aşağıdakiler bugün kodda **yoktur**. Kullanıcı metnine (§4, §5) yazılmaz. Kod gelince bu ek ve envanter §18c **önce** güncellenir, sonra özellik canlıya çıkar.
+Aşağıdakiler bugün kodda **yoktur**. Kullanıcı metnine (§4, §5) yazılmaz. Kod gelince bu ek ve envanter §18c **önce** güncellenir, sonra özellik canlıya çıkar. (İl kırılımı bu listeden çıktı: TASK-MULV3JXS1AW5X ile kodda, §2.1 ve §2.3.)
 
-| Veri                                     | Bugünkü durum                                                                   | Bağlı kart               |
-| ---------------------------------------- | ------------------------------------------------------------------------------- | ------------------------ |
-| Karnesini tamamlayan kurum sayısı        | Panoda "Henüz ölçülmüyor"                                                       | B6 ile gelecek           |
-| Ortalama karne puanı                     | Hiç yok                                                                         | B6 ile gelecek           |
-| **İl** kırılımı                          | İl toplanmıyor; panoda "İl bilgisi henüz toplanmıyor" yazar. `Tenant`'ta il yok | TASK-MULV3JXS1AW5X, B3   |
-| **Program** kırılımı (Erasmus+, …)       | Hiç yok                                                                         | B3 ile gelecek           |
-| Aylık bölge raporu (dosya ya da e-posta) | Hiç yok; ajans sayıları yalnız panoda görür                                     | B3 ile gelecek (HUKUK-6) |
+| Veri                                     | Bugünkü durum                               | Bağlı kart               |
+| ---------------------------------------- | ------------------------------------------- | ------------------------ |
+| Karnesini tamamlayan kurum sayısı        | Panoda "Henüz ölçülmüyor"                   | B6 ile gelecek           |
+| Ortalama karne puanı                     | Hiç yok                                     | B6 ile gelecek           |
+| **Program** kırılımı (Erasmus+, …)       | Hiç yok                                     | B3 ile gelecek           |
+| Aylık bölge raporu (dosya ya da e-posta) | Hiç yok; ajans sayıları yalnız panoda görür | B3 ile gelecek (HUKUK-6) |
+
+### 2.3 Kurumun ili — nasıl toplanır (TASK-MULV3JXS1AW5X)
+
+İl kırılımı için kurumun ili `Tenant.province` alanında tutulur. Kurallar (kaynak: kod):
+
+- **İsteğe bağlıdır.** Kayıt formunda "Kurumun ili (isteğe bağlı)" sorusu vardır; "Seçilmedi" bırakılabilir. Geçersiz bir değer kaydı durdurmaz, yok sayılır.
+- **Yalnız Türkiye'deki kurum için tutulur.** Bugün kayıtta açılan her kurum hesabı `country = "TR"` ile açılır; bu yüzden soru her kayıtta sorulur.
+- **Yalnız kodlu kayıtta değil, her kayıtta sorulur.** Davet kodu olmadan kayıt olan kurum da ilini verebilir. Ajansa giden sayılarda yalnız o ajansın kodlarıyla kayıt olmuş kurumlar sayılır.
+- **Karneden önceden doldurulur.** Fon hazırlık karnesinden gelen kayıt bağlantısı `?il=<il>` taşır; ad 81 il listesindeyse seçim o ille başlar. Kullanıcı değiştirebilir ya da boşaltabilir.
+- **Google / Microsoft ile kayıtta** seçilen il, yönlendirme sırasında 15 dakikalık, yalnız sunucunun okuyabildiği (httpOnly) bir çerezde taşınır. Her kayıt başlangıcında çerez yeniden yazılır ya da silinir.
+- **Sonradan değiştirilebilir.** Kurum ayarlarında (Profil) kurum sahibi ya da yöneticisi ili değiştirebilir ya da silebilir. Her değişiklik kurumun kendi denetim kaydına yazılır (`tenant.province.updated`: değiştiren kullanıcı, eski ve yeni il).
+- **Değer yalnız 81 il adından biridir** (veritabanında CHECK kısıtı).
+- **Kurum düzeyinde bir veridir, kişi verisi değildir** (leed-fb kararı, 29.09.2026; `add-tenant-province.sql` yorumu). **[HUKUK-11]** Kurum şahıs şirketi olan bir KOBİ ise il, o kişinin iş yerinin ilidir. Bu durumda ilin kişisel veri sayılıp sayılmadığı ve ana aydınlatma metninde (kodsuz kayıt dahil) yazılması gerekip gerekmediği hukukçuya sorulmalı. Ajansa il yalnız §3.1 kuralıyla, toplu sayı olarak gider.
 
 **[HUKUK-3]** Sayıların **üretilmesi** (anonimleştirmeden önceki hesaplama) FonBridge'in veritabanında yapılan bir işlemedir. Bu işlemenin hukuki sebebi için taslak önerisi: KVKK md.5/2-f (meşru menfaat) — gerekçe: kurumun ajans kanalıyla gelmesi ve kanalın ölçülmesi. Alternatif: md.5/2-c (kurumla kurulan sözleşmenin, yani kanal hizmetinin, ifası). Seçim ve gerekirse dengeleme testi hukukçunun.
 
@@ -73,6 +93,10 @@ Ajans panosu **şunları göstermez**:
 - Kayıt olan kişinin **adı, e-postası**, rolü, giriş zamanları.
 - Kurumun **adı** ve kurumu tek başına tanıtan bilgi. Kod kurum adını ya da kimliğini ajansa göndermez: huni yalnız sayı döndürür, kurum kimlikleri sunucuda kalır. **[HUKUK-4]** yalnız "kurum adı ileride gösterilmek istenirse" sorusu olarak açıktır (S4, `OKA-KANAL-ONERISI.md` §8). O durumda bu ek **yeniden yazılır**: kurum adı, şahıs şirketi olan bir KOBİ için kişisel veridir.
 - Hangi kurumun hangi davet kodunu kullandığı. Kurum hesabına yalnız ajansın kimliği bağlanır; kod bağlanmaz.
+- Bir kodun **kaç kez kullanıldığı** ve kullanım sınırına ulaşıp ulaşmadığı (kod panelinde yalnız durum var).
+- **Hangi kurumun hangi ilde** olduğu. İl yalnız toplu sayının kırılımıdır; il × kurum türü çapraz tablosu yoktur. İlini bildirmeyen kurumlar ayrı bir grup olarak gösterilmez.
+- Başvuru **sayısı** (bir kurumun kaç başvuru yaptığı); yalnız başvuru yapan kurum sayısı gider.
+- Kesin sayılar: gösterilen her sayı 5'in katına yuvarlanmıştır.
 - Karne cevapları (tek tek sorular) ve **tek bir kurumun** karne puanı.
 - Konsept notlar, yüklenen belgeler, kanıtlar, yorumlar, YZ istemleri ve çıktıları.
 - Kayıtlı aramaların kriterleri ve **hangi kurumun** hangi çağrıyı seçtiği.
@@ -85,15 +109,19 @@ Toplu sayı her zaman anonim değildir. Örnek: pano "belediye · konsept not ü
 
 Kural (kodda: `src/lib/agency/funnel.ts`, eşik `SMALL_CELL_THRESHOLD = 5`):
 
-- Bir hücrede sayı **5'ten küçükse** (0 dahil) değer gönderilmez, **"<5"** yazılır.
-- "<5" hücresi, toplamdan geri hesaplanamaz: gizlenen hücrelerin toplamı 1-4 ise en küçük görünen hücre de gizlenir.
-- Kayıtlı kurum sayısı 5'ten az olan bir kurum türünde hiçbir adımın sayısı gösterilmez.
-- Gizleme sunucuda yapılır; tarayıcıya 5'ten küçük bir sayı hiç gitmez.
-- B6 ile gelecek: ortalama karne puanı eklenirse yalnız en az 5 kurumun olduğu hücrede gösterilmelidir.
+1. **Eşik.** Bir sayı **5'ten küçükse** (0 dahil) değer gönderilmez, **"<5"** yazılır. 0 da gizlenir; böylece "<5", "hiç yok" ile "birkaç tane"yi ayırt ettirmez.
+2. **Tamamlayıcı gizleme.** Pano, bütün kırılımları (toplam, her il, her kurum türü) **birlikte** maskeler; çünkü her kırılım bir istek uzaklıktadır. Üç yönde çıkarma engellenir: toplam − görünen iller, toplam − görünen türler, bir adım − onun içindeki adım (ör. "başvuru gönderen" − "kabul alan"). Bir satırda gizli kalan kısım ya hiç yoktur ya da **en az iki, sıfırdan büyük** gizli parçadan oluşur ve toplamı en az 5'tir. Sıfır örtü sayılmaz. Değilse en küçük görünen parça da gizlenir.
+3. **Grup kuralı.** Kayıtlı kurum sayısı gizlenen bir grupta (bir tür ya da bir il) hiçbir adımın sayısı gösterilmez.
+4. **İlsiz kurumlar.** İlini bildirmeyen kurumların grubu her zaman gizlidir; tek başına hiç gösterilmez.
+5. **Tek kırılım.** Bir yanıt ya tek bir ili ya da kurum türlerini taşır; il × tür hücresi hiç üretilmez.
+6. **Yuvarlama.** Gizlenmeyen her sayı en yakın 5'in katına, **tek tek** yuvarlanır. Parçaların toplamı toplamı tutmayabilir. Eşik korunur: yalnız 5 ve üstü gösterilir, gösterilen "5" 5-7 arasıdır.
+7. **Sunucuda.** Gizleme ve yuvarlama sunucuda yapılır; tarayıcıya 5'ten küçük ya da kesin bir sayı hiç gitmez.
+8. **Saldırgan testi kapıdır.** `src/lib/agency/funnel.attack.test.ts`, bütün görünümleri ve kod panelini birleştiren bir tamsayı saldırganı modeller. Test, üretilen tablolarda gizli bir 1-4 grubunun geri okunamadığını doğrular. CI'da `pnpm test` ile koşar (`.github/workflows/ci.yml`); kırmızıysa CI kırmızıdır.
+9. B6 ile gelecek: ortalama karne puanı eklenirse yalnız en az 5 kurumun olduğu hücrede gösterilmelidir.
 
-**[HUKUK-5]** Eşik (5) bir öneridir, dış kaynaktan gelen bir değer değildir. B2 ve B3 için tek eşik kullanılır; ikisinden daha katı olan (5) seçildi (leed-fb kararı, 29.09.2026). KVKK'nın anonimleştirme rehberindeki ölçütlerle hukukçu teyit etmelidir. Kural uygulanmazsa §2'deki "anonim" iddiası ve [HUKUK-2]'deki "ajans alıcı değildir" varsayımı **düşer**.
+**[HUKUK-5]** Eşik (5) bir öneridir, dış kaynaktan gelen bir değer değildir. B2 ve B3 için tek eşik kullanılır; ikisinden daha katı olan (5) seçildi (leed-fb kararı, 29.09.2026). Yuvarlama, tek kırılım ve tek pencere de leed-fb kararıdır (29.09.2026); dış bir standarttan gelmez. Hukukçuya sorulacak: **eşik 5 + tamamlayıcı gizleme + 5'e yuvarlama + tek kırılım + tek birikimli pencere**, açık kalan zaman kanalıyla (aşağıda, K-1) birlikte KVKK'nın anonimleştirme rehberindeki ölçütlere göre **yeterli mi**? Kural uygulanmazsa §2'deki "anonim" iddiası ve [HUKUK-2]'deki "ajans alıcı değildir" varsayımı **düşer**.
 
-**[HUKUK-5 notu — davet kodları, TASK-MUM17YBJVAHRR]** Kodla kayıt olan her kurum bir kodun bir kullanımıdır. Bu yüzden kod başına kullanım sayısı, panodaki yuvarlanmış toplamla birleşince "<5" gösterilen bir kodun 1-4 kullanımını açıyordu; tek kodlu ajansta kayıt toplamının kesin değeriydi (crw-fb, TASK-MUM0M211WDIW5). Kod panosu artık yalnız **durum** gösterir. Yeni bir kodun üst sınırı en az **6**'dır: "etkin" görünen bir kodun kullanımı üst sınırın en fazla bir eksiğidir, bu da 5'ten küçük bir aralık vermemelidir. Ajans bir kodun üst sınırını zaten bildiği için, bu kuraldan önce üretilmiş, üst sınırı 5'ten küçük kodlar yine de 1-4 aralığı verebilir; pilottan önce iptal edilmeleri önerilir.
+**[HUKUK-5 notu — davet kodları, TASK-MUM17YBJVAHRR]** Kodla kayıt olan her kurum bir kodun bir kullanımıdır. Bu yüzden kod başına kullanım sayısı, panodaki yuvarlanmış toplamla birleşince "<5" gösterilen bir kodun 1-4 kullanımını açıyordu; tek kodlu ajansta kayıt toplamının kesin değeriydi (crw-fb, TASK-MUM0M211WDIW5). Kod panosu artık yalnız **durum** gösterir. Yeni bir kodun üst sınırı en az **6**'dır (`MIN_MAX_USES = 6`; leed-fb kararı "en az 5", kod bir pay bırakır): ajans her kodun üst sınırını bilir, 5'ten küçük bir üst sınır kullanımı 0-4 aralığına sıkıştırırdı. Ajans bir kodun üst sınırını zaten bildiği için, bu kuraldan önce üretilmiş, üst sınırı 5'ten küçük kodlar yine de 1-4 aralığı verebilir; pilottan önce iptal edilmeleri önerilir.
 
 **[HUKUK-5 notu — "tükendi" durumu kaldırıldı, TASK-MUM2RMN3YIBGC, leed-fb kararı 29.09]** "Tükendi" durumu bir kodun kullanımını kesin veriyordu (kullanım = üst sınır). Hiç kurum silinmediyse (pilotun ilk aylarında olağan durum; kurumları ajans davet ettiği için bunu bilebilir) bu bilgi yuvarlanmış toplamlarla birleşince hâlâ "etkin" olan kodun kullanımını 1-4 aralığına düşürüyordu (crw-fb, TASK-MUM1OTRM75QS2 B-1; örnek: dört kod tükendi, toplam "25", türler "15" ve "15" → beşinci kod 2-3). Aynı durum silinen kurum sayısını da daraltıyordu (R-2). Kod panosu artık yalnız **etkin / iptal edildi / süresi doldu** gösterir; üst sınırına ulaşan kod "etkin" görünür. Kayıt tarafında böyle bir kod yine reddedilir ve kayıt olmaya çalışan kişi diğer kullanılamayan kodlarla aynı mesajı görür. Bedel: ajans tükenen kodu ancak kayıt olamayan bir kurumun kendisine söylemesiyle öğrenir; bu bant dışı bir kanaldır ve tam sayı vermez. Saldırgan testi (`src/lib/agency/funnel.attack.test.ts`) artık hem "silinen kurum sayısı bilinmiyor" hem "hiç kurum silinmedi" varsayımıyla koşar; ikisinde de 1-4 aralığı açılmaz.
 
@@ -119,7 +147,9 @@ Bu ek, bir kalkınma ajansının verdiği davet koduyla FonBridge'e kayıt olan 
 - Kurumunuzun ajansa bağlandığı tarih (bağ yalnız kayıt sırasında kurulur; bu tarih hesabınızın açıldığı tarihtir),
 - Kodla kayıt yapıldığını gösteren bir kayıt: kurumunuzun kendi kayıt geçmişine, hesabı hangi kullanıcının açtığı ve hangi ajansa bağlandığı yazılır.
 
-Kullandığınız davet kodu hesabınıza bağlanmaz ve saklanmaz; kod yalnız kayıt sırasında kontrol edilir. Ajans raporunda kırılım olarak, kurum hesabınızda zaten kayıtlı olan **kurum türü** kullanılır; bunun için yeni bir veri toplanmaz. Hesabınız için işlenen diğer veriler (ad, e-posta vb.) ana aydınlatma metninde yazılıdır.
+Kullandığınız davet kodu hesabınıza bağlanmaz ve saklanmaz; kod yalnız kayıt sırasında kontrol edilir.
+
+Ajansın sayılarında kırılım olarak iki kurum bilgisi kullanılır: kurum hesabınızda kayıtlı olan **kurum türü** ve, verdiyseniz, **kurumunuzun ili**. İl isteğe bağlıdır. Kayıt formunda sorulur; fon hazırlık karnesinden geldiyseniz karnede seçtiğiniz il önceden seçili gelir. Kurum sahibi ya da yöneticisi ili sonradan kurum ayarlarından değiştirebilir ya da silebilir; her değişiklik kurumunuzun kayıt geçmişine yazılır. İl ajansa yalnız toplu sayının parçası olarak gider; kurumunuzun ili ajansa gösterilmez. `<<HUKUK-11: şahıs şirketinde ilin niteliği>>` Hesabınız için işlenen diğer veriler (ad, e-posta vb.) ana aydınlatma metninde yazılıdır.
 
 **4. Amaç**
 Kurumunuzu, sizi davet eden ajansın kanalına bağlamak ve ajansa, davet ettiği kurumların FonBridge'i nasıl kullandığını **toplu sayılarla** göstermek.
@@ -128,7 +158,7 @@ Kurumunuzu, sizi davet eden ajansın kanalına bağlamak ve ajansa, davet ettiğ
 `<<HUKUK-3: md.5/2-f meşru menfaat mi, md.5/2-c sözleşmenin ifası mı; dengeleme testi gerekiyor mu>>`
 
 **6. Ajans neyi görür?**
-Ajans **yalnız toplu sayıları** görür: seçtiği dönemde (son 30 ya da 90 gün) kodla kaç kurumun kayıt olduğu; kaç kurumun kayıtlı arama oluşturduğu, bir çağrıyı takibe aldığı ve konsept not ürettiği; bu kurumların kaç başvuru gönderdiği ve bu başvurulardan kaçının sonucunun kurum tarafından kabul ya da red olarak işaretlendiği. Bu sayılar kurum türüne göre de gösterilir. Bir grupta 5'ten az değer varsa ya da sayı başka sayılardan geri hesaplanabiliyorsa sayı gösterilmez, "<5" yazılır. Ajans kendi davet kodlarının durumunu da görür (etkin, iptal edildi, süresi doldu); bir kodun kaç kez kullanıldığını ya da kullanım sınırına ulaşıp ulaşmadığını görmez. Kullanılamayan bir kodla (süresi dolmuş, hakkı bitmiş ya da iptal edilmiş) deneme yapılırsa ajansın kendi kayıt alanına denemenin nedeni ve zamanı yazılır; bu kayıtta deneyen kişinin bilgisi yoktur. Ajansa yeni bir sayı gösterilmeden önce bu ek güncellenir. `<<HUKUK-5: eşik teyidi>>`
+Ajans **yalnız toplu kurum sayılarını** görür. Sayılar birikimlidir: ajansın kodlarıyla bugüne kadar kayıt olmuş bütün kurumları kapsar. Ajans şunları görür: kodla kaç kurumun kayıt olduğu; kaç kurumun kayıtlı arama oluşturduğu, bir çağrıyı takibe aldığı ve konsept not ürettiği; kaç kurumun en az bir başvurusunu gönderildi olarak işaretlediği ve kaç kurumun en az bir başvurusunun kabul ya da red olarak işaretlendiği. Başvuru sayısını görmez. Bu sayılar bir seferde tek bir kırılımla da gösterilir: ya kurum türüne göre ya da seçilen tek bir ile göre; il ve kurum türü birlikte gösterilmez. Bir grupta 5'ten az kurum varsa ya da sayı başka sayılardan geri hesaplanabiliyorsa sayı gösterilmez, "<5" yazılır. Gösterilen her sayı 5'in katına yuvarlanır; bu yüzden parçaların toplamı toplamı tutmayabilir. Ajans kendi davet kodlarının durumunu da görür (etkin, iptal edildi, süresi doldu); bir kodun kaç kez kullanıldığını ya da kullanım sınırına ulaşıp ulaşmadığını görmez. Kullanılamayan bir kodla (süresi dolmuş, hakkı bitmiş ya da iptal edilmiş) deneme yapılırsa ajansın kendi kayıt alanına denemenin nedeni ve zamanı yazılır; bu kayıtta deneyen kişinin bilgisi yoktur. Ajansa yeni bir sayı gösterilmeden önce bu ek güncellenir. `<<HUKUK-5: eşik teyidi>>`
 
 **7. Ajans neyi görmez?**
 Kurumunuzun adı ajansa gösterilmez. Ajans ayrıca adınızı, e-postanızı, kurumunuzun hangi davet kodunu kullandığını, karne cevaplarınızı, tek başına kurumunuzun puanını, konsept notlarınızı, yüklediğiniz belgeleri, kayıtlı aramalarınızı ve fatura bilgilerinizi **görmez**. FonBridge bu verileri ajansa aktarmaz.
@@ -165,7 +195,9 @@ This addendum is for organisations that sign up to FonBridge with an invite code
 - The date your organisation was linked to the agency (the link is made only at sign-up, so this is the date your account was opened),
 - A record that you signed up with a code: your organisation's own activity log records which user opened the account and which agency it was linked to.
 
-We do not link the invite code you used to your account, and we do not keep it. We check the code only at sign-up. The agency's breakdowns use the **organisation type** that is already in your organisation's account; we do not collect new data for this. The other data we process for your account (name, email, etc.) is listed in the main notice.
+We do not link the invite code you used to your account, and we do not keep it. We check the code only at sign-up.
+
+The agency's numbers are broken down by two organisation details: the **organisation type** in your organisation's account and, if you gave it, **your organisation's province**. The province is optional. The sign-up form asks for it; if you came from the funding readiness scorecard, the province you chose there is selected in advance. An owner or admin of your organisation can change or remove the province later in the organisation settings; each change is written to your organisation's activity log. The province goes to the agency only as part of aggregate numbers; the agency is not shown your organisation's province. `<<LEGAL-11: status of the province for a sole trader>>` The other data we process for your account (name, email, etc.) is listed in the main notice.
 
 **4. Purpose**
 To link your organisation to the channel of the agency that invited you, and to show the agency, **as aggregate numbers only**, how the organisations it invited use FonBridge.
@@ -174,7 +206,7 @@ To link your organisation to the channel of the agency that invited you, and to 
 `<<LEGAL-3: legitimate interest (GDPR art.6(1)(f)) or performance of a contract (art.6(1)(b)); balancing test needed?>>`
 
 **6. What the agency sees**
-The agency sees **aggregate numbers only**, for the period it selects (the last 30 or 90 days): how many organisations signed up with the code; how many created a saved search, tracked a call and wrote a concept note; how many applications these organisations submitted, and how many of these applications the organisation marked as accepted or rejected. The numbers are also broken down by organisation type. If a group has fewer than 5, or if a number can be worked out from other numbers, the number is not shown; the dashboard shows "<5". The agency also sees the status of its own invite codes (active, used up, revoked, expired); it does not see how many times a code was used. If someone tries an unusable code (expired, used up or revoked), the reason and the time are written to the agency's own records. This record contains no information about the person who tried. We update this addendum before the agency is shown any new number. `<<LEGAL-5: threshold>>`
+The agency sees **aggregate numbers of organisations only**. The numbers are cumulative: they include all organisations that ever signed up with the agency's codes. The agency sees: how many organisations signed up with a code; how many created a saved search, tracked a call and wrote a concept note; how many marked at least one application as submitted, and how many had at least one application marked as accepted or rejected. It does not see the number of applications. The numbers can also be shown with one breakdown at a time: by organisation type, or for one selected province; never by province and type together. If a group has fewer than 5 organisations, or if a number can be worked out from other numbers, the number is not shown; the dashboard shows "<5". Each number shown is rounded to a multiple of 5, so the parts may not add up to the total. The agency also sees the status of its own invite codes (active, revoked, expired); it does not see how many times a code was used or whether a code reached its limit. If someone tries an unusable code (expired, used up or revoked), the reason and the time are written to the agency's own records. This record contains no information about the person who tried. We update this addendum before the agency is shown any new number. `<<LEGAL-5: threshold>>`
 
 **7. What the agency does not see**
 The agency is not shown your organisation's name. The agency also does **not** see your name, your email, which invite code your organisation used, your scorecard answers, your organisation's own score, your concept notes, the documents you upload, your saved searches or your billing data. FonBridge does not give this data to the agency.
@@ -195,7 +227,7 @@ Your rights are listed in the main notice. Today you cannot remove the agency li
 
 1. **[HUKUK]** §7'deki bütün sorular cevaplanmış; `<<…>>` alanlarının tamamı dolu (TR ve EN).
 2. Ana aydınlatma metninin veri sorumlusu bölümü (`privacy-notice-gap-analysis.md` §6 Bölüm 1) dolu. Ek, ana metinden daha eksiksiz bir kimlik veremez.
-3. **Kod doğrulaması:** B2 panosu §2.1 listesinden **fazlasını** göstermiyor ve §3.1 küçük sayı kuralı kodda var — kaynak kodda doğrulandı (TASK-MULWC74HGLY9T eşleşme tablosu). Gerçek pano ekranında ve B3 gelince gerçek bir rapor dosyasında yeniden doğrulanır (sentetik değil). §2.2'deki bir madde koda girerse bu ek ve envanter §18c önce güncellenir.
+3. **Kod doğrulaması:** B2 panosu §2.1 listesinden **fazlasını** göstermiyor ve §3.1 küçük sayı kuralı (eşik, tamamlayıcı gizleme, tek kırılım, yuvarlama) kodda var — kaynak kodda doğrulandı (TASK-MULXXDG4O483Y eşleşme tablosu; ilk sürüm TASK-MULWC74HGLY9T). Gerçek pano ekranında ve B3 gelince gerçek bir rapor dosyasında yeniden doğrulanır (sentetik değil). §2.2'deki bir madde koda girerse bu ek ve envanter §18c önce güncellenir.
 4. S4 cevabı (ajans kurum adını görecek mi) kesinleşmiş. Bugünkü metin "gösterilmez" diyor; cevap "evet" olursa §3 ve §4 madde 7 yeniden yazılır.
 5. Ek, `src/lib/legal/consent-documents.ts` içinde **kendi sürümü** olan ayrı bir belge olarak tanımlanmış (`TASK-MULRRHM9N7XPM-cs-fb.md` §4). Metin değişirse sürüm artar. Bugün tanımlı **değil** (dosyada `agency` geçmiyor).
 6. Kayıt ekranı eki gösteriyor. Bugün kodlu kayıtta yalnız kısa bir satır içi bant var (`src/app/[locale]/login/AuthCard.tsx`, `invite-code-banner`); ek bağlantısı ve ajans görür/görmez metni yok. Bu şart sağlanmadan kodlu kayıt gerçek kullanıcıya (pilot) açılmamalı.
@@ -204,15 +236,16 @@ Your rights are listed in the main notice. Today you cannot remove the agency li
 
 ## 7. Hukuk ekibine sorular
 
-| No       | Soru                                                                                                                                                                    | Neden önemli                                                                                          |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| HUKUK-1  | Veri sorumlusunun tam kimliği ve başvuru kanalı nedir?                                                                                                                  | Ana metinde de eksik; ek ana metinle aynı kimliği yazmalı                                             |
-| HUKUK-2  | Yalnız anonim toplu sayı alan ajans, KVKK anlamında "alıcı" mıdır? Ortak veri sorumlusu olabilir mi (kodu dağıtan, kanalı yöneten taraf olarak)?                        | Cevap "evet" ise ek bir **aktarım** bölümü ve md.8 dayanağı gerekir                                   |
-| HUKUK-3  | Ajans bağının kurulması ve sayıların üretilmesi için hukuki sebep hangisi (md.5/2-f / md.5/2-c)? Dengeleme testi gerekir mi?                                            | Kayıt ekranındaki kutunun "rıza" değil "aydınlatma teyidi" olarak kalması buna bağlı                  |
-| HUKUK-4  | Kurum adı bugün ajansa gösterilmiyor. İleride gösterilmek istenirse (S4), KOBİ şahıs şirketleri için ayrı bir aydınlatma ya da hukuki sebep gerekir mi?                 | Kurum adı, şahıs şirketinde gerçek kişiyi tanıtır                                                     |
-| HUKUK-5  | "<5" eşiği ve geri hesaplamayı engelleme kuralı, anonimleştirme için yeterli mi?                                                                                        | Anonimlik iddiası ve HUKUK-2 varsayımı buna dayanır                                                   |
-| HUKUK-6  | B3 ile rapor ajansa e-postayla gönderilirse bu ekte yazılmalı mı?                                                                                                       | E-posta sağlayıcısı yurt dışındadır (envanter §21, Resend); rapor anonimse etkisiz olabilir           |
-| HUKUK-7  | Bağ kaldırıldıktan sonra bağ kaydının saklama süresi ne olmalı?                                                                                                         | Envanter §18c'de boş bırakıldı                                                                        |
-| HUKUK-8  | Bağı kaldırma bir md.11 hakkı olarak mı, sözleşmesel bir seçenek olarak mı anlatılmalı? Kaldırma sırasında geçmiş sayılar için ne denmeli?                              | Yanlış çerçeve, olmayan bir hak vaat edebilir                                                         |
-| HUKUK-9  | EN metinde GDPR art.13 karşılığı olarak farklı yazılması gereken bir madde var mı?                                                                                      | Gap analizi §6 iki dil kuralı                                                                         |
-| HUKUK-10 | Ek ayrı bir belge olarak mı kalmalı, ana aydınlatma metninin bir bölümü mü olmalı? Mevcut kullanıcılar (kodla sonradan bağlanan) için ayrı bir teyit ekranı gerekir mi? | Kayıt ekranındaki kutu metnini ve `Consent` kaydını belirler. Bugün bağ yalnız yeni kayıtta kuruluyor |
+| No       | Soru                                                                                                                                                                              | Neden önemli                                                                                          |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| HUKUK-1  | Veri sorumlusunun tam kimliği ve başvuru kanalı nedir?                                                                                                                            | Ana metinde de eksik; ek ana metinle aynı kimliği yazmalı                                             |
+| HUKUK-2  | Yalnız anonim toplu sayı alan ajans, KVKK anlamında "alıcı" mıdır? Ortak veri sorumlusu olabilir mi (kodu dağıtan, kanalı yöneten taraf olarak)?                                  | Cevap "evet" ise ek bir **aktarım** bölümü ve md.8 dayanağı gerekir                                   |
+| HUKUK-3  | Ajans bağının kurulması ve sayıların üretilmesi için hukuki sebep hangisi (md.5/2-f / md.5/2-c)? Dengeleme testi gerekir mi?                                                      | Kayıt ekranındaki kutunun "rıza" değil "aydınlatma teyidi" olarak kalması buna bağlı                  |
+| HUKUK-4  | Kurum adı bugün ajansa gösterilmiyor. İleride gösterilmek istenirse (S4), KOBİ şahıs şirketleri için ayrı bir aydınlatma ya da hukuki sebep gerekir mi?                           | Kurum adı, şahıs şirketinde gerçek kişiyi tanıtır                                                     |
+| HUKUK-5  | Eşik 5 + tamamlayıcı gizleme + 5'e yuvarlama + tek kırılım (il YA DA tür) + tek birikimli pencere, açık kalan zaman kanalıyla (§3.1 K-1) birlikte anonimleştirme için yeterli mi? | Anonimlik iddiası ve HUKUK-2 varsayımı buna dayanır                                                   |
+| HUKUK-6  | B3 ile rapor ajansa e-postayla gönderilirse bu ekte yazılmalı mı?                                                                                                                 | E-posta sağlayıcısı yurt dışındadır (envanter §21, Resend); rapor anonimse etkisiz olabilir           |
+| HUKUK-7  | Bağ kaldırıldıktan sonra bağ kaydının saklama süresi ne olmalı?                                                                                                                   | Envanter §18c'de boş bırakıldı                                                                        |
+| HUKUK-8  | Bağı kaldırma bir md.11 hakkı olarak mı, sözleşmesel bir seçenek olarak mı anlatılmalı? Kaldırma sırasında geçmiş sayılar için ne denmeli?                                        | Yanlış çerçeve, olmayan bir hak vaat edebilir                                                         |
+| HUKUK-9  | EN metinde GDPR art.13 karşılığı olarak farklı yazılması gereken bir madde var mı?                                                                                                | Gap analizi §6 iki dil kuralı                                                                         |
+| HUKUK-10 | Ek ayrı bir belge olarak mı kalmalı, ana aydınlatma metninin bir bölümü mü olmalı? Mevcut kullanıcılar (kodla sonradan bağlanan) için ayrı bir teyit ekranı gerekir mi?           | Kayıt ekranındaki kutu metnini ve `Consent` kaydını belirler. Bugün bağ yalnız yeni kayıtta kuruluyor |
+| HUKUK-11 | Kurumun ili (`Tenant.province`) şahıs şirketi olan bir KOBİ'de kişisel veri sayılır mı? İl her kayıtta (kodsuz da) sorulduğuna göre ana aydınlatma metnine de yazılmalı mı?       | Leed-fb kararı "kurum verisi" diyor; şahıs şirketinde il kişinin iş yerini gösterir                   |
