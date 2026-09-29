@@ -123,6 +123,8 @@ export default function TopicStatsImportClient({
     setBusy(mode);
     setError(null);
     if (mode === 'preview') {
+      // Clear the last result first: a stale count must never sit under a new request.
+      setPreview(null);
       setApplied(null);
       setRescore(null);
     }
@@ -232,7 +234,7 @@ export default function TopicStatsImportClient({
       </section>
 
       {error && (
-        <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 space-y-2">
+        <div role="alert" data-testid="k3-error" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 space-y-2">
           <p className="font-semibold flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" aria-hidden />
             {errorText(error.code)}
@@ -424,7 +426,7 @@ export default function TopicStatsImportClient({
                 <tr key={s.source} className="border-b border-border/60">
                   <td className="py-1.5 pr-3 font-mono break-all">{s.source}</td>
                   <td className="py-1.5 pr-3 text-right">{s.rows}</td>
-                  <td className="py-1.5 pr-3">{s.lastImportedAt ? new Date(s.lastImportedAt).toLocaleString() : '—'}</td>
+                  <td className="py-1.5 pr-3">{s.lastImportedAt ? `${s.lastImportedAt.slice(0, 16).replace('T', ' ')} UTC` : '—'}</td>
                 </tr>
               ))}
             </tbody>
