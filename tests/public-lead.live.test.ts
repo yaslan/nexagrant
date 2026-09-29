@@ -134,7 +134,8 @@ function helpersFor(): JobHelpers {
 
 async function cleanRows(): Promise<void> {
   await admin.publicLead.deleteMany({ where: { email: { endsWith: `-${RUN}@example.test` } } });
-  await admin.auditEvent.deleteMany({ where: { type: PUBLIC_LEAD_PURGED, createdAt: { gte: STARTED } } });
+  // Literal type, not the imported constant: tests/teardown-where-guard.test.ts.
+  await admin.auditEvent.deleteMany({ where: { type: 'public_lead.purged', createdAt: { gte: STARTED } } });
 }
 
 beforeAll(async () => {

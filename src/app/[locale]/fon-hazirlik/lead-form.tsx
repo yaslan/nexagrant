@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { analytics } from '@/lib/analytics';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { PRIVACY_NOTICE } from '@/lib/legal/consent-documents';
 import {
   PUBLIC_LEAD_CONSENT,
@@ -308,7 +309,7 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
               className={`h-6 w-6 shrink-0 accent-[var(--accent-strong)] ${focusRing}`}
             />
             <label htmlFor="lead-consent" className="text-sm leading-relaxed text-ink">
-              {t('consent_label', { months })}
+              {t('consent_label', { months, brand: PRODUCT_NAME })}
               {requiredMark}
             </label>
           </div>

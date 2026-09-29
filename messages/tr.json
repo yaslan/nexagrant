@@ -2093,7 +2093,7 @@
       "province_label": "İl (isteğe bağlı)",
       "province_none": "Seçilmedi",
       "district_label": "İlçe (isteğe bağlı)",
-      "consent_label": "Adımın, e-posta adresimin, kurumumun, il ve ilçe bilgimin ve karne sonucumun, benimle AB fonlarına hazırlık konusunda iletişime geçilmesi amacıyla Fabrika tarafından işlenmesine ve {months} ay saklanmasına açık rıza veriyorum.",
+      "consent_label": "Adımın, e-posta adresimin, kurumumun, il ve ilçe bilgimin ve karne sonucumun, benimle AB fonlarına hazırlık konusunda iletişime geçilmesi amacıyla {brand} tarafından işlenmesine ve {months} ay saklanmasına açık rıza veriyorum.",
       "consent_notice": "Aydınlatma metni",
       "consent_notice_aria": "Aydınlatma metni (yeni sekmede açılır)",
       "consent_withdraw": "Rızanızı dilediğiniz zaman geri alabilirsiniz. Bu kutuyu işaretlemezseniz form gönderilmez; karne sonucunuz yine de sizde kalır.",

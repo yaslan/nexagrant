@@ -2093,7 +2093,7 @@
       "province_label": "Province (optional)",
       "province_none": "Not selected",
       "district_label": "District (optional)",
-      "consent_label": "I give my explicit consent for Fabrika to process my name, e-mail address, organisation, province and district and my scorecard result in order to contact me about getting ready for EU funding, and to keep them for {months} months.",
+      "consent_label": "I give my explicit consent for {brand} to process my name, e-mail address, organisation, province and district and my scorecard result in order to contact me about getting ready for EU funding, and to keep them for {months} months.",
       "consent_notice": "Privacy notice",
       "consent_notice_aria": "Privacy notice (opens in a new tab)",
       "consent_withdraw": "You can withdraw your consent at any time. If you do not tick this box the form is not sent; your scorecard result stays with you either way.",

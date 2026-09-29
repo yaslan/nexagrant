@@ -44,6 +44,8 @@ const KNOWN: Record<string, string> = {
   'src/lib/invitations/accept.ts gt: now': 'both callers pass `input.now ?? new Date()`; a Date, never undefined',
   'src/lib/invitations/retention.ts AND: [{ tenantId }, due]':
     '`tenantId` is a `groupBy` key of Invitation rows (non-null column); `due` comes from purgeableInvitationWhere, which throws on an invalid cutoff; cron input, no client',
+  'src/lib/leads/public-lead.ts where: due (not a const object literal)':
+    '`due` comes from purgeablePublicLeadWhere, which throws on an invalid cutoff and returns `{ createdAt: { lt: cutoff } }`; cron input, no client (TASK-MULR765AR5G0C)',
   'src/modules/m10/server/actions.ts followupDocId: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts id: existing.id': DB_ROW,
 };
