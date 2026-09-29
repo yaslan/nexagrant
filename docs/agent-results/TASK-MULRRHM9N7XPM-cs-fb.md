@@ -10,7 +10,7 @@ Kod yazılmadı. `messages/*.json` dosyalarına dokunulmadı.
 
 1. **Ajans kanalı aydınlatma eki taslağı:** `docs/legal/agency-channel-notice-addendum.md`
    - Taraflar ve roller (§1), ajansa **giden** verinin tam listesi (§2), ajansa **gitmeyen** verinin açık listesi (§3).
-   - **Küçük sayı kuralı** (§3.1): 3'ten az kurum olan kırılım hücresinde "<3" yazılır. Bu kural olmazsa "toplu sayı = anonim" iddiası tutmaz. Örnek: "Çorum · belediye · 1" o belediyeyi tanıtır, şahıs şirketi olan bir KOBİ'de ise bir gerçek kişiyi.
+   - **Küçük sayı kuralı** (§3.1): 5'ten az kurum olan kırılım hücresinde "<5" yazılır (eşik 5, `ec9406c4`). Bu kural olmazsa "toplu sayı = anonim" iddiası tutmaz. Örnek: "Çorum · belediye · 1" o belediyeyi tanıtır, şahıs şirketi olan bir KOBİ'de ise bir gerçek kişiyi.
    - Kullanıcıya gösterilecek tam ek metin, 11 madde: TR (§4) ve EN (§5).
    - Yayın şartları (§6) ve hukuk ekibine 10 soru (§7, HUKUK-1 … HUKUK-10).
 2. **İşleme envanteri satırı taslağı:** `docs/legal/processing-register-draft-agency-channel.md`
@@ -52,6 +52,8 @@ Kaynaklar: `src/app/[locale]/login/AuthCard.tsx` (kayıt kutusu, satır 60-90 ve
 
 ## 3. Kayıt ekranı metni — `messages` anahtar önerisi
 
+> **Düzeltme notu — eşik 5 (`ec9406c4`), TASK-MULWC74HGLY9T, 29.09.2026:** Bu raporun ilk sürümü küçük sayı eşiğini 3 yazıyordu. Eşik leed-fb kararıyla **5** oldu (`ec9406c4`); ajans panosu da 5 uyguluyor (`src/lib/agency/funnel.ts:29`, `messages/tr.json:2081-2083`). Aşağıdaki kayıt ekranı metni (TR ve EN `sees`) ve §1, §5, §8 buna göre güncellendi. Aynı düzeltmede `sees` metninden "kaç karne tamamlandı" çıkarıldı: panoda bu adım "Henüz ölçülmüyor" (B6 yok), sayı gösterilmiyor. `unlinkHint` bugün **eklenmemeli**: ürün içi kaldırma özelliği yok (aşağıdaki koşullu anahtarlar, ek §4 madde 10). Ek ve envanter satırı bugünkü kodla hizalandı; §1 madde 2'deki taslak dosya silindi, satır artık `docs/legal/processing-register.md` §18c'de: `docs/agent-results/TASK-MULWC74HGLY9T-cs-fb.md`.
+
 > **Bu anahtarlar `messages/*.json`'a yazılmadı.** Uygulayan kart iki dile birden ekler (CLAUDE.md kural 8). `{agency}`, sunucunun doğruladığı koddan gelen ajans görünen adıdır (bkz. §4 madde 3).
 >
 > **Türkçe ek kuralı:** `{agency}` yer tutucusuna ek getirilmedi ("{agency}'nın" yok). Ajans adı "OKA" da olabilir, "Orta Karadeniz Kalkınma Ajansı" da. Sabit bir ek, bu adlardan birinde ünlü uyumunu bozar. Cümleler, eki yer tutucudan sonraki kelimeye bırakacak biçimde kuruldu ("{agency} kanalına").
@@ -65,7 +67,7 @@ Kaynaklar: `src/app/[locale]/login/AuthCard.tsx` (kayıt kutusu, satır 60-90 ve
       "title": "{agency} davet koduyla kayıt oluyorsunuz",
       "body": "Kurumunuz bu kodla {agency} kanalına bağlanır. Ajans yalnız toplu sayıları görür, sizi ve kurumunuzun çalışmalarını görmez.",
       "seesTitle": "Ajans ne görür?",
-      "sees": "Bölgedeki kurumların toplu sayıları: kaç kurum kayıt oldu, kaç karne tamamlandı, kaç çağrı seçildi, kaç başvuru yapıldı. 3'ten az kurum olan kırılımlar gösterilmez.",
+      "sees": "Bölgedeki kurumların toplu sayıları: kaç kurum kayıt oldu, kaç kurum çağrı seçti, kaç başvuru yapıldı. 5'ten az olan sayılar gösterilmez.",
       "notSeesTitle": "Ajans neyi görmez?",
       "notSees": "Adınızı, e-postanızı, kurumunuzun adını, karne cevaplarınızı, konsept notlarınızı, belgelerinizi ve fatura bilgilerinizi.",
       "more": "Ayrıntılar: <addendum>Ajans Kanalı Aydınlatma Eki</addendum>",
@@ -94,7 +96,7 @@ Kaynaklar: `src/app/[locale]/login/AuthCard.tsx` (kayıt kutusu, satır 60-90 ve
       "title": "You are signing up with an invite code from {agency}",
       "body": "With this code, your organisation is linked to the {agency} channel. The agency sees aggregate numbers only. It does not see you or your organisation's work.",
       "seesTitle": "What does the agency see?",
-      "sees": "Aggregate numbers for organisations in its region: how many signed up, how many completed the scorecard, how many picked a call, how many applied. Breakdowns with fewer than 3 organisations are not shown.",
+      "sees": "Aggregate numbers for organisations in its region: how many signed up, how many picked a call, how many applications were made. Numbers under 5 are not shown.",
       "notSeesTitle": "What does the agency not see?",
       "notSees": "Your name, your email, your organisation's name, your scorecard answers, your concept notes, your documents and your billing data.",
       "more": "Details: <addendum>Agency Channel Privacy Notice Addendum</addendum>",
@@ -152,7 +154,7 @@ Yüzey: `src/app/[locale]/login/AuthCard.tsx` kayıt modu (`/[locale]/register`,
 
 ## 5. Riskler
 
-- **Metin, henüz olmayan kodu anlatıyor.** B2 panosu ya da B3 raporu §2 listesinden fazlasını gösterirse, ya da küçük sayı kuralı uygulanmazsa ek **yanlış beyan** olur. Bu, envanter §19'daki PostHog "fazla beyan" hatasının tersidir. Önlem: ekin §6 "yayın şartları" maddesi 3 ve yukarıdaki kabul ölçütleri. **B2 ve B3 kartlarına "<3" kuralının kabul ölçütü olarak eklenmesini öneririm** (LEED-FB).
+- **Metin, henüz olmayan kodu anlatıyor.** B2 panosu ya da B3 raporu §2 listesinden fazlasını gösterirse, ya da küçük sayı kuralı uygulanmazsa ek **yanlış beyan** olur. Bu, envanter §19'daki PostHog "fazla beyan" hatasının tersidir. Önlem: ekin §6 "yayın şartları" maddesi 3 ve yukarıdaki kabul ölçütleri. **B2 ve B3 kartlarına "<5" kuralının kabul ölçütü olarak eklenmesini öneririm** (LEED-FB). Eşik 5 (`ec9406c4`); B2 kodda uyguluyor (`src/lib/agency/funnel.ts:29`).
 - **S4 açık.** OKA kurum adını isterse "ajans kişisel veri alıcısı değildir" varsayımı (HUKUK-2) düşer ve ek, aktarım bölümüyle yeniden yazılır.
 - **Ana aydınlatma metni hâlâ eksik.** Veri sorumlusu kimliği ana metinde de yok (gap analizi §4). Ek bu boşluğu kapatmaz. OKA pilotunun başlangıç şartı B12 olduğu için, pilot tarihini **ana metnin** hukuk girdisi de belirler.
 - **Paylaşımlı ağaç:** Çalışma ağacında başka ajanların commitlenmemiş değişiklikleri var (`src/lib/auth.ts`, `src/lib/agency/`, `tests/e2e/*`). Commit yalnız bu kartın 3 dosyasıyla yapıldı.
@@ -177,7 +179,7 @@ Yüzey: `src/app/[locale]/login/AuthCard.tsx` kayıt modu (`/[locale]/register`,
 
 ## 8. Sonraki adım
 
-1. LEED-FB: taslakları hukuka iletir. B2/B3 kartlarına "<3" kuralını ve "§2 listesinden fazlası yok" ölçütünü ekler. A3 ve A4'ü cevaplar.
+1. LEED-FB: taslakları hukuka iletir. B2/B3 kartlarına "<5" kuralını ve "§2 listesinden fazlası yok" ölçütünü ekler. A3 ve A4'ü cevaplar.
 2. Hukuk cevabından sonra: ek metni kesinleşir, §4/§5 gövdesi `legal.agencyChannel` altına girer, `AGENCY_CHANNEL_NOTICE` sürümü verilir.
 3. B1 birleşince §18c satırı gerçek model ve dosya adlarıyla `processing-register.md`'ye taşınır, taslak dosya silinir.
 4. Aynı kuyrukta sıradaki iş: TASK-MULRS7WKYEFOP (B9, veri yerleşimi). Bu delegasyonda başlanmadı.
