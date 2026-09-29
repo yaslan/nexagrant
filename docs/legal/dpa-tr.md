@@ -14,14 +14,14 @@ Veri Sorumlusu, platforma yüklediği kişisel verilerin işlenme amaç ve vası
 
 ## 3. İşlenen Veri Kategorileri
 
-| Kategori | Örnek alanlar | Hukuki dayanak |
-|---|---|---|
-| Kimlik ve iletişim | ad, e-posta, dil tercihi | Sözleşmenin ifası (KVKK md.5/2-c) |
-| Kurumsal profil | kurum adı, ülke, PIC, yetenek metni | Sözleşmenin ifası |
-| Kullanım kayıtları | oturum zamanları, modül erişimleri, denetim olayları | Meşru menfaat (KVKK md.5/2-f) |
-| Proje ve teklif verisi | fırsat, teklif, konsorsiyum koltuğu, kişi-gün | Sözleşmenin ifası |
-| Faturalama | plan, abonelik durumu, ödeme sağlayıcı kimlikleri | Hukuki yükümlülük (KVKK md.5/2-ç) |
-| Yapay zeka kullanım günlüğü | model, jeton sayısı, kredi, istem özeti (hash) | Meşru menfaat, şeffaflık |
+| Kategori                    | Örnek alanlar                                        | Hukuki dayanak                    |
+| --------------------------- | ---------------------------------------------------- | --------------------------------- |
+| Kimlik ve iletişim          | ad, e-posta, dil tercihi                             | Sözleşmenin ifası (KVKK md.5/2-c) |
+| Kurumsal profil             | kurum adı, ülke, PIC, yetenek metni                  | Sözleşmenin ifası                 |
+| Kullanım kayıtları          | oturum zamanları, modül erişimleri, denetim olayları | Meşru menfaat (KVKK md.5/2-f)     |
+| Proje ve teklif verisi      | fırsat, teklif, konsorsiyum koltuğu, kişi-gün        | Sözleşmenin ifası                 |
+| Faturalama                  | plan, abonelik durumu, ödeme sağlayıcı kimlikleri    | Hukuki yükümlülük (KVKK md.5/2-ç) |
+| Yapay zeka kullanım günlüğü | model, jeton sayısı, kredi, istem özeti (hash)       | Meşru menfaat, şeffaflık          |
 
 Kimlik doğrulama sırları (OAuth ve oturum jetonları) veri sahibi dışa aktarımlarına dahil edilmez.
 

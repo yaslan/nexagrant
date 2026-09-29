@@ -14,14 +14,14 @@ Processing continues for the term of the Controller's active subscription. On te
 
 ## 3. Categories of Data Processed
 
-| Category | Example fields | Legal basis |
-|---|---|---|
-| Identity and contact | name, email, language preference | Performance of a contract (GDPR art. 6(1)(b)) |
-| Organisation profile | organisation name, country, PIC, capability text | Performance of a contract |
-| Usage records | session times, module access, audit events | Legitimate interest (art. 6(1)(f)) |
-| Project and proposal data | opportunities, proposals, consortium seats, person-days | Performance of a contract |
-| Billing | plan, subscription status, payment provider identifiers | Legal obligation (art. 6(1)(c)) |
-| AI usage log | model, token counts, credits, prompt hash | Legitimate interest, transparency |
+| Category                  | Example fields                                          | Legal basis                                   |
+| ------------------------- | ------------------------------------------------------- | --------------------------------------------- |
+| Identity and contact      | name, email, language preference                        | Performance of a contract (GDPR art. 6(1)(b)) |
+| Organisation profile      | organisation name, country, PIC, capability text        | Performance of a contract                     |
+| Usage records             | session times, module access, audit events              | Legitimate interest (art. 6(1)(f))            |
+| Project and proposal data | opportunities, proposals, consortium seats, person-days | Performance of a contract                     |
+| Billing                   | plan, subscription status, payment provider identifiers | Legal obligation (art. 6(1)(c))               |
+| AI usage log              | model, token counts, credits, prompt hash               | Legitimate interest, transparency             |
 
 Authentication secrets (OAuth and session tokens) are excluded from data subject exports.
 
