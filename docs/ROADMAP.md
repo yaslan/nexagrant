@@ -42,12 +42,12 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 >
 > **Patron kararları — 29.09.2026 gece, ikinci tur (TASK-MUMNAUBUDL5E7).** (7) **Outlook takvimi kaldırıldı:**
 > M9 takvim entegrasyonu yalnız Google Takvim + `.ics`. Kod dev'de: `15313bc6` (Outlook sağlayıcısı ve
-> `src/lib/calendar/outlook.ts` silindi), `4dc067ef` (bilgi metni); kart TASK-MUMMIHYY2F4KB henüz kapanmadı
-> (fe-fb, inceleme bekliyor). (8) **Kurumsal SSO / SAML tamamen kaldırıldı.** Gerekçe: ayar yalnız
+> `src/lib/calendar/outlook.ts` silindi), `4dc067ef` (bilgi metni); kart TASK-MUMMIHYY2F4KB
+> `done` (fe-fb). (8) **Kurumsal SSO / SAML tamamen kaldırıldı.** Gerekçe: ayar yalnız
 > `Tenant.settings.sso`'ya yazılıyordu, girişte hiç okunmuyordu (`resolveSsoProviderForDomain` yalnız
 > `src/lib/sso.ts` ve testlerinde geçiyor); giriş yalnız Google. Eski "kiracı SSO self-servis" kapsamı iptal.
 > `0fdbcb8d` ile ayar formu, action, `src/lib/sso.ts` ve testleri silindi (`src` altında `sso`/`saml` 0 geçiş);
-> kart TASK-MUML0QZAZ5M80 inceleme bekliyor (be-fb). Ek durum: (5)'teki Microsoft girişi kodda kaldırıldı (`acc35b07`; TASK-MUMLFLB2OPLY3 review).
+> kart TASK-MUML0QZAZ5M80 `done` (be-fb). Ek durum: (5)'teki Microsoft girişi kodda kaldırıldı (`acc35b07`; TASK-MUMLFLB2OPLY3 `done`).
 > Hukuk paketi 1.3: `docs/legal/HUKUK-SORULARI-2026-09.md`.
 >
 > **Güncel 29.09 — Resend (3) kodda kaldırıldı (TASK-MUMO301VCLCWR, İNCELEME-21 K-4).** `fe9fd31c`: e-posta

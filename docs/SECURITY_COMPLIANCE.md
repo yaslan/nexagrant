@@ -92,7 +92,7 @@ rolündedir; ana bağlantının `fabrika_app`'e çevrilmesi ayrı bir iştir ve
 
 ## 2. Kimlik ve erişim
 - Auth.js; parola argon2; 2FA (TOTP) faz 2; ~~SSO (SAML/OIDC) Kurumsal~~.
-  - **karar 29.09.2026 (patron):** giriş yalnız Google OAuth; şifre ve e-posta bağlantısı yok (ADR-0006). Microsoft girişi kaldırıldı (`acc35b07`). **Kurumsal SSO / SAML tamamen kaldırıldı** — ayar yalnız `Tenant.settings.sso`'ya kaydediliyordu, girişte hiç kullanılmıyordu; kodda kaldırıldı (`0fdbcb8d`); kart TASK-MUML0QZAZ5M80 inceleme bekliyor (be-fb). M9 takvimde Outlook kaldırıldı, yalnız Google Takvim + `.ics` (`15313bc6`). Yukarıdaki "parola argon2" satırı bu karardan eskidir.
+  - **karar 29.09.2026 (patron):** giriş yalnız Google OAuth; şifre ve e-posta bağlantısı yok (ADR-0006). Microsoft girişi kaldırıldı (`acc35b07`). **Kurumsal SSO / SAML tamamen kaldırıldı** — ayar yalnız `Tenant.settings.sso`'ya kaydediliyordu, girişte hiç kullanılmıyordu; kodda kaldırıldı (`0fdbcb8d`; kart TASK-MUML0QZAZ5M80 `done`). M9 takvimde Outlook kaldırıldı, yalnız Google Takvim + `.ics` (`15313bc6`). Yukarıdaki "parola argon2" satırı bu karardan eskidir.
 - Oturum JWT: `userId, tenantId, role, workspaceIds`; kiracı değiştirme yeni oturum.
 - `guest_partner`: yalnızca davet bağlantısı + e-posta doğrulama; kapsam tek `Proposal`.
 
