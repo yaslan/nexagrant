@@ -2193,5 +2193,102 @@
       "invalid": "Choose a province from the list.",
       "failed": "The province could not be saved. Please try again."
     }
+  },
+  "adminTopicStats": {
+    "title": "Base rates (K3)",
+    "subtitle": "Upload the xlsx exported from the Horizon Dashboard. The file is parsed on the server; you review a preview first, then confirm. Success rates feed the G0 gate's \"base rate ≥ 8%\" rule.",
+    "uploadHeading": "Upload file",
+    "fileLabel": "Horizon Dashboard file (.xlsx)",
+    "fileHint": "Up to 10 MB. The header row must carry a topic code and a success rate (or proposal + funded counts).",
+    "dataDateLabel": "Data date",
+    "previewButton": "Preview",
+    "applyButton": "Confirm and write",
+    "working": "Working…",
+    "previewHeading": "Preview — nothing has been written yet",
+    "appliedHeading": "Import complete",
+    "sheetInfo": "Sheet \"{sheet}\", header row {row}",
+    "sourceLabel": "Source record",
+    "rateScale": {
+      "fraction": "Rate column read as fractions (0.08 = 8%)",
+      "percent": "Rate column read as percentages (8 = 8%)",
+      "na": "No rate column; rate computed from proposal/funded counts"
+    },
+    "counts": {
+      "insert": "To insert",
+      "update": "To update",
+      "unchanged": "Unchanged",
+      "unmatched": "Unmatched",
+      "rejected": "Invalid rows",
+      "blank": "Blank rows"
+    },
+    "writtenNote": "{inserted} rows inserted, {updated} rows updated.",
+    "mappingHeading": "Column mapping",
+    "fields": {
+      "topicCode": "Topic code",
+      "country": "Country",
+      "orgType": "Organisation type",
+      "proposals": "Proposals",
+      "funded": "Funded",
+      "successRate": "Success rate"
+    },
+    "unmatchedHeading": "{count} rows have a topic code the system does not know",
+    "unmatchedHint": "These rows are not written. Upload the file again after the K1 call scan has added the topic.",
+    "rejectedHeading": "{count} rows could not be read",
+    "rowRef": "Row {row}",
+    "reject": {
+      "emptyCode": "topic code is empty",
+      "aggregateRow": "total row (no topic), not imported",
+      "badCode": "topic code has unexpected characters",
+      "badCountry": "country not recognised",
+      "badCount": "proposal/funded count is not a whole number",
+      "fundedExceeds": "funded is greater than proposals",
+      "badRate": "success rate is not a number",
+      "rateMismatch": "stated rate does not match funded/proposals",
+      "noRate": "no success rate and no proposal/funded counts",
+      "outOfRange": "success rate is outside 0–100",
+      "duplicate": "same topic, country and organisation type as an earlier row"
+    },
+    "plannedCaption": "Showing the first {shown} rows",
+    "cols": {
+      "row": "Row",
+      "action": "Action",
+      "topic": "Topic",
+      "country": "Country",
+      "orgType": "Organisation type",
+      "proposals": "Proposals",
+      "funded": "Funded",
+      "successRate": "Success rate",
+      "source": "Source",
+      "rows": "Rows",
+      "lastImported": "Last import"
+    },
+    "actions": {
+      "insert": "Insert",
+      "update": "Update",
+      "unchanged": "Unchanged"
+    },
+    "familyMatch": "topic family",
+    "allValues": "All",
+    "rescoreHint": "New rates reach the G0 score of the related opportunities only when they are rescored. This updates the opportunities of every tenant in these topic families.",
+    "rescoreButton": "Rescore G0 for related opportunities",
+    "rescoreResult": "{opportunities} opportunities processed: {scored} scored, {unscorable} lacked evidence, {failed} failed.",
+    "rescoreTruncated": "Limit reached; press the button again for the rest, or run pnpm jobs:g0-rescore.",
+    "headersSeen": "Headers found in the file",
+    "currentHeading": "Stored base rates ({total} rows)",
+    "empty": "No TopicStat rows yet.",
+    "loadError": "Could not read the records.",
+    "errors": {
+      "no_file": "Choose a file first.",
+      "too_large": "The file is too large (10 MB max).",
+      "bad_date": "Enter a valid data date (today or earlier).",
+      "bad_mode": "Invalid request.",
+      "bad_form": "The file could not be sent.",
+      "not_xlsx": "This file is not a readable .xlsx workbook.",
+      "layout_changed": "File layout not recognised. The Horizon Dashboard export columns may have changed.",
+      "hash_mismatch": "The file changed after the preview. Preview it again.",
+      "import_failed": "Import failed. No rows were written.",
+      "rescore_failed": "G0 could not be rescored.",
+      "bad_prefixes": "The topic list to rescore is invalid."
+    }
   }
 }

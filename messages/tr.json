@@ -2193,5 +2193,102 @@
       "invalid": "Listeden bir il seçin.",
       "failed": "İl kaydedilemedi. Lütfen tekrar deneyin."
     }
+  },
+  "adminTopicStats": {
+    "title": "Taban oranlar (K3)",
+    "subtitle": "Horizon Dashboard'dan indirilen xlsx dosyasını yükleyin. Dosya sunucuda ayrıştırılır; önce önizlemeyi görür, sonra onaylarsınız. Başarı oranları G0 kapısındaki \"taban oran ≥ %8\" kuralını besler.",
+    "uploadHeading": "Dosya yükle",
+    "fileLabel": "Horizon Dashboard dosyası (.xlsx)",
+    "fileHint": "En fazla 10 MB. Başlık satırında konu kodu ve başarı oranı (ya da teklif + fonlanan sayıları) olmalı.",
+    "dataDateLabel": "Verinin tarihi",
+    "previewButton": "Önizle",
+    "applyButton": "Onayla ve yaz",
+    "working": "Çalışıyor…",
+    "previewHeading": "Önizleme — henüz hiçbir şey yazılmadı",
+    "appliedHeading": "Yükleme tamamlandı",
+    "sheetInfo": "Sayfa \"{sheet}\", başlık satırı {row}",
+    "sourceLabel": "Kaynak kaydı",
+    "rateScale": {
+      "fraction": "Oran sütunu kesir olarak okundu (0,08 = %8)",
+      "percent": "Oran sütunu yüzde olarak okundu (8 = %8)",
+      "na": "Oran sütunu yok; oran teklif/fonlanan sayılarından hesaplandı"
+    },
+    "counts": {
+      "insert": "Eklenecek",
+      "update": "Güncellenecek",
+      "unchanged": "Değişmeyen",
+      "unmatched": "Eşleşmedi",
+      "rejected": "Hatalı satır",
+      "blank": "Boş satır"
+    },
+    "writtenNote": "{inserted} satır eklendi, {updated} satır güncellendi.",
+    "mappingHeading": "Sütun eşleme",
+    "fields": {
+      "topicCode": "Konu kodu",
+      "country": "Ülke",
+      "orgType": "Kuruluş türü",
+      "proposals": "Teklif sayısı",
+      "funded": "Fonlanan",
+      "successRate": "Başarı oranı"
+    },
+    "unmatchedHeading": "{count} satırın konu kodu sistemde yok",
+    "unmatchedHint": "Bu satırlar yazılmaz. Konu, K1 çağrı taraması onu ekledikten sonra dosyayı yeniden yükleyerek alınabilir.",
+    "rejectedHeading": "{count} satır okunamadı",
+    "rowRef": "Satır {row}",
+    "reject": {
+      "emptyCode": "konu kodu boş",
+      "aggregateRow": "toplam satırı (konusu yok), alınmadı",
+      "badCode": "konu kodunda beklenmeyen karakter var",
+      "badCountry": "ülke tanınmadı",
+      "badCount": "teklif/fonlanan sayısı tam sayı değil",
+      "fundedExceeds": "fonlanan sayısı teklif sayısından büyük",
+      "badRate": "başarı oranı sayı değil",
+      "rateMismatch": "yazılan oran, fonlanan/teklif oranıyla tutmuyor",
+      "noRate": "ne başarı oranı ne de teklif/fonlanan sayıları var",
+      "outOfRange": "başarı oranı 0–100 aralığının dışında",
+      "duplicate": "aynı konu, ülke ve kuruluş türü daha önceki bir satırda var"
+    },
+    "plannedCaption": "İlk {shown} satır gösteriliyor",
+    "cols": {
+      "row": "Satır",
+      "action": "İşlem",
+      "topic": "Konu",
+      "country": "Ülke",
+      "orgType": "Kuruluş türü",
+      "proposals": "Teklif",
+      "funded": "Fonlanan",
+      "successRate": "Başarı oranı",
+      "source": "Kaynak",
+      "rows": "Satır",
+      "lastImported": "Son yükleme"
+    },
+    "actions": {
+      "insert": "Ekle",
+      "update": "Güncelle",
+      "unchanged": "Değişmedi"
+    },
+    "familyMatch": "konu ailesi",
+    "allValues": "Tümü",
+    "rescoreHint": "Yeni oranlar, ilgili fırsatların G0 puanına ancak yeniden hesaplamayla yansır. Bu işlem bu konu ailelerindeki tüm kiracıların fırsatlarını günceller.",
+    "rescoreButton": "İlgili fırsatların G0'ını yeniden hesapla",
+    "rescoreResult": "{opportunities} fırsat işlendi: {scored} puanlandı, {unscorable} kanıt yetersiz, {failed} hata.",
+    "rescoreTruncated": "Sınır aşıldı; kalanlar için düğmeye yeniden basın ya da pnpm jobs:g0-rescore çalıştırın.",
+    "headersSeen": "Dosyada bulunan başlıklar",
+    "currentHeading": "Kayıtlı taban oranlar ({total} satır)",
+    "empty": "Henüz TopicStat kaydı yok.",
+    "loadError": "Kayıtlar okunamadı.",
+    "errors": {
+      "no_file": "Önce bir dosya seçin.",
+      "too_large": "Dosya çok büyük (en fazla 10 MB).",
+      "bad_date": "Geçerli bir veri tarihi girin (bugün ya da öncesi).",
+      "bad_mode": "Geçersiz istek.",
+      "bad_form": "Dosya gönderilemedi.",
+      "not_xlsx": "Bu dosya okunabilir bir .xlsx çalışma kitabı değil.",
+      "layout_changed": "Dosya düzeni tanınmadı. Horizon Dashboard dışa aktarımının sütunları değişmiş olabilir.",
+      "hash_mismatch": "Dosya önizlemeden sonra değişti. Yeniden önizleyin.",
+      "import_failed": "Yükleme başarısız oldu. Hiçbir satır yazılmadı.",
+      "rescore_failed": "G0 yeniden hesaplanamadı.",
+      "bad_prefixes": "Yeniden hesaplanacak konu listesi geçersiz."
+    }
   }
 }
