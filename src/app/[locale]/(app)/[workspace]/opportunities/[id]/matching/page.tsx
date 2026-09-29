@@ -147,12 +147,14 @@ export default async function MatchingPage({
       )}
 
       <div className="grid gap-6">
+        {/* `min-w-0`: a grid item is as wide as its table by default, which
+            pushed the page past a 390px screen (the table scrolls instead). */}
         {opp.seats.map((seat) => {
           const seatCandidates = candidatesBySeat.get(seat.id) ?? [];
           const assigned = seat.organizationId ? orgById.get(seat.organizationId) : null;
           return (
-            <div key={seat.id} data-testid={`m8-seat-${seat.roleKey}`} className="border border-border p-4 rounded-lg bg-surface shadow-sm">
-              <div className="flex items-start justify-between gap-4 mb-4">
+            <div key={seat.id} data-testid={`m8-seat-${seat.roleKey}`} className="min-w-0 border border-border p-4 rounded-lg bg-surface shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                 <div>
                   <h2 className="text-lg font-semibold">
                     {t(`role.${seat.roleKey}` as 'role.unknown', {})}
