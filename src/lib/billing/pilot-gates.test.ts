@@ -10,6 +10,7 @@
  *   - the session-less M11 partner portal (magic token) is refused the same way.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { hashSecretToken } from '@/lib/secret-token';
 
 const session = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 
@@ -107,7 +108,7 @@ describe('pilot gates', () => {
     const opp = await prisma.opportunity.create({ data: { tenantId, workspaceId: workspace.id, title: 'Pilot opp' } });
     const magicToken = `pilot-gate-token-${suffix()}`;
     const part = await prisma.applicationPart.create({
-      data: { tenantId, opportunityId: opp.id, part: 'PART_A', content: {}, magicToken },
+      data: { tenantId, opportunityId: opp.id, part: 'PART_A', content: {}, magicTokenHash: hashSecretToken(magicToken) },
     });
     const budgetOf = async () =>
       ((await prisma.applicationPart.findUniqueOrThrow({ where: { id: part.id } })).content as { budget?: unknown[] })

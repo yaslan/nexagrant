@@ -11,6 +11,8 @@ import {
   updatePresenceHeartbeat,
   generateSectionDraftAi,
 } from '../../src/modules/m11/server/actions';
+import { issuePartnerPortalLink } from '../../src/modules/m11/server/partner-link';
+import { hashSecretToken } from '../../src/lib/secret-token';
 import {
   DEFAULT_PART_B_SECTIONS,
   type PartContent,
@@ -30,12 +32,12 @@ type FakePart = {
   tenantId: string;
   opportunityId: string;
   part: string;
-  magicToken: string;
+  magicTokenHash: string | null;
   content: PartContent;
 };
 
 /** The `where`/`data` clauses the fake client records, as the actions send them. */
-type FakeWhere = { id?: string; tenantId?: string };
+type FakeWhere = { id?: string; tenantId?: string; part?: string };
 
 const h = vi.hoisted(() => {
   const store: {
@@ -58,7 +60,7 @@ function freshPart(): FakePart {
     tenantId: 'tenant-1',
     opportunityId: 'opp-11',
     part: 'PART_B',
-    magicToken: 'tok-123',
+    magicTokenHash: null,
     content: {
       budget: [],
       workPackages: [],
@@ -90,7 +92,7 @@ vi.mock('../../src/lib/db', async () => {
           tenantId: data.tenantId,
           opportunityId: data.opportunityId,
           part: data.part,
-          magicToken: data.magicToken,
+          magicTokenHash: data.magicTokenHash ?? null,
           content: data.content,
         };
         return h.store.part;
@@ -102,13 +104,16 @@ vi.mock('../../src/lib/db', async () => {
           ? h.store.part
           : null;
       }),
-      updateMany: vi.fn(async ({ where, data }: { where: FakeWhere; data: { content: PartContent } }) => {
+      updateMany: vi.fn(
+        async ({ where, data }: { where: FakeWhere; data: { content?: PartContent; magicTokenHash?: string } }) => {
         h.store.lastUpdateWhere = where;
         if (!h.store.part) return { count: 0 };
         if (where.tenantId !== h.store.part.tenantId || where.id !== h.store.part.id) {
           return { count: 0 };
         }
-        h.store.part.content = data.content;
+        if (where.part !== undefined && where.part !== h.store.part.part) return { count: 0 };
+        if (data.content !== undefined) h.store.part.content = data.content;
+        if (data.magicTokenHash !== undefined) h.store.part.magicTokenHash = data.magicTokenHash;
         return { count: 1 };
       }),
     },
@@ -154,6 +159,37 @@ describe('M11 Application Production & Collaborative Editing Module', () => {
     expect(part.part).toBe('PART_B');
     const content = part?.content as unknown as PartContent | null;
     expect(content?.sections).toHaveLength(8);
+    // TASK-MULQLL2T8ZJX4 — no portal token is minted at creation; it is issued
+    // on demand and only its hash is stored.
+    expect(storedPart().magicTokenHash).toBeNull();
+  });
+
+  test('issuePartnerPortalLink returns the raw token once and stores only its hash', async () => {
+    store.part = { ...freshPart(), part: 'PART_A' };
+
+    const first = await issuePartnerPortalLink('part-111');
+    expect(first?.token).toMatch(/^[0-9a-f]{64}$/);
+    expect(storedPart().magicTokenHash).toBe(hashSecretToken(first!.token));
+    expect(storedPart().magicTokenHash).not.toBe(first!.token);
+    expect(store.lastUpdateWhere).toEqual({ id: 'part-111', tenantId: 'tenant-1', part: 'PART_A' });
+
+    // Issuing again replaces the hash: the previous link is revoked.
+    const second = await issuePartnerPortalLink('part-111');
+    expect(second?.token).not.toBe(first!.token);
+    expect(storedPart().magicTokenHash).toBe(hashSecretToken(second!.token));
+  });
+
+  test('issuePartnerPortalLink refuses Part B and another tenant\'s part', async () => {
+    // freshPart() is PART_B.
+    await expect(issuePartnerPortalLink('part-111')).resolves.toBeNull();
+    expect(storedPart().magicTokenHash).toBeNull();
+
+    store.part = { ...freshPart(), part: 'PART_A', tenantId: 'tenant-2' };
+    await expect(issuePartnerPortalLink('part-111')).resolves.toBeNull();
+    expect(storedPart().magicTokenHash).toBeNull();
+
+    setScope(null);
+    await expect(issuePartnerPortalLink('part-111')).rejects.toBeInstanceOf(FakeTenantScopeError);
   });
 
   test('calculateLumpSumBudget computes 25% overhead and direct personnel cost', async () => {

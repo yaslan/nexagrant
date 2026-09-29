@@ -57,7 +57,7 @@
       "count": 2,
       "kind": "system-scope",
       "class": "tenant-discovery",
-      "reason": "Magic-token partner portal: there is no session at all. The token is the credential and the row names its own tenant. Two call sites, generateMetadata and the page body, both reading the same row by magicToken. Same discovery shape as api-auth.ts."
+      "reason": "Magic-token partner portal: there is no session at all. The token is the credential and the row names its own tenant. Two call sites, generateMetadata and the page body, both reading the same row by magicTokenHash (SHA-256 of the URL token, TASK-MULQLL2T8ZJX4). Same discovery shape as api-auth.ts."
     },
     {
       "check": "D",

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withTenant } from '@/lib/db';
 import { requireTenantApi } from '@/lib/tenant';
-import { randomBytes } from 'crypto';
+import { issueSecretToken } from '@/lib/secret-token';
 import type { InvitationRow } from '@/types/db-rows';
 import { assertSeatAvailable, SeatLimitReachedError, type SeatUsage } from '@/lib/billing/seat-limit';
 
@@ -54,7 +54,9 @@ export async function POST(req: Request) {
     // particular TENANT_OWNER is not invitable.
     const role = INVITABLE_ROLES.has(requestedRole) ? requestedRole : 'MEMBER';
 
-    const token = randomBytes(32).toString('hex');
+    // Only the hash goes into the database (TASK-MULQLL2T8ZJX4); the raw token
+    // leaves this handler once, inside `inviteLink`, and is never stored.
+    const { raw: token, hash: tokenHash } = issueSecretToken();
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     const result = await withTenant<{
@@ -86,8 +88,9 @@ export async function POST(req: Request) {
 
       const invitation = await tx.invitation.upsert({
         where: { email_tenantId: { email, tenantId } },
-        update: { token, role, expires },
-        create: { email, tenantId, token, role, expires },
+        update: { tokenHash, role, expires },
+        create: { email, tenantId, tokenHash, role, expires },
+        select: { id: true, email: true, tenantId: true, role: true, expires: true },
       });
 
       return { conflict: false, seatLimit: null, invitation };

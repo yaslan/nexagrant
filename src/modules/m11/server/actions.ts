@@ -4,7 +4,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { assertTenantWritable, PilotExpiredError } from '@/lib/billing/pilot';
 import { revalidatePath } from 'next/cache';
-import crypto from 'crypto';
+import { hashSecretToken, secretTokenMatches } from '@/lib/secret-token';
 
 import {
   ApplicationPartRow,
@@ -58,7 +58,6 @@ async function savePartContent(tenantId: string, partId: string, content: PartCo
 
 export async function createApplicationPart(opportunityId: string, part: string) {
   const { tenantId } = await requireTenantAction();
-  const token = crypto.randomBytes(32).toString('hex');
 
   const createdPart = await withTenant<ApplicationPartRow | null>(tenantId, async (tx) => {
     // The opportunity must belong to this tenant; its id is guessable.
@@ -73,7 +72,9 @@ export async function createApplicationPart(opportunityId: string, part: string)
         tenantId,
         opportunityId,
         part,
-        magicToken: token,
+        // No partner portal token yet: only its hash is ever stored, so the
+        // link is issued on demand and shown once (issuePartnerPortalLink,
+        // TASK-MULQLL2T8ZJX4).
         content: {
           budget: [],
           workPackages: [],
@@ -547,12 +548,14 @@ export async function addBudgetLineByToken(
   // nothing and every partner link 404s.
   const part = await withSystemScope('tenant-discovery', 'm11.partByMagicToken', (tx) =>
     tx.applicationPart.findUnique({
-      where: { magicToken },
-      select: { id: true, tenantId: true, part: true, content: true },
+      where: { magicTokenHash: hashSecretToken(magicToken) },
+      select: { id: true, tenantId: true, part: true, content: true, magicTokenHash: true },
     })
   );
 
-  if (!part || part.part !== 'PART_A') {
+  // Only SHA-256(token) is stored (TASK-MULQLL2T8ZJX4); the row found by that
+  // hash is re-checked in constant time before anything is written.
+  if (!part || part.part !== 'PART_A' || !secretTokenMatches(magicToken, part.magicTokenHash)) {
     return { success: false };
   }
 

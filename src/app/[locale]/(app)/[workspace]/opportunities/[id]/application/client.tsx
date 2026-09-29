@@ -15,13 +15,15 @@ import {
   Link as LinkIcon
 } from 'lucide-react';
 import { addBudgetLine, addWorkPackage, calculateLumpSumBudget } from '@/modules/m11/server/actions';
+import { issuePartnerPortalLink } from '@/modules/m11/server/partner-link';
 import { PartBCollaborativeEditor } from '@/modules/m11/ui/PartBCollaborativeEditor';
 import type { BudgetLine, PartContent, WorkPackageItem } from '@/modules/m11/types';
 
 export interface ApplicationPartItem {
   id: string;
   part: 'PART_A' | 'PART_B' | string;
-  magicToken?: string | null;
+  /** Whether a partner portal link has been issued. The token itself is never sent here: only its hash is stored. */
+  hasPortalLink?: boolean;
   content?: PartContent;
 }
 
@@ -43,6 +45,13 @@ export function ApplicationClient({
   const locale = useLocale();
   const [activeTab, setActiveTab] = useState<'PART_A' | 'PART_B_EDITOR' | 'GANTT' | 'CHECKLIST'>('PART_B_EDITOR');
   const [copiedToken, setCopiedToken] = useState(false);
+  // TASK-MULQLL2T8ZJX4 — the portal token is stored only as a hash, so the link
+  // exists in the browser only right after it is issued. Issuing again revokes
+  // the previous link.
+  const [portalLink, setPortalLink] = useState<string | null>(null);
+  const [hasPortalLink, setHasPortalLink] = useState(Boolean(partA?.hasPortalLink));
+  const [isIssuingLink, setIsIssuingLink] = useState(false);
+  const [linkError, setLinkError] = useState(false);
 
   // Budget form state
   const [partnerName, setPartnerName] = useState('');
@@ -84,11 +93,31 @@ export function ApplicationClient({
   const [workPackages, setWorkPackages] = useState<WorkPackageItem[]>(initialWps);
 
   const handleCopyMagicLink = () => {
-    if (partA?.magicToken) {
-      const url = `${window.location.origin}/portal/partner/${partA.magicToken}`;
-      navigator.clipboard.writeText(url);
+    if (portalLink) {
+      navigator.clipboard.writeText(portalLink);
       setCopiedToken(true);
       setTimeout(() => setCopiedToken(false), 2000);
+    }
+  };
+
+  const handleIssuePortalLink = async () => {
+    if (!partA) return;
+    setIsIssuingLink(true);
+    setLinkError(false);
+    try {
+      const issued = await issuePartnerPortalLink(partA.id);
+      if (!issued) {
+        setLinkError(true);
+        return;
+      }
+      setPortalLink(`${window.location.origin}/${locale}/portal/partner/${issued.token}`);
+      setHasPortalLink(true);
+      setCopiedToken(false);
+    } catch (err) {
+      console.error('Error issuing partner portal link:', err);
+      setLinkError(true);
+    } finally {
+      setIsIssuingLink(false);
     }
   };
 
@@ -300,7 +329,7 @@ export function ApplicationClient({
           {/* Left Column: Partner Portal Link & Budget Add Form (5 cols) */}
           <div className="lg:col-span-5 space-y-6">
             {/* External Partner Portal Link Card */}
-            {partA?.magicToken && (
+            {partA && (
               <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-2xl p-5 shadow-sm border border-indigo-800 space-y-3">
                 <div className="flex items-center gap-2">
                   <LinkIcon className="w-4 h-4 text-indigo-400" />
@@ -310,18 +339,40 @@ export function ApplicationClient({
                   Dış konsorsiyum ortakları şifre gerekmeksizin aşağıdaki güvenli bağlantıyla kendi kurum ve bütçe verilerini girebilir:
                 </p>
 
-                <div className="flex items-center gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-indigo-950 font-mono text-xs text-indigo-300 overflow-hidden">
-                  <span className="truncate flex-1">
-                    {typeof window !== 'undefined' ? window.location.origin : ''}/portal/partner/{partA.magicToken}
-                  </span>
-                  <button
-                    onClick={handleCopyMagicLink}
-                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition text-[11px] font-semibold shrink-0 flex items-center gap-1"
-                  >
-                    {copiedToken ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedToken ? 'Kopyalandı' : 'Kopyala'}</span>
-                  </button>
-                </div>
+                {portalLink ? (
+                  <>
+                    <div className="flex items-center gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-indigo-950 font-mono text-xs text-indigo-300 overflow-hidden">
+                      <span className="truncate flex-1" data-testid="partner-portal-link">{portalLink}</span>
+                      <button
+                        onClick={handleCopyMagicLink}
+                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition text-[11px] font-semibold shrink-0 flex items-center gap-1"
+                      >
+                        {copiedToken ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedToken ? 'Kopyalandı' : 'Kopyala'}</span>
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-amber-200">
+                      Bu bağlantı yalnız şimdi gösterilir; güvenlik için saklanmaz. Şimdi kopyalayıp ortağınıza iletin.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-slate-300">
+                    {hasPortalLink
+                      ? 'Bir bağlantı daha önce oluşturuldu ve güvenlik için yeniden gösterilemez. Yeni bağlantı oluşturursanız eskisi çalışmaz.'
+                      : 'Henüz bağlantı oluşturulmadı.'}
+                  </p>
+                )}
+                <button
+                  onClick={handleIssuePortalLink}
+                  disabled={isIssuingLink}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg transition text-[11px] font-semibold flex items-center gap-1"
+                >
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  <span>{hasPortalLink ? 'Yeni bağlantı oluştur' : 'Bağlantı oluştur'}</span>
+                </button>
+                {linkError && (
+                  <p className="text-[11px] text-red-300" role="alert">Bağlantı oluşturulamadı. Sayfayı yenileyip tekrar deneyin.</p>
+                )}
               </div>
             )}
 

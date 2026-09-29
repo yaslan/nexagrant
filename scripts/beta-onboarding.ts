@@ -42,8 +42,8 @@
 
 import path from 'path';
 import fs from 'fs';
-import crypto from 'crypto';
 import dotenv from 'dotenv';
+import { issueSecretToken } from '../src/lib/secret-token';
 
 dotenv.config();
 
@@ -170,7 +170,7 @@ async function applyPartner(
   partner: BetaPartner,
   betaEndsAt: Date,
   moduleIds: readonly ModuleId[]
-): Promise<{ tenantId: string; userId: string; inviteToken: string; modulesPilot: number }> {
+): Promise<{ tenantId: string; userId: string; inviteToken: string | null; modulesPilot: number }> {
   const tenant = await prisma.tenant.upsert({
     where: { slug: partner.slug },
     update: {
@@ -224,21 +224,32 @@ async function applyPartner(
   });
 
   // Keep an already-issued token: re-running must not break a link we mailed out.
+  // Only its hash is stored (TASK-MULQLL2T8ZJX4), so a re-run cannot print that
+  // link again: `inviteToken` is null for a partner who already has one, and the
+  // caller skips rendering and sending their mail.
   const existingInvite = await prisma.invitation.findUnique({
     where: { email_tenantId: { email: partner.contactEmail, tenantId: tenant.id } },
+    select: { id: true },
   });
-  const inviteToken = existingInvite?.token ?? crypto.randomBytes(32).toString('base64url');
-  await prisma.invitation.upsert({
-    where: { email_tenantId: { email: partner.contactEmail, tenantId: tenant.id } },
-    update: { role: 'TENANT_OWNER', expires: betaEndsAt },
-    create: {
-      email: partner.contactEmail,
-      tenantId: tenant.id,
-      role: 'TENANT_OWNER',
-      token: inviteToken,
-      expires: betaEndsAt,
-    },
-  });
+  let inviteToken: string | null = null;
+  if (existingInvite) {
+    await prisma.invitation.update({
+      where: { id: existingInvite.id },
+      data: { role: 'TENANT_OWNER', expires: betaEndsAt },
+    });
+  } else {
+    const issued = issueSecretToken();
+    await prisma.invitation.create({
+      data: {
+        email: partner.contactEmail,
+        tenantId: tenant.id,
+        role: 'TENANT_OWNER',
+        tokenHash: issued.hash,
+        expires: betaEndsAt,
+      },
+    });
+    inviteToken = issued.raw;
+  }
 
   let modulesPilot = 0;
   for (const moduleId of moduleIds) {
@@ -349,7 +360,7 @@ async function main(): Promise<void> {
 
   for (const partner of partners) {
     let tenantId = '(dry-run)';
-    let inviteToken = 'DRY-RUN-TOKEN';
+    let inviteToken: string | null = 'DRY-RUN-TOKEN';
     let modulesPilot: number = moduleIds.length;
 
     if (opts.apply) {
@@ -358,6 +369,21 @@ async function main(): Promise<void> {
       inviteToken = result.inviteToken;
       modulesPilot = result.modulesPilot;
       log('db', `${partner.slug}: tenant ${tenantId}, owner ${partner.contactEmail}, ${modulesPilot} modules PILOT`);
+      if (inviteToken === null) {
+        // The link already went out and only its hash is kept; there is nothing
+        // to render. To issue a new link, delete the invitation and re-run.
+        log('email', `${partner.contactEmail}: invitation already issued — mail not re-rendered or re-sent`);
+        summary.push({
+          slug: partner.slug,
+          org: partner.orgName,
+          email: partner.contactEmail,
+          locale: partner.locale,
+          tenantId,
+          modulesPilot,
+          delivery: 'already-invited',
+        });
+        continue;
+      }
     } else {
       log('db', `${partner.slug}: WOULD upsert tenant + owner + ${modulesPilot} PILOT module states — dry run`);
     }

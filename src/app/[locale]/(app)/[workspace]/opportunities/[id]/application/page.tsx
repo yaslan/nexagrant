@@ -31,7 +31,12 @@ export default async function ApplicationPage({
 
   if (!opp) notFound();
 
-  const parts = opp.applicationParts as unknown as ApplicationPartItem[];
+  // The portal token's hash stays on the server (TASK-MULQLL2T8ZJX4): the client
+  // only learns whether a link exists.
+  const parts: ApplicationPartItem[] = opp.applicationParts.map(({ magicTokenHash, ...part }) => ({
+    ...(part as unknown as ApplicationPartItem),
+    hasPortalLink: magicTokenHash !== null,
+  }));
   const partA = parts.find((p) => p.part === 'PART_A');
   const partB = parts.find((p) => p.part === 'PART_B');
 

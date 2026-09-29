@@ -123,7 +123,7 @@ describe('public-sector package assignment', () => {
       // Seat 2 of 2 is free: the first invitation goes through.
       await assertSeatAvailable(tx, tenantId, 'first@example.test');
       await tx.invitation.create({
-        data: { email: 'first@example.test', tenantId, token: `b11-${suffix()}`, role: 'MEMBER', expires },
+        data: { email: 'first@example.test', tenantId, tokenHash: `b11-${suffix()}`, role: 'MEMBER', expires },
       });
     });
 

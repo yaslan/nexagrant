@@ -116,12 +116,14 @@ export interface ApiKeyRow {
   createdAt: Date;
 }
 
-/** `model Invitation` — a pending workspace invite. */
+/**
+ * `model Invitation` — a pending workspace invite. `tokenHash` is left out on
+ * purpose: it never leaves the server (TASK-MULQLL2T8ZJX4).
+ */
 export interface InvitationRow {
   id: string;
   email: string;
   tenantId: string;
-  token: string;
   role: string;
   expires: Date;
 }

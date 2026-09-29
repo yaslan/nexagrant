@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { addBudgetLineByToken } from '@/modules/m11/server/actions';
 import { getTranslations } from 'next-intl/server';
 import { errorMessage } from '@/lib/errors';
+import { hashSecretToken, secretTokenMatches } from '@/lib/secret-token';
 import type { PartContent } from '@/modules/m11/types';
 
 interface PageProps {
@@ -18,6 +19,11 @@ interface PageProps {
  * The ApplicationPart the magic-token portal resolves. The token in the URL is
  * the only credential here, so this is the one place a part is read without a
  * session — see the comment in src/modules/m11/server/actions.ts.
+ *
+ * Only SHA-256(token) is stored (TASK-MULQLL2T8ZJX4, src/lib/secret-token.ts):
+ * the row is found by the hash of the URL's token and then re-checked in
+ * constant time. A link from before the hash migration still resolves, because
+ * the migration hashed the stored token in place.
  */
 interface PartnerPortalPart {
   id: string;
@@ -35,11 +41,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   try {
     const rawPart = await withSystemScope('tenant-discovery', 'partner-portal.partByToken', (tx) =>
       tx.applicationPart.findUnique({
-        where: { magicToken: token },
+        where: { magicTokenHash: hashSecretToken(token) },
         include: { opportunity: true },
       })
     );
-    part = rawPart as unknown as PartnerPortalPart | null;
+    part = secretTokenMatches(token, rawPart?.magicTokenHash)
+      ? (rawPart as unknown as PartnerPortalPart)
+      : null;
   } catch {
     return {
       title: t('title'),
@@ -74,11 +82,13 @@ export default async function PartnerPortalPage({ params }: PageProps) {
   try {
     const rawPart = await withSystemScope('tenant-discovery', 'partner-portal.partByToken', (tx) =>
       tx.applicationPart.findUnique({
-        where: { magicToken: token },
+        where: { magicTokenHash: hashSecretToken(token) },
         include: { opportunity: true },
       })
     );
-    part = rawPart as unknown as PartnerPortalPart | null;
+    part = secretTokenMatches(token, rawPart?.magicTokenHash)
+      ? (rawPart as unknown as PartnerPortalPart)
+      : null;
   } catch (e) {
     console.warn(`[PartnerPortalPage] DB query failed: ${errorMessage(e)}`);
     return notFound();

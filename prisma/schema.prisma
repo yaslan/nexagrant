@@ -1393,7 +1393,9 @@ model ApplicationPart {
   opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   part           String      // PART_A, PART_B
   content        Json?       // Section tree, budget tables, etc.
-  magicToken     String?     @unique // For external partner access
+  // SHA-256 (hex) of the partner portal token; the raw token is shown once and
+  // never stored (src/lib/secret-token.ts, TASK-MULQLL2T8ZJX4).
+  magicTokenHash String?     @unique
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 }
@@ -1427,7 +1429,9 @@ model Invitation {
   email     String
   tenantId  String
   role      Role     @default(MEMBER)
-  token     String   @unique
+  // SHA-256 (hex) of the invite link token; the raw token is shown once and
+  // never stored (src/lib/secret-token.ts, TASK-MULQLL2T8ZJX4).
+  tokenHash String   @unique
   expires   DateTime
   createdAt DateTime @default(now())
   
