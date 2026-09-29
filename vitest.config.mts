@@ -44,7 +44,8 @@ export default defineConfig({
     // TASK-MUM676F010E9G — next-auth's ESM imports `next/server` without an
     // extension, which Node's resolver refuses when the package is loaded
     // externally. Inlined, vite resolves it; tests/oauth-registration.live.test.ts
-    // runs the real Auth.js callback through it.
-    server: { deps: { inline: ['next-auth'] } },
+    // runs the real Auth.js callback through it. next-intl's middleware has the
+    // same import; src/lib/security-headers.test.ts runs src/proxy.ts through it.
+    server: { deps: { inline: ['next-auth', 'next-intl'] } },
   },
 });

@@ -1,0 +1,183 @@
+/**
+ * Security response headers (TASK-MUN80T8IVTPM7 — Y-2, D-2 of the TASK-MUN66T2HM4A4E scan).
+ *
+ * Two halves, because they are set in two places:
+ *
+ * 1. `STATIC_SECURITY_HEADERS` — the same bytes on every response. next.config.ts
+ *    `headers()` puts them on `/:path*` (pages, API routes and `/_next/*` assets
+ *    alike). They are baked into the build (`routes-manifest.json`): changing one
+ *    means a rebuild.
+ *
+ * 2. The Content-Security-Policy — it carries a fresh nonce per request, so it is
+ *    written by src/proxy.ts at runtime. Next.js reads the nonce back out of the
+ *    *request* `Content-Security-Policy` header and stamps it on its own inline
+ *    RSC-payload scripts and chunk `<script>` tags; nothing in src/ has to pass it
+ *    around. The proxy matcher skips `/api`, `/_next` and dotted paths — those are
+ *    JSON, files and assets, and get `API_CONTENT_SECURITY_POLICY` from next.config
+ *    instead (never both on one response: two enforced policies intersect, and the
+ *    static one has no nonce).
+ *
+ * Why the policy looks the way it does — keep this in step with the code:
+ * - script-src: nonce + 'strict-dynamic'. Next's inline `self.__next_f.push(…)`
+ *   scripts rule out a plain 'self' list; 'strict-dynamic' lets the nonced loader
+ *   pull in the chunks it creates. 'unsafe-eval' only in `next dev` (React's dev
+ *   tooling and HMR use eval); the production build needs none.
+ * - style-src 'unsafe-inline': React `style={…}` attributes and next/font's
+ *   injected <style> cannot carry a nonce. Style injection is a far smaller risk
+ *   than script injection and is the documented Next.js trade-off.
+ * - img-src: next/image serves remote images through `/_next/image` ('self'); the
+ *   blog also renders unsplash URLs directly, and stored evidence may be shown
+ *   from `R2_PUBLIC_HOST`. `data:`/`blob:` for inline icons and local previews.
+ * - connect-src: the browser talks to this origin, to PostHog's capture endpoint
+ *   (src/lib/analytics.ts — only after consent) and, for evidence uploads, PUTs the
+ *   file straight to the R2 presigned URL (`<account>.r2.cloudflarestorage.com`).
+ *   Anthropic/OpenAI/SEDIA/CORDIS are called from the server only and are
+ *   deliberately absent.
+ * - form-action: Auth.js signs in with a form POST to /api/auth/signin/google that
+ *   redirects to accounts.google.com; Chrome applies form-action to that redirect.
+ * - frame-ancestors 'none' (with X-Frame-Options DENY for old browsers),
+ *   object-src 'none', base-uri 'self', frame-src 'none' — nothing embeds us and
+ *   we embed nothing.
+ * - No `upgrade-insecure-requests`: HSTS already does it on the real domain, and on
+ *   plain-http hosts (local prod build, LAN) it would rewrite same-origin asset URLs
+ *   to https and break the page.
+ *
+ * Rollback without a code change: `CSP_MODE=report-only` (read at request time by
+ * the proxy) sends the same policy as `Content-Security-Policy-Report-Only`, so a
+ * policy that turns out to block something in production can be defanged with an
+ * env change + restart instead of a rebuild.
+ */
+
+export type HeaderEntry = { key: string; value: string };
+
+/**
+ * HSTS: one year, subdomains included, no `preload` (preload is a patron decision:
+ * it is hard to undo — removal from the browser lists takes months).
+ * Only meaningful over HTTPS; browsers ignore it on plain http.
+ */
+export const HSTS_VALUE = 'max-age=31536000; includeSubDomains';
+
+export const PERMISSIONS_POLICY_VALUE =
+  'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()';
+
+export const STATIC_SECURITY_HEADERS: readonly HeaderEntry[] = [
+  { key: 'Strict-Transport-Security', value: HSTS_VALUE },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  // accept-invite overrides this with `no-referrer` (next.config.ts, later entry wins).
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: PERMISSIONS_POLICY_VALUE },
+];
+
+/**
+ * The only inline script `/api/*` ever serves: the "print / save as PDF" button of
+ * the printable pages (src/lib/document-exporter.ts, src/lib/efatura.ts →
+ * `onclick="window.print()"`). 'unsafe-hashes' + this hash allows that exact
+ * handler text and nothing else. Change the button, change the hash — the unit
+ * test recomputes it and checks the exporters still emit that text.
+ */
+export const PRINT_BUTTON_HANDLER = 'window.print()';
+export const PRINT_BUTTON_HANDLER_SHA256 = 'sha256-MguIPR6qNR8D3B+eAlK+bIRTZe8t3wkOY4B/56Me9FU=';
+
+/**
+ * For responses the proxy never sees (`/api/*`): JSON, downloads, and three printable
+ * HTML pages (document / e-invoice / agency report export) that carry user-written
+ * text — inline <style> only, no network, one hashed click handler.
+ */
+export const API_CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  `script-src 'unsafe-hashes' '${PRINT_BUTTON_HANDLER_SHA256}'`,
+  "style-src 'unsafe-inline'",
+  "img-src 'self' data:",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+export type CspOptions = {
+  nonce: string;
+  isDev: boolean;
+  /** NEXT_PUBLIC_POSTHOG_HOST, or analytics' EU default when the key is set. */
+  posthogHost?: string | null;
+  /** R2_ACCOUNT_ID — presigned PUT uploads go to `<id>.r2.cloudflarestorage.com`. */
+  r2AccountId?: string | null;
+  /** R2_PUBLIC_HOST — public object URLs. */
+  r2PublicHost?: string | null;
+};
+
+const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
+
+/** `https://host[:port]` of a URL, or null when it is blank or unparsable. */
+function originOf(value: string | null | undefined): string | null {
+  if (!value?.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+/** R2 account ids are 32 hex chars; anything else must not reach a header. */
+function r2UploadOrigin(accountId: string | null | undefined): string | null {
+  const id = accountId?.trim();
+  return id && /^[a-z0-9]{1,64}$/i.test(id) ? `https://${id}.r2.cloudflarestorage.com` : null;
+}
+
+export function buildContentSecurityPolicy(opts: CspOptions): string {
+  const posthog = originOf(opts.posthogHost);
+  const r2Upload = r2UploadOrigin(opts.r2AccountId);
+  const r2Public = originOf(opts.r2PublicHost);
+  const extra = (...values: Array<string | null>) => values.filter((v): v is string => !!v);
+
+  const directives: Array<[string, string[]]> = [
+    ['default-src', ["'self'"]],
+    [
+      'script-src',
+      ["'self'", `'nonce-${opts.nonce}'`, "'strict-dynamic'", ...(opts.isDev ? ["'unsafe-eval'"] : [])],
+    ],
+    ['style-src', ["'self'", "'unsafe-inline'"]],
+    ['img-src', ["'self'", 'data:', 'blob:', 'https://images.unsplash.com', ...extra(r2Public)]],
+    ['font-src', ["'self'", 'data:']],
+    // `next dev` HMR runs over a websocket to this origin; ws: is not covered by 'self' everywhere.
+    ['connect-src', ["'self'", ...extra(posthog, r2Upload), ...(opts.isDev ? ['ws:', 'wss:'] : [])]],
+    ['media-src', ["'self'", 'blob:']],
+    ['worker-src', ["'self'", 'blob:']],
+    ['manifest-src', ["'self'"]],
+    ['frame-src', ["'none'"]],
+    ['object-src', ["'none'"]],
+    ['base-uri', ["'self'"]],
+    ['form-action', ["'self'", 'https://accounts.google.com']],
+    ['frame-ancestors', ["'none'"]],
+  ];
+  return directives.map(([name, values]) => `${name} ${values.join(' ')}`).join('; ');
+}
+
+/** Options from the runtime environment (the proxy runs on the Node runtime). */
+export function cspOptionsFromEnv(nonce: string, env: NodeJS.ProcessEnv = process.env): CspOptions {
+  const posthogKey = env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
+  return {
+    nonce,
+    isDev: env.NODE_ENV === 'development',
+    posthogHost: posthogKey ? env.NEXT_PUBLIC_POSTHOG_HOST?.trim() || DEFAULT_POSTHOG_HOST : null,
+    r2AccountId: env.R2_ACCOUNT_ID,
+    r2PublicHost: env.R2_PUBLIC_HOST,
+  };
+}
+
+/** `CSP_MODE=report-only` → the Report-Only header name; anything else enforces. */
+export function cspHeaderName(env: NodeJS.ProcessEnv = process.env): string {
+  return env.CSP_MODE?.trim().toLowerCase() === 'report-only'
+    ? 'Content-Security-Policy-Report-Only'
+    : 'Content-Security-Policy';
+}
+
+/** 128 random bits, base64. Web Crypto — available on both Node and edge runtimes. */
+export function generateNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}

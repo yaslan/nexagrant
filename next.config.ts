@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from 'next-intl/plugin';
 import { PHASE_PRODUCTION_BUILD } from 'next/constants';
 import { execFileSync } from 'child_process';
+import { API_CONTENT_SECURITY_POLICY, STATIC_SECURITY_HEADERS } from './src/lib/security-headers';
 
 const withNextIntl = createNextIntlPlugin();
 
@@ -27,6 +28,8 @@ function checkI18n() {
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  /** D-2 (TASK-MUN66T2HM4A4E): no `X-Powered-By: Next.js` fingerprint. */
+  poweredByHeader: false,
   /**
    * `forbidden()` (next/navigation) is still behind this flag in Next 16. It lets a
    * page answer a signed-in user who may never see it with a real 403 instead of a
@@ -82,11 +85,21 @@ const nextConfig: NextConfig = {
         headers: [
           { key: 'Accept-CH', value: 'Sec-CH-Prefers-Color-Scheme' },
           { key: 'Critical-CH', value: 'Sec-CH-Prefers-Color-Scheme' },
+          // Y-2 (TASK-MUN80T8IVTPM7): HSTS, framing, nosniff, referrer, permissions.
+          // The page CSP carries a per-request nonce and is set by src/proxy.ts.
+          ...STATIC_SECURITY_HEADERS,
         ],
+      },
+      // The proxy does not run for /api, so its CSP never reaches these responses.
+      {
+        source: '/api/:path*',
+        headers: [{ key: 'Content-Security-Policy', value: API_CONTENT_SECURITY_POLICY }],
       },
       // TASK-MUN2793A57Z9I (se-fb (d)) — the invitation link carries a bearer
       // token in its query. The GET handler moves it into a cookie at once;
-      // these pages still never send a Referer and are never cached.
+      // these pages still never send a Referer and are never cached. Listed after
+      // the `/:path*` entry on purpose: for the same key the later entry wins, so
+      // `no-referrer` here overrides the global `strict-origin-when-cross-origin`.
       {
         source: '/:locale(tr|en)/accept-invite/:path*',
         headers: [
