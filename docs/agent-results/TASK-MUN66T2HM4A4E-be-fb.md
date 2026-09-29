@@ -18,7 +18,7 @@
 | D-1 | DÜŞÜK | Çerezler düz HTTP'de `Secure`'suz (beklenen); TLS arkasında `X-Forwarded-Proto: https` ile `__Host-`/`__Secure-` + Secure + HttpOnly + SameSite=Lax — **TLS sonlandıran proxy'nin bu başlığı göndermesi şart** | canlı curl |
 | D-2 | DÜŞÜK | `X-Powered-By: Next.js` sızıyor | canlı curl |
 | D-3 | DÜŞÜK | `global-error.tsx` `error.message`'ı ekrana basıyor (prod'da sunucu hataları özetlenir; istemci hataları ham görünür) | kod okuma |
-| D-4 | DÜŞÜK | Public lead IP limiti `X-Forwarded-For`'un **ilk** hop'una güveniyor → proxy XFF'i ezmezse IP limiti atlanır (e-posta limiti kalır) | kod okuma |
+| D-4 | DÜŞÜK | Public lead IP limiti `X-Forwarded-For`'un **ilk** hop'una güveniyor → proxy XFF'i ezmezse IP limiti atlanır (e-posta limiti kalır). Aynı konu crw-fb İNCELEME-50 B-1'de (915c47cf) nginx arkasında ölçülmüş — ayrı kart açma, oradakine bağla | kod okuma |
 | D-5 | DÜŞÜK | id guard (`isPresentId`) eksik ~37 action (ör. `saveSectionContent`); hepsi `tenantId` filtreli olduğu için etki aynı kiracı içinde "rastgele ilk kaydı" güncellemekle sınırlı | envanter |
 | D-6 | DÜŞÜK / bilgi | Git geçmişinde (c915bc43, `docker-compose.yml`) sabit bir **dev** `AUTH_SECRET` değeri var; bugünkü `.env` değerinden farklı (md5 farklı) — prod'da asla kullanılmadığı teyit edilmeli | parmak izi |
 
