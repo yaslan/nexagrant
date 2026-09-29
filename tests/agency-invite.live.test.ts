@@ -4,7 +4,6 @@ import { createDbClient, withTenantOn } from '@/lib/db';
 import {
   createInviteCodeIn,
   listInviteCodesIn,
-  MIN_MAX_USES,
   noteInviteRejection,
   redeemInviteCode,
   revokeInviteCodeIn,
@@ -54,22 +53,25 @@ async function newTenant(kind: 'AGENCY' | 'ORGANIZATION', suffix: string): Promi
   return t.id;
 }
 
-/**
- * A create call refuses a limit under MIN_MAX_USES (TASK-MUM17YBJVAHRR). The
- * redemption tests below need 1-, 2- and 5-use codes, as made before that rule:
- * those are created at the minimum and lowered as the owner, like `expiresAt` below.
- */
-async function makeCode(agency: string, maxUses: number, days = 30): Promise<{ id: string; code: string }> {
-  const created = await withTenantOn(rls!, agency, (tx) =>
+/** Codes have no use limit (TASK-MUM4WVYLSH9IT): only an end date. */
+async function makeCode(agency: string, days = 30): Promise<{ id: string; code: string }> {
+  return withTenantOn(rls!, agency, (tx) =>
     createInviteCodeIn(tx, {
       tenantId: agency,
       createdBy: ids.staff,
-      maxUses: Math.max(maxUses, MIN_MAX_USES),
       expiresAt: new Date(Date.now() + days * 86_400_000),
       label: RUN,
     })
   );
-  if (maxUses < MIN_MAX_USES) await admin!.agencyInviteCode.update({ where: { id: created.id }, data: { maxUses } });
+}
+
+/**
+ * A code made while codes had a limit, already used past it: the retired
+ * column keeps its old value, and nothing may read it any more.
+ */
+async function makeLegacyCodePastItsLimit(agency: string): Promise<{ id: string; code: string }> {
+  const created = await makeCode(agency);
+  await admin!.agencyInviteCode.update({ where: { id: created.id }, data: { maxUses: 6, usedCount: 9 } });
   return created;
 }
 
@@ -160,7 +162,7 @@ afterAll(async () => {
 
 describe('redeeming an agency invite code (fabrika_app)', () => {
   test('a valid code returns the agency, counts one use, and links the new tenant', async () => {
-    const { id, code } = await makeCode(ids.agencyA, 5);
+    const { id, code } = await makeCode(ids.agencyA);
     const t = await newTenant('ORGANIZATION', 'linked');
     const agency = await rls!.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.tenant_id', ${t}, true)`;
@@ -175,7 +177,7 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
   });
 
   test('a use inside a transaction that rolls back is not counted', async () => {
-    const { id, code } = await makeCode(ids.agencyA, 1);
+    const { id, code } = await makeCode(ids.agencyA);
     await expect(
       rls!.$transaction(async (tx) => {
         expect(await redeemInviteCode(tx, code)).toBe(ids.agencyA);
@@ -186,38 +188,65 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
     expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
   });
 
-  test('the limit holds: maxUses successes, then NULL', async () => {
-    const { id, code } = await makeCode(ids.agencyA, 2);
-    expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
-    expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
-    expect(await redeemAsNewTenant(rls!, code)).toBeNull();
-    expect(await usedCount(id)).toBe(2);
+  // TASK-MUM4WVYLSH9IT (leed-fb 29.09): no use limit. A code that is neither
+  // expired nor revoked works every time, so a refusal can never mean "used up".
+  test('no use limit: a live code works N times in a row, and the counter keeps count', async () => {
+    const { id, code } = await makeCode(ids.agencyA);
+    const N = 30;
+    for (let i = 0; i < N; i++) expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
+    expect(await usedCount(id)).toBe(N);
+    const row = await admin!.agencyInviteCode.findUniqueOrThrow({ where: { id }, select: { maxUses: true } });
+    expect(row.maxUses).toBeNull(); // a new code writes no limit
   });
 
-  test('race for the last use: two connections, exactly one wins', async () => {
-    const { id, code } = await makeCode(ids.agencyA, 1);
+  test('a code made under the old limit and used past it still works: the old limit is not read', async () => {
+    const { id, code } = await makeLegacyCodePastItsLimit(ids.agencyA);
+    expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
+    expect(await usedCount(id)).toBe(10);
+  });
+
+  test('two connections on one code: the row lock serialises them, both win, no use is lost', async () => {
+    const { id, code } = await makeCode(ids.agencyA);
     // The first holds the row lock (uncommitted) for 400 ms; the second starts
-    // inside that window, waits on the lock, then re-checks and finds it spent.
+    // inside that window, waits on the lock, then adds its own use.
     const first = redeemAsNewTenant(rls!, code, 400);
     await new Promise((r) => setTimeout(r, 100));
     const second = redeemAsNewTenant(rls2!, code);
-    const results = await Promise.all([first, second]);
-    expect(results.filter((r) => r === ids.agencyA)).toHaveLength(1);
-    expect(results.filter((r) => r === null)).toHaveLength(1);
-    expect(await usedCount(id)).toBe(1);
+    expect(await Promise.all([first, second])).toEqual([ids.agencyA, ids.agencyA]);
+    expect(await usedCount(id)).toBe(2);
   });
 
-  test('a burst of 12 parallel registrations on a 5-use code yields exactly 5', async () => {
-    const { id, code } = await makeCode(ids.agencyA, 5);
+  test('a burst of 12 parallel registrations on one code: all 12 succeed and are counted', async () => {
+    const { id, code } = await makeCode(ids.agencyA);
     const results = await Promise.all(
       Array.from({ length: 12 }, (_, i) => redeemAsNewTenant(i % 2 ? rls2! : rls!, code))
     );
-    expect(results.filter((r) => r === ids.agencyA)).toHaveLength(5);
-    expect(await usedCount(id)).toBe(5);
+    expect(results.filter((r) => r === ids.agencyA)).toHaveLength(12);
+    expect(await usedCount(id)).toBe(12);
+  });
+
+  test('probing (TASK-MUM3TMP8HU76G Ö-1): a much-used code answers like a fresh one; only revoke or expiry refuses, with the same NULL', async () => {
+    const fresh = await makeCode(ids.agencyA);
+    const used = await makeCode(ids.agencyA);
+    for (let i = 0; i < 8; i++) await redeemAsNewTenant(rls!, used.code);
+    // What an agency trying its own codes on the form gets back:
+    expect(await redeemAsNewTenant(rls!, fresh.code)).toBe(ids.agencyA);
+    expect(await redeemAsNewTenant(rls!, used.code)).toBe(ids.agencyA);
+    // The only refusals it can meet are ones it caused itself and already knows.
+    await withTenantOn(rls!, ids.agencyA, (tx) =>
+      revokeInviteCodeIn(tx, { tenantId: ids.agencyA, id: used.id, revokedBy: ids.staff })
+    );
+    await admin!.agencyInviteCode.update({ where: { id: fresh.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    const refusals = [
+      await redeemAsNewTenant(rls!, used.code),
+      await redeemAsNewTenant(rls!, fresh.code),
+      await redeemAsNewTenant(rls!, 'ABCD-EFGH-JKMN'),
+    ];
+    expect(refusals).toEqual([null, null, null]);
   });
 
   test('a revoked code is refused; revoking twice is a no-op', async () => {
-    const { id, code } = await makeCode(ids.agencyA, 5);
+    const { id, code } = await makeCode(ids.agencyA);
     const revoke = () =>
       withTenantOn(rls!, ids.agencyA, (tx) =>
         revokeInviteCodeIn(tx, { tenantId: ids.agencyA, id, revokedBy: ids.staff })
@@ -229,14 +258,14 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
   });
 
   test('an expired code is refused', async () => {
-    const { id, code } = await makeCode(ids.agencyA, 5);
+    const { id, code } = await makeCode(ids.agencyA);
     await admin!.agencyInviteCode.update({ where: { id }, data: { expiresAt: new Date(Date.now() - 1000) } });
     expect(await redeemAsNewTenant(rls!, code)).toBeNull();
   });
 
   test('a code of a tenant that is no longer an agency, or is deleted, is refused', async () => {
     const c = await newTenant('AGENCY', 'agency-c');
-    const { code } = await makeCode(c, 5);
+    const { code } = await makeCode(c);
     await admin!.tenant.update({ where: { id: c }, data: { kind: 'ORGANIZATION' } });
     expect(await redeemAsNewTenant(rls!, code)).toBeNull();
     await admin!.tenant.update({ where: { id: c }, data: { kind: 'AGENCY', deletedAt: new Date() } });
@@ -250,13 +279,13 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
   });
 
   test('only an agency can create codes', async () => {
-    await expect(makeCode(ids.org, 5)).rejects.toThrow(/Only an agency/);
+    await expect(makeCode(ids.org)).rejects.toThrow(/Only an agency/);
   });
 });
 
 describe('the function does not leak its system scope', () => {
   test('after a normal call the caller scope is what it was', async () => {
-    const { code } = await makeCode(ids.agencyA, 5);
+    const { code } = await makeCode(ids.agencyA);
     const after = await rls!.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.system_scope', 'off', true)`;
       await redeemInviteCode(tx, code);
@@ -271,7 +300,7 @@ describe('the function does not leak its system scope', () => {
   });
 
   test('after the function fails mid-call the scope is not left open', async () => {
-    const { code } = await makeCode(ids.agencyA, 5);
+    const { code } = await makeCode(ids.agencyA);
     // Connection 1 holds the code's row lock; connection 2 gives up waiting
     // (lock_timeout) INSIDE redeem_agency_invite, i.e. while the function's
     // `SET app.system_scope = 'on'` is in force.
@@ -325,7 +354,7 @@ describe('the agency link grants no read on the linked organisation', () => {
   });
 
   test('agency B neither sees nor revokes agency A codes', async () => {
-    const { id, code } = await makeCode(ids.agencyA, 5);
+    const { id, code } = await makeCode(ids.agencyA);
     const bList = await withTenantOn(rls!, ids.agencyB, (tx) => listInviteCodesIn(tx, ids.agencyB));
     expect(bList.find((c) => c.id === id)).toBeUndefined();
     const aList = await withTenantOn(rls!, ids.agencyA, (tx) => listInviteCodesIn(tx, ids.agencyA));
@@ -341,7 +370,7 @@ describe('the agency link grants no read on the linked organisation', () => {
   });
 
   test('the registrant cannot read codes either: no tenant scope, zero rows', async () => {
-    await makeCode(ids.agencyA, 5);
+    await makeCode(ids.agencyA);
     expect(await rls!.agencyInviteCode.count()).toBe(0);
   });
 });
@@ -380,19 +409,30 @@ describe('refused attempts are counted without the code', () => {
     }
   });
 
-  test('a spent code is filed under its agency; an unknown one leaves no tenant-readable row', async () => {
+  test('a revoked code is filed under its agency; no "exhausted" reason; an unknown one leaves no tenant-readable row', async () => {
     const since = new Date(Date.now() - 1000);
     counterBefore = await openCounter();
-    const { id, code } = await makeCode(ids.agencyA, 1);
+    const { id, code } = await makeCode(ids.agencyA);
     expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
+    await withTenantOn(rls!, ids.agencyA, (tx) =>
+      revokeInviteCodeIn(tx, { tenantId: ids.agencyA, id, revokedBy: ids.staff })
+    );
     await noteInviteRejection(rls!, code);
+    // A code past its old limit is live. Were a refusal noted on it (a lost
+    // race), the reason is not 'exhausted' (TASK-MUM4WVYLSH9IT).
+    const legacy = await makeLegacyCodePastItsLimit(ids.agencyA);
+    await noteInviteRejection(rls!, legacy.code);
     await noteInviteRejection(rls!, 'ZZZZ-ZZZZ-ZZZZ');
 
     const mine = await admin!.auditEvent.findMany({
       where: { tenantId: ids.agencyA, type: 'agency.invite.rejected', createdAt: { gte: since } },
       select: { data: true, actorId: true, target: true },
+      orderBy: { createdAt: 'asc' },
     });
-    expect(mine).toEqual([{ data: { reason: 'exhausted', codeId: id }, actorId: null, target: null }]);
+    expect(mine).toEqual([
+      { data: { reason: 'revoked', codeId: id }, actorId: null, target: null },
+      { data: { reason: 'lost_race', codeId: legacy.id }, actorId: null, target: null },
+    ]);
 
     const orphan = await admin!.auditEvent.count({
       where: { tenantId: null, type: 'agency.invite.rejected', createdAt: { gte: since } },

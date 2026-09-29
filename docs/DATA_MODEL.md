@@ -847,13 +847,17 @@ yazılır. Ajans silinirse bağ `SET NULL` olur.
 araçları tabloyu olduğu gibi kapsar). Kodun kendisi saklanmaz: yalnız normalize edilmiş halinin
 SHA-256'sı (`codeHash`) ve gösterim için son 4 karakter (`codeHint`). Kod 12 karakter,
 0/O/1/I/L/U içermeyen 30 harflik alfabeden (`src/lib/agency/invite-code.ts`).
-`CHECK (usedCount BETWEEN 0 AND maxUses)`.
+**Kullanım sınırı yok** (TASK-MUM4WVYLSH9IT, leed-fb 29.09): kod yalnız `expiresAt` (≤ 1 yıl) ve
+`revokedAt` ile yönetilir. `usedCount` iç sayaçtır, ajansa gösterilmez; `CHECK (usedCount >= 0)`.
+`maxUses` emekli kolon: nullable, yeni kod yazmaz, hiçbir yer okumaz (eski satırlar değerini korur).
 
 **Kullanım.** Kayıt olan kişinin kiracısı olmadığı için koda `tenant_isolation` üzerinden
 ulaşamaz. Tek kapı `public.redeem_agency_invite(code_hash)` (SECURITY DEFINER,
-`search_path = public, pg_temp`): tek `UPDATE … SET usedCount = usedCount + 1 WHERE …
-usedCount < maxUses … RETURNING tenantId`. Satır kilidi + kilitten sonra koşulun yeniden
-değerlendirilmesi, son kullanım yarışında yalnız birinin geçmesini sağlar. Fonksiyon ajans
+`search_path = public, pg_temp`): tek `UPDATE … SET usedCount = usedCount + 1 WHERE
+revokedAt IS NULL AND expiresAt > now … RETURNING tenantId` (`agency-invite-no-max-uses.sql`).
+Satır kilidi eşzamanlı kullanımları sıraya koyar, hiçbir kullanım kaybolmaz. Sınır olmadığı için
+ret "tükendi" anlamına gelemez; kodunu kayıt formunda deneyen ajans panelde gördüğünden fazlasını
+öğrenmez (TASK-MUM3TMP8HU76G Ö-1). Fonksiyon ajans
 id'si ya da NULL döndürür; kodun var olup olmadığı, süresinin dolup dolmadığı dışarıdan ayırt
 edilemez. `app.system_scope` fonksiyon düzeyinde açılır, çıkışta (hata dahil) geri alınır.
 Reddedilen denemeler `public.note_agency_invite_rejection(code_hash)` ile `AuditEvent`'e

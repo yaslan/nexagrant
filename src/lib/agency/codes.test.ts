@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { SMALL_CELL_THRESHOLD } from './funnel';
 import {
   AgencyInviteError,
+  createInviteCodeIn,
   inviteCodeRow,
   listInviteCodesIn,
-  MIN_MAX_USES,
+  MAX_VALIDITY_DAYS,
   validateInviteCodeInput,
   type InviteCodeRecord,
 } from './codes';
@@ -23,7 +23,6 @@ function record(over: Partial<InviteCodeRecord>): InviteCodeRecord {
     id: 'c1',
     hint: 'ABCD',
     label: null,
-    maxUses: 25,
     usedCount: 0,
     expiresAt: new Date(NOW + 30 * DAY),
     revokedAt: null,
@@ -37,9 +36,9 @@ describe('inviteCodeRow', () => {
     for (const usedCount of [0, 1, 4, 5, 7, 24, 25]) {
       const row = inviteCodeRow(record({ usedCount }), NOW);
       expect(Object.keys(row).sort()).toEqual(
-        ['createdAt', 'expiresAt', 'hint', 'id', 'label', 'maxUses', 'revokedAt', 'status'].sort()
+        ['createdAt', 'expiresAt', 'hint', 'id', 'label', 'revokedAt', 'status'].sort()
       );
-      expect(JSON.stringify(row)).not.toMatch(/used|left|exhausted/i);
+      expect(JSON.stringify(row)).not.toMatch(/used|left|exhausted|maxUses|limit/i);
     }
   });
 
@@ -50,26 +49,50 @@ describe('inviteCodeRow', () => {
     expect(inviteCodeRow(record({ usedCount: 25, revokedAt: new Date(NOW - 1) }), NOW).status).toBe('revoked');
   });
 
-  test('no "exhausted" at any limit: it was the exact use count (TASK-MUM2RMN3YIBGC)', () => {
-    for (const maxUses of [3, MIN_MAX_USES, 25]) {
-      for (const usedCount of [0, maxUses - 1, maxUses]) {
-        expect(inviteCodeRow(record({ maxUses, usedCount }), NOW).status).toBe('active');
-      }
+  test('no "exhausted" at any use count: there is no limit to reach (TASK-MUM4WVYLSH9IT)', () => {
+    for (const usedCount of [0, 1, 6, 25, 10_000, 1_000_000]) {
+      expect(inviteCodeRow(record({ usedCount }), NOW).status).toBe('active');
     }
     expect(inviteCodeRow(record({ usedCount: undefined }), NOW).status).toBe('active');
   });
 });
 
-describe('validateInviteCodeInput: maxUses ≥ MIN_MAX_USES', () => {
-  const expiresAt = new Date(NOW + 30 * DAY);
-  test('"active" (used ≤ maxUses − 1) is not "under 5" either', () => {
-    expect(MIN_MAX_USES - 1).toBeGreaterThanOrEqual(SMALL_CELL_THRESHOLD);
-  });
-  test('below the minimum is refused, the minimum is accepted', () => {
-    for (const maxUses of [1, 4, 5, MIN_MAX_USES - 1]) {
-      expect(() => validateInviteCodeInput({ maxUses, expiresAt }, new Date(NOW))).toThrow(AgencyInviteError);
+describe('validateInviteCodeInput: end date only (TASK-MUM4WVYLSH9IT)', () => {
+  test('tomorrow .. MAX_VALIDITY_DAYS is accepted; past, now, beyond and invalid are refused', () => {
+    const at = (ms: number) => () => validateInviteCodeInput({ expiresAt: new Date(ms) }, new Date(NOW));
+    expect(at(NOW + DAY)).not.toThrow();
+    expect(at(NOW + 30 * DAY)).not.toThrow();
+    expect(at(NOW + MAX_VALIDITY_DAYS * DAY)).not.toThrow();
+    for (const ms of [NOW - DAY, NOW, NOW + MAX_VALIDITY_DAYS * DAY + 1, NaN]) {
+      expect(at(ms)).toThrow(AgencyInviteError);
     }
-    expect(() => validateInviteCodeInput({ maxUses: MIN_MAX_USES, expiresAt }, new Date(NOW))).not.toThrow();
+  });
+  test('a year is the ceiling: MAX_VALIDITY_DAYS covers a leap year, no more', () => {
+    expect(MAX_VALIDITY_DAYS).toBe(366);
+  });
+});
+
+describe('createInviteCodeIn', () => {
+  test('writes no use limit and records none in the audit event', async () => {
+    const writes: Record<string, unknown>[] = [];
+    const tx = {
+      tenant: { findUnique: async () => ({ kind: 'AGENCY', deletedAt: null }) },
+      agencyInviteCode: {
+        create: async (args: { data: Record<string, unknown> }) => (
+          writes.push(args.data),
+          { id: 'new', codeHint: 'WXYZ', expiresAt: args.data.expiresAt }
+        ),
+      },
+      auditEvent: { create: async (args: { data: Record<string, unknown> }) => (writes.push(args.data), {}) },
+    } as unknown as TenantTx;
+    const created = await createInviteCodeIn(tx, {
+      tenantId: 'agency',
+      createdBy: 'u1',
+      expiresAt: new Date(Date.now() + 30 * DAY),
+    });
+    expect(Object.keys(created).sort()).toEqual(['code', 'expiresAt', 'hint', 'id']);
+    expect(writes).toHaveLength(2);
+    expect(JSON.stringify(writes)).not.toMatch(/maxUses|usedCount/);
   });
 });
 

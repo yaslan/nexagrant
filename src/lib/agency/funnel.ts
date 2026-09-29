@@ -44,9 +44,10 @@
  * Ö-2): the refused-code audit rows, `agency.invite.rejected` with `reason` and
  * `codeId`, sit in the agency's own tenant
  * (prisma/migrations/fix-agency-invite-rejection-audit.sql). `reason =
- * 'exhausted'` for a code is the very status the code panel dropped
- * (TASK-MUM2RMN3YIBGC): used = maxUses, for codes under the minimum (R-1) as
- * well. A screen that shows those rows — or counts of them — joins this funnel
+ * 'exhausted'` for a code was the very status the code panel dropped
+ * (TASK-MUM2RMN3YIBGC): used = maxUses. Codes have no use limit since
+ * agency-invite-no-max-uses.sql (TASK-MUM4WVYLSH9IT) and no new row carries it,
+ * but rows written before stay. A screen that shows those rows — or counts of them — joins this funnel
  * and must go through the same attacker (funnel.attack.test.ts, D ≥ 0 and
  * D = 0) before it ships.
  */

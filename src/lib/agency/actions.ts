@@ -21,7 +21,6 @@ import {
 import { AgencyPermissionError } from './errors';
 
 export async function createAgencyInviteCodeAction(input: {
-  maxUses: number;
   expiresAt: string | Date;
   label?: string | null;
 }): Promise<CreatedInviteCode> {
@@ -31,7 +30,6 @@ export async function createAgencyInviteCodeAction(input: {
     createInviteCodeIn(tx, {
       tenantId: scope.tenantId,
       createdBy: scope.userId,
-      maxUses: input.maxUses,
       expiresAt: new Date(input.expiresAt),
       label: input.label ?? null,
     })

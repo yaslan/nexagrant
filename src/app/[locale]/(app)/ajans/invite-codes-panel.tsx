@@ -2,13 +2,13 @@
 
 import { useId, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { MAX_USES_LIMIT, MIN_MAX_USES } from '@/lib/agency/code-limits';
 import type { InviteCodeStatus, InviteCodeSummary } from '@/lib/agency/codes';
 import { createInviteCode, listInviteCodes, revokeInviteCode, type InviteActionError } from './actions';
 
 /**
  * B-1 (TASK-MUM17YBJVAHRR): the server sends each code's status, never its use count.
- * No "exhausted" either (TASK-MUM2RMN3YIBGC): a used-up code reads "active".
+ * No "exhausted" either (TASK-MUM2RMN3YIBGC), and no use limit to reach
+ * (TASK-MUM4WVYLSH9IT): a code is governed by its end date and by revocation.
  */
 export type InviteCodeRow = InviteCodeSummary;
 
@@ -42,15 +42,15 @@ export default function InviteCodesPanel({
 }) {
   const t = useTranslations('agency.codes');
   const [codes, setCodes] = useState(initialCodes);
-  const [maxUses, setMaxUses] = useState('25');
-  const [expiresOn, setExpiresOn] = useState(isoDay(now, 90));
+  // Short by default: an unlimited code that leaks is closed by its end date or by revoking it.
+  const [expiresOn, setExpiresOn] = useState(isoDay(now, 30));
   const [label, setLabel] = useState('');
   const [error, setError] = useState<InviteActionError | null>(null);
   const [created, setCreated] = useState<{ code: string; link: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
   const createdRef = useRef<HTMLDivElement>(null);
-  const ids = { max: useId(), exp: useId(), label: useId(), err: useId() };
+  const ids = { exp: useId(), label: useId(), err: useId() };
   const registerPath = locale === 'tr' ? `/${locale}/kayit` : `/${locale}/register`;
   const dateFmt = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' });
 
@@ -63,7 +63,7 @@ export default function InviteCodesPanel({
     setError(null);
     setCopied(false);
     startTransition(async () => {
-      const res = await createInviteCode({ maxUses: Number(maxUses), expiresOn, label });
+      const res = await createInviteCode({ expiresOn, label });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -110,25 +110,9 @@ export default function InviteCodesPanel({
       {canManage ? (
         <form
           onSubmit={onCreate}
-          className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[8rem_11rem_1fr_auto] lg:items-end"
+          className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[11rem_1fr_auto] lg:items-end"
           aria-describedby={error ? ids.err : undefined}
         >
-          <div className="flex flex-col gap-1">
-            <label htmlFor={ids.max} className="text-xs font-semibold text-ink-2">
-              {t('maxUses')} <span className="font-normal text-muted">{t('maxUsesHint', { min: MIN_MAX_USES })}</span>
-            </label>
-            <input
-              id={ids.max}
-              type="number"
-              inputMode="numeric"
-              min={MIN_MAX_USES}
-              max={MAX_USES_LIMIT}
-              required
-              value={maxUses}
-              onChange={(e) => setMaxUses(e.target.value)}
-              className={input}
-            />
-          </div>
           <div className="flex flex-col gap-1">
             <label htmlFor={ids.exp} className="text-xs font-semibold text-ink-2">
               {t('expiresOn')}
@@ -210,13 +194,12 @@ export default function InviteCodesPanel({
         </p>
       ) : (
         <div className="relative overflow-x-auto rounded-xl border border-border bg-surface">
-          <table className="w-full min-w-[40rem] text-left text-sm" data-testid="invite-codes-table">
+          <table className="w-full min-w-[32rem] text-left text-sm" data-testid="invite-codes-table">
             <caption className="sr-only">{t('tableCaption')}</caption>
             <thead className="border-b border-border text-xs font-semibold text-ink-2">
               <tr>
                 <th scope="col" className="px-4 py-3">{t('colCode')}</th>
                 <th scope="col" className="px-4 py-3">{t('colLabel')}</th>
-                <th scope="col" className="px-4 py-3">{t('colLimit')}</th>
                 <th scope="col" className="px-4 py-3">{t('colExpires')}</th>
                 <th scope="col" className="px-4 py-3">{t('colStatus')}</th>
                 <th scope="col" className="px-4 py-3">
@@ -233,7 +216,6 @@ export default function InviteCodesPanel({
                       <span aria-label={t('hintSr', { hint: c.hint })}>••••-••••-{c.hint}</span>
                     </td>
                     <td className="px-4 py-3 text-ink-2">{c.label ?? '—'}</td>
-                    <td className="px-4 py-3 tabular-nums text-ink">{t('limit', { max: c.maxUses })}</td>
                     <td className="px-4 py-3 text-ink-2">{dateFmt.format(new Date(c.expiresAt))}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_CLASS[status]}`}>

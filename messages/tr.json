@@ -2146,8 +2146,6 @@
     "codes": {
       "title": "Davet kodları",
       "description": "Kod ile kayıt olan her kurum ücretsiz bir Keşif hesabı açar ve ajansınıza bağlanır. Kodun kendisi yalnız üretildiğinde bir kez gösterilir.",
-      "maxUses": "Kullanım sınırı",
-      "maxUsesHint": "En az {min}",
       "expiresOn": "Son geçerlilik günü",
       "label": "Etiket",
       "optional": "(isteğe bağlı)",
@@ -2162,16 +2160,14 @@
       "hideCode": "Kodu gizle",
       "copied": "Kopyalandı.",
       "empty": "Henüz davet kodu yok. İlk kodu yukarıdaki formla üretin.",
-      "tableCaption": "Davet kodları: ipucu, etiket, kullanım sınırı, son tarih ve durum",
+      "tableCaption": "Davet kodları: ipucu, etiket, son tarih ve durum",
       "colCode": "Kod",
       "colLabel": "Etiket",
-      "colLimit": "Kullanım sınırı",
       "colExpires": "Son geçerlilik",
       "colStatus": "Durum",
       "colActions": "İşlemler",
       "hintSr": "{hint} ile biten kod",
-      "limit": "En çok {max} kurum",
-      "countsNote": "Kurumlar tanınmasın diye bir kodun kaç kez kullanıldığı gösterilmez; yalnız durumu gösterilir; kullanım sınırına ulaşan kod da “Etkin” görünür. Kayıtlı kurum sayısı yukarıdaki panelde.",
+      "countsNote": "Kodların kullanım sınırı yoktur: kod, son geçerlilik gününe kadar ya da siz iptal edene kadar kullanılabilir. Kısa bir son tarih seçin; kod beklenmedik yerlere ulaştıysa iptal edin. Kurumlar tanınmasın diye bir kodun kaç kez kullanıldığı gösterilmez. Kayıtlı kurum sayısı yukarıdaki panelde.",
       "status": {
         "active": "Etkin",
         "revoked": "İptal edildi",
@@ -2182,7 +2178,6 @@
       "revokeConfirm": "{hint} ile biten kod iptal edilsin mi? İptal edilen kodla artık kayıt olunamaz; kayıtlı kurumlar etkilenmez.",
       "errors": {
         "forbidden": "Bu işlem için kurum yöneticisi yetkisi gerekir.",
-        "invalidMaxUses": "Kullanım sınırı 6 ile 10.000 arasında bir tam sayı olmalı.",
         "invalidExpiry": "Son geçerlilik günü yarından sonra ve en fazla bir yıl sonra olmalı.",
         "notAgency": "Bu hesap bir ajans hesabı değil.",
         "failed": "İşlem tamamlanamadı. Lütfen tekrar deneyin."

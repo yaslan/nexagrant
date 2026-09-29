@@ -19,16 +19,12 @@ import {
   inviteCodeHint,
   normalizeInviteCode,
 } from './invite-code';
-import { MAX_USES_LIMIT, MIN_MAX_USES } from './code-limits';
-
-export { MAX_USES_LIMIT, MIN_MAX_USES };
-
 /** A code outliving a year of events is a code nobody is watching. */
 export const MAX_VALIDITY_DAYS = 366;
 
 export class AgencyInviteError extends Error {
   constructor(
-    readonly code: 'NOT_AN_AGENCY' | 'INVALID_MAX_USES' | 'INVALID_EXPIRY',
+    readonly code: 'NOT_AN_AGENCY' | 'INVALID_EXPIRY',
     message: string
   ) {
     super(message);
@@ -41,7 +37,6 @@ export interface CreatedInviteCode {
   /** The code in clear. Returned exactly once; the database keeps only its hash. */
   code: string;
   hint: string;
-  maxUses: number;
   expiresAt: Date;
 }
 
@@ -60,7 +55,6 @@ export interface InviteCodeSummary {
   id: string;
   hint: string;
   label: string | null;
-  maxUses: number;
   status: InviteCodeStatus;
   expiresAt: string;
   revokedAt: string | null;
@@ -72,7 +66,6 @@ export interface InviteCodeRecord {
   id: string;
   hint: string;
   label: string | null;
-  maxUses: number;
   /** Never read for the panel (TASK-MUM2RMN3YIBGC); allowed here so a full row can be passed. */
   usedCount?: number;
   expiresAt: Date;
@@ -81,13 +74,14 @@ export interface InviteCodeRecord {
 }
 
 /**
- * No "exhausted" (TASK-MUM2RMN3YIBGC, leed-fb 29.09): a used-up code reads
- * "active". "Exhausted" gave its exact use count (= maxUses); with no
- * organisation deleted (D = 0, the pilot's usual case) that joined with the
- * funnel's rounded bounds put the one code still active at 1..4 uses
- * (TASK-MUM1OTRM75QS2-crw-fb.md B-1), and it pinned the deleted organisations
- * (R-2). Registration still refuses a used-up code, with the one message every
- * unusable code gets. `usedCount` is not read here at all.
+ * No "exhausted", and no use limit behind it (leed-fb 29.09). The panel first
+ * dropped the status (TASK-MUM2RMN3YIBGC): it gave the code's exact use count
+ * (= its limit), which joined with the funnel's rounded bounds put the one code
+ * still active at 1..4 uses (TASK-MUM1OTRM75QS2-crw-fb.md B-1). The agency could
+ * still try its own code on the registration form and read the same count
+ * from a refusal (TASK-MUM3TMP8HU76G-crw-fb.md Ö-1), so the limit itself went
+ * (TASK-MUM4WVYLSH9IT): a code is usable until it expires or is revoked, which
+ * the agency already knows. `usedCount` is not read here at all.
  */
 export function inviteCodeStatus(c: InviteCodeRecord, now: number): InviteCodeStatus {
   if (c.revokedAt) return 'revoked';
@@ -101,7 +95,6 @@ export function inviteCodeRow(c: InviteCodeRecord, now: number): InviteCodeSumma
     id: c.id,
     hint: c.hint,
     label: c.label,
-    maxUses: c.maxUses,
     status: inviteCodeStatus(c, now),
     expiresAt: c.expiresAt.toISOString(),
     revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
@@ -111,15 +104,9 @@ export function inviteCodeRow(c: InviteCodeRecord, now: number): InviteCodeSumma
 
 /** Validates the inputs a create call brings, before anything is written. */
 export function validateInviteCodeInput(
-  input: { maxUses: number; expiresAt: Date },
+  input: { expiresAt: Date },
   now: Date = new Date()
 ): void {
-  if (!Number.isInteger(input.maxUses) || input.maxUses < MIN_MAX_USES || input.maxUses > MAX_USES_LIMIT) {
-    throw new AgencyInviteError(
-      'INVALID_MAX_USES',
-      `maxUses must be an integer between ${MIN_MAX_USES} and ${MAX_USES_LIMIT}`
-    );
-  }
   const t = input.expiresAt instanceof Date ? input.expiresAt.getTime() : NaN;
   if (!Number.isFinite(t) || t <= now.getTime() || t > now.getTime() + MAX_VALIDITY_DAYS * 86_400_000) {
     throw new AgencyInviteError('INVALID_EXPIRY', `expiresAt must be in the future and at most ${MAX_VALIDITY_DAYS} days away`);
@@ -136,7 +123,7 @@ async function assertAgency(tx: TenantTx, tenantId: string): Promise<void> {
 
 export async function createInviteCodeIn(
   tx: TenantTx,
-  input: { tenantId: string; createdBy: string; maxUses: number; expiresAt: Date; label?: string | null }
+  input: { tenantId: string; createdBy: string; expiresAt: Date; label?: string | null }
 ): Promise<CreatedInviteCode> {
   validateInviteCodeInput(input);
   await assertAgency(tx, input.tenantId);
@@ -149,11 +136,10 @@ export async function createInviteCodeIn(
       codeHash: hashInviteCode(normalized),
       codeHint: inviteCodeHint(normalized),
       label: input.label?.trim() || null,
-      maxUses: input.maxUses,
       expiresAt: input.expiresAt,
       createdBy: input.createdBy,
     },
-    select: { id: true, codeHint: true, maxUses: true, expiresAt: true },
+    select: { id: true, codeHint: true, expiresAt: true },
   });
   await tx.auditEvent.create({
     data: {
@@ -161,10 +147,10 @@ export async function createInviteCodeIn(
       actorId: input.createdBy,
       type: 'agency.invite.created',
       target: row.id,
-      data: { maxUses: row.maxUses, expiresAt: row.expiresAt.toISOString() },
+      data: { expiresAt: row.expiresAt.toISOString() },
     },
   });
-  return { id: row.id, code, hint: row.codeHint, maxUses: row.maxUses, expiresAt: row.expiresAt };
+  return { id: row.id, code, hint: row.codeHint, expiresAt: row.expiresAt };
 }
 
 /**
@@ -201,7 +187,6 @@ export async function listInviteCodesIn(
       id: true,
       codeHint: true,
       label: true,
-      maxUses: true,
       expiresAt: true,
       revokedAt: true,
       createdAt: true,
@@ -213,7 +198,7 @@ export async function listInviteCodesIn(
 
 /**
  * Uses the code once and returns the agency's tenant id, or `null` for every
- * kind of unusable code — malformed, unknown, expired, spent, revoked, or
+ * kind of unusable code — malformed, unknown, expired, revoked, or
  * belonging to an agency that no longer is one. The caller cannot tell these
  * apart, and neither can whoever typed the code.
  *

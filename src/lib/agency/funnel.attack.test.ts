@@ -9,7 +9,7 @@ import {
   type FunnelCell,
 } from './funnel';
 import type { TrProvince } from '@/lib/readiness/provinces';
-import { inviteCodeRow, MIN_MAX_USES } from './codes';
+import { inviteCodeRow } from './codes';
 
 /**
  * TASK-MULZATEX4G92H (FB KAMU B2 sızıntı-2) — the gate for the small-cell rule
@@ -35,11 +35,16 @@ import { inviteCodeRow, MIN_MAX_USES } from './codes';
  *   - (TASK-MUM17YBJVAHRR, crw-fb Ö-1) the invite-code panel of the same page,
  *     exactly as `inviteCodeRow` sends it, and how codes relate to the funnel:
  *     every organisation of the cohort registered with one use of one code, so
- *     R (registered, all) ≤ Σ used; used ≤ maxUses; "exhausted" ⇒ used = maxUses.
- *     Uses whose organisation was since deleted are the slack: Σ used = R + D.
- *     It knows the rule too: a code that could show "exhausted" and does not
- *     has used ≤ maxUses − 1 (it reads whether the panel can say "exhausted"
- *     off `inviteCodeRow` itself, see {@link PANEL_SAYS_EXHAUSTED}).
+ *     R (registered, all) ≤ Σ used. Uses whose organisation was since deleted
+ *     are the slack: Σ used = R + D. Codes have no use limit any more
+ *     (TASK-MUM4WVYLSH9IT), so nothing bounds a code's uses from above; it reads
+ *     whether the panel can say "exhausted" off `inviteCodeRow` itself, see
+ *     {@link PANEL_SAYS_EXHAUSTED}.
+ *
+ *   - (TASK-MUM4WVYLSH9IT, crw-fb TASK-MUM3TMP8HU76G Ö-1) the registration form:
+ *     the agency tries each of its own codes there and sees accepted or refused
+ *     ({@link formAccepts}). Under a use limit, "refused" on a code it had
+ *     neither revoked nor let expire meant used = limit.
  *
  *   - (TASK-MUM2RMN3YIBGC, crw-fb TASK-MUM1OTRM75QS2 Ö-1) optionally, that no
  *     organisation was ever deleted: D = 0. Deleting an organisation takes a KVKK
@@ -136,7 +141,8 @@ interface Leak {
 
 /** One invite code as the database holds it. */
 interface TrueCode {
-  maxUses: number;
+  /** A retired column (TASK-MUM4WVYLSH9IT): set on codes made while codes had a limit, enforced by nothing. */
+  maxUses?: number;
   used: number;
   revoked?: boolean;
   expired?: boolean;
@@ -155,8 +161,7 @@ const DELETED = 'codes|deleted';
 
 /**
  * Whether the panel has an "exhausted" status at all, read off the function that
- * builds it: a used-up code of the smallest allowed limit. Before TASK-MUM2RMN3YIBGC
- * it had, and "active" on such a code meant used ≤ maxUses − 1.
+ * builds it: a much-used code. Before TASK-MUM2RMN3YIBGC it had.
  */
 const PANEL_SAYS_EXHAUSTED =
   inviteCodeRow(
@@ -164,8 +169,7 @@ const PANEL_SAYS_EXHAUSTED =
       id: 'probe',
       hint: 'ABCD',
       label: null,
-      maxUses: MIN_MAX_USES,
-      usedCount: MIN_MAX_USES,
+      usedCount: 10_000,
       expiresAt: new Date(NOW + 86_400_000),
       revokedAt: null,
       createdAt: new Date(NOW - 86_400_000),
@@ -174,11 +178,65 @@ const PANEL_SAYS_EXHAUSTED =
   ).status === ('exhausted' as string);
 
 /**
+ * A registration rule as the attacker knows it: what the form answers for a
+ * code, and how many uses the rule lets a code reach.
+ */
+interface FormRule {
+  accepts(c: TrueCode): boolean;
+  cap(c: TrueCode): number;
+}
+
+/**
+ * What the registration form answers when the agency tries one of its own codes:
+ * redeem_agency_invite() as agency-invite-no-max-uses.sql defines it — usable
+ * unless revoked or expired, however often it was used. The live test
+ * "probing" in tests/agency-invite.live.test.ts asserts the same on the real
+ * function under fabrika_app.
+ */
+const FORM_NOW: FormRule = {
+  accepts: (c) => !c.revoked && !c.expired,
+  cap: () => Infinity,
+};
+
+/** The form before TASK-MUM4WVYLSH9IT (add-agency-invite-code.sql): refused at used = maxUses too. Positive control only. */
+const FORM_WITH_LIMIT: FormRule = {
+  accepts: (c) => FORM_NOW.accepts(c) && c.used < (c.maxUses ?? Infinity),
+  cap: (c) => c.maxUses ?? Infinity,
+};
+
+/** How far the attacker scans an unbounded code's uses for ones consistent with the form's answer. */
+const PROBE_SCAN = 200;
+
+/** Organisations per code in the property gate's `sequential` mode (crw-fb's org-global-zero-six). */
+const SEQUENTIAL_BATCH = 6;
+
+/**
+ * The uses consistent with what the form answered, within [lo, hi]: every u for
+ * which the rule gives the answer the attacker saw. Both rules are monotone in
+ * u, so the consistent uses form one interval.
+ */
+function probe(c: TrueCode, rule: FormRule, lo: number, hi: number): [number, number] {
+  hi = Math.min(hi, rule.cap(c));
+  const seen = rule.accepts(c);
+  const top = Math.min(hi, lo + PROBE_SCAN);
+  let first = -1;
+  let last = -1;
+  for (let u = lo; u <= top; u++) {
+    if (rule.accepts({ ...c, used: u }) !== seen) continue;
+    if (first < 0) first = u;
+    last = u;
+  }
+  if (first < 0) throw new Error('the true uses are not consistent with the form answer');
+  return [first, last === top && top < hi ? hi : last];
+}
+
+/**
  * The invite-code panel: every code of the agency through `inviteCodeRow`, the
  * one function whose output reaches the page props and the list actions, then
- * through JSON as the browser receives it. The attacker reads whatever is there.
+ * through JSON as the browser receives it. The attacker reads whatever is there,
+ * and, with `form`, tries every code on the registration form as well.
  */
-function publishCodes(codes: TrueCode[]): CodeKnowledge[] {
+function publishCodes(codes: TrueCode[], form?: FormRule): CodeKnowledge[] {
   return codes.map((c, i) => {
     const row = JSON.parse(
       JSON.stringify(
@@ -187,7 +245,6 @@ function publishCodes(codes: TrueCode[]): CodeKnowledge[] {
             id: `code-${i}`,
             hint: 'ABCD',
             label: null,
-            maxUses: c.maxUses,
             usedCount: c.used,
             expiresAt: new Date(NOW + (c.expired ? -1 : 30) * 86_400_000),
             revokedAt: c.revoked ? new Date(NOW - 60_000) : null,
@@ -197,7 +254,8 @@ function publishCodes(codes: TrueCode[]): CodeKnowledge[] {
         )
       )
     ) as Record<string, unknown>;
-    const max = row.maxUses as number;
+    // A limit the panel still sent would cap the uses; none is sent, and none is enforced.
+    const max = typeof row.maxUses === 'number' ? row.maxUses : Infinity;
     let lo = 0;
     let hi = max;
     if (typeof row.usedCount === 'number') lo = hi = row.usedCount;
@@ -206,7 +264,7 @@ function publishCodes(codes: TrueCode[]): CodeKnowledge[] {
       (row.status as string | undefined) ??
       (row.revokedAt ? 'revoked' : Date.parse(row.expiresAt as string) <= NOW ? 'expired' : row.exhausted ? 'exhausted' : 'active');
     if (status === 'exhausted') lo = Math.max(lo, max);
-    if (PANEL_SAYS_EXHAUSTED && status === 'active' && max >= MIN_MAX_USES) hi = Math.min(hi, max - 1);
+    if (form) [lo, hi] = probe(c, form, lo, hi);
     return { truth: c.used, lo, hi };
   });
 }
@@ -405,66 +463,90 @@ describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', ()
   test('A = 7, B = "<5", funnel total "10" (R 8..12): B is not read back as 1..4', () => {
     // Before TASK-MUM17YBJVAHRR the panel sent A's 7: B ≥ 8 − 7 = 1 and "<5" says B ≤ 4.
     const t = tableOf({ Samsun: { SME: [10, 10, 10, 10, 0, 0, 0] } });
-    const codes = publishCodes([
-      { maxUses: 25, used: 7 },
-      { maxUses: 25, used: 3 },
-    ]);
+    const codes = publishCodes([{ used: 7 }, { used: 3 }], FORM_NOW);
     expect(attack(t, publish(t), { codes })).toEqual([]);
   });
 
-  test('one code, used up: the panel says "exhausted", never how many', () => {
+  test('one much-used code: the panel reads "active", never how many (K-1)', () => {
     const t = tableOf({ Samsun: { SME: [8, 6, 8, 3, 2, 1, 0] } });
-    expect(attack(t, publish(t), { codes: publishCodes([{ maxUses: 8, used: 8 }]) })).toEqual([]);
+    expect(attack(t, publish(t), { codes: publishCodes([{ used: 8 }], FORM_NOW) })).toEqual([]);
   });
 
-  test('"active" must not mean "under 5" either: a new code allows at least 6 uses', () => {
-    // A code that can show "exhausted" and shows "active" has used ≤ maxUses − 1. With two
-    // 5-use codes and a funnel of 5, that is 1..4 each (5 − 4 ≥ 1): hence 6, not 5.
-    expect(MIN_MAX_USES - 1).toBeGreaterThanOrEqual(SMALL_CELL_THRESHOLD);
+  test('"active" bounds nothing: no code has a use limit, so a funnel of 5 over two codes gives neither a floor', () => {
     const t = tableOf({ Samsun: { SME: [5, 5, 5, 5, 0, 0, 0] } });
-    const codes = publishCodes([
-      { maxUses: MIN_MAX_USES, used: 3 },
-      { maxUses: MIN_MAX_USES, used: 2 },
-    ]);
+    const codes = publishCodes([{ used: 3 }, { used: 2 }], FORM_NOW);
+    expect(codes.every((c) => c.hi === Infinity)).toBe(true);
     expect(attack(t, publish(t), { codes })).toEqual([]);
+    expect(attack(t, publish(t), { codes, noneDeleted: true })).toEqual([]);
   });
 
   test('the deleted organisations (R-2) are not read back: nothing gives Σ used a lower bound', () => {
-    // One 8-use code, used up; 2 of its 8 organisations deleted since: R = 6, shown "5" (5..7).
+    // One code, 8 uses; 2 of its 8 organisations deleted since: R = 6, shown "5" (5..7).
     // While the panel said "exhausted", Σ used = 8 exactly and D = 8 − R ∈ [1, 3]
     // (TASK-MUM17YBJVAHRR left this open). Without that status Σ used is only ≥ R.
     const t = tableOf({ Samsun: { SME: [6, 6, 6, 6, 0, 0, 0] } });
-    const leaks = attack(t, publish(t), { codes: publishCodes([{ maxUses: 8, used: 8 }]) });
+    const leaks = attack(t, publish(t), { codes: publishCodes([{ maxUses: 8, used: 8 }], FORM_NOW) });
     expect(leaks).toEqual([]);
   });
 
-  test('the panel never says "exhausted": a used-up code reads "active" (TASK-MUM2RMN3YIBGC)', () => {
+  test('the panel never says "exhausted": a much-used code reads "active" (TASK-MUM2RMN3YIBGC)', () => {
     expect(PANEL_SAYS_EXHAUSTED).toBe(false);
   });
 
-  test('D = 0, crw-fb org-global-zero-six #17: 4 used-up 6-use codes + funnel "25", types "15"/"15" do not bound the fifth code to 2..3', () => {
-    // TASK-MUM1OTRM75QS2-crw-fb.md Kart 1 B-1. 27 organisations, none deleted. Types are
-    // disjoint, so R ≥ 13 + 13 = 26; "25" gives R ≤ 27. With "exhausted" ×4, R = 24 + a and
-    // a ∈ [2, 3] (true 3).
+  describe('probing the registration form (TASK-MUM3TMP8HU76G-crw-fb.md Kart 1 Ö-1, TASK-MUM4WVYLSH9IT)', () => {
+    // crw-fb's #17 (TASK-MUM1OTRM75QS2-crw-fb.md Kart 1 B-1), org-global-zero-six: 27
+    // organisations, none deleted, over five codes handed out one after another. Types are
+    // disjoint, so R ≥ 13 + 13 = 26; "25" gives R ≤ 27.
     const t = tableOf({
       [NO_PROVINCE]: { MUNICIPALITY: [3, 2, 3, 0, 0, 0, 0], UNIVERSITY: [3, 2, 3, 1, 0, 0, 0] },
       Samsun: { MUNICIPALITY: [6, 4, 6, 2, 1, 0, 0], UNIVERSITY: [5, 2, 5, 1, 1, 1, 0] },
       Tokat: { MUNICIPALITY: [4, 3, 4, 3, 0, 0, 0], UNIVERSITY: [6, 4, 6, 0, 3, 2, 0] },
     });
-    const codes = publishCodes([6, 6, 6, 6, 3].map((used) => ({ maxUses: 6, used })));
-    expect(attack(t, publish(t), { codes, noneDeleted: true })).toEqual([]);
-    expect(attack(t, publish(t), { codes })).toEqual([]);
+    // The first four were made with a limit of 6 (the retired column keeps it) and used 6 times.
+    const trueCodes: TrueCode[] = [6, 6, 6, 6, 3].map((used) => ({ maxUses: 6, used }));
+
+    test('positive control: under a use limit the form says "refused" ×4, and the fifth code is read back as 2..3', () => {
+      const codes = publishCodes(trueCodes, FORM_WITH_LIMIT);
+      expect(codes.slice(0, 4).map((c) => [c.lo, c.hi])).toEqual([[6, 6], [6, 6], [6, 6], [6, 6]]);
+      const leaks = attack(t, publish(t), { codes, noneDeleted: true });
+      expect(leaks).toContainEqual({ target: 'code#4', truth: 3, lo: 2, hi: 3 });
+    });
+
+    test('no use limit: every live code is accepted, so the form tells nothing the panel does not (D = 0 and D ≥ 0)', () => {
+      const codes = publishCodes(trueCodes, FORM_NOW);
+      expect(trueCodes.map(FORM_NOW.accepts)).toEqual([true, true, true, true, true]);
+      expect(codes.map((c) => [c.lo, c.hi])).toEqual(trueCodes.map(() => [0, Infinity]));
+      expect(attack(t, publish(t), { codes, noneDeleted: true })).toEqual([]);
+      expect(attack(t, publish(t), { codes })).toEqual([]);
+    });
+
+    test('"no information": the form answer is a function of the status the panel already shows, at any use count', () => {
+      for (const used of [0, 1, 4, 5, 6, 7, 25, 10_000]) {
+        for (const maxUses of [undefined, 1, 4, 6, 25]) {
+          for (const [revoked, expired] of [[false, false], [true, false], [false, true]] as const) {
+            const c: TrueCode = { maxUses, used, revoked, expired };
+            const [shown] = publishCodes([c]);
+            const [probed] = publishCodes([c], FORM_NOW);
+            expect(probed).toEqual(shown);
+          }
+        }
+      }
+    });
   });
 
-  test('known residual: codes made before the minimum (maxUses < 5) still bound their uses to 1..4', () => {
-    // The agency knows the limit it set. Two 4-use codes and a funnel of 5 give each ≥ 1.
-    // Not fixable on the panel; such codes are listed in the report for revocation.
+  test('former residual closed: codes made with a limit under 5 no longer bound their uses to 1..4', () => {
+    // Before TASK-MUM4WVYLSH9IT two 4-use codes and a funnel of 5 gave each ≥ 1 (the agency
+    // knew the limit it set). The retired column still holds 4, but no rule enforces it.
     const t = tableOf({ Samsun: { SME: [5, 5, 5, 5, 0, 0, 0] } });
-    const codes = publishCodes([
-      { maxUses: 4, used: 3, revoked: true },
-      { maxUses: 4, used: 2 },
-    ]);
-    expect(attack(t, publish(t), { codes }).map((l) => l.target)).toEqual(['code#0', 'code#1']);
+    const codes = publishCodes(
+      [
+        { maxUses: 4, used: 3, revoked: true },
+        { maxUses: 4, used: 2 },
+      ],
+      FORM_NOW
+    );
+    expect(attack(t, publish(t), { codes })).toEqual([]);
+    expect(attack(t, publish(t), { codes, noneDeleted: true })).toEqual([]);
   });
 });
 
@@ -508,13 +590,14 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
   }
 
   /**
-   * The agency's codes behind `table`: its R organisations spread over 1..3 codes that a
-   * create call accepts today (maxUses ≥ MIN_MAX_USES), plus 0..3 uses whose organisation
-   * was deleted (none when `noneDeleted`). About a third are used up; some revoked or expired.
+   * The agency's codes behind `table`: its R organisations spread over 1..3 codes, plus
+   * 0..3 uses whose organisation was deleted (none when `noneDeleted`). Codes have no use
+   * limit (TASK-MUM4WVYLSH9IT); some carry an old one in the retired column, and some
+   * are used past it. Some are revoked or expired.
    *
-   * `sequential`: codes of the smallest limit handed out one after another, each used up
-   * before the next — crw-fb's org-global-zero-six (TASK-MUM1OTRM75QS2), where "exhausted"
-   * leaked the last code's uses under D = 0 (21 of 3,000 tables; 0 with the random spread).
+   * `sequential`: codes handed out one after another, six organisations each — crw-fb's
+   * org-global-zero-six (TASK-MUM1OTRM75QS2), where "exhausted" leaked the last code's uses
+   * under D = 0 (21 of 3,000 tables; 0 with the random spread).
    */
   function randomCodes(table: Table, rand: () => number, noneDeleted: boolean, sequential: boolean): TrueCode[] {
     const ri = (a: number, b: number) => a + Math.floor(rand() * (b - a + 1));
@@ -523,18 +606,18 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
     const total = registered + (noneDeleted ? 0 : ri(0, 3));
     if (sequential) {
       const codes: TrueCode[] = [];
-      for (let n = total; n > 0 || !codes.length; n -= MIN_MAX_USES) {
-        codes.push({ maxUses: MIN_MAX_USES, used: Math.max(0, Math.min(MIN_MAX_USES, n)) });
+      for (let n = total; n > 0 || !codes.length; n -= SEQUENTIAL_BATCH) {
+        codes.push({ maxUses: SEQUENTIAL_BATCH, used: Math.max(0, Math.min(SEQUENTIAL_BATCH, n)) });
       }
       return codes;
     }
     const used = Array.from({ length: ri(1, 3) }, () => 0);
     for (let n = total; n > 0; n--) used[ri(0, used.length - 1)]!++;
     return used.map((u) => {
-      const floor = Math.max(u, MIN_MAX_USES);
       const r = rand();
+      const legacy = rand();
       return {
-        maxUses: rand() < 0.35 ? floor : floor + ri(1, 12),
+        maxUses: legacy < 0.3 ? Math.max(1, u - ri(0, 3)) : legacy < 0.5 ? u + ri(0, 12) : undefined,
         used: u,
         revoked: r < 0.1,
         expired: r >= 0.1 && r < 0.2,
@@ -548,7 +631,7 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
   for (const noneDeleted of [false, true]) {
     for (const sequential of [false, true]) {
       for (const seed of [1, 7, 42]) {
-        const mode = `${noneDeleted ? 'D = 0' : 'D ≥ 0'}, ${sequential ? 'sequential 6-use codes' : 'random codes'}`;
+        const mode = `${noneDeleted ? 'D = 0' : 'D ≥ 0'}, ${sequential ? 'sequential codes of 6' : 'random codes'}`;
         test(`seed ${seed}, ${mode}: 300 random small tables, every view and the code panel joined`, () => {
           const rand = stream(seed);
           // A stream of its own, so the tables are the same ones the funnel-only gate saw.
@@ -560,8 +643,9 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
           for (let k = 0; k < 300; k++) {
             const t = randomTable(rand, readinessRand);
             // Every funnel group, every code's uses, and the deleted organisations are gated.
+            // The attacker also tries every code on the registration form (TASK-MUM4WVYLSH9IT).
             const leaks = attack(t, publish(t), {
-              codes: publishCodes(randomCodes(t, codeRand, noneDeleted, sequential)),
+              codes: publishCodes(randomCodes(t, codeRand, noneDeleted, sequential), FORM_NOW),
               noneDeleted,
             });
             if (leaks.length) tablesWithLeak++;

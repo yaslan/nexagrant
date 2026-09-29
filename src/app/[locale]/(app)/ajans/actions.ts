@@ -29,12 +29,11 @@ async function managerScope() {
   return scope;
 }
 
-export type InviteActionError = 'forbidden' | 'invalidMaxUses' | 'invalidExpiry' | 'notAgency' | 'failed';
+export type InviteActionError = 'forbidden' | 'invalidExpiry' | 'notAgency' | 'failed';
 
 function errorCode(e: unknown): InviteActionError {
   if (e instanceof AgencyPermissionError) return 'forbidden';
   if (e instanceof AgencyInviteError) {
-    if (e.code === 'INVALID_MAX_USES') return 'invalidMaxUses';
     if (e.code === 'INVALID_EXPIRY') return 'invalidExpiry';
     return 'notAgency';
   }
@@ -47,12 +46,11 @@ function revalidate() {
 }
 
 export async function createInviteCode(input: {
-  maxUses: number;
   /** yyyy-mm-dd; the code stays valid through the end of that day (UTC). */
   expiresOn: string;
   label: string;
 }): Promise<
-  | { ok: true; code: string; hint: string; maxUses: number; expiresAt: string }
+  | { ok: true; code: string; hint: string; expiresAt: string }
   | { ok: false; error: InviteActionError }
 > {
   const expiresAt = /^\d{4}-\d{2}-\d{2}$/.test(input.expiresOn)
@@ -64,7 +62,6 @@ export async function createInviteCode(input: {
       createInviteCodeIn(tx, {
         tenantId: scope.tenantId,
         createdBy: scope.userId,
-        maxUses: input.maxUses,
         expiresAt,
         label: input.label.slice(0, 80),
       })
@@ -74,7 +71,6 @@ export async function createInviteCode(input: {
       ok: true,
       code: created.code,
       hint: created.hint,
-      maxUses: created.maxUses,
       expiresAt: created.expiresAt.toISOString(),
     };
   } catch (e) {
