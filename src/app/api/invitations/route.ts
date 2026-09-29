@@ -248,7 +248,8 @@ type MailOutcome =
  * error — but it is never silent either:
  *   • no SMTP → `reportMailNotConfigured`;
  *   • no usable NEXT_PUBLIC_APP_URL → an error SystemAlert, because the only
- *     link we could mail is a localhost one (TASK-MUMO2XIQEHGUD, K-3);
+ *     link we could mail is a localhost one (TASK-MUMO2XIQEHGUD, K-3) or, in
+ *     production, an http:// one or one with a query glued in (İNCELEME-39);
  *   • the tenant's daily limit → a warning SystemAlert, one open row per tenant;
  *   • a refused send → a warning SystemAlert that names the invitation by id,
  *     never by address, and an `invitation.email_failed` row that ends the
@@ -268,11 +269,12 @@ async function deliverInvitationEmail(params: {
     return { sent: false, reason: 'smtp_not_configured' };
   }
   if (!params.mailBaseUrl) {
-    console.error('[Invitations] NEXT_PUBLIC_APP_URL is unset or loopback — invitation email not sent');
+    console.error('[Invitations] NEXT_PUBLIC_APP_URL is not usable — invitation email not sent');
     await recordAlert({
       level: 'error',
       source: 'invitations',
-      message: 'NEXT_PUBLIC_APP_URL is unset (or a loopback address in production): invitation emails are not being sent',
+      message:
+        'NEXT_PUBLIC_APP_URL is not usable (unset, or in production loopback, http:// or more than an origin): invitation emails are not being sent',
       dedupeKey: 'invitation-mail-app-url-missing',
     });
     return { sent: false, reason: 'app_url_not_configured' };

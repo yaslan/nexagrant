@@ -475,7 +475,9 @@ describe('POST /api/invitations — mail limits', () => {
 
   test('without a usable NEXT_PUBLIC_APP_URL in production nothing is mailed and an error alert is raised', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    for (const url of [undefined, 'http://localhost:3000']) {
+    // http:// and a query in production: İNCELEME-39 B-1/B-3, the docs promise
+    // mails stay off for them rather than carry the token over http.
+    for (const url of [undefined, 'http://localhost:3000', 'http://app.example.invalid', 'https://app.example.invalid/?x=1']) {
       envOverride.NEXT_PUBLIC_APP_URL = url;
       recordAlert.mockClear();
       const res = await invite(nextEmail());
@@ -483,6 +485,8 @@ describe('POST /api/invitations — mail limits', () => {
       expect(recordAlert).toHaveBeenCalledWith(
         expect.objectContaining({ level: 'error', dedupeKey: 'invitation-mail-app-url-missing' })
       );
+      // The inviter still gets a link to pass on by hand, never an http:// one.
+      expect(res.body.inviteLink).toMatch(/^https:\/\/fonbridge\.com\/tr\/accept-invite\?token=/);
       await admin!.invitation.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
     }
     expect(send).not.toHaveBeenCalled();

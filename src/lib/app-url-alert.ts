@@ -7,7 +7,8 @@ import { recordAlert } from '@/lib/observability/system-alert';
  * SystemAlert, the same channel `invitationMailBaseUrl`'s null already uses
  * (dedupe key per problem, so a restart loop folds into one row). Never
  * throws and never stops the server — the links fall back to
- * CANONICAL_APP_URL, but Google Calendar connect and invitation mails stay off.
+ * CANONICAL_APP_URL, but Google Calendar connect and invitation mails stay off
+ * (`appBaseUrl()` is null for every problem named here).
  */
 export async function reportAppUrlProblem(
   source?: Parameters<typeof appUrlProblem>[0],
@@ -23,7 +24,7 @@ export async function reportAppUrlProblem(
 
 const DESCRIBE: Record<AppUrlProblem, string> = {
   unset: 'unset',
-  invalid: 'not a URL',
+  invalid: 'not a bare origin URL (no path, query or fragment)',
   loopback: 'a loopback (localhost) address',
   insecure: 'an http:// URL',
 };

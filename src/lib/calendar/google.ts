@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { appBaseUrl, type AppUrlSource } from '@/lib/app-url';
+import { CalendarActionError } from './errors';
 import {
   CalendarEvent,
   CalendarProvider,
@@ -34,10 +35,14 @@ export class GoogleCalendarProvider implements CalendarProvider {
       throw new Error('GOOGLE_OAUTH_CLIENT_ID not configured (mock/dev mode)');
     }
     // Was a fixed http://localhost:3000 redirect_uri, which Google rejects for
-    // any registered live client (TASK-MUN3OAFIVW9NA).
+    // any registered live client (TASK-MUN3OAFIVW9NA). In production
+    // `appBaseUrl()` is also null for an http:// value or one with a query
+    // (İNCELEME-39 B-1, B-3), so authorisation is never started on those; the
+    // code is one the settings screen translates.
     const baseUrl = appBaseUrl(this.appUrlSource);
     if (!baseUrl) {
-      throw new Error('NEXT_PUBLIC_APP_URL not configured: no Google Calendar redirect_uri');
+      console.error('[calendar] NEXT_PUBLIC_APP_URL not usable: no Google Calendar redirect_uri');
+      throw new CalendarActionError('CALENDAR_APP_URL_NOT_CONFIGURED');
     }
     // CSRF: the caller keeps `state` (e.g. in an httpOnly cookie) and the
     // callback must refuse a response whose `state` does not match it.

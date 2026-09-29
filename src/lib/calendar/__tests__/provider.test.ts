@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { IcsProvider } from '../ics';
 import { CalendarProviderNotImplementedError, CalendarProviderSchema } from '../provider';
 import { GoogleCalendarProvider } from '../google';
+import { CalendarActionError, calendarErrorCode } from '../errors';
 import { createCalendarProvider } from '../factory';
 import type { CalendarProviderType } from '../provider';
 
@@ -90,6 +93,8 @@ describe('CalendarProvider', () => {
       expect(url.searchParams.get('redirect_uri')).toBe('https://fonbridge.com/api/calendar/callback');
       expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/calendar.events');
       expect(url.searchParams.get('response_type')).toBe('code');
+      // Without it Google returns no refresh token (İNCELEME-39 A6).
+      expect(url.searchParams.get('access_type')).toBe('offline');
       expect(result.authUrl).not.toContain('localhost');
       // Encoded, not pasted raw into the query string.
       expect(result.authUrl).toContain('redirect_uri=https%3A%2F%2Ffonbridge.com%2Fapi%2Fcalendar%2Fcallback');
@@ -113,10 +118,43 @@ describe('CalendarProvider', () => {
     });
 
     it('refuses to build a redirect_uri without a usable NEXT_PUBLIC_APP_URL', async () => {
-      for (const NEXT_PUBLIC_APP_URL of [undefined, '  ', 'http://localhost:3000', 'not a url']) {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      // http:// and a query are İNCELEME-39 B-1 and B-3: the docs promise that
+      // Calendar connect stays off for them, with a code the screen translates.
+      for (const NEXT_PUBLIC_APP_URL of [
+        undefined,
+        '  ',
+        'http://localhost:3000',
+        'not a url',
+        'http://fonbridge.com',
+        'https://fonbridge.com/?x=1',
+        'https://fonbridge.com#x',
+      ]) {
         const p = new GoogleCalendarProvider('client123', undefined, { NODE_ENV: 'production', NEXT_PUBLIC_APP_URL });
-        await expect(p.connect()).rejects.toThrow('NEXT_PUBLIC_APP_URL not configured');
+        const refused = await p.connect().then(
+          () => null,
+          (e: unknown) => e
+        );
+        expect(refused).toBeInstanceOf(CalendarActionError);
+        expect(calendarErrorCode(refused)).toBe('CALENDAR_APP_URL_NOT_CONFIGURED');
       }
+      error.mockRestore();
+    });
+
+    it('has a tr and an en message for the refusal the settings screen shows', () => {
+      for (const locale of ['tr', 'en']) {
+        const messages = JSON.parse(readFileSync(resolve(__dirname, `../../../../messages/${locale}.json`), 'utf8'));
+        expect(messages.settings.calendar.errors.CALENDAR_APP_URL_NOT_CONFIGURED).toMatch(/NEXT_PUBLIC_APP_URL/);
+      }
+    });
+
+    it('builds the redirect_uri from the origin only', async () => {
+      const dev = new GoogleCalendarProvider('client123', undefined, {
+        NODE_ENV: 'development',
+        NEXT_PUBLIC_APP_URL: 'http://localhost:3000/?x=1',
+      });
+      const url = new URL((await dev.connect()).authUrl);
+      expect(url.searchParams.get('redirect_uri')).toBe('http://localhost:3000/api/calendar/callback');
     });
 
     it('should throw when client ID is missing', async () => {

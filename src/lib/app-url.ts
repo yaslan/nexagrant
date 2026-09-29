@@ -17,21 +17,22 @@ export const CANONICAL_APP_URL = 'https://fonbridge.com';
 const DEV_APP_URL = 'http://localhost:3000';
 
 /**
- * NEXT_PUBLIC_APP_URL without a trailing slash, or null when there is none:
- * unset, blank or not a URL → null everywhere; in production a loopback host is
- * null as well. A loopback URL set on purpose in development is allowed.
+ * The origin of NEXT_PUBLIC_APP_URL (scheme, host, port; no path, query or
+ * trailing slash), or null when there is none.
+ *
+ * In production it is null whenever `appUrlProblem()` names a problem: unset,
+ * not a URL, loopback, http:// or more than an origin. The invitation mail and
+ * the Google Calendar redirect_uri are built from this and nothing else, so the
+ * `.env.example` promise holds: with a wrong value both stay off rather than go
+ * out over http:// or with a query glued in front of the path (B-1 and B-3 of
+ * İNCELEME-39). Outside production a loopback or http:// URL set on purpose
+ * (mailpit, `next dev`) is allowed.
  */
 export function appBaseUrl(source: AppUrlSource = env): string | null {
-  const raw = source.NEXT_PUBLIC_APP_URL?.trim();
-  if (!raw) return null;
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return null;
-  }
-  if (source.NODE_ENV === 'production' && isLoopback(url.hostname)) return null;
-  return raw.replace(/\/+$/, '');
+  if (source.NODE_ENV === 'production' && appUrlProblem(source)) return null;
+  const url = parseAppUrl(source);
+  if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) return null;
+  return url.origin;
 }
 
 /**
@@ -48,24 +49,36 @@ export type AppUrlProblem = 'unset' | 'invalid' | 'loopback' | 'insecure';
 
 /**
  * What is wrong with NEXT_PUBLIC_APP_URL in production, or null when nothing
- * is (and always null outside production). `insecure` is an `http://` URL:
- * `appBaseUrl()` still returns it, but OAuth providers refuse a non-https
- * redirect_uri for anything but localhost and mail links would go out in the
- * clear.
+ * is (and always null outside production). Any answer but null makes
+ * `appBaseUrl()` null there too.
+ *   • `invalid`: not a URL, or more than an origin — a query, a fragment, a
+ *     path or credentials. A link built as `${base}/path` would carry them in
+ *     the wrong place (`https://fonbridge.com/?x=1/api/calendar/callback`).
+ *   • `insecure`: not https. OAuth providers refuse such a redirect_uri for
+ *     anything but localhost, and invitation links would go out in the clear.
  */
 export function appUrlProblem(source: AppUrlSource = env): AppUrlProblem | null {
   if (source.NODE_ENV !== 'production') return null;
-  const raw = source.NEXT_PUBLIC_APP_URL?.trim();
-  if (!raw) return 'unset';
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return 'invalid';
-  }
+  if (!source.NEXT_PUBLIC_APP_URL?.trim()) return 'unset';
+  const url = parseAppUrl(source);
+  if (!url) return 'invalid';
   if (isLoopback(url.hostname)) return 'loopback';
   if (url.protocol !== 'https:') return 'insecure';
+  // `https://fonbridge.com?` parses to an empty `search`, hence the raw check.
+  const raw = source.NEXT_PUBLIC_APP_URL.trim();
+  if (url.search || url.hash || raw.includes('?') || raw.includes('#')) return 'invalid';
+  if (url.pathname !== '/' || url.username || url.password) return 'invalid';
   return null;
+}
+
+function parseAppUrl(source: AppUrlSource): URL | null {
+  const raw = source.NEXT_PUBLIC_APP_URL?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw);
+  } catch {
+    return null;
+  }
 }
 
 function isLoopback(hostname: string): boolean {

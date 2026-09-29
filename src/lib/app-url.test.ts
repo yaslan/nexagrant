@@ -24,6 +24,32 @@ describe('appBaseUrl', () => {
   it('keeps a loopback URL set on purpose in development', () => {
     expect(appBaseUrl(dev('http://localhost:3000'))).toBe('http://localhost:3000');
   });
+
+  // B-1 of İNCELEME-39: the docs say an http:// value keeps Calendar connect and
+  // invitation mails off; appBaseUrl() is what both of them read.
+  it('is null in production for an http:// value, so nothing is built on it', () => {
+    expect(appBaseUrl(prod('http://fonbridge.com'))).toBeNull();
+    expect(appBaseUrl(prod('HTTP://fonbridge.com/'))).toBeNull();
+  });
+
+  // B-3 of İNCELEME-39: `https://fonbridge.com/?x=1` used to come back whole, and
+  // the redirect_uri became `https://fonbridge.com/?x=1/api/calendar/callback`.
+  it('is null in production for any value with more than an origin', () => {
+    for (const url of [
+      'https://fonbridge.com/?x=1',
+      'https://fonbridge.com#top',
+      'https://fonbridge.com/app',
+      'https://user:pass@fonbridge.com',
+    ]) {
+      expect(appBaseUrl(prod(url))).toBeNull();
+    }
+  });
+
+  it('returns only the origin outside production', () => {
+    expect(appBaseUrl(dev('http://localhost:3000/?x=1#y'))).toBe('http://localhost:3000');
+    expect(appBaseUrl(dev('http://localhost:3000/app/'))).toBe('http://localhost:3000');
+    expect(appBaseUrl(dev('mailto:someone@example.invalid'))).toBeNull();
+  });
 });
 
 describe('appUrl', () => {
@@ -34,6 +60,8 @@ describe('appUrl', () => {
   it('never falls back to localhost in production', () => {
     expect(appUrl(prod(undefined))).toBe(CANONICAL_APP_URL);
     expect(appUrl(prod('http://localhost:3000'))).toBe('https://fonbridge.com');
+    expect(appUrl(prod('http://fonbridge.com'))).toBe(CANONICAL_APP_URL);
+    expect(appUrl(prod('https://fonbridge.com/?x=1'))).toBe(CANONICAL_APP_URL);
   });
 
   it('falls back to localhost outside production', () => {
@@ -49,6 +77,25 @@ describe('appUrlProblem', () => {
     expect(appUrlProblem(prod('https://127.0.0.1'))).toBe('loopback');
     expect(appUrlProblem(prod('http://fonbridge.com'))).toBe('insecure');
     expect(appUrlProblem(prod('https://fonbridge.com'))).toBeNull();
+    expect(appUrlProblem(prod('https://fonbridge.com/'))).toBeNull();
+  });
+
+  it('calls a query, fragment, path or credentials in the value invalid (B-3)', () => {
+    for (const url of [
+      'https://fonbridge.com/?x=1',
+      'https://fonbridge.com?',
+      'https://fonbridge.com#top',
+      'https://fonbridge.com/app',
+      'https://user:pass@fonbridge.com',
+    ]) {
+      expect(appUrlProblem(prod(url))).toBe('invalid');
+    }
+  });
+
+  it('is null exactly when appBaseUrl() has a value in production', () => {
+    for (const url of [undefined, 'fonbridge.com', 'http://localhost:3000', 'http://fonbridge.com', 'https://fonbridge.com/?x=1', 'https://fonbridge.com', 'https://fonbridge.com/']) {
+      expect(appUrlProblem(prod(url)) === null).toBe(appBaseUrl(prod(url)) !== null);
+    }
   });
 
   it('is silent outside production', () => {
