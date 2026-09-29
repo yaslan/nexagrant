@@ -111,11 +111,11 @@ function newEmail(tag: string): string {
 }
 
 /** The signed invite cookie exactly as `loginWithSocialAction` writes it. */
-function parkInvite(code: string, acknowledgement: string, now = Date.now()) {
+function parkInvite(code: string, acknowledgement: string, now = Date.now(), locale: 'tr' | 'en' = 'tr') {
   jar.clear();
   jar.set(
     lib.cookie.REGISTRATION_INVITE_COOKIE,
-    lib.cookie.encodeRegistrationInvite({ code, acknowledgement, locale: 'tr' }, process.env.AUTH_SECRET!, now)
+    lib.cookie.encodeRegistrationInvite({ code, acknowledgement, locale }, process.env.AUTH_SECRET!, now)
   );
 }
 
@@ -478,5 +478,102 @@ describe('registration choice cookies are single use (İNCELEME-12 Ö-1)', () =>
     const res = await handlers.GET(new NextRequestCtor!('http://localhost:3000/api/auth/signin'));
     expect(res.status).toBe(302);
     expect(new URL(res.headers.get('location')!, 'http://localhost:3000').pathname).toBe('/tr/giris');
+  });
+});
+
+/**
+ * İNCELEME-13 B-1 (crw-fb, TASK-MUM74TE5F3K44) — the plain acknowledgement
+ * cookie belongs to the one registration it was ticked for. It used to be only
+ * set on a ticked start and only cleared by a registration, so a tick parked by
+ * somebody who gave up at Google's consent screen registered the next person
+ * in that browser as having read the notice.
+ *
+ * The starts go through the app's own server action; its `signIn` is the real
+ * one and leaves for the (real, unconfigured) provider by throwing, which is
+ * all these tests need from it — the cookie work happens before that.
+ */
+describe('acknowledgement cookie is spent by every OAuth outcome (İNCELEME-13 B-1)', () => {
+  let action: typeof import('../src/lib/actions/auth');
+  const ackParked = () => jar.has(lib.ack.REGISTRATION_ACK_COOKIE);
+  const parkAck = () => jar.set(lib.ack.REGISTRATION_ACK_COOKIE, lib.consent.registrationAcknowledgementToken());
+
+  beforeAll(async () => {
+    if (!ready) return;
+    action = await import('../src/lib/actions/auth');
+  });
+
+  test("crw-fb's scenario: A ticks and gives up, B starts unticked with a new Google account — refused, no user, no consent", async () => {
+    // A: /kayit, box ticked, Google, gives up at Google's consent screen.
+    await action.loginWithSocialAction('google', '/tr/dashboard', lib.consent.registrationAcknowledgementToken()).catch(() => {});
+    expect(ackParked()).toBe(true);
+
+    // B: same browser, "Giriş Yap" tab (no box), a Google account with no user yet.
+    await action.loginWithSocialAction('google', '/tr/dashboard', undefined).catch(() => {});
+    expect(ackParked()).toBe(false);
+
+    const email = newEmail('b1-stale');
+    const res = await callback('google', { sub: `${RUN}-b1`, email, email_verified: true });
+    expect(res.location).toMatch(/\/tr\/kayit\?error=disclosure_required$/);
+    expect(res.sessionSet).toBe(false);
+    // No user, so nobody for a consent row to name.
+    expect(await userByEmail(email)).toBeNull();
+  });
+
+  test('a returning login spends a parked tick (it was not ticked for this person)', async () => {
+    const email = newEmail('b1-return');
+    parkAck();
+    const first = await callback('google', { sub: `${RUN}-b1r`, email, email_verified: true });
+    expect(first.location ?? '').not.toContain('error=');
+    expect(ackParked()).toBe(false);
+
+    // Signs in again, having ticked the box on /kayit by mistake: allowed, tick spent.
+    parkAck();
+    const again = await callback('google', { sub: `${RUN}-b1r`, email, email_verified: true });
+    expect(again.location ?? '').not.toContain('error=');
+    expect(ackParked()).toBe(false);
+
+    // …so the next new account in this browser is refused.
+    const next = newEmail('b1-after-return');
+    const res = await callback('google', { sub: `${RUN}-b1n`, email: next, email_verified: true });
+    expect(res.location).toMatch(/error=disclosure_required$/);
+    expect(await userByEmail(next)).toBeNull();
+  });
+
+  test('linking to an existing address spends it, and so does a refused link', async () => {
+    const email = newEmail('b1-link');
+    const existing = await admin!.user.create({ data: { email, name: 'Existing' } });
+    parkAck();
+    const refused = await callback('google', { sub: `${RUN}-b1l`, email, email_verified: false });
+    expect(refused.location).toMatch(/error=email_unverified$/);
+    expect(ackParked()).toBe(false);
+
+    parkAck();
+    const linked = await callback('google', { sub: `${RUN}-b1l`, email, email_verified: true });
+    expect(linked.location ?? '').not.toContain('error=');
+    expect(ackParked()).toBe(false);
+    // The existing user got no consent rows from somebody else's tick.
+    expect(await admin!.consent.count({ where: { userId: existing.id } })).toBe(0);
+  });
+
+  test('an invite registration spends a stray plain tick as well', async () => {
+    const { code } = await makeCode();
+    const email = newEmail('b1-invite');
+    parkInvite(code, lib.consent.registrationAcknowledgementToken({ agency: true }));
+    parkAck();
+    const res = await callback('google', { sub: `${RUN}-b1i`, email, email_verified: true });
+    expect(res.location ?? '').not.toContain('error=');
+    expect(ackParked()).toBe(false);
+  });
+
+  test('Ö-1: an invite registration records the consent in the language it was read in', async () => {
+    const { code } = await makeCode();
+    const email = newEmail('b1-invite-en');
+    parkInvite(code, lib.consent.registrationAcknowledgementToken({ agency: true }), Date.now(), 'en');
+    const res = await callback('google', { sub: `${RUN}-b1e`, email, email_verified: true });
+    expect(res.location ?? '').not.toContain('error=');
+    const user = await userByEmail(email);
+    const rows = await admin!.consent.findMany({ where: { userId: user!.id }, select: { locale: true } });
+    expect(rows).toHaveLength(3);
+    expect(rows.every((r) => r.locale === 'en')).toBe(true);
   });
 });

@@ -4,7 +4,11 @@ import { signIn, signOut } from '@/lib/auth';
 import { AuthError, CredentialsSignin } from 'next-auth';
 import { INVALID_INVITE_CODE } from '@/lib/agency/invite-signin-error';
 import { isNextRedirectError } from '@/lib/errors';
-import { setRegistrationAcknowledgementCookie } from '@/lib/legal/registration-ack-cookie';
+import { getTranslations } from 'next-intl/server';
+import {
+  clearRegistrationAcknowledgementCookie,
+  setRegistrationAcknowledgementCookie,
+} from '@/lib/legal/registration-ack-cookie';
 import { acknowledgementMatchesCurrent } from '@/lib/legal/consent-documents';
 import { setRegistrationInviteCookie } from '@/lib/agency/registration-invite-cookie';
 import { setRegistrationProvinceCookie } from '@/lib/registration-province-cookie';
@@ -134,12 +138,9 @@ export async function loginWithSocialAction(
   // be republished during the round trip), but refusing here costs nobody a
   // trip to Google to learn it.
   if (code && !acknowledgementMatchesCurrent(acknowledgement, { agency: true })) {
-    return {
-      error:
-        locale === 'tr'
-          ? 'Devam edebilmek için aydınlatma metnini ve ajans kanalı ekini okuduğunuzu, kullanım koşullarını kabul ettiğinizi onaylamanız gerekir.'
-          : 'To continue, please confirm that you have read the privacy notice and the agency channel addendum, and that you accept the terms of service.',
-    };
+    // İNCELEME-13 Ö-2 — the same key the registration screen shows it from.
+    const t = await getTranslations({ locale: locale === 'en' ? 'en' : 'tr', namespace: 'Auth' });
+    return { error: t('disclosureRequiredAgency') };
   }
   // Without a code only a current stamp counts; anything else is "not ticked".
   const acknowledged = !code && acknowledgementMatchesCurrent(acknowledgement);
@@ -147,8 +148,14 @@ export async function loginWithSocialAction(
     // Set before `signIn`, which redirects and never returns. Every cookie is
     // written or cleared on every start, so nothing from an earlier attempt on
     // a shared machine rides along.
+    // İNCELEME-13 B-1: an unticked start clears the tick too. Leaving it only
+    // "set if ticked" let a tick parked by somebody who gave up at Google's
+    // consent screen register the next person in this browser as having read
+    // the notice.
     if (acknowledged) {
       await setRegistrationAcknowledgementCookie();
+    } else {
+      await clearRegistrationAcknowledgementCookie();
     }
     await setRegistrationInviteCookie(
       code ? { code, acknowledgement: acknowledgement as string, locale: locale === 'en' ? 'en' : 'tr' } : null

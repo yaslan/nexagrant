@@ -100,7 +100,15 @@ export interface OAuthSignInDeps {
   clearInvite(): Promise<void>;
 }
 
-export type OAuthSignInDecision = { allow: true } | { allow: false; redirect: string };
+/**
+ * `plainRegistration` — let through as a registration without a code, the one
+ * outcome that still needs the plain acknowledgement cookie (events.createUser
+ * reads it into the consent rows). Every other outcome must spend that cookie
+ * at once (İNCELEME-13 B-1).
+ */
+export type OAuthSignInDecision =
+  | { allow: true; plainRegistration?: true }
+  | { allow: false; redirect: string };
 
 function refuse(locale: string, page: 'kayit' | 'giris', error: OAuthSignInError): OAuthSignInDecision {
   const safeLocale = locale === 'en' ? 'en' : 'tr';
@@ -162,7 +170,7 @@ export async function decideOAuthSignIn(
   if (!(await deps.readAcknowledged())) {
     return refuse(locale, 'kayit', OAUTH_SIGNIN_ERROR.disclosureRequired);
   }
-  return { allow: true };
+  return { allow: true, plainRegistration: true };
 }
 
 /** Thrown by the probe's transaction to roll back the use it just made. */
@@ -199,6 +207,11 @@ export interface OAuthTenantBootstrap {
   agencyId: string | null;
   /** Write the consent rows: only when the acknowledgement really travelled. */
   acknowledged: boolean;
+  /**
+   * The language the notice was read in, when the round trip carried it (the
+   * signed invite cookie does). Defaults to `tr` — see below.
+   */
+  locale?: 'tr' | 'en';
 }
 
 /**
@@ -244,11 +257,11 @@ export async function bootstrapOAuthTenant(
     await writeRegistrationConsent(tx, {
       tenantId: tenant.id,
       userId: input.userId,
-      // The OAuth round trip does not carry the locale the person was reading
-      // in; `tr` is the app's default and what the registration page serves
-      // without a prefix. Guessing from an e-mail domain would be a guess
-      // recorded as a fact.
-      locale: 'tr',
+      // An invite registration carries the locale in its signed cookie
+      // (İNCELEME-13 Ö-1). The plain round trip does not; `tr` is the app's
+      // default and what the registration page serves without a prefix.
+      // Guessing from an e-mail domain would be a guess recorded as a fact.
+      locale: input.locale ?? 'tr',
       agency: input.agencyId !== null,
     });
   }
@@ -275,6 +288,8 @@ export interface OAuthInviteRegistration {
     emailVerified?: Date | null;
   };
   code: string;
+  /** The locale from the signed invite cookie — the language the addendum was read in. */
+  locale: 'tr' | 'en';
   province: string | null;
   readiness: string | null;
 }
@@ -308,6 +323,7 @@ export async function registerOAuthUserWithInvite(
       province: input.province,
       readiness: input.readiness,
       agencyId,
+      locale: input.locale,
       // The signIn callback let this registration through only with the
       // addendum-bearing acknowledgement, so the rows are always written here.
       acknowledged: true,

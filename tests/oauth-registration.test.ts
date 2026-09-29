@@ -177,7 +177,7 @@ describe('decideOAuthSignIn (fake provider)', () => {
 
   test('a new user with the plain acknowledgement and no code registers as before', async () => {
     const deps = fakeDeps({ readAcknowledged: vi.fn(async () => true) });
-    expect(await decideOAuthSignIn(googleNewUser, deps)).toEqual({ allow: true });
+    expect(await decideOAuthSignIn(googleNewUser, deps)).toEqual({ allow: true, plainRegistration: true });
   });
 
   test('an expired or tampered cookie gets the one invite message', async () => {

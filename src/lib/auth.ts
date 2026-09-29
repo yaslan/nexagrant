@@ -157,6 +157,7 @@ const safeAdapter: Adapter = {
         const created = await registerOAuthUserWithInvite(prisma, {
           user,
           code: invite.invite.code,
+          locale: invite.invite.locale === 'en' ? 'en' : 'tr',
           province,
           readiness,
         });
@@ -576,6 +577,14 @@ export const authConfig = {
           clearInvite: clearRegistrationInviteCookie,
         }
       );
+      // İNCELEME-13 B-1 — the plain acknowledgement belongs to the one
+      // registration it was ticked for. A returning login, an e-mail link, an
+      // invite registration (its tick is in the invite cookie) and any refusal
+      // spend it here; only a plain registration leaves it for
+      // events.createUser, which records it and clears it.
+      if (!(decision.allow && decision.plainRegistration)) {
+        await clearRegistrationAcknowledgementCookie();
+      }
       if (decision.allow) return true;
       // A refused registration is over; the next one starts from
       // loginWithSocialAction again (İNCELEME-12 Ö-1).
@@ -694,6 +703,7 @@ export const authConfig = {
         // A linked existing account uses none of them; they are spent anyway,
         // so they cannot wait here for the next registration.
         await clearRegistrationChoiceCookies();
+        await clearRegistrationAcknowledgementCookie();
         return;
       }
 
