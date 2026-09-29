@@ -4,12 +4,12 @@ Repo `/Users/macbook/alan/FONBRIDGE`, dal `dev`. Kod değiştirilmedi, push yok.
 
 Kapılar ayrık worktree'de HEAD `5294480f` üzerinde koşuldu. Bu HEAD dört kartın commit'lerinin hepsini içeriyor (`git merge-base --is-ancestor` ile kontrol edildi). Paylaşılan ağaçta o sırada fe-fb'nin commit'lenmemiş B6 işi vardı. İnceleme sürerken B6 `897d3608` olarak dev'e girdi. Kart 1'in MILP'ini ayrıca bu commit'e karşı da koştum (bkz. Kart 1, "B6 sonrası").
 
-| Kart | Görev                                          | Commit'ler                                | Karar                                                                                  |
-| ---- | ---------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------- |
-| 1    | TASK-MUM2RMN3YIBGC "Tükendi" kaldırma, D=0     | `fb133d28`                                | **ONAY**. Ö-1 yeni bir kanal: kayıt formu üzerinden yoklama. Pilot öncesi karar ister. |
-| 2    | TASK-MULXYTBJAK2U3 dev ortamı README           | `ae9420fc` `a51ccfa3`                     | **ONAY** (Ö-1 libpq keg-only)                                                          |
-| 3    | TASK-MUM033NPP7UFI E2E networkidle göçü        | `056e83f6` `959bf02c` `7abb31a4` `12ada5cd` | **ONAY** (Ö-1, K-1, K-2)                                                               |
-| 4    | TASK-MULV9UJBSYJCD bakım (şema, pnpm, env)     | `b11a7b03` `83fc292f` `09c612e2`          | **ONAY** (K-1)                                                                         |
+| Kart | Görev                                      | Commit'ler                                  | Karar                                                                                  |
+| ---- | ------------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1    | TASK-MUM2RMN3YIBGC "Tükendi" kaldırma, D=0 | `fb133d28`                                  | **ONAY**. Ö-1 yeni bir kanal: kayıt formu üzerinden yoklama. Pilot öncesi karar ister. |
+| 2    | TASK-MULXYTBJAK2U3 dev ortamı README       | `ae9420fc` `a51ccfa3`                       | **ONAY** (Ö-1 libpq keg-only)                                                          |
+| 3    | TASK-MUM033NPP7UFI E2E networkidle göçü    | `056e83f6` `959bf02c` `7abb31a4` `12ada5cd` | **ONAY** (Ö-1, K-1, K-2)                                                               |
+| 4    | TASK-MULV9UJBSYJCD bakım (şema, pnpm, env) | `b11a7b03` `83fc292f` `09c612e2`            | **ONAY** (K-1)                                                                         |
 
 **PİLOT KAPISI (a) KAPANDI.** Bu hüküm kod paneli ve sunucu yanıtı kanalı için geçerli. Kendi MILP saldırganım yeni kodda 2.420 tabloda 0 sızıntı buldu:
 
@@ -47,16 +47,16 @@ Bloke etmeyen ama pilot öncesi karar isteyen bir kanal kaldı (Ö-1). Davet kod
 
 ### Kapılar (ayrık worktree, HEAD `5294480f`, `set -a; source .env; set +a`)
 
-| Kapı                    | Sonuç                                                                                           |
-| ----------------------- | ----------------------------------------------------------------------------------------------- |
-| `tsc --noEmit`          | rc=0                                                                                            |
-| `eslint`                | rc=0                                                                                            |
-| `vitest run`            | rc=0 — `Test Files 191 passed \| 2 skipped (193)` · `Tests 2213 passed \| 8 skipped (2221)`     |
-| `rls:check`             | rc=0 — "All 47 tenant-scoped models … carries ENABLE + FORCE + tenant_isolation"                |
-| `rls:verify`            | rc=0 — "47 kiracıya özel tabloda … izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü"             |
-| `rls:bypass-check`      | rc=0 — "no new tenant bypass. 0 … with a recorded reason, 32 on the sanctioned … 0 still owed" |
-| `i18n:check`            | rc=0 — "both catalogs agree, every key used in src/ resolves …"                                 |
-| `apply-migrations --list` | 29 dosya, sonuncusu `add-agency-funnel-province.sql`                                          |
+| Kapı                      | Sonuç                                                                                          |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `tsc --noEmit`            | rc=0                                                                                           |
+| `eslint`                  | rc=0                                                                                           |
+| `vitest run`              | rc=0 — `Test Files 191 passed \| 2 skipped (193)` · `Tests 2213 passed \| 8 skipped (2221)`    |
+| `rls:check`               | rc=0 — "All 47 tenant-scoped models … carries ENABLE + FORCE + tenant_isolation"               |
+| `rls:verify`              | rc=0 — "47 kiracıya özel tabloda … izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü"            |
+| `rls:bypass-check`        | rc=0 — "no new tenant bypass. 0 … with a recorded reason, 32 on the sanctioned … 0 still owed" |
+| `i18n:check`              | rc=0 — "both catalogs agree, every key used in src/ resolves …"                                |
+| `apply-migrations --list` | 29 dosya, sonuncusu `add-agency-funnel-province.sql`                                           |
 
 Kart 1'e ait dosyalar ayrıca verbose koşuldu (`src/lib/agency/`, `ajans/`, `tests/agency-invite.live`, `tests/agency-funnel.live`): `Test Files 7 passed (7) · Tests 83 passed (83)`, atlanan test yok. Saldırgan özellik testi 12 koşu olarak görünüyor: 3 tohum × {D ≥ 0, D = 0} × {rastgele, art arda 6'lık kodlar}.
 
@@ -100,13 +100,13 @@ Yöntem: İNCELEME-10'daki `milp2.py` + `gen2.ts`, scipy HiGHS, tam sayılı.
 - **Ölçüt:** Önce MILP min, min ≥ 1 ise MILP max. Sızıntı = 1 ≤ min ve max ≤ 4. LP ile budama yok.
 - **Solver kontrolü:** Solver durumu 0 olmayan her hedef `solver_warn` olarak sayılıyor.
 
-| Model                                                                   | Tablo                     | Sızan tablo | solver_warn |
-| ----------------------------------------------------------------------- | ------------------------- | ----------- | ----------- |
-| **yeni (HEAD), D = 0**, 2 üreteç × 3 dağılım × {six, mix}               | 1.200 (+20 ön deneme)     | **0**       | 0           |
-| **yeni (HEAD), D ≥ 0**, aynı 12 yapılandırma                            | 1.200                     | **0**       | 0           |
-| **pozitif kontrol: eski kod (`fb133d28^`), D = 0**, aynı 12 yapılandırma | 1.200                     | **22**      | 79 (tek dosya) |
-| B6 sonrası (`897d3608`, readiness adımı), D = 0, 12 yapılandırma        | 1.200                     | **0**       | 0           |
-| B6 pozitif kontrol: aynı veri, eski kesin sayaçlı panel (`OLD=1`)       | 200 (2 yapılandırma)      | **5 + 17**  | 0           |
+| Model                                                                    | Tablo                 | Sızan tablo | solver_warn    |
+| ------------------------------------------------------------------------ | --------------------- | ----------- | -------------- |
+| **yeni (HEAD), D = 0**, 2 üreteç × 3 dağılım × {six, mix}                | 1.200 (+20 ön deneme) | **0**       | 0              |
+| **yeni (HEAD), D ≥ 0**, aynı 12 yapılandırma                             | 1.200                 | **0**       | 0              |
+| **pozitif kontrol: eski kod (`fb133d28^`), D = 0**, aynı 12 yapılandırma | 1.200                 | **22**      | 79 (tek dosya) |
+| B6 sonrası (`897d3608`, readiness adımı), D = 0, 12 yapılandırma         | 1.200                 | **0**       | 0              |
+| B6 pozitif kontrol: aynı veri, eski kesin sayaçlı panel (`OLD=1`)        | 200 (2 yapılandırma)  | **5 + 17**  | 0              |
 
 Dökümler:
 
