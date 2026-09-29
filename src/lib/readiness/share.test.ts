@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { READINESS_QUESTIONS, type ReadinessAnswers } from './questions';
-import { buildShareQuery, decodeAnswers, encodeAnswers, parseShareQuery } from './share';
+import { buildShareQuery, decodeAnswers, encodeAnswers, parseShareQuery, readinessSignupPath } from './share';
 
 const ORG_TYPES = ['municipality', 'metropolitan'] as const;
 
@@ -42,5 +42,14 @@ describe('readiness share link', () => {
     expect(decodeAnswers('012012012012013')).toBeNull(); // 3 is not an answer
     expect(parseShareQuery(new URLSearchParams('kurum=hacker&cevap=012012012012012'), ORG_TYPES)).toBeNull();
     expect(parseShareQuery(new URLSearchParams('kurum=municipality'), ORG_TYPES)).toBeNull();
+  });
+});
+
+describe('readinessSignupPath (TASK-MULV3JXS1AW5X)', () => {
+  it('carries the source, and the province when there is one', () => {
+    expect(readinessSignupPath('tr')).toBe('/tr/kayit?kaynak=fon-hazirlik');
+    expect(readinessSignupPath('en', null)).toBe('/en/register?kaynak=fon-hazirlik');
+    expect(readinessSignupPath('tr', 'İstanbul')).toBe('/tr/kayit?kaynak=fon-hazirlik&il=%C4%B0stanbul');
+    expect(new URL(readinessSignupPath('tr', 'Şanlıurfa'), 'http://x').searchParams.get('il')).toBe('Şanlıurfa');
   });
 });

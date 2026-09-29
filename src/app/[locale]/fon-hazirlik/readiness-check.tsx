@@ -585,7 +585,7 @@ function ResultView({
         </h2>
         <p className="mt-1 text-sm text-ink">{t('cta_text')}</p>
         <Link
-          href={readinessSignupPath(locale)}
+          href={readinessSignupPath(locale, province)}
           className={`${primaryButton} mt-4`}
           onClick={() =>
             analytics.track('readiness_signup_clicked', {

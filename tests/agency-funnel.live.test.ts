@@ -53,11 +53,12 @@ let seq = 0;
 async function newTenant(
   kind: 'AGENCY' | 'ORGANIZATION',
   agencyId: string | null = null,
-  orgType: 'SME' | 'MUNICIPALITY' = 'SME'
+  orgType: 'SME' | 'MUNICIPALITY' = 'SME',
+  province: string | null = null
 ): Promise<string> {
   const n = ++seq;
   const t = await admin!.tenant.create({
-    data: { name: `${RUN} secret-name-${n}`, slug: `${RUN}-${n}`, country: 'TR', kind, agencyId, orgType },
+    data: { name: `${RUN} secret-name-${n}`, slug: `${RUN}-${n}`, country: 'TR', kind, agencyId, orgType, province },
     select: { id: true },
   });
   tenants.push(t.id);
@@ -115,9 +116,10 @@ beforeAll(async () => {
   }
   await assertRlsSubjectRole(rls, SUITE);
   const fn = await admin.$queryRaw<Array<{ n: number }>>`
-    SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'agency_funnel_counts'`;
-  if (fn[0]?.n !== 1) {
-    skipReason = 'add-agency-funnel.sql is not applied (scripts/apply-migrations.sh)';
+    SELECT count(*)::int AS n FROM pg_proc
+     WHERE proname IN ('agency_funnel_counts', 'agency_funnel_counts_by_province')`;
+  if (fn[0]?.n !== 2) {
+    skipReason = 'add-agency-funnel.sql / add-agency-funnel-province.sql is not applied (scripts/apply-migrations.sh)';
     skipOrFailInCi(SUITE, skipReason);
     return;
   }
@@ -129,11 +131,14 @@ beforeAll(async () => {
   ids.agencyA = await newTenant('AGENCY');
   ids.agencyB = await newTenant('AGENCY');
   for (let i = 0; i < 6; i++) {
-    const t = await newTenant('ORGANIZATION', ids.agencyA, 'SME');
+    // TASK-MULV3JXS1AW5X: all of A's organisations are in Samsun, so the
+    // province view has a number to show (a no-province remainder of 1..4
+    // would, correctly, mask it).
+    const t = await newTenant('ORGANIZATION', ids.agencyA, 'SME', 'Samsun');
     linkedA.push(t);
     await giveContent(t, 1, i < 5); // 6 submitted, 5 funded
   }
-  for (let i = 0; i < 2; i++) linkedA.push(await newTenant('ORGANIZATION', ids.agencyA, 'MUNICIPALITY'));
+  for (let i = 0; i < 2; i++) linkedA.push(await newTenant('ORGANIZATION', ids.agencyA, 'MUNICIPALITY', 'Samsun'));
   // B's organisation is busy: 10 submitted proposals. None may reach A.
   ids.orgB = await newTenant('ORGANIZATION', ids.agencyB, 'SME');
   await giveContent(ids.orgB, 10, true);
@@ -257,5 +262,46 @@ describe('getAgencyFunnel (fabrika_app, with B7 outcomes)', () => {
     expect(all.sort()).toEqual([...linkedA].sort());
     expect(all).not.toContain(ids.orgB);
     expect(all).not.toContain(ids.orphan);
+  });
+});
+
+describe('province (TASK-MULV3JXS1AW5X, fabrika_app)', () => {
+  const byProvinceAs = (tenantId: string) =>
+    rls!.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+      return tx.$queryRaw<Row[]>`SELECT * FROM public.agency_funnel_counts_by_province(NULL) ORDER BY org_type`;
+    });
+
+  test('agency_funnel_counts_by_province: integers per type and province, the caller’s own only', async () => {
+    expect(await byProvinceAs(ids.agencyA)).toEqual([
+      { org_type: 'MUNICIPALITY', province: 'Samsun', registered: 2, saved_search: 0, pipeline: 0, concept_note: 0 },
+      { org_type: 'SME', province: 'Samsun', registered: 6, saved_search: 6, pipeline: 6, concept_note: 6 },
+    ]);
+    expect(await byProvinceAs(ids.agencyB)).toEqual([
+      { org_type: 'SME', province: null, registered: 1, saved_search: 1, pipeline: 1, concept_note: 1 },
+    ]);
+    expect(await byProvinceAs(linkedA[0]!)).toEqual([]);
+  });
+
+  test('getAgencyFunnel with a province: that province’s cohort, masked; an empty one is all "<5"', async () => {
+    const { getAgencyFunnel } = await import('@/lib/agency/funnel');
+    const samsun = await getAgencyFunnel(ids.agencyA, 30, { province: 'Samsun' });
+    expect(samsun.province).toBe('Samsun');
+    expect(samsun.all.registered).toEqual({ state: 'count', value: 8 });
+    expect(samsun.all.submitted).toEqual({ state: 'count', value: 6 });
+    expect(samsun.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
+    expect(samsun.byOrgType.SME.registered).toEqual({ state: 'small' });
+    const tokat = await getAgencyFunnel(ids.agencyA, 30, { province: 'Tokat' });
+    for (const s of ['registered', 'savedSearch', 'pipeline', 'conceptNote', 'submitted', 'accepted', 'rejected'] as const) {
+      expect(tokat.all[s]).toEqual({ state: 'small' });
+    }
+    const text = JSON.stringify(samsun);
+    for (const t of [...linkedA, ids.orgB]) expect(text).not.toContain(t);
+  });
+
+  test('the database refuses a province outside TR_PROVINCES', async () => {
+    await expect(
+      admin!.tenant.update({ where: { id: linkedA[0]! }, data: { province: 'Samsunn' } })
+    ).rejects.toThrow(/Tenant_province_check/);
   });
 });

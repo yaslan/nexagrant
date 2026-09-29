@@ -863,3 +863,48 @@ yalnız sebep olarak yazılır (`agency.invite.rejected`; kod, hash ve kişi yok
 `app.tenant_id = ajans` ile çalışır; bağlı kurumun satırları 0 döner, yazma 42501 alır
 (`tests/agency-invite.live.test.ts`, `fabrika_app` ile). B2/B3'teki toplu sayılar, satır değil
 sayı döndüren SECURITY DEFINER fonksiyonlarla gelecek.
+
+## 19. Kurumun ili — `Tenant.province` (TASK-MULV3JXS1AW5X · FB KAMU)
+
+Migration: `prisma/migrations/add-tenant-province.sql` · geri alma: `add-tenant-province.down.sql`
+(sütunu siler; girilmiş iller kaybolur). Ajans panosu için ek fonksiyon:
+`add-agency-funnel-province.sql` · geri alma: `add-agency-funnel-province.down.sql` (önce bu
+geri alınır, sonra sütun).
+
+**Alan.** `Tenant.province String?` (NULL = bildirilmedi ya da kurum Türkiye'de değil). Ayar
+JSON'unda anahtar değil, sütun (LEED-FB kararı, 29.09.2026): B2/B3 il kırılımı bu alana
+`GROUP BY` yapar.
+
+**Değer: plaka kodu değil, il adı.** `src/lib/readiness/provinces.ts` içindeki `TR_PROVINCES`
+yazımıyla birebir (`'İstanbul'`, `'Şanlıurfa'`). Karne paylaşım bağlantısı (`?il=Samsun`) ve
+kamu kataloğu (`turkeyRegions`) zaten bu adları kullanıyor; tek sözlük üçüne de yeter ve arada
+kod↔ad çevirisi gerekmez. Aynı 81 ad veritabanında `CHECK ("Tenant_province_check")` olarak
+durur; `src/lib/province.test.ts` iki listenin ayrışmasını yakalar. Uygulamaya giren her değer
+`toTenantProvince` (`src/lib/province.ts`) üzerinden geçer: listede olmayan değer hata değil,
+NULL'dur (alan isteğe bağlı, kaydı durdurmaz).
+
+**Nerede yazılır.**
+- Kayıt (`src/app/[locale]/login/AuthCard.tsx`): isteğe bağlı il seçimi. Kayıtla açılan her
+  kiracı `country = 'TR'` olduğundan soru her kayıtta sorulur; `provinceAppliesTo(country)` TR
+  dışı bir kiracıda alanı hiç tutmaz. Karneden gelen `?il=` değeri seçimi önceden doldurur
+  (`readinessSignupPath(locale, province)`).
+  - Credentials dalı: `authorize` → `tenant.create({ province })`.
+  - OAuth dalı: il, onay çerezi gibi 15 dakikalık httpOnly bir çerezle
+    (`src/lib/registration-province-cookie.ts`) `createUser` olayına taşınır. Çerez her OAuth
+    başlangıcında yazılır ya da silinir; önceki bir seçim sonraki kayda geçmez.
+- Kurum ayarları (`settings/profile`): sahip/yönetici (`manage_users`) değiştirir; her
+  değişiklik `AuditEvent: tenant.province.updated` (`{ from, to }`).
+
+**RLS.** `Tenant` sistem geneli bir tablodur (`tenantId` sütunu yok), `tenant_isolation`
+kapsamı dışındadır; `relrowsecurity = false`, politika 0. Yeni politika gerekmez.
+
+**KVKK.** İl kurum düzeyinde bir veridir; kişisel veri eklenmez.
+
+**Ajans panosu il filtresi.** `public.agency_funnel_counts_by_province(since)` —
+`agency_funnel_counts` ile aynı sözleşme (ajans = çağıranın `app.tenant_id`'si, yalnız
+tamsayılar), satır başına kurum türü **ve** il. Eski fonksiyon dönüş tipi değişemediği için
+yerinde bırakıldı; uygulama artık yenisini çağırır. Küçük hücre kuralı (<5,
+`src/lib/agency/funnel.ts`) tür × il tablosunun tamamına uygulanır: her il görünümü tek istekle
+alınabildiği için satır (tür toplamı − görünen iller), sütun (il toplamı − görünen türler) ve
+iller arası (genel toplam − görünen il toplamları) farklarının hiçbiri 1..4 olamaz. İli
+bildirilmemiş kurumlar hiçbir il görünümünde yoktur ve her zaman gizli kütle sayılır.

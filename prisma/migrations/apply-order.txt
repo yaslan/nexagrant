@@ -37,3 +37,5 @@ drop-marketplace.sql
 fix-agency-invite-rejection-audit.sql
 add-agency-funnel.sql
 auditevent-null-system-only.sql
+add-tenant-province.sql
+add-agency-funnel-province.sql

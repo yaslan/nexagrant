@@ -347,7 +347,10 @@
     "signInTitle": "Sign In to {brand}",
     "disclosureAck": "I have read the <privacy>Privacy Policy and Data Protection Notice</privacy> and I accept the <terms>Terms of Service</terms>.",
     "disclosureRequired": "To continue, please confirm that you have read the privacy notice and accept the terms of service.",
-    "disclosureVersion": "Version you are accepting: {version}"
+    "disclosureVersion": "Version you are accepting: {version}",
+    "provinceLabel": "Organisation's province in Türkiye (optional)",
+    "provinceNone": "Not selected",
+    "provinceHint": "Used only as a count per province in development agency reports; you can change it later in your organisation settings."
   },
   "NoWorkspace": {
     "title": "You do not have a workspace yet",
@@ -2076,7 +2079,8 @@
       "allTypes": "All organisation types",
       "provinceLabel": "Province",
       "allProvinces": "All provinces",
-      "provinceNotCollected": "Province is not collected yet.",
+      "provinceApply": "Apply",
+      "provinceNote": "Only organisations that gave a province are counted per province; the others appear only under “All provinces”. Numbers under 5 are hidden as <5 across provinces too.",
       "windowLabel": "Period",
       "windowDays": "Last {days} days",
       "stepNumber": "Step {n}",
@@ -2173,6 +2177,23 @@
         "notAgency": "This account is not an agency account.",
         "failed": "The action could not be completed. Please try again."
       }
+    }
+  },
+  "tenantProvince": {
+    "title": "Organisation's province",
+    "label": "Province",
+    "none": "Not selected",
+    "hint": "Optional. Used only as a count per province in development agency reports.",
+    "readOnly": "Only the organisation owner or an admin can change the province.",
+    "notApplicable": "A province is kept only for organisations in Türkiye.",
+    "save": "Save province",
+    "saving": "Saving...",
+    "saved": "Province saved.",
+    "errors": {
+      "forbidden": "You are not allowed to change this setting.",
+      "notApplicable": "A province is kept only for organisations in Türkiye.",
+      "invalid": "Choose a province from the list.",
+      "failed": "The province could not be saved. Please try again."
     }
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions/auth';
@@ -13,6 +13,9 @@ import {
   registrationAcknowledgementToken,
 } from '@/lib/legal/consent-documents';
 import type { OAuthProviderAvailability } from '@/lib/demo-login';
+import { TR_PROVINCES } from '@/lib/readiness/provinces';
+import { SHARE_PARAM_PROVINCE } from '@/lib/readiness/share';
+import { toTenantProvince } from '@/lib/province';
 
 /**
  * The one place this file spells a demo address. Each seat used to write its
@@ -77,6 +80,17 @@ export default function AuthCard({
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /**
+   * TASK-MULV3JXS1AW5X — optional province of the new organisation. Every
+   * account opened here is a TR tenant (src/lib/auth.ts), so the question is
+   * always the Turkish one. A scorecard link carries `?il=<province>`; when it
+   * names one of TR_PROVINCES the choice starts there, anything else starts empty.
+   */
+  const [province, setProvince] = useState<string>(
+    () => toTenantProvince(searchParams.get(SHARE_PARAM_PROVINCE)) ?? ''
+  );
+  const provinceId = useId();
+  const provinceHintId = useId();
 
   /**
    * TASK-MTSWLANXSU0IG (A3) — never pre-ticked, and never persisted across a
@@ -123,7 +137,12 @@ export default function AuthCard({
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      await loginWithSocialAction(provider, rawCallbackUrl, acknowledgementToken);
+      await loginWithSocialAction(
+        provider,
+        rawCallbackUrl,
+        acknowledgementToken,
+        isRegistering ? province || undefined : undefined
+      );
     } catch (err) {
       if (isNextRedirectError(err)) {
         return;
@@ -157,7 +176,8 @@ export default function AuthCard({
         rawCallbackUrl, 
         locale,
         acknowledgementToken,
-        isRegistering ? inviteCode ?? undefined : undefined
+        isRegistering ? inviteCode ?? undefined : undefined,
+        isRegistering ? province || undefined : undefined
       );
       
       if (res?.error) {
@@ -434,6 +454,33 @@ export default function AuthCard({
           disclosure and a terms acceptance, and `Consent.kind` keeps them
           distinct from consent on the record.
         */}
+        {isRegistering && (
+          <div>
+            <label htmlFor={provinceId} className="block text-xs font-bold text-ink mb-1">
+              {tAuthCard('provinceLabel')}
+            </label>
+            <select
+              id={provinceId}
+              name="province"
+              data-testid="register-province"
+              aria-describedby={provinceHintId}
+              value={province}
+              onChange={(e) => setProvince(e.target.value)}
+              className="w-full text-xs bg-ground border border-border rounded-xl p-2.5 text-ink focus:outline-hidden focus:ring-2 focus:ring-accent cursor-pointer"
+            >
+              <option value="">{tAuthCard('provinceNone')}</option>
+              {TR_PROVINCES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            <p id={provinceHintId} className="text-[10px] text-muted mt-1">
+              {tAuthCard('provinceHint')}
+            </p>
+          </div>
+        )}
+
         {isRegistering && (
           <div className="rounded-xl border border-border bg-ground/60 p-3 space-y-1.5">
             <label className="flex items-start gap-2.5 cursor-pointer">

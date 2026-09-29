@@ -347,7 +347,10 @@
     "signInTitle": "{brand} Platformuna Giriş",
     "disclosureAck": "Kişisel verilerimin işlenmesine ilişkin <privacy>Gizlilik Politikası ve KVKK Aydınlatma Metni</privacy>'ni okudum ve <terms>Kullanım Koşulları</terms>'nı kabul ediyorum.",
     "disclosureRequired": "Devam edebilmek için aydınlatma metnini okuduğunuzu ve kullanım koşullarını kabul ettiğinizi onaylamanız gerekir.",
-    "disclosureVersion": "Onayladığınız metin sürümü: {version}"
+    "disclosureVersion": "Onayladığınız metin sürümü: {version}",
+    "provinceLabel": "Kurumun ili (isteğe bağlı)",
+    "provinceNone": "Seçilmedi",
+    "provinceHint": "Kalkınma ajansı raporlarında yalnızca il bazında sayı olarak kullanılır; sonradan kurum ayarlarından değiştirebilirsiniz."
   },
   "NoWorkspace": {
     "title": "Henüz bir çalışma alanınız yok",
@@ -2076,7 +2079,8 @@
       "allTypes": "Tüm kurum türleri",
       "provinceLabel": "İl",
       "allProvinces": "Tüm iller",
-      "provinceNotCollected": "İl bilgisi henüz toplanmıyor.",
+      "provinceApply": "Uygula",
+      "provinceNote": "Yalnızca ilini bildiren kurumlar il bazında sayılır; ilini bildirmeyenler yalnızca “Tüm iller” görünümünde yer alır. İller arasında da 5'ten küçük sayılar <5 olarak gizlenir.",
       "windowLabel": "Dönem",
       "windowDays": "Son {days} gün",
       "stepNumber": "Adım {n}",
@@ -2173,6 +2177,23 @@
         "notAgency": "Bu hesap bir ajans hesabı değil.",
         "failed": "İşlem tamamlanamadı. Lütfen tekrar deneyin."
       }
+    }
+  },
+  "tenantProvince": {
+    "title": "Kurumun ili",
+    "label": "İl",
+    "none": "Seçilmedi",
+    "hint": "İsteğe bağlı. Kalkınma ajansı raporlarında yalnızca il bazında sayı olarak kullanılır.",
+    "readOnly": "İli yalnızca kurum sahibi ya da yöneticisi değiştirebilir.",
+    "notApplicable": "İl bilgisi yalnızca Türkiye'deki kurumlar için tutulur.",
+    "save": "İli kaydet",
+    "saving": "Kaydediliyor...",
+    "saved": "İl kaydedildi.",
+    "errors": {
+      "forbidden": "Bu ayarı değiştirme yetkiniz yok.",
+      "notApplicable": "İl bilgisi yalnızca Türkiye'deki kurumlar için tutulur.",
+      "invalid": "Listeden bir il seçin.",
+      "failed": "İl kaydedilemedi. Lütfen tekrar deneyin."
     }
   }
 }

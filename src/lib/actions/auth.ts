@@ -5,6 +5,7 @@ import { AuthError, CredentialsSignin } from 'next-auth';
 import { INVALID_INVITE_CODE } from '@/lib/agency/invite-signin-error';
 import { isNextRedirectError } from '@/lib/errors';
 import { setRegistrationAcknowledgementCookie } from '@/lib/legal/registration-ack-cookie';
+import { setRegistrationProvinceCookie } from '@/lib/registration-province-cookie';
 import { isDemoLoginEnabled } from '@/lib/demo-login';
 
 /**
@@ -21,7 +22,9 @@ export async function loginWithCredentialsAction(
   redirectTo: string,
   locale: string = 'tr',
   acknowledgement?: string,
-  inviteCode?: string
+  inviteCode?: string,
+  /** TASK-MULV3JXS1AW5X — optional; `authorize` keeps it only if it is one of TR_PROVINCES. */
+  province?: string
 ) {
   // TASK-MULSCEK4JHK8X — no Credentials provider is registered with demo sign-in
   // off; say so plainly instead of letting `signIn` fail with a configuration error.
@@ -39,6 +42,7 @@ export async function loginWithCredentialsAction(
       password: password || 'demo1234',
       acknowledgement: acknowledgement ?? '',
       inviteCode: inviteCode ?? '',
+      province: province ?? '',
       redirect: false,
     });
     return { success: true };
@@ -95,13 +99,20 @@ export async function loginWithCredentialsAction(
 export async function loginWithSocialAction(
   provider: 'google' | 'microsoft-entra-id',
   redirectTo: string,
-  acknowledgement?: string
+  acknowledgement?: string,
+  /**
+   * TASK-MULV3JXS1AW5X — the optional province of a registration. The cookie is
+   * written or cleared on every OAuth start, so an earlier choice never carries
+   * over to this one.
+   */
+  province?: string
 ) {
   try {
     // Set before `signIn`, which redirects and never returns.
     if (acknowledgement) {
       await setRegistrationAcknowledgementCookie();
     }
+    await setRegistrationProvinceCookie(acknowledgement ? province : null);
     await signIn(provider, { redirectTo });
   } catch (error) {
     if (

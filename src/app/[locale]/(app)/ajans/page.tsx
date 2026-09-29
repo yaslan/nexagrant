@@ -5,6 +5,7 @@ import { asRole, can } from '@/lib/rbac';
 import { withTenant } from '@/lib/db';
 import { FUNNEL_WINDOWS, getAgencyFunnel, isAgencyTenant, isFunnelWindow } from '@/lib/agency/funnel';
 import { listInviteCodesIn } from '@/lib/agency/codes';
+import { parseProvince } from '@/lib/readiness/share';
 import FunnelPanel from './funnel-panel';
 import InviteCodesPanel, { type InviteCodeRow } from './invite-codes-panel';
 
@@ -25,18 +26,20 @@ export default async function AgencyPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ gun?: string }>;
+  searchParams: Promise<{ gun?: string; il?: string }>;
 }) {
   const { locale } = await params;
-  const { gun } = await searchParams;
+  const { gun, il } = await searchParams;
   const scope = await requireTenantPage(locale);
   if (!(await isAgencyTenant(scope.tenantId))) forbidden();
 
   const t = await getTranslations({ locale, namespace: 'agency' });
   const windowDays = isFunnelWindow(gun) ? (Number(gun) as (typeof FUNNEL_WINDOWS)[number]) : 30;
+  // TASK-MULV3JXS1AW5X — one of TR_PROVINCES, anything else is "all provinces".
+  const province = parseProvince(il);
 
   const [funnel, codes] = await Promise.all([
-    getAgencyFunnel(scope.tenantId, windowDays),
+    getAgencyFunnel(scope.tenantId, windowDays, { province }),
     withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId)),
   ]);
   const renderedAt = requestTime();

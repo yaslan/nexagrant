@@ -11,6 +11,8 @@ import { errorMessage } from '@/lib/errors';
 import { PRODUCT_NAME } from './brand';
 import { acknowledgementMatchesCurrent } from './legal/consent-documents';
 import { readRegistrationAcknowledgement } from './legal/registration-ack-cookie';
+import { readRegistrationProvince } from './registration-province-cookie';
+import { toTenantProvince } from './province';
 import { recordAlert } from './observability/system-alert';
 import {
   bindTransactionToTenant,
@@ -215,6 +217,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // /kayit?kod=…. Only the registration branch reads it; signing in to an
         // existing account ignores it (linking an existing tenant is not B1).
         inviteCode: { label: "Invite code", type: "text" },
+        // TASK-MULV3JXS1AW5X — optional province of the new organisation. Read
+        // on the registration branch only, and only one of TR_PROVINCES counts.
+        province: { label: "Province", type: "text" },
       },
       async authorize(credentials) {
         const email = (credentials?.email as string)?.trim()?.toLowerCase();
@@ -225,6 +230,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           typeof credentials?.inviteCode === "string" && credentials.inviteCode.trim()
             ? credentials.inviteCode
             : null;
+        // Every account opened here is a TR tenant (below), so the province is
+        // judged against "TR". A value outside the list is dropped, not refused.
+        const province = toTenantProvince(credentials?.province, "TR");
 
         const demoProfile = DEMO_PROFILES[email];
         // Derived from the address the user typed, never from a profile table.
@@ -295,6 +303,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   slug: `org-${newUser.id.slice(-6)}`,
                   country: "TR",
                   orgType: demoProfile?.orgType || "SME",
+                  province,
                   // No plan is written: a tenant without a subscription is on
                   // Discover (FALLBACK_PLAN_ID), which is what a code grants.
                   agencyId,
@@ -512,6 +521,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // the transaction opens: `cookies()` wants the request context, and
       // holding a transaction open across it buys nothing.
       const acknowledged = await readRegistrationAcknowledgement();
+      // TASK-MULV3JXS1AW5X — the optional province, parked the same way.
+      const province = await readRegistrationProvince();
 
       try {
         await prisma.$transaction(async (tx) => {
@@ -521,6 +532,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               slug: `org-${userId.slice(-6)}`,
               country: "TR",
               orgType: "SME",
+              province,
             },
           });
 

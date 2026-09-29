@@ -85,8 +85,14 @@ export function municipalCallsPath(locale: string): string {
   return locale === 'tr' ? `/${locale}/belediye-cagrilari` : `/${locale}/municipal-calls`;
 }
 
-/** Sign-up with the funnel source, so the account can be attributed to this page. */
-export function readinessSignupPath(locale: string): string {
+/**
+ * Sign-up with the funnel source, so the account can be attributed to this page.
+ * The province answered on the scorecard travels as `il` and pre-fills the
+ * optional province of the new organisation (TASK-MULV3JXS1AW5X).
+ */
+export function readinessSignupPath(locale: string, province?: TrProvince | null): string {
   const base = locale === 'tr' ? `/${locale}/kayit` : `/${locale}/register`;
-  return `${base}?kaynak=fon-hazirlik`;
+  const params = new URLSearchParams({ kaynak: 'fon-hazirlik' });
+  if (province) params.set(SHARE_PARAM_PROVINCE, province);
+  return `${base}?${params.toString()}`;
 }

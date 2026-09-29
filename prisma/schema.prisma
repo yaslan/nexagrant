@@ -20,6 +20,11 @@ model Tenant {
   name          String
   slug          String   @unique
   country       String   // ISO-3166-1 alpha-2
+  // TASK-MULV3JXS1AW5X — Turkish province, spelled as TR_PROVINCES
+  // (src/lib/readiness/provinces.ts), the dictionary the scorecard and the
+  // public-sector catalogue use. NULL = not given / not in Türkiye. A CHECK in
+  // add-tenant-province.sql holds the same 81 names. Organisation data.
+  province      String?
   orgType       OrgType  @default(SME)
   pic           String?  // EU Participant Identification Code
   locale        String   @default("tr")

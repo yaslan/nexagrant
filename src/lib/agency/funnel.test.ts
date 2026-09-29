@@ -1,6 +1,17 @@
 import { describe, expect, test } from 'vitest';
 import type { OrgType } from '@prisma/client';
-import { buildFunnel, maskStep, ORG_TYPES, SMALL_CELL_THRESHOLD, type FunnelCell } from './funnel';
+import {
+  buildFunnel,
+  buildProvinceFunnel,
+  maskStep,
+  NO_PROVINCE,
+  ORG_TYPES,
+  SMALL_CELL_THRESHOLD,
+  sumProvinces,
+  type AgencyFunnel,
+  type FunnelCell,
+} from './funnel';
+import type { TrProvince } from '@/lib/readiness/provinces';
 
 /** TASK-MULRQSJFB8RWJ — small-cell rule of docs/legal/agency-channel-notice-addendum.md §3.1. */
 
@@ -112,5 +123,113 @@ describe('buildFunnel', () => {
     const f = buildFunnel(30, raw({ SME: { registered: 8 } }));
     const json = JSON.stringify(f);
     expect(json).not.toMatch(/"(id|name|slug|tenantId|title)"/);
+  });
+});
+
+describe('buildProvinceFunnel (TASK-MULV3JXS1AW5X)', () => {
+  const STEPS = ['registered', 'savedSearch', 'pipeline', 'conceptNote', 'submitted', 'accepted', 'rejected'] as const;
+  type Counts = Record<(typeof STEPS)[number], number>;
+  const zero = (): Counts => Object.fromEntries(STEPS.map((s) => [s, 0])) as Counts;
+  /** `{ Samsun: { SME: 8 } }` → every step of that cell = 8 (or a partial step map). */
+  const table = (v: Record<string, Partial<Record<OrgType, number | Partial<Counts>>>>) =>
+    new Map(
+      Object.entries(v).map(([p, types]) => [
+        p,
+        Object.fromEntries(
+          ORG_TYPES.map((t) => {
+            const x = types[t];
+            const c = typeof x === 'number' ? Object.fromEntries(STEPS.map((s) => [s, x])) : { ...zero(), ...(x ?? {}) };
+            return [t, c];
+          })
+        ) as Record<OrgType, Counts>,
+      ])
+    );
+
+  test('the province view counts that province only, and the all-province view is unchanged', () => {
+    const t = table({ Samsun: { SME: 8 }, Tokat: { SME: 6 }, [NO_PROVINCE]: { SME: 5 } });
+    const f = buildProvinceFunnel(30, t, 'Samsun');
+    expect(f.province).toBe('Samsun');
+    expect(f.all.registered).toEqual({ state: 'count', value: 8 });
+    expect(f.byOrgType.SME.registered).toEqual({ state: 'count', value: 8 });
+    expect(f.all.readiness).toEqual({ state: 'unmeasured' });
+    const all = buildFunnel(30, sumProvinces(t));
+    expect(all.all.registered).toEqual({ state: 'count', value: 19 });
+    expect(all.province).toBeNull();
+  });
+
+  test('a province with fewer than 5 organisations shows "<5" on every step, 0 included', () => {
+    const t = table({ Samsun: { SME: 8 }, Amasya: { SME: 3 }, [NO_PROVINCE]: { SME: 9 } });
+    for (const p of ['Amasya', 'Çorum'] as const) {
+      const f = buildProvinceFunnel(30, t, p);
+      for (const s of STEPS) expect(f.all[s]).toEqual({ state: 'small' });
+    }
+  });
+
+  test('a small province cannot be recovered as total minus the visible provinces', () => {
+    // 20 organisations: 15 in Samsun, 5 in Tokat, 0 without a province… except Amasya has 2
+    // hidden. Visible Samsun 15 + Tokat 5 = 20 of 22 would give Amasya's 2 away.
+    const t = table({ Samsun: { SME: 15 }, Tokat: { SME: 5 }, Amasya: { SME: 2 } });
+    const all = buildFunnel(30, sumProvinces(t)).all.registered;
+    expect(all).toEqual({ state: 'count', value: 22 });
+    const tokat = buildProvinceFunnel(30, t, 'Tokat').all.registered;
+    expect(tokat).toEqual({ state: 'small' });
+    expect(buildProvinceFunnel(30, t, 'Samsun').all.registered).toEqual({ state: 'count', value: 15 });
+  });
+
+  test('a small type cell inside a province is not left recoverable from the province total', () => {
+    const t = table({ Samsun: { SME: 6, MUNICIPALITY: 2 }, Tokat: { SME: 9, MUNICIPALITY: 7 } });
+    const f = buildProvinceFunnel(30, t, 'Samsun');
+    expect(f.all.registered).toEqual({ state: 'count', value: 8 });
+    expect(f.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
+    expect(f.byOrgType.SME.registered).toEqual({ state: 'small' });
+  });
+
+  test('property: nothing a reader can subtract across all views is 1..4', () => {
+    let seed = 7;
+    const rand = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+    const provinces: string[] = ['Samsun', 'Tokat', 'Amasya', 'Çorum', NO_PROVINCE];
+    const types: OrgType[] = ['SME', 'MUNICIPALITY', 'NGO'];
+    const val = (c: FunnelCell) => (c.state === 'count' ? c.value : null);
+    for (let i = 0; i < 400; i++) {
+      const spec: Record<string, Partial<Record<OrgType, Partial<Counts>>>> = {};
+      for (const p of provinces) {
+        spec[p] = {};
+        for (const ty of types) {
+          const reg = rand() < 0.4 ? 0 : Math.floor(rand() * 10);
+          spec[p]![ty] = { registered: reg, savedSearch: Math.floor(reg * rand()), submitted: Math.floor(rand() * 12) };
+        }
+      }
+      const t = table(spec);
+      const overall = buildFunnel(30, sumProvinces(t));
+      // The other 77 provinces hold nobody: every cell of theirs is "<5" and adds 0 to a sum.
+      const views = new Map<string, AgencyFunnel>(
+        provinces.filter((p) => p !== NO_PROVINCE).map((p) => [p, buildProvinceFunnel(30, t, p as TrProvince)])
+      );
+      for (const s of STEPS) {
+        const lines: { total: number | null; parts: (number | null)[] }[] = [];
+        // Across provinces: grand total vs. every province total (no-province mass is hidden).
+        const colTotals = [...views.values()].map((v) => val(v.all[s]));
+        lines.push({ total: val(overall.all[s]), parts: colTotals});
+        for (const ty of ORG_TYPES) {
+          // Along a type: type total vs. that type in every province.
+          lines.push({ total: val(overall.byOrgType[ty][s]), parts: [...views.values()].map((v) => val(v.byOrgType[ty][s]))});
+        }
+        for (const v of views.values()) {
+          // Down a province: province total vs. its types.
+          lines.push({ total: val(v.all[s]), parts: ORG_TYPES.map((ty) => val(v.byOrgType[ty][s]))});
+        }
+        for (const v of [overall, ...views.values()]) {
+          for (const c of [v.all[s], ...ORG_TYPES.map((ty) => v.byOrgType[ty][s])]) {
+            const n = val(c);
+            if (n !== null) expect(n).toBeGreaterThanOrEqual(SMALL_CELL_THRESHOLD);
+          }
+        }
+        for (const l of lines) {
+          if (l.total === null) continue;
+          const left = l.total - l.parts.reduce<number>((n, x) => n + (x ?? 0), 0);
+          expect(left === 0 || left >= SMALL_CELL_THRESHOLD).toBe(true);
+        }
+      }
+    }
   });
 });
