@@ -87,6 +87,46 @@ describe('sanitizeLogoPng', () => {
     expect(sanitizeLogoPng(png(1025, 1))).toEqual({ ok: false, error: 'tooWide' });
     expect(sanitizeLogoPng(png(1024, 1)).ok).toBe(true);
   });
+
+  it('refuses a second IHDR, so a later one cannot slip past the size check', () => {
+    const big = Buffer.alloc(13);
+    big.writeUInt32BE(5000, 0);
+    big.writeUInt32BE(5000, 4);
+    big.set([8, 6, 0, 0, 0], 8);
+    expect(sanitizeLogoPng(png(2, 1, [chunk('IHDR', big)]))).toEqual({ ok: false, error: 'badPng' });
+    // Same size as the first one: still refused — only the first chunk may be IHDR.
+    const same = Buffer.from(png(2, 1).subarray(16, 29));
+    expect(sanitizeLogoPng(png(2, 1, [chunk('IHDR', same)]))).toEqual({ ok: false, error: 'badPng' });
+  });
+
+  it('accepts IDAT split into a run, refuses IDATs broken up by another chunk', () => {
+    const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(4, 0);
+    ihdr.writeUInt32BE(4, 4);
+    ihdr.set([8, 6, 0, 0, 0], 8);
+    const z = deflateSync(Buffer.alloc((4 * 4 + 1) * 4));
+    const half = z.length >> 1;
+    const build = (...middle: Buffer[]) =>
+      Buffer.concat([sig, chunk('IHDR', ihdr), ...middle, chunk('IEND', Buffer.alloc(0))]);
+
+    const run = build(chunk('IDAT', z.subarray(0, half)), chunk('IDAT', z.subarray(half)));
+    expect(sanitizeLogoPng(run)).toMatchObject({ ok: true, width: 4, height: 4 });
+
+    // A dropped chunk between them is still a break in the input.
+    const splitByText = build(
+      chunk('IDAT', z.subarray(0, half)),
+      chunk('tEXt', Buffer.from('k\0v', 'latin1')),
+      chunk('IDAT', z.subarray(half)),
+    );
+    expect(sanitizeLogoPng(splitByText)).toEqual({ ok: false, error: 'badPng' });
+    const splitByKept = build(
+      chunk('IDAT', z.subarray(0, half)),
+      chunk('gAMA', Buffer.from([0, 0, 0xb1, 0x8f])),
+      chunk('IDAT', z.subarray(half)),
+    );
+    expect(sanitizeLogoPng(splitByKept)).toEqual({ ok: false, error: 'badPng' });
+  });
 });
 
 describe('co-brand settings', () => {

@@ -236,7 +236,7 @@ const DEV_OBJECT_DIR = '.dev-objects';
 
 /** Keys are built by our own code; this still refuses anything that could leave the directory. */
 function devObjectPath(objectKey: string): string | null {
-  if (process.env.NODE_ENV === 'production') return null;
+  if (env.NODE_ENV === 'production') return null;
   if (!/^[A-Za-z0-9_/.-]+$/.test(objectKey) || objectKey.split('/').some((p) => p === '' || p === '.' || p === '..')) {
     return null;
   }

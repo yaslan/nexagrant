@@ -16,8 +16,11 @@
  *   • ≤ {@link COBRAND_MAX_BYTES} bytes, ≤ {@link COBRAND_MAX_SIDE} px a side.
  *   • The file is walked chunk by chunk (length, type, CRC) up to an IEND that
  *     must be the last byte; anything after it (a PNG/HTML or PNG/ZIP polyglot)
- *     is refused. Only image-bearing chunks are copied into the stored file, so
- *     text, EXIF and other metadata chunks never reach storage.
+ *     is refused. IHDR must be the first chunk and appear only there (a second
+ *     one would carry a size the 1024 px check never saw), and the IDAT chunks
+ *     must be one unbroken run, as the PNG spec requires. Only image-bearing
+ *     chunks are copied into the stored file, so text, EXIF and other metadata
+ *     chunks never reach storage.
  */
 import { crc32 } from 'node:zlib';
 
@@ -63,6 +66,7 @@ export function sanitizeLogoPng(
   let width = 0;
   let height = 0;
   let sawIdat = false;
+  let idatEnded = false;
   let pos = 8;
   let first = true;
   for (;;) {
@@ -81,8 +85,15 @@ export function sanitizeLogoPng(
       if (width === 0 || height === 0) return { ok: false, error: 'badPng' };
       if (width > COBRAND_MAX_SIDE || height > COBRAND_MAX_SIDE) return { ok: false, error: 'tooWide' };
       first = false;
+    } else if (type === 'IHDR') {
+      return { ok: false, error: 'badPng' };
     }
-    if (type === 'IDAT') sawIdat = true;
+    if (type === 'IDAT') {
+      if (idatEnded) return { ok: false, error: 'badPng' };
+      sawIdat = true;
+    } else if (sawIdat) {
+      idatEnded = true;
+    }
     if (KEPT_CHUNKS.has(type)) kept.push(buf.subarray(pos, end));
     pos = end;
     if (type === 'IEND') break;
