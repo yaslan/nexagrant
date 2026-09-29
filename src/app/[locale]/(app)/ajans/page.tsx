@@ -8,6 +8,8 @@ import { listInviteCodesIn } from '@/lib/agency/codes';
 import { parseProvince } from '@/lib/readiness/share';
 import FunnelPanel from './funnel-panel';
 import InviteCodesPanel from './invite-codes-panel';
+import ReportsPanel from './reports-panel';
+import { listAgencyReportsIn } from '@/lib/agency/report';
 import CoBrandPanel from './cobrand-panel';
 import { getAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-store';
 import { COBRAND_NAME_MAX } from '@/lib/agency/cobrand';
@@ -51,11 +53,13 @@ export default async function AgencyPage({
   const breakdown = parseBreakdown(kirilim, il);
 
   const renderedAt = requestTime();
-  const [funnel, codes, cobrand] = await Promise.all([
+  const [funnel, codes, reports, cobrand] = await Promise.all([
     // TASK-MULXF0AVMD8MN — one cohort, no date window: an old `?gun=` link is ignored.
     getAgencyFunnel(scope.tenantId, { breakdown }),
     // B-1 (TASK-MUM17YBJVAHRR): status per code, no use count.
     withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId, renderedAt)),
+    // B3 (TASK-MULRR08Y9YI77): the monthly region reports, newest first.
+    withTenant(scope.tenantId, (tx) => listAgencyReportsIn(tx, scope.tenantId)),
     // B4 (TASK-MULRRNIHVZM1Z): the agency's own co-brand entry.
     getAgencyCoBrand(scope.tenantId),
   ]);
@@ -68,6 +72,8 @@ export default async function AgencyPage({
       </header>
 
       <FunnelPanel locale={locale} funnel={funnel} />
+
+      <ReportsPanel locale={locale} reports={reports} />
 
       <InviteCodesPanel
         locale={locale}
