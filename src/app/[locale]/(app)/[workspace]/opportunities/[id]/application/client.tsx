@@ -17,6 +17,7 @@ import {
 import { addBudgetLine, addWorkPackage, calculateLumpSumBudget } from '@/modules/m11/server/actions';
 import { issuePartnerPortalLink } from '@/modules/m11/server/partner-link';
 import { PartBCollaborativeEditor } from '@/modules/m11/ui/PartBCollaborativeEditor';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import type { BudgetLine, PartContent, WorkPackageItem } from '@/modules/m11/types';
 
 export interface ApplicationPartItem {
@@ -52,7 +53,12 @@ export function ApplicationClient({
   const [portalLink, setPortalLink] = useState<string | null>(null);
   const [hasPortalLink, setHasPortalLink] = useState(Boolean(partA?.hasPortalLink));
   const [isIssuingLink, setIsIssuingLink] = useState(false);
-  const [linkError, setLinkError] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  // Only an ended pilot is said for the budget and work-package forms; their other
+  // failures stay in the console, as before (TASK-MUMT3HQI1ILAR, İNCELEME-24 B-1).
+  const [budgetError, setBudgetError] = useState<string | null>(null);
+  const [wpError, setWpError] = useState<string | null>(null);
+  const errorText = useActionErrorText();
 
   // Budget form state
   const [partnerName, setPartnerName] = useState('');
@@ -104,11 +110,11 @@ export function ApplicationClient({
   const handleIssuePortalLink = async () => {
     if (!partA) return;
     setIsIssuingLink(true);
-    setLinkError(false);
+    setLinkError(null);
     try {
       const issued = await issuePartnerPortalLink(partA.id);
       if (!issued) {
-        setLinkError(true);
+        setLinkError(t('portalLinkFailed'));
         return;
       }
       setPortalLink(`${window.location.origin}/${locale}/portal/partner/${issued.token}`);
@@ -116,7 +122,7 @@ export function ApplicationClient({
       setCopiedToken(false);
     } catch (err) {
       console.error('Error issuing partner portal link:', err);
-      setLinkError(true);
+      setLinkError(errorText(err, t('portalLinkFailed')));
     } finally {
       setIsIssuingLink(false);
     }
@@ -127,6 +133,7 @@ export function ApplicationClient({
     if (!partnerName.trim() || !partA) return;
 
     setIsAddingBudget(true);
+    setBudgetError(null);
     try {
       const coef = parseFloat(countryCoef);
       const sub = parseFloat(subcontracting);
@@ -151,6 +158,7 @@ export function ApplicationClient({
       setPersonMonths(12);
     } catch (err) {
       console.error('Error adding budget line:', err);
+      setBudgetError(errorText(err, null));
     } finally {
       setIsAddingBudget(false);
     }
@@ -161,6 +169,7 @@ export function ApplicationClient({
     if (!partB) return;
 
     setIsAddingWp(true);
+    setWpError(null);
     try {
       await addWorkPackage(partB.id, {
         code: wpCode,
@@ -184,6 +193,7 @@ export function ApplicationClient({
       ]);
     } catch (err) {
       console.error('Error adding work package:', err);
+      setWpError(errorText(err, null));
     } finally {
       setIsAddingWp(false);
     }
@@ -372,7 +382,7 @@ export function ApplicationClient({
                   <span>{hasPortalLink ? 'Yeni bağlantı oluştur' : 'Bağlantı oluştur'}</span>
                 </button>
                 {linkError && (
-                  <p className="text-[11px] text-red-300" role="alert">{t('portalLinkFailed')}</p>
+                  <p className="text-[11px] text-red-300" role="alert">{linkError}</p>
                 )}
               </div>
             )}
@@ -453,6 +463,9 @@ export function ApplicationClient({
                   <Plus className="w-3.5 h-3.5" />
                   <span>{isAddingBudget ? 'Hesaplanıyor...' : 'Bütçe Kalemini Kaydet'}</span>
                 </button>
+                {budgetError && (
+                  <p role="alert" className="text-xs font-semibold text-bad">{budgetError}</p>
+                )}
               </form>
             </div>
           </div>
@@ -663,6 +676,9 @@ export function ApplicationClient({
                 <Plus className="w-3.5 h-3.5" />
                 <span>İş Paketini Gantt Şemasına Ekle</span>
               </button>
+              {wpError && (
+                <p role="alert" className="text-xs font-semibold text-bad">{wpError}</p>
+              )}
             </form>
           </div>
         </div>

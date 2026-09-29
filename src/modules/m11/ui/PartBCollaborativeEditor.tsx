@@ -40,6 +40,7 @@ import {
 } from '../server/actions';
 import { errorMessage } from '@/lib/errors';
 import { useNow } from '@/lib/hooks/use-now';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { useOptionalSession } from '@/lib/hooks/use-optional-session';
 import { displayUserName } from '@/lib/user-display';
 import { useLocale, useTranslations } from 'next-intl';
@@ -167,6 +168,11 @@ export function PartBCollaborativeEditor({
 
   const [viewMode, setViewMode] = useState<'EDIT' | 'PREVIEW'>('EDIT');
   const [isSaving, setIsSaving] = useState(false);
+  // A refused write is said above the editor only when the pilot has ended; other failures
+  // stay in the console, as before (TASK-MUMT3HQI1ILAR, İNCELEME-24 B-1). Without it an
+  // expired pilot's save, lock and comment calls were rejected with nothing on screen.
+  const [actionError, setActionError] = useState<string | null>(null);
+  const errorText = useActionErrorText();
 
   /**
    * Derived, not stored. A save in flight is SAVING; a buffer that differs from the section's
@@ -231,6 +237,7 @@ export function PartBCollaborativeEditor({
   // 2.5s timer on every keystroke-driven render instead of once per edit.
   const handleSaveContent = useCallback(async (isManual: boolean = true) => {
     setIsSaving(true);
+    setActionError(null);
     try {
       await updateSectionContent(
         partId,
@@ -268,10 +275,11 @@ export function PartBCollaborativeEditor({
       setRevisions((prev) => [newRev, ...prev.slice(0, 20)]);
     } catch (err) {
       console.error('Error saving content:', err);
+      setActionError(errorText(err, null));
     } finally {
       setIsSaving(false);
     }
-  }, [partId, activeSectionKey, editorText, currentUserId, currentUserName, currentUserOrg, currentSectionWords]);
+  }, [partId, activeSectionKey, editorText, currentUserId, currentUserName, currentUserOrg, currentSectionWords, errorText]);
 
   // Autosave only. The dirty indicator is derived above, so this effect no longer sets state
   // in its body — it just arms the 2.5s timer and disarms it on the next keystroke.
@@ -307,13 +315,21 @@ export function PartBCollaborativeEditor({
   );
 
   const handleAcquireLock = async () => {
-    const res = await acquireSectionLock(
-      partId,
-      activeSectionKey,
-      currentUserId,
-      currentUserName,
-      currentUserOrg
-    );
+    setActionError(null);
+    let res: Awaited<ReturnType<typeof acquireSectionLock>>;
+    try {
+      res = await acquireSectionLock(
+        partId,
+        activeSectionKey,
+        currentUserId,
+        currentUserName,
+        currentUserOrg
+      );
+    } catch (err) {
+      console.error('Error acquiring section lock:', err);
+      setActionError(errorText(err, null));
+      return;
+    }
     if (res.success) {
       setSections((prev) =>
         prev.map((s) =>
@@ -334,7 +350,14 @@ export function PartBCollaborativeEditor({
   };
 
   const handleReleaseLock = async () => {
-    await releaseSectionLock(partId, activeSectionKey, currentUserId);
+    setActionError(null);
+    try {
+      await releaseSectionLock(partId, activeSectionKey, currentUserId);
+    } catch (err) {
+      console.error('Error releasing section lock:', err);
+      setActionError(errorText(err, null));
+      return;
+    }
     setSections((prev) =>
       prev.map((s) =>
         s.key === activeSectionKey
@@ -348,20 +371,35 @@ export function PartBCollaborativeEditor({
     e.preventDefault();
     if (!newCommentText.trim()) return;
 
-    const cmt = await addSectionComment(
-      partId,
-      activeSectionKey,
-      currentUserName,
-      currentUserOrg,
-      newCommentText.trim()
-    );
+    setActionError(null);
+    let cmt: Awaited<ReturnType<typeof addSectionComment>>;
+    try {
+      cmt = await addSectionComment(
+        partId,
+        activeSectionKey,
+        currentUserName,
+        currentUserOrg,
+        newCommentText.trim()
+      );
+    } catch (err) {
+      console.error('Error adding comment:', err);
+      setActionError(errorText(err, null));
+      return;
+    }
 
     setComments((prev) => [cmt, ...prev]);
     setNewCommentText('');
   };
 
   const handleToggleResolveComment = async (commentId: string) => {
-    await resolveSectionComment(partId, activeSectionKey, commentId);
+    setActionError(null);
+    try {
+      await resolveSectionComment(partId, activeSectionKey, commentId);
+    } catch (err) {
+      console.error('Error resolving comment:', err);
+      setActionError(errorText(err, null));
+      return;
+    }
     setComments((prev) =>
       prev.map((c) => (c.id === commentId ? { ...c, resolved: !c.resolved } : c))
     );
@@ -369,8 +407,14 @@ export function PartBCollaborativeEditor({
 
   const handleRestoreRevision = async (rev: SectionRevisionItem) => {
     if (confirm(`${rev.authorName} tarafından oluşturulan (${new Date(rev.timestamp).toLocaleTimeString()}) sürüme geri dönmek istediğinizden emin misiniz?`)) {
+      setActionError(null);
       setEditorText(rev.content);
-      await restoreSectionRevision(partId, activeSectionKey, rev.id);
+      try {
+        await restoreSectionRevision(partId, activeSectionKey, rev.id);
+      } catch (err) {
+        console.error('Error restoring revision:', err);
+        setActionError(errorText(err, null));
+      }
       setActiveDrawer(null);
     }
   };
@@ -710,6 +754,11 @@ export function PartBCollaborativeEditor({
 
         {/* RIGHT/CENTER COLUMN: Active Section Collaborative Editor (8 cols) */}
         <div className="lg:col-span-8 space-y-4">
+          {actionError && (
+            <p role="alert" className="bg-bad/10 border border-bad/30 rounded-xl p-4 text-sm font-semibold text-bad">
+              {actionError}
+            </p>
+          )}
           <div className="bg-surface border border-border rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
               <div>
