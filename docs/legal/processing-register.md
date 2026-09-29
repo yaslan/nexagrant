@@ -10,274 +10,274 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 
 ## 1. Hesap oluşturma ve kimlik doğrulama
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu |
-| **Veri kategorileri** | Ad, e-posta, e-posta doğrulama zamanı, profil resmi URL'si, dil tercihi, parola özeti (argon2), OAuth sağlayıcı kimliği (`providerAccountId`), OAuth erişim/yenileme token'ları, oturum token'ı |
-| **İlgili kişi kategorileri** | Platform kullanıcıları (kiracı çalışanları / danışmanları) |
-| **Amaç** | Hesap oluşturma, oturum açma, oturum yönetimi |
-| **Hukuki sebep** | KVKK md.5/2-c (sözleşmenin kurulması/ifası) / GDPR art.6(1)(b) |
+| Alan                           | Değer                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu                                                                                                                                                                                                                                                                                                      |
+| **Veri kategorileri**          | Ad, e-posta, e-posta doğrulama zamanı, profil resmi URL'si, dil tercihi, parola özeti (argon2), OAuth sağlayıcı kimliği (`providerAccountId`), OAuth erişim/yenileme token'ları, oturum token'ı                                                                                                                               |
+| **İlgili kişi kategorileri**   | Platform kullanıcıları (kiracı çalışanları / danışmanları)                                                                                                                                                                                                                                                                    |
+| **Amaç**                       | Hesap oluşturma, oturum açma, oturum yönetimi                                                                                                                                                                                                                                                                                 |
+| **Hukuki sebep**               | KVKK md.5/2-c (sözleşmenin kurulması/ifası) / GDPR art.6(1)(b)                                                                                                                                                                                                                                                                |
 | **Alıcı ve yurt dışı aktarım** | Kullanıcı Google veya Microsoft ile giriş seçerse: **Google LLC** ve **Microsoft Corporation** (ABD merkezli kimlik sağlayıcılar) — OAuth akışında ilgili kişinin adı/e-postası bu sağlayıcılardan alınır. E-posta/parola girişinde üçüncü taraf yok. Barındırma altyapısı (veritabanı) ayrı bir sub-processor'dur (bkz. §7). |
-| **Saklama süresi** | Hesap ömrü + 30 gün silme bekleme süresi (`User.deletionRequestedAt` → `users-scheduled-deletion` işi) |
-| **Teknik-idari tedbir** | argon2 parola özeti, RLS (Postgres row-level security), JWT oturum, `Session`/`Account` dışa aktarıma dahil değil |
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`User`, `Account`, `Session`, `VerificationToken`), `src/lib/auth.ts` (satır 2-4: `Google`, `MicrosoftEntraID`, `Credentials` sağlayıcıları) |
+| **Saklama süresi**             | Hesap ömrü + 30 gün silme bekleme süresi (`User.deletionRequestedAt` → `users-scheduled-deletion` işi)                                                                                                                                                                                                                        |
+| **Teknik-idari tedbir**        | argon2 parola özeti, RLS (Postgres row-level security), JWT oturum, `Session`/`Account` dışa aktarıma dahil değil                                                                                                                                                                                                             |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`User`, `Account`, `Session`, `VerificationToken`), `src/lib/auth.ts` (satır 2-4: `Google`, `MicrosoftEntraID`, `Credentials` sağlayıcıları)                                                                                                                                                          |
 
 ## 2. Kiracı/ekip üyeliği ve davet
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu (üyelik/rol), kiracı = veri sorumlusu (davet edilen kişinin e-postası kiracının ekip kararıdır) |
-| **Veri kategorileri** | Rol, çalışma alanı erişim listesi, davet edilen kişinin e-postası, davet token'ı |
-| **İlgili kişi kategorileri** | Kiracı kullanıcıları, davet edilen (henüz hesabı olmayan) kişiler |
-| **Amaç** | Ekip yönetimi, rol bazlı erişim kontrolü |
-| **Hukuki sebep** | KVKK md.5/2-c / GDPR art.6(1)(b) |
-| **Alıcı ve yurt dışı aktarım** | Yok — yalnızca iç veritabanı |
-| **Saklama süresi** | `Membership`: hesap/kiracı ömrü + 30 gün; `Invitation`: `expires` alanına kadar (kod düzeyinde otomatik temizlik yok — açık) |
-| **Teknik-idari tedbir** | RBAC (`src/lib/authz`), RLS |
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`Membership`, `Invitation`, `Role`) |
+| Alan                           | Değer                                                                                                                        |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu (üyelik/rol), kiracı = veri sorumlusu (davet edilen kişinin e-postası kiracının ekip kararıdır)     |
+| **Veri kategorileri**          | Rol, çalışma alanı erişim listesi, davet edilen kişinin e-postası, davet token'ı                                             |
+| **İlgili kişi kategorileri**   | Kiracı kullanıcıları, davet edilen (henüz hesabı olmayan) kişiler                                                            |
+| **Amaç**                       | Ekip yönetimi, rol bazlı erişim kontrolü                                                                                     |
+| **Hukuki sebep**               | KVKK md.5/2-c / GDPR art.6(1)(b)                                                                                             |
+| **Alıcı ve yurt dışı aktarım** | Yok — yalnızca iç veritabanı                                                                                                 |
+| **Saklama süresi**             | `Membership`: hesap/kiracı ömrü + 30 gün; `Invitation`: `expires` alanına kadar (kod düzeyinde otomatik temizlik yok — açık) |
+| **Teknik-idari tedbir**        | RBAC (`src/lib/authz`), RLS                                                                                                  |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`Membership`, `Invitation`, `Role`)                                                                  |
 
 ## 3. Faturalama ve ödeme — Stripe (EUR abonelik)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu (kendi geliri için fatura/tahsilat) |
-| **Veri kategorileri** | Stripe müşteri kimliği (`Subscription.providerCustomerId`), abonelik durumu; kart bilgisi ve ödeyenin e-postası **Fabrika kodundan geçmez** — Stripe'ın barındırılan ödeme sayfasına ilgili kişi tarafından doğrudan girilir |
-| **İlgili kişi kategorileri** | Ödemeyi yapan kiracı yetkilisi |
-| **Amaç** | Abonelik tahsilatı, plan/kredi senkronizasyonu |
-| **Hukuki sebep** | KVKK md.5/2-ç (hukuki yükümlülük / sözleşmenin ifası) / GDPR art.6(1)(b) ve (c) |
-| **Alıcı ve yurt dışı aktarım** | **Stripe, Inc.** (ABD merkezli; SCC/DPF güvencesi Stripe'ın kendi DPA'sına dayanır — Fabrika tarafında ayrı bir sözleşme metni repoda **YOK — açık**) |
-| **Saklama süresi** | Yasal saklama süresi boyunca (`docs/legal/dpa-en.md` §6: "kimliksizleştirilmiş biçimde") — kimliksizleştirme adımı kod düzeyinde `Subscription`/`Invoice` için **uygulanmıyor — açık**, yalnızca `AiUsageLog.userId` ve `Effort` silme akışında var (bkz. §6) |
-| **Teknik-idari tedbir** | Webhook imza doğrulaması, sunucu tarafı fiyat hesaplama (istemciden fiyat kabul edilmez) |
-| **Kaynak dosya yolu** | `src/app/api/billing/checkout/route.ts`, `src/lib/billing/subscription-sync.ts`, `prisma/schema.prisma` (`Subscription`) |
+| Alan                           | Değer                                                                                                                                                                                                                                                         |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu (kendi geliri için fatura/tahsilat)                                                                                                                                                                                                  |
+| **Veri kategorileri**          | Stripe müşteri kimliği (`Subscription.providerCustomerId`), abonelik durumu; kart bilgisi ve ödeyenin e-postası **Fabrika kodundan geçmez** — Stripe'ın barındırılan ödeme sayfasına ilgili kişi tarafından doğrudan girilir                                  |
+| **İlgili kişi kategorileri**   | Ödemeyi yapan kiracı yetkilisi                                                                                                                                                                                                                                |
+| **Amaç**                       | Abonelik tahsilatı, plan/kredi senkronizasyonu                                                                                                                                                                                                                |
+| **Hukuki sebep**               | KVKK md.5/2-ç (hukuki yükümlülük / sözleşmenin ifası) / GDPR art.6(1)(b) ve (c)                                                                                                                                                                               |
+| **Alıcı ve yurt dışı aktarım** | **Stripe, Inc.** (ABD merkezli; SCC/DPF güvencesi Stripe'ın kendi DPA'sına dayanır — Fabrika tarafında ayrı bir sözleşme metni repoda **YOK — açık**)                                                                                                         |
+| **Saklama süresi**             | Yasal saklama süresi boyunca (`docs/legal/dpa-en.md` §6: "kimliksizleştirilmiş biçimde") — kimliksizleştirme adımı kod düzeyinde `Subscription`/`Invoice` için **uygulanmıyor — açık**, yalnızca `AiUsageLog.userId` ve `Effort` silme akışında var (bkz. §6) |
+| **Teknik-idari tedbir**        | Webhook imza doğrulaması, sunucu tarafı fiyat hesaplama (istemciden fiyat kabul edilmez)                                                                                                                                                                      |
+| **Kaynak dosya yolu**          | `src/app/api/billing/checkout/route.ts`, `src/lib/billing/subscription-sync.ts`, `prisma/schema.prisma` (`Subscription`)                                                                                                                                      |
 
 ## 4. Faturalama ve ödeme — iyzico (TRY, faz 2)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu |
-| **Veri kategorileri** | iyzico ödeme referansı, tutar (kuruş) |
-| **İlgili kişi kategorileri** | Ödemeyi yapan kiracı yetkilisi |
-| **Amaç** | TRY abonelik tahsilatı |
-| **Hukuki sebep** | KVKK md.5/2-ç / GDPR art.6(1)(b)-(c) |
-| **Alıcı ve yurt dışı aktarım** | **iyzico** (Türkiye merkezli — yurt dışı aktarım yok) |
-| **Saklama süresi** | Yasal saklama süresi boyunca |
-| **Teknik-idari tedbir** | Ödeme durumu sağlayıcıdan yeniden okunur, webhook gövdesine güvenilmez (`src/lib/iyzico.ts` satır 17-19) |
-| **Kaynak dosya yolu** | `src/lib/iyzico.ts` |
+| Alan                           | Değer                                                                                                    |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu                                                                                 |
+| **Veri kategorileri**          | iyzico ödeme referansı, tutar (kuruş)                                                                    |
+| **İlgili kişi kategorileri**   | Ödemeyi yapan kiracı yetkilisi                                                                           |
+| **Amaç**                       | TRY abonelik tahsilatı                                                                                   |
+| **Hukuki sebep**               | KVKK md.5/2-ç / GDPR art.6(1)(b)-(c)                                                                     |
+| **Alıcı ve yurt dışı aktarım** | **iyzico** (Türkiye merkezli — yurt dışı aktarım yok)                                                    |
+| **Saklama süresi**             | Yasal saklama süresi boyunca                                                                             |
+| **Teknik-idari tedbir**        | Ödeme durumu sağlayıcıdan yeniden okunur, webhook gövdesine güvenilmez (`src/lib/iyzico.ts` satır 17-19) |
+| **Kaynak dosya yolu**          | `src/lib/iyzico.ts`                                                                                      |
 
 ## 5. Türk vergi kimliği ve e-Fatura (VKN/TCKN)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu |
-| **Veri kategorileri** | Alıcı unvanı, **VKN veya TCKN** (11 haneli TCKN, şahıs şirketi/gerçek kişi mükellef ise **doğrudan kimlik numarasıdır** — özel önlem gerektirir), vergi dairesi, adres, şehir |
-| **İlgili kişi kategorileri** | Fatura kesilen kiracının yetkilisi (şahıs şirketi ise gerçek kişi mükellefin kendisi) |
-| **Amaç** | Yasal fatura düzenleme (Türk vergi mevzuatı) |
-| **Hukuki sebep** | KVKK md.5/2-ç (hukuki yükümlülük) / GDPR art.6(1)(c) |
+| Alan                           | Değer                                                                                                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu                                                                                                                                                                                                                          |
+| **Veri kategorileri**          | Alıcı unvanı, **VKN veya TCKN** (11 haneli TCKN, şahıs şirketi/gerçek kişi mükellef ise **doğrudan kimlik numarasıdır** — özel önlem gerektirir), vergi dairesi, adres, şehir                                                                     |
+| **İlgili kişi kategorileri**   | Fatura kesilen kiracının yetkilisi (şahıs şirketi ise gerçek kişi mükellefin kendisi)                                                                                                                                                             |
+| **Amaç**                       | Yasal fatura düzenleme (Türk vergi mevzuatı)                                                                                                                                                                                                      |
+| **Hukuki sebep**               | KVKK md.5/2-ç (hukuki yükümlülük) / GDPR art.6(1)(c)                                                                                                                                                                                              |
 | **Alıcı ve yurt dışı aktarım** | **YOK — açık.** `docs/EFATURA_SETUP.md` satır 3-4: "e-Fatura entegrasyonu CANLI DEĞİL... bugüne kadar hiçbir belge GİB'e gönderilmedi." VKN/TCKN bugün yalnızca Fabrika veritabanında tutuluyor, üçüncü bir tarafa (GİB, entegratör) iletilmiyor. |
-| **Saklama süresi** | Yasal saklama süresi (Türk vergi mevzuatı — süre repoda tanımlı değil, muhasebe/mali müşavir onayı gerekir — **açık**) |
-| **Teknik-idari tedbir** | `TenantBillingIdentity` ayrı tablo, `Invoice.buyer*` işlem anında donmuş kopya; RLS | 
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`Invoice`, `TenantBillingIdentity`), `docs/EFATURA_SETUP.md` |
+| **Saklama süresi**             | Yasal saklama süresi (Türk vergi mevzuatı — süre repoda tanımlı değil, muhasebe/mali müşavir onayı gerekir — **açık**)                                                                                                                            |
+| **Teknik-idari tedbir**        | `TenantBillingIdentity` ayrı tablo, `Invoice.buyer*` işlem anında donmuş kopya; RLS                                                                                                                                                               |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`Invoice`, `TenantBillingIdentity`), `docs/EFATURA_SETUP.md`                                                                                                                                                              |
 
 ## 6. YZ destekli metin üretimi (LLM tamamlama — M2 Concept Note, M6 Evaluator Lens, RAG yanıtı)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri işleyen (kiracının girdisi işlenir) |
-| **Veri kategorileri** | Kullanıcının/kiracının yazdığı serbest metin girdisi (kapasite açıklaması, teklif taslağı istemi); bu metin doğası gereği kişi adı, iletişim bilgisi gibi kişisel veri **içerebilir** (kullanıcı ne yazarsa) |
-| **İlgili kişi kategorileri** | Kiracı kullanıcıları; içerikte adı geçen üçüncü kişiler (ör. ortak kuruluş temas kişisi) |
-| **Amaç** | Concept Note taslağı üretimi, iç ön değerlendirme (Evaluator Lens), RAG destekli yanıt |
-| **Hukuki sebep** | KVKK md.5/2-f (meşru menfaat) / GDPR art.6(1)(f) — kullanıcı bu özelliği kendi isteğiyle tetikler |
+| Alan                           | Değer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri işleyen (kiracının girdisi işlenir)                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Veri kategorileri**          | Kullanıcının/kiracının yazdığı serbest metin girdisi (kapasite açıklaması, teklif taslağı istemi); bu metin doğası gereği kişi adı, iletişim bilgisi gibi kişisel veri **içerebilir** (kullanıcı ne yazarsa)                                                                                                                                                                                                                                                                                                                   |
+| **İlgili kişi kategorileri**   | Kiracı kullanıcıları; içerikte adı geçen üçüncü kişiler (ör. ortak kuruluş temas kişisi)                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Amaç**                       | Concept Note taslağı üretimi, iç ön değerlendirme (Evaluator Lens), RAG destekli yanıt                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **Hukuki sebep**               | KVKK md.5/2-f (meşru menfaat) / GDPR art.6(1)(f) — kullanıcı bu özelliği kendi isteğiyle tetikler                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **Alıcı ve yurt dışı aktarım** | **Anthropic PBC** (ABD merkezli, varsayılan sağlayıcı — `src/lib/llm.ts` satır 30, 181: `https://api.anthropic.com/v1/messages`). `OpenAI` yalnızca ikinci sağlayıcı seçeneği olarak koda gömülü (`src/lib/llm.ts` satır 233); üretim çağrı noktalarının hiçbiri bugün `provider: 'openai'` ile tamamlama istemiyor (yalnız embedding için kullanılıyor — bkz. §7). Sağlayıcı sözleşmesinde eğitim-dışı kullanım taahhüdü `docs/SECURITY_COMPLIANCE.md` satır 139'da iddia ediliyor, ayrı bir imzalı ek repoda **YOK — açık**. |
-| **Saklama süresi** | İstem içeriğinin kendisi saklanmaz — yalnızca `promptHash` (SHA benzeri özet) `AiUsageLog`'a yazılır (bkz. §8); sağlayıcı tarafındaki saklama süresi Fabrika'nın kontrolünde değil |
-| **Teknik-idari tedbir** | Tek giriş noktası `src/lib/llm.ts` (CLAUDE.md kural 5), her çağrı `AiUsageLog` yazar |
-| **Kaynak dosya yolu** | `src/lib/llm.ts` (satır 358-425 `generateCompletion`/`generateText`) |
+| **Saklama süresi**             | İstem içeriğinin kendisi saklanmaz — yalnızca `promptHash` (SHA benzeri özet) `AiUsageLog`'a yazılır (bkz. §8); sağlayıcı tarafındaki saklama süresi Fabrika'nın kontrolünde değil                                                                                                                                                                                                                                                                                                                                             |
+| **Teknik-idari tedbir**        | Tek giriş noktası `src/lib/llm.ts` (CLAUDE.md kural 5), her çağrı `AiUsageLog` yazar                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **Kaynak dosya yolu**          | `src/lib/llm.ts` (satır 358-425 `generateCompletion`/`generateText`)                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## 7. YZ embedding ve RAG (belge parçalama + vektör arama)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri işleyen |
-| **Veri kategorileri** | Yüklenen belge metni (`Document`/`Chunk.text`) — çalışma programı PDF'i (kamuya açık) veya kiracının kendi yüklediği belge; ikincisi kişisel veri içerebilir |
-| **İlgili kişi kategorileri** | Kiracı kullanıcıları; yüklenen belgede adı geçen üçüncü kişiler |
-| **Amaç** | Vektör tabanlı arama/RAG ile Concept Note ve değerlendirme desteği |
-| **Hukuki sebep** | KVKK md.5/2-f / GDPR art.6(1)(f) |
+| Alan                           | Değer                                                                                                                                                                                                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri işleyen                                                                                                                                                                                                                                                                     |
+| **Veri kategorileri**          | Yüklenen belge metni (`Document`/`Chunk.text`) — çalışma programı PDF'i (kamuya açık) veya kiracının kendi yüklediği belge; ikincisi kişisel veri içerebilir                                                                                                                               |
+| **İlgili kişi kategorileri**   | Kiracı kullanıcıları; yüklenen belgede adı geçen üçüncü kişiler                                                                                                                                                                                                                            |
+| **Amaç**                       | Vektör tabanlı arama/RAG ile Concept Note ve değerlendirme desteği                                                                                                                                                                                                                         |
+| **Hukuki sebep**               | KVKK md.5/2-f / GDPR art.6(1)(f)                                                                                                                                                                                                                                                           |
 | **Alıcı ve yurt dışı aktarım** | **OpenAI, L.L.C.** (ABD merkezli) — `embedText()` her zaman OpenAI embedding uç noktasını çağırır, sağlayıcı parametresi yok (`src/lib/llm.ts` satır 507-535, `OPENAI_API_KEY` zorunlu). Yani belge metni embedding için **her koşulda** OpenAI'a gider, tamamlama Anthropic'e gitse bile. |
-| **Saklama süresi** | `Document`/`Chunk` kalıcı (silme akışı yok — **açık**); vektör pgvector'de tutulur |
-| **Teknik-idari tedbir** | RLS (`Chunk.tenantId` nullable — paylaşılan genel belgeler için), tenant izolasyonu `withTenant` |
-| **Kaynak dosya yolu** | `src/lib/llm.ts` (satır 495-535 `embedText`), `src/lib/rag.ts`, `src/lib/ai/rag.ts` — **bkz. §8 tutarsızlık notu: iki ayrı RAG dosyası var** |
+| **Saklama süresi**             | `Document`/`Chunk` kalıcı (silme akışı yok — **açık**); vektör pgvector'de tutulur                                                                                                                                                                                                         |
+| **Teknik-idari tedbir**        | RLS (`Chunk.tenantId` nullable — paylaşılan genel belgeler için), tenant izolasyonu `withTenant`                                                                                                                                                                                           |
+| **Kaynak dosya yolu**          | `src/lib/llm.ts` (satır 495-535 `embedText`), `src/lib/rag.ts`, `src/lib/ai/rag.ts` — **bkz. §8 tutarsızlık notu: iki ayrı RAG dosyası var**                                                                                                                                               |
 
 ## 8. YZ kullanım günlüğü ve kredi sayacı
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu (şeffaflık beyanı yükümlülüğü) |
-| **Veri kategorileri** | `userId` (nullable), modül, amaç, sağlayıcı, model, `promptHash`, jeton sayıları, kredi |
-| **İlgili kişi kategorileri** | Platform kullanıcıları |
-| **Amaç** | YZ kullanım şeffaflığı (Komisyon kuralı — başvuranın hangi YZ aracını nasıl kullandığını beyan edebilmesi), kredi faturalama |
-| **Hukuki sebep** | KVKK md.5/2-f (meşru menfaat + şeffaflık) / GDPR art.6(1)(f) |
-| **Alıcı ve yurt dışı aktarım** | Yok — yalnızca iç veritabanı |
-| **Saklama süresi** | Kalıcı; silme talebinde `userId` NULL'lanır, satır silinmez (`docs/SECURITY_COMPLIANCE.md` satır 115; `src/lib/inngest/jobs/users-scheduled-deletion.ts` satır ~50) |
-| **Teknik-idari tedbir** | Anonimleştirme (userId NULL) ile kimliksizleştirme |
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`AiUsageLog`), `src/lib/inngest/jobs/users-scheduled-deletion.ts` |
+| Alan                           | Değer                                                                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu (şeffaflık beyanı yükümlülüğü)                                                                                                             |
+| **Veri kategorileri**          | `userId` (nullable), modül, amaç, sağlayıcı, model, `promptHash`, jeton sayıları, kredi                                                                             |
+| **İlgili kişi kategorileri**   | Platform kullanıcıları                                                                                                                                              |
+| **Amaç**                       | YZ kullanım şeffaflığı (Komisyon kuralı — başvuranın hangi YZ aracını nasıl kullandığını beyan edebilmesi), kredi faturalama                                        |
+| **Hukuki sebep**               | KVKK md.5/2-f (meşru menfaat + şeffaflık) / GDPR art.6(1)(f)                                                                                                        |
+| **Alıcı ve yurt dışı aktarım** | Yok — yalnızca iç veritabanı                                                                                                                                        |
+| **Saklama süresi**             | Kalıcı; silme talebinde `userId` NULL'lanır, satır silinmez (`docs/SECURITY_COMPLIANCE.md` satır 115; `src/lib/inngest/jobs/users-scheduled-deletion.ts` satır ~50) |
+| **Teknik-idari tedbir**        | Anonimleştirme (userId NULL) ile kimliksizleştirme                                                                                                                  |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`AiUsageLog`), `src/lib/inngest/jobs/users-scheduled-deletion.ts`                                                                           |
 
 ## 9. İç ön değerlendirme (M6 Evaluator Lens — panel ve tekil değerlendirme)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri işleyen |
-| **Veri kategorileri** | Değerlendirici `userId`, rol (evaluator/coordinator), puanlar, kriter ağırlıkları, zayıflık notları (`weaknesses` JSON) |
-| **İlgili kişi kategorileri** | Kiracının atadığı değerlendiriciler (platform kullanıcıları) |
-| **Amaç** | Teklifin gönderim öncesi iç ön değerlendirmesi (**resmî Komisyon puanı değildir** — CLAUDE.md "Yapma" bölümü) |
-| **Hukuki sebep** | KVKK md.5/2-f / GDPR art.6(1)(f) |
-| **Alıcı ve yurt dışı aktarım** | Yok |
-| **Saklama süresi** | Kalıcı; silmede `userId` NULL (`Evaluation.userId` → `onDelete: SetNull`, `Reviewer.userId` → `onDelete: Cascade` — **tutarsızlık:** `Reviewer` satırı kullanıcı silinince tamamen silinir ama `Evaluation.userId` yalnızca NULL'lanır; puan geçmişi `Score`/`Criterion` üzerinden kalıcı kalabilir, `Reviewer` cascade ile giderse panelin kim tarafından yapıldığı bilgisi kaybolur — **açık, netleştirilmeli**) |
-| **Teknik-idari tedbir** | RLS |
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`Evaluation`, `Reviewer`, `Criterion`, `Score`) |
+| Alan                           | Değer                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri işleyen                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Veri kategorileri**          | Değerlendirici `userId`, rol (evaluator/coordinator), puanlar, kriter ağırlıkları, zayıflık notları (`weaknesses` JSON)                                                                                                                                                                                                                                                                                            |
+| **İlgili kişi kategorileri**   | Kiracının atadığı değerlendiriciler (platform kullanıcıları)                                                                                                                                                                                                                                                                                                                                                       |
+| **Amaç**                       | Teklifin gönderim öncesi iç ön değerlendirmesi (**resmî Komisyon puanı değildir** — CLAUDE.md "Yapma" bölümü)                                                                                                                                                                                                                                                                                                      |
+| **Hukuki sebep**               | KVKK md.5/2-f / GDPR art.6(1)(f)                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Alıcı ve yurt dışı aktarım** | Yok                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Saklama süresi**             | Kalıcı; silmede `userId` NULL (`Evaluation.userId` → `onDelete: SetNull`, `Reviewer.userId` → `onDelete: Cascade` — **tutarsızlık:** `Reviewer` satırı kullanıcı silinince tamamen silinir ama `Evaluation.userId` yalnızca NULL'lanır; puan geçmişi `Score`/`Criterion` üzerinden kalıcı kalabilir, `Reviewer` cascade ile giderse panelin kim tarafından yapıldığı bilgisi kaybolur — **açık, netleştirilmeli**) |
+| **Teknik-idari tedbir**        | RLS                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`Evaluation`, `Reviewer`, `Criterion`, `Score`)                                                                                                                                                                                                                                                                                                                                            |
 
 ## 10. Ortak/paydaş ilişki yönetimi (M4 Focal Point — CRM)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Kiracı = veri sorumlusu (kendi iş ilişkisi verisi), Fabrika = veri işleyen |
-| **Veri kategorileri** | Muhatabın **adı ve e-postası** (`counterpartName`, `counterpartEmail`), iletişim geçmişi özeti (`Interaction.summary`), toplantı notu içeriği (`MeetingBrief.content`, `partnerName`) |
-| **İlgili kişi kategorileri** | Kiracının iş bağlantısı olan üçüncü kişiler (ortak kuruluş temsilcisi, NCP, danışman) — **platform kullanıcısı değildir, rızası/bilgisi olmayabilir** |
-| **Amaç** | İlişki takibi, toplantı özeti üretimi (M9) |
-| **Hukuki sebep** | KVKK md.5/2-f (meşru menfaat — `docs/SECURITY_COMPLIANCE.md` satır 100: "kullanıcı girer; kaynak alanı zorunlu") / GDPR art.6(1)(f) |
-| **Alıcı ve yurt dışı aktarım** | Yok (M9 toplantı özeti YZ'ye giderse §6 ile aynı aktarım geçerli — `MeetingBrief.content` YZ üretimiyse Anthropic'e gider, kod yolu M9'da doğrulanmadı, **açık**) |
-| **Saklama süresi** | Kalıcı — silme akışı yok (kiracı kendi verisini elle güncellemeli); **muhatabın kendisi için ayrı bir silme talebi formu `docs/SECURITY_COMPLIANCE.md` satır 101'de iddia ediliyor ("herkese açık muhatap silme isteği formu") ama kod tabanında karşılığı bulunamadı — açık, ters kontrol** |
-| **Teknik-idari tedbir** | RLS |
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`Relationship`, `Interaction`, `MeetingBrief`) |
+| Alan                           | Değer                                                                                                                                                                                                                                                                                        |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Kiracı = veri sorumlusu (kendi iş ilişkisi verisi), Fabrika = veri işleyen                                                                                                                                                                                                                   |
+| **Veri kategorileri**          | Muhatabın **adı ve e-postası** (`counterpartName`, `counterpartEmail`), iletişim geçmişi özeti (`Interaction.summary`), toplantı notu içeriği (`MeetingBrief.content`, `partnerName`)                                                                                                        |
+| **İlgili kişi kategorileri**   | Kiracının iş bağlantısı olan üçüncü kişiler (ortak kuruluş temsilcisi, NCP, danışman) — **platform kullanıcısı değildir, rızası/bilgisi olmayabilir**                                                                                                                                        |
+| **Amaç**                       | İlişki takibi, toplantı özeti üretimi (M9)                                                                                                                                                                                                                                                   |
+| **Hukuki sebep**               | KVKK md.5/2-f (meşru menfaat — `docs/SECURITY_COMPLIANCE.md` satır 100: "kullanıcı girer; kaynak alanı zorunlu") / GDPR art.6(1)(f)                                                                                                                                                          |
+| **Alıcı ve yurt dışı aktarım** | Yok (M9 toplantı özeti YZ'ye giderse §6 ile aynı aktarım geçerli — `MeetingBrief.content` YZ üretimiyse Anthropic'e gider, kod yolu M9'da doğrulanmadı, **açık**)                                                                                                                            |
+| **Saklama süresi**             | Kalıcı — silme akışı yok (kiracı kendi verisini elle güncellemeli); **muhatabın kendisi için ayrı bir silme talebi formu `docs/SECURITY_COMPLIANCE.md` satır 101'de iddia ediliyor ("herkese açık muhatap silme isteği formu") ama kod tabanında karşılığı bulunamadı — açık, ters kontrol** |
+| **Teknik-idari tedbir**        | RLS                                                                                                                                                                                                                                                                                          |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`Relationship`, `Interaction`, `MeetingBrief`)                                                                                                                                                                                                                       |
 
 ## 11. Takvim entegrasyonu (Google/Outlook OAuth — M9)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri işleyen |
-| **Veri kategorileri** | Takvim erişim/yenileme token'ı (`accessToken`, `refreshToken`), dış takvim/kutu kimliği (`externalId`) |
-| **İlgili kişi kategorileri** | Platform kullanıcısı |
-| **Amaç** | Toplantı takvim senkronizasyonu |
-| **Hukuki sebep** | KVKK md.5/1 (açık rıza — OAuth izin ekranı) / GDPR art.6(1)(a) |
+| Alan                           | Değer                                                                                                                                                                                                                                                                                    |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri işleyen                                                                                                                                                                                                                                                                   |
+| **Veri kategorileri**          | Takvim erişim/yenileme token'ı (`accessToken`, `refreshToken`), dış takvim/kutu kimliği (`externalId`)                                                                                                                                                                                   |
+| **İlgili kişi kategorileri**   | Platform kullanıcısı                                                                                                                                                                                                                                                                     |
+| **Amaç**                       | Toplantı takvim senkronizasyonu                                                                                                                                                                                                                                                          |
+| **Hukuki sebep**               | KVKK md.5/1 (açık rıza — OAuth izin ekranı) / GDPR art.6(1)(a)                                                                                                                                                                                                                           |
 | **Alıcı ve yurt dışı aktarım** | **Henüz aktif değil.** `prisma/schema.prisma` satır 1195-1198: token kolonları bugün hiç doldurulmuyor, OAuth yazıcı akışı yok (`connectCalendar` `CALENDAR_OAUTH_NOT_CONFIGURED` ile reddediyor, `/api/calendar/callback` mevcut değil). Aktif olduğunda alıcı Google/Microsoft olacak. |
-| **Saklama süresi** | N/A (veri henüz üretilmiyor) |
-| **Teknik-idari tedbir** | **Şifreleme YOK — açık.** Şema yorumu (satır 1195, 1199) bu token'ların OAuth akışı canlıya alınmadan önce şifrelenmesi gerektiğini not ediyor (TASK-MTSHP3BMTAD3Y); bugün plaintext kolon olarak tanımlı. |
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`CalendarConnection`) |
+| **Saklama süresi**             | N/A (veri henüz üretilmiyor)                                                                                                                                                                                                                                                             |
+| **Teknik-idari tedbir**        | **Şifreleme YOK — açık.** Şema yorumu (satır 1195, 1199) bu token'ların OAuth akışı canlıya alınmadan önce şifrelenmesi gerektiğini not ediyor (TASK-MTSHP3BMTAD3Y); bugün plaintext kolon olarak tanımlı.                                                                               |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`CalendarConnection`)                                                                                                                                                                                                                                            |
 
 ## 12. Onay iş akışları (dual approval — M10)
 
 **Patron kararı 2026-09-08 (A4 brifingi, Seçenek C):** İki kolon (`actorUserId`, `actorName`) iki ayrı vakadır ve ikisi de bu kayıtta kalır. "Yalnızca id'yi beyan et, ekranda duran adı atlama" (brifingde Seçenek A — "sahte güvence" gerekçesiyle reddedildi) bu envanterde uygulanmamıştır: aşağıdaki veri kategorileri alanı ve aydınlatma metni taslağı **ikisini birlikte, adıyla** beyan eder. `Relationship.ownerUserId` nullable + imha ile kopma kararı ayrı kartta (TASK-MTT1XL9NP2QYU) **uygulandı**: sütun `String?` oldu (`prisma/migrations/relationship-owner-nullable.sql`) ve `purgeDueUsers()` imhada `NULL`'a çeker — o kolon artık bu envanterde saklanan bir veri değildir. Karşılaştırma tablosu: `docs/DATA_MODEL.md` §7.1.1.
 
-| Alan | Değer |
-|---|---|
-| **1. Sorumlu/işleyen rolü** | Fabrika = veri işleyen |
-| **2. Veri kategorileri** | **İki ayrı alan, ikisi de kayda giriyor:** (i) `actorUserId` — imzalayan kişinin sistem kimliği, kasıtlı olarak foreign key değil (aşağıya bkz.); (ii) `actorName` / `approvalSubmittedByName` — imza anındaki **görünen ad anlık görüntüsü**. `actorName` yalnızca DB'de durmuyor, **ekranda ada göre gösteriliyor** (bkz. madde 9 kaynak dosya) — bu yüzden beyan da id ile birlikte adı kapsamalı, yalnız id'yi beyan edip ekrandaki adı atlamak brifingde reddedilen Seçenek A'nın dokümantasyon karşılığı olurdu. Ayrıca: ret gerekçesi (`note`, serbest metin) |
-| **3. İlgili kişi kategorileri** | Platform kullanıcıları — Finans/Hukuk onaylayıcıları ve talebi açan kişi (`approvalSubmittedById`/`approvalSubmittedByName`); hem kimlikle hem adla tanımlanabilir gerçek kişiler |
-| **4. Amaç** | Dört-göz kuralı (departman onayı) ile hassas eylemlerin (gönderim, bütçe, yasal taahhüt) denetimi; imza kaydının **kim olduğu okunaklı kalması** (ad anlık görüntüsü bunun için var — kullanıcı adını değiştirse veya silinse de geçmiş kayıt kimin imzaladığını okunaklı gösterir) |
-| **5. Hukuki sebep (işleme)** | KVKK md.5/2-f (meşru menfaat) / GDPR art.6(1)(f) — onay akışına katılım kullanıcının kendi rolünün gereği |
-| **6. Hukuki sebep (silinmeme/saklama istisnası)** | **KVKK md.5/2-e (bir hakkın tesisin, kullanılması veya korunması için veri işlemenin zorunlu olması) / GDPR art.17(3)(e) (necessary for the establishment, exercise or defence of legal claims).** Bu, `actorUserId`'nin neden FK olmadığının ve kullanıcı hesabı silinse dahi hem id hem ad alanının silinme/anonimleştirme akışının (`users-scheduled-deletion`) DIŞINDA tutulduğunun gerekçesidir — imza kaydı bir hakkın (denetim/uyum, olası uyuşmazlık savunması) korunması için saklanır, kullanıcı silme talebiyle otomatik silinmez. |
-| **7. Alıcı ve yurt dışı aktarım** | Yok — yalnızca iç veritabanı |
-| **8. Saklama süresi** | **Belirsiz bırakılmamıştır.** Ölçüt: ilgili `FollowupDoc.signedAt` (imza tamamlanma tarihi) itibarıyla, madde 6'daki hukuki sebebe bağlı olarak **genel hukuki zamanaşımı süresi (TBK md.146 — 10 yıl)** boyunca saklanır, sonrasında silme/anonimleştirme değerlendirilir. **VARSAYIM — A1 hukuk girdisiyle (TASK-MTSWIFJKGTYC) kesinleşecek:** bu süre bugün için makul bir varsayılan olarak yazılmıştır, hukuk ekibinin onayladığı nihai süre değildir; onaylanınca bu satır güncellenecektir. Bugünkü kod davranışı: satır hiçbir otomatik işle silinmiyor/anonimleştirilmiyor (kalıcı - bkz. madde 9). |
-| **9. Teknik-idari tedbir (bütünlük kuralı)** | İki bütünlük kısıtı, uygulama kodu değil **veritabanı benzersiz indeksi**: `@@unique([followupDocId, department])` (bir departman bir belgeyi bir kez onaylar) ve `@@unique([followupDocId, actorUserId])` (bir kişi en çok bir departmanda imzalar) — `prisma/schema.prisma` satır 1265-1266 (model `DualApprovalStep`, satır 1254-1268). `actorUserId`'nin FK olmama gerekçesi aynı dosyada yorum satırı 1252-1253'te yazılı: "the record must outlive a change to the user row that made it." `actorName` ekranda gösterimi: `src/app/[locale]/(app)/[workspace]/opportunities/[id]/documents/client.tsx` satır 427 (`{entry.actorName}` — audit trail listesinde ada göre render). |
-| **10. Aydınlatma metni durumu** | **TASLAK — henüz yayında değil, i18n mesaj dosyalarına eklenmedi.** Taslak cümle (TR): *"Bu onayı verdiğinizde, kullanıcı kimliğiniz ve o anki görünen adınız onay kaydına ve denetim iznine yazılır; bu kayıt, olası bir hakkın tesisi/korunması amacıyla hesabınız silinse dahi saklanmaya devam eder."* Taslak cümle (EN): *"When you approve, your user identity and your display name at that moment are written to the approval record and audit trail; this record is retained even after account deletion, for the establishment or defence of a legal claim."* Bu metin **A1/TASK-MTSWIFJKGTYC ile yayına alınacaktır** — hukuk girdisi beklenmeden envanter maddesi (bu sayfa) yayınlanmış, ama kullanıcıya gösterilen aydınlatma cümlesi henüz `messages/*.json`'a eklenmemiştir (bu kart kapsamında i18n dosyasına dokunulmadı). |
+| Alan                                              | Değer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. Sorumlu/işleyen rolü**                       | Fabrika = veri işleyen                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **2. Veri kategorileri**                          | **İki ayrı alan, ikisi de kayda giriyor:** (i) `actorUserId` — imzalayan kişinin sistem kimliği, kasıtlı olarak foreign key değil (aşağıya bkz.); (ii) `actorName` / `approvalSubmittedByName` — imza anındaki **görünen ad anlık görüntüsü**. `actorName` yalnızca DB'de durmuyor, **ekranda ada göre gösteriliyor** (bkz. madde 9 kaynak dosya) — bu yüzden beyan da id ile birlikte adı kapsamalı, yalnız id'yi beyan edip ekrandaki adı atlamak brifingde reddedilen Seçenek A'nın dokümantasyon karşılığı olurdu. Ayrıca: ret gerekçesi (`note`, serbest metin)                                                                                                                                                                                                                                                                         |
+| **3. İlgili kişi kategorileri**                   | Platform kullanıcıları — Finans/Hukuk onaylayıcıları ve talebi açan kişi (`approvalSubmittedById`/`approvalSubmittedByName`); hem kimlikle hem adla tanımlanabilir gerçek kişiler                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **4. Amaç**                                       | Dört-göz kuralı (departman onayı) ile hassas eylemlerin (gönderim, bütçe, yasal taahhüt) denetimi; imza kaydının **kim olduğu okunaklı kalması** (ad anlık görüntüsü bunun için var — kullanıcı adını değiştirse veya silinse de geçmiş kayıt kimin imzaladığını okunaklı gösterir)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **5. Hukuki sebep (işleme)**                      | KVKK md.5/2-f (meşru menfaat) / GDPR art.6(1)(f) — onay akışına katılım kullanıcının kendi rolünün gereği                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **6. Hukuki sebep (silinmeme/saklama istisnası)** | **KVKK md.5/2-e (bir hakkın tesisin, kullanılması veya korunması için veri işlemenin zorunlu olması) / GDPR art.17(3)(e) (necessary for the establishment, exercise or defence of legal claims).** Bu, `actorUserId`'nin neden FK olmadığının ve kullanıcı hesabı silinse dahi hem id hem ad alanının silinme/anonimleştirme akışının (`users-scheduled-deletion`) DIŞINDA tutulduğunun gerekçesidir — imza kaydı bir hakkın (denetim/uyum, olası uyuşmazlık savunması) korunması için saklanır, kullanıcı silme talebiyle otomatik silinmez.                                                                                                                                                                                                                                                                                                |
+| **7. Alıcı ve yurt dışı aktarım**                 | Yok — yalnızca iç veritabanı                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **8. Saklama süresi**                             | **Belirsiz bırakılmamıştır.** Ölçüt: ilgili `FollowupDoc.signedAt` (imza tamamlanma tarihi) itibarıyla, madde 6'daki hukuki sebebe bağlı olarak **genel hukuki zamanaşımı süresi (TBK md.146 — 10 yıl)** boyunca saklanır, sonrasında silme/anonimleştirme değerlendirilir. **VARSAYIM — A1 hukuk girdisiyle (TASK-MTSWIFJKGTYC) kesinleşecek:** bu süre bugün için makul bir varsayılan olarak yazılmıştır, hukuk ekibinin onayladığı nihai süre değildir; onaylanınca bu satır güncellenecektir. Bugünkü kod davranışı: satır hiçbir otomatik işle silinmiyor/anonimleştirilmiyor (kalıcı - bkz. madde 9).                                                                                                                                                                                                                                 |
+| **9. Teknik-idari tedbir (bütünlük kuralı)**      | İki bütünlük kısıtı, uygulama kodu değil **veritabanı benzersiz indeksi**: `@@unique([followupDocId, department])` (bir departman bir belgeyi bir kez onaylar) ve `@@unique([followupDocId, actorUserId])` (bir kişi en çok bir departmanda imzalar) — `prisma/schema.prisma` satır 1265-1266 (model `DualApprovalStep`, satır 1254-1268). `actorUserId`'nin FK olmama gerekçesi aynı dosyada yorum satırı 1252-1253'te yazılı: "the record must outlive a change to the user row that made it." `actorName` ekranda gösterimi: `src/app/[locale]/(app)/[workspace]/opportunities/[id]/documents/client.tsx` satır 427 (`{entry.actorName}` — audit trail listesinde ada göre render).                                                                                                                                                       |
+| **10. Aydınlatma metni durumu**                   | **TASLAK — henüz yayında değil, i18n mesaj dosyalarına eklenmedi.** Taslak cümle (TR): _"Bu onayı verdiğinizde, kullanıcı kimliğiniz ve o anki görünen adınız onay kaydına ve denetim iznine yazılır; bu kayıt, olası bir hakkın tesisi/korunması amacıyla hesabınız silinse dahi saklanmaya devam eder."_ Taslak cümle (EN): _"When you approve, your user identity and your display name at that moment are written to the approval record and audit trail; this record is retained even after account deletion, for the establishment or defence of a legal claim."_ Bu metin **A1/TASK-MTSWIFJKGTYC ile yayına alınacaktır** — hukuk girdisi beklenmeden envanter maddesi (bu sayfa) yayınlanmış, ama kullanıcıya gösterilen aydınlatma cümlesi henüz `messages/*.json`'a eklenmemiştir (bu kart kapsamında i18n dosyasına dokunulmadı). |
 
 ## 13. Denetim kaydı (audit log)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu |
-| **Veri kategorileri** | `actorId`, eylem tipi, hedef, serbest `data` JSON'u (içeriği eyleme göre değişir, kişisel veri içerebilir) |
-| **İlgili kişi kategorileri** | Platform kullanıcıları |
-| **Amaç** | Güvenlik/uyum denetimi, olay soruşturması |
-| **Hukuki sebep** | KVKK md.5/2-ç (hukuki yükümlülük) / GDPR art.6(1)(c) |
-| **Alıcı ve yurt dışı aktarım** | Yok |
-| **Saklama süresi** | Kalıcı — kimliksizleştirme adımı `AuditEvent.actorId` için kod düzeyinde yok (`AiUsageLog` gibi NULL'lanmıyor) — **açık**, `docs/legal/dpa-en.md` §6'daki "denetim kayıtları kimliksizleştirilmiş tutulur" iddiasıyla çelişiyor |
-| **Teknik-idari tedbir** | RLS |
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`AuditEvent`) |
+| Alan                           | Değer                                                                                                                                                                                                                           |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu                                                                                                                                                                                                        |
+| **Veri kategorileri**          | `actorId`, eylem tipi, hedef, serbest `data` JSON'u (içeriği eyleme göre değişir, kişisel veri içerebilir)                                                                                                                      |
+| **İlgili kişi kategorileri**   | Platform kullanıcıları                                                                                                                                                                                                          |
+| **Amaç**                       | Güvenlik/uyum denetimi, olay soruşturması                                                                                                                                                                                       |
+| **Hukuki sebep**               | KVKK md.5/2-ç (hukuki yükümlülük) / GDPR art.6(1)(c)                                                                                                                                                                            |
+| **Alıcı ve yurt dışı aktarım** | Yok                                                                                                                                                                                                                             |
+| **Saklama süresi**             | Kalıcı — kimliksizleştirme adımı `AuditEvent.actorId` için kod düzeyinde yok (`AiUsageLog` gibi NULL'lanmıyor) — **açık**, `docs/legal/dpa-en.md` §6'daki "denetim kayıtları kimliksizleştirilmiş tutulur" iddiasıyla çelişiyor |
+| **Teknik-idari tedbir**        | RLS                                                                                                                                                                                                                             |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`AuditEvent`)                                                                                                                                                                                           |
 
 ## 14. Beta geri bildirim ve hata raporu
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu |
-| **Veri kategorileri** | `userId`, geri bildirim metni, sayfa URL'si, user-agent, isteğe bağlı ekran görüntüsü (R2'de saklanan `screenshotKey`) |
-| **İlgili kişi kategorileri** | Beta tasarım ortağı kullanıcılar |
-| **Amaç** | Ürün hata/istek triyajı |
-| **Hukuki sebep** | KVKK md.5/2-f / GDPR art.6(1)(f) |
+| Alan                           | Değer                                                                                                                                                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu                                                                                                                                                                              |
+| **Veri kategorileri**          | `userId`, geri bildirim metni, sayfa URL'si, user-agent, isteğe bağlı ekran görüntüsü (R2'de saklanan `screenshotKey`)                                                                                |
+| **İlgili kişi kategorileri**   | Beta tasarım ortağı kullanıcılar                                                                                                                                                                      |
+| **Amaç**                       | Ürün hata/istek triyajı                                                                                                                                                                               |
+| **Hukuki sebep**               | KVKK md.5/2-f / GDPR art.6(1)(f)                                                                                                                                                                      |
 | **Alıcı ve yurt dışı aktarım** | Ekran görüntüsü Cloudflare R2'ye yazılır (bkz. §15, alt-işleyen); ekran görüntüsü içeriği kullanıcının ekranında görünen her şeyi (başka kullanıcı verisi dahil) içerebilir — **açık**, maskeleme yok |
-| **Saklama süresi** | Kalıcı — temizlik işi yok (**açık**) |
-| **Teknik-idari tedbir** | İmzalı URL ile erişim (`screenshotKey` doğrudan public değil) |
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`Feedback`), `src/lib/feedback/submit.ts` |
+| **Saklama süresi**             | Kalıcı — temizlik işi yok (**açık**)                                                                                                                                                                  |
+| **Teknik-idari tedbir**        | İmzalı URL ile erişim (`screenshotKey` doğrudan public değil)                                                                                                                                         |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`Feedback`), `src/lib/feedback/submit.ts`                                                                                                                                     |
 
 ## 15. Dosya/kanıt depolama (Cloudflare R2)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri işleyen |
-| **Veri kategorileri** | Kiracının yüklediği kanıt dosyaları (Evidence Pack ekleri), geri bildirim ekran görüntüleri; bu dosyalar kişisel veri içerebilir |
-| **İlgili kişi kategorileri** | Kiracı kullanıcıları ve dosya içeriğinde adı geçen üçüncü kişiler |
-| **Amaç** | Belge/kanıt saklama |
-| **Hukuki sebep** | KVKK md.5/2-c / GDPR art.6(1)(b) |
+| Alan                           | Değer                                                                                                                                                                                                                                                                              |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri işleyen                                                                                                                                                                                                                                                             |
+| **Veri kategorileri**          | Kiracının yüklediği kanıt dosyaları (Evidence Pack ekleri), geri bildirim ekran görüntüleri; bu dosyalar kişisel veri içerebilir                                                                                                                                                   |
+| **İlgili kişi kategorileri**   | Kiracı kullanıcıları ve dosya içeriğinde adı geçen üçüncü kişiler                                                                                                                                                                                                                  |
+| **Amaç**                       | Belge/kanıt saklama                                                                                                                                                                                                                                                                |
+| **Hukuki sebep**               | KVKK md.5/2-c / GDPR art.6(1)(b)                                                                                                                                                                                                                                                   |
 | **Alıcı ve yurt dışı aktarım** | **Cloudflare, Inc.** (R2 nesne depolama; bölge `R2_ACCOUNT_ID`'ye bağlı, kod düzeyinde AB bölgesi zorlaması **YOK — açık**, `docs/SECURITY_COMPLIANCE.md` satır 103'teki "AB bölgesi (Frankfurt) varsayılan" iddiası repoda doğrulanamadı — bu bir altyapı/hesap ayarı, kod değil) |
-| **Saklama süresi** | Kullanıcı silme akışında R2 dosyaları önce silinir (`deleteUserFilesFromR2`, `src/lib/inngest/jobs/users-scheduled-deletion.ts` adım 1) |
-| **Teknik-idari tedbir** | Nesne anahtarı `{tenantId}/{organisationId}/...` yoluyla izole edilir (`src/lib/storage.ts`) |
-| **Kaynak dosya yolu** | `src/lib/storage.ts` |
+| **Saklama süresi**             | Kullanıcı silme akışında R2 dosyaları önce silinir (`deleteUserFilesFromR2`, `src/lib/inngest/jobs/users-scheduled-deletion.ts` adım 1)                                                                                                                                            |
+| **Teknik-idari tedbir**        | Nesne anahtarı `{tenantId}/{organisationId}/...` yoluyla izole edilir (`src/lib/storage.ts`)                                                                                                                                                                                       |
+| **Kaynak dosya yolu**          | `src/lib/storage.ts`                                                                                                                                                                                                                                                               |
 
 ## 16. Kullanıcı veri erişimi ve taşınabilirlik (GDPR md.15/20 hakkı)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu |
-| **Veri kategorileri** | Talep eden kullanıcıya ait tüm satırların JSON dökümü (`user`, `memberships`, `accounts` [yalnızca provider/type/createdAt], `evaluations`, `efforts`, `aiUsage`, `approvals`, `opportunities`) |
-| **İlgili kişi kategorileri** | Talebi yapan platform kullanıcısı |
-| **Amaç** | Erişim ve veri taşınabilirliği hakkının yerine getirilmesi |
-| **Hukuki sebep** | KVKK md.11 / GDPR art.15 ve art.20 (yasal hak — ayrı bir "işleme" değil, işlemenin hesap verilebilirliği) |
-| **Alıcı ve yurt dışı aktarım** | Yok — dosya doğrudan talep eden kişiye iner |
-| **Saklama süresi** | N/A (anlık üretim, saklanmaz) |
-| **Teknik-idari tedbir** | Kimlik doğrulama zorunlu; OAuth secret'ları (`access_token`, `refresh_token`, `id_token`) bilinçli olarak dışlanır |
-| **Kaynak dosya yolu** | `src/actions/user/export-data.ts` |
+| Alan                           | Değer                                                                                                                                                                                           |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu                                                                                                                                                                        |
+| **Veri kategorileri**          | Talep eden kullanıcıya ait tüm satırların JSON dökümü (`user`, `memberships`, `accounts` [yalnızca provider/type/createdAt], `evaluations`, `efforts`, `aiUsage`, `approvals`, `opportunities`) |
+| **İlgili kişi kategorileri**   | Talebi yapan platform kullanıcısı                                                                                                                                                               |
+| **Amaç**                       | Erişim ve veri taşınabilirliği hakkının yerine getirilmesi                                                                                                                                      |
+| **Hukuki sebep**               | KVKK md.11 / GDPR art.15 ve art.20 (yasal hak — ayrı bir "işleme" değil, işlemenin hesap verilebilirliği)                                                                                       |
+| **Alıcı ve yurt dışı aktarım** | Yok — dosya doğrudan talep eden kişiye iner                                                                                                                                                     |
+| **Saklama süresi**             | N/A (anlık üretim, saklanmaz)                                                                                                                                                                   |
+| **Teknik-idari tedbir**        | Kimlik doğrulama zorunlu; OAuth secret'ları (`access_token`, `refresh_token`, `id_token`) bilinçli olarak dışlanır                                                                              |
+| **Kaynak dosya yolu**          | `src/actions/user/export-data.ts`                                                                                                                                                               |
 
 ## 17. Hesap silme talebi ve zamanlanmış imha (GDPR md.17 hakkı)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu |
-| **Veri kategorileri** | `deletionRequestedAt`, `deletionReason`; imha sırasında R2 dosyaları, `Effort` satırları, `User`/`Account`/`Session`/`Membership` silinir; `AiUsageLog.userId` NULL'lanır |
-| **İlgili kişi kategorileri** | Silme talep eden platform kullanıcısı |
-| **Amaç** | Silinme hakkının yerine getirilmesi (30 gün bekleme + kalıcı imha) |
-| **Hukuki sebep** | KVKK md.7/md.11 / GDPR art.17 |
-| **Alıcı ve yurt dışı aktarım** | Bildirim e-postası **Resend** üzerinden gönderilir (ABD merkezli e-posta iletim sağlayıcısı) |
-| **Saklama süresi** | 30 gün bekleme, sonra kalıcı imha (`DELETION_GRACE_PERIOD_DAYS`) |
-| **Teknik-idari tedbir** | Sıralı imha (önce dosya, sonra DB), e-posta hatası talebi bloke etmez |
-| **Kaynak dosya yolu** | `src/actions/user/request-deletion.ts`, `src/lib/inngest/jobs/users-scheduled-deletion.ts` |
+| Alan                           | Değer                                                                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu                                                                                                                                                  |
+| **Veri kategorileri**          | `deletionRequestedAt`, `deletionReason`; imha sırasında R2 dosyaları, `Effort` satırları, `User`/`Account`/`Session`/`Membership` silinir; `AiUsageLog.userId` NULL'lanır |
+| **İlgili kişi kategorileri**   | Silme talep eden platform kullanıcısı                                                                                                                                     |
+| **Amaç**                       | Silinme hakkının yerine getirilmesi (30 gün bekleme + kalıcı imha)                                                                                                        |
+| **Hukuki sebep**               | KVKK md.7/md.11 / GDPR art.17                                                                                                                                             |
+| **Alıcı ve yurt dışı aktarım** | Bildirim e-postası **Resend** üzerinden gönderilir (ABD merkezli e-posta iletim sağlayıcısı)                                                                              |
+| **Saklama süresi**             | 30 gün bekleme, sonra kalıcı imha (`DELETION_GRACE_PERIOD_DAYS`)                                                                                                          |
+| **Teknik-idari tedbir**        | Sıralı imha (önce dosya, sonra DB), e-posta hatası talebi bloke etmez                                                                                                     |
+| **Kaynak dosya yolu**          | `src/actions/user/request-deletion.ts`, `src/lib/inngest/jobs/users-scheduled-deletion.ts`                                                                                |
 
 ## 18. Kayıtlı arama uyarı e-postaları (K1)
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri işleyen |
-| **Veri kategorileri** | Alıcı e-postası, kayıtlı arama kriterleri |
-| **İlgili kişi kategorileri** | Platform kullanıcısı |
-| **Amaç** | Yeni çağrı/konu eşleşmesi bildirimi |
-| **Hukuki sebep** | KVKK md.5/2-f (kullanıcının kendi tetiklediği bildirim) / GDPR art.6(1)(f) |
-| **Alıcı ve yurt dışı aktarım** | **Resend** (ABD merkezli e-posta iletim sağlayıcısı) |
-| **Saklama süresi** | N/A (e-posta gönderimi anlık; `SavedSearch` kalıcı, kullanıcı silinene kadar) |
-| **Teknik-idari tedbir** | — |
-| **Kaynak dosya yolu** | `src/lib/inngest/jobs/alerts-daily.ts` |
+| Alan                           | Değer                                                                         |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri işleyen                                                        |
+| **Veri kategorileri**          | Alıcı e-postası, kayıtlı arama kriterleri                                     |
+| **İlgili kişi kategorileri**   | Platform kullanıcısı                                                          |
+| **Amaç**                       | Yeni çağrı/konu eşleşmesi bildirimi                                           |
+| **Hukuki sebep**               | KVKK md.5/2-f (kullanıcının kendi tetiklediği bildirim) / GDPR art.6(1)(f)    |
+| **Alıcı ve yurt dışı aktarım** | **Resend** (ABD merkezli e-posta iletim sağlayıcısı)                          |
+| **Saklama süresi**             | N/A (e-posta gönderimi anlık; `SavedSearch` kalıcı, kullanıcı silinene kadar) |
+| **Teknik-idari tedbir**        | —                                                                             |
+| **Kaynak dosya yolu**          | `src/lib/inngest/jobs/alerts-daily.ts`                                        |
 
 ---
 
 ## 18b. Aydınlatma ve rıza kaydı (`Consent`) — TASK-MTSWLANXSU0IG
 
-| Alan | Değer |
-|---|---|
-| **Sorumlu/işleyen rolü** | Fabrika = veri sorumlusu |
-| **Veri kategorileri** | `userId`, kiracı kimliği, onaylanan belgenin kimliği ve **sürümü**, belgenin dili, onay zamanı, geri çekme zamanı. Metnin kendisi ve ağ tanımlayıcısı (IP / user-agent) **saklanmaz** |
-| **İlgili kişi kategorileri** | Platform kullanıcıları |
-| **Amaç** | KVKK md.10 / GDPR md.13 aydınlatma yükümlülüğünün ve — ileride §11 için — GDPR md.7(1) rıza ispatının yerine getirildiğini **gösterebilmek** |
-| **Hukuki sebep** | KVKK md.5/2-ç (hukuki yükümlülük) / GDPR art.6(1)(c) ile art.5(2) (hesap verebilirlik). Bu kaydın kendisi rızaya dayanmaz: aydınlatma yaptığını ispat etmek bir yükümlülüktür, tercih değil |
-| **Alıcı ve yurt dışı aktarım** | Yok |
-| **Saklama süresi** | **Hesabın ömrünü aşar.** İmha işi (`purgeDueUsers`) bu satırı silmez ve `userId`'yi NULL'lamaz — dayanak §12'nin `DualApprovalStep` için kurduğu dayanağın aynısı: KVKK md.5/2-e / GDPR art.17(3)(e), bir hakkın tesisi, kullanılması veya korunması. Bağı koparmak kaydı ispat olmaktan çıkarır |
-| **Teknik-idari tedbir** | RLS (`tenant_isolation`, FORCE); yazım kaydın konusu olan hesapla **aynı transaction** içinde, böylece hesabı olup kaydı olmayan bir durum doğamaz |
-| **Kaynak dosya yolu** | `prisma/schema.prisma` (`Consent`), `src/lib/legal/consent-documents.ts` (sürüm beyanı), `src/lib/legal/registration-consent.ts` (yazım), `src/lib/auth.ts` (iki kayıt yolu) |
+| Alan                           | Değer                                                                                                                                                                                                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Sorumlu/işleyen rolü**       | Fabrika = veri sorumlusu                                                                                                                                                                                                                                                                         |
+| **Veri kategorileri**          | `userId`, kiracı kimliği, onaylanan belgenin kimliği ve **sürümü**, belgenin dili, onay zamanı, geri çekme zamanı. Metnin kendisi ve ağ tanımlayıcısı (IP / user-agent) **saklanmaz**                                                                                                            |
+| **İlgili kişi kategorileri**   | Platform kullanıcıları                                                                                                                                                                                                                                                                           |
+| **Amaç**                       | KVKK md.10 / GDPR md.13 aydınlatma yükümlülüğünün ve — ileride §11 için — GDPR md.7(1) rıza ispatının yerine getirildiğini **gösterebilmek**                                                                                                                                                     |
+| **Hukuki sebep**               | KVKK md.5/2-ç (hukuki yükümlülük) / GDPR art.6(1)(c) ile art.5(2) (hesap verebilirlik). Bu kaydın kendisi rızaya dayanmaz: aydınlatma yaptığını ispat etmek bir yükümlülüktür, tercih değil                                                                                                      |
+| **Alıcı ve yurt dışı aktarım** | Yok                                                                                                                                                                                                                                                                                              |
+| **Saklama süresi**             | **Hesabın ömrünü aşar.** İmha işi (`purgeDueUsers`) bu satırı silmez ve `userId`'yi NULL'lamaz — dayanak §12'nin `DualApprovalStep` için kurduğu dayanağın aynısı: KVKK md.5/2-e / GDPR art.17(3)(e), bir hakkın tesisi, kullanılması veya korunması. Bağı koparmak kaydı ispat olmaktan çıkarır |
+| **Teknik-idari tedbir**        | RLS (`tenant_isolation`, FORCE); yazım kaydın konusu olan hesapla **aynı transaction** içinde, böylece hesabı olup kaydı olmayan bir durum doğamaz                                                                                                                                               |
+| **Kaynak dosya yolu**          | `prisma/schema.prisma` (`Consent`), `src/lib/legal/consent-documents.ts` (sürüm beyanı), `src/lib/legal/registration-consent.ts` (yazım), `src/lib/auth.ts` (iki kayıt yolu)                                                                                                                     |
 
 **Kapsam notu — hangi faaliyetler rıza gerektirir.** Bu envanterdeki 18 faaliyetin hukuki
 sebepleri tarandığında **yalnız §11 (takvim OAuth)** açık rızaya (KVKK md.5/1 / GDPR
@@ -313,43 +313,43 @@ Bu iki sağlayıcı envanterden **çıkarılmıştır** çünkü aktif bir işle
 
 Aşağıda `prisma/schema.prisma`'daki **tüm modeller** tarandı; kişisel veri taşıyanlar yukarıdaki maddelere eşlendi, taşımayanlar gerekçesiyle işaretlendi.
 
-| Model | Kişisel veri? | Envanterdeki karşılığı |
-|---|---|---|
-| User, Account, Session, VerificationToken | ✅ | §1 |
-| Membership, Invitation | ✅ | §2 |
-| Subscription | ✅ (ödeyen kişi bağlantısı) | §3 |
-| Invoice, TenantBillingIdentity | ✅ (VKN/TCKN) | §5 |
-| AiUsageLog | ✅ (userId) | §8 |
-| Document, Chunk | ⚠️ olabilir (yüklenen içerik) | §7 |
-| Evaluation, Reviewer, Criterion, Score | ✅ (userId) | §9 |
-| Relationship, Interaction, MeetingBrief | ✅ (counterpartName/Email, partnerName) | §10 |
-| CalendarConnection | ✅ (token, henüz boş) | §11 |
-| ApprovalRequest, DualApprovalStep | ✅ (requesterId/approverId/actorName) | §12 |
-| AuditEvent | ✅ (actorId) | §13 |
-| Feedback | ✅ (userId, ekran görüntüsü) | §14 |
-| Consent | ✅ (userId) | §18b |
-| ApiKey | ❌ | Kişisel veri değil — kiracı düzeyinde servis kimlik bilgisi (`keyHash`), bir gerçek kişiye değil `tenantId`'ye bağlı. **Envantere dahil edilmedi, gerekçeyle.** |
-| SeatCandidate | ❌ | `organizationId`/`partnerOrgId` — kurum düzeyinde skor, gerçek kişi yok. |
-| Tenant, Workspace, TenantProfile, ModuleState, ModuleCatalog, Plan*, AddOn*, CreditLedger, LifetimeLicence | ❌ | Kiracı/tüzel kişi ve ürün konfigürasyon verisi; gerçek kişiye ait değil. |
-| Programme, Call, Topic, TopicStat, RawFetch, SystemAlert, TopicMatch, SavedSearch (kriterleri hariç) | ❌ | K1 — kamuya açık çağrı verisi. `SavedSearch` kullanıcı e-postası taşıdığı için **§18**'e dahil edildi. |
-| CordisProject, CordisOrganization, CordisParticipation, CordisProjectTopic, CordisProjectSciVoc, CordisImportRun, CordisPartnerProfile, CordisCoParticipation | ❌ | K2 — AB'nin kamuya açık kurumsal/proje verisi (CC BY 4.0), gerçek kişiye ait değil. |
-| Opportunity, GateDecision, ConsortiumSeat, PartnerOrg, Proposal, Effort, Evidence, Claim, ClaimEvidenceLink, ProposalUsage, EvidenceReminder, ConceptTemplate, ConceptNote, ApplicationPart, FollowupDoc (partnerName hariç), TtoPortfolioItem | ⚠️ Serbest metin alanları (`notes`, `content`, `description`) kişisel veri içerebilir ama yapısal olarak kurum/proje verisidir | Envanterde ayrı madde açılmadı — **açık**: bu tablolardaki serbest metin alanlarının kişisel veri taşıyıp taşımadığı içerik denetimi gerektirir, statik şema taraması yetersiz. Sonuç raporunda ayrı risk olarak bildirildi. |
-| `Effort` | ✅ (kullanıcı çalışma kaydı: saat, tarih, not) | **Envanterde ayrı madde yoksa da §16/§17'de dışa aktarım/silme kapsamında geçiyor**; kendi maddesi açılmadı çünkü tek başına yeni bir amaç/alıcı/hukuki sebep taşımıyor — kimlik ve iletişim (§1) ile aynı çerçevede, `docs/SECURITY_COMPLIANCE.md` satır 113'te zaten kayıtlı. |
+| Model                                                                                                                                                                                                                                          | Kişisel veri?                                                                                                                  | Envanterdeki karşılığı                                                                                                                                                                                                                                                          |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User, Account, Session, VerificationToken                                                                                                                                                                                                      | ✅                                                                                                                             | §1                                                                                                                                                                                                                                                                              |
+| Membership, Invitation                                                                                                                                                                                                                         | ✅                                                                                                                             | §2                                                                                                                                                                                                                                                                              |
+| Subscription                                                                                                                                                                                                                                   | ✅ (ödeyen kişi bağlantısı)                                                                                                    | §3                                                                                                                                                                                                                                                                              |
+| Invoice, TenantBillingIdentity                                                                                                                                                                                                                 | ✅ (VKN/TCKN)                                                                                                                  | §5                                                                                                                                                                                                                                                                              |
+| AiUsageLog                                                                                                                                                                                                                                     | ✅ (userId)                                                                                                                    | §8                                                                                                                                                                                                                                                                              |
+| Document, Chunk                                                                                                                                                                                                                                | ⚠️ olabilir (yüklenen içerik)                                                                                                  | §7                                                                                                                                                                                                                                                                              |
+| Evaluation, Reviewer, Criterion, Score                                                                                                                                                                                                         | ✅ (userId)                                                                                                                    | §9                                                                                                                                                                                                                                                                              |
+| Relationship, Interaction, MeetingBrief                                                                                                                                                                                                        | ✅ (counterpartName/Email, partnerName)                                                                                        | §10                                                                                                                                                                                                                                                                             |
+| CalendarConnection                                                                                                                                                                                                                             | ✅ (token, henüz boş)                                                                                                          | §11                                                                                                                                                                                                                                                                             |
+| ApprovalRequest, DualApprovalStep                                                                                                                                                                                                              | ✅ (requesterId/approverId/actorName)                                                                                          | §12                                                                                                                                                                                                                                                                             |
+| AuditEvent                                                                                                                                                                                                                                     | ✅ (actorId)                                                                                                                   | §13                                                                                                                                                                                                                                                                             |
+| Feedback                                                                                                                                                                                                                                       | ✅ (userId, ekran görüntüsü)                                                                                                   | §14                                                                                                                                                                                                                                                                             |
+| Consent                                                                                                                                                                                                                                        | ✅ (userId)                                                                                                                    | §18b                                                                                                                                                                                                                                                                            |
+| ApiKey                                                                                                                                                                                                                                         | ❌                                                                                                                             | Kişisel veri değil — kiracı düzeyinde servis kimlik bilgisi (`keyHash`), bir gerçek kişiye değil `tenantId`'ye bağlı. **Envantere dahil edilmedi, gerekçeyle.**                                                                                                                 |
+| SeatCandidate                                                                                                                                                                                                                                  | ❌                                                                                                                             | `organizationId`/`partnerOrgId` — kurum düzeyinde skor, gerçek kişi yok.                                                                                                                                                                                                        |
+| Tenant, Workspace, TenantProfile, ModuleState, ModuleCatalog, Plan*, AddOn*, CreditLedger, LifetimeLicence                                                                                                                                     | ❌                                                                                                                             | Kiracı/tüzel kişi ve ürün konfigürasyon verisi; gerçek kişiye ait değil.                                                                                                                                                                                                        |
+| Programme, Call, Topic, TopicStat, RawFetch, SystemAlert, TopicMatch, SavedSearch (kriterleri hariç)                                                                                                                                           | ❌                                                                                                                             | K1 — kamuya açık çağrı verisi. `SavedSearch` kullanıcı e-postası taşıdığı için **§18**'e dahil edildi.                                                                                                                                                                          |
+| CordisProject, CordisOrganization, CordisParticipation, CordisProjectTopic, CordisProjectSciVoc, CordisImportRun, CordisPartnerProfile, CordisCoParticipation                                                                                  | ❌                                                                                                                             | K2 — AB'nin kamuya açık kurumsal/proje verisi (CC BY 4.0), gerçek kişiye ait değil.                                                                                                                                                                                             |
+| Opportunity, GateDecision, ConsortiumSeat, PartnerOrg, Proposal, Effort, Evidence, Claim, ClaimEvidenceLink, ProposalUsage, EvidenceReminder, ConceptTemplate, ConceptNote, ApplicationPart, FollowupDoc (partnerName hariç), TtoPortfolioItem | ⚠️ Serbest metin alanları (`notes`, `content`, `description`) kişisel veri içerebilir ama yapısal olarak kurum/proje verisidir | Envanterde ayrı madde açılmadı — **açık**: bu tablolardaki serbest metin alanlarının kişisel veri taşıyıp taşımadığı içerik denetimi gerektirir, statik şema taraması yetersiz. Sonuç raporunda ayrı risk olarak bildirildi.                                                    |
+| `Effort`                                                                                                                                                                                                                                       | ✅ (kullanıcı çalışma kaydı: saat, tarih, not)                                                                                 | **Envanterde ayrı madde yoksa da §16/§17'de dışa aktarım/silme kapsamında geçiyor**; kendi maddesi açılmadı çünkü tek başına yeni bir amaç/alıcı/hukuki sebep taşımıyor — kimlik ve iletişim (§1) ile aynı çerçevede, `docs/SECURITY_COMPLIANCE.md` satır 113'te zaten kayıtlı. |
 
 ---
 
 ## 21. Yurt dışı aktarım özeti (hızlı referans)
 
-| Alıcı | Ülke | Veri | Güvence |
-|---|---|---|---|
-| Anthropic PBC | ABD | LLM istem metni (§6) | Sözleşmeye dayalı iddia var (`docs/SECURITY_COMPLIANCE.md` satır 139), imzalı ek **YOK — açık** |
-| OpenAI, L.L.C. | ABD | Embedding için belge metni (§7) | Aynı — **YOK — açık** |
-| Google LLC | ABD | OAuth giriş bilgisi (§1), gelecekte takvim (§11) | Google'ın kendi DPF/SCC'si — Fabrika tarafı sözleşmesi **YOK — açık** |
-| Microsoft Corporation | ABD | OAuth giriş bilgisi (§1), gelecekte takvim (§11) | Aynı — **YOK — açık** |
-| Stripe, Inc. | ABD | Ödeme (§3) | Stripe'ın kendi DPA'sı — Fabrika tarafı ek **YOK — açık** |
-| Resend | ABD (belirsiz — repoda bölge bilgisi yok) | E-posta adresi (§17, §18) | **YOK — açık** |
-| Cloudflare, Inc. | Bölge hesap ayarına bağlı | Dosya/ekran görüntüsü (§15) | **YOK — açık** |
-| iyzico | Türkiye | Ödeme (§4) | Yurt dışı aktarım değil |
+| Alıcı                 | Ülke                                      | Veri                                             | Güvence                                                                                         |
+| --------------------- | ----------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Anthropic PBC         | ABD                                       | LLM istem metni (§6)                             | Sözleşmeye dayalı iddia var (`docs/SECURITY_COMPLIANCE.md` satır 139), imzalı ek **YOK — açık** |
+| OpenAI, L.L.C.        | ABD                                       | Embedding için belge metni (§7)                  | Aynı — **YOK — açık**                                                                           |
+| Google LLC            | ABD                                       | OAuth giriş bilgisi (§1), gelecekte takvim (§11) | Google'ın kendi DPF/SCC'si — Fabrika tarafı sözleşmesi **YOK — açık**                           |
+| Microsoft Corporation | ABD                                       | OAuth giriş bilgisi (§1), gelecekte takvim (§11) | Aynı — **YOK — açık**                                                                           |
+| Stripe, Inc.          | ABD                                       | Ödeme (§3)                                       | Stripe'ın kendi DPA'sı — Fabrika tarafı ek **YOK — açık**                                       |
+| Resend                | ABD (belirsiz — repoda bölge bilgisi yok) | E-posta adresi (§17, §18)                        | **YOK — açık**                                                                                  |
+| Cloudflare, Inc.      | Bölge hesap ayarına bağlı                 | Dosya/ekran görüntüsü (§15)                      | **YOK — açık**                                                                                  |
+| iyzico                | Türkiye                                   | Ödeme (§4)                                       | Yurt dışı aktarım değil                                                                         |
 
 Hiçbiri için repo içinde imzalı bir Standart Sözleşme Hükümleri (SCC) eki veya açık rıza akışı **bulunamadı** — `docs/legal/dpa-en.md` §7 yalnızca kategori bazında "alt işleyen kullanılıyor" diyor, sözleşme metni yok. Bu, envanterin en büyük tekil boşluğudur.
 
