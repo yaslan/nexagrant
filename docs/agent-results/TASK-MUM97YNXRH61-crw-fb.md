@@ -2,6 +2,8 @@
 
 Kod değiştirilmedi, push yok. Kapılar ayrık worktree'de koşuldu (`git worktree add --detach` @ `9db8ba90`, kendi `node_modules`'u, `.env` kopyası). Paylaşılan ağaçta başka ajanların commit'lenmemiş işi vardı (`auth.ts`, `report.ts` vb.); bu incelemeye girmedi. Kart açıklamasını board aracından okuyamadım (`list_tasks` yalnız başlık döndürüyor). Kapsamı başlıktan, görev metninden ve İNCELEME-12 raporundan (`TASK-MUM5YQCBNF5QW-crw-fb.md`) çıkardım.
 
+İnceleme sürerken be-fb `2ef3593e`'ü (İNCELEME-13 B-1, kapsam dışı) gönderdi. Bu commit `auth.ts`'e 10 satır ekliyor. `clearRegistrationChoiceCookies()` geçişleri `15f70b0d` ile aynı sayıda (6) duruyor; Kart 1 kararını etkilemiyor. Onu ayrıca incelemedim.
+
 ## Karar tablosu
 
 | Kart | Görev | Ajan | Commit | Karar | Bulgular → kime |
