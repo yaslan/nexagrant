@@ -4,6 +4,7 @@ import type { ModuleStatus } from '@prisma/client';
 import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * Plan gating against the USD catalogue — TASK-MTR6QIE05ZKNH.
@@ -70,7 +71,7 @@ async function signIn(page: Page) {
   await page.locator('input[type="email"]').fill(LENS.email);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${MODULES_URL}`, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
+  // Callers assert on a locator next; that auto-wait is the synchronisation.
 }
 
 /** The card for one module, located by its id badge. */
@@ -126,13 +127,14 @@ test.describe('plan entitlement — the catalogue decides what a plan opens', ()
     // ── Ultra: the same card, the same session, and it actually turns on.
     await setPlan('ultra');
     await page.reload();
-    await page.waitForLoadState('networkidle');
 
     await expect(page.getByRole('main')).toContainText('Ultra');
 
     const m6Ultra = moduleCard(page, 'M6');
     await expect(m6Ultra).not.toContainText('Kilitli');
-    await m6Ultra.getByRole('button', { name: 'Etkinleştir' }).click();
+    const enable = m6Ultra.getByRole('button', { name: 'Etkinleştir' });
+    await expectHydrated(enable);
+    await enable.click();
     await expect(m6Ultra).toContainText('Kullanıma hazır', { timeout: 20_000 });
     await page.screenshot({ path: `${SHOTS}/02-ultra-page.png`, fullPage: true });
     await m6Ultra.scrollIntoViewIfNeeded();

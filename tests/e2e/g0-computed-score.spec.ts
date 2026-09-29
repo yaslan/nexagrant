@@ -50,7 +50,7 @@ async function signIn(page: Page, target: string) {
   await page.locator('input[type="email"]').fill(G0_E2E.email);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
+  // Every caller asserts on a locator next; that auto-wait is the synchronisation.
 }
 
 const shot = (page: Page, name: string) =>
@@ -152,7 +152,6 @@ test.describe('G0 score comes from the canonical scorer', () => {
 
     // ── 3. The board badge is the computed number — and only ever a computed number.
     await page.goto(BOARD_URL);
-    await page.waitForLoadState('networkidle');
     const card = app
       .locator('div')
       .filter({ hasText: G0_E2E.scoredOppTitle })
@@ -169,7 +168,6 @@ test.describe('G0 score comes from the canonical scorer', () => {
 
     // ── 4. The control: no evidence, a fabricated 92 in the column, and an honest screen.
     await page.goto(UNSCORED_URL);
-    await page.waitForLoadState('networkidle');
     const unscoredCard = app.getByTestId('pipeline-g0-score');
     await expect(app.getByTestId('pipeline-g0-unscored')).toBeVisible();
     await expect(unscoredCard).toContainText('Hesaplanamadı');
@@ -244,12 +242,10 @@ test.describe('G0 score comes from the canonical scorer', () => {
 
     // ── each detail page agrees with its own badge.
     await page.goto(`${BOARD_URL}/${G0_E2E.scoredOppId}`);
-    await page.waitForLoadState('networkidle');
     await expect(app.getByTestId('pipeline-g0-score')).toContainText(`${coordinator?.score}/100`);
     await shot(page, '06-detail-coordinator');
 
     await page.goto(`${BOARD_URL}/${G0_E2E.partnerOppId}`);
-    await page.waitForLoadState('networkidle');
     await expect(app.getByTestId('pipeline-g0-score')).toContainText(`${partner?.score}/100`);
     await shot(page, '07-detail-partner');
   });

@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { purgeDueUsers } from '../../src/lib/inngest/jobs/users-scheduled-deletion';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTTOUDNQ97X83 F-1 — the alarm an operator actually sees.
@@ -107,7 +108,6 @@ test.describe('erasure failure reaches the alerts console', () => {
     await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${target}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
 
     // The row the failed erasure wrote.
     const message = page
@@ -123,7 +123,9 @@ test.describe('erasure failure reaches the alerts console', () => {
     await page.screenshot({ path: `${SHOTS}/06-alerts-console.png`, fullPage: true });
 
     // The ids live in `meta`, which the console shows when the operator opens
-    // the row — so opening it is part of the workflow being proved.
+    // the row — so opening it is part of the workflow being proved. The row expands
+    // through React state, so it is clicked once hydrated.
+    await expectHydrated(message);
     await message.click();
     await expect(page.getByText(ids.subject, { exact: false }).first()).toBeVisible();
     await expect(page.getByText('P2011', { exact: false }).first()).toBeVisible();

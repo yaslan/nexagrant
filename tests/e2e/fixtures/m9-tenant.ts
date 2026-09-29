@@ -123,5 +123,6 @@ export async function signInAsM9User(page: Page, target: string) {
   await page.locator('input[type="email"]').fill(M9_EMAIL);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
+  // Nothing more to wait for here: every caller asserts on a locator next, and that
+  // auto-waiting is the synchronisation (docs/E2E_TESTING.md §3.4).
 }

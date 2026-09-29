@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 const OUT = shotsDir('TASK-MTS6MRKDP168Q-screenshots');
 
@@ -20,7 +21,10 @@ test('TASK-MTS6MRKDP168Q — no unsourced figure on any public marketing surface
   ];
 
   for (const [path, file] of pages) {
-    await page.goto(path, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.goto(path);
+    // Read what React rendered, not the bare server HTML: the document is hydrated once
+    // <body> carries React's props key (fixtures/hydration.ts).
+    await expectHydrated(page.locator('body'));
     await page.waitForTimeout(500);
     // What the reader actually sees, not the i18n payload in the script tags.
     const visible = await page.locator('body').innerText();
@@ -32,7 +36,8 @@ test('TASK-MTS6MRKDP168Q — no unsourced figure on any public marketing surface
   }
 
   // The network-analytics section, where the two fabricated stat tiles stood.
-  await page.goto('/tr', { waitUntil: 'networkidle' });
+  await page.goto('/tr');
+  await expectHydrated(page.locator('body'));
   const heading = page.getByRole('heading', { name: /CORDIS Ağ Verisiyle/ });
   await heading.scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
@@ -56,7 +61,8 @@ test('TASK-MTS6MRKDP168Q — no unsourced figure on any public marketing surface
 
   // The blog body, where "60 milyar Avro", "150.000'den fazla" and "ortalama
   // 4.8/5.0" stood, so the evidence shows the prose and not just the hero.
-  await page.goto('/tr/blog/horizon-europe-basarili-konsorsiyum-rehberi', { waitUntil: 'networkidle' });
+  await page.goto('/tr/blog/horizon-europe-basarili-konsorsiyum-rehberi');
+  await expectHydrated(page.locator('body'));
   const metrics = page.getByRole('heading', { name: /Önemli Metrikler/ });
   await metrics.scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);

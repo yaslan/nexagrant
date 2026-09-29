@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * The tree must hydrate without a mismatch, with a *non-empty* cart and the cookie
@@ -52,16 +53,13 @@ for (const locale of ['tr', 'en']) {
       [CART_STORAGE_KEY, CONSENT_STORAGE_KEY, JSON.stringify(SEEDED_CART)] as const
     );
 
-    await page.goto(`/${locale}`, { waitUntil: 'networkidle' });
-    // The mismatch is reported during hydration, which starts once the chunks have run —
-    // after `networkidle`, not before it.
-    await page.waitForTimeout(1500);
-
-    // Guard against a green run that proves nothing: if neither surface actually rendered,
+    await page.goto(`/${locale}`);
+    // The mismatch is reported during hydration, so the check waits for hydration itself:
+    // the cart button carrying React's props key (fixtures/hydration.ts). That is also the
+    // guard against a green run that proves nothing — if the surface never rendered,
     // there was no mismatch to catch in the first place.
-    await expect(
-      page.getByRole('button', { name: CART_BUTTON_LABEL[locale] })
-    ).toBeVisible();
+    await expectHydrated(page.getByRole('button', { name: CART_BUTTON_LABEL[locale] }));
+    await page.waitForTimeout(1500);
     await expect(page.getByRole('alertdialog')).toBeVisible();
 
     const offenders = logs.filter(
@@ -93,19 +91,19 @@ test('cart persists across page reload', async ({ page }) => {
     [CART_STORAGE_KEY, CONSENT_STORAGE_KEY, JSON.stringify(SEEDED_CART)] as const
   );
 
-  await page.goto('/tr', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1500);
+  await page.goto('/tr');
 
-  // Verify the cart is present before reload
-  await expect(page.getByRole('button', { name: CART_BUTTON_LABEL.tr })).toBeVisible();
+  // Verify the cart is present, and hydrated, before reload
+  await expectHydrated(page.getByRole('button', { name: CART_BUTTON_LABEL.tr }));
+  await page.waitForTimeout(1500);
 
   // Reload the page
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForTimeout(1500);
+  await page.reload();
 
-  // Verify the cart button is still visible after reload
+  // Verify the cart button is still there once React has hydrated again
   // (this means the cart data was not erased on re-hydration)
-  await expect(page.getByRole('button', { name: CART_BUTTON_LABEL.tr })).toBeVisible();
+  await expectHydrated(page.getByRole('button', { name: CART_BUTTON_LABEL.tr }));
+  await page.waitForTimeout(1500);
 
   // Verify the cart items in localStorage were not wiped
   const cartAfterReload = await page.evaluate(() => {

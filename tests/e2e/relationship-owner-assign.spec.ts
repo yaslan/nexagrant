@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { REL_E2E, seed, rollback } from '../../scripts/seed-relationship-e2e';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTTOUDNQ97X83 F-2 — assigning a focal point, in a real browser.
@@ -97,7 +98,7 @@ test.describe('M4 relationships — focal-point assignment', () => {
     await page.locator('input[type="email"]').fill(REL_E2E.email);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${target}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
+    // Callers assert on a locator next, and hydrate the picker before they change it.
   }
 
   test('an unassigned relationship gets a focal point by clicking', async ({ page }) => {
@@ -113,7 +114,8 @@ test.describe('M4 relationships — focal-point assignment', () => {
     await expect(page.getByTestId('relationship-title')).toHaveText(OWN.counterpartName);
 
     const picker = page.getByTestId('relationship-owner');
-    await expect(picker).toBeVisible();
+    // Hydrated, not only visible: the save reads the selection from React state.
+    await expectHydrated(picker);
     // The empty option is the state the purge left the row in.
     await expect(picker).toHaveValue('');
     await page.screenshot({ path: `${SHOTS}/01-unassigned-before.png`, fullPage: true });
@@ -175,6 +177,7 @@ test.describe('M4 relationships — focal-point assignment', () => {
   test('the focal point can be cleared again', async ({ page }) => {
     await signIn(page, URL);
 
+    await expectHydrated(page.getByTestId('relationship-owner'));
     await page.getByTestId('relationship-owner').selectOption('');
     await page.getByTestId('relationship-save').click();
     await expect(page.getByTestId('relationship-save-status')).toHaveText('Kaydedildi.');

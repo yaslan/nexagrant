@@ -4,6 +4,7 @@ import { prisma } from '../../src/lib/db';
 import { M6_E2E, seed, rollback } from '../../scripts/seed-m6-e2e';
 import { DEFAULT_CRITERIA } from '../../src/modules/m6/types';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * M6 Evaluator Lens — happy path against a real browser and a real database.
@@ -66,14 +67,14 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
     await page.locator('form button[type="submit"]').click();
 
     await page.waitForURL(`**${PANEL_URL}`, { timeout: 30_000 });
-    // Next's dev-mode streaming leaves the outgoing page in the DOM for a moment, so a
-    // bare getByTestId can transiently match twice. Settle first, then scope to <main>.
-    await page.waitForLoadState('networkidle');
+    // Next's dev-mode streaming can hold a second, hidden copy of the page for a moment;
+    // getByRole skips hidden elements, so scoping to <main> takes the visible one.
     const app = page.getByRole('main');
 
-    // ── 2. The form is bound to the real evaluation, and says what it is.
+    // ── 2. The form is bound to the real evaluation, and says what it is. Hydrated, not
+    // just painted: the sliders below update their labels through React's onChange.
     const form = app.getByTestId('m6-evaluator-form');
-    await expect(form).toBeVisible();
+    await expectHydrated(form);
     await expect(form.getByTestId('m6-internal-badge')).toContainText('İç ön değerlendirme');
 
     // Before submitting, the dashboard has no score for this proposal — and says so in
@@ -170,7 +171,6 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
     await page.locator('input[type="email"]').fill(M6_E2E.email);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${enUrl}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
 
     const app = page.getByRole('main');
     await expect(app.getByTestId('m6-evaluator-form')).toBeVisible();
@@ -209,7 +209,6 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
       await page.locator('input[type="email"]').fill(M6_E2E.email);
       await page.locator('form button[type="submit"]').click();
       await page.waitForURL(`**${url}`, { timeout: 30_000 });
-      await page.waitForLoadState('networkidle');
 
       const app = page.getByRole('main');
       const disclaimer = app.getByTestId('m6-internal-badge');

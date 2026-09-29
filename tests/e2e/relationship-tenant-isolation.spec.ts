@@ -58,7 +58,7 @@ test.describe('M4 relationships — tenant isolation', () => {
     await page.locator('input[type="email"]').fill(REL_E2E.email);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${target}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
+    // Every caller asserts on a locator next; that auto-wait is the synchronisation.
   }
 
   test('tenant A signs in and reads its own relationship', async ({ page }) => {
@@ -87,7 +87,6 @@ test.describe('M4 relationships — tenant isolation', () => {
     // `signInAs` before the stolen id is typed.
     await signInAs(page, OWN_URL);
     await page.goto(STOLEN_URL);
-    await page.waitForLoadState('networkidle');
 
     // Asserted on what renders, not on the HTTP status, and that is a measured
     // decision rather than a convenience: this segment has a `loading.tsx`, so

@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { registrationAcknowledgementToken } from '../../src/lib/legal/consent-documents';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTSWLANXSU0IG (A3) — the disclosure step, in a real browser.
@@ -72,10 +73,11 @@ test.afterAll(async () => {
 test('the registration form asks, unticked, and will not submit until it is ticked', async ({ page }) => {
   await acceptCookies(page);
   await page.goto('/tr/register');
-  await page.waitForLoadState('networkidle');
 
+  // Ticking it enables the submit button through React state, so the box has to be
+  // hydrated before it is ticked (fixtures/hydration.ts).
   const box = form(page).getByTestId('disclosure-ack');
-  await expect(box).toBeVisible();
+  await expectHydrated(box);
 
   // Pre-ticked would make the record worthless: it would prove the page's
   // default, not the person's act. KVKK açık rıza şartı, and the same logic
@@ -116,7 +118,7 @@ test('the registration form asks, unticked, and will not submit until it is tick
 test('ticking it and registering writes the disclosure record', async ({ page }) => {
   await acceptCookies(page);
   await page.goto('/tr/register');
-  await page.waitForLoadState('networkidle');
+  await expectHydrated(form(page).getByTestId('disclosure-ack'));
 
   await form(page).locator('input[type="email"]').fill(FORM_EMAIL);
   await form(page).getByTestId('disclosure-ack').check();

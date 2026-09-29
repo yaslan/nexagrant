@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { evidenceTenant } from './fixtures/evidence-tenant';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTRH86RCGVEGC (second pass) — the "verified" badge.
@@ -58,7 +59,9 @@ test.afterAll(async () => {
 
 async function signIn(page: import('@playwright/test').Page) {
   await tenant.signIn(page);
-  await page.waitForLoadState('networkidle');
+  // The evidence page is ready when its upload button is hydrated: the second test
+  // clicks it first, and the first photographs the page straight after this.
+  await expectHydrated(page.getByRole('button', { name: /Belge Yükle|Upload/ }).first());
 }
 
 test('a document nothing has verified is not shown as verified', async ({ page }) => {

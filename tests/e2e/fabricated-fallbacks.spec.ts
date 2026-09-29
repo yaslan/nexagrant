@@ -44,7 +44,7 @@ async function signIn(page: Page, email: string, target: string) {
   await page.locator('input[type="email"]').fill(email);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
-  // No `waitForLoadState('networkidle')`: a dev server never goes quiet for the 500 ms
+  // No network-idle wait: a dev server never goes quiet for the 500 ms
   // it waits for, so it is a race and not a signal — it timed this suite out at 60 s on
   // a loaded machine. Every caller asserts on a locator next, which is the real wait.
 }

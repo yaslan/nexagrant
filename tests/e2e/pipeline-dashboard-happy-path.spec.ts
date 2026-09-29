@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs';
 
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTVR9T834EPUC — the browser half of the tenant-bypass slice 2 evidence.
@@ -94,7 +95,7 @@ async function signIn(page: Page, target: string) {
   await page.locator('input[type="email"]:visible').first().fill(F.email);
   await page.locator('form button[type="submit"]:visible').first().click();
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
+  // Callers assert on a locator next, and hydrate what they click (fixtures/hydration.ts).
 }
 
 test('the board loads a wrapped query and a wrapped action still writes', async ({ page }) => {
@@ -110,7 +111,9 @@ test('the board loads a wrapped query and a wrapped action still writes', async 
   // 2. The write path: `assignOpportunityOwner` is one of the five calls this
   //    slice wrapped. Driven by a real selection on the card's owner dropdown,
   //    which is the only place the product offers it.
-  await card.getByRole('heading', { name: F.oppTitle }).click();
+  const cardHeading = card.getByRole('heading', { name: F.oppTitle });
+  await expectHydrated(cardHeading);
+  await cardHeading.click();
 
   const ownerSelect = card.locator('select[title="Sorumlu kullanıcıyı değiştir"]');
   await expect(ownerSelect).toBeVisible();

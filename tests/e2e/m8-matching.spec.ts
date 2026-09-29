@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * M8 "Aday Bul" — a real browser, a real database, a real click.
@@ -224,7 +225,6 @@ test.describe('M8 consortium matching', () => {
     await page.locator('input[type="email"]').fill(EMAIL);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${URL}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
   };
 
   test('the page renders and "Aday Bul" produces ranked candidates', async ({ page }) => {
@@ -237,7 +237,9 @@ test.describe('M8 consortium matching', () => {
 
     // 1. The page itself. It used to die here on
     // `include: { seats: { include: { organization: true } } }`.
-    await expect(page.getByRole('heading', { name: 'Konsorsiyum Rol Matrisi' })).toBeVisible();
+    // Hydrated, not only painted: a render error surfaces in the overlay once React
+    // has run on the client, so the check below is only meaningful after that.
+    await expectHydrated(page.getByRole('heading', { name: 'Konsorsiyum Rol Matrisi' }));
     // The document is streamed and always 200 in dev, so the overlay — not the
     // status code — is what says whether the render threw.
     await expectNoRuntimeError(page);
@@ -253,8 +255,10 @@ test.describe('M8 consortium matching', () => {
     await expect(page.getByTestId('m8-seat-industry')).toContainText('M8E2E Nordwerk GmbH');
     await page.screenshot({ path: `${SHOTS}/02-after-page-renders.png`, fullPage: true });
 
-    // 2. The click.
-    await seatCard.getByRole('button', { name: 'Aday Bul' }).click();
+    // 2. The click — once React has attached the handler, or it goes nowhere.
+    const findCandidates = seatCard.getByRole('button', { name: 'Aday Bul' });
+    await expectHydrated(findCandidates);
+    await findCandidates.click();
 
     const table = seatCard.locator('table');
     await expect(table).toBeVisible({ timeout: 30_000 });
@@ -332,14 +336,15 @@ test.describe('M8 consortium matching', () => {
     await page.locator('input[type="email"]').fill(EMAIL);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${consortiumUrl}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
 
     // The real opportunity, not the DEMO_OPPORTUNITIES fallback the swallowed
     // error used to produce.
     await expect(page.getByText('M8 e2e — grid flexibility consortium')).toBeVisible();
 
     const builderSeat = page.getByTestId('m8-builder-seat-widening');
-    await builderSeat.getByRole('button', { name: 'Aday Bul' }).click();
+    const findCandidates = builderSeat.getByRole('button', { name: 'Aday Bul' });
+    await expectHydrated(findCandidates);
+    await findCandidates.click();
 
     await expect(page.getByText('M8E2E Institute of Grids').first()).toBeVisible({ timeout: 30_000 });
     await expectNoRuntimeError(page);

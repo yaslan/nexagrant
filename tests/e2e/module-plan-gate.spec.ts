@@ -63,7 +63,7 @@ async function signIn(page: Page, target: string) {
   await page.locator('input[type="email"]').fill(FLIP.email);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**/opportunities/${FLIP.opportunityId}/documents`, { timeout: 60_000 });
-  // No `waitForLoadState('networkidle')`: a dev server never goes quiet for the 500 ms
+  // No network-idle wait: a dev server never goes quiet for the 500 ms
   // it waits for, so it is a race. Every caller asserts on `main` next, and Playwright's
   // auto-waiting is the synchronisation.
 }

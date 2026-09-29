@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTR882HVZ8BG7 — "the price you join at stays yours", in a real browser.
@@ -71,8 +72,10 @@ test.describe('price lock — a locked tenant and a stranger see different price
   test('the public pricing page quotes a stranger the list price', async ({ page }) => {
     await consent(page);
     await page.goto('/tr/pricing');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Aylık', exact: true }).click();
+    // The toggle is client state: a click before hydration is lost (docs/E2E_TESTING.md §3.4).
+    const monthly = page.getByRole('button', { name: 'Aylık', exact: true });
+    await expectHydrated(monthly);
+    await monthly.click();
 
     const price = page.getByTestId('plan-price-pro');
     // The whole demonstration rests on no campaign running — that is the state
@@ -100,8 +103,10 @@ test.describe('price lock — a locked tenant and a stranger see different price
     await page.locator('input[type="email"]').fill(EMAIL);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${BILLING_URL}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Aylık', exact: true }).click();
+    // The toggle is client state: a click before hydration is lost (docs/E2E_TESTING.md §3.4).
+    const monthly = page.getByRole('button', { name: 'Aylık', exact: true });
+    await expectHydrated(monthly);
+    await monthly.click();
 
     const price = page.getByTestId('settings-plan-price-pro');
     await expect(price).toHaveText(LOCKED_PRO_MONTHLY);

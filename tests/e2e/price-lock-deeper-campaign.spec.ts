@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTR882HVZ8BG7 — the lock is a floor, not a ceiling.
@@ -68,7 +69,6 @@ test.describe('price lock — a deeper campaign reaches an already-locked tenant
   test('the locked tenant is quoted the deeper campaign, not its own shallower rate', async ({ page }) => {
     await consent(page);
     await page.goto('/tr/pricing');
-    await page.waitForLoadState('networkidle');
 
     const runningTier = (await page.getByTestId('active-tier-code').innerText()).trim();
     test.skip(
@@ -76,7 +76,10 @@ test.describe('price lock — a deeper campaign reaches an already-locked tenant
       `needs a server running BILLING_ACTIVE_TIER=ILK5; this one is running ${runningTier}`,
     );
 
-    await page.getByRole('button', { name: 'Aylık', exact: true }).click();
+    // The toggle is client state: a click before hydration is lost (docs/E2E_TESTING.md §3.4).
+    const monthly = page.getByRole('button', { name: 'Aylık', exact: true });
+    await expectHydrated(monthly);
+    await monthly.click();
     await expect(page.getByTestId('plan-price-pro')).toHaveText(CAMPAIGN_PRO_MONTHLY);
     await page.getByTestId('plan-card-pro').screenshot({
       path: `${SHOTS}/05a-pricing-card-pro-campaign.png`,
@@ -87,8 +90,9 @@ test.describe('price lock — a deeper campaign reaches an already-locked tenant
     await page.locator('input[type="email"]').fill(EMAIL);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${BILLING_URL}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Aylık', exact: true }).click();
+    const panelMonthly = page.getByRole('button', { name: 'Aylık', exact: true });
+    await expectHydrated(panelMonthly);
+    await panelMonthly.click();
 
     const price = page.getByTestId('settings-plan-price-pro');
     await expect(price).toHaveText(CAMPAIGN_PRO_MONTHLY);

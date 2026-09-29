@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTVPOR2CMV1RT — posting a note from a pipeline card, in a real browser.
@@ -135,13 +136,14 @@ test('posting a note keeps the chosen author and clears only the text', async ({
   await page.locator('input[type="email"]:visible').first().fill(F.firstEmail);
   await page.locator('form button[type="submit"]:visible').first().click();
   await page.waitForURL(`**${BOARD_URL}`, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
 
   const card = page.getByTestId(`pipeline-card-${F.oppId}`);
   await expect(card).toBeVisible();
 
-  // Expand the card to reach the note box.
-  await card.getByRole('heading', { name: F.oppTitle }).click();
+  // Expand the card to reach the note box — once React has attached the handler.
+  const cardHeading = card.getByRole('heading', { name: F.oppTitle });
+  await expectHydrated(cardHeading);
+  await cardHeading.click();
 
   // Addressed by test id, not by position: an expanded card also carries the
   // "Atanan" owner select, and that one comes first in the DOM.

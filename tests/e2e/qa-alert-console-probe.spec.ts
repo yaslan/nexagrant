@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTTUUGKNDGBXK — what the alert console actually shows an operator.
@@ -47,7 +48,9 @@ test('the alert console under a 250-row pile', async ({ page }) => {
   await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${target}`, { timeout: 60_000 });
-  await page.waitForLoadState('networkidle');
+  // The probe counts rows and then drives the "unresolved only" filter, which is client
+  // state. That checkbox hydrated means the console has rendered and can be operated.
+  await expectHydrated(page.getByRole('checkbox').first());
 
   await page.screenshot({ path: `${SHOTS}/01-console-as-found.png`, fullPage: true });
 

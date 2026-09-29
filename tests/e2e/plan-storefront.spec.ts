@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
@@ -115,8 +116,10 @@ test.describe('the studio price is the price the shopfront quotes and charges', 
   test('the public pricing page quotes the published version, not the catalogue', async ({ page }) => {
     await consent(page);
     await page.goto('/tr/pricing');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Aylık', exact: true }).click();
+    // The toggle is client state: a click before hydration is lost (docs/E2E_TESTING.md §3.4).
+    const monthly = page.getByRole('button', { name: 'Aylık', exact: true });
+    await expectHydrated(monthly);
+    await monthly.click();
 
     const price = page.getByTestId('plan-price-ultra');
     await expect(price).toHaveText(STUDIO_MONTHLY_TEXT);
@@ -129,8 +132,10 @@ test.describe('the studio price is the price the shopfront quotes and charges', 
     await signIn(page, baseURL as string);
     await consent(page);
     await page.goto(BILLING_URL);
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Aylık', exact: true }).click();
+    // The toggle is client state: a click before hydration is lost (docs/E2E_TESTING.md §3.4).
+    const monthly = page.getByRole('button', { name: 'Aylık', exact: true });
+    await expectHydrated(monthly);
+    await monthly.click();
 
     await expect(page.getByTestId('settings-plan-price-ultra')).toHaveText(STUDIO_MONTHLY_TEXT);
     // The panel scrolls inside its own shell, so `fullPage` captures the
@@ -147,8 +152,10 @@ test.describe('the studio price is the price the shopfront quotes and charges', 
     // `POST /api/billing/quote` — the same code path checkout charges from.
     await consent(page);
     await page.goto('/tr/pricing');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Aylık', exact: true }).click();
+    // The toggle is client state: a click before hydration is lost (docs/E2E_TESTING.md §3.4).
+    const monthly = page.getByRole('button', { name: 'Aylık', exact: true });
+    await expectHydrated(monthly);
+    await monthly.click();
     await page.getByTestId('plan-card-ultra').getByRole('button', { name: /sepete ekle/i }).click();
 
     const total = page.getByTestId('cart-total');
@@ -200,10 +207,10 @@ test.describe('a private plan is neither shown nor sold to a tenant it was not a
   test('it is gone from the public pricing page', async ({ page }) => {
     await consent(page);
     await page.goto('/tr/pricing');
-    await page.waitForLoadState('networkidle');
-    await expect(page.getByTestId('plan-card-basic')).toHaveCount(0);
-    // Not vacuous: the other public plans are still there.
+    // Not vacuous: the other public plans are there, so the grid has rendered and the
+    // missing card below is absent rather than not drawn yet.
     await expect(page.getByTestId('plan-card-pro')).toBeVisible();
+    await expect(page.getByTestId('plan-card-basic')).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/04-private-plan-hidden.png`, fullPage: true });
   });
 
@@ -211,9 +218,10 @@ test.describe('a private plan is neither shown nor sold to a tenant it was not a
     await signIn(page, baseURL as string);
     await consent(page);
     await page.goto(BILLING_URL);
-    await page.waitForLoadState('networkidle');
-    await expect(page.getByTestId('settings-plan-card-basic')).toHaveCount(0);
+    // The pro card first: it proves the grid has rendered, so the count below is an
+    // absence rather than a page that has not drawn yet.
     await expect(page.getByTestId('settings-plan-card-pro')).toBeVisible();
+    await expect(page.getByTestId('settings-plan-card-basic')).toHaveCount(0);
     await page.getByTestId('settings-plan-card-pro').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/05-private-plan-hidden-panel.png` });
   });
@@ -266,7 +274,6 @@ test.describe('a private plan assigned to a tenant is shown and sold to that ten
     await signIn(page, baseURL as string);
     await consent(page);
     await page.goto(BILLING_URL);
-    await page.waitForLoadState('networkidle');
     await expect(page.getByTestId('settings-plan-card-basic')).toBeVisible();
     await page.getByTestId('settings-plan-card-basic').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/06-private-plan-assigned-visible.png` });
@@ -275,7 +282,8 @@ test.describe('a private plan assigned to a tenant is shown and sold to that ten
   test('but it stays off the public pricing page, which no session backs', async ({ page }) => {
     await consent(page);
     await page.goto('/tr/pricing');
-    await page.waitForLoadState('networkidle');
+    // The grid has rendered once a public card is on it; only then is a count of 0 an absence.
+    await expect(page.getByTestId('plan-card-pro')).toBeVisible();
     await expect(page.getByTestId('plan-card-basic')).toHaveCount(0);
   });
 });

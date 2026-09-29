@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * TASK-MTSY71BUMBLWM — the screen that fills `TenantBillingIdentity` in.
@@ -61,7 +62,7 @@ async function signIn(page: Page, email: string) {
   await page.locator('input[type="email"]').fill(email);
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${BILLING_URL}`, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
+  // Callers assert on a locator next; the ones that type hydrate the form first.
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -95,6 +96,8 @@ test.describe('billing identity form', () => {
     page,
   }) => {
     await signIn(page, OWNER);
+    // The inputs are controlled: typing before React hydrates them is overwritten.
+    await expectHydrated(page.getByTestId('billing-identity-save'));
 
     await page.locator('#buyerName').fill('Örnek Teknoloji A.Ş.');
     await page.locator('#buyerVknTckn').fill(INVALID_VKN);
@@ -119,6 +122,8 @@ test.describe('billing identity form', () => {
 
   test('a valid identity is stored, normalised, and read back masked', async ({ page }) => {
     await signIn(page, OWNER);
+    // The inputs are controlled: typing before React hydrates them is overwritten.
+    await expectHydrated(page.getByTestId('billing-identity-save'));
 
     await page.locator('#buyerName').fill('Örnek Teknoloji A.Ş.');
     // Typed the way it is printed on a letterhead, spaces and all: the stored
@@ -145,7 +150,6 @@ test.describe('billing identity form', () => {
 
     // Reloading shows what is on file — masked, never the whole number.
     await page.reload();
-    await page.waitForLoadState('networkidle');
     await expect(page.getByTestId('billing-identity-onfile')).toBeVisible();
     await expect(page.getByTestId('billing-identity-onfile')).toContainText('0000');
     await expect(page.getByTestId('billing-identity-onfile')).not.toContainText(VALID_VKN);

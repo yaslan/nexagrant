@@ -4,6 +4,7 @@ import { prisma } from '../../src/lib/db';
 import { getKpiMetrics } from '../../src/modules/m5/server/queries';
 import { ARCHIVE_E2E, seed, rollback } from '../../scripts/seed-archive-e2e';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * Archiving an opportunity, and the effort log — against a real browser and a real database.
@@ -59,7 +60,6 @@ test.describe('Opportunity archive + effort log', () => {
     await page.locator('input[type="email"]').fill(ARCHIVE_E2E.email);
     await page.locator('form button[type="submit"]').click();
     await page.waitForURL(`**${BOARD_URL}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
 
     const app = page.getByRole('main');
     await expect(app.getByText(ARCHIVE_E2E.archivedOppTitle)).toBeVisible();
@@ -76,8 +76,10 @@ test.describe('Opportunity archive + effort log', () => {
 
     // ── 2. Effort tab: empty state first, because the fixture has no effort rows.
     await page.goto(DETAIL_URL);
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Efor Kaydı' }).click();
+    // The tab switch is client state; a click before hydration is lost.
+    const effortTab = page.getByRole('button', { name: 'Efor Kaydı' });
+    await expectHydrated(effortTab);
+    await effortTab.click();
     await expect(app.getByTestId('effort-empty')).toBeVisible();
     await expect(app.getByTestId('effort-table')).toHaveCount(0);
     await expect(app.getByTestId('effort-total')).toContainText('0.0');
@@ -127,9 +129,10 @@ test.describe('Opportunity archive + effort log', () => {
 
     // ── 5. Back on the board, the archived card is gone and the control card is not.
     await page.waitForURL(`**${BOARD_URL}`, { timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
-    await expect(app.getByText(ARCHIVE_E2E.archivedOppTitle)).toHaveCount(0);
+    // The control card first: it proves the board has rendered, so the count after it is
+    // an absence and not the detail page still being swapped out.
     await expect(app.getByText(ARCHIVE_E2E.keptOppTitle)).toBeVisible();
+    await expect(app.getByText(ARCHIVE_E2E.archivedOppTitle)).toHaveCount(0);
     await shot(page, '05-board-after-archive');
 
     // ── 6. The row is still on file — archived, not deleted.

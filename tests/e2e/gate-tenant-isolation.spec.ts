@@ -48,7 +48,7 @@ test.describe('Stage gate — tenant isolation', () => {
 
     await page.waitForURL(`**${DETAIL_URL}`, { timeout: 30_000 });
 
-    // `waitForLoadState('networkidle')` stood here and timed the test out about half the time:
+    // A network-idle wait stood here and timed the test out about half the time:
     // a dev server never goes fully quiet, so "no requests for 500 ms" is a race, not a signal.
     // The button is what the test is waiting for, so it waits for the button.
     const button = page.locator('main').getByTestId('pipeline-evaluate-gate');
