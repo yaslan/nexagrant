@@ -7,6 +7,7 @@ import { AlertTriangle } from 'lucide-react';
 
 import { logEffort } from '../actions';
 import { errorMessage } from '@/lib/errors';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 /**
  * One row of the `Effort` table, already tenant-scoped and name-resolved on the server.
@@ -55,6 +56,7 @@ export function EffortTracker({
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const errorText = useActionErrorText();
 
   const totalHours = efforts.reduce((sum, e) => sum + e.hours, 0);
   const personDays = (totalHours / HOURS_PER_PERSON_DAY).toFixed(1);
@@ -87,7 +89,7 @@ export function EffortTracker({
         // table and the total always show what the database actually holds.
         router.refresh();
       } catch (err) {
-        setError(errorMessage(err, t('error.EFFORT_SAVE_FAILED')));
+        setError(errorText(err, () => errorMessage(err, t('error.EFFORT_SAVE_FAILED'))));
       }
     });
   };

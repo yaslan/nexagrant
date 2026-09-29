@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { FileText, ShieldCheck, AlertTriangle, Lock } from 'lucide-react';
 
 import { saveBillingIdentity } from './identity-actions';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import type { BillingIdentityField, BillingIdentityIssue } from '@/lib/billing/billing-identity';
 
 /** One row of the country picker, measured on the server from `vat-rates.ts`. */
@@ -54,6 +55,7 @@ const ERROR_KEY: Record<BillingIdentityIssue['code'], string> = {
 export function BillingIdentityForm({ locale, onFile, canEdit, countries }: Props) {
   const t = useTranslations('billingPanels.settings');
   const [pending, startTransition] = useTransition();
+  const errorText = useActionErrorText();
   const [issues, setIssues] = useState<BillingIdentityIssue[]>([]);
   const [banner, setBanner] = useState<{ kind: 'ok' | 'warn' | 'err'; text: string } | null>(null);
 
@@ -111,7 +113,13 @@ export function BillingIdentityForm({ locale, onFile, canEdit, countries }: Prop
     event.preventDefault();
     setBanner(null);
     startTransition(async () => {
-      const result = await saveBillingIdentity(form);
+      let result: Awaited<ReturnType<typeof saveBillingIdentity>>;
+      try {
+        result = await saveBillingIdentity(form);
+      } catch (error) {
+        setBanner({ kind: 'err', text: errorText(error, () => t('identityErrWrite')) });
+        return;
+      }
       if (result.ok) {
         setIssues([]);
         setForm((prev) => ({ ...prev, buyerVknTckn: '' }));

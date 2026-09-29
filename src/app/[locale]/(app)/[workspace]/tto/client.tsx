@@ -12,6 +12,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { createTtoItem, matchTtoItemToCalls, generateIpChecklist } from '@/modules/m7/server/actions';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 export interface TtoItem {
   id: string;
@@ -59,12 +60,16 @@ export function TtoAcceleratorClient({
   // IP Checklist modal state
   const [checklistContent, setChecklistContent] = useState<string | null>(null);
   const [isGeneratingChecklist, setIsGeneratingChecklist] = useState(false);
+  // Only an ended pilot is said here; the other failures stay in the console, as before.
+  const [actionError, setActionError] = useState<string | null>(null);
+  const errorText = useActionErrorText();
 
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
     setIsSubmitting(true);
+    setActionError(null);
     try {
       const kwList = keywords.split(',').map((s) => s.trim()).filter(Boolean);
       // The action stamps the session tenant itself; the browser cannot name one.
@@ -92,12 +97,14 @@ export function TtoAcceleratorClient({
       setKeywords('');
     } catch (err) {
       console.error('Error creating TTO item:', err);
+      setActionError(errorText(err, null));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleRunMatcher = async (item: TtoItem) => {
+    setActionError(null);
     setSelectedMatchItem(item);
     setIsMatching(true);
     try {
@@ -105,12 +112,14 @@ export function TtoAcceleratorClient({
       setMatchedTopics(res.matchedTopics || []);
     } catch (err) {
       console.error('Error matching TTO item:', err);
+      setActionError(errorText(err, null));
     } finally {
       setIsMatching(false);
     }
   };
 
   const handleGenerateIpChecklist = async (item: TtoItem) => {
+    setActionError(null);
     setIsGeneratingChecklist(true);
     try {
       const res = await generateIpChecklist({
@@ -121,6 +130,7 @@ export function TtoAcceleratorClient({
       setChecklistContent(res.checklistContent);
     } catch (err) {
       console.error('Error generating IP checklist:', err);
+      setActionError(errorText(err, null));
     } finally {
       setIsGeneratingChecklist(false);
     }
@@ -148,6 +158,11 @@ export function TtoAcceleratorClient({
 
   return (
     <div className="space-y-6">
+      {actionError && (
+        <p role="alert" className="bg-bad/10 border border-bad/30 rounded-xl p-4 text-sm font-semibold text-bad">
+          {actionError}
+        </p>
+      )}
       {/* ──────────────────────── HEADER BANNER ──────────────────────── */}
       <div className="bg-surface rounded-2xl p-6 text-ink shadow-sm border border-border relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">

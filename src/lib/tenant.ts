@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getPublicRoute } from '@/lib/routes';
 import { assertTenantWritable, PilotExpiredError } from '@/lib/billing/pilot';
+import { PILOT_EXPIRED_DIGEST } from '@/lib/pilot-expired';
 
 /**
  * Tenant resolution — the single place a request's tenant is decided.
@@ -99,8 +100,25 @@ export function assertTenant(session: SessionLike): TenantScope {
  */
 export async function requireTenantAction(opts: { readOnly?: boolean } = {}): Promise<TenantScope> {
   const scope = assertTenant((await auth()) as SessionLike);
-  if (!opts.readOnly) await assertTenantWritable(scope.tenantId);
+  if (!opts.readOnly) await assertTenantActionWritable(scope.tenantId);
   return scope;
+}
+
+/**
+ * `assertTenantWritable` for a server action. The refusal leaves with
+ * `digest = 'PILOT_EXPIRED'`: Next.js keeps a digest that is already set, so in
+ * production — where the browser gets no message — the UI can still tell it
+ * apart and say "pilot ended" instead of "try again" (src/lib/pilot-expired.ts,
+ * TASK-MUMIIUEGJ6N8B). For an action that checks the tenant itself rather than
+ * through `requireTenantAction`.
+ */
+export async function assertTenantActionWritable(tenantId: string): Promise<void> {
+  try {
+    await assertTenantWritable(tenantId);
+  } catch (error) {
+    if (error instanceof PilotExpiredError) Object.assign(error, { digest: PILOT_EXPIRED_DIGEST });
+    throw error;
+  }
 }
 
 /**

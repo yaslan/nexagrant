@@ -10,6 +10,7 @@ import { ModuleId, PlanTier } from '@/lib/modules/types';
 import type { ModulesPlanView } from './plan-view';
 import { toggleModuleState } from './actions';
 import { errorMessage } from '@/lib/errors';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 interface ModulesClientProps {
   /** `null` when the plan could not be read — nothing is shown as active or offered. */
@@ -117,6 +118,7 @@ export function ModulesClient({
   const readOnly = !plan || plan.pilot?.expired === true;
   const [cascadeWarning, setCascadeWarning] = useState<{ target: ModuleId; cascading: ModuleId[] } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const errorText = useActionErrorText();
   const t = useTranslations('settings.modules');
 
   // Filters & Search
@@ -177,7 +179,7 @@ export function ModulesClient({
             await toggleModuleState(id, 'OFF');
             showToast(`${id} modülü başarıyla devre dışı bırakıldı.`, 'info');
           } catch (e) {
-            showToast(errorMessage(e, 'Modül kapatılırken hata oluştu.'), 'error');
+            showToast(errorText(e, () => errorMessage(e, 'Modül kapatılırken hata oluştu.')), 'error');
             setActiveModules((prev) => [...prev, id]); // rollback
           }
         });
@@ -192,7 +194,7 @@ export function ModulesClient({
             await toggleModuleState(id, 'ON');
             showToast(`${id} modülü başarıyla aktifleştirildi!`, 'success');
           } catch (e) {
-            showToast(errorMessage(e, 'Modül etkinleştirilirken hata oluştu.'), 'error');
+            showToast(errorText(e, () => errorMessage(e, 'Modül etkinleştirilirken hata oluştu.')), 'error');
             setActiveModules((prev) => prev.filter((m) => m !== id)); // rollback
           }
         });
@@ -212,7 +214,7 @@ export function ModulesClient({
         await toggleModuleState(id, 'OFF');
         showToast(`${id} plan dışında açık kalmıştı; kapatıldı.`, 'info');
       } catch (e) {
-        showToast(errorMessage(e, 'Modül kapatılırken hata oluştu.'), 'error');
+        showToast(errorText(e, () => errorMessage(e, 'Modül kapatılırken hata oluştu.')), 'error');
         setOutsidePlanOn((prev) => [...prev, id]); // rollback
       }
     });
@@ -232,7 +234,7 @@ export function ModulesClient({
         await toggleModuleState(target, 'OFF');
         showToast(`${target} ve bağlı ${count - 1} alt modül kapatıldı.`, 'info');
       } catch (e) {
-        showToast(errorMessage(e, 'Modüller kapatılırken hata oluştu.'), 'error');
+        showToast(errorText(e, () => errorMessage(e, 'Modüller kapatılırken hata oluştu.')), 'error');
         // Rollback
         setActiveModules((prev) => Array.from(new Set([...prev, ...toDisable])));
       }

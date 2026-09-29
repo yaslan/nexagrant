@@ -4,6 +4,7 @@ import { useId, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import CoBrandBadge from '@/components/CoBrandBadge';
 import { saveCoBrand, type CoBrandActionError } from './cobrand-actions';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 /** FB KAMU B4 (TASK-MULRRNIHVZM1Z): the agency sets the co-brand its organisations see. */
 
@@ -34,6 +35,7 @@ export default function CoBrandPanel({
   const [error, setError] = useState<CoBrandActionError | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
+  const errorText = useActionErrorText();
   const formRef = useRef<HTMLFormElement>(null);
   const ids = { name: useId(), nameHint: useId(), logo: useId(), logoHint: useId(), remove: useId(), err: useId() };
 
@@ -149,7 +151,7 @@ export default function CoBrandPanel({
       <div role="alert" id={ids.err} className="empty:hidden">
         {error ? (
           <p className="rounded-lg border border-bad bg-surface px-3 py-2 text-sm font-medium text-bad" data-testid="cobrand-error">
-            {t(`errors.${error}`)}
+            {errorText(error, () => t(`errors.${error}`))}
           </p>
         ) : null}
       </div>

@@ -4,6 +4,7 @@ import React, { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { updateRelationship, addInteraction } from '../actions';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import type { WorkspaceMember } from '@/lib/k5-pipeline/pipelineStore';
 import type { InteractionRow, RelationshipRow } from '@/types/db-rows';
 
@@ -49,18 +50,32 @@ export default function RelationshipDetail({
   /** What the last save said. The action can refuse, and a silent refusal on a
    *  screen with a Save button reads as success. */
   const [status, setStatus] = useState<'idle' | 'saved' | string>('idle');
+  const errorText = useActionErrorText();
+
+  /** An ended pilot is said in the status line; any other error goes on to the error boundary, as before. */
+  const refuse = (err: unknown) => {
+    const text = errorText(err, null);
+    if (text === null) throw err;
+    setStatus(text);
+  };
 
   const handleSave = () => {
     setStatus('idle');
     startTransition(async () => {
-      const result = await updateRelationship(rel.id, {
-        warmth: warmth as 'cold' | 'warm' | 'hot' | 'active',
-        nextStep,
-        notes,
-        // Only sent by someone the server would accept it from; the empty
-        // option is a real value meaning "unassign".
-        ...(canAssignOwner ? { ownerUserId: ownerUserId === '' ? null : ownerUserId } : {}),
-      });
+      let result: Awaited<ReturnType<typeof updateRelationship>>;
+      try {
+        result = await updateRelationship(rel.id, {
+          warmth: warmth as 'cold' | 'warm' | 'hot' | 'active',
+          nextStep,
+          notes,
+          // Only sent by someone the server would accept it from; the empty
+          // option is a real value meaning "unassign".
+          ...(canAssignOwner ? { ownerUserId: ownerUserId === '' ? null : ownerUserId } : {}),
+        });
+      } catch (err) {
+        refuse(err);
+        return;
+      }
       if (result.success) {
         setStatus('saved');
         return;
@@ -79,11 +94,17 @@ export default function RelationshipDetail({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
-      await addInteraction(rel.id, {
-        kind: fd.get('kind') as string,
-        at: fd.get('at') as string,
-        summary: fd.get('summary') as string,
-      });
+      setStatus('idle');
+      try {
+        await addInteraction(rel.id, {
+          kind: fd.get('kind') as string,
+          at: fd.get('at') as string,
+          summary: fd.get('summary') as string,
+        });
+      } catch (err) {
+        refuse(err);
+        return;
+      }
       setShowForm(false);
     });
   };

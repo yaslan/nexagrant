@@ -10,6 +10,7 @@ import { revalidatePath } from 'next/cache';
 import { withTenant } from '@/lib/db';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
+import { failureCode, type PilotExpiredCode } from '@/lib/pilot-expired';
 import {
   AgencyInviteError,
   createInviteCodeIn,
@@ -30,7 +31,7 @@ async function managerScope() {
   return scope;
 }
 
-export type InviteActionError = 'forbidden' | 'invalidExpiry' | 'notAgency' | 'failed';
+export type InviteActionError = 'forbidden' | 'invalidExpiry' | 'notAgency' | 'failed' | PilotExpiredCode;
 
 function errorCode(e: unknown): InviteActionError {
   if (e instanceof AgencyPermissionError) return 'forbidden';
@@ -38,7 +39,7 @@ function errorCode(e: unknown): InviteActionError {
     if (e.code === 'INVALID_EXPIRY') return 'invalidExpiry';
     return 'notAgency';
   }
-  return 'failed';
+  return failureCode(e, 'failed');
 }
 
 function revalidate() {

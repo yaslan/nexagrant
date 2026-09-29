@@ -34,6 +34,7 @@
     "actions": "Actions",
     "status": "Status",
     "noResults": "No results found.",
+    "pilotExpired": "The pilot has ended, so editing is off. Ask your administrator to extend it.",
     "logoAlt": "{brand} logo",
     "copyright": "© {year} {brand} ({brand} SaaS). All rights reserved."
   },

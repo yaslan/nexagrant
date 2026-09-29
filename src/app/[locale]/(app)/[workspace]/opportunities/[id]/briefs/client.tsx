@@ -18,6 +18,7 @@ import {
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { generateMeetingBrief, savePostMeetingNotes } from '@/modules/m9/server/actions';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { generateIcsContent } from '@/lib/calendar';
 import { resolveMeetingSchedule } from '@/modules/m9/meeting-schedule';
 import { isTemplateDraft, stripTemplateMarker } from '@/modules/m9/brief-template';
@@ -127,6 +128,7 @@ export function MeetingBriefsClient({
   unlinkedBriefs: initialUnlinkedBriefs = [],
 }: MeetingBriefsClientProps) {
   const t = useTranslations('m9');
+  const errorText = useActionErrorText();
   const dateLocale = locale === 'tr' ? 'tr-TR' : 'en-US';
   const [briefs, setBriefs] = useState<BriefItem[]>(initialBriefs);
   const [unlinkedBriefs, setUnlinkedBriefs] = useState<BriefItem[]>(initialUnlinkedBriefs);
@@ -257,7 +259,7 @@ export function MeetingBriefsClient({
       // The raw reason stays in the console. On screen the user gets a sentence
       // they can act on — never a stack trace or an HTTP status.
       console.error('Error generating brief:', err);
-      setGenerateError(t('generate.failed'));
+      setGenerateError(errorText(err, () => t('generate.failed')));
     } finally {
       setIsGenerating(false);
     }
@@ -359,7 +361,7 @@ export function MeetingBriefsClient({
       }
     } catch (err) {
       console.error('Error saving post-meeting notes:', err);
-      setNotesError(t('postMeeting.notesError'));
+      setNotesError(errorText(err, () => t('postMeeting.notesError')));
     } finally {
       setIsSavingNotes(false);
     }

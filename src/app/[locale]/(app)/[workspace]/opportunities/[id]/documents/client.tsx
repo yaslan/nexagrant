@@ -33,6 +33,7 @@ import type {
   DualApprovalState,
 } from '@/lib/dual-approval';
 import { errorMessage } from '@/lib/errors';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 export interface DocItem {
   id: string;
@@ -88,12 +89,16 @@ export function DocumentsClient({
   const [approval, setApproval] = useState<DualApprovalState | null>(initialApproval);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
+  // Only an ended pilot is said here; the other document failures stay in the console, as before.
+  const [docError, setDocError] = useState<string | null>(null);
+  const errorText = useActionErrorText();
 
   const formatDate = (value: Date | string) => new Date(value).toLocaleDateString(locale);
   const formatDateTime = (value: Date | string) => new Date(value).toLocaleString(locale);
 
   const handleGenerateDoc = async (kind: 'NDA' | 'LOI' | 'COMMITMENT' | 'ESR_DEBRIEF' | 'AWARD_PACK') => {
     setIsGenerating(true);
+    setDocError(null);
     try {
       // The action reads the tenant and user from the session.
       const res = await generateStandardDoc(opportunityId, kind);
@@ -109,12 +114,14 @@ export function DocumentsClient({
       setDocs((prev) => [newDoc, ...prev]);
     } catch (err) {
       console.error('Error generating document:', err);
+      setDocError(errorText(err, null));
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleSignDoc = async (docId: string) => {
+    setDocError(null);
     try {
       await signDocument(docId);
       setDocs((prev) =>
@@ -122,10 +129,12 @@ export function DocumentsClient({
       );
     } catch (err) {
       console.error('Error signing document:', err);
+      setDocError(errorText(err, null));
     }
   };
 
   const handleCreateNewVersion = async (docId: string) => {
+    setDocError(null);
     try {
       const res = await createNewVersion(docId);
       const updatedDoc = res.updatedDoc;
@@ -149,6 +158,7 @@ export function DocumentsClient({
       }
     } catch (err) {
       console.error('Error updating document version:', err);
+      setDocError(errorText(err, null));
     }
   };
 
@@ -176,7 +186,7 @@ export function DocumentsClient({
     try {
       applyResult(await submitDualApprovalAction(docId));
     } catch (err) {
-      setApprovalError(errorMessage(err, t('approval.error')));
+      setApprovalError(errorText(err, () => errorMessage(err, t('approval.error'))));
     } finally {
       setApprovalBusy(false);
     }
@@ -198,7 +208,7 @@ export function DocumentsClient({
     try {
       applyResult(await departmentApproveAction(approval.docId, department));
     } catch (err) {
-      setApprovalError(errorMessage(err, t('approval.error')));
+      setApprovalError(errorText(err, () => errorMessage(err, t('approval.error'))));
     } finally {
       setApprovalBusy(false);
     }
@@ -263,6 +273,11 @@ export function DocumentsClient({
 
   return (
     <div className="space-y-6">
+      {docError && (
+        <p role="alert" className="bg-bad/10 border border-bad/30 rounded-xl p-4 text-sm font-semibold text-bad">
+          {docError}
+        </p>
+      )}
       {/* ──────────────────────── HEADER BANNER ──────────────────────── */}
       <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-xl border border-slate-800 relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">

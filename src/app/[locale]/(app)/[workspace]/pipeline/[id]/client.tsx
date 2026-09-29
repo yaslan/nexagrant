@@ -8,6 +8,7 @@ import { AlertTriangle, Archive, CheckCircle2 } from 'lucide-react';
 import type { Gate } from '@prisma/client';
 
 import { archiveOpportunity, declareApplication, evaluateOpportunityGate } from '../actions';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { errorMessage } from '@/lib/errors';
 import { EffortTracker, type EffortEntry } from './effort';
 
@@ -65,6 +66,7 @@ export function OpportunityDetailClient({
   const [outcome, setOutcome] = useState<GateOutcome | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const errorText = useActionErrorText();
   // Two-step archive: the button opens the confirmation panel, the panel's own button commits.
   const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
@@ -96,7 +98,7 @@ export function OpportunityDetailClient({
         // rather than guessing the new state on the client.
         router.refresh();
       } catch (err) {
-        setActionError(errorMessage(err, t('detail.error.GATE_EVALUATION_FAILED')));
+        setActionError(errorText(err, () => errorMessage(err, t('detail.error.GATE_EVALUATION_FAILED'))));
       }
     });
   };
@@ -124,7 +126,7 @@ export function OpportunityDetailClient({
         router.push(backHref);
         router.refresh();
       } catch (err) {
-        setArchiveError(errorMessage(err, t('detail.archive.error.ARCHIVE_FAILED')));
+        setArchiveError(errorText(err, () => errorMessage(err, t('detail.archive.error.ARCHIVE_FAILED'))));
       }
     });
   };
@@ -144,7 +146,7 @@ export function OpportunityDetailClient({
         }
         router.refresh();
       } catch (err) {
-        setDeclareError(errorMessage(err, t('detail.application.error.DECLARE_FAILED')));
+        setDeclareError(errorText(err, () => errorMessage(err, t('detail.application.error.DECLARE_FAILED'))));
       }
     });
   };

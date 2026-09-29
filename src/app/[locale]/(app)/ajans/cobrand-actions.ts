@@ -7,11 +7,12 @@
  */
 import { revalidatePath } from 'next/cache';
 import { requireTenantAction } from '@/lib/tenant';
+import { failureCode, type PilotExpiredCode } from '@/lib/pilot-expired';
 import { isAgencyTenant } from '@/lib/agency/funnel';
 import { normalizeCoBrandName, sanitizeLogoPng, COBRAND_MAX_BYTES, type LogoRejection } from '@/lib/agency/cobrand';
 import { CoBrandStorageError, saveAgencyCoBrand } from '@/lib/agency/cobrand-store';
 
-export type CoBrandActionError = LogoRejection | 'forbidden' | 'notAgency' | 'storage' | 'failed';
+export type CoBrandActionError = LogoRejection | 'forbidden' | 'notAgency' | 'storage' | 'failed' | PilotExpiredCode;
 
 /** Only the agency tenant's owners and admins change what its organisations see. */
 const EDITOR_ROLES = new Set(['TENANT_OWNER', 'TENANT_ADMIN']);
@@ -40,6 +41,6 @@ export async function saveCoBrand(
     revalidatePath('/[locale]', 'layout');
     return { ok: true, name: entry.name, hasLogo: entry.logoKey !== null, updatedAt: entry.updatedAt };
   } catch (e) {
-    return { ok: false, error: e instanceof CoBrandStorageError ? 'storage' : 'failed' };
+    return { ok: false, error: e instanceof CoBrandStorageError ? 'storage' : failureCode(e, 'failed') };
   }
 }

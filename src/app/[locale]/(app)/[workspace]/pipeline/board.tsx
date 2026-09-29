@@ -14,6 +14,7 @@ import {
 } from './actions';
 import type { NoteEntry, OpportunityItem, WorkspaceMember } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 interface KanbanBoardProps {
   /**
@@ -85,6 +86,7 @@ export default function KanbanBoard({
   const t = useTranslations('pipeline');
   const [opps, setOpps] = useState<OpportunityItem[]>(initialOpps);
   const [isPending, startTransition] = useTransition();
+  const errorText = useActionErrorText();
 
   // Real tenant members and live call topics — fetched once on mount, since this
   // client component has no server context of its own to read them with.
@@ -179,7 +181,7 @@ export default function KanbanBoard({
         showToast(`Fırsat ${newStage} aşamasına taşındı.`, 'info');
       } catch (err) {
         console.error(err);
-        showToast('Aşama güncellenirken hata oluştu.', 'error');
+        showToast(errorText(err, 'Aşama güncellenirken hata oluştu.'), 'error');
         setOpps(initialOpps);
       }
     });
@@ -204,7 +206,7 @@ export default function KanbanBoard({
         showToast(`Fırsat ${ownerName} kişisine atandı!`, 'success');
       } catch (err) {
         console.error(err);
-        showToast('Atama sırasında hata oluştu.', 'error');
+        showToast(errorText(err, 'Atama sırasında hata oluştu.'), 'error');
       }
     });
   };
@@ -248,7 +250,7 @@ export default function KanbanBoard({
         }
       } catch (err) {
         console.error(err);
-        showToast('Not eklenirken hata oluştu.', 'error');
+        showToast(errorText(err, 'Not eklenirken hata oluştu.'), 'error');
       }
     });
   };
@@ -289,7 +291,7 @@ export default function KanbanBoard({
           showToast(`"${res.opportunity.title}" fırsatı ${member?.name || ''} üzerine atanarak oluşturuldu!`, 'success');
         }
       } catch (err) {
-        showToast(errorMessage(err, 'Fırsat oluşturulurken hata meydana geldi.'), 'error');
+        showToast(errorText(err, () => errorMessage(err, 'Fırsat oluşturulurken hata meydana geldi.')), 'error');
       }
     });
   };

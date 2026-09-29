@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Lock,
 } from 'lucide-react';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { generateApiKey, revokeApiKey, type ApiKeyActionError } from './actions';
 
 export interface ApiKeyRecord {
@@ -41,6 +42,7 @@ export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
   const [copiedKey, setCopiedKey] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [activeCodeTab, setActiveCodeTab] = useState<'curl' | 'javascript' | 'python'>('curl');
+  const errorText = useActionErrorText();
 
   const handleGenerateKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +73,7 @@ export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
       }
     } catch (err) {
       console.error('Error generating API key:', err);
+      setActionError(errorText(err, null));
     } finally {
       setIsGenerating(false);
     }
@@ -79,7 +82,13 @@ export function ApiKeysClient({ apiKeys: initialKeys }: ApiKeysClientProps) {
   const handleRevokeKey = async (id: string, name: string) => {
     if (confirm(`"${name}" adlı API anahtarını iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) {
       setActionError(null);
-      const res = await revokeApiKey(id);
+      let res: Awaited<ReturnType<typeof revokeApiKey>>;
+      try {
+        res = await revokeApiKey(id);
+      } catch (err) {
+        setActionError(errorText(err, null));
+        return;
+      }
       if ('error' in res && res.error) {
         setActionError(ACTION_ERROR_TEXT[res.error]);
         return;

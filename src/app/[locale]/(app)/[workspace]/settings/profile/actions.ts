@@ -14,8 +14,9 @@ import { withTenant } from '@/lib/db';
 import { toTenantProvince, provinceAppliesTo } from '@/lib/province';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
+import { failureCode, type PilotExpiredCode } from '@/lib/pilot-expired';
 
-export type ProvinceActionError = 'forbidden' | 'notApplicable' | 'invalid' | 'failed';
+export type ProvinceActionError = 'forbidden' | 'notApplicable' | 'invalid' | 'failed' | PilotExpiredCode;
 
 export async function updateTenantProvince(
   raw: string
@@ -49,7 +50,7 @@ export async function updateTenantProvince(
       revalidatePath('/[locale]/(app)/[workspace]/settings/profile', 'layout');
       return { ok: true as const, province };
     });
-  } catch {
-    return { ok: false, error: 'failed' };
+  } catch (error) {
+    return { ok: false, error: failureCode(error, 'failed') };
   }
 }

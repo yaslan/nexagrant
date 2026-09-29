@@ -18,6 +18,7 @@ import {
   Info
 } from 'lucide-react';
 import { generateAiEvaluation, saveHumanEvaluation, calibrateESR } from '@/modules/m6/server/actions';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { notesObject, type EvaluationNotes } from '@/modules/m6/types';
 import {
   averageLensTotal,
@@ -61,6 +62,7 @@ export function EvaluationsClient({
   // The M6 actions now throw on a failed save instead of logging and returning
   // normally, so the page has to be able to tell the user something went wrong.
   const [actionError, setActionError] = useState<string | null>(null);
+  const errorText = useActionErrorText();
   const [isInnovationAction, setIsInnovationAction] = useState(false);
 
   // Human evaluation form state
@@ -122,7 +124,7 @@ export function EvaluationsClient({
       };
       setEvaluations((prev) => [newEval, ...prev]);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : t('errors.aiFailed'));
+      setActionError(errorText(e, () => (e instanceof Error ? e.message : t('errors.aiFailed'))));
     } finally {
       setIsAiLoading(false);
     }
@@ -162,7 +164,7 @@ export function EvaluationsClient({
       setHumanWeaknesses('');
       setHumanStrengths('');
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : t('errors.saveFailed'));
+      setActionError(errorText(err, () => (err instanceof Error ? err.message : t('errors.saveFailed'))));
     } finally {
       setIsSubmittingHuman(false);
     }
@@ -184,7 +186,7 @@ export function EvaluationsClient({
         )
       );
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : t('errors.calibrationFailed'));
+      setActionError(errorText(err, () => (err instanceof Error ? err.message : t('errors.calibrationFailed'))));
     }
   };
 

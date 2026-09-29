@@ -34,6 +34,7 @@
     "actions": "İşlemler",
     "status": "Durum",
     "noResults": "Sonuç bulunamadı.",
+    "pilotExpired": "Pilot süresi doldu, düzenleme kapalı. Uzatma için yöneticinize başvurun.",
     "logoAlt": "{brand} logosu",
     "copyright": "© {year} {brand} ({brand} SaaS). Tüm hakları saklıdır."
   },

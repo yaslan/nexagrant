@@ -4,6 +4,7 @@ import { useId, useState, useTransition } from 'react';
 import { MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { updateTenantProvince } from './actions';
 
 /** TASK-MULV3JXS1AW5X — the organisation's province, optional, editable later. */
@@ -17,6 +18,7 @@ export default function ProvinceSetting({
   canEdit: boolean;
 }) {
   const t = useTranslations('tenantProvince');
+  const errorText = useActionErrorText();
   const [saved, setSaved] = useState(initialProvince ?? '');
   const [value, setValue] = useState(initialProvince ?? '');
   const [status, setStatus] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -33,7 +35,7 @@ export default function ProvinceSetting({
         setSaved(res.province ?? '');
         setStatus({ kind: 'ok', text: t('saved') });
       } else {
-        setStatus({ kind: 'error', text: t(`errors.${res.error}`) });
+        setStatus({ kind: 'error', text: errorText(res.error, () => t(`errors.${res.error}`)) });
       }
     });
   };

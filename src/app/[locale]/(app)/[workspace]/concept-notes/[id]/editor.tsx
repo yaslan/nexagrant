@@ -6,6 +6,7 @@ import { RichTextEditor } from '@/components/editor/RichTextEditor';
 import type { Editor } from '@tiptap/react';
 import { EvidenceDrawer } from '@/components/evidence/EvidenceDrawer';
 import { errorMessage } from '@/lib/errors';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 interface Section {
   key: string;
@@ -37,11 +38,23 @@ export default function ConceptNoteEditor({
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [lastAiUsage, setLastAiUsage] = useState<{ creditsUsed: number; inputTokens: number; outputTokens: number } | null>(null);
   const [isEvidenceDrawerOpen, setIsEvidenceDrawerOpen] = useState(false);
+  const errorText = useActionErrorText();
+
+  /** An ended pilot is said as such; any other error goes on to the error boundary, as before. */
+  const refuse = (err: unknown) => {
+    const text = errorText(err, null);
+    if (text === null) throw err;
+    alert(text);
+  };
   const editorRef = React.useRef<Editor | null>(null);
 
   const handleSave = (sectionKey: string) => {
     startTransition(async () => {
-      await saveSectionContent(noteId, sectionKey, content[sectionKey] || '');
+      try {
+        await saveSectionContent(noteId, sectionKey, content[sectionKey] || '');
+      } catch (err) {
+        refuse(err);
+      }
     });
   };
 
@@ -63,7 +76,7 @@ export default function ConceptNoteEditor({
         outputTokens: result.outputTokens,
       });
     } catch (err) {
-      alert(errorMessage(err) || 'AI generation failed');
+      alert(errorText(err, () => errorMessage(err) || 'AI generation failed'));
     } finally {
       setAiLoading(null);
     }
@@ -71,7 +84,12 @@ export default function ConceptNoteEditor({
 
   const handleStatusChange = async (newStatus: string) => {
     startTransition(async () => {
-      await updateNoteStatus(noteId, newStatus);
+      try {
+        await updateNoteStatus(noteId, newStatus);
+      } catch (err) {
+        refuse(err);
+        return;
+      }
       setStatus(newStatus);
     });
   };

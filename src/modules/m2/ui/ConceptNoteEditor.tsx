@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { generateConceptNoteDraft, saveConceptNoteDraft, exportToDocx } from '../server/actions';
 import { errorMessage } from '@/lib/errors';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 // We'll use standard HTML elements if UI components are missing for brevity, but let's assume they exist
 // from shadcn or base-ui per package.json. If they don't, standard works.
@@ -34,6 +35,7 @@ export default function ConceptNoteEditor({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const errorText = useActionErrorText();
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -43,7 +45,7 @@ export default function ConceptNoteEditor({
       setCurrentNoteId(newNoteId);
       alert('Draft generated successfully! Please refresh to load content if needed, or implement auto-fetch.');
     } catch (err) {
-      alert(`Error: ${errorMessage(err)}`);
+      alert(errorText(err, () => `Error: ${errorMessage(err)}`));
     } finally {
       setIsGenerating(false);
     }
@@ -56,7 +58,7 @@ export default function ConceptNoteEditor({
       await saveConceptNoteDraft(currentNoteId, content);
       alert('Saved successfully!');
     } catch (err) {
-      alert(`Error: ${errorMessage(err)}`);
+      alert(errorText(err, () => `Error: ${errorMessage(err)}`));
     } finally {
       setIsSaving(false);
     }

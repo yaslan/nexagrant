@@ -3,6 +3,7 @@
 import React, { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { addSeat, findCandidates, assignSeat, getConflicts } from './actions';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import type { ScoringBreakdown } from '@/lib/scoring/consortium';
 
 // Local types matching prisma/schema.prisma — the generated client is not
@@ -87,10 +88,26 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
   const [conflicts, setConflicts] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const [expandedSeat, setExpandedSeat] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const errorText = useActionErrorText();
+
+  /** A pilot refusal is said on the page; any other error goes on to the error boundary, as before. */
+  const refuse = (err: unknown) => {
+    const text = errorText(err, null);
+    if (text === null) throw err;
+    setActionError(text);
+  };
 
   const handleAddSeat = (roleKey: string) => {
+    setActionError(null);
     startTransition(async () => {
-      const seat = await addSeat(opportunityId, roleKey);
+      let seat: Awaited<ReturnType<typeof addSeat>>;
+      try {
+        seat = await addSeat(opportunityId, roleKey);
+      } catch (err) {
+        refuse(err);
+        return;
+      }
       if (seat) {
         setSeats(prev => [...prev, seat as unknown as ConsortiumSeat]);
       }
@@ -122,8 +139,14 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
   };
 
   const handleAssign = (seatId: string, orgId: string) => {
+    setActionError(null);
     startTransition(async () => {
-      await assignSeat(seatId, orgId);
+      try {
+        await assignSeat(seatId, orgId);
+      } catch (err) {
+        refuse(err);
+        return;
+      }
       setSeats(prev =>
         prev.map(s => (s.id === seatId ? { ...s, organizationId: orgId, status: 'INVITED' } : s))
       );
@@ -134,6 +157,11 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
 
   return (
     <div>
+      {actionError && (
+        <p role="alert" className="bg-bad/10 border border-bad/30 rounded-xl p-4 mb-6 text-sm font-semibold text-bad">
+          {actionError}
+        </p>
+      )}
       {/* Conflict Warnings */}
       {conflicts.length > 0 && (
         <div className="bg-bad/10 border border-bad/30 rounded-xl p-4 mb-6">

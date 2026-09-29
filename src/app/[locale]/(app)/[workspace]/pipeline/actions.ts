@@ -2,8 +2,7 @@
 
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { tenantScopeOf, TenantScope } from '@/lib/tenant';
-import { assertTenantWritable } from '@/lib/billing/pilot';
+import { tenantScopeOf, TenantScope, assertTenantActionWritable } from '@/lib/tenant';
 import { Gate } from '@prisma/client';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
@@ -153,7 +152,7 @@ export async function createOpportunity({
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
-  await assertTenantWritable(scope.tenantId);
+  await assertTenantActionWritable(scope.tenantId);
   const { tenantId, userId } = scope;
 
   // Real tenant members, not a fixed list — falls back to whoever the requesting
@@ -313,7 +312,7 @@ export async function assignOpportunityOwner({
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
-  await assertTenantWritable(scope.tenantId);
+  await assertTenantActionWritable(scope.tenantId);
   const { tenantId } = scope;
 
   updateInMemoryOpportunityOwner(tenantId, opportunityId, ownerId, ownerName);
@@ -353,7 +352,7 @@ export async function addOpportunityNote({
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
-  await assertTenantWritable(scope.tenantId);
+  await assertTenantActionWritable(scope.tenantId);
   const { tenantId } = scope;
 
   const nowFormatted = new Date().toLocaleString('tr-TR', {
@@ -386,7 +385,7 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
-  await assertTenantWritable(scope.tenantId);
+  await assertTenantActionWritable(scope.tenantId);
   const { tenantId } = scope;
 
   updateInMemoryOpportunityStage(tenantId, opportunityId, newStage);
@@ -439,7 +438,7 @@ export async function evaluateOpportunityGate({
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
-  await assertTenantWritable(scope.tenantId);
+  await assertTenantActionWritable(scope.tenantId);
   const { tenantId, userId } = scope;
 
   try {
@@ -504,7 +503,7 @@ export async function archiveOpportunity({
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
-  await assertTenantWritable(scope.tenantId);
+  await assertTenantActionWritable(scope.tenantId);
   const { tenantId, userId, role } = scope;
 
   try {
@@ -604,7 +603,7 @@ export async function logEffort({
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
-  await assertTenantWritable(scope.tenantId);
+  await assertTenantActionWritable(scope.tenantId);
   const { tenantId, userId } = scope;
 
   const parsed = EffortInput.safeParse({ opportunityId, date, hours, note });
@@ -687,7 +686,7 @@ export async function declareApplication({
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
-  await assertTenantWritable(scope.tenantId);
+  await assertTenantActionWritable(scope.tenantId);
   const { tenantId, userId, role } = scope;
 
   try {

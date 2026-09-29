@@ -11,6 +11,7 @@ import {
 } from './actions';
 import { DualApprovalActionType } from '@/lib/rbac';
 import { errorMessage as toErrorMessage } from '@/lib/errors';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 export interface ApprovalRequestItem {
   id: string;
@@ -57,6 +58,7 @@ export default function ApprovalsClient({
   const [selectedRequestDetails, setSelectedRequestDetails] = useState<ApprovalRequestItem | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const errorText = useActionErrorText();
 
   // New Request Form State
   const [formActionType, setFormActionType] = useState<DualApprovalActionType>('GATE_G4_SUBMISSION');
@@ -87,7 +89,7 @@ export default function ApprovalsClient({
         );
       }
     } catch (err) {
-      setErrorMessage(toErrorMessage(err) || t('errorApprove'));
+      setErrorMessage(errorText(err, () => toErrorMessage(err) || t('errorApprove')));
     } finally {
       setLoadingId(null);
     }
@@ -112,7 +114,7 @@ export default function ApprovalsClient({
         setRejectionReason('');
       }
     } catch (err) {
-      setErrorMessage(toErrorMessage(err) || t('errorReject'));
+      setErrorMessage(errorText(err, () => toErrorMessage(err) || t('errorReject')));
     } finally {
       setLoadingId(null);
     }
@@ -130,7 +132,7 @@ export default function ApprovalsClient({
         );
       }
     } catch (err) {
-      setErrorMessage(toErrorMessage(err) || t('errorCancel'));
+      setErrorMessage(errorText(err, () => toErrorMessage(err) || t('errorCancel')));
     } finally {
       setLoadingId(null);
     }
@@ -162,7 +164,7 @@ export default function ApprovalsClient({
         setActiveTab('my_requests');
       }
     } catch (err) {
-      setErrorMessage(toErrorMessage(err) || t('errorCreate'));
+      setErrorMessage(errorText(err, () => toErrorMessage(err) || t('errorCreate')));
     }
   };
 

@@ -6,6 +6,7 @@ import { Calendar, Trash2, Plus, CheckCircle, AlertCircle } from 'lucide-react';
 import { connectCalendar, disconnectCalendar } from '@/modules/m9/server/calendar-actions';
 import { calendarErrorCode, SELF_SERVE_PROVIDERS } from '@/lib/calendar/errors';
 import type { CalendarProviderType } from '@/lib/calendar/provider';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 const PROVIDERS = {
   google: { label: 'Google Calendar', color: 'blue' },
@@ -28,6 +29,7 @@ interface CalendarClientProps {
 
 export function CalendarClient({ connections, locale }: CalendarClientProps) {
   const t = useTranslations('settings.calendar');
+  const errorText = useActionErrorText();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
@@ -40,10 +42,11 @@ export function CalendarClient({ connections, locale }: CalendarClientProps) {
   const [status, setStatus] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
   /** Translate a server-action failure, or fall back to the generic message. */
-  const messageFor = (error: unknown): string => {
-    const code = calendarErrorCode(error);
-    return code ? t(`errors.${code}`) : t('errors.unknown');
-  };
+  const messageFor = (error: unknown): string =>
+    errorText(error, () => {
+      const code = calendarErrorCode(error);
+      return code ? t(`errors.${code}`) : t('errors.unknown');
+    });
 
   const handleDisconnect = async (connectionId: string) => {
     if (!confirm(t('confirmDisconnect'))) return;

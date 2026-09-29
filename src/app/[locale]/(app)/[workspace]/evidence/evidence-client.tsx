@@ -25,6 +25,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { errorMessage } from '@/lib/errors';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 export interface EvidenceItemData {
   id: string;
@@ -98,6 +99,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
   const isTr = locale === 'tr';
   const t = useTranslations('Evidence');
+  const errorText = useActionErrorText();
 
   // What the drawer may show about the selected document. Both are empty for almost
   // every row today, and an empty state is the correct thing to render: the module has
@@ -226,7 +228,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
       setUploadValidUntil('');
       setUploadAuthority('');
     } catch (err) {
-      alert(isTr ? `Yükleme hatası: ${errorMessage(err)}` : `Upload error: ${errorMessage(err)}`);
+      alert(errorText(err, () => (isTr ? `Yükleme hatası: ${errorMessage(err)}` : `Upload error: ${errorMessage(err)}`)));
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -236,7 +238,15 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
   const handleDelete = async (id: string) => {
     if (!confirm(isTr ? 'Bu belgeyi silmek istediğinize emin misiniz?' : 'Are you sure you want to delete this document?')) return;
     
-    await deleteEvidence(id);
+    try {
+      await deleteEvidence(id);
+    } catch (err) {
+      // An ended pilot is said as such; anything else fails as it did before.
+      const text = errorText(err, null);
+      if (text === null) throw err;
+      alert(text);
+      return;
+    }
     setItems(items.filter(i => i.id !== id));
     if (selectedDoc?.id === id) setSelectedDoc(null);
   };

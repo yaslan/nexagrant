@@ -3,6 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { createOpportunity } from '../../pipeline/actions';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 export default function AddToPipelineButton({
   workspace,
@@ -24,6 +25,7 @@ export default function AddToPipelineButton({
   const router = useRouter();
   const [isPending, setIsPending] = React.useState(false);
   const [addError, setAddError] = React.useState<string | null>(null);
+  const errorText = useActionErrorText();
 
   const handleAddToPipeline = async () => {
     setIsPending(true);
@@ -33,7 +35,7 @@ export default function AddToPipelineButton({
       router.push(`/${locale}/${workspace}/firsatlar`);
     } catch (e) {
       console.error(e);
-      setAddError(errorLabel);
+      setAddError(errorText(e, errorLabel));
       setIsPending(false);
     }
   };

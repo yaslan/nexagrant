@@ -4,6 +4,7 @@ import { useId, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import type { InviteCodeStatus, InviteCodeSummary } from '@/lib/agency/codes';
 import { createInviteCode, listInviteCodes, revokeInviteCode, type InviteActionError } from './actions';
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 /**
  * B-1 (TASK-MUM17YBJVAHRR): the server sends each code's status, never its use count.
@@ -49,6 +50,7 @@ export default function InviteCodesPanel({
   const [expiresOn, setExpiresOn] = useState(isoDay(now, 30));
   const [label, setLabel] = useState('');
   const [error, setError] = useState<InviteActionError | null>(null);
+  const errorText = useActionErrorText();
   const [created, setCreated] = useState<{ code: string; link: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -156,7 +158,7 @@ export default function InviteCodesPanel({
       <div role="alert" id={ids.err} className="empty:hidden">
         {error ? (
           <p className="rounded-lg border border-bad bg-surface px-3 py-2 text-sm font-medium text-bad">
-            {t(`errors.${error}`)}
+            {errorText(error, () => t(`errors.${error}`))}
           </p>
         ) : null}
       </div>

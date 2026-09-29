@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 
+import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { saveEvaluation } from '../server/actions';
 import { saveEvaluationSchema } from '../server/validation';
 import { DEFAULT_CRITERIA, MAX_SCORE, MIN_SCORE, type CriterionName } from '../types';
@@ -38,6 +39,7 @@ export function EvaluatorForm({ proposalId, evaluationId, onClose, onSaved }: Ev
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorText = useActionErrorText();
 
   /**
    * Weighted preview of what the panel average becomes, using the same weights the
@@ -76,7 +78,7 @@ export function EvaluatorForm({ proposalId, evaluationId, onClose, onSaved }: Ev
       onSaved?.(result.avgScore);
       onClose?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('form.saveFailed'));
+      setError(errorText(e, () => (e instanceof Error ? e.message : t('form.saveFailed'))));
     } finally {
       setIsSubmitting(false);
     }
