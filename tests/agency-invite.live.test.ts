@@ -9,6 +9,7 @@ import {
   revokeInviteCodeIn,
 } from '@/lib/agency/codes';
 import { envValue } from './helpers/dotenv';
+import { requireId } from './helpers/teardown-guard';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
@@ -339,7 +340,7 @@ describe('the agency link grants no read on the linked organisation', () => {
     const asAgency = await withTenantOn(rls!, ids.agencyA, async (tx) => ({
       byTenant: await tx.workspace.count({ where: { tenantId: ids.org } }),
       byId: await tx.workspace.findUnique({ where: { id: ids.orgWorkspace } }),
-      updated: (await tx.workspace.updateMany({ where: { id: ids.orgWorkspace }, data: { name: 'agency was here' } })).count,
+      updated: (await tx.workspace.updateMany({ where: { id: requireId(ids.orgWorkspace, 'ids.orgWorkspace') }, data: { name: 'agency was here' } })).count,
     }));
     expect(asAgency).toEqual({ byTenant: 0, byId: null, updated: 0 });
 

@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { Pool } from 'pg';
 
 import { createDbClient } from '../../src/lib/db';
+import { presentIds } from '../helpers/teardown-guard';
 
 // E2E RLS Isolation Tests
 // Verifies that Row Level Security policies correctly isolate tenant data at the database level
@@ -49,11 +50,11 @@ test.describe('Row Level Security (RLS) Isolation', () => {
 
   test.afterAll(async () => {
     await prisma.workspace.deleteMany({
-      where: { OR: [{ tenantId: tenantA.id }, { tenantId: tenantB.id }] },
+      where: { tenantId: { in: presentIds([tenantA?.id, tenantB?.id]) } },
     });
 
     await prisma.tenant.deleteMany({
-      where: { OR: [{ id: tenantA.id },{ id: tenantB.id }] },
+      where: { id: { in: presentIds([tenantA?.id, tenantB?.id]) } },
     });
 
     await prisma.$disconnect();

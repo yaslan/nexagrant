@@ -2,6 +2,7 @@
 
 import { prisma, withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
+import { isPresentId } from '@/lib/required-id';
 import { generateText } from '@/lib/llm';
 import { renderPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
@@ -156,6 +157,8 @@ export async function generateConceptNoteDraft(
 
 export async function saveConceptNoteDraft(noteId: string, content: ConceptNoteContent) {
   const { tenantId } = await requireTenantAction();
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(noteId)) return { success: false };
 
   // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
   // unique selector and would overwrite another tenant's draft.

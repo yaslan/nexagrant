@@ -3,6 +3,7 @@
 import { withTenant } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 import { requireTenantAction } from '@/lib/tenant';
+import { isPresentId } from '@/lib/required-id';
 import { revalidatePath } from 'next/cache';
 import { generateSeatCandidates } from './matching';
 
@@ -24,7 +25,7 @@ export async function computeSeatCandidates(opportunityId: string, seatId: strin
   const { tenantId } = await requireTenantAction({ readOnly: true });
   // Client-supplied: with `seatId` undefined the lookup below matches any seat
   // and the rewrite clears every seat's candidates (TASK-MUMSUA77J1C6Q).
-  if (typeof seatId !== 'string' || seatId === '' || typeof opportunityId !== 'string' || opportunityId === '') {
+  if (!isPresentId(seatId) || !isPresentId(opportunityId)) {
     throw new Error('Seat not found in this workspace.');
   }
 
@@ -48,6 +49,11 @@ export async function assignCandidateToSeat(
   opportunityId: string
 ) {
   const { tenantId } = await requireTenantAction();
+  // Client-supplied: with either id missing the write below would reassign every
+  // seat of the opportunity, or of the tenant (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(seatId) || !isPresentId(opportunityId)) {
+    throw new Error('Seat not found in this workspace.');
+  }
 
   const updated = await withTenant<number>(tenantId, async (tx) => {
     if (status === 'CONFIRMED') {

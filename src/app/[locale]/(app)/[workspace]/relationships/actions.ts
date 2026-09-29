@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { withTenant } from '@/lib/db';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
+import { isPresentId } from '@/lib/required-id';
 import { getWorkspaceMembers, type WorkspaceMember } from '@/lib/k5-pipeline/pipelineStore';
 import { revalidatePath } from 'next/cache';
 import type { RelationshipRow } from '@/types/db-rows';
@@ -90,6 +91,8 @@ export async function updateRelationship(
   data: RelationshipUpdateInput
 ): Promise<UpdateRelationshipResult> {
   const { tenantId, role } = await requireTenantAction();
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(id)) return { success: false, error: 'INVALID_INPUT' };
 
   const parsed = RelationshipUpdateInput.safeParse(data);
   if (!parsed.success) return { success: false, error: 'INVALID_INPUT' };

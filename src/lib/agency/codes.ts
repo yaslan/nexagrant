@@ -13,6 +13,7 @@
  */
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
+import { isPresentId } from '@/lib/required-id';
 import {
   generateInviteCode,
   hashInviteCode,
@@ -185,6 +186,10 @@ export async function revokeInviteCodeIn(
   input: { tenantId: string; id: string; revokedBy: string }
 ): Promise<boolean> {
   await assertAgency(tx, input.tenantId);
+  // `id` comes from the client. Prisma drops an `undefined` key from `where`, which would
+  // revoke every code of the agency; a missing id reports `false` like an unknown one
+  // (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(input.id) || !isPresentId(input.tenantId)) return false;
   const { count } = await tx.agencyInviteCode.updateMany({
     where: { id: input.id, tenantId: input.tenantId, revokedAt: null },
     data: { revokedAt: new Date(), revokedBy: input.revokedBy },

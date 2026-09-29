@@ -2,6 +2,7 @@
 
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
+import { isPresentId } from '@/lib/required-id';
 import { generateCompletion, LlmMessage } from '@/lib/llm';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { buildRagPrompt } from '@/lib/rag';
@@ -159,6 +160,8 @@ export async function generateSectionDraft(
  */
 export async function updateNoteStatus(noteId: string, status: string) {
   const { tenantId } = await requireTenantAction();
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(noteId)) return { success: false };
 
   // `updateMany` so the tenant is a real filter rather than an extra column on
   // a unique selector.

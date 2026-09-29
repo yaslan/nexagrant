@@ -170,7 +170,7 @@ async function rollback() {
   await prisma.opportunity.deleteMany({ where: { id: OPP } });
   await prisma.relationship.deleteMany({ where: { id: 'm8-e2e-rel' } });
   await prisma.cordisParticipation.deleteMany({ where: { organisationId: { in: presentIds(pics) } } });
-  await prisma.cordisCoParticipation.deleteMany({ where: { OR: [{ orgA: { in: pics } }, { orgB: { in: pics } }] } });
+  await prisma.cordisCoParticipation.deleteMany({ where: { OR: [{ orgA: { in: presentIds(pics) } }, { orgB: { in: presentIds(pics) } }] } });
   await prisma.cordisPartnerProfile.deleteMany({ where: { organisationId: { in: presentIds(pics) } } });
   await prisma.cordisOrganization.deleteMany({ where: { organisationId: { in: presentIds(pics) } } });
   await prisma.cordisProject.deleteMany({ where: { id: { in: PROJECTS } } });

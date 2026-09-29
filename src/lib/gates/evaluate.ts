@@ -1,5 +1,6 @@
 import type { JsonObject } from '@/types/json';
 import { withTenant, type TenantTx } from '../db';
+import { isPresentId } from '../required-id';
 import { DEFAULT_GATE_RULES } from '../scoring/defaults';
 import { computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
 
@@ -65,6 +66,9 @@ async function runGate(
   tenantId: string,
   decidedBy: string
 ): Promise<GateEvaluationResult> {
+  // Prisma drops an `undefined` key from `where`: the read below would find the tenant's first
+  // opportunity and the stage write would advance all of them (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(opportunityId) || !isPresentId(tenantId)) throw new GateOpportunityNotFoundError(String(opportunityId), tenantId);
   let passed = true;
   const reasons: string[] = [];
 

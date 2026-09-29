@@ -14,6 +14,7 @@
  */
 
 import { prisma, withTenant } from '@/lib/db';
+import { requireActionId } from '@/lib/required-id';
 import { withSystemScope } from '@/lib/system-scope';
 import { isContractPlan } from '@/lib/billing/catalog';
 
@@ -563,6 +564,8 @@ export async function updateDraftVersion(
   body: PlanVersionDraftInput,
   features: PlanFeatureInput[]
 ): Promise<AdminPlanVersionRow> {
+  // Admin action input: a missing id would drop out of the `deleteMany` below (TASK-MUN2KUHP1BP18).
+  requireActionId(versionId, 'versionId');
   const current = await prisma.planVersion.findUnique({ where: { id: versionId } });
   if (!current) throw new Error(`Plan version ${versionId} not found`);
   if (current.status !== 'draft') throw new PublishedVersionImmutableError(versionId);
@@ -818,6 +821,9 @@ export async function archivePlan(planId: string, actorId: string | null): Promi
 
 /** Delete a plan — only when nothing live points at it. Otherwise archive. */
 export async function deletePlan(planId: string, actorId: string | null): Promise<void> {
+  // Admin action input: a missing id would count every live subscription and then
+  // clear every plan's assignments and versions (TASK-MUN2KUHP1BP18).
+  requireActionId(planId, 'planId');
   const live = await countLiveSubscriptions(planId);
   if (live > 0) throw new PlanInUseError(planId, live);
 
@@ -938,6 +944,7 @@ export async function unassignPlanFromTenant(
   tenantId: string,
   actorId: string | null
 ): Promise<void> {
+  requireActionId(planId, 'planId');
   const contract = isContractPlan(planId);
   await withTenant(tenantId, async (tx) => {
     await tx.planAssignment.deleteMany({ where: { planId, tenantId } });

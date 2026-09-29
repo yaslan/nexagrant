@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { withTenant } from '@/lib/db';
 import { requireTenantApi } from '@/lib/tenant';
 import type { SavedSearchRow } from '@/types/db-rows';
+import { isPresentId } from '@/lib/required-id';
 
 const UpdateSavedSearchSchema = z.object({
   notify: z.boolean(),
@@ -14,6 +15,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!scope.ok) return scope.response;
   const { tenantId, userId } = scope.scope;
   const { id } = await params;
+  if (!isPresentId(id)) {
+    return NextResponse.json({ success: false, error: 'Geçersiz kayıtlı arama.' }, { status: 400 });
+  }
 
   let body: unknown;
   try {
@@ -57,6 +61,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (!scope.ok) return scope.response;
   const { tenantId, userId } = scope.scope;
   const { id } = await params;
+  if (!isPresentId(id)) {
+    return NextResponse.json({ success: false, error: 'Geçersiz kayıtlı arama.' }, { status: 400 });
+  }
 
   try {
     const result = await withTenant<{ count: number }>(tenantId, (tx) =>

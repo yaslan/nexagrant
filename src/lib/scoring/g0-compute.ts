@@ -22,6 +22,7 @@
 import type { JsonObject } from '@/types/json';
 import type { TenantTx } from '../db';
 import { withTenant } from '../db';
+import { isPresentId } from '../required-id';
 import { decideG0, type G0Decision, type G0Features, type G0Result } from './g0-canonical';
 import { DEFAULT_SCORING_WEIGHTS } from './defaults';
 import {
@@ -410,7 +411,7 @@ export async function persistG0(
   client: TenantTx,
   computation: G0Computation,
 ): Promise<boolean> {
-  if (computation.score === null || !computation.opportunityId) return false;
+  if (computation.score === null || !isPresentId(computation.opportunityId) || !isPresentId(computation.tenantId)) return false;
 
   await client.opportunity.updateMany({
     where: { id: computation.opportunityId, tenantId: computation.tenantId },

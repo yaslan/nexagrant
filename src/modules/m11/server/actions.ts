@@ -17,6 +17,7 @@ import {
   readPartContent,
 } from '../types';
 import { errorMessage } from '@/lib/errors';
+import { isPresentId } from '@/lib/required-id';
 
 export type { 
   PartBSectionItem, 
@@ -57,6 +58,9 @@ const PART_ROW_SELECT = {
 
 /** Loads a part the session tenant owns, or null. */
 async function loadPart(tenantId: string, partId: string): Promise<ApplicationPartRow | null> {
+  // Client-supplied: with `partId` missing, `findFirst` would return the
+  // tenant's first part (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(partId)) return null;
   return withTenant<ApplicationPartRow | null>(tenantId, (tx) =>
     tx.applicationPart.findFirst({ where: { id: partId, tenantId }, select: PART_ROW_SELECT })
   );
@@ -64,6 +68,9 @@ async function loadPart(tenantId: string, partId: string): Promise<ApplicationPa
 
 /** Writes a part's content back, refusing rows outside the tenant. */
 async function savePartContent(tenantId: string, partId: string, content: PartContent): Promise<boolean> {
+  // Prisma drops an `undefined` key from `where`: without this one part's
+  // content would overwrite every part of the tenant (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(partId)) return false;
   const result = await withTenant<{ count: number }>(tenantId, (tx) =>
     tx.applicationPart.updateMany({ where: { id: partId, tenantId }, data: { content } })
   );
@@ -154,6 +161,7 @@ export async function acquireSectionLock(
   authorOrg: string
 ) {
   const { tenantId } = await requireTenantAction();
+  if (!isPresentId(partId)) return { success: false };
   const now = new Date().toISOString();
 
   try {
@@ -194,6 +202,7 @@ export async function acquireSectionLock(
 
 export async function releaseSectionLock(partId: string, sectionKey: string, userId: string) {
   const { tenantId } = await requireTenantAction();
+  if (!isPresentId(partId)) return { success: false };
 
   try {
     const part = await loadPart(tenantId, partId);
@@ -227,6 +236,7 @@ export async function updateSectionContent(
   changeSummary?: string
 ) {
   const { tenantId } = await requireTenantAction();
+  if (!isPresentId(partId)) return { success: false };
   const now = new Date().toISOString();
   const wordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
 
@@ -310,6 +320,7 @@ export async function addSectionComment(
 
 export async function resolveSectionComment(partId: string, sectionKey: string, commentId: string) {
   const { tenantId } = await requireTenantAction();
+  if (!isPresentId(partId)) return { success: false };
 
   try {
     const part = await loadPart(tenantId, partId);
@@ -333,6 +344,7 @@ export async function resolveSectionComment(partId: string, sectionKey: string, 
 
 export async function restoreSectionRevision(partId: string, sectionKey: string, revisionId: string) {
   const { tenantId } = await requireTenantAction();
+  if (!isPresentId(partId)) return { success: false };
 
   try {
     const part = await loadPart(tenantId, partId);

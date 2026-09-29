@@ -4,6 +4,7 @@ import type { ApiKey } from '@prisma/client';
 import { withTenant } from '@/lib/db';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
+import { isPresentId } from '@/lib/required-id';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
 
@@ -81,7 +82,7 @@ export async function revokeApiKey(
   if (!can(asRole(role), 'manage_users')) return { success: false, error: 'forbidden' };
   // Client-supplied: an `undefined` id would drop out of the `where` below and
   // revoke every key of the tenant (TASK-MUMSUA77J1C6Q).
-  if (typeof keyId !== 'string' || keyId === '') return { success: false };
+  if (!isPresentId(keyId)) return { success: false };
 
   // `deleteMany` so the tenant is part of the WHERE clause; `delete` takes only
   // a unique selector and would revoke another tenant's key.

@@ -1,4 +1,5 @@
 import { withTenant, type TenantTx } from '@/lib/db';
+import { isPresentId } from '@/lib/required-id';
 
 /**
  * M8 seat matching — ranked partner candidates for one open consortium seat.
@@ -138,6 +139,9 @@ export async function runSeatMatch(
   params: { opportunityId: string; seatId: string; tenantId: string; limit: number }
 ) {
   const { opportunityId, seatId, tenantId, limit } = params;
+  // The clear below is `deleteMany({ tenantId, seatId })`: a missing seat id would
+  // wipe the candidates of every seat of the tenant (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(seatId) || !isPresentId(tenantId)) throw new Error('Seat not found in this workspace.');
 
   const opp = await tx.opportunity.findFirst({
     where: { id: opportunityId, tenantId },

@@ -2,6 +2,7 @@
 
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
+import { isPresentId } from '@/lib/required-id';
 import { scoreCandidatesForSeat, detectConflicts } from '@/lib/scoring/consortium';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
@@ -51,6 +52,9 @@ export async function addSeat(opportunityId: string, roleKey: string, required: 
 
 export async function findCandidates(seatId: string) {
   const { tenantId } = await requireTenantAction({ readOnly: true });
+  // Client-supplied: with `seatId` missing the lookup finds any seat and the
+  // scorer's clear wipes every seat's candidates (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(seatId)) return [];
 
   const seat = await withTenant<{ id: string; opportunityId: string } | null>(tenantId, (tx) =>
     tx.consortiumSeat.findFirst({
@@ -84,6 +88,8 @@ export async function findCandidates(seatId: string) {
 
 export async function assignSeat(seatId: string, organizationId: string) {
   const { tenantId } = await requireTenantAction();
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(seatId)) return { success: false };
 
   // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
   // unique selector and would let a guessed seat id reassign another tenant's seat.

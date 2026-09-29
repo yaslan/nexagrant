@@ -16,6 +16,7 @@ import {
   type WorkspaceMember
 } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
+import { isPresentId } from '@/lib/required-id';
 import { rescoreOpportunityG0 } from '@/lib/scoring/g0-compute';
 import { withTenant } from '@/lib/db';
 import { evaluateGate } from '@/lib/gates/evaluate';
@@ -314,6 +315,8 @@ export async function assignOpportunityOwner({
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
   const { tenantId } = scope;
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(opportunityId)) return { success: false as const, error: 'INVALID_INPUT' as const };
 
   updateInMemoryOpportunityOwner(tenantId, opportunityId, ownerId, ownerName);
 
@@ -387,6 +390,8 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
   const { tenantId } = scope;
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(opportunityId)) return { success: false as const, error: 'INVALID_INPUT' as const };
 
   updateInMemoryOpportunityStage(tenantId, opportunityId, newStage);
 
@@ -505,6 +510,8 @@ export async function archiveOpportunity({
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
   const { tenantId, userId, role } = scope;
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(opportunityId)) return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
 
   try {
     const archivedAt = new Date();

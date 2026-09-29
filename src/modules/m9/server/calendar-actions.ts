@@ -1,6 +1,7 @@
 'use server';
 
 import { requireTenantAction } from '@/lib/tenant';
+import { isPresentId } from '@/lib/required-id';
 import { withTenant } from '@/lib/db';
 import { CalendarProviderSchema, type CalendarProviderType } from '@/lib/calendar/provider';
 import { CalendarActionError, SELF_SERVE_PROVIDERS } from '@/lib/calendar/errors';
@@ -28,6 +29,7 @@ import { CalendarActionError, SELF_SERVE_PROVIDERS } from '@/lib/calendar/errors
 
 export async function disconnectCalendar(connectionId: string) {
   const { tenantId, userId } = await requireTenantAction();
+  if (!isPresentId(connectionId)) throw new CalendarActionError('CALENDAR_CONNECTION_NOT_FOUND');
 
   return withTenant(tenantId, async (tx) => {
     const connection = await tx.calendarConnection.findUnique({

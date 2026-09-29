@@ -21,6 +21,7 @@ import { auth } from '@/lib/auth';
 import { emailLocalPart } from '@/lib/user-display';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
+import { isPresentId } from '@/lib/required-id';
 import type { FollowupDocRow } from '@/types/db-rows';
 import { recordAlert } from '@/lib/observability/system-alert';
 
@@ -148,6 +149,8 @@ export async function generateStandardDoc(
 
 export async function signDocument(docId: string) {
   const { tenantId } = await requireTenantAction();
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(docId)) return { success: false, signedAt: null };
 
   // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
   // unique selector, so a guessed doc id would sign another tenant's document.
@@ -166,6 +169,8 @@ export async function signDocument(docId: string) {
 
 export async function createNewVersion(docId: string) {
   const { tenantId } = await requireTenantAction();
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(docId)) return { success: false, updatedDoc: null };
 
   const updatedDoc = await withTenant<FollowupDocRow | null>(tenantId, async (tx) => {
     // Scoped read: a doc id from another tenant must not resolve here.
@@ -304,6 +309,8 @@ function uniqueViolationRefusal(e: unknown): DualApprovalRefusal | null {
  */
 export async function submitDualApprovalAction(docId: string): Promise<DualApprovalActionResult> {
   const { tenantId } = await requireTenantAction();
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(docId)) return { success: false, refusal: 'DOC_NOT_FOUND', approvalState: null };
   const actor = await requireApprovalActor();
 
   // The engine decides what a submission is; the row records it.
@@ -358,6 +365,8 @@ export async function departmentApproveAction(
   note?: string
 ): Promise<DualApprovalActionResult> {
   const { tenantId } = await requireTenantAction();
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(docId)) return { success: false, refusal: 'DOC_NOT_FOUND', approvalState: null };
   const actor = await requireApprovalActor();
 
   const outcome: ApproveOutcome = await withTenant<ApproveOutcome>(tenantId, async (tx) => {

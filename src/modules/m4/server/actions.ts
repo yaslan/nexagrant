@@ -2,6 +2,7 @@
 
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
+import { isPresentId } from '@/lib/required-id';
 import { revalidatePath } from 'next/cache';
 import type { InteractionRow, RelationshipRow } from '@/types/db-rows';
 
@@ -106,6 +107,8 @@ export async function updateNextStep(
   nextStepDue: Date | null
 ) {
   const { tenantId } = await requireTenantAction();
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(relationshipId)) return { success: false };
 
   // `updateMany` keeps tenantId in the WHERE clause.
   const updated = await withTenant<{ count: number }>(tenantId, (tx) =>

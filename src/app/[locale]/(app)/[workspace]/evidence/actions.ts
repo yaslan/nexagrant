@@ -13,6 +13,7 @@ import {
 import { extractEvidenceMetadata } from '@/lib/evidence-ai';
 import { calculateEvidenceHealthScore, HealthScoreResult, MinimalEvidenceItem } from '@/lib/evidence-health';
 import { errorMessage } from '@/lib/errors';
+import { isPresentId } from '@/lib/required-id';
 import type { EvidenceItemData } from './evidence-client';
 
 /**
@@ -252,7 +253,7 @@ export async function deleteEvidence(evidenceId: string) {
   // says. Prisma drops an `undefined` key from `where`, so without this a call
   // with no id would find "any evidence" and then delete every row of the
   // tenant (TASK-MUMSUA77J1C6Q).
-  if (typeof evidenceId !== 'string' || evidenceId === '') return { success: false };
+  if (!isPresentId(evidenceId)) return { success: false };
 
   let deleted = 0;
   try {
@@ -284,6 +285,8 @@ export async function deleteEvidence(evidenceId: string) {
  */
 export async function verifyEvidenceAction(evidenceId: string, status: string) {
   const { tenantId } = await requireTenantAction();
+  // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(evidenceId)) return { success: false };
 
   let updated = 0;
   try {

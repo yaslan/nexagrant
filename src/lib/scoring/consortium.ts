@@ -27,6 +27,7 @@
  */
 
 import { withTenant, type TenantTx } from '@/lib/db';
+import { isPresentId } from '@/lib/required-id';
 import { topicPrefix } from '@/modules/m8/server/matching';
 
 export interface ScoringBreakdown {
@@ -74,6 +75,9 @@ async function runScoring(
   }
 ) {
   const { tenantId, seatId, opportunityId, topicId, limit } = params;
+  // The persist step is `deleteMany({ tenantId, seatId })`: a missing seat id would
+  // wipe the candidates of every seat of the tenant (TASK-MUN2KUHP1BP18).
+  if (!isPresentId(seatId) || !isPresentId(tenantId)) throw new Error('Seat not found in this workspace.');
 
   // 1. Existing consortium members, for country diversity. Scoped to the tenant:
   // the seat ids come from a URL and an opportunity id is guessable.

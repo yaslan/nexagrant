@@ -2,6 +2,7 @@
 
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
+import { isPresentId } from '@/lib/required-id';
 import { issueSecretToken } from '@/lib/secret-token';
 
 /**
@@ -20,7 +21,7 @@ import { issueSecretToken } from '@/lib/secret-token';
  */
 export async function issuePartnerPortalLink(partId: string): Promise<{ token: string } | null> {
   const { tenantId } = await requireTenantAction();
-  if (!partId) return null;
+  if (!isPresentId(partId)) return null;
 
   const { raw, hash } = issueSecretToken();
   const result = await withTenant<{ count: number }>(tenantId, (tx) =>
