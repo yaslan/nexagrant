@@ -163,3 +163,45 @@ export async function clearRegistrationInviteCookie(): Promise<void> {
     // No request context (a job, a test): nothing to clear.
   }
 }
+
+/**
+ * İNCELEME-14 K-1 (TASK-MUMAC8JELIZ5H) — a code that passed the signIn probe
+ * but died before the adapter used it (revoked, expired, agency gone in that
+ * window). Auth.js turns anything the adapter throws into `AdapterError`, which
+ * reaches `pages.error` only as `?error=Configuration`, the same as a real
+ * misconfiguration. The adapter leaves this note so the error route can tell
+ * the two apart and show the invite message instead.
+ *
+ * The value is only the registration's locale; it carries no code and picks a
+ * fixed message, so a planted cookie can do no more than show that message.
+ * One minute: it only has to survive the redirect it was set on.
+ */
+export const REGISTRATION_REFUSAL_COOKIE = 'fabrika_registration_refused';
+
+export async function setRegistrationInviteRefusal(locale: 'tr' | 'en'): Promise<void> {
+  try {
+    const jar = await cookies();
+    jar.set(REGISTRATION_REFUSAL_COOKIE, locale, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60,
+    });
+  } catch {
+    // No request context: nobody to show the message to.
+  }
+}
+
+/** Single use: returns the locale of a refused invite registration and deletes the note. */
+export async function takeRegistrationInviteRefusal(): Promise<'tr' | 'en' | null> {
+  try {
+    const jar = await cookies();
+    const value = jar.get(REGISTRATION_REFUSAL_COOKIE)?.value;
+    if (value === undefined) return null;
+    jar.delete(REGISTRATION_REFUSAL_COOKIE);
+    return value === 'en' ? 'en' : value === 'tr' ? 'tr' : null;
+  } catch {
+    return null;
+  }
+}

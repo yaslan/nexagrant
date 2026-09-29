@@ -110,9 +110,17 @@ export type OAuthSignInDecision =
   | { allow: true; plainRegistration?: true }
   | { allow: false; redirect: string };
 
-function refuse(locale: string, page: 'kayit' | 'giris', error: OAuthSignInError): OAuthSignInDecision {
+/**
+ * Where a refused OAuth sign-in lands. Also used by the `pages.error` route
+ * (src/app/api/auth/hata/route.ts) for a code that died after the probe.
+ */
+export function oauthRefusalPath(locale: string, page: 'kayit' | 'giris', error: OAuthSignInError): string {
   const safeLocale = locale === 'en' ? 'en' : 'tr';
-  return { allow: false, redirect: `/${safeLocale}/${page}?error=${error}` };
+  return `/${safeLocale}/${page}?error=${error}`;
+}
+
+function refuse(locale: string, page: 'kayit' | 'giris', error: OAuthSignInError): OAuthSignInDecision {
+  return { allow: false, redirect: oauthRefusalPath(locale, page, error) };
 }
 
 /**

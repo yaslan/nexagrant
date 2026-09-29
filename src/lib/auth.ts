@@ -28,6 +28,7 @@ import { InvalidInviteCodeSignin } from './agency/invite-signin-error';
 import {
   clearRegistrationInviteCookie,
   readRegistrationInvite,
+  setRegistrationInviteRefusal,
 } from './agency/registration-invite-cookie';
 import {
   bootstrapOAuthTenant,
@@ -169,6 +170,9 @@ const safeAdapter: Adapter = {
           await noteInviteRejection(prisma, invite.invite.code).catch((err) =>
             console.warn(`[AuthAdapter.createUser] could not record a refused invite code: ${errorMessage(err)}`)
           );
+          // Auth.js reports this as `Configuration`; the note lets pages.error
+          // show the invite message instead (İNCELEME-14 K-1).
+          await setRegistrationInviteRefusal(invite.invite.locale === 'en' ? 'en' : 'tr');
         }
         throw e;
       } finally {
@@ -288,6 +292,11 @@ export const authConfig = {
     // redirects that page here, and its sign-in errors (OAuthAccountNotLinked,
     // OAuthCallbackError, …) land here as `?error=<type>` too.
     signIn: "/tr/giris",
+    // İNCELEME-14 K-1 (TASK-MUMAC8JELIZ5H) — errors of kind "error"
+    // (Configuration, AdapterError, …) used to render Auth.js's English page.
+    // This route sends them to the login card, and a registration whose invite
+    // code died after the signIn probe to the invite message.
+    error: "/api/auth/hata",
   },
   providers: [
     Google({

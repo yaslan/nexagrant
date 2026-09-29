@@ -577,3 +577,135 @@ describe('acknowledgement cookie is spent by every OAuth outcome (İNCELEME-13 B
     expect(rows.every((r) => r.locale === 'en')).toBe(true);
   });
 });
+
+/**
+ * İNCELEME-14 Ö-1 (crw-fb, TASK-MUMAC8JELIZ5H) — the code dies between the
+ * signIn probe and the adapter (revoked, expired or its agency gone in that
+ * window). The signIn callback let the sign-in through, so `events.createUser`
+ * never runs and only the adapter's own clear spends the choice cookies (M2).
+ *
+ * The race is made deterministic, not timed: a trigger bound to this one code
+ * lets the first UPDATE (the probe, rolled back) through and skips the second
+ * (the adapter's redeem), which then finds no usable code, exactly as a code
+ * killed in between. The trigger only fires for this test's code id and is
+ * dropped in `finally`, so a live test running alongside is not affected.
+ */
+describe("crw-fb M2: adapter throws after the signIn probe", () => {
+  /** Runs `fn` while `id`'s code passes the signIn probe but is dead for the adapter. */
+  async function withCodeDyingAfterProbe(
+    id: string,
+    fn: () => Promise<void>,
+  ): Promise<void> {
+    const tag = `${RUN.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}_${id.slice(-6).toLowerCase()}`;
+    await admin!.$executeRawUnsafe(
+      `CREATE SEQUENCE IF NOT EXISTS crw_m2_${tag}`,
+    );
+    await admin!
+      .$executeRawUnsafe(`CREATE OR REPLACE FUNCTION crw_m2_${tag}() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF nextval('crw_m2_${tag}') > 1 THEN RETURN NULL; END IF; RETURN NEW; END $$`);
+    await admin!
+      .$executeRawUnsafe(`CREATE TRIGGER crw_m2_${tag} BEFORE UPDATE ON "AgencyInviteCode"
+      FOR EACH ROW WHEN (NEW."id" = '${id}') EXECUTE FUNCTION crw_m2_${tag}()`);
+    try {
+      await fn();
+    } finally {
+      await admin!.$executeRawUnsafe(
+        `DROP TRIGGER IF EXISTS crw_m2_${tag} ON "AgencyInviteCode"`,
+      );
+      await admin!.$executeRawUnsafe(`DROP FUNCTION IF EXISTS crw_m2_${tag}()`);
+      await admin!.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS crw_m2_${tag}`);
+    }
+  }
+
+  /** The browser following Auth.js's error redirect to `pages.error`. */
+  async function followErrorPage(location: string | null): Promise<string> {
+    const url = new URL(location!, "http://localhost:3000");
+    expect(url.pathname).toBe("/api/auth/hata");
+    const { GET } = await import("../src/app/api/auth/hata/route");
+    const res = await GET(new NextRequestCtor!(url));
+    expect(res.status).toBe(302);
+    const to = new URL(res.headers.get("location")!);
+    return `${to.pathname}${to.search}`;
+  }
+
+  test("code dies between probe and adapter: choice cookies are spent", async () => {
+    const { id, code } = await makeCode();
+    await withCodeDyingAfterProbe(id, async () => {
+      const email = newEmail("crw-m2");
+      parkInvite(
+        code,
+        lib.consent.registrationAcknowledgementToken({ agency: true }),
+      );
+      jar.set(
+        lib.province.REGISTRATION_PROVINCE_COOKIE,
+        encodeURIComponent("Ankara"),
+      );
+      jar.set(
+        lib.readiness.REGISTRATION_READINESS_COOKIE,
+        "municipality.012120201012120",
+      );
+      const res = await callback("google", {
+        sub: `${RUN}-m2`,
+        email,
+        email_verified: true,
+      });
+      expect(await userByEmail(email)).toBeNull();
+      expect(
+        [
+          lib.province.REGISTRATION_PROVINCE_COOKIE,
+          lib.readiness.REGISTRATION_READINESS_COOKIE,
+        ].filter((n) => jar.has(n)),
+      ).toEqual([]);
+      expect(res.sessionSet).toBe(false);
+    });
+  });
+
+  test("K-1: the registration that loses the race gets invite_invalid, not the Configuration page", async () => {
+    for (const locale of ["tr", "en"] as const) {
+      const { id, code } = await makeCode();
+      await withCodeDyingAfterProbe(id, async () => {
+        const email = newEmail(`k1-race-${locale}`);
+        parkInvite(
+          code,
+          lib.consent.registrationAcknowledgementToken({ agency: true }),
+          Date.now(),
+          locale,
+        );
+        const res = await callback("google", {
+          sub: `${RUN}-k1-${locale}`,
+          email,
+          email_verified: true,
+        });
+        console.log(`K-1 race (${locale}): ${res.location}`);
+        expect(await userByEmail(email)).toBeNull();
+        expect(await followErrorPage(res.location)).toBe(
+          `/${locale}/kayit?error=invite_invalid`,
+        );
+        // Single use: the note is gone once the error page has read it.
+        expect(jar.has(lib.cookie.REGISTRATION_REFUSAL_COOKIE)).toBe(false);
+      });
+    }
+  });
+
+  test("K-1: any other Auth.js error lands on the login card, not the English Configuration page", async () => {
+    jar.clear();
+    const { handlers } = NextAuthFn!({
+      ...authConfig!,
+      providers: [fakeProvider("google")],
+    } as never);
+    const res = await handlers.GET(
+      new NextRequestCtor!(
+        "http://localhost:3000/api/auth/error?error=Configuration",
+      ),
+    );
+    expect(res.status).toBe(302);
+    expect(await followErrorPage(res.headers.get("location"))).toBe(
+      "/tr/giris?error=Configuration",
+    );
+
+    // A crafted code does not reach the page as text: only a plain word passes.
+    expect(await followErrorPage("/api/auth/hata?error=%3Cscript%3E")).toBe(
+      "/tr/giris?error=Configuration",
+    );
+  });
+});
