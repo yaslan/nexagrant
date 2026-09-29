@@ -155,6 +155,7 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
       kısmi: `Relationship`/`Interaction` modelleri ve `relationships` sayfası var; haftalık özet cron'u var (`m4-weekly-summary.ts`, Pazartesi 09:00 — vadesi bir hafta içindeki `nextStepDue` eylemlerini gruplayıp bildiriyor). **"60 gün etkileşimsiz ilişkiyi hatırlat" cron'u ayrıca bulunamadı** — yalnızca haftalık vade özeti var.
       **güncel 29.09 — hâlâ açık:** 60 gün job'u yok (`jobs/` listesinde yok, koddan doğrulandı). Kart: **TASK-MULQL2NYKRGJX** (backlog).
 - [ ] K4 outreach: ortak kartından dış arama derin linkleri + tr/en e-posta şablonları. (29.09 gap analizinde eklendi.) Kart: **TASK-MULQLF067H75P** (backlog).
+      **güncel 30.09 — kod var (`d53c115b`, cs-fb):** `/partners/[pic]` kartında "Dış kaynaklarda ortak ara" (F&T Portal `?keywords=`, Ideal-ist `?topic_id=`, LinkedIn `?keywords=`; EEN ve GREENET sorgu parametresi almıyor → ana sayfa + kopyalanabilir metin) ve tr/en ilk temas şablonları (davet, bilgi isteği, takip; kopyala + alıcısız `mailto:`). M1 modül kapısının içinde. Birim test + mutant, tsc/lint/i18n/temiz build 0. **Açık:** tarayıcı kareleri (R8 guard) — `docs/agent-results/TASK-MULQLF067H75P-cs-fb.md`.
 - [x] Rol matrisi, `SeatCandidate` puanlama (M8 spesifikasyonu, `src/lib/scoring/consortium.ts`), çakışma uyarısı (aynı org'un birden çok koltuğa atanması tespiti), "davet et" (`src/app/api/invitations`).
 - Kabul: 5 aday < 3 s; birim testler.
 
