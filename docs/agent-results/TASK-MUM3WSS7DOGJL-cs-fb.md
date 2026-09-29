@@ -7,7 +7,7 @@ Commit: `af1905da` (dev, push yok). Yalnız `docs/legal/*` değişti; koda dokun
 - **B6 işaretleri kaldırıldı.** Ekte (`docs/legal/agency-channel-notice-addendum.md`) önceden "[B6 — commit'i ile doğrulanacak]" diye yazılan her madde, fe-fb'nin `897d3608` commit'iyle dosya:satır karşılaştırıldı (§2). Hepsi kodla tuttu, bu yüzden hiçbir madde çıkarılmadı. İşaretler kaldırıldı: §0, §2.1, §2.4, TR §4 m.3 ve m.6, EN §5 item 3 ve 6, §6 m.8. Dosyada artık "doğrulanacak" ya da "to be verified" geçmiyor.
 - **Kodda olup metinde eksik kalanlar eklendi** (§0 kuralı: metin koda uyar):
   - Sonuç yalnız yeni hesapta yazılır. Var olan hesaba girişte ya da karne sonradan yeniden yapıldığında yazılmaz. Bu cümle TR ve EN kullanıcı metnine de eklendi.
-  - Bozuk ya da elle değiştirilmiş kod yok sayılır.
+  - ~~Bozuk ya da elle değiştirilmiş kod yok sayılır.~~ **Yanlıştı (İNCELEME-12 B-1), düzeltme `TASK-MUM3WSS7DOGJL-cs-fb-2.md`:** Biçimi bozuk bir kod yok sayılır. Geçerli biçimdeki her kod, kimin doldurduğundan bağımsız olarak kabul edilir; puan kurumun kendi beyanıdır.
   - Karne kartı kurumun kendi panosunda görünür.
   - Ajans sayısında silinmiş kurum sayılmaz.
   - Karnenin analitik olayları cevap taşımaz ve bugün hiçbir yere gönderilmez.
