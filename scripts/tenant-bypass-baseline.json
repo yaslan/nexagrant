@@ -133,6 +133,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/billing/pilot.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "listPilots: the admin list of every tenant on the free pilot (TASK-MUMABL78X5JLX), read-only, called only by admin/billing/plans/page.tsx, which notFound()s a non-admin session. Under fabrika_app an unscoped read returns no rows and the panel says 'no tenants on a pilot'."
+    },
+    {
+      "check": "D",
       "file": "src/app/[locale]/admin/modules/page.tsx",
       "subject": "system-scope:platform-admin",
       "count": 1,
