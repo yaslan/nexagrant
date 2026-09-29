@@ -646,7 +646,7 @@
       "disconnect": "Disconnect",
       "confirmDisconnect": "Disconnect this calendar provider?",
       "infoTitle": "How It Works",
-      "infoText": "When you set a date on a meeting brief, it is added to your connected calendars as an event. Google and Outlook connections are not enabled in this deployment yet; download the .ics file from the brief screen and add it to your calendar.",
+      "infoText": "When you set a date on a meeting brief, it is added to your connected calendars as an event. Google Calendar connection is not enabled in this deployment yet; download the .ics file from the brief screen and add it to your calendar.",
       "connecting": "Connecting…",
       "connectedNoSyncYet": "Connected — no meeting has been synced yet.",
       "mockBadge": "Mock / Dev Mode",

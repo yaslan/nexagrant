@@ -646,7 +646,7 @@
       "disconnect": "Bağlantısını Kes",
       "confirmDisconnect": "Bu takvim sağlayıcısının bağlantısını kesmeyi onaylıyor musunuz?",
       "infoTitle": "Nasıl Çalışır?",
-      "infoText": "Toplantı brifine bir tarih girdiğinizde, bağlı takvimlerinize etkinlik olarak eklenir. Google ve Outlook bağlantısı bu kurulumda henüz açık değil; .ics dosyasını brif ekranından indirip takviminize ekleyebilirsiniz.",
+      "infoText": "Toplantı brifine bir tarih girdiğinizde, bağlı takvimlerinize etkinlik olarak eklenir. Google Takvim bağlantısı bu kurulumda henüz açık değil; .ics dosyasını brif ekranından indirip takviminize ekleyebilirsiniz.",
       "connecting": "Bağlanıyor…",
       "connectedNoSyncYet": "Bağlı — henüz senkronize edilen bir toplantı yok.",
       "mockBadge": "Mock / Dev Modu",

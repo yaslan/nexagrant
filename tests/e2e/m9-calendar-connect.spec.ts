@@ -99,6 +99,22 @@ test.describe('M9 calendar connections', () => {
     expect(rows).toBe(0);
   });
 
+  test('offers Google Calendar and .ics only — Outlook is gone, in both locales', async ({
+    page,
+  }) => {
+    // TASK-MUMMIHYY2F4KB — owner decision 29.09: M9 ships Google Calendar + .ics.
+    await acceptCookies(page);
+    await signIn(page, F10.full.email, calendarSettingsUrl(F10.full.workspaceSlug));
+
+    for (const locale of ['tr', 'en'] as const) {
+      if (locale === 'en') await page.goto(`/en/${F10.full.workspaceSlug}/settings/calendar`);
+      await expect(providerCard(page, 'Google Calendar')).toHaveCount(1);
+      await expect(providerCard(page, '.ics File Import')).toHaveCount(1);
+      await expect(page.getByText(/Outlook|Microsoft/)).toHaveCount(0);
+      await shot(page, `providers-no-outlook-${locale}`);
+    }
+  });
+
   test('the browser tab title follows the locale', async ({ page }) => {
     // Was `export const metadata = { title: 'Takvim Bağlantıları' }`, so the
     // English page carried a Turkish tab title.
