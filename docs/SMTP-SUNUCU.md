@@ -1,6 +1,7 @@
 # E-posta: fonbridge.com SMTP — Vulut cPanel/Exim (Seçenek A)
 
-Karar (patron, 29.09.2026, **güncellendi**): e-posta kendi SMTP sunucumuzdan çıkar.
+Karar (patron, 29.09.2026, **güncellendi**): e-posta **Vulut'un cPanel e-posta hizmetinden (Seçenek A)** çıkar;
+kendi posta sunucumuzu (MTA) işletmiyoruz.
 - Gönderici: **`info@fonbridge.com`** (önceki `info@usfinbridge.com` kararının yerini aldı)
 - SMTP sunucusu: **`mail.fonbridge.com`**
 - Canlı uygulama alan adı: **`fonbridge.com`**; barındırma: **Vulut**
@@ -14,7 +15,8 @@ Kod tarafı: `src/lib/email/mailer.ts` (nodemailer), ayarlar yalnız ortamdan (`
 Görev: TASK-MUN2PKA5AG2IV. **Canlı sunucu kurulumu ve DNS değişikliği patron onayı olmadan yapılmaz.**
 Patronun yapacakları: §8 — **ilk adım fonbridge.com'u `srv.iyisunucu.com.tr` cPanel'ine alan adı olarak eklemek**. Web tarafı (`www` → kök 301, `fonbridge.com` + `www` TLS): §10.
 
-**Plan çerçevesi (güncelleme-2, 29.09):** patron "`mail.fonbridge.com` Vulut'ta **kurulu**" diyor. Bu yüzden plan
+**Plan çerçevesi (güncelleme-2, 29.09 — _geçmiş; A kararıyla aşıldı_, geçerli olan §1'in sonucu: fonbridge.com cPanel'e
+**sıfırdan** eklenir):** patron "`mail.fonbridge.com` Vulut'ta **kurulu**" diyor. Bu yüzden plan
 "sıfırdan kur" değil, **"mevcut sunucuyu doğrula ve DNS'i tamamla"**: (1) kurulu sunucunun hangisi olduğunu ve IP'sini
 netleştir (§1.1), (2) bölgeyi o sunucuyu yöneten ad sunucusunda aç ve §3.0 kayıtlarını gir, (3) §7 komutlarıyla doğrula.
 
@@ -94,8 +96,8 @@ TTL: canlıya geçiş haftasında **300**, oturunca 3600.
 | 4 | `mail.fonbridge.com.` | A | `<MAIL_IP>` | sertifika (AutoSSL) bu kayıt yayına girince çıkar |
 | 5 | `mail.fonbridge.com.` | AAAA | `<MAIL_IPV6>` | **yalnız** posta sunucusu IPv6'dan da gönderiyorsa; o zaman SPF'e `ip6:` ve PTR v6 da gerekir. Bugün `77.92.144.187` için v6 yok → girme |
 | 6 | `fonbridge.com.` | MX 10 | `mail.fonbridge.com.` | cPanel varsayılanı `fonbridge.com`'dur → `mail.` yap |
-| 7 | `fonbridge.com.` | TXT | `v=spf1 include:_spf.vulut.com -all` | A seçeneği. B/C: `v=spf1 ip4:<MAIL_IP> -all`. Bölgede **tek** `v=spf1` olmalı |
-| 8 | `default._domainkey.fonbridge.com.` | TXT | `v=DKIM1; k=rsa; p=<cPanel üretir>` | A: cPanel → E-posta Teslim Edilebilirliği → "Onar/Kur". B/C: seçici `fb2026`, §3.2 |
+| 7 | `fonbridge.com.` | TXT | `v=spf1 include:_spf.vulut.com -all` | A seçeneği. B/C: `v=spf1 ip4:<MAIL_IP> -all`. Bölgede **tek** `v=spf1` olmalı. `~all` yerine `-all`: tek gönderici var; yönlendirmede kırılan SPF'i hizalı DKIM kapatır |
+| 8 | `default._domainkey.fonbridge.com.` | TXT | `v=DKIM1; k=rsa; p=<cPanel üretir>` | A: cPanel → E-posta Teslim Edilebilirliği → "Onar/Kur". **Anahtar 2048 bit olmalı** — yayınlanınca §7.0 adım 8 ile ölç; 1024 çıkarsa §3.1'deki "DKIM anahtar boyu" adımı. B/C: seçici `fb2026`, §3.2 |
 | 9 | `_dmarc.fonbridge.com.` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@fonbridge.com; fo=1; adkim=r; aspf=r` | 2–4 hf sonra quarantine → reject (§3.1) |
 | 10 | `fonbridge.com.` | CAA | `0 issue "letsencrypt.org"` (+ `0 issue "sectigo.com"`) | **isteğe bağlı**. Bu sunucunun AutoSSL'i Let's Encrypt veriyor (usfinbridge.com sertifikası `O=Let's Encrypt`, 29.09 ölçüm); sağlayıcı Sectigo'ya çevrilirse o da gerekir. CAA yanlışsa AutoSSL sessizce düşer — emin değilseniz hiç girmeyin |
 | — | PTR `<MAIL_IP>` | (Vulut'ta) | A: `srv.iyisunucu.com.tr` kalır; B/C: `mail.fonbridge.com` | Zone Editor'da **değil**; §6.2 |
@@ -105,7 +107,7 @@ Ek kayıt gerekmez: `autoconfig`/`autodiscover`/`cpanel`/`webmail` alt adların�
 ### 3.1 A seçeneği (seçilen)
 ```
 ; --- web (uygulama) ---
-fonbridge.com.            A      <APP_VPS_IP>        ; uygulamanın koştuğu Vulut VPS (patron verir)
+fonbridge.com.            A      <APP_IP>            ; uygulamanın koştuğu Vulut VPS (patron verir; §3.0 ile aynı yer tutucu)
 www.fonbridge.com.        CNAME  fonbridge.com.
 ; --- posta ---
 mail.fonbridge.com.       A      77.92.144.187       ; Vulut cPanel/Exim
@@ -120,10 +122,23 @@ sunucusuna (`77.92.144.187`) yazar. Uygulama ayrı VPS'te koşacağı için:
 - `MX` kökü değil **`mail.fonbridge.com`**'u göstermeli (kök artık posta sunucusu değil);
 - cPanel → E-posta Yönlendirme (Email Routing) **"Yerel Posta Değiştiricisi" (Local)** kalmalı.
 
+**DKIM anahtar boyu (B-2, İNCELEME-41):** bu sunucu bugün 2048 bit üretiyor (usfinbridge.com'un yayındaki anahtarı
+ölçüldü: `RSA Public-Key: (2048 bit)`), ama eski cPanel sürümleri 1024 bit üretirdi ve "Onar/Kur" var olan anahtarı
+**korur**. 1024 bit Gmail/Microsoft'ta zayıf sayılır. Kayıt yayınlanınca §7.0 adım 8'deki komutla ölç:
+- `(2048 bit)` → tamam.
+- `(1024 bit)` → cPanel → **E-posta Teslim Edilebilirliği** → fonbridge.com → "Yönet" → DKIM bölümünde anahtarı
+  **yeniden üret** (cPanel sürümüne göre "Generate a new key" / "Yeni anahtar oluştur"; ekranda boy seçimi varsa
+  **2048**). Ekranda yeniden üretme yoksa Vulut'a bilet (§8 madde 7f). Zone Editor'daki `default._domainkey` TXT'si
+  cPanel'le aynı sunucuda olduğundan kendiliğinden güncellenir; §7.0 adım 8'i tekrar koş. Eski anahtarla imzalanmış,
+  yolda olan iletiler birkaç dakika DKIM'den düşebilir — kurulum sırasında (gönderim başlamadan) yapın.
+- Özel anahtar cPanel'de kalır; ne biz görürüz ne repoya girer.
+
 SPF: uygulama posta göndermez, Exim'e teslim eder → uygulama VPS IP'si SPF'e **girmez**. `_spf.vulut.com`
 Exim IP'sini kapsıyor (ölçüldü: `ip4:77.92.144.0/24 …`).
 DMARC: `dmarc@fonbridge.com` kutusu (ya da `info@`'ya yönlendirme) açılmalı. 2–4 hafta rapor temizse
-`p=quarantine; pct=25` → `p=quarantine` → `p=reject`.
+`p=quarantine; pct=25` → `p=quarantine` → `p=reject`. Yükseltmenin ilk adımında `sp=reject` ekleyin (alt alanlar
+— `cpanel.`, `webmail.`, `www.` — hiç posta göndermez; `sp` yoksa `p` geçerli olur). Bu takvim isteğe bağlı değil:
+geniş `include:_spf.vulut.com`'un açığını (§6.4) ancak `p=reject` + hizalı DKIM kapatır.
 
 ### 3.2 B / C seçeneği (Vulut VPS, IP = `<VPS_IP>`) — seçilmedi, yalnız ileride geçiş için
 ```
@@ -260,6 +275,53 @@ taşırsa kırılır; önce Vulut'a sorulmalı (§8). Öneri: şimdilik include.
 fonbridge.com 29.09.2026'da kaydedildi. Birçok filtre ilk ~30 gündeki alan adlarına şüpheyle bakar. İlk haftalarda
 hacmi düşük tutun (davet/bildirim zaten düşük), toplu gönderim yapmayın, DMARC raporlarını izleyin.
 
+### 6.6 Parola TLS'ten önce istenebiliyor (B-3, İNCELEME-41)
+Ölçüm (29.09 20:47 UTC, mac, salt-okur: EHLO → QUIT, kimlik gönderilmedi):
+```
+587 düz EHLO          → 250-AUTH PLAIN LOGIN · 250-STARTTLS      ← AUTH, TLS kurulmadan sunuluyor
+587 STARTTLS + EHLO   → 250-AUTH PLAIN LOGIN                     (TLS sonrası; olması gereken tek yer)
+IMAP 143 düz          → … STARTTLS AUTH=PLAIN AUTH=LOGIN         (LOGINDISABLED yok)
+POP3 110 düz CAPA     → STLS · USER · SASL PLAIN LOGIN
+```
+Yani sunucu, şifreleme kurulmadan parola kabul etmeye hazır. Exim (SMTP) ve Dovecot (IMAP/POP) ikisi de.
+
+**Uygulama bu riskten etkilenmiyor:**
+- Üretimde port 465 = örtük TLS; ilk bayttan şifreli (`src/lib/email/mailer.ts:69`, `secure: port === 465`).
+- 587'ye geçilse bile kimlik bilgisi varken `requireTLS: true` (`mailer.ts:89`). nodemailer 10.0.12 AUTH'tan **önce**
+  STARTTLS gönderir (`nodemailer/lib/smtp-connection.js:1368`); `requireTLS` ile sunucu STARTTLS sunmasa ya da biri
+  araya girip silse bile düz metne düşmez, `ETLS` ile keser. Testle sabit: `src/lib/email/__tests__/mailer.test.ts:75-94`
+  (20/20 geçti, 29.09).
+
+**Risk insan tarafında:** `info@` kutusunu telefona/Outlook'a "şifreleme yok" ya da "varsa STARTTLS" ile kuran biri
+parolayı düz gönderebilir — ve bu parola uygulamanın `SMTP_PASS`'ı ile aynı (§8 madde 4, açık soru S-1).
+
+**Kalıcı düzeltme — sunucu ayarı, Vulut yapar (paylaşımlı sunucu; WHM erişimi bizde/patronda yok):**
+- Exim: WHM → Service Configuration → **Exim Configuration Manager** → Basic Editor → *Security* →
+  **"Require clients to connect with SSL or issue the STARTTLS command before they are allowed to authenticate with
+  the server"** = **On** (Exim'de `auth_advertise_hosts` TLS'siz oturumda AUTH'u ilan etmez). cPanel'de varsayılan
+  açıktır; bu sunucuda kapalı olduğu ölçüldü.
+- Dovecot: WHM → Service Configuration → **Mailserver Configuration** → **"Allow Plaintext Authentication (from all
+  remote clients)"** = **No** (`disable_plaintext_auth = yes`).
+- Sunucu genelinde bir ayar olduğundan Vulut'un diğer müşterilerini de etkiler; karar Vulut'ta. Bilet: §8 madde 7e.
+
+**Doğrulama (Vulut "yaptık" deyince; salt-okur, parola göndermez):**
+```sh
+# a) TLS'siz EHLO'da AUTH OLMAMALI (beklenen: yalnız 250-STARTTLS; AUTH satırı yok → çıktı boş)
+{ sleep 2; printf 'EHLO probe.example\r\n'; sleep 2; printf 'QUIT\r\n'; sleep 1; } \
+  | nc -w 5 mail.fonbridge.com 587 | tr -d '\r' | grep AUTH          # mac: nc -G 5
+# b) STARTTLS sonrası AUTH OLMALI (beklenen: 250-AUTH PLAIN LOGIN)
+{ sleep 2; printf 'EHLO probe.example\r\n'; sleep 2; printf 'QUIT\r\n'; sleep 1; } \
+  | openssl s_client -quiet -starttls smtp -connect mail.fonbridge.com:587 -servername mail.fonbridge.com 2>/dev/null \
+  | tr -d '\r' | grep AUTH
+# c) IMAP 143 düz: LOGINDISABLED görünmeli, AUTH=PLAIN görünmemeli
+{ sleep 2; printf 'a1 CAPABILITY\r\na2 LOGOUT\r\n'; sleep 2; } | nc -w 5 mail.fonbridge.com 143 | tr -d '\r' | head -2
+```
+(a) boş değilse ayar uygulanmamış. Bugün (a) `250-AUTH PLAIN LOGIN` döndürüyor.
+
+**Vulut ayarı değiştirmezse** (ya da değiştirene kadar) kural: posta istemcilerinde **yalnız** SMTP **465 SSL/TLS** ve
+IMAP **993 SSL/TLS** (POP gerekiyorsa 995) kullanılır; "şifreleme yok", "varsa STARTTLS" ya da 587/143/110 seçilmez.
+cPanel'in "Posta İstemcisi Yapılandırma" ekranındaki **"Güvenli SSL/TLS Ayarları (Önerilen)"** sütunu budur.
+
 ## 7. Canlıya geçiş kontrol listesi
 
 ### 7.0 Doğrulama komutları (DNS yayıldıktan sonra; hepsi salt-okur, son ikisi tek deneme iletisi gönderir)
@@ -294,9 +356,45 @@ swaks --server mail.fonbridge.com --port 587 --tls --tls-verify --auth LOGIN --a
 ```
 Parola ne komutta ne kabuk geçmişinde ne de bu repoda durur; swaks'ın sorduğu isteme elle girilir.
 
+Güvenlik kontrolleri (İNCELEME-41; hiçbiri ileti bırakmaz, hiçbiri parola göndermez):
+```sh
+# 7) AÇIK RELAY TESTİ (B-1) — UYGULAMA VPS'inden (25/tcp ofis ağında ISS tarafından kapalı), KİMLİK DOĞRULAMASIZ.
+#    --quit-after RCPT: DATA'ya hiç geçmez, ileti GÖNDERİLMEZ. example.org/net RFC 2606 alanları, kimseye ait değil.
+#    a) yabancı gönderici → yabancı alıcı (klasik açık relay)
+swaks --server mail.fonbridge.com --port 25 --quit-after RCPT \
+      --from probe@example.org --to probe@example.net
+#    b) KENDİ alanımızdan sahte gönderici → dış alıcı (kimlik doğrulamasız "bizim adımıza" gönderim)
+swaks --server mail.fonbridge.com --port 25 --quit-after RCPT \
+      --from info@fonbridge.com --to probe@example.net
+#    c) aynı iki deneme 587'de de (gönderim portu da kimliksiz relay yapmamalı):
+swaks --server mail.fonbridge.com --port 587 --tls --tls-verify --quit-after RCPT \
+      --from info@fonbridge.com --to probe@example.net
+#    BEKLENEN (üçünde de): RCPT TO'ya 5xx red, ör.
+#      <** 550 relay not permitted      ya da   <** 550-… Relaying denied / authentication required
+#    Bu Exim relay kararından ÖNCE göndericiyi doğrular (sender verify): (a) büyük olasılıkla
+#    `550 Sender verify failed` alır — o da geçer, önemli olan 250 DÖNMEMESİ. Relay politikasının KENDİSİNİ (b) sınar;
+#    bu yüzden (b) `info@` kutusu AÇILDIKTAN sonra koşulur (kutu yokken 550 "No Such User" ya da bölge yokken 451 alır,
+#    ikisi de relay hakkında bir şey söylemez). 29.09 ön ölçümü (587, STARTTLS, DATA yok): (a) → 550 Sender verify
+#    failed; (b) → 451 Temporary local problem (fonbridge.com bölgesi yok) → relay politikası henüz ÖLÇÜLEMEDİ.
+#    `<~ 250 Accepted` / `<- 250 Accepted` görülürse: DUR, gönderimi açma, Vulut'a acil bilet (sunucu açık relay;
+#    paylaşımlı IP 77.92.144.187 kara listeye girer ve fonbridge.com postası da düşer). 4xx (451/421) = geçici ret,
+#    sonuç anlamsız → birkaç dakika sonra tekrarla. Karşılaştırma (pozitif kontrol): kendi alanımıza teslim
+#    `--to info@fonbridge.com` ile 25'te 250 dönmeli — yoksa test yanlış sunucuya/porta gidiyordur.
+#
+# 8) DKIM ANAHTAR BOYU (B-2) — her yerden koşar (yalnız DNS). Birden çok "…" parçaya bölünmüş TXT'yi de birleştirir.
+dig +short TXT default._domainkey.fonbridge.com | tr -d '" ' | sed 's/.*p=//;s/;.*//' | fold -w64 \
+  | { echo '-----BEGIN PUBLIC KEY-----'; cat; echo '-----END PUBLIC KEY-----'; } \
+  | openssl pkey -pubin -noout -text | head -1
+#    BEKLENEN: RSA Public-Key: (2048 bit)   ·  (1024 bit) → §3.1 "DKIM anahtar boyu" adımı
+#    Boş/`Could not read` = kayıt henüz yok ya da bozuk. Komut 29.09'da doğrulandı: usfinbridge.com → (2048 bit);
+#    yerelde üretilen 1024/2048 bitlik anahtarlarla bilinen-negatif/pozitif → (1024 bit)/(2048 bit).
+#
+# 9) AUTH YALNIZ TLS SONRASI (B-3) — §6.6 "Doğrulama" komutları (a)/(b)/(c).
+```
+
 1. [ ] fonbridge.com Vulut cPanel'de; `dig SOA fonbridge.com @ns1.iyisunucu.com.tr` artık REFUSED değil.
 2. [ ] §3.1 kayıtları; kök A uygulama VPS'inde, MX `mail.fonbridge.com`; §3.3 komutları `@8.8.8.8` ve `@1.1.1.1`'de doğru.
-3. [ ] cPanel → E-posta Teslim Edilebilirliği: fonbridge.com için DKIM ve SPF "geçerli".
+3. [ ] cPanel → E-posta Teslim Edilebilirliği: fonbridge.com için DKIM ve SPF "geçerli"; §7.0 adım 8 → **`(2048 bit)`**.
 4. [ ] AutoSSL `mail.fonbridge.com`'u kapsadı (§4 openssl komutu `DNS:mail.fonbridge.com` gösteriyor).
 5. [ ] `info@` ve `dmarc@` kutuları açık; parola sır kasasında.
 6. [ ] Uygulama VPS'inden `nc -vz -w 5 mail.fonbridge.com 465` başarılı.
@@ -308,6 +406,10 @@ Parola ne komutta ne kabuk geçmişinde ne de bu repoda durur; swaks'ın sorduğ
 12. [ ] Outlook/Hotmail'e deneme (paylaşımlı IP'de en sık spam'e düşen yer); spam'deyse B'yi değerlendir.
 13. [ ] 2–4 hafta sonra DMARC raporları → `p=quarantine`.
 14. [ ] Web: §10.3 — `www` ve `http` üç istek de tek sıçramayla `301 https://fonbridge.com/…`; iki adın sertifikası geçerli.
+15. [ ] **Açık relay yok** (§7.0 adım 7, uygulama VPS'inden): a/b/c üçünde de RCPT'ye 5xx; pozitif kontrol 250.
+16. [ ] **AUTH yalnız TLS sonrası** (§6.6 doğrulama a/b/c) — ya da Vulut reddettiyse: `info@` kutusunu kullanan herkes
+    istemcisini 465/993 SSL/TLS ile kurdu (§6.6 son paragraf).
+17. [ ] (Önerilen) Google Postmaster Tools'a fonbridge.com kaydı (Microsoft SNDS'in Google karşılığı; §6.3).
 
 ## 8. Patronun yapacakları (sırayla; hiçbirini biz yapmadık)
 **Karar verildi: A (Vulut cPanel/Exim), patron 29.09.2026.** B seçilmedi. Canlı kurulum şimdilik yapılmıyor; patron
@@ -318,17 +420,32 @@ başlatınca sıra şudur:
 2. **Bilgi:** uygulama hangi sunucuda koşacak, IP'si (`<APP_IP>`, varsa IPv6) ne? Bu gelmeden §3.0'daki kök `A` kaydı
    (satır 1–2) doldurulamaz; posta kayıtları (satır 4–9) bunu beklemez.
 3. Zone Editor'da §3.1 kayıtları: kök `A` → uygulama VPS IP'si (cPanel'in yazdığını değiştir), `mail A 77.92.144.187`,
-   `MX 10 mail.fonbridge.com`, SPF, DMARC (`rua=mailto:dmarc@fonbridge.com`). DKIM'i "E-posta Teslim Edilebilirliği"nden kur.
+   `MX 10 mail.fonbridge.com`, SPF, DMARC (`rua=mailto:dmarc@fonbridge.com`). DKIM'i "E-posta Teslim Edilebilirliği"nden kur;
+   anahtar **2048 bit** olmalı — biz §7.0 adım 8 ile ölçeriz, 1024 çıkarsa §3.1'deki yeniden üretme adımını sen yaparsın.
 4. `info@fonbridge.com` ve `dmarc@fonbridge.com` (ya da `info@`'ya yönlendirme) posta kutularını aç.
+   **Kutuyu bir posta istemcisine (telefon/Outlook/Thunderbird) kurarken yalnız SMTP 465 SSL/TLS + IMAP 993 SSL/TLS**;
+   "şifreleme yok" ya da "varsa STARTTLS" seçme — sunucu bugün parolayı TLS'siz de kabul ediyor (§6.6).
+   **Karar bekliyor (S-1):** uygulama `info@`'nun parolasıyla mı göndersin, yoksa ayrı bir gönderim kutusuyla
+   (ör. `bildirim@`, ayrı parola) mı? `SMTP_USER=info@` iken uygulama sunucusundaki `.env` sızarsa saldırgan yalnız
+   göndermez, `info@`'ya gelen müşteri yazışmalarını ve DMARC raporlarını da okur. Öneri: ayrı kutu; `info@` insanlara.
 5. SSL/TLS Status → AutoSSL'i çalıştır; `mail.fonbridge.com` kapsansın.
 6. `info@` parolasını üretim sunucusu `.env`'ine (`SMTP_PASS`) bizzat koy; repoya/sohbete yazma. Diğer satırlar §5.
 7. **Vulut'a tek bilet** — sorulacaklar/istenecekler:
    a. Uygulamanın koşacağı VPS'ten `mail.fonbridge.com:465` (ve 587) çıkışı açık mı?
-   b. cPanel posta sunucusunun saatlik/günlük gönderim sınırı; dış IP'den (uygulama VPS'i) SMTP AUTH'a izin — cPHulk/firewall
-      beyaz listesine uygulama VPS IP'si.
+   b. cPanel posta sunucusunun saatlik/günlük gönderim sınırı; dış IP'den (uygulama VPS'i) SMTP AUTH'a izin. cPHulk
+      beyaz listesini **varsayılan olarak isteme** (beyaz listedeki IP kaba kuvvet korumasından muaf olur); yalnız gerçek
+      bir kilitlenme yaşanırsa uygulama VPS IP'si için iste.
    c. Paylaşımlı sunucunun giden posta IP'si sabit mi (`77.92.144.187`)? Değişirse haber verilsin.
    d. ~~(Yalnız B/C) VPS'ten giden **TCP 25**'in açılması ve `<VPS_IP> → mail.fonbridge.com` **PTR** (metin §6.2).
       Yeni IP verilirse önce kara liste kontrolü için bize iletin.~~ **A seçildi → gerekmez.** PTR `srv.iyisunucu.com.tr` kalır.
+   e. **Kimlik doğrulama yalnız TLS sonrası (§6.6):** "`srv.iyisunucu.com.tr`'de 587'de `AUTH PLAIN LOGIN`,
+      STARTTLS'ten önce ilan ediliyor; IMAP 143/POP3 110 da TLS'siz parola kabul ediyor. WHM Exim Configuration Manager'da
+      *Require clients to connect with SSL or issue the STARTTLS command before they are allowed to authenticate* ve
+      Mailserver Configuration'da *Allow Plaintext Authentication* = No yapılabilir mi?" Sunucu geneli ayar → Vulut kararı.
+      Hayır derlerse §6.6'nın istemci kuralı kalıcı olur.
+   f. (Yalnız §7.0 adım 8 `1024 bit` gösterir ve cPanel ekranında yeniden üretme yoksa) "fonbridge.com DKIM anahtarını
+      2048 bit olarak yeniden üretir misiniz?"
+   g. Sunucunun açık relay olmadığı (kimliksiz dış teslimi reddettiği) teyidi — biz de §7.0 adım 7 ile ölçeriz.
 7b. Uygulama sunucusunda §10.1 ters vekili (Caddy önerisi) — `www` → kök 301 ve iki adın sertifikası. **Şimdilik
    yapılmıyor (patron 29.09).** Başlatılınca onayla biz kurabiliriz; SSH erişimi gerekir.
 8. Bunlar bitince haber ver; §7 listesinin ölçümlerini (dig, openssl, mail-tester, kara liste, Gmail başlıkları) biz koşarız.
