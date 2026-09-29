@@ -41,10 +41,24 @@ export type {
  * where the magic token — not a session — is the credential.
  */
 
+/**
+ * Every column but `magicTokenHash` (ApplicationPartRow). Server actions return
+ * the row they read, and that return value is serialised to the browser.
+ */
+const PART_ROW_SELECT = {
+  id: true,
+  tenantId: true,
+  opportunityId: true,
+  part: true,
+  content: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 /** Loads a part the session tenant owns, or null. */
 async function loadPart(tenantId: string, partId: string): Promise<ApplicationPartRow | null> {
   return withTenant<ApplicationPartRow | null>(tenantId, (tx) =>
-    tx.applicationPart.findFirst({ where: { id: partId, tenantId } })
+    tx.applicationPart.findFirst({ where: { id: partId, tenantId }, select: PART_ROW_SELECT })
   );
 }
 
@@ -83,7 +97,8 @@ export async function createApplicationPart(opportunityId: string, part: string)
           comments: [],
           presence: [],
         }
-      }
+      },
+      select: PART_ROW_SELECT,
     });
   });
 

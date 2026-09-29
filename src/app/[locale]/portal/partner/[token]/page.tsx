@@ -44,7 +44,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const rawPart = await withSystemScope('tenant-discovery', 'partner-portal.partByToken', (tx) =>
       tx.applicationPart.findUnique({
         where: { magicTokenHash: hashSecretToken(token) },
-        include: { opportunity: true },
+        // The hash is compared here and never rendered; nothing on this page
+        // is a client component (TASK-MUMT3KVHJTYX0).
+        select: {
+          id: true,
+          tenantId: true,
+          part: true,
+          content: true,
+          magicTokenHash: true,
+          opportunity: { select: { title: true } },
+        },
       })
     );
     part = secretTokenMatches(token, rawPart?.magicTokenHash)
@@ -85,7 +94,16 @@ export default async function PartnerPortalPage({ params }: PageProps) {
     const rawPart = await withSystemScope('tenant-discovery', 'partner-portal.partByToken', (tx) =>
       tx.applicationPart.findUnique({
         where: { magicTokenHash: hashSecretToken(token) },
-        include: { opportunity: true },
+        // The hash is compared here and never rendered; nothing on this page
+        // is a client component (TASK-MUMT3KVHJTYX0).
+        select: {
+          id: true,
+          tenantId: true,
+          part: true,
+          content: true,
+          magicTokenHash: true,
+          opportunity: { select: { title: true } },
+        },
       })
     );
     part = secretTokenMatches(token, rawPart?.magicTokenHash)

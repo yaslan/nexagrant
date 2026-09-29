@@ -32,6 +32,7 @@ export async function disconnectCalendar(connectionId: string) {
   return withTenant(tenantId, async (tx) => {
     const connection = await tx.calendarConnection.findUnique({
       where: { id: connectionId },
+      select: { tenantId: true, userId: true },
     });
 
     if (!connection) {
@@ -89,6 +90,7 @@ export async function connectCalendar(
   return withTenant(tenantId, async (tx) => {
     const existing = await tx.calendarConnection.findUnique({
       where: { tenantId_userId_provider: { tenantId, userId, provider: providerType } },
+      select: { id: true },
     });
 
     if (existing) {
@@ -107,6 +109,9 @@ export async function connectCalendar(
         accessToken: null,
         refreshToken: null,
       },
+      // The row carries the OAuth tokens; this action only reports these two
+      // (TASK-MUMT3KVHJTYX0, tests/secret-model-select-guard.test.ts).
+      select: { id: true, isConnected: true },
     });
 
     return {

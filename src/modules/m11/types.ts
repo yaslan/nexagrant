@@ -96,8 +96,13 @@ export type PartContent = {
  * something Postgres does not guarantee: `content` is a `Json` column, so all a
  * read knows is that it is JSON. `readPartContent` below is where that
  * assumption is now made, once.
+ *
+ * Without `magicTokenHash`: the partner portal token's verifier stays on the
+ * server. `addBudgetLine` / `addWorkPackage` / `createApplicationPart` return
+ * this row from a server action, so it is serialised to the browser
+ * (TASK-MUMT3KVHJTYX0).
  */
-export type ApplicationPartRow = ApplicationPart;
+export type ApplicationPartRow = Omit<ApplicationPart, 'magicTokenHash'>;
 
 /**
  * Reads `ApplicationPart.content` as the document this module writes there.

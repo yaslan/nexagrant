@@ -41,6 +41,9 @@ export default async function ApiKeysSettingsPage({
       tx.apiKey.findMany({
         where: { tenantId },
         orderBy: { createdAt: 'desc' },
+        // Never `keyHash`: it is the key's verifier and every prop of
+        // <ApiKeysClient> lands in the RSC payload (TASK-MUMT3KVHJTYX0).
+        select: { id: true, name: true, prefix: true, lastUsedAt: true, createdAt: true },
       })
     );
   } catch (e) {

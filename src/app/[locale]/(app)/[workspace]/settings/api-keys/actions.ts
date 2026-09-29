@@ -28,11 +28,18 @@ const API_KEY_NAME_MAX = 100;
 
 export type ApiKeyActionError = 'forbidden' | 'invalidName';
 
+/**
+ * What the browser gets back. The return value of a server action is
+ * serialised into the response, so the full row sent `keyHash` (the key's
+ * verifier) and `tenantId` to the client (TASK-MUMT3KVHJTYX0).
+ */
+export type ApiKeyView = Pick<ApiKey, 'id' | 'name' | 'prefix' | 'lastUsedAt' | 'createdAt'>;
+
 export async function generateApiKey({
   name,
 }: {
   name: string;
-}): Promise<{ apiKeyRecord: ApiKey; rawKey: string } | { error: ApiKeyActionError }> {
+}): Promise<{ apiKeyRecord: ApiKeyView; rawKey: string } | { error: ApiKeyActionError }> {
   const { tenantId, role } = await requireTenantAction();
   if (!can(asRole(role), 'manage_users')) return { error: 'forbidden' };
 
@@ -56,6 +63,7 @@ export async function generateApiKey({
         keyHash,
         prefix,
       },
+      select: { id: true, name: true, prefix: true, lastUsedAt: true, createdAt: true },
     })
   );
 
