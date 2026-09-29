@@ -89,3 +89,7 @@ All matched files use Prettier code style!
 - İNCELEME-20 bitince FB-KAMU-2 sayıları ve kapı (f) ile tek satırlık bir güncelleme yapılmalı.
 
 **Platform beyanı:** Doğrulama yalnız **mac**'te yapıldı (Darwin 27, git + prettier + board aracı). Bu yalnız belge işi, platforma bağlı bir kod yoluna dokunulmadı. Kaydı yapılan kod da sunucu tarafı TS ve Postgres (`assertTenantWritable`, advisory lock). Süreç, kabuk, dosya yolu ya da ekran bağımlılığı yok. Windows ve Linux'ta **koşulamadı**, çünkü bu makinede yalnız macOS var. Belge içeriği platformdan bağımsız.
+
+## 7. Ek (aynı gün, ikinci commit)
+
+İlk commit'ten (`765f4863`) hemen sonra İNCELEME-20 raporu geldi (`d49312bd`). Üç kartın üçü de ONAY aldı: MUMJ9STRA6RJK, MUMJ2ERCFP964, MUMJ9M19CZY56. Board'a yeni bir kart da eklendi: TASK-MUML0QZAZ5M80 (todo). ROADMAP'teki "İNCELEME-20 sürüyor" ifadeleri ve FB-KAMU-2 sayıları güncellendi. Yeni sayılar: 61 kart (48 done · 10 review · 1 in_progress · 1 todo · 1 backlog). B-5 build yeşil bilgisi artık İNCELEME-20'nin kendi koşusuna dayanıyor: `4e5ea9e1`'de exit 0. Bu yüzden §4'teki "fe-fb raporuna dayanıyor" riski kapandı.
