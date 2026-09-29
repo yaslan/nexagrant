@@ -1019,6 +1019,9 @@
     "no_calls": "No open calls for {region} at the moment.",
     "no_calls_hint": "Check other countries or create a saved search from the dashboard."
   },
+  "applicationPartA": {
+    "portalLinkFailed": "The link could not be created. Refresh the page and try again."
+  },
   "partner_portal": {
     "badge": "Consortium Partner Portal",
     "title": "Partner Portal",

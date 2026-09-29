@@ -1019,6 +1019,9 @@
     "no_calls": "Şu anda {region} için açık çağrı yok.",
     "no_calls_hint": "Diğer ülkeleri gözlemleyin ya da panelden kayıtlı arama oluşturun."
   },
+  "applicationPartA": {
+    "portalLinkFailed": "Bağlantı oluşturulamadı. Sayfayı yenileyip tekrar deneyin."
+  },
   "partner_portal": {
     "badge": "Consortium Partner Portal",
     "title": "Partner Portal",

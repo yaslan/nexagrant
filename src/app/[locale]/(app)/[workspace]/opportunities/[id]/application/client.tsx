@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   FileCheck,
   Euro,
@@ -43,6 +43,7 @@ export function ApplicationClient({
   partB,
 }: ApplicationClientProps) {
   const locale = useLocale();
+  const t = useTranslations('applicationPartA');
   const [activeTab, setActiveTab] = useState<'PART_A' | 'PART_B_EDITOR' | 'GANTT' | 'CHECKLIST'>('PART_B_EDITOR');
   const [copiedToken, setCopiedToken] = useState(false);
   // TASK-MULQLL2T8ZJX4 — the portal token is stored only as a hash, so the link
@@ -371,7 +372,7 @@ export function ApplicationClient({
                   <span>{hasPortalLink ? 'Yeni bağlantı oluştur' : 'Bağlantı oluştur'}</span>
                 </button>
                 {linkError && (
-                  <p className="text-[11px] text-red-300" role="alert">Bağlantı oluşturulamadı. Sayfayı yenileyip tekrar deneyin.</p>
+                  <p className="text-[11px] text-red-300" role="alert">{t('portalLinkFailed')}</p>
                 )}
               </div>
             )}
