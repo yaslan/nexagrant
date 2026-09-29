@@ -122,6 +122,17 @@ describe('missed-tick detection (ADR-0008 Ö-3)', () => {
       ['warn', 'job-queue:k1-daily-calls:stuck'],
     ]);
   });
+
+  it('does not call a job exhausted while its last attempt is still running (İNCELEME-38 Ö-1 M7)', () => {
+    const now = new Date('2026-10-03T12:00:00Z');
+    const health = assessQueue(
+      known('2026-10-03T11:00:00Z'),
+      [{ id: '4', task_identifier: 'alerts-daily', attempts: 5, max_attempts: 5, last_error: 'smtp down', locked_at: new Date('2026-10-03T11:59:00Z') }],
+      now
+    );
+    expect(health.exhausted).toEqual([]);
+    expect(healthAlerts(health)).toEqual([]);
+  });
 });
 
 describe('defineJob (ADR-0008 §6.3-6.4)', () => {

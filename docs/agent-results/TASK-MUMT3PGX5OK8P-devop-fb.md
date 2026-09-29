@@ -165,7 +165,7 @@ docker build --target worker → ilk deneme ERR_PNPM_IGNORED_BUILDS (önceden va
 
 ## 4) Riskler
 
-- **Dağıtım sırası (Ö-2) bir kuraldır, kod bunu tek başına garanti edemez.** Kod yalnız üretimde bayrağın açıkça verilmesini zorluyor. Eski Inngest bulut uygulaması senkronlanmadan worker `true` ile kalkarsa e-posta gönderen işler (alerts-daily, feedback digest) bir tik boyunca iki kez koşabilir. Kredi işi Ö-1 sayesinde çift yazmaz. Sıra ADR §9.2'de yazılı; canlıya çıkarken RELEASE_CHECKLIST'e eklenmeli (cs-fb).
+- **Dağıtım sırası (Ö-2) bir kuraldır, kod bunu tek başına garanti edemez.** Kod yalnız üretimde bayrağın açıkça verilmesini zorluyor. Eski Inngest bulut uygulaması senkronlanmadan worker `true` ile kalkarsa e-posta gönderen işler (alerts-daily, feedback digest) bir tik boyunca iki kez koşabilir. Kredi işi Ö-1 sayesinde çift yazmaz. **[Düzeltme, İNCELEME-38 B-1: yanlış. Eski kodun yazdığı satır anahtarın dışında kalıyordu; doldurma + `hasLegacyGrant` eklendi, "önce worker, sonra eski kod" sırası yine açık. Bkz. `TASK-MUMT3PGX5OK8P-devop-fb-2.md`.]** Sıra ADR §9.2'de yazılı; canlıya çıkarken RELEASE_CHECKLIST'e eklenmeli (cs-fb).
 - **Barındırma kararı hâlâ açık** (ADR §4). Worker uzun yaşayan bir süreç; Vercel'de koşamaz. Kod hazır, canlıya çıkması barındırma kararına bağlı.
 - **`step.run` belleği yok.** k1'in tekrar denemesi üç kaynağı baştan çeker. Upsert idempotent olduğu için veri kaybı yok, yalnız süre uzar.
 - **Takılmış iş** graphile-worker'da 4 saat kilitli kalır. `kill -9` ile denenmedi. `job-queue-health` 4 saati aşanı alarm olarak yazıyor.

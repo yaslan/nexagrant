@@ -185,7 +185,7 @@ Sorun: worker ile Next.js ayrı süreçler, ayrı zamanlarda dağıtılır; eski
 4. 2. adım doğrulanınca worker'ı `JOBS_CRON_ENABLED=true` ile yeniden başlat.
 5. İlk günlük tikten sonra (en geç 02:00 UTC) `SystemAlert`'te `job-queue` kaynağına ve worker loguna bak.
 
-Geri dönüşte sıra tersine: önce worker'ı durdur (ya da `false` ile başlat), sonra Inngest'li sürümü geri al ve Inngest'te senkronla. Aylık kredi işi Ö-1 sayesinde yanlış sırada bile ikinci kez kredi vermez; diğer işler (e-posta gönderenler dahil) bu korumaya sahip değildir, bu yüzden sıra kuraldır.
+Geri dönüşte sıra tersine: önce worker'ı durdur (ya da `false` ile başlat), sonra Inngest'li sürümü geri al ve Inngest'te senkronla. Aylık kredi işi de bu sıra kuralına tabidir. Ö-1'in benzersiz anahtarı (`tenantId`, `grantPeriod`) yalnız yeni işin kendi koşularını birbirine karşı korur (tekrar deneme, elle koşu, iki yeni worker). Eski Inngest işinin yazdığı satırda `grantPeriod` yoktur (NULL) ve anahtar onu görmez (İNCELEME-38 B-1). İki ek önlem var: `credit-ledger-grant-period.sql` o ana kadar eski işin yazdığı satırları ayıyla işaretler (kiracı×ay başına ilk satır; `refId`'li iyzico/Stripe etkinleştirme kredileri hariç), iş de kredi vermeden önce o ay için eski biçimli satır arar (`hasLegacyGrant`). Kapanmayan tek sıra: **önce yeni worker, sonra eski kod** aynı ayda. Eski kod yeni satırı göremez ve ikinci krediyi yazar. Diğer işler (e-posta gönderenler dahil) bu korumaların hiçbirine sahip değildir. Sıra bu yüzden kuraldır.
 
 ### 9.3 Ö-3: kaçırılmış tik alarmı
 
@@ -196,6 +196,8 @@ Geri dönüşte sıra tersine: önce worker'ı durdur (ya da `false` ile başlat
 - **Takılmış iş:** 4 saatten uzun kilitli iş (`job-queue:<iş>:stuck`, `warn`).
 
 Sağlık işi her saat koştuğu için aylık bir işin kaçan tiki bir sonraki tike kadar her gün görünür kalır; günlük işlerde worker döndükten sonraki ilk saatte görünür.
+
+**Sınır (İNCELEME-38 Ö-2):** sağlık kontrolü de bir cron işidir. Cron'lu hiçbir worker çalışmıyorsa (hepsi düşük ya da hepsi `JOBS_CRON_ENABLED=false`) alarm da yazılmaz; kayıp worker döndüğünde görünür, o ana kadar sessizdir. Barındırma kararıyla (§4) birlikte dışarıdan bir kalp atışı kontrolü eklenmeli: `graphile_worker._private_known_crontabs` içinde `job-queue-health` satırının `last_execution` değeri 70 dakikadan eskiyse uptime izleyicisi alarm verir. Bu kontrol henüz yok.
 
 ### 9.4 Uygulanan tasarım (özet)
 

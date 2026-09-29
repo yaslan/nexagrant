@@ -21,8 +21,28 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# The client is generated here, not in deps: `next build` imports
+# .prisma/client (index-browser) and fails without it (İNCELEME-38 B-2).
+RUN node_modules/.bin/prisma generate
 RUN pnpm build
 
+# Scheduled-job worker (ADR-0008): `docker build --target worker`.
+# Sits BEFORE `runner` on purpose: without --target, docker builds the LAST
+# stage, and that must stay the web app (`docker build .`, İNCELEME-38 B-2).
+# A long-running process next to the web container; it runs TypeScript through
+# tsx, so it keeps the full dependency tree instead of the standalone bundle.
+# Needs DATABASE_URL, and JOBS_CRON_ENABLED set explicitly (true/false): a
+# production worker refuses to start without it (src/lib/env.ts jobsCronEnabled).
+FROM base AS worker
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN node_modules/.bin/prisma generate
+USER node
+CMD ["node_modules/.bin/tsx", "scripts/jobs-worker.ts"]
+
+# Web application: the default (last) stage, `docker build .` or `--target runner`.
 FROM base AS runner
 WORKDIR /app
 
@@ -43,17 +63,3 @@ USER nextjs
 EXPOSE 3000
 
 CMD ["node", "server.js"]
-
-# Scheduled-job worker (ADR-0008): `docker build --target worker`.
-# A long-running process next to the web container; it runs TypeScript through
-# tsx, so it keeps the full dependency tree instead of the standalone bundle.
-# Needs DATABASE_URL, and JOBS_CRON_ENABLED set explicitly (true/false): a
-# production worker refuses to start without it (src/lib/env.ts jobsCronEnabled).
-FROM base AS worker
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN node_modules/.bin/prisma generate
-USER node
-CMD ["node_modules/.bin/tsx", "scripts/jobs-worker.ts"]

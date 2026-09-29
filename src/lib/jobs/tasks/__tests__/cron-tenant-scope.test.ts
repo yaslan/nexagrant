@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenant, withTenantOn } from '@/lib/db';
 import { envValue } from '../../../../../tests/helpers/dotenv';
@@ -293,6 +295,84 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
   it('credits-monthly-grant: a period that is not YYYY-MM is refused before any write', async () => {
     expect(ready, skipReason).toBe(true);
     await expect(grantCreditsToTenants([{ id: a.tenantId }], withTenant, '2031-13')).rejects.toThrow(/YYYY-MM/);
+  });
+
+  it('credits-monthly-grant: a month the old Inngest job granted is not granted again (İNCELEME-38 B-1)', async () => {
+    expect(ready, skipReason).toBe(true);
+    await prisma.creditLedger.deleteMany({ where: { tenantId: { in: [a.tenantId, b.tenantId] } } });
+    // What the pre-ADR-0008 job wrote: no refId, no grantPeriod (NULL is
+    // distinct to the unique key, so the key alone would let the new job in).
+    // Tenant b gets the two look-alikes that must NOT count: an old-job row of
+    // the month before, and an iyzico/Stripe activation grant, which shares the
+    // reason but carries the payment id.
+    await prisma.creditLedger.createMany({
+      data: [
+        { tenantId: a.tenantId, delta: 10, reason: 'monthly_grant', createdAt: new Date('2031-07-01T06:00:03Z') },
+        { tenantId: b.tenantId, delta: 10, reason: 'monthly_grant', createdAt: new Date('2031-06-30T23:59:59Z') },
+        { tenantId: b.tenantId, delta: 10, reason: 'monthly_grant', refId: `${RUN}-pay`, createdAt: new Date('2031-07-02T09:00:00Z') },
+      ],
+    });
+    const run: TenantRunner = (tenantId, cb) => withTenantOn(rls, tenantId, cb);
+
+    const july = await grantCreditsToTenants([{ id: a.tenantId }, { id: b.tenantId }], run, '2031-07');
+    expect(july).toMatchObject({ grantedCount: 1, alreadyGrantedCount: 1, failedCount: 0, totalCreditsGranted: 10 });
+
+    const julyRows = (tenantId: string) =>
+      prisma.creditLedger.aggregate({
+        where: {
+          tenantId,
+          reason: 'monthly_grant',
+          createdAt: { gte: new Date('2031-07-01T00:00:00Z'), lt: new Date('2031-08-01T00:00:00Z') },
+        },
+        _sum: { delta: true },
+      });
+    expect((await julyRows(a.tenantId))._sum.delta).toBe(10);
+    // b: the activation grant plus this job's own July grant.
+    expect(await prisma.creditLedger.count({ where: { tenantId: b.tenantId, grantPeriod: '2031-07' } })).toBe(1);
+  });
+
+  it('credit-ledger-grant-period.sql: the backfill stamps old job rows only, once per month, and re-runs clean', async () => {
+    expect(ready, skipReason).toBe(true);
+    await prisma.creditLedger.deleteMany({ where: { tenantId: { in: [a.tenantId, b.tenantId] } } });
+    await prisma.creditLedger.createMany({
+      data: [
+        // A retried old run: two rows in December; only the first is stamped.
+        { id: `${RUN}-dec1`, tenantId: a.tenantId, delta: 10, reason: 'monthly_grant', createdAt: new Date('2031-12-01T06:00:02Z') },
+        { id: `${RUN}-dec2`, tenantId: a.tenantId, delta: 10, reason: 'monthly_grant', createdAt: new Date('2031-12-01T06:00:09Z') },
+        // November already has a stamped row: the old one stays NULL, no key clash.
+        { id: `${RUN}-nov-old`, tenantId: a.tenantId, delta: 10, reason: 'monthly_grant', createdAt: new Date('2031-11-01T06:00:03Z') },
+        { id: `${RUN}-nov-new`, tenantId: a.tenantId, delta: 10, reason: 'monthly_grant', refId: 'monthly_grant:2031-11', grantPeriod: '2031-11', createdAt: new Date('2031-11-01T06:00:05Z') },
+        // An activation grant: same reason, has a payment id, never stamped.
+        { id: `${RUN}-pay`, tenantId: b.tenantId, delta: 10, reason: 'monthly_grant', refId: `${RUN}-pay`, createdAt: new Date('2031-12-03T10:00:00Z') },
+      ],
+    });
+    const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/credit-ledger-grant-period.sql'), 'utf8');
+    const start = sql.indexOf('UPDATE "CreditLedger"');
+    const backfill = sql.slice(start, sql.indexOf(';', start));
+    expect(start, 'the backfill statement is gone from the migration').toBeGreaterThan(0);
+
+    const periods = async () =>
+      Object.fromEntries(
+        (
+          await prisma.creditLedger.findMany({
+            where: { id: { startsWith: RUN } },
+            select: { id: true, grantPeriod: true },
+          })
+        ).map((r) => [r.id.slice(RUN.length + 1), r.grantPeriod])
+      );
+    const expected = { dec1: '2031-12', dec2: null, 'nov-old': null, 'nov-new': '2031-11', pay: null };
+
+    await prisma.$executeRawUnsafe(backfill);
+    expect(await periods()).toEqual(expected);
+    await prisma.$executeRawUnsafe(backfill);
+    expect(await periods()).toEqual(expected);
+
+    // The key now covers December: the new job's insert for it is a no-op.
+    const { count } = await prisma.creditLedger.createMany({
+      data: [{ tenantId: a.tenantId, delta: 10, reason: 'monthly_grant', refId: 'monthly_grant:2031-12', grantPeriod: '2031-12' }],
+      skipDuplicates: true,
+    });
+    expect(count).toBe(0);
   });
 
   it('credits-monthly-grant: a stale tenant id is refused by the database, not misfiled', async () => {

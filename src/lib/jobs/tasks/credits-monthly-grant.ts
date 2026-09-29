@@ -1,5 +1,5 @@
 import { defineJob, monthOf } from '../define';
-import { prisma, withTenant } from '@/lib/db';
+import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
 import { CreditsMonthlyGrantOutputSchema, type CreditsMonthlyGrantOutput } from '../events';
 import type { TenantRunner } from './alerts-daily';
@@ -23,12 +23,46 @@ export function creditGrantPeriod(at: Date = new Date()): string {
 }
 
 /**
+ * A grant the old (Inngest) job wrote for `period`: `monthly_grant`, no
+ * `refId`, no `grantPeriod`, created in that UTC month. The refId-less shape is
+ * what separates it from the iyzico / Stripe activation grants, which also use
+ * `monthly_grant` but always carry the payment or subscription id and must not
+ * stand in for the scheduled grant.
+ */
+async function hasLegacyGrant(
+  tx: TenantTx,
+  tenantId: string,
+  period: string
+): Promise<boolean> {
+  const year = Number(period.slice(0, 4));
+  const month = Number(period.slice(5, 7));
+  const row = await tx.creditLedger.findFirst({
+    where: {
+      tenantId,
+      reason: 'monthly_grant',
+      refId: null,
+      grantPeriod: null,
+      createdAt: { gte: new Date(Date.UTC(year, month - 1, 1)), lt: new Date(Date.UTC(year, month, 1)) },
+    },
+    select: { id: true },
+  });
+  return row !== null;
+}
+
+/**
  * One grant per tenant per `period`, however often this runs (ADR-0008 §6.2,
  * TASK-MUMT3PGX5OK8P). The row carries `grantPeriod` and the table has
  * `@@unique([tenantId, grantPeriod])`, so the insert is ON CONFLICT DO NOTHING:
- * a retry, a manual re-run or the same tick firing in two schedulers adds no
- * second grant. It used to add one per run. A tenant that already has this
- * month's grant counts as `alreadyGrantedCount`, not as granted.
+ * a retry, a manual re-run or two new workers on the same tick add no second
+ * grant. It used to add one per run. A tenant that already has this month's
+ * grant counts as `alreadyGrantedCount`, not as granted.
+ *
+ * The key does not see rows the old Inngest job wrote: those have no
+ * `grantPeriod` (NULL, distinct to Postgres). credit-ledger-grant-period.sql
+ * backfills the ones that existed when it ran; `hasLegacyGrant` covers one the
+ * old job wrote after that (İNCELEME-38 B-1). What stays open is the old job
+ * running AFTER this one in the same month: it cannot see this row, so the
+ * deployment order in ADR-0008 §9.2 still applies to this job too.
  */
 export async function grantCreditsToTenants(
   tenants: Array<{ id: string }>,
@@ -57,6 +91,10 @@ export async function grantCreditsToTenants(
         const creditsToGrant = entitlements.aiCreditsMonthly || 0;
 
         if (creditsToGrant > 0) {
+          if (await hasLegacyGrant(tx, tenantId, period)) {
+            alreadyGrantedCount++;
+            return;
+          }
           const { count } = await tx.creditLedger.createMany({
             data: [
               {

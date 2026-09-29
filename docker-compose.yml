@@ -20,6 +20,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runner
     container_name: fabrika-web
     restart: unless-stopped
     ports:
@@ -37,8 +38,12 @@ services:
         condition: service_healthy
 
   # Scheduled-job worker (graphile-worker, ADR-0008). Same profile and database
-  # as the web app; any number of copies is safe (each cron tick runs once).
-  # This stack has no other scheduler, so cron defaults to on here.
+  # as the web app. Several workers on one database are safe (each cron tick
+  # runs once), but this service is one container: `container_name` is fixed,
+  # so `--scale` does not work; start a second copy under another name.
+  # This stack has no other scheduler, so cron defaults to on here. That
+  # default is for the local stack only: a production deployment must set
+  # JOBS_CRON_ENABLED explicitly and follow ADR-0008 §9.2 (İNCELEME-38 Ö-4).
   fabrika-worker:
     profiles: ["app"]
     build:
