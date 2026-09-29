@@ -153,7 +153,7 @@ export function findOffences(code: string, file: string): Offence[] {
     const arg = callArgument(code, open);
     if (arg === null || !hasTopLevelKey(arg, 'select')) {
       const line = code.slice(0, m.index).split('\n').length;
-      offences.push({ file, what: `${m[1]}.${m[2]} without select (line ${line}; exposes ${SECRET_MODELS[m[1]]})` });
+      offences.push({ file, what: `${m[1]}.${m[2]} without select (line ${line}; exposes ${SECRET_MODELS[m[1] ?? '']})` });
     }
   }
   const include = new RegExp(`\\b(${SECRET_RELATIONS.join('|')})\\s*:\\s*true\\b`, 'g');
@@ -188,7 +188,7 @@ describe('secret-bearing models are read with select where the result reaches th
   it('the allowlist names only entries that still exist', () => {
     for (const key of Object.keys(RELATION_INCLUDE_ALLOWLIST)) {
       const [file, relation] = key.split('::');
-      const code = stripComments(fs.readFileSync(path.join(REPO_ROOT, file), 'utf-8'));
+      const code = stripComments(fs.readFileSync(path.join(REPO_ROOT, file ?? ''), 'utf-8'));
       expect(new RegExp(`\\b${relation}\\s*:\\s*true\\b`).test(code), key).toBe(true);
     }
   });
