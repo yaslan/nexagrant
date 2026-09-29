@@ -597,6 +597,9 @@
     "metaDescription": "{brand} pricing: Starter, Professional and Enterprise plans. Free trial, monthly or yearly billing, custom enterprise solutions available."
   },
   "settings": {
+    "modules": {
+      "noSubscription": "No subscription · free plan"
+    },
     "privacy": {
       "title": "Privacy & My Data",
       "breadcrumbHome": "Dashboard",

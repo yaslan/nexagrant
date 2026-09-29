@@ -597,6 +597,9 @@
     "metaDescription": "{brand} fiyatlandırması: Başlangıç, Profesyonel ve İşletme planları. Ücretsiz deneme, aylık veya yıllık faturalandırma, kurumsal çözümler."
   },
   "settings": {
+    "modules": {
+      "noSubscription": "Aboneliğiniz yok · ücretsiz paket"
+    },
     "privacy": {
       "title": "Gizlilik ve Verilerim",
       "breadcrumbHome": "Panel",

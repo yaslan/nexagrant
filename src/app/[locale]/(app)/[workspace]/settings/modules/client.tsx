@@ -3,6 +3,7 @@ import { PRODUCT_NAME } from '@/lib/brand';
 
 import React, { useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { getAllManifests, getManifest } from '@/lib/modules/registry';
 import { canEnableEntitled, getDisableCascade } from '@/lib/modules/state-machine';
 import { ModuleId, PlanTier } from '@/lib/modules/types';
@@ -116,6 +117,7 @@ export function ModulesClient({
   const readOnly = !plan || plan.pilot?.expired === true;
   const [cascadeWarning, setCascadeWarning] = useState<{ target: ModuleId; cascading: ModuleId[] } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const t = useTranslations('settings.modules');
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -304,7 +306,7 @@ export function ModulesClient({
                 </div>
               )}
               {plan && !plan.pilot && plan.planId === 'free' && (
-                <div className="text-[11px] text-muted mt-1">Aboneliğiniz yok · ücretsiz paket</div>
+                <div className="text-[11px] text-muted mt-1">{t('noSubscription')}</div>
               )}
             </div>
             <Link
