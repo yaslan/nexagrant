@@ -85,12 +85,6 @@ export const ALLOWED: Record<string, string> = {
   // Role checked inline against its own set (TENANT_OWNER/TENANT_ADMIN), and the
   // refusal is a result value the co-brand form shows.
   'app/[locale]/(app)/ajans/cobrand-actions.ts#saveCoBrand': 'EDITOR_ROLES.has(scope.role) — owner/admin only',
-  // Four-eyes decisions: the dual-approval engine compares the approver's role
-  // with the request's required role (canRoleApprove, src/lib/dual-approval.ts).
-  'app/[locale]/(app)/[workspace]/approvals/actions.ts#approveRequestAction':
-    'role checked by approveApprovalRequest(approverRole) against requiredRole',
-  'app/[locale]/(app)/[workspace]/approvals/actions.ts#rejectRequestAction':
-    'role checked by rejectApprovalRequest(approverRole) against requiredRole',
 };
 
 // ──────────────────────────────────────────────────────────────────────────────

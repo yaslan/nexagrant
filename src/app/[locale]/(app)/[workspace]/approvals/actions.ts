@@ -46,7 +46,10 @@ export async function submitApprovalRequestAction(data: {
 }
 
 export async function approveRequestAction(requestId: string, comment?: string) {
-  const { tenantId, userId, role } = await requireTenantAction();
+  // `approveApprovalRequest` / `rejectApprovalRequest` are stubs that check no
+  // role (src/lib/dual-approval.ts), so the permission is decided here
+  // (TASK-MUN80UOUPB2A4).
+  const { tenantId, userId, role } = await requireTenantAction({ can: 'approve_dual_approval' });
 
   const result = await approveApprovalRequest({
     requestId,
@@ -61,7 +64,8 @@ export async function approveRequestAction(requestId: string, comment?: string) 
 }
 
 export async function rejectRequestAction(requestId: string, reason: string) {
-  const { tenantId, userId, role } = await requireTenantAction();
+  // Same permission as approving (see approveRequestAction).
+  const { tenantId, userId, role } = await requireTenantAction({ can: 'approve_dual_approval' });
 
   const result = await rejectApprovalRequest({
     requestId,

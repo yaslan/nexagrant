@@ -68,7 +68,7 @@ vi.mock('@/lib/k5-pipeline/pipelineStore', () => ({
 }));
 vi.mock('@/lib/dual-approval', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/dual-approval')>();
-  return { ...actual, createApprovalRequest: vi.fn(reached), cancelApprovalRequest: vi.fn(reached) };
+  return { ...actual, createApprovalRequest: vi.fn(reached), cancelApprovalRequest: vi.fn(reached), approveApprovalRequest: vi.fn(reached), rejectApprovalRequest: vi.fn(reached) };
 });
 
 import { can, type Action } from '@/lib/rbac';
@@ -134,6 +134,8 @@ const ACTIONS: [string, Action, () => Promise<unknown>][] = [
   // approvals
   ['approvals.submitApprovalRequestAction', 'request_dual_approval', () => approvals.submitApprovalRequestAction({ actionType: 'BUDGET_ALLOCATION', title: 't', payload: {} })],
   ['approvals.cancelRequestAction', 'request_dual_approval', () => approvals.cancelRequestAction('req-1')],
+  ['approvals.approveRequestAction', 'approve_dual_approval', () => approvals.approveRequestAction('req-1')],
+  ['approvals.rejectRequestAction', 'approve_dual_approval', () => approvals.rejectRequestAction('req-1', 'no')],
   // relationships (app) + m4
   ['relationships.createRelationship', 'edit_proposal', () => relationships.createRelationship({ kind: 'partner' })],
   ['relationships.addInteraction', 'edit_proposal', () => relationships.addInteraction('rel-1', { kind: 'call', at: '2026-09-30', summary: 's' })],
@@ -199,8 +201,8 @@ beforeEach(() => {
 });
 
 describe('every mapped write action follows rbac.ts for all six roles', () => {
-  test('the table covers all 55 mapped actions (Y-3 appendix A minus the portal and two reads, plus 6 the inventory mis-marked)', () => {
-    expect(ACTIONS).toHaveLength(55);
+  test('the table covers all 57 mapped actions (Y-3 appendix A minus the portal and two reads, plus 8 the inventory mis-marked)', () => {
+    expect(ACTIONS).toHaveLength(57);
   });
 
   for (const [name, permission, call] of ACTIONS) {
