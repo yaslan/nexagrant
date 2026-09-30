@@ -1,0 +1,25 @@
+#!/bin/bash
+# be-fb TASK-MUNY0O53ITDU4: İNCELEME-75 §2.1 enjeksiyonlarını YALNIZ befb0o-pg (:5477) üzerinde yeniden kurar,
+# 6 GDPR ucunu gerçek oturum çereziyle çağırır, sonra enjeksiyonları geri alır. Çerez yazdırılmaz.
+SP=/private/tmp/claude-501/-Users-macbook-alan/0c5756e7-cdae-4e8a-af2c-fb23b1414073/scratchpad
+C="$(cat $SP/cookie.txt)"; B=http://127.0.0.1:47977
+psql() { docker exec befb0o-pg psql -U fabrika -d fabrika -tAc "$1"; }
+call() { printf -- '-- %s %s (alice): ' "$1" "$2"; curl -s -X "$1" -H "Cookie: $C" -w '  HTTP %{http_code}\n' "$B$2"; }
+LEAK='prisma|invocation|P0001|Evaluation|befb0o|tablo|Database error'
+echo "== DB: $(docker exec befb0o-pg psql -U fabrika -d fabrika -tAc 'select current_database()||'"'"' @ befb0o-pg'"'"'')"
+echo "== sağlam durum (enjeksiyon yok): request-deletion GET + export"
+call GET /api/user/request-deletion
+printf -- '-- POST /api/user/export (alice): '; curl -s -X POST -H "Cookie: $C" -o /dev/null -w 'HTTP %{http_code} %{content_type}\n' "$B/api/user/export"
+echo "== fault 1: ALTER TABLE \"Evaluation\" RENAME TO \"Evaluation_befb0o\""
+psql 'ALTER TABLE "Evaluation" RENAME TO "Evaluation_befb0o"'
+OUT1=$( { call POST /api/user/export; call POST /api/user/export-data; call GET /api/gdpr/export; } ); echo "$OUT1"
+psql 'ALTER TABLE "Evaluation_befb0o" RENAME TO "Evaluation"' >/dev/null && echo "   (geri alındı)"
+echo "== fault 2: BEFORE UPDATE trigger on \"User\" raises 'befb0o-internal-detail: tablo=User kolon=deletedAt'"
+psql "CREATE OR REPLACE FUNCTION befb0o_boom() RETURNS trigger LANGUAGE plpgsql AS \$\$ BEGIN RAISE EXCEPTION 'befb0o-internal-detail: tablo=User kolon=deletedAt'; END \$\$; CREATE TRIGGER befb0o_boom BEFORE UPDATE ON \"User\" FOR EACH ROW EXECUTE FUNCTION befb0o_boom();" >/dev/null
+OUT2=$( { call POST /api/user/request-deletion; call DELETE /api/gdpr/delete; call DELETE /api/user/request-deletion; } ); echo "$OUT2"
+psql 'DROP TRIGGER befb0o_boom ON "User"; DROP FUNCTION befb0o_boom();' >/dev/null && echo "   (geri alındı)"
+echo "== sızıntı taraması (gövdelerde /$LEAK/i): $(printf '%s\n%s\n' "$OUT1" "$OUT2" | grep -ciE "$LEAK") eşleşme"
+echo "== 500 sayısı: $(printf '%s\n%s\n' "$OUT1" "$OUT2" | grep -c 'HTTP 500')/6"
+echo "== sunucu log'unda ayrıntı (ilk satırlar, kısaltılmış):"
+grep -E '\[export-data\]|\[request-deletion\]|\[cancel-deletion\]' $SP/server.log | cut -c1-160 | head -6
+echo "== temizlik: trigger=$(psql "select count(*) from pg_trigger where tgname='befb0o_boom'") Evaluation=$(psql "select to_regclass('public.\"Evaluation\"') is not null")"
