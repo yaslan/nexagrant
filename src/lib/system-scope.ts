@@ -56,12 +56,17 @@ import { logger } from '@/lib/logger';
  * What this is NOT
  * ---------------------------------------------------------------------------
  *
- * It is not a boundary against a compromised application process. `fabrika_app`
- * may call `set_config('app.system_scope','on',true)` itself — measured, it
- * works — so the SECURITY DEFINER wrapper buys purpose validation, one
- * greppable entry point and a grant that ops can `REVOKE EXECUTE` without a
- * deploy, and buys nothing against code that already runs as us. Same standing
- * as `withTenant`, which can equally set `app.tenant_id` to any tenant it likes.
+ * It is not a boundary against a compromised application process. Setting the
+ * flag by hand no longer works: `app.system_scope` is USERSET, so `fabrika_app`
+ * can still write it (`SET`, `set_config`, PGOPTIONS), but since
+ * TASK-MUOGMQK3JAH4Y the policy also wants this transaction's seal in
+ * `app.system_scope_token`, which only `enter_system_scope` can compute
+ * (prisma/rls.sql, system_scope_open). What remains is that the app role may
+ * CALL `enter_system_scope` — any listed purpose — so code that already runs
+ * as us still gets in. The wrapper buys purpose validation, one greppable
+ * entry point, a flag that cannot be forged, and a grant that ops can
+ * `REVOKE EXECUTE` without a deploy. Same standing as `withTenant`, which can
+ * equally set `app.tenant_id` to any tenant it likes.
  *
  * A hard boundary needs a SECOND connection under a role the tenant path does
  * not hold. That is a decision for a human and is written up as a 1-3-1 in

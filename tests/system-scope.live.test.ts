@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
+import pg from 'pg';
 import { resolve } from 'node:path';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient } from '@/lib/db';
@@ -173,5 +174,124 @@ describe('the purpose list', () => {
         expect(row?.p).toBe(purpose);
       });
     }
+  });
+});
+
+/**
+ * TASK-MUOGMQK3JAH4Y (İNCELEME-115 Ö-1) — only enter_system_scope opens it.
+ *
+ * `app.system_scope` is a placeholder GUC and therefore USERSET: PostgreSQL
+ * lets any role set it, and no GRANT can say otherwise. Until the seal,
+ * fabrika_app opened every tenant's rows with each of the shapes below. Each
+ * arm reads the fixture's two tenants over a raw `pg` connection as
+ * fabrika_app, because two of the shapes live in the connection itself
+ * (PGOPTIONS, `options=` in the URL) and a Prisma pool would carry a session
+ * SET into the next test.
+ */
+describe('a forged system scope opens nothing', () => {
+  const fixtureCount = async (c: pg.Client): Promise<number> =>
+    Number(
+      (
+        await c.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM "Membership" WHERE "tenantId" = ANY($1)`,
+          [FIXTURE_TENANTS]
+        )
+      ).rows[0]?.n ?? -1
+    );
+
+  async function asApp<T>(fn: (c: pg.Client) => Promise<T>, options?: string): Promise<T> {
+    const c = new pg.Client({ connectionString: RLS_URL, ...(options ? { options } : {}) });
+    await c.connect();
+    try {
+      return await fn(c);
+    } finally {
+      await c.end();
+    }
+  }
+
+  test('control: enter_system_scope sees both tenants on the same connection shape', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const n = await asApp(async (c) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(`SELECT enter_system_scope('platform-admin')`);
+        return await fixtureCount(c);
+      } finally {
+        await c.query('ROLLBACK');
+      }
+    });
+    expect(n).toBe(FIXTURE_TENANTS.length);
+  });
+
+  const forgeries: Array<[string, string[]]> = [
+    ['SET (session)', [`SET app.system_scope = 'on'`]],
+    ['SET LOCAL', ['BEGIN', `SET LOCAL app.system_scope = 'on'`]],
+    ['set_config(is_local => true)', ['BEGIN', `SELECT set_config('app.system_scope', 'on', true)`]],
+    ['set_config(is_local => false)', [`SELECT set_config('app.system_scope', 'on', false)`]],
+    ['a made-up seal', ['BEGIN', `SET LOCAL app.system_scope = 'on'`, `SET LOCAL app.system_scope_token = 'deadbeef'`]],
+  ];
+  for (const [name, statements] of forgeries) {
+    test(name, async (ctx) => {
+      if (!ready) return ctx.skip(skipReason);
+      const n = await asApp(async (c) => {
+        for (const s of statements) await c.query(s);
+        const [row] = (await c.query<{ s: string | null }>(`SELECT current_setting('app.system_scope', true) AS s`)).rows;
+        expect(row?.s).toBe('on'); // the flag really is set; only the policy refuses it
+        return fixtureCount(c);
+      });
+      expect(n).toBe(0);
+    });
+  }
+
+  test('PGOPTIONS / options= in the connection string', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const n = await asApp(fixtureCount, '-c app.system_scope=on');
+    expect(n).toBe(0);
+  });
+
+  test('a seal replayed from an earlier transaction', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const n = await asApp(async (c) => {
+      await c.query('BEGIN');
+      await c.query(`SELECT enter_system_scope('platform-admin')`);
+      const seal = (await c.query<{ t: string }>(`SELECT current_setting('app.system_scope_token') AS t`)).rows[0]!.t;
+      await c.query('COMMIT');
+      expect(seal).toMatch(/^[0-9a-f]{64}$/);
+      await c.query('BEGIN');
+      await c.query(`SELECT set_config('app.system_scope', 'on', true), set_config('app.system_scope_token', $1, true)`, [seal]);
+      try {
+        return await fixtureCount(c);
+      } finally {
+        await c.query('ROLLBACK');
+      }
+    });
+    expect(n).toBe(0);
+  });
+
+  test('a forged scope cannot write another tenant', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    await asApp(async (c) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(`SET LOCAL app.system_scope = 'on'`);
+        await expect(
+          c.query(`INSERT INTO "Membership"(id, "tenantId", "userId") VALUES ($1, $2, $3)`, [
+            `m-forged-${RUN}`,
+            FIXTURE_TENANTS[0],
+            FIXTURE_USERS[1],
+          ])
+        ).rejects.toThrow(/row-level security/i);
+      } finally {
+        await c.query('ROLLBACK');
+      }
+    });
+  });
+
+  test('the secret and the seal function are out of the app role\'s reach', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    await asApp(async (c) => {
+      await expect(c.query('SELECT secret FROM fabrika_private.system_scope_key')).rejects.toThrow(/permission denied/i);
+      await expect(c.query('SELECT fabrika_private.system_scope_seal()')).rejects.toThrow(/permission denied/i);
+    });
   });
 });
