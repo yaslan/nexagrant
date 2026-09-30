@@ -1,0 +1,522 @@
+import http from 'node:http';
+import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { PrismaClient } from '@prisma/client';
+import { envValue } from './helpers/dotenv';
+import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { presentIds, requireId } from './helpers/teardown-guard';
+
+/**
+ * TASK-MUO122UPRPJQH (İNCELEME-77 B-1) — confirm against a store that is slow,
+ * down, or dies half-way, and a row save that fails.
+ *
+ * Confirm used to copy the staging object, delete it and check the copy inside
+ * the row's interactive transaction. A store slower than Prisma's 5 s ended the
+ * transaction; the catch deleted the copy as well, so the file was nowhere, and
+ * the "DB offline" branch answered `success: true` with a made-up id. Now the
+ * store calls run outside any transaction and the staging object is removed
+ * only after the row is saved, so every failure below must leave: no row, the
+ * staging object as uploaded, an error — and a second confirm that succeeds.
+ *
+ * The store is the MinIO of tests/evidence-upload-s3.live.test.ts (same
+ * EVIDENCE_S3_TEST_* variables, same skip in CI, where the job has no S3
+ * service), reached through an in-process HTTP proxy that injects the faults.
+ */
+
+const SUITE = 'zz-devopfb92-attack.live';
+const S3 = {
+  endpoint: process.env.EVIDENCE_S3_TEST_ENDPOINT,
+  accessKey: process.env.EVIDENCE_S3_TEST_ACCESS_KEY,
+  secretKey: process.env.EVIDENCE_S3_TEST_SECRET_KEY,
+  bucket: process.env.EVIDENCE_S3_TEST_BUCKET,
+};
+const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
+const ADMIN_URL = envValue('DATABASE_URL');
+const RUN = `dvp92-${Date.now().toString(36)}`;
+
+type Fault = 'pass' | 'down' | 'dieAfterCopy' | 'slowAfterCopy';
+
+const state = vi.hoisted(() => {
+  // storage.ts builds its client when imported: point it at the proxy first.
+  const e = process.env;
+  const proxyPort = 37000 + (process.pid % 3000);
+  if (e.EVIDENCE_S3_TEST_ENDPOINT) {
+    e.R2_ACCOUNT_ID = 'minio-test';
+    e.R2_ENDPOINT = `http://127.0.0.1:${proxyPort}`;
+    e.R2_ACCESS_KEY_ID = e.EVIDENCE_S3_TEST_ACCESS_KEY;
+    e.R2_SECRET_ACCESS_KEY = e.EVIDENCE_S3_TEST_SECRET_KEY;
+    e.R2_BUCKET = e.EVIDENCE_S3_TEST_BUCKET;
+  }
+  return {
+    proxyPort,
+    rls: undefined as PrismaClient | undefined,
+    session: null as null | { user: { id: string }; tenantId: string; role: string },
+    fault: 'pass' as Fault,
+    copied: false,
+    /** Runs while the proxy holds a CopyObject request, before it is forwarded. */
+    beforeCopy: null as null | (() => Promise<void>),
+    /** Makes one evidence call inside confirm's transaction fail, as a database error would. */
+    dbFault: null as null | 'findFirst' | 'create',
+    /** Runs before the proxy forwards any request; may hold it. */
+    hook: null as null | ((r: { method: string; path: string; isCopy: boolean }) => Promise<void>),
+    requests: [] as string[],
+    forwardAbandoned: false,
+    copyLog: [] as { at: number; dst: string; status: number }[],
+    findFirstDelay: 0,
+  };
+});
+
+const als = vi.hoisted(() => new (process.getBuiltinModule('node:async_hooks').AsyncLocalStorage)<{ user: { id: string }; tenantId: string; role: string }>());
+vi.mock('@/lib/auth', () => ({ auth: async () => als.getStore() ?? state.session }));
+vi.mock('@/lib/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/db')>();
+  // Only the named `evidence` call fails: everything else runs as usual.
+  const failing = <T extends object>(tx: T): T =>
+    new Proxy(tx, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (prop === 'evidence' && state.findFirstDelay && !state.dbFault) {
+          return new Proxy(value as object, {
+            get(d, m, r) {
+              const fn = Reflect.get(d, m, r);
+              if (m !== 'findFirst') return fn;
+              return async (...a: unknown[]) => {
+                const ms = state.findFirstDelay;
+                state.findFirstDelay = 0;
+                await new Promise((res) => setTimeout(res, ms));
+                return (fn as (...x: unknown[]) => unknown).apply(d, a);
+              };
+            },
+          });
+        }
+        if (prop !== 'evidence' || !state.dbFault) return value;
+        return new Proxy(value as object, {
+          get(d, m, r) {
+            if (m !== state.dbFault) return Reflect.get(d, m, r);
+            return async () => {
+              throw new Error(`injected: evidence.${String(m)} failed`);
+            };
+          },
+        });
+      },
+    });
+  return {
+    ...actual,
+    withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1], opts?: Parameters<typeof actual.withTenant>[2]) =>
+      actual.withTenantOn(state.rls!, tenantId, (tx) => cb(failing(tx)), opts),
+  };
+});
+vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
+
+const { createDbClient } = await import('@/lib/db');
+const evidence = await import('@/app/[locale]/(app)/[workspace]/evidence/actions');
+const storage = await import('@/lib/storage');
+
+let admin: PrismaClient | undefined;
+let proxy: http.Server | undefined;
+let ready = false;
+let skipReason = '';
+const t = { a: '', userA: '', b: '', userB: '' };
+const evidenceIds: string[] = [];
+const keys: string[] = [];
+
+const finalOf = (stagingKey: string) => stagingKey.replace(/^([^/]+)\/incoming\//, '$1/');
+const PDF = (text: string) => Buffer.from(`%PDF-1.4\n% ${text}\n%%EOF\n`);
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+const put = (url: string, body: Buffer) =>
+  fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: new Uint8Array(body) });
+
+async function uploaded(name: string) {
+  const body = PDF(name);
+  const p = await evidence.getPresignedUploadUrlAction('certificate', `${name}.pdf`, 'application/pdf', body.length);
+  if (!p.success) throw new Error(`presign refused: ${p.error}`);
+  keys.push(p.objectKey, finalOf(p.objectKey));
+  expect((await put(p.uploadUrl, body)).status).toBe(200);
+  return { ...p, finalKey: finalOf(p.objectKey), body };
+}
+
+const confirm = (objectKey: string) =>
+  evidence.confirmEvidenceUploadAction({
+    title: `${RUN} upload`,
+    category: 'CAT-03',
+    objectKey,
+    fileName: 'belge.pdf',
+    fileSizeBytes: 10,
+    mimeType: 'application/pdf',
+  });
+
+const rowsOf = (finalKey: string) => admin!.evidence.findMany({ where: { r2ObjectKey: finalKey } });
+
+/** The store as it is, read with the faults off. */
+async function stored(key: string) {
+  const fault = state.fault;
+  state.fault = 'pass';
+  try {
+    return await storage.getObjectBytes(key);
+  } finally {
+    state.fault = fault;
+  }
+}
+
+/** A failed confirm: an error, no row, and the upload still under its staging key. */
+async function expectNothingLost(up: Awaited<ReturnType<typeof uploaded>>, res: Awaited<ReturnType<typeof confirm>>, error: string) {
+  expect(res).toEqual({ success: false, error });
+  expect(await rowsOf(up.finalKey)).toHaveLength(0);
+  expect((await stored(up.objectKey))?.equals(up.body), 'the staging object is kept for the next try').toBe(true);
+}
+
+/** The retry: one row with the store's figures, the checked bytes under the final key, no staging object. */
+async function expectRetrySucceeds(up: Awaited<ReturnType<typeof uploaded>>) {
+  state.fault = 'pass';
+  state.dbFault = null;
+  state.hook = null;
+  const res = await confirm(up.objectKey);
+  expect(res.success).toBe(true);
+  const rows = await rowsOf(up.finalKey);
+  evidenceIds.push(...rows.map((r) => r.id));
+  expect(rows).toHaveLength(1);
+  expect(res.success && res.evidence && 'id' in res.evidence ? res.evidence.id : null).toBe(rows[0]?.id);
+  expect(rows[0]?.fileSizeBytes).toBe(up.body.length);
+  expect((await stored(up.finalKey))?.equals(up.body)).toBe(true);
+  expect(await stored(up.objectKey), 'the staging object goes once the row is saved').toBeNull();
+}
+
+beforeAll(async () => {
+  if (!S3.endpoint || !S3.accessKey || !S3.secretKey || !S3.bucket) {
+    skipReason = 'EVIDENCE_S3_TEST_* not set (no S3-compatible store to test against).';
+    if (!isCi()) console.warn(`[${SUITE}] skipped: ${skipReason}`);
+    return;
+  }
+  const rlsUrl = requireRlsTestUrl(RLS_URL, SUITE);
+  if (!ADMIN_URL) skipOrFailInCi(SUITE, 'DATABASE_URL is not set');
+  if (!rlsUrl || !ADMIN_URL) {
+    skipReason = 'DATABASE_URL_RLS_TEST / DATABASE_URL not set. Run `pnpm db:rls-role`.';
+    return;
+  }
+
+  const upstream = new URL(S3.endpoint);
+  proxy = http.createServer(async (req, res) => {
+    const isCopy = req.method === 'PUT' && Boolean(req.headers['x-amz-copy-source']);
+    state.requests.push(`${req.method}${isCopy ? '(copy)' : ''} ${(req.url ?? '').split('?')[0]}`);
+    if (state.fault === 'down' || (state.fault === 'dieAfterCopy' && state.copied)) {
+      req.socket.destroy();
+      return;
+    }
+    if (state.fault === 'slowAfterCopy' && state.copied) await sleep(6_000);
+    if (isCopy && state.beforeCopy) {
+      const hook = state.beforeCopy;
+      state.beforeCopy = null;
+      await hook();
+    }
+    if (state.hook) await state.hook({ method: req.method ?? '', path: (req.url ?? '').split('?')[0] ?? '', isCopy });
+    // A client that gave up while the request was held is not forwarded.
+    if (req.socket.destroyed && !state.forwardAbandoned) return;
+    if (req.socket.destroyed && state.forwardAbandoned) {
+      // The store got the request before the client gave up and finishes it anyway.
+      const late = http.request({ host: upstream.hostname, port: upstream.port, method: req.method, path: req.url, headers: req.headers }, (ur) => {
+        ur.resume();
+        ur.on('end', () => state.copyLog.push({ at: Date.now(), dst: 'LATE ' + ((req.url ?? '').split('?')[0] ?? ''), status: ur.statusCode ?? 0 }));
+      });
+      late.on('error', () => {});
+      late.end();
+      return;
+    }
+    const up = http.request(
+      { host: upstream.hostname, port: upstream.port, method: req.method, path: req.url, headers: req.headers },
+      (ur) => {
+        res.writeHead(ur.statusCode ?? 502, ur.headers);
+        ur.pipe(res);
+        ur.on('end', () => {
+          if (isCopy) state.copyLog.push({ at: Date.now(), dst: (req.url ?? '').split('?')[0] ?? '', status: ur.statusCode ?? 0 });
+          if (isCopy && (ur.statusCode ?? 0) < 300) state.copied = true;
+        });
+      }
+    );
+    up.on('error', () => res.destroy());
+    req.pipe(up);
+  });
+  await new Promise<void>((resolve, reject) => {
+    proxy!.once('error', reject);
+    proxy!.listen(state.proxyPort, '127.0.0.1', () => resolve());
+  });
+
+  state.rls = createDbClient(rlsUrl);
+  admin = createDbClient(ADMIN_URL);
+  try {
+    await state.rls.$connect();
+  } catch (e) {
+    skipReason = `database unavailable: ${e instanceof Error ? e.message : String(e)}`;
+    skipOrFailInCi(SUITE, skipReason);
+    return;
+  }
+  await assertRlsSubjectRole(state.rls, SUITE);
+  expect(storage.hasObjectStore, 'storage.ts must be talking to the test store').toBe(true);
+
+  const tenant = await admin.tenant.create({
+    data: { name: `${RUN} Kurum`, slug: RUN, country: 'TR', kind: 'ORGANIZATION' },
+    select: { id: true },
+  });
+  t.a = tenant.id;
+  t.userA = (await admin.user.create({ data: { email: `${RUN}@example.invalid`, name: 'a' } })).id;
+  t.b = (await admin.tenant.create({ data: { name: `${RUN} B`, slug: `${RUN}-b`, country: 'TR', kind: 'ORGANIZATION' }, select: { id: true } })).id;
+  t.userB = (await admin.user.create({ data: { email: `${RUN}-b@example.invalid`, name: 'b' } })).id;
+  ready = true;
+});
+
+beforeEach(({ skip }) => {
+  if (!ready) skip(skipReason);
+  state.session = { user: { id: t.userA }, tenantId: t.a, role: 'TENANT_OWNER' };
+  state.fault = 'pass';
+  state.copied = false;
+  state.beforeCopy = null;
+  state.dbFault = null;
+  state.hook = null;
+  state.requests = [];
+  state.forwardAbandoned = false;
+  state.copyLog = [];
+  state.findFirstDelay = 0;
+});
+
+afterAll(async () => {
+  state.fault = 'pass';
+  for (const key of keys) await storage.deleteObjectBytes(key).catch(() => {});
+  if (admin) {
+    await admin.evidence.deleteMany({ where: { id: { in: presentIds(evidenceIds) } } }).catch(() => {});
+    for (const tenantId of presentIds([t.a, t.b])) {
+      await admin.evidence.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } }).catch(() => {});
+      await admin.tenant.delete({ where: { id: tenantId } }).catch(() => {});
+    }
+    await admin.user.deleteMany({ where: { id: { in: presentIds([t.userA, t.userB]) } } }).catch(() => {});
+    await admin.$disconnect();
+  }
+  await state.rls?.$disconnect();
+  await new Promise((resolve) => (proxy ? proxy.close(resolve) : resolve(undefined)));
+});
+
+
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+
+const lockKeyOf = (finalKey: string) => createHash('sha256').update(`evidence-confirm:${finalKey}`).digest().readBigInt64BE(0);
+const log = (...a: unknown[]) => console.log('ATK', ...a);
+const sameLen = (up: { body: Buffer }, tag: string) => {
+  const b = PDF(tag.padEnd(up.body.length - PDF('').length, tag.slice(-1)));
+  expect(b.length).toBe(up.body.length);
+  return b;
+};
+
+describe('İNCELEME-92 devop-fb saldırıları', () => {
+  test('RACE-N: 6 eşzamanlı confirm + araya 6 farklı PUT — success sonrası final nesne asla değişmez', async () => {
+    for (let round = 0; round < 3; round += 1) {
+      const up = await uploaded(`race-n-${round}`);
+      const variants = Array.from({ length: 6 }, (_, i) => sameLen(up, `V${round}${i}-`));
+      state.hook = async ({ isCopy, method }) => {
+        if (isCopy) await sleep(700 + Math.random() * 800);
+        else if (method === 'HEAD') await sleep(Math.random() * 300);
+      };
+      let successAt = 0;
+      let bytesAtSuccess: Buffer | null = null;
+      const puts = (async () => {
+        for (const v of variants) {
+          await sleep(250 + Math.random() * 300);
+          await put(up.uploadUrl, v);
+        }
+      })();
+      const results = await Promise.all(
+        Array.from({ length: 6 }, async (_, i) => {
+          await sleep(i * 180);
+          const r = await confirm(up.objectKey);
+          if (r.success && !successAt) {
+            successAt = Date.now();
+            bytesAtSuccess = await stored(up.finalKey);
+          }
+          return r;
+        })
+      );
+      await puts;
+      state.hook = null;
+      await sleep(3_000);
+      const rows = await rowsOf(up.finalKey);
+      evidenceIds.push(...rows.map((r) => r.id));
+      const finalNow = await stored(up.finalKey);
+      const lateCopies = state.copyLog.filter((c) => c.dst.endsWith(up.finalKey) && c.at > successAt && c.status < 300);
+      const errs = results.map((r) => (r.success ? 'success' : r.error));
+      log(`RACE-N r${round}: ${errs.join(',')} rows=${rows.length} copies=${state.copyLog.length} lateCopiesAfterSuccess=${lateCopies.length} finalUnchanged=${bytesAtSuccess ? finalNow?.equals(bytesAtSuccess) : 'n/a'} size==row=${finalNow?.length === rows[0]?.fileSizeBytes}`);
+      expect(errs.filter((e) => e === 'success')).toHaveLength(1);
+      expect(rows).toHaveLength(1);
+      expect(lateCopies).toHaveLength(0);
+      expect(finalNow?.equals(bytesAtSuccess!)).toBe(true);
+      expect(finalNow?.length).toBe(rows[0]?.fileSizeBytes);
+      state.copyLog = [];
+    }
+  }, 180_000);
+
+  test('kilit kapsamı: A kiracısının kilitli yavaş kopyası B kiracısının confirm\'ünü bekletmez', async () => {
+    const upA = await uploaded('scope-a');
+    const sessionB = { user: { id: t.userB }, tenantId: t.b, role: 'TENANT_OWNER' };
+    const upB = await als.run(sessionB, () => uploaded('scope-b'));
+    let held = false;
+    state.hook = async ({ isCopy, path }) => {
+      if (isCopy && path.endsWith(upA.finalKey) && !held) {
+        held = true;
+        await sleep(8_000);
+      }
+    };
+    const a = confirm(upA.objectKey);
+    await sleep(500);
+    const t0 = Date.now();
+    const b = await als.run(sessionB, () => confirm(upB.objectKey));
+    const tookB = Date.now() - t0;
+    const ra = await a;
+    state.hook = null;
+    evidenceIds.push(...(await rowsOf(upA.finalKey)).map((r) => r.id), ...(await rowsOf(upB.finalKey)).map((r) => r.id));
+    log(`SCOPE: A=${ra.success} B=${b.success} B took ${tookB} ms while A's copy was held 8 s`);
+    expect(b.success).toBe(true);
+    expect(tookB).toBeLessThan(2_000);
+  }, 60_000);
+
+  test('havuz: 10 yavaş confirm (kopya 12 sn) havuzun 10 bağlantısını tutar — B kiracısının sıradan sorgusu ne olur?', async () => {
+    const ups = await Promise.all(Array.from({ length: 10 }, (_, i) => uploaded(`pool-${i}`)));
+    state.hook = async ({ isCopy }) => {
+      if (isCopy) await sleep(12_000);
+    };
+    const all = ups.map((u) => confirm(u.objectKey));
+    await sleep(1_500);
+    const { withTenantOn } = await import('@/lib/db');
+    const probes: string[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      const t0 = Date.now();
+      try {
+        await withTenantOn(state.rls!, t.b, (tx) => tx.evidence.count());
+        probes.push(`ok ${Date.now() - t0}ms`);
+      } catch (e) {
+        probes.push(`FAIL ${Date.now() - t0}ms ${(e instanceof Error ? e.message : String(e)).split('\n').slice(-1)[0]?.slice(0, 90)}`);
+      }
+      await sleep(1_000);
+    }
+    const res = await Promise.all(all);
+    state.hook = null;
+    for (const u of ups) evidenceIds.push(...(await rowsOf(u.finalKey)).map((r) => r.id));
+    log(`POOL: confirms=${res.map((r) => (r.success ? 'ok' : r.error)).join(',')} | B-probes: ${probes.join(' | ')}`);
+  }, 90_000);
+
+  const holder = (key: bigint) =>
+    spawn(process.execPath, ['-e', `
+      const pg = require(${JSON.stringify(require.resolve('pg', { paths: [process.cwd()] }))});
+      const c = new pg.Client({ connectionString: ${JSON.stringify(ADMIN_URL)} });
+      (async () => { await c.connect(); await c.query('BEGIN'); await c.query('SELECT pg_advisory_xact_lock($1::bigint)', [${JSON.stringify(key.toString())}]);
+        const r = await c.query('SELECT pg_backend_pid() AS p'); console.log('LOCKED', r.rows[0].p); setInterval(() => {}, 1e6); })();
+    `], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const lockedBy = async (key: bigint) =>
+    Number((await admin!.$queryRaw<{ n: bigint }[]>`SELECT count(*)::bigint AS n FROM pg_locks WHERE locktype='advisory' AND granted AND ((classid::bigint << 32) | objid::bigint) = ${key}`)[0]?.n ?? 0);
+  const waitLocked = (cp: ReturnType<typeof spawn>) =>
+    new Promise<number>((res) => cp.stdout!.on('data', (d: Buffer) => { const m = /LOCKED (\d+)/.exec(String(d)); if (m) res(Number(m[1])); }));
+
+  test('süreç ölümü: kilidi tutan süreç SIGKILL → kilit hemen bırakılır; SIGSTOP (donma) → kilit süresiz tutulur', async () => {
+    const up = await uploaded('holder');
+    const key = lockKeyOf(up.finalKey);
+    // --- SIGSTOP
+    const cp = holder(key);
+    const pid = await waitLocked(cp);
+    process.kill(cp.pid!, 'SIGSTOP');
+    const t0 = Date.now();
+    const r1 = await confirm(up.objectKey);
+    const took1 = Date.now() - t0;
+    await sleep(2_000);
+    const act = await admin!.$queryRaw<{ state: string; secs: number }[]>`SELECT state, extract(epoch FROM now()-state_change)::int AS secs FROM pg_stat_activity WHERE pid=${pid}`;
+    const iit = await admin!.$queryRaw<{ v: string }[]>`SELECT current_setting('idle_in_transaction_session_timeout') AS v`;
+    const locks1 = await lockedBy(key);
+    log(`SIGSTOP: confirm=${JSON.stringify(r1)} in ${took1} ms; holder backend state=${act[0]?.state} for ${act[0]?.secs}s; advisory granted=${locks1}; idle_in_transaction_session_timeout=${iit[0]?.v}`);
+    expect(r1).toEqual({ success: false, error: 'save_failed' });
+    expect((await stored(up.objectKey))?.equals(up.body)).toBe(true);
+    // --- SIGKILL (still stopped; SIGKILL works on stopped processes)
+    const tk = Date.now();
+    process.kill(cp.pid!, 'SIGKILL');
+    let released = -1;
+    for (let i = 0; i < 100; i += 1) {
+      if ((await lockedBy(key)) === 0) { released = Date.now() - tk; break; }
+      await sleep(50);
+    }
+    log(`SIGKILL: advisory lock released after ${released} ms`);
+    expect(released).toBeGreaterThanOrEqual(0);
+    const r2 = await confirm(up.objectKey);
+    evidenceIds.push(...(await rowsOf(up.finalKey)).map((r) => r.id));
+    log(`after SIGKILL retry: ${r2.success ? 'success' : JSON.stringify(r2)}`);
+    expect(r2.success).toBe(true);
+  }, 90_000);
+
+  test('lock_timeout sızmaz: confirm\'lerden sonra havuzdaki bağlantılarda lock_timeout=0; deadlock sayacı artmaz', async () => {
+    const dl0 = (await admin!.$queryRaw<{ d: bigint }[]>`SELECT deadlocks AS d FROM pg_stat_database WHERE datname=current_database()`)[0]!.d;
+    const ups = await Promise.all(Array.from({ length: 5 }, (_, i) => uploaded(`dl-${i}`)));
+    state.hook = async ({ isCopy }) => { if (isCopy) await sleep(Math.random() * 400); };
+    const res = await Promise.all(Array.from({ length: 30 }, (_, i) => sleep(Math.random() * 500).then(() => confirm(ups[i % 5]!.objectKey))));
+    state.hook = null;
+    for (const u of ups) evidenceIds.push(...(await rowsOf(u.finalKey)).map((r) => r.id));
+    const dl1 = (await admin!.$queryRaw<{ d: bigint }[]>`SELECT deadlocks AS d FROM pg_stat_database WHERE datname=current_database()`)[0]!.d;
+    const lt = await Promise.all(Array.from({ length: 12 }, () => state.rls!.$queryRaw<{ v: string }[]>`SELECT current_setting('lock_timeout') AS v, pg_backend_pid() AS p`));
+    const tally = res.reduce<Record<string, number>>((m, r) => ((m[r.success ? 'success' : r.error] = (m[r.success ? 'success' : r.error] ?? 0) + 1), m), {});
+    const rowsPerKey = await Promise.all(ups.map(async (u) => (await rowsOf(u.finalKey)).length));
+    log(`STORM: ${JSON.stringify(tally)} rowsPerKey=${rowsPerKey.join(',')} deadlocks ${dl0}->${dl1} lock_timeout on pool conns=${[...new Set(lt.map((x) => x[0]!.v))].join(',')}`);
+    expect(tally.success).toBe(5);
+    expect(rowsPerKey).toEqual([1, 1, 1, 1, 1]);
+    expect(dl1).toBe(dl0);
+    expect(new Set(lt.map((x) => x[0]!.v))).toEqual(new Set(['0']));
+  }, 90_000);
+
+  test('geç kopya (depo iptal edilen CopyObject\'i sonra tamamlar): staging değiştiyse CopySourceIfMatch reddeder; aynı baytlar geri PUT edilirse final değişir', async () => {
+    // (a) staging v2 now: the late v1 copy is refused by the store
+    const up = await uploaded('late-a');
+    const v2 = sameLen(up, 'LATE2-');
+    let n = 0;
+    state.forwardAbandoned = true;
+    state.hook = async ({ isCopy }) => {
+      if (!isCopy) return;
+      n += 1;
+      if (n === 1) await sleep(storage.EVIDENCE_COPY_DEADLINE_MS + 4_000);
+    };
+    const pA = confirm(up.objectKey);
+    await sleep(storage.EVIDENCE_COPY_DEADLINE_MS + 1_000); // A has given up (storage_unavailable), lock is free
+    const rA = await pA;
+    expect((await put(up.uploadUrl, v2)).status).toBe(200);
+    const rC = await confirm(up.objectKey); // C checks and records v2
+    await sleep(5_000); // A's abandoned copy reaches the store now
+    const rowsA = await rowsOf(up.finalKey);
+    evidenceIds.push(...rowsA.map((r) => r.id));
+    const finalA = await stored(up.finalKey);
+    log(`LATE(a): A=${JSON.stringify(rA)} C=${rC.success} copies=${JSON.stringify(state.copyLog.map((c) => c.status))} final==v2(recorded)=${finalA?.equals(v2)}`);
+    expect(finalA?.equals(v2)).toBe(true);
+
+    // (b) attacker re-PUTs the v1 bytes after C succeeds: the late copy's IfMatch etag matches again
+    state.copyLog = [];
+    const up2 = await uploaded('late-b');
+    const w2 = sameLen(up2, 'LATEB-');
+    n = 0;
+    const pA2 = confirm(up2.objectKey);
+    await sleep(storage.EVIDENCE_COPY_DEADLINE_MS + 1_000);
+    const rA2 = await pA2;
+    expect((await put(up2.uploadUrl, w2)).status).toBe(200);
+    const rC2 = await confirm(up2.objectKey);
+    expect((await put(up2.uploadUrl, up2.body)).status).toBe(200); // same bytes → same etag as A checked
+    await sleep(5_000);
+    const rowsB = await rowsOf(up2.finalKey);
+    evidenceIds.push(...rowsB.map((r) => r.id));
+    const finalB = await stored(up2.finalKey);
+    log(`LATE(b): A=${JSON.stringify(rA2)} C=${rC2.success} copies=${JSON.stringify(state.copyLog.map((c) => c.status))} final==recorded(w2)=${finalB?.equals(w2)} final==v1(A-checked)=${finalB?.equals(up2.body)} rows=${rowsB.length}`);
+    state.hook = null;
+    state.forwardAbandoned = false;
+  }, 120_000);
+
+  test('tx süresi varsayımı: kilit alındıktan sonra DB 27 sn yavaşsa tx (40 sn) kopya bitmeden kapanır', async () => {
+    const up = await uploaded('txtime');
+    state.findFirstDelay = 27_000;
+    state.hook = async ({ isCopy }) => { if (isCopy) await sleep(14_000); };
+    const t0 = Date.now();
+    const rA = await confirm(up.objectKey);
+    const took = Date.now() - t0;
+    state.hook = null;
+    await sleep(1_000);
+    const rows = await rowsOf(up.finalKey);
+    evidenceIds.push(...rows.map((r) => r.id));
+    log(`TXTIME: A=${JSON.stringify(rA.success ? 'success' : rA)} took=${took}ms rows=${rows.length} finalExists=${Boolean(await stored(up.finalKey))} stagingKept=${Boolean(await stored(up.objectKey))}`);
+  }, 90_000);
+});

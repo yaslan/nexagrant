@@ -1,0 +1,39 @@
+KILLED   M1 kilit findFirst'ten SONRA :: Tests  2 failed | 118 passed (120) (45s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key > RACE-2: a 
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key > five confi
+          × RACE-2: a second confirm that starts before the first one saved its row cannot change the file the first one recorded 1600ms
+          × five confirms at once: one row, one copy, the uploaded bytes on the final key 62ms
+SURVIVED M2 lock_timeout oturum düzeyi (is_local=false) :: Tests  120 passed (120) (45s)
+KILLED   M3 oturum kilidi pg_advisory_lock :: Tests  1 failed | 119 passed (120) (61s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key > five confi
+          × five confirms at once: one row, one copy, the uploaded bytes on the final key 10060ms
+KILLED   M4 pg_try_advisory_xact_lock (beklemez) :: Tests  3 failed | 117 passed (120) (47s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key > RACE-2: a 
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key > a confirm 
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key > five confi
+          × RACE-2: a second confirm that starts before the first one saved its row cannot change the file the first one recorded 2579ms
+          × a confirm waits for the one ahead of it only so long: save_failed, nothing copied or lost; the first still succeeds 11025ms
+          × five confirms at once: one row, one copy, the uploaded bytes on the final key 122ms
+SURVIVED M5 kilit anahtarı kiracı geneli :: Tests  120 passed (120) (51s)
+KILLED   M6 await yok (PrismaPromise hiç koşmaz) :: Tests  3 failed | 117 passed (120) (53s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key > RACE-2: a 
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key > a confirm 
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key > five confi
+          × RACE-2: a second confirm that starts before the first one saved its row cannot change the file the first one recorded 2586ms
+          × a confirm waits for the one ahead of it only so long: save_failed, nothing copied or lost; the first still succeeds 11089ms
+          × five confirms at once: one row, one copy, the uploaded bytes on the final key 438ms
+KILLED   M7 süre sınırı çağrı başına (toplam 60 sn) :: Tests  1 failed | 119 passed (120) (51s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the upload > the stor
+          × the store holds the copy past its deadline: storage_unavailable in bounded time, nothing lost; the retry succeeds 15252ms
+SURVIVED M8 HEAD/GET süre sınırsız (yalnız kopya) :: Tests  120 passed (120) (46s)
+SURVIVED M9 P2002 dalında staging silinmez :: Tests  120 passed (120) (45s)
+SURVIVED M10 desende $ yok :: Tests  120 passed (120) (45s)
+KILLED   M11 iç-içe incoming kontrolü yok :: Tests  3 failed | 117 passed (120) (46s)
+          FAIL  tests/evidence-incoming-key.test.ts > finalKeyOfIncoming takes only the presign’s shape > refuses incoming as the organisation
+          FAIL  tests/evidence-incoming-key.test.ts > finalKeyOfIncoming takes only the presign’s shape > refuses nested incoming, full shape below it
+          FAIL  tests/evidence-mock-upload-gate.test.ts > mock-upload takes only a staging key of the presign’s shape (D-1, TASK-MUO122UPRPJQH) > a ne
+          × a nested incoming key is refused and nothing is stored 11ms
+          × refuses incoming as the organisation 12ms
+          × refuses nested incoming, full shape below it 9ms
+SURVIVED M12 tx süresi = kilit + kopya (payı yok, 25 sn) :: Tests  120 passed (120) (48s)
+restored: git status src clean

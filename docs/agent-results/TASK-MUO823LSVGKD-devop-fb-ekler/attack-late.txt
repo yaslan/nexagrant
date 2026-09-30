@@ -1,0 +1,25 @@
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/c3539f56-fd06-48ed-bf74-0334dfba3851/scratchpad/wt92
+
+ ↓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > RACE-N: 6 eşzamanlı confirm + araya 6 farklı PUT — success sonrası final nesne asla değişmez
+ ↓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > kilit kapsamı: A kiracısının kilitli yavaş kopyası B kiracısının confirm'ünü bekletmez
+ ↓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > havuz: 10 yavaş confirm (kopya 12 sn) havuzun 10 bağlantısını tutar — B kiracısının sıradan sorgusu ne olur?
+ ↓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > süreç ölümü: kilidi tutan süreç SIGKILL → kilit hemen bırakılır; SIGSTOP (donma) → kilit süresiz tutulur
+ ↓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > lock_timeout sızmaz: confirm'lerden sonra havuzdaki bağlantılarda lock_timeout=0; deadlock sayacı artmaz
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > geç kopya (depo iptal edilen CopyObject'i sonra tamamlar): staging değiştiyse CopySourceIfMatch reddeder; aynı baytlar geri PUT edilirse final değişir
+ATK LATE(a): A={"success":false,"error":"storage_unavailable"} C=true copies=[200,404] final==v2(recorded)=true
+
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > geç kopya (depo iptal edilen CopyObject'i sonra tamamlar): staging değiştiyse CopySourceIfMatch reddeder; aynı baytlar geri PUT edilirse final değişir
+ATK LATE(b): A={"success":false,"error":"storage_unavailable"} C=true copies=[200,200] final==recorded(w2)=false final==v1(A-checked)=true rows=1
+
+ ✓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > geç kopya (depo iptal edilen CopyObject'i sonra tamamlar): staging değiştiyse CopySourceIfMatch reddeder; aynı baytlar geri PUT edilirse final değişir 42229ms
+ ↓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > tx süresi varsayımı: kilit alındıktan sonra DB 27 sn yavaşsa tx (40 sn) kopya bitmeden kapanır
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 6 skipped (7)
+   Start at  18:02:06
+   Duration  42.77s (transform 112ms, setup 0ms, import 291ms, tests 42.39s, environment 0ms)
+
