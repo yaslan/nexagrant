@@ -1,0 +1,66 @@
+[YENİ] KALİBRASYON sayfa HTML 170291B işaretçi:YOK | RSC 129627B işaretçi:YOK
+[YENİ] S1 fetch ECONNREFUSED: HTTP 200 198ms → {"success":false,"errorCode":"IMPORT_FAILED"}
+[YENİ]    eylem yanıtında iç metin: YOK
+[YENİ]    DB run: FAILED | fetch failed
+[YENİ]    alarm meta.error: fetch failed
+[YENİ]    handleGetK2Status HTTP 200 iç metin: YOK
+[YENİ]    GET /tr/admin/cordis HTML 170062B iç metin: YOK | RSC 129445B iç metin: YOK
+[YENİ] S2 fetch zaman aşımı: HTTP 200 1619ms → {"success":false,"errorCode":"IMPORT_FAILED"}
+[YENİ]    eylem yanıtında iç metin: YOK
+[YENİ]    DB run: FAILED | The operation was aborted due to timeout
+[YENİ]    alarm meta.error: The operation was aborted due to timeout
+[YENİ]    handleGetK2Status HTTP 200 iç metin: YOK
+[YENİ]    GET /tr/admin/cordis HTML 170062B iç metin: YOK | RSC 129445B iç metin: YOK
+[YENİ] S3 HTTP 503: HTTP 200 95ms → {"success":false,"errorCode":"IMPORT_FAILED"}
+[YENİ]    eylem yanıtında iç metin: YOK
+[YENİ]    DB run: FAILED | Failed to download CORDIS zip from https://cordis.europa.eu/data/cordis-HORIZONprojects-csv.zip: Service Unavailable
+[YENİ]    alarm meta.error: Failed to download CORDIS zip from https://cordis.europa.eu/data/cordis-HORIZONprojects-csv.zip: Ser
+[YENİ]    handleGetK2Status HTTP 200 iç metin: YOK
+[YENİ]    GET /tr/admin/cordis HTML 170062B iç metin: YOK | RSC 129445B iç metin: YOK
+[YENİ] S4 zip değil: HTTP 200 86ms → {"success":false,"errorCode":"IMPORT_FAILED"}
+[YENİ]    eylem yanıtında iç metin: YOK
+[YENİ]    DB run: FAILED | FILE_ENDED
+[YENİ]    alarm meta.error: FILE_ENDED
+[YENİ]    handleGetK2Status HTTP 200 iç metin: YOK
+[YENİ]    GET /tr/admin/cordis HTML 170062B iç metin: YOK | RSC 129445B iç metin: YOK
+[YENİ] S5 zip içinde CSV yok: HTTP 200 89ms → {"success":false,"errorCode":"IMPORT_FAILED"}
+[YENİ]    eylem yanıtında iç metin: YOK
+[YENİ]    DB run: FAILED | Required CORDIS CSV files (project.csv, organization.csv) not found in archive
+[YENİ]    alarm meta.error: Required CORDIS CSV files (project.csv, organization.csv) not found in archive
+[YENİ]    handleGetK2Status HTTP 200 iç metin: YOK
+[YENİ]    GET /tr/admin/cordis HTML 170062B iç metin: YOK | RSC 129445B iç metin: YOK
+[YENİ] S6 CSV bozuk → bütçe aşımı: HTTP 200 144ms → {"success":false,"errorCode":"SKIP_LIMIT_EXCEEDED"}
+[YENİ]    eylem yanıtında iç metin: YOK
+[YENİ]    DB run: FAILED | CORDIS dump rejected: skipped records over the 0.1% limit — project.csv: 1/2 skipped (line 3: expected 22 fields, got 3)
+[YENİ]    alarm meta.error: CORDIS dump rejected: skipped records over the 0.1% limit — project.csv: 1/2 skipped (line 3: expect
+[YENİ]    handleGetK2Status HTTP 200 iç metin: YOK
+[YENİ]    GET /tr/admin/cordis HTML 170062B iç metin: YOK | RSC 129445B iç metin: YOK
+[YENİ] S7 iyi zip (başarı): HTTP 200 229ms → {"success":true,"runId":"cmuocl0s6000h05xk93xdfkir","skipped":false,"fileHash":"f8b9cf88bdffd763d823f010a250d4ffc2e4f5d373af2a6881a7edb1522fc6e5","rowCounts":{"
+[YENİ]    eylem yanıtında iç metin: YOK
+[YENİ]    DB run: SUCCESS | -
+[YENİ]    alarm meta.error: (yeni alarm satırı yok)
+[YENİ]    handleGetK2Status HTTP 200 iç metin: YOK
+[YENİ]    GET /tr/admin/cordis HTML 170291B iç metin: YOK | RSC 129627B iç metin: YOK
+[YENİ] S8 Prisma: tablo yok: HTTP 200 165ms → {"success":false,"errorCode":"IMPORT_FAILED"}
+[YENİ]    eylem yanıtında iç metin: YOK
+[YENİ]    DB run: FAILED | 
+Invalid `prisma.cordisOrganization.upsert()` invocation:
+
+
+The table `public.CordisOrganization` does not exist in the current database.
+[YENİ]    alarm meta.error: Invalid `prisma.cordisOrganization.upsert()` invocation:
+
+
+The table `public.CordisOrganization` do
+[YENİ]    handleGetK2Status HTTP 200 iç metin: YOK
+[YENİ]    GET /tr/admin/cordis HTML 170062B iç metin: YOK | RSC 129445B iç metin: YOK
+[YENİ] S9 Prisma: işlem zaman aşımı (kilit): HTTP 200 133555ms → {"success":true,"runId":"cmuocl335000l05xkjnlzfglx","skipped":false,"fileHash":"f8b9cf88bdffd763d823f010a250d4ffc2e4f5d373af2a6881a7edb1522fc6e5","rowCounts":{"
+[YENİ]    eylem yanıtında iç metin: YOK
+[YENİ]    DB run: SUCCESS | -
+[YENİ]    alarm meta.error: (yeni alarm satırı yok)
+[YENİ]    handleGetK2Status HTTP 200 iç metin: YOK
+[YENİ]    GET /tr/admin/cordis HTML 170291B iç metin: YOK | RSC 129627B iç metin: YOK
+[YENİ] S10 Prisma: try öncesi (run satırı yazılamaz): HTTP 500 148ms → E{"digest":"4077086484"}
+[YENİ]    eylem yanıtında iç metin: YOK
+[YENİ]    handleGetK2Status HTTP 200 iç metin: YOK
+[YENİ]    GET /tr/admin/cordis HTML 170291B iç metin: YOK | RSC 129627B iç metin: YOK

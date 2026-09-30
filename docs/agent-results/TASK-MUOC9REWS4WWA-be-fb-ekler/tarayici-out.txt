@@ -1,0 +1,13 @@
+[yeni-tr-IMPORT_FAILED] role=alert/span metni: "İçe aktarım hatası: içe aktarım tamamlanamadı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında." → /private/tmp/claude-501/-Users-macbook-alan/42270122-38ce-4028-bd86-cac05dc40d78/scratchpad/shots/yeni-tr-IMPORT_FAILED.png
+[yeni-en-IMPORT_FAILED] role=alert/span metni: "Import failed: the import could not finish. Details are in the run record and in system alerts." → /private/tmp/claude-501/-Users-macbook-alan/42270122-38ce-4028-bd86-cac05dc40d78/scratchpad/shots/yeni-en-IMPORT_FAILED.png
+[yeni-tr-SKIP_LIMIT_EXCEEDED] role=alert/span metni: "İçe aktarım hatası: CORDIS dökümünde okunamayan kayıt sayısı sınırı aştı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında." → /private/tmp/claude-501/-Users-macbook-alan/42270122-38ce-4028-bd86-cac05dc40d78/scratchpad/shots/yeni-tr-SKIP_LIMIT_EXCEEDED.png
+[yeni-en-SKIP_LIMIT_EXCEEDED] role=alert/span metni: "Import failed: the CORDIS dump has more unreadable records than the limit allows. Details are in the run record and in system alerts." → /private/tmp/claude-501/-Users-macbook-alan/42270122-38ce-4028-bd86-cac05dc40d78/scratchpad/shots/yeni-en-SKIP_LIMIT_EXCEEDED.png
+[taban-tr-sizinti] role=alert/span metni: "İçe Aktarım Hatası: fetch failed" → /private/tmp/claude-501/-Users-macbook-alan/42270122-38ce-4028-bd86-cac05dc40d78/scratchpad/shots/taban-tr-sizinti.png
+    at file:///private/tmp/claude-501/-Users-macbook-alan/42270122-38ce-4028-bd86-cac05dc40d78/scratchpad/wt/node_modules/.befb/shots.mjs:26:16
+
+Node.js v26.5.0
+    at file:///private/tmp/claude-501/-Users-macbook-alan/42270122-38ce-4028-bd86-cac05dc40d78/scratchpad/wtb/node_modules/.befb/shots.mjs:26:16
+
+Node.js v26.5.0
+[yeni-tr-eylem-firlatir] role=alert/span metni: "İçe aktarım hatası: içe aktarım tamamlanamadı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında." → /private/tmp/claude-501/-Users-macbook-alan/42270122-38ce-4028-bd86-cac05dc40d78/scratchpad/shots/yeni-tr-eylem-firlatir.png
+[taban-tr-eylem-firlatir] role=alert/span metni: "İçe Aktarım Hatası: Minified React error #441; visit https://react.dev/errors/441 for the full message or use the non-minified dev environment for full errors and additional helpful warnings." → /private/tmp/claude-501/-Users-macbook-alan/42270122-38ce-4028-bd86-cac05dc40d78/scratchpad/shots/taban-tr-eylem-firlatir.png

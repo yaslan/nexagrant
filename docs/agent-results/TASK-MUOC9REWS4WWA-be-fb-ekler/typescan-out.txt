@@ -1,0 +1,18 @@
+use-server dosya=36 export fonksiyon=127 serbest-string hata-adlı alan=17
+app/[locale]/(app)/[workspace]/approvals/actions.ts submitApprovalRequestAction → ret.request.description: string | null | undefined
+app/[locale]/(app)/[workspace]/approvals/actions.ts approveRequestAction → ret.reason: string | undefined
+app/[locale]/(app)/[workspace]/approvals/actions.ts rejectRequestAction → ret.reason: string | undefined
+app/[locale]/(app)/[workspace]/approvals/actions.ts cancelRequestAction → ret.reason: string | undefined
+app/[locale]/(app)/[workspace]/dashboard/export-csv.ts exportDashboardCSV → ret.error: string | undefined
+app/[locale]/(app)/[workspace]/evidence/actions.ts getEvidenceItemsAction → ret[].description: string | undefined
+app/[locale]/(app)/[workspace]/evidence/actions.ts confirmEvidenceUploadAction → ret.evidence.description: string | null
+app/[locale]/(app)/[workspace]/evidence/actions.ts createEvidence → ret.description: string | undefined
+app/[locale]/accept-invite/continue/actions.ts startInvitationSignInAction → ret.error: string
+app/[locale]/accept-invite/continue/actions.ts acceptInvitationAction → ret.error: string
+app/[locale]/admin/alerts/actions.ts setAlertResolved → ret.error: string | undefined
+app/[locale]/admin/feedback/actions.ts triageFeedbackEntry → ret.error: string | undefined
+app/[locale]/admin/settings/actions.ts sendSmtpTestEmail → ret.error: string
+lib/actions/auth.ts loginWithCredentialsAction → ret.error: string
+lib/actions/auth.ts loginWithSocialAction → ret.error: string
+modules/m11/server/actions.ts acquireSectionLock → ret.message: string
+modules/m9/server/actions.ts generateMeetingBrief → ret.error: string

@@ -1,0 +1,26 @@
+[ERROR] [k2-cordis] import failed [TypeError: fetch failed] {
+} {"runId":"cmuoch346000105xkfgp51fgn","dataset":"HORIZON","errorCode":"IMPORT_FAILED"}
+[ERROR] [k2-cordis] import failed [TypeError: fetch failed] {
+} {"runId":"cmuockxed000205xkkwqpn251","dataset":"HORIZON","errorCode":"IMPORT_FAILED"}
+[ERROR] [k2-cordis] import failed [Error [TimeoutError]: The operation was aborted due to timeout] {
+} {"runId":"cmuockxxy000405xkbbrkuueq","dataset":"HORIZON","errorCode":"IMPORT_FAILED"}
+[ERROR] [k2-cordis] import failed Error: Failed to download CORDIS zip from https://cordis.europa.eu/data/cordis-HORIZONprojects-csv.zip: Service Unavailable
+    at async Module.U [as handler] (.next/server/chunks/ssr/0kqh_next_dist_05dyfyd._.js:4:2628) {"runId":"cmuockzfl000605xk5mkgu0tl","dataset":"HORIZON","errorCode":"IMPORT_FAILED"}
+[ERROR] [k2-cordis] import failed Error: FILE_ENDED
+    at e.<anonymous> (.next/server/chunks/ssr/_1y57nh3._.js:1:162268) {"runId":"cmuockzpv000805xkwjh9aivw","dataset":"HORIZON","errorCode":"IMPORT_FAILED"}
+[ERROR] [k2-cordis] import failed Error: Required CORDIS CSV files (project.csv, organization.csv) not found in archive
+    at async Module.U [as handler] (.next/server/chunks/ssr/0kqh_next_dist_05dyfyd._.js:4:2628) {"runId":"cmuocl002000b05xkjm2gs1ww","dataset":"HORIZON","errorCode":"IMPORT_FAILED"}
+[ERROR] [k2-cordis] import failed Error: CORDIS dump rejected: skipped records over the 0.1% limit — project.csv: 1/2 skipped (line 3: expected 22 fields, got 3)
+    at async Module.U [as handler] (.next/server/chunks/ssr/0kqh_next_dist_05dyfyd._.js:4:2628) {"runId":"cmuocl0bz000e05xk1louezr2","dataset":"HORIZON","errorCode":"SKIP_LIMIT_EXCEEDED"}
+[ERROR] [k2-cordis] import failed Error [PrismaClientKnownRequestError]: 
+} {"runId":"cmuocl17d000j05xknf6kxnk3","dataset":"HORIZON","errorCode":"IMPORT_FAILED"}
+[ERROR] [k2-cordis] import failed Error [PrismaClientKnownRequestError]: 
+} {"runId":"cmuocok9g000n05xkcwv8hgkq","dataset":"HORIZON","errorCode":"IMPORT_FAILED"}
+[ERROR] [k2-cordis] import failed [TypeError: fetch failed] {
+} {"runId":"cmuocrbtz000p05xkdmcc2psk","dataset":"HORIZON","errorCode":"IMPORT_FAILED"}
+[ERROR] [k2-cordis] import failed [TypeError: fetch failed] {
+} {"runId":"cmuocrcvk000q05xkt57iyg7a","dataset":"HORIZON","errorCode":"IMPORT_FAILED"}
+[ERROR] [k2-cordis] import failed Error: CORDIS dump rejected: skipped records over the 0.1% limit — project.csv: 1/2 skipped (line 3: expected 22 fields, got 3)
+    at async Module.U [as handler] (.next/server/chunks/ssr/0kqh_next_dist_05dyfyd._.js:4:2628) {"runId":"cmuocrdyo000r05xksdop0l90","dataset":"HORIZON","errorCode":"SKIP_LIMIT_EXCEEDED"}
+[ERROR] [k2-cordis] import failed Error: CORDIS dump rejected: skipped records over the 0.1% limit — project.csv: 1/2 skipped (line 3: expected 22 fields, got 3)
+    at async Module.U [as handler] (.next/server/chunks/ssr/0kqh_next_dist_05dyfyd._.js:4:2628) {"runId":"cmuocrezv000t05xky5l1d3ij","dataset":"HORIZON","errorCode":"SKIP_LIMIT_EXCEEDED"}
