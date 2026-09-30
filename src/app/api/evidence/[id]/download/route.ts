@@ -6,7 +6,9 @@
  * into the CSV export. Now only a signed-in member of the tenant that owns the
  * row gets it: the tenant is the session's, the row is read by (id, tenantId)
  * under `withTenant` (RLS), and the key must lie under that tenant's prefix.
- * Another tenant's id is a 404, not a 403, so ids cannot be probed.
+ * Another tenant's id is a 404, not a 403, so ids cannot be probed. Within the
+ * tenant the role decides (Y-1, TASK-MUNTTZ94LJWBC): no `view_proposal` is a
+ * 403 for every row, a confidential row without `edit_proposal` a 403 as well.
  *
  * With an object store the answer is a redirect to a presigned GET that lives
  * five minutes and always downloads (`Content-Disposition: attachment`), so no
@@ -18,22 +20,29 @@ import { withTenant } from '@/lib/db';
 import { requireTenantApi } from '@/lib/tenant';
 import { getObjectBytes, getPresignedDownloadUrl, hasObjectStore, tenantObjectKeyOf } from '@/lib/storage';
 import { isPresentId } from '@/lib/required-id';
+import { canReadEvidence, evidenceReadWhere } from '@/lib/evidence-access';
 
 const NO_STORE = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
+const FORBIDDEN = () =>
+  NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN_ROLE' }, { status: 403, headers: NO_STORE });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireTenantApi();
   if (!auth.ok) return auth.response;
-  const { tenantId } = auth.scope;
+  const { tenantId, role } = auth.scope;
+  // Y-1 (TASK-MUNTTZ94LJWBC): a session is not enough — the external partner
+  // may not read evidence, and a confidential document needs `edit_proposal`.
+  if (!evidenceReadWhere(role)) return FORBIDDEN();
 
   const { id } = await params;
   if (!isPresentId(id)) return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_STORE });
 
   const row = await withTenant(tenantId, (tx) =>
-    tx.evidence.findFirst({ where: { id, tenantId }, select: { r2ObjectKey: true, fileName: true } })
+    tx.evidence.findFirst({ where: { id, tenantId }, select: { r2ObjectKey: true, fileName: true, confidentiality: true } })
   );
   const key = row?.r2ObjectKey ? tenantObjectKeyOf(tenantId, row.r2ObjectKey) : null;
   if (!row || !key) return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_STORE });
+  if (!canReadEvidence(role, row.confidentiality)) return FORBIDDEN();
 
   const fileName = row.fileName || key.split('/').pop() || 'evidence';
 

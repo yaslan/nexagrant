@@ -1,0 +1,45 @@
+568  portal-partner       st=200 sw=568/568 card=0/0 box=0/0 text=35/48 main=undefined
+667  portal-partner       st=200 sw=667/667 card=0/0 box=0/0 text=49/62 main=undefined
+844  portal-partner       st=200 sw=844/844 card=0/0 box=0/0 text=119/132 main=undefined
+568  blog-post            st=200 sw=568/568 card=2/2 box=2/2 text=2/30.3 main=0px,0px
+667  blog-post            st=200 sw=667/667 card=24/24 box=24/24 text=24/81.1 main=0px,0px
+844  blog-post            st=200 sw=844/844 card=24/24 box=24/24 text=24/54 main=0px,0px
+568  calls-germany        st=200 sw=568/568 card=0/0 box=0/0 text=2/43 main=undefined
+667  calls-germany        st=200 sw=667/667 card=0/0 box=0/0 text=24/65 main=undefined
+844  calls-germany        st=200 sw=844/844 card=0/0 box=0/0 text=24/65 main=undefined
+568  kayit-form-hata      st=200 sw=568/568 card=60/60 box=60/60 text=85/85 main=2px,2px
+667  kayit-form-hata      st=200 sw=667/667 card=109.5/109.5 box=109.5/109.5 text=142.5/142.5 main=16px,16px
+844  kayit-form-hata      st=200 sw=844/844 card=198/198 box=198/198 text=231/231 main=16px,16px
+568  giris-form-hata      st=200 sw=568/568 card=60/60 box=60/60 text=85/85 main=2px,2px
+667  giris-form-hata      st=200 sw=667/667 card=109.5/109.5 box=109.5/109.5 text=142.5/142.5 main=16px,16px
+844  giris-form-hata      st=200 sw=844/844 card=198/198 box=198/198 text=231/231 main=16px,16px
+568  cookie-sheet         st=200 sw=568/568 card=0/0 box=0/0 text=16/38.4 main=0px,0px DIALOG
+667  cookie-sheet         st=200 sw=667/667 card=16/267 box=16/267 text=32/291.1 main=0px,0px DIALOG
+844  cookie-sheet         st=200 sw=844/844 card=undefined box=16/444 text=32/468.1 main=0px,0px DIALOG
+568  privacy-modal        st=200 sw=568/568 card=60/60 box=60/60 text=85/100.5 main=2px,2px DIALOG
+667  privacy-modal        st=200 sw=667/667 card=109.5/109.5 box=109.5/109.5 text=134.5/150 main=24px,24px DIALOG
+844  privacy-modal        st=200 sw=844/844 card=undefined box=/ text=469.6/239 main=24px,24px DIALOG
+568  daterange-popover    st=200 sw=568/568 card=undefined box=3.7/342.3 text=3.7/430.4 main=2px,2px DIALOG
+667  daterange-popover    st=200 sw=667/667 card=undefined box=380/65 text=380/153.1 main=24px,24px DIALOG
+844  daterange-popover    st=200 sw=844/844 card=undefined box=/ text=557/153.1 main=24px,24px DIALOG
+568  tablo-audit          st=200 sw=568/568 card=2/2 box=2/2 text=19/137.5 main=2px,2px
+667  tablo-audit          st=200 sw=667/667 card=32/32 box=32/32 text=49/49 main=32px,32px
+844  tablo-audit          st=200 sw=844/844 card=320/32 box=320/32 text=337/70 main=32px,32px
+568  tablo-person-days    st=200 sw=568/568 card=2/2 box=2/2 text=2/19 main=2px,2px
+667  tablo-person-days    st=200 sw=667/667 card=56/56 box=56/56 text=56/73 main=24px,24px
+844  tablo-person-days    st=200 sw=844/844 card=312/56 box=312/56 text=312/73 main=24px,24px
+568  tablo-cordis         st=200 sw=568/568 card=2/2 box=2/2 text=27/22.9 main=2px,2px
+667  tablo-cordis         st=200 sw=667/667 card=32/32 box=32/32 text=57/56 main=32px,32px
+844  tablo-cordis         st=200 sw=844/844 card=320/32 box=320/32 text=345/48.2 main=32px,32px
+568  bos-relationships    st=200 sw=568/568 card=2/2 box=2/2 text=2/137.7 main=2px,2px
+667  bos-relationships    st=200 sw=667/667 card=40/40 box=40/40 text=40/56 main=24px,24px
+844  bos-relationships    st=200 sw=844/844 card=296/40 box=296/40 text=296/71.3 main=24px,24px
+568  detay-firsat         st=200 sw=568/568 card=2/2 box=2/2 text=2/71.8 main=2px,2px
+667  detay-firsat         st=200 sw=667/667 card=40/40 box=40/40 text=40/43.7 main=24px,24px
+844  detay-firsat         st=200 sw=844/844 card=312/56 box=312/56 text=312/-59.3 main=24px,24px
+568  detay-cagri          st=404 sw=568/568 card=0/0 box=0/0 text=102.3/102.3 main=undefined
+667  detay-cagri          st=404 sw=667/667 card=0/0 box=0/0 text=151.8/151.8 main=undefined
+844  detay-cagri          st=404 sw=844/844 card=0/0 box=0/0 text=240.3/240.3 main=undefined
+568  admin-plans          st=200 sw=568/568 card=2/2 box=2/2 text=23/91.6 main=2px,2px
+667  admin-plans          st=200 sw=667/667 card=32/32 box=32/32 text=53/63 main=32px,32px
+844  admin-plans          st=200 sw=844/844 card=320/32 box=320/32 text=320/61.1 main=32px,32px

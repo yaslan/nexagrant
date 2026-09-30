@@ -1,0 +1,160 @@
+320 /tr/fabrika-beta/approvals st=200 sw=320/320 mainOverX=54 ox=auto <- div.flex gap-2 (+54)
+320 /tr/fabrika-beta/ayarlar/faturalama st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/ayarlar/gizlilik st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/ayarlar/kapilar st=200 sw=320/320 mainOverX=14 ox=auto <- span.text-sm text-ink font-mono (+14)
+320 /tr/fabrika-beta/ayarlar/moduller st=200 sw=320/320 mainOverX=2 ox=auto <- div.flex flex-col items-end gap-1.5 shrink-0 (+2)
+320 /tr/fabrika-beta/ayarlar st=200 sw=320/320 mainOverX=2 ox=auto <- div.flex flex-col items-end gap-1.5 shrink-0 (+2)
+320 /tr/fabrika-beta/ayarlar/profil st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/ayarlar/uyeler st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/bildirimler st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/concept-notes st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/dashboard st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/evidence st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/firsatlar st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/iliskiler st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/kanitlar st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/konsept-notlar st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/notifications st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/onay-merkezi st=200 sw=320/320 mainOverX=54 ox=auto <- div.flex gap-2 (+54)
+320 /tr/fabrika-beta/opportunities/demo-opp-1/application st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/opportunities/demo-opp-1/briefs st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/opportunities/demo-opp-1/documents st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations st=200 sw=320/320 mainOverX=234 ox=auto <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-c (+234)
+320 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations/panel st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/ortaklar st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/panel st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/partners/leaders st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/partners st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/pipeline st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/relationships st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/reports/person-days st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/settings/api-keys st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/settings/billing st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/settings/calendar st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/settings/gates st=200 sw=320/320 mainOverX=14 ox=auto <- span.text-sm text-ink font-mono (+14)
+320 /tr/fabrika-beta/settings/members st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/settings/modules st=200 sw=320/320 mainOverX=2 ox=auto <- div.flex flex-col items-end gap-1.5 shrink-0 (+2)
+320 /tr/fabrika-beta/settings/privacy st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/settings/profile st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/tto-hizlandirici st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/fabrika-beta/tto st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/blog st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/accept-invite/continue st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/acik-cagrilar st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/admin/alerts st=200 sw=320/320 mainOverX=55 ox=auto <- div.rounded-lg border border-border bg-ground px-3 py-2 (+55)
+320 /tr/admin/audit st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/admin/billing st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/admin/billing/plans st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/admin/blog st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/admin/cordis st=200 sw=320/320 mainOverX=132 ox=auto <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-c (+132)
+320 /tr/admin/documents st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/admin/feedback st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/admin/leads st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/admin/modules st=200 sw=320/320 mainOverX=8 ox=auto <- div.bg-surface border border-border rounded-xl p-5 shadow-xs transition-al (+8)
+320 /tr/admin/settings st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/admin/tenants st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/admin/topic-stats st=200 sw=320/320 mainOverX=0 ox=auto
+320 /tr/belediye-cagrilari st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/calls st=200 sw=320/320 mainOverX=null ox=undefined
+320 /tr/calls/turkey st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/compliance/dpa st=200 sw=320/320 mainOverX=null ox=undefined
+320 /tr/fiyatlandirma st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/fon-hazirlik st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/funding-readiness st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/giris st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/i18n-check st=200 sw=320/320 mainOverX=null ox=undefined
+320 /tr/kayit st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/login st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/municipal-calls st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/no-workspace st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/open-calls st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/pricing st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/privacy st=200 sw=320/320 mainOverX=null ox=undefined
+320 /tr/register st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/terms st=200 sw=320/320 mainOverX=null ox=undefined
+320 /tr/turkiyeye-acik-cagrilar st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/portal/partner/devopfb72-portal-token st=200 sw=320/320 mainOverX=null ox=undefined
+320 /tr/blog/horizon-europe-basarili-konsorsiyum-rehberi st=200 sw=320/320 mainOverX=0 ox=visible
+320 /tr/calls/germany st=200 sw=320/320 mainOverX=null ox=undefined
+320 /tr/fabrika-beta/firsatlar/demo-opp-1 st=200 sw=320/320 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/approvals st=200 sw=360/360 mainOverX=14 ox=auto <- div.flex gap-2 (+14)
+360 /tr/fabrika-beta/ayarlar/faturalama st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/ayarlar/gizlilik st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/ayarlar/kapilar st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/ayarlar/moduller st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/ayarlar st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/ayarlar/profil st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/ayarlar/uyeler st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/bildirimler st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/concept-notes st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/dashboard st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/evidence st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/firsatlar st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/iliskiler st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/kanitlar st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/konsept-notlar st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/notifications st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/onay-merkezi st=200 sw=360/360 mainOverX=14 ox=auto <- div.flex gap-2 (+14)
+360 /tr/fabrika-beta/opportunities/demo-opp-1/application st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/opportunities/demo-opp-1/briefs st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/opportunities/demo-opp-1/documents st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations st=200 sw=360/360 mainOverX=194 ox=auto <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-c (+194)
+360 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations/panel st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/ortaklar st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/panel st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/partners/leaders st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/partners st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/pipeline st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/relationships st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/reports/person-days st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/settings/api-keys st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/settings/billing st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/settings/calendar st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/settings/gates st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/settings/members st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/settings/modules st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/settings/privacy st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/settings/profile st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/tto-hizlandirici st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/fabrika-beta/tto st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/blog st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/accept-invite/continue st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/acik-cagrilar st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/admin/alerts st=200 sw=360/360 mainOverX=15 ox=auto <- div.rounded-lg border border-border bg-ground px-3 py-2 (+15)
+360 /tr/admin/audit st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/admin/billing st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/admin/billing/plans st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/admin/blog st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/admin/cordis st=200 sw=360/360 mainOverX=92 ox=auto <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-c (+92)
+360 /tr/admin/documents st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/admin/feedback st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/admin/leads st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/admin/modules st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/admin/settings st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/admin/tenants st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/admin/topic-stats st=200 sw=360/360 mainOverX=0 ox=auto
+360 /tr/belediye-cagrilari st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/calls st=200 sw=360/360 mainOverX=null ox=undefined
+360 /tr/calls/turkey st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/compliance/dpa st=200 sw=360/360 mainOverX=null ox=undefined
+360 /tr/fiyatlandirma st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/fon-hazirlik st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/funding-readiness st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/giris st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/i18n-check st=200 sw=360/360 mainOverX=null ox=undefined
+360 /tr/kayit st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/login st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/municipal-calls st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/no-workspace st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/open-calls st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/pricing st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/privacy st=200 sw=360/360 mainOverX=null ox=undefined
+360 /tr/register st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/terms st=200 sw=360/360 mainOverX=null ox=undefined
+360 /tr/turkiyeye-acik-cagrilar st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/portal/partner/devopfb72-portal-token st=200 sw=360/360 mainOverX=null ox=undefined
+360 /tr/blog/horizon-europe-basarili-konsorsiyum-rehberi st=200 sw=360/360 mainOverX=0 ox=visible
+360 /tr/calls/germany st=200 sw=360/360 mainOverX=null ox=undefined
+360 /tr/fabrika-beta/firsatlar/demo-opp-1 st=200 sw=360/360 mainOverX=0 ox=auto

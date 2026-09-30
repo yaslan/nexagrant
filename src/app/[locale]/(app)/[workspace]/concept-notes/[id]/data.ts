@@ -88,6 +88,10 @@ const DEFAULT_SECTIONS: ConceptTemplateSection[] = [
  * İNCELEME-57 Ö-3). `templateSections` reads both shapes, as the export route does.
  */
 export function editorSections(template: { schema?: unknown } | null): ConceptTemplateSection[] {
-  const sections = templateSections(template?.schema);
+  // The editor counts words against `maxWords`; a section without a usable one
+  // rendered an empty, limitless editor (TASK-MUNWZGWA70P16, İNCELEME-71 B-3).
+  const sections = templateSections(template?.schema).filter(
+    (s) => typeof s.maxWords === 'number' && Number.isFinite(s.maxWords) && s.maxWords > 0
+  );
   return sections.length > 0 ? sections : DEFAULT_SECTIONS;
 }

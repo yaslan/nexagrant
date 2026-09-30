@@ -62,8 +62,11 @@ const nextConfig: NextConfig = {
    */
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: 'images.unsplash.com' },
-      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      // `port: ''` = the default https port only. Left out, it means any port:
+      // lh3…:8443 was accepted and the optimizer waited out a 504 upstream
+      // (TASK-MUNWZGWA70P16, İNCELEME-71 B-5).
+      { protocol: 'https', hostname: 'images.unsplash.com', port: '' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com', port: '' },
     ],
   },
   /**
