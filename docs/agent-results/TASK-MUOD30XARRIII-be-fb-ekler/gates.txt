@@ -1,0 +1,10 @@
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55130/fabrika
+GATE tsc=0
+GATE lint=0
+GATE i18n=0
+ Test Files  301 passed | 2 skipped (303)
+      Tests  3920 passed | 50 skipped (3970)
+vitest EXIT=0 (CI=true npx vitest run, tam süit)
+live-skip gate: 46 live files, 401 live tests passed, 42 allowed skip(s)
+live-skip gate EXIT=0
+GATE build=0 (env -u NODE_ENV pnpm build)

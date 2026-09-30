@@ -225,7 +225,10 @@ describe('runCordisImport — skipped records', () => {
     // The result carries a code only; it reaches the admin console through a
     // server action. The reason is on the run row (İNCELEME-100 Y-1).
     expect(res.errorCode).toBe('SKIP_LIMIT_EXCEEDED');
-    expect(JSON.stringify(res)).not.toContain('line 4');
+    // The thrown message is not in the result. `skippedRecords` still is, as
+    // structure (`{ line: 4, reason: 'expected 22 fields, got 3' }`): nothing
+    // passes it on, and the action returns the code only (İNCELEME-105 Ö-3).
+    expect(JSON.stringify(res)).not.toContain('CORDIS dump rejected');
     expect(writes.projects).toBe(0);
     expect(writes.participations).toBe(0);
     const run = writes.runs.get(res.runId)!;
@@ -346,5 +349,89 @@ describe('handleRunCordisImportAction — failure text', () => {
 
     expect(res.lastRun).toMatchObject({ runId: 'run-9', status: 'FAILED' });
     expect(JSON.stringify(res)).not.toContain('CordisProject');
+  });
+});
+
+// ─── Importer: the first layer, and where the text goes instead ───────────
+
+/**
+ * İNCELEME-105 Ö-1 (TASK-MUOD30XARRIII). The importer's own code choice is the
+ * first layer: whatever it caught, the result carries a listed code and no
+ * text. The fix also promised the text is not lost: it goes to the log line,
+ * the run row and the alert. Only the run row was checked before.
+ */
+describe('runCordisImport — failure code and where the text goes', () => {
+  const SECRET = 'connect ECONNREFUSED 10.0.0.5:443 at /srv/secret/cordis.zip';
+  const RESULT_KEYS = ['durationMs', 'errorCode', 'rowCounts', 'runId', 'skippedRecords', 'success'];
+
+  beforeEach(() => {
+    writes.projects = 0;
+    writes.participations = 0;
+    writes.runs.clear();
+    writes.alerts.length = 0;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  test.each([
+    ['an Error', () => new Error(SECRET)],
+    ['an Error with a code field', () => Object.assign(new Error(SECRET), { code: `P2021 ${SECRET}` })],
+    ['an Error named like the skip-limit one', () => Object.assign(new Error(SECRET), { name: 'CordisSkipLimitError' })],
+    ['a thrown string', () => SECRET],
+  ])('%s from the download gives IMPORT_FAILED and no text', async (_label, thrown) => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(thrown())));
+    const { runCordisImport } = await import('../src/lib/k2-cordis/importer');
+    const { CORDIS_IMPORT_FAILURE_CODES } = await import('../src/lib/k2-cordis/failure-codes');
+
+    const res = await runCordisImport({ dataset: 'HORIZON' });
+
+    expect(res.success).toBe(false);
+    expect(res.errorCode).toBe('IMPORT_FAILED');
+    expect(CORDIS_IMPORT_FAILURE_CODES).toContain(res.errorCode);
+    expect(Object.keys(res).every((k) => RESULT_KEYS.includes(k))).toBe(true);
+    expect(JSON.stringify(res)).not.toMatch(/ECONNREFUSED|10\.0\.0\.5|\/srv\/secret|P2021/);
+  });
+
+  test('a download error: the text is in the log line, on the run row and in the alert', async () => {
+    const thrown = new Error(SECRET);
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(thrown)));
+    const { logger } = await import('../src/lib/logger');
+    const logError = vi.spyOn(logger, 'error');
+    const { runCordisImport } = await import('../src/lib/k2-cordis/importer');
+
+    const res = await runCordisImport({ dataset: 'HORIZON' });
+
+    expect(logError).toHaveBeenCalledWith(
+      '[k2-cordis] import failed',
+      thrown,
+      expect.objectContaining({ runId: res.runId, dataset: 'HORIZON', errorCode: 'IMPORT_FAILED' })
+    );
+    expect(writes.runs.get(res.runId)).toMatchObject({ status: 'FAILED', error: SECRET });
+    expect(writes.alerts).toHaveLength(1);
+    expect(writes.alerts[0]).toMatchObject({ level: 'error', source: 'k2_cordis_import' });
+    expect((writes.alerts[0]!.meta as { error?: string }).error).toBe(SECRET);
+  });
+
+  test('a dump over the skip limit: the CSV lines are in the log error, the run row and the alert', async () => {
+    const { logger } = await import('../src/lib/logger');
+    const logError = vi.spyOn(logger, 'error');
+    const { runCordisImport } = await import('../src/lib/k2-cordis/importer');
+    const zipPath = writeZip({
+      'project.csv': [PROJECT_HEADER, ROW_PLAIN, '"999";"broken";"row"', ''].join('\n'),
+      'organization.csv': [ORG_HEADER, orgRow('101069359', '900000001'), ''].join('\n'),
+    });
+
+    const res = await runCordisImport({ dataset: 'HORIZON', localZipPath: zipPath });
+
+    expect(res.errorCode).toBe('SKIP_LIMIT_EXCEEDED');
+    const call = logError.mock.calls.find(([msg]) => msg === '[k2-cordis] import failed');
+    expect(call?.[2]).toMatchObject({ runId: res.runId, errorCode: 'SKIP_LIMIT_EXCEEDED' });
+    expect(String((call?.[1] as Error | undefined)?.message)).toContain('line 4: expected 22 fields, got 3');
+    expect(writes.runs.get(res.runId)?.error).toContain('line 4: expected 22 fields, got 3');
+    expect((writes.alerts[0]!.meta as { error?: string }).error).toContain('line 4: expected 22 fields, got 3');
   });
 });
