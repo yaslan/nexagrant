@@ -104,6 +104,19 @@ export const DUAL_APPROVAL_REQUIRED_ROLES: Record<DualApprovalActionType, Role> 
 };
 
 /**
+ * M10 follow-up document kinds that are a legal commitment, so their signature
+ * is the end of the dual approval flow (finance → legal, two people) and never
+ * a single click. `signDocument` refuses them until the flow is
+ * `APPROVED_AND_SIGNED` (İNCELEME-59 Y-4, owner decision 30.09.2026).
+ * Every other kind (ESR_DEBRIEF, AWARD_PACK, …) is signed directly as before.
+ */
+export const DUAL_APPROVAL_DOCUMENT_KINDS: readonly string[] = ['NDA', 'LOI', 'COMMITMENT'];
+
+export function documentKindRequiresDualApproval(kind: string): boolean {
+  return DUAL_APPROVAL_DOCUMENT_KINDS.includes(kind);
+}
+
+/**
  * Checks if a user role meets or exceeds the required threshold role for dual-approval.
  */
 export function canRoleApprove(userRole: Role, requiredRole: Role): boolean {

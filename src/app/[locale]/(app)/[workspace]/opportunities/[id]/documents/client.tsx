@@ -123,10 +123,14 @@ export function DocumentsClient({
   const handleSignDoc = async (docId: string) => {
     setDocError(null);
     try {
-      await signDocument(docId);
-      setDocs((prev) =>
-        prev.map((d) => (d.id === docId ? { ...d, signedAt: new Date().toISOString() } : d))
-      );
+      const res = await signDocument(docId);
+      if (!res.success) {
+        // NDA/LOI/COMMITMENT are signed by the dual approval flow, not here.
+        setDocError(t(`signRefusal.${res.refusal}`));
+        return;
+      }
+      const signedAt = new Date(res.signedAt).toISOString();
+      setDocs((prev) => prev.map((d) => (d.id === docId ? { ...d, signedAt } : d)));
     } catch (err) {
       console.error('Error signing document:', err);
       setDocError(errorText(err, null));

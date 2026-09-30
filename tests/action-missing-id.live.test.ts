@@ -182,7 +182,8 @@ beforeAll(async () => {
       data: { tenantId, opportunityId: opp1, templateId: 't', content: { marker: `note-${i}` }, createdBy: user.id },
     });
     ids.note.push(note.id);
-    const doc = await admin.followupDoc.create({ data: { tenantId, opportunityId: opp1, kind: 'NDA' } });
+    // A kind signed directly: NDA/LOI/COMMITMENT need the dual approval flow first (TASK-MUNRAQA3OEZ83).
+    const doc = await admin.followupDoc.create({ data: { tenantId, opportunityId: opp1, kind: 'ESR_DEBRIEF' } });
     ids.doc.push(doc.id);
     const ev = await admin.evidence.create({
       data: { tenantId, kind: 'corporate', title: `${RUN} ev-${i}`, body: `body-${i}` },

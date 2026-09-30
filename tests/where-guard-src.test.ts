@@ -54,6 +54,8 @@ const KNOWN: Record<string, string> = {
     '`lastContactAt` of a row collectTenant read with `lastContactAt: { not: null }`: a Date, never undefined; `id` beside it is guarded by isPresentId; cron input, no client',
   'src/modules/m10/server/actions.ts followupDocId: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts id: existing.id': DB_ROW,
+  'src/modules/m10/server/actions.ts version: existing.version':
+    '`FollowupDoc.version` (Int, non-null) of the row signDocument read one statement above, pinning that revision (TASK-MUNRAQA3OEZ83)',
 };
 
 const keyOf = (finding: string) => finding.replace(/:\d+ /, ' ');
