@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { auth } from '@/lib/auth';
 import { can } from '@/lib/rbac';
@@ -52,13 +53,17 @@ export default async function DashboardPage({
   const tenantId = sessionObj?.tenantId;
   const userRole = sessionObj?.role as Role | undefined;
 
+  // No tenant is not a missing permission: a tenantless session has no role
+  // either, so checking the role first told someone removed from their
+  // tenant that they needed a higher one (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1).
+  // They go where every other tenant page sends them.
+  if (!tenantId) {
+    redirect(`/${locale}/no-workspace`);
+  }
+
   // Authorization: pipeline manager and above (plan/module gating happens upstream).
   if (!can(userRole, 'evaluate_gates')) {
     return <Notice title={t('accessDeniedTitle')} body={t('accessDeniedBody')} />;
-  }
-
-  if (!tenantId) {
-    return <Notice title={t('sessionErrorTitle')} body={t('sessionErrorBody')} />;
   }
 
   const { from: fromDate, to: toDate, rangeEnd } = resolveDashboardRange(from, to);

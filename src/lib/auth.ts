@@ -298,6 +298,42 @@ const safeAdapter: Adapter = {
 };
 
 /**
+ * The pool could not hand out a connection: a new one took longer than
+ * `connectionTimeoutMillis` (src/lib/db.ts) to open, or the wait for a free one
+ * did. The query never reached the database.
+ */
+const NOT_CONNECTED = /Connection terminated due to connection timeout|timeout exceeded when trying to connect/;
+
+/**
+ * The jwt callback reads the database on every request, so a burst after an
+ * idle spell opens several connections at once; on a loaded host one of them
+ * can miss the 1 s deadline, and that one request came back tenantless
+ * (TASK-MUNWZA26VGK0B, İNCELEME-68 Ö-2). That read is retried once. Anything
+ * else — a query error, or the second attempt failing too — is thrown to the
+ * callback, which stays fail-closed.
+ */
+async function retryOnceIfNotConnected<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (e) {
+    if (!NOT_CONNECTED.test(errorMessage(e))) throw e;
+    return read();
+  }
+}
+
+/**
+ * The tenant an `unstable_update({ tenantId })` call asks the token to be
+ * bound to. The payload is whatever the caller sent (a browser can POST it to
+ * /api/auth/session as well), so it is only a request: the jwt callback binds
+ * to it only when the user holds a membership there.
+ */
+function requestedTenantOf(session: unknown): string | null {
+  if (typeof session !== "object" || session === null) return null;
+  const tenantId = (session as { tenantId?: unknown }).tenantId;
+  return typeof tenantId === "string" && tenantId.trim() !== "" ? tenantId : null;
+}
+
+/**
  * The whole configuration, exported so the live test can run the real
  * callbacks, adapter and events behind a fake OAuth provider
  * (tests/oauth-registration.live.test.ts, TASK-MUM676F010E9G). Nothing else
@@ -610,7 +646,7 @@ export const authConfig = {
       await clearRegistrationChoiceCookies();
       return decision.redirect;
     },
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.name = user.name;
@@ -648,8 +684,19 @@ export const authConfig = {
         // survives the loss of the membership, so a removed member of tenant A
         // who also belongs to B is left tenantless, never moved to B behind
         // their back. Only a sign-in picks a tenant afresh.
+        //
+        // The one other way to move the bond is an explicit request:
+        // `unstable_update({ tenantId })` (trigger "update") after the user
+        // accepted an invitation (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1). It is
+        // honoured only when the membership exists, so it grants nothing the
+        // user does not already have; asked for a tenant they are not in, the
+        // token stays where it was.
         const heldTenantId = typeof token.tenantId === "string" ? token.tenantId : token.boundTenantId;
         const boundTenantId = trigger !== "signIn" && typeof heldTenantId === "string" ? heldTenantId : null;
+        const requestedTenantId = trigger === "update" ? requestedTenantOf(session) : null;
+        const lookupTenantIds = [...new Set([requestedTenantId, boundTenantId])].filter(
+          (id): id is string => typeof id === "string"
+        );
         // Nothing is kept from the previous call: whatever the lookup below
         // does not grant again, the token no longer has.
         delete token.tenantId;
@@ -662,25 +709,33 @@ export const authConfig = {
           // row — the bound tenant's, or the oldest one when none is bound.
           // (`where: undefined` is meant: still only this user's memberships.)
           // Prisma sends it as two statements, the second on the
-          // (tenantId, userId) unique index.
-          const dbUser = await prisma.user.findUnique({
-            where: { id: token.id },
+          // (tenantId, userId) unique index. Only a rebind request asks for
+          // two rows: the requested tenant's and, as a fallback, the bound one.
+          const userId = token.id;
+          const dbUser = await retryOnceIfNotConnected(() => prisma.user.findUnique({
+            where: { id: userId },
             select: {
               name: true,
               isPlatformAdmin: true,
               memberships: {
-                where: boundTenantId ? { tenantId: boundTenantId } : undefined,
+                where:
+                  lookupTenantIds.length === 0
+                    ? undefined
+                    : lookupTenantIds.length === 1
+                      ? { tenantId: lookupTenantIds[0] }
+                      : { tenantId: { in: lookupTenantIds } },
                 orderBy: { createdAt: "asc" },
-                take: 1,
+                take: Math.max(1, lookupTenantIds.length),
                 select: { tenantId: true, role: true, workspaceIds: true },
               },
             },
-          });
+          }));
           token.isPlatformAdmin = dbUser?.isPlatformAdmin === true;
           // Narrowed off the element itself rather than off `.length`: an absent
           // membership must leave the token tenantless, which is the same safe
           // outcome the catch below documents.
-          const activeMembership = dbUser?.memberships?.[0];
+          const activeMembership =
+            dbUser?.memberships?.find((m) => m.tenantId === requestedTenantId) ?? dbUser?.memberships?.[0];
           if (dbUser && activeMembership) {
             token.tenantId = activeMembership.tenantId;
             token.boundTenantId = activeMembership.tenantId;
@@ -803,4 +858,4 @@ export const authConfig = {
   },
 } satisfies NextAuthConfig;
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth(authConfig);

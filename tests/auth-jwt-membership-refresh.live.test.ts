@@ -24,18 +24,34 @@ const SUITE = 'auth-jwt-membership-refresh.live';
 const RUN = `jwt-${Date.now().toString(36)}`;
 const COOKIE = 'authjs.session-token';
 
-const jar = vi.hoisted(() => ({ cookie: '' }));
+// The browser's cookie jar: every cookie the server sets comes back on the next
+// request, the session cookie that `unstable_update` re-mints included.
+const jar = vi.hoisted(() => new Map<string, string>());
 vi.mock('next/headers', () => ({
-  headers: async () => new Headers({ host: 'localhost:3000', 'x-forwarded-proto': 'http', cookie: jar.cookie }),
-  cookies: async () => ({ get: () => undefined, set: () => undefined, delete: () => undefined }),
+  headers: async () =>
+    new Headers({
+      host: 'localhost:3000',
+      'x-forwarded-proto': 'http',
+      cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '),
+    }),
+  cookies: async () => ({
+    get: (name: string) => (jar.has(name) ? { name, value: jar.get(name)! } : undefined),
+    set: (name: string, value: string) => void (value ? jar.set(name, value) : jar.delete(name)),
+    delete: (name: string) => void jar.delete(name),
+  }),
 }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
+// The accept action's error strings; the keys are enough here.
+vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key }));
 
 let admin: PrismaClient | undefined;
 let lib:
   | {
       auth: typeof import('../src/lib/auth');
       evidence: typeof import('../src/app/[locale]/(app)/[workspace]/evidence/actions');
+      acceptActions: typeof import('../src/app/[locale]/accept-invite/continue/actions');
+      acceptCookie: typeof import('../src/lib/invitations/accept-cookie');
+      token: typeof import('../src/lib/secret-token');
       encode: typeof import('next-auth/jwt').encode;
     }
   | undefined;
@@ -84,6 +100,9 @@ beforeAll(async () => {
   lib = {
     auth: await import('../src/lib/auth'),
     evidence: await import('../src/app/[locale]/(app)/[workspace]/evidence/actions'),
+    acceptActions: await import('../src/app/[locale]/accept-invite/continue/actions'),
+    acceptCookie: await import('../src/lib/invitations/accept-cookie'),
+    token: await import('../src/lib/secret-token'),
     encode: (await import('next-auth/jwt')).encode,
   };
   ready = true;
@@ -115,7 +134,8 @@ beforeEach(async (ctx) => {
     user: { id: u.id, email: u.email, name: u.name },
     trigger: 'signIn',
   } as never);
-  jar.cookie = `${COOKIE}=${await lib!.encode({ token: claims as never, secret: process.env.AUTH_SECRET!, salt: COOKIE })}`;
+  jar.clear();
+  jar.set(COOKIE, await lib!.encode({ token: claims as never, secret: process.env.AUTH_SECRET!, salt: COOKIE }));
 });
 
 afterAll(async () => {
@@ -165,5 +185,58 @@ describe('the next request sees the membership as it is now (İNCELEME-59 Y-2)',
     expect(removed.tenantB).toBe(false);
     expect(write).toBe('throw:TENANT_SCOPE_REQUIRED');
     expect(left).toBe(1);
+  });
+});
+
+describe('accepting an invitation moves the session to that tenant (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1)', () => {
+  /** A third tenant C that invites the user, as POST /api/invitations would leave it. */
+  async function invitedToC(): Promise<{ tenantC: string; raw: string }> {
+    const c = await admin!.tenant.create({ data: { name: `${RUN} C`, slug: `${RUN}-c-${Math.random().toString(36).slice(2, 8)}`, country: 'TR' } });
+    created.tenants.push(c.id);
+    const user = await admin!.user.findUniqueOrThrow({ where: { id: requireId(ids.user, 'user') }, select: { email: true } });
+    const raw = lib!.token.generateSecretToken();
+    await admin!.invitation.create({
+      data: { email: user.email!, tenantId: c.id, role: 'WRITER', tokenHash: lib!.token.hashSecretToken(raw), expires: new Date(Date.now() + 86_400_000) },
+    });
+    // What the e-mail link's GET handler parks for the accept screen.
+    jar.set(lib!.acceptCookie.INVITATION_ACCEPT_COOKIE, lib!.acceptCookie.encodeParkedInvitation({ token: raw, locale: 'tr' }));
+    return { tenantC: c.id, raw };
+  }
+
+  test('removed from the bound tenant, accepting C makes the very next request C, with the same browser', async () => {
+    await admin!.membership.delete({ where: { id: requireId(ids.membershipA, 'membershipA') } });
+    const stranded = await request();
+    const { tenantC } = await invitedToC();
+    // The real server action: joins C, re-mints the session cookie, redirects.
+    const accepted = await outcome(lib!.acceptActions.acceptInvitationAction('tr'));
+    const joined = await request();
+    const again = await request();
+
+    console.log('Y1_REBIND', JSON.stringify({ stranded, accepted, joined: { c: joined.tenantId === tenantC, role: joined.role }, again: again.tenantId === tenantC }));
+    // Before: tenantless and not moved to B (İNCELEME-59 Y-2 holds).
+    expect(stranded).toMatchObject({ tenantId: null, tenantB: false });
+    expect(accepted).toMatch(/^throw:NEXT_REDIRECT;.*\/tr\/default\/dashboard/);
+    expect(joined.tenantId).toBe(tenantC);
+    expect(joined.role).toBe('WRITER');
+    // Bound now: plain requests stay on C, and it is still not B.
+    expect(again.tenantId).toBe(tenantC);
+    expect(again.tenantB).toBe(false);
+  });
+
+  test('still a member of A, accepting C moves the session to C too: it is the tenant just chosen', async () => {
+    expect((await request()).tenantA).toBe(true);
+    const { tenantC } = await invitedToC();
+    await outcome(lib!.acceptActions.acceptInvitationAction('tr'));
+    expect((await request()).tenantId).toBe(tenantC);
+  });
+
+  test('a browser asking to be bound to a tenant it is not in stays where it was', async () => {
+    const c = await admin!.tenant.create({ data: { name: `${RUN} X`, slug: `${RUN}-x-${Math.random().toString(36).slice(2, 8)}`, country: 'TR' } });
+    created.tenants.push(c.id);
+    // What useSession().update({ tenantId }) would send: the same POST /api/auth/session.
+    await lib!.auth.unstable_update({ tenantId: c.id } as never);
+    const after = await request();
+    expect(after.tenantA).toBe(true);
+    expect(after.role).toBe('TENANT_OWNER');
   });
 });

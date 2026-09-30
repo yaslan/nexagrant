@@ -11,7 +11,12 @@ import { PLATFORM_ADMIN_DEMO_EMAIL } from './demo-login';
  */
 
 type Callbacks = {
-  jwt: (args: { token: Record<string, unknown>; user?: unknown; trigger?: string }) => Promise<Record<string, unknown>>;
+  jwt: (args: {
+    token: Record<string, unknown>;
+    user?: unknown;
+    trigger?: string;
+    session?: unknown;
+  }) => Promise<Record<string, unknown>>;
   session: (args: { session: Record<string, unknown>; token: Record<string, unknown> }) => Promise<Record<string, unknown>>;
 };
 type Config = {
@@ -169,8 +174,11 @@ describe('role and tenant claims are re-read on every request (TASK-MUNQB0GR306U
     const session = await off.callbacks.session({ session: { user: {} }, token: next });
     expect(next.tenantId).toBeUndefined();
     expect(next.role).toBeUndefined();
+    // İNCELEME-68 Ö-1: the removed tenant's workspace list goes with it.
+    expect(next.workspaceIds).toBeUndefined();
     expect(session.tenantId).toBeNull();
     expect(session.role).toBeNull();
+    expect(session.workspaceIds).toEqual([]);
   });
 
   it('removed from the bound tenant, a member of another is not moved there', async () => {
@@ -217,10 +225,127 @@ describe('role and tenant claims are re-read on every request (TASK-MUNQB0GR306U
     const down = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted } });
     expect(down.tenantId).toBeUndefined();
     expect(down.role).toBeUndefined();
+    expect(down.workspaceIds).toBeUndefined();
     prismaUser.findUnique.mockResolvedValueOnce(row([{ tenantId: 't1', role: 'TENANT_OWNER' }]));
     const up = await off.callbacks.jwt({ token: { ...down } });
     expect(membershipWhere(1)).toEqual({ tenantId: 't1' });
     expect(up.tenantId).toBe('t1');
+  });
+});
+
+describe('an accepted invitation rebinds the token (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1)', () => {
+  const row = (memberships: Array<{ tenantId: string; role: string; workspaceIds?: string[] }>) => ({
+    isPlatformAdmin: false,
+    name: 'Ayşe',
+    memberships: memberships.map((m) => ({ workspaceIds: [], ...m })),
+  });
+  const membershipQuery = (call: number) =>
+    (prismaUser.findUnique.mock.calls[call]?.[0] as { select: { memberships: { where?: unknown; take?: number } } })
+      .select.memberships;
+  // Removed from t1, still bound to it: the state İNCELEME-68 scenario 10 left the user in.
+  const stranded = { id: 'u1', boundTenantId: 't1' };
+
+  it('removed from the bound tenant, accepting t2 moves the token to t2', async () => {
+    const off = await loadConfig('false');
+    prismaUser.findUnique.mockResolvedValueOnce(row([{ tenantId: 't2', role: 'WRITER', workspaceIds: ['w2'] }]));
+    const next = await off.callbacks.jwt({ token: { ...stranded }, trigger: 'update', session: { tenantId: 't2' } });
+    expect(membershipQuery(0).where).toEqual({ tenantId: { in: ['t2', 't1'] } });
+    expect(membershipQuery(0).take).toBe(2);
+    expect(next.tenantId).toBe('t2');
+    expect(next.boundTenantId).toBe('t2');
+    expect(next.role).toBe('WRITER');
+    expect(next.workspaceIds).toEqual(['w2']);
+    // Plain requests from here on ask for t2 only.
+    prismaUser.findUnique.mockResolvedValueOnce(row([{ tenantId: 't2', role: 'WRITER' }]));
+    const later = await off.callbacks.jwt({ token: { ...next } });
+    expect(membershipQuery(1).where).toEqual({ tenantId: 't2' });
+    expect(later.tenantId).toBe('t2');
+  });
+
+  it('still a member of the bound tenant, the requested one wins even when it is newer', async () => {
+    const off = await loadConfig('false');
+    // `asc` order: t1 (older) first. Taking the first row would keep t1.
+    prismaUser.findUnique.mockResolvedValueOnce(
+      row([
+        { tenantId: 't1', role: 'TENANT_OWNER' },
+        { tenantId: 't2', role: 'MEMBER' },
+      ])
+    );
+    const next = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted }, trigger: 'update', session: { tenantId: 't2' } });
+    expect(next.tenantId).toBe('t2');
+    expect(next.role).toBe('MEMBER');
+  });
+
+  it('asked for a tenant without a membership, the token stays where it was', async () => {
+    const off = await loadConfig('false');
+    // The lookup asks for t9 and t1; only t1 exists.
+    prismaUser.findUnique.mockResolvedValueOnce(row([{ tenantId: 't1', role: 'TENANT_OWNER' }]));
+    const next = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted }, trigger: 'update', session: { tenantId: 't9' } });
+    expect(membershipQuery(0).where).toEqual({ tenantId: { in: ['t9', 't1'] } });
+    expect(next.tenantId).toBe('t1');
+    expect(next.boundTenantId).toBe('t1');
+    // Neither exists: tenantless, and still bound to t1, not to the tenant asked for.
+    prismaUser.findUnique.mockResolvedValueOnce(row([]));
+    const none = await off.callbacks.jwt({ token: { ...stranded }, trigger: 'update', session: { tenantId: 't9' } });
+    expect(none.tenantId).toBeUndefined();
+    expect(none.boundTenantId).toBe('t1');
+  });
+
+  it('a tenantId outside an update request moves nothing', async () => {
+    const off = await loadConfig('false');
+    prismaUser.findUnique.mockResolvedValueOnce(row([]));
+    const next = await off.callbacks.jwt({ token: { ...stranded }, session: { tenantId: 't2' } });
+    expect(membershipQuery(0).where).toEqual({ tenantId: 't1' });
+    expect(next.tenantId).toBeUndefined();
+  });
+
+  it('an update without a usable tenantId is an ordinary refresh', async () => {
+    const off = await loadConfig('false');
+    for (const session of [undefined, null, {}, { tenantId: '' }, { tenantId: '  ' }, { tenantId: 7 }]) {
+      prismaUser.findUnique.mockResolvedValueOnce(row([{ tenantId: 't1', role: 'TENANT_OWNER' }]));
+      const next = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted }, trigger: 'update', session });
+      expect(next.tenantId).toBe('t1');
+    }
+    for (let call = 0; call < 6; call++) expect(membershipQuery(call).where).toEqual({ tenantId: 't1' });
+  });
+});
+
+describe('a connection the pool could not open is retried once (TASK-MUNWZA26VGK0B, İNCELEME-68 Ö-2)', () => {
+  const row = { isPlatformAdmin: false, name: 'Ayşe', memberships: [{ tenantId: 't1', role: 'TENANT_OWNER', workspaceIds: [] }] };
+  // The two messages pg / pg-pool give when no connection was handed out in time.
+  const notConnected = [
+    'Connection terminated due to connection timeout',
+    'timeout exceeded when trying to connect',
+  ];
+
+  it.each(notConnected)('"%s" once: the second attempt keeps the tenant', async (message) => {
+    const off = await loadConfig('false');
+    prismaUser.findUnique.mockRejectedValueOnce(new Error(message)).mockResolvedValueOnce(row);
+    const next = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted } });
+    expect(prismaUser.findUnique).toHaveBeenCalledTimes(2);
+    expect(next.tenantId).toBe('t1');
+    expect(next.role).toBe('TENANT_OWNER');
+  });
+
+  it('twice: tenantless for this request, still fail-closed', async () => {
+    const off = await loadConfig('false');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    prismaUser.findUnique
+      .mockRejectedValueOnce(new Error(notConnected[0]))
+      .mockRejectedValueOnce(new Error(notConnected[1]));
+    const next = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted } });
+    expect(prismaUser.findUnique).toHaveBeenCalledTimes(2);
+    expect(next.tenantId).toBeUndefined();
+    expect(next.boundTenantId).toBe('t1');
+  });
+
+  it('any other error is not retried', async () => {
+    const off = await loadConfig('false');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    prismaUser.findUnique.mockRejectedValueOnce(new Error('relation "User" does not exist'));
+    const next = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted } });
+    expect(prismaUser.findUnique).toHaveBeenCalledTimes(1);
+    expect(next.tenantId).toBeUndefined();
   });
 });
 
