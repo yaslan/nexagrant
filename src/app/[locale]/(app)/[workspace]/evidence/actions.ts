@@ -1,7 +1,7 @@
 'use server';
 
 import { createHash } from 'node:crypto';
-import { withTenant } from '@/lib/db';
+import { withTenant, withTenantLockPool } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import {
@@ -100,12 +100,43 @@ export async function getPresignedUploadUrlAction(
 
 /**
  * Y-1 (TASK-MUO64MVW8TLMX): confirms of one final key run one at a time. A
- * confirm waits at most `CONFIRM_LOCK_WAIT` for the one ahead of it and then
- * answers `save_failed` (retryable). The transaction outlives the lock wait
- * plus the copy's own deadline, so it never ends while a copy is running.
+ * confirm waits at most `CONFIRM_LOCK_WAIT_MS` for the one ahead of it and then
+ * answers `save_failed` (retryable).
+ *
+ * The lock is held across the store copy, so everything that could end the
+ * transaction early is bounded, and the copy gets only the time that is left
+ * (Y-2/Y-3, TASK-MUO9IFMMVRUDJ, İNCELEME-92): each statement after the lock
+ * `CONFIRM_STATEMENT_MS`; a connection left idle inside the transaction — a
+ * frozen process, a network split — is closed by Postgres after
+ * `CONFIRM_IDLE_MS`, which frees the lock (it used to be held until TCP
+ * keepalive noticed, hours); and the copy ends `CONFIRM_MARGIN_MS` before
+ * either that or the transaction's own timeout could end the transaction and
+ * let the lock go under it. All three are transaction-local, never left on
+ * the pooled connection.
  */
-const CONFIRM_LOCK_WAIT = '10s';
-const CONFIRM_TX_TIMEOUT_MS = 10_000 + EVIDENCE_COPY_DEADLINE_MS + 15_000;
+const CONFIRM_LOCK_WAIT_MS = 10_000;
+const CONFIRM_STATEMENT_MS = 5_000;
+const CONFIRM_IDLE_MS = 20_000;
+const CONFIRM_MARGIN_MS = 2_000;
+const CONFIRM_MIN_COPY_MS = 1_000;
+const CONFIRM_TX_TIMEOUT_MS =
+  CONFIRM_LOCK_WAIT_MS + CONFIRM_STATEMENT_MS + EVIDENCE_COPY_DEADLINE_MS + CONFIRM_STATEMENT_MS + 5_000;
+
+/**
+ * How long the copy may take: the store deadline, or less when the transaction
+ * could end sooner. `lastSentAt` is when the last statement was *sent*:
+ * Postgres starts the idle clock when it finished, which is no earlier, so a
+ * process that stalls after the answer came back is counted too.
+ */
+function copyTimeLeft(txStartedAt: number, lastSentAt: number): number {
+  const now = Date.now();
+  return Math.min(
+    EVIDENCE_COPY_DEADLINE_MS,
+    lastSentAt + CONFIRM_IDLE_MS - CONFIRM_MARGIN_MS - now,
+    // The row is still to be written after the copy.
+    txStartedAt + CONFIRM_TX_TIMEOUT_MS - CONFIRM_STATEMENT_MS - CONFIRM_MARGIN_MS - now
+  );
+}
 
 function confirmLockKey(finalKey: string): bigint {
   return createHash('sha256').update(`evidence-confirm:${finalKey}`).digest().readBigInt64BE(0);
@@ -171,25 +202,38 @@ export async function confirmEvidenceUploadAction(data: {
   // had answered success: the recorded file changed under its row. Now the
   // second confirm waits for the first, finds the row, and copies nothing.
   // Nothing is deleted inside the transaction, and the copy has its own
-  // deadline (`EVIDENCE_COPY_DEADLINE_MS`), so it has ended before the
-  // transaction can time out and let the lock go.
+  // deadline, so it has ended before the transaction can end and let the
+  // lock go.
+  //
+  // B-1 (TASK-MUO9IFMMVRUDJ, İNCELEME-92): the transaction runs on its own
+  // small pool (`withTenantLockPool`). It holds its connection for as long as
+  // the store takes; on the application pool a slow store let ten confirms
+  // take every connection, and every other request of every tenant failed.
   let outcome;
   try {
-    outcome = await withTenant(
+    outcome = await withTenantLockPool(
       tenantId,
       async (tx) => {
-        await tx.$executeRaw`SELECT set_config('lock_timeout', ${CONFIRM_LOCK_WAIT}, true)`;
+        const txStartedAt = Date.now();
+        await tx.$executeRaw`SELECT set_config('lock_timeout', ${`${CONFIRM_LOCK_WAIT_MS}ms`}, true),
+          set_config('idle_in_transaction_session_timeout', ${`${CONFIRM_IDLE_MS}ms`}, true)`;
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(${confirmLockKey(finalKey)})`;
+        // After the lock: the wait for it has its own limit above.
+        await tx.$executeRaw`SELECT set_config('statement_timeout', ${`${CONFIRM_STATEMENT_MS}ms`}, true)`;
 
         // D-3 (TASK-MUNTTZ94LJWBC): a key already on a row is not copied again,
         // so a PUT to the staging key after confirm cannot reach the recorded file.
+        const readSentAt = Date.now();
         const recorded = await tx.evidence.findFirst({ where: { tenantId, r2ObjectKey: finalKey }, select: { id: true } });
         if (recorded) return { kind: 'recorded' as const };
+
+        const timeLeft = copyTimeLeft(txStartedAt, readSentAt);
+        if (timeLeft < CONFIRM_MIN_COPY_MS) return { kind: 'not_copied' as const, error: 'storage_unavailable' as const };
 
         // What was stored, not what the browser says it stored (B-1/B-3,
         // TASK-MUNODY0DVDWC5): it must exist, be an allowed type of its key's
         // extension, within the limit, and begin with that format's bytes.
-        const copied = await copyIncomingObject(objectKey, finalKey);
+        const copied = await copyIncomingObject(objectKey, finalKey, timeLeft);
         if (!copied.ok) return { kind: 'not_copied' as const, error: copied.error };
 
         const evidence = await tx.evidence.create({

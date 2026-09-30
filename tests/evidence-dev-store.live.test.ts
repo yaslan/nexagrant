@@ -61,6 +61,9 @@ vi.mock('@/lib/db', async (importOriginal) => {
     ...actual,
     withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1], opts?: Parameters<typeof actual.withTenant>[2]) =>
       actual.withTenantOn(state.rls!, tenantId, (tx) => cb(failingCreate(tx)), opts),
+    // Confirm's own pool (TASK-MUO9IFMMVRUDJ); the pool itself is tested in evidence-confirm-store-faults.
+    withTenantLockPool: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1], opts?: Parameters<typeof actual.withTenant>[2]) =>
+      actual.withTenantOn(state.rls!, tenantId, (tx) => cb(failingCreate(tx)), opts),
   };
 });
 vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));

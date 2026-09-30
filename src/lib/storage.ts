@@ -232,16 +232,22 @@ function storeFailure(err: unknown): 'object_missing' | 'storage_unavailable' {
  * (`isFinalUploadRefusal`); `object_missing` / `storage_unavailable` are worth
  * trying again. The caller has derived `finalKey` with `finalKeyOfIncoming`.
  *
- * The store calls give up after `EVIDENCE_COPY_DEADLINE_MS` in all
- * (`storage_unavailable`): confirm runs this under a lock that must not be
- * released while a copy it started is still on its way (Y-1,
- * TASK-MUO64MVW8TLMX), so the copy has to end before the lock's transaction does.
+ * The store calls — HEAD, GET, copy and the read-back alike — give up after
+ * `deadlineMs` in all (`storage_unavailable`), `EVIDENCE_COPY_DEADLINE_MS` at
+ * most: confirm runs this under a lock that must not be released while a copy
+ * it started is still on its way (Y-1, TASK-MUO64MVW8TLMX), so the copy has to
+ * end before the lock's transaction does, and confirm passes what is left of
+ * it (Y-3, TASK-MUO9IFMMVRUDJ).
  */
 export const EVIDENCE_COPY_DEADLINE_MS = 15_000;
 
-export async function copyIncomingObject(incomingKey: string, finalKey: string): Promise<IncomingCopyResult> {
+export async function copyIncomingObject(
+  incomingKey: string,
+  finalKey: string,
+  deadlineMs: number = EVIDENCE_COPY_DEADLINE_MS
+): Promise<IncomingCopyResult> {
   if (s3) {
-    const opts = { abortSignal: AbortSignal.timeout(EVIDENCE_COPY_DEADLINE_MS) };
+    const opts = { abortSignal: AbortSignal.timeout(Math.min(deadlineMs, EVIDENCE_COPY_DEADLINE_MS)) };
     let etag: string;
     let checked: { size: number; contentType: string };
     try {
