@@ -104,8 +104,13 @@ describe('the call detail page checks its [workspace] segment (Y-1)', () => {
   );
 
   it('resolves the segment against the membership before anything renders', () => {
-    const check = src.indexOf('resolveScopedWorkspace(scope, workspace)');
+    const check = src.indexOf('resolveScopedWorkspace(scope, requested)');
     expect(check).toBeGreaterThan(-1);
+    // O-1 (TASK-MUO64UQJUWEBI): the segment is normalised first, and one that is not a slug is a 404
+    const normalised = src.indexOf('const requested = normalizeWorkspaceSlug(workspace);');
+    expect(normalised).toBeGreaterThan(-1);
+    expect(normalised).toBeLessThan(check);
+    expect(src).toMatch(/if \(!requested\) notFound\(\);/);
     expect(src.indexOf('requireTenantPage(locale)')).toBeGreaterThan(-1);
     expect(check).toBeLessThan(src.indexOf('prisma.topic.findFirst'));
     expect(src).toMatch(/if \(!scoped\) redirect\(publicCallDetailHref\(locale, id\)\)/);

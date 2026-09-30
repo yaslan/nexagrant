@@ -77,7 +77,10 @@ vi.mock('@/lib/db', () => ({
 }));
 
 import { createOpportunity } from '@/app/[locale]/(app)/[workspace]/pipeline/actions';
-import { findScopedWorkspace, resolveScopedWorkspace } from '@/lib/workspaces';
+import { findScopedWorkspace, normalizeWorkspaceSlug, resolveScopedWorkspace } from '@/lib/workspaces';
+import { addInMemoryOpportunity } from '@/lib/k5-pipeline/pipelineStore';
+import { Prisma } from '@prisma/client';
+import { rescoreOpportunityG0 } from '@/lib/scoring/g0-compute';
 import type { TenantScope } from '@/lib/tenant';
 import type { TenantTx } from '@/lib/db';
 
@@ -186,5 +189,106 @@ describe('createOpportunity writes only into a workspace the membership covers',
     session.current = { user: { id: 'u-1' }, tenantId: T2, role: 'TENANT_OWNER' };
     await add('ws-b');
     expect(db.created).toEqual([expect.objectContaining({ workspaceId: 'ws-b' })]);
+  });
+});
+
+/**
+ * TASK-MUO64UQJUWEBI (İNCELEME-83 Y-1 / O-1). cs-fb replayed the "Add to pipeline"
+ * request with a `workspaceSlug` Prisma or Postgres cannot take; the lookup threw, the
+ * catch called it an outage, and the row was buffered with `success: true`.
+ */
+describe('createOpportunity refuses what is not a workspace slug, before the database', () => {
+  const buffered = vi.mocked(addInMemoryOpportunity);
+  beforeEach(() => {
+    session.current = { user: { id: 'u-1' }, tenantId: T2, role: 'TENANT_OWNER', workspaceIds: ['ws-b'] };
+    buffered.mockClear();
+    tx.workspace.findFirst.mockClear();
+  });
+
+  const call = (input: unknown) => createOpportunity(input as Parameters<typeof createOpportunity>[0]);
+
+  it.each([
+    ['NUL', 'ws-a\u0000'],
+    ['object', { foo: 1 }],
+    ['filter object', { contains: 'ws' }],
+    ['array', ['ws-a']],
+    ['number', 7],
+    ['empty', ''],
+    ['upper case', 'WS-B'],
+    ['non-ASCII with space', 'çalışma alanı'],
+    ['too long', 'a'.repeat(64)],
+  ])('%s → INVALID_INPUT, no query, nothing written, nothing buffered', async (_label, workspaceSlug) => {
+    expect(await call({ workspaceSlug, title: 'Fırsat' })).toEqual({ success: false, error: 'INVALID_INPUT' });
+    expect(tx.workspace.findFirst).not.toHaveBeenCalled();
+    expect(db.created).toEqual([]);
+    expect(buffered).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['title NUL', { title: 'x\u0000' }],
+    ['title object', { title: { foo: 1 } }],
+    ['title blank', { title: '   ' }],
+    ['topicId number', { title: 't', topicId: 7 }],
+    ['notes NUL', { title: 't', notes: 'a\u0000b' }],
+    ['stage unknown', { title: 't', stage: 'G9' }],
+    ['intendedRole object', { title: 't', intendedRole: {} }],
+  ])('other fields too: %s → INVALID_INPUT', async (_label, rest) => {
+    expect(await call({ workspaceSlug: 'ws-b', ...rest })).toEqual({ success: false, error: 'INVALID_INPUT' });
+    expect(db.created).toEqual([]);
+    expect(buffered).not.toHaveBeenCalled();
+  });
+
+  it('a well-formed request still lands in the permitted workspace (notes with newlines kept)', async () => {
+    const res = await call({ workspaceSlug: 'ws-b', title: 'Fırsat', notes: 'satır 1\nsatır 2\t.', stage: 'G1' });
+    expect(res.success).toBe(true);
+    expect(db.created).toEqual([expect.objectContaining({ workspaceId: 'ws-b', stage: 'G1', notes: 'satır 1\nsatır 2\t.' })]);
+  });
+
+  it('a query the database refuses is a refusal, not an outage: CREATE_FAILED, nothing buffered', async () => {
+    const refused = new Prisma.PrismaClientKnownRequestError('invalid byte sequence for encoding "UTF8": 0x00', {
+      code: 'P2039',
+      clientVersion: 'test',
+    });
+    tx.workspace.findFirst.mockRejectedValueOnce(refused);
+    expect(await call({ workspaceSlug: 'ws-b', title: 'Fırsat' })).toEqual({ success: false, error: 'CREATE_FAILED' });
+    expect(buffered).not.toHaveBeenCalled();
+  });
+
+  it('a scoring failure after the row is committed keeps the created row, unbuffered', async () => {
+    vi.mocked(rescoreOpportunityG0).mockRejectedValueOnce(new Error('scoring blew up'));
+    const res = await call({ workspaceSlug: 'ws-b', title: 'Fırsat' });
+    expect(res).toEqual({ success: true, opportunity: expect.objectContaining({ id: 'opp-1', workspaceId: 'ws-b', g0Score: null }) });
+    expect(buffered).not.toHaveBeenCalled();
+  });
+
+  it('a real outage (connection refused) still falls back to the buffer', async () => {
+    tx.workspace.findFirst.mockRejectedValueOnce(Object.assign(new Error(''), { code: 'ECONNREFUSED' }));
+    buffered.mockImplementationOnce((tenantId, opp) => ({ ...opp, tenantId }));
+    const res = await call({ workspaceSlug: 'ws-b', title: 'Fırsat' });
+    expect(res).toEqual({ success: true, opportunity: expect.objectContaining({ workspaceId: 'ws-b', title: 'Fırsat' }) });
+    expect(buffered).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('workspace slugs that cannot be a URL segment (O-1)', () => {
+  it('normalizeWorkspaceSlug decodes, lower-cases, and refuses what is not a slug', () => {
+    expect(normalizeWorkspaceSlug('ws-b')).toBe('ws-b');
+    expect(normalizeWorkspaceSlug('WS-B')).toBe('ws-b');
+    expect(normalizeWorkspaceSlug('ws%2Db')).toBe('ws-b');
+    expect(normalizeWorkspaceSlug('%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1')).toBeNull();
+    expect(normalizeWorkspaceSlug('çalışma alanı')).toBeNull();
+    expect(normalizeWorkspaceSlug('%E0%A4%A')).toBeNull();
+    expect(normalizeWorkspaceSlug('a%00')).toBeNull();
+    expect(normalizeWorkspaceSlug('..%2f..%2fevil')).toBeNull();
+    expect(normalizeWorkspaceSlug('')).toBeNull();
+  });
+
+  it('findScopedWorkspace never hands back a workspace whose stored slug has no URL', async () => {
+    db.workspaces.push({ id: 'ws-t8', tenantId: 't8', slug: 'çalışma alanı', deletedAt: null, createdAt: at(1) });
+    // the alias and the workspace-free route would redirect to it: refused instead
+    expect(await find(scope('t8'), null)).toBeNull();
+    expect(await find(scope('t8'), 'default')).toBeNull();
+    // and it cannot be asked for by name either
+    expect(await find(scope('t8'), 'çalışma alanı')).toBeNull();
   });
 });
