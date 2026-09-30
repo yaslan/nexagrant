@@ -12,7 +12,8 @@ import { isPresentId } from '@/lib/required-id';
  * PIC, and an invite could overwrite a seat another user had confirmed. The
  * rules now live here, next to neither action, so the two cannot drift apart.
  *
- * - Invite: any tenant member, but only an organisation that is on this seat's
+ * - Invite: a role with `manage_workspaces` (checked by the two actions,
+ *   TASK-MUN80UOUPB2A4 — until then any tenant member), and only an organisation that is on this seat's
  *   own candidate list (`SeatCandidate`, tenant-scoped), and never over an
  *   organisation already confirmed on it. The status written is always `INVITED`.
  * - Confirm: only a role with `manage_approvals`, only an `INVITED` seat, and
