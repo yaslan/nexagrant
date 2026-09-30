@@ -31,7 +31,15 @@
 --     current contact belongs to an earlier one: that is exactly the B-2 row,
 --     left NULL so it is reminded when its contact goes stale.
 --   * staleDigestOn = the member's latest stamp day, so a digest sent earlier
---     on the day of the deploy is not sent a second time.
+--     on the day of the deploy is not sent a second time. Skipped for a user
+--     whose "User"."staleDigestOn" already covers that day: the claim moved
+--     there (m4-stale-digest-user-claim.sql) and the release that claims on
+--     the user stamps with the same `now` it claims with. Without this, every
+--     re-run of the chain after that release sent a digest wrote today onto
+--     the member's NULL column, and RELEASE_CHECKLIST.md §3.1's check — a new
+--     "Membership" claim means a pre-f7a6dcf5 worker still runs — fired with
+--     no such worker (İNCELEME-106 Y-1). The column is read through to_jsonb
+--     so the file also runs before m4-stale-digest-user-claim.sql adds it.
 --
 -- RLS: untouched. Both tables stay in prisma/rls.sql's tenant-isolated list;
 -- the policies key on "tenantId", which this file does not touch.
@@ -61,4 +69,9 @@ UPDATE "Membership" m
   ) s
  WHERE m."staleDigestOn" IS NULL
    AND m."tenantId" = s."tenantId"
-   AND m."userId" = s."ownerUserId";
+   AND m."userId" = s."ownerUserId"
+   AND NOT EXISTS (
+     SELECT 1 FROM "User" u
+      WHERE u.id = m."userId"
+        AND (to_jsonb(u) ->> 'staleDigestOn')::date >= s.day
+   );
