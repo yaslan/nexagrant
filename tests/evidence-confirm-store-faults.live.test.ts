@@ -787,7 +787,7 @@ describe('İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs
     // HEAD and expecting the whole copyIncomingObject call to timeout and return storage_unavailable.
     const up = await uploaded('t7-final-head');
     state.hook = async ({ method, path, isCopy }) => {
-      // After copy, hold the final key's HEAD for 4 seconds; with a 1.5 s deadline, copyIncomingObject should fail.
+      // Hold the final key's HEAD (sent after the copy) for 4 s; with a 1.5 s deadline, copyIncomingObject should fail.
       if (!isCopy && method === 'HEAD' && path.endsWith(`/${up.finalKey}`)) {
         await sleep(4_000);
       }
@@ -798,11 +798,11 @@ describe('İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs
     state.hook = null;
     expect(res).toEqual({ ok: false, error: 'storage_unavailable' });
     expect(took, `gave up after ${took} ms`).toBeLessThan(3_000);
-    // If the copy succeeded, we would see it in requests; but with the HEAD held, copy should fail.
-    expect(state.requests.some((r) => r.startsWith('PUT(copy)'))).toBe(false);
-    await sleep(3_000);
-    // Final key should not be stored (copy was aborted), staging should be kept.
-    expect(await stored(up.finalKey)).toBeNull();
+    // The copy ran: the held HEAD is the check after it (TASK-MUOFAD4JSUCCP —
+    // this asserted no copy and no final object, and was red against a store).
+    expect(state.requests.some((r) => r.startsWith('PUT(copy)'))).toBe(true);
+    expect((await stored(up.objectKey))?.equals(up.body), 'the staging object is kept').toBe(true);
+    // The copy may stay under the final key (D-3): the retry writes the same checked bytes over it.
     await expectRetrySucceeds(up);
   }, 60_000);
 });
