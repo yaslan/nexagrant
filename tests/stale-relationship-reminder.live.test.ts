@@ -621,8 +621,16 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
       data: { staleDigestOn: dayStartUtc(d) },
     });
     const before = await claimOf(U.d2);
+    // The claim sits on a tenant with nothing due for U.d2 now, and whose M4
+    // has since closed: it is read before the tenant's gates, not after.
+    await setM4(D2.b, 'OFF');
     const same = fakeMailer();
-    const r = await runD2(same.mailer, new Date(d.getTime() + 22 * 60_000), [D2.a, D2.b]);
+    let r;
+    try {
+      r = await runD2(same.mailer, new Date(d.getTime() + 22 * 60_000), [D2.a, D2.b]);
+    } finally {
+      await setM4(D2.b, 'ON');
+    }
     expect(same.sent).toHaveLength(0);
     expect(r.skippedMailedToday).toBe(1);
     expect(r.digestsSent).toBe(0);
