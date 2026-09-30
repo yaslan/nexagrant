@@ -1,0 +1,9 @@
+B1-M1 eski claim yok sayılıyor: Tests  1 failed | 23 passed (24)
+     FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a claim the previous release wrote on a membership today holds
+B1-M2 eski claim günsüz (her eski claim engeller): Tests  4 failed | 20 passed (24)
+     FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a claim the previous release wrote on a membership today holds
+     FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > the day is the UTC day in any process time zone: −11 sends no 
+     FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > the day is the UTC day in any process time zone: +14 claims th
+     FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a rejected send gives back only its own day: a later day claim
+B1-M3 eski claim yalnız kapılardan sonra okunuyor: Tests  1 failed | 23 passed (24)
+     FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a claim the previous release wrote on a membership today holds
