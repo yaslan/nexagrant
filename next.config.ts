@@ -2,7 +2,14 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from 'next-intl/plugin';
 import { PHASE_PRODUCTION_BUILD } from 'next/constants';
 import { execFileSync } from 'child_process';
-import { API_CONTENT_SECURITY_POLICY, STATIC_SECURITY_HEADERS } from './src/lib/security-headers';
+import { readdirSync } from 'fs';
+import path from 'path';
+import {
+  API_CONTENT_SECURITY_POLICY,
+  STATIC_FILE_CONTENT_SECURITY_POLICY,
+  STATIC_SECURITY_HEADERS,
+  staticFileNotFoundSource,
+} from './src/lib/security-headers';
 
 const withNextIntl = createNextIntlPlugin();
 
@@ -24,6 +31,28 @@ const withNextIntl = createNextIntlPlugin();
 function checkI18n() {
   console.log('\n🌐 Checking i18n translations...');
   execFileSync('tsx', ['scripts/i18n-check.ts'], { stdio: 'inherit' });
+}
+
+// The metadata files Next serves by name from the top of src/app.
+const APP_METADATA_FILE =
+  /^(?:favicon\.ico|(?:icon|apple-icon|opengraph-image|twitter-image)\d*\.(?:ico|jpe?g|png|gif|svg)|robots\.txt|sitemap\.xml|manifest\.(?:json|webmanifest))$/;
+
+/**
+ * The files that really answer a static-file path: everything in public/ and the
+ * metadata files at the top of src/app (`/favicon.ico`; Next serves those by name).
+ * Read when `headers()` runs — at build time; the list is baked into
+ * routes-manifest.json like the rest of it, so a public/ file added without a
+ * rebuild gets the (harmless) 404 policy. A generated one (`app/robots.ts`) is not
+ * listed either and gets it too: a CSP on a text/plain or XML body changes nothing.
+ */
+function servedStaticFiles(root: string = process.cwd()): string[] {
+  const underPublic = readdirSync(path.join(root, 'public'), { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => path.relative(path.join(root, 'public'), path.join(e.parentPath, e.name)));
+  const appRoot = readdirSync(path.join(root, 'src/app'), { withFileTypes: true })
+    .filter((e) => e.isFile() && APP_METADATA_FILE.test(e.name))
+    .map((e) => e.name);
+  return [...underPublic, ...appRoot].map((f) => `/${f.split(path.sep).join('/')}`).sort();
 }
 
 const nextConfig: NextConfig = {
@@ -106,6 +135,15 @@ const nextConfig: NextConfig = {
       {
         source: '/api/:path*',
         headers: [{ key: 'Content-Security-Policy', value: API_CONTENT_SECURITY_POLICY }],
+      },
+      // Nor for static-file extensions, /_next and /_vercel: a `/yok.png`, `/robots.txt`
+      // or `/_next/yok` with no file behind it is Next's app 404 (İNCELEME-78 Y-1).
+      // Real files are left out of the source and go out as before. Where the proxy
+      // runs as well (`/yok.PNG` — this match ignores case, the matcher does not), its
+      // header replaces this one.
+      {
+        source: staticFileNotFoundSource(servedStaticFiles()),
+        headers: [{ key: 'Content-Security-Policy', value: STATIC_FILE_CONTENT_SECURITY_POLICY }],
       },
       // TASK-MUN2793A57Z9I (se-fb (d)) — the invitation link carries a bearer
       // token in its query. The GET handler moves it into a cookie at once;

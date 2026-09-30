@@ -15,7 +15,8 @@
  *    around. The proxy matcher skips `/api`, `/_next` and static-file extensions
  *    (src/proxy.ts `config`). `/api` gets `API_CONTENT_SECURITY_POLICY` from
  *    next.config instead (never both on one response: two enforced policies
- *    intersect, and the static one has no nonce).
+ *    intersect, and the static one has no nonce). A static-file path with no file
+ *    behind it gets `STATIC_FILE_CONTENT_SECURITY_POLICY` the same way.
  *
  * Why the policy looks the way it does — keep this in step with the code:
  * - script-src: nonce + 'strict-dynamic'. Next's inline `self.__next_f.push(…)`
@@ -101,6 +102,62 @@ export const API_CONTENT_SECURITY_POLICY = [
   "form-action 'none'",
   "frame-ancestors 'none'",
 ].join('; ');
+
+/**
+ * File extensions the proxy matcher leaves out (src/proxy.ts `config`): paths that
+ * are only ever static files. The matcher has to be a literal Next.js can read at
+ * build time, so it repeats this list — src/lib/security-headers.test.ts checks
+ * the two are the same.
+ */
+export const STATIC_FILE_EXTENSIONS =
+  'ico|png|jpe?g|gif|webp|avif|svg|txt|xml|webmanifest|woff2?|ttf|css|js|map';
+
+/**
+ * For a static-file path that has no file behind it (`/yok.png`, `/x.js`,
+ * `/robots.txt`): the proxy never runs there, so Next's app 404 — ~30 inline
+ * scripts — went out with no policy at all (İNCELEME-78 Y-1). It needs no nonce:
+ * the 404 page is a heading and a plain link, and works with its scripts blocked.
+ * No report-uri on purpose: every visit would report its own blocked scripts and
+ * use up the report endpoint's global budget.
+ */
+export const STATIC_FILE_CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * next.config `headers()` source for `STATIC_FILE_CONTENT_SECURITY_POLICY`. It covers
+ * the paths the proxy matcher skips and that are not `/api/*` (that has its own
+ * policy): every path with a static-file extension, and anything under `/_next` or
+ * `/_vercel` (`/_next/yok` is the app 404 too). Left out are the responses that are
+ * real files: `servedFiles` (e.g. `/logo.png`, read from public/ at build time),
+ * `/_next/static/*` (a missing chunk there is a plain-text 404) and `/_next/image`.
+ * Those go out without a CSP, cached as before.
+ *
+ * Header sources match case-insensitively, the proxy matcher does not: `/yok.PNG`
+ * and `/tr/yok.png` match here *and* run the proxy. That is safe — the proxy's
+ * header replaces this one on the response (measured, see the TASK-MUO06ANN5D3RM
+ * report) — and it leaves no hole for `/TR/yok.png`, which the proxy skips. The
+ * one thing case-folding costs: `/_NEXT/static/x.js` is left out as well.
+ */
+export function staticFileNotFoundSource(servedFiles: readonly string[]): string {
+  const served = servedFiles.map((f) => escapeRegExp(f.replace(/^\//, '')));
+  const skip = [
+    'api(?:/|$)',
+    '_next/static/',
+    '_next/image$',
+    ...(served.length ? [`(?:${served.join('|')})$`] : []),
+  ];
+  const covered = `.*\\.(?:${STATIC_FILE_EXTENSIONS})|_next(?:/.*)?|_vercel(?:/.*)?`;
+  return `/:path((?!${skip.join('|')})(?:${covered})$)`;
+}
 
 /** Where the browser POSTs violation reports (src/app/api/csp-report/route.ts). */
 export const CSP_REPORT_PATH = '/api/csp-report';
