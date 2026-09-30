@@ -1,0 +1,28 @@
+chrome fefb-dtw-note page status 200
+chrome fefb-dtw-note GET export -> 500 content-disposition: undefined
+chrome fefb-dtw-note NO DOWNLOAD within 30s
+chrome fefb-dtw-note popup body: 
+  
+    
+      
+        
+        
+          
+            Bu sayfa çalışmıyor
+          
+          
+            localhost
+chrome fefb-dtw-note2 page status 200
+chrome fefb-dtw-note2 GET export -> 500 content-disposition: undefined
+chrome fefb-dtw-note2 NO DOWNLOAD within 30s
+chrome fefb-dtw-note2 popup body: 
+  
+    
+      
+        
+        
+          
+            Bu sayfa çalışmıyor
+          
+          
+            localhost

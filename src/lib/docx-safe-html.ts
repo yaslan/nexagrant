@@ -68,6 +68,64 @@ function escapeHtmlAttribute(value: string): string {
 }
 
 /**
+ * True when the bundled `image-size` 1.x inside `html-to-docx` will size `bytes` without throwing
+ * (TASK-MUNDTW8O2IV6V, İNCELEME-53 B-2). The signature alone is not enough: "GIF8"+junk, a PNG
+ * signature without IHDR or a JPEG whose marker table runs off the end all reach `sizeOf`, which
+ * throws, and the export answered 500. Each branch reads exactly what that parser reads, in
+ * bounds, so an image it cannot size is dropped here like any other refused image.
+ */
+function sizeable(mime: string, bytes: Buffer): boolean {
+  if (mime === 'image/gif') {
+    // GIF.validate is /^GIF8[79]a/ on 6 bytes; otherwise the detector falls through to the
+    // other parsers (SVG, …). GIF.calculate reads width/height at 6..9.
+    return /^GIF8[79]a$/.test(bytes.toString('latin1', 0, 6)) && bytes.length >= 10;
+  }
+  if (mime === 'image/png') {
+    // PNG.calculate reads width/height at 16..23 of the IHDR chunk, which must come first.
+    return bytes.toString('latin1', 12, 16) === 'IHDR' && bytes.length >= 24;
+  }
+  return jpegSizeable(bytes);
+}
+
+/** The JPG.calculate walk of image-size 1.x, without the throws. */
+function jpegSizeable(bytes: Buffer): boolean {
+  let buffer = bytes.subarray(4);
+  while (buffer.length > 0) {
+    if (buffer.length < 2) return false;
+    const i = buffer.readUInt16BE(0);
+    if (buffer.toString('hex', 2, 6) === '45786966' && !exifReadable(buffer.subarray(2, i))) return false;
+    if (i > buffer.length || buffer[i] !== 0xff) return false;
+    const next = buffer[i + 1];
+    if (next === 0xc0 || next === 0xc1 || next === 0xc2) return i + 9 <= buffer.length;
+    buffer = buffer.subarray(i + 2);
+  }
+  return false; // "Invalid JPG, no size found"
+}
+
+/** The orientation lookup image-size runs on an "Exif" segment, bounds-checked. */
+function exifReadable(block: Buffer): boolean {
+  const byteAlign = block.toString('hex', 6, 8);
+  const bigEndian = byteAlign === '4d4d';
+  if (!bigEndian && byteAlign !== '4949') return true;
+  const u16 = (b: Buffer, at: number) => (bigEndian ? b.readUInt16BE(at) : b.readUInt16LE(at));
+  if (block.length < 16) return false;
+  const entries = u16(block, 14);
+  for (let n = 0; n < entries; n++) {
+    const start = 16 + 12 * n;
+    if (start > block.length) return true;
+    const entry = block.subarray(start, start + 12);
+    if (entry.length < 2) return false;
+    if (u16(entry, 0) !== 274) continue; // orientation tag
+    if (entry.length < 4) return false;
+    if (u16(entry, 2) !== 3) return true;
+    if (entry.length < 8) return false;
+    if ((bigEndian ? entry.readUInt32BE(4) : entry.readUInt32LE(4)) !== 1) return true;
+    return entry.length >= 10;
+  }
+  return true;
+}
+
+/**
  * Returns a canonical `data:` URI for an inline PNG/JPEG/GIF, or null for anything else —
  * every `http:`/`https:`/protocol-relative/`file:` URL included.
  */
@@ -87,7 +145,7 @@ export function safeInlineImageSrc(src: string, budget: { remaining: number }): 
   const signature = IMAGE_SIGNATURES.find(({ bytes: magic }) =>
     magic.every((byte, i) => bytes[i] === byte)
   );
-  if (!signature) return null;
+  if (!signature || !sizeable(signature.mime, bytes)) return null;
 
   budget.remaining -= bytes.length;
   return `data:${signature.mime};base64,${bytes.toString('base64')}`;

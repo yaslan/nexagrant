@@ -4,6 +4,7 @@ import { findAccessibleTemplate, templateSections } from '@/modules/m2/server/te
 import { auth } from '@/lib/auth';
 import HTMLtoDOCX from 'html-to-docx';
 import { escapeHtmlText, MAX_TOTAL_IMAGE_BYTES, sanitizeHtmlForDocx } from '@/lib/docx-safe-html';
+import { attachmentContentDisposition } from '@/lib/content-disposition';
 
 export async function GET(
   req: Request,
@@ -63,8 +64,8 @@ export async function GET(
   // escaped as text and section bodies are rebuilt from an allowlist that
   // lets no URL through as an image source. One image budget per document.
   const templateName = escapeHtmlText(template.name);
-  const imageBudget = { remaining: MAX_TOTAL_IMAGE_BYTES };
-  let htmlString = `
+  const buildHtml = (imageBudget: { remaining: number }) => {
+    let htmlString = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -77,28 +78,40 @@ export async function GET(
         <hr />
   `;
 
-  for (const section of sections) {
-    htmlString += `<h3>${escapeHtmlText(section.labelKey)}</h3>`;
-    const body = content[section.key];
-    htmlString += `<div>${typeof body === 'string' && body ? sanitizeHtmlForDocx(body, imageBudget) : '<p>No content provided.</p>'}</div>`;
-    htmlString += `<br />`;
+    for (const section of sections) {
+      htmlString += `<h3>${escapeHtmlText(section.labelKey)}</h3>`;
+      const body = content[section.key];
+      htmlString += `<div>${typeof body === 'string' && body ? sanitizeHtmlForDocx(body, imageBudget) : '<p>No content provided.</p>'}</div>`;
+      htmlString += `<br />`;
+    }
+
+    return htmlString + `</body></html>`;
+  };
+  const toDocx = (html: string) =>
+    HTMLtoDOCX(html, null, {
+      table: { row: { cantSplit: true } },
+      footer: true,
+      pageNumber: true,
+    });
+
+  // `safeInlineImageSrc` only keeps images the bundled image-size can size
+  // (TASK-MUNDTW8O2IV6V B-2). If one still makes html-to-docx throw, the note
+  // is exported once more without images rather than failing with a 500.
+  let fileBuffer: Awaited<ReturnType<typeof toDocx>>;
+  try {
+    fileBuffer = await toDocx(buildHtml({ remaining: MAX_TOTAL_IMAGE_BYTES }));
+  } catch (error) {
+    console.warn('[concept-note export] retrying without images:', error instanceof Error ? error.message : error);
+    fileBuffer = await toDocx(buildHtml({ remaining: 0 }));
   }
-
-  htmlString += `</body></html>`;
-
-  // Convert HTML to DOCX buffer
-  const fileBuffer = await HTMLtoDOCX(htmlString, null, {
-    table: { row: { cantSplit: true } },
-    footer: true,
-    pageNumber: true,
-  });
 
   // Return the file
   return new NextResponse(fileBuffer, {
     status: 200,
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'Content-Disposition': `attachment; filename="${opportunity?.title || 'ConceptNote'}.docx"`,
+      // The title is user text; a raw non-Latin-1 letter (ı, ş, ğ) made this a 500 (B-3).
+      'Content-Disposition': attachmentContentDisposition(opportunity?.title ?? '', '.docx', 'ConceptNote'),
     },
   });
 }

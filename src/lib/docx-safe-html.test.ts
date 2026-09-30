@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   MAX_IMAGE_BYTES,
   escapeHtmlText,
@@ -104,6 +106,48 @@ describe('safeInlineImageSrc — the image-size DoS path (O-3)', () => {
     const shared = { remaining: 100 };
     expect(safeInlineImageSrc(`data:image/png;base64,${PNG_B64}`, shared)).not.toBeNull();
     expect(safeInlineImageSrc(`data:image/png;base64,${PNG_B64}`, shared)).toBeNull();
+  });
+});
+
+describe('safeInlineImageSrc — bytes the bundled image-size cannot size are dropped (TASK-MUNDTW8O2IV6V, İNCELEME-53 B-2)', () => {
+  const fixture = (name: string) => readFileSync(join(process.cwd(), 'tests/fixtures/docx-images', name));
+  const uri = (bytes: Buffer, type = 'png') => `data:image/${type};base64,${bytes.toString('base64')}`;
+  const PNG = Buffer.from(PNG_B64, 'base64');
+  const GIF = fixture('12x8.gif');
+  const JPEG = fixture('exif-12x8.jpg'); // real sips output: JFIF + big-endian Exif segment + SOF0
+
+  it('keeps real PNG, GIF87a and an Exif-carrying JPEG', () => {
+    expect(safeInlineImageSrc(uri(PNG), budget())).toBe(`data:image/png;base64,${PNG_B64}`);
+    expect(safeInlineImageSrc(uri(GIF, 'gif'), budget())).toBe(`data:image/gif;base64,${GIF.toString('base64')}`);
+    expect(safeInlineImageSrc(uri(JPEG, 'jpeg'), budget())).toBe(`data:image/jpeg;base64,${JPEG.toString('base64')}`);
+  });
+
+  const broken: Record<string, Buffer> = {
+    'GIF8 + junk': Buffer.concat([Buffer.from('GIF8'), Buffer.alloc(20, 0x41)]),
+    'GIF8 + svg (falls through to the SVG parser)': Buffer.from('GIF8<svg xmlns="http://www.w3.org/2000/svg"></svg>'),
+    'GIF89a cut before the size': Buffer.from('GIF89a\x0c\x00', 'latin1'),
+    'PNG signature without IHDR': Buffer.concat([PNG.subarray(0, 8), Buffer.from('\x00\x00\x00\x0dJUNK', 'latin1'), Buffer.alloc(16)]),
+    'PNG cut inside IHDR': PNG.subarray(0, 20),
+    'JPEG signature + junk': Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(40, 0x41)]),
+    'JPEG without a SOF marker': Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xd9]),
+    'JPEG cut inside SOF0': JPEG.subarray(0, JPEG.indexOf(Buffer.from([0xff, 0xc0])) + 6),
+    // A complete SOF0 after a 10-byte big-endian "Exif" block: image-size reads the IFD count
+    // at 14 of that block and throws RangeError before it ever reaches the SOF.
+    'JPEG with a truncated Exif block': Buffer.from([
+      0xff, 0xd8, 0xff, 0xe1, 0x00, 0x0c, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0x4d, 0x4d, 0x00, 0x2a,
+      0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x08, 0x00, 0x0c, 0x03,
+    ]),
+  };
+
+  it.each(Object.entries(broken))('%s → null, and the budget is untouched', (_name, bytes) => {
+    const shared = budget();
+    expect(safeInlineImageSrc(uri(bytes), shared)).toBeNull();
+    expect(shared.remaining).toBe(budget().remaining);
+  });
+
+  it('a broken image is skipped inside a section; the text around it stays', () => {
+    const out = sanitizeHtmlForDocx(`<p>önce</p><img src="${uri(broken['GIF8 + junk']!, 'gif')}"><p>sonra</p>`);
+    expect(out).toBe('<p>önce</p><p>sonra</p>');
   });
 });
 

@@ -142,6 +142,23 @@ describe('concept-note DOCX export — SSRF', () => {
     expect((await docxParts(bytes)).xml).toContain('Opportunity: T&lt;img');
   });
 
+  it('section labels (labelKey) are text, not markup: 0 requests (İNCELEME-53 B-1 K3)', async () => {
+    // Labels come from ConceptTemplate.schema; only seeds write them today, but a tenant
+    // template editor would make them tenant text like the title above.
+    seed({ summary: 'body' });
+    mockPrisma.conceptTemplate.findFirst.mockResolvedValue(
+      partialRow<ConceptTemplate>({
+        id: 'tpl_1',
+        name: 'Standard Template',
+        schema: { sections: [{ key: 'summary', labelKey: `L<img src="http://${base}/internal/label.png">` }] },
+      })
+    );
+    const { res, bytes } = await exportNote();
+    expect(res.status).toBe(200);
+    expect(hits).toEqual([]);
+    expect((await docxParts(bytes)).xml).toContain('L&lt;img src=');
+  });
+
   it('a legitimate export still produces a real DOCX with its text and inline image', async () => {
     seed({
       summary: `<h2>Summary</h2><p>Rural <strong>grid</strong> pilot &amp; results</p><img src="data:image/png;base64,${PNG.toString('base64')}">`,
