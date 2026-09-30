@@ -1,0 +1,20 @@
+tick=2026-10-21T23:59:30.000Z job=14 left=0
+"tenantsPilotExpired":1 "tenantsModuleClosed":402 "tenantsFailed":0 "relationshipsReminded":1 "skippedMailedToday":0 "digestsSent":1 "digestsFailed":0
+total 279 {'u95-z1': 1}
+User.staleDigestOn=2026-10-21
+tick=2026-10-21T23:59:50.000Z job=15 left=0
+"tenantsPilotExpired":1 "tenantsModuleClosed":402 "tenantsFailed":0 "relationshipsReminded":0 "skippedMailedToday":0 "digestsSent":0 "digestsFailed":0
+total 279 {'u95-z1': 1}
+User.staleDigestOn=2026-10-21
+tick=2026-10-22T00:00:30.000Z job=16 left=0
+"tenantsPilotExpired":1 "tenantsModuleClosed":402 "tenantsFailed":0 "relationshipsReminded":1 "skippedMailedToday":0 "digestsSent":1 "digestsFailed":0
+total 280 {'u95-z1': 2}
+User.staleDigestOn=2026-10-22
+tick=2026-10-23T23:59:30.000Z job=17 left=0
+"tenantsPilotExpired":1 "tenantsModuleClosed":402 "tenantsFailed":0 "relationshipsReminded":1 "skippedMailedToday":0 "digestsSent":1 "digestsFailed":0
+total 281 {'u95-z2': 1}
+User.staleDigestOn=2026-10-23
+tick=2026-10-23T23:59:50.000Z job=18 left=0
+"tenantsPilotExpired":1 "tenantsModuleClosed":402 "tenantsFailed":0 "relationshipsReminded":0 "skippedMailedToday":1 "digestsSent":0 "digestsFailed":0
+total 281 {'u95-z2': 1}
+User.staleDigestOn=2026-10-23

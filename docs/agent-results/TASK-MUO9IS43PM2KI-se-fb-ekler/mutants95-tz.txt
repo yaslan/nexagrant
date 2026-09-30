@@ -1,0 +1,20 @@
+== TZ/session=Pacific/Kiritimati
+-- temiz
+      Tests  19 passed (19)
+K3 gün yerel saatle (toLocaleDateString): exit=1 Tests  5 failed | 14 passed (19)
+   × M4 stale relationship reminder (live, fabrika_app) > a contact logged after the reminder but dated before it starts a new period (İNCELEME-51 B-2)
+   × M4 stale relationship reminder (live, fabrika_app) > a row that goes stale later the same day waits for tomorrow: one digest per user per day
+   × M4 stale relationship reminder (live, fabrika_app) > a worker killed after the send and before the stamp sends no second digest that day (İNCELEME-51 
+   × M4 stale relationship reminder (live, fabrika_app) > one digest per user across tenants, only the due rows, module and pilot gates held
+   × M4 stale relationship reminder (live, fabrika_app) > the claim is a compare-and-set: a run that loses the race after reading the day as free sends not
+K4 claim günü Date olarak bağlanır: exit=0 Tests  19 passed (19)
+K5 release koşulsuz: exit=0 Tests  19 passed (19)
+== TZ/session=Pacific/Pago_Pago
+-- temiz
+      Tests  19 passed (19)
+K3 gün yerel saatle (toLocaleDateString): exit=1 Tests  3 failed | 16 passed (19)
+   × M4 stale relationship reminder (live, fabrika_app) > a tenant skipped on the second run (M4 closed) does not hide the day claimed there: no second dig
+   × M4 stale relationship reminder (live, fabrika_app) > a tenant whose read fails on the second run does not hide the day claimed there (İNCELEME-56 Y-1)
+   × M4 stale relationship reminder (live, fabrika_app) > two runs over disjoint tenants racing for the same user send exactly one digest (İNCELEME-69 D-2,
+K4 claim günü Date olarak bağlanır: exit=0 Tests  19 passed (19)
+K5 release koşulsuz: exit=0 Tests  19 passed (19)
