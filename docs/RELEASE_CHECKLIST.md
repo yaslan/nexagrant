@@ -118,6 +118,17 @@ m4-stale-digest-user-claim.sql
 Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workflows/ci.yml:99`):
 
 - [ ] 0. **Önce yedek** (§4.1) — geri dönüşün tek güvenli yolu.
+- [ ] 0a. **Go-live ön kontrolü R-1** (TASK-MUOG51GJ3PUOG; kaynak `docs/agent-results/TASK-MUOEY2GBFHY7U-crw2-fb.md` §Riskler R-1). 1. adımdan (`db push`) **önce**, sahip rolüyle:
+  ```bash
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/golive/r1-topicmatch-check.sql
+  ```
+  Betik yalnız okur (`BEGIN READ ONLY` … `ROLLBACK`; yazma denemesi `cannot execute … in a read-only transaction` verir). K1 anahtarının NULLS NOT DISTINCT olup olmadığına ve aynı (tenantId, topicId) için birden fazla K1 satırı (`opportunityId IS NULL`) bulunup bulunmadığına bakar. Çıkış kodu her durumda 0'dır; kararı son satır verir:
+  - `R1_SONUC | TEMIZ` (anahtar `t`, mükerrer 0) → devam.
+  - `R1_SONUC | DB_PUSH_ONCESI` (boş DB, `TopicMatch` yok) → devam. Kontrolü 1. adımdan sonra, 3. adımdan önce bir kez daha koşun.
+  - `R1_SONUC | NULLS_DISTINCT` (anahtar `f`, mükerrer 0) ya da `ANAHTAR_YOK` → devam. 3. adımdaki `topicmatch-per-opportunity` anahtarı tek komutta NULLS NOT DISTINCT'e çevirir.
+  - `R1_SONUC | DUR_MUKERRER` (mükerrer çiftler üstte listelenir) → **DUR.** Temizlik kararı patronundur (K1 türetilmiş veridir, yeniden hesaplanır). Bu durumda 3. adım `topicmatch-per-opportunity/migration.sql` içinde `could not create unique index … is duplicated` ile durur (exit 3). Veri silmez, eski anahtar yerinde kalır (ölçüldü: satır sayısı ve içerik md5'i önce ve sonra aynı; `docs/agent-results/TASK-MUOG51GJ3PUOG-devop-fb-ekler/B2-migration-durur.txt`). Mükerrerleri elle silmeyin.
+  - `R1_SONUC | RLS_KOR` → sayım güvenilmez: rol FORCE RLS altında satırları göremiyor (`system_scope` politikası yok ve rol süper kullanıcı değil). Süper kullanıcıyla ya da `pnpm db:rls` sonrası yeniden koşun.
+  Betik `SET LOCAL app.system_scope = 'on'` ile yalnız kendi işlemi için RLS kapsamını açar. Bu satırı çıkarmayın: `TopicMatch` FORCE RLS altındadır ve süper kullanıcı olmayan rol kapsam olmadan 0 satır görür; mükerrer varken `NULLS_DISTINCT` diye yanlış "devam" sonucu çıkar (ölçüldü, aynı ekler `B3-rls-kapsam.txt`).
 - [ ] 1. `pnpm exec prisma db push` — **`--accept-data-loss` VERMEYİN**. Veri kaybı gerektiren bir fark varsa komut durur; o durumda dur ve incele.
 - [ ] 2. `pnpm db:rls-role` — `fabrika_app` rolü (sonraki adımların `GRANT … TO fabrika_app` satırları bunu arar).
 - [ ] 2a. **Eski worker'ı durdur. ZORUNLU, atlanamaz.** Yeni sürümün `legacyClaims` koruması bu adımın yerini tutmaz; yalnız bir sırayı kapatır (gerekçe ve ölçüm aşağıda, **Claim taşıma penceresi**). Yeni worker §3.3'te kalkana kadar bu DB'de hiçbir worker koşmaz.
