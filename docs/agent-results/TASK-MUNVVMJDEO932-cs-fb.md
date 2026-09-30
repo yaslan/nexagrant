@@ -1,7 +1,7 @@
 # TASK-MUNVVMJDEO932 — FB DÜZELTME (İNCELEME-70 Y-1/D-1/D-2/D-3) (cs-fb)
 
 **Durum:** TAMAM
-**Dal:** `cs-fb/munvvm-o2-leaks` (dev `75f093d5` üstünden), dev'e merge edildi; push YOK
+**Dal:** `cs-fb/munvvm-o2-leaks` (dev `75f093d5` üstünden). `ea1fa508` → dev merge `12d9251e`, sonra istisna kaldırma commit'i ve dev'e ikinci merge. Push YOK.
 **Bulgu kaynağı:** docs/agent-results/TASK-MUNUT0ET27K2B-be-fb.md (Y-1, D-1, D-2, D-3; mutantlar MB8/MB11/MB13)
 
 **Platform beyanı:** macOS'ta doğrulandı (Darwin 27, arm64): prod build (`next build`) + `next start` 127.0.0.1:47881, izole Postgres `csfb-80x-pg` (127.0.0.1:55880, kendi konteynerim). Linux ve Windows **koşulamadı**, çünkü bu makinede yalnız macOS var. Değişen kod platforma bağlı değil: HTTP yanıt gövdeleri, logger çağrısı ve kaynak metni okuyan bir test (`node:fs` + `path.join/relative`, ayırıcıdan bağımsız). Dosya yolu, süreç ya da kabuk kodu yok. Linux prod imajında aynı davranış beklenir.
@@ -12,8 +12,8 @@
 |---|---|
 | Y-1 `webhooks/stripe:105` | 500 gövdesi artık `{"error":"internal_error"}`. Ayrıntı zaten satır 100'deki `console.error`'da. Canlıda kanıtlandı. |
 | Y-1 `admin/cordis/import:28` | `!importRes.success` dalı artık `{"success":false,"error":"import_failed","runId":…}`. Ham metin `logger.error`'a gidiyor, run satırında ve alarmda da duruyor. Canlıda kanıtlandı. |
-| Y-1 bekçi kör noktası | Bekçi artık 5xx durumlu her `NextResponse.json / new NextResponse / Response.json / new Response` çağrısının argümanlarını okuyor. `.message`, `String(e/err/error…)` ve `errorMessage(` görürse kırmızı. MB13 artık **kırmızı**. Gerçek ağaçta tek eşleşme bilinen `billing/portal:58`, yani yanlış pozitif **0**. |
-| `billing/portal` | **Dokunulmadı.** se-fb TASK-MUNSRKW0HJYBV dalında düzeltiyor (`85508f6f`). Bekçide `PENDING_ELSEWHERE` istisnası olarak duruyor. O dal merge edilince bu satır silinmeli. |
+| Y-1 bekçi kör noktası | Bekçi artık 5xx durumlu her `NextResponse.json / new NextResponse / Response.json / new Response` çağrısının argümanlarını okuyor. `.message`, `String(e/err/error…)` ve `errorMessage(` görürse kırmızı. MB13 artık **kırmızı**. Dal açıldığında gerçek ağaçta tek eşleşme bilinen `billing/portal:58` idi. se-fb'nin düzeltmesi dev'e girdikten sonra eşleşme **0**, yanlış pozitif **0**. |
+| `billing/portal` | **Dokunulmadı.** se-fb TASK-MUNSRKW0HJYBV'de düzeltti; merge `f23d79cc` benim ilk merge'imden önce dev'e girmişti. İlk commit'teki geçici `PENDING_ELSEWHERE` istisnası birleşik ağaçta kaldırıldı (2. commit). Bekçi artık istisnasız ve yeşil. |
 | D-1 (MB8) | `/api/cagrilar` için `limit=0 / -1 / -50 → pageSize 1` testi eklendi. MB8 artık **kırmızı** (3 test). |
 | D-2 (MB11) | "En eskiyi at" testi eklendi. MB11 artık **kırmızı**. |
 | D-3 | **Eklenmedi, öneri olarak kaldı** (§5). Mevcut tek hız sınırı yardımcısı `ApiKey` satırına bağlı. Kullanıcı başına uygulamak yeni tablo/migration ya da süreç-içi sayaç ister. "Mevcut yardımcıyla ucuz" koşulunu sağlamıyor. |
@@ -70,7 +70,7 @@ git status (mutasyon sonrası, izlenen): yalnız kartın 5 dosyası — betik he
 ```
 
 ### 2.5 Bekçinin gerçek ağaçtaki eşleşmesi (`…-ekler/guard-real-tree.txt`)
-`PENDING_ELSEWHERE` geçici olarak boşaltılınca:
+Dal açıldığında (se-fb merge'inden önce), `PENDING_ELSEWHERE` geçici olarak boşaltılınca:
 ```
 + [ "billing/portal/route.ts:58", ]      Tests  1 failed | 3 passed (4)
 ```
@@ -83,6 +83,9 @@ npx vitest run (1. koşu) → Test Files 3 failed | 263 passed | 6 skipped (272)
    3 kırmızı: rag-pdf-worker-isolation (CPU bütçesi, PdfLimitError), withholding-rounding + invoice-writer (Test timed out 5000ms)
    aynı 3 dosya tek başına → Tests 48 passed (48). load average 62.47 (makine doygun). Hiçbiri bu kartın dosyalarına dokunmuyor.
 npx vitest run (2. koşu, load 42) → Test Files 266 passed | 6 skipped (272) · Tests 3178 passed | 73 skipped (3251) · exit=0
+--- birleşik ağaç (dev 12d9251e + istisna kaldırıldı; se-fb portal düzeltmesi dahil) ---
+tsc exit=0 · eslint exit=0 · npx vitest run → Test Files 266 passed | 6 skipped (272) · Tests 3197 passed | 73 skipped (3270) · exit=0
+mutants.py birleşik ağaçta: 7/7 KIRMIZI (`…-ekler/vitest-full-3-birlesik-ozet.txt`)
 ```
 
 ## 3. Değişen dosyalar
@@ -95,7 +98,6 @@ npx vitest run (2. koşu, load 42) → Test Files 266 passed | 6 skipped (272) �
 - `docs/agent-results/TASK-MUNVVMJDEO932-cs-fb.md` + `-ekler/`
 
 ## 4. Riskler
-- **`billing/portal` istisnası:** bekçide `PENDING_ELSEWHERE` satırı var. se-fb dalı merge edilince silinmezse, portal'a ileride geri gelen bir sızıntıyı bekçi görmez. Merge sırası önemli değil: iki dal çakışmıyor (farklı dosyalar).
 - **Bekçinin sınırı:** statüyü değişkenden alan (`{ status }`) ya da gövdeyi önceden bir değişkene kuran 5xx yanıtları görmez. Alan geçişini (`error: result.error`) de görmez; bu yüzden cordis import için ayrı davranış testi var. Bugün ağaçta bu şekilde 5xx sızıntı yok; tarama §2.5.
 - **Admin arayüzü:** `import_failed` gövdesini okuyan bir istemci kodu yok (`grep -rn "api/admin/cordis/import" src scripts` → yalnız route'un kendi log satırları). Admin, hata ayrıntısını `runId` ile run satırından okur.
 
@@ -104,6 +106,5 @@ npx vitest run (2. koşu, load 42) → Test Files 266 passed | 6 skipped (272) �
 - **Yeni gözlem (bu kartta değiştirilmedi):** `webhooks/stripe` imza dalı (400) kimliksiz her çağırana `Webhook Error: ${error.message}` dönüyor. Canlıda `STRIPE_WEBHOOK_SECRET` boşken gövde `Webhook Error: Missing STRIPE_WEBHOOK_SECRET` oldu, yani yapılandırma durumu dışarıdan okunabiliyor. DÜŞÜK. Önerim: sabit `invalid_signature`, ayrıntı log'da. Kapsam 5xx olduğu için dokunmadım.
 
 ## 6. Sonraki adım
-- se-fb TASK-MUNSRKW0HJYBV merge edilince `tests/api/api-error-body-guard.test.ts` içindeki `PENDING_ELSEWHERE` satırı silinsin (tek satır).
 - D-3 için karar: DB tabanlı kullanıcı-başı sınır kartı açılsın mı?
 - Webhook 400 gövdesi için küçük takip (isteğe bağlı).

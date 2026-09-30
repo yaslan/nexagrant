@@ -34,12 +34,6 @@ const LEAK = [
   /\berrorMessage\(/,
 ];
 
-/**
- * se-fb fixes billing/portal in TASK-MUNSRKW0HJYBV (İNCELEME-63 Ö-B), not yet on
- * dev when this guard was widened. Delete the entry once that branch merges.
- */
-const PENDING_ELSEWHERE = new Set(['billing/portal/route.ts']);
-
 /** The argument text of every response call in `src`, with the 1-based line it starts on. */
 function responseCalls(src: string): { args: string; line: number }[] {
   const calls: { args: string; line: number }[] = [];
@@ -81,11 +75,9 @@ describe('API route 500 bodies', () => {
   });
 
   test('no 5xx response carries the thrown value (.message, String(err), errorMessage)', () => {
-    const offenders = routeFiles(API_DIR).flatMap((file) => {
-      const rel = relative(API_DIR, file);
-      if (PENDING_ELSEWHERE.has(rel)) return [];
-      return serverErrorLeaks(readFileSync(file, 'utf8')).map((n) => `${rel}:${n}`);
-    });
+    const offenders = routeFiles(API_DIR).flatMap((file) =>
+      serverErrorLeaks(readFileSync(file, 'utf8')).map((n) => `${relative(API_DIR, file)}:${n}`)
+    );
     expect(offenders).toEqual([]);
   });
 
