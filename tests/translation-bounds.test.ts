@@ -52,4 +52,25 @@ describe('translation bounds', () => {
     }
     expect(translationStats().cacheSize).toBe(TRANSLATION_CACHE_MAX_ENTRIES);
   });
+
+  // İNCELEME-70 D-2 (TASK-MUNVVMJDEO932): the cap alone passed even when the
+  // newest entry was the one thrown out, so a hot title never stayed cached.
+  test('at the cap the oldest entry is evicted, the newest stays', async () => {
+    const fetchMock = vi.fn(async () => reply('y'));
+    vi.stubGlobal('fetch', fetchMock);
+    for (let i = 0; i <= TRANSLATION_CACHE_MAX_ENTRIES; i++) {
+      await translateText(`evict title ${i}`, 'tr');
+    }
+    fetchMock.mockClear();
+
+    // Newest-first eviction still keeps the very last entry (it drops the one
+    // before it to make room), so the second newest is the one that tells.
+    await translateText(`evict title ${TRANSLATION_CACHE_MAX_ENTRIES}`, 'tr');
+    await translateText(`evict title ${TRANSLATION_CACHE_MAX_ENTRIES - 1}`, 'tr');
+    expect(fetchMock).not.toHaveBeenCalled(); // the newest two: served from the cache
+
+    await translateText('evict title 0', 'tr');
+    expect(fetchMock).toHaveBeenCalledTimes(1); // oldest: evicted, fetched again
+    expect(translationStats().cacheSize).toBe(TRANSLATION_CACHE_MAX_ENTRIES);
+  });
 });
