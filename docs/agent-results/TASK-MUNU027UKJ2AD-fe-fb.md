@@ -1,7 +1,7 @@
 # TASK-MUNU027UKJ2AD — fe-fb — Mobilde yan boşluk 2px (yapısal düzeltme)
 
 **Durum:** TAMAM
-**Dal:** `fe-fb/mobile-edge-2px` (dev `8089aa27`'den), dev'e merge edildi, push yok
+**Dal:** `fe-fb/mobile-edge-2px` (dev `8089aa27`'den). Ana commit `11f4eac1` sonrası dev `bdbafc2a` dala alındı (`bd7ca824`; bekçi 6/6, tsc 0 [`db:generate` sonrası], lint 0), sonra dev'e merge edildi: **`be0d85e2`**. Push yok.
 **Platform beyanı:** macOS (Darwin 27, Chrome kanalı, gerçek tarayıcı) üzerinde doğrulandı. Değişiklik yalnız Tailwind sınıfları ve bir CSS token'ı; platforma bağlı kod yolu yok (süreç, dosya yolu, kabuk, DPI yok). Windows ve Linux'ta koşulmadı çünkü bu makinede yoklar. Kodda o platformlarda farklı davranacak bir şey yok: kırılma noktası CSS `min-width: 40rem`, tarayıcı motoru aynı.
 
 ## 1. Ne yapıldı
