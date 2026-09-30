@@ -243,18 +243,20 @@ describe('B-3: partner portal', () => {
 });
 
 describe('İNCELEME-30: M8 matching', () => {
-  test('"Aday Bul": a pilot refusal says the pilot ended; any other failure keeps its own sentence', async () => {
+  test('"Aday Bul": a pilot refusal says the pilot ended; other failures get their own translated sentence, never the caught text', async () => {
     vi.mocked(computeSeatCandidatesForm).mockResolvedValueOnce({ status: 'error', code: 'pilotExpired' });
     render(withIntl(<FindCandidatesButton opportunityId="o-1" seatId="s-1" />));
     fireEvent.click(screen.getByRole('button', { name: trMessages.Consortium.findCandidates }));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(PILOT_TR));
 
-    vi.mocked(computeSeatCandidatesForm).mockResolvedValueOnce({ status: 'error', message: 'Seat not found.' });
+    vi.mocked(computeSeatCandidatesForm).mockResolvedValueOnce({ status: 'error', code: 'seatNotFound' });
     // While pending the button reads "computing", so find it by its idle name.
     fireEvent.click(await enabled(await screen.findByRole('button', { name: trMessages.Consortium.findCandidates })));
-    await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toBe(`${trMessages.Consortium.computeFailed} Seat not found.`)
-    );
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(trMessages.Consortium.seatNotFound));
+
+    vi.mocked(computeSeatCandidatesForm).mockResolvedValueOnce({ status: 'error', code: 'computeFailed' });
+    fireEvent.click(await enabled(await screen.findByRole('button', { name: trMessages.Consortium.findCandidates })));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(trMessages.Consortium.computeFailed));
   });
 
   test('"Davet Et" (en): a refused invite shows the pilot sentence instead of nothing; other failures stay silent', async () => {

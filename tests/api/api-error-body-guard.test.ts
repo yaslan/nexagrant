@@ -141,13 +141,11 @@ describe('API route 5xx bodies', () => {
  * Server actions that already hand a caught value back, before this guard
  * existed. Each is a follow-up, not an exemption: the count may only go down,
  * and the test fails when it does so the entry is removed with the fix.
- * - m8 findCandidates: `errorMessage(e)` carries domain messages the UI shows
- *   ("Seat not found in this workspace.") but also any Prisma error; the domain
- *   errors need a class of their own before the fallback can become a code.
+ * Both entries are closed: admin/billing/plans `toFailure()` (TASK-MUNZKR3PEV8EI)
+ * and m8 `computeSeatCandidatesForm` (TASK-MUNZ7N9IT8VPY) now answer codes.
+ * Keep the map empty; a new entry needs a follow-up card, not an exemption.
  */
-const KNOWN_ACTION_LEAKS: Record<string, number> = {
-  'src/modules/m8/server/actions.ts': 1,
-};
+const KNOWN_ACTION_LEAKS: Record<string, number> = {};
 
 describe('server action error returns', () => {
   test('no server action returns what it caught (beyond the known list)', () => {

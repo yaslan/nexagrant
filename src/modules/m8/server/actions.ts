@@ -1,7 +1,6 @@
 'use server';
 
 import { withTenant } from '@/lib/db';
-import { errorMessage } from '@/lib/errors';
 import { requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
 import { PILOT_EXPIRED_CODE, isPilotExpired, type PilotExpiredCode } from '@/lib/pilot-expired';
@@ -9,6 +8,12 @@ import { FORBIDDEN_ROLE_CODE, isForbiddenRole, type ForbiddenRoleCode } from '@/
 import { revalidatePath } from 'next/cache';
 import { generateSeatCandidates } from './matching';
 import { canConfirmSeat, inviteSeatCandidate } from './seat-transitions';
+import {
+  COMPUTE_FAILED_CODE,
+  SEAT_NOT_FOUND_CODE,
+  SeatNotFoundError,
+  type SeatCandidateErrorCode,
+} from './errors';
 
 /**
  * M8 consortium matching.
@@ -32,7 +37,7 @@ export async function computeSeatCandidates(opportunityId: string, seatId: strin
   // Client-supplied: with `seatId` undefined the lookup below matches any seat
   // and the rewrite clears every seat's candidates (TASK-MUMSUA77J1C6Q).
   if (!isPresentId(seatId) || !isPresentId(opportunityId)) {
-    throw new Error('Seat not found in this workspace.');
+    throw new SeatNotFoundError('Seat not found in this workspace.');
   }
 
   const seat = await withTenant<{ id: string } | null>(tenantId, (tx) =>
@@ -41,7 +46,7 @@ export async function computeSeatCandidates(opportunityId: string, seatId: strin
       select: { id: true },
     })
   );
-  if (!seat) throw new Error(`Seat ${seatId} not found in this workspace.`);
+  if (!seat) throw new SeatNotFoundError(`Seat ${seatId} not found in this workspace.`);
 
   const created = await generateSeatCandidates(opportunityId, seatId, tenantId, 5);
   revalidatePath(MATCHING_PATH, 'page');
@@ -159,18 +164,22 @@ export async function confirmSeatAssignment(seatId: string, opportunityId: strin
  *
  * `computeSeatCandidates` throws, which in a server component form means the
  * user gets Next's error screen instead of an explanation. This wrapper turns a
- * failure into a message the page can show next to the button, and reports how
- * many candidates were written so an empty result can say *why* it is empty.
+ * failure into a code the button translates, and reports how many candidates
+ * were written so an empty result can say *why* it is empty.
+ *
+ * The failure is a code, never the caught error's text: that text used to be
+ * returned as `message`, and a Prisma error carried table and column names to
+ * the browser with it (TASK-MUNZ7N9IT8VPY). The detail goes to the server log.
  */
 export interface SeatCandidateFormState {
   status: 'idle' | 'ok' | 'error';
-  message?: string;
   count?: number;
   /**
-   * Set for a pilot or role refusal: the button shows `Common.pilotExpired` /
-   * `Common.forbiddenRole` instead of `message`.
+   * Set with every `'error'`: a pilot or role refusal (`Common.pilotExpired` /
+   * `Common.forbiddenRole`), a seat that is not in this workspace
+   * (`Consortium.seatNotFound`), or anything else (`Consortium.computeFailed`).
    */
-  code?: PilotExpiredCode | ForbiddenRoleCode;
+  code?: PilotExpiredCode | ForbiddenRoleCode | SeatCandidateErrorCode;
 }
 
 export async function computeSeatCandidatesForm(
@@ -181,7 +190,7 @@ export async function computeSeatCandidatesForm(
   const seatId = String(formData.get('seatId') ?? '');
 
   if (!opportunityId || !seatId) {
-    return { status: 'error', message: 'Eksik istek: fırsat veya koltuk belirtilmedi.' };
+    return { status: 'error', code: SEAT_NOT_FOUND_CODE };
   }
 
   try {
@@ -192,6 +201,8 @@ export async function computeSeatCandidatesForm(
     // the code is what tells the button to say "pilot ended".
     if (isPilotExpired(e)) return { status: 'error', code: PILOT_EXPIRED_CODE };
     if (isForbiddenRole(e)) return { status: 'error', code: FORBIDDEN_ROLE_CODE };
-    return { status: 'error', message: errorMessage(e) };
+    if (e instanceof SeatNotFoundError) return { status: 'error', code: SEAT_NOT_FOUND_CODE };
+    console.error('[m8] computeSeatCandidatesForm failed', e);
+    return { status: 'error', code: COMPUTE_FAILED_CODE };
   }
 }

@@ -353,6 +353,7 @@
     "computing": "Computing candidates…",
     "candidatesReady": "{count} candidates computed.",
     "computeFailed": "Could not compute candidates.",
+    "seatNotFound": "This seat or opportunity was not found in this workspace. Refresh the page and try again.",
     "noCandidatesYet": "No candidates computed for this seat yet. Press \"Find Candidates\".",
     "partnerDataMissing": "The CORDIS partner database has not been imported yet, so no candidate can be produced. Ask your administrator to run the K2 import.",
     "dimension": {
