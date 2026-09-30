@@ -65,12 +65,16 @@ const T = {
   expired: `t-st-ex-${RUN}`, // pilot ran out, M4 ON
 };
 const TENANTS = Object.values(T);
+// İNCELEME-56 Y-1: two tenants of U.y1, pro + M4 ON, run on their own (runY1).
+const Y1 = { a: `t-st-y1a-${RUN}`, b: `t-st-y1b-${RUN}` };
+const ALL_TENANTS = [...TENANTS, Y1.a, Y1.b];
 const U = {
   tr: `u-st-tr-${RUN}`,
   en: `u-st-en-${RUN}`,
   gone: `u-st-gone-${RUN}`,
   member: `u-st-mem-${RUN}`,
   manager: `u-st-mgr-${RUN}`,
+  y1: `u-st-y1-${RUN}`,
 };
 const USERS = Object.values(U);
 const mail = (u: string) => `${u}@example.test`;
@@ -120,29 +124,32 @@ function fakeMailer(opts: { failFor?: string } = {}) {
   return { sent, mailer };
 }
 
+const runY1 = (mailer: (m: MailMessage) => Promise<void>, now: Date, runTenant?: typeof withTenant) =>
+  sendStaleRelationshipReminders({ mailer, appUrl: 'https://app.example.test', now, tenantIds: [Y1.a, Y1.b], runTenant });
+
 const run = (mailer: ((m: MailMessage) => Promise<void>) | null, now: Date = NOW, runTenant?: typeof withTenant) =>
   sendStaleRelationshipReminders({ mailer, appUrl: 'https://app.example.test', now, tenantIds: TENANTS, pageSize: 2, runTenant });
 
 async function wipe() {
-  await admin.relationship.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
-  await admin.auditEvent.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
-  await admin.tenant.deleteMany({ where: { id: { in: presentIds(TENANTS) } } });
+  await admin.relationship.deleteMany({ where: { tenantId: { in: presentIds(ALL_TENANTS) } } });
+  await admin.auditEvent.deleteMany({ where: { tenantId: { in: presentIds(ALL_TENANTS) } } });
+  await admin.tenant.deleteMany({ where: { id: { in: presentIds(ALL_TENANTS) } } });
   await admin.user.deleteMany({ where: { id: { in: presentIds(USERS) } } });
 }
 
 beforeAll(async () => {
   if (!HAS_DB) return;
-  for (const id of TENANTS) {
+  for (const id of ALL_TENANTS) {
     await admin.tenant.create({ data: { id, name: id === T.on ? `Kurum <b>&${RUN}` : id, slug: id, country: 'TR' } });
     await admin.workspace.create({ data: { tenantId: id, name: 'Ana', slug: `ws-${id}` } });
   }
-  for (const id of [T.on, T.on2, T.pilotModule, T.off]) {
+  for (const id of [T.on, T.on2, T.pilotModule, T.off, Y1.a, Y1.b]) {
     await admin.subscription.create({ data: { tenantId: id, planId: 'pro', status: 'ACTIVE' } });
   }
   await admin.subscription.create({
     data: { tenantId: T.expired, planId: 'public-team', status: 'TRIALING', provider: 'pilot', trialEndsAt: new Date(Date.now() - 60_000) },
   });
-  const status: Record<string, 'ON' | 'PILOT' | 'OFF'> = { [T.on]: 'ON', [T.on2]: 'ON', [T.pilotModule]: 'PILOT', [T.off]: 'OFF', [T.noPlan]: 'ON', [T.expired]: 'ON' };
+  const status: Record<string, 'ON' | 'PILOT' | 'OFF'> = { [T.on]: 'ON', [T.on2]: 'ON', [T.pilotModule]: 'PILOT', [T.off]: 'OFF', [T.noPlan]: 'ON', [T.expired]: 'ON', [Y1.a]: 'ON', [Y1.b]: 'ON' };
   for (const [tenantId, s] of Object.entries(status)) await admin.moduleState.create({ data: { tenantId, moduleId: 'M4', status: s } });
 
   await admin.user.create({ data: { id: U.tr, email: mail(U.tr), locale: 'tr' } });
@@ -150,6 +157,7 @@ beforeAll(async () => {
   await admin.user.create({ data: { id: U.gone, email: mail(U.gone), deletionRequestedAt: new Date() } });
   await admin.user.create({ data: { id: U.member, email: mail(U.member) } });
   await admin.user.create({ data: { id: U.manager, email: mail(U.manager) } });
+  await admin.user.create({ data: { id: U.y1, email: mail(U.y1) } });
   const member = (tenantId: string, userId: string, role: 'MEMBER' | 'PIPELINE_MANAGER' = 'MEMBER') =>
     admin.membership.create({ data: { tenantId, userId, role } });
   await member(T.on, U.tr);
@@ -161,6 +169,8 @@ beforeAll(async () => {
   await member(T.off, U.tr);
   await member(T.noPlan, U.tr);
   await member(T.expired, U.tr);
+  await member(Y1.a, U.y1);
+  await member(Y1.b, U.y1);
 
   // T.on, owner U.tr
   await rel('exact60', T.on, U.tr, ago(60 * DAY)); // the 60th day: stale
@@ -439,5 +449,63 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     const due = fakeMailer();
     await run(due.mailer, new Date(called.getTime() + 60 * DAY));
     expect(due.sent.find((m) => m.to === mail(U.tr))?.text).toContain(`backdated-${RUN}`);
+  });
+  // İNCELEME-56 Y-1: the day was claimed in one tenant, and on the second run
+  // that tenant is skipped before its claims are read (M4 closed, pilot over,
+  // or the tenant's read failing). A row that went stale in ANOTHER tenant in
+  // between must still wait for tomorrow: the claim is the user's, not the tenant's.
+  const y1Day = (offsetDays: number) => new Date(dayStartUtc(new Date(NOW.getTime() + offsetDays * DAY)).getTime() + 7 * 60 * 60 * 1000);
+  const setM4 = (tenantId: string, status: 'ON' | 'OFF') =>
+    admin.moduleState.update({ where: { tenantId_moduleId: { tenantId, moduleId: 'M4' } }, data: { status } });
+
+  async function y1FirstDigest(d: Date, key: string) {
+    await rel(`${key}First`, Y1.b, U.y1, new Date(d.getTime() - 65 * DAY));
+    const first = fakeMailer();
+    await runY1(first.mailer, d); // 07:00: only Y1.b has a due row for U.y1
+    expect(first.sent).toHaveLength(1);
+    expect(first.sent[0]!.text).toContain(`${key}First-${RUN}`);
+    expect((await claimOf(Y1.b, U.y1))?.getTime()).toBe(dayStartUtc(d).getTime());
+    expect((await claimOf(Y1.a, U.y1))?.getTime()).not.toBe(dayStartUtc(d).getTime());
+    // Goes stale in the OTHER tenant at 07:20.
+    await rel(`${key}Late`, Y1.a, U.y1, new Date(d.getTime() + 20 * 60_000 - 60 * DAY));
+  }
+
+  async function y1NextMorning(d: Date, key: string) {
+    const next = fakeMailer();
+    await runY1(next.mailer, new Date(d.getTime() + DAY));
+    expect(next.sent).toHaveLength(1);
+    expect(next.sent[0]!.text).toContain(`${key}Late-${RUN}`);
+  }
+
+  test('a tenant skipped on the second run (M4 closed) does not hide the day claimed there: no second digest (İNCELEME-56 Y-1)', async () => {
+    const d = y1Day(300);
+    await y1FirstDigest(d, 'y1m');
+    await setM4(Y1.b, 'OFF');
+    try {
+      const second = fakeMailer();
+      const r = await runY1(second.mailer, new Date(d.getTime() + 22 * 60_000));
+      expect(r.tenantsModuleClosed).toBe(1);
+      expect(second.sent).toHaveLength(0);
+      expect(await stampOf('y1mLate')).toBeNull();
+      // The claim tried on Y1.a is given back: tomorrow's run is not blocked by it.
+      expect(await claimOf(Y1.a, U.y1)).toBeNull();
+    } finally {
+      await setM4(Y1.b, 'ON');
+    }
+    await y1NextMorning(d, 'y1m');
+  });
+
+  test('a tenant whose read fails on the second run does not hide the day claimed there (İNCELEME-56 Y-1)', async () => {
+    const d = y1Day(310);
+    await y1FirstDigest(d, 'y1f');
+    const failing: typeof withTenant = (tenantId, fn) =>
+      tenantId === Y1.b ? Promise.reject(new Error('tenant down')) : withTenant(tenantId, fn);
+    const second = fakeMailer();
+    const r = await runY1(second.mailer, new Date(d.getTime() + 22 * 60_000), failing);
+    expect(r.tenantsFailed).toBe(1);
+    expect(second.sent).toHaveLength(0);
+    expect(await stampOf('y1fLate')).toBeNull();
+    expect((await claimOf(Y1.a, U.y1))?.getTime()).not.toBe(dayStartUtc(d).getTime());
+    await y1NextMorning(d, 'y1f');
   });
 });
