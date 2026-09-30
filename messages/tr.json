@@ -353,6 +353,7 @@
     "computing": "Adaylar hesaplanıyor…",
     "candidatesReady": "{count} aday hesaplandı.",
     "computeFailed": "Adaylar hesaplanamadı.",
+    "seatNotFound": "Bu koltuk ya da fırsat bu çalışma alanında bulunamadı. Sayfayı yenileyip tekrar deneyin.",
     "noCandidatesYet": "Bu koltuk için henüz aday hesaplanmadı. \"Aday Bul\"a basın.",
     "partnerDataMissing": "Ortak veritabanı (CORDIS) henüz içe aktarılmadı, bu yüzden aday üretilemiyor. Yöneticinizden K2 içe aktarımını çalıştırmasını isteyin.",
     "dimension": {

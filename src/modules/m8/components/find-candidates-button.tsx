@@ -65,8 +65,9 @@ export default function FindCandidatesButton({
 
       {state.status === 'error' && (
         <p role="alert" className="text-xs text-red-700 dark:text-red-400 max-w-xs text-right">
-          {/* An ended pilot gets its own sentence, not "could not compute … <error>". */}
-          {errorText(state.code, () => `${t('computeFailed')} ${state.message ?? ''}`)}
+          {/* An ended pilot gets its own sentence, not "could not compute". The
+              action answers a code only: the caught error stays in the server log. */}
+          {errorText(state.code, () => (state.code === 'seatNotFound' ? t('seatNotFound') : t('computeFailed')))}
         </p>
       )}
     </form>

@@ -143,13 +143,11 @@ describe('API route 5xx bodies', () => {
  * and the test fails when it does so the entry is removed with the fix.
  * - admin/billing/plans: `toFailure()` puts `errorMessage(e)` in `detail`; the
  *   UI shows it to the platform admin. Platform-admin only.
- * - m8 findCandidates: `errorMessage(e)` carries domain messages the UI shows
- *   ("Seat not found in this workspace.") but also any Prisma error; the domain
- *   errors need a class of their own before the fallback can become a code.
+ * (m8 `computeSeatCandidatesForm` was the second entry; it answers codes since
+ * TASK-MUNZ7N9IT8VPY.)
  */
 const KNOWN_ACTION_LEAKS: Record<string, number> = {
   'src/app/[locale]/admin/billing/plans/actions.ts': 11,
-  'src/modules/m8/server/actions.ts': 1,
 };
 
 describe('server action error returns', () => {

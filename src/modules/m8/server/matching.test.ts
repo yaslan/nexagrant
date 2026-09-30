@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { runSeatMatch, scoreCandidate, topicPrefix, totalScore } from './matching';
+import { SeatNotFoundError } from './errors';
 import type { TenantTx } from '@/lib/db';
 
 /**
@@ -216,5 +217,16 @@ describe('runSeatMatch', () => {
   it('refuses a seat that is not in this tenant', async () => {
     const { tx } = fakeTx({ 'consortiumSeat.findFirst': null });
     await expect(runSeatMatch(tx, params)).rejects.toThrow(/Seat seat-1 not found/);
+  });
+
+  // The "Aday Bul" form tells these apart from every other failure by class
+  // alone, and says "not in this workspace" for them (TASK-MUNZ7N9IT8VPY).
+  it.each([
+    ['a missing seat', { 'consortiumSeat.findFirst': null }, params],
+    ['a missing opportunity', { 'opportunity.findFirst': null }, params],
+    ['an empty seat id', {}, { ...params, seatId: '' }],
+  ])('refuses %s with SeatNotFoundError', async (_name, overrides, p) => {
+    const { tx } = fakeTx(overrides);
+    await expect(runSeatMatch(tx, p)).rejects.toBeInstanceOf(SeatNotFoundError);
   });
 });

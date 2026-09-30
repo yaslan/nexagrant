@@ -1,5 +1,6 @@
 import { withTenant, type TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
+import { SeatNotFoundError } from './errors';
 
 /**
  * M8 seat matching — ranked partner candidates for one open consortium seat.
@@ -141,7 +142,7 @@ export async function runSeatMatch(
   const { opportunityId, seatId, tenantId, limit } = params;
   // The clear below is `deleteMany({ tenantId, seatId })`: a missing seat id would
   // wipe the candidates of every seat of the tenant (TASK-MUN2KUHP1BP18).
-  if (!isPresentId(seatId) || !isPresentId(tenantId)) throw new Error('Seat not found in this workspace.');
+  if (!isPresentId(seatId) || !isPresentId(tenantId)) throw new SeatNotFoundError('Seat not found in this workspace.');
 
   const opp = await tx.opportunity.findFirst({
     where: { id: opportunityId, tenantId },
@@ -151,13 +152,13 @@ export async function runSeatMatch(
       seats: { select: { status: true, organizationId: true } },
     },
   });
-  if (!opp) throw new Error(`Opportunity ${opportunityId} not found in this workspace.`);
+  if (!opp) throw new SeatNotFoundError(`Opportunity ${opportunityId} not found in this workspace.`);
 
   const seat = await tx.consortiumSeat.findFirst({
     where: { id: seatId, opportunityId, tenantId },
     select: { id: true, roleKey: true },
   });
-  if (!seat) throw new Error(`Seat ${seatId} not found in this workspace.`);
+  if (!seat) throw new SeatNotFoundError(`Seat ${seatId} not found in this workspace.`);
 
   // `Opportunity` has no `topic` relation and no `callId` column, so the topic is
   // resolved by its id rather than included.
