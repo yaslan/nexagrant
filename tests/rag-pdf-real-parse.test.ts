@@ -142,11 +142,17 @@ describe('B-1: page and chunk limits hold on real PDFs before any embedding call
   test('İNCELEME-45 shape: 30 000 pages in 4.8 MB is refused in well under a second', async () => {
     const pdf = syntheticPdf(densePageLines(), 30_000);
     expect(pdf.length).toBeLessThan(RAG_UPLOAD_LIMITS.maxFileBytes);
-    const started = performance.now();
+    // CPU time of this process (the extraction worker's thread included), not
+    // the wall clock: at a load average of 40–120 on the shared machine the
+    // wall clock read 3.3–4.0 s for the same refusal while it took well under
+    // a second of work (TASK-MUNSRKW0HJYBV, İNCELEME-63 Ö-C). Parsing the 30 000
+    // pages — the regression this guards — costs tens of seconds either way.
+    const cpuBefore = process.cpuUsage();
     const e = await refusal(pdf);
-    const ms = performance.now() - started;
+    const cpu = process.cpuUsage(cpuBefore);
+    const cpuMs = (cpu.user + cpu.system) / 1000;
     expect(e).toMatchObject({ code: 'too_many_pages', detail: { pages: 30_000 } });
-    expect(ms).toBeLessThan(3_000);
+    expect(cpuMs).toBeLessThan(3_000);
     expect(embedTextMock).not.toHaveBeenCalled();
   }, 30_000);
 
