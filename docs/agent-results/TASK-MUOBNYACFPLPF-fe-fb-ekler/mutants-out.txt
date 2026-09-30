@@ -1,0 +1,9 @@
+# fe-fb TASK-MUOBNYACFPLPF — mutantlar (commit 8ca11f55 üzerinde; her mutant sonrası `git checkout HEAD -- <dosya>`; son git status temiz)
+# koşu: npx vitest run tests/cordis-csv.test.ts tests/api/admin-cordis-import-500.test.ts
+M0 değişiklik yok                       => Tests 11 passed (11)
+M1 importer+eylem dev sürümüne (düzeltme tamamen geri) => 5 failed | 6 passed — 3 eylem testi + 2 importer testi
+M1b yalnız eylem dev sürümüne           => 3 failed | 8 passed — download/skip-limit/status eylem testleri
+M2a importer errorCode alanına ham metni koyar (eylemde whitelist var) => 3 failed — skip-limit testleri; indirme testi YEŞİL = eylem whitelist'i metni IMPORT_FAILED'e çevirdi (savunma katmanı çalışıyor)
+M2b M2a + eylemde whitelist yok          => 4 failed — indirme testi de kırmızı
+M3 handleGetK2Status `error: lastRun.error` geri => 1 failed — "the status read does not return the last run's stored error text"
+M4 sınıflandırma hep IMPORT_FAILED       => 3 failed — SKIP_LIMIT_EXCEEDED beklentileri

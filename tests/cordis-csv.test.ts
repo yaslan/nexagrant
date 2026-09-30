@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -127,9 +127,10 @@ vi.mock('../src/lib/db', () => {
         ),
         findFirst: vi.fn(async () => null),
       },
-      cordisProject: { upsert: upsertCounter('projects') },
-      cordisOrganization: { upsert: upsertCounter(null) },
-      cordisParticipation: { upsert: upsertCounter('participations') },
+      cordisProject: { upsert: upsertCounter('projects'), count: vi.fn(async () => 0) },
+      cordisOrganization: { upsert: upsertCounter(null), count: vi.fn(async () => 0) },
+      cordisParticipation: { upsert: upsertCounter('participations'), count: vi.fn(async () => 0) },
+      cordisPartnerProfile: { count: vi.fn(async () => 0) },
       cordisProjectTopic: { upsert: upsertCounter(null) },
       cordisProjectSciVoc: { upsert: upsertCounter(null) },
       systemAlert: {
@@ -143,6 +144,16 @@ vi.mock('../src/lib/db', () => {
     },
   };
 });
+
+// The admin console action, for the tests at the end of this file. Only the
+// importer runs for real; its neighbours in the action module are stubbed.
+vi.mock('@/lib/tenant', () => ({ requirePlatformAdmin: vi.fn(async () => ({})) }));
+vi.mock('@/lib/k2-cordis/partnerProfileJob', () => ({
+  generatePartnerProfiles: vi.fn(async () => ({ updatedProfiles: 0, updatedCoParticipations: 0, durationMs: 0 })),
+}));
+vi.mock('@/lib/cordis-sync', () => ({ syncCordisBigData: vi.fn(), aggregateCordisMetrics: vi.fn() }));
+vi.mock('@/lib/cordis-delta', () => ({ fetchLiveCordisDelta: vi.fn(), getCordisLiveStreamLogs: vi.fn() }));
+vi.mock('@/lib/rag', () => ({ retrieveChunks: vi.fn(), formatRagPrompt: vi.fn() }));
 
 /** A stored (uncompressed) zip — enough for unzipper, no zip dependency needed. */
 function writeZip(files: Record<string, string>): string {
@@ -211,13 +222,17 @@ describe('runCordisImport — skipped records', () => {
     const res = await runCordisImport({ dataset: 'HORIZON', localZipPath: zipPath });
 
     expect(res.success).toBe(false);
-    expect(res.error).toContain('project.csv: 1/2 skipped');
-    // ROW_PLAIN spans two lines, so the broken record starts on line 4.
-    expect(res.error).toContain('line 4: expected 22 fields, got 3');
+    // The result carries a code only; it reaches the admin console through a
+    // server action. The reason is on the run row (İNCELEME-100 Y-1).
+    expect(res.errorCode).toBe('SKIP_LIMIT_EXCEEDED');
+    expect(JSON.stringify(res)).not.toContain('line 4');
     expect(writes.projects).toBe(0);
     expect(writes.participations).toBe(0);
     const run = writes.runs.get(res.runId)!;
     expect(run.status).toBe('FAILED');
+    expect(run.error).toContain('project.csv: 1/2 skipped');
+    // ROW_PLAIN spans two lines, so the broken record starts on line 4.
+    expect(run.error).toContain('line 4: expected 22 fields, got 3');
     expect(writes.alerts).toHaveLength(1);
     expect(writes.alerts[0]).toMatchObject({ level: 'error', source: 'k2_cordis_import' });
   });
@@ -237,7 +252,8 @@ describe('runCordisImport — skipped records', () => {
 
     const failed = await runCordisImport({ dataset: 'HORIZON', localZipPath: zipPath });
     expect(failed.success).toBe(false);
-    expect(failed.error).toContain('organization.csv: 1/3 skipped (unknown project 555555555)');
+    expect(failed.errorCode).toBe('SKIP_LIMIT_EXCEEDED');
+    expect(writes.runs.get(failed.runId)?.error).toContain('organization.csv: 1/3 skipped (unknown project 555555555)');
     expect(writes.participations).toBe(0);
 
     // With a budget that allows it, the rest lands and the skip is still reported.
@@ -256,5 +272,79 @@ describe('runCordisImport — skipped records', () => {
     });
     expect(writes.alerts).toHaveLength(1);
     expect(writes.alerts[0]).toMatchObject({ level: 'warn', source: 'k2_cordis_import' });
+  });
+});
+
+// ─── Admin console action: the importer's failure text stays on the server ─
+
+/**
+ * İNCELEME-100 Y-1 (TASK-MUOBNYACFPLPF). The importer caught a failure, turned
+ * it into its message, and returned it; `handleRunCordisImportAction` passed
+ * that field straight to the browser. The action-leak guard reads one file at
+ * a time, so a message made in `src/lib` and returned from an action looked
+ * clean to it. These run the real importer under the real action.
+ */
+describe('handleRunCordisImportAction — failure text', () => {
+  beforeEach(() => {
+    writes.projects = 0;
+    writes.participations = 0;
+    writes.runs.clear();
+    writes.alerts.length = 0;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  test('a download error returns IMPORT_FAILED; the message stays on the run row', async () => {
+    const secret = 'connect ECONNREFUSED 10.0.0.5:443 at /srv/secret/cordis.zip';
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new Error(secret))));
+    const { handleRunCordisImportAction } = await import('../src/app/[locale]/admin/cordis/actions');
+
+    const res = await handleRunCordisImportAction('HORIZON');
+
+    expect(res).toStrictEqual({ success: false, errorCode: 'IMPORT_FAILED' });
+    expect(JSON.stringify(res)).not.toMatch(/ECONNREFUSED|10\.0\.0\.5|\/srv/);
+    const [run] = [...writes.runs.values()];
+    expect(run).toMatchObject({ status: 'FAILED', error: secret });
+  });
+
+  test('a dump over the skip limit returns SKIP_LIMIT_EXCEEDED, without the CSV lines', async () => {
+    const zip = fs.readFileSync(
+      writeZip({
+        'project.csv': [PROJECT_HEADER, ROW_PLAIN, '"999";"broken";"row"', ''].join('\n'),
+        'organization.csv': [ORG_HEADER, orgRow('101069359', '900000001'), ''].join('\n'),
+      })
+    );
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(zip)));
+    const { handleRunCordisImportAction } = await import('../src/app/[locale]/admin/cordis/actions');
+
+    const res = await handleRunCordisImportAction('HORIZON');
+
+    expect(res).toStrictEqual({ success: false, errorCode: 'SKIP_LIMIT_EXCEEDED' });
+    const [run] = [...writes.runs.values()];
+    expect(run?.error).toContain('line 4: expected 22 fields, got 3');
+  });
+
+  test('the status read does not return the last run\'s stored error text', async () => {
+    const { prisma } = await import('../src/lib/db');
+    vi.mocked(prisma.cordisImportRun.findFirst).mockResolvedValueOnce({
+      runId: 'run-9',
+      dataset: 'HORIZON',
+      startedAt: new Date(),
+      finishedAt: new Date(),
+      status: 'FAILED',
+      fileHash: null,
+      rowCounts: null,
+      error: 'relation "CordisProject" does not exist',
+    } as never);
+    const { handleGetK2Status } = await import('../src/app/[locale]/admin/cordis/actions');
+
+    const res = await handleGetK2Status();
+
+    expect(res.lastRun).toMatchObject({ runId: 'run-9', status: 'FAILED' });
+    expect(JSON.stringify(res)).not.toContain('CordisProject');
   });
 });

@@ -1,0 +1,7 @@
+--- R1 literal: 2a atlandı; 3. adım öncesi taban
+       0
+--- tespit (boş olmamalı)
+uA
+uC
+--- iki özet sayısı (beklenen 1: uA)
+       1

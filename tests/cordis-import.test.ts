@@ -221,7 +221,7 @@ describe('K2 CORDIS Ingestion & M1 Partner Intelligence Engine', () => {
     });
 
     if (!res1.success) {
-      console.error('Import Error:', res1.error);
+      console.error('Import Error:', res1.errorCode, '(cause in the [k2-cordis] log line above)');
     }
 
     expect(res1.success).toBe(true);

@@ -1,0 +1,6 @@
+=== RB: geri dönüş simülasyonu (yeni sürüm bugün uA,uE'ye özet göndermiş; geri dönüşten sonra eski sürüm uA,uC'ye)
+User bugün (down öncesi): uA,uE
+down.sql uygulandı; User.staleDigestOn var mı: 0
+m4-double.sql down sonrası: psql:double.sql:7: ERROR:  column u.staleDigestOn does not exist
+ikinci özet (comm -12): [uA]
+ileri alındı: 1
