@@ -6,7 +6,6 @@ import {
   RAG_UPLOAD_LIMITS,
   type RagUploadError,
 } from '@/lib/rag-upload';
-import { errorMessage } from '@/lib/errors';
 import { requirePlatformAdminApi } from '@/lib/tenant';
 
 function refuse(error: RagUploadError, status: number, extra: Record<string, unknown> = {}) {
@@ -111,6 +110,7 @@ export async function POST(req: NextRequest) {
       return refuse(error.code, 413, error.detail);
     }
     console.error('Upload error:', error);
-    return NextResponse.json({ error: 'upload_failed' satisfies RagUploadError, message: errorMessage(error) }, { status: 500 });
+    // The code only; the detail (often a Prisma or OpenAI message) stays in the log above.
+    return NextResponse.json({ error: 'upload_failed' satisfies RagUploadError }, { status: 500 });
   }
 }

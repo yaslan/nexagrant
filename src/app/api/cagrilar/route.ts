@@ -1,17 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SediaAdapter } from '@/lib/adapters/sedia';
 import { translateTopicsBatch } from '@/lib/translation';
-import { prisma } from '@/lib/db';
-import { errorMessage } from '@/lib/errors';
+import { requireTenantApi } from '@/lib/tenant';
+import { logger } from '@/lib/logger';
+
+/**
+ * The largest page this route asks SEDIA for. The route fetches up to
+ * {@link MAX_PAGES} pages and translates every title, so an uncapped `limit`
+ * multiplied into thousands of outbound calls per request (TASK-MUN66T2HM4A4E O-1).
+ */
+const CAGRILAR_MAX_PAGE_SIZE = 50;
+const MAX_PAGES = 5;
 
 export async function GET(request: NextRequest) {
+  // Signed-in members only: the one consumer is the (app) calls page, and an
+  // anonymous caller could otherwise spend SEDIA and translation quota at will.
+  const tenant = await requireTenantApi();
+  if (!tenant.ok) return tenant.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const text = searchParams.get('q') || searchParams.get('text') || '***';
     // NOTE: ?page/?pageNumber is not honoured. `SediaAdapter.searchSedia` paginates
     // internally from page 1 up to maxPages and reports pageNumber 1, so there is no
     // page argument to forward. Parsing one here only implied otherwise.
-    const pageSize = parseInt(searchParams.get('limit') || searchParams.get('pageSize') || '20', 10);
+    const rawPageSize = Number.parseInt(searchParams.get('limit') || searchParams.get('pageSize') || '20', 10);
+    if (!Number.isFinite(rawPageSize)) {
+      return NextResponse.json({ success: false, error: 'invalid_limit' }, { status: 400 });
+    }
+    const pageSize = Math.min(CAGRILAR_MAX_PAGE_SIZE, Math.max(1, rawPageSize));
     const lang = (searchParams.get('lang') || searchParams.get('locale') || 'tr').toLowerCase();
     
     // Status filter: 'OPEN', 'FORTHCOMING', 'CLOSED' or numeric codes ('31094501', '31094502', '31094503')
@@ -44,7 +61,7 @@ export async function GET(request: NextRequest) {
     const result = await adapter.searchSedia({
       text,
       pageSize,
-      maxPages: 5, // Limit API calls for web endpoint
+      maxPages: MAX_PAGES, // Limit API calls for web endpoint
       statuses,
       frameworkProgrammes,
       types,
@@ -58,56 +75,11 @@ export async function GET(request: NextRequest) {
       processedTopics = await translateTopicsBatch(processedTopics, 'tr');
     }
 
-    // Asynchronously cache/upsert fetched topics to Prisma in background without blocking response
-    if (processedTopics && processedTopics.length > 0) {
-      (async () => {
-        try {
-          for (const t of processedTopics.slice(0, 10)) {
-            await prisma.topic.upsert({
-              where: { identifier: t.identifier },
-              update: {
-                title: t.title,
-                status: t.status,
-                typeOfAction: t.typeOfAction,
-                isLumpSum: t.isLumpSum,
-                isTwoStage: t.isTwoStage,
-                deadlines: t.deadlines || [],
-                nextDeadlineAt: t.nextDeadlineAt ? new Date(t.nextDeadlineAt) : null,
-                sourceUrl: t.sourceUrl,
-              },
-              create: {
-                identifier: t.identifier,
-                title: t.title,
-                status: (t.status) || 'OPEN',
-                typeOfAction: t.typeOfAction,
-                isLumpSum: t.isLumpSum || false,
-                isTwoStage: t.isTwoStage || false,
-                deadlines: t.deadlines || [],
-                nextDeadlineAt: t.nextDeadlineAt ? new Date(t.nextDeadlineAt) : null,
-                sourceUrl: t.sourceUrl,
-                call: {
-                  connectOrCreate: {
-                    where: { callIdentifier: t.callIdentifier || 'HORIZON-DEFAULT' },
-                    create: {
-                      callIdentifier: t.callIdentifier || 'HORIZON-DEFAULT',
-                      title: t.callTitle || 'Horizon Call',
-                      programme: {
-                        connectOrCreate: {
-                          where: { id: 'HE' },
-                          create: { id: 'HE', name: 'Horizon Europe', sourceKey: 'horizon' }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }).catch(() => {});
-          }
-        } catch (_e) {
-          // Non-blocking sync error
-        }
-      })();
-    }
+    // No database write here. This route used to upsert the first ten topics
+    // into the shared Topic table on every request, so any anonymous caller
+    // could make the platform write (TASK-MUN66T2HM4A4E O-1). Topic rows are the
+    // nightly k1-daily-calls job's job (src/lib/jobs/tasks/k1-daily-calls.ts,
+    // cron 02:00); a live search only reads SEDIA.
 
     return NextResponse.json({
       success: true,
@@ -117,11 +89,9 @@ export async function GET(request: NextRequest) {
       topics: processedTopics
     });
   } catch (error) {
-    console.error('[API /api/cagrilar] Internal error:', error);
-    return NextResponse.json(
-      { success: false, error: errorMessage(error) || 'Failed to fetch calls from SEDIA' },
-      { status: 500 }
-    );
+    // The detail stays in the server log; the body is a fixed code (O-2).
+    logger.error('[API /api/cagrilar] Internal error:', error);
+    return NextResponse.json({ success: false, error: 'internal_error' }, { status: 500 });
   }
 }
 
