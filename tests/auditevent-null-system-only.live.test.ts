@@ -83,8 +83,8 @@ const isRlsRefusal = (e: unknown) =>
   e instanceof Error && /row-level security|violates row-level/i.test(e.message);
 
 describe('AuditEvent: a tenant-less row is readable and writable in system scope only', () => {
-  test('tenant A reads its own row but not the tenant-less one', async () => {
-    if (!ready || !rls) return expect(skipReason).toBeTruthy();
+  test('tenant A reads its own row but not the tenant-less one', async (ctx) => {
+    if (!ready || !rls) return ctx.skip(skipReason);
     const seen = await withTenantOn(rls, TENANT_A, (tx) =>
       tx.auditEvent.findMany({ where: { type: { startsWith: MARKER } }, select: { type: true } })
     );
@@ -97,8 +97,8 @@ describe('AuditEvent: a tenant-less row is readable and writable in system scope
     expect(nullRows).toBe(0);
   });
 
-  test('tenant A cannot insert a tenant-less row', async () => {
-    if (!ready || !rls) return expect(skipReason).toBeTruthy();
+  test('tenant A cannot insert a tenant-less row', async (ctx) => {
+    if (!ready || !rls) return ctx.skip(skipReason);
     const attempt = withTenantOn(rls, TENANT_A, (tx) =>
       tx.auditEvent.create({ data: { type: `${MARKER}.forged` } })
     );
@@ -109,16 +109,16 @@ describe('AuditEvent: a tenant-less row is readable and writable in system scope
     expect(isRlsRefusal(err), `expected an RLS refusal, got: ${String(err)}`).toBe(true);
   });
 
-  test('system scope (the /admin/audit view) reads the tenant-less row and both tenants', async () => {
-    if (!ready || !rls) return expect(skipReason).toBeTruthy();
+  test('system scope (the /admin/audit view) reads the tenant-less row and both tenants', async (ctx) => {
+    if (!ready || !rls) return ctx.skip(skipReason);
     const seen = await withSystemScopeOn(rls, 'platform-admin', 'test.auditNull', (tx) =>
       tx.auditEvent.findMany({ where: { type: { startsWith: MARKER } }, select: { type: true } })
     );
     expect(seen.map((r) => r.type).sort()).toEqual([`${MARKER}.null`, `${MARKER}.own`]);
   });
 
-  test('system scope can write a tenant-less row (the erasure writers path)', async () => {
-    if (!ready || !rls || !admin) return expect(skipReason).toBeTruthy();
+  test('system scope can write a tenant-less row (the erasure writers path)', async (ctx) => {
+    if (!ready || !rls || !admin) return ctx.skip(skipReason);
     await withSystemScopeOn(rls, 'subject-scoped', 'test.erasureAudit', (tx) =>
       tx.auditEvent.create({ data: { type: `${MARKER}.erasure`, target: 'subject-ref' } })
     );
@@ -127,8 +127,8 @@ describe('AuditEvent: a tenant-less row is readable and writable in system scope
     expect(landed).toBe(1);
   });
 
-  test('with no context at all, no AuditEvent row is visible', async () => {
-    if (!ready || !rls) return expect(skipReason).toBeTruthy();
+  test('with no context at all, no AuditEvent row is visible', async (ctx) => {
+    if (!ready || !rls) return ctx.skip(skipReason);
     expect(await rls.auditEvent.count()).toBe(0);
   });
 });

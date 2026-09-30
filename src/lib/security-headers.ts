@@ -12,10 +12,10 @@
  *    written by src/proxy.ts at runtime. Next.js reads the nonce back out of the
  *    *request* `Content-Security-Policy` header and stamps it on its own inline
  *    RSC-payload scripts and chunk `<script>` tags; nothing in src/ has to pass it
- *    around. The proxy matcher skips `/api`, `/_next` and dotted paths — those are
- *    JSON, files and assets, and get `API_CONTENT_SECURITY_POLICY` from next.config
- *    instead (never both on one response: two enforced policies intersect, and the
- *    static one has no nonce).
+ *    around. The proxy matcher skips `/api`, `/_next` and static-file extensions
+ *    (src/proxy.ts `config`). `/api` gets `API_CONTENT_SECURITY_POLICY` from
+ *    next.config instead (never both on one response: two enforced policies
+ *    intersect, and the static one has no nonce).
  *
  * Why the policy looks the way it does — keep this in step with the code:
  * - script-src: nonce + 'strict-dynamic'. Next's inline `self.__next_f.push(…)`
@@ -38,6 +38,14 @@
  * - frame-ancestors 'none' (with X-Frame-Options DENY for old browsers),
  *   object-src 'none', base-uri 'self', frame-src 'none' — nothing embeds us and
  *   we embed nothing.
+ * - report-uri: violations are POSTed to `/api/csp-report`, which only logs a
+ *   trimmed summary (İNCELEME-57 Ö-1). Without it a report-only rollout shows
+ *   nothing but the visitor's own console. Deliberately no `report-to`: once a
+ *   policy names one, Chromium ignores `report-uri` and queues the report for the
+ *   Reporting API instead — measured on Chromium 1243 against a local server,
+ *   `report-uri` alone arrived at once, while with `report-to` (relative or
+ *   absolute `Reporting-Endpoints`) nothing arrived in 70 s. `report-uri` is
+ *   deprecated but every current engine still sends it.
  * - No `upgrade-insecure-requests`: HSTS already does it on the real domain, and on
  *   plain-http hosts (local prod build, LAN) it would rewrite same-origin asset URLs
  *   to https and break the page.
@@ -93,6 +101,9 @@ export const API_CONTENT_SECURITY_POLICY = [
   "form-action 'none'",
   "frame-ancestors 'none'",
 ].join('; ');
+
+/** Where the browser POSTs violation reports (src/app/api/csp-report/route.ts). */
+export const CSP_REPORT_PATH = '/api/csp-report';
 
 export type CspOptions = {
   nonce: string;
@@ -150,6 +161,7 @@ export function buildContentSecurityPolicy(opts: CspOptions): string {
     ['base-uri', ["'self'"]],
     ['form-action', ["'self'", 'https://accounts.google.com']],
     ['frame-ancestors', ["'none'"]],
+    ['report-uri', [CSP_REPORT_PATH]],
   ];
   return directives.map(([name, values]) => `${name} ${values.join(' ')}`).join('; ');
 }
