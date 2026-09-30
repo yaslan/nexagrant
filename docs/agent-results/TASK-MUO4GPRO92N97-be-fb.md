@@ -2,7 +2,7 @@
 
 **Durum: TAMAM**
 
-Dal: `be-fb/muo4gp-embed-400` (dev `47c96594`'ten açıldı, sonra dev `aea1a63d` içeri alındı). Kod commit'i `bc0ec6a3`. Kapılar birleşik ağaçta yeşil, dev'e merge edildi. Push yapılmadı.
+Dal: `be-fb/muo4gp-embed-400` (dev `47c96594`'ten açıldı, sonra dev `aea1a63d` içeri alındı). Kod commit'i `bc0ec6a3`, dev'e merge `a9ec2e34` (kod) + `7e5835cc` (rapor). Kapılar son dev ağacında yeşil. Push yapılmadı.
 Önceki koşu ~17:05'teki ağ kesintisinde kesildi. Dal ya da commit kalmamıştı, iş baştan yapıldı.
 
 ## 1. Ne yapıldı
@@ -138,6 +138,9 @@ birleşik ağaç (dev aea1a63d içeri alındıktan sonra, 219860fb):
   hedefli (rbac-guard + k1 live + embeddings + job) → 4 files, 166 passed | 1 skipped · typecheck 0 · lint 0
   npx vitest run → Test Files 293 passed | 2 skipped (295) · Tests 3622 passed | 36 skipped (3658)   exit 0
   scripts/check-live-skips.ts → exit 0 · env -u NODE_ENV pnpm build → exit 0
+son dev (7e5835cc = kod merge a9ec2e34 + rapor; arada dev'e crw-fb'nin 20 dosyalık cd4fc4f9'u da girdi):
+  npx vitest run → Test Files 294 passed | 2 skipped (296) · Tests 3661 passed | 36 skipped (3697)   exit 0
+  check-live-skips 0 · typecheck 0 · lint 0 · build 0
 ```
 
 ## 3. Değişen dosyalar
