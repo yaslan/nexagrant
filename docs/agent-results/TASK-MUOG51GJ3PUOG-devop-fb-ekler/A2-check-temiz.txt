@@ -1,0 +1,20 @@
+DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55224/fabrika
+$ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/golive/r1-topicmatch-check.sql
+rol=fabrika db=fabrika pg=16.15 (Debian 16.15-1.pgdg12+2) read_only=on system_scope=on
+tablo_var=t anahtar_var=t opportunity_kolonu_var=t rls_kor=f
+--- 1. anahtar: indnullsnotdistinct (beklenen t)
+ indnullsnotdistinct 
+---------------------
+ t
+
+--- 2. mükerrer K1 (opportunityId IS NULL) çiftleri (beklenen 0 satır)
+ tenantId | topicId | count 
+----------+---------+-------
+
+mukerrer_cift=0 fazla_satir=0
+ kontrol  | sonuc 
+----------+-------
+ R1_SONUC | TEMIZ
+
+ROLLBACK
+exit=0

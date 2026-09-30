@@ -1,0 +1,51 @@
+HEAD=c25a1623
+konteyner: devopfb-r1-pg (pgvector/pgvector:pg16, sıfırdan) 127.0.0.1:55224
+DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55224/fabrika
+DATABASE_URL_RLS_TEST=postgresql://fabrika_app:fabrika_app_ci@127.0.0.1:55224/fabrika
+CI=true
+$ pnpm db:generate
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘
+✔ Generated Prisma Client (v7.10.0) to ./node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client in 1.49s
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+exit=0
+$ pnpm exec prisma db push
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+Loaded Prisma config from prisma.config.ts.
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "fabrika", schema "public" at "127.0.0.1:55224"
+🚀  Your database is now in sync with your Prisma schema. Done in 1.41s
+exit=0
+$ pnpm db:rls-role
+├─────────┼───────────────┼──────────┼──────────────┼─────────────┼─────────────┼───────────────┤
+│ 0       │ 'fabrika_app' │ false    │ false        │ true        │ false       │ false         │
+└─────────┴───────────────┴──────────┴──────────────┴─────────────┴─────────────┴───────────────┘
+✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55224/fabrika
+exit=0
+$ scripts/apply-migrations.sh
+psql:prisma/migrations/evidence-unique-object-key.sql:49: NOTICE:  relation "Evidence_tenantId_r2ObjectKey_key" already exists, skipping
+==> [41/41] m4-stale-digest-user-claim.sql
+psql:prisma/migrations/m4-stale-digest-user-claim.sql:53: NOTICE:  column "staleDigestOn" of relation "User" already exists, skipping
+psql:prisma/migrations/m4-stale-digest-user-claim.sql:55: NOTICE:  relation "Membership_userId_idx" already exists, skipping
+apply-migrations: 41 files applied as fabrika
+exit=0
+$ scripts/apply-migrations.sh
+psql:prisma/migrations/evidence-unique-object-key.sql:49: NOTICE:  relation "Evidence_tenantId_r2ObjectKey_key" already exists, skipping
+==> [41/41] m4-stale-digest-user-claim.sql
+psql:prisma/migrations/m4-stale-digest-user-claim.sql:53: NOTICE:  column "staleDigestOn" of relation "User" already exists, skipping
+psql:prisma/migrations/m4-stale-digest-user-claim.sql:55: NOTICE:  relation "Membership_userId_idx" already exists, skipping
+apply-migrations: 41 files applied as fabrika
+exit=0
+$ pnpm db:rls
+$ tsx scripts/apply-rls.ts
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+exit=0
+$ pnpm db:seed
+Proposals seeded (3 proposals).
+Efforts seeded (10 efforts).
+M6 evaluator lens seeded (1 evaluation, 2 reviewers pending, 4 criteria, 0 scores).
+✓ E11.2 feedback seed complete
+Seeding completed with E10 data.
+exit=0
