@@ -99,7 +99,7 @@ export function PlanAdminClient({ locale, plans, modules, tenants, loadError }: 
         setNotice({ kind: 'ok', text: t('saved') });
         router.refresh();
       } else {
-        setNotice({ kind: 'err', text: t(`errors.${res.code}`, { detail: res.detail }) });
+        setNotice({ kind: 'err', text: t(`errors.${res.code}`) });
       }
     });
   };

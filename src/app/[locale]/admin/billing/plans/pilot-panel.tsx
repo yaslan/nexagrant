@@ -38,7 +38,7 @@ export function PilotPanel({
         setExtend(false);
         router.refresh();
       } else {
-        setNotice({ kind: 'err', text: t(`errors.${res.code}`, { detail: res.detail }) });
+        setNotice({ kind: 'err', text: t(`errors.${res.code}`) });
       }
     });
   };
