@@ -102,6 +102,12 @@ pnpm lint          → exit 0 (0 problems; temel dal da 0)
 pnpm i18n:check    → ✅ i18n check passed   exit 0
 pnpm build         → exit 0 (├ ƒ /api/concept-notes/[id]/export)
 ```
+**Merge sonrası birleşik dev (`eac69b44`):** merge sırasında dev ilerlemişti; araya cs-fb'nin eylem sızıntı bekçisi merge'ü (`78bda1ba`) ve CORDIS importer değişikliği girmişti. Dosya çakışması yoktu. Birleşik ağaçta tekrar koşuldu:
+```
+tsc exit=0 · lint exit=0 · CI=true vitest run (izole DB):  Test Files 299 passed | 2 skipped (301)
+                                                          Tests 3896 passed | 50 skipped (3946)   exit=0
+```
+
 Build'deki tek uyarı `src/instrumentation.ts:18` içindeki `process.exit` Edge uyarısı. Bu uyarı önceden de vardı, bu değişiklikten gelmiyor.
 
 ## 3. Değişen dosyalar
@@ -123,5 +129,5 @@ Build'deki tek uyarı `src/instrumentation.ts:18` içindeki `process.exit` Edge 
 - Görev metnindeki "KANIT ZORUNLU" satırı sonucun `/Users/macbook/alan/docs/agent-results/TASK-MUO64MPOYXLY5-devop-fb.md` yoluna yazılmasını istiyordu. O dosya başka bir ajanın (devop-fb) İNCELEME-88 raporu. Üzerine yazmadım; görevin açıkça verdiği sonuç dosyası yolunu kullandım.
 
 ## 6. Sonraki adım
-- Dal dev'e merge edildi (push yok). CI'da yeni canlı dosya live-skip kapısına dahil olacak; ilk CI koşusunda `tests/k1-embeddings-unlock.live.test.ts`'in 4/4 koştuğu kontrol edilmeli.
+- Dal dev'e merge edildi: `eac69b44` (push yok). CI'da yeni canlı dosya live-skip kapısına dahil olacak; ilk CI koşusunda `tests/k1-embeddings-unlock.live.test.ts`'in 4/4 koştuğu kontrol edilmeli.
 - Temizlik: `crwfb-muoc2k-pg` kabı ve `wtbase` worktree'si rapor commit'inden sonra kaldırılır. `wt` dal worktree'si merge'den sonra kaldırılır.
