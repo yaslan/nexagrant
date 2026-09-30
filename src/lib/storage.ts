@@ -231,16 +231,24 @@ function storeFailure(err: unknown): 'object_missing' | 'storage_unavailable' {
  * Nothing is deleted here. A refusal of the file itself is returned as such
  * (`isFinalUploadRefusal`); `object_missing` / `storage_unavailable` are worth
  * trying again. The caller has derived `finalKey` with `finalKeyOfIncoming`.
+ *
+ * The store calls give up after `EVIDENCE_COPY_DEADLINE_MS` in all
+ * (`storage_unavailable`): confirm runs this under a lock that must not be
+ * released while a copy it started is still on its way (Y-1,
+ * TASK-MUO64MVW8TLMX), so the copy has to end before the lock's transaction does.
  */
+export const EVIDENCE_COPY_DEADLINE_MS = 15_000;
+
 export async function copyIncomingObject(incomingKey: string, finalKey: string): Promise<IncomingCopyResult> {
   if (s3) {
+    const opts = { abortSignal: AbortSignal.timeout(EVIDENCE_COPY_DEADLINE_MS) };
     let etag: string;
     let checked: { size: number; contentType: string };
     try {
-      const meta = await s3.send(new HeadObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: incomingKey }));
+      const meta = await s3.send(new HeadObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: incomingKey }), opts);
       if (!meta.ETag) return { ok: false, error: 'storage_unavailable' };
       etag = meta.ETag;
-      const first = await s3.send(new GetObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: incomingKey, Range: 'bytes=0-15', IfMatch: etag }));
+      const first = await s3.send(new GetObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: incomingKey, Range: 'bytes=0-15', IfMatch: etag }), opts);
       const head = first.Body ? Buffer.from(await first.Body.transformToByteArray()) : Buffer.alloc(0);
       const verdict = storedEvidenceMatches(finalKey, { size: meta.ContentLength ?? 0, contentType: meta.ContentType ?? null, head });
       if (!verdict.ok) return verdict;
@@ -255,8 +263,8 @@ export async function copyIncomingObject(incomingKey: string, finalKey: string):
         CopySourceIfMatch: etag,
         Key: finalKey,
         MetadataDirective: 'COPY',
-      }));
-      const copy = await s3.send(new HeadObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: finalKey }));
+      }), opts);
+      const copy = await s3.send(new HeadObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: finalKey }), opts);
       if (copy.ContentLength !== checked.size || (copy.ContentType ?? checked.contentType) !== checked.contentType) {
         return { ok: false, error: 'storage_unavailable' };
       }

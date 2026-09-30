@@ -54,8 +54,10 @@ const state = vi.hoisted(() => {
     copied: false,
     /** Runs while the proxy holds a CopyObject request, before it is forwarded. */
     beforeCopy: null as null | (() => Promise<void>),
-    /** Holds the row insert past the interactive transaction's 5 s. */
-    stallCreate: false,
+    /** Makes one evidence call inside confirm's transaction fail, as a database error would. */
+    dbFault: null as null | 'findFirst' | 'create',
+    /** Runs before the proxy forwards any request; may hold it. */
+    hook: null as null | ((r: { method: string; path: string; isCopy: boolean }) => Promise<void>),
     requests: [] as string[],
   };
 });
@@ -63,19 +65,17 @@ const state = vi.hoisted(() => {
 vi.mock('@/lib/auth', () => ({ auth: async () => state.session }));
 vi.mock('@/lib/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/db')>();
-  // Only `evidence.create` is held: the pre-check and everything else run as usual.
-  const stalling = <T extends object>(tx: T): T =>
+  // Only the named `evidence` call fails: everything else runs as usual.
+  const failing = <T extends object>(tx: T): T =>
     new Proxy(tx, {
       get(target, prop, receiver) {
         const value = Reflect.get(target, prop, receiver);
-        if (prop !== 'evidence' || !state.stallCreate) return value;
-        const delegate = value as { create: (args: unknown) => Promise<unknown> };
-        return new Proxy(delegate, {
+        if (prop !== 'evidence' || !state.dbFault) return value;
+        return new Proxy(value as object, {
           get(d, m, r) {
-            if (m !== 'create') return Reflect.get(d, m, r);
-            return async (args: unknown) => {
-              await new Promise((res) => setTimeout(res, 5_500));
-              return d.create(args);
+            if (m !== state.dbFault) return Reflect.get(d, m, r);
+            return async () => {
+              throw new Error(`injected: evidence.${String(m)} failed`);
             };
           },
         });
@@ -83,8 +83,8 @@ vi.mock('@/lib/db', async (importOriginal) => {
     });
   return {
     ...actual,
-    withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1]) =>
-      actual.withTenantOn(state.rls!, tenantId, (tx) => cb(stalling(tx))),
+    withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1], opts?: Parameters<typeof actual.withTenant>[2]) =>
+      actual.withTenantOn(state.rls!, tenantId, (tx) => cb(failing(tx)), opts),
   };
 });
 vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
@@ -150,7 +150,8 @@ async function expectNothingLost(up: Awaited<ReturnType<typeof uploaded>>, res: 
 /** The retry: one row with the store's figures, the checked bytes under the final key, no staging object. */
 async function expectRetrySucceeds(up: Awaited<ReturnType<typeof uploaded>>) {
   state.fault = 'pass';
-  state.stallCreate = false;
+  state.dbFault = null;
+  state.hook = null;
   const res = await confirm(up.objectKey);
   expect(res.success).toBe(true);
   const rows = await rowsOf(up.finalKey);
@@ -189,6 +190,9 @@ beforeAll(async () => {
       state.beforeCopy = null;
       await hook();
     }
+    if (state.hook) await state.hook({ method: req.method ?? '', path: (req.url ?? '').split('?')[0] ?? '', isCopy });
+    // A client that gave up while the request was held is not forwarded.
+    if (req.socket.destroyed) return;
     const up = http.request(
       { host: upstream.hostname, port: upstream.port, method: req.method, path: req.url, headers: req.headers },
       (ur) => {
@@ -234,7 +238,8 @@ beforeEach(({ skip }) => {
   state.fault = 'pass';
   state.copied = false;
   state.beforeCopy = null;
-  state.stallCreate = false;
+  state.dbFault = null;
+  state.hook = null;
   state.requests = [];
 });
 
@@ -268,13 +273,42 @@ describe('B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the uplo
     expect(await stored(up.objectKey)).toBeNull();
   }, 90_000);
 
-  test('the row save outlives its transaction: save_failed, no row, the upload kept; the retry succeeds', async () => {
-    const up = await uploaded('tx-suresi');
-    state.stallCreate = true;
+  test('the row save fails after the copy: save_failed, no row, the upload kept; the retry succeeds', async () => {
+    const up = await uploaded('satir-hatasi');
+    state.dbFault = 'create';
     const res = await confirm(up.objectKey);
+    expect(state.copied, 'the copy did go through').toBe(true);
     await expectNothingLost(up, res, 'save_failed');
     await expectRetrySucceeds(up);
   }, 60_000);
+
+  test('T-2: the "already recorded?" read fails: save_failed before any copy, the upload kept; the retry succeeds', async () => {
+    const up = await uploaded('on-kontrol');
+    state.dbFault = 'findFirst';
+    const res = await confirm(up.objectKey);
+    await expectNothingLost(up, res, 'save_failed');
+    expect(state.requests.some((r) => r.startsWith('PUT(copy)')), 'nothing is copied without the check').toBe(false);
+    await expectRetrySucceeds(up);
+  }, 60_000);
+
+  test('the store holds the copy past its deadline: storage_unavailable in bounded time, nothing lost; the retry succeeds', async () => {
+    const up = await uploaded('asiri-yavas');
+    let held = false;
+    state.hook = async ({ isCopy }) => {
+      if (!isCopy || held) return;
+      held = true;
+      await sleep(storage.EVIDENCE_COPY_DEADLINE_MS + 3_000);
+    };
+    const started = Date.now();
+    const res = await confirm(up.objectKey);
+    const took = Date.now() - started;
+    expect(took, `gave up after ${took} ms`).toBeGreaterThanOrEqual(storage.EVIDENCE_COPY_DEADLINE_MS - 1_000);
+    expect(took).toBeLessThan(storage.EVIDENCE_COPY_DEADLINE_MS + 2_500);
+    await expectNothingLost(up, res, 'storage_unavailable');
+    expect(await stored(up.finalKey), 'the abandoned copy never reached the store').toBeNull();
+    await sleep(3_500);
+    await expectRetrySucceeds(up);
+  }, 90_000);
 
   test('the store is down before the copy: storage_unavailable, nothing lost; the retry succeeds', async () => {
     const up = await uploaded('kapali');
@@ -319,4 +353,98 @@ describe('B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the uplo
     await expectRetrySucceeds(up);
     expect(state.requests.filter((r) => r.startsWith('PUT(copy)'))).toHaveLength(1);
   });
+});
+
+describe('Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key', () => {
+  /** Same type and length as `up.body`, other bytes: what the still-valid signed PUT can put there. */
+  const other = (up: Awaited<ReturnType<typeof uploaded>>) => {
+    const v2 = PDF('X'.repeat(up.body.length - PDF('').length));
+    expect(v2.length).toBe(up.body.length);
+    expect(v2.equals(up.body)).toBe(false);
+    return v2;
+  };
+
+  test('RACE-2: a second confirm that starts before the first one saved its row cannot change the file the first one recorded', async () => {
+    const up = await uploaded('yaris-2');
+    const v2 = other(up);
+    let copies = 0;
+    let second: ReturnType<typeof confirm> | undefined;
+    state.hook = async ({ method, path, isCopy }) => {
+      if (isCopy) {
+        copies += 1;
+        // crw-fb's timing: the second copy is slow enough to land after the first row is committed.
+        if (copies === 2) await sleep(2_500);
+        return;
+      }
+      // The first confirm reads its copy back: v1 is on the final key, its row is not saved yet.
+      if (method === 'HEAD' && path.endsWith(`/${up.finalKey}`) && copies === 1 && !second) {
+        expect((await put(up.uploadUrl, v2)).status).toBe(200);
+        second = confirm(up.objectKey);
+        await sleep(1_500);
+      }
+    };
+
+    const first = await confirm(up.objectKey);
+    expect(second, 'the second confirm was started while the first one ran').toBeDefined();
+    const res2 = await second!;
+    state.hook = null;
+
+    expect(first.success, JSON.stringify(first)).toBe(true);
+    expect(res2).toEqual({ success: false, error: 'already_confirmed' });
+    const rows = await rowsOf(up.finalKey);
+    evidenceIds.push(...rows.map((r) => r.id));
+    expect(rows).toHaveLength(1);
+    expect(first.success && first.evidence && 'id' in first.evidence ? first.evidence.id : null).toBe(rows[0]?.id);
+    expect((await stored(up.finalKey))?.equals(up.body), 'the recorded file is still the one the first confirm checked').toBe(true);
+    expect(copies, 'the second confirm copied nothing').toBe(1);
+    expect(await stored(up.objectKey)).toBeNull();
+  }, 60_000);
+
+  test('a confirm waits for the one ahead of it only so long: save_failed, nothing copied or lost; the first still succeeds', async () => {
+    const up = await uploaded('kilit-bekleme');
+    let copies = 0;
+    let second: ReturnType<typeof confirm> | undefined;
+    let secondTook = 0;
+    state.hook = async ({ isCopy }) => {
+      if (!isCopy) return;
+      copies += 1;
+      if (copies !== 1) return;
+      // The first confirm holds the lock through a copy slower than the second one's wait.
+      const started = Date.now();
+      second = confirm(up.objectKey).then((r) => {
+        secondTook = Date.now() - started;
+        return r;
+      });
+      await sleep(11_000);
+    };
+
+    const first = await confirm(up.objectKey);
+    const res2 = await second!;
+    state.hook = null;
+
+    expect(res2).toEqual({ success: false, error: 'save_failed' });
+    expect(secondTook, `the second confirm answered after ${secondTook} ms`).toBeLessThan(11_000);
+    expect(first.success, JSON.stringify(first)).toBe(true);
+    const rows = await rowsOf(up.finalKey);
+    evidenceIds.push(...rows.map((r) => r.id));
+    expect(rows).toHaveLength(1);
+    expect(copies).toBe(1);
+    expect((await stored(up.finalKey))?.equals(up.body)).toBe(true);
+    // Sent again, it finds the row.
+    expect(await confirm(up.objectKey)).toEqual({ success: false, error: 'already_confirmed' });
+  }, 60_000);
+
+  test('five confirms at once: one row, one copy, the uploaded bytes on the final key', async () => {
+    const up = await uploaded('bes-birden');
+    const results = await Promise.all(Array.from({ length: 5 }, () => confirm(up.objectKey)));
+    const ok = results.filter((r) => r.success);
+    expect(ok).toHaveLength(1);
+    for (const r of results.filter((x) => !x.success)) expect(r).toEqual({ success: false, error: 'already_confirmed' });
+    const rows = await rowsOf(up.finalKey);
+    evidenceIds.push(...rows.map((r) => r.id));
+    expect(rows).toHaveLength(1);
+    expect(state.requests.filter((r) => r.startsWith('PUT(copy)'))).toHaveLength(1);
+    expect((await stored(up.finalKey))?.equals(up.body)).toBe(true);
+    expect(await stored(up.objectKey)).toBeNull();
+  }, 60_000);
 });
