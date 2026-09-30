@@ -201,7 +201,15 @@ describe.skipIf(!HAS_DB)('K1 embeddings (live, fabrika_app, fake provider)', () 
 
   test('k1-topic-match now writes rows for the embedded tenants, none for the expired pilot', async () => {
     const r = await recomputeAllTopicMatches(MINE);
-    expect(r.created).toBe(MY_TOPICS.length * 2);
+    // Rows, not `created`: tests/topic-match-nightly.live.test.ts runs the real
+    // k1-topic-match task, an unnarrowed sweep, in parallel, and when it lands
+    // between the embedding tests and this one it has already written these
+    // rows — this run then counts them as updated/unchanged (1 of 6 created in
+    // 2 of 7 full runs, TASK-MUNSRKW0HJYBV Ö-D).
+    expect(r.created + r.updated + r.unchanged).toBe(MY_TOPICS.length * 2);
+    expect(
+      await admin.topicMatch.count({ where: { tenantId: { in: [T_A, T_B] }, topicId: { in: MY_TOPICS }, opportunityId: null } }),
+    ).toBe(MY_TOPICS.length * 2);
     expect(r.pilotExpired).toBe(1);
     expect(await admin.topicMatch.count({ where: { tenantId: T_PILOT } })).toBe(0);
   });
