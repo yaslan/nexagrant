@@ -700,7 +700,8 @@ export async function embedText(
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`OpenAI embeddings error ${res.status}: ${body}`);
+    // Carries the status so a caller can tell one refused input (400) from an outage.
+    throw new LlmProviderError(`OpenAI embeddings error ${res.status}: ${body}`, res.status);
   }
 
   const data = await res.json();

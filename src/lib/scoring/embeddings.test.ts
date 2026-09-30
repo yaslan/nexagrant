@@ -63,12 +63,14 @@ function makeClient(scope: string | null) {
     },
     async $executeRaw(strings: TemplateStringsArray, ...v: unknown[]) {
       const q = sql(strings);
-      const [vec, hash, id, updatedAt] = v as [string, string, string, Date];
+      // A refused row only has its hash marked: no vector parameter.
+      const marksOnly = !q.includes('embedding =');
+      const [vec, hash, id, updatedAt] = (marksOnly ? [undefined, ...v] : v) as [string | undefined, string, string, Date];
       db.beforeWrite?.(id);
       if (q.includes('UPDATE "Topic"')) {
         const t = db.topics.find((r) => r.id === id && r.updatedAt.getTime() === updatedAt.getTime());
         if (!t) return 0;
-        t.embedding = vec;
+        if (!marksOnly) t.embedding = vec!;
         t.embeddingHash = hash;
         return 1;
       }
@@ -77,7 +79,7 @@ function makeClient(scope: string | null) {
         if (scope !== id) return 0;
         const p = db.profiles.find((r) => r.tenantId === id && r.updatedAt.getTime() === updatedAt.getTime());
         if (!p) return 0;
-        p.embedding = vec;
+        if (!marksOnly) p.embedding = vec!;
         p.embeddingHash = hash;
         return 1;
       }
@@ -124,13 +126,22 @@ const {
   embeddingHash,
   topicEmbeddingText,
   estimateEmbeddingUsd,
+  estimateEmbeddingTokens,
+  utf8Prefix,
+  needsEmbedding,
   MAX_EMBED_CHARS,
+  MAX_EMBED_TOKENS_ESTIMATE,
+  FALLBACK_EMBED_BYTES,
+  REJECTED_HASH_PREFIX,
   EMBEDDING_MODEL,
   EMBEDDING_DIMENSIONS,
   TOPIC_EMBEDDING_PURPOSE,
   PROFILE_EMBEDDING_PURPOSE,
 } = await import('./embeddings');
 const { AiUsageLogWriteError } = await import('@/lib/llm');
+const tokenFixture = (await import('../../../tests/fixtures/cl100k-token-samples.json')).default as {
+  samples: Array<{ id: string; text: string; tokens: number }>;
+};
 
 const T0 = new Date('2026-09-01T00:00:00Z');
 function topic(id: string, over: Partial<TopicRow> = {}): TopicRow {
@@ -174,7 +185,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('runK1Embeddings — sweep', () => {
-  it('embeds every open/forthcoming topic and every profile, once each, through embedText', async () => {
+  it('embeds every profile, then every open/forthcoming topic, once each, through embedText', async () => {
     const r = await runK1Embeddings();
     expect(r).toMatchObject({ topicsEmbedded: 3, profilesEmbedded: 2, failed: 0, budgetExhausted: false, aborted: false });
     expect(fetchMock).toHaveBeenCalledTimes(5);
@@ -182,11 +193,11 @@ describe('runK1Embeddings — sweep', () => {
     for (const b of sent) expect(b).toMatchObject({ model: EMBEDDING_MODEL, dimensions: EMBEDDING_DIMENSIONS });
     // Every call recorded: topics under the platform scope, profiles under their own tenant.
     expect(db.usage.map((u) => [u.tenantId, u.purpose, u.module])).toEqual([
-      ['__platform__', TOPIC_EMBEDDING_PURPOSE, 'K1'],
-      ['__platform__', TOPIC_EMBEDDING_PURPOSE, 'K1'],
-      ['__platform__', TOPIC_EMBEDDING_PURPOSE, 'K1'],
       ['t1', PROFILE_EMBEDDING_PURPOSE, 'K1'],
       ['t2', PROFILE_EMBEDDING_PURPOSE, 'K1'],
+      ['__platform__', TOPIC_EMBEDDING_PURPOSE, 'K1'],
+      ['__platform__', TOPIC_EMBEDDING_PURPOSE, 'K1'],
+      ['__platform__', TOPIC_EMBEDDING_PURPOSE, 'K1'],
     ]);
     expect(db.topics.find((t) => t.id === 'a')!.embeddingHash).toBe(embeddingHash(topicEmbeddingText(db.topics[0]!)));
   });
@@ -207,7 +218,7 @@ describe('runK1Embeddings — sweep', () => {
     db.profiles.find((p) => p.tenantId === 't2')!.keywords = ['ai', 'robotics'];
     const r = await runK1Embeddings();
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(sent.map((s) => s.input)).toEqual([expect.stringContaining('A new scope.'), expect.stringContaining('robotics')]);
+    expect(sent.map((s) => s.input)).toEqual([expect.stringContaining('robotics'), expect.stringContaining('A new scope.')]);
     expect(r).toMatchObject({ topicsEmbedded: 1, topicsUpToDate: 2, profilesEmbedded: 1, profilesUpToDate: 1 });
   });
 
@@ -258,17 +269,73 @@ describe('runK1Embeddings — sweep', () => {
     await runK1Embeddings();
     expect(sent[0]!.input.length).toBe(MAX_EMBED_CHARS);
   });
+
+  it('also cuts at MAX_EMBED_TOKENS_ESTIMATE: 16 000 characters of Greek are not sent whole (İNCELEME-55 B-1)', async () => {
+    const el = tokenFixture.samples.find((x) => x.id === 'el-16k')!;
+    expect(el.tokens).toBeGreaterThan(8191); // the 400 the reviewer got
+    db.topics = [topic('a', { title: 'Υδρογόνο', keywords: [], description: el.text })];
+    db.profiles = [];
+    const r = await runK1Embeddings();
+    expect(r).toMatchObject({ topicsEmbedded: 1, failed: 0 });
+    expect(sent[0]!.input.length).toBeLessThan(el.text.length);
+    expect(estimateEmbeddingTokens(sent[0]!.input)).toBeLessThanOrEqual(MAX_EMBED_TOKENS_ESTIMATE);
+  });
+
+  it('never cuts inside a surrogate pair', () => {
+    const t = topicEmbeddingText({ title: '🚀'.repeat(5000), keywords: [], description: null });
+    expect(estimateEmbeddingTokens(t)).toBeLessThanOrEqual(MAX_EMBED_TOKENS_ESTIMATE);
+    expect(t).toBe('🚀'.repeat(t.length / 2));
+    expect(utf8Prefix('aé🚀', 4)).toBe('aé');
+    expect(Buffer.byteLength(utf8Prefix('ж'.repeat(9000), FALLBACK_EMBED_BYTES))).toBe(FALLBACK_EMBED_BYTES);
+  });
+});
+
+describe('estimateEmbeddingTokens — floor against the real tokenizer (İNCELEME-55 B-2/B-3)', () => {
+  // Real cl100k_base counts, pinned in the fixture: the estimate may over-count
+  // (a looser cap, a shorter text) but must never under-count natural text,
+  // or the cap is crossed and the token limit is hit.
+  it.each(tokenFixture.samples.map((x) => [x.id, x] as const))('%s: estimate >= real tokens', (_id, x) => {
+    expect(estimateEmbeddingTokens(x.text)).toBeGreaterThanOrEqual(x.tokens);
+  });
+
+  it('Turkish long text is no longer under-counted (was 5334 est for 5667 real in İNCELEME-55)', () => {
+    const tr = tokenFixture.samples.find((x) => x.id === 'tr-16k')!;
+    expect(estimateEmbeddingTokens(tr.text)).toBeGreaterThanOrEqual(tr.tokens);
+    expect(Math.ceil(tr.text.length / 3)).toBeLessThan(tr.tokens); // the old 3 chars/token rule
+  });
+
+  it('stays within 2x of real for the catalogue languages, so the cap is not needlessly tight', () => {
+    for (const id of ['en', 'tr', 'tr2', 'de', 'fr', 'pl', 'el', 'ru', 'bg', 'uk', 'zh', 'tr-16k', 'el-16k', 'ru-16k']) {
+      const x = tokenFixture.samples.find((s) => s.id === id)!;
+      expect(estimateEmbeddingTokens(x.text), id).toBeLessThanOrEqual(2 * x.tokens);
+    }
+  });
+
+  it('the USD estimate is the token estimate at the published price', () => {
+    const tr = tokenFixture.samples.find((x) => x.id === 'tr')!;
+    expect(estimateEmbeddingUsd(tr.text)).toBeCloseTo((estimateEmbeddingTokens(tr.text) * 0.13) / 1e6, 12);
+    expect(estimateEmbeddingUsd(tr.text)).toBeGreaterThanOrEqual((tr.tokens * 0.13) / 1e6);
+  });
 });
 
 describe('runK1Embeddings — spend cap', () => {
   it('stops before the call that would cross the cap; the next run continues', async () => {
+    db.tenants = [];
+    db.profiles = [];
     const one = estimateEmbeddingUsd(topicEmbeddingText(db.topics[0]!));
     const r = await runK1Embeddings({ maxUsd: one * 2.5 });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(r).toMatchObject({ topicsEmbedded: 2, budgetExhausted: true, profilesEmbedded: 0 });
+    expect(r).toMatchObject({ topicsEmbedded: 2, budgetExhausted: true });
     expect(r.estimatedUsd).toBeLessThanOrEqual(r.maxUsd);
     const r2 = await runK1Embeddings({ maxUsd: 1 });
-    expect(r2).toMatchObject({ topicsEmbedded: 1, topicsUpToDate: 2, profilesEmbedded: 2, budgetExhausted: false });
+    expect(r2).toMatchObject({ topicsEmbedded: 1, topicsUpToDate: 2, budgetExhausted: false });
+  });
+
+  it('profiles go first: a cap the topic backfill would eat still leaves every profile embedded (İNCELEME-55 B-4)', async () => {
+    const profilesUsd = db.profiles.reduce((sum, p) => sum + estimateEmbeddingUsd(`${p.capabilities}\n\n${p.keywords.join(', ')}`), 0);
+    const r = await runK1Embeddings({ maxUsd: profilesUsd * 1.01 });
+    expect(r).toMatchObject({ profilesEmbedded: 2, topicsEmbedded: 0, budgetExhausted: true });
+    expect(db.usage.map((u) => u.tenantId)).toEqual(['t1', 't2']);
   });
 
   it('a 0 cap makes no call at all', async () => {
@@ -340,15 +407,111 @@ describe('runK1Embeddings — failures', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('one rejected topic is counted and the run goes on', async () => {
-    stubProvider((_input, n) => (n === 2 ? { ok: false, status: 400 } : { ok: true }));
+  it('one rejected topic is counted, marked and the run goes on', async () => {
+    stubProvider((input) => (input.startsWith('Topic b') ? { ok: false, status: 400 } : { ok: true }));
     const r = await runK1Embeddings();
-    expect(r).toMatchObject({ failed: 1, topicsEmbedded: 2, profilesEmbedded: 2, aborted: false });
+    expect(r).toMatchObject({ failed: 1, rejected: 1, topicsEmbedded: 2, profilesEmbedded: 2, aborted: false });
     expect(r.errors[0]).toContain('400');
     expect(r.errors.join()).not.toContain('sk-test-key');
+    const b = db.topics.find((t) => t.id === 'b')!;
+    expect(b.embedding).toBeNull();
+    expect(b.embeddingHash).toBe(REJECTED_HASH_PREFIX + embeddingHash(topicEmbeddingText(b)));
   });
 
-  it('three failures in a row stop the run (bad key, outage)', async () => {
+  /** Refuses what the real model would: more than 8191 tokens, with bytes as the stand-in count. */
+  const tokenLimit = (input: string) => (Buffer.byteLength(input) > 8191 ? { ok: false, status: 400 } : { ok: true });
+
+  it('a 400 on a long text is retried once on a byte-safe prefix, and that vector is kept', async () => {
+    const el = tokenFixture.samples.find((x) => x.id === 'el-16k')!;
+    db.topics = [topic('a', { title: 'Υδρογόνο', keywords: [], description: el.text })];
+    db.profiles = [];
+    stubProvider(tokenLimit);
+    const r = await runK1Embeddings();
+    expect(r).toMatchObject({ topicsEmbedded: 1, shortened: 1, failed: 0, rejected: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(Buffer.byteLength(sent[1]!.input)).toBeLessThanOrEqual(FALLBACK_EMBED_BYTES);
+    expect(sent[0]!.input.startsWith(sent[1]!.input)).toBe(true);
+    // Stored under the full text's hash: the next run does not send it again.
+    fetchMock.mockClear();
+    expect(await runK1Embeddings()).toMatchObject({ topicsUpToDate: 1, topicsEmbedded: 0 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('three refused long rows in a row no longer stop the run every night (İNCELEME-55 B-1 STALL)', async () => {
+    const el = tokenFixture.samples.find((x) => x.id === 'el-16k')!;
+    db.topics = [
+      topic('a', { description: el.text }),
+      topic('b', { description: el.text + ' β' }),
+      topic('c', { description: el.text + ' γ' }),
+      topic('d'),
+      topic('e'),
+    ];
+    // Refuses anything Greek, however short: the retry cannot save these rows.
+    stubProvider((input) => (/[α-ω]/.test(input) ? { ok: false, status: 400 } : { ok: true }));
+    const r1 = await runK1Embeddings();
+    expect(r1).toMatchObject({ rejected: 3, failed: 3, aborted: false, topicsEmbedded: 2, profilesEmbedded: 2 });
+    expect(db.topics.filter((t) => t.embedding !== null).map((t) => t.id)).toEqual(['d', 'e']);
+    // Night two: the refused rows are skipped without a call.
+    fetchMock.mockClear();
+    const r2 = await runK1Embeddings();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(r2).toMatchObject({ previouslyRejected: 3, failed: 0, aborted: false, topicsUpToDate: 2 });
+    // A new text is a new hash: it is tried again.
+    db.topics.find((t) => t.id === 'a')!.description = 'Hydrogen tanks, now in English.';
+    const r3 = await runK1Embeddings();
+    expect(r3).toMatchObject({ topicsEmbedded: 1, previouslyRejected: 2 });
+  });
+
+  it('a refused profile is marked under its own tenant and skipped next time', async () => {
+    db.topics = [];
+    stubProvider((input) => (input.includes('t2') ? { ok: false, status: 400 } : { ok: true }));
+    expect(await runK1Embeddings()).toMatchObject({ profilesEmbedded: 1, rejected: 1 });
+    expect(db.profiles.find((p) => p.tenantId === 't2')!.embeddingHash).toMatch(new RegExp(`^${REJECTED_HASH_PREFIX}`));
+    expect(db.profileScopes.every((s) => s === 't1' || s === 't2')).toBe(true);
+    fetchMock.mockClear();
+    expect(await runK1Embeddings()).toMatchObject({ previouslyRejected: 1, profilesUpToDate: 1 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('every input refused means the request is wrong: the run stops after five', async () => {
+    db.topics = Array.from({ length: 8 }, (_, i) => topic(`t${i}`));
+    db.profiles = [];
+    stubProvider(() => ({ ok: false, status: 400 }));
+    const r = await runK1Embeddings();
+    expect(r).toMatchObject({ rejected: 5, aborted: true });
+    expect(fetchMock).toHaveBeenCalledTimes(5); // short texts: no prefix retry
+  });
+
+  it('a refused row between system failures does not reset their streak', async () => {
+    db.topics = ['a', 'b', 'c', 'd', 'e'].map((id) => topic(id));
+    db.profiles = [];
+    stubProvider((input) => (input.startsWith('Topic b') ? { ok: false, status: 400 } : { ok: false, status: 503 }));
+    const r = await runK1Embeddings();
+    // a 503, b 400 (marked), c 503, d 503: three system failures, the run stops before e.
+    expect(r).toMatchObject({ aborted: true, rejected: 1, failed: 4 });
+    expect(sent.map((x) => x.input.split('\n')[0])).toEqual(['Topic a', 'Topic b', 'Topic c', 'Topic d']);
+  });
+
+  it('needsEmbedding: a row marked refused for this text is not due; for another text it is', () => {
+    const h = embeddingHash('x');
+    expect(needsEmbedding({ hasEmbedding: false, embeddingHash: REJECTED_HASH_PREFIX + h }, h)).toBe(false);
+    expect(needsEmbedding({ hasEmbedding: true, embeddingHash: REJECTED_HASH_PREFIX + h }, h)).toBe(false);
+    expect(needsEmbedding({ hasEmbedding: false, embeddingHash: REJECTED_HASH_PREFIX + h }, embeddingHash('y'))).toBe(true);
+    expect(needsEmbedding({ hasEmbedding: false, embeddingHash: h }, h)).toBe(true);
+  });
+
+  it('a 400 does not reset the system-failure streak, and a 5xx on the prefix retry counts as one', async () => {
+    const el = tokenFixture.samples.find((x) => x.id === 'el-16k')!;
+    db.topics = [topic('a'), topic('b', { description: el.text }), topic('c'), topic('d')];
+    db.profiles = [];
+    // a: 503; b: 400 then its prefix 503; c: 503 -> three system failures in a row.
+    stubProvider((input) => (Buffer.byteLength(input) > 8191 ? { ok: false, status: 400 } : { ok: false, status: 503 }));
+    const r = await runK1Embeddings();
+    expect(r).toMatchObject({ aborted: true, rejected: 0, failed: 3 });
+    expect(db.topics.every((t) => t.embeddingHash === null)).toBe(true);
+  });
+
+  it('three system failures in a row stop the run (bad key, outage)', async () => {
     stubProvider(() => ({ ok: false, status: 401 }));
     const r = await runK1Embeddings();
     expect(fetchMock).toHaveBeenCalledTimes(3);
