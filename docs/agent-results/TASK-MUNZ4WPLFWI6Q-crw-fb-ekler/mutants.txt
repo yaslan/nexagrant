@@ -1,0 +1,25 @@
+KILLED  K7 RESTRICTED açık seviyeye eklenir :: Tests  2 failed | 59 passed (61)
+      × loadEvidenceItems reads only the open levels below edit_proposal 84ms
+      × MEMBER reads the open levels only; a confidential level in any spelling needs edit_proposal 455ms
+      FAIL  tests/evidence-upload-s3.live.test.ts > Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence > MEMBER reads the open levels only; a con
+      FAIL  tests/page-loader-tenant-scope.test.ts > every query a page loader issues carries the tenant > loadEvidenceItems reads only the open levels belo
+SURVIVED K8 seviye büyük/küçük harf duyarsız :: Tests  61 passed (61)
+KILLED  K9 kopya satırdan ÖNCE (D-3 sırası geri) :: Tests  3 failed | 58 passed (61)
+      × D-1 on the dev store: a PUT after confirm does not reach the recorded file 219ms
+      × A1: a PUT after confirm, same URL, type and length, leaves the recorded file as it was 138ms
+      × A2: a second confirm of the same key writes no second row and keeps the file 133ms
+      FAIL  tests/evidence-dev-store.live.test.ts > the download route serving the dev store > D-1 on the dev store: a PUT after confirm does not reach the 
+SURVIVED K13 page.tsx rolü yok sayar (herkes sahip gibi) :: Tests  61 passed (61)
+KILLED  K18 liste action view_proposal kapısı yok :: Tests  1 failed | 60 passed (61)
+      × A6: GUEST_PARTNER cannot download, list or score any evidence, CONFIDENTIAL included 171ms
+      FAIL  tests/evidence-upload-s3.live.test.ts > Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence > A6: GUEST_PARTNER cannot download, list 
+KILLED  K19 indirme confidentiality seçmez :: Tests  1 failed | 60 passed (61)
+      × MEMBER reads the open levels only; a confidential level in any spelling needs edit_proposal 582ms
+      FAIL  tests/evidence-upload-s3.live.test.ts > Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence > MEMBER reads the open levels only; a con
+SURVIVED K20 finalKey iç içe incoming reddi (düzeltme önerisi, ters mutant) :: Tests  61 passed (61)
+KILLED  K21 hata yolunda final kopya silinmez :: Tests  4 failed | 57 passed (61)
+      × bytes that are not the key’s type are stored by the route and refused by confirm, which removes them 338ms
+      × confirm refuses a stored object whose bytes are not the key’s type, and removes that one object 388ms
+      × confirm refuses a stored object whose content type is not the key’s, even with PDF bytes 260ms
+      × confirm refuses a stored object over the limit, whatever size the browser claims 1412ms
+git diff clean: True
