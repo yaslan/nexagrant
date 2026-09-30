@@ -1,0 +1,7 @@
+source "$(dirname "$0")/env.sh" 2>/dev/null || source /private/tmp/claude-501/-Users-macbook-alan/090021ea-c739-4c72-8da4-4b97074609f4/scratchpad/env.sh
+export CSFB_ADMIN_URL=$DATABASE_URL
+export DATABASE_URL=$DATABASE_URL_RLS_TEST
+export EVIDENCE_S3_TEST_ENDPOINT=http://127.0.0.1:59133
+export EVIDENCE_S3_TEST_BUCKET=evidence-test
+export EVIDENCE_S3_TEST_ACCESS_KEY=csfbg1
+export EVIDENCE_S3_TEST_SECRET_KEY=csfbg1-minio-secret
