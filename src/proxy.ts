@@ -51,15 +51,21 @@ export default proxy;
  * own matcher compiler (İNCELEME-57 Y-2): a matcher that stops covering pages
  * leaves them without a CSP and nothing else notices.
  *
- * Left out: `/api` (gets `API_CONTENT_SECURITY_POLICY` from next.config), Next's
+ * Left out: `/api/*` (gets `API_CONTENT_SECURITY_POLICY` from next.config), Next's
  * internals, and file extensions that are only ever static files — everything in
- * public/ and the favicon. Those need no policy and should not pay for a proxy
- * call. Any other dotted path (`/foo.bar`) is matched, so its 404 has a CSP.
+ * public/ and the favicon. Those need no nonce and should not pay for a proxy
+ * call; when no file is behind one, next.config gives the 404 the static
+ * `STATIC_FILE_CONTENT_SECURITY_POLICY`. The extension list is
+ * `STATIC_FILE_EXTENSIONS` — Next wants a literal here, the test keeps them equal.
+ * Any other dotted path (`/foo.bar`) is matched, so its 404 has a CSP.
+ *
+ * `api`, `_next` and `_vercel` are whole segments (İNCELEME-78 Y-1): without the
+ * `(?:/|$)`, `/apifoo`, `/api-docs` and `/_nextfoo` were skipped too.
  */
 export const config = {
   matcher: [
     '/',
     '/(tr|en)/:path*',
-    '/((?!api|_next|_vercel|.*\\.(?:ico|png|jpe?g|gif|webp|avif|svg|txt|xml|webmanifest|woff2?|ttf|css|js|map)$).*)'
+    '/((?!api(?:/|$)|_next(?:/|$)|_vercel(?:/|$)|.*\\.(?:ico|png|jpe?g|gif|webp|avif|svg|txt|xml|webmanifest|woff2?|ttf|css|js|map)$).*)'
   ]
 };

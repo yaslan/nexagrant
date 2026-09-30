@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import nextConfig from '../../next.config';
 import { createRequire } from 'node:module';
 import { getMiddlewareRouteMatcher } from 'next/dist/shared/lib/router/utils/middleware-route-matcher';
+import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match';
 import { config as proxyConfig, proxy } from '../proxy';
 
 // The compiler `next build` runs over `config.matcher`. Exported at runtime but not
@@ -17,12 +18,15 @@ import {
   API_CONTENT_SECURITY_POLICY,
   PRINT_BUTTON_HANDLER,
   PRINT_BUTTON_HANDLER_SHA256,
+  STATIC_FILE_CONTENT_SECURITY_POLICY,
+  STATIC_FILE_EXTENSIONS,
   STATIC_SECURITY_HEADERS,
   buildContentSecurityPolicy,
   cspHeaderName,
   cspOptionsFromEnv,
   CSP_REPORT_PATH,
   generateNonce,
+  staticFileNotFoundSource,
 } from './security-headers';
 
 /** `directive → values` so a test can ask about one directive without string-matching the rest. */
@@ -246,11 +250,18 @@ describe('proxy config.matcher (İNCELEME-57 Y-1 / Y-2)', () => {
     '/.env',
     '/.well-known/security.txt.bak',
     '/foo',
+    // İNCELEME-78 Y-1: `api` / `_next` are whole segments, not prefixes.
+    '/apifoo',
+    '/api-docs',
+    '/api.html',
+    '/_nextfoo',
+    '/_vercelx',
   ])('runs for %s', (pathname) => {
     expect(matches(pathname)).toBe(true);
   });
 
   it.each([
+    '/api',
     '/api/x',
     '/api/csp-report',
     '/api/auth/session',
@@ -304,5 +315,128 @@ describe('CSP reporting (İNCELEME-57 Ö-1)', () => {
 
   it('the report endpoint is under /api, so it gets the static API policy and never the page one', () => {
     expect(CSP_REPORT_PATH.startsWith('/api/')).toBe(true);
+  });
+});
+
+/**
+ * İNCELEME-78 Y-1 — who sets the CSP on each response. The proxy (nonce policy),
+ * `/api/:path*` (API policy) and the static-file rule (script-free 404 policy) are
+ * checked here with the functions Next itself matches with: `getMiddlewareMatchers`
+ * for the proxy, and `getPathMatch` with the router's header options
+ * (next/dist/server/lib/router-utils/filesystem.js `buildCustomRoute`). Where the
+ * proxy runs its header wins (measured on `next start`, see the report), so what
+ * decides a response is: proxy if it runs, else the header rule.
+ */
+describe('CSP coverage: proxy vs next.config headers (İNCELEME-78 Y-1)', () => {
+  const runs = getMiddlewareRouteMatcher(getMiddlewareMatchers(proxyConfig.matcher, {}));
+  const proxyRuns = (pathname: string) => runs(pathname, {} as never, {});
+  const resolved = (nextConfig as unknown as (phase: string) => Record<string, unknown>)('phase-test');
+  type Rule = { source: string; headers: { key: string; value: string }[] };
+  const rulesP = (resolved.headers as () => Promise<Rule[]>)();
+
+  const cspRules = async () =>
+    (await rulesP)
+      .map((r) => ({
+        value: r.headers.find((h) => h.key.toLowerCase() === 'content-security-policy')?.value,
+        match: getPathMatch(r.source, { strict: true, removeUnnamedParams: true, sensitive: false }),
+      }))
+      .filter((r): r is { value: string; match: ReturnType<typeof getPathMatch> } => !!r.value);
+
+  /** 'nonce' | 'api' | 'static' | 'none' — which policy the response carries. */
+  async function policyOf(pathname: string): Promise<string> {
+    if (proxyRuns(pathname)) return 'nonce';
+    const hits = (await cspRules()).filter((r) => r.match(pathname) !== false);
+    // Two header rules on one response: the later one wins silently. Never let that happen.
+    expect(hits.length, `${pathname}: ${hits.length} CSP header rules`).toBeLessThanOrEqual(1);
+    const [hit] = hits;
+    if (!hit) return 'none';
+    if (hit.value === API_CONTENT_SECURITY_POLICY) return 'api';
+    if (hit.value === STATIC_FILE_CONTENT_SECURITY_POLICY) return 'static';
+    return `unknown: ${hit.value}`;
+  }
+
+  it('the matcher skips exactly STATIC_FILE_EXTENSIONS (Next needs the matcher as a literal)', () => {
+    const catchAll = proxyConfig.matcher[2];
+    expect(catchAll).toContain(`.*\\.(?:${STATIC_FILE_EXTENSIONS})$`);
+  });
+
+  it('the static-file policy runs no script, reports nothing and cannot be framed', () => {
+    const csp = parseCsp(STATIC_FILE_CONTENT_SECURITY_POLICY);
+    expect(csp.get('default-src')).toEqual(["'none'"]);
+    expect(csp.has('script-src')).toBe(false);
+    expect(csp.get('frame-ancestors')).toEqual(["'none'"]);
+    expect(csp.get('base-uri')).toEqual(["'none'"]);
+    expect(csp.get('form-action')).toEqual(["'none'"]);
+    expect(csp.has('report-uri')).toBe(false);
+  });
+
+  it.each([
+    // No file behind a static-file path: Next's app 404, ~30 scripts.
+    ['/yok.png', 'static'],
+    ['/x.js', 'static'],
+    ['/robots.txt', 'static'],
+    ['/sitemap.xml', 'static'],
+    ['/.well-known/security.txt', 'static'],
+    ['/fonts/inter.woff2', 'static'],
+    ['/a/b/c.css', 'static'],
+    ['/a/logo.png', 'static'],
+    ['/api.png', 'static'],
+    ['/TR/yok.png', 'static'],
+    ['/_next/yok', 'static'],
+    ['/_next/yok.js', 'static'],
+    ['/_next', 'static'],
+    ['/_vercel/x', 'static'],
+    ['/_vercel/x.js', 'static'],
+    // The proxy runs (and its header replaces the static one where both match).
+    ['/yok.PNG', 'nonce'],
+    ['/tr/yok.png', 'nonce'],
+    ['/apifoo', 'nonce'],
+    ['/api-docs', 'nonce'],
+    ['/api.html', 'nonce'],
+    ['/_nextfoo', 'nonce'],
+    ['/foo.bar', 'nonce'],
+    ['/tr/yok', 'nonce'],
+    // API responses, 404 included.
+    ['/api', 'api'],
+    ['/api/yok', 'api'],
+    ['/api/yok.png', 'api'],
+    ['/API/x.png', 'api'],
+    // Real files: no CSP, cache headers untouched.
+    ['/logo.png', 'none'],
+    ['/favicon.ico', 'none'],
+    ['/_next/static/chunks/main.js', 'none'],
+    ['/_next/static/css/app.css', 'none'],
+    ['/_next/image', 'none'],
+  ])('%s → %s', async (pathname, expected) => {
+    expect(await policyOf(pathname)).toBe(expected);
+  });
+
+  it('every file in public/ goes out without a CSP; a missing sibling gets the static one', async () => {
+    const pub = path.join(process.cwd(), 'public');
+    const files = readdirSync(pub, { recursive: true, withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => `/${path.relative(pub, path.join(e.parentPath, e.name))}`);
+    expect(files.length).toBeGreaterThan(0);
+    for (const f of files) {
+      expect(await policyOf(f), f).toBe('none');
+      expect(await policyOf(`${f}.yok${path.extname(f)}`), `${f} sibling`).toBe('static');
+    }
+  });
+
+  it('a served file name is matched literally, not as a regex', () => {
+    const match = getPathMatch(staticFileNotFoundSource(['/a.b.png', '/(x)+.js']), {
+      strict: true,
+      removeUnnamedParams: true,
+      sensitive: false,
+    });
+    expect(match('/a.b.png')).toBe(false);
+    expect(match('/(x)+.js')).toBe(false);
+    expect(match('/aXb.png')).not.toBe(false);
+    expect(match('/xx.js')).not.toBe(false);
+  });
+
+  it('every static-file extension, on a path with no file, gets a CSP', async () => {
+    const exts = ['ico', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg', 'txt', 'xml', 'webmanifest', 'woff', 'woff2', 'ttf', 'css', 'js', 'map'];
+    for (const ext of exts) expect(await policyOf(`/yok.${ext}`), ext).toBe('static');
   });
 });
