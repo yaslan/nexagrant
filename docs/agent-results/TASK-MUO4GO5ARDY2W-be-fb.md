@@ -65,6 +65,8 @@ build exit=0
 ```
 İlk tam koşuda `teardown-where-guard` testi yeni dosyada `in: tenants` (yerel const) biçimini reddetti. Satırlar `in: presentIds(tenantIds)` olarak düzeltildi, sonra tam koşu, tsc ve lint yeniden koşuldu (yukarıdaki sonuçlar). Test sonrası sızıntı yok: `Tenant/Workspace/User` içinde `dts-%` sayımı 0/0/0.
 
+**Birleşik ağaç (dev `ce52d32c`):** Ben dallandıktan sonra dev'e 100 dosya (DOCX export) girdi. Bu kartın dosyalarıyla kesişmiyor (`git diff --name-only 6d7e5b51 955ef50b` bu kartın yollarında boş çıktı). Merge sonrası ağaçta şunlar koşuldu: `tsc=0`, `lint=0`, `vitest run tests/deleted-tenant-sessionless.live.test.ts tests/teardown-where-guard.test.ts tests/api src/lib/jobs` → `Test Files 21 passed · Tests 158 passed (158)`.
+
 ## 3. Tarama: kiracıyı oturumsuz çözen yollar
 
 | Yol | Kimlik | Silinmiş kiracı | Durum |
