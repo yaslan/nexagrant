@@ -1,0 +1,52 @@
+tsc --noEmit exit=0
+eslint src tests exit=0
+next build exit=0 (yukarıda, 1:14)
+load: { 5.60 12.60 17.29 }
+npx vitest run exit=1
+ FAIL  tests/action-missing-id.live.test.ts [ tests/action-missing-id.live.test.ts ]
+ FAIL  tests/agency-funnel.live.test.ts [ tests/agency-funnel.live.test.ts ]
+ FAIL  tests/agency-invite.live.test.ts [ tests/agency-invite.live.test.ts ]
+ FAIL  tests/agency-report.live.test.ts [ tests/agency-report.live.test.ts ]
+ FAIL  tests/billing-k1-tenant-scope.live.test.ts [ tests/billing-k1-tenant-scope.live.test.ts ]
+ FAIL  tests/consortium-find-candidates-pilot.live.test.ts [ tests/consortium-find-candidates-pilot.live.test.ts ]
+ FAIL  tests/evidence-object-key.live.test.ts [ tests/evidence-object-key.live.test.ts ]
+ FAIL  tests/invitation-accept.live.test.ts [ tests/invitation-accept.live.test.ts ]
+ FAIL  tests/invitation-mail-limit.live.test.ts [ tests/invitation-mail-limit.live.test.ts ]
+ FAIL  tests/iyzico-webhook-idempotency-rls.live.test.ts [ tests/iyzico-webhook-idempotency-rls.live.test.ts ]
+== 2. koşu (izole DB'ye fabrika_app rolü + rls.sql uygulandıktan sonra), load: { 14.41 14.86 17.82 }
+npx vitest run exit=1
+Error creating invitation: PrismaClientKnownRequestError: 
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: PrismaClientKnownRequestError: 
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: PrismaClientKnownRequestError: 
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: PrismaClientKnownRequestError: 
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: PrismaClientKnownRequestError: 
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: PrismaClientKnownRequestError: 
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: PrismaClientKnownRequestError: 
+Error creating invitation: PrismaClientKnownRequestError: 
+== 3. koşu (izole DB şeması dev schema.prisma'ya db push ile eşitlendi: ApiKey.rateWindow*, Membership.staleDigestOn, Relationship.staleRemindedContactAt — paylaşılan :5433 bu kolonlardan yoksun), load: { 38.95 23.66 20.89 }
+npx vitest run exit=1
+ Test Files  1 failed | 266 passed | 6 skipped (273)
+      Tests  9 failed | 3196 passed | 73 skipped (3278)
+ FAIL  tests/gdpr-data-subject.live.test.ts > GDPR accountability audit — live > a request and its cancellation are both recorded
+ FAIL  tests/gdpr-data-subject.live.test.ts > GDPR erasure request — live > marks the account soft-deleted and destroys nothing
+ FAIL  tests/gdpr-data-subject.live.test.ts > GDPR erasure request — live > warns that the subject is the sole owner of their tenant
+ FAIL  tests/gdpr-data-subject.live.test.ts > GDPR purge — live > detaches rather than destroys: the tenant keeps the work, minus the person
+ FAIL  tests/gdpr-data-subject.live.test.ts > GDPR purge — live > erases the due subject for real and leaves every other tenant intact
+ FAIL  tests/gdpr-data-subject.live.test.ts > GDPR purge — live > leaves no row still carrying the erased id in a column the database does not cascade
+ FAIL  tests/gdpr-data-subject.live.test.ts > GDPR purge — live > no OAuth calendar credential of the erased subject survives
+ FAIL  tests/gdpr-data-subject.live.test.ts > GDPR purge — live > the erased focal point is detached from the relationship, and the neighbour keeps theirs
+ FAIL  tests/gdpr-data-subject.live.test.ts > GDPR purge — live > writes an audit record that does not re-create the erased identifier
+== 3. koşudaki 9 kırmızı = benim sefb75_boom tetikleyicim (canlı sızıntı denemesinden kalmış; User BEFORE UPDATE). Silindi.
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+== 4. koşu (tam), load: { 88.75 52.13 33.32 }
+npx vitest run exit=0
+ Test Files  267 passed | 6 skipped (273)
+      Tests  3205 passed | 73 skipped (3278)

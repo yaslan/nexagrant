@@ -1,0 +1,11 @@
+-- mevcut sunucu (.env STRIPE_WEBHOOK_SECRET uzunluğu: 1 bayt), imzasız POST:
+Webhook Error: Missing STRIPE_WEBHOOK_SECRET  HTTP 400
+-- bozuk imza: HTTP 400 text/plain;charset=UTF-8 Webhook Error: No signatures found matching the expected signature for payload. Are you passing the raw request body you received from Stripe? 
+ If a webhook request is being forwarded by a third-party tool, ensure that the exact request body, including JSON formatting and new line style, is preserved.
+
+Learn more about webhook signing and explore webhook integration examples for various frameworks at https://docs.stripe.com/webhooks/signature
+
+-- imzalı, bilinmeyen abonelik (1. teslim): HTTP 500 application/json {"error":"internal_error"}
+-- aynı olay yeniden teslim (Stripe retry): HTTP 500 application/json {"error":"internal_error"}
+-- imzalı, işlenmeyen tip: HTTP 200 application/json {"received":true}
+-- StripeEventLog evt_sefb75_*: 0
