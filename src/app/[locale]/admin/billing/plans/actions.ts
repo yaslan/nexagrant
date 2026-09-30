@@ -17,6 +17,7 @@
  */
 
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import { requirePlatformAdmin } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
 import {
@@ -60,6 +61,15 @@ function planFailure(e: unknown, action: string): ActionFailure {
 function revalidate() {
   revalidatePath('/[locale]/admin/billing/plans', 'page');
 }
+
+/**
+ * A server action's arguments arrive through Flight, not through TypeScript:
+ * `visibility` can be any string, and `Plan.visibility` is a text column, so an
+ * unknown value used to be stored and the plan dropped out of every shopfront
+ * list (İNCELEME-94 G-1). `satisfies` keeps this list equal to PlanVisibility.
+ */
+const VISIBILITIES = { public: true, private: true, archived: true } satisfies Record<PlanVisibility, true>;
+const visibilitySchema = z.enum(Object.keys(VISIBILITIES) as [PlanVisibility, ...PlanVisibility[]]);
 
 /**
  * Open a draft and hand the whole row back.
@@ -144,7 +154,12 @@ export async function setVisibilityAction(
 ): Promise<ActionResult> {
   try {
     const { userId } = await requirePlatformAdmin();
-    await setPlanVisibility(planId, visibility, userId);
+    const parsed = visibilitySchema.safeParse(visibility);
+    if (!parsed.success) {
+      logger.warn('[admin/plans] setVisibility refused', { code: 'INVALID_VISIBILITY' });
+      return { ok: false, code: 'INVALID_VISIBILITY' };
+    }
+    await setPlanVisibility(planId, parsed.data, userId);
     revalidate();
     return { ok: true };
   } catch (e) {

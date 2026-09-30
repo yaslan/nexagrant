@@ -1,0 +1,13 @@
+[admin, geçersiz "csfb-acb"] args=["ultra","csfb-acb"] HTTP 200 sonuç={"ok":false,"code":"INVALID_VISIBILITY"} | Plan.visibility public→public | audit 0→0 | BEKLENEN
+[admin, geçersiz "PUBLIC"] args=["ultra","PUBLIC"] HTTP 200 sonuç={"ok":false,"code":"INVALID_VISIBILITY"} | Plan.visibility public→public | audit 0→0 | BEKLENEN
+[admin, geçersiz ""] args=["ultra",""] HTTP 200 sonuç={"ok":false,"code":"INVALID_VISIBILITY"} | Plan.visibility public→public | audit 0→0 | BEKLENEN
+[admin, geçersiz "public "] args=["ultra","public "] HTTP 200 sonuç={"ok":false,"code":"INVALID_VISIBILITY"} | Plan.visibility public→public | audit 0→0 | BEKLENEN
+[admin, geçersiz "archived\u0000"] args=["ultra","archived\u0000"] HTTP 200 sonuç={"ok":false,"code":"INVALID_VISIBILITY"} | Plan.visibility public→public | audit 0→0 | BEKLENEN
+[admin, dize olmayan null] args=["ultra",null] HTTP 200 sonuç={"ok":false,"code":"INVALID_VISIBILITY"} | Plan.visibility public→public | audit 0→0 | BEKLENEN
+[admin, dize olmayan 42] args=["ultra",42] HTTP 200 sonuç={"ok":false,"code":"INVALID_VISIBILITY"} | Plan.visibility public→public | audit 0→0 | BEKLENEN
+[admin, dize olmayan ["public"]] args=["ultra",["public"]] HTTP 200 sonuç={"ok":false,"code":"INVALID_VISIBILITY"} | Plan.visibility public→public | audit 0→0 | BEKLENEN
+[admin, dize olmayan {"v":"public"}] args=["ultra",{"v":"public"}] HTTP 200 sonuç={"ok":false,"code":"INVALID_VISIBILITY"} | Plan.visibility public→public | audit 0→0 | BEKLENEN
+[üye (admin değil), geçersiz] args=["ultra","csfb-acb"] HTTP 200 sonuç={"ok":false,"code":"PLATFORM_ADMIN_REQUIRED"} | Plan.visibility public→public | audit 0→0 | BEKLENEN
+[admin, geçerli private] args=["ultra","private"] HTTP 200 sonuç={"ok":true} | Plan.visibility public→private | audit 0→1 | BEKLENEN
+[admin, geri public] args=["ultra","public"] HTTP 200 sonuç={"ok":true} | Plan.visibility private→public | audit 1→2 | BEKLENEN
+SONUÇ: 12/12 beklenen; son Plan.visibility=public
