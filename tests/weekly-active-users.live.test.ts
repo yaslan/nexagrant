@@ -43,8 +43,10 @@ const ids = { tenantA: '', tenantB: '', userA: '', userB: '', userOther: '', pla
 const tr = (local: string) => new Date(`${local}+03:00`);
 
 beforeAll(async () => {
-  if (!requireRlsTestUrl(RLS_URL, SUITE) || !ADMIN_URL) return;
-  rls = createDbClient(RLS_URL!);
+  const rlsUrl = requireRlsTestUrl(RLS_URL, SUITE);
+  if (!ADMIN_URL) skipOrFailInCi(SUITE, 'DATABASE_URL is not set');
+  if (!rlsUrl || !ADMIN_URL) return;
+  rls = createDbClient(rlsUrl);
   admin = createDbClient(ADMIN_URL);
   const reachable = await rls.$queryRaw`SELECT 1`.then(() => true).catch(() => false);
   if (!reachable) {
