@@ -87,6 +87,11 @@ typecheck rc=0 · lint rc=0 · i18n ✅ both catalogs agree · build rc=0
 CI=true npx vitest run (izole DB + MinIO env):
   Test Files 293 passed | 2 skipped (295) · Tests 3622 passed | 9 skipped (3631) · rc=0
 ```
+**Birleşik ağaç** (dev `12fa4b1e` dalıma merge edildikten sonra, `gates-merged.txt`). Dev'deki 45 dosyalık değişiklik benim dosyalarıma ve şemaya dokunmuyor.
+```
+typecheck rc=0 · lint rc=0 · i18n ✅ · build rc=0
+CI=true npx vitest run: Test Files 294 passed | 2 skipped (296) · Tests 3696 passed | 9 skipped (3705) · rc=0
+```
 İlk tam koşuda 3 dosya import anında kırmızıydı: `auth-jwt-membership-refresh`, `invitation-accept` ve `oauth-registration`. Hepsi "refusing to skip in CI — AUTH_SECRET is not set" hatası veriyordu; bu benim ortamımdaki bir eksikti, kodla ilgisi yok. Test için ayrı bir `AUTH_SECRET` ile üç dosya 46/46 geçti (`rerun-3.txt`). Ardından tam koşu baştan tekrarlandı ve yukarıdaki temiz sonucu verdi.
 
 ## 3. Değişen dosyalar
