@@ -146,6 +146,15 @@ describe('cspOptionsFromEnv / cspHeaderName', () => {
     expect(cspOptionsFromEnv('n', env({ NODE_ENV: 'production' })).isDev).toBe(false);
   });
 
+  it('only NODE_ENV=development loosens script-src; an unset or odd NODE_ENV does not', () => {
+    // A server started without NODE_ENV (or with 'test'/'staging') must not get 'unsafe-eval'.
+    expect(cspOptionsFromEnv('n', env({})).isDev, 'unset').toBe(false);
+    for (const NODE_ENV of ['', 'test', 'staging', 'Production']) {
+      expect(cspOptionsFromEnv('n', env({ NODE_ENV })).isDev, NODE_ENV).toBe(false);
+    }
+    expect(cspOptionsFromEnv('n', env({ NODE_ENV: 'development' })).isDev).toBe(true);
+  });
+
   it('enforces by default; CSP_MODE=report-only is the rollback switch', () => {
     expect(cspHeaderName(env({}))).toBe('Content-Security-Policy');
     expect(cspHeaderName(env({ CSP_MODE: 'enforce' }))).toBe('Content-Security-Policy');
