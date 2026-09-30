@@ -154,8 +154,8 @@ vitest run (tam, izole DB) → Test Files 1 failed | 284 passed | 6 skipped (291
 1. **Düzeltme kartı (crw-fb):** Y-1 (tip ve kontrol karakteri doğrulaması + tampona yalnız bağlantı hatasında düşme + 3 test); tercihen O-1 ve Ö-4 de aynı kartta.
 2. **Ayrı kartlar:** pano ve (app) okumalarını `[workspace]` ile kapsamak; `createOpportunity` için M5 modül kapısı.
 3. **Bilgi notları:**
-   - **Ö-3:** `ConceptNote.content` JSON `null` olunca export 500 veriyor (`export/route.ts:82` `content[section.key]`). Bu değer yalnız doğrudan DB yazımıyla oluşuyor, çünkü Prisma zorunlu Json alanında `null`'ı reddediyor. `content ?? {}` yeterli. `m2/server/actions.ts:209`'da da aynı kalıp var.
+   - **Ö-3:** `ConceptNote.content` JSON `null` olunca export 500 veriyor (`export/route.ts:82` `content[section.key]`). Bu değer yalnız doğrudan DB yazımıyla oluşuyor, çünkü Prisma zorunlu Json alanında `null`'ı reddediyor. `content ?? {}` yeterli. `m2/server/actions.ts:210`'da da aynı kalıp var.
    - **Ö-4:** eşit `createdAt` için id kırıcısını tutan bir test.
-4. **Temizlik:** kendi `next start` (:3583) ve `next dev` (:3584) süreçlerim durduruldu. `csfb83-pg` konteyneri ve `wt83` worktree'si rapordan sonra siliniyor. Paylaşılan `:5433`'e hiç dokunulmadı.
+4. **Temizlik:** kendi `next start` (:3583) ve `next dev` (:3584) süreçlerim durduruldu. `csfb83-pg` konteyneri ve `wt83` worktree'si silindi (`docker rm -f`, `git worktree remove`). Paylaşılan `:5433`'e hiç dokunulmadı.
 
 **Sonuç dosyası yolu notu:** Görev ekindeki "KANIT ZORUNLU" satırı `/Users/macbook/alan/docs/agent-results/TASK-MUNYY62H1L86X-fe-fb.md` yolunu veriyordu. Bu, incelenen zincirdeki fe-fb raporunun adı ve FONBRIDGE reposunun dışında. Başka ajanın raporunun üzerine yazmamak için görev gövdesindeki SONUÇ DOSYASI yolu kullanıldı: `FONBRIDGE/docs/agent-results/TASK-MUO3BD4PCJLKI-cs-fb.md`.
