@@ -1,0 +1,40 @@
+# B-O3-MAX_IMAGE-halved [be-fb] src/lib/docx-safe-html.ts
+# - 'export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;'
+# + 'export const MAX_IMAGE_BYTES = 1 * 1024 * 1024;'
+# restored_clean=True
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ddace75c-be72-4b5d-ab0e-0cce77253d82/scratchpad/wt
+
+ ❯ src/app/api/concept-notes/[id]/export/route.edge.test.ts (10 tests | 1 failed) 98ms
+     × B-1 K4: the image budget is per document — two sections cannot each spend it 3ms
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  1 failed | 102 passed (103)
+   Start at  22:11:48
+   Duration  2.15s (transform 295ms, setup 0ms, import 1.08s, tests 2.27s, environment 0ms)
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/api/concept-notes/[id]/export/route.edge.test.ts > concept-note DOCX export — İNCELEME-53 follow-ups (TASK-MUNDTW8O2IV6V) > B-1 K4: the image budget is per document — two sections cannot each spend it
+AssertionError: expected 8 to be 4 // Object.is equality
+
+- Expected
++ Received
+
+- 4
++ 8
+
+ ❯ src/app/api/concept-notes/[id]/export/route.edge.test.ts:149:60
+    147|     const big = Buffer.concat([PNG, Buffer.alloc(MAX_IMAGE_BYTES - 100…
+    148|     expect(3 * big.length).toBeLessThan(MAX_TOTAL_IMAGE_BYTES);
+    149|     expect(Math.floor(MAX_TOTAL_IMAGE_BYTES / big.length)).toBe(4);
+       |                                                            ^
+    150|     const three = img(big).repeat(3);
+    151|     seed({ a: `<p>A</p>${three}`, b: `<p>B</p>${three}` });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -1,0 +1,88 @@
+# O5-slash-not-unsafe [Ö-5] src/lib/content-disposition.ts
+# - '\\u2066-\\u2069\\\\/:*?'
+# + '\\u2066-\\u2069\\\\:*?'
+# restored_clean=True
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ddace75c-be72-4b5d-ab0e-0cce77253d82/scratchpad/wt
+
+ ❯ src/lib/content-disposition.test.ts (10 tests | 4 failed) 116ms
+     × filename* round-trips Turkish letters and emoji; only path separators and quotes change 3ms
+     × the ASCII fallback transliterates Turkish letters and drops what ASCII cannot carry 1ms
+     × no header or path injection: quotes, backslash, CR/LF, ; and path parts are neutralised 1ms
+     × digits only ("2030") uses the digits in ASCII; slashes-only ("///") falls back (Ö-5) 1ms
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  4 failed | 91 passed (95)
+   Start at  22:01:39
+   Duration  23.52s (transform 1.02s, setup 0ms, import 7.71s, tests 33.76s, environment 0ms)
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/content-disposition.test.ts > attachmentContentDisposition (TASK-MUNDTW8O2IV6V, İNCELEME-53 B-3) > filename* round-trips Turkish letters and emoji; only path separators and quotes change
+AssertionError: expected 'Çağrı_ Kırsal İklim Öncüleri — şebeke…' to be 'Çağrı_ Kırsal İklim Öncüleri — şebeke…' // Object.is equality
+
+Expected: "Çağrı_ Kırsal İklim Öncüleri — şebeke_güneş “pilot” 🚀 👩‍💻.docx"
+Received: "Çağrı_ Kırsal İklim Öncüleri — şebeke/güneş “pilot” 🚀 👩‍💻.docx"
+
+ ❯ src/lib/content-disposition.test.ts:27:33
+     25|   it('filename* round-trips Turkish letters and emoji; only path separ…
+     26|     const header = attachmentContentDisposition(title, '.docx', 'Conce…
+     27|     expect(decodedStar(header)).toBe('Çağrı_ Kırsal İklim Öncüleri — ş…
+       |                                 ^
+     28|   });
+     29|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/lib/content-disposition.test.ts > attachmentContentDisposition (TASK-MUNDTW8O2IV6V, İNCELEME-53 B-3) > the ASCII fallback transliterates Turkish letters and drops what ASCII cannot carry
+AssertionError: expected 'Cagri_ Kirsal Iklim Onculeri sebeke/g…' to be 'Cagri_ Kirsal Iklim Onculeri sebeke_g…' // Object.is equality
+
+Expected: "Cagri_ Kirsal Iklim Onculeri sebeke_gunes pilot.docx"
+Received: "Cagri_ Kirsal Iklim Onculeri sebeke/gunes pilot.docx"
+
+ ❯ src/lib/content-disposition.test.ts:32:31
+     30|   it('the ASCII fallback transliterates Turkish letters and drops what…
+     31|     const header = attachmentContentDisposition(title, '.docx', 'Conce…
+     32|     expect(asciiPart(header)).toBe('Cagri_ Kirsal Iklim Onculeri sebek…
+       |                               ^
+     33|     expect(asciiPart(attachmentContentDisposition('çğıİöşüÇĞÖŞÜ', '.do…
+     34|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/lib/content-disposition.test.ts > attachmentContentDisposition (TASK-MUNDTW8O2IV6V, İNCELEME-53 B-3) > no header or path injection: quotes, backslash, CR/LF, ; and path parts are neutralised
+AssertionError: expected 'a_; filename=evil.exe__X-Injected_ 1_…' to be 'a_; filename=evil.exe__X-Injected_ 1_…' // Object.is equality
+
+Expected: "a_; filename=evil.exe__X-Injected_ 1_.._..__etc.docx"
+Received: "a_; filename=evil.exe__X-Injected_ 1_.._..//etc.docx"
+
+ ❯ src/lib/content-disposition.test.ts:45:31
+     43|     const header = attachmentContentDisposition('a"; filename=evil.exe…
+     44|     expect(header).not.toMatch(/[\r\n]/);
+     45|     expect(asciiPart(header)).toBe('a_; filename=evil.exe__X-Injected_…
+       |                               ^
+     46|     expect(decodedStar(header)).toBe('a_; filename=evil.exe__X-Injecte…
+     47|     // RFC 5987: ' ( ) are not attr-chars and must be percent-encoded …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/lib/content-disposition.test.ts > attachmentContentDisposition (TASK-MUNDTW8O2IV6V, İNCELEME-53 B-3) > digits only ("2030") uses the digits in ASCII; slashes-only ("///") falls back (Ö-5)
+AssertionError: expected '///.docx' to be '___.docx' // Object.is equality
+
+Expected: "___.docx"
+Received: "///.docx"
+
+ ❯ src/lib/content-disposition.test.ts:81:38
+     79|     const slashesOnly = attachmentContentDisposition('///', '.docx', '…
+     80|     expect(asciiPart(slashesOnly)).toBe('ConceptNote.docx');
+     81|     expect(decodedStar(slashesOnly)).toBe('___.docx');
+       |                                      ^
+     82|   });
+     83|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
