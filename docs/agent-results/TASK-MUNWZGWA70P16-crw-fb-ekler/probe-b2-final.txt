@@ -1,0 +1,6 @@
+tr/calls distinct-links=20 old-style=/tr/calls/<ID>:0 signed-out-codes: 20 200 
+tr/calls/germany distinct-links=18 old-style=/tr/calls/<ID>:0 signed-out-codes: 18 200 
+en/calls distinct-links=20 old-style=/en/calls/<ID>:0 signed-out-codes: 20 200 
+en/calls/germany distinct-links=18 old-style=/en/calls/<ID>:0 signed-out-codes: 18 200 
+sitemap.xml 404 · robots.txt 404
+detail signed-out: /tr/default/cagrilar/EUROSTARS-2026-01-01 -> 307 http://127.0.0.1:47181/tr/giris
