@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
@@ -85,6 +86,25 @@ const SRC = path.join(REPO_ROOT, 'src');
  *     model accessor handed to a function (`f(tx.evidence)`) all count as
  *     writes.
  *
+ * TASK-MUO4GP1P89HS7 (İNCELEME-80 Y-1/Y-2/Ö-1, se-fb Y-3):
+ *
+ *   - every file the build compiles is a source: `.js`/`.jsx`/`.mjs`/`.cjs`/
+ *     `.mts`/`.cts` too (tsconfig `allowJs`), scanned for 'use server' and
+ *     resolved like TS does (`./x.js` → `x.ts`, `./x.mjs` → `x.mts`); each is
+ *     parsed as what it is, so a `.ts` file's `<T>expr` is not read as JSX;
+ *   - an `@/` or relative specifier is normalized, and one that names no file
+ *     under src/ is a write the guard cannot see past (fail-closed), not a
+ *     package;
+ *   - a constant `import('<spec>')` into src/ is followed by name only as a
+ *     member (`(await import(x)).f`) or a `const` in a function holding it or
+ *     destructuring it flat; any other shape (`?:`, `Promise.all`, a
+ *     top-level `const`, nested destructuring, `let`, a callback) and every
+ *     constant `require('<spec>')` stand for the whole module;
+ *   - what a function or value reached from an action writes is walked once
+ *     per depth and reused for every caller (a check before the call only
+ *     moves its writes out of "unchecked"), unless a recursion stop outside
+ *     that walk cut it short.
+ *
  * `<Action>` must be a literal (or a same-file `const`) that rbac.ts declares.
  * Every write must come after such a check on its own path: a check inside a
  * `withTenant` callback covers the writes after it in that callback only, and
@@ -100,7 +120,7 @@ const SRC = path.join(REPO_ROOT, 'src');
  * (tests/server-action-rbac.test.ts) and review:
  *   - a model accessor kept in an object or a collection (`{ ev: tx.evidence
  *     }`, `[tx.evidence]`) or chosen at run time (`tx[model].deleteMany`);
- *   - `require`, `import()` of a computed specifier, `eval`, getters, Proxies;
+ *   - `require()` / `import()` of a computed specifier, `eval`, getters, Proxies;
  *   - a session object mutated through a call (`Object.assign(scope, …)`) or
  *     through another alias of it;
  *   - what TRUSTED modules do — they are what the actions are checked against.
@@ -234,13 +254,48 @@ export const ALLOWED: Record<string, string> = {
 
 // ──────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Source files the build compiles (TASK-MUO4GP1P89HS7, İNCELEME-80 Y-1):
+ * tsconfig has `allowJs` and includes `.mts` files, and the bundler takes
+ * `.js`/`.jsx`/`.mjs`/`.cjs`/`.cts` too, so a 'use server' module or a writer
+ * in any of them is scanned and walked like a `.ts` one.
+ */
+const SOURCE_FILE = /\.(tsx?|jsx?|[mc][tj]s)$/;
+const NOT_SOURCE = /\.test\.|\.spec\.|\.d\.[mc]?ts$|\.d\.[^.]+\.ts$/;
+/** Resolution order for a specifier without an extension (TS `bundler`, then JS). */
+const CODE_EXTS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
+/** What an explicit extension may stand for (TS maps `.js` to `.ts`/`.tsx`, `.mjs` to `.mts`). */
+const EXT_MAP: Record<string, string[]> = {
+  '.js': ['.ts', '.tsx', '.js', '.jsx'],
+  '.jsx': ['.tsx', '.jsx'],
+  '.mjs': ['.mts', '.mjs'],
+  '.cjs': ['.cts', '.cjs'],
+  '.ts': ['.ts'],
+  '.tsx': ['.tsx'],
+  '.mts': ['.mts'],
+  '.cts': ['.cts'],
+};
+
+/**
+ * How the file is parsed. A `.ts` file parsed as TSX reads `<any>tx.x.delete()`
+ * as a JSX element and never sees the write (se-fb, TASK-MUO4GP1P89HS7 Y-3),
+ * while tsc takes it as a type assertion.
+ */
+function scriptKindOf(file: string): ts.ScriptKind {
+  if (/\.tsx$/.test(file)) return ts.ScriptKind.TSX;
+  if (/\.[mc]?ts$/.test(file)) return ts.ScriptKind.TS;
+  if (/\.jsx$/.test(file)) return ts.ScriptKind.JSX;
+  // `.js` may hold JSX (Next compiles it so); JSX kind reads plain JS the same.
+  return ts.ScriptKind.JSX;
+}
+
 function sourceFiles(dir: string): string[] {
   const found: string[] = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (entry.name !== '__tests__') found.push(...sourceFiles(full));
-    } else if (/\.tsx?$/.test(entry.name) && !/\.test\.|\.spec\.|\.d\.ts$/.test(entry.name)) found.push(full);
+    } else if (SOURCE_FILE.test(entry.name) && !NOT_SOURCE.test(entry.name)) found.push(full);
   }
   return found;
 }
@@ -287,7 +342,10 @@ function strip(e: ts.Expression): ts.Expression {
 }
 
 interface Import {
-  /** Module under src/ without extension (`lib/rbac`), or null outside src/. */
+  /**
+   * Module under src/ without extension (`lib/rbac`), null outside src/, or
+   * `?<path under src/>` for one that resolves to no file (fail-closed).
+   */
   target: string | null;
   /** The name it has there: `default`, `*` for a namespace, or the export name. */
   name: string;
@@ -297,6 +355,8 @@ interface Module {
   sf: ts.SourceFile;
   /** Module under src/ without extension. */
   id: string;
+  /** Normalized specifier bases it imports, to tell whether an overlay can change them. */
+  specs: Set<string>;
   /** Top-level functions by name (`default` for an anonymous default export). */
   all: Map<string, Fn>;
   /**
@@ -324,20 +384,62 @@ interface Module {
 /** Test-only source overrides by module id, for the multi-module mutants below. */
 type Overlay = Record<string, string>;
 
-const EXTENSIONS = ['.ts', '.tsx', '/index.ts', '/index.tsx'];
+/** A module id for a specifier inside src/ that names no file: whatever it is, the guard cannot see it. */
+const UNRESOLVED = '?';
+const isUnresolved = (id: string) => id.startsWith(UNRESOLVED);
 
-/** `@/x/y` or `./y` from module `from` → a module id under src/ that exists, or null. */
-function resolveSpec(from: string, spec: string, overlay: Overlay): string | null {
+const existing = new Map<string, boolean>();
+/** A file under src/ (the tree does not change during a run). */
+function exists(rel: string): boolean {
+  let hit = existing.get(rel);
+  if (hit === undefined) existing.set(rel, (hit = fs.existsSync(path.join(SRC, rel)) && fs.statSync(path.join(SRC, rel)).isFile()));
+  return hit;
+}
+
+/** The file a module id stands for: the id itself when it carries a code extension, else the first of CODE_EXTS. */
+function fileOfId(id: string, overlay: Overlay): string | null {
+  if (id in overlay) return SOURCE_FILE.test(id) ? id : `${id}.ts`;
+  if (SOURCE_FILE.test(id) && exists(id)) return id;
+  const ext = CODE_EXTS.find((x) => exists(id + x));
+  return ext ? id + ext : null;
+}
+
+/** `@/x/y` or `./y` from module `from` → its path under src/, normalized (İNCELEME-80 D-2); null outside src/. */
+function specBase(from: string, spec: string): string | null {
   let base: string;
-  if (spec.startsWith('@/')) base = spec.slice(2);
+  if (spec.startsWith('@/')) base = path.posix.normalize(spec.slice(2));
   else if (spec.startsWith('.')) base = path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
   else return null;
-  base = base.replace(/\.(tsx?|jsx?)$/, '');
-  if (base in overlay) return base;
-  for (const ext of EXTENSIONS) {
-    if (fs.existsSync(path.join(SRC, base + ext))) return ext.startsWith('/index') ? `${base}/index` : base;
+  base = base.replace(/\/+$/, '');
+  return base === '..' || base.startsWith('../') ? null : base;
+}
+
+/**
+ * `@/x/y` or `./y` from module `from` → a module id under src/, null for a
+ * package, a path out of src/ or a file that is not code (`.json`, `.css`), or
+ * `?<path>` for a specifier into src/ that names no file (İNCELEME-80 Y-1: it
+ * used to be taken for a package and passed silently).
+ */
+function resolveSpec(from: string, spec: string, overlay: Overlay): string | null {
+  const base = specBase(from, spec);
+  if (base === null) return null;
+  const ext = path.posix.extname(base);
+  const mapped = EXT_MAP[ext];
+  const stem = mapped ? base.slice(0, -ext.length) : base;
+  // The overlay stands in for files: `lib/x` (a `.ts`) or `lib/x.js`.
+  if (stem in overlay) return stem;
+  for (const x of mapped ?? CODE_EXTS) if (stem + x in overlay) return stem + x;
+  if (!mapped && `${stem}/index` in overlay) return `${stem}/index`;
+  for (const x of mapped ? [] : CODE_EXTS) if (`${stem}/index${x}` in overlay) return `${stem}/index${x}`;
+  // A file that is not code: nothing to walk.
+  if (!mapped && exists(base)) return null;
+  const candidates = mapped ? mapped.map((x) => [stem, x]) : [...CODE_EXTS.map((x) => [stem, x]), ...CODE_EXTS.map((x) => [`${stem}/index`, x])];
+  for (const [id, x] of candidates) {
+    if (!exists(id! + x)) continue;
+    // `lib/x` names its first file in CODE_EXTS order; another one keeps its extension in the id.
+    return fileOfId(id!, overlay) === id! + x ? id! : id! + x;
   }
-  return null;
+  return UNRESOLVED + base;
 }
 
 /** The model a receiver names: `x.evidence`, `x['evidence']`, `evidence`, or an alias of one. */
@@ -389,6 +491,12 @@ function moduleOf(
   const reexports: Module['reexports'] = [];
   const badExports: Finding[] = [];
   const exportLists: ts.ExportDeclaration[] = [];
+  const specs = new Set<string>();
+  const resolve = (spec: string) => {
+    const base = specBase(id, spec);
+    if (base !== null) specs.add(base);
+    return resolveSpec(id, spec, overlay);
+  };
   const at = (node: ts.Node) => sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
   for (const stmt of sf.statements) {
     if (ts.isFunctionDeclaration(stmt) && stmt.body) {
@@ -444,7 +552,7 @@ function moduleOf(
       if (hasExport(stmt)) exportsAll.set(hasModifier(stmt, ts.SyntaxKind.DefaultKeyword) ? 'default' : stmt.name.text, stmt.name.text);
     } else if (ts.isExportDeclaration(stmt) && !stmt.isTypeOnly) {
       if (stmt.moduleSpecifier && ts.isStringLiteral(stmt.moduleSpecifier)) {
-        const target = resolveSpec(id, stmt.moduleSpecifier.text, overlay);
+        const target = resolve(stmt.moduleSpecifier.text);
         if (!stmt.exportClause) reexports.push({ target, from: null, to: null });
         // `export * as ns from` (İNCELEME-74 R4).
         else if (ts.isNamespaceExport(stmt.exportClause)) reexports.push({ target, from: '*', to: stmt.exportClause.name.text });
@@ -456,7 +564,7 @@ function moduleOf(
       }
       exportLists.push(stmt);
     } else if (ts.isImportDeclaration(stmt) && stmt.importClause && !stmt.importClause.isTypeOnly) {
-      const target = ts.isStringLiteral(stmt.moduleSpecifier) ? resolveSpec(id, stmt.moduleSpecifier.text, overlay) : null;
+      const target = ts.isStringLiteral(stmt.moduleSpecifier) ? resolve(stmt.moduleSpecifier.text) : null;
       const clause = stmt.importClause;
       if (clause.name) imports.set(clause.name.text, { target, name: 'default' });
       const bindings = clause.namedBindings;
@@ -492,6 +600,7 @@ function moduleOf(
   const mod: Module = {
     sf,
     id,
+    specs,
     all,
     values,
     consts,
@@ -509,20 +618,23 @@ const moduleCache = new WeakMap<Overlay, Map<string, Module | null>>();
 const NO_OVERLAY: Overlay = {};
 
 function loadModule(id: string, overlay: Overlay): Module | null {
+  if (isUnresolved(id)) return null;
   let cache = moduleCache.get(overlay);
   if (!cache) moduleCache.set(overlay, (cache = new Map()));
   if (cache.has(id)) return cache.get(id)!;
-  let text: string | undefined = overlay[id];
-  let file = `${id}.ts`;
-  if (text === undefined) {
-    const ext = ['.ts', '.tsx'].find((x) => fs.existsSync(path.join(SRC, id + x)));
-    file = ext ? id + ext : file;
-    text = ext ? fs.readFileSync(path.join(SRC, file), 'utf8') : undefined;
+  let mod: Module | null = null;
+  const file = fileOfId(id, overlay);
+  if (file && id in overlay) {
+    mod = moduleOf(id, ts.createSourceFile(file, overlay[id]!, ts.ScriptTarget.Latest, true, scriptKindOf(file)), overlay).mod;
+  } else if (file && overlay !== NO_OVERLAY) {
+    // A file of the tree is parsed once for every overlay (TASK-MUO4GP1P89HS7
+    // Ö-1); its imports are resolved again only when the overlay names one.
+    const real = loadModule(id, NO_OVERLAY);
+    const shadowed = real && [...real.specs].some((b) => b in overlay || CODE_EXTS.some((x) => b + x in overlay) || `${b}/index` in overlay);
+    mod = real && shadowed ? moduleOf(id, real.sf, overlay).mod : real;
+  } else if (file) {
+    mod = moduleOf(id, ts.createSourceFile(file, fs.readFileSync(path.join(SRC, file), 'utf8'), ts.ScriptTarget.Latest, true, scriptKindOf(file)), overlay).mod;
   }
-  const mod =
-    text === undefined
-      ? null
-      : moduleOf(id, ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX), overlay).mod;
   cache.set(id, mod);
   return mod;
 }
@@ -534,10 +646,11 @@ function loadModule(id: string, overlay: Overlay): Module | null {
  * or null — a name the guard could not find, which the walk treats as the
  * whole module (fail-closed).
  */
-type Resolved = { mod: Module; node: Fn | ts.Node; name: string } | { ns: string } | { external: true } | null;
+type Resolved = { mod: Module; node: Fn | ts.Node; name: string } | { ns: string } | { external: true } | { unresolved: string } | null;
 // `external`: outside src/, or a string constant — nothing to walk.
 
 function resolveExport(id: string, name: string, overlay: Overlay, seen = new Set<string>()): Resolved {
+  if (isUnresolved(id)) return { unresolved: id };
   const key = `${id}#${name}`;
   if (seen.has(key)) return null;
   seen.add(key);
@@ -591,7 +704,14 @@ function bindingIn(name: ts.BindingName, target: string): ts.Node | null {
  * function or value). Hoisting is kept: a declaration later in the block is
  * found all the same (İNCELEME-74 D-1, D-3).
  */
+const bindings = new WeakMap<ts.Identifier, ts.Node | null>();
 function localBinding(id: ts.Identifier): ts.Node | null {
+  let found = bindings.get(id);
+  if (found === undefined) bindings.set(id, (found = findBinding(id)));
+  return found;
+}
+
+function findBinding(id: ts.Identifier): ts.Node | null {
   const name = id.text;
   for (let n: ts.Node = id.parent; n && !ts.isSourceFile(n); n = n.parent) {
     if (isFn(n)) {
@@ -649,7 +769,14 @@ function checkName(call: ts.CallExpression, mod: Module): string | null {
  * to a property of it: `role = 'X'`, `scope.role = 'X'`, `s['role'] = …`, `++`
  * (İNCELEME-74 Y-2: a `const` object is still mutable).
  */
+const writtenCache = new WeakMap<ts.Node, boolean>();
 function writtenTo(decl: ts.Node): boolean {
+  let hit = writtenCache.get(decl);
+  if (hit === undefined) writtenCache.set(decl, (hit = findWrite(decl)));
+  return hit;
+}
+
+function findWrite(decl: ts.Node): boolean {
   let scope: ts.Node = decl.parent;
   while (!isFn(scope) && !ts.isSourceFile(scope)) scope = scope.parent;
   const within = (n: ts.Node | null) => {
@@ -692,6 +819,20 @@ function writtenTo(decl: ts.Node): boolean {
   const body = isFn(scope) ? scope.body : scope;
   if (body) visit(body);
   return written;
+}
+
+/**
+ * A `const` in a function whose name is one identifier or a flat `{ a, b: c }`
+ * (no nesting, no rest): what the walk follows a namespace through by name.
+ * `anyKind` also takes `let`/`var` (a destructuring's names are followed where used).
+ */
+function flatConst(d: ts.VariableDeclaration, anyKind = false): boolean {
+  if (!anyKind && (!isConst(d) || ts.isSourceFile(d.parent.parent.parent))) return false;
+  if (ts.isIdentifier(d.name)) return true;
+  return (
+    ts.isObjectBindingPattern(d.name) &&
+    d.name.elements.every((el) => ts.isIdentifier(el.name) && !el.dotDotDotToken && propertyOf(el) !== null)
+  );
 }
 
 /** The binding a `const` declaration makes, or null for `let`/`var` (which can be reassigned). */
@@ -985,6 +1126,29 @@ interface Frame {
   /** How many modules away from the action. */
   depth: number;
   overlay: Overlay;
+  /**
+   * The lowest stack index a recursion stop pointed at in this walk. A walk
+   * stopped by something outside it depends on who called it, so its summary
+   * is not reused.
+   */
+  cut: { min: number };
+}
+
+/**
+ * What walking a function or value reached from an action found, walked with
+ * no check yet (TASK-MUO4GP1P89HS7 Ö-1). A check before the call only moves
+ * its writes out of `unchecked`, so one walk serves every caller at that
+ * depth: the same helper is no longer walked again for each action and each
+ * call site.
+ */
+const summaries = new WeakMap<Overlay, WeakMap<Module, Map<string, Facts>>>();
+
+function summaryCache(overlay: Overlay, mod: Module): Map<string, Facts> {
+  let byMod = summaries.get(overlay);
+  if (!byMod) summaries.set(overlay, (byMod = new WeakMap()));
+  let map = byMod.get(mod);
+  if (!map) byMod.set(mod, (map = new Map()));
+  return map;
 }
 
 class Walker {
@@ -1167,6 +1331,43 @@ class Walker {
     return ts.isVariableDeclaration(holder) && !writtenTo(holder) && isConst(holder) && !!holder.initializer && this.sessionValue(holder.initializer, seen);
   }
 
+  /**
+   * A constant `import('<spec>')` whose module the walk follows by name: a
+   * member of it (`(await import(x)).f`), or a `const` in a function that
+   * holds it or destructures it flat. Anything else — `?:`, `Promise.all`, a
+   * top-level `const`, nested destructuring, `let` — stands for the whole
+   * module (İNCELEME-80 Y-2).
+   */
+  private tracked(call: ts.CallExpression): boolean {
+    let p: ts.Node = call;
+    while (
+      ts.isParenthesizedExpression(p.parent) ||
+      ts.isAsExpression(p.parent) ||
+      ts.isNonNullExpression(p.parent) ||
+      ts.isSatisfiesExpression(p.parent) ||
+      ts.isTypeAssertionExpression(p.parent) ||
+      ts.isAwaitExpression(p.parent)
+    ) {
+      p = p.parent;
+    }
+    const parent = p.parent;
+    if ((ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) && parent.expression === p) {
+      return memberName(parent, this.mod) !== null;
+    }
+    return ts.isVariableDeclaration(parent) && parent.initializer === p && flatConst(parent);
+  }
+
+  /** A write the guard cannot see past: an import into src/ that names no file (İNCELEME-80 Y-1). */
+  private unresolved(target: string, checked: boolean): void {
+    const label = `import of src/${target.slice(UNRESOLVED.length)}, which is no file the guard can read (fail-closed)`;
+    this.facts.writes.push(label);
+    if (!checked) this.facts.unchecked.push(label);
+  }
+
+  private cutAt(index: number): void {
+    this.frame.cut.min = Math.min(this.frame.cut.min, index);
+  }
+
   /** The module a namespace expression stands for: `import * as ns`, a re-exported namespace, `await import('…')`, a `const` of one. */
   private namespaceOf(expr: ts.Expression, depth = 0): string | null {
     const e = strip(expr);
@@ -1187,15 +1388,29 @@ class Walker {
   /** Walks a function, a value or a whole module reached from the action, in this module or another. */
   private enter(mod: Module, node: ts.Node, name: string, checked: boolean, depth: number): void {
     const key = `${mod.id}#${name}`;
-    if (node === this.root || this.frame.stack.includes(key)) return;
+    if (node === this.root) return this.cutAt(this.frame.stack.length - 1);
+    const onStack = this.frame.stack.indexOf(key);
+    if (onStack >= 0) return this.cutAt(onStack);
     if (depth > MAX_DEPTH) {
       this.facts.deep.push({ label: `${name} (${mod.id}, from ${this.mod.id})`, checked });
       return;
     }
-    const frame: Frame = { ...this.frame, stack: [...this.frame.stack, key], depth };
-    const walker = new Walker(mod, isFn(node) ? node : null, frame, false, this.facts);
-    if (isFn(node)) walker.fn(node, checked);
-    else walker.node(node, checked);
+    const cache = summaryCache(this.frame.overlay, mod);
+    let sum = cache.get(`${key}@${depth}`);
+    if (!sum) {
+      sum = { readOnly: false, checks: 0, writes: [], unchecked: [], deep: [] };
+      const stack = [...this.frame.stack, key];
+      const cut = { min: Infinity };
+      const walker = new Walker(mod, isFn(node) ? node : null, { ...this.frame, stack, depth, cut }, false, sum);
+      if (isFn(node)) walker.fn(node, false);
+      else walker.node(node, false);
+      if (cut.min >= stack.length - 1) cache.set(`${key}@${depth}`, sum);
+      this.cutAt(cut.min);
+    }
+    this.facts.writes.push(...sum.writes);
+    if (!checked) this.facts.unchecked.push(...sum.unchecked);
+    this.facts.checks += sum.checks;
+    for (const d of sum.deep) this.facts.deep.push({ label: d.label, checked: d.checked || checked });
   }
 
   /**
@@ -1238,6 +1453,7 @@ class Walker {
 
   /** `ns.member` of a namespace; the whole module when the member is not known. */
   private followMember(target: string, member: string | null, checked: boolean): void {
+    if (isUnresolved(target)) return this.unresolved(target, checked);
     if (TRUSTED.has(target)) return;
     if (member === null) this.enterModule(target, '*', checked);
     else this.followExport(target, member, null, checked);
@@ -1248,6 +1464,7 @@ class Walker {
     const r = resolveExport(target, name, this.frame.overlay);
     // Fail-closed (İNCELEME-74 Y-1): a name the guard cannot find is the whole module.
     if (r === null) return this.enterModule(target, name, checked);
+    if ('unresolved' in r) return this.unresolved(r.unresolved, checked);
     if ('external' in r) return;
     if ('ns' in r) return this.followMember(r.ns, member, checked);
     // Another server action is an endpoint of its own: the guard judges its
@@ -1258,9 +1475,11 @@ class Walker {
 
   /** Every function and value of a module, as if the action reached each one (fail-closed). */
   private enterModule(target: string, name: string, checked: boolean): void {
+    if (isUnresolved(target)) return this.unresolved(target, checked);
     const mod = loadModule(target, this.frame.overlay);
     if (!mod || TRUSTED.has(target) || mod.useServer) return;
-    if (this.frame.stack.some((k) => k.startsWith(`${target}#?`))) return;
+    const walking = this.frame.stack.findIndex((k) => k.startsWith(`${target}#?`));
+    if (walking >= 0) return this.cutAt(walking);
     this.enter(mod, mod.sf, `?${name}`, checked, this.frame.depth + 1);
   }
 
@@ -1282,15 +1501,25 @@ class Walker {
     if (write) {
       const line = this.mod.sf.getLineAndCharacterOfPosition(node.getStart(this.mod.sf)).line + 1;
       const top = this.frame.stack[this.frame.stack.length - 1];
-      const where = this.frame.depth > 0 ? `${this.mod.id}.ts:${line}` : `line ${line}`;
+      const where = this.frame.depth > 0 ? `${this.mod.sf.fileName}:${line}` : `line ${line}`;
       const via = top ? `, via ${top.split('#')[1]}${this.frame.depth > 0 ? ` (${top.split('#')[0]})` : ''}` : '';
       const label = `${write} (${where}${via})`;
       this.facts.writes.push(label);
       if (!checked) this.facts.unchecked.push(label);
     }
     if (ts.isCallExpression(node) && this.frame.stack.length === 0 && isReadOnlyCall(node)) this.facts.readOnly = true;
+    // A constant `import()` or `require()` into src/ in a shape the walk does not follow by name is the whole module (İNCELEME-80 Y-2).
+    if (ts.isCallExpression(node) && node.arguments.length > 0 && ts.isStringLiteralLike(node.arguments[0]!)) {
+      const callee = strip(node.expression);
+      const dynamic = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+      const required = ts.isIdentifier(callee) && callee.text === 'require' && !localBinding(callee);
+      if (dynamic || required) {
+        const target = resolveSpec(this.mod.id, (node.arguments[0] as ts.StringLiteralLike).text, this.frame.overlay);
+        if (target && (required || !this.tracked(node))) this.enterModule(target, '*', checked);
+      }
+    }
     // `const { wipe } = ns`: the namespace is followed where its names are used (İNCELEME-74 R6, D2).
-    if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && this.namespaceOf(node.initializer)) {
+    if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && this.namespaceOf(node.initializer) && flatConst(node, true)) {
       this.node(node.name, checked);
       return;
     }
@@ -1343,15 +1572,15 @@ function inlineActions(sf: ts.SourceFile, relPath: string): { key: string; fn: F
  * can reach a write several modules away without touching the tree.
  */
 export function findingsFor(relPath: string, text: string, overlay: Overlay = NO_OVERLAY): { findings: Finding[]; keys: string[] } {
-  const sf = ts.createSourceFile(relPath, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const { mod, exported, badExports } = moduleOf(relPath.replace(/\.tsx?$/, ''), sf, overlay);
+  const sf = ts.createSourceFile(relPath, text, ts.ScriptTarget.Latest, true, scriptKindOf(relPath));
+  const { mod, exported, badExports } = moduleOf(relPath.replace(SOURCE_FILE, ''), sf, overlay);
   const moduleLevel = hasDirective(sf.statements, 'use server');
   const findings: Finding[] = moduleLevel ? [...badExports] : [];
   const keys: string[] = [];
 
   const judge = (key: string, fn: Fn, inline: boolean) => {
     keys.push(key);
-    const facts = new Walker(mod, fn, { stack: [], depth: 0, overlay }).run();
+    const facts = new Walker(mod, fn, { stack: [], depth: 0, overlay, cut: { min: Infinity } }).run();
     const deep = (all: boolean) =>
       facts.deep
         .filter((d) => all || !d.checked)
@@ -2064,6 +2293,155 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
             "async function gate({ role }: { role: string }) {\n  if (!can(role as never, 'edit_proposal')) throw new Error('no');\n}\n" +
             fn('g7', "  const scope = await requireTenantAction();\n  const { tenantId } = scope;\n  await gate(scope);\n" + wipe),
         );
+      });
+    });
+
+    // İNCELEME-80 (TASK-MUO12FXI8LDXJ, devop-fb) Y-1/Y-2 and se-fb Y-3, TASK-MUO4GP1P89HS7.
+    describe('İNCELEME-80 Y-1/Y-2/Y-3', () => {
+      const file = 'app/[locale]/(app)/[workspace]/evidence/i80-mutant.ts';
+      const header = [
+        "'use server';",
+        "import { withTenant, prisma } from '@/lib/db';",
+        "import { requireTenantAction } from '@/lib/tenant';",
+        "import { can } from '@/lib/rbac';",
+        '',
+      ].join('\n');
+      const ro = '  const { tenantId } = await requireTenantAction({ readOnly: true });\n';
+      const fn = (name: string, body: string) => `export async function ${name}(id: string, flag = false) {\n${body}}\n`;
+      const impl = "import { prisma } from '@/lib/db';\nexport async function wipe(id) { await prisma.evidence.delete({ where: { id } }); }\n";
+      const reader = "import { prisma } from '@/lib/db';\nexport async function read(id: string) { return prisma.evidence.findUnique({ where: { id } }); }\n";
+      const red = (text: string, key: string, problem: string, overlay: Overlay = {}, at = file) =>
+        expect(findingsFor(at, text, overlay).findings).toEqual([{ key: `${at}#${key}`, problem: expect.stringContaining(problem) }]);
+      const green = (text: string, overlay: Overlay = {}) => expect(findingsFor(file, header + text, overlay).findings).toEqual([]);
+      const readOnlyWrite = 'readOnly: true but writes: prisma.evidence.delete (lib/i80/';
+
+      it('Y-1: a writer in a .js/.jsx/.mjs/.mts/.cjs/.cts module, by any specifier', () => {
+        for (const [key, spec, where] of [
+          ['x1', '@/lib/i80/legacy', 'legacy.js'],
+          ['x1b', '@/lib/i80/legacy.js', 'legacy.js'],
+          ['x2', '@/lib/i80/view', 'view.jsx'],
+          ['x3', '@/lib/i80/modern.mjs', 'modern.mts'],
+          ['x4', '@/lib/i80/plain.mjs', 'plain.mjs'],
+          ['x5', '@/lib/i80/old.cjs', 'old.cts'],
+          ['x6', '@/lib/i80/older', 'older.cjs'],
+          ['x7', '@/lib/i80/dir', 'dir/index.js'],
+        ] as const) {
+          red(header + `import { wipe } from '${spec}';\n` + fn(key, ro + '  await wipe(id);\n'), key, `${readOnlyWrite}${where}:2`, {
+            'lib/i80/legacy.js': impl,
+            'lib/i80/view.jsx': impl,
+            'lib/i80/modern.mts': impl.replace('(id)', '(id: string)'),
+            'lib/i80/plain.mjs': impl,
+            'lib/i80/old.cts': impl.replace('(id)', '(id: string)'),
+            'lib/i80/older.cjs': impl,
+            'lib/i80/dir/index.js': impl,
+          });
+        }
+      });
+
+      it("Y-1: a 'use server' module in .js is an endpoint like a .ts one", () => {
+        const js = 'app/[locale]/(app)/[workspace]/evidence/i80-actions.js';
+        red(
+          "'use server';\nimport { prisma } from '@/lib/db';\nimport { requireTenantAction } from '@/lib/tenant';\nexport async function jsAction(id) {\n  await requireTenantAction({ readOnly: true });\n  await prisma.evidence.delete({ where: { id } });\n}\n",
+          'jsAction',
+          'readOnly: true but writes: prisma.evidence.delete (line 6)',
+          {},
+          js,
+        );
+        // And the scan picks such files up, but not declarations or tests.
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rbac-guard-'));
+        try {
+          const names = ['a.ts', 'b.tsx', 'c.js', 'd.jsx', 'e.mjs', 'f.cjs', 'g.mts', 'h.cts', 'i.d.ts', 'j.d.mts', 'k.test.js', 'l.json', 'm.css'];
+          for (const n of names) fs.writeFileSync(path.join(dir, n), '');
+          expect(sourceFiles(dir).map((f) => path.basename(f)).sort()).toEqual(['a.ts', 'b.tsx', 'c.js', 'd.jsx', 'e.mjs', 'f.cjs', 'g.mts', 'h.cts']);
+        } finally {
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      });
+
+      it('Y-1: an import into src/ that names no file is fail-closed, not a package', () => {
+        const none = 'import of src/lib/i80/missing, which is no file the guard can read';
+        red(header + "import { wipe } from '@/lib/i80/missing';\n" + fn('u1', ro + '  await wipe(id);\n'), 'u1', none);
+        red(header + "import * as m from '../../../../../lib/i80/missing';\n" + fn('u2', ro + '  await m.wipe(id);\n'), 'u2', none);
+        // Through a barrel that re-exports it.
+        red(header + "import { wipe } from '@/lib/i80/barrel';\n" + fn('u3', ro + '  await wipe(id);\n'), 'u3', none, {
+          'lib/i80/barrel': "export { wipe } from './missing';\n",
+        });
+        red(header + fn('u4', ro + "  const { wipe } = await import('@/lib/i80/missing');\n  await wipe(id);\n"), 'u4', none);
+        // After the role check, the same import is covered like any write.
+        green("import { wipe } from '@/lib/i80/missing';\n" + fn('u5', "  await requireTenantAction({ can: 'edit_proposal' });\n  await wipe(id);\n"));
+        // Files that are not code, a package, and a path out of src/ stay green.
+        green(
+          "import data from '@/locales/en/settings.json';\nimport art from '@/contracts/artifacts/DualApproval.json';\nimport '@/app/globals.css';\nimport { z } from 'zod';\n" +
+            fn('u6', ro + "  const m = await import('@/locales/en/dashboard.json');\n  return [data, art, m, z, id];\n"),
+        );
+      });
+
+      it('Y-1/D-2: an `@/` specifier is normalized, so `@/lib/./rbac` is the check', () => {
+        green(
+          "import { can as c2 } from '@/lib/./rbac';\n" +
+            fn('d2', "  const { tenantId, role } = await requireTenantAction();\n  if (!c2(role, 'edit_proposal')) return;\n  await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { id, tenantId } }));\n"),
+        );
+      });
+
+      it('Y-2: a constant `import()` in a shape the walk does not follow by name is the whole module', () => {
+        const ov: Overlay = { 'lib/i80/a': reader, 'lib/i80/b': impl };
+        const via = (key: string, body: string, pre = '') => red(header + pre + fn(key, ro + body), key, readOnlyWrite, ov);
+        via('c1', "  const m = flag ? await import('@/lib/i80/a') : await import('@/lib/i80/b');\n  await m.read(id);\n");
+        via('c4', "  const { read } = await (flag ? import('@/lib/i80/a') : import('@/lib/i80/b'));\n  await read(id);\n");
+        via('c5', "  await (await lazy).read(id);\n", "const lazy = import('@/lib/i80/b');\n");
+        via('c6', "  const [m] = await Promise.all([import('@/lib/i80/b')]);\n  await m.read(id);\n");
+        via('c9', "  const { default: { read } } = await import('@/lib/i80/b');\n  await read(id);\n");
+        via('c10', "  const k = String(id) as 'read';\n  await (await import('@/lib/i80/b'))[k](id);\n");
+        via('c11', "  const { ...all } = await import('@/lib/i80/b');\n  await all.read(id);\n");
+        via('c12', "  var m = await import('@/lib/i80/b');\n  await m.read(id);\n");
+        via('c13', "  const m = require('@/lib/i80/b');\n  await m.read(id);\n");
+        via('c14', "  const load = () => import('@/lib/i80/b');\n  await (await load()).read(id);\n");
+        // What the walk does follow by name stays precise: `read` of a module that also writes.
+        const both: Overlay = { 'lib/i80/rw': reader + "export async function wipe(id: string) { await prisma.evidence.delete({ where: { id } }); }\n" };
+        green(fn('c15', ro + "  const { read } = await import('@/lib/i80/rw');\n  const m = await import('@/lib/i80/rw');\n  return [await read(id), await m.read(id), await (await import('@/lib/i80/rw')).read(id)];\n"), both);
+      });
+
+      it('Y-3: a `.ts` module is parsed as TypeScript, so `<T>expr` does not hide a write', () => {
+        red(header + fn('y3', ro + '  await withTenant(tenantId, (tx) => <any>tx.evidence.deleteMany({ where: { id } }));\n'), 'y3', 'readOnly: true but writes: tx.evidence.deleteMany');
+        red(header + "import { w } from '@/lib/i80/cast';\n" + fn('y3b', ro + '  await w(id);\n'), 'y3b', 'readOnly: true but writes: prisma.evidence.deleteMany (lib/i80/cast.ts:2', {
+          'lib/i80/cast': "import { prisma } from '@/lib/db';\nexport async function w(id: string) { return <Promise<unknown>>prisma.evidence.deleteMany({ where: { id } }); }\n",
+        });
+      });
+
+      it('Ö-1: a walk cut short by recursion is not reused for another caller', () => {
+        // q.g → p.f → q.g (cut). p.f's walk under g misses g's write; a readOnly
+        // action that reaches p.f first must still see it.
+        const ov: Overlay = {
+          'lib/i80/p': "import { g } from './q';\nexport async function f(id: string) { await g(id); }\n",
+          'lib/i80/q':
+            "import { prisma } from '@/lib/db';\nimport { f } from './p';\nexport async function g(id: string) { if (id) await f(id.slice(1)); await prisma.evidence.delete({ where: { id } }); }\n",
+        };
+        // `second` reaches p.f through r.h, at the same depth `first` reached it.
+        ov['lib/i80/r'] = "import { f } from './p';\nexport async function h(id: string) { await f(id); }\n";
+        const text =
+          header +
+          "import { g } from '@/lib/i80/q';\nimport { h } from '@/lib/i80/r';\n" +
+          fn('first', "  await requireTenantAction({ can: 'edit_proposal' });\n  await g(id);\n") +
+          fn('second', ro + '  await h(id);\n');
+        expect(findingsFor(file, text, ov).findings).toEqual([
+          { key: `${file}#second`, problem: expect.stringContaining('prisma.evidence.delete (lib/i80/q.ts:3, via g (lib/i80/q))') },
+        ]);
+      });
+
+      it('Ö-1: a function reached at another depth is walked again, so MAX_DEPTH still holds', () => {
+        // x → c2 … c6 writes at depth 6 from the action; one wrapper more and it is past MAX_DEPTH.
+        const ov: Overlay = { 'lib/i80/x': "import { c2 } from './c2';\nexport async function x(id: string) { await c2(id); }\n" };
+        for (let i = 2; i < MAX_DEPTH; i++) ov[`lib/i80/c${i}`] = `import { c${i + 1} } from './c${i + 1}';\nexport async function c${i}(id: string) { await c${i + 1}(id); }\n`;
+        ov[`lib/i80/c${MAX_DEPTH}`] = `import { prisma } from '@/lib/db';\nexport async function c${MAX_DEPTH}(id: string) { await prisma.evidence.delete({ where: { id } }); }\n`;
+        ov['lib/i80/wrap'] = "import { x } from './x';\nexport async function wrap(id: string) { await x(id); }\n";
+        const text =
+          header +
+          "import { x } from '@/lib/i80/x';\nimport { wrap } from '@/lib/i80/wrap';\n" +
+          fn('shallow', "  await requireTenantAction({ can: 'edit_proposal' });\n  await x(id);\n") +
+          fn('deeper', ro + '  await wrap(id);\n');
+        const { findings } = findingsFor(file, text, ov);
+        expect(findings).toEqual([{ key: `${file}#deeper`, problem: expect.stringContaining(`calls go deeper than ${MAX_DEPTH} modules`) }]);
+        expect(findings[0]!.problem).not.toContain('but writes');
       });
     });
 
