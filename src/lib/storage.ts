@@ -58,11 +58,50 @@ export function generateR2ObjectKey(
 ): string {
   const cleanCategory = category.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
   const year = new Date().getFullYear();
-  const fileExt = fileName.split('.').pop() || 'pdf';
+  // The extension is the client's text too: unfiltered, `a./x/y` made it `/x/y`
+  // and added path segments to the key (TASK-MUN80W2VFY56R).
+  const fileExt = (fileName.split('.').pop() ?? '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 10) || 'pdf';
   const cleanName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
   const hash = uuidv4().slice(0, 8);
-  
-  return `${tenantId}/${organisationId}/${cleanCategory}/${year}/${hash}_${cleanName}.${fileExt}`;
+
+  const key = `${tenantId}/${organisationId}/${cleanCategory}/${year}/${hash}_${cleanName}.${fileExt}`;
+  if (tenantObjectKeyOf(tenantId, key) !== key) throw new Error('refusing to build an object key outside the tenant prefix');
+  return key;
+}
+
+const SAFE_TENANT_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const SAFE_OBJECT_KEY = /^[A-Za-z0-9_./-]{1,1024}$/;
+
+/**
+ * Y-4 of the TASK-MUN66T2HM4A4E scan (TASK-MUN80W2VFY56R): the object key of an
+ * evidence upload comes back from the browser, and the row's key is later
+ * handed to the storage delete. Every key a tenant may record or delete must
+ * therefore pass here: it is `objectKeyOrUrl` reduced to a bare key when it is
+ * one of `tenantId`'s own — under `<tenantId>/`, only `[A-Za-z0-9_./-]`, no
+ * empty, `.` or `..` segment — and null otherwise. `%` is outside the set, so
+ * an encoded `%2e%2e` never reaches a store that might decode it.
+ *
+ * An absolute URL (rows written before `r2ObjectKey` existed store only
+ * `fileUrl`) is reduced to its path first, whatever its host.
+ */
+export function tenantObjectKeyOf(tenantId: string, objectKeyOrUrl: unknown): string | null {
+  if (typeof tenantId !== 'string' || !SAFE_TENANT_ID.test(tenantId)) return null;
+  if (typeof objectKeyOrUrl !== 'string') return null;
+
+  let key = objectKeyOrUrl;
+  if (/^https?:\/\//i.test(key)) {
+    try {
+      key = new URL(key).pathname.replace(/^\/+/, '');
+    } catch {
+      return null;
+    }
+  }
+
+  if (!SAFE_OBJECT_KEY.test(key)) return null;
+  const segments = key.split('/');
+  if (segments.length < 2 || segments[0] !== tenantId) return null;
+  if (segments.some((s) => s === '' || s === '.' || s === '..')) return null;
+  return key;
 }
 
 /**
@@ -129,13 +168,34 @@ export async function getPresignedDownloadUrl(objectKey: string): Promise<string
 }
 
 /**
- * Uploads a File directly (Server-side helper).
+ * Uploads a File directly (Server-side helper). The key is built here, never
+ * taken from the client, and the bytes are really stored (R2, or `.dev-objects`
+ * outside production). Null when nothing was stored: the caller must not
+ * record a key for a file that does not exist. This used to wait 300 ms and
+ * return a URL to nothing.
  */
-export async function uploadFileToR2(file: File, tenantId: string): Promise<string | null> {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const ext = file.name.split('.').pop() || 'pdf';
-  const key = `${tenantId}/org-default/general/${new Date().getFullYear()}/${uuidv4().slice(0, 8)}.${ext}`;
-  return publicObjectUrl(key);
+export async function uploadFileToR2(
+  file: File,
+  tenantId: string,
+  category = 'general'
+): Promise<{ objectKey: string; publicUrl: string | null } | null> {
+  const objectKey = generateR2ObjectKey(tenantId, 'org-default', category, file.name);
+  const stored = await putObjectBytes(objectKey, Buffer.from(await file.arrayBuffer()), file.type || 'application/octet-stream');
+  return stored ? { objectKey, publicUrl: publicObjectUrl(objectKey) } : null;
+}
+
+/**
+ * Deletes a stored object on behalf of `tenantId` — only when the key is one of
+ * that tenant's own (`tenantObjectKeyOf`). A refused key deletes nothing and
+ * returns false; the caller may still drop its own row.
+ */
+export async function deleteTenantObject(tenantId: string, objectKeyOrUrl: string): Promise<boolean> {
+  const key = tenantObjectKeyOf(tenantId, objectKeyOrUrl);
+  if (!key) {
+    console.warn(`[R2 Storage] Refused to delete an object outside tenant ${tenantId}'s prefix`);
+    return false;
+  }
+  return deleteFileFromR2(key);
 }
 
 /**
@@ -143,7 +203,14 @@ export async function uploadFileToR2(file: File, tenantId: string): Promise<stri
  */
 export async function deleteFileFromR2(objectKeyOrUrl: string): Promise<boolean> {
   if (!s3) {
-    console.log(`[R2 Storage (Dev Fallback)] Mock deleted object: ${objectKeyOrUrl}`);
+    // Outside production the local store stands in for R2 (putObjectBytes), so
+    // a delete removes the file there too; a key it refuses deletes nothing.
+    const path = devObjectPath(objectKeyOrUrl);
+    if (path) {
+      const { rm } = await import('node:fs/promises');
+      await rm(path, { force: true });
+    }
+    console.log(`[R2 Storage (Dev Fallback)] Deleted object: ${objectKeyOrUrl}`);
     return true;
   }
 

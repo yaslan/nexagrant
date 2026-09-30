@@ -5,9 +5,10 @@ import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 import {
   getPresignedUploadUrl,
-  deleteFileFromR2,
+  deleteTenantObject,
   uploadFileToR2,
   publicObjectUrl,
+  tenantObjectKeyOf,
   EVIDENCE_BUCKET,
 } from '@/lib/storage';
 import { extractEvidenceMetadata } from '@/lib/evidence-ai';
@@ -92,11 +93,20 @@ export async function confirmEvidenceUploadAction(data: {
 }) {
   const { tenantId, userId } = await requireTenantAction();
 
+  // The key comes back from the browser. Only one under this tenant's own prefix
+  // may be recorded: the row's key is what deleteEvidence later removes from the
+  // store, so accepting another tenant's key let a member delete that tenant's
+  // file (Y-4, TASK-MUN80W2VFY56R).
+  const objectKey = tenantObjectKeyOf(tenantId, data?.objectKey);
+  if (!objectKey || objectKey !== data.objectKey) {
+    return { success: false as const, error: 'invalid_object_key' as const };
+  }
+
   // Built by the storage module, not here: this line used to concatenate the
   // storage host itself, which put the same literal in two places and meant the
   // URL survived every change made in src/lib/storage.ts. `null` when no public
   // origin is configured — the row then carries no link rather than a dead one.
-  const publicUrl = publicObjectUrl(data.objectKey);
+  const publicUrl = publicObjectUrl(objectKey);
 
   // No reader runs over the file yet, so this reports nothing rather than guessing.
   const extracted = await extractEvidenceMetadata();
@@ -123,7 +133,7 @@ export async function confirmEvidenceUploadAction(data: {
         // An upload is not a verification. The row says so in the column built for it,
         // and the list badges it as unverified until someone actually checks it.
         status: 'UNVERIFIED',
-        r2ObjectKey: data.objectKey,
+        r2ObjectKey: objectKey,
         fileBucket: EVIDENCE_BUCKET,
         fileName: data.fileName,
         fileSizeBytes: data.fileSizeBytes,
@@ -192,11 +202,14 @@ export async function createEvidence(formData: FormData) {
   let mimeType = null;
 
   if (file && file.size > 0) {
-    fileUrl = await uploadFileToR2(file, tenantId);
+    // Key built by the storage module from sanitised parts; the file name used to
+    // go into it verbatim, `../` included (TASK-MUN80W2VFY56R).
+    const stored = await uploadFileToR2(file, tenantId, category);
+    fileUrl = stored?.publicUrl ?? null;
+    objectKey = stored?.objectKey ?? null;
     fileName = file.name;
     fileSizeBytes = file.size;
     mimeType = file.type;
-    objectKey = `${tenantId}/org-default/${category}/${new Date().getFullYear()}/${file.name}`;
   }
 
   const validUntil = validUntilRaw ? new Date(validUntilRaw) : null;
@@ -264,8 +277,10 @@ export async function deleteEvidence(evidenceId: string) {
       const ev = await tx.evidence.findFirst({ where: { id: evidenceId, tenantId } });
       if (!ev) return 0;
 
+      // Only a key under this tenant's prefix is removed from the store; a row
+      // that names anything else loses its row, not someone else's file.
       if (ev.r2ObjectKey || ev.fileUrl) {
-        await deleteFileFromR2(ev.r2ObjectKey || ev.fileUrl!);
+        await deleteTenantObject(tenantId, ev.r2ObjectKey || ev.fileUrl!);
       }
 
       const result = await tx.evidence.deleteMany({ where: { id: evidenceId, tenantId } });

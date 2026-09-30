@@ -216,9 +216,14 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
         language: locale,
       });
 
+      // The server refuses a key outside this tenant's prefix (TASK-MUN80W2VFY56R).
+      if (!res.success) {
+        throw new Error(isTr ? 'Dosya anahtarı geçersiz.' : 'Invalid file key.');
+      }
+
       setUploadProgress(100);
 
-      if (res?.evidence) {
+      if (res.evidence) {
         setItems([res.evidence as unknown as EvidenceItemData, ...items]);
       }
 
