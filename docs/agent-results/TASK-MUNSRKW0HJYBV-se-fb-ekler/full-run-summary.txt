@@ -47,3 +47,62 @@ LINT_EXIT=0
 ✓ Compiled successfully in 26.1s
 ✓ Generating static pages using 11 workers (31/31) in 363ms
 BUILD_EXIT=0
+
+# ===== dev (cdb85b2c, cs-fb API sertleştirmesi dahil) dala merge edildikten SONRA =====
+# NOT: merged-1/2 ilk denemesi geçersizdi (zsh $E kelime bölmedi → DB env geçmedi); aşağıdakiler açık env ile
+## full-merged-1
+11:50  up 14:04, 1 user, load averages: 33.82 44.92 41.32
+      Tests  3190 passed | 22 skipped (3212)
+ Test Files  267 passed | 2 skipped (269)
+EXIT=0
+11:51  up 14:04, 1 user, load averages: 40.73 44.98 41.57
+
+## full-merged-2
+11:51  up 14:04, 1 user, load averages: 40.73 44.98 41.57
+     × İNCELEME-45 shape: 30 000 pages in 4.8 MB is refused in well under a second 3364ms
+      Tests  1 failed | 3189 passed | 22 skipped (3212)
+ Test Files  1 failed | 266 passed | 2 skipped (269)
+EXIT=1
+11:53  up 14:06, 1 user, load averages: 59.45 49.28 43.54
+
+## full-merged-3
+12:05  up 14:18, 1 user, load averages: 22.28 25.53 32.29
+     × k1-topic-match now writes rows for the embedded tenants, none for the expired pilot 226ms
+      Tests  1 failed | 3189 passed | 22 skipped (3212)
+ Test Files  1 failed | 266 passed | 2 skipped (269)
+EXIT=1
+12:05  up 14:19, 1 user, load averages: 47.28 31.75 34.23
+
+## full-merged-4
+12:05  up 14:19, 1 user, load averages: 47.28 31.75 34.23
+      Tests  3190 passed | 22 skipped (3212)
+ Test Files  267 passed | 2 skipped (269)
+EXIT=0
+12:06  up 14:19, 1 user, load averages: 52.54 34.96 35.27
+
+## full-merged-5
+12:07  up 14:21, 1 user, load averages: 18.89 28.45 32.78
+      Tests  3190 passed | 22 skipped (3212)
+ Test Files  267 passed | 2 skipped (269)
+EXIT=0
+12:08  up 14:21, 1 user, load averages: 48.48 34.64 34.84
+
+## full-merged-6
+12:08  up 14:21, 1 user, load averages: 48.48 34.64 34.84
+      Tests  3190 passed | 22 skipped (3212)
+ Test Files  267 passed | 2 skipped (269)
+EXIT=0
+12:09  up 14:22, 1 user, load averages: 51.95 37.46 35.87
+
+## full-merged-7
+12:09  up 14:22, 1 user, load averages: 51.95 37.46 35.87
+      Tests  3190 passed | 22 skipped (3212)
+ Test Files  267 passed | 2 skipped (269)
+EXIT=0
+12:09  up 14:23, 1 user, load averages: 47.02 38.47 36.34
+
+(merged-1,2: rag İNCELEME-45 CPU düzeltmesi öncesi; merged-3,4: k1 düzeltmesi öncesi; merged-5,6,7: son hâl)
+## gates (son hâl)
+TSC_EXIT=0
+LINT_EXIT=0
+BUILD_EXIT=0

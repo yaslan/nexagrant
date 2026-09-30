@@ -18,8 +18,9 @@
 | **Y-B** | G5: başka modüldeki yazma görülmüyordu | Transitif import takibi eklendi: `@/` ve göreli import, barrel, `import * as`, default import; en fazla `MAX_DEPTH = 6` modül | G5 ve N14 kırmızı. 6 seviyeli overlay zinciri kırmızı, 7. seviye takip edilmiyor (§3) |
 | **Ö-A** | Portal, oturum kiracısına bakmıyordu | Sorguya `tenantId: <oturum kiracısı>` eklendi, oturum `requireTenantApi()` ile okunuyor | Birim testte RED→GREEN (4→0). Canlı DB'de önce 3 kırmızı, sonra 4/4 yeşil (§4) |
 | **Ö-B** | Portal 500 yanıtı iç mesajı (tenant id) döndürüyordu | Yanıt artık sabit cümle, ayrıntı yalnız logda | Birim ve canlı testte gövdede tenant id yok, logda var (§4) |
-| **Ö-C** | Varsayılan 5 sn timeout yük altında sahte kırmızı üretiyordu | `vitest.config.mts`'e `testTimeout: 30_000` ve `hookTimeout: 60_000` eklendi. RAG olay-döngüsü testinde ürünün süre bütçesi yükseltildi | Önce: 4 kırmızı (3 timeout + 1 bütçe), load 73–121. Sonra 3 koşu: 0 timeout. 2 koşu tamamen yeşil, 1 koşuda timeout olmayan başka bir kırmızı çıktı (Ö-D) (§5) |
-| Kapılar | — | `tsc --noEmit`, `pnpm lint`, `pnpm build` | Üçü de EXIT=0 (§5) |
+| **Ö-C** | Varsayılan 5 sn timeout ve duvar saati eşikleri yük altında sahte kırmızı üretiyordu | `vitest.config.mts`'e `testTimeout: 30_000` ve `hookTimeout: 60_000` eklendi. RAG olay-döngüsü testinde ürünün süre bütçesi yükseltildi. İNCELEME-45 eşiği duvar saati yerine CPU süresiyle ölçülüyor | Önce: 4 kırmızı (3 timeout + 1 bütçe), load 73–121. Son hâlde dev merge'ü sonrası **3/3 tam koşum yeşil** (3190/3190, load 19–52) (§5) |
+| **Ö-D** (yeni) | `k1-embeddings.live` paralel bir nightly sweep ile yarışıyordu (7 koşuda 2 kırmızı) | Assertion `created` sayısı yerine TopicMatch satırlarına bakıyor | Zorla üretilen yarışta eski assertion `expected 0 to be 6`, yenisi yeşil (§5) |
+| Kapılar | — | `tsc --noEmit`, `pnpm lint`, `pnpm build` (dev merge'ü sonrası da) | Üçü de EXIT=0 (§5) |
 
 **Bekçi gevşetilmedi.**
 - ALLOWED'a girdi eklenmedi.
@@ -150,6 +151,7 @@ Eski route'ta iki kiracının sahibi, A'dayken bile X'in portalını alıyordu (
 
 **Düzeltme:**
 - `vitest.config.mts`: `testTimeout: 30_000` ve `hookTimeout: 60_000`, gerekçesiyle birlikte yorumda. Kendi bütçesini veren testler bütçesini koruyor; takılan bir test yine düşüyor.
+- `tests/rag-pdf-real-parse.test.ts`'teki "İNCELEME-45 shape" (30 000 sayfa ayrıştırılmadan reddedilir) duvar saatiyle `< 3000 ms` ölçüyordu. Yük altında 3.34 sn okudu (İNCELEME-63'te 3.96 sn). Ölçüm artık süreç CPU süresi (`process.cpuUsage`, işçi thread'i dahil). Eşik aynı: 3000 ms. Ölçülen değerler (`ekler/i45.txt`, load ~25): duvar 499–733 ms, CPU 725–1053 ms. Korunan regresyon (30 000 sayfayı ayrıştırmak) her iki ölçüde de onlarca saniye tutar.
 - `tests/rag-pdf-worker-isolation.test.ts`'teki "İNCELEME-52 shape" testi olay döngüsünü ölçüyor, süre sınırını değil. Süre sınırı bir sonraki test tarafından 500 ms ile ayrıca doğrulanıyor ve dokunulmadı. Bu testte `maxParseMs` 150 sn'ye, test timeout'u 180 sn'ye çıkarıldı. Assertion'lara dokunulmadı: `worstGapMs < 500` ve ping sayısı aynı.
 
 **Tam koşumlar** (hepsi izole DB'de; env: `CI=true`, `AUTH_SECRET` = ci.yml değeri). Özet `ekler/full-run-summary.txt`:
@@ -161,13 +163,24 @@ Eski route'ta iki kiracının sahibi, A'dayken bile X'in portalını alıyordu (
 | Sonra #2 | 28 → 53 | `3153 passed`, EXIT=0 |
 | Sonra #3 | 53 → 59 | `3153 passed`, EXIT=0 |
 
-**Ö-D (yeni, bu görevin dışında, düşük önem):** `tests/k1-embeddings.live.test.ts` "k1-topic-match now writes rows…" 3 koşudan 1'inde `expected 1 to be 6` ile düştü. Tekil koşumda 6/6 iki kez yeşil. Bu bir timeout değil, bir sayım farkı.
-- Testin kendi doc'u "the sweep reads the whole Topic catalogue and every tenant" diyor.
-- **Varsayım:** paralel koşan başka bir canlı dosya (`topic-match-nightly.live` ya da `k3-topic-stats-import.live`) aynı DB'de Topic/TopicMatch satırlarına dokunuyor.
-- Değiştirdiğim dosyalarla bir kesişim yok.
-- Öneri: bu üç dosyayı `describe.sequential` / ayrı `poolMatchGlobs` ile ya da kendi Topic alt kümesiyle izole etmek. Takip kartı gerekir.
+**Ö-D (yeni, düşük önem, bu görevde düzeltildi):** `tests/k1-embeddings.live.test.ts` "k1-topic-match now writes rows…" testi 7 tam koşumun 2'sinde `expected 1 to be 6` ile düştü. Tekil koşumda yeşil. Bu bir timeout değil.
+- **Kök neden (koddan):** `tests/topic-match-nightly.live.test.ts:240` gerçek `k1TopicMatchTask`'i koşuyor. Bu task daraltılmamış bir `recomputeAllTopicMatches({ now })` çalıştırıyor (`src/lib/jobs/tasks/k1-topic-match.ts:22`) ve paralel koşan k1 dosyasının kiracılarını k1'in gömülmüş topic'lerine karşı önceden puanlıyor. Böylece k1'in kendi koşusu satırları `created` değil `updated/unchanged` olarak sayıyor.
+- **Düzeltme:** assertion `r.created + r.updated + r.unchanged === 6` ve DB'de `(T_A, T_B) × MY_TOPICS` için 6 TopicMatch satırı. Testin iddiası ("embedded tenants için satır yazılır") aynen duruyor; hiç satır yazılmazsa test yine düşer.
+- **Kanıt:** yarışı zorla ürettim (k1 çağrısından önce daraltılmamış bir sweep). Eski assertion `AssertionError: expected +0 to be 6` ile düştü, yeni assertion `6 passed`. İki dosya birlikte ×2 koşuldu: `15 passed`.
 
-**Kapılar:**
+**dev merge'ü sonrası koşumlar:** dev `cdb85b2c`'yi dala aldım. Bu merge cs-fb'nin API sertleştirmesini ve yeni `add-api-key-rate-window` migrasyonunu getirdi. İzole DB sıfırdan kuruldu: 39/39 migrasyon ×2, 112 politika, seed (`ekler/db-prep-merged.txt`). İlk denemem geçersizdi: zsh `$E` değişkenini kelimelere bölmediği için DB env'i hiç geçmedi. Aynı dosya adlarıyla açık env kullanarak yeniden koştum.
+
+| Koşu | load | Sonuç |
+|---|---|---|
+| merged-1 | 34 → 41 | `3190 passed`, EXIT=0 |
+| merged-2 | 41 → 59 | `1 failed`: İNCELEME-45 duvar saati `3336 < 3000` → CPU'ya çevrildi |
+| merged-3 | 22 → 47 | `1 failed`: k1 (Ö-D) → düzeltildi |
+| merged-4 | 47 → 53 | `3190 passed`, EXIT=0 |
+| **merged-5 / 6 / 7 (son hâl)** | 19 → 52 | **`3190 passed \| 22 skipped` ×3, EXIT=0 ×3** |
+
+Portal canlı testi merge edilmiş kodda da `4 passed` (`ekler/portal-live-merged.txt`).
+
+**Kapılar (merge öncesi ve merge sonrası son hâl, `ekler/full-run-summary.txt`):**
 - `npx tsc --noEmit -p .` → EXIT=0
 - `pnpm lint` → EXIT=0, çıktı yok
 - `pnpm build` → EXIT=0 ("Compiled successfully", 31/31 statik sayfa)
@@ -179,22 +192,24 @@ Eski route'ta iki kiracının sahibi, A'dayken bile X'in portalını alıyordu (
 - `tests/billing-manage-billing-role.test.ts`: portal için 4 yeni test, kiracıya uyan üyelik mock'u
 - `vitest.config.mts`: Ö-C
 - `tests/rag-pdf-worker-isolation.test.ts`: Ö-C, yalnız olay-döngüsü testinin bütçesi
+- `tests/rag-pdf-real-parse.test.ts`: Ö-C, İNCELEME-45 eşiği CPU süresiyle ölçülüyor
+- `tests/k1-embeddings.live.test.ts`: Ö-D
 - `docs/agent-results/TASK-MUNSRKW0HJYBV-se-fb.md` ve `…-ekler/`: kanıt. Ekler vitest'in dışında (`**/docs/**` hariç tutuluyor).
 
 ## 7) Riskler
 - **Daha sıkı bekçi, yeni kodda daha çok kırmızı demek.** Özellikle şu biçimler artık reddediliyor: `if (!can) return` yapan yardımcı, `try { check } catch { log }`, `const ok = can(…)`. Hata mesajı kabul edilen biçimleri söylüyor. Bugün gerçek kodda 0 bulgu var.
 - **TRUSTED listesi bir güven kararı.** `lib/db` ya da `lib/tenant` içine gerçek bir iş yazması eklenirse bekçi onu görmez. Liste kısa tutuldu ve doc-comment'te gerekçelendirildi.
 - **Server-action sınırı.** readOnly bir action başka bir *write* action çağırırsa bekçi bunu işaretlemez. Çağrılan action kendi `requireTenantAction`'ını (pilot kapısı ve rol) çalışma anında koşuyor, bu yüzden açık değil. Ama "readOnly" etiketi o çağrı için yanıltıcı olur.
-- **Ö-C.** 30 sn timeout gerçek bir yavaşlamayı 6 kat daha geç yakalar. Perf eşikleri (ör. `expected 3962 < 3000`) ve `db.ts` `connectionTimeoutMillis: 1000` değişmedi; bu koşularda düşmediler.
+- **Ö-C.** 30 sn timeout gerçek bir yavaşlamayı 6 kat daha geç yakalar. CPU ölçümü, I/O'da bekleyen bir yavaşlamayı göremez; ama bu testin koruduğu şey CPU işi (30 000 sayfa). `db.ts` `connectionTimeoutMillis: 1000` değişmedi. İNCELEME-63'te 3 kez "Connection terminated due to connection timeout" görülmüştü, bu görevin 11 geçerli tam koşusunda hiç görülmedi.
+- **cs-fb'nin `api-error-body-guard`'ı** yalnız `errorMessage(…)` kalıbını arıyor. Eski portaldaki `err.message ||` biçimini yakalamazdı. Bugün `src/app/api` altında bu biçimde yalnız `admin/topic-stats/import` var ve o, tipli 4xx doğrulama mesajları; 500 sızıntısı değil. Bekçinin `\.message` biçimini de kapsaması cs-fb'ye öneri.
 
 ## 8) Açık sorular
-- Ö-D (k1 izolasyonu) için ayrı kart açılsın mı? Önerim evet (be-fb / devop-fb).
+- `topic-match-nightly.live`'daki gerçek task çağrısı daraltılmamış kalmaya devam ediyor. Başka bir paralel canlı dosyanın TopicMatch sayılarını da bozabilir. Task'a test için `tenantIds` geçirilebilmeli mi? Bu küçük bir ürün değişikliği olur, bu yüzden bu görevde yapmadım.
 - `@typescript-eslint/no-floating-promises` (type-aware lint) açılsın mı? N2'yi lint seviyesinde de yakalar. Bekçi artık bunu kendisi yakalıyor, bu yüzden isteğe bağlı.
 
 ## 9) Sonraki adım
 - İnceleme: cs-fb ya da crw-fb. Bekçinin yeni kurallarına karşı kendi mutantlarını denesinler.
-- Ö-D için takip kartı.
-- Temizlik: izole konteyner `sefb-munsrk-pg` ve worktree iş bitince kaldırıldı (§10).
+- Temizlik: izole konteyner `sefb-munsrk-pg` ve worktree kaldırılıyor (§10).
 
 ## 10) Temizlik
 Aşağıya commit sonrası eklendi.

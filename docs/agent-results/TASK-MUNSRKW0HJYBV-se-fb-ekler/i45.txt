@@ -1,0 +1,6 @@
+load averages: 27.01 26.55 32.76
+wall=567ms cpu=823ms
+load averages: 25.41 26.23 32.61
+wall=499ms cpu=725ms
+load averages: 25.41 26.23 32.61
+wall=733ms cpu=1053ms
