@@ -1,3 +1,7 @@
+-- Run with scripts/apply-migrations.sh --down <this file>; plain psql stops here (İNCELEME-115 Ö-2).
+\set ON_ERROR_STOP on
+\ir ../migration-down-guard.sql
+
 -- Reverses retire-eur-plan-ladder.sql.
 --
 -- Caveat, stated rather than hidden: the forward mapping is many-to-one

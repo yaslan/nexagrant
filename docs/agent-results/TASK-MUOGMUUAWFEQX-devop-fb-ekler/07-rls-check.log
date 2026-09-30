@@ -1,0 +1,9 @@
+$ tsx scripts/check-rls.ts
+Found 47 tenant-scoped models requiring RLS policies:
+AddOn, AgencyInviteCode, AiUsageLog, ApiKey, ApplicationPart, ApprovalRequest, AuditEvent, CalendarConnection, Claim, ClaimEvidenceLink, ConceptNote, Consent, ConsortiumSeat, CreditLedger, Criterion, DualApprovalStep, Effort, Evaluation, Evidence, EvidenceReminder, Feedback, FollowupDoc, GateDecision, Interaction, Invitation, Invoice, LifetimeLicence, MeetingBrief, Membership, ModuleState, Opportunity, PartnerOrg, PlanAssignment, Proposal, ProposalUsage, Relationship, Reviewer, SavedSearch, Score, SeatCandidate, StripeEventLog, Subscription, TenantBillingIdentity, TenantProfile, TopicMatch, TtoPortfolioItem, Workspace
+
+✅ SUCCESS: All 47 tenant-scoped models have RLS policies registered.
+   (Declared, not measured — `pnpm rls:verify` asks the database.)
+
+CHECK 4b — 15 tenant-scoped tables are created by migrations.
+✅ SUCCESS: every one of them carries ENABLE + FORCE + tenant_isolation in its own migration.

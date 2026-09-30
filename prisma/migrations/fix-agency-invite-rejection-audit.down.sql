@@ -1,3 +1,7 @@
+-- Run with scripts/apply-migrations.sh --down <this file>; plain psql stops here (İNCELEME-115 Ö-2).
+\set ON_ERROR_STOP on
+\ir ../migration-down-guard.sql
+
 -- Rollback for fix-agency-invite-rejection-audit.sql (TASK-MULU7GVFBTRXX K-6).
 -- Restores note_agency_invite_rejection() exactly as add-agency-invite-code.sql
 -- defines it: an unknown code is filed again as a "tenantId" NULL AuditEvent,
