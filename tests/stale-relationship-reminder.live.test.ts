@@ -31,16 +31,6 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
   return { rlsUrl, ownerUrl };
 });
 
-// İNCELEME-69 D-2: the cross-tenant claim check must fail closed. Switched on
-// per test; off, every call goes to the real withSystemScope.
-const scopeFault = vi.hoisted(() => ({ on: false }));
-vi.mock('@/lib/system-scope', async (importOriginal) => {
-  const real = await importOriginal<typeof import('@/lib/system-scope')>();
-  const withSystemScope: typeof real.withSystemScope = (...args) =>
-    scopeFault.on ? Promise.reject(new Error('permission denied for function enter_system_scope')) : real.withSystemScope(...args);
-  return { ...real, withSystemScope };
-});
-
 import { createDbClient, prisma, withTenant } from '@/lib/db';
 import { sendStaleRelationshipReminders, STALE_REMINDER_AUDIT } from '@/lib/relationships/stale-reminder';
 import { dayStartUtc, isReminderDue, isStaleRelationship } from '@/lib/relationships/stale';
@@ -88,6 +78,7 @@ const U = {
   manager: `u-st-mgr-${RUN}`,
   y1: `u-st-y1-${RUN}`,
   d2: `u-st-d2-${RUN}`,
+  d1: `u-st-d1-${RUN}`,
 };
 const USERS = Object.values(U);
 const mail = (u: string) => `${u}@example.test`;
@@ -123,8 +114,9 @@ async function stampOf(key: string): Promise<Date | null> {
   return row?.staleRemindedAt ?? null;
 }
 
-async function claimOf(tenantId: string, userId: string): Promise<Date | null> {
-  const row = await admin.membership.findUnique({ where: { tenantId_userId: { tenantId, userId } }, select: { staleDigestOn: true } });
+/** The UTC day `userId`'s digest was last claimed (İNCELEME-69 D-1: on the user, not a membership). */
+async function claimOf(userId: string): Promise<Date | null> {
+  const row = await admin.user.findUnique({ where: { id: userId }, select: { staleDigestOn: true } });
   return row?.staleDigestOn ?? null;
 }
 
@@ -172,6 +164,7 @@ beforeAll(async () => {
   await admin.user.create({ data: { id: U.manager, email: mail(U.manager) } });
   await admin.user.create({ data: { id: U.y1, email: mail(U.y1) } });
   await admin.user.create({ data: { id: U.d2, email: mail(U.d2) } });
+  await admin.user.create({ data: { id: U.d1, email: mail(U.d1) } });
   const member = (tenantId: string, userId: string, role: 'MEMBER' | 'PIPELINE_MANAGER' = 'MEMBER') =>
     admin.membership.create({ data: { tenantId, userId, role } });
   await member(T.on, U.tr);
@@ -187,6 +180,8 @@ beforeAll(async () => {
   await member(Y1.b, U.y1);
   await member(D2.a, U.d2);
   await member(D2.b, U.d2);
+  await member(D2.a, U.d1);
+  await member(D2.b, U.d1);
 
   // T.on, owner U.tr
   await rel('exact60', T.on, U.tr, ago(60 * DAY)); // the 60th day: stale
@@ -279,13 +274,13 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     // The stamp records the contact it named.
     const recontact = await admin.relationship.findUnique({ where: { id: requireId(R.recontact, 'recontact') }, select: { staleRemindedContactAt: true } });
     expect(recontact?.staleRemindedContactAt?.getTime()).toBe(ago(70 * DAY).getTime());
-    // The day is claimed on every membership the digest covered, and on no other.
+    // The day is claimed on each mailed user, and on no one else.
     const today = dayStartUtc(NOW).getTime();
-    expect((await claimOf(T.on, U.tr))?.getTime()).toBe(today);
-    expect((await claimOf(T.on2, U.tr))?.getTime()).toBe(today);
-    expect((await claimOf(T.on, U.en))?.getTime()).toBe(today);
-    expect(await claimOf(T.off, U.tr)).toBeNull();
-    expect(await claimOf(T.on, U.gone)).toBeNull();
+    for (const u of [U.tr, U.en, U.manager]) expect((await claimOf(u))?.getTime()).toBe(today);
+    for (const u of [U.gone, U.member]) expect(await claimOf(u)).toBeNull();
+    // The retired per-membership column is neither read nor written any more.
+    const legacy = await admin.membership.findMany({ where: { tenantId: { in: TENANTS } }, select: { staleDigestOn: true } });
+    expect(legacy.every((m) => m.staleDigestOn === null)).toBe(true);
     for (const k of ['justUnder', 'never', 'unassigned', 'gone', 'notMember', 'pmMember', 'off', 'noPlan', 'expired']) expect(await stampOf(k)).toBeNull();
     expect((await stampOf('reminded'))?.getTime()).toBe(ago(10 * DAY).getTime());
   });
@@ -339,7 +334,7 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     expect((await stampOf('okB'))?.getTime()).toBe(day3.getTime());
     expect(r.errors).toEqual([{ scope: 'digest', reason: 'smtp:EENVELOPE:550' }]);
     // The rejected user's claim is given back, so a later run the same day retries.
-    expect((await claimOf(T.on, U.tr))?.getTime()).not.toBe(dayStartUtc(day3).getTime());
+    expect((await claimOf(U.tr))?.getTime()).not.toBe(dayStartUtc(day3).getTime());
     const retry = fakeMailer();
     const r2 = await run(retry.mailer, new Date(day3.getTime() + 60_000));
     expect(retry.sent.map((m) => m.to)).toEqual([mail(U.tr)]);
@@ -404,32 +399,29 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     expect([...a.sent, ...b.sent].map((m) => m.to)).toEqual([mail(U.tr)]);
   });
 
-  test('the claim is a compare-and-set: a run that loses the race between its read and its write sends nothing', async () => {
+  test('the claim is a compare-and-set: a run that loses the race after reading the day as free sends nothing', async () => {
     const d = new Date(NOW.getTime() + 160 * DAY);
     await rel('casA', T.on, U.tr, new Date(d.getTime() - 70 * DAY));
-    // Another run claims U.tr's day in the gap between this run's read of the
-    // membership and its conditional update: the claim's read (the findUnique
-    // that selects staleDigestOn) returns the old value, then the rival writes.
-    // The code's own updateMany runs untouched, so only its CAS `where` can stop it.
+    // Another run claims U.tr's day right after this run read the claims (the
+    // findMany over users, which still sees the day free). This run's own
+    // claim statement runs untouched, so only its condition can stop it.
+    const read = prisma.user.findMany.bind(prisma.user);
     let raced = false;
-    const racing: typeof withTenant = (tenantId, fn) =>
-      withTenant(tenantId, (tx) => {
-        const membership = new Proxy(tx.membership, {
-          get(target, prop, receiver) {
-            if (prop !== 'findUnique' || raced) return Reflect.get(target, prop, receiver);
-            return async (args: Parameters<typeof tx.membership.findUnique>[0]) => {
-              const read = await target.findUnique(args);
-              if (!args.select?.staleDigestOn) return read;
-              raced = true;
-              await admin.membership.updateMany({ where: { tenantId, userId: U.tr }, data: { staleDigestOn: dayStartUtc(d) } });
-              return read;
-            };
-          },
-        });
-        return fn(new Proxy(tx, { get: (t, p, r) => (p === 'membership' ? membership : Reflect.get(t, p, r)) }));
-      });
+    const spy = vi.spyOn(prisma.user, 'findMany').mockImplementation((async (args: Parameters<typeof read>[0]) => {
+      const rows = await read(args);
+      if (!raced && args?.where?.staleDigestOn) {
+        raced = true;
+        await admin.user.update({ where: { id: U.tr }, data: { staleDigestOn: dayStartUtc(d) } });
+      }
+      return rows;
+    }) as unknown as typeof read);
+    let r;
     const { sent, mailer } = fakeMailer();
-    const r = await run(mailer, d, racing);
+    try {
+      r = await run(mailer, d);
+    } finally {
+      spy.mockRestore();
+    }
     expect(raced).toBe(true);
     expect(sent).toHaveLength(0);
     expect(r.skippedMailedToday).toBe(1);
@@ -480,8 +472,7 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     await runY1(first.mailer, d); // 07:00: only Y1.b has a due row for U.y1
     expect(first.sent).toHaveLength(1);
     expect(first.sent[0]!.text).toContain(`${key}First-${RUN}`);
-    expect((await claimOf(Y1.b, U.y1))?.getTime()).toBe(dayStartUtc(d).getTime());
-    expect((await claimOf(Y1.a, U.y1))?.getTime()).not.toBe(dayStartUtc(d).getTime());
+    expect((await claimOf(U.y1))?.getTime()).toBe(dayStartUtc(d).getTime());
     // Goes stale in the OTHER tenant at 07:20.
     await rel(`${key}Late`, Y1.a, U.y1, new Date(d.getTime() + 20 * 60_000 - 60 * DAY));
   }
@@ -503,8 +494,8 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
       expect(r.tenantsModuleClosed).toBe(1);
       expect(second.sent).toHaveLength(0);
       expect(await stampOf('y1mLate')).toBeNull();
-      // The claim tried on Y1.a is given back: tomorrow's run is not blocked by it.
-      expect(await claimOf(Y1.a, U.y1)).toBeNull();
+      // The first run's claim stands; the second one neither took nor gave back anything.
+      expect((await claimOf(U.y1))?.getTime()).toBe(dayStartUtc(d).getTime());
     } finally {
       await setM4(Y1.b, 'ON');
     }
@@ -521,7 +512,7 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     expect(r.tenantsFailed).toBe(1);
     expect(second.sent).toHaveLength(0);
     expect(await stampOf('y1fLate')).toBeNull();
-    expect((await claimOf(Y1.a, U.y1))?.getTime()).not.toBe(dayStartUtc(d).getTime());
+    expect((await claimOf(U.y1))?.getTime()).toBe(dayStartUtc(d).getTime());
     await y1NextMorning(d, 'y1f');
   });
 
@@ -529,21 +520,21 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
   const runD2 = (mailer: (m: MailMessage) => Promise<void>, now: Date, tenantIds: readonly string[], runTenant?: typeof withTenant) =>
     sendStaleRelationshipReminders({ mailer, appUrl: 'https://app.example.test', now, tenantIds, runTenant });
 
-  test('two runs over disjoint tenants, both past their claims before either looks at the other, send at most one digest (İNCELEME-69 D-2)', async () => {
+  test('two runs over disjoint tenants racing for the same user send exactly one digest (İNCELEME-69 D-2, İNCELEME-56 R-1)', async () => {
     const d = y1Day(400);
     await rel('d2RaceA', D2.a, U.d2, new Date(d.getTime() - 65 * DAY));
     await rel('d2RaceB', D2.b, U.d2, new Date(d.getTime() - 65 * DAY));
-    // Run A sees only D2.a and run B only D2.b, so each skips the tenant the
-    // other claims in. Each run is parked right after its claim (its second
-    // call into the tenant) until the other has claimed too.
+    // Run A sees only D2.a and run B only D2.b. Each is parked after its
+    // collection (its first call into the tenant) until the other has
+    // collected too, so both read the day as free and both go for the claim.
     let arrived = 0;
     let open!: () => void;
     const gate = new Promise<void>((resolve) => (open = resolve));
-    const parkedAfterClaim = (): typeof withTenant => {
+    const parkedAfterCollect = (): typeof withTenant => {
       let calls = 0;
       return (async (tenantId, fn) => {
         const result = await withTenant(tenantId, fn);
-        if (++calls === 2) {
+        if (++calls === 1) {
           if (++arrived === 2) open();
           await gate;
         }
@@ -552,31 +543,69 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     };
     const a = fakeMailer();
     const b = fakeMailer();
-    await Promise.all([runD2(a.mailer, d, [D2.a], parkedAfterClaim()), runD2(b.mailer, d, [D2.b], parkedAfterClaim())]);
+    const [ra, rb] = await Promise.all([
+      runD2(a.mailer, d, [D2.a], parkedAfterCollect()),
+      runD2(b.mailer, d, [D2.b], parkedAfterCollect()),
+    ]);
     expect(arrived).toBe(2);
-    expect(a.sent.length + b.sent.length).toBeLessThanOrEqual(1);
+    // One wins, one stands down: never two digests, and never none (R-1).
+    expect([...a.sent, ...b.sent].map((m) => m.to)).toEqual([mail(U.d2)]);
+    expect(ra.digestsSent + rb.digestsSent).toBe(1);
+    expect(ra.skippedMailedToday + rb.skippedMailedToday).toBe(1);
+    expect((await claimOf(U.d2))?.getTime()).toBe(dayStartUtc(d).getTime());
   });
 
-  test('a failing cross-tenant claim check sends nothing and gives the claims back (İNCELEME-69 D-2)', async () => {
+  test('a failing claim sends nothing and holds no claim (İNCELEME-69 D-2)', async () => {
     const d = y1Day(410);
     await rel('d2FailA', D2.a, U.d2, new Date(d.getTime() - 65 * DAY));
-    const { sent, mailer } = fakeMailer();
-    scopeFault.on = true;
+    const raw = prisma.$queryRaw.bind(prisma);
+    let failed = 0;
+    const spy = vi.spyOn(prisma, '$queryRaw').mockImplementation(((query: TemplateStringsArray, ...values: unknown[]) => {
+      if (Array.isArray(query) && query.join('?').includes('SET "staleDigestOn"')) {
+        failed++;
+        return Promise.reject(new Error('canceling statement due to lock timeout'));
+      }
+      return raw(query, ...values);
+    }) as typeof prisma.$queryRaw);
     let r;
+    const { sent, mailer } = fakeMailer();
     try {
       r = await runD2(mailer, d, [D2.a, D2.b]);
     } finally {
-      scopeFault.on = false;
+      spy.mockRestore();
     }
+    expect(failed).toBe(1);
     expect(sent).toHaveLength(0);
     expect(r.digestsSent).toBe(0);
     expect(r.digestsFailed).toBe(1);
-    expect(r.errors.map((e) => e.scope)).toEqual(['digest']);
+    expect(r.errors).toEqual([{ scope: 'digest', reason: 'canceling statement due to lock timeout' }]);
     expect(await stampOf('d2FailA')).toBeNull();
-    expect((await claimOf(D2.a, U.d2))?.getTime()).not.toBe(dayStartUtc(d).getTime());
-    // Given back, not kept: a run later that day, with the check working, sends.
+    expect((await claimOf(U.d2))?.getTime()).not.toBe(dayStartUtc(d).getTime());
+    // Nothing held: a run later that day, with the claim working, sends.
     const retry = fakeMailer();
     await runD2(retry.mailer, new Date(d.getTime() + 60_000), [D2.a, D2.b]);
     expect(retry.sent.map((m) => m.to)).toEqual([mail(U.d2)]);
+  });
+
+  test('a member removed from the tenant the day was claimed through gets no second digest that day (İNCELEME-69 D-1)', async () => {
+    const d = y1Day(420);
+    await rel('d1First', D2.b, U.d1, new Date(d.getTime() - 65 * DAY));
+    const first = fakeMailer();
+    await runD2(first.mailer, d, [D2.a, D2.b]);
+    expect(first.sent.filter((m) => m.to === mail(U.d1))).toHaveLength(1);
+    // Removed from D2.b (the membership row is hard-deleted, as a tenant
+    // deletion's cascade would too), and a row in D2.a goes stale at 07:20.
+    await admin.membership.delete({ where: { tenantId_userId: { tenantId: D2.b, userId: U.d1 } } });
+    await rel('d1Late', D2.a, U.d1, new Date(d.getTime() + 20 * 60_000 - 60 * DAY));
+    const second = fakeMailer();
+    const r = await runD2(second.mailer, new Date(d.getTime() + 22 * 60_000), [D2.a, D2.b]);
+    expect(second.sent.filter((m) => m.to === mail(U.d1))).toHaveLength(0);
+    expect(r.skippedMailedToday).toBe(1);
+    expect(await stampOf('d1Late')).toBeNull();
+    const next = fakeMailer();
+    await runD2(next.mailer, new Date(d.getTime() + DAY), [D2.a, D2.b]);
+    const own = next.sent.filter((m) => m.to === mail(U.d1));
+    expect(own).toHaveLength(1);
+    expect(own[0]!.text).toContain(`d1Late-${RUN}`);
   });
 });

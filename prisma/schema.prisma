@@ -117,6 +117,10 @@ model User {
   deletionRequestedAt DateTime?  // set when the subject asks for erasure; purge job scans this
   deletedAt     DateTime?        // soft-delete marker: hidden from the product, still restorable
   deletionReason String?         // subject_request | policy | tenant_cascade
+  /// UTC day the `m4-stale-relationships` digest for this user was claimed,
+  /// set BEFORE the mail goes (compare-and-set) so no second run can send a
+  /// second digest the same day. m4-stale-digest-user-claim.sql
+  staleDigestOn DateTime? @db.Date
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   memberships   Membership[]
@@ -176,13 +180,14 @@ model Membership {
   role      Role     @default(MEMBER)
   workspaceIds String[] // empty = all workspaces of tenant
   createdAt DateTime @default(now())
-  /// UTC day the `m4-stale-relationships` digest for this member was claimed,
-  /// set BEFORE the mail goes (compare-and-set) so a retried run cannot send a
-  /// second digest the same day. m4-stale-reminder-idempotency.sql
+  /// No longer read or written: the digest's claim moved to `User.staleDigestOn`
+  /// (m4-stale-digest-user-claim.sql). Kept for the previous release; dropped
+  /// in a later file. m4-stale-reminder-idempotency.sql
   staleDigestOn DateTime? @db.Date
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([tenantId, userId])
+  @@index([userId])
 }
 
 enum Role {

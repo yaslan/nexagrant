@@ -50,3 +50,4 @@ k1-embedding-hash.sql
 m4-stale-reminder-idempotency.sql
 add-api-key-rate-window.sql
 evidence-unique-object-key.sql
+m4-stale-digest-user-claim.sql

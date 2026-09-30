@@ -223,15 +223,6 @@
     },
     {
       "check": "D",
-      "file": "src/lib/relationships/stale-reminder.ts",
-      "subject": "system-scope:cross-tenant-job",
-      "count": 1,
-      "kind": "system-scope",
-      "class": "cross-tenant-job",
-      "reason": "claimedElsewhere (İNCELEME-56 Y-1): 'one digest per user per day' is a per-USER fact spread over that user's memberships in every tenant, and the tenant that holds today's claim may be one this run skipped. One findFirst by userId, returning a tenantId only (no row content), read after the tenant-scoped CAS claims. Under fabrika_app without the scope it finds nothing and the user gets a second digest the same day."
-    },
-    {
-      "check": "D",
       "file": "src/lib/jobs/tasks/alerts-daily.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,
