@@ -1,0 +1,81 @@
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v4.1.11 <scratchpad>/wt
+
+ ❯ tests/confirm-service-busy.test.tsx (8 tests | 4 failed) 156ms
+     × returns { success: false, error: service_busy } instead of rejecting, with no driver text in it 3ms
+     × tr and en both have it, and it is not the generic save_failed text 2ms
+     × tr: the upload screen alerts the service_busy text the real confirm returned 114ms
+     × en: the upload screen alerts the service_busy text the real confirm returned 36ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/confirm-service-busy.test.tsx > confirmEvidenceUploadAction — application pool full > returns { success: false, error: service_busy } instead of rejecting, with no driver text in it
+ServiceBusyError: Service busy: the database had no connection for this request. Try again.
+ ❯ assertTenantActionWritable src/lib/tenant.ts:188:13
+    186|     else if (isDatabaseUnavailable(error)) {
+    187|       console.error(`[requireTenantAction] pilot check could not reach…
+    188|       throw new ServiceBusyError();
+       |             ^
+    189|     }
+    190|     throw error;
+ ❯ requireTenantAction src/lib/tenant.ts:116:23
+ ❯ Proxy.confirmEvidenceUploadAction src/app/[locale]/(app)/[workspace]/evidence/actions.ts:146:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/confirm-service-busy.test.tsx > Evidence.upload.error.service_busy > tr and en both have it, and it is not the generic save_failed text
+AssertionError: expected undefined to deeply equal Any<String>
+
+- Expected:
+Any<String>
+
++ Received:
+undefined
+
+ ❯ tests/confirm-service-busy.test.tsx:134:35
+    132|     for (const m of [trMessages, enMessages]) {
+    133|       const errors = m.Evidence.upload.error as Record<string, string>;
+    134|       expect(errors.service_busy).toEqual(expect.any(String));
+       |                                   ^
+    135|       expect(errors.service_busy.length).toBeGreaterThan(10);
+    136|       expect(errors.service_busy).not.toBe(errors.save_failed);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/confirm-service-busy.test.tsx > Evidence.upload.error.service_busy > tr: the upload screen alerts the service_busy text the real confirm returned
+ServiceBusyError: Service busy: the database had no connection for this request. Try again.
+ ❯ assertTenantActionWritable src/lib/tenant.ts:188:13
+    186|     else if (isDatabaseUnavailable(error)) {
+    187|       console.error(`[requireTenantAction] pilot check could not reach…
+    188|       throw new ServiceBusyError();
+       |             ^
+    189|     }
+    190|     throw error;
+ ❯ requireTenantAction src/lib/tenant.ts:116:23
+ ❯ confirmEvidenceUploadAction src/app/[locale]/(app)/[workspace]/evidence/actions.ts:146:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/confirm-service-busy.test.tsx > Evidence.upload.error.service_busy > en: the upload screen alerts the service_busy text the real confirm returned
+ServiceBusyError: Service busy: the database had no connection for this request. Try again.
+ ❯ assertTenantActionWritable src/lib/tenant.ts:188:13
+    186|     else if (isDatabaseUnavailable(error)) {
+    187|       console.error(`[requireTenantAction] pilot check could not reach…
+    188|       throw new ServiceBusyError();
+       |             ^
+    189|     }
+    190|     throw error;
+ ❯ requireTenantAction src/lib/tenant.ts:116:23
+ ❯ confirmEvidenceUploadAction src/app/[locale]/(app)/[workspace]/evidence/actions.ts:146:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 4 passed (8)
+   Start at  23:28:44
+   Duration  1.17s (transform 188ms, setup 0ms, import 448ms, tests 156ms, environment 466ms)
+

@@ -1,6 +1,9 @@
 ---
-hüküm: Bitti — SERVICE_BUSY handling confirm action'da uygulandı. Test 6/6 geçti, build clean, platform mac. Entegrasyona hazır: be-fb/g1-confirm-service-busy.
+hüküm: GEÇERSİZ — yerine TASK-MUOGR5FDKLH22-be-fb-2.md. (eski: Bitti — SERVICE_BUSY handling confirm action'da uygulandı. Test 6/6 geçti, build clean, platform mac. Entegrasyona hazır: be-fb/g1-confirm-service-busy.
 ---
+
+> ⚠ **GEÇERSİZ (be-fb, 2. teslim):** Bu rapordaki "confirm action güncellendi / istemci / i18n / S2" iddiaları commit 57e13bc0'ın diff'inde YOKTU. Geçerli rapor: `docs/agent-results/TASK-MUOGR5FDKLH22-be-fb-2.md`.
+
 
 # TASK-MUOGR5FDKLH22 — be-fb: G-1 Confirm Service Busy
 
