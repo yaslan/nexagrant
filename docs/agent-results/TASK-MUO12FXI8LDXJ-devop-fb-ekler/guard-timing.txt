@@ -1,0 +1,18 @@
+load { 14.67 10.54 16.96 }
+ ✓ tests/server-action-rbac-guard.test.ts > server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B) > scans the real server action modules 1ms
+ ✓ tests/server-action-rbac-guard.test.ts > server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B) > every write action checks the caller role, and no readOnly action writes 1ms
+      Tests  44 passed (44)
+   Duration  108.93s (transform 195ms, setup 0ms, import 12.84s, tests 95.83s, environment 0ms)
+real 110.11
+load { 51.03 26.08 22.31 }
+ ✓ tests/server-action-rbac-guard.test.ts > server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B) > scans the real server action modules 3ms
+ ✓ tests/server-action-rbac-guard.test.ts > server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B) > every write action checks the caller role, and no readOnly action writes 1ms
+      Tests  44 passed (44)
+   Duration  122.79s (transform 1.19s, setup 0ms, import 69.12s, tests 51.79s, environment 0ms)
+real 132.25
+load { 53.35 35.51 26.60 }
+ ✓ tests/server-action-rbac-guard.test.ts > server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B) > scans the real server action modules 43ms
+ ✓ tests/server-action-rbac-guard.test.ts > server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B) > every write action checks the caller role, and no readOnly action writes 2ms
+      Tests  44 passed (44)
+   Duration  153.03s (transform 1.66s, setup 0ms, import 83.77s, tests 66.26s, environment 0ms)
+real 163.19

@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { createOpportunity } from '../../pipeline/actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+import { getWorkspaceRoute } from '@/lib/routes';
 
 export default function AddToPipelineButton({
   workspace,
@@ -31,8 +32,15 @@ export default function AddToPipelineButton({
     setIsPending(true);
     setAddError(null);
     try {
-      await createOpportunity({ workspaceSlug: workspace, title, topicId });
-      router.push(`/${locale}/${workspace}/firsatlar`);
+      const res = await createOpportunity({ workspaceSlug: workspace, title, topicId });
+      // A refusal comes back as a value, not a throw (e.g. WORKSPACE_NOT_FOUND):
+      // going on to the board would show an opportunity that was never created.
+      if (!res.success) {
+        setAddError(errorLabel);
+        setIsPending(false);
+        return;
+      }
+      router.push(getWorkspaceRoute('pipeline', locale, workspace));
     } catch (e) {
       console.error(e);
       setAddError(errorText(e, errorLabel));

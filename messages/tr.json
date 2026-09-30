@@ -224,7 +224,8 @@
       "current": "Stage-Gate Pipeline"
     },
     "heading": "Fırsat & Teklif Boru Hattı",
-    "subtitle": "G0 Triage fizibilitesinden G4 nihai başvuru teslimine kadar çalışma grubunuzdaki kullanıcılarla tekliflerinizi yönetin."
+    "subtitle": "G0 Triage fizibilitesinden G4 nihai başvuru teslimine kadar çalışma grubunuzdaki kullanıcılarla tekliflerinizi yönetin.",
+    "createRefused": "Fırsat oluşturulamadı: bu çalışma alanına yazma yetkiniz yok ya da alan artık yok."
   },
   "Evidence": {
     "title": "Kanıt Çekmecesi",
@@ -265,6 +266,7 @@
         "already_confirmed": "Bu dosya zaten kaydedildi. Yeni bir belge için dosyayı yeniden seçin.",
         "invalid_object_key": "Dosya anahtarı geçersiz.",
         "storage_unavailable": "Depolama şu an kullanılamıyor. Biraz sonra tekrar deneyin.",
+        "save_failed": "Belge kaydedilemedi. Tekrar deneyin.",
         "put_failed": "Dosya depoya yüklenemedi (HTTP {status})."
       }
     }

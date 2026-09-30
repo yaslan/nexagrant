@@ -1,0 +1,11 @@
+R0   kontrol                            @/lib/i80/realimpl                   → KIRMIZI readOnly: true but writes: prisma.evidence.delete (lib/i80/realimpl.ts:2, via wipe (lib/i80/realimpl))
+P1   alias içinde '..'                  @/lib/../lib/i80/realimpl            → KIRMIZI readOnly: true but writes: prisma.evidence.delete (lib/../lib/i80/realimpl.ts:2, via wipe (lib/../lib/i80/realimpl))
+P1b  alias içinde './'                  @/lib/./i80/realimpl                 → KIRMIZI readOnly: true but writes: prisma.evidence.delete (lib/./i80/realimpl.ts:2, via wipe (lib/./i80/realimpl))
+P4   göreli 5×'..'                      ../../../../../lib/i80/realimpl      → KIRMIZI readOnly: true but writes: prisma.evidence.delete (lib/i80/realimpl.ts:2, via wipe (lib/i80/realimpl))
+P8   büyük harf (mac: dosya bulunur)    @/lib/I80/RealImpl                   → KIRMIZI readOnly: true but writes: prisma.evidence.delete (lib/I80/RealImpl.ts:2, via wipe (lib/I80/RealImpl))
+X1   .js kaynak (allowJs)               @/lib/i80/legacy                     → YEŞİL (kaçtı)
+X1b  .js kaynak, uzantılı               @/lib/i80/legacy.js                  → YEŞİL (kaçtı)
+X3   .mts kaynak                        @/lib/i80/modern.mjs                 → YEŞİL (kaçtı)
+K0   iyi biçim db=@/lib/db rbac=@/lib/rbac                                   → YEŞİL
+K1   iyi biçim db=@/lib/DB rbac=@/lib/rbac                                   → YEŞİL
+K2   iyi biçim db=@/lib/db rbac=@/lib/RBAC                                   → KIRMIZI write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)

@@ -1,0 +1,22 @@
+#!/bin/bash
+# DB outage probes against :3481 — touches ONLY the csfb81-pg container.
+B=http://localhost:3481; J=$(mktemp)
+c=$(curl -s -c $J -b $J $B/api/auth/csrf | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrfToken"])')
+curl -s -o /dev/null -c $J -b $J -X POST $B/api/auth/callback/credentials --data-urlencode "csrfToken=$c" --data-urlencode "email=cf81@fabrika.test" --data-urlencode "callbackUrl=$B/tr"
+probe(){ curl -s -m 60 -c $J -b $J -o /tmp/csfb81-s.json -w "%{http_code} %{time_total}s" $B/api/auth/session; echo " $(python3 -c 'import json;d=json.load(open("/tmp/csfb81-s.json"));print("tenant=%s role=%s admin=%s"%(d.get("tenantId"),d.get("role"),d.get("isPlatformAdmin")))' 2>/dev/null)"; }
+burst(){ for i in $(seq 1 20); do curl -s -m 60 -b $J -o /dev/null -w "%{time_total}\n" $B/api/auth/session & done | sort -n | awk '{a[NR]=$1} END{printf "20 parallel: min=%ss median=%ss max=%ss\n",a[1],a[10],a[NR]}'; wait; }
+echo "[H0] healthy        : $(probe)"; echo "[H0] healthy        : $(probe)"
+L0=$(wc -l < ek81/dev.log)
+docker stop csfb81-pg >/dev/null; echo "--- docker stop (connection refused) ---"
+for i in 1 2 3; do echo "[S$i] db stopped     : $(probe)"; done
+echo "[S4] $(burst)"
+echo "[S5] dashboard      : $(curl -s -m 60 -b $J -o /dev/null -w '%{http_code} %{time_total}s -> %{redirect_url}' $B/tr/default/dashboard)"
+docker start csfb81-pg >/dev/null; sleep 4; echo "[S6] restarted      : $(probe)"
+docker pause csfb81-pg >/dev/null; echo "--- docker pause (connect never completes -> 1 s timeout, retried once) ---"
+sleep 7  # let idle pool connections expire (idleTimeoutMillis 5000)
+for i in 1 2 3; do echo "[P$i] db paused      : $(probe)"; done
+echo "[P4] $(burst)"
+docker unpause csfb81-pg >/dev/null; sleep 2; echo "[P5] unpaused       : $(probe)"
+echo "--- dev.log since outage (warnings) ---"
+tail -n +$L0 ek81/dev.log | grep -oE "\[Auth.jwt\][^:]*: .{0,90}" | sed 's/[0-9a-f]\{16,\}/<hex>/g' | sort | uniq -c
+rm -f $J

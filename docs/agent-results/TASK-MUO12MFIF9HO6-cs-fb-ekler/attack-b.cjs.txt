@@ -1,0 +1,46 @@
+const { chromium } = require('@playwright/test');
+const { execSync } = require('child_process');
+const B = 'http://localhost:3481'; const DIR = process.argv[2];
+const q = (sql) => execSync(`docker exec -i csfb81-pg psql -U fabrika -d fabrika -tAq`, { input: sql }).toString().trim();
+const sess = async (ctx) => { const s = await (await ctx.request.get(B + '/api/auth/session')).json(); return JSON.stringify({ tenantId: s?.tenantId ?? null, role: s?.role ?? null }); };
+async function login(ctx, email) { const { csrfToken } = await (await ctx.request.get(B + '/api/auth/csrf')).json(); await ctx.request.post(B + '/api/auth/callback/credentials', { form: { csrfToken, email, callbackUrl: B + '/tr' }, maxRedirects: 0 }); }
+(async () => {
+  const b = await chromium.launch({ channel: 'chrome' });
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
+  // state: u member of B (MEMBER), C (PM), D(deleted). Bind to C then remove C -> tenantless, B still held.
+  q(`insert into "Membership"(id,"tenantId","userId",role,"workspaceIds") values ('cf81-mc','cf81-c','cf81-u','PIPELINE_MANAGER','{}')`);
+  q(`delete from "Membership" where id='cf81-ma'`);
+  await login(ctx, 'cf81@fabrika.test');
+  const { csrfToken } = await (await ctx.request.get(B + '/api/auth/csrf')).json();
+  await ctx.request.post(B + '/api/auth/session', { headers: { 'content-type': 'application/json' }, data: JSON.stringify({ csrfToken, data: { tenantId: 'cf81-c' } }) });
+  console.log('[C5] bound to C                         :', await sess(ctx));
+  q(`delete from "Membership" where "tenantId"='cf81-c' and "userId"='cf81-u'`);
+  console.log('[C5] removed from C (B still held)      :', await sess(ctx));
+  const p = await ctx.newPage();
+  await p.goto(B + '/tr/default/dashboard', { waitUntil: 'load', timeout: 180000 });
+  console.log('[C5] dashboard ->', p.url());
+  const dlg = p.getByRole('alertdialog');
+  if (await dlg.waitFor({ timeout: 15000 }).then(() => true, () => false)) { await dlg.getByRole('button').first().click(); await dlg.waitFor({ state: 'hidden' }); }
+  await p.getByRole('link', { name: 'Tekrar giriş yap' }).click();
+  await p.waitForURL('**/giris**', { timeout: 180000 }).catch(() => {});
+  await p.waitForLoadState('load'); await p.waitForTimeout(5000);
+  console.log('[C6] "Tekrar giriş yap" ->', p.url(), '| session still', await sess(ctx));
+  await p.screenshot({ path: `${DIR}/shot-C6-giris-while-signed-in.png` });
+  const email = p.locator('input[type="email"]');
+  const hasForm = await email.waitFor({ timeout: 30000 }).then(() => true, () => false);
+  console.log('[C6] login form visible:', hasForm);
+  if (hasForm) {
+    await email.fill('cf81@fabrika.test');
+    await p.locator('button[type="submit"]').last().click();
+    await p.waitForTimeout(8000);
+    console.log('[C7] submitted sign-in ->', p.url(), '| session', await sess(ctx));
+    await p.screenshot({ path: `${DIR}/shot-C7-after-resignin.png` });
+  }
+  // pre-existing: deleted tenant D as OLDEST membership -> plain sign-in binds there too?
+  q(`update "Membership" set "createdAt"=now()-interval '10 hour' where id='cf81-md'`);
+  const ctx2 = await b.newContext();
+  await login(ctx2, 'cf81@fabrika.test');
+  console.log('[P1] D (deleted) oldest, fresh sign-in  :', await sess(ctx2), '(pre-existing path, not this diff)');
+  q(`update "Membership" set "createdAt"=now()-interval '1 hour' where id='cf81-md'`);
+  await b.close();
+})().catch((e) => { console.error('FAIL', e.stack); process.exit(1); });

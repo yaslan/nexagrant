@@ -1,0 +1,14 @@
+# jwt callback SQL (log_statement=all, izole csfb-o2b5-pg): signIn çağrısı | PROBE-MID | düz yenileme (bağlı kiracı).
+## ÖNCE (dev 23e63600)
+SELECT "public"."User"."id", "public"."User"."name", "public"."User"."isPlatformAdmin" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+SELECT "public"."Membership"."id", "public"."Membership"."tenantId", "public"."Membership"."role"::text, "public"."Membership"."workspaceIds", "public"."Membership"."userId" FROM "public"."Membership" WHERE "public"."Membership"."userId" = $1 ORDER BY "public"."Membership"."createdAt" ASC LIMIT $2 OFFSET $3
+SELECT 'PROBE-MID-before-20562'
+SELECT "public"."User"."id", "public"."User"."name", "public"."User"."isPlatformAdmin" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+SELECT "public"."Membership"."id", "public"."Membership"."tenantId", "public"."Membership"."role"::text, "public"."Membership"."workspaceIds", "public"."Membership"."userId" FROM "public"."Membership" WHERE ("public"."Membership"."tenantId" = $1 AND "public"."Membership"."userId" = $2) ORDER BY "public"."Membership"."createdAt" ASC LIMIT $3 OFFSET $4
+
+## SONRA (düzeltme)
+SELECT "public"."User"."id", "public"."User"."name", "public"."User"."isPlatformAdmin" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+SELECT "public"."Membership"."id", "public"."Membership"."tenantId", "public"."Membership"."role"::text, "public"."Membership"."workspaceIds", "public"."Membership"."userId" FROM "public"."Membership" LEFT JOIN "public"."Tenant" AS "j0" ON ("j0"."id") = ("public"."Membership"."tenantId") WHERE (("j0"."deletedAt" IS NULL AND ("j0"."id" IS NOT NULL)) AND "public"."Membership"."userId" = $1) ORDER BY "public"."Membership"."createdAt" ASC LIMIT $2 OFFSET $3
+SELECT 'PROBE-MID-after-23430'
+SELECT "public"."User"."id", "public"."User"."name", "public"."User"."isPlatformAdmin" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+SELECT "public"."Membership"."id", "public"."Membership"."tenantId", "public"."Membership"."role"::text, "public"."Membership"."workspaceIds", "public"."Membership"."userId" FROM "public"."Membership" LEFT JOIN "public"."Tenant" AS "j0" ON ("j0"."id") = ("public"."Membership"."tenantId") WHERE ((("j0"."deletedAt" IS NULL AND ("j0"."id" IS NOT NULL)) AND "public"."Membership"."tenantId" = $1) AND "public"."Membership"."userId" = $2) ORDER BY "public"."Membership"."createdAt" ASC LIMIT $3 OFFSET $4

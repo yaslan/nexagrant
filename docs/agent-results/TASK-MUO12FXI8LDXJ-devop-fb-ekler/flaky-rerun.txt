@@ -1,0 +1,4 @@
+ Test Files  3 passed (3)
+      Tests  54 passed (54)
+   Duration  46.33s (transform 1.07s, setup 0ms, import 2.12s, tests 128.39s, environment 1ms)
+load { 51.83 56.51 39.04 }

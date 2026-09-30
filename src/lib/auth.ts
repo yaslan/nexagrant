@@ -707,10 +707,17 @@ export const authConfig = {
         try {
           // One Prisma call, as before: the flag plus at most one membership
           // row — the bound tenant's, or the oldest one when none is bound.
-          // (`where: undefined` is meant: still only this user's memberships.)
           // Prisma sends it as two statements, the second on the
           // (tenantId, userId) unique index. Only a rebind request asks for
           // two rows: the requested tenant's and, as a fallback, the bound one.
+          //
+          // A soft-deleted tenant (`Tenant.deletedAt`, in its hold before the
+          // purge) grants nothing (TASK-MUO2B59ZNY7D7, İNCELEME-81 O-1). Its
+          // row is filtered in the same statement, so a token bound to it goes
+          // tenantless like a removed member's, a sign-in skips it, and a
+          // rebind request for it keeps the token where it was — as an
+          // invitation to it is already refused (src/lib/invitations/accept.ts).
+          // Clearing `deletedAt` gives the same token its tenant back.
           const userId = token.id;
           const dbUser = await retryOnceIfNotConnected(() => prisma.user.findUnique({
             where: { id: userId },
@@ -718,12 +725,14 @@ export const authConfig = {
               name: true,
               isPlatformAdmin: true,
               memberships: {
-                where:
-                  lookupTenantIds.length === 0
-                    ? undefined
+                where: {
+                  tenant: { deletedAt: null },
+                  ...(lookupTenantIds.length === 0
+                    ? {}
                     : lookupTenantIds.length === 1
                       ? { tenantId: lookupTenantIds[0] }
-                      : { tenantId: { in: lookupTenantIds } },
+                      : { tenantId: { in: lookupTenantIds } }),
+                },
                 orderBy: { createdAt: "asc" },
                 take: Math.max(1, lookupTenantIds.length),
                 select: { tenantId: true, role: true, workspaceIds: true },

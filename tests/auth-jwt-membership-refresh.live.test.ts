@@ -240,3 +240,59 @@ describe('accepting an invitation moves the session to that tenant (TASK-MUNWZA2
     expect(after.role).toBe('TENANT_OWNER');
   });
 });
+
+describe('a soft-deleted tenant grants nothing (TASK-MUO2B59ZNY7D7, İNCELEME-81 O-1)', () => {
+  /** What an operator's soft-delete leaves: the row and its memberships stay. */
+  async function softDelete(tenantId: string, at: Date | null = new Date()) {
+    await admin!.tenant.update({ where: { id: requireId(tenantId, 'tenant') }, data: { deletedAt: at } });
+  }
+
+  test('the bound tenant is deleted: the next request is tenantless, not moved to B; undeleted, it is back', async () => {
+    expect((await request()).tenantA).toBe(true);
+    const e1 = await evidenceRow('kept');
+    await softDelete(ids.tenantA);
+    const deleted = await request();
+    const write = await outcome(lib!.evidence.deleteEvidence(e1));
+    const left = await admin!.evidence.count({ where: { id: requireId(e1, 'e1') } });
+    // Restored inside the hold (deletedAt cleared): the same cookie finds A again.
+    await softDelete(ids.tenantA, null);
+    const restored = await request();
+
+    console.log('O1_BOUND_DELETED', JSON.stringify({ deleted, write, left, restored: { tenantA: restored.tenantA, role: restored.role } }));
+    expect(deleted.tenantId).toBeNull();
+    expect(deleted.role).toBeNull();
+    expect(deleted.tenantB).toBe(false);
+    expect(write).toBe('throw:TENANT_SCOPE_REQUIRED');
+    expect(left).toBe(1);
+    expect(restored).toMatchObject({ tenantA: true, role: 'TENANT_OWNER' });
+  });
+
+  test('a sign-in skips a deleted tenant even when it is the oldest membership', async () => {
+    await softDelete(ids.tenantA);
+    const user = await admin!.user.findUniqueOrThrow({ where: { id: requireId(ids.user, 'user') }, select: { email: true } });
+    const claims = await lib!.auth.authConfig.callbacks!.jwt!({
+      token: { sub: ids.user, email: user.email },
+      user: { id: ids.user, email: user.email },
+      trigger: 'signIn',
+    } as never);
+    jar.set(COOKIE, await lib!.encode({ token: claims as never, secret: process.env.AUTH_SECRET!, salt: COOKIE }));
+    const signedIn = await request();
+    console.log('O1_SIGNIN', JSON.stringify(signedIn));
+    expect(signedIn.tenantB).toBe(true);
+    expect(signedIn.tenantA).toBe(false);
+  });
+
+  test('[A9] asked to be bound to a deleted tenant it is a member of, the session stays where it was', async () => {
+    const d = await admin!.tenant.create({ data: { name: `${RUN} D`, slug: `${RUN}-d-${Math.random().toString(36).slice(2, 8)}`, country: 'TR' } });
+    created.tenants.push(d.id);
+    await admin!.membership.create({ data: { tenantId: d.id, userId: ids.user, role: 'TENANT_OWNER' } });
+    await softDelete(d.id);
+    // What POST /api/auth/session { data: { tenantId } } does: the same update path.
+    await lib!.auth.unstable_update({ tenantId: d.id } as never);
+    const after = await request();
+    console.log('O1_A9', JSON.stringify({ d: after.tenantId === d.id, tenantA: after.tenantA, role: after.role }));
+    expect(after.tenantId).not.toBe(d.id);
+    expect(after.tenantA).toBe(true);
+    expect(after.role).toBe('TENANT_OWNER');
+  });
+});

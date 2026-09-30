@@ -2,7 +2,6 @@ import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { PRODUCT_NAME } from '@/lib/brand';
-import { auth } from '@/lib/auth';
 import { publicCallDetailHref } from '@/lib/routes';
 
 interface CallCardProps {
@@ -18,10 +17,9 @@ interface CallCardProps {
     nextDeadlineAt: Date | null;
   };
   locale: string;
-  signedIn: boolean;
 }
 
-function CallCard({ call, topic, locale, signedIn }: CallCardProps) {
+function CallCard({ call, topic, locale }: CallCardProps) {
   const budget = call.budgetCents ? Number(call.budgetCents) / 100 : 0;
   const deadline = topic.nextDeadlineAt ? new Date(topic.nextDeadlineAt).toLocaleDateString() : 'TBA';
   const statusColor = topic.status === 'OPEN' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
@@ -46,7 +44,7 @@ function CallCard({ call, topic, locale, signedIn }: CallCardProps) {
         </div>
       </div>
       <Link
-        href={publicCallDetailHref(locale, topic.identifier, signedIn)}
+        href={publicCallDetailHref(locale, topic.identifier)}
         className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold text-sm"
       >
         View Details
@@ -62,7 +60,6 @@ interface PageProps {
 export default async function CallsPage({ params }: PageProps) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'callsIndex' });
-  const signedIn = Boolean((await auth())?.user);
 
   const topics = await prisma.topic.findMany({
     where: {
@@ -111,7 +108,7 @@ export default async function CallsPage({ params }: PageProps) {
               <h2 className="text-2xl font-bold text-slate-900 mb-6">{country === 'TR' ? '🇹🇷 Turkey' : country}</h2>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {countryTopics.map((topic) => (
-                  <CallCard key={topic.id} call={topic.call} topic={topic} locale={locale} signedIn={signedIn} />
+                  <CallCard key={topic.id} call={topic.call} topic={topic} locale={locale} />
                 ))}
               </div>
             </div>
