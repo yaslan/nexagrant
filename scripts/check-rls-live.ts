@@ -372,6 +372,90 @@ async function probeIsolation(
     }
   }
 
+  // 2c. A FORGED scope (TASK-MUOGMQK3JAH4Y, İNCELEME-115 Ö-1). `app.system_scope`
+  //     is a placeholder GUC, so it is USERSET: no grant can stop a role from
+  //     setting it. Until the seal, fabrika_app read every tenant's rows with a
+  //     plain SET — and every check above stayed green, because none of them
+  //     tried. Three shapes, each inside a rolled-back transaction (a session
+  //     `SET` there is undone by the ROLLBACK, and is what PGOPTIONS or a
+  //     connection string `options=` produce): transaction-local set_config,
+  //     session SET, and the seal of an earlier legitimate enter_system_scope
+  //     replayed in a later transaction.
+  if (populated.length > 0) {
+    let replay: string | null = null;
+    await m.query('BEGIN');
+    try {
+      await m.query(`select enter_system_scope('platform-admin')`);
+      const { rows } = await m.query<{ t: string | null }>(
+        `select current_setting('app.system_scope_token', true) as t`
+      );
+      replay = rows[0]?.t ?? null;
+      // Positive control: the sealed door still opens. Without it, "0 rows
+      // under a forged scope" is also what a broken system_scope looks like.
+      const probe = populated[0]!;
+      const { rows: open } = await m.query<{ n: string }>(
+        `select count(*)::int as n from ${quoteIdent(probe.table)}`
+      );
+      const seen = Number(open[0]?.n ?? 0);
+      if (seen === 0) {
+        failures.push(
+          `${probe.table}: enter_system_scope ile de 0 satır okunuyor (tabloda ${probe.rows}) — meşru kapı açılmıyor, sahte kapsam ölçümü geçersiz.`
+        );
+      } else {
+        checks.push(`kapsam (pozitif): enter_system_scope ile ${probe.table} tablosunda ${seen} satır göründü (tabloda ${probe.rows})`);
+      }
+    } catch (e) {
+      // Same standing as 2b: the throwaway probe role holds no EXECUTE.
+      if (!(e instanceof Error && /permission denied/i.test(e.message))) {
+        failures.push(
+          `enter_system_scope başarısız — mühür yeniden oynatma sondası kurulamadı: ${
+            e instanceof Error ? e.message : String(e)
+          }`
+        );
+      }
+    } finally {
+      await m.query('ROLLBACK');
+    }
+
+    const shapes: Array<{ name: string; setup: Array<[string, unknown[]]> }> = [
+      { name: `set_config('app.system_scope','on',true)`, setup: [[`select set_config('app.system_scope', 'on', true)`, []]] },
+      { name: `SET app.system_scope = 'on' (oturum; PGOPTIONS/options= ile aynı)`, setup: [[`set app.system_scope = 'on'`, []]] },
+    ];
+    if (replay) {
+      shapes.push({
+        name: 'önceki işlemin mührü yeniden oynatıldı',
+        setup: [
+          [`select set_config('app.system_scope', 'on', true)`, []],
+          [`select set_config('app.system_scope_token', $1, true)`, [replay]],
+        ],
+      });
+    } else {
+      checks.push('sahte kapsam (yeniden oynatma): ATLANDI — ölçüm rolünün enter_system_scope yetkisi yok');
+    }
+
+    for (const shape of shapes) {
+      await m.query('BEGIN');
+      try {
+        for (const [sql, params] of shape.setup) await m.query(sql, params);
+        const leaked: string[] = [];
+        for (const p of populated) {
+          const { rows } = await m.query<{ n: string }>(`select count(*)::int as n from ${quoteIdent(p.table)}`);
+          const seen = Number(rows[0]?.n ?? -1);
+          if (seen !== 0) leaked.push(`${p.table} ${seen}/${p.rows}`);
+        }
+        if (leaked.length > 0) {
+          failures.push(
+            `sahte kapsam (${shape.name}): enter_system_scope olmadan kiracı yalıtımı AÇILDI — ${leaked.join(', ')}`
+          );
+        } else {
+          checks.push(`sahte kapsam (${shape.name}): ${populated.length} dolu tablonun hepsi 0 satır döndü`);
+        }
+      } finally {
+        await m.query('ROLLBACK');
+      }
+    }
+  }
+
   // 3. WITH CHECK, the direction that lets a row land in the wrong tenant.
   //    Every insert below is rolled back; nothing is ever committed.
   if (aiUsageLogExists) {
@@ -499,17 +583,36 @@ async function main() {
     const missingPolicy = models.filter((m) => existing.has(m) && !hasPolicy.has(m));
     const missingForce = models.filter((m) => existing.has(m) && rlsOn.has(m) && !forced.has(m));
 
+    // A system_scope policy that tests the bare GUC is a forgeable one
+    // (TASK-MUOGMQK3JAH4Y): `app.system_scope` is USERSET, so fabrika_app can
+    // set it itself. Checked in the catalogue as well as by the probe below,
+    // because the probe only reads tables that hold rows — an empty AuditEvent
+    // left the old wording (restated by a migration re-run) invisible to it.
+    const scopePolicies = await client.query<{ tablename: string; qual: string | null; with_check: string | null }>(
+      `select tablename, qual, with_check from pg_policies
+        where schemaname = 'public' and policyname = 'system_scope'`
+    );
+    const unsealed = scopePolicies.rows
+      .filter((r) => !`${r.qual ?? ''}`.includes('system_scope_open(') || !`${r.with_check ?? ''}`.includes('system_scope_open('))
+      .map((r) => r.tablename)
+      .sort();
+
     console.log(`Kiracıya özel model: ${models.length} · RLS açık tablo: ${rlsOn.size} · tenant_isolation politikası: ${hasPolicy.size}`);
 
     if (missingTable.length > 0) {
       console.log(`\nℹ  Şemada olup veritabanında olmayan tablo (migration bekliyor): ${missingTable.join(', ')}`);
     }
 
-    if (missingRls.length > 0 || missingPolicy.length > 0 || missingForce.length > 0) {
+    if (missingRls.length > 0 || missingPolicy.length > 0 || missingForce.length > 0 || unsealed.length > 0) {
       console.error('\n❌ KİRACI İZOLASYONU EKSİK — bu bir ortam gürültüsü değil, güvenlik durumu.');
       if (missingRls.length > 0) console.error(`   RLS kapalı: ${missingRls.join(', ')}`);
       if (missingForce.length > 0) console.error(`   FORCE ROW LEVEL SECURITY yok (tablo sahibi politikaları atlıyor): ${missingForce.join(', ')}`);
       if (missingPolicy.length > 0) console.error(`   tenant_isolation politikası yok: ${missingPolicy.join(', ')}`);
+      if (unsealed.length > 0) {
+        console.error(
+          `   system_scope politikası mühürsüz (yalnız app.system_scope GUC'una bakıyor, fabrika_app kendisi açabilir): ${unsealed.join(', ')}`
+        );
+      }
       console.error('\n   Onarım: pnpm db:rls   (gerekirse önce pnpm db:rls-role)');
       process.exit(1);
     }

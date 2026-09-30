@@ -17,7 +17,8 @@
 --     writes only its own rows. `NULL = 'x'` is NULL, so NULL rows are neither.
 --   * system_scope, as prisma/rls.sql creates it for every policy-carrying
 --     table: NULL rows are read and written inside withSystemScope() only
---     (erasure/export writers, plan-repository, /admin/audit).
+--     (erasure/export writers, plan-repository, /admin/audit). Since
+--     TASK-MUOGMQK3JAH4Y that is rls.sql's sealed predicate, see below.
 --   * tenant_or_shared is DROPPED. Permissive policies OR together, so leaving
 --     it would keep the leak open.
 --
@@ -37,7 +38,27 @@ CREATE POLICY tenant_isolation ON "AuditEvent"
 
 -- prisma/rls.sql already creates this for AuditEvent; restated so a database
 -- repaired with this file alone does not lose the only path to the NULL rows.
-DROP POLICY IF EXISTS system_scope ON "AuditEvent";
-CREATE POLICY system_scope ON "AuditEvent"
-  USING (current_setting('app.system_scope', true) = 'on')
-  WITH CHECK (current_setting('app.system_scope', true) = 'on');
+--
+-- TASK-MUOGMQK3JAH4Y: never with the bare `app.system_scope = 'on'` test. That
+-- GUC is USERSET, so fabrika_app could set it itself and read every row. Once
+-- prisma/rls.sql has installed system_scope_open() this restates rls.sql's
+-- exact policy; this file runs again on every scripts/apply-migrations.sh, and
+-- the old wording here reopened AuditEvent after each run. On a database where
+-- rls.sql has not run yet, only the table's owner gets through (the
+-- apply-migrations session); the app's enter_system_scope() path opens when
+-- `pnpm db:rls` runs, like every other system_scope policy.
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS system_scope ON "AuditEvent";
+  IF to_regprocedure('public.system_scope_open(regclass)') IS NOT NULL THEN
+    CREATE POLICY system_scope ON "AuditEvent"
+      USING ((SELECT public.system_scope_open('"AuditEvent"'::regclass)))
+      WITH CHECK ((SELECT public.system_scope_open('"AuditEvent"'::regclass)));
+  ELSE
+    CREATE POLICY system_scope ON "AuditEvent"
+      USING (current_setting('app.system_scope', true) = 'on'
+             AND pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = '"AuditEvent"'::regclass), 'USAGE'))
+      WITH CHECK (current_setting('app.system_scope', true) = 'on'
+             AND pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = '"AuditEvent"'::regclass), 'USAGE'));
+  END IF;
+END $$;

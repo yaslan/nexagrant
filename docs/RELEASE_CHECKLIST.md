@@ -166,6 +166,7 @@ Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workfl
     Ardından 5. adımdaki `pnpm rls:verify` (`fabrika_app` ile) kiracı yalıtımının sürdüğünü ölçer.
   - Down dosyaları (§3.2) da aynı betikle ve aynı sahip rolüyle koşulur: `DATABASE_URL=<sahip rol> scripts/apply-migrations.sh --down <dosya>.down.sql`. Düz `psql -f` ile koşulan down dosyası ilk satırında durur (İNCELEME-115 Ö-2, §3.2).
 - [ ] 4. `pnpm db:rls` — kiracı politikaları + sistem kapsamı fonksiyonları.
+  - `system_scope` politikası imzalıdır (TASK-MUOGMQK3JAH4Y, ADR-0009): `fabrika_app` için yalnız `enter_system_scope()` açar; düz `SET app.system_scope` yalnız tablonun sahibi rolde işe yarar (apply-migrations oturumu, SECURITY DEFINER fonksiyonlar). `rls.sql` sırrı `fabrika_private.system_scope_key` tablosunda tutar ve ilk koşuda `CREATE SCHEMA fabrika_private` yapar. Bu yüzden onu koşan rolün veritabanında şema oluşturma yetkisi olmalı (DB sahibi olan migration rolünde var). Sır yenileme: `TRUNCATE fabrika_private.system_scope_key` + `pnpm db:rls`. O anda açık işlemlerde kapsam, işlem bitene kadar kapalı kalır.
 - [ ] 5. `pnpm rls:verify` gerçek `fabrika_app` ile exit 0. Kiracı tablolarında `FORCE ROW LEVEL SECURITY` da denetlenir (bir migration FORCE'u kapatıp geri koymazsa exit 1).
 - [ ] 6. **Web**'i yeni sürümle kaldır, sonra worker (§3.3).
 

@@ -142,6 +142,19 @@ describe('AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH
     expect(norm).toMatch(/CREATE POLICY system_scope ON "AuditEvent"/);
   });
 
+  test('its system_scope is never the bare, forgeable GUC test (TASK-MUOGMQK3JAH4Y)', () => {
+    // The file runs again on every scripts/apply-migrations.sh. With the bare
+    // `app.system_scope = 'on'` predicate it reopened AuditEvent to any role
+    // that sets the GUC — fabrika_app included — after each run.
+    const sql = stripSqlComments(
+      readFileSync(resolve(process.cwd(), 'prisma/migrations/auditevent-null-system-only.sql'), 'utf8')
+    ).replace(/\s+/g, ' ');
+    expect(sql).toContain(`USING ((SELECT public.system_scope_open('"AuditEvent"'::regclass)))`);
+    expect(sql).toContain(`WITH CHECK ((SELECT public.system_scope_open('"AuditEvent"'::regclass)))`);
+    expect(sql).not.toMatch(/USING \(current_setting\('app\.system_scope', true\) = 'on'\)/);
+    expect(sql).not.toMatch(/WITH CHECK \(current_setting\('app\.system_scope', true\) = 'on'\)/);
+  });
+
   test('it is classified strict, not nullable-shared and not exempt', () => {
     expect(NULLABLE_TENANT.has('AuditEvent')).toBe(false);
     expect(SYSTEM_WIDE.has('AuditEvent')).toBe(false);
