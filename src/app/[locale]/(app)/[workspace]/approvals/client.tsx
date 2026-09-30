@@ -321,7 +321,9 @@ export default function ApprovalsClient({
                   {req.description && <p className="text-sm text-ink-2 dark:text-muted">{req.description}</p>}
 
                   <div className="flex flex-wrap items-center gap-4 text-xs text-muted pt-1">
-                    <span>
+                    {/* A requester without a name shows the e-mail: one word with no hyphen to
+                        break at. As a flex item this span would stay that wide (+321 at 320). */}
+                    <span className="min-w-0">
                       {t('requesterLabel')}: <strong>{req.requester?.name || req.requester?.email || req.requesterId}</strong>
                     </span>
                     <span>•</span>
