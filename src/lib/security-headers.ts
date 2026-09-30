@@ -144,8 +144,14 @@ const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * Header sources match case-insensitively, the proxy matcher does not: `/yok.PNG`
  * and `/tr/yok.png` match here *and* run the proxy. That is safe — the proxy's
  * header replaces this one on the response (measured, see the TASK-MUO06ANN5D3RM
- * report) — and it leaves no hole for `/TR/yok.png`, which the proxy skips. The
- * one thing case-folding costs: `/_NEXT/static/x.js` is left out as well.
+ * report) — and it leaves no hole for `/TR/yok.png`, which the proxy skips.
+ *
+ * What case-folding costs: the exceptions above leave out every case variant of
+ * a real file too — `/Logo.png`, `/Favicon.ICO`, `/_next/Image`, `/_next/STATIC/x.js`,
+ * `/_NEXT/static/x.js` — although no file answers them (İNCELEME-98 Y-1). A regex
+ * cannot fix that here: Node 22 has no `(?-i:…)`. The proxy matcher closes it —
+ * it skips only plain-lowercase paths, so every one of those runs the proxy
+ * (src/proxy.ts `config`).
  */
 export function staticFileNotFoundSource(servedFiles: readonly string[]): string {
   const served = servedFiles.map((f) => escapeRegExp(f.replace(/^\//, '')));

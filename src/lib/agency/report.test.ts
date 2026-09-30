@@ -46,11 +46,12 @@ const AT = new Date('2026-10-01T06:00:00Z');
  * The masking does not depend on the breakdown, so the table is masked once
  * for all 83 responses (TASK-MUO0U24HHVOJH: masking it per response was 94%
  * of the property test). `endpoint` is one breakdown checked against
- * buildAgencyFunnel itself, the function the dashboard calls.
+ * buildAgencyFunnel itself, the function the dashboard calls — after the other
+ * 83 calls, so a closure whose answer depends on what it was asked before
+ * differs from the fresh one (İNCELEME-99 Ö-1).
  */
 function dashboard(raw: ReturnType<typeof table>, endpoint?: FunnelBreakdown) {
   const funnel = maskAgencyFunnel(raw);
-  if (endpoint) expect(funnel(endpoint)).toEqual(buildAgencyFunnel(raw, endpoint));
   const none = funnel({ dimension: 'none' });
   const byType = funnel({ dimension: 'orgType' });
   if (byType.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
@@ -60,6 +61,7 @@ function dashboard(raw: ReturnType<typeof table>, endpoint?: FunnelBreakdown) {
     if (f.breakdown.dimension !== 'province') throw new Error('no province breakdown');
     provinces.set(p, f.breakdown.view);
   }
+  if (endpoint) expect(funnel(endpoint)).toEqual(buildAgencyFunnel(raw, endpoint));
   return { all: none.all, byOrgType: byType.breakdown.byOrgType, provinces };
 }
 

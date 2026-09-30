@@ -15,8 +15,11 @@ const handleIntl = createMiddleware(routing);
  * `/.well-known/x`). The matcher used to skip every dotted path, so these were
  * never locale-redirected — and their 404 page went out with no CSP at all
  * (İNCELEME-57 Y-1). They now come through the proxy for the policy only.
+ * So does anything under `/_next` or `/_vercel` in any case (`/_next/Image`,
+ * `/_NEXT/x`, İNCELEME-98 Y-1): Next's internals, never a page to redirect to.
  */
-function isLocalelessDottedPath(pathname: string): boolean {
+function isPolicyOnlyPath(pathname: string): boolean {
+  if (/^\/_(?:next|vercel)(?:\/|$)/i.test(pathname)) return true;
   return pathname.includes('.') && !/^\/(tr|en)(\/|$)/.test(pathname);
 }
 
@@ -37,7 +40,7 @@ export function proxy(request: NextRequest) {
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', csp);
 
-  const response = isLocalelessDottedPath(request.nextUrl.pathname)
+  const response = isPolicyOnlyPath(request.nextUrl.pathname)
     ? NextResponse.next({ request: { headers: requestHeaders } })
     : handleIntl(new NextRequest(request, { headers: requestHeaders }));
   response.headers.set(cspHeaderName(), csp);
@@ -61,11 +64,22 @@ export default proxy;
  *
  * `api`, `_next` and `_vercel` are whole segments (İNCELEME-78 Y-1): without the
  * `(?:/|$)`, `/apifoo`, `/api-docs` and `/_nextfoo` were skipped too.
+ *
+ * Case (İNCELEME-98 Y-1). This matcher is case-sensitive; next.config header
+ * sources are not, so the static rule's real-file exceptions (`/logo.png`,
+ * `/_next/static/`, `/_next/image`) also leave out `/Logo.png`, `/Favicon.ico`,
+ * `/_next/Image` and `/_NEXT/static/x.js` — no file answers those, and Next's app
+ * 404 went out with no CSP. Only this side can tell the cases apart, so it skips a
+ * static-file path or a `/_next/…` path only when it is plain lowercase ASCII
+ * (`[-a-z0-9_./]`), which every served file is (the test checks public/). Anything
+ * else — an upper-case letter, `%`, non-ASCII (`ı` folds to `I` under /i) — runs
+ * the proxy and gets the nonce policy. `/_next/static/` is the one exception:
+ * build chunk names carry upper case, and a missing chunk there is a plain-text 404.
  */
 export const config = {
   matcher: [
     '/',
     '/(tr|en)/:path*',
-    '/((?!api(?:/|$)|_next(?:/|$)|_vercel(?:/|$)|.*\\.(?:ico|png|jpe?g|gif|webp|avif|svg|txt|xml|webmanifest|woff2?|ttf|css|js|map)$).*)'
+    '/((?!api(?:/|$)|_vercel(?:/|$)|_next/static/|_next(?:/[-a-z0-9_./]*)?$|[-a-z0-9_./]*\\.(?:ico|png|jpe?g|gif|webp|avif|svg|txt|xml|webmanifest|woff2?|ttf|css|js|map)$).*)'
   ]
 };

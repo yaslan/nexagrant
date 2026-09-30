@@ -1,0 +1,3 @@
+SURVIVED  X2 header: _next/image$ -> _next/image (prefix)  :: Tests  93 passed (93)
+SURVIVED  X3 header: _next/static/ -> _next/static (no slash)  :: Tests  93 passed (93)
+SURVIVED  X4 static CSP gets script-src-elem unsafe-inline  :: Tests  93 passed (93)

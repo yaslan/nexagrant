@@ -256,6 +256,15 @@ describe('proxy config.matcher (İNCELEME-57 Y-1 / Y-2)', () => {
     '/api.html',
     '/_nextfoo',
     '/_vercelx',
+    // İNCELEME-98 Y-1: a case variant of a real file is not that file.
+    '/Logo.png',
+    '/Favicon.ICO',
+    '/favicon.ICO',
+    '/_next/Image',
+    '/_next/STATIC/x.js',
+    '/_NEXT/static/x.js',
+    '/_Next/yok',
+    '/fav\u0131con.ico',
   ])('runs for %s', (pathname) => {
     expect(matches(pathname)).toBe(true);
   });
@@ -266,7 +275,11 @@ describe('proxy config.matcher (İNCELEME-57 Y-1 / Y-2)', () => {
     '/api/csp-report',
     '/api/auth/session',
     '/_next/static/chunks/main.js',
+    // Chunk names carry upper case; `/_next/static/` is skipped whatever follows.
+    '/_next/static/chunks/src_app_AppShell_tsx_0Ab.js',
+    '/_next/static/BUILD_Id-x/_buildManifest.js',
     '/_next/image',
+    '/_next/webpack-hmr',
     '/_vercel/insights/script.js',
     '/favicon.ico',
     '/robots.txt',
@@ -296,6 +309,16 @@ describe('proxy on a locale-less dotted path (İNCELEME-57 Y-1)', () => {
     expect(res.headers.get('x-middleware-request-content-security-policy')).toBe(csp);
     expect(res.headers.get('x-middleware-next')).toBe('1');
   });
+
+  it.each(['/_next/Image', '/_NEXT/yok', '/_Vercel/x'])(
+    '%s (İNCELEME-98 Y-1) gets the CSP and is not locale-redirected',
+    (pathname) => {
+      const res = proxy(new NextRequest(`http://localhost${pathname}`));
+      expect(res.headers.get('location')).toBeNull();
+      expect(res.headers.get('x-middleware-next')).toBe('1');
+      expect(res.headers.get('content-security-policy')).toMatch(/'nonce-[^']+'/);
+    },
+  );
 
   it('a locale-prefixed dotted path still goes through next-intl', () => {
     const res = proxy(new NextRequest('http://localhost/tr/yok.html'));
@@ -357,13 +380,16 @@ describe('CSP coverage: proxy vs next.config headers (İNCELEME-78 Y-1)', () => 
 
   it('the matcher skips exactly STATIC_FILE_EXTENSIONS (Next needs the matcher as a literal)', () => {
     const catchAll = proxyConfig.matcher[2];
-    expect(catchAll).toContain(`.*\\.(?:${STATIC_FILE_EXTENSIONS})$`);
+    expect(catchAll).toContain(`[-a-z0-9_./]*\\.(?:${STATIC_FILE_EXTENSIONS})$`);
   });
 
   it('the static-file policy runs no script, reports nothing and cannot be framed', () => {
     const csp = parseCsp(STATIC_FILE_CONTENT_SECURITY_POLICY);
     expect(csp.get('default-src')).toEqual(["'none'"]);
     expect(csp.has('script-src')).toBe(false);
+    // İNCELEME-98 D-1 (X4): `script-src-elem` / `script-src-attr` would let the
+    // 404's inline scripts run again while `script-src` stays absent.
+    expect([...csp.keys()].filter((d) => d.startsWith('script-src'))).toEqual([]);
     expect(csp.get('frame-ancestors')).toEqual(["'none'"]);
     expect(csp.get('base-uri')).toEqual(["'none'"]);
     expect(csp.get('form-action')).toEqual(["'none'"]);
@@ -381,12 +407,38 @@ describe('CSP coverage: proxy vs next.config headers (İNCELEME-78 Y-1)', () => 
     ['/a/b/c.css', 'static'],
     ['/a/logo.png', 'static'],
     ['/api.png', 'static'],
-    ['/TR/yok.png', 'static'],
     ['/_next/yok', 'static'],
     ['/_next/yok.js', 'static'],
     ['/_next', 'static'],
     ['/_vercel/x', 'static'],
     ['/_vercel/x.js', 'static'],
+    // İNCELEME-98 D-1 (X2/X3): only `/_next/image` itself and what is under
+    // `/_next/static/` are real; their neighbours are the app 404.
+    ['/_next/imagex', 'static'],
+    ['/_next/image/x', 'static'],
+    ['/_next/static', 'static'],
+    ['/_next/staticfoo', 'static'],
+    ['/_next/statics/x.js', 'static'],
+    // İNCELEME-98 Y-1: case variants of real files — the static rule leaves them
+    // out (it ignores case), so the proxy has to run.
+    ['/Logo.png', 'nonce'],
+    ['/LOGO.PNG', 'nonce'],
+    ['/Next.svg', 'nonce'],
+    ['/Favicon.ico', 'nonce'],
+    ['/Favicon.ICO', 'nonce'],
+    ['/favicon.ICO', 'nonce'],
+    ['/_next/Image', 'nonce'],
+    ['/_next/IMAGE', 'nonce'],
+    ['/_next/STATIC/x.js', 'nonce'],
+    ['/_next/Static/chunks/x.js', 'nonce'],
+    ['/_NEXT/static/x.js', 'nonce'],
+    ['/_Next/yok', 'nonce'],
+    ['/_VERCEL/x', 'nonce'],
+    ['/fav\u0131con.ico', 'nonce'],
+    // Not plain lowercase, so no longer skipped (was 'static' / 'api'; both are
+    // the app 404, and still carry a CSP).
+    ['/TR/yok.png', 'nonce'],
+    ['/API/x.png', 'nonce'],
     // The proxy runs (and its header replaces the static one where both match).
     ['/yok.PNG', 'nonce'],
     ['/tr/yok.png', 'nonce'],
@@ -400,7 +452,6 @@ describe('CSP coverage: proxy vs next.config headers (İNCELEME-78 Y-1)', () => 
     ['/api', 'api'],
     ['/api/yok', 'api'],
     ['/api/yok.png', 'api'],
-    ['/API/x.png', 'api'],
     // Real files: no CSP, cache headers untouched.
     ['/logo.png', 'none'],
     ['/favicon.ico', 'none'],
@@ -421,6 +472,36 @@ describe('CSP coverage: proxy vs next.config headers (İNCELEME-78 Y-1)', () => 
       expect(await policyOf(f), f).toBe('none');
       expect(await policyOf(`${f}.yok${path.extname(f)}`), `${f} sibling`).toBe('static');
     }
+  });
+
+  it('no case variant of a real file goes out without a CSP (İNCELEME-98 Y-1)', async () => {
+    const pub = path.join(process.cwd(), 'public');
+    const real = [
+      ...readdirSync(pub, { recursive: true, withFileTypes: true })
+        .filter((e) => e.isFile())
+        .map((e) => `/${path.relative(pub, path.join(e.parentPath, e.name))}`),
+      '/favicon.ico',
+      '/_next/image',
+      '/_next/static/chunks/main.js',
+    ];
+    const variants = (p: string) => {
+      const out = new Set([p.toUpperCase(), p.replace(/\b[a-z]/g, (c) => c.toUpperCase())]);
+      for (let i = 0; i < p.length; i++) {
+        const c = p[i]!;
+        if (/[a-z]/.test(c)) out.add(p.slice(0, i) + c.toUpperCase() + p.slice(i + 1));
+      }
+      // Only `/_next/static/<file>` itself may differ in case: that part is the chunk name.
+      return [...out].filter((v) => v !== p && !v.startsWith('/_next/static/'));
+    };
+    let checked = 0;
+    for (const f of real) {
+      expect(await policyOf(f), f).toBe('none');
+      for (const v of variants(f)) {
+        expect(await policyOf(v), v).not.toBe('none');
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
   });
 
   it('a served file name is matched literally, not as a regex', () => {

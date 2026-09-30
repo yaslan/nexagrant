@@ -1,0 +1,8 @@
+typecheck exit=0
+$ tsc --noEmit
+$ eslint
+lint exit=0
+
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+
+i18n exit=0

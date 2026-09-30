@@ -140,7 +140,8 @@ const nextConfig: NextConfig = {
       // or `/_next/yok` with no file behind it is Next's app 404 (İNCELEME-78 Y-1).
       // Real files are left out of the source and go out as before. Where the proxy
       // runs as well (`/yok.PNG` — this match ignores case, the matcher does not), its
-      // header replaces this one.
+      // header replaces this one. Ignoring case also leaves out `/Logo.png` and
+      // `/_next/Image`; the proxy covers those (İNCELEME-98 Y-1, src/proxy.ts).
       {
         source: staticFileNotFoundSource(servedStaticFiles()),
         headers: [{ key: 'Content-Security-Policy', value: STATIC_FILE_CONTENT_SECURITY_POLICY }],
