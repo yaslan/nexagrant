@@ -15,28 +15,41 @@ import { requireId } from '../../helpers/teardown-guard';
  */
 
 export const LONG_URL = 'https://docs.example.test/fonbridge/wp3/butce-revizyonu-2027-q1.pdf';
+// A link breaks after its slashes and hyphens; a file name typed with
+// underscores has no break opportunity at all. The archive band and the
+// rejection reason only overflowed with a word like this (İNCELEME-109 Y-1, B-1).
+export const LONG_WORD = 'WP3_ButceRevizyonu_KonsorsiyumOrtaklariOnayli_FinalVersiyon12_EkTablolarDahil_2027Q1';
 
 const TENANT_ID = 'demo-tenant';
 const WORKSPACE_ID = 'demo-workspace';
 const ADMIN_ID = 'demo-user-superadmin';
-// Any other seeded member: a request someone else raised shows the checker's
-// approve/reject buttons, the widest action row a card has.
-const OTHER_ID = 'demo-user-ivan';
 
 export function longContentFixture(run: string) {
   return {
     opportunityId: `mobile-long-opp-${run}`,
-    opportunityTitle: `WP3 bütçe revizyonu — ${LONG_URL}`,
+    opportunityTitle: `WP3 bütçe revizyonu — ${LONG_URL} — ${LONG_WORD}`,
     mineId: `mobile-long-mine-${run}`,
     theirsId: `mobile-long-theirs-${run}`,
+    rejectedId: `mobile-long-rejected-${run}`,
+    // Someone else's request shows the checker's approve/reject buttons, the
+    // widest action row a card has. This requester has no name, so the card
+    // prints the e-mail: no hyphen in it, so no break opportunity either.
+    requesterId: `mobile-long-requester-${run}`,
+    requesterEmail: `projekoordinatorlugu.horizoneuropebasvurulari.${run}@arastirmamerkezi.universite.example.edu.tr`,
     requestTitle: `Bütçe revizyonu onayı: ${LONG_URL}`,
     requestDescription: `Revize bütçe tablosu: ${LONG_URL} (WP3, 2027 Q1)`,
+    rejectedTitle: `Reddedilen bütçe revizyonu: ${LONG_URL}`,
+    rejectionReason: `Eksik belge: ${LONG_WORD}`,
   };
 }
 
 export type LongContentFixture = ReturnType<typeof longContentFixture>;
 
+/** Rows `plant` creates and `remove` deletes: three requests, the opportunity, the requester. */
+export const PLANTED_ROWS = 5;
+
 export async function plant(f: LongContentFixture) {
+  await prisma.user.create({ data: { id: f.requesterId, email: f.requesterEmail, name: null } });
   await prisma.opportunity.create({
     data: {
       id: f.opportunityId,
@@ -47,29 +60,43 @@ export async function plant(f: LongContentFixture) {
     },
   });
   const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+  const base = {
+    tenantId: TENANT_ID,
+    workspaceId: WORKSPACE_ID,
+    actionType: 'BUDGET_ALLOCATION',
+    payload: { amount: 125000, currency: 'EUR' },
+    expiresAt,
+  };
   await prisma.approvalRequest.createMany({
-    data: [f.mineId, f.theirsId].map((id) => ({
-      id,
-      tenantId: TENANT_ID,
-      workspaceId: WORKSPACE_ID,
-      actionType: 'BUDGET_ALLOCATION',
-      title: f.requestTitle,
-      description: f.requestDescription,
-      payload: { amount: 125000, currency: 'EUR' },
-      requesterId: id === f.mineId ? ADMIN_ID : OTHER_ID,
-      expiresAt,
-    })),
+    data: [
+      { ...base, id: f.mineId, title: f.requestTitle, description: f.requestDescription, requesterId: ADMIN_ID },
+      { ...base, id: f.theirsId, title: f.requestTitle, description: f.requestDescription, requesterId: f.requesterId },
+      // The admin's own, so "My requests" shows it with its reason.
+      {
+        ...base,
+        id: f.rejectedId,
+        title: f.rejectedTitle,
+        description: f.requestDescription,
+        requesterId: ADMIN_ID,
+        status: 'REJECTED',
+        approverId: f.requesterId,
+        rejectionReason: f.rejectionReason,
+      },
+    ],
   });
 }
 
 export async function remove(f: LongContentFixture) {
   const requests = await prisma.approvalRequest.deleteMany({
-    where: { id: { in: [f.mineId, f.theirsId] } },
+    where: { id: { in: [f.mineId, f.theirsId, f.rejectedId] } },
   });
   const opportunities = await prisma.opportunity.deleteMany({
     where: { id: requireId(f.opportunityId, 'opportunityId') },
   });
-  return requests.count + opportunities.count;
+  const users = await prisma.user.deleteMany({
+    where: { id: requireId(f.requesterId, 'requesterId') },
+  });
+  return requests.count + opportunities.count + users.count;
 }
 
 /** `<main>` is the scroll box: anything wider than it slides the page sideways. */

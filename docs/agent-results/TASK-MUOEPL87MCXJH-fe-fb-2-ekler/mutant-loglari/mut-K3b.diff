@@ -1,0 +1,30 @@
+diff --git a/src/app/[locale]/(app)/[workspace]/approvals/client.tsx b/src/app/[locale]/(app)/[workspace]/approvals/client.tsx
+index 3b6d6a32..67fe3cdb 100644
+--- a/src/app/[locale]/(app)/[workspace]/approvals/client.tsx
++++ b/src/app/[locale]/(app)/[workspace]/approvals/client.tsx
+@@ -299,7 +299,7 @@ export default function ApprovalsClient({
+                     actions. break-words then breaks the link inside the card. The row starts at
+                     lg, not md: at 768 the sidebar leaves <main> 512px, and beside the three
+                     action buttons the text got ~80px and split ordinary words mid-letter. */}
+-                <div className="space-y-2 w-full lg:w-auto flex-1 min-w-0 break-words">
++                <div className="space-y-2 w-full lg:w-auto flex-1 min-w-0">
+                   <div className="flex flex-wrap items-center gap-2">
+                     <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium border ${typeInfo.color}`}>
+                       {typeInfo.label}
+@@ -317,13 +317,13 @@ export default function ApprovalsClient({
+                     )}
+                   </div>
+ 
+-                  <h3 className="text-lg font-bold text-ink dark:text-white">{req.title}</h3>
+-                  {req.description && <p className="text-sm text-ink-2 dark:text-muted">{req.description}</p>}
++                  <h3 className="break-words text-lg font-bold text-ink dark:text-white">{req.title}</h3>
++                  {req.description && <p className="break-words text-sm text-ink-2 dark:text-muted">{req.description}</p>}
+ 
+                   <div className="flex flex-wrap items-center gap-4 text-xs text-muted pt-1">
+                     {/* A requester without a name shows the e-mail: one word with no hyphen to
+                         break at. As a flex item this span would stay that wide (+321 at 320). */}
+-                    <span className="min-w-0">
++                    <span className="min-w-0 break-words">
+                       {t('requesterLabel')}: <strong>{req.requester?.name || req.requester?.email || req.requesterId}</strong>
+                     </span>
+                     <span>•</span>

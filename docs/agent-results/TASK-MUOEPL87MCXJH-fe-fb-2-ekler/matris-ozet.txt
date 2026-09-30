@@ -1,0 +1,30 @@
+ÖNCE dev (4 varyant)         onayimi-bekleyen     temiz=32/32
+ÖNCE dev (4 varyant)         taleplerim           temiz=32/32
+ÖNCE dev (4 varyant)         firsat-detay         temiz=32/32
+ÖNCE dev (4 varyant)         firsat-arsiv-onay    temiz=14/32
+ÖNCE dev (4 varyant)         LİSTE+DETAY MATRİSİ 96/96 ; arşiv bandı 14/32
+
+de0dd66d (4 varyant)         onayimi-bekleyen     temiz=30/32
+de0dd66d (4 varyant)         taleplerim           temiz=30/32
+de0dd66d (4 varyant)         firsat-detay         temiz=32/32
+de0dd66d (4 varyant)         firsat-arsiv-onay    temiz=32/32
+de0dd66d (4 varyant)         LİSTE+DETAY MATRİSİ 92/96 ; arşiv bandı 32/32
+
+SONRA 60d6300c (4 varyant)   onayimi-bekleyen     temiz=32/32
+SONRA 60d6300c (4 varyant)   taleplerim           temiz=32/32
+SONRA 60d6300c (4 varyant)   firsat-detay         temiz=32/32
+SONRA 60d6300c (4 varyant)   firsat-arsiv-onay    temiz=32/32
+SONRA 60d6300c (4 varyant)   LİSTE+DETAY MATRİSİ 96/96 ; arşiv bandı 32/32
+
+ÖNCE dev (eposta2)           onayimi-bekleyen     temiz=2/8
+ÖNCE dev (eposta2)           taleplerim           temiz=8/8
+ÖNCE dev (eposta2)           firsat-detay         temiz=8/8
+ÖNCE dev (eposta2)           firsat-arsiv-onay    temiz=1/8
+ÖNCE dev (eposta2)           LİSTE+DETAY MATRİSİ 18/24 ; arşiv bandı 1/8
+
+SONRA 60d6300c (eposta2)     onayimi-bekleyen     temiz=8/8
+SONRA 60d6300c (eposta2)     taleplerim           temiz=8/8
+SONRA 60d6300c (eposta2)     firsat-detay         temiz=8/8
+SONRA 60d6300c (eposta2)     firsat-arsiv-onay    temiz=8/8
+SONRA 60d6300c (eposta2)     LİSTE+DETAY MATRİSİ 24/24 ; arşiv bandı 8/8
+

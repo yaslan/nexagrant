@@ -1,0 +1,12 @@
+diff --git a/src/app/[locale]/admin/cordis/client.tsx b/src/app/[locale]/admin/cordis/client.tsx
+index f6b6834b..ee36ff98 100644
+--- a/src/app/[locale]/admin/cordis/client.tsx
++++ b/src/app/[locale]/admin/cordis/client.tsx
+@@ -247,7 +247,6 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status
+           strip does it: a Tab-key user would otherwise stop on a tab cut off at the edge. */}
+       <div
+         className="flex gap-2 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)]"
+-        onFocus={(e) => e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
+       >
+         <button
+           onClick={() => setActiveTab('k2_ingestion')}

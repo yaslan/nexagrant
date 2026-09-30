@@ -1,0 +1,13 @@
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/opportunities/demo-opp-1/evaluations (4411 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/admin/cordis (3974 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/admin/alerts (2870 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/approvals (4578 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/onay-merkezi (3322 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/ayarlar/kapilar (3857 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/settings/gates (2778 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/firsatlar/demo-opp-1 (5641 ms)
+  ✓ long real-world content stays inside <main> › approvals: a link pasted into the title and description (5977 ms)
+  ✓ long real-world content stays inside <main> › opportunity detail: a link pasted into the title (9204 ms)
+  ✓ long real-world content stays inside <main> › gate settings: a longer weight name than today’s (2526 ms)
+  ✓ long real-world content stays inside <main> › cordis tabs: every tab reached with the keyboard is fully visible (1839 ms)
+12 passed, 0 failed, 0 skipped
