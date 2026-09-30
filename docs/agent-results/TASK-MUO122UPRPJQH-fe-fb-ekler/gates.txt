@@ -1,0 +1,7 @@
+✔ Generated Prisma Client (v7.10.0) to ./node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client in 976ms
+typecheck rc=0
+lint rc=0
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+
+i18n rc=0
+build rc=0
