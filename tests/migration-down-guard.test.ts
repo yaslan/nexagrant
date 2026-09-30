@@ -37,7 +37,7 @@ describe('rollback files carry the plain-psql guard', () => {
     // Nothing may run before the guard, and ON_ERROR_STOP must be on first or
     // psql would print the guard's error and carry on with the file.
     expect(code.slice(0, 2)).toEqual(['\\set ON_ERROR_STOP on', expect.stringMatching(/^\\ir /)]);
-    const target = resolve(dirname(file), code[1].slice(4).trim());
+    const target = resolve(dirname(file), (code[1] ?? '').slice(4).trim());
     expect(target).toBe(resolve(DIR, '../migration-down-guard.sql'));
   });
 });
