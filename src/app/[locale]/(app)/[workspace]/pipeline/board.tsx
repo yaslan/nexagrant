@@ -289,6 +289,9 @@ export default function KanbanBoard({
             notes: '',
           });
           showToast(`"${res.opportunity.title}" fırsatı ${member?.name || ''} üzerine atanarak oluşturuldu!`, 'success');
+        } else if (!res.success) {
+          // e.g. WORKSPACE_NOT_FOUND (TASK-MUO12A7NHANOT): a refusal is a value, not a throw.
+          showToast(t('createRefused'), 'error');
         }
       } catch (err) {
         showToast(errorText(err, () => errorMessage(err, 'Fırsat oluşturulurken hata meydana geldi.')), 'error');

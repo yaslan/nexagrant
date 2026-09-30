@@ -1,0 +1,7 @@
+{"callbackUrl":"https://evil.com/x","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3513/tr/default/dashboard"}
+{"callbackUrl":"//evil.com/x","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3513/tr/default/dashboard"}
+{"callbackUrl":"/\\evil.com/x","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3513/tr/default/dashboard"}
+{"callbackUrl":" //evil.com/x","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3513/tr/default/dashboard"}
+{"callbackUrl":"/a/../..//evil.com","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3513/tr/default/dashboard"}
+{"callbackUrl":"javascript:alert(document.domain)","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3513/tr/default/dashboard"}
+{"callbackUrl":"/tr/calls/topic/HORIZON-CL5-2026-D4-01","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3513/tr/main/cagrilar/HORIZON-CL5-2026-D4-01"}

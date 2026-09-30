@@ -18,6 +18,7 @@ import { TR_PROVINCES } from '@/lib/readiness/provinces';
 import { SHARE_PARAM_PROVINCE, SIGNUP_PARAM_READINESS, decodeReadinessCode } from '@/lib/readiness/share';
 import { READINESS_ORG_TYPES, scoreReadiness } from '@/lib/readiness/score';
 import { toTenantProvince } from '@/lib/province';
+import { safeCallbackUrl } from '@/lib/safe-callback-url';
 
 /**
  * The one place this file spells a demo address. Each seat used to write its
@@ -73,7 +74,8 @@ export default function AuthCard({
   const tCommon = useTranslations('Common');
   const tAuthCard = useTranslations('Auth');
 
-  const rawCallbackUrl = searchParams.get('callbackUrl') || `/${locale}/default/dashboard`;
+  // Same-origin paths only: this value ends up in `window.location.href` (safe-callback-url.ts).
+  const rawCallbackUrl = safeCallbackUrl(searchParams.get('callbackUrl'), `/${locale}/default/dashboard`);
 
   // Form states
   const [name, setName] = useState('');

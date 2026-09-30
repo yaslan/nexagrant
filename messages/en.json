@@ -224,7 +224,8 @@
       "current": "Stage-Gate Pipeline"
     },
     "heading": "Opportunity & Proposal Pipeline",
-    "subtitle": "Manage your proposals with the people in your workspace, from G0 triage feasibility through to G4 final submission."
+    "subtitle": "Manage your proposals with the people in your workspace, from G0 triage feasibility through to G4 final submission.",
+    "createRefused": "Could not create the opportunity: you cannot write to this workspace, or it no longer exists."
   },
   "Evidence": {
     "title": "Evidence Pack",
