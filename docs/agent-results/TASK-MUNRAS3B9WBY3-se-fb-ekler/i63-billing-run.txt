@@ -1,0 +1,39 @@
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63
+stderr | tests/i63-billing.live.test.ts > İNCELEME-63 Y-3 billing, 6 roles × 2 routes, live DB > refused roles: 403 FORBIDDEN_ROLE / 403, zero Stripe calls; owner passes the gate
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+stderr | tests/i63-billing.live.test.ts > İNCELEME-63 Y-3 billing, 6 roles × 2 routes, live DB > refused roles: 403 FORBIDDEN_ROLE / 403, zero Stripe calls; owner passes the gate
+[WARN] Checkout has no sourced VAT rate for this buyer; charging the net total {"tenantId":"cmunry9vy0000u0xkouzg4pdp","reason":"country_missing","detail":"the buyer's billing identity carries no country, so no VAT rate can be determined"}
+stderr | tests/i63-billing.live.test.ts > İNCELEME-63 Y-3 billing, 6 roles × 2 routes, live DB > refused roles: 403 FORBIDDEN_ROLE / 403, zero Stripe calls; owner passes the gate
+Portal session error: Error: No Stripe customer found for tenant cmunry9vy0000u0xkouzg4pdp. Please complete subscription setup first.
+    at createPortalSession (/private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63/src/lib/billing/create-portal-session.ts:22:11)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Module.POST (/private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63/src/app/api/billing/portal/route.ts:53:23)
+    at call (/private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63/tests/i63-billing.live.test.ts:42:9)
+    at /private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63/tests/i63-billing.live.test.ts:71:44
+    at file:///private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+stdout | tests/i63-billing.live.test.ts > İNCELEME-63 Y-3 billing, 6 roles × 2 routes, live DB > refused roles: 403 FORBIDDEN_ROLE / 403, zero Stripe calls; owner passes the gate
+Y-3 matrix
+TENANT_OWNER     can(manage_billing)=true  | checkout → 200  stripe=1 | portal → 500 No Stripe customer found for tenant cmunry9vy0000u0xkouzg4pd stripe=0
+TENANT_ADMIN     can(manage_billing)=false | checkout → 403 FORBIDDEN_ROLE stripe=0 | portal → 403 No tenant found or insufficient permissions stripe=0
+PIPELINE_MANAGER can(manage_billing)=false | checkout → 403 FORBIDDEN_ROLE stripe=0 | portal → 403 No tenant found or insufficient permissions stripe=0
+WRITER           can(manage_billing)=false | checkout → 403 FORBIDDEN_ROLE stripe=0 | portal → 403 No tenant found or insufficient permissions stripe=0
+MEMBER           can(manage_billing)=false | checkout → 403 FORBIDDEN_ROLE stripe=0 | portal → (ayrı test)
+GUEST_PARTNER    can(manage_billing)=false | checkout → 403 FORBIDDEN_ROLE stripe=0 | portal → 403 No tenant found or insufficient permissions stripe=0
+ ✓ tests/i63-billing.live.test.ts > İNCELEME-63 Y-3 billing, 6 roles × 2 routes, live DB > refused roles: 403 FORBIDDEN_ROLE / 403, zero Stripe calls; owner passes the gate 753ms
+stderr | tests/i63-billing.live.test.ts > İNCELEME-63 Y-3 billing, 6 roles × 2 routes, live DB > cross case: MEMBER of A who owns X — checkout in A refused; portal opens X (tenant-agnostic lookup)
+Portal session error: Error: No Stripe customer found for tenant cmunrya0o0001u0xkg5ti6llc. Please complete subscription setup first.
+    at createPortalSession (/private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63/src/lib/billing/create-portal-session.ts:22:11)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Module.POST (/private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63/src/app/api/billing/portal/route.ts:53:23)
+    at call (/private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63/tests/i63-billing.live.test.ts:42:9)
+    at /private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63/tests/i63-billing.live.test.ts:87:15
+    at file:///private/tmp/claude-501/-Users-macbook-alan/ef055809-4291-4e8e-b7d6-c71dd806c2e0/scratchpad/wt63/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+stdout | tests/i63-billing.live.test.ts > İNCELEME-63 Y-3 billing, 6 roles × 2 routes, live DB > cross case: MEMBER of A who owns X — checkout in A refused; portal opens X (tenant-agnostic lookup)
+CROSS MEMBER(A)+OWNER(X): checkout(A) → 403 FORBIDDEN_ROLE stripe=0; portal → 500 stripe=0 customer=null
+ ✓ tests/i63-billing.live.test.ts > İNCELEME-63 Y-3 billing, 6 roles × 2 routes, live DB > cross case: MEMBER of A who owns X — checkout in A refused; portal opens X (tenant-agnostic lookup) 103ms
+stdout | tests/i63-billing.live.test.ts
+I63_BILLING_FIXTURE {"ids":{"tA":"cmunry9vy0000u0xkouzg4pdp","tX":"cmunrya0o0001u0xkg5ti6llc"},"users":{"TENANT_OWNER":"cmunrya1a0002u0xkmyj65m2s","TENANT_ADMIN":"cmunrya2e0004u0xk1ahrbdrp","PIPELINE_MANAGER":"cmunrya3o0006u0xkrc9anu74","WRITER":"cmunrya4d0008u0xkw3rqj91j","MEMBER":"cmunrya5r000au0xk7i6nwtk3","GUEST_PARTNER":"cmunrya6f000cu0xkazp4srx6"}}
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  10:19:08
+   Duration  4.05s (transform 939ms, setup 0ms, import 1.87s, tests 1.63s, environment 0ms)

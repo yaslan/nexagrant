@@ -1,0 +1,30 @@
+### N1 try/catch swallows the throwing check: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N2a check not awaited (void): exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N2b check rejection swallowed (.catch): exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N3a same-file `can` that always says yes: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N3b same-file no-op requirePlatformAdmin: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N4 can() on a literal role, not the caller's: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N5 helper that may return before its check: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N6 write in a default parameter (runs before the body): exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N7 readOnly writes via element access tx['evidence']: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N8 readOnly passes a same-file writer by reference: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N9 readOnly writes via $queryRaw DELETE: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N10 export const = wrapper(async …): exit=1 → KIRMIZI (yakalandı) [başka test] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 84 passed (85)
+     × export only async functions 997ms
+### N11 anonymous export default async function: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N12 model accessor under another variable (documented): exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N13 check inside a short-circuited optional call: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### N14 (G5b) cross-module write BEFORE the check, write action: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+### FP1 boolean kept in a variable: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 84 passed (85)
+     × every write action checks the caller role, and no readOnly action writes 11ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#fp1: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### FP2 positive-form if (can) { write }: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 84 passed (85)
+     × every write action checks the caller role, and no readOnly action writes 19ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#fp2: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### FP3 check inside try, write in same try: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  85 passed (85)
+# Pozitif kontroller (python3 i63-mutants.py C0 C1), aynı harness:
+### C0 positive control: plain write, no role check: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 84 passed (85)
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#c0: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### C1 positive control: readOnly that writes: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 84 passed (85)
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#c1: readOnly: true but writes: tx.evidence.deleteMany (line 8)",
+# Not: ilk koşum --testTimeout olmadan yapıldı; 13 mutant use-server-exports 5 sn timeout'u (yük ~40-54) yüzünden SAHTE kırmızı çıktı. Yukarıdaki tablo --testTimeout=60000 ile.
