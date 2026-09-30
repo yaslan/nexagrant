@@ -1,0 +1,8 @@
+cordis K2 Ingestion & Durum K l=2 r=218 stripSL=0 mainSL=0 tamGorunur=true
+cordis OLAP & Hibe Dağılımı l=136 r=318 stripSL=90 mainSL=0 tamGorunur=true
+cordis Canlı CORDIS Delta API l=63 r=256 stripSL=353 mainSL=0 tamGorunur=true
+cordis Vector RAG Lab l=169 r=318 stripSL=448 mainSL=0 tamGorunur=true
+evaluations Değerlendirmeler & Pua l=2 r=278 stripSL=0 mainSL=0 tamGorunur=true
+evaluations REA Sık Hatalar Kontro l=42 r=318 stripSL=244 mainSL=0 tamGorunur=true
+evaluations ESR Kalibrasyonu l=159 r=318 stripSL=411 mainSL=0 tamGorunur=true
+evaluations Yapay Zeka Değerlendir l=23 r=297 stripSL=0 mainSL=0 tamGorunur=true

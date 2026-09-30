@@ -222,7 +222,7 @@ export default function ApprovalsClient({
       {/* Action Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border dark:border-gray-800 pb-4">
         {/* Tabs */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setActiveTab('actionable')}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${

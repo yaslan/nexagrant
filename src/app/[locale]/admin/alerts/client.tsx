@@ -150,7 +150,7 @@ export default function AlertsConsoleClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-xl border bg-surface p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      <div className="flex flex-col gap-4 rounded-xl border bg-surface p-4 shadow-2xs sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-6 lg:flex-nowrap">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-ink sm:text-2xl">
             <ShieldAlert className="h-5 w-5 text-ink-2" aria-hidden="true" />
@@ -158,7 +158,7 @@ export default function AlertsConsoleClient({
           </h1>
           <p className="mt-1 text-xs text-muted sm:text-sm">{labels.subtitle}</p>
         </div>
-        <dl className="flex shrink-0 gap-4 text-xs">
+        <dl className="grid grid-cols-2 gap-2 text-xs sm:flex sm:flex-wrap sm:gap-4 lg:shrink-0">
           <div className="rounded-lg border border-border bg-ground px-3 py-2">
             <dt className="text-muted">{labels.total}</dt>
             <dd className="text-lg font-bold text-ink">{totalCount}</dd>
