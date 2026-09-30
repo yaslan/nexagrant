@@ -179,7 +179,7 @@ describe('B-1: only an allowed type of a bounded size gets a signed upload', () 
       ['belge.pdf', 'text/html'],
       ['belge.html', 'application/pdf'],
       ['belge', 'application/pdf'],
-    ]) {
+    ] as const) {
       const res = await evidence.getPresignedUploadUrlAction('certificate', name, mime, 10);
       expect(res, `${name} ${mime}`).toEqual({ success: false, error: 'unsupported_type' });
     }
