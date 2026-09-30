@@ -1,3 +1,7 @@
+-- Run with scripts/apply-migrations.sh --down <this file>; plain psql stops here (İNCELEME-115 Ö-2).
+\set ON_ERROR_STOP on
+\ir ../migration-down-guard.sql
+
 -- Rollback for agency-invite-no-max-uses.sql (TASK-MUM4WVYLSH9IT).
 --
 -- Brings the use limit back: redeem_agency_invite() again refuses a code whose

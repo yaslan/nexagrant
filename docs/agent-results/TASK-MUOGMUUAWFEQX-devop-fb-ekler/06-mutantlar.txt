@@ -1,0 +1,10 @@
+TABAN | Tests 48 passed (48) | yakalayan: — | geri-yükleme git diff --quiet exit=0
+M6 | Tests 1 failed | 47 passed (48) | yakalayan: a file that stores a default for app.system_scope fails the run after the files; | geri-yükleme git diff --quiet exit=0
+N1 | Tests 1 failed | 47 passed (48) | yakalayan: rows in a FORCE table without a system_scope policy fail the run after the files; | geri-yükleme git diff --quiet exit=0
+N2 | Tests 1 failed | 47 passed (48) | yakalayan: rollback files run only through --down, which restores the archived rows; | geri-yükleme git diff --quiet exit=0
+N3 | Tests 2 failed | 46 passed (48) | yakalayan: rollback files carry the plain-psql guard > rename-feedback-alert-columns.down.sql;rollback files run only through --down, which restores the archived rows; | geri-yükleme git diff --quiet exit=0
+N4 | Tests 1 failed | 47 passed (48) | yakalayan: rollback files run only through --down, which restores the archived rows; | geri-yükleme git diff --quiet exit=0
+N5 | Tests 7 failed | 41 passed (48) | yakalayan: a file that stores a default for app.system_scope fails the run after the files;a stored default for app.system_scope stops the run before any file;after db:rls, the FORCE-RLS backfills update as many rows as under the superuser; | geri-yükleme git diff --quiet exit=0
+--- Ö-5 bloğu grant testinin sonuna taşındıktan sonra yeniden:
+TABAN | Tests 48 passed (48) | yakalayan: — | geri-yükleme exit=0
+N5 | Tests 1 failed | 47 passed (48) | yakalayan: the grant file gives the owner SET on app.system_scope and never fabrika_app; | geri-yükleme exit=0

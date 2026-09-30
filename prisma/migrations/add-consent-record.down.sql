@@ -1,3 +1,7 @@
+-- Run with scripts/apply-migrations.sh --down <this file>; plain psql stops here (İNCELEME-115 Ö-2).
+\set ON_ERROR_STOP on
+\ir ../migration-down-guard.sql
+
 -- Rollback for add-consent-record.sql (TASK-MTSWLANXSU0IG).
 --
 -- Dropping this table destroys the only proof that a disclosure was ever made,
