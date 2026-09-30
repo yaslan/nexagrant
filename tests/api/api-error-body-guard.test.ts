@@ -18,7 +18,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { describe, test, expect } from 'vitest';
 import { unguardedServerErrors } from './response-status-scan';
-import { actionReturnLeaks, fsModuleReader, hasUseServerDirective } from './action-leak-scan';
+import { actionReturnFindings, actionReturnLeaks, fsModuleReader, hasUseServerDirective } from './action-leak-scan';
 
 const ROOT = resolve(__dirname, '../..');
 const APP_DIR = join(ROOT, 'src/app');
@@ -143,23 +143,24 @@ describe('API route 5xx bodies', () => {
 
 /**
  * Server actions that already hand a caught value back, before this guard
- * existed. Each is a follow-up, not an exemption: the count may only go down,
- * and the test fails when it does so the entry is removed with the fix.
+ * existed, as `line N ← <where the value comes from>` (İNCELEME-107 Ö-1). Each
+ * is a follow-up, not an exemption: the list may only shrink, and the test
+ * fails when it does so the entry is removed with the fix.
  * Both entries are closed: admin/billing/plans `toFailure()` (TASK-MUNZKR3PEV8EI)
  * and m8 `computeSeatCandidatesForm` (TASK-MUNZ7N9IT8VPY) now answer codes.
  * Keep the map empty; a new entry needs a follow-up card, not an exemption.
  */
-const KNOWN_ACTION_LEAKS: Record<string, number> = {};
+const KNOWN_ACTION_LEAKS: Record<string, string[]> = {};
 
 describe('server action error returns', () => {
   test('no server action returns what it caught (beyond the known list)', () => {
     // Imports are followed into src/ (TASK-MUOBO31H8EPR5, İNCELEME-100 Y-1):
     // a service that returns what it caught leaks through the action that returns it.
     const read = fsModuleReader(ROOT);
-    const found: Record<string, number> = {};
+    const found: Record<string, string[]> = {};
     for (const file of serverActionFiles()) {
-      const n = actionReturnLeaks(readFileSync(file, 'utf8'), rel(file), read).length;
-      if (n > 0) found[rel(file)] = n;
+      const leaks = actionReturnFindings(readFileSync(file, 'utf8'), rel(file), read);
+      if (leaks.length > 0) found[rel(file)] = leaks.map((f) => `line ${f.line} ← ${f.via}`);
     }
     expect(found).toEqual(KNOWN_ACTION_LEAKS);
   });
