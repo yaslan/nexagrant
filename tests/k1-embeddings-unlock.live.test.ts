@@ -130,6 +130,9 @@ describe.skipIf(!HAS_DB)('k1-embeddings-unlock-rejected (live, fabrika_app)', ()
     expect(r).toMatchObject({ clearedTopics: 2, clearedProfiles: 2 });
     expect(await topicHashes()).toEqual({ ...TOPIC_HASHES, [T_M1]: null, [T_M2]: null });
     expect(await profileHashes()).toEqual({ ...TENANT_HASHES, [TA]: null, [TD]: null });
+    // Marks outside the scope (another live file's rows) are not this call's to clear.
+    expect((await topicHashes())[T_OUT]).toBe(TOPIC_HASHES[T_OUT]);
+    expect((await profileHashes())[TOUT]).toBe(TENANT_HASHES[TOUT]);
 
     const backup = JSON.parse(fs.readFileSync(r.backupFile!, 'utf8')) as Backup;
     expect(path.dirname(r.backupFile!)).toBe(backupDir);
