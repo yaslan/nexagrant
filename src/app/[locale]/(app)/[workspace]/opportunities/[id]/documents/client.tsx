@@ -33,6 +33,11 @@ import type {
   DualApprovalState,
 } from '@/lib/dual-approval';
 import { errorMessage } from '@/lib/errors';
+import {
+  documentKindRequiresDualApproval,
+  knownDocumentKind,
+  type FollowupDocKind,
+} from '@/lib/followup-doc-kinds';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 export interface DocItem {
@@ -91,12 +96,16 @@ export function DocumentsClient({
   const [approvalError, setApprovalError] = useState<string | null>(null);
   // Only an ended pilot is said here; the other document failures stay in the console, as before.
   const [docError, setDocError] = useState<string | null>(null);
+  // A refused signature is said under the row that was clicked: the page-top
+  // alert sat a screen above the table, off-screen, and the click looked like
+  // it did nothing (İNCELEME-65 Y-1).
+  const [signError, setSignError] = useState<{ docId: string; text: string } | null>(null);
   const errorText = useActionErrorText();
 
   const formatDate = (value: Date | string) => new Date(value).toLocaleDateString(locale);
   const formatDateTime = (value: Date | string) => new Date(value).toLocaleString(locale);
 
-  const handleGenerateDoc = async (kind: 'NDA' | 'LOI' | 'COMMITMENT' | 'ESR_DEBRIEF' | 'AWARD_PACK') => {
+  const handleGenerateDoc = async (kind: FollowupDocKind) => {
     setIsGenerating(true);
     setDocError(null);
     try {
@@ -121,19 +130,20 @@ export function DocumentsClient({
   };
 
   const handleSignDoc = async (docId: string) => {
-    setDocError(null);
+    setSignError(null);
     try {
       const res = await signDocument(docId);
       if (!res.success) {
         // NDA/LOI/COMMITMENT are signed by the dual approval flow, not here.
-        setDocError(t(`signRefusal.${res.refusal}`));
+        setSignError({ docId, text: t(`signRefusal.${res.refusal}`) });
         return;
       }
       const signedAt = new Date(res.signedAt).toISOString();
       setDocs((prev) => prev.map((d) => (d.id === docId ? { ...d, signedAt } : d)));
     } catch (err) {
       console.error('Error signing document:', err);
-      setDocError(errorText(err, null));
+      const text = errorText(err, null);
+      if (text) setSignError({ docId, text });
     }
   };
 
@@ -218,29 +228,24 @@ export function DocumentsClient({
     }
   };
 
+  // Filters, labels and badges go by the normalised kind: a stored `"NDA "`
+  // is an NDA and belongs in the legal filter, not hidden from it (İNCELEME-65 B-1).
   const filteredDocs = docs.filter((d) => {
-    if (activeFilter === 'LEGAL') return d.kind === 'NDA' || d.kind === 'LOI';
-    if (activeFilter === 'COMMITMENT') return d.kind === 'COMMITMENT';
-    if (activeFilter === 'AWARD') return d.kind === 'AWARD_PACK' || d.kind === 'ESR_DEBRIEF';
+    const kind = knownDocumentKind(d.kind);
+    if (activeFilter === 'LEGAL') return kind === 'NDA' || kind === 'LOI';
+    if (activeFilter === 'COMMITMENT') return kind === 'COMMITMENT';
+    if (activeFilter === 'AWARD') return kind === 'AWARD_PACK' || kind === 'ESR_DEBRIEF';
     return true;
   });
 
   const docKindLabel = (kind: string) => {
-    switch (kind) {
-      case 'NDA':
-      case 'LOI':
-      case 'COMMITMENT':
-      case 'AWARD_PACK':
-      case 'ESR_DEBRIEF':
-        return t(`kinds.${kind}`);
-      default:
-        return kind;
-    }
+    const known = knownDocumentKind(kind);
+    return known ? t(`kinds.${known}`) : kind;
   };
 
   const getDocKindBadge = (kind: string) => {
     const label = docKindLabel(kind);
-    switch (kind) {
+    switch (knownDocumentKind(kind)) {
       case 'NDA':
         return <span className="bg-blue-100 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full font-bold text-xs">{label}</span>;
       case 'LOI':
@@ -562,7 +567,8 @@ export function DocumentsClient({
             </thead>
             <tbody className="divide-y divide-border">
               {filteredDocs.map((doc) => (
-                <tr key={doc.id} className="hover:bg-ground/80 transition-colors">
+                <React.Fragment key={doc.id}>
+                <tr className="hover:bg-ground/80 transition-colors">
                   <td className="p-4 font-semibold text-ink">
                     {getDocKindBadge(doc.kind)}
                   </td>
@@ -609,8 +615,11 @@ export function DocumentsClient({
                         </button>
                       )}
 
-                      {!doc.signedAt && (
+                      {/* A dual approval kind is signed by the flow's legal step; a
+                          direct button there could only be refused (İNCELEME-65 Ö-2). */}
+                      {!doc.signedAt && !documentKindRequiresDualApproval(doc.kind) && (
                         <button
+                          data-testid={`sign-${doc.id}`}
                           onClick={() => handleSignDoc(doc.id)}
                           className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"
                         >
@@ -652,6 +661,23 @@ export function DocumentsClient({
                     </div>
                   </td>
                 </tr>
+                {signError?.docId === doc.id && (
+                  <tr>
+                    <td colSpan={5} className="px-4 pb-4">
+                      <p
+                        role="alert"
+                        data-testid={`sign-error-${doc.id}`}
+                        // Sticky left and capped to the viewport: on a phone the table
+                        // scrolls sideways to reach the button, and the text must not
+                        // stay behind at the table's far left.
+                        className="sticky left-4 w-fit max-w-[calc(100vw-7rem)] bg-bad/10 border border-bad/30 rounded-xl p-3 text-sm font-semibold text-bad"
+                      >
+                        {signError.text}
+                      </p>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               ))}
 
               {filteredDocs.length === 0 && (
