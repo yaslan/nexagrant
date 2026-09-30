@@ -1,10 +1,18 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
 import nextConfig from '../../next.config';
-import { proxy } from '../proxy';
+import { createRequire } from 'node:module';
+import { getMiddlewareRouteMatcher } from 'next/dist/shared/lib/router/utils/middleware-route-matcher';
+import { config as proxyConfig, proxy } from '../proxy';
+
+// The compiler `next build` runs over `config.matcher`. Exported at runtime but not
+// in next's .d.ts, hence the require and the hand-written type.
+const { getMiddlewareMatchers } = createRequire(import.meta.url)(
+  'next/dist/build/analysis/get-page-static-info',
+) as { getMiddlewareMatchers: (matcher: unknown, nextConfig: object) => Parameters<typeof getMiddlewareRouteMatcher>[0] };
 import {
   API_CONTENT_SECURITY_POLICY,
   PRINT_BUTTON_HANDLER,
@@ -13,6 +21,7 @@ import {
   buildContentSecurityPolicy,
   cspHeaderName,
   cspOptionsFromEnv,
+  CSP_REPORT_PATH,
   generateNonce,
 } from './security-headers';
 
@@ -209,5 +218,91 @@ describe('proxy', () => {
     expect([307, 308]).toContain(res.status);
     expect(res.headers.get('location')).toMatch(/\/(tr|en)$/);
     expect(res.headers.get('content-security-policy')).toMatch(/frame-ancestors 'none'/);
+  });
+});
+
+/**
+ * İNCELEME-57 Y-2 — the matcher decides which responses get a CSP at all, and the
+ * tests above call proxy() directly, so they never saw it: a matcher cut down to
+ * `['/api/:path*']` left every page without a policy and all of them still passed.
+ * Compiled here with the same Next.js functions `next build` and the router use.
+ */
+describe('proxy config.matcher (İNCELEME-57 Y-1 / Y-2)', () => {
+  const runs = getMiddlewareRouteMatcher(getMiddlewareMatchers(proxyConfig.matcher, {}));
+  const matches = (pathname: string) => runs(pathname, {} as never, {});
+
+  it.each([
+    '/',
+    '/tr',
+    '/en',
+    '/tr/login',
+    '/tr/main/dashboard',
+    '/en/main/calls/abc',
+    '/tr/accept-invite/x',
+    // Y-1: dotted paths render the app 404 — 24 inline scripts that need the nonce.
+    '/foo.bar',
+    '/tr/yok.html',
+    '/wp-login.php',
+    '/.env',
+    '/.well-known/security.txt.bak',
+    '/foo',
+  ])('runs for %s', (pathname) => {
+    expect(matches(pathname)).toBe(true);
+  });
+
+  it.each([
+    '/api/x',
+    '/api/csp-report',
+    '/api/auth/session',
+    '/_next/static/chunks/main.js',
+    '/_next/image',
+    '/_vercel/insights/script.js',
+    '/favicon.ico',
+    '/robots.txt',
+    '/sitemap.xml',
+    '/site.webmanifest',
+    '/fonts/inter.woff2',
+  ])('skips %s', (pathname) => {
+    expect(matches(pathname)).toBe(false);
+  });
+
+  it('skips every file in public/ (a proxy run would locale-redirect it to /tr/<file>)', () => {
+    const files = readdirSync(path.join(process.cwd(), 'public'), { recursive: true, withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => `/${path.relative(path.join(process.cwd(), 'public'), path.join(e.parentPath, e.name))}`);
+    expect(files.length).toBeGreaterThan(0);
+    for (const f of files) expect(matches(f), f).toBe(false);
+  });
+});
+
+describe('proxy on a locale-less dotted path (İNCELEME-57 Y-1)', () => {
+  it('sets the CSP and passes through, without a locale redirect', () => {
+    const res = proxy(new NextRequest('http://localhost/foo.bar'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('location')).toBeNull();
+    const csp = res.headers.get('content-security-policy');
+    expect(csp).toMatch(/'nonce-[^']+'/);
+    expect(res.headers.get('x-middleware-request-content-security-policy')).toBe(csp);
+    expect(res.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('a locale-prefixed dotted path still goes through next-intl', () => {
+    const res = proxy(new NextRequest('http://localhost/tr/yok.html'));
+    expect(res.headers.get('location')).toBeNull();
+    expect(res.headers.get('content-security-policy')).toMatch(/'nonce-[^']+'/);
+  });
+});
+
+describe('CSP reporting (İNCELEME-57 Ö-1)', () => {
+  it('the policy reports to /api/csp-report with report-uri, and has no report-to', () => {
+    const csp = parseCsp(buildContentSecurityPolicy({ nonce: 'n', isDev: false }));
+    expect(csp.get('report-uri')).toEqual([CSP_REPORT_PATH]);
+    expect(CSP_REPORT_PATH).toBe('/api/csp-report');
+    // With a report-to, Chromium stops sending report-uri (see security-headers.ts).
+    expect(csp.has('report-to')).toBe(false);
+  });
+
+  it('the report endpoint is under /api, so it gets the static API policy and never the page one', () => {
+    expect(CSP_REPORT_PATH.startsWith('/api/')).toBe(true);
   });
 });

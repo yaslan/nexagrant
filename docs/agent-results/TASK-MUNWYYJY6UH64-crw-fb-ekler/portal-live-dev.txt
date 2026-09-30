@@ -1,0 +1,17 @@
+[i74] P1#0 session=A → 200 cus_A74; session=X → 200 cus_X74
+[i74] P1#1 session=A → 200 cus_A74; session=X → 200 cus_X74
+[i74] P1#2 session=A → 200 cus_A74; session=X → 200 cus_X74
+[i74] P1#3 session=A → 200 cus_A74; session=X → 200 cus_X74
+[i74] P1#4 session=A → 200 cus_A74; session=X → 200 cus_X74
+ ✓ tests/zz-crwfb-i74-portal.live.test.ts > İNCELEME-74 billing portal (live) > P1 owner of A and X: session A → cus_A, session X → cus_X, 5 alternations 533ms
+[i74] P2 → 403 {"error":"No tenant found or insufficient permissions"} stripe=0
+[i74] P3 → 403 {"error":"No tenant found or insufficient permissions"} stripe=0
+[i74] P4 none → 401 {"error":"Unauthorized","message":"Oturumunuz bir çalışma alanına bağlı değil. Lütfen tekrar giriş yapın.","code":"TENANT_SCOPE_REQUIRED"}; tenantless → 401 {"error":"Unauthorized","message":"Oturumunuz bir çalışma alanına bağlı değil. Lütfen tekrar giriş yapın.","code":"TENANT_SCOPE_REQUIRED"}
+[i74] P5 → 500 {"error":"Failed to create portal session"} bodyHasTenant=false logHasTenant=true
+[i74] P6 → 500 {"error":"Failed to create portal session"} bodyHasStripeText=false logHasStripeText=true
+ ✓ tests/zz-crwfb-i74-portal.live.test.ts > İNCELEME-74 billing portal (live) > P2 ADMIN of A who owns X, session=A → 403, Stripe 0 (manage_billing is owner-only) 16ms
+ ✓ tests/zz-crwfb-i74-portal.live.test.ts > İNCELEME-74 billing portal (live) > P3 session names A, user has NO membership in A (owns X) → 403; JWT role claim ignored 21ms
+ ✓ tests/zz-crwfb-i74-portal.live.test.ts > İNCELEME-74 billing portal (live) > P4 no session / session without tenant → 401, Stripe 0 1ms
+ ✓ tests/zz-crwfb-i74-portal.live.test.ts > İNCELEME-74 billing portal (live) > P5 no Stripe customer → 500 fixed sentence; tenant id only in the log 27ms
+ ✓ tests/zz-crwfb-i74-portal.live.test.ts > İNCELEME-74 billing portal (live) > P6 Stripe throws with its own text (key fragment, customer id) → 500 fixed sentence, nothing of it in the body 39ms
+      Tests  6 passed (6)

@@ -119,8 +119,16 @@ jobs:
     # (requireTestEnv in tests/helpers/live-db-role.ts). A fixed test-only
     # value like the database passwords above, not a secret, and not the key
     # of any deployment. The e2e step sets its own (playwright.config.ts).
+    #
+    # Live-skip gate (İNCELEME-62 O-1): the JSON report is read after the run
+    # and any skipped `*.live.test.ts` test fails the step, however the skip
+    # came about (scripts/live-skip-gate.ts). `vitest run` directly, not
+    # `pnpm test --reporter=…`: pnpm would take `--reporter` as its own flag.
+    # Pinned by tests/live-skip-gate.test.ts.
     - name: Test
-      run: pnpm test
+      run: |
+        pnpm exec vitest run --passWithNoTests --reporter=default --reporter=json --outputFile.json=vitest-report.json
+        pnpm exec tsx scripts/check-live-skips.ts vitest-report.json
       env:
         AUTH_SECRET: 'ci-vitest-auth-secret-fixture-not-for-any-deployment'
 
