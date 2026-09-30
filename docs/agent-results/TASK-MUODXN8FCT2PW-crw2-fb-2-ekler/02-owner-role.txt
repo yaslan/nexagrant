@@ -1,0 +1,6 @@
+# sahip rol 'own' (süper değil, BYPASSRLS değil) — üretimdeki migrate/sahip rolünün benzeri; public nesnelerinin sahipliği ona devredildi
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55110/f
+exit=0
+own super=false bypassrls=false
+Membership owner=own force=true
+enter_system_scope owner=own

@@ -64,4 +64,38 @@ describe('withTenantLockPool', () => {
     expect(seen).toHaveLength(asked);
     expect(new Set(seen).size).toBeLessThanOrEqual(LOCK_POOL_MAX);
   });
+
+  test('T-6 (Q5/Q6): queue timeout when pool is full — maxWait and connectionTimeoutMillis protect against pool exhaustion', async () => {
+    // Fill the lock pool with LOCK_POOL_MAX transactions, each holding its connection for 6 seconds.
+    // A (LOCK_POOL_MAX + 1)-th transaction arrives: it should wait up to maxWait (5 s) and then
+    // fail with a timeout error. This test ensures Q5 (maxWait parameter) and Q6 (connectionTimeoutMillis)
+    // mutations are caught: if either is missing, the timeout is ~2+1=3 sn instead of ~5 sn.
+    const filling = Array.from({ length: LOCK_POOL_MAX }, () =>
+      withTenantLockPool(TENANT, async (tx) => {
+        await tx.$queryRawUnsafe<Record<string, string>[]>(`SELECT pg_sleep(6)::text AS z`);
+      }).catch(() => {})
+    );
+
+    // Let the pool fill first.
+    await new Promise((r) => setTimeout(r, 100));
+
+    const t0 = Date.now();
+    let gotError: unknown = null;
+    try {
+      await withTenantLockPool(TENANT, async (tx) => {
+        await tx.$queryRawUnsafe<Who[]>(whoAmI);
+      });
+    } catch (e) {
+      gotError = e;
+    }
+    const ms = Date.now() - t0;
+
+    await Promise.all(filling);
+
+    // The error must occur and must take at least ~4.5 seconds (maxWait + some overhead, but short of the full 6 s fill).
+    // If maxWait is missing (Q5 mutant defaults to 2 s) or connectionTimeoutMillis is missing (Q6 mutant defaults to 1 s),
+    // the total wait is ~3 s, which will be < 4.5 s and fail this test.
+    expect(gotError).toBeDefined();
+    expect(ms).toBeGreaterThanOrEqual(4_500);
+  }, 60_000);
 });

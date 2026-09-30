@@ -669,6 +669,22 @@ describe('runK1Embeddings — failures', () => {
     expect(await runK1Embeddings()).toMatchObject({ topicsEmbedded: 1, shortened: 1, rejected: 0, previouslyRejected: 0 });
   });
 
+  it('a 429 on a long text is not retried on the prefix: the row stays unembedded and is tried again next run (Ö-2)', async () => {
+    const el = tokenFixture.samples.find((x) => x.id === 'el-16k')!;
+    db.topics = [topic('a', { title: 'Υδρογόνο', keywords: [], description: el.text })];
+    db.profiles = [];
+    // The full text gets 429: rate limit, not a refusal. Must not retry on prefix.
+    stubProvider((input) => (input === EMBEDDING_PROBE_TEXT ? { ok: true } : { ok: false, status: 429 }));
+    const r = await runK1Embeddings();
+    expect(r).toMatchObject({ rejected: 0, failed: 1, shortened: 0, topicsEmbedded: 0, aborted: false });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // only the full text, no prefix retry
+    expect(r.errors[0]).toContain('429');
+    expect(db.topics[0]!.embeddingHash).toBeNull(); // not marked, will be tried again
+    // Next run, rate limit has passed: full text succeeds, no prefix needed.
+    stubProvider(() => ({ ok: true }));
+    expect(await runK1Embeddings()).toMatchObject({ topicsEmbedded: 1, shortened: 0 });
+  });
+
   it('three system failures in a row stop the run (bad key, outage)', async () => {
     stubProvider(() => ({ ok: false, status: 401 }));
     const r = await runK1Embeddings();

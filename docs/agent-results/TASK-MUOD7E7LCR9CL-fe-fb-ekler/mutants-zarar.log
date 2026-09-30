@@ -1,0 +1,4 @@
+K1   approvals metin md:w-auto sil (w-full her genişlikte)      yeşil (HAYATTA) — 12 passed, 0 failed, 0 skipped
+K2   fırsat başlığı sm:w-auto sil (w-full her genişlikte)       yeşil (HAYATTA) — 12 passed, 0 failed, 0 skipped
+K3   approvals break-words blok yerine yalnız h3+p              yeşil (HAYATTA) — 12 passed, 0 failed, 0 skipped
+git diff (temiz olmalı): TEMİZ

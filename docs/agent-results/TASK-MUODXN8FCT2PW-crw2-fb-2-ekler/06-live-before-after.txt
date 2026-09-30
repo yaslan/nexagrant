@@ -1,0 +1,28 @@
+# Madde 5 — live test, düzeltme öncesi / sonrası
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55110/f
+DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55110/f
+
+## 5.0 63f6205f^ ağacında bu test yok (test düzeltmeyle birlikte eklendi):
+$ git show 63f6205f^:tests/stale-relationship-reminder.live.test.ts | grep -c 'İNCELEME-106 Y-1'
+0
+→ 'önce' = düzeltilmiş test + düzeltme ÖNCESİ migration dosyası (63f6205f^)
+
+## 5.1 ÖNCE: $ git show 63f6205f^:prisma/migrations/m4-stale-reminder-idempotency.sql > prisma/migrations/m4-stale-reminder-idempotency.sql
+ prisma/migrations/m4-stale-reminder-idempotency.sql | 17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
+✓ Lockfile passes supply-chain policies (verified 19h ago)
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+     × re-running the idempotency backfill leaves a day the user already claimed off "Membership" (İNCELEME-106 Y-1) 37ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected 2028-04-02T00:00:00.000Z to be null
+- Expected:
++ Received:
+ Test Files  1 failed (1)
+      Tests  1 failed | 24 passed (25)
+exit=1
+$ git checkout -- prisma/migrations/m4-stale-reminder-idempotency.sql ; git status --short -- prisma/migrations/m4-stale-reminder-idempotency.sql → []
+
+## 5.2 SONRA (dev HEAD, dosya değişmemiş):
+ Test Files  1 passed (1)
+      Tests  25 passed (25)
+exit=0

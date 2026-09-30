@@ -96,7 +96,12 @@ beforeEach(async () => {
   for (const [id, h] of Object.entries(TOPIC_HASHES)) await admin.topic.update({ where: { id }, data: { embeddingHash: h } });
   for (const [tenantId, h] of Object.entries(TENANT_HASHES)) await admin.tenantProfile.update({ where: { tenantId }, data: { embeddingHash: h } });
   log = vi.spyOn(console, 'log').mockImplementation(() => {});
-  return () => log.mockRestore();
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  return () => {
+    log.mockRestore();
+    vi.restoreAllMocks();
+  };
 });
 
 afterAll(async () => {
@@ -140,8 +145,8 @@ describe.skipIf(!HAS_DB)('k1-embeddings-unlock-rejected (live, fabrika_app)', ()
     expect(backup.topics.map((t) => t.id)).toEqual([T_M1, T_M2]);
     expect(backup.profiles).toEqual(expect.arrayContaining([{ tenantId: TA, embeddingHash: TENANT_HASHES[TA] }, { tenantId: TD, embeddingHash: TENANT_HASHES[TD] }]));
     expect(backup.profiles).toHaveLength(2);
-    // Ids and counts only: no profile text in the backup or the output.
-    const printed = log.mock.calls.flat().join('\n') + fs.readFileSync(r.backupFile!, 'utf8');
+    // Ids and counts only: no profile text in the backup or the output (Ö-3a).
+    const printed = JSON.stringify(log.mock.calls) + fs.readFileSync(r.backupFile!, 'utf8');
     for (const id of Object.keys(TENANT_HASHES)) expect(printed).not.toContain(CAPABILITIES(id));
 
     const again = await unlockRejected({ ...SCOPE, apply: true, backupDir });
@@ -168,4 +173,79 @@ describe.skipIf(!HAS_DB)('k1-embeddings-unlock-rejected (live, fabrika_app)', ()
     expect(await topicHashes()).toEqual(TOPIC_HASHES);
     expect(await profileHashes()).toEqual(TENANT_HASHES);
   });
+
+  test('deleted tenants are not unlocked (Ö-6)', async () => {
+    const T_DELETED = `t-deleted-${RUN}`;
+    const T_ACTIVE = `t-active-${RUN}`;
+
+    try {
+      await admin.tenant.create({ data: { id: T_DELETED, name: T_DELETED, slug: T_DELETED, country: 'TR', deletedAt: new Date() } });
+      await admin.tenantProfile.create({ data: { tenantId: T_DELETED, capabilities: 'x', keywords: [], naceCodes: [], trlRange: [], preferredRoles: [], embeddingHash: `rejected:old` } });
+      await admin.tenant.create({ data: { id: T_ACTIVE, name: T_ACTIVE, slug: T_ACTIVE, country: 'TR' } });
+      await admin.tenantProfile.create({ data: { tenantId: T_ACTIVE, capabilities: 'x', keywords: [], naceCodes: [], trlRange: [], preferredRoles: [], embeddingHash: `rejected:active` } });
+
+      const r = await unlockRejected({ tenantIds: [T_DELETED, T_ACTIVE], apply: true, backupDir });
+      // Only the active tenant's profile is cleared
+      expect(r.profiles.map((p) => p.tenantId)).toEqual([T_ACTIVE]);
+      const deletedProfile = await admin.tenantProfile.findUnique({ where: { tenantId: T_DELETED }, select: { embeddingHash: true } });
+      const activeProfile = await admin.tenantProfile.findUnique({ where: { tenantId: T_ACTIVE }, select: { embeddingHash: true } });
+      expect(deletedProfile?.embeddingHash).toBe('rejected:old');
+      expect(activeProfile?.embeddingHash).toBeNull();
+    } finally {
+      await admin.tenant.deleteMany({ where: { id: { in: [T_DELETED, T_ACTIVE] } } });
+    }
+  });
+
+  test('a row re-embedded between the listing and the clear keeps its new hash (validates the LIKE guard, Ö-1)', async () => {
+    const RUN_RACE = `race-${Math.random().toString(36).slice(2, 10)}`;
+    const T = `t-race-${RUN_RACE}`;
+    const P = `P-RACE-${RUN_RACE}`;
+    const C = `c-race-${RUN_RACE}`;
+    const TP = `tp-race-${RUN_RACE}`;
+    const raceBackupDir = fs.mkdtempSync(path.join(os.tmpdir(), 'race-'));
+
+    try {
+      await admin.tenant.create({ data: { id: T, name: T, slug: T, country: 'TR' } });
+      await admin.tenantProfile.create({
+        data: { tenantId: T, capabilities: 'x', keywords: [], naceCodes: [], trlRange: [], preferredRoles: [], embeddingHash: `rejected:old-${RUN_RACE}` },
+      });
+      await admin.programme.create({ data: { id: P, name: 'race', sourceKey: 'test' } });
+      await admin.call.create({ data: { id: C, programmeId: P, callIdentifier: `R-${RUN_RACE}`, title: 'r' } });
+      await admin.topic.create({
+        data: { id: TP, callId: C, identifier: `R-${RUN_RACE}`, title: 't', keywords: [], status: 'OPEN', deadlines: [], eligibility: {}, embeddingHash: `rejected:oldt-${RUN_RACE}` },
+      });
+
+      let unlockPromise!: Promise<unknown>;
+      await admin.$transaction(
+        async (tx) => {
+          // Between listing and clear, rows are re-embedded with new hashes.
+          await tx.$executeRaw`UPDATE "TenantProfile" SET "embeddingHash" = ${`new-${RUN_RACE}`} WHERE "tenantId" = ${T}`;
+          await tx.$executeRaw`UPDATE "Topic" SET "embeddingHash" = ${`newt-${RUN_RACE}`} WHERE id = ${TP}`;
+          // Start the unlock; it will list the rejected hashes, then wait on row locks while we commit.
+          unlockPromise = unlockRejected({ topicIds: [TP], tenantIds: [T], apply: true, backupDir: raceBackupDir });
+          // Wait for backup to be written (happens after listing, before UPDATE).
+          for (let i = 0; i < 100 && fs.readdirSync(raceBackupDir).length === 0; i++) await new Promise((r) => setTimeout(r, 50));
+          expect(fs.readdirSync(raceBackupDir)).toHaveLength(1);
+          // Let the UPDATE wait a bit more to ensure it tries to clear.
+          await new Promise((r) => setTimeout(r, 500));
+        },
+        { timeout: 20_000 }
+      );
+      const r = (await unlockPromise) as { clearedTopics: number; clearedProfiles: number };
+      const prof = await admin.tenantProfile.findUnique({ where: { tenantId: T }, select: { embeddingHash: true } });
+      const top = await admin.topic.findUnique({ where: { id: TP }, select: { embeddingHash: true } });
+      // The LIKE guard prevents clearing rows that have been re-embedded with new hashes.
+      expect({ prof: prof?.embeddingHash, top: top?.embeddingHash, r }).toEqual({
+        prof: `new-${RUN_RACE}`,
+        top: `newt-${RUN_RACE}`,
+        r: expect.objectContaining({ clearedTopics: 0, clearedProfiles: 0 }),
+      });
+    } finally {
+      await admin.tenant.deleteMany({ where: { id: T } });
+      await admin.topic.deleteMany({ where: { id: TP } });
+      await admin.call.deleteMany({ where: { id: C } });
+      await admin.programme.deleteMany({ where: { id: P } });
+      fs.rmSync(raceBackupDir, { recursive: true, force: true });
+    }
+  }, 30_000);
 });
