@@ -5,6 +5,7 @@ import { errorMessage } from '@/lib/errors';
 import { requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
 import { PILOT_EXPIRED_CODE, isPilotExpired, type PilotExpiredCode } from '@/lib/pilot-expired';
+import { FORBIDDEN_ROLE_CODE, isForbiddenRole, type ForbiddenRoleCode } from '@/lib/forbidden-role';
 import { revalidatePath } from 'next/cache';
 import { generateSeatCandidates } from './matching';
 import { canConfirmSeat, inviteSeatCandidate } from './seat-transitions';
@@ -27,7 +28,7 @@ export async function computeSeatCandidates(opportunityId: string, seatId: strin
   // Not `readOnly`: the matcher deletes the seat's candidates and writes new
   // ones (`runSeatMatch`), so an expired pilot is refused here, before anything
   // is read or deleted (İNCELEME-30 B-1, TASK-MUN39FIAKFY2R).
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });
   // Client-supplied: with `seatId` undefined the lookup below matches any seat
   // and the rewrite clears every seat's candidates (TASK-MUMSUA77J1C6Q).
   if (!isPresentId(seatId) || !isPresentId(opportunityId)) {
@@ -59,7 +60,7 @@ export async function inviteCandidateToSeat(
   organizationId: string,
   opportunityId: string
 ) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });
   // Client-supplied: with either id missing the write below would reassign every
   // seat of the opportunity, or of the tenant (TASK-MUN2KUHP1BP18).
   if (!isPresentId(seatId) || !isPresentId(opportunityId)) {
@@ -165,8 +166,11 @@ export interface SeatCandidateFormState {
   status: 'idle' | 'ok' | 'error';
   message?: string;
   count?: number;
-  /** Set for a pilot refusal: the button shows `Common.pilotExpired` instead of `message`. */
-  code?: PilotExpiredCode;
+  /**
+   * Set for a pilot or role refusal: the button shows `Common.pilotExpired` /
+   * `Common.forbiddenRole` instead of `message`.
+   */
+  code?: PilotExpiredCode | ForbiddenRoleCode;
 }
 
 export async function computeSeatCandidatesForm(
@@ -187,6 +191,7 @@ export async function computeSeatCandidatesForm(
     // The refusal is caught here, so its digest never reaches the browser;
     // the code is what tells the button to say "pilot ended".
     if (isPilotExpired(e)) return { status: 'error', code: PILOT_EXPIRED_CODE };
+    if (isForbiddenRole(e)) return { status: 'error', code: FORBIDDEN_ROLE_CODE };
     return { status: 'error', message: errorMessage(e) };
   }
 }

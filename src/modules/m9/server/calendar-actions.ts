@@ -28,7 +28,7 @@ import { CalendarActionError, SELF_SERVE_PROVIDERS } from '@/lib/calendar/errors
  */
 
 export async function disconnectCalendar(connectionId: string) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
   if (!isPresentId(connectionId)) throw new CalendarActionError('CALENDAR_CONNECTION_NOT_FOUND');
 
   return withTenant(tenantId, async (tx) => {
@@ -75,7 +75,7 @@ export async function disconnectCalendar(connectionId: string) {
 export async function connectCalendar(
   provider: string
 ): Promise<{ connectionId: string; provider: CalendarProviderType; isConnected: boolean }> {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const parsed = CalendarProviderSchema.safeParse(provider);
   if (!parsed.success) {

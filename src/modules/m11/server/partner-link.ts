@@ -20,7 +20,7 @@ import { issueSecretToken } from '@/lib/secret-token';
  * the part is not this tenant's Part A.
  */
 export async function issuePartnerPortalLink(partId: string): Promise<{ token: string } | null> {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   if (!isPresentId(partId)) return null;
 
   const { raw, hash } = issueSecretToken();

@@ -23,7 +23,7 @@ export async function createRelationship(data: {
   counterpartName?: string;
   counterpartEmail?: string;
 }) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   if (!data.organizationId && !data.partnerOrgId) {
     throw new Error('Must provide either organizationId or partnerOrgId');
@@ -64,7 +64,7 @@ export async function addInteraction(data: {
   kind: string; // meeting | email | call | event
   summary?: string;
 }) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const interaction = await withTenant<InteractionRow>(tenantId, async (tx) => {
     // The relationship must be this tenant's before anything is written to it.
@@ -106,7 +106,7 @@ export async function updateNextStep(
   nextStep: string,
   nextStepDue: Date | null
 ) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
   if (!isPresentId(relationshipId)) return { success: false };
 

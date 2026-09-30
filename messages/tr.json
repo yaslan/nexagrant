@@ -35,6 +35,7 @@
     "status": "Durum",
     "noResults": "Sonuç bulunamadı.",
     "pilotExpired": "Pilot süresi doldu, düzenleme kapalı. Uzatma için yöneticinize başvurun.",
+    "forbiddenRole": "Rolünüz bu işlem için yetkili değil; hiçbir şey kaydedilmedi. Yetki için çalışma alanı yöneticinize başvurun.",
     "aiTruncated": "Yapay zekâ metni uzunluk sınırında kesildi; hiçbir şey kaydedilmedi, kredi düşülmedi. Yeniden deneyin ya da daha kısa bir belge isteyin.",
     "aiRefused": "Yapay zekâ modeli bu isteği yanıtlamayı reddetti. Hiçbir şey kaydedilmedi, kredi düşülmedi.",
     "logoAlt": "{brand} logosu",

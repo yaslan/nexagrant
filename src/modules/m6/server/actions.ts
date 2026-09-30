@@ -74,7 +74,7 @@ export async function generateAiEvaluation(opportunityId: string): Promise<AiEva
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M6');
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
   const locale = await promptLocale();
 
   const resultStr = await generateText({
@@ -140,7 +140,7 @@ export async function saveHumanEvaluation(data: {
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M6');
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const created = await withTenant(tenantId, async (tx) => {
     const opp = await tx.opportunity.findFirst({
@@ -179,7 +179,7 @@ export async function calibrateESR(evaluationId: string, actualScore: number): P
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M6');
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const calibration = await withTenant<number>(tenantId, async (tx) => {
     // Scoped read: an evaluation id from another tenant must not resolve here.
@@ -221,7 +221,7 @@ export async function saveEvaluation(data: {
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M6');
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'contribute_assigned' });
 
   const avgScore = await withTenant<number | null>(tenantId, async (tx) => {
     const evaluation = await tx.evaluation.findFirst({

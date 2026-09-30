@@ -78,7 +78,7 @@ async function savePartContent(tenantId: string, partId: string, content: PartCo
 }
 
 export async function createApplicationPart(opportunityId: string, part: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const createdPart = await withTenant<ApplicationPartRow | null>(tenantId, async (tx) => {
     // The opportunity must belong to this tenant; its id is guessable.
@@ -160,7 +160,7 @@ export async function acquireSectionLock(
   authorName: string,
   authorOrg: string
 ) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   if (!isPresentId(partId)) return { success: false };
   const now = new Date().toISOString();
 
@@ -201,7 +201,7 @@ export async function acquireSectionLock(
 }
 
 export async function releaseSectionLock(partId: string, sectionKey: string, userId: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   if (!isPresentId(partId)) return { success: false };
 
   try {
@@ -235,7 +235,7 @@ export async function updateSectionContent(
   authorOrg: string,
   changeSummary?: string
 ) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   if (!isPresentId(partId)) return { success: false };
   const now = new Date().toISOString();
   const wordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
@@ -300,7 +300,7 @@ export async function addSectionComment(
     resolved: false,
   };
 
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
   try {
     const part = await loadPart(tenantId, partId);
@@ -319,7 +319,7 @@ export async function addSectionComment(
 }
 
 export async function resolveSectionComment(partId: string, sectionKey: string, commentId: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   if (!isPresentId(partId)) return { success: false };
 
   try {
@@ -343,7 +343,7 @@ export async function resolveSectionComment(partId: string, sectionKey: string, 
 }
 
 export async function restoreSectionRevision(partId: string, sectionKey: string, revisionId: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   if (!isPresentId(partId)) return { success: false };
 
   try {
@@ -394,7 +394,12 @@ export async function updatePresenceHeartbeat(
     lastSeenAt: new Date().toISOString(),
   };
 
-  const { tenantId } = await requireTenantAction({ readOnly: true });
+  // Not `readOnly`: the heartbeat writes the part's whole `content` back
+  // (`savePartContent`), so an expired pilot is refused before the read. The
+  // editor stops beating on that refusal (TASK-MUN4H2RL79D8B, N-2). The same
+  // write needs `edit_proposal` (TASK-MUN80UOUPB2A4); a role without it is
+  // refused too, and the editor stops on that as well.
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
   try {
     const part = await loadPart(tenantId, partId);
@@ -490,7 +495,7 @@ export async function addBudgetLine(
   subcontracting: number = 0,
   travel: number = 0
 ) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   const requestedTotal = lumpSumTotal(pm, countryCoefficient, subcontracting, travel);
 
   let updatedPart: ApplicationPartRow | null = null;
@@ -533,7 +538,7 @@ export async function addWorkPackage(
     deliverables?: string[];
   }
 ) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
   let updatedPart: ApplicationPartRow | null = null;
   try {

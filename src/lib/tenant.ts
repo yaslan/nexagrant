@@ -4,6 +4,8 @@ import { auth } from '@/lib/auth';
 import { getPublicRoute } from '@/lib/routes';
 import { assertTenantWritable, PilotExpiredError } from '@/lib/billing/pilot';
 import { PILOT_EXPIRED_DIGEST } from '@/lib/pilot-expired';
+import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
+import { asRole, can, type Action } from '@/lib/rbac';
 
 /**
  * Tenant resolution — the single place a request's tenant is decided.
@@ -97,11 +99,48 @@ export function assertTenant(session: SessionLike): TenantScope {
  * body runs. An action that only reads passes `{ readOnly: true }`. Failing
  * closed is deliberate — a new action nobody marked is refused for an expired
  * pilot, which is visible; the other default would let it write.
+ *
+ * `can` is the permission the caller's role must carry (src/lib/rbac.ts); a
+ * role without it is refused with `ForbiddenRoleError` before the body runs.
+ * Every write action names one — tests/server-action-rbac-guard.test.ts keeps
+ * it that way. The pilot is checked first: an expired pilot is the answer for
+ * every role, so it is the one worth showing.
  */
-export async function requireTenantAction(opts: { readOnly?: boolean } = {}): Promise<TenantScope> {
+export async function requireTenantAction(
+  opts: { readOnly?: boolean; can?: Action } = {}
+): Promise<TenantScope> {
   const scope = assertTenant((await auth()) as SessionLike);
   if (!opts.readOnly) await assertTenantActionWritable(scope.tenantId);
+  if (opts.can) assertTenantActionRole(scope, opts.can);
   return scope;
+}
+
+/**
+ * The caller's role does not carry the permission an action needs
+ * (src/lib/rbac.ts). Leaves the action with `digest = 'FORBIDDEN_ROLE'` so the
+ * browser can say "your role cannot do this" instead of "try again"
+ * (src/lib/forbidden-role.ts). The message names the permission, never the
+ * user.
+ */
+export class ForbiddenRoleError extends Error {
+  readonly code = FORBIDDEN_ROLE_DIGEST;
+  readonly digest = FORBIDDEN_ROLE_DIGEST;
+
+  constructor(readonly action: Action) {
+    super(`Forbidden: this role cannot ${action}.`);
+    this.name = 'ForbiddenRoleError';
+  }
+}
+
+/**
+ * Role half of {@link requireTenantAction} (TASK-MUN80UOUPB2A4, FB GÜVENLİK
+ * Y-3). `rbac.ts` is the one permission table; this only asks it. For an
+ * action that resolves its tenant itself — call it next to
+ * `assertTenantActionWritable`. A role outside the enum (a stale token) grants
+ * nothing, as in `can`.
+ */
+export function assertTenantActionRole(scope: Pick<TenantScope, 'role'>, action: Action): void {
+  if (!can(asRole(scope.role), action)) throw new ForbiddenRoleError(action);
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { tenantScopeOf, TenantScope, assertTenantActionWritable } from '@/lib/tenant';
+import { tenantScopeOf, TenantScope, assertTenantActionWritable, assertTenantActionRole } from '@/lib/tenant';
 import { Gate } from '@prisma/client';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
@@ -154,6 +154,8 @@ export async function createOpportunity({
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
+  // The role half (rbac.ts; TASK-MUN80UOUPB2A4, FB GÜVENLİK Y-3).
+  assertTenantActionRole(scope, 'manage_workspaces');
   const { tenantId, userId } = scope;
 
   // Real tenant members, not a fixed list — falls back to whoever the requesting
@@ -314,6 +316,8 @@ export async function assignOpportunityOwner({
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
+  // The role half (rbac.ts; TASK-MUN80UOUPB2A4, FB GÜVENLİK Y-3).
+  assertTenantActionRole(scope, 'manage_workspaces');
   const { tenantId } = scope;
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
   if (!isPresentId(opportunityId)) return { success: false as const, error: 'INVALID_INPUT' as const };
@@ -356,6 +360,8 @@ export async function addOpportunityNote({
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
+  // The role half (rbac.ts; TASK-MUN80UOUPB2A4, FB GÜVENLİK Y-3).
+  assertTenantActionRole(scope, 'edit_proposal');
   const { tenantId } = scope;
 
   const nowFormatted = new Date().toLocaleString('tr-TR', {
@@ -389,6 +395,8 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
+  // The role half (rbac.ts; TASK-MUN80UOUPB2A4, FB GÜVENLİK Y-3).
+  assertTenantActionRole(scope, 'manage_workspaces');
   const { tenantId } = scope;
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
   if (!isPresentId(opportunityId)) return { success: false as const, error: 'INVALID_INPUT' as const };
@@ -444,6 +452,8 @@ export async function evaluateOpportunityGate({
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
+  // The role half (rbac.ts; TASK-MUN80UOUPB2A4, FB GÜVENLİK Y-3).
+  assertTenantActionRole(scope, 'evaluate_gates');
   const { tenantId, userId } = scope;
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
   if (!isPresentId(opportunityId)) return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
@@ -613,6 +623,8 @@ export async function logEffort({
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
+  // The role half (rbac.ts; TASK-MUN80UOUPB2A4, FB GÜVENLİK Y-3).
+  assertTenantActionRole(scope, 'edit_proposal');
   const { tenantId, userId } = scope;
 
   const parsed = EffortInput.safeParse({ opportunityId, date, hours, note });

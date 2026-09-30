@@ -39,6 +39,8 @@ import {
   generateSectionDraftAi,
 } from '../server/actions';
 import { errorMessage } from '@/lib/errors';
+import { isPilotExpired } from '@/lib/pilot-expired';
+import { isForbiddenRole } from '@/lib/forbidden-role';
 import { useNow } from '@/lib/hooks/use-now';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { useOptionalSession } from '@/lib/hooks/use-optional-session';
@@ -218,10 +220,15 @@ export function PartBCollaborativeEditor({
           activeSectionKey
         );
         if (!cancelled && Array.isArray(live)) setPresenceList(live);
-      } catch {}
+      } catch (e) {
+        // An expired pilot, or a role without `edit_proposal`, refuses every
+        // beat; asking again every 20 s only fills the server log
+        // (TASK-MUN4H2RL79D8B, TASK-MUN80UOUPB2A4). Other failures retry.
+        if (isPilotExpired(e) || isForbiddenRole(e)) clearInterval(interval);
+      }
     };
-    void beat();
     const interval = setInterval(() => void beat(), 20000);
+    void beat();
     return () => {
       cancelled = true;
       clearInterval(interval);

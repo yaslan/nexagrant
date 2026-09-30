@@ -33,7 +33,7 @@ export async function createTtoItem({
   summary: string;
   keywords: string[];
 }) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const item = await withTenant<TtoPortfolioItemRow>(tenantId, (tx) =>
     tx.ttoPortfolioItem.create({
@@ -56,7 +56,9 @@ export async function createTtoItem({
 }
 
 export async function matchTtoItemToCalls(itemId: string) {
-  const { tenantId } = await requireTenantAction();
+  // Reads only (TASK-MUN80UOUPB2A4): nothing here is written, so an expired
+  // pilot may still see it and no edit permission is needed.
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   // Scoped read: a portfolio item id from another tenant must not resolve here.
   const item = await withTenant<{ title: string; trl: number } | null>(tenantId, (tx) =>
@@ -112,7 +114,7 @@ export async function generateIpChecklist({
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M7');
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const locale = await promptLocale();
   const prompt = renderPrompt('m7/ip-checklist', { title, trl, patentStatus }, locale);

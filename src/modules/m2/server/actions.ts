@@ -66,7 +66,7 @@ export async function generateConceptNoteDraft(
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M2');
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   // 1. Get the opportunity — scoped to the session tenant
   const opp = await withTenant<OpportunityWithTopic | null>(tenantId, (tx) =>
@@ -156,7 +156,7 @@ export async function generateConceptNoteDraft(
 }
 
 export async function saveConceptNoteDraft(noteId: string, content: ConceptNoteContent) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
   if (!isPresentId(noteId)) return { success: false };
 
@@ -229,7 +229,9 @@ export async function exportToDocx(noteId: string) {
 }
 
 export async function generateAiUsageDeclaration(opportunityId: string) {
-  const { tenantId } = await requireTenantAction();
+  // Reads only (TASK-MUN80UOUPB2A4): nothing here is written, so an expired
+  // pilot may still see it and no edit permission is needed.
+  const { tenantId } = await requireTenantAction({ readOnly: true });
 
   const logs = await withTenant<AiUsageLogRow[]>(tenantId, (tx) =>
     tx.aiUsageLog.findMany({

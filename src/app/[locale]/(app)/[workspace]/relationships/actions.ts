@@ -27,7 +27,7 @@ export async function createRelationship(data: {
   counterpartEmail?: string;
   notes?: string;
 }) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const rel = await withTenant<RelationshipRow>(tenantId, (tx) =>
     tx.relationship.create({
@@ -160,7 +160,7 @@ export async function addInteraction(relationshipId: string, data: {
   at: string;
   summary: string;
 }) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const ok = await withTenant<boolean>(tenantId, async (tx) => {
     // The relationship must be this tenant's before anything is written to it.

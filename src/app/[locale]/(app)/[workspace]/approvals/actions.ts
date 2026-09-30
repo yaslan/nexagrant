@@ -27,7 +27,7 @@ export async function submitApprovalRequestAction(data: {
   requiredRole?: Role;
   expiresInHours?: number;
 }) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'request_dual_approval' });
 
   const result = await createApprovalRequest({
     tenantId,
@@ -76,7 +76,7 @@ export async function rejectRequestAction(requestId: string, reason: string) {
 }
 
 export async function cancelRequestAction(requestId: string) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'request_dual_approval' });
 
   const result = await cancelApprovalRequest({
     requestId,

@@ -45,7 +45,7 @@ export async function generateMeetingBrief({
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M9');
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   // The FK only checks that the opportunity exists, not whose it is (constraint
   // checks run without RLS), and the id comes from the client. Refused here,
@@ -153,7 +153,7 @@ export async function savePostMeetingNotes({
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M9');
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   const formattedPostNotes = `\n\n---
 ### 📝 Toplantı Sonrası Notlar & Alınan Kararlar (${new Date().toLocaleDateString('tr-TR')})
 - **Ortak:** ${partnerName}

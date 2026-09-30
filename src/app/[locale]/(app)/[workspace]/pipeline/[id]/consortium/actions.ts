@@ -22,7 +22,7 @@ import { inviteSeatCandidate } from '@/modules/m8/server/seat-transitions';
 const PIPELINE_PATH = '/[locale]/(app)/[workspace]/pipeline';
 
 export async function addSeat(opportunityId: string, roleKey: string, required: boolean = true) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });
 
   const seat = await withTenant(tenantId, async (tx) => {
     // The opportunity must belong to this tenant; an id is guessable.
@@ -56,7 +56,7 @@ export async function findCandidates(seatId: string) {
   // new ones, and the flag only skips the pilot check. An expired pilot is
   // refused here, before anything is read or deleted (TASK-MUN3W76B4XEJE; the
   // M8 twin is İNCELEME-30 B-1).
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });
   // Client-supplied: with `seatId` missing the lookup finds any seat and the
   // scorer's clear wipes every seat's candidates (TASK-MUN2KUHP1BP18).
   if (!isPresentId(seatId)) return [];
@@ -92,7 +92,7 @@ export async function findCandidates(seatId: string) {
 }
 
 export async function assignSeat(seatId: string, organizationId: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
   if (!isPresentId(seatId)) return { success: false };
 

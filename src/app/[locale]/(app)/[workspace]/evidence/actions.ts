@@ -58,7 +58,7 @@ export async function getPresignedUploadUrlAction(
   fileName: string,
   mimeType: string
 ) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
   return getPresignedUploadUrl(
     tenantId,
@@ -91,7 +91,7 @@ export async function confirmEvidenceUploadAction(data: {
   confidentiality?: string;
   language?: string;
 }) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   // The key comes back from the browser. Only one under this tenant's own prefix
   // may be recorded: the row's key is what deleteEvidence later removes from the
@@ -186,7 +186,7 @@ export async function confirmEvidenceUploadAction(data: {
  * Traditional FormData upload fallback
  */
 export async function createEvidence(formData: FormData) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const title = formData.get('title') as string;
   const kind = (formData.get('kind') as string) || 'certificate';
@@ -261,7 +261,7 @@ export async function createEvidence(formData: FormData) {
  * Deletes an Evidence Item and removes associated file from R2
  */
 export async function deleteEvidence(evidenceId: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   // A server action's arguments come from the client, whatever the signature
   // says. Prisma drops an `undefined` key from `where`, so without this a call
   // with no id would find "any evidence" and then delete every row of the
@@ -299,7 +299,7 @@ export async function deleteEvidence(evidenceId: string) {
  * Updates verification status of an Evidence Item
  */
 export async function verifyEvidenceAction(evidenceId: string, status: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
   if (!isPresentId(evidenceId)) return { success: false };
 

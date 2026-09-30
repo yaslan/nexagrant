@@ -25,7 +25,7 @@ export async function createConceptNote(
   opportunityId: string,
   templateId: string
 ) {
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   // A platform template or one this tenant owns — `templateId` is a server
   // action argument, so an unscoped lookup by id read another tenant's row
@@ -65,7 +65,7 @@ export async function saveSectionContent(
   sectionKey: string,
   markdown: string
 ) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
   await withTenant(tenantId, async (tx) => {
     const note = await tx.conceptNote.findFirst({
@@ -99,7 +99,7 @@ export async function generateSectionDraft(
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M2');
-  const { tenantId, userId } = await requireTenantAction();
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   // Build RAG-augmented context
   const ragQuery = `${opportunityTitle} — section: ${sectionLabel}`;
@@ -159,7 +159,7 @@ export async function generateSectionDraft(
  * Update the status of a concept note (draft → review → approved).
  */
 export async function updateNoteStatus(noteId: string, status: string) {
-  const { tenantId } = await requireTenantAction();
+  const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
   if (!isPresentId(noteId)) return { success: false };
 
