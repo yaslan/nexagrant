@@ -5,19 +5,32 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   DeleteObjectCommand
 } from '@aws-sdk/client-s3';
 import { errorMessage } from '@/lib/errors';
 import { env } from '@/lib/env';
 
+// R2_ENDPOINT points the client at another S3-compatible store (a MinIO
+// container in the live tests); unset, the account's R2 endpoint is used.
+// Checksums only when an operation requires one (B-3, TASK-MUNODY0DVDWC5): the
+// SDK default puts the CRC32 of the *empty* body into a presigned PUT URL
+// (`x-amz-checksum-crc32=AAAAAA==`), which a store that checks it refuses for
+// any real file.
 const s3 = process.env.R2_ACCOUNT_ID ? new S3Client({
   region: 'auto',
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: process.env.R2_ENDPOINT || `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  forcePathStyle: Boolean(process.env.R2_ENDPOINT),
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+  responseChecksumValidation: 'WHEN_REQUIRED',
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
   },
 }) : null;
+
+/** Whether uploads go to a real object store; false means the local dev stand-in. */
+export const hasObjectStore = s3 !== null;
 
 /**
  * The R2 bucket every object in this module is read from and written to, and
@@ -29,22 +42,6 @@ const s3 = process.env.R2_ACCOUNT_ID ? new S3Client({
  * object lives under it, and renaming a bucket orphans its contents.
  */
 export const EVIDENCE_BUCKET = env.R2_BUCKET || 'fonbridge-evidence';
-
-/** Public origin serving R2 objects, trailing slash stripped; null when unset. */
-const PUBLIC_HOST = env.R2_PUBLIC_HOST ? env.R2_PUBLIC_HOST.replace(/\/+$/, '') : null;
-
-/**
- * The public URL of a stored object — the only place one is built.
- *
- * Returns `null` when `R2_PUBLIC_HOST` is unset, because with no configured
- * origin there is no URL that would work. A link is not invented to fill the
- * gap: the evidence row is then written with `fileUrl = null` and the UI simply
- * offers no download button, instead of handing the user an address that
- * resolves nowhere. The file is still identified by its object key.
- */
-export function publicObjectUrl(objectKey: string): string | null {
-  return PUBLIC_HOST ? `${PUBLIC_HOST}/${objectKey}` : null;
-}
 
 /**
  * Generates an R2 Object Key following the specification bucket path structure:
@@ -105,66 +102,154 @@ export function tenantObjectKeyOf(tenantId: string, objectKeyOrUrl: unknown): st
 }
 
 /**
- * Generates a Presigned PUT URL for direct browser-to-R2 file upload.
- * Valid for 15 minutes.
+ * B-1 (TASK-MUNODY0DVDWC5): what an evidence upload may be. The extension of
+ * the object key and the declared type must name the same entry, and the first
+ * bytes of the stored object must look like it: the store would otherwise
+ * serve whatever the browser sent (HTML, SVG) under the company's domain.
+ * docx and xlsx are both ZIP containers, so their sniff is the ZIP header.
+ */
+export const EVIDENCE_MAX_BYTES = 25 * 1024 * 1024;
+
+const EVIDENCE_TYPES: Record<string, { mime: string; magic: (b: Buffer) => boolean }> = {
+  pdf: { mime: 'application/pdf', magic: (b) => b.subarray(0, 5).toString('latin1') === '%PDF-' },
+  png: { mime: 'image/png', magic: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+  jpg: { mime: 'image/jpeg', magic: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
+  jpeg: { mime: 'image/jpeg', magic: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
+  webp: { mime: 'image/webp', magic: (b) => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP' },
+  docx: { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', magic: isZip },
+  xlsx: { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', magic: isZip },
+};
+
+function isZip(b: Buffer): boolean {
+  return b.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+}
+
+export type EvidenceUploadRefusal = 'unsupported_type' | 'file_too_large' | 'empty_file';
+
+/**
+ * The content type an evidence file named `fileName` must carry, or why it may
+ * not be uploaded at all. `mimeType` is the browser's claim; it has to agree
+ * with the extension, since the extension is what ends up in the object key.
+ */
+export function evidenceUploadType(
+  fileName: string,
+  mimeType: string,
+  sizeBytes: number
+): { ok: true; contentType: string } | { ok: false; error: EvidenceUploadRefusal } {
+  const entry = EVIDENCE_TYPES[(fileName.split('.').pop() ?? '').toLowerCase()];
+  if (!entry || entry.mime !== mimeType) return { ok: false, error: 'unsupported_type' };
+  if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) return { ok: false, error: 'empty_file' };
+  if (sizeBytes > EVIDENCE_MAX_BYTES) return { ok: false, error: 'file_too_large' };
+  return { ok: true, contentType: entry.mime };
+}
+
+/**
+ * Whether a stored evidence object is what its key says: a known extension,
+ * within the size limit, the stored content type (when the store keeps one)
+ * equal to that extension's, and leading bytes of that format.
+ */
+export function storedEvidenceMatches(
+  objectKey: string,
+  stored: { size: number; contentType: string | null; head: Buffer }
+): { ok: true; contentType: string } | { ok: false; error: EvidenceUploadRefusal } {
+  const entry = EVIDENCE_TYPES[(objectKey.split('.').pop() ?? '').toLowerCase()];
+  if (!entry) return { ok: false, error: 'unsupported_type' };
+  if (stored.size <= 0) return { ok: false, error: 'empty_file' };
+  if (stored.size > EVIDENCE_MAX_BYTES) return { ok: false, error: 'file_too_large' };
+  if (stored.contentType !== null && stored.contentType !== entry.mime) return { ok: false, error: 'unsupported_type' };
+  if (!entry.magic(stored.head)) return { ok: false, error: 'unsupported_type' };
+  return { ok: true, contentType: entry.mime };
+}
+
+/**
+ * A presigned PUT URL for a direct browser-to-R2 upload, valid for 15 minutes.
+ * The content type and the exact length are part of the signature (B-1): a PUT
+ * with any other type or size is refused by the store itself, not only by the
+ * form. The caller has checked both with `evidenceUploadType`.
+ *
+ * Without an object store the URL is the same-origin dev stand-in
+ * (`/api/evidence/mock-upload`), which applies the same checks.
  */
 export async function getPresignedUploadUrl(
   tenantId: string,
   organisationId: string,
   category: string,
   fileName: string,
-  mimeType: string
-): Promise<{ uploadUrl: string; objectKey: string; publicUrl: string | null }> {
+  contentType: string,
+  sizeBytes: number
+): Promise<{ uploadUrl: string; objectKey: string }> {
   const objectKey = generateR2ObjectKey(tenantId, organisationId, category, fileName);
-  const publicUrl = publicObjectUrl(objectKey);
 
   if (!s3) {
-    // Dev Mode Fallback: Simulated presigned URL
-    console.log(`[R2 Storage (Dev Fallback)] Generated mock Presigned PUT URL for key: ${objectKey}`);
-    return {
-      uploadUrl: `/api/evidence/mock-upload?key=${encodeURIComponent(objectKey)}`,
-      objectKey,
-      publicUrl,
-    };
+    return { uploadUrl: `/api/evidence/mock-upload?key=${encodeURIComponent(objectKey)}`, objectKey };
   }
 
+  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+  const command = new PutObjectCommand({
+    Bucket: EVIDENCE_BUCKET,
+    Key: objectKey,
+    ContentType: contentType,
+    ContentLength: sizeBytes,
+  });
+  const uploadUrl = await getSignedUrl(s3, command, {
+    expiresIn: 900,
+    signableHeaders: new Set(['content-type', 'content-length']),
+  });
+  return { uploadUrl, objectKey };
+}
+
+/**
+ * What the store holds under `objectKey`: size, content type (null for the dev
+ * store, which keeps none) and the first 16 bytes. Null when there is no such
+ * object.
+ */
+export async function statObject(
+  objectKey: string
+): Promise<{ size: number; contentType: string | null; head: Buffer } | null> {
+  if (s3) {
+    try {
+      const meta = await s3.send(new HeadObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: objectKey }));
+      const first = await s3.send(new GetObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: objectKey, Range: 'bytes=0-15' }));
+      const head = first.Body ? Buffer.from(await first.Body.transformToByteArray()) : Buffer.alloc(0);
+      return { size: meta.ContentLength ?? 0, contentType: meta.ContentType ?? null, head };
+    } catch {
+      return null;
+    }
+  }
+  const path = devObjectPath(objectKey);
+  if (!path) return null;
+  const { open } = await import('node:fs/promises');
   try {
-    const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
-    const command = new PutObjectCommand({
-      Bucket: EVIDENCE_BUCKET,
-      Key: objectKey,
-      ContentType: mimeType,
-    });
-    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 900 });
-    return { uploadUrl, objectKey, publicUrl };
+    const fh = await open(path, 'r');
+    try {
+      const { size } = await fh.stat();
+      const head = Buffer.alloc(16);
+      const { bytesRead } = await fh.read(head, 0, 16, 0);
+      return { size, contentType: null, head: head.subarray(0, bytesRead) };
+    } finally {
+      await fh.close();
+    }
   } catch {
-    return {
-      uploadUrl: `/api/evidence/mock-upload?key=${encodeURIComponent(objectKey)}`,
-      objectKey,
-      publicUrl,
-    };
+    return null;
   }
 }
 
 /**
- * Generates a Presigned GET URL for secure downloading of evidence documents.
- * Valid for 1 hour.
+ * B-2 (TASK-MUNODY0DVDWC5): a short-lived presigned GET for one object, always
+ * as a download. Evidence is never read from a public host any more; the only
+ * caller is the authenticated, tenant-checked download route. Null without an
+ * object store (the route then serves the dev store's bytes itself).
  */
-export async function getPresignedDownloadUrl(objectKey: string): Promise<string | null> {
-  if (!s3) {
-    return publicObjectUrl(objectKey);
-  }
-
-  try {
-    const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
-    const command = new GetObjectCommand({
-      Bucket: EVIDENCE_BUCKET,
-      Key: objectKey,
-    });
-    return await getSignedUrl(s3, command, { expiresIn: 3600 });
-  } catch {
-    return publicObjectUrl(objectKey);
-  }
+export async function getPresignedDownloadUrl(objectKey: string, fileName: string): Promise<string | null> {
+  if (!s3) return null;
+  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+  const safeName = fileName.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120) || 'evidence';
+  const command = new GetObjectCommand({
+    Bucket: EVIDENCE_BUCKET,
+    Key: objectKey,
+    ResponseContentDisposition: `attachment; filename="${safeName}"`,
+  });
+  return getSignedUrl(s3, command, { expiresIn: 300 });
 }
 
 /**
@@ -173,15 +258,24 @@ export async function getPresignedDownloadUrl(objectKey: string): Promise<string
  * outside production). Null when nothing was stored: the caller must not
  * record a key for a file that does not exist. This used to wait 300 ms and
  * return a URL to nothing.
+ *
+ * Evidence rules apply here as on the presigned path (B-1): an allowed type,
+ * within the size limit, whose bytes look like that type. Null otherwise.
  */
 export async function uploadFileToR2(
   file: File,
   tenantId: string,
   category = 'general'
-): Promise<{ objectKey: string; publicUrl: string | null } | null> {
+): Promise<{ objectKey: string; contentType: string } | null> {
+  const allowed = evidenceUploadType(file.name, file.type, file.size);
+  if (!allowed.ok) return null;
+  const bytes = Buffer.from(await file.arrayBuffer());
   const objectKey = generateR2ObjectKey(tenantId, 'org-default', category, file.name);
-  const stored = await putObjectBytes(objectKey, Buffer.from(await file.arrayBuffer()), file.type || 'application/octet-stream');
-  return stored ? { objectKey, publicUrl: publicObjectUrl(objectKey) } : null;
+  if (!storedEvidenceMatches(objectKey, { size: bytes.length, contentType: allowed.contentType, head: bytes.subarray(0, 16) }).ok) {
+    return null;
+  }
+  const stored = await putObjectBytes(objectKey, bytes, allowed.contentType);
+  return stored ? { objectKey, contentType: allowed.contentType } : null;
 }
 
 /**

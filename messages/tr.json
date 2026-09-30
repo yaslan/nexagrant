@@ -254,6 +254,18 @@
       "unverified": "Doğrulanmamış",
       "valid": "Geçerli",
       "daysLeft": "{days} Gün Kaldı"
+    },
+    "upload": {
+      "fileLabel": "Belge Dosyası (PDF, DOCX, XLSX, PNG, JPG, WEBP — en fazla 25 MB)",
+      "error": {
+        "unsupported_type": "Bu dosya türü yüklenemez. PDF, DOCX, XLSX, PNG, JPG ya da WEBP seçin; dosyanın içeriği uzantısıyla uyuşmalı.",
+        "file_too_large": "Dosya 25 MB sınırını aşıyor.",
+        "empty_file": "Dosya boş.",
+        "object_missing": "Dosya depoya ulaşmadı. Tekrar deneyin.",
+        "invalid_object_key": "Dosya anahtarı geçersiz.",
+        "storage_unavailable": "Depolama şu an kullanılamıyor. Biraz sonra tekrar deneyin.",
+        "put_failed": "Dosya depoya yüklenemedi (HTTP {status})."
+      }
     }
   },
   "ConceptNote": {

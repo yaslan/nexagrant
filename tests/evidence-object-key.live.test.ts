@@ -207,9 +207,12 @@ describe('evidence object keys stay inside their tenant (Y-4)', () => {
   });
 
   test('positive control: A records and deletes its own presigned upload, the file goes', async () => {
-    const { objectKey } = await evidence.getPresignedUploadUrlAction('certificate', 'Kalite Belgesi.pdf', 'application/pdf');
+    const presign = await evidence.getPresignedUploadUrlAction('certificate', 'Kalite Belgesi.pdf', 'application/pdf', 10);
+    if (!presign.success) throw new Error(`presign refused: ${presign.error}`);
+    const { objectKey } = presign;
     expect(objectKey.startsWith(`${t.a}/`)).toBe(true);
-    await putFile(objectKey, 'A'); // what the browser's PUT would have stored
+    // What the browser's PUT would have stored; confirm checks it is a PDF (TASK-MUNODY0DVDWC5).
+    await putFile(objectKey, '%PDF-1.4 A');
 
     const res = await evidence.confirmEvidenceUploadAction(upload(objectKey));
     expect(res.success).toBe(true);

@@ -6,8 +6,11 @@ import { revalidatePath } from 'next/cache';
 import {
   getPresignedUploadUrl,
   deleteTenantObject,
+  deleteObjectBytes,
+  evidenceUploadType,
+  statObject,
+  storedEvidenceMatches,
   uploadFileToR2,
-  publicObjectUrl,
   tenantObjectKeyOf,
   EVIDENCE_BUCKET,
 } from '@/lib/storage';
@@ -51,22 +54,40 @@ export async function getEvidenceItemsAction(categoryFilter?: string) {
 }
 
 /**
- * Generates Presigned PUT Upload URL for Cloudflare R2 direct browser upload
+ * Generates Presigned PUT Upload URL for Cloudflare R2 direct browser upload.
+ *
+ * Only an allowed type within the size limit gets a URL, and that type and the
+ * exact size are signed into it (B-1, TASK-MUNODY0DVDWC5): all three arguments
+ * come from the browser, and the form's `accept` is not a server check.
  */
 export async function getPresignedUploadUrlAction(
   category: string,
   fileName: string,
-  mimeType: string
+  mimeType: string,
+  fileSizeBytes: number
 ) {
   const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
-  return getPresignedUploadUrl(
-    tenantId,
-    'org-default',
-    category || 'certificate',
-    fileName,
-    mimeType
-  );
+  if (typeof fileName !== 'string' || typeof mimeType !== 'string') {
+    return { success: false as const, error: 'unsupported_type' as const };
+  }
+  const allowed = evidenceUploadType(fileName, mimeType, fileSizeBytes);
+  if (!allowed.ok) return { success: false as const, error: allowed.error };
+
+  try {
+    const { uploadUrl, objectKey } = await getPresignedUploadUrl(
+      tenantId,
+      'org-default',
+      category || 'certificate',
+      fileName,
+      allowed.contentType,
+      fileSizeBytes
+    );
+    return { success: true as const, uploadUrl, objectKey, contentType: allowed.contentType };
+  } catch (error) {
+    console.warn(`[getPresignedUploadUrlAction] presign error: ${errorMessage(error)}`);
+    return { success: false as const, error: 'storage_unavailable' as const };
+  }
 }
 
 /**
@@ -102,11 +123,17 @@ export async function confirmEvidenceUploadAction(data: {
     return { success: false as const, error: 'invalid_object_key' as const };
   }
 
-  // Built by the storage module, not here: this line used to concatenate the
-  // storage host itself, which put the same literal in two places and meant the
-  // URL survived every change made in src/lib/storage.ts. `null` when no public
-  // origin is configured — the row then carries no link rather than a dead one.
-  const publicUrl = publicObjectUrl(objectKey);
+  // What was stored, not what the browser says it stored (B-1/B-3,
+  // TASK-MUNODY0DVDWC5): the object must exist, be an allowed type of its key's
+  // extension, within the limit, and begin with that format's bytes. A stored
+  // object that fails is removed — this one key, which is the tenant's own.
+  const stored = await statObject(objectKey);
+  if (!stored) return { success: false as const, error: 'object_missing' as const };
+  const verdict = storedEvidenceMatches(objectKey, stored);
+  if (!verdict.ok) {
+    await deleteObjectBytes(objectKey);
+    return { success: false as const, error: verdict.error };
+  }
 
   // No reader runs over the file yet, so this reports nothing rather than guessing.
   const extracted = await extractEvidenceMetadata();
@@ -136,9 +163,11 @@ export async function confirmEvidenceUploadAction(data: {
         r2ObjectKey: objectKey,
         fileBucket: EVIDENCE_BUCKET,
         fileName: data.fileName,
-        fileSizeBytes: data.fileSizeBytes,
-        mimeType: data.mimeType,
-        fileUrl: publicUrl,
+        fileSizeBytes: stored.size,
+        mimeType: verdict.contentType,
+        // No public link (B-2): evidence is read through the authenticated
+        // download route, never from a URL anyone holding it can open.
+        fileUrl: null,
         ocrText: extracted.ocrSummary,
         extractedFields: {
           // `extracted: false` is the record that nothing was read off the document,
@@ -175,7 +204,7 @@ export async function confirmEvidenceUploadAction(data: {
         body: extracted.ocrSummary ?? '',
         status: 'UNVERIFIED',
         validUntil: finalValidUntil,
-        fileUrl: publicUrl,
+        fileUrl: null,
         createdAt: new Date(),
       },
     };
@@ -195,7 +224,6 @@ export async function createEvidence(formData: FormData) {
   const validUntilRaw = formData.get('validUntil') as string;
   const file = formData.get('file') as File | null;
 
-  let fileUrl = null;
   let objectKey = null;
   let fileName = null;
   let fileSizeBytes = null;
@@ -204,12 +232,13 @@ export async function createEvidence(formData: FormData) {
   if (file && file.size > 0) {
     // Key built by the storage module from sanitised parts; the file name used to
     // go into it verbatim, `../` included (TASK-MUN80W2VFY56R).
+    // Same type and size rules as the presigned path (B-1); a refused file is
+    // not stored and the row gets no key.
     const stored = await uploadFileToR2(file, tenantId, category);
-    fileUrl = stored?.publicUrl ?? null;
     objectKey = stored?.objectKey ?? null;
     fileName = file.name;
     fileSizeBytes = file.size;
-    mimeType = file.type;
+    mimeType = stored?.contentType ?? null;
   }
 
   const validUntil = validUntilRaw ? new Date(validUntilRaw) : null;
@@ -230,7 +259,8 @@ export async function createEvidence(formData: FormData) {
         fileName,
         fileSizeBytes,
         mimeType,
-        fileUrl,
+        // No public link (B-2, TASK-MUNODY0DVDWC5).
+        fileUrl: null,
         ocrText: extracted.ocrSummary,
         tags: extracted.tags,
         createdBy: userId,
@@ -251,7 +281,7 @@ export async function createEvidence(formData: FormData) {
       category,
       body: body || extracted.ocrSummary || '',
       validUntil,
-      fileUrl,
+      fileUrl: null,
       createdAt: new Date(),
     };
   }
