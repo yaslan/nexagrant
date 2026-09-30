@@ -1,0 +1,42 @@
+[cs87 A1]
+x-api-key opportunities: live=200 deleted=401 restored=200
+x-api-key calls: live=200 deleted=401 restored=200
+x-api-key partners: live=200 deleted=401 restored=200
+x-api-key partners/[pic]: live=404 deleted=401 restored=404
+Bearer opportunities: live=200 deleted=401 restored=200
+Bearer calls: live=200 deleted=401 restored=200
+Bearer partners: live=200 deleted=401 restored=200
+Bearer partners/[pic]: live=404 deleted=401 restored=404
+[cs87 A2] 130 calls → statuses 401; count 0→0
+[cs87 A3] orphan key survives purge: true; status 401
+[cs87 A4] deleted between auth and read → status 200, secret in body: true
+[cs87 P1] write={"success":false} fake={"success":false} page=notFound metaTitle=title — Partner Portal
+[cs87 P2] deleted mid-action → result {"success":true,"requestedTotal":6875}, budget lines in deleted tenant: 1
+[cs87 A1]
+x-api-key opportunities: live=200 deleted=401 restored=200
+x-api-key calls: live=200 deleted=401 restored=200
+x-api-key partners: live=200 deleted=401 restored=200
+x-api-key partners/[pic]: live=404 deleted=401 restored=404
+Bearer opportunities: live=200 deleted=401 restored=200
+Bearer calls: live=200 deleted=401 restored=200
+Bearer partners: live=200 deleted=401 restored=200
+Bearer partners/[pic]: live=404 deleted=401 restored=404
+[cs87 A2] 130 calls → statuses 401; count 0→0
+[cs87 A3] orphan key survives purge: true; status 401
+[cs87 A4] deleted between auth and read → status 200, secret in body: true
+[cs87 P1] write={"success":true,"requestedTotal":6875} fake={"success":false} page=rendered metaTitle=title — cs87-muo72jot secret p1
+[cs87 P2] deleted mid-action → result {"success":true,"requestedTotal":6875}, budget lines in deleted tenant: 1
+[cs87 A1]
+x-api-key opportunities: live=200 deleted=401 restored=200
+x-api-key calls: live=200 deleted=401 restored=200
+x-api-key partners: live=200 deleted=401 restored=200
+x-api-key partners/[pic]: live=404 deleted=401 restored=404
+Bearer opportunities: live=200 deleted=401 restored=200
+Bearer calls: live=200 deleted=401 restored=200
+Bearer partners: live=200 deleted=401 restored=200
+Bearer partners/[pic]: live=404 deleted=401 restored=404
+[cs87 A2] 130 calls → statuses 401; count 0→0
+[cs87 A3] orphan key survives purge: true; status 401
+[cs87 A4] deleted between auth and read → status 200, secret in body: true
+[cs87 P1] write={"success":false} fake={"success":false} page=notFound metaTitle=title — Partner Portal
+[cs87 P2] deleted mid-action → result {"success":true,"requestedTotal":6875}, budget lines in deleted tenant: 1
