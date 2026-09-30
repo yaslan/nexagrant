@@ -141,14 +141,11 @@ describe('API route 5xx bodies', () => {
  * Server actions that already hand a caught value back, before this guard
  * existed. Each is a follow-up, not an exemption: the count may only go down,
  * and the test fails when it does so the entry is removed with the fix.
- * - admin/billing/plans: `toFailure()` puts `errorMessage(e)` in `detail`; the
- *   UI shows it to the platform admin. Platform-admin only.
- * (m8 `computeSeatCandidatesForm` was the second entry; it answers codes since
- * TASK-MUNZ7N9IT8VPY.)
+ * Both entries are closed: admin/billing/plans `toFailure()` (TASK-MUNZKR3PEV8EI)
+ * and m8 `computeSeatCandidatesForm` (TASK-MUNZ7N9IT8VPY) now answer codes.
+ * Keep the map empty; a new entry needs a follow-up card, not an exemption.
  */
-const KNOWN_ACTION_LEAKS: Record<string, number> = {
-  'src/app/[locale]/admin/billing/plans/actions.ts': 11,
-};
+const KNOWN_ACTION_LEAKS: Record<string, number> = {};
 
 describe('server action error returns', () => {
   test('no server action returns what it caught (beyond the known list)', () => {
@@ -188,6 +185,8 @@ describe('server action error returns', () => {
       // A domain error's own code (evidence/actions.ts UploadRefused).
       'try { x(); } catch (error) { if (error instanceof UploadRefused) return { success: false, error: error.code }; }',
       "try { x(); } catch (e) { if (isPilotExpired(e)) return { code: 'pilot_expired' }; return { error: 'failed' }; }",
+      // admin/billing/plans (TASK-MUNZKR3PEV8EI); what planFailure returns is pinned by its own test.
+      "try { x(); } catch (e) { return planFailure(e, 'createDraft'); }",
     ];
     for (const src of fine) expect(catchReturnLeaks(src), src).toEqual([]);
   });

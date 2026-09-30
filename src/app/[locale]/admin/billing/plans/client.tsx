@@ -48,7 +48,7 @@ interface PlanAdminClientProps {
   plans: AdminPlanRow[];
   modules: Array<{ id: string; name: string }>;
   tenants: Array<{ id: string; name: string }>;
-  loadError: string | null;
+  loadError: boolean;
 }
 
 const VISIBILITIES = ['public', 'private', 'archived'] as const;
@@ -99,7 +99,7 @@ export function PlanAdminClient({ locale, plans, modules, tenants, loadError }: 
         setNotice({ kind: 'ok', text: t('saved') });
         router.refresh();
       } else {
-        setNotice({ kind: 'err', text: t(`errors.${res.code}`, { detail: res.detail }) });
+        setNotice({ kind: 'err', text: t(`errors.${res.code}`) });
       }
     });
   };
@@ -158,7 +158,6 @@ export function PlanAdminClient({ locale, plans, modules, tenants, loadError }: 
         <p className="text-sm text-rose-700" data-testid="plans-load-error">
           {t('loadError')}
         </p>
-        <p className="text-xs font-mono text-muted">{loadError}</p>
       </div>
     );
   }

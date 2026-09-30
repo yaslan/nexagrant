@@ -1,0 +1,15 @@
+## tsc
+tsc EXIT 0
+## eslint
+eslint EXIT 0
+## i18n
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+
+i18n EXIT 0
+## build (önceki koşu)
+BUILD EXIT 0
+## vitest
+vitest EXIT 0
+ Test Files  290 passed | 6 skipped (296)
+      Tests  3606 passed | 91 skipped (3697)
+   Duration  26.27s (transform 14.19s, setup 0ms, import 65.79s, tests 167.57s, environment 12.89s)

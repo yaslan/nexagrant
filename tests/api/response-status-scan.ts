@@ -220,9 +220,11 @@ export function unguardedServerErrors(src: string): number[] {
 /**
  * Functions that turn a caught value into a fixed code, so passing the caught
  * value to them does not carry its text anywhere. Reading `caught.code`
- * directly counts the same as `errorCode(caught)`.
+ * directly counts the same as `errorCode(caught)`. `planFailure` (admin plan
+ * actions) is trusted by name here; what it returns is pinned by
+ * src/app/[locale]/admin/billing/plans/actions.test.ts.
  */
-const SANITISERS = ['errorCode', 'failureCode', 'mailFailureCode'];
+const SANITISERS = ['errorCode', 'failureCode', 'mailFailureCode', 'planFailure'];
 
 function blockEnd(masked: string, open: number): number {
   let depth = 0;

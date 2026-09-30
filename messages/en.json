@@ -1717,7 +1717,7 @@
       "LIVE_PROVIDER_SUBSCRIPTION": "This tenant has a live Stripe/iyzico subscription. Cancel it before assigning a public-sector package.",
       "NO_PUBLISHED_VERSION": "This package has no published version and cannot be assigned.",
       "PLATFORM_ADMIN_REQUIRED": "This action requires a platform administrator.",
-      "UNKNOWN": "Action failed: {detail}",
+      "UNKNOWN": "The action could not be completed. Try again; if it persists, the details are in the server log.",
       "PILOT_OVER_CONTRACT": "The tenant is already on a contracted public-sector package; a pilot cannot be granted."
     },
     "pilot": {

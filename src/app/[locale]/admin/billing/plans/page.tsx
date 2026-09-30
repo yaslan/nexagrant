@@ -34,7 +34,7 @@ export default async function AdminPlansPage({
   let modules: Array<{ id: string; name: string }> = [];
   let tenants: Array<{ id: string; name: string }> = [];
   let pilots: PilotRow[] = [];
-  let loadError: string | null = null;
+  let loadError = false;
 
   try {
     [plans, modules, tenants, pilots] = await Promise.all([
@@ -46,7 +46,8 @@ export default async function AdminPlansPage({
   } catch (e) {
     // An empty editor is recoverable; an editor showing invented plans is not.
     console.error(`[AdminPlansPage] DB query failed: ${errorMessage(e)}`);
-    loadError = errorMessage(e);
+    // The error text stays in the log; the screen says only that the read failed (TASK-MUNZKR3PEV8EI).
+    loadError = true;
   }
 
   return (
