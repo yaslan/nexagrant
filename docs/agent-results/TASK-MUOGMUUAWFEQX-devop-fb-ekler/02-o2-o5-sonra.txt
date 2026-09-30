@@ -1,0 +1,70 @@
+== SONRA (devop-fb/o2-o5-migrations, çalışma ağacı) — Ö-2
+DATABASE_URL=postgresql://fabrika_migrate:***@127.0.0.1:55225/<kopya> (sahip; :5433 DEĞİL). Kaynak: fb_o2 = 07 arşivi yazılmış hali (01-o2-once.txt)
+
+--- (a) düz psql, SET yok
+psql:prisma/migration-down-guard.sql:25: ERROR:  rollback files run with scripts/apply-migrations.sh --down <file>, not plain psql
+HINT:  Without its app.system_scope session the file sees no tenant rows under FORCE RLS. docs/RELEASE_CHECKLIST.md §3.2.
+CONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE
+exit=3
+psql:/private/tmp/claude-501/-Users-macbook-alan/7f79e05a-d885-43a7-b06a-1d0ba10fc0ad/scratchpad/wt/docs/agent-results/TASK-MUOGMUUAWFEQX-devop-fb-ekler/o2-count.sql:4: ERROR:  column "sentryEventId" does not exist
+LINE 1: ...count(*) FROM "Feedback" WHERE id LIKE 'df-%' AND "sentryEve...
+                                                             ^
+--- (a2) düz psql, ON_ERROR_STOP de yok (en kötü el yazımı)
+psql:prisma/migration-down-guard.sql:25: ERROR:  rollback files run with scripts/apply-migrations.sh --down <file>, not plain psql
+HINT:  Without its app.system_scope session the file sees no tenant rows under FORCE RLS. docs/RELEASE_CHECKLIST.md §3.2.
+CONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE
+exit=3
+psql:/private/tmp/claude-501/-Users-macbook-alan/7f79e05a-d885-43a7-b06a-1d0ba10fc0ad/scratchpad/wt/docs/agent-results/TASK-MUOGMUUAWFEQX-devop-fb-ekler/o2-count.sql:4: ERROR:  column "sentryEventId" does not exist
+LINE 1: ...count(*) FROM "Feedback" WHERE id LIKE 'df-%' AND "sentryEve...
+                                                             ^
+--- (b) eski §3.1 komutu: -c "SET app.system_scope = 'on'" -f (betiksiz)
+SET
+psql:prisma/migration-down-guard.sql:25: ERROR:  rollback files run with scripts/apply-migrations.sh --down <file>, not plain psql
+HINT:  Without its app.system_scope session the file sees no tenant rows under FORCE RLS. docs/RELEASE_CHECKLIST.md §3.2.
+CONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE
+exit=3
+psql:/private/tmp/claude-501/-Users-macbook-alan/7f79e05a-d885-43a7-b06a-1d0ba10fc0ad/scratchpad/wt/docs/agent-results/TASK-MUOGMUUAWFEQX-devop-fb-ekler/o2-count.sql:4: ERROR:  column "sentryEventId" does not exist
+LINE 1: ...count(*) FROM "Feedback" WHERE id LIKE 'df-%' AND "sentryEve...
+                                                             ^
+--- (c) YENİ: DATABASE_URL=<sahip> scripts/apply-migrations.sh --down rename-feedback-alert-columns.down.sql
+==> [down] rename-feedback-alert-columns.down.sql
+apply-migrations: rolled back with rename-feedback-alert-columns.down.sql as fabrika_migrate
+exit=0
+ geri_gelen_eventid | geri_gelen_status | arsiv_satiri 
+--------------------+-------------------+--------------
+                  2 |                 3 |            0
+(1 row)
+
+--- (c-ref) süper kullanıcı referansı, aynı komut
+==> [down] rename-feedback-alert-columns.down.sql
+apply-migrations: rolled back with rename-feedback-alert-columns.down.sql as fabrika
+exit=0
+ geri_gelen_eventid | geri_gelen_status | arsiv_satiri 
+--------------------+-------------------+--------------
+                  2 |                 3 |            0
+(1 row)
+
+--- (c2) aynı down ikinci kez (idempotent)
+==> [down] rename-feedback-alert-columns.down.sql
+apply-migrations: rolled back with rename-feedback-alert-columns.down.sql as fabrika_migrate
+exit=0
+--- (d) yanlış argümanlar
+apply-migrations: --down takes one rollback file in prisma/migrations (<name>.down.sql or <folder>/down.sql), got "rename-feedback-alert-columns.sql"
+exit=1
+apply-migrations: --down takes one rollback file in prisma/migrations (<name>.down.sql or <folder>/down.sql), got "../../prisma/migrations/add-feedback.down.sql"
+exit=1
+apply-migrations: --down takes one rollback file in prisma/migrations (<name>.down.sql or <folder>/down.sql), got ""
+exit=1
+apply-migrations: unknown argument "--dwon" (use no argument, --list or --down <file>)
+exit=1
+
+== Ö-5: grant dosyası -v owner olmadan
+psql:prisma/migration-owner-grant.sql:37: ERROR:  no migration owner given: psql "$SUPERUSER_URL" -v owner=<migration-owner> -f prisma/migration-owner-grant.sql
+CONTEXT:  PL/pgSQL function inline_code_block line 2 at RAISE
+exit=3
+== (a)/(a2)/(b) sonrası, yeni-şekil sayımı (süper kullanıcıyla okundu): hiçbir şey değişmedi, arşiv yerinde
+-- fb_o2_a
+3|4|0
+-- fb_o2_b
+3|4|0
+(sütunlar: legacy_satir | arsivdeki_satir | eski_kolon)

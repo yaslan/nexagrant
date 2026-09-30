@@ -1,0 +1,36 @@
+(psql NOTICE satırları süzüldü: grep -v NOTICE)
+===== once: /Users/macbook/alan/FONBRIDGE/scripts/apply-migrations.sh
+db push (sahip) exit=0
+db:rls-role exit=0
+DATABASE_URL=postgresql://fabrika_migrate:***@127.0.0.1:55225/fb_o4_once  (db:rls koşmadı, 2 Feedback satırı)
+Feedback|2
+Tenant|2
+apply-migrations: 41 files applied as fabrika_migrate
+zincir exit=0
+süper kullanıcıyla: gf1:sentry-g1/sent gf2:sentry-g2/failed | arsiv=0
+===== sonra: scripts/apply-migrations.sh
+db push (sahip) exit=0
+db:rls-role exit=0
+DATABASE_URL=postgresql://fabrika_migrate:***@127.0.0.1:55225/fb_o4_sonra  (db:rls koşmadı, 2 Feedback satırı)
+Feedback|2
+Tenant|2
+apply-migrations: these FORCE RLS tables hold rows but have no system_scope policy, so role "fabrika_migrate" saw none of them:
+  Feedback (~2 rows)
+  Their backfills in this run updated zero rows. Do not start the app, and do not simply run this script again:
+  a rerun does not redo every skipped step. Restore the backup taken before this run, run `pnpm db:rls`,
+  then this script. docs/RELEASE_CHECKLIST.md §3.1.
+zincir exit=1
+süper kullanıcıyla: gf1:sentry-g1/sent gf2:sentry-g2/failed | arsiv=0
+===== 'yeniden koşmak yetmez' iddiasının ölçümü (fb_o4_once üzerinde): db:rls + zincir tekrar
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+apply-migrations: 41 files applied as fabrika_migrate
+süper kullanıcıyla: gf1:NULL/legacy gf2:NULL/legacy | arsiv=0
+(alertId sentry-g1/sentry-g2 SystemAlert arşivine yazılmadan NULL'landı → kalıcı kayıp; bu yüzden mesaj 'yedekten dön' diyor)
+===== normal akış (fb_o4_norm): boş DB → zincir → db:rls → zincir
+db push (sahip) exit=0
+db:rls-role exit=0
+apply-migrations: 41 files applied as fabrika_migrate
+exit=0
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+apply-migrations: 41 files applied as fabrika_migrate
+exit=0

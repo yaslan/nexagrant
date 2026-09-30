@@ -1,0 +1,14 @@
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55225/fabrika
+  without the one-time grant it stops before applying any file 543ms
+  the grant file gives the owner SET on app.system_scope and never fabrika_app 294ms
+  with the grant the whole chain runs to the end, and a second run before db:rls refuses 4436ms
+  after db:rls, the FORCE-RLS backfills update as many rows as under the superuser 8194ms
+  the migration session leaves no system scope behind: fabrika_app stays tenant-isolated 45ms
+  a stored default for app.system_scope stops the run before any file 609ms
+  a file that stores a default for app.system_scope fails the run after the files 4243ms
+  rows in a FORCE table without a system_scope policy fail the run after the files 9741ms
+  rollback files run only through --down, which restores the archived rows 5417ms
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+artık test DB=0
+artık test rolü=0

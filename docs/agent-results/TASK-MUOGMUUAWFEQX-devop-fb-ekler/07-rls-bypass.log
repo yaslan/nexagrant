@@ -1,0 +1,28 @@
+$ tsx scripts/check-tenant-bypass.ts
+Scanned 610 tracked source files in src/** against 47 tenant-scoped models.
+  36 call site(s) outside a tenant scope; baseline records 36.
+  92 more are in fixtures (*.test.ts, *.spec.ts, __tests__/): reported, not judged.
+
+Shared catalogues this gate does not police (by construction, not by allowlist):
+  Topic — 16 call site(s) in src/**
+      shared CORDIS catalogue, no tenantId column at all — every tenant reads the same rows (pipeline/actions.ts:98,106). It is in SYSTEM_WIDE, so it never had an RLS policy to bypass.
+  ConceptTemplate — 0 call site(s) in src/**
+      tenantId is String? and null means "platform template"; it is in NULLABLE_TENANT and carries the tenant_or_shared policy, not tenant_isolation. Unlike Topic it DOES have a tenant column, so a read by a client-supplied id alone returned another tenant's template — measured, not hypothetical (TASK-MTVTU103F11XJ: tenant A created a ConceptNote against tenant B's template). The RLS policy did not stop it because the app role is BYPASSRLS. Fixed by routing every read through src/modules/m2/server/templates.ts, which ANDs the id with OR[tenantId NULL, tenantId]. Still structurally outside this gate, which judges the client rather than the where clause: src/modules/m2/server/templates.test.ts is the gate for this rule.
+  PublicLead — 0 call site(s) in src/**
+      contact request an anonymous visitor leaves on the readiness result screen (TASK-MULR765AR5G0C). The visitor has no account, so the row belongs to no tenant and has no tenantId; it is in SYSTEM_WIDE like User. Written only by src/lib/leads/public-lead.ts (public form), read only by /admin/leads behind requirePlatformAdmin(), deleted by the nightly public-lead-cleanup job. No tenant code path touches it.
+  Document — 0 call site(s) in src/**
+      tenantId is String?; in NULLABLE_TENANT.
+  Chunk — 0 call site(s) in src/**
+      tenantId is String?; in NULLABLE_TENANT.
+
+Sanctioned cross-tenant escapes: 36 call site(s) via withSystemScope, measured.
+  cross-tenant-job     5 call site(s) in 5 file(s)
+  platform-admin       10 call site(s) in 7 file(s)
+  platform-aggregate   5 call site(s) in 3 file(s)
+  subject-scoped       9 call site(s) in 3 file(s)
+  tenant-discovery     7 call site(s) in 6 file(s)
+  Each one is recorded with a reason, ratcheted like a bypass, and opens the
+  `system_scope` RLS policy for one transaction only (prisma/rls.sql).
+
+✅ SUCCESS: no new tenant bypass. 0 call site(s) allowed with a recorded reason, 36 on the sanctioned cross-tenant path, 0 still owed.
+   (Shape only — `pnpm rls:verify` asks the database whether isolation actually holds.)
