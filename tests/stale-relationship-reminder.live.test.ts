@@ -31,6 +31,16 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
   return { rlsUrl, ownerUrl };
 });
 
+// İNCELEME-69 D-2: the cross-tenant claim check must fail closed. Switched on
+// per test; off, every call goes to the real withSystemScope.
+const scopeFault = vi.hoisted(() => ({ on: false }));
+vi.mock('@/lib/system-scope', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/system-scope')>();
+  const withSystemScope: typeof real.withSystemScope = (...args) =>
+    scopeFault.on ? Promise.reject(new Error('permission denied for function enter_system_scope')) : real.withSystemScope(...args);
+  return { ...real, withSystemScope };
+});
+
 import { createDbClient, prisma, withTenant } from '@/lib/db';
 import { sendStaleRelationshipReminders, STALE_REMINDER_AUDIT } from '@/lib/relationships/stale-reminder';
 import { dayStartUtc, isReminderDue, isStaleRelationship } from '@/lib/relationships/stale';
@@ -67,7 +77,9 @@ const T = {
 const TENANTS = Object.values(T);
 // İNCELEME-56 Y-1: two tenants of U.y1, pro + M4 ON, run on their own (runY1).
 const Y1 = { a: `t-st-y1a-${RUN}`, b: `t-st-y1b-${RUN}` };
-const ALL_TENANTS = [...TENANTS, Y1.a, Y1.b];
+// İNCELEME-69 D-2: two tenants of U.d2, pro + M4 ON, each run on its own.
+const D2 = { a: `t-st-d2a-${RUN}`, b: `t-st-d2b-${RUN}` };
+const ALL_TENANTS = [...TENANTS, Y1.a, Y1.b, D2.a, D2.b];
 const U = {
   tr: `u-st-tr-${RUN}`,
   en: `u-st-en-${RUN}`,
@@ -75,6 +87,7 @@ const U = {
   member: `u-st-mem-${RUN}`,
   manager: `u-st-mgr-${RUN}`,
   y1: `u-st-y1-${RUN}`,
+  d2: `u-st-d2-${RUN}`,
 };
 const USERS = Object.values(U);
 const mail = (u: string) => `${u}@example.test`;
@@ -143,13 +156,13 @@ beforeAll(async () => {
     await admin.tenant.create({ data: { id, name: id === T.on ? `Kurum <b>&${RUN}` : id, slug: id, country: 'TR' } });
     await admin.workspace.create({ data: { tenantId: id, name: 'Ana', slug: `ws-${id}` } });
   }
-  for (const id of [T.on, T.on2, T.pilotModule, T.off, Y1.a, Y1.b]) {
+  for (const id of [T.on, T.on2, T.pilotModule, T.off, Y1.a, Y1.b, D2.a, D2.b]) {
     await admin.subscription.create({ data: { tenantId: id, planId: 'pro', status: 'ACTIVE' } });
   }
   await admin.subscription.create({
     data: { tenantId: T.expired, planId: 'public-team', status: 'TRIALING', provider: 'pilot', trialEndsAt: new Date(Date.now() - 60_000) },
   });
-  const status: Record<string, 'ON' | 'PILOT' | 'OFF'> = { [T.on]: 'ON', [T.on2]: 'ON', [T.pilotModule]: 'PILOT', [T.off]: 'OFF', [T.noPlan]: 'ON', [T.expired]: 'ON', [Y1.a]: 'ON', [Y1.b]: 'ON' };
+  const status: Record<string, 'ON' | 'PILOT' | 'OFF'> = { [T.on]: 'ON', [T.on2]: 'ON', [T.pilotModule]: 'PILOT', [T.off]: 'OFF', [T.noPlan]: 'ON', [T.expired]: 'ON', [Y1.a]: 'ON', [Y1.b]: 'ON', [D2.a]: 'ON', [D2.b]: 'ON' };
   for (const [tenantId, s] of Object.entries(status)) await admin.moduleState.create({ data: { tenantId, moduleId: 'M4', status: s } });
 
   await admin.user.create({ data: { id: U.tr, email: mail(U.tr), locale: 'tr' } });
@@ -158,6 +171,7 @@ beforeAll(async () => {
   await admin.user.create({ data: { id: U.member, email: mail(U.member) } });
   await admin.user.create({ data: { id: U.manager, email: mail(U.manager) } });
   await admin.user.create({ data: { id: U.y1, email: mail(U.y1) } });
+  await admin.user.create({ data: { id: U.d2, email: mail(U.d2) } });
   const member = (tenantId: string, userId: string, role: 'MEMBER' | 'PIPELINE_MANAGER' = 'MEMBER') =>
     admin.membership.create({ data: { tenantId, userId, role } });
   await member(T.on, U.tr);
@@ -171,6 +185,8 @@ beforeAll(async () => {
   await member(T.expired, U.tr);
   await member(Y1.a, U.y1);
   await member(Y1.b, U.y1);
+  await member(D2.a, U.d2);
+  await member(D2.b, U.d2);
 
   // T.on, owner U.tr
   await rel('exact60', T.on, U.tr, ago(60 * DAY)); // the 60th day: stale
@@ -507,5 +523,60 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     expect(await stampOf('y1fLate')).toBeNull();
     expect((await claimOf(Y1.a, U.y1))?.getTime()).not.toBe(dayStartUtc(d).getTime());
     await y1NextMorning(d, 'y1f');
+  });
+
+  // İNCELEME-69 D-2: the two properties the code only stated in comments.
+  const runD2 = (mailer: (m: MailMessage) => Promise<void>, now: Date, tenantIds: readonly string[], runTenant?: typeof withTenant) =>
+    sendStaleRelationshipReminders({ mailer, appUrl: 'https://app.example.test', now, tenantIds, runTenant });
+
+  test('two runs over disjoint tenants, both past their claims before either looks at the other, send at most one digest (İNCELEME-69 D-2)', async () => {
+    const d = y1Day(400);
+    await rel('d2RaceA', D2.a, U.d2, new Date(d.getTime() - 65 * DAY));
+    await rel('d2RaceB', D2.b, U.d2, new Date(d.getTime() - 65 * DAY));
+    // Run A sees only D2.a and run B only D2.b, so each skips the tenant the
+    // other claims in. Each run is parked right after its claim (its second
+    // call into the tenant) until the other has claimed too.
+    let arrived = 0;
+    let open!: () => void;
+    const gate = new Promise<void>((resolve) => (open = resolve));
+    const parkedAfterClaim = (): typeof withTenant => {
+      let calls = 0;
+      return (async (tenantId, fn) => {
+        const result = await withTenant(tenantId, fn);
+        if (++calls === 2) {
+          if (++arrived === 2) open();
+          await gate;
+        }
+        return result;
+      }) as typeof withTenant;
+    };
+    const a = fakeMailer();
+    const b = fakeMailer();
+    await Promise.all([runD2(a.mailer, d, [D2.a], parkedAfterClaim()), runD2(b.mailer, d, [D2.b], parkedAfterClaim())]);
+    expect(arrived).toBe(2);
+    expect(a.sent.length + b.sent.length).toBeLessThanOrEqual(1);
+  });
+
+  test('a failing cross-tenant claim check sends nothing and gives the claims back (İNCELEME-69 D-2)', async () => {
+    const d = y1Day(410);
+    await rel('d2FailA', D2.a, U.d2, new Date(d.getTime() - 65 * DAY));
+    const { sent, mailer } = fakeMailer();
+    scopeFault.on = true;
+    let r;
+    try {
+      r = await runD2(mailer, d, [D2.a, D2.b]);
+    } finally {
+      scopeFault.on = false;
+    }
+    expect(sent).toHaveLength(0);
+    expect(r.digestsSent).toBe(0);
+    expect(r.digestsFailed).toBe(1);
+    expect(r.errors.map((e) => e.scope)).toEqual(['digest']);
+    expect(await stampOf('d2FailA')).toBeNull();
+    expect((await claimOf(D2.a, U.d2))?.getTime()).not.toBe(dayStartUtc(d).getTime());
+    // Given back, not kept: a run later that day, with the check working, sends.
+    const retry = fakeMailer();
+    await runD2(retry.mailer, new Date(d.getTime() + 60_000), [D2.a, D2.b]);
+    expect(retry.sent.map((m) => m.to)).toEqual([mail(U.d2)]);
   });
 });
