@@ -43,16 +43,17 @@ export function isCi(env: NodeJS.ProcessEnv = process.env): boolean {
   );
 }
 
+const DB_FIX =
+  "Provide the database and DATABASE_URL_RLS_TEST (`pnpm db:rls-role`) in the CI job.";
+
 /**
  * Called where a live suite is about to skip itself. Locally: a warning and the
  * skip goes ahead. In CI: throws, because a skipped suite there is a false green.
+ * `fix` says what the CI job is missing when it is not the database.
  */
-export function skipOrFailInCi(suite: string, reason: string): void {
+export function skipOrFailInCi(suite: string, reason: string, fix = DB_FIX): void {
   if (isCi()) {
-    throw new Error(
-      `${suite}: refusing to skip in CI — ${reason}. ` +
-        "Provide the database and DATABASE_URL_RLS_TEST (`pnpm db:rls-role`) in the CI job.",
-    );
+    throw new Error(`${suite}: refusing to skip in CI — ${reason}. ${fix}`);
   }
   console.warn(`${suite} skipped: ${reason}`);
 }
@@ -69,6 +70,22 @@ export function requireRlsTestUrl(
   skipOrFailInCi(
     suite,
     "DATABASE_URL_RLS_TEST is not set (run `pnpm db:rls-role`)",
+  );
+  return undefined;
+}
+
+/**
+ * Returns `process.env[name]`, or `undefined` after a local warning. In CI a
+ * missing value throws. For the non-database settings a live suite needs, such
+ * as the AUTH_SECRET the real Auth.js callback signs with (İNCELEME-54 Y-1).
+ */
+export function requireTestEnv(name: string, suite: string): string | undefined {
+  const value = process.env[name];
+  if (value) return value;
+  skipOrFailInCi(
+    suite,
+    `${name} is not set`,
+    `Set a test-only ${name} in the Test step of .github/workflows/ci.yml.`,
   );
   return undefined;
 }

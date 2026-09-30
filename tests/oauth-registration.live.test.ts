@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { PrismaClient } from '@prisma/client';
 
-import { skipOrFailInCi, assertRlsSubjectRole, requireRlsTestUrl } from './helpers/live-db-role';
+import { skipOrFailInCi, assertRlsSubjectRole, requireRlsTestUrl, requireTestEnv } from './helpers/live-db-role';
 import { AGENCY_INVITE_CODE_DDL_LOCK, UNKNOWN_INVITE_COUNTER_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
@@ -145,7 +145,10 @@ async function userByEmail(email: string) {
 beforeAll(async () => {
   const rlsUrl = requireRlsTestUrl(env.rls, SUITE);
   if (!env.admin) skipOrFailInCi(SUITE, 'DATABASE_URL is not set');
-  if (!rlsUrl || !env.admin || !process.env.AUTH_SECRET) {
+  // The Auth.js callback signs and verifies with it; without it the suite skips,
+  // and in CI that skip was a false green of all its tests (İNCELEME-54 Y-1).
+  const authSecret = requireTestEnv('AUTH_SECRET', SUITE);
+  if (!rlsUrl || !env.admin || !authSecret) {
     skipReason = 'DATABASE_URL_RLS_TEST / DATABASE_URL / AUTH_SECRET not set';
     return;
   }

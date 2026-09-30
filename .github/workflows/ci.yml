@@ -112,8 +112,17 @@ jobs:
     - name: Typecheck
       run: pnpm typecheck
       
+    # AUTH_SECRET: the live suites that drive the real Auth.js callback
+    # (oauth-registration, invitation-accept) sign and verify cookies with it.
+    # Without it they skipped themselves and the step went green having run
+    # none of their 38 tests (İNCELEME-54 Y-1); they now fail instead
+    # (requireTestEnv in tests/helpers/live-db-role.ts). A fixed test-only
+    # value like the database passwords above, not a secret, and not the key
+    # of any deployment. The e2e step sets its own (playwright.config.ts).
     - name: Test
       run: pnpm test
+      env:
+        AUTH_SECRET: 'ci-vitest-auth-secret-fixture-not-for-any-deployment'
 
     # Same reason: the browsers must match the pinned @playwright/test.
     - name: Install Playwright browsers
