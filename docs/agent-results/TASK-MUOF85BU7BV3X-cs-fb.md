@@ -139,7 +139,7 @@ vitest 2. koşu: 4042 passed | 2 failed → rag-pdf-worker-isolation (3610 ms < 
 tek başına: bekçi 2/2 yeşil, rag+k1 35/35 yeşil
 ```
 Bu kırmızılar ortamdan geliyor, değişiklikten değil. Kanıt:
-- (1) Makinenin yük ortalaması 12 çekirdekte **33–42** (ek 12'de `uptime` var); diğer pane'ler yük bindiriyor.
+- (1) Makinenin yük ortalaması 12 çekirdekte **33–42** (`uptime` satırları ek 11'de); diğer pane'ler yük bindiriyor.
 - (2) Kırmızılar koşudan koşuya yer değiştiriyor.
 - (3) Aynı yükte bekçi süresi dalda dev'den kısa: dal 13.9/12.1 sn, dev 16.6/15.0 sn.
 - (4) rag ve k1 test yolları `@/lib/tenant`'ı hiç çağırmıyor.
