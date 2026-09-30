@@ -2541,6 +2541,7 @@
       "too_many_pages": "The PDF is too long: {pages} pages, the limit is {maxPages}. Split it into parts and upload them one by one. Nothing was stored.",
       "too_many_chunks": "The PDF has too much text for one upload (at most {maxChunks} chunks). Split it into parts and upload them one by one. Nothing was stored.",
       "over_budget": "The estimated embedding cost of this document is over the per-upload limit ({maxUsd} USD). Split it into parts and upload them one by one. Nothing was stored.",
+      "parse_too_heavy": "The PDF's content is too heavy to process safely (its compressed content is too large, or reading it went past the time or memory limit). Re-save it through a PDF printer or split it into parts and upload again. Nothing was stored.",
       "upload_failed": "The upload failed; no chunks were stored."
     }
   },

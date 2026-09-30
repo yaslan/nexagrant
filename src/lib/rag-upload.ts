@@ -43,6 +43,23 @@ export const RAG_UPLOAD_LIMITS = {
    * holds on its own if the chunk size, the model or `maxChunks` changes.
    */
   maxEmbeddingUsd: 0.2,
+  /**
+   * The page and chunk limits bound how many pages are read, not the work in
+   * one page: a 37 KB PDF with one highly compressed content stream took pdf.js
+   * 20 s (İNCELEME-52 B-1'). Extraction runs in its own thread, which is
+   * terminated at this deadline. The 1000-page dense test PDF reaches its
+   * chunk limit in under 2 s, so 30 s is far past a real work programme.
+   */
+  maxParseMs: 30_000,
+  /** V8 heap of the extraction thread; past it the thread dies, not the server. */
+  maxParseHeapMb: 512,
+  /**
+   * What all of the file's streams may inflate to, and one stream alone
+   * (decompression bomb). A text page's content stream is tens to hundreds of
+   * KB inflated; 20 MB of text PDF does not come near 256 MB.
+   */
+  maxInflatedMb: 256,
+  maxStreamInflatedMb: 64,
 } as const;
 
 /**
@@ -115,6 +132,7 @@ export const RAG_UPLOAD_ERRORS = [
   'too_many_pages',
   'too_many_chunks',
   'over_budget',
+  'parse_too_heavy',
   'upload_failed',
 ] as const;
 export type RagUploadError = (typeof RAG_UPLOAD_ERRORS)[number];

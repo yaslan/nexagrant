@@ -16,19 +16,13 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
 const pdfText = { value: 'x'.repeat(2400) };
-// One page holding `pdfText.value`, in the two calls `extractPdfText` makes:
-// `getInfo` for the page count, then `getText` over a page range.
-vi.mock('pdf-parse', () => ({
-  PDFParse: class {
-    async getInfo(): Promise<{ total: number }> {
-      return { total: 1 };
-    }
-    async getText(): Promise<{ total: number; text: string; pages: { num: number; text: string }[] }> {
-      return { total: 1, text: pdfText.value, pages: [{ num: 1, text: pdfText.value }] };
-    }
-    async destroy(): Promise<void> {}
-  },
-}));
+// One page holding `pdfText.value`. Extraction itself runs in a worker thread
+// (src/lib/rag-pdf-extract.ts) where a `vi.mock('pdf-parse')` does not reach;
+// it is covered on real PDFs by rag-pdf-real-parse and rag-pdf-worker-isolation.
+vi.mock('../src/lib/rag-pdf-extract', async () => {
+  const actual = await vi.importActual<typeof import('../src/lib/rag-pdf-extract')>('../src/lib/rag-pdf-extract');
+  return { ...actual, extractPdfText: async () => ({ pages: 1, text: pdfText.value }) };
+});
 
 // The limits are the real ones unless a test lowers one.
 const limits = vi.hoisted(() => ({ current: {} as Record<string, number> }));

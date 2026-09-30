@@ -22,12 +22,13 @@ function refuse(error: RagUploadError, status: number, extra: Record<string, unk
  * parsed PDF can decide: over `maxPages`, `maxChunks` or `maxEmbeddingUsd`
  * (413) and no readable text (422).
  *
- * Parsing and embedding stay inside this request rather than in a
- * graphile-worker job (ADR-0008): a job needs the PDF bytes stored somewhere
- * the worker can read (a table or file store this card does not add) and a
- * status the page can poll, and the worker's hosting is still open
- * (ADR-0008 §4). The limits bound what one request can cost instead, and
- * `extractPdfText` yields the event loop between page slices.
+ * The PDF is parsed in a `worker_threads` Worker with a deadline, a heap
+ * ceiling and a ceiling on inflated stream bytes (src/lib/rag-pdf-extract.ts,
+ * İNCELEME-52 B-1'), so no PDF holds this server's event loop; a PDF over
+ * one of them is `parse_too_heavy` (413). The embedding calls still run inside
+ * this request rather than in a graphile-worker job (ADR-0008): a job needs the
+ * PDF bytes stored somewhere the worker can read and a status the page can
+ * poll, and the worker's hosting is still open (ADR-0008 §4).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof NoExtractableTextError) {
       return refuse('no_text', 422);
     }
-    // Too many pages, too many chunks or over the embedding budget: refused
+    // Too many pages, too many chunks, over the embedding budget or too heavy to parse: refused
     // before the first embedding call and before any row was written.
     if (error instanceof PdfLimitError) {
       return refuse(error.code, 413, error.detail);

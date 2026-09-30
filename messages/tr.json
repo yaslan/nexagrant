@@ -2541,6 +2541,7 @@
       "too_many_pages": "PDF çok uzun: {pages} sayfa, sınır {maxPages} sayfa. Belgeyi bölümlere ayırıp ayrı yükleyin. Hiçbir şey kaydedilmedi.",
       "too_many_chunks": "PDF'teki metin tek yüklemede işlenemeyecek kadar uzun (en çok {maxChunks} parça). Belgeyi bölümlere ayırıp ayrı yükleyin. Hiçbir şey kaydedilmedi.",
       "over_budget": "Bu belgenin tahmini gömme maliyeti tek yükleme sınırını ({maxUsd} USD) aşıyor. Belgeyi bölümlere ayırıp ayrı yükleyin. Hiçbir şey kaydedilmedi.",
+      "parse_too_heavy": "PDF'in içeriği güvenle işlenemeyecek kadar ağır (sıkıştırılmış içerik çok büyük ya da okuma süre/bellek sınırını aştı). Belgeyi PDF yazdırıcıyla yeniden kaydedip ya da bölümlere ayırıp tekrar yükleyin. Hiçbir şey kaydedilmedi.",
       "upload_failed": "Yükleme başarısız oldu; hiçbir parça kaydedilmedi."
     }
   },

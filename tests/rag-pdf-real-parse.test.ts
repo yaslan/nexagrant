@@ -168,8 +168,9 @@ describe('B-1: page and chunk limits hold on real PDFs before any embedding call
     } finally {
       clearInterval(timer);
     }
-    // 300 pages = 15 slices, each followed by a turn of the loop. One
-    // `getText()` over the whole document gave 0 (İNCELEME-45: 0 of 186 pings).
+    // Extraction runs in a worker thread (İNCELEME-52 B-1'); on the main
+    // thread one `getText()` over the whole document gave 0 (İNCELEME-45: 0 of
+    // 186 pings). The heavy single-page shapes: rag-pdf-worker-isolation.
     expect(ticks).toBeGreaterThanOrEqual(10);
   }, 30_000);
 });
