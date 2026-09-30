@@ -22,7 +22,7 @@ describe('editorSections', () => {
   });
 
   it('falls back to the default sections with no template or no readable sections', () => {
-    for (const template of [null, { schema: undefined }, { schema: {} }, { schema: [] }]) {
+    for (const template of [null, { schema: undefined }, { schema: {} }, { schema: [] }, { schema: [null] }, { schema: [{ foo: 1 }] }, { schema: [{ key: 'a', labelKey: 'A' }] }, { schema: [{ key: 'b', maxWords: '5' }] }, { schema: [{ key: 'c', maxWords: 0 }] }, { schema: [{ key: 'd', maxWords: NaN }] }]) {
       const sections = editorSections(template);
       expect(sections.map((s) => s.key)).toEqual(['excellence', 'impact', 'implementation']);
     }

@@ -44,4 +44,22 @@ describe('pages under the dynamic root layout', () => {
       'generateStaticParams makes the route SSG; the root layout reads cookies(), so the page 500s with DYNAMIC_SERVER_USAGE',
     ).toEqual([]);
   });
+
+  // TASK-MUNWZGWA70P16 (İNCELEME-71 B-4): `generateStaticParams` is not the only
+  // way to ask for a static page. `dynamic = 'force-static'` built
+  // /[locale]/calls/[region] as ○ and served it with `s-maxage=31536000` — the
+  // live "open, deadline still ahead" list frozen at the CDN for a year — and
+  // `revalidate = 3600` asks for ISR; both passed the check above.
+  it("none exports dynamic = 'force-static' | 'error' or a positive revalidate", () => {
+    const offenders = pageFiles(APP_DIR)
+      .filter((f) => {
+        const src = fs.readFileSync(f, 'utf8');
+        return (
+          /export\s+const\s+dynamic\s*(?::[^=]+)?=\s*['"`](force-static|error)['"`]/.test(src) ||
+          /export\s+const\s+revalidate\s*(?::[^=]+)?=\s*(?!0\b|false\b)[\w.]/.test(src)
+        );
+      })
+      .map((f) => path.relative(REPO_ROOT, f));
+    expect(offenders, 'a static or ISR page 500s under the dynamic root layout, or caches live data').toEqual([]);
+  });
 });

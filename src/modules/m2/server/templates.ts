@@ -94,9 +94,24 @@ export async function findAccessibleTemplateByKey(
  * canonical and migrating the rows is a separate change.
  */
 export function templateSections(schema: unknown): ConceptTemplateSection[] {
-  if (Array.isArray(schema)) return schema as ConceptTemplateSection[];
-  if (schema && typeof schema === 'object' && Array.isArray((schema as { sections?: unknown }).sections)) {
-    return (schema as { sections: ConceptTemplateSection[] }).sections;
+  let raw: unknown[] = [];
+  if (Array.isArray(schema)) raw = schema;
+  else if (schema && typeof schema === 'object' && Array.isArray((schema as { sections?: unknown }).sections)) {
+    raw = (schema as { sections: unknown[] }).sections;
   }
-  return [];
+  return raw.filter(isSection);
+}
+
+/**
+ * Only elements with a section key (TASK-MUNWZGWA70P16, İNCELEME-71 B-3). The
+ * column is untyped Json: a `[null]` schema made every reader's `section.key`
+ * throw — the editor page became a 500. The key is all every reader needs; the
+ * DOCX export (src/app/api/concept-notes/[id]/export/route.ts) reads only `key`
+ * and `labelKey`, so a word limit is not required here — the editor checks
+ * that itself (`editorSections`).
+ */
+function isSection(value: unknown): value is ConceptTemplateSection {
+  if (!value || typeof value !== 'object') return false;
+  const { key } = value as { key?: unknown };
+  return typeof key === 'string' && key.length > 0;
 }

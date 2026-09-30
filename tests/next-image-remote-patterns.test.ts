@@ -26,4 +26,9 @@ describe('next.config images.remotePatterns', () => {
     expect(allowed('https://evil.googleusercontent.com.example.org/a/x')).toBe(false);
     expect(allowed('https://evil.example.com/x.png')).toBe(false);
   });
+
+  it('refuses a non-default port on the allowed hosts (İNCELEME-71 B-5)', () => {
+    expect(allowed('https://lh3.googleusercontent.com:8443/a/x')).toBe(false);
+    expect(allowed('https://images.unsplash.com:8080/photo-1')).toBe(false);
+  });
 });
