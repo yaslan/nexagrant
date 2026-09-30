@@ -111,14 +111,14 @@ afterAll(async () => {
 });
 
 describe('withSystemScope over a NOBYPASSRLS role', () => {
-  test('outside the path, a cross-tenant read returns nothing', async () => {
-    if (!ready || !rls) return expect(skipReason).toBeTruthy();
+  test('outside the path, a cross-tenant read returns nothing', async (ctx) => {
+    if (!ready || !rls) return ctx.skip(skipReason);
     const count = await rls.membership.count();
     expect(count).toBe(0);
   });
 
-  test('inside the path, the same read spans tenants', async () => {
-    if (!ready || !rls || !admin) return expect(skipReason).toBeTruthy();
+  test('inside the path, the same read spans tenants', async (ctx) => {
+    if (!ready || !rls || !admin) return ctx.skip(skipReason);
 
     // Counted over the fixture's tenants, not the whole table: the other live
     // files write Membership rows concurrently, and a whole-table count taken
@@ -138,8 +138,8 @@ describe('withSystemScope over a NOBYPASSRLS role', () => {
     for (const t of FIXTURE_TENANTS) expect(seenTenants.has(t)).toBe(true);
   });
 
-  test('the scope dies with its transaction', async () => {
-    if (!ready || !rls) return expect(skipReason).toBeTruthy();
+  test('the scope dies with its transaction', async (ctx) => {
+    if (!ready || !rls) return ctx.skip(skipReason);
     await withSystemScopeOn(rls, 'platform-aggregate', 'test.scopeLifetime', async (tx) => {
       expect(await tx.membership.count()).toBeGreaterThan(0);
     });
@@ -147,8 +147,8 @@ describe('withSystemScope over a NOBYPASSRLS role', () => {
     expect(await rls.membership.count()).toBe(0);
   });
 
-  test('the database refuses a purpose that is not on the list', async () => {
-    if (!ready || !rls) return expect(skipReason).toBeTruthy();
+  test('the database refuses a purpose that is not on the list', async (ctx) => {
+    if (!ready || !rls) return ctx.skip(skipReason);
     await expect(
       rls.$transaction((tx) => tx.$executeRaw`SELECT enter_system_scope('anything-i-like')`)
     ).rejects.toThrow(/unknown purpose/i);
@@ -164,8 +164,8 @@ describe('the purpose list', () => {
     expect(inSql.sort()).toEqual([...SYSTEM_SCOPE_PURPOSES].sort());
   });
 
-  test('every purpose is accepted by the database', async () => {
-    if (!ready || !rls) return expect(skipReason).toBeTruthy();
+  test('every purpose is accepted by the database', async (ctx) => {
+    if (!ready || !rls) return ctx.skip(skipReason);
     for (const purpose of SYSTEM_SCOPE_PURPOSES) {
       await withSystemScopeOn(rls, purpose, `test.${purpose}`, async (tx) => {
         const [row] = await tx.$queryRaw<Array<{ p: string }>>`
