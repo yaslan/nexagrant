@@ -14,7 +14,7 @@
  * only (no enums, no parameter properties) for the same reason.
  */
 import { parentPort, workerData } from 'node:worker_threads';
-import { constants, inflateSync } from 'node:zlib';
+import { deflateSync } from 'node:zlib';
 // Before pdf-parse, for its side effect: it imports @napi-rs/canvas statically
 // and sets `DOMMatrix`, `Path2D` and `ImageData` on the global object, which
 // pdf.js needs just to load in Node. pdf.js's own fallback loads the canvas
@@ -45,77 +45,203 @@ export type PdfWorkerOutput =
 
 /** Pages per `getText` call — the text length is checked between calls. */
 const PAGES_PER_SLICE = 20;
-/** `[/FlateDecode /FlateDecode …]` nests; deeper than this is not a document. */
-const MAX_INFLATE_DEPTH = 3;
 const MB = 1024 * 1024;
 
-/** A zlib header: CM = 8 (deflate) and the FCHECK bits (RFC 1950 §2.2). */
-function looksLikeZlib(b: Uint8Array): boolean {
-  return b.length >= 2 && (b[0]! & 0x0f) === 8 && ((b[0]! << 8) | b[1]!) % 31 === 0;
+/*
+ * The inflated-bytes cap (TASK-MUNRAWJ0N84T6, İNCELEME-60 Y-1).
+ *
+ * It used to be a text scan of the file before pdf.js started: it inflated
+ * the bytes between `stream` and the first `endstream` when they began with a
+ * zlib header. Every other shape went past it uncounted — LZW, RunLength,
+ * ASCIIHex/ASCII85 in front of Flate, a fourth Flate layer, `endstream` bytes
+ * inside the compressed data — and an 852-byte file grew the server's RSS by
+ * 2 GB inside the 30 s deadline.
+ *
+ * Now pdf.js's own decoding is counted, as it decodes. Every filter pdf.js
+ * implements is a subclass of its internal `DecodeStream`, and each one grows
+ * its output through `DecodeStream.prototype.ensureBuffer(requested)` —
+ * before it writes the bytes — or, for the image decoders (DCT, JBIG2, JPX),
+ * assigns a whole decoded `buffer` at once (those do not run at all here:
+ * see `offImageDecoder`). What is counted is the buffer
+ * pdf.js allocates, before it allocates it (it grows by doubling, so up to 2×
+ * the decoded bytes: that is the memory the cap is for), against
+ * `maxStreamInflatedBytes` (one stream object) and `maxInflatedBytes` (all of
+ * them, over the whole extraction: a stream that several pages share counts
+ * once per page, as pdf.js decodes it once per page). Past either, the counter
+ * throws inside pdf.js and the refusal is posted at once, so the caller
+ * terminates the thread even if pdf.js catches the error and goes on.
+ *
+ * `DecodeStream` is not exported by pdf.js. It is found from the first
+ * instance pdf.js constructs: its constructor assigns `_rawMinBufferLength`,
+ * which a one-shot setter on `Object.prototype` intercepts. That name is
+ * pdfjs-dist's (5.4.296, pinned by pdf-parse); if a new version drops it the
+ * hook would stay uninstalled, so every extraction first decodes a small Flate
+ * PDF and refuses to go on when that was not counted (fail closed).
+ */
+
+/** Thrown inside pdf.js to stop a decode; the refusal itself is `meter.refused`. */
+class DecodeLimitError extends Error {}
+
+interface DecodeMeter {
+  limits: PdfWorkerInput['limits'];
+  /** Bytes counted per decode stream object. */
+  perStream: WeakMap<object, number>;
+  total: number;
+  refused: PdfWorkerOutput | null;
+  onRefused?: (out: PdfWorkerOutput) => void;
 }
 
+/** The extraction being counted; null outside one (the self-test is not counted). */
+let meter: DecodeMeter | null = null;
+let hookInstalled = false;
+const BUFFER = Symbol('decodeStreamBuffer');
+
+/** `stream` now holds `bytes` decoded bytes. Throws past a limit. */
+function countDecoded(stream: object, bytes: number): void {
+  const m = meter;
+  if (!m) return;
+  // pdf.js may catch the first throw and go on to the next stream: keep refusing.
+  if (m.refused) throw new DecodeLimitError('decode limit');
+  const had = m.perStream.get(stream) ?? 0;
+  if (bytes <= had) return;
+  const total = m.total + bytes - had;
+  if (bytes > m.limits.maxStreamInflatedBytes || total > m.limits.maxInflatedBytes) {
+    m.refused = {
+      kind: 'limit',
+      code: 'parse_too_heavy',
+      detail: {
+        maxInflatedMb: Math.round(m.limits.maxInflatedBytes / MB),
+        maxStreamInflatedMb: Math.round(m.limits.maxStreamInflatedBytes / MB),
+      },
+    };
+    m.onRefused?.(m.refused);
+    throw new DecodeLimitError('decode limit');
+  }
+  m.perStream.set(stream, bytes);
+  m.total = total;
+}
+
+type DecodeStreamLike = { ensureBuffer(requested: number): Uint8Array; minBufferLength: number; [BUFFER]?: unknown };
+
+const imageDecodersSeen = new WeakSet<object>();
+
 /**
- * How many bytes `data` inflates to, following nested deflate layers — or
- * `cap + 1` as soon as it is past `cap`. zlib stops at `maxOutputLength`, so a
- * 1000:1 stream costs at most `cap` bytes to measure, never its full size.
- * Data that is not deflate (images, fonts in other filters, an encrypted file)
- * counts as 0: pdf.js decodes it or fails on its own, under the deadline.
+ * The image decoders (DCT, JBIG2, JPX) size their output from the image's own
+ * header — a 49-byte JBIG2 stream declares a 60000 × 60000 page, 450 MB, which
+ * the decoder allocates before `buffer` is assigned and counted. Text
+ * extraction never needs one: pdf.js skips images, and a font program (the
+ * way to reach them) that is an image is not a font. So while an extraction
+ * is counted, they refuse to run and pdf.js falls back to a standard font.
  */
-function inflatedBytes(data: Uint8Array, cap: number, depth = 0): number {
-  if (!looksLikeZlib(data)) return 0;
-  let out: Buffer;
+function offImageDecoder(proto: Record<string, unknown>): void {
+  if (imageDecodersSeen.has(proto)) return;
+  imageDecodersSeen.add(proto);
+  if (!Object.prototype.hasOwnProperty.call(proto, 'decodeImage')) return;
+  const decodeImage = proto.decodeImage as (this: unknown, ...args: unknown[]) => unknown;
+  proto.decodeImage = function (this: unknown, ...args: unknown[]) {
+    if (meter) throw new Error('image decoding is off during text extraction');
+    return decodeImage.apply(this, args);
+  };
+}
+
+function hookDecodeStream(instance: object): void {
+  // The topmost prototype with its own `ensureBuffer` is DecodeStream's: its
+  // subclasses (JpegStream, Jbig2Stream, JpxStream) override it with a no-op.
+  let proto: Record<string, unknown> | null = null;
+  for (let p = Object.getPrototypeOf(instance); p && p !== Object.prototype; p = Object.getPrototypeOf(p)) {
+    if (Object.prototype.hasOwnProperty.call(p, 'ensureBuffer')) proto = p;
+  }
+  if (!proto) return;
+  const ensureBuffer = proto.ensureBuffer as (this: DecodeStreamLike, requested: number) => Uint8Array;
+  Object.defineProperty(proto, 'ensureBuffer', {
+    configurable: true,
+    writable: true,
+    value(this: DecodeStreamLike, requested: number) {
+      // Counted before pdf.js allocates: it doubles `minBufferLength` until
+      // that holds `requested`. What it then assigns to `buffer` is counted
+      // again below, should its growth rule ever differ.
+      const held = ArrayBuffer.isView(this[BUFFER]) ? this[BUFFER].byteLength : 0;
+      if (requested > held) {
+        let size = this.minBufferLength > 0 ? this.minBufferLength : requested;
+        while (size < requested) size *= 2;
+        countDecoded(this, size);
+      }
+      return ensureBuffer.call(this, requested);
+    },
+  });
+  Object.defineProperty(proto, 'buffer', {
+    configurable: true,
+    get(this: DecodeStreamLike) {
+      return this[BUFFER];
+    },
+    set(this: DecodeStreamLike, value: unknown) {
+      // The constructor's first assignment shows each subclass once.
+      offImageDecoder(Object.getPrototypeOf(this));
+      if (ArrayBuffer.isView(value)) countDecoded(this, value.byteLength);
+      this[BUFFER] = value;
+    },
+  });
+  hookInstalled = true;
+}
+
+function installDecodeHook(): void {
+  const name = '_rawMinBufferLength';
+  if (hookInstalled || Object.prototype.hasOwnProperty.call(Object.prototype, name)) return;
+  Object.defineProperty(Object.prototype, name, {
+    configurable: true,
+    set(this: object, value: unknown) {
+      delete (Object.prototype as Record<string, unknown>)[name];
+      Object.defineProperty(this, name, { value, writable: true, enumerable: true, configurable: true });
+      hookDecodeStream(this);
+    },
+  });
+}
+installDecodeHook();
+
+/** One page whose content stream is Flate: pdf.js must decode it to read the text. */
+function selfTestPdf(): Uint8Array {
+  const content = deflateSync(Buffer.from('BT /F1 9 Tf 40 800 Td (ok) Tj ET', 'latin1'));
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << >> /Contents 4 0 R >>',
+  ];
+  const parts: Buffer[] = [Buffer.from('%PDF-1.4\n', 'latin1')];
+  const offsets: number[] = [];
+  let length = parts[0]!.length;
+  const push = (b: Buffer) => {
+    parts.push(b);
+    length += b.length;
+  };
+  objects.forEach((o, i) => {
+    offsets.push(length);
+    push(Buffer.from(`${i + 1} 0 obj\n${o}\nendobj\n`, 'latin1'));
+  });
+  offsets.push(length);
+  push(Buffer.from(`4 0 obj\n<< /Length ${content.length} /Filter /FlateDecode >>\nstream\n`, 'latin1'));
+  push(content);
+  push(Buffer.from('\nendstream\nendobj\n', 'latin1'));
+  const xref = length;
+  push(
+    Buffer.from(
+      `xref\n0 5\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}` +
+        `trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`,
+      'latin1'
+    )
+  );
+  return new Uint8Array(Buffer.concat(parts));
+}
+
+/** Whether pdf.js's decoding is being counted in this thread; decodes a small PDF once to find out. */
+async function decodeHookWorks(): Promise<boolean> {
+  if (hookInstalled) return true;
+  const parser = new PDFParse({ data: selfTestPdf() });
   try {
-    // Z_SYNC_FLUSH: a stream cut short (a common PDF defect) still reports what it held.
-    out = inflateSync(data, { maxOutputLength: cap + 1, finishFlush: constants.Z_SYNC_FLUSH });
-  } catch (e) {
-    if ((e as { code?: string }).code === 'ERR_BUFFER_TOO_LARGE') return cap + 1;
-    return 0;
+    await parser.getText();
+  } finally {
+    await parser.destroy();
   }
-  if (out.length > cap || depth + 1 >= MAX_INFLATE_DEPTH) return out.length;
-  return out.length + inflatedBytes(out, cap - out.length, depth + 1);
-}
-
-/**
- * Walk the file's `stream … endstream` bodies and add up what they inflate to.
- * pdf.js keeps a decoded stream as a typed array, whose bytes are outside the
- * V8 heap — the Worker's `resourceLimits` do not see them, so this is the
- * bound on them. Returns a refusal, or null when the file is within the limits.
- */
-export function inflateCheck(buf: Buffer, limits: PdfWorkerInput['limits']): PdfWorkerOutput | null {
-  let total = 0;
-  let pos = 0;
-  while ((pos = buf.indexOf('stream', pos, 'latin1')) !== -1) {
-    // `endstream` also contains the word.
-    if (pos >= 3 && buf.toString('latin1', pos - 3, pos) === 'end') {
-      pos += 6;
-      continue;
-    }
-    let start = pos + 6;
-    if (buf[start] === 0x0d) start++;
-    if (buf[start] === 0x0a) start++;
-    else if (buf[start - 1] !== 0x0d) {
-      // Not the keyword (e.g. `/stream` in a name): the keyword ends its line.
-      pos = start;
-      continue;
-    }
-    const end = buf.indexOf('endstream', start, 'latin1');
-    if (end === -1) break;
-    const cap = Math.min(limits.maxStreamInflatedBytes, limits.maxInflatedBytes - total);
-    const n = inflatedBytes(buf.subarray(start, end), cap);
-    if (n > cap) {
-      return {
-        kind: 'limit',
-        code: 'parse_too_heavy',
-        detail: {
-          maxInflatedMb: Math.round(limits.maxInflatedBytes / MB),
-          maxStreamInflatedMb: Math.round(limits.maxStreamInflatedBytes / MB),
-        },
-      };
-    }
-    total += n;
-    pos = end + 9;
-  }
-  return null;
+  return hookInstalled;
 }
 
 /**
@@ -126,14 +252,19 @@ export function inflateCheck(buf: Buffer, limits: PdfWorkerInput['limits']): Pdf
  *   one carries `-- N of M --` after every page (its default `pageJoiner`),
  *   which made a scan look like a text PDF (İNCELEME-45 B-2).
  */
-export async function extractInThisThread(input: PdfWorkerInput): Promise<PdfWorkerOutput> {
-  const buf = Buffer.from(input.bytes.buffer, input.bytes.byteOffset, input.bytes.byteLength);
-  const refused = inflateCheck(buf, input.limits);
-  if (refused) return refused;
-
+export async function extractInThisThread(
+  input: PdfWorkerInput,
+  onRefused?: (out: PdfWorkerOutput) => void
+): Promise<PdfWorkerOutput> {
+  if (!(await decodeHookWorks())) {
+    return { kind: 'error', message: 'the decoded-bytes counter could not be attached to pdf.js' };
+  }
+  const m: DecodeMeter = { limits: input.limits, perStream: new WeakMap(), total: 0, refused: null, onRefused };
+  meter = m;
   const parser = new PDFParse({ data: input.bytes });
   try {
     const { total } = await parser.getInfo();
+    if (m.refused) return m.refused;
     if (total > input.limits.maxPages) {
       return { kind: 'limit', code: 'too_many_pages', detail: { pages: total, maxPages: input.limits.maxPages } };
     }
@@ -142,6 +273,8 @@ export async function extractInThisThread(input: PdfWorkerInput): Promise<PdfWor
     for (let first = 1; first <= total; first += PAGES_PER_SLICE) {
       const last = Math.min(first + PAGES_PER_SLICE - 1, total);
       const slice = await parser.getText({ first, last, pageJoiner: '' });
+      // pdf.js may have caught the counter's throw and left a page out.
+      if (m.refused) return m.refused;
       for (const page of slice.pages) {
         pageTexts.push(page.text);
         length += page.text.length + 2;
@@ -151,14 +284,18 @@ export async function extractInThisThread(input: PdfWorkerInput): Promise<PdfWor
       }
     }
     return { kind: 'ok', pages: total, text: pageTexts.join('\n\n') };
+  } catch (e) {
+    if (m.refused) return m.refused;
+    throw e;
   } finally {
+    meter = null;
     await parser.destroy();
   }
 }
 
 if (parentPort) {
   const port = parentPort;
-  extractInThisThread(workerData as PdfWorkerInput).then(
+  extractInThisThread(workerData as PdfWorkerInput, (out) => port.postMessage(out)).then(
     (out) => port.postMessage(out),
     (e: unknown) => port.postMessage({ kind: 'error', message: e instanceof Error ? e.message : String(e) })
   );

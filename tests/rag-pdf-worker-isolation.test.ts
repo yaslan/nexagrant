@@ -8,8 +8,24 @@
  * worker thread with a deadline, a heap ceiling and a ceiling on inflated
  * stream bytes (src/lib/rag-pdf-extract.ts). These run the real pdf-parse.
  */
+import { deflateSync } from 'node:zlib';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { flatePdf, inPlaceTextContent, syntheticPdf, densePageLines } from './helpers/synthetic-pdf';
+import {
+  ascii85Encode,
+  asciiHexEncode,
+  densePageLines,
+  flatePdf,
+  fontFilePdf,
+  inPlaceTextContent,
+  jbig2BlankPage,
+  lzwLiteral,
+  lzwRun,
+  lzwRunSize,
+  runLengthEncode,
+  streamPdf,
+  syntheticPdf,
+  zlibWithStoredEndstream,
+} from './helpers/synthetic-pdf';
 
 // The limits are the real ones unless a test lowers one.
 const limits = vi.hoisted(() => ({ current: {} as Record<string, number>, actual: {} as Record<string, number> }));
@@ -152,6 +168,103 @@ describe('decompression bomb: inflated stream bytes are capped before pdf.js sta
     expect(ms).toBeLessThan(3_000);
     expect(worstGapMs).toBeLessThan(500);
   }, 60_000);
+});
+
+/**
+ * TASK-MUNRAWJ0N84T6 (İNCELEME-60 Y-1): the cap was a text scan of the file
+ * that measured only streams whose first layer was zlib, up to the first
+ * `endstream` bytes. What pdf.js decodes is now counted as it decodes it,
+ * whatever the filter chain.
+ */
+describe('decompression bomb: every filter chain pdf.js decodes is counted', () => {
+  const MB = 1024 * 1024;
+  const spaces = (mb: number) => Buffer.alloc(mb * MB, 0x20);
+
+  test('LZWDecode', async () => {
+    limits.current.maxStreamInflatedMb = 1;
+    const data = lzwRun(1);
+    expect(lzwRunSize(1)).toBeGreaterThan(7 * MB);
+    const e = await extractPdfText(streamPdf({ data, filter: '/LZWDecode' }), MAX_CHARS).catch((err: unknown) => err);
+    expect(e).toMatchObject({ code: 'parse_too_heavy', detail: { maxStreamInflatedMb: 1 } });
+  });
+
+  test.each([
+    ['[/ASCIIHexDecode /FlateDecode]', (b: Buffer) => asciiHexEncode(deflateSync(b))],
+    ['[/ASCII85Decode /FlateDecode]', (b: Buffer) => ascii85Encode(deflateSync(b))],
+    ['/RunLengthDecode', (b: Buffer) => runLengthEncode(b)],
+    ['[/FlateDecode /FlateDecode /FlateDecode /FlateDecode]', (b: Buffer) => deflateSync(deflateSync(deflateSync(deflateSync(b))))],
+  ])('%s', async (filter, encode) => {
+    limits.current.maxStreamInflatedMb = 1;
+    const e = await extractPdfText(streamPdf({ data: encode(spaces(4)), filter }), MAX_CHARS).catch((err: unknown) => err);
+    expect(e).toMatchObject({ code: 'parse_too_heavy', detail: { maxStreamInflatedMb: 1 } });
+  });
+
+  test('an image decoder reached through a font program (/JBIG2Decode) does not run', async () => {
+    // A 49-byte stream declaring a 60000 × 60000 page: 450 MB, allocated by
+    // the decoder from the header before any count could see it. Text
+    // extraction never needs an image decoded; the font falls back.
+    const pdf = fontFilePdf({ data: jbig2BlankPage(60_000, 60_000), filter: '/JBIG2Decode' });
+    expect(pdf.length).toBeLessThan(2_000);
+    // Decoded, 450 MB would be past this cap and refused.
+    limits.current.maxStreamInflatedMb = 1;
+    const { result, ms } = await withPings(() => extractPdfText(pdf, MAX_CHARS));
+    expect(result).toMatchObject({ pages: 1, text: expect.stringContaining('Font file') });
+    expect(ms).toBeLessThan(5_000);
+  });
+
+  test('a bomb in a font program, where pdf.js catches the error and falls back to a standard font', async () => {
+    // pdf.js swallows a font that fails to load; the refusal must not depend on
+    // the error reaching extractInThisThread.
+    limits.current.maxStreamInflatedMb = 1;
+    const pdf = fontFilePdf({ data: lzwRun(1), filter: '/LZWDecode' });
+    const e = await extractPdfText(pdf, MAX_CHARS).catch((err: unknown) => err);
+    expect(e).toMatchObject({ code: 'parse_too_heavy', detail: { maxStreamInflatedMb: 1 } });
+  });
+
+  test('`endstream` bytes inside the compressed data do not end the count', async () => {
+    limits.current.maxStreamInflatedMb = 1;
+    const data = zlibWithStoredEndstream(spaces(4));
+    expect(data.includes('endstream')).toBe(true);
+    const e = await extractPdfText(streamPdf({ data, filter: '/FlateDecode' }), MAX_CHARS).catch((err: unknown) => err);
+    expect(e).toMatchObject({ code: 'parse_too_heavy', detail: { maxStreamInflatedMb: 1 } });
+  });
+
+  test('LZW streams under the per-stream cap that add up past maxInflatedMb', async () => {
+    limits.current.maxInflatedMb = 20;
+    const pdf = streamPdf({ data: lzwRun(1), filter: '/LZWDecode', pages: 4 });
+    const e = await extractPdfText(pdf, MAX_CHARS).catch((err: unknown) => err);
+    expect(e).toMatchObject({ code: 'parse_too_heavy', detail: { maxInflatedMb: 20 } });
+  });
+
+  test('a 1.3 GB LZW bomb (~1 MB file) is refused at the real limits, fast, the event loop turning', async () => {
+    const data = lzwRun(180);
+    expect(lzwRunSize(180)).toBeGreaterThan(1.3e9);
+    const pdf = streamPdf({ data, filter: '/LZWDecode' });
+    expect(pdf.length).toBeLessThan(1.1 * MB);
+    const { result, ms, worstGapMs } = await withPings(() => extractPdfText(pdf, MAX_CHARS));
+    expect(result).toMatchObject({ code: 'parse_too_heavy', detail: { maxStreamInflatedMb: limits.actual.maxStreamInflatedMb } });
+    expect(ms).toBeLessThan(5_000);
+    expect(worstGapMs).toBeLessThan(500);
+  }, 60_000);
+
+  test('the same filter chains holding ordinary text are still extracted', async () => {
+    const content = Buffer.from(
+      ['BT', '/F1 9 Tf', '40 800 Td', '11 TL', ...densePageLines().map((l) => `(${l}) '`), 'ET'].join('\n'),
+      'latin1'
+    );
+    const reference = await extractPdfText(flatePdf({ content, pages: 2 }), MAX_CHARS);
+    expect(reference.text).toContain('Horizon Europe work programme text');
+    for (const [filter, data] of [
+      ['/LZWDecode', lzwLiteral(content)],
+      ['[/ASCIIHexDecode /FlateDecode]', asciiHexEncode(deflateSync(content))],
+      ['[/ASCII85Decode /FlateDecode]', ascii85Encode(deflateSync(content))],
+      ['/RunLengthDecode', runLengthEncode(content)],
+      ['/FlateDecode', zlibWithStoredEndstream(content)],
+    ] as const) {
+      const { pages, text } = await extractPdfText(streamPdf({ data, filter, pages: 2 }), MAX_CHARS);
+      expect({ filter, pages, text }).toEqual({ filter, pages: 2, text: reference.text });
+    }
+  }, 30_000);
 });
 
 describe('what still works', () => {
