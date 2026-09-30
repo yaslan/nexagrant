@@ -137,7 +137,23 @@ Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workfl
     wc -l < m4-claims-before.txt                                         # sayıyı not edin (N0)
     ```
     `enter_system_scope` satırını çıkarmayın. `Membership` FORCE RLS altındadır ve süper kullanıcı olmayan sahip rolü kiracı bağlamı olmadan **0 satır** okur, yani yanlışlıkla "temiz" görünür (ölçüldü: 3 claim varken düz sorgu 0 döndü). `COLLATE "C"` ve aşağıdaki `LC_ALL=C comm` aynı bayt sırasını kullanır; DB collation'ı ile kabuk yerel ayarı farklıysa `comm` yanlış satır bildirmez.
-- [ ] 3. `DATABASE_URL=<sahip rol> scripts/apply-migrations.sh` — 41 dosya; iki kez koşmak güvenli (CI her push'ta iki kez koşuyor).
+- [ ] 3. `DATABASE_URL=<sahip rol> scripts/apply-migrations.sh` — 41 dosya; iki kez koşmak güvenli (CI her push'ta iki kez koşuyor). Son satır `apply-migrations: 41 files applied as <sahip rol>` olmalı.
+  - **Hangi rolle (İNCELEME-106 I-1, TASK-MUOEGWSV8I7H0):** şemanın ve tabloların **sahibi** olan rolle. Süper kullanıcı değil, BYPASSRLS değil, **asla `fabrika_app` değil**. CI süper kullanıcıyla koşar, canlı koşmaz; aradaki iki farkı betik kendisi kapatır ya da koşmadan önce durur:
+    - (i) **Tek seferlik yetki (DB kümesi başına bir kez, süper kullanıcıyla):** `psql "$SUPERUSER_URL" -v owner=<sahip rol> -f prisma/migration-owner-grant.sql`. Çıktıdaki tabloda sahip rolü için `can_set_system_scope = t`, `fabrika_app` için **`f`** olmalı. Neden: 23. dosyadan itibaren 4 fonksiyon `SET app.system_scope = 'on'` taşır. PostgreSQL bu yer tutucu parametreyi fonksiyon tanımına yalnız süper kullanıcının ya da `SET` yetkisi verilmiş rolün yazmasına izin verir. Yetki yoksa betik **hiçbir dosyayı uygulamadan** `role "…" may not create functions with SET app.system_scope` diye durur. Eskiden 22 dosya uygulanıp 23.'de `permission denied to set parameter "app.system_scope"` ile yarıda kalıyordu (ölçüldü). BYPASSRLS bunu **çözmez**; bu bir satır güvenliği değil, parametre yetkisi kontrolüdür (ölçüldü). Geri alma: `prisma/migration-owner-grant-rollback.sql`.
+    - (ii) **Backfill'ler FORCE RLS altında:** kiracı tabloları `FORCE ROW LEVEL SECURITY`'dir. Sahip rolü kiracı bağlamı olmadan bu tablolarda 0 satır okur ve günceller. Betik bu yüzden her dosyayı `app.system_scope = 'on'` oturumuyla koşar. Bu, `prisma/rls.sql`'in mevcut `system_scope` politikasını açar; politika değişmez, hiçbir rol BYPASSRLS almaz. Bu olmadan 8 backfill dosyası sessizce 0 satır güncelliyordu. `retire-eur-plan-ladder.sql` ise emekli planı silip abonelikleri silinmiş plana işaret eder bırakıyordu (ölçüldü, TASK-MUOEGWSV8I7H0 §2.2). `system_scope` politikası olmayan bir FORCE tablo varsa betik **koşmadan önce** durur ve tabloları listeler. Çözüm: önce `pnpm db:rls`, sonra betiği yeniden koşun. Taze bir DB'de ilk koşudan sonra `db:rls`'ten önce yapılan ikinci koşu bu yüzden durur. Beklenen davranış budur.
+    - (iii) **Kalıcı varsayılan yasak:** (i)'deki yetkiyle sahip rolü `ALTER DATABASE … SET app.system_scope = 'on'` da yazabilir (ölçüldü). Bu, `fabrika_app` dahil her yeni oturumda kiracı yalıtımını kapatır. Betik böyle bir varsayılan görürse, koşudan önce ya da sonra, exit 1 verir. Sahip rolü zaten kendi tablolarında RLS'yi kapatabilir, yani bu yeni bir güç değildir. Ama sessiz bir yoldur. **Asla elle yazmayın.**
+  - **Doğrulama sorgusu** (sahip rolüyle, 3. adımdan sonra; beklenen tek satır `<sahip rol>|f|f|t|0|0`):
+    ```sql
+    SELECT current_user,
+           r.rolsuper, r.rolbypassrls,
+           has_parameter_privilege('app.system_scope', 'SET')                  AS can_set,
+           has_parameter_privilege('fabrika_app', 'app.system_scope', 'SET')::int AS app_can_set,
+           (SELECT count(*) FROM pg_db_role_setting s, unnest(s.setconfig) c
+             WHERE c LIKE 'app.system\_scope=%')                                AS stored_defaults
+      FROM pg_roles r WHERE r.rolname = current_user;
+    ```
+    Ardından 5. adımdaki `pnpm rls:verify` (`fabrika_app` ile) kiracı yalıtımının sürdüğünü ölçer.
+  - Down dosyalarını (§3.2) elle aynı sahip rolüyle uygularken de aynı oturumu açın, yoksa geri dönüş backfill'leri de 0 satır günceller: `psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "SET app.system_scope = 'on'" -f <dosya>.down.sql`.
 - [ ] 4. `pnpm db:rls` — kiracı politikaları + sistem kapsamı fonksiyonları.
 - [ ] 5. `pnpm rls:verify` gerçek `fabrika_app` ile exit 0. Kiracı tablolarında `FORCE ROW LEVEL SECURITY` da denetlenir (bir migration FORCE'u kapatıp geri koymazsa exit 1).
 - [ ] 6. **Web**'i yeni sürümle kaldır, sonra worker (§3.3).
