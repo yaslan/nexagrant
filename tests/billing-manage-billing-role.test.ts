@@ -133,19 +133,26 @@ describe('POST /api/billing/checkout needs manage_billing', () => {
 });
 
 describe('POST /api/billing/portal needs manage_billing', () => {
-  /** The membership read, run against one row of the given role: honours the route's `where`. */
-  const membershipOf = (role: Role) => {
+  type Where = { userId: string; tenantId?: string; role: { in: Role[] } };
+  /** The membership read, run against the given rows: honours the route's `where`, first match wins. */
+  const membershipsOf = (rows: { tenantId: string; role: Role }[]) => {
     m.withSystemScope.mockImplementation(async (_p: string, _l: string, fn: (tx: unknown) => unknown) =>
       fn({
         membership: {
-          findFirst: async ({ where }: { where: { userId: string; role: { in: Role[] } } }) =>
-            where.userId === 'user-1' && where.role.in.includes(role)
-              ? { tenantId: 'tenant-A', role, tenant: { id: 'tenant-A' } }
-              : null,
+          findFirst: async ({ where }: { where: Where }) => {
+            const row = rows.find(
+              (r) =>
+                where.userId === 'user-1' &&
+                (where.tenantId === undefined || where.tenantId === r.tenantId) &&
+                where.role.in.includes(r.role),
+            );
+            return row ? { ...row, tenant: { id: row.tenantId } } : null;
+          },
         },
       }),
     );
   };
+  const membershipOf = (role: Role) => membershipsOf([{ tenantId: 'tenant-A', role }]);
 
   for (const role of ROLES) {
     const allowed = can(role, 'manage_billing');
@@ -166,4 +173,66 @@ describe('POST /api/billing/portal needs manage_billing', () => {
       expect(m.portalCreate).not.toHaveBeenCalled();
     });
   }
+
+  // TASK-MUNSRKW0HJYBV (İNCELEME-63 Ö-A): the portal opens the tenant the
+  // session is in. It used to take whichever tenant the user owns, so a MEMBER
+  // of A who owns X got X's portal from inside A — and a user owning two
+  // tenants got one of them at the database's whim.
+  test('opens the session tenant only: a MEMBER of A who owns X gets 403, not X', async () => {
+    m.auth.mockResolvedValue(sessionFor('MEMBER'));
+    membershipsOf([
+      { tenantId: 'tenant-X', role: 'TENANT_OWNER' },
+      { tenantId: 'tenant-A', role: 'MEMBER' },
+    ]);
+
+    const res = await portal.POST(portalRequest());
+
+    expect(res.status).toBe(403);
+    expect(m.withTenant).not.toHaveBeenCalled();
+    expect(m.portalCreate).not.toHaveBeenCalled();
+  });
+
+  test('the owner of two tenants gets the portal of the one the session is in', async () => {
+    m.auth.mockResolvedValue(sessionFor('TENANT_OWNER'));
+    membershipsOf([
+      { tenantId: 'tenant-X', role: 'TENANT_OWNER' },
+      { tenantId: 'tenant-A', role: 'TENANT_OWNER' },
+    ]);
+
+    const res = await portal.POST(portalRequest());
+
+    expect(res.status).toBe(200);
+    expect(m.withTenant).toHaveBeenCalledWith('tenant-A', expect.any(Function));
+  });
+
+  test('a session without a tenant gets 401 before any read', async () => {
+    m.auth.mockResolvedValue({ user: { id: 'user-1' } });
+    membershipOf('TENANT_OWNER');
+
+    const res = await portal.POST(portalRequest());
+
+    expect(res.status).toBe(401);
+    expect(m.withSystemScope).not.toHaveBeenCalled();
+    expect(m.portalCreate).not.toHaveBeenCalled();
+  });
+
+  // İNCELEME-63 Ö-B: a failure answers with a fixed sentence; the tenant id and
+  // Stripe's own text stay in the server log.
+  test('a failure answers 500 without the internal message', async () => {
+    m.auth.mockResolvedValue(sessionFor('TENANT_OWNER'));
+    membershipOf('TENANT_OWNER');
+    m.withTenant.mockImplementation(async (_t: string, fn: (tx: unknown) => unknown) =>
+      fn({ subscription: { findUnique: async () => null } }),
+    );
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await portal.POST(portalRequest());
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Failed to create portal session' });
+    expect(JSON.stringify(body)).not.toContain('tenant-A');
+    expect(String(log.mock.calls[0]?.[1])).toContain('tenant-A');
+    log.mockRestore();
+  });
 });

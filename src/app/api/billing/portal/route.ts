@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
 import { withSystemScope } from '@/lib/system-scope';
 import { createPortalSession } from '@/lib/billing/create-portal-session';
 import { Role } from '@prisma/client';
 import { can } from '@/lib/rbac';
+import { requireTenantApi } from '@/lib/tenant';
 
 /**
  * The roles that may manage the tenant's subscription, read from rbac.ts
@@ -15,18 +15,16 @@ const BILLING_ROLES = Object.values(Role).filter((role) => can(role, 'manage_bil
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const tenant = await requireTenantApi();
+    if (!tenant.ok) return tenant.response;
     // Hoisted: the narrowing above does not survive into the callback below.
-    const userId = session.user.id;
+    const { userId, tenantId: sessionTenantId } = tenant.scope;
 
-    // Answers "which tenant does this signed-in user own?" — scoped by
-    // session.user.id and role, and the tenantId it returns is what
-    // createPortalSession is then given. Nothing narrower exists to scope to
-    // yet, so this is the discovery read, not a bypass.
+    // Is the signed-in user an owner of the tenant the session is in? Read from
+    // the membership row, not the token's role, which is only refreshed at
+    // sign-in. Scoped to the session tenant (İNCELEME-63 Ö-A,
+    // TASK-MUNSRKW0HJYBV): without it, a member of one tenant who owns another
+    // opened the other one's portal, and an owner of two got either.
     const membership = await withSystemScope(
       'tenant-discovery',
       'billing-portal.ownedTenantForUser',
@@ -34,6 +32,7 @@ export async function POST(request: NextRequest) {
         tx.membership.findFirst({
           where: {
             userId,
+            tenantId: sessionTenantId,
             role: { in: BILLING_ROLES },
           },
           include: { tenant: true },
@@ -53,11 +52,9 @@ export async function POST(request: NextRequest) {
     const portalUrl = await createPortalSession(tenantId, returnUrl);
     return NextResponse.json({ url: portalUrl });
   } catch (error: unknown) {
-    const err = error instanceof Error ? error : new Error(String(error));
+    // The message names the tenant and carries Stripe's own text: it stays in
+    // the log, the browser gets the sentence (İNCELEME-63 Ö-B).
     console.error('Portal session error:', error);
-    return NextResponse.json(
-      { error: err.message || 'Failed to create portal session' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create portal session' }, { status: 500 });
   }
 }

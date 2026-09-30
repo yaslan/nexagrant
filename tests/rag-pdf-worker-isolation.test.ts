@@ -75,6 +75,11 @@ async function withPings<T>(work: () => Promise<T>): Promise<{ result: T | unkno
 
 describe("B-1': the event loop keeps turning while pdf.js works on one heavy page", () => {
   test('İNCELEME-52 shape: 20 pages sharing one compressed stream of 100 000 text operators', async () => {
+    // What this measures is the event loop while the worker works, not the
+    // deadline (the next test does that): on a loaded machine the real 30 s
+    // deadline refused this PDF as parse_too_heavy and the pings went
+    // unmeasured (TASK-MUNSRKW0HJYBV, İNCELEME-63 Ö-C).
+    limits.current.maxParseMs = 150_000;
     const pdf = flatePdf({ content: inPlaceTextContent(100_000), pages: 20, shared: true });
     expect(pdf.length).toBeLessThan(40_000);
     const { result, ms, pings, worstGapMs } = await withPings(() => extractPdfText(pdf, MAX_CHARS));
@@ -83,7 +88,7 @@ describe("B-1': the event loop keeps turning while pdf.js works on one heavy pag
     expect(ms).toBeGreaterThan(1_000);
     expect(pings).toBeGreaterThanOrEqual(Math.floor(ms / 20) / 2);
     expect(worstGapMs).toBeLessThan(500);
-  }, 60_000);
+  }, 180_000);
 
   test('past maxParseMs the thread is terminated and the PDF refused as parse_too_heavy', async () => {
     limits.current.maxParseMs = 500;

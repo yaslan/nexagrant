@@ -37,6 +37,16 @@ export default defineConfig({
       // unless this says otherwise (src/lib/demo-login.ts).
       DEMO_LOGIN_ENABLED: 'true',
     },
+    // TASK-MUNSRKW0HJYBV (İNCELEME-63 Ö-C) — vitest's 5 s default is a
+    // budget for one test on an idle machine. The property sweeps
+    // (withholding-rounding, vat-by-country, invoice-writer: every amount × every
+    // rate), the source scanners (use-server-exports, server-action-rbac-guard:
+    // 3.6–4.3 s idle) and the live suites' database fixtures took 5–10 s at a
+    // load average of 40–120 on the shared machine, and a full run showed 31
+    // "Test timed out in 5000ms" reds that pass alone. A test with its own
+    // budget still sets it; a test that hangs still fails.
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
     exclude: ['**/node_modules/**', '**/dist/**', '**/tests/e2e/**', '**/.next/**', '**/docs/**', '**/.claude/worktrees/**'],
     alias: {
       '@': path.resolve(root, './src'),
