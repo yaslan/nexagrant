@@ -1,0 +1,21 @@
+presign shape          → "T/org-default/certificate/2026/deadbeef_belge_pdf.pdf"
+nested incoming org    → null
+INCOMING upper org     → "T/INCOMING/certificate/2026/deadbeef_x_pdf.pdf"
+Incoming mixed org     → "T/Incoming/certificate/2026/deadbeef_x_pdf.pdf"
+category=incoming      → "T/org-default/incoming/2026/deadbeef_x_pdf.pdf"
+double nested          → null
+old loose short        → null
+other tenant as org    → "T/cmtenantbbbbbbbbbbbbbbbbb/certificate/2026/deadbeef_x_pdf.pdf"
+final key itself       → null
+dot-dot                → null
+encoded slash          → null
+trailing newline       → null
+leading slash          → null
+double slash           → null
+uppercase ext          → null
+hash 9 chars           → null
+extra segment          → null
+unicode name           → null
+url form               → null
+array                  → null
+other tenant key       → null
