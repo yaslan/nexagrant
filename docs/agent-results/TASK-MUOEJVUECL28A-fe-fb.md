@@ -81,6 +81,11 @@ src/lib/tenant.ts:112  const scope = assertTenant((await auth()) as SessionLike)
 src/lib/tenant.ts:169  const session = (await auth()) as SessionLike;
 ```
 
+**Merge:** `fe-fb/b5-design-fix` (`0bd26a62`) → dev, merge commit **`df56877b`** (dev `6c277ba1`'den). Ana checkout
+dev'de olduğu için merge detached bir merge worktree'sinde yapıldı. `dev`, `git update-ref refs/heads/dev <yeni> <eski>`
+ile ilerletildi (eski değer kontrolüyle). Ardından ana checkout'ta yalnız bu 5 yeni yol `git checkout dev -- <yollar>`
+ile eşitlendi (öncesi `D ` gösteriyordu, sonrası temiz). Başka hiçbir dosyaya dokunulmadı. Push yok.
+
 ## 3. Değişen dosyalar
 - `docs/kamu/B5-BEYAZ-ETIKET-TASARIMI.md` (yeni, rev. 2 tasarım)
 - `docs/agent-results/TASK-MUOEJVUECL28A-fe-fb.md` (bu rapor)
