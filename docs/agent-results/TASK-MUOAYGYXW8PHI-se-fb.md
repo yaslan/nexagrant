@@ -1,7 +1,7 @@
 # TASK-MUOAYGYXW8PHI — se-fb — FB MOBİL TAKİP (İNCELEME-96 Y-1/Y-2): uzun URL taşması + bekçi mutantları
 
 **Durum:** TAMAM
-**Dal:** `se-fb/muoayg-mobile-url` (dev `2c08c956`'dan, ayrı worktree). Kapılar yeşil, dev'e merge edildi, push YOK.
+**Dal:** `se-fb/muoayg-mobile-url` (dev `2c08c956`'dan, ayrı worktree). Kapılar yeşil, dev'e merge edildi (`e5eaa8a3`), push YOK.
 **Ortam:**
 - Worktree scratchpad'de, `node_modules` APFS klonu.
 - İzole Postgres `sefbay-pg` (127.0.0.1:55431), CI sırasıyla kuruldu: db push → rls-role → apply-migrations ×2 (41/41) → rls → seed. Paylaşılan `fabrika-postgres` :5433'e yazılmadı; worktree `.env`'inde `5433` geçmiyor.
@@ -131,6 +131,11 @@ Modal satırındaki `gap-3` görsel aralık için. Taşmayla ilgisi yok, bu yüz
 tsc=0  lint=0  i18n=0 ("both catalogs agree, every key used in src/ resolves…")
 next build exit=0 (ÖNCE ve SONRA)
 npx vitest run: Test Files 292 passed | 6 skipped (298) · Tests 3730 passed | 104 skipped · exit 0
+```
+
+**dev'e merge sonrası** (`e5eaa8a3`, arada dev 31 dosya ilerlemişti; birleşik ağaçta yeniden koşuldu):
+```
+tsc=0  lint=0  i18n=0 · npx vitest run: Test Files 295 passed | 6 skipped (301) · Tests 3833 passed | 113 skipped · exit 0
 ```
 
 İlk tam vitest koşusu **1 kırmızı** verdi: `tests/teardown-where-guard.test.ts`, fixture'ın `deleteMany({ where: { id: f.opportunityId } })` satırını yakaladı. Parametre `undefined` gelirse Prisma bu filtreyi düşürür ve tüm tablo silinir. `requireId(...)` ile düzelttim, sonra tam koşu yeşil oldu. Build'den sonra yalnız test dosyası değişti, src değişmedi.
