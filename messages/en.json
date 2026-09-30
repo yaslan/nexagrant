@@ -2653,5 +2653,11 @@
     "more": "and {count} more",
     "cta": "Open relationships",
     "footer": "This digest is sent at most once a day. A relationship is not named again until a newer contact is also 60 days old."
+  },
+  "adminCordis": {
+    "importErrors": {
+      "SKIP_LIMIT_EXCEEDED": "Import failed: the CORDIS dump has more unreadable records than the limit allows. Details are in the run record and in system alerts.",
+      "IMPORT_FAILED": "Import failed: the import could not finish. Details are in the run record and in system alerts."
+    }
   }
 }

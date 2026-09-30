@@ -16,6 +16,8 @@ import {
   RawCsvRow,
 } from './cordisSchema';
 import { errorMessage } from '@/lib/errors';
+import { logger } from '@/lib/logger';
+import type { CordisImportFailureCode } from './failure-codes';
 import { recordRawFetch } from './raw-fetch';
 import { parseCordisCsv, type CordisCsvMalformed } from './csv';
 import { recordAlert } from '@/lib/observability/system-alert';
@@ -56,10 +58,19 @@ export interface CordisImportResult {
     scivocs: number;
   };
   durationMs: number;
-  error?: string;
+  /**
+   * Why a failed run failed, as a fixed code. The raw message (SQL, file
+   * paths, CSV lines) goes only to the log, the run row and the alert: this
+   * result reaches the admin console through a server action (İNCELEME-100
+   * Y-1, TASK-MUOBNYACFPLPF).
+   */
+  errorCode?: CordisImportFailureCode;
   /** Per-file records that were not imported. Present whenever the files were read. */
   skippedRecords?: CordisFileSkips[];
 }
+
+/** Thrown when a file lost more records than `maxSkippedRatio` allows. */
+class CordisSkipLimitError extends Error {}
 
 /**
  * The default for `maxSkippedRatio`: 0.1 % of a file, i.e. about 23 of the
@@ -240,7 +251,7 @@ function assertSkipBudget(skips: CordisFileSkips[], maxSkippedRatio: number): vo
           .join('; ')})`
     )
     .join(' | ');
-  throw new Error(
+  throw new CordisSkipLimitError(
     `CORDIS dump rejected: skipped records over the ${maxSkippedRatio * 100}% limit — ${detail}`
   );
 }
@@ -668,6 +679,9 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
     };
   } catch (error) {
     const errorMsg = errorMessage(error, String(error));
+    const errorCode: CordisImportFailureCode =
+      error instanceof CordisSkipLimitError ? 'SKIP_LIMIT_EXCEEDED' : 'IMPORT_FAILED';
+    logger.error('[k2-cordis] import failed', error, { runId: runRecord?.runId, dataset, errorCode });
     try {
       await prisma.cordisImportRun.update({
         where: { runId: runRecord?.runId || 'unknown' },
@@ -698,7 +712,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       runId: runRecord?.runId || 'error',
       rowCounts: { projects: 0, organizations: 0, participations: 0, topics: 0, scivocs: 0 },
       durationMs: Date.now() - startTime,
-      error: errorMsg,
+      errorCode,
       ...(fileSkips ? { skippedRecords: fileSkips } : {}),
     };
   }

@@ -33,15 +33,16 @@ beforeEach(() => {
 });
 
 describe('/api/admin/cordis/import 500 body', () => {
-  test('a failed run returns a fixed code and the run id; the detail goes to the log', async () => {
-    const detail = 'relation "CordisProject" does not exist at /srv/secret/cordis.zip';
-    m.runCordisImport.mockResolvedValue({ success: false, runId: 'run-42', error: detail });
+  test('a failed run returns a fixed code and the run id', async () => {
+    // Since İNCELEME-100 Y-1 the importer returns a code, not the message; the
+    // detail is on the run row and in the importer's own log line.
+    m.runCordisImport.mockResolvedValue({ success: false, runId: 'run-42', errorCode: 'IMPORT_FAILED' });
     const res = await post();
     expect(res.status).toBe(500);
     const text = await res.text();
     expect(JSON.parse(text)).toEqual({ success: false, error: 'import_failed', runId: 'run-42' });
     expect(text).not.toMatch(/CordisProject|secret|\/srv/);
-    expect(logger.error).toHaveBeenCalledWith(expect.any(String), detail, { runId: 'run-42' });
+    expect(logger.error).toHaveBeenCalledWith(expect.any(String), 'IMPORT_FAILED', { runId: 'run-42' });
     expect(m.generatePartnerProfiles).not.toHaveBeenCalled();
   });
 
