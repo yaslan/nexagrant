@@ -3,6 +3,8 @@
 import { createHash } from 'node:crypto';
 import { withTenant, withTenantLockPool } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
+import type { TenantScope } from '@/lib/tenant';
+import { isServiceBusy } from '@/lib/service-busy';
 import { revalidatePath } from 'next/cache';
 import {
   getPresignedUploadUrl,
@@ -164,7 +166,22 @@ export async function confirmEvidenceUploadAction(data: {
   confidentiality?: string;
   language?: string;
 }) {
-  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
+  // A pilot check that got no connection from the application pool
+  // (`ServiceBusyError`, src/lib/tenant.ts) is answered, not thrown: the upload
+  // screen says "busy, nothing was saved" (TASK-MUOGR5FDKLH22, İNCELEME-103
+  // G-1 Ö-1). Every other refusal — an ended pilot, a role that may not
+  // upload, anything unexpected — leaves as it was thrown. The check stays a
+  // declaration inside the `try`: that is a shape the role-check guard reads
+  // (tests/server-action-rbac-guard.test.ts), and every `catch` here leaves.
+  let scope: TenantScope;
+  try {
+    const checked = await requireTenantAction({ can: 'edit_proposal' });
+    scope = checked;
+  } catch (error) {
+    if (isServiceBusy(error)) return { success: false as const, error: 'service_busy' as const };
+    throw error;
+  }
+  const { tenantId, userId } = scope;
 
   // The key comes back from the browser. Only one under this tenant's own prefix
   // may be recorded: the row's key is what deleteEvidence later removes from the

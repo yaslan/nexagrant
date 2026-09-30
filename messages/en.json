@@ -268,6 +268,7 @@
         "invalid_object_key": "Invalid file key.",
         "storage_unavailable": "Storage is unavailable right now. Try again shortly.",
         "save_failed": "The document could not be saved. Try again.",
+        "service_busy": "The system is very busy right now, so the document was not saved. Upload it again in a few seconds.",
         "put_failed": "The file could not be uploaded to storage (HTTP {status})."
       }
     }
