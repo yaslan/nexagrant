@@ -147,6 +147,11 @@ Her iki koşuda live-skip kapısı (`scripts/check-live-skips.ts`) yalnız izin 
 - Bu dosyaya dokunmadım. Koşu 2'de aynı test yeşil.
 - Ö-1'in önerisi hâlâ geçerli: tabloları 300'den ~100'e indirmek ya da süreyi CPU ile ölçmek. Ayrı bir kart gerekir.
 
+### 2.6 Merge sonrası dev (`235e3162`)
+Ben çalışırken dev `5ec0d733`'ten `c06f0bc4`'e ilerledi. Bu aralıkta başka ajanların merge'leriyle `src/` altında 52 dosya değişti. Merge'ten sonra dev'de iki kontrol koştum:
+- `tests/server-action-rbac-guard.test.ts` + `tests/server-action-rbac.test.ts` → `Tests 109 passed (109)`. Yeni ağaçta da FP 0.
+- `tsc --noEmit` → EXIT 0.
+
 ## 3) Değişen dosyalar
 - `tests/server-action-rbac-guard.test.ts`: bekçi ve kendi-mutant testleri.
 - `docs/agent-results/TASK-MUNY0V7B590EI-se-fb.md` ve `…-se-fb-ekler/`: rapor ve kanıt dosyaları.
