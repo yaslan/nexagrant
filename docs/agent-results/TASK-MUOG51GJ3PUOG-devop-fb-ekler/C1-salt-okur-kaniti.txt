@@ -1,0 +1,13 @@
+DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55224/fabrika
+sha256(betik) önce=6c2981fbcc61c502
+$ psql -Atc 'SELECT count(*) FROM "TopicMatch"'
+7
+$ grep -n "DELETE FROM" scripts/golive/r1-topicmatch-check.sql   # geçici eklenen satır
+37:DELETE FROM "TopicMatch" WHERE "opportunityId" IS NULL;   -- R1 SALT-OKUR KANITI, GERİ ALINACAK
+$ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/golive/r1-topicmatch-check.sql
+psql:scripts/golive/r1-topicmatch-check.sql:37: ERROR:  cannot execute DELETE in a read-only transaction
+exit=3
+--- geri alındı: sha256(betik) sonra=6c2981fbcc61c502 (önceyle AYNI)
+betikte DELETE geçen satır: 0
+$ psql -Atc 'SELECT count(*) FROM "TopicMatch"'
+7

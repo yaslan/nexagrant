@@ -1,0 +1,2038 @@
+HEAD=75dfc800 Wed Sep 30 21:27:42 +03 2026
+DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55223/fabrika
+DATABASE_URL_RLS_TEST=postgresql://fabrika_app:fabrika_app_ci@127.0.0.1:55223/fabrika
+CI=true
+$ pnpm lint
+$ eslint
+exit=0
+$ pnpm typecheck
+$ tsc --noEmit
+exit=0
+$ pnpm exec vitest run --passWithNoTests --reporter=default --reporter=json --outputFile.json=/private/tmp/claude-501/-Users-macbook-alan/72c459bc-6745-4b51-90b1-ab8307a5cd8f/scratchpad/vitest-report.json
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v4.1.11 /Users/macbook/alan/FONBRIDGE
+
+(node:60663) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/teardown-where-guard.test.ts (6 tests) 2187ms
+     ✓ no test file in the repo has an unguarded where  2100ms
+ ✓ src/modules/m8/server/schema-contract.test.ts (16 tests) 2687ms
+     ✓ actually walks the write bodies in src/  660ms
+     ✓ names only models, relations and columns that exist  741ms
+     ✓ keeps the known-broken field list from going stale  618ms
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > code dies between probe and adapter: choice cookies are spent
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /Users/macbook/alan/FONBRIDGE/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/Users/macbook/alan/FONBRIDGE/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/Users/macbook/alan/FONBRIDGE/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > code dies between probe and adapter: choice cookies are spent
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /Users/macbook/alan/FONBRIDGE/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/Users/macbook/alan/FONBRIDGE/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/Users/macbook/alan/FONBRIDGE/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /Users/macbook/alan/FONBRIDGE/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/Users/macbook/alan/FONBRIDGE/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/Users/macbook/alan/FONBRIDGE/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /Users/macbook/alan/FONBRIDGE/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/Users/macbook/alan/FONBRIDGE/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/Users/macbook/alan/FONBRIDGE/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stdout | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+K-1 race (tr): http://localhost:3000/api/auth/hata?error=Configuration
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /Users/macbook/alan/FONBRIDGE/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/Users/macbook/alan/FONBRIDGE/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/Users/macbook/alan/FONBRIDGE/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /Users/macbook/alan/FONBRIDGE/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/Users/macbook/alan/FONBRIDGE/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/Users/macbook/alan/FONBRIDGE/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stdout | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+K-1 race (en): http://localhost:3000/api/auth/hata?error=Configuration
+
+ ✓ tests/oauth-registration.live.test.ts (20 tests) 2984ms
+     ✓ Google: a code + addendum acknowledgement opens an account linked to the agency, with 3 consent rows  373ms
+     ✓ crw-fb's scenario: A ticks and gives up, B starts unticked with a new Google account — refused, no user, no consent  369ms
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > a second invitation to the same address within 10 minutes sends no mail and keeps the mailed link valid
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > a second invitation to the same address within 10 minutes sends no mail and keeps the mailed link valid
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+ ✓ src/app/api/concept-notes/[id]/export/route.edge.test.ts (9 tests) 2906ms
+     ✓ B-1 K4: the image budget is per document — two sections cannot each spend it  2565ms
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > within the cooldown a re-invite with another role leaves the mailed invitation as it is and is recorded
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > within the cooldown a re-invite with another role leaves the mailed invitation as it is and is recorded
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > within the cooldown a re-invite with the same role pushes the expiry out and keeps the token
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > within the cooldown a re-invite with the same role pushes the expiry out and keeps the token
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > an address inside its cooldown is recently_sent even when the tenant is at the daily limit
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > an address inside its cooldown is recently_sent even when the tenant is at the daily limit
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > after the cooldown the same address is mailed again
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > after the cooldown the same address is mailed again
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > re-inviting an address whose earlier invitation was accepted reopens it with a fresh link
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > re-inviting an address whose earlier invitation was accepted reopens it with a fresh link
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > 9 minutes after a mail the same address is still cooling down
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > 9 minutes after a mail the same address is still cooling down
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > a send the SMTP server refused does not start a cooldown
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+ ✓ tests/server-action-rbac-guard.test.ts (64 tests) 1926ms
+         ✓ B-1 (İNCELEME-101): the same through a relative import of a directory index  700ms
+         ✓ B-1: with a catch-all `"*": ["./src/*"]`, a package is still a package and src/ still src/  533ms
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > a send the SMTP server refused does not start a cooldown
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+ ✓ tests/where-guard-src.test.ts (3 tests) 3985ms
+     ✓ every unguarded where under src/ is a known, explained one  2282ms
+     ✓ KNOWN has no stale entries  1682ms
+ ✓ tests/invitation-accept.live.test.ts (18 tests) 1727ms
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > two concurrent invitations to one address send one mail
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > two concurrent invitations to one address send one mail
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > two concurrent invitations with different roles leave the mailed role in place
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > past the daily limit no mail is sent, the invitation is still issued, and a warning is raised
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > past the daily limit a re-invitation still gets a fresh link that works
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > past the daily limit a re-invitation still gets a fresh link that works
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > rows 23 hours old still count toward the daily limit
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > rows older than 24 hours do not count toward the daily limit
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > without a usable NEXT_PUBLIC_APP_URL in production nothing is mailed and an error alert is raised
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > without a usable NEXT_PUBLIC_APP_URL in production nothing is mailed and an error alert is raised
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > without a usable NEXT_PUBLIC_APP_URL in production nothing is mailed and an error alert is raised
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > without a usable NEXT_PUBLIC_APP_URL in production nothing is mailed and an error alert is raised
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > the mailed link is built from NEXT_PUBLIC_APP_URL and the subject carries a cut tenant name
+[Invitations] invitation issued for tenant cmuofuivo0000tyxkp02habsi
+
+ ✓ tests/invitation-mail-limit.live.test.ts (16 tests) 2498ms
+     ✓ two concurrent invitations to one address send one mail  577ms
+     ✓ two concurrent invitations with different roles leave the mailed role in place  540ms
+ ✓ tests/withholding-rounding.test.ts (8 tests) 1402ms
+     ✓ every net from 1 to 3000, at each VAT rate and each withholding rate  1400ms
+ ✓ tests/i18n-check-script.test.ts (8 tests) 2860ms
+     ✓ passes when both catalogs agree  334ms
+     ✓ fails when a key ships in Turkish only (CLAUDE.md rule 8)  422ms
+     ✓ fails when a key used in code is missing from a catalog  383ms
+     ✓ does not treat a template-literal key as a missing literal key  349ms
+     ✓ still fails a template-literal key whose whole group is missing in one language  341ms
+     ✓ resolves each variable against its own namespace  339ms
+     ✓ re-reads the namespace when a later function rebinds the same variable  332ms
+     ✓ ignores t() written inside a comment  348ms
+ ✓ src/lib/billing/plan-admin.test.ts (25 tests) 2157ms
+     ✓ refuses to edit a published version  360ms
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/billing/invoice-writer.test.ts (26 tests) 1600ms
+     ✓ reconstructs the charged amount exactly, for every amount and rate swept  1183ms
+     ✓ never needs more than one minor unit of rounding  399ms
+ ✓ tests/lock-pool.live.test.ts (3 tests) 7176ms
+     ✓ never holds more than 3 connections, however many transactions ask  895ms
+     ✓ T-6 (Q5/Q6): queue timeout when pool is full — maxWait and connectionTimeoutMillis protect against pool exhaustion  6039ms
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/pilot-expired-write-paths.test.tsx (12 tests) 1393ms
+     ✓ budget line: a refused add says the pilot ended; the line is not added  405ms
+     ✓ Part B editor: a refused lock and a refused save both say the pilot ended  342ms
+(node:60828) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > the next request sees the membership as it is now (İNCELEME-59 Y-2) > demoted to MEMBER: the next request is MEMBER and an edit is refused
+Y2_DEMOTE {"signedIn":"TENANT_OWNER","asOwner":"ok:{\"success\":true}","demoted":{"tenantA":true,"role":"MEMBER"},"asMember":"throw:FORBIDDEN_ROLE","left":1}
+
+ ✓ tests/api/api-error-body-guard.test.ts (22 tests) 9136ms
+     ✓ the guard sees the files it is meant to guard  352ms
+     ✓ no server action returns what it caught (beyond the known list)  8469ms
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > the next request sees the membership as it is now (İNCELEME-59 Y-2) > membership removed: the next request is tenantless, not moved to the other tenant, and an edit is refused
+Y2_REMOVE {"removed":{"tenantA":false,"tenantB":false,"tenantId":null,"role":null},"write":"throw:TENANT_SCOPE_REQUIRED","left":1}
+
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > accepting an invitation moves the session to that tenant (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1) > removed from the bound tenant, accepting C makes the very next request C, with the same browser
+Y1_REBIND {"stranded":{"tenantA":false,"tenantB":false,"tenantId":null,"role":null},"accepted":"throw:NEXT_REDIRECT;replace;/tr/default/dashboard;307;","joined":{"c":true,"role":"WRITER"},"again":true}
+
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > a soft-deleted tenant grants nothing (TASK-MUO2B59ZNY7D7, İNCELEME-81 O-1) > the bound tenant is deleted: the next request is tenantless, not moved to B; undeleted, it is back
+O1_BOUND_DELETED {"deleted":{"tenantA":false,"tenantB":false,"tenantId":null,"role":null},"write":"throw:TENANT_SCOPE_REQUIRED","left":1,"restored":{"tenantA":true,"role":"TENANT_OWNER"}}
+
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > a soft-deleted tenant grants nothing (TASK-MUO2B59ZNY7D7, İNCELEME-81 O-1) > a sign-in skips a deleted tenant even when it is the oldest membership
+O1_SIGNIN {"tenantA":false,"tenantB":true,"tenantId":"cmuofuo7e0018xsxkaww0reyf","role":"TENANT_OWNER"}
+
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > a soft-deleted tenant grants nothing (TASK-MUO2B59ZNY7D7, İNCELEME-81 O-1) > [A9] asked to be bound to a deleted tenant it is a member of, the session stays where it was
+O1_A9 {"d":false,"tenantA":true,"role":"TENANT_OWNER"}
+
+ ✓ tests/auth-jwt-membership-refresh.live.test.ts (8 tests) 2211ms
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/docx-safe-html.image-size.test.ts (20 tests) 10999ms
+     ✓ png: truncations and byte flips  2212ms
+     ✓ gif: truncations and byte flips  4715ms
+     ✓ jpeg: truncations and byte flips  3988ms
+ ✓ tests/deleted-tenant-sessionless.live.test.ts (5 tests) 1788ms
+     ✓ a soft-deleted tenant’s key is 401 and leaves no trace; restoring the tenant restores the key  351ms
+     ✓ the page and its metadata do not open a soft-deleted tenant’s part; restored, they do  302ms
+ ✓ tests/agency-invite.live.test.ts (18 tests) 4064ms
+     ✓ no use limit: a live code works N times in a row, and the counter keeps count  861ms
+     ✓ two connections on one code: the row lock serialises them, both win, no use is lost  439ms
+     ✓ probing (TASK-MUM3TMP8HU76G Ö-1): a much-used code answers like a fresh one; only revoke or expiry refuses, with the same NULL  356ms
+     ✓ after the function fails mid-call the scope is not left open  869ms
+(node:60663) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60856) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60663) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/macbook/alan/FONBRIDGE/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/macbook/alan/FONBRIDGE/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+<--- Last few GCs --->
+
+[60663:0x7b78498000]        7 ms: Scavenge (during sweeping) 3.2 (3.6) -> 2.5 (3.9) MB, pooled: 0.0 MB, 0.22 / 0.00 ms (average mu = 0.687, current mu = 0.687) allocation failure; 
+
+FATAL ERROR: CALL_AND_RETRY_LAST Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0x1069e6218 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+ 2: 0x105a4689c v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+ 3: 0x105a4684c v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+ 4: 0x105bf8e1c v8::internal::HeapAllocator::TryResizeLargeObject(v8::internal::Tagged<v8::internal::HeapObject>, unsigned long, unsigned long) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+ 5: 0x105bf8d44 v8::internal::HeapAllocator::AllocateRawSlowPath(v8::internal::HeapAllocator::AllocationRetryMode, int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment, v8::internal::AllocationHint) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+ 6: 0x105bcf3dc v8::internal::FactoryBase<v8::internal::LocalFactory>::NewCodeWrapper() [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+ 7: 0x105bcf070 v8::internal::FactoryBase<v8::internal::LocalFactory>::NewCode(v8::internal::NewCodeOptions const&) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+ 8: 0x105bdc734 v8::internal::Factory::CodeBuilder::BuildInternal(bool) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+ 9: 0x105fc5e04 v8::internal::baseline::BaselineCompiler::Build() [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+10: 0x105fc4734 v8::internal::baseline::BaselineCompilerTask::Compile(v8::internal::LocalIsolate*) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+11: 0x105fc4684 v8::internal::baseline::BaselineBatchCompilerJob::Compile(v8::internal::LocalIsolate*) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+12: 0x105fc4498 v8::internal::baseline::ConcurrentBaselineCompiler::JobDispatcher::Run(v8::JobDelegate*) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+13: 0x1064ccf78 v8::platform::DefaultJobWorker::Run() [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+14: 0x10590d464 node::(anonymous namespace)::PlatformWorkerThread(void*) [/opt/homebrew/Cellar/node/26.5.0/lib/libnode.147.dylib]
+15: 0x19c269d00 _pthread_start [/usr/lib/system/libsystem_pthread.dylib]
+16: 0x19c264cec thread_start [/usr/lib/system/libsystem_pthread.dylib]
+ ✓ tests/live-skip-gate.test.ts (13 tests) 1685ms
+     ✓ the CLI exits 1 on a skip and 0 on a clean report  1059ms
+     ✓ outside CI a failing gate says why a CI run may differ; the exit stays 1 (TASK-MUOEY2GBFHY7U)  616ms
+ ✓ tests/stale-relationship-reminder.live.test.ts (25 tests) 8284ms
+     ✓ one digest per user across tenants, only the due rows, module and pilot gates held  444ms
+     ✓ a row that goes stale later the same day waits for tomorrow: one digest per user per day  454ms
+     ✓ a rejected send stamps nothing for that user; the others still go out  313ms
+     ✓ a worker killed after the send and before the stamp sends no second digest that day (İNCELEME-51 B-1)  658ms
+     ✓ two runs racing for the same day send one digest (the claim is a compare-and-set)  337ms
+     ✓ a contact logged while the digest is being sent is not stamped as reminded  409ms
+     ✓ a contact logged after the reminder but dated before it starts a new period (İNCELEME-51 B-2)  913ms
+     ✓ a tenant skipped on the second run (M4 closed) does not hide the day claimed there: no second digest (İNCELEME-56 Y-1)  386ms
+     ✓ a tenant whose read fails on the second run does not hide the day claimed there (İNCELEME-56 Y-1)  429ms
+     ✓ a failing claim sends nothing and holds no claim (İNCELEME-69 D-2)  357ms
+     ✓ a member removed from the tenant the day was claimed through gets no second digest that day (İNCELEME-69 D-1)  534ms
+     ✓ a claim the previous release wrote on a membership today holds; yesterday's does not (İNCELEME-95 B-1)  385ms
+     ✓ a rejected send gives back only its own day: a later day claimed meanwhile stays (İNCELEME-95 T-2)  461ms
+ ✓ tests/rag-pdf-real-parse.test.ts (19 tests) 7030ms
+     ✓ a one-page PDF with no text layer (what a scan extracts to)  537ms
+     ✓ a 300-page scan: once 300 paid "-- N of 300 --" chunks  524ms
+     ✓ a 300-page scan whose only text is a stamped page label  371ms
+     ✓ a broken text layer that yields only symbols  301ms
+     ✓ maxPages (1000) pages is accepted  873ms
+     ✓ İNCELEME-45 shape: 30 000 pages in 4.8 MB is refused in well under a second  574ms
+     ✓ 1000 dense pages stop extracting as soon as maxChunks is out of reach  1498ms
+     ✓ the event loop keeps turning while a large PDF is extracted  1590ms
+stderr | tests/stripe-webhook-tenant-scope.live.test.ts > stripe webhook tenant scope (live database) > a redelivered subscription event moves the subscription, add-on and credit rows exactly once
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+ ✓ tests/prisma-delegate-types-are-real.test.ts (2 tests) 7467ms
+     ✓ tsc rejects a phantom model and a phantom column  7360ms
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+stdout | tests/stripe-webhook-tenant-scope.live.test.ts > stripe webhook tenant scope (live database) > a redelivered subscription event moves the subscription, add-on and credit rows exactly once
+Event evt-scope-sync-gbp86q52 already processed; skipping
+
+ ✓ tests/cordis-partner-profile.live.test.ts (1 test) 2855ms
+     ✓ writes the same profiles and co-participations as the legacy job  2334ms
+ ✓ tests/agency-report.live.test.ts (5 tests) 2011ms
+     ✓ the run writes one snapshot per agency, in its own tenant, for the month that closed  521ms
+     ✓ the stored numbers are the dashboard’s: none, by type and each province, cell for cell  687ms
+(node:61299) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/use-server-exports.test.ts (2 tests) 979ms
+     ✓ export only async functions  976ms
+ ✓ tests/stripe-webhook-tenant-scope.live.test.ts (5 tests) 2138ms
+     ✓ a redelivered subscription event moves the subscription, add-on and credit rows exactly once  333ms
+     ✓ ten simultaneous webhooks all complete without exhausting the connection pool  304ms
+stderr | src/lib/billing/pilot.test.ts > grantPilot (live DB) > the Stripe sync and cancellation leave a pilot row alone
+[ERROR] Stripe subscription names a tenant on the free pilot; not synced {
+  tenantId: 'cmuofus73000u7zxk569ssp00',
+  eventId: 'evt_pilot_sync_1790792898916-gyudnd',
+  stripeSubscriptionId: 'sub_forged_pilot'
+} 
+
+ ✓ tests/api/action-leak-scan.test.ts (133 tests) 1014ms
+stderr | src/lib/billing/pilot.test.ts > grantPilot (live DB) > the Stripe sync and cancellation leave a pilot row alone
+[ERROR] Stripe cancellation names a tenant on the free pilot; not applied {
+  tenantId: 'cmuofus73000u7zxk569ssp00',
+  eventId: 'evt_pilot_cancel_1790792898959-ytok93',
+  stripeSubscriptionId: 'sub_forged_pilot'
+} 
+
+stderr | src/lib/billing/pilot.test.ts > grantPilot (live DB) > a grant landing after the Stripe fast-path read is still caught inside the sync transaction (Ö-4)
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+stderr | tests/m9-briefs-form-errors.test.tsx > P2-9 — a half-filled meeting date is reported, not dropped > leaves an empty pair alone — scheduling a meeting stays optional
+[M9] generateMeetingBrief returned no brief: { success: true, brief: null }
+
+ ✓ src/lib/agency/report.test.ts (16 tests) 1070ms
+     ✓ property: 300 random tables — every cell of the report is the dashboard’s cell  1009ms
+stderr | src/lib/billing/pilot.test.ts > grantPilot (live DB) > a grant landing after the Stripe fast-path read is still caught inside the sync transaction (Ö-4)
+[ERROR] Stripe subscription names a tenant on the free pilot; not synced {
+  tenantId: 'cmuofuscg000x7zxknjkrf1ck',
+  eventId: 'evt_pilot_race_1790792899092-6491fv',
+  stripeSubscriptionId: 'sub_race_pilot'
+} 
+
+ ✓ src/lib/billing/pilot.test.ts (14 tests) 1799ms
+ ✓ tests/agency-funnel.live.test.ts (13 tests) 2308ms
+     ✓ getAgencyFunnel with a province: that province over every type, masked; an empty one is all "<5"  443ms
+ ✓ src/lib/billing/plan-repository.test.ts (10 tests) 1456ms
+       ✓ should fetch the published version of a plan  392ms
+stderr | tests/m9-briefs-form-errors.test.tsx > TASK-MTQURC2H4E0WF — brief generation never fails in silence > is dismissible, like the calendar band — one error surface, one behaviour
+Error generating brief: Error: boom
+    at /Users/macbook/alan/FONBRIDGE/tests/m9-briefs-form-errors.test.tsx:309:44
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+ ✓ tests/m9-briefs-form-errors.test.tsx (12 tests) 929ms
+stderr | tests/gdpr-data-subject.live.test.ts > GDPR erasure request — live > marks the account soft-deleted and destroys nothing
+[mail] request-deletion: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stderr | tests/gdpr-data-subject.live.test.ts > GDPR erasure request — live > warns that the subject is the sole owner of their tenant
+[mail] request-deletion: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stderr | tests/gdpr-data-subject.live.test.ts > GDPR accountability audit — live > a request and its cancellation are both recorded
+[mail] request-deletion: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+(node:61313) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Not implemented: Window's open() method
+Not implemented: navigation to another Document
+ ✓ tests/gdpr-data-subject.live.test.ts (20 tests) 1325ms
+ ✓ tests/billing-settings-invoices.test.tsx (9 tests) 701ms
+ ✓ tests/vat-by-country.test.ts (30 tests) 922ms
+     ✓ gross is always net plus the tax, exactly, with no third number  738ms
+ ✓ src/lib/billing/public-sector-assignment.test.ts (6 tests) 1069ms
+stderr | src/lib/llm.generate.test.ts > credits and failures > retries a rate limit and still charges once
+[AI Retry] Attempt 1 failed with 429. Retrying in 1000ms...
+
+ ✓ tests/k1-embeddings-unlock.live.test.ts (6 tests) 1692ms
+     ✓ a row re-embedded between the listing and the clear keeps its new hash (validates the LIKE guard, Ö-1)  708ms
+ ✓ tests/seat-assignment-authz.live.test.ts (27 tests) 1481ms
+stderr | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a first delivery writes the money, the key and the audit row together
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+ ✓ tests/k3-topic-stats-parse.test.ts (48 tests) 1647ms
+     ✓ stops inflating a part that grows past the cap, whatever its header claims (zip bomb)  829ms
+     ✓ charges row holes to the same budget (<row r="100000"/> in many parts)  379ms
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a redelivery of the same event changes no row in any of the five tables
+Event evt-rls-sync-mtvsbe-1790792901197 already processed; skipping
+
+ ✓ tests/m10-sign-dual-approval.live.test.ts (27 tests) 1775ms
+     ✓ a revision committed between the read and the write is not signed on the old approvals  383ms
+stderr | tests/modules/settings-modules-plan.test.ts > modules settings — plan and state from entitlements > no subscription: Discover, nothing active, Pro module refused and not written
+[toggleModuleState] Error: Error: Modül etkinleştirilemez: Plan upgrade required.
+    at Module.toggleModuleState (/Users/macbook/alan/FONBRIDGE/src/app/[locale]/(app)/[workspace]/settings/modules/actions.ts:52:15)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /Users/macbook/alan/FONBRIDGE/tests/modules/settings-modules-plan.test.ts:72:5
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | src/lib/llm.generate.test.ts > generateCompletion — an unrecorded paid call is named, not raw > reports a failed AiUsageLog write as AiUsageLogWriteError
+[generateCompletion] AiUsageLog write failed after a provider call Error: db down
+    at /Users/macbook/alan/FONBRIDGE/src/lib/llm.generate.test.ts:635:52
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+stderr | src/lib/llm.generate.test.ts > generateCompletion — an unrecorded paid call is named, not raw > reports a failed CreditLedger write as AiUsageLogWriteError too
+[generateCompletion] AiUsageLog write failed after a provider call Error: db down
+    at /Users/macbook/alan/FONBRIDGE/src/lib/llm.generate.test.ts:643:54
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+stderr | src/lib/llm.generate.test.ts > generateCompletion — an unrecorded paid call is named, not raw > reports an RLS refusal on the bookkeeping transaction as a log-write failure
+[generateCompletion] AiUsageLog write failed after a provider call Error: new row violates row-level security policy for table "AiUsageLog"
+    at /Users/macbook/alan/FONBRIDGE/src/lib/llm.generate.test.ts:652:7
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 {
+  code: 'P2039'
+}
+
+stderr | src/lib/llm.generate.test.ts > generateCompletion — an unrecorded paid call is named, not raw > carries the original database error as `cause`
+[generateCompletion] AiUsageLog write failed after a provider call Error: db down
+    at /Users/macbook/alan/FONBRIDGE/src/lib/llm.generate.test.ts:669:36
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 {
+  code: 'P2002'
+}
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a stale active event replayed after a cancellation grants no second allowance
+Event evt-rls-stale-mtvsbe-1790792901197 already processed; skipping
+
+ ✓ src/lib/llm.generate.test.ts (50 tests) 1024ms
+     ✓ retries a rate limit and still charges once  1000ms
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a stale active event replayed after a cancellation grants no second allowance
+Event evt-rls-stale-mtvsbe-1790792901197 already processed; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a stale active event replayed after a cancellation grants no second allowance
+Event evt-rls-stale-mtvsbe-1790792901197 already processed; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790792901197 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790792901197 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790792901197 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790792901197 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790792901197 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790792901197 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790792901197 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+wave=8 applied=1 skipped=7 rejected=0 | keys=1 creditRows=1 balance=777
+
+ ✓ tests/stripe-webhook-idempotency-rls.live.test.ts (7 tests) 1296ms
+stderr | tests/modules/settings-modules-plan.test.ts > modules settings — plan and state from entitlements > running pilot: Belediye Ekip with its last day, Pro grant, M1 can be switched on
+[toggleModuleState] Error: Error: Modül etkinleştirilemez: Plan upgrade required.
+    at Module.toggleModuleState (/Users/macbook/alan/FONBRIDGE/src/app/[locale]/(app)/[workspace]/settings/modules/actions.ts:52:15)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /Users/macbook/alan/FONBRIDGE/tests/modules/settings-modules-plan.test.ts:101:5
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/evidence-dev-store.live.test.ts > B-1 on the dev store (TASK-MUO64MVW8TLMX, İNCELEME-82 T-2) > the row save fails: save_failed, no row, the staging file kept as uploaded; the retry succeeds
+[confirmEvidenceUploadAction] DB error: injected: the row insert failed
+
+ ✓ tests/translation.test.ts (2 tests) 850ms
+     ✓ should translate a batch of topics to Turkish  847ms
+ ✓ tests/modules/settings-modules-plan.test.ts (6 tests) 1373ms
+     ✓ running pilot: Belediye Ekip with its last day, Pro grant, M1 can be switched on  314ms
+ ✓ tests/evidence-dev-store.live.test.ts (9 tests) 1660ms
+ ✓ tests/action-missing-id.live.test.ts (36 tests) 10325ms
+     ✓ m11 addSectionComment  321ms
+     ✓ m11 addBudgetLine  303ms
+     ✓ m11 addWorkPackage  379ms
+     ✓ m11 issuePartnerPortalLink  347ms
+     ✓ m10 signDocument  304ms
+     ✓ m10 submitDualApprovalAction  380ms
+     ✓ evidence verifyEvidenceAction  314ms
+     ✓ evidence deleteEvidence  423ms
+     ✓ consortium assignSeat  444ms
+     ✓ m8 inviteCandidateToSeat (seat)  309ms
+     ✓ refuses a missing opportunity id before reading or writing  456ms
+stderr | tests/plan-entitlement-version.spec.ts > entitlements come from the plan version the subscription is on > a pointer at another plan version is refused, not honoured
+[WARN] Subscription plan version refused; entitling from the catalogue {"tenantId":"cmuofuv0m0002kaxklfopsvm6","planId":"pro","planVersionId":"cmuofuv420003kaxk5uma6bz8","reason":"wrong-plan"}
+
+stderr | tests/evidence-object-key.live.test.ts > evidence object keys stay inside their tenant (Y-4) > a row of A that already names B’s object loses the row, B keeps the file
+[R2 Storage] Refused to delete an object outside tenant cmuofuv990000jcxkq2x1yztl's prefix
+
+stderr | tests/evidence-object-key.live.test.ts > evidence object keys stay inside their tenant (Y-4) > a row of A that already names B’s object loses the row, B keeps the file
+[R2 Storage] Refused to delete an object outside tenant cmuofuv990000jcxkq2x1yztl's prefix
+
+ ✓ tests/m11-partb-editor-buffer.test.tsx (4 tests) 426ms
+stderr | tests/plan-entitlement-version.spec.ts > entitlements come from the plan version the subscription is on > a pointer at a draft is refused — nothing was sold under one
+[WARN] Subscription plan version refused; entitling from the catalogue {"tenantId":"cmuofuuzy0000kaxkc1o7wz94","planId":"entitlement-version-fixture","planVersionId":"cmuofuves0005kaxkn66xlwk7","reason":"draft"}
+
+stdout | tests/evidence-object-key.live.test.ts > evidence object keys stay inside their tenant (Y-4) > positive control: A records and deletes its own presigned upload, the file goes
+[R2 Storage (Dev Fallback)] Deleted object: cmuofuv990000jcxkq2x1yztl/org-default/certificate/2026/396e87ed_kalite_belgesi_pdf.pdf
+
+stderr | src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > credits-monthly-grant: a stale tenant id is refused by the database, not misfiled
+Failed to grant credits for tenant cmuofuusk0004i7xk59v71qf4: PrismaClientKnownRequestError: 
+Invalid `tx.creditLedger.createMany()` invocation in
+/Users/macbook/alan/FONBRIDGE/src/lib/jobs/tasks/credits-monthly-grant.ts:98:51
+
+  95   alreadyGrantedCount++;
+  96   return;
+  97 }
+→ 98 const { count } = await tx.creditLedger.createMany(
+Database error. Code: `42501`. Message: `new row violates row-level security policy for table "CreditLedger"`
+    at vn.handleRequestError (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:65:8643)
+    at vn.handleAndLogRequestError (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:65:7932)
+    at vn.request (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:65:7639)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at a (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:6935)
+    at /Users/macbook/alan/FONBRIDGE/src/lib/jobs/tasks/credits-monthly-grant.ts:98:29
+    at Proxy._transactionWithCallback (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at grantCreditsToTenants (/Users/macbook/alan/FONBRIDGE/src/lib/jobs/tasks/credits-monthly-grant.ts:89:7)
+    at /Users/macbook/alan/FONBRIDGE/src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts:450:20
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 {
+  code: 'P2039',
+  meta: {
+    modelName: 'CreditLedger',
+    driverAdapterError: DriverAdapterError: new row violates row-level security policy for table "CreditLedger"
+        at PgTransaction.onError (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+adapter-pg@7.10.0/node_modules/@prisma/adapter-pg/dist/index.mjs:666:11)
+        at PgTransaction.performIO (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+adapter-pg@7.10.0/node_modules/@prisma/adapter-pg/dist/index.mjs:661:12)
+        at processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at PgTransaction.executeRaw (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+adapter-pg@7.10.0/node_modules/@prisma/adapter-pg/dist/index.mjs:634:13)
+        at /Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:11:70205
+        at e.interpretNode (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:11:71857)
+        at e.run (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:11:69273)
+        at execute (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:57:815)
+        at yr.request (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:58:2425)
+        at Object.singleLoader (/Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:65:6920) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.10.0'
+}
+
+stdout | tests/evidence-object-key.live.test.ts > evidence object keys stay inside their tenant (Y-4) > FormData upload: the file name cannot steer the key, and the bytes are really stored
+[R2 Storage (Dev Fallback)] Deleted object: cmuofuv990000jcxkq2x1yztl/org-default/______cmuofuv9y0002jcxk8ugb2mpi/2026/8ad41899_______cmuofuv9y0002jcxk8ugb2mpi_org-default_x_pdf.pdf
+
+ ✓ tests/plan-entitlement-version.spec.ts (8 tests) 890ms
+ ✓ tests/evidence-object-key.live.test.ts (5 tests) 694ms
+ ✓ src/lib/agency/funnel.attack.test.ts (24 tests) 19536ms
+     ✓ seed 1, D ≥ 0, random codes: 300 random small tables, every view and the code panel joined  2064ms
+     ✓ seed 7, D ≥ 0, random codes: 300 random small tables, every view and the code panel joined  1927ms
+     ✓ seed 42, D ≥ 0, random codes: 300 random small tables, every view and the code panel joined  1544ms
+     ✓ seed 1, D ≥ 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  1872ms
+     ✓ seed 7, D ≥ 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  1490ms
+     ✓ seed 42, D ≥ 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  1313ms
+     ✓ seed 1, D = 0, random codes: 300 random small tables, every view and the code panel joined  1564ms
+     ✓ seed 7, D = 0, random codes: 300 random small tables, every view and the code panel joined  2057ms
+     ✓ seed 42, D = 0, random codes: 300 random small tables, every view and the code panel joined  1270ms
+     ✓ seed 1, D = 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  1464ms
+     ✓ seed 7, D = 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  1435ms
+     ✓ seed 42, D = 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  1435ms
+ ✓ src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts (14 tests) 1495ms
+     ✓ credits-monthly-grant: a second run for the same month grants nothing (ADR-0008 §6.2)  326ms
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+ ✓ tests/api-key-rate-limit.live.test.ts (4 tests) 848ms
+     ✓ counts each request on the key row and records lastUsedAt  366ms
+     ✓ concurrent requests serialise: exactly the remaining budget passes  343ms
+stdout | tests/bearer-token-hash.live.test.ts > bearer tokens are stored as SHA-256 only (live DB) > an invitation stores the hash of the link token, and the response does not carry the row's secret
+[Invitations] invitation issued for tenant cmuofuvut0000nmxkb53weca7
+
+stderr | tests/bearer-token-hash.live.test.ts > bearer tokens are stored as SHA-256 only (live DB) > an invitation stores the hash of the link token, and the response does not carry the row's secret
+[mail] invitations: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stdout | tests/bearer-token-hash.live.test.ts > bearer tokens are stored as SHA-256 only (live DB) > an invitation stores the hash of the link token, and the response does not carry the row's secret
+[Invitations] invitation issued for tenant cmuofuvut0000nmxkb53weca7
+
+stderr | tests/bearer-token-hash.live.test.ts > bearer tokens are stored as SHA-256 only (live DB) > an invitation stores the hash of the link token, and the response does not carry the row's secret
+[mail] invitations: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stdout | tests/public-lead.live.test.ts > public lead form (live database, fabrika_app) > a filled honeypot answers ok and stores nothing
+[INFO] public lead dropped by honeypot {"source":"fon-hazirlik"}
+
+ ✓ tests/consortium-find-candidates-pilot.live.test.ts (2 tests) 640ms
+stderr | src/lib/billing/pilot-gates.test.ts > pilot gates > only a platform admin can grant a pilot
+[WARN] [admin/plans] grantPilot refused {"code":"PLATFORM_ADMIN_REQUIRED"}
+
+ ✓ tests/bearer-token-hash.live.test.ts (3 tests) 798ms
+     ✓ an invitation stores the hash of the link token, and the response does not carry the row's secret  490ms
+ ✓ tests/system-scope.live.test.ts (6 tests) 531ms
+ ✓ tests/plan-storefront.spec.ts (10 tests) 871ms
+stdout | tests/relationship-tenant-scope.test.ts > M4 relationship detail — tenant scope
+[seed-relationship-e2e] ready — A=rel-e2e-tenant-a/rel-e2e-relationship-a B=rel-e2e-tenant-b/rel-e2e-relationship-b
+
+ ✓ src/lib/billing/pilot-gates.test.ts (5 tests) 1056ms
+ ✓ tests/double-charge-prevention.test.ts (5 tests) 1048ms
+stdout | tests/relationship-tenant-scope.test.ts > M4 relationship detail — tenant scope
+[seed-relationship-e2e] rolled back
+
+ ✓ tests/relationship-tenant-scope.test.ts (8 tests) 567ms
+ ✓ tests/translation-bounds.test.ts (3 tests) 457ms
+ ✓ tests/registration-consent.live.test.ts (4 tests) 609ms
+ ✓ tests/modules-pilot-upgrade-cta.test.tsx (4 tests) 670ms
+     ✓ pilot: no "Planı Yükselt" anywhere, locked cards say "Pilotta kapalı", header link stays  340ms
+ ✓ tests/auth-card-signin-errors.test.tsx (10 tests) 479ms
+ ✓ tests/public-lead.live.test.ts (16 tests) 2256ms
+     ✓ addresses rotated inside one IPv6 /64 share one IP bucket  383ms
+     ✓ a forged first X-Forwarded-For hop does not open a new IP bucket  323ms
+ ✓ tests/application-outcome.live.test.ts (9 tests) 1341ms
+     ✓ counts declarations summed across the given tenants only  575ms
+stdout | tests/iyzico-webhook-idempotency-rls.live.test.ts > iyzico webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the advisory lock, not by a read
+wave=8 synced=1 duplicate=7 rejected=0 | creditRows=1 balance=777
+
+ ✓ tests/iyzico-webhook-idempotency-rls.live.test.ts (6 tests) 821ms
+ ✓ tests/rls.spec.ts (6 tests) 596ms
+ ✓ tests/weekly-active-users.live.test.ts (3 tests) 549ms
+ ✓ tests/k1-embeddings.live.test.ts (11 tests | 1 skipped) 1472ms
+ ✓ tests/admin-cordis-client-import-error.test.tsx (3 tests) 430ms
+ ✓ tests/auditevent-null-system-only.live.test.ts (5 tests) 559ms
+stderr | tests/stripe-webhook-idempotency.live.test.ts > stripe webhook idempotency (live database) > a redelivered subscription event writes no second audit row
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+(node:61802) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/billing-settings-lifetime-badge.test.tsx (5 tests) 483ms
+stdout | tests/stripe-webhook-idempotency.live.test.ts > stripe webhook idempotency (live database) > a redelivered subscription event writes no second audit row
+Event evt-sync-n6duk4ca already processed; skipping
+
+ ✓ tests/cart-checkout-signed-out.test.tsx (1 test) 528ms
+     ✓ sends the visitor to the login page and keeps the cart  526ms
+ ✓ src/lib/auth-callbacks.test.ts (32 tests) 427ms
+ ✓ tests/topic-match-nightly.live.test.ts (10 tests) 1310ms
+stdout | tests/stripe-webhook-idempotency.live.test.ts > stripe webhook idempotency (live database) > a stale event replayed after a cancellation grants no second allowance
+Event evt-replay-n6duk4ca already processed; skipping
+
+ ✓ tests/plan-visibility-rls.spec.ts (5 tests) 519ms
+ ✓ tests/stripe-webhook-idempotency.live.test.ts (4 tests) 682ms
+ ✓ src/lib/docx-safe-html.test.ts (40 tests) 317ms
+ ✓ tests/system-alert.live.test.ts (1 test) 340ms
+ ✓ src/app/api/concept-notes/[id]/export/route.ssrf.test.ts (12 tests) 488ms
+ ✓ tests/pipeline-surface-tenant-scope.live.test.ts (5 tests) 406ms
+ ✓ tests/calendar-token-db.live.test.ts (2 tests) 321ms
+ ✓ src/lib/jobs/tasks/__tests__/alerts-daily.test.ts (12 tests) 352ms
+ ✓ tests/social-action-disclosure.test.ts (2 tests) 296ms
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+ ✓ tests/relationship-owner-assignment.live.test.ts (9 tests) 529ms
+ ✓ tests/k3-topic-stats-import.live.test.ts (5 tests) 623ms
+stderr | tests/prompt-snapshots.test.ts > prompt text is byte-identical to the pre-move inline literals > M7 IP checklist (prompt + system)
+[generateIpChecklist] LLM fallback: captured
+
+stderr | tests/prompt-snapshots.test.ts > prompt text is byte-identical to the pre-move inline literals > M9 meeting brief (prompt + system)
+[M9 generateMeetingBrief] LLM call fallback: captured
+
+stderr | tests/prompt-snapshots.test.ts > prompt text is byte-identical to the pre-move inline literals > M10 standard document (prompt + system)
+[m10 generateStandardDoc] generation failed for NDA: captured
+
+ ✓ src/app/[locale]/(app)/ajans/actions.test.ts (2 tests) 189ms
+(node:62043) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/prompt-snapshots.test.ts (8 tests) 450ms
+stderr | tests/cordis-csv.test.ts > runCordisImport — skipped records > a record it cannot read, over the limit, fails the run before any write
+[ERROR] [k2-cordis] import failed CordisSkipLimitError: CORDIS dump rejected: skipped records over the 0.1% limit — project.csv: 1/2 skipped (line 4: expected 22 fields, got 3)
+    at assertSkipBudget (/Users/macbook/alan/FONBRIDGE/src/lib/k2-cordis/importer.ts:254:9)
+    at runCordisImport (/Users/macbook/alan/FONBRIDGE/src/lib/k2-cordis/importer.ts:407:5)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /Users/macbook/alan/FONBRIDGE/tests/cordis-csv.test.ts:222:17
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 {"runId":"run-1","dataset":"HORIZON","errorCode":"SKIP_LIMIT_EXCEEDED"}
+
+stderr | tests/cordis-csv.test.ts > runCordisImport — skipped records > a participation of an unknown project is skipped, counted, and fails at the default limit
+[ERROR] [k2-cordis] import failed CordisSkipLimitError: CORDIS dump rejected: skipped records over the 0.1% limit — organization.csv: 1/3 skipped (unknown project 555555555)
+    at assertSkipBudget (/Users/macbook/alan/FONBRIDGE/src/lib/k2-cordis/importer.ts:254:9)
+    at runCordisImport (/Users/macbook/alan/FONBRIDGE/src/lib/k2-cordis/importer.ts:407:5)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /Users/macbook/alan/FONBRIDGE/tests/cordis-csv.test.ts:256:20
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 {"runId":"run-1","dataset":"HORIZON","errorCode":"SKIP_LIMIT_EXCEEDED"}
+
+ ✓ tests/billing-checkout-auth.test.ts (3 tests) 410ms
+     ✓ a signed-in tenant still checks out, priced under its own tenant id  334ms
+stdout | tests/billing-k1-tenant-scope.live.test.ts > billing K1 call sites under fabrika_app (TASK-MULQKFER4MF0Y) > recordLifetimeLicence writes the licence under the RLS role
+[INFO] Lifetime licence already recorded; skipping {"eventId":"evt-k1-mulqk-1790792908586","seq":1}
+
+ ✓ tests/cordis-csv.test.ts (15 tests) 323ms
+ ✓ tests/billing-k1-tenant-scope.live.test.ts (4 tests) 383ms
+(node:62044) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/invitation-retention.live.test.ts (6 tests) 530ms
+ ✓ tests/dashboard-tenantless.test.ts (3 tests) 223ms
+ ✓ tests/m9-brief-opportunity.live.test.ts (4 tests) 357ms
+ ✓ tests/pilot-expired-action-message.test.tsx (9 tests) 569ms
+ ✓ tests/concept-template-tenant-scope.live.test.ts (6 tests) 435ms
+ ✓ src/lib/calendar/__tests__/sync.test.ts (12 tests) 304ms
+ ✓ tests/storage-public-url.test.ts (3 tests) 224ms
+stderr | tests/admin-upload-authz.test.ts > POST /api/admin/documents/upload > fails closed when the session lookup itself throws
+Upload error: Error: auth backend down
+    at /Users/macbook/alan/FONBRIDGE/tests/admin-upload-authz.test.ts:127:32
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+ ✓ tests/server-action-missing-id.test.ts (15 tests) 33ms
+stderr | tests/admin-upload-authz.test.ts > POST /api/admin/documents/upload — input validation (TASK-MULQL8QB679LQ) > an ingest failure → 500 upload_failed
+Upload error: Error: provider down
+    at /Users/macbook/alan/FONBRIDGE/tests/admin-upload-authz.test.ts:267:46
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+ ✓ tests/admin-upload-authz.test.ts (20 tests) 109ms
+ ✓ tests/efatura-integrator.test.ts (9 tests) 58ms
+ ✓ src/app/api/concept-notes/[id]/export/route.test.ts (4 tests) 165ms
+stderr | tests/rag-pdf-ingest-partial.test.ts > processPdfAndStore leaves the corpus consistent > an orphan that survives cleanup is named in a SystemAlert, not left quiet
+[processPdfAndStore] orphan document doc-0 ("A paper") left behind
+
+ ✓ tests/stripe-event-retention.live.test.ts (5 tests) 428ms
+ ✓ tests/rag-pdf-ingest-partial.test.ts (8 tests) 71ms
+ ✓ src/lib/agency/invite-code.test.ts (5 tests) 71ms
+ ✓ tests/notifications-read-store.test.tsx (6 tests) 275ms
+(node:62100) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/secret-model-select-guard.test.ts (34 tests) 84ms
+(node:62096) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/document-exporter.test.ts (15 tests) 117ms
+(node:62094) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/i18n.test.ts (4 tests) 177ms
+(node:62109) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.createOpportunity needs manage_workspaces
+[createOpportunity] member lookup bypassed: REACHED_BEHIND_THE_GATE
+[createOpportunity] refused by the database, not buffered: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.createOpportunity needs manage_workspaces
+[createOpportunity] member lookup bypassed: REACHED_BEHIND_THE_GATE
+[createOpportunity] refused by the database, not buffered: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.createOpportunity needs manage_workspaces
+[createOpportunity] member lookup bypassed: REACHED_BEHIND_THE_GATE
+[createOpportunity] refused by the database, not buffered: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.evaluateOpportunityGate needs evaluate_gates
+[evaluateOpportunityGate] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.evaluateOpportunityGate needs evaluate_gates
+[evaluateOpportunityGate] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.evaluateOpportunityGate needs evaluate_gates
+[evaluateOpportunityGate] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.logEffort needs edit_proposal
+[logEffort] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.logEffort needs edit_proposal
+[logEffort] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.logEffort needs edit_proposal
+[logEffort] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.logEffort needs edit_proposal
+[logEffort] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.getPresignedUploadUrlAction needs edit_proposal
+[getPresignedUploadUrlAction] presign error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.getPresignedUploadUrlAction needs edit_proposal
+[getPresignedUploadUrlAction] presign error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.getPresignedUploadUrlAction needs edit_proposal
+[getPresignedUploadUrlAction] presign error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.getPresignedUploadUrlAction needs edit_proposal
+[getPresignedUploadUrlAction] presign error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.createEvidence needs edit_proposal
+[createEvidence] DB fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.createEvidence needs edit_proposal
+[createEvidence] DB fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.createEvidence needs edit_proposal
+[createEvidence] DB fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.createEvidence needs edit_proposal
+[createEvidence] DB fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.deleteEvidence needs edit_proposal
+[deleteEvidence] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.deleteEvidence needs edit_proposal
+[deleteEvidence] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.deleteEvidence needs edit_proposal
+[deleteEvidence] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.deleteEvidence needs edit_proposal
+[deleteEvidence] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.verifyEvidenceAction needs edit_proposal
+[verifyEvidenceAction] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.verifyEvidenceAction needs edit_proposal
+[verifyEvidenceAction] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.verifyEvidenceAction needs edit_proposal
+[verifyEvidenceAction] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.verifyEvidenceAction needs edit_proposal
+[verifyEvidenceAction] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m7.generateIpChecklist needs edit_proposal
+[generateIpChecklist] LLM fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m7.generateIpChecklist needs edit_proposal
+[generateIpChecklist] LLM fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m7.generateIpChecklist needs edit_proposal
+[generateIpChecklist] LLM fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m7.generateIpChecklist needs edit_proposal
+[generateIpChecklist] LLM fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m9.savePostMeetingNotes needs edit_proposal
+[savePostMeetingNotes] DB update failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m9.savePostMeetingNotes needs edit_proposal
+[savePostMeetingNotes] DB update failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m9.savePostMeetingNotes needs edit_proposal
+[savePostMeetingNotes] DB update failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m9.savePostMeetingNotes needs edit_proposal
+[savePostMeetingNotes] DB update failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.acquireSectionLock needs edit_proposal
+[m11 acquireSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.acquireSectionLock needs edit_proposal
+[m11 acquireSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.acquireSectionLock needs edit_proposal
+[m11 acquireSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.acquireSectionLock needs edit_proposal
+[m11 acquireSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.releaseSectionLock needs edit_proposal
+[m11 releaseSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.releaseSectionLock needs edit_proposal
+[m11 releaseSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.releaseSectionLock needs edit_proposal
+[m11 releaseSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.releaseSectionLock needs edit_proposal
+[m11 releaseSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updateSectionContent needs edit_proposal
+[m11 updateSectionContent] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updateSectionContent needs edit_proposal
+[m11 updateSectionContent] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updateSectionContent needs edit_proposal
+[m11 updateSectionContent] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updateSectionContent needs edit_proposal
+[m11 updateSectionContent] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addSectionComment needs edit_proposal
+[m11 addSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addSectionComment needs edit_proposal
+[m11 addSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addSectionComment needs edit_proposal
+[m11 addSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addSectionComment needs edit_proposal
+[m11 addSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.resolveSectionComment needs edit_proposal
+[m11 resolveSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.resolveSectionComment needs edit_proposal
+[m11 resolveSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.resolveSectionComment needs edit_proposal
+[m11 resolveSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.resolveSectionComment needs edit_proposal
+[m11 resolveSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.restoreSectionRevision needs edit_proposal
+[m11 restoreSectionRevision] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.restoreSectionRevision needs edit_proposal
+[m11 restoreSectionRevision] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.restoreSectionRevision needs edit_proposal
+[m11 restoreSectionRevision] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.restoreSectionRevision needs edit_proposal
+[m11 restoreSectionRevision] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updatePresenceHeartbeat needs edit_proposal
+[m11 updatePresenceHeartbeat] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updatePresenceHeartbeat needs edit_proposal
+[m11 updatePresenceHeartbeat] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updatePresenceHeartbeat needs edit_proposal
+[m11 updatePresenceHeartbeat] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updatePresenceHeartbeat needs edit_proposal
+[m11 updatePresenceHeartbeat] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addBudgetLine needs edit_proposal
+[m11 addBudgetLine] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addBudgetLine needs edit_proposal
+[m11 addBudgetLine] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+ ✓ tests/public-footer-data-residency.test.tsx (4 tests) 181ms
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addBudgetLine needs edit_proposal
+[m11 addBudgetLine] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addBudgetLine needs edit_proposal
+[m11 addBudgetLine] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addWorkPackage needs edit_proposal
+[m11 addWorkPackage] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addWorkPackage needs edit_proposal
+[m11 addWorkPackage] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addWorkPackage needs edit_proposal
+[m11 addWorkPackage] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addWorkPackage needs edit_proposal
+[m11 addWorkPackage] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+ ✓ tests/retired-brand-name.test.ts (5 tests) 79ms
+ ✓ tests/brand-surfaces-render.test.tsx (2 tests) 175ms
+ ✓ tests/server-action-rbac.test.ts (65 tests) 75ms
+ ✓ tests/api/stripe-webhook-bodies.test.ts (3 tests) 73ms
+ ✓ src/lib/csp-report.test.ts (12 tests) 53ms
+ ✓ tests/invoice-i18n.test.ts (14 tests) 22ms
+ ✓ src/app/[locale]/admin/billing/plans/actions.test.ts (42 tests) 18ms
+ ✓ tests/evidence-form-file-clear.test.tsx (4 tests) 135ms
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > returns ok with topics for a well-formed payload
+[INFO] [SediaAdapter] Fetching page 1/1, size=1 
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > returns ok with topics for a well-formed payload
+[INFO] [SediaAdapter] Total fetched: 1 topics across 1 pages 
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > reports { status: error, reason, topicsProcessed: 0 } instead of throwing
+[INFO] [SediaAdapter] Fetching page 1/1, size=100 
+
+stderr | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > reports { status: error, reason, topicsProcessed: 0 } instead of throwing
+[ERROR] [SediaAdapter] Error on page 1: Error: ECONNREFUSED
+    at /Users/macbook/alan/FONBRIDGE/tests/k1-adapters.test.ts:138:50
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 
+[WARN] [SediaAdapter] 1 errors during fetch {"firstErrors":["Page 1 fetch error: ECONNREFUSED"]}
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > reports { status: error, reason, topicsProcessed: 0 } instead of throwing
+[INFO] [SediaAdapter] Total fetched: 0 topics across 0 pages 
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > raises a SystemAlert when the upstream envelope changes shape
+[INFO] [SediaAdapter] Fetching page 1/1, size=100 
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > raises a SystemAlert when the upstream envelope changes shape
+[INFO] [SediaAdapter] No results on page 1, stopping pagination 
+[INFO] [SediaAdapter] Total fetched: 0 topics across 0 pages 
+
+stderr | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > raises a SystemAlert when the upstream envelope changes shape
+[WARN] [sedia] schema drift detected {"count":1,"sample":["search envelope changed on page 1: totalResults Invalid input: expected number, received undefined; results Invalid input: expected array, received undefined"]}
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > skips a result whose required metadata is missing, and records the drift
+[INFO] [SediaAdapter] Fetching page 1/1, size=100 
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > skips a result whose required metadata is missing, and records the drift
+[INFO] [SediaAdapter] Total fetched: 0 topics across 1 pages 
+
+stderr | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > skips a result whose required metadata is missing, and records the drift
+[WARN] [sedia] schema drift detected {"count":1,"sample":["result missing required metadata: metadata.identifier"]}
+
+stdout | tests/k1-adapters.test.ts > EurostarsAdapter > reports an error envelope when the page is blocked
+[INFO] [EurostarsAdapter] Fetching Eurostars calls 
+
+stdout | tests/k1-adapters.test.ts > EurostarsAdapter > flags schema drift when a 200 page yields no recognizable call
+[INFO] [EurostarsAdapter] Fetching Eurostars calls 
+
+stderr | tests/k1-adapters.test.ts > EurostarsAdapter > flags schema drift when a 200 page yields no recognizable call
+[WARN] [eurostars] schema drift detected {"count":1,"sample":["Eurostars page returned 200 but matched no known call-id pattern"]}
+
+stdout | tests/k1-adapters.test.ts > EurostarsAdapter > flags schema drift when a 200 page yields no recognizable call
+[INFO] [EurostarsAdapter] Fetched 0 Eurostars calls 
+
+stdout | tests/k1-adapters.test.ts > TubitakAdapter > reports an error envelope when the page 404s
+[INFO] [TubitakAdapter] Fetching TÜBİTAK calls 
+
+ ✓ tests/k1-adapters.test.ts (16 tests) 45ms
+ ✓ tests/modules/m6/comparison-tenant-scope.test.ts (7 tests) 5ms
+stderr | tests/fabricated-fallbacks.test.ts > M10 generateStandardDoc — a failed generation is an error, not a document > writes no document and charges no credit when the LLM call throws
+[m10 generateStandardDoc] generation failed for AWARD_PACK: upstream 503
+
+ ✓ src/lib/jobs/tasks/__tests__/k1-embeddings.test.ts (11 tests) 21ms
+ ✓ tests/fabricated-fallbacks.test.ts (23 tests) 60ms
+stdout | src/lib/leads/public-lead.test.ts > input > refuses before any database call when consent is missing or outdated, or the honeypot is filled
+[INFO] public lead dropped by honeypot {"source":"fon-hazirlik"}
+
+stderr | src/lib/leads/public-lead.test.ts > client IP > reads the proxy count from TRUSTED_PROXY_HOPS, 1 when unset or unusable
+[WARN] TRUSTED_PROXY_HOPS is not a whole number 0..5; using 1 {"value":"-1"}
+[WARN] TRUSTED_PROXY_HOPS is not a whole number 0..5; using 1 {"value":"1.5"}
+[WARN] TRUSTED_PROXY_HOPS is not a whole number 0..5; using 1 {"value":"two"}
+[WARN] TRUSTED_PROXY_HOPS is not a whole number 0..5; using 1 {"value":"NaN"}
+
+ ✓ src/lib/leads/public-lead.test.ts (16 tests) 83ms
+ ✓ tests/required-id.test.ts (12 tests) 37ms
+ ✓ src/lib/scoring/embeddings.test.ts (95 tests) 141ms
+stderr | tests/feedback-digest-run.test.ts > runFeedbackDigest delivery branches > skips outside production when a recipient exists but SMTP is not configured
+[mail] feedback-digest: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stderr | tests/feedback-digest-run.test.ts > runFeedbackDigest delivery branches > fails with an error SystemAlert in production when SMTP is not configured
+[mail] feedback-digest: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stderr | tests/feedback-digest-run.test.ts > runFeedbackDigest delivery branches > reports a transport failure instead of throwing out of the job
+[ERROR] feedback digest email failed Error: smtp is down
+    at sender (/Users/macbook/alan/FONBRIDGE/tests/feedback-digest-run.test.ts:123:15)
+    at Module.runFeedbackDigest (/Users/macbook/alan/FONBRIDGE/src/lib/feedback/digest-run.ts:147:11)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /Users/macbook/alan/FONBRIDGE/tests/feedback-digest-run.test.ts:119:20
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 
+
+ ✓ tests/feedback-digest-run.test.ts (7 tests) 117ms
+ ✓ tests/rls-coverage.test.ts (27 tests) 75ms
+ ✓ tests/efatura.test.ts (8 tests) 46ms
+ ✓ tests/m9-calendar-tenant-scope.live.test.ts (3 tests) 185ms
+ ✓ tests/app-url-self-links.test.ts (4 tests) 73ms
+ ✓ tests/esr-calibration.test.ts (66 tests) 46ms
+ ✓ tests/efatura-unit.test.ts (25 tests) 33ms
+ ✓ tests/migration-owner-chain.live.test.ts (6 tests) 21874ms
+     ✓ without the one-time grant it stops before applying any file  600ms
+     ✓ with the grant the whole chain runs to the end, and a second run before db:rls refuses  5358ms
+     ✓ after db:rls, the FORCE-RLS backfills update as many rows as under the superuser  9293ms
+     ✓ a stored default for app.system_scope stops the run before any file  590ms
+ ✓ tests/client-clock-hooks.test.tsx (4 tests) 42ms
+ ✓ src/lib/llm.stop-reason.test.ts (17 tests) 21ms
+stderr | tests/workspace-scoped-writes.test.ts > createOpportunity refuses what is not a workspace slug, before the database > a query the database refuses is a refusal, not an outage: CREATE_FAILED, nothing buffered
+[createOpportunity] refused by the database, not buffered: invalid byte sequence for encoding "UTF8": 0x00
+
+stderr | tests/workspace-scoped-writes.test.ts > createOpportunity refuses what is not a workspace slug, before the database > a scoring failure after the row is committed keeps the created row, unbuffered
+[createOpportunity] G0 scoring skipped for opp-1: scoring blew up
+
+stderr | tests/workspace-scoped-writes.test.ts > createOpportunity refuses what is not a workspace slug, before the database > a real outage (connection refused) still falls back to the buffer
+[createOpportunity] DB query bypassed, stored in resilient pipeline store: Unknown error
+
+ ✓ tests/workspace-scoped-writes.test.ts (34 tests) 66ms
+stderr | tests/api/cagrilar-hardening.test.ts > /api/cagrilar hardening > a 500 carries a fixed code, never the underlying message
+[ERROR] [API /api/cagrilar] Internal error: Error: 
+Invalid `prisma.topic.upsert()` invocation: relation "Topic" secret detail
+    at /Users/macbook/alan/FONBRIDGE/tests/api/cagrilar-hardening.test.ts:107:7
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 
+
+ ✓ tests/api/cagrilar-hardening.test.ts (9 tests) 54ms
+stderr | tests/users-scheduled-deletion.test.ts > purgeDueUsers — erasure > one failed purge does not abort the rest of the batch
+[users-scheduled-deletion] failed for user bad: Error: FK violation
+    at /Users/macbook/alan/FONBRIDGE/tests/users-scheduled-deletion.test.ts:248:38
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+stderr | tests/users-scheduled-deletion.test.ts > purgeDueUsers — a failed run raises an alarm > writes a SystemAlert when an erasure could not be completed
+[users-scheduled-deletion] failed for user bad: Error: Null constraint violation
+    at /Users/macbook/alan/FONBRIDGE/tests/users-scheduled-deletion.test.ts:271:52
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 {
+  code: 'P2011'
+}
+
+stderr | tests/users-scheduled-deletion.test.ts > purgeDueUsers — a failed run raises an alarm > a second failing night folds into the open alert instead of a new row
+[users-scheduled-deletion] failed for user bad: Error: Null constraint violation
+    at /Users/macbook/alan/FONBRIDGE/tests/users-scheduled-deletion.test.ts:333:48
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 {
+  code: 'P2011'
+}
+
+ ✓ tests/users-scheduled-deletion.test.ts (13 tests) 46ms
+ ✓ tests/llm-outcome-message.test.tsx (5 tests) 26ms
+ ✓ tests/invoice-fx-tcmb.test.ts (21 tests) 28ms
+ ✓ tests/beta/pricing-analysis.test.ts (23 tests) 47ms
+ ✓ src/lib/money.test.ts (25 tests) 25ms
+(node:62325) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/billing/entitlement-source.test.ts (7 tests) 5ms
+ ✓ src/lib/email/__tests__/mailer.test.ts (20 tests) 24ms
+ ✓ src/modules/m2/server/actions.test.ts (6 tests) 70ms
+ ✓ tests/secret-model-props.test.tsx (5 tests) 49ms
+ ✓ tests/tenant-fallback-guard.test.ts (1 test) 71ms
+ ✓ tests/modules/m9.test.ts (6 tests) 52ms
+ ✓ tests/admin-actions-authz.test.ts (33 tests) 23ms
+stderr | src/lib/billing/catalog.test.ts > active tier resolution > falls back loudly instead of guessing when the setting is unreadable
+[WARN] BILLING_ACTIVE_TIER names no known tier; falling back to the default tier {"configured":"50%","fallback":"NONE","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+ ✓ tests/verify-deployed-bytecode.test.ts (6 tests) 18ms
+ ✓ src/lib/billing/catalog.test.ts (68 tests) 26ms
+(node:62330) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/api/cordis-public-hardening.test.ts > /api/cordis/* 500 bodies > projects: the Prisma message stays out of the body
+[ERROR] [API /api/cordis/projects] query failed Error: 
+Invalid `prisma.cordisProject.findMany()` invocation:
+{ where: {}, skip: NaN, include: { participations: … } }
+    at /Users/macbook/alan/FONBRIDGE/tests/api/cordis-public-hardening.test.ts:93:42
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 
+
+stderr | tests/api/cordis-public-hardening.test.ts > /api/cordis/* 500 bodies > organizations: the Prisma message stays out of the body
+[ERROR] [API /api/cordis/organizations] query failed Error: 
+Invalid `prisma.cordisProject.findMany()` invocation:
+{ where: {}, skip: NaN, include: { participations: … } }
+    at /Users/macbook/alan/FONBRIDGE/tests/api/cordis-public-hardening.test.ts:102:42
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 
+
+stderr | tests/api/cordis-public-hardening.test.ts > /api/cordis/* 500 bodies > organization profile: the Prisma message stays out of the body
+[ERROR] [API /api/cordis/organizations/[id]] query failed Error: 
+Invalid `prisma.cordisProject.findMany()` invocation:
+{ where: {}, skip: NaN, include: { participations: … } }
+    at /Users/macbook/alan/FONBRIDGE/tests/api/cordis-public-hardening.test.ts:109:40
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 
+
+ ✓ tests/api/cordis-public-hardening.test.ts (11 tests) 17ms
+ ✓ src/app/[locale]/(app)/ajans/cobrand-actions.test.ts (8 tests) 83ms
+ ✓ tests/api/v1-partners.test.ts (8 tests) 17ms
+ ✓ tests/modules/m6/scoring.test.ts (9 tests) 11ms
+ ✓ tests/cordis-rag.test.ts (11 tests) 80ms
+ ✓ src/lib/iyzico.test.ts (23 tests) 52ms
+ ✓ tests/modules/m5-dashboard-range.test.ts (14 tests) 16ms
+ ✓ tests/jobs-schedule.test.ts (17 tests) 90ms
+ ✓ tests/cordis-k2-job.test.ts (10 tests) 33ms
+ ✓ src/lib/security-headers.test.ts (126 tests) 45ms
+ ✓ src/lib/rag.test.ts (17 tests) 12ms
+ ✓ tests/billing-manage-billing-role.test.ts (17 tests) 26ms
+ ✓ tests/feedback-triage.test.ts (17 tests) 8ms
+ ✓ src/modules/m1/outreach.test.ts (14 tests) 6ms
+ ✓ src/lib/agency/funnel.test.ts (20 tests) 27ms
+ ✓ tests/absence-not-zero.test.ts (23 tests) 9ms
+ ✓ tests/mobile-edge-gutter.test.ts (6 tests) 6ms
+ ✓ tests/beta/pricing-report.test.ts (6 tests) 44ms
+ ✓ tests/adapters/sedia-circuit-breaker.test.ts (5 tests) 27ms
+ ✓ tests/modules/m6/scoring-tenant-scope.test.ts (15 tests) 27ms
+ ✓ src/modules/m8/server/matching.test.ts (17 tests) 21ms
+stderr | src/lib/calendar/__tests__/provider.test.ts > CalendarProvider > GoogleCalendarProvider > should throw when client ID is missing
+[MOCK/DEV] Google Calendar connect attempted without GOOGLE_OAUTH_CLIENT_ID (mock/dev mode)
+
+stderr | src/lib/calendar/__tests__/provider.test.ts > CalendarProvider > GoogleCalendarProvider > refuses to invent an event id for an API it does not call
+[MOCK/DEV] Google Calendar createEvent called in mock/dev mode: no real event created
+
+stderr | src/lib/calendar/__tests__/provider.test.ts > CalendarProvider > GoogleCalendarProvider > refuses to invent an event id for an API it does not call
+[MOCK/DEV] Google Calendar updateEvent called in mock/dev mode
+
+stderr | src/lib/calendar/__tests__/provider.test.ts > CalendarProvider > GoogleCalendarProvider > refuses to invent an event id for an API it does not call
+[MOCK/DEV] Google Calendar deleteEvent called in mock/dev mode
+
+ ✓ src/lib/calendar/__tests__/provider.test.ts (19 tests) 23ms
+stderr | tests/api/v1-calls.test.ts > GET /api/v1/calls > answers a failed query with 500, never with fabricated rows
+[/api/v1/calls] query failed: connect ECONNREFUSED
+
+ ✓ tests/api/v1-calls.test.ts (11 tests) 45ms
+ ✓ tests/feedback-digest.test.ts (14 tests) 8ms
+ ✓ src/lib/readiness/score.test.ts (19 tests) 14ms
+ ✓ tests/modules/esr-parser.test.ts (5 tests) 10ms
+ ✓ src/lib/calendar/__tests__/encryption.test.ts (14 tests) 16ms
+ ✓ tests/beta/invite-email.test.ts (6 tests) 4ms
+ ✓ tests/rag-ingest-silent-failure.test.ts (8 tests) 27ms
+ ✓ tests/modules/m7.test.ts (7 tests) 25ms
+ ✓ tests/cordis-delta.test.ts (8 tests) 27ms
+ ✓ src/modules/m2/server/templates.test.ts (22 tests) 25ms
+ ✓ tests/invoice-document.test.ts (9 tests) 33ms
+ ✓ tests/evidence-object-key.test.ts (28 tests) 10ms
+ ✓ src/lib/content-disposition.test.ts (10 tests) 28ms
+ ✓ tests/beta/pricing-survey.test.ts (11 tests) 24ms
+ ✓ tests/no-ssg-under-dynamic-root.test.ts (3 tests) 31ms
+ ✓ tests/m8-seat-candidates-form-errors.test.ts (7 tests) 17ms
+stderr | tests/api/v1-opportunities.test.ts > GET /api/v1/opportunities > answers a failed query with 500, never with fabricated rows
+[/api/v1/opportunities] query failed: connect ECONNREFUSED
+
+ ✓ tests/api/v1-opportunities.test.ts (6 tests) 45ms
+ ✓ tests/efatura-foreign-currency.test.ts (14 tests) 53ms
+ ✓ tests/api/admin-cordis-import-500.test.ts (2 tests) 9ms
+stderr | src/lib/billing/subscription-sync-tenant-scope.test.ts > syncStripeSubscription — tenant scope > writes the subscription, the credit grant and the add-ons through withTenant
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+stdout | src/lib/billing/subscription-sync-tenant-scope.test.ts > syncStripeSubscription — tenant scope > rolls the money back when a concurrent delivery claimed the event first
+Event evt_3c claimed concurrently; skipping
+
+stdout | src/lib/billing/subscription-sync-tenant-scope.test.ts > syncStripeSubscription — tenant scope > does nothing at all when the event was already processed
+Event evt_5 already processed; skipping
+
+ ✓ src/lib/billing/subscription-sync-tenant-scope.test.ts (10 tests) 9ms
+stdout | tests/k3-topic-stats-authz.test.ts > POST /api/admin/topic-stats/rescore > a platform admin reaches the rescore
+[INFO] K3 G0 rescore after TopicStat import {"userId":"u-admin","prefixes":1,"opportunities":1,"scored":1,"unscorable":0,"failed":0,"truncated":false}
+
+ ✓ tests/k3-topic-stats-authz.test.ts (8 tests) 51ms
+(node:62381) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/marketing-unsourced-figures.test.ts (36 tests) 13ms
+ ✓ tests/modules/m2.test.ts (3 tests) 26ms
+ ✓ tests/modules/m6.test.ts (13 tests) 32ms
+stderr | tests/fabricated-identity-strings.test.ts > listSessionWorkspaces — the switcher answers from Workspace rows > a failed lookup yields an empty switcher, not an invented workspace
+[listSessionWorkspaces] lookup failed, switcher stays empty: connection refused
+
+ ✓ tests/fabricated-identity-strings.test.ts (27 tests) 33ms
+ ✓ tests/admin-cordis-failure-code.test.ts (15 tests) 12ms
+ ✓ tests/g0-features.test.ts (26 tests) 14ms
+ ✓ tests/modules/state-machine.test.ts (13 tests) 4ms
+ ✓ tests/page-loader-tenant-scope.test.ts (24 tests) 9ms
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc keeps a cut-off generation's error and creates no document
+[m10 generateStandardDoc] generation failed for AWARD_PACK: cut off at the length limit
+
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc keeps a cut-off generation's error and creates no document
+[recordAlert] could not write SystemAlert: Cannot read properties of undefined (reading 'findMany')
+
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc keeps a refused generation's error too
+[m10 generateStandardDoc] generation failed for NDA: declined
+
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc keeps a refused generation's error too
+[recordAlert] could not write SystemAlert: Cannot read properties of undefined (reading 'findMany')
+
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc still reports any other failure generically
+[m10 generateStandardDoc] generation failed for NDA: socket hang up
+
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc still reports any other failure generically
+[recordAlert] could not write SystemAlert: Cannot read properties of undefined (reading 'findMany')
+
+ ✓ tests/modules/m10.test.ts (13 tests) 21ms
+ ✓ src/lib/ai/prompts/prompts.test.ts (21 tests) 18ms
+ ✓ tests/oauth-registration.test.ts (17 tests) 14ms
+stdout | src/lib/billing/lifetime-licence.test.ts > recordLifetimeLicence > writes nothing the second time the same event arrives
+[INFO] Lifetime licence already recorded; skipping {"eventId":"evt_1","seq":1}
+
+stdout | src/lib/billing/lifetime-licence.test.ts > recordLifetimeLicence > writes nothing when the same session arrives under a new event id
+[INFO] Lifetime licence already recorded; skipping {"eventId":"evt_redelivered","seq":1}
+
+stderr | src/lib/billing/lifetime-licence.test.ts > recordLifetimeLicence > does not record a session whose payment has not settled
+[WARN] Lifetime checkout completed without payment; not recording a licence {"sessionId":"cs_test_lifetime_1","paymentStatus":"unpaid"}
+
+stderr | src/lib/llm.embed.test.ts > embedText — every provider call leaves an AiUsageLog row > reports an RLS refusal as a log-write failure rather than returning the vector
+[embedText] AiUsageLog write failed after a provider call Error: new row violates row-level security policy for table "AiUsageLog"
+    at /Users/macbook/alan/FONBRIDGE/src/lib/llm.embed.test.ts:216:21
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 {
+  code: 'P2039'
+}
+
+stderr | src/lib/llm.embed.test.ts > embedText — every provider call leaves an AiUsageLog row > surfaces a failed log write instead of returning a silently unlogged vector
+[embedText] AiUsageLog write failed after a provider call Error: db down
+    at /Users/macbook/alan/FONBRIDGE/src/lib/llm.embed.test.ts:228:52
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///Users/macbook/alan/FONBRIDGE/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+ ✓ src/lib/llm.embed.test.ts (12 tests) 18ms
+ ✓ src/lib/billing/lifetime-licence.test.ts (20 tests) 18ms
+ ✓ tests/efatura-line-withholding-xml.test.ts (7 tests) 8ms
+ ✓ tests/modules/module-plan-gate.test.ts (9 tests) 9ms
+ ✓ tests/evidence-incoming-key.test.ts (15 tests) 18ms
+ ✓ tests/m10-dual-approval-action.test.ts (15 tests) 15ms
+ ✓ src/app/api/saved-searches/route.test.ts (7 tests) 65ms
+ ✓ src/lib/jobs/tasks/__tests__/k1-topic-match-m4-stale.test.ts (8 tests) 10ms
+ ✓ tests/beta/checkin-schedule.test.ts (21 tests) 46ms
+ ✓ tests/billing-invoice-list.test.ts (10 tests) 8ms
+(node:62402) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/billing-identity.test.ts (18 tests) 8ms
+stderr | src/lib/billing/subscription-sync.test.ts > logInvoicePayment > lets the payment stand even if issuing the invoice throws
+[logInvoicePayment] invoice not issued for in_test_1: database is down
+
+stderr | src/lib/billing/subscription-sync.test.ts > logInvoicePayment > when Stripe sends no line description > lets the payment stand when the tenant lookup itself fails
+[logInvoicePayment] invoice not issued for in_test_1: database is down
+
+stderr | src/lib/billing/subscription-sync.test.ts > logInvoicePayment > writes nothing at all when the subscription carries no tenant
+Unable to determine tenantId for invoice in_test_1; skipping log
+
+ ✓ src/lib/billing/subscription-sync.test.ts (15 tests) 14ms
+ ✓ src/modules/m6/server/__tests__/scoring.test.ts (40 tests) 8ms
+ ✓ tests/beta/pricing-transition.test.ts (16 tests) 27ms
+ ✓ src/lib/agency/cobrand.test.ts (13 tests) 8ms
+ ✓ tests/modules/ai-module-gate.test.ts (12 tests) 29ms
+ ✓ src/lib/metrics/weekly-active-users.test.ts (13 tests) 7ms
+ ✓ tests/g0-compute.test.ts (21 tests) 16ms
+ ✓ tests/evidence-mock-upload-gate.test.ts (4 tests) 10ms
+ ✓ src/lib/agency/codes.test.ts (10 tests) 12ms
+ ✓ tests/beta/roster.test.ts (13 tests) 17ms
+ ✓ tests/scripts-dotenv-first.test.ts (7 tests) 13ms
+ ✓ src/lib/demo-login.test.ts (8 tests) 5ms
+ ✓ tests/modules/m11.test.ts (15 tests) 21ms
+ ✓ src/modules/m6/server/__tests__/comparison.test.ts (6 tests) 5ms
+ ✓ tests/m9-calendar-connect.test.ts (15 tests) 41ms
+ ✓ src/lib/jobs/tasks/__tests__/invitation-cleanup.test.ts (7 tests) 9ms
+stderr | tests/api/api-key-rate-limit.test.ts > authenticateApiKey rate limit > a counter that cannot be written fails closed
+[authenticateApiKey] key lookup failed: connection refused
+
+ ✓ tests/api/api-key-rate-limit.test.ts (5 tests) 12ms
+ ✓ tests/pipeline-actions-pilot-digest.test.ts (15 tests) 10ms
+ ✓ tests/gates.test.ts (16 tests) 19ms
+ ✓ src/lib/observability/__tests__/system-alert-dedupe.test.ts (20 tests) 19ms
+ ✓ tests/helpers/live-db-role.test.ts (17 tests) 19ms
+ ✓ src/lib/public-sector/catalog.test.ts (10 tests) 9ms
+ ✓ tests/call-topic-route.test.ts (12 tests) 10ms
+ ✓ tests/k1-sync-topics.test.ts (6 tests) 30ms
+ ✓ src/lib/jobs/tasks/alerts-sweep.test.ts (12 tests) 47ms
+ ✓ tests/api/gdpr-500-body.test.ts (13 tests) 21ms
+ ✓ src/app/api/saved-searches/[id]/route.test.ts (7 tests) 92ms
+ ✓ src/lib/secret-token.test.ts (5 tests) 8ms
+ ✓ tests/followup-doc-kinds.test.ts (24 tests) 31ms
+ ✓ tests/dual-approval.test.ts (24 tests) 115ms
+ ✓ src/lib/auth-secret.test.ts (7 tests) 16ms
+stderr | tests/billing-identity-action.test.ts > saveBillingIdentity — what reaches the database > a database failure is reported as a failure, not as a save
+[ERROR] billing identity write failed connection refused {"tenantId":"tenant-1"}
+
+ ✓ tests/billing-identity-action.test.ts (13 tests) 12ms
+ ✓ tests/m9-meeting-schedule.test.ts (7 tests) 6ms
+ ✓ tests/db-unavailable.test.ts (17 tests) 63ms
+(node:62436) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/registration-consent.test.ts (8 tests) 4ms
+ ✓ src/lib/public-sector/radar.test.ts (8 tests) 9ms
+ ✓ src/lib/billing/storefront.test.ts (10 tests) 11ms
+ ✓ tests/modules/api-keys.test.ts (25 tests) 22ms
+ ✓ src/lib/jobs/tasks/__tests__/public-lead-cleanup.test.ts (4 tests) 8ms
+ ✓ src/lib/calendar/__tests__/token-envelope.test.ts (3 tests) 11ms
+stderr | tests/m9-brief-persistence.test.ts > generateMeetingBrief — persistence > a failed write is reported as a failure, never as a saved brief
+[M9 generateMeetingBrief] DB write failed: insert failed: RLS
+
+stderr | tests/m9-brief-persistence.test.ts > generateMeetingBrief — persistence > a template draft costs no credit and says, in the stored content, that it is one
+[M9 generateMeetingBrief] LLM call fallback: 401 invalid x-api-key
+
+stderr | tests/m9-brief-persistence.test.ts > generateMeetingBrief — persistence > a template draft uses template text and does not call generateText
+[M9 generateMeetingBrief] LLM call fallback: 401 invalid x-api-key
+
+ ✓ tests/m9-brief-persistence.test.ts (6 tests) 19ms
+ ✓ tests/admin-modules.test.ts (4 tests) 6ms
+ ✓ src/lib/app-url.test.ts (15 tests) 6ms
+ ✓ tests/jobs-enqueue-and-tick.test.ts (2 tests) 6ms
+ ✓ tests/app-shell-no-loading-boundary.test.ts (1 test) 5ms
+ ✓ tests/i18n-hardcoded-detector.test.ts (24 tests) 7ms
+stderr | tests/cordis-import.test.ts > K2 CORDIS Ingestion & M1 Partner Intelligence Engine > 5,000 row import execution, idempotency, coordinator counts, and EC contributions
+Sample zip not available locally; skipping zip integration test.
+
+ ✓ tests/cordis-import.test.ts (5 tests) 8ms
+ ✓ tests/public-calls-links.test.ts (15 tests) 3ms
+ ✓ tests/evidence-page-role.test.ts (9 tests) 8ms
+ ✓ tests/feedback-alerts.test.ts (11 tests) 6ms
+ ✓ src/lib/scoring/g0-scoring.test.ts (19 tests) 33ms
+ ✓ tests/efatura-xml-minor-units.test.ts (11 tests) 9ms
+ ✓ tests/adapters.test.ts (6 tests | 2 skipped) 8ms
+ ✓ tests/user-display.test.ts (6 tests) 3ms
+ ✓ tests/opportunity-archive-permission.test.ts (4 tests) 3ms
+ ✓ tests/modules/module-gate-alias.test.ts (3 tests) 14ms
+ ✓ tests/analytics-posthog.test.ts (7 tests) 33ms
+ ✓ tests/k5-pipeline-store-tenant.test.ts (8 tests) 7ms
+ ✓ tests/accept-invite-rebind-failure.test.ts (2 tests) 3ms
+ ✓ tests/evidence-upload-s3.live.test.ts (21 tests | 21 skipped) 5ms
+ ✓ src/lib/public-sector/fit.test.ts (6 tests) 2ms
+ ✓ src/lib/calendar.test.ts (10 tests) 45ms
+ ✓ tests/evidence-status.test.ts (14 tests) 4ms
+ ✓ src/lib/billing/price-lock.test.ts (28 tests) 6ms
+ ✓ tests/safe-callback-url.test.ts (21 tests) 5ms
+ ✓ tests/modules/route-catalog.test.ts (7 tests) 3ms
+ ✓ tests/m4-weekly-summary.test.ts (4 tests) 7ms
+ ✓ tests/localized-routes.test.ts (4 tests) 4ms
+ ✓ src/lib/invitations/accept.test.ts (18 tests) 6ms
+ ✓ tests/evidence-confirm-store-faults.live.test.ts (21 tests | 21 skipped) 3ms
+ ✓ src/lib/readiness/share.test.ts (7 tests) 6ms
+ ✓ tests/g0-scoring.test.ts (27 tests) 41ms
+ ✓ tests/next-image-remote-patterns.test.ts (4 tests) 19ms
+ ✓ tests/api/api-error.test.ts (2 tests) 9ms
+ ✓ tests/modules/module-gate-coverage.test.ts (1 test) 3ms
+ ✓ tests/proposal-outcome.test.ts (15 tests) 10ms
+ ✓ src/lib/user-rate-limit.test.ts (2 tests) 3ms
+ ✓ tests/accept-invite-headers.test.ts (1 test) 9ms
+ ✓ src/lib/province.test.ts (4 tests) 8ms
+ ✓ tests/kpi-metrics.test.ts (6 tests) 7ms
+ ✓ tests/application-outcome.test.ts (7 tests) 3ms
+ ✓ src/lib/billing/public-sector-plans.test.ts (6 tests) 4ms
+ ✓ tests/pipeline-note-input-shape.test.ts (3 tests) 2ms
+ ✓ tests/concept-note-editor-sections.test.ts (3 tests) 3ms
+ ↓ tests/k1-daily-calls.test.ts (4 tests | 4 skipped)
+ ↓ tests/sedia-adapter.test.ts (2 tests | 2 skipped)
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: [vitest-pool]: Worker forks emitted error.
+ ❯ EventEmitter.onTaskError node_modules/.pnpm/vitest@4.1.11_@opentelemetry+api@1.9.1_@types+node@20.19.43_jsdom@30.0.1_@noble+hashes@_fc4fea1163e3a34b3293b0cfd2b58d8b/node_modules/vitest/dist/chunks/cli-api.CnMVyzaz.js:3526:21
+ ❯ EventEmitter.emit node:events:509:20
+ ❯ ChildProcess.emitUnexpectedExit node_modules/.pnpm/vitest@4.1.11_@opentelemetry+api@1.9.1_@types+node@20.19.43_jsdom@30.0.1_@noble+hashes@_fc4fea1163e3a34b3293b0cfd2b58d8b/node_modules/vitest/dist/chunks/cli-api.CnMVyzaz.js:3092:22
+ ❯ ChildProcess.emit node:events:509:20
+ ❯ Process.ChildProcess._handle.onexit node:internal/child_process:294:12
+
+Caused by: Error: Worker exited unexpectedly
+ ❯ ChildProcess.emitUnexpectedExit node_modules/.pnpm/vitest@4.1.11_@opentelemetry+api@1.9.1_@types+node@20.19.43_jsdom@30.0.1_@noble+hashes@_fc4fea1163e3a34b3293b0cfd2b58d8b/node_modules/vitest/dist/chunks/cli-api.CnMVyzaz.js:3090:33
+ ❯ ChildProcess.emit node:events:509:20
+ ❯ Process.ChildProcess._handle.onexit node:internal/child_process:294:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  301 passed | 2 skipped (304)
+      Tests  4008 passed | 51 skipped (4082)
+     Errors  1 error
+   Start at  21:28:03
+   Duration  34.22s (transform 16.13s, setup 0ms, import 78.92s, tests 214.30s, environment 15.24s)
+
+JSON report written to /private/tmp/claude-501/-Users-macbook-alan/72c459bc-6745-4b51-90b1-ab8307a5cd8f/scratchpad/vitest-report.json
+exit=1
+$ pnpm exec tsx scripts/check-live-skips.ts /private/tmp/claude-501/-Users-macbook-alan/72c459bc-6745-4b51-90b1-ab8307a5cd8f/scratchpad/vitest-report.json
+live-skip gate: 47 live files, 412 live tests passed, 43 allowed skip(s)
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the upload crw-fb’s case: every store call after the copy takes 6 s — the confirm is slow, and it succeeds [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the upload the row save fails after the copy: save_failed, no row, the upload kept; the retry succeeds [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the upload T-2: the "already recorded?" read fails: save_failed before any copy, the upload kept; the retry succeeds [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the upload the store holds the copy past its deadline: storage_unavailable in bounded time, nothing lost; the retry succeeds [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the upload the store is down before the copy: storage_unavailable, nothing lost; the retry succeeds [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the upload the store dies right after the copy: storage_unavailable, nothing lost; the retry succeeds [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the upload the staging object is replaced between the check and the copy: the unchecked bytes never reach the final key [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the upload positive control: through the same proxy with no fault, one confirm is one row and no staging object [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key RACE-2: a second confirm that starts before the first one saved its row cannot change the file the first one recorded [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key a confirm waits for the one ahead of it only so long: save_failed, nothing copied or lost; the first still succeeds [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key five confirms at once: one row, one copy, the uploaded bytes on the final key [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else B-1: ten confirms held by a slow store do not take the application pool — another tenant’s queries run as usual [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else T-4: two uploads of one tenant do not wait for each other [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else T-3: the limits are set inside confirm’s transaction and never left on a pooled connection [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else Y-2: a process that freezes inside confirm’s transaction loses the lock after 20 s, not hours; the retry succeeds [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else Y-3: the copy ends before a connection idle through it could be closed — the lock is never gone while the copy runs [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else Y-3: the copy ends before the transaction’s own timeout — a late lock and a stalled process leave it less time [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else Y-3: a slow database after the lock is cut off by statement_timeout — save_failed in ~5 s, nothing copied [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else T-5: a store that holds the HEAD of the staging object is given up on within the deadline [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else T-5: a store that holds the GET of the staging object is given up on within the deadline [skipped]
+  allowed: tests/evidence-confirm-store-faults.live.test.ts :: İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else T-7: a store that holds the HEAD of the final object after the copy is given up on within the deadline [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload types outside the list, a type that disagrees with the extension, and bad sizes get no URL [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload the URL signs type and length and carries no empty-body checksum (B-3) [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload the store refuses a PUT whose type differs from the signed one [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload the store refuses a PUT larger or smaller than the signed length [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload confirm refuses a key that was never uploaded, and writes no row [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload confirm refuses a stored object whose bytes are not the key’s type, and removes that one object [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload confirm refuses a stored object whose content type is not the key’s, even with PDF bytes [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload confirm refuses a stored object over the limit, whatever size the browser claims [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload positive control: a real PDF goes through, and the row records the store’s size and type [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-2: evidence is read only by a signed-in member of its tenant a CONFIDENTIAL file cannot be read without a session, neither from the store nor through the app [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-2: evidence is read only by a signed-in member of its tenant another tenant’s evidence is a 404 and no signed URL is handed out [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-2: evidence is read only by a signed-in member of its tenant a row of A that names B’s object does not open it [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: B-2: evidence is read only by a signed-in member of its tenant positive control: the owner gets a 5-minute signed download of the same bytes, as an attachment [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: D-1 (TASK-MUNTTZ94LJWBC): a confirmed file cannot be replaced through its signed PUT A1: a PUT after confirm, same URL, type and length, leaves the recorded file as it was [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: D-1 (TASK-MUNTTZ94LJWBC): a confirmed file cannot be replaced through its signed PUT confirm takes only a staging key: a final key, even the tenant’s own, is refused [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: D-3 (TASK-MUNTTZ94LJWBC): one key is confirmed once A2: a second confirm of the same key writes no second row and keeps the file [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: D-3 (TASK-MUNTTZ94LJWBC): one key is confirmed once two confirms at the same time: one row, one success, the file stays [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: D-3 (TASK-MUNTTZ94LJWBC): one key is confirmed once the index itself refuses a second row with the same key [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence A6: GUEST_PARTNER cannot download, list or score any evidence, CONFIDENTIAL included [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence MEMBER reads the open levels only; a confidential level in any spelling needs edit_proposal [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence a role outside the enum (a stale token) reads nothing [skipped]
+  allowed: tests/k1-embeddings.live.test.ts :: K1 embeddings (live, REAL OpenAI) real vectors rank each tenant’s own topic first [skipped]
+exit=0
+$ pnpm rls:check
+$ tsx scripts/check-rls.ts
+Found 47 tenant-scoped models requiring RLS policies:
+AddOn, AgencyInviteCode, AiUsageLog, ApiKey, ApplicationPart, ApprovalRequest, AuditEvent, CalendarConnection, Claim, ClaimEvidenceLink, ConceptNote, Consent, ConsortiumSeat, CreditLedger, Criterion, DualApprovalStep, Effort, Evaluation, Evidence, EvidenceReminder, Feedback, FollowupDoc, GateDecision, Interaction, Invitation, Invoice, LifetimeLicence, MeetingBrief, Membership, ModuleState, Opportunity, PartnerOrg, PlanAssignment, Proposal, ProposalUsage, Relationship, Reviewer, SavedSearch, Score, SeatCandidate, StripeEventLog, Subscription, TenantBillingIdentity, TenantProfile, TopicMatch, TtoPortfolioItem, Workspace
+
+✅ SUCCESS: All 47 tenant-scoped models have RLS policies registered.
+   (Declared, not measured — `pnpm rls:verify` asks the database.)
+
+CHECK 4b — 15 tenant-scoped tables are created by migrations.
+✅ SUCCESS: every one of them carries ENABLE + FORCE + tenant_isolation in its own migration.
+exit=0
+$ pnpm rls:bypass-check
+$ tsx scripts/check-tenant-bypass.ts
+Scanned 610 tracked source files in src/** against 47 tenant-scoped models.
+  36 call site(s) outside a tenant scope; baseline records 36.
+  92 more are in fixtures (*.test.ts, *.spec.ts, __tests__/): reported, not judged.
+
+Shared catalogues this gate does not police (by construction, not by allowlist):
+  Topic — 16 call site(s) in src/**
+      shared CORDIS catalogue, no tenantId column at all — every tenant reads the same rows (pipeline/actions.ts:98,106). It is in SYSTEM_WIDE, so it never had an RLS policy to bypass.
+  ConceptTemplate — 0 call site(s) in src/**
+      tenantId is String? and null means "platform template"; it is in NULLABLE_TENANT and carries the tenant_or_shared policy, not tenant_isolation. Unlike Topic it DOES have a tenant column, so a read by a client-supplied id alone returned another tenant's template — measured, not hypothetical (TASK-MTVTU103F11XJ: tenant A created a ConceptNote against tenant B's template). The RLS policy did not stop it because the app role is BYPASSRLS. Fixed by routing every read through src/modules/m2/server/templates.ts, which ANDs the id with OR[tenantId NULL, tenantId]. Still structurally outside this gate, which judges the client rather than the where clause: src/modules/m2/server/templates.test.ts is the gate for this rule.
+  PublicLead — 0 call site(s) in src/**
+      contact request an anonymous visitor leaves on the readiness result screen (TASK-MULR765AR5G0C). The visitor has no account, so the row belongs to no tenant and has no tenantId; it is in SYSTEM_WIDE like User. Written only by src/lib/leads/public-lead.ts (public form), read only by /admin/leads behind requirePlatformAdmin(), deleted by the nightly public-lead-cleanup job. No tenant code path touches it.
+  Document — 0 call site(s) in src/**
+      tenantId is String?; in NULLABLE_TENANT.
+  Chunk — 0 call site(s) in src/**
+      tenantId is String?; in NULLABLE_TENANT.
+
+Sanctioned cross-tenant escapes: 36 call site(s) via withSystemScope, measured.
+  cross-tenant-job     5 call site(s) in 5 file(s)
+  platform-admin       10 call site(s) in 7 file(s)
+  platform-aggregate   5 call site(s) in 3 file(s)
+  subject-scoped       9 call site(s) in 3 file(s)
+  tenant-discovery     7 call site(s) in 6 file(s)
+  Each one is recorded with a reason, ratcheted like a bypass, and opens the
+  `system_scope` RLS policy for one transaction only (prisma/rls.sql).
+
+✅ SUCCESS: no new tenant bypass. 0 call site(s) allowed with a recorded reason, 36 on the sanctioned cross-tenant path, 0 still owed.
+   (Shape only — `pnpm rls:verify` asks the database whether isolation actually holds.)
+exit=0
+$ pnpm rls:verify
+$ tsx scripts/check-rls-live.ts
+Kiracıya özel model: 47 · RLS açık tablo: 53 · tenant_isolation politikası: 47
+
+⚠  DATABASE_URL rolü fabrika (rolsuper=true, rolbypassrls=true) — RLS bu bağlantıda hiç uygulanmıyor.
+   Bu rolle yapılan bir izolasyon ölçümü GEÇERSİZDİR; RLS'e tabi bir rol aranıyor:
+
+Ölçüm rolü: fabrika_app (rolsuper=false, rolbypassrls=false) — kaynak: DATABASE_URL_RLS_TEST
+   ✓ okuma (negatif): app.tenant_id yokken 16 dolu tablonun hepsi 0 satır döndü
+   ✓ okuma (pozitif): Consent kendi kiracısı bağlamında 3 satır döndü
+   ✓ yazma (negatif): app.tenant_id yokken INSERT reddedildi
+   ✓ yazma (pozitif): kendi kiracısına INSERT kabul edildi (geri alındı)
+   ✓ yazma (çapraz): başka kiracıya INSERT reddedildi
+
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+exit=0
+$ pnpm build
+$ next build
+▲ Next.js 16.3.4 (Turbopack)
+- Environments: .env
+
+🌐 Checking i18n translations...
+
+=== i18n Translation Audit Report ===
+
+Report generated: 2026-09-30T18:28:40.398Z
+
+Summary:
+  Static keys used in code: 1413
+  Dynamic key patterns:     74
+  Keys in messages/tr.json: 2141
+  Keys in messages/en.json: 2141
+
+💤 In the catalogs but not reached from src/ (informational) (323):
+   - Approvals.auditHash
+   - Approvals.selfApprovalForbidden
+   - Approvals.subtitle
+   - Auth.disclosureAck
+   - Auth.disclosureAckAgency
+   - Auth.disclosureRequired
+   - Auth.register
+   - Auth.signIn
+   - Auth.signOut
+   - Common.actions
+   ... and 313 more
+
+Hard-coded user-facing text (src/app, src/modules — *.tsx):
+  Literals found:   312 in 36 file(s)
+  Baseline allows:  314 in 36 file(s)
+
+⚠️  Baseline is looser than reality — 2 literal(s) paid down. Refresh it with:
+      pnpm i18n:check --update-baseline
+   - src/app/[locale]/admin/settings/page.tsx  9 → 7
+
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+
+✓ Running next.config.ts took 555ms
+- Experiments (use with caution):
+  ✓ authInterrupts
+
+  Creating an optimized production build ...
+
+🌐 Checking i18n translations...
+
+=== i18n Translation Audit Report ===
+
+Report generated: 2026-09-30T18:28:41.451Z
+
+Summary:
+  Static keys used in code: 1413
+  Dynamic key patterns:     74
+  Keys in messages/tr.json: 2141
+  Keys in messages/en.json: 2141
+
+💤 In the catalogs but not reached from src/ (informational) (323):
+   - Approvals.auditHash
+   - Approvals.selfApprovalForbidden
+   - Approvals.subtitle
+   - Auth.disclosureAck
+   - Auth.disclosureAckAgency
+   - Auth.disclosureRequired
+   - Auth.register
+   - Auth.signIn
+   - Auth.signOut
+   - Common.actions
+   ... and 313 more
+
+Hard-coded user-facing text (src/app, src/modules — *.tsx):
+  Literals found:   312 in 36 file(s)
+  Baseline allows:  314 in 36 file(s)
+
+⚠️  Baseline is looser than reality — 2 literal(s) paid down. Refresh it with:
+      pnpm i18n:check --update-baseline
+   - src/app/[locale]/admin/settings/page.tsx  9 → 7
+
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+
+
+=== i18n Translation Audit Report ===
+
+Report generated: 2026-09-30T18:28:41.922Z
+
+Summary:
+  Static keys used in code: 1413
+  Dynamic key patterns:     74
+  Keys in messages/tr.json: 2141
+  Keys in messages/en.json: 2141
+
+💤 In the catalogs but not reached from src/ (informational) (323):
+   - Approvals.auditHash
+   - Approvals.selfApprovalForbidden
+   - Approvals.subtitle
+   - Auth.disclosureAck
+   - Auth.disclosureAckAgency
+   - Auth.disclosureRequired
+   - Auth.register
+   - Auth.signIn
+   - Auth.signOut
+   - Common.actions
+   ... and 313 more
+
+Hard-coded user-facing text (src/app, src/modules — *.tsx):
+  Literals found:   312 in 36 file(s)
+  Baseline allows:  314 in 36 file(s)
+
+⚠️  Baseline is looser than reality — 2 literal(s) paid down. Refresh it with:
+      pnpm i18n:check --update-baseline
+   - src/app/[locale]/admin/settings/page.tsx  9 → 7
+
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+
+
+🌐 Checking i18n translations...
+✓ Compiled successfully in 1377ms
+  Running TypeScript ...
+  Finished TypeScript in 2.7s ...
+  Collecting page data using 11 workers ...
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+(node:62704) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+(node:62713) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:62706) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:62709) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  Generating static pages using 11 workers (0/32) ...
+(node:62708) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  Generating static pages using 11 workers (8/32) 
+  Generating static pages using 11 workers (16/32) 
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+  Generating static pages using 11 workers (24/32) 
+✓ Generating static pages using 11 workers (32/32) in 105ms
+Turbopack build encountered 1 warning:
+./src/instrumentation.ts:18:5
+Warning: A Node.js API is used (process.exit at line: 18) which is not supported in the Edge Runtime.
+    Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+  [90m16 |[0m     [90m// with a 500, which a port health check reads as a running server. Exit.[0m
+  [90m17 |[0m     console.error(error [36minstanceof[0m [33mError[0m ? error.message : error);
+[33m[1m>[0m [90m18 |[0m     process.exit([35m1[0m);
+  [90m   |[0m     [33m[1m^^^^^^^^^^^^[0m
+  [90m19 |[0m   }
+  [90m20 |[0m   [90m// A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.[0m
+  [90m21 |[0m   [36mconst[0m { reportAppUrlProblem } = [36mawait[0m [36mimport[0m([32m'./lib/app-url-alert'[0m);
+
+Ecmascript file had an error
+
+
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /_not-found
+├ ƒ /[locale]
+├ ƒ /[locale]/[workspace]/approvals
+├ ƒ /[locale]/[workspace]/ayarlar
+├ ƒ /[locale]/[workspace]/ayarlar/faturalama
+├ ƒ /[locale]/[workspace]/ayarlar/gizlilik
+├ ƒ /[locale]/[workspace]/ayarlar/kapilar
+├ ƒ /[locale]/[workspace]/ayarlar/moduller
+├ ƒ /[locale]/[workspace]/ayarlar/profil
+├ ƒ /[locale]/[workspace]/ayarlar/uyeler
+├ ƒ /[locale]/[workspace]/bildirimler
+├ ƒ /[locale]/[workspace]/cagrilar
+├ ƒ /[locale]/[workspace]/cagrilar/[id]
+├ ƒ /[locale]/[workspace]/calls
+├ ƒ /[locale]/[workspace]/calls/[id]
+├ ƒ /[locale]/[workspace]/concept-notes
+├ ƒ /[locale]/[workspace]/concept-notes/[id]
+├ ƒ /[locale]/[workspace]/dashboard
+├ ƒ /[locale]/[workspace]/dashboard/api/export-csv
+├ ƒ /[locale]/[workspace]/evidence
+├ ƒ /[locale]/[workspace]/firsatlar
+├ ƒ /[locale]/[workspace]/firsatlar/[id]
+├ ƒ /[locale]/[workspace]/iliskiler
+├ ƒ /[locale]/[workspace]/kanitlar
+├ ƒ /[locale]/[workspace]/konsept-notlar
+├ ƒ /[locale]/[workspace]/notifications
+├ ƒ /[locale]/[workspace]/onay-merkezi
+├ ƒ /[locale]/[workspace]/opportunities/[id]/application
+├ ƒ /[locale]/[workspace]/opportunities/[id]/briefs
+├ ƒ /[locale]/[workspace]/opportunities/[id]/documents
+├ ƒ /[locale]/[workspace]/opportunities/[id]/evaluations
+├ ƒ /[locale]/[workspace]/opportunities/[id]/evaluations/panel
+├ ƒ /[locale]/[workspace]/opportunities/[id]/m2
+├ ƒ /[locale]/[workspace]/opportunities/[id]/matching
+├ ƒ /[locale]/[workspace]/ortaklar
+├ ƒ /[locale]/[workspace]/panel
+├ ƒ /[locale]/[workspace]/partners
+├ ƒ /[locale]/[workspace]/partners/[pic]
+├ ƒ /[locale]/[workspace]/partners/leaders
+├ ƒ /[locale]/[workspace]/pipeline
+├ ƒ /[locale]/[workspace]/pipeline/[id]
+├ ƒ /[locale]/[workspace]/pipeline/[id]/consortium
+├ ƒ /[locale]/[workspace]/relationships
+├ ƒ /[locale]/[workspace]/relationships/[id]
+├ ƒ /[locale]/[workspace]/reports/person-days
+├ ƒ /[locale]/[workspace]/settings/api-keys
+├ ƒ /[locale]/[workspace]/settings/billing
+├ ƒ /[locale]/[workspace]/settings/calendar
+├ ƒ /[locale]/[workspace]/settings/gates
+├ ƒ /[locale]/[workspace]/settings/members
+├ ƒ /[locale]/[workspace]/settings/modules
+├ ƒ /[locale]/[workspace]/settings/privacy
+├ ƒ /[locale]/[workspace]/settings/profile
+├ ƒ /[locale]/[workspace]/tto
+├ ƒ /[locale]/[workspace]/tto-hizlandirici
+├ ƒ /[locale]/accept-invite
+├ ƒ /[locale]/accept-invite/continue
+├ ƒ /[locale]/acik-cagrilar
+├ ƒ /[locale]/admin/alerts
+├ ƒ /[locale]/admin/audit
+├ ƒ /[locale]/admin/billing
+├ ƒ /[locale]/admin/billing/plans
+├ ƒ /[locale]/admin/blog
+├ ƒ /[locale]/admin/cordis
+├ ƒ /[locale]/admin/documents
+├ ƒ /[locale]/admin/feedback
+├ ƒ /[locale]/admin/leads
+├ ƒ /[locale]/admin/modules
+├ ƒ /[locale]/admin/settings
+├ ƒ /[locale]/admin/tenants
+├ ƒ /[locale]/admin/topic-stats
+├ ƒ /[locale]/agency
+├ ƒ /[locale]/ajans
+├ ƒ /[locale]/belediye-cagrilari
+├ ƒ /[locale]/blog
+├ ƒ /[locale]/blog/[slug]
+├ ƒ /[locale]/calls
+├ ƒ /[locale]/calls/[region]
+├ ƒ /[locale]/calls/topic/[id]
+├ ƒ /[locale]/calls/turkey
+├ ƒ /[locale]/compliance/dpa
+├ ƒ /[locale]/fiyatlandirma
+├ ƒ /[locale]/fon-hazirlik
+├ ƒ /[locale]/funding-readiness
+├ ƒ /[locale]/giris
+├ ƒ /[locale]/i18n-check
+├ ƒ /[locale]/kayit
+├ ƒ /[locale]/login
+├ ƒ /[locale]/municipal-calls
+├ ƒ /[locale]/no-workspace
+├ ƒ /[locale]/open-calls
+├ ƒ /[locale]/portal/partner/[token]
+├ ƒ /[locale]/pricing
+├ ƒ /[locale]/privacy
+├ ƒ /[locale]/register
+├ ƒ /[locale]/terms
+├ ƒ /[locale]/turkiyeye-acik-cagrilar
+├ ƒ /api/admin/cordis/import
+├ ƒ /api/admin/documents/upload
+├ ƒ /api/admin/topic-stats/import
+├ ƒ /api/admin/topic-stats/rescore
+├ ƒ /api/agency/cobrand-logo
+├ ƒ /api/agency/reports/[id]
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/auth/hata
+├ ƒ /api/billing/checkout
+├ ƒ /api/billing/invoices/[id]/export
+├ ƒ /api/billing/portal
+├ ƒ /api/billing/quote
+├ ƒ /api/cagrilar
+├ ƒ /api/concept-notes/[id]/export
+├ ƒ /api/cordis/organizations
+├ ƒ /api/cordis/organizations/[id]
+├ ƒ /api/cordis/projects
+├ ƒ /api/csp-report
+├ ƒ /api/dashboard/export-csv
+├ ƒ /api/documents/export
+├ ƒ /api/evidence/[id]/download
+├ ƒ /api/evidence/mock-upload
+├ ƒ /api/feedback
+├ ƒ /api/gdpr/delete
+├ ƒ /api/gdpr/export
+├ ƒ /api/invitations
+├ ƒ /api/saved-searches
+├ ƒ /api/saved-searches/[id]
+├ ƒ /api/user/export
+├ ƒ /api/user/export-data
+├ ƒ /api/user/request-deletion
+├ ƒ /api/v1/calls
+├ ƒ /api/v1/opportunities
+├ ƒ /api/v1/partners
+├ ƒ /api/v1/partners/[pic]
+├ ƒ /api/webhooks/iyzico
+└ ƒ /api/webhooks/stripe
+
+
+ƒ Proxy (Middleware)
+
+ƒ  (Dynamic)  server-rendered on demand
+
+exit=0
+GATES fail=1 Wed Sep 30 21:28:48 +03 2026

@@ -1,0 +1,60 @@
+## git diff --stat
+ src/lib/tenant.ts | 7 +++++++
+ 1 file changed, 7 insertions(+)
+## git diff src/lib/tenant.ts
+diff --git a/src/lib/tenant.ts b/src/lib/tenant.ts
+index 388ae0d7..c33f8149 100644
+--- a/src/lib/tenant.ts
++++ b/src/lib/tenant.ts
+@@ -6,6 +6,7 @@ import { assertTenantWritable, PilotExpiredError } from '@/lib/billing/pilot';
+ import { PILOT_EXPIRED_DIGEST } from '@/lib/pilot-expired';
+ import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
+ import { asRole, can, type Action } from '@/lib/rbac';
++import { errorMessage } from '@/lib/errors';
+ 
+ /**
+  * Tenant resolution — the single place a request's tenant is decided.
+@@ -156,6 +157,12 @@ export async function assertTenantActionWritable(tenantId: string): Promise<void
+     await assertTenantWritable(tenantId);
+   } catch (error) {
+     if (error instanceof PilotExpiredError) Object.assign(error, { digest: PILOT_EXPIRED_DIGEST });
++    const msg = errorMessage(error);
++    if (msg.includes('timeout exceeded when trying to connect')) {
++      const poolError = new Error('Sistem şu anda meşgul. Lütfen tekrar deneyin.');
++      Object.assign(poolError, { code: 'SERVICE_BUSY', digest: 'SERVICE_BUSY' });
++      throw poolError;
++    }
+     throw error;
+   }
+ }
+## mtime
+Sep 30 21:14:16 2026 src/lib/tenant.ts
+## untracked cs-fb-ekler
+total 224
+drwxr-xr-x@  22 macbook  staff    704 Sep 30 21:14 .
+drwxr-xr-x@ 975 macbook  staff  31200 Sep 30 21:14 ..
+-rw-r--r--@   1 macbook  staff    757 Sep 30 21:14 db-prep.txt
+-rw-r--r--@   1 macbook  staff    130 Sep 30 21:14 fp2-after.txt
+-rw-r--r--@   1 macbook  staff    133 Sep 30 21:14 fp2-before.txt
+-rw-r--r--@   1 macbook  staff   1020 Sep 30 21:14 fp2.mts
+-rw-r--r--@   1 macbook  staff    119 Sep 30 21:14 gates.txt
+-rw-r--r--@   1 macbook  staff    372 Sep 30 21:14 m6.mts
+-rw-r--r--@   1 macbook  staff   2779 Sep 30 21:14 mutants-after.txt
+## branches
+fatal: Needed a single revision
+ls: docs/agent-results/TASK-MUOEGWSV8I7H0-se-fb.md: No such file or directory
+## devop-fb/merge-hsts: c6fad2ac
+## se-fb/i1-owner-chain-merge: af2e7be7
+## g1 branch diff tenant.ts
+8ad7b66c docs: prior task TASK-MUODYIZIF6FLZ result (3rd delivery)
+a89fdef6 test: TASK-MUODYIZIF6FLZ 3rd delivery — 13 mutants, 6 KILLED, gates pass
+## recheck Wed Sep 30 21:15:13 +03 2026
+ M src/lib/tenant.ts
+ M tests/evidence-confirm-store-faults.live.test.ts
+?? FON_BRIDGE.md
+?? docs/agent-results/TASK-MUNQB0GR306U0-be-fb.md
+?? docs/agent-results/TASK-MUODXBIM9H1PP-cs-fb-ekler/
+?? docs/agent-results/TASK-MUODYSLQ8HIRT-crw-fb-3.md
+?? docs/agent-results/TASK-MUOEUYV0GMU12-devop-fb.md
+?? docs/agent-results/TASK-MUOFCOKBQBUSQ-devop-fb-ekler/
+Sep 30 21:14:16 2026 src/lib/tenant.ts

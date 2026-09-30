@@ -519,6 +519,8 @@ bitirmesi gerekir; bunu zaten vekil yapıyor, ikinci bir yönlendirme noktası d
 ### 10.1 Uygulama bir Vulut VPS'inde (Docker) — önerilen: Caddy
 **Şimdilik kurulmuyor (patron 29.09.2026).** Aşağıdaki yapılandırma, kurulum başlatılınca kullanılacak plandır.
 
+**Önemli:** Strict-Transport-Security (HSTS) başlığı **yalnız Caddy tarafından** gönderilir. Uygulama bu başlığı eklemez.
+
 Caddy sertifikayı (Let's Encrypt) `fonbridge.com` ve `www` için kendisi alır ve yeniler. `/etc/caddy/Caddyfile`:
 ```
 # Yalnız IPv4 dinle (patron kararı 30.09.2026: AAAA yok); bkz. §10.1 sonundaki uyarı. `tcp4/` şart:

@@ -90,7 +90,7 @@ describe('the Exif orientation entry: kept exactly when the bundled image-size c
     return Buffer.concat([IMAGES.jpeg!.subarray(0, 2), segment, IMAGES.jpeg!.subarray(2)]);
   };
 
-  it.each([2, 4, 6, 8, 9, 10, 11, 12])('entry cut at %i bytes', async (entryLen) => {
+  it.each([2, 4, 6, 8, 9, 10, 11, 12])('entry cut at %i bytes (big-endian, count=1)', async (entryLen) => {
     const bytes = withOrientationEntry(entryLen);
     const kept = safeInlineImageSrc(`data:image/jpeg;base64,${bytes.toString('base64')}`, { remaining: Number.MAX_SAFE_INTEGER }) !== null;
     const libraryReads = await HTMLtoDOCX(`<img src="data:image/jpeg;base64,${bytes.toString('base64')}" />`, null, {}).then(
@@ -100,5 +100,45 @@ describe('the Exif orientation entry: kept exactly when the bundled image-size c
     expect({ kept }).toEqual({ kept: libraryReads });
     // Pinned both ways, so neither side can drift and still agree by accident.
     expect(kept).toBe(entryLen >= 10);
+  });
+
+  const withOrientationEntryLe = (entryLen: number) => {
+    const entry = Buffer.from([0x12, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00]).subarray(0, entryLen);
+    const ifdCount = Buffer.from([0x01, 0x00]); // 1 entry, little-endian
+    const tiff = Buffer.concat([Buffer.from('II\x2a\0\x08\0\0\0', 'latin1'), ifdCount, entry]);
+    const payload = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff]);
+    const segment = Buffer.concat([Buffer.from([0xff, 0xe1, (payload.length + 2) >> 8, (payload.length + 2) & 0xff]), payload]);
+    return Buffer.concat([IMAGES.jpeg!.subarray(0, 2), segment, IMAGES.jpeg!.subarray(2)]);
+  };
+
+  it.each([6, 7, 8, 10, 11, 12])('entry cut at %i bytes (little-endian, count=1, Ö-4)', async (entryLen) => {
+    const bytes = withOrientationEntryLe(entryLen);
+    const kept = safeInlineImageSrc(`data:image/jpeg;base64,${bytes.toString('base64')}`, { remaining: Number.MAX_SAFE_INTEGER }) !== null;
+    const libraryReads = await HTMLtoDOCX(`<img src="data:image/jpeg;base64,${bytes.toString('base64')}" />`, null, {}).then(
+      () => true,
+      () => false
+    );
+    expect({ kept }).toEqual({ kept: libraryReads });
+    expect(kept).toBe(entryLen >= 10);
+  });
+
+  const withOrientationEntryCountNe1 = (count: number) => {
+    const countBytes = Buffer.alloc(4);
+    countBytes.writeUInt32BE(count);
+    const entry = Buffer.concat([Buffer.from([0x01, 0x12, 0x00, 0x03]), countBytes, Buffer.from([0, 6, 0, 0])]);
+    const tiff = Buffer.concat([Buffer.from('MM\0\x2a\0\0\0\x08', 'latin1'), Buffer.from([0, 1]), entry]);
+    const payload = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff]);
+    const segment = Buffer.concat([Buffer.from([0xff, 0xe1, (payload.length + 2) >> 8, (payload.length + 2) & 0xff]), payload]);
+    return Buffer.concat([IMAGES.jpeg!.subarray(0, 2), segment, IMAGES.jpeg!.subarray(2)]);
+  };
+
+  it.each([2, 3, 5])('count ≠ 1: count=%i (Ö-4)', async (count) => {
+    const bytes = withOrientationEntryCountNe1(count);
+    const kept = safeInlineImageSrc(`data:image/jpeg;base64,${bytes.toString('base64')}`, { remaining: Number.MAX_SAFE_INTEGER }) !== null;
+    const libraryReads = await HTMLtoDOCX(`<img src="data:image/jpeg;base64,${bytes.toString('base64')}" />`, null, {}).then(
+      () => true,
+      () => false
+    );
+    expect({ kept }).toEqual({ kept: libraryReads });
   });
 });

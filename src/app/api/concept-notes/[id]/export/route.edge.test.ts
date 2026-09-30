@@ -20,7 +20,7 @@ const mockPrisma = vi.hoisted(() => ({
   opportunity: { findFirst: vi.fn() },
   conceptTemplate: { findFirst: vi.fn() },
 }));
-const docx = vi.hoisted(() => ({ failures: 0, calls: [] as string[] }));
+const docx = vi.hoisted(() => ({ failures: 0, calls: [] as string[], failureError: null as Error | null }));
 
 vi.mock('@/lib/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/db')>();
@@ -42,7 +42,7 @@ vi.mock('html-to-docx', async (importOriginal) => {
       docx.calls.push(html);
       if (docx.failures > 0) {
         docx.failures--;
-        throw new TypeError('Invalid JPG, marker table corrupted');
+        throw docx.failureError ?? new TypeError('Invalid JPG, marker table corrupted');
       }
       return real(html, ...rest);
     },
@@ -63,7 +63,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   docx.failures = 0;
   docx.calls.length = 0;
-  vi.mocked(auth).mockResolvedValue({ tenantId: 'tenant_1' } as never);
+  vi.mocked(auth).mockResolvedValue({
+    tenantId: 'tenant_1',
+    user: { email: 'user@example.com', name: 'Test User' },
+  } as never);
 });
 
 function seed(content: Record<string, string>, title: string | null = 'Smart Grids') {
@@ -166,7 +169,7 @@ describe('concept-note DOCX export — İNCELEME-53 follow-ups (TASK-MUNDTW8O2IV
     warn.mockRestore();
   });
 
-  it('İNCELEME-88 O-2: the retry is logged with request, note and tenant ids and the reason — no title, text or image', async () => {
+  it('İNCELEME-88 O-2: the retry is logged with request, note and tenant ids and the reason — no sensitive data (Ö-3b/c)', async () => {
     seed({ summary: `<p>gizli not metni</p>${img(PNG)}` }, 'Gizli Fırsat Başlığı');
     docx.failures = 1;
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -180,10 +183,33 @@ describe('concept-note DOCX export — İNCELEME-53 follow-ups (TASK-MUNDTW8O2IV
       reason: 'Invalid JPG, marker table corrupted',
     });
     const logged = JSON.stringify(warn.mock.calls);
-    for (const leak of ['Gizli', 'gizli not', PNG.toString('base64').slice(0, 16), 'Standard Template']) {
+    // No profile text, title, image content, template, or user email/name (Ö-3b)
+    for (const leak of [
+      'Gizli',
+      'gizli not',
+      PNG.toString('base64').slice(0, 16),
+      'Standard Template',
+      'user@example.com',
+      'Test User',
+    ]) {
       expect(logged).not.toContain(leak);
     }
     warn.mockRestore();
+  });
+
+  it('İNCELEME-88 O-2: reason is first line only and capped at 200 characters (Ö-3c)', async () => {
+    seed({ summary: `<p>metin</p>${img(PNG)}` });
+    docx.failures = 1;
+    docx.failureError = new TypeError(`${'x'.repeat(250)}\nsecond line detail`);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await exportNote();
+    const logged = warn.mock.calls[0]?.[1] as Record<string, string> | undefined;
+    expect(logged?.reason).not.toContain('\n');
+    expect(logged?.reason).not.toContain('second line');
+    expect(logged?.reason?.length).toBeLessThanOrEqual(200);
+    expect(logged?.reason).toBe('x'.repeat(200)); // exactly 200, first 200 chars
+    warn.mockRestore();
+    docx.failureError = null;
   });
 
   it('İNCELEME-88 O-2: a missing or unsafe X-Request-Id is replaced by one made here, and it is the one logged', async () => {
