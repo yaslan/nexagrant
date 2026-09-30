@@ -1,0 +1,36 @@
+-- [tr] arşivle (Plan UPDATE, düz RAISE): plan-notice = "İşlem tamamlanamadı. Tekrar deneyin; sürerse ayrıntı sunucu günlüğündedir."
+OK   [tr] arşivle (Plan UPDATE, düz RAISE): expected sentence
+OK   [tr] arşivle (Plan UPDATE, düz RAISE): no internal text on screen
+OK   [tr] arşivle (Plan UPDATE, düz RAISE): action response on the wire has no internal text (1 resp, 98 B) — "code":"UNKNOWN"
+-- [en] archive (Plan UPDATE, plain RAISE): plan-notice = "The action could not be completed. Try again; if it persists, the details are in the server log."
+OK   [en] archive (Plan UPDATE, plain RAISE): expected sentence
+OK   [en] archive (Plan UPDATE, plain RAISE): no internal text on screen
+OK   [en] archive (Plan UPDATE, plain RAISE): action response on the wire has no internal text (1 resp, 98 B) — "code":"UNKNOWN"
+-- [tr] kamu paketi ata (PlanAssignment INSERT, FK ihlali 23503): plan-notice = "İşlem tamamlanamadı. Tekrar deneyin; sürerse ayrıntı sunucu günlüğündedir."
+OK   [tr] kamu paketi ata (PlanAssignment INSERT, FK ihlali 23503): expected sentence
+OK   [tr] kamu paketi ata (PlanAssignment INSERT, FK ihlali 23503): no internal text on screen
+OK   [tr] kamu paketi ata (PlanAssignment INSERT, FK ihlali 23503): action response on the wire has no internal text (1 resp, 98 B) — "code":"UNKNOWN"
+-- [en] assign public package (PlanAssignment INSERT, FK 23503): plan-notice = "The action could not be completed. Try again; if it persists, the details are in the server log."
+OK   [en] assign public package (PlanAssignment INSERT, FK 23503): expected sentence
+OK   [en] assign public package (PlanAssignment INSERT, FK 23503): no internal text on screen
+OK   [en] assign public package (PlanAssignment INSERT, FK 23503): action response on the wire has no internal text (1 resp, 98 B) — "code":"UNKNOWN"
+-- [tr] pilot ver (Subscription INSERT/UPDATE, unique 23505): pilot-notice = "İşlem tamamlanamadı. Tekrar deneyin; sürerse ayrıntı sunucu günlüğündedir."
+OK   [tr] pilot ver (Subscription INSERT/UPDATE, unique 23505): expected sentence
+OK   [tr] pilot ver (Subscription INSERT/UPDATE, unique 23505): no internal text on screen
+OK   [tr] pilot ver (Subscription INSERT/UPDATE, unique 23505): action response on the wire has no internal text (1 resp, 0 B)
+-- [en] grant pilot (Subscription INSERT/UPDATE, unique 23505): pilot-notice = "The action could not be completed. Try again; if it persists, the details are in the server log."
+OK   [en] grant pilot (Subscription INSERT/UPDATE, unique 23505): expected sentence
+OK   [en] grant pilot (Subscription INSERT/UPDATE, unique 23505): no internal text on screen
+OK   [en] grant pilot (Subscription INSERT/UPDATE, unique 23505): action response on the wire has no internal text (1 resp, 98 B) — "code":"UNKNOWN"
+-- [tr] bilinen ret: yayınlanmış sürüme taslak yokken publish yok → archive sonrası ata (NO_PUBLISHED?): plan-notice = "Paketin yayınlanmış sürümü yok; atanamaz."
+OK   [tr] bilinen ret: yayınlanmış sürüme taslak yokken publish yok → archive sonrası ata (NO_PUBLISHED?): expected sentence
+OK   [tr] bilinen ret: yayınlanmış sürüme taslak yokken publish yok → archive sonrası ata (NO_PUBLISHED?): no internal text on screen
+OK   [tr] bilinen ret: yayınlanmış sürüme taslak yokken publish yok → archive sonrası ata (NO_PUBLISHED?): action response on the wire has no internal text (1 resp, 111 B) — "code":"NO_PUBLISHED_VERSION"
+-- non-admin: HTTP 404
+OK   non-admin: 404
+OK   non-admin: no plan editor rendered
+OK   Plan basic still public
+OK   no assignment on public-team/demo-tenant
+OK   no pilot subscription left
+OK   triggers removed
+ALL OK

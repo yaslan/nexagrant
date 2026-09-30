@@ -1,0 +1,10 @@
+HEAD=2a3900b8 status=[]
+tsc=0
+lint=0
+i18n=0 ✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+build=0
+vitest=0
+ Test Files  296 passed | 2 skipped (298)
+      Tests  3754 passed | 41 skipped (3795)
+liveskip=0
+DONE
