@@ -1,0 +1,15 @@
+├ ƒ /api/user/export
+├ ƒ /api/user/export-data
+├ ƒ /api/user/request-deletion
+├ ƒ /api/v1/calls
+├ ƒ /api/v1/opportunities
+├ ƒ /api/v1/partners
+├ ƒ /api/v1/partners/[pic]
+├ ƒ /api/webhooks/iyzico
+└ ƒ /api/webhooks/stripe
+
+
+ƒ Proxy (Middleware)
+
+ƒ  (Dynamic)  server-rendered on demand
+

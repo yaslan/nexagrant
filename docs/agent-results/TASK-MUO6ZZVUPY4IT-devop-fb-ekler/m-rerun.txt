@@ -1,0 +1,46 @@
+ok  K1  [açık→KIRMIZI beklenir] kontrol: readOnly doğrudan yazma                               → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (line 7)
+ok  K2  [meşru→YEŞİL beklenir] kontrol: iyi biçim                                             → YEŞİL
+ok  B1  [açık→KIRMIZI beklenir] export { default as w } from './impl' (anonim default fn)      → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/b1impl.ts:2, via default (lib/i80/b1impl))
+ok  B2  [açık→KIRMIZI beklenir] iki export * barrel, ad ikincide                               → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/b2b.ts:2, via wipe (lib/i80/b2b))
+ok  B3  [açık→KIRMIZI beklenir] iç içe export * (3 kat)                                        → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/b3impl.ts:2, via wipe (lib/i80/b3impl))
+ok  B4  [açık→KIRMIZI beklenir] export { wipe as default } from + import w from                → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/b4impl.ts:2, via wipe (lib/i80/b4impl))
+ok  B5  [açık→KIRMIZI beklenir] import * as ns + barrel export * → ns.wipe()                   → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/b5impl.ts:2, via wipe (lib/i80/b5impl))
+ok  B6  [açık→KIRMIZI beklenir] barrel alias yolu: export { wipe } from '@/lib/…'              → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/b6impl.ts:2, via wipe (lib/i80/b6impl))
+ok  B7  [açık→KIRMIZI beklenir] barrel export type {…} + değer export                          → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/b7impl.ts:2, via wipe (lib/i80/b7impl))
+ok  B8  [açık→KIRMIZI beklenir] export * ile gelen ad namespace içinde: import {ns}; ns.wipe   → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/b8impl.ts:2, via wipe (lib/i80/b8impl))
+ok  B9  [açık→KIRMIZI beklenir] döngüsel barrel (a→b→a), ad yok → fail-closed                  → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/b9a.ts:3, via ?wipe (lib/i80/b9a))
+ok  C1  [açık→KIRMIZI beklenir] koşullu: const m = flag ? await import(a) : await import(b)    → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/c1a.ts:2, via ?* (lib/i80/c1a)); prisma.evidence.delete (lib/i80/c1b.ts:2, via ?* (lib/i80/c1b))
+ok  C2  [açık→KIRMIZI beklenir] import(…).then((m) => m.wipe(id))                              → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/c2impl.ts:2, via ?then (lib/i80/c2impl))
+ok  C3  [açık→KIRMIZI beklenir] let m = await import(…); m.wipe()                              → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/c3impl.ts:2, via ?* (lib/i80/c3impl)); prisma.evidence.delete (lib/i80/c3impl.ts:2, via ?* (lib/i80/c3impl))
+ok  C4  [açık→KIRMIZI beklenir] const { wipe } = await (flag ? import(a) : import(b))          → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/c4a.ts:2, via ?* (lib/i80/c4a)); prisma.evidence.delete (lib/i80/c4b.ts:2, via ?* (lib/i80/c4b))
+ok  C5  [açık→KIRMIZI beklenir] üst düzey const lazy = import(…); (await lazy).wipe()          → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/c5impl.ts:2, via ?* (lib/i80/c5impl))
+ok  C6  [açık→KIRMIZI beklenir] Promise.all([import(a)]) → [m]                                 → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/c6impl.ts:2, via ?* (lib/i80/c6impl))
+ok  C7  [açık→KIRMIZI beklenir] const m = await import(…) as any; m.wipe()                     → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/c7impl.ts:2, via wipe (lib/i80/c7impl))
+ok  C8  [açık→KIRMIZI beklenir] koşullu statik: flag ? a.wipe : b.wipe (import {..})           → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/c8b.ts:2, via wipe (lib/i80/c8b))
+ok  T1  [meşru→YEŞİL beklenir] import type {X} from yazan modül (readOnly)                    → YEŞİL
+ok  T2  [meşru→YEŞİL beklenir] import { type Row, read } (readOnly okuma)                     → YEŞİL
+ok  T3  [meşru→YEŞİL beklenir] import { Row } (tip, type-siz import) yalnız tip konumunda     → YEŞİL
+ok  T4  [meşru→YEŞİL beklenir] class implements ImportedInterface (heritage)                  → YEŞİL
+ok  T5  [meşru→YEŞİL beklenir] enum değer import (readOnly)                                   → YEŞİL
+ok  T6  [meşru→YEŞİL beklenir] typeof import: type M = typeof import(…)                       → YEŞİL
+ok  J1  [meşru→YEŞİL beklenir] import data from '@/contracts/…json'                           → YEŞİL
+ok  J2  [meşru→YEŞİL beklenir] import … with { type: 'json' }                                 → YEŞİL
+ok  J3  [meşru→YEŞİL beklenir] await import('@/locales/en/settings.json')                     → YEŞİL
+ok  P1  [açık→KIRMIZI beklenir] alias içinde '..': '@/lib/../lib/i80/p1impl'                   → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/p1impl.ts:2, via wipe (lib/i80/p1impl))
+ok  P2  [açık→KIRMIZI beklenir] uzantılı: '@/lib/i80/p2impl.js'                                → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/p2impl.ts:2, via wipe (lib/i80/p2impl))
+ok  P3  [açık→KIRMIZI beklenir] açık index: '@/lib/i80/p3dir/index'                            → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/p3dir/index.ts:2, via wipe (lib/i80/p3dir/index))
+ok  P4  [açık→KIRMIZI beklenir] göreli '../..' ile src içi                                     → KIRMIZI  readOnly: true but writes: import of src/app/lib/i80/p4impl, which is no file the guard can read (fail-closed)
+ok  P5  [meşru→YEŞİL beklenir] gerçek: can '@/lib/rbac' + '@/lib/./rbac' değil → iyi biçim    → YEŞİL
+ok  P6  [meşru→YEŞİL beklenir] can '@/lib/./rbac' (normalize edilmemiş, meşru TS)             → YEŞİL
+ok  P7  [meşru→YEŞİL beklenir] db '@/lib/../lib/db' + iyi biçim                               → YEŞİL
+ok  S1  [açık→KIRMIZI beklenir] oturum kopyası üzerine yazma: {...scope, role: input}          → KIRMIZI  write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)
+ok  S2  [açık→KIRMIZI beklenir] iç blokta aynı ad: { const role = input.role; if(!can(role)) } → KIRMIZI  write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)
+ok  S3  [açık→KIRMIZI beklenir] scope.role ??= / ||= ile yazma                                 → KIRMIZI  write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)
+ok  S4  [açık→KIRMIZI beklenir] sahte auth: auth barrel üzerinden başka modülden               → KIRMIZI  write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)
+ok  S5  [açık→KIRMIZI beklenir] kapanış içinde yazma: const f = () => { scope.role = x }       → KIRMIZI  write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)
+XX  S6  [açık→KIRMIZI beklenir] belgeli: takma ad üzerinden yazma const s2 = scope; s2.role = x → YEŞİL
+XX  F1  [meşru→YEŞİL beklenir] readOnly: repo.find() — repo nesnesinde ayrıca save() yazması var → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/f1impl.ts:4, via repo (lib/i80/f1impl))
+XX  F2  [meşru→YEŞİL beklenir] readOnly: Repo.find() — sınıfta ayrıca static save() yazması   → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i80/f2impl.ts:4, via Repo (lib/i80/f2impl))
+ok  F3  [meşru→YEŞİL beklenir] readOnly: ns.read() — aynı modülde wipe() de var               → YEŞİL
+ok  F4  [meşru→YEŞİL beklenir] readOnly: barrel export * üzerinden read()                     → YEŞİL
+beklenenden sapan: 3/45

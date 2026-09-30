@@ -1,0 +1,18 @@
+== vitest start 17:46:03 load { 26.20 26.26 23.00 }
+VITEST_EXIT=0
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence a role outside the enum (a stale token) reads nothing [skipped]
+  allowed: tests/k1-embeddings.live.test.ts :: K1 embeddings (live, REAL OpenAI) real vectors rank each tenant’s own topic first [skipped]
+LIVESKIP_EXIT=0
+== vitest end 17:46:37 load { 30.36 27.25 23.49 }
+ Test Files  294 passed | 2 skipped (296)
+      Tests  3661 passed | 36 skipped (3697)
+   Duration  33.42s (transform 14.76s, setup 0ms, import 77.50s, tests 208.33s, environment 17.10s)
+ ✓ tests/server-action-rbac-guard.test.ts (52 tests) 455ms
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.createOpportunity needs manage_workspaces
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.createOpportunity needs manage_workspaces
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.createOpportunity needs manage_workspaces
+TSC_EXIT=0
+LINT_EXIT=0
+BUILD_EXIT=0
+✓ Compiled successfully in 6.9s
+== end 17:47:16 load { 19.67 24.86 22.79 }
