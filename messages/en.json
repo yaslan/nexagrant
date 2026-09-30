@@ -36,6 +36,7 @@
     "noResults": "No results found.",
     "pilotExpired": "The pilot has ended, so editing is off. Ask your administrator to extend it.",
     "forbiddenRole": "Your role does not allow this action, so nothing was saved. Ask your workspace administrator for access.",
+    "serviceBusy": "The system is very busy right now, so nothing was saved. Try again in a few seconds.",
     "aiTruncated": "The AI text was cut off at the length limit, so nothing was saved and no credit was charged. Try again, or ask for a shorter document.",
     "aiRefused": "The AI model declined this request. Nothing was saved and no credit was charged.",
     "logoAlt": "{brand} logo",

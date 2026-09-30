@@ -1,0 +1,30 @@
+HEAD=7b8fffa0 (dev c25a1623 merge'lü) DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55133/fabrika CI=true
+== vitest
+     ✓ a thrown action shows IMPORT_FAILED, not the error text  2038ms
+     ✓ an unlisted code from the server shows IMPORT_FAILED, not the code  391ms
+stderr | tests/workspace-scoped-writes.test.ts > createOpportunity refuses what is not a workspace slug, before the database > a query the database refuses is a refusal, not an outage: CREATE_FAILED, nothing buffered
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > decompression bomb: inflated stream bytes are capped before pdf.js starts > a 128 MB-inflating stream (~130 KB file) is refused at the real limits, fast
+ FAIL  tests/api/api-error-body-guard.test.ts > server action error returns > no server action returns what it caught (beyond the known list)
+ Test Files  2 failed | 302 passed | 2 skipped (306)
+      Tests  2 failed | 4042 passed | 51 skipped (4095)
+vitest exit=1
+live-skip-gate exit=0
+"numPassedTests":4042
+"numFailedTests":2
+tsc exit=0
+lint exit=0
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+i18n exit=0
+build exit=0
+✓ Compiled successfully in 3.7s
+
+== vitest 2. koşu (tam, CI=true) — 21:45  up 23:59, 1 user, load averages: 33.00 35.29 28.78
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/k1-embeddings.live.test.ts > K1 embeddings (live, fabrika_app) — refused rows (İNCELEME-55 B-1) > a refused request (every input, the probe too) marks no row, profile or topic, and stops the run (İNCELEME-85 Y-1)
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > decompression bomb: inflated stream bytes are capped before pdf.js starts > a 128 MB-inflating stream (~130 KB file) is refused at the real limits, fast
+ Test Files  2 failed | 302 passed | 2 skipped (306)
+      Tests  2 failed | 4042 passed | 51 skipped (4095)
+vitest exit=1
+live-skip-gate exit=0
+21:47  up 1 day, 0 sec, 1 user, load averages: 42.73 37.67 30.33
