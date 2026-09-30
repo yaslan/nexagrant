@@ -105,14 +105,14 @@ Kaldırılan servislerin (Sentry, Resend, Inngest, Entra, Outlook, SAML) hiçbir
 
 ```
 $ bash scripts/apply-migrations.sh --list | wc -l
-36
-$ bash scripts/apply-migrations.sh --list | tail -5
-hash-bearer-tokens.sql
-credit-ledger-grant-period.sql
-invitation-accepted-at.sql
-add-public-lead.sql
+41
+$ bash scripts/apply-migrations.sh --list | tail -6
 relationship-stale-reminded-at.sql
+k1-embedding-hash.sql
 m4-stale-reminder-idempotency.sql
+add-api-key-rate-window.sql
+evidence-unique-object-key.sql
+m4-stale-digest-user-claim.sql
 ```
 
 Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workflows/ci.yml:99`):
@@ -120,10 +120,16 @@ Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workfl
 - [ ] 0. **Önce yedek** (§4.1) — geri dönüşün tek güvenli yolu.
 - [ ] 1. `pnpm exec prisma db push` — **`--accept-data-loss` VERMEYİN**. Veri kaybı gerektiren bir fark varsa komut durur; o durumda dur ve incele.
 - [ ] 2. `pnpm db:rls-role` — `fabrika_app` rolü (sonraki adımların `GRANT … TO fabrika_app` satırları bunu arar).
-- [ ] 3. `DATABASE_URL=<sahip rol> scripts/apply-migrations.sh` — 36 dosya; iki kez koşmak güvenli (CI her push'ta iki kez koşuyor).
+- [ ] 2a. **Eski worker'ı durdur** (SIGTERM; elindeki işi bitirip `graceful shutdown complete` yazar). Yeni worker §3.3'te kalkana kadar hiçbir worker koşmaz. Gerekçe aşağıda (**Claim taşıma penceresi**).
+- [ ] 3. `DATABASE_URL=<sahip rol> scripts/apply-migrations.sh` — 41 dosya; iki kez koşmak güvenli (CI her push'ta iki kez koşuyor).
 - [ ] 4. `pnpm db:rls` — kiracı politikaları + sistem kapsamı fonksiyonları.
-- [ ] 5. `pnpm rls:verify` gerçek `fabrika_app` ile exit 0.
+- [ ] 5. `pnpm rls:verify` gerçek `fabrika_app` ile exit 0. Kiracı tablolarında `FORCE ROW LEVEL SECURITY` da denetlenir (bir migration FORCE'u kapatıp geri koymazsa exit 1).
 - [ ] 6. **Web**'i yeni sürümle kaldır, sonra worker (§3.3).
+
+**Claim taşıma penceresi (İNCELEME-95 B-1, TASK-MUOADTEOQVL4Z):** `m4-stale-digest-user-claim.sql` M4 özetinin günlük claim'ini `Membership.staleDigestOn`'dan `User.staleDigestOn`'a taşır ve o ana kadarki claim'leri bir kez kopyalar (backfill). Backfill bir anlık görüntüdür: 3. adımdan sonra **eski** worker 07:00 UTC tikini (ya da yeniden denemeyi, elle eklenen işi) koşarsa claim'i yine üyeliğe yazar ve backfill bunu görmez. Aynı gün yeni worker'ın `fill=6h` telafisi ya da bir yeniden deneme o kullanıcıya ikinci özeti gönderir. İzole ortamda gerçek worker + mailpit ile ölçüldü: eski sıra → 2 özet, 2a ile → 1 özet. Bu yüzden:
+- Eski worker 3. adımdan **önce** durur (2a). Durduğu sırada kaçan 07:00 tikini yeni worker açılışta `fill=6h` ile koşar; 13:00 UTC'den sonra açılırsa o günün özeti ertesi sabaha kalır (e-posta kaybı değil, gecikme).
+- Yeni sürüm ayrıca bugünkü eski claim'i de okur (`stale-reminder.ts` `legacyClaims`): 2a atlanmış olsa bile aynı gün ikinci özet gitmez (ölçüldü: 1 özet). Bu okuma yalnız geçiş günü içindir; kolon kaldırılırken onunla birlikte gider.
+- 2a atlandıysa ve yeni sürümün bu koruması yoksa (ör. geri dönüp yeniden ileri alma): worker değiştikten sonra **aynı UTC gününde** `scripts/apply-migrations.sh`'i bir kez daha koşun. Backfill idempotenttir (yalnız NULL'u ya da daha eski günü yükseltir); ölçüldü: 1 özet.
 
 **Bilinen pencere (İNCELEME-12 K-6):** zincir koşarken 23. dosya (`add-agency-invite-code.sql`) ile 30. dosya (`agency-invite-no-max-uses.sql`) arasında `redeem_agency_invite()` eski gövdededir: `maxUses = NULL` olan davet kodları reddedilir (ölçüm: 23.–30. dosyalar 1,2 sn). Düşük trafik saatinde koşun; zincir yarıda kalırsa pencere açık kalır. Kontrol: `SELECT prosrc LIKE '%maxUses%' FROM pg_proc WHERE proname = 'redeem_agency_invite';` → `false` olmalı. İlk canlı kurulumda (boş DB, kullanıcı yok) bu pencere etkisizdir.
 
@@ -143,11 +149,11 @@ Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workfl
 
 - [ ] 1. Web'i kaldır.
 - [ ] 2. Inngest panosunda FonBridge uygulaması yok ya da "Functions" boş (eski zamanlayıcı tik atmıyor).
-- [ ] 3. Worker'ı `JOBS_CRON_ENABLED=false` ile kaldır (şemayı kurar; `job-queue:cron-disabled` uyarısı beklenir).
+- [ ] 3. Worker'ı `JOBS_CRON_ENABLED=false` ile kaldır (şemayı kurar; `job-queue:cron-disabled` uyarısı beklenir). Eski worker §3.1 2a'da durdurulmuş olmalı; eski ve yeni sürümün worker'ı aynı anda koşmaz (claim taşıma penceresi, §3.1).
 - [ ] 4. Worker'ı `JOBS_CRON_ENABLED=true` ile yeniden başlat. **Tek bir** cron'lu worker yeter; iki worker aynı DB'de güvenlidir (her tik bir kez koşar).
 - [ ] 5. İlk günlük tikten sonra (en geç 02:00 UTC `k1-daily-calls`) `/[locale]/admin/alerts`'te `job-queue` kaynağı ve worker logu kontrol.
 
-Geri dönüşte sıra ters: önce worker'ı durdur, sonra web'i geri al.
+Geri dönüşte sıra ters: önce worker'ı durdur, sonra web'i geri al. `m4-stale-digest-user-claim.down.sql` yeni sürümün o günkü claim'lerini üyeliklere geri kopyalamaz: geri dönüş günü yeni sürümün özet gönderdiği bir kullanıcı eski sürümden ikinci özeti alabilir. Geri dönüşü 07:00–13:00 UTC dışında yapın ya da eski worker'ı ertesi UTC gününe kadar `JOBS_CRON_ENABLED=false` ile tutun.
 
 ---
 

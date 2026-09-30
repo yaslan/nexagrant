@@ -61,23 +61,53 @@ function withCalendarTokenGate(client: PrismaClient): PrismaClient {
  * policies locally, since the default `fabrika` role is SUPERUSER and therefore
  * exempt from them. See prisma/rls-app-role.sql.
  */
-export function createDbClient(url: string): PrismaClient {
+export function createDbClient(url: string, poolOptions: DbPoolOptions = {}): PrismaClient {
   // 1s fast timeout for instant fallback in dev
   const pool = new pg.Pool({
     connectionString: url,
     connectionTimeoutMillis: 1000,
     idleTimeoutMillis: 5000,
+    ...poolOptions,
   });
   return withCalendarTokenGate(new PrismaClient({ adapter: new PrismaPg(pool) }));
 }
 
+/** The pg pool settings a caller of {@link createDbClient} may change. */
+export type DbPoolOptions = { max?: number; connectionTimeoutMillis?: number; application_name?: string };
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  lockPool: PrismaClient | undefined;
 };
 
 export const prisma: PrismaClient = globalForPrisma.prisma ?? createDbClient(connectionString);
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+/**
+ * B-1 (TASK-MUO9IFMMVRUDJ, İNCELEME-92): the pool of {@link withTenantLockPool}.
+ * Its transactions hold a lock while they wait on something outside the
+ * database (evidence confirm: an object-store copy of up to 15 s). On the
+ * application pool — 10 connections a process — ten such waits took every
+ * connection, and every other query of every tenant failed after 1 s. Here
+ * they take at most `LOCK_POOL_MAX` connections of their own; one more waits
+ * `LOCK_POOL_QUEUE_MS` for a free one and then fails, the rest of the app
+ * never notices. Its connections show up in `pg_stat_activity` under
+ * `application_name = LOCK_POOL_NAME`.
+ */
+export const LOCK_POOL_MAX = 3;
+export const LOCK_POOL_QUEUE_MS = 5_000;
+export const LOCK_POOL_NAME = 'fonbridge-lock-pool';
+export const LOCK_POOL_OPTIONS: DbPoolOptions = {
+  max: LOCK_POOL_MAX,
+  connectionTimeoutMillis: LOCK_POOL_QUEUE_MS,
+  application_name: LOCK_POOL_NAME,
+};
+
+function lockPoolClient(): PrismaClient {
+  globalForPrisma.lockPool ??= createDbClient(connectionString, LOCK_POOL_OPTIONS);
+  return globalForPrisma.lockPool;
+}
 
 declare const tenantScopeBrand: unique symbol;
 export type TenantScopeBrand = { readonly [tenantScopeBrand]: true };
@@ -197,4 +227,17 @@ export async function withTenant<T>(
   options?: TenantTxOptions
 ): Promise<T> {
   return withTenantOn(prisma, tenantId, callback, options);
+}
+
+/**
+ * {@link withTenant} on its own small pool ({@link LOCK_POOL_MAX}), for a
+ * transaction that holds a lock across a call outside the database. Anything
+ * that only talks to the database uses {@link withTenant}.
+ */
+export async function withTenantLockPool<T>(
+  tenantId: string,
+  callback: (tx: TenantTx) => Promise<T>,
+  options?: TenantTxOptions
+): Promise<T> {
+  return withTenantOn(lockPoolClient(), tenantId, callback, { maxWait: LOCK_POOL_QUEUE_MS, ...options });
 }

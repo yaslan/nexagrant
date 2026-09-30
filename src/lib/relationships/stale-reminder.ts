@@ -32,7 +32,10 @@ import { renderStaleRelationshipsEmail, type StaleDigestSection } from '@/lib/em
  * the tenant the first one mailed from (pilot over, M4 closed, the tenant's
  * read failing, the member removed, the tenant deleted) still finds it, and
  * two runs over different tenants race for the same row, so exactly one of
- * them sends.
+ * them sends. On the day this release goes out, a claim the previous release
+ * still wrote on a membership after the migration's backfill (its worker
+ * ticked between the migration and the worker swap) holds too: see
+ * `legacyClaims` (TASK-MUOADTEOQVL4Z, İNCELEME-95 B-1).
  *
  * Skipped, and counted:
  *   - a tenant whose free pilot has run out (read-only: nothing is stamped, so
@@ -119,15 +122,35 @@ async function recipientFor(
   return { userId, email: user.email, locale: user.locale === 'en' ? 'en' : 'tr' };
 }
 
+/**
+ * Adds to `into` the members of this tenant whose day the PREVIOUS release
+ * claimed (`Membership.staleDigestOn`, today). m4-stale-digest-user-claim.sql
+ * copies those claims onto the user row once; a claim that release's worker
+ * writes after that — it ticked between the migration and the worker swap —
+ * is only seen here, and without it the user gets a second digest that day
+ * (İNCELEME-95 B-1, measured: 2 mails). Read in every tenant the run visits,
+ * gated or not, since the old claim may sit on a tenant with nothing due now.
+ * Goes with the column, in the file that drops it.
+ */
+async function legacyClaims(tx: TenantTx, tenantId: string, now: Date, into: Set<string>): Promise<void> {
+  const rows = await tx.membership.findMany({
+    where: { tenantId, staleDigestOn: { gte: dayStartUtc(now) } },
+    select: { userId: true },
+  });
+  for (const r of rows) into.add(r.userId);
+}
+
 async function collectTenant(
   tenantId: string,
   now: Date,
   pageSize: number,
   runTenant: typeof withTenant,
-  out: StaleReminderResult
+  out: StaleReminderResult,
+  legacy: Set<string>
 ): Promise<TenantDue | null> {
   const cutoff = staleCutoff(now);
   return runTenant(tenantId, async (tx) => {
+    await legacyClaims(tx, tenantId, now, legacy);
     if ((await getPilotState(tenantId, tx, now)).kind === 'expired') {
       out.tenantsPilotExpired++;
       return null;
@@ -336,6 +359,7 @@ export async function sendStaleRelationshipReminders(options: {
 
   // 1 — collect, tenant by tenant (the tenant list itself read in pages).
   const collected: TenantDue[] = [];
+  const legacy = new Set<string>();
   let cursor = '';
   for (;;) {
     const tenants = await prisma.tenant.findMany({
@@ -350,7 +374,7 @@ export async function sendStaleRelationshipReminders(options: {
     for (const { id: tenantId } of tenants) {
       out.tenants++;
       try {
-        const due = await collectTenant(tenantId, now, pageSize, runTenant, out);
+        const due = await collectTenant(tenantId, now, pageSize, runTenant, out, legacy);
         if (due) collected.push(due);
       } catch (error) {
         out.tenantsFailed++;
@@ -365,6 +389,7 @@ export async function sendStaleRelationshipReminders(options: {
   type Section = StaleDigestSection & { tenantId: string; due: Array<{ id: string; lastContactAt: Date }> };
   const byUser = new Map<string, { recipient: Recipient; sections: Section[] }>();
   const mailedToday = await claimedToday([...new Set(collected.flatMap((t) => [...t.byOwner.keys()]))], now, pageSize);
+  for (const userId of legacy) mailedToday.add(userId);
   const mailedTodayDue = new Set<string>();
   for (const t of collected) {
     for (const [userId, { recipient, rows }] of t.byOwner) {
