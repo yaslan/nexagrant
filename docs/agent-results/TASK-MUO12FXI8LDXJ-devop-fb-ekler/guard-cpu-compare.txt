@@ -1,0 +1,20 @@
+== 2b0bbae8 load { 18.03 40.80 43.49 }
+      Tests  45 passed (45)
+scan#1: files=42 keys=128 findings=0 wall=22224ms cpu=8461ms (NO_OVERLAY yerine 
+scan#2: files=42 keys=128 findings=0 wall=38690ms cpu=8774ms (NO_OVERLAY yerine 
+src ts/tsx files=521
+== 8a4382bd load { 22.98 36.46 41.54 }
+      Tests  45 passed (45)
+scan#1: files=42 keys=128 findings=0 wall=9910ms cpu=8845ms (NO_OVERLAY yerine {
+scan#2: files=42 keys=128 findings=0 wall=8518ms cpu=7881ms (NO_OVERLAY yerine {
+src ts/tsx files=517
+== 2b0bbae8 load { 29.79 36.03 40.95 }
+      Tests  45 passed (45)
+scan#1: files=42 keys=128 findings=0 wall=10324ms cpu=7199ms (NO_OVERLAY yerine 
+scan#2: files=42 keys=128 findings=0 wall=7863ms cpu=6704ms (NO_OVERLAY yerine {
+src ts/tsx files=521
+== 8a4382bd^ (düzeltme öncesi) load { 20.11 32.93 39.62 }
+      Tests  34 passed (34)
+scan#1: files=42 keys=128 findings=0 wall=1649ms cpu=1810ms (NO_OVERLAY yerine {
+scan#2: files=42 keys=128 findings=0 wall=2066ms cpu=1778ms (NO_OVERLAY yerine {
+src ts/tsx files=517

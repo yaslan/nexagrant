@@ -27,9 +27,9 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
 });
 
 import { createDbClient, prisma } from '@/lib/db';
-import { runK1Embeddings, embeddingHash, profileEmbeddingText, TOPIC_EMBEDDING_PURPOSE, PROFILE_EMBEDDING_PURPOSE, EMBEDDING_USD_PER_MTOK } from '@/lib/scoring/embeddings';
+import { runK1Embeddings, embeddingHash, profileEmbeddingText, topicEmbeddingText, TOPIC_EMBEDDING_PURPOSE, PROFILE_EMBEDDING_PURPOSE, EMBEDDING_USD_PER_MTOK, REJECTED_HASH_PREFIX } from '@/lib/scoring/embeddings';
 import { recomputeAllTopicMatches } from '@/lib/scoring/topic-match';
-import { PLATFORM_SCOPE_TENANT_ID } from '@/lib/llm';
+import { LlmProviderError, PLATFORM_SCOPE_TENANT_ID } from '@/lib/llm';
 import { fakeEmbedding } from './helpers/fake-embedding';
 import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
@@ -82,6 +82,9 @@ const topicId = (k: TopicKey) => `tp-emb-${k}-${RUN}`;
 const MY_TOPICS = (Object.keys(TOPICS) as TopicKey[]).map(topicId);
 /** Never matched by k1-topic-match, so never paid for. */
 const CLOSED_TOPIC = `tp-emb-closed-${RUN}`;
+/** İNCELEME-55 B-1: three long Greek topics in a row, then an ordinary one. */
+const LONG_TOPICS = ['a', 'b', 'c', 'z'].map((k) => `tp-emb-long-${k}-${RUN}`);
+const GREEK = 'Αναμενόμενα αποτελέσματα: τα έργα αναμένεται να συμβάλουν στην ανάπτυξη ασφαλών λύσεων αποθήκευσης υδρογόνου για βαριές μεταφορές. ';
 
 const PROFILES: Record<string, { capabilities: string; keywords: string[] }> = {
   [T_A]: { capabilities: 'We design metal hydride hydrogen tanks and fuel-cell powertrains for trucks.', keywords: ['hydrogen', 'fuel cells'] },
@@ -115,7 +118,7 @@ async function wipe() {
   await admin.auditEvent.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
   await admin.aiUsageLog.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
   await admin.tenant.deleteMany({ where: { id: { in: presentIds(TENANTS) } } });
-  await admin.topic.deleteMany({ where: { id: { in: presentIds([...MY_TOPICS, CLOSED_TOPIC]) } } });
+  await admin.topic.deleteMany({ where: { id: { in: presentIds([...MY_TOPICS, CLOSED_TOPIC, ...LONG_TOPICS]) } } });
   await admin.call.deleteMany({ where: { id: requireId(CALL, 'call') } });
   await admin.programme.deleteMany({ where: { id: requireId(PROGRAMME, 'programme') } });
 }
@@ -243,5 +246,67 @@ describe.skipIf(!REAL)('K1 embeddings (live, REAL OpenAI)', () => {
     const best = (t: string) => rows.find((x) => x.tenantId === t)!.topicId;
     expect(best(T_A)).toBe(topicId('h2'));
     expect(best(T_B)).toBe(topicId('med'));
+  });
+});
+
+describe.skipIf(!HAS_DB)('K1 embeddings (live, fabrika_app) — refused rows (İNCELEME-55 B-1)', () => {
+  const LONG = { topicIds: LONG_TOPICS, tenantIds: [] as string[] };
+  /** A provider that refuses what text-embedding-3-large would, bytes standing in for tokens. */
+  const refuse = (text: string) => new LlmProviderError(`OpenAI embeddings error 400: ${text.length} chars`, 400);
+  const byteLimited = vi.fn(async (text: string) => {
+    if (Buffer.byteLength(text) > 8191) throw refuse(text);
+    return fakeEmbedding(text);
+  });
+  const greekRefused = vi.fn(async (text: string) => {
+    if (/[α-ω]/.test(text)) throw refuse(text);
+    return fakeEmbedding(text);
+  });
+
+  beforeAll(async () => {
+    if (!HAS_DB) return;
+    for (const [i, id] of LONG_TOPICS.entries()) {
+      const long = i < 3;
+      await admin.topic.create({
+        data: {
+          id, callId: CALL, identifier: `EMB-${RUN}-long-${i}`, status: 'OPEN', deadlines: [], eligibility: {},
+          title: long ? `Υδρογόνο ${i}` : 'Hydrogen refuelling stations', keywords: [],
+          description: long ? GREEK.repeat(160).slice(0, 16_000) : 'Stations for trucks.',
+        },
+      });
+    }
+  });
+
+  test('three refused rows in a row: the run goes on, marks them, and the next run skips them', async () => {
+    greekRefused.mockClear();
+    const r1 = await runK1Embeddings({ ...LONG, embed: greekRefused, maxUsd: 1 });
+    expect(r1).toMatchObject({ rejected: 3, aborted: false, topicsEmbedded: 1 });
+    for (const id of LONG_TOPICS.slice(0, 3)) {
+      const row = (await admin.topic.findUniqueOrThrow({ where: { id }, select: { title: true, keywords: true, description: true } }));
+      expect(await topicState(id)).toMatchObject({ has: false, hash: REJECTED_HASH_PREFIX + embeddingHash(topicEmbeddingText(row)) });
+    }
+    expect(await topicState(LONG_TOPICS[3]!)).toMatchObject({ has: true, dims: 1536 });
+    greekRefused.mockClear();
+    const r2 = await runK1Embeddings({ ...LONG, embed: greekRefused, maxUsd: 1 });
+    expect(greekRefused).not.toHaveBeenCalled();
+    expect(r2).toMatchObject({ previouslyRejected: 3, topicsUpToDate: 1, failed: 0 });
+  });
+
+  test('a new text lifts the mark; a too-long one is embedded from its byte-safe prefix', async () => {
+    // The title, not the tail: the tail is past the cut, so changing it changes neither the text nor the hash.
+    await admin.topic.update({ where: { id: LONG_TOPICS[0]! }, data: { title: 'Υδρογόνο 0, αναθεωρημένο' } });
+    byteLimited.mockClear();
+    const r = await runK1Embeddings({ ...LONG, embed: byteLimited, maxUsd: 1 });
+    expect(r).toMatchObject({ topicsEmbedded: 1, shortened: 1, failed: 0, previouslyRejected: 2 });
+    expect(byteLimited).toHaveBeenCalledTimes(2);
+    expect(await topicState(LONG_TOPICS[0]!)).toMatchObject({ has: true, dims: 1536 });
+  });
+
+  test('a refused profile is marked under RLS as fabrika_app', async () => {
+    await admin.tenantProfile.update({ where: { tenantId: T_A }, data: { capabilities: 'Κυψέλες καυσίμου υδρογόνου.' } });
+    const r = await runK1Embeddings({ topicIds: [], tenantIds: [T_A], embed: greekRefused, maxUsd: 1 });
+    expect(r).toMatchObject({ rejected: 1, profilesEmbedded: 0 });
+    expect((await profileState(T_A)).hash).toBe(REJECTED_HASH_PREFIX + embeddingHash(profileEmbeddingText({ capabilities: 'Κυψέλες καυσίμου υδρογόνου.', keywords: PROFILES[T_A]!.keywords })));
+    // Leave the profile as the fixtures made it.
+    await admin.tenantProfile.update({ where: { tenantId: T_A }, data: { capabilities: PROFILES[T_A]!.capabilities } });
   });
 });

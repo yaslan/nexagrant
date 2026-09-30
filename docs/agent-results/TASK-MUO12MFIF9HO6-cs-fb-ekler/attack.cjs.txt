@@ -1,0 +1,139 @@
+// İNCELEME-81 live attacks against :3481 (DB csfb81-pg only). Chrome via @playwright/test.
+const { chromium } = require('@playwright/test');
+const fs = require('fs');
+const { execSync } = require('child_process');
+const B = 'http://localhost:3481';
+const DIR = '/private/tmp/claude-501/-Users-macbook-alan/3f08ba86-a97c-436e-ad08-89028cd4ad88/scratchpad/ek81';
+const tok = Object.fromEntries(fs.readFileSync(DIR + '/tokens.env', 'utf8').trim().split('\n').map((l) => l.split('=')));
+const q = (sql) => execSync(`docker exec -i csfb81-pg psql -U fabrika -d fabrika -tAq`, { input: sql }).toString().trim();
+
+async function login(ctx, email) {
+  const r = ctx.request;
+  const { csrfToken } = await (await r.get(B + '/api/auth/csrf')).json();
+  await r.post(B + '/api/auth/callback/credentials', { form: { csrfToken, email, callbackUrl: B + '/tr' }, maxRedirects: 0 });
+}
+const sess = async (ctx) => {
+  const s = await (await ctx.request.get(B + '/api/auth/session')).json();
+  return JSON.stringify({ tenantId: s?.tenantId ?? null, role: s?.role ?? null, keys: Object.keys(s || {}) });
+};
+async function update(ctx, data, withCsrf = true) {
+  const { csrfToken } = await (await ctx.request.get(B + '/api/auth/csrf')).json();
+  const res = await ctx.request.post(B + '/api/auth/session', {
+    headers: { 'content-type': 'application/json' },
+    data: JSON.stringify(withCsrf ? { csrfToken, data } : { data }),
+    failOnStatusCode: false,
+    maxRedirects: 0,
+  });
+  let body = await res.text();
+  try { const j = JSON.parse(body); body = JSON.stringify({ tenantId: j?.tenantId ?? null, role: j?.role ?? null }); } catch { body = body.slice(0, 80); }
+  return `${res.status()} ${body}`;
+}
+const text = async (p) => (await p.innerText('body')).replace(/\s+/g, ' ').slice(0, 300);
+
+async function acceptWith(ctx, raw, label, shot) {
+  const p = await ctx.newPage();
+  await p.goto(B + '/tr/accept-invite?token=' + raw, { waitUntil: 'load', timeout: 120000 });
+  const dlg = p.getByRole('alertdialog');
+  if (await dlg.waitFor({ timeout: 8000 }).then(() => true, () => false)) { await dlg.getByRole('button').first().click(); await dlg.waitFor({ state: 'hidden' }); }
+  const btn = p.getByTestId('accept-invite-submit');
+  const hasBtn = await btn.waitFor({ timeout: 15000 }).then(() => true, () => false);
+  if (hasBtn) {
+    await btn.click();
+    await p.waitForTimeout(4000);
+  }
+  console.log(`[${label}] url=${p.url().replace(raw, '<token>')} button=${hasBtn} | session ${await sess(ctx)}`);
+  console.log(`     text: ${(await text(p)).slice(0, 220)}`);
+  if (shot) await p.screenshot({ path: `${DIR}/${shot}` });
+  await p.close();
+}
+
+(async () => {
+  const b = await chromium.launch({ channel: 'chrome' });
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
+  await login(ctx, 'cf81@fabrika.test');
+  console.log('[0] signed in                      :', await sess(ctx));
+
+  // --- A: client-side session.update ---
+  console.log('[A1] update {tenantId: cf81-x} (not member)      :', await update(ctx, { tenantId: 'cf81-x' }), '| next GET', await sess(ctx));
+  console.log('[A2] update {tenantId: cf81-c} (not yet member)  :', await update(ctx, { tenantId: 'cf81-c' }));
+  console.log('[A3] update w/o csrf {tenantId: cf81-b}          :', await update(ctx, { tenantId: 'cf81-b' }, false), '| next GET', await sess(ctx));
+  console.log('[A4] update {tenantId: {in:[cf81-x]}} (object)   :', await update(ctx, { tenantId: { in: ['cf81-x'] } }));
+  console.log('[A5] update {tenantId: [cf81-x,cf81-b]} (array)  :', await update(ctx, { tenantId: ['cf81-x', 'cf81-b'] }));
+  console.log('[A6] update {tenantId: " cf81-x"} (padded)       :', await update(ctx, { tenantId: ' cf81-x' }));
+  console.log('[A7] update {tenantId:x, role:TENANT_OWNER, isPlatformAdmin:true, boundTenantId:x, workspaceIds:[]} :', await update(ctx, { tenantId: 'cf81-x', role: 'TENANT_OWNER', isPlatformAdmin: true, boundTenantId: 'cf81-x' }));
+  console.log('[A8] update {tenantId: cf81-b} (member, MEMBER)  :', await update(ctx, { tenantId: 'cf81-b' }), '| next GET', await sess(ctx));
+  console.log('[A9] update {tenantId: cf81-d} (member, DELETED tenant):', await update(ctx, { tenantId: 'cf81-d' }), '| next GET', await sess(ctx));
+  {
+    const p = await ctx.newPage();
+    const r = await p.goto(B + '/tr/default/dashboard', { waitUntil: 'load', timeout: 120000 });
+    console.log('[A9b] bound to deleted D, /tr/default/dashboard ->', r.status(), p.url(), '|', (await text(p)).slice(0, 160));
+    await p.screenshot({ path: `${DIR}/shot-A9b-deleted-tenant-dashboard.png` });
+    await p.close();
+  }
+  console.log('[A10] update {tenantId: cf81-a} (back to owner A):', await update(ctx, { tenantId: 'cf81-a' }));
+  // plain requests never move: remove A while bound to A
+  q(`delete from "Membership" where id='cf81-ma'`);
+  console.log('[S1] removed from A, plain GET x3              :', await sess(ctx), await sess(ctx), await sess(ctx));
+
+  // --- B: invitation tokens that must not rebind ---
+  await acceptWith(ctx, tok['cf81-inv-oth'], 'B1 someone else\'s token (victim@, X)', 'shot-B1-other-token.png');
+  await acceptWith(ctx, tok['cf81-inv-exp'], 'B2 expired token (X)', null);
+  await acceptWith(ctx, tok['cf81-inv-rev'], 'B3 revoked (tenant D deleted)', null);
+  await acceptWith(ctx, tok['cf81-inv-usd'], 'B4 used by another, not member (Y)', null);
+  await acceptWith(ctx, 'deadbeef'.repeat(8), 'B5 unknown token', null);
+  console.log('[B*] memberships of u:', q(`select string_agg("tenantId"||':'||role, ', ' order by "tenantId") from "Membership" where "userId"='cf81-u'`));
+
+  // --- C: /no-workspace (tenantless) ---
+  {
+    const p = await ctx.newPage();
+    const r = await p.goto(B + '/tr/default/dashboard', { waitUntil: 'load', timeout: 120000 });
+    const html = await p.content();
+    console.log('[C1] tenantless dashboard ->', r.status(), p.url());
+    console.log('     text:', await text(p));
+    console.log('     leaks? A name:', html.includes('cf81 A'), 'B name:', html.includes('cf81 B'), 'email:', html.includes('cf81@fabrika.test'), 'user name:', html.includes('Cf Kullanici'), 'tenant ids:', /cf81-[abcdxy]\b/.test(html));
+    await p.screenshot({ path: `${DIR}/shot-C1-no-workspace.png` });
+    const r2 = await p.goto(B + '/en/default/dashboard', { waitUntil: 'load', timeout: 120000 });
+    console.log('[C2] tenantless /en dashboard ->', r2.status(), p.url(), '|', (await text(p)).slice(0, 90));
+    for (const path of ['/%2F%2Fevil.example/default/dashboard', '/%5C%5Cevil.example/default/dashboard', '/xx/default/dashboard']) {
+      const rr = await ctx.request.get(B + path, { maxRedirects: 0, failOnStatusCode: false });
+      console.log(`[C3] ${path} -> ${rr.status()} location=${rr.headers()['location'] ?? '-'}`);
+    }
+    // "Tekrar giriş yap" link
+    await p.goto(B + '/tr/no-workspace', { waitUntil: 'load' });
+    await p.getByRole('link', { name: 'Tekrar giriş yap' }).click();
+    await p.waitForLoadState('load'); await p.waitForTimeout(1500);
+    console.log('[C4] "Tekrar giriş yap" ->', p.url(), '| session', await sess(ctx));
+    await p.screenshot({ path: `${DIR}/shot-C4-login-from-no-workspace.png` });
+    await p.close();
+  }
+
+  // --- D: same invitation, two tabs, concurrently ---
+  {
+    const p1 = await ctx.newPage(); const p2 = await ctx.newPage();
+    for (const p of [p1, p2]) {
+      await p.goto(B + '/tr/accept-invite?token=' + tok['cf81-inv-c'], { waitUntil: 'load', timeout: 120000 });
+      const dlg = p.getByRole('alertdialog');
+      if (await dlg.waitFor({ timeout: 8000 }).then(() => true, () => false)) { await dlg.getByRole('button').first().click(); await dlg.waitFor({ state: 'hidden' }); }
+      await p.getByTestId('accept-invite-submit').waitFor({ timeout: 60000 });
+    }
+    await Promise.all([p1.getByTestId('accept-invite-submit').click(), p2.getByTestId('accept-invite-submit').click()]);
+    await Promise.all([p1.waitForTimeout(6000), p2.waitForTimeout(6000)]);
+    console.log('[D1] tab1 ->', p1.url(), '|', (await text(p1)).slice(0, 110));
+    console.log('[D2] tab2 ->', p2.url(), '|', (await text(p2)).slice(0, 110));
+    console.log('[D3] session', await sess(ctx));
+    console.log('[D4] DB: memberships C =', q(`select count(*) from "Membership" where "tenantId"='cf81-c' and "userId"='cf81-u'`),
+      '· audit invitation.accepted =', q(`select count(*) from "AuditEvent" where target='cf81-inv-c' and type='invitation.accepted'`),
+      '· acceptedAt set =', q(`select ("acceptedAt" is not null) from "Invitation" where id='cf81-inv-c'`));
+    await p1.screenshot({ path: `${DIR}/shot-D1-tab1.png` }); await p2.screenshot({ path: `${DIR}/shot-D2-tab2.png` });
+    await p1.close(); await p2.close();
+  }
+  // --- E: sign out + sign in ---
+  {
+    const { csrfToken } = await (await ctx.request.get(B + '/api/auth/csrf')).json();
+    await ctx.request.post(B + '/api/auth/signout', { form: { csrfToken, callbackUrl: B + '/tr' } });
+    console.log('[E1] after sign-out                   :', await sess(ctx));
+    await login(ctx, 'cf81@fabrika.test');
+    console.log('[E2] sign in again (oldest = B now)   :', await sess(ctx));
+  }
+  await b.close();
+})().catch((e) => { console.error('FAIL', e.stack); process.exit(1); });

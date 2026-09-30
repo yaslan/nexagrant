@@ -37,7 +37,7 @@ function helpersFor(attempts = 1): JobHelpers {
 }
 const result = (over: Record<string, unknown> = {}) => ({
   topicsScanned: 3, topicsEmbedded: 3, topicsUpToDate: 0, topicsEmpty: 0, profilesScanned: 1, profilesEmbedded: 1,
-  profilesUpToDate: 0, profilesEmpty: 0, profilesPilotExpired: 0, raced: 0, failed: 0, estimatedUsd: 0.0002,
+  profilesUpToDate: 0, profilesEmpty: 0, profilesPilotExpired: 0, rejected: 0, previouslyRejected: 0, shortened: 0, raced: 0, failed: 0, estimatedUsd: 0.0002,
   maxUsd: 0.05, budgetExhausted: false, aborted: false, errors: [], durationMs: 5, ...over,
 });
 const TICK = '2026-10-01T02:15:00.000Z';
@@ -77,6 +77,14 @@ describe('k1-embeddings job', () => {
     expect(JSON.stringify(alerts)).not.toContain('secret-body');
     expect(infos.join('\n')).not.toContain('secret-body');
     expect(infos.some((m) => m.includes('"success":false'))).toBe(true);
+  });
+
+  it('refused rows are named in the warn as skipped, and the output carries the counts', async () => {
+    runK1Embeddings.mockResolvedValue(result({ failed: 2, rejected: 2, previouslyRejected: 1, shortened: 1 }));
+    await k1EmbeddingsTask({}, helpersFor());
+    expect(alerts).toEqual([expect.objectContaining({ level: 'warn', dedupeKey: 'k1-embeddings:failed', meta: expect.objectContaining({ rejected: 2 }) })]);
+    expect(String(alerts[0]!.message)).toContain('2 rows refused, now skipped');
+    expect(infos.some((m) => m.includes('"rejected":2') && m.includes('"previouslyRejected":1') && m.includes('"shortened":1'))).toBe(true);
   });
 
   it('the cap is an info alert, and the run still counts as a success', async () => {
