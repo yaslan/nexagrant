@@ -5,7 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
 import { SediaAdapter } from '@/lib/adapters/sedia';
 import { requireTenantPage } from '@/lib/tenant';
-import { resolveScopedWorkspace } from '@/lib/workspaces';
+import { normalizeWorkspaceSlug, resolveScopedWorkspace } from '@/lib/workspaces';
 import { getWorkspaceRoute, publicCallDetailHref } from '@/lib/routes';
 import AddToPipelineButton from './add-button';
 
@@ -23,8 +23,14 @@ export default async function CallDetailsPage({
   // which picks a permitted one (or /no-workspace). `createOpportunity` checks
   // again on write; this keeps the button from being offered for a workspace it
   // would refuse.
+  //
+  // The segment is normalised first (TASK-MUO64UQJUWEBI, İNCELEME-83 O-1): it may
+  // arrive percent-encoded or upper-cased, and one that cannot be a slug at all is a
+  // 404 here — sending it back through the workspace-free route is what looped.
   const scope = await requireTenantPage(locale);
-  const scoped = await resolveScopedWorkspace(scope, workspace);
+  const requested = normalizeWorkspaceSlug(workspace);
+  if (!requested) notFound();
+  const scoped = await resolveScopedWorkspace(scope, requested);
   if (!scoped) redirect(publicCallDetailHref(locale, id));
   if (scoped.slug !== workspace) {
     redirect(getWorkspaceRoute('callDetail', locale, scoped.slug, encodeURIComponent(id)));
