@@ -1,0 +1,50 @@
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H1 forbidden writes are refused with FORBIDDEN_ROLE and change nothing
+H1
+MEMBER           deleteEvidence(evA)                      → throw:FORBIDDEN_ROLE
+GUEST_PARTNER    deleteEvidence(evA)                      → throw:FORBIDDEN_ROLE
+MEMBER           signDocument(docA)                       → throw:FORBIDDEN_ROLE
+GUEST_PARTNER    issuePartnerPortalLink(partA)            → throw:FORBIDDEN_ROLE
+WRITER           departmentApproveAction(docA,FINANCE)    → throw:FORBIDDEN_ROLE
+WRITER           moveOpportunityStage(oppA,G1)            → throw:FORBIDDEN_ROLE
+WRITER           evaluateOpportunityGate(oppA,G1)         → throw:FORBIDDEN_ROLE
+MEMBER           createRelationship                       → throw:FORBIDDEN_ROLE
+MEMBER           updateNoteStatus(x,approved)             → throw:FORBIDDEN_ROLE
+MEMBER           updateRelationship(relA,{ownerUserId})   → ok:{"success":false,"error":"FORBIDDEN"}
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H2 stale / missing role claims grant nothing
+H2
+"SUPER_WRITER" → throw:FORBIDDEN_ROLE
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H3 cross-tenant: OWNER of A aims at B ids — nothing in B changes
+H3
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H4 tenant id in the session is the only scope: WRITER of A with a forged B tenant claim
+H4 WRITER(A user) with tenantId=B claim → ok:{"success":true}
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H4 tenant id in the session is the only scope: WRITER of A with a forged B tenant claim
+H4 relB.notes = forged-claim
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H5 GUEST_PARTNER (no view_proposal) still writes updateRelationship notes/warmth
+H5 GUEST_PARTNER updateRelationship → throw:FORBIDDEN_ROLE; relA now {"notes":"orig","warmth":"cold"}
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H5-fix GUEST_PARTNER is refused with FORBIDDEN_ROLE and relA is unchanged; MEMBER still edits
+H5-fix GUEST_PARTNER updateRelationship → throw:FORBIDDEN_ROLE; relA before {"notes":"orig","warmth":"cold","ownerUserId":null} after {"notes":"orig","warmth":"cold","ownerUserId":null}
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H5-fix GUEST_PARTNER is refused with FORBIDDEN_ROLE and relA is unchanged; MEMBER still edits
+H5-fix MEMBER updateRelationship → ok:{"success":true}; relA.notes = member-wrote
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H6 KARAR items as implemented: WRITER approves own note, signs without dual approval, issues/rotates partner token
+H6 WRITER signDocument(docA) → ok:{"success":true,"signedAt":"2026-09-30T06:48:31.212Z"}; docA.signedAt null → Wed Sep 30 2026 09:48:31 GMT+0300 (Türkiye Standard Time)
+H6 WRITER issuePartnerPortalLink ×2 → ok:{"token":"******… / ok:{"token":"******…; hash changed twice: true
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H6 KARAR items as implemented: WRITER approves own note, signs without dual approval, issues/rotates partner token
+H6 WRITER updateNoteStatus(free-text status) → ok:{"success":true}
+ ✓ tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H1 forbidden writes are refused with FORBIDDEN_ROLE and change nothing 43ms
+ ✓ tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H2 stale / missing role claims grant nothing 7ms
+ ✓ tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H3 cross-tenant: OWNER of A aims at B ids — nothing in B changes 22ms
+ ✓ tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H4 tenant id in the session is the only scope: WRITER of A with a forged B tenant claim 4ms
+ ✓ tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H5 GUEST_PARTNER (no view_proposal) still writes updateRelationship notes/warmth 2ms
+ ✓ tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H5-fix GUEST_PARTNER is refused with FORBIDDEN_ROLE and relA is unchanged; MEMBER still edits 12ms
+ ✓ tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H6 KARAR items as implemented: WRITER approves own note, signs without dual approval, issues/rotates partner token 19ms
+stdout | tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H8 6 roles × 3 permissions, live rows: result == can(role, perm)
+H8
+TENANT_OWNER     edit_proposal: geçti (satır kaldı=0) can=true | approve_dual_approval: geçti→ok:{"success":false,"refusal":"DOC_NOT_FOUND","approvalState can=true
+TENANT_ADMIN     edit_proposal: geçti (satır kaldı=0) can=true | approve_dual_approval: geçti→ok:{"success":false,"refusal":"DOC_NOT_FOUND","approvalState can=true
+PIPELINE_MANAGER edit_proposal: geçti (satır kaldı=0) can=true | approve_dual_approval: RET can=false
+WRITER           edit_proposal: geçti (satır kaldı=0) can=true | approve_dual_approval: RET can=false
+MEMBER           edit_proposal: RET (satır kaldı=1) can=false | approve_dual_approval: RET can=false
+GUEST_PARTNER    edit_proposal: RET (satır kaldı=1) can=false | approve_dual_approval: RET can=false
+I59_FIXTURE {"ids":{"tA":"cmunquu6q0000bkxklecrygr8","oppA":"cmunquu7f0002bkxk27jw3bjq","evA":"cmunquu7i0003bkxkock7meec","relA":"cmunquu7l0004bkxktnro1txh","docA":"cmunquu7m0005bkxkb0t8e8no","partAA":"cmunquu7o0006bkxkgxcedosv","tB":"cmunquu7q0007bkxkn40rqfp3","oppB":"cmunquu7t0009bkxkkla4cm8j","evB":"cmunquu7u000abkxkqkv551my","relB":"cmunquu7v000bbkxkpj72ekqx","docB":"cmunquu7x000cbkxk3zgzwt9x","partAB":"cmunquu7y000dbkxk6uqy1kda"},"users":{"TENANT_OWNER":"cmunquu7z000ebkxkhvkasl4f","TENANT_ADMIN":"cmunquu82000gbkxk6a48yl27","PIPELINE_MANAGER":"cmunquu84000ibkxka6fj7x6p","WRITER":"cmunquu87000kbkxkekolb7nw","MEMBER":"cmunquu89000mbkxkdq1zo9bl","GUEST_PARTNER":"cmunquu8b000obkxk7b5utr9f"}}
+ ✓ tests/i59-rbac-hostile.live.test.ts > İNCELEME-59 hostile calls, live DB > H8 6 roles × 3 permissions, live rows: result == can(role, perm) 49ms
+      Tests  8 passed (8)
