@@ -1,0 +1,148 @@
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55141/f
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt
+ ✓ tests/rls-coverage.test.ts > RLS model classification (scripts/rls-models.ts) > no SYSTEM_WIDE table carries a tenantId 2ms
+ ✓ tests/rls-coverage.test.ts > RLS model classification (scripts/rls-models.ts) > every NULLABLE_TENANT table really has an optional tenantId 1ms
+ ✓ tests/rls-coverage.test.ts > RLS model classification (scripts/rls-models.ts) > the two sets never claim the same table 0ms
+ ✓ tests/rls-coverage.test.ts > RLS model classification (scripts/rls-models.ts) > every strict model is declared in prisma/rls.sql 1ms
+ ✓ tests/rls-coverage.test.ts > B-1 — ClaimEvidenceLink and EvidenceReminder are tenant data > ClaimEvidenceLink has a required tenantId in schema.prisma 0ms
+ ✓ tests/rls-coverage.test.ts > B-1 — ClaimEvidenceLink and EvidenceReminder are tenant data > EvidenceReminder has a required tenantId in schema.prisma 0ms
+ ✓ tests/rls-coverage.test.ts > B-1 — ClaimEvidenceLink and EvidenceReminder are tenant data > ClaimEvidenceLink is no longer exempt from the gates 1ms
+ ✓ tests/rls-coverage.test.ts > B-1 — ClaimEvidenceLink and EvidenceReminder are tenant data > EvidenceReminder is no longer exempt from the gates 1ms
+ ✓ tests/rls-coverage.test.ts > B-1 — ClaimEvidenceLink and EvidenceReminder are tenant data > ClaimEvidenceLink is under strict tenant_isolation in prisma/rls.sql 1ms
+ ✓ tests/rls-coverage.test.ts > B-1 — ClaimEvidenceLink and EvidenceReminder are tenant data > EvidenceReminder is under strict tenant_isolation in prisma/rls.sql 1ms
+ ✓ tests/rls-coverage.test.ts > B-1 — ClaimEvidenceLink and EvidenceReminder are tenant data > EvidenceReminder carries personal data, so it is indexed by tenant 1ms
+ ✓ tests/rls-coverage.test.ts > AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH1PF) > its tenantId is optional in schema.prisma 0ms
+ ✓ tests/rls-coverage.test.ts > AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH1PF) > it takes strict tenant_isolation, never tenant_or_shared 0ms
+ ✓ tests/rls-coverage.test.ts > AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH1PF) > rls.sql drops the C-2 policy on already-migrated databases 0ms
+ ✓ tests/rls-coverage.test.ts > AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH1PF) > its migration drops tenant_or_shared and restates both remaining policies 2ms
+ ✓ tests/rls-coverage.test.ts > AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH1PF) > it is classified strict, not nullable-shared and not exempt 1ms
+ ✓ tests/rls-coverage.test.ts > AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH1PF) > src/actions/user/request-deletion.ts writes its tenant-less AuditEvent in system scope (request-deletion.erasureAudit) 0ms
+ ✓ tests/rls-coverage.test.ts > AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH1PF) > src/lib/jobs/tasks/users-scheduled-deletion.ts writes its tenant-less AuditEvent in system scope (erasure-sweep.erasureAudit) 1ms
+ ✓ tests/rls-coverage.test.ts > AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH1PF) > src/actions/user/export-data.ts writes its tenant-less AuditEvent in system scope (gdpr-export.accessAudit) 0ms
+ ✓ tests/rls-coverage.test.ts > AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH1PF) > the platform audit page reads through system scope 1ms
+ ✓ tests/rls-coverage.test.ts > 4b — every migration protects the tenant table it creates > no forward migration creates a tenant table it leaves unprotected 44ms
+ ✓ tests/rls-coverage.test.ts > 4b — every migration protects the tenant table it creates > the scan actually sees tables — including the three it once missed 18ms
+ ✓ tests/rls-coverage.test.ts > 4b — every migration protects the tenant table it creates > probe B — a table whose policy is in its own migration is no violation 17ms
+ ✓ tests/rls-coverage.test.ts > 4b — every migration protects the tenant table it creates > both migration shapes are read, and no down migration is 1ms
+ ✓ tests/rls-coverage.test.ts > 4b — every migration protects the tenant table it creates > a commented-out CREATE TABLE is not counted as a table 0ms
+ ✓ tests/rls-coverage.test.ts > 4b — every migration protects the tenant table it creates > the canonical wording is read from prisma/rls.sql, not copied 4ms
+ ✓ tests/rls-coverage.test.ts > 4b — every migration protects the tenant table it creates > mutation probe — an unprotected tenant table in a fake migration is caught 11ms
+ ✓ tests/rls.spec.ts > Row Level Security (RLS) > the test connection is genuinely subject to RLS 27ms
+ ✓ tests/rls.spec.ts > Row Level Security (RLS) > Tenant A cannot see Tenant B workspaces 46ms
+ ✓ tests/rls.spec.ts > Row Level Security (RLS) > queries outside the withTenant wrapper see no rows at all 3ms
+ ✓ tests/rls.spec.ts > Row Level Security (RLS) > tenant B cannot see tenant A's dual approval steps 81ms
+ ✓ tests/rls.spec.ts > Row Level Security (RLS) > the four-eyes rules are enforced by the database, not only by the app 61ms
+ ✓ tests/system-scope.live.test.ts > withSystemScope over a NOBYPASSRLS role > outside the path, a cross-tenant read returns nothing 5ms
+ ✓ tests/system-scope.live.test.ts > withSystemScope over a NOBYPASSRLS role > inside the path, the same read spans tenants 16ms
+ ✓ tests/system-scope.live.test.ts > withSystemScope over a NOBYPASSRLS role > the scope dies with its transaction 8ms
+ ✓ tests/system-scope.live.test.ts > withSystemScope over a NOBYPASSRLS role > the database refuses a purpose that is not on the list 9ms
+ ✓ tests/system-scope.live.test.ts > the purpose list > TypeScript and prisma/rls.sql declare the same five purposes 2ms
+ ✓ tests/system-scope.live.test.ts > the purpose list > every purpose is accepted by the database 19ms
+ ✓ tests/rls.spec.ts > Row Level Security (RLS) > writes are rejected when they target another tenant 20ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > a valid code returns the agency, counts one use, and links the new tenant 109ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > a use inside a transaction that rolls back is not counted 22ms
+ ✓ tests/iyzico-webhook-idempotency-rls.live.test.ts > iyzico webhook idempotency under fabrika_app (live database) > the handler really is running as a role the policies apply to 3ms
+ ✓ tests/iyzico-webhook-idempotency-rls.live.test.ts > iyzico webhook idempotency under fabrika_app (live database) > a first delivery writes the money and the audit trail together 205ms
+ ✓ tests/iyzico-webhook-idempotency-rls.live.test.ts > iyzico webhook idempotency under fabrika_app (live database) > a redelivery of the same event changes no row 24ms
+stderr | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a first delivery writes the money, the key and the audit row together
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+ ✓ tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > the handlers really are running as a role the policies apply to 3ms
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a redelivery of the same event changes no row in any of the five tables
+Event evt-rls-sync-mtvsbe-1790791674556 already processed; skipping
+ ✓ tests/agency-funnel.live.test.ts > agency_funnel_counts (fabrika_app) > returns integers per organisation type and nothing that names an organisation 17ms
+ ✓ tests/agency-funnel.live.test.ts > agency_funnel_counts (fabrika_app) > the agency is the caller: B sees only its own organisation, never A’s 10ms
+ ✓ tests/agency-funnel.live.test.ts > agency_funnel_counts (fabrika_app) > an organisation, or no tenant at all, gets no rows 15ms
+ ✓ tests/agency-funnel.live.test.ts > agency_funnel_counts (fabrika_app) > the system scope does not outlive the call, and the agency still reads no content 46ms
+ ✓ tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a first delivery writes the money, the key and the audit row together 125ms
+ ✓ tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a redelivery of the same event changes no row in any of the five tables 10ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > no use limit: a live code works N times in a row, and the counter keeps count 622ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > a code made under the old limit and used past it still works: the old limit is not read 84ms
+stdout | tests/iyzico-webhook-idempotency-rls.live.test.ts > iyzico webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the advisory lock, not by a read
+wave=8 synced=1 duplicate=7 rejected=0 | creditRows=1 balance=777
+ ✓ tests/iyzico-webhook-idempotency-rls.live.test.ts > iyzico webhook idempotency under fabrika_app (live database) > a new event id does move the same rows 52ms
+ ✓ tests/iyzico-webhook-idempotency-rls.live.test.ts > iyzico webhook idempotency under fabrika_app (live database) > an unresolvable tenant does not throw and raises an operator-visible alert 18ms
+ ✓ tests/iyzico-webhook-idempotency-rls.live.test.ts > iyzico webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the advisory lock, not by a read 262ms
+ ✓ tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a new event id does move the same rows 179ms
+ ✓ tests/agency-funnel.live.test.ts > getAgencyFunnel (fabrika_app, with B7 outcomes) > A’s funnel counts A’s organisations only, masked, with B7 numbers from A’s cohort 303ms
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a stale active event replayed after a cancellation grants no second allowance
+Event evt-rls-stale-mtvsbe-1790791674556 already processed; skipping
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a stale active event replayed after a cancellation grants no second allowance
+Event evt-rls-stale-mtvsbe-1790791674556 already processed; skipping
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a stale active event replayed after a cancellation grants no second allowance
+Event evt-rls-stale-mtvsbe-1790791674556 already processed; skipping
+ ✓ tests/agency-funnel.live.test.ts > getAgencyFunnel (fabrika_app, with B7 outcomes) > B’s funnel: one organisation is a small group, so nothing is shown, not B’s 10 nor A’s 6 34ms
+ ✓ tests/agency-funnel.live.test.ts > getAgencyFunnel (fabrika_app, with B7 outcomes) > an organisation cannot read a funnel 17ms
+ ✓ tests/agency-funnel.live.test.ts > getAgencyFunnel (fabrika_app, with B7 outcomes) > the B7 list is derived from the agency link: A never receives B’s organisation 13ms
+ ✓ tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a stale active event replayed after a cancellation grants no second allowance 199ms
+ ✓ tests/agency-funnel.live.test.ts > getAgencyFunnel (fabrika_app, with B7 outcomes) > Ö-1: B7 in organisations counts 6 who applied where applications count 8 234ms
+ ✓ tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a crash after the money cannot leave the key behind, or the money without it 140ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > two connections on one code: the row lock serialises them, both win, no use is lost 446ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > 60-day rule (pure) > the 60th full day is stale, a millisecond earlier is not, never-contacted is not 2ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > 60-day rule (pure) > due again for any other contact than the one reminded about, earlier-dated included (İNCELEME-51 B-2) 1ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > without a mail provider nothing is sent and nothing is stamped 325ms
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790791674556 claimed concurrently; skipping
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790791674556 claimed concurrently; skipping
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790791674556 claimed concurrently; skipping
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790791674556 claimed concurrently; skipping
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790791674556 claimed concurrently; skipping
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790791674556 claimed concurrently; skipping
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790791674556 claimed concurrently; skipping
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+wave=8 applied=1 skipped=7 rejected=0 | keys=1 creditRows=1 balance=777
+ ✓ tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read 278ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > a burst of 12 parallel registrations on one code: all 12 succeed and are counted 144ms
+ ✓ tests/agency-funnel.live.test.ts > one cohort, no date window (TASK-MULXF0AVMD8MN, fabrika_app) > an organisation registered 400 days ago is counted like one registered today 20ms
+ ✓ tests/agency-funnel.live.test.ts > province (TASK-MULV3JXS1AW5X, fabrika_app) > agency_funnel_counts_by_province: integers per type and province, the caller’s own only 22ms
+ ✓ tests/agency-funnel.live.test.ts > province (TASK-MULV3JXS1AW5X, fabrika_app) > getAgencyFunnel with a province: that province over every type, masked; an empty one is all "<5" 310ms
+ ✓ tests/agency-funnel.live.test.ts > province (TASK-MULV3JXS1AW5X, fabrika_app) > the database refuses a province outside TR_PROVINCES 9ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > probing (TASK-MUM3TMP8HU76G Ö-1): a much-used code answers like a fresh one; only revoke or expiry refuses, with the same NULL 228ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > one digest per user across tenants, only the due rows, module and pilot gates held 429ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > a revoked code is refused; revoking twice is a no-op 55ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > an expired code is refused 23ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > the audit rows carry counts only 5ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > a code of a tenant that is no longer an agency, or is deleted, is refused 47ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > unknown and malformed codes are refused the same way 32ms
+ ✓ tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > only an agency can create codes 11ms
+ ✓ tests/agency-invite.live.test.ts > the function does not leak its system scope > after a normal call the caller scope is what it was 27ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a second run names no relationship again 172ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a row that goes stale later the same day waits for tomorrow: one digest per user per day 377ms
+ ✓ tests/agency-invite.live.test.ts > the function does not leak its system scope > after the function fails mid-call the scope is not left open 855ms
+ ✓ tests/agency-invite.live.test.ts > the agency link grants no read on the linked organisation > agency scope: the linked org content is invisible and unwritable 76ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a rejected send stamps nothing for that user; the others still go out 513ms
+ ✓ tests/agency-invite.live.test.ts > the agency link grants no read on the linked organisation > agency B neither sees nor revokes agency A codes 79ms
+ ✓ tests/agency-invite.live.test.ts > the agency link grants no read on the linked organisation > the registrant cannot read codes either: no tenant scope, zero rows 21ms
+ ✓ tests/agency-invite.live.test.ts > refused attempts are counted without the code > a revoked code is filed under its agency; no "exhausted" reason; an unknown one leaves no tenant-readable row 143ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a contact after the reminder starts a new 60-day period 464ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a worker killed after the send and before the stamp sends no second digest that day (İNCELEME-51 B-1) 578ms
+ ✓ tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > without the one-time grant it stops before applying any file 585ms
+ ✓ tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > the grant file gives the owner SET on app.system_scope and never fabrika_app 143ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > two runs racing for the same day send one digest (the claim is a compare-and-set) 210ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > the claim is a compare-and-set: a run that loses the race after reading the day as free sends nothing 264ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a contact logged while the digest is being sent is not stamped as reminded 179ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a contact logged after the reminder but dated before it starts a new period (İNCELEME-51 B-2) 516ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a tenant skipped on the second run (M4 closed) does not hide the day claimed there: no second digest (İNCELEME-56 Y-1) 229ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a tenant whose read fails on the second run does not hide the day claimed there (İNCELEME-56 Y-1) 203ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > two runs over disjoint tenants racing for the same user send exactly one digest (İNCELEME-69 D-2, İNCELEME-56 R-1) 51ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a failing claim sends nothing and holds no claim (İNCELEME-69 D-2) 129ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a member removed from the tenant the day was claimed through gets no second digest that day (İNCELEME-69 D-1) 206ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a claim the previous release wrote on a membership today holds; yesterday's does not (İNCELEME-95 B-1) 94ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > the day is the UTC day in any process time zone: −11 sends no second digest the same UTC day (İNCELEME-95 T-1) 99ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > the day is the UTC day in any process time zone: +14 claims the UTC day, and the next UTC day still sends (İNCELEME-95 T-1) 115ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a rejected send gives back only its own day: a later day claimed meanwhile stays (İNCELEME-95 T-2) 107ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > the migration backfills the latest membership claim, never lowers one, and leaves Membership FORCEd (İNCELEME-95 T-3) 37ms
+ ✓ tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > re-running the idempotency backfill leaves a day the user already claimed off "Membership" (İNCELEME-106 Y-1) 43ms
+ ✓ tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > with the grant the whole chain runs to the end, and a second run before db:rls refuses 3063ms
+ ✓ tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > after db:rls, the FORCE-RLS backfills update as many rows as under the superuser 6164ms
+ ✓ tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > the migration session leaves no system scope behind: fabrika_app stays tenant-isolated 47ms
+ ✓ tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > a stored default for app.system_scope stops the run before any file 696ms
+ Test Files  9 passed (9)
+      Tests  114 passed (114)
+   Start at  21:07:52
+   Duration  16.07s (transform 3.46s, setup 0ms, import 7.12s, tests 30.45s, environment 1ms)

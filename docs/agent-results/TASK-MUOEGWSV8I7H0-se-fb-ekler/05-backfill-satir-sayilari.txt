@@ -1,0 +1,97 @@
+grant: own has_parameter_privilege(app.system_scope,SET)=t (P1 kapalı; bu dosya yalnız P2'yi ölçer)
+
+######## SÜPER KULLANICI, ESKİ betik (dev b8cde55e)
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55141/l_super_old
+apply-migrations: 41 files applied
+exit=0
+-- sayım (süper kullanıcıyla okundu):
+07 rename-feedback-alert-columns   Feedback alertStatus=legacy → 2
+08 retire-eur-plan-ladder         Subscription team->pro → 2
+14 topicmatch-per-opportunity     TopicMatch opportunityId set → 2
+21 add-stripe-event-log           StripeEventLog backfilled → 2
+32 hash-bearer-tokens             Invitation tokenHash set → 2
+32 hash-bearer-tokens             ApplicationPart magicTokenHash set → 1
+33 credit-ledger-grant-period     CreditLedger grantPeriod set → 2
+38 m4-stale-reminder-idempotency  Relationship staleRemindedContactAt → 2
+38 m4-stale-reminder-idempotency  Membership staleDigestOn → 2
+41 m4-stale-digest-user-claim     User staleDigestOn → 2
+32 (veri kaybı) Invitation.token kolonu var mı → 0
+
+######## SÜPER KULLANICI, YENİ betik
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55141/l_super_new
+apply-migrations: 41 files applied as fabrika
+exit=0
+-- sayım (süper kullanıcıyla okundu):
+07 rename-feedback-alert-columns   Feedback alertStatus=legacy → 2
+08 retire-eur-plan-ladder         Subscription team->pro → 2
+14 topicmatch-per-opportunity     TopicMatch opportunityId set → 2
+21 add-stripe-event-log           StripeEventLog backfilled → 2
+32 hash-bearer-tokens             Invitation tokenHash set → 2
+32 hash-bearer-tokens             ApplicationPart magicTokenHash set → 1
+33 credit-ledger-grant-period     CreditLedger grantPeriod set → 2
+38 m4-stale-reminder-idempotency  Relationship staleRemindedContactAt → 2
+38 m4-stale-reminder-idempotency  Membership staleDigestOn → 2
+41 m4-stale-digest-user-claim     User staleDigestOn → 2
+32 (veri kaybı) Invitation.token kolonu var mı → 0
+
+######## SAHİP (own), ESKİ betik
+DATABASE_URL=postgresql://own:***@127.0.0.1:55141/l_owner_old
+psql:prisma/migrations/hash-bearer-tokens.sql:70: ERROR:  column "tokenHash" of relation "Invitation" contains null values
+exit=3
+-- sayım (süper kullanıcıyla okundu):
+07 rename-feedback-alert-columns   Feedback alertStatus=legacy → 0
+08 retire-eur-plan-ladder         Subscription team->pro → 0
+14 topicmatch-per-opportunity     TopicMatch opportunityId set → 0
+21 add-stripe-event-log           StripeEventLog backfilled → 0
+32 hash-bearer-tokens             Invitation tokenHash set → 0
+32 hash-bearer-tokens             ApplicationPart magicTokenHash set → 0
+33 credit-ledger-grant-period     CreditLedger grantPeriod set → 0
+38 m4-stale-reminder-idempotency  Relationship staleRemindedContactAt → 0
+38 m4-stale-reminder-idempotency  Membership staleDigestOn → 0
+41 m4-stale-digest-user-claim     User staleDigestOn → 0
+32 (veri kaybı) Invitation.token kolonu var mı → 1
+
+######## SAHİP (own), YENİ betik
+DATABASE_URL=postgresql://own:***@127.0.0.1:55141/l_owner_new
+apply-migrations: 41 files applied as own
+exit=0
+-- sayım (süper kullanıcıyla okundu):
+07 rename-feedback-alert-columns   Feedback alertStatus=legacy → 2
+08 retire-eur-plan-ladder         Subscription team->pro → 2
+14 topicmatch-per-opportunity     TopicMatch opportunityId set → 2
+21 add-stripe-event-log           StripeEventLog backfilled → 2
+32 hash-bearer-tokens             Invitation tokenHash set → 2
+32 hash-bearer-tokens             ApplicationPart magicTokenHash set → 1
+33 credit-ledger-grant-period     CreditLedger grantPeriod set → 2
+38 m4-stale-reminder-idempotency  Relationship staleRemindedContactAt → 2
+38 m4-stale-reminder-idempotency  Membership staleDigestOn → 2
+41 m4-stale-digest-user-claim     User staleDigestOn → 2
+32 (veri kaybı) Invitation.token kolonu var mı → 0
+
+######## SAHİP (own), ESKİ çağrı biçimi, yalnız FORCE-RLS backfill dosyaları tek tek (hata olsa da devam)
+DATABASE_URL=postgresql://own:***@127.0.0.1:55141/l_owner_perfile
+  rename-feedback-alert-columns.sql exit=0 
+  retire-eur-plan-ladder.sql exit=0 
+  topicmatch-per-opportunity/migration.sql exit=0 
+  add-stripe-event-log/migration.sql exit=0 
+  hash-bearer-tokens.sql exit=3 psql:prisma/migrations/hash-bearer-tokens.sql:70: ERROR:  column "tokenHash" of relation "Invitation" contains null values
+  credit-ledger-grant-period.sql exit=0 
+  m4-stale-reminder-idempotency.sql exit=0 
+  m4-stale-digest-user-claim.sql exit=0 
+-- sayım:
+07 rename-feedback-alert-columns   Feedback alertStatus=legacy → 0
+08 retire-eur-plan-ladder         Subscription team->pro → 0
+14 topicmatch-per-opportunity     TopicMatch opportunityId set → 0
+21 add-stripe-event-log           StripeEventLog backfilled → 0
+32 hash-bearer-tokens             Invitation tokenHash set → 0
+32 hash-bearer-tokens             ApplicationPart magicTokenHash set → 0
+33 credit-ledger-grant-period     CreditLedger grantPeriod set → 0
+38 m4-stale-reminder-idempotency  Relationship staleRemindedContactAt → 0
+38 m4-stale-reminder-idempotency  Membership staleDigestOn → 0
+41 m4-stale-digest-user-claim     User staleDigestOn → 0
+32 (veri kaybı) Invitation.token kolonu var mı → 1
+
+######## Yan etkiler: ham token kolonları ve emekli plan (süper kullanıcıyla okundu)
+l_super_old: ApplicationPart.magicToken kolonu=0 magicTokenHash dolu=1 | Invitation.token kolonu=0 | Plan team var=0 Subscription team=0
+l_owner_old: ApplicationPart.magicToken kolonu=1 magicTokenHash dolu=0 | Invitation.token kolonu=1 | Plan team var=0 Subscription team=2
+l_owner_new: ApplicationPart.magicToken kolonu=0 magicTokenHash dolu=1 | Invitation.token kolonu=0 | Plan team var=0 Subscription team=0
