@@ -6,6 +6,7 @@ import { assertTenantWritable, PilotExpiredError } from '@/lib/billing/pilot';
 import { PILOT_EXPIRED_DIGEST } from '@/lib/pilot-expired';
 import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
 import { asRole, can, type Action } from '@/lib/rbac';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * Tenant resolution — the single place a request's tenant is decided.
@@ -156,6 +157,12 @@ export async function assertTenantActionWritable(tenantId: string): Promise<void
     await assertTenantWritable(tenantId);
   } catch (error) {
     if (error instanceof PilotExpiredError) Object.assign(error, { digest: PILOT_EXPIRED_DIGEST });
+    const msg = errorMessage(error);
+    if (msg.includes('timeout exceeded when trying to connect')) {
+      const poolError = new Error('Sistem şu anda meşgul. Lütfen tekrar deneyin.');
+      Object.assign(poolError, { code: 'SERVICE_BUSY', digest: 'SERVICE_BUSY' });
+      throw poolError;
+    }
     throw error;
   }
 }
