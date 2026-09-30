@@ -2,7 +2,7 @@
 
 **Durum:** TAMAM (yeniden inceleme se-fb'de)
 **Kaynak inceleme:** `docs/agent-results/TASK-MUNOE0Q4FR2J-se-fb.md` (480326f8)
-**Dal:** `cs-fb/munqax-rbac`, dev `110c0b37` tabanlı; kod commit'i `7cf2fdd2`. dev'e `--no-ff` ile merge edildi, push yok.
+**Dal:** `cs-fb/munqax-rbac`, dev `110c0b37` tabanlı; kod commit'i `7cf2fdd2`. dev'e `--no-ff` ile merge edildi (`62fd07c2`), push yok.
 **İzole DB:** kendi konteynerim `csfb-rbac-pg` (127.0.0.1:5496, veritabanı `csfb_rbac`). Paylaşılan `fabrika` DB'sine yazılmadı.
 **Platform beyanı:** Doğrulama mac'te yapıldı (Darwin 27, Node, vitest 4.1.11, pgvector/pg16 konteyneri). Değişen kod yolları platforma bağlı değil: sunucu tarafında rol karşılaştırması, route handler ve TypeScript AST taraması. Bekçi yolları `path.sep` ile normalize ediyor, bu yüzden Windows ve Linux'ta aynı sonucu beklerim. Windows ve Linux'ta koşulmadı, çünkü bu makinede yalnız mac var. CI (ubuntu) ilk push'ta Linux'u koşacak.
 
@@ -152,6 +152,14 @@ npx vitest run tests/server-action-rbac-guard.test.ts tests/server-action-rbac.t
 - **Bilinen kırmızı:** `teardown-where-guard`. Sebep `stale-relationship-reminder.live.test.ts:395`, benim dosyam değil. se-fb bunu TASK-MUNQ9IGG6R59R'de düzeltiyor.
 - **`oauth-registration.live` zaman aşımı yük kaynaklı bir flake.** 1. tam koşumda yeşildi, tek başına 3 kez koşuldu: `Tests 20 passed (20)` ×3. Bu değişiklik auth/OAuth yoluna dokunmuyor.
 - **Önceden var olan durum:** `billing-checkout-auth.test.ts`'in "signed-in tenant" testi DB'siz worktree'de dev `110c0b37` üzerinde de kırmızıydı (`getPilotState` DB okuyor). İzole DB ile tam koşumda yeşil.
+
+**Merge sonrası (dev `62fd07c2`, se-fb'nin teardown düzeltmesi 47f75927 dahil):**
+```
+npx vitest run tests/server-action-rbac-guard.test.ts tests/server-action-rbac.test.ts tests/use-server-exports.test.ts tests/billing-manage-billing-role.test.ts tests/billing-checkout-auth.test.ts tests/teardown-where-guard.test.ts
+ Test Files  6 passed (6)
+      Tests  107 passed (107)
+```
+Birleşik dev'de bilinen kırmızı (`teardown-where-guard`) da yeşil.
 
 **Typecheck / lint:**
 ```
