@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { OrgType } from '@prisma/client';
-import { buildAgencyFunnel, FUNNEL_STEPS, NO_PROVINCE, ORG_TYPES, type FunnelView } from './funnel';
+import { buildAgencyFunnel, FUNNEL_STEPS, maskAgencyFunnel, NO_PROVINCE, ORG_TYPES, type FunnelBreakdown, type FunnelView } from './funnel';
 import { TR_PROVINCES, type TrProvince } from '@/lib/readiness/provinces';
 import {
   agencyReportCsv,
@@ -41,14 +41,22 @@ function table(v: Record<string, Partial<Record<OrgType, number | Partial<Counts
 
 const AT = new Date('2026-10-01T06:00:00Z');
 
-/** Every number the dashboard publishes for `raw`, as the report must copy it. */
-function dashboard(raw: ReturnType<typeof table>) {
-  const none = buildAgencyFunnel(raw, { dimension: 'none' });
-  const byType = buildAgencyFunnel(raw, { dimension: 'orgType' });
+/**
+ * Every number the dashboard publishes for `raw`, as the report must copy it.
+ * The masking does not depend on the breakdown, so the table is masked once
+ * for all 83 responses (TASK-MUO0U24HHVOJH: masking it per response was 94%
+ * of the property test). `endpoint` is one breakdown checked against
+ * buildAgencyFunnel itself, the function the dashboard calls.
+ */
+function dashboard(raw: ReturnType<typeof table>, endpoint?: FunnelBreakdown) {
+  const funnel = maskAgencyFunnel(raw);
+  if (endpoint) expect(funnel(endpoint)).toEqual(buildAgencyFunnel(raw, endpoint));
+  const none = funnel({ dimension: 'none' });
+  const byType = funnel({ dimension: 'orgType' });
   if (byType.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
   const provinces = new Map<TrProvince, FunnelView>();
   for (const p of TR_PROVINCES) {
-    const f = buildAgencyFunnel(raw, { dimension: 'province', province: p });
+    const f = funnel({ dimension: 'province', province: p });
     if (f.breakdown.dimension !== 'province') throw new Error('no province breakdown');
     provinces.set(p, f.breakdown.view);
   }
@@ -56,8 +64,8 @@ function dashboard(raw: ReturnType<typeof table>) {
 }
 
 /** The report equals the dashboard, number for number; a province left out shows nothing there. */
-function expectSameAsDashboard(r: AgencyReportSnapshot, raw: ReturnType<typeof table>) {
-  const d = dashboard(raw);
+function expectSameAsDashboard(r: AgencyReportSnapshot, raw: ReturnType<typeof table>, endpoint?: FunnelBreakdown) {
+  const d = dashboard(raw, endpoint);
   expect(r.all).toEqual(d.all);
   expect(r.byOrgType).toEqual(d.byOrgType);
   const listed = new Set(r.byProvince.map((p) => p.province));
@@ -95,6 +103,12 @@ describe('report numbers == dashboard response', () => {
   test('property: 300 random tables — every cell of the report is the dashboard’s cell', () => {
     const rnd = lcg(20260929);
     const provinces: string[] = ['Samsun', 'Tokat', 'Çorum', 'Amasya', NO_PROVINCE];
+    // One breakdown per table goes through buildAgencyFunnel too, in turn: none, by type, each table province.
+    const endpoints: FunnelBreakdown[] = [
+      { dimension: 'none' },
+      { dimension: 'orgType' },
+      ...(['Samsun', 'Tokat', 'Çorum', 'Amasya'] as const).map((province): FunnelBreakdown => ({ dimension: 'province', province })),
+    ];
     for (let n = 0; n < 300; n++) {
       const spec: Record<string, Partial<Record<OrgType, Partial<Counts>>>> = {};
       for (const p of provinces) {
@@ -119,9 +133,9 @@ describe('report numbers == dashboard response', () => {
         }
       }
       const raw = table(spec);
-      expectSameAsDashboard(buildAgencyReport(raw, '2026-09', AT), raw);
+      expectSameAsDashboard(buildAgencyReport(raw, '2026-09', AT), raw, endpoints[n % endpoints.length]);
     }
-    // The dashboard side walks all 81 provinces of every table: ~25 000 maskings.
+    // The dashboard side walks all 81 provinces of every table: ~25 000 responses, one masking per table.
   }, 120_000);
 });
 

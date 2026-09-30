@@ -2,7 +2,7 @@
  * Agency region report (TASK-MULRR08Y9YI77, FB KAMU B3; docs/kamu/OKA-KANAL-ONERISI.md §4).
  *
  * The report makes no number of its own. It is the dashboard's published,
- * already safe output — {@link buildAgencyFunnel}: one cumulative cohort,
+ * already safe output — `buildAgencyFunnel`: one cumulative cohort,
  * masking under 5 with complementary suppression, every number rounded to 5 —
  * copied once a month and formatted as a printable page and a CSV.
  *
@@ -34,8 +34,8 @@ import { generateTableReportHtml, toCsv, type ExportLocale } from '@/lib/documen
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
 import { AGENCY_REPORT_GENERATE_EVENT, AgencyReportGenerateEventSchema } from '@/lib/jobs/events';
 import {
-  buildAgencyFunnel,
   FUNNEL_STEPS,
+  maskAgencyFunnel,
   normalizeProvinces,
   ORG_TYPES,
   readAgencyFunnelRaw,
@@ -89,10 +89,11 @@ const shows = (v: FunnelView) => Object.values(v).some((c) => c.state === 'count
 
 /**
  * Pure: the report of one agency's raw counts. Every view is a
- * {@link buildAgencyFunnel} response, unchanged.
+ * `buildAgencyFunnel` response, unchanged; the table is masked once for all of them.
  */
 export function buildAgencyReport(raw: RawByProvince, period: string, generatedAt: Date): AgencyReportSnapshot {
-  const byType = buildAgencyFunnel(raw, { dimension: 'orgType' });
+  const funnel = maskAgencyFunnel(raw);
+  const byType = funnel({ dimension: 'orgType' });
   if (byType.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
   // A province not in the table is all "<5" (buildAgencyFunnel, `known = false`), so walking
   // only the provinces that occur, in TR_PROVINCES order, finds every province that shows a number.
@@ -100,7 +101,7 @@ export function buildAgencyReport(raw: RawByProvince, period: string, generatedA
   const byProvince: AgencyReportSnapshot['byProvince'] = [];
   for (const province of TR_PROVINCES) {
     if (!present.has(province)) continue;
-    const f = buildAgencyFunnel(raw, { dimension: 'province', province });
+    const f = funnel({ dimension: 'province', province });
     if (f.breakdown.dimension !== 'province') throw new Error('no province breakdown');
     if (shows(f.breakdown.view)) byProvince.push({ province, view: f.breakdown.view });
   }
