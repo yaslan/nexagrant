@@ -26,8 +26,6 @@ const DB_ROW = 'value read from a non-null column of a row fetched just above, n
 const KNOWN: Record<string, string> = {
   'src/app/[locale]/(app)/[workspace]/pipeline/actions.ts id: opp.proposal.id': DB_ROW,
   'src/app/[locale]/(app)/[workspace]/pipeline/actions.ts id: opp.id': DB_ROW,
-  'src/app/[locale]/(app)/[workspace]/evidence/actions.ts id: created.id':
-    'id of the Evidence row `tx.evidence.create` returned a few statements above, in the same transaction; `tenantId` beside it (TASK-MUNTTZ94LJWBC)',
   'src/lib/billing/plan-repository.ts planId: draft.planId': DB_ROW,
   'src/lib/billing/public-sector-plans.ts planVersionId: version.id': 'id of the row created one statement above',
   'src/lib/billing/subscription-sync.ts sku: skuStr': 'iterates the SKUs of AddOn rows read from the database',

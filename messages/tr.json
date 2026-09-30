@@ -266,6 +266,7 @@
         "already_confirmed": "Bu dosya zaten kaydedildi. Yeni bir belge için dosyayı yeniden seçin.",
         "invalid_object_key": "Dosya anahtarı geçersiz.",
         "storage_unavailable": "Depolama şu an kullanılamıyor. Biraz sonra tekrar deneyin.",
+        "save_failed": "Belge kaydedilemedi. Tekrar deneyin.",
         "put_failed": "Dosya depoya yüklenemedi (HTTP {status})."
       }
     }

@@ -1,0 +1,25 @@
+├ ƒ /api/dashboard/export-csv
+├ ƒ /api/documents/export
+├ ƒ /api/evidence/[id]/download
+├ ƒ /api/evidence/mock-upload
+├ ƒ /api/feedback
+├ ƒ /api/gdpr/delete
+├ ƒ /api/gdpr/export
+├ ƒ /api/invitations
+├ ƒ /api/saved-searches
+├ ƒ /api/saved-searches/[id]
+├ ƒ /api/user/export
+├ ƒ /api/user/export-data
+├ ƒ /api/user/request-deletion
+├ ƒ /api/v1/calls
+├ ƒ /api/v1/opportunities
+├ ƒ /api/v1/partners
+├ ƒ /api/v1/partners/[pic]
+├ ƒ /api/webhooks/iyzico
+└ ƒ /api/webhooks/stripe
+
+
+ƒ Proxy (Middleware)
+
+ƒ  (Dynamic)  server-rendered on demand
+

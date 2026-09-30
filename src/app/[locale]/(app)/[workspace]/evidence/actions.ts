@@ -9,9 +9,8 @@ import {
   deleteObjectBytes,
   evidenceUploadType,
   finalKeyOfIncoming,
-  promoteIncomingObject,
-  statObject,
-  storedEvidenceMatches,
+  copyIncomingObject,
+  isFinalUploadRefusal,
   uploadFileToR2,
   tenantObjectKeyOf,
   EVIDENCE_BUCKET,
@@ -22,14 +21,6 @@ import { errorCode, errorMessage } from '@/lib/errors';
 import { EVIDENCE_READ_ACTION, evidenceReadWhere } from '@/lib/evidence-access';
 import { isPresentId } from '@/lib/required-id';
 import type { EvidenceItemData } from './evidence-client';
-import type { EvidenceUploadRefusal } from '@/lib/storage';
-
-/** A confirm that stops inside its transaction, so the row is rolled back. */
-class UploadRefused extends Error {
-  constructor(readonly code: EvidenceUploadRefusal | 'object_missing') {
-    super(code);
-  }
-}
 
 /**
  * Retrieves all Evidence items for active tenant
@@ -147,103 +138,110 @@ export async function confirmEvidenceUploadAction(data: {
   // The user's date, or none. A document with no stated expiry does not get one.
   const finalValidUntil = data.validUntil ? new Date(data.validUntil) : null;
 
-  // Set once the object sits under the final key, so a failure after that
-  // removes the copy this call made.
-  let promoted = false;
+  // B-1 (TASK-MUO122UPRPJQH, İNCELEME-77): no store call runs inside a
+  // transaction any more, and the staging object — the user's only copy until
+  // the row exists — is removed last. The order is: already recorded? → check
+  // and copy to the final key → save the row → remove the staging object. A
+  // failure at any step before the last leaves the staging object and no row,
+  // returns an error, and the same confirm can be sent again. This used to copy,
+  // delete the staging object and check the copy inside the row's transaction;
+  // a store slower than its 5 s ended the transaction, the copy was deleted as
+  // well, and a "DB offline" branch reported success with a made-up id.
+
+  // D-3 (TASK-MUNTTZ94LJWBC): a key already on a row is not copied again, so a
+  // PUT to the staging key after confirm cannot reach the recorded file.
+  let recorded: { id: string } | null;
+  try {
+    recorded = await withTenant(tenantId, (tx) =>
+      tx.evidence.findFirst({ where: { tenantId, r2ObjectKey: finalKey }, select: { id: true } })
+    );
+  } catch (error) {
+    console.warn(`[confirmEvidenceUploadAction] DB error: ${errorMessage(error)}`);
+    return { success: false as const, error: 'save_failed' as const };
+  }
+  if (recorded) {
+    await deleteObjectBytes(objectKey);
+    return { success: false as const, error: 'already_confirmed' as const };
+  }
+
+  // What was stored, not what the browser says it stored (B-1/B-3,
+  // TASK-MUNODY0DVDWC5): it must exist, be an allowed type of its key's
+  // extension, within the limit, and begin with that format's bytes.
+  const copied = await copyIncomingObject(objectKey, finalKey);
+  if (!copied.ok) {
+    // A file that is not acceptable stays unacceptable: it is removed. A store
+    // that failed keeps the upload for the next try.
+    if (isFinalUploadRefusal(copied.error)) await deleteObjectBytes(objectKey);
+    return { success: false as const, error: copied.error };
+  }
+
   let evidence;
   try {
-    evidence = await withTenant(tenantId, async (tx) => {
-      // The row comes first (D-3, TASK-MUNTTZ94LJWBC). (tenantId, r2ObjectKey)
-      // is unique, so a second confirm of the same key stops here, before it
-      // copies anything over the first one's file — also when both run at
-      // once: the second insert waits for this transaction to end.
-      const created = await tx.evidence.create({
-      data: {
-        tenantId,
-        title: data.title || data.fileName.replace(/\.[^/.]+$/, ''),
-        category: data.category || 'CAT-03',
-        kind: data.kind || 'certificate',
-        body: extracted.ocrSummary ?? '',
-        description: `Uploaded document: ${data.fileName}`,
-        language: data.language || 'tr',
-        // Only the value the user entered. `extracted` has nothing to add.
-        issuingAuthority: data.issuingAuthority || null,
-        documentNumber: null,
-        validUntil: finalValidUntil,
-        confidentiality: data.confidentiality || 'INTERNAL',
-        // An upload is not a verification. The row says so in the column built for it,
-        // and the list badges it as unverified until someone actually checks it.
-        status: 'UNVERIFIED',
-        r2ObjectKey: finalKey,
-        fileBucket: EVIDENCE_BUCKET,
-        fileName: data.fileName,
-        // Replaced below by what the store holds, never the browser's figures.
-        fileSizeBytes: null,
-        mimeType: null,
-        // No public link (B-2): evidence is read through the authenticated
-        // download route, never from a URL anyone holding it can open.
-        fileUrl: null,
-        ocrText: extracted.ocrSummary,
-        extractedFields: {
-          // `extracted: false` is the record that nothing was read off the document,
-          // so a later reader cannot mistake these blanks for a failed extraction.
-          extracted: extracted.extracted,
-          maskedPiiFound: extracted.maskedPiiFound,
+    // (tenantId, r2ObjectKey) is unique: of two confirms running at once, the
+    // second insert waits for the first and then fails with P2002.
+    evidence = await withTenant(tenantId, (tx) =>
+      tx.evidence.create({
+        data: {
+          tenantId,
+          title: data.title || data.fileName.replace(/\.[^/.]+$/, ''),
+          category: data.category || 'CAT-03',
+          kind: data.kind || 'certificate',
+          body: extracted.ocrSummary ?? '',
+          description: `Uploaded document: ${data.fileName}`,
+          language: data.language || 'tr',
+          // Only the value the user entered. `extracted` has nothing to add.
+          issuingAuthority: data.issuingAuthority || null,
+          documentNumber: null,
+          validUntil: finalValidUntil,
+          confidentiality: data.confidentiality || 'INTERNAL',
+          // An upload is not a verification. The row says so in the column built for it,
+          // and the list badges it as unverified until someone actually checks it.
+          status: 'UNVERIFIED',
+          r2ObjectKey: finalKey,
+          fileBucket: EVIDENCE_BUCKET,
+          fileName: data.fileName,
+          // What the store holds, never the browser's figures.
+          fileSizeBytes: copied.size,
+          mimeType: copied.contentType,
+          // No public link (B-2): evidence is read through the authenticated
+          // download route, never from a URL anyone holding it can open.
+          fileUrl: null,
+          ocrText: extracted.ocrSummary,
+          extractedFields: {
+            // `extracted: false` is the record that nothing was read off the document,
+            // so a later reader cannot mistake these blanks for a failed extraction.
+            extracted: extracted.extracted,
+            maskedPiiFound: extracted.maskedPiiFound,
+          },
+          tags: extracted.tags,
+          createdBy: userId,
         },
-        tags: extracted.tags,
-        createdBy: userId,
-      },
-      });
-
-      // What was stored, not what the browser says it stored (B-1/B-3,
-      // TASK-MUNODY0DVDWC5), checked on the copy: it must exist, be an allowed
-      // type of its key's extension, within the limit, and begin with that
-      // format's bytes. A copy that fails is removed and the row rolled back.
-      if (!(await promoteIncomingObject(objectKey, finalKey))) throw new UploadRefused('object_missing');
-      promoted = true;
-      const stored = await statObject(finalKey);
-      if (!stored) throw new UploadRefused('object_missing');
-      const verdict = storedEvidenceMatches(finalKey, stored);
-      if (!verdict.ok) throw new UploadRefused(verdict.error);
-
-      await tx.evidence.updateMany({
-        where: { id: created.id, tenantId },
-        data: { fileSizeBytes: stored.size, mimeType: verdict.contentType },
-      });
-
-      // No claim is created here. Uploading a file is not evidence for any statement,
-      // and the rows this used to write ("independently audited", "fully compliant
-      // with international standards", at confidence 0.95) were backed by nothing.
-      // A claim is written when a person makes it and links it to this document.
-
-      return { ...created, fileSizeBytes: stored.size, mimeType: verdict.contentType };
-    });
+      })
+    );
   } catch (error) {
-    if (promoted) await deleteObjectBytes(finalKey);
-    if (error instanceof UploadRefused) return { success: false as const, error: error.code };
     if (errorCode(error) === 'P2002') {
-      // Already confirmed. What a PUT after that left under the staging key is
-      // removed; the confirmed file under the final key is not touched.
+      // Confirmed by a confirm running alongside. The final object is that
+      // row's file and stays; the staging object is done with.
       await deleteObjectBytes(objectKey);
       return { success: false as const, error: 'already_confirmed' as const };
     }
+    // No success without a row. The staging object stays, so trying again
+    // works; the copy under the final key is left too (D-3 of İNCELEME-77): a
+    // concurrent confirm may have recorded it meanwhile, and the next try
+    // writes the same checked bytes over it.
     console.warn(`[confirmEvidenceUploadAction] DB error: ${errorMessage(error)}`);
-    // Mock return if DB offline
-    return {
-      success: true,
-      evidence: {
-        id: `ev-${Date.now()}`,
-        tenantId,
-        title: data.title,
-        category: data.category,
-        kind: 'certificate',
-        body: extracted.ocrSummary ?? '',
-        status: 'UNVERIFIED',
-        validUntil: finalValidUntil,
-        fileUrl: null,
-        createdAt: new Date(),
-      },
-    };
+    return { success: false as const, error: 'save_failed' as const };
+  }
+
+  // No claim is created here. Uploading a file is not evidence for any statement,
+  // and the rows this used to write ("independently audited", "fully compliant
+  // with international standards", at confidence 0.95) were backed by nothing.
+  // A claim is written when a person makes it and links it to this document.
+
+  // The row holds the final key, so the staging object can go. If this delete
+  // fails, a later confirm of the key reports already_confirmed and retries it.
+  if (!(await deleteObjectBytes(objectKey))) {
+    console.warn(`[confirmEvidenceUploadAction] staging object left behind: ${objectKey}`);
   }
 
   revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');

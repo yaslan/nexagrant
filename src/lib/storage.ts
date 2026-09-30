@@ -166,8 +166,8 @@ export function storedEvidenceMatches(
  * D-1 (TASK-MUNTTZ94LJWBC, İNCELEME-66): a signed PUT stays valid for its 15
  * minutes after the upload is confirmed, so it used to be a way to replace a
  * checked file with anything of the same type and length. The browser now
- * uploads to a staging key, `<tenantId>/incoming/<rest>`, and confirm copies
- * the object to `<tenantId>/<rest>` before checking it. The final key is never
+ * uploads to a staging key, `<tenantId>/incoming/<rest>`, and confirm checks
+ * the object and copies it to `<tenantId>/<rest>`. The final key is never
  * in a signed PUT; a PUT after confirm only recreates the staging object.
  */
 const INCOMING_SEGMENT = 'incoming';
@@ -177,50 +177,121 @@ function incomingKeyOf(tenantId: string, finalKey: string): string {
 }
 
 /**
+ * The exact shape `getPresignedUploadUrl` hands out:
+ * `<tenant>/incoming/<organisation>/<category>/<year>/<hash>_<name>.<ext>`.
+ * Anything else is refused (D-1, TASK-MUO122UPRPJQH, İNCELEME-77): a nested
+ * `<t>/incoming/incoming/x.pdf` used to pass and map to `<t>/incoming/x.pdf`,
+ * another staging key, which the dev upload route then let anyone overwrite.
+ */
+const INCOMING_KEY_SHAPE = /^incoming\/([A-Za-z0-9_-]{1,128})\/[a-z0-9_-]+\/\d{4}\/[a-z0-9]{8}_[a-z0-9_-]+\.[a-z0-9]{1,10}$/;
+
+/**
  * The final key a staging key of `tenantId` is confirmed under, or null when
  * `objectKey` is not one of that tenant's staging keys (a final key included).
  */
 export function finalKeyOfIncoming(tenantId: string, objectKey: unknown): string | null {
   const key = tenantObjectKeyOf(tenantId, objectKey);
   if (!key || key !== objectKey) return null;
-  const segments = key.split('/');
-  if (segments.length < 3 || segments[1] !== INCOMING_SEGMENT) return null;
-  return [tenantId, ...segments.slice(2)].join('/');
+  const rest = key.slice(tenantId.length + 1);
+  const shape = INCOMING_KEY_SHAPE.exec(rest);
+  if (!shape || shape[1] === INCOMING_SEGMENT) return null;
+  return `${tenantId}/${rest.slice(INCOMING_SEGMENT.length + 1)}`;
+}
+
+export type IncomingCopyResult =
+  | { ok: true; size: number; contentType: string }
+  | { ok: false; error: EvidenceUploadRefusal | 'object_missing' | 'storage_unavailable' };
+
+/** Whether a refusal is about the file itself, so trying again cannot help. */
+export function isFinalUploadRefusal(error: string): error is EvidenceUploadRefusal {
+  return error === 'unsupported_type' || error === 'file_too_large' || error === 'empty_file';
+}
+
+function storeFailure(err: unknown): 'object_missing' | 'storage_unavailable' {
+  const e = err as { name?: string; $metadata?: { httpStatusCode?: number } } | null;
+  const status = e?.$metadata?.httpStatusCode;
+  return status === 404 || e?.name === 'NotFound' || e?.name === 'NoSuchKey' ? 'object_missing' : 'storage_unavailable';
 }
 
 /**
- * Moves the staging object to its final key: a server-side copy, then the
- * staging object is removed. The copy is what confirm checks and records, so
- * a later PUT to the staging key cannot reach it. False when there was nothing
- * to copy. The caller has derived `finalKey` with `finalKeyOfIncoming`.
+ * B-1 (TASK-MUO122UPRPJQH, İNCELEME-77): copies the checked staging object to
+ * its final key and leaves the staging object where it is. The caller records
+ * the row and only then removes the staging object, so every failure on the
+ * way — a slow or dead store included — leaves the user's upload in place and
+ * a later confirm of the same key can finish the job. This used to delete the
+ * staging object right after the copy, inside the row's transaction; a store
+ * slower than the transaction's 5 s then lost the file altogether.
+ *
+ * The staging object is checked *before* the copy and the copy is pinned to
+ * the checked version (`CopySourceIfMatch`), so the final key only ever holds
+ * bytes that passed `storedEvidenceMatches` — a PUT to the staging key while
+ * this runs makes the copy fail rather than slip in unchecked. The final
+ * object is then read back to prove it is there.
+ *
+ * Nothing is deleted here. A refusal of the file itself is returned as such
+ * (`isFinalUploadRefusal`); `object_missing` / `storage_unavailable` are worth
+ * trying again. The caller has derived `finalKey` with `finalKeyOfIncoming`.
  */
-export async function promoteIncomingObject(incomingKey: string, finalKey: string): Promise<boolean> {
+export async function copyIncomingObject(incomingKey: string, finalKey: string): Promise<IncomingCopyResult> {
   if (s3) {
+    let etag: string;
+    let checked: { size: number; contentType: string };
+    try {
+      const meta = await s3.send(new HeadObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: incomingKey }));
+      if (!meta.ETag) return { ok: false, error: 'storage_unavailable' };
+      etag = meta.ETag;
+      const first = await s3.send(new GetObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: incomingKey, Range: 'bytes=0-15', IfMatch: etag }));
+      const head = first.Body ? Buffer.from(await first.Body.transformToByteArray()) : Buffer.alloc(0);
+      const verdict = storedEvidenceMatches(finalKey, { size: meta.ContentLength ?? 0, contentType: meta.ContentType ?? null, head });
+      if (!verdict.ok) return verdict;
+      checked = { size: meta.ContentLength ?? 0, contentType: verdict.contentType };
+    } catch (err) {
+      return { ok: false, error: storeFailure(err) };
+    }
     try {
       await s3.send(new CopyObjectCommand({
         Bucket: EVIDENCE_BUCKET,
         CopySource: `${EVIDENCE_BUCKET}/${incomingKey}`,
+        CopySourceIfMatch: etag,
         Key: finalKey,
         MetadataDirective: 'COPY',
       }));
-    } catch {
-      return false;
+      const copy = await s3.send(new HeadObjectCommand({ Bucket: EVIDENCE_BUCKET, Key: finalKey }));
+      if (copy.ContentLength !== checked.size || (copy.ContentType ?? checked.contentType) !== checked.contentType) {
+        return { ok: false, error: 'storage_unavailable' };
+      }
+    } catch (err) {
+      // 412: the staging object changed after the check. Trying again checks the new one.
+      const failure = storeFailure(err);
+      return { ok: false, error: failure === 'object_missing' ? 'object_missing' : 'storage_unavailable' };
     }
-    await deleteFileFromR2(incomingKey);
-    return true;
+    return { ok: true, ...checked };
   }
+
   const from = devObjectPath(incomingKey);
   const to = devObjectPath(finalKey);
-  if (!from || !to) return false;
-  const { mkdir, rename } = await import('node:fs/promises');
+  if (!from || !to) return { ok: false, error: 'object_missing' };
+  const staged = await statObject(incomingKey);
+  if (!staged) return { ok: false, error: 'object_missing' };
+  const verdict = storedEvidenceMatches(finalKey, staged);
+  if (!verdict.ok) return verdict;
+  const { copyFile, mkdir, rename, rm } = await import('node:fs/promises');
   const { dirname } = await import('node:path');
+  // Written aside and renamed, so the final path never holds half a file.
+  const partial = `${to}.${uuidv4().slice(0, 8)}.partial`;
   try {
     await mkdir(dirname(to), { recursive: true });
-    await rename(from, to);
-    return true;
+    await copyFile(from, partial);
+    await rename(partial, to);
   } catch {
-    return false;
+    await rm(partial, { force: true }).catch(() => {});
+    return { ok: false, error: 'storage_unavailable' };
   }
+  const copy = await statObject(finalKey);
+  if (!copy || copy.size !== staged.size || !storedEvidenceMatches(finalKey, copy).ok) {
+    return { ok: false, error: 'storage_unavailable' };
+  }
+  return { ok: true, size: copy.size, contentType: verdict.contentType };
 }
 
 /**
@@ -232,7 +303,8 @@ export async function promoteIncomingObject(incomingKey: string, finalKey: strin
  * Without an object store the URL is the same-origin dev stand-in
  * (`/api/evidence/mock-upload`), which applies the same checks.
  *
- * `objectKey` is a staging key (`finalKeyOfIncoming`); confirm moves it.
+ * `objectKey` is a staging key (`finalKeyOfIncoming`); confirm copies it to
+ * the final key (`copyIncomingObject`) and removes it once the row is saved.
  */
 export async function getPresignedUploadUrl(
   tenantId: string,
@@ -514,6 +586,5 @@ export async function deleteObjectBytes(objectKey: string): Promise<boolean> {
   const path = devObjectPath(objectKey);
   if (!path) return false;
   const { rm } = await import('node:fs/promises');
-  await rm(path, { force: true });
-  return true;
+  return rm(path, { force: true }).then(() => true, () => false);
 }

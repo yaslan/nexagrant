@@ -35,9 +35,9 @@ vi.mock('@/lib/tenant', () => ({
 const { PUT } = await import('@/app/api/evidence/mock-upload/route');
 
 const KEY = 'tenant-g/incoming/org-default/certificate/2026/abcd1234_x.pdf';
-const call = () =>
+const call = (key = KEY) =>
   PUT(
-    new Request(`http://localhost/api/evidence/mock-upload?key=${encodeURIComponent(KEY)}`, {
+    new Request(`http://localhost/api/evidence/mock-upload?key=${encodeURIComponent(key)}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/pdf' },
       body: '%PDF-1.4 x',
@@ -73,5 +73,16 @@ describe('mock-upload is a development-only route', () => {
     expect(res.status).toBe(200);
     expect(state.authCalls).toBe(1);
     expect(state.puts).toBe(1);
+  });
+});
+
+describe('mock-upload takes only a staging key of the presign’s shape (D-1, TASK-MUO122UPRPJQH)', () => {
+  test('a nested incoming key is refused and nothing is stored', async () => {
+    // It maps to `tenant-g/incoming/…`, itself a staging key a confirm would record.
+    for (const key of ['tenant-g/incoming/incoming/x.pdf', 'tenant-g/incoming/incoming/certificate/2026/abcd1234_x.pdf']) {
+      const res = await call(key);
+      expect(res.status, key).toBe(403);
+    }
+    expect(state.puts).toBe(0);
   });
 });

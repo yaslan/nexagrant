@@ -266,6 +266,7 @@
         "already_confirmed": "This file has already been saved. Choose the file again to add a new document.",
         "invalid_object_key": "Invalid file key.",
         "storage_unavailable": "Storage is unavailable right now. Try again shortly.",
+        "save_failed": "The document could not be saved. Try again.",
         "put_failed": "The file could not be uploaded to storage (HTTP {status})."
       }
     }
