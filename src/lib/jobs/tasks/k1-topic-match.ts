@@ -12,9 +12,10 @@ import { K1TopicMatchOutputSchema, type K1TopicMatchOutput } from '../events';
  *
  * A tenant that fails is counted and the run goes on; the run then writes a
  * `warn` SystemAlert with counts only (SystemAlert has no tenant isolation, so
- * no tenant id goes into it). A run that could score nothing because no topic
- * has an embedding is reported in production, where it means K1 matching is
- * off for everyone (TASK-MULQM3LFB4KRA).
+ * no tenant id goes into it). A run that could score nothing because topics or
+ * tenant profiles lack an embedding is reported in production, where it means
+ * K1 matching is off for everyone (TASK-MULQM3LFB4KRA; the profile half,
+ * İNCELEME-51 Y-2).
  */
 export const k1TopicMatchTask = defineJob('k1-topic-match', async ({ tick }): Promise<K1TopicMatchOutput> => {
   const now = tick ?? new Date();
@@ -29,7 +30,7 @@ export const k1TopicMatchTask = defineJob('k1-topic-match', async ({ tick }): Pr
       dedupeKey: 'k1-topic-match:tenant-failed',
     });
   }
-  if (env.NODE_ENV === 'production' && r.scored === 0 && r.topicsWithoutEmbedding > 0) {
+  if (env.NODE_ENV === 'production' && r.scored === 0 && (r.topicsWithoutEmbedding > 0 || r.noProfileEmbedding > 0)) {
     await recordAlert({
       level: 'warn',
       source: 'k1-topic-match',

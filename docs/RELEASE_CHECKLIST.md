@@ -112,6 +112,7 @@ credit-ledger-grant-period.sql
 invitation-accepted-at.sql
 add-public-lead.sql
 relationship-stale-reminded-at.sql
+m4-stale-reminder-idempotency.sql
 ```
 
 Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workflows/ci.yml:99`):

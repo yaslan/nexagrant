@@ -16,9 +16,17 @@ import { renderStaleRelationshipsEmail, type StaleDigestSection } from '@/lib/em
  * Once a day every focal point gets at most ONE e-mail listing the
  * relationships they own whose last contact is 60 or more days old, across
  * every tenant they belong to. A relationship is named once per stale period:
- * the row is stamped (`staleRemindedAt`) after the mail is accepted, and is due
- * again only when a newer contact (`lastContactAt` > `staleRemindedAt`) has
- * itself gone 60 days stale.
+ * the row is stamped after the mail is accepted with the contact it named
+ * (`staleRemindedContactAt`), and is due again only when `lastContactAt` holds
+ * another value — any new or re-dated contact — that has gone 60 days stale.
+ *
+ * "At most one a day" survives a crash (İNCELEME-51 B-1): before a digest is
+ * sent the user's day is claimed on every membership it covers
+ * (`Membership.staleDigestOn`, compare-and-set), the rows are stamped as soon
+ * as that one mail is accepted, and the claim is given back only when the send
+ * is rejected. A worker killed between claim and stamp costs that user one
+ * day's digest (the unstamped rows go out the next morning); it never sends a
+ * second one the same day.
  *
  * Skipped, and counted:
  *   - a tenant whose free pilot has run out (read-only: nothing is stamped, so
@@ -40,6 +48,9 @@ export { STALE_AFTER_DAYS, staleCutoff, isStaleRelationship, isReminderDue, dayS
 export const STALE_REMINDER_AUDIT = 'relationship.stale_reminded';
 
 export const STALE_PAGE_SIZE = 500;
+
+/** Rows stamped per transaction, so a first run over a long backlog stays inside the transaction timeout. */
+export const STALE_STAMP_CHUNK = 200;
 
 interface DueRow {
   id: string;
@@ -72,7 +83,7 @@ export interface StaleReminderResult {
   skippedNeverContacted: number;
   skippedAlreadyReminded: number;
   skippedRecipient: number;
-  /** Owners left out because a digest already went to them earlier this (UTC) day. */
+  /** Owners left out because their digest for this (UTC) day was already claimed. */
   skippedMailedToday: number;
   digestsSent: number;
   digestsFailed: number;
@@ -140,26 +151,37 @@ async function collectTenant(
       tx.relationship.count({ where: { tenantId, ownerUserId: null, lastContactAt: { lte: cutoff } } }),
       tx.relationship.count({ where: { tenantId, ownerUserId: { not: null }, lastContactAt: null } }),
     ]);
-    // Owners this tenant already stamped today: a second run on the same day
-    // (a retry, a hand-added job) must not send them a second digest for rows
-    // that went stale in between. Collected in every tenant, applied per user
-    // across tenants below.
-    const stampedToday = await tx.relationship.findMany({
-      where: { tenantId, ownerUserId: { not: null }, staleRemindedAt: { gte: dayStartUtc(now) } },
-      select: { ownerUserId: true },
-      distinct: ['ownerUserId'],
+    // Members whose digest this tenant already claimed today: a second run on
+    // the same day (a retry after a crash, a hand-added job) must not mail them
+    // again, even about rows that went stale in between. Collected in every
+    // tenant, applied per user across tenants below; claimDigest re-checks it.
+    const claimedToday = await tx.membership.findMany({
+      where: { tenantId, staleDigestOn: { gte: dayStartUtc(now) } },
+      select: { userId: true },
     });
-    for (const s of stampedToday) if (s.ownerUserId) mailedToday.add(s.ownerUserId);
+    for (const c of claimedToday) mailedToday.add(c.userId);
     out.skippedUnassigned += unassigned;
     out.skippedNeverContacted += neverContacted;
+
+    // Already reminded about this very contact: counted here, and left out of
+    // the page query below so a tenant's daily scan grows with what is DUE,
+    // not with every relationship it ever reminded about (İNCELEME-51 Y-1).
+    const stale = { tenantId, ownerUserId: { not: null }, lastContactAt: { not: null, lte: cutoff } } as const;
+    out.skippedAlreadyReminded += await tx.relationship.count({
+      where: { ...stale, staleRemindedContactAt: { equals: tx.relationship.fields.lastContactAt } },
+    });
 
     let cursor = '';
     for (;;) {
       const page = await tx.relationship.findMany({
-        where: { tenantId, ownerUserId: { not: null }, lastContactAt: { not: null, lte: cutoff }, id: { gt: cursor } },
+        where: {
+          ...stale,
+          OR: [{ staleRemindedContactAt: null }, { NOT: { staleRemindedContactAt: { equals: tx.relationship.fields.lastContactAt } } }],
+          id: { gt: cursor },
+        },
         select: {
           id: true, ownerUserId: true, counterpartName: true, organizationId: true, partnerOrgId: true,
-          lastContactAt: true, staleRemindedAt: true,
+          lastContactAt: true, staleRemindedContactAt: true,
         },
         orderBy: { id: 'asc' },
         take: pageSize,
@@ -193,31 +215,92 @@ async function collectTenant(
 }
 
 /**
- * Stamps the rows a digest named, in their tenant, and records the count. The
+ * Claims `userId`'s digest for `now`'s UTC day on their membership in
+ * `tenantId`: a compare-and-set, so of two runs racing for the same day only
+ * one gets it. Returns the previous value (to give the claim back if the send
+ * is rejected), or `false` when the day is already claimed or the member left.
+ */
+async function claimDigest(
+  tenantId: string,
+  userId: string,
+  now: Date,
+  runTenant: typeof withTenant
+): Promise<{ previous: Date | null } | false> {
+  if (!isPresentId(tenantId) || !isPresentId(userId)) return false;
+  const today = dayStartUtc(now);
+  return runTenant(tenantId, async (tx) => {
+    const m = await tx.membership.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { staleDigestOn: true },
+    });
+    if (!m || (m.staleDigestOn && m.staleDigestOn.getTime() >= today.getTime())) return false;
+    const { count } = await tx.membership.updateMany({
+      where: { tenantId, userId, staleDigestOn: m.staleDigestOn },
+      data: { staleDigestOn: today },
+    });
+    return count === 1 ? { previous: m.staleDigestOn } : false;
+  });
+}
+
+/** Gives a claim back after a rejected send, so a later run the same day may try again. */
+async function releaseDigest(
+  tenantId: string,
+  userId: string,
+  previous: Date | null,
+  now: Date,
+  runTenant: typeof withTenant
+): Promise<void> {
+  if (!isPresentId(tenantId) || !isPresentId(userId)) return;
+  await runTenant(tenantId, (tx) =>
+    tx.membership.updateMany({
+      where: { tenantId, userId, staleDigestOn: dayStartUtc(now) },
+      data: { staleDigestOn: previous },
+    })
+  );
+}
+
+/**
+ * Stamps the rows one accepted digest named in one tenant, each with the
+ * contact it named. A row whose `lastContactAt` changed since it was read (a
+ * contact logged meanwhile) is left alone: it is in a new period already. The
  * pilot check repeats here: a pilot that ended between the read and the send
  * leaves the rows as they were.
  */
-async function stampTenant(
+async function stampRows(
   tenantId: string,
-  ids: string[],
-  recipients: number,
+  rows: Array<{ id: string; lastContactAt: Date }>,
   now: Date,
   runTenant: typeof withTenant
 ): Promise<number> {
-  if (!isPresentId(tenantId) || ids.length === 0) return 0;
-  return runTenant(tenantId, async (tx) => {
-    await assertTenantWritable(tenantId, tx, now);
-    const { count } = await tx.relationship.updateMany({
-      where: { tenantId, id: { in: ids } },
-      data: { staleRemindedAt: now },
+  if (!isPresentId(tenantId)) return 0;
+  let stamped = 0;
+  for (let i = 0; i < rows.length; i += STALE_STAMP_CHUNK) {
+    const chunk = rows.slice(i, i + STALE_STAMP_CHUNK);
+    stamped += await runTenant(tenantId, async (tx) => {
+      await assertTenantWritable(tenantId, tx, now);
+      let n = 0;
+      for (const r of chunk) {
+        if (!isPresentId(r.id)) continue;
+        const { count } = await tx.relationship.updateMany({
+          where: { tenantId, id: r.id, lastContactAt: r.lastContactAt },
+          data: { staleRemindedAt: now, staleRemindedContactAt: r.lastContactAt },
+        });
+        n += count;
+      }
+      return n;
     });
-    if (count > 0) {
-      await tx.auditEvent.create({
-        data: { tenantId, type: STALE_REMINDER_AUDIT, data: { relationships: count, recipients, staleAfterDays: STALE_AFTER_DAYS } },
-      });
-    }
-    return count;
-  });
+  }
+  return stamped;
+}
+
+/** One tenant's audit row for the run: counts only, never a name or an address. */
+async function auditTenant(tenantId: string, relationships: number, recipients: number, runTenant: typeof withTenant): Promise<void> {
+  if (!isPresentId(tenantId) || relationships === 0) return;
+  await runTenant(tenantId, (tx) =>
+    tx.auditEvent.create({
+      data: { tenantId, type: STALE_REMINDER_AUDIT, data: { relationships, recipients, staleAfterDays: STALE_AFTER_DAYS } },
+    })
+  );
 }
 
 /**
@@ -273,11 +356,13 @@ export async function sendStaleRelationshipReminders(options: {
   }
 
   // 2 — one digest per user, across tenants.
-  const byUser = new Map<string, { recipient: Recipient; sections: Array<StaleDigestSection & { tenantId: string; ids: string[] }> }>();
+  type Section = StaleDigestSection & { tenantId: string; due: Array<{ id: string; lastContactAt: Date }> };
+  const byUser = new Map<string, { recipient: Recipient; sections: Section[] }>();
+  const mailedTodayDue = new Set<string>();
   for (const t of collected) {
     for (const [userId, { recipient, rows }] of t.byOwner) {
       if (mailedToday.has(userId)) {
-        out.skippedMailedToday++;
+        mailedTodayDue.add(userId);
         out.relationshipsDue -= rows.length;
         continue;
       }
@@ -288,11 +373,13 @@ export async function sendStaleRelationshipReminders(options: {
         tenantName: t.tenantName,
         link: t.workspaceSlug ? `${options.appUrl}/${recipient.locale}/${t.workspaceSlug}/relationships` : `${options.appUrl}/${recipient.locale}`,
         rows: rows.map((r) => ({ name: r.name, lastContactAt: r.lastContactAt })),
-        ids: rows.map((r) => r.id),
+        due: rows.map((r) => ({ id: r.id, lastContactAt: r.lastContactAt })),
       });
       byUser.set(userId, entry);
     }
   }
+
+  out.skippedMailedToday += mailedTodayDue.size;
 
   if (!options.mailer) {
     if (byUser.size > 0) out.reason = 'no_mail_provider';
@@ -300,27 +387,75 @@ export async function sendStaleRelationshipReminders(options: {
     return out;
   }
 
-  // 3 — send, then stamp what the accepted mail named. A rejected send stamps
-  // nothing, so tomorrow's run names the same rows.
-  const stampByTenant = new Map<string, { ids: string[]; recipients: number }>();
-  for (const { recipient, sections } of byUser.values()) {
+  // 3 — per user: claim the day, send, stamp what the accepted mail named.
+  // Nothing is held back until the end of the run, so a run cut short leaves
+  // every digest it sent claimed and stamped (İNCELEME-51 B-1).
+  const auditByTenant = new Map<string, { relationships: number; recipients: number }>();
+  for (const [userId, { recipient, sections }] of byUser) {
+    const claims: Array<{ tenantId: string; previous: Date | null }> = [];
+    const release = async () => {
+      for (const c of claims) {
+        try {
+          await releaseDigest(c.tenantId, userId, c.previous, now, runTenant);
+        } catch (error) {
+          // The claim stays: this user waits for tomorrow instead of risking a second mail.
+          out.errors.push({ scope: 'digest', reason: errorMessage(error) });
+        }
+      }
+    };
+
+    let claimed = true;
     try {
-      await options.mailer(renderStaleRelationshipsEmail({ to: recipient.email, locale: recipient.locale, now, sections }));
-      out.digestsSent++;
       for (const s of sections) {
-        const acc = stampByTenant.get(s.tenantId) ?? { ids: [], recipients: 0 };
-        acc.ids.push(...s.ids);
-        acc.recipients++;
-        stampByTenant.set(s.tenantId, acc);
+        const c = await claimDigest(s.tenantId, userId, now, runTenant);
+        if (!c) {
+          claimed = false;
+          break;
+        }
+        claims.push({ tenantId: s.tenantId, previous: c.previous });
       }
     } catch (error) {
       out.digestsFailed++;
       out.errors.push({ scope: 'digest', reason: errorMessage(error) });
+      await release();
+      continue;
+    }
+    if (!claimed) {
+      // Another run claimed this user's day after this one read it.
+      out.skippedMailedToday++;
+      out.relationshipsDue -= sections.reduce((n, s) => n + s.due.length, 0);
+      await release();
+      continue;
+    }
+
+    try {
+      await options.mailer(renderStaleRelationshipsEmail({ to: recipient.email, locale: recipient.locale, now, sections }));
+    } catch (error) {
+      out.digestsFailed++;
+      out.errors.push({ scope: 'digest', reason: errorMessage(error) });
+      await release();
+      continue;
+    }
+    out.digestsSent++;
+
+    // Sent: from here on the claim is kept whatever happens, so this user gets
+    // no second mail today. A failed stamp only means tomorrow names these rows again.
+    for (const s of sections) {
+      try {
+        const n = await stampRows(s.tenantId, s.due, now, runTenant);
+        out.relationshipsReminded += n;
+        const acc = auditByTenant.get(s.tenantId) ?? { relationships: 0, recipients: 0 };
+        acc.relationships += n;
+        acc.recipients++;
+        auditByTenant.set(s.tenantId, acc);
+      } catch (error) {
+        out.errors.push({ scope: 'stamp', reason: errorMessage(error) });
+      }
     }
   }
-  for (const [tenantId, { ids, recipients }] of stampByTenant) {
+  for (const [tenantId, { relationships, recipients }] of auditByTenant) {
     try {
-      out.relationshipsReminded += await stampTenant(tenantId, ids, recipients, now, runTenant);
+      await auditTenant(tenantId, relationships, recipients, runTenant);
     } catch (error) {
       out.errors.push({ scope: 'stamp', reason: errorMessage(error) });
     }

@@ -176,6 +176,10 @@ model Membership {
   role      Role     @default(MEMBER)
   workspaceIds String[] // empty = all workspaces of tenant
   createdAt DateTime @default(now())
+  /// UTC day the `m4-stale-relationships` digest for this member was claimed,
+  /// set BEFORE the mail goes (compare-and-set) so a retried run cannot send a
+  /// second digest the same day. m4-stale-reminder-idempotency.sql
+  staleDigestOn DateTime? @db.Date
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([tenantId, userId])
@@ -1129,9 +1133,12 @@ model Relationship {
   nextStepDue    DateTime?
   notes          String?
   /// When the `m4-stale-relationships` job last put this relationship in its owner's
-  /// "no contact for 60 days" digest. A reminder is due again only after a newer
-  /// contact (`lastContactAt` > this) has gone stale in turn. relationship-stale-reminded-at.sql
+  /// "no contact for 60 days" digest. relationship-stale-reminded-at.sql
   staleRemindedAt DateTime?
+  /// The `lastContactAt` that digest was about. A reminder is due again once
+  /// `lastContactAt` differs from it (any new or re-dated contact, earlier or
+  /// later) and has gone stale in turn. m4-stale-reminder-idempotency.sql
+  staleRemindedContactAt DateTime?
   updatedAt      DateTime @updatedAt
   @@index([tenantId, ownerUserId])
   @@index([tenantId, lastContactAt])

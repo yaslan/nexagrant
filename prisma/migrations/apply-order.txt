@@ -47,3 +47,4 @@ invitation-accepted-at.sql
 add-public-lead.sql
 relationship-stale-reminded-at.sql
 k1-embedding-hash.sql
+m4-stale-reminder-idempotency.sql

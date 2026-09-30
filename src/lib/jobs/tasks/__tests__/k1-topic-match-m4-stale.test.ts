@@ -80,6 +80,13 @@ describe('k1-topic-match job', () => {
     expect(alerts.map((a) => a.dedupeKey)).toEqual(['k1-topic-match:no-embeddings']);
   });
 
+  it('topics embedded but no tenant profile is: still "nothing scorable", still reported (İNCELEME-51 Y-2)', async () => {
+    recomputeAllTopicMatches.mockResolvedValue(topicResult({ scored: 0, created: 0, topicsWithoutEmbedding: 0, noProfileEmbedding: 3 }));
+    env.NODE_ENV = 'production';
+    await k1TopicMatchTask({}, helpersFor());
+    expect(alerts.map((a) => a.dedupeKey)).toEqual(['k1-topic-match:no-embeddings']);
+  });
+
   it('a thrown run is retried and alerted by the wrapper on the last attempt', async () => {
     recomputeAllTopicMatches.mockRejectedValue(new Error('connection reset'));
     await expect(k1TopicMatchTask({}, helpersFor(5, 5))).rejects.toThrow('connection reset');

@@ -32,11 +32,18 @@ export function isStaleRelationship(lastContactAt: Date | string | null | undefi
   return Number.isFinite(at) && at <= staleCutoff(now).getTime();
 }
 
-/** Pure: stale and not yet reminded for this stale period. */
+/**
+ * Pure: stale and not yet reminded for this stale period. A period is one
+ * `lastContactAt` value: the reminder records the contact it named
+ * (`staleRemindedContactAt`), and any other value — a later contact, or one
+ * entered after the reminder but dated before it — starts a new period.
+ * Comparing against WHEN the reminder went out instead silenced a relationship
+ * for good after a back-dated contact (İNCELEME-51 B-2).
+ */
 export function isReminderDue(
-  row: { lastContactAt: Date | null; staleRemindedAt: Date | null },
+  row: { lastContactAt: Date | null; staleRemindedContactAt: Date | null },
   now: Date
 ): boolean {
   if (!isStaleRelationship(row.lastContactAt, now)) return false;
-  return row.staleRemindedAt === null || row.staleRemindedAt.getTime() < new Date(row.lastContactAt as Date).getTime();
+  return row.staleRemindedContactAt === null || row.staleRemindedContactAt.getTime() !== new Date(row.lastContactAt as Date).getTime();
 }

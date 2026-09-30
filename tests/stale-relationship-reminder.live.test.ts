@@ -31,9 +31,9 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
   return { rlsUrl, ownerUrl };
 });
 
-import { createDbClient, prisma } from '@/lib/db';
+import { createDbClient, prisma, withTenant } from '@/lib/db';
 import { sendStaleRelationshipReminders, STALE_REMINDER_AUDIT } from '@/lib/relationships/stale-reminder';
-import { isStaleRelationship } from '@/lib/relationships/stale';
+import { dayStartUtc, isReminderDue, isStaleRelationship } from '@/lib/relationships/stale';
 import type { MailMessage } from '@/lib/email/mailer';
 import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
@@ -80,7 +80,13 @@ const NOW = new Date();
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
 
 const R: Record<string, string> = {};
-async function rel(key: string, tenantId: string, owner: string | null, lastContactAt: Date | null, extra: { staleRemindedAt?: Date; name?: string } = {}) {
+async function rel(
+  key: string,
+  tenantId: string,
+  owner: string | null,
+  lastContactAt: Date | null,
+  extra: { staleRemindedAt?: Date; staleRemindedContactAt?: Date; name?: string } = {}
+) {
   const row = await admin.relationship.create({
     data: {
       tenantId,
@@ -89,6 +95,7 @@ async function rel(key: string, tenantId: string, owner: string | null, lastCont
       counterpartName: extra.name ?? `${key}-${RUN}`,
       lastContactAt,
       staleRemindedAt: extra.staleRemindedAt ?? null,
+      staleRemindedContactAt: extra.staleRemindedContactAt ?? null,
     },
   });
   R[key] = row.id;
@@ -97,6 +104,11 @@ async function rel(key: string, tenantId: string, owner: string | null, lastCont
 async function stampOf(key: string): Promise<Date | null> {
   const row = await admin.relationship.findUnique({ where: { id: requireId(R[key], key) }, select: { staleRemindedAt: true } });
   return row?.staleRemindedAt ?? null;
+}
+
+async function claimOf(tenantId: string, userId: string): Promise<Date | null> {
+  const row = await admin.membership.findUnique({ where: { tenantId_userId: { tenantId, userId } }, select: { staleDigestOn: true } });
+  return row?.staleDigestOn ?? null;
 }
 
 function fakeMailer(opts: { failFor?: string } = {}) {
@@ -108,8 +120,8 @@ function fakeMailer(opts: { failFor?: string } = {}) {
   return { sent, mailer };
 }
 
-const run = (mailer: ((m: MailMessage) => Promise<void>) | null, now: Date = NOW) =>
-  sendStaleRelationshipReminders({ mailer, appUrl: 'https://app.example.test', now, tenantIds: TENANTS, pageSize: 2 });
+const run = (mailer: ((m: MailMessage) => Promise<void>) | null, now: Date = NOW, runTenant?: typeof withTenant) =>
+  sendStaleRelationshipReminders({ mailer, appUrl: 'https://app.example.test', now, tenantIds: TENANTS, pageSize: 2, runTenant });
 
 async function wipe() {
   await admin.relationship.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
@@ -155,8 +167,8 @@ beforeAll(async () => {
   await rel('justUnder', T.on, U.tr, ago(60 * DAY - 1)); // one ms short: not stale
   await rel('old90', T.on, U.tr, ago(90 * DAY), { name: '<img src=x onerror=alert(1)>' });
   await rel('never', T.on, U.tr, null);
-  await rel('reminded', T.on, U.tr, ago(80 * DAY), { staleRemindedAt: ago(10 * DAY) }); // already told
-  await rel('recontact', T.on, U.tr, ago(70 * DAY), { staleRemindedAt: ago(200 * DAY) }); // new stale period
+  await rel('reminded', T.on, U.tr, ago(80 * DAY), { staleRemindedAt: ago(10 * DAY), staleRemindedContactAt: ago(80 * DAY) }); // already told
+  await rel('recontact', T.on, U.tr, ago(70 * DAY), { staleRemindedAt: ago(200 * DAY), staleRemindedContactAt: ago(260 * DAY) }); // new stale period
   await rel('unassigned', T.on, null, ago(90 * DAY));
   await rel('gone', T.on, U.gone, ago(90 * DAY));
   await rel('notMember', T.on, U.member, ago(90 * DAY)); // U.member is not in T.on
@@ -184,6 +196,16 @@ describe('60-day rule (pure)', () => {
     expect(isStaleRelationship(new Date(now.getTime() - 60 * DAY), now)).toBe(true);
     expect(isStaleRelationship(new Date(now.getTime() - 60 * DAY + 1), now)).toBe(false);
     expect(isStaleRelationship(null, now)).toBe(false);
+  });
+
+  test('due again for any other contact than the one reminded about, earlier-dated included (İNCELEME-51 B-2)', () => {
+    const now = new Date('2026-10-01T07:00:00.000Z');
+    const c = new Date(now.getTime() - 70 * DAY);
+    expect(isReminderDue({ lastContactAt: c, staleRemindedContactAt: null }, now)).toBe(true);
+    expect(isReminderDue({ lastContactAt: c, staleRemindedContactAt: new Date(c) }, now)).toBe(false);
+    // Reminded about an older contact; the current one is back-dated but still a new period.
+    expect(isReminderDue({ lastContactAt: c, staleRemindedContactAt: new Date(c.getTime() - 30 * DAY) }, now)).toBe(true);
+    expect(isReminderDue({ lastContactAt: new Date(now.getTime() - 59 * DAY), staleRemindedContactAt: null }, now)).toBe(false);
   });
 });
 
@@ -226,6 +248,16 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     expect(en.html).toContain(`/en/ws-${T.on}/relationships`);
 
     for (const k of ['exact60', 'old90', 'recontact', 'en1', 'second', 'pmManager']) expect((await stampOf(k))?.getTime()).toBe(NOW.getTime());
+    // The stamp records the contact it named.
+    const recontact = await admin.relationship.findUnique({ where: { id: requireId(R.recontact, 'recontact') }, select: { staleRemindedContactAt: true } });
+    expect(recontact?.staleRemindedContactAt?.getTime()).toBe(ago(70 * DAY).getTime());
+    // The day is claimed on every membership the digest covered, and on no other.
+    const today = dayStartUtc(NOW).getTime();
+    expect((await claimOf(T.on, U.tr))?.getTime()).toBe(today);
+    expect((await claimOf(T.on2, U.tr))?.getTime()).toBe(today);
+    expect((await claimOf(T.on, U.en))?.getTime()).toBe(today);
+    expect(await claimOf(T.off, U.tr)).toBeNull();
+    expect(await claimOf(T.on, U.gone)).toBeNull();
     for (const k of ['justUnder', 'never', 'unassigned', 'gone', 'notMember', 'pmMember', 'off', 'noPlan', 'expired']) expect(await stampOf(k)).toBeNull();
     expect((await stampOf('reminded'))?.getTime()).toBe(ago(10 * DAY).getTime());
   });
@@ -277,6 +309,13 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     expect(await stampOf('failA')).toBeNull();
     expect((await stampOf('okB'))?.getTime()).toBe(day3.getTime());
     expect(r.errors).toEqual([{ scope: 'digest', reason: 'smtp:EENVELOPE:550' }]);
+    // The rejected user's claim is given back, so a later run the same day retries.
+    expect((await claimOf(T.on, U.tr))?.getTime()).not.toBe(dayStartUtc(day3).getTime());
+    const retry = fakeMailer();
+    const r2 = await run(retry.mailer, new Date(day3.getTime() + 60_000));
+    expect(retry.sent.map((m) => m.to)).toEqual([mail(U.tr)]);
+    expect(r2.digestsSent).toBe(1);
+    expect((await stampOf('failA'))?.getTime()).toBe(day3.getTime() + 60_000);
   });
 
   test('a contact after the reminder starts a new 60-day period', async () => {
@@ -288,5 +327,78 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     const { sent, mailer } = fakeMailer();
     await run(mailer, new Date(contact.getTime() + 60 * DAY));
     expect(sent.find((m) => m.to === mail(U.tr))?.text).toContain(`exact60-${RUN}`);
+  });
+
+  test('a worker killed after the send and before the stamp sends no second digest that day (İNCELEME-51 B-1)', async () => {
+    const d = new Date(NOW.getTime() + 100 * DAY);
+    await rel('crashA', T.on, U.tr, new Date(d.getTime() - 90 * DAY));
+    await rel('crashB', T.on2, U.tr, new Date(d.getTime() - 80 * DAY));
+    // The "crash": once a mail is accepted, every later database call fails —
+    // nothing after the send runs, as if the process had been killed there.
+    let killed = false;
+    const crashing: typeof withTenant = (tenantId, fn) => (killed ? Promise.reject(new Error('worker killed')) : withTenant(tenantId, fn));
+    const sent: MailMessage[] = [];
+    await run(async (m) => {
+      sent.push(m);
+      killed = true;
+    }, d, crashing);
+    expect(sent.map((m) => m.to)).toEqual([mail(U.tr)]);
+    expect(await stampOf('crashA')).toBeNull();
+    expect(await stampOf('crashB')).toBeNull();
+
+    // The retry the same day (graphile re-runs the job): nothing for U.tr.
+    const retry = fakeMailer();
+    const r = await run(retry.mailer, new Date(d.getTime() + 60_000));
+    expect(retry.sent).toHaveLength(0);
+    expect(r.skippedMailedToday).toBe(1);
+    expect(await stampOf('crashA')).toBeNull();
+
+    // The next morning the unstamped rows go out, once.
+    const next = fakeMailer();
+    await run(next.mailer, new Date(d.getTime() + DAY));
+    expect(next.sent.map((m) => m.to)).toEqual([mail(U.tr)]);
+    expect(next.sent[0]!.text).toContain(`crashA-${RUN}`);
+    expect(next.sent[0]!.text).toContain(`crashB-${RUN}`);
+    expect((await stampOf('crashA'))?.getTime()).toBe(d.getTime() + DAY);
+  });
+
+  test('two runs racing for the same day send one digest (the claim is a compare-and-set)', async () => {
+    const d = new Date(NOW.getTime() + 150 * DAY);
+    await rel('raceA', T.on, U.tr, new Date(d.getTime() - 70 * DAY));
+    const a = fakeMailer();
+    const b = fakeMailer();
+    await Promise.all([run(a.mailer, d), run(b.mailer, new Date(d.getTime() + 1))]);
+    expect([...a.sent, ...b.sent].map((m) => m.to)).toEqual([mail(U.tr)]);
+  });
+
+  test('a contact logged while the digest is being sent is not stamped as reminded', async () => {
+    const d = new Date(NOW.getTime() + 170 * DAY);
+    await rel('midRun', T.on, U.tr, new Date(d.getTime() - 75 * DAY));
+    const fresh = new Date(d.getTime() - 60_000);
+    const sent: MailMessage[] = [];
+    await run(async (m) => {
+      sent.push(m);
+      await admin.relationship.update({ where: { id: requireId(R.midRun, 'midRun') }, data: { lastContactAt: fresh } });
+    }, d);
+    expect(sent[0]?.text).toContain(`midRun-${RUN}`);
+    const row = await admin.relationship.findUnique({ where: { id: requireId(R.midRun, 'midRun') }, select: { staleRemindedAt: true, staleRemindedContactAt: true } });
+    expect(row).toEqual({ staleRemindedAt: null, staleRemindedContactAt: null });
+  });
+
+  test('a contact logged after the reminder but dated before it starts a new period (İNCELEME-51 B-2)', async () => {
+    const e = new Date(NOW.getTime() + 200 * DAY);
+    await rel('backdated', T.on, U.tr, new Date(e.getTime() - 61 * DAY));
+    const first = fakeMailer();
+    await run(first.mailer, e);
+    expect(first.sent[0]?.text).toContain(`backdated-${RUN}`);
+    // "I called them last week": entered after the reminder, dated a week before it.
+    const called = new Date(e.getTime() - 7 * DAY);
+    await admin.relationship.update({ where: { id: requireId(R.backdated, 'backdated') }, data: { lastContactAt: called } });
+    const early = fakeMailer();
+    await run(early.mailer, new Date(called.getTime() + 59 * DAY)); // a day short; also a different UTC day from the next run
+    expect(early.sent.some((m) => m.text?.includes(`backdated-${RUN}`))).toBe(false);
+    const due = fakeMailer();
+    await run(due.mailer, new Date(called.getTime() + 60 * DAY));
+    expect(due.sent.find((m) => m.to === mail(U.tr))?.text).toContain(`backdated-${RUN}`);
   });
 });
