@@ -54,9 +54,10 @@ export const RAG_UPLOAD_LIMITS = {
   /** V8 heap of the extraction thread; past it the thread dies, not the server. */
   maxParseHeapMb: 512,
   /**
-   * What all of the file's streams may inflate to, and one stream alone
-   * (decompression bomb). A text page's content stream is tens to hundreds of
-   * KB inflated; 20 MB of text PDF does not come near 256 MB.
+   * What all of the file's streams may decode to, and one stream alone
+   * (decompression bomb), counted as pdf.js decodes them through any filter
+   * chain (src/lib/rag-pdf.worker.ts). A text page's content stream is tens to
+   * hundreds of KB decoded; 20 MB of text PDF does not come near 256 MB.
    */
   maxInflatedMb: 256,
   maxStreamInflatedMb: 64,

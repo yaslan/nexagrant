@@ -12,9 +12,10 @@
  * - a wall-clock deadline (`maxParseMs`) — past it the thread is terminated;
  * - a V8 heap ceiling (`maxParseHeapMb`) — out of memory kills the thread,
  *   not the server;
- * - a ceiling on what the file's streams inflate to (`maxInflatedMb`,
- *   `maxStreamInflatedMb`), checked before pdf.js starts: decoded streams are
- *   typed arrays outside the V8 heap, which the heap ceiling does not see.
+ * - a ceiling on what the file's streams decode to (`maxInflatedMb`,
+ *   `maxStreamInflatedMb`), counted inside pdf.js as it decodes, whatever the
+ *   filter chain (TASK-MUNRAWJ0N84T6): decoded streams are typed arrays
+ *   outside the V8 heap, which the heap ceiling does not see.
  * Each one is refused as `parse_too_heavy` (413). One extraction runs at a time
  * so that parallel uploads cannot stack up several threads' memory.
  *
