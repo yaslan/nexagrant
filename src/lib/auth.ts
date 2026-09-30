@@ -639,32 +639,54 @@ export const authConfig = {
       token.isPlatformAdmin = false;
 
       if (typeof token.id === "string") {
-        const refreshMembership = !token.tenantId || trigger === "signIn";
+        // Role and tenant are re-read on EVERY call too (TASK-MUNQB0GR306U0,
+        // İNCELEME-59 Y-2). They used to be read only on sign-in or while the
+        // token had no tenant, so a member demoted or removed kept the old
+        // role for as long as the token lived — 30 days, sliding.
+        //
+        // The token stays bound to the tenant it was given: `boundTenantId`
+        // survives the loss of the membership, so a removed member of tenant A
+        // who also belongs to B is left tenantless, never moved to B behind
+        // their back. Only a sign-in picks a tenant afresh.
+        const heldTenantId = typeof token.tenantId === "string" ? token.tenantId : token.boundTenantId;
+        const boundTenantId = trigger !== "signIn" && typeof heldTenantId === "string" ? heldTenantId : null;
+        // Nothing is kept from the previous call: whatever the lookup below
+        // does not grant again, the token no longer has.
+        delete token.tenantId;
+        delete token.role;
+        delete token.workspaceIds;
+        delete token.boundTenantId;
+        if (boundTenantId) token.boundTenantId = boundTenantId;
         try {
-          // One query either way: the membership join only when the token
-          // has no tenant yet or a sign-in just happened, the flag always.
-          if (refreshMembership) {
-            const dbUser = await prisma.user.findUnique({
-              where: { id: token.id },
-              include: { memberships: true },
-            });
-            token.isPlatformAdmin = dbUser?.isPlatformAdmin === true;
-            // Narrowed off the element itself rather than off `.length`: an absent
-            // first membership must leave the token tenantless, which is the same
-            // safe outcome the catch below documents.
-            const activeMembership = dbUser?.memberships[0];
-            if (dbUser && activeMembership) {
-              token.tenantId = activeMembership.tenantId;
-              token.role = activeMembership.role;
-              token.workspaceIds = activeMembership.workspaceIds;
-              if (dbUser.name) token.name = dbUser.name;
-            }
-          } else {
-            const dbUser = await prisma.user.findUnique({
-              where: { id: token.id },
-              select: { isPlatformAdmin: true },
-            });
-            token.isPlatformAdmin = dbUser?.isPlatformAdmin === true;
+          // One Prisma call, as before: the flag plus at most one membership
+          // row — the bound tenant's, or the oldest one when none is bound.
+          // (`where: undefined` is meant: still only this user's memberships.)
+          // Prisma sends it as two statements, the second on the
+          // (tenantId, userId) unique index.
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id },
+            select: {
+              name: true,
+              isPlatformAdmin: true,
+              memberships: {
+                where: boundTenantId ? { tenantId: boundTenantId } : undefined,
+                orderBy: { createdAt: "asc" },
+                take: 1,
+                select: { tenantId: true, role: true, workspaceIds: true },
+              },
+            },
+          });
+          token.isPlatformAdmin = dbUser?.isPlatformAdmin === true;
+          // Narrowed off the element itself rather than off `.length`: an absent
+          // membership must leave the token tenantless, which is the same safe
+          // outcome the catch below documents.
+          const activeMembership = dbUser?.memberships?.[0];
+          if (dbUser && activeMembership) {
+            token.tenantId = activeMembership.tenantId;
+            token.boundTenantId = activeMembership.tenantId;
+            token.role = activeMembership.role;
+            token.workspaceIds = activeMembership.workspaceIds;
+            if (dbUser.name) token.name = dbUser.name;
           }
         } catch (e) {
           if (claimedAdmin) {

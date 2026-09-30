@@ -96,11 +96,20 @@ describe('platform-admin claim (TASK-MULU7GVFBTRXX Ö-2)', () => {
     const off = await loadConfig('false');
     const bob = await sessionFor(off, { id: 'demo-user-bob', email: 'bob@example.org', isPlatformAdmin: true, ...tenanted });
     expect(bob.isPlatformAdmin).toBe(false);
-    // One select of the flag only: the token already has a tenant.
+    // One call: the flag and the bound tenant's membership together.
     expect(prismaUser.findUnique).toHaveBeenCalledTimes(1);
     expect(prismaUser.findUnique).toHaveBeenCalledWith({
       where: { id: 'demo-user-bob' },
-      select: { isPlatformAdmin: true },
+      select: {
+        isPlatformAdmin: true,
+        name: true,
+        memberships: {
+          where: { tenantId: 't1' },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { tenantId: true, role: true, workspaceIds: true },
+        },
+      },
     });
   });
 
@@ -131,6 +140,87 @@ describe('platform-admin claim (TASK-MULU7GVFBTRXX Ö-2)', () => {
     const off = await loadConfig('false');
     expect((await sessionFor(off, { isPlatformAdmin: true })).isPlatformAdmin).toBe(false);
     expect(prismaUser.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('role and tenant claims are re-read on every request (TASK-MUNQB0GR306U0, İNCELEME-59 Y-2)', () => {
+  const row = (memberships: Array<{ tenantId: string; role: string; workspaceIds?: string[] }>) => ({
+    isPlatformAdmin: false,
+    name: 'Ayşe',
+    memberships: memberships.map((m) => ({ workspaceIds: [], ...m })),
+  });
+  const membershipWhere = (call: number) =>
+    (prismaUser.findUnique.mock.calls[call]?.[0] as { select: { memberships: { where?: unknown } } }).select.memberships.where;
+
+  it('a demoted member carries the new role in the next request', async () => {
+    const off = await loadConfig('false');
+    prismaUser.findUnique.mockResolvedValueOnce(row([{ tenantId: 't1', role: 'MEMBER' }]));
+    const next = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted } });
+    expect(next.tenantId).toBe('t1');
+    expect(next.role).toBe('MEMBER');
+    expect(next.workspaceIds).toEqual([]);
+    expect(membershipWhere(0)).toEqual({ tenantId: 't1' });
+  });
+
+  it('a removed member is tenantless in the next request', async () => {
+    const off = await loadConfig('false');
+    prismaUser.findUnique.mockResolvedValueOnce(row([]));
+    const next = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted } });
+    const session = await off.callbacks.session({ session: { user: {} }, token: next });
+    expect(next.tenantId).toBeUndefined();
+    expect(next.role).toBeUndefined();
+    expect(session.tenantId).toBeNull();
+    expect(session.role).toBeNull();
+  });
+
+  it('removed from the bound tenant, a member of another is not moved there', async () => {
+    const off = await loadConfig('false');
+    // The lookup asks for t1 only; t2 is never offered.
+    prismaUser.findUnique.mockResolvedValueOnce(row([]));
+    const removed = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted } });
+    expect(removed.tenantId).toBeUndefined();
+    expect(removed.boundTenantId).toBe('t1');
+    // Tenantless now, but still bound: the next request asks for t1 again.
+    prismaUser.findUnique.mockResolvedValueOnce(row([]));
+    const later = await off.callbacks.jwt({ token: { ...removed } });
+    expect(later.tenantId).toBeUndefined();
+    expect(membershipWhere(1)).toEqual({ tenantId: 't1' });
+    // Added back to t1, the token has it again.
+    prismaUser.findUnique.mockResolvedValueOnce(row([{ tenantId: 't1', role: 'WRITER' }]));
+    const readded = await off.callbacks.jwt({ token: { ...later } });
+    expect(readded.tenantId).toBe('t1');
+    expect(readded.role).toBe('WRITER');
+  });
+
+  it('a sign-in picks the oldest membership afresh', async () => {
+    const off = await loadConfig('false');
+    prismaUser.findUnique.mockResolvedValueOnce(row([{ tenantId: 't2', role: 'TENANT_ADMIN' }]));
+    const next = await off.callbacks.jwt({ token: { id: 'u1', boundTenantId: 't1' }, trigger: 'signIn' });
+    expect(membershipWhere(0)).toBeUndefined();
+    expect(next.tenantId).toBe('t2');
+    expect(next.boundTenantId).toBe('t2');
+    expect(next.role).toBe('TENANT_ADMIN');
+  });
+
+  it('a token that never had a tenant takes its first membership (invitation accepted)', async () => {
+    const off = await loadConfig('false');
+    prismaUser.findUnique.mockResolvedValueOnce(row([{ tenantId: 't3', role: 'MEMBER' }]));
+    const next = await off.callbacks.jwt({ token: { id: 'u1' } });
+    expect(membershipWhere(0)).toBeUndefined();
+    expect(next.tenantId).toBe('t3');
+  });
+
+  it('no database: tenantless for this request, same tenant once it is back', async () => {
+    const off = await loadConfig('false');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    prismaUser.findUnique.mockRejectedValueOnce(new Error('db down'));
+    const down = await off.callbacks.jwt({ token: { id: 'u1', ...tenanted } });
+    expect(down.tenantId).toBeUndefined();
+    expect(down.role).toBeUndefined();
+    prismaUser.findUnique.mockResolvedValueOnce(row([{ tenantId: 't1', role: 'TENANT_OWNER' }]));
+    const up = await off.callbacks.jwt({ token: { ...down } });
+    expect(membershipWhere(1)).toEqual({ tenantId: 't1' });
+    expect(up.tenantId).toBe('t1');
   });
 });
 

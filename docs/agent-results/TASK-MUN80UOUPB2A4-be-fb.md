@@ -241,7 +241,7 @@ Dosyalar:
   - (b) Koşullu bir `can(...)` da "kontrol var" sayılıyor, örneğin `updateRelationship`.
   - (c) Route handler'ları kapsamıyor: `app/api/saved-searches/*` Y-3 Ek A'da W, Rol=- idi. Bunlar kullanıcıya ait kayıtlar ve bu kartın dışında kaldı.
 - **R-5 — UX.** MEMBER ve WRITER artık görünen düğmelere basıp ret cümlesi görecek (§6).
-- **R-6 — Rol değişikliğinin yayılması.** Rol JWT oturumundan okunuyor. Bir rol değişikliği mevcut davranışta olduğu gibi token yenilendiğinde yansıyor.
+- **R-6 — Rol değişikliğinin yayılması.** Rol JWT oturumundan okunuyor. ~~Bir rol değişikliği mevcut davranışta olduğu gibi token yenilendiğinde yansıyor.~~ **Düzeltme (TASK-MUNQB0GR306U0):** bu cümle yanlıştı. O tarihte jwt callback rol ve kiracıyı yalnız sign-in'de ya da token kiracısızken okuyordu. Rolü düşürülen veya üyeliği silinen kullanıcı, token yaşadığı sürece (30 gün, kayan pencere) eski rolünü koruyordu (İNCELEME-59 Y-2, H7). Artık jwt callback her istekte üyeliği okuyor. Rol değişikliği bir sonraki istekte yansıyor, silinen üyelik de oturumu kiracısız bırakıyor.
 
 ## 9) Açık sorular
 - §4'teki 10 madde.
