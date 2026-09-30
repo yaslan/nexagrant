@@ -1,0 +1,7 @@
+import { encode } from 'next-auth/jwt';
+const t = await encode({ token: { id: 'demo-user-superadmin', sub: 'demo-user-superadmin' }, secret: process.env.AUTH_SECRET, salt: 'authjs.session-token', maxAge: 3600 });
+for (const n of [100_000, 500_000, 900_000, 1_000_000]) {
+  const r = await fetch('http://127.0.0.1:47100/tr/admin/billing/plans', { method: 'POST', headers: { 'Next-Action': '60de0980bf55b08ca9d916836948b59e364b037ade', Accept: 'text/x-component', 'Content-Type': 'text/plain;charset=UTF-8', Origin: 'http://127.0.0.1:47100', Cookie: `authjs.session-token=${t}` }, body: JSON.stringify(['ultra', 'x'.repeat(n)]) });
+  const b = await r.text();
+  console.log(n, r.status, (b.match(/^1:(.*)$/m) || [])[1] ?? b.slice(0, 80).replace(/\n/g, ' '));
+}

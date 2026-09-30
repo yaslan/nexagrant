@@ -1,0 +1,18 @@
+import subprocess,re
+F='tests/api/action-leak-scan.ts'
+M=[
+ ('S-c','sink yalnız dosya + dış fonksiyonlar (iç içe fonksiyon dönüşleri sayılmaz)',"  for (const f of [sf, ...functions]) {\n    if (rejectionHandlers.has(f)) continue;","  for (const f of [sf, ...functions]) {\n    if (rejectionHandlers.has(f)) continue;\n    if (f !== sf && f.parent && !ts.isSourceFile(f.parent) && !(ts.isVariableDeclaration(f.parent) && ts.isSourceFile(f.parent.parent.parent))) continue;"),
+ ('S-f','.code muafiyeti her ifadeye (e.cause.code dahil)',"if (n.name.text === 'code' && ts.isIdentifier(skipWrappers(n.expression))) return false;","if (n.name.text === 'code') return false;"),
+ ('S-g','for…of akışı kaldırıldı',"    if (ts.isForOfStatement(n)) flows.push(n);\n",""),
+ ('S-j','eleman erişimi yalnız indeksle (e[\'message\'] temiz)',"if (ts.isElementAccessExpression(n)) return leaks(n.expression) || leaks(n.argumentExpression);","if (ts.isElementAccessExpression(n)) return leaks(n.argumentExpression);"),
+ ('S-k','new ifadesi hiç sızmaz (new Error(e.message) temiz)',"if (ts.isNewExpression(n)) return (n.arguments ?? []).some((a) => leaks(a));","if (ts.isNewExpression(n)) return false;"),
+ ('S-l','koşul ifadesinde yalnız whenTrue',"if (ts.isConditionalExpression(n)) return leaks(n.whenTrue) || leaks(n.whenFalse);","if (ts.isConditionalExpression(n)) return leaks(n.whenTrue);"),
+]
+orig=open(F).read()
+for mid,d,a,b in M:
+    if a not in orig: print(mid,'UYGULANAMADI'); continue
+    open(F,'w').write(orig.replace(a,b,1))
+    o=subprocess.run(['npx','vitest','run','tests/api/api-error-body-guard.test.ts'],capture_output=True,text=True)
+    m=re.search(r'Tests\s+(.*)',o.stdout)
+    print(f"{'ÖLDÜ  ' if o.returncode else 'YAŞADI'} | {mid} | {d} | {m.group(1).strip() if m else o.stdout[-200:]}",flush=True)
+open(F,'w').write(orig)
