@@ -1,0 +1,16 @@
+== enjeksiyon: statement trigger SeatCandidate BEFORE DELETE -> 1
+[tr prisma-hatası] alert="Adaylar hesaplanamadı." | POST gövdesi=1 (durum içermeyen=0) | sızıntı-eşleşen gövde=0
+   gövde: 0:{"a":"$@1","f":"","q":"","i":false,"b":"GyC7hgZTjpVyFZW3fqipT"} 1:{"status":"error","code":"computeFailed"} 
+[en prisma-hatası] alert="Could not compute candidates." | POST gövdesi=1 (durum içermeyen=0) | sızıntı-eşleşen gövde=0
+   gövde: 0:{"a":"$@1","f":"","q":"","i":false,"b":"GyC7hgZTjpVyFZW3fqipT"} 1:{"status":"error","code":"computeFailed"} 
+== geri alındı: trigger sayısı = 0
+[tr koltuk-silinmiş] alert="Bu koltuk ya da fırsat bu çalışma alanında bulunamadı. Sayfayı yenileyip tekrar deneyin." | POST gövdesi=1 (durum içermeyen=0) | sızıntı-eşleşen gövde=0
+   gövde: 0:{"a":"$@1","f":"","q":"","i":false,"b":"GyC7hgZTjpVyFZW3fqipT"} 1:{"status":"error","code":"seatNotFound"} 
+[en koltuk-silinmiş] alert="This seat or opportunity was not found in this workspace. Refresh the page and try again." | POST gövdesi=1 (durum içermeyen=0) | sızıntı-eşleşen gövde=0
+   gövde: 0:{"a":"$@1","f":"","q":"","i":false,"b":"GyC7hgZTjpVyFZW3fqipT"} 1:{"status":"error","code":"seatNotFound"} 
+[tr sağlam] alert sayısı=0
+GEÇTİ  tr prisma
+GEÇTİ  en prisma
+GEÇTİ  tr seatNotFound
+GEÇTİ  en seatNotFound
+GEÇTİ  tr sağlam
