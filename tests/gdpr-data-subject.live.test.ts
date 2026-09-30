@@ -432,8 +432,13 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
 
     // Guard: this job scans the whole database. It must never run here while a
     // row it did not seed is also due, or the test would destroy real data.
+    // "Due" is the purge's own filter (purgeDueUsers(30): requested 30+ days
+    // ago). A fresh request another live file seeds in parallel — e.g.
+    // stale-relationship-reminder's `U.gone`, requested today — is not touched
+    // by this run and must not fail it (İNCELEME-54 Y-2).
+    const dueCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const due = await db.user.findMany({
-      where: { deletionRequestedAt: { not: null } },
+      where: { deletionRequestedAt: { not: null, lte: dueCutoff } },
       select: { id: true },
     });
     expect(due.map((u: { id: string }) => u.id)).toEqual([ids.subject]);
