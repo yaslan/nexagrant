@@ -1,0 +1,12 @@
+login 200 chrome 154.0.8037.58
+cookie dialog dismissed
+chrome tr page=200 suggestedFilename="Çağrı_ Kırsal İklim Öncüleri — ğüşıöç 🚀.docx" cps=44 failure=null
+chrome crlf page=200 suggestedFilename="x__Set-Cookie_ pwn=1__X-Evil_ 1.docx" cps=36 failure=null
+chrome semi page=200 suggestedFilename="a; filename=_evil.exe_; b.docx" cps=30 failure=null
+chrome quote page=200 suggestedFilename="He said _hi_ it's (ok) _x_.docx" cps=31 failure=null
+chrome long page=200 suggestedFilename="ŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞŞ.docx" cps=125 failure=null
+chrome bidi page=200 suggestedFilename="fatura_cod.exe.docx" cps=19 failure=null
+chrome emoji page=200 suggestedFilename="🚀🚀.docx" cps=7 failure=null
+chrome pct page=200 suggestedFilename="100% %0d%0a.docx" cps=16 failure=null
+chrome long-emoji suggestedFilename cps=125 utf8bytes=485 head="🚀🚀🚀🚀🚀🚀" tail="\ude80🚀.docx" failure=null saved=15245175B
+saveAs ok

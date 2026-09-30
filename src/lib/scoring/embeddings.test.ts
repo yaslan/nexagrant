@@ -137,10 +137,12 @@ const {
   EMBEDDING_DIMENSIONS,
   TOPIC_EMBEDDING_PURPOSE,
   PROFILE_EMBEDDING_PURPOSE,
+  EMBEDDING_PROBE_TEXT,
+  PROBE_EMBEDDING_PURPOSE,
 } = await import('./embeddings');
 const { AiUsageLogWriteError } = await import('@/lib/llm');
 const tokenFixture = (await import('../../../tests/fixtures/cl100k-token-samples.json')).default as {
-  samples: Array<{ id: string; text: string; tokens: number }>;
+  samples: Array<{ id: string; text: string; tokens: number; cutChars?: number; cutTokens?: number }>;
 };
 
 const T0 = new Date('2026-09-01T00:00:00Z');
@@ -154,13 +156,13 @@ function profile(tenantId: string, over: Partial<ProfileRow> = {}): ProfileRow {
 let fetchMock: ReturnType<typeof vi.fn>;
 /** Bodies the provider received. */
 const sent: Array<{ model: string; input: string; dimensions: number }> = [];
-function stubProvider(respond?: (input: string, n: number) => { ok: boolean; status?: number }) {
+function stubProvider(respond?: (input: string, n: number) => { ok: boolean; status?: number; body?: string }) {
   let n = 0;
   fetchMock = vi.fn(async (_url: string, init: { body: string; headers: Record<string, string> }) => {
     const body = JSON.parse(init.body);
     sent.push(body);
     const r = respond?.(body.input, ++n) ?? { ok: true };
-    if (!r.ok) return { ok: false, status: r.status ?? 500, text: async () => 'upstream error' };
+    if (!r.ok) return { ok: false, status: r.status ?? 500, text: async () => r.body ?? 'upstream error' };
     return {
       ok: true,
       json: async () => ({ data: [{ embedding: new Array(1536).fill(0.01) }], usage: { prompt_tokens: 10 } }),
@@ -302,6 +304,26 @@ describe('estimateEmbeddingTokens — floor against the real tokenizer (İNCELEM
     const tr = tokenFixture.samples.find((x) => x.id === 'tr-16k')!;
     expect(estimateEmbeddingTokens(tr.text)).toBeGreaterThanOrEqual(tr.tokens);
     expect(Math.ceil(tr.text.length / 3)).toBeLessThan(tr.tokens); // the old 3 chars/token rule
+  });
+
+  it('upper-case Greek and Cyrillic are not under-counted (İNCELEME-85 Y-2: all-caps Greek was 0.62x real)', () => {
+    for (const id of ['el-caps', 'el2-caps', 'ru-caps', 'bg-caps', 'uk-caps', 'sr-caps', 'mn-caps', 'kk-caps', 'el-caps-16k', 'ru-caps-16k']) {
+      const x = tokenFixture.samples.find((s) => s.id === id)!;
+      expect(estimateEmbeddingTokens(x.text), id).toBeGreaterThanOrEqual(x.tokens);
+    }
+    // Lower case keeps its weight: the same text in lower case is estimated well under its capitals.
+    const el = tokenFixture.samples.find((s) => s.id === 'el')!;
+    expect(estimateEmbeddingTokens(el.text)).toBeLessThan(0.7 * estimateEmbeddingTokens(el.text.toUpperCase()));
+  });
+
+  it('what is kept of 16 000 all-caps characters stays under the model limit in real tokens', () => {
+    for (const id of ['el-caps-16k', 'ru-caps-16k']) {
+      const x = tokenFixture.samples.find((s) => s.id === id)!;
+      expect(x.tokens, id).toBeGreaterThan(8191); // whole, the model refuses it
+      // The fixture pins what topicEmbeddingText keeps and its real count; a looser cut or weight moves the length.
+      expect(topicEmbeddingText({ title: x.text, keywords: [], description: null }).length, id).toBe(x.cutChars);
+      expect(x.cutTokens!, id).toBeLessThanOrEqual(8191);
+    }
   });
 
   it('stays within 2x of real for the catalogue languages, so the cap is not needlessly tight', () => {
@@ -468,28 +490,145 @@ describe('runK1Embeddings — failures', () => {
     expect(await runK1Embeddings()).toMatchObject({ profilesEmbedded: 1, rejected: 1 });
     expect(db.profiles.find((p) => p.tenantId === 't2')!.embeddingHash).toMatch(new RegExp(`^${REJECTED_HASH_PREFIX}`));
     expect(db.profileScopes.every((s) => s === 't1' || s === 't2')).toBe(true);
+    // The probe is the platform's check, not the tenant's spend.
+    expect(db.usage.filter((u) => u.purpose === PROBE_EMBEDDING_PURPOSE).map((u) => u.tenantId)).toEqual(['__platform__']);
     fetchMock.mockClear();
     expect(await runK1Embeddings()).toMatchObject({ previouslyRejected: 1, profilesUpToDate: 1 });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('every input refused means the request is wrong: the run stops after five', async () => {
-    db.topics = Array.from({ length: 8 }, (_, i) => topic(`t${i}`));
-    db.profiles = [];
-    stubProvider(() => ({ ok: false, status: 400 }));
+  /** Every request refused, as a wrong model, `dimensions` or gateway would: nothing about the rows. */
+  const requestRefused = () => ({ ok: false, status: 400, body: '{"error":{"message":"This model does not support specifying dimensions.","type":"invalid_request_error"}}' });
+
+  it('a refused request is not a refused row: nothing is marked and the run stops (İNCELEME-85 Y-1)', async () => {
+    db.topics = Array.from({ length: 12 }, (_, i) => topic(`t${String(i).padStart(2, '0')}`));
+    stubProvider(requestRefused);
     const r = await runK1Embeddings();
-    expect(r).toMatchObject({ rejected: 5, aborted: true });
-    expect(fetchMock).toHaveBeenCalledTimes(5); // short texts: no prefix retry
+    expect(r).toMatchObject({ rejected: 0, aborted: true, requestRefused: true, profilesEmbedded: 0, topicsEmbedded: 0 });
+    // The first profile, then the probe: two calls, then the run stops.
+    expect(sent.map((x) => x.input)).toEqual([sent[0]!.input, EMBEDDING_PROBE_TEXT]);
+    expect(sent[0]!.input).toContain('R&D of t1');
+    expect(db.profiles.every((p) => p.embeddingHash === null)).toBe(true);
+    expect(db.topics.every((t) => t.embeddingHash === null)).toBe(true);
+    expect(r.errors).toHaveLength(2);
   });
 
-  it('a refused row between system failures does not reset their streak', async () => {
+  it('night after night of refused requests locks no row; once fixed, every row is embedded (S5)', async () => {
+    db.topics = Array.from({ length: 12 }, (_, i) => topic(`t${String(i).padStart(2, '0')}`));
+    stubProvider(requestRefused);
+    for (let night = 0; night < 4; night++) {
+      expect(await runK1Embeddings()).toMatchObject({ rejected: 0, requestRefused: true });
+      expect([...db.profiles, ...db.topics].filter((x) => x.embeddingHash?.startsWith(REJECTED_HASH_PREFIX))).toHaveLength(0);
+    }
+    stubProvider();
+    const fixed = await runK1Embeddings();
+    expect(fixed).toMatchObject({ profilesEmbedded: 2, topicsEmbedded: 12, previouslyRejected: 0, requestRefused: false, aborted: false });
+  });
+
+  it('a refused row is marked only after the probe is embedded, and the probe is booked to the platform', async () => {
+    db.topics = [topic('a')];
+    db.profiles = [];
+    stubProvider((input) => (input === EMBEDDING_PROBE_TEXT ? { ok: true } : { ok: false, status: 400 }));
+    const r = await runK1Embeddings();
+    expect(r).toMatchObject({ rejected: 1, requestRefused: false, aborted: false });
+    expect(sent.map((x) => x.input)).toEqual([topicEmbeddingText(db.topics[0]!), EMBEDDING_PROBE_TEXT]);
+    expect(db.topics[0]!.embeddingHash).toBe(REJECTED_HASH_PREFIX + embeddingHash(topicEmbeddingText(db.topics[0]!)));
+    expect(db.usage).toEqual([expect.objectContaining({ tenantId: '__platform__', module: 'K1', purpose: PROBE_EMBEDDING_PURPOSE })]);
+  });
+
+  it('a probe that hits an outage judges nothing: the row is not marked, the failure counts towards the streak', async () => {
+    db.topics = [topic('a'), topic('b')];
+    db.profiles = [];
+    stubProvider((input) => (input === EMBEDDING_PROBE_TEXT ? { ok: false, status: 429 } : input.startsWith('Topic a') ? { ok: false, status: 400 } : { ok: false, status: 503 }));
+    const r = await runK1Embeddings();
+    // a 400 + probe 429 (1), b 503 (2): not yet three.
+    expect(r).toMatchObject({ rejected: 0, requestRefused: false, aborted: false, failed: 2 });
+    expect(db.topics.every((t) => t.embeddingHash === null)).toBe(true);
+    // Next run, the provider is back: a is judged again (and embedded).
+    stubProvider();
+    expect(await runK1Embeddings()).toMatchObject({ topicsEmbedded: 2 });
+  });
+
+  it('no room left under the cap for the probe: the row is not marked and is tried next run', async () => {
+    db.topics = [topic('a')];
+    db.profiles = [];
+    stubProvider((input) => (input === EMBEDDING_PROBE_TEXT ? { ok: true } : { ok: false, status: 400 }));
+    const r = await runK1Embeddings({ maxUsd: estimateEmbeddingUsd(topicEmbeddingText(db.topics[0]!)) });
+    expect(r).toMatchObject({ rejected: 0, budgetExhausted: true });
+    expect(sent).toHaveLength(1);
+    expect(db.topics[0]!.embeddingHash).toBeNull();
+  });
+
+  it('a refused row between system failures does not reset their streak, and is not marked while the provider is down', async () => {
     db.topics = ['a', 'b', 'c', 'd', 'e'].map((id) => topic(id));
     db.profiles = [];
     stubProvider((input) => (input.startsWith('Topic b') ? { ok: false, status: 400 } : { ok: false, status: 503 }));
     const r = await runK1Embeddings();
-    // a 503, b 400 (marked), c 503, d 503: three system failures, the run stops before e.
-    expect(r).toMatchObject({ aborted: true, rejected: 1, failed: 4 });
-    expect(sent.map((x) => x.input.split('\n')[0])).toEqual(['Topic a', 'Topic b', 'Topic c', 'Topic d']);
+    // a 503, b 400 + probe 503, c 503: three system failures, the run stops before d.
+    expect(r).toMatchObject({ aborted: true, rejected: 0, failed: 3 });
+    expect(sent.map((x) => x.input.split('\n')[0])).toEqual(['Topic a', 'Topic b', EMBEDDING_PROBE_TEXT, 'Topic c']);
+    expect(db.topics.every((t) => t.embeddingHash === null)).toBe(true);
+  });
+
+  it('429s are an outage, never a refusal: three stop the run, no probe, no mark (İNCELEME-85 N1)', async () => {
+    stubProvider(() => ({ ok: false, status: 429 }));
+    const r = await runK1Embeddings();
+    expect(r).toMatchObject({ aborted: true, rejected: 0, failed: 3, requestRefused: false });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(sent.some((x) => x.input === EMBEDDING_PROBE_TEXT)).toBe(false);
+    expect([...db.profiles, ...db.topics].every((x) => x.embeddingHash === null)).toBe(true);
+  });
+
+  it('a 413 is a refusal of the input too: retried on the byte-safe prefix (İNCELEME-85 N2)', async () => {
+    const el = tokenFixture.samples.find((x) => x.id === 'el-16k')!;
+    db.topics = [topic('a', { description: el.text })];
+    db.profiles = [];
+    stubProvider((input) => (Buffer.byteLength(input) > 8191 ? { ok: false, status: 413 } : { ok: true }));
+    expect(await runK1Embeddings()).toMatchObject({ topicsEmbedded: 1, shortened: 1, failed: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('an embedded row breaks a run of refusals: scattered refused rows never stop the run (İNCELEME-85 N4)', async () => {
+    db.topics = Array.from({ length: 9 }, (_, i) => topic(`t${i}`));
+    db.profiles = [];
+    // t0-t3 refused, t4 embedded, t5-t8 refused: never five in a row.
+    stubProvider((input) => (input === EMBEDDING_PROBE_TEXT || input.startsWith('Topic t4') ? { ok: true } : { ok: false, status: 400 }));
+    const r = await runK1Embeddings();
+    expect(r).toMatchObject({ rejected: 8, topicsEmbedded: 1, aborted: false });
+  });
+
+  it('five refused rows in a row, each confirmed by the probe, stop the run; the next run goes on past them', async () => {
+    db.topics = Array.from({ length: 7 }, (_, i) => topic(`t${i}`));
+    db.profiles = [];
+    stubProvider((input) => (input === EMBEDDING_PROBE_TEXT || input.startsWith('Topic t6') ? { ok: true } : { ok: false, status: 400 }));
+    expect(await runK1Embeddings()).toMatchObject({ rejected: 5, aborted: true, requestRefused: false });
+    expect(await runK1Embeddings()).toMatchObject({ rejected: 1, previouslyRejected: 5, topicsEmbedded: 1, aborted: false });
+  });
+
+  it('a profile is not marked once its pilot has expired while the probe ran (İNCELEME-85 N6)', async () => {
+    db.topics = [];
+    db.profiles = [profile('t1')];
+    db.tenants = [{ id: 't1', deletedAt: null }];
+    stubProvider((input) => {
+      if (input === EMBEDDING_PROBE_TEXT) {
+        db.expired.add('t1');
+        return { ok: true };
+      }
+      return { ok: false, status: 400 };
+    });
+    await expect(runK1Embeddings()).rejects.toThrow('pilot expired');
+    expect(db.profiles[0]!.embeddingHash).toBeNull();
+  });
+
+  it("the provider's body reaches the run's errors as one line of at most 200 characters (İNCELEME-85 N13)", async () => {
+    stubProvider(() => ({ ok: false, status: 503, body: `first line ${'x'.repeat(500)}\nsecond line with detail` }));
+    const r = await runK1Embeddings();
+    expect(r.errors).toHaveLength(3);
+    for (const e of r.errors) {
+      expect(e).not.toContain('\n');
+      expect(e).not.toContain('second line');
+      expect(e.length).toBeLessThanOrEqual(200);
+    }
   });
 
   it('needsEmbedding: a row marked refused for this text is not due; for another text it is', () => {

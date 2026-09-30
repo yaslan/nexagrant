@@ -19,7 +19,8 @@ import { errorMessage } from '@/lib/errors';
 import { isPresentId } from '@/lib/required-id';
 import { rescoreOpportunityG0 } from '@/lib/scoring/g0-compute';
 import { withTenant } from '@/lib/db';
-import { findScopedWorkspace } from '@/lib/workspaces';
+import { findScopedWorkspace, isWorkspaceSlug } from '@/lib/workspaces';
+import { isDatabaseUnavailable } from '@/lib/db-unavailable';
 import { evaluateGate } from '@/lib/gates/evaluate';
 import { canArchiveOpportunity } from '@/lib/pipeline/archive';
 import {
@@ -48,6 +49,8 @@ async function sessionScope(): Promise<TenantScope | null> {
 
 const NO_TENANT = { success: false as const, error: 'TENANT_SCOPE_REQUIRED' as const };
 const WORKSPACE_REFUSED = { success: false as const, error: 'WORKSPACE_NOT_FOUND' as const };
+const INVALID_INPUT = { success: false as const, error: 'INVALID_INPUT' as const };
+const CREATE_FAILED = { success: false as const, error: 'CREATE_FAILED' as const };
 
 /** One effort row covers at most a week of hours — above that it is a typo, not a fact. */
 const MAX_EFFORT_HOURS = 24 * 7;
@@ -63,6 +66,29 @@ const EffortInput = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   hours: z.number().finite().gt(0).max(MAX_EFFORT_HOURS),
   note: z.string().max(500).optional(),
+});
+
+/** A string Postgres can store: no NUL (22021) and no other control characters. */
+const text = (max: number) => z.string().max(max).regex(/^[^\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]*$/);
+
+/**
+ * `createOpportunity` input (TASK-MUO64UQJUWEBI, İNCELEME-83 Y-1).
+ *
+ * A server action's argument is whatever the request body says — the TypeScript
+ * signature is not checked at runtime. A `workspaceSlug` of `{foo:1}`, `["ws-a"]`,
+ * `7` or `"ws-a\u0000"` used to reach the workspace query and make it throw, and the
+ * catch below buffered the row as if the database were down. Every field is now a
+ * bounded string (or the Gate enum) before anything touches the database.
+ */
+const CreateOpportunityInput = z.object({
+  workspaceSlug: z.string().refine(isWorkspaceSlug),
+  title: text(500).refine((v) => v.trim().length > 0),
+  topicId: text(200).optional(),
+  intendedRole: text(50).optional(),
+  ownerId: text(200).optional(),
+  ownerName: text(200).optional(),
+  stage: z.nativeEnum(Gate).optional(),
+  notes: text(10_000).optional(),
 });
 
 /** B7 declaration input. */
@@ -133,16 +159,7 @@ export async function getSuggestedTopics(): Promise<{
   }
 }
 
-export async function createOpportunity({
-  workspaceSlug,
-  title,
-  topicId,
-  intendedRole = 'coordinator',
-  ownerId,
-  ownerName,
-  stage = 'G0',
-  notes
-}: {
+export async function createOpportunity(input: {
   workspaceSlug: string;
   title: string;
   topicId?: string;
@@ -154,6 +171,18 @@ export async function createOpportunity({
 }) {
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
+  const parsed = CreateOpportunityInput.safeParse(input);
+  if (!parsed.success) return INVALID_INPUT;
+  const {
+    workspaceSlug,
+    title,
+    topicId,
+    intendedRole = 'coordinator',
+    ownerId,
+    ownerName,
+    stage = 'G0',
+    notes,
+  } = parsed.data;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
   // The role half (rbac.ts; TASK-MUN80UOUPB2A4, FB GÜVENLİK Y-3).
@@ -182,7 +211,7 @@ export async function createOpportunity({
 
   const newOpp: Omit<OpportunityItem, 'tenantId'> = {
     id: `opp-${Date.now()}`,
-    workspaceId: workspaceSlug || 'default',
+    workspaceId: workspaceSlug,
     title,
     topicId: topicId ? topicId.trim() : null,
     intendedRole,
@@ -234,7 +263,7 @@ export async function createOpportunity({
     // write share one tenant scope, so the row is created under the same scope
     // that proved the workspace.
     const created = await withTenant(tenantId, async (tx) => {
-      const workspace = await findScopedWorkspace(tx, scope, workspaceSlug || null);
+      const workspace = await findScopedWorkspace(tx, scope, workspaceSlug);
       if (!workspace) {
         workspaceRefused = true;
         return null;
@@ -267,7 +296,16 @@ export async function createOpportunity({
       // match, the imported success rate, the tenant's CORDIS history, the call's budget and
       // flags — and store the per-feature breakdown alongside it (CLAUDE.md §7). An opportunity
       // with no evidence yet stays unscored rather than being handed a plausible-looking number.
-      const scored = await rescoreOpportunityG0(tenantId, created.id);
+      //
+      // The row is committed by now, so a scoring failure must not turn this into a failed
+      // create (the user would retry and file it twice) nor into a buffered copy: the card
+      // stays unscored, which the board already shows honestly.
+      let scored: Awaited<ReturnType<typeof rescoreOpportunityG0>> = null;
+      try {
+        scored = await rescoreOpportunityG0(tenantId, created.id);
+      } catch (err) {
+        console.warn(`[createOpportunity] G0 scoring skipped for ${created.id}: ${errorMessage(err)}`);
+      }
 
       // The row handed back to the board is the row the database holds, id included, so the
       // optimistic card and the card the next render draws are the same card.
@@ -289,6 +327,13 @@ export async function createOpportunity({
       };
     }
   } catch (err) {
+    // Only an outage may fall through to the buffer. Anything else — a query Prisma or
+    // Postgres refused — is a refusal: buffering it would report `success` for a row
+    // that no workspace check ever passed.
+    if (!isDatabaseUnavailable(err)) {
+      console.warn(`[createOpportunity] refused by the database, not buffered: ${errorMessage(err)}`);
+      return CREATE_FAILED;
+    }
     console.warn('[createOpportunity] DB query bypassed, stored in resilient pipeline store:', errorMessage(err));
   }
 

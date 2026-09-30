@@ -79,6 +79,42 @@ export async function listSessionWorkspaces(session: SessionLike): Promise<Sessi
  */
 export const WORKSPACE_ALIAS = 'default';
 
+/**
+ * What a workspace slug may look like: lowercase kebab-case ASCII, the grammar every
+ * code path that creates a workspace already writes (`default`, `main`, the beta
+ * roster's `^[a-z0-9]+(-[a-z0-9]+)*$`). The database does not enforce it.
+ *
+ * TASK-MUO64UQJUWEBI (İNCELEME-83 O-1): a slug outside it — `çalışma alanı` — cannot
+ * round-trip through a URL. The route encoded it, the page compared the encoded
+ * segment with the raw slug, never matched, and redirected back: an endless loop,
+ * and a 500 when the raw UTF-8 went into a `Location` header. Such a workspace is
+ * treated as absent instead (404 / no-workspace), never as a redirect target.
+ */
+const WORKSPACE_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export const MAX_WORKSPACE_SLUG_LENGTH = 63;
+
+export function isWorkspaceSlug(value: unknown): value is string {
+  return (
+    typeof value === 'string' && value.length <= MAX_WORKSPACE_SLUG_LENGTH && WORKSPACE_SLUG_PATTERN.test(value)
+  );
+}
+
+/**
+ * The canonical slug a `[workspace]` URL segment asks for, or `null` when it cannot
+ * name one. The segment may arrive percent-encoded and in any case; a malformed
+ * escape is `null`, not a throw.
+ */
+export function normalizeWorkspaceSlug(segment: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+  const slug = decoded.normalize('NFC').toLowerCase();
+  return isWorkspaceSlug(slug) ? slug : null;
+}
+
 export interface ScopedWorkspace {
   id: string;
   slug: string;
@@ -99,7 +135,10 @@ export interface ScopedWorkspace {
  *   called that, means the oldest permitted workspace (deterministic);
  * - anything else — unknown, deleted, outside the membership — is `null`.
  *   Never a fallback: a caller that falls back silently writes somewhere the
- *   user did not pick.
+ *   user did not pick;
+ * - a slug outside the slug grammar is `null` before any query, and so is a
+ *   resolved workspace whose stored slug is outside it (`isWorkspaceSlug`): it
+ *   has no URL, so nothing may be sent to it or written into it.
  *
  * Takes the transaction so a write can prove and use the workspace in one scope.
  */
@@ -110,11 +149,13 @@ export async function findScopedWorkspace(
 ): Promise<ScopedWorkspace | null> {
   const where = { tenantId: scope.tenantId, deletedAt: null, ...workspaceIdFilter(scope.workspaceIds) };
   const select = { id: true, slug: true } as const;
-  if (slug) {
+  if (slug !== null) {
+    if (!isWorkspaceSlug(slug)) return null;
     const exact = await tx.workspace.findFirst({ where: { ...where, slug }, select });
     if (exact || slug !== WORKSPACE_ALIAS) return exact;
   }
-  return tx.workspace.findFirst({ where, select, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
+  const oldest = await tx.workspace.findFirst({ where, select, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
+  return oldest && isWorkspaceSlug(oldest.slug) ? oldest : null;
 }
 
 /** `findScopedWorkspace` in its own tenant scope, for pages and route handlers. */
