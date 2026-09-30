@@ -1,9 +1,9 @@
-# dev (9a97b721) birleştirildikten sonra, HEAD e499a647
+# dev (51f39e6c, TASK-MUNZKR3PEV8EI dahil) birleştirildikten sonra, HEAD 08745684 — bekçi listesi çakışması çözüldü: KNOWN_ACTION_LEAKS = {}
 tsc --noEmit exit=0
 eslint src tests exit=0
 ✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
 i18n:check exit=0
 next build exit=0
 npx vitest run exit=0
- Test Files  291 passed | 6 skipped (297)
-      Tests  3619 passed | 96 skipped (3715)
+ Test Files  292 passed | 6 skipped (298)
+      Tests  3646 passed | 96 skipped (3742)
