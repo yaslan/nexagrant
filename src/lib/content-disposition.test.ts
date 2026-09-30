@@ -63,6 +63,10 @@ describe('attachmentContentDisposition (TASK-MUNDTW8O2IV6V, İNCELEME-53 B-3)', 
     const emojiOnly = attachmentContentDisposition('🚀🚀', '.docx', 'ConceptNote');
     expect(asciiPart(emojiOnly)).toBe('ConceptNote.docx');
     expect(decodedStar(emojiOnly)).toBe('🚀🚀.docx');
+    // Punctuation alone is not a name: the ASCII part falls back rather than ".!.docx" (İNCELEME-88 O-1 D14).
+    const punctuation = attachmentContentDisposition('—.!', '.docx', 'ConceptNote');
+    expect(asciiPart(punctuation)).toBe('ConceptNote.docx');
+    expect(decodedStar(punctuation)).toBe('—.!.docx');
     expect(() => attachmentContentDisposition('kırık \uD83D başlık', '.docx', 'N')).not.toThrow();
     expect(decodedStar(attachmentContentDisposition('kırık \uD83D başlık', '.docx', 'N'))).toBe('kırık � başlık.docx');
   });

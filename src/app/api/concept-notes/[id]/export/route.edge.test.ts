@@ -80,8 +80,8 @@ function seed(content: Record<string, string>, title: string | null = 'Smart Gri
   );
 }
 
-async function exportNote() {
-  const res = await GET(new Request('https://example.test/api/concept-notes/note_1/export'), {
+async function exportNote(headers: HeadersInit = {}) {
+  const res = await GET(new Request('https://example.test/api/concept-notes/note_1/export', { headers }), {
     params: Promise.resolve({ id: 'note_1' }),
   });
   const bytes = Buffer.from(await res.arrayBuffer());
@@ -163,6 +163,40 @@ describe('concept-note DOCX export — İNCELEME-53 follow-ups (TASK-MUNDTW8O2IV
     expect(xml).toContain('metin');
     expect(pictures(xml)).toBe(0);
     expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it('İNCELEME-88 O-2: the retry is logged with request, note and tenant ids and the reason — no title, text or image', async () => {
+    seed({ summary: `<p>gizli not metni</p>${img(PNG)}` }, 'Gizli Fırsat Başlığı');
+    docx.failures = 1;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { res } = await exportNote({ 'X-Request-Id': 'req-abc.123' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Request-Id')).toBe('req-abc.123');
+    expect(warn).toHaveBeenCalledExactlyOnceWith('[concept-note export] retrying without images', {
+      requestId: 'req-abc.123',
+      noteId: 'note_1',
+      tenantId: 'tenant_1',
+      reason: 'Invalid JPG, marker table corrupted',
+    });
+    const logged = JSON.stringify(warn.mock.calls);
+    for (const leak of ['Gizli', 'gizli not', PNG.toString('base64').slice(0, 16), 'Standard Template']) {
+      expect(logged).not.toContain(leak);
+    }
+    warn.mockRestore();
+  });
+
+  it('İNCELEME-88 O-2: a missing or unsafe X-Request-Id is replaced by one made here, and it is the one logged', async () => {
+    seed({ summary: `<p>metin</p>${img(PNG)}` });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    for (const given of [undefined, 'a b\tc', 'x'.repeat(129), '<script>']) {
+      warn.mockClear();
+      docx.failures = 1;
+      const { res } = await exportNote(given === undefined ? {} : { 'X-Request-Id': given });
+      const id = res.headers.get('X-Request-Id')!;
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      expect(warn.mock.calls[0]![1]).toMatchObject({ requestId: id, noteId: 'note_1' });
+    }
     warn.mockRestore();
   });
 

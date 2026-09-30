@@ -107,6 +107,16 @@ describe('safeInlineImageSrc — the image-size DoS path (O-3)', () => {
     expect(safeInlineImageSrc(`data:image/png;base64,${PNG_B64}`, shared)).not.toBeNull();
     expect(safeInlineImageSrc(`data:image/png;base64,${PNG_B64}`, shared)).toBeNull();
   });
+
+  it('an image that exactly fits what is left of the budget is kept, and spends it to 0 (İNCELEME-88 O-1 D4)', () => {
+    const size = Buffer.from(PNG_B64, 'base64').length;
+    const exact = { remaining: size };
+    expect(safeInlineImageSrc(`data:image/png;base64,${PNG_B64}`, exact)).not.toBeNull();
+    expect(exact.remaining).toBe(0);
+    const short = { remaining: size - 1 };
+    expect(safeInlineImageSrc(`data:image/png;base64,${PNG_B64}`, short)).toBeNull();
+    expect(short.remaining).toBe(size - 1);
+  });
 });
 
 describe('safeInlineImageSrc — bytes the bundled image-size cannot size are dropped (TASK-MUNDTW8O2IV6V, İNCELEME-53 B-2)', () => {

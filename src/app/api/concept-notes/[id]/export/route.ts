@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { withTenant } from '@/lib/db';
 import { findAccessibleTemplate, templateSections } from '@/modules/m2/server/templates';
@@ -6,11 +7,21 @@ import HTMLtoDOCX from 'html-to-docx';
 import { escapeHtmlText, MAX_TOTAL_IMAGE_BYTES, sanitizeHtmlForDocx } from '@/lib/docx-safe-html';
 import { attachmentContentDisposition } from '@/lib/content-disposition';
 
+/**
+ * A proxy's `X-Request-Id` when it is a plain token, otherwise one made here. It goes back on the
+ * response, so a user's download can be matched to the server log line below.
+ */
+function requestIdOf(req: Request): string {
+  const given = req.headers.get('x-request-id');
+  return given && /^[\w.:-]{1,128}$/.test(given) ? given : randomUUID();
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const requestId = requestIdOf(req);
   const session = await auth();
   const tenantId = session?.tenantId;
 
@@ -101,7 +112,14 @@ export async function GET(
   try {
     fileBuffer = await toDocx(buildHtml({ remaining: MAX_TOTAL_IMAGE_BYTES }));
   } catch (error) {
-    console.warn('[concept-note export] retrying without images:', error instanceof Error ? error.message : error);
+    // Which export lost its images, by id only: no title, no note text, no image bytes
+    // (İNCELEME-88 O-2). The reason is the library's first line, capped.
+    console.warn('[concept-note export] retrying without images', {
+      requestId,
+      noteId: id,
+      tenantId,
+      reason: (error instanceof Error ? error.message : String(error)).split('\n')[0]!.slice(0, 200),
+    });
     fileBuffer = await toDocx(buildHtml({ remaining: 0 }));
   }
 
@@ -112,6 +130,7 @@ export async function GET(
       'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       // The title is user text; a raw non-Latin-1 letter (ı, ş, ğ) made this a 500 (B-3).
       'Content-Disposition': attachmentContentDisposition(opportunity?.title ?? '', '.docx', 'ConceptNote'),
+      'X-Request-Id': requestId,
     },
   });
 }
