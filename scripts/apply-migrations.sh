@@ -58,10 +58,77 @@ fi
 url=$(printf '%s' "$DATABASE_URL" | sed -E 's/([?&])schema=[^&]*&?/\1/; s/[?&]$//')
 psql_bin=${PSQL:-psql}
 
+# Which role runs the chain (TASK-MUOEGWSV8I7H0, İNCELEME-106 I-1). In CI and
+# locally it is a superuser; in production it is the schema owner, which is
+# neither superuser nor BYPASSRLS. Two things differ for that owner:
+#
+#  1. Creating a function with `SET app.system_scope = 'on'` (file 23 onwards)
+#     needs SET privilege on that placeholder parameter. Without it the chain
+#     stopped half applied. Checked here, before any file runs.
+#  2. The tenant tables are FORCE ROW LEVEL SECURITY, so the owner reads and
+#     updates ZERO rows of them without a tenant: every backfill silently
+#     did nothing. Each file therefore runs with `app.system_scope = 'on'` for
+#     its session, which opens the existing `system_scope` policy
+#     (prisma/rls.sql) exactly as enter_system_scope() does for the app; no
+#     policy changes and no role gains BYPASSRLS. That door exists only on
+#     tables `pnpm db:rls` has covered, so a FORCE table without it stops the
+#     run instead of being skipped quietly.
+#
+# Session-level on purpose: `SET LOCAL` would end at the first COMMIT inside a
+# file. It dies with the psql process, one per file.
+system_scope_defaults() {
+  "$psql_bin" "$url" -X -Atq -v ON_ERROR_STOP=1 -c "
+    SELECT coalesce(string_agg(coalesce(d.datname, '*') || '/' || coalesce(r.rolname, '*'), ', '), '')
+      FROM pg_db_role_setting s
+      LEFT JOIN pg_database d ON d.oid = s.setdatabase
+      LEFT JOIN pg_roles r ON r.oid = s.setrole
+     WHERE EXISTS (SELECT 1 FROM unnest(s.setconfig) c WHERE c LIKE 'app.system\_scope=%')"
+}
+
+preflight=$("$psql_bin" "$url" -X -Atq -F '|' -v ON_ERROR_STOP=1 -c "
+  SELECT current_user,
+         r.rolsuper OR r.rolbypassrls,
+         r.rolsuper OR has_parameter_privilege('app.system_scope', 'SET'),
+         coalesce((SELECT string_agg(c.relname, ', ' ORDER BY c.relname)
+                     FROM pg_class c
+                    WHERE c.relnamespace = current_schema()::regnamespace
+                      AND c.relkind = 'r'
+                      AND c.relforcerowsecurity
+                      AND NOT EXISTS (SELECT 1 FROM pg_policy p
+                                       WHERE p.polrelid = c.oid AND p.polname = 'system_scope')), '')
+    FROM pg_roles r WHERE r.rolname = current_user")
+IFS='|' read -r role exempt can_set uncovered <<< "$preflight"
+
+if [ "$can_set" != t ]; then
+  echo "apply-migrations: role \"$role\" may not create functions with SET app.system_scope (add-agency-invite-code.sql and later)." >&2
+  echo "  Once, as a superuser: psql \"\$SUPERUSER_URL\" -v owner=$role -f prisma/migration-owner-grant.sql" >&2
+  echo "  No file was applied. docs/RELEASE_CHECKLIST.md §3.1." >&2
+  exit 1
+fi
+if [ "$exempt" != t ] && [ -n "$uncovered" ]; then
+  echo "apply-migrations: role \"$role\" is subject to row security, and these FORCE RLS tables have no system_scope policy:" >&2
+  echo "  $uncovered" >&2
+  echo "  A backfill would read and update zero of their rows. Run \`pnpm db:rls\` first, then this script again." >&2
+  echo "  No file was applied." >&2
+  exit 1
+fi
+leaked=$(system_scope_defaults)
+if [ -n "$leaked" ]; then
+  echo "apply-migrations: app.system_scope has a stored default ($leaked); every new session, fabrika_app's included, would skip tenant isolation." >&2
+  echo "  Remove it (ALTER DATABASE/ROLE ... RESET app.system_scope). No file was applied." >&2
+  exit 1
+fi
+
 n=0
 for f in "${listed[@]}"; do
   n=$((n + 1))
   echo "==> [$n/${#listed[@]}] $f"
-  "$psql_bin" "$url" -X -q -v ON_ERROR_STOP=1 -f "$dir/$f"
+  "$psql_bin" "$url" -X -q -v ON_ERROR_STOP=1 -c "SET app.system_scope = 'on'" -f "$dir/$f"
 done
-echo "apply-migrations: $n files applied"
+
+leaked=$(system_scope_defaults)
+if [ -n "$leaked" ]; then
+  echo "apply-migrations: a file stored a default for app.system_scope ($leaked). RESET it before starting the app." >&2
+  exit 1
+fi
+echo "apply-migrations: $n files applied as $role"

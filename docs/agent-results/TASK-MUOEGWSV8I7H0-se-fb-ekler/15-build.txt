@@ -1,0 +1,10 @@
+$ pnpm build
+exit=0
+├ ƒ /api/webhooks/iyzico
+└ ƒ /api/webhooks/stripe
+
+
+ƒ Proxy (Middleware)
+
+ƒ  (Dynamic)  server-rendered on demand
+

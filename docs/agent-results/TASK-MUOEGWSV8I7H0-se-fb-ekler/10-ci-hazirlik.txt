@@ -1,0 +1,6 @@
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55141/f
+apply-migrations: 41 files applied as fabrika
+apply-migrations: 41 files applied as fabrika
+✅ prisma/rls.sql applied. Policies in public: 112 → 112
+Node.js v26.5.0
+[ELIFECYCLE] Command failed with exit code 1.
