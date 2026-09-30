@@ -107,6 +107,7 @@ DB prep: prisma db push 0 · db:rls-role 0 · apply-migrations ×2 0 (40 dosya) 
 tsc EXIT 0 · lint (tam) EXIT 0 · i18n EXIT 0
 build EXIT 0 · ●=0 · ƒ /[locale]/calls · ƒ /[locale]/calls/[region] · ƒ /[locale]/calls/topic/[id] · ƒ /[locale]/[workspace]/cagrilar/[id]
 vitest run (tam) EXIT 0 → Test Files 281 passed | 6 skipped (287) · Tests 3407 passed | 81 skipped (3488)
+güncel dev (23e63600) dala merge edildikten sonra: tsc 0 · lint 0 · i18n 0 · vitest EXIT 0 → Test Files 281 passed | 6 skipped (287) · Tests 3453 passed | 84 skipped (3537)
 ```
 
 ## 3. Değişen dosyalar
