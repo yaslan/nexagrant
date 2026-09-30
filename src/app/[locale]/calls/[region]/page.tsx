@@ -4,16 +4,9 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { Metadata } from 'next';
 import { PRODUCT_NAME } from '@/lib/brand';
-
-const REGIONS: Record<string, { name: string; code: string }> = {
-  turkey: { name: 'Türkiye', code: 'TR' },
-  germany: { name: 'Almanya', code: 'DE' },
-  belgium: { name: 'Belçika', code: 'BE' },
-  france: { name: 'Fransa', code: 'FR' },
-  italy: { name: 'İtalya', code: 'IT' },
-};
-
-type RegionParam = keyof typeof REGIONS;
+import { auth } from '@/lib/auth';
+import { publicCallDetailHref } from '@/lib/routes';
+import { regionOf } from './regions';
 
 interface PageProps {
   params: Promise<{
@@ -38,7 +31,7 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { region, locale } = await params;
-  const regionInfo = REGIONS[region as RegionParam];
+  const regionInfo = regionOf(region);
   if (!regionInfo) {
     return {
       title: locale === 'tr' ? `Sayfa Bulunamadı — ${PRODUCT_NAME}` : `Page Not Found — ${PRODUCT_NAME}`,
@@ -74,13 +67,14 @@ type TopicRow = {
 
 export default async function CallsPage({ params }: PageProps) {
   const { region, locale } = await params;
-  const regionInfo = REGIONS[region as RegionParam];
+  const regionInfo = regionOf(region);
   if (!regionInfo) {
     notFound();
   }
   const regionLabel = regionInfo.name;
 
   const t = await getTranslations('calls_region');
+  const signedIn = Boolean((await auth())?.user);
 
   const calls = (await prisma.topic.findMany({
     where: {
@@ -148,7 +142,7 @@ export default async function CallsPage({ params }: PageProps) {
                       </div>
                     </div>
                     <Link
-                      href={`/${locale}/login?redirect=/dashboard`}
+                      href={publicCallDetailHref(locale, call.identifier, signedIn)}
                       className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium whitespace-nowrap ml-4"
                     >
                       {t('view_details')}

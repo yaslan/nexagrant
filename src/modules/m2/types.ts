@@ -9,7 +9,9 @@
 
 /**
  * One section of a ConceptTemplate. The template's `schema` Json column holds
- * `{ sections: ConceptTemplateSection[] }` — see the comment on that column.
+ * either a bare `ConceptTemplateSection[]` or `{ sections: [...] }`; read it
+ * through `templateSections` (src/modules/m2/server/templates.ts), which
+ * accepts both and drops malformed elements.
  */
 export interface ConceptTemplateSection {
   key: string;

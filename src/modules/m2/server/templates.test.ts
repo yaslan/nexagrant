@@ -110,4 +110,14 @@ describe('templateSections', () => {
       expect(templateSections(bad)).toEqual([]);
     }
   );
+
+  it('drops elements with no section key (İNCELEME-71 B-3)', () => {
+    const junk = [null, 'x', 42, {}, { key: '', maxWords: 5 }, { key: 7 }];
+    expect(templateSections(junk)).toEqual([]);
+    expect(templateSections({ sections: [null, ...sections] })).toEqual(sections);
+  });
+
+  it('keeps a keyed section with no word limit — the DOCX export needs only key and labelKey', () => {
+    expect(templateSections({ sections: [{ key: 'a', labelKey: 'A' }] })).toEqual([{ key: 'a', labelKey: 'A' }]);
+  });
 });

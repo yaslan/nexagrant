@@ -129,3 +129,22 @@ export function getWorkspaceRoute(
       return `/${locale}/${workspace}/panel`;
   }
 }
+
+/**
+ * Where a public call card's "details" button goes (TASK-MUNWZGWA70P16, İNCELEME-71 B-2).
+ *
+ * The cards on /[locale]/calls used to link /[locale]/calls/<identifier>, which
+ * lands on the `[region]` route and 404s — every card, on the page's main path.
+ * There is no public call-detail page; the detail lives in the workspace app.
+ * A signed-in visitor goes straight there. Anyone else goes to sign-in with the
+ * detail as `callbackUrl`, because the (app) layout's own redirect for a
+ * signed-out request drops the URL it was asked for.
+ *
+ * Interim: whether the cards should instead open a public detail page is a
+ * product decision still open with the owner.
+ */
+export function publicCallDetailHref(locale: string, identifier: string, signedIn: boolean): string {
+  const detail = getWorkspaceRoute('callDetail', locale, 'default', encodeURIComponent(identifier));
+  if (signedIn) return detail;
+  return `${getPublicRoute('login', locale)}?callbackUrl=${encodeURIComponent(detail)}`;
+}
