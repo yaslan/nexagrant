@@ -1,0 +1,35 @@
+DB=postgresql://fabrika:fabrika@127.0.0.1:55136/fabrika HEAD=0779e8f8
+=== O1a diff:
+-        UPDATE "TenantProfile" SET "embeddingHash" = NULL WHERE "tenantId" = ${p.tenantId} AND "embeddingHash" LIKE ${LIKE}`
++        UPDATE "TenantProfile" SET "embeddingHash" = NULL WHERE "tenantId" = ${p.tenantId}`
+--- O1a full file:
+     × a row re-embedded between the listing and the clear keeps its new hash (validates the LIKE guard, Ö-1) 589ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+-     "clearedProfiles": 0,
++     "clearedProfiles": 1,
+      "clearedTopics": 0,
+      Tests  1 failed | 5 passed (6)
+=== O1b diff:
+-    UPDATE "Topic" SET "embeddingHash" = NULL WHERE id = ANY(${topicIds}::text[]) AND "embeddingHash" LIKE ${LIKE}`;
++    UPDATE "Topic" SET "embeddingHash" = NULL WHERE id = ANY(${topicIds}::text[])`;
+--- O1b full file:
+     × a row re-embedded between the listing and the clear keeps its new hash (validates the LIKE guard, Ö-1) 588ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+      "clearedProfiles": 0,
+-     "clearedTopics": 0,
++     "clearedTopics": 1,
+      Tests  1 failed | 5 passed (6)
+=== O1ab diff:
+-    UPDATE "Topic" SET "embeddingHash" = NULL WHERE id = ANY(${topicIds}::text[]) AND "embeddingHash" LIKE ${LIKE}`;
++    UPDATE "Topic" SET "embeddingHash" = NULL WHERE id = ANY(${topicIds}::text[])`;
+-        UPDATE "TenantProfile" SET "embeddingHash" = NULL WHERE "tenantId" = ${p.tenantId} AND "embeddingHash" LIKE ${LIKE}`
++        UPDATE "TenantProfile" SET "embeddingHash" = NULL WHERE "tenantId" = ${p.tenantId}`
+--- O1ab full file:
+     × a row re-embedded between the listing and the clear keeps its new hash (validates the LIKE guard, Ö-1) 589ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+-     "clearedProfiles": 0,
+-     "clearedTopics": 0,
++     "clearedProfiles": 1,
++     "clearedTopics": 1,
+      Tests  1 failed | 5 passed (6)
+restored
