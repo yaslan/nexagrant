@@ -33,6 +33,15 @@ import { isPresentId } from '@/lib/required-id';
  * if that is refused too, the row is marked `rejected:<hash>` and skipped until
  * its text changes. Only failures that say nothing about the row (401, 429,
  * 5xx, network) count towards {@link MAX_CONSECUTIVE_FAILURES}.
+ *
+ * A 400 is not always the row's (TASK-MUO4GPRO92N97, İNCELEME-85 Y-1): a wrong
+ * model, `dimensions` or gateway refuses every request, and marking each row
+ * it touched locked the catalogue (and the profiles, which go first) five rows
+ * a night. So no row is marked on its own word: after a refusal the run sends
+ * {@link EMBEDDING_PROBE_TEXT}. Only if the probe is embedded is the refusal the
+ * row's. If the probe is refused too, the request is at fault: the run stops
+ * with `requestRefused` and marks nothing. Any other probe failure is a system
+ * failure and the row is simply tried again next run.
  */
 
 /** Must match `embedText`'s default model and the `vector(1536)` columns. */
@@ -70,6 +79,13 @@ export const MAX_EMBED_TOKENS_ESTIMATE = 8_000;
  */
 export const FALLBACK_EMBED_BYTES = 8_000;
 
+/**
+ * Sent after a refusal to tell a refused row from a refused request: a few
+ * tokens that any working model/dimensions/key embeds. Booked to the platform.
+ */
+export const EMBEDDING_PROBE_TEXT = 'Research and innovation funding call.';
+export const PROBE_EMBEDDING_PURPOSE = 'k1_embedding_probe';
+
 /** Marks a row whose text the provider refused; see {@link needsEmbedding}. */
 export const REJECTED_HASH_PREFIX = 'rejected:';
 
@@ -77,9 +93,9 @@ export const REJECTED_HASH_PREFIX = 'rejected:';
 const MAX_CONSECUTIVE_FAILURES = 3;
 
 /**
- * After this many refused rows in a row the run stops too: every input being
- * refused says the request is wrong, not the rows. The rows already marked
- * come back once `embeddingHash` is cleared (see the result file).
+ * After this many refused rows in a row the run stops too. Each refusal was
+ * confirmed by a probe, so these are the rows' own; the stop only bounds the
+ * work a run of bad rows makes, and the next run goes on past the marks.
  */
 const MAX_CONSECUTIVE_REJECTIONS = 5;
 
@@ -98,12 +114,21 @@ export const PROFILE_EMBEDDING_PURPOSE = 'k1_profile_embedding';
  * letters with diacritics also split their neighbours, hence 2 each. Scripts
  * not listed get 3, at or above their UTF-8 length. Machine strings (base64,
  * hex) are not bounded by it; {@link FALLBACK_EMBED_BYTES} covers their length.
+ *
+ * Case matters (İNCELEME-85 Y-2): the vocabulary holds lower-case Greek and
+ * Cyrillic words, capitals fall apart into bytes — an all-caps Greek title is
+ * ~1.7 real tokens a letter, all-caps Russian ~1.0, Kazakh/Mongolian letters
+ * outside basic Cyrillic ~2. Those get their UTF-8 length (2) or 1.5, lower
+ * case keeps its measured weight, so lower-case text is not cut any shorter.
  */
 function tokenWeight(c: number): number {
   if (c < 0x80) return c >= 0x30 && c <= 0x39 ? 0.6 : 0.3; // ASCII: digits split in threes
   if (c < 0x250 || (c >= 0x1e00 && c < 0x1f00)) return 2; // Latin-1, Latin Extended A/B and Additional
-  if ((c >= 0x370 && c < 0x400) || (c >= 0x1f00 && c < 0x2000)) return 1.2; // Greek
-  if (c >= 0x400 && c < 0x530) return 0.8; // Cyrillic
+  if (c >= 0x3ac && c <= 0x3ce) return 1.2; // Greek lower case
+  if ((c >= 0x370 && c < 0x400) || (c >= 0x1f00 && c < 0x2000)) return 2; // Greek capitals, polytonic: their UTF-8 length
+  if (c >= 0x430 && c < 0x460) return 0.8; // Cyrillic lower case
+  if (c >= 0x400 && c < 0x430) return 1.5; // Cyrillic capitals
+  if (c >= 0x460 && c < 0x530) return 2; // Cyrillic extended (Kazakh, Mongolian, historic): their UTF-8 length
   if ((c >= 0x3040 && c < 0x3100) || (c >= 0x3400 && c < 0xa000) || (c >= 0xac00 && c < 0xd7b0) || (c >= 0xf900 && c < 0xfb00)) return 1.5; // kana, CJK, Hangul
   if (c > 0xffff) return 4; // emoji and other astral code points: 4 UTF-8 bytes
   return 3;
@@ -226,6 +251,8 @@ export interface EmbeddingRunResult {
   budgetExhausted: boolean;
   /** True when {@link MAX_CONSECUTIVE_FAILURES} system failures (or {@link MAX_CONSECUTIVE_REJECTIONS} refusals) in a row stopped the run. */
   aborted: boolean;
+  /** True when the probe was refused as well: the request (model, dimensions, gateway) is wrong, no row was marked, the run stopped. */
+  requestRefused: boolean;
   /** Set when nothing was attempted: `no_api_key`. */
   skipped?: 'no_api_key';
   errors: string[];
@@ -261,7 +288,7 @@ class Run {
     this.out = {
       topicsScanned: 0, topicsEmbedded: 0, topicsUpToDate: 0, topicsEmpty: 0,
       profilesScanned: 0, profilesEmbedded: 0, profilesUpToDate: 0, profilesEmpty: 0, profilesPilotExpired: 0,
-      rejected: 0, previouslyRejected: 0, shortened: 0, raced: 0, failed: 0, estimatedUsd: 0, maxUsd, budgetExhausted: false, aborted: false, errors: [], durationMs: 0,
+      rejected: 0, previouslyRejected: 0, shortened: 0, raced: 0, failed: 0, estimatedUsd: 0, maxUsd, budgetExhausted: false, aborted: false, requestRefused: false, errors: [], durationMs: 0,
     };
   }
 
@@ -316,9 +343,24 @@ class Run {
     }
     this.fail(r.error);
     if (isInputRejection(r.error)) {
-      this.out.rejected++;
-      if (++this.rejectedStreak >= MAX_CONSECUTIVE_REJECTIONS) this.out.aborted = true;
-      return 'rejected';
+      const probe = await this.call(EMBEDDING_PROBE_TEXT, { tenantId: null, module: 'K1', purpose: PROBE_EMBEDDING_PURPOSE });
+      // No room left to ask: not the row's fault as far as this run knows; it is tried again next run.
+      if (probe === 'cap') return null;
+      if ('vec' in probe) {
+        // The same model and dimensions embed other text: this input is the problem.
+        this.out.rejected++;
+        if (++this.rejectedStreak >= MAX_CONSECUTIVE_REJECTIONS) this.out.aborted = true;
+        return 'rejected';
+      }
+      if (isInputRejection(probe.error)) {
+        // A known-good text is refused as well: the request is wrong, not the row. Stop; mark nothing.
+        this.fail(probe.error);
+        this.out.requestRefused = true;
+        this.out.aborted = true;
+        return null;
+      }
+      // The probe hit an outage (429, 5xx, network): count it; the row is not judged.
+      r = probe;
     }
     if (++this.streak >= MAX_CONSECUTIVE_FAILURES) this.out.aborted = true;
     return null;

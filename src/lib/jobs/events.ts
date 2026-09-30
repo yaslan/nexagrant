@@ -255,6 +255,7 @@ export const K1EmbeddingsOutputSchema = z.object({
   maxUsd: z.number(),
   budgetExhausted: z.boolean(),
   aborted: z.boolean(),
+  requestRefused: z.boolean(),
   durationMs: z.number(),
 });
 
