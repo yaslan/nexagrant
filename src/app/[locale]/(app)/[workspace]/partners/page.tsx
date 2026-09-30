@@ -182,7 +182,7 @@ export default async function PartnersPage({
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 space-y-6">
+    <div className="max-w-7xl mx-auto py-8 sm:px-4 space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-medium text-muted">
         <Link href={getWorkspaceRoute('dashboard', locale, workspace)} className="hover:text-ink transition-colors">

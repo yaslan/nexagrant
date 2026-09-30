@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 bg-slate-50 dark:bg-slate-950">
+    <main className="min-h-screen flex items-center justify-center px-edge sm:px-4 bg-slate-50 dark:bg-slate-950">
       <div className="max-w-md w-full rounded-2xl border border-border bg-surface p-6 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
         <div className="mt-3 space-y-3 text-sm text-slate-600 dark:text-slate-400">{children}</div>

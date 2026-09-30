@@ -28,7 +28,7 @@ export default async function ProfileSettingsLayout({
   return (
     <>
       {children}
-      <div className="max-w-4xl mx-auto px-4 pb-8">
+      <div className="max-w-4xl mx-auto sm:px-4 pb-8">
         <ProvinceSetting
           applies={provinceAppliesTo(tenant?.country)}
           initialProvince={tenant?.province ?? null}

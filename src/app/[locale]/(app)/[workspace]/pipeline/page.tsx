@@ -112,7 +112,7 @@ export default async function PipelinePage({
   const opportunities = await withEvidenceBackedScores(tenantId, merged);
 
   return (
-    <div className="max-w-[1600px] mx-auto py-8 px-4">
+    <div className="max-w-[1600px] mx-auto py-8 sm:px-4">
       {/* The board never receives a tenantId: server actions read the tenant
           from the session, so a value travelling through the client would be
           an attacker-controlled input, not a fact. */}

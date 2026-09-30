@@ -86,7 +86,7 @@ export default async function EvaluationsPage({
   if (!opp) notFound();
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl mx-auto py-6 sm:px-6 space-y-6">
       <EvaluationsClient
         opportunityId={opp.id}
         opportunityTitle={opp.title}

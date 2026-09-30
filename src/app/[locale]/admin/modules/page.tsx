@@ -52,7 +52,7 @@ export default async function AdminModulesPage() {
 
   if (!initialTenantId) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto py-6 sm:px-6">
         <div className="bg-surface border rounded-xl p-8 text-center">
           <h1 className="text-xl font-bold text-ink mb-2">Modül Yönetimi</h1>
           <p className="text-sm text-muted">
@@ -64,7 +64,7 @@ export default async function AdminModulesPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl mx-auto py-6 sm:px-6 space-y-6">
       <AdminModulesClient
         tenants={tenants}
         initialTenantId={initialTenantId}

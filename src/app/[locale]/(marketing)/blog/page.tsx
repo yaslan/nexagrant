@@ -20,7 +20,7 @@ export default async function BlogIndexPage({
       <PublicNavbar locale={locale} />
 
       <main className="flex-1 py-16 lg:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8 space-y-12">
           {/* Page Header */}
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <span className="text-xs font-bold text-accent uppercase tracking-widest bg-accent/10 border border-accent/20 px-3.5 py-1.5 rounded-full">

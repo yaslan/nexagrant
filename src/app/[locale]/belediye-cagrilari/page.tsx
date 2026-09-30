@@ -273,7 +273,7 @@ export default async function BelediyeCagrilariPage({
     <div className="flex min-h-screen flex-col bg-background text-ink">
       <PublicNavbar locale={locale} />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 space-y-12 px-4 py-12">
+      <main className="mx-auto w-full max-w-6xl flex-1 space-y-12 px-edge sm:px-4 py-12">
         <header className="space-y-4">
           <Badge className="bg-accent/15 text-accent-ink border-accent/30">{t('badge')}</Badge>
           <h1 className="font-heading text-3xl font-extrabold text-ink md:text-4xl">{t('title')}</h1>

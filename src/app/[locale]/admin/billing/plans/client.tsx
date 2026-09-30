@@ -151,7 +151,7 @@ export function PlanAdminClient({ locale, plans, modules, tenants, loadError }: 
 
   if (loadError) {
     return (
-      <div className="max-w-3xl mx-auto bg-surface border border-rose-300 rounded-xl p-6 space-y-2">
+      <div className="max-w-3xl mx-auto bg-surface border border-rose-300 rounded-xl p-4 sm:p-6 space-y-2">
         <h1 className="text-lg font-bold text-ink flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-rose-600" /> {t('title')}
         </h1>

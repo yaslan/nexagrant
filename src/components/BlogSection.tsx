@@ -14,7 +14,7 @@ export default function BlogSection({ locale }: BlogSectionProps) {
 
   return (
     <section className="py-20 lg:py-28 bg-surface border-b border-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
           <div>

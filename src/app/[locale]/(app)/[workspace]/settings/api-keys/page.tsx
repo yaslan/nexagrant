@@ -56,7 +56,7 @@ export default async function ApiKeysSettingsPage({
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl mx-auto py-6 sm:px-6 space-y-6">
       <ApiKeysClient apiKeys={apiKeys} apiBaseUrl={appUrl()} />
     </div>
   );

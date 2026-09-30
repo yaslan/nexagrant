@@ -170,7 +170,7 @@ export default async function TurkeyCalls({
     <div className="min-h-screen flex flex-col bg-background text-ink">
       <PublicNavbar locale={locale} />
 
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+      <main className="flex-1 max-w-7xl mx-auto px-edge sm:px-6 lg:px-8 py-12 w-full">
         <div className="space-y-8">
           {/* Header */}
           <div className="space-y-2">

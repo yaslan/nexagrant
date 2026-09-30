@@ -151,7 +151,7 @@ export default async function BlogDetailPage({
       <PublicNavbar locale={locale} />
 
       <main className="flex-1 py-12 lg:py-20">
-        <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        <article className="max-w-4xl mx-auto px-edge sm:px-6 lg:px-8 space-y-8">
           {/* Back link */}
           <div>
             <Link

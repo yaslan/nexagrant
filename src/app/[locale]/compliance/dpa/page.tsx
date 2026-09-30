@@ -55,7 +55,7 @@ export default async function DpaPage({
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-12 px-6 bg-surface border rounded-xl my-8">
+    <div className="max-w-4xl mx-edge sm:mx-auto py-12 px-4 sm:px-6 bg-surface border rounded-xl my-8">
       <article className="prose prose-slate max-w-none">
         <MarkdownView source={source} />
       </article>

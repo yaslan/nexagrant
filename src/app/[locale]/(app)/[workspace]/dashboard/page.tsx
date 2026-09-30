@@ -28,7 +28,7 @@ export async function generateMetadata({
 
 function Notice({ title, body, detail }: { title: string; body: string; detail?: string }) {
   return (
-    <div className="max-w-2xl mx-auto p-8 text-center" role="alert">
+    <div className="max-w-2xl mx-auto py-8 sm:px-8 text-center" role="alert">
       <h1 className="text-2xl font-bold mb-2">{title}</h1>
       <p className="text-ink-2">{body}</p>
       {detail && <p className="text-xs text-gray-500 mt-4">{detail}</p>}
@@ -78,7 +78,7 @@ export default async function DashboardPage({
   }
 
   return (
-    <div className="space-y-8 p-6 max-w-7xl mx-auto">
+    <div className="space-y-8 py-6 sm:px-6 max-w-7xl mx-auto">
       <Dashboard
         metrics={metrics}
         trendData={trendData}

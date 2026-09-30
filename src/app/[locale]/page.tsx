@@ -60,7 +60,7 @@ export default async function HomePage({
           {/* Subtle background glow effect */}
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-gradient-to-tr from-accent/10 via-teal-500/10 to-accent-ink/10 blur-3xl pointer-events-none -z-10 rounded-full"></div>
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto space-y-6">
               {/* Badge */}
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent-ink text-xs font-semibold shadow-2xs">
@@ -248,7 +248,7 @@ export default async function HomePage({
 
         {/* ─── STAGE-GATE 5 ADIMLI MODEL ─── */}
         <section id="stage-gate" className="py-20 lg:py-28 bg-surface border-b border-border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
               <span className="text-xs font-bold text-accent uppercase tracking-widest bg-accent/10 border border-accent/20 px-3 py-1 rounded-full">
                 {isTr ? 'Metodoloji' : 'Methodology'}
@@ -330,7 +330,7 @@ export default async function HomePage({
 
         {/* ─── MODÜLLER VE YETENEKLER (M1-M11) ─── */}
         <section id="moduller" className="py-20 lg:py-28 bg-ground/50 border-b border-border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
               <span className="text-xs font-bold text-accent uppercase tracking-widest bg-accent/10 border border-accent/20 px-3 py-1 rounded-full">
                 {isTr ? 'Entegre Modül Mimarisi' : 'Modular Powerhouse'}
@@ -467,7 +467,7 @@ export default async function HomePage({
 
         {/* ─── CORDIS İSTİHBARAT & GRAF ANALİTİĞİ ─── */}
         <section id="cordis" className="py-20 lg:py-28 bg-surface border-b border-border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6">
                 <span className="text-xs font-bold text-accent uppercase tracking-widest bg-accent/10 border border-accent/20 px-3 py-1 rounded-full">
@@ -577,7 +577,7 @@ export default async function HomePage({
 
         {/* ─── KİMLER İÇİN İDEAL? (TARGET AUDIENCES) ─── */}
         <section className="py-20 lg:py-28 bg-ground/50 border-b border-border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
               <h2 className="text-3xl sm:text-4xl font-extrabold font-heading text-ink">
                 {isTr ? 'Tüm Ekosistem Paydaşları İçin Tek Çözüm' : 'Built for the Entire Innovation Ecosystem'}
@@ -636,7 +636,7 @@ export default async function HomePage({
 
         {/* ─── FINAL CALL TO ACTION ─── */}
         <section className="py-20 lg:py-24 bg-gradient-to-br from-accent/90 via-accent-ink to-slate-950 text-white relative overflow-hidden">
-          <div className="max-w-5xl mx-auto px-4 text-center space-y-6 relative z-10">
+          <div className="max-w-5xl mx-auto px-edge sm:px-4 text-center space-y-6 relative z-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-heading tracking-tight">
               {isTr
                 ? 'Bir Sonraki Horizon Europe Projenizi Bugün Başlatın'

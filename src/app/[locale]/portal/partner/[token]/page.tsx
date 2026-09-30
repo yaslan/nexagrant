@@ -131,7 +131,7 @@ export default async function PartnerPortalPage({ params }: PageProps) {
   const tCommon = await getTranslations('Common');
 
   return (
-    <div className="min-h-screen bg-ground flex flex-col items-center pt-16 pb-20 px-4 font-sans">
+    <div className="min-h-screen bg-ground flex flex-col items-center pt-16 pb-20 px-edge sm:px-4 font-sans">
       <div className="w-full max-w-2xl bg-surface shadow-md rounded-2xl p-8 border border-border">
         <div className="mb-8 text-center border-b pb-6">
           <span className="text-xs font-mono font-bold bg-blue-100 text-blue-800 px-3 py-1 rounded-full uppercase tracking-wider">

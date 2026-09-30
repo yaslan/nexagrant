@@ -68,7 +68,7 @@ export default async function RelationshipsPage({
   const isTr = locale === 'tr';
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4">
+    <div className="max-w-6xl mx-auto py-8 sm:px-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold font-heading text-ink">{isTr ? 'Odak Noktası CRM (M3)' : 'Focal Point CRM'}</h1>

@@ -87,7 +87,7 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto py-8 px-4">
+    <div className="space-y-6 max-w-6xl mx-auto py-8 sm:px-4">
       {/* Header & Tenant Filter */}
       <div className="bg-surface p-6 rounded-2xl border border-border shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>

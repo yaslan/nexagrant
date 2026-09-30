@@ -96,7 +96,7 @@ export default async function TurkiyeyeAcikCagrilarPage({
     <div className="min-h-screen flex flex-col bg-background text-ink">
       <PublicNavbar locale={locale} />
 
-      <main className="flex-1 max-w-5xl mx-auto py-12 px-4 w-full">
+      <main className="flex-1 max-w-5xl mx-auto py-12 px-edge sm:px-4 w-full">
         <div className="mb-10 text-center">
           <span className="bg-bad/15 text-bad text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full inline-block mb-3 border border-bad/20">
             {isTr ? 'Horizon Europe & Asosiye Ülkeler' : 'Horizon Europe Associated Countries'}

@@ -44,7 +44,7 @@ export function PilotPanel({
   };
 
   return (
-    <section className="max-w-6xl mx-auto px-4 pb-16" data-testid="pilot-panel">
+    <section className="max-w-6xl mx-auto sm:px-4 pb-16" data-testid="pilot-panel">
       <div className="bg-surface border rounded-xl p-5 space-y-3">
         <h2 className="text-base font-bold text-ink flex items-center gap-1.5">
           <FlaskConical className="w-4 h-4" /> {t('pilot.title')}

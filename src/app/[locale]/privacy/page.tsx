@@ -54,7 +54,7 @@ export default async function PrivacyPage({
   ];
 
   return (
-    <div className="max-w-4xl mx-auto py-12 px-6 bg-surface border rounded-xl my-8">
+    <div className="max-w-4xl mx-edge sm:mx-auto py-12 px-4 sm:px-6 bg-surface border rounded-xl my-8">
       <h1 className="text-3xl font-bold font-heading mb-6 text-ink">{t('heading')}</h1>
 
       <div className="prose prose-slate max-w-none text-ink-2 space-y-6">

@@ -42,7 +42,7 @@ export async function moduleGate(
     <section
       role="alert"
       aria-live="polite"
-      className="max-w-2xl mx-auto px-4 py-16 text-center"
+      className="max-w-2xl mx-auto sm:px-4 py-16 text-center"
     >
       <p className="text-5xl mb-6" aria-hidden="true">
         🔒

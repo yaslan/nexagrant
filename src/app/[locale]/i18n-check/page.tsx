@@ -34,7 +34,7 @@ export default async function I18nCheckPage() {
   const parityMatch = missingInEn.length === 0 && missingInTr.length === 0;
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
+    <div className="max-w-4xl mx-auto py-8 px-edge sm:px-4">
       <div className="mb-6">
         <h1 className="text-3xl font-bold font-heading text-ink">i18n Audit & Parity Check</h1>
         <p className="text-muted mt-1">Automatic verification of localization key parity between TR and EN.</p>

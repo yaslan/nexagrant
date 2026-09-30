@@ -19,7 +19,7 @@ export default function GateSettingsPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-8">
+    <div className="max-w-3xl mx-auto py-8 sm:px-8">
       <h1 className="text-3xl font-bold mb-6">Stage-Gate Settings</h1>
       <p className="text-ink-2 mb-8">
         Configure the mathematical thresholds and rules for your opportunity pipeline.
