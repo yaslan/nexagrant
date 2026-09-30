@@ -1,0 +1,9 @@
+cn-null editor=200 export=500
+cn-nolabel editor=200 export=500
+cn-numlabel editor=200 export=500
+cn-ok editor=200 export=500
+cn2-null (başlık: ASCII Opp) export=200
+cn2-nolabel (başlık: ASCII Opp) export=500
+cn2-numlabel (başlık: ASCII Opp) export=500
+cn2-ok (başlık: ASCII Opp) export=200
+cn3-ok (başlık: Güneş Enerjisi Projesi) export=500
