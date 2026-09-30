@@ -15,7 +15,7 @@
  * hand-built 5xx body contains is no longer a question the guard has to answer.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { describe, test, expect } from 'vitest';
 import { catchReturnLeaks, unguardedServerErrors } from './response-status-scan';
 
@@ -46,7 +46,8 @@ const responseBuilders = () => [
 const serverActionFiles = () =>
   walk(SRC_DIR, isSource).filter((f) => /^\s*['"]use server['"]/.test(readFileSync(f, 'utf8')));
 
-const rel = (f: string) => relative(ROOT, f);
+/** Repo-relative with `/`, so the expectations below hold on Windows too. */
+const rel = (f: string) => relative(ROOT, f).split(sep).join('/');
 
 describe('API route 5xx bodies', () => {
   test('the guard sees the files it is meant to guard', () => {
