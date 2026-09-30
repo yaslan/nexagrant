@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { requirePlatformAdminApi } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
 import { rescoreG0ForPrefixes } from '@/lib/k3-topic-stats/importer';
@@ -33,6 +34,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, ...summary });
   } catch (err) {
     logger.error('K3 G0 rescore failed', err, { prefixes: prefixes.length });
-    return NextResponse.json({ error: 'rescore_failed' }, { status: 500 });
+    return internalError({ error: 'rescore_failed' });
   }
 }

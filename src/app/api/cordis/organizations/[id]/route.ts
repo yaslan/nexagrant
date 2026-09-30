@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { cordisOrganisationIdSchema } from '@/lib/k2-cordis/api-query';
@@ -143,6 +144,6 @@ export async function GET(
   } catch (error) {
     // A Prisma message quotes the query shape and table names: log it, never return it.
     logger.error('[API /api/cordis/organizations/[id]] query failed', error);
-    return NextResponse.json({ success: false, error: 'internal_error' }, { status: 500 });
+    return internalError({ success: false, error: 'internal_error' });
   }
 }

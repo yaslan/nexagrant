@@ -11,6 +11,7 @@
  * not exist in production or when an object store is configured.
  */
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { env } from '@/lib/env';
 import { requireTenantApi } from '@/lib/tenant';
 import { asRole, can } from '@/lib/rbac';
@@ -41,7 +42,7 @@ export async function PUT(req: Request) {
   }
 
   if (!(await putObjectBytes(key, bytes, allowed.contentType))) {
-    return NextResponse.json({ error: 'storage_unavailable' }, { status: 503 });
+    return internalError({ error: 'storage_unavailable' }, { status: 503 });
   }
   return new NextResponse(null, { status: 200 });
 }

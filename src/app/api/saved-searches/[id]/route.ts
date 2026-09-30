@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { z } from 'zod';
 import { withTenant } from '@/lib/db';
 import { requireTenantApi } from '@/lib/tenant';
@@ -51,7 +52,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ success: true, search: updated[0] });
   } catch (error) {
     console.error('[saved-searches][PATCH]', error);
-    return NextResponse.json({ success: false, error: 'İç Sunucu Hatası' }, { status: 500 });
+    return internalError({ success: false, error: 'İç Sunucu Hatası' });
   }
 }
 
@@ -77,6 +78,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[saved-searches][DELETE]', error);
-    return NextResponse.json({ success: false, error: 'İç Sunucu Hatası' }, { status: 500 });
+    return internalError({ success: false, error: 'İç Sunucu Hatası' });
   }
 }

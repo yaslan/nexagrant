@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { z } from 'zod';
 import { authenticateApiKey } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
@@ -195,14 +196,11 @@ export async function GET(req: Request) {
     // Reported, not replaced with invented rows. The old catch fell through to
     // a demo array, which is how a permanently broken query shipped unnoticed.
     console.error(`[/api/v1/calls] query failed: ${errorMessage(e)}`);
-    return NextResponse.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Call lookup failed.',
-        code: 'CALLS_QUERY_FAILED',
-      },
-      { status: 500 }
-    );
+    return internalError({
+      error: 'Internal Server Error',
+      message: 'Call lookup failed.',
+      code: 'CALLS_QUERY_FAILED',
+    });
   }
 
   const calls = topics.map(toApiRow);

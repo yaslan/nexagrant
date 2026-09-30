@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { errorMessage } from '@/lib/errors';
 import { API_KEY_RATE_LIMIT_PER_MINUTE } from '@/lib/api-rate-limit';
 
@@ -149,14 +150,11 @@ export async function authenticateApiKey(req: Request): Promise<
 
     return {
       authenticated: false,
-      errorResponse: NextResponse.json(
-        {
-          error: 'Internal Server Error',
-          message: 'API key authentication failed.',
-          code: 'AUTH_INTERNAL_ERROR',
-        },
-        { status: 500 }
-      ),
+      errorResponse: internalError({
+        error: 'Internal Server Error',
+        message: 'API key authentication failed.',
+        code: 'AUTH_INTERNAL_ERROR',
+      }),
     };
   }
 }

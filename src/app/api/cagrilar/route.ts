@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { SediaAdapter } from '@/lib/adapters/sedia';
 import { translateTopicsBatch } from '@/lib/translation';
 import { requireTenantApi } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
+import { UserWindowLimiter } from '@/lib/user-rate-limit';
 
 /**
  * The largest page this route asks SEDIA for. The route fetches up to
@@ -12,11 +14,26 @@ import { logger } from '@/lib/logger';
 const CAGRILAR_MAX_PAGE_SIZE = 50;
 const MAX_PAGES = 5;
 
+/**
+ * Searches one user may run per minute (İNCELEME-75 D-3). The calls page asks
+ * once per filter change, so a person does not come near it; a loop does.
+ */
+export const CAGRILAR_PER_USER_PER_MINUTE = 30;
+const limiter = new UserWindowLimiter(CAGRILAR_PER_USER_PER_MINUTE);
+
 export async function GET(request: NextRequest) {
   // Signed-in members only: the one consumer is the (app) calls page, and an
   // anonymous caller could otherwise spend SEDIA and translation quota at will.
   const tenant = await requireTenantApi();
   if (!tenant.ok) return tenant.response;
+
+  const retryAfter = limiter.take(tenant.scope.userId);
+  if (retryAfter !== null) {
+    return NextResponse.json(
+      { success: false, error: 'rate_limited' },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+    );
+  }
 
   try {
     const { searchParams } = new URL(request.url);
@@ -91,7 +108,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // The detail stays in the server log; the body is a fixed code (O-2).
     logger.error('[API /api/cagrilar] Internal error:', error);
-    return NextResponse.json({ success: false, error: 'internal_error' }, { status: 500 });
+    return internalError({ success: false, error: 'internal_error' });
   }
 }
 

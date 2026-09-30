@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { findSharedDocumentByTitle, NoExtractableTextError, PdfLimitError, processPdfAndStore } from '@/lib/rag';
 import {
   hasPdfSignature,
@@ -8,7 +9,7 @@ import {
 } from '@/lib/rag-upload';
 import { requirePlatformAdminApi } from '@/lib/tenant';
 
-function refuse(error: RagUploadError, status: number, extra: Record<string, unknown> = {}) {
+function refuse(error: RagUploadError, status: 400 | 409 | 413 | 415 | 422, extra: Record<string, unknown> = {}) {
   return NextResponse.json({ error, ...extra }, { status });
 }
 
@@ -111,6 +112,6 @@ export async function POST(req: NextRequest) {
     }
     console.error('Upload error:', error);
     // The code only; the detail (often a Prisma or OpenAI message) stays in the log above.
-    return NextResponse.json({ error: 'upload_failed' satisfies RagUploadError }, { status: 500 });
+    return internalError({ error: 'upload_failed' satisfies RagUploadError });
   }
 }

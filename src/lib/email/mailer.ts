@@ -45,6 +45,14 @@ export class MailSendError extends Error {
   }
 }
 
+/**
+ * The code-only text of a `MailSendError` (`smtp:EAUTH:535`), or `null` for
+ * any other thrown value, whose message may quote the server or the config.
+ */
+export function mailFailureCode(error: unknown): string | null {
+  return error instanceof MailSendError ? error.message : null;
+}
+
 export interface SmtpConfig {
   host: string;
   port: number;

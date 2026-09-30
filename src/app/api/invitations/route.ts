@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { withTenant } from '@/lib/db';
 import { requireTenantApi } from '@/lib/tenant';
 import { issueSecretToken } from '@/lib/secret-token';
@@ -230,7 +231,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Error creating invitation:', error);
-    return NextResponse.json({ error: 'İç Sunucu Hatası' }, { status: 500 });
+    return internalError({ error: 'İç Sunucu Hatası' });
   }
 }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { auth } from '@/lib/auth';
 import { withTenant } from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -106,7 +107,7 @@ export async function GET(
     );
   } catch (error) {
     logger.error('invoice export lookup failed', { tenantId, invoice: id, error });
-    return NextResponse.json({ error: 'invoice_lookup_failed' }, { status: 500 });
+    return internalError({ error: 'invoice_lookup_failed' });
   }
 
   if (!record) {
@@ -131,14 +132,11 @@ export async function GET(
       // generic — `missing` used to ship the env var names straight to the
       // customer's browser (TASK-MTUH6YKP6OQAX).
       logger.error('invoice supplier identity not configured', { missing: error.missing });
-      return NextResponse.json(
-        { error: 'supplier_identity_not_configured' },
-        { status: 503 }
-      );
+      return internalError({ error: 'supplier_identity_not_configured' }, { status: 503 });
     }
     if (error instanceof InvoiceLinesInvalidError) {
       logger.error('stored invoice lines unreadable', { invoice: id, detail: error.detail });
-      return NextResponse.json({ error: 'invoice_lines_invalid' }, { status: 500 });
+      return internalError({ error: 'invoice_lines_invalid' });
     }
     throw error;
   }

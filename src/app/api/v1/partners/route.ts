@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { authenticateApiKey } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
@@ -132,14 +133,11 @@ export async function GET(req: Request) {
     // catch fell through to a demo array, which is how a broken query shipped
     // twice without anyone noticing.
     console.error(`[/api/v1/partners] query failed: ${errorMessage(e)}`);
-    return NextResponse.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Partner lookup failed.',
-        code: 'PARTNERS_QUERY_FAILED',
-      },
-      { status: 500 }
-    );
+    return internalError({
+      error: 'Internal Server Error',
+      message: 'Partner lookup failed.',
+      code: 'PARTNERS_QUERY_FAILED',
+    });
   }
 
   const partners = orgs.map(toApiRow);

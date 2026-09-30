@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { authenticateApiKey } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
@@ -305,14 +306,11 @@ export async function GET(
   } catch (e) {
     // Reported, not replaced with an invented organisation.
     console.error(`[/api/v1/partners/${pic}] query failed: ${errorMessage(e)}`);
-    return NextResponse.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Partner lookup failed.',
-        code: 'PARTNER_QUERY_FAILED',
-      },
-      { status: 500 }
-    );
+    return internalError({
+      error: 'Internal Server Error',
+      message: 'Partner lookup failed.',
+      code: 'PARTNER_QUERY_FAILED',
+    });
   }
 
   return NextResponse.json({

@@ -27,7 +27,11 @@ export interface DeletionRequestResult {
   deletedAt?: string;
   /** Set when the subject is the only owner of a tenant that will be left without one */
   soleOwnerOf?: string[];
-  error?: string;
+  /**
+   * A fixed code. The thrown value's text stays in the server log: a Prisma
+   * error names tables and the query shape (İNCELEME-75 Y-1).
+   */
+  error?: 'Unauthorized' | 'User not found' | 'request_failed' | 'cancel_failed';
 }
 
 export async function requestAccountDeletion(): Promise<DeletionRequestResult> {
@@ -125,9 +129,8 @@ export async function requestAccountDeletion(): Promise<DeletionRequestResult> {
     if (soleOwnerOf.length > 0) result.soleOwnerOf = soleOwnerOf;
     return result;
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to request deletion';
-    console.error('[request-deletion]', message);
-    return { success: false, error: message };
+    console.error('[request-deletion]', error);
+    return { success: false, error: 'request_failed' };
   }
 }
 
@@ -164,9 +167,8 @@ export async function cancelAccountDeletion(): Promise<DeletionRequestResult> {
 
     return { success: true };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to cancel deletion';
-    console.error('[cancel-deletion]', message);
-    return { success: false, error: message };
+    console.error('[cancel-deletion]', error);
+    return { success: false, error: 'cancel_failed' };
   }
 }
 

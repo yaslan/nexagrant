@@ -25,7 +25,11 @@ export interface UserDataExport {
 export interface ExportResult {
   success: boolean;
   data?: UserDataExport;
-  error?: string;
+  /**
+   * A fixed code. The thrown value's text stays in the server log: a Prisma
+   * error names tables and the query shape (İNCELEME-75 Y-1).
+   */
+  error?: 'Unauthorized' | 'export_failed';
 }
 
 export async function exportUserData(): Promise<ExportResult> {
@@ -190,9 +194,8 @@ export async function exportUserData(): Promise<ExportResult> {
       },
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to export user data';
-    console.error('[export-data]', message);
-    return { success: false, error: message };
+    console.error('[export-data]', error);
+    return { success: false, error: 'export_failed' };
   }
 }
 

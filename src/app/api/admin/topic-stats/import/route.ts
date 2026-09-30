@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { requirePlatformAdminApi } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
 import { XLSX_LIMITS, XlsxReadError } from '@/lib/k3-topic-stats/xlsx';
@@ -116,6 +117,6 @@ export async function POST(req: NextRequest) {
       );
     }
     logger.error('K3 TopicStat import failed', err, { fileName, hash, mode });
-    return NextResponse.json({ error: 'import_failed' }, { status: 500 });
+    return internalError({ error: 'import_failed' });
   }
 }

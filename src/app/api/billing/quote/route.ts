@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { logger } from '@/lib/logger';
@@ -93,6 +94,6 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     logger.error('Error quoting a cart', error);
-    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
+    return internalError();
   }
 }
