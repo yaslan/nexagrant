@@ -138,6 +138,8 @@ const ACTIONS: [string, Action, () => Promise<unknown>][] = [
   ['approvals.rejectRequestAction', 'approve_dual_approval', () => approvals.rejectRequestAction('req-1', 'no')],
   // relationships (app) + m4
   ['relationships.createRelationship', 'edit_proposal', () => relationships.createRelationship({ kind: 'partner' })],
+  // İNCELEME-59 B-1 (TASK-MUNQAXELV83HO): every internal member, never the outside partner. The final bar is KARAR 7.
+  ['relationships.updateRelationship', 'view_proposal', () => relationships.updateRelationship('rel-1', { notes: 'x' })],
   ['relationships.addInteraction', 'edit_proposal', () => relationships.addInteraction('rel-1', { kind: 'call', at: '2026-09-30', summary: 's' })],
   ['m4.createRelationship', 'edit_proposal', () => m4.createRelationship({ organizationId: 'org-1', kind: 'partner' })],
   ['m4.addInteraction', 'edit_proposal', () => m4.addInteraction({ relationshipId: 'rel-1', kind: 'call' })],
@@ -201,8 +203,8 @@ beforeEach(() => {
 });
 
 describe('every mapped write action follows rbac.ts for all six roles', () => {
-  test('the table covers all 57 mapped actions (Y-3 appendix A minus the portal and two reads, plus 8 the inventory mis-marked)', () => {
-    expect(ACTIONS).toHaveLength(57);
+  test('the table covers all 58 mapped actions (Y-3 appendix A minus the portal and two reads, plus 8 the inventory mis-marked, plus updateRelationship)', () => {
+    expect(ACTIONS).toHaveLength(58);
   });
 
   for (const [name, permission, call] of ACTIONS) {
@@ -303,6 +305,32 @@ describe('real flows, fake transaction', () => {
       expect(tx.conceptNote.findFirst).not.toHaveBeenCalled();
       expect(tx.conceptNote.update).not.toHaveBeenCalled();
     }
+  });
+
+  test('relationship edit: MEMBER writes the notes, GUEST_PARTNER is refused before the transaction (İNCELEME-59 B-1)', async () => {
+    const tx = {
+      membership: { findFirst: vi.fn(async () => ({ userId: 'user-2' })) },
+      relationship: { updateMany: vi.fn(async () => ({ count: 1 })) },
+    };
+    m.withTenant.mockImplementation(async (_t: string, fn: (t: typeof tx) => unknown) => fn(tx));
+    const edit = { notes: 'guest-wrote', warmth: 'cold' as const, nextStep: 'call them' };
+
+    m.session = sessionFor('MEMBER');
+    await expect(relationships.updateRelationship('rel-1', edit)).resolves.toEqual({ success: true });
+    expect(tx.relationship.updateMany).toHaveBeenCalledWith({
+      where: { id: 'rel-1', tenantId: 'tenant-A' },
+      data: { warmth: 'cold', nextStep: 'call them', nextStepDue: undefined, notes: 'guest-wrote' },
+    });
+
+    tx.relationship.updateMany.mockClear();
+    m.withTenant.mockClear();
+    m.session = sessionFor('GUEST_PARTNER');
+    await expect(relationships.updateRelationship('rel-1', edit)).rejects.toMatchObject({
+      digest: 'FORBIDDEN_ROLE',
+      action: 'view_proposal',
+    });
+    expect(m.withTenant).not.toHaveBeenCalled();
+    expect(tx.relationship.updateMany).not.toHaveBeenCalled();
   });
 
   test('a stale role claim outside the enum grants nothing', async () => {

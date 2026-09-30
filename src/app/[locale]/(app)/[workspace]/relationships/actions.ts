@@ -77,9 +77,13 @@ export type UpdateRelationshipResult =
 /**
  * The permission that assigning a focal point needs.
  *
- * Warmth, next step and notes stay open to every member — that is what this
- * action has always allowed and narrowing it would take the screen away from
- * the people who use it. Handing a relationship to someone else is a different
+ * Warmth, next step and notes stay open to every internal member — that is
+ * what this action has always allowed and narrowing it would take the screen
+ * away from the people who use it. The external partner (GUEST_PARTNER) is not
+ * one of them: it has no `view_proposal`, so it could not even read these rows
+ * on the screen, yet it used to be able to rewrite them (İNCELEME-59 B-1,
+ * TASK-MUNQAXELV83HO). Where the line finally sits is KARAR 7; this only keeps
+ * the outside partner out. Handing a relationship to someone else is a different
  * act: it decides whose queue the overdue `nextStep` lands in, so it is gated
  * on the same permission as the rest of workspace administration and only that
  * one field is refused when the role does not carry it.
@@ -90,7 +94,7 @@ export async function updateRelationship(
   id: string,
   data: RelationshipUpdateInput
 ): Promise<UpdateRelationshipResult> {
-  const { tenantId, role } = await requireTenantAction();
+  const { tenantId, role } = await requireTenantAction({ can: 'view_proposal' });
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
   if (!isPresentId(id)) return { success: false, error: 'INVALID_INPUT' };
 
