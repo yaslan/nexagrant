@@ -371,3 +371,13 @@ Sıra bağımlılığa göre; her adım bir öncekini bekler (paralel yapılabil
 12. **1 Ekim: GitHub push** (`git push origin dev`) — öncesinde push yapılacak makinede `git config core.hooksPath githooks` (§6). CI yeşilini gör.
 13. 1–11 bitince haber ver → biz (onayla): sunucuya Caddy + Docker kurulumu, §3.1 şema sırası, §3.3 web→worker sırası, §4.2 geri yükleme testi, `docs/SMTP-SUNUCU.md` §7 posta ölçümleri, `docs/SMTP-SUNUCU.md` §10.3 yönlendirme ölçümleri.
 14. **Canlıya geçiş onayı** (açık, yazılı). Onaysız hiçbir adım canlıya yazılmaz.
+
+## 9. Dev entegrasyon prosedürü (TASK-MUOFCOKBQBUSQ)
+
+1. İşçi ajan yalnız kendi worktree'sinde ve kendi dalında çalışır. Ana checkout'ta (`/Users/macbook/alan/FONBRIDGE`, dal `dev`) tracked dosya değiştirmez, `dev` ref'ini de ilerletmez. Merge'ü yalnız entegratör (devop-fb) yapar.
+2. Entegratör başlamadan önce `git status --short --untracked-files=no` çıktısını ≥20 sn arayla iki kez alır. Çıktıda başka birinin tracked değişikliği varsa durur. Değişikliğin sahibi kapandıysa değişiklik kaybolmasın diye önce kurtarılır: `git diff -- <dosya> > x.patch`, ardından `git worktree add <wt> -b <sahip>/<iş>-wip dev`, `git -C <wt> apply x.patch`, `git -C <wt> commit -- <dosya>` ve `git diff dev <dal> | cmp - x.patch`. Ancak bu kanıttan sonra ana checkout'ta `git checkout -- <dosya>` koşulur.
+3. Yalnız inceleme raporu TAMAM/ONAY olan ve görev metninde adı geçen dal merge edilir: `git merge --no-ff <dal>`. Çakışma olursa entegratör durur ve raporlar, çakışmayı çözmez. Merge'den önce `git merge-tree --write-tree HEAD <dal>` ile çakışma olup olmadığına bakılır.
+4. Her merge'den sonra kapılar CI sırasıyla koşulur. DB, izole ve sıfırdan kurulmuş bir Postgres'tir (ör. `devopfb-int-pg`, 127.0.0.1:55223; :5433 yasak, `.env`'e dokunulmaz). DB hazırlığı `prisma db push → db:rls-role → apply-migrations ×2 → db:rls → db:seed` sırasıyla yapılır. Kapılar: `lint`, `typecheck`, tam `vitest run` + `check-live-skips`, `build`. Şema veya RLS değiştiyse bunlara `rls:check`, `rls:bypass-check` ve `rls:verify` eklenir. `DATABASE_URL`, `DATABASE_URL_RLS_TEST` ve `CI=true` komut satırında verilir ve çıktıya basılır.
+5. Ham çıktılar `docs/agent-results/<TASK>-devop-fb-ekler/` altına yazılır. Bir kapı 0'dan farklı biterse sonraki dala geçilmez.
+6. Her adımdan önce ve sonra `git reflog -3 dev` kontrol edilir. Entegratörün yapmadığı bir `dev` hareketi görülürse raporda "eşzamanlı yazıcı" olarak kaydedilir. Kapılar o hareketi de kapsayacak biçimde yeniden koşulur.
+7. Commit'ler `git commit -- <yollar>` ile atılır; geniş `git add -A` kullanılmaz. İş bitince `git merge-base --is-ancestor <sha> dev` ile her dalın dev'de olduğu kanıtlanır. Push yalnız ayrı ve açık onayla yapılır.
