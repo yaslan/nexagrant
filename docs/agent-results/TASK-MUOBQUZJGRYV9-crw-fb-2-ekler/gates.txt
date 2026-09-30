@@ -1,0 +1,9 @@
+$ tsc --noEmit
+typecheck exit=0
+$ eslint
+lint exit=0
+  type: 'TurbopackInternalError',
+  location: undefined
+}
+[ELIFECYCLE] Command failed with exit code 1.
+build exit=1

@@ -122,21 +122,21 @@ Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workfl
 - [ ] 2. `pnpm db:rls-role` — `fabrika_app` rolü (sonraki adımların `GRANT … TO fabrika_app` satırları bunu arar).
 - [ ] 2a. **Eski worker'ı durdur. ZORUNLU, atlanamaz.** Yeni sürümün `legacyClaims` koruması bu adımın yerini tutmaz; yalnız bir sırayı kapatır (gerekçe ve ölçüm aşağıda, **Claim taşıma penceresi**). Yeni worker §3.3'te kalkana kadar bu DB'de hiçbir worker koşmaz.
   - **İlk canlı kurulumda** eski worker yoktur. 2a o zaman yalnız "bu DB'ye bağlı koşan bir worker yok" kontrolüdür: aşağıdaki (b) ve (c) adımları.
-  - (a) Durdur: SIGTERM gönder. Worker elindeki işi bitirir ve `graceful shutdown complete` yazar. Konteynerdeyse `docker stop -t 300 <eski-worker>` kullanın. Docker varsayılan olarak 10 sn sonra SIGKILL gönderir; `-t` değerini bir M4 koşusundan uzun tutun (koşu süresi ölçülmedi, 300 bir varsayımdır).
-  - (b) Durduğunu kontrol et: logun son satırlarında `graceful shutdown complete` görünmeli. Sonra sahip rolüyle `SELECT count(*) FROM graphile_worker.jobs WHERE locked_at IS NOT NULL;` → **0** olmalı. 0 değilse ve hiçbir worker koşmuyorsa, iş yarıda öldürülmüştür (ör. SIGKILL). Kilit 4 saat sonra düşer ve iş yeni worker'da yeniden koşar; M4 için bu zararsızdır (yeni kod eski claim'i okur). Ama 0 değilse ve bir worker hâlâ bağlıysa, **devam etmeyin**: o worker'ı bulun ve durdurun.
+  - (a) Durdur: SIGTERM gönder. Worker elindeki işi bitirir ve `graceful shutdown complete` yazar. Konteynerdeyse `docker stop -t 300 <eski-worker>` kullanın; bu repodaki compose ile `docker compose --profile app stop -t 300 fabrika-worker`. Docker varsayılan olarak 10 sn sonra SIGKILL gönderir; `-t` değerini bir M4 koşusundan uzun tutun (koşu süresi ölçülmedi, 300 bir varsayımdır). Compose servisinde `stop_grace_period` yok, yani `docker compose up` konteyneri yeniden oluştururken eskisini 10 sn sonra öldürür: önce `stop -t 300`, sonra `up`.
+  - (b) Durduğunu kontrol et: logun son satırlarında `graceful shutdown complete` görünmeli. Sonra sahip rolüyle (worker ayrı bir `JOBS_DATABASE_URL` rolüyle bağlanıyorsa `graphile_worker` şemasını o rol kurmuştur; sahip rolü okuyamazsa o rolle) `SELECT count(*) FROM graphile_worker.jobs WHERE locked_at IS NOT NULL;` → **0** olmalı. 0 değilse ve hiçbir worker koşmuyorsa, iş yarıda öldürülmüştür (ör. SIGKILL). Kilit 4 saat sonra düşer ve iş yeni worker'da yeniden koşar; M4 için bu zararsızdır (yeni kod eski claim'i okur). Ama 0 değilse ve bir worker hâlâ bağlıysa, **devam etmeyin**: o worker'ı bulun ve durdurun.
   - (c) Bugünkü eski claim'lerin listesini al (3. adımdan **önce**). Bu liste aşağıdaki tespit kontrolünün tabanıdır:
     ```bash
     cat > m4-claims.sql <<'SQL'
     BEGIN;
     SELECT enter_system_scope('platform-aggregate') \g /dev/null
-    SELECT DISTINCT "userId" FROM "Membership"
+    SELECT DISTINCT "userId" COLLATE "C" FROM "Membership"
      WHERE "staleDigestOn" >= (now() AT TIME ZONE 'UTC')::date ORDER BY 1;
     COMMIT;
     SQL
     psql -Atq "$DATABASE_URL" -f m4-claims.sql > m4-claims-before.txt   # DATABASE_URL = sahip rol
     wc -l < m4-claims-before.txt                                         # sayıyı not edin (N0)
     ```
-    `enter_system_scope` satırını çıkarmayın. `Membership` FORCE RLS altındadır ve süper kullanıcı olmayan sahip rolü kiracı bağlamı olmadan **0 satır** okur, yani yanlışlıkla "temiz" görünür (ölçüldü: 3 claim varken düz sorgu 0 döndü).
+    `enter_system_scope` satırını çıkarmayın. `Membership` FORCE RLS altındadır ve süper kullanıcı olmayan sahip rolü kiracı bağlamı olmadan **0 satır** okur, yani yanlışlıkla "temiz" görünür (ölçüldü: 3 claim varken düz sorgu 0 döndü). `COLLATE "C"` ve aşağıdaki `LC_ALL=C comm` aynı bayt sırasını kullanır; DB collation'ı ile kabuk yerel ayarı farklıysa `comm` yanlış satır bildirmez.
 - [ ] 3. `DATABASE_URL=<sahip rol> scripts/apply-migrations.sh` — 41 dosya; iki kez koşmak güvenli (CI her push'ta iki kez koşuyor).
 - [ ] 4. `pnpm db:rls` — kiracı politikaları + sistem kapsamı fonksiyonları.
 - [ ] 5. `pnpm rls:verify` gerçek `fabrika_app` ile exit 0. Kiracı tablolarında `FORCE ROW LEVEL SECURITY` da denetlenir (bir migration FORCE'u kapatıp geri koymazsa exit 1).
@@ -161,36 +161,36 @@ Son satırda eski worker'ın iş alması için 07:00 cron tiki gerekmez. graphil
 
 Kaçan tik: eski worker durduğu sırada kaçan 07:00 tikini yeni worker açılışta `fill=6h` ile koşar. Yeni worker 13:00 UTC'den sonra açılırsa o günün özeti ertesi sabaha kalır. Bu bir gecikmedir, e-posta kaybı değildir.
 
-**Tespit — eski worker 3. adımdan sonra da koştu mu?** Yeni sürüm `Membership.staleDigestOn`'a hiç yazmaz. Bu yüzden 3. adımdan sonra o kolona düşen her yeni claim, eski bir worker'ın hâlâ koştuğunu gösterir.
+**Tespit — eski worker 3. adımdan sonra da koştu mu?** Yeni sürüm `Membership.staleDigestOn`'a bugünü yazmaz: kodu o kolona hiç yazmaz, 3. adım yeniden koşulunca da yazmaz. `m4-stale-reminder-idempotency.sql`'in backfill'i NULL üyeliklere son damga gününü yazar, ama `User.staleDigestOn`'u o günü zaten kapsayan kullanıcıyı atlar. Yeni sürüm damgayı claim'le aynı anda (aynı `now`) attığı için kendi gönderdiği her özet bu koşula girer. Bu atlama olmadan, yeni worker özet gönderdikten sonra zinciri aynı gün yeniden koşmak (ikinci yayın, hotfix) tespiti eski worker olmadan da tetikliyordu (İNCELEME-106 Y-1, ölçüldü; düzeltme TASK-MUOBQUZJGRYV9). Bu yüzden 3. adımdan sonra o kolona düşen yeni bir claim, eski bir worker'ın hâlâ koştuğunu gösterir. İstisna (dar): aynı gün başka bir kullanıcıya özetle bildirilmiş bir ilişkinin sahibi değişir ve yeni sahip o gün özet almamışsa, zincirin yeniden koşusu yeni sahibe bu claim'i yazar. Bu yüzden aşağıdaki 1. adımda önce log ile doğrulayın.
 
 - [ ] Yeni worker kalktıktan sonra ve **aynı UTC gününün sonundan önce** (23:59 UTC; en iyisi 13:00 UTC'den sonra, telafi penceresi kapanınca) 2a (c)'deki dosyayı yeniden koşun:
   ```bash
   psql -Atq "$DATABASE_URL" -f m4-claims.sql > m4-claims-after.txt
-  comm -13 m4-claims-before.txt m4-claims-after.txt     # boş olmalı
+  LC_ALL=C comm -13 m4-claims-before.txt m4-claims-after.txt     # boş olmalı
   ```
   Sonuç boşsa pencere kapalıdır. Başka bir şey yapmayın.
 - [ ] Ertesi UTC günü aynı dosyayı bir kez daha koşun. Çıktı **tamamen boş** olmalıdır: yayından sonraki hiçbir günde `Membership` claim'i olmaz.
 
 Bu iki kontrolden birinin çıktısı boş değilse:
 
-1. **Eski worker hâlâ bir yerde koşuyor.** Onu hemen bulun ve 2a (a)–(b) ile durdurun. Bağlı istemcileri görmek için sahip rolüyle: `SELECT usename, client_addr, application_name, backend_start FROM pg_stat_activity WHERE datname = current_database();` Bilinen web ve yeni worker dışındaki bağlantı eski worker adayıdır. Worker kuyruğa `JOBS_DATABASE_URL` ile (yoksa `DATABASE_URL`) bağlanır; bu genelde sahip roldür. Süper kullanıcı olmayan bir rol, başka rollerin satırlarında `client_addr`'ı boş görür (`pg_read_all_stats` rolü bunu açar). Konteyner ortamında logdan da görülür: `docker logs --timestamps --since <3. adımın saati> <eski-worker> 2>&1 | grep '\[m4-stale-relationships\] DONE'`. Satırdaki `"digestsSent":N`, o koşunun gönderdiği özet sayısıdır.
+1. **Eski worker hâlâ bir yerde koşuyor.** Onu hemen bulun ve 2a (a)–(b) ile durdurun. Önce aşağıdaki log satırıyla ya da bağlantıyla doğrulayın; ikisi de yoksa yukarıdaki dar istisnayı (aynı gün sahip değişikliği + zincirin yeniden koşusu) düşünün. Bağlı istemcileri görmek için sahip rolüyle: `SELECT usename, client_addr, application_name, backend_start FROM pg_stat_activity WHERE datname = current_database();` Bilinen web ve yeni worker dışındaki bağlantı eski worker adayıdır. graphile-worker ve Prisma bağlantılarında `application_name` boştur (yalnız kilit havuzu ayarlar, `src/lib/db.ts`), yani aynı rolle bağlanan iki worker yalnız `client_addr` ve `backend_start` ile ayrılır: `backend_start`'ı yeni worker'ın açılış saatinden **eski** olan bağlantılar eski worker adayıdır. Worker kuyruğa `JOBS_DATABASE_URL` ile (yoksa `DATABASE_URL`) bağlanır; bu genelde sahip roldür. Süper kullanıcı olmayan bir rol, başka rollerin satırlarında `client_addr`'ı boş görür (`pg_read_all_stats` rolü bunu açar). Konteyner ortamında logdan da görülür: `docker logs --timestamps --since <3. adımın saati> <eski-worker> 2>&1 | grep '\[m4-stale-relationships\] DONE'`. Satırdaki `"digestsSent":N`, o koşunun gönderdiği özet sayısıdır.
 2. **Kaç kişiye ikinci özet gitti?** İki sürümün de bugün claim yazdığı kullanıcılar, 2a (c) listesinde olanlar hariç:
    ```bash
    cat > m4-double.sql <<'SQL'
    BEGIN;
    SELECT enter_system_scope('platform-aggregate') \g /dev/null
-   SELECT DISTINCT m."userId" FROM "Membership" m JOIN "User" u ON u.id = m."userId"
+   SELECT DISTINCT m."userId" COLLATE "C" FROM "Membership" m JOIN "User" u ON u.id = m."userId"
     WHERE m."staleDigestOn" >= (now() AT TIME ZONE 'UTC')::date
       AND u."staleDigestOn" >= (now() AT TIME ZONE 'UTC')::date ORDER BY 1;
    COMMIT;
    SQL
-   psql -Atq "$DATABASE_URL" -f m4-double.sql | comm -23 - m4-claims-before.txt | wc -l
+   psql -Atq "$DATABASE_URL" -f m4-double.sql | LC_ALL=C comm -23 - m4-claims-before.txt | wc -l
    ```
-   Bu, tablonun üçüncü satırıdır (ölçülen durumda doğru kullanıcıyı buldu). Tespit çıktısı boş değil ama bu sayı 0 ise, eski worker yeni worker'dan **önce** koşmuş ve `legacyClaims` ikinci özeti engellemiştir. Yine de 1. adım gereklidir: eski worker ayakta kaldıkça her gün bir yeniden deneme ya da elle eklenen iş ikinci özeti gönderebilir.
+   Bu, tablonun üçüncü satırıdır (ölçülen durumda doğru kullanıcıyı buldu). Tespit çıktısı boş değil ama bu sayı 0 ise, eski worker yeni worker'dan **önce** koşmuş ve `legacyClaims` ikinci özeti engellemiştir. **Sayıyı zinciri yeniden koşmadan önce alın.** Zincir, eski worker'ın claim'inden sonra yeniden koşulursa `m4-stale-digest-user-claim.sql` backfill'i o claim'i `User`'a da kopyalar. Bu kopya korumanın parçasıdır. Ama bundan sonra sayı, eski worker'ın önce koştuğu ve **tek** özet alan kullanıcıları da içerir, yani yalnız üst sınırdır (TASK-MUOBQUZJGRYV9 ölçümü: eski worker önce, yeni sonra: 1 e-posta; sayı yeniden koşudan önce 0, sonra 1). Yine de 1. adım gereklidir: eski worker ayakta kaldıkça her gün bir yeniden deneme ya da elle eklenen iş ikinci özeti gönderebilir.
 3. **Veriyi elle düzeltmeyin.** Claim'ler gün bazlıdır; eski worker durunca ertesi gün kendiliğinden düzelir. `Membership.staleDigestOn`'u silmek ya da `apply-migrations.sh`'i yeniden koşmak ikinci özeti geri almaz. Giden e-posta geri alınamaz. Olayı yayın notuna **yalnız sayı** olarak yazın, adres ya da ad yazmayın.
 
 **`legacyClaims` ne zaman kaldırılır (İNCELEME-102 Ö-4):** Okuma yalnız `>= bugün` claim'lerine bakar. Eski worker tamamen durduktan sonraki UTC gününden itibaren işlevsizdir. `Membership.staleDigestOn` kolonuyla **aynı yayında** kaldırılır, ancak şu üç koşulun hepsi sağlanınca:
-- Her ortamda (canlı, staging, varsa demo) yayından sonraki bir günde `m4-claims.sql` boş döner. Yani hiçbir yerde f7a6dcf5 öncesi bir worker yok.
+- Her ortamda (canlı, staging, varsa demo) yayından sonraki bir günde `m4-claims.sql` boş döner. Yani hiçbir yerde f7a6dcf5 öncesi bir worker yok. (Zincirin o gün yeniden koşulması bu sonucu bozmaz; yukarıdaki backfill atlaması.)
 - f7a6dcf5 öncesine geri dönüş planı yok.
 - Kaldıran kart, kolonu şemadan çıkarınca `tsc`'nin verdiği hataların hepsini kapatır: `legacyClaims` ve çağrısı, ayrıca `tests/stale-relationship-reminder.live.test.ts`'deki B-1, T-3 ve eski üyelik claim'i testleri (İNCELEME-102 ölçümü: 10 hata). Aynı kart, veri içeren bir kolonun `prisma db push` (`--accept-data-loss` yasak) ile nasıl düşürüleceğini de yazmalıdır: düşürme dosyası push'tan önce mi koşacak, yoksa kolon önce NULL'lanacak mı?
 

@@ -1,0 +1,47 @@
+operator DATABASE_URL=postgresql://own:ownpw@127.0.0.1:55107/f
+worker   DATABASE_URL=postgresql://fabrika_app:***@127.0.0.1:55107/f
+own super=false bypassrls=false
+UTC today: 2026-09-30
+
+=== (a) 2a UYGULANDI: yalnız yeni worker, sonra zincir yeniden koşuldu (Y-1 senaryosu) ===
+  before (bu kullanıcılar): []
+  new worker: {"digestsSent":1,"sent":["u-a@example.test"],"tenantsFailed":0,"errors":[]}
+  Membership=NULL User=2026-09-30
+  -- zincir yeniden koşmadan önce:
+  tespit  LC_ALL=C comm -13 before after: []
+  sayım   m4-double | comm -23 | wc -l  : 0
+  chain rerun (DÜZELTİLMİŞ backfill): apply-migrations: 41 files applied
+  Membership=NULL User=2026-09-30
+  -- zincir yeniden koştuktan sonra:
+  tespit  LC_ALL=C comm -13 before after: []
+  sayım   m4-double | comm -23 | wc -l  : 0
+
+=== (b) 2a ATLANDI: önce YENİ sonra ESKİ worker (tablo 3. satır), sonra zincir yeniden koşuldu ===
+  new worker: {"digestsSent":1,"sent":["u-b@example.test"],"tenantsFailed":0,"errors":[]}
+  old worker: {"digestsSent":1,"sent":["u-b@example.test"],"tenantsFailed":0,"errors":[]}
+  Membership=2026-09-30 User=2026-09-30
+  -- zincir yeniden koşmadan önce:
+  tespit  LC_ALL=C comm -13 before after: [u-b]
+  sayım   m4-double | comm -23 | wc -l  : 1
+  chain rerun: apply-migrations: 41 files applied
+  Membership=2026-09-30 User=2026-09-30
+  -- zincir yeniden koştuktan sonra:
+  tespit  LC_ALL=C comm -13 before after: [u-b]
+  sayım   m4-double | comm -23 | wc -l  : 1
+
+=== (c) 2a ATLANDI: önce ESKİ sonra YENİ worker (tablo 2. satır), sonra zincir yeniden koşuldu ===
+  old worker: {"digestsSent":1,"sent":["u-c@example.test"],"tenantsFailed":0,"errors":[]}
+  new worker: {"digestsSent":0,"sent":[],"tenantsFailed":0,"errors":[]}
+  Membership=2026-09-30 User=NULL
+  -- zincir yeniden koşmadan önce:
+  tespit  LC_ALL=C comm -13 before after: [u-c]
+  sayım   m4-double | comm -23 | wc -l  : 0
+  chain rerun: apply-migrations: 41 files applied
+  Membership=2026-09-30 User=2026-09-30
+  -- zincir yeniden koştuktan sonra:
+  tespit  LC_ALL=C comm -13 before after: [u-c]
+  sayım   m4-double | comm -23 | wc -l  : 1
+
+=== (d) KONTROL: (a)'nın kullanıcısı, dev'deki (düzeltme ÖNCESİ) m4-stale-reminder-idempotency.sql ile ===
+  dev dosyası koşuldu; Membership=2026-09-30 User=2026-09-30
+  tespit (yalnız u-a): [u-a]   <- Y-1 yanlış alarmı, eski worker yok

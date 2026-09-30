@@ -765,4 +765,43 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     expect(await forced()).toBe(true);
     await admin.membership.updateMany({ where: { userId: { in: [U.d1, U.d2, U.y1] } }, data: { staleDigestOn: null } });
   });
+
+  test('re-running the idempotency backfill leaves a day the user already claimed off "Membership" (İNCELEME-106 Y-1)', async () => {
+    // The release that claims on the user stamps with the claim's `now`. A later
+    // run of the whole chain (a second deploy, a hotfix) must not copy that stamp
+    // back onto the member's NULL column: RELEASE_CHECKLIST §3.1 reads any new
+    // "Membership" claim as a pre-f7a6dcf5 worker still running.
+    const at = y1Day(550);
+    const day = dayStartUtc(at);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const membershipClaim = async (tenantId: string, userId: string) =>
+      (await admin.membership.findUnique({ where: { tenantId_userId: { tenantId, userId } }, select: { staleDigestOn: true } }))?.staleDigestOn ?? null;
+    await admin.membership.updateMany({ where: { userId: { in: presentIds(USERS) } }, data: { staleDigestOn: null } });
+    await rel('y106d1', D2.a, U.d1, new Date(at.getTime() - 70 * DAY), { staleRemindedAt: at, staleRemindedContactAt: new Date(at.getTime() - 70 * DAY) });
+    await rel('y106d2', D2.a, U.d2, new Date(at.getTime() - 70 * DAY), { staleRemindedAt: at, staleRemindedContactAt: new Date(at.getTime() - 70 * DAY) });
+    await rel('y106y1', Y1.a, U.y1, new Date(at.getTime() - 70 * DAY), { staleRemindedAt: at, staleRemindedContactAt: new Date(at.getTime() - 70 * DAY) });
+    // U.d1: the new release sent today's digest (user claim = stamp day) → skipped.
+    await admin.$executeRaw`UPDATE "User" SET "staleDigestOn" = ${iso(day)}::date WHERE id = ${U.d1}`;
+    // U.d2: no user claim → the backfill still does its job (a stamp from a release without claims).
+    await admin.$executeRaw`UPDATE "User" SET "staleDigestOn" = NULL WHERE id = ${U.d2}`;
+    // U.y1: user claim a day older than the stamp → not covered, filled.
+    await admin.$executeRaw`UPDATE "User" SET "staleDigestOn" = ${iso(new Date(day.getTime() - DAY))}::date WHERE id = ${U.y1}`;
+
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const { default: pg } = await import('pg');
+    const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/m4-stale-reminder-idempotency.sql'), 'utf8');
+    const client = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika' });
+    await client.connect();
+    try {
+      await client.query(sql);
+      await client.query(sql);
+    } finally {
+      await client.end();
+    }
+    expect(await membershipClaim(D2.a, U.d1)).toBeNull();
+    expect((await membershipClaim(D2.a, U.d2))?.getTime()).toBe(day.getTime());
+    expect((await membershipClaim(Y1.a, U.y1))?.getTime()).toBe(day.getTime());
+    await admin.membership.updateMany({ where: { userId: { in: presentIds(USERS) } }, data: { staleDigestOn: null } });
+  });
 });
