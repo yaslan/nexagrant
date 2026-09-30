@@ -112,5 +112,5 @@ pnpm build                      → exit 0
 - API anahtarı ve portal yollarındaki `deletedAt` boşluğu için kart açılsın mı? (Önerim: evet, §4.)
 
 ## 6. Sonraki adım
-- Kapılar yeşil. Dal dev'e merge edildi, push yapılmadı (bkz. commit listesi). İnceleme ya da push kararı liderde.
+- Dal dev'e merge edildi: `6a5c3c62`, push yapılmadı. Dev bu arada iki merge ilerlemişti (`80c0641a` crw-fb, `9aa5c286` fe-fb). Birleşik ağaçta (`6a5c3c62`, izole DB) kapılar yeniden koşuldu: `tsc 0 · lint 0 · i18n 0 · vitest exit 0 (Test Files 285 passed | 6 skipped · Tests 3488 passed | 90 skipped) · build 0`. İnceleme ya da push kararı liderde.
 - İNCELEME-81 Ö-5 (bağlantı reddinde boş hata sebebi) bu kartın kapsamında değildi, açık duruyor.
