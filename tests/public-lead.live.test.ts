@@ -277,6 +277,43 @@ describe.skipIf(!HAS_DB)('public lead form (live database, fabrika_app)', () => 
     expect(await submitPublicLead(form({ email: mail('win-ip-old') }), { ip: '192.0.2.71', now: NOW, secret: SECRET })).toEqual({ ok: true });
   });
 
+  // İNCELEME-61 Ö-1: the exact edges, 1 ms apart, so `gte`→`gt` or a slightly longer window goes red.
+  test('both windows include their exact edge and nothing 1 ms before it', async () => {
+    for (let i = 0; i < PUBLIC_LEAD_EMAIL_LIMIT; i++) await seed(`edge-mail-at${i}`, new Date(NOW.getTime() - DAY), { email: mail('edge-mail-at') });
+    expect(await submitPublicLead(form({ email: mail('edge-mail-at') }), { ip: '192.0.2.80', now: NOW, secret: SECRET })).toEqual({
+      ok: false,
+      error: 'rate_limited',
+    });
+    for (let i = 0; i < PUBLIC_LEAD_EMAIL_LIMIT; i++) await seed(`edge-mail-before${i}`, new Date(NOW.getTime() - DAY - 1), { email: mail('edge-mail-before') });
+    expect(await submitPublicLead(form({ email: mail('edge-mail-before') }), { ip: '192.0.2.81', now: NOW, secret: SECRET })).toEqual({ ok: true });
+
+    const at = hashClientIp('192.0.2.82', SECRET);
+    for (let i = 0; i < PUBLIC_LEAD_IP_LIMIT; i++) await seed(`edge-ip-at${i}`, new Date(NOW.getTime() - HOUR), { ipHash: at });
+    expect(await submitPublicLead(form({ email: mail('edge-ip-at-new') }), { ip: '192.0.2.82', now: NOW, secret: SECRET })).toEqual({
+      ok: false,
+      error: 'rate_limited',
+    });
+    const before = hashClientIp('192.0.2.83', SECRET);
+    for (let i = 0; i < PUBLIC_LEAD_IP_LIMIT; i++) await seed(`edge-ip-before${i}`, new Date(NOW.getTime() - HOUR - 1), { ipHash: before });
+    expect(await submitPublicLead(form({ email: mail('edge-ip-before-new') }), { ip: '192.0.2.83', now: NOW, secret: SECRET })).toEqual({
+      ok: true,
+    });
+  });
+
+  // İNCELEME-61 B-1: one IPv6 host rotating through its own /64 stays in one bucket.
+  test('addresses rotated inside one IPv6 /64 share one IP bucket', async () => {
+    const results = [];
+    for (let i = 0; i <= PUBLIC_LEAD_IP_LIMIT + 1; i++) {
+      const hdr = { get: (k: string) => (k.toLowerCase() === 'x-forwarded-for' ? `10.9.${i}.1, 2001:db8:61:61::${(0xb1 + i).toString(16)}` : null) };
+      results.push((await submitPublicLead(form({ email: mail(`v6r${i}`) }), { ip: clientIpFrom(hdr, 1), now: NOW, secret: SECRET })).ok);
+    }
+    expect(results).toEqual([...Array(PUBLIC_LEAD_IP_LIMIT).fill(true), false, false]);
+    const stored = await admin.publicLead.findMany({ where: { email: { startsWith: 'v6r', endsWith: `-${RUN}@example.test` } } });
+    expect(new Set(stored.map((r) => r.ipHash))).toEqual(new Set([hashClientIp('2001:db8:61:61::1', SECRET)]));
+    // The next /64 is another subscriber.
+    expect(await submitPublicLead(form({ email: mail('v6other') }), { ip: '2001:db8:61:62::b1', now: NOW, secret: SECRET })).toEqual({ ok: true });
+  });
+
   // İNCELEME-50 B-1, as the documented nginx delivers it: "<client-sent>, <real peer>".
   test('a forged first X-Forwarded-For hop does not open a new IP bucket', async () => {
     const real = '198.51.100.77';

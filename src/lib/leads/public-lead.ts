@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { isIPv4, isIPv6 } from 'node:net';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
@@ -71,18 +72,29 @@ export const publicLeadInputSchema = z.object({
 
 const FIELD_NAMES: readonly PublicLeadField[] = ['name', 'email', 'organisation', 'province', 'district'];
 
+/** Above this many proxies of ours the topology is not one we run; treated as unusable. */
+export const MAX_TRUSTED_PROXY_HOPS = 5;
+let warnedHops: string | undefined;
+
 /**
  * How many reverse proxies we own sit in front of the app (`TRUSTED_PROXY_HOPS`,
  * default 1: the nginx/Caddy of docs/SMTP-SUNUCU.md §10.1). Each one APPENDS the
  * address it saw to X-Forwarded-For, so only the last `hops` entries were written
  * by us; everything to their left was sent by the client and can be anything.
  * 0 means no proxy of ours: every header is the client's, so no IP is trusted.
- * A value that is not a whole number >= 0 falls back to 1.
+ * Only a plain decimal 0..{@link MAX_TRUSTED_PROXY_HOPS} is accepted; anything
+ * else falls back to 1 and is logged once (İNCELEME-61 Ö-2) — too many hops would
+ * read the client's forged entry again, so a typo must not pass silently.
  */
 export function trustedProxyHops(raw: string | undefined = process.env.TRUSTED_PROXY_HOPS): number {
   if (raw === undefined || raw.trim() === '') return 1;
-  const n = Number(raw);
-  return Number.isInteger(n) && n >= 0 ? n : 1;
+  const value = raw.trim();
+  if (/^\d+$/.test(value) && Number(value) <= MAX_TRUSTED_PROXY_HOPS) return Number(value);
+  if (warnedHops !== value) {
+    warnedHops = value;
+    logger.warn('TRUSTED_PROXY_HOPS is not a whole number 0..5; using 1', { value: value.slice(0, 20) });
+  }
+  return 1;
 }
 
 /**
@@ -108,15 +120,47 @@ export function clientIpFrom(
 }
 
 /**
- * Keyed hash of the IP, so the per-IP limit works without storing the address.
- * A plain SHA-256 of an IPv4 address is reversed by trying all 2^32; the key
- * makes that impossible without AUTH_SECRET. No secret or no IP → null, and only
- * the per-address limit applies.
+ * The unit the per-IP limit counts (İNCELEME-61 B-1). One IPv6 host is normally
+ * handed a whole /64, so counting full addresses let one machine rotate through
+ * its own prefix and never hit the limit; an IPv6 address counts by its first 64
+ * bits. An IPv4-mapped address (`::ffff:a.b.c.d`) is the IPv4 address it carries.
+ * IPv4 and anything that is not an address are returned unchanged.
+ */
+export function ipBucket(ip: string): string {
+  const bare = ip.trim().replace(/^\[(.*)\]$/, '$1').replace(/%.*$/, '');
+  if (!isIPv6(bare)) return ip;
+  const groups = expandIPv6(bare.toLowerCase());
+  if (groups.slice(0, 5).every((g) => g === 0) && groups[5] === 0xffff) {
+    return [groups[6]! >> 8, groups[6]! & 0xff, groups[7]! >> 8, groups[7]! & 0xff].join('.');
+  }
+  return `${groups.slice(0, 4).map((g) => g.toString(16)).join(':')}::/64`;
+}
+
+/** The eight 16-bit groups of a valid IPv6 address (validated by the caller). */
+function expandIPv6(address: string): number[] {
+  let text = address;
+  const tail = text.slice(text.lastIndexOf(':') + 1);
+  if (isIPv4(tail)) {
+    const [a, b, c, d] = tail.split('.').map(Number) as [number, number, number, number];
+    text = `${text.slice(0, text.lastIndexOf(':') + 1)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const [head, rest] = text.split('::') as [string, string | undefined];
+  const left = head ? head.split(':') : [];
+  const right = rest ? rest.split(':') : [];
+  const zeros = rest === undefined ? [] : Array(8 - left.length - right.length).fill('0');
+  return [...left, ...zeros, ...right].map((g) => parseInt(g, 16));
+}
+
+/**
+ * Keyed hash of the IP's bucket ({@link ipBucket}), so the per-IP limit works
+ * without storing the address. A plain SHA-256 of an IPv4 address is reversed by
+ * trying all 2^32; the key makes that impossible without AUTH_SECRET. No secret
+ * or no IP → null, and only the per-address limit applies.
  */
 export function hashClientIp(ip: string | null, secret: string | null | undefined): string | null {
   if (!ip || !secret) return null;
   const key = createHmac('sha256', secret).update(IP_KEY_LABEL).digest();
-  return createHmac('sha256', key).update(ip).digest('hex');
+  return createHmac('sha256', key).update(ipBucket(ip)).digest('hex');
 }
 
 function authSecret(): string | null {

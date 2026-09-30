@@ -521,6 +521,11 @@ bitirmesi gerekir; bunu zaten vekil yapıyor, ikinci bir yönlendirme noktası d
 
 Caddy sertifikayı (Let's Encrypt) `fonbridge.com` ve `www` için kendisi alır ve yeniler. `/etc/caddy/Caddyfile`:
 ```
+# Yalnız IPv4 dinle (patron kararı 30.09.2026: AAAA yok); bkz. §10.1 sonundaki uyarı. `tcp4/` şart:
+# düz `0.0.0.0` Go'da çift yığın bağlanır, IPv6 yine cevap verir (ölçüldü, İNCELEME-61 yeniden kontrol).
+{
+	default_bind tcp4/0.0.0.0
+}
 fonbridge.com {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:3000
@@ -557,14 +562,14 @@ yollarından önce yakalar, ayrıca 443'te TLS-ALPN-01 de dener; yani 80'deki 30
 
 nginx tercih edilirse (certbot ile):
 ```nginx
-server { listen 80; listen [::]:80; server_name fonbridge.com www.fonbridge.com;
+server { listen 80; server_name fonbridge.com www.fonbridge.com;
          location /.well-known/acme-challenge/ { root /var/www/acme; }
          location / { return 301 https://fonbridge.com$request_uri; } }
-server { listen 443 ssl; listen [::]:443 ssl; http2 on; server_name www.fonbridge.com;
+server { listen 443 ssl; http2 on; server_name www.fonbridge.com;
          ssl_certificate /etc/letsencrypt/live/fonbridge.com/fullchain.pem;
          ssl_certificate_key /etc/letsencrypt/live/fonbridge.com/privkey.pem;
          return 301 https://fonbridge.com$request_uri; }
-server { listen 443 ssl; listen [::]:443 ssl; http2 on; server_name fonbridge.com;
+server { listen 443 ssl; http2 on; server_name fonbridge.com;
          ssl_certificate /etc/letsencrypt/live/fonbridge.com/fullchain.pem;
          ssl_certificate_key /etc/letsencrypt/live/fonbridge.com/privkey.pem;
          location / { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host;
@@ -576,12 +581,22 @@ değeri okur (`src/lib/leads/public-lead.ts` `clientIpFrom`; bu kurulumda tek pr
 `X-Real-IP` okunmaz: Caddy istemcinin gönderdiğini olduğu gibi geçirir. Caddy (§10.1 üstü) güvenilmeyen istemcinin
 `X-Forwarded-For`'unu zaten atıp yalnız gerçek adresi yazar; aynı ayar ikisinde de doğrudur. Önüne CDN/ikinci proxy
 eklenirse değeri 2 yap. Uygulama portu (3000) dışarıdan erişilebilirse başlık doğrudan istemciden gelir ve sınır
-atlatılır — `docker-compose.yml` port bağını üretimde `127.0.0.1:3000:3000` yap ya da 3000'i güvenlik duvarında kapat.
+atlatılır — `docker-compose.yml` port bağı bu yüzden `127.0.0.1` (İNCELEME-61 Y-1); başka bir dağıtımda da 3000'i
+dışa açmayın ya da güvenlik duvarında kapatın. Compose `TRUSTED_PROXY_HOPS`'u `.env`'den geçirir (varsayılan 1).
 Sertifika (tek sertifika, iki ad): `certbot certonly --webroot -w /var/www/acme -d fonbridge.com -d www.fonbridge.com`;
 yenileme `certbot.timer` + `--deploy-hook "systemctl reload nginx"`.
 Yerel kanıt (Docker `nginx:1.30.5`, kendinden imzalı sertifika aynı yola): `nginx -t` başarılı; üç giriş de
 `301 https://fonbridge.com/tr/pricing?a=1`, `https://fonbridge.com` → 200; `http://www…/.well-known/acme-challenge/tok` → 200
-(webroot'tan dosya döner, yönlendirilmez). `listen [::]` satırları yalnız AAAA kaydı varsa; `http2 on;` nginx ≥ 1.25.1 ister (eskisinde `listen 443 ssl http2;`).
+(webroot'tan dosya döner, yönlendirilmez). `http2 on;` nginx ≥ 1.25.1 ister (eskisinde `listen 443 ssl http2;`).
+
+**Yalnız IPv4 (patron kararı 30.09.2026: prod'da AAAA kaydı açılmaz).** Yukarıdaki iki yapılandırma bilerek yalnız
+IPv4 dinler: nginx'te `listen [::]:80` / `listen [::]:443` yok (`listen 443` yalnız IPv4'e bağlanır), Caddy'de
+`default_bind tcp4/0.0.0.0` (Caddy varsayılanı ve düz `0.0.0.0` IPv6'yı da dinler). AAAA olmasa da
+sunucunun IPv6 adresini bilen biri `Host: fonbridge.com` ile doğrudan bağlanabilir; dinlememek bu yolu da kapatır.
+> ⚠ **IPv6 açılırsa** (AAAA eklenir, `listen [::]` geri gelir ya da `default_bind` kalkarsa): iletişim formunun
+> IP sınırı IPv6 adresini **/64 önekine** göre saymalı, yoksa tek makine kendi /64'ü içinde adres değiştirerek
+> sınırı atlatır (İNCELEME-61 B-1). Uygulama bunu bugün yapıyor (`src/lib/leads/public-lead.ts` `ipBucket`,
+> `::ffff:a.b.c.d` de IPv4 sayılır); IPv6'yı açmadan önce bu kuralın hâlâ yerinde olduğunu doğrulayın.
 
 ### 10.2 Site cPanel'in kendisindeyse (uygulama `srv.iyisunucu` üzerinde)
 AutoSSL `fonbridge.com` + `www.fonbridge.com`'u otomatik kapsar. 301 için `public_html/.htaccess` (cPanel →

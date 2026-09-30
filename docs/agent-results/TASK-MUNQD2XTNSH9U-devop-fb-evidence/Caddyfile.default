@@ -1,0 +1,7 @@
+# Same, WITHOUT default_bind (Caddy default) — control.
+{
+	auto_https off
+}
+:80 {
+	reverse_proxy host.docker.internal:3962
+}

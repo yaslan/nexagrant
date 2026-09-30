@@ -23,10 +23,16 @@ services:
       target: runner
     container_name: fabrika-web
     restart: unless-stopped
+    # Loopback only (İNCELEME-61 Y-1): the reverse proxy in front (docs/SMTP-SUNUCU.md
+    # §10.1) is what makes X-Forwarded-For trustworthy. Published on 0.0.0.0, a client
+    # could reach 3000 directly, write its own X-Forwarded-For and rotate the per-IP
+    # limit of the contact form away.
     ports:
-      - "${FABRIKA_WEB_PORT:-3000}:3000"
+      - "127.0.0.1:${FABRIKA_WEB_PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
+      # Proxies of ours in front of the app; see .env.example.
+      - TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-1}
       - DATABASE_URL=postgresql://fabrika:${FABRIKA_PG_PASSWORD:-fabrika}@postgres-vector:5432/fabrika?schema=public
       - REDIS_URL=redis://redis:6379
       - AUTH_SECRET=${AUTH_SECRET:?set AUTH_SECRET (openssl rand -base64 32)}

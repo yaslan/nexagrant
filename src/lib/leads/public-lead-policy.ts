@@ -21,7 +21,7 @@ export const PUBLIC_LEAD_RETENTION_DAYS = 365;
 /**
  * The explicit-consent text the visitor ticks (KVKK md.5/1, GDPR art.6(1)(a)).
  * Same rule as src/lib/legal/consent-documents.ts: change the copy behind
- * `messageKey` in messages/*.json (or PUBLIC_LEAD_RETENTION_DAYS, which the text
+ * `messageKey` or `withdrawKey` in messages/*.json (or PUBLIC_LEAD_RETENTION_DAYS, which the text
  * states) and bump `version` in the same commit, so a stored row never claims
  * agreement to a text nobody saw. Enforced: public-lead.test.ts pins each version
  * to the SHA-256 of the rendered tr/en text.
@@ -30,6 +30,8 @@ export const PUBLIC_LEAD_CONSENT = {
   id: 'public-lead-contact',
   version: '2026-09-30.1',
   messageKey: 'readiness.lead.consent_label',
+  /** The line printed right under the box; part of what the visitor agrees with (İNCELEME-61 Ö-3). */
+  withdrawKey: 'readiness.lead.consent_withdraw',
 } as const;
 
 /** Funnel pages that may carry the form. */

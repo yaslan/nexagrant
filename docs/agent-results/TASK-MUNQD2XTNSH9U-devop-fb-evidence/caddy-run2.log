@@ -1,0 +1,10 @@
+caddy[v4only-tcp4] <- 172.62.0.12 : http=200 exit=0
+caddy[v4only-tcp4] <- [fd62:62:62:62::12] : http=000 exit=7
+   {"rows":1,"distinctIpHash":1,"nullIpHash":0,"deleted":1,"left":0}
+caddy[bind-0.0.0.0] <- 172.62.0.14 : http=200 exit=0
+caddy[bind-0.0.0.0] <- [fd62:62:62:62::14] : http=200 exit=0
+   {"rows":2,"distinctIpHash":2,"nullIpHash":0,"deleted":2,"left":0}
+caddy[default] <- 172.62.0.13 : http=200 exit=0
+caddy[default] <- [fd62:62:62:62::13] : http=200 exit=0
+   {"rows":2,"distinctIpHash":2,"nullIpHash":0,"deleted":2,"left":0}
+Valid configuration
