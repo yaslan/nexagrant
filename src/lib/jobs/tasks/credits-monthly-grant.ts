@@ -141,6 +141,18 @@ export async function grantCreditsToTenants(
 }
 
 /**
+ * The tenants a monthly run grants to. A soft-deleted tenant (in its hold
+ * before the purge) gets no grant, like the other fan-outs (topic-match,
+ * embeddings, stale-reminder); a tenant restored mid-month is picked up by a
+ * rerun with `payload.period` (TASK-MUO4GO5ARDY2W). Exported so the live test
+ * runs these exact arguments against the database.
+ */
+export const GRANTABLE_TENANTS_QUERY = {
+  where: { deletedAt: null },
+  select: { id: true },
+} as const;
+
+/**
  * Credits Monthly Grant — 1st of month, 6 AM UTC.
  * Grants AI credits to active tenants based on their plan entitlements, for
  * the tick's month (`payload.period` on a job added by hand). A second run for
@@ -154,7 +166,7 @@ export const creditsMonthlyGrantTask = defineJob(
     // tenants exist, so no tenant id is known yet — the same intentional
     // exception as `fetch-saved-searches` in alerts-daily.ts. `Tenant` is the
     // table the scope is derived *from*; every query below it is scoped.
-    const tenants = await prisma.tenant.findMany({ select: { id: true } });
+    const tenants = await prisma.tenant.findMany(GRANTABLE_TENANTS_QUERY);
     return grantCreditsToTenants(tenants, withTenant, period);
   }
 );

@@ -1,0 +1,37 @@
+import subprocess, os, sys
+WT=os.path.dirname(os.path.abspath(__file__))+'/wt'
+T='tests/deleted-tenant-sessionless.live.test.ts'
+P='src/app/[locale]/portal/partner/[token]/page.tsx'
+CHK="      return row && (await isTenantLive(tx, row.tenantId)) ? row : null;"
+M=[
+ ('M1 api-auth: EXISTS satırı silindi','src/lib/api-auth.ts','          AND EXISTS (SELECT 1 FROM "Tenant" WHERE "Tenant"."id" = ${keyRecord.tenantId} AND "Tenant"."deletedAt" IS NULL)\n','',1),
+ ('M2 api-auth: ters koşul (IS NOT NULL)','src/lib/api-auth.ts','"Tenant"."deletedAt" IS NULL)','"Tenant"."deletedAt" IS NOT NULL)',1),
+ ('M3 api-auth: ileri tarihli deletedAt canlı sayılır','src/lib/api-auth.ts','"Tenant"."deletedAt" IS NULL)','("Tenant"."deletedAt" IS NULL OR "Tenant"."deletedAt" > now()))',1),
+ ('M4 m11 action: canlılık kontrolü yok','src/modules/m11/server/actions.ts','    return row && (await isTenantLive(tx, row.tenantId)) ? row : null;','    return row;',1),
+ ('M5 portal sayfa gövdesi: kontrol yok',P,CHK,'      return row;',2),
+ ('M6 portal generateMetadata: kontrol yok',P,CHK,'      return row;',1),
+ ('M7 isTenantLive deletedAt\'e bakmıyor','src/lib/tenant-liveness.ts','return tenant !== null && tenant.deletedAt === null;','return tenant !== null;',1),
+ ('M8 credits: filtre yok','src/lib/jobs/tasks/credits-monthly-grant.ts',"  where: { deletedAt: null },\n","  where: {},\n",1),
+ ('M9 alerts-daily: keepLiveTenantRows yok','src/lib/jobs/tasks/alerts-daily.ts','return keepLiveTenantRows(tx, await tx.savedSearch.findMany(SAVED_SEARCH_ALERT_QUERY));','return tx.savedSearch.findMany(SAVED_SEARCH_ALERT_QUERY);',1),
+ ('M10 m4-weekly: keepLiveTenantRows yok','src/lib/jobs/tasks/m4-weekly-summary.ts','  return keepLiveTenantRows(tx, due);','  return due;',1),
+ ('M11 keepLiveTenantRows deletedAt filtresi yok','src/lib/tenant-liveness.ts',"    where: { id: { in: [...new Set(rows.map((r) => r.tenantId))] }, deletedAt: null },","    where: { id: { in: [...new Set(rows.map((r) => r.tenantId))] } },",1),
+]
+def run():
+    r=subprocess.run(['pnpm','exec','vitest','run',T],cwd=WT,capture_output=True,text=True)
+    out=r.stdout+r.stderr
+    line=[l for l in out.splitlines() if l.strip().startswith('Tests ')]
+    fails=[l.strip() for l in out.splitlines() if l.strip().startswith('×') or ' FAIL ' in l]
+    return (line[-1].strip() if line else out[-400:]), fails
+base,_=run(); print('BASE', base)
+for name,f,old,new,occ in M:
+    p=os.path.join(WT,f); s=open(p).read()
+    idx=-1
+    for _ in range(occ): idx=s.index(old, idx+1)
+    open(p,'w').write(s[:idx]+new+s[idx+len(old):])
+    try:
+        res,fails=run()
+    finally:
+        open(p,'w').write(s)
+    print(name,'->',res); [print('   ',x) for x in fails[:6]]
+print('AFTER', run()[0])
+print(subprocess.run(['git','status','--short','src'],cwd=WT,capture_output=True,text=True).stdout)
