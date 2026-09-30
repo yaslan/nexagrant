@@ -382,17 +382,21 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     const d = new Date(NOW.getTime() + 160 * DAY);
     await rel('casA', T.on, U.tr, new Date(d.getTime() - 70 * DAY));
     // Another run claims U.tr's day in the gap between this run's read of the
-    // membership and its conditional update.
+    // membership and its conditional update: the claim's read (the findUnique
+    // that selects staleDigestOn) returns the old value, then the rival writes.
+    // The code's own updateMany runs untouched, so only its CAS `where` can stop it.
     let raced = false;
     const racing: typeof withTenant = (tenantId, fn) =>
       withTenant(tenantId, (tx) => {
         const membership = new Proxy(tx.membership, {
           get(target, prop, receiver) {
-            if (prop !== 'updateMany' || raced) return Reflect.get(target, prop, receiver);
-            return async (args: Parameters<typeof tx.membership.updateMany>[0]) => {
+            if (prop !== 'findUnique' || raced) return Reflect.get(target, prop, receiver);
+            return async (args: Parameters<typeof tx.membership.findUnique>[0]) => {
+              const read = await target.findUnique(args);
+              if (!args.select?.staleDigestOn) return read;
               raced = true;
               await admin.membership.updateMany({ where: { tenantId, userId: U.tr }, data: { staleDigestOn: dayStartUtc(d) } });
-              return target.updateMany(args);
+              return read;
             };
           },
         });
