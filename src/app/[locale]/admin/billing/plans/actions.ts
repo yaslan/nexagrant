@@ -11,12 +11,14 @@
  * hold regardless of who calls them; this file is the authorisation edge.
  *
  * Actions return `{ ok: false, code }` instead of throwing, so the client can
- * show the operator a translated sentence rather than a stack trace.
+ * show the operator a translated sentence rather than a stack trace. `code` is
+ * one of PLAN_FAILURE_CODES and nothing else crosses: the thrown text stays in
+ * the server log (TASK-MUNZKR3PEV8EI).
  */
 
 import { revalidatePath } from 'next/cache';
 import { requirePlatformAdmin } from '@/lib/tenant';
-import { errorMessage } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import {
   createDraftVersion,
   updateDraftVersion,
@@ -35,18 +37,24 @@ import {
   type AdminPlanVersionRow,
 } from '@/lib/billing/plan-repository';
 import { grantPilot } from '@/lib/billing/pilot';
+import { planFailureCode, type PlanFailureCode } from './failure-codes';
+
+export type ActionFailure = { ok: false; code: PlanFailureCode };
 
 export type ActionResult<T = undefined> =
   | ({ ok: true } & (T extends undefined ? { data?: undefined } : { data: T }))
-  | { ok: false; code: string; detail: string };
+  | ActionFailure;
 
-/** Narrow a thrown value to the stable `code` the UI translates. */
-function toFailure(e: unknown): { ok: false; code: string; detail: string } {
-  const code =
-    typeof e === 'object' && e !== null && 'code' in e && typeof (e as { code: unknown }).code === 'string'
-      ? (e as { code: string }).code
-      : 'UNKNOWN';
-  return { ok: false, code, detail: errorMessage(e) };
+/**
+ * What the browser learns about a failure: a listed code, no text. A refusal
+ * the operator can act on (PLAN_IN_USE, …) is expected and logged as a
+ * warning; anything else is a fault and its whole error goes to the log.
+ */
+function planFailure(e: unknown, action: string): ActionFailure {
+  const code = planFailureCode(e);
+  if (code === 'UNKNOWN') logger.error(`[admin/plans] ${action} failed`, e);
+  else logger.warn(`[admin/plans] ${action} refused`, { code });
+  return { ok: false, code };
 }
 
 function revalidate() {
@@ -68,7 +76,7 @@ export async function createDraftAction(planId: string): Promise<ActionResult<Ad
     revalidate();
     return { ok: true, data: draft };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'createDraft');
   }
 }
 
@@ -83,7 +91,7 @@ export async function saveDraftAction(
     revalidate();
     return { ok: true };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'saveDraft');
   }
 }
 
@@ -94,7 +102,7 @@ export async function discardDraftAction(versionId: string): Promise<ActionResul
     revalidate();
     return { ok: true };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'discardDraft');
   }
 }
 
@@ -112,7 +120,7 @@ export async function previewImpactAction(versionId: string): Promise<ActionResu
     const impact = await computePublishImpact(versionId);
     return { ok: true, data: impact };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'previewImpact');
   }
 }
 
@@ -126,7 +134,7 @@ export async function publishVersionAction(
     revalidate();
     return { ok: true };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'publishVersion');
   }
 }
 
@@ -140,7 +148,7 @@ export async function setVisibilityAction(
     revalidate();
     return { ok: true };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'setVisibility');
   }
 }
 
@@ -151,7 +159,7 @@ export async function archivePlanAction(planId: string): Promise<ActionResult> {
     revalidate();
     return { ok: true };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'archivePlan');
   }
 }
 
@@ -162,7 +170,7 @@ export async function deletePlanAction(planId: string): Promise<ActionResult> {
     revalidate();
     return { ok: true };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'deletePlan');
   }
 }
 
@@ -177,7 +185,7 @@ export async function assignPlanAction(
     revalidate();
     return { ok: true };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'assignPlan');
   }
 }
 
@@ -188,7 +196,7 @@ export async function unassignPlanAction(planId: string, tenantId: string): Prom
     revalidate();
     return { ok: true };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'unassignPlan');
   }
 }
 
@@ -212,6 +220,6 @@ export async function grantPilotAction(
     revalidate();
     return { ok: true, data: { outcome: result.outcome, endsAt: result.endsAt.toISOString() } };
   } catch (e) {
-    return toFailure(e);
+    return planFailure(e, 'grantPilot');
   }
 }

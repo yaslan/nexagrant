@@ -1716,7 +1716,7 @@
       "LIVE_PROVIDER_SUBSCRIPTION": "Kiracının Stripe/iyzico üzerinden aktif aboneliği var. Kamu paketi atamadan önce o aboneliği iptal edin.",
       "NO_PUBLISHED_VERSION": "Paketin yayınlanmış sürümü yok; atanamaz.",
       "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekir.",
-      "UNKNOWN": "İşlem başarısız: {detail}",
+      "UNKNOWN": "İşlem tamamlanamadı. Tekrar deneyin; sürerse ayrıntı sunucu günlüğündedir.",
       "PILOT_OVER_CONTRACT": "Kiracı zaten sözleşmeli bir kamu paketinde; pilot atanamaz."
     },
     "pilot": {
