@@ -1,0 +1,14 @@
+== 5 oturumsuz istek (sayaca girmemeli):
+401 401 401 401 401 
+== alice: 40 EŞZAMANLI istek (xargs -P 40)
+   dağılım:  30 200; 10 429;
+== alice 41. istek (başlıklar):
+HTTP/1.1 429 Too Many Requests
+retry-after: 58
+{"success":false,"error":"rate_limited"}
+
+== bob (aynı kiracı, farklı kullanıcı) alice kilitliyken:
+   HTTP 200
+== alice ?limit=abc (400 yolu) kilitliyken:
+{"success":false,"error":"rate_limited"}  HTTP 429
+== harness: SEDIA/çeviri dış çağrısı engellendi sayısı (log): 66 satır (her 10'da bir)

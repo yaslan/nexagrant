@@ -1,0 +1,14 @@
+├ ƒ /[locale]/[workspace]/cagrilar
+├ ƒ /[locale]/[workspace]/cagrilar/[id]
+├ ƒ /[locale]/[workspace]/calls
+├ ƒ /[locale]/[workspace]/calls/[id]
+├ ƒ /[locale]/acik-cagrilar
+├ ƒ /[locale]/belediye-cagrilari
+├ ƒ /[locale]/calls
+├ ƒ /[locale]/calls/[region]
+├ ƒ /[locale]/calls/turkey
+├ ƒ /[locale]/municipal-calls
+├ ƒ /[locale]/open-calls
+├ ƒ /[locale]/turkiyeye-acik-cagrilar
+├ ƒ /api/cagrilar
+├ ƒ /api/v1/calls

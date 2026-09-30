@@ -1,0 +1,13 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed | 280 passed | 2 skipped (283)
+      Tests  1 failed | 3404 passed | 9 skipped (3414)
+rc=1
+--- run 2 ---
+ FAIL  tests/topic-match-nightly.live.test.ts [ tests/topic-match-nightly.live.test.ts ]
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/lib/agency/funnel.attack.test.ts > property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92H gate) > seed 42, D ≥ 0, sequential codes of 6: 300 random small tables, every view and the code panel joined
+ FAIL  src/lib/agency/report.test.ts > report numbers == dashboard response > property: 300 random tables — every cell of the report is the dashboard’s cell
+ Test Files  3 failed | 278 passed | 2 skipped (283)
+      Tests  2 failed | 3394 passed | 9 skipped (3405)
+rc=1
+--- rerun of the 3 red files alone: 3 passed / 49 passed; report.test.ts alone 3x: 16/16 ---
