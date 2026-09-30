@@ -1,0 +1,11 @@
+once-gercekci 320 Taleplerim over=31 × düğmesi right=279 iw=320 görünür
+   <- div.flex gap-2 +31 "Onayımı BekleyenlerTaleplerim (Maker)(24"
+   <- div.space-y-2 flex-1 +12 "Bütçe / Kaynak Değişikliği⏳ Onay Bekliyo"
+   <- div.space-y-2 flex-1 +12 "Bütçe / Kaynak Değişikliği✓ Onaylandı👤 "
+once-gercekci 390 Taleplerim over=0 × düğmesi right=349 iw=390 görünür
+once-gercekci 640 Taleplerim over=0 × düğmesi right=551 iw=640 görünür
+once-gercekci 768 Taleplerim over=12 × düğmesi right=615 iw=768 görünür
+   <- div.flex items-center gap-2 self-end md:self-center +12 "Detay / PayloadTalebi Geri Çek"
+   <- div.flex items-center gap-2 self-end md:self-center +12 "Detay / PayloadTalebi Geri Çek"
+   <- div.flex items-center gap-2 self-end md:self-center +12 "Detay / PayloadTalebi Geri Çek"
+once-gercekci 1280 Taleplerim over=0 × düğmesi right=871 iw=1280 görünür
