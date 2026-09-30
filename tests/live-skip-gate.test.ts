@@ -92,6 +92,33 @@ describe('checkLiveSkips', () => {
     expect(run(bad)).toBe(1);
     expect(run(path.join(dir, 'missing.json'))).toBe(1);
   });
+
+  it('outside CI a failing gate says why a CI run may differ; the exit stays 1 (TASK-MUOEY2GBFHY7U)', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'live-skip-'));
+    const bad = path.join(dir, 'bad.json');
+    writeFileSync(bad, JSON.stringify(report({ 'tests/a.live.test.ts': [['x', 'passed'], ['y', 'skipped']] })));
+    const stderr = (ci: string | undefined) => {
+      const env = { ...process.env };
+      if (ci === undefined) delete env.CI;
+      else env.CI = ci;
+      try {
+        execFileSync(path.join(root, 'node_modules/.bin/tsx'), [path.join(root, 'scripts/check-live-skips.ts'), bad], {
+          stdio: 'pipe',
+          env,
+        });
+        return { status: 0, err: '' };
+      } catch (e) {
+        const x = e as { status: number; stderr: Buffer };
+        return { status: x.status, err: x.stderr.toString() };
+      }
+    };
+    const local = stderr(undefined);
+    expect(local.status).toBe(1);
+    expect(local.err).toMatch(/note — CI is not set/);
+    const ci = stderr('true');
+    expect(ci.status).toBe(1);
+    expect(ci.err).not.toMatch(/CI is not set/);
+  });
 });
 
 describe('.github/workflows/ci.yml Test step', () => {
