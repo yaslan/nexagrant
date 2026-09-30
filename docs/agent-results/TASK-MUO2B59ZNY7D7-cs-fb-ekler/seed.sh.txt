@@ -1,0 +1,20 @@
+#!/bin/bash
+# TASK-MUO2B59ZNY7D7 seed — ONLY csfb-o2b5-pg (127.0.0.1:5482).
+q(){ docker exec -i csfb-o2b5-pg psql -U fabrika -d fabrika -tAq -c "$1"; }
+q "delete from \"Tenant\" where id like 'cfo2-%'; delete from \"User\" where id like 'cfo2-%'"
+q "insert into \"Tenant\"(id,name,slug,country,\"updatedAt\",\"deletedAt\") values
+ ('cfo2-a','cfo2 A Kurulusu','cfo2-a','TR',now(),null),
+ ('cfo2-b','cfo2 B Kurulusu','cfo2-b','TR',now(),null),
+ ('cfo2-d','cfo2 SILINMIS D','cfo2-d','TR',now(),now())"
+q "insert into \"User\"(id,email,name,\"updatedAt\") values
+ ('cfo2-u','cfo2@fabrika.test','Cfo Kullanici',now()),
+ ('cfo2-w','cfo2-w@fabrika.test','Cfo Ikinci',now())"
+# u: owner of A (oldest), member of B, owner of soft-deleted D
+# w: owner of soft-deleted D (OLDEST), member of B
+q "insert into \"Membership\"(id,\"tenantId\",\"userId\",role,\"workspaceIds\",\"createdAt\") values
+ ('cfo2-ma','cfo2-a','cfo2-u','TENANT_OWNER','{}',now()-interval '3 hour'),
+ ('cfo2-mb','cfo2-b','cfo2-u','MEMBER','{}',now()-interval '2 hour'),
+ ('cfo2-md','cfo2-d','cfo2-u','TENANT_OWNER','{}',now()-interval '1 hour'),
+ ('cfo2-wd','cfo2-d','cfo2-w','TENANT_OWNER','{}',now()-interval '5 hour'),
+ ('cfo2-wb','cfo2-b','cfo2-w','MEMBER','{}',now()-interval '1 hour')"
+echo seeded
