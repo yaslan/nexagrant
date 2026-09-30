@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
-import { auth, signIn, signOut } from '@/lib/auth';
+import { auth, signIn, signOut, unstable_update } from '@/lib/auth';
 import { setRegistrationInviteCookie } from '@/lib/agency/registration-invite-cookie';
 import { acknowledgementMatchesCurrent } from '@/lib/legal/consent-documents';
 import {
@@ -82,6 +82,17 @@ export async function acceptInvitationAction(locale: string): Promise<{ error: s
   }
   if (!outcome.ok) return { error: t(`errors.${outcome.reason}`) };
   await clearInvitationAcceptCookie();
+  // Accepting is the person choosing this tenant, so the session moves there
+  // now (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1). The token otherwise stays bound
+  // to the tenant it was signed in with: someone removed from that one sat
+  // tenantless until they signed in again, and the workspace this redirect
+  // opens showed the old tenant. The jwt callback checks the membership; if
+  // this fails the membership still stands and the next sign-in finds it.
+  try {
+    await unstable_update({ tenantId: outcome.tenantId });
+  } catch (error) {
+    console.error(`[AcceptInvite] session rebind failed: ${error instanceof Error ? error.name : 'unknown'}`);
+  }
   redirect(workspacePath(lang));
 }
 
