@@ -1,0 +1,8 @@
+[ONCE(dev)] handleRunCordisImportAction → HTTP 200 {"success":false,"error":"fetch failed"} | iç metin: fetch failed
+[ONCE(dev)]   DB'deki son koşu: FAILED | fetch failed
+[ONCE(dev)] handleGetK2Status → HTTP 200 iç metin: CordisProject
+[ONCE(dev)] GET /tr/admin/cordis (SSR+RSC) → 169733 bayt, iç metin: CordisProject, "Son Çalıştırma" var: true
+[SONRA(dal)] handleRunCordisImportAction → HTTP 200 {"success":false,"errorCode":"IMPORT_FAILED"} | iç metin: YOK
+[SONRA(dal)]   DB'deki son koşu: FAILED | fetch failed
+[SONRA(dal)] handleGetK2Status → HTTP 200 iç metin: YOK
+[SONRA(dal)] GET /tr/admin/cordis (SSR+RSC) → 169967 bayt, iç metin: YOK, "Son Çalıştırma" var: true

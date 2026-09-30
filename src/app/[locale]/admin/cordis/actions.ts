@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db';
 import { runCordisImport } from '@/lib/k2-cordis/importer';
+import { cordisImportFailureCode } from '@/lib/k2-cordis/failure-codes';
 import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
 import { syncCordisBigData, aggregateCordisMetrics } from '@/lib/cordis-sync';
 import { fetchLiveCordisDelta, getCordisLiveStreamLogs } from '@/lib/cordis-delta';
@@ -19,7 +20,9 @@ export async function handleRunCordisImportAction(dataset: 'HORIZON' | 'H2020', 
   await requirePlatformAdmin();
   const importRes = await runCordisImport({ dataset, limit });
   if (!importRes.success) {
-    return { success: false, error: importRes.error };
+    // A code only: the importer keeps the raw failure in the log, the run row
+    // and the alert (İNCELEME-100 Y-1, TASK-MUOBNYACFPLPF).
+    return { success: false, errorCode: cordisImportFailureCode(importRes.errorCode) };
   }
 
   let profileRes = { updatedProfiles: 0, updatedCoParticipations: 0, durationMs: 0 };
@@ -58,7 +61,7 @@ export async function handleGetK2Status() {
           status: lastRun.status,
           fileHash: lastRun.fileHash,
           rowCounts: lastRun.rowCounts,
-          error: lastRun.error,
+          // `lastRun.error` is the importer's raw message; it stays in the DB.
         }
       : null,
     rowCounts: {

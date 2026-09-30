@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Database,
   Search,
@@ -16,7 +17,7 @@ import {
   FolderGit2,
 } from 'lucide-react';
 import { handleRunCordisSync, handleRunCordisLiveDelta, handleTestRagQuery, handleRunCordisImportAction, handleGetK2Status } from './actions';
-import { errorMessage } from '@/lib/errors';
+import { cordisImportFailureCode, type CordisImportFailureCode } from '@/lib/k2-cordis/failure-codes';
 
 interface CordisMetrics {
   totalProjectsCount: number;
@@ -46,7 +47,6 @@ interface K2ImportRun {
   fileHash: string | null;
   /** Json column; the importer writes K2RowCounts, or a `{ message }` note. */
   rowCounts: K2RowCounts | unknown | null;
-  error: string | null;
 }
 
 /** The K2 ingestion status header: current table counts plus the last run. */
@@ -59,7 +59,7 @@ export interface K2Status {
 interface K2ImportResult {
   success: boolean;
   skipped?: boolean;
-  error?: string;
+  errorCode?: CordisImportFailureCode;
   importDurationMs?: number;
   rowCounts?: K2RowCounts;
 }
@@ -96,6 +96,7 @@ interface CordisRagAdminClientProps {
 }
 
 export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status }: CordisRagAdminClientProps) {
+  const t = useTranslations('adminCordis');
   // Server-rendered figures; no client path updates them, so the setter was dead.
   const [metrics] = useState<CordisMetrics>(initialMetrics);
   const [k2Status, setK2Status] = useState<K2Status | undefined>(initialK2Status);
@@ -132,7 +133,10 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
       const updatedStatus = await handleGetK2Status();
       setK2Status(updatedStatus as unknown as K2Status);
     } catch (err) {
-      setImportResult({ success: false, error: errorMessage(err, 'Import failed')});
+      // A thrown action (network, a server error digest) carries no text worth
+      // showing; the server log has the cause.
+      console.error('[admin/cordis] import action failed', err);
+      setImportResult({ success: false, errorCode: 'IMPORT_FAILED' });
     } finally {
       setIsImporting(false);
     }
@@ -408,7 +412,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                   ) : (
                     <>
                       <AlertCircle className="w-4 h-4 text-red-600" />
-                      <span>İçe Aktarım Hatası: {importResult.error}</span>
+                      <span role="alert">{t(`importErrors.${cordisImportFailureCode(importResult.errorCode)}`)}</span>
                     </>
                   )}
                 </div>

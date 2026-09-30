@@ -1,0 +1,5 @@
+VITEST_CI_EXIT=0
+ Test Files  297 passed | 2 skipped (299)
+      Tests  3829 passed | 50 skipped (3879)
+xact before=8677 after=17324
+SKIPGATE=0

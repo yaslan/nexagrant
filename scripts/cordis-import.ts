@@ -47,7 +47,9 @@ async function main() {
   }
 
   if (!res.success) {
-    console.error(`❌ [CORDIS Import] Error: ${res.error}`);
+    // The cause is in the importer's `[k2-cordis] import failed` line above
+    // and on the CordisImportRun row.
+    console.error(`❌ [CORDIS Import] ${res.errorCode} (run ${res.runId})`);
     process.exit(1);
   }
 

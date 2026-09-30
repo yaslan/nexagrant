@@ -2653,5 +2653,11 @@
     "more": "ve {count} ilişki daha",
     "cta": "İlişkileri aç",
     "footer": "Bu özet günde en çok bir kez gönderilir. Aynı ilişki, yeni bir temas da 60 gün eskiyene kadar yeniden hatırlatılmaz."
+  },
+  "adminCordis": {
+    "importErrors": {
+      "SKIP_LIMIT_EXCEEDED": "İçe aktarım hatası: CORDIS dökümünde okunamayan kayıt sayısı sınırı aştı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında.",
+      "IMPORT_FAILED": "İçe aktarım hatası: içe aktarım tamamlanamadı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında."
+    }
   }
 }
