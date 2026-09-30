@@ -1,7 +1,7 @@
 # TASK-MUO06ANN5D3RM — FB TAKİP (İNCELEME-78 Y-1): CSP'siz 404'ler — cs-fb
 
 **Durum:** TAMAM
-**Dal:** `cs-fb/muo06a-csp-404` (dev `413aca46`'dan), ayrı worktree. Kod commit'i `80a57df1`; dev'e merge edildi, **push yok**.
+**Dal:** `cs-fb/muo06a-csp-404` (dev `413aca46`'dan), ayrı worktree. Kod commit'i `80a57df1`, rapor `a9352e20`; dev'e `3eb40805` olarak merge edildi, **push yok**.
 **DB:** Kendi konteynerim `csfb06-pg` (127.0.0.1:55606, :5433'ün salt-okunur dump'ı + şema farkı yalnız bu DB'ye). Paylaşılan :5433'e yazılmadı.
 **Platform beyanı:** Doğrulama **macOS'ta** yapıldı (Darwin 27, arm64, Node 26.5, standalone `next start`, Chromium headless-shell 1243). **Linux** (prod Docker `node:22-alpine`, CI Node 22) koşulamadı: bu makinede yok. Koddan değerlendirme: değişiklik yalnız regex ve `headers()` üretimi. Bilerek Node 22'de olmayan regex modifier'ı (`(?-i:…)`) kullanılmadı. `readdirSync({recursive, withFileTypes})` + `parentPath` Node ≥20.12'de var. **Windows** koşulamadı, makine yok. Koddan: `servedStaticFiles` yolu `path.sep` ile bölüp `/` ile birleştiriyor, bu yüzden liste Windows'ta da `/logo.png` biçiminde çıkar.
 
@@ -99,6 +99,8 @@ Her mutanttan sonra dosya yedekten geri yüklendi. `git status` yalnız kendi 4 
 | `pnpm i18n:check` | exit 0 |
 | `pnpm build` | exit 0, `ƒ Proxy (Middleware)` |
 | `npx vitest run` (tam, izole DB) | **exit 0**. 292 dosya geçti, 6 atlandı. **3689 test geçti, 0 başarısız**, 96 atlandı |
+
+**Merge sonrası (dev `3eb40805`).** Dev bu arada fe-fb'nin 3 commit'iyle ilerlemişti (67 dosya); merge çakışmasız geçti. Birleşik ağaçta: tsc 0, lint 0, i18n 0, build 0, `npx vitest run` exit 0 (292 dosya geçti, 6 atlandı; **3696 test geçti, 0 başarısız**, 96 atlandı).
 
 Son adımda `next.config.ts`'te yalnız bir JSDoc bloğunun yeri değişti (kod yok). Bundan sonra tsc 0, eslint 0 ve hedefli testler 94/94 yeniden koşuldu.
 
