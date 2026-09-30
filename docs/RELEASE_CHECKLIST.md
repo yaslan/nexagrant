@@ -284,6 +284,28 @@ Repoda Postgres yedekleme/geri yükleme betiği, zamanlayıcısı ya da belgesi 
 - [ ] `source` `job-queue` ile başlayan `error` alarmı yok; `job-queue:cron-disabled` yok (yani 3.3 adım 4 yapıldı).
 - [ ] SMTP yoksa her gönderim denemesi `SystemAlert` yazar → e-posta ile ilgili alarm yok.
 
+### 5.4 HSTS ramp-up (ilk hafta → sonra)
+
+Strict-Transport-Security başlığı Caddy tarafından gönderilir (uygulama eklemez). Kurulum sırası:
+
+1. **Gün 1 (yayından sonra):** Caddyfile'da `header Strict-Transport-Security "max-age=300"` ile başla.
+   ```bash
+   curl -sI https://fonbridge.com/ | grep -i strict-transport
+   # Beklenen: strict-transport-security: max-age=300
+   ```
+
+2. **Gün 8 (toplam 7 gün geçtikten sonra):** Caddyfile güncellemesi:
+   ```caddy
+   header Strict-Transport-Security "max-age=31536000"  # 1 yıl
+   ```
+   Caddy reload sonra doğrula:
+   ```bash
+   curl -sI https://fonbridge.com/ | grep -i strict-transport
+   # Beklenen: strict-transport-security: max-age=31536000
+   ```
+
+3. **Gün 366 (opsiyonel):** `includeSubDomains` eklenebilir (cPanel subdomains kalıcı olarak kilitlenmeyecekse).
+
 ---
 
 ## 6. GitHub push (1 Ekim) ve CI

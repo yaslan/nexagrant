@@ -44,7 +44,6 @@ const env = (vars: Record<string, string>) => vars as unknown as NodeJS.ProcessE
 describe('STATIC_SECURITY_HEADERS (TASK-MUN80T8IVTPM7 Y-2) — pinned', () => {
   it('is exactly this list', () => {
     expect(STATIC_SECURITY_HEADERS).toEqual([
-      { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
       { key: 'X-Frame-Options', value: 'DENY' },
       { key: 'X-Content-Type-Options', value: 'nosniff' },
       { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
@@ -53,11 +52,6 @@ describe('STATIC_SECURITY_HEADERS (TASK-MUN80T8IVTPM7 Y-2) — pinned', () => {
         value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()',
       },
     ]);
-  });
-
-  it('HSTS has no preload (a patron decision, not ours)', () => {
-    const hsts = STATIC_SECURITY_HEADERS.find((h) => h.key === 'Strict-Transport-Security');
-    expect(hsts?.value).not.toMatch(/preload/i);
   });
 });
 
