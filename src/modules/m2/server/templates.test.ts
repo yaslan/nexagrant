@@ -120,4 +120,20 @@ describe('templateSections', () => {
   it('keeps a keyed section with no word limit — the DOCX export needs only key and labelKey', () => {
     expect(templateSections({ sections: [{ key: 'a', labelKey: 'A' }] })).toEqual([{ key: 'a', labelKey: 'A' }]);
   });
+
+  it.each([
+    [{ key: 'a', maxWords: 100 }],
+    [{ key: 'a', labelKey: 7, maxWords: 100 }],
+    [{ key: 'a', labelKey: null }],
+  ])('heads a section whose labelKey is not a string with its key (İNCELEME-76 Y-2): %o', (section) => {
+    const [read] = templateSections([section]);
+    expect(read).toEqual({ ...section, labelKey: 'a' });
+  });
+
+  it('gives every section a string label, so the DOCX export can escape it (Y-2: was a 500)', async () => {
+    const { escapeHtmlText } = await import('@/lib/docx-safe-html');
+    const junk = [{ key: 'a' }, { key: 'b', labelKey: 7 }, { key: 'c', labelKey: {} }, { key: 'd', labelKey: 'D' }];
+    const labels = templateSections(junk).map((s) => escapeHtmlText(s.labelKey));
+    expect(labels).toEqual(['a', 'b', 'c', 'D']);
+  });
 });

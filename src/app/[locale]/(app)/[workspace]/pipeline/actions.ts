@@ -19,6 +19,7 @@ import { errorMessage } from '@/lib/errors';
 import { isPresentId } from '@/lib/required-id';
 import { rescoreOpportunityG0 } from '@/lib/scoring/g0-compute';
 import { withTenant } from '@/lib/db';
+import { findScopedWorkspace } from '@/lib/workspaces';
 import { evaluateGate } from '@/lib/gates/evaluate';
 import { canArchiveOpportunity } from '@/lib/pipeline/archive';
 import {
@@ -46,6 +47,7 @@ async function sessionScope(): Promise<TenantScope | null> {
 }
 
 const NO_TENANT = { success: false as const, error: 'TENANT_SCOPE_REQUIRED' as const };
+const WORKSPACE_REFUSED = { success: false as const, error: 'WORKSPACE_NOT_FOUND' as const };
 
 /** One effort row covers at most a week of hours — above that it is a typo, not a fact. */
 const MAX_EFFORT_HOURS = 24 * 7;
@@ -221,24 +223,22 @@ export async function createOpportunity({
   // `pipelineStore` documents itself as a database-outage fallback, so it is only written when
   // the database actually refused the row.
   let persisted: OpportunityItem | null = null;
+  let workspaceRefused = false;
 
   try {
-    // Both lookups carry `tenantId`, so a workspace slug from another tenant
-    // resolves to nothing instead of to that tenant's workspace. The two reads
-    // and the write share one tenant scope, so the row is created under the
-    // same scope that proved the workspace belongs to this tenant.
+    // The slug is client input (the URL segment). It must name a live workspace
+    // this membership covers — `findScopedWorkspace` — and a slug that does not
+    // is refused, never swapped for "the first workspace" (TASK-MUO12A7NHANOT,
+    // İNCELEME-76 Y-1: a user restricted to workspace B wrote into A, and a
+    // soft-deleted `default` workspace kept receiving rows). The read and the
+    // write share one tenant scope, so the row is created under the same scope
+    // that proved the workspace.
     const created = await withTenant(tenantId, async (tx) => {
-      let workspace = await tx.workspace.findFirst({
-        where: {
-          tenantId,
-          ...(workspaceSlug && workspaceSlug !== 'default' ? { slug: workspaceSlug } : {})
-        }
-      });
+      const workspace = await findScopedWorkspace(tx, scope, workspaceSlug || null);
       if (!workspace) {
-        workspace = await tx.workspace.findFirst({ where: { tenantId } });
+        workspaceRefused = true;
+        return null;
       }
-
-      if (!workspace) return null;
 
       return tx.opportunity.create({
         data: {
@@ -291,6 +291,10 @@ export async function createOpportunity({
   } catch (err) {
     console.warn('[createOpportunity] DB query bypassed, stored in resilient pipeline store:', errorMessage(err));
   }
+
+  // Not a database outage: the workspace is not one this user may write to. Buffering the row
+  // would show a card on a board it does not belong to.
+  if (workspaceRefused) return WORKSPACE_REFUSED;
 
   // Exactly one row leaves this action: the persisted one, or — only when the database did not
   // take it — the buffered one.

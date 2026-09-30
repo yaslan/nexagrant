@@ -1,0 +1,3 @@
+M4 orderBy yok: ÖLDÜ  Tests  1 failed | 81 passed (82)
+M18 safeCallbackUrl origin kontrolü yok: SAĞ  Tests  82 passed (82)
+git diff sonrası değişen dosya sayısı (mutant öncesiyle aynı olmalı): 20

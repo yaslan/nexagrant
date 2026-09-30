@@ -99,8 +99,23 @@ export function templateSections(schema: unknown): ConceptTemplateSection[] {
   else if (schema && typeof schema === 'object' && Array.isArray((schema as { sections?: unknown }).sections)) {
     raw = (schema as { sections: unknown[] }).sections;
   }
-  return raw.filter(isSection);
+  return raw.filter(isSection).map(withLabel);
 }
+
+/**
+ * A section whose `labelKey` is missing or not a string is headed by its key
+ * (TASK-MUO12A7NHANOT, İNCELEME-76 Y-2). The DOCX export escapes `labelKey` as
+ * text, and `{ key: 'a' }` or `{ key: 'a', labelKey: 7 }` made that a 500
+ * (`undefined.replace` / `7.replace`). Dropping the section would lose its
+ * content from the editor and the export, so the key stands in for the label.
+ */
+function withLabel(section: KeyedSection): ConceptTemplateSection {
+  return typeof section.labelKey === 'string'
+    ? (section as ConceptTemplateSection)
+    : ({ ...section, labelKey: section.key } as ConceptTemplateSection);
+}
+
+type KeyedSection = { key: string; labelKey?: unknown };
 
 /**
  * Only elements with a section key (TASK-MUNWZGWA70P16, İNCELEME-71 B-3). The
@@ -110,7 +125,7 @@ export function templateSections(schema: unknown): ConceptTemplateSection[] {
  * and `labelKey`, so a word limit is not required here — the editor checks
  * that itself (`editorSections`).
  */
-function isSection(value: unknown): value is ConceptTemplateSection {
+function isSection(value: unknown): value is KeyedSection {
   if (!value || typeof value !== 'object') return false;
   const { key } = value as { key?: unknown };
   return typeof key === 'string' && key.length > 0;

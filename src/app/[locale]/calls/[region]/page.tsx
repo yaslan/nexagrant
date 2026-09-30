@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { Metadata } from 'next';
 import { PRODUCT_NAME } from '@/lib/brand';
-import { auth } from '@/lib/auth';
 import { publicCallDetailHref } from '@/lib/routes';
 import { regionOf } from './regions';
 
@@ -74,7 +73,6 @@ export default async function CallsPage({ params }: PageProps) {
   const regionLabel = regionInfo.name;
 
   const t = await getTranslations('calls_region');
-  const signedIn = Boolean((await auth())?.user);
 
   const calls = (await prisma.topic.findMany({
     where: {
@@ -142,7 +140,7 @@ export default async function CallsPage({ params }: PageProps) {
                       </div>
                     </div>
                     <Link
-                      href={publicCallDetailHref(locale, call.identifier, signedIn)}
+                      href={publicCallDetailHref(locale, call.identifier)}
                       className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium whitespace-nowrap ml-4"
                     >
                       {t('view_details')}

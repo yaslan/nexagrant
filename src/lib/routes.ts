@@ -131,20 +131,18 @@ export function getWorkspaceRoute(
 }
 
 /**
- * Where a public call card's "details" button goes (TASK-MUNWZGWA70P16, İNCELEME-71 B-2).
+ * Where a public call card's "details" button goes.
  *
- * The cards on /[locale]/calls used to link /[locale]/calls/<identifier>, which
- * lands on the `[region]` route and 404s — every card, on the page's main path.
- * There is no public call-detail page; the detail lives in the workspace app.
- * A signed-in visitor goes straight there. Anyone else goes to sign-in with the
- * detail as `callbackUrl`, because the (app) layout's own redirect for a
- * signed-out request drops the URL it was asked for.
+ * TASK-MUNWZGWA70P16 (İNCELEME-71 B-2): the cards linked /[locale]/calls/<id>,
+ * the `[region]` route, and every one 404'd. Owner decision (30.09): they go to
+ * the signed-in call detail.
  *
- * Interim: whether the cards should instead open a public detail page is a
- * product decision still open with the owner.
+ * TASK-MUO12A7NHANOT (İNCELEME-76 Y-1): that detail sits under a workspace the
+ * public page does not know, and the fixed `default` segment put pipeline
+ * writes in the wrong workspace. The card now links a workspace-free route that
+ * the server resolves per session (src/app/[locale]/calls/topic/[id]/route.ts),
+ * so the link is the same for every visitor and the page needs no session.
  */
-export function publicCallDetailHref(locale: string, identifier: string, signedIn: boolean): string {
-  const detail = getWorkspaceRoute('callDetail', locale, 'default', encodeURIComponent(identifier));
-  if (signedIn) return detail;
-  return `${getPublicRoute('login', locale)}?callbackUrl=${encodeURIComponent(detail)}`;
+export function publicCallDetailHref(locale: string, identifier: string): string {
+  return `/${locale}/calls/topic/${encodeURIComponent(identifier)}`;
 }

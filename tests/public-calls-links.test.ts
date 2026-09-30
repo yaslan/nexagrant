@@ -22,47 +22,37 @@ describe('regionOf (B-1)', () => {
   );
 });
 
-describe('publicCallDetailHref (B-2)', () => {
-  it('sends a signed-in visitor straight to the workspace detail', () => {
-    expect(publicCallDetailHref('tr', 'HORIZON-CL5-2026-D4-01', true)).toBe('/tr/default/cagrilar/HORIZON-CL5-2026-D4-01');
-    expect(publicCallDetailHref('en', 'HORIZON-CL5-2026-D4-01', true)).toBe('/en/default/calls/HORIZON-CL5-2026-D4-01');
+describe('publicCallDetailHref (B-2, İNCELEME-76 Y-1)', () => {
+  it('links the workspace-free route, the same for every visitor', () => {
+    expect(publicCallDetailHref('tr', 'HORIZON-CL5-2026-D4-01')).toBe('/tr/calls/topic/HORIZON-CL5-2026-D4-01');
+    expect(publicCallDetailHref('en', 'HORIZON-CL5-2026-D4-01')).toBe('/en/calls/topic/HORIZON-CL5-2026-D4-01');
   });
 
-  it('sends anyone else to sign-in with the detail as the return URL', () => {
-    expect(publicCallDetailHref('tr', 'HORIZON-CL5-2026-D4-01', false)).toBe(
-      '/tr/giris?callbackUrl=%2Ftr%2Fdefault%2Fcagrilar%2FHORIZON-CL5-2026-D4-01'
-    );
-    const en = new URL(publicCallDetailHref('en', 'HORIZON-CL5-2026-D4-01', false), 'https://x.test');
-    expect(en.pathname).toBe('/en/login');
-    expect(en.searchParams.get('callbackUrl')).toBe('/en/default/calls/HORIZON-CL5-2026-D4-01');
-  });
-
-  it('never points back into the public /calls/[region] route', () => {
-    for (const signedIn of [true, false]) {
-      for (const locale of ['tr', 'en']) {
-        expect(publicCallDetailHref(locale, 'X-1', signedIn)).not.toMatch(new RegExp(`^/${locale}/calls/`));
-      }
+  it('carries no workspace segment — the server picks the workspace, not the link (Y-1)', () => {
+    for (const locale of ['tr', 'en']) {
+      const href = publicCallDetailHref(locale, 'X-1');
+      expect(href).not.toMatch(/\/default\//);
+      expect(href.split('/')).toEqual(['', locale, 'calls', 'topic', 'X-1']);
     }
   });
 
   it('keeps an odd identifier inside one path segment', () => {
-    const href = publicCallDetailHref('en', 'A/B?c=1#d', true);
-    expect(href).toBe('/en/default/calls/A%2FB%3Fc%3D1%23d');
-    const back = new URL(publicCallDetailHref('en', 'A/B?c=1#d', false), 'https://x.test');
-    expect(back.searchParams.get('callbackUrl')).toBe('/en/default/calls/A%2FB%3Fc%3D1%23d');
+    expect(publicCallDetailHref('en', 'A/B?c=1#d')).toBe('/en/calls/topic/A%2FB%3Fc%3D1%23d');
   });
 });
 
 describe('the public call lists use publicCallDetailHref (B-2)', () => {
   const pages = ['src/app/[locale]/calls/page.tsx', 'src/app/[locale]/calls/[region]/page.tsx'];
 
-  it.each(pages)('%s links every card through it, signed-in state included', (file) => {
+  it.each(pages)('%s links every card through it and reads no session', (file) => {
     const src = fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8');
     // The old targets: /calls/<identifier> (the [region] route, 404) and
     // /login?redirect=/dashboard (a parameter nothing reads).
     expect(src).not.toMatch(/href=\{`\/\$\{locale\}\/calls\/\$\{/);
     expect(src).not.toMatch(/login\?redirect=/);
-    expect(src).toMatch(/href=\{publicCallDetailHref\(locale, \w+\.identifier, signedIn\)\}/);
-    expect(src).toMatch(/const signedIn = Boolean\(\(await auth\(\)\)\?\.user\)/);
+    expect(src).toMatch(/href=\{publicCallDetailHref\(locale, \w+\.identifier\)\}/);
+    // Y-1: the link no longer depends on the session, so a signed-in branch
+    // (İNCELEME-76 N4/N5, `signedIn = … || true` survived) cannot come back.
+    expect(src).not.toMatch(/\bauth\(\)|signedIn/);
   });
 });
