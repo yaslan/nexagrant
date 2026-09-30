@@ -19,6 +19,7 @@ import {
 } from '@/lib/dual-approval';
 import { auth } from '@/lib/auth';
 import { documentKindRequiresDualApproval } from '@/lib/rbac';
+import { FollowupDocKindSchema, type FollowupDocKind } from '@/lib/followup-doc-kinds';
 import { emailLocalPart } from '@/lib/user-display';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
@@ -45,11 +46,20 @@ function revalidateDocuments(): void {
 
 export async function generateStandardDoc(
   opportunityId: string,
-  kind: 'NDA' | 'LOI' | 'COMMITMENT' | 'ESR_DEBRIEF' | 'AWARD_PACK' | string
+  requestedKind: FollowupDocKind
 ) {
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M10');
+  // The kind is client-supplied and `FollowupDoc.kind` is free text: `"NDA "`
+  // or `"nda"` was stored verbatim and then signed without the dual approval
+  // flow (İNCELEME-65 B-1). Only the closed list is written, and an unknown
+  // kind is refused here — before the LLM call and the credit it costs.
+  const parsedKind = FollowupDocKindSchema.safeParse(requestedKind);
+  if (!parsedKind.success) {
+    throw new Error('Unknown document kind. No document was created and no credit was charged.');
+  }
+  const kind = parsedKind.data;
   const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const opp = await withTenant<{ title: string } | null>(tenantId, (tx) =>

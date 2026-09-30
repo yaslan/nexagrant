@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/db';
 import { DUAL_APPROVAL_DOCUMENT_KINDS } from '@/lib/rbac';
@@ -19,11 +20,19 @@ import { requireId } from './helpers/teardown-guard';
  * in `requireTenantAction`, the pilot gate, `withTenant`, Prisma and the action
  * bodies are real. Runs as the app's own BYPASSRLS role: the check under test is
  * the action's, and RLS has nothing to say about a same-tenant signature.
+ *
+ * TASK-MUNTFQ8Q5Z9UM — İNCELEME-65 B-1/D-1/D-2. `generateStandardDoc` also runs
+ * here; for it the module gate and the LLM text are faked too (the tenant has no
+ * M10 subscription and there is no model key), and the LLM spy is how "refused
+ * before the credit is spent" is measured.
  */
 
 const s = vi.hoisted(() => ({ session: null as Record<string, unknown> | null }));
 vi.mock('@/lib/auth', () => ({ auth: vi.fn(async () => s.session) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
+vi.mock('@/lib/modules/access', async (orig) => ({ ...(await orig<object>()), assertModuleAccess: vi.fn(async () => {}) }));
+const llm = vi.hoisted(() => ({ generateText: vi.fn(async () => 'GİZLİLİK SÖZLEŞMESİ (NDA) — taraflar …') }));
+vi.mock('@/lib/llm', async (orig) => ({ ...(await orig<object>()), generateText: llm.generateText }));
 
 const m10 = await import('@/modules/m10/server/actions');
 
@@ -57,6 +66,28 @@ async function row(id: string) {
   });
 }
 
+/** An NDA-family doc taken through finance and legal: APPROVED_AND_SIGNED. */
+async function fullyApproved(kind: string) {
+  const doc = await newDoc(kind);
+  asWriter();
+  expect((await m10.submitDualApprovalAction(doc.id)).success).toBe(true);
+  actingAs('TENANT_ADMIN', `${TAG}-finance`);
+  await m10.departmentApproveAction(doc.id, 'FINANCE');
+  actingAs('TENANT_OWNER', `${TAG}-legal`);
+  const legal = await m10.departmentApproveAction(doc.id, 'LEGAL');
+  expect(legal.success && legal.approvalState.stage).toBe('APPROVED_AND_SIGNED');
+  return doc;
+}
+
+/** Every doc of the test tenant — what a refused generation must not grow. */
+const tenantDocIds = async () =>
+  (await prisma.followupDoc.findMany({ where: { tenantId: requireId(fx.tenantId, 'tenantId') }, select: { id: true } })).map((d) => d.id);
+
+// The spellings crw-fb generated and signed with no approval (İNCELEME-65 A1),
+// a Cyrillic А (U+0410) homoglyph, and a kind nobody knows.
+const NDA_VARIANTS = ['nda', 'Nda', 'NDA ', ' NDA', 'loi', 'Commitment', 'NDA\u200B'];
+const STORED_VARIANTS = [...NDA_VARIANTS, 'ND\u0410', 'CONTRACT'];
+
 async function createTenant(suffix: string) {
   const tenant = await prisma.tenant.create({ data: { name: `${TAG} ${suffix}`, slug: `${TAG}-${suffix}`, country: 'TR' } });
   const ws = await prisma.workspace.create({ data: { tenantId: tenant.id, name: `${TAG} ws`, slug: `${TAG}-ws-${suffix}` } });
@@ -81,7 +112,13 @@ describe.skipIf(!dbReachable)('signDocument and the dual approval flow, live DB'
     }
   });
 
-  test.each([...DUAL_APPROVAL_DOCUMENT_KINDS])(
+  // Written out, not spread from the module: an emptied list must fail here,
+  // not make these cases vanish (İNCELEME-65 D-1, mutant M2 went 33 → 30).
+  test('the dual approval kinds are NDA, LOI and COMMITMENT', () => {
+    expect(DUAL_APPROVAL_DOCUMENT_KINDS).toEqual(['NDA', 'LOI', 'COMMITMENT']);
+  });
+
+  test.each(['NDA', 'LOI', 'COMMITMENT'])(
     'WRITER cannot sign a %s that never entered the flow; the row is unchanged',
     async (kind) => {
       const doc = await newDoc(kind);
@@ -156,4 +193,101 @@ describe.skipIf(!dbReachable)('signDocument and the dual approval flow, live DB'
     expect(res).toEqual({ success: false, signedAt: null, refusal: 'DOC_NOT_FOUND' });
     expect((await row(foreign.id))?.signedAt).toBeNull();
   });
+  describe('İNCELEME-65 B-1: the kind is a closed list, and the gate is fail-closed', () => {
+    test.each(NDA_VARIANTS)('generateStandardDoc refuses the kind %j before the LLM; no row is written', async (kind) => {
+      const before = await tenantDocIds();
+      llm.generateText.mockClear();
+
+      asWriter();
+      // The type forbids it; a hand-made Next-Action POST does not.
+      const err = await m10.generateStandardDoc(requireId(fx.opportunityId, 'opportunityId'), kind as 'NDA').catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toMatch(/Unknown document kind/);
+      expect(llm.generateText).not.toHaveBeenCalled();
+      expect(await tenantDocIds()).toEqual(before);
+    });
+
+    test('counterfactual: generateStandardDoc still writes an exact NDA, which then needs the flow', async () => {
+      llm.generateText.mockClear();
+      asWriter();
+      const gen = await m10.generateStandardDoc(requireId(fx.opportunityId, 'opportunityId'), 'NDA');
+
+      expect(llm.generateText).toHaveBeenCalledTimes(1);
+      expect(gen.kind).toBe('NDA');
+      expect(await m10.signDocument(gen.id)).toEqual({ success: false, signedAt: null, refusal: 'DUAL_APPROVAL_REQUIRED' });
+      expect((await row(gen.id))?.signedAt).toBeNull();
+    });
+
+    test.each(STORED_VARIANTS)('a row already stored as %j is not signed directly; the row is unchanged', async (kind) => {
+      const doc = await newDoc(kind);
+      const before = await row(doc.id);
+
+      asWriter();
+      const res = await m10.signDocument(doc.id);
+
+      expect(res).toEqual({ success: false, signedAt: null, refusal: 'DUAL_APPROVAL_REQUIRED' });
+      expect(await row(doc.id)).toEqual(before);
+    });
+
+    test('a variant row taken through the flow is signed with the legal timestamp', async () => {
+      const doc = await fullyApproved('nda');
+      const legalAt = (await row(doc.id))!.signedAt!.getTime();
+
+      asWriter();
+      const res = await m10.signDocument(doc.id);
+
+      expect(res.success).toBe(true);
+      expect(res.signedAt?.getTime()).toBe(legalAt);
+    });
+  });
+
+  // İNCELEME-65 D-2: the `version` pin had only a shape check behind it. This is
+  // crw-fb's A2: signDocument reads the approved NDA, then blocks on its UPDATE
+  // while another transaction writes what createNewVersion writes. Without the
+  // pin the new revision is signed on the old approvals.
+  test('a revision committed between the read and the write is not signed on the old approvals', async () => {
+    const doc = await fullyApproved('NDA');
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let locked!: () => void;
+    const isLocked = new Promise<void>((r) => (locked = r));
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "FollowupDoc" WHERE id = ${doc.id} FOR UPDATE`;
+        locked();
+        await gate;
+        // What createNewVersion writes (src/modules/m10/server/actions.ts), in the same order.
+        await tx.dualApprovalStep.deleteMany({ where: { followupDocId: requireId(doc.id, 'docId'), tenantId: requireId(fx.tenantId, 'tenantId') } });
+        await tx.followupDoc.update({
+          where: { id: doc.id },
+          data: { version: { increment: 1 }, signedAt: null, approvalSubmittedAt: null, approvalSubmittedById: null, approvalSubmittedByName: null },
+        });
+      },
+      { timeout: 20_000 }
+    );
+    await isLocked;
+
+    asWriter();
+    const signing = m10.signDocument(doc.id);
+    // Until signDocument is queued behind the lock; else the test proves nothing.
+    let waiting = 0;
+    for (let i = 0; i < 50 && waiting === 0; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      const rows = await prisma.$queryRaw<{ n: bigint }[]>(
+        Prisma.sql`SELECT count(*)::bigint AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query ILIKE '%FollowupDoc%'`
+      );
+      waiting = Number(rows[0]?.n ?? 0);
+    }
+    release();
+    await holder;
+    const res = await signing;
+
+    expect(waiting).toBeGreaterThan(0);
+    expect(res).toEqual({ success: false, signedAt: null, refusal: 'DOC_NOT_FOUND' });
+    const after = await row(doc.id);
+    expect(after?.version).toBe(2);
+    expect(after?.signedAt).toBeNull();
+    expect(after?.approvalSteps).toEqual([]);
+  }, 30_000);
 });
