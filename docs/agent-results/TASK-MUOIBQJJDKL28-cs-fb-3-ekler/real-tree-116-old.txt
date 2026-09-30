@@ -1,0 +1,24 @@
+--- CORDIS 5e674e7f (import yolu) ---
+YAKALADI | R0 kontrol: statik import | [22,30] | src/lib/k2-cordis/importer.ts#runCordisImport ← catch (line 669)
+YAKALADI | R0b kontrol: const { runCordisImport } = await import('…') | [22,30] | src/lib/k2-cordis/importer.ts#runCordisImport ← catch (line 669)
+KAÇTI    | R1 const r = require; r(…) | []
+KAÇTI    | R2 module.require(…) | []
+KAÇTI    | R3 createRequire(import.meta.url)(…) | []
+KAÇTI    | R4 require.call(null, …) | []
+YAKALADI | R4b kontrol: require(…) | [22,30] | src/lib/k2-cordis/importer.ts#runCordisImport ← catch (line 669)
+--- CORDIS 5e674e7f (genel taint: Object yazımı) ---
+YAKALADI | T1 Object['assign'](out, importRes) | [30] | src/lib/k2-cordis/importer.ts#runCordisImport ← catch (line 669)
+YAKALADI | T5 Object.assign.call(null, out, importRes) | [30] | src/lib/k2-cordis/importer.ts#runCordisImport ← catch (line 669)
+YAKALADI | T0 kontrol: Object.assign(out, importRes) | [22,30] | out (line 22)
+--- Y-1: yeni use-server dosyası, 5e674e7f importer ---
+KAÇTI    | X1 export * from '@/lib/k2-cordis/importer' | []
+YAKALADI | X1b kontrol: export { runCordisImport } from '…' | [2] | src/lib/k2-cordis/importer.ts#runCordisImport ← catch (line 669)
+KAÇTI    | X8 export let act = async () => …; act = runCordisImport | []
+--- .code güveni: evidence/actions.ts (dev HEAD), ilk catch ---
+KAÇTI    | E0 kontrol: return [(error as any).code] (güvenilir, temiz beklenir) | []
+YAKALADI | E1 kontrol: (error as any).code = String(error) | [59] | catch (line 58)
+YAKALADI | E2 kontrol: Object.assign(error, …) | [59] | catch (line 58)
+KAÇTI    | E3 Object['assign'](error, …) | []
+KAÇTI    | E4 Object.assign.call(null, error, …) | []
+KAÇTI    | E5 [error].forEach(x => { x.code = String(x) }) | []
+KAÇTI    | E6 Reflect['set'](error, 'code', …) | []
