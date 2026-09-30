@@ -1,0 +1,103 @@
+Pager usage is off.
+BEGIN
+ enter_system_scope 
+--------------------
+ cross-tenant-job
+(1 row)
+
+ memberships_visible 
+---------------------
+              120015
+(1 row)
+
+== Q1 claimedElsewhere (onceki claim sorgusu)
+                                                                                                             QUERY PLAN                                                                                                             
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=3.077..3.078 rows=0 loops=1)
+   Buffers: shared hit=788
+   ->  Index Scan using "Membership_tenantId_userId_key" on "Membership" (actual time=3.070..3.071 rows=0 loops=1)
+         Index Cond: ("userId" = 'bulk-u-30001'::text)
+         Filter: (("tenantId" <> 'bulk-t-1'::text) AND ("staleDigestOn" >= '2026-09-30'::date) AND (("tenantId" = current_setting('app.tenant_id'::text, true)) OR (current_setting('app.system_scope'::text, true) = 'on'::text)))
+         Rows Removed by Filter: 2
+         Buffers: shared hit=788
+ Planning:
+   Buffers: shared hit=8
+ Planning Time: 0.099 ms
+ Execution Time: 3.090 ms
+(11 rows)
+
+                                                                                                             QUERY PLAN                                                                                                             
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=2.736..2.736 rows=0 loops=1)
+   Buffers: shared hit=788
+   ->  Index Scan using "Membership_tenantId_userId_key" on "Membership" (actual time=2.735..2.735 rows=0 loops=1)
+         Index Cond: ("userId" = 'bulk-u-30001'::text)
+         Filter: (("tenantId" <> 'bulk-t-1'::text) AND ("staleDigestOn" >= '2026-09-30'::date) AND (("tenantId" = current_setting('app.tenant_id'::text, true)) OR (current_setting('app.system_scope'::text, true) = 'on'::text)))
+         Rows Removed by Filter: 2
+         Buffers: shared hit=788
+ Planning Time: 0.071 ms
+ Execution Time: 2.747 ms
+(9 rows)
+
+== Q2 kullanicinin uyelikleri (GDPR export / hesap silme)
+                                                                QUERY PLAN                                                                 
+-------------------------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using "Membership_tenantId_userId_key" on "Membership" (actual time=1.419..2.425 rows=2 loops=1)
+   Index Cond: ("userId" = 'bulk-u-30001'::text)
+   Filter: (("tenantId" = current_setting('app.tenant_id'::text, true)) OR (current_setting('app.system_scope'::text, true) = 'on'::text))
+   Heap Fetches: 2
+   Buffers: shared hit=789
+ Planning Time: 0.049 ms
+ Execution Time: 2.432 ms
+(7 rows)
+
+                                                                QUERY PLAN                                                                 
+-------------------------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using "Membership_tenantId_userId_key" on "Membership" (actual time=1.336..2.328 rows=2 loops=1)
+   Index Cond: ("userId" = 'bulk-u-30001'::text)
+   Filter: (("tenantId" = current_setting('app.tenant_id'::text, true)) OR (current_setting('app.system_scope'::text, true) = 'on'::text))
+   Heap Fetches: 2
+   Buffers: shared hit=789
+ Planning Time: 0.018 ms
+ Execution Time: 2.332 ms
+(7 rows)
+
+ROLLBACK
+Pager usage is off.
+== Q3 kullanici silme (Membership FK cascade), geri alinir
+BEGIN
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Delete on "User" (actual time=0.089..0.090 rows=0 loops=1)
+   ->  Index Scan using "User_pkey" on "User" (actual time=0.034..0.035 rows=1 loops=1)
+         Index Cond: (id = 'bulk-u-30002'::text)
+ Planning Time: 0.204 ms
+ Trigger for constraint Account_userId_fkey: time=0.145 calls=1
+ Trigger for constraint Session_userId_fkey: time=0.067 calls=1
+ Trigger for constraint Membership_userId_fkey: time=6.792 calls=1
+ Trigger for constraint Evaluation_userId_fkey: time=0.240 calls=1
+ Trigger for constraint Reviewer_userId_fkey: time=0.173 calls=1
+ Trigger for constraint ApprovalRequest_requesterId_fkey: time=0.173 calls=1
+ Trigger for constraint ApprovalRequest_approverId_fkey: time=0.019 calls=1
+ Execution Time: 7.749 ms
+(12 rows)
+
+ROLLBACK
+BEGIN
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Delete on "User" (actual time=0.021..0.022 rows=0 loops=1)
+   ->  Index Scan using "User_pkey" on "User" (actual time=0.015..0.015 rows=1 loops=1)
+         Index Cond: (id = 'bulk-u-30003'::text)
+ Planning Time: 0.019 ms
+ Trigger for constraint Account_userId_fkey: time=0.018 calls=1
+ Trigger for constraint Session_userId_fkey: time=0.011 calls=1
+ Trigger for constraint Membership_userId_fkey: time=5.379 calls=1
+ Trigger for constraint Evaluation_userId_fkey: time=0.051 calls=1
+ Trigger for constraint Reviewer_userId_fkey: time=0.020 calls=1
+ Trigger for constraint ApprovalRequest_requesterId_fkey: time=0.021 calls=1
+ Trigger for constraint ApprovalRequest_approverId_fkey: time=0.011 calls=1
+ Execution Time: 5.540 ms
+(12 rows)
+
+ROLLBACK

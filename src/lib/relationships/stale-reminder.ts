@@ -1,5 +1,4 @@
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
-import { withSystemScope } from '@/lib/system-scope';
 import { getEntitlements } from '@/lib/billing';
 import { getPilotState, assertTenantWritable } from '@/lib/billing/pilot';
 import { canAccessStatus } from '@/lib/modules/state-machine';
@@ -22,17 +21,18 @@ import { renderStaleRelationshipsEmail, type StaleDigestSection } from '@/lib/em
  * another value — any new or re-dated contact — that has gone 60 days stale.
  *
  * "At most one a day" survives a crash (İNCELEME-51 B-1): before a digest is
- * sent the user's day is claimed on every membership it covers
- * (`Membership.staleDigestOn`, compare-and-set), the rows are stamped as soon
- * as that one mail is accepted, and the claim is given back only when the send
- * is rejected. A worker killed between claim and stamp costs that user one
- * day's digest (the unstamped rows go out the next morning); it never sends a
- * second one the same day.
+ * sent the user's day is claimed (`User.staleDigestOn`, compare-and-set), the
+ * rows are stamped as soon as that one mail is accepted, and the claim is
+ * given back only when the send is rejected. A worker killed between claim and
+ * stamp costs that user one day's digest (the unstamped rows go out the next
+ * morning); it never sends a second one the same day.
  *
- * The day is the USER's, not a tenant's (İNCELEME-56 Y-1): once the claims are
- * in, a claim for the same day on any OTHER membership of the user — made by an
- * earlier run through a tenant this run skips (pilot over, M4 closed, the
- * tenant's read failing) — gives this run's claims back and sends nothing.
+ * The day is the USER's, not a tenant's, so the claim sits on the user row
+ * (İNCELEME-69 D-1, m4-stale-digest-user-claim.sql): a second run that skips
+ * the tenant the first one mailed from (pilot over, M4 closed, the tenant's
+ * read failing, the member removed, the tenant deleted) still finds it, and
+ * two runs over different tenants race for the same row, so exactly one of
+ * them sends.
  *
  * Skipped, and counted:
  *   - a tenant whose free pilot has run out (read-only: nothing is stamped, so
@@ -124,8 +124,7 @@ async function collectTenant(
   now: Date,
   pageSize: number,
   runTenant: typeof withTenant,
-  out: StaleReminderResult,
-  mailedToday: Set<string>
+  out: StaleReminderResult
 ): Promise<TenantDue | null> {
   const cutoff = staleCutoff(now);
   return runTenant(tenantId, async (tx) => {
@@ -157,15 +156,6 @@ async function collectTenant(
       tx.relationship.count({ where: { tenantId, ownerUserId: null, lastContactAt: { lte: cutoff } } }),
       tx.relationship.count({ where: { tenantId, ownerUserId: { not: null }, lastContactAt: null } }),
     ]);
-    // Members whose digest this tenant already claimed today: a second run on
-    // the same day (a retry after a crash, a hand-added job) must not mail them
-    // again, even about rows that went stale in between. Collected in every
-    // tenant, applied per user across tenants below; claimDigest re-checks it.
-    const claimedToday = await tx.membership.findMany({
-      where: { tenantId, staleDigestOn: { gte: dayStartUtc(now) } },
-      select: { userId: true },
-    });
-    for (const c of claimedToday) mailedToday.add(c.userId);
     out.skippedUnassigned += unassigned;
     out.skippedNeverContacted += neverContacted;
 
@@ -220,70 +210,60 @@ async function collectTenant(
   });
 }
 
-/**
- * Claims `userId`'s digest for `now`'s UTC day on their membership in
- * `tenantId`: a compare-and-set, so of two runs racing for the same day only
- * one gets it. Returns the previous value (to give the claim back if the send
- * is rejected), or `false` when the day is already claimed or the member left.
- */
-async function claimDigest(
-  tenantId: string,
-  userId: string,
-  now: Date,
-  runTenant: typeof withTenant
-): Promise<{ previous: Date | null } | false> {
-  if (!isPresentId(tenantId) || !isPresentId(userId)) return false;
-  const today = dayStartUtc(now);
-  return runTenant(tenantId, async (tx) => {
-    const m = await tx.membership.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
-      select: { staleDigestOn: true },
-    });
-    if (!m || (m.staleDigestOn && m.staleDigestOn.getTime() >= today.getTime())) return false;
-    const { count } = await tx.membership.updateMany({
-      where: { tenantId, userId, staleDigestOn: m.staleDigestOn },
-      data: { staleDigestOn: today },
-    });
-    return count === 1 ? { previous: m.staleDigestOn } : false;
-  });
+/** `now`'s UTC day as the DATE literal the claim binds (text, so no session time zone can shift it). */
+function utcDay(now: Date): string {
+  return dayStartUtc(now).toISOString().slice(0, 10);
 }
 
 /**
- * Whether `userId`'s day is already claimed on a membership outside `claimedNow`
- * (the tenants this run has just claimed). Read after the claims, never before,
- * so of two runs claiming disjoint tenants at the same time at least one sees
- * the other and stands down; both may, which costs the user one day's digest
- * and never sends two.
+ * Claims `userId`'s digest for `now`'s UTC day: one statement that reads the
+ * row under a lock and writes it only if the day is not claimed yet, so of any
+ * number of runs racing for the same user exactly one gets it, whatever
+ * tenants each of them looked at. Returns the previous day (to give the claim
+ * back if the send is rejected), or `false` when the day is already claimed or
+ * the user is gone.
  *
- * Cross-tenant by nature — the one question here with no tenant to scope to —
- * so it goes through the system scope: one membership, by user, one column.
+ * Raw SQL on purpose: Prisma's `update` would also move `User.updatedAt`,
+ * which the GDPR export hands to the data subject as their account's last change.
  */
-async function claimedElsewhere(userId: string, claimedNow: readonly string[], now: Date): Promise<boolean> {
-  if (!isPresentId(userId)) return true;
-  const other = await withSystemScope('cross-tenant-job', 'm4-stale.claimedElsewhere', (tx) =>
-    tx.membership.findFirst({
-      where: { userId, tenantId: { notIn: [...claimedNow] }, staleDigestOn: { gte: dayStartUtc(now) } },
-      select: { tenantId: true },
-    })
-  );
-  return other !== null;
+async function claimDigest(userId: string, now: Date): Promise<{ previous: string | null } | false> {
+  if (!isPresentId(userId)) return false;
+  const today = utcDay(now);
+  const rows = await prisma.$queryRaw<Array<{ previous: string | null }>>`
+    UPDATE "User" u
+       SET "staleDigestOn" = ${today}::date
+      FROM (SELECT id, "staleDigestOn" AS prev FROM "User" WHERE id = ${userId} FOR UPDATE) o
+     WHERE u.id = o.id
+       AND (o.prev IS NULL OR o.prev < ${today}::date)
+    RETURNING o.prev::text AS previous`;
+  return rows.length === 1 ? { previous: rows[0]!.previous } : false;
 }
 
 /** Gives a claim back after a rejected send, so a later run the same day may try again. */
-async function releaseDigest(
-  tenantId: string,
-  userId: string,
-  previous: Date | null,
-  now: Date,
-  runTenant: typeof withTenant
-): Promise<void> {
-  if (!isPresentId(tenantId) || !isPresentId(userId)) return;
-  await runTenant(tenantId, (tx) =>
-    tx.membership.updateMany({
-      where: { tenantId, userId, staleDigestOn: dayStartUtc(now) },
-      data: { staleDigestOn: previous },
-    })
-  );
+async function releaseDigest(userId: string, previous: string | null, now: Date): Promise<void> {
+  if (!isPresentId(userId)) return;
+  await prisma.$executeRaw`
+    UPDATE "User" SET "staleDigestOn" = ${previous}::date
+     WHERE id = ${userId} AND "staleDigestOn" = ${utcDay(now)}::date`;
+}
+
+/**
+ * The owners, of `userIds`, whose day is already claimed: a second run on the
+ * same day (a retry after a crash, a hand-added job) must not mail them again,
+ * even about rows that went stale in between. Read before the claims only to
+ * count them (and for the dry run); claimDigest decides.
+ */
+async function claimedToday(userIds: readonly string[], now: Date, pageSize: number): Promise<Set<string>> {
+  const claimed = new Set<string>();
+  const ids = userIds.filter(isPresentId);
+  for (let i = 0; i < ids.length; i += pageSize) {
+    const rows = await prisma.user.findMany({
+      where: { id: { in: ids.slice(i, i + pageSize) }, staleDigestOn: { gte: dayStartUtc(now) } },
+      select: { id: true },
+    });
+    for (const r of rows) claimed.add(r.id);
+  }
+  return claimed;
 }
 
 /**
@@ -356,7 +336,6 @@ export async function sendStaleRelationshipReminders(options: {
 
   // 1 — collect, tenant by tenant (the tenant list itself read in pages).
   const collected: TenantDue[] = [];
-  const mailedToday = new Set<string>();
   let cursor = '';
   for (;;) {
     const tenants = await prisma.tenant.findMany({
@@ -371,7 +350,7 @@ export async function sendStaleRelationshipReminders(options: {
     for (const { id: tenantId } of tenants) {
       out.tenants++;
       try {
-        const due = await collectTenant(tenantId, now, pageSize, runTenant, out, mailedToday);
+        const due = await collectTenant(tenantId, now, pageSize, runTenant, out);
         if (due) collected.push(due);
       } catch (error) {
         out.tenantsFailed++;
@@ -385,6 +364,7 @@ export async function sendStaleRelationshipReminders(options: {
   // 2 — one digest per user, across tenants.
   type Section = StaleDigestSection & { tenantId: string; due: Array<{ id: string; lastContactAt: Date }> };
   const byUser = new Map<string, { recipient: Recipient; sections: Section[] }>();
+  const mailedToday = await claimedToday([...new Set(collected.flatMap((t) => [...t.byOwner.keys()]))], now, pageSize);
   const mailedTodayDue = new Set<string>();
   for (const t of collected) {
     for (const [userId, { recipient, rows }] of t.byOwner) {
@@ -419,43 +399,30 @@ export async function sendStaleRelationshipReminders(options: {
   // every digest it sent claimed and stamped (İNCELEME-51 B-1).
   const auditByTenant = new Map<string, { relationships: number; recipients: number }>();
   for (const [userId, { recipient, sections }] of byUser) {
-    const claims: Array<{ tenantId: string; previous: Date | null }> = [];
-    const release = async () => {
-      for (const c of claims) {
-        try {
-          await releaseDigest(c.tenantId, userId, c.previous, now, runTenant);
-        } catch (error) {
-          // The claim stays: this user waits for tomorrow instead of risking a second mail.
-          out.errors.push({ scope: 'digest', reason: errorMessage(error) });
-        }
-      }
-    };
-
-    let claimed = true;
+    let claim: { previous: string | null } | false;
     try {
-      for (const s of sections) {
-        const c = await claimDigest(s.tenantId, userId, now, runTenant);
-        if (!c) {
-          claimed = false;
-          break;
-        }
-        claims.push({ tenantId: s.tenantId, previous: c.previous });
-      }
-      if (claimed && (await claimedElsewhere(userId, claims.map((c) => c.tenantId), now))) claimed = false;
+      claim = await claimDigest(userId, now);
     } catch (error) {
       out.digestsFailed++;
       out.errors.push({ scope: 'digest', reason: errorMessage(error) });
-      await release();
       continue;
     }
-    if (!claimed) {
-      // Another run claimed this user's day: after this one read it, or in a
-      // tenant this run skipped (İNCELEME-56 Y-1).
+    if (!claim) {
+      // Another run claimed this user's day after this one read it, whichever
+      // tenants it went through (İNCELEME-56 Y-1, İNCELEME-69 D-1).
       out.skippedMailedToday++;
       out.relationshipsDue -= sections.reduce((n, s) => n + s.due.length, 0);
-      await release();
       continue;
     }
+    const { previous } = claim;
+    const release = async () => {
+      try {
+        await releaseDigest(userId, previous, now);
+      } catch (error) {
+        // The claim stays: this user waits for tomorrow instead of risking a second mail.
+        out.errors.push({ scope: 'digest', reason: errorMessage(error) });
+      }
+    };
 
     try {
       await options.mailer(renderStaleRelationshipsEmail({ to: recipient.email, locale: recipient.locale, now, sections }));
