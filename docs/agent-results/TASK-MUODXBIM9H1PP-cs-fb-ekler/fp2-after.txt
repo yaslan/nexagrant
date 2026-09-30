@@ -1,0 +1,3 @@
+F12 catch içinde forEach ok gövdesi loglar: []
+F13 catch içinde setTimeout(() => log(e)): []
+F14 after() ile arka plan log: []
