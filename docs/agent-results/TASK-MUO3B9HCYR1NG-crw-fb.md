@@ -155,4 +155,4 @@ Kod değişmedi. Yalnız bu rapor ve ekleri eklendi:
 
 ## 7. Sonraki adım
 - fe-fb için kart: Y-1 (+ RACE-2 regresyon testi), T-1 (iki red girdisi), T-2 (dev create-hatası ve ön-kontrol DB hatası testleri).
-- Temizlik: `crwfb82-pg` ve `crwfb82-minio` kapları ve worktree kaldırılacak.
+- Temizlik: `crwfb82-pg` ve `crwfb82-minio` kapları ve worktree kaldırıldı.
