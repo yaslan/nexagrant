@@ -1,5 +1,6 @@
 import { defineJob } from '../define';
-import { withSystemScope } from '@/lib/system-scope';
+import { withSystemScope, type SystemTx } from '@/lib/system-scope';
+import { keepLiveTenantRows } from '@/lib/tenant-liveness';
 import { M4WeeklySummaryOutputSchema, type M4WeeklySummaryOutput } from '../events';
 
 /**
@@ -49,6 +50,32 @@ export function groupPendingActionsByFocalPoint<T extends PendingAction>(
 }
 
 /**
+ * Every tenant's relationship actions due by `until`, less a soft-deleted
+ * tenant's: nobody there is told about them during the hold before the purge
+ * (TASK-MUO4GO5ARDY2W). Exported so the live test runs it under `fabrika_app`.
+ */
+export async function dueRelationshipActions(tx: SystemTx, until: Date) {
+  const due = await tx.relationship.findMany({
+    where: {
+      nextStepDue: {
+        not: null,
+        lte: until,
+      },
+    },
+    select: {
+      id: true,
+      tenantId: true,
+      ownerUserId: true,
+      counterpartName: true,
+      nextStep: true,
+      nextStepDue: true,
+      warmth: true,
+    },
+  });
+  return keepLiveTenantRows(tx, due);
+}
+
+/**
  * M4 Weekly Summary — Monday 9 AM UTC
  * Sends relationship management summaries and due actions to focal points
  * Groups pending actions by focal point and notifies them
@@ -64,23 +91,7 @@ export const m4WeeklySummaryTask = defineJob(
       // there is no single scope to run it in — and under `fabrika_app` it
       // returns nothing, so the job would mail no one and report success.
       return await withSystemScope('cross-tenant-job', 'm4-weekly.dueActions', (tx) =>
-        tx.relationship.findMany({
-          where: {
-            nextStepDue: {
-              not: null,
-              lte: oneWeekFromNow,
-            },
-          },
-          select: {
-            id: true,
-            tenantId: true,
-            ownerUserId: true,
-            counterpartName: true,
-            nextStep: true,
-            nextStepDue: true,
-            warmth: true,
-          },
-        })
+        dueRelationshipActions(tx, oneWeekFromNow)
       );
     })();
 
