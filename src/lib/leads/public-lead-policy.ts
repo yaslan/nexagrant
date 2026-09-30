@@ -8,8 +8,8 @@
 /**
  * How long a contact request is kept: 12 months from when it was left.
  *
- * PROPOSAL, NOT DECIDED — the retention period is the owner's call ("KARAR
- * GEREKLİ", docs/agent-results/TASK-MULR765AR5G0C-fe-fb.md §5). This constant is
+ * Decided: owner decision (patron kararı) 29.09.2026, 12 months — the question
+ * was raised in docs/agent-results/TASK-MULR765AR5G0C-fe-fb.md §5. This constant is
  * the one place it lives; the purge, the admin screen and the notice all read it.
  * Why 12 months: a municipality's EU application cycle is annual (most calls
  * open once a year and the readiness gaps take months to close), so a request
@@ -21,8 +21,10 @@ export const PUBLIC_LEAD_RETENTION_DAYS = 365;
 /**
  * The explicit-consent text the visitor ticks (KVKK md.5/1, GDPR art.6(1)(a)).
  * Same rule as src/lib/legal/consent-documents.ts: change the copy behind
- * `messageKey` in messages/*.json and bump `version` in the same commit, so a
- * stored row never claims agreement to a text nobody saw.
+ * `messageKey` in messages/*.json (or PUBLIC_LEAD_RETENTION_DAYS, which the text
+ * states) and bump `version` in the same commit, so a stored row never claims
+ * agreement to a text nobody saw. Enforced: public-lead.test.ts pins each version
+ * to the SHA-256 of the rendered tr/en text.
  */
 export const PUBLIC_LEAD_CONSENT = {
   id: 'public-lead-contact',

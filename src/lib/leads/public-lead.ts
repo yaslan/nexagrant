@@ -71,11 +71,40 @@ export const publicLeadInputSchema = z.object({
 
 const FIELD_NAMES: readonly PublicLeadField[] = ['name', 'email', 'organisation', 'province', 'district'];
 
-/** First hop of X-Forwarded-For, else X-Real-IP; null when neither is present. */
-export function clientIpFrom(headers: { get(name: string): string | null }): string | null {
-  const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  if (forwarded) return forwarded;
-  return headers.get('x-real-ip')?.trim() || null;
+/**
+ * How many reverse proxies we own sit in front of the app (`TRUSTED_PROXY_HOPS`,
+ * default 1: the nginx/Caddy of docs/SMTP-SUNUCU.md §10.1). Each one APPENDS the
+ * address it saw to X-Forwarded-For, so only the last `hops` entries were written
+ * by us; everything to their left was sent by the client and can be anything.
+ * 0 means no proxy of ours: every header is the client's, so no IP is trusted.
+ * A value that is not a whole number >= 0 falls back to 1.
+ */
+export function trustedProxyHops(raw: string | undefined = process.env.TRUSTED_PROXY_HOPS): number {
+  if (raw === undefined || raw.trim() === '') return 1;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : 1;
+}
+
+/**
+ * The client address as our nearest trusted proxy saw it: the X-Forwarded-For
+ * entry `hops` places from the right (İNCELEME-50 B-1 — the FIRST entry is
+ * whatever the client wrote, so reading it let one machine rotate the per-IP
+ * limit away). X-Real-IP is never read: Caddy passes a client-sent one through
+ * untouched, so it is only as good as the proxy config nobody tests.
+ * Null when no proxy of ours is in front, or the header is missing.
+ */
+export function clientIpFrom(
+  headers: { get(name: string): string | null },
+  hops: number = trustedProxyHops()
+): string | null {
+  if (hops < 1) return null;
+  const chain = (headers.get('x-forwarded-for') ?? '')
+    .split(',')
+    .map((hop) => hop.trim())
+    .filter(Boolean);
+  if (chain.length === 0) return null;
+  // Fewer entries than proxies: every entry was appended by one of ours, the leftmost is the client.
+  return chain[Math.max(0, chain.length - hops)] ?? null;
 }
 
 /**

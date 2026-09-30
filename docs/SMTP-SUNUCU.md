@@ -570,6 +570,13 @@ server { listen 443 ssl; listen [::]:443 ssl; http2 on; server_name fonbridge.co
          location / { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host;
                       proxy_set_header X-Forwarded-Proto https; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; } }
 ```
+**İstemci IP'si (İNCELEME-50 B-1):** `$proxy_add_x_forwarded_for` istemcinin gönderdiği `X-Forwarded-For`'u KORUR ve
+gerçek adresi SONA ekler (`<sahte…>, <gerçek>`). Uygulama bu yüzden baştakini değil **sağdan `TRUSTED_PROXY_HOPS`'uncu**
+değeri okur (`src/lib/leads/public-lead.ts` `clientIpFrom`; bu kurulumda tek proxy → `TRUSTED_PROXY_HOPS=1`, varsayılan).
+`X-Real-IP` okunmaz: Caddy istemcinin gönderdiğini olduğu gibi geçirir. Caddy (§10.1 üstü) güvenilmeyen istemcinin
+`X-Forwarded-For`'unu zaten atıp yalnız gerçek adresi yazar; aynı ayar ikisinde de doğrudur. Önüne CDN/ikinci proxy
+eklenirse değeri 2 yap. Uygulama portu (3000) dışarıdan erişilebilirse başlık doğrudan istemciden gelir ve sınır
+atlatılır — `docker-compose.yml` port bağını üretimde `127.0.0.1:3000:3000` yap ya da 3000'i güvenlik duvarında kapat.
 Sertifika (tek sertifika, iki ad): `certbot certonly --webroot -w /var/www/acme -d fonbridge.com -d www.fonbridge.com`;
 yenileme `certbot.timer` + `--deploy-hook "systemctl reload nginx"`.
 Yerel kanıt (Docker `nginx:1.30.5`, kendinden imzalı sertifika aynı yola): `nginx -t` başarılı; üç giriş de
