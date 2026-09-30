@@ -180,9 +180,11 @@ model Membership {
   role      Role     @default(MEMBER)
   workspaceIds String[] // empty = all workspaces of tenant
   createdAt DateTime @default(now())
-  /// No longer read or written: the digest's claim moved to `User.staleDigestOn`
-  /// (m4-stale-digest-user-claim.sql). Kept for the previous release; dropped
-  /// in a later file. m4-stale-reminder-idempotency.sql
+  /// No longer written: the digest's claim moved to `User.staleDigestOn`
+  /// (m4-stale-digest-user-claim.sql). Kept for the previous release, which
+  /// still claims here; read only so that such a claim made on the deploy day
+  /// holds (stale-reminder.ts `legacyClaims`). Dropped in a later file.
+  /// m4-stale-reminder-idempotency.sql
   staleDigestOn DateTime? @db.Date
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -608,4 +608,153 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     expect(own).toHaveLength(1);
     expect(own[0]!.text).toContain(`d1Late-${RUN}`);
   });
+
+  // ── TASK-MUOADTEOQVL4Z (İNCELEME-95 B-1, T-1..T-3) ─────────────────────────
+
+  test('a claim the previous release wrote on a membership today holds; yesterday\'s does not (İNCELEME-95 B-1)', async () => {
+    // Deploy day: the migration's backfill has run, then the previous release's
+    // worker ticks once more and claims on the membership, not on the user.
+    const d = y1Day(500);
+    await rel('b1First', D2.a, U.d2, new Date(d.getTime() - 65 * DAY));
+    await admin.membership.update({
+      where: { tenantId_userId: { tenantId: D2.b, userId: U.d2 } },
+      data: { staleDigestOn: dayStartUtc(d) },
+    });
+    const before = await claimOf(U.d2);
+    const same = fakeMailer();
+    const r = await runD2(same.mailer, new Date(d.getTime() + 22 * 60_000), [D2.a, D2.b]);
+    expect(same.sent).toHaveLength(0);
+    expect(r.skippedMailedToday).toBe(1);
+    expect(r.digestsSent).toBe(0);
+    expect(await stampOf('b1First')).toBeNull();
+    expect(await claimOf(U.d2)).toEqual(before); // read only, the user row is not touched
+    // The next day the old claim is history: the digest goes out.
+    const next = fakeMailer();
+    await runD2(next.mailer, new Date(d.getTime() + DAY), [D2.a, D2.b]);
+    expect(next.sent.map((m) => m.to)).toEqual([mail(U.d2)]);
+  });
+
+  test('the day is the UTC day in any process time zone: −11 sends no second digest the same UTC day (İNCELEME-95 T-1)', async () => {
+    // Pago Pago is UTC−11: 07:00Z is still the previous local day, 11:30Z the
+    // UTC day itself. Claiming the LOCAL day lets the 11:30 run (a retry, the
+    // 6 h fill) claim "a newer day" and mail the same user twice in one UTC day.
+    const tz = process.env.TZ;
+    process.env.TZ = 'Pacific/Pago_Pago';
+    try {
+      expect(new Date(Date.UTC(2026, 0, 2, 7)).getDate()).toBe(1); // the zone took effect
+      const d = y1Day(510);
+      await rel('t1Due', D2.a, U.d2, new Date(d.getTime() - 65 * DAY));
+      const first = fakeMailer();
+      await runD2(first.mailer, d, [D2.a, D2.b]);
+      expect(first.sent.map((m) => m.to)).toEqual([mail(U.d2)]);
+      expect((await claimOf(U.d2))?.getTime()).toBe(dayStartUtc(d).getTime());
+      await rel('t1Late', D2.b, U.d2, new Date(d.getTime() + 4 * 60 * 60_000 - 60 * DAY));
+      const second = fakeMailer();
+      const r = await runD2(second.mailer, new Date(d.getTime() + 4.5 * 60 * 60_000), [D2.a, D2.b]);
+      expect(second.sent).toHaveLength(0);
+      expect(r.skippedMailedToday).toBe(1);
+    } finally {
+      process.env.TZ = tz;
+      if (tz === undefined) delete process.env.TZ;
+    }
+  });
+
+  test('the day is the UTC day in any process time zone: +14 claims the UTC day, and the next UTC day still sends (İNCELEME-95 T-1)', async () => {
+    // Kiritimati is UTC+14: 23:30Z is already the next local day.
+    const tz = process.env.TZ;
+    process.env.TZ = 'Pacific/Kiritimati';
+    try {
+      expect(new Date(Date.UTC(2026, 0, 1, 23)).getDate()).toBe(2);
+      const d = new Date(dayStartUtc(y1Day(520)).getTime() + 23.5 * 60 * 60_000);
+      await rel('t1Night', D2.a, U.d2, new Date(d.getTime() - 65 * DAY));
+      const first = fakeMailer();
+      await runD2(first.mailer, d, [D2.a, D2.b]);
+      expect(first.sent.map((m) => m.to)).toEqual([mail(U.d2)]);
+      expect((await claimOf(U.d2))?.getTime()).toBe(dayStartUtc(d).getTime());
+      // 07:00Z the next UTC day, a new row due: that day's digest is not lost.
+      const morning = new Date(dayStartUtc(d).getTime() + DAY + 7 * 60 * 60_000);
+      await rel('t1Morning', D2.b, U.d2, new Date(morning.getTime() - 61 * DAY));
+      const next = fakeMailer();
+      await runD2(next.mailer, morning, [D2.a, D2.b]);
+      expect(next.sent.map((m) => m.to)).toEqual([mail(U.d2)]);
+    } finally {
+      process.env.TZ = tz;
+      if (tz === undefined) delete process.env.TZ;
+    }
+  });
+
+  test('a rejected send gives back only its own day: a later day claimed meanwhile stays (İNCELEME-95 T-2)', async () => {
+    // Run A claims day D and its send hangs; run B claims D+1 and sends; then
+    // A's send is rejected. A's give-back must not wipe B's claim, or a third
+    // run on D+1 mails the user again.
+    const d = y1Day(530);
+    const d1 = new Date(d.getTime() + DAY);
+    await rel('t2Row', D2.a, U.d2, new Date(d.getTime() - 65 * DAY));
+    let releaseA!: () => void;
+    const aMayFail = new Promise<void>((resolve) => (releaseA = resolve));
+    let aInSend!: () => void;
+    const aSending = new Promise<void>((resolve) => (aInSend = resolve));
+    const a = sendStaleRelationshipReminders({
+      appUrl: 'https://app.example.test',
+      now: d,
+      tenantIds: [D2.a, D2.b],
+      mailer: async () => {
+        aInSend();
+        await aMayFail;
+        throw new Error('smtp:ETIMEDOUT');
+      },
+    });
+    await aSending;
+    expect((await claimOf(U.d2))?.getTime()).toBe(dayStartUtc(d).getTime());
+    const b = fakeMailer();
+    await runD2(b.mailer, d1, [D2.a, D2.b]);
+    expect(b.sent.map((m) => m.to)).toEqual([mail(U.d2)]);
+    releaseA();
+    const ra = await a;
+    expect(ra.digestsFailed).toBe(1);
+    expect((await claimOf(U.d2))?.getTime()).toBe(dayStartUtc(d1).getTime());
+    await rel('t2Late', D2.b, U.d2, new Date(d1.getTime() + 20 * 60_000 - 60 * DAY));
+    const c = fakeMailer();
+    const rc = await runD2(c.mailer, new Date(d1.getTime() + 22 * 60_000), [D2.a, D2.b]);
+    expect(c.sent).toHaveLength(0);
+    expect(rc.skippedMailedToday).toBe(1);
+  });
+
+  test('the migration backfills the latest membership claim, never lowers one, and leaves Membership FORCEd (İNCELEME-95 T-3)', async () => {
+    const d = dayStartUtc(y1Day(540));
+    const day = (n: number) => new Date(d.getTime() + n * DAY);
+    const forced = async () =>
+      (await admin.$queryRaw<Array<{ f: boolean }>>`SELECT relforcerowsecurity AS f FROM pg_class WHERE oid = '"Membership"'::regclass`)[0]?.f;
+    // CI and a `pnpm db:rls`-ed database FORCE it; the file must leave it so.
+    expect(await forced()).toBe(true);
+    // U.d1: no user claim, two membership claims → the later one.
+    await admin.$executeRaw`UPDATE "User" SET "staleDigestOn" = NULL WHERE id = ${U.d1}`;
+    await admin.membership.update({ where: { tenantId_userId: { tenantId: D2.a, userId: U.d1 } }, data: { staleDigestOn: day(-3) } });
+    await admin.membership.update({ where: { tenantId_userId: { tenantId: D2.b, userId: U.d2 } }, data: { staleDigestOn: day(-1) } });
+    await admin.membership.update({ where: { tenantId_userId: { tenantId: D2.a, userId: U.d2 } }, data: { staleDigestOn: day(-5) } });
+    // U.d2: its user claim is newer than any membership's → untouched.
+    await admin.$executeRaw`UPDATE "User" SET "staleDigestOn" = ${day(0).toISOString().slice(0, 10)}::date WHERE id = ${U.d2}`;
+    // U.y1: user claim older than its membership claims → raised to the latest.
+    await admin.$executeRaw`UPDATE "User" SET "staleDigestOn" = ${day(-9).toISOString().slice(0, 10)}::date WHERE id = ${U.y1}`;
+    await admin.membership.update({ where: { tenantId_userId: { tenantId: Y1.a, userId: U.y1 } }, data: { staleDigestOn: day(-2) } });
+    await admin.membership.update({ where: { tenantId_userId: { tenantId: Y1.b, userId: U.y1 } }, data: { staleDigestOn: day(-4) } });
+
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const { default: pg } = await import('pg');
+    const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/m4-stale-digest-user-claim.sql'), 'utf8');
+    const client = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika' });
+    await client.connect();
+    try {
+      await client.query(sql);
+      await client.query(sql); // idempotent: a second run changes nothing
+    } finally {
+      await client.end();
+    }
+    expect((await claimOf(U.d1))?.getTime()).toBe(day(-3).getTime());
+    expect((await claimOf(U.d2))?.getTime()).toBe(day(0).getTime());
+    expect((await claimOf(U.y1))?.getTime()).toBe(day(-2).getTime());
+    expect(await forced()).toBe(true);
+    await admin.membership.updateMany({ where: { userId: { in: [U.d1, U.d2, U.y1] } }, data: { staleDigestOn: null } });
+  });
 });
