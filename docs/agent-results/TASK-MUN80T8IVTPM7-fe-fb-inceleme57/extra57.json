@@ -1,0 +1,29 @@
+{
+  "log": [
+    "/tr/blog/horizon-europe-basarili-konsorsiyum-rehberi 200 imgs=3 broken=[] fontsLoaded=",
+    "/en/fiyatlandirma 200 imgs=2 broken=[] fontsLoaded=",
+    "/tr/giris 200 imgs=3 broken=[] fontsLoaded=",
+    "/tr/acik-cagrilar 200 imgs=2 broken=[] fontsLoaded=",
+    "/tr/yok-boyle-sayfa 404 imgs=0 broken=[] fontsLoaded=",
+    "/en/nope 404 imgs=0 broken=[] fontsLoaded=",
+    "/tr/main/panel 200",
+    "/tr/main/firsatlar 200",
+    "/tr/main/cagrilar 200",
+    "/tr/main/ortaklar 200",
+    "/tr/main/iliskiler 200",
+    "/tr/main/onay-merkezi 200",
+    "/tr/main/ayarlar/moduller 200",
+    "/tr/main/ayarlar/api-anahtarlari 200",
+    "/tr/main/opportunities/demo-opp-1/application 200",
+    "/tr/main/opportunities/demo-opp-1/m2 200",
+    "/en/main/pipeline 200",
+    "/tr/admin/tenants 404",
+    "/tr/main/yok 404",
+    "editor typed: contains text=true bold=true",
+    "editor save clicked",
+    "concept-note docx: no download",
+    "violations=0 pageerrors=0"
+  ],
+  "violations": [],
+  "errors": []
+}
