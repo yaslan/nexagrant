@@ -1,0 +1,13 @@
+N1 requestedTenantOf String() coercion (7 -> "7", [a,b] -> "a,b"): exit=1 Tests  1 failed | 50 passed (51)
+N2 retry regex widened to /timeout/i (statement timeout retried too): exit=0 Tests  51 passed (51)
+N3 unbounded retry (recursion): exit=1 Tests  1 failed | 45 passed | 5 skipped (51)
+N4 accept: rebind error not caught: exit=0 Tests  51 passed (51)
+N5 dashboard redirect without locale: exit=1 Tests  1 failed | 50 passed (51)
+N6 session falls back to boundTenantId: exit=1 Tests  3 failed | 48 passed (51)
+N7 newest row instead of requested: exit=0 Tests  51 passed (51)
+N8 second failure swallowed (null, no warn): exit=0 Tests  51 passed (51)
+N9 accept rebinds to the tenant the session already had: exit=1 Tests  1 failed | 50 passed (51)
+N10 rebind also on signIn trigger (requested from any session payload): exit=0 Tests  51 passed (51)
+N11 session exposes boundTenantId claim: exit=0 Tests  51 passed (51)
+baseline after restore: Tests  51 passed (51)
+src restored clean

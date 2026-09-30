@@ -1,0 +1,8 @@
+container devopfb80-pg 127.0.0.1:55580 (CI sırası)
+🚀  Your database is now in sync with your Prisma schema. Done in 1.83s
+✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55580/fabrika
+apply-migrations: 40 files applied
+apply-migrations: 40 files applied
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+Seeding completed with E10 data.

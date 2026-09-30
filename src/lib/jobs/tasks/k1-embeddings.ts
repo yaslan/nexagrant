@@ -29,8 +29,8 @@ export const k1EmbeddingsTask = defineJob('k1-embeddings', async ({ payload, tic
     await recordAlert({
       level: 'warn',
       source: 'k1-embeddings',
-      message: `K1 embeddings: ${r.failed} provider calls failed${r.aborted ? ', run stopped' : ''}`,
-      meta: { failed: r.failed, aborted: r.aborted, topicsEmbedded: r.topicsEmbedded, profilesEmbedded: r.profilesEmbedded },
+      message: `K1 embeddings: ${r.failed} provider calls failed${r.rejected ? ` (${r.rejected} rows refused, now skipped until their text changes)` : ''}${r.aborted ? ', run stopped' : ''}`,
+      meta: { failed: r.failed, rejected: r.rejected, aborted: r.aborted, topicsEmbedded: r.topicsEmbedded, profilesEmbedded: r.profilesEmbedded },
       dedupeKey: 'k1-embeddings:failed',
     });
   }

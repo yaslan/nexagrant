@@ -1,0 +1,7 @@
+[C5] bound to C                         : {"tenantId":"cf81-c","role":"PIPELINE_MANAGER"}
+[C5] removed from C (B still held)      : {"tenantId":null,"role":null}
+[C5] dashboard -> http://localhost:3481/tr/no-workspace
+[C6] "Tekrar giriş yap" -> http://localhost:3481/tr/giris | session still {"tenantId":null,"role":null}
+[C6] login form visible: true
+[C7] submitted sign-in -> http://localhost:3481/tr/default/dashboard | session {"tenantId":"cf81-b","role":"MEMBER"}
+[P1] D (deleted) oldest, fresh sign-in  : {"tenantId":"cf81-d","role":"TENANT_OWNER"} (pre-existing path, not this diff)
