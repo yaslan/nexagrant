@@ -73,3 +73,32 @@ describe('kept images always survive the real html-to-docx (TASK-MUNDTW8O2IV6V B
     expect(dropped).toBeGreaterThan(5);
   }, 60_000);
 });
+
+describe('the Exif orientation entry: kept exactly when the bundled image-size can read it (İNCELEME-88 O-1 D19)', () => {
+  /**
+   * A JPEG whose first segment is a big-endian Exif block with one IFD entry — the orientation
+   * tag (274), type SHORT, count 1 — cut to `entryLen` of its 12 bytes. image-size reads the
+   * value at 8..9 of the entry: at 8 or 9 bytes it throws, at 10 it does not. The byte where
+   * the sanitizer starts keeping must be the byte where the library stops throwing, or a kept
+   * image turns the export into the image-less retry (or, without it, a 500).
+   */
+  const withOrientationEntry = (entryLen: number) => {
+    const entry = Buffer.from([0x01, 0x12, 0x00, 0x03, 0, 0, 0, 1, 0, 6, 0, 0]).subarray(0, entryLen);
+    const tiff = Buffer.concat([Buffer.from('MM\0\x2a\0\0\0\x08', 'latin1'), Buffer.from([0, 1]), entry]);
+    const payload = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff]);
+    const segment = Buffer.concat([Buffer.from([0xff, 0xe1, (payload.length + 2) >> 8, (payload.length + 2) & 0xff]), payload]);
+    return Buffer.concat([IMAGES.jpeg!.subarray(0, 2), segment, IMAGES.jpeg!.subarray(2)]);
+  };
+
+  it.each([2, 4, 6, 8, 9, 10, 11, 12])('entry cut at %i bytes', async (entryLen) => {
+    const bytes = withOrientationEntry(entryLen);
+    const kept = safeInlineImageSrc(`data:image/jpeg;base64,${bytes.toString('base64')}`, { remaining: Number.MAX_SAFE_INTEGER }) !== null;
+    const libraryReads = await HTMLtoDOCX(`<img src="data:image/jpeg;base64,${bytes.toString('base64')}" />`, null, {}).then(
+      () => true,
+      () => false
+    );
+    expect({ kept }).toEqual({ kept: libraryReads });
+    // Pinned both ways, so neither side can drift and still agree by accident.
+    expect(kept).toBe(entryLen >= 10);
+  });
+});

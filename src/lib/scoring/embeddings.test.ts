@@ -650,6 +650,25 @@ describe('runK1Embeddings — failures', () => {
     expect(db.topics.every((t) => t.embeddingHash === null)).toBe(true);
   });
 
+  it('a 429 on the prefix retry judges the row on the 429: no probe, no mark, tried again next run (İNCELEME-91 O-1)', async () => {
+    const el = tokenFixture.samples.find((x) => x.id === 'el-16k')!;
+    db.topics = [topic('a', { title: 'Υδρογόνο', keywords: [], description: el.text })];
+    db.profiles = [];
+    // The whole text is over the limit, its prefix meets a rate limit, and the probe would be embedded:
+    // judged on the first 400, the probe would mark a row nothing is wrong with.
+    stubProvider((input) =>
+      input === EMBEDDING_PROBE_TEXT ? { ok: true } : Buffer.byteLength(input) > 8191 ? { ok: false, status: 400 } : { ok: false, status: 429 }
+    );
+    const r = await runK1Embeddings();
+    expect(r).toMatchObject({ rejected: 0, failed: 1, shortened: 0, topicsEmbedded: 0, aborted: false });
+    expect(sent.map((x) => x.input === EMBEDDING_PROBE_TEXT)).toEqual([false, false]);
+    expect(r.errors[0]).toContain('429');
+    expect(db.topics[0]!.embeddingHash).toBeNull();
+    // Next run the limit has passed: the row is judged again and embedded from its prefix.
+    stubProvider(tokenLimit);
+    expect(await runK1Embeddings()).toMatchObject({ topicsEmbedded: 1, shortened: 1, rejected: 0, previouslyRejected: 0 });
+  });
+
   it('three system failures in a row stop the run (bad key, outage)', async () => {
     stubProvider(() => ({ ok: false, status: 401 }));
     const r = await runK1Embeddings();

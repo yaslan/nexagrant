@@ -16,29 +16,48 @@
  * second --apply finds nothing. `Topic` has no tenant and no RLS; each
  * `TenantProfile` is written under its own tenant scope (`withTenant`), as the job
  * does. Prints ids and counts only, never profile text.
+ *
+ * `unlockRejected` and `restoreRejected` are exported for
+ * tests/k1-embeddings-unlock.live.test.ts (İNCELEME-91 O-2); `topicIds` /
+ * `tenantIds` narrow them the way they narrow `runK1Embeddings`, so that test
+ * touches only its own rows. The command line never narrows.
  */
 
 import 'dotenv/config';
 
 import fs from 'fs';
+import path from 'path';
 import { prisma, withTenant } from '../src/lib/db';
 import { REJECTED_HASH_PREFIX } from '../src/lib/scoring/embeddings';
 
-interface Backup {
+export interface Backup {
   createdAt: string;
   topics: Array<{ id: string; embeddingHash: string }>;
   profiles: Array<{ tenantId: string; embeddingHash: string }>;
 }
 
-const LIKE = `${REJECTED_HASH_PREFIX}%`;
-
-async function markedTopics(): Promise<Backup['topics']> {
-  return prisma.$queryRaw<Backup['topics']>`
-    SELECT id, "embeddingHash" FROM "Topic" WHERE "embeddingHash" LIKE ${LIKE} ORDER BY id`;
+/** Leave a list out to take every row; an empty list takes none. */
+export interface UnlockScope {
+  topicIds?: readonly string[];
+  tenantIds?: readonly string[];
 }
 
-async function markedProfiles(): Promise<Backup['profiles']> {
-  const tenants = await prisma.tenant.findMany({ where: { deletedAt: null }, select: { id: true }, orderBy: { id: 'asc' } });
+const LIKE = `${REJECTED_HASH_PREFIX}%`;
+
+async function markedTopics(scope: UnlockScope): Promise<Backup['topics']> {
+  const only = scope.topicIds ? [...scope.topicIds] : null;
+  return prisma.$queryRaw<Backup['topics']>`
+    SELECT id, "embeddingHash" FROM "Topic"
+     WHERE "embeddingHash" LIKE ${LIKE} AND (${only}::text[] IS NULL OR id = ANY(${only}::text[]))
+     ORDER BY id`;
+}
+
+async function markedProfiles(scope: UnlockScope): Promise<Backup['profiles']> {
+  const tenants = await prisma.tenant.findMany({
+    where: { deletedAt: null, ...(scope.tenantIds ? { id: { in: [...scope.tenantIds] } } : {}) },
+    select: { id: true },
+    orderBy: { id: 'asc' },
+  });
   const out: Backup['profiles'] = [];
   for (const { id } of tenants) {
     const rows = await withTenant(id, (tx) =>
@@ -50,7 +69,7 @@ async function markedProfiles(): Promise<Backup['profiles']> {
   return out;
 }
 
-async function restore(file: string): Promise<void> {
+export async function restoreRejected(file: string): Promise<{ topics: number; profiles: number }> {
   const backup = JSON.parse(fs.readFileSync(file, 'utf8')) as Backup;
   let topics = 0;
   let profiles = 0;
@@ -66,52 +85,76 @@ async function restore(file: string): Promise<void> {
     );
   }
   console.log(`RESTORE from ${file}: topics ${topics}/${backup.topics.length}, profiles ${profiles}/${backup.profiles.length} marks put back`);
+  return { topics, profiles };
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-  const restoreArg = args.find((a) => a.startsWith('--restore='));
-  if (restoreArg) return restore(restoreArg.slice('--restore='.length));
-  const apply = args.includes('--apply');
+export interface UnlockResult {
+  topics: Backup['topics'];
+  profiles: Backup['profiles'];
+  /** Set only when something was cleared. */
+  backupFile: string | null;
+  clearedTopics: number;
+  clearedProfiles: number;
+}
 
-  const topics = await markedTopics();
-  const profiles = await markedProfiles();
+export async function unlockRejected(
+  opts: UnlockScope & { apply: boolean; backupDir?: string }
+): Promise<UnlockResult> {
+  const { apply } = opts;
+  const topics = await markedTopics(opts);
+  const profiles = await markedProfiles(opts);
+  const result: UnlockResult = { topics, profiles, backupFile: null, clearedTopics: 0, clearedProfiles: 0 };
   console.log(`${apply ? 'APPLY' : 'DRY RUN'} — marked rows: topics ${topics.length}, tenant profiles ${profiles.length}`);
   for (const t of topics) console.log(`  topic   ${t.id}`);
   for (const p of profiles) console.log(`  profile ${p.tenantId}`);
 
   if (!apply) {
     console.log('\nNothing changed (dry run). Re-run with -- --apply to clear the marks listed above.');
-    return;
+    return result;
   }
   if (topics.length + profiles.length === 0) {
     console.log('\nNothing to clear.');
-    return;
+    return result;
   }
 
-  const file = `k1-unlock-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  const file = path.join(opts.backupDir ?? '.', `k1-unlock-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
   fs.writeFileSync(file, JSON.stringify({ createdAt: new Date().toISOString(), topics, profiles } satisfies Backup, null, 1));
+  result.backupFile = file;
   console.log(`\nBackup written: ${file} (undo: -- --restore=${file})`);
 
   // Only the rows listed (and backed up) above: a mark written since is left for the next pass.
   const topicIds = topics.map((t) => t.id);
-  const clearedTopics = await prisma.$executeRaw`
+  result.clearedTopics = await prisma.$executeRaw`
     UPDATE "Topic" SET "embeddingHash" = NULL WHERE id = ANY(${topicIds}::text[]) AND "embeddingHash" LIKE ${LIKE}`;
-  let clearedProfiles = 0;
   for (const p of profiles) {
-    clearedProfiles += await withTenant(p.tenantId, (tx) =>
+    result.clearedProfiles += await withTenant(p.tenantId, (tx) =>
       tx.$executeRaw`
         UPDATE "TenantProfile" SET "embeddingHash" = NULL WHERE "tenantId" = ${p.tenantId} AND "embeddingHash" LIKE ${LIKE}`
     );
   }
-  console.log(`Cleared: topics ${clearedTopics}, tenant profiles ${clearedProfiles}. The next k1-embeddings run judges them again.`);
+  console.log(`Cleared: topics ${result.clearedTopics}, tenant profiles ${result.clearedProfiles}. The next k1-embeddings run judges them again.`);
+  return result;
 }
 
-main()
-  .catch((err) => {
-    console.error(err);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect?.();
-  });
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const restoreArg = args.find((a) => a.startsWith('--restore='));
+  if (restoreArg) {
+    await restoreRejected(restoreArg.slice('--restore='.length));
+    return;
+  }
+  await unlockRejected({ apply: args.includes('--apply') });
+}
+
+// Imported by the live test: run only as `tsx scripts/k1-embeddings-unlock-rejected.ts`.
+const isMain = process.argv[1]?.includes('k1-embeddings-unlock-rejected');
+if (isMain) {
+  main()
+    .catch((err) => {
+      console.error(err);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect?.();
+    });
+}
