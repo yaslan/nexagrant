@@ -1,0 +1,62 @@
+### C0 positive control: plain write, no role check: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 7ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#c0: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### C1 positive control: readOnly that writes: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 7ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#c1: readOnly: true but writes: tx.evidence.deleteMany (line 8)",
+### N1 try/catch swallows the throwing check: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 10ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n1: writes before any role check covers them: tx.evidence.deleteMany (line 13)",
+### N2a check not awaited (void): exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 8ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n2: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### N2b check rejection swallowed (.catch): exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 5ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n2b: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### N3a same-file `can` that always says yes: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 10ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n3: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### N3b same-file no-op requirePlatformAdmin: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 13ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n3b: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### N4 can() on a literal role, not the caller's: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 5ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n4: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### N5 helper that may return before its check: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 6ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n5: writes before any role check covers them: tx.evidence.deleteMany (line 13)",
+### N6 write in a default parameter (runs before the body): exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 6ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n6: writes before any role check covers them: prisma.evidence.deleteMany (line 6)",
+### N7 readOnly writes via element access tx['evidence']: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 17ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n7: readOnly: true but writes: tx['evidence'].deleteMany (line 8)",
+### N8 readOnly passes a same-file writer by reference: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 6ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n8: readOnly: true but writes: tx.evidence.deleteMany (line 6, via wipeTx)",
+### N9 readOnly writes via $queryRaw DELETE: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 6ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n9: readOnly: true but writes: prisma.$queryRaw (writing SQL) (line 8)",
+### N10 export const = wrapper(async …): exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  2 failed | 1 passed (3) | Tests  2 failed | 98 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 11ms
+     × export only async functions 849ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n10: exported value is not a function the guard can read (declare the action as a function)",
+### N11 anonymous export default async function: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 12ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#default: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### N12 model accessor under another variable (documented): exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 12ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n12: readOnly: true but writes: ev.deleteMany (line 10)",
+### N13 check inside a short-circuited optional call: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 21ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n13: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### N14 (G5b) cross-module write BEFORE the check, write action: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 15ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#n14: writes before any role check covers them: tx.seatCandidate.deleteMany (lib/scoring/consortium.ts:170, via runScoring (lib/scoring/consortium)); tx.seatCandidate.create (lib/scoring/consortium.ts:173,
+### FP1 boolean kept in a variable: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 14ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#fp1: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### FP2 positive-form if (can) { write }: exit=1 → KIRMIZI (yakalandı) [RBAC bekçisi] | Test Files  1 failed | 2 passed (3) | Tests  1 failed | 99 passed (100)
+     × every write action checks the caller role, and no readOnly action writes 25ms
+     +   "app/[locale]/(app)/[workspace]/evidence/i63-mut.ts#fp2: write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)",
+### FP3 check inside try, write in same try: exit=0 → YEŞİL (sağ kaldı) | Test Files  3 passed (3) | Tests  100 passed (100)
