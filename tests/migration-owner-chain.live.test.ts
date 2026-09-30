@@ -182,13 +182,6 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
   }, LONG);
 
   test('the grant file gives the owner SET on app.system_scope and never fabrika_app', async () => {
-    // İNCELEME-115 Ö-5: without -v owner it says what to pass, not `syntax error at or near ":"`.
-    const noOwner = run(PSQL, [adminUrl(), '-X', '-f', 'prisma/migration-owner-grant.sql'], adminUrl());
-    expect(noOwner.status).not.toBe(0);
-    expect(noOwner.out).toContain('no migration owner given');
-    expect(noOwner.out).toContain('-v owner=<migration-owner>');
-    expect(noOwner.out).not.toContain('syntax error');
-
     const g = run(PSQL, [adminUrl(), '-X', '-v', `owner=${OWNER}`, '-f', 'prisma/migration-owner-grant.sql'], adminUrl());
     expect(g.status, g.out).toBe(0);
     granted = true;
@@ -204,6 +197,13 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
     const refuse = run(PSQL, [adminUrl(), '-X', '-v', 'owner=fabrika_app', '-f', 'prisma/migration-owner-grant.sql'], adminUrl());
     // Refused by the file itself when fabrika_app exists, or because no such role exists.
     expect(refuse.status).not.toBe(0);
+
+    // İNCELEME-115 Ö-5: without -v owner it says what to pass, not `syntax error at or near ":"`.
+    const noOwner = run(PSQL, [adminUrl(), '-X', '-f', 'prisma/migration-owner-grant.sql'], adminUrl());
+    expect(noOwner.status).not.toBe(0);
+    expect(noOwner.out).toContain('no migration owner given');
+    expect(noOwner.out).toContain('-v owner=<migration-owner>');
+    expect(noOwner.out).not.toContain('syntax error');
   }, LONG);
 
   test('with the grant the whole chain runs to the end, and a second run before db:rls refuses', async () => {
