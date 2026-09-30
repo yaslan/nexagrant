@@ -205,6 +205,8 @@ describe('60-day rule (pure)', () => {
     expect(isReminderDue({ lastContactAt: c, staleRemindedContactAt: new Date(c) }, now)).toBe(false);
     // Reminded about an older contact; the current one is back-dated but still a new period.
     expect(isReminderDue({ lastContactAt: c, staleRemindedContactAt: new Date(c.getTime() - 30 * DAY) }, now)).toBe(true);
+    // A contact dated before the one reminded about (re-dated, or logged late) is a new period too.
+    expect(isReminderDue({ lastContactAt: c, staleRemindedContactAt: new Date(c.getTime() + 5 * DAY) }, now)).toBe(true);
     expect(isReminderDue({ lastContactAt: new Date(now.getTime() - 59 * DAY), staleRemindedContactAt: null }, now)).toBe(false);
   });
 });
@@ -276,7 +278,8 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     const r = await run(mailer, new Date(NOW.getTime() + 60_000));
     expect(sent).toHaveLength(0);
     expect(r.relationshipsDue).toBe(0);
-    expect(r.skippedAlreadyReminded).toBeGreaterThanOrEqual(7);
+    // reminded + the six just stamped; counted once each (the page query leaves them out, İNCELEME-51 Y-1).
+    expect(r.skippedAlreadyReminded).toBe(7);
   });
 
   test('a row that goes stale later the same day waits for tomorrow: one digest per user per day', async () => {
@@ -352,6 +355,10 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     expect(retry.sent).toHaveLength(0);
     expect(r.skippedMailedToday).toBe(1);
     expect(await stampOf('crashA')).toBeNull();
+    // The dry count agrees: a claimed day is not "due" either.
+    const dry = await run(null, new Date(d.getTime() + 120_000));
+    expect(dry.relationshipsDue).toBe(0);
+    expect(dry.reason).toBeUndefined();
 
     // The next morning the unstamped rows go out, once.
     const next = fakeMailer();
@@ -369,6 +376,34 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     const b = fakeMailer();
     await Promise.all([run(a.mailer, d), run(b.mailer, new Date(d.getTime() + 1))]);
     expect([...a.sent, ...b.sent].map((m) => m.to)).toEqual([mail(U.tr)]);
+  });
+
+  test('the claim is a compare-and-set: a run that loses the race between its read and its write sends nothing', async () => {
+    const d = new Date(NOW.getTime() + 160 * DAY);
+    await rel('casA', T.on, U.tr, new Date(d.getTime() - 70 * DAY));
+    // Another run claims U.tr's day in the gap between this run's read of the
+    // membership and its conditional update.
+    let raced = false;
+    const racing: typeof withTenant = (tenantId, fn) =>
+      withTenant(tenantId, (tx) => {
+        const membership = new Proxy(tx.membership, {
+          get(target, prop, receiver) {
+            if (prop !== 'updateMany' || raced) return Reflect.get(target, prop, receiver);
+            return async (args: Parameters<typeof tx.membership.updateMany>[0]) => {
+              raced = true;
+              await admin.membership.updateMany({ where: { tenantId, userId: U.tr }, data: { staleDigestOn: dayStartUtc(d) } });
+              return target.updateMany(args);
+            };
+          },
+        });
+        return fn(new Proxy(tx, { get: (t, p, r) => (p === 'membership' ? membership : Reflect.get(t, p, r)) }));
+      });
+    const { sent, mailer } = fakeMailer();
+    const r = await run(mailer, d, racing);
+    expect(raced).toBe(true);
+    expect(sent).toHaveLength(0);
+    expect(r.skippedMailedToday).toBe(1);
+    expect(await stampOf('casA')).toBeNull();
   });
 
   test('a contact logged while the digest is being sent is not stamped as reminded', async () => {
