@@ -140,6 +140,8 @@ DONE job=4 … "skippedMailedToday":2,"digestsSent":0 → u96-s0-dep 1, u96-s7-d
   - `rls:bypass-check`: `✅ SUCCESS … 36 on the sanctioned cross-tenant path, 0 still owed`.
   - `build` exit 0.
   - Tam `CI=true npx vitest run` → **`Test Files 297 passed | 2 skipped (299) · Tests 3712 passed | 41 skipped (3753)`**, exit 0. live-skip gate exit 0.
+- **dev'e merge sonrası uç `f7a6dcf5`** (`gates-dev-tip.txt`): `typecheck`, `lint`, `i18n:check`, `rls:bypass-check` ve `build` 0. Tam `CI=true npx vitest run` → **`Test Files 297 passed | 2 skipped (299) · Tests 3755 passed | 41 skipped (3796)`**, exit 0. live-skip gate exit 0.
+- Ana checkout'un paylaşılan `node_modules` Prisma client'ı `User.staleDigestOn`'u henüz bilmiyor (devop-fb R-4 ile aynı durum). Paylaşılan ağacın sahibi `pnpm db:generate` koşmalı; ben dokunmadım.
 - Build uyarısı yalnız `src/instrumentation.ts:18` (`process.exit`, Edge Runtime). Önceden var ve bu değişiklikle ilgisiz.
 
 ## 3. Değişen dosyalar
