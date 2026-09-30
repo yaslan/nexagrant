@@ -1,0 +1,7 @@
+docker rm -f devopfb-o25-pg exit=0
+kalan konteyner: 0
+:55225 kapalı
+worktree remove exit=0
+kalan wt: 0
+kendi süreçlerim: 0
+ana checkout tracked değişiklik: 0
