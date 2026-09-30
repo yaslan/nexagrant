@@ -1,0 +1,5 @@
+O2 round 1: {"undefined":3,"wz-b":17}
+O2 round 2: {"wz-b":19,"undefined":1}
+O2 round 3: {"wz-b":17,"undefined":3}
+O2 warnings: 7 ["[Auth.jwt] membership lookup failed, session stays tenantless: Connection terminated due to connection timeout"]
+ ✓ zz-befb-o2.test.ts > o2 burst through slow proxy 21361ms

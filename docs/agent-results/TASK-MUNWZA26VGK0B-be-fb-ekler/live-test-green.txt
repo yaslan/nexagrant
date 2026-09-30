@@ -1,0 +1,9 @@
+Y2_DEMOTE {"signedIn":"TENANT_OWNER","asOwner":"ok:{\"success\":true}","demoted":{"tenantA":true,"role":"MEMBER"},"asMember":"throw:FORBIDDEN_ROLE","left":1}
+ ✓ tests/auth-jwt-membership-refresh.live.test.ts > the next request sees the membership as it is now (İNCELEME-59 Y-2) > demoted to MEMBER: the next request is MEMBER and an edit is refused 1521ms
+Y2_REMOVE {"removed":{"tenantA":false,"tenantB":false,"tenantId":null,"role":null},"write":"throw:TENANT_SCOPE_REQUIRED","left":1}
+ ✓ tests/auth-jwt-membership-refresh.live.test.ts > the next request sees the membership as it is now (İNCELEME-59 Y-2) > membership removed: the next request is tenantless, not moved to the other tenant, and an edit is refused 76ms
+Y1_REBIND {"stranded":{"tenantA":false,"tenantB":false,"tenantId":null,"role":null},"accepted":"throw:NEXT_REDIRECT;replace;/tr/default/dashboard;307;","joined":{"c":true,"role":"WRITER"},"again":true}
+ ✓ tests/auth-jwt-membership-refresh.live.test.ts > accepting an invitation moves the session to that tenant (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1) > removed from the bound tenant, accepting C makes the very next request C, with the same browser 786ms
+ ✓ tests/auth-jwt-membership-refresh.live.test.ts > accepting an invitation moves the session to that tenant (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1) > still a member of A, accepting C moves the session to C too: it is the tenant just chosen 314ms
+ ✓ tests/auth-jwt-membership-refresh.live.test.ts > accepting an invitation moves the session to that tenant (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1) > a browser asking to be bound to a tenant it is not in stays where it was 174ms
+      Tests  5 passed (5)
