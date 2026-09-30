@@ -112,7 +112,7 @@ export default function RelationshipDetail({
   const warmthOptions = ['cold', 'warm', 'hot', 'active'] as const;
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
+    <div className="max-w-5xl mx-auto py-8 sm:px-4">
       {/* Header */}
       <div className="bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 shadow-xs">
         <h1 data-testid="relationship-title" className="text-2xl font-bold font-heading text-ink mb-1">

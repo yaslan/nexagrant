@@ -150,7 +150,7 @@ export default async function ConsortiumPage({
   // different answers, and only the second one is a 404.
   if (queryFailed) {
     return (
-      <div className="max-w-5xl mx-auto py-8 px-4">
+      <div className="max-w-5xl mx-auto py-8 sm:px-4">
         <div
           role="alert"
           className="border border-amber-200 bg-amber-50 text-amber-900 text-sm rounded-lg p-4"
@@ -168,7 +168,7 @@ export default async function ConsortiumPage({
   const orgMap = Object.fromEntries(orgs.map((o) => [o.id, o]));
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
+    <div className="max-w-5xl mx-auto py-8 sm:px-4">
       <div className="mb-6">
         <Link
           href={`/${locale}/${workspace}/pipeline`}

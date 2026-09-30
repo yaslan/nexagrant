@@ -42,7 +42,7 @@ export default async function TermsPage({
   const t = await getTranslations({ locale, namespace: 'legal.terms' });
 
   return (
-    <div className="max-w-4xl mx-auto py-12 px-6 bg-surface border rounded-xl my-8">
+    <div className="max-w-4xl mx-edge sm:mx-auto py-12 px-4 sm:px-6 bg-surface border rounded-xl my-8">
       <h1 className="text-3xl font-bold font-heading mb-6 text-ink">
         {isTr ? 'Kullanım Koşulları ve Hizmet Sözleşmesi' : 'Terms of Service'}
       </h1>

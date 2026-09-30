@@ -41,7 +41,7 @@ export default async function ApprovalsPage({
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4">
+    <div className="max-w-6xl mx-auto py-8 sm:px-4">
       <div className="mb-8">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">
           <span>{t('breadcrumbSecurity')}</span>

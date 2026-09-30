@@ -58,7 +58,7 @@ export default async function ConceptNotesListPage({
   };
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
+    <div className="max-w-5xl mx-auto py-8 sm:px-4">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold font-heading">Concept Notes</h1>

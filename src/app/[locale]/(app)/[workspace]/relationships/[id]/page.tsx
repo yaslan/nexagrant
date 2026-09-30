@@ -56,7 +56,7 @@ export default async function RelationshipDetailPage({
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
+    <div className="max-w-4xl mx-auto py-8 sm:px-4">
       <Link
         href={`/${locale}/${workspace}/relationships`}
         className="text-muted hover:text-ink mb-4 inline-block"

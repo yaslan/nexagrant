@@ -171,7 +171,7 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
               zero, which is a verdict on work it has not started. Say that instead, and
               point at the one action that starts producing the numbers. */}
           {!metrics.hasAnyOpportunity ? (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center max-w-xl mx-auto">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 sm:p-8 text-center max-w-xl mx-auto">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {t('emptyTitle')}
               </h2>
@@ -186,7 +186,7 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
           ) : metrics.totalOffers === 0 ? (
             /* Opportunities exist, this range just has none — a different sentence, and
                one the reader can act on without leaving the page. */
-            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center max-w-xl mx-auto">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 sm:p-8 text-center max-w-xl mx-auto">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {t('emptyRangeTitle')}
               </h2>

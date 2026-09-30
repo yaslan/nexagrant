@@ -17,7 +17,7 @@ export default async function ModulesSettingsPage({
   // If user is logged in with a restricted role, show forbidden banner
   if (!can(role as Role, 'manage_modules')) {
     return (
-      <div className="p-8 max-w-4xl mx-auto text-center bg-surface rounded-xl border shadow-sm my-12">
+      <div className="p-4 sm:p-8 max-w-4xl mx-auto text-center bg-surface rounded-xl border shadow-sm my-12">
         <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
           !
         </div>

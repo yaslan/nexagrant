@@ -45,7 +45,7 @@ export default async function ConceptNoteDetailPage({
   const { note, template, opportunity } = data;
 
   return (
-    <div className="max-w-[1400px] mx-auto py-6 px-4">
+    <div className="max-w-[1400px] mx-auto py-6 sm:px-4">
       <div className="flex items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
           <Link

@@ -39,7 +39,7 @@ export default async function EvidencePage({
   const isTr = locale === 'tr';
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
+    <div className="max-w-5xl mx-auto py-8 sm:px-4">
       <div className="mb-8">
         <h1 className="text-3xl font-bold font-heading text-ink">
           {isTr ? 'Kanıt & Yetkinlik Deposu (Evidence Pack)' : 'Evidence Pack'}

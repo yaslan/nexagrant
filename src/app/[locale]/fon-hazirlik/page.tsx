@@ -50,7 +50,7 @@ export default async function FonHazirlikPage({
         <PublicNavbar locale={locale} />
       </div>
 
-      <main id="main" className="flex-1 max-w-3xl mx-auto w-full px-4 py-8 sm:py-12">
+      <main id="main" className="flex-1 max-w-3xl mx-auto w-full px-edge sm:px-4 py-8 sm:py-12">
         <ReadinessCheck locale={locale} shared={shared} />
       </main>
 

@@ -106,7 +106,7 @@ export default async function CallsPage({ params }: PageProps) {
 
   return (
     <div className="bg-gray-50 dark:bg-slate-900 min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8 py-12">
         <Link href={`/${locale}`} className="text-indigo-600 dark:text-indigo-400 hover:underline text-sm">
           ← {t('back')}
         </Link>
@@ -118,7 +118,7 @@ export default async function CallsPage({ params }: PageProps) {
         </p>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+      <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8 pb-20">
         <div className="space-y-4">
           {calls.length > 0 ? (
             calls.map((call: TopicRow) => {

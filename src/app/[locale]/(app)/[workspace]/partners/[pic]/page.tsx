@@ -100,7 +100,7 @@ export default async function PartnerDetailPage({
   };
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
+    <div className="max-w-5xl mx-auto py-8 sm:px-4">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-medium text-muted mb-4">
         <Link href={getWorkspaceRoute('dashboard', locale, workspace)} className="hover:text-ink transition-colors">

@@ -80,7 +80,7 @@ export default async function EvaluationPanelPage({
   if (!proposal) {
     const t = await getTranslations({ locale, namespace: 'm6' });
     return (
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="max-w-4xl mx-auto py-6 sm:px-6 space-y-6">
         <h1 className="text-2xl font-bold tracking-tight">{t('panel.title')}</h1>
         <p
           className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300"
@@ -100,7 +100,7 @@ export default async function EvaluationPanelPage({
   const rows = await listPanelScores(proposal.id);
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="max-w-4xl mx-auto py-6 sm:px-6 space-y-6">
       <PanelClient
         proposalId={proposal.id}
         seatedEvaluationId={seated?.id ?? null}

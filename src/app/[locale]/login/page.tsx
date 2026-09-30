@@ -21,7 +21,7 @@ export default async function LoginPage({
     <div className="min-h-screen flex flex-col bg-background selection:bg-accent selection:text-white">
       <PublicNavbar locale={locale} />
 
-      <main className="flex-1 flex items-start justify-center px-4 pt-2 pb-12 sm:pt-4 sm:pb-16">
+      <main className="flex-1 flex items-start justify-center px-edge sm:px-4 pt-2 pb-12 sm:pt-4 sm:pb-16">
         <Suspense fallback={<div className="text-center py-12 text-xs text-muted">Yükleniyor...</div>}>
           <AuthCard
             locale={locale}

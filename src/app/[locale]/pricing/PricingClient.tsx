@@ -117,7 +117,7 @@ export default function PricingClient({
     <div className="min-h-screen flex flex-col bg-[#080d1a] text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
       <PublicNavbar locale={locale} />
 
-      <main className="flex-1 max-w-6xl mx-auto py-12 px-4 sm:px-6 w-full">
+      <main className="flex-1 max-w-6xl mx-auto py-12 px-edge sm:px-6 w-full">
         {/* Header Section */}
         <div className="text-center max-w-3xl mx-auto mb-10 space-y-4">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold uppercase tracking-wider shadow-[0_0_15px_rgba(34,211,238,0.15)]">

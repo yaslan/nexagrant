@@ -32,7 +32,7 @@ export default function PanelError({
     <section
       role="alert"
       aria-live="assertive"
-      className="max-w-2xl mx-auto px-4 py-16 text-center"
+      className="max-w-2xl mx-auto sm:px-4 py-16 text-center"
       data-testid="m6-panel-error"
     >
       <p className="text-5xl mb-6" aria-hidden="true">

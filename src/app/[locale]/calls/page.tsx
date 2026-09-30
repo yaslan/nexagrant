@@ -97,7 +97,7 @@ export default async function CallsPage({ params }: PageProps) {
         </nav>
       </header>
 
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <section className="max-w-6xl mx-auto px-edge sm:px-6 lg:px-8 py-20">
         <h1 className="text-4xl font-bold text-slate-900 mb-4">{t('title')}</h1>
         <p className="text-xl text-slate-600 mb-12">{t('subtitle')}</p>
 

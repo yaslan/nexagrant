@@ -116,7 +116,7 @@ export default async function AdminLayout({
         </aside>
 
         {/* ───────────────────────── CONTENT AREA ───────────────────────── */}
-        <main className="flex-1 p-4 sm:p-8 overflow-y-auto bg-ground">
+        <main className="flex-1 px-edge py-4 sm:p-8 overflow-y-auto bg-ground">
           {children}
         </main>
       </div>

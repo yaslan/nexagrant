@@ -1,0 +1,25 @@
+before (dev) vs after, same viewport; nonzero only where noted
+admin-768.png IDENTICAL
+blog-768.png diff px=40 bbox=(253, 32, 258, 40)  (animate-pulse dot in PublicNavbar/hero badge)
+concept-notes-768.png IDENTICAL
+dashboard-768.png IDENTICAL
+giris-768.png diff px=40 bbox=(253, 32, 258, 40)  (animate-pulse dot in PublicNavbar/hero badge)
+home-768.png diff px=100 bbox=(177, 32, 258, 156)  (animate-pulse dot in PublicNavbar/hero badge)
+opp-documents-768.png IDENTICAL
+partners-768.png IDENTICAL
+pipeline-768.png IDENTICAL
+pricing-768.png diff px=99 bbox=(230, 32, 258, 141)  (animate-pulse dot in PublicNavbar/hero badge)
+privacy-768.png IDENTICAL
+settings-profile-768.png IDENTICAL
+admin-1280.png IDENTICAL
+blog-1280.png diff px=60 bbox=(503, 32, 511, 40)  (animate-pulse dot in PublicNavbar/hero badge)
+concept-notes-1280.png IDENTICAL
+dashboard-1280.png IDENTICAL
+giris-1280.png diff px=60 bbox=(503, 32, 511, 40)  (animate-pulse dot in PublicNavbar/hero badge)
+home-1280.png diff px=120 bbox=(433, 32, 511, 188)  (animate-pulse dot in PublicNavbar/hero badge)
+opp-documents-1280.png IDENTICAL
+partners-1280.png IDENTICAL
+pipeline-1280.png IDENTICAL
+pricing-1280.png diff px=119 bbox=(486, 32, 511, 141)  (animate-pulse dot in PublicNavbar/hero badge)
+privacy-1280.png IDENTICAL
+settings-profile-1280.png IDENTICAL

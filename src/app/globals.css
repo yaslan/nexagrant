@@ -73,6 +73,17 @@
   --font-mono: 'IBM Plex Mono', Menlo, Monaco, Consolas, monospace;
 }
 
+/* Page gutter below sm (640px): the only horizontal space between the screen
+   edge and the page content on a phone (TASK-MUNU027UKJ2AD). It generates
+   `px-edge`, which the app/admin <main> and the outermost container of every
+   layout-less public page use as their mobile inline padding; from sm up they
+   keep their own values. Nested page roots add no horizontal padding below sm
+   (tests/mobile-edge-gutter.test.ts), so the gutter never stacks. Cards keep
+   their inner padding; this is the outer edge only. */
+@theme {
+  --spacing-edge: 2px;
+}
+
 body {
   background-color: var(--ground);
   color: var(--ink);

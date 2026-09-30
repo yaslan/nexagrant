@@ -43,7 +43,7 @@ export default async function CalendarSettingsPage({ params }: { params: Promise
   );
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
+    <div className="max-w-4xl mx-auto py-8 sm:px-4">
       <div className="flex items-center gap-2 text-xs font-medium text-muted mb-4">
         <a href={getWorkspaceRoute('dashboard', locale, workspace)} className="hover:text-ink transition-colors">
           {t('breadcrumbHome')}

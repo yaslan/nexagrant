@@ -120,7 +120,7 @@ export default function PrivacySettingsClient({ locale, workspace, initialStatus
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
+    <div className="max-w-4xl mx-auto py-8 sm:px-4 space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs font-medium text-muted" aria-label="Breadcrumb">
         <Link href={getWorkspaceRoute('dashboard', locale, workspace)} className="hover:text-ink transition-colors">

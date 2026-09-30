@@ -19,7 +19,7 @@ export default async function NoWorkspacePage({
   const t = await getTranslations({ locale, namespace: 'NoWorkspace' });
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 bg-slate-50 dark:bg-slate-950">
+    <main className="min-h-screen flex items-center justify-center px-edge sm:px-4 bg-slate-50 dark:bg-slate-950">
       <div className="max-w-md w-full text-center">
         <p className="text-5xl mb-6" aria-hidden="true">
           🔑

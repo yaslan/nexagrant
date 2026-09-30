@@ -43,7 +43,7 @@ export default async function OpportunityM2Page({
 
   if (!m2State || m2State.status === 'OFF') {
     return (
-      <div className="p-8 text-center border rounded-lg bg-ground mt-10 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-8 text-center border rounded-lg bg-ground mt-10 max-w-2xl mx-auto">
         <h2 className="text-xl font-bold mb-2">Concept Note Modülü Kapalı</h2>
         <p className="text-ink-2">Bu modülü kullanmak için eklenti satın almalı veya planınızı yükseltmelisiniz.</p>
       </div>
@@ -74,7 +74,7 @@ export default async function OpportunityM2Page({
   const template = await findAccessibleTemplate(templateId, tenantId);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto mt-6 bg-surface border rounded-lg shadow-sm">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto mt-6 bg-surface border rounded-lg shadow-sm">
       <ConceptNoteEditor
         opportunityId={opp.id}
         templateId={templateId}
