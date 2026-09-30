@@ -24,8 +24,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (!importRes.success) {
+      // The importer's message is the raw failure (SQL, file paths). It is on
+      // the run row and in the alert; the body carries the run id to look it up
+      // (İNCELEME-70 Y-1, TASK-MUNVVMJDEO932).
+      logger.error('[API /api/admin/cordis/import] import run failed', importRes.error, { runId: importRes.runId });
       return NextResponse.json(
-        { success: false, error: importRes.error, runId: importRes.runId },
+        { success: false, error: 'import_failed', runId: importRes.runId },
         { status: 500 }
       );
     }

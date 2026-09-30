@@ -72,6 +72,15 @@ describe('/api/cagrilar hardening', () => {
     expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 50, maxPages: 5 });
   });
 
+  // İNCELEME-70 D-1 (TASK-MUNVVMJDEO932): the lower bound had no test, so a
+  // negative page size could reach SEDIA and every test stayed green.
+  test.each(['0', '-1', '-50'])('limit=%s is raised to a page size of 1', async (limit) => {
+    const res = await get(`?limit=${limit}&lang=en`);
+    expect(res.status).toBe(200);
+    expect(mocks.searchSedia).toHaveBeenCalledTimes(1);
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 1, maxPages: 5 });
+  });
+
   test('a non-numeric limit is a 400 before any outbound call', async () => {
     const res = await get('?limit=zz');
     expect(res.status).toBe(400);

@@ -102,9 +102,9 @@ export async function POST(request: Request) {
     if (err.message?.includes('already processed')) {
       return NextResponse.json({ received: true });
     }
-    return new NextResponse(`Error processing webhook: ${err.message}`, {
-      status: 500,
-    });
+    // The detail is logged above; Stripe only needs the non-2xx to retry
+    // (İNCELEME-70 Y-1, TASK-MUNVVMJDEO932).
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });
