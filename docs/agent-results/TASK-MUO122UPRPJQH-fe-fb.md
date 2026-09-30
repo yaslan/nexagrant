@@ -1,7 +1,7 @@
 # TASK-MUO122UPRPJQH — fe-fb — İNCELEME-77 B-1 (BLOKE) + D-1/D-2 düzeltmesi
 
 **Durum:** TAMAM
-**Dal:** `fe-fb/muo122-confirm-atomic` (dev `19dc119b`'den), kendi worktree'mde. Kapılar yeşil olunca dev'e merge edildi, push yok.
+**Dal:** `fe-fb/muo122-confirm-atomic` (dev `19dc119b`'den), kendi worktree'mde. Kapılar yeşil olunca dev'e merge edildi: `9aa5c286`. Push yok. Merge sonrası dev üzerinde de json/i18n/tsc 0 ve 5 birim suite (41 test) yeşil.
 **Ortam:** izole Postgres `fefb122-pg` (127.0.0.1:55122; CI sırası: db push → db:rls-role → apply-migrations ×2 → db:rls → db:seed) ve kendi MinIO'm `fefb122-minio` (127.0.0.1:59122, private kova). Paylaşılan :5433'e yazılmadı.
 **Platform beyanı:** mac'te doğrulandı (Darwin 27, Node 26, vitest 4.1.11, `pgvector/pgvector:pg16`, `bitnamilegacy/minio`). Linux ve Windows'ta koşulamadı, bu makinede yalnız mac var. Koddan çıkarımlar:
 - Prod yolu (S3 `HeadObject`/`GetObject IfMatch`/`CopyObject CopySourceIfMatch`/`DeleteObject`) platformdan bağımsız.
