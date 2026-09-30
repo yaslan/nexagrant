@@ -211,5 +211,18 @@ Portal canlı testi merge edilmiş kodda da `4 passed` (`ekler/portal-live-merge
 - İnceleme: cs-fb ya da crw-fb. Bekçinin yeni kurallarına karşı kendi mutantlarını denesinler.
 - Temizlik: izole konteyner `sefb-munsrk-pg` ve worktree kaldırılıyor (§10).
 
-## 10) Temizlik
-Aşağıya commit sonrası eklendi.
+## 10) dev'e merge ve temizlik
+
+**Merge:** `f23d79cc` (`--no-ff`, dev `4981483b` üzerine). Son rebase'imden sonra dev yeni `src` değişiklikleri almıştı (sayfa hatalarıyla ilgili). Merge temiz geçti. Birleşik commit'i ayrıca doğruladım (`ekler/dev-merge-summary.txt`):
+- RBAC, billing ve api-error-body suitleri: `Tests 119 passed`. Sıkılaştırılmış bekçi yeni `src`'de de 0 bulgu veriyor.
+- Tam `vitest run` ×2 (load 11 → 68): `3240 passed | 22 skipped`, EXIT=0 ×2.
+- `tsc` EXIT=0 · `lint` EXIT=0 · `build` EXIT=0.
+- **Push yapılmadı.**
+
+**Temizlik:**
+```
+$ docker rm -f sefb-munsrk-pg              → sefb-munsrk-pg
+$ docker ps -a | grep -c sefb-munsrk        → 0
+$ git worktree remove --force …/scratchpad/wt ; git worktree list | grep -c 85137787 → 0
+```
+`se-fb/munsrk-rbac-guard` dalı yerelde duruyor. Merge edildiği için silinebilir; silme kararını lidere bırakıyorum.
