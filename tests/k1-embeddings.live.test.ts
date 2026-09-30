@@ -27,7 +27,7 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
 });
 
 import { createDbClient, prisma } from '@/lib/db';
-import { runK1Embeddings, embeddingHash, profileEmbeddingText, topicEmbeddingText, TOPIC_EMBEDDING_PURPOSE, PROFILE_EMBEDDING_PURPOSE, EMBEDDING_USD_PER_MTOK, REJECTED_HASH_PREFIX } from '@/lib/scoring/embeddings';
+import { runK1Embeddings, embeddingHash, profileEmbeddingText, topicEmbeddingText, TOPIC_EMBEDDING_PURPOSE, PROFILE_EMBEDDING_PURPOSE, EMBEDDING_USD_PER_MTOK, REJECTED_HASH_PREFIX, EMBEDDING_PROBE_TEXT } from '@/lib/scoring/embeddings';
 import { recomputeAllTopicMatches } from '@/lib/scoring/topic-match';
 import { LlmProviderError, PLATFORM_SCOPE_TENANT_ID } from '@/lib/llm';
 import { fakeEmbedding } from './helpers/fake-embedding';
@@ -307,6 +307,24 @@ describe.skipIf(!HAS_DB)('K1 embeddings (live, fabrika_app) — refused rows (İ
     expect(r).toMatchObject({ rejected: 1, profilesEmbedded: 0 });
     expect((await profileState(T_A)).hash).toBe(REJECTED_HASH_PREFIX + embeddingHash(profileEmbeddingText({ capabilities: 'Κυψέλες καυσίμου υδρογόνου.', keywords: PROFILES[T_A]!.keywords })));
     // Leave the profile as the fixtures made it.
+    await admin.tenantProfile.update({ where: { tenantId: T_A }, data: { capabilities: PROFILES[T_A]!.capabilities } });
+  });
+
+  test('a refused request (every input, the probe too) marks no row, profile or topic, and stops the run (İNCELEME-85 Y-1)', async () => {
+    await admin.tenantProfile.update({ where: { tenantId: T_A }, data: { capabilities: 'Hydrogen storage for heavy-duty trucks.' } });
+    await admin.topic.update({ where: { id: LONG_TOPICS[3]! }, data: { description: 'Stations for trucks and buses.' } });
+    const before = { profile: await profileState(T_A), topics: await Promise.all(LONG_TOPICS.map(topicState)) };
+    const everyRequestRefused = vi.fn(async (_text: string): Promise<number[]> => {
+      throw new LlmProviderError('OpenAI embeddings error 400: {"error":{"message":"This model does not support specifying dimensions."}}', 400);
+    });
+    const r = await runK1Embeddings({ topicIds: LONG_TOPICS, tenantIds: [T_A], embed: everyRequestRefused, maxUsd: 1 });
+    expect(r).toMatchObject({ rejected: 0, requestRefused: true, aborted: true, profilesEmbedded: 0, topicsEmbedded: 0 });
+    // The profile goes first; its refusal is checked with the probe, which is refused too: two calls, then stop.
+    expect(everyRequestRefused.mock.calls.map((c) => c[0])).toEqual([profileEmbeddingText({ capabilities: 'Hydrogen storage for heavy-duty trucks.', keywords: PROFILES[T_A]!.keywords }), EMBEDDING_PROBE_TEXT]);
+    expect({ profile: await profileState(T_A), topics: await Promise.all(LONG_TOPICS.map(topicState)) }).toEqual(before);
+    // Once the provider takes the request again, both are embedded: nothing was locked.
+    const back = await runK1Embeddings({ topicIds: LONG_TOPICS, tenantIds: [T_A], embed: vi.fn(async (t: string) => fakeEmbedding(t)), maxUsd: 1 });
+    expect(back).toMatchObject({ profilesEmbedded: 1, topicsEmbedded: 1, requestRefused: false });
     await admin.tenantProfile.update({ where: { tenantId: T_A }, data: { capabilities: PROFILES[T_A]!.capabilities } });
   });
 });

@@ -38,7 +38,7 @@ function helpersFor(attempts = 1): JobHelpers {
 const result = (over: Record<string, unknown> = {}) => ({
   topicsScanned: 3, topicsEmbedded: 3, topicsUpToDate: 0, topicsEmpty: 0, profilesScanned: 1, profilesEmbedded: 1,
   profilesUpToDate: 0, profilesEmpty: 0, profilesPilotExpired: 0, rejected: 0, previouslyRejected: 0, shortened: 0, raced: 0, failed: 0, estimatedUsd: 0.0002,
-  maxUsd: 0.05, budgetExhausted: false, aborted: false, errors: [], durationMs: 5, ...over,
+  maxUsd: 0.05, budgetExhausted: false, aborted: false, requestRefused: false, errors: [], durationMs: 5, ...over,
 });
 const TICK = '2026-10-01T02:15:00.000Z';
 
@@ -85,6 +85,15 @@ describe('k1-embeddings job', () => {
     expect(alerts).toEqual([expect.objectContaining({ level: 'warn', dedupeKey: 'k1-embeddings:failed', meta: expect.objectContaining({ rejected: 2 }) })]);
     expect(String(alerts[0]!.message)).toContain('2 rows refused, now skipped');
     expect(infos.some((m) => m.includes('"rejected":2') && m.includes('"previouslyRejected":1') && m.includes('"shortened":1'))).toBe(true);
+  });
+
+  it('a refused request says so in the warn: no row was marked (İNCELEME-85 Y-1)', async () => {
+    runK1Embeddings.mockResolvedValue(result({ failed: 2, aborted: true, requestRefused: true }));
+    await k1EmbeddingsTask({}, helpersFor());
+    expect(alerts).toEqual([expect.objectContaining({ level: 'warn', dedupeKey: 'k1-embeddings:failed', meta: expect.objectContaining({ requestRefused: true }) })]);
+    expect(String(alerts[0]!.message)).toContain('refused the request itself');
+    expect(String(alerts[0]!.message)).not.toContain('rows refused');
+    expect(infos.some((m) => m.includes('"requestRefused":true') && m.includes('"success":false'))).toBe(true);
   });
 
   it('the cap is an info alert, and the run still counts as a success', async () => {
