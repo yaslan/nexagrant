@@ -1,0 +1,9 @@
+owner ws-a oluşturdu: cmuo7uoe7000flgxk3g6yevct
+önce  : o83-ws-a|G0|o83-owner
+restr (yalnız ws-b) move ws-a fırsatı G4 -> 1:{"success":true}
+restr assign ws-a fırsatı sahibi -> restr -> 1:{"success":true,"ownerId":"o83-restr","ownerName":"x"}
+sonra : o83-ws-a|G4|o83-restr
+restr move stage "G9" -> 1:{"success":true}
+restr move id NUL -> 1:{"success":true}
+restr assign ownerId {foo:1} -> 1:{"success":true,"ownerId":"$T0:0:ownerId","ownerName":"x"}
+son   : o83-ws-a|G4|o83-restr

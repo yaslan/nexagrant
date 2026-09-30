@@ -1,0 +1,19 @@
+47 ownerId başka kiracının kullanıcısı o83-t8u -> 1:{"success":true,"opportunity":{"id":"cmuo7tet0000blgxk7370eu0l","workspaceId":"o83-ws-b","title":"CSFB90-47","topicId":null,"intendedRole":"coordinator","ownerId":"o83-t8u","ownerName":"Sahte Ad","s
+48 intendedRole "Connection terminated" -> 1:{"success":true,"opportunity":{"id":"cmuo7teyj000clgxkn9jxzhl1","workspaceId":"o83-ws-b","title":"CSFB90-48","topicId":null,"intendedRole":"Connection terminated due to connection timeout","ownerId"
+49 stage G3 (kapı atlama) -> 1:{"success":true,"opportunity":{"id":"cmuo7tf2z000dlgxkmz5wjq5e","workspaceId":"o83-ws-b","title":"CSFB90-49","topicId":null,"intendedRole":"coordinator","ownerId":"o83-restr","ownerName":"Restr O83"
+50 nomem NUL -> 1:{"success":false,"error":"TENANT_SCOPE_REQUIRED"}
+51 none 'x\x00' -> 1:{"success":false,"error":"INVALID_INPUT"}
+51 none {'foo': 1} -> 1:{"success":false,"error":"INVALID_INPUT"}
+51 none 7 -> 1:{"success":false,"error":"INVALID_INPUT"}
+51 none 'default' -> 1:{"success":false,"error":"WORKSPACE_NOT_FOUND"}
+51 none 'kendi' -> 1:{"success":false,"error":"WORKSPACE_NOT_FOUND"}
+51 t5u 'x\x00' -> 1:{"success":false,"error":"INVALID_INPUT"}
+51 t5u {'foo': 1} -> 1:{"success":false,"error":"INVALID_INPUT"}
+51 t5u 7 -> 1:{"success":false,"error":"INVALID_INPUT"}
+51 t5u 'default' -> 1:{"success":false,"error":"WORKSPACE_NOT_FOUND"}
+51 t5u 'kendi' -> 1:{"success":false,"error":"WORKSPACE_NOT_FOUND"}
+51 t6u 'x\x00' -> 1:{"success":false,"error":"INVALID_INPUT"}
+51 t6u {'foo': 1} -> 1:{"success":false,"error":"INVALID_INPUT"}
+51 t6u 7 -> 1:{"success":false,"error":"INVALID_INPUT"}
+51 t6u 'default' -> 1:{"success":false,"error":"WORKSPACE_NOT_FOUND"}
+51 t6u 'kendi' -> 1:{"success":false,"error":"WORKSPACE_NOT_FOUND"}
