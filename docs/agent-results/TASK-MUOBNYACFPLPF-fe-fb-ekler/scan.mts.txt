@@ -1,0 +1,39 @@
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { join, dirname, resolve, relative } from 'node:path';
+import { actionReturnLeaks, hasUseServerDirective } from '../tests/api/action-leak-scan.ts';
+const root = resolve('.');
+const walk = (d: string): string[] => readdirSync(d).flatMap((n) => { const f = join(d, n); return statSync(f).isDirectory() ? walk(f) : /\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n) ? [f] : []; });
+const files = walk('src');
+const src = new Map(files.map((f) => [f, readFileSync(f, 'utf8')]));
+const resolveSpec = (from: string, spec: string): string | null => {
+  let base: string;
+  if (spec.startsWith('@/')) base = join('src', spec.slice(2));
+  else if (spec.startsWith('.')) base = relative(root, resolve(dirname(from), spec));
+  else return null;
+  for (const c of [base + '.ts', base + '.tsx', join(base, 'index.ts'), join(base, 'index.tsx'), base]) if (src.has(c)) return c;
+  return null;
+};
+// imports: file -> [{spec target, names}]
+const imps = new Map<string, { to: string; names: string[] }[]>();
+const re = /import\s+(type\s+)?([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g;
+for (const [f, s] of src) {
+  const out: { to: string; names: string[] }[] = [];
+  for (const m of s.matchAll(re)) { if (m[1]) continue; const to = resolveSpec(f, m[3]); if (!to) continue;
+    const names = [...m[2].matchAll(/([A-Za-z_$][\w$]*)(?:\s+as\s+[\w$]+)?/g)].map((x) => x[1]).filter((n) => n !== 'type');
+    out.push({ to, names }); }
+  imps.set(f, out);
+}
+const flagged = new Map<string, number[]>();
+for (const [f, s] of src) if (!hasUseServerDirective(s, f)) { const l = actionReturnLeaks(s, f); if (l.length) flagged.set(f, l); }
+const actions = [...src.keys()].filter((f) => hasUseServerDirective(src.get(f)!, f));
+console.log(`actionFiles=${actions.length} flaggedNonAction=${flagged.size}`);
+for (const a of actions) {
+  // BFS over imports, depth <= 3, record path
+  const seen = new Map<string, string[]>([[a, [a]]]); const q = [a];
+  while (q.length) { const f = q.shift()!; const p = seen.get(f)!; if (p.length > 4) continue;
+    for (const { to } of imps.get(f) ?? []) if (!seen.has(to) && !hasUseServerDirective(src.get(to)!, to)) { seen.set(to, [...p, to]); q.push(to); } }
+  for (const [f, p] of seen) if (flagged.has(f) && !/\.tsx$/.test(f)) {
+    const direct = (imps.get(a) ?? []).filter((x) => x.to === p[1]).flatMap((x) => x.names);
+    console.log(`${a}\n   -> ${p.slice(1).join(' -> ')}  lines ${JSON.stringify(flagged.get(f))}  [action imports from hop1: ${direct.join(',')}]`);
+  }
+}

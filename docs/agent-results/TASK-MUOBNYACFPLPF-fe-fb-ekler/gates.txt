@@ -1,0 +1,11 @@
+DATABASE_URL=DATABASE_URL=postgresql://fabrika:***@localhost:55777/fabrika
+GATE tsc=0
+GATE lint=0
+GATE i18n=0
+
+ƒ  (Dynamic)  server-rendered on demand
+
+GATE build=0
+ Test Files  297 passed | 2 skipped (299)
+      Tests  3832 passed | 50 skipped (3882)
+GATE vitest=0
