@@ -1,0 +1,12 @@
+{
+	local_certs
+	on_demand_tls {
+		ask http://host.docker.internal:9123/check
+	}
+}
+https:// {
+	tls {
+		on_demand
+	}
+	respond "host={host}" 200
+}

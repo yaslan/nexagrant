@@ -1,0 +1,113 @@
+// se-fb TASK-MUOAYGYXW8PHI — ölçüm + kare (next start, çerezle oturum). Commit'lenmez.
+import { chromium, type Page } from '@playwright/test';
+import { encode } from 'next-auth/jwt';
+import { mkdirSync } from 'node:fs';
+import { longContentFixture, plant, remove, stretchTexts } from '../tests/e2e/fixtures/mobile-long-content';
+import { prisma } from '../src/lib/db';
+import { DEFAULT_SCORING_WEIGHTS } from '../src/lib/scoring/defaults';
+
+const [port, label, out] = process.argv.slice(2);
+const BASE = `http://localhost:${port}`;
+mkdirSync(`${out}/kareler`, { recursive: true });
+const WIDTHS = [320, 360, 390, 472, 640, 768, 1024, 1280];
+const SHOT_W = [320, 390];
+const L = longContentFixture('olcum-' + label);
+await remove(L);
+await plant(L);
+const token = await encode({ token: { sub: 'demo-user-superadmin', id: 'demo-user-superadmin', name: 'Y', email: 'admin@yasinaslan.com.tr', tenantId: 'demo-tenant', role: 'TENANT_OWNER' }, secret: process.env.AUTH_SECRET!, salt: 'authjs.session-token', maxAge: 3600 });
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+
+async function culprit(p: Page) {
+  return p.evaluate(() => {
+    const main = document.querySelector('main')!; const mr = main.getBoundingClientRect(); const out: string[] = [];
+    for (const el of main.querySelectorAll<HTMLElement>('*')) {
+      const rr = el.getBoundingClientRect(); const over = rr.right - mr.right; if (over <= 0.5) continue;
+      let inner = false; for (let e = el.parentElement; e && e !== main; e = e.parentElement) if (getComputedStyle(e).overflowX !== 'visible') { inner = true; break; }
+      if (inner) continue;
+      const par = el.parentElement!; if (par !== main && par.getBoundingClientRect().right - mr.right >= over - 0.5) continue;
+      out.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 60)} +${Math.round(over)}`);
+    }
+    return out.slice(0, 2).join(' | ');
+  });
+}
+async function measure(p: Page, name: string, shots = true) {
+  for (const w of WIDTHS) {
+    await p.setViewportSize({ width: w, height: 800 }); await p.waitForTimeout(250);
+    const r = await p.evaluate(() => { const m = document.querySelector('main')!; return { sw: m.scrollWidth, cw: m.clientWidth, dsw: document.documentElement.scrollWidth, iw: innerWidth }; });
+    const over = r.sw - r.cw;
+    console.log(`${label} ${name.padEnd(26)} ${String(w).padStart(4)} main.scrollWidth=${r.sw} main.clientWidth=${r.cw} ${r.sw === r.cw ? 'EŞİT' : 'TAŞMA +' + over} doc=${r.dsw}/${r.iw}${over ? '  <- ' + (await culprit(p)) : ''}`);
+    if (shots && SHOT_W.includes(w)) await p.screenshot({ path: `${out}/kareler/${label}-${name.replace(/[^a-z0-9]+/gi, '_')}-${w}.png` });
+  }
+}
+async function page(route: string) {
+  const ctx = await browser.newContext({ viewport: { width: 320, height: 800 }, reducedMotion: 'reduce' });
+  await ctx.addCookies([{ name: 'authjs.session-token', value: token, url: BASE }]);
+  await ctx.addInitScript(() => { try { localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: false, marketing: false })); } catch {} });
+  const p = await ctx.newPage();
+  const res = await p.goto(BASE + route);
+  if (res?.status() !== 200) throw new Error(`${route} -> ${res?.status()}`);
+  await p.locator('main h1, main h2').first().waitFor({ timeout: 30000 });
+  await p.waitForFunction(() => { const b = document.querySelector('main button'); return !b || Object.keys(b).some((k) => k.startsWith('__reactProps$')); });
+  return { ctx, p };
+}
+try {
+  {
+    const { ctx, p } = await page('/tr/fabrika-beta/approvals');
+    await p.getByRole('heading', { name: L.requestTitle }).waitFor();
+    await measure(p, 'approvals-onayimi-bekleyen');
+    await p.setViewportSize({ width: 320, height: 800 });
+    await p.getByRole('button', { name: /Taleplerim/ }).click(); await p.waitForTimeout(300);
+    await measure(p, 'approvals-taleplerim');
+    for (const w of [320, 390]) {
+      await p.setViewportSize({ width: w, height: 800 }); await p.waitForTimeout(200);
+      await p.getByRole('button', { name: /Detay/ }).first().click(); await p.waitForTimeout(300);
+      const x = await p.getByRole('button', { name: '×' }).boundingBox();
+      const panel = await p.getByRole('button', { name: '×' }).evaluate((b) => { let e: HTMLElement | null = b as HTMLElement; while (e && !String(e.className).includes('max-w-lg')) e = e.parentElement; const r = e!.getBoundingClientRect(); return `panel ${Math.round(r.left)}..${Math.round(r.right)}`; });
+      console.log(`${label} approvals-detay-modal       ${w} × right=${Math.round(x!.x + x!.width)} iw=${w} ${x!.x + x!.width <= w ? 'görünür' : 'EKRAN DIŞI'} ${panel}`);
+      await p.screenshot({ path: `${out}/kareler/${label}-approvals_detay_modal-${w}.png` });
+      await p.getByRole('button', { name: '×' }).evaluate((b) => (b as HTMLElement).click()); // ÖNCE'de × ekran dışı: DOM click
+      await p.waitForTimeout(200);
+    }
+    await ctx.close();
+  }
+  {
+    const { ctx, p } = await page(`/tr/fabrika-beta/firsatlar/${L.opportunityId}`);
+    await measure(p, 'firsat-detay-uzun-baslik');
+    const heading = p.locator('main h1').locator('..'); const actions = p.getByTestId('pipeline-evaluate-gate').locator('..');
+    for (const w of [640, 768, 1024, 1280]) {
+      await p.setViewportSize({ width: w, height: 800 }); await p.waitForTimeout(200);
+      const [a, h] = [await actions.boundingBox(), await heading.boundingBox()];
+      console.log(`${label} firsat-aksiyon-konumu       ${w} başlık=${Math.round(h!.width)}px geniş, aksiyonlar ${a!.y >= h!.y + h!.height - 1 ? 'ALTINDA' : 'YANINDA'}`);
+    }
+    await ctx.close();
+  }
+  {
+    const { ctx, p } = await page('/tr/fabrika-beta/firsatlar/demo-opp-1');
+    await measure(p, 'firsat-detay-seed', false);
+    await ctx.close();
+  }
+  {
+    const { ctx, p } = await page('/tr/fabrika-beta/settings/gates');
+    const n = await stretchTexts(p, Object.keys(DEFAULT_SCORING_WEIGHTS), 'AcrossEveryConsortiumPartnerAndWorkPackage');
+    console.log(`${label} gates: ${n} ağırlık adı uzatıldı`);
+    await measure(p, 'gates-uzatilmis-ad', false);
+    await ctx.close();
+  }
+  {
+    const { ctx, p } = await page('/tr/admin/cordis');
+    const first = p.getByRole('button', { name: /K2 Ingestion/ }); const strip = first.locator('..'); const tabs = strip.getByRole('button');
+    await first.focus(); const res: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      if (i) await p.keyboard.press('Tab'); await p.waitForTimeout(150);
+      const [t, s] = [await tabs.nth(i).boundingBox(), await strip.boundingBox()];
+      const ok = t!.x >= s!.x - 1 && t!.x + t!.width <= s!.x + s!.width + 1;
+      res.push(`${(await tabs.nth(i).innerText()).slice(0, 14)} r=${Math.round(t!.x + t!.width)}/${Math.round(s!.x + s!.width)} ${ok ? 'tam' : 'YARIM'}`);
+    }
+    console.log(`${label} cordis Tab 320: ${res.join(' | ')}`);
+    await ctx.close();
+  }
+} finally {
+  await browser.close();
+  console.log(`${label} fixture silindi: ${await remove(L)}`);
+  await prisma.$disconnect();
+}

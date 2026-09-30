@@ -1,6 +1,17 @@
-import { test, expect, type Browser } from '@playwright/test';
+import { test, expect, type Browser, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { DEFAULT_SCORING_WEIGHTS } from '../../src/lib/scoring/defaults';
+import { expectHydrated } from './fixtures/hydration';
+import {
+  fitsHorizontally,
+  isBelow,
+  longContentFixture,
+  mainOverflow,
+  plant,
+  remove,
+  stretchTexts,
+} from './fixtures/mobile-long-content';
 
 /**
  * TASK-MUNZ06XM2OIL2 — nothing inside the shell's <main> may be wider than
@@ -54,16 +65,29 @@ async function signIn(browser: Browser) {
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('no sideways scroll inside <main> on a phone', () => {
-  test.beforeAll(async ({ browser }) => {
-    if (!(await prisma.user.findFirst({ where: { email: ADMIN_EMAIL } }))) {
-      skipReason = `no platform admin ${ADMIN_EMAIL} in this database (run pnpm db:seed)`;
-    } else {
-      await signIn(browser);
-    }
-    await prisma.$disconnect();
-  });
+// TASK-MUOAYGYXW8PHI: the seed has only short text, so the routes above stayed
+// green while a link pasted into an approval request or an opportunity title
+// still pushed <main> sideways (İNCELEME-96 Y-1/Y-2). The file plants that
+// content once and the second describe reads it.
+const LONG = longContentFixture(Date.now().toString(36));
+let planted = false;
 
+test.beforeAll(async ({ browser }) => {
+  if (!(await prisma.user.findFirst({ where: { email: ADMIN_EMAIL } }))) {
+    skipReason = `no platform admin ${ADMIN_EMAIL} in this database (run pnpm db:seed)`;
+    return;
+  }
+  await plant(LONG);
+  planted = true;
+  await signIn(browser);
+});
+
+test.afterAll(async () => {
+  if (planted) expect(await remove(LONG), 'every planted row must be removed').toBe(3);
+  await prisma.$disconnect();
+});
+
+test.describe('no sideways scroll inside <main> on a phone', () => {
   for (const route of ROUTES) {
     test(route, async ({ browser }) => {
       test.skip(skipReason !== '', skipReason);
@@ -79,10 +103,123 @@ test.describe('no sideways scroll inside <main> on a phone', () => {
       for (const width of WIDTHS) {
         await page.setViewportSize({ width, height: 800 });
         await page.waitForTimeout(200);
-        const over = await main.evaluate((el) => el.scrollWidth - el.clientWidth);
+        const over = await mainOverflow(page);
         expect(over, `${route} at ${width}px: <main>.scrollWidth − clientWidth`).toBe(0);
       }
       await ctx.close();
     });
   }
+});
+
+// Phones plus the tablet and desktop widths: the approvals action row was
+// also over at 768 (İNCELEME-96 Y-1), and the long title is where the
+// opportunity header's min-w-0 does its work (640 and up).
+const LONG_WIDTHS = [...WIDTHS, 768, 1024, 1280];
+
+async function openAt(browser: Browser, route: string, width: number) {
+  const ctx = await browser.newContext({ storageState, viewport: { width, height: 800 } });
+  const page = await ctx.newPage();
+  const response = await page.goto(route);
+  expect(response?.status(), `${route} must render, not redirect to a lock or 404`).toBe(200);
+  return { ctx, page };
+}
+
+async function expectNoOverflowAcross(page: Page, label: string) {
+  for (const width of LONG_WIDTHS) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.waitForTimeout(200);
+    expect(await mainOverflow(page), `${label} at ${width}px: <main>.scrollWidth − clientWidth`).toBe(0);
+  }
+}
+
+test.describe('long real-world content stays inside <main>', () => {
+  test('approvals: a link pasted into the title and description', async ({ browser }) => {
+    test.skip(skipReason !== '', skipReason);
+    const { ctx, page } = await openAt(browser, '/tr/fabrika-beta/approvals', 320);
+    const main = page.locator('main');
+
+    // Default tab: someone else's request, with the approve/reject buttons.
+    await expect(main.getByRole('heading', { name: LONG.requestTitle })).toBeVisible({ timeout: 30_000 });
+    await expectNoOverflowAcross(page, 'approvals / actionable');
+
+    // "My requests": the request this admin raised, with the withdraw button.
+    await page.setViewportSize({ width: 320, height: 800 });
+    const mine = main.getByRole('button', { name: /Taleplerim/ });
+    await expectHydrated(mine);
+    await mine.click();
+    await expect(main.getByRole('heading', { name: LONG.requestTitle })).toHaveCount(1);
+    await expectNoOverflowAcross(page, 'approvals / my requests');
+
+    // Detail modal at the narrowest width: the long title must not push the
+    // close button off the screen.
+    await page.setViewportSize({ width: 320, height: 800 });
+    await main.getByRole('button', { name: /Detay/ }).first().click();
+    const close = page.getByRole('button', { name: '×' });
+    await expect(close).toBeVisible();
+    const box = await close.boundingBox();
+    expect(box && box.x + box.width, 'detail modal × at 320px: right edge').toBeLessThanOrEqual(320);
+    // …and the title wraps inside its own box instead of running under the ×.
+    const modalTitle = page.getByRole('heading', { name: LONG.requestTitle }).last();
+    expect(await modalTitle.evaluate((el) => el.scrollWidth - el.clientWidth), 'detail modal title at 320px').toBe(0);
+    await ctx.close();
+  });
+
+  test('opportunity detail: a link pasted into the title', async ({ browser }) => {
+    test.skip(skipReason !== '', skipReason);
+    const { ctx, page } = await openAt(browser, `/tr/fabrika-beta/firsatlar/${LONG.opportunityId}`, 320);
+    const title = page.locator('main h1', { hasText: LONG.opportunityTitle });
+    await expect(title).toBeVisible({ timeout: 30_000 });
+    await expectNoOverflowAcross(page, 'opportunity detail');
+
+    // A title too long for one line puts the actions under it between sm and
+    // lg (sm:flex-wrap), and beside it from lg on (lg:flex-nowrap). Without the
+    // wrap the actions keep their width and squeeze the title into a sliver.
+    const heading = title.locator('..');
+    const actions = page.getByTestId('pipeline-evaluate-gate').locator('..');
+    for (const [width, below] of [[640, true], [768, true], [1024, false], [1280, false]] as const) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.waitForTimeout(200);
+      expect(await isBelow(actions, heading), `opportunity actions at ${width}px below the title`).toBe(below);
+    }
+    await ctx.close();
+  });
+
+  test('gate settings: a longer weight name than today’s', async ({ browser }) => {
+    test.skip(skipReason !== '', skipReason);
+    const { ctx, page } = await openAt(browser, '/tr/fabrika-beta/settings/gates', 320);
+    // Hydrated first: hydration would put the original text back.
+    await expectHydrated(page.locator('main form button[type="submit"]'));
+    // The names are code constants, so there is no row to plant: stretch them
+    // in place. 42 more characters with no break opportunity.
+    const keys = Object.keys(DEFAULT_SCORING_WEIGHTS);
+    const suffix = 'AcrossEveryConsortiumPartnerAndWorkPackage';
+    const stretched = await stretchTexts(page, keys, suffix);
+    expect(stretched, 'every weight name was found and stretched').toBe(keys.length);
+    await expectNoOverflowAcross(page, 'gate settings');
+    await expect(page.locator('main span', { hasText: suffix }), 'the stretched names are still on the page').toHaveCount(keys.length);
+    await ctx.close();
+  });
+
+  test('cordis tabs: every tab reached with the keyboard is fully visible', async ({ browser }) => {
+    test.skip(skipReason !== '', skipReason);
+    const { ctx, page } = await openAt(browser, '/tr/admin/cordis', 320);
+    const first = page.getByRole('button', { name: /K2 Ingestion/ });
+    await expectHydrated(first);
+    const strip = first.locator('..');
+    const tabs = strip.getByRole('button');
+    const count = await tabs.count();
+    expect(count, 'the strip holds the four tabs').toBe(4);
+
+    // Chrome does not scroll a half-visible element into view on Tab; the
+    // strip's onFocus does. Real key presses, not focus() calls.
+    await first.focus();
+    for (let i = 0; i < count; i++) {
+      if (i > 0) await page.keyboard.press('Tab');
+      const tab = tabs.nth(i);
+      await expect(tab).toBeFocused();
+      await page.waitForTimeout(100);
+      expect(await fitsHorizontally(tab, strip), `cordis tab ${i + 1} fully inside the strip at 320px`).toBe(true);
+    }
+    await ctx.close();
+  });
 });
