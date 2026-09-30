@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
@@ -49,6 +50,8 @@ const state = vi.hoisted(() => {
   return {
     proxyPort,
     rls: undefined as PrismaClient | undefined,
+    /** Confirm's own pool, built as src/lib/db.ts builds it (LOCK_POOL_OPTIONS). */
+    rlsLock: undefined as PrismaClient | undefined,
     session: null as null | { user: { id: string }; tenantId: string; role: string },
     fault: 'pass' as Fault,
     copied: false,
@@ -56,8 +59,14 @@ const state = vi.hoisted(() => {
     beforeCopy: null as null | (() => Promise<void>),
     /** Makes one evidence call inside confirm's transaction fail, as a database error would. */
     dbFault: null as null | 'findFirst' | 'create',
+    /** Holds confirm's process (not the database) around its "already recorded?" read. */
+    dbPause: null as null | { before?: number; after?: number; afterLock?: number },
+    /** Makes the database itself slow on confirm's "already recorded?" read (pg_sleep, seconds). */
+    dbSleep: 0,
+    /** The limits confirm's transaction ran its row save under. */
+    seenLimits: null as null | Record<string, string>,
     /** Runs before the proxy forwards any request; may hold it. */
-    hook: null as null | ((r: { method: string; path: string; isCopy: boolean }) => Promise<void>),
+    hook: null as null | ((r: { method: string; path: string; isCopy: boolean; gone: Promise<void> }) => Promise<void>),
     requests: [] as string[],
   };
 });
@@ -66,17 +75,50 @@ vi.mock('@/lib/auth', () => ({ auth: async () => state.session }));
 vi.mock('@/lib/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/db')>();
   // Only the named `evidence` call fails: everything else runs as usual.
+  // `dbPause` / `dbSleep` slow the "already recorded?" read down; the row
+  // save records the transaction's limits.
+  type Raw = { $queryRaw: <R>(q: TemplateStringsArray, ...v: unknown[]) => Promise<R> };
+  const pause = (ms?: number) => (ms ? new Promise((res) => setTimeout(res, ms)) : undefined);
   const failing = <T extends object>(tx: T): T =>
     new Proxy(tx, {
       get(target, prop, receiver) {
         const value = Reflect.get(target, prop, receiver);
-        if (prop !== 'evidence' || !state.dbFault) return value;
+        if (prop === '$executeRaw') {
+          return async (strings: TemplateStringsArray, ...values: unknown[]) => {
+            const done = await (value as (s: TemplateStringsArray, ...v: unknown[]) => Promise<number>).call(target, strings, ...values);
+            if (strings.join('').includes('pg_advisory_xact_lock')) await pause(state.dbPause?.afterLock);
+            return done;
+          };
+        }
+        if (prop !== 'evidence') return value;
         return new Proxy(value as object, {
           get(d, m, r) {
-            if (m !== state.dbFault) return Reflect.get(d, m, r);
-            return async () => {
-              throw new Error(`injected: evidence.${String(m)} failed`);
-            };
+            const real = Reflect.get(d, m, r) as (...a: unknown[]) => Promise<unknown>;
+            if (m === state.dbFault) {
+              return async () => {
+                throw new Error(`injected: evidence.${String(m)} failed`);
+              };
+            }
+            if (m === 'findFirst') {
+              return async (...a: unknown[]) => {
+                await pause(state.dbPause?.before);
+                if (state.dbSleep) await (target as unknown as Raw).$queryRaw`SELECT pg_sleep(${state.dbSleep})::text`;
+                const found = await real.apply(d, a);
+                await pause(state.dbPause?.after);
+                return found;
+              };
+            }
+            if (m === 'create') {
+              return async (...a: unknown[]) => {
+                const [limits] = await (target as unknown as Raw).$queryRaw<Record<string, string>[]>`
+                  SELECT current_setting('lock_timeout') AS lock_timeout,
+                         current_setting('statement_timeout') AS statement_timeout,
+                         current_setting('idle_in_transaction_session_timeout') AS idle_in_transaction_session_timeout`;
+                state.seenLimits = limits ?? null;
+                return real.apply(d, a);
+              };
+            }
+            return typeof real === 'function' ? real.bind(d) : real;
           },
         });
       },
@@ -85,11 +127,14 @@ vi.mock('@/lib/db', async (importOriginal) => {
     ...actual,
     withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1], opts?: Parameters<typeof actual.withTenant>[2]) =>
       actual.withTenantOn(state.rls!, tenantId, (tx) => cb(failing(tx)), opts),
+    // Confirm's own pool: a client of its own, with the production pool options.
+    withTenantLockPool: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1], opts?: Parameters<typeof actual.withTenant>[2]) =>
+      actual.withTenantOn(state.rlsLock!, tenantId, (tx) => cb(failing(tx)), { maxWait: actual.LOCK_POOL_QUEUE_MS, ...opts }),
   };
 });
 vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
 
-const { createDbClient } = await import('@/lib/db');
+const { createDbClient, withTenantOn, LOCK_POOL_MAX, LOCK_POOL_NAME, LOCK_POOL_OPTIONS } = await import('@/lib/db');
 const evidence = await import('@/app/[locale]/(app)/[workspace]/evidence/actions');
 const storage = await import('@/lib/storage');
 
@@ -97,7 +142,8 @@ let admin: PrismaClient | undefined;
 let proxy: http.Server | undefined;
 let ready = false;
 let skipReason = '';
-const t = { a: '', userA: '' };
+const t = { a: '', b: '', userA: '' };
+const LOCK_POOL_RUN = `${LOCK_POOL_NAME}-${RUN}`;
 const evidenceIds: string[] = [];
 const keys: string[] = [];
 
@@ -151,6 +197,8 @@ async function expectNothingLost(up: Awaited<ReturnType<typeof uploaded>>, res: 
 async function expectRetrySucceeds(up: Awaited<ReturnType<typeof uploaded>>) {
   state.fault = 'pass';
   state.dbFault = null;
+  state.dbPause = null;
+  state.dbSleep = 0;
   state.hook = null;
   const res = await confirm(up.objectKey);
   expect(res.success).toBe(true);
@@ -190,7 +238,11 @@ beforeAll(async () => {
       state.beforeCopy = null;
       await hook();
     }
-    if (state.hook) await state.hook({ method: req.method ?? '', path: (req.url ?? '').split('?')[0] ?? '', isCopy });
+    if (state.hook) {
+      // Settles when the client gives up on the request (or it is answered).
+      const gone = new Promise<void>((resolve) => res.once('close', () => resolve()));
+      await state.hook({ method: req.method ?? '', path: (req.url ?? '').split('?')[0] ?? '', isCopy, gone });
+    }
     // A client that gave up while the request was held is not forwarded.
     if (req.socket.destroyed) return;
     const up = http.request(
@@ -212,6 +264,8 @@ beforeAll(async () => {
   });
 
   state.rls = createDbClient(rlsUrl);
+  // Production's options under a name of this run, so other suites' lock pools are not counted.
+  state.rlsLock = createDbClient(rlsUrl, { ...LOCK_POOL_OPTIONS, application_name: LOCK_POOL_RUN });
   admin = createDbClient(ADMIN_URL);
   try {
     await state.rls.$connect();
@@ -228,6 +282,12 @@ beforeAll(async () => {
     select: { id: true },
   });
   t.a = tenant.id;
+  t.b = (
+    await admin.tenant.create({
+      data: { name: `${RUN} Diger Kurum`, slug: `${RUN}-b`, country: 'TR', kind: 'ORGANIZATION' },
+      select: { id: true },
+    })
+  ).id;
   t.userA = (await admin.user.create({ data: { email: `${RUN}@example.invalid`, name: 'a' } })).id;
   ready = true;
 });
@@ -239,6 +299,9 @@ beforeEach(({ skip }) => {
   state.copied = false;
   state.beforeCopy = null;
   state.dbFault = null;
+  state.dbPause = null;
+  state.dbSleep = 0;
+  state.seenLimits = null;
   state.hook = null;
   state.requests = [];
 });
@@ -248,7 +311,7 @@ afterAll(async () => {
   for (const key of keys) await storage.deleteObjectBytes(key).catch(() => {});
   if (admin) {
     await admin.evidence.deleteMany({ where: { id: { in: presentIds(evidenceIds) } } }).catch(() => {});
-    for (const tenantId of presentIds([t.a])) {
+    for (const tenantId of presentIds([t.a, t.b])) {
       await admin.evidence.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } }).catch(() => {});
       await admin.tenant.delete({ where: { id: tenantId } }).catch(() => {});
     }
@@ -256,6 +319,7 @@ afterAll(async () => {
     await admin.$disconnect();
   }
   await state.rls?.$disconnect();
+  await state.rlsLock?.$disconnect();
   await new Promise((resolve) => (proxy ? proxy.close(resolve) : resolve(undefined)));
 });
 
@@ -424,6 +488,8 @@ describe('Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one ke
 
     expect(res2).toEqual({ success: false, error: 'save_failed' });
     expect(secondTook, `the second confirm answered after ${secondTook} ms`).toBeLessThan(11_000);
+    // The whole lock_timeout, not the shorter statement_timeout (TASK-MUO9IFMMVRUDJ).
+    expect(secondTook).toBeGreaterThanOrEqual(9_000);
     expect(first.success, JSON.stringify(first)).toBe(true);
     const rows = await rowsOf(up.finalKey);
     evidenceIds.push(...rows.map((r) => r.id));
@@ -446,5 +512,243 @@ describe('Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one ke
     expect(state.requests.filter((r) => r.startsWith('PUT(copy)'))).toHaveLength(1);
     expect((await stored(up.finalKey))?.equals(up.body)).toBe(true);
     expect(await stored(up.objectKey)).toBeNull();
+  }, 60_000);
+});
+
+describe('İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else', () => {
+  /** Same derivation as confirmLockKey in evidence/actions.ts. */
+  const lockKeyOf = (finalKey: string) =>
+    createHash('sha256').update(`evidence-confirm:${finalKey}`).digest().readBigInt64BE(0);
+  const lockHeld = async (finalKey: string) =>
+    Number(
+      (
+        await admin!.$queryRaw<{ n: bigint }[]>`
+          SELECT count(*)::bigint AS n FROM pg_locks
+          WHERE locktype = 'advisory' AND granted AND ((classid::bigint << 32) | objid::bigint) = ${lockKeyOf(finalKey)}`
+      )[0]?.n ?? 0
+    );
+  const lockPoolConnections = async () =>
+    Number(
+      (
+        await admin!.$queryRaw<{ n: bigint }[]>`
+          SELECT count(*)::bigint AS n FROM pg_stat_activity WHERE application_name = ${LOCK_POOL_RUN}`
+      )[0]?.n ?? 0
+    );
+  /** Watches the lock every 100 ms until `until` settles; the time it was first seen gone, or null if it was held throughout. */
+  const watchLock = (finalKey: string, until: Promise<unknown>) => {
+    let done = false;
+    void until.finally(() => (done = true));
+    return (async () => {
+      while (!done) {
+        if ((await lockHeld(finalKey)) === 0) return Date.now();
+        await sleep(100);
+      }
+      return null;
+    })();
+  };
+
+  test('B-1: ten confirms held by a slow store do not take the application pool — another tenant’s queries run as usual', async () => {
+    const ups = await Promise.all(Array.from({ length: 10 }, (_, i) => uploaded(`havuz-${i}`)));
+    state.hook = async ({ isCopy }) => {
+      if (isCopy) await sleep(8_000);
+    };
+    const all = ups.map((u) => confirm(u.objectKey));
+    await sleep(1_500);
+
+    const probes: { ok: boolean; ms: number }[] = [];
+    let peakLockConnections = 0;
+    for (let i = 0; i < 4; i += 1) {
+      const t0 = Date.now();
+      // Tenant B, on the application pool — the same 10-connection pg.Pool as src/lib/db.ts.
+      const ok = await withTenantOn(state.rls!, t.b, (tx) => tx.evidence.count())
+        .then(() => true)
+        .catch(() => false);
+      probes.push({ ok, ms: Date.now() - t0 });
+      peakLockConnections = Math.max(peakLockConnections, await lockPoolConnections());
+      await sleep(1_000);
+    }
+    const res = await Promise.all(all);
+    state.hook = null;
+    for (const u of ups) evidenceIds.push(...(await rowsOf(u.finalKey)).map((r) => r.id));
+    console.info(
+      `[B-1] confirms=${res.map((r) => (r.success ? 'ok' : r.error)).join(',')} probes=${probes.map((p) => `${p.ok ? 'ok' : 'FAIL'} ${p.ms}ms`).join(' | ')} lockPoolConnections(peak)=${peakLockConnections}`
+    );
+
+    for (const p of probes) {
+      expect(p.ok, 'tenant B’s query got a connection').toBe(true);
+      expect(p.ms).toBeLessThan(500);
+    }
+    expect(peakLockConnections).toBeGreaterThan(0);
+    expect(peakLockConnections).toBeLessThanOrEqual(LOCK_POOL_MAX);
+    // The pool holds LOCK_POOL_MAX confirms; the rest waited their turn or gave up — retryably, nothing lost.
+    const saved = res.filter((r) => r.success);
+    expect(saved.length).toBeGreaterThanOrEqual(LOCK_POOL_MAX);
+    for (const [i, r] of res.entries()) {
+      if (r.success) continue;
+      await expectNothingLost(ups[i]!, r, 'save_failed');
+      await expectRetrySucceeds(ups[i]!);
+    }
+  }, 120_000);
+
+  test('T-4: two uploads of one tenant do not wait for each other', async () => {
+    const [slow, fast] = await Promise.all([uploaded('t4-yavas'), uploaded('t4-hizli')]);
+    let fastTook = 0;
+    let fastRes: Awaited<ReturnType<typeof confirm>> | undefined;
+    state.hook = async ({ isCopy, path }) => {
+      if (!isCopy || !path.endsWith(`/${slow.finalKey}`)) return;
+      const t0 = Date.now();
+      fastRes = await confirm(fast.objectKey);
+      fastTook = Date.now() - t0;
+      await sleep(Math.max(0, 6_000 - fastTook));
+    };
+    const slowRes = await confirm(slow.objectKey);
+    state.hook = null;
+    evidenceIds.push(...(await rowsOf(slow.finalKey)).map((r) => r.id), ...(await rowsOf(fast.finalKey)).map((r) => r.id));
+    expect(slowRes.success).toBe(true);
+    expect(fastRes?.success, JSON.stringify(fastRes)).toBe(true);
+    expect(fastTook, `the second upload answered after ${fastTook} ms`).toBeLessThan(2_000);
+  }, 60_000);
+
+  test('T-3: the limits are set inside confirm’s transaction and never left on a pooled connection', async () => {
+    const ups = await Promise.all(Array.from({ length: LOCK_POOL_MAX }, (_, i) => uploaded(`t3-${i}`)));
+    const res = await Promise.all(ups.map((u) => confirm(u.objectKey)));
+    for (const u of ups) evidenceIds.push(...(await rowsOf(u.finalKey)).map((r) => r.id));
+    expect(res.every((r) => r.success)).toBe(true);
+    expect(state.seenLimits).toEqual({
+      lock_timeout: '10s',
+      statement_timeout: '5s',
+      idle_in_transaction_session_timeout: '20s',
+    });
+
+    // Every connection of the pool at once (pg_sleep keeps each one busy), outside any transaction.
+    const after = await Promise.all(
+      Array.from({ length: LOCK_POOL_MAX }, () =>
+        state.rlsLock!.$queryRaw<{ pid: number; l: string; s: string; i: string }[]>`
+          SELECT pg_backend_pid() AS pid, current_setting('lock_timeout') AS l, current_setting('statement_timeout') AS s,
+                 current_setting('idle_in_transaction_session_timeout') AS i, pg_sleep(0.3)::text AS z`
+      )
+    );
+    expect(new Set(after.map((r) => r[0]!.pid)).size).toBe(LOCK_POOL_MAX);
+    for (const r of after) expect({ l: r[0]!.l, s: r[0]!.s, i: r[0]!.i }).toEqual({ l: '0', s: '0', i: '0' });
+  }, 60_000);
+
+  test('Y-2: a process that freezes inside confirm’s transaction loses the lock after 20 s, not hours; the retry succeeds', async () => {
+    const up = await uploaded('donan');
+    // The process stops between the lock and its next statement: the connection sits idle in the transaction.
+    state.dbPause = { before: 24_000 };
+    const started = Date.now();
+    const running = confirm(up.objectKey);
+    await sleep(1_000);
+    expect(await lockHeld(up.finalKey), 'the frozen confirm holds the lock').toBe(1);
+    const releasedAt = await watchLock(up.finalKey, running);
+    const res = await running;
+    const releasedAfter = releasedAt === null ? null : releasedAt - started;
+    console.info(`[Y-2] lock released after ${releasedAfter} ms; confirm=${JSON.stringify(res)}`);
+
+    expect(releasedAfter, 'released by idle_in_transaction_session_timeout').not.toBeNull();
+    expect(releasedAfter!).toBeGreaterThanOrEqual(19_000);
+    expect(releasedAfter!).toBeLessThan(23_000);
+    await expectNothingLost(up, res, 'save_failed');
+    expect(state.requests.some((r) => r.startsWith('PUT(copy)'))).toBe(false);
+    // The pool dropped the closed connection: the next confirm gets a working one.
+    await expectRetrySucceeds(up);
+  }, 90_000);
+
+  test('Y-3: the copy ends before a connection idle through it could be closed — the lock is never gone while the copy runs', async () => {
+    const up = await uploaded('idle-pay');
+    // 12 s pass after the read: 20 − 12 − 2 leaves the copy about 6 s, not 15.
+    state.dbPause = { after: 12_000 };
+    let copyGoneAt = 0;
+    state.hook = async ({ isCopy, gone }) => {
+      if (!isCopy) return;
+      await gone;
+      copyGoneAt = Date.now();
+    };
+    const started = Date.now();
+    const running = confirm(up.objectKey);
+    await sleep(1_000);
+    const releasedAt = await watchLock(up.finalKey, running);
+    const res = await running;
+    state.hook = null;
+    console.info(
+      `[Y-3 idle] copy given up after ${copyGoneAt - started} ms; lock ${releasedAt === null ? 'held until confirm answered' : `gone after ${releasedAt - started} ms`}`
+    );
+
+    expect(copyGoneAt, 'the copy was attempted and given up').toBeGreaterThan(0);
+    expect(copyGoneAt - started).toBeLessThan(19_000);
+    // Held until confirm answered, or at least until the copy was given up.
+    if (releasedAt !== null) expect(releasedAt, 'the lock outlived the copy').toBeGreaterThanOrEqual(copyGoneAt);
+    await expectNothingLost(up, res, 'storage_unavailable');
+    expect(await stored(up.finalKey)).toBeNull();
+    await expectRetrySucceeds(up);
+  }, 90_000);
+
+  test('Y-3: the copy ends before the transaction’s own timeout — a late lock and a stalled process leave it less time', async () => {
+    const up = await uploaded('tx-pay');
+    // Another confirm of the key holds the lock for 9 s.
+    const holder = admin!.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKeyOf(up.finalKey)})`;
+        await sleep(9_000);
+      },
+      { timeout: 30_000 }
+    );
+    await sleep(300);
+    // Then the process stalls 15 s after taking the lock, and the read takes 4.5 s:
+    // about 29 s of the transaction's 40 are gone, ~4 s are left for the copy instead of ~13.
+    state.dbPause = { afterLock: 15_000 };
+    state.dbSleep = 4.5;
+    let copyGoneAt = 0;
+    state.hook = async ({ isCopy, gone }) => {
+      if (!isCopy) return;
+      await gone;
+      copyGoneAt = Date.now();
+    };
+    const started = Date.now();
+    const running = confirm(up.objectKey);
+    await holder;
+    await sleep(1_000);
+    const releasedAt = await watchLock(up.finalKey, running);
+    const res = await running;
+    state.hook = null;
+    console.info(
+      `[Y-3 tx] copy given up after ${copyGoneAt - started} ms; lock ${releasedAt === null ? 'held until confirm answered' : `gone after ${releasedAt - started} ms`}`
+    );
+
+    expect(copyGoneAt, 'the copy was attempted and given up').toBeGreaterThan(0);
+    expect(copyGoneAt - started).toBeLessThan(38_000);
+    if (releasedAt !== null) expect(releasedAt, 'the lock outlived the copy').toBeGreaterThanOrEqual(copyGoneAt);
+    await expectNothingLost(up, res, 'storage_unavailable');
+    await expectRetrySucceeds(up);
+  }, 90_000);
+
+  test('Y-3: a slow database after the lock is cut off by statement_timeout — save_failed in ~5 s, nothing copied', async () => {
+    const up = await uploaded('yavas-db');
+    state.dbSleep = 8;
+    const started = Date.now();
+    const res = await confirm(up.objectKey);
+    const took = Date.now() - started;
+    expect(took, `answered after ${took} ms`).toBeLessThan(7_000);
+    await expectNothingLost(up, res, 'save_failed');
+    expect(state.requests.some((r) => r.startsWith('PUT(copy)'))).toBe(false);
+    expect(await lockHeld(up.finalKey)).toBe(0);
+    await expectRetrySucceeds(up);
+  }, 60_000);
+
+  test.each(['HEAD', 'GET'])('T-5: a store that holds the %s of the staging object is given up on within the deadline', async (held) => {
+    const up = await uploaded(`t5-${held.toLowerCase()}`);
+    state.hook = async ({ method, path, isCopy }) => {
+      if (!isCopy && method === held && path.endsWith(`/${up.objectKey}`)) await sleep(4_000);
+    };
+    const started = Date.now();
+    const res = await storage.copyIncomingObject(up.objectKey, up.finalKey, 1_500);
+    const took = Date.now() - started;
+    state.hook = null;
+    expect(res).toEqual({ ok: false, error: 'storage_unavailable' });
+    expect(took, `gave up after ${took} ms`).toBeLessThan(3_000);
+    expect(state.requests.some((r) => r.startsWith('PUT(copy)'))).toBe(false);
+    await sleep(3_000);
+    expect(await stored(up.finalKey)).toBeNull();
+    await expectRetrySucceeds(up);
   }, 60_000);
 });
