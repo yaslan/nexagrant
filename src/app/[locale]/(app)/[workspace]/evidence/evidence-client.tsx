@@ -55,6 +55,14 @@ export interface EvidenceItemData {
   }>;
 }
 
+/**
+ * The authenticated, tenant-checked download (B-2, TASK-MUNODY0DVDWC5). A row's
+ * `fileUrl` is never linked: it was a public URL anyone holding it could open.
+ */
+function evidenceDownloadHref(id: string): string {
+  return `/api/evidence/${encodeURIComponent(id)}/download`;
+}
+
 interface EvidenceClientProps {
   initialData: EvidenceItemData[];
   locale?: string;
@@ -178,47 +186,47 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
     setUploadProgress(15);
 
     try {
-      // 1. Get Presigned Upload URL
-      const { uploadUrl, objectKey } = await getPresignedUploadUrlAction(
+      // 1. Get Presigned Upload URL. The server refuses a type outside its list
+      // or a file over the limit, and signs the type and size it accepted.
+      const presign = await getPresignedUploadUrlAction(
         uploadCategory,
         uploadFile.name,
-        uploadFile.type || 'application/pdf'
+        uploadFile.type,
+        uploadFile.size
       );
+      if (!presign.success) throw new Error(t(`upload.error.${presign.error}`));
 
       setUploadProgress(40);
 
-      // 2. Direct R2 Upload via Presigned PUT (Dev Fallback supported)
-      if (uploadUrl.includes('/api/evidence/mock-upload')) {
-        // Dev Mode Mock Delay
-        await new Promise(r => setTimeout(r, 600));
-      } else {
-        await fetch(uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': uploadFile.type || 'application/pdf' },
-          body: uploadFile,
-        });
-      }
+      // 2. Direct PUT to the presigned URL (R2, or the same-origin dev store).
+      // A refused PUT stops here: confirming it would record a file that is not
+      // stored (B-3, TASK-MUNODY0DVDWC5).
+      const put = await fetch(presign.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': presign.contentType },
+        body: uploadFile,
+      });
+      if (!put.ok) throw new Error(t('upload.error.put_failed', { status: put.status }));
 
       setUploadProgress(75);
 
-      // 3. Confirm Evidence Upload & Trigger AI OCR
+      // 3. Confirm: the server checks the stored object itself, not these fields.
       const res = await confirmEvidenceUploadAction({
         title: uploadTitle || uploadFile.name.replace(/\.[^/.]+$/, ''),
         category: uploadCategory,
         kind: uploadCategory.toLowerCase(),
-        objectKey,
+        objectKey: presign.objectKey,
         fileName: uploadFile.name,
         fileSizeBytes: uploadFile.size,
-        mimeType: uploadFile.type || 'application/pdf',
+        mimeType: presign.contentType,
         validUntil: uploadValidUntil || undefined,
         issuingAuthority: uploadAuthority || undefined,
         confidentiality: uploadConfidentiality,
         language: locale,
       });
 
-      // The server refuses a key outside this tenant's prefix (TASK-MUN80W2VFY56R).
       if (!res.success) {
-        throw new Error(isTr ? 'Dosya anahtarı geçersiz.' : 'Invalid file key.');
+        throw new Error(t(`upload.error.${'error' in res ? res.error : 'object_missing'}`));
       }
 
       setUploadProgress(100);
@@ -257,9 +265,12 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
   };
 
   const exportCSV = () => {
-    const header = "ID,Title,Category,IssuingAuthority,ValidUntil,Status,FileUrl\n";
+    // No file link in the export (B-2, TASK-MUNODY0DVDWC5): a CSV travels, and a
+    // link in it used to open the file for anyone. The name identifies it; the
+    // file itself is downloaded in the app.
+    const header = "ID,Title,Category,IssuingAuthority,ValidUntil,Status,FileName\n";
     const rows = filteredItems.map(i => 
-      `${i.id},"${i.title.replace(/"/g, '""')}",${i.category || i.kind || ''},"${i.issuingAuthority || ''}",${i.validUntil || ''},${i.status || 'UNVERIFIED'},"${i.fileUrl || ''}"`
+      `${i.id},"${i.title.replace(/"/g, '""')}",${i.category || i.kind || ''},"${i.issuingAuthority || ''}",${i.validUntil || ''},${i.status || 'UNVERIFIED'},"${(i.fileName || '').replace(/"/g, '""')}"`
     ).join('\n');
     
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
@@ -516,9 +527,9 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                     </button>
 
                     <div className="flex items-center gap-1.5">
-                      {doc.fileUrl && (
+                      {doc.r2ObjectKey && (
                         <a
-                          href={doc.fileUrl}
+                          href={evidenceDownloadHref(doc.id)}
                           target="_blank"
                           rel="noreferrer"
                           className="p-1.5 text-muted hover:text-ink bg-ground hover:bg-surface border border-border rounded-lg transition"
@@ -572,12 +583,12 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
               {/* File Dropzone */}
               <div>
                 <label className="block text-xs font-bold text-ink mb-1">
-                  {isTr ? 'Belge Dosyası (PDF, DOCX, XLSX, max 100MB)' : 'Evidence File (PDF, DOCX, max 100MB)'}
+                  {t('upload.fileLabel')}
                 </label>
                 <input
                   type="file"
                   required
-                  accept=".pdf,.docx,.xlsx,.png,.jpg,.jpeg"
+                  accept=".pdf,.docx,.xlsx,.png,.jpg,.jpeg,.webp"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
@@ -783,9 +794,9 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             </div>
 
             <div className="pt-4 border-t border-border flex items-center justify-between">
-              {selectedDoc.fileUrl && (
+              {selectedDoc.r2ObjectKey && (
                 <a
-                  href={selectedDoc.fileUrl}
+                  href={evidenceDownloadHref(selectedDoc.id)}
                   target="_blank"
                   rel="noreferrer"
                   className="bg-accent text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs hover:opacity-90 transition flex items-center gap-2"

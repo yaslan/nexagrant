@@ -121,7 +121,7 @@ const ACTIONS: [string, Action, () => Promise<unknown>][] = [
   ['m8.computeSeatCandidates', 'manage_workspaces', () => m8.computeSeatCandidates('opp-1', 'seat-1')],
   ['m8.inviteCandidateToSeat', 'manage_workspaces', () => m8.inviteCandidateToSeat('seat-1', 'org-1', 'opp-1')],
   // evidence
-  ['evidence.getPresignedUploadUrlAction', 'edit_proposal', () => evidence.getPresignedUploadUrlAction('c', 'f.pdf', 'application/pdf')],
+  ['evidence.getPresignedUploadUrlAction', 'edit_proposal', () => evidence.getPresignedUploadUrlAction('c', 'f.pdf', 'application/pdf', 1)],
   ['evidence.confirmEvidenceUploadAction', 'edit_proposal', () => evidence.confirmEvidenceUploadAction({ title: 't', category: 'c', objectKey: 'tenants/tenant-A/x', fileName: 'f', fileSizeBytes: 1, mimeType: 'application/pdf' })],
   ['evidence.createEvidence', 'edit_proposal', () => evidence.createEvidence(form())],
   ['evidence.deleteEvidence', 'edit_proposal', () => evidence.deleteEvidence('ev-1')],

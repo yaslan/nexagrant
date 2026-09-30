@@ -179,14 +179,12 @@ const envSchema = z.object({
    * credentials stay on `process.env` inside src/lib/storage.ts because moving
    * a credential is a different change from moving a brand string.
    *
-   * R2_PUBLIC_HOST is the origin that serves stored objects publicly
-   * (e.g. https://files.example.org). Unset means there is no public origin,
-   * and `publicObjectUrl()` then returns null instead of a link: the evidence
-   * row is written with `fileUrl = null` and the UI renders no download button,
-   * which is the truthful outcome. This used to be a bare literal on the
-   * retired brand's storage domain, repeated in six places, so every upload
-   * recorded a download link on a domain the company no longer publishes
-   * (TASK-MTV5ESBVAHUEV).
+   * R2_PUBLIC_HOST is the public origin of the bucket, if one exists. Evidence
+   * is no longer linked from it (B-2, TASK-MUNODY0DVDWC5): anyone holding such
+   * a URL read the file, CONFIDENTIAL ones included, and it went into the CSV
+   * export. Evidence is read through the authenticated download route, which
+   * redirects to a short-lived presigned GET. Only the CSP still reads this
+   * (src/lib/security-headers.ts); the bucket itself should not be public.
    *
    * R2_BUCKET keeps the historical bucket default that storage.ts applies: 50
    * Evidence rows already carry it, and a bucket name is an infrastructure

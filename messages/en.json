@@ -254,6 +254,18 @@
       "unverified": "Unverified",
       "valid": "Valid",
       "daysLeft": "{days} Days Left"
+    },
+    "upload": {
+      "fileLabel": "Evidence File (PDF, DOCX, XLSX, PNG, JPG, WEBP — max 25 MB)",
+      "error": {
+        "unsupported_type": "This file type cannot be uploaded. Choose a PDF, DOCX, XLSX, PNG, JPG or WEBP whose content matches its extension.",
+        "file_too_large": "The file is larger than the 25 MB limit.",
+        "empty_file": "The file is empty.",
+        "object_missing": "The file did not reach storage. Try again.",
+        "invalid_object_key": "Invalid file key.",
+        "storage_unavailable": "Storage is unavailable right now. Try again shortly.",
+        "put_failed": "The file could not be uploaded to storage (HTTP {status})."
+      }
     }
   },
   "ConceptNote": {
