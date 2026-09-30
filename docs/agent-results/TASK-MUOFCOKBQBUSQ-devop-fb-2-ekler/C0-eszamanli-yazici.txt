@@ -1,0 +1,15 @@
+=== EŞZAMANLI YAZICI TESPİTİ Wed Sep 30 21:20:45 +03 2026
+3dfa77c1 dev@{2026-09-30 21:20:23 +0300}: commit: docs(agent-results): TASK-MUOFCOKBQBUSQ devop-fb — ana checkout'taki commit'lenmemiş raporlar (MUOEUYV0GMU12 devop-fb, MUOFCOKBQBUSQ devop-fb 1. koşu + ekler, MUODYSLQ8HIRT crw-fb-3, MUOEPL87MCXJH fe-fb)
+ac2ec5f3 dev@{2026-09-30 21:19:59 +0300}: 
+a806cc51 dev@{2026-09-30 21:16:05 +0300}: commit: docs(agent-results): TASK-MUODXBIM9H1PP cs-fb — İNCELEME-107 düzeltmesi: B-1 import()/require() izlenir (5e674e7f CORDIS dinamik [22,30]), B-2 .code yazımla biter, Y-1 (a) export'lar modül özetiyle, Y-2..Y-6, this-yazımı, hesaplanan anahtar; T-1 35/35 KILLED (11 yaşayan dahil); Ö-1 satır+iz, Ö-2 FP temiz; sonda 36→2 (Ö-3); gerçek ağaç 0; vitest 3960/0, tsc/lint/build 0; merge bb855b31, push yok
+ac2ec5f312263b5a52085e3967fde0753b918558 Claude BE-FB <hulyasinaslan@gmail.com> Wed Sep 30 21:19:59 2026 +0300
+3d15de69 fix(db): TASK-MUOEY2GBFHY7U crw2-fb — K1 TopicMatch key is NULLS NOT DISTINCT even after prisma db push
+70c448f7 fix(ci): TASK-MUOEY2GBFHY7U crw2-fb — live-skip gate names the missing CI=true on a local failure
+e860b035 docs(agent-results): TASK-MUOEJVUECL28A fe-fb — merge sha
+=== 2. EŞZAMANLI YAZICI Wed Sep 30 21:27:02 +03 2026
+e8c6e7ca dev@{2026-09-30 21:25:30 +0300}: 
+956124f3 dev@{2026-09-30 21:24:01 +0300}: merge devop-fb/merge-hsts: Merge made by the 'ort' strategy.
+3dfa77c1 dev@{2026-09-30 21:20:23 +0300}: commit: docs(agent-results): TASK-MUOFCOKBQBUSQ devop-fb — ana checkout'taki c
+e8c6e7ca merge: spike/job-queue (TASK-MUMLFDTNQ53VJ) — graphile-worker spike kept as reference, not production code (patron 30.09, TASK-MUOEY2GBFHY7U)
+Not: e8c6e7ca (21:25:30) C1 vitest koşusu sırasında geldi; yalnız scripts/spike-jobq/* ekler (test dosyası yok). lint+tsc 21:25:30 öncesi 956124f3 üzerinde koştu; C2 kapıları dev ucunun tamamını (spike dahil) ölçer.
+crw-fb yeni oturumu: crw-fb/t5-wip dalını kendi worktree'sine aldı (temizlik-islem.txt), ana checkout'a yalnız untracked ekler yazıyor.

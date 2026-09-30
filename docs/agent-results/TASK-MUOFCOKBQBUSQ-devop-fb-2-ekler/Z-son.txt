@@ -1,0 +1,26 @@
+=== SON Wed Sep 30 21:31:48 +03 2026
+1cc51388 docs(release): TASK-MUOFCOKBQBUSQ devop-fb — §9 dev entegrasyon prosedürü
+c6fad2ac dev'de: EVET
+af2e7be7 dev'de: EVET
+5c8361b6 dev'de: EVET
+064e2897 dev'de: EVET
+--- HSTS grep (src/ next.config.ts)
+grep exit=1
+--- dal uçları (merge edilmeyenler dev dışında mı?)
+fe-fb/muoepl-merge-temp: dev'de DEĞİL
+be-fb/g1-wip: dev'de DEĞİL
+crw-fb/t5-wip: dev'de DEĞİL
+--- konteyner
+devopfb-int-pg
+devopfb-*: yok
+--- git status --short
+?? FON_BRIDGE.md
+?? docs/agent-results/TASK-MUNQB0GR306U0-be-fb.md
+?? docs/agent-results/TASK-MUOFAD4JSUCCP-crw-fb-ekler/
+?? docs/agent-results/TASK-MUOFCOKBQBUSQ-devop-fb-2-ekler/
+?? docs/agent-results/TASK-MUOFKI8C1009Z-se-fb-ekler/
+?? docs/agent-results/TASK-MUOFKI8C1009Z-se-fb.md
+tracked değişiklik: 0
+--- push yok kanıtı
+c5aa48d7
+     630

@@ -1,0 +1,36 @@
+[A] 2026-09-29T12:11:00.391Z up (graphile-worker, cron "0 4 1 * *")
+[core] INFO: Worker connected and looking for jobs... (task names: 'k2-monthly-cordis')
+[A] 2026-09-29T12:11:04.287Z START job=10 task=k2-monthly-cordis attempt=1/3 tick=- month=2026-06
+[A] 2026-09-29T12:11:04.636Z FAIL  job=10 attempt=1: Worker responded with status 503
+[A] 2026-09-29T12:11:04.637Z event job:error job=10 Worker responded with status 503
+[worker(worker-4a24ea9682e7d3e292)] ERROR: Failed task 10 (k2-monthly-cordis, 349.74ms, attempt 1 of 3) with error 'Worker responded with status 503':
+  Error: Worker responded with status 503
+      at k2MonthlyCordis (/Users/macbook/alan/FONBRIDGE-wt-jobq/scripts/spike-jobq/worker.ts:60:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async doNext (/Users/macbook/alan/FONBRIDGE-wt-jobq/node_modules/.pnpm/graphile-worker@0.18.0_supports-color@7.2.0_typescript@5.9.3/node_modules/graphile-worker/dist/worker.js:191:26)
+[A] 2026-09-29T12:11:05.308Z START job=11 task=k2-monthly-cordis attempt=1/3 tick=- month=2026-06
+[A] 2026-09-29T12:11:05.526Z FAIL  job=11 attempt=1: Worker responded with status 503
+[A] 2026-09-29T12:11:05.527Z event job:error job=11 Worker responded with status 503
+[worker(worker-246954cbd5b12d183a)] ERROR: Failed task 11 (k2-monthly-cordis, 218.71ms, attempt 1 of 3) with error 'Worker responded with status 503':
+  Error: Worker responded with status 503
+      at k2MonthlyCordis (/Users/macbook/alan/FONBRIDGE-wt-jobq/scripts/spike-jobq/worker.ts:60:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async doNext (/Users/macbook/alan/FONBRIDGE-wt-jobq/node_modules/.pnpm/graphile-worker@0.18.0_supports-color@7.2.0_typescript@5.9.3/node_modules/graphile-worker/dist/worker.js:191:26)
+[A] 2026-09-29T12:11:08.539Z START job=11 task=k2-monthly-cordis attempt=2/3 tick=- month=2026-06
+[A] 2026-09-29T12:11:08.757Z FAIL  job=11 attempt=2: Worker responded with status 503
+[A] 2026-09-29T12:11:08.757Z event job:error job=11 Worker responded with status 503
+[worker(worker-246954cbd5b12d183a)] ERROR: Failed task 11 (k2-monthly-cordis, 218.15ms, attempt 2 of 3) with error 'Worker responded with status 503':
+  Error: Worker responded with status 503
+      at k2MonthlyCordis (/Users/macbook/alan/FONBRIDGE-wt-jobq/scripts/spike-jobq/worker.ts:60:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async doNext (/Users/macbook/alan/FONBRIDGE-wt-jobq/node_modules/.pnpm/graphile-worker@0.18.0_supports-color@7.2.0_typescript@5.9.3/node_modules/graphile-worker/dist/worker.js:191:26)
+[A] 2026-09-29T12:11:16.688Z START job=11 task=k2-monthly-cordis attempt=3/3 tick=- month=2026-06
+[A] 2026-09-29T12:11:16.907Z FAIL  job=11 attempt=3: Worker responded with status 503
+[A] 2026-09-29T12:11:16.907Z event job:error job=11 Worker responded with status 503
+[worker(worker-4a24ea9682e7d3e292)] ERROR: Failed task 11 (k2-monthly-cordis, 218.80ms, attempt 3 of 3) with error 'Worker responded with status 503':
+  Error: Worker responded with status 503
+      at k2MonthlyCordis (/Users/macbook/alan/FONBRIDGE-wt-jobq/scripts/spike-jobq/worker.ts:60:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async doNext (/Users/macbook/alan/FONBRIDGE-wt-jobq/node_modules/.pnpm/graphile-worker@0.18.0_supports-color@7.2.0_typescript@5.9.3/node_modules/graphile-worker/dist/worker.js:191:26)
+[core] INFO: Received 'SIGTERM'; attempting global graceful shutdown... (all termination signals will be ignored for the next 5 seconds)
+[core] INFO: Global graceful shutdown complete; killing self via SIGTERM

@@ -1,0 +1,12 @@
+=== C1 merge Wed Sep 30 21:24:01 +03 2026
+3dfa77c1 docs(agent-results): TASK-MUOFCOKBQBUSQ devop-fb — ana checkout'taki commit'lenmemiş raporlar (MUOEUYV0GMU12 devop-fb, MUOFCOKBQBUSQ devop-fb 1. koşu + ekler, MUODYSLQ8HIRT crw-fb-3, MUOEPL87MCXJH fe-fb)
+Merge made by the 'ort' strategy.
+ docs/RELEASE_CHECKLIST.md        | 22 ++++++++++++++++++++++
+ docs/SMTP-SUNUCU.md              |  2 ++
+ src/lib/security-headers.test.ts |  6 ------
+ src/lib/security-headers.ts      |  8 --------
+ 4 files changed, 24 insertions(+), 14 deletions(-)
+merge exit=0
+956124f3 merge: devop-fb/merge-hsts (TASK-MUOEUYV0GMU12) — HSTS uygulamadan Caddy ters vekiline taşındı (entegratör TASK-MUOFCOKBQBUSQ)
+--- HSTS grep (boş olmalı)
+grep exit=1 (1 = eşleşme yok)

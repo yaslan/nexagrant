@@ -137,7 +137,23 @@ Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workfl
     wc -l < m4-claims-before.txt                                         # sayıyı not edin (N0)
     ```
     `enter_system_scope` satırını çıkarmayın. `Membership` FORCE RLS altındadır ve süper kullanıcı olmayan sahip rolü kiracı bağlamı olmadan **0 satır** okur, yani yanlışlıkla "temiz" görünür (ölçüldü: 3 claim varken düz sorgu 0 döndü). `COLLATE "C"` ve aşağıdaki `LC_ALL=C comm` aynı bayt sırasını kullanır; DB collation'ı ile kabuk yerel ayarı farklıysa `comm` yanlış satır bildirmez.
-- [ ] 3. `DATABASE_URL=<sahip rol> scripts/apply-migrations.sh` — 41 dosya; iki kez koşmak güvenli (CI her push'ta iki kez koşuyor).
+- [ ] 3. `DATABASE_URL=<sahip rol> scripts/apply-migrations.sh` — 41 dosya; iki kez koşmak güvenli (CI her push'ta iki kez koşuyor). Son satır `apply-migrations: 41 files applied as <sahip rol>` olmalı.
+  - **Hangi rolle (İNCELEME-106 I-1, TASK-MUOEGWSV8I7H0):** şemanın ve tabloların **sahibi** olan rolle. Süper kullanıcı değil, BYPASSRLS değil, **asla `fabrika_app` değil**. CI süper kullanıcıyla koşar, canlı koşmaz; aradaki iki farkı betik kendisi kapatır ya da koşmadan önce durur:
+    - (i) **Tek seferlik yetki (DB kümesi başına bir kez, süper kullanıcıyla):** `psql "$SUPERUSER_URL" -v owner=<sahip rol> -f prisma/migration-owner-grant.sql`. Çıktıdaki tabloda sahip rolü için `can_set_system_scope = t`, `fabrika_app` için **`f`** olmalı. Neden: 23. dosyadan itibaren 4 fonksiyon `SET app.system_scope = 'on'` taşır. PostgreSQL bu yer tutucu parametreyi fonksiyon tanımına yalnız süper kullanıcının ya da `SET` yetkisi verilmiş rolün yazmasına izin verir. Yetki yoksa betik **hiçbir dosyayı uygulamadan** `role "…" may not create functions with SET app.system_scope` diye durur. Eskiden 22 dosya uygulanıp 23.'de `permission denied to set parameter "app.system_scope"` ile yarıda kalıyordu (ölçüldü). BYPASSRLS bunu **çözmez**; bu bir satır güvenliği değil, parametre yetkisi kontrolüdür (ölçüldü). Geri alma: `prisma/migration-owner-grant-rollback.sql`.
+    - (ii) **Backfill'ler FORCE RLS altında:** kiracı tabloları `FORCE ROW LEVEL SECURITY`'dir. Sahip rolü kiracı bağlamı olmadan bu tablolarda 0 satır okur ve günceller. Betik bu yüzden her dosyayı `app.system_scope = 'on'` oturumuyla koşar. Bu, `prisma/rls.sql`'in mevcut `system_scope` politikasını açar; politika değişmez, hiçbir rol BYPASSRLS almaz. Bu olmadan 8 backfill dosyası sessizce 0 satır güncelliyordu. `retire-eur-plan-ladder.sql` ise emekli planı silip abonelikleri silinmiş plana işaret eder bırakıyordu (ölçüldü, TASK-MUOEGWSV8I7H0 §2.2). `system_scope` politikası olmayan bir FORCE tablo varsa betik **koşmadan önce** durur ve tabloları listeler. Çözüm: önce `pnpm db:rls`, sonra betiği yeniden koşun. Taze bir DB'de ilk koşudan sonra `db:rls`'ten önce yapılan ikinci koşu bu yüzden durur. Beklenen davranış budur.
+    - (iii) **Kalıcı varsayılan yasak:** (i)'deki yetkiyle sahip rolü `ALTER DATABASE … SET app.system_scope = 'on'` da yazabilir (ölçüldü). Bu, `fabrika_app` dahil her yeni oturumda kiracı yalıtımını kapatır. Betik böyle bir varsayılan görürse, koşudan önce ya da sonra, exit 1 verir. Sahip rolü zaten kendi tablolarında RLS'yi kapatabilir, yani bu yeni bir güç değildir. Ama sessiz bir yoldur. **Asla elle yazmayın.**
+  - **Doğrulama sorgusu** (sahip rolüyle, 3. adımdan sonra; beklenen tek satır `<sahip rol>|f|f|t|0|0`):
+    ```sql
+    SELECT current_user,
+           r.rolsuper, r.rolbypassrls,
+           has_parameter_privilege('app.system_scope', 'SET')                  AS can_set,
+           has_parameter_privilege('fabrika_app', 'app.system_scope', 'SET')::int AS app_can_set,
+           (SELECT count(*) FROM pg_db_role_setting s, unnest(s.setconfig) c
+             WHERE c LIKE 'app.system\_scope=%')                                AS stored_defaults
+      FROM pg_roles r WHERE r.rolname = current_user;
+    ```
+    Ardından 5. adımdaki `pnpm rls:verify` (`fabrika_app` ile) kiracı yalıtımının sürdüğünü ölçer.
+  - Down dosyalarını (§3.2) elle aynı sahip rolüyle uygularken de aynı oturumu açın, yoksa geri dönüş backfill'leri de 0 satır günceller: `psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "SET app.system_scope = 'on'" -f <dosya>.down.sql`.
 - [ ] 4. `pnpm db:rls` — kiracı politikaları + sistem kapsamı fonksiyonları.
 - [ ] 5. `pnpm rls:verify` gerçek `fabrika_app` ile exit 0. Kiracı tablolarında `FORCE ROW LEVEL SECURITY` da denetlenir (bir migration FORCE'u kapatıp geri koymazsa exit 1).
 - [ ] 6. **Web**'i yeni sürümle kaldır, sonra worker (§3.3).
@@ -284,6 +300,28 @@ Repoda Postgres yedekleme/geri yükleme betiği, zamanlayıcısı ya da belgesi 
 - [ ] `source` `job-queue` ile başlayan `error` alarmı yok; `job-queue:cron-disabled` yok (yani 3.3 adım 4 yapıldı).
 - [ ] SMTP yoksa her gönderim denemesi `SystemAlert` yazar → e-posta ile ilgili alarm yok.
 
+### 5.4 HSTS ramp-up (ilk hafta → sonra)
+
+Strict-Transport-Security başlığı Caddy tarafından gönderilir (uygulama eklemez). Kurulum sırası:
+
+1. **Gün 1 (yayından sonra):** Caddyfile'da `header Strict-Transport-Security "max-age=300"` ile başla.
+   ```bash
+   curl -sI https://fonbridge.com/ | grep -i strict-transport
+   # Beklenen: strict-transport-security: max-age=300
+   ```
+
+2. **Gün 8 (toplam 7 gün geçtikten sonra):** Caddyfile güncellemesi:
+   ```caddy
+   header Strict-Transport-Security "max-age=31536000"  # 1 yıl
+   ```
+   Caddy reload sonra doğrula:
+   ```bash
+   curl -sI https://fonbridge.com/ | grep -i strict-transport
+   # Beklenen: strict-transport-security: max-age=31536000
+   ```
+
+3. **Gün 366 (opsiyonel):** `includeSubDomains` eklenebilir (cPanel subdomains kalıcı olarak kilitlenmeyecekse).
+
 ---
 
 ## 6. GitHub push (1 Ekim) ve CI
@@ -333,3 +371,13 @@ Sıra bağımlılığa göre; her adım bir öncekini bekler (paralel yapılabil
 12. **1 Ekim: GitHub push** (`git push origin dev`) — öncesinde push yapılacak makinede `git config core.hooksPath githooks` (§6). CI yeşilini gör.
 13. 1–11 bitince haber ver → biz (onayla): sunucuya Caddy + Docker kurulumu, §3.1 şema sırası, §3.3 web→worker sırası, §4.2 geri yükleme testi, `docs/SMTP-SUNUCU.md` §7 posta ölçümleri, `docs/SMTP-SUNUCU.md` §10.3 yönlendirme ölçümleri.
 14. **Canlıya geçiş onayı** (açık, yazılı). Onaysız hiçbir adım canlıya yazılmaz.
+
+## 9. Dev entegrasyon prosedürü (TASK-MUOFCOKBQBUSQ)
+
+1. İşçi ajan yalnız kendi worktree'sinde ve kendi dalında çalışır. Ana checkout'ta (`/Users/macbook/alan/FONBRIDGE`, dal `dev`) tracked dosya değiştirmez, `dev` ref'ini de ilerletmez. Merge'ü yalnız entegratör (devop-fb) yapar.
+2. Entegratör başlamadan önce `git status --short --untracked-files=no` çıktısını ≥20 sn arayla iki kez alır. Çıktıda başka birinin tracked değişikliği varsa durur. Değişikliğin sahibi kapandıysa değişiklik kaybolmasın diye önce kurtarılır: `git diff -- <dosya> > x.patch`, ardından `git worktree add <wt> -b <sahip>/<iş>-wip dev`, `git -C <wt> apply x.patch`, `git -C <wt> commit -- <dosya>` ve `git diff dev <dal> | cmp - x.patch`. Ancak bu kanıttan sonra ana checkout'ta `git checkout -- <dosya>` koşulur.
+3. Yalnız inceleme raporu TAMAM/ONAY olan ve görev metninde adı geçen dal merge edilir: `git merge --no-ff <dal>`. Çakışma olursa entegratör durur ve raporlar, çakışmayı çözmez. Merge'den önce `git merge-tree --write-tree HEAD <dal>` ile çakışma olup olmadığına bakılır.
+4. Her merge'den sonra kapılar CI sırasıyla koşulur. DB, izole ve sıfırdan kurulmuş bir Postgres'tir (ör. `devopfb-int-pg`, 127.0.0.1:55223; :5433 yasak, `.env`'e dokunulmaz). DB hazırlığı `prisma db push → db:rls-role → apply-migrations ×2 → db:rls → db:seed` sırasıyla yapılır. Kapılar: `lint`, `typecheck`, tam `vitest run` + `check-live-skips`, `build`. Şema veya RLS değiştiyse bunlara `rls:check`, `rls:bypass-check` ve `rls:verify` eklenir. `DATABASE_URL`, `DATABASE_URL_RLS_TEST` ve `CI=true` komut satırında verilir ve çıktıya basılır.
+5. Ham çıktılar `docs/agent-results/<TASK>-devop-fb-ekler/` altına yazılır. Bir kapı 0'dan farklı biterse sonraki dala geçilmez.
+6. Her adımdan önce ve sonra `git reflog -3 dev` kontrol edilir. Entegratörün yapmadığı bir `dev` hareketi görülürse raporda "eşzamanlı yazıcı" olarak kaydedilir. Kapılar o hareketi de kapsayacak biçimde yeniden koşulur.
+7. Commit'ler `git commit -- <yollar>` ile atılır; geniş `git add -A` kullanılmaz. İş bitince `git merge-base --is-ancestor <sha> dev` ile her dalın dev'de olduğu kanıtlanır. Push yalnız ayrı ve açık onayla yapılır.

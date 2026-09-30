@@ -180,6 +180,26 @@ WHERE tm.id = l.id AND COALESCE(array_length(l.candidates, 1), 0) <> 1;
 -- `opportunityId` is NULL on those rows.
 DROP INDEX IF EXISTS "TopicMatch_tenantId_topicId_key";
 
+--
+-- TASK-MUOEY2GBFHY7U: `prisma db push` runs before this file (ci.yml, RELEASE_CHECKLIST §1) and
+-- builds the same-named key from schema.prisma, which cannot say NULLS NOT DISTINCT. `IF NOT
+-- EXISTS` then kept that NULLS DISTINCT key and two overlapping K1 recomputes wrote a second
+-- (tenant, topic, NULL) row (measured: tests/k1-embeddings.live.test.ts, 9 rows for 6). A key
+-- without NULLS NOT DISTINCT is swapped for the right one in one statement, so a failure (existing
+-- duplicate pairs) leaves the old key in place and stops the run under ON_ERROR_STOP.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_index i
+    JOIN pg_class c ON c.oid = i.indexrelid
+    WHERE c.oid = to_regclass('"TopicMatch_tenantId_topicId_opportunityId_key"') AND NOT i.indnullsnotdistinct
+  ) THEN
+    DROP INDEX "TopicMatch_tenantId_topicId_opportunityId_key";
+    CREATE UNIQUE INDEX "TopicMatch_tenantId_topicId_opportunityId_key"
+      ON "TopicMatch" ("tenantId", "topicId", "opportunityId") NULLS NOT DISTINCT;
+  END IF;
+END $$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS "TopicMatch_tenantId_topicId_opportunityId_key"
   ON "TopicMatch" ("tenantId", "topicId", "opportunityId") NULLS NOT DISTINCT;
 

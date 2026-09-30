@@ -59,18 +59,10 @@
 
 export type HeaderEntry = { key: string; value: string };
 
-/**
- * HSTS: one year, subdomains included, no `preload` (preload is a patron decision:
- * it is hard to undo — removal from the browser lists takes months).
- * Only meaningful over HTTPS; browsers ignore it on plain http.
- */
-export const HSTS_VALUE = 'max-age=31536000; includeSubDomains';
-
 export const PERMISSIONS_POLICY_VALUE =
   'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()';
 
 export const STATIC_SECURITY_HEADERS: readonly HeaderEntry[] = [
-  { key: 'Strict-Transport-Security', value: HSTS_VALUE },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   // accept-invite overrides this with `no-referrer` (next.config.ts, later entry wins).

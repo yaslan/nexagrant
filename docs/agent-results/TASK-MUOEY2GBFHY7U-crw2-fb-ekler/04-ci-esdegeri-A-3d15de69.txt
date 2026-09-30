@@ -1,0 +1,160 @@
+DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55120/fabrika
+Already up to date
+Done in 485ms using pnpm v11.25.0
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+Loaded Prisma config from prisma.config.ts.
+Prisma schema loaded from prisma/schema.prisma.
+Prisma schema warning:
+- Preview feature "driverAdapters" is deprecated. The functionality can be used without specifying it as a preview feature.
+The schema at prisma/schema.prisma is valid 🚀
+$ prisma generate
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+Loaded Prisma config from prisma.config.ts.
+Prisma schema loaded from prisma/schema.prisma.
+warn Preview feature "driverAdapters" is deprecated. The functionality can be used without specifying it as a preview feature.
+✔ Generated Prisma Client (v7.10.0) to ./node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client in 372ms
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+Loaded Prisma config from prisma.config.ts.
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "fabrika", schema "public" at "127.0.0.1:55120"
+🚀  Your database is now in sync with your Prisma schema. Done in 1.05s
+$ tsx scripts/setup-rls-role.ts
+┌─────────┬───────────────┬──────────┬──────────────┬─────────────┬─────────────┬───────────────┐
+│ (index) │ rolname       │ rolsuper │ rolbypassrls │ rolcanlogin │ rolcreatedb │ rolcreaterole │
+├─────────┼───────────────┼──────────┼──────────────┼─────────────┼─────────────┼───────────────┤
+│ 0       │ 'fabrika_app' │ false    │ false        │ true        │ false       │ false         │
+└─────────┴───────────────┴──────────┴──────────────┴─────────────┴─────────────┴───────────────┘
+✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55120/fabrika
+psql (PostgreSQL) 16.15 (Homebrew)
+==> [1/41] add-m6-evaluator-lens.sql
+==> [2/41] add-soft-delete.sql
+==> [3/41] add-feedback.sql
+==> [4/41] add-calendar-connections/migration.sql
+==> [5/41] add-m9-meeting-schedule/migration.sql
+==> [6/41] add-systemalert-console-indexes.sql
+==> [7/41] rename-feedback-alert-columns.sql
+==> [8/41] retire-eur-plan-ladder.sql
+==> [9/41] add-lifetime-licence.sql
+==> [10/41] add-subscription-price-lock.sql
+==> [11/41] add-invoice.sql
+==> [12/41] add-plan-versioning/migration.sql
+==> [13/41] add-m10-dual-approval-persistence/migration.sql
+==> [14/41] topicmatch-per-opportunity/migration.sql
+==> [15/41] add-invoice-write-path.sql
+==> [16/41] add-invoice-fx-rate.sql
+==> [17/41] relationship-owner-nullable.sql
+==> [18/41] add-evidence-link-tenant-id.sql
+==> [19/41] auditevent-tenant-or-shared.sql
+==> [20/41] add-consent-record.sql
+==> [21/41] add-stripe-event-log/migration.sql
+==> [22/41] add-marketplace-order.sql
+==> [23/41] add-agency-invite-code.sql
+==> [24/41] drop-marketplace.sql
+==> [25/41] fix-agency-invite-rejection-audit.sql
+==> [26/41] add-agency-funnel.sql
+==> [27/41] auditevent-null-system-only.sql
+==> [28/41] add-tenant-province.sql
+==> [29/41] add-agency-funnel-province.sql
+==> [30/41] agency-invite-no-max-uses.sql
+==> [31/41] add-meeting-brief-opportunity.sql
+==> [32/41] hash-bearer-tokens.sql
+==> [33/41] credit-ledger-grant-period.sql
+==> [34/41] invitation-accepted-at.sql
+==> [35/41] add-public-lead.sql
+==> [36/41] relationship-stale-reminded-at.sql
+==> [37/41] k1-embedding-hash.sql
+==> [38/41] m4-stale-reminder-idempotency.sql
+==> [39/41] add-api-key-rate-window.sql
+==> [40/41] evidence-unique-object-key.sql
+==> [41/41] m4-stale-digest-user-claim.sql
+apply-migrations: 41 files applied
+==> [1/41] add-m6-evaluator-lens.sql
+==> [2/41] add-soft-delete.sql
+==> [3/41] add-feedback.sql
+==> [4/41] add-calendar-connections/migration.sql
+==> [5/41] add-m9-meeting-schedule/migration.sql
+==> [6/41] add-systemalert-console-indexes.sql
+==> [7/41] rename-feedback-alert-columns.sql
+==> [8/41] retire-eur-plan-ladder.sql
+==> [9/41] add-lifetime-licence.sql
+==> [10/41] add-subscription-price-lock.sql
+==> [11/41] add-invoice.sql
+==> [12/41] add-plan-versioning/migration.sql
+==> [13/41] add-m10-dual-approval-persistence/migration.sql
+==> [14/41] topicmatch-per-opportunity/migration.sql
+==> [15/41] add-invoice-write-path.sql
+==> [16/41] add-invoice-fx-rate.sql
+==> [17/41] relationship-owner-nullable.sql
+==> [18/41] add-evidence-link-tenant-id.sql
+==> [19/41] auditevent-tenant-or-shared.sql
+==> [20/41] add-consent-record.sql
+==> [21/41] add-stripe-event-log/migration.sql
+==> [22/41] add-marketplace-order.sql
+==> [23/41] add-agency-invite-code.sql
+==> [24/41] drop-marketplace.sql
+==> [25/41] fix-agency-invite-rejection-audit.sql
+==> [26/41] add-agency-funnel.sql
+==> [27/41] auditevent-null-system-only.sql
+==> [28/41] add-tenant-province.sql
+==> [29/41] add-agency-funnel-province.sql
+==> [30/41] agency-invite-no-max-uses.sql
+==> [31/41] add-meeting-brief-opportunity.sql
+==> [32/41] hash-bearer-tokens.sql
+==> [33/41] credit-ledger-grant-period.sql
+==> [34/41] invitation-accepted-at.sql
+==> [35/41] add-public-lead.sql
+==> [36/41] relationship-stale-reminded-at.sql
+==> [37/41] k1-embedding-hash.sql
+==> [38/41] m4-stale-reminder-idempotency.sql
+==> [39/41] add-api-key-rate-window.sql
+==> [40/41] evidence-unique-object-key.sql
+==> [41/41] m4-stale-digest-user-claim.sql
+apply-migrations: 41 files applied
+$ tsx scripts/apply-rls.ts
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+$ tsx prisma/seed.ts
+Seeding Database...
+Tenant and users seeded (Fabrika Beta, 10 seats + superadmin).
+Demo ModuleState seeded (pro: M1, M2, M3, M4, M5, M6, M8 ON).
+Calls and topics seeded (20 calls).
+Opportunity seeded: District renovation pilot — İzmir (stage: G0, G0 0 (8% evidence coverage))
+Opportunity seeded: Industrial waste-heat recovery consortium (stage: G1, G0 0 (8% evidence coverage))
+Opportunity seeded: Grid flexibility platform (stage: G2, G0 0 (8% evidence coverage))
+Opportunity seeded: Citizen engagement for climate-neutral Bursa (stage: G3, G0 0 (8% evidence coverage))
+Opportunity seeded: SME-led R&D innovation — Eurostars (stage: G4, G0 0 (8% evidence coverage))
+Opportunities seeded (5 opportunities).
+  G0 demo evidence: skipping 5 K1 match(es) — no such Topic: demo-topic-1, demo-topic-2, demo-topic-3, demo-topic-5, demo-topic-6. G0 alignment (weight 30) stays unseeded.
+G0 evidence seeded for demo tenant — rescoring:
+  demo-opp-1: G0 12 → NO_GO (20% evidence coverage)
+  demo-opp-2: G0 0 → NO_GO (8% evidence coverage)
+  demo-opp-3: G0 6 → NO_GO (20% evidence coverage)
+  demo-opp-4: G0 0 → NO_GO (8% evidence coverage)
+  demo-opp-5: G0 6 → NO_GO (20% evidence coverage)
+Gate decisions seeded (15 decisions).
+Proposals seeded (3 proposals).
+Efforts seeded (10 efforts).
+M6 evaluator lens seeded (1 evaluation, 2 reviewers pending, 4 criteria, 0 scores).
+✓ E11.2 feedback seed complete
+Seeding completed with E10 data.
+== lint
+$ eslint
+== typecheck
+$ tsc --noEmit
+== test
+DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55120/fabrika
+ ↓ tests/sedia-adapter.test.ts (2 tests | 2 skipped)
+ Test Files  301 passed | 2 skipped (303)
+      Tests  3924 passed | 51 skipped (3975)
+   Start at  21:15:42
+   Duration  35.53s (transform 16.97s, setup 0ms, import 87.23s, tests 227.74s, environment 18.71s)
+JSON report written to /private/tmp/claude-501/-Users-macbook-alan/14f3c35e-b877-43e2-bab2-299d055cec92/scratchpad/wtgate/vitest-report.json
+== gate
+live-skip gate: 46 live files, 404 live tests passed, 43 allowed skip(s)
+== i18n
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+== build
+ƒ Proxy (Middleware)
+ƒ  (Dynamic)  server-rendered on demand
+== ALL GREEN

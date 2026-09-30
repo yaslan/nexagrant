@@ -194,6 +194,18 @@ describe.skipIf(!HAS_DB)('K1 TopicMatch nightly recompute (live, fabrika_app)', 
     expect(await admin.topicMatch.count({ where: { tenantId: T_TR, topicId: topicId('same') } })).toBe(1);
   });
 
+  // TASK-MUOEY2GBFHY7U: `prisma db push` runs first and built this key NULLS DISTINCT, so two
+  // overlapping runs (this file's unnarrowed job and k1-embeddings' sweep) each inserted the
+  // same K1 pair. The database, not the findMany in writePage, is what keeps it one row.
+  test('the database refuses a second K1 row for the same tenant × topic (the key is NULLS NOT DISTINCT)', async () => {
+    await expect(
+      admin.topicMatch.create({
+        data: { tenantId: T_TR, topicId: topicId('same'), opportunityId: null, fitScore: 1, breakdown: {} },
+      }),
+    ).rejects.toMatchObject({ code: 'P2002' });
+    expect(await admin.topicMatch.count({ where: { tenantId: T_TR, topicId: topicId('same') } })).toBe(1);
+  });
+
   test('a changed embedding updates the existing row in place', async () => {
     await admin.$executeRaw`UPDATE "Topic" SET embedding = ${vec({ 1: 1 })}::vector WHERE id = ${topicId('diag')}`;
     const r = await recomputeTenantTopicMatches(T_TR, MINE);
