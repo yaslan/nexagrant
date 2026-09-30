@@ -113,7 +113,7 @@ ask sunucusu KAPALI, önceden alınmış panel.oka-ornek.test → host=panel.oka
 - Ajans sayısı sınırlı (Türkiye'de 26 kalkınma ajansı). Pilotta **on-demand yerine statik site bloğu** (her ajans için
   Caddyfile'a bir satır + `caddy reload`) saldırı yüzeyi sıfır ve yeterli. On-demand ancak self-servis alan ekleme
   istenirse değer. Her iki durumda da uygulamadaki host kapısı zorunlu.
-- HSTS: `includeSubDomains` bizim tarafımızda yok (`docs/SMTP-SUNUCU.md:538-539`); ajans alanında HSTS'yi biz
+- HSTS: `includeSubDomains` bizim tarafımızda yok (`docs/SMTP-SUNUCU.md:540-541`); ajans alanında HSTS'yi biz
   yalnız o hostname için veririz, ajansın kök alanına dokunmayız.
 
 ### 2.3 DNS doğrulama (TXT/CNAME)
