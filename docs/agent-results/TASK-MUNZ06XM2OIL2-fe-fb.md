@@ -96,6 +96,10 @@ devop-fb'nin 80 rotalık listesi 7 genişlikte (560 ölçüm) iki sunucuda taran
 
 ### 2g. Kapılar (son kod, `gates.txt`)
 
+**Merge sonrası dev `a222ca6a`** (dev bu arada `83bc522c`'ye ilerlemişti, merge çakışmasız): tsc=0, lint=0, i18n=0, `npx vitest run` → Test Files 292 passed | 6 skipped · Tests **3653 passed | 0 failed** | 96 skipped · exit=0.
+
+Dal üzerinde:
+
 ```
 tsc=0  lint=0  i18n=0  build exit=0
 vitest: Test Files 291 passed | 6 skipped (297) · Tests 3636 passed | 96 skipped (3732) · exit=0
