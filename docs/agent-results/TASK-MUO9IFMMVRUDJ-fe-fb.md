@@ -112,5 +112,10 @@ Merge sonrası kapılar §6'da.
 - İNCELEME-92 O-1'i (`INCOMING_KEY_SHAPE` sonundaki `$` için test, M10) bu kartta ele almadım; ayrı küçük kart olarak kalıyor.
 
 ## 6. Sonraki adım / merge
-- Merge sonrası dev ucunda kapılar yeniden koşuldu; sonuç aşağıda (MERGE bölümü).
+- **Merge öncesi birleşik ağaç** (dal + güncel dev `829dbf4b`, `f4471a84`): dev'in yeni commit'leri bu dosyalara dokunmuyor. Dev `prisma/schema.prisma`'da küçük bir değişiklik getirdi (+5/−3); izole DB'ye `db push` yapılmadı, süit yine de yeşil.
+  ```
+  tsc=0 · lint=0 · i18n=0 · build=0
+  CI=true npx vitest run: Test Files 297 passed | 2 skipped (299) · Tests 3836 passed | 9 skipped (3845)
+  ```
+- dev'e `--no-ff` merge edildi, push yok.
 - Temizlik: `fefb9i-pg` ve `fefb9i-minio` kapları ile worktree rapordan sonra kaldırıldı.
