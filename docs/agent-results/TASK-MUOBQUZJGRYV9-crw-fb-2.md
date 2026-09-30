@@ -120,7 +120,7 @@ Yalnız `User(id)`, `Membership` ve `Relationship` olan boş bir şemada düzelt
 - Kolon kaldırma kartı: yukarıdaki risk 3.
 
 ## Temizlik
-Konteyner `crwfb-muobqu-pg` ve iki geçici worktree (`wt`, `wtold`) raporun sonunda kaldırıldı (bkz. commit sonrası çıktı, sohbet). Başka konteynere ya da pane'e dokunulmadı.
+Konteyner `crwfb-muobqu-pg` ve iki geçici worktree (`wt`, `wtold`) merge'ten sonra kaldırıldı: `docker ps -a | grep -c crwfb-muobqu` → 0, `git worktree list | grep -c 543a4cb5` → 0. Dal `crw-fb/muobqu-checklist-fix` duruyor. Merge: dev 25665e1f (63f6205f), push yok. Dal açıldıktan sonra dev ilerlemişti (ddf3129b). Aradaki değişiklikler bu 3 dosyaya ve `src/lib/relationships`'e dokunmuyor (`git diff --stat be797148 ddf3129b -- …` boş). Başka konteynere ya da pane'e dokunulmadı.
 
 **Platform:** mac'te doğrulandı (darwin 27, libpq psql, pgvector/pg16 konteyneri, Node 26, pnpm 11).
 - Kod değişikliği yalnız SQL. Postgres'te platformdan bağımsız.
