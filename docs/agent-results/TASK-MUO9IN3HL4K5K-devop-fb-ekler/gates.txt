@@ -1,0 +1,12 @@
+# HEAD 2a3900b8 docs(agent-results): TASK-MUO06ANN5D3RM cs-fb — merge sonrası dev 3eb40805 kapıları: tsc/lint/i18n/build 0, vitest 3696/0
+tsc --noEmit exit=0
+eslint src tests exit=0
+i18n:check exit=0
+next build exit=0
+npx vitest run exit=1   <- 1. koşu: izole DB paylaşılan dump idi, şeması dev gerisinde (ColumnNotFound); geçersiz sayıldı
+ Test Files  19 failed | 273 passed | 6 skipped (298)
+      Tests  86 failed | 3532 passed | 177 skipped (3795)
+-- izole DB'ye dev şeması uygulandı (prisma migrate diff → 4 ALTER + 2 INDEX, yalnız devopfb93-pg)
+npx vitest run (2. koşu) exit=0
+ Test Files  292 passed | 6 skipped (298)
+      Tests  3696 passed | 99 skipped (3795)

@@ -1,0 +1,9 @@
+// Komşu yol: throw eden m8 eylemi (inviteCandidateToSeat) prod'da hata metnini gövdeye koyuyor mu?
+import { readFileSync } from 'node:fs';
+const B='http://127.0.0.1:47993'; const COOKIE=readFileSync('cookie.txt','utf8').trim();
+const r=await fetch(`${B}/tr/main/opportunities/demo-opp-1/matching`,{method:'POST',headers:{'Next-Action':process.argv[2],Accept:'text/x-component','Content-Type':'text/plain;charset=UTF-8',Origin:B,Cookie:`authjs.session-token=${COOKIE}`},body:JSON.stringify(['devopfb93-nope-seat','demo-opp-1','devopfb93-org'])});
+const b=await r.text();
+console.log('HTTP', r.status, '| gövde:', b.replace(/\s+/g,' ').slice(0,300));
+for (const m of b.matchAll(/.{0,80}(devopfb93-nope-seat|not found in this workspace|cannot be offered|Seat devopfb93).{0,80}/gi)) console.log('   eşleşme:', m[0]);
+console.log('digest:', (b.match(/"digest":"[^"]*"/)||['yok'])[0]);
+console.log('sızıntı (/devopfb93-nope-seat|not found in this workspace|cannot be offered|Seat devopfb93/):', /devopfb93-nope-seat|not found in this workspace|cannot be offered|Seat devopfb93/i.test(b) ? 'VAR' : 0);
