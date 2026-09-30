@@ -1,0 +1,6 @@
+== PROBE P1 (#i89 alias, gerçek dosyalar)
+tsc i89 hata sayısı: 0
+     × every write action checks the caller role, and no readOnly action writes 6ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
++   "app/[locale]/i89/actions.ts#zzHash: readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2))",
+      Tests  1 failed | 58 passed (59)

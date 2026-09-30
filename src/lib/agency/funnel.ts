@@ -357,6 +357,16 @@ export function suppressedCells(raw: RawByProvince): Set<string> {
  * every breakdown at once ({@link suppressedCells}).
  */
 export function buildAgencyFunnel(raw: RawByProvince, breakdown: FunnelBreakdown): AgencyFunnel {
+  return maskAgencyFunnel(raw)(breakdown);
+}
+
+/**
+ * Pure: masks `raw` once and returns {@link buildAgencyFunnel} for any
+ * breakdown of it. The masking does not depend on the breakdown, so a caller
+ * that needs several breakdowns of one table (the region report) masks it once
+ * instead of once per breakdown (TASK-MUO0U24HHVOJH).
+ */
+export function maskAgencyFunnel(raw: RawByProvince): (breakdown: FunnelBreakdown) => AgencyFunnel {
   const byProvince = normalizeProvinces(raw);
   const hidden = suppressedCells(byProvince);
   const total = sumProvinces(byProvince);
@@ -368,23 +378,25 @@ export function buildAgencyFunnel(raw: RawByProvince, breakdown: FunnelBreakdown
         return [s, cell(value(m), !known || hidden.has(cellId(m, t, p)))];
       })
     ) as FunnelView;
-  const all = view((s) => ORG_TYPES.reduce((n, t) => n + total[t][s], 0), ALL, ALL);
 
-  if (breakdown.dimension === 'province') {
-    const { province } = breakdown;
-    const table = byProvince.get(province);
-    // A province nobody gave is not in the table at all: all of it is "<5".
-    const v = view((s) => (table ? ORG_TYPES.reduce((n, t) => n + table[t][s], 0) : 0), ALL, province, !!table);
-    return { all, breakdown: { dimension: 'province', province, view: v } };
-  }
-  if (breakdown.dimension === 'orgType') {
-    const byOrgType = Object.fromEntries(ORG_TYPES.map((t) => [t, view((s) => total[t][s], t, ALL)])) as Record<
-      OrgType,
-      FunnelView
-    >;
-    return { all, breakdown: { dimension: 'orgType', byOrgType } };
-  }
-  return { all, breakdown: { dimension: 'none' } };
+  return (breakdown) => {
+    const all = view((s) => ORG_TYPES.reduce((n, t) => n + total[t][s], 0), ALL, ALL);
+    if (breakdown.dimension === 'province') {
+      const { province } = breakdown;
+      const table = byProvince.get(province);
+      // A province nobody gave is not in the table at all: all of it is "<5".
+      const v = view((s) => (table ? ORG_TYPES.reduce((n, t) => n + table[t][s], 0) : 0), ALL, province, !!table);
+      return { all, breakdown: { dimension: 'province', province, view: v } };
+    }
+    if (breakdown.dimension === 'orgType') {
+      const byOrgType = Object.fromEntries(ORG_TYPES.map((t) => [t, view((s) => total[t][s], t, ALL)])) as Record<
+        OrgType,
+        FunnelView
+      >;
+      return { all, breakdown: { dimension: 'orgType', byOrgType } };
+    }
+    return { all, breakdown: { dimension: 'none' } };
+  };
 }
 
 /** Pure: raw per-type counts in (no province split), the masked funnel by type out. Exported for tests. */

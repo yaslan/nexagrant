@@ -68,6 +68,10 @@ const SRC = path.join(REPO_ROOT, 'src');
  *   - fail-closed: a name of a src/ module the guard cannot resolve stands for
  *     the whole module, and a call past MAX_DEPTH is itself a finding (for a
  *     readOnly action anywhere, for a write action before its check);
+ *   - a specifier into src/ is one of a relative path or any alias tsconfig
+ *     `paths` or package.json `imports` declares, not only `@/` (İNCELEME-89
+ *     Y-4); an alias into src/ with more than one target is fail-closed, and a
+ *     config the guard does not read (`extends`, `exports`) fails the suite;
  *   - the role a check is asked about must come from the session: `role` /
  *     `scope.role` / `s?.role` / `asRole(…)` of one, bound by a `const` that is
  *     never written to, from `requireTenantAction()` / `requireTenantApi()` /
@@ -387,6 +391,8 @@ type Overlay = Record<string, string>;
 /** A module id for a specifier inside src/ that names no file: whatever it is, the guard cannot see it. */
 const UNRESOLVED = '?';
 const isUnresolved = (id: string) => id.startsWith(UNRESOLVED);
+/** How such an import is labelled: counted like a write, but reported as what it is (İNCELEME-89 D-4). */
+const BLIND = 'imports ';
 
 const existing = new Map<string, boolean>();
 /** A file under src/ (the tree does not change during a run). */
@@ -404,12 +410,139 @@ function fileOfId(id: string, overlay: Overlay): string | null {
   return ext ? id + ext : null;
 }
 
-/** `@/x/y` or `./y` from module `from` → its path under src/, normalized (İNCELEME-80 D-2); null outside src/. */
-function specBase(from: string, spec: string): string | null {
+/**
+ * Import aliases (İNCELEME-89 Y-4, TASK-MUO827UIF3IHL): every tsconfig `paths`
+ * entry and every package.json `imports` entry, read from the files, so a new
+ * alias into src/ (`~lib/*`, `#x/*`) is walked like `@/` and not taken for a
+ * package. Tests stand in for the two files with overlay keys.
+ */
+const TSCONFIG_JSON = ':tsconfig.json';
+const PACKAGE_JSON = ':package.json';
+/** A specifier matched by an alias whose targets are not exactly one path under src/: `?` + this + the specifier. */
+const ALIAS_BLIND = '!alias:';
+
+interface Alias {
+  /** Where it is declared, for messages. */
+  source: 'tsconfig.json' | 'package.json';
+  /** The part before the `*`, or the whole key without one. */
+  prefix: string;
+  /** The part after the `*`; null for a key without one (exact match). */
+  suffix: string | null;
+  /** Every target, repo-relative and `*` still in it, or null for a target that is no path (a package, `null`). */
+  targets: (string | null)[];
+}
+interface AliasTable {
+  aliases: Alias[];
+  /** What the guard cannot read in the two files: each one is a failing assertion, never a silent pass. */
+  problems: string[];
+}
+
+function readRepoFile(name: string, overlay: Overlay, key: string): string | null {
+  if (key in overlay) return overlay[key]!;
+  const file = path.join(REPO_ROOT, name);
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+}
+
+/** Every string a package.json `imports` target leads to: a string, a list of fallbacks, or conditions. */
+function importTargets(value: unknown, out: (string | null)[]): void {
+  if (typeof value === 'string') out.push(value.startsWith('./') ? path.posix.normalize(value) : null);
+  else if (Array.isArray(value)) value.forEach((v) => importTargets(v, out));
+  else if (value && typeof value === 'object') Object.values(value).forEach((v) => importTargets(v, out));
+  else if (value !== null) out.push('!');
+}
+
+function aliasTableOf(overlay: Overlay): AliasTable {
+  const aliases: Alias[] = [];
+  const problems: string[] = [];
+  const add = (source: Alias['source'], key: string, targets: (string | null)[]) => {
+    const stars = key.split('*').length - 1;
+    if (stars > 1 || targets.some((t) => t === '!' || (t !== null && t.split('*').length - 1 !== stars))) {
+      problems.push(`${source}: alias '${key}' is not a shape the guard reads (one '*' in the key and in each target)`);
+      return;
+    }
+    const [prefix, suffix] = stars === 1 ? key.split('*') : [key, null];
+    aliases.push({ source, prefix: prefix!, suffix: suffix ?? null, targets });
+  };
+
+  const tsText = readRepoFile('tsconfig.json', overlay, TSCONFIG_JSON);
+  if (tsText !== null) {
+    const { config, error } = ts.parseConfigFileTextToJson('tsconfig.json', tsText);
+    if (error) problems.push(`tsconfig.json: ${ts.flattenDiagnosticMessageText(error.messageText, '\n')}`);
+    if (config?.extends !== undefined) problems.push('tsconfig.json `extends`: the guard reads `paths` from tsconfig.json alone');
+    const opts = config?.compilerOptions ?? {};
+    const base = typeof opts.baseUrl === 'string' ? opts.baseUrl : '.';
+    for (const [key, list] of Object.entries<unknown>(opts.paths ?? {})) {
+      const targets = Array.isArray(list) ? list.map((t) => (typeof t === 'string' ? path.posix.normalize(path.posix.join(base, t)) : '!')) : ['!'];
+      add('tsconfig.json', key, targets);
+    }
+  }
+  const pkgText = readRepoFile('package.json', overlay, PACKAGE_JSON);
+  if (pkgText !== null) {
+    const pkg = JSON.parse(pkgText) as { imports?: Record<string, unknown>; exports?: unknown };
+    // With `exports`, the package imports itself by its name: an alias the guard would not see.
+    if (pkg.exports !== undefined) problems.push('package.json `exports`: a self-reference by package name is not read by the guard');
+    for (const [key, value] of Object.entries(pkg.imports ?? {})) {
+      const targets: (string | null)[] = [];
+      importTargets(value, targets);
+      add('package.json', key, targets);
+    }
+  }
+  return { aliases, problems };
+}
+
+const aliasTables = new WeakMap<Overlay, AliasTable>();
+function aliasTable(overlay: Overlay): AliasTable {
+  const own = TSCONFIG_JSON in overlay || PACKAGE_JSON in overlay ? overlay : NO_OVERLAY;
+  let table = aliasTables.get(own);
+  if (!table) aliasTables.set(own, (table = aliasTableOf(own)));
+  return table;
+}
+export const aliasProblems = (overlay: Overlay): string[] => aliasTable(overlay).problems;
+
+/**
+ * The path under src/ an aliased specifier names; null when no alias matches or
+ * every target is outside src/ (a package); `ALIAS_BLIND + spec` when a target
+ * is in src/ but it is not the only one (fallbacks, conditions), fail-closed.
+ * Per file, as tsc and Node do it: an exact key, else the longest prefix.
+ */
+function aliasBase(spec: string, overlay: Overlay): string | null {
+  let best: { alias: Alias; star: string } | null = null;
+  const bases = new Set<string | null>();
+  for (const source of ['tsconfig.json', 'package.json'] as const) {
+    best = null;
+    for (const alias of aliasTable(overlay).aliases) {
+      if (alias.source !== source) continue;
+      if (alias.suffix === null) {
+        if (spec === alias.prefix) best = { alias, star: '' };
+      } else if (
+        spec.startsWith(alias.prefix) &&
+        spec.endsWith(alias.suffix) &&
+        spec.length >= alias.prefix.length + alias.suffix.length &&
+        (best === null || (best.alias.suffix !== null && alias.prefix.length > best.alias.prefix.length))
+      ) {
+        best = { alias, star: spec.slice(alias.prefix.length, spec.length - alias.suffix.length) };
+      }
+    }
+    if (!best) continue;
+    for (const t of best.alias.targets) {
+      const target = t === null ? null : path.posix.normalize(t.replace('*', best.star));
+      bases.add(target !== null && (target === 'src' || target.startsWith('src/')) ? target.slice(4) : null);
+    }
+  }
+  const inSrc = [...bases].filter((b) => b !== null);
+  if (inSrc.length === 0) return null;
+  return bases.size === 1 ? inSrc[0]! : ALIAS_BLIND + spec;
+}
+
+/** An alias, `@/x/y` included, or `./y` from module `from` → its path under src/, normalized (İNCELEME-80 D-2); null outside src/. */
+function specBase(from: string, spec: string, overlay: Overlay): string | null {
   let base: string;
-  if (spec.startsWith('@/')) base = path.posix.normalize(spec.slice(2));
-  else if (spec.startsWith('.')) base = path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
-  else return null;
+  if (spec.startsWith('.')) base = path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
+  else {
+    const aliased = aliasBase(spec, overlay);
+    if (aliased === null || aliased.startsWith(ALIAS_BLIND)) return aliased;
+    base = path.posix.normalize(aliased);
+  }
   base = base.replace(/\/+$/, '');
   return base === '..' || base.startsWith('../') ? null : base;
 }
@@ -421,8 +554,9 @@ function specBase(from: string, spec: string): string | null {
  * used to be taken for a package and passed silently).
  */
 function resolveSpec(from: string, spec: string, overlay: Overlay): string | null {
-  const base = specBase(from, spec);
+  const base = specBase(from, spec, overlay);
   if (base === null) return null;
+  if (base.startsWith(ALIAS_BLIND)) return UNRESOLVED + base;
   const ext = path.posix.extname(base);
   const mapped = EXT_MAP[ext];
   const stem = mapped ? base.slice(0, -ext.length) : base;
@@ -493,7 +627,7 @@ function moduleOf(
   const exportLists: ts.ExportDeclaration[] = [];
   const specs = new Set<string>();
   const resolve = (spec: string) => {
-    const base = specBase(id, spec);
+    const base = specBase(id, spec, overlay);
     if (base !== null) specs.add(base);
     return resolveSpec(id, spec, overlay);
   };
@@ -630,7 +764,7 @@ function loadModule(id: string, overlay: Overlay): Module | null {
     // A file of the tree is parsed once for every overlay (TASK-MUO4GP1P89HS7
     // Ö-1); its imports are resolved again only when the overlay names one.
     const real = loadModule(id, NO_OVERLAY);
-    const shadowed = real && [...real.specs].some((b) => b in overlay || CODE_EXTS.some((x) => b + x in overlay) || `${b}/index` in overlay);
+    const shadowed = real && (aliasTable(overlay) !== aliasTable(NO_OVERLAY) || [...real.specs].some((b) => b in overlay || CODE_EXTS.some((x) => b + x in overlay) || `${b}/index` in overlay));
     mod = real && shadowed ? moduleOf(id, real.sf, overlay).mod : real;
   } else if (file) {
     mod = moduleOf(id, ts.createSourceFile(file, fs.readFileSync(path.join(SRC, file), 'utf8'), ts.ScriptTarget.Latest, true, scriptKindOf(file)), overlay).mod;
@@ -1357,9 +1491,12 @@ class Walker {
     return ts.isVariableDeclaration(parent) && parent.initializer === p && flatConst(parent);
   }
 
-  /** A write the guard cannot see past: an import into src/ that names no file (İNCELEME-80 Y-1). */
+  /** A write the guard cannot see past: an import into src/ that names no file (İNCELEME-80 Y-1), or no one file (Y-4). */
   private unresolved(target: string, checked: boolean): void {
-    const label = `import of src/${target.slice(UNRESOLVED.length)}, which is no file the guard can read (fail-closed)`;
+    const what = target.slice(UNRESOLVED.length);
+    const label = what.startsWith(ALIAS_BLIND)
+      ? `${BLIND}${what.slice(ALIAS_BLIND.length)}, an alias into src/ with more than one target, which the guard cannot find (fail-closed): give it one target`
+      : `${BLIND}src/${what}, which the guard cannot find (fail-closed): fix the specifier or add the file`;
     this.facts.writes.push(label);
     if (!checked) this.facts.unchecked.push(label);
   }
@@ -1587,9 +1724,15 @@ export function findingsFor(relPath: string, text: string, overlay: Overlay = NO
         .map((d) => d.label)
         .join('; ');
     const tooDeep = `calls go deeper than ${MAX_DEPTH} modules, where the guard stops seeing writes`;
+    // A write is said as one; an import the guard cannot find as what it is (İNCELEME-89 D-4).
+    const said = (labels: string[], lead: string, writesLead: string) => {
+      const writes = labels.filter((l) => !l.startsWith(BLIND));
+      const blind = labels.filter((l) => l.startsWith(BLIND));
+      return [...(writes.length > 0 ? [`${writesLead}${writes.join('; ')}`] : []), ...blind.map((b) => lead + b)].join('; ');
+    };
     if (facts.readOnly) {
       if (facts.writes.length > 0) {
-        findings.push({ key, problem: `readOnly: true but writes: ${facts.writes.join('; ')}` });
+        findings.push({ key, problem: said(facts.writes, 'readOnly: true but ', 'readOnly: true but writes: ') });
       }
       if (facts.deep.length > 0) findings.push({ key, problem: `readOnly: true but ${tooDeep}: ${deep(true)}` });
       return;
@@ -1608,7 +1751,7 @@ export function findingsFor(relPath: string, text: string, overlay: Overlay = NO
           'write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)',
       });
     } else if (facts.unchecked.length > 0) {
-      findings.push({ key, problem: `writes before any role check covers them: ${facts.unchecked.join('; ')}` });
+      findings.push({ key, problem: said(facts.unchecked, 'before any role check, ', 'writes before any role check covers them: ') });
     }
     if (facts.checks > 0 && deep(false)) findings.push({ key, problem: `before any role check, ${tooDeep}: ${deep(false)}` });
   };
@@ -2359,7 +2502,7 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
       });
 
       it('Y-1: an import into src/ that names no file is fail-closed, not a package', () => {
-        const none = 'import of src/lib/i80/missing, which is no file the guard can read';
+        const none = 'readOnly: true but imports src/lib/i80/missing, which the guard cannot find (fail-closed): fix the specifier or add the file';
         red(header + "import { wipe } from '@/lib/i80/missing';\n" + fn('u1', ro + '  await wipe(id);\n'), 'u1', none);
         red(header + "import * as m from '../../../../../lib/i80/missing';\n" + fn('u2', ro + '  await m.wipe(id);\n'), 'u2', none);
         // Through a barrel that re-exports it.
@@ -2442,6 +2585,80 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
         const { findings } = findingsFor(file, text, ov);
         expect(findings).toEqual([{ key: `${file}#deeper`, problem: expect.stringContaining(`calls go deeper than ${MAX_DEPTH} modules`) }]);
         expect(findings[0]!.problem).not.toContain('but writes');
+      });
+    });
+
+    // İNCELEME-89 (TASK-MUO6ZZVUPY4IT, devop-fb) Y-4, TASK-MUO827UIF3IHL.
+    describe('İNCELEME-89 Y-4: import aliases', () => {
+      const file = 'app/[locale]/(app)/[workspace]/evidence/i89-mutant.ts';
+      const header = "'use server';\nimport { requireTenantAction } from '@/lib/tenant';\n";
+      const ro = '  await requireTenantAction({ readOnly: true });\n';
+      const fn = (name: string, body: string) => `export async function ${name}(id: string) {\n${body}}\n`;
+      const impl = "import { prisma } from '@/lib/db';\nexport async function wipe(id) { await prisma.evidence.delete({ where: { id } }); }\n";
+      const pkg = (imports: unknown) => JSON.stringify({ name: 'x', imports });
+      const tsc = (paths: unknown, extra = '') => `{\n  // comment\n  "compilerOptions": { ${extra}"paths": ${JSON.stringify(paths)} }\n}\n`;
+      const findings = (spec: string, key: string, overlay: Overlay) =>
+        findingsFor(file, header + `import { wipe } from '${spec}';\n` + fn(key, ro + '  await wipe(id);\n'), overlay).findings;
+      const red = (spec: string, key: string, problem: string, overlay: Overlay) =>
+        expect(findings(spec, key, overlay)).toEqual([{ key: `${file}#${key}`, problem: expect.stringContaining(problem) }]);
+      const writes = 'readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2';
+
+      it('the real tree: every alias is read, and `@/` is into src/', () => {
+        expect(aliasProblems(NO_OVERLAY)).toEqual([]);
+        expect(specBase('lib/x', '@/lib/./rbac', NO_OVERLAY)).toBe('lib/rbac');
+        expect(specBase('lib/x', 'zod', NO_OVERLAY)).toBeNull();
+      });
+
+      it('a package.json `imports` alias into src/ is walked (the probe: `#i89/*` → ./src/lib/i89/*.js)', () => {
+        const ov: Overlay = { [PACKAGE_JSON]: pkg({ '#i89/*': './src/lib/i89/*.js' }), 'lib/i89/legacy2.js': impl };
+        red('#i89/legacy2', 'p1', writes, ov);
+        // Exact keys and conditions (`node`/`default`) too.
+        red('#wipe', 'p2', writes, { ...ov, [PACKAGE_JSON]: pkg({ '#wipe': { node: './src/lib/i89/legacy2.js', default: './src/lib/i89/legacy2.js' } }) });
+      });
+
+      it('a new tsconfig `paths` alias into src/ is walked', () => {
+        const ov: Overlay = { [TSCONFIG_JSON]: tsc({ '@/*': ['./src/*'], '~lib/*': ['./src/lib/*'] }), 'lib/i89/legacy2.js': impl };
+        red('~lib/i89/legacy2', 't1', writes, ov);
+        red('@/lib/i89/legacy2', 't2', writes, ov);
+        // Relative to `baseUrl` when there is one.
+        red('~lib/i89/legacy2', 't3', writes, { ...ov, [TSCONFIG_JSON]: tsc({ '~lib/*': ['lib/*'] }, '"baseUrl": "./src", ') });
+      });
+
+      it('an alias into src/ the guard cannot pin to one file is fail-closed', () => {
+        const blind = 'which the guard cannot find (fail-closed)';
+        // Names no file.
+        red('#i89/missing', 'f1', 'imports src/lib/i89/missing.js, ' + blind, { [PACKAGE_JSON]: pkg({ '#i89/*': './src/lib/i89/*.js' }) });
+        // Two targets (fallbacks, or conditions that differ), one of them in src/.
+        const two = 'imports #two, an alias into src/ with more than one target, ' + blind;
+        red('~two', 'f2', two.replace('#two', '~two'), { [TSCONFIG_JSON]: tsc({ '~two': ['./src/lib/i89/a', './src/lib/i89/b'] }) });
+        red('#two', 'f3', two, { [PACKAGE_JSON]: pkg({ '#two': { node: './src/lib/i89/a.js', default: 'some-package' } }) });
+      });
+
+      it('an alias out of src/ is a package, as before', () => {
+        expect(findings('#ext', 'o1', { [PACKAGE_JSON]: pkg({ '#ext': 'some-package', '#out/*': './scripts/*.js' }) })).toEqual([]);
+        expect(findings('#out/x', 'o2', { [PACKAGE_JSON]: pkg({ '#out/*': './scripts/*.js' }) })).toEqual([]);
+      });
+
+      it('a config the guard does not read is red, not ignored', () => {
+        expect(aliasProblems({ [TSCONFIG_JSON]: '{ "extends": "./base.json", "compilerOptions": {} }' })).toEqual([
+          expect.stringContaining('tsconfig.json `extends`'),
+        ]);
+        expect(aliasProblems({ [PACKAGE_JSON]: JSON.stringify({ name: 'x', exports: { './a': './src/a.ts' } }) })).toEqual([
+          expect.stringContaining('package.json `exports`'),
+        ]);
+        expect(aliasProblems({ [TSCONFIG_JSON]: tsc({ '~a/*/b/*': ['./src/*/*'] }) })).toEqual([expect.stringContaining("'~a/*/b/*'")]);
+        expect(aliasProblems({ [PACKAGE_JSON]: pkg({ '#a/*': './src/lib/a.js' }) })).toEqual([expect.stringContaining("'#a/*'")]);
+      });
+
+      it('N-1: no two code files under src/ share a path but for the extension', () => {
+        // A bundler that tries `.js` before `.ts` (webpack) would build the file the guard did not walk.
+        const byStem = new Map<string, string[]>();
+        for (const f of sourceFiles(SRC)) {
+          const rel = path.relative(SRC, f).split(path.sep).join('/');
+          const stem = rel.replace(SOURCE_FILE, '');
+          byStem.set(stem, [...(byStem.get(stem) ?? []), rel]);
+        }
+        expect([...byStem.values()].filter((files) => files.length > 1)).toEqual([]);
       });
     });
 
