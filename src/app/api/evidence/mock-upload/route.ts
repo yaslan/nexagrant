@@ -6,15 +6,23 @@
  * was confirmed for a file that was never stored. Now the bytes land in the dev
  * store (`.dev-objects`), and confirm checks them exactly as it checks R2.
  *
- * It enforces what the signature enforces on R2: a key under the caller's own
- * tenant, the content type of the key's extension, and the size limit. It does
+ * It enforces what the signature enforces on R2: a staging key under the
+ * caller's own tenant, the content type of the key's extension, and the size
+ * limit. It does
  * not exist in production or when an object store is configured.
  */
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env';
 import { requireTenantApi } from '@/lib/tenant';
 import { asRole, can } from '@/lib/rbac';
-import { EVIDENCE_MAX_BYTES, evidenceUploadType, hasObjectStore, putObjectBytes, tenantObjectKeyOf } from '@/lib/storage';
+import {
+  EVIDENCE_MAX_BYTES,
+  evidenceUploadType,
+  finalKeyOfIncoming,
+  hasObjectStore,
+  putObjectBytes,
+  tenantObjectKeyOf,
+} from '@/lib/storage';
 
 export async function PUT(req: Request) {
   if (hasObjectStore || env.NODE_ENV === 'production') {
@@ -28,7 +36,11 @@ export async function PUT(req: Request) {
 
   const requested = new URL(req.url).searchParams.get('key');
   const key = tenantObjectKeyOf(auth.scope.tenantId, requested);
-  if (!key || key !== requested) return NextResponse.json({ error: 'invalid_object_key' }, { status: 403 });
+  // Only a staging key, as on R2 (D-1, TASK-MUNTTZ94LJWBC): a confirmed file
+  // lives under its final key, which no upload may name.
+  if (!key || key !== requested || !finalKeyOfIncoming(auth.scope.tenantId, key)) {
+    return NextResponse.json({ error: 'invalid_object_key' }, { status: 403 });
+  }
 
   const declared = Number(req.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > EVIDENCE_MAX_BYTES) {

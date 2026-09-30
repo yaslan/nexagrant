@@ -25,11 +25,11 @@ export default async function EvidencePage({
 
   // Redirects an anonymous visitor to login and a signed-in user with no
   // membership to /no-workspace. It cannot hand back a null or empty tenant.
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId, role } = await requireTenantPage(locale);
 
   let evidence: EvidenceItemData[] = [];
   try {
-    evidence = await loadEvidenceItems(tenantId);
+    evidence = await loadEvidenceItems(tenantId, role);
   } catch (e) {
     // Kept so an offline or unseeded database renders an empty pack instead of
     // a crash. The failure mode is now "no rows", never "other tenants' rows".

@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 
 import { prisma, withTenantOn, assertTenantScope } from '@/lib/db';
+import { evidenceReadWhere } from '@/lib/evidence-access';
 import type { EvidenceItemData } from './evidence-client';
 
 /**
@@ -28,13 +29,19 @@ import type { EvidenceItemData } from './evidence-client';
  */
 export async function loadEvidenceItems(
   tenantId: string,
+  role: string | null | undefined,
   client: PrismaClient = prisma,
 ): Promise<EvidenceItemData[]> {
   assertTenantScope(tenantId, 'loadEvidenceItems');
 
+  // Y-1 (TASK-MUNTTZ94LJWBC): what the role may read — nothing for the external
+  // partner, the open levels only below `edit_proposal` (src/lib/evidence-access.ts).
+  const readable = evidenceReadWhere(role);
+  if (!readable) return [];
+
   const items = await withTenantOn(client, tenantId, (tx) =>
     tx.evidence.findMany({
-      where: { tenantId },
+      where: { tenantId, ...readable },
       // The detail drawer distinguishes "no claim is linked" from "claims were
       // not loaded", so the links have to come with the first render, not only
       // from getEvidenceItemsAction.
