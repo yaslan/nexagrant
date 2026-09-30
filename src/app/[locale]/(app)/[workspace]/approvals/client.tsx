@@ -291,7 +291,7 @@ export default function ApprovalsClient({
             return (
               <div
                 key={req.id}
-                className="p-5 bg-surface dark:bg-zinc-900 border border-border dark:border-gray-800 rounded-xl shadow-sm hover:border-border transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+                className="p-5 bg-surface dark:bg-zinc-900 border border-border dark:border-gray-800 rounded-xl shadow-sm hover:border-border transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
               >
                 {/* A link pasted into the title or description is one unbreakable word. In the
                     phone column the card's items-start would size this block to that word, so

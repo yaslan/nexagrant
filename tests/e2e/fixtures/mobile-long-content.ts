@@ -29,6 +29,8 @@ export function longContentFixture(run: string) {
     opportunityTitle: `WP3 bütçe revizyonu — ${LONG_URL}`,
     mineId: `mobile-long-mine-${run}`,
     theirsId: `mobile-long-theirs-${run}`,
+    rejectedId: `mobile-long-rejected-${run}`,
+    longEmailRequester: `approvals-requester-long-email-${run}@consortium.example.test`,
     requestTitle: `Bütçe revizyonu onayı: ${LONG_URL}`,
     requestDescription: `Revize bütçe tablosu: ${LONG_URL} (WP3, 2027 Q1)`,
   };
@@ -37,6 +39,15 @@ export function longContentFixture(run: string) {
 export type LongContentFixture = ReturnType<typeof longContentFixture>;
 
 export async function plant(f: LongContentFixture) {
+  await prisma.user.upsert({
+    where: { email: f.longEmailRequester },
+    update: {},
+    create: {
+      id: `mobile-long-requester-${f.rejectedId}`,
+      email: f.longEmailRequester,
+      name: null,
+    },
+  });
   await prisma.opportunity.create({
     data: {
       id: f.opportunityId,
@@ -48,23 +59,17 @@ export async function plant(f: LongContentFixture) {
   });
   const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
   await prisma.approvalRequest.createMany({
-    data: [f.mineId, f.theirsId].map((id) => ({
-      id,
-      tenantId: TENANT_ID,
-      workspaceId: WORKSPACE_ID,
-      actionType: 'BUDGET_ALLOCATION',
-      title: f.requestTitle,
-      description: f.requestDescription,
-      payload: { amount: 125000, currency: 'EUR' },
-      requesterId: id === f.mineId ? ADMIN_ID : OTHER_ID,
-      expiresAt,
-    })),
+    data: [
+      { id: f.mineId, tenantId: TENANT_ID, workspaceId: WORKSPACE_ID, actionType: 'BUDGET_ALLOCATION', title: f.requestTitle, description: f.requestDescription, payload: { amount: 125000, currency: 'EUR' }, requesterId: ADMIN_ID, expiresAt },
+      { id: f.theirsId, tenantId: TENANT_ID, workspaceId: WORKSPACE_ID, actionType: 'BUDGET_ALLOCATION', title: f.requestTitle, description: f.requestDescription, payload: { amount: 125000, currency: 'EUR' }, requesterId: OTHER_ID, expiresAt },
+      { id: f.rejectedId, tenantId: TENANT_ID, workspaceId: WORKSPACE_ID, actionType: 'BUDGET_ALLOCATION', title: f.requestTitle, description: f.requestDescription, payload: { amount: 125000, currency: 'EUR' }, requesterId: f.longEmailRequester, status: 'REJECTED', rejectionReason: 'WP3_ButceRevizyonu_PreTerm_Adjustment_2027Q1_ConsortiumPartnerReview_LongNameWithoutBreakOpportunity', expiresAt },
+    ],
   });
 }
 
 export async function remove(f: LongContentFixture) {
   const requests = await prisma.approvalRequest.deleteMany({
-    where: { id: { in: [f.mineId, f.theirsId] } },
+    where: { id: { in: [f.mineId, f.theirsId, f.rejectedId] } },
   });
   const opportunities = await prisma.opportunity.deleteMany({
     where: { id: requireId(f.opportunityId, 'opportunityId') },
