@@ -177,6 +177,11 @@ describe('Partner portal magic link', () => {
     expect(await lib.m11.addBudgetLineByToken(raw, 'ACME', 2)).toEqual({ success: false });
     expect(await budgetLines()).toBe(0);
 
+    // A deletion scheduled for later is closed as well: "set" means deleted.
+    await softDelete(tenantId, new Date(Date.now() + 86_400_000));
+    expect(await lib.m11.addBudgetLineByToken(raw, 'ACME', 2)).toEqual({ success: false });
+    expect(await budgetLines()).toBe(0);
+
     await softDelete(tenantId, null);
     const ok = await lib.m11.addBudgetLineByToken(raw, 'ACME', 2);
     expect(ok.success).toBe(true);
@@ -192,6 +197,11 @@ describe('Partner portal magic link', () => {
     await expect(lib.portal.default({ params })).resolves.toBeTruthy();
 
     await softDelete(tenantId, new Date());
+    await expect(lib.portal.default({ params })).rejects.toBe(notFoundMarker);
+    expect(await title()).not.toContain(`${RUN} portal opp read`);
+
+    // A deletion scheduled for later is closed as well: "set" means deleted.
+    await softDelete(tenantId, new Date(Date.now() + 86_400_000));
     await expect(lib.portal.default({ params })).rejects.toBe(notFoundMarker);
     expect(await title()).not.toContain(`${RUN} portal opp read`);
 
@@ -239,6 +249,9 @@ describe('cron fan-outs leave a soft-deleted tenant out', () => {
       return { searches: mine(searches), actions: mine(actions) };
     };
 
+    expect(await tenantsSeen()).toEqual({ searches: [live], actions: [live] });
+    // A deletion scheduled for later is left out as well: "set" means deleted.
+    await softDelete(gone, new Date(Date.now() + 86_400_000));
     expect(await tenantsSeen()).toEqual({ searches: [live], actions: [live] });
     await softDelete(gone, null);
     expect(await tenantsSeen()).toEqual({ searches: [live, gone].sort(), actions: [live, gone].sort() });
