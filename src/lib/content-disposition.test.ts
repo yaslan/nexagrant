@@ -71,6 +71,26 @@ describe('attachmentContentDisposition (TASK-MUNDTW8O2IV6V, İNCELEME-53 B-3)', 
     expect(decodedStar(attachmentContentDisposition('kırık \uD83D başlık', '.docx', 'N'))).toBe('kırık � başlık.docx');
   });
 
+  it('digits only ("2030") uses the digits in ASCII; slashes-only ("///") falls back (Ö-5)', () => {
+    const digitsOnly = attachmentContentDisposition('2030', '.docx', 'ConceptNote');
+    expect(asciiPart(digitsOnly)).toBe('2030.docx');
+    expect(decodedStar(digitsOnly)).toBe('2030.docx');
+
+    const slashesOnly = attachmentContentDisposition('///', '.docx', 'ConceptNote');
+    expect(asciiPart(slashesOnly)).toBe('ConceptNote.docx');
+    expect(decodedStar(slashesOnly)).toBe('___.docx');
+  });
+
+  it('punctuation-starting titles keep punctuation, not fallback (Ö-5)', () => {
+    const punctStart = attachmentContentDisposition('!Important Announcement', '.docx', 'ConceptNote');
+    expect(asciiPart(punctStart)).toBe('!Important Announcement.docx');
+    expect(decodedStar(punctStart)).toBe('!Important Announcement.docx');
+
+    const dotStart = attachmentContentDisposition('.hidden', '.docx', 'ConceptNote');
+    expect(asciiPart(dotStart)).toBe('.hidden.docx');
+    expect(decodedStar(dotStart)).toBe('.hidden.docx');
+  });
+
   it('caps the name at 120 code points without splitting an emoji', () => {
     const header = attachmentContentDisposition('ş'.repeat(119) + '🚀🚀🚀', '.docx', 'N');
     expect(decodedStar(header)).toBe('ş'.repeat(119) + '🚀.docx');
