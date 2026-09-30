@@ -61,6 +61,8 @@ describe('Y-1: a caught value handed back by another module', () => {
     ['a method of an exported class', "import { Svc } from '@/lib/svc';", "const r = await new Svc().run();\nreturn { error: r };", { 'src/lib/svc.ts': "export class Svc {\n  async run() { try { await go(); return 'ok'; } catch (e) { return String(e); } }\n}\n" }],
     ['an export built by a local factory', "import { run } from '@/lib/svc';", "return { error: await run() };", { 'src/lib/svc.ts': "function make() { return async () => { try { await go(); return 'ok'; } catch (e) { return String(e); } }; }\nexport const run = make();\n" }],
     ['a destructured export of a factory', "import { run } from '@/lib/svc';", "return { error: await run() };", { 'src/lib/svc.ts': "function make() { return { run: async () => { try { await go(); return 'ok'; } catch (e) { return String(e); } } }; }\nexport const { run } = make();\n" }],
+    ['an export built by a factory in another module', "import { run } from '@/lib/svc';", "return { error: await run() };", { 'src/lib/svc.ts': "import { make } from './factory';\nexport const run = make();\n", 'src/lib/factory.ts': "export function make() { return async () => { try { await go(); return 'ok'; } catch (e) { return String(e); } }; }\n" }],
+    ['a helper of the service that returns what it caught', "import { run } from '@/lib/svc';", "return { error: await run() };", { 'src/lib/svc.ts': "async function inner() { try { await go(); return 'ok'; } catch (e) { return String(e); } }\nexport async function run() { return inner(); }\n" }],
     ['a callback that returns what it caught', "import { all } from '@/lib/svc';", "return { results: all([id]) };", { 'src/lib/svc.ts': "export function all(ids: string[]) { return ids.map((i) => { try { go(i); return 'ok'; } catch (e) { return String(e); } }); }\n" }],
     ['a getter that returns what it caught', "import { describeFailure } from '@/lib/svc';", "return { error: describeFailure().d };", { 'src/lib/svc.ts': "export function describeFailure() { try { go(); return { d: 'ok' }; } catch (e) { const o = { get d() { return String(e); } }; return o; } }\n" }],
     ['a service that writes the caught text into the caller\'s object', "import { fill } from '@/lib/svc';", "const out: Record<string, unknown> = { ok: false };\ntry { await go(); } catch (e) { fill(out, e); }\nreturn out;", { 'src/lib/svc.ts': "export function fill(o: Record<string, unknown>, x: unknown) { o.detail = String(x); }\n" }],
@@ -99,6 +101,8 @@ describe('Y-1: a caught value handed back by another module', () => {
       ["import { logger } from '@/lib/logger';", "try { await go(); } catch (e) { logger.error('x', e); }\nreturn { ok: logger.ready };", { 'src/lib/logger.ts': "export const logger = { ready: true, error(m: string, e: unknown) { console.error(m, e); } };\n" }],
       // A catch in another export of the same module is not this export's.
       ["import { ok } from '@/lib/svc';", "return { ok: ok() };", { 'src/lib/svc.ts': LEAKY_SERVICE + "export function ok() { return 'ok'; }\n" }],
+      // `export *` of a module whose export is clean.
+      ["import { ok } from '@/lib/a';", "return { ok: ok() };", { 'src/lib/a.ts': "export * from './b';\n", 'src/lib/b.ts': "export function ok() { return 'ok'; }\n" }],
       // A factory from a package.
       ["import { run } from '@/lib/svc';", "return { r: await run() };", { 'src/lib/svc.ts': "import NextAuth from 'next-auth';\nconst config = { providers: [] };\nexport const { auth: run } = NextAuth(config);\n" }],
     ] as const;
