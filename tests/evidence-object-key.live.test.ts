@@ -129,16 +129,14 @@ beforeEach(({ skip }) => {
 
 afterAll(async () => {
   if (admin) {
-    const ids = presentIds(evidenceIds);
-    if (ids.length) await admin.evidence.deleteMany({ where: { id: { in: ids } } }).catch(() => {});
+    await admin.evidence.deleteMany({ where: { id: { in: presentIds(evidenceIds) } } }).catch(() => {});
     for (const tenantId of presentIds([t.a, t.b])) {
       await admin.evidence.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } }).catch(() => {});
       await admin.tenant.delete({ where: { id: tenantId } }).catch(() => {});
       // Only this run's tenant directories; the store's other contents are untouched.
       await rm(join(STORE, requireId(tenantId, 'tenantId')), { recursive: true, force: true });
     }
-    const users = presentIds([t.userA, t.userB]);
-    if (users.length) await admin.user.deleteMany({ where: { id: { in: users } } }).catch(() => {});
+    await admin.user.deleteMany({ where: { id: { in: presentIds([t.userA, t.userB]) } } }).catch(() => {});
     await admin.$disconnect();
   }
   await state.rls?.$disconnect();
