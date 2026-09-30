@@ -294,10 +294,12 @@ export default function ApprovalsClient({
                 className="p-5 bg-surface dark:bg-zinc-900 border border-border dark:border-gray-800 rounded-xl shadow-sm hover:border-border transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
               >
                 {/* A link pasted into the title or description is one unbreakable word. In the
-                    phone column the card's items-start would size this block to that word, so
-                    it takes the full width there; in the md row min-w-0 lets it shrink beside
-                    the actions. break-words then breaks the link inside the card. */}
-                <div className="space-y-2 w-full md:w-auto flex-1 min-w-0 break-words">
+                    column the card's items-start would size this block to that word, so it
+                    takes the full width there; in the lg row min-w-0 lets it shrink beside the
+                    actions. break-words then breaks the link inside the card. The row starts at
+                    lg, not md: at 768 the sidebar leaves <main> 512px, and beside the three
+                    action buttons the text got ~80px and split ordinary words mid-letter. */}
+                <div className="space-y-2 w-full lg:w-auto flex-1 min-w-0 break-words">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium border ${typeInfo.color}`}>
                       {typeInfo.label}
@@ -341,7 +343,7 @@ export default function ApprovalsClient({
                 </div>
 
                 {/* Actions Button Bar */}
-                <div className="flex items-center gap-2 self-end md:self-center">
+                <div className="flex items-center gap-2 self-end lg:self-center">
                   <button
                     onClick={() => setSelectedRequestDetails(req)}
                     className="px-3 py-1.5 text-xs font-medium text-ink-2 dark:text-gray-300 bg-surface border border-border hover:bg-surface-hover dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"

@@ -9,6 +9,7 @@ import {
   longContentFixture,
   mainOverflow,
   plant,
+  PLANTED_ROWS,
   remove,
   stretchTexts,
 } from './fixtures/mobile-long-content';
@@ -83,7 +84,7 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.afterAll(async () => {
-  if (planted) expect(await remove(LONG), 'every planted row must be removed').toBe(3);
+  if (planted) expect(await remove(LONG), 'every planted row must be removed').toBe(PLANTED_ROWS);
   await prisma.$disconnect();
 });
 
@@ -138,8 +139,10 @@ test.describe('long real-world content stays inside <main>', () => {
     const { ctx, page } = await openAt(browser, '/tr/fabrika-beta/approvals', 320);
     const main = page.locator('main');
 
-    // Default tab: someone else's request, with the approve/reject buttons.
+    // Default tab: someone else's request, with the approve/reject buttons and
+    // the requester's e-mail (no name) under it.
     await expect(main.getByRole('heading', { name: LONG.requestTitle })).toBeVisible({ timeout: 30_000 });
+    await expect(main.getByText(LONG.requesterEmail)).toBeVisible();
     await expectNoOverflowAcross(page, 'approvals / actionable');
 
     // "My requests": the request this admin raised, with the withdraw button.
@@ -148,12 +151,21 @@ test.describe('long real-world content stays inside <main>', () => {
     await expectHydrated(mine);
     await mine.click();
     await expect(main.getByRole('heading', { name: LONG.requestTitle })).toHaveCount(1);
+    // …and the rejected one, whose reason is a single unbroken word.
+    await expect(main.getByText(LONG.rejectionReason)).toBeVisible();
     await expectNoOverflowAcross(page, 'approvals / my requests');
 
     // Detail modal at the narrowest width: the long title must not push the
-    // close button off the screen.
+    // close button off the screen. The pending request's own card, not
+    // whichever card the list happens to sort first.
     await page.setViewportSize({ width: 320, height: 800 });
-    await main.getByRole('button', { name: /Detay/ }).first().click();
+    await main
+      .locator('div')
+      .filter({ has: page.getByRole('heading', { name: LONG.requestTitle }) })
+      .filter({ has: page.getByRole('button', { name: /Detay/ }) })
+      .last()
+      .getByRole('button', { name: /Detay/ })
+      .click();
     const close = page.getByRole('button', { name: '×' });
     await expect(close).toBeVisible();
     const box = await close.boundingBox();
@@ -180,6 +192,22 @@ test.describe('long real-world content stays inside <main>', () => {
       await page.setViewportSize({ width, height: 800 });
       await page.waitForTimeout(200);
       expect(await isBelow(actions, heading), `opportunity actions at ${width}px below the title`).toBe(below);
+    }
+
+    // "Arşivle" asks first, in a band that repeats the title (İNCELEME-109 Y-1).
+    // Opening it archives nothing; only its confirm button would.
+    await page.setViewportSize({ width: 320, height: 800 });
+    const archive = page.getByTestId('pipeline-archive');
+    await expectHydrated(archive);
+    await archive.click();
+    const band = page.getByTestId('pipeline-archive-confirm');
+    await expect(band).toBeVisible();
+    await expectNoOverflowAcross(page, 'opportunity archive confirmation');
+    // <main> can stay level while the text runs out of the amber box (390px).
+    for (const width of LONG_WIDTHS) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.waitForTimeout(200);
+      expect(await band.evaluate((el) => el.scrollWidth - el.clientWidth), `archive band at ${width}px`).toBe(0);
     }
     await ctx.close();
   });

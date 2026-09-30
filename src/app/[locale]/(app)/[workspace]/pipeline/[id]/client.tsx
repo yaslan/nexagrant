@@ -221,8 +221,10 @@ export function OpportunityDetailClient({
           >
             <p id="archive-confirm-title" className="font-semibold flex items-center gap-2">
               <Archive className="w-4 h-4 shrink-0" aria-hidden="true" />
+              {/* Bare text here would be an anonymous flex item as wide as the title's longest
+                  word; a pasted link pushed <main> sideways by up to 387px at 320. */}
               <span className="min-w-0 break-words">
-                {t("detail.archive.confirmTitle", { title: opportunity.title })}
+                {t('detail.archive.confirmTitle', { title: opportunity.title })}
               </span>
             </p>
             <p className="mt-1 text-xs opacity-90">{t('detail.archive.confirmBody')}</p>
