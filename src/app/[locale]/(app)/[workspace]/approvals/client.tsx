@@ -293,7 +293,11 @@ export default function ApprovalsClient({
                 key={req.id}
                 className="p-5 bg-surface dark:bg-zinc-900 border border-border dark:border-gray-800 rounded-xl shadow-sm hover:border-border transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
               >
-                <div className="space-y-2 flex-1">
+                {/* A link pasted into the title or description is one unbreakable word. In the
+                    phone column the card's items-start would size this block to that word, so
+                    it takes the full width there; in the md row min-w-0 lets it shrink beside
+                    the actions. break-words then breaks the link inside the card. */}
+                <div className="space-y-2 w-full md:w-auto flex-1 min-w-0 break-words">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium border ${typeInfo.color}`}>
                       {typeInfo.label}
@@ -427,8 +431,8 @@ export default function ApprovalsClient({
       {selectedRequestDetails && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface dark:bg-zinc-900 border border-border dark:border-gray-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
+            <div className="flex justify-between items-start gap-3">
+              <div className="min-w-0 break-words">
                 <h3 className="text-lg font-bold text-ink dark:text-white">{selectedRequestDetails.title}</h3>
                 <span className="text-xs text-muted">{t('requestIdLabel')}: {selectedRequestDetails.id}</span>
               </div>
