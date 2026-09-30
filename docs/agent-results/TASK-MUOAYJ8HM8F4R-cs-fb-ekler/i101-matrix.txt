@@ -1,0 +1,92 @@
+TRACE zod
+  'paths' option is specified, looking for a pattern to match module name 'zod'.
+  Module name 'zod', matched pattern '*'.
+  Loading module as file / folder, candidate module location '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101/src/zod', target file types: TypeScript, Declaration.
+  Loading module 'zod' from 'node_modules' folder, target file types: TypeScript, Declaration.
+  ======== Module name 'zod' was successfully resolved to '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101/node_modules/zod/index.d.cts' with Package ID 'zod/index.d.cts@4.5.4'. ========
+TRACE #q/legacy2
+  'paths' option is specified, looking for a pattern to match module name '#q/legacy2'.
+  Module name '#q/legacy2', matched pattern '#q/*'.
+  Loading module as file / folder, candidate module location '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101/scripts/legacy2', target file types: TypeScript, Declaration.
+  Loading module '#q/legacy2' from 'node_modules' folder, target file types: TypeScript, Declaration.
+  'paths' option is specified, looking for a pattern to match module name '#q/legacy2'.
+  Module name '#q/legacy2', matched pattern '#q/*'.
+  Loading module as file / folder, candidate module location '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101/scripts/legacy2', target file types: JavaScript.
+  Loading module '#q/legacy2' from 'node_modules' folder, target file types: JavaScript.
+  ======== Module name '#q/legacy2' was not resolved. ========
+TRACE zod
+  'baseUrl' option is set to '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101', using this value to resolve non-relative module name 'zod'.
+  'paths' option is specified, looking for a pattern to match module name 'zod'.
+  'baseUrl' option is set to '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101', using this value to resolve non-relative module name 'zod'.
+  Loading module as file / folder, candidate module location '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101/zod', target file types: TypeScript, Declaration.
+  Loading module 'zod' from 'node_modules' folder, target file types: TypeScript, Declaration.
+  ======== Module name 'zod' was successfully resolved to '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101/node_modules/zod/index.d.cts' with Package ID 'zod/index.d.cts@4.5.4'. ========
+TRACE lib/i89/legacy2
+  'baseUrl' option is set to '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101/src', using this value to resolve non-relative module name 'lib/i89/legacy2'.
+  'paths' option is specified, looking for a pattern to match module name 'lib/i89/legacy2'.
+  Module name 'lib/i89/legacy2', matched pattern 'lib/*'.
+  Loading module as file / folder, candidate module location '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101/scripts/i89/legacy2', target file types: TypeScript, Declaration.
+  Loading module 'lib/i89/legacy2' from 'node_modules' folder, target file types: TypeScript, Declaration.
+  'baseUrl' option is set to '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101/src', using this value to resolve non-relative module name 'lib/i89/legacy2'.
+  'paths' option is specified, looking for a pattern to match module name 'lib/i89/legacy2'.
+  Module name 'lib/i89/legacy2', matched pattern 'lib/*'.
+  Loading module as file / folder, candidate module location '/private/tmp/claude-501/-Users-macbook-alan/e23fa8e3-190d-4dc6-af5a-85a18f68dd2c/scratchpad/wt101/scripts/i89/legacy2', target file types: JavaScript.
+  Loading module 'lib/i89/legacy2' from 'node_modules' folder, target file types: JavaScript.
+  ======== Module name 'lib/i89/legacy2' was not resolved. ========
+A1 imports joker | #q/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+A2 koşullu iç içe aynı hedef | #w | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+A3 types≠default | #w | tsc=SRC:lib/i89/legacy2.js | guard=CLOSED | ok(closed) | findings=["readOnly: true but imports #w, an alias into src/ with more than one target, which the guard cannot find (fail"] | problems=[]
+A4 dizi tek | #w | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+A5 dizi src+paket | #w | tsc=SRC:lib/i89/legacy2.js | guard=CLOSED | ok(closed) | findings=["readOnly: true but imports #w, an alias into src/ with more than one target, which the guard cannot find (fail"] | problems=[]
+A6 en uzun önek | #q/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+A7 eşit önek (Y-2) | #q/legacy2.js | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+A7b sıra ters | #q/legacy2.js | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+A8 SRC büyük harf (N-1) | #q/legacy2 | tsc=NONE | guard=OUT/PKG | ok | findings=[] | problems=[]
+A9 ./x/../src | #q/legacy2 | tsc=NONE | guard=SRC:lib/i89/legacy2.js | FP | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+A10 null hedef | #q/legacy2 | tsc=NONE | guard=OUT/PKG | ok | findings=[] | problems=[]
+B1 paths joker | ~l/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+B2 paths çoklu farklı | ~l/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=CLOSED | ok(closed) | findings=["readOnly: true but imports ~l/i89/legacy2, an alias into src/ with more than one target, which the guard canno"] | problems=[]
+B3 paths çoklu aynı | ~l/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+B4 catch-all → zod (B-1) | zod | tsc=OUT:pkg | guard=OUT/PKG | ok | findings=[] | problems=[]
+B4b catch-all → lib | lib/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+B5 baseUrl . + src/… (Y-1) | src/lib/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+B6 baseUrl ./src + lib/… | lib/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+B8 tsconfig→scripts(yok), imports→src | #q/legacy2 | tsc=NONE | guard=SRC:lib/i89/legacy2.js | FP | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+C1 src dışı | #o/x | tsc=NONE | guard=OUT/PKG | ok | findings=[] | problems=[]
+D1 dosyasız src alias | #q/nope | tsc=NONE | guard=CLOSED | closed(strict) | findings=["readOnly: true but imports src/lib/i89/nope.js, which the guard cannot find (fail-closed): fix the specifier o"] | problems=[]
+N1 baseUrl+paths birlikte (hedef baseUrl göreli) | ~l/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+N2 paths göreli hedef, baseUrl yok | ~l/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+N3 baseUrl yok, çıplak lib/… (paket kalmalı) | lib/i89/legacy2 | tsc=NONE | guard=OUT/PKG | ok | findings=[] | problems=[]
+N3b baseUrl yok, zod | zod | tsc=OUT:pkg | guard=OUT/PKG | ok | findings=[] | problems=[]
+N3c baseUrl . , zod (paket kalmalı) | zod | tsc=OUT:pkg | guard=OUT/PKG | ok | findings=[] | problems=[]
+N3d baseUrl ./src , next/server | next/server | tsc=OUT:pkg | guard=OUT/PKG | ok | findings=[] | problems=[]
+N4 extends ile gelen baseUrl | lib/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=OUT/PKG | FAIL-OPEN | findings=[] | problems=["tsconfig.json `extends`: the guard reads `paths` from tsconfig.json alone"]
+N5 imports koşullu nesne + eşit önek | #q/legacy2.js | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+N5b koşullu nesne + eşit önek, koşullar farklı | #q/legacy2.js | tsc=SRC:lib/i89/legacy2.js | guard=CLOSED | ok(closed) | findings=["readOnly: true but imports #q/legacy2.js, an alias into src/ with more than one target, which the guard cannot"] | problems=[]
+N5c koşullu nesne kısa anahtarda, eşit önek | #q/legacy2.js | tsc=NONE | guard=OUT/PKG | ok | findings=[] | problems=[]
+N6 catch-all + @/lib/rbac | @/lib/rbac | tsc=SRC:lib/rbac.ts | guard=SRC:lib/rbac | ok | findings=[] | problems=[]
+N6b catch-all + @prisma/client | @prisma/client | tsc=OUT:pkg | guard=OUT/PKG | ok | findings=[] | problems=[]
+N6c catch-all + zod/v4 (alt yol) | zod/v4 | tsc=OUT:pkg | guard=OUT/PKG | ok | findings=[] | problems=[]
+N6d catch-all + node:fs | node:fs | tsc=NONE | guard=OUT/PKG | ok | findings=[] | problems=[]
+N7 catch-all, src'ye çözülen çıplak | lib/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+N8 çok hedefli src-dışı (yok) + baseUrl ./src | lib/i89/legacy2 | tsc=NONE | guard=OUT/PKG | ok | findings=[] | problems=[]
+N8b catch-all çok hedefli src-dışı + baseUrl ./src | lib/i89/legacy2 | tsc=NONE | guard=OUT/PKG | ok | findings=[] | problems=[]
+N8c tek hedef src-dışı (yok) + baseUrl ./src | lib/i89/legacy2 | tsc=NONE | guard=SRC:lib/i89/legacy2.js | FP | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+N8d eşit önek iki src-dışı (yok) + baseUrl ./src | lib/i89/legacy2.js | tsc=NONE | guard=OUT/PKG | ok | findings=[] | problems=[]
+N8e çok hedefli src-dışı + imports→src | #q/legacy2 | tsc=NONE | guard=CLOSED | closed(strict) | findings=["readOnly: true but imports #q/legacy2, an alias into src/ with more than one target, which the guard cannot fi"] | problems=[]
+N9 baseUrl ters bölü .\\src | lib/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=OUT/PKG | FAIL-OPEN | findings=[] | problems=[]
+N9b paths hedefi ters bölü | ~l/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=OUT/PKG | FAIL-OPEN | findings=[] | problems=[]
+N10 mutlak baseUrl | lib/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=OUT/PKG | FAIL-OPEN | findings=[] | problems=[]
+N11 baseUrl ../<repo>/src | lib/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=OUT/PKG | FAIL-OPEN | findings=[] | problems=[]
+N12 baseUrl . + açık uzantı | src/lib/i89/legacy2.js | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+N13 exact paths anahtarı + baseUrl | ~one | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+N14 baseUrl ./src/ (sonda /) | lib/i89/legacy2 | tsc=SRC:lib/i89/legacy2.js | guard=SRC:lib/i89/legacy2.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2.js))"] | problems=[]
+N15 paths hedefi src dizini (index) | ~d | tsc=SRC:lib/i89/index.js | guard=SRC:lib/i89/index.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/index.js:2, via wipe (lib/i89/index.js))"] | problems=[]
+N16 baseUrl . + src/lib/i89 dizini (index) | src/lib/i89 | tsc=SRC:lib/i89/index.js | guard=SRC:lib/i89/index.js | ok | findings=["readOnly: true but writes: prisma.evidence.delete (lib/i89/index.js:2, via wipe (lib/i89/index.js))"] | problems=[]
+today: distinct bare=263 {"ok":263} bad=[]
+catch-all: distinct bare=263 {"ok":263} bad=[]
+baseUrl .: distinct bare=263 {"ok":263} bad=[]
+baseUrl ./src: distinct bare=263 {"ok":263} bad=[]
+      Tests  3 passed | 62 skipped (65)
+   Start at  19:16:53
+   Duration  1.62s (transform 99ms, setup 0ms, import 971ms, tests 556ms, environment 0ms)
