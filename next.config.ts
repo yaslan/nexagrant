@@ -53,9 +53,18 @@ const nextConfig: NextConfig = {
    *
    * Listed host by host on purpose: a wildcard would let any URL pasted into the blog admin form
    * run through the image optimiser.
+   *
+   * `lh3.googleusercontent.com` is the Google profile picture Auth.js stores in `User.image`
+   * for a Google sign-in; the app shell renders it through `next/image`. Without it every
+   * Google user's avatar was a 400 `"url" parameter is not allowed` (TASK-MUNRB2037NA5V,
+   * İNCELEME-57 Ö-5). https only, that one host; it is still served from `/_next/image`, so
+   * the CSP `img-src 'self'` covers it and needs no new host.
    */
   images: {
-    remotePatterns: [{ protocol: 'https', hostname: 'images.unsplash.com' }],
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+    ],
   },
   /**
    * Ask the browser for the OS colour-scheme preference on every request.
