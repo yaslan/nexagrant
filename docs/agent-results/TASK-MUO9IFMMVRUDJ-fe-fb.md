@@ -117,5 +117,5 @@ Merge sonrası kapılar §6'da.
   tsc=0 · lint=0 · i18n=0 · build=0
   CI=true npx vitest run: Test Files 297 passed | 2 skipped (299) · Tests 3836 passed | 9 skipped (3845)
   ```
-- dev'e `--no-ff` merge edildi, push yok.
+- dev'e `--no-ff` merge edildi (`6d791a4c`), push yok. Merge sırasında dev'e üç commit daha girmişti (`d83d14a5` M4 yayın penceresi dahil). Bu yüzden merge sonrası dev ucunda son kontrol yapıldı: `tsc=0`, `CI=true npx vitest run` → Test Files 297 passed | 2 skipped · Tests 3836 passed | 9 skipped.
 - Temizlik: `fefb9i-pg` ve `fefb9i-minio` kapları ile worktree rapordan sonra kaldırıldı.
