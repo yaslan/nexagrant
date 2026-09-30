@@ -1,0 +1,2 @@
+SELECT "public"."User"."id", "public"."User"."name", "public"."User"."isPlatformAdmin" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+SELECT "public"."Membership"."id", "public"."Membership"."tenantId", "public"."Membership"."role"::text, "public"."Membership"."workspaceIds", "public"."Membership"."userId" FROM "public"."Membership" LEFT JOIN "public"."Tenant" AS "j0" ON ("j0"."id") = ("public"."Membership"."tenantId") WHERE ((("j0"."deletedAt" IS NULL AND ("j0"."id" IS NOT NULL)) AND "public"."Membership"."tenantId" = $1) AND "
