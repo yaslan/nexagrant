@@ -1,0 +1,18 @@
+S="/private/tmp/claude-501/-Users-macbook-alan/96f6579a-034b-4d0c-91ac-1c4d46bce391/scratchpad"
+cd "$S/wt"
+export DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:5491/fabrika
+TID=$(python3 -c "import json;print(json.load(open('$S/fx.json'))['tenantId'])")
+KEY=$(python3 -c "import json;print(json.load(open('$S/fx.json'))['key'])")
+TOK=$(python3 -c "import json;print(json.load(open('$S/fx.json'))['tok'])")
+B=http://127.0.0.1:3491
+probe() {
+  for r in opportunities calls partners; do
+    code=$(curl -s -o "$S/body.txt" -w '%{http_code}' -H "x-api-key: $KEY" "$B/api/v1/$r")
+    echo "  [$1] GET /api/v1/$r -> $code · gizli başlık gövdede: $(/usr/bin/grep -c 'GIZLI FIRSAT' "$S/body.txt") · code=$(python3 -c "import json;print(json.load(open('$S/body.txt')).get('code','-'))" 2>/dev/null)"
+  done
+  code=$(curl -s -o "$S/page.html" -w '%{http_code}' "$B/en/portal/partner/$TOK")
+  echo "  [$1] GET /en/portal/partner/<token> -> $code · fırsat başlığı HTML'de: $(/usr/bin/grep -c 'GIZLI FIRSAT' "$S/page.html")"
+}
+echo "A) canlı kiracı"; probe canli
+pnpm exec tsx probe-fixture.ts del "$TID"; echo "B) deletedAt = now()"; probe silinmis
+pnpm exec tsx probe-fixture.ts restore "$TID"; echo "C) deletedAt = NULL (geri alındı)"; probe geri
