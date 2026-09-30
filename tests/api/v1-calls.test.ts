@@ -63,6 +63,8 @@ const dbBox = vi.hoisted(() => ({ client: undefined as unknown }));
 
 vi.mock('../../src/lib/db', () => {
   const client = {
+    // authenticateApiKey's per-key rate-limit UPDATE ... RETURNING (TASK-MUN80XIW5NPV1): first request of a window.
+    $queryRaw: vi.fn().mockResolvedValue([{ count: 1, windowStartedAt: new Date() }]),
     apiKey: {
       findUnique: vi.fn().mockImplementation(async ({ where }) =>
         where.keyHash === TEST_API_KEY_HASH ? TEST_API_KEY_ROW : null

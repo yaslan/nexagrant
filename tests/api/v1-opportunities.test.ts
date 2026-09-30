@@ -43,6 +43,8 @@ const OPPORTUNITY_ROW = {
 };
 
 const mockDb = vi.hoisted(() => ({
+  // authenticateApiKey's per-key rate-limit UPDATE ... RETURNING (TASK-MUN80XIW5NPV1): first request of a window.
+  $queryRaw: vi.fn().mockResolvedValue([{ count: 1, windowStartedAt: new Date() }]),
   apiKey: {
     findUnique: vi.fn(),
     update: vi.fn().mockResolvedValue({}),

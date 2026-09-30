@@ -1,0 +1,51 @@
+ FAIL  src/lib/billing/public-sector-assignment.test.ts > public-sector package assignment > enforces the seat limit: public-starter allows 2 seats (members + pending invitations)
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > alerts-daily: a send the provider refuses fails that search and keeps its matches
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > alerts-daily: a stale tenant id fails the search rather than touching the other tenant
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > alerts-daily: every search advances lastRunAt under its own tenant
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > alerts-daily: the lastRunAt write itself is refused under a foreign scope
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > alerts-daily: with no mail provider, nothing is counted sent and lastRunAt stays put
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > credit-ledger-grant-period.sql: rollback, re-apply and a re-run of the same month add no second grant (İNCELEME-44 N-1)
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > credit-ledger-grant-period.sql: the backfill stamps old job rows only, once per month, and re-runs clean
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > credits-monthly-grant: a month the old Inngest job granted is not granted again (İNCELEME-38 B-1)
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > credits-monthly-grant: a period that is not YYYY-MM is refused before any write
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > credits-monthly-grant: a second run for the same month grants nothing (ADR-0008 §6.2)
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > credits-monthly-grant: a stale tenant id is refused by the database, not misfiled
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > credits-monthly-grant: each ledger row lands in the tenant of its own iteration
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > credits-monthly-grant: rows without a grant period stay unconstrained
+ FAIL  src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > is measuring through a role the policies actually apply to
+ FAIL  tests/action-missing-id.live.test.ts 
+ FAIL  tests/bearer-token-hash.live.test.ts > bearer tokens are stored as SHA-256 only (live DB) > an invitation stores the hash of the link token, and the response does not carry the row's secret
+ FAIL  tests/gdpr-data-subject.live.test.ts > GDPR purge — live > the erased focal point is detached from the relationship, and the neighbour keeps theirs
+ FAIL  tests/invitation-accept.live.test.ts > a new account through Google (real Auth.js callback, fake provider) > verified + matching + acknowledged: joins the inviting tenant, no tenant of its own, consent rows there
+ FAIL  tests/invitation-accept.live.test.ts > an existing account accepts (acceptInvitation, fabrika_app) > seat limit: an accepted invitation is no longer a pending seat
+ FAIL  tests/invitation-accept.live.test.ts > an existing account accepts (acceptInvitation, fabrika_app) > two concurrent accepts: one membership, one audit row, both land in the workspace
+ FAIL  tests/invitation-accept.live.test.ts > an existing account accepts (acceptInvitation, fabrika_app) > valid: membership with the invited role, link spent, audit row; a second accept is idempotent
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > 9 minutes after a mail the same address is still cooling down
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > a second invitation to the same address within 10 minutes sends no mail and keeps the mailed link valid
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > a send the SMTP server refused does not start a cooldown
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > after the cooldown the same address is mailed again
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > an address inside its cooldown is recently_sent even when the tenant is at the daily limit
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > past the daily limit a re-invitation still gets a fresh link that works
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > past the daily limit no mail is sent, the invitation is still issued, and a warning is raised
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > re-inviting an address whose earlier invitation was accepted reopens it with a fresh link
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > rows 23 hours old still count toward the daily limit
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > rows older than 24 hours do not count toward the daily limit
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > the mailed link is built from NEXT_PUBLIC_APP_URL and the subject carries a cut tenant name
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > two concurrent invitations to one address send one mail
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > two concurrent invitations with different roles leave the mailed role in place
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > within the cooldown a re-invite with another role leaves the mailed invitation as it is and is recorded
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > within the cooldown a re-invite with the same role pushes the expiry out and keeps the token
+ FAIL  tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > without a usable NEXT_PUBLIC_APP_URL in production nothing is mailed and an error alert is raised
+ FAIL  tests/oauth-registration.live.test.ts > acknowledgement cookie is spent by every OAuth outcome (İNCELEME-13 B-1) > an invite registration spends a stray plain tick as well
+ FAIL  tests/oauth-registration.live.test.ts > acknowledgement cookie is spent by every OAuth outcome (İNCELEME-13 B-1) > Ö-1: an invite registration records the consent in the language it was read in
+ FAIL  tests/oauth-registration.live.test.ts > OAuth registration with an agency invite code (fake provider, fabrika_app) > Google: a code + addendum acknowledgement opens an account linked to the agency, with 3 consent rows
+ FAIL  tests/oauth-registration.live.test.ts > OAuth registration with an agency invite code (fake provider, fabrika_app) > linking to an existing account: refused without a verified e-mail, linked with one; a code is ignored
+ FAIL  tests/oauth-registration.live.test.ts > OAuth registration with an agency invite code (fake provider, fabrika_app) > without a code, a plain acknowledgement still registers (2 consent rows, no agency)
+ FAIL  tests/oauth-registration.live.test.ts > registration choice cookies are single use (İNCELEME-12 Ö-1) > invite-code registration: the choices land on the tenant and the cookies are gone
+ FAIL  tests/oauth-registration.live.test.ts > registration choice cookies are single use (İNCELEME-12 Ö-1) > shared browser: A parks a result, B registers, C registers next — only B gets it
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > B-1': the event loop keeps turning while pdf.js works on one heavy page > İNCELEME-52 shape: 20 pages sharing one compressed stream of 100 000 text operators
+ FAIL  tests/relationship-owner-assignment.live.test.ts > updateRelationship — focal-point assignment
+ FAIL  tests/relationship-tenant-scope.test.ts > M4 relationship detail — tenant scope
+ FAIL  tests/system-scope.live.test.ts 
+ FAIL  tests/weekly-active-users.live.test.ts 
+ FAIL  tests/withholding-rounding.test.ts > the document and the panel withhold the same amount > every net from 1 to 3000, at each VAT rate and each withholding rate

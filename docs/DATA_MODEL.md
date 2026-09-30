@@ -202,6 +202,8 @@ uyarıya bakın).
 
 `Evaluation` (M6), `MeetingBrief` (M9), `FollowupDoc` (M10), `ApplicationPart` (M11), `TtoPortfolioItem` (M7), `ApiKey`. (Pazar yeri tabloları kaldırıldı — ADR-0005, `prisma/migrations/drop-marketplace.sql`.)
 
+`ApiKey` hız sınırı (TASK-MUN80XIW5NPV1): `rateWindowStartedAt` + `rateWindowCount` anahtar başına sabit 1 dakikalık pencereyi tutar; `src/lib/api-auth.ts` her `/api/v1` isteğinde tek `UPDATE … RETURNING` ile sayar ve `API_KEY_RATE_LIMIT_PER_MINUTE` (1.000, `src/lib/api-rate-limit.ts`) aşılınca 429 + `Retry-After` döner. Migration: `prisma/migrations/add-api-key-rate-window.sql`.
+
 ### 8.1 M6 Evaluator Lens — değerlendirme paneli
 
 `Evaluation` tek tablo, iki şekil taşır; ayrım `readerType` alanındadır:
