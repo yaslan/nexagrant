@@ -122,6 +122,20 @@ BUILD_EXIT=0  ✓ Compiled successfully in 9.4s
 ```
 Build'deki tek uyarı `src/instrumentation.ts:18`'deki Edge `process.exit` uyarısı. Bu uyarı önceden de vardı (İNCELEME-97 §2.1) ve bu işle ilgisiz. Build'den önce worktree'deki `node_modules` symlink'i gerçek `pnpm install --offline` ile değiştirildi, çünkü Turbopack symlink'i reddediyor.
 
+### 2.7 Merge sonrası (dev `d0da1bc1` + dal → `c3ba06d2`)
+```
+npx tsc --noEmit → TSC_MERGED=0
+npx vitest run tests/server-action-rbac-guard.test.ts → Tests 62 passed (62)
+```
+Dev'in araya giren commit'leri (eylem bekçisi AST, admin/plans, raporlar) benim dosyalarıma dokunmuyor. Merge çakışmasız oldu.
+
+**Kaza, sonucu doğrulandı.** Merge sonrası kontrolde `vitest run … tests/api` filtresi, adı `tests/api` ile başladığı için `tests/api-key-rate-limit.live.test.ts`'i de yakaladı. Ana repodaki `.env` paylaşılan `:5433`'ü gösteriyor. Hatayı görmek için bu dosyayı bir kez daha koştum, yani toplam 2 koşu oldu. Her testin `beforeEach`'i bir `Tenant` açıyor ve `apiKey.create`'te hata alıyor. `afterEach` o tenant'ı `tenantId` üzerinden siliyor. Salt-okunur kontrolün sonucu (`fabrika-postgres`):
+```
+select count(*) from "Tenant" where slug like 'rate-limit-%'  → 0
+select count(*) from "ApiKey" where name='rate limit test'    → 0
+```
+Kalıntı yok. Bundan sonra paylaşılan ağaçta yalnız tam dosya yoluyla test koşacağım. Kapıların kendisi (§2.6) izole `:55971` DB'sinde koşuldu.
+
 ## 3) Değişen dosyalar
 - `tests/server-action-rbac-guard.test.ts`: çözümleyici, 3 yeni test, başlık belgesi.
 - `docs/agent-results/TASK-MUOACFUBMNOGQ-crw-fb.md` ve `…-crw-fb-ekler/`.
