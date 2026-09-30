@@ -1,0 +1,33 @@
+ATK app pool role=fabrika_app
+ATK D1 confirms: ok@12596, ok@12596, ok@12596, save_failed@5023, save_failed@5021, save_failed@5029, save_failed@5030, save_failed@5030, save_failed@5030, save_failed@5031
+ATK D1 B probes: 235 total, 0 FAIL, max 27 ms, p50 6 ms
+ATK D1 pg_stat_activity 0.0s app:idle in transaction=10
+ATK D1 pg_stat_activity 1.0s app:idle=10 fonbridge-lock-pool:idle in transaction=3
+ATK D1 pg_stat_activity 2.0s app:idle=10 fonbridge-lock-pool:idle in transaction=3
+ATK D1 pg_stat_activity 3.0s app:idle=10 fonbridge-lock-pool:idle in transaction=3
+ATK D1 pg_stat_activity 4.0s app:idle=10 fonbridge-lock-pool:idle in transaction=3
+ATK D1 pg_stat_activity 5.0s app:idle=9 fonbridge-lock-pool:idle in transaction=3
+ATK D1 pg_stat_activity 6.0s app:idle=5 fonbridge-lock-pool:idle in transaction=3
+ATK D1 pg_stat_activity 7.0s app:idle=5 fonbridge-lock-pool:idle in transaction=3
+ATK D1 pg_stat_activity 8.0s app:idle=5 fonbridge-lock-pool:idle in transaction=3
+ATK D1 pg_stat_activity 9.0s app:idle=5 fonbridge-lock-pool:idle in transaction=3
+ATK D1 pg_stat_activity 10.0s app:idle=5 fonbridge-lock-pool:idle in transaction=3
+ATK D1 pg_stat_activity 11.0s app:idle=5 fonbridge-lock-pool:idle=3
+ATK D1 peak lock-pool conns=3 peak app-pool idle-in-tx (≥1 s)=0
+ATK D1 retries: ok,ok,ok,ok,ok,ok,ok
+ATK D2 4th/5th: {"success":false,"error":"save_failed"} in 5004 ms | {"success":false,"error":"save_failed"} in 5004 ms
+ATK D2 warn: [confirmEvidenceUploadAction] DB error: Transaction API error: Unable to start a transaction in the given time. || [confirmEvidenceUploadAction] DB error: Transaction API error: Unable to start a transaction in the given time.
+ATK D2 while full: fonbridge-lock-pool:idle in transaction=3
+ATK D2 first three: ok,ok,ok
+ATK D2 after (6 s): 
+ATK D2 retry: ok,ok
+ATK D3 paths: already={"success":false,"error":"already_confirmed"} missing={"success":false,"error":"object_missing"} stmt={"success":false,"error":"save_failed"}@5021ms lock={"success":false,"error":"save_failed"}@10016ms
+ATK D3 lock pool: [{"pid":794,"lock_timeout":"0","statement_timeout":"0","idle":"0","z":""},{"pid":798,"lock_timeout":"0","statement_timeout":"0","idle":"0","z":""},{"pid":797,"lock_timeout":"0","statement_timeout":"0","idle":"0","z":""}] live=797,798,794
+ATK D3 app pool: ["0/0/0"]
+ATK D4 killed tx: "Client has encountered a connection error and is not queryable" after 2836 ms; next 9 lock-pool tx: ok,ok,ok,ok,ok,ok,ok,ok,ok
+ATK D5 r0: storage_unavailable,storage_unavailable,success,already_confirmed,already_confirmed,already_confirmed rows=1 copies=3 lateCopiesAfterSuccess=0 finalUnchanged=true size==row=true
+ATK D5 r1: storage_unavailable,storage_unavailable,storage_unavailable,success,already_confirmed,already_confirmed rows=1 copies=4 lateCopiesAfterSuccess=0 finalUnchanged=true size==row=true
+ATK D5 r2: storage_unavailable,storage_unavailable,storage_unavailable,success,already_confirmed,already_confirmed rows=1 copies=4 lateCopiesAfterSuccess=0 finalUnchanged=true size==row=true
+ATK D6 SIGKILL: holder=fonbridge-lock-pool/idle in transaction; lock released 37 ms after signal; retry=success rows=1 final==uploaded=true
+ATK D6 SIGSTOP: holder=fonbridge-lock-pool/idle in transaction; confirm-while-held={"success":false,"error":"save_failed"} in 10013 ms; lock released 19434 ms after signal; retry=success rows=1 final==uploaded=true
+ATK D7 flood A: {"object_missing":150} | B confirm: "success" in 369 ms

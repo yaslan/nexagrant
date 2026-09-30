@@ -1,0 +1,45 @@
+KILLED   Q1 idle_in_transaction oturum düzeyi (is_local=false) :: Tests  1 failed | 130 passed (131) (152s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > T-3: the 
+          × T-3: the limits are set inside confirm’s transaction and never left on a pooled connection 393ms
+KILLED   Q2 statement_timeout oturum düzeyi (is_local=false) :: Tests  3 failed | 128 passed (131) (128s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): overlapping confirms of one key > a confirm waits for 
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > T-3: the 
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > Y-3: the 
+          × T-3: the limits are set inside confirm’s transaction and never left on a pooled connection 355ms
+          × Y-3: the copy ends before the transaction’s own timeout — a late lock and a stalled process leave it less time 10027ms
+          × a confirm waits for the one ahead of it only so long: save_failed, nothing copied or lost; the first still succeeds 11042ms
+KILLED   Q3 CopyObject süre sınırsız :: Tests  3 failed | 128 passed (131) (340s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > B-1 (TASK-MUO122UPRPJQH): a slow or failing store never loses the upload > the store holds th
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > Y-3: the 
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts [ tests/evidence-confirm-store-faults.live.test.ts ]
+          × Y-3: the copy ends before a connection idle through it could be closed — the lock is never gone while the copy runs 90005ms
+          × Y-3: the copy ends before the transaction’s own timeout — a late lock and a stalled process leave it less time 90002ms
+          × the store holds the copy past its deadline: storage_unavailable in bounded time, nothing lost; the retry succeeds 18265ms
+SURVIVED Q4 geri-okuma HEAD süre sınırsız :: Tests  131 passed (131) (151s)
+SURVIVED Q5 withTenantLockPool maxWait yok (Prisma varsayılanı 2 sn) :: Tests  131 passed (131) (152s)
+SURVIVED Q6 kilit havuzu connectionTimeoutMillis yok (1 sn) :: Tests  131 passed (131) (151s)
+KILLED   Q7 CONFIRM_IDLE_MS 20 sn → 60 sn :: Tests  3 failed | 128 passed (131) (161s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > T-3: the 
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > Y-2: a pr
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > Y-3: the 
+          × T-3: the limits are set inside confirm’s transaction and never left on a pooled connection 68ms
+          × Y-2: a process that freezes inside confirm’s transaction loses the lock after 20 s, not hours; the retry succeeds 24199ms
+          × Y-3: the copy ends before a connection idle through it could be closed — the lock is never gone while the copy runs 27219ms
+KILLED   Q8 CONFIRM_MARGIN_MS 2 sn → 0 :: Tests  1 failed | 130 passed (131) (158s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > Y-3: the 
+          × Y-3: the copy ends before a connection idle through it could be closed — the lock is never gone while the copy runs 20186ms
+SURVIVED Q9 kalan < 1 sn kontrolü yok :: Tests  131 passed (131) (152s)
+KILLED   Q10 txStartedAt kilitten SONRA ölçülüyor :: Tests  1 failed | 130 passed (131) (158s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > Y-3: the 
+          × Y-3: the copy ends before the transaction’s own timeout — a late lock and a stalled process leave it less time 42150ms
+KILLED   Q11 statement_timeout 5 sn → 50 sn :: Tests  3 failed | 128 passed (131) (162s)
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > T-3: the 
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > Y-3: a sl
+          FAIL  tests/evidence-confirm-store-faults.live.test.ts > İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs nobody else > Y-3: the 
+          × T-3: the limits are set inside confirm’s transaction and never left on a pooled connection 121ms
+          × Y-3: a slow database after the lock is cut off by statement_timeout — save_failed in ~5 s, nothing copied 8059ms
+          × Y-3: the copy ends before the transaction’s own timeout — a late lock and a stalled process leave it less time 42262ms
+KILLED   Q12 kilit havuzu application_name yok :: Tests  1 failed | 130 passed (131) (153s)
+          FAIL  tests/lock-pool.live.test.ts > withTenantLockPool > runs on the lock pool, and withTenant does not
+          × runs on the lock pool, and withTenant does not 25ms
+restored: git status src clean
