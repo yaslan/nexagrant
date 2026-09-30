@@ -216,12 +216,18 @@ describe('evidence object keys stay inside their tenant (Y-4)', () => {
 
     const res = await evidence.confirmEvidenceUploadAction(upload(objectKey));
     expect(res.success).toBe(true);
-    const row = await admin!.evidence.findFirst({ where: { tenantId: t.a, r2ObjectKey: objectKey } });
+    // The upload went to a staging key and was moved to its final key (D-1,
+    // TASK-MUNTTZ94LJWBC); the row records the final one.
+    const finalKey = objectKey.replace(`${t.a}/incoming/`, `${t.a}/`);
+    expect(finalKey).not.toBe(objectKey);
+    const row = await admin!.evidence.findFirst({ where: { tenantId: t.a, r2ObjectKey: finalKey } });
     expect(row, 'the row really exists (not the DB-offline fallback)').not.toBeNull();
     evidenceIds.push(row!.id);
+    expect(existsSync(fileOf(objectKey))).toBe(false);
+    expect(existsSync(fileOf(finalKey))).toBe(true);
 
     expect(await evidence.deleteEvidence(row!.id)).toEqual({ success: true });
-    expect(existsSync(fileOf(objectKey))).toBe(false);
+    expect(existsSync(fileOf(finalKey))).toBe(false);
   });
 
   test('FormData upload: the file name cannot steer the key, and the bytes are really stored', async () => {

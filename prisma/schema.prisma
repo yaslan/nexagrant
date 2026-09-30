@@ -1011,6 +1011,10 @@ model Evidence {
   proposalUsages     ProposalUsage[]
   reminders          EvidenceReminder[]
 
+  // One row per stored object (D-3, TASK-MUNTTZ94LJWBC): confirming the same
+  // key twice made two rows, and deleting either removed the other's file.
+  // prisma/migrations/evidence-unique-object-key.sql
+  @@unique([tenantId, r2ObjectKey])
   @@index([tenantId, kind])
   @@index([tenantId, category])
   @@index([tenantId, status])

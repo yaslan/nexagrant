@@ -6,7 +6,8 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
-  DeleteObjectCommand
+  DeleteObjectCommand,
+  CopyObjectCommand
 } from '@aws-sdk/client-s3';
 import { errorMessage } from '@/lib/errors';
 import { env } from '@/lib/env';
@@ -162,6 +163,67 @@ export function storedEvidenceMatches(
 }
 
 /**
+ * D-1 (TASK-MUNTTZ94LJWBC, İNCELEME-66): a signed PUT stays valid for its 15
+ * minutes after the upload is confirmed, so it used to be a way to replace a
+ * checked file with anything of the same type and length. The browser now
+ * uploads to a staging key, `<tenantId>/incoming/<rest>`, and confirm copies
+ * the object to `<tenantId>/<rest>` before checking it. The final key is never
+ * in a signed PUT; a PUT after confirm only recreates the staging object.
+ */
+const INCOMING_SEGMENT = 'incoming';
+
+function incomingKeyOf(tenantId: string, finalKey: string): string {
+  return `${tenantId}/${INCOMING_SEGMENT}/${finalKey.slice(tenantId.length + 1)}`;
+}
+
+/**
+ * The final key a staging key of `tenantId` is confirmed under, or null when
+ * `objectKey` is not one of that tenant's staging keys (a final key included).
+ */
+export function finalKeyOfIncoming(tenantId: string, objectKey: unknown): string | null {
+  const key = tenantObjectKeyOf(tenantId, objectKey);
+  if (!key || key !== objectKey) return null;
+  const segments = key.split('/');
+  if (segments.length < 3 || segments[1] !== INCOMING_SEGMENT) return null;
+  return [tenantId, ...segments.slice(2)].join('/');
+}
+
+/**
+ * Moves the staging object to its final key: a server-side copy, then the
+ * staging object is removed. The copy is what confirm checks and records, so
+ * a later PUT to the staging key cannot reach it. False when there was nothing
+ * to copy. The caller has derived `finalKey` with `finalKeyOfIncoming`.
+ */
+export async function promoteIncomingObject(incomingKey: string, finalKey: string): Promise<boolean> {
+  if (s3) {
+    try {
+      await s3.send(new CopyObjectCommand({
+        Bucket: EVIDENCE_BUCKET,
+        CopySource: `${EVIDENCE_BUCKET}/${incomingKey}`,
+        Key: finalKey,
+        MetadataDirective: 'COPY',
+      }));
+    } catch {
+      return false;
+    }
+    await deleteFileFromR2(incomingKey);
+    return true;
+  }
+  const from = devObjectPath(incomingKey);
+  const to = devObjectPath(finalKey);
+  if (!from || !to) return false;
+  const { mkdir, rename } = await import('node:fs/promises');
+  const { dirname } = await import('node:path');
+  try {
+    await mkdir(dirname(to), { recursive: true });
+    await rename(from, to);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * A presigned PUT URL for a direct browser-to-R2 upload, valid for 15 minutes.
  * The content type and the exact length are part of the signature (B-1): a PUT
  * with any other type or size is refused by the store itself, not only by the
@@ -169,6 +231,8 @@ export function storedEvidenceMatches(
  *
  * Without an object store the URL is the same-origin dev stand-in
  * (`/api/evidence/mock-upload`), which applies the same checks.
+ *
+ * `objectKey` is a staging key (`finalKeyOfIncoming`); confirm moves it.
  */
 export async function getPresignedUploadUrl(
   tenantId: string,
@@ -178,7 +242,7 @@ export async function getPresignedUploadUrl(
   contentType: string,
   sizeBytes: number
 ): Promise<{ uploadUrl: string; objectKey: string }> {
-  const objectKey = generateR2ObjectKey(tenantId, organisationId, category, fileName);
+  const objectKey = incomingKeyOf(tenantId, generateR2ObjectKey(tenantId, organisationId, category, fileName));
 
   if (!s3) {
     return { uploadUrl: `/api/evidence/mock-upload?key=${encodeURIComponent(objectKey)}`, objectKey };
