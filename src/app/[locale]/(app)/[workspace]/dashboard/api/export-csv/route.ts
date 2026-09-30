@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { exportDashboardCSV } from '../../export-csv';
 
 export async function GET(request: NextRequest) {
@@ -10,9 +11,9 @@ export async function GET(request: NextRequest) {
     const result = await exportDashboardCSV({ from, to });
 
     if (!result.success) {
-      const status =
-        result.error === 'Unauthorized' ? 401 : result.error === 'Forbidden' ? 403 : 500;
-      return NextResponse.json({ error: result.error }, { status });
+      if (result.error === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      if (result.error === 'Forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return internalError({ error: 'ExportFailed' });
     }
 
     return new NextResponse(result.data, {
@@ -24,6 +25,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('[Dashboard] CSV export route failed:', error);
-    return NextResponse.json({ error: 'InternalServerError' }, { status: 500 });
+    return internalError({ error: 'InternalServerError' });
   }
 }

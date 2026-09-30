@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { runCordisImport } from '@/lib/k2-cordis/importer';
 import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
 import { logger } from '@/lib/logger';
@@ -28,10 +29,7 @@ export async function POST(req: NextRequest) {
       // the run row and in the alert; the body carries the run id to look it up
       // (İNCELEME-70 Y-1, TASK-MUNVVMJDEO932).
       logger.error('[API /api/admin/cordis/import] import run failed', importRes.error, { runId: importRes.runId });
-      return NextResponse.json(
-        { success: false, error: 'import_failed', runId: importRes.runId },
-        { status: 500 }
-      );
+      return internalError({ success: false, error: 'import_failed' }, { ids: { runId: importRes.runId } });
     }
 
     let profileRes = { updatedProfiles: 0, updatedCoParticipations: 0, durationMs: 0 };
@@ -53,6 +51,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     logger.error('[API /api/admin/cordis/import] import failed', error);
-    return NextResponse.json({ success: false, error: 'internal_error' }, { status: 500 });
+    return internalError({ success: false, error: 'internal_error' });
   }
 }

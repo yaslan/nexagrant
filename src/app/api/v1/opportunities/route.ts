@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { authenticateApiKey } from '@/lib/api-auth';
 import { withTenant } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
@@ -61,14 +62,11 @@ export async function GET(req: Request) {
     // a demo array, so a permanently broken query would have answered 200 OK
     // for as long as nobody read the server log.
     console.error(`[/api/v1/opportunities] query failed: ${errorMessage(e)}`);
-    return NextResponse.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Opportunity lookup failed.',
-        code: 'OPPORTUNITIES_QUERY_FAILED',
-      },
-      { status: 500 }
-    );
+    return internalError({
+      error: 'Internal Server Error',
+      message: 'Opportunity lookup failed.',
+      code: 'OPPORTUNITIES_QUERY_FAILED',
+    });
   }
 
   return NextResponse.json({

@@ -1,0 +1,12 @@
+// be-fb test düzeneği: SEDIA ve çeviri host'larına giden fetch'i ağ çağrısı yapmadan reddeder.
+const real = globalThis.fetch;
+let blocked = 0;
+globalThis.fetch = (input, init) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (/ec\.europa\.eu|mymemory\.translated\.net/.test(url)) {
+    blocked++;
+    if (blocked % 10 === 1) console.log(`[befb0o-harness] blocked outbound #${blocked}`);
+    return Promise.reject(new TypeError('befb0o-harness: outbound blocked'));
+  }
+  return real(input, init);
+};

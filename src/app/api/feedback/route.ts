@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { logger } from '@/lib/logger';
@@ -116,6 +117,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, ...result }, { status: 201 });
   } catch (error) {
     logger.error('beta feedback submission failed', error, { tenantId });
-    return NextResponse.json({ error: 'submission_failed' }, { status: 500 });
+    return internalError({ error: 'submission_failed' });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import Stripe from 'stripe';
 import {
   syncStripeSubscription,
@@ -17,15 +18,22 @@ export async function POST(request: Request) {
 
   let event: Stripe.Event;
 
+  // Neither answer tells an unauthenticated caller how the endpoint is set up
+  // (İNCELEME-75 D-2): the old 400 said `Missing STRIPE_WEBHOOK_SECRET` or
+  // quoted the SDK's verification text. The detail is in the log. Stripe
+  // retries every non-2xx, so a missing secret still recovers once it is set —
+  // and as our fault, not the sender's, it is a 5xx.
+  if (!webhookSecret) {
+    console.error('[stripe webhook] rejected: STRIPE_WEBHOOK_SECRET is not set');
+    return internalError({ error: 'service_unavailable' }, { status: 503 });
+  }
+
   try {
-    if (!webhookSecret) {
-      throw new Error('Missing STRIPE_WEBHOOK_SECRET');
-    }
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err: unknown) {
     const error = err instanceof Error ? err : new Error(String(err));
     console.error(`Webhook signature verification failed: ${error.message}`);
-    return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
+    return new NextResponse('invalid_signature', { status: 400 });
   }
 
   try {
@@ -104,7 +112,7 @@ export async function POST(request: Request) {
     }
     // The detail is logged above; Stripe only needs the non-2xx to retry
     // (İNCELEME-70 Y-1, TASK-MUNVVMJDEO932).
-    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
+    return internalError();
   }
 
   return NextResponse.json({ received: true });

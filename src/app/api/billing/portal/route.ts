@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { withSystemScope } from '@/lib/system-scope';
 import { createPortalSession } from '@/lib/billing/create-portal-session';
 import { Role } from '@prisma/client';
@@ -55,6 +56,6 @@ export async function POST(request: NextRequest) {
     // The message names the tenant and carries Stripe's own text: it stays in
     // the log, the browser gets the sentence (İNCELEME-63 Ö-B).
     console.error('Portal session error:', error);
-    return NextResponse.json({ error: 'Failed to create portal session' }, { status: 500 });
+    return internalError({ error: 'Failed to create portal session' });
   }
 }

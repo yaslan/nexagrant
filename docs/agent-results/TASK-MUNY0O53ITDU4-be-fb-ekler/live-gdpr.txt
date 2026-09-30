@@ -1,0 +1,25 @@
+== DB: fabrika @ befb0o-pg
+== sağlam durum (enjeksiyon yok): request-deletion GET + export
+-- GET /api/user/request-deletion (alice): {"pending":false}  HTTP 200
+-- POST /api/user/export (alice): HTTP 200 application/json; charset=utf-8
+== fault 1: ALTER TABLE "Evaluation" RENAME TO "Evaluation_befb0o"
+ALTER TABLE
+-- POST /api/user/export (alice): {"error":"export_failed"}  HTTP 500
+-- POST /api/user/export-data (alice): {"error":"export_failed"}  HTTP 500
+-- GET /api/gdpr/export (alice): {"error":"export_failed"}  HTTP 500
+   (geri alındı)
+== fault 2: BEFORE UPDATE trigger on "User" raises 'befb0o-internal-detail: tablo=User kolon=deletedAt'
+-- POST /api/user/request-deletion (alice): {"error":"request_failed"}  HTTP 500
+-- DELETE /api/gdpr/delete (alice): {"error":"request_failed"}  HTTP 500
+-- DELETE /api/user/request-deletion (alice): {"error":"cancel_failed"}  HTTP 500
+   (geri alındı)
+== sızıntı taraması (gövdelerde /prisma|invocation|P0001|Evaluation|befb0o|tablo|Database error/i): 0 eşleşme
+== 500 sayısı: 6/6
+== sunucu log'unda ayrıntı (ilk satırlar, kısaltılmış):
+[export-data] Error [PrismaClientKnownRequestError]: 
+[export-data] Error [PrismaClientKnownRequestError]: 
+[export-data] Error [PrismaClientKnownRequestError]: 
+[request-deletion] Error [PrismaClientKnownRequestError]: 
+[request-deletion] Error [PrismaClientKnownRequestError]: 
+[cancel-deletion] Error [PrismaClientKnownRequestError]: 
+== temizlik: trigger=0 Evaluation=t

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { z } from 'zod';
 import Stripe from 'stripe';
 import { logger } from '@/lib/logger';
@@ -242,7 +243,7 @@ export async function POST(req: Request) {
         amountMinor: below.amountMinor,
         tier: activeTier.code,
       });
-      return NextResponse.json({ error: 'Pricing error' }, { status: 500 });
+      return internalError({ error: 'Pricing error' });
     }
 
     const totalMinor = priced.reduce((sum, line) => sum + line.totalMinor, 0);
@@ -360,6 +361,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: checkoutSession.url });
   } catch (error) {
     logger.error('Error creating checkout session', error);
-    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
+    return internalError();
   }
 }

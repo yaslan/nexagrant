@@ -1,7 +1,7 @@
 'use server';
 
 import { requirePlatformAdmin } from '@/lib/tenant';
-import { reportMailNotConfigured, smtpMailer } from '@/lib/email/mailer';
+import { mailFailureCode, reportMailNotConfigured, smtpMailer } from '@/lib/email/mailer';
 import { PRODUCT_NAME } from '@/lib/brand';
 
 export type SmtpTestResult = { ok: true } | { ok: false; error: 'invalid_address' | 'not_configured' | string };
@@ -34,6 +34,7 @@ export async function sendSmtpTestEmail(to: string): Promise<SmtpTestResult> {
     });
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'unknown_error' };
+    console.error('[admin-smtp-test] send failed', error);
+    return { ok: false, error: mailFailureCode(error) ?? 'unknown_error' };
   }
 }

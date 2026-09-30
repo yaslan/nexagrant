@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import {
   getIyzicoConfig,
   handleIyzicoWebhook,
@@ -24,10 +25,7 @@ export async function POST(request: Request) {
     // 503, not 400: the delivery may well be genuine, we simply cannot check
     // it. iyzico retries on 5xx, so a later configuration fix recovers it.
     console.error('[iyzico webhook] rejected: integration is not configured');
-    return NextResponse.json(
-      { success: false, error: 'iyzico integration is not configured' },
-      { status: 503 }
-    );
+    return internalError({ success: false, error: 'service_unavailable' }, { status: 503 });
   }
 
   const raw = await request.text();
@@ -76,9 +74,6 @@ export async function POST(request: Request) {
     const err = error instanceof Error ? error : new Error(String(error));
     // 500 so the provider retries; the idempotency guard makes the retry safe.
     console.error(`[iyzico webhook] processing failed: ${err.message}`);
-    return NextResponse.json(
-      { success: false, error: 'Notification could not be processed' },
-      { status: 500 }
-    );
+    return internalError({ success: false, error: 'Notification could not be processed' });
   }
 }

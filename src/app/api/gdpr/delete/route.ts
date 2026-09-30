@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { internalError } from '@/lib/api-error';
 import { requestAccountDeletion } from '@/actions/user/request-deletion';
 
 /**
@@ -12,8 +13,8 @@ export async function DELETE() {
   const result = await requestAccountDeletion();
 
   if (!result.success) {
-    const status = result.error === 'Unauthorized' ? 401 : 500;
-    return NextResponse.json({ error: result.error ?? 'Request failed' }, { status });
+    if (result.error === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return internalError({ error: 'request_failed' });
   }
 
   return NextResponse.json(

@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { internalError } from '@/lib/api-error';
 import { asRole, can } from '@/lib/rbac';
 // One implementation of the dashboard KPIs, shared with the page that shows them. This route
 // used to carry its own copy, which is how the outcome comparison could be fixed in one place
@@ -47,6 +48,6 @@ export async function GET(request: Request) {
     });
   } catch (error: unknown) {
     console.error('CSV export error:', error);
-    return new Response('Internal Server Error', { status: 500 });
+    return internalError();
   }
 }
