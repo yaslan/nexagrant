@@ -317,14 +317,69 @@ function analyseFile(src: string, fileName: string, read: ModuleReader, action =
    * The module `import('…')` or `require('…')` loads (through `await` and
    * parentheses); `null` for a package, UNRESOLVED for a specifier that is not
    * a string, `undefined` when `e` is no such load.
+   * Also handles `createRequire(import.meta.url)(…)`, `require.call(…)`, `require.apply(…)`,
+   * `module.require(…)`, and `const r = require; r(…)` aliases.
    */
   const dynamicLoad = (e: ts.Expression): string | null | undefined => {
     let x = skipWrappers(e);
     if (ts.isAwaitExpression(x)) x = skipWrappers(x.expression);
     if (!ts.isCallExpression(x)) return undefined;
-    if (x.expression.kind !== ts.SyntaxKind.ImportKeyword && !isGlobal(x.expression, 'require')) return undefined;
+
+    const expr = x.expression;
     const spec = x.arguments[0];
-    return spec && ts.isStringLiteralLike(spec) ? resolveSpec(fileName, spec.text, read) : UNRESOLVED;
+
+    // Direct: `import()` or `require()`
+    if (expr.kind === ts.SyntaxKind.ImportKeyword || isGlobal(expr, 'require')) {
+      return spec && ts.isStringLiteralLike(spec) ? resolveSpec(fileName, spec.text, read) : UNRESOLVED;
+    }
+
+    // `createRequire(import.meta.url)(…)`
+    if (ts.isCallExpression(expr)) {
+      const innerCall = expr.expression;
+      if (ts.isIdentifier(innerCall) && innerCall.text === 'createRequire' && !symbolOf(innerCall)?.declarations?.length) {
+        return spec && ts.isStringLiteralLike(spec) ? resolveSpec(fileName, spec.text, read) : UNRESOLVED;
+      }
+    }
+
+    // `require.call(…)`, `require.apply(…)`, `module.require(…)`
+    if (ts.isPropertyAccessExpression(expr)) {
+      const obj = expr.expression;
+      const prop = expr.name.text;
+
+      // `require.call(null, specifier)` or `require.apply(null, [specifier])`
+      if (isGlobal(obj, 'require') && (prop === 'call' || prop === 'apply')) {
+        // For .call, spec is arguments[1]; for .apply, spec is arguments[1][0]
+        if (prop === 'call' && x.arguments.length > 1) {
+          const spec2 = x.arguments[1];
+          return spec2 && ts.isStringLiteralLike(spec2) ? resolveSpec(fileName, spec2.text, read) : UNRESOLVED;
+        }
+        if (prop === 'apply' && x.arguments.length > 1) {
+          const arr = x.arguments[1];
+          if (ts.isArrayLiteralExpression(arr) && arr.elements[0]) {
+            const spec2 = arr.elements[0];
+            return spec2 && ts.isStringLiteralLike(spec2) ? resolveSpec(fileName, spec2.text, read) : UNRESOLVED;
+          }
+          return UNRESOLVED; // array is not a literal
+        }
+      }
+
+      // `module.require(…)` — module is global
+      if (isGlobal(obj, 'module') && prop === 'require') {
+        return spec && ts.isStringLiteralLike(spec) ? resolveSpec(fileName, spec.text, read) : UNRESOLVED;
+      }
+    }
+
+    // `const r = require; r(…)` — aliased require
+    if (ts.isIdentifier(expr)) {
+      const sym = symbolOf(expr);
+      if (!sym?.declarations?.length) return undefined; // unknown identifier (possibly an alias)
+      const decl = sym.declarations[0];
+      if (ts.isVariableDeclaration(decl) && decl.initializer && isGlobal(decl.initializer, 'require')) {
+        return spec && ts.isStringLiteralLike(spec) ? resolveSpec(fileName, spec.text, read) : UNRESOLVED;
+      }
+    }
+
+    return undefined;
   };
 
   // --- Collect functions, rejection handlers and the nodes that move values. ---
@@ -1449,7 +1504,28 @@ function analyseFile(src: string, fileName: string, read: ModuleReader, action =
       if (!decl || ((exp.flags & ts.SymbolFlags.Type) !== 0 && (exp.flags & ts.SymbolFlags.Value) === 0)) continue;
       if (ts.isExportSpecifier(decl) && (decl.isTypeOnly || decl.parent.parent.isTypeOnly)) continue;
       if (ts.isFunctionDeclaration(decl)) continue;
-      if (ts.isVariableDeclaration(decl) && decl.initializer && ts.isFunctionLike(skipWrappers(decl.initializer))) continue;
+      if (ts.isVariableDeclaration(decl) && decl.initializer && ts.isFunctionLike(skipWrappers(decl.initializer))) {
+        // For const, safe. For let/var, check for re-assignment that may leak.
+        const parent = decl.parent;
+        const isConst = parent && ts.isVariableDeclarationList(parent) && parent.flags & ts.NodeFlags.Const;
+        if (isConst) continue;
+        // For let/var, check if there's a re-assignment to a leaking value.
+        const varNames = bindingIds(decl.name);
+        let hasLeakingReassignment = false;
+        for (const name of varNames) {
+          for (const flow of flows) {
+            if (ts.isBinaryExpression(flow) && flow.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+              const left = skipWrappers(flow.left);
+              if (ts.isIdentifier(left) && left.text === name.text && nodeLeaks(skipWrappers(flow.right), undefined, new Set())) {
+                hasLeakingReassignment = true;
+                break;
+              }
+            }
+          }
+          if (hasLeakingReassignment) break;
+        }
+        if (!hasLeakingReassignment) continue;
+      }
       const name = exp.escapedName as string;
       if (!exportLeaks(name)) continue;
       const fn = exportedFunction(name);
