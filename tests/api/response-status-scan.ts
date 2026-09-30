@@ -219,7 +219,8 @@ export function unguardedServerErrors(src: string): number[] {
 
 /**
  * Functions that turn a caught value into a fixed code, so passing the caught
- * value to them does not carry its text anywhere.
+ * value to them does not carry its text anywhere. Reading `caught.code`
+ * directly counts the same as `errorCode(caught)`.
  */
 const SANITISERS = ['errorCode', 'failureCode', 'mailFailureCode'];
 
@@ -237,7 +238,8 @@ function usesTainted(expr: string, names: Set<string>): boolean {
   for (const name of names) {
     const cleaned = expr
       .replace(new RegExp(String.raw`\b(?:${SANITISERS.join('|')})\(\s*${name}\b`, 'g'), '(')
-      .replace(new RegExp(String.raw`\b${name}\s+instanceof\b`, 'g'), '');
+      .replace(new RegExp(String.raw`\b${name}\s+instanceof\b`, 'g'), '')
+      .replace(new RegExp(String.raw`(?<![.\w$])${name}\.code\b`, 'g'), '');
     // `{ error: 'x' }` names a property, it does not read the variable.
     const key = new RegExp(String.raw`[{,]\s*${name}\s*:(?!:)`, 'g');
     if (new RegExp(String.raw`(?<![.\w$])${name}\b`).test(cleaned.replace(key, ','))) return true;

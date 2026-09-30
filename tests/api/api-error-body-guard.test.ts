@@ -175,6 +175,8 @@ describe('server action error returns', () => {
       'try { x(); } catch (e) { const { message } = e as Error; return { error: message }; }',
       'try { x(); } catch (e) { const m = (e as Error).message; const out = { error: m }; return out; }',
       'try { x(); } catch (e) { return toFailure(e); }',
+      'try { x(); } catch (error) { if (error instanceof UploadRefused) return { success: false, error: error.message }; }',
+      'try { x(); } catch (e) { return { error: e.codeText }; }',
     ];
     for (const src of leaks) expect(catchReturnLeaks(src), src).toHaveLength(1);
 
@@ -184,6 +186,8 @@ describe('server action error returns', () => {
       "try { x(); } catch (e) { return { ok: false, error: failureCode(e, 'failed') }; }",
       "try { x(); } catch (e) { return { ok: false, error: e instanceof CoBrandStorageError ? 'storage' : 'failed' }; }",
       "try { x(); } catch (error) { return { ok: false, error: mailFailureCode(error) ?? 'unknown_error' }; }",
+      // A domain error's own code (evidence/actions.ts UploadRefused).
+      'try { x(); } catch (error) { if (error instanceof UploadRefused) return { success: false, error: error.code }; }',
       "try { x(); } catch (e) { if (isPilotExpired(e)) return { code: 'pilot_expired' }; return { error: 'failed' }; }",
     ];
     for (const src of fine) expect(catchReturnLeaks(src), src).toEqual([]);
