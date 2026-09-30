@@ -1,0 +1,11 @@
+# birleşik ağaç (7e169aed)
+schema=0
+role=0
+apply-migrations: 41 files applied
+mig1=0
+apply-migrations: 41 files applied
+mig2=0
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+rls=0
+Seeding completed with E10 data.
+seed=0

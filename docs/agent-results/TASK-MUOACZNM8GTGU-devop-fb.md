@@ -86,6 +86,13 @@ vitest (tam, izole DB :5611): Test Files 296 passed | 2 skipped (298); Tests 382
 ```
 İzole DB `devopfbcz-pg` (pgvector pg16), 127.0.0.1:5611'de: migrate diff şeması → `db:rls-role` → `apply-migrations` ×2 (her seferinde 41 dosya) → `db:rls` 28 → 112 → seed (`db-prep.txt`). Paylaşılan :5433'e yazılmadı. Build'deki "process.exit … Edge Runtime" uyarısı baseline build'inde de var, yeni değil.
 
+**Birleşik ağaç** (dev `f407482f` dala merge edildi → `7e169aed`; `gates-birlesik.txt`, `db-prep-birlesik.txt`, `matrix-birlesik.txt`): Şema değiştiği için izole DB sıfırdan kuruldu.
+```
+tsc 0 · lint 0 · i18n 0 · next build 0 · vitest Test Files 297 passed | 2 skipped (299); Tests 3829 passed | 50 skipped (3879); SKIPGATE=0
+next start matrisi: 122 yol, CSP'siz text/html 0; /logo.png ve /favicon.ico 200, CSP=0, önbellek aynı
+```
+Not: İlk birleşik build exit 1 verdi (`/_global-error` prerender, `useContext` null). Sebep, kabuğa `.env` export ederken `NODE_ENV=development`'ın da girmesiydi. `env -u NODE_ENV` ile aynı ağaç exit 0 verdi. Kod hatası değil, benim ortam hatam.
+
 ## 3) Değişen dosyalar
 - `src/proxy.ts`: matcher, `isPolicyOnlyPath`, yorum
 - `src/lib/security-headers.ts`: yalnız yorum (kapsam düzeltmesi)
