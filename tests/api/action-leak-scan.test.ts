@@ -519,3 +519,48 @@ describe('Ö-2: callbacks that only log', () => {
     for (const src of leaks) expect(actionReturnLeaks(src, FILE, read), src).not.toEqual([]);
   });
 });
+
+describe('Y-4: witness tests for TASK-MUOIBQJJDKL28 (İNCELEME-116 gap coverage)', () => {
+  test('A1: namespace handed back whole as a value', () => {
+    // `await import()` used as a value, not called: the whole module (fail-closed).
+    expect(
+      actionReturnLeaks(
+        action(
+          "try { await go(id); return { ok: true }; } catch (e) { const m = await import('@/lib/svc'); return { svc: m }; }",
+          ''
+        ),
+        FILE,
+        tree({ 'src/lib/svc.ts': 'export async function run() { try { await go(); } catch (e) { return String(e); } }\n' })
+      )
+    ).not.toEqual([]);
+  });
+
+  test('A3: catch binding handed to imported function, then .code read', () => {
+    // A namespace's method (normalize) is called with a catch binding; then .code of the binding is read.
+    // Y-3 limit: does not catch computed Object/Reflect writes via `ns.method()`.
+    expect(
+      actionReturnLeaks(
+        action(
+          `import * as ns from '@/lib/svc';\ntry { await go(id); return { ok: true }; } catch (e) { ns.normalize(e); return { code: e.code }; }`,
+          ''
+        ),
+        FILE,
+        tree({ 'src/lib/svc.ts': 'export function normalize(x: Record<string, unknown>) { (x as any).normalized = true; }\n' })
+      )
+    ).not.toEqual([]);
+  });
+
+  test('A10: dynamic load method call with tainted argument', () => {
+    // `(await import()).fill(out)` writes caught value into `out`. Y-4 source.
+    expect(
+      actionReturnLeaks(
+        action(
+          `const out: Record<string, unknown> = { ok: false };\ntry { await go(id); } catch (e) { const svc = await import('@/lib/svc'); svc.fill(out, e); }\nreturn out;`,
+          ''
+        ),
+        FILE,
+        tree({ 'src/lib/svc.ts': 'export function fill(o: Record<string, unknown>, x: unknown) { o.detail = String(x); }\n' })
+      )
+    ).not.toEqual([]);
+  });
+});

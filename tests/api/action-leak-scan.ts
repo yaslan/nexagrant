@@ -81,8 +81,11 @@
  *
  * Known limits (none occurs in src today; each is a follow-up, not a licence):
  * an `EventEmitter` error listener, a method of a local object handed the caught
- * binding (its `.code` stays trusted), and a caught value that leaves through
- * something other than a return (a redirect URL, a cookie).
+ * binding (its `.code` stays trusted), a caught value that leaves through
+ * something other than a return (a redirect URL, a cookie), and indirect writes
+ * via `Object['assign']`, `Reflect['set']`, computed `Object`/`Reflect`, `.call`/`.apply`
+ * chaining with wrong argument index, callback parameters written through spread,
+ * and `Reflect.apply` chains (Y-3).
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
