@@ -43,6 +43,7 @@ import {
   PUBLIC_LEAD_IP_LIMIT,
   PUBLIC_LEAD_PURGED,
   PUBLIC_LEAD_RETENTION_DAYS,
+  clientIpFrom,
   hashClientIp,
   purgeOldPublicLeads,
   submitPublicLead,
@@ -72,7 +73,9 @@ if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 
 const RUN = Math.random().toString(36).slice(2, 10);
 const SECRET = 'test-secret-for-public-lead-ip-hash-0123456789';
-const DAY = 24 * 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 const NOW = new Date();
 const STARTED = new Date(NOW.getTime() - 1000);
 const ago = (days: number) => new Date(NOW.getTime() - days * DAY);
@@ -103,11 +106,12 @@ async function purgeAudits() {
   return admin.auditEvent.findMany({ where: { type: PUBLIC_LEAD_PURGED, createdAt: { gte: STARTED } } });
 }
 
-async function seed(label: string, createdAt: Date): Promise<string> {
+async function seed(label: string, createdAt: Date, extra: { email?: string; ipHash?: string | null } = {}): Promise<string> {
   const row = await admin.publicLead.create({
     data: {
       name: 'Seed',
-      email: mail(label),
+      email: extra.email ?? mail(label),
+      ipHash: extra.ipHash ?? null,
       organisation: 'Seed org',
       consentVersion: PUBLIC_LEAD_CONSENT.version,
       consentAt: createdAt,
@@ -247,6 +251,46 @@ describe.skipIf(!HAS_DB)('public lead form (live database, fabrika_app)', () => 
     expect(await rowsFor(mail('ip-over'))).toHaveLength(0);
     // Another IP is not affected.
     expect(await submitPublicLead(form({ email: mail('ip-other') }), { ip: '192.0.2.45', now: NOW, secret: SECRET })).toEqual({ ok: true });
+  });
+
+  // İNCELEME-50 Y-1: every request above ran at one instant, so shrinking either
+  // window changed nothing. Earlier requests just inside and just outside each window.
+  test('the address window is 24 hours: 23 h ago still counts, 25 h ago no longer', async () => {
+    for (let i = 0; i < PUBLIC_LEAD_EMAIL_LIMIT; i++) await seed(`win-mail-in${i}`, new Date(NOW.getTime() - 23 * HOUR), { email: mail('win-mail') });
+    expect(await submitPublicLead(form({ email: mail('win-mail') }), { ip: '192.0.2.60', now: NOW, secret: SECRET })).toEqual({
+      ok: false,
+      error: 'rate_limited',
+    });
+    for (let i = 0; i < PUBLIC_LEAD_EMAIL_LIMIT; i++) await seed(`win-mail-out${i}`, new Date(NOW.getTime() - 25 * HOUR), { email: mail('win-old') });
+    expect(await submitPublicLead(form({ email: mail('win-old') }), { ip: '192.0.2.61', now: NOW, secret: SECRET })).toEqual({ ok: true });
+  });
+
+  test('the IP window is 1 hour: 59 min ago still counts, 61 min ago no longer', async () => {
+    const inside = hashClientIp('192.0.2.70', SECRET);
+    for (let i = 0; i < PUBLIC_LEAD_IP_LIMIT; i++) await seed(`win-ip-in${i}`, new Date(NOW.getTime() - 59 * MINUTE), { ipHash: inside });
+    expect(await submitPublicLead(form({ email: mail('win-ip-new') }), { ip: '192.0.2.70', now: NOW, secret: SECRET })).toEqual({
+      ok: false,
+      error: 'rate_limited',
+    });
+    const outside = hashClientIp('192.0.2.71', SECRET);
+    for (let i = 0; i < PUBLIC_LEAD_IP_LIMIT; i++) await seed(`win-ip-out${i}`, new Date(NOW.getTime() - 61 * MINUTE), { ipHash: outside });
+    expect(await submitPublicLead(form({ email: mail('win-ip-old') }), { ip: '192.0.2.71', now: NOW, secret: SECRET })).toEqual({ ok: true });
+  });
+
+  // İNCELEME-50 B-1, as the documented nginx delivers it: "<client-sent>, <real peer>".
+  test('a forged first X-Forwarded-For hop does not open a new IP bucket', async () => {
+    const real = '198.51.100.77';
+    const results = [];
+    for (let i = 0; i <= PUBLIC_LEAD_IP_LIMIT + 1; i++) {
+      const hdr = { get: (k: string) => (k.toLowerCase() === 'x-forwarded-for' ? `10.9.${i}.1, ${real}` : null) };
+      const ip = clientIpFrom(hdr, 1);
+      results.push((await submitPublicLead(form({ email: mail(`xff${i}`) }), { ip, now: NOW, secret: SECRET })).ok);
+    }
+    // 12 requests: the first 10 pass, the 11th and 12th are refused.
+    expect(results).toEqual([...Array(PUBLIC_LEAD_IP_LIMIT).fill(true), false, false]);
+    const stored = await admin.publicLead.findMany({ where: { email: { startsWith: 'xff', endsWith: `-${RUN}@example.test` } } });
+    expect(stored).toHaveLength(PUBLIC_LEAD_IP_LIMIT);
+    expect(new Set(stored.map((r) => r.ipHash))).toEqual(new Set([hashClientIp(real, SECRET)]));
   });
 
   test('concurrent requests cannot both slip past the address limit', async () => {
