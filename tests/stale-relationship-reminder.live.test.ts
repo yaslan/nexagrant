@@ -37,6 +37,7 @@ import { dayStartUtc, isReminderDue, isStaleRelationship } from '@/lib/relations
 import type { MailMessage } from '@/lib/email/mailer';
 import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
+import { sqlStatements } from './helpers/sql-statements';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 const SUITE = 'stale relationship reminder test';
@@ -754,8 +755,11 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     const client = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika' });
     await client.connect();
     try {
-      await client.query(sql);
-      await client.query(sql); // idempotent: a second run changes nothing
+      // Statement by statement, as psql applies it in production: one implicit
+      // transaction would hold "User" while waiting for "Membership" and
+      // deadlock other files' requests (tests/helpers/sql-statements.ts).
+      for (const statement of sqlStatements(sql)) await client.query(statement);
+      for (const statement of sqlStatements(sql)) await client.query(statement); // idempotent: a second run changes nothing
     } finally {
       await client.end();
     }
@@ -794,8 +798,8 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     const client = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika' });
     await client.connect();
     try {
-      await client.query(sql);
-      await client.query(sql);
+      for (const statement of sqlStatements(sql)) await client.query(statement);
+      for (const statement of sqlStatements(sql)) await client.query(statement);
     } finally {
       await client.end();
     }
