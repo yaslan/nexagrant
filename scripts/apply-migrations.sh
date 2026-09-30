@@ -12,6 +12,7 @@
 # Usage:
 #   DATABASE_URL=postgresql://... scripts/apply-migrations.sh
 #   scripts/apply-migrations.sh --list    # print the order, touch nothing
+#   DATABASE_URL=postgresql://... scripts/apply-migrations.sh --down <name>.down.sql
 #
 # Exits non-zero on the first failing statement, or when apply-order.txt and
 # the files on disk disagree. Running it twice must also exit 0: that is the
@@ -19,7 +20,12 @@
 #
 # Env: DATABASE_URL (required), PSQL (psql binary, default `psql`).
 # Rollback: each file has a .down.sql (flat) or down.sql (folder) beside it;
-# apply those in reverse order by hand.
+# apply those in reverse order, one `--down <file>` per call. `--down` runs the
+# file with the same checks and the same session as a forward file. Plain psql
+# is refused by the file itself (prisma/migration-down-guard.sql): without the
+# system_scope session a rollback sees no tenant rows under FORCE RLS, and
+# rename-feedback-alert-columns.down.sql then deleted its archive without
+# replaying it (TASK-MUOGMUUAWFEQX, İNCELEME-115 Ö-2).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -48,10 +54,29 @@ if [ -n "$dupes" ]; then
   exit 1
 fi
 
-if [ "${1:-}" = "--list" ]; then
-  printf '%s\n' "${listed[@]}"
-  exit 0
-fi
+down=
+case "${1:-}" in
+  "") ;;
+  --list)
+    printf '%s\n' "${listed[@]}"
+    exit 0 ;;
+  --down)
+    down=${2:-}
+    down=${down#./}
+    down=${down#"$dir"/}
+    case "$down" in
+      *..*|/*) down= ;;
+      *.down.sql|*/down.sql) ;;
+      *) down= ;;
+    esac
+    if [ -z "$down" ] || [ ! -f "$dir/$down" ]; then
+      echo "apply-migrations: --down takes one rollback file in $dir (<name>.down.sql or <folder>/down.sql), got \"${2:-}\"" >&2
+      exit 1
+    fi ;;
+  *)
+    echo "apply-migrations: unknown argument \"$1\" (use no argument, --list or --down <file>)" >&2
+    exit 1 ;;
+esac
 
 : "${DATABASE_URL:?DATABASE_URL is not set}"
 # Prisma's `?schema=` parameter is not a libpq option; psql rejects the URL with it.
@@ -119,6 +144,50 @@ if [ -n "$leaked" ]; then
   exit 1
 fi
 
+# After the files. A stored default would outlive the run. A FORCE table that
+# a file created (add-feedback.sql and others) has no system_scope policy until
+# `pnpm db:rls`; if it already held rows, the backfills after it saw none of
+# them (İNCELEME-115 Ö-4, measured: exit 0 with Feedback left unconverted).
+# n_live_tup is a statistic and not subject to RLS, so the owner can read it.
+# It lags a moment behind writes and is reset by a crash; either only hides a
+# table from this check, it never flags an empty one.
+postflight() {
+  leaked=$(system_scope_defaults)
+  if [ -n "$leaked" ]; then
+    echo "apply-migrations: a file stored a default for app.system_scope ($leaked). RESET it before starting the app." >&2
+    exit 1
+  fi
+  [ "$exempt" = t ] && return 0
+  unseen=$("$psql_bin" "$url" -X -Atq -v ON_ERROR_STOP=1 -c "
+    SELECT coalesce(string_agg(c.relname || ' (~' || s.n_live_tup || ' rows)', ', ' ORDER BY c.relname), '')
+      FROM pg_class c
+      JOIN pg_stat_user_tables s ON s.relid = c.oid
+     WHERE c.relnamespace = current_schema()::regnamespace
+       AND c.relkind = 'r'
+       AND c.relforcerowsecurity
+       AND s.n_live_tup > 0
+       AND NOT EXISTS (SELECT 1 FROM pg_policy p
+                        WHERE p.polrelid = c.oid AND p.polname = 'system_scope')")
+  if [ -n "$unseen" ]; then
+    echo "apply-migrations: these FORCE RLS tables hold rows but have no system_scope policy, so role \"$role\" saw none of them:" >&2
+    echo "  $unseen" >&2
+    echo "  Their backfills in this run updated zero rows. Do not start the app, and do not simply run this script again:" >&2
+    echo "  a rerun does not redo every skipped step. Restore the backup taken before this run, run \`pnpm db:rls\`," >&2
+    echo "  then this script. docs/RELEASE_CHECKLIST.md §3.1." >&2
+    exit 1
+  fi
+}
+
+if [ -n "$down" ]; then
+  echo "==> [down] $down"
+  # fabrika.migration_down is what prisma/migration-down-guard.sql looks for.
+  "$psql_bin" "$url" -X -q -v ON_ERROR_STOP=1 -c "SET app.system_scope = 'on'" -c "SET fabrika.migration_down = 'on'" \
+    -f "$dir/$down"
+  postflight
+  echo "apply-migrations: rolled back with $down as $role"
+  exit 0
+fi
+
 n=0
 for f in "${listed[@]}"; do
   n=$((n + 1))
@@ -126,9 +195,5 @@ for f in "${listed[@]}"; do
   "$psql_bin" "$url" -X -q -v ON_ERROR_STOP=1 -c "SET app.system_scope = 'on'" -f "$dir/$f"
 done
 
-leaked=$(system_scope_defaults)
-if [ -n "$leaked" ]; then
-  echo "apply-migrations: a file stored a default for app.system_scope ($leaked). RESET it before starting the app." >&2
-  exit 1
-fi
+postflight
 echo "apply-migrations: $n files applied as $role"

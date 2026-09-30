@@ -1,3 +1,7 @@
+-- Run with scripts/apply-migrations.sh --down <this file>; plain psql stops here (İNCELEME-115 Ö-2).
+\set ON_ERROR_STOP on
+\ir ../migration-down-guard.sql
+
 -- ============================================================================
 -- ROLLBACK for add-m6-evaluator-lens.sql (TASK-MTPZH6T9L6E2E)
 --
@@ -8,7 +12,7 @@
 -- Run only with an explicit human go-ahead. Take a dump first:
 --   pg_dump "$DATABASE_URL" -t '"Evaluation"' -t '"Reviewer"' -t '"Criterion"' -t '"Score"' > m6-rollback-backup.sql
 --
--- Apply: psql "$DATABASE_URL" -f prisma/migrations/add-m6-evaluator-lens.down.sql
+-- Apply: DATABASE_URL=<owner> scripts/apply-migrations.sh --down add-m6-evaluator-lens.down.sql
 -- Idempotent: every statement is IF EXISTS, safe to run twice.
 -- ============================================================================
 

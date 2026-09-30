@@ -1,3 +1,7 @@
+-- Run with scripts/apply-migrations.sh --down <this file>; plain psql stops here (İNCELEME-115 Ö-2).
+\set ON_ERROR_STOP on
+\ir ../migration-down-guard.sql
+
 -- Rollback for add-agency-invite-code.sql (TASK-MULRQJQYM0NAM).
 -- Drops every invite code and every agency link (AuditEvent rows of type
 -- agency.invite.* are kept: they are history, and carry no code). Linked tenants keep their

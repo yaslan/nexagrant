@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { appendFileSync, cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { envValue } from './helpers/dotenv';
@@ -33,6 +34,8 @@ const OWNER = `fb_mig_owner_${RUN}`;
 const OWNER_PW = randomBytes(18).toString('hex');
 const DB = `fb_owner_chain_${RUN}`;
 const DB_SUPER = `${DB}_su`;
+const DB_GAP = `${DB}_gap`;
+const DB_DOWN = `${DB}_down`;
 const LONG = 240_000;
 
 let ready = false;
@@ -64,6 +67,7 @@ function run(cmd: string, args: string[], url: string) {
   return { status: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 const chain = (url: string) => run('bash', ['scripts/apply-migrations.sh'], url);
+const down = (url: string, file: string) => run('bash', ['scripts/apply-migrations.sh', '--down', file], url);
 
 async function withDb<T>(url: string, fn: (c: pg.Client) => Promise<T>): Promise<T> {
   const c = new pg.Client({ connectionString: url });
@@ -178,6 +182,13 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
   }, LONG);
 
   test('the grant file gives the owner SET on app.system_scope and never fabrika_app', async () => {
+    // İNCELEME-115 Ö-5: without -v owner it says what to pass, not `syntax error at or near ":"`.
+    const noOwner = run(PSQL, [adminUrl(), '-X', '-f', 'prisma/migration-owner-grant.sql'], adminUrl());
+    expect(noOwner.status).not.toBe(0);
+    expect(noOwner.out).toContain('no migration owner given');
+    expect(noOwner.out).toContain('-v owner=<migration-owner>');
+    expect(noOwner.out).not.toContain('syntax error');
+
     const g = run(PSQL, [adminUrl(), '-X', '-v', `owner=${OWNER}`, '-f', 'prisma/migration-owner-grant.sql'], adminUrl());
     expect(g.status, g.out).toBe(0);
     granted = true;
@@ -272,5 +283,103 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
     } finally {
       await withDb(ownerUrl(), (c) => c.query(`ALTER DATABASE ${DB} RESET app.system_scope`));
     }
+  }, LONG);
+  // İNCELEME-115 Ö-3 (mutant M6): the check AFTER the files, measured on its own.
+  // The files run from a copy of scripts/ and prisma/migrations, so the repo is
+  // never edited; the last listed file writes the default, as a bad migration would.
+  test('a file that stores a default for app.system_scope fails the run after the files', async () => {
+    const tree = mkdtempSync(join(tmpdir(), 'fb-owner-chain-'));
+    try {
+      cpSync(resolve(ROOT, 'scripts/apply-migrations.sh'), join(tree, 'scripts/apply-migrations.sh'));
+      cpSync(resolve(ROOT, 'prisma/migrations'), join(tree, 'prisma/migrations'), { recursive: true });
+      const last = run('bash', ['scripts/apply-migrations.sh', '--list'], ownerUrl()).out.trim().split('\n').pop()!;
+      appendFileSync(
+        join(tree, 'prisma/migrations', last),
+        `\nDO $$ BEGIN EXECUTE format('ALTER DATABASE %I SET app.system_scope = %L', current_database(), 'on'); END $$;\n`
+      );
+      const r = run('bash', [join(tree, 'scripts/apply-migrations.sh')], ownerUrl());
+      expect(r.status, r.out.slice(-2000)).toBe(1);
+      expect(r.out).toMatch(/==> \[(\d+)\/\1\]/); // every file ran: the pre-run check could not have caught it
+      expect(r.out).toContain('a file stored a default for app.system_scope');
+      expect(r.out).not.toContain('files applied as');
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+      await withDb(ownerUrl(), (c) => c.query(`ALTER DATABASE ${DB} RESET app.system_scope`));
+    }
+  }, LONG);
+
+  // İNCELEME-115 Ö-4: `db push` done, `db:rls` never run, rows already there.
+  // No table is FORCE yet, so the pre-run check passes; add-feedback.sql turns
+  // Feedback FORCE and rename-feedback-alert-columns.sql then converts none of
+  // its rows. Before this check the run ended with exit 0.
+  test('rows in a FORCE table without a system_scope policy fail the run after the files', async () => {
+    await admin!.query(`CREATE DATABASE ${DB_GAP} OWNER ${OWNER}`);
+    created.dbs.push(DB_GAP);
+    await withDb(adminUrl(DB_GAP), async (c) => {
+      await c.query('CREATE EXTENSION IF NOT EXISTS vector');
+      await c.query(`ALTER SCHEMA public OWNER TO ${OWNER}`);
+    });
+    const push = run('node_modules/.bin/prisma', ['db', 'push'], ownerUrl(DB_GAP));
+    expect(push.status, push.out).toBe(0);
+    await withDb(adminUrl(DB_GAP), (c) =>
+      c.query(`INSERT INTO "Tenant"(id,name,slug,country,"updatedAt") VALUES ('gt-a','gt-a','gt-a','TR',now());
+               INSERT INTO "Feedback"(id,"tenantId",category,title,body,"alertStatus","updatedAt")
+                 VALUES ('gf-1','gt-a','BUG','t','b','sent',now()), ('gf-2','gt-a','BUG','t','b','failed',now());`)
+    );
+    // The check reads pg_stat_user_tables, which the inserting session flushes a moment later.
+    for (let i = 0; i < 50; i++) {
+      const s = await one(adminUrl(DB_GAP), `SELECT n_live_tup::int AS n FROM pg_stat_user_tables WHERE relname = 'Feedback'`);
+      if (s.n > 0) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    const r = chain(ownerUrl(DB_GAP));
+    expect(r.status, r.out.slice(-2000)).toBe(1);
+    expect(r.out).toContain('hold rows but have no system_scope policy');
+    expect(r.out).toContain('Feedback (~2 rows)');
+    expect(r.out).toContain('Restore the backup taken before this run');
+    const left = await one(adminUrl(DB_GAP), `SELECT count(*)::int AS n FROM "Feedback" WHERE "alertStatus" = 'legacy'`);
+    expect(left.n).toBe(0); // what the check reports: the backfill saw nothing
+  }, LONG);
+
+  // İNCELEME-115 Ö-2: a rollback run by hand without the system_scope session
+  // replayed nothing, deleted the archive and exited 0 (permanent loss).
+  test('rollback files run only through --down, which restores the archived rows', async () => {
+    await admin!.query(`CREATE DATABASE ${DB_DOWN} TEMPLATE ${DB} OWNER ${OWNER}`);
+    created.dbs.push(DB_DOWN);
+    await withDb(adminUrl(DB_DOWN), (c) =>
+      c.query(`INSERT INTO "Feedback"(id,"tenantId",category,title,body,"alertId","alertStatus","updatedAt")
+                 VALUES ('df-a','lt-a','BUG','t','b','ext-a','sent',now()), ('df-b','lt-b','BUG','t','b','ext-b','failed',now());
+               ALTER TABLE "Feedback" RENAME COLUMN "alertId" TO "sentryEventId";
+               ALTER TABLE "Feedback" RENAME COLUMN "alertStatus" TO "sentryStatus";`)
+    );
+    const up = chain(ownerUrl(DB_DOWN));
+    expect(up.status, up.out.slice(-2000)).toBe(0);
+    const ARCHIVE = `SELECT jsonb_array_length(meta -> 'rows') AS n FROM "SystemAlert" WHERE id = 'feedback-migration-alert-columns'`;
+    // df-a, df-b and the two lf-* rows of LEGACY (which carry 'legacy' by now).
+    expect((await one(adminUrl(DB_DOWN), ARCHIVE))?.n).toBe(4);
+
+    const file = 'prisma/migrations/rename-feedback-alert-columns.down.sql';
+    for (const extra of [[], ['-c', `SET app.system_scope = 'on'`]]) {
+      const plain = run(PSQL, [ownerUrl(DB_DOWN), '-X', ...extra, '-f', file], ownerUrl(DB_DOWN));
+      expect(plain.status).not.toBe(0);
+      expect(plain.out).toContain('scripts/apply-migrations.sh --down <file>, not plain psql');
+      expect((await one(adminUrl(DB_DOWN), ARCHIVE))?.n).toBe(4);
+    }
+
+    const wrong = down(ownerUrl(DB_DOWN), 'rename-feedback-alert-columns.sql');
+    expect(wrong.status).toBe(1);
+    expect(wrong.out).toContain('--down takes one rollback file');
+
+    const r = down(ownerUrl(DB_DOWN), file);
+    expect(r.status, r.out).toBe(0);
+    expect(r.out).toContain(`rolled back with rename-feedback-alert-columns.down.sql as ${OWNER}`);
+    const back = await one(
+      adminUrl(DB_DOWN),
+      `SELECT array_agg(id || '=' || "sentryEventId" || '/' || "sentryStatus" ORDER BY id) AS rows,
+              (SELECT count(*)::int FROM "SystemAlert" WHERE id = 'feedback-migration-alert-columns') AS archive
+         FROM "Feedback" WHERE id LIKE 'df-%'`
+    );
+    expect(back).toEqual({ rows: ['df-a=ext-a/sent', 'df-b=ext-b/failed'], archive: 0 });
   }, LONG);
 });

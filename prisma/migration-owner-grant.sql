@@ -28,6 +28,15 @@
 
 \set ON_ERROR_STOP on
 
+-- Without `-v owner=...` the `:'owner'` below is not substituted and psql
+-- reports only `syntax error at or near ":"` (İNCELEME-115 Ö-5).
+\if :{?owner}
+\else
+  DO $$ BEGIN
+    RAISE EXCEPTION 'no migration owner given: psql "$SUPERUSER_URL" -v owner=<migration-owner> -f prisma/migration-owner-grant.sql';
+  END $$;
+\endif
+
 SELECT set_config('fabrika.migration_owner', :'owner', false);
 
 DO $$

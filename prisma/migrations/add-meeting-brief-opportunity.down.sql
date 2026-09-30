@@ -1,3 +1,7 @@
+-- Run with scripts/apply-migrations.sh --down <this file>; plain psql stops here (İNCELEME-115 Ö-2).
+\set ON_ERROR_STOP on
+\ir ../migration-down-guard.sql
+
 -- Rollback for add-meeting-brief-opportunity.sql (TASK-MULQLQIE3ES6G).
 --
 -- Loses one thing: which opportunity each brief written after the migration was

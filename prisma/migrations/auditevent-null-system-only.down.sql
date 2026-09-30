@@ -1,3 +1,7 @@
+-- Run with scripts/apply-migrations.sh --down <this file>; plain psql stops here (İNCELEME-115 Ö-2).
+\set ON_ERROR_STOP on
+\ir ../migration-down-guard.sql
+
 -- Rollback for auditevent-null-system-only.sql (TASK-MULUJ8O4JH1PF).
 --
 -- Restores the shared policy of auditevent-tenant-or-shared.sql. Read this
