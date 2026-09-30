@@ -521,7 +521,7 @@ describe('Ö-2: callbacks that only log', () => {
 });
 
 describe('Y-4: witness tests for TASK-MUOIBQJJDKL28 (İNCELEME-116 gap coverage)', () => {
-  test('A1: namespace handed back whole as a value', () => {
+  test('a namespace bound to a name and handed back whole', () => {
     // `await import()` used as a value, not called: the whole module (fail-closed).
     expect(
       actionReturnLeaks(
@@ -550,7 +550,7 @@ describe('Y-4: witness tests for TASK-MUOIBQJJDKL28 (İNCELEME-116 gap coverage)
     ).not.toEqual([]);
   });
 
-  test('A10: dynamic load method call with tainted argument', () => {
+  test('a namespace bound to a name, its method writing into an argument', () => {
     // `(await import()).fill(out)` writes caught value into `out`. Y-4 source.
     expect(
       actionReturnLeaks(
@@ -562,5 +562,170 @@ describe('Y-4: witness tests for TASK-MUOIBQJJDKL28 (İNCELEME-116 gap coverage)
         tree({ 'src/lib/svc.ts': 'export function fill(o: Record<string, unknown>, x: unknown) { o.detail = String(x); }\n' })
       )
     ).not.toEqual([]);
+  });
+});
+
+/**
+ * TASK-MUOIBQJJDKL28, 3rd delivery (İNCELEME-118, docs/agent-results/TASK-MUOJ736LL7ILJ-crw-fb-2.md).
+ * The two tests above were named after mutants A1 and A10 but pass under them;
+ * the witnesses below fail under A1, A4 and A10 (Y-2). Then one fixture per new
+ * branch (Y-3): each loader shape of B-2 and Y-1 with its clean counterpart,
+ * the fail-closed rule for a loader read the scan does not follow, and the
+ * `export let` reassignments (X8, Ö-1).
+ */
+const CLEAN_SVC = "export async function run() { try { await go(); return 'ok'; } catch { return 'failed'; } }\n";
+const LEAKY = tree({ 'src/lib/svc.ts': CATCHER });
+const CLEAN = tree({ 'src/lib/svc.ts': CLEAN_SVC });
+const NODE_MODULE = "import { createRequire } from 'node:module';";
+const FILL_SVC = 'export function fill(o: Record<string, unknown>, x: unknown) { o.detail = String(x); }\n';
+
+describe('İNCELEME-118 Y-2: witnesses that tell A1, A4 and A10 apart', () => {
+  test('A1: a dynamic load handed back in place is the whole module', () => {
+    expect(actionReturnLeaks(action("return { m: await import('@/lib/svc') };"), FILE, LEAKY)).toEqual([4]);
+  });
+
+  test('A4: `Reflect.apply(fn, e, [])` writes the caught binding, so its `.code` is not trusted', () => {
+    const src = action(
+      'try { await go(id); return { ok: true }; } catch (e: any) { Reflect.apply(setCode, e, []); return { code: e.code }; }',
+      'function setCode(this: any) { this.code = String(this.message); }'
+    );
+    expect(actionReturnLeaks(src, FILE, tree({}))).toEqual([4]);
+  });
+
+  test('A10: `(await import(…)).fill(out, e)` writes into `out`', () => {
+    const src = action(
+      "const out: Record<string, unknown> = { ok: false };\ntry { await go(id); } catch (e) { (await import('@/lib/svc')).fill(out, e); }\nreturn out;"
+    );
+    const read = tree({ 'src/lib/svc.ts': 'export function fill(o: Record<string, unknown>, x: unknown) { o.detail = String(x); }\n' });
+    expect(actionReturnLeaks(src, FILE, read)).toEqual([6]);
+  });
+});
+
+describe('İNCELEME-118 B-2: `createRequire` from node:module', () => {
+  test.each([
+    ['imported, called in place (the runtime probe)', "return { error: await createRequire(import.meta.url)('@/lib/svc').run() };", NODE_MODULE],
+    ['imported under another name', "return { error: await cr(import.meta.url)('@/lib/svc').run() };", "import { createRequire as cr } from 'node:module';"],
+    ['through a namespace', "return { error: await nm.createRequire(import.meta.url)('@/lib/svc').run() };", "import * as nm from 'node:module';"],
+    ['its loader bound to a name first', "const req = createRequire(import.meta.url);\nreturn { error: await req('@/lib/svc').run() };", NODE_MODULE],
+    ['destructured from a dynamic import', "const { createRequire: cr } = await import('node:module');\nreturn { error: await cr(import.meta.url)('@/lib/svc').run() };", ''],
+    ['with no import at all', "return { error: await createRequire(import.meta.url)('@/lib/svc').run() };", ''],
+  ])('%s: the module is read', (_, body, imports) => {
+    expect(actionReturnLeaks(action(body, imports), FILE, LEAKY)).not.toEqual([]);
+    expect(actionReturnLeaks(action(body, imports), FILE, CLEAN)).toEqual([]);
+  });
+
+  test('a specifier that is not a string literal is fail-closed', () => {
+    const src = action("const p = '@/lib/svc';\nreturn { error: await createRequire(import.meta.url)(p).run() };", NODE_MODULE);
+    expect(actionReturnLeaks(src, FILE, CLEAN)).not.toEqual([]);
+  });
+});
+
+describe('İNCELEME-118 Y-1: every spelling of `require`', () => {
+  test.each([
+    ['`const r = require as any`', "const r = require as any;\nreturn { error: await r('@/lib/svc').run() };"],
+    ['`const r = (require)`', "const r = (require);\nreturn { error: await r('@/lib/svc').run() };"],
+    ['assigned later: `let r; r = require`', "let r: any;\nr = require;\nreturn { error: await r('@/lib/svc').run() };"],
+    ['an alias of an alias', "const r = require, s = r;\nreturn { error: await s('@/lib/svc').run() };"],
+    ['`require.call(null, …)`', "return { error: await require.call(null, '@/lib/svc').run() };"],
+    ['`require.apply(null, […])`', "return { error: await require.apply(null, ['@/lib/svc']).run() };"],
+    ['`require.bind(null)(…)`', "return { error: await require.bind(null)('@/lib/svc').run() };"],
+    ['`(0, require)(…)`', "return { error: await (0, require)('@/lib/svc').run() };"],
+    ['`module.require(…)`', "return { error: await module.require('@/lib/svc').run() };"],
+    ["`module['require'](…)`", "return { error: await module['require']('@/lib/svc').run() };"],
+    ['`const { require: r } = module`', "const { require: r } = module;\nreturn { error: await r('@/lib/svc').run() };"],
+    ['`const r = module.require`', "const r = module.require;\nreturn { error: await r('@/lib/svc').run() };"],
+  ])('%s: the module is read', (_, body) => {
+    expect(actionReturnLeaks(action(body), FILE, LEAKY)).not.toEqual([]);
+    expect(actionReturnLeaks(action(body), FILE, CLEAN)).toEqual([]);
+  });
+
+  test('a local function that happens to be called `r` is not a loader', () => {
+    expect(actionReturnLeaks(action("const r = (x: string) => ({ run: async () => x });\nreturn { error: await r('@/lib/svc').run() };"), FILE, LEAKY)).toEqual([]);
+  });
+
+  test.each([
+    ['`require.call(null, p)`', "const p = '@/lib/svc';\nreturn { error: await require.call(null, p).run() };"],
+    ['`require.apply(null, arr)`', "const arr = ['@/lib/svc'];\nreturn { error: await require.apply(null, arr).run() };"],
+  ])('%s with a specifier that is not a literal is fail-closed', (_, body) => {
+    expect(actionReturnLeaks(action(body), FILE, CLEAN)).not.toEqual([]);
+  });
+});
+
+describe('İNCELEME-118 Y-1: a loader read the scan does not follow (fail-closed)', () => {
+  const VIA = 'a module loader the scan does not follow (fail-closed)';
+  test.each([
+    ['handed to a call', 'use(require);\nreturn { ok: true };', 4],
+    ['held in an array', "return { error: await [require][0]('@/lib/svc').run() };", 4],
+    ['held in an object', "const o = { require };\nreturn { error: await o.require('@/lib/svc').run() };", 4],
+    ['`module` under another name', "const m = module;\nreturn { error: await m.require('@/lib/svc').run() };", 4],
+    ['an alias handed on', 'const r = require;\nuse(r);\nreturn { ok: true };', 5],
+    ['the loader `createRequire` returns, handed on', 'use(createRequire(import.meta.url));\nreturn { ok: true };', 4],
+  ])('%s is a finding even when the module is clean', (_, body, line) => {
+    const imports = body.includes('createRequire') ? NODE_MODULE : '';
+    expect(actionReturnFindings(action(body, imports), FILE, CLEAN)).toContainEqual({ line, via: VIA });
+  });
+
+  test('a loader exported to another module is a loader there too', () => {
+    for (const svc of ["export const r = require;\n", "const r = require;\nexport { r };\n", "export { r } from './load2';\n"]) {
+      const read = tree({ 'src/lib/load.ts': svc, 'src/lib/load2.ts': 'export const r = module.require;\n', 'src/lib/svc.ts': FILL_SVC });
+      expect(actionReturnLeaks(action("return { ok: typeof r === 'function' };", "import { r } from '@/lib/load';"), FILE, read), svc).toEqual([]);
+      const fills = action("const out: Record<string, unknown> = { ok: false };\ntry { await go(id); } catch (e) { r('@/lib/svc').fill(out, e); }\nreturn out;", "import { r } from '@/lib/load';");
+      expect(actionReturnLeaks(fills, FILE, read), svc).toEqual([6]);
+      const viaNs = action("const out: Record<string, unknown> = { ok: false };\ntry { await go(id); } catch (e) { L.r('@/lib/svc').fill(out, e); }\nreturn out;", "import * as L from '@/lib/load';");
+      expect(actionReturnLeaks(viaNs, FILE, read), svc).toEqual([6]);
+      expect(actionReturnLeaks(action('use(r);\nreturn { ok: true };', "import { r } from '@/lib/load';"), FILE, read), svc).toEqual([4]);
+    }
+  });
+
+  test('a loader exported to another module, called with a clean module, stays clean', () => {
+    const read = tree({ 'src/lib/load.ts': 'export const r = require;\n', 'src/lib/svc.ts': CLEAN_SVC });
+    expect(actionReturnLeaks(action("return { r: await r('@/lib/svc').run() };", "import { r } from '@/lib/load';"), FILE, read)).toEqual([]);
+  });
+
+  test('reads it does follow stay clean', () => {
+    const fine = [
+      "if (typeof require === 'undefined') return { ok: false };\nreturn { ok: true };",
+      "const p = require.resolve('@/lib/svc');\nreturn { ok: p.length > 0 };",
+      "const ok = typeof module !== 'undefined' && !!module.exports;\nreturn { ok };",
+    ];
+    for (const body of fine) expect(actionReturnLeaks(action(body), FILE, CLEAN), body).toEqual([]);
+  });
+
+  test('in an imported module, every export then counts as a leak and may write into any argument', () => {
+    const svc = "const load = [require][0];\nexport async function run() { return 'ok'; }\nexport function fill(o: Record<string, unknown>, x: unknown) { void o; void x; }\n";
+    const read = tree({ 'src/lib/svc.ts': svc });
+    expect(actionReturnLeaks(action("return { r: await run() };", "import { run } from '@/lib/svc';"), FILE, read)).toEqual([4]);
+    const fills = action("const out: Record<string, unknown> = { ok: false };\ntry { await go(id); } catch (e) { fill(out, e); }\nreturn out;", "import { fill } from '@/lib/svc';");
+    expect(actionReturnLeaks(fills, FILE, read)).toEqual([6]);
+    // The same module without the loader read: clean on both counts.
+    const plain = tree({ 'src/lib/svc.ts': svc.replace('const load = [require][0];\n', '') });
+    expect(actionReturnLeaks(action("return { r: await run() };", "import { run } from '@/lib/svc';"), FILE, plain)).toEqual([]);
+    expect(actionReturnLeaks(fills, FILE, plain)).toEqual([]);
+  });
+});
+
+describe("İNCELEME-118 X8/Ö-1: an `export let` action given another value", () => {
+  const exp = (tail: string) => `'use server';\nimport { run } from '@/lib/svc';\nexport let act: any = async () => ({ ok: true });\n${tail}\n`;
+  test.each([
+    ['`act = run`', 'act = run;'],
+    ['`act = run as any`', 'act = run as any;'],
+    ['inside a function', 'function init() { act = run; }\ninit();'],
+    ['`act ||= run`', 'act ||= run;'],
+    ['`[act] = [run]`', '[act] = [run];'],
+    ['`({ act } = { act: run })`', '({ act } = { act: run });'],
+  ])('%s is judged by the value it is given', (_, tail) => {
+    expect(actionReturnLeaks(exp(tail), FILE, LEAKY)).toEqual([3]);
+    expect(actionReturnLeaks(exp(tail), FILE, CLEAN)).toEqual([]);
+  });
+
+  test('`export var` is judged the same way', () => {
+    const src = "'use server';\nimport { run } from '@/lib/svc';\nexport var act: any = async () => ({ ok: true });\nact = run;\n";
+    expect(actionReturnLeaks(src, FILE, LEAKY)).toEqual([3]);
+    expect(actionReturnLeaks(src, FILE, CLEAN)).toEqual([]);
+  });
+
+  test('a clean reassignment, and another `act` in an inner scope, stay clean', () => {
+    expect(actionReturnLeaks(exp('act = async () => ({ ok: false });'), FILE, LEAKY)).toEqual([]);
+    expect(actionReturnLeaks(exp('export async function other() { let act: any = null; act = run; return { ok: !!act }; }'), FILE, LEAKY)).toEqual([]);
   });
 });

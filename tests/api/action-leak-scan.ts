@@ -25,9 +25,17 @@
  * - **Across modules.** An `@/` or relative import is read and analysed the same
  *   way, to any depth (each module once per reader), and its export returns a
  *   caught value when the function it names does. So is a dynamic load: `await
- *   import('…')` and `require('…')`, bound to a name (a namespace), destructured
- *   one level (`const { run } = await import('…')`), or used in place
- *   (`(await import('…')).run()`); İNCELEME-107 B-1. An import into src/ that
+ *   import('…')` and a loader call — `require('…')`, `module.require('…')`,
+ *   `createRequire(…)('…')` (imported from `node:module` under any name),
+ *   `require.call`/`.apply`/`.bind`, or a name given any of these (`const r =
+ *   require as any`, `r = module.require`, `const { require: r } = module`, an
+ *   import of a module's `export const r = require`) —
+ *   bound to a name (a namespace), destructured one level (`const { run } =
+ *   await import('…')`), or used in place (`(await import('…')).run()`);
+ *   İNCELEME-107 B-1, İNCELEME-118 B-2/Y-1. Any other read of a loader, of
+ *   `createRequire` or of the `module` object (`use(require)`, `[require][0]`,
+ *   `const m = module`) is itself a finding, and makes a module's every export
+ *   leak (fail-closed). An import into src/ that
  *   names no file, a load whose specifier is not a string literal, a load used
  *   any other way (`import('…').then(…)`, deeper destructuring), a name the
  *   module does not export, an export built by a call (`export const run =
@@ -82,10 +90,22 @@
  * Known limits (none occurs in src today; each is a follow-up, not a licence):
  * an `EventEmitter` error listener, a method of a local object handed the caught
  * binding (its `.code` stays trusted), a caught value that leaves through
- * something other than a return (a redirect URL, a cookie), and indirect writes
- * via `Object['assign']`, `Reflect['set']`, computed `Object`/`Reflect`, `.call`/`.apply`
- * chaining with wrong argument index, callback parameters written through spread,
- * and `Reflect.apply` chains (Y-3).
+ * something other than a return (a redirect URL, a cookie), a loader reached
+ * through a global object (`globalThis.require`, `global.module`) or built from
+ * text (`eval`, `new Function`), and these writes (İNCELEME-116 Y-3, İNCELEME-118
+ * Ö-2):
+ * - `Object`/`Reflect` under another spelling: `Object['assign']`,
+ *   `Reflect['set']`, `const O = Object; O.assign(…)`, `globalThis.Object.assign(…)`;
+ * - `Object.assign.call(null, e, …)` and `.apply(null, [e, …])`: the scan takes
+ *   the `this` argument (`args[0]`) as the target, as it must for
+ *   `Array.prototype.push.call(out, e)`, so the real target `args[1]` is missed;
+ * - `Reflect.apply(Object.assign, null, [e, …])`: the target inside the array;
+ * - a callback's parameter written to (`[e].forEach((x) => { x.code = … })`,
+ *   `Promise.resolve(e).then((x) => { x.code = … })`): the parameter is tainted,
+ *   but the write does not reach the array or promise it came from;
+ * - a copy of an array that holds the object (`[out].slice()[0].m = String(e)`).
+ * `export * from '…'` and a reassigned `export function` in a `'use server'`
+ * file are not checked either: `next build` and tsc reject both.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
@@ -230,7 +250,10 @@ type Summary = {
   exportLeaks: (name: string, member?: string, deep?: boolean) => boolean;
   exportVia: (name: string) => string | undefined;
   effects: (name: string, i: number | null) => Effects;
+  /** Whether the export is a loader or `createRequire` (`export const r = require`). */
+  exportKind: (name: string) => ModuleKind;
 };
+type ModuleKind = 'loader' | 'factory' | undefined;
 const PENDING = Symbol('pending');
 const summaries = new WeakMap<ModuleReader, Map<string, Summary | typeof PENDING>>();
 
@@ -313,72 +336,127 @@ function analyseFile(src: string, fileName: string, read: ModuleReader, action =
   /** A name with no declaration in the file: `Promise`, `Object`, `require`. */
   const isGlobal = (e: ts.Node, name: string) => ts.isIdentifier(e) && e.text === name && !symbolOf(e)?.declarations?.length;
 
+  /** `k` for `o.k` and `o['k']`; `undefined` for anything else. */
+  const memberName = (x: ts.Expression): string | undefined => {
+    if (ts.isPropertyAccessExpression(x)) return x.name.text;
+    if (ts.isElementAccessExpression(x) && ts.isStringLiteralLike(x.argumentExpression)) return x.argumentExpression.text;
+    return undefined;
+  };
   /**
-   * The module `import('…')` or `require('…')` loads (through `await` and
-   * parentheses); `null` for a package, UNRESOLVED for a specifier that is not
-   * a string, `undefined` when `e` is no such load.
-   * Also handles `createRequire(import.meta.url)(…)`, `require.call(…)`, `require.apply(…)`,
-   * `module.require(…)`, and `const r = require; r(…)` aliases.
+   * The values a name is given in this file: its initializer, each value
+   * assigned to it, and `[o, k]` for `const { k: x } = o` (TASK-MUOIBQJJDKL28,
+   * İNCELEME-118 Y-1). Built from `flows` when first asked.
+   */
+  let givenBySymbol: Map<ts.Symbol, { value: ts.Expression; key?: string }[]> | undefined;
+  const given = (s: ts.Symbol) => {
+    if (!givenBySymbol) {
+      const map = (givenBySymbol = new Map());
+      const give = (id: ts.Node, value: ts.Expression, key?: string) => {
+        const t = ts.isIdentifier(id) ? symbolOf(id) : undefined;
+        if (!t) return;
+        let list = map.get(t);
+        if (!list) map.set(t, (list = []));
+        list.push({ value, key });
+      };
+      for (const f of flows) {
+        if (ts.isVariableDeclaration(f) && f.initializer) {
+          if (ts.isIdentifier(f.name)) give(f.name, f.initializer);
+          else if (ts.isObjectBindingPattern(f.name)) {
+            for (const el of f.name.elements) {
+              const k = el.propertyName ?? el.name;
+              if (!el.dotDotDotToken && (ts.isIdentifier(k) || ts.isStringLiteral(k))) give(el.name, f.initializer, k.text);
+            }
+          }
+        } else if (ts.isBinaryExpression(f) && ts.isIdentifier(skipWrappers(f.left))) give(skipWrappers(f.left), f.right);
+      }
+    }
+    return givenBySymbol.get(s) ?? [];
+  };
+  /**
+   * What a value is to the module system: `'loader'` for a function that loads
+   * a module by its specifier (the global `require`, `module.require`, what
+   * `createRequire(…)` or `require.bind(…)` returns, and any name given one of
+   * these), `'factory'` for `createRequire` itself (imported from `node:module`
+   * under any name, or reached as `nm.createRequire`), `undefined` otherwise.
+   * Through wrappers and the right side of a comma (`(0, require)`).
+   */
+  /** The kind of an imported binding (its `member`, for a namespace), from its module's summary. */
+  const importedKind = (s: ts.Symbol, member?: string): ModuleKind => {
+    const t = importTarget(s);
+    const name = t?.name ?? member;
+    if (!t || t.file === null || t.file === UNRESOLVED || name === undefined) return undefined;
+    return summaryOf(t.file, read)?.exportKind(name);
+  };
+  const kinds = new Map<ts.Node, 'loader' | 'factory' | undefined>();
+  const moduleKind = (e: ts.Expression, seen?: Set<ts.Symbol>): 'loader' | 'factory' | undefined => {
+    if (seen) return moduleKindOf(e, seen);
+    if (!kinds.has(e)) kinds.set(e, moduleKindOf(e, new Set()));
+    return kinds.get(e);
+  };
+  const moduleKindOf = (e: ts.Expression, seen: Set<ts.Symbol>): 'loader' | 'factory' | undefined => {
+    let x = skipWrappers(e);
+    while (ts.isBinaryExpression(x) && x.operatorToken.kind === ts.SyntaxKind.CommaToken) x = skipWrappers(x.right);
+    if (isGlobal(x, 'require')) return 'loader';
+    const key = memberName(x);
+    if (key !== undefined) {
+      const obj = skipWrappers((x as ts.PropertyAccessExpression).expression);
+      if (key === 'require' && isGlobal(obj, 'module')) return 'loader';
+      if (key === 'createRequire') return 'factory';
+      // `L.r` on `import * as L from '…'`: what that module exports under `r`.
+      const ns = ts.isIdentifier(obj) ? symbolOf(obj) : undefined;
+      const nd = ns?.declarations?.[0];
+      return nd && ts.isNamespaceImport(nd) ? importedKind(ns!, key) : undefined;
+    }
+    if (ts.isCallExpression(x)) {
+      const t = skipWrappers(x.expression);
+      if (moduleKind(t, seen) === 'factory') return 'loader';
+      if (memberName(t) === 'bind' && moduleKind((t as ts.PropertyAccessExpression).expression, seen) === 'loader') return 'loader';
+      return undefined;
+    }
+    if (!ts.isIdentifier(x)) return undefined;
+    if (x.text === 'createRequire') return 'factory';
+    const s = symbolOf(x);
+    if (!s || seen.has(s)) return undefined;
+    seen.add(s);
+    const d = s.declarations?.[0];
+    if (d && ts.isImportSpecifier(d) && (d.propertyName ?? d.name).text === 'createRequire') return 'factory';
+    // `import { r } from '…'` where that module has `export const r = require`.
+    if (d && ts.isImportSpecifier(d)) return importedKind(s);
+    for (const g of given(s)) {
+      const k =
+        g.key === undefined
+          ? moduleKind(g.value, seen)
+          : g.key === 'require' && isGlobal(skipWrappers(g.value), 'module')
+            ? 'loader'
+            : g.key === 'createRequire'
+              ? 'factory'
+              : undefined;
+      if (k) return k;
+    }
+    return undefined;
+  };
+
+  /**
+   * The module `import('…')` or a loader call (`require('…')`,
+   * `createRequire(…)('…')`, `module.require('…')`, `r('…')` for a name given
+   * a loader, `require.call(null, '…')`, `require.apply(null, ['…'])`) loads,
+   * through `await` and parentheses; `null` for a package, UNRESOLVED for a
+   * specifier that is not a string literal, `undefined` when `e` is no such load.
    */
   const dynamicLoad = (e: ts.Expression): string | null | undefined => {
     let x = skipWrappers(e);
     if (ts.isAwaitExpression(x)) x = skipWrappers(x.expression);
     if (!ts.isCallExpression(x)) return undefined;
-
-    const expr = x.expression;
-    const spec = x.arguments[0];
-
-    // Direct: `import()` or `require()`
-    if (expr.kind === ts.SyntaxKind.ImportKeyword || isGlobal(expr, 'require')) {
-      return spec && ts.isStringLiteralLike(spec) ? resolveSpec(fileName, spec.text, read) : UNRESOLVED;
+    const load = (spec: ts.Expression | undefined) => (spec && ts.isStringLiteralLike(spec) ? resolveSpec(fileName, spec.text, read) : UNRESOLVED);
+    const t = skipWrappers(x.expression);
+    if (t.kind === ts.SyntaxKind.ImportKeyword || moduleKind(t) === 'loader') return load(x.arguments[0]);
+    const via = memberName(t);
+    if ((via === 'call' || via === 'apply') && moduleKind((t as ts.PropertyAccessExpression).expression) === 'loader') {
+      const a = x.arguments[1];
+      if (via === 'call') return load(a);
+      const arr = a && skipWrappers(a);
+      return load(arr && ts.isArrayLiteralExpression(arr) ? arr.elements[0] : undefined);
     }
-
-    // `createRequire(import.meta.url)(…)`
-    if (ts.isCallExpression(expr)) {
-      const innerCall = expr.expression;
-      if (ts.isIdentifier(innerCall) && innerCall.text === 'createRequire' && !symbolOf(innerCall)?.declarations?.length) {
-        return spec && ts.isStringLiteralLike(spec) ? resolveSpec(fileName, spec.text, read) : UNRESOLVED;
-      }
-    }
-
-    // `require.call(…)`, `require.apply(…)`, `module.require(…)`
-    if (ts.isPropertyAccessExpression(expr)) {
-      const obj = expr.expression;
-      const prop = expr.name.text;
-
-      // `require.call(null, specifier)` or `require.apply(null, [specifier])`
-      if (isGlobal(obj, 'require') && (prop === 'call' || prop === 'apply')) {
-        // For .call, spec is arguments[1]; for .apply, spec is arguments[1][0]
-        if (prop === 'call' && x.arguments.length > 1) {
-          const spec2 = x.arguments[1];
-          return spec2 && ts.isStringLiteralLike(spec2) ? resolveSpec(fileName, spec2.text, read) : UNRESOLVED;
-        }
-        if (prop === 'apply' && x.arguments.length > 1) {
-          const arr = x.arguments[1];
-          if (ts.isArrayLiteralExpression(arr) && arr.elements[0]) {
-            const spec2 = arr.elements[0];
-            return spec2 && ts.isStringLiteralLike(spec2) ? resolveSpec(fileName, spec2.text, read) : UNRESOLVED;
-          }
-          return UNRESOLVED; // array is not a literal
-        }
-      }
-
-      // `module.require(…)` — module is global
-      if (isGlobal(obj, 'module') && prop === 'require') {
-        return spec && ts.isStringLiteralLike(spec) ? resolveSpec(fileName, spec.text, read) : UNRESOLVED;
-      }
-    }
-
-    // `const r = require; r(…)` — aliased require
-    if (ts.isIdentifier(expr)) {
-      const sym = symbolOf(expr);
-      if (!sym?.declarations?.length) return undefined; // unknown identifier (possibly an alias)
-      const decl = sym.declarations[0];
-      if (ts.isVariableDeclaration(decl) && decl.initializer && isGlobal(decl.initializer, 'require')) {
-        return spec && ts.isStringLiteralLike(spec) ? resolveSpec(fileName, spec.text, read) : UNRESOLVED;
-      }
-    }
-
     return undefined;
   };
 
@@ -1240,6 +1318,73 @@ function analyseFile(src: string, fileName: string, read: ModuleReader, action =
     return false;
   };
 
+  // --- İNCELEME-118 Y-1: a loader read the scan does not follow is a finding (fail-closed). ---
+  /**
+   * Every read of a loader or of `createRequire` (by {@link moduleKind}), and
+   * of the global `module` object, must be one the scan follows: called
+   * (`require('…')`, `(0, require)('…')`), the receiver of a called
+   * `.call`/`.apply`/`.bind` (or `require.resolve`, which loads nothing),
+   * given to a name (`const r = require as any`, `r = module.require`), under
+   * `typeof`, and for `module` a named member (`module.exports`) or a one-level
+   * destructuring. Any other read (`use(require)`, `[require][0]('…')`,
+   * `const m = module`, `{ ...module }`) could load a module the scan never
+   * reads, so the line is reported.
+   */
+  const loaderEscapes: ts.Node[] = [];
+  {
+    const valueRead = (n: ts.Node): boolean => {
+      const p = n.parent;
+      if (!ts.isIdentifier(n)) return ts.isPropertyAccessExpression(n) || ts.isElementAccessExpression(n) || ts.isCallExpression(n);
+      if (ts.isShorthandPropertyAssignment(p)) return true; // `{ require }` holds the value
+      if (ts.isBinaryExpression(p) && p.left === n && isAssignment(p.operatorToken.kind)) return false; // `r = …` writes `r`
+      // A name, not a value: `o.require`, `{ require: x }`, `const r`, `function f`, a label.
+      if ((p as { name?: ts.Node }).name === n || (p as { propertyName?: ts.Node }).propertyName === n) return false;
+      return !(ts.isQualifiedName(p) || ts.isLabeledStatement(p) || ts.isBreakOrContinueStatement(p) || ts.isExportSpecifier(p));
+    };
+    /** The node that stands for `n`'s value: up through wrappers and the right side of a comma. */
+    const outer = (n: ts.Node): ts.Node => {
+      let c = n;
+      for (;;) {
+        const p = c.parent;
+        if (ts.isParenthesizedExpression(p) || ts.isAsExpression(p) || ts.isSatisfiesExpression(p) || ts.isNonNullExpression(p) || ts.isTypeAssertionExpression(p)) c = p;
+        else if (ts.isBinaryExpression(p) && p.operatorToken.kind === ts.SyntaxKind.CommaToken && p.right === c) c = p;
+        else return c;
+      }
+    };
+    const called = (c: ts.Node) => ts.isCallExpression(c.parent) && c.parent.expression === c;
+    /** Given to a name (`const r = …`, `r = …`), whose reads are checked in turn (and, for an export, by its importers). */
+    const bound = (c: ts.Node) => {
+      const p = c.parent;
+      if (ts.isVariableDeclaration(p) && p.initializer === c) return ts.isIdentifier(p.name);
+      return ts.isBinaryExpression(p) && p.right === c && isAssignment(p.operatorToken.kind) && ts.isIdentifier(skipWrappers(p.left));
+    };
+    const followed = (n: ts.Node, kind: 'loader' | 'factory' | 'module'): boolean => {
+      const c = outer(n);
+      const p = c.parent;
+      if (ts.isTypeOfExpression(p)) return true;
+      if (kind !== 'module' && (called(c) || bound(c))) return true;
+      if ((ts.isPropertyAccessExpression(p) || ts.isElementAccessExpression(p)) && p.expression === c) {
+        const name = memberName(p);
+        if (kind === 'module') return name !== undefined;
+        if (kind === 'loader' && (name === 'call' || name === 'apply' || name === 'bind')) return called(outer(p));
+        return kind === 'loader' && name === 'resolve';
+      }
+      if (kind === 'module' && ts.isVariableDeclaration(p) && p.initializer === c && ts.isObjectBindingPattern(p.name)) {
+        return p.name.elements.every((el) => !el.dotDotDotToken && (!el.propertyName || ts.isIdentifier(el.propertyName) || ts.isStringLiteral(el.propertyName)));
+      }
+      return false;
+    };
+    const walk = (n: ts.Node) => {
+      if (ts.isTypeNode(n) || ts.isImportDeclaration(n)) return;
+      if (ts.isExpression(n) && valueRead(n)) {
+        const kind = isGlobal(n, 'module') ? 'module' : moduleKind(n as ts.Expression);
+        if (kind && !followed(n, kind)) loaderEscapes.push(n);
+      }
+      ts.forEachChild(n, walk);
+    };
+    walk(sf);
+  }
+
   // --- Which local functions are sanitisers (judged by their body) and which return a caught value. ---
   const candidates = new Set(functions.filter((f) => f.parameters.length > 0));
   /**
@@ -1296,6 +1441,7 @@ function analyseFile(src: string, fileName: string, read: ModuleReader, action =
     const line = lineOf(n);
     if (!findings.has(line)) findings.set(line, via);
   };
+  for (const n of loaderEscapes) report(n, 'a module loader the scan does not follow (fail-closed)');
   for (const f of [sf, ...functions]) {
     if (rejectionHandlers.has(f) || isCallArgument(f)) continue;
     for (const r of returnsOf(f)) {
@@ -1400,6 +1546,7 @@ function analyseFile(src: string, fileName: string, read: ModuleReader, action =
     return undefined;
   };
   const exportLeaks = (name: string, member?: string, deep = false): boolean => {
+    if (loaderEscapes.length) return true; // a module it may load unseen: fail-closed
     const exp = exportsOf().find((x) => x.escapedName === name);
     if (exp) {
       const decl = exp.declarations?.[0];
@@ -1470,6 +1617,7 @@ function analyseFile(src: string, fileName: string, read: ModuleReader, action =
   /** Whether any function here takes a caught value into a parameter or calls a parameter with one. */
   let touchesParams: boolean | undefined;
   const effects = (name: string, i: number | null): Effects => {
+    if (loaderEscapes.length) return i === null ? NO_EFFECTS : ALL_EFFECTS;
     const fn = exportedFunction(name);
     if (fn && 'file' in fn) {
       if (fn.file === null) return i === null ? NO_EFFECTS : ALL_EFFECTS; // a package: may write into any argument
@@ -1505,25 +1653,19 @@ function analyseFile(src: string, fileName: string, read: ModuleReader, action =
       if (ts.isExportSpecifier(decl) && (decl.isTypeOnly || decl.parent.parent.isTypeOnly)) continue;
       if (ts.isFunctionDeclaration(decl)) continue;
       if (ts.isVariableDeclaration(decl) && decl.initializer && ts.isFunctionLike(skipWrappers(decl.initializer))) {
-        // For const, safe. For let/var, check for re-assignment that may leak.
+        // A `const` stays the function written here. A `let`/`var` is judged by every
+        // value assigned to it, matched by symbol: `act = run`, `act ||= run`,
+        // `[act] = [run]`, `({ act } = { act: run })` (İNCELEME-118 Ö-1).
         const parent = decl.parent;
         const isConst = parent && ts.isVariableDeclarationList(parent) && parent.flags & ts.NodeFlags.Const;
         if (isConst) continue;
-        // For let/var, check if there's a re-assignment to a leaking value.
-        const varNames = bindingIds(decl.name);
-        let hasLeakingReassignment = false;
-        for (const name of varNames) {
-          for (const flow of flows) {
-            if (ts.isBinaryExpression(flow) && flow.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-              const left = skipWrappers(flow.left);
-              if (ts.isIdentifier(left) && left.text === name.text && nodeLeaks(skipWrappers(flow.right), undefined, new Set())) {
-                hasLeakingReassignment = true;
-                break;
-              }
-            }
-          }
-          if (hasLeakingReassignment) break;
-        }
+        const own = new Set(bindingIds(decl.name).map((id) => symbolOf(id)));
+        const hasLeakingReassignment = flows.some((flow) => {
+          if (!ts.isBinaryExpression(flow) || !isAssignment(flow.operatorToken.kind)) return false;
+          const left = skipWrappers(flow.left);
+          const targets = ts.isObjectLiteralExpression(left) || ts.isArrayLiteralExpression(left) ? bindingIds(left) : ts.isIdentifier(left) ? [left] : [];
+          return targets.some((id) => own.has(symbolOf(id))) && nodeLeaks(skipWrappers(flow.right), undefined, new Set());
+        });
         if (!hasLeakingReassignment) continue;
       }
       const name = exp.escapedName as string;
@@ -1533,11 +1675,29 @@ function analyseFile(src: string, fileName: string, read: ModuleReader, action =
     }
   }
 
+  const exportKind = (name: string): ModuleKind => {
+    const decl = exportsOf().find((x) => x.escapedName === name)?.declarations?.[0];
+    if (!decl) return undefined;
+    if (ts.isExportSpecifier(decl)) {
+      const from = decl.parent.parent.moduleSpecifier;
+      const local = (decl.propertyName ?? decl.name).text;
+      if (from && ts.isStringLiteral(from)) {
+        const file = resolveSpec(fileName, from.text, read);
+        return file === null || file === UNRESOLVED ? undefined : summaryOf(file, read)?.exportKind(local);
+      }
+      const d = checker.getExportSpecifierLocalTargetSymbol(decl)?.declarations?.[0];
+      if (d && ts.isImportSpecifier(d)) return moduleKind(d.name);
+      return d && ts.isVariableDeclaration(d) && ts.isIdentifier(d.name) ? moduleKind(d.name) : undefined;
+    }
+    return ts.isVariableDeclaration(decl) && ts.isIdentifier(decl.name) ? moduleKind(decl.name) : undefined;
+  };
+
   return {
     findings: [...findings].sort((a, b) => a[0] - b[0]).map(([line, via]) => ({ line, via })),
     exportLeaks,
     exportVia,
     effects,
+    exportKind,
   };
 }
 
