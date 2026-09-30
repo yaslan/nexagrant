@@ -1,0 +1,8 @@
+B=http://localhost:3481; J=$(mktemp)
+c=$(curl -s -c $J -b $J $B/api/auth/csrf | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrfToken"])')
+curl -s -o /dev/null -c $J -b $J -X POST $B/api/auth/callback/credentials --data-urlencode "csrfToken=$c" --data-urlencode "email=cf81@fabrika.test" --data-urlencode "callbackUrl=$B/tr"
+curl -s -b $J -o /dev/null $B/api/auth/session
+docker pause csfb81-pg >/dev/null; sleep 7
+echo "single: $(curl -s -m 60 -b $J -o /dev/null -w '%{time_total}s' $B/api/auth/session)"
+for r in 1 2; do for i in $(seq 1 20); do curl -s -m 60 -b $J -o /dev/null -w "%{time_total}\n" $B/api/auth/session & done | sort -n | awk -v r=$r '{a[NR]=$1} END{printf "burst %s: min=%ss median=%ss max=%ss\n",r,a[1],a[10],a[NR]}'; wait; done
+docker unpause csfb81-pg >/dev/null; rm -f $J
