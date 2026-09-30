@@ -1,0 +1,30 @@
+# cs-fb TASK-MUOACB79XEL25 — Ö-1/Ö-2/G-1 testlerine mutant. Dosyaları bellekteki orijinaline geri yazar (git checkout YOK: commitlenmemiş iş silinmesin).
+import subprocess, sys, pathlib, json
+W = pathlib.Path(sys.argv[1]); P = 'src/app/[locale]/admin/billing/plans'
+T = P + '/actions.test.ts'
+M = {
+ "O1 tenant.ts PlatformAdminRequiredError.code yeniden adlandırıldı (crw-fb X6)": [('src/lib/tenant.ts', "readonly code = 'PLATFORM_ADMIN_REQUIRED';", "readonly code = 'ADMIN_REQUIRED';")],
+ 'O2 P2002 listeye ve iki kataloğa eklendi': [
+   (P + '/failure-codes.ts', "  'UNKNOWN',\n] as const;", "  'P2002',\n  'UNKNOWN',\n] as const;"),
+   ('messages/tr.json', '"INVALID_VISIBILITY": ', '"P2002": "x",\n    "INVALID_VISIBILITY": '),
+   ('messages/en.json', '"INVALID_VISIBILITY": ', '"P2002": "x",\n    "INVALID_VISIBILITY": ')],
+ 'O2b 23505 (SQLSTATE) listeye ve iki kataloğa': [
+   (P + '/failure-codes.ts', "  'UNKNOWN',\n] as const;", "  '23505',\n  'UNKNOWN',\n] as const;"),
+   ('messages/tr.json', '"INVALID_VISIBILITY": ', '"23505": "x",\n    "INVALID_VISIBILITY": '),
+   ('messages/en.json', '"INVALID_VISIBILITY": ', '"23505": "x",\n    "INVALID_VISIBILITY": ')],
+ 'G1 doğrulama kaldırıldı': [(P + '/actions.ts', "    if (!parsed.success) {", "    if (false as boolean) {"), (P + '/actions.ts', "await setPlanVisibility(planId, parsed.data, userId);", "await setPlanVisibility(planId, visibility, userId);")],
+ 'G1b doğrulama yetki kontrolünden önce': [(P + '/actions.ts', "    const { userId } = await requirePlatformAdmin();\n    const parsed = visibilitySchema.safeParse(visibility);\n    if (!parsed.success) {\n      logger.warn('[admin/plans] setVisibility refused', { code: 'INVALID_VISIBILITY' });\n      return { ok: false, code: 'INVALID_VISIBILITY' };\n    }\n", "    const parsed = visibilitySchema.safeParse(visibility);\n    if (!parsed.success) {\n      logger.warn('[admin/plans] setVisibility refused', { code: 'INVALID_VISIBILITY' });\n      return { ok: false, code: 'INVALID_VISIBILITY' };\n    }\n    const { userId } = await requirePlatformAdmin();\n")],
+ 'G1c enum gevşek (z.string())': [(P + '/actions.ts', "const visibilitySchema = z.enum(Object.keys(VISIBILITIES) as [PlanVisibility, ...PlanVisibility[]]);", "const visibilitySchema = z.string().min(1) as unknown as z.ZodType<PlanVisibility>;")],
+}
+for name, edits in M.items():
+    orig = {}
+    for f, old, new in edits:
+        p = W / f; s = orig.setdefault(f, p.read_text()); cur = p.read_text()
+        assert cur.count(old) == 1, (name, f, cur.count(old))
+        p.write_text(cur.replace(old, new))
+    r = subprocess.run(['npx', 'vitest', 'run', T], cwd=W, capture_output=True, text=True)
+    fails = sorted({l.strip()[:140] for l in (r.stdout + r.stderr).splitlines() if l.strip().startswith('×')})
+    print(f'{"ÖLDÜ" if r.returncode else "YAŞADI":6} | {name} | kırmızı: {len(fails)}')
+    for l in fails[:3]: print('    ', l)
+    for f, s in orig.items(): (W / f).write_text(s)
+print('diff --stat:', subprocess.run(['git', 'diff', '--stat'], cwd=W, capture_output=True, text=True).stdout.strip().splitlines()[-1])
