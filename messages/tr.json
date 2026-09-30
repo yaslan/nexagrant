@@ -262,6 +262,7 @@
         "file_too_large": "Dosya 25 MB sınırını aşıyor.",
         "empty_file": "Dosya boş.",
         "object_missing": "Dosya depoya ulaşmadı. Tekrar deneyin.",
+        "already_confirmed": "Bu dosya zaten kaydedildi. Yeni bir belge için dosyayı yeniden seçin.",
         "invalid_object_key": "Dosya anahtarı geçersiz.",
         "storage_unavailable": "Depolama şu an kullanılamıyor. Biraz sonra tekrar deneyin.",
         "put_failed": "Dosya depoya yüklenemedi (HTTP {status})."

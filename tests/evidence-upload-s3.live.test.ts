@@ -52,6 +52,7 @@ const state = vi.hoisted(() => {
   return {
     rls: undefined as PrismaClient | undefined,
     session: null as null | { user: { id: string }; tenantId: string; role: string },
+    role: 'TENANT_OWNER',
   };
 });
 
@@ -81,15 +82,20 @@ const keys: string[] = [];
 
 function actAs(who: 'a' | 'b' | 'anon') {
   state.session =
-    who === 'anon' ? null : { user: { id: who === 'a' ? t.userA : t.userB }, tenantId: t[who], role: 'TENANT_OWNER' };
+    who === 'anon' ? null : { user: { id: who === 'a' ? t.userA : t.userB }, tenantId: t[who], role: state.role };
 }
+
+/** The final key a staging key is confirmed under (D-1): the same path without `incoming/`. */
+const finalOf = (stagingKey: string) => stagingKey.replace(/^([^/]+)\/incoming\//, '$1/');
+/** A staging key of tenant A, as the presign hands out. */
+const stagingOf = (finalKey: string) => finalKey.replace(/^([^/]+)\//, '$1/incoming/');
 
 const PDF = (text: string) => Buffer.from(`%PDF-1.4\n% ${text}\n%%EOF\n`);
 
 async function presign(name: string, mime: string, size: number) {
   const res = await evidence.getPresignedUploadUrlAction('certificate', name, mime, size);
   if (!res.success) throw new Error(`presign refused: ${res.error}`);
-  keys.push(res.objectKey);
+  keys.push(res.objectKey, finalOf(res.objectKey));
   return res;
 }
 
@@ -152,6 +158,7 @@ beforeAll(async () => {
 
 beforeEach(({ skip }) => {
   if (!ready) skip(skipReason);
+  state.role = 'TENANT_OWNER';
   actAs('a');
 });
 
@@ -223,7 +230,7 @@ describe('B-1: only an allowed type of a bounded size gets a signed upload', () 
   test('confirm refuses a key that was never uploaded, and writes no row', async () => {
     const { objectKey } = await presign('yok.pdf', 'application/pdf', 10);
     expect(await confirm(objectKey)).toEqual({ success: false, error: 'object_missing' });
-    expect(await admin!.evidence.count({ where: { tenantId: t.a, r2ObjectKey: objectKey } })).toBe(0);
+    expect(await admin!.evidence.count({ where: { tenantId: t.a, r2ObjectKey: finalOf(objectKey) } })).toBe(0);
   });
 
   test('confirm refuses a stored object whose bytes are not the key’s type, and removes that one object', async () => {
@@ -239,26 +246,31 @@ describe('B-1: only an allowed type of a bounded size gets a signed upload', () 
     const res = await confirm(objectKey, { fileSizeBytes: text.length });
     expect(res).toEqual({ success: false, error: 'unsupported_type' });
     expect(await storage.statObject(objectKey), 'the refused object is gone').toBeNull();
+    expect(await storage.statObject(finalOf(objectKey)), 'and so is its copy').toBeNull();
     expect(await storage.statObject(n.objectKey), 'another object of the same tenant stays').not.toBeNull();
-    expect(await admin!.evidence.count({ where: { tenantId: t.a, r2ObjectKey: objectKey } })).toBe(0);
+    expect(await admin!.evidence.count({ where: { tenantId: t.a, r2ObjectKey: finalOf(objectKey) } })).toBe(0);
   });
 
   test('confirm refuses a stored object whose content type is not the key’s, even with PDF bytes', async () => {
     // Written past the presign, as a store holding an older upload might.
-    const key = storage.generateR2ObjectKey(t.a, 'org-default', 'certificate', 'eski.pdf');
-    keys.push(key);
+    const final = storage.generateR2ObjectKey(t.a, 'org-default', 'certificate', 'eski.pdf');
+    const key = stagingOf(final);
+    keys.push(key, final);
     expect(await storage.putObjectBytes(key, PDF('eski'), 'text/html')).toBe(true);
     expect(await confirm(key)).toEqual({ success: false, error: 'unsupported_type' });
     expect(await storage.statObject(key)).toBeNull();
+    expect(await storage.statObject(final)).toBeNull();
   });
 
   test('confirm refuses a stored object over the limit, whatever size the browser claims', async () => {
-    const key = storage.generateR2ObjectKey(t.a, 'org-default', 'certificate', 'buyuk.pdf');
-    keys.push(key);
+    const final = storage.generateR2ObjectKey(t.a, 'org-default', 'certificate', 'buyuk.pdf');
+    const key = stagingOf(final);
+    keys.push(key, final);
     const big = Buffer.concat([PDF('buyuk'), Buffer.alloc(storage.EVIDENCE_MAX_BYTES, 0x20)]);
     expect(await storage.putObjectBytes(key, big, 'application/pdf')).toBe(true);
     expect(await confirm(key, { fileSizeBytes: 10 })).toEqual({ success: false, error: 'file_too_large' });
     expect(await storage.statObject(key)).toBeNull();
+    expect(await storage.statObject(final)).toBeNull();
    }, 60_000);
 
   test('positive control: a real PDF goes through, and the row records the store’s size and type', async () => {
@@ -268,8 +280,10 @@ describe('B-1: only an allowed type of a bounded size gets a signed upload', () 
 
     const res = await confirm(objectKey, { fileSizeBytes: 999, mimeType: 'text/html' });
     expect(res.success).toBe(true);
-    const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: objectKey } });
+    const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: finalOf(objectKey) } });
     evidenceIds.push(row.id);
+    expect(objectKey).toContain('/incoming/');
+    expect(await storage.statObject(objectKey), 'the staging object is moved, not copied').toBeNull();
     expect(row.fileSizeBytes).toBe(body.length);
     expect(row.mimeType).toBe('application/pdf');
     expect(row.fileUrl).toBeNull();
@@ -284,9 +298,9 @@ describe('B-2: evidence is read only by a signed-in member of its tenant', () =>
     expect((await put(uploadUrl, body, 'application/pdf')).status).toBe(200);
     const res = await confirm(objectKey, { confidentiality });
     expect(res.success).toBe(true);
-    const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t[tenant], r2ObjectKey: objectKey } });
+    const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t[tenant], r2ObjectKey: finalOf(objectKey) } });
     evidenceIds.push(row.id);
-    return { id: row.id, objectKey, body };
+    return { id: row.id, objectKey: finalOf(objectKey), body };
   }
 
   test('a CONFIDENTIAL file cannot be read without a session, neither from the store nor through the app', async () => {
@@ -338,5 +352,139 @@ describe('B-2: evidence is read only by a signed-in member of its tenant', () =>
     expect(file.status).toBe(200);
     expect(file.headers.get('content-disposition')).toMatch(/^attachment;/);
     expect(Buffer.from(await file.arrayBuffer()).equals(own.body)).toBe(true);
+  });
+});
+
+/** A confirmed upload of tenant A: the staging URL and key, the final key and the row. */
+async function confirmedUpload(name: string, confidentiality = 'INTERNAL') {
+  const body = PDF(name);
+  const p = await presign(`${name}.pdf`, 'application/pdf', body.length);
+  expect((await put(p.uploadUrl, body, 'application/pdf')).status).toBe(200);
+  const res = await confirm(p.objectKey, { confidentiality });
+  expect(res.success).toBe(true);
+  const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } });
+  evidenceIds.push(row.id);
+  return { ...p, finalKey: finalOf(p.objectKey), id: row.id, body };
+}
+
+describe('D-1 (TASK-MUNTTZ94LJWBC): a confirmed file cannot be replaced through its signed PUT', () => {
+  test('A1: a PUT after confirm, same URL, type and length, leaves the recorded file as it was', async () => {
+    const up = await confirmedUpload('a1-ilk');
+    expect(new URL(up.uploadUrl).pathname).toContain('/incoming/');
+    expect(new URL(up.uploadUrl).pathname).not.toContain(up.finalKey);
+
+    // Same length as the PDF, HTML bytes, the signed type: the store takes it...
+    const html = Buffer.from('<html>'.padEnd(up.body.length - 7, 'x') + '</html>');
+    expect(html.length).toBe(up.body.length);
+    expect((await put(up.uploadUrl, html, 'application/pdf')).status).toBe(200);
+
+    // ...but only under the staging key. The recorded object is the checked PDF.
+    expect((await storage.getObjectBytes(up.finalKey))!.equals(up.body)).toBe(true);
+    const dl = await callDownload(up.id);
+    expect(dl.status).toBe(302);
+    const file = await fetch(dl.headers.get('location')!);
+    expect(Buffer.from(await file.arrayBuffer()).equals(up.body)).toBe(true);
+
+    // Confirming the replacement is the D-3 case: refused, the staging object
+    // removed, the recorded file untouched.
+    expect(await confirm(up.objectKey)).toEqual({ success: false, error: 'already_confirmed' });
+    expect(await storage.statObject(up.objectKey)).toBeNull();
+    expect((await storage.getObjectBytes(up.finalKey))!.equals(up.body)).toBe(true);
+  });
+
+  test('confirm takes only a staging key: a final key, even the tenant’s own, is refused', async () => {
+    const up = await confirmedUpload('a1-son');
+    expect(await confirm(up.finalKey)).toEqual({ success: false, error: 'invalid_object_key' });
+    const other = storage.generateR2ObjectKey(t.a, 'org-default', 'certificate', 'dogrudan.pdf');
+    keys.push(other);
+    expect(await storage.putObjectBytes(other, PDF('dogrudan'), 'application/pdf')).toBe(true);
+    expect(await confirm(other)).toEqual({ success: false, error: 'invalid_object_key' });
+    expect(await admin!.evidence.count({ where: { tenantId: t.a, r2ObjectKey: other } })).toBe(0);
+  });
+});
+
+describe('D-3 (TASK-MUNTTZ94LJWBC): one key is confirmed once', () => {
+  test('A2: a second confirm of the same key writes no second row and keeps the file', async () => {
+    const up = await confirmedUpload('a2-cift');
+    // Even with the staging object put back first.
+    expect((await put(up.uploadUrl, up.body, 'application/pdf')).status).toBe(200);
+    expect(await confirm(up.objectKey)).toEqual({ success: false, error: 'already_confirmed' });
+    expect(await admin!.evidence.count({ where: { tenantId: t.a, r2ObjectKey: up.finalKey } })).toBe(1);
+    expect(await storage.statObject(up.finalKey)).not.toBeNull();
+  });
+
+  test('two confirms at the same time: one row, one success, the file stays', async () => {
+    const body = PDF('a2-es');
+    const p = await presign('a2-es.pdf', 'application/pdf', body.length);
+    expect((await put(p.uploadUrl, body, 'application/pdf')).status).toBe(200);
+
+    const results = await Promise.all([confirm(p.objectKey), confirm(p.objectKey)]);
+    expect(results.filter((r) => r.success)).toHaveLength(1);
+    const refused = results.find((r) => !r.success);
+    expect(['already_confirmed', 'object_missing']).toContain(refused && 'error' in refused ? refused.error : null);
+
+    const rows = await admin!.evidence.findMany({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } });
+    evidenceIds.push(...rows.map((r) => r.id));
+    expect(rows).toHaveLength(1);
+    expect((await storage.getObjectBytes(finalOf(p.objectKey)))!.equals(body)).toBe(true);
+  });
+
+  test('the index itself refuses a second row with the same key', async () => {
+    const up = await confirmedUpload('a2-indeks');
+    await expect(
+      admin!.evidence.create({ data: { tenantId: t.a, kind: 'certificate', title: `${RUN} dup`, body: '', r2ObjectKey: up.finalKey } })
+    ).rejects.toMatchObject({ code: 'P2002' });
+  });
+});
+
+describe('Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence', () => {
+  test('A6: GUEST_PARTNER cannot download, list or score any evidence, CONFIDENTIAL included', async () => {
+    const secret = await confirmedUpload('a6-gizli', 'CONFIDENTIAL');
+    const open = await confirmedUpload('a6-acik', 'INTERNAL');
+    state.role = 'GUEST_PARTNER';
+    actAs('a');
+    for (const id of [secret.id, open.id]) {
+      const res = await callDownload(id);
+      expect(res.status, id).toBe(403);
+      expect(res.headers.get('location')).toBeNull();
+      expect(res.headers.get('cache-control')).toContain('no-store');
+    }
+    // Refused before any row is read: a made-up id answers the same, so the
+    // partner cannot tell which ids exist.
+    expect((await callDownload(`${secret.id}x`)).status).toBe(403);
+    await expect(evidence.getEvidenceItemsAction()).rejects.toMatchObject({ digest: 'FORBIDDEN_ROLE' });
+    // The score counts documents; the partner's is built from none of them.
+    expect((await evidence.getHealthScoreAction()).totalItems).toBe(0);
+    state.role = 'TENANT_OWNER';
+    actAs('a');
+    expect((await evidence.getHealthScoreAction()).totalItems, 'positive control').toBeGreaterThanOrEqual(2);
+  });
+
+  test('MEMBER reads the open levels only; a confidential level in any spelling needs edit_proposal', async () => {
+    const levels = ['CONFIDENTIAL', 'RESTRICTED', 'confidential', 'SECRET'] as const;
+    const hidden = [];
+    for (const level of levels) hidden.push(await confirmedUpload(`mb-${level}`, level));
+    const open = await confirmedUpload('mb-internal', 'INTERNAL');
+
+    state.role = 'MEMBER';
+    actAs('a');
+    for (const h of hidden) expect((await callDownload(h.id)).status, h.finalKey).toBe(403);
+    expect((await callDownload(open.id)).status).toBe(302);
+    const listed = (await evidence.getEvidenceItemsAction()).map((e) => e.id);
+    expect(listed).toContain(open.id);
+    for (const h of hidden) expect(listed).not.toContain(h.id);
+
+    state.role = 'WRITER';
+    actAs('a');
+    for (const h of hidden) expect((await callDownload(h.id)).status, h.finalKey).toBe(302);
+    const all = (await evidence.getEvidenceItemsAction()).map((e) => e.id);
+    for (const h of hidden) expect(all).toContain(h.id);
+  });
+
+  test('a role outside the enum (a stale token) reads nothing', async () => {
+    const open = await confirmedUpload('stale-rol', 'PUBLIC');
+    state.role = 'OWNER_V0';
+    actAs('a');
+    expect((await callDownload(open.id)).status).toBe(403);
   });
 });

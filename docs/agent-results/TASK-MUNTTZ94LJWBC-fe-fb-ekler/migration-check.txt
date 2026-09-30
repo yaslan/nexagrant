@@ -1,0 +1,24 @@
+# down.sql
+DROP INDEX
+# down.sql again (idempotent)
+DROP INDEX
+NOTICE:  index "Evidence_tenantId_r2ObjectKey_key" does not exist, skipping
+# plant a duplicate pair
+INSERT 0 1
+INSERT 0 2
+# forward with duplicates (must stop)
+ERROR:  evidence-unique-object-key: 1 object key(s) are recorded by more than one "Evidence" row of the same tenant; resolve them first (see this file's header)
+CONTEXT:  PL/pgSQL function inline_code_block line 14 at RAISE
+rc=3
+# resolve: second row loses the key, then forward
+UPDATE 1
+DO
+CREATE INDEX
+rc=0
+# forward again (idempotent)
+DO
+NOTICE:  relation "Evidence_tenantId_r2ObjectKey_key" already exists, skipping
+CREATE INDEX
+rc=0
+DELETE 2
+DELETE 1

@@ -99,7 +99,7 @@ const LOADERS = [
   {
     name: 'loadEvidenceItems (M3 Evidence Pack)',
     run: (tenantId: unknown, client: PrismaClient) =>
-      loadEvidenceItems(tenantId as string, client),
+      loadEvidenceItems(tenantId as string, 'TENANT_OWNER', client),
   },
   {
     name: 'loadConceptNotesIndex (M2 list)',
@@ -140,13 +140,35 @@ describe('every query a page loader issues carries the tenant', () => {
   test('loadEvidenceItems filters Evidence by tenantId', async () => {
     const { client, calls, tenantContext } = recordingClient();
 
-    await loadEvidenceItems(TENANT, client);
+    await loadEvidenceItems(TENANT, 'TENANT_OWNER', client);
 
     expect(tenantContext).toEqual([TENANT]);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({ model: 'evidence', method: 'findMany' });
     expect(calls[0]!.where).toEqual({ tenantId: TENANT });
   });
+
+  // Y-1 (TASK-MUNTTZ94LJWBC): the role narrows the read further.
+  test('loadEvidenceItems reads only the open levels below edit_proposal', async () => {
+    const { client, calls } = recordingClient();
+
+    await loadEvidenceItems(TENANT, 'MEMBER', client);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.where).toEqual({
+      tenantId: TENANT,
+      confidentiality: { in: ['PUBLIC', 'CONSORTIUM', 'INTERNAL'] },
+    });
+  });
+
+  for (const role of ['GUEST_PARTNER', 'NOT_A_ROLE', null]) {
+    test(`loadEvidenceItems issues no query for role ${role}`, async () => {
+      const client = forbiddenClient();
+
+      await expect(loadEvidenceItems(TENANT, role, client)).resolves.toEqual([]);
+      expect(client.touched).toBe(0);
+    });
+  }
 
   test('loadConceptNotesIndex filters ConceptNote by tenantId', async () => {
     const { client, calls, tenantContext } = recordingClient();

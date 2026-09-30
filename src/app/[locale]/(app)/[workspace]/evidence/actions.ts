@@ -8,6 +8,8 @@ import {
   deleteTenantObject,
   deleteObjectBytes,
   evidenceUploadType,
+  finalKeyOfIncoming,
+  promoteIncomingObject,
   statObject,
   storedEvidenceMatches,
   uploadFileToR2,
@@ -16,18 +18,31 @@ import {
 } from '@/lib/storage';
 import { extractEvidenceMetadata } from '@/lib/evidence-ai';
 import { calculateEvidenceHealthScore, HealthScoreResult, MinimalEvidenceItem } from '@/lib/evidence-health';
-import { errorMessage } from '@/lib/errors';
+import { errorCode, errorMessage } from '@/lib/errors';
+import { EVIDENCE_READ_ACTION, evidenceReadWhere } from '@/lib/evidence-access';
 import { isPresentId } from '@/lib/required-id';
 import type { EvidenceItemData } from './evidence-client';
+import type { EvidenceUploadRefusal } from '@/lib/storage';
+
+/** A confirm that stops inside its transaction, so the row is rolled back. */
+class UploadRefused extends Error {
+  constructor(readonly code: EvidenceUploadRefusal | 'object_missing') {
+    super(code);
+  }
+}
 
 /**
  * Retrieves all Evidence items for active tenant
  */
 export async function getEvidenceItemsAction(categoryFilter?: string) {
-  const { tenantId } = await requireTenantAction({ readOnly: true });
+  // Y-1 (TASK-MUNTTZ94LJWBC): the external partner has no `view_proposal` and
+  // is refused; below `edit_proposal` only the open levels are listed.
+  const { tenantId, role } = await requireTenantAction({ readOnly: true, can: EVIDENCE_READ_ACTION });
+  const readable = evidenceReadWhere(role);
+  if (!readable) return [];
 
   try {
-    const whereClause: Record<string, unknown> = { tenantId };
+    const whereClause: Record<string, unknown> = { tenantId, ...readable };
     if (categoryFilter && categoryFilter !== 'ALL') {
       whereClause.category = categoryFilter;
     }
@@ -117,22 +132,13 @@ export async function confirmEvidenceUploadAction(data: {
   // The key comes back from the browser. Only one under this tenant's own prefix
   // may be recorded: the row's key is what deleteEvidence later removes from the
   // store, so accepting another tenant's key let a member delete that tenant's
-  // file (Y-4, TASK-MUN80W2VFY56R).
+  // file (Y-4, TASK-MUN80W2VFY56R). And only a staging key (D-1,
+  // TASK-MUNTTZ94LJWBC): the row records the final key it is copied to, which
+  // no signed PUT names, so the checked file cannot be replaced afterwards.
   const objectKey = tenantObjectKeyOf(tenantId, data?.objectKey);
-  if (!objectKey || objectKey !== data.objectKey) {
+  const finalKey = finalKeyOfIncoming(tenantId, data?.objectKey);
+  if (!objectKey || objectKey !== data.objectKey || !finalKey) {
     return { success: false as const, error: 'invalid_object_key' as const };
-  }
-
-  // What was stored, not what the browser says it stored (B-1/B-3,
-  // TASK-MUNODY0DVDWC5): the object must exist, be an allowed type of its key's
-  // extension, within the limit, and begin with that format's bytes. A stored
-  // object that fails is removed — this one key, which is the tenant's own.
-  const stored = await statObject(objectKey);
-  if (!stored) return { success: false as const, error: 'object_missing' as const };
-  const verdict = storedEvidenceMatches(objectKey, stored);
-  if (!verdict.ok) {
-    await deleteObjectBytes(objectKey);
-    return { success: false as const, error: verdict.error };
   }
 
   // No reader runs over the file yet, so this reports nothing rather than guessing.
@@ -141,8 +147,16 @@ export async function confirmEvidenceUploadAction(data: {
   // The user's date, or none. A document with no stated expiry does not get one.
   const finalValidUntil = data.validUntil ? new Date(data.validUntil) : null;
 
+  // Set once the object sits under the final key, so a failure after that
+  // removes the copy this call made.
+  let promoted = false;
+  let evidence;
   try {
-    const evidence = await withTenant(tenantId, async (tx) => {
+    evidence = await withTenant(tenantId, async (tx) => {
+      // The row comes first (D-3, TASK-MUNTTZ94LJWBC). (tenantId, r2ObjectKey)
+      // is unique, so a second confirm of the same key stops here, before it
+      // copies anything over the first one's file — also when both run at
+      // once: the second insert waits for this transaction to end.
       const created = await tx.evidence.create({
       data: {
         tenantId,
@@ -160,11 +174,12 @@ export async function confirmEvidenceUploadAction(data: {
         // An upload is not a verification. The row says so in the column built for it,
         // and the list badges it as unverified until someone actually checks it.
         status: 'UNVERIFIED',
-        r2ObjectKey: objectKey,
+        r2ObjectKey: finalKey,
         fileBucket: EVIDENCE_BUCKET,
         fileName: data.fileName,
-        fileSizeBytes: stored.size,
-        mimeType: verdict.contentType,
+        // Replaced below by what the store holds, never the browser's figures.
+        fileSizeBytes: null,
+        mimeType: null,
         // No public link (B-2): evidence is read through the authenticated
         // download route, never from a URL anyone holding it can open.
         fileUrl: null,
@@ -180,17 +195,38 @@ export async function confirmEvidenceUploadAction(data: {
       },
       });
 
+      // What was stored, not what the browser says it stored (B-1/B-3,
+      // TASK-MUNODY0DVDWC5), checked on the copy: it must exist, be an allowed
+      // type of its key's extension, within the limit, and begin with that
+      // format's bytes. A copy that fails is removed and the row rolled back.
+      if (!(await promoteIncomingObject(objectKey, finalKey))) throw new UploadRefused('object_missing');
+      promoted = true;
+      const stored = await statObject(finalKey);
+      if (!stored) throw new UploadRefused('object_missing');
+      const verdict = storedEvidenceMatches(finalKey, stored);
+      if (!verdict.ok) throw new UploadRefused(verdict.error);
+
+      await tx.evidence.updateMany({
+        where: { id: created.id, tenantId },
+        data: { fileSizeBytes: stored.size, mimeType: verdict.contentType },
+      });
+
       // No claim is created here. Uploading a file is not evidence for any statement,
       // and the rows this used to write ("independently audited", "fully compliant
       // with international standards", at confidence 0.95) were backed by nothing.
       // A claim is written when a person makes it and links it to this document.
 
-      return created;
+      return { ...created, fileSizeBytes: stored.size, mimeType: verdict.contentType };
     });
-
-    revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
-    return { success: true, evidence };
   } catch (error) {
+    if (promoted) await deleteObjectBytes(finalKey);
+    if (error instanceof UploadRefused) return { success: false as const, error: error.code };
+    if (errorCode(error) === 'P2002') {
+      // Already confirmed. What a PUT after that left under the staging key is
+      // removed; the confirmed file under the final key is not touched.
+      await deleteObjectBytes(objectKey);
+      return { success: false as const, error: 'already_confirmed' as const };
+    }
     console.warn(`[confirmEvidenceUploadAction] DB error: ${errorMessage(error)}`);
     // Mock return if DB offline
     return {
@@ -209,6 +245,9 @@ export async function confirmEvidenceUploadAction(data: {
       },
     };
   }
+
+  revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
+  return { success: true, evidence };
 }
 
 /**
@@ -357,12 +396,15 @@ export async function verifyEvidenceAction(evidenceId: string, status: string) {
  * Generates Evidence Pack Health Score (0-100) for tenant
  */
 export async function getHealthScoreAction(): Promise<HealthScoreResult> {
-  const { tenantId } = await requireTenantAction({ readOnly: true });
+  const { tenantId, role } = await requireTenantAction({ readOnly: true });
+  // The score names documents, so it is built from the rows the role may read.
+  const readable = evidenceReadWhere(role);
+  if (!readable) return calculateEvidenceHealthScore([]);
 
   try {
     const items = await withTenant<MinimalEvidenceItem[]>(tenantId, (tx) =>
       tx.evidence.findMany({
-        where: { tenantId },
+        where: { tenantId, ...readable },
         select: {
           id: true,
           kind: true,
