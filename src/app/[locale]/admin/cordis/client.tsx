@@ -237,10 +237,17 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
       </div>
 
       {/* ──────────────────────── NAVIGATION TABS ──────────────────────── */}
-      <div className="flex border-b border-border gap-2">
+      {/* Scrolls sideways on narrow screens instead of widening <main>. The baseline is an
+          inset shadow, not border-b + -mb-px: a scroll box would clip the tabs' overlap.
+          Chrome does not scroll a half-visible element into view on keyboard focus, so the
+          strip does it: a Tab-key user would otherwise stop on a tab cut off at the edge. */}
+      <div
+        className="flex gap-2 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)]"
+        onFocus={(e) => e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
+      >
         <button
           onClick={() => setActiveTab('k2_ingestion')}
-          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 -mb-px ${
+          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 shrink-0 whitespace-nowrap ${
             activeTab === 'k2_ingestion'
               ? 'border-blue-600 text-blue-600 bg-blue-50/50'
               : 'border-transparent text-muted hover:text-ink'
@@ -252,7 +259,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
 
         <button
           onClick={() => setActiveTab('sync')}
-          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 -mb-px ${
+          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 shrink-0 whitespace-nowrap ${
             activeTab === 'sync'
               ? 'border-blue-600 text-blue-600 bg-blue-50/50'
               : 'border-transparent text-muted hover:text-ink'
@@ -264,7 +271,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
 
         <button
           onClick={() => setActiveTab('delta')}
-          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 -mb-px ${
+          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 shrink-0 whitespace-nowrap ${
             activeTab === 'delta'
               ? 'border-purple-600 text-purple-600 bg-purple-50/50'
               : 'border-transparent text-muted hover:text-ink'
@@ -276,7 +283,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
 
         <button
           onClick={() => setActiveTab('workbench')}
-          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 -mb-px ${
+          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 shrink-0 whitespace-nowrap ${
             activeTab === 'workbench'
               ? 'border-blue-600 text-blue-600 bg-blue-50/50'
               : 'border-transparent text-muted hover:text-ink'
@@ -349,7 +356,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
 
             {/* Run Controls */}
             <div className="pt-2 flex flex-col md:flex-row items-center justify-between gap-4 border-t border-border">
-              <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <div>
                   <label className="text-xs font-bold text-ink-2 block mb-1">Veri Kümesi (Dataset)</label>
                   <select

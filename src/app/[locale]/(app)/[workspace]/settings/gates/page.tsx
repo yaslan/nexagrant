@@ -59,11 +59,11 @@ export default function GateSettingsPage() {
           <h2 className="text-lg font-semibold border-b border-border pb-2 mb-4">G0: Scoring Weights</h2>
           <p className="text-sm text-ink-2 mb-4">Total must equal 100. These weights determine how the final G0 score is calculated.</p>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-4">
             {Object.entries(DEFAULT_SCORING_WEIGHTS).map(([key, value]) => (
-              <div key={key} className="flex justify-between items-center bg-ground p-2 rounded border border-border">
-                <span className="text-sm font-medium text-ink-2">{key}</span>
-                <span className="text-sm text-ink font-mono">{value}</span>
+              <div key={key} className="flex justify-between items-center gap-2 min-w-0 bg-ground p-2 rounded border border-border">
+                <span className="text-sm font-medium text-ink-2 min-w-0 break-words">{key}</span>
+                <span className="text-sm text-ink font-mono shrink-0">{value}</span>
               </div>
             ))}
           </div>

@@ -231,7 +231,7 @@ export function EvaluationsClient({
       <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-xl border border-slate-800 relative overflow-hidden">
         <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-blue-400 font-semibold tracking-wider uppercase mb-1">
               <Award className="w-4 h-4 text-blue-400" />
@@ -252,7 +252,7 @@ export function EvaluationsClient({
               The copy was hard-coded Turkish, so an English reader saw no disclaimer they
               could read. It now comes from the same m6 keys the panel surfaces use. */}
           <div
-            className="bg-amber-500/15 border border-amber-500/30 text-amber-300 rounded-xl px-4 py-2.5 text-xs flex items-center gap-2.5 shadow-xs shrink-0 max-w-sm"
+            className="bg-amber-500/15 border border-amber-500/30 text-amber-300 rounded-xl px-4 py-2.5 text-xs flex items-center gap-2.5 shadow-xs max-w-sm"
             data-testid="m6-internal-badge"
           >
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" aria-hidden="true" />
@@ -263,7 +263,7 @@ export function EvaluationsClient({
         </div>
 
         {/* Top Metric Cards Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800 text-xs wrap-anywhere">
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
             <span className="text-muted block text-[11px]">{t('metrics.avgScore')}</span>
             {avgTotalScore === null ? (
@@ -328,10 +328,17 @@ export function EvaluationsClient({
       </div>
 
       {/* ──────────────────────── NAVIGATION TABS ──────────────────────── */}
-      <div className="flex border-b border-border gap-2">
+      {/* Scrolls sideways on narrow screens instead of widening <main>. The baseline is an
+          inset shadow, not border-b + -mb-px: a scroll box would clip the tabs' overlap.
+          Chrome does not scroll a half-visible element into view on keyboard focus, so the
+          strip does it: a Tab-key user would otherwise stop on a tab cut off at the edge. */}
+      <div
+        className="flex gap-2 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)]"
+        onFocus={(e) => e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
+      >
         <button
           onClick={() => setActiveTab('evaluations')}
-          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 -mb-px ${
+          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 shrink-0 whitespace-nowrap ${
             activeTab === 'evaluations'
               ? 'border-blue-600 text-blue-600 bg-blue-50/50'
               : 'border-transparent text-muted hover:text-ink hover:bg-ground'
@@ -346,7 +353,7 @@ export function EvaluationsClient({
 
         <button
           onClick={() => setActiveTab('rea')}
-          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 -mb-px ${
+          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 shrink-0 whitespace-nowrap ${
             activeTab === 'rea'
               ? 'border-blue-600 text-blue-600 bg-blue-50/50'
               : 'border-transparent text-muted hover:text-ink hover:bg-ground'
@@ -361,7 +368,7 @@ export function EvaluationsClient({
 
         <button
           onClick={() => setActiveTab('calibration')}
-          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 -mb-px ${
+          className={`px-4 py-2.5 font-semibold text-xs rounded-t-xl transition flex items-center gap-2 border-b-2 shrink-0 whitespace-nowrap ${
             activeTab === 'calibration'
               ? 'border-blue-600 text-blue-600 bg-blue-50/50'
               : 'border-transparent text-muted hover:text-ink hover:bg-ground'
