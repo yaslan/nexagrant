@@ -1,0 +1,18 @@
+  768 approvals              piksel(>8)=103934 maxdelta=235
+  768 approvals-taleplerim   piksel(>8)= 50216 maxdelta=235
+  768 approvals-modal        piksel(>8)= 25163 maxdelta=64
+  768 onay-merkezi           piksel(>8)=103934 maxdelta=235
+  768 firsat-kisa            piksel(>8)=     0 maxdelta=0
+  768 firsat-demo            piksel(>8)=     0 maxdelta=0
+ 1024 approvals              piksel(>8)=     0 maxdelta=0
+ 1024 approvals-taleplerim   piksel(>8)=     0 maxdelta=0
+ 1024 approvals-modal        piksel(>8)=     0 maxdelta=0
+ 1024 onay-merkezi           piksel(>8)=     0 maxdelta=0
+ 1024 firsat-kisa            piksel(>8)=     0 maxdelta=0
+ 1024 firsat-demo            piksel(>8)=     0 maxdelta=0
+ 1280 approvals              piksel(>8)=     0 maxdelta=0
+ 1280 approvals-taleplerim   piksel(>8)=     0 maxdelta=0
+ 1280 approvals-modal        piksel(>8)=     0 maxdelta=0
+ 1280 onay-merkezi           piksel(>8)=     0 maxdelta=0
+ 1280 firsat-kisa            piksel(>8)=     0 maxdelta=0
+ 1280 firsat-demo            piksel(>8)=     0 maxdelta=0
