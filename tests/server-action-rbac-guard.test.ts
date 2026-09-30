@@ -73,9 +73,12 @@ const SRC = path.join(REPO_ROOT, 'src');
  *     `paths` or package.json `imports` declares, not only `@/` (İNCELEME-89
  *     Y-4); an alias into src/ with more than one target is fail-closed, and a
  *     config the guard does not read (`extends`, `exports`) fails the suite.
- *     A bare specifier is resolved in tsc's order — `paths`, then tsconfig
+ *     A bare specifier is resolved in the order `paths`, then tsconfig
  *     `baseUrl`, then `imports`, then node_modules, each step only when the
- *     one before names no file — and each file's key is picked by its own
+ *     one before names no file. tsc (5.9, bundler) is narrower: once a `paths`
+ *     key matches, it goes straight to node_modules (İNCELEME-101 B-2); the
+ *     guard reads on, which is stricter — tsc then fails the typecheck with
+ *     TS2307 anyway. Each file's key is picked by its own
  *     rule (Node's longer key on an equal prefix; tied `paths` keys are
  *     fail-closed), so `baseUrl` + `'src/lib/x'` is walked and a catch-all
  *     `"*": ["./src/*"]` leaves `zod` a package (İNCELEME-97 Y-1/Y-2/B-1,
@@ -581,10 +584,13 @@ const pickKey = (p: Pick) => (typeof p === 'string' ? p : `:${p.base}`);
 
 /**
  * A bare specifier (not `./`) → a module id under src/, null outside src/, or
- * `?…` fail-closed. tsc and the bundler read tsconfig in this order, each step
- * only when the one before names no file: `paths` (every target of the key in
- * turn), `baseUrl` + the specifier (İNCELEME-97 Y-1), package.json `imports`,
- * node_modules. So with a catch-all `"*": ["./src/*"]`, `zod` is still a
+ * `?…` fail-closed. The guard reads in this order, each step only when the one
+ * before names no file: `paths` (every target of the key in turn), `baseUrl` +
+ * the specifier (İNCELEME-97 Y-1), package.json `imports`, node_modules. tsc
+ * 5.9 stops earlier: a matched `paths` key whose targets name no file sends it
+ * to node_modules, not to `baseUrl` or `imports` (İNCELEME-101 B-2, seen with
+ * `traceResolution`). Reading on is the stricter side: what tsc cannot find
+ * fails its typecheck (TS2307). So with a catch-all `"*": ["./src/*"]`, `zod` is still a
  * package (B-1), but a specifier that did point into src/ and names neither a
  * file there nor a package is a typo the guard cannot see past. Node reads
  * `imports` alone and throws on a missing target, so that match never falls
@@ -2741,7 +2747,8 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
         const ov: Overlay = { [TSCONFIG_JSON]: tsc({ '@/*': ['./src/*'] }, '"baseUrl": ".", '), 'lib/i89/legacy2.js': impl };
         red('src/lib/i89/legacy2', 'u1', writes, ov);
         red('lib/i89/legacy2', 'u2', writes, { ...ov, [TSCONFIG_JSON]: tsc({ '@/*': ['./*'] }, '"baseUrl": "./src", ') });
-        // After `paths`: a key whose one target names no file falls through to `baseUrl`, as in tsc.
+        // After `paths`: a key whose one target names no file goes on to `baseUrl`. tsc stops at
+        // node_modules there (TS2307, İNCELEME-101 B-2); the guard reading on is the stricter side.
         red('lib/i89/legacy2', 'u3', writes, { ...ov, [TSCONFIG_JSON]: tsc({ '@/*': ['./*'], 'lib/*': ['../scripts/*'] }, '"baseUrl": "./src", ') });
         red('src/lib/i89/nope', 'u4', 'imports src/lib/i89/nope, which the guard cannot find (fail-closed)', ov);
         // Not a file there: a package, as tsc finds it.
@@ -2769,7 +2776,8 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
           ...ov,
           [TSCONFIG_JSON]: tsc({ '~q/*': ['./scripts/*'], '~q/*.js': ['./src/lib/i89/*.js'] }),
         });
-        // Each file on its own: tsconfig names no file (falls through), `imports` names src/.
+        // Each file on its own: tsconfig names no file, so the guard goes on to `imports`, which names
+        // src/. tsc would stop at node_modules (İNCELEME-101 B-2); the bundler may not, so it is walked.
         red('#q/legacy2', 'k10', writes, { ...ov, [TSCONFIG_JSON]: tsc({ '#q/*': ['./scripts/*'] }), [PACKAGE_JSON]: pkg({ '#q/*': './src/lib/i89/*.js' }) });
         // Both name a file, and they differ: the guard cannot know which the build takes.
         red('#q/apply-rls', 'k11', 'imports #q/apply-rls, an alias into src/ with more than one target', {
@@ -2780,6 +2788,28 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
         // Every fallback of a list counts, not only the first.
         red('#w', 'k12', 'imports #w, an alias into src/ with more than one target', { ...ov, [PACKAGE_JSON]: pkg({ '#w': ['some-package', './src/lib/i89/legacy2.js'] }) });
         expect(aliasProblems({ [TSCONFIG_JSON]: '{ "compilerOptions": { "paths": ' })).not.toEqual([]);
+      });
+
+      // İNCELEME-101 B-1 (TASK-MUOBO31H8EPR5): a real module's `@/` import that resolves to a
+      // directory index is looked up again when an overlay puts a file in front of that index.
+      // Without `probed` holding the base it tried first, the overlay's file went unseen.
+      it('B-1 (İNCELEME-101): a file an overlay puts in front of a directory index is walked', () => {
+        expect(resolveSpec('lib/rag', '@/lib/ai/prompts', NO_OVERLAY)).toBe('lib/ai/prompts/index');
+        const shadow = "import { prisma } from '@/lib/db';\nexport function renderPrompt() { void prisma.evidence.delete({ where: { id: 'x' } }); return ''; }\n";
+        const text = header + "import { formatRagPrompt } from '@/lib/rag';\n" + fn('n18', ro + "  return formatRagPrompt([], 'q', 'tr');\n");
+        expect(findingsFor(file, text, NO_OVERLAY).findings).toEqual([]);
+        expect(findingsFor(file, text, { 'lib/ai/prompts.ts': shadow }).findings).toEqual([
+          { key: `${file}#n18`, problem: expect.stringContaining('readOnly: true but writes: prisma.evidence.delete (lib/ai/prompts.ts:2') },
+        ]);
+      });
+
+      it('B-1 (İNCELEME-101): the same through a relative import of a directory index', () => {
+        // lib/jobs/worker.ts: `import { taskList } from './tasks'` → lib/jobs/tasks/index.ts today.
+        const shadow = "import { prisma } from '@/lib/db';\nexport const taskList = { zz: async () => { await prisma.evidence.delete({ where: { id: 'x' } }); } };\n";
+        const text = header + "import { startJobsWorker } from '@/lib/jobs/worker';\n" + fn('n18r', ro + '  await startJobsWorker();\n');
+        const problems = (ov: Overlay) => findingsFor(file, text, ov).findings.map((f) => f.problem).join('\n');
+        expect(problems(NO_OVERLAY)).not.toContain('lib/jobs/tasks.ts:');
+        expect(problems({ 'lib/jobs/tasks.ts': shadow })).toContain('prisma.evidence.delete (lib/jobs/tasks.ts:2');
       });
 
       it('B-1: with a catch-all `"*": ["./src/*"]`, a package is still a package and src/ still src/', () => {
