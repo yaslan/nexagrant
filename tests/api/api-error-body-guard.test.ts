@@ -18,7 +18,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { describe, test, expect } from 'vitest';
 import { unguardedServerErrors } from './response-status-scan';
-import { actionReturnLeaks, hasUseServerDirective } from './action-leak-scan';
+import { actionReturnLeaks, fsModuleReader, hasUseServerDirective } from './action-leak-scan';
 
 const ROOT = resolve(__dirname, '../..');
 const APP_DIR = join(ROOT, 'src/app');
@@ -153,9 +153,12 @@ const KNOWN_ACTION_LEAKS: Record<string, number> = {};
 
 describe('server action error returns', () => {
   test('no server action returns what it caught (beyond the known list)', () => {
+    // Imports are followed into src/ (TASK-MUOBO31H8EPR5, İNCELEME-100 Y-1):
+    // a service that returns what it caught leaks through the action that returns it.
+    const read = fsModuleReader(ROOT);
     const found: Record<string, number> = {};
     for (const file of serverActionFiles()) {
-      const n = actionReturnLeaks(readFileSync(file, 'utf8'), rel(file)).length;
+      const n = actionReturnLeaks(readFileSync(file, 'utf8'), rel(file), read).length;
       if (n > 0) found[rel(file)] = n;
     }
     expect(found).toEqual(KNOWN_ACTION_LEAKS);
