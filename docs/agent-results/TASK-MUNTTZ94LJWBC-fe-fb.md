@@ -1,7 +1,7 @@
 # TASK-MUNTTZ94LJWBC — fe-fb — Kanıt: misafir erişimi (Y-1), confirm sonrası PUT (D-1), çift confirm (D-3), dev rota testleri (D-4)
 
 **Durum:** TAMAM
-**Dal:** `fe-fb/muntt-evidence-guest`. Kod commit'i `2efa909f`, taban dev `45c07fc1`. Worktree: `/Users/macbook/alan/FONBRIDGE-wt-fefb-muntt`. dev'e merge edildi, push yapılmadı.
+**Dal:** `fe-fb/muntt-evidence-guest`. Kod commit'i `2efa909f`, taban dev `45c07fc1`; dev `68e48e11` dala merge edildi (`7877a9f6`). Worktree: `/Users/macbook/alan/FONBRIDGE-wt-fefb-muntt`. dev'e merge edildi, push yapılmadı.
 **Platform beyanı:** Doğrulama mac'te yapıldı: Darwin 27, Node 22, vitest 4.1.11, Chrome (Playwright `channel:'chrome'`), `pgvector/pgvector:pg16` ve `bitnamilegacy/minio` konteynerleri. Değişen kodda platforma bağlı bir yol var: `promoteIncomingObject`'in dev dalı `fs.rename`. Aynı dosya sisteminde bu Linux ve Windows'ta da atomik taşıma yapar. `devObjectPath` değişmedi ve yolu `/` ile kuruyor. Windows'ta Node bunu kabul eder, ama Windows'ta koşulmadı (bu makinede yalnız mac var). Production yolu S3 `CopyObject` + `DeleteObject` ve platformdan bağımsız. CI (ubuntu) MinIO suite'ini atlıyor, çünkü job'da S3 servisi yok. Yeni dev deposu suite'i (`evidence-dev-store.live`) ve prod kapısı testi CI'da koşar; ikisi de S3 istemiyor.
 
 ## 1. Ne yapıldı
@@ -108,6 +108,19 @@ pnpm typecheck rc=0 · pnpm lint rc=0 · pnpm i18n:check ✅ both catalogs agree
 CI=true npx vitest run (izole DB + MinIO env, HEAD 2efa909f):
   Test Files 273 passed | 2 skipped (275) · Tests 3292 passed | 9 skipped (3301) · rc=0
 ```
+**dev merge'lü ağaç, CI Test adımının birebir kopyası.** Bu koşuda S3 env'i yok. dev bu arada `68e48e11`'e ilerledi ve cs-fb'nin live-skip kapısı geldi (`full-test-run3-ci-parity.txt`):
+```
+HEAD 7877a9f6 · vitest rc=0 · Test Files 276 passed | 2 skipped (278) · Tests 3341 passed | 30 skipped (3371)
+check-live-skips rc=0 (atlananların hepsi allow-list'te: evidence-upload-s3.live dosyası + k1 gerçek OpenAI)
+typecheck rc=0 · lint rc=0 · i18n ✅ · build rc=0
+```
+CI'da MinIO suite'i atlanıyor; bu atlama allow-list'te, yani beklenen bir durum. CI'da Y-1/D-1/D-3'ü şunlar taşıyor:
+- `evidence-dev-store.live`: misafire 403, dev deposunda D-1 ve `already_confirmed`, final anahtara PUT 403,
+- `page-loader-tenant-scope`: MEMBER filtresi ve misafire sorgu atılmaması,
+- `evidence-mock-upload-gate`.
+
+İndex (D3c) ve eşzamanlı confirm yalnız MinIO suite'inde sınanıyor. ci.yml'e bir MinIO servisi eklenirse onlar da CI'da koşar.
+
 Koşu 1'in tek kırmızısı `where-guard-src` idi: yeni `updateMany({ where: { id: created.id, tenantId } })`. Buna gerekçeli bir KNOWN kaydı eklendi (bkz. §1) ve koşu 2'de 0 hata çıktı.
 
 ## 3. Değişen dosyalar
