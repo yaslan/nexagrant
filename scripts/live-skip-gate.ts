@@ -31,6 +31,13 @@ export const ALLOWED_LIVE_SKIPS: readonly { file: string; namePrefix: string; wh
     namePrefix: '',
     why: 'no S3-compatible store in the CI job (EVIDENCE_S3_TEST_* unset)',
   },
+  {
+    // The same MinIO behind a fault-injecting proxy (TASK-MUO122UPRPJQH): it
+    // skips in CI for the same reason and goes with the entry above.
+    file: 'tests/evidence-confirm-store-faults.live.test.ts',
+    namePrefix: '',
+    why: 'no S3-compatible store in the CI job (EVIDENCE_S3_TEST_* unset)',
+  },
 ];
 
 type AssertionResult = { fullName?: string; title?: string; status?: string };

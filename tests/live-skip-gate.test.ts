@@ -59,6 +59,7 @@ describe('checkLiveSkips', () => {
     expect(ALLOWED_LIVE_SKIPS.map((a) => a.file)).toEqual([
       'tests/k1-embeddings.live.test.ts',
       'tests/evidence-upload-s3.live.test.ts',
+      'tests/evidence-confirm-store-faults.live.test.ts',
     ]);
   });
 
