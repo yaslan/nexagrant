@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import Stripe from 'stripe';
-import { errorMessage } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import {
   findTierByCode,
@@ -361,6 +360,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: checkoutSession.url });
   } catch (error) {
     logger.error('Error creating checkout session', error);
-    return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
   }
 }

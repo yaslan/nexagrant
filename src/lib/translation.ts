@@ -7,6 +7,48 @@
 const translationCache = new Map<string, string>();
 
 /**
+ * Bounds on the free translation service (TASK-MUN66T2HM4A4E O-1). The cache is
+ * capped so a stream of distinct titles cannot grow the heap without end (Map
+ * keeps insertion order, so the oldest entry goes first), and at most
+ * {@link MAX_CONCURRENT_TRANSLATIONS} outbound calls run at once across the
+ * whole process, however many requests are translating.
+ */
+export const TRANSLATION_CACHE_MAX_ENTRIES = 5000;
+export const MAX_CONCURRENT_TRANSLATIONS = 8;
+
+let activeTranslations = 0;
+const translationQueue: Array<() => void> = [];
+
+async function withTranslationSlot<T>(run: () => Promise<T>): Promise<T> {
+  if (activeTranslations >= MAX_CONCURRENT_TRANSLATIONS) {
+    await new Promise<void>((resolve) => translationQueue.push(resolve));
+  } else {
+    activeTranslations++;
+  }
+  try {
+    return await run();
+  } finally {
+    const next = translationQueue.shift();
+    // The slot passes straight to the next waiter, so the count only drops when nobody waits.
+    if (next) next();
+    else activeTranslations--;
+  }
+}
+
+function cacheTranslation(key: string, value: string): void {
+  if (translationCache.size >= TRANSLATION_CACHE_MAX_ENTRIES && !translationCache.has(key)) {
+    const oldest = translationCache.keys().next().value;
+    if (oldest !== undefined) translationCache.delete(oldest);
+  }
+  translationCache.set(key, value);
+}
+
+/** Test seam: the live counters, so a test can prove the bounds hold. */
+export function translationStats(): { cacheSize: number; active: number; queued: number } {
+  return { cacheSize: translationCache.size, active: activeTranslations, queued: translationQueue.length };
+}
+
+/**
  * Common EU Funding Terms Dictionary for fast & high-quality Turkish translations
  */
 const EU_DICTIONARY: Record<string, string> = {
@@ -44,27 +86,30 @@ export async function translateText(text: string, targetLang = 'tr'): Promise<st
   // 2. Check EU dictionary exact match
   if (targetLang === 'tr' && EU_DICTIONARY[trimmed]) {
     const translated = EU_DICTIONARY[trimmed];
-    translationCache.set(cacheKey, translated);
+    cacheTranslation(cacheKey, translated);
     return translated;
   }
 
   // 3. Call translation service with timeout
   try {
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(trimmed)}&langpair=en|${targetLang}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (res.ok) {
-      const data = await res.json();
-      const translated = data.responseData?.translatedText;
-
-      if (translated && typeof translated === 'string' && !translated.includes('QUERY LENGTH LIMIT EXCEEDED')) {
-        translationCache.set(cacheKey, translated);
-        return translated;
+    const translated = await withTranslationSlot(async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const text: unknown = data.responseData?.translatedText;
+        return typeof text === 'string' ? text : null;
+      } finally {
+        clearTimeout(timeoutId);
       }
+    });
+
+    if (translated && !translated.includes('QUERY LENGTH LIMIT EXCEEDED')) {
+      cacheTranslation(cacheKey, translated);
+      return translated;
     }
   } catch {
     // Network or timeout error -> fallback gracefully
@@ -85,7 +130,7 @@ export async function translateTopicsBatch<T extends { title: string; descriptio
     return topics;
   }
 
-  // Translate titles in parallel (limit concurrency to max 10 items)
+  // Items start together; the outbound calls themselves queue on withTranslationSlot.
   const translated = await Promise.all(
     topics.map(async (topic) => {
       const translatedTitle = await translateText(topic.title, targetLang);

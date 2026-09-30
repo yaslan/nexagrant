@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { errorMessage } from '@/lib/errors';
+import { logger } from '@/lib/logger';
+import { cordisOrganisationIdSchema } from '@/lib/k2-cordis/api-query';
 import type {
   CordisCoParticipationRow,
   CordisOrganizationSummary,
@@ -12,7 +13,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const idParse = cordisOrganisationIdSchema.safeParse((await params).id);
+    if (!idParse.success) {
+      return NextResponse.json({ success: false, error: 'invalid_id' }, { status: 400 });
+    }
+    const id = idParse.data;
 
     const org = await prisma.cordisOrganization.findUnique({
       where: { organisationId: id },
@@ -136,9 +141,8 @@ export async function GET(
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: errorMessage(error, 'Failed to fetch CORDIS organization profile')},
-      { status: 500 }
-    );
+    // A Prisma message quotes the query shape and table names: log it, never return it.
+    logger.error('[API /api/cordis/organizations/[id]] query failed', error);
+    return NextResponse.json({ success: false, error: 'internal_error' }, { status: 500 });
   }
 }

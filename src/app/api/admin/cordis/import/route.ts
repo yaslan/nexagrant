@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runCordisImport } from '@/lib/k2-cordis/importer';
 import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
-import { errorMessage } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import { requirePlatformAdminApi } from '@/lib/tenant';
 
 export async function POST(req: NextRequest) {
@@ -48,9 +48,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: errorMessage(error, 'Failed to execute CORDIS import job')},
-      { status: 500 }
-    );
+    logger.error('[API /api/admin/cordis/import] import failed', error);
+    return NextResponse.json({ success: false, error: 'internal_error' }, { status: 500 });
   }
 }
