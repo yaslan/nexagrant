@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
-import { errorMessage } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { UnsupportedCycleError, type PricedLine } from '@/lib/billing/catalog';
 import { PlanNotAvailableError, priceLineForTenant } from '@/lib/billing/storefront';
@@ -94,6 +93,6 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     logger.error('Error quoting a cart', error);
-    return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
   }
 }

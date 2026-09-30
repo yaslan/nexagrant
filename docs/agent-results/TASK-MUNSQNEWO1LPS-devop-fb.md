@@ -2,6 +2,11 @@
 
 **Durum:** TAMAM
 **Karar:** **ONAY.** Kartın kapsamı olan B-1, B-2 ve B-3 gerçek MinIO ve izole Postgres üzerinde saldırgan gözle denendi ve kapalı. Denemelerde yeni bir engelleyici bulunmadı. Yeni bulgular bu düzeltmenin gerilemesi değil. Hepsi takip kartına yazılabilir: bir Orta (önceden var olan misafir ortak erişimi) ve birkaç Düşük/Bilgi maddesi (§3).
+**Karar güncellemesi (30.09.2026, § E2E):** **ONAY korunuyor.**
+- Patron onaylı e2e tekrar denendi. Playwright koşusu yine **koşulamadı**: kill-guard onayı komut önekinden değil, pane ortamından okuyor (ayrıntı § E2E).
+- Onun yerine gerçek tarayıcıda, izole DB üzerinde `evidence-unverified-badge` spec'inin 1. testi elle yürütüldü: **yeşil**.
+- Yükleme içeren 2 test tarayıcıda koşulamadı, çünkü tarayıcı aracı dosya seçemiyor.
+- Kırmızı sonuç yok. Koşulamayan 2 test açık kalıyor.
 **İncelenen:** `7e24d1a6`, `a2a54966`, dev merge `592c2174`. Ayrı worktree, detached, dev HEAD `33b5602d`.
 **Kaynak:** `docs/agent-results/TASK-MUNODY0DVDWC5-fe-fb.md`, `docs/agent-results/TASK-MUN80W2VFY56R-se-fb-inceleme58.md` §3
 **Platform beyanı:** Doğrulama **mac**'te yapıldı: Darwin 27, Node 26.5, vitest 4.1.11, `pgvector/pgvector:pg16` ve `bitnamilegacy/minio` konteynerleri.
@@ -114,6 +119,75 @@ MinIO kovası: 0 nesne · DB: 0 dv66*/evs3-* kiracı → docker rm -f devfb66-pg
 next start (kendi pid'im, :3966) durduruldu → lsof :3966 = 0 · worktree wt66 kaldırıldı
 ```
 
+## § E2E (patron onaylı)
+Onay: patron, 30.09.2026, "e2e onayı veriyorum, izole DB'de koştur". Kart: TASK-MUNSQNEWO1LPS EK.
+
+**Kurulum (hepsi kendime ait, paylaşılan :5433'e dokunulmadı):**
+- Worktree: ayrı, detached, dev HEAD `62ce8770`. `592c2174` bu HEAD'in atası. `git diff 592c2174 HEAD` kanıt kodunda boş: `src/lib/storage.ts`, `src/app`, `tests/e2e/evidence-*`.
+- DB: kendi konteynerim `devfb66e-pg` (`pgvector/pgvector:pg16`, 127.0.0.1:55467). CI sırasıyla hazırlandı: `prisma db push`, `db:rls-role`, `apply-migrations.sh` ×2 (38+38), `db:rls`, `db:generate`, `db:seed`. Hepsi `prep=0`.
+- MinIO: `devfb66e-minio` (127.0.0.1:59467) açıldı ama kullanılmadı, çünkü playwright koşusu gerçekleşmedi.
+- Koşu öncesi `echo` çıktısı:
+```
+DATABASE_URL=postgresql://fb:***@127.0.0.1:55467/fb66e
+container: devfb66e-pg 127.0.0.1:55467->5432/tcp
+```
+
+**1) Playwright koşusu: KOŞULAMADI. Kırmızı değil, hiç başlamadı.**
+- Komut kartta verilen komuttu (`MURAT_LIVE_OK=1 E2E_PORT=3471 DATABASE_URL=<izole> npx playwright test tests/e2e/evidence-*.spec.ts`).
+- Önek üç biçimde denendi: komutun başında, `bash -c` içinde ve `npx --prefix … --version` ile. Üçü de aynı ret mesajını aldı:
+```
+⛔ AgentSpace kill-guard [R8-canli-app-varken-acilis] — bu komut ÇALIŞTIRILMADI.
+```
+- Kök neden `/Applications/AgentSpace.app/…/killGuard.cjs` dosyasında. `contextFromEnv()` şu satırla `allowLive: String(e.MURAT_LIVE_OK || '') === '1'` değeri **pane sürecinin ortamından** okuyor, komut metninden değil.
+- Kod yorumu da aynı şeyi söylüyor: "Bu değişkeni yalnız Murat verir; ajanın kendi kendine yazması bir KARAR değil, kartın ihlalidir." Yani karttaki yazılı onay, ajan tarafında kapıyı açmıyor.
+- Kapıyı atlatacak yollar (komutu gizleme, `AGENTSPACE_KILL_GUARD=0`) **denenmedi**. Bunlar bir güvenlik kontrolünü delmek olurdu.
+- Koşmanın iki yolu var:
+  - (a) Pane `MURAT_LIVE_OK=1` ortamıyla başlatılır ve bu kart yeniden atanır.
+  - (b) Patron komutu kendisi koşar (aşağıdaki "Tekrar").
+
+**2) Gerçek tarayıcı yürütmesi (kapıya takılmayan yol): 1/1 yeşil.**
+- Sunucu: kendi `pnpm dev --port 3471` sürecim. Ortam olarak izole DB ve `playwright.config.ts` `testEnv`'inin aynısı kullanıldı: test AUTH_SECRET, `DEMO_LOGIN_ENABLED=true`, INVOICE_*.
+- Fixture: spec'lerin kendi `evidenceTenant('fabrication')` ve `evidenceTenant('badge')` kurulumları ile `UNVERIFIED_ROW`. Ekteki `e2e-onayli/fixture.ts` bunları doğrudan içe aktarıyor.
+- Tarayıcı: AgentSpace iç tarayıcısı (headed, `agentspace_browser`). Adımlar:
+  1. `/tr/giris?callbackUrl=/tr/ev-badge-e2e/evidence` açıldı.
+  2. `ev-badge-e2e@fabrika.test` yazıldı.
+  3. Çerez bandı kabul edildi. Spec bunu `localStorage` init script'iyle yapıyor; araçta bu seçenek yok.
+  4. Submit tıklandı.
+- Sunucu logu:
+```
+POST /tr/giris?callbackUrl=%2Ftr%2Fev-badge-e2e%2Fevidence 200 in 417ms
+GET /tr/ev-badge-e2e/evidence 200 in 2.1s
+```
+
+| Spec / test | Assert | Tarayıcıda görülen | Sonuç |
+|---|---|---|---|
+| unverified-badge · "a document nothing has verified is not shown as verified" | başlık görünür | `Doğrulanmamış Test Belgesi` | ✅ |
+| 〃 | `evidence-badge` sayısı 1 | sayfada tek kart; `read [data-testid="evidence-badge"]` tek sonuç | ✅ |
+| 〃 | badge metni `Doğrulanmamış` | `Doğrulanmamış` | ✅ |
+| 〃 | `0 Geçerli Belge` görünür | `0 Geçerli Belge`, `0/100 SAĞLIK SKORU` | ✅ |
+| 〃 | `data-badge-kind="UNVERIFIED"` | araç öznitelik okuyamıyor, **doğrulanmadı** | — |
+| unverified-badge · "a fresh upload is recorded as unverified" | yükleme → satır `UNVERIFIED` | **koşulamadı**: araçta dosya seçme (setInputFiles) yok | — |
+| fabrication · "no invented metadata" | yükleme → çekmecede uydurma yok | **koşulamadı**: aynı sebep | — |
+
+- Yükleme zinciri (presign → PUT → confirm) tarayıcı dışında zaten sınanmıştı: §2.1–2.2'de gerçek HTTP ile, hem MinIO'da hem dev deposunda.
+- Kareler:
+  - `docs/agent-results/TASK-MUNSQNEWO1LPS-devop-fb-ekler/e2e-onayli/01-evidence-page-signed-in.png`: girişten sonra kanıt sayfası
+  - `…/e2e-onayli/02-unverified-badge-row.png`: tek kart, "Doğrulanmamış" rozeti
+- Playwright koşmadığı için trace dosyası yok.
+
+**Temizlik:**
+```
+fixture teardown → left evidence 0 tenants 0
+kendi next dev'im (:3471) durduruldu → lsof :3471 = 0
+docker rm -f devfb66e-pg devfb66e-minio → konteyner 0 · worktree kaldırıldı
+```
+Canlı uygulama ve başka pane süreçleri durdurulmadı.
+
+**Tekrar (patron için ya da `MURAT_LIVE_OK=1` ortamlı bir pane için):**
+1. DB yukarıdaki sırayla izole bir konteynerde hazırlanır.
+2. Karttaki komut `DATABASE_URL` o konteyneri gösterecek şekilde koşulur.
+3. Beklenen: 2 dosya, 3 test.
+
 ## 3. Bulgular
 | # | Önem | Konum | Bulgu | Öneri |
 |---|---|---|---|---|
@@ -146,4 +220,4 @@ Kapsam dışı olup değişmeyenler: B-4 (DB hatasında `success:true`) ve CI'da
   - (b) D-1 ve D-3: geçici anahtar + CopyObject, çift confirm
   - (c) D-4: dev rotası ve sınır testleri
   - (d) ci.yml'e MinIO servisi (açık)
-- Onay gelirse e2e koşusu.
+- E2E (30.09 güncel): 3 testin playwright koşusu `MURAT_LIVE_OK=1` ortamlı bir pane'de ya da patronun kendi koşusunda yapılmalı (§ E2E "Tekrar"). Tarayıcıda 1/3 test elle yeşil.

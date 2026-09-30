@@ -1472,6 +1472,10 @@ model ApiKey {
   keyHash     String    @unique
   prefix      String
   lastUsedAt  DateTime?
+  /// Per-key rate limit window (src/lib/api-auth.ts): when the current one-minute window began.
+  rateWindowStartedAt DateTime?
+  /// Requests counted in the window that began at rateWindowStartedAt.
+  rateWindowCount     Int       @default(0)
   createdAt   DateTime  @default(now())
   @@index([tenantId])
 }

@@ -1,8 +1,8 @@
 import type { PrismaClient } from '@prisma/client';
 
 import { prisma, withTenantOn, assertTenantScope } from '@/lib/db';
-import { findAccessibleTemplate } from '@/modules/m2/server/templates';
-import type { ConceptNoteRow, ConceptTemplateRow } from '@/modules/m2/types';
+import { findAccessibleTemplate, templateSections } from '@/modules/m2/server/templates';
+import type { ConceptNoteRow, ConceptTemplateRow, ConceptTemplateSection } from '@/modules/m2/types';
 
 /**
  * Tenant-scoped read behind one concept note.
@@ -69,4 +69,25 @@ export async function loadConceptNoteDetail(
 
     return { note, template, opportunity };
   });
+}
+
+/** Shown when a note has no template, or its template has no readable sections. */
+const DEFAULT_SECTIONS: ConceptTemplateSection[] = [
+  { key: 'excellence', labelKey: 'Excellence & Innovation', maxWords: 1000 },
+  { key: 'impact', labelKey: 'Expected Impact', maxWords: 800 },
+  { key: 'implementation', labelKey: 'Implementation Plan', maxWords: 600 },
+];
+
+/**
+ * The editor's sections for a note's template.
+ *
+ * The page used to cast `template.schema` to `{ sections }` and pass
+ * `schema.sections` on. Every seeded template stores a bare array
+ * (`prisma/seed.ts`), so that was `undefined` and the editor's `sections[0]`
+ * threw `Cannot read properties of undefined (reading '0')` (TASK-MUNRB2037NA5V,
+ * İNCELEME-57 Ö-3). `templateSections` reads both shapes, as the export route does.
+ */
+export function editorSections(template: { schema?: unknown } | null): ConceptTemplateSection[] {
+  const sections = templateSections(template?.schema);
+  return sections.length > 0 ? sections : DEFAULT_SECTIONS;
 }

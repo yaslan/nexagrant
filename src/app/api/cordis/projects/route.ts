@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { errorMessage } from '@/lib/errors';
+import { logger } from '@/lib/logger';
+import { cordisProjectsQuerySchema, pickQuery } from '@/lib/k2-cordis/api-query';
 import type { CordisProjectWithParticipants } from '@/lib/k2-cordis/rows';
 
 export async function GET(req: NextRequest) {
@@ -11,12 +12,15 @@ export async function GET(req: NextRequest) {
     const country = searchParams.get('country')?.trim().toUpperCase() || '';
     const topic = searchParams.get('topic')?.trim() || '';
     const framework = searchParams.get('framework')?.trim().toUpperCase() || '';
-    const yearFrom = searchParams.get('year_from') ? parseInt(searchParams.get('year_from')!, 10) : undefined;
-    const yearTo = searchParams.get('year_to') ? parseInt(searchParams.get('year_to')!, 10) : undefined;
     const role = searchParams.get('role')?.trim().toLowerCase() || '';
 
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-    const rawLimit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
+    const parsed = cordisProjectsQuerySchema.safeParse(
+      pickQuery(searchParams, ['year_from', 'year_to', 'page', 'limit'] as const)
+    );
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: 'invalid_query' }, { status: 400 });
+    }
+    const { year_from: yearFrom, year_to: yearTo, page, limit: rawLimit } = parsed.data;
 
     const where: Record<string, unknown> = {};
 
@@ -122,9 +126,8 @@ export async function GET(req: NextRequest) {
       data: formattedProjects,
     });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: errorMessage(error, 'Failed to search CORDIS projects')},
-      { status: 500 }
-    );
+    // A Prisma message quotes the query shape and table names: log it, never return it.
+    logger.error('[API /api/cordis/projects] query failed', error);
+    return NextResponse.json({ success: false, error: 'internal_error' }, { status: 500 });
   }
 }

@@ -12,6 +12,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+import { API_KEY_RATE_LIMIT_PER_MINUTE } from '@/lib/api-rate-limit';
 import { generateApiKey, revokeApiKey, type ApiKeyActionError } from './actions';
 
 export interface ApiKeyRecord {
@@ -139,7 +140,7 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl }: ApiKeysClien
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
             <span className="text-muted block text-[11px]">Hız Limiti (Rate Limit)</span>
             <span className="text-xl font-bold text-emerald-400 font-mono mt-0.5 block">
-              1,000 <span className="text-xs text-muted">istek / dk</span>
+              {API_KEY_RATE_LIMIT_PER_MINUTE.toLocaleString('en-US')} <span className="text-xs text-muted">istek / dk</span>
             </span>
           </div>
 

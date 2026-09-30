@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { errorMessage } from '@/lib/errors';
+import { logger } from '@/lib/logger';
+import { cordisOrganizationsQuerySchema, pickQuery } from '@/lib/k2-cordis/api-query';
 import type { CordisPartnerProfileRow } from '@/lib/k2-cordis/rows';
 
 export async function GET(req: NextRequest) {
@@ -10,11 +11,15 @@ export async function GET(req: NextRequest) {
     const q = searchParams.get('q')?.trim() || '';
     const country = searchParams.get('country')?.trim().toUpperCase() || '';
     const activityType = searchParams.get('activity_type')?.trim().toUpperCase() || '';
-    const minProjects = searchParams.get('min_projects') ? parseInt(searchParams.get('min_projects')!, 10) : 0;
     const isTurkish = searchParams.get('is_turkish') !== null ? searchParams.get('is_turkish') === 'true' : undefined;
 
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
+    const parsed = cordisOrganizationsQuerySchema.safeParse(
+      pickQuery(searchParams, ['min_projects', 'page', 'limit'] as const)
+    );
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: 'invalid_query' }, { status: 400 });
+    }
+    const { min_projects: minProjects, page, limit } = parsed.data;
 
     const where: Record<string, unknown> = {};
 
@@ -82,9 +87,8 @@ export async function GET(req: NextRequest) {
       data,
     });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: errorMessage(error, 'Failed to search M1 partner profiles')},
-      { status: 500 }
-    );
+    // A Prisma message quotes the query shape and table names: log it, never return it.
+    logger.error('[API /api/cordis/organizations] query failed', error);
+    return NextResponse.json({ success: false, error: 'internal_error' }, { status: 500 });
   }
 }
