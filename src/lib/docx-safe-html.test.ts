@@ -78,6 +78,12 @@ describe('sanitizeHtmlForDocx — no URL survives as an image source (TASK-MUN80
     expect(out).toContain('core');
     expect((out.match(/<div>/g) ?? []).length).toBeLessThanOrEqual(32);
   });
+
+  it('keeps exactly 32 levels of nesting and flattens the 33rd to its text (MAX_DEPTH boundary, İNCELEME-113)', () => {
+    const nest = (n: number, core = 'core') => '<b>'.repeat(n) + core + '</b>'.repeat(n);
+    expect(sanitizeHtmlForDocx(nest(32), budget())).toBe(nest(32));
+    expect(sanitizeHtmlForDocx(nest(32, '<i>core</i>'), budget())).toBe(nest(32));
+  });
 });
 
 describe('safeInlineImageSrc — the image-size DoS path (O-3)', () => {

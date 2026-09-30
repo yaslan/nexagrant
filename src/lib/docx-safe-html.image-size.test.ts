@@ -132,6 +132,42 @@ describe('the Exif orientation entry: kept exactly when the bundled image-size c
     return Buffer.concat([IMAGES.jpeg!.subarray(0, 2), segment, IMAGES.jpeg!.subarray(2)]);
   };
 
+  // İNCELEME-113: with the whole 12-byte entry, `count ≠ 1 → keep` and `→ entry.length >= 10` agree,
+  // so the count check was unpinned. Cut the entry after the count (8, 9 bytes): the library does not
+  // read a value it does not use, so the image must be kept, and only the count check keeps it.
+  const withShortEntryCount = (bigEndian: boolean, count: number, entryLen: number) => {
+    const entry = Buffer.alloc(12);
+    if (bigEndian) {
+      entry.writeUInt16BE(274, 0);
+      entry.writeUInt16BE(3, 2);
+      entry.writeUInt32BE(count, 4);
+      entry.writeUInt16BE(6, 8);
+    } else {
+      entry.writeUInt16LE(274, 0);
+      entry.writeUInt16LE(3, 2);
+      entry.writeUInt32LE(count, 4);
+      entry.writeUInt16LE(6, 8);
+    }
+    const header = bigEndian ? Buffer.from('MM\0\x2a\0\0\0\x08\0\x01', 'latin1') : Buffer.from('II\x2a\0\x08\0\0\0\x01\0', 'latin1');
+    const payload = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), header, entry.subarray(0, entryLen)]);
+    const segment = Buffer.concat([Buffer.from([0xff, 0xe1, (payload.length + 2) >> 8, (payload.length + 2) & 0xff]), payload]);
+    return Buffer.concat([IMAGES.jpeg!.subarray(0, 2), segment, IMAGES.jpeg!.subarray(2)]);
+  };
+
+  it.each([
+    [true, 0, 8], [true, 2, 8], [true, 2, 9],
+    [false, 0, 8], [false, 2, 8], [false, 2, 9],
+  ])('bigEndian=%s, count=%i, entry cut at %i bytes: kept, as the library reads it (İNCELEME-113)', async (bigEndian, count, entryLen) => {
+    const bytes = withShortEntryCount(bigEndian, count, entryLen);
+    const kept = safeInlineImageSrc(`data:image/jpeg;base64,${bytes.toString('base64')}`, { remaining: Number.MAX_SAFE_INTEGER }) !== null;
+    const libraryReads = await HTMLtoDOCX(`<img src="data:image/jpeg;base64,${bytes.toString('base64')}" />`, null, {}).then(
+      () => true,
+      () => false
+    );
+    expect({ kept }).toEqual({ kept: libraryReads });
+    expect(kept).toBe(true);
+  });
+
   it.each([2, 3, 5])('count ≠ 1: count=%i (Ö-4)', async (count) => {
     const bytes = withOrientationEntryCountNe1(count);
     const kept = safeInlineImageSrc(`data:image/jpeg;base64,${bytes.toString('base64')}`, { remaining: Number.MAX_SAFE_INTEGER }) !== null;

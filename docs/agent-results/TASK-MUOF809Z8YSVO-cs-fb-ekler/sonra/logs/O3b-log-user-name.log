@@ -1,0 +1,51 @@
+# O3b-log-user-name [Ö-3b] src/app/api/concept-notes/[id]/export/route.ts
+# - '      tenantId,\n      reason:'
+# + '      tenantId,\n      who: session?.user?.name,\n      reason:'
+# restored_clean=True
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ddace75c-be72-4b5d-ab0e-0cce77253d82/scratchpad/wt
+
+ ❯ src/app/api/concept-notes/[id]/export/route.edge.test.ts (10 tests | 1 failed) 1377ms
+     × İNCELEME-88 O-2: the retry is logged with request, note and tenant ids and the reason — no sensitive data (Ö-3b/c) 13ms
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  1 failed | 102 passed (103)
+   Start at  22:08:37
+   Duration  3.38s (transform 357ms, setup 0ms, import 1.62s, tests 4.90s, environment 1ms)
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/api/concept-notes/[id]/export/route.edge.test.ts > concept-note DOCX export — İNCELEME-53 follow-ups (TASK-MUNDTW8O2IV6V) > İNCELEME-88 O-2: the retry is logged with request, note and tenant ids and the reason — no sensitive data (Ö-3b/c)
+AssertionError: expected "warn" to be called once with arguments: [ …(2) ]
+
+Received:
+
+  1st warn call:
+
+@@ -3,7 +3,8 @@
+    {
+      "noteId": "note_1",
+      "reason": "Invalid JPG, marker table corrupted",
+      "requestId": "req-abc.123",
+      "tenantId": "tenant_1",
++     "who": "Test User",
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/app/api/concept-notes/[id]/export/route.edge.test.ts:180:18
+    178|     expect(res.status).toBe(200);
+    179|     expect(res.headers.get('X-Request-Id')).toBe('req-abc.123');
+    180|     expect(warn).toHaveBeenCalledExactlyOnceWith('[concept-note export…
+       |                  ^
+    181|       requestId: 'req-abc.123',
+    182|       noteId: 'note_1',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
