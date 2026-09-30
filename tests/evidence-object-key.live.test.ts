@@ -56,8 +56,8 @@ vi.mock('@/lib/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/db')>();
   return {
     ...actual,
-    withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1]) =>
-      actual.withTenantOn(state.rls!, tenantId, cb),
+    withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1], opts?: Parameters<typeof actual.withTenant>[2]) =>
+      actual.withTenantOn(state.rls!, tenantId, cb, opts),
   };
 });
 vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));

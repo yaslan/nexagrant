@@ -1,0 +1,45 @@
+slow-after-copy (12047 ms) → success=true rows=1 finalEqUpload=true staging=false
+staging HEAD dropped       → {"success":false,"error":"storage_unavailable"} rows=0 stagingIntact=true final=false
+                             retry → {"success":true,"evidence":{"id":"cmuo7g9id0003ajxkykag1ars","tenantId rows=1 finalEqUpload=true staging=false
+staging HEAD 503           → {"success":false,"error":"storage_unavailable"} rows=0 stagingIntact=true final=false
+                             retry → {"success":true,"evidence":{"id":"cmuo7g9ns0004ajxkbhs71rj1","tenantId rows=1 finalEqUpload=true staging=false
+staging HEAD 404           → {"success":false,"error":"object_missing"} rows=0 stagingIntact=true final=false
+                             retry → {"success":true,"evidence":{"id":"cmuo7g9ou0005ajxke4shetgd","tenantId rows=1 finalEqUpload=true staging=false
+ranged GET dropped         → {"success":false,"error":"storage_unavailable"} rows=0 stagingIntact=true final=false
+                             retry → {"success":true,"evidence":{"id":"cmuo7g9wm0006ajxkda5aj9zl","tenantId rows=1 finalEqUpload=true staging=false
+ranged GET 500             → {"success":false,"error":"storage_unavailable"} rows=0 stagingIntact=true final=false
+                             retry → {"success":true,"evidence":{"id":"cmuo7ga1m0007ajxk6or4640g","tenantId rows=1 finalEqUpload=true staging=false
+CopyObject dropped         → {"success":false,"error":"storage_unavailable"} rows=0 stagingIntact=true final=false
+                             retry → {"success":true,"evidence":{"id":"cmuo7ga600008ajxkrd4bfi7e","tenantId rows=1 finalEqUpload=true staging=false
+CopyObject 500             → {"success":false,"error":"storage_unavailable"} rows=0 stagingIntact=true final=false
+                             retry → {"success":true,"evidence":{"id":"cmuo7gaah0009ajxklu7druh5","tenantId rows=1 finalEqUpload=true staging=false
+CopyObject 412             → {"success":false,"error":"storage_unavailable"} rows=0 stagingIntact=true final=false
+                             retry → {"success":true,"evidence":{"id":"cmuo7gacf000aajxkhovwnjny","tenantId rows=1 finalEqUpload=true staging=false
+final HEAD dropped         → {"success":false,"error":"storage_unavailable"} rows=0 stagingIntact=true final=true
+                             retry → {"success":true,"evidence":{"id":"cmuo7gal8000bajxkuoxrwi31","tenantId rows=1 finalEqUpload=true staging=false
+final HEAD 404             → {"success":false,"error":"object_missing"} rows=0 stagingIntact=true final=true
+                             retry → {"success":true,"evidence":{"id":"cmuo7ganx000cajxkkd57lwv1","tenantId rows=1 finalEqUpload=true staging=false
+findFirst DB error         → {"success":false,"error":"save_failed"} rows=0 stagingIntact=true final=false
+                             retry → {"success":true,"evidence":{"id":"cmuo7gaqj000dajxk5p2uhel5","tenantId rows=1 finalEqUpload=true staging=false
+create rolled back         → {"success":false,"error":"save_failed"} rows=0 stagingIntact=true final=true
+                             retry → {"success":true,"evidence":{"id":"cmuo7gatw000fajxkho5gscfu","tenantId rows=1 finalEqUpload=true staging=false
+P2028 lock hold: confirm took 6725 ms
+create > tx timeout        → {"success":true,"evidence":{"id":"cmuo7gb3t000hajxknzot6vr5","tenantId rows=1 stagingIntact=false final=true
+                             retry → {"success":false,"error":"already_confirmed"} rows=1 finalEqUpload=true staging=false
+reply lost after commit → {"success":false,"error":"save_failed"} rows=1 staging=true finalEqUpload=true
+   retry → {"success":false,"error":"already_confirmed"} rows=1 staging=false
+staging DELETE 500 → success=true rows=1 staging=true finalEqUpload=true
+   again → {"success":false,"error":"already_confirmed"} staging=false
+refused → {"success":false,"error":"unsupported_type"} rows=0 staging=false final=false
+2x confirm → ok,already_confirmed rows=1 finalEqUpload=true staging=false
+5x confirm → already_confirmed,ok,already_confirmed,already_confirmed,already_confirmed rows=1 finalEqUpload=true staging=false
+RACE → A={"success":true,"evidence":{"id":"cmuo7gj9x000majxksbr6kyxc","tenantId C={"success":false,"error":"already_confirmed"} rows=1 rowSize=56 (v1=56, v2=56)
+   final==v1: true  final==v2: false  download serves: % ORIGINAL certificate, valid until 2027
+   store log: PUT A/incoming/org-default/certificate/2026/222a8d77_race_pdf.pdf ; HEAD A/incoming/org-default/certificate/2026/222a8d77_race_pdf.pdf ; GET(range) A/incoming/org-default/certificate/2026/222a8d77_race_pdf.pdf ; PUT(copy) A/org-default/certificate/2026/222a8d77_race_pdf.pdf ; HEAD A/org-default/certificate/2026/222a8d77_race_pdf.pdf ; PUT A/incoming/org-default/certificate/2026/222a8d77_race_pdf.pdf ; DELETE A/incoming/org-default/certificate/2026/222a8d77_race_pdf.pdf ; DELETE A/incoming/org-default/certificate/2026/222a8d77_race_pdf.pdf ; GET A/org-default/certificate/2026/222a8d77_race_pdf.pdf
+RACE-2 → A={"success":true,"evidence":{"id":"cmuo7gki8000najxkqlvot1n9","tenantId C={"success":false,"error":"already_confirmed"} rows=1 rowId==A: true
+   final==v1: true  final==v2: false  download of A's row serves: % ORIGINAL certificate, valid until 2027
+   store log: PUT A/incoming/org-default/certificate/2026/433b3242_race2_pdf.pdf ; HEAD A/incoming/org-default/certificate/2026/433b3242_race2_pdf.pdf ; GET(range) A/incoming/org-default/certificate/2026/433b3242_race2_pdf.pdf ; PUT(copy) A/org-default/certificate/2026/433b3242_race2_pdf.pdf ; HEAD A/org-default/certificate/2026/433b3242_race2_pdf.pdf ; PUT A/incoming/org-default/certificate/2026/433b3242_race2_pdf.pdf ; DELETE A/incoming/org-default/certificate/2026/433b3242_race2_pdf.pdf ; DELETE A/incoming/org-default/certificate/2026/433b3242_race2_pdf.pdf ; GET A/org-default/certificate/2026/433b3242_race2_pdf.pdf
+docker PAUSE 8s → success=true ms=8080 rows=1 finalEqUpload=true staging=false
+docker STOP → {"success":false,"error":"storage_unavailable"} ms=69 rows=0
+docker stop                → {"success":false,"error":"storage_unavailable"} rows=0 stagingIntact=true final=false
+                             retry → {"success":true,"evidence":{"id":"cmuo7guur000pajxkosg51dt5","tenantId rows=1 finalEqUpload=true staging=false

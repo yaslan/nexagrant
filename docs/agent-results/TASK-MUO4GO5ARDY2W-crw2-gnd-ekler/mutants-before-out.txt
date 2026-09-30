@@ -1,0 +1,10 @@
+BASE Tests  5 passed (5)
+R1 api-auth: EXISTS kiracı kimliğine bağlı değil (herhangi canlı kiracı yeter) -> Tests  1 failed | 4 passed (5)
+R2 isTenantLive: ileri tarihli deletedAt canlı -> Tests  5 passed (5)
+R3 keepLiveTenantRows: ileri tarihli deletedAt canlı -> Tests  5 passed (5)
+R4 credits job: görev sabiti kullanmıyor (kablolama) -> Tests  5 passed (5)
+R5 alerts-daily job: görev süzgeçsiz okuyor (kablolama) -> Tests  5 passed (5)
+R6 isTenantLive: kayıp kiracı canlı sayılır -> Tests  5 passed (5)
+R7 api-auth: sayaç artmıyor ama deletedAt ters (IS NOT NULL OR true yok) — kontrol: silinmişte lastUsedAt yazan ayrı UPDATE -> Tests  1 failed | 4 passed (5)
+AFTER Tests  5 passed (5)
+git status src: ''

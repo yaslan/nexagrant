@@ -1,0 +1,51 @@
+== SONRA dev(c214f02d) ortam yükü load={ 27.55 17.90 19.52 }
+scan#1: files=42 keys=128 findings=0 wall=1039ms cpu=817ms (NO_OVERLAY yerine {} → önbelleksiz)
+scan#2: files=42 keys=128 findings=0 wall=923ms cpu=671ms (NO_OVERLAY yerine {} → önbelleksiz)
+scan#3: files=42 keys=128 findings=0 wall=714ms cpu=619ms (NO_OVERLAY yerine {} → önbelleksiz)
+src ts/tsx files=527
+      Tests  52 passed (52)
+   Duration  1.50s (transform 106ms, setup 0ms, import 1.15s, tests 246ms, environment 0ms)
+real 2.10
+user 2.47
+sys 0.34
+== ÖNCE a21b3a50~1 ortam yükü load={ 29.04 18.71 19.78 }
+scan#1: files=42 keys=128 findings=0 wall=2921ms cpu=3055ms (NO_OVERLAY yerine {} → önbelleksiz)
+scan#2: files=42 keys=128 findings=0 wall=3987ms cpu=3467ms (NO_OVERLAY yerine {} → önbelleksiz)
+scan#3: files=42 keys=128 findings=0 wall=12369ms cpu=4041ms (NO_OVERLAY yerine {} → önbelleksiz)
+src ts/tsx files=527
+      Tests  44 passed (44)
+   Duration  22.08s (transform 248ms, setup 0ms, import 12.03s, tests 9.81s, environment 0ms)
+real 23.96
+user 9.47
+sys 0.53
+== SONRA dev + 16× yes yapay yük load={ 36.72 22.68 21.16 }
+scan#1: files=42 keys=128 findings=0 wall=1086ms cpu=741ms (NO_OVERLAY yerine {} → önbelleksiz)
+scan#2: files=42 keys=128 findings=0 wall=1259ms cpu=638ms (NO_OVERLAY yerine {} → önbelleksiz)
+scan#3: files=42 keys=128 findings=0 wall=1158ms cpu=576ms (NO_OVERLAY yerine {} → önbelleksiz)
+src ts/tsx files=527
+      Tests  52 passed (52)
+   Duration  2.29s (transform 171ms, setup 0ms, import 1.66s, tests 490ms, environment 0ms)
+real 2.99
+user 2.71
+sys 0.32
+== SONRA dev + 16× yes (tekrar) load={ 42.87 24.43 21.80 }
+scan#1: files=42 keys=128 findings=0 wall=1193ms cpu=750ms (NO_OVERLAY yerine {} → önbelleksiz)
+scan#2: files=42 keys=128 findings=0 wall=1178ms cpu=655ms (NO_OVERLAY yerine {} → önbelleksiz)
+scan#3: files=42 keys=128 findings=0 wall=1315ms cpu=595ms (NO_OVERLAY yerine {} → önbelleksiz)
+src ts/tsx files=527
+      Tests  52 passed (52)
+   Duration  2.68s (transform 143ms, setup 0ms, import 1.95s, tests 607ms, environment 0ms)
+real 3.37
+user 2.74
+sys 0.32
+== ÖNCE a21b3a50~1 + 16× yes load={ 51.85 26.94 22.72 }
+scan#1: files=42 keys=128 findings=0 wall=7411ms cpu=3589ms (NO_OVERLAY yerine {} → önbelleksiz)
+scan#2: files=42 keys=128 findings=0 wall=8164ms cpu=3608ms (NO_OVERLAY yerine {} → önbelleksiz)
+scan#3: files=42 keys=128 findings=0 wall=7620ms cpu=3717ms (NO_OVERLAY yerine {} → önbelleksiz)
+src ts/tsx files=527
+      Tests  44 passed (44)
+   Duration  16.24s (transform 222ms, setup 0ms, import 9.60s, tests 6.51s, environment 0ms)
+real 17.18
+user 9.25
+sys 0.41
+?? tests/zz-devopfb-i80-timing.test.ts

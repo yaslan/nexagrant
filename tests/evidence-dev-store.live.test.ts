@@ -34,16 +34,33 @@ const state = vi.hoisted(() => {
     rls: undefined as PrismaClient | undefined,
     session: null as null | { user: { id: string }; tenantId: string; role: string },
     role: 'TENANT_OWNER',
+    /** Makes the row insert of confirm fail, as a database error would. */
+    failCreate: false,
   };
 });
 
 vi.mock('@/lib/auth', () => ({ auth: async () => state.session }));
 vi.mock('@/lib/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/db')>();
+  const failingCreate = <T extends object>(tx: T): T =>
+    new Proxy(tx, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (prop !== 'evidence' || !state.failCreate) return value;
+        return new Proxy(value as object, {
+          get(d, m, r) {
+            if (m !== 'create') return Reflect.get(d, m, r);
+            return async () => {
+              throw new Error('injected: the row insert failed');
+            };
+          },
+        });
+      },
+    });
   return {
     ...actual,
-    withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1]) =>
-      actual.withTenantOn(state.rls!, tenantId, cb),
+    withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1], opts?: Parameters<typeof actual.withTenant>[2]) =>
+      actual.withTenantOn(state.rls!, tenantId, (tx) => cb(failingCreate(tx)), opts),
   };
 });
 vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
@@ -131,6 +148,7 @@ beforeAll(async () => {
 beforeEach(({ skip }) => {
   if (!ready) skip(skipReason);
   state.role = 'TENANT_OWNER';
+  state.failCreate = false;
   actAs('a');
 });
 
@@ -257,6 +275,28 @@ describe('the download route serving the dev store', () => {
     expect(await confirm(p.objectKey)).toEqual({ success: false, error: 'already_confirmed' });
     expect(Buffer.from(await (await callDownload(row.id)).arrayBuffer()).equals(body)).toBe(true);
     expect(await storage.statObject(p.objectKey), 'the second staging object is removed').toBeNull();
+  });
+});
+
+describe('B-1 on the dev store (TASK-MUO64MVW8TLMX, İNCELEME-82 T-2)', () => {
+  test('the row save fails: save_failed, no row, the staging file kept as uploaded; the retry succeeds', async () => {
+    const body = PDF('dev-satir');
+    const p = await presign('dev-satir.pdf', body.length);
+    expect((await mput(p.objectKey, body, 'application/pdf')).status).toBe(200);
+
+    state.failCreate = true;
+    expect(await confirm(p.objectKey)).toEqual({ success: false, error: 'save_failed' });
+    expect(await admin!.evidence.count({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } })).toBe(0);
+    // The dev store copies, it does not move: the user's only copy is still there.
+    expect((await storage.getObjectBytes(p.objectKey))?.equals(body), 'the staging file is kept for the next try').toBe(true);
+
+    state.failCreate = false;
+    expect((await confirm(p.objectKey)).success).toBe(true);
+    const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } });
+    evidenceIds.push(row.id);
+    expect(row.fileSizeBytes).toBe(body.length);
+    expect((await storage.getObjectBytes(finalOf(p.objectKey)))?.equals(body)).toBe(true);
+    expect(await storage.statObject(p.objectKey), 'the staging file goes once the row is saved').toBeNull();
   });
 });
 

@@ -155,7 +155,8 @@ export function assertTenantScope(
 export async function withTenantOn<T>(
   client: PrismaClient,
   tenantId: string,
-  callback: (tx: TenantTx) => Promise<T>
+  callback: (tx: TenantTx) => Promise<T>,
+  options?: TenantTxOptions
 ): Promise<T> {
   // Before the connection is touched: every caller of this function is asking
   // for a tenant-scoped transaction, so a missing tenant is a bug in the
@@ -173,8 +174,15 @@ export async function withTenantOn<T>(
     // tx is a Prisma.TransactionClient; casting to TenantTx mints the nominal brand
     // to prove that app.tenant_id has been set in this transaction.
     return callback(tx as TenantTx);
-  });
+  }, options);
 }
+
+/**
+ * Prisma's interactive-transaction limits, for the rare caller whose
+ * transaction must outlive the 5 s default (evidence confirm holds a lock
+ * across an object-store copy). Everything else keeps the default.
+ */
+export type TenantTxOptions = { maxWait?: number; timeout?: number };
 
 /**
  * Executes a transaction where the PostgreSQL session variable `app.tenant_id`
@@ -185,7 +193,8 @@ export async function withTenantOn<T>(
  */
 export async function withTenant<T>(
   tenantId: string,
-  callback: (tx: TenantTx) => Promise<T>
+  callback: (tx: TenantTx) => Promise<T>,
+  options?: TenantTxOptions
 ): Promise<T> {
-  return withTenantOn(prisma, tenantId, callback);
+  return withTenantOn(prisma, tenantId, callback, options);
 }
