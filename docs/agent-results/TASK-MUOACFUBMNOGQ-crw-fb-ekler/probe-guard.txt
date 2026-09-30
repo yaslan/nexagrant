@@ -1,0 +1,6 @@
+     × every write action checks the caller role, and no readOnly action writes 14ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
++   "app/[locale]/zzacf/actions.ts#zzA7: readOnly: true but writes: prisma.evidence.delete (lib/zzacf/legacy2.js:2, via wipe (lib/zzacf/legacy2))",
++   "app/[locale]/zzacf/actions.ts#zzB5: readOnly: true but writes: prisma.evidence.delete (lib/zzacf/legacy3.js:2, via wipe (lib/zzacf/legacy3))",
+      Tests  1 failed | 61 passed (62)
+ESKİ:       Tests  59 passed (59)

@@ -472,14 +472,21 @@ async function main() {
   try {
     const models = tenantScopedModels();
 
-    const enabled = await client.query<{ relname: string; relrowsecurity: boolean }>(
-      `select c.relname, c.relrowsecurity
+    const enabled = await client.query<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+      `select c.relname, c.relrowsecurity, c.relforcerowsecurity
          from pg_class c
          join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r'`
     );
     const rlsOn = new Set(enabled.rows.filter((r) => r.relrowsecurity).map((r) => r.relname));
     const existing = new Set(enabled.rows.map((r) => r.relname));
+    // FORCE is what holds the policies on the table's OWNER — the prod migrate
+    // role and every script that connects as it. The behavioural probe below
+    // runs as an RLS-subject role that does not own the tables, so it cannot see
+    // FORCE drop: a migration that turns it off for a backfill and fails to put
+    // it back (m4-stale-digest-user-claim.sql) stayed green here
+    // (TASK-MUOADTEOQVL4Z, İNCELEME-95 T-3).
+    const forced = new Set(enabled.rows.filter((r) => r.relforcerowsecurity).map((r) => r.relname));
 
     const policies = await client.query<{ tablename: string }>(
       `select tablename from pg_policies
@@ -490,6 +497,7 @@ async function main() {
     const missingTable = models.filter((m) => !existing.has(m));
     const missingRls = models.filter((m) => existing.has(m) && !rlsOn.has(m));
     const missingPolicy = models.filter((m) => existing.has(m) && !hasPolicy.has(m));
+    const missingForce = models.filter((m) => existing.has(m) && rlsOn.has(m) && !forced.has(m));
 
     console.log(`Kiracıya özel model: ${models.length} · RLS açık tablo: ${rlsOn.size} · tenant_isolation politikası: ${hasPolicy.size}`);
 
@@ -497,9 +505,10 @@ async function main() {
       console.log(`\nℹ  Şemada olup veritabanında olmayan tablo (migration bekliyor): ${missingTable.join(', ')}`);
     }
 
-    if (missingRls.length > 0 || missingPolicy.length > 0) {
+    if (missingRls.length > 0 || missingPolicy.length > 0 || missingForce.length > 0) {
       console.error('\n❌ KİRACI İZOLASYONU EKSİK — bu bir ortam gürültüsü değil, güvenlik durumu.');
       if (missingRls.length > 0) console.error(`   RLS kapalı: ${missingRls.join(', ')}`);
+      if (missingForce.length > 0) console.error(`   FORCE ROW LEVEL SECURITY yok (tablo sahibi politikaları atlıyor): ${missingForce.join(', ')}`);
       if (missingPolicy.length > 0) console.error(`   tenant_isolation politikası yok: ${missingPolicy.join(', ')}`);
       console.error('\n   Onarım: pnpm db:rls   (gerekirse önce pnpm db:rls-role)');
       process.exit(1);

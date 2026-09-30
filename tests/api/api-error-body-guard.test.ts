@@ -17,7 +17,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { describe, test, expect } from 'vitest';
-import { catchReturnLeaks, unguardedServerErrors } from './response-status-scan';
+import { unguardedServerErrors } from './response-status-scan';
+import { actionReturnLeaks, hasUseServerDirective } from './action-leak-scan';
 
 const ROOT = resolve(__dirname, '../..');
 const APP_DIR = join(ROOT, 'src/app');
@@ -42,9 +43,12 @@ const responseBuilders = () => [
     (f) => !f.startsWith(APP_DIR) && f !== HELPER && /\b(?:NextResponse|Response)\b/.test(readFileSync(f, 'utf8'))
   ),
 ];
-/** Server actions: a `'use server'` module is its own HTTP entry point. */
-const serverActionFiles = () =>
-  walk(SRC_DIR, isSource).filter((f) => /^\s*['"]use server['"]/.test(readFileSync(f, 'utf8')));
+/**
+ * Server actions: a `'use server'` module, or a file with an inline `'use server'`
+ * function, is its own HTTP entry point. Read off the syntax tree, so a comment
+ * above the directive (İNCELEME-93 X7) no longer drops the file from the scan.
+ */
+const serverActionFiles = () => walk(SRC_DIR, isSource).filter((f) => hasUseServerDirective(readFileSync(f, 'utf8'), f));
 
 /** Repo-relative with `/`, so the expectations below hold on Windows too. */
 const rel = (f: string) => relative(ROOT, f).split(sep).join('/');
@@ -151,18 +155,33 @@ describe('server action error returns', () => {
   test('no server action returns what it caught (beyond the known list)', () => {
     const found: Record<string, number> = {};
     for (const file of serverActionFiles()) {
-      const n = catchReturnLeaks(readFileSync(file, 'utf8')).length;
+      const n = actionReturnLeaks(readFileSync(file, 'utf8'), rel(file)).length;
       if (n > 0) found[rel(file)] = n;
     }
     expect(found).toEqual(KNOWN_ACTION_LEAKS);
   });
+
+  test('the directive is found past comments and inside a function, and only as a directive', () => {
+    expect(hasUseServerDirective("/** m8 */\n'use server';\nexport async function a() {}")).toBe(true);
+    expect(hasUseServerDirective('// x\n\n/* y */ "use server";\nexport async function a() {}')).toBe(true);
+    expect(hasUseServerDirective("'use strict';\n'use server';\nexport async function a() {}")).toBe(true);
+    expect(hasUseServerDirective("export default function P() {\n  async function act() {\n    'use server';\n  }\n}")).toBe(true);
+    expect(hasUseServerDirective("import x from 'y';\n'use server';")).toBe(false);
+    expect(hasUseServerDirective("const note = 'use server';")).toBe(false);
+    // The inline action of the partner portal page is now scanned too (İNCELEME-93 D-1).
+    expect(serverActionFiles().map(rel)).toContain('src/app/[locale]/portal/partner/[token]/page.tsx');
+  });
+
+  /** An action body wrapped the way the files are: the directive, imports, then the action. */
+  const action = (body: string, imports = '') =>
+    `'use server';\n${imports}\nexport async function act(id: string) {\n${body}\n}\n`;
 
   test('the action guard catches the shapes it is meant to catch', () => {
     const leaks = [
       // Y-1 exactly as export-data.ts / request-deletion.ts had it.
       "try { x(); } catch (error) {\n  const message = error instanceof Error ? error.message : 'Failed';\n  console.error('[export-data]', message);\n  return { success: false, error: message };\n}",
       "try { x(); } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'unknown_error' }; }",
-      'try { x(); } catch (e) { return { status: \'error\', message: errorMessage(e) }; }',
+      "try { x(); } catch (e) { return { status: 'error', message: errorMessage(e) }; }",
       'try { x(); } catch (e) { return { error: String(e) }; }',
       'try { x(); } catch (e) { return { error: `${e}` }; }',
       'try { x(); } catch (e) { return { error: (e as Error).stack }; }',
@@ -174,20 +193,52 @@ describe('server action error returns', () => {
       'try { x(); } catch (error) { if (error instanceof UploadRefused) return { success: false, error: error.message }; }',
       'try { x(); } catch (e) { return { error: e.codeText }; }',
     ];
-    for (const src of leaks) expect(catchReturnLeaks(src), src).toHaveLength(1);
+    for (const src of leaks) expect(actionReturnLeaks(src), src).toHaveLength(1);
 
     const fine = [
       "try { x(); } catch (error) { console.error('[x]', error); return { success: false, error: 'export_failed' }; }",
-      "try { x(); } catch (e) { return { ok: false, error: errorCode(e) }; }",
-      "try { x(); } catch (e) { return { ok: false, error: failureCode(e, 'failed') }; }",
+      "import { errorCode } from '@/lib/errors';\ntry { x(); } catch (e) { return { ok: false, error: errorCode(e) }; }",
+      "import { failureCode } from '@/lib/pilot-expired';\ntry { x(); } catch (e) { return { ok: false, error: failureCode(e, 'failed') }; }",
       "try { x(); } catch (e) { return { ok: false, error: e instanceof CoBrandStorageError ? 'storage' : 'failed' }; }",
-      "try { x(); } catch (error) { return { ok: false, error: mailFailureCode(error) ?? 'unknown_error' }; }",
+      "import { mailFailureCode } from '@/lib/email/mailer';\ntry { x(); } catch (error) { return { ok: false, error: mailFailureCode(error) ?? 'unknown_error' }; }",
       // A domain error's own code (evidence/actions.ts UploadRefused).
       'try { x(); } catch (error) { if (error instanceof UploadRefused) return { success: false, error: error.code }; }',
       "try { x(); } catch (e) { if (isPilotExpired(e)) return { code: 'pilot_expired' }; return { error: 'failed' }; }",
-      // admin/billing/plans (TASK-MUNZKR3PEV8EI); what planFailure returns is pinned by its own test.
-      "try { x(); } catch (e) { return planFailure(e, 'createDraft'); }",
+      // admin/billing/plans: a local helper is judged by its body, not its name.
+      "import { planFailureCode } from './failure-codes';\nfunction planFailure(e: unknown, action: string) {\n  const code = planFailureCode(e);\n  if (code === 'UNKNOWN') logger.error(`[admin/plans] ${action} failed`, e);\n  return { ok: false, code };\n}\nasync function a() { try { x(); } catch (e) { return planFailure(e, 'createDraft'); } }",
+      // m10 actions.ts: a promise `.catch` that answers a fixed code.
+      "async function a() { const r = await send().catch(() => ({ ok: false as const, code: 'failed' })); return r; }",
+      // zod's `.catch(value)` is a fallback value, not a rejection handler.
+      "function a(v: string) { return z.string().catch('x').parse(v); }",
+      // A caught value in one function is not the same-named variable in another.
+      'function a() { try { x(); } catch (e) { log(e); } }\nfunction b(e: string) { return e; }',
     ];
-    for (const src of fine) expect(catchReturnLeaks(src), src).toEqual([]);
+    for (const src of fine) expect(actionReturnLeaks(src, 'src/app/[locale]/admin/billing/plans/actions.ts'), src).toEqual([]);
+  });
+
+  /**
+   * İNCELEME-93 D-1: the six shapes devop-fb's mutants got past the regex guard
+   * (docs/agent-results/TASK-MUO9IN3HL4K5K-devop-fb.md §2.3), each as it was
+   * written into m8 computeSeatCandidatesForm, plus their near relatives.
+   */
+  test.each([
+    ['X2 destructured catch binding', action("try { await compute(id); return { status: 'ok' }; } catch ({ message }) {\n  if (message) return { status: 'error', code: message as never };\n  return { status: 'error', code: 'computeFailed' };\n}")],
+    ['X3 field set on the object after it was built', action("try { await compute(id); return { status: 'ok' }; } catch (e) {\n  const out: Record<string, unknown> = { status: 'error', code: 'computeFailed' };\n  out.detail = String(e);\n  return out;\n}")],
+    ['X4 outer let assigned in the catch', action("let why = '';\ntry { await compute(id); return { status: 'ok' }; } catch (e) {\n  why = String(e);\n  return { status: 'error', code: 'computeFailed', why };\n}")],
+    ['X5 promise .catch handing the error on', action("const created = await compute(id).catch((err: unknown) => err as Error);\nif (created instanceof Error) return { status: 'error', code: created.message as never };\nreturn { status: 'ok' };")],
+    ['X6 local function named like a sanitiser', "'use server';\nfunction errorCode(x: unknown) { return String(x) as never; }\nexport async function act(id: string) {\n  try { await compute(id); return { status: 'ok' }; } catch (e) {\n    return { status: 'error', code: errorCode(e) };\n  }\n}\n"],
+    ['X6b a sanitiser name imported from another module', action("try { await compute(id); return { status: 'ok' }; } catch (e) {\n  return { status: 'error', code: errorCode(e) };\n}", "import { errorCode } from '@/lib/debug';")],
+    ['X6c another export imported under a sanitiser name', action("try { await compute(id); return { status: 'ok' }; } catch (e) {\n  return { status: 'error', code: errorCode(e) };\n}", "import { errorMessage as errorCode } from '@/lib/errors';")],
+    ['X6d a parameter shadowing the imported sanitiser', "'use server';\nimport { errorCode } from '@/lib/errors';\nexport async function act(id: string, errorCode: (e: unknown) => string) {\n  try { await compute(id); return { status: 'ok' }; } catch (e) {\n    return { status: 'error', code: errorCode(e) };\n  }\n}\n"],
+    ['X7 comment above the directive (plus X1)', "/** m8 */\n'use server';\nexport async function act(id: string) {\n  try { await compute(id); return { status: 'ok' }; } catch (e) {\n    return { status: 'error', code: 'computeFailed', message: String(e) };\n  }\n}\n"],
+    ['pushed into a list that is returned', action("const errors: string[] = [];\nfor (const s of seats) {\n  try { await compute(s); } catch (e) { errors.push((e as Error).message); }\n}\nreturn { status: 'done', errors };")],
+    ['Object.assign onto the result', action("const out = { status: 'error' };\ntry { await compute(id); } catch (e) { Object.assign(out, { detail: (e as Error).message }); }\nreturn out;")],
+    ['.then with a rejection handler', action("const r = await compute(id).then(() => 'ok', (e: Error) => e.message);\nreturn { status: r };")],
+    ['a rejection handler passed by name', action("const r = await compute(id).catch(describe);\nreturn { status: 'error', code: r };", 'function describe(e: unknown) { return String(e); }')],
+    ['a helper that leaks, called from the catch', action("try { await compute(id); return { status: 'ok' }; } catch (e) {\n  return { status: 'error', code: describe(e) };\n}", "function describe(e: unknown) { return e instanceof Error ? e.message : 'x'; }")],
+    ['a destructuring assignment in the catch', action("let message = '';\ntry { await compute(id); } catch (e) { ({ message } = e as Error); }\nreturn { status: 'error', message };")],
+  ])('%s', (_, src) => {
+    expect(hasUseServerDirective(src)).toBe(true);
+    expect(actionReturnLeaks(src, 'src/modules/m8/server/actions.ts'), src).not.toEqual([]);
   });
 });

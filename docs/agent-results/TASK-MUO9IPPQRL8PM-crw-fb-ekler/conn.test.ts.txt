@@ -1,0 +1,32 @@
+// crw-fb İNCELEME-94 probe (NOT committed): DATABASE_URL points at a closed port → every action's first query fails to connect.
+import { it, expect, vi } from 'vitest';
+import { appendFileSync } from 'node:fs';
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+vi.mock('@/lib/auth', () => ({ auth: vi.fn(async () => ({ user: { id: 'demo-user-alice', isPlatformAdmin: true } })) }));
+import { logger } from '@/lib/logger';
+import * as A from '@/app/[locale]/admin/billing/plans/actions';
+const OUT = process.env.CRW94_OUT ?? '/dev/null';
+it('S5 connection refused: all 11 → UNKNOWN', async () => {
+  const errSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+  const calls: Record<string, () => Promise<unknown>> = {
+    createDraftAction: () => A.createDraftAction('ultra'),
+    saveDraftAction: () => A.saveDraftAction('pv_ultra_1', {} as never, []),
+    discardDraftAction: () => A.discardDraftAction('pv_ultra_1'),
+    previewImpactAction: () => A.previewImpactAction('pv_ultra_1'),
+    publishVersionAction: () => A.publishVersionAction('pv_ultra_1', 0),
+    setVisibilityAction: () => A.setVisibilityAction('ultra', 'public'),
+    archivePlanAction: () => A.archivePlanAction('ultra'),
+    deletePlanAction: () => A.deletePlanAction('ultra'),
+    assignPlanAction: () => A.assignPlanAction('public-team', 'demo-tenant', ''),
+    unassignPlanAction: () => A.unassignPlanAction('public-team', 'demo-tenant'),
+    grantPilotAction: () => A.grantPilotAction('demo-tenant', false),
+  };
+  for (const [name, call] of Object.entries(calls)) {
+    errSpy.mockClear();
+    const res = await call();
+    const logged = errSpy.mock.calls.at(-1)?.[1] as { code?: unknown; errorCode?: unknown; constructor: { name: string } } | undefined;
+    appendFileSync(OUT, `S5 ${name}: ${JSON.stringify(res)} | log.code=${String(logged?.code)} log.errorCode=${String(logged?.errorCode)} log.class=${logged?.constructor.name}\n`);
+    expect(res).toStrictEqual({ ok: false, code: 'UNKNOWN' });
+    expect(errSpy).toHaveBeenCalledTimes(1);
+  }
+}, 120_000);

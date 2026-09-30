@@ -1,0 +1,9 @@
+passed 3754 failed 0 skipped 41
+{
+  'tests/adapters.test.ts': 2,
+  'tests/evidence-confirm-store-faults.live.test.ts': 11,
+  'tests/evidence-upload-s3.live.test.ts': 21,
+  'tests/k1-daily-calls.test.ts': 4,
+  'tests/k1-embeddings.live.test.ts': 1,
+  'tests/sedia-adapter.test.ts': 2
+}

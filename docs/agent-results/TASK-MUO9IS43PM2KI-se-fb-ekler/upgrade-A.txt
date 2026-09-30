@@ -1,0 +1,17 @@
+--- A1 db push
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "fabrika", schema "public" at "localhost:55795"
+🚀  Your database is now in sync with your Prisma schema. Done in 218ms
+Membership_pkey
+Membership_tenantId_userId_key
+Membership_userId_idx
+0
+--- A2 apply-migrations x2
+apply-migrations: 41 files applied
+exit=0
+apply-migrations: 41 files applied
+exit=0
+Membership_pkey
+Membership_tenantId_userId_key
+Membership_userId_idx
+t

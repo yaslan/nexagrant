@@ -1,0 +1,7 @@
+=== rls:verify, Membership NO FORCE (SQL-M2 mutantının bıraktığı durum)
+[wtdev] exit=0
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+[wt] exit=1
+❌ KİRACI İZOLASYONU EKSİK — bu bir ortam gürültüsü değil, güvenlik durumu.
+   FORCE ROW LEVEL SECURITY yok (tablo sahibi politikaları atlıyor): Membership
+[wt] FORCE geri: exit=0

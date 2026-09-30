@@ -1,0 +1,132 @@
+Pager usage is off.
+ANALYZE
+ANALYZE
+== owner: GDPR export / request-deletion (userId =)
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on "Membership" (actual time=0.039..0.047 rows=6 loops=1)
+   Recheck Cond: ("userId" = 'bulk95-u12345'::text)
+   Heap Blocks: exact=6
+   ->  Bitmap Index Scan on "Membership_userId_idx" (actual time=0.035..0.035 rows=6 loops=1)
+         Index Cond: ("userId" = 'bulk95-u12345'::text)
+ Planning Time: 0.103 ms
+ Execution Time: 0.067 ms
+(7 rows)
+
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on "Membership" (actual time=0.010..0.013 rows=6 loops=1)
+   Recheck Cond: ("userId" = 'bulk95-u12345'::text)
+   Heap Blocks: exact=6
+   ->  Bitmap Index Scan on "Membership_userId_idx" (actual time=0.007..0.007 rows=6 loops=1)
+         Index Cond: ("userId" = 'bulk95-u12345'::text)
+ Planning Time: 0.021 ms
+ Execution Time: 0.020 ms
+(7 rows)
+
+== owner: auth.ts jwt memberships (userId IN + tenant join)
+                                                QUERY PLAN                                                
+----------------------------------------------------------------------------------------------------------
+ Hash Join (actual time=0.016..0.067 rows=6 loops=1)
+   Hash Cond: (t.id = m."tenantId")
+   ->  Seq Scan on "Tenant" t (actual time=0.002..0.038 rows=408 loops=1)
+         Filter: ("deletedAt" IS NULL)
+   ->  Hash (actual time=0.008..0.009 rows=6 loops=1)
+         Buckets: 1024  Batches: 1  Memory Usage: 9kB
+         ->  Bitmap Heap Scan on "Membership" m (actual time=0.005..0.007 rows=6 loops=1)
+               Recheck Cond: ("userId" = 'bulk95-u12345'::text)
+               Heap Blocks: exact=6
+               ->  Bitmap Index Scan on "Membership_userId_idx" (actual time=0.004..0.004 rows=6 loops=1)
+                     Index Cond: ("userId" = 'bulk95-u12345'::text)
+ Planning Time: 0.199 ms
+ Execution Time: 0.084 ms
+(13 rows)
+
+== owner: yeni claim (User PK, FOR UPDATE) — geri alınır
+BEGIN
+                                                QUERY PLAN                                                
+----------------------------------------------------------------------------------------------------------
+ Update on "User" u (actual time=0.069..0.070 rows=1 loops=1)
+   ->  Nested Loop (actual time=0.017..0.018 rows=1 loops=1)
+         ->  Subquery Scan on o (actual time=0.013..0.014 rows=1 loops=1)
+               ->  LockRows (actual time=0.010..0.011 rows=1 loops=1)
+                     ->  Index Scan using "User_pkey" on "User" (actual time=0.007..0.007 rows=1 loops=1)
+                           Index Cond: (id = 'bulk95-u12345'::text)
+                           Filter: (("staleDigestOn" IS NULL) OR ("staleDigestOn" < '2026-10-09'::date))
+         ->  Index Scan using "User_pkey" on "User" u (actual time=0.003..0.003 rows=1 loops=1)
+               Index Cond: (id = o.id)
+ Planning Time: 0.095 ms
+ Execution Time: 0.104 ms
+(11 rows)
+
+ROLLBACK
+== owner: claimedToday (id IN sayfa + gün)
+                                            QUERY PLAN                                            
+--------------------------------------------------------------------------------------------------
+ Hash Join (actual time=0.499..1.646 rows=22 loops=1)
+   Hash Cond: ("User".id = ('bulk95-u'::text || (g.g)::text))
+   ->  Seq Scan on "User" (actual time=0.309..1.396 rows=1177 loops=1)
+         Filter: ("staleDigestOn" >= '2026-10-05'::date)
+         Rows Removed by Filter: 18838
+   ->  Hash (actual time=0.186..0.186 rows=500 loops=1)
+         Buckets: 1024  Batches: 1  Memory Usage: 26kB
+         ->  HashAggregate (actual time=0.116..0.145 rows=500 loops=1)
+               Group Key: ('bulk95-u'::text || (g.g)::text)
+               Batches: 1  Memory Usage: 89kB
+               ->  Function Scan on generate_series g (actual time=0.015..0.051 rows=500 loops=1)
+ Planning Time: 0.060 ms
+ Execution Time: 1.658 ms
+(13 rows)
+
+== owner: DELETE User (FK cascade) — geri alınır
+BEGIN
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Delete on "User" (actual time=0.036..0.036 rows=0 loops=1)
+   ->  Index Scan using "User_pkey" on "User" (actual time=0.019..0.020 rows=1 loops=1)
+         Index Cond: (id = 'bulk95-u777'::text)
+ Planning Time: 0.045 ms
+ Trigger for constraint Account_userId_fkey: time=0.268 calls=1
+ Trigger for constraint Session_userId_fkey: time=0.106 calls=1
+ Trigger for constraint Membership_userId_fkey: time=0.075 calls=1
+ Trigger for constraint Evaluation_userId_fkey: time=0.183 calls=1
+ Trigger for constraint Reviewer_userId_fkey: time=0.121 calls=1
+ Trigger for constraint ApprovalRequest_requesterId_fkey: time=0.125 calls=1
+ Trigger for constraint ApprovalRequest_approverId_fkey: time=0.017 calls=1
+ Execution Time: 0.951 ms
+(12 rows)
+
+ROLLBACK
+Pager usage is off.
+BEGIN
+ enter_system_scope 
+--------------------
+ subject-scoped
+(1 row)
+
+== fabrika_app + system scope: GDPR export (userId =)
+                                                                QUERY PLAN                                                                 
+-------------------------------------------------------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on "Membership" (actual time=0.027..0.059 rows=6 loops=1)
+   Recheck Cond: ("userId" = 'bulk95-u12345'::text)
+   Filter: (("tenantId" = current_setting('app.tenant_id'::text, true)) OR (current_setting('app.system_scope'::text, true) = 'on'::text))
+   Heap Blocks: exact=6
+   ->  Bitmap Index Scan on "Membership_userId_idx" (actual time=0.016..0.016 rows=6 loops=1)
+         Index Cond: ("userId" = 'bulk95-u12345'::text)
+ Planning Time: 0.234 ms
+ Execution Time: 0.079 ms
+(8 rows)
+
+                                                                QUERY PLAN                                                                 
+-------------------------------------------------------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on "Membership" (actual time=0.006..0.009 rows=6 loops=1)
+   Recheck Cond: ("userId" = 'bulk95-u12345'::text)
+   Filter: (("tenantId" = current_setting('app.tenant_id'::text, true)) OR (current_setting('app.system_scope'::text, true) = 'on'::text))
+   Heap Blocks: exact=6
+   ->  Bitmap Index Scan on "Membership_userId_idx" (actual time=0.005..0.005 rows=6 loops=1)
+         Index Cond: ("userId" = 'bulk95-u12345'::text)
+ Planning Time: 0.021 ms
+ Execution Time: 0.014 ms
+(8 rows)
+
+ROLLBACK

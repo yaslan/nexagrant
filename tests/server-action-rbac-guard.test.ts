@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { isBuiltin } from 'module';
 import os from 'os';
 import path from 'path';
 import ts from 'typescript';
@@ -71,7 +72,14 @@ const SRC = path.join(REPO_ROOT, 'src');
  *   - a specifier into src/ is one of a relative path or any alias tsconfig
  *     `paths` or package.json `imports` declares, not only `@/` (İNCELEME-89
  *     Y-4); an alias into src/ with more than one target is fail-closed, and a
- *     config the guard does not read (`extends`, `exports`) fails the suite;
+ *     config the guard does not read (`extends`, `exports`) fails the suite.
+ *     A bare specifier is resolved in tsc's order — `paths`, then tsconfig
+ *     `baseUrl`, then `imports`, then node_modules, each step only when the
+ *     one before names no file — and each file's key is picked by its own
+ *     rule (Node's longer key on an equal prefix; tied `paths` keys are
+ *     fail-closed), so `baseUrl` + `'src/lib/x'` is walked and a catch-all
+ *     `"*": ["./src/*"]` leaves `zod` a package (İNCELEME-97 Y-1/Y-2/B-1,
+ *     TASK-MUOACFUBMNOGQ);
  *   - the role a check is asked about must come from the session: `role` /
  *     `scope.role` / `s?.role` / `asRole(…)` of one, bound by a `const` that is
  *     never written to, from `requireTenantAction()` / `requireTenantApi()` /
@@ -433,6 +441,8 @@ interface Alias {
 }
 interface AliasTable {
   aliases: Alias[];
+  /** tsconfig `baseUrl`, repo-relative: a bare specifier is looked up under it (İNCELEME-97 Y-1). */
+  baseUrl: string | null;
   /** What the guard cannot read in the two files: each one is a failing assertion, never a silent pass. */
   problems: string[];
 }
@@ -454,6 +464,7 @@ function importTargets(value: unknown, out: (string | null)[]): void {
 function aliasTableOf(overlay: Overlay): AliasTable {
   const aliases: Alias[] = [];
   const problems: string[] = [];
+  let baseUrl: string | null = null;
   const add = (source: Alias['source'], key: string, targets: (string | null)[]) => {
     const stars = key.split('*').length - 1;
     if (stars > 1 || targets.some((t) => t === '!' || (t !== null && t.split('*').length - 1 !== stars))) {
@@ -470,7 +481,9 @@ function aliasTableOf(overlay: Overlay): AliasTable {
     if (error) problems.push(`tsconfig.json: ${ts.flattenDiagnosticMessageText(error.messageText, '\n')}`);
     if (config?.extends !== undefined) problems.push('tsconfig.json `extends`: the guard reads `paths` from tsconfig.json alone');
     const opts = config?.compilerOptions ?? {};
-    const base = typeof opts.baseUrl === 'string' ? opts.baseUrl : '.';
+    if (opts.baseUrl !== undefined && typeof opts.baseUrl !== 'string') problems.push('tsconfig.json `baseUrl`: not a string');
+    if (typeof opts.baseUrl === 'string') baseUrl = path.posix.normalize(opts.baseUrl);
+    const base = baseUrl ?? '.';
     for (const [key, list] of Object.entries<unknown>(opts.paths ?? {})) {
       const targets = Array.isArray(list) ? list.map((t) => (typeof t === 'string' ? path.posix.normalize(path.posix.join(base, t)) : '!')) : ['!'];
       add('tsconfig.json', key, targets);
@@ -487,7 +500,7 @@ function aliasTableOf(overlay: Overlay): AliasTable {
       add('package.json', key, targets);
     }
   }
-  return { aliases, problems };
+  return { aliases, baseUrl, problems };
 }
 
 const aliasTables = new WeakMap<Overlay, AliasTable>();
@@ -500,63 +513,140 @@ function aliasTable(overlay: Overlay): AliasTable {
 export const aliasProblems = (overlay: Overlay): string[] => aliasTable(overlay).problems;
 
 /**
- * The path under src/ an aliased specifier names; null when no alias matches or
- * every target is outside src/ (a package); `ALIAS_BLIND + spec` when a target
- * is in src/ but it is not the only one (fallbacks, conditions), fail-closed.
- * Per file, as tsc and Node do it: an exact key, else the longest prefix.
+ * The alias `spec` matches in one of the two files, as the resolver that reads
+ * that file picks it: an exact key first, else the wildcard key with the
+ * longest prefix. Node (and tsc for `imports`) breaks a tie by the longer key,
+ * PATTERN_KEY_COMPARE (İNCELEME-97 Y-2), and its `*` matches at least one
+ * character. tsc keeps the first `paths` key of a tie, a bundler may not: every
+ * tied key is returned, and their targets are taken together.
  */
-function aliasBase(spec: string, overlay: Overlay): string | null {
-  let best: { alias: Alias; star: string } | null = null;
-  const bases = new Set<string | null>();
-  for (const source of ['tsconfig.json', 'package.json'] as const) {
-    best = null;
-    for (const alias of aliasTable(overlay).aliases) {
-      if (alias.source !== source) continue;
-      if (alias.suffix === null) {
-        if (spec === alias.prefix) best = { alias, star: '' };
-      } else if (
-        spec.startsWith(alias.prefix) &&
-        spec.endsWith(alias.suffix) &&
-        spec.length >= alias.prefix.length + alias.suffix.length &&
-        (best === null || (best.alias.suffix !== null && alias.prefix.length > best.alias.prefix.length))
-      ) {
-        best = { alias, star: spec.slice(alias.prefix.length, spec.length - alias.suffix.length) };
-      }
+function matchAlias(spec: string, source: Alias['source'], overlay: Overlay): { alias: Alias; star: string }[] {
+  const node = source === 'package.json';
+  let best: Alias[] = [];
+  for (const alias of aliasTable(overlay).aliases) {
+    if (alias.source !== source) continue;
+    if (alias.suffix === null) {
+      if (spec === alias.prefix) return [{ alias, star: '' }];
+      continue;
     }
-    if (!best) continue;
-    for (const t of best.alias.targets) {
-      const target = t === null ? null : path.posix.normalize(t.replace('*', best.star));
-      bases.add(target !== null && (target === 'src' || target.startsWith('src/')) ? target.slice(4) : null);
-    }
+    if (!spec.startsWith(alias.prefix) || !spec.endsWith(alias.suffix)) continue;
+    if (spec.length < alias.prefix.length + alias.suffix.length + (node ? 1 : 0)) continue;
+    const top = best[0];
+    if (!top || alias.prefix.length > top.prefix.length || (node && alias.prefix.length === top.prefix.length && alias.suffix.length > top.suffix!.length)) best = [alias];
+    else if (!node && alias.prefix.length === top.prefix.length) best.push(alias);
   }
-  const inSrc = [...bases].filter((b) => b !== null);
-  if (inSrc.length === 0) return null;
-  return bases.size === 1 ? inSrc[0]! : ALIAS_BLIND + spec;
+  return best.map((alias) => ({ alias, star: spec.slice(alias.prefix.length, spec.length - alias.suffix!.length) }));
 }
 
-/** An alias, `@/x/y` included, or `./y` from module `from` → its path under src/, normalized (İNCELEME-80 D-2); null outside src/. */
-function specBase(from: string, spec: string, overlay: Overlay): string | null {
-  let base: string;
-  if (spec.startsWith('.')) base = path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
-  else {
-    const aliased = aliasBase(spec, overlay);
-    if (aliased === null || aliased.startsWith(ALIAS_BLIND)) return aliased;
-    base = path.posix.normalize(aliased);
+/** The targets of the matched keys, `*` filled in and without repeats; null stands for a package. */
+function targetsOf(matches: { alias: Alias; star: string }[]): (string | null)[] {
+  return [...new Set(matches.flatMap(({ alias, star }) => alias.targets.map((t) => (t === null ? null : path.posix.normalize(t.replace('*', star))))))];
+}
+
+/** A repo-relative path → its path under src/ (normalized, no trailing `/`), or null outside src/. */
+function underSrc(target: string): string | null {
+  if (target !== 'src' && !target.startsWith('src/')) return null;
+  return path.posix.normalize(target.slice(4)).replace(/\/+$/, '');
+}
+
+/** Whether a repo-relative path outside src/ names a file tsc would take: a scripts/ file, a type stub. */
+function resolvesOutside(target: string): boolean {
+  const ext = path.posix.extname(target);
+  const stem = EXT_MAP[ext] ? target.slice(0, -ext.length) : target;
+  const exts = [...(EXT_MAP[ext] ?? CODE_EXTS), '.d.ts', '.json'];
+  return [target, ...exts.map((x) => stem + x), ...exts.map((x) => `${stem}/index${x}`)].some((f) => {
+    const abs = path.join(REPO_ROOT, f);
+    return fs.existsSync(abs) && fs.statSync(abs).isFile();
+  });
+}
+
+const packages = new Map<string, boolean>();
+/** A specifier tsc finds in node_modules (or @types) or a Node built-in: what a bare specifier falls back to. */
+function isPackage(spec: string): boolean {
+  if (isBuiltin(spec)) return true;
+  const parts = spec.split('/');
+  const name = spec.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]!;
+  let hit = packages.get(name);
+  if (hit === undefined) {
+    const types = name.startsWith('@') ? name.slice(1).replace('/', '__') : name;
+    hit = !!name && (fs.existsSync(path.join(REPO_ROOT, 'node_modules', name)) || fs.existsSync(path.join(REPO_ROOT, 'node_modules/@types', types)));
+    packages.set(name, hit);
   }
-  base = base.replace(/\/+$/, '');
-  return base === '..' || base.startsWith('../') ? null : base;
+  return hit;
+}
+
+/** What one resolver makes of a bare specifier: a path under src/, something outside src/, or no one file (fail-closed). */
+type Pick = { base: string } | 'out' | 'blind';
+const pickKey = (p: Pick) => (typeof p === 'string' ? p : `:${p.base}`);
+
+/**
+ * A bare specifier (not `./`) → a module id under src/, null outside src/, or
+ * `?…` fail-closed. tsc and the bundler read tsconfig in this order, each step
+ * only when the one before names no file: `paths` (every target of the key in
+ * turn), `baseUrl` + the specifier (İNCELEME-97 Y-1), package.json `imports`,
+ * node_modules. So with a catch-all `"*": ["./src/*"]`, `zod` is still a
+ * package (B-1), but a specifier that did point into src/ and names neither a
+ * file there nor a package is a typo the guard cannot see past. Node reads
+ * `imports` alone and throws on a missing target, so that match never falls
+ * through. When tsconfig and `imports` both name a place and they differ, the
+ * guard cannot know which one the build takes: fail-closed.
+ */
+function resolveBare(spec: string, overlay: Overlay, probed?: Set<string>): string | null {
+  const picks: Pick[] = [];
+  let missed: string | null = null;
+  // tsconfig: `paths`, then `baseUrl`.
+  const at = (target: string): Pick | null => {
+    const base = underSrc(target);
+    if (base === null) return resolvesOutside(target) ? 'out' : null;
+    probed?.add(base);
+    if (!isUnresolved(lookup(base, overlay) ?? '')) return { base };
+    missed ??= base;
+    return null;
+  };
+  let tsPick: Pick | null = null;
+  const pathsMatch = matchAlias(spec, 'tsconfig.json', overlay);
+  if (pathsMatch.length) {
+    const targets = targetsOf(pathsMatch) as string[];
+    // Fallbacks or tied keys: the guard does not guess which one the build finds.
+    if (targets.length > 1) tsPick = targets.some((t) => underSrc(t) !== null) ? 'blind' : 'out';
+    else tsPick = at(targets[0]!);
+  }
+  const { baseUrl } = aliasTable(overlay);
+  if (tsPick === null && baseUrl !== null) tsPick = at(path.posix.normalize(path.posix.join(baseUrl, spec)));
+  if (tsPick !== null) picks.push(tsPick);
+  // package.json `imports`.
+  const importsMatch = matchAlias(spec, 'package.json', overlay);
+  if (importsMatch.length) {
+    const bases = targetsOf(importsMatch).map((t) => (t === null ? null : underSrc(t)));
+    bases.forEach((b) => b !== null && probed?.add(b));
+    if (bases.every((b) => b === null)) picks.push('out');
+    else picks.push(bases.length === 1 ? { base: bases[0]! } : 'blind');
+  }
+  // node_modules.
+  if (picks.length === 0) return missed !== null && !isPackage(spec) ? UNRESOLVED + missed : null;
+  const pick = new Set(picks.map(pickKey)).size === 1 ? picks[0]! : picks.every((p) => p === 'out') ? 'out' : 'blind';
+  if (pick === 'out') return null;
+  if (pick === 'blind') return UNRESOLVED + ALIAS_BLIND + spec;
+  return lookup(pick.base, overlay);
 }
 
 /**
  * `@/x/y` or `./y` from module `from` → a module id under src/, null for a
  * package, a path out of src/ or a file that is not code (`.json`, `.css`), or
  * `?<path>` for a specifier into src/ that names no file (İNCELEME-80 Y-1: it
- * used to be taken for a package and passed silently).
+ * used to be taken for a package and passed silently). Every path under src/
+ * it looks at goes into `probed`, so an overlay adding one of them is seen.
  */
-function resolveSpec(from: string, spec: string, overlay: Overlay): string | null {
-  const base = specBase(from, spec, overlay);
-  if (base === null) return null;
-  if (base.startsWith(ALIAS_BLIND)) return UNRESOLVED + base;
+function resolveSpec(from: string, spec: string, overlay: Overlay, probed?: Set<string>): string | null {
+  if (!spec.startsWith('.')) return resolveBare(spec, overlay, probed);
+  const base = path.posix.normalize(path.posix.join(path.posix.dirname(from), spec)).replace(/\/+$/, '');
+  if (base === '..' || base.startsWith('../')) return null;
+  probed?.add(base);
+  return lookup(base, overlay);
+}
+
+/** A path under src/ → the module id it names, null for a file that is not code, or `?<path>` for none. */
+function lookup(base: string, overlay: Overlay): string | null {
   const ext = path.posix.extname(base);
   const mapped = EXT_MAP[ext];
   const stem = mapped ? base.slice(0, -ext.length) : base;
@@ -626,11 +716,7 @@ function moduleOf(
   const badExports: Finding[] = [];
   const exportLists: ts.ExportDeclaration[] = [];
   const specs = new Set<string>();
-  const resolve = (spec: string) => {
-    const base = specBase(id, spec, overlay);
-    if (base !== null) specs.add(base);
-    return resolveSpec(id, spec, overlay);
-  };
+  const resolve = (spec: string) => resolveSpec(id, spec, overlay, specs);
   const at = (node: ts.Node) => sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
   for (const stmt of sf.statements) {
     if (ts.isFunctionDeclaration(stmt) && stmt.body) {
@@ -2605,8 +2691,8 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
 
       it('the real tree: every alias is read, and `@/` is into src/', () => {
         expect(aliasProblems(NO_OVERLAY)).toEqual([]);
-        expect(specBase('lib/x', '@/lib/./rbac', NO_OVERLAY)).toBe('lib/rbac');
-        expect(specBase('lib/x', 'zod', NO_OVERLAY)).toBeNull();
+        expect(resolveSpec('lib/x', '@/lib/./rbac', NO_OVERLAY)).toBe('lib/rbac');
+        expect(resolveSpec('lib/x', 'zod', NO_OVERLAY)).toBeNull();
       });
 
       it('a package.json `imports` alias into src/ is walked (the probe: `#i89/*` → ./src/lib/i89/*.js)', () => {
@@ -2648,6 +2734,80 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
         ]);
         expect(aliasProblems({ [TSCONFIG_JSON]: tsc({ '~a/*/b/*': ['./src/*/*'] }) })).toEqual([expect.stringContaining("'~a/*/b/*'")]);
         expect(aliasProblems({ [PACKAGE_JSON]: pkg({ '#a/*': './src/lib/a.js' }) })).toEqual([expect.stringContaining("'#a/*'")]);
+      });
+
+      // İNCELEME-97 (TASK-MUO9SMKSKFYRR, cs-fb) Y-1/Y-2/B-1, TASK-MUOACFUBMNOGQ.
+      it('Y-1: a bare specifier under tsconfig `baseUrl` is walked', () => {
+        const ov: Overlay = { [TSCONFIG_JSON]: tsc({ '@/*': ['./src/*'] }, '"baseUrl": ".", '), 'lib/i89/legacy2.js': impl };
+        red('src/lib/i89/legacy2', 'u1', writes, ov);
+        red('lib/i89/legacy2', 'u2', writes, { ...ov, [TSCONFIG_JSON]: tsc({ '@/*': ['./*'] }, '"baseUrl": "./src", ') });
+        // After `paths`: a key whose one target names no file falls through to `baseUrl`, as in tsc.
+        red('lib/i89/legacy2', 'u3', writes, { ...ov, [TSCONFIG_JSON]: tsc({ '@/*': ['./*'], 'lib/*': ['../scripts/*'] }, '"baseUrl": "./src", ') });
+        red('src/lib/i89/nope', 'u4', 'imports src/lib/i89/nope, which the guard cannot find (fail-closed)', ov);
+        // Not a file there: a package, as tsc finds it.
+        expect(resolveSpec('lib/x', 'zod', ov)).toBeNull();
+        expect(aliasProblems({ [TSCONFIG_JSON]: '{ "compilerOptions": { "baseUrl": 1 } }' })).toEqual([expect.stringContaining('`baseUrl`')]);
+      });
+
+      it('Y-2: the alias a file picks is the one its resolver picks', () => {
+        const ov: Overlay = { 'lib/i89/legacy2.js': impl };
+        // package.json: on an equal prefix the longer key wins (Node PATTERN_KEY_COMPARE), in either order.
+        red('#q/legacy2.js', 'k1', writes, { ...ov, [PACKAGE_JSON]: pkg({ '#q/*': './scripts/*', '#q/*.js': './src/lib/i89/*.js' }) });
+        red('#q/legacy2.js', 'k2', writes, { ...ov, [PACKAGE_JSON]: pkg({ '#q/*.js': './src/lib/i89/*.js', '#q/*': './scripts/*' }) });
+        // The longest prefix, whatever the order.
+        red('#q/i89/legacy2', 'k3', writes, { ...ov, [PACKAGE_JSON]: pkg({ '#q/*': './scripts/*.js', '#q/i89/*': './src/lib/i89/*.js' }) });
+        red('#q/i89/legacy2', 'k4', writes, { ...ov, [PACKAGE_JSON]: pkg({ '#q/i89/*': './src/lib/i89/*.js', '#q/*': './scripts/*.js' }) });
+        // An exact key before any wildcard.
+        red('#q/legacy2', 'k5', writes, { ...ov, [PACKAGE_JSON]: pkg({ '#q/legacy2': './src/lib/i89/legacy2.js', '#q/*': './scripts/*.js' }) });
+        red('#q/legacy2', 'k6', writes, { ...ov, [PACKAGE_JSON]: pkg({ '#q/*': './scripts/*.js', '#q/legacy2': './src/lib/i89/legacy2.js' }) });
+        // A key's suffix must match too: `#q/*.mjs` is not `#q/legacy2`'s.
+        red('#q/legacy2', 'k7', writes, { ...ov, [PACKAGE_JSON]: pkg({ '#q/*.mjs': './scripts/*.mjs', '#q/*': './src/lib/i89/*.js' }) });
+        // Node's `*` is never empty: `#q/.js` is `#q/*` with `.js`, out of src/.
+        expect(findings('#q/.js', 'k8', { ...ov, '.js': impl, [PACKAGE_JSON]: pkg({ '#q/*': './scripts/*', '#q/*.js': './src/*.js' }) })).toEqual([]);
+        // tsconfig: tsc keeps the first of tied keys, a bundler may not — both are taken, so fail-closed.
+        red('~q/legacy2.js', 'k9', 'imports ~q/legacy2.js, an alias into src/ with more than one target', {
+          ...ov,
+          [TSCONFIG_JSON]: tsc({ '~q/*': ['./scripts/*'], '~q/*.js': ['./src/lib/i89/*.js'] }),
+        });
+        // Each file on its own: tsconfig names no file (falls through), `imports` names src/.
+        red('#q/legacy2', 'k10', writes, { ...ov, [TSCONFIG_JSON]: tsc({ '#q/*': ['./scripts/*'] }), [PACKAGE_JSON]: pkg({ '#q/*': './src/lib/i89/*.js' }) });
+        // Both name a file, and they differ: the guard cannot know which the build takes.
+        red('#q/apply-rls', 'k11', 'imports #q/apply-rls, an alias into src/ with more than one target', {
+          ...ov,
+          [TSCONFIG_JSON]: tsc({ '#q/*': ['./scripts/*'] }),
+          [PACKAGE_JSON]: pkg({ '#q/*': './src/lib/i89/*.js' }),
+        });
+        // Every fallback of a list counts, not only the first.
+        red('#w', 'k12', 'imports #w, an alias into src/ with more than one target', { ...ov, [PACKAGE_JSON]: pkg({ '#w': ['some-package', './src/lib/i89/legacy2.js'] }) });
+        expect(aliasProblems({ [TSCONFIG_JSON]: '{ "compilerOptions": { "paths": ' })).not.toEqual([]);
+      });
+
+      it('B-1: with a catch-all `"*": ["./src/*"]`, a package is still a package and src/ still src/', () => {
+        const real = fs.readFileSync(path.join(REPO_ROOT, 'tsconfig.json'), 'utf8');
+        const catchAll = real.replace('"@/*": ["./src/*"]', '"@/*": ["./src/*"], "*": ["./src/*"]');
+        expect(catchAll).not.toBe(real);
+        const ov: Overlay = { [TSCONFIG_JSON]: catchAll, 'lib/i89/legacy2.js': impl };
+        for (const spec of ['zod', 'node:crypto', 'fs', 'next/server', '@prisma/client']) expect(resolveSpec('lib/x', spec, ov)).toBeNull();
+        red('lib/i89/legacy2', 'c1', writes, ov);
+        // A file in src/ comes before a package of the same name, as in tsc.
+        red('zod', 'c2', 'writes: prisma.evidence.delete (zod.js:2', { ...ov, 'zod.js': impl });
+        // Neither a file in src/ nor a package: a typo, fail-closed.
+        red('lib/i89/nope', 'c3', 'imports src/lib/i89/nope, which the guard cannot find (fail-closed)', ov);
+        // Every import of today's tree resolves as it does without the catch-all or with a `baseUrl`.
+        const variants = [ov, { [TSCONFIG_JSON]: real.replace('"paths": {', '"baseUrl": ".", "paths": {') }];
+        let bare = 0;
+        const moved: string[] = [];
+        for (const file of sourceFiles(SRC)) {
+          const from = path.relative(SRC, file).split(path.sep).join('/');
+          for (const { fileName } of ts.preProcessFile(fs.readFileSync(file, 'utf8'), true, true).importedFiles) {
+            if (fileName.startsWith('.')) continue;
+            bare++;
+            const today = resolveSpec(from, fileName, NO_OVERLAY);
+            for (const v of variants) if (resolveSpec(from, fileName, v) !== today) moved.push(`${from}: ${fileName}`);
+          }
+        }
+        expect(moved).toEqual([]);
+        expect(bare).toBeGreaterThan(1000);
       });
 
       it('N-1: no two code files under src/ share a path but for the extension', () => {
