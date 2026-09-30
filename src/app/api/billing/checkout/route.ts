@@ -12,6 +12,8 @@ import { PlanNotAvailableError, priceLineForTenant } from '@/lib/billing/storefr
 import { tierForTenant } from '@/lib/billing/tenant-tier';
 import { taxLineForTenant } from '@/lib/billing/checkout-tax';
 import { requireTenantApi } from '@/lib/tenant';
+import { asRole, can } from '@/lib/rbac';
+import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
 import { getPilotState } from '@/lib/billing/pilot';
 import { appUrl as resolveAppUrl } from '@/lib/app-url';
 
@@ -94,6 +96,21 @@ export async function POST(req: Request) {
     const scope = await requireTenantApi();
     if (!scope.ok) return scope.response;
     const { tenantId } = scope.scope;
+
+    // Buying on the tenant's behalf is `manage_billing`, which only the owner
+    // carries (src/lib/rbac.ts). Any member — the outside partner included —
+    // used to be able to open a subscription session here (İNCELEME-59 Y-3,
+    // TASK-MUNQAXELV83HO). Refused before the pilot read, the pricing and Stripe.
+    if (!can(asRole(scope.scope.role), 'manage_billing')) {
+      return NextResponse.json(
+        {
+          error: 'Forbidden',
+          message: 'Ödeme ve plan değişikliğini yalnız çalışma alanı sahibi yapabilir.',
+          code: FORBIDDEN_ROLE_DIGEST,
+        },
+        { status: 403 }
+      );
+    }
 
     // A tenant on the free pilot buys nothing until the pilot is over: no
     // e-Fatura yet, so no sale may start (TASK-MUMABL78X5JLX). Running or run

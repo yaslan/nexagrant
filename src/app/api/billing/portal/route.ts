@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withSystemScope } from '@/lib/system-scope';
 import { createPortalSession } from '@/lib/billing/create-portal-session';
+import { Role } from '@prisma/client';
+import { can } from '@/lib/rbac';
+
+/**
+ * The roles that may manage the tenant's subscription, read from rbac.ts
+ * rather than restated: `manage_billing` is the owner's alone. The list here
+ * used to be OWNER and ADMIN, which let an admin change the payment method and
+ * cancel the plan the owner pays for (İNCELEME-59 Y-3, TASK-MUNQAXELV83HO).
+ */
+const BILLING_ROLES = Object.values(Role).filter((role) => can(role, 'manage_billing'));
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +34,7 @@ export async function POST(request: NextRequest) {
         tx.membership.findFirst({
           where: {
             userId,
-            role: { in: ['TENANT_OWNER', 'TENANT_ADMIN'] },
+            role: { in: BILLING_ROLES },
           },
           include: { tenant: true },
         })

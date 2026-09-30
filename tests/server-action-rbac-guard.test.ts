@@ -11,28 +11,65 @@ const SRC = path.join(REPO_ROOT, 'src');
  * two things a server action must say about itself, checked statically.
  *
  * 1. A write names its permission. Every exported function of a 'use server'
- *    module is a public POST endpoint. `requireTenantAction` makes it a write
- *    by default (the pilot gate fails closed), and a write must also check the
- *    caller's role against src/lib/rbac.ts — `requireTenantAction({ can })`,
- *    `assertTenantActionRole`, a bare `can(...)`, or one of the role rules in
- *    ROLE_CHECKS. 52 write actions once checked nothing but the tenant, so a
- *    MEMBER could evaluate gates, delete evidence and rewrite concept notes.
+ *    module — and every function with an inline 'use server' — is a public
+ *    POST endpoint. `requireTenantAction` makes it a write by default (the
+ *    pilot gate fails closed), and a write must also check the caller's role
+ *    against src/lib/rbac.ts. 52 write actions once checked nothing but the
+ *    tenant, so a MEMBER could evaluate gates, delete evidence and rewrite
+ *    concept notes.
  * 2. `readOnly: true` means it. The flag skips the expired-pilot gate, so an
  *    action marked read-only that writes is a write an expired pilot can still
  *    make (m11 `updatePresenceHeartbeat` did, TASK-MUN4H2RL79D8B N-2).
  *
- * Both follow calls into helpers of the same file (`savePartContent`,
- * `requireManager`, …). A write made by a function in another module is not
- * seen — that is what the behaviour tests (tests/server-action-rbac.test.ts)
- * and review are for. An action that answers to something other than a tenant
- * role goes in ALLOWED with the reason.
+ * TASK-MUNQAXELV83HO (İNCELEME-59 Y-1): the first version counted any `can`
+ * anywhere as "role checked" and matched writes only on `prisma|tx|db`, and 8
+ * of se-fb's 10 mutants passed it — `updateRelationship` itself shipped with a
+ * `can` that only ran for one field (B-1). A role check now counts only in a
+ * shape that stops the action:
+ *
+ *   - a statement that throws: `requireTenantAction({ can: '<Action>' })`,
+ *     `assertTenantActionRole(scope, '<Action>')`, `requirePlatformAdmin()` —
+ *     not behind `&&`, `||`, `?:` or inside a callback;
+ *   - `if (!<check>(…)) return|throw` with no `else`, where <check> is one of
+ *     BOOLEAN_CHECKS (`||` of such conditions, or `&&` of all of them, too);
+ *   - a call to a same-file helper whose body does one of the above.
+ *
+ * `<Action>` must be a literal (or a same-file `const`) that rbac.ts declares.
+ * Every write must come after such a check on its own path: a check inside a
+ * `withTenant` callback covers the writes after it in that callback only, and
+ * one inside an `if` block covers only that block.
+ *
+ * A write is `<anything>.<model>.<write method>(…)` or `<model>.<write
+ * method>(…)` for a model of prisma/schema.prisma (so `(t) =>`, a destructured
+ * `{ evidence }` and `prisma as client` are all seen), plus `$executeRaw*` in
+ * call or tagged-template form. Calls are followed into helpers of the same
+ * file. Known blind spots: a write made by a function in another module (se-fb
+ * G5) and a model accessor stored under a different variable name — that is
+ * what the behaviour tests (tests/server-action-rbac.test.ts) and review are
+ * for. An action that answers to something other than a tenant role goes in
+ * ALLOWED with the reason.
  */
 
-/** Calls that decide on the caller's role (or platform-staff status) before a write. */
-const ROLE_CHECKS = new Set([
+/** The permissions src/lib/rbac.ts declares. A `can` naming anything else is not a check. */
+const RBAC_ACTIONS = new Set(
+  [
+    ...fs
+      .readFileSync(path.join(SRC, 'lib/rbac.ts'), 'utf8')
+      .match(/export type Action =([^;]*);/)![1]!
+      .matchAll(/["']([a-z_]+)["']/g),
+  ].map(([, name]) => name!),
+);
+
+/** Prisma model accessors (`tx.evidence`, `{ evidence }`), from the schema. */
+const MODELS = new Set(
+  [...fs.readFileSync(path.join(REPO_ROOT, 'prisma/schema.prisma'), 'utf8').matchAll(/^model (\w+) \{/gm)].map(
+    ([, name]) => name!.charAt(0).toLowerCase() + name!.slice(1),
+  ),
+);
+
+/** Checks that answer yes/no. They count only as `if (!check(…)) return|throw`. */
+const BOOLEAN_CHECKS = new Set([
   'can',
-  'assertTenantActionRole',
-  'requirePlatformAdmin',
   'isPlatformAdminSession',
   // Owner-or-pipeline-role rule, src/lib/pipeline/archive.ts.
   'canArchiveOpportunity',
@@ -40,7 +77,7 @@ const ROLE_CHECKS = new Set([
   'canConfirmSeat',
 ]);
 
-/** Prisma write methods. Matched only as `<prisma|tx|db>.<model>.<method>(…)`. */
+/** Prisma write methods. */
 const WRITE_METHODS = new Set([
   'create',
   'createMany',
@@ -52,7 +89,6 @@ const WRITE_METHODS = new Set([
   'delete',
   'deleteMany',
 ]);
-const CLIENTS = new Set(['prisma', 'tx', 'db']);
 const RAW_WRITES = new Set(['$executeRaw', '$executeRawUnsafe']);
 
 /**
@@ -78,6 +114,10 @@ export const ALLOWED: Record<string, string> = {
   // Token-authenticated partner portal: no session, no tenant role. Narrow by
   // construction (Part A budget lines only) and pilot-gated on the token's tenant.
   'modules/m11/server/actions.ts#addBudgetLineByToken': 'partner portal; the magic token is the credential',
+  // The portal form's inline action only hands the form to addBudgetLineByToken
+  // above; an inline action that writes itself is refused regardless of this entry.
+  'app/[locale]/portal/partner/[token]/page.tsx#inline:PartnerPortalPage:1':
+    'partner portal form; delegates to addBudgetLineByToken, the token is the credential',
   // Reads that resolve the tenant through pipeline/actions.ts `sessionScope()`
   // rather than `requireTenantAction({ readOnly: true })`.
   'app/[locale]/(app)/[workspace]/pipeline/actions.ts#getOpportunityFormMembers': 'read-only member list',
@@ -100,10 +140,10 @@ function sourceFiles(dir: string): string[] {
   return found;
 }
 
-function hasUseServerDirective(sf: ts.SourceFile): boolean {
-  for (const stmt of sf.statements) {
+function hasDirective(statements: ts.NodeArray<ts.Statement>, directive: string): boolean {
+  for (const stmt of statements) {
     if (!ts.isExpressionStatement(stmt) || !ts.isStringLiteral(stmt.expression)) return false;
-    if (stmt.expression.text === 'use server') return true;
+    if (stmt.expression.text === directive) return true;
   }
   return false;
 }
@@ -111,95 +151,313 @@ function hasUseServerDirective(sf: ts.SourceFile): boolean {
 const hasExport = (node: ts.Node) =>
   ts.canHaveModifiers(node) && !!ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 
-type Fn = ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression;
+type Fn = ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression | ts.MethodDeclaration;
 
-/** Top-level functions of a module by name, and which of them are exported. */
-function functionsOf(sf: ts.SourceFile): { all: Map<string, Fn>; exported: string[] } {
+const isFn = (node: ts.Node): node is Fn =>
+  ts.isFunctionDeclaration(node) ||
+  ts.isArrowFunction(node) ||
+  ts.isFunctionExpression(node) ||
+  ts.isMethodDeclaration(node);
+
+/** `(x)`, `x as T`, `x!`, `x satisfies T`, `await x` → `x`. */
+function strip(e: ts.Expression): ts.Expression {
+  while (
+    ts.isParenthesizedExpression(e) ||
+    ts.isAsExpression(e) ||
+    ts.isNonNullExpression(e) ||
+    ts.isSatisfiesExpression(e) ||
+    ts.isAwaitExpression(e)
+  ) {
+    e = e.expression;
+  }
+  return e;
+}
+
+interface Module {
+  sf: ts.SourceFile;
+  /** Top-level functions by name. */
+  all: Map<string, Fn>;
+  /** Top-level `const X = '<string>'`. */
+  consts: Map<string, string>;
+}
+
+/** Top-level functions and string constants of a module, and what it exports as a server action. */
+function moduleOf(sf: ts.SourceFile): { mod: Module; exported: Map<string, string>; badExports: Finding[] } {
   const all = new Map<string, Fn>();
-  const exported: string[] = [];
+  const consts = new Map<string, string>();
+  const exported = new Map<string, string>(); // exported name → local function name
+  const badExports: Finding[] = [];
+  const exportLists: ts.ExportDeclaration[] = [];
   for (const stmt of sf.statements) {
     if (ts.isFunctionDeclaration(stmt) && stmt.name && stmt.body) {
       all.set(stmt.name.text, stmt);
-      if (hasExport(stmt)) exported.push(stmt.name.text);
+      if (hasExport(stmt)) exported.set(stmt.name.text, stmt.name.text);
     } else if (ts.isVariableStatement(stmt)) {
       for (const d of stmt.declarationList.declarations) {
-        let init = d.initializer;
-        while (init && (ts.isParenthesizedExpression(init) || ts.isAsExpression(init))) init = init.expression;
-        if (ts.isIdentifier(d.name) && init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init))) {
+        if (!ts.isIdentifier(d.name) || !d.initializer) continue;
+        const init = strip(d.initializer);
+        if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) {
           all.set(d.name.text, init);
-          if (hasExport(stmt)) exported.push(d.name.text);
+          if (hasExport(stmt)) exported.set(d.name.text, d.name.text);
+        } else if (ts.isStringLiteralLike(init)) {
+          consts.set(d.name.text, init.text);
         }
       }
+    } else if (ts.isExportDeclaration(stmt) && !stmt.isTypeOnly) {
+      exportLists.push(stmt);
     }
   }
-  return { all, exported };
+  // `export { fn }` / `export { fn as other }` (se-fb G7): the same endpoint as `export async function`.
+  for (const decl of exportLists) {
+    if (decl.moduleSpecifier || !decl.exportClause || !ts.isNamedExports(decl.exportClause)) {
+      badExports.push({
+        key: `${sf.fileName}#export@${sf.getLineAndCharacterOfPosition(decl.getStart(sf)).line + 1}`,
+        problem: 're-export from another module; the guard cannot see what it exports',
+      });
+      continue;
+    }
+    for (const el of decl.exportClause.elements) {
+      if (el.isTypeOnly) continue;
+      const local = (el.propertyName ?? el.name).text;
+      if (all.has(local)) exported.set(el.name.text, local);
+      else
+        badExports.push({
+          key: `${sf.fileName}#${el.name.text}`,
+          problem: 'exported through `export { … }` but not a function this module declares',
+        });
+    }
+  }
+  return { mod: { sf, all, consts }, exported, badExports };
 }
 
 function calleeName(call: ts.CallExpression): string | null {
-  const e = call.expression;
-  if (ts.isIdentifier(e)) return e.text;
-  return null;
+  const e = strip(call.expression);
+  return ts.isIdentifier(e) ? e.text : null;
 }
 
-/** `requireTenantAction({ …, <key>: … })` — the key is present (and for readOnly, `true`). */
-function requireTenantActionHas(call: ts.CallExpression, key: 'readOnly' | 'can'): boolean {
-  if (calleeName(call) !== 'requireTenantAction') return false;
+/** A literal (or same-file constant) that names an rbac.ts permission. */
+function isRbacAction(arg: ts.Expression | undefined, mod: Module): boolean {
+  if (!arg) return false;
+  const e = strip(arg);
+  const value = ts.isStringLiteralLike(e) ? e.text : ts.isIdentifier(e) ? mod.consts.get(e.text) : undefined;
+  return value !== undefined && RBAC_ACTIONS.has(value);
+}
+
+/** The object literal `requireTenantAction({ … })` was given, if any. */
+function requireTenantActionOpts(call: ts.CallExpression): ts.ObjectLiteralExpression | null {
+  if (calleeName(call) !== 'requireTenantAction') return null;
   const arg = call.arguments[0];
-  if (!arg || !ts.isObjectLiteralExpression(arg)) return false;
-  return arg.properties.some(
-    (p) =>
-      ts.isPropertyAssignment(p) &&
-      ts.isIdentifier(p.name) &&
-      p.name.text === key &&
-      (key === 'can' || p.initializer.kind === ts.SyntaxKind.TrueKeyword),
-  );
+  return arg && ts.isObjectLiteralExpression(strip(arg)) ? (strip(arg) as ts.ObjectLiteralExpression) : null;
 }
 
-function isPrismaWrite(call: ts.CallExpression): boolean {
-  const e = call.expression;
-  if (!ts.isPropertyAccessExpression(e)) return false;
-  const method = e.name.text;
-  if (RAW_WRITES.has(method)) return true;
-  if (!WRITE_METHODS.has(method)) return false;
-  const model = e.expression;
-  return (
-    ts.isPropertyAccessExpression(model) && ts.isIdentifier(model.expression) && CLIENTS.has(model.expression.text)
-  );
+function optionOf(opts: ts.ObjectLiteralExpression, key: string): ts.Expression | undefined {
+  for (const p of opts.properties) {
+    if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === key) return p.initializer;
+  }
+  return undefined;
+}
+
+const isReadOnlyCall = (call: ts.CallExpression) => {
+  const opts = requireTenantActionOpts(call);
+  const value = opts && optionOf(opts, 'readOnly');
+  return !!value && value.kind === ts.SyntaxKind.TrueKeyword;
+};
+
+/** A call that throws unless the caller's role carries the permission. */
+function isThrowingCheck(call: ts.CallExpression, mod: Module): boolean {
+  const name = calleeName(call);
+  if (name === 'requirePlatformAdmin') return true;
+  if (name === 'assertTenantActionRole') return isRbacAction(call.arguments[1], mod);
+  const opts = requireTenantActionOpts(call);
+  return !!opts && isRbacAction(optionOf(opts, 'can'), mod);
+}
+
+/** A yes/no check the caller's role must pass. */
+function isBooleanCheck(e: ts.Expression, mod: Module): boolean {
+  const call = strip(e);
+  if (!ts.isCallExpression(call)) return false;
+  const name = calleeName(call);
+  if (!name || !BOOLEAN_CHECKS.has(name)) return false;
+  return name !== 'can' || isRbacAction(call.arguments[1], mod);
+}
+
+/** After `if (<cond>) exit`, the check holds. */
+function isGuardCondition(e: ts.Expression, mod: Module): boolean {
+  e = strip(e);
+  if (ts.isPrefixUnaryExpression(e) && e.operator === ts.SyntaxKind.ExclamationToken) {
+    return isBooleanCheck(e.operand, mod);
+  }
+  if (ts.isBinaryExpression(e)) {
+    if (e.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+      return isGuardCondition(e.left, mod) || isGuardCondition(e.right, mod);
+    }
+    if (e.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+      return isGuardCondition(e.left, mod) && isGuardCondition(e.right, mod);
+    }
+  }
+  return false;
+}
+
+function exits(stmt: ts.Statement): boolean {
+  if (ts.isReturnStatement(stmt) || ts.isThrowStatement(stmt)) return true;
+  const last = ts.isBlock(stmt) ? stmt.statements[stmt.statements.length - 1] : undefined;
+  if (last) return exits(last);
+  return false;
+}
+
+/** Calls a statement always makes: not behind `&&`/`||`/`??`/`?:`, not inside a callback. */
+function unconditionalCalls(node: ts.Node, acc: ts.CallExpression[] = []): ts.CallExpression[] {
+  if (isFn(node)) return acc;
+  if (ts.isConditionalExpression(node)) return unconditionalCalls(node.condition, acc);
+  if (ts.isBinaryExpression(node)) {
+    const op = node.operatorToken.kind;
+    if (
+      op === ts.SyntaxKind.AmpersandAmpersandToken ||
+      op === ts.SyntaxKind.BarBarToken ||
+      op === ts.SyntaxKind.QuestionQuestionToken ||
+      op === ts.SyntaxKind.AmpersandAmpersandEqualsToken ||
+      op === ts.SyntaxKind.BarBarEqualsToken ||
+      op === ts.SyntaxKind.QuestionQuestionEqualsToken
+    ) {
+      return unconditionalCalls(node.left, acc);
+    }
+  }
+  if (ts.isCallExpression(node) && !node.questionDotToken) acc.push(node);
+  ts.forEachChild(node, (c) => {
+    unconditionalCalls(c, acc);
+  });
+  return acc;
+}
+
+/** The Prisma write this node makes, as source text, or null. */
+function writeOf(node: ts.Node, sf: ts.SourceFile): string | null {
+  let target: ts.Expression;
+  if (ts.isCallExpression(node)) target = node.expression;
+  else if (ts.isTaggedTemplateExpression(node)) target = node.tag;
+  else return null;
+  if (!ts.isPropertyAccessExpression(target)) return null;
+  const method = target.name.text;
+  if (RAW_WRITES.has(method)) return target.getText(sf);
+  if (!WRITE_METHODS.has(method)) return null;
+  const receiver = strip(target.expression);
+  const model = ts.isPropertyAccessExpression(receiver)
+    ? receiver.name.text
+    : ts.isIdentifier(receiver)
+      ? receiver.text
+      : null;
+  return model && MODELS.has(model) ? target.getText(sf) : null;
 }
 
 interface Facts {
   readOnly: boolean;
-  roleChecked: boolean;
+  /** Role checks in a shape that stops the action, anywhere on its paths. */
+  checks: number;
   writes: string[];
+  /** Writes no earlier check covers. */
+  unchecked: string[];
 }
 
-/** What an exported action does, following calls into same-file helpers. */
-function factsOf(sf: ts.SourceFile, name: string, all: Map<string, Fn>): Facts {
-  const facts: Facts = { readOnly: false, roleChecked: false, writes: [] };
-  const seen = new Set<string>();
-  const visitFn = (fnName: string) => {
-    if (seen.has(fnName)) return;
-    seen.add(fnName);
-    const fn = all.get(fnName);
-    if (!fn) return;
-    const walk = (node: ts.Node) => {
-      if (ts.isCallExpression(node)) {
-        const callee = calleeName(node);
-        if (requireTenantActionHas(node, 'readOnly') && fnName === name) facts.readOnly = true;
-        if (requireTenantActionHas(node, 'can')) facts.roleChecked = true;
-        if (callee && ROLE_CHECKS.has(callee)) facts.roleChecked = true;
-        if (isPrismaWrite(node)) {
-          const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-          facts.writes.push(`${node.expression.getText(sf)} (line ${line}${fnName === name ? '' : `, via ${fnName}`})`);
-        }
-        if (callee && all.has(callee)) visitFn(callee);
+class Walker {
+  readonly facts: Facts = { readOnly: false, checks: 0, writes: [], unchecked: [] };
+  private readonly stack: string[] = [];
+
+  constructor(
+    private readonly mod: Module,
+    private readonly root: Fn,
+  ) {}
+
+  run(): Facts {
+    this.fn(this.root, false);
+    return this.facts;
+  }
+
+  /** Walks a function body; true when its own top level establishes a check. */
+  private fn(fn: Fn, checked: boolean): boolean {
+    if (!fn.body) return false;
+    if (ts.isBlock(fn.body)) return this.statements(fn.body.statements, checked);
+    this.node(fn.body, checked);
+    return false;
+  }
+
+  /** A statement list in order. True when it establishes a check for what follows it. */
+  private statements(list: readonly ts.Statement[], checked: boolean): boolean {
+    let established = false;
+    for (const stmt of list) {
+      if (ts.isIfStatement(stmt) && !stmt.elseStatement && exits(stmt.thenStatement) && isGuardCondition(stmt.expression, this.mod)) {
+        this.node(stmt, checked);
+        this.facts.checks++;
+        checked = established = true;
+        continue;
       }
-      ts.forEachChild(node, walk);
-    };
-    walk(fn);
-  };
-  visitFn(name);
-  return facts;
+      if (ts.isTryStatement(stmt)) {
+        if (this.statements(stmt.tryBlock.statements, checked)) checked = established = true;
+        if (stmt.catchClause) this.node(stmt.catchClause, checked);
+        if (stmt.finallyBlock) this.node(stmt.finallyBlock, checked);
+        continue;
+      }
+      if (ts.isBlock(stmt)) {
+        if (this.statements(stmt.statements, checked)) checked = established = true;
+        continue;
+      }
+      // Writes in this statement are judged against the checks before it.
+      this.node(stmt, checked);
+      if ((ts.isExpressionStatement(stmt) || ts.isVariableStatement(stmt)) && this.establishes(stmt)) {
+        this.facts.checks++;
+        checked = established = true;
+      }
+    }
+    return established;
+  }
+
+  private establishes(stmt: ts.Statement): boolean {
+    return unconditionalCalls(stmt).some((call) => {
+      if (isThrowingCheck(call, this.mod)) return true;
+      const name = calleeName(call);
+      const helper = name ? this.mod.all.get(name) : undefined;
+      if (!helper || this.stack.includes(name!)) return false;
+      this.stack.push(name!);
+      // Judged on its own: does its body check before it returns?
+      const sub = new Walker(this.mod, helper);
+      sub.stack.push(...this.stack);
+      const ok = sub.fn(helper, false);
+      this.stack.pop();
+      return ok;
+    });
+  }
+
+  private node(node: ts.Node, checked: boolean): void {
+    if (isFn(node)) {
+      this.fn(node, checked);
+      return;
+    }
+    if (ts.isBlock(node)) {
+      this.statements(node.statements, checked);
+      return;
+    }
+    if (ts.isCaseClause(node) || ts.isDefaultClause(node)) {
+      this.statements(node.statements, checked);
+      return;
+    }
+    const write = writeOf(node, this.mod.sf);
+    if (write) {
+      const line = this.mod.sf.getLineAndCharacterOfPosition(node.getStart(this.mod.sf)).line + 1;
+      const via = this.stack.length > 0 ? `, via ${this.stack[this.stack.length - 1]}` : '';
+      const label = `${write} (line ${line}${via})`;
+      this.facts.writes.push(label);
+      if (!checked) this.facts.unchecked.push(label);
+    }
+    if (ts.isCallExpression(node)) {
+      if (this.stack.length === 0 && isReadOnlyCall(node)) this.facts.readOnly = true;
+      const name = calleeName(node);
+      const helper = name ? this.mod.all.get(name) : undefined;
+      if (helper && helper !== this.root && !this.stack.includes(name!)) {
+        this.stack.push(name!);
+        this.fn(helper, checked);
+        this.stack.pop();
+      }
+    }
+    ts.forEachChild(node, (c) => this.node(c, checked));
+  }
 }
 
 export interface Finding {
@@ -207,27 +465,67 @@ export interface Finding {
   problem: string;
 }
 
-/** Every violation in one 'use server' module's source. Exported for the mutant tests below. */
+/** The functions of a file that carry their own 'use server' (se-fb G10). */
+function inlineActions(sf: ts.SourceFile, relPath: string): { key: string; fn: Fn }[] {
+  const found: { key: string; fn: Fn }[] = [];
+  const counts = new Map<string, number>();
+  const visit = (node: ts.Node, owner: string) => {
+    let next = owner;
+    if (isFn(node)) {
+      const own =
+        (node.name && ts.isIdentifier(node.name) && node.name.text) ||
+        (ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name) && node.parent.name.text) ||
+        null;
+      if (node.body && ts.isBlock(node.body) && hasDirective(node.body.statements, 'use server')) {
+        const n = (counts.get(owner) ?? 0) + 1;
+        counts.set(owner, n);
+        found.push({ key: `${relPath}#${own ?? `inline:${owner}:${n}`}`, fn: node });
+      }
+      if (own) next = own;
+    }
+    ts.forEachChild(node, (c) => visit(c, next));
+  };
+  visit(sf, 'module');
+  return found;
+}
+
+/** Every violation in one source file. Exported for the mutant tests below. */
 export function findingsFor(relPath: string, text: string): { findings: Finding[]; keys: string[] } {
   const sf = ts.createSourceFile(relPath, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  if (!hasUseServerDirective(sf)) return { findings: [], keys: [] };
-  const { all, exported } = functionsOf(sf);
-  const findings: Finding[] = [];
+  const { mod, exported, badExports } = moduleOf(sf);
+  const moduleLevel = hasDirective(sf.statements, 'use server');
+  const findings: Finding[] = moduleLevel ? [...badExports] : [];
   const keys: string[] = [];
-  for (const name of exported) {
-    const key = `${relPath}#${name}`;
+
+  const judge = (key: string, fn: Fn, inline: boolean) => {
     keys.push(key);
-    const facts = factsOf(sf, name, all);
+    const facts = new Walker(mod, fn).run();
     if (facts.readOnly) {
       if (facts.writes.length > 0) {
         findings.push({ key, problem: `readOnly: true but writes: ${facts.writes.join('; ')}` });
       }
-      continue;
+      return;
     }
-    if (!facts.roleChecked && !(key in ALLOWED)) {
-      findings.push({ key, problem: 'write action without a role check (requireTenantAction({ can }) / can(...))' });
+    if (inline && facts.writes.length > 0) {
+      findings.push({
+        key,
+        problem: `inline 'use server' action writes directly (${facts.writes.join('; ')}); move the write into a module action the guard checks`,
+      });
     }
-  }
+    if (key in ALLOWED) return;
+    if (facts.checks === 0) {
+      findings.push({
+        key,
+        problem:
+          'write action without a role check (requireTenantAction({ can: <Action> }) / if (!can(…, <Action>)) return)',
+      });
+    } else if (facts.unchecked.length > 0) {
+      findings.push({ key, problem: `writes before any role check covers them: ${facts.unchecked.join('; ')}` });
+    }
+  };
+
+  if (moduleLevel) for (const [name, local] of exported) judge(`${relPath}#${name}`, mod.all.get(local)!, false);
+  for (const { key, fn } of inlineActions(sf, relPath)) judge(key, fn, true);
   return { findings, keys };
 }
 
@@ -303,6 +601,176 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
           problem: expect.stringContaining('via savePartContent'),
         },
       ]);
+    });
+
+    // İNCELEME-59 (TASK-MUNOE0Q4FR2J) mutants that survived the first guard,
+    // TASK-MUNQAXELV83HO. Each one appends or edits an action in a real module.
+    const only = (file: string, text: string, key: string, problem: string) =>
+      expect(findingsFor(file, text).findings).toEqual([{ key: `${file}#${key}`, problem: expect.stringContaining(problem) }]);
+    const withAction = (extra: string) => source + extra;
+
+    it('G1: a `can` whose answer decides nothing', () => {
+      const mutant = withAction(
+        "\nexport async function wipeEvidenceG1(id: string) {\n  const { tenantId, role } = await requireTenantAction();\n  console.debug(can(role as never, 'edit_proposal'));\n  await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { id, tenantId } }));\n}\n",
+      );
+      only(evidence, mutant, 'wipeEvidenceG1', 'without a role check');
+    });
+
+    it('G1/B-1: a `can` that only runs for one field', () => {
+      const rel = 'app/[locale]/(app)/[workspace]/relationships/actions.ts';
+      const relSource = fs.readFileSync(path.join(SRC, rel), 'utf8');
+      const mutant = relSource.replace(
+        "const { tenantId, role } = await requireTenantAction({ can: 'view_proposal' });",
+        'const { tenantId, role } = await requireTenantAction();',
+      );
+      expect(mutant).not.toBe(relSource);
+      only(rel, mutant, 'updateRelationship', 'without a role check');
+    });
+
+    it('G2: `can: undefined`, or a permission rbac.ts does not declare', () => {
+      only(
+        evidence,
+        withAction(
+          "\nexport async function wipeEvidenceG2(id: string) {\n  const { tenantId } = await requireTenantAction({ can: undefined as never });\n  await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { id, tenantId } }));\n}\n",
+        ),
+        'wipeEvidenceG2',
+        'without a role check',
+      );
+      only(
+        evidence,
+        withAction(
+          "\nexport async function wipeEvidenceG2b(id: string) {\n  const { tenantId } = await requireTenantAction({ can: 'edit_everything' as never });\n  await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { id, tenantId } }));\n}\n",
+        ),
+        'wipeEvidenceG2b',
+        'without a role check',
+      );
+    });
+
+    it('G3: readOnly writes through a client named `t`', () => {
+      only(
+        evidence,
+        withAction(
+          '\nexport async function peekEvidenceG3(id: string) {\n  const { tenantId } = await requireTenantAction({ readOnly: true });\n  await withTenant(tenantId, (t) => t.evidence.deleteMany({ where: { id, tenantId } }));\n}\n',
+        ),
+        'peekEvidenceG3',
+        't.evidence.deleteMany',
+      );
+    });
+
+    it('G4: readOnly writes through a destructured model', () => {
+      only(
+        evidence,
+        withAction(
+          '\nexport async function peekEvidenceG4(id: string) {\n  const { tenantId } = await requireTenantAction({ readOnly: true });\n  await withTenant(tenantId, ({ evidence }) => evidence.deleteMany({ where: { id, tenantId } }));\n}\n',
+        ),
+        'peekEvidenceG4',
+        'evidence.deleteMany',
+      );
+    });
+
+    it('G8: readOnly writes through `prisma as client`', () => {
+      const mutant = withAction(
+        '\nexport async function peekEvidenceG8(id: string) {\n  await requireTenantAction({ readOnly: true });\n  await client.evidence.deleteMany({ where: { id } });\n}\n',
+      ).replace("import { withTenant } from '@/lib/db';", "import { withTenant, prisma as client } from '@/lib/db';");
+      only(evidence, mutant, 'peekEvidenceG8', 'client.evidence.deleteMany');
+    });
+
+    it('G6: the role check moved after the write', () => {
+      const profile = 'app/[locale]/(app)/[workspace]/settings/profile/actions.ts';
+      const profileSource = fs.readFileSync(path.join(SRC, profile), 'utf8');
+      const check = "    if (!can(asRole(scope.role), 'manage_users')) return { ok: false, error: 'forbidden' };\n";
+      const after = "      revalidatePath('/[locale]/(app)/[workspace]/settings/profile', 'layout');";
+      expect(profileSource).toContain(check);
+      expect(profileSource).toContain(after);
+      const mutant = profileSource
+        .replace(check, '')
+        .replace(
+          after,
+          "      if (!can(asRole(scope.role), 'manage_users')) return { ok: false as const, error: 'forbidden' as const };\n" +
+            after,
+        );
+      only(profile, mutant, 'updateTenantProvince', 'writes before any role check covers them: tx.tenant.update');
+    });
+
+    it('G7: an action exported through `export { … }`', () => {
+      only(
+        evidence,
+        withAction(
+          '\nasync function wipeEvidenceG7(id: string) {\n  const { tenantId } = await requireTenantAction();\n  await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { id, tenantId } }));\n}\nexport { wipeEvidenceG7 as purgeEvidence };\n',
+        ),
+        'purgeEvidence',
+        'without a role check',
+      );
+    });
+
+    it('G10: an inline `use server` action that writes', () => {
+      const portal = 'app/[locale]/portal/partner/[token]/page.tsx';
+      const portalSource = fs.readFileSync(path.join(SRC, portal), 'utf8');
+      const anchor = "            'use server';";
+      expect(portalSource.split(anchor)).toHaveLength(2);
+      const mutant = portalSource.replace(
+        anchor,
+        anchor +
+          "\n            await (await import('@/lib/db')).prisma.evidence.deleteMany({ where: { id: String(fd.get('x')) } });",
+      );
+      only(portal, mutant, 'inline:PartnerPortalPage:1', "inline 'use server' action writes directly");
+    });
+
+    it('G10: an inline `use server` action with no role check', () => {
+      const page = 'app/[locale]/(app)/[workspace]/evidence/g10-page.tsx';
+      const mutant =
+        "import { withTenant } from '@/lib/db';\nimport { requireTenantAction } from '@/lib/tenant';\nexport default function Page() {\n  async function wipe(fd: FormData) {\n    'use server';\n    const { tenantId } = await requireTenantAction();\n    await helperG10(tenantId, String(fd.get('id')));\n  }\n  return <form action={wipe} />;\n}\nasync function helperG10(tenantId: string, id: string) {\n  await withTenant(tenantId, (tx) => tx.evidence.delete({ where: { id } }));\n}\n";
+      expect(findingsFor(page, mutant).findings).toEqual([
+        { key: `${page}#wipe`, problem: expect.stringContaining("inline 'use server' action writes directly") },
+        { key: `${page}#wipe`, problem: expect.stringContaining('without a role check') },
+      ]);
+    });
+
+    it('G9 (fail-closed): a `can` spread from a constant is not read, and stays red', () => {
+      only(
+        evidence,
+        withAction(
+          "\nconst WRITE = { can: 'edit_proposal' } as const;\nexport async function wipeEvidenceG9(id: string) {\n  const { tenantId } = await requireTenantAction({ ...WRITE, readOnly: false });\n  await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { id, tenantId } }));\n}\n",
+        ),
+        'wipeEvidenceG9',
+        'without a role check',
+      );
+    });
+
+    it('stays green for a check in each accepted shape', () => {
+      const good = withAction(
+        [
+          "\nconst PERM = 'edit_proposal' as const;",
+          'export async function okThrow(id: string) {',
+          "  const { tenantId } = await requireTenantAction({ can: PERM });",
+          '  await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { id, tenantId } }));',
+          '}',
+          'export async function okIf(id: string) {',
+          '  const { tenantId, role } = await requireTenantAction();',
+          "  if (!can(role as never, 'edit_proposal')) {",
+          "    throw new Error('forbidden');",
+          '  }',
+          '  await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { id, tenantId } }));',
+          '}',
+          'async function gateStmt() {',
+          "  const scope = await requireTenantAction({ can: 'edit_proposal' });",
+          '  return scope;',
+          '}',
+          'export async function okHelper(id: string) {',
+          '  const { tenantId } = await gateStmt();',
+          '  await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { id, tenantId } }));',
+          '}',
+          'export async function okInCallback(id: string) {',
+          '  const { tenantId, role } = await requireTenantAction();',
+          '  await withTenant(tenantId, async (tx) => {',
+          "    if (!can(role as never, 'edit_proposal')) return 'FORBIDDEN';",
+          '    await tx.evidence.deleteMany({ where: { id, tenantId } });',
+          '  });',
+          '}',
+          '',
+        ].join('\n'),
+      ).replace("import { requireTenantAction } from '@/lib/tenant';", "import { requireTenantAction } from '@/lib/tenant';\nimport { can } from '@/lib/rbac';");
+      expect(findingsFor(evidence, good).findings).toEqual([]);
     });
   });
 });
