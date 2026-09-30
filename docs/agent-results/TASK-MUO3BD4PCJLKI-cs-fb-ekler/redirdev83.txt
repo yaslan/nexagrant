@@ -1,0 +1,11 @@
+{"callbackUrl":"https://evil.com/x","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/tr/default/dashboard"}
+{"callbackUrl":"//evil.com/x","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/tr/default/dashboard"}
+{"callbackUrl":"/\\evil.com/x","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/tr/default/dashboard"}
+{"callbackUrl":" //evil.com/x","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/tr/default/dashboard"}
+{"callbackUrl":"/a/../..//evil.com","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/tr/default/dashboard"}
+{"callbackUrl":"/%2e%2e//evil.com","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/tr/default/dashboard"}
+{"callbackUrl":"/\t/evil.com","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/tr/default/dashboard"}
+{"callbackUrl":"javascript:alert(document.domain)","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/tr/default/dashboard"}
+{"callbackUrl":"http://localhost:3584@evil.com/","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/tr/default/dashboard"}
+{"callbackUrl":"/%2F%2Fevil.com","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/%2F%2Fevil.com"}
+{"callbackUrl":"/tr/calls/topic/HORIZON-CL5-2026-D4-01","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3584/tr/main/cagrilar/HORIZON-CL5-2026-D4-01"}

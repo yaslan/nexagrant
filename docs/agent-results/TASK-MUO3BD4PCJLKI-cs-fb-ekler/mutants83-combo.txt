@@ -1,0 +1,14 @@
+== C11+C12+C13+C14 birlikte (yalnız '/' ön-eki, '//' ön-eki ve son '//' kontrolü kalır)
+toplam=54 kaçan=0
+     × replaces '/\evil.com/x' with the fallback 73ms
+     × replaces '/\/evil.com' with the fallback 1ms
+     × replaces '/tr/\npanel' with the fallback 2ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  3 failed | 18 passed (21)
+== + C20: normalize yol yerine HAM değer döndürülüyor
+KAÇTI kept     "/\\evil.com/x" -> /\evil.com/x
+KAÇTI kept     "/\t/evil.com" -> /	/evil.com
+KAÇTI kept     "/\n/evil.com" -> /
+KAÇTI kept     "/\r//evil.com" -> ///evil.com
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  4 failed | 17 passed (21)

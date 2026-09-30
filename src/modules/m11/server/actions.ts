@@ -18,6 +18,7 @@ import {
 } from '../types';
 import { errorMessage } from '@/lib/errors';
 import { isPresentId } from '@/lib/required-id';
+import { isTenantLive } from '@/lib/tenant-liveness';
 
 export type { 
   PartBSectionItem, 
@@ -598,12 +599,17 @@ export async function addBudgetLineByToken(
   // tenant to scope to until this row comes back — so the read runs on the
   // sanctioned cross-tenant path. Under `fabrika_app` an unscoped read returns
   // nothing and every partner link 404s.
-  const part = await withSystemScope('tenant-discovery', 'm11.partByMagicToken', (tx) =>
-    tx.applicationPart.findUnique({
+  //
+  // A soft-deleted tenant (in its hold before the purge) takes no partner
+  // writes: the link resolves to nothing, exactly like an unknown token, and
+  // works again if the deletion is cancelled (TASK-MUO4GO5ARDY2W).
+  const part = await withSystemScope('tenant-discovery', 'm11.partByMagicToken', async (tx) => {
+    const row = await tx.applicationPart.findUnique({
       where: { magicTokenHash: hashSecretToken(magicToken) },
       select: { id: true, tenantId: true, part: true, content: true, magicTokenHash: true },
-    })
-  );
+    });
+    return row && (await isTenantLive(tx, row.tenantId)) ? row : null;
+  });
 
   // Only SHA-256(token) is stored (TASK-MULQLL2T8ZJX4); the row found by that
   // hash is re-checked in constant time before anything is written.

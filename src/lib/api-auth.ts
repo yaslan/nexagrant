@@ -90,6 +90,15 @@ export async function authenticateApiKey(req: Request): Promise<
     // counter has to be synchronous, and a failure here lands in the catch below
     // and fails closed like the key lookup does (an uncounted key is unlimited).
     // Tenant-scoped, not system-scoped: only the discovery read is cross-tenant.
+    //
+    // The same statement also refuses a soft-deleted tenant (`Tenant.deletedAt`
+    // set, in its hold before the purge; TASK-MUO4GO5ARDY2W). The session path
+    // already drops such a tenant in the jwt callback, and a key must not keep
+    // reading a workspace its own members can no longer open. `ApiKey` declares
+    // no `tenant` relation, so the check is an EXISTS here rather than a filter
+    // on the discovery read: no extra round trip, and a deleted tenant's key
+    // neither counts nor stamps `lastUsedAt`. Clearing `deletedAt` gives the
+    // same key its access back.
     const now = new Date();
     const windowStartedBefore = new Date(now.getTime() - API_KEY_RATE_WINDOW_MS);
     const usage = await withTenant(keyRecord.tenantId, (tx) =>
@@ -103,11 +112,13 @@ export async function authenticateApiKey(req: Request): Promise<
               THEN ${now} ELSE "rateWindowStartedAt" END,
             "lastUsedAt" = ${now}
         WHERE "id" = ${keyRecord.id} AND "tenantId" = ${keyRecord.tenantId}
+          AND EXISTS (SELECT 1 FROM "Tenant" WHERE "Tenant"."id" = ${keyRecord.tenantId} AND "Tenant"."deletedAt" IS NULL)
         RETURNING "rateWindowCount" AS "count", "rateWindowStartedAt" AS "windowStartedAt"`
     );
     const window = usage[0];
     if (!window) {
-      // The row vanished between the lookup and the count (revoked mid-request).
+      // The row vanished between the lookup and the count (revoked mid-request),
+      // or its tenant is soft-deleted. Both read as a revoked key.
       return invalidKey();
     }
 

@@ -8,6 +8,7 @@ import { getTranslations } from 'next-intl/server';
 import { errorMessage } from '@/lib/errors';
 import { hashSecretToken, secretTokenMatches } from '@/lib/secret-token';
 import { getPilotState } from '@/lib/billing/pilot';
+import { isTenantLive } from '@/lib/tenant-liveness';
 import type { PartContent } from '@/modules/m11/types';
 
 interface PageProps {
@@ -41,8 +42,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   let part: PartnerPortalPart | null = null;
   try {
-    const rawPart = await withSystemScope('tenant-discovery', 'partner-portal.partByToken', (tx) =>
-      tx.applicationPart.findUnique({
+    const rawPart = await withSystemScope('tenant-discovery', 'partner-portal.partByToken', async (tx) => {
+      const row = await tx.applicationPart.findUnique({
         where: { magicTokenHash: hashSecretToken(token) },
         // The hash is compared here and never rendered; nothing on this page
         // is a client component (TASK-MUMT3KVHJTYX0).
@@ -54,8 +55,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
           magicTokenHash: true,
           opportunity: { select: { title: true } },
         },
-      })
-    );
+      });
+      // A soft-deleted tenant's link reads as an unknown one (TASK-MUO4GO5ARDY2W).
+      return row && (await isTenantLive(tx, row.tenantId)) ? row : null;
+    });
     part = secretTokenMatches(token, rawPart?.magicTokenHash)
       ? (rawPart as unknown as PartnerPortalPart)
       : null;
@@ -91,8 +94,8 @@ export default async function PartnerPortalPage({ params }: PageProps) {
 
   let part: PartnerPortalPart | null = null;
   try {
-    const rawPart = await withSystemScope('tenant-discovery', 'partner-portal.partByToken', (tx) =>
-      tx.applicationPart.findUnique({
+    const rawPart = await withSystemScope('tenant-discovery', 'partner-portal.partByToken', async (tx) => {
+      const row = await tx.applicationPart.findUnique({
         where: { magicTokenHash: hashSecretToken(token) },
         // The hash is compared here and never rendered; nothing on this page
         // is a client component (TASK-MUMT3KVHJTYX0).
@@ -104,8 +107,10 @@ export default async function PartnerPortalPage({ params }: PageProps) {
           magicTokenHash: true,
           opportunity: { select: { title: true } },
         },
-      })
-    );
+      });
+      // A soft-deleted tenant's link reads as an unknown one (TASK-MUO4GO5ARDY2W).
+      return row && (await isTenantLive(tx, row.tenantId)) ? row : null;
+    });
     part = secretTokenMatches(token, rawPart?.magicTokenHash)
       ? (rawPart as unknown as PartnerPortalPart)
       : null;

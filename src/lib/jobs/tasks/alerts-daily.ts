@@ -1,7 +1,8 @@
 import { defineJob } from '../define';
 import { appUrl as resolveAppUrl } from '@/lib/app-url';
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
-import { withSystemScope } from '@/lib/system-scope';
+import { withSystemScope, type SystemTx } from '@/lib/system-scope';
+import { keepLiveTenantRows } from '@/lib/tenant-liveness';
 import { smtpMailer, type Mailer } from '@/lib/email/mailer';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert, type RecordAlertInput } from '@/lib/observability/system-alert';
@@ -29,6 +30,15 @@ export const SAVED_SEARCH_ALERT_QUERY = {
   where: { notify: true },
   select: { id: true, tenantId: true, name: true, filters: true, lastRunAt: true, createdAt: true },
 } as const;
+
+/**
+ * Every tenant's alert-enabled saved searches, less a soft-deleted tenant's:
+ * its owner gets no alert mail during the hold before the purge
+ * (TASK-MUO4GO5ARDY2W). Exported so the live test runs it under `fabrika_app`.
+ */
+export async function alertEnabledSearches(tx: SystemTx): Promise<SavedSearchAlertRow[]> {
+  return keepLiveTenantRows(tx, await tx.savedSearch.findMany(SAVED_SEARCH_ALERT_QUERY));
+}
 
 /**
  * Shaped by hand rather than pulled from `Prisma.TopicWhereInput`: this
@@ -296,9 +306,7 @@ export const alertsDailyTask = defineJob(
         // searches, read before each one is mailed. Empty under `fabrika_app`,
         // which this job would report as `totalSearches: 0` — a false success
         // of exactly the kind the docstring above says it refuses.
-        return await withSystemScope('cross-tenant-job', 'alerts-daily.enabledSearches', (tx) =>
-          tx.savedSearch.findMany(SAVED_SEARCH_ALERT_QUERY)
-        );
+        return await withSystemScope('cross-tenant-job', 'alerts-daily.enabledSearches', alertEnabledSearches);
       } catch (error) {
         await recordAlert({
           level: 'error',

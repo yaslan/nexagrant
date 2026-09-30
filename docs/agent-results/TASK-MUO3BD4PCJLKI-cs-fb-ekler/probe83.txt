@@ -1,0 +1,84 @@
+== A. kart linkleri (girişsiz ve girişli aynı mı)
+tr/calls girişsiz topic=20 default=0 | restr aynı=evet
+en/calls girişsiz topic=20 default=0 | restr aynı=evet
+== B. alan-bağımsız rota: kullanıcı × dil (tam zincir)
+anon tr: 307 -> /tr/giris?callbackUrl=%2Ftr%2Fcalls%2Ftopic%2FHORIZON-CL5-2026-D4-01 200
+anon en: 307 -> /en/login?callbackUrl=%2Fen%2Fcalls%2Ftopic%2FHORIZON-CL5-2026-D4-01 200
+alice tr: 307 -> /tr/main/cagrilar/HORIZON-CL5-2026-D4-01 200
+alice en: 307 -> /en/main/calls/HORIZON-CL5-2026-D4-01 200
+owner tr: 307 -> /tr/ws-a/cagrilar/HORIZON-CL5-2026-D4-01 200
+owner en: 307 -> /en/ws-a/calls/HORIZON-CL5-2026-D4-01 200
+restr tr: 307 -> /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 200
+restr en: 307 -> /en/ws-b/calls/HORIZON-CL5-2026-D4-01 200
+restrc tr: 307 -> /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 200
+restrc en: 307 -> /en/ws-b/calls/HORIZON-CL5-2026-D4-01 200
+del tr: 307 -> /tr/yeni/cagrilar/HORIZON-CL5-2026-D4-01 200
+del en: 307 -> /en/yeni/calls/HORIZON-CL5-2026-D4-01 200
+none tr: 307 -> /tr/no-workspace 200
+none en: 307 -> /en/no-workspace 200
+nomem tr: 307 -> /tr/no-workspace 200
+nomem en: 307 -> /en/no-workspace 200
+t5u tr: 307 -> /tr/no-workspace 200
+t5u en: 307 -> /en/no-workspace 200
+t6u tr: 307 -> /tr/no-workspace 200
+t6u en: 307 -> /en/no-workspace 200
+t7u tr: 307 -> /tr/eski/cagrilar/HORIZON-CL5-2026-D4-01 200
+t7u en: 307 -> /en/eski/calls/HORIZON-CL5-2026-D4-01 200
+t8u tr: 307 -> /tr/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/cagrilar/HORIZON-CL5-2026-D4-01 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/cagrilar/HORIZON-CL5-2026-D4-01 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/cagrilar/HORIZON-CL5-2026-D4-01 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/cagrilar/HORIZON-CL5-2026-D4-01 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01  ⚠DÖNGÜ(8+ hop)
+t8u en: 307 -> /en/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/calls/HORIZON-CL5-2026-D4-01 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/calls/HORIZON-CL5-2026-D4-01 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/calls/HORIZON-CL5-2026-D4-01 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/calls/HORIZON-CL5-2026-D4-01 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01  ⚠DÖNGÜ(8+ hop)
+== C. rota girdi kurcalama
+restr /de/calls/topic/HORIZON-CL5-2026-D4-01: 307 -> /tr/de/calls/topic/HORIZON-CL5-2026-D4-01 404
+restr /tr/calls/topic/%00: 404
+restr /tr/calls/topic/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: 307 -> /tr/ws-b/cagrilar/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 404
+restr /tr/calls/topic/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: 404
+restr /tr/calls/topic/..%2f..%2fevil: 307 -> /tr/ws-b/cagrilar/..%2F..%2Fevil 404
+restr /tr/calls/topic/%2F%2Fevil.com: 307 -> /tr/ws-b/cagrilar/%2F%2Fevil.com 404
+restr /tr/calls/topic/a%3Fx%3D1%23y: 307 -> /tr/ws-b/cagrilar/a%3Fx%3D1%23y 404
+restr /TR/calls/topic/HORIZON-CL5-2026-D4-01: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 200
+restr /tr/calls/topic/__proto__: 307 -> /tr/ws-b/cagrilar/__proto__ 404
+Cache-Control: cache-control: private, no-store
+== D. detay sayfası URL slug kurcalama (tam zincir)
+restr /tr/ws-a/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 200
+restr /en/ws-a/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/ws-b/calls/HORIZON-CL5-2026-D4-01 200
+restr /tr/ws-c/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 200
+restr /en/ws-c/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/ws-b/calls/HORIZON-CL5-2026-D4-01 200
+restr /tr/default/cagrilar: 307 -> /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 200
+restr /en/default/calls: 307 -> /en/ws-b/calls/HORIZON-CL5-2026-D4-01 200
+restr /tr/WS-B/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 200
+restr /en/WS-B/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/ws-b/calls/HORIZON-CL5-2026-D4-01 200
+restr /tr/ws-b/cagrilar: 200
+restr /en/ws-b/calls: 200
+restrc /tr/ws-c/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 200
+restrc /en/ws-c/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/ws-b/calls/HORIZON-CL5-2026-D4-01 200
+restrc /tr/default/cagrilar: 307 -> /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 200
+restrc /en/default/calls: 307 -> /en/ws-b/calls/HORIZON-CL5-2026-D4-01 200
+del /tr/default/cagrilar: 307 -> /tr/yeni/cagrilar/HORIZON-CL5-2026-D4-01 200
+del /en/default/calls: 307 -> /en/yeni/calls/HORIZON-CL5-2026-D4-01 200
+del /tr/yeni/cagrilar: 200
+del /en/yeni/calls: 200
+owner /tr/ws-c/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/ws-a/cagrilar/HORIZON-CL5-2026-D4-01 200
+owner /en/ws-c/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/ws-a/calls/HORIZON-CL5-2026-D4-01 200
+owner /tr/nope/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/ws-a/cagrilar/HORIZON-CL5-2026-D4-01 200
+owner /en/nope/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/ws-a/calls/HORIZON-CL5-2026-D4-01 200
+t5u /tr/silik/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/no-workspace 200
+t5u /en/silik/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/no-workspace 200
+t5u /tr/canli/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/no-workspace 200
+t5u /en/canli/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/no-workspace 200
+t6u /tr/ws-a/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/no-workspace 200
+t6u /en/ws-a/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/no-workspace 200
+t6u /tr/kendi/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/no-workspace 200
+t6u /en/kendi/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/no-workspace 200
+t7u /tr/default/cagrilar: 200
+t7u /en/default/calls: 200
+t7u /tr/eski/cagrilar: 200
+t7u /en/eski/calls: 200
+alice /tr/ws-a/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/main/cagrilar/HORIZON-CL5-2026-D4-01 200
+alice /en/ws-a/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/main/calls/HORIZON-CL5-2026-D4-01 200
+none /tr/default/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/no-workspace 200
+none /en/default/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/no-workspace 200
+nomem /tr/default/cagrilar: 307 -> /tr/no-workspace 200
+nomem /en/default/calls: 307 -> /en/no-workspace 200
+t8u /tr/default/cagrilar: 500
+t8u /en/default/calls: 500
+t8u /tr/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/cagrilar: 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/cagrilar/HORIZON-CL5-2026-D4-01 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/cagrilar/HORIZON-CL5-2026-D4-01 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/cagrilar/HORIZON-CL5-2026-D4-01 307 -> /tr/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /tr/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/cagrilar/HORIZON-CL5-2026-D4-01  ⚠DÖNGÜ(8+ hop)
+t8u /en/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/calls: 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/calls/HORIZON-CL5-2026-D4-01 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/calls/HORIZON-CL5-2026-D4-01 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/calls/HORIZON-CL5-2026-D4-01 307 -> /en/calls/topic/HORIZON-CL5-2026-D4-01 307 -> /en/%C3%A7al%C4%B1%C5%9Fma%20alan%C4%B1/calls/HORIZON-CL5-2026-D4-01  ⚠DÖNGÜ(8+ hop)
