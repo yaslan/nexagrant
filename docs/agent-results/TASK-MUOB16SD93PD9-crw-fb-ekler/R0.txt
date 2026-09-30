@@ -1,0 +1,22 @@
+[wt] DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55102/r0
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55102/r0
+apply-migrations: 41 files applied
+✅ prisma/rls.sql applied. Policies in public: 112 → 112
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+verify exit=0
+[wtold] DATABASE_URL=postgresql://fabrika_app:***@127.0.0.1:55102/r0 JOBS=postgresql://fabrika:***@127.0.0.1:55102/r0
+[wtold] tick=2026-10-27T07:00:00.000Z job=1 left=0
+"tenantsFailed":0 "skippedMailedToday":0 "digestsSent":2 "digestsFailed":0
+shutdown: 1
+[wt] DATABASE_URL=postgresql://fabrika_app:***@127.0.0.1:55102/r0 JOBS=postgresql://fabrika:***@127.0.0.1:55102/r0
+[wt] tick=2026-10-27T07:22:00.000Z job=2 left=0
+"tenantsFailed":0 "skippedMailedToday":1 "digestsSent":1 "digestsFailed":0
+shutdown: 1
+total=3 {'uA@example.test': 1, 'uC@example.test': 1, 'uE@example.test': 1}
+Membership|tA/uA|2026-10-27
+Membership|tA/uE|2026-10-27
+Membership|tB/uA|
+Membership|tB/uC|
+User|uA|
+User|uC|2026-10-27
+User|uE|
