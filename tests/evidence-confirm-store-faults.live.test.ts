@@ -752,6 +752,29 @@ describe('İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs
     await expectRetrySucceeds(up);
   }, 60_000);
 
+  test('T-5 (final key HEAD): a store that holds the HEAD of the final object before copy verification is given up on within the deadline', async () => {
+    // Q4-variant: final key HEAD hold during the pre-copy existence check (not after copy).
+    // This sibling test to T-5 ensures that holding HEAD on the final key at any point
+    // during confirm results in storage_unavailable within the deadline.
+    const up = await uploaded('t5-final-head');
+    state.hook = async ({ method, path, isCopy }) => {
+      // Hold the final key's HEAD; with a 1.5 s deadline, copyIncomingObject should fail.
+      if (!isCopy && method === 'HEAD' && path.endsWith(`/${up.finalKey}`)) {
+        await sleep(4_000);
+      }
+    };
+    const started = Date.now();
+    const res = await storage.copyIncomingObject(up.objectKey, up.finalKey, 1_500);
+    const took = Date.now() - started;
+    state.hook = null;
+    expect(res).toEqual({ ok: false, error: 'storage_unavailable' });
+    expect(took, `gave up after ${took} ms`).toBeLessThan(3_000);
+    expect(state.requests.some((r) => r.startsWith('PUT(copy)'))).toBe(false);
+    await sleep(3_000);
+    expect(await stored(up.finalKey)).toBeNull();
+    await expectRetrySucceeds(up);
+  }, 60_000);
+
   test('T-7: a store that holds the HEAD of the final object after the copy is given up on within the deadline', async () => {
     // Q4 mutant test: the final key HEAD command must have timeout opts.
     // If opts (abortSignal.timeout) is missing from the HeadObjectCommand call for the final key,
