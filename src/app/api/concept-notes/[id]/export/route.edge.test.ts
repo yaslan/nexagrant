@@ -63,6 +63,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   docx.failures = 0;
   docx.calls.length = 0;
+  docx.failureError = null;
   vi.mocked(auth).mockResolvedValue({
     tenantId: 'tenant_1',
     user: { email: 'user@example.com', name: 'Test User' },
@@ -210,6 +211,17 @@ describe('concept-note DOCX export — İNCELEME-53 follow-ups (TASK-MUNDTW8O2IV
     expect(logged?.reason).toBe('x'.repeat(200)); // exactly 200, first 200 chars
     warn.mockRestore();
     docx.failureError = null;
+  });
+
+  it('İNCELEME-88 O-2: a short first line is the whole reason — the lines after it are cut, not just the length (İNCELEME-113)', async () => {
+    // The 250-char case above cannot tell "first line" from "first 200 chars": both give 200 x's.
+    seed({ summary: `<p>metin</p>${img(PNG)}` });
+    docx.failures = 1;
+    docx.failureError = new TypeError('Invalid JPG, marker table corrupted\n    at body: Gizli Fırsat Başlığı');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await exportNote();
+    expect((warn.mock.calls[0]?.[1] as Record<string, string> | undefined)?.reason).toBe('Invalid JPG, marker table corrupted');
+    warn.mockRestore();
   });
 
   it('İNCELEME-88 O-2: a missing or unsafe X-Request-Id is replaced by one made here, and it is the one logged', async () => {

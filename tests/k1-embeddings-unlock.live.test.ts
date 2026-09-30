@@ -74,6 +74,10 @@ async function profileHashes(): Promise<Record<string, string | null>> {
 
 let backupDir = '';
 let log: ReturnType<typeof vi.spyOn>;
+let warn: ReturnType<typeof vi.spyOn>;
+let error: ReturnType<typeof vi.spyOn>;
+/** Everything the script printed, on any console channel, object arguments included (İNCELEME-113). */
+const printedOutput = () => JSON.stringify([log.mock.calls, warn.mock.calls, error.mock.calls]);
 
 beforeAll(async () => {
   if (!HAS_DB) return;
@@ -96,8 +100,8 @@ beforeEach(async () => {
   for (const [id, h] of Object.entries(TOPIC_HASHES)) await admin.topic.update({ where: { id }, data: { embeddingHash: h } });
   for (const [tenantId, h] of Object.entries(TENANT_HASHES)) await admin.tenantProfile.update({ where: { tenantId }, data: { embeddingHash: h } });
   log = vi.spyOn(console, 'log').mockImplementation(() => {});
-  vi.spyOn(console, 'warn').mockImplementation(() => {});
-  vi.spyOn(console, 'error').mockImplementation(() => {});
+  warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  error = vi.spyOn(console, 'error').mockImplementation(() => {});
   return () => {
     log.mockRestore();
     vi.restoreAllMocks();
@@ -146,7 +150,8 @@ describe.skipIf(!HAS_DB)('k1-embeddings-unlock-rejected (live, fabrika_app)', ()
     expect(backup.profiles).toEqual(expect.arrayContaining([{ tenantId: TA, embeddingHash: TENANT_HASHES[TA] }, { tenantId: TD, embeddingHash: TENANT_HASHES[TD] }]));
     expect(backup.profiles).toHaveLength(2);
     // Ids and counts only: no profile text in the backup or the output (Ö-3a).
-    const printed = JSON.stringify(log.mock.calls) + fs.readFileSync(r.backupFile!, 'utf8');
+    // warn/error are silenced above, so they are read here too: a leak there would otherwise pass unseen (İNCELEME-113).
+    const printed = printedOutput() + fs.readFileSync(r.backupFile!, 'utf8');
     for (const id of Object.keys(TENANT_HASHES)) expect(printed).not.toContain(CAPABILITIES(id));
 
     const again = await unlockRejected({ ...SCOPE, apply: true, backupDir });
@@ -184,9 +189,12 @@ describe.skipIf(!HAS_DB)('k1-embeddings-unlock-rejected (live, fabrika_app)', ()
       await admin.tenant.create({ data: { id: T_ACTIVE, name: T_ACTIVE, slug: T_ACTIVE, country: 'TR' } });
       await admin.tenantProfile.create({ data: { tenantId: T_ACTIVE, capabilities: 'x', keywords: [], naceCodes: [], trlRange: [], preferredRoles: [], embeddingHash: `rejected:active` } });
 
-      const r = await unlockRejected({ tenantIds: [T_DELETED, T_ACTIVE], apply: true, backupDir });
+      // `topicIds: []`: without it the call clears every marked Topic in the database, the parallel
+      // tests/k1-embeddings.live.test.ts rows included (İNCELEME-113: a flaky red there).
+      const r = await unlockRejected({ topicIds: [], tenantIds: [T_DELETED, T_ACTIVE], apply: true, backupDir });
       // Only the active tenant's profile is cleared
       expect(r.profiles.map((p) => p.tenantId)).toEqual([T_ACTIVE]);
+      expect(r).toMatchObject({ topics: [], clearedTopics: 0, clearedProfiles: 1 });
       const deletedProfile = await admin.tenantProfile.findUnique({ where: { tenantId: T_DELETED }, select: { embeddingHash: true } });
       const activeProfile = await admin.tenantProfile.findUnique({ where: { tenantId: T_ACTIVE }, select: { embeddingHash: true } });
       expect(deletedProfile?.embeddingHash).toBe('rejected:old');
