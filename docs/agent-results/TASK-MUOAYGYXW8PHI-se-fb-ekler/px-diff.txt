@@ -1,0 +1,36 @@
+sonra  1280-admin_alerts.png                                   FARK bbox=(320, 170, 1248, 554) piksel(>8)=23313 maxdelta=249
+once2  1280-admin_alerts.png                                   AYNI
+sonra  1280-admin_cordis.png                                   AYNI
+once2  1280-admin_cordis.png                                   AYNI
+sonra  1280-ayarlar_kapilar.png                                AYNI
+once2  1280-ayarlar_kapilar.png                                AYNI
+sonra  1280-demo-opp-1_evaluations.png                         AYNI
+once2  1280-demo-opp-1_evaluations.png                         AYNI
+sonra  1280-fabrika-beta_approvals.png                         AYNI
+once2  1280-fabrika-beta_approvals.png                         AYNI
+sonra  1280-fabrika-beta_dashboard.png                         AYNI
+once2  1280-fabrika-beta_dashboard.png                         AYNI
+sonra  1280-fabrika-beta_onay-merkezi.png                      AYNI
+once2  1280-fabrika-beta_onay-merkezi.png                      AYNI
+sonra  1280-firsatlar_demo-opp-1.png                           AYNI
+once2  1280-firsatlar_demo-opp-1.png                           AYNI
+sonra  1280-settings_gates.png                                 AYNI
+once2  1280-settings_gates.png                                 AYNI
+sonra  768-admin_alerts.png                                    FARK bbox=(33, 109, 1067, 1063) piksel(>8)=20767 maxdelta=249
+once2  768-admin_alerts.png                                    AYNI
+sonra  768-admin_cordis.png                                    AYNI
+once2  768-admin_cordis.png                                    AYNI
+sonra  768-ayarlar_kapilar.png                                 FARK bbox=(312, 255, 712, 257) piksel(>8)=0 maxdelta=2
+once2  768-ayarlar_kapilar.png                                 AYNI
+sonra  768-demo-opp-1_evaluations.png                          AYNI
+once2  768-demo-opp-1_evaluations.png                          AYNI
+sonra  768-fabrika-beta_approvals.png                          AYNI
+once2  768-fabrika-beta_approvals.png                          AYNI
+sonra  768-fabrika-beta_dashboard.png                          AYNI
+once2  768-fabrika-beta_dashboard.png                          AYNI
+sonra  768-fabrika-beta_onay-merkezi.png                       AYNI
+once2  768-fabrika-beta_onay-merkezi.png                       AYNI
+sonra  768-firsatlar_demo-opp-1.png                            AYNI
+once2  768-firsatlar_demo-opp-1.png                            AYNI
+sonra  768-settings_gates.png                                  AYNI
+once2  768-settings_gates.png                                  FARK bbox=(312, 255, 712, 257) piksel(>8)=0 maxdelta=2

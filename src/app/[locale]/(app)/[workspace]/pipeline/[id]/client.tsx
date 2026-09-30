@@ -166,7 +166,9 @@ export function OpportunityDetailClient({
 
       <div className="bg-surface p-6 md:p-8 rounded-xl shadow-xs border border-border mb-8">
         <div className="flex flex-col sm:flex-row sm:flex-wrap lg:flex-nowrap justify-between items-start gap-4 mb-6">
-          <div className="min-w-0 break-words">
+          {/* w-full below sm: the column's items-start would otherwise size this block to the
+              longest unbreakable word of the title (a pasted link), wider than the card. */}
+          <div className="w-full sm:w-auto min-w-0 break-words">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs font-semibold bg-accent/15 text-accent-ink border border-accent/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
                 {opportunity.stage}
