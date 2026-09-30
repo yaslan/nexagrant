@@ -24,6 +24,11 @@ describe('finalKeyOfIncoming takes only the presign’s shape', () => {
     ['nested incoming (crw-fb’s case)', `${T}/incoming/incoming/x.pdf`],
     ['nested incoming, full shape below it', `${T}/incoming/incoming/certificate/2026/deadbeef_n.pdf`],
     ['incoming as the organisation', `${T}/incoming/incoming/certificate/2026/deadbeef_n_pdf.pdf`],
+    // T-1 (TASK-MUO64MVW8TLMX, İNCELEME-82 N7): a whole staging key below a
+    // second `incoming`. Only the `^` of the shape refuses these; unanchored,
+    // the first maps to `${T}/incoming/org-default/…`, another staging key.
+    ['a full staging key nested under incoming', `${T}/incoming/incoming/org-default/certificate/2026/deadbeef_n_pdf.pdf`],
+    ['a full staging key below incoming/<segment>', `${T}/incoming/zzz/incoming/org-default/certificate/2026/deadbeef_n_pdf.pdf`],
     ['a final key', `${T}/org-default/certificate/2026/deadbeef_n.pdf`],
     ['too few segments', `${T}/incoming/x.pdf`],
     ['no year', `${T}/incoming/org-default/certificate/deadbeef_n.pdf`],

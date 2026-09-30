@@ -1,5 +1,6 @@
 'use server';
 
+import { createHash } from 'node:crypto';
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
@@ -14,6 +15,7 @@ import {
   uploadFileToR2,
   tenantObjectKeyOf,
   EVIDENCE_BUCKET,
+  EVIDENCE_COPY_DEADLINE_MS,
 } from '@/lib/storage';
 import { extractEvidenceMetadata } from '@/lib/evidence-ai';
 import { calculateEvidenceHealthScore, HealthScoreResult, MinimalEvidenceItem } from '@/lib/evidence-health';
@@ -97,6 +99,19 @@ export async function getPresignedUploadUrlAction(
 }
 
 /**
+ * Y-1 (TASK-MUO64MVW8TLMX): confirms of one final key run one at a time. A
+ * confirm waits at most `CONFIRM_LOCK_WAIT` for the one ahead of it and then
+ * answers `save_failed` (retryable). The transaction outlives the lock wait
+ * plus the copy's own deadline, so it never ends while a copy is running.
+ */
+const CONFIRM_LOCK_WAIT = '10s';
+const CONFIRM_TX_TIMEOUT_MS = 10_000 + EVIDENCE_COPY_DEADLINE_MS + 15_000;
+
+function confirmLockKey(finalKey: string): bigint {
+  return createHash('sha256').update(`evidence-confirm:${finalKey}`).digest().readBigInt64BE(0);
+}
+
+/**
  * Confirms an evidence file upload and saves the DB record.
  *
  * Only what the user actually typed is stored. There is no OCR behind the upload, so
@@ -138,100 +153,112 @@ export async function confirmEvidenceUploadAction(data: {
   // The user's date, or none. A document with no stated expiry does not get one.
   const finalValidUntil = data.validUntil ? new Date(data.validUntil) : null;
 
-  // B-1 (TASK-MUO122UPRPJQH, İNCELEME-77): no store call runs inside a
-  // transaction any more, and the staging object — the user's only copy until
-  // the row exists — is removed last. The order is: already recorded? → check
-  // and copy to the final key → save the row → remove the staging object. A
-  // failure at any step before the last leaves the staging object and no row,
-  // returns an error, and the same confirm can be sent again. This used to copy,
-  // delete the staging object and check the copy inside the row's transaction;
-  // a store slower than its 5 s ended the transaction, the copy was deleted as
-  // well, and a "DB offline" branch reported success with a made-up id.
-
-  // D-3 (TASK-MUNTTZ94LJWBC): a key already on a row is not copied again, so a
-  // PUT to the staging key after confirm cannot reach the recorded file.
-  let recorded: { id: string } | null;
+  // B-1 (TASK-MUO122UPRPJQH, İNCELEME-77): the staging object — the user's
+  // only copy until the row exists — is removed last, after the row is
+  // committed. The order is: already recorded? → check and copy to the final
+  // key → save the row → remove the staging object. A failure at any step
+  // before the last leaves the staging object and no row, returns an error,
+  // and the same confirm can be sent again. This used to delete the staging
+  // object inside the row's transaction; a store slower than its 5 s ended the
+  // transaction, the copy was deleted as well, and a "DB offline" branch
+  // reported success with a made-up id.
+  //
+  // Y-1 (TASK-MUO64MVW8TLMX, İNCELEME-82): the first three steps hold a lock
+  // on the final key until the row is committed. Without it a second confirm
+  // of the same key could read "not recorded" before the first one committed,
+  // and its copy — of whatever the still-valid signed PUT had put under the
+  // staging key meanwhile — landed on the final key after the first confirm
+  // had answered success: the recorded file changed under its row. Now the
+  // second confirm waits for the first, finds the row, and copies nothing.
+  // Nothing is deleted inside the transaction, and the copy has its own
+  // deadline (`EVIDENCE_COPY_DEADLINE_MS`), so it has ended before the
+  // transaction can time out and let the lock go.
+  let outcome;
   try {
-    recorded = await withTenant(tenantId, (tx) =>
-      tx.evidence.findFirst({ where: { tenantId, r2ObjectKey: finalKey }, select: { id: true } })
-    );
-  } catch (error) {
-    console.warn(`[confirmEvidenceUploadAction] DB error: ${errorMessage(error)}`);
-    return { success: false as const, error: 'save_failed' as const };
-  }
-  if (recorded) {
-    await deleteObjectBytes(objectKey);
-    return { success: false as const, error: 'already_confirmed' as const };
-  }
+    outcome = await withTenant(
+      tenantId,
+      async (tx) => {
+        await tx.$executeRaw`SELECT set_config('lock_timeout', ${CONFIRM_LOCK_WAIT}, true)`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${confirmLockKey(finalKey)})`;
 
-  // What was stored, not what the browser says it stored (B-1/B-3,
-  // TASK-MUNODY0DVDWC5): it must exist, be an allowed type of its key's
-  // extension, within the limit, and begin with that format's bytes.
-  const copied = await copyIncomingObject(objectKey, finalKey);
-  if (!copied.ok) {
-    // A file that is not acceptable stays unacceptable: it is removed. A store
-    // that failed keeps the upload for the next try.
-    if (isFinalUploadRefusal(copied.error)) await deleteObjectBytes(objectKey);
-    return { success: false as const, error: copied.error };
-  }
+        // D-3 (TASK-MUNTTZ94LJWBC): a key already on a row is not copied again,
+        // so a PUT to the staging key after confirm cannot reach the recorded file.
+        const recorded = await tx.evidence.findFirst({ where: { tenantId, r2ObjectKey: finalKey }, select: { id: true } });
+        if (recorded) return { kind: 'recorded' as const };
 
-  let evidence;
-  try {
-    // (tenantId, r2ObjectKey) is unique: of two confirms running at once, the
-    // second insert waits for the first and then fails with P2002.
-    evidence = await withTenant(tenantId, (tx) =>
-      tx.evidence.create({
-        data: {
-          tenantId,
-          title: data.title || data.fileName.replace(/\.[^/.]+$/, ''),
-          category: data.category || 'CAT-03',
-          kind: data.kind || 'certificate',
-          body: extracted.ocrSummary ?? '',
-          description: `Uploaded document: ${data.fileName}`,
-          language: data.language || 'tr',
-          // Only the value the user entered. `extracted` has nothing to add.
-          issuingAuthority: data.issuingAuthority || null,
-          documentNumber: null,
-          validUntil: finalValidUntil,
-          confidentiality: data.confidentiality || 'INTERNAL',
-          // An upload is not a verification. The row says so in the column built for it,
-          // and the list badges it as unverified until someone actually checks it.
-          status: 'UNVERIFIED',
-          r2ObjectKey: finalKey,
-          fileBucket: EVIDENCE_BUCKET,
-          fileName: data.fileName,
-          // What the store holds, never the browser's figures.
-          fileSizeBytes: copied.size,
-          mimeType: copied.contentType,
-          // No public link (B-2): evidence is read through the authenticated
-          // download route, never from a URL anyone holding it can open.
-          fileUrl: null,
-          ocrText: extracted.ocrSummary,
-          extractedFields: {
-            // `extracted: false` is the record that nothing was read off the document,
-            // so a later reader cannot mistake these blanks for a failed extraction.
-            extracted: extracted.extracted,
-            maskedPiiFound: extracted.maskedPiiFound,
+        // What was stored, not what the browser says it stored (B-1/B-3,
+        // TASK-MUNODY0DVDWC5): it must exist, be an allowed type of its key's
+        // extension, within the limit, and begin with that format's bytes.
+        const copied = await copyIncomingObject(objectKey, finalKey);
+        if (!copied.ok) return { kind: 'not_copied' as const, error: copied.error };
+
+        const evidence = await tx.evidence.create({
+          data: {
+            tenantId,
+            title: data.title || data.fileName.replace(/\.[^/.]+$/, ''),
+            category: data.category || 'CAT-03',
+            kind: data.kind || 'certificate',
+            body: extracted.ocrSummary ?? '',
+            description: `Uploaded document: ${data.fileName}`,
+            language: data.language || 'tr',
+            // Only the value the user entered. `extracted` has nothing to add.
+            issuingAuthority: data.issuingAuthority || null,
+            documentNumber: null,
+            validUntil: finalValidUntil,
+            confidentiality: data.confidentiality || 'INTERNAL',
+            // An upload is not a verification. The row says so in the column built for it,
+            // and the list badges it as unverified until someone actually checks it.
+            status: 'UNVERIFIED',
+            r2ObjectKey: finalKey,
+            fileBucket: EVIDENCE_BUCKET,
+            fileName: data.fileName,
+            // What the store holds, never the browser's figures.
+            fileSizeBytes: copied.size,
+            mimeType: copied.contentType,
+            // No public link (B-2): evidence is read through the authenticated
+            // download route, never from a URL anyone holding it can open.
+            fileUrl: null,
+            ocrText: extracted.ocrSummary,
+            extractedFields: {
+              // `extracted: false` is the record that nothing was read off the document,
+              // so a later reader cannot mistake these blanks for a failed extraction.
+              extracted: extracted.extracted,
+              maskedPiiFound: extracted.maskedPiiFound,
+            },
+            tags: extracted.tags,
+            createdBy: userId,
           },
-          tags: extracted.tags,
-          createdBy: userId,
-        },
-      })
+        });
+        return { kind: 'saved' as const, evidence };
+      },
+      { timeout: CONFIRM_TX_TIMEOUT_MS }
     );
   } catch (error) {
     if (errorCode(error) === 'P2002') {
-      // Confirmed by a confirm running alongside. The final object is that
-      // row's file and stays; the staging object is done with.
+      // (tenantId, r2ObjectKey) is unique; the lock makes this unreachable for
+      // confirms, but a row written by another path is still a row.
       await deleteObjectBytes(objectKey);
       return { success: false as const, error: 'already_confirmed' as const };
     }
-    // No success without a row. The staging object stays, so trying again
-    // works; the copy under the final key is left too (D-3 of İNCELEME-77): a
-    // concurrent confirm may have recorded it meanwhile, and the next try
-    // writes the same checked bytes over it.
+    // No success without a row: a failed pre-check, a lock not granted in
+    // time, a failed or timed-out row save. The staging object stays, so
+    // trying again works; a copy under the final key is left too (D-3 of
+    // İNCELEME-77) and the next try writes the same checked bytes over it.
     console.warn(`[confirmEvidenceUploadAction] DB error: ${errorMessage(error)}`);
     return { success: false as const, error: 'save_failed' as const };
   }
+
+  if (outcome.kind === 'recorded') {
+    await deleteObjectBytes(objectKey);
+    return { success: false as const, error: 'already_confirmed' as const };
+  }
+  if (outcome.kind === 'not_copied') {
+    // A file that is not acceptable stays unacceptable: it is removed. A store
+    // that failed keeps the upload for the next try.
+    if (isFinalUploadRefusal(outcome.error)) await deleteObjectBytes(objectKey);
+    return { success: false as const, error: outcome.error };
+  }
+  const evidence = outcome.evidence;
 
   // No claim is created here. Uploading a file is not evidence for any statement,
   // and the rows this used to write ("independently audited", "fully compliant
