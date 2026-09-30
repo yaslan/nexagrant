@@ -1,0 +1,5 @@
+DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55108/fabrika
+U11 ikinci apply 'Nothing to clear' dalı yok (boş yedek yazılır) => KILLED   (Tests 1 failed | 118 passed | 1 skipped (120))  × --apply clears only `rejected:` rows, after a backup of exactly those; a second --apply finds nothing 213ms| FAIL tests/k1-embedding
+U12c profil satırı nesne olarak basılır                => SURVIVED (Tests 119 passed | 1 skipped (120))
+U12b profil metni string olarak basılır                  => KILLED   (Tests 1 failed | 118 passed | 1 skipped (120))  × --apply clears only `rejected:` rows, after a backup of exactly those; a second --apply finds nothing 103ms| FAIL tests/k1-embeddings-unlock
+U12d console.warn ile basılır                            => SURVIVED (Tests 119 passed | 1 skipped (120))
