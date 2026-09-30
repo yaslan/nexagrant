@@ -1833,6 +1833,10 @@
       "pdfTitle": "Resmî PDF / Baskı Şablonu Aç",
       "empty": "Bu filtreye uygun doküman bulunmuyor. Yukarıdaki butonlarla yeni bir doküman üretebilirsiniz."
     },
+    "signRefusal": {
+      "DOC_NOT_FOUND": "Doküman bu çalışma alanında bulunamadı.",
+      "DUAL_APPROVAL_REQUIRED": "Bu doküman hukuki bir taahhüt: doğrudan değil, çift onay akışıyla (önce finans, sonra hukuk) imzalanır. Onaya gönderin."
+    },
     "preview": {
       "close": "Kapat"
     }

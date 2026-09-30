@@ -1833,6 +1833,10 @@
       "pdfTitle": "Open the official PDF / print template",
       "empty": "No document matches this filter. Use the buttons above to generate one."
     },
+    "signRefusal": {
+      "DOC_NOT_FOUND": "The document was not found in this workspace.",
+      "DUAL_APPROVAL_REQUIRED": "This document is a legal commitment: it is signed by the dual approval flow (finance, then legal), not directly. Send it for approval."
+    },
     "preview": {
       "close": "Close"
     }

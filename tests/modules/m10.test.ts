@@ -147,22 +147,31 @@ describe('M10 Follow-up Documents Module', () => {
     );
   });
 
-  test('signDocument updates document signedAt timestamp', async () => {
+  test('signDocument updates document signedAt timestamp for a kind without dual approval', async () => {
+    h.followupDocFindFirst.mockResolvedValue({ id: 'doc-101', kind: 'ESR_DEBRIEF', version: 1, signedAt: null, approvalSteps: [] });
     const res = await signDocument('doc-101');
     expect(res.success).toBe(true);
     expect(res.signedAt).toBeInstanceOf(Date);
-    // The tenant is part of the WHERE clause, not just the id.
+    // The tenant is part of the WHERE clause, not just the id; the version pins the revision read.
     expect(h.followupDocUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'doc-101', tenantId: 'tenant-1' },
+      where: { id: 'doc-101', tenantId: 'tenant-1', version: 1 },
       data: { signedAt: res.signedAt },
     });
   });
 
-  test('signDocument reports failure when the id belongs to another tenant', async () => {
-    h.followupDocUpdateMany.mockResolvedValue({ count: 0 });
+  test('signDocument refuses an NDA outside a finished dual approval flow and writes nothing (İNCELEME-59 Y-4)', async () => {
+    h.followupDocFindFirst.mockResolvedValue({ id: 'doc-101', kind: 'NDA', version: 1, signedAt: null, approvalSteps: [] });
+    const res = await signDocument('doc-101');
+    expect(res).toEqual({ success: false, signedAt: null, refusal: 'DUAL_APPROVAL_REQUIRED' });
+    expect(h.followupDocUpdateMany).not.toHaveBeenCalled();
+  });
+
+  test('signDocument reports failure, with no timestamp, when the id belongs to another tenant', async () => {
+    h.followupDocFindFirst.mockResolvedValue(null);
 
     const res = await signDocument('doc-from-other-tenant');
-    expect(res.success).toBe(false);
+    expect(res).toEqual({ success: false, signedAt: null, refusal: 'DOC_NOT_FOUND' });
+    expect(h.followupDocUpdateMany).not.toHaveBeenCalled();
   });
 
   test('createNewVersion increments document version', async () => {

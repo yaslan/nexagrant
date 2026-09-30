@@ -18,6 +18,7 @@ import {
   type PersistedApproval,
 } from '@/lib/dual-approval';
 import { auth } from '@/lib/auth';
+import { documentKindRequiresDualApproval } from '@/lib/rbac';
 import { emailLocalPart } from '@/lib/user-display';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
@@ -152,24 +153,62 @@ export async function generateStandardDoc(
   return { ...doc, contentText };
 }
 
-export async function signDocument(docId: string) {
+/** Why a direct signature was refused. The client maps these to i18n copy. */
+export type SignDocumentRefusal = 'DOC_NOT_FOUND' | 'DUAL_APPROVAL_REQUIRED';
+
+/** A refused signature carries no timestamp: nothing was signed (İNCELEME-59 Ö-5). */
+export type SignDocumentResult =
+  | { success: true; signedAt: Date }
+  | { success: false; signedAt: null; refusal: SignDocumentRefusal };
+
+/**
+ * Direct signature.
+ *
+ * İNCELEME-59 Y-4: a WRITER could call this on an NDA and write `signedAt`
+ * without anybody from finance or legal having seen it, so the dual approval
+ * flow was optional. For the kinds in `DUAL_APPROVAL_DOCUMENT_KINDS` the
+ * signature is refused until the flow is `APPROVED_AND_SIGNED`; the legal step
+ * has already written `signedAt` then, and that timestamp is kept. Other kinds
+ * are signed directly, as before.
+ */
+export async function signDocument(docId: string): Promise<SignDocumentResult> {
   const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
-  if (!isPresentId(docId)) return { success: false, signedAt: null };
+  if (!isPresentId(docId)) return { success: false, signedAt: null, refusal: 'DOC_NOT_FOUND' };
 
-  // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
-  // unique selector, so a guessed doc id would sign another tenant's document.
-  const signedAt = new Date();
-  const updated = await withTenant<{ count: number }>(tenantId, (tx) =>
-    tx.followupDoc.updateMany({
+  const result = await withTenant<SignDocumentResult>(tenantId, async (tx) => {
+    // Scoped read: a doc id from another tenant must not resolve here.
+    const existing = await tx.followupDoc.findFirst({
       where: { id: docId, tenantId },
-      data: { signedAt }
-    })
-  );
+      select: { ...APPROVAL_SELECT, kind: true, version: true },
+    });
+    if (!existing) return { success: false, signedAt: null, refusal: 'DOC_NOT_FOUND' };
 
-  revalidateDocuments();
+    let signedAt = new Date();
+    if (documentKindRequiresDualApproval(existing.kind)) {
+      const flow = deriveDualApprovalState(toPersisted(existing));
+      if (flow?.stage !== 'APPROVED_AND_SIGNED') {
+        return { success: false, signedAt: null, refusal: 'DUAL_APPROVAL_REQUIRED' };
+      }
+      signedAt = existing.signedAt ?? signedAt;
+    }
 
-  return { success: updated.count > 0, signedAt };
+    // `updateMany` keeps tenantId in the WHERE clause; `update` takes only a
+    // unique selector, so a guessed doc id would sign another tenant's document.
+    // `version` pins the revision read above: a revision made in between drops
+    // the approval steps, and must not be signed on the old ones.
+    const updated = await tx.followupDoc.updateMany({
+      where: { id: existing.id, tenantId, version: existing.version },
+      data: { signedAt },
+    });
+    return updated.count > 0
+      ? { success: true, signedAt }
+      : { success: false, signedAt: null, refusal: 'DOC_NOT_FOUND' };
+  });
+
+  if (result.success) revalidateDocuments();
+
+  return result;
 }
 
 export async function createNewVersion(docId: string) {
