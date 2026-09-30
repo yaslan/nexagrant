@@ -147,7 +147,7 @@ npx vitest run exit=0
 - **Rapor:** `docs/agent-results/TASK-MUNY0O53ITDU4-be-fb.md` + `…-ekler/` (canlı çıktılar, mutant betiği ve çıktısı, kapılar, düzenek betikleri `.txt` olarak)
 
 ## 4. Riskler
-- **Admin plan eylemleri (11 yer, yalnız platform admin):** `toFailure()` `detail` alanına `errorMessage(e)` koyuyor ve arayüz bunu gösteriyor. Ayrıca `requirePlatformAdmin()` bu `try` bloğunun içinde çağrılıyor. Bir redirect ya da notFound fırlatırsa, bu atış `toFailure` tarafından yakalanıp `{ok:false}`'a çevrilebilir. Doğrulamadım, takip kartında bakılmalı.
+- **Admin plan eylemleri (11 yer, yalnız platform admin):** `toFailure()` `detail` alanına `errorMessage(e)` koyuyor ve arayüz bunu gösteriyor. ~~Ayrıca `requirePlatformAdmin()` try içinde; redirect yutulabilir.~~ **Düzeltme (takip kartı TASK-MUNZKR3PEV8EI yazılırken koddan doğrulandı):** `requirePlatformAdmin` redirect değil `PlatformAdminRequiredError` (code `PLATFORM_ADMIN_REQUIRED`) fırlatıyor; `{ok:false}`'a çevrilmesi istenen davranış. Yeni bulgu: `toFailure` `code`'u her hatadan okuduğu için Prisma'nın `P2002` gibi kodları çeviri anahtarı oluyor.
 - **m8 `findCandidates` (1 yer, kiracı kullanıcısı):** `errorMessage(e)` arayüze bilinçli alan mesajları taşıyor (ör. "Seat not found in this workspace."), ama bir Prisma hatası da aynı yoldan geçer. Aynı sınıftan, ORTA. Düzeltmek için alan hataları için ayrı bir sınıf gerekiyor, bu yüzden bu karta sığmadı. İkisi de bekçide sayılı listede; takip kartı önerisi §6.
 - **Gözlem, benim kapsamım dışında:** `evidence/actions.ts` `confirmEvidenceUploadAction` fonksiyonu `UploadRefused` ya da `P2002` dışındaki her DB hatasında `// Mock return if DB offline` diyerek `{ success: true, evidence: { id: 'ev-<ts>' … } }` dönüyor. DB hatası kullanıcıya sahte bir başarı olarak gidiyor. Veri bütünlüğü açısından fe-fb'ye iletilmeli.
 - D-3 süreç içinde tutulduğu için sınır instance sayısıyla çarpılır ve yeniden başlatmada sıfırlanır. Bu bilinerek seçilmiş bir ara çözüm.
@@ -159,7 +159,7 @@ npx vitest run exit=0
 
 ## 6. Sonraki adım
 1. Takip kartı: m8 `findCandidates` alan hataları için ayrı sınıf; varsayılan dal sabit kod dönmeli; bekçi listesinden `m8: 1` silinmeli.
-2. Takip kartı: admin plan `toFailure().detail` sabitlenmeli ve `requirePlatformAdmin()` `try` bloğunun dışına alınmalı; bekçi listesinden silinmeli.
+2. Takip kartı **TASK-MUNZKR3PEV8EI** açıldı: admin plan `toFailure().detail` kaldırılacak, `code` izinli listeyle sınırlanacak; bekçi listesinden silinecek. (m8 için: **TASK-MUNZ7N9IT8VPY**.)
 3. fe-fb'ye bilgi: `confirmEvidenceUploadAction` DB hatasında sahte başarı dönüyor.
 4. İsteğe bağlı: D-3 için `UserRateWindow` DB penceresi.
 
