@@ -1,0 +1,37 @@
+#!/bin/bash
+# cs-fb İNCELEME-79 canlı: yalnız csfb79-pg (:5479). Çerez yazdırılmaz.
+SP=/private/tmp/claude-501/-Users-macbook-alan/8c793703-37d0-48b6-8a19-6afae265f0ee/scratchpad
+C="$(cat $SP/cookie.txt)"; CB="$(cat $SP/cookie-bob.txt)"; B=http://127.0.0.1:47979
+psql() { docker exec csfb79-pg psql -U fabrika -d fabrika -tAc "$1"; }
+call() { printf -- '-- %s %s: ' "$1" "$2"; curl -s -m 30 -X "$1" -H "Cookie: $C" -w '  HTTP %{http_code}\n' "$B$2" | cut -c1-200; }
+LEAK='prisma|invocation|P0001|P20|Evaluation|csfb79|tablo|kolon|Database|column|relation|does not exist'
+echo "== DB: $(psql 'select inet_server_port()') @ csfb79-pg (5432 konteyner içi = host 127.0.0.1:5479)"
+echo "== A) başarılı yollar (enjeksiyon yok)"
+for p in "POST /api/user/export" "POST /api/user/export-data" "GET /api/gdpr/export"; do
+  set -- $p; H=$(curl -s -m 30 -X $1 -H "Cookie: $C" -D - -o $SP/exp.json "$B$2")
+  echo "-- $1 $2: $(echo "$H" | head -1 | tr -d '\r') | $(echo "$H" | grep -i '^content-disposition' | tr -d '\r' | sed 's/filename=.*/filename=…/') | gövde $(wc -c < $SP/exp.json) bayt, anahtarlar: $(node -e 'const d=require(process.argv[1]);console.log(Object.keys(d).slice(0,6).join(","))' $SP/exp.json)"
+done
+call POST /api/user/request-deletion
+echo "   DB deletionRequestedAt dolu mu: $(psql "select \"deletionRequestedAt\" is not null from \"User\" where id='demo-user-alice'")"
+call GET /api/user/request-deletion
+call DELETE /api/user/request-deletion
+call DELETE /api/gdpr/delete
+call DELETE /api/user/request-deletion
+echo "   DB deletionRequestedAt (iptal sonrası): $(psql "select coalesce(\"deletionRequestedAt\"::text,'null') from \"User\" where id='demo-user-alice'")"
+echo "-- oturumsuz 401'ler:"; for p in "POST /api/user/export" "POST /api/user/export-data" "GET /api/gdpr/export" "DELETE /api/gdpr/delete" "POST /api/user/request-deletion" "DELETE /api/user/request-deletion"; do set -- $p; printf '   %s %s → ' $1 $2; curl -s -m 20 -X $1 -w ' HTTP %{http_code}\n' "$B$2"; done
+echo "== B) fault 1: Evaluation tablosu yeniden adlandırıldı"
+psql 'ALTER TABLE "Evaluation" RENAME TO "Evaluation_csfb79"'
+OUT1=$( { call POST /api/user/export; call POST /api/user/export-data; call GET /api/gdpr/export; } ); echo "$OUT1"
+psql 'ALTER TABLE "Evaluation_csfb79" RENAME TO "Evaluation"' >/dev/null && echo "   (geri alındı)"
+echo "== C) fault 2: User BEFORE UPDATE trigger 'csfb79-internal-detail: tablo=User kolon=deletedAt'"
+psql "CREATE OR REPLACE FUNCTION csfb79_boom() RETURNS trigger LANGUAGE plpgsql AS \$\$ BEGIN RAISE EXCEPTION 'csfb79-internal-detail: tablo=User kolon=deletedAt'; END \$\$; CREATE TRIGGER csfb79_boom BEFORE UPDATE ON \"User\" FOR EACH ROW EXECUTE FUNCTION csfb79_boom();" >/dev/null
+OUT2=$( { call POST /api/user/request-deletion; call DELETE /api/gdpr/delete; call DELETE /api/user/request-deletion; } ); echo "$OUT2"
+psql 'DROP TRIGGER csfb79_boom ON "User"; DROP FUNCTION csfb79_boom();' >/dev/null && echo "   (geri alındı)"
+echo "== D) throw → Next 500: getDeletionStatus try/catch'siz; User.deletionRequestedAt kolonu yeniden adlandırıldı"
+psql 'ALTER TABLE "User" RENAME COLUMN "deletionRequestedAt" TO "dra_csfb79"'
+printf -- '-- GET /api/user/request-deletion: '; OUT3=$(curl -s -m 30 -H "Cookie: $C" -D $SP/h3.txt -w '  HTTP %{http_code}' "$B/api/user/request-deletion"); echo "$OUT3 | ctype=$(grep -i '^content-type' $SP/h3.txt | tr -d '\r' | cut -d' ' -f2-) | gövde uzunluğu=$(printf %s "$OUT3" | sed 's/  HTTP.*//' | wc -c)"
+psql 'ALTER TABLE "User" RENAME COLUMN "dra_csfb79" TO "deletionRequestedAt"' >/dev/null && echo "   (geri alındı)"
+echo "== sızıntı taraması (B+C+D gövdeleri, /$LEAK/i): $(printf '%s\n%s\n%s\n' "$OUT1" "$OUT2" "$OUT3" | grep -ciE "$LEAK") eşleşme"
+echo "== 500 sayısı B+C: $(printf '%s\n%s\n' "$OUT1" "$OUT2" | grep -c 'HTTP 500')/6, D: $(echo "$OUT3" | grep -c 'HTTP 500')/1"
+echo "== sunucu log'unda ayrıntı: does-not-exist=$(grep -c 'does not exist' $SP/server.log) csfb79-internal-detail=$(grep -c 'csfb79-internal-detail' $SP/server.log) dra_csfb79/deletionRequestedAt=$(grep -cE 'deletionRequestedAt' $SP/server.log)"
+echo "== temizlik: trigger=$(psql "select count(*) from pg_trigger where tgname='csfb79_boom'") Evaluation=$(psql "select to_regclass('public.\"Evaluation\"') is not null") kolon=$(psql "select count(*) from information_schema.columns where table_name='User' and column_name='deletionRequestedAt'") alice.dRA=$(psql "select coalesce(\"deletionRequestedAt\"::text,'null') from \"User\" where id='demo-user-alice'")"

@@ -1,0 +1,6 @@
+#!/bin/bash
+SP=/private/tmp/claude-501/-Users-macbook-alan/8c793703-37d0-48b6-8a19-6afae265f0ee/scratchpad
+cd $SP/wt79 && set -a && source .env && set +a
+export PORT=47979 HOSTNAME=127.0.0.1 NODE_ENV=production AUTH_URL=http://127.0.0.1:47979 AUTH_TRUST_HOST=true
+[ -n "$WHSEC" ] && export STRIPE_WEBHOOK_SECRET="$WHSEC"
+exec node --import $SP/nosedia.mjs .next/standalone/server.js

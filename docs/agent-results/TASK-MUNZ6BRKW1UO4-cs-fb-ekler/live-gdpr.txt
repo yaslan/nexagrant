@@ -1,0 +1,38 @@
+== DB:  @ csfb79-pg (5432 konteyner içi = host 127.0.0.1:5479)
+== A) başarılı yollar (enjeksiyon yok)
+-- POST /api/user/export: HTTP/1.1 200 OK | content-disposition: attachment; filename=… | gövde     4843 bayt, anahtarlar: timestamp,tenant,notice,tables
+-- POST /api/user/export-data: HTTP/1.1 200 OK | content-disposition: attachment; filename=… | gövde     4843 bayt, anahtarlar: timestamp,tenant,notice,tables
+-- GET /api/gdpr/export: HTTP/1.1 200 OK | content-disposition: attachment; filename=… | gövde     4843 bayt, anahtarlar: timestamp,tenant,notice,tables
+-- POST /api/user/request-deletion: {"status":"pending","deletedAt":"2026-10-30T10:51:14.288Z"}  HTTP 200
+   DB deletionRequestedAt dolu mu: t
+-- GET /api/user/request-deletion: {"pending":true,"requestedAt":"2026-09-30T10:51:14.288Z","purgeAt":"2026-10-30T10:51:14.288Z"}  HTTP 200
+-- DELETE /api/user/request-deletion: {"status":"active"}  HTTP 200
+-- DELETE /api/gdpr/delete: {"success":true,"status":"pending","deletedAt":"2026-10-30T10:51:16.558Z"}  HTTP 200
+-- DELETE /api/user/request-deletion: {"status":"active"}  HTTP 200
+   DB deletionRequestedAt (iptal sonrası): null
+-- oturumsuz 401'ler:
+   POST /api/user/export → {"error":"Unauthorized"} HTTP 401
+   POST /api/user/export-data → {"error":"Unauthorized"} HTTP 401
+   GET /api/gdpr/export → {"error":"Unauthorized"} HTTP 401
+   DELETE /api/gdpr/delete → {"error":"Unauthorized"} HTTP 401
+   POST /api/user/request-deletion → {"error":"Unauthorized"} HTTP 401
+   DELETE /api/user/request-deletion → {"error":"Unauthorized"} HTTP 401
+== B) fault 1: Evaluation tablosu yeniden adlandırıldı
+ALTER TABLE
+-- POST /api/user/export: {"error":"export_failed"}  HTTP 500
+-- POST /api/user/export-data: {"error":"export_failed"}  HTTP 500
+-- GET /api/gdpr/export: {"error":"export_failed"}  HTTP 500
+   (geri alındı)
+== C) fault 2: User BEFORE UPDATE trigger 'csfb79-internal-detail: tablo=User kolon=deletedAt'
+-- POST /api/user/request-deletion: {"error":"request_failed"}  HTTP 500
+-- DELETE /api/gdpr/delete: {"error":"request_failed"}  HTTP 500
+-- DELETE /api/user/request-deletion: {"error":"cancel_failed"}  HTTP 500
+   (geri alındı)
+== D) throw → Next 500: getDeletionStatus try/catch'siz; User.deletionRequestedAt kolonu yeniden adlandırıldı
+ALTER TABLE
+-- GET /api/user/request-deletion:   HTTP 500 | ctype= | gövde uzunluğu=       0
+   (geri alındı)
+== sızıntı taraması (B+C+D gövdeleri, /prisma|invocation|P0001|P20|Evaluation|csfb79|tablo|kolon|Database|column|relation|does not exist/i): 0 eşleşme
+== 500 sayısı B+C: 6/6, D: 1/1
+== sunucu log'unda ayrıntı: does-not-exist=4 csfb79-internal-detail=6 dra_csfb79/deletionRequestedAt=1
+== temizlik: trigger=0 Evaluation=t kolon=1 alice.dRA=null
