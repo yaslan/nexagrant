@@ -1,0 +1,9 @@
+D1 {"noSession":401,"memberRole":403,"otherTenantKey":403,"noKey":403,"traversal":403,"htmlType":415,"htmlKey":415,"declaredTooBig":413,"chunkedTooBig":413,"htmlBytesPdfType":200}
+D1 confirm of html bytes via dev store -> {"success":false,"error":"unsupported_type"} stat after: null
+D1 good PUT 200 confirm true
+D2 dev download 200 {"cache-control":"private, no-store","content-disposition":"attachment; filename=\"belge.pdf\"","content-length":"21","content-security-policy":"default-src 'none'; sandbox","content-type":"application/octet-stream","x-content-type-options":"nosniff"}
+D2 other tenant dev download 404
+D2 anon dev download 401
+ ✓ tests/zz-devfb66-devstore.live.test.ts > DEV STORE > D1 mock-upload refusals 193ms
+ Test Files  1 passed (1)
+      Tests  1 passed (1)

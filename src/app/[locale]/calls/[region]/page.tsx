@@ -22,11 +22,19 @@ interface PageProps {
   }>;
 }
 
-export async function generateStaticParams() {
-  return Object.keys(REGIONS).map((region) => ({
-    region,
-  }));
-}
+/**
+ * Rendered per request, never prerendered (TASK-MUNRB2037NA5V, İNCELEME-57 Ö-2).
+ *
+ * This route used to export `generateStaticParams`, which made it the app's one
+ * SSG (●) route. Nothing was actually prerendered — the params carried no
+ * `locale` — so every region URL was generated on first request as a static
+ * page, and the root layout's `cookies()`/`headers()` (the theme, src/app/layout.tsx)
+ * threw `DYNAMIC_SERVER_USAGE`: a 500 on /tr/calls/germany and every other region.
+ * A static page could not work here anyway: the CSP nonce set by src/proxy.ts
+ * changes on every request and is only stamped on scripts during a dynamic render,
+ * and the list ("open, deadline still ahead") is live data.
+ */
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { region, locale } = await params;

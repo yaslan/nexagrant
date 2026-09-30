@@ -2,10 +2,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ConceptNoteEditor from './editor';
 import { errorMessage } from '@/lib/errors';
-import type { ConceptTemplateSchema } from '@/modules/m2/types';
 import { moduleGate } from '@/lib/modules/guard';
 import { requireTenantPage } from '@/lib/tenant';
-import { loadConceptNoteDetail, type ConceptNoteDetailData } from './data';
+import { editorSections, loadConceptNoteDetail, type ConceptNoteDetailData } from './data';
 
 /**
  * One concept note (M2).
@@ -45,14 +44,6 @@ export default async function ConceptNoteDetailPage({
 
   const { note, template, opportunity } = data;
 
-  const schema = (template?.schema || {
-    sections: [
-      { key: 'excellence', labelKey: 'Excellence & Innovation', maxWords: 1000 },
-      { key: 'impact', labelKey: 'Expected Impact', maxWords: 800 },
-      { key: 'implementation', labelKey: 'Implementation Plan', maxWords: 600 },
-    ],
-  }) as ConceptTemplateSchema;
-
   return (
     <div className="max-w-[1400px] mx-auto py-6 px-4">
       <div className="flex items-center justify-between gap-4 mb-6">
@@ -84,7 +75,7 @@ export default async function ConceptNoteDetailPage({
       <ConceptNoteEditor
         noteId={note.id}
         opportunityTitle={opportunity?.title || 'Untitled Opportunity'}
-        sections={schema.sections}
+        sections={editorSections(template)}
         initialContent={(note.content || {}) as Record<string, string>}
         status={note.status}
         version={note.version}

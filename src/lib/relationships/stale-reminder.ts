@@ -1,4 +1,5 @@
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { getEntitlements } from '@/lib/billing';
 import { getPilotState, assertTenantWritable } from '@/lib/billing/pilot';
 import { canAccessStatus } from '@/lib/modules/state-machine';
@@ -27,6 +28,11 @@ import { renderStaleRelationshipsEmail, type StaleDigestSection } from '@/lib/em
  * is rejected. A worker killed between claim and stamp costs that user one
  * day's digest (the unstamped rows go out the next morning); it never sends a
  * second one the same day.
+ *
+ * The day is the USER's, not a tenant's (İNCELEME-56 Y-1): once the claims are
+ * in, a claim for the same day on any OTHER membership of the user — made by an
+ * earlier run through a tenant this run skips (pilot over, M4 closed, the
+ * tenant's read failing) — gives this run's claims back and sends nothing.
  *
  * Skipped, and counted:
  *   - a tenant whose free pilot has run out (read-only: nothing is stamped, so
@@ -242,6 +248,27 @@ async function claimDigest(
   });
 }
 
+/**
+ * Whether `userId`'s day is already claimed on a membership outside `claimedNow`
+ * (the tenants this run has just claimed). Read after the claims, never before,
+ * so of two runs claiming disjoint tenants at the same time at least one sees
+ * the other and stands down; both may, which costs the user one day's digest
+ * and never sends two.
+ *
+ * Cross-tenant by nature — the one question here with no tenant to scope to —
+ * so it goes through the system scope: one membership, by user, one column.
+ */
+async function claimedElsewhere(userId: string, claimedNow: readonly string[], now: Date): Promise<boolean> {
+  if (!isPresentId(userId)) return true;
+  const other = await withSystemScope('cross-tenant-job', 'm4-stale.claimedElsewhere', (tx) =>
+    tx.membership.findFirst({
+      where: { userId, tenantId: { notIn: [...claimedNow] }, staleDigestOn: { gte: dayStartUtc(now) } },
+      select: { tenantId: true },
+    })
+  );
+  return other !== null;
+}
+
 /** Gives a claim back after a rejected send, so a later run the same day may try again. */
 async function releaseDigest(
   tenantId: string,
@@ -414,6 +441,7 @@ export async function sendStaleRelationshipReminders(options: {
         }
         claims.push({ tenantId: s.tenantId, previous: c.previous });
       }
+      if (claimed && (await claimedElsewhere(userId, claims.map((c) => c.tenantId), now))) claimed = false;
     } catch (error) {
       out.digestsFailed++;
       out.errors.push({ scope: 'digest', reason: errorMessage(error) });
@@ -421,7 +449,8 @@ export async function sendStaleRelationshipReminders(options: {
       continue;
     }
     if (!claimed) {
-      // Another run claimed this user's day after this one read it.
+      // Another run claimed this user's day: after this one read it, or in a
+      // tenant this run skipped (İNCELEME-56 Y-1).
       out.skippedMailedToday++;
       out.relationshipsDue -= sections.reduce((n, s) => n + s.due.length, 0);
       await release();
