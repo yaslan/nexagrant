@@ -1,0 +1,18 @@
+CM1 legacyClaims yalnız vadeli sahibi olan kiracıda (ilk taslak): exit=1 Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+    - M4 stale relationship reminder (live, fabrika_app) > a claim the previous release wrote on a membership today holds; yesterday's does not (İ
+CM2 legacy gte -> lt (dünkü claim tutar, bugünkü tutmaz): exit=1 Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+    - M4 stale relationship reminder (live, fabrika_app) > a claim the previous release wrote on a membership today holds; yesterday's does not (İ
+    - M4 stale relationship reminder (live, fabrika_app) > a rejected send gives back only its own day: a later day claimed meanwhile stays (İNCEL
+    - M4 stale relationship reminder (live, fabrika_app) > the day is the UTC day in any process time zone: +14 claims the UTC day, and the next U
+    - M4 stale relationship reminder (live, fabrika_app) > the day is the UTC day in any process time zone: −11 sends no second digest the same UT
+CM3 legacy günü now yerine duvar saati: exit=1 Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+    - M4 stale relationship reminder (live, fabrika_app) > a claim the previous release wrote on a membership today holds; yesterday's does not (İ
+    - M4 stale relationship reminder (live, fabrika_app) > a rejected send gives back only its own day: a later day claimed meanwhile stays (İNCEL
+    - M4 stale relationship reminder (live, fabrika_app) > the day is the UTC day in any process time zone: +14 claims the UTC day, and the next U
+    - M4 stale relationship reminder (live, fabrika_app) > the day is the UTC day in any process time zone: −11 sends no second digest the same UT
+CM4 legacy set, filtre döngüsünden SONRA mailedToday'e eklenir: exit=1 Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+    - M4 stale relationship reminder (live, fabrika_app) > a claim the previous release wrote on a membership today holds; yesterday's does not (İ
+CM5 legacyClaims tenantId filtresi yok (RLS'e güven): exit=0 Tests 24 passed (24)
+CM6 legacyClaims yalnız ilk tenant sayfası (legacy her sayfada sıfırlanır): exit=1 Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+    - M4 stale relationship reminder (live, fabrika_app) > a claim the previous release wrote on a membership today holds; yesterday's does not (İ
+git status: ?? seed.ts

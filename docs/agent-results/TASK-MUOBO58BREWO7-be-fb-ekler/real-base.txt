@@ -1,0 +1,15 @@
+PATH                                                   CODE  CTYPE                   CSP  SCR  CACHE
+/logo.png                                              200   image/png               0    0    public, max-age=0
+/next.svg                                              200   image/svg+xml           0    0    public, max-age=0
+/file.svg                                              200   image/svg+xml           0    0    public, max-age=0
+/globe.svg                                             200   image/svg+xml           0    0    public, max-age=0
+/vercel.svg                                            200   image/svg+xml           0    0    public, max-age=0
+/window.svg                                            200   image/svg+xml           0    0    public, max-age=0
+/favicon.ico                                           200   image/x-icon            0    0    public, max-age=0, must-revalidate
+/_next/static/chunks/033lhlaibp3gl.css                 200   text/css                0    0    public, max-age=31536000, immutable
+/_next/static/chunks/07lrto610w_qf.js                  200   application/javascript  0    0    public, max-age=31536000, immutable
+/_next/static/chunks/0cz1d0mv5g_q7.js                  200   application/javascript  0    0    public, max-age=31536000, immutable
+/_next/static/chunks/0ffxn1zm_81d2.js                  200   application/javascript  0    0    public, max-age=31536000, immutable
+/_next/static/6E5HyuFzr7VjGb5t30W22/_buildManifest.js  200   application/javascript  0    0    public, max-age=31536000, immutable
+/_next/static/media/favicon.2vob68tjqpejf.ico          200   image/x-icon            0    0    public, max-age=31536000, immutable
+/_next/image?url=%2Flogo.png&w=64&q=75                 200   image/png               1    0    public, max-age=14400, must-revalidate

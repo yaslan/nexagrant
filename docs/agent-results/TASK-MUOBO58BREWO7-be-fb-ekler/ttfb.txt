@@ -1,0 +1,9 @@
+path                                         taban med/p95 ms    yeni med/p95 ms
+/logo.png                                      0.98/   1.46      0.98/   1.38
+/favicon.ico                                   1.29/   2.10      1.29/   2.17
+/_next/static/chunks/0cz1d0mv5g_q7.js          0.98/   1.69      0.96/   1.53
+/_next/image?url=%2Flogo.png&w=64&q=75         1.15/   1.74      1.17/   1.59
+/yok.png                                       5.02/   8.23      4.95/   8.46
+/Logo.png                                      4.82/   9.43      5.44/  10.87
+/_next/Image                                   3.00/   5.54      3.53/   6.48
+/tr/login                                      7.50/  11.76      7.33/  11.07
