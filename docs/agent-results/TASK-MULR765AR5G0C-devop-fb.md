@@ -3,8 +3,7 @@
 **Durum: TAMAM** — B-1, Y-1 ve Y-3 kapandı. Y-2 yorumu güncellendi. Kanıtlar gerçek Postgres'te, gerçek HTTP'de ve önünde gerçek nginx 1.30.5 varken alındı.
 
 Kaynak: `docs/agent-results/TASK-MUN7B6OO32BS4-crw-fb.md` (İNCELEME-50).
-Commit'ler (worktree'de yazıldı, dev'e cherry-pick edildi; hash'ler dev'deki karşılıkları, §7'de):
-`cc48d8dd` iskelet · `ef2e58c0` düzeltme · `d53db6ad` canlı testler · son rapor commit'i §7'de.
+Commit'ler (dev): `83c1e8ef` iskelet · `20940f42` düzeltme · `30c12233` canlı testler · `f0178392` rapor/kanıt (+ bu hash güncellemesi).
 
 ## 1. Ne yapıldı
 
@@ -179,11 +178,12 @@ Build'deki tek uyarı `src/instrumentation.ts:18`'deki `process.exit` (Edge runt
 - cs-fb: `processing-register.md` §18d'deki süre satırını "karar 29.09.2026, 12 ay" olarak kesinleştirsin (Y-2'nin kalan yarısı).
 - crw-fb: yeniden inceleme. `lead-xff-e2e.mjs` artık A'da `…,rate_limited,rate_limited` basıyor.
 - Deploy: `TRUSTED_PROXY_HOPS` varsayılanı 1 olduğu için env eklemeden de doğru çalışır.
-  - **Geri alma:** `git revert ef2e58c0 d53db6ad` (dev karşılıkları §7'de). DB değişikliği yok, migration yok.
+  - **Geri alma:** `git revert 30c12233 20940f42` (dev). DB değişikliği yok, migration yok.
   - **İzleme:** yayından sonra `PublicLead` satırlarının saatlik `count(DISTINCT "ipHash")` / `count(*)` oranına bak. 1'e yakınsa her istek ayrı IP'den geliyor, bu da `TRUSTED_PROXY_HOPS`'un az ayarlandığını gösterir. Bir IP'nin sürekli 10'da takılması ise fazla ayarlandığını ya da tüm trafiğin proxy IP'sine düştüğünü gösterir.
 
 ## 7. Commit'ler ve platform
-- Worktree commit'leri: `cc48d8dd` (iskelet, dev'e ayrıca cherry-pick edildi) · `ef2e58c0` · `d53db6ad` · rapor/kanıt commit'i.
-- Dev karşılıkları: cherry-pick sonrası `git log` ile aşağıya işlendi.
+- dev: `83c1e8ef` iskelet · `20940f42` fix(leads) · `30c12233` test(leads) · `f0178392` rapor + kanıt · ardından bu hash güncellemesi.
+- Worktree (ayrık, `c5e22a6e` tabanı) karşılıkları: `cc48d8dd` · `ef2e58c0` · `d53db6ad` · `03eb97ee`; dev'e cherry-pick, çakışma yok.
+- Sonuç yolu notu: kart gövdesi `docs/agent-results/TASK-MULR765AR5G0C-devop-fb.md` (FONBRIDGE reposu) diyor, KANIT sarmalayıcısı `/Users/macbook/alan/docs/agent-results/…` (repo dışı kök) diyor. Asıl rapor repoda; kök yola aynı içeriğin kopyası konuldu (git dışı).
 
 **Platform beyanı:** Doğrulama **mac**'te yapıldı (Darwin 27, Docker Desktop; nginx 1.30.5 ve Caddy 2.11.4 Linux konteynerleri). Değişen kod platformdan bağımsız: yalnız başlık metni ayrıştırılıyor ve env okunuyor. Dosya yolu, süreç ya da kabuk yok. Linux prod'da davranışı belirleyen şey işletim sistemi değil proxy topolojisi; nginx ve Caddy Linux konteynerinde koşturuldu. Windows koşulamadı ve kapsam dışı: FONBRIDGE Windows'ta dağıtılmıyor, kod yolunda da platforma bağlı bir dal yok.
