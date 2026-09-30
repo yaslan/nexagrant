@@ -6,8 +6,9 @@
  * message went on screen, and a Prisma `P2002` became the translation key
  * `adminPlans.errors.P2002`, which does not exist. Now it is exactly
  * `{ ok: false, code }` with `code` from PLAN_FAILURE_CODES, and every code has
- * a sentence in both languages. The source guard trusts `planFailure` by name
- * (tests/api/response-status-scan.ts), so this file is what holds it to that.
+ * a sentence in both languages. The source guard (tests/api/action-leak-scan.ts)
+ * judges `planFailure` by its body and trusts `planFailureCode` by import, so
+ * this file is what holds the codes themselves to that.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import tr from '../../../../../../messages/tr.json';
@@ -24,7 +25,12 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
-vi.mock('@/lib/tenant', () => ({ requirePlatformAdmin: h.admin }));
+// İNCELEME-94 Ö-1: the real module, so the refusal below is the real error
+// class with its real `code`; only the session check is replaced.
+vi.mock('@/lib/tenant', async (importActual) => ({
+  ...(await importActual<typeof import('@/lib/tenant')>()),
+  requirePlatformAdmin: h.admin,
+}));
 
 vi.mock('@/lib/billing/plan-repository', async (importActual) => ({
   ...(await importActual<typeof import('@/lib/billing/plan-repository')>()),
@@ -54,6 +60,8 @@ import {
   NoPublishedVersionError,
 } from '@/lib/billing/plan-repository';
 import { ContractSubscriptionError } from '@/lib/billing/pilot';
+import { PlatformAdminRequiredError } from '@/lib/tenant';
+import * as repository from '@/lib/billing/plan-repository';
 import * as actions from './actions';
 import { PLAN_FAILURE_CODES } from './failure-codes';
 
@@ -81,10 +89,6 @@ function prismaError() {
   });
 }
 
-class PlatformAdminRequired extends Error {
-  readonly code = 'PLATFORM_ADMIN_REQUIRED';
-}
-
 beforeEach(() => {
   vi.restoreAllMocks();
   h.admin.mockReset().mockResolvedValue({ userId: 'admin-1' });
@@ -110,7 +114,7 @@ describe('admin plan actions — failure shape', () => {
   });
 
   it.each(Object.keys(CALLS))('%s: a non-admin gets PLATFORM_ADMIN_REQUIRED and nothing else', async (name) => {
-    h.admin.mockRejectedValue(new PlatformAdminRequired('Unauthorized: platform admin required.'));
+    h.admin.mockRejectedValue(new PlatformAdminRequiredError());
     const res = await CALLS[name]!();
     expect(res).toStrictEqual({ ok: false, code: 'PLATFORM_ADMIN_REQUIRED' });
     expect(logger.error).not.toHaveBeenCalled();
@@ -135,11 +139,47 @@ describe('admin plan actions — failure shape', () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  it('the refusal code comes from the real PlatformAdminRequiredError', () => {
+    expect(new PlatformAdminRequiredError().code).toBe('PLATFORM_ADMIN_REQUIRED');
+    expect(PLAN_FAILURE_CODES).toContain(new PlatformAdminRequiredError().code);
+  });
+
   it('a thrown string or a bare object with a foreign code is UNKNOWN', async () => {
     for (const e of ['boom', { code: 'ECONNREFUSED' }, { code: 42 }, null]) {
       h.thrown = e;
       expect(await actions.deletePlanAction('plan-1')).toStrictEqual({ ok: false, code: 'UNKNOWN' });
     }
+  });
+});
+
+describe('setVisibilityAction — the value is checked at run time (İNCELEME-94 G-1)', () => {
+  beforeEach(() => {
+    vi.mocked(repository.setPlanVisibility).mockReset().mockResolvedValue(undefined);
+  });
+
+  it.each(['crw94', '', 'PUBLIC', 'public ', 'deleted'])('%j is refused before the repository', async (v) => {
+    const res = await actions.setVisibilityAction('plan-1', v as never);
+    expect(res).toStrictEqual({ ok: false, code: 'INVALID_VISIBILITY' });
+    expect(repository.setPlanVisibility).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it.each([null, undefined, 42, { toString: () => 'public' }])('a non-string %j is refused too', async (v) => {
+    expect(await actions.setVisibilityAction('plan-1', v as never)).toStrictEqual({ ok: false, code: 'INVALID_VISIBILITY' });
+    expect(repository.setPlanVisibility).not.toHaveBeenCalled();
+  });
+
+  it.each(['public', 'private', 'archived'] as const)('%s reaches the repository', async (v) => {
+    expect(await actions.setVisibilityAction('plan-1', v)).toStrictEqual({ ok: true });
+    expect(repository.setPlanVisibility).toHaveBeenCalledWith('plan-1', v, 'admin-1');
+  });
+
+  it('a non-admin learns only that it is not an admin, whatever the value', async () => {
+    h.admin.mockRejectedValue(new PlatformAdminRequiredError());
+    expect(await actions.setVisibilityAction('plan-1', 'crw94' as never)).toStrictEqual({
+      ok: false,
+      code: 'PLATFORM_ADMIN_REQUIRED',
+    });
   });
 });
 
@@ -154,6 +194,18 @@ describe('admin plan failure codes — translations', () => {
     for (const code of PLAN_FAILURE_CODES) {
       expect(errors(messages)[code], code).toEqual(expect.any(String));
       expect(errors(messages)[code], code).not.toMatch(/\{/);
+    }
+  });
+
+  // İNCELEME-94 Ö-2: a code is a key this product names, never a driver's code.
+  // Before this, listing `P2002` together with a sentence in both catalogues
+  // would have passed every test above.
+  it('no code is a Prisma, Postgres or Node error code', () => {
+    for (const code of PLAN_FAILURE_CODES) {
+      expect(code, code).toMatch(/^[A-Z]+(?:_[A-Z]+)*$/);
+      expect(code, code).not.toMatch(/^P\d{4}$/); // Prisma: P2002
+      expect(code, code).not.toMatch(/^[0-9A-Z]{5}$/); // SQLSTATE: 23505, 57P01
+      expect(code, code).not.toMatch(/^E[A-Z]+$/); // Node: ENOENT, ECONNREFUSED
     }
   });
 });
