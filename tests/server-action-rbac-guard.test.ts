@@ -2013,7 +2013,7 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
           "      if (!can(asRole(scope.role), 'manage_users')) return { ok: false as const, error: 'forbidden' as const };\n" +
             after,
         );
-      only(profile, mutant, 'updateTenantProvince', 'writes before any role check covers them: tx.tenant.update');
+      only(profile, mutant, 'updateTenantProfile', 'writes before any role check covers them: tx.tenantProfile.update (line 62); tx.tenantProfile.create (line 71); tx.auditEvent.create (line 84)');
     });
 
     it('G7: an action exported through `export { … }`', () => {
