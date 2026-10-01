@@ -14,6 +14,7 @@ import { setRegistrationProvinceCookie } from '@/lib/registration-province-cooki
 import { setRegistrationReadinessCookie } from '@/lib/registration-readiness-cookie';
 import { clearInvitationAcceptCookie, readParkedInvitation } from '@/lib/invitations/accept-cookie';
 import { acceptInvitation } from '@/lib/invitations/accept';
+import { landingPathFor } from '@/lib/landing';
 
 /**
  * Server actions of the accept screen (TASK-MUN2793A57Z9I). The token never
@@ -27,11 +28,6 @@ function safeLocale(locale: string): 'tr' | 'en' {
 
 function continuePath(locale: 'tr' | 'en'): string {
   return `/${locale}/accept-invite/continue`;
-}
-
-/** Where the person lands after joining — the same default the sign-in screen uses. */
-function workspacePath(locale: 'tr' | 'en'): string {
-  return `/${locale}/default/dashboard`;
 }
 
 /**
@@ -93,7 +89,9 @@ export async function acceptInvitationAction(locale: string): Promise<{ error: s
   } catch (error) {
     console.error(`[AcceptInvite] session rebind failed: ${error instanceof Error ? error.name : 'unknown'}`);
   }
-  redirect(workspacePath(lang));
+  // The first screen follows the role: the dashboard is for pipeline managers and above
+  // (QA Y-1, TASK-MUPUGXME9DP6K); a member or writer lands where they can work.
+  redirect(landingPathFor(outcome.role, lang));
 }
 
 /** Signed in with the wrong account: sign out and come back here, invitation still parked. */

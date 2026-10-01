@@ -3,7 +3,8 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { auth } from '@/lib/auth';
-import { can } from '@/lib/rbac';
+import { asRole, can } from '@/lib/rbac';
+import { landingPathFor } from '@/lib/landing';
 import { Role } from '@prisma/client';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { Dashboard } from '@/modules/m5/ui/Dashboard';
@@ -44,7 +45,7 @@ export default async function DashboardPage({
   params: Promise<{ locale: string; workspace: string }>;
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
-  const { locale } = await params;
+  const { locale, workspace } = await params;
   const { from, to } = await searchParams;
   const t = await getTranslations('Dashboard');
 
@@ -63,6 +64,12 @@ export default async function DashboardPage({
 
   // Authorization: pipeline manager and above (plan/module gating happens upstream).
   if (!can(userRole, 'evaluate_gates')) {
+    // The sign-in default is this page for every role (AuthCard), so a member or
+    // writer is sent on to the screen their role can open instead of a refusal
+    // (QA Y-1, TASK-MUPUGXME9DP6K). The gate itself is unchanged; a role the
+    // table does not know still gets the refusal.
+    const known = asRole(userRole);
+    if (known) redirect(landingPathFor(known, locale, workspace));
     return <Notice title={t('accessDeniedTitle')} body={t('accessDeniedBody')} />;
   }
 

@@ -49,8 +49,20 @@ describe('dashboard without a tenant', () => {
     expect(redirect).toHaveBeenCalledWith('/tr/no-workspace');
   });
 
-  it('a member whose role is too low still gets the role refusal', async () => {
-    const el = await render({ user: { id: 'u1' }, tenantId: 't1', role: 'MEMBER' });
+  it('a member whose role is too low is sent to the screen their role can open, not refused (QA Y-1)', async () => {
+    await expect(render({ user: { id: 'u1' }, tenantId: 't1', role: 'MEMBER' })).rejects.toThrow(
+      'NEXT_REDIRECT:/tr/default/firsatlar'
+    );
+    await expect(render({ user: { id: 'u1' }, tenantId: 't1', role: 'WRITER' })).rejects.toThrow(
+      'NEXT_REDIRECT:/tr/default/firsatlar'
+    );
+    await expect(render({ user: { id: 'u1' }, tenantId: 't1', role: 'GUEST_PARTNER' })).rejects.toThrow(
+      'NEXT_REDIRECT:/tr/default/bildirimler'
+    );
+  });
+
+  it('a role the table does not know still gets the role refusal', async () => {
+    const el = await render({ user: { id: 'u1' }, tenantId: 't1', role: 'LEGACY_ROLE' });
     expect(redirect).not.toHaveBeenCalled();
     expect(noticeTitle(el)).toBe('accessDeniedTitle');
   });
