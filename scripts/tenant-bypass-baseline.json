@@ -52,6 +52,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/auth.ts",
+      "subject": "system-scope:tenant-discovery",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "tenant-discovery",
+      "reason": "The Auth.js jwt callback re-reads the signed-in user's memberships on every call (TASK-MUNQB0GR306U0) to put tenantId, role and workspaceIds on the token. This read is what DISCOVERS the tenant, so there is no app.tenant_id to scope it with. Measured under fabrika_app (TASK-MUPYHVSBW47GD#auth, live Supabase): the unscoped read returned zero Membership rows, so every session was tenantless and every user landed on /no-workspace with no role. The read stays bound to the user: User by id, and the memberships relation filter is \"Membership\".\"userId\" = token.id, plus the existing tenant.deletedAt and bound/requested-tenant filters. A failure still leaves the token tenantless (fail closed)."
+    },
+    {
+      "check": "D",
       "file": "src/app/[locale]/portal/partner/[token]/page.tsx",
       "subject": "system-scope:tenant-discovery",
       "count": 2,
