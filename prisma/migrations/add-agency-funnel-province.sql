@@ -37,15 +37,18 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
-SET app.system_scope = 'on'
 AS $fn$
 DECLARE
+  -- In place of a function-level SET app.system_scope (Supabase: no SET ON PARAMETER, TASK-MUOG51GJ3PUOG).
+  scope_was text := current_setting('app.system_scope', true);
   agency text := nullif(current_setting('app.tenant_id', true), '');
 BEGIN
+  PERFORM set_config('app.system_scope', 'on', true);
   IF agency IS NULL OR NOT EXISTS (
     SELECT 1 FROM "Tenant" a
      WHERE a."id" = agency AND a."kind" = 'AGENCY' AND a."deletedAt" IS NULL
   ) THEN
+    PERFORM set_config('app.system_scope', coalesce(scope_was, ''), true);
     RETURN;
   END IF;
 
@@ -64,6 +67,7 @@ BEGIN
      AND t."deletedAt" IS NULL
      AND (since IS NULL OR t."createdAt" >= since)
    GROUP BY t."orgType", t."province";
+  PERFORM set_config('app.system_scope', coalesce(scope_was, ''), true);
 END
 $fn$;
 

@@ -57,12 +57,15 @@ LANGUAGE plpgsql
 VOLATILE
 SECURITY DEFINER
 SET search_path = public, pg_temp
-SET app.system_scope = 'on'
 AS $fn$
 DECLARE
+  -- In place of a function-level SET app.system_scope (Supabase: no SET ON PARAMETER, TASK-MUOG51GJ3PUOG).
+  scope_was text := current_setting('app.system_scope', true);
   agency text;
 BEGIN
+  PERFORM set_config('app.system_scope', 'on', true);
   IF code_hash IS NULL OR code_hash !~ '^[0-9a-f]{64}$' THEN
+    PERFORM set_config('app.system_scope', coalesce(scope_was, ''), true);
     RETURN NULL;
   END IF;
 
@@ -78,6 +81,7 @@ BEGIN
      AND a."deletedAt" IS NULL
   RETURNING c."tenantId" INTO agency;
 
+  PERFORM set_config('app.system_scope', coalesce(scope_was, ''), true);
   RETURN agency;
 END
 $fn$;
@@ -99,14 +103,16 @@ LANGUAGE plpgsql
 VOLATILE
 SECURITY DEFINER
 SET search_path = public, pg_temp
-SET app.system_scope = 'on'
 AS $fn$
 DECLARE
+  -- In place of a function-level SET app.system_scope (Supabase: no SET ON PARAMETER, TASK-MUOG51GJ3PUOG).
+  scope_was text := current_setting('app.system_scope', true);
   agency text;
   code_id text;
   reason text;
   alert_id text;
 BEGIN
+  PERFORM set_config('app.system_scope', 'on', true);
   IF code_hash IS NOT NULL AND code_hash ~ '^[0-9a-f]{64}$' THEN
     SELECT c."tenantId",
            c."id",
@@ -127,6 +133,7 @@ BEGIN
     INSERT INTO "AuditEvent" ("id", "tenantId", "type", "data")
     VALUES (gen_random_uuid()::text, agency, 'agency.invite.rejected',
             jsonb_build_object('reason', reason, 'codeId', code_id));
+    PERFORM set_config('app.system_scope', coalesce(scope_was, ''), true);
     RETURN;
   END IF;
 
@@ -156,6 +163,7 @@ BEGIN
             jsonb_build_object('alertDedupeKey', 'agency.invite.rejected.unknown'),
             CURRENT_TIMESTAMP AT TIME ZONE 'UTC');
   END IF;
+  PERFORM set_config('app.system_scope', coalesce(scope_was, ''), true);
 END
 $fn$;
 

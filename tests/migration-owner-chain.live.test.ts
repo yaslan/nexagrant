@@ -41,7 +41,6 @@ const LONG = 240_000;
 let ready = false;
 let skipReason = '';
 let admin: pg.Client | undefined;
-let granted = false;
 const created = { role: false, dbs: [] as string[] };
 
 function urlFor(base: string, db: string, user?: { name: string; password: string }): string {
@@ -162,54 +161,32 @@ afterAll(async () => {
   for (const db of created.dbs) {
     await admin.query(`DROP DATABASE IF EXISTS ${db} WITH (FORCE)`).catch(() => {});
   }
-  if (granted) await admin.query(`REVOKE SET ON PARAMETER app.system_scope FROM ${OWNER}`).catch(() => {});
   if (created.role) await admin.query(`DROP ROLE IF EXISTS ${OWNER}`).catch(() => {});
   await admin.end();
 }, LONG);
 
 describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)', () => {
-  test('without the one-time grant it stops before applying any file', async () => {
-    const facts = await one(ownerUrl(), 'SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
-    expect(facts).toEqual({ rolsuper: false, rolbypassrls: false });
-
-    const r = chain(ownerUrl());
-    expect(r.status).toBe(1);
-    expect(r.out).toContain(`role "${OWNER}" may not create functions with SET app.system_scope`);
-    expect(r.out).toContain('No file was applied');
-    expect(r.out).not.toContain('==> [1/');
-    const fn = await one(ownerUrl(), `SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'redeem_agency_invite'`);
-    expect(fn.n).toBe(0);
-  }, LONG);
-
-  test('the grant file gives the owner SET on app.system_scope and never fabrika_app', async () => {
-    const g = run(PSQL, [adminUrl(), '-X', '-v', `owner=${OWNER}`, '-f', 'prisma/migration-owner-grant.sql'], adminUrl());
-    expect(g.status, g.out).toBe(0);
-    granted = true;
-    const priv = await one(
-      adminUrl(),
-      `SELECT has_parameter_privilege('${OWNER}', 'app.system_scope', 'SET') AS owner_can,
-              (SELECT has_parameter_privilege('fabrika_app', 'app.system_scope', 'SET')
-                 FROM pg_roles WHERE rolname = 'fabrika_app') AS app_can`
+  // TASK-MUOG51GJ3PUOG: Supabase has no superuser for us, so the owner never
+  // gets SET ON PARAMETER app.system_scope. The chain must run without it.
+  test('without SET on app.system_scope the whole chain runs, and a second run before db:rls refuses', async () => {
+    const facts = await one(
+      ownerUrl(),
+      `SELECT rolsuper, rolbypassrls, has_parameter_privilege('app.system_scope', 'SET') AS can_set
+         FROM pg_roles WHERE rolname = current_user`
     );
-    expect(priv.owner_can).toBe(true);
-    expect(priv.app_can === null || priv.app_can === false).toBe(true);
+    expect(facts).toEqual({ rolsuper: false, rolbypassrls: false, can_set: false });
 
-    const refuse = run(PSQL, [adminUrl(), '-X', '-v', 'owner=fabrika_app', '-f', 'prisma/migration-owner-grant.sql'], adminUrl());
-    // Refused by the file itself when fabrika_app exists, or because no such role exists.
-    expect(refuse.status).not.toBe(0);
-
-    // İNCELEME-115 Ö-5: without -v owner it says what to pass, not `syntax error at or near ":"`.
-    const noOwner = run(PSQL, [adminUrl(), '-X', '-f', 'prisma/migration-owner-grant.sql'], adminUrl());
-    expect(noOwner.status).not.toBe(0);
-    expect(noOwner.out).toContain('no migration owner given');
-    expect(noOwner.out).toContain('-v owner=<migration-owner>');
-    expect(noOwner.out).not.toContain('syntax error');
-  }, LONG);
-
-  test('with the grant the whole chain runs to the end, and a second run before db:rls refuses', async () => {
     const r = chain(ownerUrl());
     expect(r.status, r.out.slice(-2000)).toBe(0);
     expect(r.out).toMatch(new RegExp(`apply-migrations: \\d+ files applied as ${OWNER}`));
+    const fns = await one(
+      ownerUrl(),
+      `SELECT count(*)::int AS n,
+              count(*) FILTER (WHERE EXISTS (SELECT 1 FROM unnest(proconfig) c WHERE c LIKE 'app.system\\_scope=%'))::int AS with_clause
+         FROM pg_proc WHERE proname IN ('redeem_agency_invite', 'note_agency_invite_rejection',
+                                        'agency_funnel_counts', 'agency_funnel_counts_by_province')`
+    );
+    expect(fns).toEqual({ n: 4, with_clause: 0 });
 
     // FORCE tables created by the chain have no system_scope policy until
     // `pnpm db:rls`; a backfill there would silently update nothing.
@@ -217,6 +194,26 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
     expect(again.status).toBe(1);
     expect(again.out).toContain('have no system_scope policy');
     expect(again.out).toContain('No file was applied');
+  }, LONG);
+
+  test('a file that brings back a function-level SET app.system_scope is refused before any file', async () => {
+    const tree = mkdtempSync(join(tmpdir(), 'fb-owner-clause-'));
+    try {
+      cpSync(resolve(ROOT, 'scripts/apply-migrations.sh'), join(tree, 'scripts/apply-migrations.sh'));
+      cpSync(resolve(ROOT, 'prisma/migrations'), join(tree, 'prisma/migrations'), { recursive: true });
+      appendFileSync(
+        join(tree, 'prisma/migrations/add-agency-funnel.sql'),
+        `\nCREATE OR REPLACE FUNCTION public.zz_clause() RETURNS int LANGUAGE sql\nSET app.system_scope = 'on'\nAS 'SELECT 1';\n`
+      );
+      const r = run('bash', [join(tree, 'scripts/apply-migrations.sh')], ownerUrl());
+      expect(r.status).toBe(1);
+      expect(r.out).toContain(`role "${OWNER}" may not create functions with SET app.system_scope`);
+      expect(r.out).toContain('add-agency-funnel.sql');
+      expect(r.out).toContain('No file was applied');
+      expect(r.out).not.toContain('==> [1/');
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
   }, LONG);
 
   test('after db:rls, the FORCE-RLS backfills update as many rows as under the superuser', async () => {
@@ -311,15 +308,66 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
     });
   }, LONG);
 
+  // TASK-MUOG51GJ3PUOG: the functions set app.system_scope in their body now,
+  // not as a function-level SET that PostgreSQL restores by itself. Measured
+  // here that every return path puts the caller's value back.
+  test('the definer functions hand app.system_scope back to fabrika_app unchanged', async (ctx) => {
+    if (!RLS_URL) ctx.skip('DATABASE_URL_RLS_TEST is not set');
+    const app = new URL(RLS_URL!);
+    const hash = 'a'.repeat(64);
+    const calls = [
+      `SELECT count(*) FROM public.agency_funnel_counts(NULL)`,
+      `SELECT count(*) FROM public.agency_funnel_counts_by_province(NULL)`,
+      `SELECT public.redeem_agency_invite('not-a-hash')`,
+      `SELECT public.redeem_agency_invite('${hash}')`,
+      `SELECT public.note_agency_invite_rejection('not-a-hash')`,
+      `SELECT public.note_agency_invite_rejection('${hash}')`,
+    ];
+    await withDb(urlFor(ADMIN_URL!, DB, { name: app.username, password: decodeURIComponent(app.password) }), async (c) => {
+      const scope = async () => (await c.query(`SELECT current_setting('app.system_scope', true) AS v`)).rows[0].v ?? '';
+      const members = async () =>
+        (await c.query(`SELECT count(*)::int AS n FROM "Membership" WHERE id LIKE 'lm-%'`)).rows[0].n;
+      await c.query('BEGIN');
+      try {
+        // An agency tenant (both funnel paths run) that owns no lm-* membership.
+        await c.query(`SELECT set_config('app.tenant_id', 'oc-ag', true)`);
+        for (const sql of calls) {
+          await c.query(sql);
+          expect(await scope(), sql).not.toBe('on');
+          expect(await members(), sql).toBe(0);
+        }
+        // Inside a sealed system scope the caller keeps it.
+        await c.query(`SELECT enter_system_scope('platform-aggregate')`);
+        expect(await members()).toBe(2);
+        for (const sql of calls) {
+          await c.query(sql);
+          expect(await scope(), sql).toBe('on');
+          expect(await members(), sql).toBe(2);
+        }
+      } finally {
+        await c.query('ROLLBACK');
+      }
+    });
+  }, LONG);
+
+  // Without SET on the parameter the owner cannot store this default itself
+  // (permission denied, TASK-MUOG51GJ3PUOG); a superuser still can, and the
+  // check guards against it whoever wrote it.
+  test('the owner cannot store a default for app.system_scope', async () => {
+    await expect(
+      withDb(ownerUrl(), (c) => c.query(`ALTER DATABASE ${DB} SET app.system_scope = 'on'`))
+    ).rejects.toThrow('permission denied to set parameter "app.system_scope"');
+  }, LONG);
+
   test('a stored default for app.system_scope stops the run before any file', async () => {
-    await withDb(ownerUrl(), (c) => c.query(`ALTER DATABASE ${DB} SET app.system_scope = 'on'`));
+    await withDb(adminUrl(), (c) => c.query(`ALTER DATABASE ${DB} SET app.system_scope = 'on'`));
     try {
       const r = chain(ownerUrl());
       expect(r.status).toBe(1);
       expect(r.out).toContain('app.system_scope has a stored default');
       expect(r.out).not.toContain('==> [1/');
     } finally {
-      await withDb(ownerUrl(), (c) => c.query(`ALTER DATABASE ${DB} RESET app.system_scope`));
+      await withDb(adminUrl(), (c) => c.query(`ALTER DATABASE ${DB} RESET app.system_scope`));
     }
   }, LONG);
   // İNCELEME-115 Ö-3 (mutant M6): the check AFTER the files, measured on its own.
@@ -335,14 +383,15 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
         join(tree, 'prisma/migrations', last),
         `\nDO $$ BEGIN EXECUTE format('ALTER DATABASE %I SET app.system_scope = %L', current_database(), 'on'); END $$;\n`
       );
-      const r = run('bash', [join(tree, 'scripts/apply-migrations.sh')], ownerUrl());
+      // As the superuser: the owner can no longer write the default at all.
+      const r = run('bash', [join(tree, 'scripts/apply-migrations.sh')], adminUrl());
       expect(r.status, r.out.slice(-2000)).toBe(1);
       expect(r.out).toMatch(/==> \[(\d+)\/\1\]/); // every file ran: the pre-run check could not have caught it
       expect(r.out).toContain('a file stored a default for app.system_scope');
       expect(r.out).not.toContain('files applied as');
     } finally {
       rmSync(tree, { recursive: true, force: true });
-      await withDb(ownerUrl(), (c) => c.query(`ALTER DATABASE ${DB} RESET app.system_scope`));
+      await withDb(adminUrl(), (c) => c.query(`ALTER DATABASE ${DB} RESET app.system_scope`));
     }
   }, LONG);
 

@@ -1,9 +1,10 @@
--- Rollback of prisma/migration-owner-grant.sql. Run as a superuser:
+-- Rollback of the former prisma/migration-owner-grant.sql (removed in
+-- TASK-MUOG51GJ3PUOG: the chain no longer needs SET ON PARAMETER). Run it on a
+-- cluster where that grant was given, as a superuser:
 --
 --   psql "$SUPERUSER_URL" -v owner=<migration-owner> -f prisma/migration-owner-grant-rollback.sql
 --
--- After this, a non-superuser owner can no longer run scripts/apply-migrations.sh
--- (it stops in the preflight, before any file).
+-- scripts/apply-migrations.sh keeps working for the owner afterwards.
 
 \set ON_ERROR_STOP on
 
