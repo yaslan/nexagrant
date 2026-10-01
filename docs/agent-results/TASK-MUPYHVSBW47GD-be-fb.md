@@ -6,7 +6,7 @@ ajan: be-fb
 motor: claude
 tip: hata
 okur: ekip
-hüküm: Kısmen bitti: düzeltme devop-fb'nin a617188a'sıyla zaten dev'de ve canlıda; temiz PG16'da doğruladım, kaçan sızıntı/hata yolu testini ekledim, EXCEPTION bloğu eşdeğer ölçüldüğü için eklenmedi (karar liderde).
+hüküm: Bitti: düzeltme devop-fb'nin a617188a'sıyla dev'de ve canlıda; temiz PG16'da doğrulandı, eksik kapsam testi dev'e merge edildi (1d2c54f3), EXCEPTION bloğu karar gereği eklenmedi.
 platform: mac (Darwin 27, Homebrew PostgreSQL 16.15 + pgvector 0.8.1, yalıtılmış scratch küme :55341). Değişiklik yalnız SQL + vitest; platforma bağlı kod yolu yok. Linux CI aynı adımları koşar (ci.yml); Windows koşulmadı (proje CI'ı Linux, apply-migrations.sh bash betiği). Canlı Supabase'e BAĞLANILMADI.
 sürüm: 1
 tarih: 2026-10-01T20:13:32.461Z
@@ -79,3 +79,9 @@ funcs with app.* in proconfig: 0
 ## 6. Sonraki adım
 - Test commit'i (`91e93717`) inceleme sonrası dev'e merge edilebilir. Push/merge yapılmadı.
 - se-fb/crw güvenlik incelemesi devop-fb'nin a617188a'sı için zaten gerekiyor. Bu test o incelemenin kanıtına eklenebilir.
+
+## 7. Karar ve merge (01.10.2026)
+
+- **Karar (kullanıcı):** EXCEPTION bloğu eklenmeyecek. dev'deki a617188a uygulaması olduğu gibi kalıyor.
+- Test dalı yerel `dev`'e merge edildi: `1d2c54f3` (`be-fb/supabase-system-scope` → 91e93717). Push edilmedi.
+- Merge sonrası `dev` (1d2c54f3) üzerinde koşu: migration-owner-chain + agency-invite + agency-funnel + system-scope live → `Test Files 4 passed (4) · Tests 60 passed (60)`. `npx tsc --noEmit` exit 0.
