@@ -13,7 +13,7 @@
 | Duration | 8 weeks · **2026-09-07 → 2026-11-01** |
 | Partners | 10 design partners (SME, university TTO, consultancy, research centre) |
 | Cost | Free during the beta (Team plan entitlements + 500 AI credits) |
-| Weekly rhythm | Thursday 14:00–14:45 (Europe/Istanbul) partner sync |
+| Weekly rhythm | Monday 15:00–15:45 (Europe/Istanbul) partner sync |
 | Expected effort | About 1 hour per week: 1 sync + real usage on 1 live call |
 | Output | Product feedback, issue triage, price validation, G0 calibration |
 
@@ -117,7 +117,7 @@ Every week, at minimum: one gate decision, one feedback item, one sync attended.
 
 ## 4. Weekly rhythm and calendar
 
-### Sync schedule (Thursday 14:00–14:45, Europe/Istanbul)
+### Sync schedule (Monday 15:00–15:45, Europe/Istanbul)
 
 | Week | Date | Theme |
 |---|---|---|
@@ -125,10 +125,10 @@ Every week, at minimum: one gate decision, one feedback item, one sync attended.
 | 2 | 2026-09-17 | G0/G1 experience, quality of call intelligence |
 | 3 | 2026-09-24 | M1/M8 partner matching accuracy |
 | 4 | 2026-10-01 | Concept note (M2) output quality and credit usage |
-| 5 | 2026-10-08 | Evidence discipline (M3) and reporting |
-| 6 | 2026-10-15 | KPI dashboard: which metric changes a decision? |
-| 7 | 2026-10-22 | **Price validation workshop** (E11.4) |
-| 8 | 2026-10-29 | G0 calibration (E11.3) and beta close-out, next steps |
+| 5 | 2026-10-05 | Evidence discipline (M3) and reporting |
+| 6 | 2026-10-12 | KPI dashboard: which metric changes a decision? |
+| 7 | 2026-10-19 | **Price validation workshop** (E11.4) |
+| 8 | 2026-10-26 | G0 calibration (E11.3) and beta close-out, next steps |
 
 Calendar file: [`beta/beta-weekly-sync.ics`](./beta/beta-weekly-sync.ics) — importable into Google
 Calendar, Outlook and Apple Calendar (Google Calendar: *Settings → Import & export → Import*). Automatic

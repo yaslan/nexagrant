@@ -32,12 +32,11 @@
  *   --modules=<set>   `all` (E11 brief, default) or `mvp` (docs/BETA_GUIDE.md scope)
  *   --day=<1-7>       ISO weekday of the check-in, 1=Monday (default) … 7=Sunday
  *   --time=<HH:MM>    wall-clock start of the check-in, default 15:00
- *   --tz=<IANA>       zone the wall-clock time is in, default Europe/Brussels
+ *   --tz=<IANA>       zone the wall-clock time is in, default Europe/Istanbul
  *
- * The programme design is not settled: the E11 brief says "every module in pilot,
- * Mondays 15:00 Brussels", while docs/BETA_GUIDE.md says "MVP modules, Thursdays
- * 14:00 Istanbul". Rather than pick for the team, both are flags:
- *   --modules=mvp --day=4 --time=14:00 --tz=Europe/Istanbul   # guide's design
+ * The check-in slot is settled (owner decision P-7, 2026-10-01): Mondays 15:00
+ * Istanbul. Module scope and slot stay flags, e.g. the MVP-only variant:
+ *   --modules=mvp
  */
 
 import 'dotenv/config';

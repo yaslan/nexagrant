@@ -2,9 +2,9 @@
  * Weekly beta check-in schedule (E11.1).
  *
  * The slot is defined as a wall-clock time in a named zone ("Monday 15:00 in
- * Europe/Brussels"). Eight weekly occurrences straddle the last Sunday in October,
- * so half the cohort would drift by an hour if the offset were hard-coded. Each
- * occurrence therefore resolves its own UTC instant from the zone, and the ICS is
+ * Europe/Istanbul"). Istanbul has a fixed +03:00 offset, but the zone is still a
+ * flag (a different --tz may straddle a DST change), so each occurrence resolves
+ * its own UTC instant from the zone rather than a hard-coded offset, and the ICS is
  * emitted in UTC — one VEVENT per week rather than an RRULE, so every client lands
  * on the same minute regardless of how it expands recurrence across a DST change.
  */

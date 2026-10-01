@@ -13,7 +13,7 @@
 | Süre | 8 hafta · **2026-09-07 → 2026-11-01** |
 | Ortak sayısı | 10 tasarım ortağı (KOBİ, üniversite TTO, danışmanlık, araştırma merkezi) |
 | Ücret | Beta boyunca ücretsiz (Ekip planı yetkileri + 500 YZ kredisi) |
-| Haftalık ritim | Perşembe 14:00–14:45 (Europe/Istanbul) ortak sync |
+| Haftalık ritim | Pazartesi 15:00–15:45 (Europe/Istanbul) ortak sync |
 | Beklenen katkı | Haftada ~1 saat: 1 sync + en az 1 gerçek çağrı üzerinde kullanım |
 | Çıktı | Ürün geri bildirimi, hata triyajı, fiyat doğrulama, G0 kalibrasyonu |
 
@@ -116,7 +116,7 @@ Her hafta en az: 1 kapı kararı, 1 geri bildirim kaydı, 1 sync katılımı.
 
 ## 4. Haftalık ritim ve takvim
 
-### Sync takvimi (Perşembe 14:00–14:45, Europe/Istanbul)
+### Sync takvimi (Pazartesi 15:00–15:45, Europe/Istanbul)
 
 | Hafta | Tarih | Tema |
 |---|---|---|
@@ -124,10 +124,10 @@ Her hafta en az: 1 kapı kararı, 1 geri bildirim kaydı, 1 sync katılımı.
 | 2 | 2026-09-17 | G0/G1 deneyimi, çağrı istihbaratı kalitesi |
 | 3 | 2026-09-24 | M1/M8 ortak eşleştirme doğruluğu |
 | 4 | 2026-10-01 | Konsept notu (M2) çıktı kalitesi + kredi tüketimi |
-| 5 | 2026-10-08 | Kanıt disiplini (M3) ve raporlama |
-| 6 | 2026-10-15 | KPI paneli: hangi metrik karar değiştiriyor? |
-| 7 | 2026-10-22 | **Fiyat doğrulama atölyesi** (E11.4) |
-| 8 | 2026-10-29 | G0 kalibrasyonu (E11.3) + beta kapanışı, sonraki adımlar |
+| 5 | 2026-10-05 | Kanıt disiplini (M3) ve raporlama |
+| 6 | 2026-10-12 | KPI paneli: hangi metrik karar değiştiriyor? |
+| 7 | 2026-10-19 | **Fiyat doğrulama atölyesi** (E11.4) |
+| 8 | 2026-10-26 | G0 kalibrasyonu (E11.3) + beta kapanışı, sonraki adımlar |
 
 Takvim dosyası: [`beta/beta-weekly-sync.ics`](./beta/beta-weekly-sync.ics) — Google Calendar, Outlook ve
 Apple Takvim'e içe aktarılabilir (Google Takvim: *Ayarlar → İçe aktar ve dışa aktar → İçe aktar*).

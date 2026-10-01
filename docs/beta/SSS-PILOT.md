@@ -521,9 +521,9 @@ not adopted for the pilot.
 Evet. Pilot boyunca her hafta 30 dakikalık bir görüşme yapılır.
 
 - Kaynak: `docs/kamu/ILKADIM-PILOT.md:101`.
-- **[DOĞRULANMADI — patrona sor]** Gün ve saat.
+- Gün ve saat: **Pazartesi 15:00 (Europe/Istanbul, UTC+03:00)** — patron kararı 01.10.2026 (P-7).
 
-**EN:** Yes, a 30-minute call every week. Day and time: *ask the owner.*
+**EN:** Yes, a 30-minute call every week, **Mondays 15:00 Istanbul time (UTC+03:00)** (owner decision, 01.10.2026).
 
 ---
 
@@ -537,7 +537,7 @@ Evet. Pilot boyunca her hafta 30 dakikalık bir görüşme yapılır.
 | P-4 | "Model eğitimi için kullanılmaz" kullanıcıya taahhüt olarak söylenebilir mi? | D3 |
 | P-5 | Kurumun bütün verisini dışa aktarma ve kurum hesabını silme yolu | D4, D5 |
 | P-6 | İmzalı DPA ve üründeki DPA adresi pilot için güncel mi? | D7 |
-| P-7 | Pilot haftalık görüşme günü/saati ve .ics daveti | E7, G4 |
+| P-7 | ~~Pilot haftalık görüşme günü/saati~~ → **karar verildi: Pazartesi 15:00 Europe/Istanbul** (01.10.2026). Açık kalan: pilot için ayrı .ics daveti hazır mı? | E7, G4 |
 | P-8 | Canlı SMTP kurulumu ne zaman biter? | E8 |
 | P-9 | ~~Pilot destek e-posta adresi~~ → **karar verildi: info@fonbridge.com** (01.10.2026, posta alımı doğrulandı) | G2 |
 | P-10 | Pilot için yanıt süresi hedefleri | G3 |
