@@ -9,7 +9,7 @@
 
 Merhaba,
 
-Fabrika Beta programının haftalık senkronizasyon toplantılarının zamanı değişmektedir:
+Fabrika Beta programı ve İlkadım pilotu için ortak haftalık görüşmenin zamanı değişiyor:
 
 | Alan | Eski | Yeni |
 |------|------|------|
@@ -19,8 +19,8 @@ Fabrika Beta programının haftalık senkronizasyon toplantılarının zamanı d
 | **Saat Dilimi** | Europe/Istanbul | Europe/Istanbul |
 
 ### İlk Pazartesi Görüşmesi
-📅 **5 Ekim 2026, Pazartesi 15:00 Istanbul**  
-🔗 Google Meet: https://meet.google.com/fabrika-beta-checkin
+📅 **5 Ekim 2026, Pazartesi 15:00 Istanbul** (14:00 Brussels)  
+🔗 Google Meet: https://meet.google.com/eio-ftwm-wak
 
 ### Ardından Gelen Tarihler
 - **12 Ekim** — Pazartesi 15:00 Istanbul (14:00 Brussels)
@@ -28,7 +28,7 @@ Fabrika Beta programının haftalık senkronizasyon toplantılarının zamanı d
 - **26 Ekim** — Pazartesi 15:00 Istanbul (13:00 Brussels — kış saati başlangıcı)
 
 ### Takvim Dosyası (ics)
-Kalendarınıza otomatik olarak yeni zamanı eklemek için, güncellenmiş davet dosyasını (`beta-weekly-sync.ics`) kullanınız. Eğer önceki Perşembe davetleri kalendarınızda varsa, lütfen **siliniz**. Yeni dosya o etkinlikleri geçersiz kılmıştır.
+Takviminize otomatik olarak yeni zamanı eklemek için, güncellenmiş davet dosyasını (`beta-weekly-sync.ics`) kullanınız. Takviminizde 8 Ekim ve sonrasına ait Perşembe davetleri kaldıysa lütfen **siliniz**; takvim uygulamanız bunları kendiliğinden güncellemeyebilir.
 
 ### Sorular veya Sorunlar
 Beta programına ilişkin tüm sorularınız için: **info@fonbridge.com**
@@ -41,7 +41,7 @@ Beta programına ilişkin tüm sorularınız için: **info@fonbridge.com**
 
 Hello,
 
-The time for Fabrika Beta programme's weekly synchronization meetings has changed:
+The joint weekly sync for the Fabrika Beta programme and the İlkadım pilot is moving:
 
 | Field | Old | New |
 |-------|-----|-----|
@@ -51,8 +51,8 @@ The time for Fabrika Beta programme's weekly synchronization meetings has change
 | **Time Zone** | Europe/Istanbul | Europe/Istanbul |
 
 ### First Monday Sync
-📅 **October 5, 2026, Monday 15:00 Istanbul**  
-🔗 Google Meet: https://meet.google.com/fabrika-beta-checkin
+📅 **October 5, 2026, Monday 15:00 Istanbul** (14:00 Brussels)  
+🔗 Google Meet: https://meet.google.com/eio-ftwm-wak
 
 ### Following Dates
 - **October 12** — Monday 15:00 Istanbul (14:00 Brussels)
@@ -60,7 +60,7 @@ The time for Fabrika Beta programme's weekly synchronization meetings has change
 - **October 26** — Monday 15:00 Istanbul (13:00 Brussels — daylight saving time ends)
 
 ### Calendar File (ics)
-To automatically add the new time to your calendar, use the updated invitation file (`beta-weekly-sync.ics`). If you have previous Thursday meetings in your calendar, please **delete** them. The new file supersedes those events.
+To automatically add the new time to your calendar, use the updated invitation file (`beta-weekly-sync.ics`). If Thursday invitations for October 8 or later are still in your calendar, please **delete** them; your calendar app may not update them automatically.
 
 ### Questions or Issues
 For any questions about the beta programme: **info@fonbridge.com**
@@ -69,6 +69,6 @@ For any questions about the beta programme: **info@fonbridge.com**
 
 ## Notlar Görevci İçin / Notes for Sender
 - E-posta gönderimi: patron tarafından yapılacak
-- Google Meet bağlantısı: https://meet.google.com/fabrika-beta-checkin (constants.ts'den alınan)
+- Google Meet bağlantısı: https://meet.google.com/eio-ftwm-wak (dev `src/lib/beta/constants.ts` BETA_MEETING_URL varsayılanı, rebrand sonrası — leed-fb düzeltti)
 - .ics dosyası: docs/beta/beta-weekly-sync.ics (güncel olduğu varsayılmıştır)
 - Brüksel saati dönüşümü doğrulanmıştır: 5-25 Ekim = 14:00 Brussels, 26 Ekim+ = 13:00 Brussels
