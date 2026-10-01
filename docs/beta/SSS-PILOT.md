@@ -494,12 +494,12 @@ you want (PNG/JPEG/WebP, max 2 MB). Hide personal data in screenshots first.
 
 ### G2. Destek e-posta adresi ve telefon var mı?
 
-**[DOĞRULANMADI — patrona sor]** Pilot için resmî destek adresi belirlenmedi. Koddaki varsayılan
-destek adresi eski program adıyla `support@fabrika.dev` (`src/lib/beta/constants.ts:50`); sitenin
-alt bilgisindeki iletişim adresi `info@fonbridge.com` (`src/components/PublicFooter.tsx:136`). Hangisi
-pilot destek adresi olacak, patron karar verir. Telefon hattı hiçbir belgede yok.
+Pilot destek adresi **info@fonbridge.com**. Hata, hesap ve ürün geri bildirimi için bu adrese yazın.
+Koddaki varsayılan (`src/lib/beta/constants.ts:49-50`) bu adrestir (TASK-MUPIR7Y1P7AH4). Kutunun posta
+aldığı 01.10.2026'da patronun deneme e-postasıyla doğrulandı. Telefon hattı yok.
 
-**EN:** Not verified — ask the owner. No official pilot support address is set yet.
+**EN:** The pilot support address is **info@fonbridge.com**. Write to it for bugs, account questions and
+product feedback. There is no phone line.
 
 ### G3. Ne kadar sürede cevap alırım?
 
@@ -535,5 +535,5 @@ Evet. Pilot boyunca her hafta 30 dakikalık bir görüşme yapılır.
 | P-6 | İmzalı DPA ve üründeki DPA adresi pilot için güncel mi? | D7 |
 | P-7 | Pilot haftalık görüşme günü/saati ve .ics daveti | E7, G4 |
 | P-8 | Canlı SMTP kurulumu ne zaman biter? | E8 |
-| P-9 | Pilot destek e-posta adresi (fabrika.dev mi, fonbridge.com mu?) | G2 |
+| P-9 | ~~Pilot destek e-posta adresi~~ → **karar verildi: info@fonbridge.com** (01.10.2026, posta alımı doğrulandı) | G2 |
 | P-10 | Pilot için yanıt süresi hedefleri | G3 |
