@@ -16,13 +16,14 @@ Bu sözleşme, aşağıdaki tabloda bilgileri yazılı iki taraf arasında yapı
 
 | Bilgi                      | Veri Sorumlusu (müşteri kurum) | Veri İşleyen                    |
 | -------------------------- | ------------------------------ | ------------------------------- |
-| Unvan                      | ............................... | {{ŞİRKET_UNVANI}}               |
-| Adres                      | ............................... | {{ŞİRKET_ADRESİ}}               |
-| Vergi dairesi / VKN        | ............................... | {{ŞİRKET_VERGİ_DAİRESİ_VKN}}    |
-| MERSİS no                  | ............................... | {{ŞİRKET_MERSİS_NO}}            |
+| Ad                         | ............................... | FonBridge                       |
+| Ticari unvan               | ............................... | ............................... |
+| Adres                      | ............................... | ............................... |
+| Vergi dairesi / VKN        | ............................... | ............................... |
+| MERSİS no                  | ............................... | ............................... |
 | Bildirim e-posta adresi    | ............................... | info@fonbridge.com              |
 
-Veri Sorumlusu, Veri İşleyen tarafından işletilen FonBridge platformunu ("Platform") kullanan kurumdur. Veri Sorumlusu, Platform'a yüklediği kişisel verilerin işlenme amaç ve vasıtalarını belirler. Veri İşleyen, bu verileri yalnızca Veri Sorumlusu'nun talimatları doğrultusunda işler.
+Veri İşleyen FonBridge'dir. Veri Sorumlusu, FonBridge tarafından işletilen FonBridge platformunu ("Platform") kullanan kurumdur. Veri Sorumlusu, Platform'a yüklediği kişisel verilerin işlenme amaç ve vasıtalarını belirler. Veri İşleyen, bu verileri yalnızca Veri Sorumlusu'nun talimatları doğrultusunda işler.
 
 ## 2. İşlemenin Konusu ve Süresi
 
@@ -62,7 +63,7 @@ Düzeltme ve itiraz talepleri Veri Sorumlusu'nun kiracı yöneticisi üzerinden 
 ## 6. Verilerin İadesi ve İmhası
 
 - **6.1 Sona ermede dışa aktarım:** Abonelik sona erdiğinde Veri Sorumlusu, sona erme tarihinden itibaren 30 gün içinde verilerinin dışa aktarılmasını isteyebilir. Kurum düzeyindeki toplu dışa aktarım bugün Platform'da kendi kendine kullanılabilen bir işlev değildir; talep 10. maddedeki adrese yazılı olarak iletilir ve Veri İşleyen tarafından yerine getirilir. Kullanıcı düzeyindeki dışa aktarım 4. maddedeki ekrandan yapılır.
-- **6.2 Sona ermede imha:** 30 günlük sürenin sonunda veriler, 6.4'te sayılan kayıtlar dışında kalıcı olarak silinir.
+- **6.2 Sona ermede imha:** 30 günlük sürenin sonunda Veri İşleyen, 6.4'te sayılan kayıtlar dışındaki verileri kalıcı olarak siler. Kurum düzeyindeki imha bugün Platform'da otomatik çalışan bir işlem değildir; Veri İşleyen tarafından yapılır ve tamamlandığı 10. maddedeki adrese yazılı olarak bildirilir.
 - **6.3 Kullanıcı hesabının silinmesi:** 4. maddeye göre bir hesap silindiğinde, Veri Sorumlusu'na ait olup saklanması gereken kayıtlar (denetim olayları, yapay zeka kullanım günlüğü, fırsat, geri bildirim, teklif kullanımı ve ilişki kayıtları) silinmez; bu kayıtlardaki kullanıcı kimliği bağlantısı kaldırılır. Denetim olaylarının serbest içerik alanı bu işlemde değiştirilmez ve kişisel veri içerebilir. Silme işleminin kendisi, kullanıcı kimliğinin tek yönlü özeti (hash) ile kayda geçirilir.
 - **6.4 Kimliksizleştirilmeden saklanan kayıtlar:** Aşağıdaki kayıtlar kimliksizleştirilmez ve gerekçeleri süresince saklanır: (a) düzenlenmiş faturalar — alıcının unvanı, VKN veya TCKN'si, vergi dairesi ve adresi, faturanın düzenlendiği andaki haliyle, ilgili vergi mevzuatının öngördüğü saklama süresi boyunca; (b) çift onay adımlarında onaylayan kişinin kimliği ve adı, onayın imza niteliği taşıması nedeniyle; (c) kullanıcıya aydınlatma yapıldığını ve onay alındığını gösteren kayıtlar, ispat yükümlülüğü nedeniyle.
 
@@ -104,10 +105,10 @@ Bu sözleşme, tarafların aşağıda imzaladığı tarihlerden sonuncusunda yü
 | Alt işleyen                    | Hizmet                                                                        | Konum                                 | İşlenen veri                                                         | Durum                                       |
 | ------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------- |
 | Vulut                          | Barındırma: uygulama sunucusu, PostgreSQL veritabanı, iş kuyruğu, e-posta sunucusu | Türkiye                               | Platform'daki tüm veri; giden e-postaların içeriği ve alıcı adresi   | Kullanımda                                  |
-| Cloudflare, Inc. (R2)          | Nesne depolama                                                                | {{R2_BÖLGESİ}}                        | Dosya ekleri, kanıt dosyaları, kurum logoları                        | Kullanımda                                  |
+| Cloudflare, Inc. (R2) | Nesne depolama | Belirtilecek: ................ | Dosya ekleri, kanıt dosyaları, kurum logoları | Kullanımda |
 | Anthropic PBC                  | Yapay zeka dil modeli                                                         | ABD                                   | Yapay zeka özelliklerinde gönderilen istem metni                     | Kullanımda                                  |
 | OpenAI, L.L.C.                 | Yapay zeka dil modeli ve metin gömme (embedding)                              | ABD                                   | İstem metni; arama için gömülen belge metni                          | Kullanımda                                  |
 | Stripe, Inc.                   | Ödeme altyapısı                                                               | ABD                                   | Ödeme sayfasında girilen ödeme bilgileri; kurum ve abonelik kimlikleri | Kullanımda                                  |
-| iyzico                         | Ödeme altyapısı (TL)                                                          | Türkiye                               | Alıcının adı, soyadı, e-posta adresi, kimlik numarası; ödeme bilgileri | Kullanımda                                  |
-| Google LLC                     | Google hesabıyla oturum açma                                                  | ABD                                   | Ad, e-posta adresi, Google hesap kimliği                             | Kullanıcı bu giriş yolunu seçerse           |
+| iyzico | Ödeme altyapısı (TL) | Türkiye | Alıcının adı, soyadı, e-posta adresi, kimlik numarası, adresi, IP adresi; ödeme bilgileri | Entegre; bugün bu yolla ödeme alınmıyor; devreye alınmadan önce 7. maddedeki bildirim yapılır |
+| Google LLC | Google hesabıyla oturum açma; Google Takvim eşitleme | ABD | Oturum açmada ad, e-posta adresi, Google hesap kimliği; takvim eşitlemede toplantı başlığı (ortak kurumun adı) ve toplantı notunun ilk 500 karakteri | Kullanıcı bu giriş yolunu ya da takvim bağlantısını seçerse |
 | PostHog Inc.                   | Ürün analitiği                                                                | AB                                    | Onay sonrası tarayıcıya özgü rastgele kimlik ve ürün kullanım olayları (kullanıcı kimliği, e-posta ve ad gönderilmez; isteğin IP adresi sağlayıcıya ulaşır) | Entegre, devre dışı (7. madde)              |

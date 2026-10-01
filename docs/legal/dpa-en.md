@@ -16,13 +16,14 @@ This agreement is made between the two parties whose details are set out in the 
 
 | Detail                     | Controller (customer organisation) | Processor                       |
 | -------------------------- | ---------------------------------- | ------------------------------- |
-| Legal name                 | ...............................    | {{ŞİRKET_UNVANI}}               |
-| Address                    | ...............................    | {{ŞİRKET_ADRESİ}}               |
-| Tax office / tax number    | ...............................    | {{ŞİRKET_VERGİ_DAİRESİ_VKN}}    |
-| Trade registry (MERSİS) no | ...............................    | {{ŞİRKET_MERSİS_NO}}            |
+| Name                       | ...............................    | FonBridge                       |
+| Registered legal name      | ...............................    | ............................... |
+| Address                    | ...............................    | ............................... |
+| Tax office / tax number    | ...............................    | ............................... |
+| Trade registry (MERSİS) no | ...............................    | ............................... |
 | Notice email address       | ...............................    | info@fonbridge.com              |
 
-The Controller is the organisation that uses the FonBridge platform (the "Platform") operated by the Processor. The Controller determines the purposes and means of processing the personal data it uploads to the Platform. The Processor processes that data only on the Controller's documented instructions.
+The Processor is FonBridge. The Controller is the organisation that uses the FonBridge platform (the "Platform") operated by FonBridge. The Controller determines the purposes and means of processing the personal data it uploads to the Platform. The Processor processes that data only on the Controller's documented instructions.
 
 ## 2. Subject Matter and Duration
 
@@ -62,7 +63,7 @@ Rectification and objection requests are handled through the Controller's tenant
 ## 6. Return and Deletion of Data
 
 - **6.1 Export on termination:** On termination the Controller may ask for its data to be exported within 30 days of the termination date. An organisation-wide export is not a self-service function of the Platform today; the request is sent in writing to the address in section 10 and the Processor carries it out. A user-level export is made from the screen in section 4.
-- **6.2 Deletion on termination:** At the end of the 30-day period the data is permanently deleted, except for the records listed in 6.4.
+- **6.2 Deletion on termination:** At the end of the 30-day period the Processor permanently deletes the data, except for the records listed in 6.4. Organisation-wide deletion is not an automatic process of the Platform today; the Processor carries it out and confirms in writing to the address in section 10 when it is complete.
 - **6.3 Deletion of a user account:** When an account is deleted under section 4, the records that belong to the Controller and must be kept (audit events, the AI usage log, opportunities, feedback, proposal usage and relationship records) are not deleted; the link to the user's identifier in those records is removed. The free-form content field of an audit event is not changed by this step and may contain personal data. The deletion itself is recorded with a one-way hash of the user's identifier.
 - **6.4 Records kept without de-identification:** The following records are not de-identified and are kept for as long as their reason applies: (a) issued invoices — the buyer's legal name, tax or national identity number, tax office and address, as they stood when the invoice was issued, for the retention period set by the applicable tax law; (b) the identity and name of the approver on a dual-approval step, because the approval has the character of a signature; (c) records showing that the user was informed and gave consent, because of the duty to demonstrate compliance.
 
@@ -104,10 +105,10 @@ This agreement enters into force on the later of the dates on which the parties 
 | Sub-processor         | Service                                                              | Location       | Data processed                                                                                     | Status                                   |
 | --------------------- | -------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | Vulut                 | Hosting: application server, PostgreSQL database, job queue, email server | Türkiye        | All data on the Platform; content and recipient address of outgoing email                          | In use                                   |
-| Cloudflare, Inc. (R2) | Object storage                                                       | {{R2_BÖLGESİ}} | File attachments, evidence files, organisation logos                                               | In use                                   |
+| Cloudflare, Inc. (R2) | Object storage | To be stated: ................ | File attachments, evidence files, organisation logos | In use |
 | Anthropic PBC         | AI language model                                                    | USA            | Prompt text sent by AI features                                                                    | In use                                   |
 | OpenAI, L.L.C.        | AI language model and text embedding                                 | USA            | Prompt text; document text embedded for search                                                     | In use                                   |
 | Stripe, Inc.          | Payment infrastructure                                               | USA            | Payment details entered on the payment page; organisation and subscription identifiers             | In use                                   |
-| iyzico                | Payment infrastructure (TRY)                                         | Türkiye        | Buyer's first name, last name, email address, identity number; payment details                     | In use                                   |
-| Google LLC            | Sign-in with a Google account                                        | USA            | Name, email address, Google account identifier                                                     | If the user chooses this sign-in method  |
+| iyzico | Payment infrastructure (TRY) | Türkiye | Buyer's first name, last name, email address, identity number, address, IP address; payment details | Integrated; no payments are taken this way today; the notice in section 7 is given before it is switched on |
+| Google LLC | Sign-in with a Google account; Google Calendar sync | USA | For sign-in: name, email address, Google account identifier; for calendar sync: meeting title (the partner organisation's name) and the first 500 characters of the meeting note | If the user chooses this sign-in method or connects a calendar |
 | PostHog Inc.          | Product analytics                                                    | EU             | After consent, a random per-browser identifier and product usage events (no user id, email or name is sent; the request's IP address reaches the provider) | Integrated, switched off (section 7)     |
