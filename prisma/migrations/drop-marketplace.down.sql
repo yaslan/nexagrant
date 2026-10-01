@@ -68,10 +68,6 @@ DROP POLICY IF EXISTS tenant_isolation ON "MarketplaceListing";
 CREATE POLICY tenant_isolation ON "MarketplaceListing"
   USING ("tenantId" = current_setting('app.tenant_id', true))
   WITH CHECK ("tenantId" = current_setting('app.tenant_id', true));
-DROP POLICY IF EXISTS system_scope ON "MarketplaceListing";
-CREATE POLICY system_scope ON "MarketplaceListing"
-  USING (current_setting('app.system_scope', true) = 'on')
-  WITH CHECK (current_setting('app.system_scope', true) = 'on');
 
 ALTER TABLE "MarketplaceOrder" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "MarketplaceOrder" FORCE ROW LEVEL SECURITY;
@@ -79,10 +75,32 @@ DROP POLICY IF EXISTS tenant_isolation ON "MarketplaceOrder";
 CREATE POLICY tenant_isolation ON "MarketplaceOrder"
   USING ("tenantId" = current_setting('app.tenant_id', true))
   WITH CHECK ("tenantId" = current_setting('app.tenant_id', true));
-DROP POLICY IF EXISTS system_scope ON "MarketplaceOrder";
-CREATE POLICY system_scope ON "MarketplaceOrder"
-  USING (current_setting('app.system_scope', true) = 'on')
-  WITH CHECK (current_setting('app.system_scope', true) = 'on');
+
+-- system_scope: never the bare `app.system_scope = 'on'` test (TASK-MUPCYOCLINGC7,
+-- crw2-fb B-1). That GUC is USERSET, so fabrika_app could set it itself and
+-- read and write every tenant's rows until `pnpm db:rls` ran. Same wording as
+-- auditevent-null-system-only.sql: rls.sql's sealed predicate once
+-- system_scope_open() exists, otherwise only the table's owner gets through.
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['MarketplaceListing', 'MarketplaceOrder'] LOOP
+    EXECUTE format('DROP POLICY IF EXISTS system_scope ON %I', t);
+    IF to_regprocedure('public.system_scope_open(regclass)') IS NOT NULL THEN
+      EXECUTE format($p$CREATE POLICY system_scope ON %I
+        USING ((SELECT public.system_scope_open(%L::regclass)))
+        WITH CHECK ((SELECT public.system_scope_open(%L::regclass)))$p$,
+        t, quote_ident(t), quote_ident(t));
+    ELSE
+      EXECUTE format($p$CREATE POLICY system_scope ON %I
+        USING (current_setting('app.system_scope', true) = 'on'
+               AND pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = %L::regclass), 'USAGE'))
+        WITH CHECK (current_setting('app.system_scope', true) = 'on'
+               AND pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = %L::regclass), 'USAGE'))$p$,
+        t, quote_ident(t), quote_ident(t));
+    END IF;
+  END LOOP;
+END $$;
 
 DO $$
 BEGIN

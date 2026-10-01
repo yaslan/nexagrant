@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
   canonicalPolicyClauses,
@@ -155,41 +155,37 @@ describe('AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH
     expect(sql).not.toMatch(/WITH CHECK \(current_setting\('app\.system_scope', true\) = 'on'\)/);
   });
 
-  test('Y-1(a): all migration files (including .down.sql) never use bare system_scope GUC', () => {
-    // Y-1 finding: N4/N5 mutants were not caught in CI because rls-coverage
-    // and rls:check only scan forward migrations, not rollback (.down.sql) files.
-    // Once a forward migration introduces a policy, the corresponding .down.sql
-    // must use signed scope, not the forgeable 'on' test.
-    const migrationsDir = resolve(process.cwd(), 'prisma/migrations');
+  test('Y-1(a): no migration file, .down.sql included, creates a policy on the bare system_scope flag (TASK-MUPCYOCLINGC7)', () => {
+    // crw2-fb B-1: drop-marketplace.down.sql recreated system_scope as
+    // `current_setting('app.system_scope', true) = 'on'` and the test above
+    // only looks at one file. That GUC is USERSET, so fabrika_app could set it
+    // and read/write every tenant's rows. A policy that mentions the flag must
+    // also gate it: rls.sql's system_scope_open(), or — on a database where
+    // rls.sql has not run yet — the owner-only pg_has_role(current_user, …).
+    // `ON (\S+)` on purpose: policies built in DO blocks say `ON %I`.
+    const root = resolve(process.cwd(), 'prisma/migrations');
     const files: string[] = [];
-    function walk(dir: string) {
+    const walk = (dir: string) => {
       for (const entry of readdirSync(dir).sort()) {
         const full = join(dir, entry);
-        if (statSync(full).isDirectory()) {
-          walk(full);
-        } else if (entry.endsWith('.sql')) {
-          files.push(relative(process.cwd(), full));
-        }
+        if (statSync(full).isDirectory()) walk(full);
+        else if (entry.endsWith('.sql')) files.push(full);
       }
-    }
-    walk(migrationsDir);
+    };
+    walk(root);
+    expect(files.some((f) => f.endsWith('.down.sql'))).toBe(true);
 
-    const failures: string[] = [];
+    const offenders: string[] = [];
     for (const file of files) {
-      const sql = stripSqlComments(readFileSync(resolve(process.cwd(), file), 'utf8'));
-      // Reject policies created with bare GUC test — include .down.sql files
-      if (
-        sql.match(/CREATE POLICY\s+\w+\s+ON\s+\w+/) &&
-        (sql.match(/USING\s*\(\s*current_setting\s*\(\s*['"]app\.system_scope['"]\s*,\s*true\s*\)\s*=\s*['"]on['"]\s*\)/) ||
-          sql.match(/WITH\s+CHECK\s*\(\s*current_setting\s*\(\s*['"]app\.system_scope['"]\s*,\s*true\s*\)\s*=\s*['"]on['"]\s*\)/))
-      ) {
-        failures.push(file);
+      const sql = stripSqlComments(readFileSync(file, 'utf8'));
+      for (const m of sql.matchAll(/CREATE\s+POLICY\s+(\S+)\s+ON\s+(\S+)([\s\S]*?);/gi)) {
+        const body = m[3] ?? '';
+        if (!/app\.system_scope'/.test(body)) continue;
+        if (/system_scope_open\(/.test(body) || /pg_has_role\(\s*current_user\b/.test(body)) continue;
+        offenders.push(`${relative(root, file)}: ${m[1]} ON ${m[2]}`);
       }
     }
-    expect(failures).toEqual(
-      [],
-      `These migrations have system_scope policies with forgeable GUC: ${failures.join(', ')}`
-    );
+    expect(offenders).toEqual([]);
   });
 
   test('it is classified strict, not nullable-shared and not exempt', () => {
