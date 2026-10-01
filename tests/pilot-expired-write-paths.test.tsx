@@ -205,11 +205,18 @@ describe('B-2: a 403 PILOT_EXPIRED from a write route', () => {
   });
 
   test('member invite (en): the English pilot sentence, not the Turkish body text', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({ error: 'Ücretsiz pilot süresi doldu; çalışma alanı salt-okunur. Verileriniz korunuyor.', code: 'PILOT_EXPIRED' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      )
+    // The page also reads the team list (GET /api/team, read-only: still 200
+    // for an expired pilot); only the invite write answers with the refusal.
+    const fetchMock = vi.fn(async (_url: unknown, init?: { method?: string }) =>
+      init?.method === 'POST'
+        ? new Response(
+            JSON.stringify({ error: 'Ücretsiz pilot süresi doldu; çalışma alanı salt-okunur. Verileriniz korunuyor.', code: 'PILOT_EXPIRED' }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } }
+          )
+        : new Response(JSON.stringify({ me: { userId: 'u', role: 'TENANT_OWNER' }, members: [], invitations: [] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
     );
     vi.stubGlobal('fetch', fetchMock);
     render(withIntl(<MembersSettingsPage />, 'en'));
