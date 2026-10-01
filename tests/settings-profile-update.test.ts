@@ -226,8 +226,8 @@ describe('updateTenantProfile action', () => {
     });
 
     expect(events.length).toBe(1);
-    expect(events[0].actorId).toBe(userId);
-    expect(events[0].data).toMatchObject({
+    expect(events[0]?.actorId).toBe(userId);
+    expect(events[0]?.data).toMatchObject({
       capabilities: input.capabilities,
       keywords: ['AI', 'ML'],
       trlRange: [5, 7],
