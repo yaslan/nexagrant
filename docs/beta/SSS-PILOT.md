@@ -48,14 +48,15 @@ katılmanıza izin vermez.
 - Kaynak: QA raporu akış 8 (yanlış e-posta: "başka bir adrese gönderildi", kabul düğmesi yok,
   "Çıkış yap ve hesap değiştir" var); `docs/kamu/VERI-YERLESIMI.md` ("Google ile giriş tek giriş
   yoludur, kapatılamaz").
-- **[DOĞRULANMADI — patrona sor]** Kurum adresi için bir Google hesabı nasıl açılır, belediyeye
-  hangi yol önerilir? Pilot planında açık soru: "Pilotta kullanılacak kullanıcı hesapları kurum
+- Kurum adresiyle Google hesabı açarken Google, o adrese bir **doğrulama e-postası** (kod ya da
+  bağlantı) gönderir. Onaylayın, sonra davetteki adresle giriş yapın. Hesap açılamıyorsa destekle
+  konuşun. **[DOĞRULANMADI]** Google'ın ekran adımları canlı denenmedi.
+- **[DOĞRULANMADI — patrona sor]** Belediyeye hangi yol önerilir? Pilot planında açık soru: "Pilotta kullanılacak kullanıcı hesapları kurum
   e-postasıyla mı açılacak?" (`docs/kamu/ILKADIM-PILOT.md:171`, S5).
 
 **EN:** You must sign in with a Google account that uses the e-mail address the invitation was sent
 to. With a different Google account the page says the invitation was sent to another address, and
-you cannot join. How to get a Google account for a non-Gmail work address: *not verified — ask the
-owner.*
+you cannot join. When you create a Google account with your work address, Google sends a verification e-mail to that address. Confirm it, then sign in with the invited address. If you cannot create the account, contact support. *Google's screens were not tested live.*
 
 ### A4. Arayüz İngilizce olabilir mi?
 
@@ -303,13 +304,14 @@ düğmesi var. Size ait kayıtlar bir **JSON** dosyası olarak iner. Güvenlik i
 - Kaynak: `messages/tr.json:677`, `:688`, `:694` (ekran ve düğme adları), `src/app/[locale]/(app)/[workspace]/settings/privacy/client.tsx:39-52`,
   `src/app/api/user/export/route.ts`, `src/actions/user/export-data.ts:8-15`,
   `messages/tr.json:745`, `src/lib/routes.ts:126-127`.
-- Not: Bu dışa aktarım **kişiseldir** (sizin satırlarınız). **[DOĞRULANMADI — patrona sor]**
-  Kurumun bütün verisini tek dosyada almanın bir yolu var mı?
+- Not: Bu dışa aktarım **kişiseldir** (sizin satırlarınız). Kurumun bütün verisi için ekrandan
+  bir düğme yoktur; pilot süresince destek ekibi bunu **elle** yürütür (yazılı talep ile). Ayrıntı:
+  `docs/adr/ADR-0010-tenant-export-and-deletion.md` (taslak). Süre ya da sonuç sözü verilmez.
 - Not: Bu ekran pilot süresi dolunca da çalışmalı: dışa aktarım yolu pilot kapısını çağırmıyor
   (kod okuması). Süresi dolmuş pilotta canlı denenmedi.
 
 **EN:** Settings → Privacy & My Data (`/en/default/settings/privacy`) → "Export My Data". You get your own records as a
-JSON file, without sign-in secrets. Whole-organisation export: *not verified — ask the owner.*
+JSON file, without sign-in secrets. Whole-organisation export: there is no button; during the pilot the support team does it by hand on a written request (see `docs/adr/ADR-0010-tenant-export-and-deletion.md`, draft). No time or result is promised.
 
 ### D5. Hesabımı nasıl sildiririm?
 
@@ -321,11 +323,13 @@ ve yüklediğiniz belgeler kalıcı olarak silinir. Bu 30 gün içinde talebi ip
 - Kurumun **tek** Kurum Sahibi iseniz sistem bunu size bildirir (kurum sahipsiz kalır).
   Kaynak: `src/actions/user/request-deletion.ts:80-100` (`soleOwnerOf`). Önce başka bir sahip
   belirlenmesi için destekle konuşun.
-- **[DOĞRULANMADI — patrona sor]** Kurum (kiracı) hesabının tamamen silinmesi nasıl istenir?
+- Kurum (kiracı) hesabının tamamen silinmesi: ekrandan yapılamaz; pilot süresince destek ekibi
+  **elle** yürütür, yazılı talep ister. Ayrıntı: `docs/adr/ADR-0010-tenant-export-and-deletion.md`
+  (taslak). Süre ya da sonuç sözü verilmez.
 
 **EN:** Request deletion on the same page. Your account is closed at once and deleted after 30 days.
 You can cancel within 30 days. If you are the only Owner, the system warns you. Deleting the whole
-organisation: *not verified — ask the owner.*
+organisation: not possible from the screen; during the pilot the support team does it by hand on a written request (see `docs/adr/ADR-0010-tenant-export-and-deletion.md`, draft). No time or result is promised.
 
 ### D6. Sisteme vatandaş verisi yükleyebilir miyiz?
 

@@ -9,7 +9,7 @@
 ## Kullanım kuralları
 
 1. **Köşeli ayraçlı alanlar** (`[Ad]`, `[tarih]`) göndermeden önce doldurulur. `[DESTEK ADRESİ]` ve
-   `[İMZA]` pilot destek adresi belirlenene kadar boş kalamaz (SSS G2, patron sorusu P-9).
+   `[İMZA]` boş kalamaz; pilot destek adresi **info@fonbridge.com**'dur (SSS G2, P-9 çözüldü).
 2. **[DOĞRULANMADI]** işaretli cümle, patron cevabı gelmeden gönderilmez; şablonda o cümleyi silin ya
    da "ekibimize sorup size döneceğim" yazın.
 3. **Fiyat, tarih, SLA, hukuki taahhüt yazılmaz.** Uzatma ya da ücretli geçiş sözü verilmez.
@@ -341,8 +341,10 @@ pilot için **[DOĞRULANMADI]**, P-10). Kurum e-postası Google değilse → P-1
 >
 > [SIGNATURE]
 
-**İç not:** Kurumun **tamamının** verisini isteme ya da kurum hesabını silme → **[DOĞRULANMADI]**
-(P-5), patron + hukuk. Resmî KVKK başvurusu (yazılı dilekçe) gelirse şablonla cevap verilmez; hukuka
+**İç not:** Kurumun **tamamının** verisini isteme ya da kurum hesabını silme → kurum geneli için
+kod yolu yok; pilot süresince destek ekibi elle yürütür, yazılı talep ister (bkz.
+`docs/adr/ADR-0010-tenant-export-and-deletion.md`, taslak/onay bekliyor). Kullanıcıya süre ya da
+sonuç sözü verilmez; **[DOĞRULANMADI]** (P-5), patron + hukuk. Resmî KVKK başvurusu (yazılı dilekçe) gelirse şablonla cevap verilmez; hukuka
 yükseltilir (`docs/legal/`). "Model eğitimi" sorusu gelirse → SSS D3, taahhüt verilmez.
 
 ---
