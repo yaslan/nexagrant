@@ -5,9 +5,13 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 const session = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
+const tenantScope = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 
 vi.mock('@/lib/auth', () => ({ auth: vi.fn(async () => session.current) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+vi.mock('@/lib/tenant', () => ({
+  requireTenantAction: vi.fn(async () => tenantScope.current),
+}));
 
 import { prisma, withTenant } from '@/lib/db';
 import { updateTenantProfile, type UpdateProfileInput } from '@/app/[locale]/(app)/[workspace]/settings/profile/actions';
@@ -61,6 +65,7 @@ describe('updateTenantProfile action', () => {
 
   it('creates a new profile with valid input', async () => {
     session.current = { tenantId, userId, role: 'TENANT_OWNER' };
+    tenantScope.current = { tenantId, userId, role: 'TENANT_OWNER' };
 
     const input: UpdateProfileInput = {
       capabilities: 'AI and machine learning expertise, TRL 5-8',
@@ -85,6 +90,7 @@ describe('updateTenantProfile action', () => {
 
   it('updates an existing profile', async () => {
     session.current = { tenantId, userId, role: 'TENANT_OWNER' };
+    tenantScope.current = { tenantId, userId, role: 'TENANT_OWNER' };
 
     // Create initial profile
     await prisma.tenantProfile.create({
@@ -120,6 +126,7 @@ describe('updateTenantProfile action', () => {
 
   it('rejects empty capabilities', async () => {
     session.current = { tenantId, userId, role: 'TENANT_OWNER' };
+    tenantScope.current = { tenantId, userId, role: 'TENANT_OWNER' };
 
     const input: UpdateProfileInput = {
       capabilities: '   ',
@@ -135,6 +142,7 @@ describe('updateTenantProfile action', () => {
 
   it('rejects empty keywords', async () => {
     session.current = { tenantId, userId, role: 'TENANT_OWNER' };
+    tenantScope.current = { tenantId, userId, role: 'TENANT_OWNER' };
 
     const input: UpdateProfileInput = {
       capabilities: 'Some capabilities',
@@ -150,6 +158,7 @@ describe('updateTenantProfile action', () => {
 
   it('rejects invalid TRL range', async () => {
     session.current = { tenantId, userId, role: 'TENANT_OWNER' };
+    tenantScope.current = { tenantId, userId, role: 'TENANT_OWNER' };
 
     // Min > Max
     let input: UpdateProfileInput = {
@@ -186,6 +195,7 @@ describe('updateTenantProfile action', () => {
 
   it('forbids non-owner users', async () => {
     session.current = { tenantId, userId, role: 'MEMBER' };
+    tenantScope.current = { tenantId, userId, role: 'MEMBER' };
 
     const input: UpdateProfileInput = {
       capabilities: 'Capabilities',
@@ -203,11 +213,12 @@ describe('updateTenantProfile action', () => {
       where: { tenantId },
     });
 
-    expect(profile).toBeUndefined();
+    expect(profile).toBeNull();
   });
 
   it('creates audit event on successful update', async () => {
     session.current = { tenantId, userId, role: 'TENANT_OWNER' };
+    tenantScope.current = { tenantId, userId, role: 'TENANT_OWNER' };
 
     const input: UpdateProfileInput = {
       capabilities: 'Capabilities',
@@ -236,6 +247,7 @@ describe('updateTenantProfile action', () => {
 
   it('trims whitespace from keywords', async () => {
     session.current = { tenantId, userId, role: 'TENANT_OWNER' };
+    tenantScope.current = { tenantId, userId, role: 'TENANT_OWNER' };
 
     const input: UpdateProfileInput = {
       capabilities: 'Capabilities',
