@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { errorMessage } from '@/lib/errors';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+import TeamList from './team-list';
 
 export default function MembersSettingsPage() {
   const params = useParams();
@@ -15,6 +16,7 @@ export default function MembersSettingsPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageIsError, setMessageIsError] = useState(false);
+  const [listVersion, setListVersion] = useState(0);
   const errorText = useActionErrorText();
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -69,6 +71,8 @@ export default function MembersSettingsPage() {
       // Nothing was changed, so it is not shown as a success.
       setMessageIsError(data.reason === 'role_change_blocked');
       setEmail('');
+      // The invitation holds a seat now: re-read the list from the server.
+      setListVersion((v) => v + 1);
     } catch (error) {
       setMessage(errorText(error, () => `${isTr ? 'Hata' : 'Error'}: ${errorMessage(error)}`));
       setMessageIsError(true);
@@ -128,21 +132,14 @@ export default function MembersSettingsPage() {
         {message && (
           <div
             role={messageIsError ? 'alert' : 'status'}
-            className={`mt-4 p-3 rounded-xl text-xs font-medium ${messageIsError ? 'bg-bad/15 text-bad border border-bad/30' : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'}`}
+            className={`mt-4 p-3 rounded-xl text-xs font-medium break-all ${messageIsError ? 'bg-bad/15 text-bad border border-bad/30' : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'}`}
           >
             {message}
           </div>
         )}
       </div>
 
-      <div className="bg-surface border border-border rounded-2xl p-6 shadow-2xs">
-        <h2 className="text-xl font-semibold mb-4 text-ink">
-          {isTr ? 'Aktif Ekip Üyeleri' : 'Active Members'}
-        </h2>
-        <p className="text-muted text-xs italic">
-          {isTr ? 'Aktif kullanıcı ve yetkili ekip üyesi listesi bu bölümde görüntülenecektir.' : 'List of members will be displayed here...'}
-        </p>
-      </div>
+      <TeamList isTr={isTr} refreshKey={listVersion} />
     </div>
   );
 }
