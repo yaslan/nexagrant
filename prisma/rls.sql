@@ -126,8 +126,8 @@ END $$;
 --          `ALTER TABLE … NO FORCE ROW LEVEL SECURITY` anyway, so letting its
 --          own plain `SET app.system_scope = 'on'` through gives it nothing it
 --          did not have. This is the path of scripts/apply-migrations.sh (I-1,
---          TASK-MUOEGWSV8I7H0), of the SECURITY DEFINER functions that carry
---          `SET app.system_scope = 'on'` (they run as the owner), and of the
+--          TASK-MUOEGWSV8I7H0), of the SECURITY DEFINER functions that turn
+--          `app.system_scope` on in their body (they run as the owner), and of the
 --          go-live checks in docs/RELEASE_CHECKLIST.md.
 --       2. `app.system_scope_token` carries this transaction's seal, which only
 --          enter_system_scope(purpose) can compute: a SHA-256 over a secret in

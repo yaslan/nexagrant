@@ -124,11 +124,16 @@ CREATE POLICY tenant_isolation ON "AgencyInviteCode"
 -- granted. Two registrations racing for the last use: the second one re-checks
 -- "usedCount" < "maxUses", finds it false, updates nothing, gets NULL.
 --
--- Scope: `SET app.system_scope = 'on'` below is a function-level setting, so
--- PostgreSQL restores the caller's previous value when the function exits —
--- normally or by error. It is what lets the UPDATE see the agency's row under
--- FORCE ROW LEVEL SECURITY without depending on the owner being BYPASSRLS, and
--- it cannot outlive this call. search_path is pinned against hijacking.
+-- Scope: the body turns `app.system_scope` on with set_config(..., true) and
+-- puts the caller's value back before every RETURN. That is what lets the
+-- UPDATE see the agency's row under FORCE ROW LEVEL SECURITY without depending
+-- on the owner being BYPASSRLS. On error the transaction (or the caller's
+-- savepoint) rolls the setting back with it. It used to be a function-level
+-- `SET app.system_scope = 'on'`, which PostgreSQL lets only a superuser or a
+-- role with SET ON PARAMETER write; Supabase gives neither (TASK-MUOG51GJ3PUOG).
+-- Even a leaked 'on' opens nothing for fabrika_app: system_scope_open() also
+-- wants the table owner's privileges or enter_system_scope()'s seal (rls.sql).
+-- search_path is pinned against hijacking.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.redeem_agency_invite(code_hash text)
 RETURNS text
@@ -136,12 +141,15 @@ LANGUAGE plpgsql
 VOLATILE
 SECURITY DEFINER
 SET search_path = public, pg_temp
-SET app.system_scope = 'on'
 AS $fn$
 DECLARE
+  -- In place of a function-level SET app.system_scope (Supabase: no SET ON PARAMETER, TASK-MUOG51GJ3PUOG).
+  scope_was text := current_setting('app.system_scope', true);
   agency text;
 BEGIN
+  PERFORM set_config('app.system_scope', 'on', true);
   IF code_hash IS NULL OR code_hash !~ '^[0-9a-f]{64}$' THEN
+    PERFORM set_config('app.system_scope', coalesce(scope_was, ''), true);
     RETURN NULL;
   END IF;
 
@@ -157,6 +165,7 @@ BEGIN
      AND a."deletedAt" IS NULL
   RETURNING c."tenantId" INTO agency;
 
+  PERFORM set_config('app.system_scope', coalesce(scope_was, ''), true);
   RETURN agency;
 END
 $fn$;
@@ -193,12 +202,14 @@ LANGUAGE plpgsql
 VOLATILE
 SECURITY DEFINER
 SET search_path = public, pg_temp
-SET app.system_scope = 'on'
 AS $fn$
 DECLARE
+  -- In place of a function-level SET app.system_scope (Supabase: no SET ON PARAMETER, TASK-MUOG51GJ3PUOG).
+  scope_was text := current_setting('app.system_scope', true);
   agency text;
   reason text := 'unknown';
 BEGIN
+  PERFORM set_config('app.system_scope', 'on', true);
   IF code_hash IS NOT NULL AND code_hash ~ '^[0-9a-f]{64}$' THEN
     SELECT c."tenantId",
            CASE
@@ -220,6 +231,7 @@ BEGIN
 
   INSERT INTO "AuditEvent" ("id", "tenantId", "type", "data")
   VALUES (gen_random_uuid()::text, agency, 'agency.invite.rejected', jsonb_build_object('reason', reason));
+  PERFORM set_config('app.system_scope', coalesce(scope_was, ''), true);
 END
 $fn$;
 

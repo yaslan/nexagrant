@@ -87,9 +87,13 @@ psql_bin=${PSQL:-psql}
 # locally it is a superuser; in production it is the schema owner, which is
 # neither superuser nor BYPASSRLS. Two things differ for that owner:
 #
-#  1. Creating a function with `SET app.system_scope = 'on'` (file 23 onwards)
-#     needs SET privilege on that placeholder parameter. Without it the chain
-#     stopped half applied. Checked here, before any file runs.
+#  1. A function-level `SET app.system_scope = 'on'` clause needs SET privilege
+#     on that placeholder parameter, which only a superuser can grant. Supabase
+#     has no superuser for us, so no file carries the clause any more: the
+#     functions set and restore the flag in their body (TASK-MUOG51GJ3PUOG).
+#     A file that brings the clause back is refused here, before any file
+#     runs, unless this role may write it anyway; the chain used to stop
+#     half applied at file 23.
 #  2. The tenant tables are FORCE ROW LEVEL SECURITY, so the owner reads and
 #     updates ZERO rows of them without a tenant: every backfill silently
 #     did nothing. Each file therefore runs with `app.system_scope = 'on'` for
@@ -124,11 +128,16 @@ preflight=$("$psql_bin" "$url" -X -Atq -F '|' -v ON_ERROR_STOP=1 -c "
     FROM pg_roles r WHERE r.rolname = current_user")
 IFS='|' read -r role exempt can_set uncovered <<< "$preflight"
 
+# A function header line `SET app.system_scope = ...` (no semicolon: a clause,
+# not a statement). Session or LOCAL statements need no privilege.
 if [ "$can_set" != t ]; then
-  echo "apply-migrations: role \"$role\" may not create functions with SET app.system_scope (add-agency-invite-code.sql and later)." >&2
-  echo "  Once, as a superuser: psql \"\$SUPERUSER_URL\" -v owner=$role -f prisma/migration-owner-grant.sql" >&2
-  echo "  No file was applied. docs/RELEASE_CHECKLIST.md §3.1." >&2
-  exit 1
+  clause_files=$(cd "$dir" && grep -lE "^[[:space:]]*SET[[:space:]]+app\.system_scope[[:space:]]*(=|TO)[^;]*$" "${listed[@]}" ${down:+"$down"} || true)
+  if [ -n "$clause_files" ]; then
+    echo "apply-migrations: role \"$role\" may not create functions with SET app.system_scope, and these files do:" >&2
+    printf '  %s\n' $clause_files >&2
+    echo "  Set and restore the flag in the function body instead (add-agency-invite-code.sql). No file was applied." >&2
+    exit 1
+  fi
 fi
 if [ "$exempt" != t ] && [ -n "$uncovered" ]; then
   echo "apply-migrations: role \"$role\" is subject to row security, and these FORCE RLS tables have no system_scope policy:" >&2
