@@ -1,0 +1,5 @@
+tests/api/action-leak-scan.ts(358,43): error TS2345: Argument of type 'Expression | undefined' is not assignable to parameter of type 'Node'.
+  Type 'undefined' is not assignable to type 'Node'.
+tests/api/action-leak-scan.ts(377,36): error TS2345: Argument of type 'Declaration | undefined' is not assignable to parameter of type 'Node'.
+  Type 'undefined' is not assignable to type 'Node'.
+tsc exit=2
