@@ -18,7 +18,7 @@ Bu sözleşme, aşağıdaki tabloda bilgileri yazılı iki taraf arasında yapı
 | Bilgi                      | Veri Sorumlusu (müşteri kurum) | Veri İşleyen                    |
 | -------------------------- | ------------------------------ | ------------------------------- |
 | Ad                         | ............................... | FonBridge                       |
-| Ticari unvan               | ............................... | ............................... |
+| Ticari unvan               | ............................... | Fonbridge Ltd. Şti.             |
 | Adres                      | ............................... | ............................... |
 | Vergi dairesi / VKN        | ............................... | ............................... |
 | MERSİS no                  | ............................... | ............................... |
@@ -113,7 +113,7 @@ Bu sözleşme, tarafların aşağıda imzaladığı tarihlerden sonuncusunda yü
 
 - **13.1 Dil:** Bu sözleşme Türkçe ve İngilizce hazırlanmıştır. İki metin arasında çelişki veya yorum farkı olması halinde Türkçe metin geçerlidir.
 - **13.2 Uygulanacak hukuk:** Bu sözleşmeye Türkiye Cumhuriyeti hukuku uygulanır.
-- **13.3 Yetkili mahkeme:** Bu sözleşmeden doğan uyuşmazlıklarda İstanbul (Merkez) Mahkemeleri ve İcra Daireleri yetkilidir.
+- **13.3 Yetkili mahkeme:** Bu sözleşmeden doğan uyuşmazlıklarda Samsun Mahkemeleri ve İcra Daireleri yetkilidir.
 
 ## Ek-1: Alt İşleyenler
 

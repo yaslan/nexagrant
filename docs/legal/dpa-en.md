@@ -18,7 +18,7 @@ This agreement is made between the two parties whose details are set out in the 
 | Detail                     | Controller (customer organisation) | Processor                       |
 | -------------------------- | ---------------------------------- | ------------------------------- |
 | Name                       | ...............................    | FonBridge                       |
-| Registered legal name      | ...............................    | ............................... |
+| Registered legal name      | ...............................    | Fonbridge Ltd. Şti.             |
 | Address                    | ...............................    | ............................... |
 | Tax office / tax number    | ...............................    | ............................... |
 | Trade registry (MERSİS) no | ...............................    | ............................... |
@@ -113,7 +113,7 @@ This agreement enters into force on the later of the dates on which the parties 
 
 - **13.1 Language:** This agreement is made in Turkish and English. If the two texts conflict or differ in interpretation, the Turkish version shall prevail.
 - **13.2 Governing law:** This agreement is governed by the law of the Republic of Türkiye.
-- **13.3 Jurisdiction:** The Istanbul (Central) Courts and Enforcement Offices have jurisdiction over disputes arising from this agreement.
+- **13.3 Jurisdiction:** The Samsun Courts and Enforcement Offices have jurisdiction over disputes arising from this agreement.
 
 ## Annex 1: Sub-processors
 
