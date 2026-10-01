@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { prisma } from '../../../src/lib/db';
+import { withSystemScope } from '../../../src/lib/system-scope';
 
 /**
  * The tenant the `notFound()` status spec runs in.
@@ -67,21 +68,25 @@ export async function setupNotFoundTenant() {
     create: { id: NF_USER_ID, email: NF_EMAIL, name: 'notFound E2E', locale: 'tr' },
     update: { email: NF_EMAIL },
   });
-  await prisma.membership.upsert({
-    where: { id: `${NF_USER_ID}-membership` },
-    create: {
-      id: `${NF_USER_ID}-membership`,
-      tenantId: NF_TENANT,
-      userId: NF_USER_ID,
-      role: 'TENANT_OWNER',
-      workspaceIds: [NF_WORKSPACE_ID],
-    },
-    update: { tenantId: NF_TENANT, role: 'TENANT_OWNER' },
-  });
+  await withSystemScope('platform-admin', 'notfound-fixture.setup.membership', (tx) =>
+    tx.membership.upsert({
+      where: { id: `${NF_USER_ID}-membership` },
+      create: {
+        id: `${NF_USER_ID}-membership`,
+        tenantId: NF_TENANT,
+        userId: NF_USER_ID,
+        role: 'TENANT_OWNER',
+        workspaceIds: [NF_WORKSPACE_ID],
+      },
+      update: { tenantId: NF_TENANT, role: 'TENANT_OWNER' },
+    })
+  );
 }
 
 export async function teardownNotFoundTenant() {
-  await prisma.membership.deleteMany({ where: { tenantId: NF_TENANT } });
+  await withSystemScope('platform-admin', 'notfound-fixture.teardown.membership', (tx) =>
+    tx.membership.deleteMany({ where: { tenantId: NF_TENANT } })
+  );
   await prisma.moduleState.deleteMany({ where: { tenantId: NF_TENANT } });
   await prisma.subscription.deleteMany({ where: { tenantId: NF_TENANT } });
   await prisma.workspace.deleteMany({ where: { tenantId: NF_TENANT } });

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { prisma } from '../../../src/lib/db';
+import { withSystemScope } from '../../../src/lib/system-scope';
 
 /**
  * A tenant of its own for each Evidence Pack (M3) spec (TASK-MULU828HTNN4N).
@@ -31,7 +32,9 @@ export function evidenceTenant(key: string) {
     // Evidence and Claim carry a bare tenantId with no relation to cascade from.
     await prisma.evidence.deleteMany({ where: { tenantId } });
     await prisma.claim.deleteMany({ where: { tenantId } });
-    await prisma.membership.deleteMany({ where: { tenantId } });
+    await withSystemScope('platform-admin', 'evidence-fixture.teardown.membership', (tx) =>
+      tx.membership.deleteMany({ where: { tenantId } })
+    );
     await prisma.moduleState.deleteMany({ where: { tenantId } });
     await prisma.subscription.deleteMany({ where: { tenantId } });
     await prisma.workspace.deleteMany({ where: { tenantId } });
@@ -67,9 +70,11 @@ export function evidenceTenant(key: string) {
     await prisma.user.create({
       data: { id: userId, email, name: `Evidence ${key} E2E`, locale: 'tr' },
     });
-    await prisma.membership.create({
-      data: { tenantId, userId, role: 'TENANT_OWNER', workspaceIds: [workspaceId] },
-    });
+    await withSystemScope('platform-admin', 'evidence-fixture.setup.membership', (tx) =>
+      tx.membership.create({
+        data: { tenantId, userId, role: 'TENANT_OWNER', workspaceIds: [workspaceId] },
+      })
+    );
   }
 
   /** Real sign-in through the login form, landing on the evidence page. */

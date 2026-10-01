@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { prisma } from '../../../src/lib/db';
+import { withSystemScope } from '../../../src/lib/system-scope';
 
 /**
  * The tenant `tests/e2e/module-gate.spec.ts` runs in.
@@ -92,20 +93,24 @@ export async function setupModuleGateTenant() {
     update: { email: MG_EMAIL },
   });
 
-  await prisma.membership.upsert({
-    where: { tenantId_userId: { tenantId: MG_TENANT, userId: MG_USER_ID } },
-    create: {
-      tenantId: MG_TENANT,
-      userId: MG_USER_ID,
-      role: 'TENANT_OWNER',
-      workspaceIds: [MG_WORKSPACE_ID],
-    },
-    update: { role: 'TENANT_OWNER', workspaceIds: [MG_WORKSPACE_ID] },
-  });
+  await withSystemScope('platform-admin', 'module-gate-fixture.setup.membership', (tx) =>
+    tx.membership.upsert({
+      where: { tenantId_userId: { tenantId: MG_TENANT, userId: MG_USER_ID } },
+      create: {
+        tenantId: MG_TENANT,
+        userId: MG_USER_ID,
+        role: 'TENANT_OWNER',
+        workspaceIds: [MG_WORKSPACE_ID],
+      },
+      update: { role: 'TENANT_OWNER', workspaceIds: [MG_WORKSPACE_ID] },
+    })
+  );
 }
 
 export async function teardownModuleGateTenant() {
-  await prisma.membership.deleteMany({ where: { tenantId: MG_TENANT } });
+  await withSystemScope('platform-admin', 'module-gate-fixture.teardown.membership', (tx) =>
+    tx.membership.deleteMany({ where: { tenantId: MG_TENANT } })
+  );
   await prisma.moduleState.deleteMany({ where: { tenantId: MG_TENANT } });
   await prisma.subscription.deleteMany({ where: { tenantId: MG_TENANT } });
   await prisma.workspace.deleteMany({ where: { tenantId: MG_TENANT } });

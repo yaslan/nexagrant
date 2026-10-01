@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { prisma } from '../../../src/lib/db';
+import { withSystemScope } from '../../../src/lib/system-scope';
 
 /**
  * The tenant the M9 end-to-end specs run in.
@@ -67,17 +68,19 @@ export async function setupM9Tenant() {
     create: { id: M9_USER_ID, email: M9_EMAIL, name: 'M9 E2E', locale: 'tr' },
     update: { email: M9_EMAIL },
   });
-  await prisma.membership.upsert({
-    where: { id: `${M9_USER_ID}-membership` },
-    create: {
-      id: `${M9_USER_ID}-membership`,
-      tenantId: M9_TENANT,
-      userId: M9_USER_ID,
-      role: 'PIPELINE_MANAGER',
-      workspaceIds: [M9_WORKSPACE_ID],
-    },
-    update: { tenantId: M9_TENANT, role: 'PIPELINE_MANAGER' },
-  });
+  await withSystemScope('platform-admin', 'm9-fixture.setup.membership', (tx) =>
+    tx.membership.upsert({
+      where: { id: `${M9_USER_ID}-membership` },
+      create: {
+        id: `${M9_USER_ID}-membership`,
+        tenantId: M9_TENANT,
+        userId: M9_USER_ID,
+        role: 'PIPELINE_MANAGER',
+        workspaceIds: [M9_WORKSPACE_ID],
+      },
+      update: { tenantId: M9_TENANT, role: 'PIPELINE_MANAGER' },
+    })
+  );
   await prisma.opportunity.upsert({
     where: { id: M9_OPPORTUNITY },
     create: {
@@ -102,7 +105,9 @@ export async function teardownM9Tenant() {
   await prisma.meetingBrief.deleteMany({ where: { tenantId: M9_TENANT } });
   await prisma.creditLedger.deleteMany({ where: { tenantId: M9_TENANT } });
   await prisma.opportunity.deleteMany({ where: { tenantId: M9_TENANT } });
-  await prisma.membership.deleteMany({ where: { tenantId: M9_TENANT } });
+  await withSystemScope('platform-admin', 'm9-fixture.teardown.membership', (tx) =>
+    tx.membership.deleteMany({ where: { tenantId: M9_TENANT } })
+  );
   await prisma.moduleState.deleteMany({ where: { tenantId: M9_TENANT } });
   await prisma.subscription.deleteMany({ where: { tenantId: M9_TENANT } });
   await prisma.workspace.deleteMany({ where: { tenantId: M9_TENANT } });

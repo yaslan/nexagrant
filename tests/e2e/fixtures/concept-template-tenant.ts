@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { prisma } from '../../../src/lib/db';
+import { withSystemScope } from '../../../src/lib/system-scope';
 
 /**
  * Two tenants for `tests/e2e/concept-template-tenant-isolation.spec.ts`.
@@ -135,16 +136,18 @@ export async function setupConceptTemplateTenants() {
     update: { email: CT_EMAIL },
   });
 
-  await prisma.membership.upsert({
-    where: { tenantId_userId: { tenantId: CT_TENANT_A, userId: CT_USER_ID } },
-    create: {
-      tenantId: CT_TENANT_A,
-      userId: CT_USER_ID,
-      role: 'TENANT_OWNER',
-      workspaceIds: [CT_WORKSPACE_ID],
-    },
-    update: { role: 'TENANT_OWNER', workspaceIds: [CT_WORKSPACE_ID] },
-  });
+  await withSystemScope('platform-admin', 'concept-template-fixture.setup.membership', (tx) =>
+    tx.membership.upsert({
+      where: { tenantId_userId: { tenantId: CT_TENANT_A, userId: CT_USER_ID } },
+      create: {
+        tenantId: CT_TENANT_A,
+        userId: CT_USER_ID,
+        role: 'TENANT_OWNER',
+        workspaceIds: [CT_WORKSPACE_ID],
+      },
+      update: { role: 'TENANT_OWNER', workspaceIds: [CT_WORKSPACE_ID] },
+    })
+  );
 }
 
 export async function teardownConceptTemplateTenants() {
@@ -154,7 +157,9 @@ export async function teardownConceptTemplateTenants() {
     where: { id: { in: [CT_FOREIGN_TEMPLATE_ID, CT_OWN_TEMPLATE_ID] } },
   });
   await prisma.opportunity.deleteMany({ where: { tenantId: { in: tenantIds } } });
-  await prisma.membership.deleteMany({ where: { tenantId: { in: tenantIds } } });
+  await withSystemScope('platform-admin', 'concept-template-fixture.teardown.membership', (tx) =>
+    tx.membership.deleteMany({ where: { tenantId: { in: tenantIds } } })
+  );
   await prisma.moduleState.deleteMany({ where: { tenantId: { in: tenantIds } } });
   await prisma.subscription.deleteMany({ where: { tenantId: { in: tenantIds } } });
   await prisma.workspace.deleteMany({ where: { tenantId: { in: tenantIds } } });
