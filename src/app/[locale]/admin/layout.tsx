@@ -12,7 +12,6 @@ import UserMenu from '@/components/UserMenu';
 import AdminSidebarNav from '@/components/AdminSidebarNav';
 import {
   ChevronRight,
-  ExternalLink,
 } from 'lucide-react';
 
 import MobileAdminHeader from '@/components/MobileAdminHeader';
@@ -132,15 +131,6 @@ export default async function AdminLayout({
         </div>
 
         <div className="flex items-center space-x-4">
-          <a
-            href="https://docs.fabrika.app"
-            target="_blank"
-            rel="noreferrer"
-            className="hover:text-ink transition-colors flex items-center gap-1"
-          >
-            <span>Dokümantasyon</span>
-            <ExternalLink className="w-3 h-3 text-muted" />
-          </a>
           <Link href={`/${locale}/privacy`} className="hover:text-ink transition-colors">
             Gizlilik & DPA
           </Link>

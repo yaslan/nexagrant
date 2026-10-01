@@ -18,7 +18,7 @@ export async function POST() {
     return internalError({ error: 'export_failed' });
   }
 
-  const filename = `fabrika-data-export-${new Date().toISOString().split('T')[0]}.json`;
+  const filename = `fonbridge-data-export-${new Date().toISOString().split('T')[0]}.json`;
 
   return new NextResponse(JSON.stringify(result.data, null, 2), {
     status: 200,
