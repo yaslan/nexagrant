@@ -132,6 +132,8 @@ Every week, at minimum: one gate decision, one feedback item, one sync attended.
 
 This is the one weekly meeting for **pilot and beta partners together**: 30 minutes, Google Meet (the link is in the calendar invitation).
 
+> **Note:** Weeks 1–4 were held on Thursday at 14:00 (Istanbul time). Starting from week 5, the schedule changed to Monday 15:00–15:30 (Europe/Istanbul) via Google Meet (patron decision: 2026-10-01, pilot + beta together).
+
 Calendar file: [`beta/beta-weekly-sync.ics`](./beta/beta-weekly-sync.ics) — importable into Google
 Calendar, Outlook and Apple Calendar (Google Calendar: *Settings → Import & export → Import*). Automatic
 calendar integration is v1.1 work; during the beta the calendar is distributed as a **static ICS**.

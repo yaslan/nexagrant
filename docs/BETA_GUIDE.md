@@ -131,6 +131,8 @@ Her hafta en az: 1 kapı kararı, 1 geri bildirim kaydı, 1 sync katılımı.
 
 Bu görüşme **pilot ve beta ortaklarının birlikte** katıldığı tek haftalık görüşmedir: 30 dakika, Google Meet (bağlantı takvim davetindedir).
 
+> **Not:** Hafta 1–4 Perşembe 14:00 (İstanbul) saatinde yapılmıştır. Hafta 5'ten itibaren Pazartesi 15:00–15:30 (Europe/Istanbul) saatine, Google Meet ortamına geçilmiştir (patron kararı: 2026-10-01, pilot + beta birlikte).
+
 Takvim dosyası: [`beta/beta-weekly-sync.ics`](./beta/beta-weekly-sync.ics) — Google Calendar, Outlook ve
 Apple Takvim'e içe aktarılabilir (Google Takvim: *Ayarlar → İçe aktar ve dışa aktar → İçe aktar*).
 Otomatik takvim entegrasyonu v1.1 kapsamındadır; beta'da takvim **statik ICS** ile dağıtılır.
