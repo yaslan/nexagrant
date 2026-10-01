@@ -36,6 +36,7 @@ const DB = `fb_owner_chain_${RUN}`;
 const DB_SUPER = `${DB}_su`;
 const DB_GAP = `${DB}_gap`;
 const DB_DOWN = `${DB}_down`;
+const DB_ACL = `${DB}_acl`;
 const LONG = 240_000;
 
 let ready = false;
@@ -149,6 +150,10 @@ beforeAll(async () => {
   // The owner builds the base tables, as in production (RELEASE_CHECKLIST §3.1 step 1).
   const push = run('node_modules/.bin/prisma', ['db', 'push'], ownerUrl());
   if (push.status !== 0) throw new Error(`prisma db push as owner failed:\n${push.out}`);
+  // Base tables only, no chain yet: the Supabase default-ACL suite below needs
+  // the functions to be created after its default privileges are in place.
+  await admin.query(`CREATE DATABASE ${DB_ACL} TEMPLATE ${DB} OWNER ${OWNER}`);
+  created.dbs.push(DB_ACL);
   ready = true;
 }, LONG);
 
@@ -196,14 +201,21 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
     expect(again.out).toContain('No file was applied');
   }, LONG);
 
-  test('a file that brings back a function-level SET app.system_scope is refused before any file', async () => {
+  // crw2-fb Ö-4 (TASK-MUPYHVSBW47GD): the quoted name, lower case and a `;`
+  // inside a trailing comment used to slip past the check.
+  test.each([
+    ["SET app.system_scope = 'on'"],
+    [`SET "app.system_scope" = 'on'`],
+    ['set app.system_scope to on'],
+    ["SET app.system_scope = 'on' -- was: SET LOCAL; now a clause"],
+  ])('a file that brings back a function-level clause (%s) is refused before any file', async (clause) => {
     const tree = mkdtempSync(join(tmpdir(), 'fb-owner-clause-'));
     try {
       cpSync(resolve(ROOT, 'scripts/apply-migrations.sh'), join(tree, 'scripts/apply-migrations.sh'));
       cpSync(resolve(ROOT, 'prisma/migrations'), join(tree, 'prisma/migrations'), { recursive: true });
       appendFileSync(
         join(tree, 'prisma/migrations/add-agency-funnel.sql'),
-        `\nCREATE OR REPLACE FUNCTION public.zz_clause() RETURNS int LANGUAGE sql\nSET app.system_scope = 'on'\nAS 'SELECT 1';\n`
+        `\nCREATE OR REPLACE FUNCTION public.zz_clause() RETURNS int LANGUAGE sql\n${clause}\nAS 'SELECT 1';\n`
       );
       const r = run('bash', [join(tree, 'scripts/apply-migrations.sh')], ownerUrl());
       expect(r.status).toBe(1);
@@ -445,6 +457,50 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
     }
   }, LONG);
 
+  // crw2-fb Ö-1 (TASK-MUPYHVSBW47GD, mutants M1 and M5): the known-code branch
+  // of note_agency_invite_rejection (it writes an AuditEvent and returns early)
+  // was never called, and no success of it ended in COMMIT. Called here for a
+  // revoked code, under each caller value, in a transaction that COMMITs: the
+  // caller's value comes back inside it, and nothing survives it.
+  test('note_agency_invite_rejection for a known code hands the caller\'s value back, and leaves nothing for the session', async (ctx) => {
+    if (!RLS_URL) ctx.skip('DATABASE_URL_RLS_TEST is not set');
+    const app = new URL(RLS_URL!);
+    const appUrl = urlFor(ADMIN_URL!, DB, { name: app.username, password: decodeURIComponent(app.password) });
+    const hash = 'b'.repeat(64);
+    await withDb(adminUrl(), (c) =>
+      c.query(`INSERT INTO "AgencyInviteCode"(id,"tenantId","codeHash","codeHint","expiresAt","revokedAt","createdBy")
+               VALUES ('oc-code-revoked','oc-ag','${hash}','bbbb',now() + interval '1 day',now(),'lu-a')
+               ON CONFLICT (id) DO NOTHING`)
+    );
+    const audits = async () =>
+      (await one(adminUrl(), `SELECT count(*)::int AS n FROM "AuditEvent"
+                                WHERE type = 'agency.invite.rejected' AND data ->> 'codeId' = 'oc-code-revoked'`)).n as number;
+    const start = await audits();
+    let calls = 0;
+    for (const prev of [undefined, 'off', 'on']) {
+      await withDb(appUrl, async (c) => {
+        const scope = async () => (await c.query(`SELECT current_setting('app.system_scope', true) AS s`)).rows[0].s || null;
+        await c.query('BEGIN');
+        try {
+          if (prev !== undefined) await c.query(`SELECT set_config('app.system_scope', $1, true)`, [prev]);
+          await c.query(`SELECT set_config('app.tenant_id', 'oc-ag', true)`);
+          await c.query(`SELECT public.note_agency_invite_rejection('${hash}')`);
+          calls += 1;
+          expect(await scope(), `caller value ${prev}`).toBe(prev ?? null);
+        } finally {
+          await c.query('COMMIT');
+        }
+        expect(await scope(), `after COMMIT, caller value ${prev}`).toBeNull();
+      });
+    }
+    // The branch under test really ran: one 'revoked' audit row per call.
+    expect(calls).toBe(3);
+    expect(await audits()).toBe(start + 3);
+    const reason = await one(adminUrl(), `SELECT data ->> 'reason' AS r FROM "AuditEvent"
+                                            WHERE data ->> 'codeId' = 'oc-code-revoked' LIMIT 1`);
+    expect(reason.r).toBe('revoked');
+  }, LONG);
+
   // Without SET on the parameter the owner cannot store this default itself
   // (permission denied, TASK-MUOG51GJ3PUOG); a superuser still can, and the
   // check guards against it whoever wrote it.
@@ -563,5 +619,88 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
          FROM "Feedback" WHERE id LIKE 'df-%'`
     );
     expect(back).toEqual({ rows: ['df-a=ext-a/sent', 'df-b=ext-b/failed'], archive: 0 });
+  }, LONG);
+});
+
+// TASK-MUOG51GJ3PUOG R-S2 + crw2-fb Ö-2. Supabase exposes every function
+// `anon`/`authenticated` may EXECUTE at /rest/v1/rpc, and its default
+// privileges grant them EXECUTE on whatever `postgres` creates. Simulated here
+// for the owner: the chain and rls.sql must leave none of the owner's
+// functions callable by either role, and the policies must still work.
+describe('Supabase API roles (anon, authenticated) get no EXECUTE from the chain', () => {
+  const API_ROLES = ['anon', 'authenticated'];
+  const madeRoles: string[] = [];
+
+  afterAll(async () => {
+    if (!admin) return;
+    await admin.query(`DROP DATABASE IF EXISTS ${DB_ACL} WITH (FORCE)`).catch(() => {});
+    for (const r of madeRoles) await admin.query(`DROP ROLE IF EXISTS ${r}`).catch(() => {});
+  }, LONG);
+
+  test('with Supabase-style default privileges, no owner function is callable by anon or authenticated', async () => {
+    for (const r of API_ROLES) {
+      const exists = (await admin!.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [r])).rowCount;
+      if (!exists) {
+        await admin!.query(`CREATE ROLE ${r} NOLOGIN`);
+        madeRoles.push(r);
+      }
+    }
+    // What Supabase does for `postgres`, here for the role running the chain.
+    await withDb(adminUrl(DB_ACL), (c) =>
+      c.query(`ALTER DEFAULT PRIVILEGES FOR ROLE ${OWNER} IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated`)
+    );
+    // Control: the default really applies to a function the owner creates.
+    const control = await withDb(ownerUrl(DB_ACL), async (c) => {
+      await c.query('CREATE FUNCTION public.zz_acl_control() RETURNS int LANGUAGE sql AS $$SELECT 1$$');
+      await c.query('REVOKE ALL ON FUNCTION public.zz_acl_control() FROM PUBLIC');
+      const r = (await c.query(`SELECT has_function_privilege('anon', 'public.zz_acl_control()', 'EXECUTE') AS anon`)).rows[0];
+      await c.query('DROP FUNCTION public.zz_acl_control()');
+      return r.anon;
+    });
+    expect(control).toBe(true);
+
+    const first = chain(ownerUrl(DB_ACL));
+    expect(first.status, first.out.slice(-2000)).toBe(0);
+    await withDb(ownerUrl(DB_ACL), async (c) => {
+      const sql = readFileSync(resolve(ROOT, 'prisma/rls.sql'), 'utf8')
+        .split('\n')
+        .filter((line) => !line.startsWith('\\'))
+        .join('\n');
+      await c.query(sql);
+    });
+    const again = chain(ownerUrl(DB_ACL));
+    expect(again.status, again.out.slice(-2000)).toBe(0);
+
+    const facts = await one(
+      adminUrl(DB_ACL),
+      `SELECT
+         (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+           WHERE n.nspname = 'public' AND p.proowner = '${OWNER}'::regrole)::int AS owned,
+         (SELECT coalesce(array_agg(p.oid::regprocedure::text || ' -> ' || r), '{}')
+            FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace, unnest(array['anon','authenticated']) r
+           WHERE n.nspname = 'public' AND p.proowner = '${OWNER}'::regrole
+             AND has_function_privilege(r, p.oid, 'EXECUTE')) AS callable,
+         (SELECT coalesce(array_agg(p.proname::text ORDER BY p.proname), '{}')
+            FROM pg_proc p
+           WHERE p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open')
+             AND EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                          WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE')) AS public_exec`
+    );
+    // 4 definer functions, 3 RLS helpers, enter_system_scope, triggers: many.
+    expect(facts.owned).toBeGreaterThan(5);
+    expect(facts.callable).toEqual([]);
+    expect(facts.public_exec).toEqual([]);
+
+    // The app role keeps what the policies and the pricing page need.
+    const appRole = (await admin!.query(`SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app'`)).rowCount;
+    if (appRole) {
+      const app = await one(
+        adminUrl(DB_ACL),
+        `SELECT bool_and(has_function_privilege('fabrika_app', p.oid, 'EXECUTE')) AS ok, count(*)::int AS n
+           FROM pg_proc p
+          WHERE p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open', 'enter_system_scope')`
+      );
+      expect(app).toEqual({ ok: true, n: 4 });
+    }
   }, LONG);
 });
