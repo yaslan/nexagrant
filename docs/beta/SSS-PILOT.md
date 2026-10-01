@@ -558,7 +558,7 @@ the same all year) for **30 minutes** on Google Meet. The meeting link and a cal
 | No | Soru | SSS |
 | -- | ---- | --- |
 | P-1 | Kurum e-postası Google hesabı değilse belediyeye önerilen yol? (ILKADIM-PILOT S5) | A3 |
-| P-2 | ~~Yanlış üye / yanlış davet~~ → **karar verildi** (K-4, 01.10.2026): ürün hazır olana kadar tek yetkili kişi elle çıkarır, kayıtla. Açık kalan: yetkili kişinin adı ve audit/KVKK sahibi (iç runbook) | B7 |
+| P-2 | ~~Yanlış üye / yanlış davet~~ → **karar verildi** (K-4, 01.10.2026): ürün hazır olana kadar tek yetkili kişi elle çıkarır, kayıtla. Yetkili kişi ve hukuk/KVKK bildirim sahibi: patron (01.10.2026, iç runbook R-1/R-2) | B7 |
 | P-3 | ~~Süre uzatma koşulu~~ → **karar verildi** (K-6, 01.10.2026): vaka bazlı, yayımlanmış kriter yok, otomatik uzatma yok | C4 |
 | P-4 | "Model eğitimi için kullanılmaz" kullanıcıya taahhüt olarak söylenebilir mi? | D3 |
 | P-5 | Kurumun bütün verisini dışa aktarma ve kurum hesabını silme yolu | D4, D5 |

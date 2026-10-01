@@ -15,9 +15,9 @@
 
 | Rol | Kim | Ne yapar |
 | --- | --- | -------- |
-| **Yetkili kişi (tek)** | **[PATRON ADLANDIRIR — bu satır boşken runbook yürütülmez]** | Adım 4–6'yı (DB'de silme, audit kaydı, doğrulama) yapar. Başka kimse çıkarma yapmaz. |
+| **Yetkili kişi (tek)** | **Patron (platform yöneticisi)** — patron kararı 01.10.2026 | Adım 4–6'yı (DB'de silme, audit kaydı, doğrulama) yapar. Başka kimse çıkarma yapmaz. |
 | Destek (CS) | CS-FB / destek sahibi | Adım 1–2: talebi kaydeder, kimliği doğrular, yetkili kişiye yükseltir. **Silme yapmaz.** |
-| Hukuk / veri sorumlusu bildirim sahibi | **[PATRON ADLANDIRIR]** | Adım 3: KVKK değerlendirmesi. İhlal bildirimi kararı hukukundur. |
+| Hukuk / veri sorumlusu bildirim sahibi | **Patron** — patron kararı 01.10.2026 (hukuka ve veri sorumlusuna bildirimi kendisi yapar) | Adım 3: KVKK değerlendirmesi. İhlal bildirimi kararı hukukundur. |
 
 ## 3. Adımlar
 
@@ -40,8 +40,8 @@
 
 | No | Madde |
 | -- | ----- |
-| R-1 | Yetkili kişinin adı (§2). |
-| R-2 | KVKK / hukuk bildirim sahibinin adı (§2). |
+| R-1 | ~~Yetkili kişinin adı (§2).~~ **Karar verildi** (01.10.2026): patron. |
+| R-2 | ~~KVKK / hukuk bildirim sahibinin adı (§2).~~ **Karar verildi** (01.10.2026): patron. |
 | R-3 | Kayıtlı adres doğrulama yöntemi (adım 2). |
 | R-4 | Elle `AuditEvent` biçimi (adım 5). |
 | R-5 | Çıkarılan kişinin oturumunun düşme davranışı (adım 4) — kodla doğrulanmalı. |
