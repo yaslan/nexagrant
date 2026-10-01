@@ -1,0 +1,190 @@
+import http from 'node:http';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { PrismaClient } from '@prisma/client';
+
+/**
+ * TASK-MUOF85BU7BV3X (cs-fb) G-1 ölçümü, İNCELEME-103 D7 harness'ından uyarlandı — fe-fb's confirm pool fix
+ * (TASK-MUO9IFMMVRUDJ) under attack. Unlike the evidence suites, nothing in
+ * @/lib/db is mocked: this process runs with DATABASE_URL = the fabrika_app
+ * (RLS subject) URL, so `withTenant` is the real application pool (10) and
+ * `withTenantLockPool` the real lock pool (3), as in production.
+ * The store is MinIO behind an in-process proxy that injects delay.
+ */
+
+const S3 = {
+  endpoint: process.env.EVIDENCE_S3_TEST_ENDPOINT!,
+  bucket: process.env.EVIDENCE_S3_TEST_BUCKET!,
+};
+const ADMIN_URL = process.env.BEFB_ADMIN_URL!;
+const RUN = `befbg1c-${Date.now().toString(36)}`;
+
+type Session = { user: { id: string }; tenantId: string; role: string };
+const als = vi.hoisted(() => new (process.getBuiltinModule('node:async_hooks').AsyncLocalStorage)<Session>());
+const state = vi.hoisted(() => {
+  const e = process.env;
+  const proxyPort = 33000 + (process.pid % 3000);
+  e.R2_ACCOUNT_ID = 'minio-test';
+  e.R2_ENDPOINT = `http://127.0.0.1:${proxyPort}`;
+  e.R2_ACCESS_KEY_ID = e.EVIDENCE_S3_TEST_ACCESS_KEY;
+  e.R2_SECRET_ACCESS_KEY = e.EVIDENCE_S3_TEST_SECRET_KEY;
+  e.R2_BUCKET = e.EVIDENCE_S3_TEST_BUCKET;
+  return {
+    proxyPort,
+    session: null as null | Session,
+    hook: null as null | ((r: { method: string; path: string; isCopy: boolean }) => Promise<void>),
+    copyLog: [] as { at: number; dst: string; status: number }[],
+  };
+});
+vi.mock('@/lib/auth', () => ({ auth: async () => als.getStore() ?? state.session }));
+vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
+
+const db = await import('@/lib/db');
+const evidence = await import('@/app/[locale]/(app)/[workspace]/evidence/actions');
+const storage = await import('@/lib/storage');
+
+let admin: PrismaClient;
+let proxy: http.Server;
+const t = { a: '', b: '', userA: '', userB: '' };
+const keys: string[] = [];
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const log = (...a: unknown[]) => { console.log('ATK', ...a); if (process.env.BEFB_LOG) process.getBuiltinModule('node:fs').appendFileSync(process.env.BEFB_LOG, `ATK ${a.map(String).join(' ')}\n`); };
+const finalOf = (k: string) => k.replace(/^([^/]+)\/incoming\//, '$1/');
+const PDF = (s: string) => Buffer.from(`%PDF-1.4\n% ${s}\n%%EOF\n`);
+const lockKeyOf = (finalKey: string) => createHash('sha256').update(`evidence-confirm:${finalKey}`).digest().readBigInt64BE(0);
+const put = (url: string, body: Buffer) =>
+  fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: new Uint8Array(body) });
+const sessA = (): Session => ({ user: { id: t.userA }, tenantId: t.a, role: 'TENANT_OWNER' });
+const sessB = (): Session => ({ user: { id: t.userB }, tenantId: t.b, role: 'TENANT_OWNER' });
+
+async function uploaded(name: string, s: Session = sessA()) {
+  return als.run(s, async () => {
+    const body = PDF(name);
+    const p = await evidence.getPresignedUploadUrlAction('certificate', `${name}.pdf`, 'application/pdf', body.length);
+    if (!p.success) throw new Error(`presign refused: ${p.error}`);
+    keys.push(p.objectKey, finalOf(p.objectKey));
+    expect((await put(p.uploadUrl, body)).status).toBe(200);
+    return { ...p, finalKey: finalOf(p.objectKey), body };
+  });
+}
+const confirm = (objectKey: string, s: Session = sessA()) =>
+  als.run(s, () =>
+    evidence.confirmEvidenceUploadAction({
+      title: `${RUN} upload`, category: 'CAT-03', objectKey, fileName: 'belge.pdf', fileSizeBytes: 10, mimeType: 'application/pdf',
+    })
+  );
+const rowsOf = (tenantId: string, finalKey: string) => admin.evidence.findMany({ where: { tenantId, r2ObjectKey: finalKey } });
+async function stored(key: string) {
+  const h = state.hook;
+  state.hook = null;
+  try {
+    return await storage.getObjectBytes(key);
+  } finally {
+    state.hook = h;
+  }
+}
+/** Is the confirm lock of this final key held by someone? (admin session, try-lock in its own tx) */
+async function lockHeld(finalKey: string) {
+  return admin.$transaction(async (tx) => {
+    const [r] = await tx.$queryRaw<{ got: boolean }[]>`SELECT pg_try_advisory_xact_lock(${lockKeyOf(finalKey)}) AS got`;
+    return !r!.got;
+  });
+}
+type Act = { app: string; state: string; n: number };
+async function activity(): Promise<Act[]> {
+  return admin.$queryRaw<Act[]>`SELECT coalesce(application_name,'') AS app, coalesce(state,'') AS state, count(*)::int AS n
+    FROM pg_stat_activity WHERE usename = 'fabrika_app' AND pid <> pg_backend_pid() GROUP BY 1, 2 ORDER BY 1, 2`;
+}
+const fmtAct = (a: Act[]) => a.map((r) => `${r.app || 'app'}:${r.state}=${r.n}`).join(' ');
+
+beforeAll(async () => {
+  const upstream = new URL(S3.endpoint);
+  proxy = http.createServer(async (req, res) => {
+    const isCopy = req.method === 'PUT' && Boolean(req.headers['x-amz-copy-source']);
+    if (state.hook) await state.hook({ method: req.method ?? '', path: (req.url ?? '').split('?')[0] ?? '', isCopy });
+    if (req.socket.destroyed) return;
+    const up = http.request({ host: upstream.hostname, port: upstream.port, method: req.method, path: req.url, headers: req.headers }, (ur) => {
+      res.writeHead(ur.statusCode ?? 502, ur.headers);
+      ur.pipe(res);
+      ur.on('end', () => {
+        if (isCopy) state.copyLog.push({ at: Date.now(), dst: (req.url ?? '').split('?')[0] ?? '', status: ur.statusCode ?? 0 });
+      });
+    });
+    up.on('error', () => res.destroy());
+    req.pipe(up);
+  });
+  await new Promise<void>((r) => proxy.listen(state.proxyPort, '127.0.0.1', () => r()));
+  admin = db.createDbClient(ADMIN_URL);
+  const [who] = await db.prisma.$queryRaw<{ u: string }[]>`SELECT current_user AS u`;
+  log(`app pool role=${who!.u}`);
+  expect(who!.u).toBe('fabrika_app');
+  expect(storage.hasObjectStore).toBe(true);
+  t.a = (await admin.tenant.create({ data: { name: `${RUN} A`, slug: RUN, country: 'TR', kind: 'ORGANIZATION' }, select: { id: true } })).id;
+  t.b = (await admin.tenant.create({ data: { name: `${RUN} B`, slug: `${RUN}-b`, country: 'TR', kind: 'ORGANIZATION' }, select: { id: true } })).id;
+  t.userA = (await admin.user.create({ data: { email: `${RUN}@example.invalid`, name: 'a' } })).id;
+  t.userB = (await admin.user.create({ data: { email: `${RUN}-b@example.invalid`, name: 'b' } })).id;
+});
+
+beforeEach(() => {
+  state.session = sessA();
+  state.hook = null;
+  state.copyLog = [];
+});
+
+afterAll(async () => {
+  state.hook = null;
+  for (const k of keys) await storage.deleteObjectBytes(k).catch(() => {});
+  for (const id of [t.a, t.b].filter(Boolean)) {
+    await admin.evidence.deleteMany({ where: { tenantId: id } }).catch(() => {});
+    await admin.tenant.delete({ where: { id } }).catch(() => {});
+  }
+  await admin.user.deleteMany({ where: { id: { in: [t.userA, t.userB].filter(Boolean) } } }).catch(() => {});
+  await admin.$disconnect();
+  await db.prisma.$disconnect();
+  await new Promise((r) => proxy.close(r));
+});
+
+/** What the caller of the action is left holding, in one word. */
+function classify(e: unknown): string {
+  const err = e as { message?: unknown; digest?: unknown; code?: unknown };
+  const msg = String(e instanceof Error ? e.message : e).split('\n').slice(-1)[0]!.slice(0, 60);
+  const tag = typeof err?.digest === 'string' ? `digest=${err.digest}` : 'no-digest';
+  const raw = /timeout exceeded|Connection terminated/i.test(String(err?.message ?? e)) ? 'RAW-POOL-TEXT' : 'no-pool-text';
+  return `THROW ${tag} ${raw} msg="${msg}"`;
+}
+
+describe('G-1 S2 ölçümü (be-fb TASK-MUOGR5FDKLH22)', () => {
+  test('S2 havuz dolu (tekrarlanabilir): uygulama havuzunun 10 bağlantısı pg_sleep(1.6) ile tutulurken 150 eşzamanlı confirm', async () => {
+    const pattern = (await uploaded('g1-s2')).objectKey;
+    const holders = Array.from({ length: 10 }, () =>
+      db.withTenant(t.b, (tx) => tx.$queryRaw`SELECT pg_sleep(1.6)::text`).then(() => 'held', (e) => `holder-failed ${String(e).slice(0, 40)}`)
+    );
+    await sleep(150);
+    log(`S2 activity while held: ${fmtAct(await activity())}`);
+    const t0 = Date.now();
+    const fr = await Promise.all(
+      Array.from({ length: 150 }, (_, i) =>
+        confirm(pattern.replace(/[^/]+\.pdf$/, `${String(900000 + i).padStart(8, '0')}_s2.pdf`)).then(
+          (r) => (r.success ? 'ok' : `value error=${r.error}`),
+          classify
+        )
+      )
+    );
+    const ms = Date.now() - t0;
+    const hold = await Promise.all(holders);
+    const tally = fr.reduce<Record<string, number>>((m, e) => ((m[e] = (m[e] ?? 0) + 1), m), {});
+    const thrown = fr.filter((e) => e.startsWith('THROW')).length;
+    const raw = fr.filter((e) => e.includes('RAW-POOL-TEXT')).length;
+    log(`S2 holders: ${JSON.stringify(hold.reduce<Record<string, number>>((m, e) => ((m[e] = (m[e] ?? 0) + 1), m), {}))}`);
+    log(`S2 150 confirm in ${ms} ms: ${JSON.stringify(tally)}`);
+    log(`S2 SUMMARY thrown=${thrown} raw_pool_text=${raw}`);
+    await sleep(1_500);
+    const after = await confirm(pattern);
+    const rows = await rowsOf(t.a, finalOf(pattern));
+    log(`S2 AFTER pool free: confirm=${JSON.stringify(after.success ? { success: true } : after)} rows=${rows.length}`);
+    expect(after.success).toBe(true);
+    expect(rows).toHaveLength(1);
+  }, 120_000);
+});

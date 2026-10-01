@@ -126,20 +126,19 @@ describe('requireTenantAction — pilot check without a database connection', ()
     expect(logged).toEqual([]);
   });
 
-  test('the real evidence confirm (İNCELEME-103 D7) rejects with SERVICE_BUSY, never with the driver text', async () => {
+  test('the real evidence confirm (İNCELEME-103 D7) answers service_busy rather than rejecting, never with the driver text (TASK-MUOGR5FDKLH22)', async () => {
     pilot.fail = poolTimeout;
-    const error = await rejection(() =>
-      confirmEvidenceUploadAction({
-        title: 'belge',
-        category: 'CAT-03',
-        objectKey: 't-1/incoming/00000001_belge.pdf',
-        fileName: 'belge.pdf',
-        fileSizeBytes: 10,
-        mimeType: 'application/pdf',
-      })
-    );
-    expect(error).toMatchObject({ digest: SERVICE_BUSY_DIGEST });
-    expect((error as Error).message).toBe(new ServiceBusyError().message);
+    const result = await confirmEvidenceUploadAction({
+      title: 'belge',
+      category: 'CAT-03',
+      objectKey: 't-1/incoming/00000001_belge.pdf',
+      fileName: 'belge.pdf',
+      fileSizeBytes: 10,
+      mimeType: 'application/pdf',
+    });
+    expect(result).toStrictEqual({ success: false, error: 'service_busy' });
+    expect(JSON.stringify(result)).not.toContain(POOL_TEXT);
+    expect(logged.some((l) => l.includes(POOL_TEXT))).toBe(true);
   });
 });
 

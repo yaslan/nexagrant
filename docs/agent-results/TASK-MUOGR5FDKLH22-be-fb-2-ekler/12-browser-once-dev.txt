@@ -1,0 +1,22 @@
+{
+ "MODE": "once-dev",
+ "LOCALE": "tr",
+ "alerts": [
+  "Yükleme hatası: timeout exceeded when trying to connect"
+ ],
+ "actionResponses": [
+  "coming%2Forg-default%2Fcat-03%2F2026%2Fc8da64f3_befb-once-dev-tr_pdf.pdf\",\"objectKey\":\"demo-tenant/incoming/org-default/cat-03/2026/c8da64f3_befb-once-dev-tr_pdf.pdf\",\"contentType\":\"application/pdf\"}\n",
+  "wt/.next/dev/server/chunks/ssr/_1m0pb6w._.js?id=%5Bproject%5D/src/app/%5Blocale%5D/(app)/%5Bworkspace%5D/evidence/actions.ts+%5Bapp-rsc%5D+(ecmascript)\",151,34,0,0,true]],\"env\":\"Server\",\"owner\":null}\n"
+ ]
+}
+{
+ "MODE": "once-dev",
+ "LOCALE": "tr",
+ "alerts": [
+  "Yükleme hatası: timeout exceeded when trying to connect"
+ ],
+ "actionResponses": [
+  "coming%2Forg-default%2Fcat-03%2F2026%2Ff3169138_befb-once-dev-tr_pdf.pdf\",\"objectKey\":\"demo-tenant/incoming/org-default/cat-03/2026/f3169138_befb-once-dev-tr_pdf.pdf\",\"contentType\":\"application/pdf\"}\n",
+  "wt/.next/dev/server/chunks/ssr/_1m0pb6w._.js?id=%5Bproject%5D/src/app/%5Blocale%5D/(app)/%5Bworkspace%5D/evidence/actions.ts+%5Bapp-rsc%5D+(ecmascript)\",151,34,0,0,true]],\"env\":\"Server\",\"owner\":null}\n"
+ ]
+}

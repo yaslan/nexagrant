@@ -1,0 +1,44 @@
+{
+ "MODE": "inject",
+ "LOCALE": "tr",
+ "alerts": [
+  "Yükleme hatası: Sistem şu an çok yoğun; belge kaydedilmedi. Birkaç saniye sonra yeniden yükleyin."
+ ],
+ "actionResponses": [
+  "2Fincoming%2Forg-default%2Fcat-03%2F2026%2Fbbd1ae21_befb-inject-tr_pdf.pdf\",\"objectKey\":\"demo-tenant/incoming/org-default/cat-03/2026/bbd1ae21_befb-inject-tr_pdf.pdf\",\"contentType\":\"application/pdf\"}\n",
+  "0:{\"a\":\"$@1\",\"f\":\"\",\"q\":\"\",\"i\":true,\"b\":\"development\"}\n1:D\"$2\"\n1:{\"success\":false,\"error\":\"service_busy\"}\n"
+ ]
+}
+{
+ "MODE": "inject",
+ "LOCALE": "tr",
+ "alerts": [
+  "Yükleme hatası: Sistem şu an çok yoğun; belge kaydedilmedi. Birkaç saniye sonra yeniden yükleyin."
+ ],
+ "actionResponses": [
+  "2Fincoming%2Forg-default%2Fcat-03%2F2026%2Fcbc6bae7_befb-inject-tr_pdf.pdf\",\"objectKey\":\"demo-tenant/incoming/org-default/cat-03/2026/cbc6bae7_befb-inject-tr_pdf.pdf\",\"contentType\":\"application/pdf\"}\n",
+  "0:{\"a\":\"$@1\",\"f\":\"\",\"q\":\"\",\"i\":true,\"b\":\"development\"}\n1:D\"$2\"\n1:{\"success\":false,\"error\":\"service_busy\"}\n"
+ ]
+}
+{
+ "MODE": "inject",
+ "LOCALE": "en",
+ "alerts": [
+  "Upload error: The system is very busy right now, so the document was not saved. Upload it again in a few seconds."
+ ],
+ "actionResponses": [
+  "2Fincoming%2Forg-default%2Fcat-03%2F2026%2F2959fd1f_befb-inject-en_pdf.pdf\",\"objectKey\":\"demo-tenant/incoming/org-default/cat-03/2026/2959fd1f_befb-inject-en_pdf.pdf\",\"contentType\":\"application/pdf\"}\n",
+  "0:{\"a\":\"$@1\",\"f\":\"\",\"q\":\"\",\"i\":true,\"b\":\"development\"}\n1:D\"$2\"\n1:{\"success\":false,\"error\":\"service_busy\"}\n"
+ ]
+}
+{
+ "MODE": "inject",
+ "LOCALE": "en",
+ "alerts": [
+  "Upload error: The system is very busy right now, so the document was not saved. Upload it again in a few seconds."
+ ],
+ "actionResponses": [
+  "2Fincoming%2Forg-default%2Fcat-03%2F2026%2Fd960068c_befb-inject-en_pdf.pdf\",\"objectKey\":\"demo-tenant/incoming/org-default/cat-03/2026/d960068c_befb-inject-en_pdf.pdf\",\"contentType\":\"application/pdf\"}\n",
+  "0:{\"a\":\"$@1\",\"f\":\"\",\"q\":\"\",\"i\":true,\"b\":\"development\"}\n1:D\"$2\"\n1:{\"success\":false,\"error\":\"service_busy\"}\n"
+ ]
+}
