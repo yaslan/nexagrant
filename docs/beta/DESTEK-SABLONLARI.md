@@ -12,7 +12,10 @@
    `[İMZA]` boş kalamaz; pilot destek adresi **info@fonbridge.com**'dur (SSS G2, P-9 çözüldü).
 2. **[DOĞRULANMADI]** işaretli cümle, patron cevabı gelmeden gönderilmez; şablonda o cümleyi silin ya
    da "ekibimize sorup size döneceğim" yazın.
-3. **Fiyat, tarih, SLA, hukuki taahhüt yazılmaz.** Uzatma ya da ücretli geçiş sözü verilmez.
+3. **Fiyat, tarih, SLA, hukuki taahhüt yazılmaz.** Uzatma ya da ücretli geçiş sözü verilmez. Yanıt
+   süresi söylenecekse yalnız SSS G3'teki "hedef, taahhüt değil" tablosu (P0 2 saat / P1 1 iş günü /
+   P2 2 iş günü, iş saatleri içinde) kullanılır; başka süre uydurulmaz.
+   > **İç hedef (müşteriye yazılmaz):** Taleplerin %90'ı hedef sürede ilk yanıt alır. Sahibi PM. Bu hedef K-5 kararından geliyor ve müşterilere ya da SSS'e yazılmaz.
 4. **Kişisel veri:** Yanıtta başka kullanıcının adını/e-postasını yazmayın. E-posta adreslerini
    maskeleyin (`u***@ilkadim…`), ürün de böyle maskeler (QA akış 8).
 5. **Bilinen sorun** şablonları (Ş-1, Ş-2, Ş-3) geçicidir. Düzeltme gelince bu dosya güncellenir;
@@ -148,12 +151,13 @@ değilse **[DOĞRULANMADI]** — patrona yükseltin (P-1).
 > Merhaba [Ad],
 >
 > Yazdığınız için teşekkürler. Bu, bildiğimiz bir eksik: bugün üründe davet iptali, üye çıkarma ve
-> üye listesi henüz yok.
+> üye listesi henüz yok. Bunları şimdilik ekibimiz elle yapıyor.
 >
 > - **Yanlış adrese giden davet** 7 gün sonra kendiliğinden geçersiz olur. O süre boyunca bir koltuk
 >   tutar.
-> - **Yanlış katılan kişi** ya da **rol değişikliği** için talebinizi ekibimize ilettim. [DOĞRULANMADI:
->   ne zaman yapılacağı — patron cevabından sonra süre yazın ya da bu cümleyi silin.]
+> - **Yanlış katılan kişi** için talebinizi öncelikli olarak inceliyoruz. Kimliğinizi doğrulamak için
+>   size ayrıca yazabiliriz; yanıt vermeniz işlemi hızlandırır.
+> - **Rol değişikliği** için talebinizi ekibimize ilettim.
 >
 > Talep numaranız: [TALEP-NO]. İşlem yapılınca size yazacağım.
 >
@@ -164,10 +168,12 @@ değilse **[DOĞRULANMADI]** — patrona yükseltin (P-1).
 > Hello [Name],
 >
 > Thank you for writing. This is a known gap: today the product cannot cancel an invitation, remove a
-> member or list members.
+> member or list members. For now our team does these by hand.
 >
 > - **An invitation to a wrong address** expires by itself after 7 days. Until then it uses one seat.
-> - For **a wrong member** or **a role change**, I have passed your request to our team.
+> - For **a wrong member**, we are reviewing your request as a priority. We may write to you
+>   separately to verify who you are; your answer will speed things up.
+> - For **a role change**, I have passed your request to our team.
 >
 > Your request number: [REQUEST-NO]. I will write to you when it is done.
 >
@@ -175,7 +181,10 @@ değilse **[DOĞRULANMADI]** — patrona yükseltin (P-1).
 
 **Yükseltme notu (platform ekibine):** kiracı adı · istenen işlem (üye çıkar / rol değiştir / davet
 sil) · hedef kişinin **maskeli** e-postası · talep eden kişinin rolü (yalnız Kurum Sahibi/Kiracı
-Yöneticisi talebi işlenir; SSS B3) · QA Y-3.
+Yöneticisi talebi işlenir; SSS B3) · QA Y-3. **Yanlış kişi katıldıysa P0'dır** (veri görmüş olabilir):
+hemen yükselt. Üyeyi elle çıkarma işini yalnız **runbook'taki yetkili kişi** yapar; destek çıkarma
+yapmaz, yalnız talebi kaydeder ve yükseltir → `docs/destek/RUNBOOK-YANLIS-UYE.md` (iç belge; müşteriyle
+paylaşılmaz).
 
 ---
 
@@ -239,8 +248,8 @@ davetle sınır aşımı). Kullanıcıya bir şey söylemeyin, kayda "Y-2 şüph
 > - Verilerinizi kendi hesabınız için **Ayarlar → Gizlilik ve Verilerim** ekranından JSON olarak
 >   indirebilirsiniz.
 >
-> Süreyi uzatma kararını yalnız platform yöneticisi verir. Talebinizi ilgili ekibe ilettim; size
-> dönüş yapılacak.
+> Süreyi uzatma kararını yalnız platform yöneticisi verir. Her talep ayrı değerlendirilir; uzatma
+> sözü veremem. Talebinizi ilgili ekibe ilettim; size dönüş yapılacak.
 >
 > [İMZA]
 
@@ -254,13 +263,21 @@ davetle sınır aşımı). Kullanıcıya bir şey söylemeyin, kayda "Y-2 şüph
 > - Adding, editing and inviting new members are closed.
 > - You can download your own data as JSON in **Settings → Privacy & My Data**.
 >
-> Only the platform admin can extend the pilot. I have passed your request to the team; they will
-> get back to you.
+> Only the platform admin can extend the pilot. We review each request, so I cannot promise an
+> extension. I have passed your request to the team; they will get back to you.
 >
 > [SIGNATURE]
 
-**Yasak:** "Uzatacağız", "şu tarihe kadar açılır", fiyat. Uzatma koşulu **[DOĞRULANMADI]** (P-3).
-**Yükseltme:** patron — kiracı, son gün, talep eden, talep gerekçesi.
+**Yasak:** "Uzatacağız", "şu tarihe kadar açılır", fiyat, "şu koşulu sağlarsanız uzatılır" (yayımlanmış
+kriter yok).
+**Yükseltme:** platform yöneticisi — kiracı, son gün, talep eden, talep gerekçesi.
+
+**İç not (kullanıcıya gösterilmez; patron kararı K-6, 01.10.2026):** Uzatma yalnız platform yöneticisi
+kararıdır, vaka bazlıdır; sayısal kriter yoktur, otomatik uzatma yoktur. Talep geldiğinde: (1) talep
+eden Kurum Sahibi/Kiracı Yöneticisi mi, (2) kiracının bitiş tarihi (`/admin/billing/plans`),
+(3) karar → panelden "Süreyi 90 gün uzat" ya da ret. Süre dolmuşsa uzatma bugünden sayılır (gün geri
+verilmez); süre dolmadan yapılan uzatma bitiş tarihinden devam eder. Aktif üye sayısı gibi bir ölçüt
+konulacaksa QA Y-3 (üye listesi) çözülmeden konmaz.
 
 ---
 
@@ -300,8 +317,8 @@ davetle sınır aşımı). Kullanıcıya bir şey söylemeyin, kayda "Y-2 şüph
 >
 > [SIGNATURE]
 
-**Öncelik:** Giriş yapılamıyorsa ve geçici çözüm yoksa **P0** (BETA_GUIDE §5 tanımı; hedef süre
-pilot için **[DOĞRULANMADI]**, P-10). Kurum e-postası Google değilse → P-1, patrona yükselt.
+**Öncelik:** Giriş yapılamıyorsa ve geçici çözüm yoksa **P0** (BETA_GUIDE §5 tanımı ve hedef süre,
+SSS G3; pilot ve beta için aynı tablo). Kurum e-postası Google değilse → P-1, patrona yükselt.
 
 ---
 
@@ -512,7 +529,7 @@ değiştirme önerisi değildir (kod değişikliği bu kartın kapsamı dışın
 | 6 | Konu | seçim: Giriş · Davet/koltuk · Pilot süresi · Veri/gizlilik · Modül kullanımı · Hata · Özellik isteği · Diğer | ✔ | destek | Uygulama formundaki konu listesiyle eşlenir |
 | 7 | Etki | seçim: Çalışamıyorum · Ciddi engel · İdare ediyorum · Fikrim var | ✔ | kullanıcı | Uygulama formuyla aynı ölçek (`BETA_GUIDE.md:161`) |
 | 8 | Etkilenen kişi sayısı | sayı (1–6) | ✔ | destek | Triyaj: önem × etki × kaç kullanıcı |
-| 9 | Öncelik | seçim: P0 / P1 / P2 / P3 | ✔ | destek | Tanımlar `BETA_GUIDE.md:178-183`; **hedef süreler pilot için doğrulanmadı** (P-10) |
+| 9 | Öncelik | seçim: P0 / P1 / P2 / P3 | ✔ | destek | Tanımlar ve hedef süreler `BETA_GUIDE.md` §5 (pilot + beta; iş saatleri içinde, takip PM; K-5) |
 | 10 | Sayfa adresi | URL | — | sistem/kullanıcı | Uygulama formu kendiliğinden ekler |
 | 11 | Tekrar üretim adımları | metin | hata ise ✔ | destek | Ş-8'deki 5 soru |
 | 12 | Beklenen / gözlenen | metin | hata ise ✔ | destek | |
@@ -543,7 +560,7 @@ tablo güncellenir.
 | ----- | --------------------- | ------------ | ------ |
 | Y-1 | Davetle katılınca "Erişim Reddedildi" | Sol menüden Çağrılar | Ş-1 |
 | Y-2 | (kullanıcı görmez) koltuk sayısı 6'yı aşabilir | Ekibe yükselt, kullanıcıya söyleme | Ş-4 iç not |
-| Y-3 | Üye listesi yok, davet iptali/üye çıkarma yok | 7 gün bekle ya da ekibe yükselt | Ş-3 |
+| Y-3 | Üye listesi yok, davet iptali/üye çıkarma yok | Yanlış davet 7 günde düşer; yanlış üye için ekibe yükselt (elle çıkarma, tek yetkili kişi) | Ş-3 |
 | Y-4 | Profil "kaydedildi" diyor, kaydetmiyor | Metni ayrıca sakla | Ş-11 |
 | Ö-1 | Koltuk hatası "planı yükseltin" diyor; EN'de Türkçe | Yükseltme cümlesini yok say | Ş-4 |
 | Ö-2 | "Kurum Sahibi" seçilen kişi Üye oluyor | Bu rolü seçme; rol değişikliği için yükselt | Ş-1, Ş-3 |

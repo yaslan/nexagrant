@@ -79,28 +79,28 @@ describe('buildCheckinSchedule', () => {
     }
   });
 
-  it('holds 15:00 Brussels across the end of summer time', () => {
-    // The regression this guards: a hard-coded +02:00 would put week 8 an hour early.
+  it('holds 15:00 Istanbul (+03:00, no DST) across the whole beta', () => {
     expect(schedule.every((o) => o.localTime === '15:00')).toBe(true);
-    expect(schedule.slice(0, 7).every((o) => o.utcOffset === '+02:00')).toBe(true);
-    expect(schedule[7]?.utcOffset).toBe('+01:00');
-    expect(schedule[0]?.start.toISOString()).toBe('2026-09-07T13:00:00.000Z');
-    expect(schedule[7]?.start.toISOString()).toBe('2026-10-26T14:00:00.000Z');
+    expect(schedule.every((o) => o.utcOffset === '+03:00')).toBe(true);
+    expect(schedule[0]?.start.toISOString()).toBe('2026-09-07T12:00:00.000Z');
+    expect(schedule[7]?.start.toISOString()).toBe('2026-10-26T12:00:00.000Z');
   });
 
-  it('honours an alternative slot without touching the default', () => {
-    // docs/BETA_GUIDE.md's design: Thursdays 14:00 Europe/Istanbul, which has no DST.
-    const istanbul = buildCheckinSchedule('2026-09-10', 8, {
-      timezone: 'Europe/Istanbul',
-      weekday: 4,
-      hour: 14,
+  it('honours an alternative DST zone without touching the default', () => {
+    // The regression this guards: a hard-coded offset would put week 8 an hour off.
+    const brussels = buildCheckinSchedule('2026-09-07', 8, {
+      timezone: 'Europe/Brussels',
+      weekday: 1,
+      hour: 15,
       minute: 0,
       durationMinutes: 45,
     });
-    expect(istanbul[0]?.localDate).toBe('2026-09-10');
-    expect(istanbul[0]?.start.toISOString()).toBe('2026-09-10T11:00:00.000Z');
-    expect(istanbul.every((o) => o.utcOffset === '+03:00')).toBe(true);
-    expect(schedule[0]?.start.toISOString()).toBe('2026-09-07T13:00:00.000Z');
+    expect(brussels.every((o) => o.localTime === '15:00')).toBe(true);
+    expect(brussels.slice(0, 7).every((o) => o.utcOffset === '+02:00')).toBe(true);
+    expect(brussels[7]?.utcOffset).toBe('+01:00');
+    expect(brussels[0]?.start.toISOString()).toBe('2026-09-07T13:00:00.000Z');
+    expect(brussels[7]?.start.toISOString()).toBe('2026-10-26T14:00:00.000Z');
+    expect(schedule[0]?.start.toISOString()).toBe('2026-09-07T12:00:00.000Z');
   });
 
   it('gives every occurrence a 45-minute duration', () => {
@@ -139,9 +139,9 @@ describe('buildCheckinIcs', () => {
     expect(/[^\r]\n/.test(ics)).toBe(false);
   });
 
-  it('emits the DST-correct UTC instants', () => {
-    expect(ics).toContain('DTSTART:20260907T130000Z');
-    expect(ics).toContain('DTSTART:20261026T140000Z');
+  it('emits the Istanbul-correct UTC instants', () => {
+    expect(ics).toContain('DTSTART:20260907T120000Z');
+    expect(ics).toContain('DTSTART:20261026T120000Z');
   });
 
   it('carries organizer and attendee', () => {

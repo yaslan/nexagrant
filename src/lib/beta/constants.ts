@@ -5,12 +5,10 @@
  * cannot drift apart. Anything an operator may need to change per environment is
  * read from the environment with a documented default.
  *
- * NOTE — two programme designs are in play for E11.1 and the choice is not ours:
- *   • the E11 brief asks for every module in `pilot`, Mondays 15:00 Europe/Brussels;
- *   • docs/BETA_GUIDE.md scopes the beta to the MVP modules, Thursdays 14:00
- *     Europe/Istanbul.
- * Both are therefore configurable rather than hard-coded — see MODULE_SETS below
- * and the --modules / --day / --time / --tz flags on scripts/beta-onboarding.ts.
+ * NOTE — the weekly check-in slot was settled by the owner on 2026-10-01 (P-7):
+ * Mondays 15:00 Europe/Istanbul. The module scope (`all` vs `mvp`) stays
+ * configurable — see MODULE_SETS below and the --modules / --day / --time / --tz
+ * flags on scripts/beta-onboarding.ts.
  */
 
 import type { ModuleId } from '../modules/types';
@@ -39,8 +37,8 @@ export const BETA_PLAN_ID = 'ultra';
 /** Number of weekly check-ins across the beta (S8 → S16). */
 export const BETA_CHECKIN_WEEKS = 8;
 
-/** Default check-in slot — the E11 brief's Monday 15:00 Brussels. */
-export const BETA_CHECKIN_TZ = 'Europe/Brussels';
+/** Default check-in slot — Monday 15:00 Istanbul (owner decision P-7, 2026-10-01). */
+export const BETA_CHECKIN_TZ = 'Europe/Istanbul';
 /** ISO weekday, 1 = Monday … 7 = Sunday. */
 export const BETA_CHECKIN_WEEKDAY = 1;
 export const BETA_CHECKIN_HOUR = 15;

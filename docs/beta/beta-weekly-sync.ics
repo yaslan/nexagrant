@@ -72,45 +72,49 @@ TRANSP:OPAQUE
 END:VEVENT
 BEGIN:VEVENT
 UID:fabrika-beta-week05@fabrika.app
-DTSTAMP:20260906T090000Z
-DTSTART;TZID=Europe/Istanbul:20261008T140000
-DTEND;TZID=Europe/Istanbul:20261008T144500
+DTSTAMP:20261001T090000Z
+SEQUENCE:2
+DTSTART;TZID=Europe/Istanbul:20261005T150000
+DTEND;TZID=Europe/Istanbul:20261005T153000
 SUMMARY:Fabrika Beta — Hafta 5 Sync / Week 5 Sync
-DESCRIPTION:Tema / Theme: Kanit disiplini (M3) ve raporlama — Evidence discipline (M3) and reporting\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
-LOCATION:Online
+DESCRIPTION:Tema / Theme: Kanit disiplini (M3) ve raporlama — Evidence discipline (M3) and reporting\n\nGundem / Agenda: 5dk durum\, 10dk surtunme\, 5dk tema\, 5dk triyaj\, 5dk karar. Pilot ve beta ortaklari / Pilot and beta partners. Sure / Duration: 30 dk / min. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Google Meet — https://meet.google.com/eio-ftwm-wak
 STATUS:CONFIRMED
 TRANSP:OPAQUE
 END:VEVENT
 BEGIN:VEVENT
 UID:fabrika-beta-week06@fabrika.app
-DTSTAMP:20260906T090000Z
-DTSTART;TZID=Europe/Istanbul:20261015T140000
-DTEND;TZID=Europe/Istanbul:20261015T144500
+DTSTAMP:20261001T090000Z
+SEQUENCE:2
+DTSTART;TZID=Europe/Istanbul:20261012T150000
+DTEND;TZID=Europe/Istanbul:20261012T153000
 SUMMARY:Fabrika Beta — Hafta 6 Sync / Week 6 Sync
-DESCRIPTION:Tema / Theme: KPI paneli: hangi metrik karar degistiriyor? — KPI dashboard: which metric changes a decision?\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
-LOCATION:Online
+DESCRIPTION:Tema / Theme: KPI paneli: hangi metrik karar degistiriyor? — KPI dashboard: which metric changes a decision?\n\nGundem / Agenda: 5dk durum\, 10dk surtunme\, 5dk tema\, 5dk triyaj\, 5dk karar. Pilot ve beta ortaklari / Pilot and beta partners. Sure / Duration: 30 dk / min. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Google Meet — https://meet.google.com/eio-ftwm-wak
 STATUS:CONFIRMED
 TRANSP:OPAQUE
 END:VEVENT
 BEGIN:VEVENT
 UID:fabrika-beta-week07@fabrika.app
-DTSTAMP:20260906T090000Z
-DTSTART;TZID=Europe/Istanbul:20261022T140000
-DTEND;TZID=Europe/Istanbul:20261022T144500
+DTSTAMP:20261001T090000Z
+SEQUENCE:2
+DTSTART;TZID=Europe/Istanbul:20261019T150000
+DTEND;TZID=Europe/Istanbul:20261019T153000
 SUMMARY:Fabrika Beta — Hafta 7 Sync / Week 7 Sync
-DESCRIPTION:Tema / Theme: Fiyat dogrulama atolyesi (E11.4) — Price validation workshop (E11.4)\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
-LOCATION:Online
+DESCRIPTION:Tema / Theme: Fiyat dogrulama atolyesi (E11.4) — Price validation workshop (E11.4)\n\nGundem / Agenda: 5dk durum\, 10dk surtunme\, 5dk tema\, 5dk triyaj\, 5dk karar. Pilot ve beta ortaklari / Pilot and beta partners. Sure / Duration: 30 dk / min. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Google Meet — https://meet.google.com/eio-ftwm-wak
 STATUS:CONFIRMED
 TRANSP:OPAQUE
 END:VEVENT
 BEGIN:VEVENT
 UID:fabrika-beta-week08@fabrika.app
-DTSTAMP:20260906T090000Z
-DTSTART;TZID=Europe/Istanbul:20261029T140000
-DTEND;TZID=Europe/Istanbul:20261029T144500
+DTSTAMP:20261001T090000Z
+SEQUENCE:2
+DTSTART;TZID=Europe/Istanbul:20261026T150000
+DTEND;TZID=Europe/Istanbul:20261026T153000
 SUMMARY:Fabrika Beta — Hafta 8 Sync / Week 8 Sync
-DESCRIPTION:Tema / Theme: G0 kalibrasyonu (E11.3) + beta kapanisi — G0 calibration (E11.3) and beta close-out\n\nGundem / Agenda: 5dk durum\, 15dk surtunme\, 10dk tema\, 10dk triyaj\, 5dk karar. Rehber / Guide: docs/BETA_GUIDE.md
-LOCATION:Online
+DESCRIPTION:Tema / Theme: G0 kalibrasyonu (E11.3) + beta kapanisi — G0 calibration (E11.3) and beta close-out\n\nGundem / Agenda: 5dk durum\, 10dk surtunme\, 5dk tema\, 5dk triyaj\, 5dk karar. Pilot ve beta ortaklari / Pilot and beta partners. Sure / Duration: 30 dk / min. Rehber / Guide: docs/BETA_GUIDE.md
+LOCATION:Google Meet — https://meet.google.com/eio-ftwm-wak
 STATUS:CONFIRMED
 TRANSP:OPAQUE
 END:VEVENT

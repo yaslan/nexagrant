@@ -161,18 +161,24 @@ bağlantıyı kullanmasını söyleyin.
 
 ### B7. Yanlış adrese davet gönderdim / yanlış kişi katıldı. Nasıl geri alırım?
 
-**[BİLİNEN SORUN — QA Y-3]** Bugün üründe davet iptali ve üye çıkarma **yok**. "Üyeler" ekranında
-aktif üye listesi de görünmüyor.
+Yanlış adrese giden davet 7 gün sonra kendiliğinden geçersiz olur; o süre boyunca 1 koltuk tutar.
 
-- Yanlış adrese giden davet 7 gün sonra kendiliğinden düşer; o süre boyunca 1 koltuk tutar.
-- Yanlış kişi katıldıysa koltuğu siz boşaltamazsınız. Destek ekibine yazın (şablon Ş-3).
-- Kaynak: QA raporu Y-3 (`invitation.delete` yalnız `retention.ts`'te, `membership.delete` yok).
-- **[DOĞRULANMADI — patrona sor]** Platform ekibi elle üye çıkarır mı, ne kadar sürede? (QA §6
-  soru 2).
+Yanlış bir kişi katıldıysa vakit kaybetmeden **info@fonbridge.com** adresine yazın. Kurum adınızı ve
+çıkarılacak kişinin e-posta adresini ekleyin. Talep Kurum Sahibi ya da Kiracı Yöneticisi'nden gelmelidir;
+kimliğinizi doğrularız. Ekibimiz üyeyi elle çıkarır. Bu geçici bir yöntemdir; ürüne davet iptali ve üye
+çıkarma eklenince kendiniz yapabileceksiniz. Yanlış kişi katılmışsa bunu acil sayarız (ilk yanıt
+hedefi: iş saatleri içinde 2 saat, bkz. G3). Bu bir hedeftir, taahhüt değildir.
 
-**EN:** Known issue (QA Y-3): you cannot cancel an invitation or remove a member yet. A wrong
-invitation expires after 7 days. For a wrong member, contact support. Who removes it and how fast:
-*not verified — ask the owner.*
+- Kaynak: patron kararı 01.10.2026 (K-4); QA raporu Y-3 (`membership.delete` yok; `invitation.delete`
+  yalnız `retention.ts`'te).
+
+**EN:** An invitation sent to a wrong address expires by itself after 7 days; until then it uses 1 seat.
+If a wrong person joined, write to info@fonbridge.com now. Add your organisation name and the e-mail
+address of the person to remove. The request must come from the Organisation Owner or a Tenant Admin;
+we verify who you are. Our team removes the member by hand. This is a temporary method; when the
+product gets invitation cancel and member removal, you will be able to do it yourself. If a wrong
+person joined, we treat it as urgent (first-response target: 2 hours within business hours, see G3).
+This is a target, not a guarantee.
 
 ### B8. Davet ederken hangi rolü seçmeliyim?
 
@@ -230,15 +236,18 @@ An amber banner shows. Known issue Y-4: the Company Profile page says "saved" bu
 
 ### C4. Süre uzatılabilir mi?
 
-Süreyi yalnız **platform yöneticisi** uzatır. Her uzatma 90 gündür. Otomatik uzatma yoktur; kendi
-başınıza uzatamazsınız.
+Süreyi yalnız **platform yöneticisi** uzatır; her uzatma 90 gündür. Otomatik uzatma yoktur ve kendi
+başınıza uzatamazsınız. Her talep ayrı ayrı değerlendirilir; uzatma sözü verilmez. Talebinizi süre
+bitmeden **info@fonbridge.com** adresine yazmanızı öneririz. Süre dolsa bile
+verileriniz silinmez; çalışma alanı salt-okunur olur (bkz. C3).
 
-- Kaynak: `docs/adr/ADR-0007-ilkadim-free-pilot.md:25-26`, `messages/tr.json:1726-1727`.
-- **[DOĞRULANMADI — patrona sor]** Uzatma hangi koşulla verilir? Kullanıcıya söz verilmez; talep
-  patrona iletilir (şablon Ş-4).
+- Kaynak: `docs/adr/ADR-0007-ilkadim-free-pilot.md:25-26`, `messages/tr.json:1726-1727`; patron kararı
+  01.10.2026 (K-6): uzatma vaka bazlıdır, yayımlanmış kriter yoktur. Destek şablonu: Ş-5.
 
-**EN:** Only the platform admin can extend it, 90 days at a time. There is no automatic extension.
-When an extension is given: *not verified — ask the owner.*
+**EN:** Only the platform admin can extend the pilot, 90 days at a time. There is no automatic extension
+and you cannot extend it yourself. We review each request; we cannot promise an extension. We
+recommend writing to info@fonbridge.com before your pilot period ends. If the pilot ends, your
+data is not deleted; the workspace becomes read-only (see C3).
 
 ### C5. Pilot sırasında ücretli plana geçebilir miyim?
 
@@ -441,9 +450,8 @@ Takvim desteği yalnız **Google Takvim** ve **.ics** dosyasıdır. Outlook takv
 .ics dosyasını Outlook dahil çoğu takvime elle içe aktarabilirsiniz.
 
 - Kaynak: `docs/ROADMAP.md:43-45`, `:333`.
-- Not: Toplantı özeti modülü (M9) pilotta **kapalıdır** (E1). Haftalık pilot görüşmesinin daveti
-  ayrıca gönderilir. **[DOĞRULANMADI — patrona sor]** Pilot haftalık görüşmesi için .ics dosyası
-  hazır mı? (`docs/beta/beta-weekly-sync.ics` Fabrika beta programı içindir, pilot için değil.)
+- Not: Toplantı özeti modülü (M9) pilotta **kapalıdır** (E1). Haftalık görüşmenin takvim daveti (.ics)
+  e-postanızla gelir (bkz. G4).
 
 **EN:** Only Google Calendar and `.ics` files. Outlook calendar sync was removed. You can import an
 `.ics` file into Outlook by hand.
@@ -507,23 +515,41 @@ product feedback. There is no phone line.
 
 ### G3. Ne kadar sürede cevap alırım?
 
-**[DOĞRULANMADI — patrona sor]** Beta rehberinde hedef süreler var (P0 ilk yanıt 2 saat, P1 1 iş
-günü, P2 2 iş günü, P3 haftalık görüşmede). Bu tablo Fabrika beta programı içindir ve orada da
-"taahhüt değil, hedef" diye yazılıdır. Pilot için kabul edilmedi. Pilot planında SLA yoktur.
+Sorunu bildirirken önceliği P0–P3 olarak belirtin. Hedeflerimiz **iş saatleri içinde** (Pazartesi–Cuma,
+İstanbul saati, Türkiye ve Belçika resmî tatilleri hariç) geçerlidir ve **taahhüt değildir**:
 
-- Kaynak: `docs/BETA_GUIDE.md:176-185`, `:80` ("SLA taahhüdü yoktur").
+| Öncelik | Ne zaman | İlk yanıt hedefi |
+| ------- | -------- | ---------------- |
+| P0 | Veri kaybı, giriş yapılamıyor, başka kurumun verisini gördüğünüzü düşünüyorsanız | 2 saat |
+| P1 | Ana akış bloke | 1 iş günü |
+| P2 | Rahatsız edici ama geçici çözümü var | 2 iş günü |
+| P3 | Öneri | Haftalık görüşmede ele alınır |
 
-**EN:** Not verified — ask the owner. The beta guide has target times (not a commitment); they were
-not adopted for the pilot.
+Yoğun dönemlerde ya da arıza sırasında gecikme olabilir. P0 şüphesinde beklemeyin; doğrudan
+**info@fonbridge.com** adresine yazın. Pilot planında SLA yoktur.
+
+- Kaynak: `docs/BETA_GUIDE.md` § 5 (pilot ve beta için tek tablo); patron kararı 01.10.2026 (K-5).
+  Takibi proje yöneticisi (PM) yapar.
+
+**EN:** Mark the priority P0–P3 when you report a problem. Our targets apply **within business hours**
+(Monday–Friday, Istanbul time, Turkish and Belgian public holidays excluded) and are **not guarantees**: P0 (data loss,
+cannot sign in, or you believe you can see another organisation's data): first answer in 2 hours; P1
+(main flow blocked): 1 business day; P2 (annoying, has a workaround): 2 business days; P3 (suggestion):
+discussed in the weekly meeting. There may be delays in busy periods or during an incident. If you
+suspect P0, do not wait; write to info@fonbridge.com directly. The pilot plan has no SLA.
 
 ### G4. Haftalık görüşme var mı?
 
-Evet. Pilot boyunca her hafta 30 dakikalık bir görüşme yapılır.
+Evet. Pilot ve beta ortakları birlikte, her **Pazartesi 15:00'te** (İstanbul saati, UTC+03:00, yıl boyu
+aynı) **30 dakikalık** bir görüşme yaparız. Görüşme Google Meet üzerinden yapılır. Toplantı bağlantısı
+ve takvim daveti (.ics) e-postanızla gelir. Takvim bağlantısı çalışmazsa info@fonbridge.com adresine
+yazın.
 
-- Kaynak: `docs/kamu/ILKADIM-PILOT.md:101`.
-- **[DOĞRULANMADI — patrona sor]** Gün ve saat.
+- Kaynak: patron kararı 01.10.2026 (K-1, K-2, K-3); `docs/BETA_GUIDE.md` § 4.
 
-**EN:** Yes, a 30-minute call every week. Day and time: *ask the owner.*
+**EN:** Yes. Pilot and beta partners meet together every **Monday at 15:00** (Istanbul time, UTC+03:00,
+the same all year) for **30 minutes** on Google Meet. The meeting link and a calendar invitation
+(.ics) arrive by e-mail. If the calendar link does not work, write to info@fonbridge.com.
 
 ---
 
@@ -532,12 +558,12 @@ Evet. Pilot boyunca her hafta 30 dakikalık bir görüşme yapılır.
 | No | Soru | SSS |
 | -- | ---- | --- |
 | P-1 | Kurum e-postası Google hesabı değilse belediyeye önerilen yol? (ILKADIM-PILOT S5) | A3 |
-| P-2 | Yanlış üye / yanlış davet: platform ekibi elle çıkarır mı, hangi sürede? | B7 |
-| P-3 | Süre uzatma hangi koşulla verilir? | C4 |
+| P-2 | ~~Yanlış üye / yanlış davet~~ → **karar verildi** (K-4, 01.10.2026): ürün hazır olana kadar tek yetkili kişi elle çıkarır, kayıtla. Yetkili kişi ve hukuk/KVKK bildirim sahibi: patron (01.10.2026, iç runbook R-1/R-2) | B7 |
+| P-3 | ~~Süre uzatma koşulu~~ → **karar verildi** (K-6, 01.10.2026): vaka bazlı, yayımlanmış kriter yok, otomatik uzatma yok | C4 |
 | P-4 | "Model eğitimi için kullanılmaz" kullanıcıya taahhüt olarak söylenebilir mi? | D3 |
 | P-5 | Kurumun bütün verisini dışa aktarma ve kurum hesabını silme yolu | D4, D5 |
 | P-6 | İmzalı DPA ve üründeki DPA adresi pilot için güncel mi? | D7 |
-| P-7 | Pilot haftalık görüşme günü/saati ve .ics daveti | E7, G4 |
+| P-7 | ~~Pilot haftalık görüşme günü/saati~~ → **karar verildi: Pazartesi 15:00 Europe/Istanbul** (01.10.2026). Pilot ve beta birlikte, 30 dk, Google Meet (K-1..K-3). Açık kalan: ilk görüşmenin tarihi ve toplantı bağlantısı davetle gider | E7, G4 |
 | P-8 | Canlı SMTP kurulumu ne zaman biter? | E8 |
 | P-9 | ~~Pilot destek e-posta adresi~~ → **karar verildi: info@fonbridge.com** (01.10.2026, posta alımı doğrulandı) | G2 |
-| P-10 | Pilot için yanıt süresi hedefleri | G3 |
+| P-10 | ~~Pilot yanıt süresi hedefleri~~ → **karar verildi** (K-5, 01.10.2026): P0 2 saat / P1 1 iş günü / P2 2 iş günü, iş saatleri içinde, takip PM | G3 |
