@@ -758,7 +758,11 @@ describe('İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs
     // at most EVIDENCE_COPY_DEADLINE_MS. Held until the client gives up, or
     // longer than any copy may take, so a HEAD without that limit is answered
     // late (and the confirm goes on to save the row) instead of never.
+    // The process stalls 12 s after the "already recorded?" read, so the idle
+    // limit leaves the copy 20 − 12 − 2 = ~6 s, well under the 15 s deadline:
+    // a copy that is not held to `timeLeft` answers ~9 s later and fails the bound.
     const up = await uploaded('t5-final-head');
+    state.dbPause = { after: 12_000 };
     let headHeldAt = 0;
     state.hook = async ({ method, path, isCopy, gone }) => {
       if (isCopy || method !== 'HEAD' || !path.endsWith(`/${up.finalKey}`)) return;
@@ -769,12 +773,14 @@ describe('İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs
     const res = await confirm(up.objectKey);
     const took = Date.now() - started;
     state.hook = null;
+    state.dbPause = null;
     console.info(`[T-5 final HEAD] held ${headHeldAt ? headHeldAt - started : '-'} ms in; confirm answered after ${took} ms`);
 
     expect(state.requests.some((r) => r.startsWith('PUT(copy)')), 'the copy ran: the held HEAD is the check after it').toBe(true);
     expect(headHeldAt, 'the HEAD of the final key was sent and held').toBeGreaterThan(0);
     await expectNothingLost(up, res, 'storage_unavailable');
-    expect(took, `answered after ${took} ms`).toBeLessThan(storage.EVIDENCE_COPY_DEADLINE_MS + 2_000);
+    // 12 s stall + ~6 s time left + margin; a copy given the full 15 s answers after ~27 s.
+    expect(took, `answered after ${took} ms`).toBeLessThan(12_000 + 6_000 + 2_500);
     expect(await lockHeld(up.finalKey), 'the lock went with the transaction').toBe(0);
     // The copy may stay under the final key (D-3): the retry writes the same checked bytes over it.
     await expectRetrySucceeds(up);
@@ -783,8 +789,9 @@ describe('İNCELEME-92 (TASK-MUO9IFMMVRUDJ): the lock held across the copy costs
   test('T-7: a store that holds the HEAD of the final object after the copy is given up on within the deadline', async () => {
     // Q4 mutant test: the final key HEAD command must have timeout opts.
     // If opts (abortSignal.timeout) is missing from the HeadObjectCommand call for the final key,
-    // HEAD has no timeout and hangs. This test catches that mutation by holding the final key's
-    // HEAD and expecting the whole copyIncomingObject call to timeout and return storage_unavailable.
+    // nothing cancels that HEAD at the deadline: it waits out the 4 s hold and the call answers
+    // ok: true, late. This test catches that mutation by holding the final key's HEAD and
+    // expecting the whole copyIncomingObject call to give up and return storage_unavailable.
     const up = await uploaded('t7-final-head');
     state.hook = async ({ method, path, isCopy }) => {
       // Hold the final key's HEAD (sent after the copy) for 4 s; with a 1.5 s deadline, copyIncomingObject should fail.
