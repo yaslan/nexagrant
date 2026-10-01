@@ -30,9 +30,10 @@
  */
 import type { Prisma, PrismaClient, Role, User } from '@prisma/client';
 
-import { withTenant } from '@/lib/db';
+import { withTenant, type TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
 import { getPilotState } from '@/lib/billing/pilot';
+import { lockTenantSeats, readSeatUsage } from '@/lib/billing/seat-limit';
 import { bindTransactionToTenant, writeRegistrationConsent } from '@/lib/legal/registration-consent';
 import { hashSecretToken, secretTokenMatches } from '@/lib/secret-token';
 import { withSystemScope } from '@/lib/system-scope';
@@ -181,11 +182,38 @@ export interface AcceptInvitationCore {
 export async function acceptInvitationIn(
   tx: Prisma.TransactionClient,
   core: AcceptInvitationCore
-): Promise<'accepted' | 'already_member' | 'lost'> {
+): Promise<'accepted' | 'already_member' | 'lost' | 'seat_limit'> {
   const { invitationId, tokenHash, tenantId, userId, now } = core;
   // A missing key would drop out of the UPDATE below and spend every pending
   // invitation of the tenant (TASK-MUN2KUHP1BP18).
   if (!isPresentId(invitationId) || !isPresentId(tokenHash) || !isPresentId(tenantId)) return 'lost';
+
+  // Seat re-check (TASK-MUPUH481FBGUP, QA Y-2). The invitation held a seat while
+  // pending, but a tenant pushed past its limit (the Y-2 race, a plan that
+  // shrank) must not take on one more MEMBER. Under the tenant's seat lock the
+  // member count must still be below the limit. Pending invitations are not
+  // added: accepting turns this one into a member without changing the total,
+  // and counting the others would make two over-subscribed invitations refuse
+  // each other for good. Nothing is written when refused, so the link stays
+  // usable once a seat frees.
+  // Both callers have bound `tx` to the tenant (withTenant / bindTransactionToTenant),
+  // which is what the brand stands for.
+  const scoped = tx as TenantTx;
+  await lockTenantSeats(scoped, tenantId);
+  const pending = await tx.invitation.findFirst({
+    where: { id: invitationId, tenantId, tokenHash, acceptedAt: null, expires: { gt: now } },
+    select: { email: true },
+  });
+  if (pending) {
+    const alreadyMember = await tx.membership.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { id: true },
+    });
+    if (!alreadyMember) {
+      const usage = await readSeatUsage(scoped, tenantId, pending.email);
+      if (usage.members >= usage.limit) return 'seat_limit';
+    }
+  }
   const claimed = await tx.invitation.updateMany({
     where: { id: invitationId, tenantId, tokenHash, acceptedAt: null, expires: { gt: now } },
     data: { acceptedAt: now },
@@ -208,7 +236,14 @@ export async function acceptInvitationIn(
   return 'accepted';
 }
 
-export type AcceptRefusal = 'invalid' | 'revoked' | 'expired' | 'used' | 'email_mismatch' | 'pilot_expired';
+export type AcceptRefusal =
+  | 'invalid'
+  | 'revoked'
+  | 'expired'
+  | 'used'
+  | 'email_mismatch'
+  | 'pilot_expired'
+  | 'seat_limit_reached';
 
 export type AcceptOutcome =
   | { ok: true; tenantId: string; alreadyMember: boolean; role: Role | null }
@@ -251,6 +286,7 @@ export async function acceptInvitation(input: {
     })
   );
   if (result === 'lost') return { ok: false, reason: 'used' };
+  if (result === 'seat_limit') return { ok: false, reason: 'seat_limit_reached' };
   return {
     ok: true,
     tenantId: invitation.tenantId,
@@ -335,6 +371,7 @@ export async function registerInvitedOAuthUser(
     });
     // A brand-new user cannot already be a member; anything but `accepted`
     // means the link was spent in between. Throwing rolls the user back too.
+    if (result === 'seat_limit') throw new InvitationNotAcceptableError('seat_limit_reached');
     if (result !== 'accepted') throw new InvitationNotAcceptableError('lost');
     return user;
   });

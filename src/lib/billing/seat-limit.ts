@@ -15,6 +15,8 @@
  * pending invitation refreshes that one and takes no new seat.
  */
 
+import crypto from 'node:crypto';
+
 import { getEntitlements } from '@/lib/billing';
 import type { TenantTx } from '@/lib/db';
 
@@ -42,8 +44,27 @@ export class SeatLimitReachedError extends Error {
 }
 
 /**
+ * Serialises every seat decision of one tenant for the rest of the transaction
+ * (TASK-MUPUH481FBGUP, QA Y-2). Count-then-write is a race: N concurrent
+ * invitations each counted "1 free seat" before any of them wrote its row, and
+ * a 6-seat tenant ended with 8, then 10. Whoever takes a seat — issuing an
+ * invitation, accepting one — takes this lock first and counts after it; under
+ * READ COMMITTED the count that follows sees what the previous holder
+ * committed. It is a transaction-level advisory lock, so it is released with the
+ * transaction and no code path can forget to unlock. Its key is its own, apart
+ * from the mail lock (invitation-mail-policy.ts): seat lock first, mail lock
+ * second, everywhere, so the two never wait on each other in a cycle.
+ */
+export async function lockTenantSeats(tx: TenantTx, tenantId: string): Promise<void> {
+  const key = crypto.createHash('sha256').update(`tenant-seats:${tenantId}`).digest().readBigInt64BE(0);
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${key})`;
+}
+
+/**
  * Reads the tenant's seat usage inside the caller's tenant transaction, so the
- * count and the invitation write that follows see the same rows.
+ * count and the invitation write that follows see the same rows. It takes no
+ * lock itself: a caller that goes on to take a seat uses {@link assertSeatAvailable}
+ * or calls {@link lockTenantSeats} first.
  *
  * `email` is the address about to be invited: its own pending invitation, if
  * any, is not counted, because issuing it again replaces it.
@@ -62,6 +83,8 @@ export async function readSeatUsage(tx: TenantTx, tenantId: string, email: strin
 
 /** Throws {@link SeatLimitReachedError} when no seat is free. */
 export async function assertSeatAvailable(tx: TenantTx, tenantId: string, email: string): Promise<SeatUsage> {
+  // Always, whether or not a mail will go out: the count must not run unguarded.
+  await lockTenantSeats(tx, tenantId);
   const usage = await readSeatUsage(tx, tenantId, email);
   if (!hasFreeSeat(usage)) throw new SeatLimitReachedError(usage);
   return usage;
