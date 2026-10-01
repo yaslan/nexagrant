@@ -93,7 +93,7 @@ describe('buildCheckinSchedule', () => {
       weekday: 1,
       hour: 15,
       minute: 0,
-      durationMinutes: 45,
+      durationMinutes: 30,
     });
     expect(brussels.every((o) => o.localTime === '15:00')).toBe(true);
     expect(brussels.slice(0, 7).every((o) => o.utcOffset === '+02:00')).toBe(true);
@@ -103,9 +103,9 @@ describe('buildCheckinSchedule', () => {
     expect(schedule[0]?.start.toISOString()).toBe('2026-09-07T12:00:00.000Z');
   });
 
-  it('gives every occurrence a 45-minute duration', () => {
+  it('gives every occurrence a 30-minute duration', () => {
     for (const occ of schedule) {
-      expect(occ.end.getTime() - occ.start.getTime()).toBe(45 * 60_000);
+      expect(occ.end.getTime() - occ.start.getTime()).toBe(30 * 60_000);
     }
   });
 
