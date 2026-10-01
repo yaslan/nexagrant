@@ -85,9 +85,26 @@ vi.mock('../src/lib/system-scope', () => ({
     cb(dbBox.client as never),
 }));
 
-vi.mock('../src/lib/storage', () => ({
-  deleteUserFilesFromR2: vi.fn().mockResolvedValue(undefined),
-}));
+/**
+ * TASK-MUPL2D9B8QWAB (U-6): every object in the store belongs to a tenant —
+ * evidence, a co-brand logo, a feedback screenshot — and none to a person, so
+ * erasing a person must not touch the store at all. Each export of the storage
+ * module that can remove an object is recorded here — the removed
+ * `deleteUserFilesFromR2` too, should it come back — and the purge may call none.
+ */
+const storeCall = vi.hoisted(() => vi.fn());
+vi.mock('../src/lib/storage', () => {
+  const record = (name: string) => async (...args: unknown[]) => {
+    storeCall(name, ...args);
+    return true;
+  };
+  return {
+    deleteUserFilesFromR2: record('deleteUserFilesFromR2'),
+    deleteFileFromR2: record('deleteFileFromR2'),
+    deleteTenantObject: record('deleteTenantObject'),
+    deleteObjectBytes: record('deleteObjectBytes'),
+  };
+});
 
 const { purgeDueUsers, buildPurgeFailureAlert } = await import(
   '../src/lib/jobs/tasks/users-scheduled-deletion'
@@ -206,6 +223,13 @@ describe('purgeDueUsers — erasure', () => {
       data: { userId: null },
     });
     expect(result).toMatchObject({ success: true, dueCount: 1, purgedCount: 1, failedCount: 0 });
+  });
+
+  test('leaves the object store alone: every stored file is a tenant\'s, not the person\'s', async () => {
+    const result = await purgeDueUsers(30);
+
+    expect(result).toMatchObject({ dueCount: 1, purgedCount: 1, failedCount: 0 });
+    expect(storeCall).not.toHaveBeenCalled();
   });
 
   test('writes one audit event per tenant, keyed by a one-way hash', async () => {

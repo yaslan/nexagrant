@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { defineJob } from '../define';
 import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
-import { deleteUserFilesFromR2 } from '@/lib/storage';
 import { errorCode } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
 import {
@@ -104,8 +103,14 @@ export async function purgeDueUsers(
   for (const user of dueUsers) {
     const userId = user.id;
     try {
-      // 1. Object storage first — a failed DB delete must not orphan files.
-      await deleteUserFilesFromR2(userId);
+      // 1. Object storage: nothing to do, deliberately (TASK-MUPL2D9B8QWAB).
+      //    Every stored object is a tenant's — evidence under `<tenant>/`, the
+      //    co-brand logo under `<tenant>/agency/cobrand/`, a feedback screenshot
+      //    under `feedback/<tenant>/` whose row step 3b keeps — and none is
+      //    keyed by a person. This step used to list `users/<id>/`, a prefix no
+      //    code writes, so it removed nothing. The files go when their tenant
+      //    is deleted, not when one of its members is. Declared in
+      //    docs/legal/processing-register.md §15.
 
       // 2-3. Everything below detaches or removes the subject across EVERY tenant
       //      they belong to at once — `where: { userId }`, no tenantId anywhere —

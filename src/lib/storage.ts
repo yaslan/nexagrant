@@ -1,8 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { 
   S3Client, 
-  DeleteObjectsCommand, 
-  ListObjectsV2Command,
   PutObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
@@ -475,38 +473,6 @@ export async function deleteFileFromR2(objectKeyOrUrl: string): Promise<boolean>
   } catch (err) {
     console.error(`[R2 Storage] Delete error: ${errorMessage(err)}`);
     return false;
-  }
-}
-
-/**
- * Deletes all files associated with a specific user (GDPR hard delete)
- */
-export async function deleteUserFilesFromR2(userId: string): Promise<void> {
-  if (!s3) {
-    console.warn('[R2 Cleanup] Storage not configured, skipping cleanup.');
-    return;
-  }
-
-  try {
-    const prefix = `users/${userId}/`;
-    const listedObjects = await s3.send(new ListObjectsV2Command({
-      Bucket: EVIDENCE_BUCKET,
-      Prefix: prefix
-    }));
-
-    if (!listedObjects.Contents || listedObjects.Contents.length === 0) return;
-
-    const deleteParams = {
-      Bucket: EVIDENCE_BUCKET,
-      Delete: {
-        Objects: listedObjects.Contents.map((obj) => ({ Key: obj.Key }))
-      }
-    };
-
-    await s3.send(new DeleteObjectsCommand(deleteParams));
-    console.log(`[R2 Cleanup] Deleted ${listedObjects.Contents.length} objects for user ${userId}.`);
-  } catch (error) {
-    console.error(`[R2 Cleanup] Failed to delete files for user ${userId}:`, error);
   }
 }
 

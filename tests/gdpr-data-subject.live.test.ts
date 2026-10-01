@@ -46,11 +46,15 @@ vi.mock('@/lib/auth', () => ({
   auth: async () => currentSession,
 }));
 
-// R2 is not part of what these tests assert, and the purge must not depend on
-// object storage being configured on a developer's machine.
-const deleteUserFiles = vi.fn().mockResolvedValue(undefined);
+// Every stored object is a tenant's, so erasing a person must not reach the
+// object store (TASK-MUPL2D9B8QWAB; tests/user-erasure-object-store.test.ts
+// against a real store). Any delete export the purge called would land here.
+const storeDelete = vi.fn().mockResolvedValue(true);
 vi.mock('@/lib/storage', () => ({
-  deleteUserFilesFromR2: (...args: unknown[]) => deleteUserFiles(...args),
+  deleteUserFilesFromR2: (...args: unknown[]) => storeDelete('deleteUserFilesFromR2', ...args),
+  deleteFileFromR2: (...args: unknown[]) => storeDelete('deleteFileFromR2', ...args),
+  deleteTenantObject: (...args: unknown[]) => storeDelete('deleteTenantObject', ...args),
+  deleteObjectBytes: (...args: unknown[]) => storeDelete('deleteObjectBytes', ...args),
 }));
 
 const { exportUserData } = await import('@/actions/user/export-data');
@@ -468,7 +472,7 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
     expect(await db.user.findUnique({ where: { id: ids.outsider } })).not.toBeNull();
     expect(await db.effort.count({ where: { userId: ids.neighbour } })).toBe(1);
     expect(await db.opportunity.count({ where: { tenantId: ids.tenantB } })).toBe(1);
-    expect(deleteUserFiles).toHaveBeenCalledWith(ids.subject);
+    expect(storeDelete).not.toHaveBeenCalled();
   });
 
   test('leaves no row still carrying the erased id in a column the database does not cascade', async () => {
