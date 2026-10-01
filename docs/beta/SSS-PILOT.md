@@ -238,7 +238,7 @@ An amber banner shows. Known issue Y-4: the Company Profile page says "saved" bu
 
 Süreyi yalnız **platform yöneticisi** uzatır; her uzatma 90 gündür. Otomatik uzatma yoktur ve kendi
 başınıza uzatamazsınız. Her talep ayrı ayrı değerlendirilir; uzatma sözü verilmez. Talebinizi süre
-bitmeden en az 1 hafta önce **info@fonbridge.com** adresine yazmanızı öneririz. Süre dolsa bile
+bitmeden **info@fonbridge.com** adresine yazmanızı öneririz. Süre dolsa bile
 verileriniz silinmez; çalışma alanı salt-okunur olur (bkz. C3).
 
 - Kaynak: `docs/adr/ADR-0007-ilkadim-free-pilot.md:25-26`, `messages/tr.json:1726-1727`; patron kararı
@@ -246,7 +246,7 @@ verileriniz silinmez; çalışma alanı salt-okunur olur (bkz. C3).
 
 **EN:** Only the platform admin can extend the pilot, 90 days at a time. There is no automatic extension
 and you cannot extend it yourself. We review each request; we cannot promise an extension. We
-recommend writing to info@fonbridge.com at least 1 week before the end date. If the pilot ends, your
+recommend writing to info@fonbridge.com before your pilot period ends. If the pilot ends, your
 data is not deleted; the workspace becomes read-only (see C3).
 
 ### C5. Pilot sırasında ücretli plana geçebilir miyim?
@@ -516,7 +516,7 @@ product feedback. There is no phone line.
 ### G3. Ne kadar sürede cevap alırım?
 
 Sorunu bildirirken önceliği P0–P3 olarak belirtin. Hedeflerimiz **iş saatleri içinde** (Pazartesi–Cuma,
-İstanbul saati, resmî tatiller hariç) geçerlidir ve **taahhüt değildir**:
+İstanbul saati, Türkiye ve Belçika resmî tatilleri hariç) geçerlidir ve **taahhüt değildir**:
 
 | Öncelik | Ne zaman | İlk yanıt hedefi |
 | ------- | -------- | ---------------- |
@@ -532,7 +532,7 @@ Yoğun dönemlerde ya da arıza sırasında gecikme olabilir. P0 şüphesinde be
   Takibi proje yöneticisi (PM) yapar.
 
 **EN:** Mark the priority P0–P3 when you report a problem. Our targets apply **within business hours**
-(Monday–Friday, Istanbul time, public holidays excluded) and are **not guarantees**: P0 (data loss,
+(Monday–Friday, Istanbul time, Turkish and Belgian public holidays excluded) and are **not guarantees**: P0 (data loss,
 cannot sign in, or you believe you can see another organisation's data): first answer in 2 hours; P1
 (main flow blocked): 1 business day; P2 (annoying, has a workaround): 2 business days; P3 (suggestion):
 discussed in the weekly meeting. There may be delays in busy periods or during an incident. If you

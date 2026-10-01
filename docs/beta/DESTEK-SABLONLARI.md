@@ -15,6 +15,7 @@
 3. **Fiyat, tarih, SLA, hukuki taahhüt yazılmaz.** Uzatma ya da ücretli geçiş sözü verilmez. Yanıt
    süresi söylenecekse yalnız SSS G3'teki "hedef, taahhüt değil" tablosu (P0 2 saat / P1 1 iş günü /
    P2 2 iş günü, iş saatleri içinde) kullanılır; başka süre uydurulmaz.
+   > **İç hedef (müşteriye yazılmaz):** Taleplerin %90'ı hedef sürede ilk yanıt alır. Sahibi PM. Bu hedef K-5 kararından geliyor ve müşterilere ya da SSS'e yazılmaz.
 4. **Kişisel veri:** Yanıtta başka kullanıcının adını/e-postasını yazmayın. E-posta adreslerini
    maskeleyin (`u***@ilkadim…`), ürün de böyle maskeler (QA akış 8).
 5. **Bilinen sorun** şablonları (Ş-1, Ş-2, Ş-3) geçicidir. Düzeltme gelince bu dosya güncellenir;

@@ -177,7 +177,7 @@ tarayıcı bilgisini sizin yerinize doldurmasıdır.
 
 ### Öncelik ve hedef süreler (taahhüt değil, hedef)
 
-Bu tablo pilot ve beta için geçerlidir. Süreler **iş saatleri içinde** (Pazartesi–Cuma, İstanbul saati; resmî tatiller hariç) sayılır; nöbet yoktur. Hedeflerin takibi proje yöneticisindedir (PM).
+Bu tablo pilot ve beta için geçerlidir. Süreler **iş saatleri içinde** (Pazartesi–Cuma, İstanbul saati; Türkiye ve Belçika resmî tatilleri hariç) sayılır; nöbet yoktur. Hedeflerin takibi proje yöneticisindedir (PM).
 
 | Öncelik | Tanım | İlk yanıt | Hedef çözüm |
 |---|---|---|---|

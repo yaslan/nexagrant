@@ -160,7 +160,7 @@ triage system is built in E11.2; during the beta, items are collected through th
 
 ### Priority and target times (targets, not commitments)
 
-This table applies to the pilot and the beta. Times count **within business hours** (Monday–Friday, Istanbul time; public holidays excluded). There is no on-call service. The project manager (PM) follows the targets.
+This table applies to the pilot and the beta. Times count **within business hours** (Monday–Friday, Istanbul time; Turkish and Belgian public holidays excluded). There is no on-call service. The project manager (PM) follows the targets.
 
 | Priority | Definition | First response | Target fix |
 |---|---|---|---|
