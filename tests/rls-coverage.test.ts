@@ -155,6 +155,43 @@ describe('AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH
     expect(sql).not.toMatch(/WITH CHECK \(current_setting\('app\.system_scope', true\) = 'on'\)/);
   });
 
+  test('Y-1(a): all migration files (including .down.sql) never use bare system_scope GUC', () => {
+    // Y-1 finding: N4/N5 mutants were not caught in CI because rls-coverage
+    // and rls:check only scan forward migrations, not rollback (.down.sql) files.
+    // Once a forward migration introduces a policy, the corresponding .down.sql
+    // must use signed scope, not the forgeable 'on' test.
+    const migrationsDir = resolve(process.cwd(), 'prisma/migrations');
+    const files: string[] = [];
+    function walk(dir: string) {
+      for (const entry of readdirSync(dir).sort()) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          walk(full);
+        } else if (entry.endsWith('.sql')) {
+          files.push(relative(process.cwd(), full));
+        }
+      }
+    }
+    walk(migrationsDir);
+
+    const failures: string[] = [];
+    for (const file of files) {
+      const sql = stripSqlComments(readFileSync(resolve(process.cwd(), file), 'utf8'));
+      // Reject policies created with bare GUC test — include .down.sql files
+      if (
+        sql.match(/CREATE POLICY\s+\w+\s+ON\s+\w+/) &&
+        (sql.match(/USING\s*\(\s*current_setting\s*\(\s*['"]app\.system_scope['"]\s*,\s*true\s*\)\s*=\s*['"]on['"]\s*\)/) ||
+          sql.match(/WITH\s+CHECK\s*\(\s*current_setting\s*\(\s*['"]app\.system_scope['"]\s*,\s*true\s*\)\s*=\s*['"]on['"]\s*\)/))
+      ) {
+        failures.push(file);
+      }
+    }
+    expect(failures).toEqual(
+      [],
+      `These migrations have system_scope policies with forgeable GUC: ${failures.join(', ')}`
+    );
+  });
+
   test('it is classified strict, not nullable-shared and not exempt', () => {
     expect(NULLABLE_TENANT.has('AuditEvent')).toBe(false);
     expect(SYSTEM_WIDE.has('AuditEvent')).toBe(false);
