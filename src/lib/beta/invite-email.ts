@@ -45,7 +45,7 @@ const COPY = {
     whatIsBeta: 'Beta nedir?',
     whatIsBetaBody: (weeks: number) =>
       `${weeks} hafta boyunca tüm modüller hesabınızda "pilot" durumunda açık olur. Ücret alınmaz. ` +
-      'Karşılığında haftada bir kısa geri bildirim ve haftalık 45 dakikalık ortak toplantıya katılım bekliyoruz.',
+      'Karşılığında haftada bir kısa geri bildirim ve haftalık 30 dakikalık ortak toplantıya katılım bekliyoruz.',
     whatToTest: 'Neleri test edeceksiniz?',
     testItems: [
       'K1 — Çağrı takibi: size uygun açık çağrıları bulma ve son tarih takibi.',
@@ -76,7 +76,7 @@ const COPY = {
     whatIsBeta: 'What is the beta?',
     whatIsBetaBody: (weeks: number) =>
       `For ${weeks} weeks every module is switched on in "pilot" state in your account, at no cost. ` +
-      'In return we ask for one short feedback form per week and your attendance at a 45-minute weekly check-in.',
+      'In return we ask for one short feedback form per week and your attendance at a 30-minute weekly check-in.',
     whatToTest: 'What will you test?',
     testItems: [
       'K1 — Call monitoring: finding open calls that fit you, and tracking deadlines.',

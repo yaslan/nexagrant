@@ -43,7 +43,7 @@ export const BETA_CHECKIN_TZ = 'Europe/Istanbul';
 export const BETA_CHECKIN_WEEKDAY = 1;
 export const BETA_CHECKIN_HOUR = 15;
 export const BETA_CHECKIN_MINUTE = 0;
-export const BETA_CHECKIN_DURATION_MIN = 45;
+export const BETA_CHECKIN_DURATION_MIN = 30;
 
 export const BETA_SUPPORT_EMAIL = process.env.BETA_SUPPORT_EMAIL ?? 'info@fonbridge.com';
 export const BETA_FEEDBACK_EMAIL = process.env.BETA_FEEDBACK_EMAIL ?? 'info@fonbridge.com';
