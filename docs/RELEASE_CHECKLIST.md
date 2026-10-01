@@ -78,7 +78,7 @@ Sonuç: **şemadaki her anahtar `.env.example`'da var.** Fark ters yönde ve şe
 | `FEEDBACK_DIGEST_TO` | haftalık geri bildirim özeti hesaplanır, gönderilmez | PATRON (adres) |
 | `JOBS_DATABASE_URL` | boş = `DATABASE_URL`. Worker ilk açılışta `graphile_worker` şemasını **kurar** → bu rolün şema oluşturma yetkisi olmalı; `fabrika_app`'in yoksa ayrı rol gerekir (ADR-0008 §6.6) | EKSİK (rol yetkisi canlı DB'de ölçülecek) |
 | `NEXT_PUBLIC_POSTHOG_KEY/HOST` | analitik yok (zararsız) | isteğe bağlı |
-| `BETA_SUPPORT_EMAIL` | `src/lib/beta/constants.ts:50` varsayılanı **`support@fabrika.dev`** (eski marka) → davet e-postalarında görünür. `info@fonbridge.com` verilmeli | PATRON (değer) / EKSİK (varsayılan düzeltilmeli, ayrı kart) |
+| `BETA_SUPPORT_EMAIL`, `BETA_FEEDBACK_EMAIL` | varsayılan `info@fonbridge.com` (`src/lib/beta/constants.ts:49-50`; 01.10.2026'ya dek `support@`/`feedback@fabrika.dev` idi, TASK-MUPIR7Y1P7AH4) → davet e-postası, takvim ORGANIZER'ı ve beta rehberi bu adresi gösterir. Kutunun gerçekten posta alması Vulut panelinde kurulur | HAZIR (kod) / **PATRON** (info@fonbridge.com kutusu + MX/SPF/DKIM) |
 | `NEXT_PUBLIC_SMTP_FROM_ADDRESS` | varsayılan `info@fonbridge.com` (doğru) | HAZIR |
 
 ### 2.3 Pilotta boş kalmalı (ADR-0007)

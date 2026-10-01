@@ -245,6 +245,9 @@ okunmadı (ve okunmamalı).
    (`src/lib/auth.ts:84`, `src/app/[locale]/login/AuthCard.tsx:37`).
    `fabrika.app` (API örnekleri, `docs.fabrika.app`, takvim UID'leri),
    `fabrika.dev` (`support@`, `feedback@`, `app.fabrika.dev` — `src/lib/beta/constants.ts:49-51`),
+   **01.10.2026 notu:** beta `support@`/`feedback@` varsayılanları `info@fonbridge.com`'a taşındı
+   (TASK-MUPIR7Y1P7AH4); `app.fabrika.dev` artık `src/`'de yok (`src/lib/app-url.ts`). Kalan tek iz
+   takvim UID'lerindeki `@fabrika.dev` (`src/lib/beta/checkin-schedule.ts`) — posta adresi değil.
    `yasinaslan.com.tr` (`admin@` — platform yöneticisi kimliği, `src/lib/auth.ts:30`).
    Aydınlatma metninin başvuru kanalı olarak hangisini göstereceği **karar konusudur**.
 
