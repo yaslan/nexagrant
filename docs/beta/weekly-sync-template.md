@@ -17,18 +17,18 @@ Panelden canlı: ortak başına aktif fırsat sayısı ve kapı dağılımı.
 |---|---|---|---|---|---|---|---|
 | BP-01 | | | | | | | |
 
-### 2. Sürtünme (15 dk)
+### 2. Sürtünme (10 dk)
 Bu hafta sizi yavaşlatan en fazla 3 şey. Her madde: **ne yapmaya çalıştınız · ne oldu · ne beklediniz · ekran/URL.**
 
 1. …
 2. …
 3. …
 
-### 3. Haftanın teması (10 dk)
+### 3. Haftanın teması (5 dk)
 Tema sorusu ve alınan yanıtlar. Ölçülebilir bir şey çıktıysa buraya yaz (ör. "M2 taslağının %60'ı elle
 yeniden yazıldı").
 
-### 4. Triyaj (10 dk)
+### 4. Triyaj (5 dk)
 
 | # | Başlık | Bildiren | Öncelik (P0–P3) | Karar |
 |---|---|---|---|---|

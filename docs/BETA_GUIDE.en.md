@@ -13,7 +13,7 @@
 | Duration | 8 weeks · **2026-09-07 → 2026-11-01** |
 | Partners | 10 design partners (SME, university TTO, consultancy, research centre) |
 | Cost | Free during the beta (Team plan entitlements + 500 AI credits) |
-| Weekly rhythm | Monday 15:00–15:45 (Europe/Istanbul) partner sync |
+| Weekly rhythm | Monday 15:00–15:30 (Europe/Istanbul, 30 min, Google Meet) partner sync — pilot and beta together |
 | Expected effort | About 1 hour per week: 1 sync + real usage on 1 live call |
 | Output | Product feedback, issue triage, price validation, G0 calibration |
 
@@ -117,7 +117,7 @@ Every week, at minimum: one gate decision, one feedback item, one sync attended.
 
 ## 4. Weekly rhythm and calendar
 
-### Sync schedule (Monday 15:00–15:45, Europe/Istanbul)
+### Sync schedule (Monday 15:00–15:30, Europe/Istanbul)
 
 | Week | Date | Theme |
 |---|---|---|
@@ -130,18 +130,20 @@ Every week, at minimum: one gate decision, one feedback item, one sync attended.
 | 7 | 2026-10-19 | **Price validation workshop** (E11.4) |
 | 8 | 2026-10-26 | G0 calibration (E11.3) and beta close-out, next steps |
 
+This is the one weekly meeting for **pilot and beta partners together**: 30 minutes, Google Meet (the link is in the calendar invitation).
+
 Calendar file: [`beta/beta-weekly-sync.ics`](./beta/beta-weekly-sync.ics) — importable into Google
 Calendar, Outlook and Apple Calendar (Google Calendar: *Settings → Import & export → Import*). Automatic
 calendar integration is v1.1 work; during the beta the calendar is distributed as a **static ICS**.
 
-### Sync agenda template (45 minutes)
+### Sync agenda template (30 minutes)
 
 | Time | Section | Content |
 |---|---|---|
 | 5 min | Status | Live pipeline dashboard: how many opportunities, at which gate |
-| 15 min | Friction | The 3 things that slowed you down this week (with screen or step) |
-| 10 min | Theme of the week | Deep dive per the table above |
-| 10 min | Triage | Prioritising the issues and requests opened |
+| 10 min | Friction | The 3 things that slowed you down this week (with screen or step) |
+| 5 min | Theme of the week | Deep dive per the table above |
+| 5 min | Triage | Prioritising the issues and requests opened |
 | 5 min | Decisions | Who, what, by when — written down |
 
 If you miss a week, fill in the **asynchronous form** (same five headings) before the sync; notes and the
@@ -157,6 +159,8 @@ Each item needs: **what you tried · what happened · what you expected · scree
 triage system is built in E11.2; during the beta, items are collected through the program channel.
 
 ### Priority and target times (targets, not commitments)
+
+This table applies to the pilot and the beta. Times count **within business hours** (Monday–Friday, Istanbul time; public holidays excluded). There is no on-call service. The project manager (PM) follows the targets.
 
 | Priority | Definition | First response | Target fix |
 |---|---|---|---|

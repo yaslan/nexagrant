@@ -13,7 +13,7 @@
 | Süre | 8 hafta · **2026-09-07 → 2026-11-01** |
 | Ortak sayısı | 10 tasarım ortağı (KOBİ, üniversite TTO, danışmanlık, araştırma merkezi) |
 | Ücret | Beta boyunca ücretsiz (Ekip planı yetkileri + 500 YZ kredisi) |
-| Haftalık ritim | Pazartesi 15:00–15:45 (Europe/Istanbul) ortak sync |
+| Haftalık ritim | Pazartesi 15:00–15:30 (Europe/Istanbul, 30 dk, Google Meet) ortak sync — pilot ve beta birlikte |
 | Beklenen katkı | Haftada ~1 saat: 1 sync + en az 1 gerçek çağrı üzerinde kullanım |
 | Çıktı | Ürün geri bildirimi, hata triyajı, fiyat doğrulama, G0 kalibrasyonu |
 
@@ -116,7 +116,7 @@ Her hafta en az: 1 kapı kararı, 1 geri bildirim kaydı, 1 sync katılımı.
 
 ## 4. Haftalık ritim ve takvim
 
-### Sync takvimi (Pazartesi 15:00–15:45, Europe/Istanbul)
+### Sync takvimi (Pazartesi 15:00–15:30, Europe/Istanbul)
 
 | Hafta | Tarih | Tema |
 |---|---|---|
@@ -129,18 +129,20 @@ Her hafta en az: 1 kapı kararı, 1 geri bildirim kaydı, 1 sync katılımı.
 | 7 | 2026-10-19 | **Fiyat doğrulama atölyesi** (E11.4) |
 | 8 | 2026-10-26 | G0 kalibrasyonu (E11.3) + beta kapanışı, sonraki adımlar |
 
+Bu görüşme **pilot ve beta ortaklarının birlikte** katıldığı tek haftalık görüşmedir: 30 dakika, Google Meet (bağlantı takvim davetindedir).
+
 Takvim dosyası: [`beta/beta-weekly-sync.ics`](./beta/beta-weekly-sync.ics) — Google Calendar, Outlook ve
 Apple Takvim'e içe aktarılabilir (Google Takvim: *Ayarlar → İçe aktar ve dışa aktar → İçe aktar*).
 Otomatik takvim entegrasyonu v1.1 kapsamındadır; beta'da takvim **statik ICS** ile dağıtılır.
 
-### Sync gündem şablonu (45 dakika)
+### Sync gündem şablonu (30 dakika)
 
 | Süre | Bölüm | İçerik |
 |---|---|---|
 | 5 dk | Durum | Pipeline panelinden canlı ekran: kaç fırsat, hangi kapıda |
-| 15 dk | Sürtünme | Bu hafta sizi yavaşlatan 3 şey (somut ekran/adım ile) |
-| 10 dk | Haftanın teması | Yukarıdaki tabloya göre derinlemesine konu |
-| 10 dk | Triyaj | Açılan hata/istek kayıtlarının önceliklendirilmesi |
+| 10 dk | Sürtünme | Bu hafta sizi yavaşlatan 3 şey (somut ekran/adım ile) |
+| 5 dk | Haftanın teması | Yukarıdaki tabloya göre derinlemesine konu |
+| 5 dk | Triyaj | Açılan hata/istek kayıtlarının önceliklendirilmesi |
 | 5 dk | Karar & aksiyon | Kim, ne, ne zaman — kayıt altına alınır |
 
 Katılamadığınız hafta: **asenkron form** (aynı 5 başlık) sync'ten önce doldurulur; kayıt ve notlar
@@ -174,6 +176,8 @@ E-posta ile de bildirebilirsiniz (§ 8); tek fark, uygulama içi formun sayfa ad
 tarayıcı bilgisini sizin yerinize doldurmasıdır.
 
 ### Öncelik ve hedef süreler (taahhüt değil, hedef)
+
+Bu tablo pilot ve beta için geçerlidir. Süreler **iş saatleri içinde** (Pazartesi–Cuma, İstanbul saati; resmî tatiller hariç) sayılır; nöbet yoktur. Hedeflerin takibi proje yöneticisindedir (PM).
 
 | Öncelik | Tanım | İlk yanıt | Hedef çözüm |
 |---|---|---|---|
