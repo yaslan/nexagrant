@@ -380,6 +380,48 @@ describe('an existing account accepts (acceptInvitation, fabrika_app)', () => {
     expect(await admin!.auditEvent.count({ where: { tenantId, type: lib.accept.INVITATION_ACCEPTED } })).toBe(1);
   });
 
+  test('seat re-check (QA Y-2): a tenant already at its member limit refuses the accept, link stays pending', async () => {
+    const tenantId = await makeTenant('seat-full');
+    const limit = (await lib.db.withTenant(tenantId, (tx) => lib.seats.readSeatUsage(tx, tenantId, 'x@example.invalid'))).limit;
+    for (let i = 0; i < limit; i++) {
+      const holder = await makeUser(email(`seat-holder-${i}`));
+      await admin!.membership.create({ data: { tenantId, userId: holder, role: 'MEMBER', workspaceIds: [] } });
+    }
+    const address = email('seat-late');
+    const userId = await makeUser(address);
+    const inv = await invite(tenantId, address);
+
+    expect(await lib.accept.acceptInvitation({ token: inv.raw, userId, userEmail: address })).toEqual({
+      ok: false,
+      reason: 'seat_limit_reached',
+    });
+    expect(await memberships(userId)).toEqual([]);
+    const row = await admin!.invitation.findUniqueOrThrow({ where: { id: inv.id }, select: { acceptedAt: true } });
+    expect(row.acceptedAt).toBeNull();
+  });
+
+  test('seat re-check (QA Y-2): over-subscribed pending invitations — concurrent accepts add members only up to the limit', async () => {
+    const tenantId = await makeTenant('seat-race');
+    const limit = (await lib.db.withTenant(tenantId, (tx) => lib.seats.readSeatUsage(tx, tenantId, 'x@example.invalid'))).limit;
+    // One free member seat, but limit + 2 pending invitations (what the Y-2 race produced).
+    for (let i = 0; i < limit - 1; i++) {
+      const holder = await makeUser(email(`seat-race-holder-${i}`));
+      await admin!.membership.create({ data: { tenantId, userId: holder, role: 'MEMBER', workspaceIds: [] } });
+    }
+    const people = await Promise.all(
+      Array.from({ length: 4 }, async (_, i) => {
+        const address = email(`seat-race-${i}`);
+        return { address, userId: await makeUser(address), inv: await invite(tenantId, address) };
+      })
+    );
+    const results = await Promise.all(
+      people.map((p) => lib.accept.acceptInvitation({ token: p.inv.raw, userId: p.userId, userEmail: p.address }))
+    );
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(results.filter((r) => !r.ok && r.reason === 'seat_limit_reached')).toHaveLength(3);
+    expect(await admin!.membership.count({ where: { tenantId } })).toBe(limit);
+  });
+
   test('the core refuses a link spent after the caller looked (race window): lost, no membership', async () => {
     // acceptInvitation read the row as pending; before its transaction ran,
     // another accept spent the link and that membership was removed again.

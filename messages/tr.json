@@ -438,6 +438,7 @@
       "email_unverified": "Google bu e-posta adresini doğrulanmış olarak bildirmedi. Doğrulanmış bir adresle tekrar deneyin.",
       "disclosure_required": "Yeni hesap açmak için Gizlilik Bildirimi ve Kullanım Koşulları kutusunu işaretleyin.",
       "pilot_expired": "Bu kuruluşun ücretsiz pilot süresi doldu. Yeni üye eklenemiyor.",
+      "seat_limit_reached": "Bu kuruluşun planındaki koltuk sınırına ulaşıldı. Davet eden kişiden koltuk eklemesini ya da planı yükseltmesini isteyin; bağlantınız geçerli kalır.",
       "invalid": "Davet bağlantısı geçersiz. Bağlantıyı e-postadan tekrar açın.",
       "revoked": "Davet iptal edildi.",
       "expired": "Davetin süresi doldu. Davet eden kişiden yeni bir davet isteyin.",

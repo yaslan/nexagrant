@@ -438,6 +438,7 @@
       "email_unverified": "Google did not report this e-mail address as verified. Try again with a verified address.",
       "disclosure_required": "To open a new account, tick the Privacy Notice and Terms of Service box.",
       "pilot_expired": "The free pilot of this organisation has ended. New members cannot be added.",
+      "seat_limit_reached": "This organisation has reached the seat limit of its plan. Ask the person who invited you to add seats or upgrade the plan; your link stays valid.",
       "invalid": "The invitation link is not valid. Open the link from the e-mail again.",
       "revoked": "The invitation was cancelled.",
       "expired": "The invitation has expired. Ask the person who invited you for a new invitation.",
