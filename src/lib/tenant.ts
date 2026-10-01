@@ -5,7 +5,10 @@ import { getPublicRoute } from '@/lib/routes';
 import { assertTenantWritable, PilotExpiredError } from '@/lib/billing/pilot';
 import { PILOT_EXPIRED_DIGEST } from '@/lib/pilot-expired';
 import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
+import { SERVICE_BUSY_DIGEST } from '@/lib/service-busy';
+import { isDatabaseUnavailable } from '@/lib/db-unavailable';
 import { asRole, can, type Action } from '@/lib/rbac';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * Tenant resolution — the single place a request's tenant is decided.
@@ -144,18 +147,46 @@ export function assertTenantActionRole(scope: Pick<TenantScope, 'role'>, action:
 }
 
 /**
+ * The pilot check could not reach the database: the application pool had no
+ * free connection in time, or the server could not be reached at all
+ * (src/lib/service-busy.ts, TASK-MUOF85BU7BV3X). Leaves the action with
+ * `digest = 'SERVICE_BUSY'`, so the browser says "busy, try again in a moment"
+ * rather than the driver's text. The message is fixed; what the driver said is
+ * logged on the server, never put on this error.
+ */
+export class ServiceBusyError extends Error {
+  readonly code = SERVICE_BUSY_DIGEST;
+  readonly digest = SERVICE_BUSY_DIGEST;
+
+  constructor() {
+    super('Service busy: the database had no connection for this request. Try again.');
+    this.name = 'ServiceBusyError';
+  }
+}
+
+/**
  * `assertTenantWritable` for a server action. The refusal leaves with
  * `digest = 'PILOT_EXPIRED'`: Next.js keeps a digest that is already set, so in
  * production — where the browser gets no message — the UI can still tell it
  * apart and say "pilot ended" instead of "try again" (src/lib/pilot-expired.ts,
  * TASK-MUMIIUEGJ6N8B). For an action that checks the tenant itself rather than
  * through `requireTenantAction`.
+ *
+ * A check that could not reach the database leaves as `ServiceBusyError`
+ * (İNCELEME-103 G-1): under load the application pool gives no connection
+ * within its 1 s, and every action rejected with pg-pool's own message. Only a
+ * failure `isDatabaseUnavailable` recognises is turned into it; any other error
+ * leaves as it was thrown.
  */
 export async function assertTenantActionWritable(tenantId: string): Promise<void> {
   try {
     await assertTenantWritable(tenantId);
   } catch (error) {
     if (error instanceof PilotExpiredError) Object.assign(error, { digest: PILOT_EXPIRED_DIGEST });
+    else if (isDatabaseUnavailable(error)) {
+      console.error(`[requireTenantAction] pilot check could not reach the database: ${errorMessage(error)}`);
+      throw new ServiceBusyError();
+    }
     throw error;
   }
 }
