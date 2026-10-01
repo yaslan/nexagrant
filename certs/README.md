@@ -20,5 +20,13 @@ verify-full against the system store and fails with SELF_SIGNED_CERT_IN_CHAIN),
 never `uselibpqcompat=true` or `rejectUnauthorized: false` (no verification).
 TASK-MUOG51GJ3PUOG R-S7.
 
+The Prisma CLI is the exception: its schema engine ignores `verify-full` and
+`sslrootcert` (it would connect without checking anything). Give it the same
+URL anyway; `prisma.config.ts` (`prisma/cli-url.ts`) rewrites it for the CLI
+only, as `sslmode=require&sslaccept=strict&sslcert=<absolute CA path>`, and
+stops when the CA file is missing. Never hand that rewritten form to node-pg
+(it reads `sslcert` as a client certificate), and never pass the URL to
+Prisma with `--from-url`/`--to-url`, which skips the rewrite. TASK-MUOG51GJ3PUOG Y-1.
+
 Check a replacement before committing it:
 `openssl x509 -in <file> -noout -subject -enddate -fingerprint -sha256`.
