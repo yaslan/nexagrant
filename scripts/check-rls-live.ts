@@ -622,7 +622,10 @@ async function main() {
     // Supabase's Data API roles (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2): none of
     // the schema owner's functions in public may be callable by them, or
     // /rest/v1/rpc reaches them anonymously. The roles exist only on Supabase;
-    // elsewhere the query returns nothing.
+    // elsewhere the query returns nothing. Extension members (pgvector when the
+    // owner installed it) are skipped, as in revoke-api-role-function-execute.sql
+    // step 2: db:rls does not touch them, so flagging them would be a red the
+    // repair cannot clear (crw2-fb golive review Ö-A).
     const apiCallable = await client.query<{ fn: string; role: string }>(
       `select p.oid::regprocedure::text as fn, r.rolname as role
          from pg_proc p
@@ -631,6 +634,8 @@ async function main() {
         where n.nspname = 'public'
           and p.proowner = (select c.relowner from pg_class c where c.oid = to_regclass('public."Tenant"'))
           and has_function_privilege(r.rolname, p.oid, 'EXECUTE')
+          and not exists (select 1 from pg_depend d
+                           where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')
         order by 1, 2`
     );
     const apiExposed = apiCallable.rows.map((r) => `${r.fn} → ${r.role}`);
