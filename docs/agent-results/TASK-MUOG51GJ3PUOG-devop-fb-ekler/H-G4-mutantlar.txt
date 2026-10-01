@@ -1,0 +1,25 @@
+== MA
+     × note_agency_invite_rejection for a known code hands the caller's value back, and leaves nothing for the session 23ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > note_agency_invite_rejection for a known code hands the caller's value back, and leaves nothing for the session
+      Tests  1 failed | 16 passed (17)
+== MB
+     × note_agency_invite_rejection for a known code hands the caller's value back, and leaves nothing for the session 20ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > note_agency_invite_rejection for a known code hands the caller's value back, and leaves nothing for the session
+      Tests  1 failed | 16 passed (17)
+== MC
+     × with Supabase-style default privileges, no owner function is callable by anon or authenticated 3489ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/migration-owner-chain.live.test.ts > Supabase API roles (anon, authenticated) get no EXECUTE from the chain > with Supabase-style default privileges, no owner function is callable by anon or authenticated
+      Tests  1 failed | 16 passed (17)
+== MD
+     × with Supabase-style default privileges, no owner function is callable by anon or authenticated 3359ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/migration-owner-chain.live.test.ts > Supabase API roles (anon, authenticated) get no EXECUTE from the chain > with Supabase-style default privileges, no owner function is callable by anon or authenticated
+      Tests  1 failed | 16 passed (17)
+== ME
+     × a file that brings back a function-level clause (SET "app.system_scope" = 'on') is refused before any file 330ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > a file that brings back a function-level clause (SET "app.system_scope" = 'on') is refused before any file
+      Tests  1 failed | 16 passed (17)

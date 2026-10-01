@@ -1,0 +1,13 @@
+### rls:verify --require-db, DATABASE_URL=fabrika_app (sslmode=verify-full&sslrootcert=certs/…), NODE_EXTRA_CA_CERTS YOK
+
+Ölçüm rolü: fabrika_app (rolsuper=false, rolbypassrls=false) — kaynak: DATABASE_URL
+   ✓ yazma (negatif): app.tenant_id yokken INSERT reddedildi
+   ✓ yazma (pozitif): kendi kiracısına INSERT kabul edildi (geri alındı)
+   ✓ yazma (çapraz): başka kiracıya INSERT reddedildi
+   ℹ dolu kiracıya özel tablo yok — okuma sondası koşulmadı.
+
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+exit 0
+### negatif: aynı URL sslmode=require (CA'sız) --require-db
+[ELIFECYCLE] Command failed with exit code 1.
+exit 1
