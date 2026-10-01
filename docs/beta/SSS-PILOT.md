@@ -161,24 +161,62 @@ bağlantıyı kullanmasını söyleyin.
 
 ### B7. Yanlış adrese davet gönderdim / yanlış kişi katıldı. Nasıl geri alırım?
 
-Yanlış adrese giden davet 7 gün sonra kendiliğinden geçersiz olur; o süre boyunca 1 koltuk tutar.
+Bunu **Ekip Üyeleri** sayfasından kendiniz yapabilirsiniz. Sayfayı yalnız **Kurum Sahibi** ve
+**Kurum Yöneticisi** görür ve kullanır.
 
-Yanlış bir kişi katıldıysa vakit kaybetmeden **info@fonbridge.com** adresine yazın. Kurum adınızı ve
-çıkarılacak kişinin e-posta adresini ekleyin. Talep Kurum Sahibi ya da Kiracı Yöneticisi'nden gelmelidir;
-kimliğinizi doğrularız. Ekibimiz üyeyi elle çıkarır. Bu geçici bir yöntemdir; ürüne davet iptali ve üye
-çıkarma eklenince kendiniz yapabileceksiniz. Yanlış kişi katılmışsa bunu acil sayarız (ilk yanıt
-hedefi: iş saatleri içinde 2 saat, bkz. G3). Bu bir hedeftir, taahhüt değildir.
+**Sayfaya gitmek için:** sağ üstte adınıza tıklayın → **Abonelik & Krediler** → koltuk kutusundaki
+**Ekip üyelerini yönet →** bağlantısı. Doğrudan adres: `/tr/<çalışma-alanınız>/ayarlar/uyeler`.
+(Sol menüdeki "Ayarlar" bu sayfaya götürmez.)
 
-- Kaynak: patron kararı 01.10.2026 (K-4); QA raporu Y-3 (`membership.delete` yok; `invitation.delete`
-  yalnız `retention.ts`'te).
+- **Yanlış adrese giden davet:** "Bekleyen Davetler" listesinde o adresin yanındaki **İptal** →
+  **Evet, iptal et**. Davet bağlantısı hemen çalışmaz olur ve koltuk boşalır. İptal etmezseniz davet
+  7 gün sonra kendiliğinden geçersiz olur; o süre boyunca 1 koltuk tutar.
+- **Yanlış katılan kişi:** "Aktif Ekip Üyeleri" listesinde o kişinin yanındaki **Çıkar** → **Evet,
+  çıkar**. Kişi kurumunuza erişimini kaybeder ve koltuk boşalır. Kişi o sayfayı açık tutuyorsa bir
+  sonraki işleminde erişimi kesilir.
 
-**EN:** An invitation sent to a wrong address expires by itself after 7 days; until then it uses 1 seat.
-If a wrong person joined, write to info@fonbridge.com now. Add your organisation name and the e-mail
-address of the person to remove. The request must come from the Organisation Owner or a Tenant Admin;
-we verify who you are. Our team removes the member by hand. This is a temporary method; when the
-product gets invitation cancel and member removal, you will be able to do it yourself. If a wrong
-person joined, we treat it as urgent (first-response target: 2 hours within business hours, see G3).
-This is a target, not a guarantee.
+Kurallar:
+
+- Kendinizi çıkaramazsınız ("Kendinizi ekipten çıkaramazsınız.").
+- Kurum Sahibi'ni yalnız başka bir Kurum Sahibi çıkarabilir. Kurum Yöneticisi bir sahibi çıkaramaz.
+- Kurumun son sahibi çıkarılamaz ("Kurumun son sahibi çıkarılamaz.").
+- Pilot süresi bittiyse çıkarma ve iptal yapılamaz (liste görünür). Bu durumda
+  **info@fonbridge.com** adresine yazın.
+
+**Yanlış kişi kurumunuzdaki bilgileri görmüş olabilir.** Kişiyi çıkardıktan sonra da
+**info@fonbridge.com** adresine yazın: kurum adınızı, ne zaman fark ettiğinizi ve kişinin ne kadar
+süre erişimi olduğunu ekleyin. Bunu acil sayarız (ilk yanıt hedefi: iş saatleri içinde 2 saat, bkz.
+G3). Bu bir hedeftir, taahhüt değildir. Ekranı açamıyorsanız da aynı adrese yazın; talep Kurum Sahibi
+ya da Kurum Yöneticisi'nden gelmelidir ve kimliğinizi doğrularız.
+
+- Rol değiştirme ekranda yoktur; rol değişikliği için info@fonbridge.com adresine yazın.
+- Kaynak: QA Y-3 ekranı (kart TASK-MUPUHBAE811KP, inceleme ONAY:
+  `docs/agent-results/TASK-MUPUHBAE811KP-crw2-fb.md`); `src/app/api/team/members/[id]/route.ts`
+  (kendini çıkarma, sahip ve son sahip kuralları), `src/lib/team/access.ts` (yalnız Sahip/Yönetici),
+  `settings/members/team-list.tsx` (buton ve onay metinleri); patron kararı K-4 (01.10.2026).
+
+**EN:** You can do this yourself on the **Team Members** page. Only the **Owner** and the **Tenant
+Admin** can see and use it. To open it: click your name at the top right → **Subscription &
+Credits** → **Manage team members →** in the seats box. Direct address:
+`/en/<your-workspace>/settings/members`. ("Settings" in the left menu does not go to this page.)
+
+- **Invitation to a wrong address:** in "Pending Invitations", click **Cancel** next to the address,
+  then **Yes, cancel**. The link stops working at once and the seat becomes free. If you do not
+  cancel it, it expires by itself after 7 days; until then it uses 1 seat.
+- **A wrong person joined:** in "Active Members", click **Remove** next to the person, then **Yes,
+  remove**. The person loses access to your organisation and the seat becomes free. If the person
+  has the app open, access stops at their next action.
+
+Rules: you cannot remove yourself. Only another Owner can remove an Owner; a Tenant Admin cannot.
+The last Owner cannot be removed. When the pilot has ended, you can see the list but you cannot
+remove or cancel; write to info@fonbridge.com.
+
+**The wrong person may have seen your organisation's data.** After you remove the person, also write
+to info@fonbridge.com: add your organisation name, when you noticed, and how long the person had
+access. We treat it as urgent (first-response target: 2 hours within business hours, see G3). This
+is a target, not a guarantee. If you cannot open the page, write to the same address; the request
+must come from the Owner or a Tenant Admin, and we verify who you are. To change a role, write to
+info@fonbridge.com; the page cannot change roles.
 
 ### B8. Davet ederken hangi rolü seçmeliyim?
 
@@ -558,7 +596,7 @@ the same all year) for **30 minutes** on Google Meet. The meeting link and a cal
 | No | Soru | SSS |
 | -- | ---- | --- |
 | P-1 | Kurum e-postası Google hesabı değilse belediyeye önerilen yol? (ILKADIM-PILOT S5) | A3 |
-| P-2 | ~~Yanlış üye / yanlış davet~~ → **karar verildi** (K-4, 01.10.2026): ürün hazır olana kadar tek yetkili kişi elle çıkarır, kayıtla. Yetkili kişi ve hukuk/KVKK bildirim sahibi: patron (01.10.2026, iç runbook R-1/R-2) | B7 |
+| P-2 | ~~Yanlış üye / yanlış davet~~ → **karar verildi** (K-4, 01.10.2026); QA Y-3 ekranı devrede: Kurum Sahibi/Kurum Yöneticisi Ekip Üyeleri sayfasından çıkarır/iptal eder. İç runbook yalnız ekran kullanılamazsa yedektir. Veri görülmüş olabilir şüphesinde KVKK değerlendirmesi ve hukuk bildirimi patronda (R-2) | B7 |
 | P-3 | ~~Süre uzatma koşulu~~ → **karar verildi** (K-6, 01.10.2026): vaka bazlı, yayımlanmış kriter yok, otomatik uzatma yok | C4 |
 | P-4 | "Model eğitimi için kullanılmaz" kullanıcıya taahhüt olarak söylenebilir mi? | D3 |
 | P-5 | Kurumun bütün verisini dışa aktarma ve kurum hesabını silme yolu | D4, D5 |
