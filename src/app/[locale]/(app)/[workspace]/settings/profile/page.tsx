@@ -48,7 +48,7 @@ export default function TenantProfilePage() {
         forbidden: isTr ? 'Bu işlem için yetkiniz yok' : 'You do not have permission to perform this action',
         invalid: isTr ? 'Lütfen tüm alanları doğru şekilde doldurun' : 'Please fill all fields correctly',
         failed: isTr ? 'Profil kaydedilemedi' : 'Failed to save profile',
-        PILOT_EXPIRED: isTr ? 'Pilot süresi doldu' : 'Pilot period has ended',
+        pilotExpired: isTr ? 'Pilot süresi doldu' : 'Pilot period has ended',
       };
       setError(errorMessages[result.error] || (isTr ? 'Bir hata oluştu' : 'An error occurred'));
     }
