@@ -40,7 +40,7 @@ const COPY = {
     subject: `${PRODUCT_NAME} Beta — Sizi davet ediyoruz`,
     greeting: (name: string) => `Merhaba ${name},`,
     intro: (org: string) =>
-      `${org} adına ${PRODUCT_NAME}'nin 8 haftalık kapalı betasına tasarım ortağı olarak davet ediyoruz. ` +
+      `${org} adına ${PRODUCT_NAME}'in 8 haftalık kapalı betasına tasarım ortağı olarak davet ediyoruz. ` +
       `${PRODUCT_NAME}, Avrupa fonları için çağrı takibi, konsept not üretimi ve teklif hattı yönetimini tek yerde toplayan çok kiracılı bir platform.`,
     whatIsBeta: 'Beta nedir?',
     whatIsBetaBody: (weeks: number) =>

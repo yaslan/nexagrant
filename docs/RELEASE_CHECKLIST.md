@@ -79,6 +79,7 @@ Sonuç: **şemadaki her anahtar `.env.example`'da var.** Fark ters yönde ve şe
 | `JOBS_DATABASE_URL` | boş = `DATABASE_URL`. Worker ilk açılışta `graphile_worker` şemasını **kurar** → bu rolün şema oluşturma yetkisi olmalı; `fabrika_app`'in yoksa ayrı rol gerekir (ADR-0008 §6.6) | EKSİK (rol yetkisi canlı DB'de ölçülecek) |
 | `NEXT_PUBLIC_POSTHOG_KEY/HOST` | analitik yok (zararsız) | isteğe bağlı |
 | `BETA_SUPPORT_EMAIL`, `BETA_FEEDBACK_EMAIL` | varsayılan `info@fonbridge.com` (`src/lib/beta/constants.ts:49-50`; 01.10.2026'ya dek `support@`/`feedback@fabrika.dev` idi, TASK-MUPIR7Y1P7AH4) → davet e-postası, takvim ORGANIZER'ı ve beta rehberi bu adresi gösterir. Kutunun gerçekten posta alması Vulut panelinde kurulur | HAZIR (kod) / **PATRON** (info@fonbridge.com kutusu + MX/SPF/DKIM) |
+| `docs/BETA_DATA/generated/` (git dışı) | 06.09.2026 çıktıları eski adresi (`support@fabrika.dev`), eski takvim UID'sini ve "Fabrika" adını taşıyor. `pricing-survey/` 01.10.2026'da yeniden üretildi. `invites/`, `calendar/`, `onboarding-summary.json`, `esr-calibration/` **gönderimden hemen önce** gerçek DB'ye karşı `pnpm tsx scripts/beta-onboarding.ts --apply` ve `pnpm tsx scripts/esr-calibration.ts --apply` ile yeniden üretilmeli. Dry-run çıktısı `DRY-RUN-TOKEN` ve localhost bağlantısı taşır, gönderilemez. P-7 (gün/saat) kararı da bundan önce verilmeli | **EKSİK** (gönderim öncesi adım) |
 | `NEXT_PUBLIC_SMTP_FROM_ADDRESS` | varsayılan `info@fonbridge.com` (doğru) | HAZIR |
 
 ### 2.3 Pilotta boş kalmalı (ADR-0007)
