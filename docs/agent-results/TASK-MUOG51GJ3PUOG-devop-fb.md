@@ -237,3 +237,16 @@ Canlı DB ilk kurulumda boşsa sonuç `DB_PUSH_ONCESI` olur. Bu durumda aynı ko
 **Platform beyanı:** Tüm koşular macOS'ta (darwin, Docker `pgvector/pgvector:pg16`, psql istemcisi yerel) yapıldı. Betik saf SQL ve psql meta-komutlarından (`\gset`, `\if`, `\echo`) oluşuyor. psql ≥10 olan her platformda (Linux, Windows, macOS) aynı çalışır; `indnullsnotdistinct` kolonu sunucu tarafında Postgres ≥15 ister. Linux'ta ve Windows'ta koşulamadı, çünkü bu makinede o ortamlar yok. Checklist'teki komut POSIX kabuk sözdizimi (`"$DATABASE_URL"`) kullanıyor; Windows PowerShell'de `$env:DATABASE_URL` gerekir.
 
 Hafıza: RLS kör-nokta tuzağı (FORCE RLS altında salt-okur kontrol betiği için kapsam şart) hafızaya yazıldı.
+
+## Bağımsız güvenlik incelemesi — crw2-fb (01.10.2026, TASK-MUPYHVSBW47GD#review)
+
+**Hüküm: ONAY. Bloke eden bulgu yok.** Ayrıntılar: `docs/agent-results/TASK-MUPYHVSBW47GD-crw2-fb.md`.
+
+- Temiz PG16'da zincir ×2 (41 dosya) ve `rls:verify` exit 0. İlgili 4 suite 60/60 geçti.
+- Çağıranın değeri her durumda birebir dönüyor: SAVEPOINT içinde, PL/pgSQL EXCEPTION içinde ve autocommit'te.
+- Canlı Supabase salt-okuma kontrolü: sahip `fabrika_migrate`. anon, authenticated ve service_role'un EXECUTE yetkisi yok. Kaynak md5'leri repo ile aynı.
+- Öneriler:
+  - **Ö-1:** note'un bilinen-kod dalı ve oturum düzeyi testte görünmüyor; M1 ve M5 mutantları yaşıyor.
+  - **Ö-2:** varsayılan ACL için `anon`/`authenticated` REVOKE ile sertleştirme.
+  - **Ö-3:** ADR-0009:15 eski.
+  - **Ö-4:** clause grep'i tırnaklı adı yakalamıyor.

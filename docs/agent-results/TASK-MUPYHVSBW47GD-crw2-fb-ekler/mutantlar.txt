@@ -1,0 +1,14 @@
+crw2-fb — dev ff9c283e, detached worktree; her mutant dosyada uygulandı, yalnız tests/migration-owner-chain.live.test.ts koşuldu, sonra git checkout ile geri alındı.
+(note_agency_invite_rejection'ın SON tanımı agency-invite-no-max-uses.sql'de: apply-order 42. satır, fix-agency-invite-rejection-audit.sql'i ezer.)
+
+M1 agency-invite-no-max-uses.sql:144 silindi (note, BİLİNEN kod dalı, RETURN öncesi geri yükleme)   -> Tests 12 passed (12)          SURVIVED
+M2 agency-invite-no-max-uses.sql:72  'on', true -> 'on', false (redeem, oturum düzeyi)              -> 1 failed | 11 passed          KILLED
+M3 add-agency-funnel-province.sql:70 silindi (province, normal çıkış geri yüklemesi)                -> 2 failed | 10 passed          KILLED
+M4 agency-invite-no-max-uses.sql:74  silindi (redeem, erken RETURN geri yüklemesi)                   -> 2 failed | 10 passed          KILLED
+M5 agency-invite-no-max-uses.sql:124 'on', true -> 'on', false (note, oturum düzeyi)                -> Tests 12 passed (12)          SURVIVED
+
+M1 etkisinin elle kanıtı (known.sql, tek işlem + ROLLBACK, fabrika_app rolü, iptal edilmiş bilinen kod):
+ REAL after note(known) | off        <- gerçek kod: çağıranın 'off' değeri döndü
+ M1 after note(known)   | on         <- mutant: 'on' sızdı
+ M1 sealed+off -> Membership rows visible | 11   <- mühürlü kapsam + çağıran 'off' yapmışsa sızan 'on' tüm satırları açar
+Not: uygulamada mühürden sonra 'off' yazan bir yol yok (exit_system_scope bilerek yok; grep src/ prisma/rls.sql -> 0 eşleşme).
