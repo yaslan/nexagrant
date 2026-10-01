@@ -43,6 +43,18 @@ vi.mock('next-auth/providers/credentials', () => ({
 }));
 vi.mock('@auth/prisma-adapter', () => ({ PrismaAdapter: () => ({}) }));
 vi.mock('./db', () => ({ prisma: { user: prismaUser, $transaction: vi.fn() } }));
+// The jwt callback reads the user and its memberships through the system scope
+// (TASK-MUPYHVSBW47GD#auth): "Membership" is FORCE RLS and this read is what
+// discovers the tenant. The scope itself is measured under fabrika_app in
+// tests/auth-jwt-membership-app-role.live.test.ts; here the callback gets a tx
+// whose `user` is the same mock, and the purpose it asked for is recorded.
+const { scopeCalls } = vi.hoisted(() => ({ scopeCalls: [] as Array<[string, string]> }));
+vi.mock('./system-scope', () => ({
+  withSystemScope: async (purpose: string, context: string, cb: (tx: unknown) => Promise<unknown>) => {
+    scopeCalls.push([purpose, context]);
+    return cb({ user: prismaUser });
+  },
+}));
 
 async function loadConfig(demoLogin: 'true' | 'false'): Promise<Config> {
   vi.stubEnv('DEMO_LOGIN_ENABLED', demoLogin);
@@ -67,6 +79,7 @@ const LIVE = { tenant: { deletedAt: null } };
 beforeEach(() => {
   prismaUser.findUnique.mockReset();
   prismaUser.update.mockReset();
+  scopeCalls.length = 0;
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -104,8 +117,10 @@ describe('platform-admin claim (TASK-MULU7GVFBTRXX Ö-2)', () => {
     const off = await loadConfig('false');
     const bob = await sessionFor(off, { id: 'demo-user-bob', email: 'bob@example.org', isPlatformAdmin: true, ...tenanted });
     expect(bob.isPlatformAdmin).toBe(false);
-    // One call: the flag and the bound tenant's membership together.
+    // One call: the flag and the bound tenant's membership together …
     expect(prismaUser.findUnique).toHaveBeenCalledTimes(1);
+    // … inside one tenant-discovery scope, never a bare `prisma.user` read.
+    expect(scopeCalls).toEqual([['tenant-discovery', 'auth.jwt.membership']]);
     expect(prismaUser.findUnique).toHaveBeenCalledWith({
       where: { id: 'demo-user-bob' },
       select: {
