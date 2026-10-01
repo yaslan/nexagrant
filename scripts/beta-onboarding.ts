@@ -426,7 +426,7 @@ async function main(): Promise<void> {
         text: email.text,
         attachments: [
           {
-            filename: 'fabrika-beta-checkins.ics',
+            filename: 'fonbridge-beta-checkins.ics',
             content: Buffer.from(
               buildCheckinIcs(schedule, {
                 organizerEmail: BETA_SUPPORT_EMAIL,

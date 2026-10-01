@@ -133,7 +133,7 @@ export default async function AdminLayout({
 
         <div className="flex items-center space-x-4">
           <a
-            href="https://docs.fabrika.app"
+            href="https://fonbridge.com/yardim"
             target="_blank"
             rel="noreferrer"
             className="hover:text-ink transition-colors flex items-center gap-1"

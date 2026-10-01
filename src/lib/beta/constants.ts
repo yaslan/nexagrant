@@ -50,7 +50,7 @@ export const BETA_CHECKIN_DURATION_MIN = 45;
 export const BETA_SUPPORT_EMAIL = process.env.BETA_SUPPORT_EMAIL ?? 'info@fonbridge.com';
 export const BETA_FEEDBACK_EMAIL = process.env.BETA_FEEDBACK_EMAIL ?? 'info@fonbridge.com';
 export const BETA_APP_URL = appUrl();
-export const BETA_MEETING_URL = process.env.BETA_MEETING_URL ?? 'https://meet.google.com/fabrika-beta-checkin';
+export const BETA_MEETING_URL = process.env.BETA_MEETING_URL ?? 'https://meet.google.com/eio-ftwm-wak';
 
 /**
  * E11.3 ESR calibration survey deadline (TASK-MTQ2KL3JO4MK2).
