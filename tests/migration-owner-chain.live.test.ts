@@ -350,6 +350,101 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
     });
   }, LONG);
 
+  // TASK-MUPYHVSBW47GD, on top of the previous test: the caller's exact value
+  // (unset, 'off', 'on') comes back, also on the ERROR path (an error raised
+  // inside a function after it opened the scope); the function never sets the
+  // flag for the session (the transaction ends with COMMIT, which a session-
+  // level set_config would survive and ROLLBACK would hide); fabrika_app cannot
+  // write the flag into a function definition; tenant A sees no row of B.
+  // No EXCEPTION handler is needed for the error path: a failing function
+  // aborts the transaction or the caller's savepoint, and that rolls the
+  // setting back (measured: an EXCEPTION ... restore; RAISE; block changes
+  // nothing this test sees).
+  test('definer functions put the caller\'s app.system_scope back on every exit, and tenant A still sees no row of B', async (ctx) => {
+    if (!RLS_URL) ctx.skip('DATABASE_URL_RLS_TEST is not set');
+    const app = new URL(RLS_URL!);
+    const appUrl = urlFor(ADMIN_URL!, DB, { name: app.username, password: decodeURIComponent(app.password) });
+    // An error raised INSIDE note_agency_invite_rejection, after it opened the
+    // scope: a trigger on the row it writes for an unknown code. The message
+    // carries the flag as the trigger saw it.
+    await withDb(ownerUrl(), (c) =>
+      c.query(`CREATE FUNCTION public.fb_scope_probe() RETURNS trigger LANGUAGE plpgsql AS $p$
+                 BEGIN RAISE EXCEPTION 'scope probe: %', current_setting('app.system_scope', true); END $p$;
+               CREATE TRIGGER fb_scope_probe BEFORE INSERT OR UPDATE ON "SystemAlert"
+                 FOR EACH ROW WHEN (NEW."source" = 'agency.invite') EXECUTE FUNCTION public.fb_scope_probe();`)
+    );
+    try {
+      for (const prev of [undefined, 'off', 'on']) {
+        // A fresh session per case, so "unset" really is unset.
+        await withDb(appUrl, async (c) => {
+          const q = async (sql: string) => (await c.query(sql)).rows[0];
+          await c.query('BEGIN');
+          try {
+            if (prev !== undefined) await c.query(`SELECT set_config('app.system_scope', $1, true)`, [prev]);
+            await c.query(`SELECT set_config('app.tenant_id', 'oc-ag', true)`);
+            const before = (await q(`SELECT current_setting('app.system_scope', true) AS s`)).s;
+            expect(before ?? null).toBe(prev ?? null);
+            const scope = async () => (await q(`SELECT current_setting('app.system_scope', true) AS s`)).s || null;
+
+            // Normal exit: the function saw the member's row, the caller's flag is back.
+            const rows = (await c.query(`SELECT registered, saved_search FROM public.agency_funnel_counts(NULL)`)).rows;
+            expect(rows).toEqual([{ registered: 1, saved_search: 1 }]);
+            expect(await scope()).toBe(prev ?? null);
+            const prov = (await c.query(`SELECT registered FROM public.agency_funnel_counts_by_province(NULL)`)).rows;
+            expect(prov).toEqual([{ registered: 1 }]);
+            expect(await scope()).toBe(prev ?? null);
+
+            // Early RETURN (malformed hash).
+            expect((await q(`SELECT public.redeem_agency_invite('not-a-hash') AS a`)).a).toBeNull();
+            expect(await scope()).toBe(prev ?? null);
+
+            // Error path: the original error comes out, raised while the scope was on.
+            await c.query('SAVEPOINT probe');
+            const err = await c
+              .query(`SELECT public.note_agency_invite_rejection(repeat('a', 64))`)
+              .then(() => '', (e: Error) => e.message);
+            expect(err).toBe('scope probe: on');
+            await c.query('ROLLBACK TO SAVEPOINT probe');
+            expect(await scope()).toBe(prev ?? null);
+
+            // Nothing leaked: as the agency, the member's and the other tenants' rows stay invisible.
+            expect((await q(`SELECT count(*)::int AS n FROM "SavedSearch" WHERE id = 'oc-s'`)).n).toBe(0);
+            expect((await q(`SELECT count(*)::int AS n FROM "Membership" WHERE id LIKE 'lm-%'`)).n).toBe(0);
+            // As tenant A: only A's membership, never B's — whatever the flag.
+            await c.query(`SELECT set_config('app.tenant_id', 'lt-a', true)`);
+            const own = await q(`SELECT array_agg(id ORDER BY id) AS ids FROM "Membership" WHERE id LIKE 'lm-%'`);
+            expect(own.ids).toEqual(['lm-a']);
+          } finally {
+            // COMMIT, not ROLLBACK: a rollback would also undo a session-level
+            // set_config inside the function and hide it. Nothing above wrote rows.
+            await c.query('COMMIT');
+          }
+          // And nothing survives the transaction: every value above was local.
+          const after = (await c.query(`SELECT current_setting('app.system_scope', true) AS s`)).rows[0].s;
+          expect(after || null).toBeNull();
+        });
+      }
+
+      // fabrika_app cannot write the flag into a function definition (the old
+      // pattern), and its own plain SET opens nothing.
+      await withDb(appUrl, async (c) => {
+        const priv = (await c.query(`SELECT has_parameter_privilege('app.system_scope', 'SET') AS p`)).rows[0];
+        expect(priv.p).toBe(false);
+        const denied = await c
+          .query(`CREATE FUNCTION pg_temp.fb_open() RETURNS int LANGUAGE sql SET app.system_scope = 'on' AS 'SELECT 1'`)
+          .then(() => '', (e: Error) => e.message);
+        expect(denied).toContain('permission denied to set parameter "app.system_scope"');
+        await c.query(`SET app.system_scope = 'on'`);
+        const n = (await c.query(`SELECT count(*)::int AS n FROM "Membership" WHERE id LIKE 'lm-%'`)).rows[0];
+        expect(n.n).toBe(0);
+      });
+    } finally {
+      await withDb(ownerUrl(), (c) =>
+        c.query(`DROP TRIGGER IF EXISTS fb_scope_probe ON "SystemAlert"; DROP FUNCTION IF EXISTS public.fb_scope_probe();`)
+      );
+    }
+  }, LONG);
+
   // Without SET on the parameter the owner cannot store this default itself
   // (permission denied, TASK-MUOG51GJ3PUOG); a superuser still can, and the
   // check guards against it whoever wrote it.
