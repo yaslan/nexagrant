@@ -9,7 +9,7 @@
 | 1.0   | 2026-09-06 | İlk yayım (şablon, imza alanı yok)                                                                                                                 |
 | 1.0   | 2026-09-08 | 7. madde değişti, sürüm numarası ve tarih güncellenmedi                                                                                            |
 | 1.1   | 2026-10-01 | Taraflar, iletişim, imza ve yürürlük maddeleri eklendi; 6. madde kodla uyumlu hale getirildi; alt işleyenler Ek-1'de adıyla listelendi |
-| 1.2   | 2026-10-01 | 13. madde (dil önceliği, uygulanacak hukuk, yetki) eklendi; 4, 5, 7, 8, 9. maddelere GDPR md.28(3) ve KVKK md.12 unsurları ile yurt dışı aktarım dayanağı eklendi; 5. maddede model eğitimi ifadesinin dayanağı açıklandı |
+| 1.2   | 2026-10-01 | 13. madde (dil önceliği, uygulanacak hukuk, yetki) eklendi; 4, 5, 7, 8, 9. maddelere GDPR md.28(3) ve KVKK md.12 unsurları ile yurt dışı aktarım dayanağı eklendi; 5. maddede model eğitimi ifadesinin dayanağı açıklandı; 7.2/7.3 gerçek duruma çekildi (alt işleyen sözleşmesi ve aktarım dayanağı bugünkü durumla); 13.3 yetkili mahkeme Samsun; işleyen ticari unvanı eklendi |
 
 ## 1. Taraflar ve Roller
 

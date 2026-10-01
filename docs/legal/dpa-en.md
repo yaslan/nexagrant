@@ -9,7 +9,7 @@
 | 1.0     | 2026-09-06 | First publication (template, no signature block)                                                                                            |
 | 1.0     | 2026-09-08 | Section 7 changed; version number and date were not updated                                                                                 |
 | 1.1     | 2026-10-01 | Parties, notices, signature and effective-date sections added; section 6 aligned with the code; sub-processors listed by name in Annex 1 |
-| 1.2     | 2026-10-01 | Section 13 (language precedence, governing law, jurisdiction) added; GDPR art. 28(3) and KVKK art. 12 elements and the international transfer basis added to sections 4, 5, 7, 8, 9; basis for the "no model training" statement explained in section 5 |
+| 1.2     | 2026-10-01 | Section 13 (language precedence, governing law, jurisdiction) added; GDPR art. 28(3) and KVKK art. 12 elements and the international transfer basis added to sections 4, 5, 7, 8, 9; basis for the "no model training" statement explained in section 5; sections 7.2/7.3 aligned with the actual state (sub-processor contracts and transfer basis as of today); 13.3 jurisdiction set to Samsun; processor legal name added |
 
 ## 1. Parties and Roles
 
