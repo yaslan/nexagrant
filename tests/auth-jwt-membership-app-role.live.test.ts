@@ -156,7 +156,7 @@ describe('jwt membership lookup under fabrika_app (TASK-MUPYHVSBW47GD#auth)', ()
   });
 
   test('a user with no membership stays tenantless (fail closed)', async () => {
-    await admin!.membership.deleteMany({ where: { userId: ids.userU } });
+    await admin!.membership.deleteMany({ where: { userId: requireId(ids.userU, 'user') } });
     const token = await signIn(ids.userU);
     expect(token.tenantId).toBeUndefined();
     expect(token.role).toBeUndefined();
