@@ -1,12 +1,28 @@
 # Data Processing Agreement (DPA)
 
-Version 1.0 — Effective date: 2026-09-06
+**Version:** 1.1 · **Text date:** 2026-10-01 · **Effective date:** the date of the last signature in section 12
+
+## Version History
+
+| Version | Date       | Change                                                                                                                                      |
+| ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0     | 2026-09-06 | First publication (template, no signature block)                                                                                            |
+| 1.0     | 2026-09-08 | Section 7 changed; version number and date were not updated                                                                                 |
+| 1.1     | 2026-10-01 | Parties, notices, signature and effective-date sections added; section 6 aligned with the code; sub-processors listed by name in Annex 1 |
 
 ## 1. Parties and Roles
 
-This agreement is between the organisation using the Fabrika SaaS platform (the "Controller") and Fabrika, which operates the platform (the "Processor").
+This agreement is made between the two parties whose details are set out in the table below.
 
-The Controller determines the purposes and means of processing the personal data it uploads. The Processor processes that data only on the Controller's documented instructions.
+| Detail                     | Controller (customer organisation) | Processor                       |
+| -------------------------- | ---------------------------------- | ------------------------------- |
+| Legal name                 | ...............................    | {{ŞİRKET_UNVANI}}               |
+| Address                    | ...............................    | {{ŞİRKET_ADRESİ}}               |
+| Tax office / tax number    | ...............................    | {{ŞİRKET_VERGİ_DAİRESİ_VKN}}    |
+| Trade registry (MERSİS) no | ...............................    | {{ŞİRKET_MERSİS_NO}}            |
+| Notice email address       | ...............................    | info@fonbridge.com              |
+
+The Controller is the organisation that uses the FonBridge platform (the "Platform") operated by the Processor. The Controller determines the purposes and means of processing the personal data it uploads to the Platform. The Processor processes that data only on the Controller's documented instructions.
 
 ## 2. Subject Matter and Duration
 
@@ -27,7 +43,7 @@ Authentication secrets (OAuth and session tokens) are excluded from data subject
 
 ## 4. Data Subject Rights
 
-Users of the Controller can exercise the following rights directly in the product:
+Users of the Controller can exercise the following rights directly in the Platform:
 
 - **Access and portability:** `Settings → Privacy & My Data → Export My Data` (JSON)
 - **Erasure:** `Settings → Privacy & My Data → Request Account Deletion` — the account is closed immediately and permanently deleted after 30 days
@@ -45,13 +61,16 @@ Rectification and objection requests are handled through the Controller's tenant
 
 ## 6. Return and Deletion of Data
 
-On termination the Controller may export all data within 30 days. After that period the data is permanently deleted. Billing and audit records are retained in de-identified form for the duration of statutory retention periods.
+- **6.1 Export on termination:** On termination the Controller may ask for its data to be exported within 30 days of the termination date. An organisation-wide export is not a self-service function of the Platform today; the request is sent in writing to the address in section 10 and the Processor carries it out. A user-level export is made from the screen in section 4.
+- **6.2 Deletion on termination:** At the end of the 30-day period the data is permanently deleted, except for the records listed in 6.4.
+- **6.3 Deletion of a user account:** When an account is deleted under section 4, the records that belong to the Controller and must be kept (audit events, the AI usage log, opportunities, feedback, proposal usage and relationship records) are not deleted; the link to the user's identifier in those records is removed. The free-form content field of an audit event is not changed by this step and may contain personal data. The deletion itself is recorded with a one-way hash of the user's identifier.
+- **6.4 Records kept without de-identification:** The following records are not de-identified and are kept for as long as their reason applies: (a) issued invoices — the buyer's legal name, tax or national identity number, tax office and address, as they stood when the invoice was issued, for the retention period set by the applicable tax law; (b) the identity and name of the approver on a dual-approval step, because the approval has the character of a signature; (c) records showing that the user was informed and gave consent, because of the duty to demonstrate compliance.
 
 ## 7. Sub-processors
 
-The Processor uses sub-processors in the following categories: hosting and database, object storage, email delivery, payment infrastructure, and AI model providers. The Controller is notified in advance of any change to sub-processors.
+The Processor uses the sub-processors listed in Annex 1 with their name, service, location and the data they process. The Controller is notified through the address in section 10 before any sub-processor is added or replaced.
 
-Error monitoring and product analytics are **not** sub-processed to a third party today: analytics is an inert stub with no network call, and error tracking runs entirely in-house through the `SystemAlert` mechanism, by deliberate decision to keep this category of data from leaving the platform (see `docs/legal/processing-register.md` §19 for the evidence trail). If a third-party error-monitoring or analytics provider is introduced later, this section will be updated before that provider goes live.
+Error monitoring is not sub-processed to any third party today; errors are kept only in the Platform's own `SystemAlert` mechanism. The product analytics provider listed in Annex 1 is integrated into the Platform but switched off; the notice in this section is given before it is switched on.
 
 ## 8. Breach Notification
 
@@ -60,3 +79,35 @@ On becoming aware of a personal data breach, the Processor notifies the Controll
 ## 9. Audit
 
 The Controller may, once per year and with reasonable notice, request documentation and reports concerning the processing activities.
+
+## 10. Contact and Notices
+
+Notices under this agreement (breach notifications, sub-processor changes, export and deletion requests, forwarding of data subject requests) are made in writing to the notice email addresses in the table in section 1. The Processor's notice address is **info@fonbridge.com**. Each party tells the other in writing if its address changes.
+
+## 11. Version and Amendment
+
+The current text of this agreement is identified by the version number and text date written on it. Every change to the text gets a new version number and date and is entered in the Version History table.
+
+## 12. Entry into Force and Signature
+
+This agreement enters into force on the later of the dates on which the parties sign below and remains in force for the term in section 2.
+
+| Field             | For the Controller              | For the Processor               |
+| ----------------- | ------------------------------- | ------------------------------- |
+| Full name         | ............................... | ............................... |
+| Title / position  | ............................... | ............................... |
+| Date              | ....../....../..........        | ....../....../..........        |
+| Signature         |                                 |                                 |
+
+## Annex 1: Sub-processors
+
+| Sub-processor         | Service                                                              | Location       | Data processed                                                                                     | Status                                   |
+| --------------------- | -------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Vulut                 | Hosting: application server, PostgreSQL database, job queue, email server | Türkiye        | All data on the Platform; content and recipient address of outgoing email                          | In use                                   |
+| Cloudflare, Inc. (R2) | Object storage                                                       | {{R2_BÖLGESİ}} | File attachments, evidence files, organisation logos                                               | In use                                   |
+| Anthropic PBC         | AI language model                                                    | USA            | Prompt text sent by AI features                                                                    | In use                                   |
+| OpenAI, L.L.C.        | AI language model and text embedding                                 | USA            | Prompt text; document text embedded for search                                                     | In use                                   |
+| Stripe, Inc.          | Payment infrastructure                                               | USA            | Payment details entered on the payment page; organisation and subscription identifiers             | In use                                   |
+| iyzico                | Payment infrastructure (TRY)                                         | Türkiye        | Buyer's first name, last name, email address, identity number; payment details                     | In use                                   |
+| Google LLC            | Sign-in with a Google account                                        | USA            | Name, email address, Google account identifier                                                     | If the user chooses this sign-in method  |
+| PostHog Inc.          | Product analytics                                                    | EU             | After consent, a random per-browser identifier and product usage events (no user id, email or name is sent; the request's IP address reaches the provider) | Integrated, switched off (section 7)     |
