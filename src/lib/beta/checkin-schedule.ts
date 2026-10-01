@@ -156,7 +156,7 @@ export function buildCheckinSchedule(
       utcOffset: formatOffset(zoneOffsetMs(slot.timezone, start.getTime())),
       start,
       end,
-      uid: `fabrika-beta-checkin-w${week}@fabrika.dev`,
+      uid: `fonbridge-beta-checkin-w${week}@fonbridge.com`,
     });
   }
   return occurrences;

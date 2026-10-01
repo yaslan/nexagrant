@@ -92,8 +92,8 @@ const COPY = {
     subject: 'FonBridge Beta — G0 skoru doğrulama anketi (5 dakika)',
     greeting: (name: string) => `Merhaba ${name},`,
     intro: (n: number) =>
-      `FonBridge'nin G0 triyaj skorunu gerçek değerlendirme sonuçlarıyla kalibre ediyoruz. ` +
-      `Aşağıda ${n} örnek fırsat var; her biri için FonBridge'nin verdiği skoru ve kararı görüyorsunuz.`,
+      `FonBridge'in G0 triyaj skorunu gerçek değerlendirme sonuçlarıyla kalibre ediyoruz. ` +
+      `Aşağıda ${n} örnek fırsat var; her biri için FonBridge'in verdiği skoru ve kararı görüyorsunuz.`,
     ask: 'Tek sorumuz şu: siz olsanız aynı kararı verir miydiniz?',
     howTitle: 'Nasıl yanıtlanır',
     how: [

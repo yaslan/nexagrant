@@ -240,8 +240,8 @@ Panelde gösterilen her oran bir kayda dayanır; kaynak yoksa metrik "veri yok" 
 
 | Amaç | Adres |
 |---|---|
-| Destek, hata, hesap | **support@fabrika.dev** |
-| Ürün geri bildirimi, özellik isteği | **feedback@fabrika.dev** |
+| Destek, hata, hesap | **info@fonbridge.com** |
+| Ürün geri bildirimi, özellik isteği | **info@fonbridge.com** |
 
 > Bu adresler `BETA_SUPPORT_EMAIL` / `BETA_FEEDBACK_EMAIL` ortam değişkenlerinden okunur
 > ([`src/lib/beta/constants.ts`](../src/lib/beta/constants.ts)); davet e-postası ve bu rehber
