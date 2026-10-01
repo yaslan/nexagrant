@@ -149,6 +149,13 @@ export async function isMemberOf(tenantId: string, userId: string): Promise<bool
   );
 }
 
+/** The person's role in the tenant, or null when they are not a member. */
+export async function membershipRoleOf(tenantId: string, userId: string): Promise<Role | null> {
+  return withTenant(tenantId, async (tx) =>
+    (await tx.membership.findUnique({ where: { tenantId_userId: { tenantId, userId } }, select: { role: true } }))?.role ?? null
+  );
+}
+
 export interface AcceptInvitationCore {
   invitationId: string;
   tokenHash: string;
@@ -204,7 +211,7 @@ export async function acceptInvitationIn(
 export type AcceptRefusal = 'invalid' | 'revoked' | 'expired' | 'used' | 'email_mismatch' | 'pilot_expired';
 
 export type AcceptOutcome =
-  | { ok: true; tenantId: string; alreadyMember: boolean }
+  | { ok: true; tenantId: string; alreadyMember: boolean; role: Role | null }
   | { ok: false; reason: AcceptRefusal };
 
 /** An existing, signed-in account accepts the invitation behind `token`. */
@@ -222,7 +229,12 @@ export async function acceptInvitation(input: {
   if (state.status === 'used' || state.status === 'expired') {
     // Idempotent for the person it was meant for: a second click lands them in the workspace.
     if (await isMemberOf(invitation.tenantId, input.userId)) {
-      return { ok: true, tenantId: invitation.tenantId, alreadyMember: true };
+      return {
+        ok: true,
+        tenantId: invitation.tenantId,
+        alreadyMember: true,
+        role: await membershipRoleOf(invitation.tenantId, input.userId),
+      };
     }
     return { ok: false, reason: state.status };
   }
@@ -239,7 +251,13 @@ export async function acceptInvitation(input: {
     })
   );
   if (result === 'lost') return { ok: false, reason: 'used' };
-  return { ok: true, tenantId: invitation.tenantId, alreadyMember: result === 'already_member' };
+  return {
+    ok: true,
+    tenantId: invitation.tenantId,
+    alreadyMember: result === 'already_member',
+    // The role the membership really has (an earlier membership keeps its own), which decides the landing screen.
+    role: await membershipRoleOf(invitation.tenantId, input.userId),
+  };
 }
 
 /**

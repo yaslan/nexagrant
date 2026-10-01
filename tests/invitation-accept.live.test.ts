@@ -282,7 +282,7 @@ describe('an existing account accepts (acceptInvitation, fabrika_app)', () => {
     const inv = await invite(tenantId, address, { role: 'PIPELINE_MANAGER' });
 
     const first = await lib.accept.acceptInvitation({ token: inv.raw, userId, userEmail: address.toUpperCase() });
-    expect(first).toEqual({ ok: true, tenantId, alreadyMember: false });
+    expect(first).toEqual({ ok: true, tenantId, alreadyMember: false, role: 'PIPELINE_MANAGER' });
     expect(await memberships(userId)).toEqual([{ tenantId, role: 'PIPELINE_MANAGER' }]);
     const row = await admin!.invitation.findUniqueOrThrow({ where: { id: inv.id }, select: { acceptedAt: true } });
     expect(row.acceptedAt).not.toBeNull();
@@ -293,7 +293,7 @@ describe('an existing account accepts (acceptInvitation, fabrika_app)', () => {
     expect(audit).toEqual([{ actorId: userId, target: inv.id, data: null }]);
 
     const again = await lib.accept.acceptInvitation({ token: inv.raw, userId, userEmail: address });
-    expect(again).toEqual({ ok: true, tenantId, alreadyMember: true });
+    expect(again).toEqual({ ok: true, tenantId, alreadyMember: true, role: 'PIPELINE_MANAGER' });
     expect(await memberships(userId)).toHaveLength(1);
     expect(await admin!.auditEvent.count({ where: { tenantId, type: lib.accept.INVITATION_ACCEPTED } })).toBe(1);
   });

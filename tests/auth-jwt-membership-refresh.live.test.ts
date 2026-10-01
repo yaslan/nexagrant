@@ -215,7 +215,8 @@ describe('accepting an invitation moves the session to that tenant (TASK-MUNWZA2
     console.log('Y1_REBIND', JSON.stringify({ stranded, accepted, joined: { c: joined.tenantId === tenantC, role: joined.role }, again: again.tenantId === tenantC }));
     // Before: tenantless and not moved to B (İNCELEME-59 Y-2 holds).
     expect(stranded).toMatchObject({ tenantId: null, tenantB: false });
-    expect(accepted).toMatch(/^throw:NEXT_REDIRECT;.*\/tr\/default\/dashboard/);
+    // WRITER cannot open the dashboard: the landing is the pipeline board (QA Y-1, TASK-MUPUGXME9DP6K).
+    expect(accepted).toMatch(/^throw:NEXT_REDIRECT;.*\/tr\/default\/firsatlar/);
     expect(joined.tenantId).toBe(tenantC);
     expect(joined.role).toBe('WRITER');
     // Bound now: plain requests stay on C, and it is still not B.

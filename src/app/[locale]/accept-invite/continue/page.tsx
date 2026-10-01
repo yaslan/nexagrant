@@ -11,11 +11,13 @@ import { getPublicRoute } from '@/lib/routes';
 import { readParkedInvitation } from '@/lib/invitations/accept-cookie';
 import {
   isInvitingTenantReadOnly,
-  isMemberOf,
+  membershipRoleOf,
   lookupInvitation,
   maskEmail,
   sameEmail,
 } from '@/lib/invitations/accept';
+
+import { landingPathFor } from '@/lib/landing';
 
 import AcceptInviteActions from './AcceptInviteActions';
 
@@ -92,8 +94,9 @@ export default async function AcceptInviteContinuePage({
   const matches = userId !== null && sameEmail(invitation.email, userEmail);
 
   // Joined already (this link, or a second click on it): straight to the workspace.
-  if (matches && userId && (await isMemberOf(invitation.tenantId, userId))) {
-    redirect(`/${locale}/default/dashboard`);
+  if (matches && userId) {
+    const memberRole = await membershipRoleOf(invitation.tenantId, userId);
+    if (memberRole) redirect(landingPathFor(memberRole, locale));
   }
 
   if (state.status === 'expired' || state.status === 'used') {

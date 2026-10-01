@@ -49,13 +49,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   m.auth.mockResolvedValue({ user: { id: 'u1', email: 'a@example.invalid' }, tenantId: 't1' });
   m.readParkedInvitation.mockResolvedValue({ token: 'parked', locale: 'tr' });
-  m.acceptInvitation.mockResolvedValue({ ok: true, tenantId: 't2' });
+  m.acceptInvitation.mockResolvedValue({ ok: true, tenantId: 't2', role: 'PIPELINE_MANAGER' });
 });
 
 describe('accepting an invitation when the session cannot be re-minted (İNCELEME-81 Ö-3)', () => {
   it('control: the rebind asks for the accepted tenant, then the workspace opens', async () => {
     m.unstable_update.mockResolvedValue(null);
-    expect(await outcome(acceptInvitationAction('tr'))).toBe('throw:NEXT_REDIRECT;/tr/default/dashboard');
+    expect(await outcome(acceptInvitationAction('tr'))).toBe('throw:NEXT_REDIRECT;/tr/default/panel');
     expect(m.unstable_update).toHaveBeenCalledWith({ tenantId: 't2' });
   });
 
