@@ -20,6 +20,7 @@ import {
   Globe, 
   Key, 
   ShieldCheck, 
+  HelpCircle, 
   LogOut, 
   ChevronDown, 
   Building2, 
@@ -569,6 +570,15 @@ export default function UserMenu({
                 <ShieldCheck className="w-4 h-4 text-muted" />
                 <span>{isTr ? 'GDPR & Veri Gizliliği' : 'GDPR & Data Privacy'}</span>
               </Link>
+              <a
+                href="https://fonbridge.com/yardim"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
+              >
+                <HelpCircle className="w-4 h-4 text-muted" />
+                <span>{isTr ? 'Yardım & Dokümantasyon' : 'Help & Documentation'}</span>
+              </a>
             </div>
 
             <div className="my-1 border-t border-border" />

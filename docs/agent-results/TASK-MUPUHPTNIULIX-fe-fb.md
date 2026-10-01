@@ -30,3 +30,9 @@ src/app/[locale]/(app)/[workspace]/settings/privacy/client.tsx · src/app/api/gd
 
 ## 6. Sonraki adım
 Yanıt gelince 5.1/5.2 küçük takip kartı; dal incelemeye hazır (dev'e merge sizde).
+
+## Ek (patron yanıtı sonrası)
+- Soru 1 → yardım bağlantıları `https://fonbridge.com/yardim` ile geri eklendi (admin altbilgi + UserMenu), import'lar geri geldi.
+- Soru 2 → `BETA_MEETING_URL` varsayılanı `https://meet.google.com/eio-ftwm-wak` (constants.ts + .env.example); ayrıca `scripts/beta-onboarding.ts` ics dosya adı `fonbridge-beta-checkins.ics`.
+- `storage.fabrika.app` (m10 sahte belge URL'si) için yanıt gelmedi, dokunulmadı.
+- `npx tsc --noEmit` 0; ilgili vitest (tests + src/lib/beta): 241 passed | 6 skipped dosya, 2914 passed | 119 skipped test.
