@@ -61,4 +61,4 @@
 | R-2 | ~~KVKK / hukuk bildirim sahibinin adı (§2).~~ **Karar verildi** (01.10.2026): patron. |
 | R-3 | Kayıtlı adres doğrulama yöntemi (adım 2). |
 | R-4 | Elle `AuditEvent` biçimi (adım 5). |
-| R-5 | Çıkarılan kişinin oturumunun düşme davranışı (adım 4) — kodla doğrulanmalı. |
+| R-5 | Çıkarılan kişinin oturumunun düşme davranışı (adım 4). Ekran yolu için kodla cevaplandı (baştaki EMEKLİ notu; Y-3 `dev`'e girince geçerli). Elle DB silme yolu ayrıca doğrulanmadı. |
