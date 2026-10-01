@@ -1,6 +1,6 @@
 # Data Processing Agreement (DPA)
 
-**Version:** 1.1 · **Text date:** 2026-10-01 · **Effective date:** the date of the last signature in section 12
+**Version:** 1.2 · **Text date:** 2026-10-01 · **Effective date:** the date of the last signature in section 12
 
 ## Version History
 
@@ -9,6 +9,7 @@
 | 1.0     | 2026-09-06 | First publication (template, no signature block)                                                                                            |
 | 1.0     | 2026-09-08 | Section 7 changed; version number and date were not updated                                                                                 |
 | 1.1     | 2026-10-01 | Parties, notices, signature and effective-date sections added; section 6 aligned with the code; sub-processors listed by name in Annex 1 |
+| 1.2     | 2026-10-01 | Section 13 (language precedence, governing law, jurisdiction) added; GDPR art. 28(3) and KVKK art. 12 elements and the international transfer basis added to sections 4, 5, 7, 8, 9; basis for the "no model training" statement explained in section 5 |
 
 ## 1. Parties and Roles
 
@@ -52,34 +53,42 @@ Users of the Controller can exercise the following rights directly in the Platfo
 
 Rectification and objection requests are handled through the Controller's tenant administrator.
 
+**Assistance with data subject requests:** Taking into account the nature of the processing, the Processor assists the Controller by appropriate technical and organisational measures in fulfilling the Controller's duty to respond to data subject requests (GDPR arts. 12-22; KVKK arts. 11 and 13). A data subject request that reaches the Processor directly is not answered unless the Controller instructs it; it is forwarded without delay to the address in section 10.
+
 ## 5. Security Measures
 
 - Tenant data is isolated at row level using PostgreSQL Row Level Security.
 - File attachments are stored in encrypted, S3-compatible object storage.
 - Access is role-based; sensitive operations require dual approval.
 - Audit events are recorded in the `AuditEvent` table.
-- Customer data is never used to train AI models.
+- The Processor ensures that its personnel who process personal data are bound by a duty of confidentiality, which continues after their engagement ends (GDPR art. 28(3)(b); KVKK art. 12(1) and 12(4)).
+- The Processor takes the technical and organisational measures needed to ensure a level of security appropriate to the processing (GDPR art. 32; KVKK art. 12(1)).
+- That customer data is not used to train AI models rests on the AI providers' (Annex 1: Anthropic, OpenAI) published commercial terms of service, not on a separate agreement signed between the Processor and those providers (those terms provide that content sent through the API is not used to train the provider's models; providers may change their terms). Under their own terms, providers may retain the content sent for a limited period; for example, OpenAI retains text embedding requests for up to 30 days today. A retention period of zero is not promised.
 
 ## 6. Return and Deletion of Data
 
 - **6.1 Export on termination:** On termination the Controller may ask for its data to be exported within 30 days of the termination date. An organisation-wide export is not a self-service function of the Platform today; the request is sent in writing to the address in section 10 and the Processor carries it out. A user-level export is made from the screen in section 4.
-- **6.2 Deletion on termination:** At the end of the 30-day period the Processor permanently deletes the data, except for the records listed in 6.4. Organisation-wide deletion is not an automatic process of the Platform today; the Processor carries it out and confirms in writing to the address in section 10 when it is complete.
+- **6.2 Deletion on termination:** When the agreement ends, the data is returned or deleted at the Controller's choice (GDPR art. 28(3)(g)). At the end of the 30-day period the Processor permanently deletes the data, except for the records listed in 6.4. Organisation-wide deletion is not an automatic process of the Platform today; the Processor carries it out and confirms in writing to the address in section 10 when it is complete.
 - **6.3 Deletion of a user account:** When an account is deleted under section 4, the records that belong to the Controller and must be kept (audit events, the AI usage log, opportunities, feedback, proposal usage and relationship records) are not deleted; the link to the user's identifier in those records is removed. The free-form content field of an audit event is not changed by this step and may contain personal data. The deletion itself is recorded with a one-way hash of the user's identifier.
 - **6.4 Records kept without de-identification:** The following records are not de-identified and are kept for as long as their reason applies: (a) issued invoices — the buyer's legal name, tax or national identity number, tax office and address, as they stood when the invoice was issued, for the retention period set by the applicable tax law; (b) the identity and name of the approver on a dual-approval step, because the approval has the character of a signature; (c) records showing that the user was informed and gave consent, because of the duty to demonstrate compliance.
 
 ## 7. Sub-processors
 
-The Processor uses the sub-processors listed in Annex 1 with their name, service, location and the data they process. The Controller is notified through the address in section 10 before any sub-processor is added or replaced.
+The Processor uses the sub-processors listed in Annex 1 with their name, service, location and the data they process. The Controller gives general authorisation for the use of these sub-processors.
+
+- **7.1 Prior notice and objection:** The Controller is notified through the address in section 10 at least 30 days before any sub-processor is added or replaced. In that period the Controller may object in writing on reasonable data protection grounds. If it objects, the parties discuss a solution in good faith; if none is found, the Controller may terminate the service that involves the sub-processor concerned, and the return and deletion terms in section 6 apply.
+- **7.2 Same obligations imposed:** The Processor imposes on each sub-processor, by written contract, the data protection obligations of this agreement (GDPR art. 28(4); KVKK art. 12). If a sub-processor fails to meet its obligations, the Processor remains liable to the Controller.
+- **7.3 International transfers:** Personal data may be transferred to the sub-processors located in the USA in Annex 1 (Anthropic, OpenAI, Stripe, Google). The transfer basis is: for data coming from the European Union, either the provider's certification under the EU-US Data Privacy Framework (DPF), which relies on the European Commission's adequacy decision under GDPR art. 45, or, where there is none, Standard Contractual Clauses (SCC) under GDPR art. 46; for data coming from Türkiye, an adequacy decision or appropriate safeguards under KVKK art. 9, that is, signing the standard contract and notifying it to the Personal Data Protection Authority within the legal period after signature. The Processor states the basis of a transfer in writing on the Controller's request.
 
 Error monitoring is not sub-processed to any third party today; errors are kept only in the Platform's own `SystemAlert` mechanism. The product analytics provider listed in Annex 1 is integrated into the Platform but switched off; the notice in this section is given before it is switched on.
 
 ## 8. Breach Notification
 
-On becoming aware of a personal data breach, the Processor notifies the Controller without undue delay and no later than 72 hours, describing the scope of the breach, the categories of data affected, and the measures taken.
+On becoming aware of a personal data breach, the Processor notifies the Controller without undue delay and no later than 72 hours, describing the scope of the breach, the categories of data affected, and the measures taken. Taking into account the nature of the processing and the information available to it, the Processor also assists the Controller with its security obligations (GDPR art. 32), with notifying the breach to the supervisory authority and to the persons concerned (GDPR arts. 33-34; KVKK art. 12(5)), with data protection impact assessments (GDPR art. 35) and with prior consultation of the supervisory authority (GDPR art. 36).
 
 ## 9. Audit
 
-The Controller may, once per year and with reasonable notice, request documentation and reports concerning the processing activities.
+The Processor makes available to the Controller all information necessary to demonstrate compliance with the obligations in this agreement. The Controller may, once per year and with reasonable notice, request documentation and reports concerning the processing activities; it may also carry out an audit, itself or through an auditor it appoints, with reasonable notice and without unreasonably disrupting the Processor's operations. If a breach is suspected or a competent authority requests it, the Controller may carry out this audit more than once per year (GDPR art. 28(3)(h); KVKK art. 12(3)).
 
 ## 10. Contact and Notices
 
@@ -99,6 +108,12 @@ This agreement enters into force on the later of the dates on which the parties 
 | Title / position  | ............................... | ............................... |
 | Date              | ....../....../..........        | ....../....../..........        |
 | Signature         |                                 |                                 |
+
+## 13. Language Precedence, Governing Law and Jurisdiction
+
+- **13.1 Language:** This agreement is made in Turkish and English. If the two texts conflict or differ in interpretation, the Turkish version shall prevail.
+- **13.2 Governing law:** This agreement is governed by the law of the Republic of Türkiye.
+- **13.3 Jurisdiction:** The Istanbul (Central) Courts and Enforcement Offices have jurisdiction over disputes arising from this agreement.
 
 ## Annex 1: Sub-processors
 

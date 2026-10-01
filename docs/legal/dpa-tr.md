@@ -1,6 +1,6 @@
 # Veri İşleme Sözleşmesi (DPA)
 
-**Sürüm:** 1.1 · **Metin tarihi:** 2026-10-01 · **Yürürlük tarihi:** 12. maddedeki son imza tarihi
+**Sürüm:** 1.2 · **Metin tarihi:** 2026-10-01 · **Yürürlük tarihi:** 12. maddedeki son imza tarihi
 
 ## Sürüm Geçmişi
 
@@ -9,6 +9,7 @@
 | 1.0   | 2026-09-06 | İlk yayım (şablon, imza alanı yok)                                                                                                                 |
 | 1.0   | 2026-09-08 | 7. madde değişti, sürüm numarası ve tarih güncellenmedi                                                                                            |
 | 1.1   | 2026-10-01 | Taraflar, iletişim, imza ve yürürlük maddeleri eklendi; 6. madde kodla uyumlu hale getirildi; alt işleyenler Ek-1'de adıyla listelendi |
+| 1.2   | 2026-10-01 | 13. madde (dil önceliği, uygulanacak hukuk, yetki) eklendi; 4, 5, 7, 8, 9. maddelere GDPR md.28(3) ve KVKK md.12 unsurları ile yurt dışı aktarım dayanağı eklendi; 5. maddede model eğitimi ifadesinin dayanağı açıklandı |
 
 ## 1. Taraflar ve Roller
 
@@ -52,34 +53,42 @@ Veri Sorumlusu'nun kullanıcıları Platform üzerinden şu hakları doğrudan k
 
 Düzeltme ve itiraz talepleri Veri Sorumlusu'nun kiracı yöneticisi üzerinden karşılanır.
 
+**Veri sahibi taleplerinde yardım:** Veri İşleyen, işlemenin niteliğini dikkate alarak, Veri Sorumlusu'nun veri sahibi taleplerini (GDPR md.12-22; KVKK md.11 ve 13) yanıtlama yükümlülüğünü yerine getirebilmesi için uygun teknik ve idari tedbirlerle Veri Sorumlusu'na yardım eder. Veri İşleyen'e doğrudan ulaşan bir veri sahibi talebi, Veri Sorumlusu'nun talimatı olmadıkça yanıtlanmaz; gecikmeksizin 10. maddedeki adrese iletilir.
+
 ## 5. Güvenlik Önlemleri
 
 - Kiracı verileri PostgreSQL Row Level Security ile satır düzeyinde yalıtılır.
 - Dosya ekleri şifreli nesne depolamada (S3 uyumlu) saklanır.
 - Erişim rol tabanlıdır; hassas işlemler çift onay gerektirir.
 - Denetim olayları `AuditEvent` tablosunda tutulur.
-- Yapay zeka çağrılarında müşteri verisi model eğitimi için kullanılmaz.
+- Veri İşleyen, kişisel verileri işleyen kendi personelinin gizlilik yükümlülüğü altında olmasını sağlar; bu yükümlülük görev sona erdikten sonra da sürer (GDPR md.28(3)(b); KVKK md.12/1 ve 12/4).
+- Veri İşleyen, işlemenin niteliğine uygun bir güvenlik düzeyini sağlayacak teknik ve idari tedbirleri alır (GDPR md.32; KVKK md.12/1).
+- Yapay zeka çağrılarında müşteri verisinin model eğitimi için kullanılmaması, Veri İşleyen'in yapay zeka sağlayıcılarıyla (Ek-1: Anthropic, OpenAI) imzalanmış ayrı bir sözleşmeye değil, bu sağlayıcıların yayımlanmış ticari hizmet şartlarına dayanır (bu şartlar API üzerinden gönderilen içeriğin sağlayıcının modellerini eğitmek için kullanılmayacağını öngörür; sağlayıcılar şartlarını değiştirebilir). Sağlayıcılar, kendi şartlarına göre gönderilen içeriği sınırlı bir süre saklayabilir; örneğin OpenAI metin gömme isteklerinde bugün bu süre 30 güne kadardır. Saklama süresinin sıfır olduğu taahhüt edilmez.
 
 ## 6. Verilerin İadesi ve İmhası
 
 - **6.1 Sona ermede dışa aktarım:** Abonelik sona erdiğinde Veri Sorumlusu, sona erme tarihinden itibaren 30 gün içinde verilerinin dışa aktarılmasını isteyebilir. Kurum düzeyindeki toplu dışa aktarım bugün Platform'da kendi kendine kullanılabilen bir işlev değildir; talep 10. maddedeki adrese yazılı olarak iletilir ve Veri İşleyen tarafından yerine getirilir. Kullanıcı düzeyindeki dışa aktarım 4. maddedeki ekrandan yapılır.
-- **6.2 Sona ermede imha:** 30 günlük sürenin sonunda Veri İşleyen, 6.4'te sayılan kayıtlar dışındaki verileri kalıcı olarak siler. Kurum düzeyindeki imha bugün Platform'da otomatik çalışan bir işlem değildir; Veri İşleyen tarafından yapılır ve tamamlandığı 10. maddedeki adrese yazılı olarak bildirilir.
+- **6.2 Sona ermede imha:** Sözleşme sona erdiğinde Veri Sorumlusu'nun tercihine göre veriler iade edilir ya da silinir (GDPR md.28(3)(g)). 30 günlük sürenin sonunda Veri İşleyen, 6.4'te sayılan kayıtlar dışındaki verileri kalıcı olarak siler. Kurum düzeyindeki imha bugün Platform'da otomatik çalışan bir işlem değildir; Veri İşleyen tarafından yapılır ve tamamlandığı 10. maddedeki adrese yazılı olarak bildirilir.
 - **6.3 Kullanıcı hesabının silinmesi:** 4. maddeye göre bir hesap silindiğinde, Veri Sorumlusu'na ait olup saklanması gereken kayıtlar (denetim olayları, yapay zeka kullanım günlüğü, fırsat, geri bildirim, teklif kullanımı ve ilişki kayıtları) silinmez; bu kayıtlardaki kullanıcı kimliği bağlantısı kaldırılır. Denetim olaylarının serbest içerik alanı bu işlemde değiştirilmez ve kişisel veri içerebilir. Silme işleminin kendisi, kullanıcı kimliğinin tek yönlü özeti (hash) ile kayda geçirilir.
 - **6.4 Kimliksizleştirilmeden saklanan kayıtlar:** Aşağıdaki kayıtlar kimliksizleştirilmez ve gerekçeleri süresince saklanır: (a) düzenlenmiş faturalar — alıcının unvanı, VKN veya TCKN'si, vergi dairesi ve adresi, faturanın düzenlendiği andaki haliyle, ilgili vergi mevzuatının öngördüğü saklama süresi boyunca; (b) çift onay adımlarında onaylayan kişinin kimliği ve adı, onayın imza niteliği taşıması nedeniyle; (c) kullanıcıya aydınlatma yapıldığını ve onay alındığını gösteren kayıtlar, ispat yükümlülüğü nedeniyle.
 
 ## 7. Alt İşleyenler
 
-Veri İşleyen, Ek-1'de adı, hizmeti, konumu ve işlediği veri yazılı alt işleyenleri kullanır. Alt işleyen eklenmesi veya değiştirilmesi, değişiklik devreye alınmadan önce 10. maddedeki adres üzerinden Veri Sorumlusu'na bildirilir.
+Veri İşleyen, Ek-1'de adı, hizmeti, konumu ve işlediği veri yazılı alt işleyenleri kullanır. Veri Sorumlusu bu alt işleyenlerin kullanımına genel olarak izin verir.
+
+- **7.1 Önceden bildirim ve itiraz:** Alt işleyen eklenmesi veya değiştirilmesi, değişiklik devreye alınmadan önce en az 30 gün önceden 10. maddedeki adres üzerinden Veri Sorumlusu'na bildirilir. Veri Sorumlusu bu sürede, makul ve veri korumasına ilişkin gerekçeyle yazılı olarak itiraz edebilir. İtiraz halinde taraflar çözümü iyi niyetle görüşür; çözüm bulunamazsa Veri Sorumlusu, itiraz konusu alt işleyenle ilgili hizmeti sona erdirebilir ve 6. maddedeki iade ve imha hükümleri uygulanır.
+- **7.2 Aynı yükümlülüklerin yüklenmesi:** Veri İşleyen, her alt işleyene bu sözleşmedeki veri koruma yükümlülüklerini yazılı sözleşmeyle yükler (GDPR md.28(4); KVKK md.12). Alt işleyenin yükümlülüklerini yerine getirmemesi halinde Veri İşleyen, Veri Sorumlusu'na karşı sorumludur.
+- **7.3 Yurt dışına aktarım:** Ek-1'de ABD'de konumlanan alt işleyenlere (Anthropic, OpenAI, Stripe, Google) kişisel veri aktarımı yapılabilir. Aktarım dayanağı, Avrupa Birliği'nden gelen veriler için GDPR md.45 kapsamında Avrupa Komisyonu'nun yeterlilik kararına dayanan AB-ABD Veri Gizliliği Çerçevesi (DPF) sertifikası ya da bu yoksa GDPR md.46 kapsamında Standart Sözleşme Hükümleri (SCC); Türkiye'den gelen veriler için KVKK md.9 kapsamında yeterlilik kararı ya da uygun güvenceler, yani standart sözleşmenin imzalanması ve imzadan sonraki yasal süre içinde Kişisel Verileri Koruma Kurumu'na bildirilmesidir. Veri İşleyen, aktarımın dayanağını Veri Sorumlusu'nun talebi üzerine yazılı olarak bildirir.
 
 Hata izleme bugün hiçbir üçüncü tarafa alt işlettirilmiyor; hatalar yalnız Platform'un kendi `SystemAlert` mekanizmasında tutulur. Ürün analitiği için Ek-1'de yer alan sağlayıcı Platform'a entegre edilmiştir ancak devre dışıdır; devreye alınmadan önce bu maddedeki bildirim yapılır.
 
 ## 8. İhlal Bildirimi
 
-Kişisel veri ihlali tespit edildiğinde Veri İşleyen, Veri Sorumlusu'na gecikmeksizin ve en geç 72 saat içinde bildirimde bulunur; ihlalin kapsamı, etkilenen veri kategorileri ve alınan önlemler bildirimde yer alır.
+Kişisel veri ihlali tespit edildiğinde Veri İşleyen, Veri Sorumlusu'na gecikmeksizin ve en geç 72 saat içinde bildirimde bulunur; ihlalin kapsamı, etkilenen veri kategorileri ve alınan önlemler bildirimde yer alır. Veri İşleyen ayrıca, işlemenin niteliğini ve elindeki bilgiyi dikkate alarak, Veri Sorumlusu'na güvenlik yükümlülüklerinde (GDPR md.32), ihlalin denetim makamına ve ilgili kişilere bildiriminde (GDPR md.33-34; KVKK md.12/5), veri koruma etki değerlendirmesinde (GDPR md.35) ve denetim makamına önceden danışmada (GDPR md.36) yardım eder.
 
 ## 9. Denetim
 
-Veri Sorumlusu, yılda bir kez, makul bildirim süresiyle, işleme faaliyetlerine ilişkin belge ve raporları talep edebilir.
+Veri İşleyen, bu sözleşmedeki yükümlülüklere uyduğunu göstermek için gerekli tüm bilgiyi Veri Sorumlusu'nun kullanımına sunar. Veri Sorumlusu, yılda bir kez, makul bildirim süresiyle, işleme faaliyetlerine ilişkin belge ve raporları talep edebilir; ayrıca kendisi ya da görevlendirdiği bir denetçi aracılığıyla, makul bildirimle ve Veri İşleyen'in faaliyetlerini gereksiz yere aksatmayacak biçimde denetim yapabilir. Veri Sorumlusu, ihlal şüphesi veya yetkili makamın talebi halinde bu denetimi yılda bir kezle sınırlı olmaksızın yapabilir (GDPR md.28(3)(h); KVKK md.12/3).
 
 ## 10. İletişim ve Bildirimler
 
@@ -99,6 +108,12 @@ Bu sözleşme, tarafların aşağıda imzaladığı tarihlerden sonuncusunda yü
 | Unvan / Görevi   | ............................... | ............................... |
 | Tarih            | ....../....../..........        | ....../....../..........        |
 | İmza             |                                 |                                 |
+
+## 13. Dil Önceliği, Uygulanacak Hukuk ve Yetki
+
+- **13.1 Dil:** Bu sözleşme Türkçe ve İngilizce hazırlanmıştır. İki metin arasında çelişki veya yorum farkı olması halinde Türkçe metin geçerlidir.
+- **13.2 Uygulanacak hukuk:** Bu sözleşmeye Türkiye Cumhuriyeti hukuku uygulanır.
+- **13.3 Yetkili mahkeme:** Bu sözleşmeden doğan uyuşmazlıklarda İstanbul (Merkez) Mahkemeleri ve İcra Daireleri yetkilidir.
 
 ## Ek-1: Alt İşleyenler
 
