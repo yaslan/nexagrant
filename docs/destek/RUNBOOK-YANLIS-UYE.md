@@ -1,5 +1,22 @@
 # Runbook (İÇ BELGE) — Yanlış kabul edilmiş üyeyi elle çıkarma
 
+> **⚠ EMEKLİ — QA Y-3 Ekip Üyeleri ekranı devrede (kart TASK-MUPUHBAE811KP).** Yanlış üyeyi ve yanlış
+> daveti artık Kurum Sahibi / Kurum Yöneticisi ekrandan çıkarır/iptal eder (müşteri metni: SSS B7,
+> Ş-3). Bu runbook'un **adım 4–6'sı (elle DB silme) yalnız ekran kullanılamazsa** yedek prosedürdür:
+> pilot süresi bitmiş kiracı (ekranda çıkarma/iptal kapalı), ekran hatası, ya da kurumda işlemi
+> yapabilecek Sahip/Yönetici yok.
+>
+> **Ekran kullanılsa da geçerli olanlar:** adım 1 (kayıt, yanlış kişi katıldıysa **P0**) ve **adım 3
+> (olay / KVKK değerlendirmesi; hukuka ve veri sorumlusuna bildirim — sahibi patron, R-2)**. Ekrandan
+> çıkarma, kişinin çıkarılana kadar veri görmüş olabileceği gerçeğini değiştirmez.
+>
+> Ekranın kendi davranışı (koddan, `docs/agent-results/TASK-MUPUHBAE811KP-crw2-fb.md` ONAY): çıkarma
+> `Membership` satırını siler ve `member.removed` audit kaydı yazar; davet iptali `invitation.cancelled`
+> yazar. Çıkarılan kişinin oturumu, oturum her istekte üyeliği yeniden okuduğu için bir sonraki isteğinde
+> kurum erişimini kaybeder (`src/lib/auth.ts`) — bu R-5'in ekran yolu için cevabıdır; elle DB silmesinde
+> de aynı kod yolu çalışır ama yedek prosedürde ayrıca doğrulanmadı. Bu not Y-3 `dev`'e birleştiğinde
+> geçerlidir.
+
 > Sürüm 1.0 · 01.10.2026 · Hazırlayan: CS-FB · Kart: TASK-MUPV41M8BYQXF (FB-GAP-1)
 >
 > **İç belge. Müşteriye, SSS'e ya da destek yanıtına KOYULMAZ.** Müşteriye giden metin: `docs/beta/SSS-PILOT.md` B7 ve `docs/beta/DESTEK-SABLONLARI.md` Ş-3.
@@ -9,7 +26,7 @@
 
 - Üründe `membership.delete` yok; `invitation.delete` yalnız `src/lib/invitations/retention.ts`'te (QA Y-3, kart **TASK-MUPUHBAE811KP**). Yanlış kabul edilmiş **üye** kendiliğinden düşmez; koltuk kalıcıdır. (Yalnız yanlış **davet** 7 günde düşer.)
 - **Karar K-4:** Y-3 ekranı (üye listesi + çıkarma + davet iptali) hazır olana kadar yanlış üye çıkarma **tek yetkili kişi** tarafından, **elle ve kayıtla** yapılır.
-- Y-3 kapanınca bu runbook emekli olur: SSS B7 ve Ş-3 silinir/güncellenir (`DESTEK-SABLONLARI` kural 5).
+- Y-3 kapanınca bu runbook emekli olur: SSS B7 ve Ş-3 silinir/güncellenir (`DESTEK-SABLONLARI` kural 5). **Yapıldı** — bkz. baştaki EMEKLİ notu; SSS B7 ve Ş-3 ekrana yönlendiriyor.
 
 ## 2. Kim yapar
 
@@ -44,4 +61,4 @@
 | R-2 | ~~KVKK / hukuk bildirim sahibinin adı (§2).~~ **Karar verildi** (01.10.2026): patron. |
 | R-3 | Kayıtlı adres doğrulama yöntemi (adım 2). |
 | R-4 | Elle `AuditEvent` biçimi (adım 5). |
-| R-5 | Çıkarılan kişinin oturumunun düşme davranışı (adım 4) — kodla doğrulanmalı. |
+| R-5 | Çıkarılan kişinin oturumunun düşme davranışı (adım 4). Ekran yolu için kodla cevaplandı (baştaki EMEKLİ notu; Y-3 `dev`'e girince geçerli). Elle DB silme yolu ayrıca doğrulanmadı. |
