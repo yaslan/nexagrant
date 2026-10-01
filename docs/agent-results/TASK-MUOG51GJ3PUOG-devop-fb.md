@@ -1,6 +1,68 @@
-# TASK-MUOG51GJ3PUOG — FB canlı DB kurulumu (Supabase), faz 2 (devop-fb)
+# TASK-MUOG51GJ3PUOG — FB canlı DB kurulumu (Supabase), faz 3: engel kaldırıldı, §3.1 adım 3–5 canlıda TAMAM (devop-fb)
 
-**Hüküm: KISMEN — ENGELLİ.** Pgvector, üç rol, `db push` ve `fabrika_app` canlı Supabase'de kuruldu ve doğrulandı. **Migration zinciri (§3.1 adım 3) Supabase'de bu haliyle koşamaz**: Supabase `postgres` rolü süper kullanıcı değil ve `app.system_scope` parametresine SET yetkisi veremiyor. Zincir hiçbir dosya uygulanmadan durdu. Bu yüzden adım 4 (`db:rls`) ve 5 (`rls:verify`) yapılmadı. **Uygulama bu DB'ye BAĞLANMAMALI**: RLS politikası henüz yok.
+**Hüküm: GEÇTİ (DB katmanı).** Patron 01.10.2026 faz 2'deki seçenek **1**'i seçti. Fonksiyonlardaki `SET app.system_scope` bildirimi gövdeye taşındı (dal `devop-fb/supabase-system-scope` → `a617188a`, yerel `dev`'e `ff177df7`; push yok). Canlı Supabase'de: zincir `41 files applied as fabrika_migrate`, `rls.sql` (28 → 112 politika), R-1 `TEMIZ`, `rls:verify` gerçek `fabrika_app` ile **exit 0, ölçüldü**. Politika metni ve RLS tablo kümesi CI kümesiyle md5 düzeyinde aynı.
+**Uygulama henüz bağlanmamalı. İki go-live koşulu açık:** (1) **SSL**: node-pg `sslmode=require` ile Supabase'e bağlanamıyor (aşağıda R-S7). (2) **Data API**: anon 3 fonksiyonu çağırabiliyor (R-S2).
+**Tip:** bug/runtime (migration + altyapı) · **Platform:** mac (darwin). Yerel doğrulama Docker'da PG16.15 ve PG17.11 (pgvector) yalıtılmış kümelerinde yapıldı; canlı ortam Supabase PG17.11. Windows/Linux koşulmadı: değişiklik SQL + bash betiği, platforma bağlı yolu yok. `apply-migrations.sh` bash + psql ister (Windows'ta WSL/Git Bash).
+**Güvenlik incelemesi:** değişiklik RLS kapsamına dokunuyor → crw/se incelemesi istenmeli (kart önerisi aşağıda). İnceleme bulgu çıkarırsa düzeltme idempotent; aynı zincir yeniden koşulur.
+
+## 1. Kod değişikliği (a617188a)
+
+| Dosya | Değişiklik |
+|---|---|
+| `prisma/migrations/{add-agency-invite-code, add-agency-funnel, add-agency-funnel-province, agency-invite-no-max-uses, fix-agency-invite-rejection-audit}.sql` + 2 `.down.sql` | 7 fonksiyon tanımı. Başlıktaki `SET app.system_scope = 'on'` kaldırıldı. Gövde girişte `set_config('app.system_scope','on',true)` yapıyor, her `RETURN` ve son `END` öncesi çağıranın değerini (`scope_was`) geri yüklüyor. Dönüşüm betikle yapıldı (elle değil). Hata durumunda işlem ya da çağıranın savepoint'i bayrağı da geri alır (PostgreSQL GUC alt-işlem davranışı) |
+| `scripts/apply-migrations.sh` | Yetki ön kontrolü: rol SET yetkisi taşımıyorsa yalnız fonksiyon **başlığında** `SET app.system_scope` (noktalı virgülsüz satır) olan bir dosya varsa durur ve dosyayı adıyla söyler. Diğer kontroller (politikasız FORCE, kalıcı varsayılan, son-kontrol) aynı |
+| `prisma/migration-owner-grant.sql` | **Silindi.** Artık gerekmiyor; rollback dosyası daha önce verilmiş yetkiyi geri almak için kaldı |
+| `tests/migration-owner-chain.live.test.ts` | Yeni: yetkisiz sahip tüm zinciri koşar (4 fonksiyonda `proconfig`'te bayrak yok); başlıkta SET geri gelirse zincir dosya uygulamadan durur; 4 fonksiyon × 6 çağrı, kapsamsız ve `enter_system_scope` açıkken bayrağı ve görünür satır sayısını değiştirmeden geri verir; sahip artık kalıcı varsayılan **yazamaz** (yan etki: §3.1 (iii) riski sahip için kapandı) |
+| `docs/RELEASE_CHECKLIST.md` §3.1 (i)/(iii), doğrulama satırı `…\|f\|f\|f\|0\|0`; `scripts/README.md`; `prisma/rls.sql` yorumu | Belgeler |
+
+Neden güvenli: `system_scope_open()` bayrağın yanında tablo sahibinin yetkisini ya da `enter_system_scope()` mührünü ister. Geri yükleme bir yolda unutulsa bile `fabrika_app`'e açılan bir şey olmaz. Yine de test her yolu ölçüyor. Mutasyon kanıtı: bir geri yükleme satırı silinince test kırmızıya döndü (`expected 'on' not to be 'on'`).
+
+## 2. Doğrulama (kanıt: ekler/G1, F0–F6)
+
+**Yerel (G1).** PG16 ve PG17'de CI'nin "Prepare database" adımları koşuldu: zincir iki kez `41 files applied`, `db:rls` 28 → 112, seed exit 0, `rls:verify` exit 0. `migration-owner-chain` iki sürümde **11/11**. `agency-funnel`, `agency-invite`, `agency-report` ve `system-scope` live paketleri yeşil. Lint 0 hata, typecheck exit 0. Tam vitest PG16'da 4200 geçti, 9 kaldı. Bu 9 hata (profile-save / rbac-guard G6 / settings-profile-update) değişikliksiz `dev`'de de aynen var, ilgisiz.
+
+**Canlı Supabase:**
+
+| Adım | Komut (rol) | Sonuç | Ek |
+|---|---|---|---|
+| 0a'' | `r1-topicmatch-check.sql` (fabrika_migrate) | `NULLS_DISTINCT` → devam | F0 |
+| 3 | `DATABASE_URL=<fabrika_migrate> scripts/apply-migrations.sh` | `[23/41] add-agency-invite-code.sql` geçti; **`apply-migrations: 41 files applied as fabrika_migrate`**, exit 0 | F1 |
+| 4 | `psql <fabrika_migrate> -f prisma/rls.sql` (`pnpm db:rls` uzak DB'yi reddediyor) | politikalar 28 → **112**, exit 0 | F2 |
+| 0a''' | R-1 tekrar | **`TEMIZ`** | F3 |
+| 5 | `DATABASE_URL=<fabrika_app> pnpm rls:verify` | 1. deneme: **ATLANDI** (node-pg `SELF_SIGNED_CERT_IN_CHAIN`), exit 0 ama geçti **sayılmadı**. 2. deneme (`&uselibpqcompat=true`, şifreli): "47 kiracıya özel tabloda … fabrika_app rolüyle GERÇEKTEN ölçüldü", **exit 0** | F4 |
+| §3.1 doğrulama | sahip rolüyle | `fabrika_migrate\|f\|f\|f\|0\|0` (beklenen) | F5 |
+| CI eşitliği | aynı sorgu iki kümede | `75\|53\|47\|112\|8183175e…\|eb0d1c3b…` — **birebir aynı** (Supabase `ensure_rls` fazladan RLS açmadı) | F5 |
+| Erişim | `has_table_privilege` / `has_function_privilege` | anon/authenticated/service_role/fabrika_jobs: tablolarda **0/75**. `fabrika_private`'a kimse erişemiyor | F6 |
+
+## 3. Riskler (faz 2'dekilere ek / güncel)
+
+- **R-S7 SSL (YENİ, go-live koşulu):** uygulama (`src/lib/db.ts` → `PrismaPg` + node-pg Pool), graphile-worker ve tsx betikleri node-pg kullanıyor. node-pg 8.x `sslmode=require`'ı `verify-full` sayıyor, Supabase pooler'ın sertifika zinciri ise sistem güveninde değil → bağlantı kurulmuyor. Doğru çözüm: Supabase panelinden (Database → SSL) CA sertifikasını indirmek, üretim URL'lerine `sslmode=verify-full&sslrootcert=<yol>` eklemek. Geçici seçenek `uselibpqcompat=true&sslmode=require`: bağlantı şifreli ama sertifika doğrulanmıyor, MITM'e açık, üretimde önerilmez. `.env.supabase.local`'a sırsız bir not satırı eklendi. Ayrıca `rls:verify`, DB'ye ulaşamayınca **exit 0** veriyor ("ATLANDI"). Canlı kapıda bunu geçti saymamak gerekiyor; ileride betiğe `--require-db` bayrağı eklenebilir.
+- **R-S2 (somut):** anon ve authenticated `lifetime_licence_count()` (SECURITY DEFINER, küresel lisans sayısı), `system_scope_sealed()` ve `system_scope_open(regclass)` fonksiyonlarını çağırabiliyor (F6). Data API açıksa bunlar `/rest/v1/rpc` üzerinden internete açık. Diğer definer fonksiyonlar kapalı. Öneri (patron): Supabase'de Data API'yi kapatmak ya da `public`'i "Exposed schemas"tan çıkarmak. DB tarafı (geri alınabilir): `REVOKE USAGE ON SCHEMA public FROM anon, authenticated, PUBLIC;`
+- R-S1 (`ensure_rls`), R-S3 (CI 16 ↔ canlı 17), R-S4 (session pooler), R-S5 (yedek/plan doğrulanamadı) faz 2'deki gibi açık. R-S3 kısmen kapandı: zincir ve RLS testleri PG17'de yerelde yeşil, ama CI matrisinde 17 hâlâ yok. **R-S6 kapandı:** RLS ve politikalar kurulu.
+
+## 4. Açık sorular
+
+1. SSL: Supabase CA ile `verify-full` mı (önerilen), yoksa pilotta geçici `uselibpqcompat` mı?
+2. Data API kapatılsın mı / `public` USAGE revoke uygulansın mı?
+3. Güvenlik incelemesi kartı: crw-fb ya da se-fb (kart açılmadı; patron/lider ataması).
+4. Supabase planı/PITR (faz 2 açık soru 2) hâlâ açık.
+
+## 5. Sonraki adım
+
+- Patron: SSL CA + Data API kararı. Sonra üretim env'i: `DATABASE_URL=SUPABASE_APP_URL(+ssl)`, `JOBS_DATABASE_URL=SUPABASE_JOBS_URL(+ssl)`. Worker ilk açılışta `graphile_worker` şemasını `fabrika_jobs` ile kurar (CREATE yetkisi geri alınan provada ölçüldü).
+- İnceleme: `a617188a` (migration gövde kalıbı + apply-migrations ön kontrolü + test).
+- **Geri alma:** kod → `git revert -m 1 ff177df7` (eski başlık-SET'li tanımlar Supabase'de yeniden **oluşturulamaz**, yani geri dönüş Supabase'de çalışmaz; bu bilinçli bir tek yönlü kapı). Canlı DB → down dosyaları `apply-migrations.sh --down` ile; boş DB'de en temiz yol patronun yeni proje/şema sıfırlamasıdır (DROP bana yasak).
+- İzleme: Supabase Security Advisor her DDL sonrası; uygulama bağlanınca `/admin/alerts` `job-queue`.
+
+## Değişen dosyalar (faz 3)
+
+Kod (`a617188a`, birleşme `ff177df7`): yukarıdaki 14 dosya. Rapor: bu dosya + `ekler/F0…F6`, `ekler/G1-yerel-dogrulama.txt`. Git dışı: `.env.supabase.local` (SSL not satırı). Canlı DB: 41 migration, rls.sql, `fabrika_private` şeması (sahip `fabrika_migrate`).
+
+---
+
+# (Faz 2) TASK-MUOG51GJ3PUOG — FB canlı DB kurulumu (Supabase) (devop-fb)
+
+**Hüküm (faz 2, AŞILDI — bkz. faz 3): KISMEN — ENGELLİ.** Pgvector, üç rol, `db push` ve `fabrika_app` canlı Supabase'de kuruldu ve doğrulandı. **Migration zinciri (§3.1 adım 3) Supabase'de bu haliyle koşamaz**: Supabase `postgres` rolü süper kullanıcı değil ve `app.system_scope` parametresine SET yetkisi veremiyor. Zincir hiçbir dosya uygulanmadan durdu. Bu yüzden adım 4 (`db:rls`) ve 5 (`rls:verify`) yapılmadı. **Uygulama bu DB'ye BAĞLANMAMALI**: RLS politikası henüz yok.
 **Tip:** runtime / altyapı · **Sprint:** FB-GAP-1 · **Platform:** mac (darwin, psql 16.15 istemci) → Supabase PostgreSQL **17.11** (eu-west-1, session pooler 5432). CI 16 kullanıyor; fark aşağıda. Windows/Linux koşulmadı: iş bir istemci makinesinden uzak DB'ye SQL göndermekti, platforma bağlı kod yolu yok. `scripts/apply-migrations.sh` bash + psql ister; Windows'ta WSL/Git Bash gerekir (koddan).
 **Patron onayı:** 01.10.2026 (canlı DB = Supabase). Kod değişikliği yok, commit edilen tek şey bu rapor + ekleri. Push yok.
 
