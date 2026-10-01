@@ -2,6 +2,77 @@
 
 Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri + 0,5 tasarım + Claude Code.
 
+> **güncel 01.10 akşam — 30.09–01.10 durumu (TASK-MUOLBU17657JZ, prm-fb, tur 2).** dev @ `efefbe91`
+> (`git rev-parse --short dev`, 01.10 akşam; `a35633a8` son kod merge'i, sonrası rapor commit'leri). Yerel `origin/dev` ref'i `6168360b`; dev ondan **39 commit önde**, yani
+> bugünkü işlerin hiçbiri push edilmedi (ref'i bu turda `git fetch` ile tazelemedim). Her satırın kanıtı bir commit
+> ya da repo içi rapor dosyası. Board kartlarının statüleri `list_tasks` ile 01.10 akşam okundu.
+>
+> **30.09'da dev'e girenler**
+> - **5 dal entegrasyonu** (TASK-MUOIBDBQSKHQ3, `done`): `b2227b55` be-fb o1 · `0c81fb87` crw-fb T-5 · `d167a860` se-fb R-2 ·
+>   `af6e4598` cs-fb İNCELEME-113 · `0779e8f8` fe-fb mobil. Ardından `49c46a78` (İNCELEME-108, TASK-MUODYIZIF6FLZ) ve
+>   `6168360b` (rapor toplama, TASK-MUOK1PQDND4RS, `done`).
+> - **Ö-2..Ö-5 migration güvenliği** (TASK-MUOGMUUAWFEQX, `done`): merge `bbababe7`, rapor `b8ec02a8`.
+> - **o1 — imzalı `system_scope`** (TASK-MUOGMQK3JAH4Y, `done`): `5392550d`, merge `b2227b55`, ADR-0009. Bağımsız inceleme
+>   artık var (TASK-MUPBOQ9ZV8ZOY, `done`, crw2-fb). Takibi (`.down` migration, `rls:verify` CI'da) TASK-MUPCYOCLINGC7
+>   (`done`): `fe87ee93`, `25a1d269`, `897fd020`; dev'e `f7921f3c` ile girdi (TASK-MUPK1XJQYNDY2, `done`).
+>
+> **01.10'da dev'e girenler (kart → SHA)**
+> - **G-1 "servis meşgul" tamam:** önkoşul `cs-fb/g1-pool-timeout` `d57e2bb5` (TASK-MUPCYTXF1F61, `done`), ardından
+>   `be-fb/g1-confirm-service-busy` `a35633a8` (TASK-MUOGR5FDKLH22, kart `review`; entegrasyon raporu `docs/agent-results/TASK-MUOGR5FDKLH22-qae-fb.md`, `efefbe91`). İNCELEME-119 ONAY (TASK-MUOJFFC2CHAAO, `done`).
+>   Havuz dolunca ham "timeout exceeded" artık dönmüyor. Y-1 (auth havuz doluyken "kiracı yok") TASK-MUOKWIF6MNTM4 (`done`,
+>   rapor `docs/agent-results/TASK-MUOKWIF6MNTM4-se-fb.md`).
+> - **T-5 `timeLeft` testi:** `dbc9c90e` (TASK-MUPK1XJQYNDY2, `done`; TASK-MUPE28811TI1L, `done`; rapor
+>   `docs/agent-results/TASK-MUPK1XJQYNDY2-qae-fb.md`).
+> - **P-9 destek adresi** `6dee2cce`, **RELEASE_CHECKLIST R-2 notu** `04bb4ef5`, **ADR-0010 taslağı** `73ae2613`
+>   (TASK-MUPL20074JQ0V, `done`; rapor `docs/agent-results/TASK-MUPL20074JQ0V-qae-fb.md`). Kaynak kartlar:
+>   TASK-MUPIR7Y1P7AH4 (P-9, `done`), TASK-MUPE21TEA2UB0 (checklist, `done`), TASK-MUPIQODOCEZH9 (ADR-0010, `review`).
+>   `info@fonbridge.com` **kutusunun** var olduğu doğrulanmadı (`docs/agent-results/TASK-MUPIR7Y1P7AH4-devop-fb.md`).
+>
+> **Kapılar (01.10 akşam).** Yerel fabrika DB'si silinmişti. devop-fb sıfırdan kurdu; tam `npm test`
+> **303 dosya geçti, 6 atlandı; 4050 test geçti, 117 atlandı**, 0 kırmızı (TASK-MUPL268JAAWHD, `done`, rapor
+> `docs/agent-results/TASK-MUPL268JAAWHD-devop-fb-2.md`, dev `d97c1328`). Bu sayı 30.09'daki 3987'yi ezer.
+> 3 live dosyası paylaşılan `fabrika` DB'sinde bilerek atlanıyor (`SHARED = DB_NAME==='fabrika' && !isCi()`), CI'da koşar.
+> `prisma migrate deploy` boş DB'de düşer; kurulum CI sırasıyla yapılır (aynı rapor §1 adım 3). qae-fb de
+> `0e834904`'te izole bir PostgreSQL 16 ile rls:verify/lint/tsc/i18n/vitest/build'i yeşil geçti.
+> Evidence live **57/57** MinIO ile (TASK-MUOJFCOZBM3PU, `done`); mobil e2e **12/12**, `pnpm exec playwright` ile
+> (TASK-MUOJF9YTROP9V, `done`).
+>
+> **CI hâlâ başlamıyor — patron aksiyonu.** `6168360b` push'unda GitHub Actions koşusu `36779912619` başlamadı:
+> "recent account payments have failed or your spending limit needs to be increased" (TASK-MUMACETT8NSI4, `review`,
+> rapor `docs/agent-results/TASK-MUMACETT8NSI4-devop-fb.md`). Ödeme/limit düzelmeden **dev'in CI yeşil kanıtı yok**;
+> yukarıdaki yeşil sayılar yerel koşudur. Düzelince `gh run rerun 36779912619`, sonra 37 commit'lik farkı push
+> etmek gerekir (TASK-MUPBPMGSN0WYK, `review`).
+>
+> **Açık kalanlar — dev'de DEĞİL**
+> - **R2 kişi silme düzeltmesi** (TASK-MUPL2D9B8QWAB, kart `done`): kod `a3e52e93`, dal `be-fb/u6-r2-user-files`, rapor `docs/agent-results/TASK-MUPL2D9B8QWAB-be-fb.md` (`99337d06`, dev'de).
+>   **Kart `done` ama dev'e alınmadı** (`git merge-base --is-ancestor a3e52e93 dev` → hayır). Dev'de hâlâ ölü `users/`
+>   önekli `deleteUserFilesFromR2` var. Entegrasyon kartı gerekir (aşağıdaki öneri).
+> - **DPA v1.2** (TASK-MUPIQY1GFTRE2, kart `review`): Y-2/Y-3/Ö-1 kapandı (`80244a64`), **Y-1 patron bilgisini bekliyor**
+>   (işleyen unvan/adres/VKN/MERSİS, R2 konumu, 13.3 yetki, 7.1'deki 30 gün). Dal `se-fb/p6-dpa-signable`, dev'de değil.
+>   İmzaya gitmez. Rapor yalnız dalda: `git show se-fb/p6-dpa-signable:docs/agent-results/TASK-MUPIQY1GFTRE2-se-fb-2.md`; inceleme
+>   `docs/agent-results/TASK-MUPIQY1GFTRE2-crw-fb.md`.
+> - **Eylem sızıntı bekçisi** (TASK-MUOIBQJJDKL28, `review`): İNCELEME-121 ONAY, dal `cs-fb/i116-leak-scan-gaps` @ `ce5039f7`,
+>   kod `f3892470`; dev'de değil.
+> - **B5 beyaz etiket rev. 4** (TASK-MUOEJVUECL28A, `review`): dal `fe-fb/b5-design-rev3` @ `b6799e7b`, dev'de değil;
+>   dev'de rev. 2 (`df56877b`) var. `devop-fb/muoibd-gates` dalındaki `57e13bc0` + geri alma `5de7a1d1` dev'e alınmamalı.
+> - **Google girişi:** yönlendirmenin `localhost:3000`'e gittiği ve yedek secret'ın düzeltildiği bilgisi görev metninden
+>   geldi; repoda bunu doğrulayan rapor/commit bulamadım, bu yüzden kanıtsız notu bırakıyorum. Anahtarlar ve izin ekranı adı
+>   patron kartında (TASK-MULQM3LFB4KRA, `todo`).
+>
+> **Pilot QA "koşullu hazır"** (TASK-MUOLBPFFDC92B, `done`, dev `6168360b` üzerinde): B bulgusu yok, 4 Y bulgusu pilot
+> öncesi kapanmalı (aşağıda kapı g). Rapor repoya kopyalandı: `docs/agent-results/TASK-MUOLBPFFDC92B-qae-fb.md`
+> (21 KB; 9,6 MB'lık ekran görüntüsü klasörü repoya alınmadı, yalnız `/Users/macbook/alan/docs/agent-results/TASK-MUOLBPFFDC92B-qae-fb-ekler/` altında).
+>
+> **Önerilen kartlar (leed-fb açar; ben açmadım).**
+> 1. `FB PİLOT QA Y-1 — Davetle katılan MEMBER/WRITER ilk ekranda "Erişim Reddedildi"` (be-fb/fe-fb)
+> 2. `FB PİLOT QA Y-2 — Eşzamanlı davetle 6 koltuk sınırı aşılıyor (8, sonra 10)` (be-fb)
+> 3. `FB PİLOT QA Y-3 — Bekleyen davet iptali, üye çıkarma ve üye listesi` (be-fb/fe-fb; önce patron sorusu: ilk hafta platform ekibi elle mi yönetecek)
+> 4. `FB PİLOT QA Y-4 — "Kurumsal Profil" kaydı sunucuya gitmiyor, sahte başarı gösteriyor` (fe-fb/be-fb)
+> 5. `FB ENTEGRASYON — be-fb/u6-r2-user-files (a3e52e93) dev'e al` (devop-fb/qae-fb)
+> 6. `FB ENTEGRASYON — se-fb/p6-dpa-signable, cs-fb/i116-leak-scan-gaps, fe-fb/b5-design-rev3 dev'e al (inceleme ONAY sonrası)`
+>
+> Board'da FB-GAP-1'de `in_progress` kart yok. `review`: 11 kart, `todo`: 1 (patron), `backlog`: 1 (R-1, canlı DB bekliyor).
+
 > **Durum güncellemesi — 29.09.2026 (TASK-MULQMNMPFY29P).** Aşağıdaki 07–10.09 tarihli notlar
 > geçmiş kayıt olarak duruyor. 29.09'da kodla ve `git log` ile karşılaştırıldı. Değişen her
 > maddenin altında **"güncel 29.09"** satırı var. Kapanan her şey için kanıt commit hash'i ya da
@@ -281,9 +352,12 @@ Board'da FB-GAP-1: 43 kart (bu kart dahil). Kanıt: commit hash'leri `git log --
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | a   | Ajans panosu sızıntısı: davet kodu paneli kesin `usedCount` gösteriyor, yuvarlanmış toplamla farkı küçük kodu açığa çıkarıyor                                                                                     | **Kapandı.** Panel yalnız durum gösterir (`b11ed48b`), "tükendi" durumu yok (`fb133d28`), kullanım sınırı yok (`62a2715e`). İNCELEME-11 ONAY (MILP D=0 2.420 tablo, 0 sızıntı)                                                                                                                                                                                                                                                                                                                               | TASK-MUM17YBJVAHRR, TASK-MUM2RMN3YIBGC, TASK-MUM4WVYLSH9IT (`done`); inceleme TASK-MUM3TMP8HU76G (`347228c4`)                                    |
 | b   | Davet koduyla kayıtta KVKK ajans eki gösterilsin + Consent kaydına ek sürümü yazılsın                                                                                                                             | **Kapandı.** Kayıt ekranında ek + onay kutusu + Consent'e `agency-channel-addendum@2026-09-29.1` yazımı kodda (`9fbc81f8`), eski onay çerezi düzeltmesi `2ef3593e`. İNCELEME-15 **ONAY**, bloke eden bulgu yok (`5b28908c`)                                                                                                                                                                                                                                                                                  | TASK-MUM676F010E9G (`done`, be-fb) · inceleme TASK-MUM9RP3R6S13K (`done`, crw-fb). Metin: TASK-MULXXDG4O483Y, TASK-MUM3WSS7DOGJL (`done`)        |
-| c   | **Kalıcı giriş yöntemi** — şifre mi, e-posta linki mi, yalnız Google/Microsoft mu                                                                                                                                 | **Karar verildi:** yalnız Google/Microsoft OAuth (ADR-0006, `44d558ee`); ilk aşamada yalnız Google, Entra anahtar gelince açılır (`10d39f0a`). Kod dev'de (`9fbc81f8`, `2ef3593e`), İNCELEME-15 ONAY (`5b28908c`). Gerçek Google yönlendirmesi denendi; callback'e dönüş bir insanın test hesabıyla doğrulanmadı. Google izin ekranı yanlış ad gösteriyor ("cevreportal"). **karar 29.09:** Microsoft kaldırıldı, giriş yalnız Google; uygulama TASK-MUMLFLB2OPLY3'te sürüyor. Kapı için Microsoft beklenmez | **TASK-MUM676F010E9G** (`done`) · anahtarlar ve izin ekranı: patron **TASK-MULQM3LFB4KRA** (todo). Açık karar #21 kapandı                        |
-| d   | **HUKUK-5:** panoda 5'e yuvarlama + tek kırılım + zaman kanalı (tekrarlı sorgu ile fark alma) hukuka sorulacak                                                                                                    | Hukuk görüşü alınmadı. **güncel 29.09 gece:** soru paketi hukukçuya gönderilecek hâlde: `docs/legal/HUKUK-SORULARI-2026-09.md` (`6bfae321`, İNCELEME-18 ONAY); 1.1 eki PostHog/Sentry (`b8311fdf`, review). Gönderim ve görüş bekleniyor                                                                                                                                                                                                                                                                     | Paket: TASK-MUMH7OISNJ5OV (`done`), 1.1: TASK-MUMJA8VJJ8YP0 (review) — görüş: hukuk (Açık karar #22)                                             |
-| f   | **Pilotu kiracıya atama:** platform yöneticisi kiracıya 90 günlük Belediye Ekip pilotu atar (6 koltuk, M1–M6 + M8); süre dolunca kiracı salt-okunur (patron onayı, ADR-0007 madde 5). Ödeme ve e-Fatura adımı yok | Kod dev'de (`a6b22241`, `f4a5eecc`). **güncel 29.09 gece — B-1 kapandı:** M11 ortak portalı artık yazmadan önce pilot kapısından geçiyor (`fe021b59`, `src/modules/m11/server/actions.ts:587`); İNCELEME-19 canlı **ONAY** (`79ff1312`: süresi dolmuş pilotta ret + süren pilotta pozitif kontrol). Salt-okunur kararı ve M6 patron onaylı (Açık karar #24). be-fb test verisi silindi (`3481a4b9`). Kart `review`'da; `done` olunca kapı kapanır                                                            | **TASK-MUMABL78X5JLX** (review, be-fb) · inceleme TASK-MUMH7665CD7DQ, TASK-MUMJA0EG9EMGS (`done`, crw-fb) · temizlik TASK-MUMHVNJLRYQU9 (review) |
+| c   | **Kalıcı giriş yöntemi** — şifre mi, e-posta linki mi, yalnız Google/Microsoft mu                                                                                                                                 | **Karar verildi:** yalnız Google/Microsoft OAuth (ADR-0006, `44d558ee`); ilk aşamada yalnız Google, Entra anahtar gelince açılır (`10d39f0a`). Kod dev'de (`9fbc81f8`, `2ef3593e`), İNCELEME-15 ONAY (`5b28908c`). Gerçek Google yönlendirmesi denendi; callback'e dönüş bir insanın test hesabıyla doğrulanmadı. Google izin ekranı yanlış ad gösteriyor ("cevreportal"). **karar 29.09:** Microsoft kaldırıldı, giriş yalnız Google; uygulama TASK-MUMLFLB2OPLY3'te sürüyor. Kapı için Microsoft beklenmez. **güncel 01.10:** Microsoft kodda kaldırıldı (`acc35b07`). Google izin ekranı adı ve anahtarlar hâlâ patron kartında (todo) | **TASK-MUM676F010E9G** (`done`) · anahtarlar ve izin ekranı: patron **TASK-MULQM3LFB4KRA** (todo). Açık karar #21 kapandı                        |
+| d   | **HUKUK-5:** panoda 5'e yuvarlama + tek kırılım + zaman kanalı (tekrarlı sorgu ile fark alma) hukuka sorulacak                                                                                                    | Hukuk görüşü alınmadı. **güncel 29.09 gece:** soru paketi hukukçuya gönderilecek hâlde: `docs/legal/HUKUK-SORULARI-2026-09.md` (`6bfae321`, İNCELEME-18 ONAY); 1.1 eki PostHog/Sentry (`b8311fdf`, review). Gönderim ve görüş bekleniyor. **güncel 01.10:** 1.1 eki dev'de (`49ccb924`), kart açık listelerde yok; hukuk görüşü hâlâ alınmadı                                                                                                                                                                                                                                                                     | Paket: TASK-MUMH7OISNJ5OV (`done`), 1.1: TASK-MUMJA8VJJ8YP0 (review) — görüş: hukuk (Açık karar #22)                                             |
+| f   | **Pilotu kiracıya atama:** platform yöneticisi kiracıya 90 günlük Belediye Ekip pilotu atar (6 koltuk, M1–M6 + M8); süre dolunca kiracı salt-okunur (patron onayı, ADR-0007 madde 5). Ödeme ve e-Fatura adımı yok | Kod dev'de (`a6b22241`, `f4a5eecc`). **güncel 29.09 gece — B-1 kapandı:** M11 ortak portalı artık yazmadan önce pilot kapısından geçiyor (`fe021b59`, `src/modules/m11/server/actions.ts:587`); İNCELEME-19 canlı **ONAY** (`79ff1312`: süresi dolmuş pilotta ret + süren pilotta pozitif kontrol). Salt-okunur kararı ve M6 patron onaylı (Açık karar #24). be-fb test verisi silindi (`3481a4b9`). Kart `review`'da; `done` olunca kapı kapanır. **güncel 01.10 — kapandı:** TASK-MUMABL78X5JLX ve temizlik TASK-MUMHVNJLRYQU9 board'un açık listelerinde (todo/in_progress/review/backlog) yok. Kod `fe021b59`, rapor `178f9ffc`. Pilot atama akışı 01.10 QA'da gerçek tarayıcıda yönetici panelinden çalıştı (TASK-MUOLBPFFDC92B akış 1 ve 14). Salt-okunur pilotta profil kaydı Y-4'e bakın                                                            | **TASK-MUMABL78X5JLX** (board'da açık değil, be-fb) · inceleme TASK-MUMH7665CD7DQ, TASK-MUMJA0EG9EMGS (`done`, crw-fb) · temizlik TASK-MUMHVNJLRYQU9 (açık değil) |
+| g   | **Pilot QA bulguları (01.10, yeni):** qae-fb uçtan uca testi "pilota koşullu hazır" dedi. B yok, 4 Y pilot başlamadan kapanmalı | **Açık.** Y-1 davetle katılan MEMBER/WRITER ilk ekranda "Erişim Reddedildi" · Y-2 eşzamanlı davetle 6 koltuk sınırı aşılıyor (8, sonra 10) · Y-3 bekleyen davet iptali / üye çıkarma / üye listesi yok · Y-4 "Kurumsal Profil" kaydı sunucuya gitmiyor, her durumda "başarıyla güncellendi". Ayrıca 11 Ö bulgusu. Kanıt: `docs/agent-results/TASK-MUOLBPFFDC92B-qae-fb.md` (dev `6168360b` üzerinde koşuldu). Y-3 için patron sorusu: pilotun ilk haftası platform ekibi elle mi yönetecek | QA: TASK-MUOLBPFFDC92B (`done`, qae-fb). Düzeltme: **kart yok** (01.10 akşam `list_tasks` ile doğrulandı: FB-GAP-1 ve FB-KAMU-2'de todo/in_progress/backlog'da Y-1..Y-4 kartı yok; önerilen kart başlıkları yukarıdaki blokta, leed-fb açar) |
+
+**güncel 01.10 — pilotu bekleten ek iş:** servis meşgul (TASK-MUOGR5FDKLH22 + TASK-MUOF85BU7BV3X, İNCELEME-119 ONAY) dev'e alınmadı; havuz dolunca kullanıcı ham "timeout exceeded" ya da "kiracı yok" görebilir. Kapı değil, ama pilot öncesi alınması önerilir. CI 01.10'da faturalama yüzünden koşmadı (TASK-MUMACETT8NSI4).
 
 İlgili açık patron kartları: **TASK-MULQM3LFB4KRA** (test modu anahtarları; 29.09'da Anthropic + OpenAI + Google izin ekranı adına daraldı). **karar 29.09:** TASK-MULQM9UCIRY1A (çalışma zamanında RLS, Açık karar #16) HAYIR ile kapandı, pilotu bloke etmez.
 
