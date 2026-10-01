@@ -438,14 +438,46 @@ taraf bağlamlarına açar ve tarayıcıların üçüncü taraf çerez kısıtla
 | `hostname`, `status`, `verifyToken(Hash)`, `lastCheckedAt` | `AgencyDomain` (rev. 1 §2.1) | platform yöneticisi + DNS kontrol işi |
 | `hostname`, `syncedGeneration`, `edgeSyncedAt`, `edgeError`, `verifiedAt` | yeni `AgencyDomainEdgeState` | `fb_edge_sync` DB rolü (§4.3). Web kodu yazmaz. DB'de nasıl zorlandığı aşağıda (İNCELEME-120 Ö-4) |
 
-- **`AgencyDomainEdgeState` yazma yetkisi (İNCELEME-120 Ö-4).** Tabloyu açan migrasyon (sahibi `fabrika_migrate`,
-  NOSUPERUSER) şu satırları taşır:
+- **`AgencyDomainEdgeState` yazma yetkisi (İNCELEME-120 Ö-4, İNCELEME-122 Ö-6).** Tabloyu açan migrasyon dosyası
+  (düz `.sql`, `prisma/migrations/apply-order.txt`'e eklenir; `scripts/apply-migrations.sh` her dosyayı
+  `psql -v ON_ERROR_STOP=1` ile, tablo sahibi rolle koşar ve zinciri **iki kez** koşar: CI idempotensi kapısı)
+  depodaki desene uyar: rol var mı diye bakan `DO` bloğu (`prisma/migrations/add-public-lead.sql:49-54`,
+  `add-agency-funnel.sql:84-89`). Çıplak `GRANT … TO fb_edge_sync` yazılmaz: rol yoksa `ERROR: role does not exist`
+  ile zincir durur (ölçüldü, aşağıda).
   ```sql
   REVOKE ALL ON "AgencyDomainEdgeState" FROM PUBLIC;
-  GRANT SELECT ON "AgencyDomainEdgeState" TO fabrika_app;                       -- RLS'e tabi uygulama rolü
-  GRANT SELECT, INSERT, UPDATE ON "AgencyDomainEdgeState" TO fb_edge_sync;
-  REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "AgencyDomainEdgeState" FROM fabrika;  -- bugünkü web bağlantısı
+  DO $$
+  BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app') THEN
+      -- ALTER DEFAULT PRIVILEGES (rls-app-role.sql:62-76) bu tabloya zaten SELECT/INSERT/UPDATE/DELETE verdi.
+      -- GRANT SELECT onu daraltmaz, bu REVOKE şart.
+      REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "AgencyDomainEdgeState" FROM fabrika_app;
+      GRANT SELECT ON "AgencyDomainEdgeState" TO fabrika_app;
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fb_edge_sync') THEN
+      GRANT SELECT, INSERT, UPDATE ON "AgencyDomainEdgeState" TO fb_edge_sync;
+    END IF;
+  END $$;
+  REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "AgencyDomainEdgeState" FROM fabrika;  -- bugünkü web bağlantısı (etkisiz, aşağıya bak)
   ```
+  **Boru hattında üç şey yazıldığı gibi çalışmıyordu (İNCELEME-122 Ö-6), ölçüldü** (`postgres:16`, `fabrika` SUPERUSER,
+  sıra `prisma/rls-app-role.sql` → tablo + bu blok; yöntem sonuç raporu fe-fb-4):
+  1. **`fabrika_app` zaten yazabiliyor.** `rls-app-role.sql:59` mevcut tablolara, `:62-76` sahip rolün (`fabrika`,
+     `fabrika_migrate`) sonradan açacağı tablolara DML verir. Eski blokta yalnız `GRANT SELECT` vardı; GRANT eklemelidir,
+     daraltmaz. Ölçüm: eski blok sonrası `fabrika_app` INSERT/UPDATE/DELETE = `t|t|t`, gerçek `INSERT` başarılı. Üstteki
+     `REVOKE … FROM fabrika_app` ile `f|f|f`. (Önceki ek `grant.sql` bunu görmedi: `rls-app-role.sql` koşmadan kuruldu.)
+  2. **`db:rls-role` yeniden koşunca REVOKE geri alınır.** `setup-rls-role.ts` her koşuda `rls-app-role.sql:59`
+     `GRANT … ON ALL TABLES` verir. REVOKE sonrası `pnpm db:rls-role` tekrar koşulursa `fabrika_app` yine `t|t|t`
+     (ölçüldü). `RELEASE_CHECKLIST.md` §2 sırası (`db:rls-role` → migrasyonlar) ve CI sırası bunu karşılar, çünkü
+     migrasyon sonra gelir. Ama canlıda `db:rls-role` tek başına (parola döndürme) koşulursa kısıt düşer. Uygulama
+     kartı iki şeyden birini yapar: `rls-app-role.sql` adım 3'ü bu tabloyu dışarıda bırakacak şekilde değiştirmek
+     **(kod, bu belgenin kapsamı dışı)**, ya da `db:rls-role` sonrası `apply-migrations.sh`'in her zaman koşmasını
+     checklist'e zorunlu yazmak. Öneri: ilki; ikincisi bir insan adımına bağlı kalır.
+  3. **`fb_edge_sync` rolünü depodaki hiçbir betik açmıyor** (`fabrika_migrate` da yalnız `.env.example:21` ve
+     `rls-app-role.sql:65`'te adıyla geçer). Rol, apply-migrations'tan **önce** ve parolası `.sql` dosyasına yazılmadan
+     açılmalıdır (`setup-rls-role.ts` deseni: parola ortam değişkeninden). Yeni bir `db:edge-sync-role` adımı, uygulama
+     kartının işi; checklist §2'ye `db:rls-role`'den sonra, `apply-migrations`'tan önce girer. Rol sonradan açılırsa
+     `DO` bloğu o koşuda atlanmıştır: `apply-migrations.sh` bir kez daha koşulur (idempotent).
   **Sınır, açıkça:** web bugün `DATABASE_URL` ile `fabrika` rolüne bağlanıyor. Bu rol SUPERUSER + BYPASSRLS
   (`docs/ROADMAP.md` #16; patron 29.09: bağlantı `fabrika_app`'e geçmiyor). Süper kullanıcı GRANT'a bakmaz. Ölçüldü
   (`postgres:16`, `…-fe-fb-3-ekler/grant.log`): `fabrika_app` `INSERT` → `permission denied`, `fb_edge_sync` yazar,
