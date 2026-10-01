@@ -268,6 +268,32 @@ describe('a forged system scope opens nothing', () => {
     expect(n).toBe(0);
   });
 
+  // TASK-MUPCYOCLINGC7 (crw2-fb Ö-2, mutant N6): this transaction's real seal
+  // with one hex digit changed. Comparing only a prefix (N6: the first 8 hex,
+  // 32 bits, brute-forceable inside one transaction) or only a suffix would
+  // let one of these through.
+  test('a near-miss of this transaction\'s seal (first or last hex digit changed)', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const flip = (h: string) => (h === '0' ? '1' : '0');
+    const seen = await asApp(async (c) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(`SELECT enter_system_scope('platform-admin')`);
+        const seal = (await c.query<{ t: string }>(`SELECT current_setting('app.system_scope_token') AS t`)).rows[0]!.t;
+        expect(seal).toMatch(/^[0-9a-f]{64}$/);
+        const out: number[] = [await fixtureCount(c)]; // control: the real seal opens it
+        for (const forged of [seal.slice(0, -1) + flip(seal.slice(-1)), flip(seal[0]!) + seal.slice(1)]) {
+          await c.query(`SELECT set_config('app.system_scope_token', $1, true)`, [forged]);
+          out.push(await fixtureCount(c));
+        }
+        return out;
+      } finally {
+        await c.query('ROLLBACK');
+      }
+    });
+    expect(seen).toEqual([FIXTURE_TENANTS.length, 0, 0]);
+  });
+
   test('a forged scope cannot write another tenant', async (ctx) => {
     if (!ready) return ctx.skip(skipReason);
     await asApp(async (c) => {

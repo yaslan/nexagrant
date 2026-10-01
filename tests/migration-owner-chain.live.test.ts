@@ -273,6 +273,44 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
     });
   }, LONG);
 
+  // TASK-MUPCYOCLINGC7 (crw2-fb Ö-1, mutant N2). In CI the definer functions
+  // belong to the `fabrika` superuser and skip RLS altogether, so the owner arm
+  // of system_scope_open() — pg_has_role(current_user, owner) — is measured
+  // only here, where they belong to a NOSUPERUSER NOBYPASSRLS owner. Inside a
+  // definer function current_user is that owner while session_user is still
+  // fabrika_app; with session_user the agency would count 0 saved searches.
+  test('a SECURITY DEFINER function owned by the NOSUPERUSER owner reads across tenants for fabrika_app', async (ctx) => {
+    if (!RLS_URL) ctx.skip('DATABASE_URL_RLS_TEST is not set');
+    const app = new URL(RLS_URL!);
+    const fn = await one(
+      ownerUrl(),
+      `SELECT r.rolname AS owner, r.rolsuper AS super, r.rolbypassrls AS bypass, p.prosecdef AS definer
+         FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner
+        WHERE p.oid = 'public.agency_funnel_counts(timestamp without time zone)'::regprocedure`
+    );
+    expect(fn).toEqual({ owner: OWNER, super: false, bypass: false, definer: true });
+    await withDb(ownerUrl(), (c) => c.query('GRANT SELECT ON "SavedSearch" TO fabrika_app'));
+    await withDb(adminUrl(), (c) =>
+      c.query(`INSERT INTO "Tenant"(id,name,slug,country,kind,"updatedAt") VALUES ('oc-ag','oc-ag','oc-ag','TR','AGENCY',now());
+               INSERT INTO "Tenant"(id,name,slug,country,"agencyId","updatedAt") VALUES ('oc-m','oc-m','oc-m','TR','oc-ag',now());
+               INSERT INTO "SavedSearch"(id,"tenantId","userId",name,filters) VALUES ('oc-s','oc-m','lu-a','s','{}');`)
+    );
+    await withDb(urlFor(ADMIN_URL!, DB, { name: app.username, password: decodeURIComponent(app.password) }), async (c) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(`SELECT set_config('app.tenant_id', 'oc-ag', true)`);
+        // The member's row is invisible to the agency directly …
+        const direct = (await c.query(`SELECT count(*)::int AS n FROM "SavedSearch" WHERE id = 'oc-s'`)).rows[0];
+        expect(direct.n).toBe(0);
+        // … and counted by the owner's function.
+        const rows = (await c.query(`SELECT registered, saved_search FROM public.agency_funnel_counts(NULL)`)).rows;
+        expect(rows).toEqual([{ registered: 1, saved_search: 1 }]);
+      } finally {
+        await c.query('ROLLBACK');
+      }
+    });
+  }, LONG);
+
   test('a stored default for app.system_scope stops the run before any file', async () => {
     await withDb(ownerUrl(), (c) => c.query(`ALTER DATABASE ${DB} SET app.system_scope = 'on'`));
     try {

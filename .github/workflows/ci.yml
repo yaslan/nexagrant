@@ -106,6 +106,14 @@ jobs:
         pnpm db:rls
         pnpm db:seed
 
+    # Catalog-level policy drift (TASK-MUPCYOCLINGC7, crw2-fb Y-1). A system_scope
+    # policy turned back into the bare, forgeable `app.system_scope = 'on'` test
+    # in the database (mutants N4/N5) kept every vitest suite green; only this
+    # live check, which reads pg_policies and measures isolation as fabrika_app,
+    # went red. It used to run only in the local `pnpm gate`.
+    - name: Verify RLS policies (live, as fabrika_app)
+      run: pnpm rls:verify
+
     - name: Lint
       run: pnpm lint
       

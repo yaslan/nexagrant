@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
   canonicalPolicyClauses,
@@ -153,6 +153,39 @@ describe('AuditEvent — a tenant-less row belongs to no tenant (TASK-MULUJ8O4JH
     expect(sql).toContain(`WITH CHECK ((SELECT public.system_scope_open('"AuditEvent"'::regclass)))`);
     expect(sql).not.toMatch(/USING \(current_setting\('app\.system_scope', true\) = 'on'\)/);
     expect(sql).not.toMatch(/WITH CHECK \(current_setting\('app\.system_scope', true\) = 'on'\)/);
+  });
+
+  test('Y-1(a): no migration file, .down.sql included, creates a policy on the bare system_scope flag (TASK-MUPCYOCLINGC7)', () => {
+    // crw2-fb B-1: drop-marketplace.down.sql recreated system_scope as
+    // `current_setting('app.system_scope', true) = 'on'` and the test above
+    // only looks at one file. That GUC is USERSET, so fabrika_app could set it
+    // and read/write every tenant's rows. A policy that mentions the flag must
+    // also gate it: rls.sql's system_scope_open(), or — on a database where
+    // rls.sql has not run yet — the owner-only pg_has_role(current_user, …).
+    // `ON (\S+)` on purpose: policies built in DO blocks say `ON %I`.
+    const root = resolve(process.cwd(), 'prisma/migrations');
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir).sort()) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) walk(full);
+        else if (entry.endsWith('.sql')) files.push(full);
+      }
+    };
+    walk(root);
+    expect(files.some((f) => f.endsWith('.down.sql'))).toBe(true);
+
+    const offenders: string[] = [];
+    for (const file of files) {
+      const sql = stripSqlComments(readFileSync(file, 'utf8'));
+      for (const m of sql.matchAll(/CREATE\s+POLICY\s+(\S+)\s+ON\s+(\S+)([\s\S]*?);/gi)) {
+        const body = m[3] ?? '';
+        if (!/app\.system_scope'/.test(body)) continue;
+        if (/system_scope_open\(/.test(body) || /pg_has_role\(\s*current_user\b/.test(body)) continue;
+        offenders.push(`${relative(root, file)}: ${m[1]} ON ${m[2]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 
   test('it is classified strict, not nullable-shared and not exempt', () => {

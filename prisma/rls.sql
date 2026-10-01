@@ -148,7 +148,8 @@ END $$;
 --
 -- What it is still NOT: a boundary against a compromised app process. The app
 -- role may CALL enter_system_scope — any purpose on the list — so a SQL
--- injection that can run a statement of its own still gets in. RLS stays a
+-- injection that can run any injected expression, even inside a SELECT subquery or CTE
+-- (not necessarily a standalone statement), can open the scope. RLS stays a
 -- guard against FORGETTING to scope and against forging the flag, not against
 -- an attacker who runs our code. A hard boundary needs a second connection
 -- under a role the tenant path does not hold — see
