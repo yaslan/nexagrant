@@ -18,6 +18,91 @@ import { failureCode, type PilotExpiredCode } from '@/lib/pilot-expired';
 
 export type ProvinceActionError = 'forbidden' | 'notApplicable' | 'invalid' | 'failed' | PilotExpiredCode;
 
+export interface UpdateProfileInput {
+  capabilities: string;
+  keywords: string;
+  trlMin: number;
+  trlMax: number;
+}
+
+export type ProfileActionError = 'forbidden' | 'invalid' | 'failed' | PilotExpiredCode;
+
+export async function updateTenantProfile(
+  input: UpdateProfileInput
+): Promise<{ ok: true } | { ok: false; error: ProfileActionError }> {
+  try {
+    const scope = await requireTenantAction();
+
+    // Girdi doğrulaması (yetki kontrolleri öncesi, çünkü keşif süreci)
+    if (!input.capabilities?.trim()) return { ok: false, error: 'invalid' };
+    if (!input.keywords?.trim()) return { ok: false, error: 'invalid' };
+    if (input.trlMin < 1 || input.trlMin > 9) return { ok: false, error: 'invalid' };
+    if (input.trlMax < 1 || input.trlMax > 9) return { ok: false, error: 'invalid' };
+    if (input.trlMin > input.trlMax) return { ok: false, error: 'invalid' };
+
+    // Kurumsal profili güncelleme izni: kurum sahibi veya yönetici (YETKİ KONTROL ÖNCEKİ TÜM GİRDİLER GEÇ)
+    if (!can(asRole(scope.role), 'manage_users')) return { ok: false, error: 'forbidden' };
+
+    // Keywords ve TRL range'i ön işleme (withTenant'dan önce)
+    const keywords = input.keywords
+      .split(',')
+      .map((k) => k.trim())
+      .filter((k) => k);
+
+    if (!keywords.length) return { ok: false, error: 'invalid' };
+
+    const trlRange = [input.trlMin, input.trlMax];
+
+    return await withTenant(scope.tenantId, async (tx) => {
+      // Mevcut profili bul veya yeni oluştur
+      const existing = await tx.tenantProfile.findUnique({
+        where: { tenantId: scope.tenantId },
+      });
+
+      if (existing) {
+        await tx.tenantProfile.update({
+          where: { tenantId: scope.tenantId },
+          data: {
+            capabilities: input.capabilities.trim(),
+            keywords,
+            trlRange,
+          },
+        });
+      } else {
+        await tx.tenantProfile.create({
+          data: {
+            tenantId: scope.tenantId,
+            capabilities: input.capabilities.trim(),
+            keywords,
+            trlRange,
+            naceCodes: [],
+            preferredRoles: [],
+          },
+        });
+      }
+
+      // Denetim olayı
+      await tx.auditEvent.create({
+        data: {
+          tenantId: scope.tenantId,
+          actorId: scope.userId,
+          type: 'tenant.profile.updated',
+          data: {
+            capabilities: input.capabilities.trim(),
+            keywords,
+            trlRange,
+          },
+        },
+      });
+
+      revalidatePath('/[locale]/(app)/[workspace]/settings/profile', 'layout');
+      return { ok: true as const };
+    });
+  } catch (error) {
+    return { ok: false, error: failureCode(error, 'failed') };
+  }
+}
+
 export async function updateTenantProvince(
   raw: string
 ): Promise<{ ok: true; province: string | null } | { ok: false; error: ProvinceActionError }> {

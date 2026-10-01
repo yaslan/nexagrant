@@ -2,9 +2,10 @@
 
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Building, Sparkles, Key, CheckCircle } from 'lucide-react';
+import { Building, Sparkles, Key, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
+import { updateTenantProfile } from './actions';
 
 export default function TenantProfilePage() {
   const params = useParams();
@@ -22,18 +23,35 @@ export default function TenantProfilePage() {
   const [trlMax, setTrlMax] = useState(8);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setSavedSuccess(false);
+    setError('');
 
-    // Mock save and vector embedding generation
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    const result = await updateTenantProfile({
+      capabilities,
+      keywords,
+      trlMin,
+      trlMax,
+    });
 
     setSaving(false);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 4000);
+
+    if (result.ok) {
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 4000);
+    } else {
+      const errorMessages: Record<string, string> = {
+        forbidden: isTr ? 'Bu işlem için yetkiniz yok' : 'You do not have permission to perform this action',
+        invalid: isTr ? 'Lütfen tüm alanları doğru şekilde doldurun' : 'Please fill all fields correctly',
+        failed: isTr ? 'Profil kaydedilemedi' : 'Failed to save profile',
+        PILOT_EXPIRED: isTr ? 'Pilot süresi doldu' : 'Pilot period has ended',
+      };
+      setError(errorMessages[result.error] || (isTr ? 'Bir hata oluştu' : 'An error occurred'));
+    }
   };
 
   return (
@@ -87,6 +105,13 @@ export default function TenantProfilePage() {
               ? 'Kurumsal profil başarıyla güncellendi ve YZ eşleştirme vektörleri yeniden hesaplandı!'
               : 'Organization profile successfully updated and AI matching embeddings recalculated!'}
           </span>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-6 p-4 rounded-xl bg-bad/10 border border-bad/30 text-bad flex items-center gap-3 text-xs font-semibold animate-in fade-in">
+          <AlertCircle className="w-4 h-4 text-bad shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
