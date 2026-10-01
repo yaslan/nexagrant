@@ -137,7 +137,7 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
 
 ## 4. YZ kullanımı
 - Komisyon kuralı: üretken YZ kullanılabilir; başvuran sorumlu; hangi araçların nasıl kullanıldığı şeffaf; kaynaklar listelenir. → `AiUsageLog` + otomatik beyan (`/ai/disclosure`).
-- Sağlayıcı ayarı: eğitim için kullanım kapalı, veri saklama sıfır/minimum; sözleşme ekinde.
+- Sağlayıcı koşulları: eğitim için kullanılmama, sağlayıcıların yayımlanmış ticari hizmet şartlarına dayanır; sağlayıcılarla imzalanmış ayrı bir ek sözleşme yoktur ve şartlar değişebilir. Sağlayıcılar gönderilen içeriği kendi şartlarına göre sınırlı süre saklayabilir (OpenAI metin gömme isteklerinde bugün 30 güne kadar); sıfır saklama taahhüt edilmez. Bkz. DPA 5. madde.
 - Kullanıcıya uyarı: gizli/patentlenebilir içerik için "hassas mod" (yalnızca kurumsal model / yerel) — faz 2.
 - Evaluator Lens çıktısı "iç ön değerlendirme"; hakemlik simülasyonu Komisyon değerlendiricileri için değil, başvuranlar için.
 
