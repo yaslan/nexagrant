@@ -28,6 +28,7 @@ DECLARE
   app_role   text := 'fabrika_app';
   app_pw     text := current_setting('fabrika.app_password', true);
   owner_role text;
+  fn         regprocedure;
 BEGIN
   IF app_pw IS NULL OR app_pw = '' THEN
     RAISE EXCEPTION
@@ -74,9 +75,21 @@ BEGIN
       owner_role, app_role
     );
   END LOOP;
+
+  -- 5. The functions the RLS policies and the pricing page call as this role.
+  --    PUBLIC has no EXECUTE on them (revoke-api-role-function-execute.sql);
+  --    granted there and in rls.sql too, here for a role created after both.
+  FOR fn IN
+    SELECT p.oid::regprocedure
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open')
+  LOOP
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO %I', fn, app_role);
+  END LOOP;
 END $$;
 
--- 5. Proof, printed by the script itself: the role must be neither superuser
+-- 6. Proof, printed by the script itself: the role must be neither superuser
 --    nor bypassrls, or every downstream RLS assertion is worthless.
 SELECT rolname, rolsuper, rolbypassrls, rolcanlogin, rolcreatedb, rolcreaterole
 FROM pg_roles

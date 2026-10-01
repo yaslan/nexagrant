@@ -301,3 +301,47 @@ BEGIN
       t, quote_ident(t), quote_ident(t));
   END LOOP;
 END $$;
+
+-- No function of this schema is callable through Supabase's Data API roles
+-- (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2). The policies above call
+-- system_scope_open/system_scope_sealed as the querying role, and the pricing
+-- page calls lifetime_licence_count() as fabrika_app: PUBLIC loses EXECUTE on
+-- the three and fabrika_app gets it by name. `anon`/`authenticated` exist only
+-- on Supabase, whose default privileges for `postgres` grant them EXECUTE on
+-- every new function; revoked here from every function the running role owns
+-- in public. Mirrored in prisma/migrations/revoke-api-role-function-execute.sql
+-- (same block; the chain runs before this file, when system_scope_* may not
+-- exist yet). `pnpm rls:verify` fails while any of them is still callable.
+DO $$
+DECLARE
+  f regprocedure;
+  r text;
+BEGIN
+  -- 1. The three without a PUBLIC revoke: PUBLIC out, the app role in by name.
+  FOR f IN
+    SELECT p.oid::regprocedure
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open')
+       AND pg_has_role(current_user, p.proowner, 'USAGE')
+  LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app') THEN
+      EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO fabrika_app', f);
+    END IF;
+  END LOOP;
+
+  -- 2. Supabase's API roles: nothing this role owns in public.
+  FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated') LOOP
+    FOR f IN
+      SELECT p.oid::regprocedure
+        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public'
+         AND pg_has_role(current_user, p.proowner, 'USAGE')
+         AND NOT EXISTS (SELECT 1 FROM pg_depend d
+                          WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')
+    LOOP
+      EXECUTE format('REVOKE ALL ON FUNCTION %s FROM %I', f, r);
+    END LOOP;
+  END LOOP;
+END $$;

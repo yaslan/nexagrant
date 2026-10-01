@@ -41,6 +41,11 @@
  * absent measurement, not a passing one).
  * 1 = the database is reachable and isolation is missing, partial, or could not
  * be measured honestly.
+ *
+ *   pnpm rls:verify --require-db
+ *
+ * turns the skip into exit 1: a go-live gate where an unreachable database (a
+ * TLS failure, TASK-MUOG51GJ3PUOG R-S7) must not read as exit 0.
  */
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -54,6 +59,17 @@ const PROBE_ROLE = 'rls_verify_probe';
 /** Reserved tenant ids for the write probe. Every row written is rolled back. */
 const PROBE_TENANT_A = 'rls-verify-probe-a';
 const PROBE_TENANT_B = 'rls-verify-probe-b';
+
+/** `--require-db`: an unreachable or unset database fails instead of skipping. */
+const REQUIRE_DB = process.argv.includes('--require-db');
+
+function skipped(reason: string): void {
+  if (REQUIRE_DB) {
+    console.error(`❌ ${reason} — canlı RLS denetimi koşamadı ve --require-db verildi.`);
+    process.exit(1);
+  }
+  console.log(`⏭  ${reason} — canlı RLS denetimi ATLANDI (geçti sayılmaz).`);
+}
 
 interface RoleCaps {
   rolname: string;
@@ -157,6 +173,11 @@ async function createProbeRole(admin: pg.Client, adminUrl: string): Promise<Meas
         EXECUTE format('GRANT CONNECT ON DATABASE %I TO ${PROBE_ROLE}', current_database());
         EXECUTE 'GRANT USAGE ON SCHEMA public TO ${PROBE_ROLE}';
         EXECUTE 'GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA public TO ${PROBE_ROLE}';
+        -- The system_scope policy calls these as the querying role; PUBLIC has
+        -- no EXECUTE on them (revoke-api-role-function-execute.sql).
+        IF to_regprocedure('public.system_scope_open(regclass)') IS NOT NULL THEN
+          EXECUTE 'GRANT EXECUTE ON FUNCTION public.system_scope_open(regclass), public.system_scope_sealed() TO ${PROBE_ROLE}';
+        END IF;
       END $$;`);
   } catch (e) {
     console.log(`   geçici ölçüm rolü kurulamadı: ${e instanceof Error ? e.message : String(e)}`);
@@ -539,15 +560,16 @@ async function main() {
   const dotenv = readDotenv();
   const url = process.env.DATABASE_URL ?? dotenv.DATABASE_URL;
   if (!url) {
-    console.log('⏭  DATABASE_URL yok — canlı RLS denetimi ATLANDI (geçti sayılmaz).');
+    skipped('DATABASE_URL yok');
     return;
   }
 
   const client = new pg.Client({ connectionString: url, connectionTimeoutMillis: 3000 });
   try {
     await client.connect();
-  } catch {
-    console.log('⏭  Veritabanına ulaşılamadı — canlı RLS denetimi ATLANDI (geçti sayılmaz).');
+  } catch (e) {
+    const why = e instanceof Error ? e.message.split('\n')[0] : String(e);
+    skipped(`Veritabanına ulaşılamadı (${why})`);
     console.log('   Kiracı izolasyonu ÖLÇÜLMEDİ. Docker/Postgres açıkken tekrar koş.');
     return;
   }
@@ -597,13 +619,29 @@ async function main() {
       .map((r) => r.tablename)
       .sort();
 
+    // Supabase's Data API roles (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2): none of
+    // the schema owner's functions in public may be callable by them, or
+    // /rest/v1/rpc reaches them anonymously. The roles exist only on Supabase;
+    // elsewhere the query returns nothing.
+    const apiCallable = await client.query<{ fn: string; role: string }>(
+      `select p.oid::regprocedure::text as fn, r.rolname as role
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+         cross join (select rolname from pg_roles where rolname in ('anon', 'authenticated')) r
+        where n.nspname = 'public'
+          and p.proowner = (select c.relowner from pg_class c where c.oid = to_regclass('public."Tenant"'))
+          and has_function_privilege(r.rolname, p.oid, 'EXECUTE')
+        order by 1, 2`
+    );
+    const apiExposed = apiCallable.rows.map((r) => `${r.fn} → ${r.role}`);
+
     console.log(`Kiracıya özel model: ${models.length} · RLS açık tablo: ${rlsOn.size} · tenant_isolation politikası: ${hasPolicy.size}`);
 
     if (missingTable.length > 0) {
       console.log(`\nℹ  Şemada olup veritabanında olmayan tablo (migration bekliyor): ${missingTable.join(', ')}`);
     }
 
-    if (missingRls.length > 0 || missingPolicy.length > 0 || missingForce.length > 0 || unsealed.length > 0) {
+    if (missingRls.length > 0 || missingPolicy.length > 0 || missingForce.length > 0 || unsealed.length > 0 || apiExposed.length > 0) {
       console.error('\n❌ KİRACI İZOLASYONU EKSİK — bu bir ortam gürültüsü değil, güvenlik durumu.');
       if (missingRls.length > 0) console.error(`   RLS kapalı: ${missingRls.join(', ')}`);
       if (missingForce.length > 0) console.error(`   FORCE ROW LEVEL SECURITY yok (tablo sahibi politikaları atlıyor): ${missingForce.join(', ')}`);
@@ -612,6 +650,9 @@ async function main() {
         console.error(
           `   system_scope politikası mühürsüz (yalnız app.system_scope GUC'una bakıyor, fabrika_app kendisi açabilir): ${unsealed.join(', ')}`
         );
+      }
+      if (apiExposed.length > 0) {
+        console.error(`   Supabase API rolleri şema sahibinin fonksiyonlarını çağırabiliyor (/rest/v1/rpc): ${apiExposed.join(', ')}`);
       }
       console.error('\n   Onarım: pnpm db:rls   (gerekirse önce pnpm db:rls-role)');
       process.exit(1);
