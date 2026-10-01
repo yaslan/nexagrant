@@ -1,0 +1,14 @@
+$ psql (postgres) -c "CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions"   -> CREATE EXTENSION (22:41)
+-- yeniden okuma (salt-okur):
+BEGIN
+ extname | extversion | extnamespace |    extowner    
+---------+------------+--------------+----------------
+ vector  | 0.8.2      | extensions   | supabase_admin
+(1 row)
+
+      cos_dist       
+---------------------
+ 0.00853986601633272
+(1 row)
+
+ROLLBACK
