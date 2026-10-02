@@ -5,71 +5,11 @@
  * Before: Form "başarıyla güncellendi" gösteriyordu ama 0 POST gidiyordu ve veri kayboluyor.
  * After: Form gerçek sunucu isteği gönderiyor, başarı mesajı ancak sunucu başarılı dönünce gösterilir.
  */
-import 'dotenv/config';
 import { test, expect, type Page } from '@playwright/test';
 import { expectHydrated } from './fixtures/hydration';
-import { createDbClient } from '../../src/lib/db';
 
-const TENANT_ID = 'demo-tenant';
-const WORKSPACE_SLUG = 'main';
 const PROFILE_URL = '/tr/main/settings/profile';
-const TEST_EMAIL = 'profile-test@fabrika.test';
-
-const prisma = createDbClient(
-  process.env.DATABASE_URL || 'postgresql://fabrika:fabrika@localhost:5432/fabrika'
-);
-
-async function setupProfileTestUser() {
-  // Ensure demo tenant exists
-  await prisma.tenant.upsert({
-    where: { id: TENANT_ID },
-    update: {},
-    create: {
-      id: TENANT_ID,
-      name: 'Demo Tenant',
-      slug: TENANT_ID,
-      country: 'TR',
-      orgType: 'SME',
-    },
-  });
-
-  // Ensure main workspace exists
-  const workspaceId = `${TENANT_ID}-${WORKSPACE_SLUG}`;
-  await prisma.workspace.upsert({
-    where: { id: workspaceId },
-    update: {},
-    create: {
-      id: workspaceId,
-      tenantId: TENANT_ID,
-      name: 'Main Workspace',
-      slug: WORKSPACE_SLUG,
-    },
-  });
-
-  // Create test user (or update if exists)
-  await prisma.user.upsert({
-    where: { email: TEST_EMAIL },
-    update: {},
-    create: {
-      id: `profile-test-user`,
-      email: TEST_EMAIL,
-      name: 'Profile Test User',
-      locale: 'tr',
-    },
-  });
-
-  // Ensure membership exists with TENANT_OWNER role
-  await prisma.membership.upsert({
-    where: { tenantId_userId: { tenantId: TENANT_ID, userId: `profile-test-user` } },
-    update: {},
-    create: {
-      tenantId: TENANT_ID,
-      userId: `profile-test-user`,
-      role: 'TENANT_OWNER',
-      workspaceIds: [workspaceId],
-    },
-  });
-}
+const TEST_EMAIL = 'demo@fabrika.test';
 
 async function signIn(page: Page, email: string) {
   await page.addInitScript(() => {
@@ -85,15 +25,6 @@ async function signIn(page: Page, email: string) {
 }
 
 test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
-  test.beforeAll(async () => {
-    await setupProfileTestUser();
-  });
-
-  test.afterAll(async () => {
-    await prisma.membership.deleteMany({ where: { tenantId: TENANT_ID, userId: `profile-test-user` } });
-    await prisma.user.delete({ where: { email: TEST_EMAIL } }).catch(() => {});
-    await prisma.$disconnect();
-  });
 
   test('should send profile update to server and persist after reload', async ({ page }) => {
     // Sign in through the login flow with test user
