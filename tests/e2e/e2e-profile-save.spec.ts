@@ -20,8 +20,6 @@ async function signIn(page: Page, email: string) {
   });
   await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(PROFILE_URL)}`);
   await page.locator('input[type="email"]').fill(email);
-  // Accept terms before submitting
-  await page.locator('form').filter({ visible: true }).getByTestId('disclosure-ack').check();
   await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`**${PROFILE_URL}`, { timeout: 30_000 });
 }
