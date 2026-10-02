@@ -24,7 +24,7 @@ export function parsePublishedDate(dateStr: string): Date | null {
     const year = trMatch[3]!;
     const monthIdx = trMonths[month.toLowerCase()];
     if (monthIdx !== undefined) {
-      return new Date(parseInt(year), monthIdx, parseInt(day));
+      return new Date(Date.UTC(parseInt(year), monthIdx, parseInt(day)));
     }
   }
 
@@ -36,7 +36,7 @@ export function parsePublishedDate(dateStr: string): Date | null {
     const year = enMatch1[3]!;
     const monthIdx = enMonths[month.toLowerCase()];
     if (monthIdx !== undefined) {
-      return new Date(parseInt(year), monthIdx, parseInt(day));
+      return new Date(Date.UTC(parseInt(year), monthIdx, parseInt(day)));
     }
   }
 
@@ -47,11 +47,9 @@ export function parsePublishedDate(dateStr: string): Date | null {
     const year = enMatch2[3]!;
     const monthIdx = enMonths[month.toLowerCase()];
     if (monthIdx !== undefined) {
-      return new Date(parseInt(year), monthIdx, parseInt(day));
+      return new Date(Date.UTC(parseInt(year), monthIdx, parseInt(day)));
     }
   }
 
-  // Fallback: try native Date parsing
-  const parsed = new Date(dateStr);
-  return isNaN(parsed.getTime()) ? null : parsed;
+  return null;
 }
