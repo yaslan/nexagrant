@@ -1,7 +1,7 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
-import { DEFAULT_SCORING_WEIGHTS } from '../../src/lib/scoring/defaults';
+import trMessages from '../../messages/tr.json';
 import { expectHydrated } from './fixtures/hydration';
 import {
   fitsHorizontally,
@@ -215,16 +215,17 @@ test.describe('long real-world content stays inside <main>', () => {
   test('gate settings: a longer weight name than today’s', async ({ browser }) => {
     test.skip(skipReason !== '', skipReason);
     const { ctx, page } = await openAt(browser, '/tr/fabrika-beta/settings/gates', 320);
-    // Hydrated first: hydration would put the original text back.
-    await expectHydrated(page.locator('main form button[type="submit"]'));
-    // The names are code constants, so there is no row to plant: stretch them
+    // Hydrated first: hydration would put the original text back. The page is
+    // read-only since AKTAR-MURBCJ0A-1, so there is no submit button to wait on.
+    await expectHydrated(page.getByTestId('weight-alignment'));
+    // The names are catalogue strings, so there is no row to plant: stretch them
     // in place. 42 more characters with no break opportunity.
-    const keys = Object.keys(DEFAULT_SCORING_WEIGHTS);
+    const names = Object.values(trMessages.settings.gates.weights);
     const suffix = 'AcrossEveryConsortiumPartnerAndWorkPackage';
-    const stretched = await stretchTexts(page, keys, suffix);
-    expect(stretched, 'every weight name was found and stretched').toBe(keys.length);
+    const stretched = await stretchTexts(page, names, suffix);
+    expect(stretched, 'every weight name was found and stretched').toBe(names.length);
     await expectNoOverflowAcross(page, 'gate settings');
-    await expect(page.locator('main span', { hasText: suffix }), 'the stretched names are still on the page').toHaveCount(keys.length);
+    await expect(page.locator('main span', { hasText: suffix }), 'the stretched names are still on the page').toHaveCount(names.length);
     await ctx.close();
   });
 
