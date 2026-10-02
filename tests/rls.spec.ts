@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenantOn } from '../src/lib/db';
 import { envValue } from './helpers/dotenv';
+import { requireId } from './helpers/teardown-guard';
 
 /**
  * Tenant isolation is only observable through a role that is actually subject
@@ -186,6 +187,62 @@ describe('Row Level Security (RLS)', () => {
         data: { ...step, actorUserId: 'four-eyes-carol', actorName: 'Carol', department: 'FINANCE' },
       })
     ).rejects.toThrow();
+  });
+
+  test("tenant B can neither read nor decide tenant A's approval requests", async (ctx) => {
+    if (!ready) return ctx.skip();
+
+    // AKTAR-MURBCJ0A-1 — the approvals screen writes ApprovalRequest rows now.
+    // The action filters by tenantId; this is the policy behind that filter,
+    // measured through the NOBYPASSRLS role.
+    const requester = await prisma.user.create({
+      data: { email: `rls-approval-${Date.now()}@fabrika.test`, name: 'RLS Requester A' },
+    });
+    try {
+      const req = await prisma.approvalRequest.create({
+        data: {
+          tenantId: tenantA_Id,
+          actionType: 'BUDGET_ALLOCATION',
+          title: 'RLS approval request fixture',
+          payload: {},
+          requesterId: requester.id,
+          expiresAt: new Date(Date.now() + 3600_000),
+        },
+      });
+
+      await withTenantOn(rls, tenantA_Id, async (tx) => {
+        expect((await tx.approvalRequest.findMany()).map((r) => r.id)).toEqual([req.id]);
+      });
+
+      await withTenantOn(rls, tenantB_Id, async (tx) => {
+        expect(await tx.approvalRequest.findMany()).toHaveLength(0);
+        const { count } = await tx.approvalRequest.updateMany({
+          where: { id: requireId(req.id, 'req.id'), status: 'PENDING' },
+          data: { status: 'APPROVED' },
+        });
+        expect(count).toBe(0);
+      });
+      expect((await prisma.approvalRequest.findUniqueOrThrow({ where: { id: req.id } })).status).toBe('PENDING');
+
+      // WITH CHECK: B may not plant a request into A.
+      await expect(
+        withTenantOn(rls, tenantB_Id, async (tx) => {
+          await tx.approvalRequest.create({
+            data: {
+              tenantId: tenantA_Id,
+              actionType: 'BUDGET_ALLOCATION',
+              title: 'Smuggled request',
+              payload: {},
+              requesterId: requester.id,
+              expiresAt: new Date(Date.now() + 3600_000),
+            },
+          });
+        })
+      ).rejects.toThrow();
+    } finally {
+      // Cascades to the fixture request.
+      await prisma.user.delete({ where: { id: requester.id } });
+    }
   });
 
   test('writes are rejected when they target another tenant', async (ctx) => {
