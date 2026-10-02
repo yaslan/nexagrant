@@ -66,14 +66,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // 3. Blog posts (all locales)
+  // Query failures are silently skipped to prevent deployment failures when the
+  // database is temporarily unavailable. Incomplete sitemap entries are acceptable;
+  // search engines will fetch the page anyway if referenced elsewhere.
   try {
     const blogPosts = await getBlogPosts();
     for (const post of blogPosts) {
       for (const locale of locales) {
-        const publishedDate = post.publishedAt ?? new Date();
         entries.push({
           url: `${baseUrl}/${locale}/blog/${post.slug}`,
-          lastModified: publishedDate,
+          lastModified: post.publishedAt,
           changeFrequency: 'monthly',
           priority: 0.5,
         });
@@ -84,6 +86,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // 4. Open calls (individual topics) — OPEN status only
+  // Query failures are silently skipped to prevent deployment failures when the
+  // database is temporarily unavailable. Incomplete sitemap entries are acceptable;
+  // search engines will fetch the page anyway if referenced elsewhere.
   try {
     const openTopics = await prisma.topic.findMany({
       where: { status: 'OPEN' },
