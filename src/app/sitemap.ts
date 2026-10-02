@@ -2,7 +2,6 @@ import { MetadataRoute } from 'next';
 import { prisma } from '@/lib/db';
 import { appUrl } from '@/lib/app-url';
 import { getBlogPosts } from '@/lib/blog';
-import { parsePublishedDate } from '@/lib/date';
 
 // Hardcoded regions matching src/app/[locale]/calls/[region]/regions.ts
 const REGIONS: Record<string, { name: string; code: string }> = {
@@ -67,18 +66,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // 3. Blog posts (all locales)
-  const blogPosts = getBlogPosts();
-  for (const post of blogPosts) {
-    for (const locale of locales) {
-      // Parse publishedAt (e.g., "28 Ağustos 2026") into a Date; fallback to current date
-      const publishedDate = parsePublishedDate(post.publishedAt) ?? new Date();
-      entries.push({
-        url: `${baseUrl}/${locale}/blog/${post.slug}`,
-        lastModified: publishedDate,
-        changeFrequency: 'monthly',
-        priority: 0.5,
-      });
+  try {
+    const blogPosts = await getBlogPosts();
+    for (const post of blogPosts) {
+      for (const locale of locales) {
+        const publishedDate = post.publishedAt ?? new Date();
+        entries.push({
+          url: `${baseUrl}/${locale}/blog/${post.slug}`,
+          lastModified: publishedDate,
+          changeFrequency: 'monthly',
+          priority: 0.5,
+        });
+      }
     }
+  } catch (err) {
+    console.error('[sitemap] getBlogPosts failed:', err);
   }
 
   // 4. Open calls (individual topics) — OPEN status only

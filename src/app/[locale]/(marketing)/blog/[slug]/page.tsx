@@ -8,7 +8,6 @@ import PublicFooter from '@/components/PublicFooter';
 import { formatBlogDate, getBlogPostBySlug, getBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
 import { appUrl } from '@/lib/app-url';
-import { parsePublishedDate } from '@/lib/date';
 
 export async function generateMetadata({
   params,
@@ -16,7 +15,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
   const { locale, slug } = await params;
-  const post = getBlogPostBySlug(slug);
+  const post = await getBlogPostBySlug(slug);
 
   if (!post) {
     return { title: 'Not found' };
@@ -24,7 +23,7 @@ export async function generateMetadata({
 
   const baseUrl = appUrl();
   const canonicalUrl = `${baseUrl}/${locale}/blog/${slug}`;
-  const publishedDate = parsePublishedDate(post.publishedAt);
+  const publishedDate = post.publishedAt;
 
   return {
     title: post.title,
