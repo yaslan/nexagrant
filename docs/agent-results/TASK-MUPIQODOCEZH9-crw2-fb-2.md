@@ -1,89 +1,35 @@
----
-sözleşme: 3
-görev: TASK-MUPIQODOCEZH9
-kod: TASK-MUPIQODOCEZH9
-ajan: crw2-fb
-motor: claude
-tip: karar
-okur: ekip
-hüküm: Bitti: Kart 1 (MUPIQODOCEZH9) ONAY, Kart 2 (MUPA6KH1L0CV8 + MUOLBW7PZ7HM4) DEĞİŞİKLİK İSTE (SSS, crw-fb Ö-2/Ö-3 notlarını işlemedi ve dev'de değil), Kart 3 (MUOIBQJJDKL28) ONAY (4 tek satırlık mutasyonun hepsi kırmızıya döndü).
-platform: mac (Darwin 27, arm64). Kod ve belge okuma, vitest koşusu (action-leak-scan, saf TS). Linux/Windows koşulamadı: bu makinede yalnız mac var; incelenen işler saf TS/Markdown olduğundan platform farkı beklenmez. Canlı DB doğrulaması yok (:5433 kapalı, MUPE1WNXJGYXT).
-sürüm: 1
-tarih: 2026-10-01T15:25:49.973Z
----
+Hüküm: ONAY (1 öneri, 1 süreç notu) — be-fb envanteri schema.prisma'daki 75 modelin tamamını, 4 R2 önekini ve dış sistemleri kapsıyor; ADR-0010 dev'de (ff8b2db6) ve kendi içinde tutarlı; U-1..U-5, U-7, U-8 kartları panoda henüz AÇILMAMIŞ (rapor da "açılmadı" diyor; U-6 ayrı açılıp done). Bloke eden yok.
 
-# FB REVIEW TURU 2 — crw2-fb (3 kart)
+# TASK-MUPIQODOCEZH9 — crw2-fb inceleme (tur 2, kart 2)
 
-Kod değiştirilmedi. Mutasyon için scratchpad'de ayrı worktree kullanıldı, her mutasyon `git checkout -- <dosya>` ile geri alındı, worktree kaldırıldı.
-
-## Kart 1 — TASK-MUPIQODOCEZH9 (be-fb): **ONAY**
-
-**Envanter şemayı kapsıyor mu?** Evet. Şemadaki model sayısı ve ADR'deki ad kontrolü yeniden koşuldu:
+## 1. Model kapsamı (schema.prisma ↔ ADR-0010 Ek A)
 ```
-75 models; with tenantId 50; without 25
-ADR-0010 içinde adı geçmeyen model: (hiçbiri)   # 75 modelin hepsi için döngü, çıktı boş
+$ python3 (schema.prisma modelleri / tenantId kolonu)
+75 model; tenantId alanlı 50
 ```
-`tenantId` taşıyan 50 model (python ile şemadan çıkarıldı) ADR Ek A.1/A.2/A.4/A.5'te var; taşımayan 25 model (Tenant, User, Account, Session, VerificationToken, 5 plan/katalog, 15 paylaşılan katalog/CORDIS) A.1–A.3'te. ADR sayım cümlesi (25 + 50, 29 cascade + 21 FK'siz) şemayla tutuyor. Eksik model yok.
+- 75 modelin her biri ADR metninde geçiyor (`ADR'de geçmeyen modeller:` boş).
+- Ek A tablosunda tek satırlık `| Model |` biçiminde görünmeyen 16 model (Programme, Call, Topic, TopicStat, 8×Cordis*, TopicMatch, ConceptTemplate, Document, Chunk) elle bakıldı: TopicMatch Ek A:260 (G0) + :283 (K1), Chunk :274, Document :275, ConceptTemplate :276 ayrı satırlarda ("(tenantId ≠ NULL)" notuyla); katalog modelleri A.2/A.3 grup satırlarında. Eksik kurum modeli YOK. Karma satırlar (tenantId NULL = platform) doğru ele alınmış: "platform satırları NULL, dokunulmaz".
+- 50 = 29 cascade + 21 FK'siz sayımı ADR §1.1 ve Ek A sonundaki "Sayım" paragrafıyla tutuyor; rls.sql 47+3 = 50 ile uyumlu (rapor §2.1).
 
-**R2 nesneleri:** `<tenantId>/`, `incoming/<tenantId>/`, `feedback/<tenantId>/`, `exports/<tenantId>/` ADR §2.5'te. `feedback/${tenantId}/…` satırı `src/lib/feedback/submit.ts:104`'te teyit edildi. S3 istemcisi yalnız `src/lib/storage.ts`'te (`grep @aws-sdk/client-s3|PutObjectCommand` → tek dosya).
+## 2. R2 nesneleri
+dev'de (`FONBRIDGE-wt-qaefb-merge`) tüm yazıcılar tarandı: `PutObjectCommand`/`putObjectBytes`/`putObjectToR2` çağrıları → `storage.ts` (tenant önekli kanıt + `incoming/<tenantId>/`), `evidence/mock-upload/route.ts` (aynı anahtar şekli), `agency/cobrand-store.ts:107` (`<tenantId>/`), `feedback/submit.ts:144` (anahtar `feedback/${tenantId}/…`, `:104` civarı). ADR §2.5'teki 4 önek (`<tenantId>/`, `incoming/<tenantId>/`, `feedback/<tenantId>/`, `exports/<tenantId>/`) = kodda yazılan tüm önekler; eksik önek yok. Dış sistemler (Stripe/AI/SMTP/PostHog/jobs/yedek) ayrıca listeli.
 
-**ADR-0010 dev'de ve tutarlı mı?** Evet: `git branch --contains ff8b2db6` → `be-fb/p5-tenant-export-prep` ve `dev`; dosya `docs/adr/ADR-0010-tenant-export-and-deletion.md` (290 satır). Bölüm 9 K-1..K-5 özeti rapor §5 ile birebir; Ek A etiketleri (E/E*/H, C/X/S/P) kendi içinde tutarlı. Rapor §2.6'daki "kişi silme depoya dokunmuyor" bulgusu sonradan MUPL2D9B8QWAB ile kodlandı.
-
-**Uygulama kartları açıldı mı?** Hayır, bilerek: rapor §4 U-1..U-8'i "panoya AÇILMADI" diye yazıyor ve K-1..K-5 patron kararını bekliyor. Bu bir hata değil; DoD "açıldı mı" sorusunun yanıtı: açılmadı, lider (leed-fb) açacak.
-
-Öneriler (bloke etmez):
-- **Ö-1** `Document.fileUrl` (`prisma/schema.prisma:1212`) ADR A.5 #9'da "dışa E / silme X" ama bir R2 nesnesine mi işaret ettiği yazılı değil. U-2/U-3 yazılırken `grep fileUrl` ile R2'ye işaret edip etmediği doğrulanmalı (tenant_upload türü).
-- **Ö-2** Rapor ve R-2: FK listesi şemadan çıkarıldı, canlı `pg_constraint` doğrulaması yok (DB kapalıydı). U-3 canlı testi bunu kapatmalı; yazar da söylüyor.
-- **Ö-3** Rapor `/Users/macbook/alan/docs/agent-results/`'te, FONBRIDGE reposunda izlenmiyor (aynı sorun MUPL2D9B8QWAB ve MUPA77EIENLPH'de de var). Entegrasyonda repoya kopyalanmalı.
-
-## Kart 2 — TASK-MUPA6KH1L0CV8 (crw-fb) + TASK-MUOLBW7PZ7HM4 (cs-fb): **DEĞİŞİKLİK İSTE**
-
-İncelenen: SSS ve destek şablonları `cs-fb/pilot-sss` ucu `4566d1a8` (`git show` ile okundu). **dev'de bu iki dosya yok**: `ls docs/beta/` → `beta-weekly-sync.ics partner-tracker.md weekly-sync-template.md`; `git branch --contains 75e27c1c` → yalnız `cs-fb/pilot-sss`.
-
-Tutanlar:
-- tr/en eşleşmesi: `grep -c "^### [A-G][0-9]" sss.md` → 38, `grep -c "^\*\*EN" sss.md` → 38; `grep -c "^### Ş-" destek.md` → 11, `**EN` → 11. crw-fb'nin 38/11 sayıları doğru.
-- P-9 `info@fonbridge.com` tutarlı: SSS satır 449/457/497/501/538; `4566d1a8` G2'yi ve P-9 tablosunu güncellemiş; dev'de `src/lib/beta/constants.ts:50` `BETA_SUPPORT_EMAIL ?? 'info@fonbridge.com'`; `grep -rn fabrika.dev src docs/beta docs/BETA_GUIDE.md` → boş. Destek şablonlarında e-posta adresi yok (imza adressiz), çelişki yok.
-
-**Y-1 (zorunlu): crw-fb'nin MUPA77EIENLPH Ö-2 ve Ö-3 notları SSS'ye işlenmemiş.**
-- Ö-3: P-1 için "Google'ın gönderdiği doğrulama e-postasını onaylayın" adımı SSS A3'te (`sss.md:42-53`) yok. `grep -nE "doğrulama|verif" sss.md destek.md` ilgili adımı vermiyor (yalnız posta doğrulama sözü G2'de).
-- Ö-2: D4/D5 (`sss.md:297-326`) ADR-0010'a ve "kurum verisi kurum silinince gider, pilot süresince destek ekibi elle yürütür" cümlesine bağlanmıyor. `grep -n ADR-0010 sss.md destek.md` → boş. D5 hâlâ "[DOĞRULANMADI] kurum hesabı nasıl silinir" diyor, oysa ADR-0010 dev'de ve U-6 kararı geldi.
-- İstenen: A3'e doğrulama adımı, D4/D5 ve Ş-7'ye ADR-0010 bağlantısı + el prosedürü cümlesi (tr ve en).
-
-**Y-2: MUPA6KH1L0CV8 raporu bayat bir gerçeği "açık" sayıyor.** Rapor §3.3 ve Bulgular, `support@fabrika.dev` ile `info@fonbridge.com` karışıklığını "P-9 bekliyor" diyerek geçiyor ve ONAY veriyor. P-9 kararı 01.10'da verildi (`95ae554d`, `4566d1a8`); rapor yeniden verilmeli ya da güncellenmeli. Ayrıca `messages/tr.json` için "satır satır doğrulama yapılmadı" (§3.1) — 8 referansın satır numarası kontrolsüz kaldı.
-
-**Ö-1:** SSS ve şablonlar dev'e alınmadı (`cs-fb/pilot-sss` `4566d1a8`); entegrasyon kartı gerek. Ayrıca iki yazar raporu (MUPA6KH1L0CV8, MUOLBW7PZ7HM4) FONBRIDGE reposunda izlenmiyor.
-
-## Kart 3 — TASK-MUOIBQJJDKL28 (cs-fb-3): **ONAY**
-
-Dal `cs-fb/i116-leak-scan-gaps` ucu `ce5039f7` (rapor ucu; kod `f3892470`), scratchpad worktree (detached), node_modules bağlantısıyla. Taban koşu:
+## 3. ADR-0010 dev'de ve tutarlı mı
 ```
-$ npx vitest run tests/api/action-leak-scan.test.ts
- Test Files  1 passed (1)
-      Tests  179 passed (179)
+$ git log --oneline -3 dev -- docs/adr/ADR-0010-tenant-export-and-deletion.md
+ff8b2db6 docs(adr): ADR-0010 taslak — ...
+$ git diff --stat dev be-fb/p5-tenant-export-prep -- <ADR>   → (boş: aynı içerik)
 ```
-Her mutasyon tek satır; sonra `git checkout -- tests/api/action-leak-scan.ts`; her koşudan sonra `git status --short` boş.
+dev ucu `99337d06`; ADR-0010 dev'de (qae-fb TASK-MUPL20074JQ0V ile alınmış). Tutarlılık: durum ÖNERİLDİ, K-1..K-5 §9 ile rapor §5 aynı; §1 iddiaları (tenant.delete yok, deletedAt yalnız okunuyor) rapor kanıtıyla aynı; ADR-0007/0008/0009 ve DPA §6 atıfları mevcut dosyalara gidiyor. ADR numarası çakışmıyor (0009 → 0010).
 
-| # | Hedef | Satır | Mutasyon | Sonuç |
-|---|---|---|---|---|
-| M1 | Y-1: `require` takma adı/`createRequire` sonucu yükleyici tanıma | `action-leak-scan.ts:452` | `moduleKind(t) === 'loader'` → `false` | **KIRMIZI**: `× M4 require()`, `× a namespace from require()`, `× \`const r = require as any\``, `× assigned later: let r; r = require`, … (12+ test) |
-| M2 | Y-1: createRequire çağrısının sonucu | `:412` | `=== 'factory'` → `=== 'nope'` | **KIRMIZI**: `FAIL … B-2: createRequire from node:module > imported, called in place`, `> imported under another name`, `> through a namespace`, `> its loader bound to a name first`, … |
-| M3 | Y-2: `export let` yeniden atama eşleşmesi | `:1667` | `return false && targets.some(...)` | **KIRMIZI**: `FAIL … X8/Ö-1: an export let action given another value > act = run`, `> act ||= run`, `> [act] = [run]`, `> ({ act } = { act: run })`, `> export var` |
-| M4 | Y-2: yeniden atanan değer sızıntı sayılmıyor | `:1667` | `&& nodeLeaks(...)` → `&& false` | **KIRMIZI**: aynı beş test (`act = run` … `export var`) |
+## 4. Uygulama kartları
+`list_tasks` (60 kart): U-6 = TASK-MUPL2D9B8QWAB (done). U-1, U-2, U-3, U-4, U-5, U-7, U-8 için pano kartı YOK. Rapor bunu açıkça "panoya AÇILMADI, lider açar" diyor, yani yazar kusuru değil; bu işin kabul koşulu "kartlar açıldı" ise karşılanmamış → **Ö-1: leed-fb K-1..K-5 patron kararından sonra U-1..U-5, U-7, U-8'i açmalı** (pilot 02.10; K-3 A'daki U-8 runbook'u pilotta DPA §6 vaadinin tek karşılığı, önceliklendirilmeli).
 
-(İlk M3 denemesinde hedef satır numarası yanlıştı, sed eşleşmedi, değişiklik oluşmadı ve 179/179 yeşil çıktı; bu mutasyon sayılmadı. Satır `grep` ile bulunup M3 yeniden koşuldu.)
+## 5. Bulgular
+- Bloke eden: yok.
+- Ö-1: yukarıdaki kart açılışı (lider işi).
+- Ö-2 (süreç): rapor "ADR dev'e alınmadı" diyor; sonradan dev'e alınmış (rapor bayat), zararsız.
+- Ö-3 (yazar zaten işaretlemiş): FK cascade'in `fabrika_app` altında RLS'e takılmaması canlı doğrulanmadı (R-1/R-2, DB :5433 kapalıydı); U-3 DoD'unda ölçüm şartı var — yeterli.
+- Not: kod değiştirmedim; canlı DB doğrulaması yapılmadı.
 
-Geri alma kanıtı (her mutasyondan sonra ve sonda):
-```
-$ git status
-Not currently on any branch.
-nothing to commit, working tree clean       # HEAD ce5039f7
-```
-Kırmızıya dönmeyen tanık yok → DEĞİŞİKLİK İSTE koşulu oluşmadı. Not: kartın "Y-2" etiketi iki anlamda geçiyor (İNCELEME-118 Y-2 = A1/A4/A10 tanıkları; `export let` = Ö-1/X8). Bu incelemede görevin "export let yeniden atama" tanımı kullanıldı; A1/A4/A10 tanıkları için yazarın önce/sonra tablosu (`mutants118-before/after`) yeniden koşulmadı.
-
-## Özet
-
-| Kart | Hüküm |
-|---|---|
-| MUPIQODOCEZH9 | ONAY |
-| MUPA6KH1L0CV8 + MUOLBW7PZ7HM4 | DEĞİŞİKLİK İSTE (Y-1, Y-2) |
-| MUOIBQJJDKL28 | ONAY |
+**Platform beyanı:** yalnız mac (Darwin 27), belge/statik okuma incelemesi; platforma bağlı yol yok. Linux/Windows koşulmadı (makinede yalnız mac), fark beklenmez.

@@ -21,7 +21,7 @@
   "src/app/[locale]/admin/layout.tsx": 3,
   "src/app/[locale]/admin/modules/client.tsx": 3,
   "src/app/[locale]/admin/modules/page.tsx": 1,
-  "src/app/[locale]/admin/settings/page.tsx": 9,
+  "src/app/[locale]/admin/settings/page.tsx": 7,
   "src/app/[locale]/admin/settings/smtp-form.tsx": 6,
   "src/app/[locale]/admin/tenants/page.tsx": 4,
   "src/app/[locale]/calls/turkey/page.tsx": 1,
