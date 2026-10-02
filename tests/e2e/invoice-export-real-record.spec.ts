@@ -6,6 +6,7 @@ import { encode } from 'next-auth/jwt';
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
+import { seedUserMembership, cleanupUserMembership } from './fixtures/user-membership-seed';
 
 /**
  * TASK-MTRD9QBJ2G32E — an invoice export may only describe an invoice that exists.
@@ -102,10 +103,17 @@ test.describe('invoice export reads a real record', () => {
     invoiceA = a.number;
     invoiceB = b.number;
     ettnA = a.ettn;
-    cookieA = await sessionCookie(tenantA, `${STAMP}-user-a`);
+
+    // Seed users and memberships so JWT callback can find them
+    const userIdA = `${STAMP}-user-a`;
+    await seedUserMembership(tenantA, userIdA, `${userIdA}@e2e.fabrika.test`, 'Invoice Export User A', 'TENANT_OWNER');
+
+    cookieA = await sessionCookie(tenantA, userIdA);
   });
 
   test.afterAll(async () => {
+    const userIdA = `${STAMP}-user-a`;
+    await cleanupUserMembership(tenantA, userIdA);
     await prisma.invoice.deleteMany({ where: { tenantId: { in: [tenantA, tenantB] } } });
     await prisma.tenant.deleteMany({ where: { id: { in: [tenantA, tenantB] } } });
     await prisma.$disconnect();

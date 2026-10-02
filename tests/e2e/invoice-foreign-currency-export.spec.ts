@@ -6,6 +6,7 @@ import { encode } from 'next-auth/jwt';
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
+import { seedUserMembership, cleanupUserMembership } from './fixtures/user-membership-seed';
 import { requireId } from '../helpers/teardown-guard';
 
 /**
@@ -124,10 +125,16 @@ test.describe('a foreign-currency invoice export', () => {
 
     usdNumber = (await issue('USD', `${STAMP}-USD`)).number;
     tryNumber = (await issue('TRY', `${STAMP}-TRY`)).number;
-    cookie = await sessionCookie(tenantId, `${STAMP}-user`);
+
+    const userId = `${STAMP}-user`;
+    await seedUserMembership(tenantId, userId, `${userId}@e2e.fabrika.test`, 'FX Export User', 'TENANT_OWNER');
+
+    cookie = await sessionCookie(tenantId, userId);
   });
 
   test.afterAll(async () => {
+    const userId = `${STAMP}-user`;
+    await cleanupUserMembership(tenantId, userId);
     await prisma.invoice.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
     await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
     await prisma.$disconnect();

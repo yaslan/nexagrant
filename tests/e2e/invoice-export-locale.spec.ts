@@ -6,6 +6,7 @@ import { encode } from 'next-auth/jwt';
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
+import { seedUserMembership, cleanupUserMembership } from './fixtures/user-membership-seed';
 import { requireId } from '../helpers/teardown-guard';
 
 /**
@@ -91,11 +92,18 @@ test.describe('the printed invoice follows the reader language', () => {
 
     ninetenths = await issue(`${STAMP}-0001`, 20, 0.9);
     fivetenths = await issue(`${STAMP}-0002`, 10, 0.5);
+
+    const userId = `${STAMP}-user`;
+    const userEmail = `${STAMP}@e2e.fabrika.test`;
+
+    // Seed user and membership so JWT callback can find them
+    await seedUserMembership(tenantId, userId, userEmail, 'Invoice Locale User', 'TENANT_OWNER');
+
     cookie = await encode({
       token: {
-        sub: `${STAMP}-user`,
-        id: `${STAMP}-user`,
-        email: `${STAMP}@e2e.fabrika.test`,
+        sub: userId,
+        id: userId,
+        email: userEmail,
         tenantId,
         role: 'TENANT_OWNER',
       },
@@ -106,6 +114,8 @@ test.describe('the printed invoice follows the reader language', () => {
   });
 
   test.afterAll(async () => {
+    const userId = `${STAMP}-user`;
+    await cleanupUserMembership(tenantId, userId);
     await prisma.invoice.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
     await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
     await prisma.$disconnect();
