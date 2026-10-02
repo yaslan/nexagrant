@@ -1,5 +1,7 @@
 import React from 'react';
-import TurkiyeyeAcikCagrilarPage from '../turkiyeye-acik-cagrilar/page';
+import TurkiyeyeAcikCagrilarPage, { generateMetadata } from '../turkiyeye-acik-cagrilar/page';
+
+export { generateMetadata };
 
 export default async function OpenCallsPage({
   params
