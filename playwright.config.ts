@@ -55,6 +55,9 @@ const E2E_WEB_SERVER = process.env.E2E_WEB_SERVER === 'start' ? 'start' : 'dev';
 
 const testEnv = {
   AUTH_SECRET: E2E_AUTH_SECRET,
+  // OAuth credentials for E2E tests (test/sandbox values only)
+  AUTH_GOOGLE_ID: 'test-google-client-id-e2e',
+  AUTH_GOOGLE_SECRET: 'test-google-client-secret-e2e',
   // The specs sign in through the demo seats; off by default (TASK-MULSCEK4JHK8X).
   ...(E2E_WEB_SERVER === 'dev' ? { DEMO_LOGIN_ENABLED: 'true' } : {}),
   INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.',

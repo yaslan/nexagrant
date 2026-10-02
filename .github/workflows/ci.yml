@@ -155,6 +155,8 @@ jobs:
       env:
         CI: 'true'
         E2E_WEB_SERVER: ${{ inputs.e2e_server || 'dev' }}
+        AUTH_GOOGLE_ID: 'test-google-client-id-e2e'
+        AUTH_GOOGLE_SECRET: 'test-google-client-secret-e2e'
         INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.'
         INVOICE_SUPPLIER_VKN: '1000000000'
         INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD'
