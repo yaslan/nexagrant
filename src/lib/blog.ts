@@ -22,6 +22,7 @@ import { logger } from './logger';
 import { withSystemScope, type SystemTx } from './system-scope';
 import {
   BLOG_LIMITS,
+  BLOG_WRITE_ERRORS,
   BLOG_SLUG_PATTERN,
   mergeBlogPatch,
   slugifyTitle,
@@ -116,10 +117,18 @@ class BlogRefusal extends Error {
   }
 }
 
+/**
+ * A caught value as a refusal code — never the value itself: the result goes
+ * back to the browser (tests/api/api-error-body-guard.test.ts). Only a code
+ * from the closed BLOG_WRITE_ERRORS list can come out; anything else is logged
+ * here and answered as `save_failed`.
+ */
 function failure(context: string, slug: string, error: unknown): { ok: false; error: BlogWriteError } {
-  if (error instanceof BlogRefusal) return { ok: false, error: error.code };
-  if (errorCode(error) === 'P2002') return { ok: false, error: 'slug_taken' };
-  if (errorCode(error) === 'P2025') return { ok: false, error: 'not_found' };
+  const code = errorCode(error);
+  if (code === 'P2002') return { ok: false, error: 'slug_taken' };
+  if (code === 'P2025') return { ok: false, error: 'not_found' };
+  const known = BLOG_WRITE_ERRORS.find((c) => c === code);
+  if (error instanceof BlogRefusal && known) return { ok: false, error: known };
   logger.error(`blog ${context} failed`, error, { slug });
   return { ok: false, error: 'save_failed' };
 }

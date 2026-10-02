@@ -203,6 +203,7 @@ export default function AdminBlogClient({
 
         <button
           onClick={handleOpenCreateModal}
+          data-testid="blog-new"
           className="bg-accent hover:opacity-90 text-white font-bold text-xs px-5 py-3 rounded-xl shadow-2xs hover:shadow-md transition flex items-center justify-center space-x-2 shrink-0"
         >
           <Plus className="w-4 h-4" />
@@ -352,6 +353,7 @@ export default function AdminBlogClient({
                   <td className="p-4 text-center">
                     <button
                       onClick={() => handleToggleFeatured(post.slug)}
+                      data-testid={`blog-feature-${post.slug}`}
                       className={`p-1.5 rounded-lg border transition ${
                         post.featured
                           ? 'bg-amber/15 text-amber border-amber/30'
@@ -381,6 +383,7 @@ export default function AdminBlogClient({
                       </button>
                       <button
                         onClick={() => handleDelete(post.slug)}
+                        data-testid={`blog-delete-${post.slug}`}
                         className="p-1.5 rounded-lg border border-border text-bad hover:bg-bad/10 transition"
                         title="Sil"
                       >
@@ -429,8 +432,9 @@ export default function AdminBlogClient({
                 </div>
               )}
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Makale Başlığı *</label>
+                <label htmlFor="blog-title" className="block text-xs font-bold text-ink mb-1">Makale Başlığı *</label>
                 <input
+                  id="blog-title"
                   type="text"
                   required
                   value={formData.title}
@@ -442,8 +446,9 @@ export default function AdminBlogClient({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1">Kategori *</label>
+                  <label htmlFor="blog-category" className="block text-xs font-bold text-ink mb-1">Kategori *</label>
                   <input
+                  id="blog-category"
                     type="text"
                     required
                     value={formData.category}
@@ -466,8 +471,9 @@ export default function AdminBlogClient({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Özet (Excerpt) *</label>
+                <label htmlFor="blog-excerpt" className="block text-xs font-bold text-ink mb-1">Özet (Excerpt) *</label>
                 <textarea
+                  id="blog-excerpt"
                   rows={2}
                   required
                   value={formData.excerpt}
@@ -478,8 +484,9 @@ export default function AdminBlogClient({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Makale İçeriği (Markdown) *</label>
+                <label htmlFor="blog-content" className="block text-xs font-bold text-ink mb-1">Makale İçeriği (Markdown) *</label>
                 <textarea
+                  id="blog-content"
                   rows={6}
                   required
                   value={formData.content}
@@ -546,6 +553,7 @@ export default function AdminBlogClient({
                 </button>
                 <button
                   type="submit"
+                  data-testid="blog-submit"
                   disabled={isSubmitting}
                   className="bg-accent hover:opacity-90 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-2xs transition disabled:opacity-50"
                 >
