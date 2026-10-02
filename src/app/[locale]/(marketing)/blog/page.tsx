@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
-import { getBlogPosts } from '@/lib/blog';
+import { formatBlogDate, getBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
 
 export default async function BlogIndexPage({
@@ -12,7 +12,7 @@ export default async function BlogIndexPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const posts = getBlogPosts();
+  const posts = await getBlogPosts();
   const isTr = locale === 'tr';
 
   return (
@@ -64,7 +64,7 @@ export default async function BlogIndexPage({
                 <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                   <div className="space-y-2.5">
                     <div className="flex items-center gap-2 text-[11px] text-muted font-medium">
-                      <span>{post.publishedAt}</span>
+                      <time dateTime={post.publishedAt.toISOString()}>{formatBlogDate(post.publishedAt, locale)}</time>
                       <span>•</span>
                       <span>{post.readTime}</span>
                     </div>

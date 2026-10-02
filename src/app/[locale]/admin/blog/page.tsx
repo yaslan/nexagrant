@@ -1,5 +1,6 @@
 import React from 'react';
-import { getBlogPosts } from '@/lib/blog';
+import { getBlogPosts, type BlogPost } from '@/lib/blog';
+import { errorMessage } from '@/lib/errors';
 import { auth } from '@/lib/auth';
 import { getTranslations } from 'next-intl/server';
 import { displayUserName } from '@/lib/user-display';
@@ -11,7 +12,16 @@ export default async function AdminBlogPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const initialPosts = getBlogPosts();
+  // A failed read is shown as a failed read, not as an empty blog the admin
+  // might then "fill" with duplicates (AKTAR-MURBCJ0A-1).
+  let initialPosts: BlogPost[] = [];
+  let loadError = false;
+  try {
+    initialPosts = await getBlogPosts();
+  } catch (e) {
+    console.error(`[AdminBlogPage] DB query failed: ${errorMessage(e)}`);
+    loadError = true;
+  }
 
   // TASK-MTRNQHC3IV2BE — the "new post" form opened pre-filled with
   // `authorName: 'Dr. Mehmet Yılmaz'`, `authorRole: 'AB Proje Başdanışmanı'` and
@@ -30,6 +40,7 @@ export default async function AdminBlogPage({
       initialPosts={initialPosts}
       locale={locale}
       sessionUserName={sessionUserName}
+      loadError={loadError}
     />
   );
 }
