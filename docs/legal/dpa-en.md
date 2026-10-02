@@ -20,8 +20,8 @@ This agreement is made between the two parties whose details are set out in the 
 | -------------------------- | ---------------------------------- | ------------------------------- |
 | Name                       | ...............................    | FonBridge                       |
 | Registered legal name      | ...............................    | Fonbridge Ltd. Şti.             |
-| Address                    | ...............................    | ............................... |
-| Tax office / tax number    | ...............................    | ............................... |
+| Address                    | ...............................    | Karasamsun Quarter, İlkadım, SAMSUN [to be completed] |
+| Tax office / tax number    | ...............................    | 29120352230                     |
 | Trade registry (MERSİS) no | ...............................    | ............................... |
 | Notice email address       | ...............................    | info@fonbridge.com              |
 
@@ -121,7 +121,7 @@ This agreement enters into force on the later of the dates on which the parties 
 | Sub-processor         | Service                                                              | Location       | Data processed                                                                                     | Status                                   |
 | --------------------- | -------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | Vulut                 | Hosting: application server, PostgreSQL database, job queue, email server | Türkiye        | All data on the Platform; content and recipient address of outgoing email                          | In use                                   |
-| Cloudflare, Inc. (R2) | Object storage | To be stated: ................ | File attachments, evidence files, organisation logos | In use |
+| Cloudflare, Inc. (R2) | Object storage | Amsterdam (Western Europe) | File attachments, evidence files, organisation logos | In use |
 | Anthropic PBC         | AI language model                                                    | USA            | Prompt text sent by AI features                                                                    | In use                                   |
 | OpenAI, L.L.C.        | AI language model and text embedding                                 | USA            | Prompt text; document text embedded for search                                                     | In use                                   |
 | Stripe, Inc.          | Payment infrastructure                                               | USA            | Payment details entered on the payment page; organisation and subscription identifiers             | In use                                   |

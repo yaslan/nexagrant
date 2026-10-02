@@ -20,8 +20,8 @@ Bu sözleşme, aşağıdaki tabloda bilgileri yazılı iki taraf arasında yapı
 | -------------------------- | ------------------------------ | ------------------------------- |
 | Ad                         | ............................... | FonBridge                       |
 | Ticari unvan               | ............................... | Fonbridge Ltd. Şti.             |
-| Adres                      | ............................... | ............................... |
-| Vergi dairesi / VKN        | ............................... | ............................... |
+| Adres                      | ............................... | Karasamsun Mahallesi, İlkadım, SAMSUN [tamamlanacak] |
+| Vergi dairesi / VKN        | ............................... | 29120352230                     |
 | MERSİS no                  | ............................... | ............................... |
 | Bildirim e-posta adresi    | ............................... | info@fonbridge.com              |
 
@@ -121,7 +121,7 @@ Bu sözleşme, tarafların aşağıda imzaladığı tarihlerden sonuncusunda yü
 | Alt işleyen                    | Hizmet                                                                        | Konum                                 | İşlenen veri                                                         | Durum                                       |
 | ------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------- |
 | Vulut                          | Barındırma: uygulama sunucusu, PostgreSQL veritabanı, iş kuyruğu, e-posta sunucusu | Türkiye                               | Platform'daki tüm veri; giden e-postaların içeriği ve alıcı adresi   | Kullanımda                                  |
-| Cloudflare, Inc. (R2) | Nesne depolama | Belirtilecek: ................ | Dosya ekleri, kanıt dosyaları, kurum logoları | Kullanımda |
+| Cloudflare, Inc. (R2) | Nesne depolama | Amsterdam (Batı Avrupa) | Dosya ekleri, kanıt dosyaları, kurum logoları | Kullanımda |
 | Anthropic PBC                  | Yapay zeka dil modeli                                                         | ABD                                   | Yapay zeka özelliklerinde gönderilen istem metni                     | Kullanımda                                  |
 | OpenAI, L.L.C.                 | Yapay zeka dil modeli ve metin gömme (embedding)                              | ABD                                   | İstem metni; arama için gömülen belge metni                          | Kullanımda                                  |
 | Stripe, Inc.                   | Ödeme altyapısı                                                               | ABD                                   | Ödeme sayfasında girilen ödeme bilgileri; kurum ve abonelik kimlikleri | Kullanımda                                  |
