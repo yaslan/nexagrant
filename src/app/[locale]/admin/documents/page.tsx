@@ -27,8 +27,13 @@ export default async function AdminDocumentsPage() {
   let loadError = false;
   try {
     const result = await listSharedDocuments(RAG_UPLOAD_KINDS);
-    documents = result.documents.map((d) => ({ ...d, createdAt: d.createdAt.toISOString() }));
-    total = result.total;
+    if (result?.documents) {
+      documents = result.documents.map((d) => ({ ...d, createdAt: d.createdAt.toISOString() }));
+      total = result.total;
+    } else {
+      console.error(`[AdminDocumentsPage] DB query returned null result`);
+      loadError = true;
+    }
   } catch (e) {
     console.error(`[AdminDocumentsPage] DB query failed: ${errorMessage(e)}`);
     loadError = true;

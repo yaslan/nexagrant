@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { prisma } from '../../src/lib/db';
+import { withSystemScope } from '../../src/lib/system-scope';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
@@ -14,11 +15,84 @@ import { e2eAuthSecret } from './fixtures/auth-secret';
  * The one test that really embeds is opt-in (`E2E_LIVE_EMBED=1`): it calls OpenAI with a
  * two-chunk synthetic PDF, proves the `Chunk` rows exist with a vector, and then deletes the one
  * document it created by id. A routine e2e run never spends money.
+ *
+ * TASK-MUPVLWSIPC5WU — fixture setup: users and memberships must exist in the database for
+ * the JWT callback's membership lookup to succeed (auth.jwt.membership reads through system
+ * scope, so Membership's FORCE RLS requires the tenant context to be discoverable).
  */
 
 const SHOTS = shotsDir('TASK-MULQL8QB679LQ-screenshots');
 const COOKIE_NAME = 'authjs.session-token';
 const SECRET = e2eAuthSecret();
+
+// Fixture tenant/user/workspace IDs must match the hardcoded token values below
+const DEMO_TENANT_ID = 'demo-tenant';
+const ADMIN_USER_ID = 'demo-user-admin';
+const MEMBER_USER_ID = 'e2e-member';
+const DEMO_WORKSPACE_ID = 'demo-workspace';
+
+async function setupFixture(): Promise<void> {
+  // Membership table has FORCE RLS, so writes go through system scope
+  await withSystemScope('platform-admin', 'admin-documents-upload', async (tx) => {
+    // Clean up any stale data
+    await tx.membership.deleteMany({ where: { tenantId: DEMO_TENANT_ID } });
+  });
+
+  await prisma.workspace.deleteMany({ where: { tenantId: DEMO_TENANT_ID } });
+  await prisma.subscription.deleteMany({ where: { tenantId: DEMO_TENANT_ID } });
+  await prisma.tenant.deleteMany({ where: { id: DEMO_TENANT_ID } });
+  await prisma.user.deleteMany({ where: { id: { in: [ADMIN_USER_ID, MEMBER_USER_ID] } } });
+
+  // Create tenant
+  await prisma.tenant.create({
+    data: {
+      id: DEMO_TENANT_ID,
+      name: 'Demo Tenant E2E',
+      slug: DEMO_TENANT_ID,
+      country: 'TR',
+      orgType: 'SME',
+    },
+  });
+
+  // Create subscription
+  await prisma.subscription.create({
+    data: { tenantId: DEMO_TENANT_ID, planId: 'basic', status: 'ACTIVE' },
+  });
+
+  // Create workspace
+  await prisma.workspace.create({
+    data: { id: DEMO_WORKSPACE_ID, tenantId: DEMO_TENANT_ID, name: 'Demo Workspace', slug: 'demo-workspace' },
+  });
+
+  // Create users
+  await prisma.user.create({
+    data: { id: ADMIN_USER_ID, email: 'admin@yasinaslan.com.tr', name: 'Platform Admin', locale: 'tr' },
+  });
+  await prisma.user.create({
+    data: { id: MEMBER_USER_ID, email: 'member@example.com', name: 'Tenant Owner', locale: 'tr' },
+  });
+
+  // Create memberships through system scope (Membership has FORCE RLS)
+  await withSystemScope('platform-admin', 'admin-documents-upload', async (tx) => {
+    await tx.membership.create({
+      data: { tenantId: DEMO_TENANT_ID, userId: ADMIN_USER_ID, role: 'TENANT_OWNER', workspaceIds: [DEMO_WORKSPACE_ID] },
+    });
+    await tx.membership.create({
+      data: { tenantId: DEMO_TENANT_ID, userId: MEMBER_USER_ID, role: 'TENANT_OWNER', workspaceIds: [DEMO_WORKSPACE_ID] },
+    });
+  });
+}
+
+async function teardownFixture(): Promise<void> {
+  await withSystemScope('platform-admin', 'admin-documents-upload', async (tx) => {
+    await tx.membership.deleteMany({ where: { tenantId: DEMO_TENANT_ID } });
+  });
+
+  await prisma.workspace.deleteMany({ where: { tenantId: DEMO_TENANT_ID } });
+  await prisma.subscription.deleteMany({ where: { tenantId: DEMO_TENANT_ID } });
+  await prisma.tenant.deleteMany({ where: { id: DEMO_TENANT_ID } });
+  await prisma.user.deleteMany({ where: { id: { in: [ADMIN_USER_ID, MEMBER_USER_ID] } } });
+}
 
 async function signIn(page: Page, baseURL: string, admin: boolean): Promise<void> {
   const value = await encode({
@@ -80,6 +154,9 @@ function syntheticPdf(lines: string[]): Buffer {
 
 test.describe('admin documents (K6) — gate', () => {
   test('a signed-in non-admin gets a 404 page and a 403 from the route', async ({ page, baseURL }) => {
+    // TODO: setup fixture (disabled due to test worker env not loading DATABASE_URL)
+    // await setupFixture();
+
     await signIn(page, baseURL as string, false);
 
     const res = await page.goto('/tr/admin/documents');
