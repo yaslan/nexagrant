@@ -18,7 +18,7 @@
    > **İç hedef (müşteriye yazılmaz):** Taleplerin %90'ı hedef sürede ilk yanıt alır. Sahibi PM. Bu hedef K-5 kararından geliyor ve müşterilere ya da SSS'e yazılmaz.
 4. **Kişisel veri:** Yanıtta başka kullanıcının adını/e-postasını yazmayın. E-posta adreslerini
    maskeleyin (`u***@ilkadim…`), ürün de böyle maskeler (QA akış 8).
-5. **Bilinen sorun** şablonları (Ş-1, Ş-2, Ş-3) geçicidir. Düzeltme gelince bu dosya güncellenir;
+5. **Bilinen sorun** şablonları (Ş-1, Ş-2) geçicidir. Düzeltme gelince bu dosya güncellenir;
    kullanıcıya "düzeltildi" kapanış mesajı gönderilir (Ş-10).
 6. Her talep önce §3'teki forma kaydedilir, sonra yanıtlanır.
 
@@ -28,7 +28,7 @@
 | -- | ----- | --- | ------ |
 | Ş-1 | Davetle katıldım, "Erişim Reddedildi" görüyorum | **Bilinen sorun** (QA Y-1) | SSS A5 |
 | Ş-2 | Davet bağlantısı çalışmıyor | Kısmen bilinen sorun (QA Ö-5) | SSS B4–B6, A3 |
-| Ş-3 | Yanlış davet / yanlış üye; üye listesi görünmüyor | **Bilinen sorun** (QA Y-3) | SSS B7 |
+| Ş-3 | Yanlış davet / yanlış üye / üye çıkarma | Doğrulanmış davranış (QA Y-3 ekranı); veri görülmüş olabilirse P0 yükseltme | SSS B7 |
 | Ş-4 | Koltuk doldu | Kısmen bilinen sorun (QA Ö-1, Ö-6) | SSS B1–B2 |
 | Ş-5 | Pilot süresi bitti / düzenleyemiyorum | Doğrulanmış davranış | SSS C3–C5 |
 | Ş-6 | Giriş yapamıyorum | Doğrulanmış davranış | SSS A1–A3 |
@@ -141,25 +141,37 @@ değilse **[DOĞRULANMADI]** — patrona yükseltin (P-1).
 
 ---
 
-### Ş-3 · Yanlış davet / yanlış kişi katıldı / üye listesi yok — BİLİNEN SORUN
+### Ş-3 · Yanlış davet / yanlış kişi katıldı / üye çıkarma
 
-**Tetik:** "Yanlış adrese davet gittim", "yanlış kişi katıldı", "Üyeler sayfasında kimse görünmüyor",
-"rolü değiştirmek istiyorum". → SSS B7
+**Tetik:** "Yanlış adrese davet gitti", "yanlış kişi katıldı", "üyeyi nasıl çıkarırım", "üye
+listesini bulamıyorum", "rolü değiştirmek istiyorum". → SSS B7
+
+**Önce:** talep edenin rolü ne? Ekip Üyeleri sayfasını yalnız Kurum Sahibi ve Kurum Yöneticisi
+kullanır. Başka rolden gelirse kurumdaki Sahip/Yönetici'ye yönlendirin. Yanlış kişi katıldıysa ve
+kurum verisini görmüş olabilirse talep **P0**'dır; kullanıcı ekrandan çıkarmış olsa bile aşağıdaki
+yükseltme notu gider.
 
 **TR**
 
 > Merhaba [Ad],
 >
-> Yazdığınız için teşekkürler. Bu, bildiğimiz bir eksik: bugün üründe davet iptali, üye çıkarma ve
-> üye listesi henüz yok. Bunları şimdilik ekibimiz elle yapıyor.
+> Yazdığınız için teşekkürler. Bunu **Ekip Üyeleri** sayfasından kendiniz yapabilirsiniz (yalnız
+> Kurum Sahibi ve Kurum Yöneticisi). Sayfaya gitmek için sağ üstte adınıza tıklayın →
+> **Abonelik & Krediler** → koltuk kutusundaki **Ekip üyelerini yönet →** bağlantısı.
 >
-> - **Yanlış adrese giden davet** 7 gün sonra kendiliğinden geçersiz olur. O süre boyunca bir koltuk
->   tutar.
-> - **Yanlış katılan kişi** için talebinizi öncelikli olarak inceliyoruz. Kimliğinizi doğrulamak için
->   size ayrıca yazabiliriz; yanıt vermeniz işlemi hızlandırır.
-> - **Rol değişikliği** için talebinizi ekibimize ilettim.
+> - **Yanlış adrese giden davet:** "Bekleyen Davetler" listesinde **İptal** → **Evet, iptal et**.
+>   Bağlantı hemen çalışmaz olur, koltuk boşalır.
+> - **Yanlış katılan kişi:** "Aktif Ekip Üyeleri" listesinde **Çıkar** → **Evet, çıkar**. Kişinin
+>   erişimi kesilir, koltuk boşalır.
 >
-> Talep numaranız: [TALEP-NO]. İşlem yapılınca size yazacağım.
+> Kurum sahibini yalnız başka bir kurum sahibi çıkarabilir; kurumun son sahibi çıkarılamaz.
+> Kendinizi de çıkaramazsınız.
+>
+> Yanlış katılan kişi kurumunuzdaki bilgileri görmüş olabilir. Bu yüzden talebinizi öncelikli olarak
+> ekibimize ilettim; size ayrıca yazabiliriz. Rol değişikliği ekranda yok; bu talebinizi de ekibimize
+> ilettim.
+>
+> Talep numaranız: [TALEP-NO].
 >
 > [İMZA]
 
@@ -167,24 +179,39 @@ değilse **[DOĞRULANMADI]** — patrona yükseltin (P-1).
 
 > Hello [Name],
 >
-> Thank you for writing. This is a known gap: today the product cannot cancel an invitation, remove a
-> member or list members. For now our team does these by hand.
+> Thank you for writing. You can do this yourself on the **Team Members** page (Owner and Tenant
+> Admin only). To open it, click your name at the top right → **Subscription & Credits** →
+> **Manage team members →** in the seats box.
 >
-> - **An invitation to a wrong address** expires by itself after 7 days. Until then it uses one seat.
-> - For **a wrong member**, we are reviewing your request as a priority. We may write to you
->   separately to verify who you are; your answer will speed things up.
-> - For **a role change**, I have passed your request to our team.
+> - **Invitation to a wrong address:** in "Pending Invitations", click **Cancel**, then **Yes,
+>   cancel**. The link stops working at once and the seat becomes free.
+> - **A wrong person joined:** in "Active Members", click **Remove**, then **Yes, remove**. The
+>   person loses access and the seat becomes free.
 >
-> Your request number: [REQUEST-NO]. I will write to you when it is done.
+> Only another Owner can remove an Owner, and the last Owner cannot be removed. You cannot remove
+> yourself.
+>
+> The wrong person may have seen your organisation's data, so I have passed your request to our team
+> as a priority; we may write to you separately. The page cannot change roles; I have passed that
+> request to our team too.
+>
+> Your request number: [REQUEST-NO].
 >
 > [SIGNATURE]
 
-**Yükseltme notu (platform ekibine):** kiracı adı · istenen işlem (üye çıkar / rol değiştir / davet
-sil) · hedef kişinin **maskeli** e-postası · talep eden kişinin rolü (yalnız Kurum Sahibi/Kiracı
-Yöneticisi talebi işlenir; SSS B3) · QA Y-3. **Yanlış kişi katıldıysa P0'dır** (veri görmüş olabilir):
-hemen yükselt. Üyeyi elle çıkarma işini yalnız **runbook'taki yetkili kişi** yapar; destek çıkarma
-yapmaz, yalnız talebi kaydeder ve yükseltir → `docs/destek/RUNBOOK-YANLIS-UYE.md` (iç belge; müşteriyle
-paylaşılmaz).
+Yanıttan çıkarın: yalnız davet sorunu varsa "Yanlış katılan kişi" maddesini ve veri paragrafını; rol
+talebi yoksa rol cümlesini.
+
+**Ekran kullanılamıyorsa** (pilot süresi bitti — çıkarma/iptal kapalı; ekran hata veriyor; talep eden
+Sahip/Yönetici sayfaya giremiyor): ekrana yönlendirmeyin. Talebi kaydedin ve yükseltin; çıkarma
+yedek prosedürle yapılır → `docs/destek/RUNBOOK-YANLIS-UYE.md`.
+
+**Yükseltme notu (patrona — her yanlış-üye vakasında, ekrandan çıkarılmış olsa da):** kiracı adı ·
+istenen/yapılan işlem (üye çıkarıldı / çıkarılacak / rol değiştir / davet iptal) · hedef kişinin
+**maskeli** e-postası · kişinin ne zamandan beri erişimi vardı (kullanıcının söylediği) · talep eden
+kişinin rolü · QA Y-3. **Yanlış kişi katıldıysa P0'dır** (veri görmüş olabilir): hemen yükselt. KVKK
+değerlendirmesi ve hukuka / veri sorumlusuna bildirim **patrondadır** (runbook adım 3, R-2); destek
+hüküm vermez, kullanıcıya "ihlal yok / var" demez. Destek çıkarma yapmaz.
 
 ---
 
@@ -204,9 +231,9 @@ paylaşılmaz).
 > saymadığı için farklı görünebilir; doğru sayı hata mesajındakidir.
 >
 > Yapabilecekleriniz:
-> - Kabul edilmemiş bir davet yanlışsa, 7 gün sonra kendiliğinden düşer ve koltuk boşalır.
-> - Koltuğu hemen boşaltmak gerekiyorsa bize hangi davetin iptal edilmesini istediğinizi yazın;
->   ekibimize iletirim (Ş-3).
+> - Koltuğu hemen boşaltmak için Kurum Sahibi ya da Kurum Yöneticisi **Ekip Üyeleri** sayfasından
+>   gereksiz bir daveti iptal edebilir ya da bir üyeyi çıkarabilir (sağ üstte adınız → **Abonelik &
+>   Krediler** → **Ekip üyelerini yönet →**). İptal edilmeyen davet 7 gün sonra kendiliğinden düşer.
 >
 > [İMZA]
 
@@ -222,8 +249,9 @@ paylaşılmaz).
 > the correct count.
 >
 > What you can do:
-> - A wrong pending invitation expires after 7 days and frees the seat.
-> - If you need the seat now, tell us which invitation to cancel and I will pass it to our team.
+> - To free a seat now, the Owner or a Tenant Admin can cancel a pending invitation or remove a
+>   member on the **Team Members** page (your name at the top right → **Subscription & Credits** →
+>   **Manage team members →**). An invitation that is not cancelled expires after 7 days.
 >
 > [SIGNATURE]
 
@@ -560,7 +588,7 @@ tablo güncellenir.
 | ----- | --------------------- | ------------ | ------ |
 | Y-1 | Davetle katılınca "Erişim Reddedildi" | Sol menüden Çağrılar | Ş-1 |
 | Y-2 | (kullanıcı görmez) koltuk sayısı 6'yı aşabilir | Ekibe yükselt, kullanıcıya söyleme | Ş-4 iç not |
-| Y-3 | Üye listesi yok, davet iptali/üye çıkarma yok | Yanlış davet 7 günde düşer; yanlış üye için ekibe yükselt (elle çıkarma, tek yetkili kişi) | Ş-3 |
+| Y-3 | ~~Üye listesi yok, davet iptali/üye çıkarma yok~~ → Ekip Üyeleri sayfası devrede (TASK-MUPUHBAE811KP) | Sahip/Yönetici ekrandan çıkarır/iptal eder (Abonelik & Krediler → Ekip üyelerini yönet). Yanlış üye veri görmüş olabilirse P0, patrona yükselt (KVKK/hukuk patronda). Ekran kullanılamazsa runbook yedek prosedürü | Ş-3 |
 | Y-4 | Profil "kaydedildi" diyor, kaydetmiyor | Metni ayrıca sakla | Ş-11 |
 | Ö-1 | Koltuk hatası "planı yükseltin" diyor; EN'de Türkçe | Yükseltme cümlesini yok say | Ş-4 |
 | Ö-2 | "Kurum Sahibi" seçilen kişi Üye oluyor | Bu rolü seçme; rol değişikliği için yükselt | Ş-1, Ş-3 |

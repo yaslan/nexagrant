@@ -57,6 +57,10 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Database CA (public certificate, not a secret): DATABASE_URL names it with
+# sslmode=verify-full&sslrootcert=/app/certs/... (docs/RELEASE_CHECKLIST.md §2.1).
+# The worker stage has it through `COPY . .`.
+COPY --from=builder /app/certs ./certs
 
 USER nextjs
 

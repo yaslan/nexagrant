@@ -53,11 +53,18 @@ process.env.AUTH_SECRET = E2E_AUTH_SECRET;
  */
 const E2E_WEB_SERVER = process.env.E2E_WEB_SERVER === 'start' ? 'start' : 'dev';
 
+// Set E2E_DATABASE_URL to process.env.DATABASE_URL so both runner and webServer see it
+if (process.env.E2E_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.E2E_DATABASE_URL;
+}
+
 const testEnv = {
   AUTH_SECRET: E2E_AUTH_SECRET,
   // OAuth credentials for E2E tests (test/sandbox values only)
   AUTH_GOOGLE_ID: 'test-google-client-id-e2e',
   AUTH_GOOGLE_SECRET: 'test-google-client-secret-e2e',
+  // E2E database URL — defaults to .env DATABASE_URL if not overridden via E2E_DATABASE_URL.
+  DATABASE_URL: process.env.DATABASE_URL,
   // The specs sign in through the demo seats; off by default (TASK-MULSCEK4JHK8X).
   ...(E2E_WEB_SERVER === 'dev' ? { DEMO_LOGIN_ENABLED: 'true' } : {}),
   INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.',
@@ -90,6 +97,6 @@ export default defineConfig({
     env: {
       ...process.env,
       ...testEnv,
-    },
+    } as Record<string, string>,
   },
 });

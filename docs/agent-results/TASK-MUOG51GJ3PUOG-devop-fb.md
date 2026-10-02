@@ -1,3 +1,14 @@
+# TASK-MUOG51GJ3PUOG — faz 4 (#golive): canlıya hazırlık (devop-fb, 01.10.2026)
+
+**Hüküm: GEÇTİ.** R-S7 SSL ve R-S2 Data API kapandı, crw2-fb Ö-1..Ö-4 kapandı. Ayrıntı ve kanıt: `TASK-MUOG51GJ3PUOG-devop-fb-golive.md` (ekler `…-ekler/H-*`). Dal `devop-fb/supabase-golive` (`510dcdb1`, `de7367bd`, `693bfbe0`); push yok, merge yok.
+**Tip:** runtime/altyapı + test · **Platform:** mac (darwin); canlı Supabase PG17.11; Windows ve Linux koşulmadı.
+
+- **SSL:** URL'e `sslmode=verify-full&sslrootcert=/app/certs/supabase-prod-ca-2021.crt` eklendi; CA repoda ve imajda. Yanlış CA ile bağlantı reddediliyor. `rls:verify --require-db` canlıda `fabrika_app` ile exit 0. CA'sız URL ile exit 1.
+- **Data API:** Migration canlıda `fabrika_migrate` ile ×2 koşuldu. anon/authenticated 3 fonksiyonda `t→f`, `fabrika_app` `t`. API'den çağrılabilir sahip fonksiyonu 3 → **0**.
+- **Patron işi:** Data API'yi panelden kapatmak (adımlar golive §4) ve plan/PITR'a bakmak (golive §5). Entegrasyon FonBridge projesini görmüyor.
+
+---
+
 # TASK-MUOG51GJ3PUOG — FB canlı DB kurulumu (Supabase), faz 3: engel kaldırıldı, §3.1 adım 3–5 canlıda TAMAM (devop-fb)
 
 **Hüküm: GEÇTİ (DB katmanı).** Patron 01.10.2026 faz 2'deki seçenek **1**'i seçti. Fonksiyonlardaki `SET app.system_scope` bildirimi gövdeye taşındı (dal `devop-fb/supabase-system-scope` → `a617188a`, yerel `dev`'e `ff177df7`; push yok). Canlı Supabase'de: zincir `41 files applied as fabrika_migrate`, `rls.sql` (28 → 112 politika), R-1 `TEMIZ`, `rls:verify` gerçek `fabrika_app` ile **exit 0, ölçüldü**. Politika metni ve RLS tablo kümesi CI kümesiyle md5 düzeyinde aynı.

@@ -89,27 +89,17 @@ function consent(page: Page) {
 
 test.describe('the studio price is the price the shopfront quotes and charges', () => {
   test.beforeAll(async () => {
-    const rows = await prisma.$queryRawUnsafe<Array<{ monthlyCents: number; yearlyCents: number }>>(
-      `SELECT "monthlyCents", "yearlyCents" FROM "PlanVersion"
-       WHERE "planId" = 'ultra' AND "status" = 'published' ORDER BY "version" DESC LIMIT 1`
-    );
+    const rows = await prisma.$queryRaw<Array<{ monthlyCents: number; yearlyCents: number }>>`SELECT "monthlyCents", "yearlyCents" FROM "PlanVersion"
+       WHERE "planId" = 'ultra' AND "status" = 'published' ORDER BY "version" DESC LIMIT 1`;
     ultraBefore = rows[0] ?? null;
-    await prisma.$executeRawUnsafe(
-      `UPDATE "PlanVersion" SET "monthlyCents" = $1, "yearlyCents" = $2
-       WHERE "planId" = 'ultra' AND "status" = 'published'`,
-      STUDIO_MONTHLY,
-      STUDIO_YEARLY
-    );
+    await prisma.$executeRaw`UPDATE "PlanVersion" SET "monthlyCents" = ${STUDIO_MONTHLY}, "yearlyCents" = ${STUDIO_YEARLY}
+       WHERE "planId" = 'ultra' AND "status" = 'published'`;
   });
 
   test.afterAll(async () => {
     if (ultraBefore) {
-      await prisma.$executeRawUnsafe(
-        `UPDATE "PlanVersion" SET "monthlyCents" = $1, "yearlyCents" = $2
-         WHERE "planId" = 'ultra' AND "status" = 'published'`,
-        ultraBefore.monthlyCents,
-        ultraBefore.yearlyCents
-      );
+      await prisma.$executeRaw`UPDATE "PlanVersion" SET "monthlyCents" = ${ultraBefore.monthlyCents}, "yearlyCents" = ${ultraBefore.yearlyCents}
+         WHERE "planId" = 'ultra' AND "status" = 'published'`;
     }
   });
 
@@ -195,13 +185,13 @@ test.describe('the studio price is the price the shopfront quotes and charges', 
 
 test.describe('a private plan is neither shown nor sold to a tenant it was not assigned to', () => {
   test.beforeAll(async () => {
-    await prisma.$executeRawUnsafe(`UPDATE "Plan" SET "visibility" = 'private' WHERE "id" = 'basic'`);
+    await prisma.$executeRaw`UPDATE "Plan" SET "visibility" = 'private' WHERE "id" = 'basic'`;
     // No PlanAssignment row: nobody has been given it.
-    await prisma.$executeRawUnsafe(`DELETE FROM "PlanAssignment" WHERE "planId" = 'basic'`);
+    await prisma.$executeRaw`DELETE FROM "PlanAssignment" WHERE "planId" = 'basic'`;
   });
 
   test.afterAll(async () => {
-    await prisma.$executeRawUnsafe(`UPDATE "Plan" SET "visibility" = 'public' WHERE "id" = 'basic'`);
+    await prisma.$executeRaw`UPDATE "Plan" SET "visibility" = 'public' WHERE "id" = 'basic'`;
   });
 
   test('it is gone from the public pricing page', async ({ page }) => {
@@ -256,18 +246,15 @@ test.describe('a private plan is neither shown nor sold to a tenant it was not a
 
 test.describe('a private plan assigned to a tenant is shown and sold to that tenant', () => {
   test.beforeAll(async () => {
-    await prisma.$executeRawUnsafe(`UPDATE "Plan" SET "visibility" = 'private' WHERE "id" = 'basic'`);
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "PlanAssignment" ("id","planId","tenantId","assignedBy","updatedAt")
-       VALUES ('pa_e2e_storefront','basic',$1,'e2e-fixture',CURRENT_TIMESTAMP)
-       ON CONFLICT ("planId","tenantId") DO NOTHING`,
-      TENANT_ID
-    );
+    await prisma.$executeRaw`UPDATE "Plan" SET "visibility" = 'private' WHERE "id" = 'basic'`;
+    await prisma.$executeRaw`INSERT INTO "PlanAssignment" ("id","planId","tenantId","assignedBy","updatedAt")
+       VALUES ('pa_e2e_storefront','basic',${TENANT_ID},'e2e-fixture',CURRENT_TIMESTAMP)
+       ON CONFLICT ("planId","tenantId") DO NOTHING`;
   });
 
   test.afterAll(async () => {
-    await prisma.$executeRawUnsafe(`DELETE FROM "PlanAssignment" WHERE "id" = 'pa_e2e_storefront'`);
-    await prisma.$executeRawUnsafe(`UPDATE "Plan" SET "visibility" = 'public' WHERE "id" = 'basic'`);
+    await prisma.$executeRaw`DELETE FROM "PlanAssignment" WHERE "id" = 'pa_e2e_storefront'`;
+    await prisma.$executeRaw`UPDATE "Plan" SET "visibility" = 'public' WHERE "id" = 'basic'`;
   });
 
   test('the assigned tenant sees it in its billing panel and can be quoted', async ({ page, baseURL }) => {

@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Adapter, AdapterAccount, AdapterSession, AdapterUser } from "next-auth/adapters";
 import type { OrgType, Role } from "@prisma/client";
 import { prisma } from "./db";
+import { withSystemScope } from "./system-scope";
 import { env } from "./env";
 import { errorMessage } from '@/lib/errors';
 import { PRODUCT_NAME } from './brand';
@@ -718,8 +719,17 @@ export const authConfig = {
           // rebind request for it keeps the token where it was — as an
           // invitation to it is already refused (src/lib/invitations/accept.ts).
           // Clearing `deletedAt` gives the same token its tenant back.
+          //
+          // Through the system scope (TASK-MUPYHVSBW47GD#auth): "Membership" is
+          // FORCE ROW LEVEL SECURITY under `tenant_isolation`, and this lookup is
+          // what DISCOVERS the tenant, so there is no app.tenant_id to give it.
+          // Under the superuser of local dev and CI it worked by accident; under
+          // fabrika_app (production, Supabase) it read ZERO memberships and every
+          // session came out tenantless ("no workspace", "no role"). The read
+          // stays bound to `userId`: the relation filter is
+          // "Membership"."userId" = token.id, so no other user's row can match.
           const userId = token.id;
-          const dbUser = await retryOnceIfNotConnected(() => prisma.user.findUnique({
+          const dbUser = await retryOnceIfNotConnected(() => withSystemScope('tenant-discovery', 'auth.jwt.membership', (tx) => tx.user.findUnique({
             where: { id: userId },
             select: {
               name: true,
@@ -738,7 +748,7 @@ export const authConfig = {
                 select: { tenantId: true, role: true, workspaceIds: true },
               },
             },
-          }));
+          })));
           token.isPlatformAdmin = dbUser?.isPlatformAdmin === true;
           // Narrowed off the element itself rather than off `.length`: an absent
           // membership must leave the token tenantless, which is the same safe

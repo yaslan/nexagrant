@@ -13,6 +13,7 @@
 Kısıtlar:
 - **I-1 (TASK-MUOEGWSV8I7H0):** `scripts/apply-migrations.sh`, sahip rolüyle her dosyayı düz `SET app.system_scope = 'on'` oturumuyla koşuyor. FORCE RLS tablolarındaki backfill'ler buna dayanıyor.
 - Migration'lardaki dört SECURITY DEFINER fonksiyon fonksiyon düzeyinde `SET app.system_scope = 'on'` taşıyor. Sahip rolüyle koşuyorlar.
+  - **Değişti (TASK-MUOG51GJ3PUOG, 01.10.2026):** Supabase'de süper kullanıcı yok, sahip `SET ON PARAMETER` alamıyor. Fonksiyonlar artık bayrağı gövdede `set_config('app.system_scope','on',true)` ile açıyor ve her çıkışta çağıranın değerini geri yüklüyor; fonksiyon düzeyinde `SET` yok (`scripts/apply-migrations.sh` geri gelmesini reddeder).
 - `withSystemScope` çağıranları (35 çağrı yeri) değişmemeli.
 - `tenant_isolation` metni değişmemeli, çünkü migration kopyaları bayt bayt karşılaştırılıyor.
 

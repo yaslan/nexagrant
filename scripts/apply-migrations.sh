@@ -129,9 +129,14 @@ preflight=$("$psql_bin" "$url" -X -Atq -F '|' -v ON_ERROR_STOP=1 -c "
 IFS='|' read -r role exempt can_set uncovered <<< "$preflight"
 
 # A function header line `SET app.system_scope = ...` (no semicolon: a clause,
-# not a statement). Session or LOCAL statements need no privilege.
+# not a statement). Session or LOCAL statements need no privilege. Any case,
+# the name quoted or not, and a `--` comment stripped first, so a `;` in a
+# trailing comment does not make a clause look like a statement (crw2-fb Ö-4).
 if [ "$can_set" != t ]; then
-  clause_files=$(cd "$dir" && grep -lE "^[[:space:]]*SET[[:space:]]+app\.system_scope[[:space:]]*(=|TO)[^;]*$" "${listed[@]}" ${down:+"$down"} || true)
+  clause_files=$(cd "$dir" && for f in "${listed[@]}" ${down:+"$down"}; do
+    sed 's/--.*$//' "$f" \
+      | grep -qiE '^[[:space:]]*SET[[:space:]]+"?app\.system_scope"?[[:space:]]*(=|TO)[^;]*$' && echo "$f"
+  done || true)
   if [ -n "$clause_files" ]; then
     echo "apply-migrations: role \"$role\" may not create functions with SET app.system_scope, and these files do:" >&2
     printf '  %s\n' $clause_files >&2
