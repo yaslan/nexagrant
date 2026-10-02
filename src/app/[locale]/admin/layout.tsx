@@ -78,7 +78,7 @@ export default async function AdminLayout({
               <span className="font-bold text-base tracking-tight text-white block leading-none">
                 Admin Console
               </span>
-              <span className="text-[10px] text-muted font-mono">
+              <span className="text-[10px] text-slate-400 font-mono">
                 Platform Console v1.1
               </span>
             </div>
