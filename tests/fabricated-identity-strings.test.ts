@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
-import { getBlogPosts, updateBlogPost, type BlogPost } from '@/lib/blog';
+import { mergeBlogPatch, type BlogPostInput } from '@/lib/blog-shared';
+import { BLOG_SEED_POSTS } from '@/lib/blog-seed';
 import { displayUserName } from '@/lib/user-display';
 import { DEFAULT_PART_B_SECTIONS } from '@/modules/m11/types';
 import { setScope, resetScope } from './helpers/tenant-scope-mock';
@@ -192,34 +193,59 @@ describe('listSessionWorkspaces — the switcher answers from Workspace rows', (
 });
 
 describe('blog — a byline names a real author or there is none', () => {
+  // AKTAR-MURBCJ0A-1: posts live in the BlogPost table. The launch posts are
+  // BLOG_SEED_POSTS (src/lib/blog-seed.ts), inserted as-is by `pnpm db:seed-blog`;
+  // the byline rule on writes is mergeBlogPatch + validateBlogInput, measured
+  // end to end against the database in tests/blog-posts.live.test.ts.
   test('no seeded post ships with an author', () => {
-    const posts = getBlogPosts();
-    expect(posts.length).toBeGreaterThan(0);
-    for (const post of posts) {
-      expect(post.author, `"${post.slug}" still carries a byline`).toBeUndefined();
+    expect(BLOG_SEED_POSTS.length).toBeGreaterThan(0);
+    for (const post of BLOG_SEED_POSTS) {
+      const fields = post as unknown as Record<string, unknown>;
+      for (const key of ['author', 'authorName', 'authorRole', 'authorAvatar']) {
+        expect(fields[key], `"${post.slug}" still carries a byline (${key})`).toBeUndefined();
+      }
     }
   });
 
   test('none of the invented bylines survives in the source', () => {
-    const source = readCode('src/lib/blog.ts');
-    for (const invented of [MEHMET, 'Av. Ayşe Kaya', 'Dr. Sofia Rossi', 'Can Aksoy']) {
-      expect(source, `blog.ts still names "${invented}"`).not.toContain(invented);
+    for (const file of ['src/lib/blog.ts', 'src/lib/blog-shared.ts', 'src/lib/blog-seed.ts']) {
+      const source = readCode(file);
+      for (const invented of [MEHMET, 'Av. Ayşe Kaya', 'Dr. Sofia Rossi', 'Can Aksoy']) {
+        expect(source, `${file} still names "${invented}"`).not.toContain(invented);
+      }
     }
   });
 
+  const STORED: BlogPostInput = {
+    title: 'Eski başlık',
+    excerpt: 'Özet',
+    content: 'İçerik',
+    category: 'Test',
+    readTime: '1 dk',
+    authorName: '',
+    authorRole: '',
+    authorAvatar: '',
+    image: 'https://images.unsplash.com/x',
+    featured: false,
+  };
+
   test('an update that carries no author leaves an authorless post authorless', () => {
-    const slug = getBlogPosts()[0]!.slug;
-    const updated = updateBlogPost(slug, { title: 'Yeni başlık' }) as BlogPost;
+    const updated = mergeBlogPatch(STORED, { title: 'Yeni başlık' });
     expect(updated.title).toBe('Yeni başlık');
-    expect(updated.author).toBeUndefined();
+    expect(updated.authorName).toBe('');
+    expect(updated.authorRole).toBe('');
   });
 
   test('an update that carries an author records exactly that author', () => {
-    const slug = getBlogPosts()[1]!.slug;
-    const updated = updateBlogPost(slug, {
-      author: { name: 'Zeynep Aydın', role: 'Editör' },
-    }) as BlogPost;
-    expect(updated.author).toEqual({ name: 'Zeynep Aydın', role: 'Editör' });
+    const updated = mergeBlogPatch(STORED, { authorName: 'Zeynep Aydın', authorRole: 'Editör' });
+    expect(updated).toMatchObject({ authorName: 'Zeynep Aydın', authorRole: 'Editör', authorAvatar: '' });
+  });
+
+  test('an update that clears the name clears the whole byline, never keeps the old one', () => {
+    const authored = { ...STORED, authorName: 'Zeynep Aydın', authorRole: 'Editör', authorAvatar: 'https://images.unsplash.com/a' };
+    expect(mergeBlogPatch(authored, { authorName: '' })).toMatchObject({ authorName: '', authorRole: '', authorAvatar: '' });
+    // …and a patch without a name keeps the recorded byline as it is.
+    expect(mergeBlogPatch(authored, { title: 'Başka' })).toMatchObject({ authorName: 'Zeynep Aydın', authorRole: 'Editör' });
   });
 
   test('the publish action invents no default author, role or portrait', () => {

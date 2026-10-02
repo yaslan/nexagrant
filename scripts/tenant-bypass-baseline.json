@@ -142,6 +142,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/blog.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "AKTAR-MURBCJ0A-1: the four blog writes (create/update/delete/toggle featured), reached only from the /admin/blog actions behind requirePlatformAdmin(). BlogPost itself is SYSTEM_WIDE with no RLS; the scope is for the AuditEvent written in the same transaction, which is tenant-less (tenantId NULL) and refused by the strict tenant_isolation policy outside system_scope."
+    },
+    {
+      "check": "D",
       "file": "src/app/[locale]/admin/feedback/actions.ts",
       "subject": "system-scope:platform-admin",
       "count": 1,

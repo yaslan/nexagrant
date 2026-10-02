@@ -2522,6 +2522,25 @@
     "result_value": "{total}/100 · {level}",
     "none": "—"
   },
+  "adminBlog": {
+    "saved": "Blog yazısı kaydedildi.",
+    "deleted": "Blog yazısı silindi.",
+    "featureToggled": "Öne çıkan durumu güncellendi.",
+    "loadFailed": "Blog yazıları veritabanından okunamadı. Sayfayı yenileyin.",
+    "errors": {
+      "invalid_title": "Başlık 3–200 karakter olmalı.",
+      "invalid_slug": "Kısa ad (slug) yalnız küçük harf, rakam ve tire içerebilir (3–120 karakter).",
+      "invalid_excerpt": "Özet 10–500 karakter olmalı.",
+      "invalid_content": "İçerik 20–50.000 karakter olmalı.",
+      "invalid_category": "Kategori 1–60 karakter olmalı.",
+      "invalid_read_time": "Okuma süresi 1–30 karakter olmalı.",
+      "invalid_image": "Görsel adresi https ile başlamalı ve izin verilen bir sunucudan (images.unsplash.com) gelmeli.",
+      "invalid_author": "Yazar adı ve unvanı en fazla 120 karakter olabilir; unvan ya da portre yalnız yazar adıyla birlikte girilebilir.",
+      "slug_taken": "Bu kısa adla (slug) bir yazı zaten var. Başlığı ya da kısa adı değiştirin.",
+      "not_found": "Yazı bulunamadı; başka bir yönetici silmiş olabilir. Sayfayı yenileyin.",
+      "save_failed": "Yazı kaydedilemedi. Lütfen tekrar deneyin."
+    }
+  },
   "adminDocuments": {
     "title": "Belgeler (K6 RAG)",
     "subtitle": "Çalışma programı ve konu PDF'lerini paylaşılan RAG belleğine yükleyin. Metin parçalara ayrılır, her parça OpenAI ile gömülür (maliyet platforma yazılır) ve tüm kiracıların aramasında kullanılır.",

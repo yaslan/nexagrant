@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, test, expect } from 'vitest';
 
-import { BLOG_POSTS } from '@/lib/blog';
+import { BLOG_SEED_POSTS } from '@/lib/blog-seed';
 
 /**
  * TASK-MTS6MRKDP168Q — no figure on a public page without a record behind it.
@@ -100,8 +100,10 @@ describe('landing page — the M1 mock quotes no real institution and no uplift'
   });
 });
 
+// AKTAR-MURBCJ0A-1: the posts live in the BlogPost table now; BLOG_SEED_POSTS is
+// exactly what `pnpm db:seed-blog` inserts, so pinning it pins the launch content.
 describe('blog posts — the sourced-sounding statistics are gone', () => {
-  const bodies = BLOG_POSTS.map((p) => `${p.title}\n${p.excerpt}\n${p.content}`).join('\n');
+  const bodies = BLOG_SEED_POSTS.map((p) => `${p.title}\n${p.excerpt}\n${p.content}`).join('\n');
 
   test.each(REMOVED_LITERALS)('no post text contains %s', (literal) => {
     expect(bodies).not.toContain(literal);
@@ -113,8 +115,8 @@ describe('blog posts — the sourced-sounding statistics are gone', () => {
   });
 
   test('the removal did not empty the posts out', () => {
-    expect(BLOG_POSTS.length).toBeGreaterThan(0);
-    for (const post of BLOG_POSTS) {
+    expect(BLOG_SEED_POSTS.length).toBeGreaterThan(0);
+    for (const post of BLOG_SEED_POSTS) {
       expect(post.excerpt.trim().length).toBeGreaterThan(40);
       expect(post.content.trim().length).toBeGreaterThan(200);
     }

@@ -106,8 +106,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   m.count.mockResolvedValue(0);
   m.importRunFind.mockResolvedValue(null);
-  for (const fn of Object.values(m.blog)) fn.mockReturnValue({ slug: 's' });
-  m.blog.deleteBlogPost.mockReturnValue(true);
+  // The shapes src/lib/blog.ts answers with since AKTAR-MURBCJ0A-1.
+  for (const fn of Object.values(m.blog)) fn.mockResolvedValue({ ok: true, post: { slug: 's' } });
+  m.blog.deleteBlogPost.mockResolvedValue({ ok: true });
   m.runCordisImport.mockResolvedValue({ success: true, skipped: false, runId: 'r', rowCounts: {}, durationMs: 1 });
   m.generatePartnerProfiles.mockResolvedValue({ updatedProfiles: 0, updatedCoParticipations: 0, durationMs: 0 });
   m.syncCordisBigData.mockResolvedValue({ ok: true });
