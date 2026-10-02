@@ -244,6 +244,7 @@ export default function ApprovalsClient({
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setActiveTab('actionable')}
+            data-testid="approvals-tab-actionable"
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
               activeTab === 'actionable'
                 ? 'bg-indigo-600 text-white shadow-sm'
@@ -259,6 +260,7 @@ export default function ApprovalsClient({
           </button>
           <button
             onClick={() => setActiveTab('my_requests')}
+            data-testid="approvals-tab-my_requests"
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
               activeTab === 'my_requests'
                 ? 'bg-indigo-600 text-white shadow-sm'
@@ -270,6 +272,7 @@ export default function ApprovalsClient({
           </button>
           <button
             onClick={() => setActiveTab('history')}
+            data-testid="approvals-tab-history"
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               activeTab === 'history'
                 ? 'bg-indigo-600 text-white shadow-sm'
