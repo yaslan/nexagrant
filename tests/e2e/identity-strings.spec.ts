@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
-import { prisma } from '../../src/lib/db';
+import { withSystemScope } from '../../src/lib/system-scope';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
@@ -64,16 +64,28 @@ const ADMIN = {
 } as const;
 
 test.beforeAll(async () => {
-  await prisma.user.upsert({
-    where: { id: ADMIN.id },
-    create: { ...ADMIN, locale: 'tr', isPlatformAdmin: true },
-    update: { email: ADMIN.email, name: ADMIN.name, isPlatformAdmin: true },
+  // JWT callback reads User row on every token refresh (d57f13f1). Seed test users.
+  // Use withSystemScope to bypass RLS during test setup.
+  await withSystemScope('platform-admin', 'e2e.identity-strings.setup', async (tx) => {
+    await Promise.all([
+      tx.user.upsert({
+        where: { id: ADMIN.id },
+        create: { ...ADMIN, locale: 'tr', isPlatformAdmin: true },
+        update: { email: ADMIN.email, name: ADMIN.name, isPlatformAdmin: true },
+      }),
+      tx.user.upsert({
+        where: { id: 'e2e-identity-user' },
+        create: { id: 'e2e-identity-user', email: 'zeynep@e2e.fabrika.test', name: 'Zeynep Aydın', locale: 'tr' },
+        update: { email: 'zeynep@e2e.fabrika.test', name: 'Zeynep Aydın' },
+      }),
+    ]);
   });
 });
 
 test.afterAll(async () => {
-  await prisma.user.deleteMany({ where: { id: ADMIN.id } });
-  await prisma.$disconnect();
+  await withSystemScope('platform-admin', 'e2e.identity-strings.cleanup', async (tx) => {
+    await tx.user.deleteMany({ where: { id: { in: [ADMIN.id, 'e2e-identity-user'] } } });
+  });
 });
 
 test.describe('identity strings', () => {
