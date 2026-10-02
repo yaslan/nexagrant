@@ -349,7 +349,7 @@ export default function AuthCard({
 
       {/* Error Alert */}
       {errorMessage && (
-        <div role="alert" className="p-3 bg-bad/15 border border-bad/30 text-bad text-xs rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+        <div role="alert" data-testid="signin-error" className="p-3 bg-bad/15 border border-bad/30 text-bad text-xs rounded-xl flex items-center justify-between animate-in fade-in duration-200">
           <span>{errorMessage}</span>
           <button
             type="button"
@@ -619,6 +619,7 @@ export default function AuthCard({
           </label>
           <input
             type="email"
+            data-testid="registration-email"
             required
             placeholder="ad.soyad@kurum.com"
             value={email}

@@ -50,10 +50,14 @@ test.describe('sign-in error messages', () => {
     await expect(alert(page)).toContainText(tr.generic);
     await page.screenshot({ path: `${SHOTS}/02-oauth-callback-error-tr.png`, fullPage: true });
 
-    const closeButton = alert(page).getByRole('button', { name: 'Kapat' });
+    // The close button is in the error alert (data-testid="signin-error") with aria-label
+    const errorAlert = page.getByTestId('signin-error');
+    const closeButton = errorAlert.getByRole('button', { name: /^(Close|Kapat)$/i });
     await expect(closeButton).toBeVisible();
     await closeButton.click();
 
+    // Verify the signin-error alert is gone, but other alerts (e.g., route announcer) may remain
+    await expect(page.getByTestId('signin-error')).toHaveCount(0);
     await expect(alert(page)).toHaveCount(0);
   });
 
@@ -71,7 +75,7 @@ test.describe('sign-in error messages', () => {
   });
 
   test('no error parameter, no alert', async ({ page }) => {
-    await page.goto('/tr/giris');
+    await page.goto('/tr/giris', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading').first()).toBeVisible();
     await expect(alert(page)).toHaveCount(0);
   });
