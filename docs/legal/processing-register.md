@@ -331,7 +331,7 @@ Taşındı: `docs/legal/processing-register-draft-agency-channel.md` (TASK-MULRR
 | **Alıcı ve yurt dışı aktarım** | Alıcı **yok**. Veri yalnız Fabrika veritabanında durur ve yalnız platform yöneticisi `/admin/leads` ekranında görür. CSV veya başka dışa aktarım yok. Otomatik e-posta gönderilmez |
 | **Saklama süresi**             | **Öneri 12 ay** (`PUBLIC_LEAD_RETENTION_DAYS = 365`, `src/lib/leads/public-lead-policy.ts`, tek sabit). Gece `public-lead-cleanup` işi (03:45 UTC) `createdAt`'i süreyi aşan satırları siler ve `public_lead.purged` denetim olayına yalnız sayıyı yazar. Gerekçe: kamu kurumlarının AB başvuru döngüsü yıllık; bir çağrıdan sonra bırakılan talep bir sonrakine kadar yanıtlanabilir olmalı. Daha eski bir karne sonucu kurumun bugünkü durumunu anlatmaz. **KARAR GEREKLİ** |
 | **Teknik-idari tedbir**        | Zod ile sunucu doğrulaması; honeypot alanı; hız sınırı (e-posta başına 24 saatte 3, IP başına saatte 10; advisory lock altında); kişisel veri günlüğe yazılmaz (hata yolunda yalnız hata adı); IP yalnız anahtarlı özetiyle; admin ekranı iki kez yetki kontrolü yapar (layout + sayfa); dışa aktarım yok |
-| **Açık noktalar**              | (1) Aydınlatma metni (`/privacy`) bu faaliyeti henüz anlatmıyor; formdaki bağlantı genel metne gidiyor — **açık**, cs-fb. (2) Rızanın geri alınması için ürün içi yol yok; talep üzerine platform yöneticisi satırı elle siler — **açık**. (3) E-posta adresi doğrulanmıyor (çift onay yok); başkası adına bırakılan talep mümkün — **açık**, hız sınırı kötüye kullanımı sınırlar |
+| **Açık noktalar**              | (1) ~~Aydınlatma metni (`/privacy`) bu faaliyeti henüz anlatmıyor~~ **Kısmen kapandı (02.10.2026):** `legal.privacy.legalBasisBody` artık "Ziyaretçi iletişim talebi (açık rıza; IP özeti için meşru menfaat)" diyor. Saklama süresi (12 ay) metinde hâlâ yok — **açık**, cs-fb. (2) Rızanın geri alınması için ürün içi yol yok; talep üzerine platform yöneticisi satırı elle siler — **açık**. (3) E-posta adresi doğrulanmıyor (çift onay yok); başkası adına bırakılan talep mümkün — **açık**, hız sınırı kötüye kullanımı sınırlar |
 | **Kaynak dosya yolu**          | `prisma/schema.prisma` (`PublicLead`), `prisma/migrations/add-public-lead.sql`, `src/lib/leads/public-lead.ts`, `src/lib/leads/public-lead-policy.ts`, `src/app/[locale]/fon-hazirlik/lead-form.tsx`, `src/app/[locale]/fon-hazirlik/actions.ts`, `src/app/[locale]/admin/leads/page.tsx`, `src/lib/jobs/tasks/public-lead-cleanup.ts` |
 
 ---
@@ -372,6 +372,22 @@ Bu iki sağlayıcı envanterden **çıkarılmıştır** çünkü aktif bir işle
 | **Kaynak dosya yolu** | `src/lib/analytics.ts`, `src/lib/cookie-consent.ts`, `src/components/CookieConsent.tsx` |
 
 **Anahtar açılırken yapılacaklar:** (1) PostHog projesinde "Discard client IP data" açılmalı. Olay başına `$geoip_disable` gönderiliyor, ama IP'nin hiç saklanmaması proje ayarıyla sağlanır. (2) PostHog DPA'sı imzalanmalı ve §21'e eklenmeli. (3) Çerez metninde (`legal.cookieConsent`) analitik amacı adıyla geçmeli. (4) Onayı geri alma yolu yok: bant bir kez yanıtlanınca yeniden açılmıyor (**açık**, KVKK md.7 / GDPR art.7(3)).
+
+### 19b. PostHog — gönderilen olaylar ve `/privacy` metniyle eşleme (AKTAR-MURBCJ0A-1#privacy2, 02.10.2026)
+
+§19a'nın alan tablosu yukarıda durur; bu alt bölüm onu kodla yeniden doğrular ve aydınlatma metnine bağlar.
+
+| Soru | Cevap | Kanıt |
+| --- | --- | --- |
+| Hangi olaylar gider? | Dört olay: `readiness_started`, `readiness_completed`, `readiness_signup_clicked` (hepsi `/fon-hazirlik`) ve `readiness_lead_submitted` (aynı sayfanın iletişim formu). Başka çağrı yeri yok | `src/app/[locale]/fon-hazirlik/readiness-check.tsx:87,114,595`, `src/app/[locale]/fon-hazirlik/lead-form.tsx:119` |
+| Ne zaman gider? | Üç koşulun üçü de doğruysa: anahtar dolu, çerez bandında "Tümünü Kabul Et", tarayıcıda çalışıyor | `src/lib/analytics.ts:121-122` (`posthogConfig()` ve `hasAnalyticsConsent()`), `src/lib/cookie-consent.ts:14` |
+| Ne gider? | Olay adı, süzülmüş özellikler, rastgele anonim kimlik, `$lib`, `$process_person_profile:false`, `$geoip_disable:true`, zaman damgası | `src/lib/analytics.ts:101-115` (`buildCaptureBody`) |
+| Nereye? | `https://eu.i.posthog.com/i/v0/e/` (varsayılan; `NEXT_PUBLIC_POSTHOG_HOST` ile değişir) | `src/lib/analytics.ts:28,128` |
+| Sağlayıcı / bölge / DPA | PostHog Inc.; varsayılan AB bölgesi. Canlıda anahtarın ve ana makinenin hangi değerde olduğu bu kartta **doğrulanamadı** (`.env.example:165-166` boş). İmzalı DPA **yok — açık** | §19a "Anahtar açılırken yapılacaklar" (2) |
+| Bu kartta nasıl doğrulandı? | Yerel `next dev` (`NEXT_PUBLIC_POSTHOG_KEY` sahte değerle), bant TR/EN ekran görüntüsü; testler `tests/analytics-posthog.test.ts` (geçti) | `docs/agent-results/AKTAR-MURBCJ0A-1-explor-fb-privacy.md` |
+| `/privacy`'de nasıl geçiyor? | `legal.privacy.recipientsBody` madde (6): "PostHog Inc. (AB bölgesi, varsayılan) — olay adları ve puanlandırma duruşu (çerez onayıyla)"; `collectionMethodBody` madde (4); `legalBasisBody` "Ürün analitiği (açık rıza)". Çerez bandı (`legal.cookieConsent.description`) analitik amacı adıyla söylüyor — §19a madde (3) kapandı | `messages/tr.json`, `messages/en.json` |
+
+**Bilinen sapma:** `recipientsBody` "olay adları ve puanlandırma duruşu" diyor; kod aslında kurum türü, puan, seviye gibi kapalı kümeden değerler de gönderiyor (`readiness_completed`). Metin eksik değil ama dar; hukukçu isterse genişletilir.
 
 ---
 
