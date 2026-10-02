@@ -5,73 +5,127 @@
  * Before: Form "başarıyla güncellendi" gösteriyordu ama 0 POST gidiyordu ve veri kayboluyor.
  * After: Form gerçek sunucu isteği gönderiyor, başarı mesajı ancak sunucu başarılı dönünce gösterilir.
  */
-import { test, expect } from '@playwright/test';
+import 'dotenv/config';
+import { test, expect, type Page } from '@playwright/test';
 import { expectHydrated } from './fixtures/hydration';
-import path from 'path';
-import crypto from 'crypto';
+import { createDbClient } from '../../src/lib/db';
 
-const suffix = crypto.randomBytes(3).toString('hex');
+const TENANT_ID = 'demo-tenant';
+const WORKSPACE_SLUG = 'main';
+const PROFILE_URL = '/tr/main/settings/profile';
+const TEST_EMAIL = 'profile-test@fabrika.test';
 
-test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
-  let tenantId: string;
-  let userId: string;
-  let authToken: string;
+const prisma = createDbClient(
+  process.env.DATABASE_URL || 'postgresql://fabrika:fabrika@localhost:5432/fabrika'
+);
 
-  test.beforeAll(async () => {
-    // Setup: Create test tenant and user with auth token
-    // This would normally be done via an API setup call
-    // For now, we skip this and assume the test environment is pre-configured
-    tenantId = `test-tenant-${suffix}`;
-    userId = `test-user-${suffix}`;
+async function setupProfileTestUser() {
+  // Ensure demo tenant exists
+  await prisma.tenant.upsert({
+    where: { id: TENANT_ID },
+    update: {},
+    create: {
+      id: TENANT_ID,
+      name: 'Demo Tenant',
+      slug: TENANT_ID,
+      country: 'TR',
+      orgType: 'SME',
+    },
   });
 
-  test('should send profile update to server and persist after reload', async ({ browser }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
+  // Ensure main workspace exists
+  const workspaceId = `${TENANT_ID}-${WORKSPACE_SLUG}`;
+  await prisma.workspace.upsert({
+    where: { id: workspaceId },
+    update: {},
+    create: {
+      id: workspaceId,
+      tenantId: TENANT_ID,
+      name: 'Main Workspace',
+      slug: WORKSPACE_SLUG,
+    },
+  });
 
-    // Set auth cookie (simulating logged-in user)
-    // In a real test, you would get this from your test setup
-    // For now, we'll navigate to the profile page
+  // Create test user (or update if exists)
+  await prisma.user.upsert({
+    where: { email: TEST_EMAIL },
+    update: {},
+    create: {
+      id: `profile-test-user`,
+      email: TEST_EMAIL,
+      name: 'Profile Test User',
+      locale: 'tr',
+    },
+  });
 
-    const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
-    const profileUrl = `${baseUrl}/tr/default/settings/profile`;
+  // Ensure membership exists with TENANT_OWNER role
+  await prisma.membership.upsert({
+    where: { tenantId_userId: { tenantId: TENANT_ID, userId: `profile-test-user` } },
+    update: {},
+    create: {
+      tenantId: TENANT_ID,
+      userId: `profile-test-user`,
+      role: 'TENANT_OWNER',
+      workspaceIds: [workspaceId],
+    },
+  });
+}
 
-    // Go to profile page
-    await page.goto(profileUrl);
+async function signIn(page: Page, email: string) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'fabrika_cookie_consent',
+      JSON.stringify({ necessary: true, analytics: true, marketing: true })
+    );
+  });
+  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(PROFILE_URL)}`);
+  await page.locator('input[type="email"]').fill(email);
+  await page.locator('form button[type="submit"]').click();
+  await page.waitForURL(`**${PROFILE_URL}`, { timeout: 30_000 });
+}
 
-    // Wait for page to load
-    await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
-    await expectHydrated(page.locator('button:has-text("Profili Kaydet")'));
+test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
+  test.beforeAll(async () => {
+    await setupProfileTestUser();
+  });
 
-    // Get the current values
+  test.afterAll(async () => {
+    await prisma.membership.deleteMany({ where: { tenantId: TENANT_ID, userId: `profile-test-user` } });
+    await prisma.user.delete({ where: { email: TEST_EMAIL } }).catch(() => {});
+    await prisma.$disconnect();
+  });
+
+  test('should send profile update to server and persist after reload', async ({ page }) => {
+    // Sign in through the login flow with test user
+    await signIn(page, TEST_EMAIL);
+
+    // Wait for form to hydrate
+    const saveButton = page.locator('button:has-text("Profili Kaydet")');
+    await expectHydrated(saveButton);
+
+    // Get the input fields
     const capabilitiesInput = page.locator('textarea[placeholder*="teknik"]');
     const keywordsInput = page.locator('input[placeholder*="e.g. AI"]');
 
-    // Read current values
-    const originalCapabilities = await capabilitiesInput.inputValue();
-    const originalKeywords = await keywordsInput.inputValue();
-
     // Create new test data
-    const newCapabilities = `Test profile ${suffix}: AI, ML, Robotics expertise, TRL 5-8`;
-    const newKeywords = 'TestAI, TestML, TestRobotics';
+    const testCapabilities = 'Yapay zeka algoritmaları, derin öğrenme, TRL 5-8 prototipleme deneyimi';
+    const testKeywords = 'AI, Deep Learning, Robotics, Green Energy';
 
-    // Clear and fill form
+    // Fill form with test data
     await capabilitiesInput.clear();
-    await capabilitiesInput.fill(newCapabilities);
+    await capabilitiesInput.fill(testCapabilities);
 
     await keywordsInput.clear();
-    await keywordsInput.fill(newKeywords);
+    await keywordsInput.fill(testKeywords);
 
-    // Click save button
-    const saveButton = page.locator('button:has-text("Profili Kaydet")');
-
-    // Wait for success message instead of monitoring network
+    // Wait for success message locator
     const successMessage = page.locator('text=başarıyla güncellendi');
 
+    // Click save button
     await saveButton.click();
 
     // Wait for success message to appear (indicates server action succeeded)
-    await successMessage.waitFor({ state: 'visible', timeout: 3000 });
+    await successMessage.waitFor({ state: 'visible', timeout: 5000 });
 
     // Verify success message is shown
     await expect(successMessage).toBeVisible();
@@ -79,57 +133,41 @@ test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
     // Reload the page
     await page.reload();
 
-    // Wait for form to load
-    await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
+    // Wait for form to hydrate again
     await expectHydrated(page.locator('button:has-text("Profili Kaydet")'));
 
     // Verify data persists after reload
-    const savedCapabilities = await capabilitiesInput.inputValue();
-    const savedKeywords = await keywordsInput.inputValue();
+    const savedCapabilities = await page.locator('textarea[placeholder*="teknik"]').inputValue();
+    const savedKeywords = await page.locator('input[placeholder*="e.g. AI"]').inputValue();
 
-    expect(savedCapabilities).toBe(newCapabilities);
-    expect(savedKeywords).toBe(newKeywords);
-
-    // Cleanup
-    await context.close();
+    expect(savedCapabilities).toBe(testCapabilities);
+    expect(savedKeywords).toBe(testKeywords);
   });
 
-  test('should show error when server returns error', async ({ browser }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
+  test('should show error when server returns error', async ({ page }) => {
+    // Sign in through the login flow
+    await signIn(page, TEST_EMAIL);
 
-    const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
-    const profileUrl = `${baseUrl}/tr/default/settings/profile`;
-
-    await page.goto(profileUrl);
-
-    // Wait for form
-    await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
-    await expectHydrated(page.locator('button:has-text("Profili Kaydet")'));
+    // Wait for form to hydrate
+    const saveButton = page.locator('button:has-text("Profili Kaydet")');
+    await expectHydrated(saveButton);
 
     const capabilitiesInput = page.locator('textarea[placeholder*="teknik"]');
 
     // Try to submit with empty capabilities (should fail validation)
     await capabilitiesInput.clear();
 
-    const saveButton = page.locator('button:has-text("Profili Kaydet")');
-    await saveButton.click();
-
     // Should NOT show success message
     const successMessage = page.locator('text=başarıyla güncellendi');
-    const errorMessage = page.locator('[class*="text-bad"]');
+    const errorMessage = page.locator('text=/Lütfen tüm alanları|Please fill/');
+
+    await saveButton.click();
 
     // Verify error message is shown, not success
-    try {
-      await successMessage.waitFor({ state: 'visible', timeout: 2000 });
-      throw new Error('Success message should not be shown for validation error');
-    } catch {
-      // Expected - success message should not appear
-    }
+    // The error banner should appear with a validation message
+    await expect(errorMessage).toBeVisible({ timeout: 3000 });
 
-    await expect(errorMessage).toBeVisible();
-
-    // Cleanup
-    await context.close();
+    // Ensure success message does NOT appear
+    await expect(successMessage).not.toBeVisible();
   });
 });
