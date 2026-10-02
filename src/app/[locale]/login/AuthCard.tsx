@@ -619,6 +619,7 @@ export default function AuthCard({
           </label>
           <input
             type="email"
+            data-testid="registration-email"
             required
             placeholder="ad.soyad@kurum.com"
             value={email}

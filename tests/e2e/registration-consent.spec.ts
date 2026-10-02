@@ -36,17 +36,24 @@ async function acceptCookies(page: Page) {
 }
 
 /**
- * The registration form that contains the email input.
+ * The registration disclosure form (separate from the credentials form).
  *
  * While the page is still streaming, Next parks the Suspense content in a
  * `hidden` container and moves it once the boundary resolves, so for a moment
  * the document really does hold two copies of the form — and a bare
- * `getByTestId` then fails strict mode instead of waiting. Scoping to the
- * visible form that contains the email input removes the ambiguity.
+ * `getByTestId` then fails strict mode instead of waiting. Targeting the
+ * disclosure form by its testid removes the ambiguity.
  */
-function form(page: Page) {
+function disclosureForm(page: Page) {
+  return page.locator('form[data-testid="registration-disclosure"]').filter({ visible: true });
+}
+
+/**
+ * The email input form (for credentials sign-up). Located below the disclosure form.
+ */
+function credentialsForm(page: Page) {
   return page.locator('form').filter({ visible: true }).filter({
-    has: page.getByRole('textbox', { name: /e-posta|email/i })
+    has: page.getByTestId('registration-email')
   });
 }
 
@@ -77,7 +84,7 @@ test('the registration form asks, unticked, and will not submit until it is tick
 
   // Ticking it enables the submit button through React state, so the box has to be
   // hydrated before it is ticked (fixtures/hydration.ts).
-  const box = form(page).getByTestId('disclosure-ack');
+  const box = disclosureForm(page).getByTestId('disclosure-ack');
   await expectHydrated(box);
 
   // Pre-ticked would make the record worthless: it would prove the page's
@@ -87,22 +94,22 @@ test('the registration form asks, unticked, and will not submit until it is tick
 
   // The version is on screen, so a screenshot of this box is evidence about a
   // specific text rather than about whatever the notice says today.
-  const version = form(page).getByTestId('disclosure-version');
+  const version = disclosureForm(page).getByTestId('disclosure-version');
   await expect(version).toContainText('privacy-notice@');
   await expect(version).toContainText('terms-of-service@');
 
   // Both legal texts are reachable from here, in the locale being read.
-  await expect(form(page).locator('a[href="/tr/privacy"]')).toBeVisible();
-  await expect(form(page).locator('a[href="/tr/terms"]')).toBeVisible();
+  await expect(disclosureForm(page).locator('a[href="/tr/privacy"]')).toBeVisible();
+  await expect(disclosureForm(page).locator('a[href="/tr/terms"]')).toBeVisible();
 
-  const submit = form(page).locator('button[type="submit"]');
-  await form(page).locator('input[type="email"]').fill(REFUSED_EMAIL);
+  const submit = credentialsForm(page).locator('button[type="submit"]');
+  await credentialsForm(page).locator('input[type="email"]').fill(REFUSED_EMAIL);
   await expect(submit).toBeDisabled();
   await page.screenshot({ path: `${SHOTS}/01-unticked-submit-disabled.png`, fullPage: true });
 
   // Past the disabled attribute: submit the form itself, the way a keyboard or
   // a tampered DOM would.
-  await form(page).evaluate((el: HTMLFormElement) => el.requestSubmit());
+  await credentialsForm(page).evaluate((el: HTMLFormElement) => el.requestSubmit());
   await expect(page.getByText(/onaylamanız gerekir/i)).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/02-unticked-refused.png`, fullPage: true });
 

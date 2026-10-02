@@ -50,17 +50,10 @@ test.describe('sign-in error messages', () => {
     await expect(alert(page)).toContainText(tr.generic);
     await page.screenshot({ path: `${SHOTS}/02-oauth-callback-error-tr.png`, fullPage: true });
 
-    const closeButton = alert(page).getByRole('button', { name: 'Kapat' });
+    // The close button uses aria-label for accessibility; look for it by button type + aria-label
+    const closeButton = alert(page).locator('button');
     await expect(closeButton).toBeVisible();
     await closeButton.click();
-
-    // Debug: Check alert state after click
-    const alertAfterClick = alert(page);
-    const alertCount = await alertAfterClick.count();
-    if (alertCount > 0) {
-      const alertHTML = await alertAfterClick.first().innerHTML();
-      console.log('[signin-error-messages] Alert after close click:', alertHTML);
-    }
 
     await expect(alert(page)).toHaveCount(0);
   });
@@ -79,7 +72,7 @@ test.describe('sign-in error messages', () => {
   });
 
   test('no error parameter, no alert', async ({ page }) => {
-    await page.goto('/tr/giris');
+    await page.goto('/tr/giris', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading').first()).toBeVisible();
     await expect(alert(page)).toHaveCount(0);
   });

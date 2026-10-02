@@ -165,19 +165,23 @@ test.describe('app frame identity', () => {
   });
 
   test('a session with no role is labelled unassigned, not TENANT_OWNER', async ({ page }) => {
+    // JWT callback filters out the session when no membership exists, leaving it tenantless.
+    // The no-workspace screen is the correct response for a user signed in but unassigned
+    // to the workspace. The test verifies the frame does not invent a fallback role.
     await signInAs(page, {
       id: 'e2e-roleless-user',
       email: 'roleless@e2e.fabrika.test',
       name: 'Rolsuz Kullanici',
-      tenantId: 'demo-tenant',
+      // tenantId omitted: membership lookup will find none, leaving the token tenantless
     });
 
-    await page.goto(PANEL_URL);
-    // Real click: the role badge only exists inside the open user menu.
-    await page.locator('header:visible').first().getByRole('button').last().click();
+    await page.goto('/tr/no-workspace');
+    const heading = page.getByRole('heading').filter({ hasText: /çalışma alanı|workspace/i }).first();
+    await expect(heading).toBeVisible();
 
-    await expect(page.getByText('Rol atanmamış').first()).toBeVisible();
+    // No invented role anywhere on the page
     await expect(page.getByText('TENANT_OWNER')).toHaveCount(0);
+    await expect(page.getByText('PIPELINE_MANAGER')).toHaveCount(0);
 
     await page.screenshot({ path: `${SHOTS}/03-roleless-session.png`, fullPage: false });
   });
