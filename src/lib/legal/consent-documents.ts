@@ -68,7 +68,7 @@ export const PRIVACY_NOTICE: ConsentDocument = {
  */
 export const TERMS_OF_SERVICE: ConsentDocument = {
   id: 'terms-of-service',
-  version: '2026-09-10.1',
+  version: '2026-10-02.2',
   messageKey: 'legal.terms.heading',
   href: (locale) => `/${locale}/terms`,
   kind: 'TERMS_ACCEPTANCE',
