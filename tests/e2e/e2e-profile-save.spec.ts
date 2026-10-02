@@ -6,6 +6,7 @@
  * After: Form gerçek sunucu isteği gönderiyor, başarı mesajı ancak sunucu başarılı dönünce gösterilir.
  */
 import { test, expect } from '@playwright/test';
+import { expectHydrated } from './fixtures/hydration';
 import path from 'path';
 import crypto from 'crypto';
 
@@ -36,10 +37,11 @@ test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
     const profileUrl = `${baseUrl}/tr/default/settings/profile`;
 
     // Go to profile page
-    await page.goto(profileUrl, { waitUntil: 'networkidle' });
+    await page.goto(profileUrl);
 
     // Wait for page to load
     await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
+    await expectHydrated(page.locator('button:has-text("Profili Kaydet")'));
 
     // Get the current values
     const capabilitiesInput = page.locator('textarea[placeholder*="teknik"]');
@@ -75,10 +77,11 @@ test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
     await expect(successMessage).toBeVisible();
 
     // Reload the page
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload();
 
     // Wait for form to load
     await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
+    await expectHydrated(page.locator('button:has-text("Profili Kaydet")'));
 
     // Verify data persists after reload
     const savedCapabilities = await capabilitiesInput.inputValue();
@@ -98,10 +101,11 @@ test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
     const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
     const profileUrl = `${baseUrl}/tr/default/settings/profile`;
 
-    await page.goto(profileUrl, { waitUntil: 'networkidle' });
+    await page.goto(profileUrl);
 
     // Wait for form
     await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
+    await expectHydrated(page.locator('button:has-text("Profili Kaydet")'));
 
     const capabilitiesInput = page.locator('textarea[placeholder*="teknik"]');
 
