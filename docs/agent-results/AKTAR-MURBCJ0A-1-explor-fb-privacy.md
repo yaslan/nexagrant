@@ -4,7 +4,7 @@
 **Tip:** feature (hukuki metin / i18n + belge)
 **Platform:** mac (macOS, Node v26.5.0, Chromium/Playwright, vitest 4.1.11). Değişen kod yalnız mesaj kataloğu (JSON) ve markdown; süreç, dosya yolu, kabuk ya da kısayol kodu yok, bu yüzden Windows/Linux davranışı farklı olamaz. Windows ve Linux'ta koşulmadı: bu kartta o ortamlar yok.
 **Dal / ağaç:** `explor-fb/privacy-recipients` · `/Users/macbook/alan/FONBRIDGE-wt-explorfb-privacy` · push YOK
-**Commit'ler:** `a29711b0` (önceki tur) · bu tur commit'i rapor dahil, SHA'sı §3'te
+**Commit'ler:** `a29711b0` (önceki tur) · `5f9a30c4` (bu tur, rapor dahil)
 
 ## 1) Ne yapıldı
 
@@ -125,7 +125,7 @@ $ pnpm exec vitest run tests/analytics-posthog.test.ts tests/localized-routes.te
 - `docs/legal/privacy-notice-gap-analysis.md` (§2.3 yeni)
 - `docs/agent-results/AKTAR-MURBCJ0A-1-explor-fb-privacy.md` ve `…-ekler/` (4 PNG)
 
-Commit: `git add <bu dosyalar>` ile seçerek; SHA için `git log --oneline -1` (bu raporun yazıldığı an commit atılmamıştı, commit sonrası `git show --name-only` ile doğrulanır).
+Commit: `5f9a30c4` (seçici `git add`; `git show --name-only` yalnız bu dosyaları listeledi).
 
 ## 4) Riskler
 
