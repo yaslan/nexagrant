@@ -126,11 +126,11 @@ test('the registration form asks, unticked, and will not submit until it is tick
 test('ticking it and registering writes the disclosure record', async ({ page }) => {
   await acceptCookies(page);
   await page.goto('/tr/register');
-  await expectHydrated(form(page).getByTestId('disclosure-ack'));
+  await expectHydrated(disclosureForm(page).getByTestId('disclosure-ack'));
 
-  await form(page).locator('input[type="email"]').fill(FORM_EMAIL);
-  await form(page).getByTestId('disclosure-ack').check();
-  await form(page).locator('button[type="submit"]').click();
+  await credentialsForm(page).locator('input[type="email"]').fill(FORM_EMAIL);
+  await disclosureForm(page).getByTestId('disclosure-ack').check();
+  await credentialsForm(page).locator('button[type="submit"]').click();
 
   // The app lands the new account on its workspace.
   await page.waitForURL(/\/tr\/.*(dashboard|panel|no-workspace)/, { timeout: 30_000 });
