@@ -4,6 +4,15 @@ import { loadEnvConfig } from '@next/env';
 loadEnvConfig(process.cwd(), true);
 
 /**
+ * Database the dev server and the specs use (TASK-MUPVLWSIPC5WU). E2E_DATABASE_URL,
+ * when set, replaces DATABASE_URL for this run, so the suite can use its own
+ * database instead of the shared dev one. process.env beats .env in Next, so the
+ * server started below connects to it too. Prepare that database with the CI
+ * steps (ci.yml "Prepare database"); tests/e2e/global-setup.ts checks it.
+ */
+if (process.env.E2E_DATABASE_URL) process.env.DATABASE_URL = process.env.E2E_DATABASE_URL;
+
+/**
  * Playwright configuration.
  *
  * There was none, so `pnpm test:e2e` globbed the repository root: it picked up the
