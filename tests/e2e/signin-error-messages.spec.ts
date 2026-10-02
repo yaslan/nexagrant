@@ -54,14 +54,6 @@ test.describe('sign-in error messages', () => {
     await expect(closeButton).toBeVisible();
     await closeButton.click();
 
-    // Debug: Check alert state after click
-    const alertAfterClick = alert(page);
-    const alertCount = await alertAfterClick.count();
-    if (alertCount > 0) {
-      const alertHTML = await alertAfterClick.first().innerHTML();
-      console.log('[signin-error-messages] Alert after close click:', alertHTML);
-    }
-
     await expect(alert(page)).toHaveCount(0);
   });
 
