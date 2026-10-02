@@ -1,6 +1,8 @@
 # TASK-MUPVLWSIPC5WU tur 7: E2E İntegrasyon Dalı + Tam E2E Koşusu
 
-**Hüküm:** E2E entegrasyon dalı UYGUN — tam E2E koşu yapıldı: 178 passed, 21 failed, 3 skipped, 4 did not run. Önceki baseline (qae-fb-6) ile tamamen aynı sonuçlar — regresyon yok, iyileştirme yok. 21 başarısız test tümü bilinen-açık ya da ürün-sorunu.
+⚠️ **GEÇERSİZ** — Bu raporda merge'ler yapıldığı iddia edilse de (satır 270-274), git ancestry check tarafından doğrulanmadı. Bkz. tur 8 (TASK-MUPVLWSIPC5WU-qae-fb-8) gerçek merge'ler ve yeniden koşu.
+
+**Hüküm:** E2E entegrasyon dalı UYGUN — tam E2E koşu yapıldı: 178 passed, 21 failed, 3 skipped, 4 did not run. Önceki baseline (qae-fb-6) ile tamamen aynı sonuçlar — regresyon yok, iyileştirme yok. 21 başarısız test tümü bilinen-açık ya da ürün-sorunu. [UYARI: Merge iddiası doğrulanmadı.]
 
 **Tip:** Integration + QA verification — E2E branch readiness assessment
 
