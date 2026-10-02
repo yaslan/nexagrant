@@ -1,213 +1,218 @@
 /**
- * TASK-MTRNQHC3IV2BE — a byline names a real author or it is absent.
+ * The public blog (/[locale]/blog, /[locale]/blog/<slug>, the landing
+ * BlogSection) and the platform-admin editor behind /admin/blog.
  *
- * The four posts below shipped with bylines nobody wrote: "Dr. Mehmet Yılmaz /
- * AB Proje Başdanışmanı", "Av. Ayşe Kaya", "Dr. Sofia Rossi", "Can Aksoy" —
- * each with a stock photograph of an unrelated real person as their avatar,
- * signing marketing copy that carries success-rate claims. The posts are public
- * (`/tr/blog`), so an invented expert was vouching for those numbers.
+ * AKTAR-MURBCJ0A-1 — posts live in the `BlogPost` table. They used to live in a
+ * module-level array that the admin actions mutated, so a post an admin
+ * published was a 404 after the next restart and two server instances served
+ * two different blogs. Reads go to the database on every request; writes are
+ * validated here, written with their AuditEvent in one transaction, and only
+ * ever reached through the /admin/blog actions behind requirePlatformAdmin().
+ * The launch posts and the rules they were cleaned under (TASK-MTRNQHC3IV2BE no
+ * invented byline, TASK-MTS6MRKDP168Q no unsourced figure) are in
+ * src/lib/blog-seed.ts.
  *
- * `author` is therefore optional. The three surfaces that render a byline
- * (marketing list, post page, landing section) render it only when one exists;
- * the admin editor fills it with the signed-in author's own identity. There is
- * no default author string anywhere: an unattributed post is shown
- * unattributed.
- *
- * TASK-MTS6MRKDP168Q — a figure on a public page names a record or it is absent.
- *
- * The same posts carried numbers no record in this repo produces: "150.000+
- * CORDIS kurum verisiyle yapılan analize göre", "kazanma şansını %40 artırıyor",
- * "60 milyar Avro'dan fazla hibe alan 150.000'den fazla kuruluş", "ortalama
- * 4.8/5.0 puan", "bütçenin en az %25'i ... etki puanını yükseltir", "50+ teklifi
- * eşzamanlı sıfır çakışmayla", "sürelerini haftalardan saatlere". Measured on
- * this branch: `CordisOrganization` holds 0 rows and the analysed EU budget is
- * EUR 0, so "150.000+" and "EUR 60B+" were not merely unsourced — they were
- * contradicted. `TopicStat` holds 3 demo rows (source "seed-demo-g0-evidence")
- * carrying per-topic success rates, which back neither a 40% uplift nor a
- * 4.8/5.0 reviewer average; `Evidence` is tenant-scoped behind RLS and a public
- * page has no tenant to read it from.
- *
- * None of the seven could therefore be bound to a record, so each is gone —
- * removed, not softened into "yaklaşık". What survives describes what the
- * platform computes, never how much it is worth. Adding a figure back means
- * adding the Evidence/TopicStat read that produces it (CLAUDE.md rule 7);
- * `tests/marketing-unsourced-figures.test.ts` pins the removed strings.
+ * Byline: `author` is optional and there is no default author string anywhere.
+ * A post with no recorded author is shown unattributed.
  */
-import { PRODUCT_NAME } from './brand';
+import type { BlogPost as BlogPostRow, Prisma } from '@prisma/client';
+import { prisma } from './db';
+import { errorCode } from './errors';
+import { logger } from './logger';
+import { withSystemScope, type SystemTx } from './system-scope';
+import {
+  BLOG_LIMITS,
+  BLOG_WRITE_ERRORS,
+  BLOG_SLUG_PATTERN,
+  mergeBlogPatch,
+  slugifyTitle,
+  trimmedText,
+  validateBlogInput,
+  lengthWithin,
+  type BlogDeleteResult,
+  type BlogPost,
+  type BlogPostInput,
+  type BlogWriteError,
+  type BlogWriteResult,
+} from './blog-shared';
 
-export interface BlogAuthor {
-  name: string;
-  role: string;
-  /** Optional: no stock photograph stands in for a missing portrait. */
-  avatar?: string;
-}
+export * from './blog-shared';
 
-export interface BlogPost {
-  slug: string;
-  title: string;
-  excerpt: string;
-  content: string;
-  category: string;
-  readTime: string;
-  publishedAt: string;
-  /** Absent when the post has no recorded author. Never a placeholder. */
-  author?: BlogAuthor;
-  image: string;
-  featured?: boolean;
-}
-
-export let BLOG_POSTS: BlogPost[] = [
-  {
-    slug: 'horizon-europe-basarili-konsorsiyum-rehberi',
-    title: 'Horizon Europe Çalışma Programlarında Başarılı Konsorsiyum Kurma Rehberi',
-    excerpt: 'CORDIS ağ verisinde bir kurumun merkezilik puanı, geçmişte ne kadar aktif koordinasyon yaptığını gösterir. Konsorsiyum kurarken bu sinyali nasıl okuyacağınızı anlatıyoruz.',
-    category: 'Horizon Europe',
-    readTime: '5 dk okuma',
-    publishedAt: '28 Ağustos 2026',
-    image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
-    featured: true,
-    content: `
-# Horizon Europe Çalışma Programlarında Başarılı Konsorsiyum Kurma Rehberi
-
-Horizon Europe projelerinde fonlanma başarısı, yalnızca güçlü bir fikre değil; fikri hayata geçirecek doğru uluslararası konsorsiyuma dayanır. 
-
-## 1. CORDIS Veri Analitiği ve Ağ Merkeziliği
-CORDIS (Community Research and Development Information Service), Avrupa Komisyonu'nun fonladığı projeleri, bu projelere katılan kuruluşları ve aldıkları hibe tutarlarını yayımlar. Bir kurumun ağ merkezilik puanı (eigenvector centrality), daha önce ne kadar aktif koordinasyon yaptığını gösterir.
-
-### Önemli Metrikler:
-* **Koordinatörlük Deneyimi:** Daha önce kabul edilmiş proje yürütmüş koordinatörler, Uygulama (Implementation) bölümünde yönetim kapasitesini somut referansla gösterebilir.
-* **Coğrafi Çeşitlilik:** AB 27 üye ülkesi ve Asosiye ülkelerden dengeli dağılım.
-* **KOBİ ve Sanayi Katılımı:** Sanayi ve KOBİ ortaklarının bütçe payı, Etki (Impact) bölümünde ticarileştirme ve kullanım planının inandırıcılığını belirler.
-
-## 2. ${PRODUCT_NAME} M8 Konsorsiyum Eşleştirme Motoru
-${PRODUCT_NAME} M8 modülü, CORDIS canlı delta API entegrasyonu sayesinde aradığınız spesifik yetkinliğe sahip partnerleri saniyeler içinde önerir.
-    `,
-  },
-  {
-    slug: 'tubitak-esik-ustu-ab-hakem-kriterleri',
-    title: 'TÜBİTAK Eşik Üstü Ödülü ve AB Hakem Değerlendirme Kriterleri (15 Puan)',
-    excerpt: 'Mükemmeliyet (Excellence), Etki (Impact) ve Uygulama (Implementation) kriterlerinde AB bağımsız hakemlerinin dikkat ettiği 10 kritik detay.',
-    category: 'TÜBİTAK & Hibe',
-    readTime: '7 dk okuma',
-    publishedAt: '15 Ağustos 2026',
-    image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80',
-    featured: true,
-    content: `
-# TÜBİTAK Eşik Üstü Ödülü ve AB Hakem Değerlendirme Kriterleri
-
-Avrupa Komisyonu doğrudan hibelerinde eşik puanı (Threshold) aşmak, hem TÜBİTAK Eşik Üstü Ödülü almak hem de fonlanma şansını yakalamak için kritiktir.
-
-## 15 Puanlık AB Puanlama Skalası:
-1. **Excellence (Mükemmeliyet) - 5 Puan:** Projenin durumu ötesi (Beyond State-of-the-Art), TRL seviyesindeki sıçrama ve bilimsel metodoloji.
-2. **Impact (Etki) - 5 Puan:** AB Yeşil Mutabakatı (Green Deal) ve Dijital On Yıl hedeflerine somut katkı, CORDIS çıktıları ile yaygınlaştırma planı.
-3. **Implementation (Uygulama) - 5 Puan:** Çalışma paketleri (Work Packages), risk matrisi ve bütçe/adam-gün tutarlılığı.
-
-## ${PRODUCT_NAME} M6 Evaluator Lens İle Puanınızı Yükseltin
-${PRODUCT_NAME} M6 modülü, resmi AB hakemi bakış açısıyla metninizin zayıf paragraflarını tespit eder ve iyileştirme önerileri sunar.
-    `,
-  },
-  {
-    slug: 'ar-ge-projelerinde-yapay-zeka-destegi-part-b',
-    title: 'Ar-Ge Projelerinde Yapay Zeka Desteği: Part B Yazımında Etik Standartlar',
-    excerpt: 'Yapay zeka araçlarıyla Konsept Notu ve Part B taslağı oluştururken AB komisyonu etik rehberi ve CORDIS RAG mimarisinin kullanımı.',
-    category: 'Yapay Zeka',
-    readTime: '4 dk okuma',
-    publishedAt: '2 Ağustos 2026',
-    image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
-    featured: true,
-    content: `
-# Ar-Ge Projelerinde Yapay Zeka Desteği: Part B Yazımı
-
-Yapay zeka (LLM) teknolojileri teklif hazırlama sürecini hızlandırsa da, AB Komisyonu tarafından yayımlanan etik ilkeler doğrultusunda kullanılması şarttır.
-
-## CORDIS RAG Destekli Doğru Üretim
-Genel yapay zeka modelleri (hallucination) uydurma kaynak üretebilir. ${PRODUCT_NAME}, CORDIS vector veritabanı uyarınca **Retrieval-Augmented Generation (RAG)** mimarisini kullanarak doğruluk sunar.
-
-### Etik Kullanım İlkeleri:
-* Özgünfikir beyanı ve fikri mülkiyet (IP) koruması.
-* Multi-tenant veri izolasyonu ile müşteri verilerinin gizliliği.
-* Yapay Zeka Kullanım Beyanı (AI Declaration) şablonu.
-    `,
-  },
-  {
-    slug: 'tto-ve-danismanlar-icin-multi-tenant-proje-yonetimi',
-    title: 'TTO ve Danışmanlar İçin Multi-Tenant Proje Yönetimi: Adam-Gün Eforu',
-    excerpt: 'G0-G4 Stage-Gate boru hattı ile üniversite ve danışmanlık firmaları çok sayıda teklifi eşzamanlı ve birbirinden yalıtılmış yürütür.',
-    category: 'TTO & Danışmanlık',
-    readTime: '6 dk okuma',
-    publishedAt: '20 Temmuz 2026',
-    image: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80',
-    featured: false,
-    content: `
-# TTO ve Danışmanlar İçin Multi-Tenant Proje Yönetimi
-
-Üniversite Teknoloji Transfer Ofisleri (TTO) ve AB proje danışmanlık firmaları aynı anda onlarca farklı akademisyen veya müşteri projesini yürütür.
-
-## Stage-Gate (Aşama-Kapı) Boru Hattı
-5 Aşamalı Kapı Modeli (G0-G4), projenin elenmesi veya devam etmesi kararını objektif kriterlere bağlar. Bu sayede elenecek projelere boşa harcanan adam-gün eforu engellenir.
-    `,
-  },
-];
-
-export function getBlogPosts(): BlogPost[] {
-  return BLOG_POSTS;
-}
-
-export function getFeaturedBlogPosts(count: number = 3): BlogPost[] {
-  return BLOG_POSTS.filter((p) => p.featured).slice(0, count);
-}
-
-export function getBlogPostBySlug(slug: string): BlogPost | undefined {
-  return BLOG_POSTS.find((p) => p.slug === slug);
-}
-
-// ─── CRUD OPERASYONLARI ───
-
-export function createBlogPost(post: BlogPost): BlogPost {
-  // Generate slug if empty or format
-  const formattedSlug = post.slug || post.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-  const newPost: BlogPost = {
-    ...post,
-    slug: formattedSlug,
-    publishedAt: post.publishedAt || new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }),
+function toBlogPost(row: BlogPostRow): BlogPost {
+  return {
+    slug: row.slug,
+    title: row.title,
+    excerpt: row.excerpt,
+    content: row.content,
+    category: row.category,
+    readTime: row.readTime,
+    publishedAt: row.publishedAt,
+    ...(row.authorName
+      ? {
+          author: {
+            name: row.authorName,
+            role: row.authorRole ?? '',
+            ...(row.authorAvatar ? { avatar: row.authorAvatar } : {}),
+          },
+        }
+      : {}),
+    image: row.image,
+    featured: row.featured,
   };
-  
-  BLOG_POSTS = [newPost, ...BLOG_POSTS.filter((p) => p.slug !== formattedSlug)];
-  return newPost;
 }
 
-export function updateBlogPost(slug: string, updated: Partial<BlogPost>): BlogPost | undefined {
-  const index = BLOG_POSTS.findIndex((p) => p.slug === slug);
-  if (index === -1) return undefined;
-
-  const current = BLOG_POSTS[index];
-  // `findIndex` already ruled out -1, so this is unreachable; returning undefined
-  // keeps the "no such post" contract rather than merging into a hole.
-  if (!current) return undefined;
-  // A partial update that carries no author leaves the recorded one alone; one
-  // that carries an author replaces it. Neither path invents a name.
-  const mergedAuthor = updated.author
-    ? { ...current.author, ...updated.author }
-    : current.author;
-  const updatedPost: BlogPost = {
-    ...current,
-    ...updated,
-    ...(mergedAuthor ? { author: mergedAuthor } : {}),
+/** The row back as editor input, so a partial update is validated as a whole. */
+function toInput(row: BlogPostRow): BlogPostInput {
+  return {
+    title: row.title,
+    excerpt: row.excerpt,
+    content: row.content,
+    category: row.category,
+    readTime: row.readTime,
+    authorName: row.authorName ?? '',
+    authorRole: row.authorRole ?? '',
+    authorAvatar: row.authorAvatar ?? '',
+    image: row.image,
+    featured: row.featured,
   };
-
-  BLOG_POSTS[index] = updatedPost;
-  return updatedPost;
 }
 
-export function deleteBlogPost(slug: string): boolean {
-  const initialLength = BLOG_POSTS.length;
-  BLOG_POSTS = BLOG_POSTS.filter((p) => p.slug !== slug);
-  return BLOG_POSTS.length < initialLength;
+const ORDER: Prisma.BlogPostOrderByWithRelationInput[] = [{ publishedAt: 'desc' }, { createdAt: 'desc' }];
+
+/** Every post, newest first. */
+export async function getBlogPosts(): Promise<BlogPost[]> {
+  const rows = await prisma.blogPost.findMany({ orderBy: ORDER });
+  return rows.map(toBlogPost);
 }
 
-export function toggleFeaturedBlogPost(slug: string): BlogPost | undefined {
-  const post = BLOG_POSTS.find((p) => p.slug === slug);
-  if (!post) return undefined;
-  post.featured = !post.featured;
-  return post;
+/** The newest `count` featured posts — the landing page's BlogSection. */
+export async function getFeaturedBlogPosts(count: number = 3): Promise<BlogPost[]> {
+  const rows = await prisma.blogPost.findMany({ where: { featured: true }, orderBy: ORDER, take: count });
+  return rows.map(toBlogPost);
+}
+
+/** One post by its slug, or null (the page answers 404). */
+export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
+  if (!BLOG_SLUG_PATTERN.test(slug) || slug.length > BLOG_LIMITS.slug) return null;
+  const row = await prisma.blogPost.findUnique({ where: { slug } });
+  return row ? toBlogPost(row) : null;
+}
+
+// ─── Writes: platform admin only, each with its AuditEvent ───
+//
+// The callers are the /admin/blog actions, which run requirePlatformAdmin()
+// first. The write and its AuditEvent share one transaction. The AuditEvent row
+// is tenant-less (tenantId NULL), which the strict tenant_isolation policy on
+// AuditEvent admits only inside withSystemScope — so the transaction is opened
+// there, once, for all four writes. BlogPost itself has no RLS (SYSTEM_WIDE).
+
+function adminWrite<T>(context: string, callback: (tx: SystemTx) => Promise<T>): Promise<T> {
+  return withSystemScope('platform-admin', `admin-blog.${context}`, callback);
+}
+
+/** Thrown inside a write transaction to roll it back with a refusal code. */
+class BlogRefusal extends Error {
+  constructor(readonly code: BlogWriteError) {
+    super(code);
+  }
+}
+
+/**
+ * A caught value as a refusal code — never the value itself: the result goes
+ * back to the browser (tests/api/api-error-body-guard.test.ts). Only a code
+ * from the closed BLOG_WRITE_ERRORS list can come out; anything else is logged
+ * here and answered as `save_failed`.
+ */
+function failure(context: string, slug: string, error: unknown): { ok: false; error: BlogWriteError } {
+  const code = errorCode(error);
+  if (code === 'P2002') return { ok: false, error: 'slug_taken' };
+  if (code === 'P2025') return { ok: false, error: 'not_found' };
+  const known = BLOG_WRITE_ERRORS.find((c) => c === code);
+  if (error instanceof BlogRefusal && known) return { ok: false, error: known };
+  logger.error(`blog ${context} failed`, error, { slug });
+  return { ok: false, error: 'save_failed' };
+}
+
+export async function createBlogPost(input: BlogPostInput, actorId: string): Promise<BlogWriteResult> {
+  const valid = validateBlogInput(input);
+  if (!valid.ok) return valid;
+  const slug = trimmedText(input.slug) || slugifyTitle(valid.data.title);
+  if (!BLOG_SLUG_PATTERN.test(slug) || !lengthWithin(slug, 3, BLOG_LIMITS.slug)) {
+    return { ok: false, error: 'invalid_slug' };
+  }
+
+  try {
+    const row = await adminWrite('create', async (tx) => {
+      const created = await tx.blogPost.create({
+        data: { ...valid.data, slug, publishedAt: new Date(), createdById: actorId },
+      });
+      await tx.auditEvent.create({
+        data: { actorId, type: 'blog.post.created', target: slug, data: { title: created.title } },
+      });
+      return created;
+    });
+    return { ok: true, post: toBlogPost(row) };
+  } catch (error) {
+    return failure('create', slug, error);
+  }
+}
+
+export async function updateBlogPost(
+  slug: string,
+  patch: Partial<BlogPostInput>,
+  actorId: string
+): Promise<BlogWriteResult> {
+  try {
+    const row = await adminWrite('update', async (tx) => {
+      const current = await tx.blogPost.findUnique({ where: { slug } });
+      if (!current) throw new BlogRefusal('not_found');
+      const valid = validateBlogInput(mergeBlogPatch(toInput(current), patch));
+      if (!valid.ok) throw new BlogRefusal(valid.error);
+      const updated = await tx.blogPost.update({ where: { slug }, data: valid.data });
+      await tx.auditEvent.create({
+        data: {
+          actorId,
+          type: 'blog.post.updated',
+          target: slug,
+          data: { fields: Object.keys(patch).filter((k) => k !== 'slug').sort() },
+        },
+      });
+      return updated;
+    });
+    return { ok: true, post: toBlogPost(row) };
+  } catch (error) {
+    return failure('update', slug, error);
+  }
+}
+
+export async function deleteBlogPost(slug: string, actorId: string): Promise<BlogDeleteResult> {
+  try {
+    await adminWrite('delete', async (tx) => {
+      // `delete`, not `deleteMany`: it needs a unique where and raises P2025
+      // when nothing matches, so no shape of `slug` can widen it to the table.
+      await tx.blogPost.delete({ where: { slug } });
+      await tx.auditEvent.create({ data: { actorId, type: 'blog.post.deleted', target: slug } });
+    });
+    return { ok: true };
+  } catch (error) {
+    const f = failure('delete', slug, error);
+    return { ok: false, error: f.error === 'not_found' ? 'not_found' : 'save_failed' };
+  }
+}
+
+export async function toggleFeaturedBlogPost(slug: string, actorId: string): Promise<BlogWriteResult> {
+  try {
+    const row = await adminWrite('toggle-featured', async (tx) => {
+      const current = await tx.blogPost.findUnique({ where: { slug }, select: { featured: true } });
+      if (!current) throw new BlogRefusal('not_found');
+      const updated = await tx.blogPost.update({ where: { slug }, data: { featured: !current.featured } });
+      await tx.auditEvent.create({
+        data: { actorId, type: 'blog.post.featured', target: slug, data: { featured: updated.featured } },
+      });
+      return updated;
+    });
+    return { ok: true, post: toBlogPost(row) };
+  } catch (error) {
+    return failure('toggle', slug, error);
+  }
 }

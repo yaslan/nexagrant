@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
-import { getBlogPostBySlug, getBlogPosts } from '@/lib/blog';
+import { formatBlogDate, getBlogPostBySlug, getBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
 
 /**
@@ -23,7 +23,7 @@ function renderInline(text: string): React.ReactNode {
 }
 
 /**
- * Post content is stored as plain markdown text (src/lib/blog.ts) with no
+ * Post content is stored as plain markdown text (BlogPost.content) with no
  * blank line guaranteed between a heading and the paragraph or list that
  * follows it, so blocks are built line-by-line rather than by splitting on
  * '\n\n' — a block split let a `### heading` swallow the rest of its
@@ -137,14 +137,14 @@ export default async function BlogDetailPage({
   params: Promise<{ locale: string; slug: string }>;
 }) {
   const { locale, slug } = await params;
-  const post = getBlogPostBySlug(slug);
+  const post = await getBlogPostBySlug(slug);
 
   if (!post) {
     notFound();
   }
 
   const isTr = locale === 'tr';
-  const relatedPosts = getBlogPosts().filter((p) => p.slug !== slug).slice(0, 2);
+  const relatedPosts = (await getBlogPosts()).filter((p) => p.slug !== slug).slice(0, 2);
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-ink selection:bg-accent selection:text-white">
@@ -169,7 +169,9 @@ export default async function BlogDetailPage({
               <span className="bg-accent/15 text-accent-ink border border-accent/20 text-xs font-bold px-3 py-1 rounded-full">
                 {post.category}
               </span>
-              <span className="text-xs text-muted font-medium">{post.publishedAt}</span>
+              <time dateTime={post.publishedAt.toISOString()} className="text-xs text-muted font-medium">
+                {formatBlogDate(post.publishedAt, locale)}
+              </time>
               <span className="text-xs text-muted font-medium">• {post.readTime}</span>
             </div>
 

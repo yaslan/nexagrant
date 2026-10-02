@@ -1,15 +1,28 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { getFeaturedBlogPosts } from '@/lib/blog';
+import { formatBlogDate, getFeaturedBlogPosts, type BlogPost } from '@/lib/blog';
+import { errorMessage } from '@/lib/errors';
 import { getPublicRoute } from '@/lib/routes';
 
 interface BlogSectionProps {
   locale: string;
 }
 
-export default function BlogSection({ locale }: BlogSectionProps) {
-  const posts = getFeaturedBlogPosts(3);
+/**
+ * The landing page's three featured posts, read from the BlogPost table
+ * (AKTAR-MURBCJ0A-1). A failed read hides the section instead of taking the
+ * whole landing page down with it; no post is invented to fill the gap.
+ */
+export default async function BlogSection({ locale }: BlogSectionProps) {
+  let posts: BlogPost[];
+  try {
+    posts = await getFeaturedBlogPosts(3);
+  } catch (e) {
+    console.error(`[BlogSection] featured posts read failed: ${errorMessage(e)}`);
+    return null;
+  }
+  if (posts.length === 0) return null;
   const isTr = locale === 'tr';
 
   return (
@@ -68,7 +81,7 @@ export default function BlogSection({ locale }: BlogSectionProps) {
               <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                 <div className="space-y-2.5">
                   <div className="flex items-center gap-2 text-[11px] text-muted font-medium">
-                    <span>{post.publishedAt}</span>
+                    <time dateTime={post.publishedAt.toISOString()}>{formatBlogDate(post.publishedAt, locale)}</time>
                     <span>•</span>
                     <span>{post.readTime}</span>
                   </div>

@@ -605,6 +605,38 @@ model SystemAlert {
   @@index([resolvedAt, createdAt])
 }
 
+/// AKTAR-MURBCJ0A-1 — a post on the public blog (/tr/blog, landing BlogSection).
+/// Platform content, not tenant data: no tenantId, listed in scripts/rls-models.ts
+/// SYSTEM_WIDE. Read by the public pages through src/lib/blog.ts, written only by
+/// the /admin/blog actions behind requirePlatformAdmin(). Before this table the
+/// posts lived in a module-level array, so an admin's post vanished on restart and
+/// every server instance showed different content.
+///
+/// The byline is optional on purpose (TASK-MTRNQHC3IV2BE): `authorName` NULL means
+/// "no recorded author" and the public pages render no byline — never a default.
+/// `createdById` is the admin who created the row; no FK, so erasing that user
+/// never blocks on or deletes published content. prisma/migrations/add-blog-post.sql.
+model BlogPost {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  title        String
+  excerpt      String
+  /// Markdown subset rendered as React text nodes (no HTML) — see blog/[slug]/page.tsx.
+  content      String
+  category     String
+  readTime     String
+  publishedAt  DateTime
+  authorName   String?
+  authorRole   String?
+  authorAvatar String?
+  image        String
+  featured     Boolean  @default(false)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([publishedAt])
+}
+
 /// FB KAMU (TASK-MULR765AR5G0C) — a contact request an anonymous visitor leaves on
 /// the funding-readiness result screen (/tr/fon-hazirlik). Platform data: it belongs
 /// to no tenant, so it has no tenantId and sits in scripts/rls-models.ts SYSTEM_WIDE.

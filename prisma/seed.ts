@@ -10,6 +10,7 @@ import {
   plansGrantingModule,
 } from '../src/lib/billing/catalog';
 import { upsertPublicSectorPlans } from '../src/lib/billing/public-sector-plans';
+import { seedBlogPosts } from '../src/lib/blog-seed';
 import { rescoreOpportunityG0 } from '../src/lib/scoring/g0-compute';
 import { DEFAULT_CRITERIA } from '../src/modules/m6/types';
 import seedTenantWorkspace from './seed-tenant-workspace';
@@ -390,6 +391,11 @@ async function main() {
   await seedTenantWorkspace();
   await seedDemoModuleStates();
   await seedCalls();
+
+  // Public blog launch posts (AKTAR-MURBCJ0A-1). Insert-only: an existing slug,
+  // including one an admin edited, is left as it is.
+  const blog = await seedBlogPosts(prisma);
+  console.log(`Blog posts seeded (${blog.inserted} inserted, ${blog.kept} already present).`);
   await seedOpportunities();
   await seedG0DemoEvidence();
   await seedGateDecisions();

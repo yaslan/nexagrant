@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { BlogPost } from '@/lib/blog';
+import { useTranslations } from 'next-intl';
+// blog-shared, not blog: this is a client component and @/lib/blog reaches Prisma.
+import { formatBlogDate, type BlogPost } from '@/lib/blog-shared';
 import { 
   createBlogPostAction, 
   updateBlogPostAction, 
@@ -33,14 +35,23 @@ interface AdminBlogClientProps {
    * the field starts empty and the post is published unattributed.
    */
   sessionUserName?: string;
+  /** The server could not read the posts; shown instead of an empty table. */
+  loadError?: boolean;
 }
+
+/** One line of feedback above the table. `error` is only ever a translated message. */
+type Notice = { kind: 'ok' | 'error'; text: string } | null;
 
 export default function AdminBlogClient({
   initialPosts,
   locale,
   sessionUserName = '',
+  loadError = false,
 }: AdminBlogClientProps) {
+  const t = useTranslations('adminBlog');
   const [posts, setPosts] = useState<BlogPost[]>(initialPosts);
+  const [notice, setNotice] = useState<Notice>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -76,6 +87,7 @@ export default function AdminBlogClient({
 
   const handleOpenCreateModal = () => {
     setEditingSlug(null);
+    setFormError(null);
     setFormData({
       title: '',
       slug: '',
@@ -94,6 +106,7 @@ export default function AdminBlogClient({
 
   const handleOpenEditModal = (post: BlogPost) => {
     setEditingSlug(post.slug);
+    setFormError(null);
     setFormData({
       title: post.title,
       slug: post.slug,
@@ -114,24 +127,28 @@ export default function AdminBlogClient({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setFormError(null);
 
+    // Success is shown only for `ok: true`, i.e. once the row is in the
+    // database. A refusal keeps the modal open with the reason; nothing in the
+    // list changes (AKTAR-MURBCJ0A-1 — this used to close on any answer).
     try {
-      if (editingSlug) {
-        // Update existing
-        const res = await updateBlogPostAction(editingSlug, formData);
-        if (res.success && res.post) {
-          setPosts((prev) => prev.map((p) => (p.slug === editingSlug ? res.post! : p)));
-        }
-      } else {
-        // Create new
-        const res = await createBlogPostAction(formData);
-        if (res.success && res.post) {
-          setPosts((prev) => [res.post!, ...prev]);
-        }
+      const res = editingSlug
+        ? await updateBlogPostAction(editingSlug, formData)
+        : await createBlogPostAction(formData);
+      if (!res.ok) {
+        setFormError(t(`errors.${res.error}`));
+        return;
       }
+      const saved = res.post;
+      setPosts((prev) =>
+        editingSlug ? prev.map((p) => (p.slug === editingSlug ? saved : p)) : [saved, ...prev]
+      );
       setIsModalOpen(false);
+      setNotice({ kind: 'ok', text: t('saved') });
     } catch (err) {
       console.error(err);
+      setFormError(t('errors.save_failed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -139,16 +156,33 @@ export default function AdminBlogClient({
 
   const handleDelete = async (slug: string) => {
     if (!confirm('Bu blog yazısını silmek istediğinize emin misiniz?')) return;
-    const res = await deleteBlogPostAction(slug);
-    if (res.success) {
+    try {
+      const res = await deleteBlogPostAction(slug);
+      if (!res.ok) {
+        setNotice({ kind: 'error', text: t(`errors.${res.error}`) });
+        return;
+      }
       setPosts((prev) => prev.filter((p) => p.slug !== slug));
+      setNotice({ kind: 'ok', text: t('deleted') });
+    } catch (err) {
+      console.error(err);
+      setNotice({ kind: 'error', text: t('errors.save_failed') });
     }
   };
 
   const handleToggleFeatured = async (slug: string) => {
-    const res = await toggleFeaturedBlogPostAction(slug);
-    if (res.success && res.post) {
-      setPosts((prev) => prev.map((p) => (p.slug === slug ? res.post! : p)));
+    try {
+      const res = await toggleFeaturedBlogPostAction(slug);
+      if (!res.ok) {
+        setNotice({ kind: 'error', text: t(`errors.${res.error}`) });
+        return;
+      }
+      const saved = res.post;
+      setPosts((prev) => prev.map((p) => (p.slug === slug ? saved : p)));
+      setNotice({ kind: 'ok', text: t('featureToggled') });
+    } catch (err) {
+      console.error(err);
+      setNotice({ kind: 'error', text: t('errors.save_failed') });
     }
   };
 
@@ -169,12 +203,31 @@ export default function AdminBlogClient({
 
         <button
           onClick={handleOpenCreateModal}
+          data-testid="blog-new"
           className="bg-accent hover:opacity-90 text-white font-bold text-xs px-5 py-3 rounded-xl shadow-2xs hover:shadow-md transition flex items-center justify-center space-x-2 shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Yeni Blog Yazısı Ekle</span>
         </button>
       </div>
+
+      {loadError && (
+        <div role="alert" data-testid="blog-load-error" className="rounded-xl border border-bad/30 bg-bad/10 px-4 py-3 text-xs font-semibold text-bad">
+          {t('loadFailed')}
+        </div>
+      )}
+
+      {notice && (
+        <div
+          role={notice.kind === 'error' ? 'alert' : 'status'}
+          data-testid={notice.kind === 'error' ? 'blog-error' : 'blog-success'}
+          className={`rounded-xl border px-4 py-3 text-xs font-semibold ${
+            notice.kind === 'error' ? 'border-bad/30 bg-bad/10 text-bad' : 'border-good/30 bg-good/10 text-good'
+          }`}
+        >
+          {notice.text}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -292,10 +345,15 @@ export default function AdminBlogClient({
                       <div className="text-muted" aria-hidden="true">—</div>
                     )}
                   </td>
-                  <td className="p-4 text-muted">{post.publishedAt}</td>
+                  <td className="p-4 text-muted">
+                    <time dateTime={new Date(post.publishedAt).toISOString()}>
+                      {formatBlogDate(new Date(post.publishedAt), locale)}
+                    </time>
+                  </td>
                   <td className="p-4 text-center">
                     <button
                       onClick={() => handleToggleFeatured(post.slug)}
+                      data-testid={`blog-feature-${post.slug}`}
                       className={`p-1.5 rounded-lg border transition ${
                         post.featured
                           ? 'bg-amber/15 text-amber border-amber/30'
@@ -325,6 +383,7 @@ export default function AdminBlogClient({
                       </button>
                       <button
                         onClick={() => handleDelete(post.slug)}
+                        data-testid={`blog-delete-${post.slug}`}
                         className="p-1.5 rounded-lg border border-border text-bad hover:bg-bad/10 transition"
                         title="Sil"
                       >
@@ -367,9 +426,15 @@ export default function AdminBlogClient({
 
             {/* Modal Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+              {formError && (
+                <div role="alert" data-testid="blog-form-error" className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-xs font-semibold text-bad">
+                  {formError}
+                </div>
+              )}
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Makale Başlığı *</label>
+                <label htmlFor="blog-title" className="block text-xs font-bold text-ink mb-1">Makale Başlığı *</label>
                 <input
+                  id="blog-title"
                   type="text"
                   required
                   value={formData.title}
@@ -381,8 +446,9 @@ export default function AdminBlogClient({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1">Kategori *</label>
+                  <label htmlFor="blog-category" className="block text-xs font-bold text-ink mb-1">Kategori *</label>
                   <input
+                  id="blog-category"
                     type="text"
                     required
                     value={formData.category}
@@ -405,8 +471,9 @@ export default function AdminBlogClient({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Özet (Excerpt) *</label>
+                <label htmlFor="blog-excerpt" className="block text-xs font-bold text-ink mb-1">Özet (Excerpt) *</label>
                 <textarea
+                  id="blog-excerpt"
                   rows={2}
                   required
                   value={formData.excerpt}
@@ -417,8 +484,9 @@ export default function AdminBlogClient({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Makale İçeriği (Markdown) *</label>
+                <label htmlFor="blog-content" className="block text-xs font-bold text-ink mb-1">Makale İçeriği (Markdown) *</label>
                 <textarea
+                  id="blog-content"
                   rows={6}
                   required
                   value={formData.content}
@@ -485,6 +553,7 @@ export default function AdminBlogClient({
                 </button>
                 <button
                   type="submit"
+                  data-testid="blog-submit"
                   disabled={isSubmitting}
                   className="bg-accent hover:opacity-90 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-2xs transition disabled:opacity-50"
                 >
