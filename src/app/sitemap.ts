@@ -2,6 +2,7 @@ import { MetadataRoute } from 'next';
 import { prisma } from '@/lib/db';
 import { appUrl } from '@/lib/app-url';
 import { getBlogPosts } from '@/lib/blog';
+import { parsePublishedDate } from '@/lib/date';
 
 // Hardcoded regions matching src/app/[locale]/calls/[region]/regions.ts
 const REGIONS: Record<string, { name: string; code: string }> = {
@@ -43,7 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   };
 
   for (const locale of locales) {
-    for (const { path, priority } of staticRoutes[locale]) {
+    for (const { path, priority } of staticRoutes[locale] ?? []) {
       entries.push({
         url: `${baseUrl}/${locale}${path}`,
         lastModified: new Date(),
@@ -69,8 +70,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const blogPosts = getBlogPosts();
   for (const post of blogPosts) {
     for (const locale of locales) {
-      // publishedAt is a formatted string like "28 Ağustos 2026" — use current date as fallback
-      const publishedDate = new Date();
+      // Parse publishedAt (e.g., "28 Ağustos 2026") into a Date; fallback to current date
+      const publishedDate = parsePublishedDate(post.publishedAt) ?? new Date();
       entries.push({
         url: `${baseUrl}/${locale}/blog/${post.slug}`,
         lastModified: publishedDate,

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { publicCallDetailHref } from '@/lib/routes';
+import { appUrl } from '@/lib/app-url';
 
 export async function generateMetadata({
   params,
@@ -15,14 +16,17 @@ export async function generateMetadata({
   const title = t('pageTitle');
   const description = t('pageDescription');
 
+  const baseUrl = appUrl();
+  const canonicalUrl = `${baseUrl}/${locale}/calls`;
+
   return {
     title,
     description,
     alternates: {
-      canonical: `/${locale}/calls`,
+      canonical: canonicalUrl,
       languages: {
-        'tr': '/tr/calls',
-        'en': '/en/calls',
+        'tr': `${baseUrl}/tr/calls`,
+        'en': `${baseUrl}/en/calls`,
       },
     },
     openGraph: {
@@ -30,7 +34,7 @@ export async function generateMetadata({
       description,
       type: 'website',
       locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
-      url: `/${locale}/calls`,
+      url: canonicalUrl,
     },
     twitter: { card: 'summary_large_image', title, description },
   };

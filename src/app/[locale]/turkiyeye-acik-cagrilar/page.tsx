@@ -6,6 +6,7 @@ import Link from 'next/link';
 import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
 import { errorMessage } from '@/lib/errors';
+import { appUrl } from '@/lib/app-url';
 
 export async function generateMetadata({
   params,
@@ -17,14 +18,17 @@ export async function generateMetadata({
   const title = t('meta_title');
   const description = t('meta_description');
 
+  const baseUrl = appUrl();
+  const canonicalUrl = `${baseUrl}/${locale}/turkiyeye-acik-cagrilar`;
+
   return {
     title,
     description,
     alternates: {
-      canonical: `/${locale}/turkiyeye-acik-cagrilar`,
+      canonical: canonicalUrl,
       languages: {
-        'tr': '/tr/turkiyeye-acik-cagrilar',
-        'en': '/en/turkiyeye-acik-cagrilar',
+        'tr': `${baseUrl}/tr/turkiyeye-acik-cagrilar`,
+        'en': `${baseUrl}/en/turkiyeye-acik-cagrilar`,
       },
     },
     openGraph: {
@@ -32,7 +36,7 @@ export async function generateMetadata({
       description,
       type: 'website',
       locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
-      url: `/${locale}/turkiyeye-acik-cagrilar`,
+      url: canonicalUrl,
     },
     twitter: { card: 'summary_large_image', title, description },
   };

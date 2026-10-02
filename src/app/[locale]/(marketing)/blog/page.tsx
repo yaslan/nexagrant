@@ -7,6 +7,7 @@ import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
 import { getBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
+import { appUrl } from '@/lib/app-url';
 
 export async function generateMetadata({
   params,
@@ -18,14 +19,17 @@ export async function generateMetadata({
   const title = t('meta_title');
   const description = t('meta_description');
 
+  const baseUrl = appUrl();
+  const canonicalUrl = `${baseUrl}/${locale}/blog`;
+
   return {
     title,
     description,
     alternates: {
-      canonical: `/${locale}/blog`,
+      canonical: canonicalUrl,
       languages: {
-        'tr': '/tr/blog',
-        'en': '/en/blog',
+        'tr': `${baseUrl}/tr/blog`,
+        'en': `${baseUrl}/en/blog`,
       },
     },
     openGraph: {
@@ -33,7 +37,7 @@ export async function generateMetadata({
       description,
       type: 'website',
       locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
-      url: `/${locale}/blog`,
+      url: canonicalUrl,
     },
     twitter: { card: 'summary_large_image', title, description },
   };

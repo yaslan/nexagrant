@@ -17,7 +17,6 @@ export default function robots(): MetadataRoute.Robots {
           '/**/login', // Login (English)
           '/**/register', // Register (English)
           '/**/admin', // Admin panel
-          '/**/(app)/', // Protected workspace routes
           '/**/no-workspace', // Error page
         ],
       },

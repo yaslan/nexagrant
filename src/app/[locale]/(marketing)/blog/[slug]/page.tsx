@@ -7,6 +7,8 @@ import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
 import { getBlogPostBySlug, getBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
+import { appUrl } from '@/lib/app-url';
+import { parsePublishedDate } from '@/lib/date';
 
 export async function generateMetadata({
   params,
@@ -20,14 +22,18 @@ export async function generateMetadata({
     return { title: 'Not found' };
   }
 
+  const baseUrl = appUrl();
+  const canonicalUrl = `${baseUrl}/${locale}/blog/${slug}`;
+  const publishedDate = parsePublishedDate(post.publishedAt);
+
   return {
     title: post.title,
     description: post.excerpt,
     alternates: {
-      canonical: `/${locale}/blog/${slug}`,
+      canonical: canonicalUrl,
       languages: {
-        'tr': `/tr/blog/${slug}`,
-        'en': `/en/blog/${slug}`,
+        'tr': `${baseUrl}/tr/blog/${slug}`,
+        'en': `${baseUrl}/en/blog/${slug}`,
       },
     },
     openGraph: {
@@ -35,8 +41,9 @@ export async function generateMetadata({
       description: post.excerpt,
       type: 'article',
       locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
-      url: `/${locale}/blog/${slug}`,
+      url: canonicalUrl,
       images: [{ url: post.image, alt: post.title }],
+      publishedTime: publishedDate?.toISOString(),
     },
     twitter: { card: 'summary_large_image', title: post.title, description: post.excerpt },
   };
