@@ -24,8 +24,8 @@ async function signIn(page: Page, baseURL: string, admin: boolean): Promise<void
   const value = await encode({
     token: admin
       ? {
-          sub: 'demo-user-admin',
-          id: 'demo-user-admin',
+          sub: 'demo-user-superadmin',
+          id: 'demo-user-superadmin',
           name: 'Platform Admin',
           email: 'admin@yasinaslan.com.tr',
           tenantId: 'demo-tenant',
@@ -105,7 +105,9 @@ test.describe('admin documents (K6) — screen', () => {
   });
 
   test('renders in tr and en, is linked from the admin menu, fits 390px', async ({ page }) => {
-    await page.goto('/tr/admin');
+    // /admin has no page of its own (404); the app's way in is the sidebar's
+    // ADMIN link to /admin/modules, which renders the admin menu.
+    await page.goto('/tr/admin/modules');
     await page.getByRole('link', { name: /Belgeler \(K6 RAG\)/ }).first().click();
     await expect(page).toHaveURL(/\/tr\/admin\/documents$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Belgeler (K6 RAG)' })).toBeVisible();
