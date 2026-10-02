@@ -108,16 +108,16 @@ describe('parsePublishedDate', () => {
     });
 
     test('returns null for null input', () => {
-      expect(parsePublishedDate(null as any)).toBeNull();
+      expect(parsePublishedDate(null as unknown as string)).toBeNull();
     });
 
     test('returns null for undefined input', () => {
-      expect(parsePublishedDate(undefined as any)).toBeNull();
+      expect(parsePublishedDate(undefined as unknown as string)).toBeNull();
     });
 
     test('returns null for non-string input', () => {
-      expect(parsePublishedDate(123 as any)).toBeNull();
-      expect(parsePublishedDate({} as any)).toBeNull();
+      expect(parsePublishedDate(123 as unknown as string)).toBeNull();
+      expect(parsePublishedDate({} as unknown as string)).toBeNull();
     });
 
     test('returns null for invalid month name in Turkish', () => {
