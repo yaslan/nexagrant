@@ -64,15 +64,23 @@ const ADMIN = {
 } as const;
 
 test.beforeAll(async () => {
-  await prisma.user.upsert({
-    where: { id: ADMIN.id },
-    create: { ...ADMIN, locale: 'tr', isPlatformAdmin: true },
-    update: { email: ADMIN.email, name: ADMIN.name, isPlatformAdmin: true },
-  });
+  // JWT callback reads User row on every token refresh (d57f13f1). Seed test users.
+  await Promise.all([
+    prisma.user.upsert({
+      where: { id: ADMIN.id },
+      create: { ...ADMIN, locale: 'tr', isPlatformAdmin: true },
+      update: { email: ADMIN.email, name: ADMIN.name, isPlatformAdmin: true },
+    }),
+    prisma.user.upsert({
+      where: { id: 'e2e-identity-user' },
+      create: { id: 'e2e-identity-user', email: 'zeynep@e2e.fabrika.test', name: 'Zeynep Aydın', locale: 'tr' },
+      update: { email: 'zeynep@e2e.fabrika.test', name: 'Zeynep Aydın' },
+    }),
+  ]);
 });
 
 test.afterAll(async () => {
-  await prisma.user.deleteMany({ where: { id: ADMIN.id } });
+  await prisma.user.deleteMany({ where: { id: { in: [ADMIN.id, 'e2e-identity-user'] } } });
   await prisma.$disconnect();
 });
 
