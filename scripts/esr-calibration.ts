@@ -559,10 +559,9 @@ function buildRecommendation(
       `Eşiği değiştirmek yeni bir patron kararı gerektirir, #8'in yeniden okunmasını değil.`,
   );
   lines.push(
-    `**Kalan tutarsızlık (karar değil, etiket hatası):** \`/settings/gates\` aynı sayıyı hâlâ "Minimum AI Alignment ` +
-      `Score" diye etiketliyor (\`src/app/[locale]/(app)/[workspace]/settings/gates/page.tsx:35\`, alan \`minG0Score\`), ` +
-      `oysa \`gates/evaluate.ts\` onu bileşik skora uyguluyor. #8'in öngördüğü etiket düzeltmesi yapılmadı; sahibi ` +
-      `board **TASK-MTQ63RR8Z0G8E**. Kalibrasyonu etkilemez, kullanıcıya yanlış şeyi söyler.`,
+    `**Etiket:** \`/settings/gates\` bu eşiği salt okunur olarak "en düşük bileşik G0 puanı" diye gösteriyor ` +
+      `(\`DEFAULT_GATE_RULES.G0.minScore\`, AKTAR-MURBCJ0A-1); uyum alt puanı eşiği ayrı satırda ` +
+      `\`DEFAULT_G0_RULES.minAlignment\`'tan okunuyor.`,
   );
 
   return lines.join('\n\n');

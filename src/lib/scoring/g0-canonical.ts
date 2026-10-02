@@ -12,9 +12,10 @@
  *   • a weighted 0–100 *composite* score, used to rank opportunities;
  *   • three *hard rules* that decide the gate.
  *
- * `src/lib/gates/evaluate.ts` currently gates on the composite (`DEFAULT_GATE_RULES.G0.minScore`,
- * 70) while the settings screen labels that same number "Minimum AI Alignment Score". Which of the
- * two readings is the real gate is an open decision (docs/ROADMAP.md · Açık kararlar #8) — so both
+ * `src/lib/gates/evaluate.ts` gates on the composite (`DEFAULT_GATE_RULES.G0.minScore`, 70); the
+ * settings screen once labelled that same number "Minimum AI Alignment Score" (read-only and
+ * relabelled since AKTAR-MURBCJ0A-1). Which of the two readings is the real gate was open decision
+ * #8 (docs/ROADMAP.md · Açık kararlar), closed 2026-09-06 for the composite — so both
  * are expressed here as *configurable rules* and the calibration harness measures which one fits
  * the observed ESR outcomes. Nothing is hard-coded that a calibration run cannot move.
  *
