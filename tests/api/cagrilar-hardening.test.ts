@@ -73,7 +73,7 @@ describe('/api/cagrilar hardening', () => {
     const res = await get('?limit=1000&lang=tr');
     expect(res.status).toBe(200);
     expect(mocks.searchSedia).toHaveBeenCalledTimes(1);
-    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 50, maxPages: 5 });
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 50, maxPages: 1 });
   });
 
   // İNCELEME-70 D-1 (TASK-MUNVVMJDEO932): the lower bound had no test, so a
@@ -82,7 +82,28 @@ describe('/api/cagrilar hardening', () => {
     const res = await get(`?limit=${limit}&lang=en`);
     expect(res.status).toBe(200);
     expect(mocks.searchSedia).toHaveBeenCalledTimes(1);
-    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 1, maxPages: 5 });
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 1, maxPages: 1 });
+  });
+
+  // TASK-MUPVLWSIPC5WU: the route fetched five SEDIA pages from page 1 whatever
+  // was asked, so the pager showed the same 100 rows on every page and all 100
+  // were translated before the list could leave its loading state.
+  test('?page is forwarded as the one SEDIA page fetched; absent or below 1 means page 1', async () => {
+    await get('?limit=20&page=3&lang=en');
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 20, startPage: 3, maxPages: 1 });
+
+    await get('?limit=20&lang=en');
+    expect(mocks.searchSedia.mock.calls[1]![0]).toMatchObject({ startPage: 1, maxPages: 1 });
+
+    await get('?limit=20&page=-4&lang=en');
+    expect(mocks.searchSedia.mock.calls[2]![0]).toMatchObject({ startPage: 1, maxPages: 1 });
+  });
+
+  test('a non-numeric page is a 400 before any outbound call', async () => {
+    const res = await get('?page=zz');
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ success: false, error: 'invalid_page' });
+    expect(mocks.searchSedia).not.toHaveBeenCalled();
   });
 
   test('a non-numeric limit is a 400 before any outbound call', async () => {

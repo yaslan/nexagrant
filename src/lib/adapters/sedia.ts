@@ -40,6 +40,11 @@ export interface SediaSearchOptions {
   text?: string;
   pageSize?: number;
   maxPages?: number;
+  /**
+   * First SEDIA page to fetch, 1-based (default 1). The live search on the calls
+   * page asks for exactly the page a person is on; the daily job walks from 1.
+   */
+  startPage?: number;
   statuses?: string[];
   frameworkProgrammes?: string[];
   types?: string[];
@@ -254,6 +259,7 @@ export class SediaAdapter {
       text = '***',
       pageSize = 100,
       maxPages = 10,
+      startPage = 1,
       statuses = [SEDIA_STATUS_CODES.FORTHCOMING, SEDIA_STATUS_CODES.OPEN],
       frameworkProgrammes = [],
       types = ['1'],
@@ -278,14 +284,17 @@ export class SediaAdapter {
     const errors: string[] = [];
     const now = new Date();
     let totalResults = 0;
-    let pageNumber = 1;
+    const firstPage = Math.max(1, Math.floor(startPage));
+    let pageNumber = firstPage;
     let detailFetches = 0;
 
-    while (pageNumber <= maxPages) {
+    while (pageNumber < firstPage + maxPages) {
       const encodedText = encodeURIComponent(queryText);
       const searchUrl = `${this.baseUrl}?apiKey=${this.apiKey}&text=${encodedText}&pageSize=${pageSize}&pageNumber=${pageNumber}`;
 
-      logger.info(`[SediaAdapter] Fetching page ${pageNumber}/${maxPages}, size=${pageSize}`);
+      logger.info(
+        `[SediaAdapter] Fetching page ${pageNumber} (${pageNumber - firstPage + 1}/${maxPages}), size=${pageSize}`
+      );
 
       try {
         const formData = new FormData();
@@ -324,7 +333,7 @@ export class SediaAdapter {
             ? ((data as { results: unknown[] }).results)
             : [];
 
-        if (pageNumber === 1 && envelope.success) {
+        if (pageNumber === firstPage && envelope.success) {
           totalResults = envelope.data.totalResults;
         }
 
@@ -383,10 +392,10 @@ export class SediaAdapter {
     }
 
     logger.info(
-      `[SediaAdapter] Total fetched: ${topics.length} topics across ${pageNumber - 1} pages`
+      `[SediaAdapter] Total fetched: ${topics.length} topics across ${pageNumber - firstPage} pages`
     );
 
-    return { totalResults, pageNumber: 1, pageSize, topics, schemaDrift, errors };
+    return { totalResults, pageNumber: firstPage, pageSize, topics, schemaDrift, errors };
   }
 
   /** Back-compatible plain list. Never throws; an empty array means "nothing usable". */

@@ -7,12 +7,11 @@ import { logger } from '@/lib/logger';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
 
 /**
- * The largest page this route asks SEDIA for. The route fetches up to
- * {@link MAX_PAGES} pages and translates every title, so an uncapped `limit`
- * multiplied into thousands of outbound calls per request (TASK-MUN66T2HM4A4E O-1).
+ * The largest page this route asks SEDIA for. Every title on the page is
+ * translated, so an uncapped `limit` multiplied into thousands of outbound calls
+ * per request (TASK-MUN66T2HM4A4E O-1).
  */
 const CAGRILAR_MAX_PAGE_SIZE = 50;
-const MAX_PAGES = 5;
 
 /**
  * Searches one user may run per minute (İNCELEME-75 D-3). The calls page asks
@@ -38,14 +37,20 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const text = searchParams.get('q') || searchParams.get('text') || '***';
-    // NOTE: ?page/?pageNumber is not honoured. `SediaAdapter.searchSedia` paginates
-    // internally from page 1 up to maxPages and reports pageNumber 1, so there is no
-    // page argument to forward. Parsing one here only implied otherwise.
     const rawPageSize = Number.parseInt(searchParams.get('limit') || searchParams.get('pageSize') || '20', 10);
     if (!Number.isFinite(rawPageSize)) {
       return NextResponse.json({ success: false, error: 'invalid_limit' }, { status: 400 });
     }
     const pageSize = Math.min(CAGRILAR_MAX_PAGE_SIZE, Math.max(1, rawPageSize));
+    // One SEDIA page per request, the one the calls page is showing. The route used
+    // to walk five pages from page 1 whatever was asked: the page got 100 rows under a
+    // 20-per-page pager, "next" brought the same 100 back, and translating all of
+    // them held the list on its loading state for 12-30 s (TASK-MUPVLWSIPC5WU).
+    const rawPage = Number.parseInt(searchParams.get('page') || searchParams.get('pageNumber') || '1', 10);
+    if (!Number.isFinite(rawPage)) {
+      return NextResponse.json({ success: false, error: 'invalid_page' }, { status: 400 });
+    }
+    const page = Math.max(1, rawPage);
     const lang = (searchParams.get('lang') || searchParams.get('locale') || 'tr').toLowerCase();
     
     // Status filter: 'OPEN', 'FORTHCOMING', 'CLOSED' or numeric codes ('31094501', '31094502', '31094503')
@@ -78,7 +83,8 @@ export async function GET(request: NextRequest) {
     const result = await adapter.searchSedia({
       text,
       pageSize,
-      maxPages: MAX_PAGES, // Limit API calls for web endpoint
+      startPage: page,
+      maxPages: 1,
       statuses,
       frameworkProgrammes,
       types,

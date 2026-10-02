@@ -31,7 +31,18 @@ async function acceptCookies(page: Page) {
   });
 }
 
-const alert = (page: Page) => page.getByRole('alert').filter({ visible: true });
+/**
+ * The sign-in alert, never Next's route announcer. The App Router mounts an
+ * empty `role="alert"` live region (`<next-route-announcer>`, id
+ * `__next-route-announcer__`) after hydration; it is a 1x1 clipped box, so
+ * Playwright counts it as visible and "no alert" would read 1 (TASK-MUPVLWSIPC5WU).
+ * Only that one element is excluded: an empty alert of our own still counts.
+ */
+const alert = (page: Page) =>
+  page
+    .getByRole('alert')
+    .filter({ visible: true })
+    .and(page.locator(':not(#__next-route-announcer__)'));
 
 test.describe('sign-in error messages', () => {
   test.beforeEach(async ({ page }) => {

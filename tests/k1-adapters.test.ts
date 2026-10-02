@@ -161,6 +161,19 @@ describe('SediaAdapter.fetchSediaTopics', () => {
     expect(alert.data.message).toContain('API schema change detected');
   });
 
+  // TASK-MUPVLWSIPC5WU: the calls page asks for the page a person is on.
+  it('starts at startPage, asks SEDIA for that page number and reports it back', async () => {
+    const fetchMock = mockFetchJson(sediaFixture());
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await new SediaAdapter().searchSedia({ startPage: 3, maxPages: 1, pageSize: 20 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]![0])).toContain('pageSize=20&pageNumber=3');
+    expect(result.pageNumber).toBe(3);
+    expect(result.totalResults).toBe(sediaFixture().totalResults);
+  });
+
   it('skips a result whose required metadata is missing, and records the drift', async () => {
     const payload = sediaFixture();
     delete payload.results[0].metadata.identifier;

@@ -36,18 +36,29 @@ async function acceptCookies(page: Page) {
 }
 
 /**
- * The visible sign-in form.
+ * The register page holds two forms (ADR-0006, TASK-MUM676F010E9G): the
+ * disclosure step with the acknowledgement box, and below it the e-mail form
+ * that is actually submitted and reads the same state. Each is named here, so
+ * the spec says which one it means instead of assuming there is only one
+ * (TASK-MUPVLWSIPC5WU).
  *
- * While the page is still streaming, Next parks the Suspense content in a
- * `hidden` container and moves it once the boundary resolves, so for a moment
- * the document really does hold two copies of this form — and a bare
- * `getByTestId` then fails strict mode instead of waiting. Whether a run sees
- * it is a matter of timing: this spec passed alone and failed in the middle of
- * a full `pnpm gate`. Scoping to the visible copy removes the race rather than
- * making it rarer.
+ * Both are scoped to the visible copy. While the page is still streaming, Next
+ * parks the Suspense content in a `hidden` container and moves it once the
+ * boundary resolves, so for a moment the document really does hold two copies
+ * of each form — and a bare locator then fails strict mode instead of waiting.
+ * Whether a run sees it is a matter of timing: this spec passed alone and
+ * failed in the middle of a full `pnpm gate`. Scoping to the visible copy
+ * removes the race rather than making it rarer.
  */
-function form(page: Page) {
-  return page.locator('form').filter({ visible: true });
+function disclosure(page: Page) {
+  return page.getByTestId('registration-disclosure').filter({ visible: true });
+}
+
+function emailForm(page: Page) {
+  return page
+    .locator('form')
+    .filter({ visible: true })
+    .filter({ has: page.locator('input[type="email"]') });
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -77,7 +88,7 @@ test('the registration form asks, unticked, and will not submit until it is tick
 
   // Ticking it enables the submit button through React state, so the box has to be
   // hydrated before it is ticked (fixtures/hydration.ts).
-  const box = form(page).getByTestId('disclosure-ack');
+  const box = disclosure(page).getByTestId('disclosure-ack');
   await expectHydrated(box);
 
   // Pre-ticked would make the record worthless: it would prove the page's
@@ -87,22 +98,22 @@ test('the registration form asks, unticked, and will not submit until it is tick
 
   // The version is on screen, so a screenshot of this box is evidence about a
   // specific text rather than about whatever the notice says today.
-  const version = form(page).getByTestId('disclosure-version');
+  const version = disclosure(page).getByTestId('disclosure-version');
   await expect(version).toContainText('privacy-notice@');
   await expect(version).toContainText('terms-of-service@');
 
   // Both legal texts are reachable from here, in the locale being read.
-  await expect(form(page).locator('a[href="/tr/privacy"]')).toBeVisible();
-  await expect(form(page).locator('a[href="/tr/terms"]')).toBeVisible();
+  await expect(disclosure(page).locator('a[href="/tr/privacy"]')).toBeVisible();
+  await expect(disclosure(page).locator('a[href="/tr/terms"]')).toBeVisible();
 
-  const submit = form(page).locator('button[type="submit"]');
-  await form(page).locator('input[type="email"]').fill(REFUSED_EMAIL);
+  const submit = emailForm(page).locator('button[type="submit"]');
+  await emailForm(page).locator('input[type="email"]').fill(REFUSED_EMAIL);
   await expect(submit).toBeDisabled();
   await page.screenshot({ path: `${SHOTS}/01-unticked-submit-disabled.png`, fullPage: true });
 
   // Past the disabled attribute: submit the form itself, the way a keyboard or
   // a tampered DOM would.
-  await form(page).evaluate((el: HTMLFormElement) => el.requestSubmit());
+  await emailForm(page).evaluate((el: HTMLFormElement) => el.requestSubmit());
   await expect(page.getByText(/onaylamanız gerekir/i)).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/02-unticked-refused.png`, fullPage: true });
 
@@ -119,11 +130,11 @@ test('the registration form asks, unticked, and will not submit until it is tick
 test('ticking it and registering writes the disclosure record', async ({ page }) => {
   await acceptCookies(page);
   await page.goto('/tr/register');
-  await expectHydrated(form(page).getByTestId('disclosure-ack'));
+  await expectHydrated(disclosure(page).getByTestId('disclosure-ack'));
 
-  await form(page).locator('input[type="email"]').fill(FORM_EMAIL);
-  await form(page).getByTestId('disclosure-ack').check();
-  await form(page).locator('button[type="submit"]').click();
+  await emailForm(page).locator('input[type="email"]').fill(FORM_EMAIL);
+  await disclosure(page).getByTestId('disclosure-ack').check();
+  await emailForm(page).locator('button[type="submit"]').click();
 
   // The app lands the new account on its workspace.
   await page.waitForURL(/\/tr\/.*(dashboard|panel|no-workspace)/, { timeout: 30_000 });
