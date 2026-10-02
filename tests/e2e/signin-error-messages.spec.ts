@@ -50,12 +50,14 @@ test.describe('sign-in error messages', () => {
     await expect(alert(page)).toContainText(tr.generic);
     await page.screenshot({ path: `${SHOTS}/02-oauth-callback-error-tr.png`, fullPage: true });
 
-    // The close button uses aria-label for accessibility; look for it by button type + aria-label
-    const closeButton = alert(page).locator('button');
+    // The close button is in the error alert (data-testid="signin-error") with aria-label
+    const errorAlert = page.getByTestId('signin-error');
+    const closeButton = errorAlert.getByRole('button', { name: /^(Close|Kapat)$/i });
     await expect(closeButton).toBeVisible();
     await closeButton.click();
 
-    await expect(alert(page)).toHaveCount(0);
+    // Verify the signin-error alert is gone, but other alerts (e.g., route announcer) may remain
+    await expect(page.getByTestId('signin-error')).toHaveCount(0);
   });
 
   test('an unknown code shows the generic message, never the code itself', async ({ page }) => {

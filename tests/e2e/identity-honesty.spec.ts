@@ -175,7 +175,10 @@ test.describe('app frame identity', () => {
       // tenantId omitted: membership lookup will find none, leaving the token tenantless
     });
 
-    await page.goto('/tr/no-workspace');
+    // Navigate to the workspace panel and expect a redirect to no-workspace
+    await page.goto(PANEL_URL);
+    await expect(page).toHaveURL(/\/no-workspace/);
+
     const heading = page.getByRole('heading').filter({ hasText: /çalışma alanı|workspace/i }).first();
     await expect(heading).toBeVisible();
 
