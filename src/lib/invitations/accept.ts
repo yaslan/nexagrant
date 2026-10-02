@@ -30,11 +30,11 @@
  */
 import type { Prisma, PrismaClient, Role, User } from '@prisma/client';
 
-import { withTenant, type TenantTx } from '@/lib/db';
+import { withTenant, withTenantOn, type TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
 import { getPilotState } from '@/lib/billing/pilot';
 import { lockTenantSeats, readSeatUsage } from '@/lib/billing/seat-limit';
-import { bindTransactionToTenant, writeRegistrationConsent } from '@/lib/legal/registration-consent';
+import { writeRegistrationConsent } from '@/lib/legal/registration-consent';
 import { hashSecretToken, secretTokenMatches } from '@/lib/secret-token';
 import { withSystemScope } from '@/lib/system-scope';
 
@@ -180,7 +180,7 @@ export interface AcceptInvitationCore {
  * and matches nothing.
  */
 export async function acceptInvitationIn(
-  tx: Prisma.TransactionClient,
+  tx: TenantTx,
   core: AcceptInvitationCore
 ): Promise<'accepted' | 'already_member' | 'lost' | 'seat_limit'> {
   const { invitationId, tokenHash, tenantId, userId, now } = core;
@@ -196,10 +196,9 @@ export async function acceptInvitationIn(
   // and counting the others would make two over-subscribed invitations refuse
   // each other for good. Nothing is written when refused, so the link stays
   // usable once a seat frees.
-  // Both callers have bound `tx` to the tenant (withTenant / bindTransactionToTenant),
+  // Both callers have bound `tx` to the tenant (withTenant / withTenantOn),
   // which is what the brand stands for.
-  const scoped = tx as TenantTx;
-  await lockTenantSeats(scoped, tenantId);
+  await lockTenantSeats(tx, tenantId);
   const pending = await tx.invitation.findFirst({
     where: { id: invitationId, tenantId, tokenHash, acceptedAt: null, expires: { gt: now } },
     select: { email: true },
@@ -210,7 +209,7 @@ export async function acceptInvitationIn(
       select: { id: true },
     });
     if (!alreadyMember) {
-      const usage = await readSeatUsage(scoped, tenantId, pending.email);
+      const usage = await readSeatUsage(tx, tenantId, pending.email);
       if (usage.members >= usage.limit) return 'seat_limit';
     }
   }
@@ -350,7 +349,7 @@ export async function registerInvitedOAuthUser(
   if (!sameEmail(invitation.email, input.user.email)) throw new InvitationNotAcceptableError('email_mismatch');
   if (await isInvitingTenantReadOnly(invitation.tenantId)) throw new InvitationNotAcceptableError('pilot_expired');
 
-  return client.$transaction(async (tx) => {
+  return withTenantOn(client, invitation.tenantId, async (tx) => {
     const user = await tx.user.create({
       data: {
         email: input.user.email,
@@ -359,7 +358,6 @@ export async function registerInvitedOAuthUser(
         emailVerified: input.user.emailVerified ?? null,
       },
     });
-    await bindTransactionToTenant(tx, invitation.tenantId);
     const result = await acceptInvitationIn(tx, {
       invitationId: invitation.id,
       tokenHash: hashSecretToken(input.token),
