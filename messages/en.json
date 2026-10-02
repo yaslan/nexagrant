@@ -534,7 +534,26 @@
     "descriptionPlaceholder": "Additional notes for the approver...",
     "payloadFieldLabel": "Payload Data (JSON)",
     "payloadSampleNote": "Consortium agreement finalized.",
-    "submitCreate": "Submit Request (Maker)"
+    "submitCreate": "Submit Request (Maker)",
+    "errors": {
+      "invalidActionType": "Invalid action type.",
+      "invalidRequiredRole": "The required approver role cannot be lower than this action type's minimum.",
+      "invalidExpiry": "The validity period must be between 1 hour and 30 days.",
+      "invalidWorkspace": "Workspace not found.",
+      "titleRequired": "A title is required.",
+      "titleTooLong": "The title can be at most 200 characters.",
+      "descriptionTooLong": "The description can be at most 2000 characters.",
+      "invalidPayload": "The payload must be a JSON object.",
+      "payloadTooLarge": "The payload can be at most 10,000 characters.",
+      "reasonRequired": "A rejection reason is required.",
+      "reasonTooLong": "The rejection reason can be at most 1000 characters.",
+      "notFound": "Request not found.",
+      "notPending": "This request is no longer pending; someone may have decided on it or it was cancelled.",
+      "expired": "This request has expired and can no longer be acted on.",
+      "selfApproval": "You cannot approve or reject your own request (four-eyes principle).",
+      "insufficientRole": "Your role does not carry the approval authority this request requires.",
+      "notRequester": "Only the person who created the request can cancel it."
+    }
   },
   "nav": {
     "pricing": "Pricing",

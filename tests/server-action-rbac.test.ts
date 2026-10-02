@@ -66,8 +66,9 @@ vi.mock('@/lib/k5-pipeline/pipelineStore', () => ({
   updateInMemoryOpportunityOwner: vi.fn(reached),
   addInMemoryOpportunityNote: vi.fn(reached),
 }));
-vi.mock('@/lib/dual-approval', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/dual-approval')>();
+// The approvals actions write through src/lib/approval-requests.ts (AKTAR-MURBCJ0A-1).
+vi.mock('@/lib/approval-requests', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/approval-requests')>();
   return { ...actual, createApprovalRequest: vi.fn(reached), cancelApprovalRequest: vi.fn(reached), approveApprovalRequest: vi.fn(reached), rejectApprovalRequest: vi.fn(reached) };
 });
 

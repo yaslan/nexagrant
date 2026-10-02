@@ -534,7 +534,26 @@
     "descriptionPlaceholder": "Onaylayacak yetkiliye iletmek istediğiniz ek notlar...",
     "payloadFieldLabel": "Payload Verisi (JSON)",
     "payloadSampleNote": "Konsorsiyum mutabakatı tamamlandı.",
-    "submitCreate": "Talebi Başlat (Maker)"
+    "submitCreate": "Talebi Başlat (Maker)",
+    "errors": {
+      "invalidActionType": "Geçersiz işlem türü.",
+      "invalidRequiredRole": "Gereken onay rolü, bu işlem türünün asgari rolünden düşük olamaz.",
+      "invalidExpiry": "Geçerlilik süresi 1 saat ile 30 gün arasında olmalı.",
+      "invalidWorkspace": "Çalışma alanı bulunamadı.",
+      "titleRequired": "Başlık zorunludur.",
+      "titleTooLong": "Başlık en fazla 200 karakter olabilir.",
+      "descriptionTooLong": "Açıklama en fazla 2000 karakter olabilir.",
+      "invalidPayload": "Veri (payload) bir JSON nesnesi olmalı.",
+      "payloadTooLarge": "Veri (payload) en fazla 10.000 karakter olabilir.",
+      "reasonRequired": "Ret gerekçesi zorunludur.",
+      "reasonTooLong": "Ret gerekçesi en fazla 1000 karakter olabilir.",
+      "notFound": "Talep bulunamadı.",
+      "notPending": "Bu talep artık beklemede değil; başka biri karar vermiş ya da iptal edilmiş olabilir.",
+      "expired": "Talebin süresi doldu; işlem yapılamaz.",
+      "selfApproval": "Kendi talebinizi onaylayamaz ya da reddedemezsiniz (4-göz ilkesi).",
+      "insufficientRole": "Rolünüz bu talebin gerektirdiği onay yetkisini taşımıyor.",
+      "notRequester": "Talebi yalnız oluşturan kişi iptal edebilir."
+    }
   },
   "nav": {
     "pricing": "Fiyatlandırma",
