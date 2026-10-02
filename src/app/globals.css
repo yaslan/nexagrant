@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, [data-theme="dark"]));
+/* The server puts .dark / data-theme="dark" on <html> only (src/app/layout.tsx), so the
+   variant has to match descendants too. Without ` *` it compiled to
+   `.dark\:x:where(.dark, …)` — the element itself had to be <html> — and every
+   dark: class below it was dead (AKTAR-MURBCJ0A-1 K-3, tests/e2e/theme-dark-variant). */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
 :root {
   --ground: #F4F6F8;
@@ -8,7 +12,7 @@
   --surface-hover: #F1F5F9;
   --ink: #0F172A;
   --ink-2: #334155;
-  --muted: #64748B;
+  --muted: #5B6B7F; /* 5.03:1 on --ground, 5.45:1 on white; #64748B was 4.39 (K-4) */
   --line: #E2E8F0;
   --accent: #0369A1;
   --accent-ink: #0369A1;
