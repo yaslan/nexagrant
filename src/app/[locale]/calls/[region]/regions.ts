@@ -1,4 +1,4 @@
-const REGIONS: Record<string, { name: string; code: string }> = {
+export const REGIONS: Record<string, { name: string; code: string }> = {
   turkey: { name: 'Türkiye', code: 'TR' },
   germany: { name: 'Almanya', code: 'DE' },
   belgium: { name: 'Belçika', code: 'BE' },
