@@ -48,8 +48,8 @@ let ultraBefore: { monthlyCents: number; yearlyCents: number } | null = null;
 async function sessionToken(): Promise<string> {
   return encode({
     token: {
-      sub: 'demo-user-admin',
-      id: 'demo-user-admin',
+      sub: 'demo-user-superadmin',
+      id: 'demo-user-superadmin',
       name: 'Platform Admin',
       email: 'admin@yasinaslan.com.tr',
       tenantId: TENANT_ID,

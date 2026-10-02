@@ -27,8 +27,8 @@ const URL = '/tr/admin/billing/plans';
 async function signInAsPlatformAdmin(page: Page, baseURL: string): Promise<void> {
   const value = await encode({
     token: {
-      sub: 'demo-user-admin',
-      id: 'demo-user-admin',
+      sub: 'demo-user-superadmin',
+      id: 'demo-user-superadmin',
       name: 'Platform Admin',
       email: 'admin@yasinaslan.com.tr',
       tenantId: 'demo-tenant',
@@ -274,7 +274,7 @@ test.describe('admin plan editor', () => {
         where: { type: 'plan.version.published', target: `${planId}#v2` },
       });
       expect(event).not.toBeNull();
-      expect(event?.actorId).toBe('demo-user-admin');
+      expect(event?.actorId).toBe('demo-user-superadmin');
       const data = event?.data as Record<string, unknown>;
       expect((data.before as Record<string, unknown>).seats).toBe(5);
       expect((data.after as Record<string, unknown>).seats).toBe(9);

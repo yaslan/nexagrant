@@ -54,8 +54,8 @@ async function signIn(page: Page, baseURL: string, token: Record<string, unknown
 }
 
 const PLATFORM_ADMIN = {
-  sub: 'demo-user-admin',
-  id: 'demo-user-admin',
+  sub: 'demo-user-superadmin',
+  id: 'demo-user-superadmin',
   name: 'Platform Admin',
   email: 'admin@yasinaslan.com.tr',
   tenantId: TENANT_ID,
@@ -65,8 +65,8 @@ const PLATFORM_ADMIN = {
 
 /** The same person without the platform hat — a tenant looking at its own bill. */
 const TENANT_OWNER = {
-  sub: 'demo-user-admin',
-  id: 'demo-user-admin',
+  sub: 'demo-user-superadmin',
+  id: 'demo-user-superadmin',
   name: 'Demo Owner',
   email: 'admin@yasinaslan.com.tr',
   tenantId: TENANT_ID,
