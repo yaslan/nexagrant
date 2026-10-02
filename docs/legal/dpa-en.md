@@ -19,7 +19,7 @@ This agreement is made between the two parties whose details are set out in the 
 | Detail                     | Controller (customer organisation) | Processor                       |
 | -------------------------- | ---------------------------------- | ------------------------------- |
 | Name                       | ...............................    | FonBridge                       |
-| Registered legal name      | ...............................    | Fonbridge Ltd. Şti.             |
+| Registered legal name      | ...............................    | FonBridge Ltd. Şti.             |
 | Address                    | ...............................    | ............................... |
 | Tax office / tax number    | ...............................    | ............................... |
 | Trade registry (MERSİS) no | ...............................    | ............................... |
