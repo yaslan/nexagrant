@@ -114,7 +114,7 @@ export default async function AppLayout({
             alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
             width={72}
             height={72}
-            className="object-contain group-hover:scale-105 transition shrink-0"
+            className="object-contain group-hover:scale-105 transition shrink-0 dark:brightness-0 dark:invert"
           />
         </Link>
 

@@ -57,7 +57,7 @@ export default function MobileAppHeader({
               alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
               width={32}
               height={32}
-              className="object-contain"
+              className="object-contain dark:brightness-0 dark:invert"
             />
           </Link>
           {cobrand ? <CoBrandBadge cobrand={cobrand} compact /> : null}
@@ -95,7 +95,7 @@ export default function MobileAppHeader({
                   alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
                   width={40}
                   height={40}
-                  className="object-contain"
+                  className="object-contain dark:brightness-0 dark:invert"
                 />
               </Link>
               <button

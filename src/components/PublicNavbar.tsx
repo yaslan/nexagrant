@@ -48,7 +48,7 @@ export default function PublicNavbar({
             alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
             width={56}
             height={56}
-            className="object-contain group-hover:scale-105 transition"
+            className="object-contain group-hover:scale-105 transition dark:brightness-0 dark:invert"
           />
         </Link>
 
