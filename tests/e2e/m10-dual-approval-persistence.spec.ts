@@ -43,7 +43,7 @@ const ACTOR_B = `E2E Finance ${RUN}`;
 const USER_B: { id: string; email: string; role: Role } = {
   id: 'm10-persist-user-b',
   email: 'm10-persist-b@fabrika.test',
-  role: 'PIPELINE_MANAGER',
+  role: 'TENANT_ADMIN',
 };
 
 async function mintSession(userId: string, name: string, email: string): Promise<string> {

@@ -73,7 +73,7 @@ const ACTOR_B = `E2E Approver B ${RUN}`;
 const USER_B: { id: string; email: string; role: Role } = {
   id: 'plan-e2e-ultra-user-b',
   email: 'plan-e2e-ultra-b@fabrika.test',
-  role: 'PIPELINE_MANAGER',
+  role: 'TENANT_ADMIN',
 };
 
 /** The Turkish label of the row-level sign button; there is no test id on it. */
