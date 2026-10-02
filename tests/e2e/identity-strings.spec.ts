@@ -3,6 +3,7 @@ import { encode } from 'next-auth/jwt';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
+import { seedUserMembership, cleanupUserMembership } from './fixtures/user-membership-seed';
 
 /**
  * TASK-MTRNQHC3IV2BE — no invented person, organisation or byline on screen.
@@ -52,7 +53,7 @@ async function signInAs(page: Page, token: Record<string, unknown>): Promise<voi
 
 /**
  * The platform admin the blog-editor test signs in as. Since f7a36779
- * (TASK-MULU7GVFBTRXX Ö-2) the jwt callback takes `isPlatformAdmin` from the
+ * (TASK-MULU7GVFBTRXX O-2) the jwt callback takes `isPlatformAdmin` from the
  * User row on every call and drops a claim no row backs, so a minted token
  * saying "admin" is no longer enough. The row exists for this spec only
  * (TASK-MULU828HTNN4N).
@@ -60,7 +61,7 @@ async function signInAs(page: Page, token: Record<string, unknown>): Promise<voi
 const ADMIN = {
   id: 'e2e-admin-user',
   email: 'zeynep.editor@e2e.fabrika.test',
-  name: 'Zeynep Aydın',
+  name: 'Zeynep Aydin',
 } as const;
 
 test.beforeAll(async () => {
@@ -69,9 +70,11 @@ test.beforeAll(async () => {
     create: { ...ADMIN, locale: 'tr', isPlatformAdmin: true },
     update: { email: ADMIN.email, name: ADMIN.name, isPlatformAdmin: true },
   });
+  await seedUserMembership('demo-tenant', 'e2e-identity-user', 'zeynep@e2e.fabrika.test', 'Zeynep Aydin', 'PIPELINE_MANAGER');
 });
 
 test.afterAll(async () => {
+  await cleanupUserMembership('demo-tenant', 'e2e-identity-user');
   await prisma.user.deleteMany({ where: { id: ADMIN.id } });
   await prisma.$disconnect();
 });
@@ -81,7 +84,7 @@ test.describe('identity strings', () => {
     await signInAs(page, {
       id: 'e2e-identity-user',
       email: 'zeynep@e2e.fabrika.test',
-      name: 'Zeynep Aydın',
+      name: 'Zeynep Aydin',
       tenantId: 'demo-tenant',
       role: 'PIPELINE_MANAGER',
     });
@@ -158,13 +161,13 @@ test.describe('identity strings', () => {
     await expect(modal).toBeVisible();
 
     // The default byline is the signed-in admin, not an invented consultant.
-    await expect(modal.locator('input[value="Zeynep Aydın"]')).toHaveCount(1);
+    await expect(modal.locator('input[value="Zeynep Aydin"]')).toHaveCount(1);
 
     // The listing behind the modal shows an em-dash for the seeded posts, which
     // carry no author at all — the four invented bylines are gone from them.
     const html = await modal.innerHTML();
     expect(html, 'the invented default author is back').not.toContain(MEHMET);
-    expect(html).not.toContain('AB Proje Başdanışmanı');
+    expect(html).not.toContain('AB Proje Basdasisman');
 
     await page.screenshot({ path: `${SHOTS}/05-admin-blog-default-author.png`, fullPage: false });
   });
@@ -173,7 +176,7 @@ test.describe('identity strings', () => {
     await page.goto('/tr/blog');
 
     const text = await page.locator('body').innerText();
-    for (const invented of [MEHMET, 'Av. Ayşe Kaya', 'Dr. Sofia Rossi', 'Can Aksoy']) {
+    for (const invented of [MEHMET, 'Av. Ayse Kaya', 'Dr. Sofia Rossi', 'Can Aksoy']) {
       expect(text, `blog list still bylines "${invented}"`).not.toContain(invented);
     }
 

@@ -83,6 +83,7 @@ function stubRetrieve(paymentId: string, conversationId: string) {
 
 let tenantId: string;
 let planId: string;
+let userId: string;
 let cookie: string;
 
 test.beforeAll(async () => {
@@ -94,10 +95,15 @@ test.beforeAll(async () => {
     data: { name: `Invoice Write Path ${STAMP}`, slug: STAMP, country: 'TR' },
   });
   tenantId = tenant.id;
-  cookie = await sessionCookie(tenantId, `${STAMP}-user`);
+
+  userId = `${STAMP}-user`;
+  await seedUserMembership(tenantId, userId, `${userId}@e2e.fabrika.test`, 'Invoice Write Path User', 'TENANT_OWNER');
+
+  cookie = await sessionCookie(tenantId, userId);
 });
 
 test.afterAll(async () => {
+  await cleanupUserMembership(tenantId, userId);
   // Scoped to this run's tenant only; nothing pre-existing is touched.
   //
   // `SystemAlert` first, and by `meta.tenantId` rather than by a column: the

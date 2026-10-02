@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
+import { seedUserMembership, cleanupUserMembership } from './fixtures/user-membership-seed';
 
 /**
  * TASK-MTR5BGKNELCO2 — the app frame must never invent who is signed in.
@@ -48,7 +49,19 @@ async function signInAs(
 }
 
 test.describe('app frame identity', () => {
-  test('a session with no name is never given somebody else’s name', async ({ page }) => {
+  test.beforeAll(async () => {
+    await seedUserMembership('demo-tenant', 'e2e-nameless-user', 'ayse.nameless@e2e.fabrika.test', 'E2E Nameless', 'PIPELINE_MANAGER');
+    await seedUserMembership('demo-tenant', 'e2e-named-user', 'ayse.named@e2e.fabrika.test', 'Zeynep Aydin', 'PIPELINE_MANAGER');
+    await seedUserMembership('demo-tenant', 'e2e-roleless-user', 'roleless@e2e.fabrika.test', 'Rolsuz Kullanici');
+  });
+
+  test.afterAll(async () => {
+    await cleanupUserMembership('demo-tenant', 'e2e-nameless-user');
+    await cleanupUserMembership('demo-tenant', 'e2e-named-user');
+    await cleanupUserMembership('demo-tenant', 'e2e-roleless-user');
+  });
+
+  test('a session with no name is never given somebody else\'s name', async ({ page }) => {
     // No `name` claim, and `tenantId` already resolved so the jwt callback does not
     // refill the token from the database — exactly the shape an OAuth sign-in produces
     // when the provider returns no display name.
@@ -81,14 +94,14 @@ test.describe('app frame identity', () => {
     await signInAs(page, {
       id: 'e2e-named-user',
       email: 'ayse.named@e2e.fabrika.test',
-      name: 'Zeynep Aydın',
+      name: 'Zeynep Aydin',
       tenantId: 'demo-tenant',
       role: 'PIPELINE_MANAGER',
     });
 
     await page.goto(PANEL_URL);
     const header = page.locator('header:visible').first();
-    await expect(header.getByText('Zeynep Aydın').first()).toBeVisible();
+    await expect(header.getByText('Zeynep Aydin').first()).toBeVisible();
 
     const frame = await page.locator('body').innerText();
     for (const invented of INVENTED) {
@@ -102,7 +115,7 @@ test.describe('app frame identity', () => {
     await signInAs(page, {
       id: 'e2e-roleless-user',
       email: 'roleless@e2e.fabrika.test',
-      name: 'Rolsüz Kullanıcı',
+      name: 'Rolsuz Kullanici',
       tenantId: 'demo-tenant',
     });
 
