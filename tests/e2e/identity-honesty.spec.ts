@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
-import { prisma } from '../../src/lib/db';
+import { withSystemScope } from '../../src/lib/system-scope';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
@@ -50,30 +50,32 @@ async function signInAs(
 
 test.beforeAll(async () => {
   // JWT callback reads User row on every token refresh (d57f13f1). Seed test users.
-  await Promise.all([
-    prisma.user.upsert({
-      where: { id: 'e2e-nameless-user' },
-      create: { id: 'e2e-nameless-user', email: 'ayse.nameless@e2e.fabrika.test', locale: 'tr' },
-      update: { email: 'ayse.nameless@e2e.fabrika.test' },
-    }),
-    prisma.user.upsert({
-      where: { id: 'e2e-named-user' },
-      create: { id: 'e2e-named-user', email: 'ayse.named@e2e.fabrika.test', name: 'Zeynep Aydın', locale: 'tr' },
-      update: { email: 'ayse.named@e2e.fabrika.test', name: 'Zeynep Aydın' },
-    }),
-    prisma.user.upsert({
-      where: { id: 'e2e-roleless-user' },
-      create: { id: 'e2e-roleless-user', email: 'roleless@e2e.fabrika.test', name: 'Rolsüz Kullanıcı', locale: 'tr' },
-      update: { email: 'roleless@e2e.fabrika.test', name: 'Rolsüz Kullanıcı' },
-    }),
-  ]);
+  // Use withSystemScope to bypass RLS during test setup.
+  await withSystemScope('platform-admin', 'e2e.identity-honesty.setup', async (tx) => {
+    await Promise.all([
+      tx.user.upsert({
+        where: { id: 'e2e-nameless-user' },
+        create: { id: 'e2e-nameless-user', email: 'ayse.nameless@e2e.fabrika.test', locale: 'tr' },
+        update: { email: 'ayse.nameless@e2e.fabrika.test' },
+      }),
+      tx.user.upsert({
+        where: { id: 'e2e-named-user' },
+        create: { id: 'e2e-named-user', email: 'ayse.named@e2e.fabrika.test', name: 'Zeynep Aydın', locale: 'tr' },
+        update: { email: 'ayse.named@e2e.fabrika.test', name: 'Zeynep Aydın' },
+      }),
+      tx.user.upsert({
+        where: { id: 'e2e-roleless-user' },
+        create: { id: 'e2e-roleless-user', email: 'roleless@e2e.fabrika.test', name: 'Rolsüz Kullanıcı', locale: 'tr' },
+        update: { email: 'roleless@e2e.fabrika.test', name: 'Rolsüz Kullanıcı' },
+      }),
+    ]);
+  });
 });
 
 test.afterAll(async () => {
-  await Promise.all([
-    prisma.user.deleteMany({ where: { id: { in: ['e2e-nameless-user', 'e2e-named-user', 'e2e-roleless-user'] } } }),
-  ]);
-  await prisma.$disconnect();
+  await withSystemScope('platform-admin', 'e2e.identity-honesty.cleanup', async (tx) => {
+    await tx.user.deleteMany({ where: { id: { in: ['e2e-nameless-user', 'e2e-named-user', 'e2e-roleless-user'] } } });
+  });
 });
 
 test.describe('app frame identity', () => {
