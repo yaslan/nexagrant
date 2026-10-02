@@ -782,13 +782,21 @@
       "heading": "Privacy Policy & GDPR Disclosure",
       "controllerHeading": "1. Data Controller",
       "controllerBody": "{brand} SaaS Platform, in compliance with GDPR and applicable national laws, prioritizes the security and privacy of all user data.",
-      "dataHeading": "2. Data Processed & Collection Purposes",
-      "dataBody": "Account registration, session authentication, EU funding call matching, AI-assisted concept note drafting, and subscription billing processes involve processing names, emails, organization profiles, and payment metadata.",
-      "rightsHeading": "3. Data Subject Rights (Export & Deletion)",
-      "rightsBody": "Under GDPR and applicable data protection law, you can export your data as JSON at any time from “Settings → Privacy & My Data”. From the same screen you can request deletion of your account: it is closed immediately and all of your data and uploaded files are permanently deleted after 30 days. You may cancel the request within that 30-day window. For security, authentication secrets (OAuth and session tokens) are excluded from the export file.",
+      "dataHeading": "2. Data Processed, Collection Purposes and Legal Basis",
+      "dataBody": "Account registration, session authentication, EU funding call matching, AI-assisted concept note drafting, product analytics, and subscription billing processes involve processing names, emails, organization profiles, payment records, and browser events. Data is processed under account creation and contract performance (GDPR art.6(1)(b)), legal obligations (art.6(1)(c)), legitimate interests (art.6(1)(f)), and explicit consent (art.6(1)(a) — analytics cookies and product improvement).",
+      "rightsHeading": "4. Data Subject Rights",
+      "rightsBody": "Under GDPR and applicable data protection law, you have the following nine rights: (a) To know whether your personal data is being processed; (b) To request information about your processed data — you can export it as JSON at any time from 'Settings → Privacy & My Data'; (c) To learn the purpose of processing and whether it aligns with that purpose; (d) To know which third parties within and outside your country your data is transferred to; (e) To request correction of incomplete or incorrect data; (f) To request deletion or destruction of your data — you can request account deletion from 'Settings → Privacy & My Data' (account is closed immediately and permanently deleted after 30 days; you may cancel within that window); (g) To request that deletion or correction be communicated to third parties; (h) To object to decisions based solely on automated processing (product scoring falls under this right); (i) To seek compensation for harm. For security, authentication secrets (OAuth and session tokens) are excluded from exports.",
       "rightsLink": "Go to Privacy & My Data",
-      "securityHeading": "4. Security and Storage",
-      "securityBody": "Your data is partitioned via PostgreSQL Row-Level Security (RLS) in a multi-tenant environment, and uploaded files are protected in encrypted cloud object storage (R2/S3)."
+      "securityHeading": "7. Security and Storage",
+      "securityBody": "Your data is partitioned via PostgreSQL Row-Level Security (RLS) in a multi-tenant environment, and uploaded files are protected in encrypted cloud object storage (R2/S3).",
+      "recipientsHeading": "3. Data Recipients & International Transfers",
+      "recipientsBody": "Your data may be transferred to: (1) Anthropic PBC (USA) — capacity descriptions sent for AI text generation; (2) Google LLC (USA) — name and email sent during sign-in; (3) Stripe, Inc. (USA) — customer identifier and billing status for subscription and payment management; (4) OpenAI, L.L.C. (USA) — document text for embedding; (5) Cloudflare, Inc. (region depends on account settings) — uploaded files and screenshots; (6) PostHog Inc. (EU region, default) — event names and scoring status (requires cookie consent); (7) Vulut (Turkey) — database, application server, and email hosting; (8) iyzico (Turkey) — payments in Turkish Lira. For information about legal safeguards and standard contractual clauses for international transfers, contact your administrator.",
+      "legalBasisHeading": "5. Legal Basis Table",
+      "legalBasisBody": "Processing activities and their legal basis: Account creation (art.6(1)(b) — contract performance); Invitations and team management (art.6(1)(b)); Billing and payments (art.6(1)(b) and (c) — legal record-keeping); Tax ID (art.6(1)(c)); AI text generation (art.6(1)(f) — legitimate interest); AI embedding and RAG (art.6(1)(f)); Usage logging (art.6(1)(f)); Internal pre-assessment (art.6(1)(f)); Audit trail (art.6(1)(f)); Feedback (art.6(1)(f)); Product analytics (art.6(1)(a) — explicit consent, cookie approval required); Disclosure and consent records (art.6(1)(f)); Agency channel invitations (art.6(1)(f)); Assessment/test results (art.6(1)(f)).",
+      "collectionMethodHeading": "6. Data Collection Method",
+      "collectionMethodBody": "Data is collected through: (1) User input (forms — registration, sign-in, profile, assessment results); (2) Google OAuth — name and email during sign-in; (3) Cookies and browser storage — session, language preference, theme choice; (4) Analytics cookies (with consent) — product events via PostHog; (5) Automated — AI scoring system.",
+      "contactHeading": "8. Request Channel & Contact",
+      "contactBody": "To exercise your rights listed above, contact us at info@fonbridge.com. Your request can be submitted in writing, via KEP (Turkish secure email), secure electronic signature, mobile signature, or your registered email address on file. You will receive a response within 30 days (response time is free of charge, except for statutory copying fees). Even if you do not have an account with us when you submit your request, you can still exercise these rights."
     },
     "terms": {
       "metaTitle": "Terms of Service and Agreement — {brand}",
@@ -825,7 +833,7 @@
     },
     "cookieConsent": {
       "title": "Cookie Preferences",
-      "description": "We only use the cookies and browser storage the site needs to work: your session, your language and theme preference, and your cart. We do not use analytics or third-party tracking cookies. For details, see our ",
+      "description": "We use cookies and browser storage the site needs to work: your session, your language and theme preference, and your cart. If you click 'Accept All', we also use analytics cookies (PostHog) to improve the product. We do not use third-party tracking cookies. For details, see our ",
       "privacyLink": "Privacy Policy",
       "acceptAll": "Accept All",
       "essentialOnly": "Essential Only"
