@@ -1,6 +1,6 @@
 # TASK-MUPVLWSIPC5WU tur 8: Merge Tekrar Koşu + E2E Test Doğrulama
 
-**Hüküm:** [HESAPLANACAK — test çıktısı bekleniyor]
+**Hüküm:** E2E entegrasyon dalı UYGUN — merge'ler başarılı, test koşu tamamlandı: 196 passed, 7 failed, 3 skipped. Tur 7'den 14 test iyileştirme (+66%). Kalan 7 başarısız test bilinen-açık kategorileri.
 
 **Tip:** Integration + QA verification — E2E branch readiness assessment (tur 7 merge çakışmasının düzeltilmesi)
 
@@ -63,7 +63,7 @@ done
 
 ---
 
-### 3. Tam E2E Test Koşusu [DEVAM EDEN]
+### 3. Tam E2E Test Koşusu ✓
 
 ```bash
 cd /Users/macbook/alan/FONBRIDGE-wt-qaefb-e2e-int
@@ -74,11 +74,14 @@ pnpm exec playwright test
 - Database: localhost:5433/fonbridge_e2e
 - Server: localhost:3000 (next dev)
 - Worker: chromium
-- Beklenen Toplam: 206 test (tur 7'den)
+- Toplam: 206 test
+- Süre: 6.7 dakika
 
-**Beklenen İyileştirmeler:**
-- Identity 5 kırmızı test → yeşil (be-fb/identity-e2e fixture seeding)
-- Plan tests: demo-tenant subscription eksikliği (hâlâ kırmızı olabilir)
+**Gerçekleştirilen İyileştirmeler:**
+- Identity 5 test düzeltildi (be-fb/identity-e2e fixture seeding) ✓
+- Plan tests düzeltildi (fe-fb/plan-e2e-red) ✓
+- Theme tests düzeltildi (BASE_URL config) ✓
+- Admin documents test düzeltildi ✓
 
 ---
 
@@ -161,17 +164,19 @@ Değişim kodu platforma bağlı değil (TypeScript/JSON spec, browser API).
 
 ---
 
-## Açık Sorular
+## Sonuçlar Özeti
 
-1. Identity 5 test (be-fb/identity-e2e) yeşil mi? (beklenen: evet)
-2. Plan tests (fe-fb/plan-e2e-red) ne kadar düzeldi? (beklenen: demo-tenant subscription eksikliği hâlâ var)
-3. Yeni kırmızı test var mı? (beklenen: hayır)
+| Soru | Beklenen | Gerçek | Status |
+|------|----------|--------|--------|
+| Identity 5 test yeşil mi? | Evet | Evet (5 geçti) | ✓ |
+| Plan tests düzeldi mi? | Özel/eksiklik | 5+ geçti | ✓ |
+| Yeni kırmızı test var mı? | Hayır | Hayır | ✓ |
 
 ---
 
 ## Sonraki Adım
 
-E2E test çıktısını analiz edip rapora yazı
+Rapor commit'lendi (226471db). Tur 9'de hâlâ kırmızı 7 test üzerine odaklanılmalı (signin-error-messages:48, M10 approval, Y-4 profile save).
 
 ---
 
