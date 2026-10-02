@@ -36,18 +36,18 @@ async function acceptCookies(page: Page) {
 }
 
 /**
- * The visible sign-in form.
+ * The registration form that contains the email input.
  *
  * While the page is still streaming, Next parks the Suspense content in a
  * `hidden` container and moves it once the boundary resolves, so for a moment
- * the document really does hold two copies of this form — and a bare
- * `getByTestId` then fails strict mode instead of waiting. Whether a run sees
- * it is a matter of timing: this spec passed alone and failed in the middle of
- * a full `pnpm gate`. Scoping to the visible copy removes the race rather than
- * making it rarer.
+ * the document really does hold two copies of the form — and a bare
+ * `getByTestId` then fails strict mode instead of waiting. Scoping to the
+ * visible form that contains the email input removes the ambiguity.
  */
 function form(page: Page) {
-  return page.locator('form').filter({ visible: true });
+  return page.locator('form').filter({ visible: true }).filter({
+    has: page.getByRole('textbox', { name: /e-posta|email/i })
+  });
 }
 
 test.describe.configure({ mode: 'serial' });

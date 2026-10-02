@@ -50,15 +50,68 @@ async function signInAs(
 
 test.describe('app frame identity', () => {
   test.beforeAll(async () => {
-    await seedUserMembership('demo-tenant', 'e2e-nameless-user', 'ayse.nameless@e2e.fabrika.test', 'E2E Nameless', 'PIPELINE_MANAGER');
-    await seedUserMembership('demo-tenant', 'e2e-named-user', 'ayse.named@e2e.fabrika.test', 'Zeynep Aydin', 'PIPELINE_MANAGER');
-    await seedUserMembership('demo-tenant', 'e2e-roleless-user', 'roleless@e2e.fabrika.test', 'Rolsuz Kullanici');
+    // Seed test users with specific roles/names for identity honesty tests
+    await seedUserMembership(
+      'demo-tenant',
+      'e2e-nameless-user',
+      'ayse.nameless@e2e.fabrika.test',
+      null,
+      'PIPELINE_MANAGER'
+    );
+    await seedUserMembership(
+      'demo-tenant',
+      'e2e-named-user',
+      'ayse.named@e2e.fabrika.test',
+      'Zeynep Aydin',
+      'PIPELINE_MANAGER'
+    );
+    // e2e-roleless-user: User exists but no membership, so the session has no role
+    await seedUserMembership(
+      'demo-tenant',
+      'e2e-roleless-user',
+      'roleless@e2e.fabrika.test',
+      null,
+      'PIPELINE_MANAGER',
+      [],
+      true // skipMembership = true
+    );
+  });
+
+  test('sanity check: e2e users + memberships exist in database', async () => {
+    const { Client } = await import('pg');
+    const url = process.env.E2E_DATABASE_URL || process.env.DATABASE_URL;
+    if (!url) throw new Error('DATABASE_URL not set');
+    const client = new Client({ connectionString: url });
+    await client.connect();
+    try {
+      // Use system scope to bypass RLS (same as global-setup seeding)
+      await client.query('BEGIN');
+      await client.query(`SET app.system_scope = 'on'`);
+
+      const usersResult = await client.query(`
+        SELECT id, email, name FROM "User" WHERE id LIKE 'e2e-%' ORDER BY id
+      `);
+      expect(usersResult.rows.length).toBeGreaterThan(0);
+
+      const membershipsResult = await client.query(`
+        SELECT "tenantId", "userId", role FROM "Membership" WHERE "userId" LIKE 'e2e-%' ORDER BY "userId"
+      `);
+      expect(membershipsResult.rows.length).toBeGreaterThan(0);
+
+      await client.query('COMMIT');
+    } finally {
+      await client.end();
+    }
   });
 
   test.afterAll(async () => {
-    await cleanupUserMembership('demo-tenant', 'e2e-nameless-user');
-    await cleanupUserMembership('demo-tenant', 'e2e-named-user');
-    await cleanupUserMembership('demo-tenant', 'e2e-roleless-user');
+    try {
+      await cleanupUserMembership('demo-tenant', 'e2e-nameless-user');
+      await cleanupUserMembership('demo-tenant', 'e2e-named-user');
+      await cleanupUserMembership('demo-tenant', 'e2e-roleless-user');
+    } catch (e) {
+      console.warn('[identity-honesty] cleanupUserMembership failed:', e instanceof Error ? e.message : String(e));
+    }
   });
 
   test('a session with no name is never given somebody else\'s name', async ({ page }) => {
