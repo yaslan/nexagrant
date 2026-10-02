@@ -49,8 +49,12 @@ export default async function PrivacyPage({
   const sections = [
     { heading: t('controllerHeading'), body: t('controllerBody', { brand: PRODUCT_NAME }) },
     { heading: t('dataHeading'), body: t('dataBody') },
+    { heading: t('recipientsHeading'), body: t('recipientsBody') },
     { heading: t('rightsHeading'), body: t('rightsBody'), href: getWorkspaceRoute('settingsPrivacy', locale, 'default') },
+    { heading: t('legalBasisHeading'), body: t('legalBasisBody') },
+    { heading: t('collectionMethodHeading'), body: t('collectionMethodBody') },
     { heading: t('securityHeading'), body: t('securityBody') },
+    { heading: t('contactHeading'), body: t('contactBody') },
   ];
 
   return (
