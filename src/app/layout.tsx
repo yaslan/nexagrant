@@ -17,6 +17,18 @@ export const metadata: Metadata = {
   title: PRODUCT_NAME,
   description: 'Avrupa fonları için proje pipeline SaaS',
   metadataBase: new URL(appUrl()),
+  icons: {
+    icon: '/favicon.ico',
+    apple: {
+      url: '/apple-icon.png',
+      sizes: '180x180',
+      type: 'image/png',
+    },
+  },
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F4F6F8' },
+    { media: '(prefers-color-scheme: dark)', color: '#080D1A' },
+  ],
 };
 
 /**
