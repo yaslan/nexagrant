@@ -6,6 +6,7 @@ import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
+import { requireId } from '../helpers/teardown-guard';
 
 /**
  * AKTAR-MURBCJ0A-1 (cae-fb K-2) — the approvals screen (Onay Merkezi) used to
@@ -91,7 +92,9 @@ test.describe('Onay Merkezi persistence', () => {
 
   test.afterAll(async () => {
     if (process.env.PLAN_E2E_KEEP !== '1') {
-      await prisma.approvalRequest.deleteMany({ where: { tenantId: ULTRA.tenantId, title: { contains: RUN } } });
+      await prisma.approvalRequest.deleteMany({
+        where: { tenantId: requireId(ULTRA.tenantId, 'tenantId'), title: { contains: requireId(RUN, 'RUN') } },
+      });
       await prisma.membership.deleteMany({ where: { userId: APPROVER.id } });
       await prisma.user.deleteMany({ where: { id: APPROVER.id } });
       await rollback();
