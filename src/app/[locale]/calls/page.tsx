@@ -1,8 +1,44 @@
+import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { publicCallDetailHref } from '@/lib/routes';
+import { appUrl } from '@/lib/app-url';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'callsPage' });
+  const title = t('pageTitle');
+  const description = t('pageDescription');
+
+  const baseUrl = appUrl();
+  const canonicalUrl = `${baseUrl}/${locale}/calls`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        'tr': `${baseUrl}/tr/calls`,
+        'en': `${baseUrl}/en/calls`,
+      },
+    },
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
+      url: canonicalUrl,
+    },
+    twitter: { card: 'summary_large_image', title, description },
+  };
+}
 
 interface CallCardProps {
   call: {

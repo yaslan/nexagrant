@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -6,6 +7,47 @@ import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
 import { formatBlogDate, getBlogPostBySlug, getBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
+import { appUrl } from '@/lib/app-url';
+import { parsePublishedDate } from '@/lib/date';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}): Promise<Metadata> {
+  const { locale, slug } = await params;
+  const post = getBlogPostBySlug(slug);
+
+  if (!post) {
+    return { title: 'Not found' };
+  }
+
+  const baseUrl = appUrl();
+  const canonicalUrl = `${baseUrl}/${locale}/blog/${slug}`;
+  const publishedDate = parsePublishedDate(post.publishedAt);
+
+  return {
+    title: post.title,
+    description: post.excerpt,
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        'tr': `${baseUrl}/tr/blog/${slug}`,
+        'en': `${baseUrl}/en/blog/${slug}`,
+      },
+    },
+    openGraph: {
+      title: post.title,
+      description: post.excerpt,
+      type: 'article',
+      locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
+      url: canonicalUrl,
+      images: [{ url: post.image, alt: post.title }],
+      publishedTime: publishedDate?.toISOString(),
+    },
+    twitter: { card: 'summary_large_image', title: post.title, description: post.excerpt },
+  };
+}
 
 /**
  * Renders `**bold**` spans inside a line of already-escaped React text.

@@ -1182,7 +1182,9 @@
     "budget": "Bütçe",
     "view_details": "Detayları Gör",
     "no_calls": "Şu anda {region} için açık çağrı yok.",
-    "no_calls_hint": "Diğer ülkeleri gözlemleyin ya da panelden kayıtlı arama oluşturun."
+    "no_calls_hint": "Diğer ülkeleri gözlemleyin ya da panelden kayıtlı arama oluşturun.",
+    "meta_title": "{region} Çağrıları",
+    "meta_description": "{region} bölgesine uygun AB hibe çağrıları"
   },
   "applicationPartA": {
     "portalLinkFailed": "Bağlantı oluşturulamadı. Sayfayı yenileyip tekrar deneyin."
@@ -2772,5 +2774,16 @@
       "SKIP_LIMIT_EXCEEDED": "İçe aktarım hatası: CORDIS dökümünde okunamayan kayıt sayısı sınırı aştı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında.",
       "IMPORT_FAILED": "İçe aktarım hatası: içe aktarım tamamlanamadı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında."
     }
+  },
+  "blog": {
+    "meta_title": "AB Proje Yönetimi & Hibe Blogu",
+    "meta_description": "Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri."
+  },
+  "blog_detail": {
+    "meta_description": "Blog yazısı"
+  },
+  "turkiyeye_acik_cagrilar": {
+    "meta_title": "Türkiye'ye Açık Horizon Çağrıları",
+    "meta_description": "Türk kuruluşlarının katılabildiği açık Horizon Europe çağrıları. Son başvuru tarihleri, bütçeler ve başvuru bağlantıları."
   }
 }

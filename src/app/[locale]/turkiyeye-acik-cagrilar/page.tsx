@@ -1,9 +1,46 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import React from 'react';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
 import { errorMessage } from '@/lib/errors';
+import { appUrl } from '@/lib/app-url';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'turkiyeye_acik_cagrilar' });
+  const title = t('meta_title');
+  const description = t('meta_description');
+
+  const baseUrl = appUrl();
+  const canonicalUrl = `${baseUrl}/${locale}/turkiyeye-acik-cagrilar`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        'tr': `${baseUrl}/tr/turkiyeye-acik-cagrilar`,
+        'en': `${baseUrl}/en/turkiyeye-acik-cagrilar`,
+      },
+    },
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      locale: locale === 'tr' ? 'tr_TR' : 'en_GB',
+      url: canonicalUrl,
+    },
+    twitter: { card: 'summary_large_image', title, description },
+  };
+}
 
 /** The Topic columns this listing renders, with its parent call. */
 interface OpenTopicRow {

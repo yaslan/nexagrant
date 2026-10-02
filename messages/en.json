@@ -1182,7 +1182,9 @@
     "budget": "Budget",
     "view_details": "View Details",
     "no_calls": "No open calls for {region} at the moment.",
-    "no_calls_hint": "Check other countries or create a saved search from the dashboard."
+    "no_calls_hint": "Check other countries or create a saved search from the dashboard.",
+    "meta_title": "{region} Calls",
+    "meta_description": "EU funding calls open to {region}"
   },
   "applicationPartA": {
     "portalLinkFailed": "The link could not be created. Refresh the page and try again."
@@ -2772,5 +2774,16 @@
       "SKIP_LIMIT_EXCEEDED": "Import failed: the CORDIS dump has more unreadable records than the limit allows. Details are in the run record and in system alerts.",
       "IMPORT_FAILED": "Import failed: the import could not finish. Details are in the run record and in system alerts."
     }
+  },
+  "blog": {
+    "meta_title": "EU Grant Management & Insights Blog",
+    "meta_description": "Expert articles, Horizon Europe methodologies, CORDIS network graph analysis, and AI proposal writing tips."
+  },
+  "blog_detail": {
+    "meta_description": "Blog post"
+  },
+  "turkiyeye_acik_cagrilar": {
+    "meta_title": "Horizon Calls Open to Turkey",
+    "meta_description": "Open Horizon Europe funding calls for Turkish organizations. Deadlines, budgets, and application links."
   }
 }
