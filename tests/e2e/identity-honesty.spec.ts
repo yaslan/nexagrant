@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
-import { seedUserMembership, cleanupUserMembership } from './fixtures/user-membership-seed';
+import { cleanupUserMembership } from './fixtures/user-membership-seed';
 
 /**
  * TASK-MTR5BGKNELCO2 — the app frame must never invent who is signed in.
@@ -50,15 +50,46 @@ async function signInAs(
 
 test.describe('app frame identity', () => {
   test.beforeAll(async () => {
-    await seedUserMembership('demo-tenant', 'e2e-nameless-user', 'ayse.nameless@e2e.fabrika.test', 'E2E Nameless', 'PIPELINE_MANAGER');
-    await seedUserMembership('demo-tenant', 'e2e-named-user', 'ayse.named@e2e.fabrika.test', 'Zeynep Aydin', 'PIPELINE_MANAGER');
-    await seedUserMembership('demo-tenant', 'e2e-roleless-user', 'roleless@e2e.fabrika.test', 'Rolsuz Kullanici');
+    // Fixture seeding is handled by global-setup.ts; users are created there.
+    // This hook can be removed once all specs rely on global-setup seeding.
+  });
+
+  test('sanity check: e2e users + memberships exist in database', async () => {
+    const { Client } = await import('pg');
+    const url = process.env.E2E_DATABASE_URL || process.env.DATABASE_URL;
+    if (!url) throw new Error('DATABASE_URL not set');
+    const client = new Client({ connectionString: url });
+    await client.connect();
+    try {
+      // Use system scope to bypass RLS (same as global-setup seeding)
+      const usersResult = await client.query(`
+        BEGIN;
+        SET app.system_scope = 'on';
+        SELECT id, email, name FROM "User" WHERE id LIKE 'e2e-%' ORDER BY id;
+        COMMIT;
+      `);
+      expect(usersResult.rows.length).toBeGreaterThan(0);
+
+      const membershipsResult = await client.query(`
+        BEGIN;
+        SET app.system_scope = 'on';
+        SELECT "tenantId", "userId", role FROM "Membership" WHERE "userId" LIKE 'e2e-%' ORDER BY "userId";
+        COMMIT;
+      `);
+      expect(membershipsResult.rows.length).toBeGreaterThan(0);
+    } finally {
+      await client.end();
+    }
   });
 
   test.afterAll(async () => {
-    await cleanupUserMembership('demo-tenant', 'e2e-nameless-user');
-    await cleanupUserMembership('demo-tenant', 'e2e-named-user');
-    await cleanupUserMembership('demo-tenant', 'e2e-roleless-user');
+    try {
+      await cleanupUserMembership('demo-tenant', 'e2e-nameless-user');
+      await cleanupUserMembership('demo-tenant', 'e2e-named-user');
+      await cleanupUserMembership('demo-tenant', 'e2e-roleless-user');
+    } catch (e) {
+      console.warn('[identity-honesty] cleanupUserMembership failed:', e instanceof Error ? e.message : String(e));
+    }
   });
 
   test('a session with no name is never given somebody else\'s name', async ({ page }) => {

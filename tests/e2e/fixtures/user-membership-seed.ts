@@ -12,7 +12,7 @@ export async function seedUserMembership(
   userId: string,
   email: string,
   name: string = 'E2E Test User',
-  role: 'TENANT_OWNER' | 'TENANT_ADMIN' | 'MEMBER' = 'TENANT_OWNER',
+  role: 'TENANT_OWNER' | 'TENANT_ADMIN' | 'MEMBER' | 'PIPELINE_MANAGER' | null = 'TENANT_OWNER',
   workspaceIds: string[] = []
 ) {
   return withSystemScope('platform-admin', 'e2e-test-user-seed', async (tx) => {
@@ -23,11 +23,13 @@ export async function seedUserMembership(
       update: { email, name },
     });
 
-    // Create membership if it doesn't exist
+    // Create membership if it doesn't exist. When role is null, it must be explicitly
+    // set to null in both create and update, otherwise Prisma's @default(MEMBER) applies.
+    const roleValue = role === null ? { role: null } : { role };
     await tx.membership.upsert({
       where: { tenantId_userId: { tenantId, userId } },
-      create: { tenantId, userId, role, workspaceIds },
-      update: { role, workspaceIds },
+      create: { tenantId, userId, ...roleValue, workspaceIds },
+      update: { ...roleValue, workspaceIds },
     });
   });
 }
