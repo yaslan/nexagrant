@@ -12,6 +12,13 @@ import {
 import { DualApprovalActionType } from '@/lib/rbac';
 import { errorMessage as toErrorMessage } from '@/lib/errors';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+import {
+  APPROVAL_DESCRIPTION_MAX,
+  APPROVAL_REASON_MAX,
+  APPROVAL_TITLE_MAX,
+  type ApprovalRequestError,
+} from '@/lib/approval-request-rules';
+import type { ApprovalRequestRow } from '@/lib/approval-requests';
 
 export interface ApprovalRequestItem {
   id: string;
@@ -59,6 +66,21 @@ export default function ApprovalsClient({
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const errorText = useActionErrorText();
+  // A refusal the server answered as a value: `Approvals.errors.<code>`, spelled
+  // exactly as src/lib/approval-request-rules.ts spells the code.
+  const refusalText = (code: ApprovalRequestError) => t(`errors.${code}`);
+  const toItem = (row: ApprovalRequestRow): ApprovalRequestItem => ({
+    ...row,
+    payload: (row.payload ?? {}) as Record<string, unknown>,
+  });
+  const replaceItem = (row: ApprovalRequestRow) =>
+    setRequests((prev) => prev.map((item) => (item.id === row.id ? toItem(row) : item)));
+  /** A refusal can still have moved the row (expiry is written when an action meets it). */
+  const markIfExpired = (id: string, code: ApprovalRequestError) => {
+    if (code === 'expired') {
+      setRequests((prev) => prev.map((item) => (item.id === id ? { ...item, status: 'EXPIRED' } : item)));
+    }
+  };
 
   // New Request Form State
   const [formActionType, setFormActionType] = useState<DualApprovalActionType>('GATE_G4_SUBMISSION');
@@ -78,15 +100,12 @@ export default function ApprovalsClient({
     try {
       setLoadingId(req.id);
       setErrorMessage(null);
-      const res = await approveRequestAction(req.id, t('statusApproved'));
-      if (res.success) {
-        setRequests((prev) =>
-          prev.map((item) =>
-            item.id === req.id
-              ? { ...item, status: 'APPROVED', approverId: currentUserId, executedAt: new Date() }
-              : item
-          )
-        );
+      const res = await approveRequestAction(req.id);
+      if (res.ok) {
+        replaceItem(res.request);
+      } else {
+        markIfExpired(req.id, res.error);
+        setErrorMessage(refusalText(res.error));
       }
     } catch (err) {
       setErrorMessage(errorText(err, () => toErrorMessage(err) || t('errorApprove')));
@@ -102,16 +121,13 @@ export default function ApprovalsClient({
       setLoadingId(rejectModalItem.id);
       setErrorMessage(null);
       const res = await rejectRequestAction(rejectModalItem.id, rejectionReason);
-      if (res.success) {
-        setRequests((prev) =>
-          prev.map((item) =>
-            item.id === rejectModalItem.id
-              ? { ...item, status: 'REJECTED', approverId: currentUserId, rejectionReason }
-              : item
-          )
-        );
+      if (res.ok) {
+        replaceItem(res.request);
         setRejectModalItem(null);
         setRejectionReason('');
+      } else {
+        markIfExpired(rejectModalItem.id, res.error);
+        setErrorMessage(refusalText(res.error));
       }
     } catch (err) {
       setErrorMessage(errorText(err, () => toErrorMessage(err) || t('errorReject')));
@@ -126,10 +142,11 @@ export default function ApprovalsClient({
       setLoadingId(req.id);
       setErrorMessage(null);
       const res = await cancelRequestAction(req.id);
-      if (res.success) {
-        setRequests((prev) =>
-          prev.map((item) => (item.id === req.id ? { ...item, status: 'CANCELLED' } : item))
-        );
+      if (res.ok) {
+        replaceItem(res.request);
+      } else {
+        markIfExpired(req.id, res.error);
+        setErrorMessage(refusalText(res.error));
       }
     } catch (err) {
       setErrorMessage(errorText(err, () => toErrorMessage(err) || t('errorCancel')));
@@ -156,12 +173,14 @@ export default function ApprovalsClient({
         payload: parsedPayload,
       });
 
-      if (res.success && res.request) {
-        setRequests((prev) => [res.request, ...prev]);
+      if (res.ok) {
+        setRequests((prev) => [toItem(res.request), ...prev]);
         setIsNewModalOpen(false);
         setFormTitle('');
         setFormDescription('');
         setActiveTab('my_requests');
+      } else {
+        setErrorMessage(refusalText(res.error));
       }
     } catch (err) {
       setErrorMessage(errorText(err, () => toErrorMessage(err) || t('errorCreate')));
@@ -213,7 +232,7 @@ export default function ApprovalsClient({
     <div className="space-y-6">
       {/* Top Banner with Alert / Error */}
       {errorMessage && (
-        <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-sm flex items-center justify-between">
+        <div data-testid="approvals-error" role="alert" className="p-4 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-sm flex items-center justify-between">
           <span>{errorMessage}</span>
           <button onClick={() => setErrorMessage(null)} className="font-bold text-lg">&times;</button>
         </div>
@@ -264,6 +283,7 @@ export default function ApprovalsClient({
         {/* New Request Button */}
         <button
           onClick={() => setIsNewModalOpen(true)}
+          data-testid="approval-new"
           className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-sm font-semibold rounded-lg shadow-sm transition-all flex items-center gap-2"
         >
           <span>+</span>
@@ -291,6 +311,8 @@ export default function ApprovalsClient({
             return (
               <div
                 key={req.id}
+                data-testid={`approval-request-${req.id}`}
+                data-status={req.status}
                 className="p-5 bg-surface dark:bg-zinc-900 border border-border dark:border-gray-800 rounded-xl shadow-sm hover:border-border transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
               >
                 {/* A link pasted into the title or description is one unbreakable word. In the
@@ -358,12 +380,14 @@ export default function ApprovalsClient({
                     <>
                       <button
                         onClick={() => handleApprove(req)}
+                        data-testid={`approve-${req.id}`}
                         disabled={loadingId === req.id}
                         className="px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm transition-all"
                       >
                         {loadingId === req.id ? t('processing') : `✓ ${t('approve')}`}
                       </button>
                       <button
+                        data-testid={`reject-${req.id}`}
                         onClick={() => {
                           setRejectModalItem(req);
                           setRejectionReason('');
@@ -380,6 +404,7 @@ export default function ApprovalsClient({
                   {req.status === 'PENDING' && isMaker && (
                     <button
                       onClick={() => handleCancel(req)}
+                      data-testid={`cancel-${req.id}`}
                       disabled={loadingId === req.id}
                       className="px-3 py-1.5 text-xs font-medium text-ink-2 hover:text-red-600 bg-surface-hover dark:bg-gray-800 hover:bg-red-50 rounded-lg transition-colors"
                     >
@@ -407,6 +432,7 @@ export default function ApprovalsClient({
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder={t('rejectPlaceholder')}
                 required
+                maxLength={APPROVAL_REASON_MAX}
                 rows={3}
                 className="w-full text-sm p-3 border border-border dark:border-gray-700 rounded-lg bg-ground dark:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-red-500"
               />
@@ -508,6 +534,8 @@ export default function ApprovalsClient({
                   onChange={(e) => setFormTitle(e.target.value)}
                   placeholder={t('titlePlaceholder')}
                   required
+                  maxLength={APPROVAL_TITLE_MAX}
+                  data-testid="approval-title-input"
                   className="w-full p-2.5 border border-border dark:border-gray-700 rounded-lg bg-ground dark:bg-zinc-800"
                 />
               </div>
@@ -519,6 +547,7 @@ export default function ApprovalsClient({
                   onChange={(e) => setFormDescription(e.target.value)}
                   placeholder={t('descriptionPlaceholder')}
                   rows={2}
+                  maxLength={APPROVAL_DESCRIPTION_MAX}
                   className="w-full p-2.5 border border-border dark:border-gray-700 rounded-lg bg-ground dark:bg-zinc-800"
                 />
               </div>
@@ -544,6 +573,7 @@ export default function ApprovalsClient({
                 </button>
                 <button
                   type="submit"
+                  data-testid="approval-create-submit"
                   className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm"
                 >
                   {t('submitCreate')}

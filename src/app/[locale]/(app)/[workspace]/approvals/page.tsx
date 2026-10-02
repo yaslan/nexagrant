@@ -1,4 +1,5 @@
-import { withTenant } from '@/lib/db';
+import { listApprovalRequests } from '@/lib/approval-requests';
+import { effectiveApprovalStatus } from '@/lib/approval-request-rules';
 import { auth } from '@/lib/auth';
 import ApprovalsClient, { type ApprovalRequestItem } from './client';
 import { Role } from '@prisma/client';
@@ -20,21 +21,14 @@ export default async function ApprovalsPage({
   let requests: ApprovalRequestItem[] = [];
   try {
     if (tenantId) {
-      const rawRequests = await withTenant(tenantId, (tx) =>
-        tx.approvalRequest.findMany({
-          where: { tenantId },
-          include: {
-            requester: {
-              select: { id: true, name: true, email: true },
-            },
-            approver: {
-              select: { id: true, name: true, email: true },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-        })
-      );
-      requests = rawRequests as unknown as ApprovalRequestItem[];
+      // A PENDING row past its expiry is shown as EXPIRED; the row itself is
+      // written EXPIRED by the next action that meets it (src/lib/approval-requests.ts).
+      const now = new Date();
+      requests = (await listApprovalRequests(tenantId)).map((r) => ({
+        ...r,
+        payload: (r.payload ?? {}) as Record<string, unknown>,
+        status: effectiveApprovalStatus(r.status, r.expiresAt, now),
+      }));
     }
   } catch (e) {
     console.warn(`[Approvals] DB query bypassed or fallback: ${errorMessage(e)}`);
