@@ -4,6 +4,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 
 import { createDbClient } from '../../src/lib/db';
+import { withSystemScope } from '../../src/lib/system-scope';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 import { requireId } from '../helpers/teardown-guard';
@@ -84,52 +85,73 @@ test.describe('a foreign-currency invoice export', () => {
   let cookie: string;
 
   test.beforeAll(async () => {
-    const tenant = await prisma.tenant.create({
-      data: { name: `FX Export ${STAMP}`, slug: STAMP, country: 'TR' },
-    });
-    tenantId = tenant.id;
+    await withSystemScope('platform-admin', 'e2e.invoice-foreign-currency-export.setup', async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: { name: `FX Export ${STAMP}`, slug: STAMP, country: 'TR' },
+      });
+      tenantId = tenant.id;
 
-    // $99.00 and ₺99.00 — the same 9900 minor units, so the only thing that can
-    // make the two documents differ is the currency they are read under.
-    const issue = async (currency: string, number: string) =>
-      prisma.invoice.create({
-        data: {
-          tenantId,
-          number,
-          issuedAt: new Date('2026-09-08T09:00:00.000Z'),
-          currency,
-          // TRY needs no conversion and stores nothing; USD must store all four
-          // or Postgres rejects the row (ADR-0002). 99.00 x 41.2345 = 4082.2155
-          // TL -> 408222 kuruş.
-          ...(currency === 'TRY'
-            ? {}
-            : {
-                fxRate: FIXTURE_RATE,
-                fxRateDate: new Date('2026-09-08T00:00:00.000Z'),
-                fxRateSource: 'TCMB',
-                grandTotalTryMinor: 408222,
-              }),
-          buyerName: `FX Buyer ${STAMP}`,
-          buyerVknTckn: '2840958172',
-          buyerTaxOffice: 'Kadıköy V.D.',
-          buyerAddress: 'Bağdat Cad. No:10',
-          buyerCity: 'İstanbul',
-          buyerCountry: 'Türkiye',
-          lines: [
-            { name: 'Fabrika Pro (1 ay)', quantity: 1, unitCode: 'MON', unitPriceMinor: 9900, vatRate: 20 },
-          ],
-          ettn: randomUUID(),
-        },
+      // $99.00 and ₺99.00 — the same 9900 minor units, so the only thing that can
+      // make the two documents differ is the currency they are read under.
+      const issue = async (currency: string, number: string) =>
+        tx.invoice.create({
+          data: {
+            tenantId,
+            number,
+            issuedAt: new Date('2026-09-08T09:00:00.000Z'),
+            currency,
+            // TRY needs no conversion and stores nothing; USD must store all four
+            // or Postgres rejects the row (ADR-0002). 99.00 x 41.2345 = 4082.2155
+            // TL -> 408222 kuruş.
+            ...(currency === 'TRY'
+              ? {}
+              : {
+                  fxRate: FIXTURE_RATE,
+                  fxRateDate: new Date('2026-09-08T00:00:00.000Z'),
+                  fxRateSource: 'TCMB',
+                  grandTotalTryMinor: 408222,
+                }),
+            buyerName: `FX Buyer ${STAMP}`,
+            buyerVknTckn: '2840958172',
+            buyerTaxOffice: 'Kadıköy V.D.',
+            buyerAddress: 'Bağdat Cad. No:10',
+            buyerCity: 'İstanbul',
+            buyerCountry: 'Türkiye',
+            lines: [
+              { name: 'Fabrika Pro (1 ay)', quantity: 1, unitCode: 'MON', unitPriceMinor: 9900, vatRate: 20 },
+            ],
+            ettn: randomUUID(),
+          },
+        });
+
+      usdNumber = (await issue('USD', `${STAMP}-USD`)).number;
+      tryNumber = (await issue('TRY', `${STAMP}-TRY`)).number;
+
+      const userId = `${STAMP}-user`;
+      await tx.user.upsert({
+        where: { id: userId },
+        create: { id: userId, email: `${userId}@e2e.fabrika.test`, locale: 'tr' },
+        update: { email: `${userId}@e2e.fabrika.test` },
+      });
+      await tx.membership.upsert({
+        where: { tenantId_userId: { tenantId, userId } },
+        create: { userId, tenantId, role: 'TENANT_OWNER' },
+        update: { role: 'TENANT_OWNER' },
       });
 
-    usdNumber = (await issue('USD', `${STAMP}-USD`)).number;
-    tryNumber = (await issue('TRY', `${STAMP}-TRY`)).number;
-    cookie = await sessionCookie(tenantId, `${STAMP}-user`);
+      cookie = await sessionCookie(tenantId, userId);
+    });
   });
 
   test.afterAll(async () => {
-    await prisma.invoice.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
-    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
+    await withSystemScope('platform-admin', 'e2e.invoice-foreign-currency-export.cleanup', async (tx) => {
+      const tid = requireId(tenantId, 'tenantId');
+      const uid = `${STAMP}-user`;
+      await tx.membership.deleteMany({ where: { tenantId: tid, userId: uid } });
+      await tx.user.deleteMany({ where: { id: uid } });
+      await tx.invoice.deleteMany({ where: { tenantId: tid } });
+      await tx.tenant.deleteMany({ where: { id: tid } });
+    });
     await prisma.$disconnect();
   });
 

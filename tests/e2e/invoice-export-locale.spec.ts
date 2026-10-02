@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 
 import { createDbClient } from '../../src/lib/db';
+import { withSystemScope } from '../../src/lib/system-scope';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 import { requireId } from '../helpers/teardown-guard';
@@ -51,63 +52,84 @@ test.describe('the printed invoice follows the reader language', () => {
   let fivetenths: string;
 
   test.beforeAll(async () => {
-    const tenant = await prisma.tenant.create({
-      data: { name: `Invoice Locale ${STAMP}`, slug: STAMP, country: 'TR' },
-    });
-    tenantId = tenant.id;
+    await withSystemScope('platform-admin', 'e2e.invoice-export-locale.setup', async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: { name: `Invoice Locale ${STAMP}`, slug: STAMP, country: 'TR' },
+      });
+      tenantId = tenant.id;
 
-    const issue = async (number: string, vatRate: number, withholdingRate: number) =>
-      (
-        await prisma.invoice.create({
-          data: {
-            tenantId,
-            number,
-            issuedAt: new Date('2026-09-10T09:15:00.000Z'),
-            currency: 'TRY',
-            buyerName: `Invoice Locale Buyer ${STAMP}`,
-            buyerVknTckn: '2840958172',
-            buyerTaxOffice: 'Doğanbey V.D.',
-            buyerAddress: 'ODTÜ Teknokent Blok B',
-            buyerCity: 'Ankara',
-            buyerCountry: 'Türkiye',
-            invoiceType: 'TEVKIFAT',
-            lines: [
-              // unitCode MON — the shape a subscription invoice actually has, and
-              // the row that used to print "1 Adet" no matter what the code said.
-              {
-                name: 'Fabrika Pro Plan (1 ay)',
-                quantity: 1,
-                unitCode: 'MON',
-                unitPriceMinor: 250000,
-                vatRate,
-                withholdingCode: '604',
-                withholdingRate,
-              },
-            ],
-            ettn: randomUUID(),
-          },
-        })
-      ).number;
+      const issue = async (number: string, vatRate: number, withholdingRate: number) =>
+        (
+          await tx.invoice.create({
+            data: {
+              tenantId,
+              number,
+              issuedAt: new Date('2026-09-10T09:15:00.000Z'),
+              currency: 'TRY',
+              buyerName: `Invoice Locale Buyer ${STAMP}`,
+              buyerVknTckn: '2840958172',
+              buyerTaxOffice: 'Doğanbey V.D.',
+              buyerAddress: 'ODTÜ Teknokent Blok B',
+              buyerCity: 'Ankara',
+              buyerCountry: 'Türkiye',
+              invoiceType: 'TEVKIFAT',
+              lines: [
+                // unitCode MON — the shape a subscription invoice actually has, and
+                // the row that used to print "1 Adet" no matter what the code said.
+                {
+                  name: 'Fabrika Pro Plan (1 ay)',
+                  quantity: 1,
+                  unitCode: 'MON',
+                  unitPriceMinor: 250000,
+                  vatRate,
+                  withholdingCode: '604',
+                  withholdingRate,
+                },
+              ],
+              ettn: randomUUID(),
+            },
+          })
+        ).number;
 
-    ninetenths = await issue(`${STAMP}-0001`, 20, 0.9);
-    fivetenths = await issue(`${STAMP}-0002`, 10, 0.5);
-    cookie = await encode({
-      token: {
-        sub: `${STAMP}-user`,
-        id: `${STAMP}-user`,
-        email: `${STAMP}@e2e.fabrika.test`,
-        tenantId,
-        role: 'TENANT_OWNER',
-      },
-      secret: SECRET,
-      salt: COOKIE_NAME,
-      maxAge: 60 * 60,
+      ninetenths = await issue(`${STAMP}-0001`, 20, 0.9);
+      fivetenths = await issue(`${STAMP}-0002`, 10, 0.5);
+
+      const userId = `${STAMP}-user`;
+      await tx.user.upsert({
+        where: { id: userId },
+        create: { id: userId, email: `${STAMP}@e2e.fabrika.test`, locale: 'tr' },
+        update: { email: `${STAMP}@e2e.fabrika.test` },
+      });
+      await tx.membership.upsert({
+        where: { tenantId_userId: { tenantId, userId } },
+        create: { userId, tenantId, role: 'TENANT_OWNER' },
+        update: { role: 'TENANT_OWNER' },
+      });
+
+      cookie = await encode({
+        token: {
+          sub: userId,
+          id: userId,
+          email: `${STAMP}@e2e.fabrika.test`,
+          tenantId,
+          role: 'TENANT_OWNER',
+        },
+        secret: SECRET,
+        salt: COOKIE_NAME,
+        maxAge: 60 * 60,
+      });
     });
   });
 
   test.afterAll(async () => {
-    await prisma.invoice.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
-    await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
+    await withSystemScope('platform-admin', 'e2e.invoice-export-locale.cleanup', async (tx) => {
+      const tid = requireId(tenantId, 'tenantId');
+      const uid = `${STAMP}-user`;
+      await tx.membership.deleteMany({ where: { tenantId: tid, userId: uid } });
+      await tx.user.deleteMany({ where: { id: uid } });
+      await tx.invoice.deleteMany({ where: { tenantId: tid } });
+      await tx.tenant.deleteMany({ where: { id: tid } });
+    });
     await prisma.$disconnect();
   });
 

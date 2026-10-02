@@ -4,6 +4,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 
 import { createDbClient } from '../../src/lib/db';
+import { withSystemScope } from '../../src/lib/system-scope';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
@@ -70,44 +71,64 @@ test.describe('invoice export reads a real record', () => {
   let cookieA: string;
 
   test.beforeAll(async () => {
-    const mk = async (suffix: string) =>
-      prisma.tenant.create({
-        data: { name: `Invoice Export ${suffix} ${STAMP}`, slug: `${STAMP}-${suffix}`, country: 'TR' },
-      });
-    tenantA = (await mk('A')).id;
-    tenantB = (await mk('B')).id;
+    await withSystemScope('platform-admin', 'e2e.invoice-export-real-record.setup', async (tx) => {
+      const mk = async (suffix: string) =>
+        tx.tenant.create({
+          data: { name: `Invoice Export ${suffix} ${STAMP}`, slug: `${STAMP}-${suffix}`, country: 'TR' },
+        });
+      tenantA = (await mk('A')).id;
+      tenantB = (await mk('B')).id;
 
-    const issue = async (tenantId: string, number: string, buyer: string) =>
-      prisma.invoice.create({
-        data: {
-          tenantId,
-          number,
-          issuedAt: new Date('2026-09-07T09:15:00.000Z'),
-          currency: 'TRY',
-          buyerName: buyer,
-          buyerVknTckn: '2840958172',
-          buyerTaxOffice: 'Doğanbey V.D.',
-          buyerAddress: 'ODTÜ Teknokent Blok B',
-          buyerCity: 'Ankara',
-          buyerCountry: 'Türkiye',
-          lines: [
-            { name: 'Fabrika Pro Plan (1 ay)', quantity: 1, unitCode: 'C62', unitPriceMinor: 250000, vatRate: 20 },
-          ],
-          ettn: randomUUID(),
-        },
+      const issue = async (tenantId: string, number: string, buyer: string) =>
+        tx.invoice.create({
+          data: {
+            tenantId,
+            number,
+            issuedAt: new Date('2026-09-07T09:15:00.000Z'),
+            currency: 'TRY',
+            buyerName: buyer,
+            buyerVknTckn: '2840958172',
+            buyerTaxOffice: 'Doğanbey V.D.',
+            buyerAddress: 'ODTÜ Teknokent Blok B',
+            buyerCity: 'Ankara',
+            buyerCountry: 'Türkiye',
+            lines: [
+              { name: 'Fabrika Pro Plan (1 ay)', quantity: 1, unitCode: 'C62', unitPriceMinor: 250000, vatRate: 20 },
+            ],
+            ettn: randomUUID(),
+          },
+        });
+
+      const a = await issue(tenantA, `${STAMP}-A-0001`, `Invoice Export A ${STAMP}`);
+      const b = await issue(tenantB, `${STAMP}-B-0001`, `Invoice Export B ${STAMP}`);
+      invoiceA = a.number;
+      invoiceB = b.number;
+      ettnA = a.ettn;
+
+      const userIdA = `${STAMP}-user-a`;
+      await tx.user.upsert({
+        where: { id: userIdA },
+        create: { id: userIdA, email: `${userIdA}@e2e.fabrika.test`, locale: 'tr' },
+        update: { email: `${userIdA}@e2e.fabrika.test` },
+      });
+      await tx.membership.upsert({
+        where: { tenantId_userId: { tenantId: tenantA, userId: userIdA } },
+        create: { userId: userIdA, tenantId: tenantA, role: 'TENANT_OWNER' },
+        update: { role: 'TENANT_OWNER' },
       });
 
-    const a = await issue(tenantA, `${STAMP}-A-0001`, `Invoice Export A ${STAMP}`);
-    const b = await issue(tenantB, `${STAMP}-B-0001`, `Invoice Export B ${STAMP}`);
-    invoiceA = a.number;
-    invoiceB = b.number;
-    ettnA = a.ettn;
-    cookieA = await sessionCookie(tenantA, `${STAMP}-user-a`);
+      cookieA = await sessionCookie(tenantA, userIdA);
+    });
   });
 
   test.afterAll(async () => {
-    await prisma.invoice.deleteMany({ where: { tenantId: { in: [tenantA, tenantB] } } });
-    await prisma.tenant.deleteMany({ where: { id: { in: [tenantA, tenantB] } } });
+    await withSystemScope('platform-admin', 'e2e.invoice-export-real-record.cleanup', async (tx) => {
+      const userIdA = `${STAMP}-user-a`;
+      await tx.membership.deleteMany({ where: { userId: userIdA } });
+      await tx.user.deleteMany({ where: { id: userIdA } });
+      await tx.invoice.deleteMany({ where: { tenantId: { in: [tenantA, tenantB] } } });
+      await tx.tenant.deleteMany({ where: { id: { in: [tenantA, tenantB] } } });
+    });
     await prisma.$disconnect();
   });
 
