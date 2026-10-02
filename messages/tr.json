@@ -733,6 +733,46 @@
         "CALENDAR_UNKNOWN_PROVIDER": "Bilinmeyen takvim sağlayıcısı.",
         "unknown": "Takvim işlemi tamamlanamadı. Lütfen tekrar deneyin."
       }
+    },
+    "gates": {
+      "title": "Aşama Kapısı Eşikleri",
+      "breadcrumbHome": "Panel",
+      "breadcrumbSettings": "Ayarlar",
+      "intro": "Fırsat hattınızın değerlendirildiği kurallar. Kapı kararları ve G0 puanı tam olarak bu değerlerle hesaplanır.",
+      "readOnlyNote": "Bu değerler şu an platform genelinde sabittir ve çalışma alanı bazında değiştirilemez.",
+      "g0Heading": "G0 · Konu triyajı",
+      "g0MinScore": "En düşük bileşik G0 puanı",
+      "g0MinAlignment": "En düşük uyum alt puanı",
+      "g0MinBaseRate": "En düşük geçmiş başarı oranı",
+      "g0Country": "Ülkenin çağrıya uygun olması",
+      "outOf100": "/ 100",
+      "percent": "%",
+      "required": "Zorunlu",
+      "notRequired": "Aranmaz",
+      "g1Heading": "G1 · Rol kontrolü",
+      "g1Coordinator": "Hedeflenen rol koordinatörse koordinatörlük geçmişi",
+      "g1Recorded": "Kararla birlikte kaydedilir; kapıyı engellemez",
+      "off": "Kapalı",
+      "g2Heading": "G2 · Konsorsiyum kilidi",
+      "g2Seats": "Tüm konsorsiyum koltuklarının dolu olması",
+      "g3Heading": "G3 · Değerlendirme",
+      "g3MinCriterion": "Her kriterde en düşük puan",
+      "g3MinTotal": "En düşük toplam puan",
+      "weightsHeading": "G0 puanlama ağırlıkları",
+      "weightsIntro": "Bileşik G0 puanı bu etkenlerin ağırlıklı ortalamasıdır. Ağırlıkların toplamı 100 değilse puan gerçek toplama göre ölçeklenir.",
+      "weightsCustom": "Bu çalışma alanı için platform ekibi özel ağırlık tanımlamış. Farklı olan değerlerin yanında platform varsayılanı gösterilir.",
+      "weightsDefault": "varsayılan {value}",
+      "weightsUnavailable": "Bu çalışma alanının ağırlıkları okunamadı. Tekrar denemek için sayfayı yenileyin.",
+      "weightsTotal": "Toplam",
+      "weights": {
+        "alignment": "Uyum",
+        "baseRate": "Taban oran",
+        "coordinatorHistory": "Koordinatörlük geçmişi",
+        "researchAndEndUser": "Araştırma + son kullanıcı",
+        "networkCentrality": "Ağ merkeziliği",
+        "budgetRoleEconomy": "Bütçe / rol ekonomisi",
+        "lumpSumTwoStage": "Götürü bedel / iki aşamalı"
+      }
     }
   },
   "legal": {
