@@ -782,13 +782,21 @@
       "heading": "Gizlilik Politikası ve KVKK Aydınlatma Metni",
       "controllerHeading": "1. Veri Sorumlusu",
       "controllerBody": "{brand} SaaS Platformu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) ve AB Genel Veri Koruma Tüzüğü (“GDPR”) uyarınca kişisel verilerinizin güvenliğine azami özen göstermekteyiz.",
-      "dataHeading": "2. İşlenen Veriler ve Toplama Amaçları",
-      "dataBody": "Kullanıcı hesabı açma, oturum doğrulama, AB hibe çağrılarıyla eşleştirme, yapay zeka destekli teklif taslağı oluşturma ve abonelik faturalandırması süreçlerinde ad, e-posta, şirket/kurum bilgileri ve ödeme kayıtları işlenmektedir.",
-      "rightsHeading": "3. Veri Sahibi Hakları (Dışa Aktarma ve Silme)",
-      "rightsBody": "KVKK 11. maddesi ve GDPR uyarınca verilerinizi dilediğiniz an “Ayarlar → Gizlilik ve Verilerim” ekranından JSON biçiminde dışa aktarabilirsiniz. Aynı ekrandan hesabınızın silinmesini talep edebilirsiniz: hesabınız derhal erişime kapatılır ve 30 gün sonra tüm verileriniz ile yüklediğiniz belgeler kalıcı olarak silinir. Bu 30 günlük süre içinde talebinizi iptal edebilirsiniz. Güvenlik gereği dışa aktarım dosyasına kimlik doğrulama anahtarları (OAuth ve oturum jetonları) dahil edilmez.",
+      "dataHeading": "2. İşlenen Veriler, Toplama Amaçları ve Hukuki Sebebi",
+      "dataBody": "Kullanıcı hesabı açma, oturum doğrulama, AB hibe çağrılarıyla eşleştirme, yapay zeka destekli teklif taslağı oluşturma, ürün analitikleri ve abonelik faturalandırması süreçlerinde ad, e-posta, şirket/kurum bilgileri, ödeme kayıtları ve tarayıcı etkinlikleri işlenmektedir. Veriler hesap oluşturma ve sözleşmenin ifası (KVKK md.5/2-c), yasal yükümlülükler (md.5/2-ç), meşru menfaatler (md.5/2-f) ve açık rıza (md.5/1 — analitik çerezleri ve ürün iyileştirme) kapsamında işlenmektedir.",
+      "rightsHeading": "4. Veri Sahibi Hakları",
+      "rightsBody": "KVKK 11. maddesi ve GDPR uyarınca aşağıdaki dokuz hakkınız vardır: (a) Kişisel verilerinizin işlenip işlenmediğini öğrenme; (b) İşlenmiş verilerinize ilişkin bilgi talep etme — 'Ayarlar → Gizlilik ve Verilerim' ekranından JSON biçiminde dışa aktarabilirsiniz; (c) İşleme amacını ve amaca uygunluğunu öğrenme; (ç) Verilerinizin yurt içinde ve yurt dışında aktarıldığı üçüncü kişileri bilme; (d) Eksik veya yanlış verilerinizin düzeltilmesini isteme; (e) Verilerinizin silinmesini veya yok edilmesini isteme — 'Ayarlar → Gizlilik ve Verilerim' ekranından hesabınızın silinmesini talep edebilirsiniz (hesabınız derhal kapatılır, 30 gün sonra kalıcı silinir, bu süre içinde iptal edebilirsiniz); (f) Düzeltme veya silme işleminin üçüncü kişilere bildirilmesini isteme; (g) Münhasıran otomatik sistem analizi sonucu aleyhe sonuca itiraz etme (ürün puanlaması bu kapsamdadır); (ğ) Zarara uğrama hâlinde tazminat talep etme. Güvenlik gereği, kimlik doğrulama anahtarları (OAuth ve oturum jetonları) dışa aktarıma dahil edilmez.",
       "rightsLink": "Gizlilik ve Verilerim ekranına git",
-      "securityHeading": "4. Güvenlik ve Depolama",
-      "securityBody": "Verileriniz çok kiracılı veritabanında PostgreSQL Row-Level Security (RLS) ile diğer kiracılardan yalıtılmış olup, dosya ekleriniz şifreli bulut depolama (R2/S3) üzerinde saklanır."
+      "securityHeading": "7. Güvenlik ve Depolama",
+      "securityBody": "Verileriniz çok kiracılı veritabanında PostgreSQL Row-Level Security (RLS) ile diğer kiracılardan yalıtılmış olup, dosya ekleriniz şifreli bulut depolama (R2/S3) üzerinde saklanır.",
+      "recipientsHeading": "3. Veri Alıcıları ve Yurt Dışı Aktarım",
+      "recipientsBody": "Verileriniz aşağıdaki alıcılara aktarılabilir: (1) Anthropic PBC (ABD) — yapay zeka destekli metin üretimi ve ön değerlendirme için gönderdiğiniz metinler (kapasite açıklaması, teklif taslağı, değerlendirilen belge içeriği); (2) Google LLC (ABD) — oturum açma sırasında gönderilen ad ve e-posta; (3) Stripe, Inc. (ABD) — abonelik ve ödeme yönetimi için müşteri tanımlayıcısı ve faturalama durumu; (4) OpenAI, L.L.C. (ABD) — yüklenen belgelerin embedding'i için metin; (5) Cloudflare, Inc. (bölge ayara bağlı) — yüklenen dosya ve ekran görüntüleri; (6) PostHog Inc. (Avrupa Birliği bölgesi, varsayılan) — olay adları ve puanlandırma duruşu (çerez onayıyla); (7) Vulut (Türkiye) — veritabanı, uygulama sunucusu ve e-posta barındırması. Yurt dışı aktarımla ilgili sorularınızı info@fonbridge.com adresine iletebilirsiniz.",
+      "legalBasisHeading": "5. Hukuki Sebebi Tablosu",
+      "legalBasisBody": "İşleme faaliyetleri başına hukuki sebebi: Hesap oluşturma (md.5/2-c — sözleşmenin kurulması/ifası); Davetler ve ekip yönetimi (md.5/2-c); Faturalama ve ödeme (md.5/2-c ve md.5/2-ç — yasal saklama yükümlülüğü); VKN/TCKN (md.5/2-ç); Yapay zeka metin üretimi (md.5/2-f — meşru menfaat); Yapay zeka embedding ve RAG (md.5/2-f); Kullanım günlüğü (md.5/2-f); İç ön değerlendirme (md.5/2-f); Denetim kaydı (md.5/2-ç); Geri bildirim (md.5/2-f); Ürün analitiği (md.5/1 — açık rıza, çerez onayı gerekli); Aydınlatma ve rıza kaydı (md.5/2-ç); Ajans kanalı davetleri (md.5/2-f); Karne sonucu ve ajans kanalı sayıları (md.5/2-f); Muhatap ve ilişki kayıtları (md.5/2-f); Dosya ve kanıt depolama (md.5/2-c); Kayıtlı arama uyarı e-postaları (md.5/2-f); Onay iş akışı kayıtları (md.5/2-f; hesap silinse de saklama için md.5/2-e — hakkın tesisi); Ziyaretçi iletişim talebi (md.5/1 — açık rıza; kötüye kullanım önleme için IP özeti md.5/2-f).",
+      "collectionMethodHeading": "6. Veri Toplama Yöntemi",
+      "collectionMethodBody": "Veriler aşağıdaki yollardan toplanır: (1) Kullanıcı tarafından (form — kayıt, oturum açma, profil bilgileri, fon hazırlık karnesi); (2) Google OAuth — oturum açma sırasında ad ve e-posta; (3) Çerezler ve tarayıcı depolaması — oturum, dil tercihi, tema seçimi; (4) Analitik çerezleri (çerez onayıyla) — PostHog üzerinden ürün etkinlikleri; (5) Otomatik — yapay zeka puanlaması sistemi tarafından.",
+      "contactHeading": "8. Başvuru Kanalı ve İletişim",
+      "contactBody": "Yukarıdaki haklarınızı kullanmak için info@fonbridge.com adresine başvurabilirsiniz. Başvurunuz Başvuru Usul ve Esasları Tebliği uyarınca yazılı, KEP, güvenli elektronik imza veya mobil imza ile yapılabilir; sistemde kayıtlı e-posta adresiniz de kabul edilir. Başvurunuz en geç 30 gün içinde ücretsiz sonuçlandırılır; işlemin ayrıca bir maliyet gerektirmesi hâlinde Kurulca belirlenen tarifedeki ücret alınabilir. Başvuru yaptığınız tarihte hesap olmasa da bu hakları kullanabilirsiniz."
     },
     "terms": {
       "metaTitle": "Kullanım Koşulları ve Hizmet Sözleşmesi — {brand}",
@@ -825,7 +833,7 @@
     },
     "cookieConsent": {
       "title": "Çerez Tercihleri",
-      "description": "Yalnızca sitenin çalışması için gereken çerezleri ve tarayıcı depolamasını kullanıyoruz: oturumunuz, dil ve tema tercihiniz, sepetiniz. Analitik ya da üçüncü taraf takip çerezi kullanmıyoruz. Ayrıntılar için bkz. ",
+      "description": "Sitenin çalışması için gereken çerezleri ve tarayıcı depolamasını kullanıyoruz: oturumunuz, dil ve tema tercihiniz, sepetiniz. \"Tümünü Kabul Et\" seçerseniz, ürün iyileştirmesi için analitik çerezleri (PostHog) de kullanırız. Üçüncü taraf takip çerezi kullanmıyoruz. Ayrıntılar için bkz. ",
       "privacyLink": "Gizlilik Bildirimi",
       "acceptAll": "Tümünü Kabul Et",
       "essentialOnly": "Gerekli Çerezler"

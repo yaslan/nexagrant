@@ -127,6 +127,27 @@ süreleri** ve veri sahibi hakları"_ içeren bir politika vaat ediyor. Gövdede
 diğer süreler (yasal saklama süresi, kalıcı saklama, TBK md.146 10 yıl varsayımı) metinde
 **hiç geçmiyor**. Meta açıklaması, gövdenin taşımadığı bir içeriği vaat ediyor.
 
+### 2.3 Durum güncellemesi — `a29711b0` + AKTAR-MURBCJ0A-1#privacy2 (02.10.2026)
+
+Karşılaştırma yüzeyi: `messages/{tr,en}.json` → `legal.privacy.*` (bu daldaki hâli) ve `src/app/[locale]/privacy/page.tsx`. Tablo yukarıdaki §2 ölçümünü satır satır günceller; "hukukçu" sütunu metnin yayına çıkmadan önce hâlâ teyit beklediği yerleri gösterir.
+
+| #   | md.10 unsuru | §2 ölçümü (10.09) | Bugün | Ne kapandı / ne açık |
+| --- | --- | --- | --- | --- |
+| a   | Veri sorumlusunun kimliği | YOK | **YOK (açık)** | Hâlâ yalnız ürün adı (`{brand}`). Unvan, adres, MERSİS, KEP metinde yok; `info@fonbridge.com` yalnız başvuru kanalı olarak geçiyor. Bilerek eklenmedi: tüzel kişi bilgisi patron kararı |
+| b   | İşleme amaçları | KISMİ (5 amaç / 18 faaliyet) | **KISMİ, belirgin iyileşti** | `legalBasisBody` 19 faaliyeti adıyla sayıyor (envanterdeki 23 "Hukuki sebep" satırından 19 faaliyet; kalan 4'ün gerekçesi raporda). Amaç cümleleri hâlâ kısa; saklama süresi yok |
+| c   | Aktarım: kime, ne amaçla | YOK | **KISMİ** | 7 alıcı adıyla ve ülke/bölgeyle yazılı: Anthropic, Google, Stripe, OpenAI, Cloudflare, PostHog, Vulut. Yurt dışı aktarımın hukuki dayanağı cümlesi **bilerek yazılmadı** (patron + hukukçu kararı; envanter §21: imzalı SCC yok). iyzico, Microsoft, Resend alıcı değil |
+| ç   | Toplama yöntemi ve hukuki sebep | YOK | **VAR (hukukçu teyidi bekliyor)** | `collectionMethodHeading` (5 yol) ve `legalBasisHeading` (md.5/2-c, -ç, -e, -f, md.5/1) eklendi. Ajans kanalı ve ziyaretçi talebi envanterde hâlâ "taslak" |
+| d   | md.11 hakları | KISMİ (1 tam, 1 kısmi, 7 yok) | **VAR (9/9)** | Dokuz bendin dokuzu `rightsBody`'de, ürün puanlaması g bendine bağlandı. Başvuru usulü (yazılı, KEP, güvenli e-imza, kayıtlı e-posta; 30 gün) `contactBody`'de. Posta/KEP **adresi** yazılmadı |
+
+Önceki §2.1 tablosunun güncel sayımı: **9 bentten 9'u var** (önce 1 tam, 1 kısmi, 7 yok).
+
+Hâlâ açık kalanlar (bu kartın kapsamı dışında bırakıldı):
+1. Veri sorumlusu unvanı/adresi/KEP (md.10/1-a).
+2. Saklama süreleri hiç yok (§2.2 çelişkisi sürüyor).
+3. Yurt dışı aktarımın hukuki dayanağı cümlesi: patron + hukukçu kararı bekliyor.
+4. `legal.privacy.metaDescription` hâlâ "saklama süreleri" vaat ediyor (gövde taşımıyor).
+5. §1.3 render kusuru bu kartta ölçülmedi; ekran görüntüsünde gövde görünüyor (kanıt: rapor eki), ama kök neden kontrolü ayrı iş.
+
 ---
 
 ## 3. `processing-register.md` çapraz kontrolü — envanterde beyan edilip kullanıcıya söylenmeyenler
