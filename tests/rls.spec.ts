@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenantOn } from '../src/lib/db';
 import { envValue } from './helpers/dotenv';
+import { requireId } from './helpers/teardown-guard';
 
 /**
  * Tenant isolation is only observable through a role that is actually subject
@@ -216,7 +217,7 @@ describe('Row Level Security (RLS)', () => {
       await withTenantOn(rls, tenantB_Id, async (tx) => {
         expect(await tx.approvalRequest.findMany()).toHaveLength(0);
         const { count } = await tx.approvalRequest.updateMany({
-          where: { id: req.id, status: 'PENDING' },
+          where: { id: requireId(req.id, 'req.id'), status: 'PENDING' },
           data: { status: 'APPROVED' },
         });
         expect(count).toBe(0);

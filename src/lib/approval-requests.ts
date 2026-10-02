@@ -33,6 +33,7 @@ import { createHash } from 'node:crypto';
 import type { ApprovalStatus, Prisma, Role } from '@prisma/client';
 
 import { withTenant, type TenantTx } from '@/lib/db';
+import { isPresentId, requireActionId } from '@/lib/required-id';
 import { canRoleApprove, DUAL_APPROVAL_REQUIRED_ROLES, asRole, type DualApprovalActionType } from '@/lib/rbac';
 import {
   APPROVAL_DESCRIPTION_MAX,
@@ -67,11 +68,6 @@ function isActionType(value: unknown): value is DualApprovalActionType {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** A server action argument is request body: anything but a non-blank string is no id. */
-function isId(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
 }
 
 export interface CreateApprovalRequestInput {
@@ -160,7 +156,7 @@ export async function createApprovalRequest(input: CreateApprovalRequestInput): 
 
   return withTenant(input.tenantId, async (tx) => {
     if (input.workspaceId !== undefined) {
-      const ws = isId(input.workspaceId)
+      const ws = isPresentId(input.workspaceId)
         ? await tx.workspace.findFirst({ where: { id: input.workspaceId, tenantId: input.tenantId }, select: { id: true } })
         : null;
       if (!ws) return refuse('invalidWorkspace');
@@ -225,8 +221,10 @@ async function expireIfDue(
 ): Promise<boolean> {
   if (row.status === 'EXPIRED') return true;
   if (row.status !== 'PENDING' || row.expiresAt.getTime() > now.getTime()) return false;
+  const id = requireActionId(row.id, 'approvalRequest.id');
+  const tenantId = requireActionId(row.tenantId, 'approvalRequest.tenantId');
   const { count } = await tx.approvalRequest.updateMany({
-    where: { id: row.id, tenantId: row.tenantId, status: 'PENDING' },
+    where: { id, tenantId, status: 'PENDING' },
     data: { status: 'EXPIRED' },
   });
   if (count === 1) {
@@ -245,7 +243,9 @@ async function decide(params: {
   decision: Decision;
 }): Promise<ApprovalResult> {
   const { requestId, tenantId, approverId, decision } = params;
-  if (!isId(requestId)) return refuse('notFound');
+  // An id missing from a `where` drops out of it and matches every row.
+  if (!isPresentId(requestId)) return refuse('notFound');
+  requireActionId(approverId, 'approverId');
 
   return withTenant(tenantId, async (tx) => {
     const now = new Date();
@@ -260,7 +260,7 @@ async function decide(params: {
     // The read above is advice; this WHERE is the rule. A concurrent decision
     // holds the row lock, and once it commits this re-check finds no PENDING row.
     const { count } = await tx.approvalRequest.updateMany({
-      where: { id: row.id, tenantId, status: 'PENDING', requesterId: { not: approverId }, expiresAt: { gt: now } },
+      where: { id: requestId, tenantId, status: 'PENDING', requesterId: { not: approverId }, expiresAt: { gt: now } },
       data: {
         status: decision.status,
         approverId,
@@ -310,7 +310,8 @@ export async function cancelApprovalRequest(params: {
   requesterId: string;
 }): Promise<ApprovalResult> {
   const { requestId, tenantId, requesterId } = params;
-  if (!isId(requestId)) return refuse('notFound');
+  if (!isPresentId(requestId)) return refuse('notFound');
+  requireActionId(requesterId, 'requesterId');
 
   return withTenant(tenantId, async (tx) => {
     const now = new Date();
@@ -321,7 +322,7 @@ export async function cancelApprovalRequest(params: {
     if (row.status !== 'PENDING') return refuse('notPending');
 
     const { count } = await tx.approvalRequest.updateMany({
-      where: { id: row.id, tenantId, status: 'PENDING', requesterId },
+      where: { id: requestId, tenantId, status: 'PENDING', requesterId },
       data: { status: 'CANCELLED' },
     });
     if (count !== 1) return refuse('notPending');
