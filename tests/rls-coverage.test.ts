@@ -305,3 +305,28 @@ describe('4b — every migration protects the tenant table it creates', () => {
     rmSync(root, { recursive: true, force: true });
   });
 });
+
+describe('BlogPost — platform content, classified as SYSTEM_WIDE on purpose (AKTAR-MURBCJ0A-1)', () => {
+  // A blog post is shown to anonymous visitors and written only by platform
+  // admins (/admin/blog, requirePlatformAdmin). It belongs to no tenant, so the
+  // exemption is honest only while the model carries no tenant column at all.
+  test('the model exists and carries no tenantId', () => {
+    const body = modelBodies().get('BlogPost');
+    expect(body, 'BlogPost is missing from schema.prisma').toBeDefined();
+    expect(/^\s*tenantId\s/m.test(body as string)).toBe(false);
+  });
+
+  test('it is listed in SYSTEM_WIDE, not NULLABLE_TENANT, and no policy names it', () => {
+    expect(SYSTEM_WIDE.has('BlogPost')).toBe(true);
+    expect(NULLABLE_TENANT.has('BlogPost')).toBe(false);
+    expect(tenantScopedModels()).not.toContain('BlogPost');
+    expect(policyTables('tenant_isolation')).not.toContain('BlogPost');
+    expect(policyTables('tenant_or_shared')).not.toContain('BlogPost');
+  });
+
+  test('its migration states why it has no RLS', () => {
+    const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/add-blog-post.sql'), 'utf8');
+    expect(sql).toMatch(/RLS: none, on purpose/);
+    expect(stripSqlComments(sql)).not.toMatch(/ROW LEVEL SECURITY|CREATE POLICY/i);
+  });
+});

@@ -33,6 +33,10 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // readiness scorecard. No account, hence no tenant; read by platform admins
   // only (/admin/leads), same standing as User. See prisma/migrations/add-public-lead.sql.
   'PublicLead',
+  // AKTAR-MURBCJ0A-1: a post on the public blog. Platform content shown to
+  // anonymous visitors, owned by no tenant; written only by /admin/blog behind
+  // requirePlatformAdmin(). See prisma/migrations/add-blog-post.sql.
+  'BlogPost',
 ]);
 
 /**
