@@ -18,14 +18,22 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     # Job-wide so the DB preparation, the vitest suites that hit Postgres and
-    # the e2e run all reach the same service container.
+    # the e2e run all reach the same service container. MinIO is also running in
+    # CI to test evidence upload/download without real R2 credentials.
     env:
       DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
       # RLS-subject role (NOSUPERUSER NOBYPASSRLS) for the live RLS suites.
       # `pnpm db:rls-role` creates fabrika_app with this password. A throwaway
       # service-container credential like the one above, not a secret.
       DATABASE_URL_RLS_TEST: postgresql://fabrika_app:fabrika_app_ci@localhost:5432/fabrika
+      # MinIO test object store (TASK-MUSJ4RYVZEZ6Q). Test-only credentials, not a real secret.
+      R2_ACCOUNT_ID: 'ci-test'
+      R2_ENDPOINT: http://localhost:9000
+      R2_ACCESS_KEY_ID: 'minioadmin'
+      R2_SECRET_ACCESS_KEY: 'minioadmin'
+      R2_BUCKET: 'test-evidence'
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -40,6 +48,18 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: 'minioadmin'
+          MINIO_ROOT_PASSWORD: 'minioadmin'
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 9000:9000
     steps:
     - uses: actions/checkout@v4
     
@@ -58,7 +78,15 @@ jobs:
         
     - name: Install dependencies
       run: pnpm install
-      
+
+    - name: Create MinIO test bucket
+      run: |
+        aws s3 mb s3://test-evidence --endpoint-url http://localhost:9000 || true
+      env:
+        AWS_ACCESS_KEY_ID: minioadmin
+        AWS_SECRET_ACCESS_KEY: minioadmin
+        AWS_REGION: us-east-1
+
     # `pnpm exec`, not `pnpm dlx`: dlx downloads the newest prisma from the
     # registry instead of the pinned one, and prisma 8+ has no `validate`.
     - name: Validate Prisma schema
