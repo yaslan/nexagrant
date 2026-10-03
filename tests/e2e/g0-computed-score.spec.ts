@@ -4,6 +4,7 @@ import { prisma, withTenant } from '../../src/lib/db';
 import { computeG0ForOpportunity, rescoreOpportunityG0 } from '../../src/lib/scoring/g0-compute';
 import { G0_E2E, seed, rollback } from '../../scripts/seed-g0-e2e';
 import { shotsDir } from './fixtures/shots';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTQ63RR8Z0G8E — the G0 score on screen is the canonical scorer's, in a real browser.
@@ -46,9 +47,15 @@ async function acceptCookies(page: Page) {
 }
 
 async function signIn(page: Page, target: string) {
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(G0_E2E.email);
-  await page.locator('form button[type="submit"]').click();
+  // A cookie for the user the seed wrote: the demo sign-in form does not exist in a
+  // production build (TASK-MUSBCXP9RKS3D).
+  await signInAs(page, {
+    id: G0_E2E.userId,
+    email: G0_E2E.email,
+    tenantId: G0_E2E.tenantId,
+    role: 'TENANT_OWNER',
+  });
+  await page.goto(target);
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
   // Every caller asserts on a locator next; that auto-wait is the synchronisation.
 }

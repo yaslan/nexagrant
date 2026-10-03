@@ -4,6 +4,7 @@ import { prisma } from '../../src/lib/db';
 import { evidenceTenant } from './fixtures/evidence-tenant';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTRH86RCGVEGC — the evidence module invented accreditation.
@@ -41,7 +42,14 @@ const PLAIN_FILE = {
 };
 
 test('an upload with no readable metadata does not gain invented metadata', async ({ page }) => {
-  await tenant.signIn(page);
+  // `tenant.signIn` drives the demo sign-in form, which a production build does not
+  // have (TASK-MUSBCXP9RKS3D). fixtures/evidence-tenant.ts is shared with the badge
+  // spec and outside this card, so the session is minted here for the user its
+  // setup() wrote, found by the address it returns.
+  const user = await prisma.user.findUniqueOrThrow({ where: { email: tenant.email }, select: { id: true } });
+  await signInAs(page, { id: user.id, email: tenant.email, tenantId: tenant.tenantId, role: 'TENANT_OWNER' });
+  await page.goto(tenant.evidenceUrl);
+  await page.waitForURL(`**${tenant.evidenceUrl}`, { timeout: 30_000 });
   // The upload button opens the form through React state; it is the first thing clicked.
   const upload = page.getByRole('button', { name: /Belge Yükle|Upload/ }).first();
   await expectHydrated(upload);

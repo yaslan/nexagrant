@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { SediaTopicSchema } from '@/lib/adapters/schemas/sedia';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTQV1JYGMGU6V — the components that carried inline `eslint-disable` exceptions,
@@ -25,6 +26,11 @@ import { expectHydrated } from './fixtures/hydration';
 
 const SHOTS = shotsDir('TASK-MTQV1JYGMGU6V-screenshots');
 const EMAIL = 'admin@yasinaslan.com.tr';
+// The seeded platform-admin seat behind EMAIL (prisma/seed-tenant-workspace.ts,
+// `isPlatformAdmin: true`). The demo sign-in form that used to resolve the address to
+// it does not exist in a production build, so the session is a minted cookie for the
+// same user (TASK-MUSBCXP9RKS3D); the jwt callback still reads the admin flag from the row.
+const SEAT = { id: 'demo-user-superadmin', email: EMAIL, tenantId: 'demo-tenant', role: 'SUPER_ADMIN' };
 const CALLS_URL = '/tr/main/calls';
 
 /** React reports hydration mismatches and render-phase violations through console.error. */
@@ -150,9 +156,8 @@ test.describe('render-purity refactor — the three formerly suppressed componen
     await consent(page);
     const calls = stubCalls(page);
     await calls.ready;
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(CALLS_URL)}`);
-    await page.locator('input[type="email"]').fill(EMAIL);
-    await page.locator('form button[type="submit"]').click();
+    await signInAs(page, SEAT);
+    await page.goto(CALLS_URL);
     await page.waitForURL(`**${CALLS_URL}`, { timeout: 30_000 });
 
     // `loading` is derived from "the query the filters describe" vs "the query the rows came

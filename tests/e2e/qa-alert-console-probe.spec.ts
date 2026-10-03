@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTTUUGKNDGBXK — what the alert console actually shows an operator.
@@ -15,6 +16,11 @@ import { expectHydrated } from './fixtures/hydration';
 
 const SHOTS = shotsDir('TASK-MTTUUGKNDGBXK-screenshots');
 const ADMIN_EMAIL = 'admin@yasinaslan.com.tr';
+// The seeded platform-admin seat behind ADMIN_EMAIL (prisma/seed-tenant-workspace.ts,
+// `isPlatformAdmin: true`). The demo sign-in form that used to resolve the address to
+// it does not exist in a production build, so the session is a minted cookie for the
+// same user (TASK-MUSBCXP9RKS3D); the jwt callback still reads the admin flag from the row.
+const ADMIN_SEAT = { id: 'demo-user-superadmin', email: ADMIN_EMAIL, tenantId: 'demo-tenant', role: 'SUPER_ADMIN' };
 
 test.describe.configure({ mode: 'serial' });
 
@@ -44,9 +50,8 @@ test('the alert console under a 250-row pile', async ({ page }) => {
   });
 
   const target = '/tr/admin/alerts';
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
-  await page.locator('form button[type="submit"]').click();
+  await signInAs(page, ADMIN_SEAT);
+  await page.goto(target);
   await page.waitForURL(`**${target}`, { timeout: 60_000 });
   // The probe counts rows and then drives the "unresolved only" filter, which is client
   // state. That checkbox hydrated means the console has rendered and can be operated.
