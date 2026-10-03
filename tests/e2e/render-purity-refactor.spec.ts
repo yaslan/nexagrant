@@ -1,4 +1,8 @@
-import { test, expect, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { test, expect, type Page, type Route } from '@playwright/test';
+import { z } from 'zod';
+import { SediaTopicSchema } from '@/lib/adapters/schemas/sedia';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
 
@@ -41,6 +45,67 @@ const consent = (page: Page) =>
     );
   });
 
+/**
+ * The calls page reads `/api/cagrilar`, which searches the live EC SEDIA portal and translates
+ * every topic through MyMemory. On CI that took up to the whole 30 s budget and failed ~1 run in
+ * 20 (TASK-MUPVLWSIPC5WU#render-purity). This spec is about how the page derives `loading`, not
+ * about SEDIA, so the route is answered from a fixture shaped like the route's real body
+ * (`src/app/api/cagrilar/route.ts`); the schema parse below fails if that shape drifts.
+ */
+const CagrilarResponseSchema = z.object({
+  success: z.literal(true),
+  totalResults: z.number(),
+  pageNumber: z.number(),
+  pageSize: z.number(),
+  topics: z.array(SediaTopicSchema).min(1),
+});
+const CALLS_FIXTURE = CagrilarResponseSchema.parse(
+  JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'cagrilar-response.json'), 'utf8')),
+);
+const HORIZON = '43108390';
+
+/**
+ * Answers `/api/cagrilar` from the fixture, filtered by `framework` the way SEDIA filters it.
+ * Responses are held while the gate is closed, so "the list is loading" is observed for as long
+ * as the test needs instead of for however long the network happened to take; `release()`
+ * answers everything held and lets later requests through until `hold()` closes it again.
+ */
+function stubCalls(page: Page) {
+  const requests: URL[] = [];
+  let held: Array<() => Promise<void>> = [];
+  let open = false;
+
+  const answer = (route: Route, url: URL) => () => {
+    const framework = url.searchParams.get('framework');
+    const topics = framework
+      ? CALLS_FIXTURE.topics.filter((t) => framework.split(',').includes(t.frameworkProgramme ?? ''))
+      : CALLS_FIXTURE.topics;
+    return route.fulfill({ json: { ...CALLS_FIXTURE, totalResults: topics.length, topics } });
+  };
+
+  const ready = page.route('**/api/cagrilar?**', async (route) => {
+    const url = new URL(route.request().url());
+    requests.push(url);
+    const fulfil = answer(route, url);
+    if (open) await fulfil();
+    else held.push(fulfil);
+  });
+
+  return {
+    ready,
+    requests,
+    hold: () => {
+      open = false;
+    },
+    release: async () => {
+      open = true;
+      const pending = held;
+      held = [];
+      await Promise.all(pending.map((f) => f()));
+    },
+  };
+}
+
 const hydrationNoise = (errors: string[]) =>
   errors.filter((e) =>
     /hydrat|did not match|Text content does not match|Minified React error #(418|423|425)/i.test(e),
@@ -81,6 +146,8 @@ test.describe('render-purity refactor — the three formerly suppressed componen
   }) => {
     const errors = watchConsole(page);
     await consent(page);
+    const calls = stubCalls(page);
+    await calls.ready;
     await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(CALLS_URL)}`);
     await page.locator('input[type="email"]').fill(EMAIL);
     await page.locator('form button[type="submit"]').click();
@@ -92,14 +159,32 @@ test.describe('render-purity refactor — the three formerly suppressed componen
     await expect(loadingLabel).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/03-calls-loading.png`, fullPage: false, caret: 'initial' });
 
+    const row = (i: number) => page.getByText(CALLS_FIXTURE.topics[i]!.title, { exact: true });
+    const [energy, health, digital] = [row(0), row(1), row(2)];
+    await expect.poll(() => calls.requests.length).toBeGreaterThan(0);
+    await calls.release();
     await expect(loadingLabel).toBeHidden({ timeout: 30_000 });
+    // The skeleton went away because the fixture rows arrived, not because a request failed.
+    await expect(energy).toBeVisible();
+    await expect(health).toBeVisible();
+    await expect(digital).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/04-calls-loaded.png`, fullPage: false, caret: 'initial' });
 
     // Changing a filter changes the derived query, so the list must go stale again on its own.
+    calls.hold();
+    const before = calls.requests.length;
     await page.getByRole('button', { name: 'Ufuk Avrupa (Horizon Europe)', exact: true }).click();
     await expect(loadingLabel).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/05-calls-refiltering.png`, fullPage: false, caret: 'initial' });
+    // …and the stale list asks again, for the new filter.
+    await expect
+      .poll(() => calls.requests.slice(before).map((u) => u.searchParams.get('framework')))
+      .toContain(HORIZON);
+    await calls.release();
     await expect(loadingLabel).toBeHidden({ timeout: 30_000 });
+    await expect(energy).toBeVisible();
+    await expect(health).toBeVisible();
+    await expect(digital).toBeHidden();
     await page.screenshot({ path: `${SHOTS}/06-calls-filtered.png`, fullPage: false, caret: 'initial' });
 
     expect(hydrationNoise(errors), 'hydration errors on the calls page').toEqual([]);
