@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { shotsDir } from './fixtures/shots';
+import { signInAs } from './fixtures/session';
 import tr from '../../messages/tr.json';
 
 /**
@@ -18,6 +19,12 @@ import tr from '../../messages/tr.json';
 
 const SHOTS = shotsDir('TASK-MUSBZX8ROL52A-screenshots');
 const EMAIL = 'admin@yasinaslan.com.tr';
+// The seeded platform-admin seat behind EMAIL (prisma/seed-tenant-workspace.ts). The demo
+// sign-in form that used to resolve the address to it does not exist in a production build
+// (start mode: `locator.fill` on the email field timed out, CI run 37134974386), so the session
+// is a minted cookie for the same user (TASK-MUSNBNCXVR9GZ), as render-purity-refactor does
+// for this page. The jwt callback still reads the admin flag from the row.
+const SEAT = { id: 'demo-user-superadmin', email: EMAIL, tenantId: 'demo-tenant', role: 'SUPER_ADMIN' };
 const CALLS_URL = '/tr/main/calls';
 const T = tr.callsPage;
 
@@ -61,15 +68,9 @@ async function stubCalls(page: Page, first: Answer) {
 }
 
 async function openCalls(page: Page) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
-  });
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(CALLS_URL)}`);
-  await page.locator('input[type="email"]').fill(EMAIL);
-  await page.locator('form button[type="submit"]').click();
+  // signInAs also records the cookie consent the banner would otherwise ask for.
+  await signInAs(page, SEAT);
+  await page.goto(CALLS_URL);
   await page.waitForURL(`**${CALLS_URL}`, { timeout: 30_000 });
 }
 
