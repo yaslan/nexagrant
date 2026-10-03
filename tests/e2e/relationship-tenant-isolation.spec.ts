@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { REL_E2E, seed, rollback } from '../../scripts/seed-relationship-e2e';
 import { shotsDir } from './fixtures/shots';
+import { seedIdentity, signInAs, cleanupIdentity } from './fixtures/session';
 
 /**
  * TASK-MTRKV9JGY7OQY — M4 relationship screens, isolation in a real browser.
@@ -26,9 +27,17 @@ test.describe.configure({ mode: 'serial' });
 test.describe('M4 relationships — tenant isolation', () => {
   test.beforeAll(async () => {
     await seed();
+    await seedIdentity({
+      userId: REL_E2E.userId,
+      email: REL_E2E.email,
+      role: 'TENANT_OWNER',
+      tenantId: REL_E2E.tenantId,
+      workspaceIds: [REL_E2E.workspaceId],
+    });
   });
 
   test.afterAll(async () => {
+    await cleanupIdentity([REL_E2E.userId]);
     if (process.env.REL_E2E_KEEP !== '1') await rollback();
     await prisma.$disconnect();
   });
@@ -44,25 +53,15 @@ test.describe('M4 relationships — tenant isolation', () => {
     });
   });
 
-  /**
-   * Signs in as tenant A and lands on `target`.
-   *
-   * Every test gets its own browser context, so the session does not carry over
-   * — and a test that silently ran signed-out would land on the login screen and
-   * "prove" isolation by showing nothing at all. `waitForURL(target)` is the
-   * check that the session is real: it only resolves once the app has let this
-   * user through to the page under test.
-   */
-  async function signInAs(page: import('@playwright/test').Page, target: string) {
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-    await page.locator('input[type="email"]').fill(REL_E2E.email);
-    await page.locator('form button[type="submit"]').click();
-    await page.waitForURL(`**${target}`, { timeout: 30_000 });
-    // Every caller asserts on a locator next; that auto-wait is the synchronisation.
-  }
 
   test('tenant A signs in and reads its own relationship', async ({ page }) => {
-    await signInAs(page, OWN_URL);
+    await signInAs(page, {
+      id: REL_E2E.userId,
+      email: REL_E2E.email,
+      role: 'TENANT_OWNER',
+      tenantId: REL_E2E.tenantId,
+    });
+    await page.goto(OWN_URL);
 
     await expect(page.getByTestId('relationship-title')).toHaveText(REL_E2E.counterpartName);
     // The interaction the fixture filed for tenant A renders in the timeline.
@@ -85,7 +84,13 @@ test.describe('M4 relationships — tenant isolation', () => {
     // served. Landing on the login screen instead would make the assertions
     // below vacuous, so the session is established first and asserted by
     // `signInAs` before the stolen id is typed.
-    await signInAs(page, OWN_URL);
+    await signInAs(page, {
+      id: REL_E2E.userId,
+      email: REL_E2E.email,
+      role: 'TENANT_OWNER',
+      tenantId: REL_E2E.tenantId,
+    });
+    await page.goto(OWN_URL);
     await page.goto(STOLEN_URL);
 
     // Asserted on what renders, not on the HTTP status, and that is a measured
@@ -112,7 +117,13 @@ test.describe('M4 relationships — tenant isolation', () => {
     });
     expect(rows, 'both fixture relationships must exist').toHaveLength(2);
 
-    await signInAs(page, LIST_URL);
+    await signInAs(page, {
+      id: REL_E2E.userId,
+      email: REL_E2E.email,
+      role: 'TENANT_OWNER',
+      tenantId: REL_E2E.tenantId,
+    });
+    await page.goto(LIST_URL);
 
     await expect(page.getByText(REL_E2E.counterpartName).first()).toBeVisible();
     await expect(page.locator('body')).not.toContainText(REL_E2E.otherCounterpartName);

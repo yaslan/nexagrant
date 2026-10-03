@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { prisma } from '../../../src/lib/db';
+import { signInAs } from './session';
 
 /**
  * The tenant the M9 end-to-end specs run in.
@@ -111,18 +112,13 @@ export async function teardownM9Tenant() {
   await prisma.$disconnect();
 }
 
-/** Real sign-in through the login form, landing on `target`. */
+/** Sign in via JWT cookie (production mode), landing on `target`. */
 export async function signInAsM9User(page: Page, target: string) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
+  await signInAs(page, {
+    id: M9_USER_ID,
+    email: M9_EMAIL,
+    tenantId: M9_TENANT,
+    role: 'PIPELINE_MANAGER',
   });
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(M9_EMAIL);
-  await page.locator('form button[type="submit"]').click();
-  await page.waitForURL(`**${target}`, { timeout: 30_000 });
-  // Nothing more to wait for here: every caller asserts on a locator next, and that
-  // auto-waiting is the synchronisation (docs/E2E_TESTING.md §3.4).
+  await page.goto(target);
 }

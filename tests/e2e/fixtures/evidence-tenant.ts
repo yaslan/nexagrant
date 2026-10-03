@@ -83,6 +83,7 @@ export function evidenceTenant(key: string) {
       role: 'TENANT_OWNER',
     });
     await page.goto(evidenceUrl);
+    await page.waitForURL(`**${evidenceUrl}`, { timeout: 30_000 });
     return userId;
   }
 

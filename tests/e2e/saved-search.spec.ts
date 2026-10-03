@@ -6,6 +6,7 @@ import { parseSavedSearchFilters } from '../../src/lib/saved-search-filters';
 import { SAVED_SEARCH_E2E, seed, rollback } from '../../scripts/seed-saved-search-e2e';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { seedIdentity, signInAs, cleanupIdentity } from './fixtures/session';
 
 /**
  * TASK-MTSHUZUMVLTBF — the "Aramayı Kaydet" button, clicked, and the row it wrote.
@@ -39,28 +40,30 @@ test.describe.configure({ mode: 'serial' });
 test.describe('Saved search — the button writes a row the alert job can read', () => {
   test.beforeAll(async () => {
     await seed();
+    await seedIdentity({
+      userId: SAVED_SEARCH_E2E.userId,
+      email: SAVED_SEARCH_E2E.email,
+      role: 'TENANT_OWNER',
+      tenantId: SAVED_SEARCH_E2E.tenantId,
+      workspaceIds: [SAVED_SEARCH_E2E.workspaceId],
+    });
   });
 
   test.afterAll(async () => {
+    await cleanupIdentity([SAVED_SEARCH_E2E.userId]);
     // SAVED_SEARCH_E2E_KEEP=1 leaves the rows in place for inspection after a run.
     if (process.env.SAVED_SEARCH_E2E_KEEP !== '1') await rollback();
     await prisma.$disconnect();
   });
 
   test('a click on "Aramayı Kaydet" creates the SavedSearch row', async ({ page }) => {
-    // The cookie consent is a full-screen `inset-0` alertdialog and swallows every
-    // click underneath it. A recorded consent is the state a returning user is in.
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-      );
+    await signInAs(page, {
+      id: SAVED_SEARCH_E2E.userId,
+      email: SAVED_SEARCH_E2E.email,
+      role: 'TENANT_OWNER',
+      tenantId: SAVED_SEARCH_E2E.tenantId,
     });
-
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(CALLS_URL)}`);
-    await page.locator('input[type="email"]').fill(SAVED_SEARCH_E2E.email);
-    await page.locator('form button[type="submit"]').click();
-    await page.waitForURL(`**${CALLS_URL}`, { timeout: 30_000 });
+    await page.goto(CALLS_URL);
 
     // Asserted before the click, not assumed: the fixture must start with nothing
     // saved, or a leftover row would let a dead button pass this test.
@@ -160,17 +163,13 @@ test.describe('Saved search — the button writes a row the alert job can read',
   });
 
   test('deleting a saved search removes its row', async ({ page }) => {
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-      );
+    await signInAs(page, {
+      id: SAVED_SEARCH_E2E.userId,
+      email: SAVED_SEARCH_E2E.email,
+      role: 'TENANT_OWNER',
+      tenantId: SAVED_SEARCH_E2E.tenantId,
     });
-
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(CALLS_URL)}`);
-    await page.locator('input[type="email"]').fill(SAVED_SEARCH_E2E.email);
-    await page.locator('form button[type="submit"]').click();
-    await page.waitForURL(`**${CALLS_URL}`, { timeout: 30_000 });
+    await page.goto(CALLS_URL);
 
     const list = page.getByTestId('calls-saved-search-list');
     await expect(list).toBeVisible({ timeout: 30_000 });

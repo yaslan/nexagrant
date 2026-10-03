@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { prisma } from '../../../src/lib/db';
+import { signInAs } from './session';
 
 /**
  * The tenant `tests/e2e/gate-settings-readonly.spec.ts` runs in.
@@ -80,17 +81,13 @@ export async function teardownGateSettingsTenant() {
   await prisma.$disconnect();
 }
 
-/** Real sign-in through the login form, landing on `target`. */
+/** Sign in via JWT cookie (production mode), landing on `target`. */
 export async function signInAsGateSettingsUser(page: Page, target: string) {
-  // The cookie banner is a full-screen alertdialog that swallows the sign-in click.
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
+  await signInAs(page, {
+    id: SG_USER_ID,
+    email: SG_EMAIL,
+    tenantId: SG_TENANT,
+    role: 'TENANT_OWNER',
   });
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(SG_EMAIL);
-  await page.locator('form button[type="submit"]').click();
-  await page.waitForURL(`**${target}`, { timeout: 30_000 });
+  await page.goto(target);
 }

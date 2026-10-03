@@ -151,6 +151,7 @@ test.describe('identity strings', () => {
   });
 
   test('the login page headlines the demo seat, not a person', async ({ page }) => {
+    test.skip(process.env.E2E_WEB_SERVER === 'start', 'demo login form unavailable in start mode');
     await page.goto('/tr/giris');
     await acceptCookies(page);
 
@@ -170,6 +171,7 @@ test.describe('identity strings', () => {
   });
 
   test('the login page in English shows the same seats, translated', async ({ page }) => {
+    test.skip(process.env.E2E_WEB_SERVER === 'start', 'demo login form unavailable in start mode');
     await page.goto('/en/login');
     await acceptCookies(page);
 
