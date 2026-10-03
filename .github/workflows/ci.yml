@@ -157,6 +157,7 @@ jobs:
         E2E_WEB_SERVER: ${{ inputs.e2e_server || 'dev' }}
         # OAuth placeholder env for E2E auth tests (tests render button only, no real Google interaction)
         AUTH_GOOGLE_ID: 'ci-placeholder-id.apps.googleusercontent.com'
+        AUTH_GOOGLE_SECRET: 'ci-placeholder-google-secret'
         AUTH_SECRET: 'ci-placeholder-secret-for-nextauth-at-least-32-chars-1234'
         NEXTAUTH_URL: 'http://localhost:3000'
         AUTH_TRUST_HOST: 'true'
