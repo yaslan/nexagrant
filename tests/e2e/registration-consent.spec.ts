@@ -36,16 +36,21 @@ async function acceptCookies(page: Page) {
 }
 
 /**
- * The registration disclosure form.
+ * The visible sign-in form.
  *
  * While the page is still streaming, Next parks the Suspense content in a
  * `hidden` container and moves it once the boundary resolves, so for a moment
- * the document really does hold two copies of this form. Scoping to the
- * specific test ID removes the strict mode violation instead of making it rarer.
+ * the document really does hold two copies of this form — and a bare
+ * `getByTestId` then fails strict mode instead of waiting. Whether a run sees
+ * it is a matter of timing: this spec passed alone and failed in the middle of
+ * a full `pnpm gate`. Scoping to the visible copy removes the race rather than
+ * making it rarer.
  */
-function form(page: Page) {
-  return page.getByTestId('registration-disclosure');
-}
+function visibleForms(page: Page) { return page.locator('form').filter({ visible: true }); }
+/** The acknowledgement form (province, readiness, the box). */
+function disclosure(page: Page) { return visibleForms(page).filter({ has: page.getByTestId('disclosure-ack') }); }
+/** The demo e-mail form: the one that submits. */
+function form(page: Page) { return visibleForms(page).filter({ has: page.locator('input[type="email"]') }); }
 
 test.describe.configure({ mode: 'serial' });
 
@@ -54,15 +59,15 @@ test.afterAll(async () => {
   const users = await prisma.user.findMany({ where: { email: { in: emails } }, select: { id: true } });
   const ids = users.map((u) => u.id);
   if (ids.length) {
-    await prisma.consent.deleteMany({ where: { userId: { in: presentIds(ids) } } });
+    await prisma.consent.deleteMany({ where: { userId: { in: presentIds(ids) as any } } });
     const memberships = await prisma.membership.findMany({
-      where: { userId: { in: ids } },
+      where: { userId: { in: ids as any } },
       select: { tenantId: true },
     });
-    await prisma.user.deleteMany({ where: { id: { in: presentIds(ids) } } });
+    await prisma.user.deleteMany({ where: { id: { in: presentIds(ids) as any } } });
     const tenantIds = memberships.map((m) => m.tenantId);
     if (tenantIds.length) {
-      await prisma.tenant.deleteMany({ where: { id: { in: presentIds(tenantIds) } } });
+      await prisma.tenant.deleteMany({ where: { id: { in: presentIds(tenantIds) as any } } });
     }
   }
   await prisma.$disconnect();
@@ -74,7 +79,7 @@ test('the registration form asks, unticked, and will not submit until it is tick
 
   // Ticking it enables the submit button through React state, so the box has to be
   // hydrated before it is ticked (fixtures/hydration.ts).
-  const box = form(page).getByTestId('disclosure-ack');
+  const box = disclosure(page).getByTestId('disclosure-ack');
   await expectHydrated(box);
 
   // Pre-ticked would make the record worthless: it would prove the page's
@@ -84,13 +89,13 @@ test('the registration form asks, unticked, and will not submit until it is tick
 
   // The version is on screen, so a screenshot of this box is evidence about a
   // specific text rather than about whatever the notice says today.
-  const version = form(page).getByTestId('disclosure-version');
+  const version = disclosure(page).getByTestId('disclosure-version');
   await expect(version).toContainText('privacy-notice@');
   await expect(version).toContainText('terms-of-service@');
 
   // Both legal texts are reachable from here, in the locale being read.
-  await expect(form(page).locator('a[href="/tr/privacy"]')).toBeVisible();
-  await expect(form(page).locator('a[href="/tr/terms"]')).toBeVisible();
+  await expect(disclosure(page).locator('a[href="/tr/privacy"]')).toBeVisible();
+  await expect(disclosure(page).locator('a[href="/tr/terms"]')).toBeVisible();
 
   const submit = form(page).locator('button[type="submit"]');
   await form(page).locator('input[type="email"]').fill(REFUSED_EMAIL);
@@ -116,10 +121,10 @@ test('the registration form asks, unticked, and will not submit until it is tick
 test('ticking it and registering writes the disclosure record', async ({ page }) => {
   await acceptCookies(page);
   await page.goto('/tr/register');
-  await expectHydrated(form(page).getByTestId('disclosure-ack'));
+  await expectHydrated(disclosure(page).getByTestId('disclosure-ack'));
 
   await form(page).locator('input[type="email"]').fill(FORM_EMAIL);
-  await form(page).getByTestId('disclosure-ack').check();
+  await disclosure(page).getByTestId('disclosure-ack').check();
   await form(page).locator('button[type="submit"]').click();
 
   // The app lands the new account on its workspace.

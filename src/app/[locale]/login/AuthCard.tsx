@@ -353,12 +353,11 @@ export default function AuthCard({
           <span>{errorMessage}</span>
           <button
             type="button"
-            data-testid="dismiss-error-alert"
             onClick={() => setErrorMessage(null)}
             aria-label={isTr ? 'Kapat' : 'Close'}
             className="font-bold text-bad ml-2"
           >
-            {isTr ? 'Kapat' : 'Close'}
+            ✕
           </button>
         </div>
       )}
