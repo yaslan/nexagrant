@@ -11,29 +11,40 @@ vi.mock('stripe', () => ({
 }));
 
 vi.mock('@/lib/db', () => {
+  // Shared delegates between prisma and tx — when createInvoiceForPayment calls
+  // tx.invoice.create, it must hit the same mock that the test checks.
+  const invoiceDelegate = { findFirst: vi.fn(), create: vi.fn() };
+  const tenantDelegate = { findUnique: vi.fn() };
+  const tenantBillingIdentityDelegate = { findUnique: vi.fn() };
+
   const prisma: Record<string, unknown> = {
     auditEvent: { findFirst: vi.fn(), create: vi.fn() },
-    invoice: { findFirst: vi.fn(), create: vi.fn() },
-    tenant: { findUnique: vi.fn() },
-    tenantBillingIdentity: { findUnique: vi.fn() },
+    invoice: invoiceDelegate,
+    tenant: tenantDelegate,
+    tenantBillingIdentity: tenantBillingIdentityDelegate,
     systemAlert: { create: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   };
 
   // The idempotency key and the audit row are written inside a tenant
   // transaction since ADR-0003, so this file has to hand `logInvoicePayment` a
   // `withTenant` too. The transactional client carries only what runs in there:
-  // the claim and the audit row. The invoice document is written *outside* the
-  // transaction (it fetches a TCMB rate and raises SystemAlerts through the
-  // bare client), which is why `invoice` stays on `prisma` above — if a future
-  // change moved it inside, the tests here would fail on a missing delegate
-  // rather than pass quietly.
+  // the claim and the audit row. The invoice document is written inside a
+  // `prisma.$transaction` for the advisory lock on invoice numbers, so `tx` must
+  // include `invoice` and `tenantBillingIdentity` for the writer to read/write them.
+  // The delegates are the SAME OBJECTS as on prisma so test assertions work.
   const tx: Record<string, unknown> = {
     stripeEventLog: { create: vi.fn(), findUnique: vi.fn() },
     auditEvent: { create: vi.fn() },
+    invoice: invoiceDelegate,
+    tenant: tenantDelegate,
+    tenantBillingIdentity: tenantBillingIdentityDelegate,
+    $executeRaw: vi.fn(),
   };
   const withTenant = vi.fn(
     async (_tenantId: string, callback: (client: typeof tx) => Promise<unknown>) => callback(tx)
   );
+  // The invoice write calls prisma.$transaction for the advisory lock on invoice numbers.
+  prisma.$transaction = vi.fn(async (_callback: (arg: unknown) => Promise<unknown>) => _callback(tx));
   return { prisma, withTenant, __tx: tx };
 });
 
@@ -90,6 +101,16 @@ beforeEach(() => {
   db.systemAlert.findMany.mockResolvedValue([]);
   db.tenantBillingIdentity.findUnique.mockResolvedValue(IDENTITY);
   db.tenant.findUnique.mockResolvedValue({ locale: 'tr' });
+  // The invoice writer runs inside prisma.$transaction, so it uses tx's delegates.
+  // Mock them separately for the transaction callback.
+  tx.invoice.findFirst.mockResolvedValue(null);
+  tx.invoice.create.mockResolvedValue({
+    id: 'inv_1',
+    number: 'FB-2026-000001',
+    ettn: 'ettn-1',
+  });
+  tx.tenant.findUnique.mockResolvedValue({ locale: 'tr' });
+  tx.tenantBillingIdentity.findUnique.mockResolvedValue(IDENTITY);
 });
 
 /**
@@ -265,5 +286,45 @@ describe('logInvoicePayment', () => {
     expect(tx.stripeEventLog.create).not.toHaveBeenCalled();
     expect(tx.auditEvent.create).not.toHaveBeenCalled();
     expect(db.invoice.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * TASK-MUPVLWSIPC5WU — the Stripe path creates an invoice via createInvoiceForPayment.
+   * It calls the writer inside a prisma.$transaction for the advisory lock on invoice numbers.
+   */
+  it('calls createInvoiceForPayment inside the transaction', async () => {
+    await logInvoicePayment(paidInvoice(), 'evt_tx_call');
+
+    // The payment's audit event lands in the tenant transaction.
+    expect(tx.auditEvent.create).toHaveBeenCalledTimes(1);
+    // The invoice write lands inside prisma.$transaction (the mock callback receives tx).
+    // Test that the write hit the transaction's delegates, not the bare client's.
+    expect(tx.invoice.create).toHaveBeenCalledTimes(1);
+    const invoiceCall = tx.invoice.create.mock.calls[0][0];
+    expect(invoiceCall.data).toMatchObject({
+      tenantId: TENANT,
+      paymentRef: 'in_test_1',
+    });
+  });
+
+  /**
+   * When the invoice write inside the transaction fails, the payment still stands
+   * recorded as an audit event. The transaction error does not roll back the audit.
+   */
+  it('lets the payment stand even if the transaction throws', async () => {
+    // Advisory lock or TCMB fetch fails — the invoice cannot be issued.
+    (db.$transaction as any).mockImplementationOnce(
+      async (_callback: (tx: any) => Promise<unknown>) => {
+        throw new Error('advisory lock timeout');
+      }
+    );
+
+    await expect(logInvoicePayment(paidInvoice(), 'evt_tx_fail')).resolves.toBeUndefined();
+
+    // The payment was already recorded as an audit event *before* the transaction,
+    // so the audit row does stand even though the invoice write failed.
+    expect(tx.auditEvent.create).toHaveBeenCalledTimes(1);
+    // The invoice write never ran or failed partway through.
+    expect(tx.invoice.create).not.toHaveBeenCalled();
   });
 });

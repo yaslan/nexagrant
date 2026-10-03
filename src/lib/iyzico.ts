@@ -485,8 +485,8 @@ export function notificationEventId(notification: IyzicoNotification): string | 
  * writes that follow it cannot interleave. Without it the check-then-write
  * guard has a race that double-grants credits.
  */
-function advisoryLockKey(eventId: string): bigint {
-  return crypto.createHash('sha256').update(eventId).digest().readBigInt64BE(0);
+export function advisoryLockKey(key: string): bigint {
+  return crypto.createHash('sha256').update(key).digest().readBigInt64BE(0);
 }
 
 const SUBSCRIPTION_PERIOD_DAYS: Record<BillingInterval, number> = {

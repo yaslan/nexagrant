@@ -8,6 +8,7 @@ import {
 } from '@/lib/fx/tcmb';
 import { convertCurrencyMinor, vatOnNetMinor } from '@/lib/money';
 import { recordAlert, resolveAlerts } from '@/lib/observability/system-alert';
+import { advisoryLockKey } from '@/lib/iyzico';
 
 import { resolveVatRate } from './vat-rate';
 
@@ -105,7 +106,7 @@ const REQUIRED_BUYER_FIELDS = [
 ] as const;
 
 /** The subset of a Prisma client this module touches. */
-export type InvoiceWriterDb = Pick<Prisma.TransactionClient, 'invoice' | 'tenantBillingIdentity'>;
+export type InvoiceWriterDb = Pick<Prisma.TransactionClient, 'invoice' | 'tenantBillingIdentity' | '$executeRaw'>;
 
 /**
  * How many times a number collision is retried before giving up.
@@ -522,6 +523,15 @@ export async function createInvoiceForPayment(
   const year = paidAt.getUTCFullYear();
 
   for (let attempt = 0; attempt < NUMBER_ATTEMPTS; attempt += 1) {
+    // Advisory lock on first attempt: concurrent payments for the same tenant
+    // and year serialize, so each gets a distinct invoice number. Lock key is
+    // stable (hash of tenant+year) so retries reuse the same lock without
+    // re-acquiring it.
+    if (attempt === 0) {
+      const lockKey = advisoryLockKey(`${tenantId}:${year}`);
+      await db.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey})`;
+    }
+
     // Read the tenant's highest number for the year, take the next one, and let
     // the unique index arbitrate if another payment got there first. Ordering
     // by the string is safe because the sequence is zero-padded to a fixed width.
