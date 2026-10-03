@@ -48,7 +48,7 @@ test.beforeAll(async () => {
       name: 'Zeynep Aydın',
       tenantId: 'demo-tenant',
       role: 'PIPELINE_MANAGER',
-      workspaceIds: ['fabrika-beta-workspace'],
+      workspaceIds: [workspace.id],
     },
   );
 });
