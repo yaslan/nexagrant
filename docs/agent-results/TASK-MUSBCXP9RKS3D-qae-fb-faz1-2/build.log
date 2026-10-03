@@ -1,0 +1,308 @@
+$ next build
+▲ Next.js 16.3.4 (Turbopack)
+- Environments: .env.local, .env
+
+🌐 Checking i18n translations...
+
+=== i18n Translation Audit Report ===
+
+Report generated: 2026-10-03T12:27:16.933Z
+
+Summary:
+  Static keys used in code: 1486
+  Dynamic key patterns:     77
+  Keys in messages/tr.json: 2277
+  Keys in messages/en.json: 2277
+
+💤 In the catalogs but not reached from src/ (informational) (350):
+   - Approvals.auditHash
+   - Approvals.selfApprovalForbidden
+   - Approvals.subtitle
+   - Auth.disclosureAck
+   - Auth.disclosureAckAgency
+   - Auth.disclosureRequired
+   - Auth.register
+   - Auth.signIn
+   - Auth.signOut
+   - Common.actions
+   ... and 340 more
+
+Hard-coded user-facing text (src/app, src/modules — *.tsx):
+  Literals found:   303 in 34 file(s)
+  Baseline allows:  304 in 35 file(s)
+
+⚠️  Baseline is looser than reality — 1 literal(s) paid down. Refresh it with:
+      pnpm i18n:check --update-baseline
+   - src/app/[locale]/(app)/[workspace]/settings/profile/page.tsx  1 → 0  (clean — remove from the baseline)
+
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+
+✓ Running next.config.ts took 2.4s
+- Experiments (use with caution):
+  ✓ authInterrupts
+
+  Creating an optimized production build ...
+
+🌐 Checking i18n translations...
+
+=== i18n Translation Audit Report ===
+
+Report generated: 2026-10-03T12:27:17.546Z
+
+Summary:
+  Static keys used in code: 1486
+  Dynamic key patterns:     77
+  Keys in messages/tr.json: 2277
+  Keys in messages/en.json: 2277
+
+💤 In the catalogs but not reached from src/ (informational) (350):
+   - Approvals.auditHash
+   - Approvals.selfApprovalForbidden
+   - Approvals.subtitle
+   - Auth.disclosureAck
+   - Auth.disclosureAckAgency
+   - Auth.disclosureRequired
+   - Auth.register
+   - Auth.signIn
+   - Auth.signOut
+   - Common.actions
+   ... and 340 more
+
+Hard-coded user-facing text (src/app, src/modules — *.tsx):
+  Literals found:   303 in 34 file(s)
+  Baseline allows:  304 in 35 file(s)
+
+⚠️  Baseline is looser than reality — 1 literal(s) paid down. Refresh it with:
+      pnpm i18n:check --update-baseline
+   - src/app/[locale]/(app)/[workspace]/settings/profile/page.tsx  1 → 0  (clean — remove from the baseline)
+
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+
+
+=== i18n Translation Audit Report ===
+
+Report generated: 2026-10-03T12:27:17.993Z
+
+Summary:
+  Static keys used in code: 1486
+  Dynamic key patterns:     77
+  Keys in messages/tr.json: 2277
+  Keys in messages/en.json: 2277
+
+💤 In the catalogs but not reached from src/ (informational) (350):
+   - Approvals.auditHash
+   - Approvals.selfApprovalForbidden
+   - Approvals.subtitle
+   - Auth.disclosureAck
+   - Auth.disclosureAckAgency
+   - Auth.disclosureRequired
+   - Auth.register
+   - Auth.signIn
+   - Auth.signOut
+   - Common.actions
+   ... and 340 more
+
+Hard-coded user-facing text (src/app, src/modules — *.tsx):
+  Literals found:   303 in 34 file(s)
+  Baseline allows:  304 in 35 file(s)
+
+⚠️  Baseline is looser than reality — 1 literal(s) paid down. Refresh it with:
+      pnpm i18n:check --update-baseline
+   - src/app/[locale]/(app)/[workspace]/settings/profile/page.tsx  1 → 0  (clean — remove from the baseline)
+
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+
+
+🌐 Checking i18n translations...
+✓ Compiled successfully in 8.2s
+  Running TypeScript ...
+  Finished TypeScript in 12.1s ...
+  Collecting page data using 11 workers ...
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+(node:65732) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:65724) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+(node:65731) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:65730) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  Generating static pages using 11 workers (0/38) ...
+  Generating static pages using 11 workers (9/38) 
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+  Generating static pages using 11 workers (18/38) 
+⚠ Unsupported metadata themeColor is configured in metadata export in /_not-found. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+  Generating static pages using 11 workers (28/38) 
+✓ Generating static pages using 11 workers (38/38) in 147ms
+Turbopack build encountered 1 warning:
+./src/instrumentation.ts:18:5
+Warning: A Node.js API is used (process.exit at line: 18) which is not supported in the Edge Runtime.
+    Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+  [90m16 |[0m     [90m// with a 500, which a port health check reads as a running server. Exit.[0m
+  [90m17 |[0m     console.error(error [36minstanceof[0m [33mError[0m ? error.message : error);
+[33m[1m>[0m [90m18 |[0m     process.exit([35m1[0m);
+  [90m   |[0m     [33m[1m^^^^^^^^^^^^[0m
+  [90m19 |[0m   }
+  [90m20 |[0m   [90m// A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.[0m
+  [90m21 |[0m   [36mconst[0m { reportAppUrlProblem } = [36mawait[0m [36mimport[0m([32m'./lib/app-url-alert'[0m);
+
+Ecmascript file had an error
+
+
+  Finalizing page optimization ...
+
+Route (app)                                                     Revalidate  Expire
+┌ ƒ /_not-found
+├ ƒ /[locale]
+├ ƒ /[locale]/[workspace]/approvals
+├ ƒ /[locale]/[workspace]/ayarlar
+├ ƒ /[locale]/[workspace]/ayarlar/faturalama
+├ ƒ /[locale]/[workspace]/ayarlar/gizlilik
+├ ƒ /[locale]/[workspace]/ayarlar/kapilar
+├ ƒ /[locale]/[workspace]/ayarlar/moduller
+├ ƒ /[locale]/[workspace]/ayarlar/profil
+├ ƒ /[locale]/[workspace]/ayarlar/uyeler
+├ ƒ /[locale]/[workspace]/bildirimler
+├ ƒ /[locale]/[workspace]/cagrilar
+├ ƒ /[locale]/[workspace]/cagrilar/[id]
+├ ƒ /[locale]/[workspace]/calls
+├ ƒ /[locale]/[workspace]/calls/[id]
+├ ƒ /[locale]/[workspace]/concept-notes
+├ ƒ /[locale]/[workspace]/concept-notes/[id]
+├ ƒ /[locale]/[workspace]/dashboard
+├ ƒ /[locale]/[workspace]/dashboard/api/export-csv
+├ ƒ /[locale]/[workspace]/evidence
+├ ƒ /[locale]/[workspace]/firsatlar
+├ ƒ /[locale]/[workspace]/firsatlar/[id]
+├ ƒ /[locale]/[workspace]/iliskiler
+├ ƒ /[locale]/[workspace]/kanitlar
+├ ƒ /[locale]/[workspace]/konsept-notlar
+├ ƒ /[locale]/[workspace]/notifications
+├ ƒ /[locale]/[workspace]/onay-merkezi
+├ ƒ /[locale]/[workspace]/opportunities/[id]/application
+├ ƒ /[locale]/[workspace]/opportunities/[id]/briefs
+├ ƒ /[locale]/[workspace]/opportunities/[id]/documents
+├ ƒ /[locale]/[workspace]/opportunities/[id]/evaluations
+├ ƒ /[locale]/[workspace]/opportunities/[id]/evaluations/panel
+├ ƒ /[locale]/[workspace]/opportunities/[id]/m2
+├ ƒ /[locale]/[workspace]/opportunities/[id]/matching
+├ ƒ /[locale]/[workspace]/ortaklar
+├ ƒ /[locale]/[workspace]/panel
+├ ƒ /[locale]/[workspace]/partners
+├ ƒ /[locale]/[workspace]/partners/[pic]
+├ ƒ /[locale]/[workspace]/partners/leaders
+├ ƒ /[locale]/[workspace]/pipeline
+├ ƒ /[locale]/[workspace]/pipeline/[id]
+├ ƒ /[locale]/[workspace]/pipeline/[id]/consortium
+├ ƒ /[locale]/[workspace]/relationships
+├ ƒ /[locale]/[workspace]/relationships/[id]
+├ ƒ /[locale]/[workspace]/reports/person-days
+├ ƒ /[locale]/[workspace]/settings/api-keys
+├ ƒ /[locale]/[workspace]/settings/billing
+├ ƒ /[locale]/[workspace]/settings/calendar
+├ ƒ /[locale]/[workspace]/settings/gates
+├ ƒ /[locale]/[workspace]/settings/members
+├ ƒ /[locale]/[workspace]/settings/modules
+├ ƒ /[locale]/[workspace]/settings/privacy
+├ ƒ /[locale]/[workspace]/settings/profile
+├ ƒ /[locale]/[workspace]/tto
+├ ƒ /[locale]/[workspace]/tto-hizlandirici
+├ ƒ /[locale]/accept-invite
+├ ƒ /[locale]/accept-invite/continue
+├ ƒ /[locale]/acik-cagrilar
+├ ƒ /[locale]/admin
+├ ƒ /[locale]/admin/alerts
+├ ƒ /[locale]/admin/audit
+├ ƒ /[locale]/admin/billing
+├ ƒ /[locale]/admin/billing/plans
+├ ƒ /[locale]/admin/blog
+├ ƒ /[locale]/admin/cordis
+├ ƒ /[locale]/admin/documents
+├ ƒ /[locale]/admin/feedback
+├ ƒ /[locale]/admin/leads
+├ ƒ /[locale]/admin/modules
+├ ƒ /[locale]/admin/settings
+├ ƒ /[locale]/admin/tenants
+├ ƒ /[locale]/admin/topic-stats
+├ ƒ /[locale]/agency
+├ ƒ /[locale]/ajans
+├ ƒ /[locale]/belediye-cagrilari
+├ ƒ /[locale]/blog
+├ ƒ /[locale]/blog/[slug]
+├ ƒ /[locale]/calls
+├ ƒ /[locale]/calls/[region]
+├ ƒ /[locale]/calls/topic/[id]
+├ ƒ /[locale]/calls/turkey
+├ ƒ /[locale]/compliance/dpa
+├ ƒ /[locale]/fiyatlandirma
+├ ƒ /[locale]/fon-hazirlik
+├ ƒ /[locale]/funding-readiness
+├ ƒ /[locale]/giris
+├ ƒ /[locale]/i18n-check
+├ ƒ /[locale]/kayit
+├ ƒ /[locale]/login
+├ ƒ /[locale]/municipal-calls
+├ ƒ /[locale]/no-workspace
+├ ƒ /[locale]/open-calls
+├ ƒ /[locale]/portal/partner/[token]
+├ ƒ /[locale]/pricing
+├ ƒ /[locale]/privacy
+├ ƒ /[locale]/register
+├ ƒ /[locale]/terms
+├ ƒ /[locale]/turkiyeye-acik-cagrilar
+├ ƒ /api/admin/cordis/import
+├ ƒ /api/admin/documents/upload
+├ ƒ /api/admin/topic-stats/import
+├ ƒ /api/admin/topic-stats/rescore
+├ ƒ /api/agency/cobrand-logo
+├ ƒ /api/agency/reports/[id]
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/auth/hata
+├ ƒ /api/billing/checkout
+├ ƒ /api/billing/invoices/[id]/export
+├ ƒ /api/billing/portal
+├ ƒ /api/billing/quote
+├ ƒ /api/cagrilar
+├ ƒ /api/concept-notes/[id]/export
+├ ƒ /api/cordis/organizations
+├ ƒ /api/cordis/organizations/[id]
+├ ƒ /api/cordis/projects
+├ ƒ /api/csp-report
+├ ƒ /api/dashboard/export-csv
+├ ƒ /api/documents/export
+├ ƒ /api/evidence/[id]/download
+├ ƒ /api/evidence/mock-upload
+├ ƒ /api/feedback
+├ ƒ /api/gdpr/delete
+├ ƒ /api/gdpr/export
+├ ƒ /api/invitations
+├ ƒ /api/saved-searches
+├ ƒ /api/saved-searches/[id]
+├ ƒ /api/team
+├ ƒ /api/team/invitations/[id]
+├ ƒ /api/team/members/[id]
+├ ƒ /api/user/export
+├ ƒ /api/user/export-data
+├ ƒ /api/user/request-deletion
+├ ƒ /api/v1/calls
+├ ƒ /api/v1/opportunities
+├ ƒ /api/v1/partners
+├ ƒ /api/v1/partners/[pic]
+├ ƒ /api/webhooks/iyzico
+├ ƒ /api/webhooks/stripe
+├ ○ /apple-icon.png
+├ ○ /icon.svg
+├ ○ /manifest.webmanifest
+├ ○ /robots.txt
+└ ○ /sitemap.xml                                                        1h      1y
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

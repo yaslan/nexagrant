@@ -1,0 +1,11 @@
+$ eslint
+
+<wt>/src/lib/invitations/accept.ts
+  31:15  warning  'Prisma' is defined but never used  @typescript-eslint/no-unused-vars
+
+<wt>/tests/settings-profile-update.test.ts
+   5:32  warning  'beforeAll' is defined but never used   @typescript-eslint/no-unused-vars
+  16:18  warning  'withTenant' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 3 problems (0 errors, 3 warnings)
+
