@@ -169,6 +169,8 @@ export type CspOptions = {
   r2AccountId?: string | null;
   /** R2_PUBLIC_HOST — public object URLs. */
   r2PublicHost?: string | null;
+  /** R2_ENDPOINT — S3-compatible endpoint (MinIO, etc.). Origin only, safe HTTP for loopback. */
+  r2Endpoint?: string | null;
 };
 
 const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
@@ -191,10 +193,29 @@ function r2UploadOrigin(accountId: string | null | undefined): string | null {
   return id && /^[a-z0-9]{1,64}$/i.test(id) ? `https://${id}.r2.cloudflarestorage.com` : null;
 }
 
+/** R2_ENDPOINT origin — S3-compatible endpoint (MinIO, etc.). HTTPS always safe; HTTP only for loopback. */
+function r2EndpointOrigin(endpoint: string | null | undefined): string | null {
+  if (!endpoint?.trim()) return null;
+  try {
+    const url = new URL(endpoint.trim());
+    if (url.protocol === 'https:') return url.origin;
+    if (url.protocol === 'http:') {
+      const host = url.hostname.toLowerCase();
+      if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return url.origin;
+      // allow http for loopback; reject remote http
+      return null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function buildContentSecurityPolicy(opts: CspOptions): string {
   const posthog = originOf(opts.posthogHost);
   const r2Upload = r2UploadOrigin(opts.r2AccountId);
   const r2Public = originOf(opts.r2PublicHost);
+  const r2Ep = r2EndpointOrigin(opts.r2Endpoint);
   const extra = (...values: Array<string | null>) => values.filter((v): v is string => !!v);
 
   const directives: Array<[string, string[]]> = [
@@ -207,7 +228,7 @@ export function buildContentSecurityPolicy(opts: CspOptions): string {
     ['img-src', ["'self'", 'data:', 'blob:', 'https://images.unsplash.com', ...extra(r2Public)]],
     ['font-src', ["'self'", 'data:']],
     // `next dev` HMR runs over a websocket to this origin; ws: is not covered by 'self' everywhere.
-    ['connect-src', ["'self'", ...extra(posthog, r2Upload), ...(opts.isDev ? ['ws:', 'wss:'] : [])]],
+    ['connect-src', ["'self'", ...extra(posthog, r2Upload, r2Ep), ...(opts.isDev ? ['ws:', 'wss:'] : [])]],
     ['media-src', ["'self'", 'blob:']],
     ['worker-src', ["'self'", 'blob:']],
     ['manifest-src', ["'self'"]],
@@ -230,6 +251,7 @@ export function cspOptionsFromEnv(nonce: string, env: NodeJS.ProcessEnv = proces
     posthogHost: posthogKey ? env.NEXT_PUBLIC_POSTHOG_HOST?.trim() || DEFAULT_POSTHOG_HOST : null,
     r2AccountId: env.R2_ACCOUNT_ID,
     r2PublicHost: env.R2_PUBLIC_HOST,
+    r2Endpoint: env.R2_ENDPOINT,
   };
 }
 
