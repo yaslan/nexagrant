@@ -3,7 +3,7 @@
 **Hüküm:** Bitti: M9 takvim reddi artık `{ ok:false, code }` olarak DÖNÜYOR; prod build'de kod istemciye ulaşıyor (start 5/5, dev 5/5), mutant (`code='unknown'`) :84'ü kırmızıya çeviriyor.
 **Tip:** hata (yalnız production)
 **Platform:** mac (Darwin 27, Chromium/Playwright, yerel Postgres). Değişiklik platformdan bağımsız: Next.js Server Action serileştirmesi + saf TS; Windows/Linux'ta koşulmadı (gerek yok — dosya yolu/süreç/kabuk kodu yok).
-**Dal / PR:** `be-fb/m9-calendar-result` (origin/dev d0d2f5ec'den) → PR base `dev` (aşağıda link)
+**Dal / PR:** `be-fb/m9-calendar-result` (origin/dev d0d2f5ec) → https://github.com/yaslan/fonbridge/pull/14 (base dev)
 
 ## 1. Ne yapıldı
 Kök neden: `connectCalendar`/`disconnectCalendar` reddi `CalendarActionError` FIRLATIYORDU; istemci kodu `error.message`'dan okuyordu. Next.js production build'de fırlatılan Server Action hatasının mesajı tarayıcıya gitmez (yalnız `digest`), bu yüzden her ret `errors.unknown` ("Takvim işlemi tamamlanamadı…") oluyordu.
