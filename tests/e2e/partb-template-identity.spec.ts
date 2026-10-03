@@ -1,9 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
+import { encode } from 'next-auth/jwt';
 
 import { prisma } from '../../src/lib/db';
 import trMessages from '../../messages/tr.json';
 import enMessages from '../../messages/en.json';
 import { shotsDir } from './fixtures/shots';
+import { e2eAuthSecret } from './fixtures/auth-secret';
 
 /**
  * TASK-MTS6LZOD715WM — a Part B the tenant has not written names nobody.
@@ -21,6 +23,8 @@ import { shotsDir } from './fixtures/shots';
  */
 
 const SHOTS = shotsDir('TASK-MTS6LZOD715WM-screenshots');
+const COOKIE_NAME = 'authjs.session-token';
+const SECRET = e2eAuthSecret();
 
 const M11_E2E = {
   email: 'm11-e2e@fabrika.test',
@@ -136,16 +140,29 @@ async function rollbackFixture() {
 
 async function signInAndOpenPartB(page: Page, locale: string) {
   const url = APPLICATION_URL(locale);
+  const value = await encode({
+    token: {
+      sub: M11_E2E.userId,
+      id: M11_E2E.userId,
+      name: 'M11 E2E Author',
+      email: M11_E2E.email,
+      tenantId: M11_E2E.tenantId,
+      role: 'TENANT_OWNER',
+    },
+    secret: SECRET,
+    salt: COOKIE_NAME,
+    maxAge: 60 * 60,
+  });
+  await page.context().addCookies([
+    { name: COOKIE_NAME, value, url: 'http://localhost:3000' },
+  ]);
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'fabrika_cookie_consent',
       JSON.stringify({ necessary: true, analytics: true, marketing: true }),
     );
   });
-  const loginPath = locale === 'tr' ? 'giris' : 'login';
-  await page.goto(`/${locale}/${loginPath}?callbackUrl=${encodeURIComponent(url)}`);
-  await page.locator('input[type="email"]').fill(M11_E2E.email);
-  await page.locator('form button[type="submit"]').click();
+  await page.goto(url);
   await page.waitForURL(`**${url}`, { timeout: 60_000 });
   // The caller asserts on a locator next; that auto-wait is the synchronisation.
   return page.getByRole('main');
