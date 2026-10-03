@@ -269,7 +269,8 @@
         "storage_unavailable": "Depolama şu an kullanılamıyor. Biraz sonra tekrar deneyin.",
         "save_failed": "Belge kaydedilemedi. Tekrar deneyin.",
         "service_busy": "Sistem şu an çok yoğun; belge kaydedilmedi. Birkaç saniye sonra yeniden yükleyin.",
-        "put_failed": "Dosya depoya yüklenemedi (HTTP {status})."
+        "put_failed": "Dosya depoya yüklenemedi (HTTP {status}).",
+        "object_store_unconfigured": "Belge yükleme bu kurulumda henüz açık değil: dosya deposu yapılandırılmamış. Dosyanız gönderilmedi; lütfen yöneticinize bildirin."
       }
     }
   },

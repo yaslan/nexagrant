@@ -98,6 +98,13 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
   const [uploadConfidentiality] = useState<string>('INTERNAL');
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  /**
+   * Why the last upload failed, shown inside the modal. It used to be a native
+   * `alert()`: untranslatable chrome, no role for assistive tech, and the modal
+   * behind it gave no sign of what had gone wrong once it was dismissed
+   * (TASK-MUSFO7ELD7WYF).
+   */
+  const [uploadError, setUploadError] = useState<string | null>(null);
   
   // Selected Document Detail Drawer
   const [selectedDoc, setSelectedDoc] = useState<EvidenceItemData | null>(null);
@@ -182,6 +189,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
     e.preventDefault();
     if (!uploadFile) return;
 
+    setUploadError(null);
     setIsUploading(true);
     setUploadProgress(15);
 
@@ -241,7 +249,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
       setUploadValidUntil('');
       setUploadAuthority('');
     } catch (err) {
-      alert(errorText(err, () => (isTr ? `Yükleme hatası: ${errorMessage(err)}` : `Upload error: ${errorMessage(err)}`)));
+      setUploadError(errorText(err, () => (isTr ? `Yükleme hatası: ${errorMessage(err)}` : `Upload error: ${errorMessage(err)}`)));
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -430,7 +438,10 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
           </button>
 
           <button
-            onClick={() => setShowUploadModal(true)}
+            onClick={() => {
+              setUploadError(null);
+              setShowUploadModal(true);
+            }}
             className="bg-accent hover:opacity-90 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
           >
             <Upload className="w-4 h-4" />
@@ -453,7 +464,10 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                 : 'No evidence matches your filters. Upload new documents to Cloudflare R2 repository.'}
             </p>
             <button
-              onClick={() => setShowUploadModal(true)}
+              onClick={() => {
+                setUploadError(null);
+                setShowUploadModal(true);
+              }}
               className="bg-accent text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm hover:opacity-90 transition"
             >
               + {isTr ? 'Belge Yükle' : 'Upload Document'}
@@ -657,6 +671,16 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                   />
                 </div>
               </div>
+
+              {uploadError && (
+                <div
+                  role="alert"
+                  data-testid="evidence-upload-error"
+                  className="text-xs rounded-xl p-3 border border-amber-200 bg-amber-50 text-amber-900"
+                >
+                  {uploadError}
+                </div>
+              )}
 
               {isUploading && (
                 <div className="space-y-1.5 pt-1">
