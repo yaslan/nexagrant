@@ -23,9 +23,9 @@ const DEFAULT_BASE_URL =
  * seeded; the cookie does not create anybody.
  *
  * Several users in one spec: seed each of them in the same beforeAll. To put them in
- * the same workspace, pass `workspace` to the first call only and the same id in
- * `workspaceIds` to the others (or pass the same `workspace` to every call — the
- * upsert is keyed on tenant + slug, so that is safe too). Then, in each test, sign in
+ * the same workspace, pass the workspace object to each user, or pass `workspace` only
+ * to the first and `workspaceIds: [workspace.id]` to the others. The upsert is keyed
+ * on tenant + slug, so sharing the object across calls is safe. Then, in each test, sign in
  * as exactly one of them:
  *
  *   const ws = { id: 'my-ws', slug: 'my-ws', name: 'My WS' };
@@ -222,14 +222,17 @@ export async function seedIdentity(
  */
 export async function cleanupIdentity(userIds: string[]): Promise<void> {
   await withSystemScope('platform-admin', 'e2e.session.cleanup', async (tx) => {
-    // Delete memberships first (they have a FK to users)
-    await tx.membership.deleteMany({
-      where: { userId: { in: userIds } },
-    });
-    // Then delete the users
-    await tx.user.deleteMany({
-      where: { id: { in: userIds } },
-    });
+    for (const userId of userIds) {
+      if (!userId) continue;
+      // Delete memberships first (they have a FK to users)
+      await tx.membership.deleteMany({
+        where: { userId },
+      });
+      // Then delete the user
+      await tx.user.deleteMany({
+        where: { id: userId },
+      });
+    }
   });
 }
 
@@ -274,7 +277,7 @@ export async function signInAs(
   ]);
 
   // Set cookie consent in localStorage so the banner doesn't block the test
-  const page = 'context' in contextOrPage ? contextOrPage : contextOrPage;
+  const page = 'context' in contextOrPage ? contextOrPage.context() : contextOrPage;
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'fabrika_cookie_consent',

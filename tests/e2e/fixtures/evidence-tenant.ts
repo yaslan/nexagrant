@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { prisma } from '../../../src/lib/db';
+import { signInAs } from './session';
 
 /**
  * A tenant of its own for each Evidence Pack (M3) spec (TASK-MULU828HTNN4N).
@@ -72,21 +73,18 @@ export function evidenceTenant(key: string) {
     });
   }
 
-  /** Real sign-in through the login form, landing on the evidence page. */
-  async function signIn(page: Page) {
-    // The cookie banner is a full-screen `inset-0` alertdialog and swallows the
-    // click on the sign-in button; a recorded consent is a returning user's state.
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-      );
+  /** Sign in via JWT session cookie. */
+  async function signIn(page: Page): Promise<string> {
+    await signInAs(page, {
+      id: userId,
+      email,
+      name: `Evidence ${key} E2E`,
+      tenantId,
+      role: 'TENANT_OWNER',
     });
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(evidenceUrl)}`);
-    await page.locator('input[type="email"]').fill(email);
-    await page.locator('form button[type="submit"]').click();
-    await page.waitForURL(`**${evidenceUrl}`, { timeout: 30_000 });
+    await page.goto(evidenceUrl);
+    return userId;
   }
 
-  return { tenantId, workspace, email, evidenceUrl, setup, teardown, signIn };
+  return { tenantId, workspace, email, evidenceUrl, setup, teardown, signIn, userId };
 }
