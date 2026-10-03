@@ -69,6 +69,29 @@ describe('SEDIA search timeout', () => {
     expect(result.errors[0]).toMatch(/^Page 2 fetch error/);
   }, 2_000);
 
+  // crw-fb Ö-1 (mutant O2): the route always passes a signal. With
+  // `signal ?? pageTimeout` the per-page cap silently dropped out, and only the
+  // route's whole budget was left to end a stalled page.
+  test('a live caller signal does not replace the per-page timeout', async () => {
+    const fetchMock = stallAfterFirstPage();
+    vi.stubGlobal('fetch', fetchMock);
+    const caller = new AbortController(); // never fires in this test
+
+    const started = Date.now();
+    const result = await new SediaAdapter().searchSedia({
+      maxPages: 5,
+      pageSize: 1,
+      timeoutMs: 50,
+      signal: caller.signal,
+    });
+
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(caller.signal.aborted).toBe(false);
+    expect(result.topics.map((t) => t.identifier)).toEqual(['HORIZON-T-1']);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.errors[0]).toMatch(/^Page 2 fetch error: .*timeout/i);
+  }, 2_000);
+
   test('an already-cancelled caller makes no request at all', async () => {
     const fetchMock = stallAfterFirstPage();
     vi.stubGlobal('fetch', fetchMock);

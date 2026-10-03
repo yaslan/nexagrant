@@ -46,6 +46,9 @@ async function withTranslationSlot<T>(run: () => Promise<T>, signal?: AbortSigna
     activeTranslations++;
   }
   try {
+    // The signal can fire after `wake` took the abort listener off but before this
+    // line runs; `run` would then listen on an already-aborted signal and never hear it.
+    signal?.throwIfAborted();
     return await run();
   } finally {
     const next = translationQueue.shift();

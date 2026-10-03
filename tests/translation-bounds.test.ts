@@ -111,4 +111,57 @@ describe('translation bounds', () => {
     vi.stubGlobal('fetch', vi.fn(async () => reply('sonra')));
     expect(await translateText('after abort', 'tr')).toBe('sonra');
   }, 2_000);
+
+  // crw-fb Ö-2: when a slot passes to a waiter, `wake` removes the waiter's abort
+  // listener. If the signal fires before the waiter's `run` starts, the listener
+  // `run` adds never fires (the signal is already aborted), so the call went out
+  // anyway and held the slot until its own 3 s timeout.
+  test('a waiter aborted between getting the slot and starting its call sends nothing and frees the slot', async () => {
+    const holders: Array<() => void> = [];
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      const q = new URL(url).searchParams.get('q') ?? '';
+      if (q.startsWith('race hold')) {
+        return new Promise<Response>((resolve) => holders.push(() => resolve(reply(`tr:${q}`))));
+      }
+      // The late call stalls until its signal fires, like a dead upstream.
+      return new Promise<Response>((_, reject) => {
+        const signal = init?.signal;
+        signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), {
+          once: true,
+        });
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const held = Array.from({ length: MAX_CONCURRENT_TRANSLATIONS }, (_, i) => translateText(`race hold ${i}`, 'tr'));
+    await vi.waitFor(() => expect(holders).toHaveLength(MAX_CONCURRENT_TRANSLATIONS));
+
+    const client = new AbortController();
+    // `wake` is the only code that removes the waiter's abort listener. Abort
+    // right after it, before the waiter's continuation can run.
+    const removeListener = client.signal.removeEventListener.bind(client.signal);
+    let woken = false;
+    client.signal.removeEventListener = ((...args: Parameters<AbortSignal['removeEventListener']>) => {
+      removeListener(...args);
+      if (!woken && args[0] === 'abort') {
+        woken = true;
+        client.abort();
+      }
+    }) as AbortSignal['removeEventListener'];
+
+    const started = Date.now();
+    const late = translateText('race late title', 'tr', client.signal);
+    expect(translationStats().queued).toBe(1);
+
+    holders[0]!(); // frees one slot → it passes to the late waiter → wake → abort
+    expect(await late).toBe('race late title'); // untranslated fallback
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(woken).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(MAX_CONCURRENT_TRANSLATIONS); // the late call never went out
+    expect(translationStats()).toMatchObject({ active: MAX_CONCURRENT_TRANSLATIONS - 1, queued: 0 });
+
+    holders.slice(1).forEach((release) => release());
+    await Promise.all(held);
+    expect(translationStats()).toMatchObject({ active: 0, queued: 0 });
+  }, 2_000);
 });
