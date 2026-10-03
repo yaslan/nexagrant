@@ -48,18 +48,6 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      minio:
-        image: docker.io/minio/minio:RELEASE.2024-12-13T22-33-32Z
-        env:
-          MINIO_ROOT_USER: 'minioadmin'
-          MINIO_ROOT_PASSWORD: 'minioadmin'
-        options: >-
-          --health-cmd "pgrep -f minio || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 9000:9000
     steps:
     - uses: actions/checkout@v4
     
@@ -79,19 +67,29 @@ jobs:
     - name: Install dependencies
       run: pnpm install
 
-    - name: Create MinIO test bucket
+    - name: Start MinIO object store
       run: |
-        # Wait for MinIO to be ready (healthcheck may still be pending)
+        # Download MinIO binary (TASK-MUSJ4RYVZEZ6Q)
+        curl -fL https://dl.min.io/server/minio/release/linux-x86_64/minio -o /tmp/minio
+        chmod +x /tmp/minio
+        # Start MinIO server in background with test credentials
+        mkdir -p /tmp/minio-data
+        MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin /tmp/minio server /tmp/minio-data &
+        # Wait for port 9000 to be ready
         for i in {1..30}; do
           if nc -z localhost 9000 2>/dev/null; then
-            echo "MinIO is ready"
+            echo "MinIO is ready on port 9000"
             break
           fi
           echo "Waiting for MinIO... ($i/30)"
           sleep 1
         done
+
+    - name: Create MinIO test bucket
+      run: |
         # Create bucket (idempotent if exists)
         aws s3 mb s3://test-evidence --endpoint-url http://localhost:9000 || true
+        echo "Bucket test-evidence ready for evidence uploads"
       env:
         AWS_ACCESS_KEY_ID: minioadmin
         AWS_SECRET_ACCESS_KEY: minioadmin
