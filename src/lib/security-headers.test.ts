@@ -121,6 +121,144 @@ describe('buildContentSecurityPolicy', () => {
     expect(text).not.toMatch(/anthropic|openai/);
   });
 
+  it('R2_ENDPOINT: valid https endpoint is added to connect-src (origin only, no path)', () => {
+    const policy = parseCsp(
+      buildContentSecurityPolicy({
+        nonce: 'n',
+        isDev: false,
+        r2Endpoint: 'https://minio.example.com:9000/path/to/bucket',
+      }),
+    );
+    expect(policy.get('connect-src')).toEqual(["'self'", 'https://minio.example.com:9000']);
+  });
+
+  it('R2_ENDPOINT: loopback http endpoints are added (localhost, 127.0.0.1, ::1)', () => {
+    for (const host of ['localhost', '127.0.0.1', '[::1]']) {
+      const policy = parseCsp(
+        buildContentSecurityPolicy({
+          nonce: 'n',
+          isDev: false,
+          r2Endpoint: `http://${host}:9000`,
+        }),
+      );
+      expect(policy.get('connect-src')).toContain(`http://${host}:9000`);
+    }
+  });
+
+  it('R2_ENDPOINT: IPv6 http — only ::1 is loopback; the parser canonicalises long forms to [::1]', () => {
+    const connect = (r2Endpoint: string) =>
+      parseCsp(buildContentSecurityPolicy({ nonce: 'n', isDev: false, r2Endpoint })).get('connect-src');
+    // Same address as ::1 (RFC 5952): new URL() rewrites it before our check, header gets the canonical form.
+    expect(connect('http://[0:0:0:0:0:0:0:1]:9000')).toEqual(["'self'", 'http://[::1]:9000']);
+    for (const ep of ['http://[::ffff:127.0.0.1]:9000', 'http://[::2]:9000', 'http://[fe80::1]:9000']) {
+      expect(connect(ep)).toEqual(["'self'"]);
+    }
+  });
+
+  it('R2_ENDPOINT: remote http endpoint is rejected (safe fallback)', () => {
+    const policy = parseCsp(
+      buildContentSecurityPolicy({
+        nonce: 'n',
+        isDev: false,
+        r2Endpoint: 'http://s3.example.com:9000',
+      }),
+    );
+    expect(policy.get('connect-src')).toEqual(["'self'"]);
+  });
+
+  it('R2_ENDPOINT: invalid url is dropped', () => {
+    const policy = parseCsp(
+      buildContentSecurityPolicy({
+        nonce: 'n',
+        isDev: false,
+        r2Endpoint: 'not a url',
+      }),
+    );
+    expect(policy.get('connect-src')).toEqual(["'self'"]);
+  });
+
+  it('R2_ENDPOINT: empty or missing leaves connect-src unchanged', () => {
+    for (const endpoint of ['', null, undefined]) {
+      const policy = parseCsp(
+        buildContentSecurityPolicy({
+          nonce: 'n',
+          isDev: false,
+          r2Endpoint: endpoint as unknown as string | null | undefined,
+        }),
+      );
+      expect(policy.get('connect-src')).toEqual(["'self'"]);
+    }
+  });
+
+  describe('R2_ENDPOINT mutant tests (each mutation should fail these tests)', () => {
+    it('MUTANT 1 RED→GREEN: loopback HTTP filter must exist (reject without it)', () => {
+      const policy = parseCsp(
+        buildContentSecurityPolicy({
+          nonce: 'n',
+          isDev: false,
+          r2Endpoint: 'http://localhost:9000',
+        }),
+      );
+      // If r2EndpointOrigin did NOT check for loopback, this would fail (connect-src would be ["'self'"])
+      expect(policy.get('connect-src')).toContain('http://localhost:9000');
+    });
+
+    it('MUTANT 2 RED→GREEN: r2Endpoint must be included in connect-src (not omitted)', () => {
+      const policy = parseCsp(
+        buildContentSecurityPolicy({
+          nonce: 'n',
+          isDev: false,
+          r2Endpoint: 'https://minio.example.com:9000',
+        }),
+      );
+      // If r2Endpoint were omitted from extra(), this would fail
+      expect(policy.get('connect-src')).toContain('https://minio.example.com:9000');
+    });
+
+    it('MUTANT 3 RED→GREEN: cspOptionsFromEnv must read R2_ENDPOINT (not ignore it)', () => {
+      const opts = cspOptionsFromEnv('n', env({ R2_ENDPOINT: 'https://minio.local:9000' }));
+      // If cspOptionsFromEnv set r2Endpoint to null or ignored it, this would fail
+      expect(opts.r2Endpoint).toBe('https://minio.local:9000');
+    });
+
+    it('MUTANT 4 RED→GREEN: originOf filter must not accept malformed URLs', () => {
+      const policy = parseCsp(
+        buildContentSecurityPolicy({
+          nonce: 'n',
+          isDev: false,
+          r2Endpoint: 'not a valid url at all',
+        }),
+      );
+      // If r2EndpointOrigin did not drop invalid URLs, it might cause errors or strange CSP
+      expect(policy.get('connect-src')).toEqual(["'self'"]);
+    });
+
+    it('MUTANT 5 RED→GREEN: HTTP remote endpoint must be rejected (not accepted)', () => {
+      const policy = parseCsp(
+        buildContentSecurityPolicy({
+          nonce: 'n',
+          isDev: false,
+          r2Endpoint: 'http://s3.example.com:9000',
+        }),
+      );
+      // If HTTP remote were allowed, this would fail
+      expect(policy.get('connect-src')).toEqual(["'self'"]);
+    });
+
+    it('MUTANT 6 RED→GREEN: IPv6 bracket notation must be stripped for loopback check', () => {
+      const policy = parseCsp(
+        buildContentSecurityPolicy({
+          nonce: 'n',
+          isDev: false,
+          r2Endpoint: 'http://[::1]:9000',
+        }),
+      );
+      // If bracket stripping were omitted, url.hostname would be "[::1]" (with brackets),
+      // which would not match "::1" in the hardcoded check, so the endpoint would be rejected
+      expect(policy.get('connect-src')).toContain('http://[::1]:9000');
+    });
+  });
+
   it('drops malformed env values instead of writing them into the header', () => {
     const bad = parseCsp(
       buildContentSecurityPolicy({
@@ -151,6 +289,13 @@ describe('cspOptionsFromEnv / cspHeaderName', () => {
         .posthogHost,
     ).toBe('https://us.i.posthog.com');
     expect(cspOptionsFromEnv('n', env({ NODE_ENV: 'production' })).isDev).toBe(false);
+  });
+
+  it('R2_ENDPOINT is read and passed to buildContentSecurityPolicy', () => {
+    expect(cspOptionsFromEnv('n', env({})).r2Endpoint).toBeUndefined();
+    expect(cspOptionsFromEnv('n', env({ R2_ENDPOINT: 'https://minio.local:9000' })).r2Endpoint).toBe(
+      'https://minio.local:9000',
+    );
   });
 
   it('only NODE_ENV=development loosens script-src; an unset or odd NODE_ENV does not', () => {
