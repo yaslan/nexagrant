@@ -1,77 +1,44 @@
-# DevOps — MinIO Setup (Local Evidence Storage)
+# MinIO — local test object store for evidence uploads
 
-**Task ID:** TASK-MUSJ4RYVZEZ6Q  
-**Sprint:** FB-GAP-1  
-**Context:** Evidence uploads test against MinIO locally and in CI instead of real R2.
+TASK-MUSJ4RYVZEZ6Q. CI starts the same store in `.github/workflows/ci.yml`
+(step "Start MinIO (test object store)") and gives only the E2E step the `R2_*`
+variables below. All values here are throwaway test credentials, never R2's.
 
----
+MinIO no longer publishes its own images or binaries (Docker Hub `minio/minio`
+404, `dl.min.io` 410 as of 2026-10-03). The image below is Chainguard's build,
+pinned by digest; bump the digest deliberately, not with `:latest`.
 
-## Local Setup
+## Start it
 
-MinIO emulates S3-compatible object storage. To test evidence upload/download flows locally without R2 credentials:
-
-### 1. Start MinIO Container
 ```bash
-docker run -d \
-  -p 9000:9000 \
-  -p 9001:9001 \
-  -e MINIO_ROOT_USER=minioadmin \
-  -e MINIO_ROOT_PASSWORD=minioadmin \
-  minio/minio:latest
-```
-
-Verify health:
-```bash
+docker run -d --name minio -p 9000:9000 \
+  -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+  cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034 \
+  server /data
 curl -f http://localhost:9000/minio/health/live
-# Expected: HTTP 200 OK
+
+AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin AWS_REGION=us-east-1 \
+  aws --endpoint-url http://localhost:9000 s3api create-bucket --bucket test-evidence
 ```
 
-### 2. Set Environment Variables
+## Point the app at it (E2E / manual testing)
+
 ```bash
-# .env.local (or .env)
-R2_ACCOUNT_ID=ci-test
+R2_ACCOUNT_ID=ci-minio            # any value; it only switches the S3 client on
 R2_ENDPOINT=http://localhost:9000
 R2_ACCESS_KEY_ID=minioadmin
 R2_SECRET_ACCESS_KEY=minioadmin
 R2_BUCKET=test-evidence
 ```
 
-### 3. Create Bucket
+## Vitest S3 live suites
+
+`tests/evidence-upload-s3.live.test.ts` and friends do not read `R2_*`; they take
+`EVIDENCE_S3_TEST_ENDPOINT` / `_ACCESS_KEY` / `_SECRET_KEY` / `_BUCKET` from the
+process environment (see each file's header).
+
+## Stop it
+
 ```bash
-# Using AWS CLI (if installed)
-aws s3 mb s3://test-evidence --endpoint-url http://localhost:9000 \
-  --region us-east-1
+docker rm -f minio
 ```
-
-Or via MinIO web UI at `http://localhost:9001` (login with minioadmin/minioadmin).
-
-### 4. Start Dev Server
-```bash
-pnpm dev
-# Evidence uploads now go to local MinIO, not R2
-```
-
----
-
-## CI Usage
-
-The GitHub Actions workflow (`.github/workflows/ci.yml`) automatically:
-- Runs MinIO as a service (healthcheck waits for ready)
-- Sets R2 env vars to point at MinIO
-- Creates the test bucket before running tests
-- Cleans up after the run (no manual intervention needed)
-
-No real secrets are used; test-only credentials prevent accidents.
-
----
-
-## Troubleshooting
-
-**Error: "Access Denied" or "Signature does not match"**  
-Ensure `R2_ENDPOINT` is exactly `http://localhost:9000` and credentials match what MinIO was started with.
-
-**Error: "Cannot connect to MinIO"**  
-Check that MinIO is running: `curl http://localhost:9000/minio/health/live`
-
-**Bucket not found**  
-Create it via CLI or web UI (step 3 above).
