@@ -18,6 +18,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # The `e2e_server: start` run took 99 min (TASK-MUSJ4RYVZEZ6Q); GitHub's
+    # default is 360. 120 leaves ~20% headroom and stops a hung run 4 h sooner.
+    timeout-minutes: 120
     # Job-wide so the DB preparation, the vitest suites that hit Postgres and
     # the e2e run all reach the same service container.
     env:
@@ -58,7 +61,7 @@ jobs:
         
     - name: Install dependencies
       run: pnpm install
-      
+
     # `pnpm exec`, not `pnpm dlx`: dlx downloads the newest prisma from the
     # registry instead of the pinned one, and prisma 8+ has no `validate`.
     - name: Validate Prisma schema
@@ -150,11 +153,49 @@ jobs:
       if: ${{ inputs.e2e_server == 'start' }}
       run: pnpm build
 
+    # S3-compatible store for the evidence specs, which upload through a real
+    # presigned PUT (TASK-MUSJ4RYVZEZ6Q); without one, `next start` refuses
+    # evidence uploads (production has no local stand-in). A `docker run` step,
+    # not `services:`: the image has no default command and a service container
+    # cannot be given `server /data`. MinIO's own images and dl.min.io are gone
+    # (Docker Hub 404, quay.io unauthorized, dl.min.io 410 on 2026-10-03), so
+    # this is Chainguard's build, pinned by digest (MinIO RELEASE.2026-09-22).
+    # minioadmin/minioadmin is a throwaway credential like the Postgres one.
+    - name: Start MinIO (test object store)
+      run: |
+        docker run -d --name minio -p 9000:9000 \
+          -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+          cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034 \
+          server /data
+        for i in $(seq 1 30); do
+          curl -sf http://localhost:9000/minio/health/live && { echo "MinIO up after ${i}s"; break; }
+          sleep 1
+        done
+        curl -sf http://localhost:9000/minio/health/live || { docker logs minio; exit 1; }
+        aws --endpoint-url http://localhost:9000 s3api head-bucket --bucket test-evidence 2>/dev/null \
+          || aws --endpoint-url http://localhost:9000 s3api create-bucket --bucket test-evidence
+        aws --endpoint-url http://localhost:9000 s3api head-bucket --bucket test-evidence
+        echo "bucket test-evidence ready"
+      env:
+        AWS_ACCESS_KEY_ID: minioadmin
+        AWS_SECRET_ACCESS_KEY: minioadmin
+        AWS_REGION: us-east-1
+        AWS_EC2_METADATA_DISABLED: 'true'
+
+    # R2_* only here, not job-wide: the vitest suites import storage.ts and
+    # some (evidence-dev-store.live) need the local stand-in; the S3 live suites
+    # read EVIDENCE_S3_TEST_* instead. R2_ACCOUNT_ID only switches the client on;
+    # R2_ENDPOINT sends it to MinIO.
     - name: E2E Test
       run: pnpm test:e2e
       env:
         CI: 'true'
         E2E_WEB_SERVER: ${{ inputs.e2e_server || 'dev' }}
+        R2_ACCOUNT_ID: 'ci-minio'
+        R2_ENDPOINT: 'http://localhost:9000'
+        R2_ACCESS_KEY_ID: 'minioadmin'
+        R2_SECRET_ACCESS_KEY: 'minioadmin'
+        R2_BUCKET: 'test-evidence'
         # OAuth placeholder env for E2E auth tests (tests render button only, no real Google interaction)
         AUTH_GOOGLE_ID: 'ci-placeholder-id.apps.googleusercontent.com'
         AUTH_GOOGLE_SECRET: 'ci-placeholder-google-secret'
