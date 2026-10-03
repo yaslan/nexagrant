@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 
 import { prisma } from '../../../src/lib/db';
 import { withSystemScope } from '../../../src/lib/system-scope';
+import { signInAs } from './session';
 
 /**
  * The tenants `tests/e2e/e2e-profile-save.spec.ts` runs in (TASK-MUPVLWSIPC5WU).
@@ -99,17 +100,13 @@ export async function readStoredProfile() {
   );
 }
 
-/** Real sign-in through the login form, landing on `target`. */
+/** Sign in via JWT cookie (production mode), landing on `target`. */
 export async function signInAsProfileSaveUser(page: Page, target: string) {
-  // The cookie banner is a full-screen alertdialog that swallows the sign-in click.
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
+  await signInAs(page, {
+    id: PS_USER_ID,
+    email: PS_EMAIL,
+    tenantId: PS_TENANT,
+    role: 'TENANT_OWNER',
   });
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(PS_EMAIL);
-  await page.locator('form button[type="submit"]').click();
-  await page.waitForURL(`**${target}`, { timeout: 30_000 });
+  await page.goto(target);
 }
