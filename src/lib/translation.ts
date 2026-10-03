@@ -19,13 +19,36 @@ export const MAX_CONCURRENT_TRANSLATIONS = 8;
 let activeTranslations = 0;
 const translationQueue: Array<() => void> = [];
 
-async function withTranslationSlot<T>(run: () => Promise<T>): Promise<T> {
+/**
+ * Runs `run` in one of the shared slots. A waiter whose `signal` fires leaves the
+ * queue at once and never gets a slot, so a request the client has given up on
+ * (or whose time budget ran out) stops holding a place in front of live ones
+ * (TASK-MUS7OVUMOJZP3).
+ */
+async function withTranslationSlot<T>(run: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  signal?.throwIfAborted();
   if (activeTranslations >= MAX_CONCURRENT_TRANSLATIONS) {
-    await new Promise<void>((resolve) => translationQueue.push(resolve));
+    await new Promise<void>((resolve, reject) => {
+      const drop = () => {
+        const at = translationQueue.indexOf(wake);
+        if (at === -1) return;
+        translationQueue.splice(at, 1);
+        reject(signal?.reason);
+      };
+      function wake() {
+        signal?.removeEventListener('abort', drop);
+        resolve();
+      }
+      translationQueue.push(wake);
+      signal?.addEventListener('abort', drop, { once: true });
+    });
   } else {
     activeTranslations++;
   }
   try {
+    // The signal can fire after `wake` took the abort listener off but before this
+    // line runs; `run` would then listen on an already-aborted signal and never hear it.
+    signal?.throwIfAborted();
     return await run();
   } finally {
     const next = translationQueue.shift();
@@ -70,7 +93,11 @@ const EU_DICTIONARY: Record<string, string> = {
 /**
  * Translates a single text string from English to target language (default Turkish 'tr').
  */
-export async function translateText(text: string, targetLang = 'tr'): Promise<string> {
+export async function translateText(
+  text: string,
+  targetLang = 'tr',
+  signal?: AbortSignal
+): Promise<string> {
   if (!text || !text.trim() || targetLang === 'en') {
     return text;
   }
@@ -96,6 +123,8 @@ export async function translateText(text: string, targetLang = 'tr'): Promise<st
     const translated = await withTranslationSlot(async () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const cancel = () => controller.abort();
+      signal?.addEventListener('abort', cancel, { once: true });
       try {
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) return null;
@@ -104,8 +133,9 @@ export async function translateText(text: string, targetLang = 'tr'): Promise<st
         return typeof text === 'string' ? text : null;
       } finally {
         clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', cancel);
       }
-    });
+    }, signal);
 
     if (translated && !translated.includes('QUERY LENGTH LIMIT EXCEEDED')) {
       cacheTranslation(cacheKey, translated);
@@ -115,16 +145,19 @@ export async function translateText(text: string, targetLang = 'tr'): Promise<st
     // Network or timeout error -> fallback gracefully
   }
 
-  // Fallback: return original text if translation fails
+  // Fallback: return original text if translation fails or was cancelled
   return text;
 }
 
 /**
- * Batch translates array of items (titles and descriptions) into target language
+ * Batch translates array of items (titles and descriptions) into target language.
+ * Once `signal` fires, queued calls are dropped, calls in flight are aborted and
+ * the remaining texts come back untranslated.
  */
 export async function translateTopicsBatch<T extends { title: string; description?: string }>(
   topics: T[],
-  targetLang = 'tr'
+  targetLang = 'tr',
+  signal?: AbortSignal
 ): Promise<T[]> {
   if (targetLang === 'en' || !topics || topics.length === 0) {
     return topics;
@@ -133,11 +166,11 @@ export async function translateTopicsBatch<T extends { title: string; descriptio
   // Items start together; the outbound calls themselves queue on withTranslationSlot.
   const translated = await Promise.all(
     topics.map(async (topic) => {
-      const translatedTitle = await translateText(topic.title, targetLang);
+      const translatedTitle = await translateText(topic.title, targetLang, signal);
       let translatedDescription = topic.description;
 
       if (topic.description && topic.description.length < 500) {
-        translatedDescription = await translateText(topic.description, targetLang);
+        translatedDescription = await translateText(topic.description, targetLang, signal);
       }
 
       return {
