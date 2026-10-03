@@ -15,6 +15,15 @@ const CAGRILAR_MAX_PAGE_SIZE = 50;
 const MAX_PAGES = 5;
 
 /**
+ * Total time one search may take, SEDIA and translation together
+ * (TASK-MUS7OVUMOJZP3). SEDIA had no timeout and translation queues behind a
+ * process-wide limit, so the calls page could stay on "loading" for good. What
+ * is left of the budget after SEDIA goes to translation; once it runs out the
+ * topics go back in English with `translated: false`.
+ */
+export const CAGRILAR_BUDGET_MS = 20_000;
+
+/**
  * Searches one user may run per minute (İNCELEME-75 D-3). The calls page asks
  * once per filter change, so a person does not come near it; a loop does.
  */
@@ -34,6 +43,14 @@ export async function GET(request: NextRequest) {
       { status: 429, headers: { 'Retry-After': String(retryAfter) } }
     );
   }
+
+  // The budget and the client's own disconnect both cancel the outbound work.
+  const budget = new AbortController();
+  const budgetTimer = setTimeout(
+    () => budget.abort(new DOMException('cagrilar budget exhausted', 'TimeoutError')),
+    CAGRILAR_BUDGET_MS
+  );
+  const signal = AbortSignal.any([budget.signal, request.signal]);
 
   try {
     const { searchParams } = new URL(request.url);
@@ -82,14 +99,36 @@ export async function GET(request: NextRequest) {
       statuses,
       frameworkProgrammes,
       types,
-      languages: [lang, 'en']
+      languages: [lang, 'en'],
+      signal,
     });
 
-    let processedTopics = result.topics;
+    // Not one page came back: SEDIA is down or slower than the budget. A 200
+    // with no topics would read as "no calls match", which is not what happened.
+    if (result.topics.length === 0 && result.errors.length > 0) {
+      logger.warn('[API /api/cagrilar] SEDIA returned no page', { firstError: result.errors[0] });
+      return internalError(
+        {
+          success: false,
+          error: 'sedia_unavailable',
+          message: 'The EU funding portal (SEDIA) did not answer in time. Please try again shortly.',
+        },
+        { status: 503, headers: { 'Retry-After': '30' } }
+      );
+    }
 
-    // If requested language is Turkish, translate titles & descriptions to Turkish
-    if (lang === 'tr' && processedTopics.length > 0) {
-      processedTopics = await translateTopicsBatch(processedTopics, 'tr');
+    let processedTopics = result.topics;
+    let translated = false;
+
+    // If requested language is Turkish, translate titles & descriptions to Turkish,
+    // within what is left of the budget. A partial translation is thrown away so
+    // the list is never half Turkish, half English.
+    if (lang === 'tr' && processedTopics.length > 0 && !signal.aborted) {
+      const turkish = await translateTopicsBatch(processedTopics, 'tr', signal);
+      if (!signal.aborted) {
+        processedTopics = turkish;
+        translated = true;
+      }
     }
 
     // No database write here. This route used to upsert the first ten topics
@@ -103,12 +142,15 @@ export async function GET(request: NextRequest) {
       totalResults: result.totalResults,
       pageNumber: result.pageNumber,
       pageSize: result.pageSize,
-      topics: processedTopics
+      topics: processedTopics,
+      translated,
     });
   } catch (error) {
     // The detail stays in the server log; the body is a fixed code (O-2).
     logger.error('[API /api/cagrilar] Internal error:', error);
     return internalError({ success: false, error: 'internal_error' });
+  } finally {
+    clearTimeout(budgetTimer);
   }
 }
 

@@ -73,4 +73,42 @@ describe('translation bounds', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1); // oldest: evicted, fetched again
     expect(translationStats().cacheSize).toBe(TRANSLATION_CACHE_MAX_ENTRIES);
   });
+
+  // TASK-MUS7OVUMOJZP3: a request the client gave up on (or whose budget ran out)
+  // kept its jobs in the process-wide queue, in front of every live request.
+  test('an aborted batch leaves the queue at once, its calls in flight are aborted, and nothing it queued is ever sent', async () => {
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          const signal = init?.signal;
+          signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), {
+            once: true,
+          });
+        })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new AbortController();
+    const topics = Array.from({ length: 30 }, (_, i) => ({ title: `abort title ${i}`, description: `abort desc ${i}` }));
+    const batch = translateTopicsBatch(topics, 'tr', client.signal);
+
+    await vi.waitFor(() => expect(translationStats().queued).toBeGreaterThan(0));
+    expect(translationStats().active).toBe(MAX_CONCURRENT_TRANSLATIONS);
+    expect(fetchMock).toHaveBeenCalledTimes(MAX_CONCURRENT_TRANSLATIONS);
+
+    client.abort();
+    // The queue empties on the abort itself, not when the slots happen to free up.
+    expect(translationStats().queued).toBe(0);
+
+    const out = await batch;
+    expect(translationStats()).toMatchObject({ active: 0, queued: 0 });
+    // Only the calls that already held a slot were ever sent.
+    expect(fetchMock).toHaveBeenCalledTimes(MAX_CONCURRENT_TRANSLATIONS);
+    // Untranslated text falls back to the original.
+    expect(out[29]).toEqual({ title: 'abort title 29', description: 'abort desc 29' });
+
+    // The slots are really free: a new batch runs straight through.
+    vi.stubGlobal('fetch', vi.fn(async () => reply('sonra')));
+    expect(await translateText('after abort', 'tr')).toBe('sonra');
+  }, 2_000);
 });

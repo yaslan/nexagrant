@@ -1361,6 +1361,8 @@
     "detailsButton": "Detaylar",
     "openInSedia": "SEDIA Portalında Aç",
     "noResults": "Seçilen filtrelere uygun çağrı bulunamadı. Lütfen arama terimini veya durum filtrelerini kontrol edin.",
+    "loadFailed": "Çağrı listesi şu anda alınamadı (AB fon portalı yanıt vermedi ya da istek zaman aşımına uğradı). Lütfen birkaç dakika sonra tekrar deneyin.",
+    "loadFailedShort": "Çağrılar alınamadı",
     "perPage": "Sayfa Başı Gösterim:",
     "previous": "Önceki",
     "next": "Sonraki",

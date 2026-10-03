@@ -1361,6 +1361,8 @@
     "detailsButton": "Details",
     "openInSedia": "Open in SEDIA Portal",
     "noResults": "No funding calls found matching your filter parameters.",
+    "loadFailed": "The list of calls could not be loaded (the EU funding portal did not answer, or the request timed out). Please try again in a few minutes.",
+    "loadFailedShort": "Could not load calls",
     "perPage": "Per page:",
     "previous": "Previous",
     "next": "Next",
