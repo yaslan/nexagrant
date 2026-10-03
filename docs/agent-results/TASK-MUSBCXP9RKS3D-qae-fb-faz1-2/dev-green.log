@@ -1,0 +1,9 @@
+[e2e-gate] Dev server info: PID=66093
+[e2e-gate] Test data: INVOICE_SUPPLIER_NAME loaded
+
+Running 2 tests using 1 worker
+
+  ✓  1 [chromium] › tests/e2e/identity-honesty.spec.ts:63:7 › app frame identity › a session with no name is never given somebody else’s name (1.7s)
+  ✓  2 [chromium] › tests/e2e/identity-honesty.spec.ts:92:7 › app frame identity › a session that carries a name shows that name (596ms)
+
+  2 passed (7.3s)
