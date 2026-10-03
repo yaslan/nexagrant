@@ -303,8 +303,7 @@ export async function signInAs(
     );
   }
 
-  // Navigate to a page to establish the session, then verify via the session endpoint
-  await page.goto('/');
+  // Verify session via the session endpoint
   const sessionResponse = await page.request.get(`${baseURL}/api/auth/session`);
   const session = (await sessionResponse.json()) as { user?: { id?: string }; tenantId?: string | null } | null;
 
