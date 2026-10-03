@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
 import { shotsDir } from './fixtures/shots';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTQYXISOPUJ53 — fabricated data fallbacks, in a real browser.
@@ -40,9 +41,12 @@ async function acceptCookies(page: Page) {
 }
 
 async function signIn(page: Page, email: string, target: string) {
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('form button[type="submit"]').click();
+  // A cookie for the user the seed wrote: the demo sign-in form does not exist in a
+  // production build (TASK-MUSBCXP9RKS3D).
+  const seat = [F10.empty, F10.full].find((t) => t.email === email);
+  if (!seat) throw new Error(`no seeded F10 user for ${email}`);
+  await signInAs(page, { id: seat.userId, email: seat.email, tenantId: seat.tenantId, role: 'TENANT_OWNER' });
+  await page.goto(target);
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
   // No network-idle wait: a dev server never goes quiet for the 500 ms
   // it waits for, so it is a race and not a signal — it timed this suite out at 60 s on

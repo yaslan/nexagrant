@@ -5,6 +5,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 
 /**
  * TASK-MTR882HVZ8BG7 — "the price you join at stays yours", in a real browser.
@@ -25,7 +26,18 @@ import { expectHydrated } from './fixtures/hydration';
 
 const SHOTS = shotsDir('TASK-MTR882HVZ8BG7-screenshots');
 const TENANT_ID = 'demo-tenant';
-const EMAIL = 'admin@yasinaslan.com.tr';
+/**
+ * A TENANT_OWNER seat of this spec's own on the locked tenant, seeded in `beforeAll`
+ * and removed in `afterAll`; signed in with a minted cookie, not the demo form, so the
+ * spec runs against `next start` too (TASK-MUSBCXP9RKS3D). `workspaceIds: []` is every
+ * workspace, the reach of the demo seat it replaces.
+ */
+const OWNER = {
+  userId: 'e2e-price-lock-owner',
+  email: 'price-lock-owner@e2e.fabrika.test',
+  role: 'TENANT_OWNER' as const,
+  tenantId: TENANT_ID,
+};
 const BILLING_URL = '/tr/main/settings/billing';
 
 /** Pro monthly: $87.00 list, $26.10 at 70% off (ILK5). */
@@ -51,12 +63,21 @@ const LOCKED_PRO_MONTHLY = /26[.,]10/;
 
 test.describe('price lock — a locked tenant and a stranger see different prices', () => {
   test.beforeAll(async () => {
+    await seedIdentity({ ...OWNER, workspaceIds: [] });
     await prisma.subscription.update({ where: { tenantId: TENANT_ID }, data: LOCK });
   });
 
   test.afterAll(async () => {
     await prisma.subscription.update({ where: { tenantId: TENANT_ID }, data: CLEARED });
+    await cleanupIdentity([OWNER.userId]);
   });
+
+  /** The owner's session, landing on the billing panel; the URL is the proof it is real. */
+  const signInAsOwner = async (page: import('@playwright/test').Page) => {
+    await signInAs(page, { id: OWNER.userId, email: OWNER.email, tenantId: OWNER.tenantId, role: OWNER.role });
+    await page.goto(BILLING_URL);
+    await page.waitForURL(`**${BILLING_URL}`, { timeout: 30_000 });
+  };
 
   const shot = (page: import('@playwright/test').Page, name: string) =>
     page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
@@ -99,10 +120,7 @@ test.describe('price lock — a locked tenant and a stranger see different price
 
   test('the locked tenant’s own billing panel still quotes the rate it joined at', async ({ page }) => {
     await consent(page);
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(BILLING_URL)}`);
-    await page.locator('input[type="email"]').fill(EMAIL);
-    await page.locator('form button[type="submit"]').click();
-    await page.waitForURL(`**${BILLING_URL}`, { timeout: 30_000 });
+    await signInAsOwner(page);
     // The toggle is client state: a click before hydration is lost (docs/E2E_TESTING.md §3.4).
     const monthly = page.getByRole('button', { name: 'Aylık', exact: true });
     await expectHydrated(monthly);
@@ -125,10 +143,7 @@ test.describe('price lock — a locked tenant and a stranger see different price
     // Stripe credentials are not live in dev, so checkout returns the amounts it
     // computed instead of a Stripe URL — which is exactly the number under test.
     await consent(page);
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(BILLING_URL)}`);
-    await page.locator('input[type="email"]').fill(EMAIL);
-    await page.locator('form button[type="submit"]').click();
-    await page.waitForURL(`**${BILLING_URL}`, { timeout: 30_000 });
+    await signInAsOwner(page);
 
     const response = await page.request.post('/api/billing/checkout', {
       data: { items: [{ sku: 'pro', billingCycle: 'monthly', quantity: 1 }] },

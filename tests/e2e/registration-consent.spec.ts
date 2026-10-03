@@ -62,6 +62,17 @@ function form(page: Page) {
 
 test.describe.configure({ mode: 'serial' });
 
+// SKIP PROPOSAL (TASK-MUSBCXP9RKS3D faz2a), awaiting approval: what this file tests IS
+// the e-mail registration form and the credentials endpoint behind it. Both exist only
+// while DEMO_LOGIN_ENABLED is on (src/lib/auth.ts registers the Credentials provider
+// only then), and a production build refuses to boot with it on, so under
+// `next start` there is no such form or endpoint to test. A minted session cannot
+// stand in: the subject is the sign-up, not a signed-in page. It still runs under `dev`.
+test.skip(
+  process.env.E2E_WEB_SERVER === 'start',
+  'registration form + credentials endpoint exist only with DEMO_LOGIN_ENABLED, which next start refuses',
+);
+
 test.afterAll(async () => {
   const emails = [FORM_EMAIL, REFUSED_EMAIL];
   const users = await prisma.user.findMany({ where: { email: { in: emails } }, select: { id: true } });

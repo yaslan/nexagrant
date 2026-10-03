@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 import { presentIds } from '../helpers/teardown-guard';
 
 /**
@@ -27,6 +28,10 @@ const CONFIRMED_SEAT = 'm8-e2e-seat-confirmed';
 const BUILDER_SEAT = 'm8-e2e-seat-widening';
 const URL = `/tr/${WORKSPACE}/opportunities/${OPP}/matching`;
 const EMAIL = 'alice@fabrika.test';
+// The seeded PIPELINE_MANAGER seat behind EMAIL (prisma/seed-tenant-workspace.ts). The
+// demo sign-in form that used to resolve the address to it does not exist in a
+// production build, so the session is a minted cookie for the same user (TASK-MUSBCXP9RKS3D).
+const SEAT = { id: 'demo-user-alice', email: EMAIL, tenantId: TENANT, role: 'PIPELINE_MANAGER' };
 
 /** CORDIS PICs the fixture introduces. All are removed again in afterAll. */
 const PIC = {
@@ -222,9 +227,8 @@ test.describe('M8 consortium matching', () => {
         JSON.stringify({ necessary: true, analytics: true, marketing: true }),
       );
     });
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(URL)}`);
-    await page.locator('input[type="email"]').fill(EMAIL);
-    await page.locator('form button[type="submit"]').click();
+    await signInAs(page, SEAT);
+    await page.goto(URL);
     await page.waitForURL(`**${URL}`, { timeout: 30_000 });
   };
 
@@ -333,9 +337,8 @@ test.describe('M8 consortium matching', () => {
         JSON.stringify({ necessary: true, analytics: true, marketing: true }),
       );
     });
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(consortiumUrl)}`);
-    await page.locator('input[type="email"]').fill(EMAIL);
-    await page.locator('form button[type="submit"]').click();
+    await signInAs(page, SEAT);
+    await page.goto(consortiumUrl);
     await page.waitForURL(`**${consortiumUrl}`, { timeout: 30_000 });
 
     // The real opportunity, not the DEMO_OPPORTUNITIES fallback the swallowed

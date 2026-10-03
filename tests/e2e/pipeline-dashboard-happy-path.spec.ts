@@ -4,6 +4,7 @@ import { writeFileSync } from 'node:fs';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTVR9T834EPUC — the browser half of the tenant-bypass slice 2 evidence.
@@ -91,9 +92,10 @@ async function signIn(page: Page, target: string) {
       JSON.stringify({ necessary: true, analytics: true, marketing: true }),
     );
   });
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]:visible').first().fill(F.email);
-  await page.locator('form button[type="submit"]:visible').first().click();
+  // A cookie for the owner beforeAll created: the demo sign-in form does not exist in
+  // a production build (TASK-MUSBCXP9RKS3D).
+  await signInAs(page, { id: F.userId, email: F.email, tenantId: F.tenantId, role: 'TENANT_OWNER' });
+  await page.goto(target);
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
   // Callers assert on a locator next, and hydrate what they click (fixtures/hydration.ts).
 }

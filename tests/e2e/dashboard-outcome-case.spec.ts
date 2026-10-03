@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs';
 
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 
 /**
  * TASK-MTQTYXC0NUT0B — the dashboard's outcome-based KPI read 0 % where the data said 20 %.
@@ -23,7 +24,19 @@ import { shotsDir } from './fixtures/shots';
 
 const SHOTS = shotsDir('TASK-MTQTYXC0NUT0B-screenshots');
 const EXPORT_PATH = '/api/dashboard/export-csv';
-const SIGN_IN_AS = 'alice@fabrika.test';
+/**
+ * A PIPELINE_MANAGER seat of this spec's own on the demo tenant (the role of the demo
+ * seat it replaces), seeded before the test and removed after it; signed in with a
+ * minted cookie, not the demo form, so the spec runs against `next start` too
+ * (TASK-MUSBCXP9RKS3D). `workspaceIds: []` is every workspace, `main` included.
+ */
+const SEAT = {
+  userId: 'e2e-dashboard-outcome-member',
+  email: 'dashboard-outcome-member@e2e.fabrika.test',
+  role: 'PIPELINE_MANAGER' as const,
+  tenantId: 'demo-tenant',
+};
+const SIGN_IN_AS = SEAT.email;
 
 /** Just enough of a loaded opportunity to count the two figures the CSV reports. */
 interface OutcomeRow {
@@ -67,20 +80,24 @@ async function acceptCookies(page: Page) {
   });
 }
 
-async function signIn(page: Page, email: string, target: string) {
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('form button[type="submit"]').click();
+async function signIn(page: Page, seat: typeof SEAT, target: string) {
+  await signInAs(page, { id: seat.userId, email: seat.email, tenantId: seat.tenantId, role: seat.role });
+  await page.goto(target);
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
 }
 
+test.beforeAll(async () => {
+  await seedIdentity({ ...SEAT, workspaceIds: [] });
+});
+
 test.afterAll(async () => {
+  await cleanupIdentity([SEAT.userId]);
   await prisma.$disconnect();
 });
 
 test('the panel export reports the above-threshold rate the database actually holds', async ({ page }) => {
   await acceptCookies(page);
-  await signIn(page, SIGN_IN_AS, '/tr/main/panel');
+  await signIn(page, SEAT, '/tr/main/panel');
 
   // A real click onto the tab that offers the export.
   const exportTab = page.getByRole('tab', { name: 'Dışa Aktar' });

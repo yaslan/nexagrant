@@ -4,6 +4,7 @@ import { prisma } from '../../src/lib/db';
 import { evidenceTenant } from './fixtures/evidence-tenant';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTRH86RCGVEGC (second pass) — the "verified" badge.
@@ -57,8 +58,17 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
+/**
+ * A minted session for the user `tenant.setup()` writes (TENANT_OWNER of the spec's own
+ * tenant; fixtures/evidence-tenant.ts owns its User + Membership and removes them), not
+ * `tenant.signIn`, which drives the demo sign-in form and so cannot run against
+ * `next start` (TASK-MUSBCXP9RKS3D). evidence-tenant.ts is shared with
+ * evidence-fabrication.spec.ts and is left as it is; its user id is `ev-<key>-e2e-user`.
+ */
 async function signIn(page: import('@playwright/test').Page) {
-  await tenant.signIn(page);
+  await signInAs(page, { id: 'ev-badge-e2e-user', email: tenant.email, tenantId: tenant.tenantId, role: 'TENANT_OWNER' });
+  await page.goto(tenant.evidenceUrl);
+  await page.waitForURL(`**${tenant.evidenceUrl}`, { timeout: 30_000 });
   // The evidence page is ready when its upload button is hydrated: the second test
   // clicks it first, and the first photographs the page straight after this.
   await expectHydrated(page.getByRole('button', { name: /Belge Yükle|Upload/ }).first());

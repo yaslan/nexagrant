@@ -5,6 +5,7 @@ import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * Plan gating against the USD catalogue — TASK-MTR6QIE05ZKNH.
@@ -58,18 +59,12 @@ async function setM6(status: ModuleStatus) {
 }
 
 async function signIn(page: Page) {
-  // The cookie banner is a full-screen alertdialog and swallows the click on the
-  // sign-in button; a recorded consent is the state a returning user is in.
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
-  });
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(MODULES_URL)}`);
   // Managing modules is Tenant Owner only, and the fixture seats its user as one.
-  await page.locator('input[type="email"]').fill(LENS.email);
-  await page.locator('form button[type="submit"]').click();
+  // A minted session for that user (scripts/seed-plan-e2e.ts owns its User + Membership,
+  // `rollback` removes them), not the demo sign-in form, so the spec runs against
+  // `next start` too (TASK-MUSBCXP9RKS3D). signInAs also records the cookie consent.
+  await signInAs(page, { id: LENS.userId, email: LENS.email, tenantId: LENS.tenantId, role: LENS.role });
+  await page.goto(MODULES_URL);
   await page.waitForURL(`**${MODULES_URL}`, { timeout: 30_000 });
   // Callers assert on a locator next; that auto-wait is the synchronisation.
 }

@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
 import { shotsDir } from './fixtures/shots';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTQWBAJ2T5XSV (F10+F16) — "absence is not zero", in a real browser.
@@ -40,11 +41,13 @@ async function acceptCookies(page: Page) {
  * under load, so it is a race rather than a signal. Every caller asserts on a locator
  * straight afterwards, and Playwright's auto-waiting is the synchronisation.
  */
-async function signIn(page: Page, email: string, target: string, locale = 'tr') {
-  const signInPath = locale === 'tr' ? `/${locale}/giris` : `/${locale}/login`;
-  await page.goto(`${signInPath}?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('form button[type="submit"]').click();
+async function signIn(page: Page, email: string, target: string) {
+  // A cookie for the user the seed wrote: the demo sign-in form does not exist in a
+  // production build (TASK-MUSBCXP9RKS3D). The locale lives in `target` itself.
+  const seat = [F10.empty, F10.full].find((t) => t.email === email);
+  if (!seat) throw new Error(`no seeded F10 user for ${email}`);
+  await signInAs(page, { id: seat.userId, email: seat.email, tenantId: seat.tenantId, role: 'TENANT_OWNER' });
+  await page.goto(target);
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
 }
 
@@ -87,7 +90,7 @@ test.describe('F10 — a workspace with nothing in it is not a workspace scoring
   test('the same empty state reads in English', async ({ page }) => {
     await acceptCookies(page);
     const target = dashboardUrl(F10.empty.workspaceSlug, 'en');
-    await signIn(page, F10.empty.email, target, 'en');
+    await signIn(page, F10.empty.email, target);
 
     const overview = page.locator('#dashboard-panel-overview');
     await expect(overview).toContainText('No opportunities in this workspace yet');
