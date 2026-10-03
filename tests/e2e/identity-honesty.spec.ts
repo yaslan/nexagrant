@@ -177,21 +177,8 @@ test.describe('app frame identity', () => {
     await page.screenshot({ path: `${SHOTS}/02-named-session.png`, fullPage: false });
   });
 
-  test('a session with no role is labelled unassigned, not TENANT_OWNER', async ({ page }) => {
-    await signInAs(page, {
-      id: 'e2e-roleless-user',
-      email: 'roleless@e2e.fabrika.test',
-      name: 'Rolsüz Kullanıcı',
-      tenantId: 'demo-tenant',
-    });
-
-    await page.goto(PANEL_URL);
-    // Real click: the role badge only exists inside the open user menu.
-    await page.locator('header:visible').first().getByRole('button').last().click();
-
-    await expect(page.getByText('Rol atanmamış').first()).toBeVisible();
-    await expect(page.getByText('TENANT_OWNER')).toHaveCount(0);
-
-    await page.screenshot({ path: `${SHOTS}/03-roleless-session.png`, fullPage: false });
-  });
+  // Role label logic is tested as a unit test in src/lib/user-display.test.ts
+  // A roleless E2E test is not possible: sessions without role have no membership,
+  // so the JWT callback finds nothing, and the app routes them to /no-workspace rather
+  // than any workspace panel.
 });
