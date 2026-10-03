@@ -37,7 +37,7 @@ Durum etiketleri: **HAZIR** = repoda var ve kanıtlı · **EKSİK** = bizim (aja
 | 5 | İzleme / alarm | **EKSİK** (kısmi) | `SystemAlert` yalnız `/[locale]/admin/alerts` ekranında; e-posta/push yok; dış kalp atışı yok (§5) |
 | 6 | GitHub push + CI | **PATRON** (push) / **EKSİK** (yerel kanca) | `dev` origin'den **223 commit** ileride; `core.hooksPath` var olmayan dizini gösteriyor (§6) |
 | 7 | Anahtar yenileme (OpenAI) | **PATRON** | anahtar sohbette açığa çıktı → yenile + harcama limiti (§2.3) |
-| 8 | Dosya depolama (R2) | **PATRON** (karar) | R2 yoksa yükleme **sahte presigned URL** döner, dosya saklanmaz (§2.2) |
+| 8 | Dosya depolama (R2) | **PATRON** (karar) | R2 yoksa production'da her kanıt yüklemesi `object_store_unconfigured` ile reddedilir (kullanıcıya "dosya deposu yapılandırılmamış" der, sunucu log'una `console.error`); dosya yüklenemez (§2.2, TASK-MUSFO7ELD7WYF) |
 
 ---
 
@@ -74,7 +74,7 @@ Sonuç: **şemadaki her anahtar `.env.example`'da var.** Fark ters yönde ve şe
 
 | Değişken | Boşsa ne olur | Durum |
 |---|---|---|
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_HOST` | `src/lib/storage.ts:13` istemci `null`; `:82` "Dev Mode Fallback" **sahte presigned URL** üretir → kanıt/dosya yüklemesi başarılı görünür ama dosya **saklanmaz**. Ayrıca `.env.example:109` `R2_BUCKET=fabrika`, kodun varsayılanı `fonbridge-evidence` (`storage.ts`) — biri seçilmeli | **PATRON** (R2 hesabı mı, başka depolama mı) + EKSİK (üretimde sahte URL yerine hata/alarm) |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_HOST` | `src/lib/storage.ts` istemci `null` (`hasObjectStore=false`). Production'da presign erken reddeder (`object_store_unconfigured`, i18n'li mesaj + `[getPresignedUploadUrlAction] no object store configured in production` hata log'u); dev'e özel `/api/evidence/mock-upload` production'da hiç dağıtılmaz (TASK-MUSFO7ELD7WYF). Yani yükleme **kapalıdır**, sessizce kaybolmaz. Ayrıca `.env.example:109` `R2_BUCKET=fabrika`, kodun varsayılanı `fonbridge-evidence` (`storage.ts`) — biri seçilmeli | **PATRON** (R2 hesabı mı, başka depolama mı). Go-live kontrolü: canlıda bir PDF yükle → satır oluşmalı; "dosya deposu yapılandırılmamış" görülürse R2_* eksik |
 | `WORKER_URL`, `WORKER_TOKEN` | `k2-monthly-cordis` (ayda bir, 1'i 04:00 UTC) `http://localhost:8000`'e gider → Python CORDIS servisi (`workers/cordis`) yoksa iş düşer, `job-queue` alarmı | PATRON (pilotta CORDIS aylık yenileme gerekli mi?) |
 | `FEEDBACK_DIGEST_TO` | haftalık geri bildirim özeti hesaplanır, gönderilmez | PATRON (adres) |
 | `JOBS_DATABASE_URL` | boş = `DATABASE_URL`. Worker ilk açılışta `graphile_worker` şemasını **kurar** → bu rolün şema oluşturma yetkisi olmalı; `fabrika_app`'in yoksa ayrı rol gerekir (ADR-0008 §6.6) | EKSİK (rol yetkisi canlı DB'de ölçülecek) |

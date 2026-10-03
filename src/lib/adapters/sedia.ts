@@ -36,6 +36,13 @@ export type { SediaTopic };
 
 export const SEDIA_SOURCE = 'sedia';
 
+/**
+ * Longest one search page may take, body included. The search fetch had no
+ * timeout, so one stalled page held its caller (the calls page, the nightly
+ * job) for as long as the socket stayed open (TASK-MUS7OVUMOJZP3).
+ */
+export const SEDIA_TIMEOUT_MS = 10_000;
+
 export interface SediaSearchOptions {
   text?: string;
   pageSize?: number;
@@ -53,6 +60,13 @@ export interface SediaSearchOptions {
   enrichFromTopicDetails?: boolean;
   /** Hard cap on enrichment round-trips, even when enabled. */
   maxDetailFetches?: number;
+  /** Per-page timeout; defaults to {@link SEDIA_TIMEOUT_MS}. */
+  timeoutMs?: number;
+  /**
+   * The caller's own deadline or cancellation. Once it fires, the page in
+   * flight is abandoned and no further page is asked for.
+   */
+  signal?: AbortSignal;
 }
 
 export interface SediaSearchResult {
@@ -260,6 +274,8 @@ export class SediaAdapter {
       languages = ['en'],
       enrichFromTopicDetails = false,
       maxDetailFetches = 25,
+      timeoutMs = SEDIA_TIMEOUT_MS,
+      signal,
     } = options;
 
     const queryText = text.trim() || '***';
@@ -282,6 +298,11 @@ export class SediaAdapter {
     let detailFetches = 0;
 
     while (pageNumber <= maxPages) {
+      if (signal?.aborted) {
+        errors.push(`Page ${pageNumber} not fetched: ${errorMessage(signal.reason)}`);
+        break;
+      }
+
       const encodedText = encodeURIComponent(queryText);
       const searchUrl = `${this.baseUrl}?apiKey=${this.apiKey}&text=${encodedText}&pageSize=${pageSize}&pageNumber=${pageNumber}`;
 
@@ -300,7 +321,14 @@ export class SediaAdapter {
           'languages.json'
         );
 
-        const response = await fetch(searchUrl, { method: 'POST', body: formData });
+        // A timeout ends up in the catch below like any other transport error:
+        // pagination stops and the pages already read are returned.
+        const pageTimeout = AbortSignal.timeout(timeoutMs);
+        const response = await fetch(searchUrl, {
+          method: 'POST',
+          body: formData,
+          signal: signal ? AbortSignal.any([pageTimeout, signal]) : pageTimeout,
+        });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }

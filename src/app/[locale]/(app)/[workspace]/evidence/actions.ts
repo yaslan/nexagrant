@@ -8,6 +8,7 @@ import { isServiceBusy } from '@/lib/service-busy';
 import { revalidatePath } from 'next/cache';
 import {
   getPresignedUploadUrl,
+  objectStoreMissingInProduction,
   deleteTenantObject,
   deleteObjectBytes,
   evidenceUploadType,
@@ -83,6 +84,16 @@ export async function getPresignedUploadUrlAction(
   }
   const allowed = evidenceUploadType(fileName, mimeType, fileSizeBytes);
   if (!allowed.ok) return { success: false as const, error: allowed.error };
+
+  // A production server without R2 has no store to upload to: the dev
+  // stand-in answers 404 there. Refuse before the browser sends a byte, with a
+  // code the screen translates, instead of handing out a URL that cannot work
+  // (TASK-MUSFO7ELD7WYF). Logged as an error: it is a deployment fault, not a
+  // user mistake, and every upload fails until R2_* is set.
+  if (objectStoreMissingInProduction()) {
+    console.error('[getPresignedUploadUrlAction] no object store configured in production (R2_ACCOUNT_ID unset); upload refused');
+    return { success: false as const, error: 'object_store_unconfigured' as const };
+  }
 
   try {
     const { uploadUrl, objectKey } = await getPresignedUploadUrl(

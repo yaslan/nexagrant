@@ -40,7 +40,12 @@ export function CalendarClient({ connections, locale }: CalendarClientProps) {
    */
   const [status, setStatus] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
-  /** Translate a server-action failure, or fall back to the generic message. */
+  /**
+   * Translate a server-action failure, or fall back to the generic message.
+   * `error` is either the `{ ok: false, code }` an action returned — the only
+   * form whose code survives a production build — or whatever it threw (a role
+   * or pilot refusal, a fault), which `errorText` recognises by digest.
+   */
   const messageFor = (error: unknown): string =>
     errorText(error, () => {
       const code = calendarErrorCode(error);
@@ -52,7 +57,11 @@ export function CalendarClient({ connections, locale }: CalendarClientProps) {
     setStatus(null);
     setIsDisconnecting(true);
     try {
-      await disconnectCalendar(connectionId);
+      const result = await disconnectCalendar(connectionId);
+      if (!result.ok) {
+        setStatus({ tone: 'error', text: messageFor(result) });
+        return;
+      }
       window.location.reload();
     } catch (error) {
       console.error('Failed to disconnect calendar:', error);
@@ -68,14 +77,18 @@ export function CalendarClient({ connections, locale }: CalendarClientProps) {
     setSelectedProvider(provider);
     try {
       const result = await connectCalendar(provider);
+      if (!result.ok) {
+        // A refusal is an outcome, not a crash: the user is told why, in their
+        // own language, and the button returns to its resting state.
+        setStatus({ tone: 'error', text: messageFor(result) });
+        return;
+      }
       if (result.isConnected) {
         window.location.reload();
         return;
       }
       setStatus({ tone: 'error', text: t('errors.unknown') });
     } catch (error) {
-      // A refusal is an outcome, not a crash: the user is told why, in their
-      // own language, and the button returns to its resting state.
       setStatus({ tone: 'error', text: messageFor(error) });
     } finally {
       setIsConnecting(false);

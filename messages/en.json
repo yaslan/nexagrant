@@ -269,7 +269,8 @@
         "storage_unavailable": "Storage is unavailable right now. Try again shortly.",
         "save_failed": "The document could not be saved. Try again.",
         "service_busy": "The system is very busy right now, so the document was not saved. Upload it again in a few seconds.",
-        "put_failed": "The file could not be uploaded to storage (HTTP {status})."
+        "put_failed": "The file could not be uploaded to storage (HTTP {status}).",
+        "object_store_unconfigured": "Document upload is not available on this installation yet: no file storage is configured. Your file was not sent; please tell your administrator."
       }
     }
   },
@@ -1320,6 +1321,8 @@
   },
   "callsPage": {
     "liveApiActive": "Live SEDIA API Active",
+    "liveApiChecking": "Checking SEDIA Connection",
+    "liveApiFailed": "SEDIA Data Unavailable",
     "pageTitle": "EU Funding Calls & Topics (SEDIA)",
     "pageDescription": "Browse and search live funding opportunities across Horizon Europe, Digital Europe, Erasmus+, and EU programmes.",
     "grantsTab": "Grants",
@@ -1361,6 +1364,14 @@
     "detailsButton": "Details",
     "openInSedia": "Open in SEDIA Portal",
     "noResults": "No funding calls found matching your filter parameters.",
+    "loadErrors": {
+      "sediaUnavailable": "The EU funding portal (SEDIA) did not answer in time. The list of calls could not be loaded; please try again in a few minutes.",
+      "rateLimited": "You have searched too often in a short time. Please wait {seconds} seconds and try again.",
+      "badRequest": "The search request was rejected: one of the filters has an invalid value. Change the filters and try again.",
+      "network": "The server could not be reached, or it did not answer in time. Check your internet connection and try again.",
+      "unexpected": "The list of calls could not be loaded because of an unexpected error. Please try again; if it keeps happening, tell your administrator."
+    },
+    "loadFailedShort": "Could not load calls",
     "perPage": "Per page:",
     "previous": "Previous",
     "next": "Next",

@@ -40,6 +40,43 @@ const FRAMEWORK_PROGRAMMES = [
   { id: '43353724', labelKey: 'cef' },
 ] as const;
 
+/**
+ * Longest the list waits for `/api/cagrilar`. The route gives up on its own after
+ * CAGRILAR_BUDGET_MS (20 s); this is the backstop for a server that never answers.
+ */
+const CALLS_CLIENT_TIMEOUT_MS = 30_000;
+
+/**
+ * Why the last `/api/cagrilar` request returned no list. Each kind has its own sentence:
+ * a 429 is "you searched too often" and a 400 is "the request was malformed", not "the EU portal did not answer",
+ * which is what the single `loadFailed` text used to say for all of them (TASK-MUSBZX8ROL52A).
+ */
+type LoadFailure =
+  | { kind: 'sediaUnavailable' } // 503: SEDIA did not answer within the route's budget
+  | { kind: 'rateLimited'; seconds: number } // 429: the per-user search limit, with Retry-After
+  | { kind: 'badRequest' } // 400: the route rejected a parameter (invalid_limit)
+  | { kind: 'network' } // fetch threw: offline, or no answer within CALLS_CLIENT_TIMEOUT_MS
+  | { kind: 'unexpected' }; // any other status, or a 200 that is not a list
+
+/** Seconds from a Retry-After header; the limiter's one-minute window when it is missing. */
+function retryAfterSeconds(header: string | null): number {
+  const seconds = Number.parseInt(header ?? '', 10);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 60;
+}
+
+function failureFromResponse(res: Response): LoadFailure {
+  switch (res.status) {
+    case 503:
+      return { kind: 'sediaUnavailable' };
+    case 429:
+      return { kind: 'rateLimited', seconds: retryAfterSeconds(res.headers.get('Retry-After')) };
+    case 400:
+      return { kind: 'badRequest' };
+    default:
+      return { kind: 'unexpected' };
+  }
+}
+
 export default function CallsPage({
   params,
 }: {
@@ -61,6 +98,11 @@ export default function CallsPage({
 
   const [topics, setTopics] = useState<SediaTopic[]>([]);
   const [totalResults, setTotalResults] = useState(0);
+  // Set with the rows, after the await: why the list for `loadedQuery` could not be fetched,
+  // or null when it was. It also drives the SEDIA badge, so the badge reports the last real
+  // request instead of being green by default; no separate health probe is made.
+  const [loadFailure, setLoadFailure] = useState<LoadFailure | null>(null);
+  const loadFailed = loadFailure !== null;
   const [savingSearch, setSavingSearch] = useState(false);
   const [savedSearchMessage, setSavedSearchMessage] = useState<string | null>(null);
   const [savedSearchError, setSavedSearchError] = useState<string | null>(null);
@@ -161,34 +203,48 @@ export default function CallsPage({
   // Fetch calls from live SEDIA API route. Nothing here is server-rendered, so the request
   // has to start from an effect — but every setState happens after an await, and a response
   // that lands after the filters moved on is dropped instead of overwriting a newer list.
+  //
+  // A superseded request is aborted, so the server stops spending SEDIA and translation
+  // quota on it. The route answers within its own budget (CAGRILAR_BUDGET_MS); the
+  // client timeout only covers a server that never answers at all, so "loading" always
+  // ends — in rows, "no results" or an error (TASK-MUS7OVUMOJZP3).
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CALLS_CLIENT_TIMEOUT_MS);
 
     void (async () => {
       try {
-        const res = await fetch(`/api/cagrilar?${query}`);
-        const data = await res.json();
+        const res = await fetch(`/api/cagrilar?${query}`, { signal: controller.signal });
+        // The status decides the failure, not the body: a proxy's HTML 502 has no JSON to read.
+        const data = res.ok ? await res.json().catch(() => null) : null;
         if (cancelled) return;
 
-        if (data.success) {
+        if (res.ok && data?.success) {
           setTopics(data.topics || []);
           setTotalResults(data.totalResults || 0);
+          setLoadFailure(null);
         } else {
           setTopics([]);
           setTotalResults(0);
+          setLoadFailure(res.ok ? { kind: 'unexpected' } : failureFromResponse(res));
         }
       } catch (err) {
         if (cancelled) return;
         console.error('Failed to fetch calls:', err);
         setTopics([]);
         setTotalResults(0);
+        setLoadFailure({ kind: 'network' });
       } finally {
+        clearTimeout(timeoutId);
         if (!cancelled) setLoadedQuery(query);
       }
     })();
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
     };
   }, [query]);
 
@@ -324,10 +380,34 @@ export default function CallsPage({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 sm:mb-8 gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              {t('liveApiActive')}
-            </span>
+            {loadedQuery === null ? (
+              <span
+                data-testid="sedia-status"
+                data-state="checking"
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-ground text-muted border border-border"
+              >
+                <span aria-hidden="true" className="w-2 h-2 rounded-full bg-gray-400"></span>
+                {t('liveApiChecking')}
+              </span>
+            ) : loadFailed ? (
+              <span
+                data-testid="sedia-status"
+                data-state="failed"
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-700 dark:text-red-300 border border-red-500/30"
+              >
+                <span aria-hidden="true" className="w-2 h-2 rounded-full bg-red-500"></span>
+                {t('liveApiFailed')}
+              </span>
+            ) : (
+              <span
+                data-testid="sedia-status"
+                data-state="live"
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+              >
+                <span aria-hidden="true" className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                {t('liveApiActive')}
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold font-heading mb-2 text-ink">
             {t('pageTitle')}
@@ -509,6 +589,8 @@ export default function CallsPage({
           <div className="text-muted font-medium text-[11px] sm:text-xs">
             {loading ? (
               <span>{t('loadingData')}</span>
+            ) : loadFailed ? (
+              <span>{t('loadFailedShort')}</span>
             ) : (
               <span>{t('resultsCount', { count: totalResults, page })}</span>
             )}
@@ -681,6 +763,19 @@ export default function CallsPage({
                     </td>
                   </tr>
                 ))
+              ) : loadFailed ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    role="alert"
+                    data-testid="calls-load-error"
+                    className="px-6 py-12 text-center text-red-600 text-xs sm:text-sm"
+                  >
+                    {loadFailure?.kind === 'rateLimited'
+                      ? t('loadErrors.rateLimited', { seconds: loadFailure.seconds })
+                      : t(`loadErrors.${loadFailure?.kind ?? 'unexpected'}`)}
+                  </td>
+                </tr>
               ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-muted text-xs sm:text-sm">

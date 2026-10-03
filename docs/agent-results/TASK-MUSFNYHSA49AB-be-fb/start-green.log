@@ -1,0 +1,18 @@
+[WebServer] $ next start --port 3157
+[WebServer] ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+[WebServer] [app-url] NEXT_PUBLIC_APP_URL is a loopback (localhost) address in production: set it to https://fonbridge.com
+[WebServer] [WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+[e2e-gate] Dev server info: PID=94590
+[e2e-gate] Test data: INVOICE_SUPPLIER_NAME loaded
+
+Running 5 tests using 1 worker
+
+[seed-f10-e2e] ready — empty=f10-empty-ws full=f10-full-ws opportunity=f10-full-opp-a
+  ✓  1 [chromium] › tests/e2e/m9-calendar-connect.spec.ts:84:7 › M9 calendar connections › an unconfigured provider is refused in Turkish, not silently swallowed (1.4s)
+  ✓  2 [chromium] › tests/e2e/m9-calendar-connect.spec.ts:111:7 › M9 calendar connections › offers Google Calendar and .ics only — Outlook is gone, in both locales (428ms)
+  ✓  3 [chromium] › tests/e2e/m9-calendar-connect.spec.ts:127:7 › M9 calendar connections › the browser tab title follows the locale (378ms)
+  ✓  4 [chromium] › tests/e2e/m9-calendar-connect.spec.ts:139:7 › M9 calendar connections › .ics connects for real and the screen reflects the stored row (413ms)
+[seed-f10-e2e] rolled back
+  ✓  5 [chromium] › tests/e2e/m9-calendar-connect.spec.ts:160:7 › M9 calendar connections › .ics disconnects for real and the row leaves the database (411ms)
+
+  5 passed (5.5s)
