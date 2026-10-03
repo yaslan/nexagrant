@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTR882HVZ8BG7 — the lock is a floor, not a ceiling.
@@ -23,6 +24,11 @@ import { expectHydrated } from './fixtures/hydration';
 const SHOTS = shotsDir('TASK-MTR882HVZ8BG7-screenshots');
 const TENANT_ID = 'demo-tenant';
 const EMAIL = 'admin@yasinaslan.com.tr';
+// The seeded platform-admin seat behind EMAIL (prisma/seed-tenant-workspace.ts,
+// `isPlatformAdmin: true`). The demo sign-in form that used to resolve the address to
+// it does not exist in a production build, so the session is a minted cookie for the
+// same user (TASK-MUSBCXP9RKS3D); the jwt callback still reads the admin flag from the row.
+const SEAT = { id: 'demo-user-superadmin', email: EMAIL, tenantId: TENANT_ID, role: 'SUPER_ADMIN' };
 const BILLING_URL = '/tr/main/settings/billing';
 
 /** A shallower lock than the campaign: Pro monthly at 40% off is $52.20. */
@@ -86,9 +92,8 @@ test.describe('price lock — a deeper campaign reaches an already-locked tenant
     });
     await shot(page, '05-pricing-page-campaign-running');
 
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(BILLING_URL)}`);
-    await page.locator('input[type="email"]').fill(EMAIL);
-    await page.locator('form button[type="submit"]').click();
+    await signInAs(page, SEAT);
+    await page.goto(BILLING_URL);
     await page.waitForURL(`**${BILLING_URL}`, { timeout: 30_000 });
     const panelMonthly = page.getByRole('button', { name: 'Aylık', exact: true });
     await expectHydrated(panelMonthly);

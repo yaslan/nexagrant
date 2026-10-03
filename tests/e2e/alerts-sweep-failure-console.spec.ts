@@ -7,6 +7,7 @@ import {
 } from '../../src/lib/jobs/tasks/alerts-sweep';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTVRC1UGA3B6Y — a failing sweep must reach the operator's screen.
@@ -33,6 +34,11 @@ import { expectHydrated } from './fixtures/hydration';
 
 const SHOTS = shotsDir('TASK-MTVRC1UGA3B6Y-screenshots');
 const ADMIN_EMAIL = 'admin@yasinaslan.com.tr';
+// The seeded platform-admin seat behind ADMIN_EMAIL (prisma/seed-tenant-workspace.ts,
+// `isPlatformAdmin: true`). The demo sign-in form that used to resolve the address to
+// it does not exist in a production build, so the session is a minted cookie for the
+// same user (TASK-MUSBCXP9RKS3D); the jwt callback still reads the admin flag from the row.
+const ADMIN_SEAT = { id: 'demo-user-superadmin', email: ADMIN_EMAIL, tenantId: 'demo-tenant', role: 'SUPER_ADMIN' };
 const THRESHOLD = 3;
 const HEALTH_SOURCE = 'alerts-sweep';
 const STREAK_KEY = 'alerts-sweep:run-failed';
@@ -108,9 +114,8 @@ test.describe('a repeatedly failing alerts sweep reaches the alerts console', ()
     });
 
     const target = '/tr/admin/alerts';
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-    await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
-    await page.locator('form button[type="submit"]').click();
+    await signInAs(page, ADMIN_SEAT);
+    await page.goto(target);
     await page.waitForURL(`**${target}`, { timeout: 30_000 });
 
     // Scoped to the table body: the source name also exists as an <option> in

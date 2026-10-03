@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 import { ST6, seed, rollback } from '../../scripts/seed-st6-empty-e2e';
 import { shotsDir } from './fixtures/shots';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTQYXISOPUJ53, re-verification — the card's five points, measured on a
@@ -45,10 +46,16 @@ async function acceptCookies(page: Page) {
   });
 }
 
+/**
+ * A session for a user the seed wrote (User + TENANT_OWNER Membership), minted as a
+ * cookie: the demo sign-in form does not exist in a production build
+ * (TASK-MUSBCXP9RKS3D).
+ */
 async function signIn(page: Page, email: string, target: string) {
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('form button[type="submit"]').click();
+  const seat = [ST6.bare, ST6.app].find((t) => t.email === email);
+  if (!seat) throw new Error(`no seeded ST6 user for ${email}`);
+  await signInAs(page, { id: seat.userId, email: seat.email, tenantId: seat.tenantId, role: 'TENANT_OWNER' });
+  await page.goto(target);
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
 }
 

@@ -4,6 +4,7 @@ import { prisma } from '../../src/lib/db';
 import { REL_E2E, seed, rollback } from '../../scripts/seed-relationship-e2e';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTTOUDNQ97X83 F-2 — assigning a focal point, in a real browser.
@@ -94,9 +95,15 @@ test.describe('M4 relationships — focal-point assignment', () => {
   });
 
   async function signIn(page: import('@playwright/test').Page, target: string) {
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-    await page.locator('input[type="email"]').fill(REL_E2E.email);
-    await page.locator('form button[type="submit"]').click();
+    // A cookie for the user the seed wrote: the demo sign-in form does not exist in a
+    // production build (TASK-MUSBCXP9RKS3D).
+    await signInAs(page, {
+      id: REL_E2E.userId,
+      email: REL_E2E.email,
+      tenantId: REL_E2E.tenantId,
+      role: 'TENANT_OWNER',
+    });
+    await page.goto(target);
     await page.waitForURL(`**${target}`, { timeout: 30_000 });
     // Callers assert on a locator next, and hydrate the picker before they change it.
   }
