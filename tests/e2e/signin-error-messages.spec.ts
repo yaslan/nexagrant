@@ -50,7 +50,7 @@ test.describe('sign-in error messages', () => {
     await expect(alert(page)).toContainText(tr.generic);
     await page.screenshot({ path: `${SHOTS}/02-oauth-callback-error-tr.png`, fullPage: true });
 
-    await alert(page).getByRole('button', { name: 'Kapat' }).click();
+    await page.getByTestId('dismiss-error-alert').click();
     await expect(alert(page)).toHaveCount(0);
   });
 
