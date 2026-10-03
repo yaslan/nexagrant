@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 import trMessages from '../../messages/tr.json';
 import enMessages from '../../messages/en.json';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * İNCELEME-14 K-3 (TASK-MUMAC1VT7DT5Q) — Auth.js's own sign-in errors reach the
@@ -31,7 +32,9 @@ async function acceptCookies(page: Page) {
   });
 }
 
-const alert = (page: Page) => page.getByRole('alert').filter({ visible: true });
+// Next's App Router leaves an empty role=alert route announcer on every page; not ours.
+const alert = (page: Page) =>
+  page.getByRole('alert').filter({ visible: true }).and(page.locator(':not(#__next-route-announcer__)'));
 
 test.describe('sign-in error messages', () => {
   test.beforeEach(async ({ page }) => {
@@ -50,7 +53,9 @@ test.describe('sign-in error messages', () => {
     await expect(alert(page)).toContainText(tr.generic);
     await page.screenshot({ path: `${SHOTS}/02-oauth-callback-error-tr.png`, fullPage: true });
 
-    await alert(page).getByRole('button', { name: 'Kapat' }).click();
+    const close = alert(page).getByRole('button', { name: 'Kapat' });
+    await expectHydrated(close);
+    await close.click();
     await expect(alert(page)).toHaveCount(0);
   });
 
