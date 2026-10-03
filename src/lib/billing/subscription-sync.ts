@@ -952,25 +952,31 @@ export async function logInvoicePayment(
     // that already succeeded. Outside it, a tenant lookup that threw would replay
     // the webhook Stripe retries — the exact thing the catch below exists to stop.
     // Read after the idempotency guard, so a redelivered event does not pay for it.
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { locale: true },
-    });
+    // Invoice is issued inside a transaction to ensure the advisory lock on
+    // the invoice number remains held until commit. Outside a transaction,
+    // pg_advisory_xact_lock releases when the query ends, allowing concurrent
+    // payments for the same tenant to collide on invoice numbers.
+    await prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.findUnique({
+        where: { id: tenantId },
+        select: { locale: true },
+      });
 
-    await createInvoiceForPayment(
-      prisma,
-      {
-        tenantId,
-        paymentRef: invoice.id ?? eventId,
-        amountMinor: invoice.amount_paid,
-        currency: invoice.currency.toUpperCase(),
-        description: invoiceLineDescription(invoice, tenant?.locale ?? null),
-        paidAt: new Date(),
-        provider: 'stripe',
-      }
-      // No third argument: the VAT rate is no longer a server setting. It comes
-      // from the buyer's country inside the writer (boss decision 2026-09-08).
-    );
+      await createInvoiceForPayment(
+        tx,
+        {
+          tenantId,
+          paymentRef: invoice.id ?? eventId,
+          amountMinor: invoice.amount_paid,
+          currency: invoice.currency.toUpperCase(),
+          description: invoiceLineDescription(invoice, tenant?.locale ?? null),
+          paidAt: new Date(),
+          provider: 'stripe',
+        }
+        // No third argument: the VAT rate is no longer a server setting. It comes
+        // from the buyer's country inside the writer (boss decision 2026-09-08).
+      );
+    });
   } catch (error) {
     console.error(
       `[logInvoicePayment] invoice not issued for ${invoice.id}: ${

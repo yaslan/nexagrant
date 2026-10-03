@@ -81,6 +81,7 @@ function fakeDb(options: {
         options.identity === undefined ? completeIdentity() : options.identity
       ),
     },
+    $executeRaw: vi.fn(async () => {}),
   } as unknown as InvoiceWriterDb & { created: Array<Record<string, unknown>> };
 }
 
