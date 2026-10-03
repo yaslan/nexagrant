@@ -146,7 +146,17 @@ export async function GET(request: NextRequest) {
       translated,
     });
   } catch (error) {
-    // The detail stays in the server log; the body is a fixed code (O-2).
+    // If the client aborted the request (closed page, cancelled, etc), the signal fires and
+    // any pending work (e.g., SEDIA fetch or translation) throws AbortError. This is expected,
+    // not a server error — return gracefully instead of logging as "internal error".
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      // The client is already gone; 503 won't reach them, but do not leave unhandled exceptions.
+      return internalError(
+        { success: false, error: 'client_aborted' },
+        { status: 503 }
+      );
+    }
+    // Other errors are unexpected.
     logger.error('[API /api/cagrilar] Internal error:', error);
     return internalError({ success: false, error: 'internal_error' });
   } finally {
