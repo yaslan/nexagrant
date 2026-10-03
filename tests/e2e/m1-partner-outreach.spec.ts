@@ -90,6 +90,17 @@ test.describe('M1 partner card — K4 outreach', () => {
   for (const locale of ['tr', 'en'] as const) {
     test(`external search links and e-mail templates work (${locale})`, async ({ page, context }) => {
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+      // Mock external domains to prevent network timeout flakiness; fulfill with empty response
+      // so navigation completes without hitting the real sites. This keeps the URL change for
+      // waitForURL while avoiding the external dependency.
+      const mockFulfill = { status: 200, body: '' };
+      await context.route('https://ec.europa.eu/**', route => route.fulfill(mockFulfill));
+      await context.route('https://een.ec.europa.eu/**', route => route.fulfill(mockFulfill));
+      await context.route('https://www.ideal-ist.eu/**', route => route.fulfill(mockFulfill));
+      await context.route('https://greenet-partner-search-tool.b2match.io/**', route => route.fulfill(mockFulfill));
+      await context.route('https://www.linkedin.com/**', route => route.fulfill(mockFulfill));
+
       await signIn(page, locale);
 
       const search = page.getByTestId('partner-outreach-search');
@@ -114,12 +125,13 @@ test.describe('M1 partner card — K4 outreach', () => {
         `https://www.ideal-ist.eu/partner-search?topic_id=${TOPIC}`,
       );
 
-      // A real click opens a new tab on the F&T Portal.
+      // A real click opens a new tab (mocked to prevent network timeout flakiness).
+      // Validates: (1) click succeeds, (2) opens in new page, (3) no opener (proves target="_blank" + rel="noopener").
       const [popup] = await Promise.all([
         context.waitForEvent('page'),
         page.getByTestId('outreach-link-ft').locator('a').click(),
       ]);
-      await popup.waitForURL(/ec\.europa\.eu/, { timeout: 30_000, waitUntil: 'commit' });
+      await popup.waitForURL(/ec\.europa\.eu/, { timeout: 5_000, waitUntil: 'commit' });
       expect(new URL(popup.url()).host).toBe('ec.europa.eu');
       expect(await popup.evaluate(() => window.opener)).toBeNull();
       await popup.close();
