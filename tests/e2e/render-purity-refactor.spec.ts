@@ -50,7 +50,9 @@ const consent = (page: Page) =>
  * every topic through MyMemory. On CI that took up to the whole 30 s budget and failed ~1 run in
  * 20 (TASK-MUPVLWSIPC5WU#render-purity). This spec is about how the page derives `loading`, not
  * about SEDIA, so the route is answered from a fixture shaped like the route's real body
- * (`src/app/api/cagrilar/route.ts`); the schema parse below fails if that shape drifts.
+ * (`src/app/api/cagrilar/route.ts`). The parse below checks each topic against the product's
+ * `SediaTopicSchema`; the envelope schema is written here by hand, so a renamed or removed
+ * envelope field in the route is NOT caught by this spec.
  */
 const CagrilarResponseSchema = z.object({
   success: z.literal(true),
@@ -162,6 +164,9 @@ test.describe('render-purity refactor — the three formerly suppressed componen
     const row = (i: number) => page.getByText(CALLS_FIXTURE.topics[i]!.title, { exact: true });
     const [energy, health, digital] = [row(0), row(1), row(2)];
     await expect.poll(() => calls.requests.length).toBeGreaterThan(0);
+    // The request is held, so the list must still say loading and show no rows yet.
+    await expect(loadingLabel).toBeVisible();
+    await expect(energy).toBeHidden();
     await calls.release();
     await expect(loadingLabel).toBeHidden({ timeout: 30_000 });
     // The skeleton went away because the fixture rows arrived, not because a request failed.
@@ -180,6 +185,8 @@ test.describe('render-purity refactor — the three formerly suppressed componen
     await expect
       .poll(() => calls.requests.slice(before).map((u) => u.searchParams.get('framework')))
       .toContain(HORIZON);
+    // The new filter's request is held, so the list must still be stale.
+    await expect(loadingLabel).toBeVisible();
     await calls.release();
     await expect(loadingLabel).toBeHidden({ timeout: 30_000 });
     await expect(energy).toBeVisible();
