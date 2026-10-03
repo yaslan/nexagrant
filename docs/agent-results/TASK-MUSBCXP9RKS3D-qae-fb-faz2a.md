@@ -3,7 +3,7 @@
 **Hüküm:** ⚠️ GEÇTİ, 2 açık bulguyla. All 16 group 2a specs are migrated or classified. **Start mode: 57 passed / 2 failed / 3 skipped. Dev mode: 62/62 passed.** The 2 start failures are **not** session failures. Both specs pass in dev with the same migrated session code. Their root causes are production-only behaviour in `src/` (B-class, outside this card's scope, details in §1.4). The `registration-consent` skip is a **SKIP PROPOSAL** waiting for approval. The mutant goes RED, and after the revert the same spec is GREEN. typecheck and lint are clean.
 **Tip:** test-altyapısı (E2E migration) + fixture extension
 **Platform:** Verified on mac (Darwin 27.0.0, Node + pnpm, Postgres in Docker on :5433, `next build` + `next start` and `next dev`, Chromium). Windows and Linux were not run because neither is available on this machine. What the code tells us: the changes use only Playwright, Prisma and `next-auth/jwt` (cookie minting). There are no file paths, shell commands or process handling, so they are platform-independent. CI (ubuntu) runs the same `playwright test`.
-**Branch / commit:** `qae-fb/e2e-prod-2a` (opened from `origin/qae-fb/e2e-prod-session-fixture` @e139bfd8) · code a5af4ef9 + report commit. PR base `dev`, not merged.
+**Branch / commit:** `qae-fb/e2e-prod-2a` (opened from `origin/qae-fb/e2e-prod-session-fixture` @e139bfd8) · code a5af4ef9 + report commit. **PR #11** (https://github.com/yaslan/fonbridge/pull/11), base `dev`, not merged. It depends on PR #10.
 
 ---
 
