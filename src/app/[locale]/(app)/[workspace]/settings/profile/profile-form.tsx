@@ -161,7 +161,7 @@ export default function TenantProfileForm({ initial }: { initial: StoredTenantPr
             value={keywords}
             onChange={(e) => setKeywords(e.target.value)}
             className="w-full bg-ground border border-border p-3 rounded-xl text-xs text-ink focus:outline-none focus:ring-2 focus:ring-accent"
-            placeholder="e.g. AI, Machine Learning, Robotics, Green Energy"
+            placeholder={isTr ? 'ör. Yapay Zeka, Makine Öğrenmesi, Robotik, Yeşil Enerji' : 'e.g. AI, Machine Learning, Robotics, Green Energy'}
           />
         </div>
 
