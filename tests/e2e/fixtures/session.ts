@@ -69,7 +69,9 @@ export const E2E_IDENTITIES = {
   /** Platform admin with super-admin role */
   platformAdmin: {
     userId: 'e2e-platform-admin',
-    email: 'admin@yasinaslan.com.tr',
+    // Not the seed's admin@yasinaslan.com.tr: that address already belongs to
+    // `demo-user-superadmin`, and User.email is unique, so seeding it under this id fails.
+    email: 'platform.admin@e2e.fabrika.test',
     name: 'Platform Admin',
     role: 'SUPER_ADMIN' as const,
     tenantId: 'demo-tenant',
