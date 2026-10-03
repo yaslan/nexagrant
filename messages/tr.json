@@ -1320,6 +1320,8 @@
   },
   "callsPage": {
     "liveApiActive": "SEDIA Canlı API Bağlantısı Etkin",
+    "liveApiChecking": "SEDIA Bağlantısı Kontrol Ediliyor",
+    "liveApiFailed": "SEDIA Verisi Alınamadı",
     "pageTitle": "AB Hibeleri & Çağrı Başlıkları (SEDIA)",
     "pageDescription": "Avrupa Komisyonu (SEDIA) arama servisine canlı erişim ile Ufuk Avrupa, Dijital Avrupa, Erasmus+, LIFE ve diğer AB programlarına ait açık ve gelecek çağrıları arayın.",
     "grantsTab": "Hibeler (Grants)",
@@ -1361,7 +1363,13 @@
     "detailsButton": "Detaylar",
     "openInSedia": "SEDIA Portalında Aç",
     "noResults": "Seçilen filtrelere uygun çağrı bulunamadı. Lütfen arama terimini veya durum filtrelerini kontrol edin.",
-    "loadFailed": "Çağrı listesi şu anda alınamadı (AB fon portalı yanıt vermedi ya da istek zaman aşımına uğradı). Lütfen birkaç dakika sonra tekrar deneyin.",
+    "loadErrors": {
+      "sediaUnavailable": "AB fon portalı (SEDIA) zamanında yanıt vermedi. Çağrı listesi şu anda alınamadı; lütfen birkaç dakika sonra tekrar deneyin.",
+      "rateLimited": "Kısa sürede çok fazla arama yaptınız. Lütfen {seconds} saniye bekleyip tekrar deneyin.",
+      "badRequest": "Arama isteği kabul edilmedi: filtrelerden biri geçersiz bir değer içeriyor. Filtreleri değiştirip tekrar deneyin.",
+      "network": "Sunucuya ulaşılamadı ya da yanıt zaman aşımına uğradı. İnternet bağlantınızı kontrol edip tekrar deneyin.",
+      "unexpected": "Çağrı listesi beklenmeyen bir hata nedeniyle alınamadı. Lütfen tekrar deneyin; sorun sürerse yöneticinize bildirin."
+    },
     "loadFailedShort": "Çağrılar alınamadı",
     "perPage": "Sayfa Başı Gösterim:",
     "previous": "Önceki",
