@@ -2785,5 +2785,33 @@
   "turkiyeye_acik_cagrilar": {
     "meta_title": "Horizon Calls Open to Turkey",
     "meta_description": "Open Horizon Europe funding calls for Turkish organizations. Deadlines, budgets, and application links."
+  },
+  "Profile": {
+    "title": "Organization Profile & R&D Capabilities",
+    "description": "Define your organization capabilities, patents, and focus areas. The AI engine uses this profile to match open EU calls and consortium seats.",
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbSettings": "Settings",
+    "breadcrumbCurrent": "Organization Profile",
+    "buttonBilling": "Billing",
+    "buttonApiKeys": "API Keys",
+    "capabilitiesDefaultText": "Artificial intelligence algorithms, deep learning, experience in EU Horizon Europe Cluster 4 & 5 projects, TRL 4-7 prototyping.",
+    "keywordsDefaultText": "Artificial Intelligence, Horizon Europe, Green Energy, Robotics, TRL 6",
+    "capabilitiesLabel": "Technical Capabilities & R&D Expertise",
+    "capabilitiesPlaceholder": "Describe your technical infrastructure, laboratory facilities, and past EU project experience in detail...",
+    "capabilitiesHelper": "Converted to semantic search vectors for M1 CORDIS and M8 Consortium Matcher.",
+    "keywordsLabel": "Keywords (Comma Separated)",
+    "keywordsPlaceholder": "e.g. AI, Machine Learning, Robotics, Green Energy",
+    "trlMinLabel": "Minimum TRL (Technology Readiness Level)",
+    "trlMinDescription": "1: Basic Principles — 9: Proven System",
+    "trlMaxLabel": "Maximum TRL (Technology Readiness Level)",
+    "trlMaxDescription": "Target ceiling level for call filters",
+    "successMessage": "Organization profile successfully updated and AI matching embeddings recalculated!",
+    "errorForbidden": "You do not have permission to perform this action",
+    "errorInvalid": "Please fill all fields correctly",
+    "errorFailed": "Failed to save profile",
+    "errorPilotExpired": "Pilot period has ended",
+    "errorGeneric": "An error occurred",
+    "savingButton": "Generating AI Embeddings...",
+    "saveButton": "Save Profile"
   }
 }
