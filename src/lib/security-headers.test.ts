@@ -145,6 +145,16 @@ describe('buildContentSecurityPolicy', () => {
     }
   });
 
+  it('R2_ENDPOINT: IPv6 http — only ::1 is loopback; the parser canonicalises long forms to [::1]', () => {
+    const connect = (r2Endpoint: string) =>
+      parseCsp(buildContentSecurityPolicy({ nonce: 'n', isDev: false, r2Endpoint })).get('connect-src');
+    // Same address as ::1 (RFC 5952): new URL() rewrites it before our check, header gets the canonical form.
+    expect(connect('http://[0:0:0:0:0:0:0:1]:9000')).toEqual(["'self'", 'http://[::1]:9000']);
+    for (const ep of ['http://[::ffff:127.0.0.1]:9000', 'http://[::2]:9000', 'http://[fe80::1]:9000']) {
+      expect(connect(ep)).toEqual(["'self'"]);
+    }
+  });
+
   it('R2_ENDPOINT: remote http endpoint is rejected (safe fallback)', () => {
     const policy = parseCsp(
       buildContentSecurityPolicy({
