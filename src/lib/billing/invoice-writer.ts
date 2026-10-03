@@ -106,7 +106,7 @@ const REQUIRED_BUYER_FIELDS = [
 ] as const;
 
 /** The subset of a Prisma client this module touches. */
-export type InvoiceWriterDb = Pick<Prisma.TransactionClient, 'invoice' | 'tenantBillingIdentity'>;
+export type InvoiceWriterDb = Pick<Prisma.TransactionClient, 'invoice' | 'tenantBillingIdentity' | '$executeRaw'>;
 
 /**
  * How many times a number collision is retried before giving up.
