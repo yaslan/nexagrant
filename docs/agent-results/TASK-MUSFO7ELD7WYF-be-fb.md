@@ -3,7 +3,7 @@
 **Hüküm:** Bitti: R2'siz production'da presign artık erken ve i18n'li `object_store_unconfigured` ile reddediyor. Mock URL prod'da hiç üretilmiyor (iki katmanda). Hata native `alert` yerine modal içindeki `role="alert"` alanında görünüyor. CI object store kararı patronda (aşağıda §5).
 **Tip:** hata (production yapılandırma)
 **Platform:** mac (Darwin 27, Chromium/Playwright, yerel Postgres). Kod platformdan bağımsız: `NODE_ENV` + env okuma + React. Dosya yolu, süreç ya da kabuk kodu yok. Windows/Linux'ta koşulmadı; davranış farkı beklenmiyor.
-**Dal / PR:** `be-fb/evidence-no-object-store` (origin/dev d0d2f5ec'den), PR base `dev` (link aşağıda §7)
+**Dal / PR:** `be-fb/evidence-no-object-store` (origin/dev d0d2f5ec) → https://github.com/yaslan/fonbridge/pull/15 (base dev)
 
 ## 1. Ne yapıldı
 Kök neden: `R2_ACCOUNT_ID` boşken `s3=null`. `getPresignedUploadUrl` NODE_ENV'e bakmadan dev'e özel `/api/evidence/mock-upload?key=…` URL'ini veriyordu. Bu rota production'da 404 döndüğü için kullanıcı native `alert` içinde "Dosya depoya yüklenemedi (HTTP 404)" görüyordu.
