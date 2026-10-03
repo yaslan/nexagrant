@@ -31,13 +31,8 @@ async function signInAs(
   page: Page,
   token: Record<string, unknown>,
 ): Promise<void> {
-  // Remove undefined fields so the JWT does not carry them.
-  // This allows the roleless test to send a token with no role claim.
-  const cleaned = Object.fromEntries(
-    Object.entries(token).filter(([, v]) => v !== undefined)
-  );
   const value = await encode({
-    token: { sub: cleaned.id as string, ...cleaned },
+    token: { sub: token.id as string, ...token },
     secret: SECRET,
     salt: COOKIE_NAME,
     maxAge: 60 * 60,
@@ -76,17 +71,9 @@ test.beforeAll(async () => {
         create: { id: 'e2e-named-user', email: 'ayse.named@e2e.fabrika.test', name: 'Zeynep Aydın', locale: 'tr' },
         update: { email: 'ayse.named@e2e.fabrika.test', name: 'Zeynep Aydın' },
       }),
-      tx.user.upsert({
-        where: { id: 'e2e-roleless-user' },
-        create: { id: 'e2e-roleless-user', email: 'roleless@e2e.fabrika.test', name: 'Rolsüz Kullanıcı', locale: 'tr' },
-        update: { email: 'roleless@e2e.fabrika.test', name: 'Rolsüz Kullanıcı' },
-      }),
     ]);
 
-    // Seed memberships for the first two tests so JWT callback can find them.
-    // The third test sends a token with no role claim and has no membership:
-    // the JWT callback finds nothing, session.role stays null, and the app renders
-    // "Rol atanmamış" (unassigned). The test uses navigation to /tr/no-workspace instead.
+    // Seed memberships so the JWT callback can find them.
     await Promise.all([
       tx.membership.upsert({
         where: { tenantId_userId: { tenantId: 'demo-tenant', userId: 'e2e-nameless-user' } },
@@ -108,7 +95,6 @@ test.beforeAll(async () => {
         },
         update: { role: 'PIPELINE_MANAGER', workspaceIds: [workspace.id] },
       }),
-      // Deliberately skip e2e-roleless-user membership so JWT callback finds nothing
     ]);
   });
 });
@@ -116,12 +102,11 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await withSystemScope('platform-admin', 'e2e.identity-honesty.cleanup', async (tx) => {
     // Cleanup in reverse order: memberships first (FK constraint), then users.
-    // e2e-roleless-user has no membership, only user row.
     await tx.membership.deleteMany({
       where: { userId: { in: ['e2e-nameless-user', 'e2e-named-user'] } },
     });
     await tx.user.deleteMany({
-      where: { id: { in: ['e2e-nameless-user', 'e2e-named-user', 'e2e-roleless-user'] } },
+      where: { id: { in: ['e2e-nameless-user', 'e2e-named-user'] } },
     });
   });
 });

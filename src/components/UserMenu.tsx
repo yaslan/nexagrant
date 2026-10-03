@@ -363,7 +363,7 @@ export default function UserMenu({
                 <div className="min-w-0 flex-1">
                   <h4 className="font-bold text-sm text-ink truncate">{effectiveUserName}</h4>
                   <p className="text-xs text-muted truncate">{effectiveUserEmail}</p>
-                  <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded font-mono ${effectiveRole ? 'bg-accent/15 text-accent-ink border border-accent/20' : 'bg-surface-hover text-muted border border-border'}`}>
+                  <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded font-mono ${effectiveRole?.trim() ? 'bg-accent/15 text-accent-ink border border-accent/20' : 'bg-surface-hover text-muted border border-border'}`}>
                     {effectiveRoleName}
                   </span>
                 </div>
