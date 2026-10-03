@@ -150,7 +150,7 @@ test.describe('identity strings', () => {
     await page.screenshot({ path: `${SHOTS}/01-user-menu-workspaces.png`, fullPage: false });
   });
 
-  test('the login page headlines the demo seat, not a person', async ({ page }) => {
+  (process.env.E2E_WEB_SERVER === 'start' ? test.skip : test)('the login page headlines the demo seat, not a person', async ({ page }) => {
     await page.goto('/tr/giris');
     await acceptCookies(page);
 
@@ -169,7 +169,7 @@ test.describe('identity strings', () => {
     await page.screenshot({ path: `${SHOTS}/02-login-demo-roles.png`, fullPage: false });
   });
 
-  test('the login page in English shows the same seats, translated', async ({ page }) => {
+  (process.env.E2E_WEB_SERVER === 'start' ? test.skip : test)('the login page in English shows the same seats, translated', async ({ page }) => {
     await page.goto('/en/login');
     await acceptCookies(page);
 
