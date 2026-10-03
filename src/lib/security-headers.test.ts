@@ -132,8 +132,8 @@ describe('buildContentSecurityPolicy', () => {
     expect(policy.get('connect-src')).toEqual(["'self'", 'https://minio.example.com:9000']);
   });
 
-  it('R2_ENDPOINT: loopback http endpoints are added (localhost, 127.0.0.1)', () => {
-    for (const host of ['localhost', '127.0.0.1']) {
+  it('R2_ENDPOINT: loopback http endpoints are added (localhost, 127.0.0.1, ::1)', () => {
+    for (const host of ['localhost', '127.0.0.1', '[::1]']) {
       const policy = parseCsp(
         buildContentSecurityPolicy({
           nonce: 'n',
@@ -173,7 +173,7 @@ describe('buildContentSecurityPolicy', () => {
         buildContentSecurityPolicy({
           nonce: 'n',
           isDev: false,
-          r2Endpoint: endpoint as any,
+          r2Endpoint: endpoint as unknown as string | null | undefined,
         }),
       );
       expect(policy.get('connect-src')).toEqual(["'self'"]);
@@ -233,6 +233,19 @@ describe('buildContentSecurityPolicy', () => {
       );
       // If HTTP remote were allowed, this would fail
       expect(policy.get('connect-src')).toEqual(["'self'"]);
+    });
+
+    it('MUTANT 6 RED→GREEN: IPv6 bracket notation must be stripped for loopback check', () => {
+      const policy = parseCsp(
+        buildContentSecurityPolicy({
+          nonce: 'n',
+          isDev: false,
+          r2Endpoint: 'http://[::1]:9000',
+        }),
+      );
+      // If bracket stripping were omitted, url.hostname would be "[::1]" (with brackets),
+      // which would not match "::1" in the hardcoded check, so the endpoint would be rejected
+      expect(policy.get('connect-src')).toContain('http://[::1]:9000');
     });
   });
 

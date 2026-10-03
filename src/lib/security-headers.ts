@@ -200,7 +200,8 @@ function r2EndpointOrigin(endpoint: string | null | undefined): string | null {
     const url = new URL(endpoint.trim());
     if (url.protocol === 'https:') return url.origin;
     if (url.protocol === 'http:') {
-      const host = url.hostname.toLowerCase();
+      // Node.js URL.hostname returns IPv6 with brackets [::1], strip them for comparison
+      const host = url.hostname.toLowerCase().replace(/[\[\]]/g, '');
       if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return url.origin;
       // allow http for loopback; reject remote http
       return null;
