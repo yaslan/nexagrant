@@ -33,6 +33,23 @@ const status =
   (route) =>
     route.fulfill({ status: code, json: body, headers });
 
+/**
+ * Holds every request until `release()` and then answers it with `then`, so the state before
+ * the first response is observed for as long as the test needs, not for however long the
+ * network happened to take.
+ */
+function held(then: Answer) {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const answer: Answer = async (route) => {
+    await gate;
+    await then(route);
+  };
+  return { answer, release };
+}
+
 /** Every `/api/cagrilar` request is answered by `next`, which a test can swap between requests. */
 async function stubCalls(page: Page, first: Answer) {
   const state = { next: first, count: 0 };
@@ -60,6 +77,23 @@ const badge = (page: Page) => page.getByTestId('sedia-status');
 const loadError = (page: Page) => page.getByTestId('calls-load-error');
 
 test.describe('calls page — SEDIA badge and error text follow the real request', () => {
+  test('before the first response the badge says "checking", not green or red', async ({ page }) => {
+    const first = held(ok);
+    const calls = await stubCalls(page, first.answer);
+    await openCalls(page);
+
+    // The request has reached the gate, so the page is waiting on it, not about to send it.
+    await expect.poll(() => calls.count, { timeout: 30_000 }).toBeGreaterThan(0);
+    await expect(badge(page)).toHaveAttribute('data-state', 'checking');
+    await expect(badge(page)).toHaveText(T.liveApiChecking);
+    await page.screenshot({ path: `${SHOTS}/00-badge-checking.png` });
+
+    first.release();
+    await expect(badge(page)).toHaveAttribute('data-state', 'live', { timeout: 30_000 });
+    await expect(badge(page)).toHaveText(T.liveApiActive);
+    await expect(loadError(page)).toHaveCount(0);
+  });
+
   test('a successful list turns the badge green', async ({ page }) => {
     await stubCalls(page, ok);
     await openCalls(page);
