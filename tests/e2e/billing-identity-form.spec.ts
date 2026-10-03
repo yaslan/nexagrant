@@ -4,6 +4,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 
 /**
  * TASK-MTSY71BUMBLWM — the screen that fills `TenantBillingIdentity` in.
@@ -32,10 +33,27 @@ const SHOTS = shotsDir('TASK-MTSY71BUMBLWM-screenshots');
 const TENANT_ID = 'demo-tenant';
 const BILLING_URL = '/tr/main/settings/billing';
 
+/**
+ * Seats of this spec's own on the demo tenant, seeded in `beforeAll` and removed in
+ * `afterAll` (TASK-MUSBCXP9RKS3D): the session is a minted cookie, not the demo
+ * sign-in form, so the spec runs against `next start` too. `workspaceIds: []` is
+ * every workspace, the same reach the demo seats it replaces had.
+ */
+type Seat = { userId: string; email: string; role: 'TENANT_OWNER' | 'PIPELINE_MANAGER'; tenantId: string };
 /** TENANT_OWNER on the demo tenant — the only role `manage_billing` is granted to. */
-const OWNER = 'admin@yasinaslan.com.tr';
+const OWNER: Seat = {
+  userId: 'e2e-billing-identity-owner',
+  email: 'billing-identity-owner@e2e.fabrika.test',
+  role: 'TENANT_OWNER',
+  tenantId: TENANT_ID,
+};
 /** PIPELINE_MANAGER on the same tenant: signed in, entitled to the page, not to the identity. */
-const NON_OWNER = 'alice@fabrika.test';
+const NON_OWNER: Seat = {
+  userId: 'e2e-billing-identity-member',
+  email: 'billing-identity-member@e2e.fabrika.test',
+  role: 'PIPELINE_MANAGER',
+  tenantId: TENANT_ID,
+};
 
 /**
  * A valid VKN whose check digit holds, and one whose does not. Both are test
@@ -51,16 +69,11 @@ const prisma = createDbClient(
   process.env.DATABASE_URL || 'postgresql://fabrika:fabrika@localhost:5432/fabrika'
 );
 
-async function signIn(page: Page, email: string) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true })
-    );
-  });
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(BILLING_URL)}`);
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('form button[type="submit"]').click();
+async function signIn(page: Page, seat: Seat) {
+  // signInAs also records the cookie consent the banner would otherwise ask for.
+  await signInAs(page, { id: seat.userId, email: seat.email, tenantId: seat.tenantId, role: seat.role });
+  await page.goto(BILLING_URL);
+  // Landing on the page (not bounced to /giris or /no-workspace) is the proof the session is real.
   await page.waitForURL(`**${BILLING_URL}`, { timeout: 30_000 });
   // Callers assert on a locator next; the ones that type hydrate the form first.
 }
@@ -69,6 +82,9 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('billing identity form', () => {
   test.beforeAll(async () => {
+    for (const seat of [OWNER, NON_OWNER]) {
+      await seedIdentity({ ...seat, workspaceIds: [] });
+    }
     // Only the demo tenant's own row, and only so the run starts from the state
     // every tenant is in today: none of them has an identity.
     await prisma.tenantBillingIdentity.deleteMany({ where: { tenantId: TENANT_ID } });
@@ -76,6 +92,7 @@ test.describe('billing identity form', () => {
 
   test.afterAll(async () => {
     await prisma.tenantBillingIdentity.deleteMany({ where: { tenantId: TENANT_ID } });
+    await cleanupIdentity([OWNER.userId, NON_OWNER.userId]);
     await prisma.$disconnect();
   });
 

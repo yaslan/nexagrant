@@ -69,7 +69,9 @@ export const E2E_IDENTITIES = {
   /** Platform admin with super-admin role */
   platformAdmin: {
     userId: 'e2e-platform-admin',
-    email: 'admin@yasinaslan.com.tr',
+    // Not the seed's admin@yasinaslan.com.tr: that address already belongs to
+    // `demo-user-superadmin`, and User.email is unique, so seeding it under this id fails.
+    email: 'platform.admin@e2e.fabrika.test',
     name: 'Platform Admin',
     role: 'SUPER_ADMIN' as const,
     tenantId: 'demo-tenant',
@@ -96,9 +98,15 @@ export type Identity = Partial<typeof E2E_IDENTITIES[keyof typeof E2E_IDENTITIES
  * Seed a User, Workspace (if needed), and Membership into the database for an
  * E2E test. Uses withSystemScope to bypass RLS.
  *
- * If workspaceIds is not provided, creates a default demo workspace and assigns
- * the user to it. If workspaceIds is provided but refers to non-existent workspaces,
- * this will fail (the test must create them first via workspace parameter if needed).
+ * If neither workspaceIds nor workspace is given, creates a default demo workspace
+ * and assigns the user to it. `workspaceIds: []` given explicitly means every
+ * workspace of the tenant (schema: "empty = all"), which is what the demo seats
+ * hold. If workspaceIds refers to non-existent workspaces, this will fail (the test
+ * must create them first via workspace parameter if needed).
+ *
+ * `isPlatformAdmin` sets User.isPlatformAdmin. The jwt callback reads the platform-admin
+ * right from that column on every request (a claim in the cookie is ignored), so an
+ * /admin spec needs it here, not in signInAs.
  *
  * @param identity Object with userId, email, name (optional), role, tenantId, workspaceIds
  * @param workspace Optional { id, slug, name } to create alongside the user (one workspace)
@@ -131,9 +139,11 @@ export async function seedIdentity(
     role: $Enums.Role;
     tenantId: string;
     workspaceIds?: string[];
+    isPlatformAdmin?: boolean;
   },
   workspace?: { id: string; slug: string; name: string },
 ): Promise<void> {
+  const isPlatformAdmin = identity.isPlatformAdmin === true;
   await withSystemScope('platform-admin', 'e2e.session.seed', async (tx) => {
     let workspaceIds = identity.workspaceIds ?? [];
 
@@ -154,8 +164,8 @@ export async function seedIdentity(
       workspaceIds = [row.id];
     }
 
-    // If still no workspaces, create a default one
-    if (workspaceIds.length === 0) {
+    // Nothing asked for at all: create a default one. An explicit [] stays [] (all).
+    if (!workspace && identity.workspaceIds === undefined) {
       const defaultWorkspace = await tx.workspace.upsert({
         where: { tenantId_slug: { tenantId: identity.tenantId, slug: 'e2e-default' } },
         create: {
@@ -176,10 +186,12 @@ export async function seedIdentity(
         email: identity.email,
         name: identity.name,
         locale: 'tr',
+        isPlatformAdmin,
       },
       update: {
         email: identity.email,
         name: identity.name,
+        isPlatformAdmin,
       },
     });
 

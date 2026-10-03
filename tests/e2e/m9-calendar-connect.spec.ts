@@ -4,6 +4,7 @@ import { prisma } from '../../src/lib/db';
 import { F10, seed, rollback } from '../../scripts/seed-f10-e2e';
 import { shotsDir } from './fixtures/shots';
 import { requireId } from '../helpers/teardown-guard';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTQUTBH8Q9VMK — the calendar connect flow, in a real browser.
@@ -33,10 +34,17 @@ async function acceptCookies(page: Page) {
   });
 }
 
+/**
+ * A minted session for the user `seed()` wrote (scripts/seed-f10-e2e.ts seats it as
+ * TENANT_OWNER of its own tenant), instead of the demo sign-in form, so the spec runs
+ * against `next start` too (TASK-MUSBCXP9RKS3D). The seed already writes User +
+ * Membership and `rollback` removes them, so the session fixture only adds the cookie.
+ */
 async function signIn(page: Page, email: string, target: string) {
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('form button[type="submit"]').click();
+  const seat = [F10.full, F10.empty].find((t) => t.email === email);
+  if (!seat) throw new Error(`no F10 fixture user with e-mail ${email}`);
+  await signInAs(page, { id: seat.userId, email: seat.email, tenantId: seat.tenantId, role: 'TENANT_OWNER' });
+  await page.goto(target);
   await page.waitForURL(`**${target}`, { timeout: 30_000 });
   // No network-idle wait — see docs/E2E_TESTING.md §3.4: on a dev server
   // "no requests for 500 ms" is a race, not a signal. The assertions below do the waiting.

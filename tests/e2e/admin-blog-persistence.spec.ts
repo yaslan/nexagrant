@@ -1,8 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
-import { encode } from 'next-auth/jwt';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
-import { e2eAuthSecret } from './fixtures/auth-secret';
+import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 
 /**
  * AKTAR-MURBCJ0A-1 — an admin's blog post survives the server that wrote it.
@@ -19,8 +18,6 @@ import { e2eAuthSecret } from './fixtures/auth-secret';
  */
 
 const SHOTS = shotsDir('AKTAR-MURBCJ0A-1-blog-screenshots');
-const COOKIE_NAME = 'authjs.session-token';
-const SECRET = e2eAuthSecret();
 const RUN = Math.random().toString(36).slice(2, 8);
 const TITLE = `E2E kalıcılık testi ${RUN}`;
 const SLUG = `e2e-kalicilik-testi-${RUN}`;
@@ -39,28 +36,23 @@ const CONTENT = [
   '* **kalın** madde',
 ].join('\n');
 
+/**
+ * A platform-admin seat of this spec's own (TENANT_OWNER on the demo tenant, every
+ * workspace, `User.isPlatformAdmin` set: the reach of the demo admin seat it replaces),
+ * seeded in `beforeAll` and removed in `afterAll`. The session is a minted cookie, not
+ * the demo sign-in form, so the spec runs against `next start` too (TASK-MUSBCXP9RKS3D).
+ * The platform-admin right comes from the database row; the cookie carries no claim for it.
+ */
+const ADMIN = {
+  userId: 'e2e-blog-persistence-admin',
+  email: 'blog-persistence-admin@e2e.fabrika.test',
+  role: 'TENANT_OWNER' as const,
+  tenantId: 'demo-tenant',
+};
+
 async function signInAsPlatformAdmin(page: Page, baseURL: string): Promise<void> {
-  const value = await encode({
-    token: {
-      sub: 'demo-user-admin',
-      id: 'demo-user-admin',
-      name: 'Platform Admin',
-      email: 'admin@yasinaslan.com.tr',
-      tenantId: 'demo-tenant',
-      role: 'SUPER_ADMIN',
-      isPlatformAdmin: true,
-    },
-    secret: SECRET,
-    salt: COOKIE_NAME,
-    maxAge: 60 * 60,
-  });
-  await page.context().addCookies([{ name: COOKIE_NAME, value, url: baseURL }]);
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true })
-    );
-  });
+  // signInAs also records the cookie consent the banner would otherwise ask for.
+  await signInAs(page, { id: ADMIN.userId, email: ADMIN.email, tenantId: ADMIN.tenantId, role: ADMIN.role }, baseURL);
 }
 
 async function fillNewPost(page: Page): Promise<void> {
@@ -73,8 +65,13 @@ async function fillNewPost(page: Page): Promise<void> {
 }
 
 test.describe.serial('admin blog — a post outlives the process that wrote it', () => {
+  test.beforeAll(async () => {
+    await seedIdentity({ ...ADMIN, workspaceIds: [], isPlatformAdmin: true });
+  });
+
   test.afterAll(async () => {
     await prisma.blogPost.deleteMany({ where: { slug: { startsWith: 'e2e-kalicilik-testi-' } } });
+    await cleanupIdentity([ADMIN.userId]);
     await prisma.$disconnect();
   });
 
@@ -94,7 +91,7 @@ test.describe.serial('admin blog — a post outlives the process that wrote it',
 
     // Read back by this test process, over its own connection.
     const row = await prisma.blogPost.findUnique({ where: { slug: SLUG } });
-    expect(row).toMatchObject({ title: TITLE, category: 'E2E', createdById: 'demo-user-admin' });
+    expect(row).toMatchObject({ title: TITLE, category: 'E2E', createdById: ADMIN.userId });
     expect(row?.content).toContain(HOSTILE);
 
     // A fresh, cookieless client.

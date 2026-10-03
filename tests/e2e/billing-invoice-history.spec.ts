@@ -4,6 +4,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 import { createDbClient } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
+import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 
 /**
  * TASK-MTRD91ZLKEQ3A — Settings → Billing may not quote a number nobody issued.
@@ -39,16 +40,23 @@ const prisma = createDbClient(
   process.env.DATABASE_URL || 'postgresql://fabrika:fabrika@localhost:5432/fabrika'
 );
 
+/**
+ * A TENANT_OWNER seat of this spec's own on the demo tenant, seeded in `beforeAll` and
+ * removed in `afterAll`; signed in with a minted cookie, not the demo form, so the spec
+ * runs against `next start` too (TASK-MUSBCXP9RKS3D). `workspaceIds: []` is every
+ * workspace, the reach of the demo seat it replaces.
+ */
+const OWNER = {
+  userId: 'e2e-invoice-history-owner',
+  email: 'invoice-history-owner@e2e.fabrika.test',
+  role: 'TENANT_OWNER' as const,
+  tenantId: TENANT_ID,
+};
+
 async function signIn(page: Page) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true })
-    );
-  });
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(BILLING_URL)}`);
-  await page.locator('input[type="email"]').fill('admin@yasinaslan.com.tr');
-  await page.locator('form button[type="submit"]').click();
+  // signInAs also records the cookie consent the banner would otherwise ask for.
+  await signInAs(page, { id: OWNER.userId, email: OWNER.email, tenantId: OWNER.tenantId, role: OWNER.role });
+  await page.goto(BILLING_URL);
   await page.waitForURL(`**${BILLING_URL}`, { timeout: 30_000 });
   // Every caller asserts on a locator next; that auto-wait is the synchronisation.
 }
@@ -61,8 +69,13 @@ function invoiceSection(page: Page) {
 test.describe.configure({ mode: 'serial' });
 
 test.describe('billing panel invoice history', () => {
+  test.beforeAll(async () => {
+    await seedIdentity({ ...OWNER, workspaceIds: [] });
+  });
+
   test.afterAll(async () => {
     await prisma.invoice.deleteMany({ where: { tenantId: TENANT_ID, number: NUMBER } });
+    await cleanupIdentity([OWNER.userId]);
     await prisma.$disconnect();
   });
 
