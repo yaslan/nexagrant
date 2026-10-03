@@ -1,8 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
-import { encode } from 'next-auth/jwt';
-import { withSystemScope } from '../../src/lib/system-scope';
+import { test, expect } from '@playwright/test';
 import { shotsDir } from './fixtures/shots';
-import { e2eAuthSecret } from './fixtures/auth-secret';
+import { signInAs, seedIdentity, cleanupIdentity } from './fixtures/session';
 
 /**
  * TASK-MTR5BGKNELCO2 — the app frame must never invent who is signed in.
@@ -21,94 +19,44 @@ import { e2eAuthSecret } from './fixtures/auth-secret';
 const SHOTS = shotsDir('TASK-MTR5BGKNELCO2-screenshots');
 const WORKSPACE = 'fabrika-beta';
 const PANEL_URL = `/tr/${WORKSPACE}/panel`;
-const COOKIE_NAME = 'authjs.session-token';
-const SECRET = e2eAuthSecret();
 
 /** The two identities the frame used to invent, in every casing the UI could render. */
 const INVENTED = ['Ayşe Kaya', 'Mehmet Yılmaz', 'mehmet@fabrika.app'];
-
-async function signInAs(
-  page: Page,
-  token: Record<string, unknown>,
-): Promise<void> {
-  const value = await encode({
-    token: { sub: token.id as string, ...token },
-    secret: SECRET,
-    salt: COOKIE_NAME,
-    maxAge: 60 * 60,
-  });
-  await page.context().addCookies([
-    { name: COOKIE_NAME, value, url: 'http://localhost:3000' },
-  ]);
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
-  });
-}
 
 test.beforeAll(async () => {
   // JWT callback reads User row on every token refresh (d57f13f1). Seed test users
   // and their memberships so the JWT callback can find them.
   // CI clean database has no demo-tenant or memberships, so we must seed them.
-  await withSystemScope('platform-admin', 'e2e.identity-honesty.setup', async (tx) => {
-    // Ensure demo-tenant exists with the fabrika-beta workspace the test visits.
-    const workspace = await tx.workspace.upsert({
-      where: { tenantId_slug: { tenantId: 'demo-tenant', slug: 'fabrika-beta' } },
-      create: { tenantId: 'demo-tenant', slug: 'fabrika-beta', name: 'Fabrika Beta' },
-      update: {},
-    });
+  //
+  // The fixture handles the withSystemScope setup internally.
+  const workspace = { id: 'fabrika-beta-workspace', slug: 'fabrika-beta', name: 'Fabrika Beta' };
 
-    await Promise.all([
-      tx.user.upsert({
-        where: { id: 'e2e-nameless-user' },
-        create: { id: 'e2e-nameless-user', email: 'ayse.nameless@e2e.fabrika.test', locale: 'tr' },
-        update: { email: 'ayse.nameless@e2e.fabrika.test' },
-      }),
-      tx.user.upsert({
-        where: { id: 'e2e-named-user' },
-        create: { id: 'e2e-named-user', email: 'ayse.named@e2e.fabrika.test', name: 'Zeynep Aydın', locale: 'tr' },
-        update: { email: 'ayse.named@e2e.fabrika.test', name: 'Zeynep Aydın' },
-      }),
-    ]);
+  await seedIdentity(
+    {
+      userId: 'e2e-nameless-user',
+      email: 'ayse.nameless@e2e.fabrika.test',
+      tenantId: 'demo-tenant',
+      role: 'PIPELINE_MANAGER',
+    },
+    workspace,
+  );
 
-    // Seed memberships so the JWT callback can find them.
-    await Promise.all([
-      tx.membership.upsert({
-        where: { tenantId_userId: { tenantId: 'demo-tenant', userId: 'e2e-nameless-user' } },
-        create: {
-          tenantId: 'demo-tenant',
-          userId: 'e2e-nameless-user',
-          role: 'PIPELINE_MANAGER',
-          workspaceIds: [workspace.id],
-        },
-        update: { role: 'PIPELINE_MANAGER', workspaceIds: [workspace.id] },
-      }),
-      tx.membership.upsert({
-        where: { tenantId_userId: { tenantId: 'demo-tenant', userId: 'e2e-named-user' } },
-        create: {
-          tenantId: 'demo-tenant',
-          userId: 'e2e-named-user',
-          role: 'PIPELINE_MANAGER',
-          workspaceIds: [workspace.id],
-        },
-        update: { role: 'PIPELINE_MANAGER', workspaceIds: [workspace.id] },
-      }),
-    ]);
-  });
+  await seedIdentity(
+    {
+      userId: 'e2e-named-user',
+      email: 'ayse.named@e2e.fabrika.test',
+      name: 'Zeynep Aydın',
+      tenantId: 'demo-tenant',
+      role: 'PIPELINE_MANAGER',
+      workspaceIds: ['fabrika-beta-workspace'],
+    },
+  );
 });
 
 test.afterAll(async () => {
-  await withSystemScope('platform-admin', 'e2e.identity-honesty.cleanup', async (tx) => {
-    // Cleanup in reverse order: memberships first (FK constraint), then users.
-    await tx.membership.deleteMany({
-      where: { userId: { in: ['e2e-nameless-user', 'e2e-named-user'] } },
-    });
-    await tx.user.deleteMany({
-      where: { id: { in: ['e2e-nameless-user', 'e2e-named-user'] } },
-    });
-  });
+  // Cleanup in reverse order: memberships first (FK constraint), then users.
+  // The fixture handles the withSystemScope setup internally.
+  await cleanupIdentity(['e2e-nameless-user', 'e2e-named-user']);
 });
 
 test.describe('app frame identity', () => {
