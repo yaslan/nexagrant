@@ -73,15 +73,24 @@ const ACTOR_B = `E2E Approver B ${RUN}`;
 const USER_B: { id: string; email: string; role: Role } = {
   id: 'plan-e2e-ultra-user-b',
   email: 'plan-e2e-ultra-b@fabrika.test',
-  role: 'PIPELINE_MANAGER',
+  role: 'TENANT_ADMIN',
 };
+
+/**
+ * Both sides of the flow sign a department, and `departmentApproveAction` asks for
+ * `approve_dual_approval` (src/lib/rbac.ts) — a TENANT_OWNER/TENANT_ADMIN right, not the
+ * PIPELINE_MANAGER seat `seed-plan-e2e.ts` gives the ultra user. The jwt callback re-reads
+ * role and display name from Membership/User on every request (src/lib/auth.ts), so the
+ * role and the per-run names are written to the rows here; the token carries the same.
+ */
+const APPROVER_ROLE: Role = 'TENANT_ADMIN';
 
 /** The Turkish label of the row-level sign button; there is no test id on it. */
 const SIGN_BUTTON = 'Elektronik İmzala';
 
 async function mintSession(userId: string, name: string, email: string): Promise<string> {
   return encode({
-    token: { sub: userId, id: userId, name, email, tenantId: ULTRA.tenantId, role: ULTRA.role },
+    token: { sub: userId, id: userId, name, email, tenantId: ULTRA.tenantId, role: APPROVER_ROLE },
     secret: SECRET,
     salt: COOKIE_NAME,
     maxAge: 60 * 60,
@@ -138,10 +147,16 @@ test.describe('M10 dual approval identity', () => {
     await seed();
     // The second approver. `seed-plan-e2e.ts` is shared with `module-plan-gate`, so the
     // extra member is created here and removed here.
+    // The session's display name is the User row's, so the per-run names live there.
+    await prisma.user.update({ where: { id: ULTRA.userId }, data: { name: ACTOR_A } });
+    await prisma.membership.update({
+      where: { tenantId_userId: { tenantId: ULTRA.tenantId, userId: ULTRA.userId } },
+      data: { role: APPROVER_ROLE },
+    });
     await prisma.user.upsert({
       where: { id: USER_B.id },
-      update: { email: USER_B.email },
-      create: { id: USER_B.id, email: USER_B.email, name: USER_B.id, locale: 'tr' },
+      update: { email: USER_B.email, name: ACTOR_B },
+      create: { id: USER_B.id, email: USER_B.email, name: ACTOR_B, locale: 'tr' },
     });
     await prisma.membership.upsert({
       where: { tenantId_userId: { tenantId: ULTRA.tenantId, userId: USER_B.id } },
@@ -270,9 +285,13 @@ test.describe('M10 dual approval identity', () => {
     request,
     baseURL,
   }) => {
-    const harvestDoc = await newDoc(ULTRA.tenantId, ULTRA.opportunityId, 'LOI');
-    const targetDoc = await newDoc(ULTRA.tenantId, ULTRA.opportunityId, 'COMMITMENT');
-    const otherTenantDoc = await newDoc(FLIP.tenantId, FLIP.opportunityId, 'NDA');
+    // Direct-sign kinds only: NDA/LOI/COMMITMENT are signed by the dual approval flow and
+    // `signDocument` refuses them outright (src/lib/followup-doc-kinds.ts), which would
+    // hide the button to harvest from and let the cross-tenant replay pass for the wrong
+    // reason.
+    const harvestDoc = await newDoc(ULTRA.tenantId, ULTRA.opportunityId, 'ESR_DEBRIEF');
+    const targetDoc = await newDoc(ULTRA.tenantId, ULTRA.opportunityId, 'AWARD_PACK');
+    const otherTenantDoc = await newDoc(FLIP.tenantId, FLIP.opportunityId, 'ESR_DEBRIEF');
 
     const sessionA = await mintSession(ULTRA.userId, ACTOR_A, ULTRA.email);
     await primeConsent(page);
