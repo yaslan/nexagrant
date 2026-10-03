@@ -192,7 +192,7 @@ jobs:
         CI: 'true'
         E2E_WEB_SERVER: ${{ inputs.e2e_server || 'dev' }}
         R2_ACCOUNT_ID: 'ci-minio'
-        R2_ENDPOINT: 'http://localhost:9000'
+        R2_ENDPOINT: ''
         R2_ACCESS_KEY_ID: 'minioadmin'
         R2_SECRET_ACCESS_KEY: 'minioadmin'
         R2_BUCKET: 'test-evidence'
