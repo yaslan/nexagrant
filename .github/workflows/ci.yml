@@ -49,12 +49,12 @@ jobs:
         ports:
           - 5432:5432
       minio:
-        image: minio/minio:latest
+        image: docker.io/minio/minio:RELEASE.2024-12-13T22-33-32Z
         env:
           MINIO_ROOT_USER: 'minioadmin'
           MINIO_ROOT_PASSWORD: 'minioadmin'
         options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-cmd "pgrep -f minio || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -81,6 +81,16 @@ jobs:
 
     - name: Create MinIO test bucket
       run: |
+        # Wait for MinIO to be ready (healthcheck may still be pending)
+        for i in {1..30}; do
+          if nc -z localhost 9000 2>/dev/null; then
+            echo "MinIO is ready"
+            break
+          fi
+          echo "Waiting for MinIO... ($i/30)"
+          sleep 1
+        done
+        # Create bucket (idempotent if exists)
         aws s3 mb s3://test-evidence --endpoint-url http://localhost:9000 || true
       env:
         AWS_ACCESS_KEY_ID: minioadmin
