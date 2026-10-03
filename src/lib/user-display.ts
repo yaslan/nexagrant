@@ -30,3 +30,16 @@ export function displayUserName(
   if (trimmed) return trimmed;
   return emailLocalPart(email) ?? unnamedLabel;
 }
+
+/**
+ * What to show as the user's role.
+ * If the session carries no role, show the caller's translated "unassigned"
+ * label. Never invent a role (e.g., "TENANT_OWNER" as a fallback).
+ */
+export function displayRoleName(
+  role: string | null | undefined,
+  unassignedLabel: string
+): string {
+  const trimmed = role?.trim();
+  return trimmed || unassignedLabel;
+}
