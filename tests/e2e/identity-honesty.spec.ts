@@ -31,8 +31,13 @@ async function signInAs(
   page: Page,
   token: Record<string, unknown>,
 ): Promise<void> {
+  // Remove undefined fields so the JWT does not carry them.
+  // This allows the roleless test to send a token with no role claim.
+  const cleaned = Object.fromEntries(
+    Object.entries(token).filter(([, v]) => v !== undefined)
+  );
   const value = await encode({
-    token: { sub: token.id as string, ...token },
+    token: { sub: cleaned.id as string, ...cleaned },
     secret: SECRET,
     salt: COOKIE_NAME,
     maxAge: 60 * 60,
@@ -49,9 +54,17 @@ async function signInAs(
 }
 
 test.beforeAll(async () => {
-  // JWT callback reads User row on every token refresh (d57f13f1). Seed test users.
-  // Use withSystemScope to bypass RLS during test setup.
+  // JWT callback reads User row on every token refresh (d57f13f1). Seed test users
+  // and their memberships so the JWT callback can find them.
+  // CI clean database has no demo-tenant or memberships, so we must seed them.
   await withSystemScope('platform-admin', 'e2e.identity-honesty.setup', async (tx) => {
+    // Ensure demo-tenant exists with the fabrika-beta workspace the test visits.
+    const workspace = await tx.workspace.upsert({
+      where: { tenantId_slug: { tenantId: 'demo-tenant', slug: 'fabrika-beta' } },
+      create: { tenantId: 'demo-tenant', slug: 'fabrika-beta', name: 'Fabrika Beta' },
+      update: {},
+    });
+
     await Promise.all([
       tx.user.upsert({
         where: { id: 'e2e-nameless-user' },
@@ -69,12 +82,47 @@ test.beforeAll(async () => {
         update: { email: 'roleless@e2e.fabrika.test', name: 'Rolsüz Kullanıcı' },
       }),
     ]);
+
+    // Seed memberships for the first two tests so JWT callback can find them.
+    // The third test sends a token with no role claim and has no membership:
+    // the JWT callback finds nothing, session.role stays null, and the app renders
+    // "Rol atanmamış" (unassigned). The test uses navigation to /tr/no-workspace instead.
+    await Promise.all([
+      tx.membership.upsert({
+        where: { tenantId_userId: { tenantId: 'demo-tenant', userId: 'e2e-nameless-user' } },
+        create: {
+          tenantId: 'demo-tenant',
+          userId: 'e2e-nameless-user',
+          role: 'PIPELINE_MANAGER',
+          workspaceIds: [workspace.id],
+        },
+        update: { role: 'PIPELINE_MANAGER', workspaceIds: [workspace.id] },
+      }),
+      tx.membership.upsert({
+        where: { tenantId_userId: { tenantId: 'demo-tenant', userId: 'e2e-named-user' } },
+        create: {
+          tenantId: 'demo-tenant',
+          userId: 'e2e-named-user',
+          role: 'PIPELINE_MANAGER',
+          workspaceIds: [workspace.id],
+        },
+        update: { role: 'PIPELINE_MANAGER', workspaceIds: [workspace.id] },
+      }),
+      // Deliberately skip e2e-roleless-user membership so JWT callback finds nothing
+    ]);
   });
 });
 
 test.afterAll(async () => {
   await withSystemScope('platform-admin', 'e2e.identity-honesty.cleanup', async (tx) => {
-    await tx.user.deleteMany({ where: { id: { in: ['e2e-nameless-user', 'e2e-named-user', 'e2e-roleless-user'] } } });
+    // Cleanup in reverse order: memberships first (FK constraint), then users.
+    // e2e-roleless-user has no membership, only user row.
+    await tx.membership.deleteMany({
+      where: { userId: { in: ['e2e-nameless-user', 'e2e-named-user'] } },
+    });
+    await tx.user.deleteMany({
+      where: { id: { in: ['e2e-nameless-user', 'e2e-named-user', 'e2e-roleless-user'] } },
+    });
   });
 });
 
