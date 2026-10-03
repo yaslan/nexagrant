@@ -94,7 +94,17 @@ test.beforeAll(async () => {
     data: { name: `Invoice Write Path ${STAMP}`, slug: STAMP, country: 'TR' },
   });
   tenantId = tenant.id;
-  cookie = await sessionCookie(tenantId, `${STAMP}-user`);
+
+  // Create user and membership so JWT callback can bind tenantId to the session
+  const userId = `${STAMP}-user`;
+  const user = await prisma.user.create({
+    data: { id: userId, email: `${userId}@e2e.fabrika.test` },
+  });
+  await prisma.membership.create({
+    data: { userId: user.id, tenantId, role: 'TENANT_OWNER' },
+  });
+
+  cookie = await sessionCookie(tenantId, userId);
 });
 
 test.afterAll(async () => {
