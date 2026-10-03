@@ -32,6 +32,31 @@ const s3 = process.env.R2_ACCOUNT_ID ? new S3Client({
 export const hasObjectStore = s3 !== null;
 
 /**
+ * True when this is a production server with no object store configured.
+ *
+ * The dev stand-in (`/api/evidence/mock-upload`, `.dev-objects`) does not exist
+ * in production — the route answers 404 there — so a production deployment
+ * without R2 has nowhere to put an upload. It used to be handed the dev URL
+ * anyway, and the user saw a bare "HTTP 404" (TASK-MUSFO7ELD7WYF). A function,
+ * not a constant, so a test can vary NODE_ENV.
+ */
+export function objectStoreMissingInProduction(
+  source: { NODE_ENV?: string } = env,
+  objectStore: boolean = hasObjectStore
+): boolean {
+  return !objectStore && source.NODE_ENV === 'production';
+}
+
+/** `getPresignedUploadUrl` was asked for a URL that production cannot serve. */
+export class ObjectStoreUnconfiguredError extends Error {
+  readonly code = 'object_store_unconfigured';
+  constructor() {
+    super('No object store is configured (R2_ACCOUNT_ID is unset) and the dev upload stand-in does not exist in production');
+    this.name = 'ObjectStoreUnconfiguredError';
+  }
+}
+
+/**
  * The R2 bucket every object in this module is read from and written to, and
  * the value `Evidence.fileBucket` records. Exported because it is the single
  * source: a caller that hard-codes the name drifts away from `R2_BUCKET` the
@@ -313,7 +338,10 @@ export async function copyIncomingObject(
  * form. The caller has checked both with `evidenceUploadType`.
  *
  * Without an object store the URL is the same-origin dev stand-in
- * (`/api/evidence/mock-upload`), which applies the same checks.
+ * (`/api/evidence/mock-upload`), which applies the same checks — outside
+ * production only. In production that route does not exist, so this throws
+ * ObjectStoreUnconfiguredError rather than hand out a URL that answers 404
+ * (TASK-MUSFO7ELD7WYF); the action refuses before it gets here.
  *
  * `objectKey` is a staging key (`finalKeyOfIncoming`); confirm copies it to
  * the final key (`copyIncomingObject`) and removes it once the row is saved.
@@ -329,6 +357,7 @@ export async function getPresignedUploadUrl(
   const objectKey = incomingKeyOf(tenantId, generateR2ObjectKey(tenantId, organisationId, category, fileName));
 
   if (!s3) {
+    if (objectStoreMissingInProduction()) throw new ObjectStoreUnconfiguredError();
     return { uploadUrl: `/api/evidence/mock-upload?key=${encodeURIComponent(objectKey)}`, objectKey };
   }
 

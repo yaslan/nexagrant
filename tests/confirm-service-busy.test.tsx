@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 
 import trMessages from '../messages/tr.json';
@@ -140,11 +140,13 @@ describe('Evidence.upload.error.service_busy', () => {
   test.each([
     ['tr', trMessages],
     ['en', enMessages],
-  ] as const)('%s: the upload screen alerts the service_busy text the real confirm returned', async (locale, messages) => {
+  ] as const)('%s: the upload screen shows the service_busy text the real confirm returned', async (locale, messages) => {
     pilot.fail = () => new Error(POOL_TEXT);
     const confirmSpy = vi.mocked(confirmEvidenceUploadAction);
     confirmSpy.mockClear();
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })));
+    // The failure is shown inside the modal now, not in a native alert()
+    // (TASK-MUSFO7ELD7WYF); a stray alert() would still be caught here.
     const alerts: string[] = [];
     vi.stubGlobal('alert', (text: string) => alerts.push(text));
 
@@ -158,9 +160,11 @@ describe('Evidence.upload.error.service_busy', () => {
     fireEvent.change(input, { target: { files: [new File(['%PDF-1.4'], 'belge.pdf', { type: 'application/pdf' })] } });
     fireEvent.submit(input.closest('form')!);
 
-    await waitFor(() => expect(alerts).toHaveLength(1));
+    const banner = await view.findByTestId('evidence-upload-error');
+    expect(banner.getAttribute('role')).toBe('alert');
     expect(await confirmSpy.mock.results[0]!.value).toStrictEqual({ success: false, error: 'service_busy' });
-    expect(alerts[0]).toContain(messages.Evidence.upload.error.service_busy);
-    expect(alerts[0]).not.toContain(POOL_TEXT);
+    expect(banner.textContent).toContain(messages.Evidence.upload.error.service_busy);
+    expect(banner.textContent).not.toContain(POOL_TEXT);
+    expect(alerts).toHaveLength(0);
   });
 });
