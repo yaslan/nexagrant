@@ -149,3 +149,17 @@ URL ve şifre hiçbir çıktıya basılmadı. psql çıktısı ayrıca `postgres
 
 - Koşum: **macOS (darwin arm64)** istemcisi → canlı Supabase. R-1 betiği ve psql platformdan bağımsız: istemci yalnız libpq kullanıyor, Linux ve Windows'ta aynı sonucu verir. Sunucu tarafı ölçüldüğü için sonuç "hepsi (canlı DB)".
 - Prisma CLI P1011 **platforma bağlı**. darwin schema-engine'i Security.framework kullanıyor (P1011 gözlendi). Linux'ta OpenSSL kullanıyor: **koşulamadı**, çünkü bu makinede Linux engine'i yok ve görev kapsamı dışında. Windows'ta SChannel kullanıyor: **koşulamadı**, EKU'suz yaprağı reddetmesi olası (çıkarım).
+
+## 7. Yeniden koşum — 03.10.2026 14:25 UTC (TASK-MUOG51GJ3PUOG#r1-check)
+
+Aynı betik (sha256 `6c2981fb…7dd2`, `origin/dev` ile aynı) aynı canlı DB'ye karşı yeniden koşuldu: `fabrika_migrate`, PG 17.11, `default_transaction_read_only=on` + `BEGIN READ ONLY … ROLLBACK`.
+
+```
+rol=fabrika_migrate db=postgres pg=17.11 read_only=on system_scope=on
+tablo_var=t anahtar_var=t opportunity_kolonu_var=t rls_kor=f
+indnullsnotdistinct = t · mukerrer_cift=0 fazla_satir=0
+R1_SONUC | TEMIZ
+ROLLBACK · exit=0 · bağlam: topicmatch=0 tenant=1 user=1
+```
+
+Hüküm: **GO** (§3.1 0a). Tam kanıt `TASK-MUOG51GJ3PUOG-devop-fb-r1-check.md` dosyasında. Canlıya yazım yapılmadı.
