@@ -6,6 +6,43 @@ import { e2eAuthSecret } from './auth-secret';
 
 const COOKIE_NAME = 'authjs.session-token';
 const SECRET = e2eAuthSecret();
+// Same default as playwright.config.ts, so the cookie lands on the server under test.
+const DEFAULT_BASE_URL =
+  process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_PORT ?? 3000}`;
+
+/*
+ * How the two halves fit together
+ *
+ * seedIdentity() writes database rows (User + Membership [+ Workspace]). It needs no
+ * browser, so call it in `test.beforeAll`, once per user. The JWT callback reads
+ * these rows on every request; without them the session is routed to /no-workspace.
+ *
+ * signInAs() puts a session cookie into ONE browser context. A context exists only
+ * inside a test (`{ page }`), so call it in the test body or in `test.beforeEach` —
+ * never in `beforeAll`. Its claims (id, email, tenantId, role) must name a user you
+ * seeded; the cookie does not create anybody.
+ *
+ * Several users in one spec: seed each of them in the same beforeAll. To put them in
+ * the same workspace, pass `workspace` to the first call only and the same id in
+ * `workspaceIds` to the others (or pass the same `workspace` to every call — the
+ * upsert is keyed on tenant + slug, so that is safe too). Then, in each test, sign in
+ * as exactly one of them:
+ *
+ *   const ws = { id: 'my-ws', slug: 'my-ws', name: 'My WS' };
+ *   test.beforeAll(async () => {
+ *     await seedIdentity({ userId: 'e2e-a', email: 'a@e2e.test', role: 'TENANT_OWNER', tenantId: 'demo-tenant' }, ws);
+ *     await seedIdentity({ userId: 'e2e-b', email: 'b@e2e.test', role: 'PIPELINE_MANAGER', tenantId: 'demo-tenant', workspaceIds: [ws.id] });
+ *   });
+ *   test.afterAll(() => cleanupIdentity(['e2e-a', 'e2e-b']));
+ *
+ *   test('owner sees X', async ({ page }) => {
+ *     await signInAs(page, { id: 'e2e-a', email: 'a@e2e.test', tenantId: 'demo-tenant', role: 'TENANT_OWNER' });
+ *     await page.goto('/tr/my-ws/panel');
+ *   });
+ *
+ * Two users in ONE test need two contexts (`browser.newContext()`), one signInAs each:
+ * a second signInAs on the same context overwrites the first cookie.
+ */
 
 /**
  * Demo seat identities for E2E tests. Each carries a realistic set of claims
@@ -102,7 +139,9 @@ export async function seedIdentity(
 
     // Create workspace if provided
     if (workspace) {
-      await tx.workspace.upsert({
+      // Use the id the row actually has: when the slug already exists (seeded by
+      // another spec or the demo seed) under another id, `workspace.id` names nothing.
+      const row = await tx.workspace.upsert({
         where: { tenantId_slug: { tenantId: identity.tenantId, slug: workspace.slug } },
         create: {
           id: workspace.id,
@@ -112,7 +151,7 @@ export async function seedIdentity(
         },
         update: { name: workspace.name },
       });
-      workspaceIds = [workspace.id];
+      workspaceIds = [row.id];
     }
 
     // If still no workspaces, create a default one
@@ -188,7 +227,7 @@ export async function cleanupIdentity(userIds: string[]): Promise<void> {
  *
  * @param contextOrPage Playwright BrowserContext or Page (if Page, uses its context)
  * @param token Token claims to encode (sub/id, email, name, tenantId, role, etc.)
- * @param baseURL Base URL for cookie domain (defaults to 'http://localhost:3000')
+ * @param baseURL Base URL for the cookie (defaults to E2E_BASE_URL, else localhost:E2E_PORT)
  * @example
  *   await signInAs(page, {
  *     id: 'my-user',
@@ -201,7 +240,7 @@ export async function cleanupIdentity(userIds: string[]): Promise<void> {
 export async function signInAs(
   contextOrPage: BrowserContext | Page,
   token: Record<string, unknown>,
-  baseURL = 'http://localhost:3000',
+  baseURL = DEFAULT_BASE_URL,
 ): Promise<void> {
   const context = 'context' in contextOrPage ? contextOrPage.context() : contextOrPage;
 
