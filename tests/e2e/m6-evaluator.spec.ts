@@ -5,6 +5,7 @@ import { M6_E2E, seed, rollback } from '../../scripts/seed-m6-e2e';
 import { DEFAULT_CRITERIA } from '../../src/modules/m6/types';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * M6 Evaluator Lens — happy path against a real browser and a real database.
@@ -49,24 +50,14 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
 
   test('a seated reviewer scores a proposal and sees it on the dashboard', async ({ page }) => {
     // ── 1. Sign in as the seeded reviewer, landing on the panel page.
-    // The cookie consent renders as a full-screen `inset-0` alertdialog and intercepts
-    // pointer events across the whole page, including the sign-in button. Recording a
-    // prior consent is the same state a returning user is in.
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-      );
+    await signInAs(page, {
+      id: M6_E2E.userId,
+      email: M6_E2E.email,
+      tenantId: M6_E2E.tenantId,
+      role: 'PIPELINE_MANAGER',
     });
 
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(PANEL_URL)}`);
-
-    await page.locator('input[type="email"]').fill(M6_E2E.email);
-    // Located by role in the form rather than by label: the button's copy differs per
-    // locale and the same helper is reused by the English test below.
-    await page.locator('form button[type="submit"]').click();
-
-    await page.waitForURL(`**${PANEL_URL}`, { timeout: 30_000 });
+    await page.goto(PANEL_URL);
     // Next's dev-mode streaming can hold a second, hidden copy of the page for a moment;
     // getByRole skips hidden elements, so scoping to <main> takes the visible one.
     const app = page.getByRole('main');
@@ -159,18 +150,15 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
   });
 
   test('the English locale renders the English M6 copy', async ({ page }) => {
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-      );
+    const enUrl = PANEL_URL.replace('/tr/', '/en/');
+    await signInAs(page, {
+      id: M6_E2E.userId,
+      email: M6_E2E.email,
+      tenantId: M6_E2E.tenantId,
+      role: 'PIPELINE_MANAGER',
     });
 
-    const enUrl = PANEL_URL.replace('/tr/', '/en/');
-    await page.goto(`/en/login?callbackUrl=${encodeURIComponent(enUrl)}`);
-    await page.locator('input[type="email"]').fill(M6_E2E.email);
-    await page.locator('form button[type="submit"]').click();
-    await page.waitForURL(`**${enUrl}`, { timeout: 30_000 });
+    await page.goto(enUrl);
 
     const app = page.getByRole('main');
     await expect(app.getByTestId('m6-evaluator-form')).toBeVisible();
