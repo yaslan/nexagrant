@@ -26,7 +26,7 @@ test.describe('Authentication and Tenant Provisioning', () => {
     await page.goto('/tr/register');
 
     // 2. Verify page loaded correctly
-    await expect(page.locator('h1')).toContainText('Ücretsiz Çalışma Alanı Açın');
+    await expect(page.getByRole('heading', { level: 1, name: /Ücretsiz Çalışma Alanı Açın/ })).toBeVisible();
 
     // 3. Verify OAuth options exist
     await expect(page.getByRole('button', { name: /Google ile Devam Et/ })).toBeVisible();
