@@ -78,7 +78,7 @@ describe('connectCalendar', () => {
   test('connects .ics, which needs no authorisation, and says so truthfully', async () => {
     const result = await connectCalendar('ics');
 
-    expect(result).toEqual({ connectionId: 'conn-1', provider: 'ics', isConnected: true });
+    expect(result).toEqual({ ok: true, connectionId: 'conn-1', provider: 'ics', isConnected: true });
     // The row written matches what was returned. It used to be `isConnected:
     // false` under a `{ success: true }`.
     expect(createMock).toHaveBeenCalledWith({
@@ -94,23 +94,26 @@ describe('connectCalendar', () => {
   });
 
   test('refuses google instead of storing a connection that can never carry an event', async () => {
-    await expect(connectCalendar('google')).rejects.toThrow('CALENDAR_OAUTH_NOT_CONFIGURED');
+    await expect(connectCalendar('google')).resolves.toEqual({
+      ok: false,
+      code: 'CALENDAR_OAUTH_NOT_CONFIGURED',
+    });
     expect(createMock).not.toHaveBeenCalled();
   });
 
   test('rejects outlook as an unknown provider (removed, owner decision 29.09)', async () => {
-    await expect(connectCalendar('outlook')).rejects.toThrow('CALENDAR_UNKNOWN_PROVIDER');
+    await expect(connectCalendar('outlook')).resolves.toEqual({ ok: false, code: 'CALENDAR_UNKNOWN_PROVIDER' });
     expect(createMock).not.toHaveBeenCalled();
   });
 
   test('rejects an unknown provider rather than writing an unrecognised row', async () => {
-    await expect(connectCalendar('fantasy-cal')).rejects.toThrow('CALENDAR_UNKNOWN_PROVIDER');
+    await expect(connectCalendar('fantasy-cal')).resolves.toEqual({ ok: false, code: 'CALENDAR_UNKNOWN_PROVIDER' });
     expect(createMock).not.toHaveBeenCalled();
   });
 
   test('refuses a second connection for the same tenant, user and provider', async () => {
     findUniqueMock.mockResolvedValue({ id: 'conn-existing' });
-    await expect(connectCalendar('ics')).rejects.toThrow('CALENDAR_ALREADY_CONNECTED');
+    await expect(connectCalendar('ics')).resolves.toEqual({ ok: false, code: 'CALENDAR_ALREADY_CONNECTED' });
     expect(createMock).not.toHaveBeenCalled();
   });
 
@@ -144,14 +147,14 @@ describe('disconnectCalendar', () => {
       userId: 'user-1',
     });
 
-    await expect(disconnectCalendar('conn-1')).rejects.toThrow('CALENDAR_FORBIDDEN');
+    await expect(disconnectCalendar('conn-1')).resolves.toEqual({ ok: false, code: 'CALENDAR_FORBIDDEN' });
     expect(deleteManyMock).not.toHaveBeenCalled();
   });
 
   test('scopes the delete itself to the owner, not just the check before it', async () => {
     findUniqueMock.mockResolvedValue({ id: 'conn-1', tenantId: 'tenant-1', userId: 'user-1' });
 
-    await expect(disconnectCalendar('conn-1')).resolves.toEqual({ success: true });
+    await expect(disconnectCalendar('conn-1')).resolves.toEqual({ ok: true, success: true });
 
     // The owner travels *with the write*. `delete({ where: { id } })` would
     // pass the JS check above and then delete by id alone (§3.9 of the
@@ -185,9 +188,37 @@ describe('disconnectCalendar', () => {
 
   test('reports a missing connection as missing', async () => {
     findUniqueMock.mockResolvedValue(null);
-    await expect(disconnectCalendar('conn-gone')).rejects.toThrow(
-      'CALENDAR_CONNECTION_NOT_FOUND'
-    );
+    await expect(disconnectCalendar('conn-gone')).resolves.toEqual({
+      ok: false,
+      code: 'CALENDAR_CONNECTION_NOT_FOUND',
+    });
+  });
+});
+
+describe('refusals cross the Server Action boundary as data (TASK-MUSFNYHSA49AB)', () => {
+  /**
+   * A production build sends the browser only a thrown error's `digest`, never
+   * its message, so a thrown CALENDAR_* code was lost there and every refusal
+   * read `errors.unknown`. The code has to be in the *returned value*; this
+   * round-trips each refusal through the same structured-clone a Flight
+   * payload preserves and reads it back with the client's own helper.
+   */
+  test.each([
+    ['google', 'CALENDAR_OAUTH_NOT_CONFIGURED'],
+    ['outlook', 'CALENDAR_UNKNOWN_PROVIDER'],
+  ] as const)('connectCalendar(%s) returns %s, it does not throw it', async (provider, code) => {
+    const result = structuredClone(await connectCalendar(provider));
+    expect(result).toEqual({ ok: false, code });
+    expect(calendarErrorCode(result)).toBe(code);
+  });
+
+  test('disconnectCalendar returns its refusals too', async () => {
+    findUniqueMock.mockResolvedValue({ id: 'conn-1', tenantId: 'other-tenant', userId: 'user-1' });
+    const forbidden = structuredClone(await disconnectCalendar('conn-1'));
+    expect(calendarErrorCode(forbidden)).toBe('CALENDAR_FORBIDDEN');
+
+    const missing = structuredClone(await disconnectCalendar(''));
+    expect(calendarErrorCode(missing)).toBe('CALENDAR_CONNECTION_NOT_FOUND');
   });
 });
 
@@ -198,6 +229,14 @@ describe('calendarErrorCode', () => {
     expect(calendarErrorCode(new Error('CALENDAR_OAUTH_NOT_CONFIGURED'))).toBe(
       'CALENDAR_OAUTH_NOT_CONFIGURED'
     );
+  });
+
+  test('reads the code from a returned { ok: false, code } result', () => {
+    expect(calendarErrorCode({ ok: false, code: 'CALENDAR_ALREADY_CONNECTED' })).toBe(
+      'CALENDAR_ALREADY_CONNECTED'
+    );
+    // An unlisted code is not trusted just because it sits in a `code` field.
+    expect(calendarErrorCode({ ok: false, code: 'unknown' })).toBeNull();
   });
 
   test('leaves an unrecognised failure unrecognised', () => {

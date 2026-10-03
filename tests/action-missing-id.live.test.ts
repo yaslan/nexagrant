@@ -249,7 +249,9 @@ type Case = [string, (id: string) => Promise<unknown>, (answer: unknown) => bool
 const refused = (a: unknown) =>
   a === null ||
   (Array.isArray(a) && a.length === 0) ||
-  (typeof a === 'object' && a !== null && ('threw' in a || (a as { success?: unknown }).success === false));
+  (typeof a === 'object' &&
+    a !== null &&
+    ('threw' in a || (a as { success?: unknown }).success === false || (a as { ok?: unknown }).ok === false));
 
 const CASES: Case[] = [
   ['m11 acquireSectionLock', (id) => m11.acquireSectionLock(id, 'excellence', 'u', 'n', 'o'), refused],

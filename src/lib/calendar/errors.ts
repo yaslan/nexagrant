@@ -53,14 +53,40 @@ export class CalendarEncryptionNotConfiguredError extends Error {
 }
 
 /**
- * Read the code back out of whatever crossed the Server Action boundary.
+ * What a calendar Server Action answers with.
  *
- * Next.js serialises a thrown error, so the client receives a plain `Error`
- * whose `message` is the code — the class itself does not survive. Anything
- * unrecognised stays unrecognised rather than being mapped to a plausible
- * message the user would then act on.
+ * A refusal is *returned*, not thrown. In a production build Next.js does not
+ * send a Server Action's thrown `Error.message` to the browser — only an opaque
+ * `digest` — so a thrown CALENDAR_* code reached the client in `next dev` and
+ * never in production, where every refusal fell back to `errors.unknown`
+ * (TASK-MUSFNYHSA49AB). A returned value is serialised as data in both modes.
+ */
+export type CalendarActionFailure = { ok: false; code: CalendarActionCode };
+export type CalendarActionResult<T extends object = object> = ({ ok: true } & T) | CalendarActionFailure;
+
+export function calendarFailure(code: CalendarActionCode): CalendarActionFailure {
+  return { ok: false, code };
+}
+
+const isCode = (value: unknown): value is CalendarActionCode =>
+  typeof value === 'string' && (CODES as readonly string[]).includes(value);
+
+/**
+ * Read the code out of a calendar failure.
+ *
+ * The primary input is the `{ ok: false, code }` an action returned. A thrown
+ * error with a listed `code` (CalendarActionError, or
+ * CalendarEncryptionNotConfiguredError on the server) is read the same way;
+ * failing that, an error whose message carries a code — what a throw looks like
+ * after crossing the boundary in `next dev`. Anything unrecognised stays
+ * unrecognised rather than being mapped to a plausible message the user would
+ * then act on.
  */
 export function calendarErrorCode(error: unknown): CalendarActionCode | null {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = (error as { code: unknown }).code;
+    if (isCode(code)) return code;
+  }
   const message =
     error instanceof Error ? error.message : typeof error === 'string' ? error : '';
   return CODES.find((code) => message.includes(code)) ?? null;
