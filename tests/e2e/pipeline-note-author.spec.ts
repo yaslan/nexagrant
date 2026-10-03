@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTVPOR2CMV1RT — posting a note from a pipeline card, in a real browser.
@@ -121,21 +122,15 @@ test('posting a note keeps the chosen author and clears only the text', async ({
     if (msg.type() === 'error') consoleErrors.push(msg.text());
   });
 
-  // The consent dialog is `inset-0` and swallows clicks; a returning user has
-  // already answered it.
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
+  // Sign in with JWT fixture pattern
+  await signInAs(page, {
+    id: F.firstUserId,
+    email: F.firstEmail,
+    name: F.firstName,
+    role: 'TENANT_OWNER',
+    tenantId: F.tenantId,
   });
-
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(BOARD_URL)}`);
-  // The sign-in page renders the form twice (responsive variants), so the
-  // locators are pinned to the one actually on screen.
-  await page.locator('input[type="email"]:visible').first().fill(F.firstEmail);
-  await page.locator('form button[type="submit"]:visible').first().click();
-  await page.waitForURL(`**${BOARD_URL}`, { timeout: 30_000 });
+  await page.goto(BOARD_URL);
 
   const card = page.getByTestId(`pipeline-card-${F.oppId}`);
   await expect(card).toBeVisible();

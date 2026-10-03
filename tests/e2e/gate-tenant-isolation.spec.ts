@@ -4,6 +4,7 @@ import { prisma } from '../../src/lib/db';
 import { evaluateGate, GateOpportunityNotFoundError } from '../../src/lib/gates/evaluate';
 import { GATE_E2E, seed, rollback } from '../../scripts/seed-gate-e2e';
 import { shotsDir } from './fixtures/shots';
+import { signInAs } from './fixtures/session';
 
 /**
  * Stage gate — happy path in a real browser, isolation against the real database.
@@ -32,21 +33,14 @@ test.describe('Stage gate — tenant isolation', () => {
   });
 
   test('tenant A can still run its own gate, and the decision is filed', async ({ page }) => {
-    // The cookie consent renders as a full-screen `inset-0` alertdialog and intercepts pointer
-    // events across the page, the gate button included. A recorded consent is the state a
-    // returning user is already in.
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-      );
+    // Sign in with JWT fixture pattern
+    await signInAs(page, {
+      id: GATE_E2E.userId,
+      email: GATE_E2E.email,
+      role: 'TENANT_OWNER',
+      tenantId: GATE_E2E.tenantId,
     });
-
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(DETAIL_URL)}`);
-    await page.locator('input[type="email"]').fill(GATE_E2E.email);
-    await page.locator('form button[type="submit"]').click();
-
-    await page.waitForURL(`**${DETAIL_URL}`, { timeout: 30_000 });
+    await page.goto(DETAIL_URL);
 
     // A network-idle wait stood here and timed the test out about half the time:
     // a dev server never goes fully quiet, so "no requests for 500 ms" is a race, not a signal.

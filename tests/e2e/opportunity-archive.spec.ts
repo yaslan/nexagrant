@@ -5,6 +5,7 @@ import { getKpiMetrics } from '../../src/modules/m5/server/queries';
 import { ARCHIVE_E2E, seed, rollback } from '../../scripts/seed-archive-e2e';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 
 /**
  * Archiving an opportunity, and the effort log — against a real browser and a real database.
@@ -46,20 +47,15 @@ test.describe('Opportunity archive + effort log', () => {
     page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 
   test('archiving hides the opportunity everywhere but keeps the record', async ({ page }) => {
-    // The cookie consent renders as a full-screen `inset-0` alertdialog and swallows clicks
-    // across the page; recording a prior consent is the state a returning user is in.
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-      );
+    // ── 1. Sign in with JWT fixture pattern, landing on the board.
+    await signInAs(page, {
+      id: ARCHIVE_E2E.userId,
+      email: ARCHIVE_E2E.email,
+      name: ARCHIVE_E2E.userName,
+      role: 'TENANT_OWNER',
+      tenantId: ARCHIVE_E2E.tenantId,
     });
-
-    // ── 1. Sign in, landing on the board.
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(BOARD_URL)}`);
-    await page.locator('input[type="email"]').fill(ARCHIVE_E2E.email);
-    await page.locator('form button[type="submit"]').click();
-    await page.waitForURL(`**${BOARD_URL}`, { timeout: 30_000 });
+    await page.goto(BOARD_URL);
 
     const app = page.getByRole('main');
     await expect(app.getByText(ARCHIVE_E2E.archivedOppTitle)).toBeVisible();
