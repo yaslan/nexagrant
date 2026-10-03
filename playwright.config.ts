@@ -82,6 +82,11 @@ export default defineConfig({
     env: {
       ...process.env,
       ...testEnv,
+      // Blank LLM keys in dev E2E so tests use template fallback, not real API calls
+      // (matches CI behavior; reduces cost, ensures deterministic failures like CI).
+      // Opt-in live tests (e.g. E2E_LIVE_EMBED=1) can override OPENAI_API_KEY if needed.
+      ANTHROPIC_API_KEY: '',
+      OPENAI_API_KEY: process.env.E2E_LIVE_EMBED === '1' ? process.env.OPENAI_API_KEY : '',
     } as Record<string, string>,
   },
 });
