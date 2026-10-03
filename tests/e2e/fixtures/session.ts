@@ -239,6 +239,7 @@ export async function cleanupIdentity(userIds: string[]): Promise<void> {
 /**
  * Sign in as a user by minting a JWT session cookie with the e2e auth secret.
  * Adds the cookie to the browser context and sets up localStorage for cookie consent.
+ * Validates that the session identity matches expectations after sign-in.
  *
  * @param contextOrPage Playwright BrowserContext or Page (if Page, uses its context)
  * @param token Token claims to encode (sub/id, email, name, tenantId, role, etc.)
@@ -257,7 +258,13 @@ export async function signInAs(
   token: Record<string, unknown>,
   baseURL = DEFAULT_BASE_URL,
 ): Promise<void> {
-  const context = 'context' in contextOrPage ? contextOrPage.context() : contextOrPage;
+  const isPage = 'context' in contextOrPage;
+  const context = isPage ? (contextOrPage as Page).context() : (contextOrPage as BrowserContext);
+  const page = isPage ? (contextOrPage as Page) : (contextOrPage as BrowserContext).pages()[0];
+
+  if (!page) {
+    throw new Error('signInAs: BrowserContext has no open pages');
+  }
 
   // Ensure token has an id/sub claim for NextAuth
   const tokenWithId = {
@@ -277,11 +284,42 @@ export async function signInAs(
   ]);
 
   // Set cookie consent in localStorage so the banner doesn't block the test
-  const page = 'context' in contextOrPage ? contextOrPage.context() : contextOrPage;
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'fabrika_cookie_consent',
       JSON.stringify({ necessary: true, analytics: true, marketing: true }),
     );
   });
+
+  // Verify session identity by reading /api/auth/session
+  // This ensures the session cookie was correctly applied and matches the seeded identity.
+  // Without this check, tests can pass spuriously if a JWT becomes tenantless (unseeded user ID).
+  const expectedUserId = (token.id as string) ?? (token.sub as string);
+  const expectedTenantId = token.tenantId as string;
+
+  if (!expectedUserId || !expectedTenantId) {
+    throw new Error(
+      `signInAs: token must include id (or sub) and tenantId. Got: id=${expectedUserId}, tenantId=${expectedTenantId}`,
+    );
+  }
+
+  // Verify session via the session endpoint
+  const sessionResponse = await page.request.get(`${baseURL}/api/auth/session`);
+  const session = (await sessionResponse.json()) as { user?: { id?: string }; tenantId?: string | null } | null;
+
+  if (!session?.user?.id || !session?.tenantId) {
+    throw new Error(
+      `signInAs: Session identity check failed - no user.id or tenantId in session. ` +
+      `Expected: id=${expectedUserId}, tenantId=${expectedTenantId}. ` +
+      `Got: ${JSON.stringify(session)}`,
+    );
+  }
+
+  if (session.user.id !== expectedUserId || session.tenantId !== expectedTenantId) {
+    throw new Error(
+      `signInAs: Session identity mismatch. ` +
+      `Expected: id=${expectedUserId}, tenantId=${expectedTenantId}. ` +
+      `Got: id=${session.user.id}, tenantId=${session.tenantId}`,
+    );
+  }
 }
