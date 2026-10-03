@@ -178,25 +178,22 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
    * a hard-coded Turkish string, so an English reader got no readable warning above the
    * same marks. Both locales are asserted here so a regression cannot pass in one.
    */
-  for (const { locale, loginPath, badge } of [
-    { locale: 'tr', loginPath: 'giris', badge: 'İç ön değerlendirme' },
-    { locale: 'en', loginPath: 'login', badge: 'Internal pre-assessment' },
+  for (const { locale, badge } of [
+    { locale: 'tr', badge: 'İç ön değerlendirme' },
+    { locale: 'en', badge: 'Internal pre-assessment' },
   ]) {
     test(`the Evaluator Lens page states it is an internal pre-assessment (${locale})`, async ({
       page,
     }) => {
-      await page.addInitScript(() => {
-        window.localStorage.setItem(
-          'fabrika_cookie_consent',
-          JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-        );
+      await signInAs(page, {
+        id: M6_E2E.userId,
+        email: M6_E2E.email,
+        tenantId: M6_E2E.tenantId,
+        role: 'PIPELINE_MANAGER',
       });
 
       const url = EVALUATIONS_URL.replace('/tr/', `/${locale}/`);
-      await page.goto(`/${locale}/${loginPath}?callbackUrl=${encodeURIComponent(url)}`);
-      await page.locator('input[type="email"]').fill(M6_E2E.email);
-      await page.locator('form button[type="submit"]').click();
-      await page.waitForURL(`**${url}`, { timeout: 30_000 });
+      await page.goto(url);
 
       const app = page.getByRole('main');
       const disclaimer = app.getByTestId('m6-internal-badge');
