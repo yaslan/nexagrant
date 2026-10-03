@@ -7,6 +7,7 @@ import { PRODUCT_NAME } from '../../src/lib/brand';
 import { prisma } from '../../src/lib/db';
 import { DOC_E2E, seed, rollback } from '../../scripts/seed-doc-export-e2e';
 import { shotsDir } from './fixtures/shots';
+import { signInAs } from './fixtures/session';
 
 /**
  * TASK-MTS9VGEKE8N3B — `/api/documents/export`, in a real browser and over real HTTP.
@@ -103,11 +104,21 @@ test.describe('Document export — session required, tenant scoped, no invented 
     });
   });
 
-  /** Signs in as `email` and lands on `target`; `waitForURL` is the proof the session is real. */
+  /**
+   * Signs in as `email` and lands on `target`; `waitForURL` is the proof the session is real.
+   * The session is a minted cookie for a user `seed()` wrote (TENANT_OWNER of its own
+   * tenant, scripts/seed-doc-export-e2e.ts), not the demo sign-in form, so the spec runs
+   * against `next start` too (TASK-MUSBCXP9RKS3D). The seed owns User + Membership and
+   * `rollback` removes them; the session fixture only adds the cookie.
+   */
   async function signIn(page: Page, email: string, target: string) {
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-    await page.locator('input[type="email"]').fill(email);
-    await page.locator('form button[type="submit"]').click();
+    const seat = [
+      { id: DOC_E2E.userId, email: DOC_E2E.email, tenantId: DOC_E2E.tenantId },
+      { id: DOC_E2E.otherUserId, email: DOC_E2E.otherEmail, tenantId: DOC_E2E.otherTenantId },
+    ].find((t) => t.email === email);
+    if (!seat) throw new Error(`no doc-export fixture user with e-mail ${email}`);
+    await signInAs(page, { ...seat, role: 'TENANT_OWNER' });
+    await page.goto(target);
     await page.waitForURL(`**${target}`, { timeout: 60_000 });
   }
 

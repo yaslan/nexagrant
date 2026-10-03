@@ -4,6 +4,7 @@ import type { ModuleStatus } from '@prisma/client';
 import { prisma } from '../../src/lib/db';
 import { PLAN_E2E, seed, rollback } from '../../scripts/seed-plan-e2e';
 import { shotsDir } from './fixtures/shots';
+import { signInAs } from './fixtures/session';
 
 /**
  * The plan half of the module gate, in a real browser — TASK-MTQZ8MVAU3J7I.
@@ -51,17 +52,12 @@ async function setM10(status: ModuleStatus) {
 }
 
 async function signIn(page: Page, target: string) {
-  // The cookie banner is a full-screen alertdialog and swallows the click on the
-  // sign-in button; a recorded consent is the state a returning user is in.
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
-  });
-  await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-  await page.locator('input[type="email"]').fill(FLIP.email);
-  await page.locator('form button[type="submit"]').click();
+  // A minted session for the user `seed()` wrote (scripts/seed-plan-e2e.ts owns its
+  // User + Membership, `rollback` removes them), not the demo sign-in form, so the spec
+  // runs against `next start` too (TASK-MUSBCXP9RKS3D). signInAs also records the
+  // cookie consent: the banner is a full-screen alertdialog that swallows clicks.
+  await signInAs(page, { id: FLIP.userId, email: FLIP.email, tenantId: FLIP.tenantId, role: FLIP.role });
+  await page.goto(target);
   await page.waitForURL(`**/opportunities/${FLIP.opportunityId}/documents`, { timeout: 60_000 });
   // No network-idle wait: a dev server never goes quiet for the 500 ms
   // it waits for, so it is a race. Every caller asserts on `main` next, and Playwright's

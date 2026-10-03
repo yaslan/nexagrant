@@ -3,6 +3,7 @@ import { test, expect, type Browser, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import trMessages from '../../messages/tr.json';
 import { expectHydrated } from './fixtures/hydration';
+import { signInAs } from './fixtures/session';
 import {
   fitsHorizontally,
   isBelow,
@@ -31,6 +32,19 @@ import {
  */
 
 const ADMIN_EMAIL = 'admin@yasinaslan.com.tr';
+/**
+ * The db:seed admin seat itself (prisma/seed-tenant-workspace.ts DEMO_ADMIN_SEAT), not a
+ * seat of this spec's own: fixtures/mobile-long-content.ts plants "my" approval requests
+ * under `demo-user-superadmin`, so only that user sees them as its own. It is signed in
+ * with a minted cookie instead of the demo form, so the spec runs against `next start`
+ * too (TASK-MUSBCXP9RKS3D); it is never seeded or deleted here — it is the seed's row.
+ */
+const ADMIN_SEAT = {
+  id: 'demo-user-superadmin',
+  email: ADMIN_EMAIL,
+  tenantId: 'demo-tenant',
+  role: 'TENANT_OWNER',
+};
 const WIDTHS = [320, 360, 390, 472, 640];
 const ROUTES = [
   '/tr/fabrika-beta/opportunities/demo-opp-1/evaluations',
@@ -50,15 +64,18 @@ let skipReason = '';
 async function signIn(browser: Browser) {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
+  await signInAs(page, ADMIN_SEAT);
+  // After signInAs, whose own consent script records analytics/marketing as accepted:
+  // init scripts run in order, so this one decides what the stored state holds.
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'fabrika_cookie_consent',
       JSON.stringify({ necessary: true, analytics: false, marketing: false }),
     );
   });
-  await page.goto('/tr/giris?callbackUrl=%2Ftr%2Fadmin%2Falerts');
-  await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
-  await page.locator('form button[type="submit"]').click();
+  // Visiting an admin page is the proof the cookie is a platform admin's, and it is
+  // what puts the consent into localStorage for `storageState` to carry.
+  await page.goto('/tr/admin/alerts');
   await page.waitForURL('**/tr/admin/alerts', { timeout: 30_000 });
   storageState = await ctx.storageState();
   await ctx.close();

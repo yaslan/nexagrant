@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { purgeDueUsers } from '../../src/lib/jobs/tasks/users-scheduled-deletion';
 import { shotsDir } from './fixtures/shots';
+import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 import { expectHydrated } from './fixtures/hydration';
 
 /**
@@ -18,7 +19,19 @@ import { expectHydrated } from './fixtures/hydration';
  */
 
 const SHOTS = shotsDir('TASK-MTTOUDNQ97X83-screenshots');
-const ADMIN_EMAIL = 'admin@yasinaslan.com.tr';
+/**
+ * A platform-admin seat of this spec's own (TENANT_OWNER on the demo tenant, every
+ * workspace, `User.isPlatformAdmin` set: the reach of the demo admin seat it replaces),
+ * seeded in `beforeAll` and removed in `afterAll`. The session is a minted cookie, not
+ * the demo sign-in form, so the spec runs against `next start` too (TASK-MUSBCXP9RKS3D).
+ * The platform-admin right comes from the database row; the cookie carries no claim for it.
+ */
+const ADMIN = {
+  userId: 'e2e-purge-alert-admin',
+  email: 'purge-alert-admin@e2e.fabrika.test',
+  role: 'TENANT_OWNER' as const,
+  tenantId: 'demo-tenant',
+};
 const RUN = Date.now().toString(36);
 const ids = {
   tenant: `purge-alert-t-${RUN}`,
@@ -32,14 +45,11 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('erasure failure reaches the alerts console', () => {
   test.beforeAll(async () => {
+    await seedIdentity({ ...ADMIN, workspaceIds: [], isPlatformAdmin: true });
     // `SET NOT NULL` cannot be applied while any row is already NULL, so a
     // database that has unassigned relationships is not measurable here.
     if ((await prisma.relationship.count({ where: { ownerUserId: null } })) > 0) {
       skipReason = 'database already has unassigned relationships; column cannot be pinned';
-      return;
-    }
-    if (!(await prisma.user.findFirst({ where: { email: ADMIN_EMAIL } }))) {
-      skipReason = `no platform admin ${ADMIN_EMAIL} in this database`;
       return;
     }
 
@@ -90,6 +100,7 @@ test.describe('erasure failure reaches the alerts console', () => {
     await prisma.relationship.deleteMany({ where: { tenantId: ids.tenant } });
     await prisma.tenant.deleteMany({ where: { id: ids.tenant } });
     await prisma.user.deleteMany({ where: { id: ids.subject } });
+    await cleanupIdentity([ADMIN.userId]);
     await prisma.$disconnect();
   });
 
@@ -104,9 +115,9 @@ test.describe('erasure failure reaches the alerts console', () => {
     });
 
     const target = '/tr/admin/alerts';
-    await page.goto(`/tr/giris?callbackUrl=${encodeURIComponent(target)}`);
-    await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
-    await page.locator('form button[type="submit"]').click();
+    await signInAs(page, { id: ADMIN.userId, email: ADMIN.email, tenantId: ADMIN.tenantId, role: ADMIN.role });
+    await page.goto(target);
+    // Landing on the console (not bounced to /giris or a 404) is the proof the session is an admin's.
     await page.waitForURL(`**${target}`, { timeout: 30_000 });
 
     // The row the failed erasure wrote.

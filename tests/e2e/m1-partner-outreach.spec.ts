@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { presentIds } from '../helpers/teardown-guard';
+import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 
 /**
  * K4 outreach on the M1 partner card (TASK-MULQLF067H75P) — real browser, real DB.
@@ -15,7 +16,18 @@ import { presentIds } from '../helpers/teardown-guard';
 
 const SHOTS = shotsDir('TASK-MULQLF067H75P-screenshots');
 const WORKSPACE = 'main';
-const EMAIL = 'alice@fabrika.test';
+/**
+ * A PIPELINE_MANAGER seat of this spec's own on the demo tenant (the role the demo
+ * seat it replaces held), seeded in `beforeAll` and removed in `afterAll`; signed in
+ * with a minted cookie, not the demo form, so the spec runs against `next start` too
+ * (TASK-MUSBCXP9RKS3D). `workspaceIds: []` is every workspace, `main` included.
+ */
+const MEMBER = {
+  userId: 'e2e-m1-outreach-member',
+  email: 'm1-outreach-member@e2e.fabrika.test',
+  role: 'PIPELINE_MANAGER' as const,
+  tenantId: 'demo-tenant',
+};
 const PIC = 'K4E2E-PIC-1';
 const PROJECT = 'K4E2E-PROJ-1';
 const TOPIC = 'HORIZON-CL5-2024-D3-01-05';
@@ -49,16 +61,10 @@ async function seed() {
 }
 
 async function signIn(page: Page, locale: string) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
-    );
-  });
+  // signInAs also records the cookie consent the banner would otherwise ask for.
+  await signInAs(page, { id: MEMBER.userId, email: MEMBER.email, tenantId: MEMBER.tenantId, role: MEMBER.role });
   const url = pageUrl(locale);
-  await page.goto(`/${locale}/giris?callbackUrl=${encodeURIComponent(url)}`);
-  await page.locator('input[type="email"]').fill(EMAIL);
-  await page.locator('form button[type="submit"]').click();
+  await page.goto(url);
   await page.waitForURL(`**${url}`, { timeout: 30_000 });
 }
 
@@ -71,9 +77,13 @@ const EXPECTED_HOSTS: Record<string, string> = {
 };
 
 test.describe('M1 partner card — K4 outreach', () => {
-  test.beforeAll(seed);
+  test.beforeAll(async () => {
+    await seedIdentity({ ...MEMBER, workspaceIds: [] });
+    await seed();
+  });
   test.afterAll(async () => {
     await rollback();
+    await cleanupIdentity([MEMBER.userId]);
     await prisma.$disconnect();
   });
 
