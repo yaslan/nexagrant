@@ -272,6 +272,7 @@ function fakeDb(identity: Record<string, string> | null) {
   return {
     created,
     db: {
+      $executeRaw: vi.fn(async () => undefined),
       invoice: {
         findFirst: vi.fn(async () => null),
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
