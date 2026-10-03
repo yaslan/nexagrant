@@ -89,7 +89,8 @@ describe.skipIf(!dbReachable)('disconnectCalendar against a live database', () =
     expect(await rowExists(victim.id)).toBe(true);
 
     actingAs(TENANT_B, USER_B);
-    await expect(disconnectCalendar(victim.id)).rejects.toThrow();
+    // A refusal is returned, not thrown (TASK-MUSFNYHSA49AB).
+    await expect(disconnectCalendar(victim.id)).resolves.toMatchObject({ ok: false });
 
     // The claim of this card, measured where it is true or false: in the table.
     expect(await rowExists(victim.id)).toBe(true);
@@ -101,7 +102,8 @@ describe.skipIf(!dbReachable)('disconnectCalendar against a live database', () =
     const victim = await seedConnection(TENANT_A, USER_A);
 
     actingAs(TENANT_A, USER_B);
-    await expect(disconnectCalendar(victim.id)).rejects.toThrow();
+    // A refusal is returned, not thrown (TASK-MUSFNYHSA49AB).
+    await expect(disconnectCalendar(victim.id)).resolves.toMatchObject({ ok: false });
 
     expect(await rowExists(victim.id)).toBe(true);
   });
@@ -112,7 +114,7 @@ describe.skipIf(!dbReachable)('disconnectCalendar against a live database', () =
     const own = await seedConnection(TENANT_A, USER_A);
 
     actingAs(TENANT_A, USER_A);
-    await expect(disconnectCalendar(own.id)).resolves.toEqual({ success: true });
+    await expect(disconnectCalendar(own.id)).resolves.toEqual({ ok: true, success: true });
 
     expect(await rowExists(own.id)).toBe(false);
   });
