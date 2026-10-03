@@ -1,135 +1,87 @@
 /**
- * TASK-MUPUHIIKSQAPN — Y-4 regression test: Kurumsal Profil kaydı sunucuya gidiyor
- * ve sayfa yenilendikten sonra değer kalıcı oluyor.
+ * TASK-MUPUHIIKSQAPN / TASK-MUPVLWSIPC5WU — Y-4 regression test: Kurumsal Profil
+ * kaydı sunucuya gidiyor ve sayfa yenilendikten sonra değer kalıcı oluyor.
  *
- * Before: Form "başarıyla güncellendi" gösteriyordu ama 0 POST gidiyordu ve veri kayboluyor.
- * After: Form gerçek sunucu isteği gönderiyor, başarı mesajı ancak sunucu başarılı dönünce gösterilir.
+ * Before: Form "başarıyla güncellendi" gösteriyordu ama 0 POST gidiyordu ve veri
+ * kayboluyordu. Sonra kayıt sunucuya gitti ama sayfa her yüklemede sabit metinle
+ * açıldığı için yenilemeden sonra kaydedilen değer yine görünmüyordu.
+ * After: Kayıt veritabanına yazılır; sayfa kayıtlı profili sunucuda, oturumun
+ * kendi kiracısından okur.
  */
-import { test, expect } from '@playwright/test';
-import { expectHydrated } from './fixtures/hydration';
-import path from 'path';
-import crypto from 'crypto';
+import { test, expect, type Page } from '@playwright/test';
 
-const suffix = crypto.randomBytes(3).toString('hex');
+import { expectHydrated } from './fixtures/hydration';
+import {
+  PS_OTHER_CAPABILITIES,
+  PS_WORKSPACE,
+  readStoredProfile,
+  setupProfileSaveTenant,
+  signInAsProfileSaveUser,
+  teardownProfileSaveTenant,
+} from './fixtures/profile-save-tenant';
+
+const PROFILE_URL = `/tr/${PS_WORKSPACE}/settings/profile`;
+
+function profileForm(page: Page) {
+  const saveButton = page.getByRole('button', { name: 'Profili Kaydet' });
+  const form = page.locator('form').filter({ has: saveButton });
+  return {
+    saveButton,
+    capabilities: form.locator('textarea'),
+    keywords: form.locator('input[type="text"]'),
+    trlMin: form.locator('input[type="number"]').nth(0),
+    trlMax: form.locator('input[type="number"]').nth(1),
+  };
+}
 
 test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
-  let tenantId: string;
-  let userId: string;
-  let authToken: string;
+  test.describe.configure({ mode: 'serial' });
+  test.beforeAll(setupProfileSaveTenant);
+  test.afterAll(teardownProfileSaveTenant);
 
-  test.beforeAll(async () => {
-    // Setup: Create test tenant and user with auth token
-    // This would normally be done via an API setup call
-    // For now, we skip this and assume the test environment is pre-configured
-    tenantId = `test-tenant-${suffix}`;
-    userId = `test-user-${suffix}`;
-  });
+  test('should send profile update to server and persist after reload', async ({ page }) => {
+    await signInAsProfileSaveUser(page, PROFILE_URL);
+    const f = profileForm(page);
+    await expectHydrated(f.saveButton);
+    await expect(f.capabilities).not.toHaveValue(PS_OTHER_CAPABILITIES);
 
-  test('should send profile update to server and persist after reload', async ({ browser }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
+    const capabilities = `Yapay zeka, derin öğrenme, TRL 5-8 prototipleme — ${Date.now()}`;
+    const keywords = 'AI, Deep Learning, Robotics';
+    await f.capabilities.fill(capabilities);
+    await f.keywords.fill(keywords);
+    await f.trlMin.fill('5');
+    await f.trlMax.fill('8');
+    await f.saveButton.click();
+    await expect(page.getByText('başarıyla güncellendi')).toBeVisible({ timeout: 10_000 });
 
-    // Set auth cookie (simulating logged-in user)
-    // In a real test, you would get this from your test setup
-    // For now, we'll navigate to the profile page
+    // The row the action wrote, read past the page.
+    expect(await readStoredProfile()).toEqual({
+      capabilities,
+      keywords: ['AI', 'Deep Learning', 'Robotics'],
+      trlRange: [5, 8],
+    });
 
-    const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
-    const profileUrl = `${baseUrl}/tr/default/settings/profile`;
-
-    // Go to profile page
-    await page.goto(profileUrl);
-
-    // Wait for page to load
-    await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
-    await expectHydrated(page.locator('button:has-text("Profili Kaydet")'));
-
-    // Get the current values
-    const capabilitiesInput = page.locator('textarea[placeholder*="teknik"]');
-    const keywordsInput = page.locator('input[placeholder*="e.g. AI"]');
-
-    // Read current values
-    const originalCapabilities = await capabilitiesInput.inputValue();
-    const originalKeywords = await keywordsInput.inputValue();
-
-    // Create new test data
-    const newCapabilities = `Test profile ${suffix}: AI, ML, Robotics expertise, TRL 5-8`;
-    const newKeywords = 'TestAI, TestML, TestRobotics';
-
-    // Clear and fill form
-    await capabilitiesInput.clear();
-    await capabilitiesInput.fill(newCapabilities);
-
-    await keywordsInput.clear();
-    await keywordsInput.fill(newKeywords);
-
-    // Click save button
-    const saveButton = page.locator('button:has-text("Profili Kaydet")');
-
-    // Wait for success message instead of monitoring network
-    const successMessage = page.locator('text=başarıyla güncellendi');
-
-    await saveButton.click();
-
-    // Wait for success message to appear (indicates server action succeeded)
-    await successMessage.waitFor({ state: 'visible', timeout: 3000 });
-
-    // Verify success message is shown
-    await expect(successMessage).toBeVisible();
-
-    // Reload the page
     await page.reload();
-
-    // Wait for form to load
-    await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
-    await expectHydrated(page.locator('button:has-text("Profili Kaydet")'));
-
-    // Verify data persists after reload
-    const savedCapabilities = await capabilitiesInput.inputValue();
-    const savedKeywords = await keywordsInput.inputValue();
-
-    expect(savedCapabilities).toBe(newCapabilities);
-    expect(savedKeywords).toBe(newKeywords);
-
-    // Cleanup
-    await context.close();
+    await expectHydrated(f.saveButton);
+    await expect(f.capabilities).toHaveValue(capabilities);
+    await expect(f.keywords).toHaveValue(keywords);
+    await expect(f.trlMin).toHaveValue('5');
+    await expect(f.trlMax).toHaveValue('8');
   });
 
-  test('should show error when server returns error', async ({ browser }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
+  test('should show error when server returns error', async ({ page }) => {
+    await signInAsProfileSaveUser(page, PROFILE_URL);
+    const f = profileForm(page);
+    await expectHydrated(f.saveButton);
+    const before = await readStoredProfile();
 
-    const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
-    const profileUrl = `${baseUrl}/tr/default/settings/profile`;
+    // Bypass the browser's `required` check so the server's validation answers.
+    await f.capabilities.evaluate((el) => el.removeAttribute('required'));
+    await f.capabilities.fill('');
+    await f.saveButton.click();
 
-    await page.goto(profileUrl);
-
-    // Wait for form
-    await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
-    await expectHydrated(page.locator('button:has-text("Profili Kaydet")'));
-
-    const capabilitiesInput = page.locator('textarea[placeholder*="teknik"]');
-
-    // Try to submit with empty capabilities (should fail validation)
-    await capabilitiesInput.clear();
-
-    const saveButton = page.locator('button:has-text("Profili Kaydet")');
-    await saveButton.click();
-
-    // Should NOT show success message
-    const successMessage = page.locator('text=başarıyla güncellendi');
-    const errorMessage = page.locator('[class*="text-bad"]');
-
-    // Verify error message is shown, not success
-    try {
-      await successMessage.waitFor({ state: 'visible', timeout: 2000 });
-      throw new Error('Success message should not be shown for validation error');
-    } catch {
-      // Expected - success message should not appear
-    }
-
-    await expect(errorMessage).toBeVisible();
-
-    // Cleanup
-    await context.close();
+    await expect(page.getByText(/Lütfen tüm alanları/)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('başarıyla güncellendi')).toHaveCount(0);
+    expect(await readStoredProfile()).toEqual(before);
   });
 });
