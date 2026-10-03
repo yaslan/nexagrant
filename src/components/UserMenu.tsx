@@ -33,7 +33,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { useTheme } from './ThemeProvider';
 import { getWorkspaceRoute, getPublicRoute } from '@/lib/routes';
-import { displayUserName } from '@/lib/user-display';
+import { displayUserName, displayRoleName } from '@/lib/user-display';
 import { isNextRedirectError } from '@/lib/errors';
 
 /** One entry of the workspace switcher, as it exists in the database. */
@@ -94,7 +94,8 @@ export default function UserMenu({
   const effectiveUserImage = propUserImage || sessionData?.user?.image;
   // Display only. Assuming TENANT_OWNER here would show an owner badge to a session that
   // carries no role; authorization is decided server-side from `session.role`.
-  const effectiveRoleName = propRoleName || sessionData?.role || null;
+  const effectiveRole = propRoleName || sessionData?.role || null;
+  const effectiveRoleName = displayRoleName(effectiveRole, tIdentity('noRole'));
 
   // Extract active workspace from pathname. No fallback slug: outside a workspace
   // route ("/tr/admin", "/tr/pricing") no workspace is active, and pretending
@@ -362,15 +363,9 @@ export default function UserMenu({
                 <div className="min-w-0 flex-1">
                   <h4 className="font-bold text-sm text-ink truncate">{effectiveUserName}</h4>
                   <p className="text-xs text-muted truncate">{effectiveUserEmail}</p>
-                  {effectiveRoleName ? (
-                    <span className="inline-block mt-1 text-[10px] font-bold bg-accent/15 text-accent-ink border border-accent/20 px-2 py-0.5 rounded font-mono">
-                      {effectiveRoleName}
-                    </span>
-                  ) : (
-                    <span className="inline-block mt-1 text-[10px] font-bold bg-surface-hover text-muted border border-border px-2 py-0.5 rounded font-mono">
-                      {tIdentity('noRole')}
-                    </span>
-                  )}
+                  <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded font-mono ${effectiveRole?.trim() ? 'bg-accent/15 text-accent-ink border border-accent/20' : 'bg-surface-hover text-muted border border-border'}`}>
+                    {effectiveRoleName}
+                  </span>
                 </div>
               </div>
             </div>

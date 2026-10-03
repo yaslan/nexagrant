@@ -67,6 +67,13 @@ test.beforeAll(async () => {
   // JWT callback reads User row on every token refresh (d57f13f1). Seed test users.
   // Use withSystemScope to bypass RLS during test setup.
   await withSystemScope('platform-admin', 'e2e.identity-strings.setup', async (tx) => {
+    // Ensure demo-tenant exists with workspace and memberships.
+    const workspace = await tx.workspace.upsert({
+      where: { tenantId_slug: { tenantId: 'demo-tenant', slug: 'default' } },
+      create: { tenantId: 'demo-tenant', slug: 'default', name: 'Demo Workspace' },
+      update: {},
+    });
+
     await Promise.all([
       tx.user.upsert({
         where: { id: ADMIN.id },
@@ -79,11 +86,39 @@ test.beforeAll(async () => {
         update: { email: 'zeynep@e2e.fabrika.test', name: 'Zeynep Aydın' },
       }),
     ]);
+
+    // Seed memberships for test users so JWT callback finds them.
+    await Promise.all([
+      tx.membership.upsert({
+        where: { tenantId_userId: { tenantId: 'demo-tenant', userId: ADMIN.id } },
+        create: {
+          tenantId: 'demo-tenant',
+          userId: ADMIN.id,
+          role: 'PIPELINE_MANAGER',
+          workspaceIds: [workspace.id],
+        },
+        update: { role: 'PIPELINE_MANAGER', workspaceIds: [workspace.id] },
+      }),
+      tx.membership.upsert({
+        where: { tenantId_userId: { tenantId: 'demo-tenant', userId: 'e2e-identity-user' } },
+        create: {
+          tenantId: 'demo-tenant',
+          userId: 'e2e-identity-user',
+          role: 'PIPELINE_MANAGER',
+          workspaceIds: [workspace.id],
+        },
+        update: { role: 'PIPELINE_MANAGER', workspaceIds: [workspace.id] },
+      }),
+    ]);
   });
 });
 
 test.afterAll(async () => {
   await withSystemScope('platform-admin', 'e2e.identity-strings.cleanup', async (tx) => {
+    // Cleanup in reverse order: memberships first (FK constraint), then users.
+    await tx.membership.deleteMany({
+      where: { userId: { in: [ADMIN.id, 'e2e-identity-user'] } },
+    });
     await tx.user.deleteMany({ where: { id: { in: [ADMIN.id, 'e2e-identity-user'] } } });
   });
 });
