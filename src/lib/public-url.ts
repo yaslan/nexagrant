@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { appBaseUrl, appUrl } from '@/lib/app-url';
 
 /**
  * Build a safe origin URL for redirects behind a proxy (e.g., Passenger).
@@ -6,8 +7,8 @@ import { NextRequest } from 'next/server';
  * When behind Passenger/LiteSpeed, req.url is rewritten to http://localhost:3000/...
  * making `new URL(path, req.url)` produce a localhost-based redirect. This helper
  * uses AUTH_URL (NextAuth.js standard for proxy environments) to pin the public origin,
- * falling back to NEXT_PUBLIC_APP_URL for production compatibility, or extracting the
- * origin from req.url when both env vars are unset.
+ * falling back to NEXT_PUBLIC_APP_URL via appUrl() for sensible dev/prod defaults,
+ * or extracting the origin from req.url when both env vars are unset.
  *
  * Open-redirect safe: returns only the origin (scheme + host + port), no path/query.
  */
@@ -22,14 +23,10 @@ export function publicUrl(req?: NextRequest): string {
     }
   }
 
-  // Fallback to NEXT_PUBLIC_APP_URL for development/production without AUTH_URL
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    try {
-      const url = new URL(process.env.NEXT_PUBLIC_APP_URL);
-      return url.origin;
-    } catch {
-      // Invalid NEXT_PUBLIC_APP_URL — fall through
-    }
+  // Try NEXT_PUBLIC_APP_URL via app-url.ts helpers (pass process.env as source)
+  const baseUrl = appBaseUrl(process.env as any);
+  if (baseUrl) {
+    return baseUrl;
   }
 
   // Fallback to origin from request URL if available
@@ -42,6 +39,6 @@ export function publicUrl(req?: NextRequest): string {
     }
   }
 
-  // Last resort: localhost (development with no env vars and no req)
-  return 'http://localhost:3000';
+  // Last resort: appUrl() handles dev/prod defaults when both above fail
+  return appUrl(process.env as any);
 }
