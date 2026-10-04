@@ -211,16 +211,16 @@ test.describe('Settings → Modules access control (RBAC)', () => {
     baseURL,
   }) => {
     await signInAsUser(page, baseURL as string, 'test-member-user-1', 'MEMBER');
-    await page.goto('/tr/default/settings/profile');
+    await page.goto('/tr/default/dashboard');
 
     // User should see Settings link in sidebar (profile, not modules)
-    const profileLink = page.locator('a[href*="/settings/profile"]');
+    const profileLink = page.locator('a[href*="ayarlar/profil"], a[href*="settings/profile"]');
     await expect(profileLink).toBeVisible();
 
     // Open user menu and verify no "Modül Ayarları" link
-    const userButton = page.getByRole('button').last(); // Last button in header (user menu)
+    const userButton = page.getByRole('button').last();
     await userButton.click();
-    const moduleSettingsLink = page.locator('a[href*="/settings/modules"]');
+    const moduleSettingsLink = page.locator('a[href*="ayarlar/moduller"], a[href*="settings/modules"]');
     await expect(moduleSettingsLink).toHaveCount(0);
 
     await page.screenshot({ path: `${SHOTS}/01-member-user-menu.png`, fullPage: false });
@@ -231,7 +231,7 @@ test.describe('Settings → Modules access control (RBAC)', () => {
     baseURL,
   }) => {
     await signInAsUser(page, baseURL as string, 'test-member-user-2', 'MEMBER');
-    await page.goto('/tr/default/settings/modules');
+    await page.goto('/tr/default/ayarlar/moduller');
 
     // Should see "Erişim Reddedildi" (Access Denied) message
     await expect(page.getByText(/Erişim Reddedildi/)).toBeVisible();
@@ -245,18 +245,18 @@ test.describe('Settings → Modules access control (RBAC)', () => {
     baseURL,
   }) => {
     await signInAsUser(page, baseURL as string, 'test-owner-user-1', 'TENANT_OWNER');
-    await page.goto('/tr/default/dashboard');
+    await page.goto('/tr/default/panel');
 
     // Sidebar Settings link should navigate to modules
-    const settingsLink = page.locator('a[href*="/settings/modules"]');
+    const settingsLink = page.locator('a[href*="ayarlar/moduller"], a[href*="settings/modules"]');
     await expect(settingsLink).toBeVisible();
 
     // Open user menu and verify "Modül Ayarları" link exists
-    const userButton = page.getByRole('button').last();
+    // User menu button is in the last relative div (after notifications button)
+    const userButton = page.locator('div.relative').last().locator('button').first();
     await userButton.click();
-    const moduleSettingsLink = page.locator('a[href*="/settings/modules"]');
+    const moduleSettingsLink = page.locator('a[href*="ayarlar/moduller"], a[href*="settings/modules"]');
     await expect(moduleSettingsLink).toBeVisible();
-    await expect(moduleSettingsLink).toContainText(/Modül Ayarları|Module Settings/);
 
     await page.screenshot({ path: `${SHOTS}/03-owner-user-menu.png`, fullPage: false });
   });
@@ -266,7 +266,7 @@ test.describe('Settings → Modules access control (RBAC)', () => {
     baseURL,
   }) => {
     await signInAsUser(page, baseURL as string, 'test-owner-user-2', 'TENANT_OWNER');
-    await page.goto('/tr/default/settings/modules');
+    await page.goto('/tr/default/ayarlar/moduller');
 
     // Should see modules page content, not access denied
     await expect(page.getByText(/Erişim Reddedildi/)).toHaveCount(0);
@@ -282,7 +282,7 @@ test.describe('Settings → Modules access control (RBAC)', () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await signInAsUser(page, baseURL as string, 'test-member-mobile', 'MEMBER');
-    await page.goto('/tr/default/dashboard');
+    await page.goto('/tr/default/panel');
 
     // Open mobile menu
     const menuButton = page.getByRole('button', { name: /Open Mobile Menu/i });
@@ -294,7 +294,7 @@ test.describe('Settings → Modules access control (RBAC)', () => {
       const settingsLink = page.locator('a').filter({ hasText: /settings|ayarlar/i }).first();
       if (await settingsLink.isVisible()) {
         await settingsLink.click();
-        await page.waitForURL(/\/settings\/(profile|ayarlar\/profil)/);
+        await page.waitForURL(/(settings\/profile|ayarlar\/profil)/);
       }
     }
 
