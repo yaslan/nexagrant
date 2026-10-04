@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { appBaseUrl, appUrl } from '@/lib/app-url';
+import { appBaseUrl, appUrl, type AppUrlSource } from '@/lib/app-url';
 
 /**
  * Build a safe origin URL for redirects behind a proxy (e.g., Passenger).
@@ -24,7 +24,7 @@ export function publicUrl(req?: NextRequest): string {
   }
 
   // Try NEXT_PUBLIC_APP_URL via app-url.ts helpers (pass process.env as source)
-  const baseUrl = appBaseUrl(process.env as any);
+  const baseUrl = appBaseUrl(process.env as AppUrlSource);
   if (baseUrl) {
     return baseUrl;
   }
@@ -40,5 +40,5 @@ export function publicUrl(req?: NextRequest): string {
   }
 
   // Last resort: appUrl() handles dev/prod defaults when both above fail
-  return appUrl(process.env as any);
+  return appUrl(process.env as AppUrlSource);
 }
