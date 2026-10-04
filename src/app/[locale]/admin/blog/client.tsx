@@ -591,7 +591,7 @@ export default function AdminBlogClient({
                   <div className="min-w-0 space-y-1">
                     <label
                       htmlFor="blog-image-file"
-                      className={`inline-flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-lg border border-border bg-ground text-xs font-bold text-ink hover:bg-surface-hover transition cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent ${isUploading ? 'pointer-events-none opacity-60' : ''}`}
+                      className={`inline-flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-lg border border-border bg-ground text-xs font-bold text-ink hover:bg-surface-hover transition cursor-pointer has-focus-visible:ring-2 has-focus-visible:ring-accent ${isUploading ? 'pointer-events-none opacity-60' : ''}`}
                     >
                       {isUploading ? (
                         <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />

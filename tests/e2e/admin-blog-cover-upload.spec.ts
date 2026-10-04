@@ -166,6 +166,10 @@ test.describe.serial('admin blog — cover image is uploaded, not typed', () => 
     expect(storeConfigured, 'CI must run this against the MinIO public bucket').toBe(true);
 
     await page.setViewportSize({ width: 390, height: 844 });
+    // The new-post form starts on an unsplash cover; answer for the CDN so CI needs no internet.
+    await page.route('https://images.unsplash.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'image/png', body: PNG })
+    );
     await openNewPost(page, baseURL as string);
     const before = await page.getByTestId('blog-image-preview').getAttribute('src');
     const input = page.getByLabel('Görseli değiştir');
@@ -187,8 +191,9 @@ test.describe.serial('admin blog — cover image is uploaded, not typed', () => 
     expect(await res.json()).toEqual({ error: 'type' });
     await expect(page.getByTestId('blog-image-error')).toHaveText(MSG_TYPE);
 
-    // The form still holds the image it had.
+    // The form still holds the image it had, and still shows it.
     await expect(page.getByTestId('blog-image-preview')).toHaveAttribute('src', before as string);
+    await expectImageDecoded(page, page.getByTestId('blog-image-preview'));
     await page.getByTestId('blog-image-error').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/03-wrong-type-390.png` });
   });
@@ -204,12 +209,32 @@ test.describe.serial('admin blog — cover image is uploaded, not typed', () => 
     await page.route('**/api/admin/blog/image', (route) =>
       route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'object_store_unconfigured' }) })
     );
+    await page.route('https://images.unsplash.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'image/png', body: PNG })
+    );
     await openNewPost(page, baseURL as string);
+    // The picker is in the tab order (the input is visually hidden, not removed).
+    await page.locator('#featured').focus();
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.getByTestId('blog-image-input')).toBeFocused();
+    // …and the focus is visible: the label draws a ring around the hidden input.
+    const picker = page.locator('label[for="blog-image-file"]');
+    // Tailwind writes transparent shadows when no ring is on; a ring has a 2px spread.
+    await expect(picker).toHaveCSS('box-shadow', /0px 0px 0px 2px/);
+    const box = await picker.boundingBox();
+    if (box) {
+      await page.screenshot({
+        path: `${SHOTS}/04a-keyboard-focus.png`,
+        clip: { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 16 },
+      });
+    }
     await page.getByLabel('Görseli değiştir').setInputFiles({ name: 'kapak.png', mimeType: 'image/png', buffer: PNG });
     await expect(page.getByTestId('blog-image-error')).toHaveText(MSG_UNCONFIGURED);
     await expect(page.getByTestId('blog-image-uploading')).toHaveCount(0);
     await expect(page.getByTestId('blog-submit')).toBeEnabled();
     expect(dialogs).toBe(0);
+    // The cover the form had is kept and still shown.
+    await expectImageDecoded(page, page.getByTestId('blog-image-preview'));
     await page.screenshot({ path: `${SHOTS}/04-unconfigured.png`, fullPage: true });
   });
 
