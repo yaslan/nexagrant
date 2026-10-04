@@ -9,9 +9,10 @@ import { getWorkspaceRoute } from '@/lib/routes';
 interface SidebarNavProps {
   locale: string;
   isPlatformAdmin?: boolean;
+  canManageModules?: boolean;
 }
 
-export default function SidebarNav({ locale, isPlatformAdmin = false }: SidebarNavProps) {
+export default function SidebarNav({ locale, isPlatformAdmin = false, canManageModules = false }: SidebarNavProps) {
   const t = useTranslations('Navigation');
   const pathname = usePathname();
 
@@ -34,7 +35,13 @@ export default function SidebarNav({ locale, isPlatformAdmin = false }: SidebarN
     { key: 'tto', href: getWorkspaceRoute('tto', locale, workspaceSlug), label: t('tto') },
     { key: 'approvals', href: getWorkspaceRoute('approvals', locale, workspaceSlug), label: t('approvals') },
     { key: 'apiKeys', href: getWorkspaceRoute('settingsApiKeys', locale, workspaceSlug), label: t('apiKeys') },
-    { key: 'settings', href: getWorkspaceRoute('settingsModules', locale, workspaceSlug), label: t('settings') },
+    {
+      key: 'settings',
+      href: canManageModules
+        ? getWorkspaceRoute('settingsModules', locale, workspaceSlug)
+        : getWorkspaceRoute('settingsProfile', locale, workspaceSlug),
+      label: t('settings')
+    },
   ];
 
   const adminItem = {

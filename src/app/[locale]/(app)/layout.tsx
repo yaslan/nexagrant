@@ -15,6 +15,7 @@ import { tenantScopeOf } from '@/lib/tenant';
 import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-store';
 import CoBrandBadge from '@/components/CoBrandBadge';
 import PilotBanner from '@/components/PilotBanner';
+import { can, asRole } from '@/lib/rbac';
 
 import MobileAppHeader from '@/components/MobileAppHeader';
 import FeedbackWidget from '@/components/FeedbackWidget';
@@ -88,6 +89,8 @@ export default async function AppLayout({
     roleName === 'PLATFORM_ADMIN'
   );
 
+  const canManageModules = can(asRole(roleName), 'manage_modules');
+
   return (
     <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-background">
       {/* Mobile Top Header */}
@@ -98,6 +101,7 @@ export default async function AppLayout({
         userImage={userImage}
         roleName={roleName}
         isPlatformAdmin={isPlatformAdmin}
+        canManageModules={canManageModules}
         workspaces={workspaces}
         cobrand={cobrand}
       />
@@ -118,7 +122,7 @@ export default async function AppLayout({
           />
         </Link>
 
-        <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} />
+        <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} canManageModules={canManageModules} />
       </aside>
 
       {/* Main Workspace Frame */}
@@ -137,6 +141,7 @@ export default async function AppLayout({
               userImage={userImage}
               roleName={roleName}
               workspaces={workspaces}
+              canManageModules={canManageModules}
             />
           </div>
         </header>
