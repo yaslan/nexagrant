@@ -187,6 +187,32 @@ function originOf(value: string | null | undefined): string | null {
   }
 }
 
+/**
+ * The `images.remotePatterns` entry next.config adds for R2_PUBLIC_HOST, the
+ * public bucket's base URL (blog images, TASK-MUU20NSV2TETW): that host, that
+ * port only, and only the `blog/` objects under its path. Null when the value
+ * is unset or not an http(s) URL. next.config reads it when the config loads —
+ * for the standalone build that is `next build`, so the variable must be set
+ * at build time as well.
+ */
+export function publicAssetImagePattern(
+  value: string | null | undefined
+): { protocol: 'http' | 'https'; hostname: string; port: string; pathname: string } | null {
+  if (!value?.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return {
+      protocol: url.protocol === 'https:' ? 'https' : 'http',
+      hostname: url.hostname,
+      port: url.port,
+      pathname: `${url.pathname.replace(/\/+$/, '')}/blog/**`,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** R2 account ids are 32 hex chars; anything else must not reach a header. */
 function r2UploadOrigin(accountId: string | null | undefined): string | null {
   const id = accountId?.trim();
