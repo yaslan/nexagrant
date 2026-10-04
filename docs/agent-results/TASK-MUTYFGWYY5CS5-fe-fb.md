@@ -23,13 +23,10 @@ Implemented RBAC-based access control for Settings → Modules:
 4. **Mobile support (MobileAppHeader.tsx)**
    - Propagated `canManageModules` to both UserMenu and drawer SidebarNav
 
-5. **E2E test (settings-modules-access-control.spec.ts)**
-   - JWT-based `signInAsUser()` fixture for production-mode testing
-   - MEMBER role: Settings → profile, no "Modül Ayarları" link in menu
-   - MEMBER direct to /settings/modules → "Erişim Reddedildi" (already server-side)
-   - TENANT_OWNER: Settings → modules, "Modül Ayarları" visible
-   - Mobile 390px: MEMBER Settings → profile
-   - Tests use demo-tenant with JWT cookies, no database seeding needed
+5. **E2E test pattern**
+   - (deferred to CI) Requires proper tenant/membership database fixtures
+   - Pattern: JWT-based `signInAsUser()` for production-mode E2E
+   - Would test: MEMBER Settings → profile, TENANT_OWNER → modules, mobile 390px
 
 ## Kanıt
 
