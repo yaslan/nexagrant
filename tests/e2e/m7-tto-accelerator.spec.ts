@@ -1,10 +1,9 @@
-import { test, expect, type Page, type BrowserContext } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
-import { signInAs, cleanupIdentity, seedIdentity, E2E_IDENTITIES } from './fixtures/session';
+import { signInAs, seedIdentity } from './fixtures/session';
 import { expectHydrated } from './fixtures/hydration';
-import { presentIds } from '../helpers/teardown-guard';
 
 /**
  * M7 TTO Accelerator — Technology Transfer Portfolio.
@@ -47,7 +46,6 @@ const ISOLATION_WORKSPACE = {
 };
 
 const TTO_BASE_URL = `/${WORKSPACE}/tto`;
-const TTO_ACCEL_URL = `/${WORKSPACE}/tto-hizlandirici`;
 
 /**
  * Cleanup function: removes demo-tenant items created by tests, plus the isolation
