@@ -42,14 +42,15 @@ const MSG_UNCONFIGURED = 'Dosya deposu yapılandırılmamış; görsel şu an y�
 
 /** A real RGB PNG of `w`×`h` pixels, a two-colour gradient — no fixture file needed. */
 function makePng(w: number, h: number): Buffer {
-  const crcTable = Array.from({ length: 256 }, (_, n) => {
+  const crcTable = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
     let c = n;
     for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    return c >>> 0;
-  });
+    crcTable[n] = c >>> 0;
+  }
   const crc = (buf: Buffer) => {
     let c = 0xffffffff;
-    for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8);
+    for (const b of buf) c = (crcTable[(c ^ b) & 0xff] as number) ^ (c >>> 8);
     return (c ^ 0xffffffff) >>> 0;
   };
   const chunk = (type: string, data: Buffer) => {
