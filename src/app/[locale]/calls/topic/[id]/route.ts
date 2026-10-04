@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ loca
   }
 
   const visitor = await visitorOf();
-  const res = NextResponse.redirect(new URL(callTopicTarget(locale, id, visitor), publicUrl()), 307);
+  const res = NextResponse.redirect(new URL(callTopicTarget(locale, id, visitor), publicUrl(req)), 307);
   // The target depends on who is asking.
   res.headers.set('Cache-Control', 'private, no-store');
   return res;

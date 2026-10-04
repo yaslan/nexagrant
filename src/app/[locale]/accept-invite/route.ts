@@ -29,7 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ loca
   const raw = req.nextUrl.searchParams.get('token');
   const token = parseInvitationToken(raw);
 
-  const res = NextResponse.redirect(new URL(`/${locale}/accept-invite/continue`, publicUrl()), 303);
+  const res = NextResponse.redirect(new URL(`/${locale}/accept-invite/continue`, publicUrl(req)), 303);
   if (token) {
     res.cookies.set(INVITATION_ACCEPT_COOKIE, encodeParkedInvitation({ token, locale }), invitationAcceptCookieOptions());
   } else if (raw !== null) {
