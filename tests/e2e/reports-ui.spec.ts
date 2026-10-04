@@ -315,9 +315,16 @@ test.describe('person-days report — real effort, computed from the seed', () =
     expect(res?.status()).toBe(200);
     await expect(page.getByRole('heading', { level: 1, name: 'Person-Days Report' })).toBeVisible();
     await expectReportMatches(page, expectedRows(), true);
-    await expect(page.getByRole('columnheader', { name: 'Person-Days' })).toBeAttached();
     await expectNoPageOverflow(page);
     await shot(page, 'd1-person-days-en-390');
+    // At 390 px the table (min-w 500) scrolls inside its card and the Person-Days column
+    // starts off-screen. It must still be reachable: scrolled to, it is in the viewport.
+    const pdHeader = page.getByRole('columnheader', { name: 'Person-Days' });
+    await pdHeader.scrollIntoViewIfNeeded();
+    await expect(pdHeader).toBeInViewport();
+    await expect(page.locator('table tbody tr').first().locator('td').nth(2)).toBeInViewport();
+    await expectNoPageOverflow(page);
+    await shot(page, 'd1b-person-days-en-390-scrolled');
   });
 });
 
