@@ -71,6 +71,8 @@ const envSchema = z.object({
   /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */
   FEEDBACK_DIGEST_TO: z.string().email().optional(),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
+  /** NextAuth.js standard for proxy environments (e.g., Passenger). Provides the public origin when req.url is rewritten to localhost. */
+  AUTH_URL: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PUBLISHABLE_KEY: z.string().optional(),

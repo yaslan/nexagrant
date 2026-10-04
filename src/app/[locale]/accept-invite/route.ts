@@ -6,6 +6,7 @@ import {
   invitationAcceptCookieOptions,
   parseInvitationToken,
 } from '@/lib/invitations/accept-cookie';
+import { publicUrl } from '@/lib/public-url';
 
 /**
  * The link in the invitation e-mail: `/<locale>/accept-invite?token=<raw>`
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ loca
   const raw = req.nextUrl.searchParams.get('token');
   const token = parseInvitationToken(raw);
 
-  const res = NextResponse.redirect(new URL(`/${locale}/accept-invite/continue`, req.url), 303);
+  const res = NextResponse.redirect(new URL(`/${locale}/accept-invite/continue`, publicUrl(req)), 303);
   if (token) {
     res.cookies.set(INVITATION_ACCEPT_COOKIE, encodeParkedInvitation({ token, locale }), invitationAcceptCookieOptions());
   } else if (raw !== null) {

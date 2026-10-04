@@ -5,6 +5,7 @@ import { tenantScopeOf } from '@/lib/tenant';
 import { resolveScopedWorkspace } from '@/lib/workspaces';
 import { routing } from '@/i18n/routing';
 import { callTopicTarget, MAX_TOPIC_ID_LENGTH, type CallTopicVisitor } from './target';
+import { publicUrl } from '@/lib/public-url';
 
 /**
  * The public /calls cards' "details" link (src/lib/routes.ts
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ loca
   }
 
   const visitor = await visitorOf();
-  const res = NextResponse.redirect(new URL(callTopicTarget(locale, id, visitor), req.url), 307);
+  const res = NextResponse.redirect(new URL(callTopicTarget(locale, id, visitor), publicUrl(req)), 307);
   // The target depends on who is asking.
   res.headers.set('Cache-Control', 'private, no-store');
   return res;

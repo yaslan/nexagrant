@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { takeRegistrationInviteRefusal } from "@/lib/agency/registration-invite-cookie";
 import { OAUTH_SIGNIN_ERROR, oauthRefusalPath } from "@/lib/oauth-registration";
+import { publicUrl } from "@/lib/public-url";
 
 /**
  * Auth.js `pages.error` (İNCELEME-14 K-1, TASK-MUMAC8JELIZ5H). Auth.js sends
@@ -24,12 +25,12 @@ export async function GET(req: NextRequest) {
       "kayit",
       OAUTH_SIGNIN_ERROR.inviteInvalid,
     );
-    return NextResponse.redirect(new URL(to, req.url), 302);
+    return NextResponse.redirect(new URL(to, publicUrl(req)), 302);
   }
   const raw = req.nextUrl.searchParams.get("error") ?? "";
   const code = /^[A-Za-z]{1,64}$/.test(raw) ? raw : "Configuration";
   return NextResponse.redirect(
-    new URL(`/tr/giris?error=${code}`, req.url),
+    new URL(`/tr/giris?error=${code}`, publicUrl(req)),
     302,
   );
 }
