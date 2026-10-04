@@ -49,6 +49,7 @@ test.describe('Settings → Modules access control (RBAC)', () => {
           id: 'demo-tenant',
           name: 'Demo Tenant',
           slug: 'demo',
+          country: 'TR',
         },
         update: { name: 'Demo Tenant' },
       });
@@ -66,7 +67,7 @@ test.describe('Settings → Modules access control (RBAC)', () => {
 
       // Create member membership (no manage_modules permission)
       await tx.membership.upsert({
-        where: { userId_tenantId: { userId: 'test-member-user-1', tenantId: 'demo-tenant' } },
+        where: { tenantId_userId: { userId: 'test-member-user-1', tenantId: 'demo-tenant' } },
         create: {
           userId: 'test-member-user-1',
           tenantId: 'demo-tenant',
@@ -88,7 +89,7 @@ test.describe('Settings → Modules access control (RBAC)', () => {
 
       // Create second member membership
       await tx.membership.upsert({
-        where: { userId_tenantId: { userId: 'test-member-user-2', tenantId: 'demo-tenant' } },
+        where: { tenantId_userId: { userId: 'test-member-user-2', tenantId: 'demo-tenant' } },
         create: {
           userId: 'test-member-user-2',
           tenantId: 'demo-tenant',
@@ -110,7 +111,7 @@ test.describe('Settings → Modules access control (RBAC)', () => {
 
       // Create owner membership (with manage_modules permission)
       await tx.membership.upsert({
-        where: { userId_tenantId: { userId: 'test-owner-user-1', tenantId: 'demo-tenant' } },
+        where: { tenantId_userId: { userId: 'test-owner-user-1', tenantId: 'demo-tenant' } },
         create: {
           userId: 'test-owner-user-1',
           tenantId: 'demo-tenant',
@@ -132,7 +133,7 @@ test.describe('Settings → Modules access control (RBAC)', () => {
 
       // Create second owner membership
       await tx.membership.upsert({
-        where: { userId_tenantId: { userId: 'test-owner-user-2', tenantId: 'demo-tenant' } },
+        where: { tenantId_userId: { userId: 'test-owner-user-2', tenantId: 'demo-tenant' } },
         create: {
           userId: 'test-owner-user-2',
           tenantId: 'demo-tenant',
@@ -154,7 +155,7 @@ test.describe('Settings → Modules access control (RBAC)', () => {
 
       // Create mobile member membership
       await tx.membership.upsert({
-        where: { userId_tenantId: { userId: 'test-member-mobile', tenantId: 'demo-tenant' } },
+        where: { tenantId_userId: { userId: 'test-member-mobile', tenantId: 'demo-tenant' } },
         create: {
           userId: 'test-member-mobile',
           tenantId: 'demo-tenant',
