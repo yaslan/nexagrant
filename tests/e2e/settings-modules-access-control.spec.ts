@@ -51,7 +51,8 @@ test.describe('Settings → Modules access control (RBAC)', () => {
           slug: 'demo',
           country: 'TR',
         },
-        update: { name: 'Demo Tenant' },
+        // Already seeded on a shared database: leave it as it is.
+        update: {},
       });
 
       // Create member user
@@ -198,10 +199,8 @@ test.describe('Settings → Modules access control (RBAC)', () => {
         },
       });
 
-      // Delete tenant
-      await tx.tenant.deleteMany({
-        where: { id: 'demo-tenant' },
-      });
+      // demo-tenant is NOT deleted: it is the shared seed tenant every other
+      // spec signs into, and deleting it cascades through the demo data.
     });
     await prisma.$disconnect();
   });
