@@ -2643,6 +2643,23 @@
       "slug_taken": "Bu kısa adla (slug) bir yazı zaten var. Başlığı ya da kısa adı değiştirin.",
       "not_found": "Yazı bulunamadı; başka bir yönetici silmiş olabilir. Sayfayı yenileyin.",
       "save_failed": "Yazı kaydedilemedi. Lütfen tekrar deneyin."
+    },
+    "image": {
+      "label": "Kapak görseli",
+      "choose": "Görsel seç",
+      "change": "Görseli değiştir",
+      "hint": "JPG, PNG veya WebP, en fazla {maxMb} MB.",
+      "uploading": "Görsel yükleniyor…",
+      "uploaded": "Görsel yüklendi.",
+      "previewAlt": "Kapak görseli önizlemesi",
+      "missing": "Kaydetmeden önce bir kapak görseli yükleyin.",
+      "errors": {
+        "type": "Bu dosya türü desteklenmiyor. JPG, PNG veya WebP bir görsel seçin.",
+        "size": "Görsel {maxMb} MB'tan büyük. Daha küçük bir dosya seçin.",
+        "forbidden": "Görsel yükleme yetkiniz yok. Platform yöneticisi olarak oturum açın.",
+        "object_store_unconfigured": "Dosya deposu yapılandırılmamış; görsel şu an yüklenemiyor. Sistem yöneticisine bildirin.",
+        "upload_failed": "Görsel yüklenemedi. Lütfen tekrar deneyin."
+      }
     }
   },
   "adminDocuments": {
