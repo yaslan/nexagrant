@@ -218,8 +218,10 @@ test.describe('Settings → Modules access control (RBAC)', () => {
     await expect(profileLink).toBeVisible();
 
     // Open user menu and verify no "Modül Ayarları" link
-    const userButton = page.getByRole('button').last();
+    const userButton = page.getByRole('button', { name: /Member User/ }).filter({ visible: true });
     await userButton.click();
+    // The menu is open: its profile entry is on screen before we assert an absence.
+    await expect(page.getByText('member@test.local').filter({ visible: true })).toBeVisible();
     const moduleSettingsLink = page.locator('a[href*="ayarlar/moduller"], a[href*="settings/modules"]');
     await expect(moduleSettingsLink).toHaveCount(0);
 
@@ -252,11 +254,13 @@ test.describe('Settings → Modules access control (RBAC)', () => {
     await expect(settingsLink).toBeVisible();
 
     // Open user menu and verify "Modül Ayarları" link exists
-    // User menu button is in the last relative div (after notifications button)
-    const userButton = page.locator('div.relative').last().locator('button').first();
+    const userButton = page.getByRole('button', { name: /Tenant Owner User/ }).filter({ visible: true });
     await userButton.click();
-    const moduleSettingsLink = page.locator('a[href*="ayarlar/moduller"], a[href*="settings/modules"]');
+    const moduleSettingsLink = page
+      .locator('a[href*="ayarlar/moduller"], a[href*="settings/modules"]')
+      .filter({ hasText: /Modül Ayarları|Module Settings/ });
     await expect(moduleSettingsLink).toBeVisible();
+    await expect(moduleSettingsLink).toContainText(/Modül Ayarları|Module Settings/);
 
     await page.screenshot({ path: `${SHOTS}/03-owner-user-menu.png`, fullPage: false });
   });
