@@ -90,6 +90,7 @@ export default async function AppLayout({
   );
 
   const canManageModules = can(asRole(roleName), 'manage_modules');
+  const canManageUsers = can(asRole(roleName), 'manage_users');
 
   return (
     <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-background">
@@ -102,6 +103,7 @@ export default async function AppLayout({
         roleName={roleName}
         isPlatformAdmin={isPlatformAdmin}
         canManageModules={canManageModules}
+        canManageUsers={canManageUsers}
         workspaces={workspaces}
         cobrand={cobrand}
       />
@@ -122,7 +124,7 @@ export default async function AppLayout({
           />
         </Link>
 
-        <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} canManageModules={canManageModules} />
+        <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} canManageModules={canManageModules} canManageUsers={canManageUsers} />
       </aside>
 
       {/* Main Workspace Frame */}
@@ -142,6 +144,7 @@ export default async function AppLayout({
               roleName={roleName}
               workspaces={workspaces}
               canManageModules={canManageModules}
+              canManageUsers={canManageUsers}
             />
           </div>
         </header>
