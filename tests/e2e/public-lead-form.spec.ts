@@ -138,6 +138,22 @@ test.describe('public lead form — /tr/fon-hazirlik result screen', () => {
     await context.close();
   });
 
+  test('before hydration the submit button is disabled, so no native GET puts the details in the URL', async ({ browser }) => {
+    // JavaScript off = the server-rendered form as it stands until React hydrates it.
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    await page.goto(TR_RESULT);
+    await page.getByLabel('Adınız soyadınız').fill('Ön Yükleme');
+    await page.getByLabel('E-posta adresiniz').fill(email('prehydration'));
+    const submit = page.getByRole('button', { name: 'Gönder' });
+    await expect(submit).toBeDisabled();
+    // Implicit submission (Enter in a field) is blocked too while the default button is disabled.
+    await page.getByLabel('E-posta adresiniz').press('Enter');
+    expect(new URL(page.url()).searchParams.get('email')).toBeNull();
+    expect(page.url()).toContain(`cevap=${ANSWERS}`);
+    await context.close();
+  });
+
   test('required fields, an invalid e-mail and a missing consent each block the submit', async ({ browser }) => {
     const { context, page } = await anonymousPage(browser);
     const address = email('blocked');

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslations } from 'next-intl';
 import { analytics } from '@/lib/analytics';
 import { PRODUCT_NAME } from '@/lib/brand';
@@ -31,6 +31,7 @@ const focusRing =
 const inputClass = `mt-1 min-h-11 w-full rounded-lg border bg-surface px-3 text-sm text-ink ${focusRing}`;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FIELD_ORDER: readonly (PublicLeadField | 'consent')[] = ['name', 'email', 'organisation', 'province', 'district', 'consent'];
+const noSubscribe = () => () => {};
 
 /**
  * Contact form on the readiness result screen (TASK-MULR765AR5G0C). Nothing is
@@ -51,6 +52,14 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
   const honeypotRef = useRef<HTMLInputElement>(null);
   const successRef = useRef<HTMLHeadingElement>(null);
   const months = publicLeadRetentionMonths();
+  // The form is server-rendered without an action: before hydration a click on
+  // submit is a native GET to this page, which puts the name and e-mail in the URL
+  // and drops the result query. The button stays disabled until onSubmit is live.
+  const hydrated = useSyncExternalStore(
+    noSubscribe,
+    () => true,
+    () => false,
+  );
 
   // After the success panel has rendered, not before: a keyboard or screen-reader
   // user lands on the confirmation instead of the top of the page.
@@ -352,8 +361,8 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
 
         <button
           type="submit"
-          disabled={sending}
-          aria-disabled={sending}
+          disabled={sending || !hydrated}
+          aria-disabled={sending || !hydrated}
           className={`inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent-strong px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60 sm:w-auto ${focusRing}`}
         >
           {sending ? t('sending') : t('submit')}
