@@ -154,6 +154,22 @@ test.describe('public lead form — /tr/fon-hazirlik result screen', () => {
     await context.close();
   });
 
+  test('opening a shared result keeps focus and scroll where the visitor left them', async ({ browser }) => {
+    const { context, page } = await anonymousPage(browser);
+    await page.goto(TR_RESULT);
+    const submit = page.getByRole('button', { name: 'Gönder' });
+    // Enabled = hydrated; the mount effects have run by then.
+    await expect(submit).toBeEnabled();
+    await expect(page.locator('#result-heading')).not.toBeFocused();
+    await submit.scrollIntoViewIfNeeded();
+    const y = await page.evaluate(() => window.scrollY);
+    expect(y).toBeGreaterThan(0);
+    await submit.click();
+    await expect(page.getByText('Adınızı yazın (en az 2 karakter).')).toBeVisible();
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    await context.close();
+  });
+
   test('required fields, an invalid e-mail and a missing consent each block the submit', async ({ browser }) => {
     const { context, page } = await anonymousPage(browser);
     const address = email('blocked');
