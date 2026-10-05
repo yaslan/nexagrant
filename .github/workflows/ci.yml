@@ -43,6 +43,17 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+      # Mail catcher for the e2e step (TASK-MUVFUDZDKSMWO). The invite cooldown
+      # answers (`recently_sent`, `role_change_blocked`) only exist once a mail
+      # has really been sent; with no SMTP the server stops at "created, mail
+      # not sent" and tests/e2e/team-members-ui.spec.ts cannot reach them.
+      # Accepts anything on :1025, nothing leaves the runner; :8025 is its API.
+      # axllent/mailpit v1.31.3, pinned by digest like MinIO below.
+      mailpit:
+        image: axllent/mailpit@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+        ports:
+          - 1025:1025
+          - 8025:8025
     steps:
     - uses: actions/checkout@v4
     
@@ -213,6 +224,14 @@ jobs:
         AUTH_URL: 'http://localhost:3000'
         NEXTAUTH_URL: 'http://localhost:3000'
         AUTH_TRUST_HOST: 'true'
+        # The mailpit service above; E2E_MAILPIT_URL turns on the inbox check.
+        # An invitation mail needs a base URL for its link and is not sent
+        # without one. The dev server falls back to this same origin anyway,
+        # so it changes nothing else (a `start` run refuses loopback here).
+        SMTP_HOST: 'localhost'
+        SMTP_PORT: '1025'
+        E2E_MAILPIT_URL: 'http://localhost:8025'
+        NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
         # Invoice test data
         INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.'
         INVOICE_SUPPLIER_VKN: '1000000000'
