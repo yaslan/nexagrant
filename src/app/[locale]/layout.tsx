@@ -3,6 +3,7 @@ import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
 import CookieConsent from '@/components/CookieConsent';
+import { LocaleUpdater } from '@/components/LocaleUpdater';
 
 import { CartProvider } from '@/components/cart/CartContext';
 import { CartDrawer } from '@/components/cart/CartDrawer';
@@ -29,6 +30,7 @@ export default async function LocaleLayout({
           read-only: the cart and every price card render under the same tier
           the checkout route prices with. */}
       <CartProvider activeTier={getActiveTier()}>
+        <LocaleUpdater />
         {children}
         <CartDrawer locale={locale} />
         <CookieConsent />
