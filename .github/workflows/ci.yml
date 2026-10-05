@@ -176,6 +176,14 @@ jobs:
           || aws --endpoint-url http://localhost:9000 s3api create-bucket --bucket test-evidence
         aws --endpoint-url http://localhost:9000 s3api head-bucket --bucket test-evidence
         echo "bucket test-evidence ready"
+        # Blog images (TASK-MUU20NSV2TETW): a second bucket anyone may read,
+        # like the public bucket a deployment serves blog covers from. The
+        # evidence bucket above stays private.
+        aws --endpoint-url http://localhost:9000 s3api head-bucket --bucket test-public 2>/dev/null \
+          || aws --endpoint-url http://localhost:9000 s3api create-bucket --bucket test-public
+        aws --endpoint-url http://localhost:9000 s3api put-bucket-policy --bucket test-public --policy \
+          '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::test-public/*"]}]}'
+        echo "bucket test-public ready (anonymous read)"
       env:
         AWS_ACCESS_KEY_ID: minioadmin
         AWS_SECRET_ACCESS_KEY: minioadmin
@@ -196,6 +204,8 @@ jobs:
         R2_ACCESS_KEY_ID: 'minioadmin'
         R2_SECRET_ACCESS_KEY: 'minioadmin'
         R2_BUCKET: 'test-evidence'
+        R2_PUBLIC_BUCKET: 'test-public'
+        R2_PUBLIC_HOST: 'http://localhost:9000/test-public'
         # OAuth placeholder env for E2E auth tests (tests render button only, no real Google interaction)
         AUTH_GOOGLE_ID: 'ci-placeholder-id.apps.googleusercontent.com'
         AUTH_GOOGLE_SECRET: 'ci-placeholder-google-secret'

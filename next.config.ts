@@ -8,6 +8,7 @@ import {
   API_CONTENT_SECURITY_POLICY,
   STATIC_FILE_CONTENT_SECURITY_POLICY,
   STATIC_SECURITY_HEADERS,
+  publicAssetImagePattern,
   staticFileNotFoundSource,
 } from './src/lib/security-headers';
 
@@ -96,6 +97,10 @@ const nextConfig: NextConfig = {
       // (TASK-MUNWZGWA70P16, İNCELEME-71 B-5).
       { protocol: 'https', hostname: 'images.unsplash.com', port: '' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com', port: '' },
+      // Uploaded blog images (TASK-MUU20NSV2TETW): the public bucket's host
+      // from R2_PUBLIC_HOST, `blog/` objects only. Read when this file loads,
+      // so a standalone build needs the variable at `next build` time too.
+      ...[publicAssetImagePattern(process.env.R2_PUBLIC_HOST)].filter((p) => p !== null),
     ],
   },
   /**
