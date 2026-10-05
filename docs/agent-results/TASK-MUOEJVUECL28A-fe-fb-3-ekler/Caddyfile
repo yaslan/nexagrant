@@ -1,0 +1,20 @@
+{
+	default_bind tcp4/0.0.0.0
+	admin unix//run/caddy/admin.sock
+	servers {
+		strict_sni_host on
+	}
+}
+fonbridge.com {
+	encode zstd gzip
+	header >Strict-Transport-Security "max-age=31536000"
+	reverse_proxy 127.0.0.1:3000
+}
+www.fonbridge.com, http://www.fonbridge.com, http://fonbridge.com {
+	redir https://fonbridge.com{uri} permanent
+}
+import {$FB_AGENCIES:/etc/caddy/agencies.d/agencies.caddy}
+:443 {
+	tls internal
+	respond 421
+}

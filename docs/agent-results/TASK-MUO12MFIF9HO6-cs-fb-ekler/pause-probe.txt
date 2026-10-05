@@ -1,0 +1,3 @@
+single: 2.097811s
+burst 1: min=2.917884s median=4.478595s max=5.017085s
+burst 2: min=4.875425s median=6.474544s max=7.842214s

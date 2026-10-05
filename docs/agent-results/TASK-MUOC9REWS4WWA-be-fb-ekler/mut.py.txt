@@ -1,0 +1,46 @@
+# be-fb TASK-MUOC9REWS4WWA — kendi mutantlarım. Her mutant kaydedilmiş orijinalden geri yazılır (git checkout yok).
+import subprocess, os, sys, re
+W = os.environ['WTM']; os.chdir(W)
+TESTS = ['tests/cordis-csv.test.ts','tests/api/admin-cordis-import-500.test.ts','tests/cordis-import.test.ts','tests/admin-actions-authz.test.ts','tests/api/api-error-body-guard.test.ts']
+A='src/app/[locale]/admin/cordis/actions.ts'; I='src/lib/k2-cordis/importer.ts'; C='src/app/[locale]/admin/cordis/client.tsx'; F='src/lib/k2-cordis/failure-codes.ts'
+M = [
+ ('B0 değişiklik yok', []),
+ ('B1 importer başarısız sonuca ek alan: detail: errorMsg', [(I,'      errorCode,\n      ...(fileSkips','      errorCode,\n      detail: errorMsg,\n      ...(fileSkips')]),
+ ('B2 eylem importer sonucunu yayar (...importRes)', [(A,'return { success: false, errorCode: cordisImportFailureCode(importRes.errorCode) };','return { ...importRes, success: false, errorCode: cordisImportFailureCode(importRes.errorCode) };')]),
+ ('B3 eylem skippedRecords örneklerini döndürür', [(A,'return { success: false, errorCode: cordisImportFailureCode(importRes.errorCode) };','return { success: false, errorCode: cordisImportFailureCode(importRes.errorCode), skipped: importRes.skippedRecords?.flatMap((s) => s.samples) };')]),
+ ('B4 handleGetK2Status lastRun yayılır (...lastRun)', [(A,'          runId: lastRun.runId,','          ...lastRun,\n          runId: lastRun.runId,')]),
+ ('B5 handleGetK2Status rowCounts yoksa error', [(A,'          rowCounts: lastRun.rowCounts,','          rowCounts: lastRun.rowCounts ?? lastRun.error,')]),
+ ('B6 importer logger.error satırı silinir', [(I,"    logger.error('[k2-cordis] import failed', error, { runId: runRecord?.runId, dataset, errorCode });\n",'')]),
+ ('B7 alarm meta.error silinir', [(I,'meta: { runId: runRecord?.runId, error: errorMsg.slice(0, 2000) },','meta: { runId: runRecord?.runId },')]),
+ ('B8 run satırına kod yazılır (ayrıntı kaybı)', [(I,'          error: errorMsg,\n        },\n      });\n    } catch (_e) {','          error: errorCode,\n        },\n      });\n    } catch (_e) {')]),
+ ('B9 whitelist her dizgiyi geçirir', [(F,"typeof code === 'string' && KNOWN.has(code)","typeof code === 'string'")]),
+ ('B10 sınıflandırma: her Error → SKIP_LIMIT_EXCEEDED', [(I,'error instanceof CordisSkipLimitError ?','error instanceof Error ?')]),
+ ('B11 istemci catch ham metni koda koyar', [(C,"setImportResult({ success: false, errorCode: 'IMPORT_FAILED' });","setImportResult({ success: false, errorCode: String(err) as never });")]),
+ ('B12 istemci kodu whitelist\'siz basar + ham kod', [(C,"{t(`importErrors.${cordisImportFailureCode(importResult.errorCode)}`)}","{t(`importErrors.${importResult.errorCode}`)} {String(importResult.errorCode)}")]),
+ ('B13 CordisSkipLimitError yerine düz Error fırlatılır', [(I,'  throw new CordisSkipLimitError(','  throw new Error(')]),
+]
+env = dict(os.environ, CI='true')
+out = open(os.environ['OUT'],'w')
+def log(s): print(s); out.write(s+'\n'); out.flush()
+for name, edits in M:
+    saved = {}
+    ok = True
+    for f, a, b in edits:
+        src = saved.get(f) or open(f).read(); saved.setdefault(f, src)
+        cur = open(f).read()
+        if cur.count(a) != 1: log(f'{name}: UYGULANAMADI ({f} eşleşme {cur.count(a)})'); ok=False; break
+        open(f,'w').write(cur.replace(a,b))
+    if ok:
+        r = subprocess.run(['npx','vitest','run',*TESTS], capture_output=True, text=True, env=env)
+        t = r.stdout + r.stderr
+        m = re.search(r'Tests\s+(.*)', t); fails = re.findall(r'(?:FAIL|×)\s+(.*)', t)
+        extra = ''
+        if f'{C}' in [e[0] for e in edits] or name.startswith('B9'):
+            tc = subprocess.run(['npx','tsc','--noEmit','-p','.'], capture_output=True, text=True); extra += f' | tsc={tc.returncode}'
+            li = subprocess.run(['pnpm','-s','i18n:check'], capture_output=True, text=True); extra += f' | i18n={li.returncode}'
+            ln = subprocess.run(['npx','eslint',C], capture_output=True, text=True); extra += f' | eslint(client)={ln.returncode}'
+        log(f'{name}: vitest exit={r.returncode} {m.group(1) if m else "?"}{extra}')
+        for x in sorted(set(fails))[:6]: log(f'    kırmızı: {x.strip()[:150]}')
+    for f, src in saved.items(): open(f,'w').write(src)
+st = subprocess.run(['git','status','--short'], capture_output=True, text=True).stdout
+log('son git status: ' + (st.strip() or 'temiz'))

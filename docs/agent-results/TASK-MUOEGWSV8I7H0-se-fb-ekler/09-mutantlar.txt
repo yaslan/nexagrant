@@ -1,0 +1,27 @@
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55141/f
+### M1: scripts/apply-migrations.sh = dev (b8cde55e) sürümü
+     × without the one-time grant it stops before applying any file 1394ms
+     × with the grant the whole chain runs to the end, and a second run before db:rls refuses 1878ms
+     × after db:rls, the FORCE-RLS backfills update as many rows as under the superuser 3698ms
+     × a stored default for app.system_scope stops the run before any file 1812ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > without the one-time grant it stops before applying any file
+AssertionError: expected 3 to be 1 // Object.is equality
+ FAIL  tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > with the grant the whole chain runs to the end, and a second run before db:rls refuses
+AssertionError: expected '==> [1/41] add-m6-evaluator-lens.sql\…' to match /apply-migrations: \d+ files applied a…/
+ FAIL  tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > after db:rls, the FORCE-RLS backfills update as many rows as under the superuser
+AssertionError: expected { feedback_legacy: +0, …(6) } to deeply equal { feedback_legacy: 2, …(6) }
+ FAIL  tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > a stored default for app.system_scope stops the run before any file
+AssertionError: expected +0 to be 1 // Object.is equality
+      Tests  4 failed | 2 passed (6)
+
+### M2: yalnız -c "SET app.system_scope = 'on'" çıkarıldı
+0
+     × after db:rls, the FORCE-RLS backfills update as many rows as under the superuser 3923ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/migration-owner-chain.live.test.ts > apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS) > after db:rls, the FORCE-RLS backfills update as many rows as under the superuser
+AssertionError: expected { feedback_legacy: +0, …(6) } to deeply equal { feedback_legacy: 2, …(6) }
+      Tests  1 failed | 5 passed (6)
+
+### geri yüklendi: diff fixed = aynı
+      Tests  6 passed (6)

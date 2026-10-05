@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/vitest-report.json
 
 # next.js
 /.next/
@@ -32,6 +33,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# The template is tracked: every setting a new checkout needs (DEMO_LOGIN_ENABLED,
+# INVOICE_SUPPLIER_*, ...) lives here with placeholder values only. Never put a
+# real secret in it (TASK-MULRUCLPGIVIL).
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +44,71 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# beta onboarding (E11.1) — rendered invitations carry live invitation tokens,
+# which grant TENANT_OWNER access; the real roster carries partner PII.
+# Both stay out of the repository.
+docs/BETA_DATA/generated/
+docs/BETA_DATA/beta-partners.local.csv
+
+# one-off codemod scripts and tooling dumps (S8 cleanup)
+# Ad-hoc regex patchers written during a typecheck firefight: they rewrite
+# source in place (including the `as any` hacks CLAUDE.md forbids) and must
+# never be re-run. resolution.log is a 5 MB `tsc --traceResolution` dump.
+fix-*.py
+patch_schema*.py
+resolution.log
+*.bak
+
+# Playwright artifacts
+test-results/
+playwright-report/
+.tmp-be-en/
+# Screenshots, CSVs and HTML dumps an e2e run produces. Default root of
+# tests/e2e/fixtures/shots.ts: without it every run rewrote the committed
+# evidence frames of already-closed tasks under docs/agent-results/.
+# Publishing a frame is deliberate: E2E_SHOTS_ROOT=docs/agent-results.
+test-artifacts/
+
+# ad-hoc agent verification scratch (not part of the build)
+.qa-scratch/
+.tmp-qa-en/
+
+# CORDIS bulk archives land here at runtime (src/lib/k2-cordis/importer.ts,
+# CORDIS_TMP_DIR). The real dataset is a ~500 MB zip; it must never be committed.
+tmp_cordis/
+
+# cPanel Production Backups & Database Dumps (TASK-MTJ1D7K5TBS0B)
+cpanel-backup/
+production_backup/
+production_backup.zip
+*.dump.sql
+*.sql.gz
+cpanel_*.tar.gz
+
+
+# Throwaway compile probe from tests/prisma-delegate-types-are-real.test.ts —
+# removed by the test itself; ignored so a killed run leaves nothing tracked.
+.prisma-delegate-probe/
+
+# .claude/worktrees — isolated development environments created by CLI tools.
+# They are internal project directories not part of the main codebase and should
+# not be tested or tracked; test runners must exclude **/.claude/worktrees/** to
+# avoid collecting test files from stale/diverged worktrees.
+.claude/worktrees/
+
+# Local planning/business folder (TASK-MULQJZNB7U3QN) — holds a Google OAuth
+# client secret, .docx and .zip; not production code. Never commit.
+/AB Project SaaS/
+
+# Credential files wherever they land, not only under /AB Project SaaS/
+# (TASK-MULRUCLPGIVIL, crw-fb K-8): Google OAuth client secrets, GCP service
+# account keys, PKCS#12 bundles and private keys. *.pem is covered above.
+client_secret*.json
+service-account*.json
+*.p12
+*.key
+*.pfx
+
+# FB KAMU B4 — local stand-in for R2 in development (src/lib/storage.ts)
+/.dev-objects/

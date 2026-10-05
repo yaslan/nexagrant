@@ -1,0 +1,228 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:8:48). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/macbook/AgentSpace/fabrika
+
+ ❯ tests/efatura-foreign-currency.test.ts (7 tests | 5 failed) 20ms
+     × the printable document never prints ₺ on an amount that is not TRY 17ms
+     × the document that reaches the renderer carries the amount under a currency-neutral name 1ms
+     × totals are rounded in the invoice currency, not always in kuruş 1ms
+     × the block is named, so a caller can report which figures are missing 0ms
+     × filing a USD document is refused before the adapter is ever reached 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/efatura-foreign-currency.test.ts > a foreign-currency invoice states its own currency > the printable document never prints ₺ on an amount that is not TRY
+AssertionError: expected '<!DOCTYPE html>\n<html lang="tr">\n<h…' not to contain '₺'
+
+- Expected
++ Received
+
+- ₺
++ <!DOCTYPE html>
++ <html lang="tr">
++ <head>
++   <meta charset="UTF-8">
++   <title>ÖRNEK — E-Fatura - FB-2026-000001</title>
++   <style>
++     @page { size: A4; margin: 15mm; }
++     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0f172a; font-size: 10pt; line-height: 1.5; }
++     .header-box { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
++     .company-title { font-size: 14pt; font-weight: bold; color: #1e3a8a; }
++     .doc-type { font-size: 16pt; font-weight: bold; color: #b91c1c; text-align: right; }
++     .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
++     .party-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: #f8fafc; }
++     .party-title { font-weight: bold; font-size: 11pt; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; color: #334155; }
++     table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5pt; }
++     th { background: #0f172a; color: #fff; padding: 8px; text-align: left; }
++     .totals-table { width: 45%; margin-left: auto; border: none; }
++     .totals-table td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }
++     .totals-table td.label { font-weight: bold; color: #475569; }
++     .grand-total { background: #f1f5f9; font-size: 11pt; font-weight: bold; color: #0f172a; }
++     .footer { font-size: 8pt; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 8px; text-align: center; }
++     /* Deliberately not inside .no-print: the mark has to survive the printout
++        and the PDF, which is exactly where an unfiled document would otherwise
++        start looking like a filed one. */
++     .unfiled-banner {
++       border: 2px solid #b91c1c; background: #fef2f2; color: #7f1d1d;
++       font-weight: bold; text-align: center; padding: 10px; border-radius: 6px;
++       margin-bottom: 14px; letter-spacing: 0.02em;
++       -webkit-print-color-adjust: exact; print-color-adjust: exact;
++     }
++     @media print {
++       .no-print { display: none; }
++     }
++   </style>
++ </head>
++ <body>
++   <div class="unfiled-banner">ÖRNEK BELGE — GİB'e gönderilmemiştir, mali mühür taşımaz ve mali değeri yoktur.</div>
++   <div class="no-print" style="background:#f1f5f9; padding:10px; text-align:right; margin-bottom:15px;">
++     <button onclick="window.print()" style="background:#1e3a8a; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">
++       🖨️ Faturayı Yazdır / PDF İndir
++     </button>
++   </div>
++
++   <div class="header-box">
++     <div>
++       <div class="company-title">Test Tedarikçi A.Ş.</div>
++       <div style="font-size: 8.5pt; color: #475569; margin-top: 4px;">
++         Test Cad. No:1 - Ankara / Türkiye<br>
++         Vergi Dairesi: Test V.D. | VKN: 1000000000
++       </div>
++     </div>
++     <div>
++       <div class="doc-type">e-Fatura</div>
++       <div style="font-size: 9pt; font-family: monospace; text-align: right; color: #334155;">
++         <strong>Fatura No:</strong> FB-2026-000001<br>
++         <strong>Tarih:</strong> 2026-09-08<br>
++         <strong>ETTN:</strong> 5f6b1c2a-0000-4000-8000-000000000001
++       </div>
++     </div>
++   </div>
++
++   <div class="meta-grid">
++     <div class="party-box">
++       <div class="party-title">SAYIN (ALICI)</div>
++       <strong>Anadolu Danışmanlık Ltd. Şti.</strong><br>
++       Bağdat Cad. No:10 - İstanbul / Türkiye<br>
++       <strong>Vergi Dairesi:</strong> Kadıköy V.D.<br>
++       <strong>VKN:</strong> 2840958172
++     </div>
++
++     <div class="party-box">
++       <div class="party-title">FATURA DETAYLARI</div>
++       <strong>Senaryo:</strong> TICARIFATURA<br>
++       <strong>Fatura Tipi:</strong> SATIS<br>
++       <strong>Düzenleme Zamanı:</strong> 2026-09-08 09:00:00<br>
++       <strong>Para Birimi:</strong> USD
++     </div>
++   </div>
++
++   <table>
++     <thead>
++       <tr>
++         <th style="width: 5%; text-align: center;">Sıra</th>
++         <th style="width: 45%;">Hizmet / Ürün Açıklaması</th>
++         <th style="width: 10%; text-align: center;">Miktar</th>
++         <th style="width: 15%; text-align: right;">Birim Fiyat</th>
++         <th style="width: 10%; text-align: center;">KDV Oranı</th>
++         <th style="width: 15%; text-align: right;">Toplam Tutar</th>
++       </tr>
++     </thead>
++     <tbody>
++       
++     <tr>
++       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">1</td>
++       <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Fabrika Pro (1 ay)</strong></td>
++       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">1 Adet</td>
++       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace;">₺99,00</td>
++       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">%20</td>
++       <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace; font-weight: bold;">₺99,00</td>
++     </tr>
++   
++     </tbody>
++   </table>
++
++   <table class="totals-table">
++     <tr>
++       <td class="label">Ara Toplam (Matrah):</td>
++       <td style="text-align: right; font-family: monospace;">₺99,00</td>
++     </tr>
++     <tr>
++       <td class="label">Hesaplanan KDV (%20):</td>
++       <td style="text-align: right; font-family: monospace;">₺19,80</td>
++     </tr>
++     
++     <tr class="grand-total">
++       <td class="label">ÖDENECEK GENEL TOPLAM:</td>
++       <td style="text-align: right; font-family: monospace; color: #047857;">₺118,80</td>
++     </tr>
++   </table>
++
++   <div class="footer">
++     ÖRNEK BELGE — GİB'e gönderilmemiştir, mali mühür taşımaz ve mali değeri yoktur.
++   </div>
++ </body>
++ </html>
+
+ ❯ tests/efatura-foreign-currency.test.ts:74:22
+     72|     // The header already says USD; the money cells used to disagree w…
+     73|     expect(html).toContain('USD');
+     74|     expect(html).not.toContain('₺');
+       |                      ^
+     75|     expect(html).toContain('$99,00');
+     76|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  tests/efatura-foreign-currency.test.ts > a foreign-currency invoice states its own currency > the document that reaches the renderer carries the amount under a currency-neutral name
+AssertionError: expected { id: '1', …(5) } to not have property "unitPriceTRY"
+
+- Expected:
+undefined
+
++ Received:
+99
+
+ ❯ tests/efatura-foreign-currency.test.ts:87:30
+     85|     const doc = buildInvoiceDocument(USD_RECORD, SUPPLIER);
+     86|     // `unitPriceTRY` was the name that let a USD amount be printed as…
+     87|     expect(doc.lines[0]).not.toHaveProperty('unitPriceTRY');
+       |                              ^
+     88|     expect(doc.lines[0]!.unitPrice).toBe(99);
+     89|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  tests/efatura-foreign-currency.test.ts > a foreign-currency invoice states its own currency > totals are rounded in the invoice currency, not always in kuruş
+Error: Not a decimal amount: null
+ ❯ toMinorUnits src/lib/money.ts:41:11
+     39|   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(text);
+     40|   if (!match) {
+     41|     throw new Error(`Not a decimal amount: ${JSON.stringify(decimal)}`…
+       |           ^
+     42|   }
+     43|   const [, sign, whole, fractionRaw = ''] = match;
+ ❯ calculateInvoiceTotals src/lib/efatura.ts:133:28
+ ❯ tests/efatura-foreign-currency.test.ts:92:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  tests/efatura-foreign-currency.test.ts > a foreign-currency invoice may not be filed without its TL figures > the block is named, so a caller can report which figures are missing
+TypeError: foreignCurrencyFilingBlock is not a function
+ ❯ tests/efatura-foreign-currency.test.ts:103:12
+    101|
+    102|   test('the block is named, so a caller can report which figures are m…
+    103|     expect(foreignCurrencyFilingBlock(buildInvoiceDocument(TRY_RECORD,…
+       |            ^
+    104|
+    105|     const reason = foreignCurrencyFilingBlock(usdDoc());
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  tests/efatura-foreign-currency.test.ts > a foreign-currency invoice may not be filed without its TL figures > filing a USD document is refused before the adapter is ever reached
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/efatura-foreign-currency.test.ts:121:21
+    119|     );
+    120|
+    121|     expect(reached).toBe(false);
+       |                     ^
+    122|     expect(isFiled(outcome)).toBe(false);
+    123|     expect(outcome.status).toBe('rejected');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 2 passed (7)
+   Start at  20:14:44
+   Duration  161ms (transform 27ms, setup 0ms, import 56ms, tests 20ms, environment 0ms)
+

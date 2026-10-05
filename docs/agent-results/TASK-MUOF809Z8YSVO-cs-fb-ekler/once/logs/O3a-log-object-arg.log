@@ -1,0 +1,90 @@
+# O3a-log-object-arg [Ö-3a] scripts/k1-embeddings-unlock-rejected.ts
+# - 'for (const p of profiles) console.log(`  profile ${p.tenantId}`);'
+# + 'for (const p of profiles) console.log("  profile", (await withTenant(p.tenantId, (tx) => tx.tenantProfile.findUnique({ where: { tenantId: p.tenantId } }))));'
+# restored_clean=True
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ddace75c-be72-4b5d-ab0e-0cce77253d82/scratchpad/wt
+
+ ❯ tests/k1-embeddings.live.test.ts (11 tests | 1 failed | 1 skipped) 853ms
+     × a refused request (every input, the probe too) marks no row, profile or topic, and stops the run (İNCELEME-85 Y-1) 125ms
+ ❯ tests/k1-embeddings-unlock.live.test.ts (6 tests | 1 failed) 1337ms
+     × --apply clears only `rejected:` rows, after a backup of exactly those; a second --apply finds nothing 184ms
+
+ Test Files  2 failed | 2 passed (4)
+      Tests  2 failed | 120 passed | 1 skipped (123)
+   Start at  21:58:01
+   Duration  2.28s (transform 1.93s, setup 0ms, import 3.52s, tests 2.33s, environment 0ms)
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+(node:69520) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/k1-embeddings-unlock.live.test.ts > k1-embeddings-unlock-rejected (live, fabrika_app) > --apply clears only `rejected:` rows, after a backup of exactly those; a second --apply finds nothing
+AssertionError: expected '[["APPLY — marked rows: topics 2, ten…' not to contain 'Secret capability text of t-unl-a-p9n…'
+
+- Expected
++ Received
+
+- Secret capability text of t-unl-a-p9n9vkez
++ [["APPLY — marked rows: topics 2, tenant profiles 2"],["  topic   tp-unl-m1-p9n9vkez"],["  topic   tp-unl-m2-p9n9vkez"],["  profile",{"tenantId":"t-unl-a-p9n9vkez","capabilities":"Secret capability text of t-unl-a-p9n9vkez","keywords":[],"naceCodes":[],"trlRange":[],"preferredRoles":[],"priorProjects":[],"embeddingHash":"rejected:pa-p9n9vkez","updatedAt":"2026-09-30T18:58:02.298Z"}],["  profile",{"tenantId":"t-unl-d-p9n9vkez","capabilities":"Secret capability text of t-unl-d-p9n9vkez","keywords":[],"naceCodes":[],"trlRange":[],"preferredRoles":[],"priorProjects":[],"embeddingHash":"rejected:pd-p9n9vkez","updatedAt":"2026-09-30T18:58:02.301Z"}],["\nBackup written: /var/folders/4q/vwck56vd699b6jw6gp1sc0w80000gn/T/k1-unlock-OlHLsc/k1-unlock-backup-2026-09-30T18-58-02-436Z.json (undo: -- --restore=/var/folders/4q/vwck56vd699b6jw6gp1sc0w80000gn/T/k1-unlock-OlHLsc/k1-unlock-backup-2026-09-30T18-58-02-436Z.json)"],["Cleared: topics 2, tenant profiles 2. The next k1-embeddings run judges them again."]]{
++  "createdAt": "2026-09-30T18:58:02.437Z",
++  "topics": [
++   {
++    "id": "tp-unl-m1-p9n9vkez",
++    "embeddingHash": "rejected:m1-p9n9vkez"
++   },
++   {
++    "id": "tp-unl-m2-p9n9vkez",
++    "embeddingHash": "rejected:m2-p9n9vkez"
++   }
++  ],
++  "profiles": [
++   {
++    "tenantId": "t-unl-a-p9n9vkez",
++    "embeddingHash": "rejected:pa-p9n9vkez"
++   },
++   {
++    "tenantId": "t-unl-d-p9n9vkez",
++    "embeddingHash": "rejected:pd-p9n9vkez"
++   }
++  ]
++ }
+
+ ❯ tests/k1-embeddings-unlock.live.test.ts:150:70
+    148|     // Ids and counts only: no profile text in the backup or the outpu…
+    149|     const printed = JSON.stringify(log.mock.calls) + fs.readFileSync(r…
+    150|     for (const id of Object.keys(TENANT_HASHES)) expect(printed).not.t…
+       |                                                                      ^
+    151|
+    152|     const again = await unlockRejected({ ...SCOPE, apply: true, backup…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/k1-embeddings.live.test.ts > K1 embeddings (live, fabrika_app) — refused rows (İNCELEME-55 B-1) > a refused request (every input, the probe too) marks no row, profile or topic, and stops the run (İNCELEME-85 Y-1)
+AssertionError: expected { topicsScanned: 4, …(20) } to match object { profilesEmbedded: 1, …(2) }
+(18 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "profilesEmbedded": 1,
+    "requestRefused": false,
+-   "topicsEmbedded": 1,
++   "topicsEmbedded": 3,
+  }
+
+ ❯ tests/k1-embeddings.live.test.ts:327:18
+    325|     // Once the provider takes the request again, both are embedded: n…
+    326|     const back = await runK1Embeddings({ topicIds: LONG_TOPICS, tenant…
+    327|     expect(back).toMatchObject({ profilesEmbedded: 1, topicsEmbedded: …
+       |                  ^
+    328|     await admin.tenantProfile.update({ where: { tenantId: T_A }, data:…
+    329|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

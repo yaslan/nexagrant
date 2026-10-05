@@ -1,0 +1,8 @@
+ Test Files  296 passed | 2 skipped (298)
+      Tests  3793 passed | 41 skipped (3834)
+vitest exit=0
+live-skips exit=0
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence MEMBER reads the open levels only; a confidential level in any spelling needs edit_proposal [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence a role outside the enum (a stale token) reads nothing [skipped]
+  allowed: tests/k1-embeddings.live.test.ts :: K1 embeddings (live, REAL OpenAI) real vectors rank each tenant’s own topic first [skipped]
+live-skips exit=0

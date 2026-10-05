@@ -1,0 +1,32 @@
+ONCE n= 560 mobil main-taşma 14 mobil doc-taşma 0 768 main 10 1280 main 0 status!=200 7 main-yok 49 başlıksız 49
+SONRA n= 560 mobil main-taşma 0 mobil doc-taşma 0 768 main 6 1280 main 0 status!=200 7 main-yok 49 başlıksız 49
+ÖNCE mobil taşmalar:
+   320 /tr/admin/alerts main 41 doc 0 → SONRA main 0 doc 0
+   320 /tr/admin/cordis main 118 doc 0 → SONRA main 0 doc 0
+   320 /tr/fabrika-beta/approvals main 24 doc 0 → SONRA main 0 doc 0
+   320 /tr/fabrika-beta/ayarlar/kapilar main 14 doc 0 → SONRA main 0 doc 0
+   320 /tr/fabrika-beta/onay-merkezi main 24 doc 0 → SONRA main 0 doc 0
+   320 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations main 196 doc 0 → SONRA main 0 doc 0
+   320 /tr/fabrika-beta/settings/gates main 14 doc 0 → SONRA main 0 doc 0
+   360 /tr/admin/alerts main 1 doc 0 → SONRA main 0 doc 0
+   360 /tr/admin/cordis main 78 doc 0 → SONRA main 0 doc 0
+   360 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations main 156 doc 0 → SONRA main 0 doc 0
+   390 /tr/admin/cordis main 48 doc 0 → SONRA main 0 doc 0
+   390 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations main 126 doc 0 → SONRA main 0 doc 0
+   472 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations main 44 doc 0 → SONRA main 0 doc 0
+   640 /tr/fabrika-beta/firsatlar/demo-opp-1 main 4 doc 0 → SONRA main 0 doc 0
+768/1280 taşmalar (önce→sonra):
+   768 /tr/admin/alerts 118 → 0
+   768 /tr/admin/billing 25 → 25
+   768 /tr/admin/cordis 56 → 0
+   768 /tr/admin/feedback 14 → 14
+   768 /tr/admin/modules 95 → 95
+   768 /tr/fabrika-beta/ayarlar 60 → 60
+   768 /tr/fabrika-beta/ayarlar/moduller 60 → 60
+   768 /tr/fabrika-beta/firsatlar/demo-opp-1 156 → 0
+   768 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations 50 → 0
+   768 /tr/fabrika-beta/settings/modules 60 → 60
+YENİ taşma (sonra>0, önce=0): []
+clipped artan (sonra>önce):
+clipped azalan:
+gizleyen ata örnekleri: [ '/tr/fabrika-beta div:hidden' ]

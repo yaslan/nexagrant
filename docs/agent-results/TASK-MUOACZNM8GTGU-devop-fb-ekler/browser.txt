@@ -1,0 +1,22 @@
+== 3940
+{"path":"/Logo.png","status":404,"csp":null,"pwned":true,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":0}
+{"path":"/Favicon.ICO","status":404,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":1}
+{"path":"/_next/STATIC/x.js","status":404,"csp":null,"pwned":true,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":0}
+{"path":"/_NEXT/static/x.js","status":404,"csp":null,"pwned":true,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":0}
+{"path":"/_next/Image","status":404,"csp":null,"pwned":true,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":0}
+{"path":"/Next.svg","status":404,"csp":null,"pwned":true,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":0}
+{"path":"/_Next/yok","status":404,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":1}
+{"path":"/yok.png","status":404,"csp":"default-src 'none'; style-src ","pwned":false,"nextRan":false,"text":"","cspViolations":32}
+{"path":"/tr/login","status":200,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"Kapı Modeli Modüller Açık Çağrılar CORDI","cspViolations":1}
+{"path":"/logo.png","status":200,"csp":null,"pwned":true,"nextRan":false,"text":"","cspViolations":0}
+== 3941
+{"path":"/Logo.png","status":404,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":1}
+{"path":"/Favicon.ICO","status":404,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":1}
+{"path":"/_next/STATIC/x.js","status":404,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":1}
+{"path":"/_NEXT/static/x.js","status":404,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":1}
+{"path":"/_next/Image","status":404,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":1}
+{"path":"/Next.svg","status":404,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":1}
+{"path":"/_Next/yok","status":404,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"404 Sayfa Bulunamadı Aradığınız sayfa v","cspViolations":1}
+{"path":"/yok.png","status":404,"csp":"default-src 'none'; style-src ","pwned":false,"nextRan":false,"text":"","cspViolations":32}
+{"path":"/tr/login","status":200,"csp":"default-src 'self'; script-src","pwned":false,"nextRan":true,"text":"Kapı Modeli Modüller Açık Çağrılar CORDI","cspViolations":1}
+{"path":"/logo.png","status":200,"csp":null,"pwned":true,"nextRan":false,"text":"","cspViolations":0}

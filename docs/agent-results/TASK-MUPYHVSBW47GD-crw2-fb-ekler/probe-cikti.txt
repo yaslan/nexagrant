@@ -1,0 +1,127 @@
+=== P1 caller SAVEPOINT, error after scope on, caller LOCAL value off
+BEGIN
+ set_off 
+---------
+ off
+(1 row)
+
+SAVEPOINT
+SET
+psql:/private/tmp/claude-501/-Users-macbook-alan/99a69645-3d7b-4f03-a9c6-9bf6c66af7f9/scratchpad/probe.sql:6: ERROR:  probe inside: scope=on
+CONTEXT:  PL/pgSQL function zz_probe_raise() line 4 at RAISE
+SQL statement "UPDATE "SystemAlert"
+       SET "meta" = COALESCE("meta", '{}'::jsonb) || jsonb_build_object(
+             'alertRepeatCount', GREATEST(COALESCE(("meta" ->> 'alertRepeatCount')::int, 1), 1) + 1,
+             'alertLastSeenAt', to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+     WHERE "id" = alert_id"
+PL/pgSQL function note_agency_invite_rejection(text) line 48 at SQL statement
+ROLLBACK
+          k           |  v  
+----------------------+-----
+ P1 after ROLLBACK TO | off
+(1 row)
+
+COMMIT
+        k        | v 
+-----------------+---
+ P1 after COMMIT | 
+(1 row)
+
+=== P2 PL/pgSQL EXCEPTION block in caller (DO), caller value unset in this tx
+BEGIN
+psql:/private/tmp/claude-501/-Users-macbook-alan/99a69645-3d7b-4f03-a9c6-9bf6c66af7f9/scratchpad/probe.sql:22: NOTICE:  P2 caught: probe inside: scope=on | scope in handler=[]
+psql:/private/tmp/claude-501/-Users-macbook-alan/99a69645-3d7b-4f03-a9c6-9bf6c66af7f9/scratchpad/probe.sql:22: NOTICE:  P2 after inner block scope=[]
+DO
+      k      | v 
+-------------+---
+ P2 after DO | 
+(1 row)
+
+COMMIT
+=== P3 autocommit, caller SESSION value xyz
+SET
+ redeem 
+--------
+ 
+(1 row)
+
+        k        |  v  
+-----------------+-----
+ P3 after redeem | xyz
+(1 row)
+
+ funnel_rows 
+-------------
+           0
+(1 row)
+
+        k        |  v  
+-----------------+-----
+ P3 after funnel | xyz
+(1 row)
+
+ note_agency_invite_rejection 
+------------------------------
+ 
+(1 row)
+
+       k       |  v  
+---------------+-----
+ P3 after note | xyz
+(1 row)
+
+RESET
+=== P4 sealed scope, app sets flag off (token kept), calls definers, then reads Membership
+BEGIN
+      entered       
+--------------------
+ platform-aggregate
+(1 row)
+
+ sealed_on_rows 
+----------------
+             11
+(1 row)
+
+ off 
+-----
+ off
+(1 row)
+
+ off_rows_before 
+-----------------
+               0
+(1 row)
+
+ redeem_agency_invite | note_agency_invite_rejection 
+----------------------+------------------------------
+                      | 
+(1 row)
+
+ funnel_rows 
+-------------
+           0
+(1 row)
+
+ flag_after | off_rows_after 
+------------+----------------
+ off        |              0
+(1 row)
+
+ROLLBACK
+=== P5 fabrika_app plain SET (no seal) opens nothing
+BEGIN
+SET
+ plain_set_rows 
+----------------
+              0
+(1 row)
+
+ROLLBACK
+=== P6 fabrika_app cannot create a function with SET app.system_scope
+ app_can_set_param 
+-------------------
+ f
+(1 row)
+
+psql:/private/tmp/claude-501/-Users-macbook-alan/99a69645-3d7b-4f03-a9c6-9bf6c66af7f9/scratchpad/probe.sql:48: ERROR:  permission denied to set parameter "app.system_scope"

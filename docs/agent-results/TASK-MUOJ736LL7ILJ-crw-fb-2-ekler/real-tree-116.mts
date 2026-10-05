@@ -1,0 +1,51 @@
+// İNCELEME-116: yeni kaçışları gerçek ağaçta tek satırlık yeniden yazımla sınar. Kullanım: tsx real-tree-116.mts <tarayıcı yolu>
+import { execFileSync } from 'node:child_process';
+const mod = await import(process.argv[2]!);
+const AT = '5e674e7f';
+const cache = new Map<string, string | undefined>();
+const atCommit = (p: string) => {
+  if (!cache.has(p)) { let v: string | undefined; try { v = execFileSync('git', ['cat-file', 'blob', `${AT}:${p}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { v = undefined; } cache.set(p, v); }
+  return cache.get(p);
+};
+const F = 'src/app/[locale]/admin/cordis/actions.ts';
+const base = atCommit(F)!;
+const IMP = "import { runCordisImport } from '@/lib/k2-cordis/importer';\n";
+const RET = 'return { success: false, error: importRes.error };';
+const must = (s: string, sub: string) => { if (!s.includes(sub)) throw new Error('yok: ' + sub); return s; };
+must(base, IMP); must(base, RET);
+const dynLine = (line: string) => base.replace(IMP, '').replace('const importRes = await runCordisImport(', `${line}\n  const importRes = await runCordisImport(`);
+const show = (name: string, src: string, file = F, read: (p: string) => string | undefined = atCommit) => {
+  const f = mod.actionReturnFindings ? mod.actionReturnFindings(src, file, read) : mod.actionReturnLeaks(src, file, read).map((line: number) => ({ line, via: "" }));
+  console.log(`${f.length ? 'YAKALADI' : 'KAÇTI   '} | ${name} | ${JSON.stringify(f.map((x: any) => x.line))}${f[0] ? ' | ' + f[0].via : ''}`);
+};
+console.log('--- CORDIS 5e674e7f (import yolu) ---');
+show('R0 kontrol: statik import', base);
+show("R0b kontrol: const { runCordisImport } = await import('…')", dynLine("const { runCordisImport } = await import('@/lib/k2-cordis/importer');"));
+show('R1 const r = require; r(…)', dynLine("const r = require; const { runCordisImport } = r('@/lib/k2-cordis/importer');"));
+show('R2 module.require(…)', dynLine("const { runCordisImport } = module.require('@/lib/k2-cordis/importer');"));
+show('R3 createRequire(import.meta.url)(…)', dynLine("const { runCordisImport } = createRequire(import.meta.url)('@/lib/k2-cordis/importer');").replace("'use server';\n", "'use server';\nimport { createRequire } from 'node:module';\n"));
+show('R4 require.call(null, …)', dynLine("const { runCordisImport } = require.call(null, '@/lib/k2-cordis/importer');"));
+show('R4b kontrol: require(…)', dynLine("const { runCordisImport } = require('@/lib/k2-cordis/importer');"));
+console.log('--- CORDIS 5e674e7f (genel taint: Object yazımı) ---');
+show("T1 Object['assign'](out, importRes)", base.replace(RET, "const out: any = {}; Object['assign'](out, importRes); return { success: false, error: out.error };"));
+show('T5 Object.assign.call(null, out, importRes)', base.replace(RET, 'const out: any = {}; Object.assign.call(null, out, importRes); return { success: false, error: out.error };'));
+show('T0 kontrol: Object.assign(out, importRes)', base.replace(RET, 'const out: any = {}; Object.assign(out, importRes); return { success: false, error: out.error };'));
+console.log('--- Y-1: yeni use-server dosyası, 5e674e7f importer ---');
+const F2 = 'src/app/[locale]/admin/cordis/reexport-actions.ts';
+show("X1 export * from '@/lib/k2-cordis/importer'", "'use server';\nexport * from '@/lib/k2-cordis/importer';\n", F2);
+show("X1b kontrol: export { runCordisImport } from '…'", "'use server';\nexport { runCordisImport } from '@/lib/k2-cordis/importer';\n", F2);
+show('X8 export let act = async () => …; act = runCordisImport', "'use server';\nimport { runCordisImport } from '@/lib/k2-cordis/importer';\nexport let act = async (..._a: unknown[]) => ({ success: true as boolean, error: '' });\nact = runCordisImport as any;\n", F2);
+console.log('--- .code güveni: evidence/actions.ts (dev HEAD), ilk catch ---');
+const cwd = mod.fsModuleReader(process.cwd());
+const EV = 'src/app/[locale]/(app)/[workspace]/evidence/actions.ts';
+const ev = cwd(EV)!;
+const EVRET = "    console.warn(`[getEvidenceItemsAction] DB error: ${errorMessage(error)}`);\n    return [];";
+must(ev, EVRET);
+const evv = (line: string) => ev.replace(EVRET, `    ${line}`);
+show('E0 kontrol: return [(error as any).code] (güvenilir, temiz beklenir)', evv('return [(error as any).code];'), EV, cwd);
+show('E1 kontrol: (error as any).code = String(error)', evv('(error as any).code = String(error); return [(error as any).code];'), EV, cwd);
+show('E2 kontrol: Object.assign(error, …)', evv('Object.assign(error as object, { code: String(error) }); return [(error as any).code];'), EV, cwd);
+show("E3 Object['assign'](error, …)", evv("Object['assign'](error as object, { code: String(error) }); return [(error as any).code];"), EV, cwd);
+show('E4 Object.assign.call(null, error, …)', evv('Object.assign.call(null, error as object, { code: String(error) }); return [(error as any).code];'), EV, cwd);
+show('E5 [error].forEach(x => { x.code = String(x) })', evv('[error].forEach((x: any) => { x.code = String(x); }); return [(error as any).code];'), EV, cwd);
+show("E6 Reflect['set'](error, 'code', …)", evv("Reflect['set'](error as object, 'code', String(error)); return [(error as any).code];"), EV, cwd);

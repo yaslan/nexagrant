@@ -1,0 +1,55 @@
+# Forward migrations, in the order scripts/apply-migrations.sh applies them.
+#
+# Rule (TASK-MULU7SAA4EPP8): the order in which each file first reached the
+# repository, `git log --diff-filter=A --format=%aI -- <file> | tail -1`. That
+# is the order they were written against, so later files may rely on earlier
+# ones (add-feedback -> rename-feedback-alert-columns, add-invoice ->
+# add-invoice-write-path -> add-invoice-fx-rate, add-marketplace-order ->
+# drop-marketplace). A new migration goes at the END of this list, in the same
+# commit that adds it; the script refuses to run while a forward file is
+# missing here or a listed file is missing on disk.
+#
+# Paths are relative to prisma/migrations. Down files are never listed.
+add-m6-evaluator-lens.sql
+add-soft-delete.sql
+add-feedback.sql
+add-calendar-connections/migration.sql
+add-m9-meeting-schedule/migration.sql
+add-systemalert-console-indexes.sql
+rename-feedback-alert-columns.sql
+retire-eur-plan-ladder.sql
+add-lifetime-licence.sql
+add-subscription-price-lock.sql
+add-invoice.sql
+add-plan-versioning/migration.sql
+add-m10-dual-approval-persistence/migration.sql
+topicmatch-per-opportunity/migration.sql
+add-invoice-write-path.sql
+add-invoice-fx-rate.sql
+relationship-owner-nullable.sql
+add-evidence-link-tenant-id.sql
+auditevent-tenant-or-shared.sql
+add-consent-record.sql
+add-stripe-event-log/migration.sql
+add-marketplace-order.sql
+add-agency-invite-code.sql
+drop-marketplace.sql
+fix-agency-invite-rejection-audit.sql
+add-agency-funnel.sql
+auditevent-null-system-only.sql
+add-tenant-province.sql
+add-agency-funnel-province.sql
+agency-invite-no-max-uses.sql
+add-meeting-brief-opportunity.sql
+hash-bearer-tokens.sql
+credit-ledger-grant-period.sql
+invitation-accepted-at.sql
+add-public-lead.sql
+relationship-stale-reminded-at.sql
+k1-embedding-hash.sql
+m4-stale-reminder-idempotency.sql
+add-api-key-rate-window.sql
+evidence-unique-object-key.sql
+m4-stale-digest-user-claim.sql
+revoke-api-role-function-execute.sql
+add-blog-post.sql

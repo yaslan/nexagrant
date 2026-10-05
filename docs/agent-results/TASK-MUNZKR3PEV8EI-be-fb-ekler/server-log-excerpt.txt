@@ -1,0 +1,12 @@
+8:[ERROR] [admin/plans] setVisibility failed Error [PrismaClientKnownRequestError]: 
+12:Database error. Code: `P0001`. Message: `befbkr-internal-detail: tablo=Plan kolon=visibility`
+16:  code: 'P2039',
+28:[ERROR] [admin/plans] setVisibility failed Error [PrismaClientKnownRequestError]: 
+32:Database error. Code: `P0001`. Message: `befbkr-internal-detail: tablo=Plan kolon=visibility`
+36:  code: 'P2039',
+48:[ERROR] [admin/plans] createDraft failed Error [PrismaClientKnownRequestError]: 
+55:  code: 'P2002',
+67:[ERROR] [admin/plans] createDraft failed Error [PrismaClientKnownRequestError]: 
+74:  code: 'P2002',
+86:[AdminPlansPage] DB query failed: 
+91:[AdminPlansPage] DB query failed: 

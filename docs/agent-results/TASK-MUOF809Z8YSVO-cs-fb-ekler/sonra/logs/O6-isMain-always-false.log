@@ -1,0 +1,35 @@
+# O6-isMain-always-false [Ö-6] scripts/k1-embeddings-unlock-rejected.ts
+# - "const isMain = process.argv[1]?.includes('k1-embeddings-unlock-rejected');"
+# + 'const isMain = false;'
+# restored_clean=True
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ddace75c-be72-4b5d-ab0e-0cce77253d82/scratchpad/wt
+
+ ❯ tests/k1-embeddings-unlock.ismain.test.ts (2 tests | 1 failed) 1384ms
+     × run as `tsx scripts/k1-embeddings-unlock-rejected.ts`, it does a dry run and then disconnects 1016ms
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  1 failed | 123 passed | 1 skipped (125)
+   Start at  22:10:54
+   Duration  1.90s (transform 1.56s, setup 0ms, import 2.97s, tests 3.21s, environment 0ms)
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+(node:34230) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/k1-embeddings-unlock.ismain.test.ts > k1-embeddings-unlock-rejected: isMain > run as `tsx scripts/k1-embeddings-unlock-rejected.ts`, it does a dry run and then disconnects
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/k1-embeddings-unlock.ismain.test.ts:52:50
+     50|     process.argv = [argv[0]!, '/repo/scripts/k1-embeddings-unlock-reje…
+     51|     await import('../scripts/k1-embeddings-unlock-rejected');
+     52|     await vi.waitFor(() => expect(db.disconnect).toHaveBeenCalledTimes…
+       |                                                  ^
+     53|     expect(db.queryRaw).toHaveBeenCalledTimes(1); // markedTopics
+     54|     expect(db.findMany).toHaveBeenCalledTimes(1); // markedProfiles' t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

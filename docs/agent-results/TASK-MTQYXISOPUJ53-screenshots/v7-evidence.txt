@@ -1,0 +1,83 @@
+ÇALIŞMA ALANI
+Panel
+Çağrılar
+Fırsatlar
+Ortaklar
+İlişkiler
+Kanıtlar
+TTO Hızlandırıcısı (M7)
+Onay Merkezi (4-Eyes)
+Pazar Yeri & API
+Partner REST API
+Ayarlar
+DK
+Prof. Dr. Ayşe Kaya
+Kanıt & Yetkinlik Deposu (Evidence Pack)
+
+Kuruluşunuzun temel yetkinliklerini, sertifikalarını, mali raporlarını ve geçmiş proje başarılarını tek bir merkezde toplayın. Doğrulanmış belgeleri yükleyerek AB teklif yazımında doğrudan kanıt belgesi olarak kullanın.
+
+M3 EVIDENCE PACK HEALTH ENGINE
+1 GB Free Storage
+Evidence Pack Kurumsal Hazırlık Skoru
+
+Henüz hiçbir kurumsal kanıt belgesi yüklenmedi. Başlamak için Ticaret Sicil ve KOBİ beyannamesini yükleyin.
+
+⚠️ EKSİK ZORUNLU BELGELER:
+Ticaret Sicil / Faaliyet Belgesi
+KOBİ Beyannamesi (SME Declaration)
+Son Yıl Bilanço / Bağımsız Denetim
+Gender Equality Plan (GEP) / Etik Uyum
+0/100
+SAĞLIK SKORU
+0 Geçerli Belge
+0 Süresi Yaklaşan
+0 Süresi Dolmuş
+🗂️
+Kanıt Taksonomisi (8 Kategori Kütüphanesi)
+0 Kayıtlı Belge
+🏛️
+0
+Kurumsal Kimlik
+CAT-01
+📊
+0
+Mali Belgeler
+CAT-02
+📜
+0
+Sertifika & Uyum
+CAT-03
+🔬
+0
+Yetkinlik & Altyapı
+CAT-04
+🏆
+0
+Geçmiş Performans
+CAT-05
+⚖️
+0
+Etik & Yasal Uyum
+CAT-06
+🤝
+0
+Ortak Belgeleri
+CAT-07
+👤
+0
+Personel & CV
+CAT-08
+🔍
+Tüm Durumlar
+Geçerli Belgeler
+Süresi Yaklaşanlar
+Süresi Dolmuşlar
+CSV Dışa Aktar
+Yeni Belge Yükle (R2)
+📄
+Kayıtlı Kanıt Belgesi Bulunamadı
+
+Seçili filtrelere uygun belge bulunmuyor. Cloudflare R2 üzerine direkt belge yüklemek için yukarıdaki yükle butonunu kullanın.
+
++ Belge Yükle
+Geri bildirim

@@ -1,0 +1,6 @@
+Relationship.ownerUserId is_nullable : YES
+SystemAlert rows, source=users-scheduled-deletion: 0
+leftover qa tenants  : 0
+leftover qa users    : 0
+unassigned relationships in db: 0
+user.erased audit rows with reason "qa probe": 0

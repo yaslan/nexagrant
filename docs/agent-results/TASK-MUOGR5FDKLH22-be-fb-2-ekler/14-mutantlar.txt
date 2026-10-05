@@ -1,0 +1,31 @@
+== M1 yakalama kaldirildi
+     × the real evidence confirm (İNCELEME-103 D7) answers service_busy rather than rejecting, never with the driver text (TASK-MUOGR5FDKLH22) 2ms
+     × returns { success: false, error: service_busy } instead of rejecting, with no driver text in it 3ms
+     × tr: the upload screen alerts the service_busy text the real confirm returned 102ms
+     × en: the upload screen alerts the service_busy text the real confirm returned 34ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  4 failed | 16 passed (20)
+restore check (tr.json vs HEAD differs as expected=1): 1
+== M2 her hata service_busy (yutma)
+     × an ended pilot still rejects with PILOT_EXPIRED 2ms
+     × a role that may not upload still rejects with FORBIDDEN_ROLE 0ms
+     × a query the database refused (P2002) is not swallowed: the action rejects with the same error 0ms
+     × a programming error is not swallowed: the action rejects with the same error 0ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  4 failed | 16 passed (20)
+restore check (tr.json vs HEAD differs as expected=1): 1
+== M3 save_failed dondur
+     × the real evidence confirm (İNCELEME-103 D7) answers service_busy rather than rejecting, never with the driver text (TASK-MUOGR5FDKLH22) 4ms
+     × returns { success: false, error: service_busy } instead of rejecting, with no driver text in it 5ms
+     × tr: the upload screen alerts the service_busy text the real confirm returned 103ms
+     × en: the upload screen alerts the service_busy text the real confirm returned 35ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  4 failed | 16 passed (20)
+restore check (tr.json vs HEAD differs as expected=1): 1
+== M4 tr anahtari silindi
+     × tr and en both have it, and it is not the generic save_failed text 2ms
+     × tr: the upload screen alerts the service_busy text the real confirm returned 106ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  2 failed | 18 passed (20)
+restore check (tr.json vs HEAD differs as expected=1): 1
+actions restored OK

@@ -1,0 +1,17 @@
+HEAD 8ef11190 + çalışma ağacı
+pnpm typecheck rc=0
+$ tsc --noEmit
+pnpm lint rc=0
+$ eslint
+
+i18n rc=0
+
+pnpm build rc=0
+✓ Compiled successfully in 31.7s
+  [90m17 |[0m     console.error(error [36minstanceof[0m [33mError[0m ? error.message : error);
+Ecmascript file had an error
+├ ƒ /[locale]/[workspace]/evidence
+├ ƒ /api/evidence/[id]/download
+├ ƒ /api/evidence/mock-upload
+HEAD 2efa909f pnpm typecheck rc=0
+HEAD 2efa909f pnpm lint rc=0

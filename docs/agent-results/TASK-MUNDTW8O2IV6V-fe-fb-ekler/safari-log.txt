@@ -1,0 +1,5 @@
+Safari 27.0.1 (AppleWebKit/605.1.15) — gerçek Safari.app, open -a Safari http://127.0.0.1:3787/export
+sunulan Content-Disposition (uygulamanın ürettiği baytların birebir kopyası):
+attachment; filename="Cagri_ Kirsal Iklim Onculeri gusioc.docx"; filename*=UTF-8''%C3%87a%C4%9Fr%C4%B1_%20K%C4%B1rsal%20%C4%B0klim%20%C3%96nc%C3%BCleri%20%E2%80%94%20%C4%9F%C3%BC%C5%9F%C4%B1%C3%B6%C3%A7%20%F0%9F%9A%80.docx
+Safari'nin ~/Downloads'a kaydettiği ad: Çağrı_ Kırsal İklim Öncüleri — ğüşıöç 🚀.docx
+NOT: yeniden-oynatma sunucusu gövde olarak yanlışlıkla Quick Look PNG'sini gönderdi (readdir eşleşmesi); gövde değil yalnız DOSYA ADI bu adımın kanıtı. Gövde Chrome indirmesinde doğrulandı.

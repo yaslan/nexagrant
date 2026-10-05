@@ -1,0 +1,22 @@
+1280-admin_alerts.png AYNI
+1280-admin_cordis.png AYNI
+1280-ayarlar_kapilar.png AYNI
+1280-demo-opp-1_application.png AYNI
+1280-demo-opp-1_documents.png AYNI
+1280-demo-opp-1_evaluations.png FARK bbox=(413, 338, 1183, 548) maxdelta=1
+1280-fabrika-beta_approvals.png AYNI
+1280-fabrika-beta_onay-merkezi.png AYNI
+1280-fabrika-beta_tto.png AYNI
+1280-firsatlar_demo-opp-1.png AYNI
+1280-settings_gates.png AYNI
+768-admin_alerts.png BOYUT (768, 1122) -> (768, 1166)
+768-admin_cordis.png BOYUT (768, 1247) -> (768, 1220)
+768-ayarlar_kapilar.png FARK bbox=(309, 593, 715, 900) maxdelta=240
+768-demo-opp-1_application.png AYNI
+768-demo-opp-1_documents.png AYNI
+768-demo-opp-1_evaluations.png FARK bbox=(283, 103, 768, 899) maxdelta=248
+768-fabrika-beta_approvals.png FARK bbox=(293, 278, 746, 599) maxdelta=210
+768-fabrika-beta_onay-merkezi.png FARK bbox=(293, 278, 746, 599) maxdelta=210
+768-fabrika-beta_tto.png AYNI
+768-firsatlar_demo-opp-1.png FARK bbox=(345, 190, 768, 900) maxdelta=252
+768-settings_gates.png FARK bbox=(309, 593, 715, 900) maxdelta=240

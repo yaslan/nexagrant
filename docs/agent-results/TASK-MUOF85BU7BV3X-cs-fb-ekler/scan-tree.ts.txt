@@ -1,0 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { actionReturnFindings, hasUseServerDirective } from './wtg1/tests/api/action-leak-scan';
+process.chdir(__dirname + '/wtg1');
+const files = execSync("git ls-files 'src/**/*.ts' 'src/**/*.tsx'").toString().trim().split('\n');
+let n = 0, total = 0;
+for (const f of files) {
+  const src = readFileSync(f, 'utf8');
+  if (!hasUseServerDirective(src, f)) continue;
+  n++;
+  const found = actionReturnFindings(src, f);
+  total += found.length;
+  if (found.length) console.log(f, JSON.stringify(found));
+}
+const ev = 'src/app/[locale]/(app)/[workspace]/evidence/actions.ts';
+console.log(`use-server files scanned: ${n}, findings: ${total}; evidence/actions.ts (confirm, imports @/lib/tenant): ${JSON.stringify(actionReturnFindings(readFileSync(ev,'utf8'), ev))}`);

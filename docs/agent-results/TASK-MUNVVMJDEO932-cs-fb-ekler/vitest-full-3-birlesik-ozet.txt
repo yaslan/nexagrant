@@ -1,0 +1,3 @@
+ Test Files  266 passed | 6 skipped (272)
+      Tests  3197 passed | 73 skipped (3270)
+exit=0

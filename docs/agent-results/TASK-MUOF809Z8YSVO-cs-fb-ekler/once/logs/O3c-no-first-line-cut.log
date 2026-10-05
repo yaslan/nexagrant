@@ -1,0 +1,16 @@
+# O3c-no-first-line-cut [Ö-3c] src/app/api/concept-notes/[id]/export/route.ts
+# - ".split('\\n')[0]!.slice(0, 200),"
+# + '.slice(0, 200),'
+# restored_clean=True
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ddace75c-be72-4b5d-ab0e-0cce77253d82/scratchpad/wt
+
+
+ Test Files  6 passed (6)
+      Tests  95 passed (95)
+   Start at  21:58:40
+   Duration  25.63s (transform 995ms, setup 0ms, import 7.78s, tests 38.49s, environment 1ms)
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m

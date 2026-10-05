@@ -1,0 +1,20 @@
+/foo.bar             404 CSP=yes nonce=yes scripts=31 nonced=31  | report-uri /api/csp-report 
+/tr/yok.html         404 CSP=yes nonce=yes scripts=19 nonced=19  | report-uri /api/csp-report 
+/wp-login.php        404 CSP=yes nonce=yes scripts=32 nonced=32  | report-uri /api/csp-report 
+/.env                404 CSP=yes nonce=yes scripts=31 nonced=31  | report-uri /api/csp-report 
+/tr                  200 CSP=yes nonce=yes scripts=39 nonced=39  | report-uri /api/csp-report 
+/tr/login            200 CSP=yes nonce=yes scripts=27 nonced=27  | report-uri /api/csp-report 
+/en                  200 CSP=yes nonce=yes scripts=39 nonced=39  | report-uri /api/csp-report 
+/tr/main/dashboard   307 CSP=yes nonce=yes scripts=20 nonced=20 location: /tr/giris | report-uri /api/csp-report 
+/                    307 CSP=yes nonce=yes scripts=0 nonced=0 location: /tr | report-uri /api/csp-report 
+--- static (no page CSP expected)
+--- static (no page CSP expected)
+200 0.001966s /logo.png                                        csp=
+200 0.001770s /favicon.ico                                     csp=
+200 0.000982s /next.svg                                        csp=
+200 0.000937s /_next/static/chunks/03-3r36aa59-x.js            csp=
+200 0.028249s /_next/image?url=%2Flogo.png&w=64&q=75           csp=Content-Security-Policy: script-src 'none'; frame-
+405 0.001504s /api/csp-report                                  csp=Content-Security-Policy: default-src 'none'; scrip
+--- nonce per request:
+'nonce-IAcOTY03cF5gpJoAdWxiEA=='
+'nonce-NE7HHFU/8VZnkl59k18ycg=='

@@ -1,0 +1,6 @@
+🚀  Your database is now in sync with your Prisma schema. Done in 323ms
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55464/fabrika
+apply-migrations: 39 files applied
+apply-migrations: 39 files applied
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+Seeding completed with E10 data.

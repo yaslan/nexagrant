@@ -1,0 +1,217 @@
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55141/f
+AUTH_SECRET = ci.yml:133'teki test fikstürü
+$ vitest run --passWithNoTests
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt
+
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27553) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29129) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29153) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29428) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Not implemented: Window's open() method
+Not implemented: navigation to another Document
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29593) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29635) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29657) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29634) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29671) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29711) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29726) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29729) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29741) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29844) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27442) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29866) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29897) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  302 passed | 2 skipped (304)
+      Tests  3927 passed | 50 skipped (3977)
+   Start at  21:06:15
+   Duration  73.18s (transform 20.94s, setup 0ms, import 154.30s, tests 521.21s, environment 35.80s)
+
+exit=0

@@ -1,0 +1,33 @@
+== test
+DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55120/fabrika
+     ✓ a worker killed after the send and before the stamp sends no second digest that day (İNCELEME-51 B-1)  1198ms
+     ✓ two runs racing for the same day send one digest (the claim is a compare-and-set)  450ms
+     ✓ the claim is a compare-and-set: a run that loses the race after reading the day as free sends nothing  674ms
+     ✓ a contact logged after the reminder but dated before it starts a new period (İNCELEME-51 B-2)  812ms
+     ✓ a tenant skipped on the second run (M4 closed) does not hide the day claimed there: no second digest (İNCELEME-56 Y-1)  576ms
+     ✓ a tenant whose read fails on the second run does not hide the day claimed there (İNCELEME-56 Y-1)  585ms
+     ✓ a failing claim sends nothing and holds no claim (İNCELEME-69 D-2)  429ms
+     ✓ a member removed from the tenant the day was claimed through gets no second digest that day (İNCELEME-69 D-1)  405ms
+     ✓ a claim the previous release wrote on a membership today holds; yesterday's does not (İNCELEME-95 B-1)  337ms
+     ✓ the day is the UTC day in any process time zone: +14 claims the UTC day, and the next UTC day still sends (İNCELEME-95 T-1)  379ms
+     ✓ a rejected send gives back only its own day: a later day claimed meanwhile stays (İNCELEME-95 T-2)  370ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/k1-embeddings.live.test.ts > K1 embeddings (live, fabrika_app, fake provider) > k1-topic-match now writes rows for the embedded tenants, none for the expired pilot
+AssertionError: expected 9 to be 6 // Object.is equality
+- Expected
++ Received
+- 6
++ 9
+ ❯ tests/k1-embeddings.live.test.ts:215:7
+    213|     expect(
+    214|       await admin.topicMatch.count({ where: { tenantId: { in: [T_A, T_…
+    215|     ).toBe(MY_TOPICS.length * 2);
+       |       ^
+    216|     expect(r.pilotExpired).toBe(1);
+    217|     expect(await admin.topicMatch.count({ where: { tenantId: T_PILOT }…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+ Test Files  1 failed | 300 passed | 2 skipped (303)
+      Tests  1 failed | 3922 passed | 51 skipped (3974)
+   Start at  21:11:58
+   Duration  57.02s (transform 15.18s, setup 0ms, import 157.09s, tests 269.22s, environment 29.82s)
+JSON report written to /private/tmp/claude-501/-Users-macbook-alan/14f3c35e-b877-43e2-bab2-299d055cec92/scratchpad/wtgate/vitest-report.json

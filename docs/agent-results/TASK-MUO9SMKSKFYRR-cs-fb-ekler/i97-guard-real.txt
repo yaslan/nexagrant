@@ -1,0 +1,3 @@
+     × every write action checks the caller role, and no readOnly action writes 6ms
++   "app/[locale]/i97/actions.ts#zzCtrl: readOnly: true but writes: prisma.evidence.delete (lib/i97/legacy2.js:2, via wipe (lib/i97/legacy2))",
+      Tests  1 failed | 58 passed (59)

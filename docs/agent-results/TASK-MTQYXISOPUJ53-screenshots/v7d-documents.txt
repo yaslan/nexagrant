@@ -1,0 +1,57 @@
+ÇALIŞMA ALANI
+Panel
+Çağrılar
+Fırsatlar
+Ortaklar
+İlişkiler
+Kanıtlar
+TTO Hızlandırıcısı (M7)
+Onay Merkezi (4-Eyes)
+Pazar Yeri & API
+Partner REST API
+Ayarlar
+DK
+Prof. Dr. Ayşe Kaya
+MODÜL 10 — FOLLOW-UP DOCUMENTS
+Takip Belgeleri & Eşik Üstü Ödül Paketi
+
+Fırsat: CSV7 probe — application empty state
+
+0 Doküman Mevcut
+TÜBİTAK Eşik Üstü Ödülü Desteği
+
+Ufuk Avrupa değerlendirmesinden eşik üstü (≥ 12.0/15) alan projeler için TÜBİTAK Ödül paketi tek tıkla üretilir.
+
+TÜBİTAK Ödül Paketi Üret
+ÇİFT ONAYLI KURUMSAL YETKİ AKIŞI (DUAL APPROVAL WORKFLOW)
+Finans & Hukuk Çift Onayı
+
+Şu anda onay akışında doküman yok. Aşağıdaki listede bir dokümanın “Onaya Gönder” düğmesiyle akışı başlatın.
+
+AŞAMA 1
+1. Taslak Üretimi
+Başlamadı
+AŞAMA 2
+2. Finans Onayı
+Başlamadı
+AŞAMA 3
+3. Hukuk Onayı
+Başlamadı
+AŞAMA 4
+4. İmzalı & Onaylı
+Başlamadı
+
+Her onay adımı veritabanına yazılır; sayfayı yenilediğinizde akış kaldığı yerden görünür. Onayı veren kişi her zaman oturumdan okunur ve bir departmanı onaylayan kişi diğerini onaylayamaz.
+
+Yeni İdari / Yasal Doküman Üret (AI Draft Generator)
++ NDA Gizlilik Anlaşması
++ LOI Niyet Mektubu
++ Ortak Taahhüt Formu
++ ESR Sonrası Özet
+Tüm Dokümanlar (0)
+Yasal Anlaşmalar (NDA / LOI)
+Ortak Taahhütleri
+TÜBİTAK Ödül Paketi
+DOKÜMAN TÜRÜ	SÜRÜM	OLUŞTURULMA	İMZA / ONAY DURUMU	EYLEMLER
+Bu filtreye uygun doküman bulunmuyor. Yukarıdaki butonlarla yeni bir doküman üretebilirsiniz.
+Geri bildirim

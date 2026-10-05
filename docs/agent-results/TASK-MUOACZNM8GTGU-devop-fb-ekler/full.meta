@@ -1,0 +1,7 @@
+start 19:18:49 load averages: 12.87 15.16 16.75
+VITEST_EXIT=0
+end 19:19:18
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence MEMBER reads the open levels only; a confidential level in any spelling needs edit_proposal [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence a role outside the enum (a stale token) reads nothing [skipped]
+  allowed: tests/k1-embeddings.live.test.ts :: K1 embeddings (live, REAL OpenAI) real vectors rank each tenant’s own topic first [skipped]
+SKIPGATE=0

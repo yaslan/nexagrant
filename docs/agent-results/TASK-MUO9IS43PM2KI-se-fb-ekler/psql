@@ -1,0 +1,7 @@
+#!/bin/bash
+# psql shim -> docker exec sefb95-pg
+args=(); f=""; url=""
+while [ $# -gt 0 ]; do case "$1" in -f) f="$2"; shift 2;; postgres*://*) url="$1"; shift;; *) args+=("$1"); shift;; esac; done
+[ -z "$url" ] && url="postgresql://fabrika:fabrika@localhost:5432/fabrika"
+url=$(printf '%s' "$url" | sed -E 's#@[^/]*/#@localhost:5432/#')
+if [ -n "$f" ]; then docker exec -i sefb95-pg psql "$url" "${args[@]}" -f - < "$f"; else docker exec -i sefb95-pg psql "$url" "${args[@]}"; fi

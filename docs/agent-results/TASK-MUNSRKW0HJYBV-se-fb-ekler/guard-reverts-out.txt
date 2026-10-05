@@ -1,0 +1,37 @@
+### R1 catch need not leave (N1): exit=1 Tests  1 failed | 32 passed (33)
+     × N1: a check whose refusal a `catch` swallows
+### R2 await not required (N2): exit=1 Tests  1 failed | 32 passed (33)
+     × N2: a check that is not awaited, or whose rejection is caught
+### R3 check need not be imported (N3): exit=1 Tests  1 failed | 32 passed (33)
+     × N3: a same-file stand-in for `can` or `requirePlatformAdmin`
+### R4 fixed role accepted (N4): exit=1 Tests  1 failed | 32 passed (33)
+     × N4: `can` asked about a role written in the code, not the caller's
+### R5 helper early return ignored (N5): exit=1 Tests  1 failed | 32 passed (33)
+     × N5: a helper that may return before its check, or refuses by returning
+### R6 parameter defaults not walked (N6): exit=1 Tests  1 failed | 32 passed (33)
+     × N6: a write in a parameter default, which runs before the body
+Traceback (most recent call last):
+  File "/private/tmp/claude-501/-Users-macbook-alan/85137787-d431-4b19-9180-7d3250e42e46/scratchpad/wt/../guard-reverts.py", line 24, in <module>
+    assert orig.count(old) == 1, (name, orig.count(old))
+AssertionError: ('R7 element access not a model (N7)', 0)
+### R7 element access not a model (N7): exit=1 Tests  1 failed | 32 passed (33)
+     × N7: readOnly writes through `tx['evidence']`
+### R8 references not followed (N8): exit=1 Tests  1 failed | 32 passed (33)
+     × N8: readOnly hands a same-file writer over by reference
+### R9 $queryRaw never a write (N9): exit=1 Tests  1 failed | 32 passed (33)
+     × N9: readOnly writes through `$queryRaw` SQL
+### R10 exported non-function ignored (N10): exit=1 Tests  1 failed | 32 passed (33)
+     × N10: an exported value the guard cannot read
+### R11 anonymous default skipped (N11): exit=1 Tests  1 failed | 32 passed (33)
+     × N11: the anonymous `export default`
+### R12 aliases ignored (N12): exit=1 Tests  1 failed | 32 passed (33)
+     × N12: a model accessor kept in another variable
+### R13 optional call counts (N13): exit=1 Tests  1 failed | 32 passed (33)
+     × N13: a check inside an optional call that never runs
+### R14 no cross-module walk (N14/G5): exit=1 Tests  2 failed | 31 passed (33)
+     × G5: follows imports 6 modules deep, through a barrel and a namespace import
+     × N14 / G5: a write in another module, before the check or under readOnly
+### R15 depth 1 only (G5 depth): exit=1 Tests  1 failed | 32 passed (33)
+     × G5: follows imports 1 modules deep, through a barrel and a namespace import
+### R16 server-action boundary removed (FP guard): exit=1 Tests  1 failed | 32 passed (33)
+     × every write action checks the caller role, and no readOnly action writes

@@ -1,0 +1,45 @@
+import { expect, test } from 'vitest';
+import type { OrgType } from '@prisma/client';
+import * as NEW from './funnel';
+import * as OLD from './zz_funnel_pre';
+import { buildAgencyReport as repNew } from './report';
+import { buildAgencyReport as repOld } from './zz_report_pre';
+import { TR_PROVINCES } from '@/lib/readiness/provinces';
+
+function lcg(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
+const AT = new Date('2026-10-01T06:00:00Z');
+const EXTRA = ['samsun', 'Bilinmeyen', ' Tokat', '', NEW.NO_PROVINCE];
+
+test('differential: old vs new buildAgencyFunnel / buildAgencyReport, wide tables', () => {
+  const rnd = lcg(Number(process.env.SEED ?? 99));
+  let cells = 0, reports = 0, shownProv = 0;
+  for (let n = 0; n < Number(process.env.N ?? 1500); n++) {
+    const raw = new Map<string, Record<OrgType, Record<string, number>>>();
+    const pool = [...TR_PROVINCES, ...EXTRA];
+    const k = Math.floor(rnd() * (n % 10 === 0 ? 81 : 8));
+    for (let i = 0; i < k; i++) {
+      const p = pool[Math.floor(rnd() * pool.length)]!;
+      const max = rnd() < 0.5 ? 14 : 60;
+      const t = Object.fromEntries(NEW.ORG_TYPES.map((o) => {
+        const c: Record<string, number> = {};
+        const reg = rnd() < 0.4 ? 0 : Math.floor(rnd() * max);
+        for (const s of NEW.FUNNEL_STEPS) c[s] = rnd() < 0.1 ? Math.floor(rnd() * max) /* non-nested */ : Math.floor(rnd() * (reg + 1));
+        c.registered = reg;
+        return [o, c];
+      })) as Record<OrgType, Record<string, number>>;
+      raw.set(p, t as never);
+    }
+    const bs: NEW.FunnelBreakdown[] = [{ dimension: 'none' }, { dimension: 'orgType' }, ...TR_PROVINCES.map((province) => ({ dimension: 'province', province }) as NEW.FunnelBreakdown)];
+    const m = NEW.maskAgencyFunnel(raw as never);
+    for (const b of bs) {
+      const o = OLD.buildAgencyFunnel(raw as never, b as never);
+      expect(NEW.buildAgencyFunnel(raw as never, b)).toEqual(o);
+      expect(m(b)).toEqual(o);
+      cells++;
+    }
+    const ro = repOld(raw as never, '2026-09', AT);
+    expect(repNew(raw as never, '2026-09', AT)).toEqual(ro);
+    reports++; shownProv += ro.byProvince.length;
+  }
+  console.log(`DIFF responses=${cells} reports=${reports} provinceRowsShown=${shownProv}`);
+}, 1_500_000);

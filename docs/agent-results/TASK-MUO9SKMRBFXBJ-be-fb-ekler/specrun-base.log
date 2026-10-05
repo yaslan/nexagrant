@@ -1,0 +1,10 @@
+login-page: input[type=email] count=1, form button[type=submit] count=1 (strict locator needs 1)
+✓ /tr/fabrika-beta/opportunities/demo-opp-1/evaluations 320:0 360:0 390:0 472:0 640:0
+✓ /tr/admin/cordis 320:0 360:0 390:0 472:0 640:0
+✓ /tr/admin/alerts 320:0 360:0 390:0 472:0 640:0
+✓ /tr/fabrika-beta/approvals 320:0 360:0 390:0 472:0 640:0
+✓ /tr/fabrika-beta/onay-merkezi 320:0 360:0 390:0 472:0 640:0
+✓ /tr/fabrika-beta/ayarlar/kapilar 320:0 360:0 390:0 472:0 640:0
+✓ /tr/fabrika-beta/settings/gates 320:0 360:0 390:0 472:0 640:0
+✓ /tr/fabrika-beta/firsatlar/demo-opp-1 320:0 360:0 390:0 472:0 640:0
+8 passed, 0 failed

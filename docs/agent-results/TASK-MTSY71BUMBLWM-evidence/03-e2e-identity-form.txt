@@ -1,0 +1,15 @@
+# e2e — billing identity form, real browser, real clicks (mac, 2026-09-10 14:22)
+# Committed playwright.config.ts; it starts its own dev server on :3000.
+
+$ E2E_SHOTS_ROOT=docs/agent-results npx playwright test tests/e2e/billing-identity-form.spec.ts
+[e2e-gate] Dev server info: PID=61116
+[e2e-gate] Test data: INVOICE_SUPPLIER_NAME loaded
+
+Running 4 tests using 1 worker
+
+  ✓  1 [chromium] › tests/e2e/billing-identity-form.spec.ts:81:7 › billing identity form › an owner with no identity on file is told so, and given the form (2.6s)
+  ✓  2 [chromium] › tests/e2e/billing-identity-form.spec.ts:94:7 › billing identity form › a VKN whose check digit does not hold is refused, and nothing is written (1.6s)
+  ✓  3 [chromium] › tests/e2e/billing-identity-form.spec.ts:120:7 › billing identity form › a valid identity is stored, normalised, and read back masked (2.6s)
+  ✓  4 [chromium] › tests/e2e/billing-identity-form.spec.ts:158:7 › billing identity form › a member who may not edit it never receives the number (1.5s)
+
+  4 passed (11.9s)

@@ -1,0 +1,8 @@
+KILLED    X1 served-file exclusion without trailing $ (prefix)  :: Tests  1 failed | 92 passed (93)
+SURVIVED  X2 _next/image$ -> _next/image (prefix)  :: Tests  93 passed (93)
+SURVIVED  X3 _next/static/ -> _next/static (no slash)  :: Tests  93 passed (93)
+SURVIVED  X4 static CSP gets script-src-elem unsafe-inline  :: Tests  93 passed (93)
+SURVIVED  X5 static CSP img-src *  :: Tests  93 passed (93)
+SURVIVED  X6 public/ not recursive  :: Tests  93 passed (93)
+KILLED    X7 static rule value = API policy  :: Tests  17 failed | 76 passed (93)
+KILLED    X8 covered _next(?:/.*)? -> _next/.*  :: Tests  1 failed | 92 passed (93)

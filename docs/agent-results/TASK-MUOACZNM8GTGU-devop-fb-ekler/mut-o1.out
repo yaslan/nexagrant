@@ -1,0 +1,2 @@
+S1  closure stateful: after an orgType call, provinces are masked KILLED :: Tests  2 failed | 86 passed (88)
+S1b S1, only with >=2 provinces                                  KILLED :: Tests  1 failed | 87 passed (88)

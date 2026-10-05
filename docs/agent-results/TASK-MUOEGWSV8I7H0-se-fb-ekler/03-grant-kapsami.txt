@@ -1,0 +1,16 @@
+== yetki yokken ==
+has_parameter_privilege(SET)=false
+ERROR:  permission denied to set parameter "app.system_scope"
+ERROR:  permission denied to set parameter "app.system_scope"
+== GRANT SET ON PARAMETER app.system_scope TO own sonrası ==
+has_parameter_privilege(SET)=true
+fabrika_app has_parameter_privilege(SET)=false
+ALTER DATABASE
+fabrika_app yeni oturum app.system_scope=on
+RESET sonrası=NULL
+== karşılaştırma: sahip rolü yetkisiz de RLS'yi zaten kapatabilir (tablo sahibi) ==
+BEGIN
+ALTER TABLE
+ALTER TABLE
+ROLLBACK
+pg_parameter_acl satırı=0

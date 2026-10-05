@@ -1,0 +1,18 @@
+K1 findScoped: slug!==null → truthy ("" = en eski)         | HAYATTA
+K2 başlık boşluk-kontrolü yok                              | ÖLDÜ | Failed Tests 1
+K3 text(): NUL serbest (\u0001'den başla)                  | ÖLDÜ | Failed Tests 2
+K4 zod slug dilbilgisi yok (yalnız findScoped kalkanı)     | ÖLDÜ | Failed Tests 5
+K5 PrismaClientInitializationError sınıfı yok              | ÖLDÜ | Failed Tests 1
+K6 sürücü mesajı geniş: /connection|timeout/i              | HAYATTA
+K7 PG kodu çapasız (^08 öneki, $ yok)                      | HAYATTA
+K8 AggregateError.errors gezinmesi yok                     | HAYATTA
+K9 ECONNRESET listeden çıktı                               | ÖLDÜ | Failed Tests 1
+K10 normalize NFC yok                                      | HAYATTA
+K11 sayfa: normalize sonucu kullanılmıyor (ham segment)    | ÖLDÜ | Failed Tests 1
+K12 stage enum → serbest string                            | ÖLDÜ | Failed Tests 1
+K13 text(): ESC (\u001b) serbest                           | HAYATTA
+K14 başlık üst sınırı 500 → 5000                           | HAYATTA
+K15 notlar üst sınırı yok                                  | ÖLDÜ | Failed Tests 1
+K16 kesinti dalında da CREATE_FAILED yok: tampon hep       | ÖLDÜ | Failed Tests 1
+K17 isWorkspaceSlug typeof kontrolü yok                    | HAYATTA
+K18 derinlik sınırı yok (döngüsel cause)                   | HAYATTA

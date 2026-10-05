@@ -1,0 +1,73 @@
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/c3539f56-fd06-48ed-bf74-0334dfba3851/scratchpad/wt92
+
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > RACE-N: 6 eşzamanlı confirm + araya 6 farklı PUT — success sonrası final nesne asla değişmez
+ATK RACE-N r0: storage_unavailable,storage_unavailable,success,already_confirmed,already_confirmed,already_confirmed rows=1 copies=3 lateCopiesAfterSuccess=0 finalUnchanged=true size==row=true
+
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > RACE-N: 6 eşzamanlı confirm + araya 6 farklı PUT — success sonrası final nesne asla değişmez
+ATK RACE-N r1: storage_unavailable,storage_unavailable,storage_unavailable,success,already_confirmed,already_confirmed rows=1 copies=4 lateCopiesAfterSuccess=0 finalUnchanged=true size==row=true
+
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > RACE-N: 6 eşzamanlı confirm + araya 6 farklı PUT — success sonrası final nesne asla değişmez
+ATK RACE-N r2: storage_unavailable,storage_unavailable,storage_unavailable,success,already_confirmed,already_confirmed rows=1 copies=4 lateCopiesAfterSuccess=0 finalUnchanged=true size==row=true
+
+ ✓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > RACE-N: 6 eşzamanlı confirm + araya 6 farklı PUT — success sonrası final nesne asla değişmez 24146ms
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > kilit kapsamı: A kiracısının kilitli yavaş kopyası B kiracısının confirm'ünü bekletmez
+ATK SCOPE: A=true B=true B took 25 ms while A's copy was held 8 s
+
+ ✓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > kilit kapsamı: A kiracısının kilitli yavaş kopyası B kiracısının confirm'ünü bekletmez 8078ms
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > havuz: 10 yavaş confirm (kopya 12 sn) havuzun 10 bağlantısını tutar — B kiracısının sıradan sorgusu ne olur?
+ATK POOL: confirms=ok,ok,ok,ok,ok,ok,ok,ok,ok,ok | B-probes: FAIL 1001ms timeout exceeded when trying to connect | FAIL 1001ms timeout exceeded when trying to connect | FAIL 1001ms timeout exceeded when trying to connect
+
+ ✓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > havuz: 10 yavaş confirm (kopya 12 sn) havuzun 10 bağlantısını tutar — B kiracısının sıradan sorgusu ne olur? 12123ms
+stderr | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > süreç ölümü: kilidi tutan süreç SIGKILL → kilit hemen bırakılır; SIGSTOP (donma) → kilit süresiz tutulur
+[confirmEvidenceUploadAction] DB error: 
+Invalid `prisma.$executeRaw()` invocation:
+
+
+Raw query failed. Code: `55P03`. Message: `canceling statement due to lock timeout`
+
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > süreç ölümü: kilidi tutan süreç SIGKILL → kilit hemen bırakılır; SIGSTOP (donma) → kilit süresiz tutulur
+ATK SIGSTOP: confirm={"success":false,"error":"save_failed"} in 10010 ms; holder backend state=idle in transaction for 12s; advisory granted=1; idle_in_transaction_session_timeout=0
+
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > süreç ölümü: kilidi tutan süreç SIGKILL → kilit hemen bırakılır; SIGSTOP (donma) → kilit süresiz tutulur
+ATK SIGKILL: advisory lock released after 54 ms
+
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > süreç ölümü: kilidi tutan süreç SIGKILL → kilit hemen bırakılır; SIGSTOP (donma) → kilit süresiz tutulur
+ATK after SIGKILL retry: success
+
+ ✓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > süreç ölümü: kilidi tutan süreç SIGKILL → kilit hemen bırakılır; SIGSTOP (donma) → kilit süresiz tutulur 12177ms
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > lock_timeout sızmaz: confirm'lerden sonra havuzdaki bağlantılarda lock_timeout=0; deadlock sayacı artmaz
+ATK STORM: {"success":5,"already_confirmed":25} rowsPerKey=1,1,1,1,1 deadlocks 0->0 lock_timeout on pool conns=0
+
+ ✓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > lock_timeout sızmaz: confirm'lerden sonra havuzdaki bağlantılarda lock_timeout=0; deadlock sayacı artmaz 532ms
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > geç kopya (depo iptal edilen CopyObject'i sonra tamamlar): staging değiştiyse CopySourceIfMatch reddeder; aynı baytlar geri PUT edilirse final değişir
+ATK LATE(a): A={"success":false,"error":"storage_unavailable"} C=true copies=[200] final==v2(recorded)=true
+
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > geç kopya (depo iptal edilen CopyObject'i sonra tamamlar): staging değiştiyse CopySourceIfMatch reddeder; aynı baytlar geri PUT edilirse final değişir
+ATK LATE(b): A={"success":false,"error":"storage_unavailable"} C=true copies=[200] final==recorded(w2)=true final==v1(A-checked)=false rows=1
+
+ ✓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > geç kopya (depo iptal edilen CopyObject'i sonra tamamlar): staging değiştiyse CopySourceIfMatch reddeder; aynı baytlar geri PUT edilirse final değişir 42142ms
+stderr | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > tx süresi varsayımı: kilit alındıktan sonra DB 27 sn yavaşsa tx (40 sn) kopya bitmeden kapanır
+[confirmEvidenceUploadAction] DB error: 
+Invalid `tx.evidence.create()` invocation in
+/private/tmp/claude-501/-Users-macbook-alan/c3539f56-fd06-48ed-bf74-0334dfba3851/scratchpad/wt92/src/app/[locale]/(app)/[workspace]/evidence/actions.ts:195:44
+
+  192 const copied = await copyIncomingObject(objectKey, finalKey);
+  193 if (!copied.ok) return { kind: 'not_copied' as const, error: copied.error };
+  194 
+→ 195 const evidence = await tx.evidence.create(
+Transaction API error: A query cannot be executed on an expired transaction. The timeout for this transaction was 40000 ms, however 41030 ms passed since the start of the transaction. Consider increasing the interactive transaction timeout or doing less work in the transaction.
+
+stdout | tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > tx süresi varsayımı: kilit alındıktan sonra DB 27 sn yavaşsa tx (40 sn) kopya bitmeden kapanır
+ATK TXTIME: A={"success":false,"error":"save_failed"} took=41038ms rows=0 finalExists=true stagingKept=true
+
+ ✓ tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > tx süresi varsayımı: kilit alındıktan sonra DB 27 sn yavaşsa tx (40 sn) kopya bitmeden kapanır 42076ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  17:58:51
+   Duration  141.87s (transform 122ms, setup 0ms, import 302ms, tests 141.49s, environment 0ms)
+

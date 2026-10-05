@@ -1,0 +1,9 @@
+[mock] listening :18077 failFirst=99 delayMs=200
+[mock] hit=1 POST /jobs/cordis?month=2026-06 at=2026-09-29T12:11:04.306Z
+[mock] hit=1 -> 503
+[mock] hit=2 POST /jobs/cordis?month=2026-06 at=2026-09-29T12:11:05.310Z
+[mock] hit=2 -> 503
+[mock] hit=3 POST /jobs/cordis?month=2026-06 at=2026-09-29T12:11:08.540Z
+[mock] hit=3 -> 503
+[mock] hit=4 POST /jobs/cordis?month=2026-06 at=2026-09-29T12:11:16.689Z
+[mock] hit=4 -> 503

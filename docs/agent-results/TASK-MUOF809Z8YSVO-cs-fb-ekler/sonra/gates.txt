@@ -1,0 +1,14 @@
+HEAD d6d12b8d + çalışma ağacı değişiklikleri · CI=true · DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55136/fabrika
+vitest exit=0
+ Test Files  303 passed | 2 skipped (305)
+      Tests  4041 passed | 51 skipped (4092)
+  allowed: tests/evidence-upload-s3.live.test.ts :: D-3 (TASK-MUNTTZ94LJWBC): one key is confirmed once the index itself refuses a second row with the same key [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence A6: GUEST_PARTNER cannot download, list or score any evidence, CONFIDENTIAL included [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence MEMBER reads the open levels only; a confidential level in any spelling needs edit_proposal [skipped]
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence a role outside the enum (a stale token) reads nothing [skipped]
+  allowed: tests/k1-embeddings.live.test.ts :: K1 embeddings (live, REAL OpenAI) real vectors rank each tenant’s own topic first [skipped]
+live-skip-gate exit=0
+tsc exit=0 lines=0
+lint exit=0
+build exit=0
+1

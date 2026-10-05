@@ -1,0 +1,29 @@
+import subprocess, sys, os
+os.chdir(os.path.dirname(os.path.abspath(__file__)) + '/wtg1')
+T='src/lib/tenant.ts'; H='src/lib/hooks/use-action-error-text.ts'
+M = {
+ 'M1 yakalama kaldırıldı (havuz hatası ham fırlar)': (T, """    else if (isDatabaseUnavailable(error)) {
+      console.error(`[requireTenantAction] pilot check could not reach the database: ${errorMessage(error)}`);
+      throw new ServiceBusyError();
+    }
+""", ""),
+ 'M2 iç metin istemciye (message = sürücü metni)': (T, "      throw new ServiceBusyError();", "      throw Object.assign(new ServiceBusyError(), { message: errorMessage(error) });"),
+ 'M2b iç hata cause ile istemciye': (T, "      throw new ServiceBusyError();", "      throw Object.assign(new ServiceBusyError(), { cause: error });"),
+ 'M3 her hata SERVICE_BUSY': (T, "    else if (isDatabaseUnavailable(error)) {", "    else {"),
+ 'M4 istemci kancası SERVICE_BUSY tanımıyor': (H, "      if (isServiceBusy(error)) return t('serviceBusy');\n", ""),
+}
+TESTS=['tests/service-busy-action.test.tsx','tests/service-busy-pool.live.test.ts','tests/pilot-expired-action-message.test.tsx','tests/pipeline-actions-pilot-digest.test.ts']
+for name,(f,old,new) in M.items():
+    s=open(f).read(); assert s.count(old)==1, name
+    open(f,'w').write(s.replace(old,new))
+    print(f'=== {name}\n--- diff'); sys.stdout.flush()
+    subprocess.run(['git','diff','--stat'])
+    r=subprocess.run(['pnpm','exec','vitest','run',*TESTS],capture_output=True,text=True)
+    out=r.stdout+r.stderr
+    fails=[l.strip() for l in out.splitlines() if l.strip().startswith('FAIL') or l.strip().startswith('×')]
+    summ=[l.strip() for l in out.splitlines() if 'Tests ' in l and ('passed' in l or 'failed' in l)]
+    print('\n'.join(fails[:8])); print(summ[-1] if summ else out[-800:])
+    print('VERDICT:', 'KILLED' if r.returncode!=0 else 'SURVIVED')
+    subprocess.run(['git','checkout','--',f])
+    q=subprocess.run(['git','diff','--quiet']).returncode
+    print('reverted; git diff --quiet exit =', q); sys.stdout.flush()

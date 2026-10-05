@@ -1,0 +1,12 @@
+CI=true DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55136/fabrika
+🚀  Your database is now in sync with your Prisma schema. Done in 2.13s
+
+✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55136/fabrika
+apply-migrations: 41 files applied as fabrika
+exit=0
+apply-migrations: 41 files applied as fabrika
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+
+✓ E11.2 feedback seed complete
+Seeding completed with E10 data.

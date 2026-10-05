@@ -1,0 +1,16 @@
+m1 imports dizisi: yalnız ilk eleman: ÖLDÜ — 1 failed | 61 passed (62)
+m3 en uzun önek yok (ilk eşleşen kazanır): ÖLDÜ — 1 failed | 61 passed (62)
+m4 tam anahtar önceliği yok (sıraya bağlı): ÖLDÜ — 1 failed | 61 passed (62)
+m7 anahtar sonekini denetleme: ÖLDÜ — 1 failed | 61 passed (62)
+m8 src öneki gevşek (srcx/ de src): HAYATTA — 62 passed (62)
+m9 loadModule: alias tablosu değişince yeniden çözme yok: HAYATTA — 62 passed (62)
+m11 kaynaklar ayrı değil (matchAlias kaynağı yok sayar): ÖLDÜ — 4 failed | 58 passed (62)
+m14 tsconfig parse hatası yutuluyor: ÖLDÜ — 1 failed | 61 passed (62)
+n18 bare: probed eklenmiyor (at içinde): HAYATTA — 62 passed (62) | probe SHADOW=?
+x1 missed hiç atanmıyor (catch-all yazım hatası → paket): ÖLDÜ — 3 failed | 59 passed (62)
+x2 isPackage @types bakmıyor: HAYATTA — 62 passed (62)
+x3 isPackage isBuiltin yok: ÖLDÜ — 1 failed | 61 passed (62)
+x4 baseUrl normalize yok: HAYATTA — 62 passed (62)
+x5 tsconfig * boşa izin → node kuralı her ikisine: HAYATTA — 62 passed (62)
+x6 imports hedefi src-dışı ise out yerine blind: ÖLDÜ — 2 failed | 60 passed (62)
+x7 imports probed eklenmiyor: HAYATTA — 62 passed (62) | probe SHADOW=?

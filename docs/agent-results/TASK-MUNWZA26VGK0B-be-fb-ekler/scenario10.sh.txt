@@ -1,0 +1,18 @@
+#!/bin/bash
+# Scenario 10 (İNCELEME-68) live on :3491, DB befbwz-pg only
+B=http://localhost:3491; S=$(dirname "$0")
+q(){ docker exec -i befbwz-pg psql -U fabrika -d fabrika -tA -c "$1"; }
+login(){ rm -f $1; local c=$(curl -s -c $1 -b $1 $B/api/auth/csrf | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrfToken"])'); curl -s -o /dev/null -c $1 -b $1 -X POST $B/api/auth/callback/credentials --data-urlencode "csrfToken=$c" --data-urlencode "email=$2" --data-urlencode "callbackUrl=$B/tr"; }
+sess(){ curl -s -m 30 -c $1 -b $1 $B/api/auth/session | python3 -c 'import sys,json;d=json.load(sys.stdin);print("tenant=%s role=%s"%(d.get("tenantId"),d.get("role")))'; }
+q "delete from \"Tenant\" where id like 'wz-%'; delete from \"User\" where id='wz-u'" >/dev/null
+q "insert into \"Tenant\"(id,name,slug,country,\"updatedAt\") values ('wz-a','wz-A','wz-a','TR',now()),('wz-b','wz-B','wz-b','TR',now()),('wz-c','wz-C Kuruluşu','wz-c','TR',now())" >/dev/null
+q "insert into \"User\"(id,email,name,\"updatedAt\") values ('wz-u','wz@fabrika.test','Wz Kullanıcı',now())" >/dev/null
+q "insert into \"Membership\"(id,\"tenantId\",\"userId\",role,\"workspaceIds\",\"createdAt\") values ('wz-ma','wz-a','wz-u','TENANT_OWNER','{}',now()-interval '2 hour'),('wz-mb','wz-b','wz-u','TENANT_OWNER','{}',now()-interval '1 hour')" >/dev/null
+J=$S/j.txt; login $J wz@fabrika.test
+echo "[1] signed in (A oldest)        : $(sess $J)"
+q "delete from \"Membership\" where id='wz-ma'" >/dev/null
+echo "[2] removed from A (B kept)     : $(sess $J)"
+RAW=$(openssl rand -hex 32); H=$(printf '%s' "$RAW" | shasum -a 256 | cut -d' ' -f1)
+q "insert into \"Invitation\"(id,email,\"tenantId\",role,\"tokenHash\",expires) values ('wz-inv','wz@fabrika.test','wz-c','PIPELINE_MANAGER','$H',now()+interval '1 day')" >/dev/null
+echo "$RAW" > $S/raw.txt
+echo "[3] invited to C (PIPELINE_MANAGER), token parked for the browser"

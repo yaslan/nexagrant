@@ -1,0 +1,14 @@
+PATH                                 CODE CONTENT-TYPE             CSP SCR   CACHE-CONTROL                          CSP-HEAD                                 LOCATION
+/logo.png                            200  image/png                1   0     public, max-age=0                      default-src 'none'; style-src 'self' 'un 
+/favicon.ico                         200  image/x-icon             1   0     public, max-age=0, must-revalidate     default-src 'none'; style-src 'self' 'un 
+/_next/static/chunks/004tjz112xczd.js 200  application/javascript;  1   0     public, max-age=31536000, immutable    default-src 'none'; style-src 'self' 'un 
+/_next/image?url=%2Flogo.png&w=64&q=75 200  image/png                1   0     public, max-age=14400, must-revalidate script-src 'none'; frame-src 'none'; san 
+/Logo.png                            404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/Favicon.ico                         404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/STATIC/x.js                   404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/Image                         404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/yok.png                             404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/static                        404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/apifoo                              307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/apifoo
+/api/yok                             404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; script-src 'unsafe-h 
+/tr                                  200  text/html; charset=utf-8 1   39    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 

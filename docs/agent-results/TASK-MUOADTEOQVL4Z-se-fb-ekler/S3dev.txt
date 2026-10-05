@@ -1,0 +1,14 @@
+=== S3dev: eski sıra (migrate → ESKİ 07:00) → worker değişimi → apply-migrations YENİDEN → DEV 07:22
+
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55801/s3dev
+apply-migrations: 41 files applied
+✅ prisma/rls.sql applied. Policies in public: 112 → 112
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+[wtold] tick=2026-10-27T07:00:00.000Z job=1 left=0
+"tenantsFailed":0 "skippedMailedToday":0 "digestsSent":2 "digestsFailed":0
+shutdown: 1
+apply-migrations: 41 files applied
+[wtdev] tick=2026-10-27T07:22:00.000Z job=2 left=0
+"tenantsFailed":0 "skippedMailedToday":1 "digestsSent":1 "digestsFailed":0
+shutdown: 1
+total=3 {'uA@example.test': 1, 'uC@example.test': 1, 'uE@example.test': 1}

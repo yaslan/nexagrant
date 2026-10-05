@@ -1,0 +1,141 @@
+once url    onayimi-bekleyen        320 main 413/320 TAŞMA +93 doc=320/320 main.ox=auto metin=h3 right=413>320 ; p right=413>320  <- div.space-y-2 flex-1 +93
+once url    onayimi-bekleyen        360 main 413/360 TAŞMA +53 doc=360/360 main.ox=auto metin=h3 right=413>360 ; p right=413>360  <- div.space-y-2 flex-1 +53
+once url    onayimi-bekleyen        390 main 413/390 TAŞMA +23 doc=390/390 main.ox=auto metin=h3 right=413>390 ; p right=413>390  <- div.space-y-2 flex-1 +23
+once url    onayimi-bekleyen        472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+once url    onayimi-bekleyen        640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+once url    onayimi-bekleyen        768 main 691/512 TAŞMA +179 doc=768/768 main.ox=auto metin=görünür  <- div.flex items-center gap-2 self-end md:self-center +179
+once url    onayimi-bekleyen       1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once url    onayimi-bekleyen       1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once url    taleplerim              320 main 413/320 TAŞMA +93 doc=320/320 main.ox=auto metin=h3 right=413>320 ; p right=413>320 ; h3 right=413>320  <- div.space-y-2 flex-1 +93 | div.space-y-2 flex-1 +93
+once url    taleplerim              360 main 413/360 TAŞMA +53 doc=360/360 main.ox=auto metin=h3 right=413>360 ; p right=413>360 ; h3 right=413>360  <- div.space-y-2 flex-1 +53 | div.space-y-2 flex-1 +53
+once url    taleplerim              390 main 413/390 TAŞMA +23 doc=390/390 main.ox=auto metin=h3 right=413>390 ; p right=413>390 ; h3 right=413>390  <- div.space-y-2 flex-1 +23 | div.space-y-2 flex-1 +23
+once url    taleplerim              472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+once url    taleplerim              640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+once url    taleplerim              768 main 604/512 TAŞMA +92 doc=768/768 main.ox=auto metin=görünür  <- div.flex items-center gap-2 self-end md:self-center +92 | div.flex items-center gap-2 self-end md:self-center +26
+once url    taleplerim             1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once url    taleplerim             1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once url    detay-modal            320 ×.right=442 başlık sw-cw=0 panel=16..304 sw-cw=139 SORUN
+once url    × ekran dışında: alttaki Kapat ile kapatılıyor
+once url    detay-modal kapandı=true
+once url    firsat-detay            320 main 593/320 TAŞMA +273 doc=320/320 main.ox=auto metin=h1 right=593>320  <- div.min-w-0 break-words +273
+once url    firsat-detay            360 main 593/360 TAŞMA +233 doc=360/360 main.ox=auto metin=h1 right=593>360  <- div.min-w-0 break-words +233
+once url    firsat-detay            390 main 593/390 TAŞMA +203 doc=390/390 main.ox=auto metin=h1 right=593>390  <- div.min-w-0 break-words +203
+once url    firsat-detay            472 main 593/472 TAŞMA +121 doc=472/472 main.ox=auto metin=h1 right=593>472  <- div.min-w-0 break-words +121
+once url    firsat-detay            640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+once url    firsat-detay            768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+once url    firsat-detay           1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once url    firsat-detay           1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once url    firsat-arsiv-onay       320 main 593/320 TAŞMA +273 doc=320/320 main.ox=auto metin=h1 right=593>320 ; p sw>cw 329/232  <- div.min-w-0 break-words +273
+once url    firsat-arsiv-onay       360 main 593/360 TAŞMA +233 doc=360/360 main.ox=auto metin=h1 right=593>360 ; p sw>cw 329/272  <- div.min-w-0 break-words +233
+once url    firsat-arsiv-onay       390 main 593/390 TAŞMA +203 doc=390/390 main.ox=auto metin=h1 right=593>390 ; p sw>cw 329/302  <- div.min-w-0 break-words +203
+once url    firsat-arsiv-onay       472 main 593/472 TAŞMA +121 doc=472/472 main.ox=auto metin=h1 right=593>472  <- div.min-w-0 break-words +121
+once url    firsat-arsiv-onay       640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+once url    firsat-arsiv-onay       768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=p sw>cw 329/300
+once url    firsat-arsiv-onay      1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once url    firsat-arsiv-onay      1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once kelime onayimi-bekleyen        320 main 833/320 TAŞMA +513 doc=320/320 main.ox=auto metin=h3 right=833>320 ; p right=833>320  <- div.space-y-2 flex-1 +513
+once kelime onayimi-bekleyen        360 main 833/360 TAŞMA +473 doc=360/360 main.ox=auto metin=h3 right=833>360 ; p right=833>360  <- div.space-y-2 flex-1 +473
+once kelime onayimi-bekleyen        390 main 833/390 TAŞMA +443 doc=390/390 main.ox=auto metin=h3 right=833>390 ; p right=833>390  <- div.space-y-2 flex-1 +443
+once kelime onayimi-bekleyen        472 main 833/472 TAŞMA +361 doc=472/472 main.ox=auto metin=h3 right=833>472 ; p right=833>472  <- div.space-y-2 flex-1 +361
+once kelime onayimi-bekleyen        640 main 871/640 TAŞMA +231 doc=640/640 main.ox=auto metin=h3 right=871>640 ; p right=871>640  <- div.space-y-2 flex-1 +231
+once kelime onayimi-bekleyen        768 main 1111/512 TAŞMA +599 doc=768/768 main.ox=auto metin=h3 right=1127>768 ; p right=1127>768  <- div.space-y-2 flex-1 +359 | div.flex items-center gap-2 self-end md:self-center +599
+once kelime onayimi-bekleyen       1024 main 1111/768 TAŞMA +343 doc=1024/1024 main.ox=auto metin=h3 right=1127>1024 ; p right=1127>1024  <- div.space-y-2 flex-1 +103 | div.flex items-center gap-2 self-end md:self-center +343
+once kelime onayimi-bekleyen       1280 main 1111/1024 TAŞMA +87 doc=1280/1280 main.ox=auto metin=görünür  <- div.flex items-center gap-2 self-end md:self-center +87
+once kelime taleplerim              320 main 833/320 TAŞMA +513 doc=320/320 main.ox=auto metin=h3 right=833>320 ; p right=833>320 ; h3 right=833>320  <- div.space-y-2 flex-1 +513 | div.space-y-2 flex-1 +513
+once kelime taleplerim              360 main 833/360 TAŞMA +473 doc=360/360 main.ox=auto metin=h3 right=833>360 ; p right=833>360 ; h3 right=833>360  <- div.space-y-2 flex-1 +473 | div.space-y-2 flex-1 +473
+once kelime taleplerim              390 main 833/390 TAŞMA +443 doc=390/390 main.ox=auto metin=h3 right=833>390 ; p right=833>390 ; h3 right=833>390  <- div.space-y-2 flex-1 +443 | div.space-y-2 flex-1 +443
+once kelime taleplerim              472 main 833/472 TAŞMA +361 doc=472/472 main.ox=auto metin=h3 right=833>472 ; p right=833>472 ; h3 right=833>472  <- div.space-y-2 flex-1 +361 | div.space-y-2 flex-1 +361
+once kelime taleplerim              640 main 871/640 TAŞMA +231 doc=640/640 main.ox=auto metin=h3 right=871>640 ; p right=871>640 ; h3 right=871>640  <- div.space-y-2 flex-1 +231 | div.space-y-2 flex-1 +231
+once kelime taleplerim              768 main 1024/512 TAŞMA +512 doc=768/768 main.ox=auto metin=h3 right=1127>768 ; p right=1127>768 ; h3 right=1127>768  <- div.space-y-2 flex-1 +359 | div.flex items-center gap-2 self-end md:self-center +512
+once kelime taleplerim             1024 main 1024/768 TAŞMA +256 doc=1024/1024 main.ox=auto metin=h3 right=1127>1024 ; p right=1127>1024 ; h3 right=1127>1024  <- div.space-y-2 flex-1 +103 | div.flex items-center gap-2 self-end md:self-center +256
+once kelime taleplerim             1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once kelime detay-modal            320 ×.right=862 başlık sw-cw=0 panel=16..304 sw-cw=559 SORUN
+once kelime × ekran dışında: alttaki Kapat ile kapatılıyor
+once kelime detay-modal kapandı=true
+once kelime firsat-detay            320 main 1229/320 TAŞMA +909 doc=320/320 main.ox=auto metin=h1 right=1229>320  <- div.min-w-0 break-words +909
+once kelime firsat-detay            360 main 1229/360 TAŞMA +869 doc=360/360 main.ox=auto metin=h1 right=1229>360  <- div.min-w-0 break-words +869
+once kelime firsat-detay            390 main 1229/390 TAŞMA +839 doc=390/390 main.ox=auto metin=h1 right=1229>390  <- div.min-w-0 break-words +839
+once kelime firsat-detay            472 main 1229/472 TAŞMA +757 doc=472/472 main.ox=auto metin=h1 right=1229>472  <- div.min-w-0 break-words +757
+once kelime firsat-detay            640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+once kelime firsat-detay            768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+once kelime firsat-detay           1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once kelime firsat-detay           1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once kelime firsat-arsiv-onay       320 main 1229/320 TAŞMA +909 doc=320/320 main.ox=auto metin=h1 right=1229>320 ; p sw>cw 663/232  <- div.min-w-0 break-words +909
+once kelime firsat-arsiv-onay       360 main 1229/360 TAŞMA +869 doc=360/360 main.ox=auto metin=h1 right=1229>360 ; p sw>cw 663/272  <- div.min-w-0 break-words +869
+once kelime firsat-arsiv-onay       390 main 1229/390 TAŞMA +839 doc=390/390 main.ox=auto metin=h1 right=1229>390 ; p sw>cw 663/302  <- div.min-w-0 break-words +839
+once kelime firsat-arsiv-onay       472 main 1229/472 TAŞMA +757 doc=472/472 main.ox=auto metin=h1 right=1229>472 ; p sw>cw 663/384  <- div.min-w-0 break-words +757
+once kelime firsat-arsiv-onay       640 main 745/640 TAŞMA +105 doc=640/640 main.ox=auto metin=p sw>cw 663/476  <- 
+once kelime firsat-arsiv-onay       768 main 769/512 TAŞMA +257 doc=768/768 main.ox=auto metin=p sw>cw 663/300  <- 
+once kelime firsat-arsiv-onay      1024 main 769/768 TAŞMA +1 doc=1024/1024 main.ox=auto metin=p sw>cw 663/556  <- 
+once kelime firsat-arsiv-onay      1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once eposta onayimi-bekleyen        320 main 320/320 EŞİT doc=320/320 main.ox=auto metin=görünür
+once eposta onayimi-bekleyen        360 main 360/360 EŞİT doc=360/360 main.ox=auto metin=görünür
+once eposta onayimi-bekleyen        390 main 390/390 EŞİT doc=390/390 main.ox=auto metin=görünür
+once eposta onayimi-bekleyen        472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+once eposta onayimi-bekleyen        640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+once eposta onayimi-bekleyen        768 main 596/512 TAŞMA +84 doc=768/768 main.ox=auto metin=görünür  <- div.flex items-center gap-2 self-end md:self-center +84
+once eposta onayimi-bekleyen       1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once eposta onayimi-bekleyen       1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once eposta taleplerim              320 main 320/320 EŞİT doc=320/320 main.ox=auto metin=görünür
+once eposta taleplerim              360 main 360/360 EŞİT doc=360/360 main.ox=auto metin=görünür
+once eposta taleplerim              390 main 390/390 EŞİT doc=390/390 main.ox=auto metin=görünür
+once eposta taleplerim              472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+once eposta taleplerim              640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+once eposta taleplerim              768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+once eposta taleplerim             1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once eposta taleplerim             1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once eposta detay-modal            320 ×.right=347 başlık sw-cw=0 panel=16..304 sw-cw=44 SORUN
+once eposta × ekran dışında: alttaki Kapat ile kapatılıyor
+once eposta detay-modal kapandı=true
+once eposta firsat-detay            320 main 456/320 TAŞMA +136 doc=320/320 main.ox=auto metin=h1 right=456>320  <- div.min-w-0 break-words +136
+once eposta firsat-detay            360 main 456/360 TAŞMA +96 doc=360/360 main.ox=auto metin=h1 right=456>360  <- div.min-w-0 break-words +96
+once eposta firsat-detay            390 main 456/390 TAŞMA +66 doc=390/390 main.ox=auto metin=h1 right=456>390  <- div.min-w-0 break-words +66
+once eposta firsat-detay            472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+once eposta firsat-detay            640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+once eposta firsat-detay            768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+once eposta firsat-detay           1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once eposta firsat-detay           1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once eposta firsat-arsiv-onay       320 main 456/320 TAŞMA +136 doc=320/320 main.ox=auto metin=h1 right=456>320 ; p sw>cw 262/232  <- div.min-w-0 break-words +136
+once eposta firsat-arsiv-onay       360 main 456/360 TAŞMA +96 doc=360/360 main.ox=auto metin=h1 right=456>360  <- div.min-w-0 break-words +96
+once eposta firsat-arsiv-onay       390 main 456/390 TAŞMA +66 doc=390/390 main.ox=auto metin=h1 right=456>390  <- div.min-w-0 break-words +66
+once eposta firsat-arsiv-onay       472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+once eposta firsat-arsiv-onay       640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+once eposta firsat-arsiv-onay       768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+once eposta firsat-arsiv-onay      1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once eposta firsat-arsiv-onay      1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once turkce onayimi-bekleyen        320 main 633/320 TAŞMA +313 doc=320/320 main.ox=auto metin=h3 right=633>320 ; p right=633>320  <- div.space-y-2 flex-1 +313
+once turkce onayimi-bekleyen        360 main 633/360 TAŞMA +273 doc=360/360 main.ox=auto metin=h3 right=633>360 ; p right=633>360  <- div.space-y-2 flex-1 +273
+once turkce onayimi-bekleyen        390 main 633/390 TAŞMA +243 doc=390/390 main.ox=auto metin=h3 right=633>390 ; p right=633>390  <- div.space-y-2 flex-1 +243
+once turkce onayimi-bekleyen        472 main 633/472 TAŞMA +161 doc=472/472 main.ox=auto metin=h3 right=633>472 ; p right=633>472  <- div.space-y-2 flex-1 +161
+once turkce onayimi-bekleyen        640 main 671/640 TAŞMA +31 doc=640/640 main.ox=auto metin=h3 right=671>640 ; p right=671>640  <- div.space-y-2 flex-1 +31
+once turkce onayimi-bekleyen        768 main 911/512 TAŞMA +399 doc=768/768 main.ox=auto metin=h3 right=927>768 ; p right=927>768  <- div.space-y-2 flex-1 +159 | div.flex items-center gap-2 self-end md:self-center +399
+once turkce onayimi-bekleyen       1024 main 911/768 TAŞMA +143 doc=1024/1024 main.ox=auto metin=görünür  <- div.flex items-center gap-2 self-end md:self-center +143
+once turkce onayimi-bekleyen       1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once turkce taleplerim              320 main 633/320 TAŞMA +313 doc=320/320 main.ox=auto metin=h3 right=633>320 ; p right=633>320 ; h3 right=633>320  <- div.space-y-2 flex-1 +313 | div.space-y-2 flex-1 +313
+once turkce taleplerim              360 main 633/360 TAŞMA +273 doc=360/360 main.ox=auto metin=h3 right=633>360 ; p right=633>360 ; h3 right=633>360  <- div.space-y-2 flex-1 +273 | div.space-y-2 flex-1 +273
+once turkce taleplerim              390 main 633/390 TAŞMA +243 doc=390/390 main.ox=auto metin=h3 right=633>390 ; p right=633>390 ; h3 right=633>390  <- div.space-y-2 flex-1 +243 | div.space-y-2 flex-1 +243
+once turkce taleplerim              472 main 633/472 TAŞMA +161 doc=472/472 main.ox=auto metin=h3 right=633>472 ; p right=633>472 ; h3 right=633>472  <- div.space-y-2 flex-1 +161 | div.space-y-2 flex-1 +161
+once turkce taleplerim              640 main 671/640 TAŞMA +31 doc=640/640 main.ox=auto metin=h3 right=671>640 ; p right=671>640 ; h3 right=671>640  <- div.space-y-2 flex-1 +31 | div.space-y-2 flex-1 +31
+once turkce taleplerim              768 main 825/512 TAŞMA +313 doc=768/768 main.ox=auto metin=h3 right=927>768 ; p right=927>768 ; h3 right=927>768  <- div.space-y-2 flex-1 +159 | div.flex items-center gap-2 self-end md:self-center +313
+once turkce taleplerim             1024 main 825/768 TAŞMA +57 doc=1024/1024 main.ox=auto metin=görünür  <- div.flex items-center gap-2 self-end md:self-center +57
+once turkce taleplerim             1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once turkce detay-modal            320 ×.right=663 başlık sw-cw=0 panel=16..304 sw-cw=360 SORUN
+once turkce × ekran dışında: alttaki Kapat ile kapatılıyor
+once turkce detay-modal kapandı=true
+once turkce firsat-detay            320 main 913/320 TAŞMA +593 doc=320/320 main.ox=auto metin=h1 right=913>320  <- div.min-w-0 break-words +593
+once turkce firsat-detay            360 main 913/360 TAŞMA +553 doc=360/360 main.ox=auto metin=h1 right=913>360  <- div.min-w-0 break-words +553
+once turkce firsat-detay            390 main 913/390 TAŞMA +523 doc=390/390 main.ox=auto metin=h1 right=913>390  <- div.min-w-0 break-words +523
+once turkce firsat-detay            472 main 913/472 TAŞMA +441 doc=472/472 main.ox=auto metin=h1 right=913>472  <- div.min-w-0 break-words +441
+once turkce firsat-detay            640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+once turkce firsat-detay            768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+once turkce firsat-detay           1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once turkce firsat-detay           1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once turkce firsat-arsiv-onay       320 main 913/320 TAŞMA +593 doc=320/320 main.ox=auto metin=h1 right=913>320 ; p sw>cw 508/232  <- div.min-w-0 break-words +593
+once turkce firsat-arsiv-onay       360 main 913/360 TAŞMA +553 doc=360/360 main.ox=auto metin=h1 right=913>360 ; p sw>cw 508/272  <- div.min-w-0 break-words +553
+once turkce firsat-arsiv-onay       390 main 913/390 TAŞMA +523 doc=390/390 main.ox=auto metin=h1 right=913>390 ; p sw>cw 508/302  <- div.min-w-0 break-words +523
+once turkce firsat-arsiv-onay       472 main 913/472 TAŞMA +441 doc=472/472 main.ox=auto metin=h1 right=913>472 ; p sw>cw 508/384  <- div.min-w-0 break-words +441
+once turkce firsat-arsiv-onay       640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=p sw>cw 508/476
+once turkce firsat-arsiv-onay       768 main 614/512 TAŞMA +102 doc=768/768 main.ox=auto metin=p sw>cw 508/300  <- 
+once turkce firsat-arsiv-onay      1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+once turkce firsat-arsiv-onay      1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+once BİTTİ sorunlu-ölçüm=78

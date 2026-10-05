@@ -1,0 +1,18 @@
+== alanı olmayan kullanıcılar: NUL / nesne slug
+none "workspaceSlug":"x\u0000" -> 1:{"success":true,"opportunity":{"id":"opp-1790772692576","workspaceId":"x\u0000","title":"CSFB83-N-none","topicId":"HOR
+4:["$","$L15",null,{"formats":"$undefined","locale":"tr","messages":{"Navigation":{"dashboard":"Panel","calls":"Çağrılar
+none "workspaceSlug":{"foo":1} -> 1:{"success":true,"opportunity":{"id":"opp-1790772692943","workspaceId":"$T0:0:workspaceSlug","title":"CSFB83-N-none","t
+4:["$","$L15",null,{"formats":"$undefined","locale":"tr","messages":{"Navigation":{"dashboard":"Panel","calls":"Çağrılar
+t5u "workspaceSlug":"x\u0000" -> 1:{"success":true,"opportunity":{"id":"opp-1790772693250","workspaceId":"x\u0000","title":"CSFB83-N-t5u","topicId":"HORI
+4:["$","$L15",null,{"formats":"$undefined","locale":"tr","messages":{"Navigation":{"dashboard":"Panel","calls":"Çağrılar
+t5u "workspaceSlug":{"foo":1} -> 1:{"success":true,"opportunity":{"id":"opp-1790772693637","workspaceId":"$T0:0:workspaceSlug","title":"CSFB83-N-t5u","to
+4:["$","$L15",null,{"formats":"$undefined","locale":"tr","messages":{"Navigation":{"dashboard":"Panel","calls":"Çağrılar
+t6u "workspaceSlug":"x\u0000" -> 1:{"success":true,"opportunity":{"id":"opp-1790772693972","workspaceId":"x\u0000","title":"CSFB83-N-t6u","topicId":"HORI
+4:["$","$L15",null,{"formats":"$undefined","locale":"tr","messages":{"Navigation":{"dashboard":"Panel","calls":"Çağrılar
+t6u "workspaceSlug":{"foo":1} -> 1:{"success":true,"opportunity":{"id":"opp-1790772694273","workspaceId":"$T0:0:workspaceSlug","title":"CSFB83-N-t6u","to
+4:["$","$L15",null,{"formats":"$undefined","locale":"tr","messages":{"Navigation":{"dashboard":"Panel","calls":"Çağrılar
+== pano görünürlüğü (HTML'de işaretçi)
+owner /tr/ws-a/firsatlar:   modül-kapalı=1
+owner /en/ws-a/pipeline:   modül-kapalı=1
+restr /tr/ws-b/firsatlar:   modül-kapalı=1
+alice /tr/main/firsatlar:   modül-kapalı=1

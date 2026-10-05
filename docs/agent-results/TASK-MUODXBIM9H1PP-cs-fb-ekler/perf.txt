@@ -1,0 +1,22 @@
+== _orig_scan single:
+files=37 total=8682 ms
+files=37 total=1720 ms
+files=37 total=1492 ms
+== _orig_scan 6 concurrent:
+files=37 total=2794 ms
+files=37 total=2837 ms
+files=37 total=2661 ms
+files=37 total=2878 ms
+files=37 total=2749 ms
+files=37 total=2821 ms
+== action-leak-scan single:
+files=37 total=1392 ms
+files=37 total=1297 ms
+files=37 total=1342 ms
+== action-leak-scan 6 concurrent:
+files=37 total=3174 ms
+files=37 total=3075 ms
+files=37 total=2909 ms
+files=37 total=3159 ms
+files=37 total=3265 ms
+files=37 total=3084 ms

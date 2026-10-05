@@ -1,0 +1,9 @@
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55105/fabrika
+ Test Files  297 passed | 2 skipped (299)
+      Tests  3832 passed | 50 skipped (3882)
+EXIT=0
+GATE tsc=0
+GATE lint=0
+GATE i18n=0 (✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.)
+GATE build=EXIT=0 (env -u NODE_ENV pnpm build, dev HEAD 6754ef1b)
+taban build (238d9dd9)=EXIT=0

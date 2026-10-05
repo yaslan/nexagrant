@@ -1,0 +1,28 @@
+
+ Test Files  8 failed | 250 passed | 2 skipped (260)
+      Tests  9 failed | 3136 passed | 9 skipped (3154)
+   Start at  11:02:29
+   Duration  156.50s (transform 50.91s, setup 0ms, import 354.27s, tests 962.51s, environment 94.64s)
+
+rc=1
+ FAIL  src/lib/agency/report.test.ts > report numbers == dashboard response > property: 300 random tables — every cell of the report is the dashboard’s cell
+ FAIL  src/lib/billing/invoice-writer.test.ts > decomposeGrossAmount > reconstructs the charged amount exactly, for every amount and rate swept
+ FAIL  tests/cordis-partner-profile.live.test.ts > generatePartnerProfiles (paged) vs the in-memory original > writes the same profiles and co-participations as the legacy job
+ FAIL  tests/rag-pdf-real-parse.test.ts > B-1: page and chunk limits hold on real PDFs before any embedding call > İNCELEME-45 shape: 30 000 pages in 4.8 MB is refused in well under a second
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > B-1': the event loop keeps turning while pdf.js works on one heavy page > İNCELEME-52 shape: 20 pages sharing one compressed stream of 100 000 text operators
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > what still works > parallel uploads are extracted one at a time and all answer
+ FAIL  tests/use-server-exports.test.ts > 'use server' modules > export only async functions
+ FAIL  tests/vat-by-country.test.ts > vatOnNetMinor — one rounding rule for the whole system > gross is always net plus the tax, exactly, with no third number
+ FAIL  tests/withholding-rounding.test.ts > the document and the panel withhold the same amount > every net from 1 to 3000, at each VAT rate and each withholding rate
+--- rerun failed files (parallel, load ~50):
+ Test Files  5 failed | 3 passed (8)
+      Tests  5 failed | 111 passed (116)
+   Start at  11:05:19
+   Duration  97.11s (transform 11.86s, setup 0ms, import 19.17s, tests 234.22s, environment 28ms)
+
+--- rerun 4 still-red files --maxWorkers=1:
+ Test Files  4 passed (4)
+      Tests  67 passed (67)
+   Start at  11:08:06
+   Duration  30.33s (transform 946ms, setup 0ms, import 1.50s, tests 27.90s, environment 0ms)
+

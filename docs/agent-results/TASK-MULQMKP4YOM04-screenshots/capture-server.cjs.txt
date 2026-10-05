@@ -1,0 +1,11 @@
+// Local stand-in for PostHog + Sentry ingest. Logs every request as one JSON line.
+const http = require('http'); const fs = require('fs');
+const out = process.argv[3]; const port = Number(process.argv[2]);
+http.createServer((req, res) => {
+  const cors = { 'access-control-allow-origin': req.headers.origin || '*', 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'POST, OPTIONS' };
+  let body = ''; req.on('data', (c) => (body += c));
+  req.on('end', () => {
+    fs.appendFileSync(out, JSON.stringify({ at: new Date().toISOString(), method: req.method, url: req.url, origin: req.headers.origin || null, sentryAuth: req.headers['x-sentry-auth'] ? req.headers['x-sentry-auth'].replace(/sentry_key=[^,]+/, 'sentry_key=<masked>') : null, body }) + '\n');
+    res.writeHead(req.method === 'OPTIONS' ? 204 : 200, { ...cors, 'content-type': 'application/json' }); res.end(req.method === 'OPTIONS' ? '' : '{"status":1}');
+  });
+}).listen(port, '127.0.0.1', () => console.log('capture listening', port));

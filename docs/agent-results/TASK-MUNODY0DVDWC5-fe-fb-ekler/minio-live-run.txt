@@ -1,0 +1,15 @@
+ ✓ tests/evidence-upload-s3.live.test.ts > B-1: only an allowed type of a bounded size gets a signed upload > types outside the list, a type that disagrees with the extension, and bad sizes get no URL 58ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-1: only an allowed type of a bounded size gets a signed upload > the URL signs type and length and carries no empty-body checksum (B-3) 21ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-1: only an allowed type of a bounded size gets a signed upload > the store refuses a PUT whose type differs from the signed one 49ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-1: only an allowed type of a bounded size gets a signed upload > the store refuses a PUT larger or smaller than the signed length 18ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-1: only an allowed type of a bounded size gets a signed upload > confirm refuses a key that was never uploaded, and writes no row 24ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-1: only an allowed type of a bounded size gets a signed upload > confirm refuses a stored object whose bytes are not the key’s type, and removes that one object 57ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-1: only an allowed type of a bounded size gets a signed upload > confirm refuses a stored object whose content type is not the key’s, even with PDF bytes 23ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-1: only an allowed type of a bounded size gets a signed upload > confirm refuses a stored object over the limit, whatever size the browser claims 246ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-1: only an allowed type of a bounded size gets a signed upload > positive control: a real PDF goes through, and the row records the store’s size and type 62ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-2: evidence is read only by a signed-in member of its tenant > a CONFIDENTIAL file cannot be read without a session, neither from the store nor through the app 38ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-2: evidence is read only by a signed-in member of its tenant > another tenant’s evidence is a 404 and no signed URL is handed out 43ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-2: evidence is read only by a signed-in member of its tenant > a row of A that names B’s object does not open it 27ms
+ ✓ tests/evidence-upload-s3.live.test.ts > B-2: evidence is read only by a signed-in member of its tenant > positive control: the owner gets a 5-minute signed download of the same bytes, as an attachment 27ms
+ Test Files  1 passed (1)
+      Tests  13 passed (13)

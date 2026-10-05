@@ -1,0 +1,13 @@
+diff --git a/src/app/[locale]/(app)/[workspace]/pipeline/[id]/client.tsx b/src/app/[locale]/(app)/[workspace]/pipeline/[id]/client.tsx
+index eee6082d..08eedc57 100644
+--- a/src/app/[locale]/(app)/[workspace]/pipeline/[id]/client.tsx
++++ b/src/app/[locale]/(app)/[workspace]/pipeline/[id]/client.tsx
+@@ -223,7 +223,7 @@ export function OpportunityDetailClient({
+               <Archive className="w-4 h-4 shrink-0" aria-hidden="true" />
+               {/* Bare text here would be an anonymous flex item as wide as the title's longest
+                   word; a pasted link pushed <main> sideways by up to 387px at 320. */}
+-              <span className="min-w-0 break-words">
++              <span className="break-words">
+                 {t('detail.archive.confirmTitle', { title: opportunity.title })}
+               </span>
+             </p>

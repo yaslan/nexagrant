@@ -1,0 +1,40 @@
+import subprocess
+A='src/lib/auth.ts'; ACT='src/app/[locale]/accept-invite/continue/actions.ts'
+TESTS=['tests/accept-invite-rebind-failure.test.ts','src/lib/auth-callbacks.test.ts','tests/auth-jwt-membership-refresh.live.test.ts','tests/dashboard-tenantless.test.ts','tests/invitation-accept.live.test.ts']
+F='                  tenant: { deletedAt: null },\n'
+M=[
+ # --- my own forms of the five that lived in İNCELEME-81 ---
+ ('N2a regex + "statement timeout"',A,'const NOT_CONNECTED = /Connection terminated due to connection timeout|timeout exceeded when trying to connect/;','const NOT_CONNECTED = /Connection terminated due to connection timeout|timeout exceeded when trying to connect|statement timeout/;'),
+ ('N2b regex /Connection terminated/ (unexpectedly too)',A,'const NOT_CONNECTED = /Connection terminated due to connection timeout|timeout exceeded when trying to connect/;','const NOT_CONNECTED = /Connection terminated|timeout exceeded when trying to connect/;'),
+ ('N2c regex unanchored "timeout exceeded|Query timeout"',A,'const NOT_CONNECTED = /Connection terminated due to connection timeout|timeout exceeded when trying to connect/;','const NOT_CONNECTED = /Connection terminated due to connection timeout|timeout exceeded when trying to connect|Query timeout/;'),
+ ('N4a accept: catch rethrows',ACT,"    console.error(`[AcceptInvite] session rebind failed: ${error instanceof Error ? error.name : 'unknown'}`);\n","    console.error(`[AcceptInvite] session rebind failed: ${error instanceof Error ? error.name : 'unknown'}`);\n    throw error;\n"),
+ ('N4b accept: logs the full error (message leak)',ACT,"session rebind failed: ${error instanceof Error ? error.name : 'unknown'}","session rebind failed: ${error instanceof Error ? error.message : 'unknown'}"),
+ ('N4c accept: cookie not cleared on rebind failure (return before redirect)',ACT,"    console.error(`[AcceptInvite] session rebind failed: ${error instanceof Error ? error.name : 'unknown'}`);\n","    console.error(`[AcceptInvite] session rebind failed: ${error instanceof Error ? error.name : 'unknown'}`);\n    return;\n"),
+ ('N7a bound preferred over requested',A,'dbUser?.memberships?.find((m) => m.tenantId === requestedTenantId) ?? dbUser?.memberships?.[0]','dbUser?.memberships?.find((m) => m.tenantId === boundTenantId) ?? dbUser?.memberships?.[0]'),
+ ('N7b first row only (ignore requested)',A,'dbUser?.memberships?.find((m) => m.tenantId === requestedTenantId) ?? dbUser?.memberships?.[0]','dbUser?.memberships?.[0]'),
+ ('N7c orderBy desc',A,'                orderBy: { createdAt: "asc" },\n                take: Math.max(1, lookupTenantIds.length),','                orderBy: { createdAt: "desc" },\n                take: Math.max(1, lookupTenantIds.length),'),
+ ('N8a warn logged twice (also inside retry)',A,'    if (!NOT_CONNECTED.test(errorMessage(e))) throw e;\n    return read();','    if (!NOT_CONNECTED.test(errorMessage(e))) throw e;\n    console.warn(`[Auth.jwt] membership lookup failed, session stays tenantless: ${errorMessage(e)}`);\n    return read();'),
+ ('N8b second failure returns undefined (no throw)',A,'    return read();\n  }\n}','    try { return await read(); } catch { return undefined as T; }\n  }\n}'),
+ ('N11a session.user carries boundTenantId',A,'        session.user.image = (token.image as string) || session.user.image;\n','        session.user.image = (token.image as string) || session.user.image;\n        (session.user as unknown as Record<string, unknown>).boundTenantId = token.boundTenantId;\n'),
+ ('N11b session exposes demoAdmin',A,'        session.role = typeof token.role === "string" ? token.role : null;','        session.role = typeof token.role === "string" ? token.role : null;\n        (session as unknown as Record<string, unknown>).demoAdmin = token.demoAdmin;'),
+ # --- deleted-tenant filter variants ---
+ ('D1 bound row kept even when deleted (OR tenantId=bound)',A,F,'                  OR: [{ tenant: { deletedAt: null } }, ...(boundTenantId ? [{ tenantId: boundTenantId }] : [])],\n'),
+ ('D2 requested row kept even when deleted',A,F,'                  OR: [{ tenant: { deletedAt: null } }, ...(requestedTenantId ? [{ tenantId: requestedTenantId }] : [])],\n'),
+ ('D3 filter only on rebind (length>=2)',A,F,'                  ...(lookupTenantIds.length >= 2 ? { tenant: { deletedAt: null } } : {}),\n'),
+ ('D4 inverted: deletedAt not null',A,F,'                  tenant: { deletedAt: { not: null } },\n'),
+ ('D5 filter on user.deletedAt instead of tenant',A,F,'                  user: { deletedAt: null },\n'),
+ ('D6 equivalent form tenant: { is: { deletedAt: null } }',A,F,'                  tenant: { is: { deletedAt: null } },\n'),
+ ('D7 filter only future-deleted (deletedAt > now)',A,F,'                  tenant: { OR: [{ deletedAt: null }, { deletedAt: { gt: new Date() } }] },\n'),
+ ('D8 bound kept when lookup empty: fallback to boundTenantId in session',A,'            if (dbUser.name) token.name = dbUser.name;\n          }','            if (dbUser.name) token.name = dbUser.name;\n          } else if (boundTenantId) {\n            token.tenantId = boundTenantId;\n          }'),
+]
+for name,f,old,new in M:
+  s=open(f).read(); assert s.count(old)==1,(name, s.count(old))
+  open(f,'w').write(s.replace(old,new))
+  r=subprocess.run(['npx','vitest','run',*TESTS],capture_output=True,text=True)
+  open(f,'w').write(s)
+  out=r.stdout+r.stderr
+  line=[l for l in out.splitlines() if l.strip().startswith('Tests ')]
+  print(f'{name}: exit={r.returncode} {line[-1].strip() if line else out[-300:]}',flush=True)
+r=subprocess.run(['npx','vitest','run',*TESTS],capture_output=True,text=True)
+print('baseline after restore:', [l.strip() for l in (r.stdout+r.stderr).splitlines() if l.strip().startswith('Tests ')][-1])
+print(subprocess.run(['git','status','--short','src'],capture_output=True,text=True).stdout or 'src restored clean')

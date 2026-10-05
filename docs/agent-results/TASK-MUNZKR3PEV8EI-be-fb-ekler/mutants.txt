@@ -1,0 +1,14 @@
+# be-fb TASK-MUNZKR3PEV8EI — mutantlar (her biri uygulandı, hedef testler koşuldu, `git checkout --` ile geri alındı)
+# Koşu: npx vitest run "src/app/[locale]/admin/billing/plans/actions.test.ts" tests/api/api-error-body-guard.test.ts  (sağlamda 33/33)
+M1-detail-geri              planFailure → { ok:false, code, detail: String(e) }            Tests 24 failed | 9 passed (33)
+M2-ham-prisma-kodu          planFailureCode → errorCode(e) ?? 'UNKNOWN' (P2002 anahtar olur) Tests 12 failed | 21 passed (33)
+M3-log-yok                  UNKNOWN'da logger.error çağrılmaz                               Tests 11 failed | 22 passed (33)
+M4-tek-catch-sizinti        deletePlan catch'i { …, detail: (e as Error).message } döner    Tests 4 failed | 29 passed (33)
+                            (bekçi ayrıca: + "src/app/[locale]/admin/billing/plans/actions.ts": 1)
+M5-sanitiser-listeden-cik   SANITISERS'tan 'planFailure' silinir                            Tests 2 failed | 31 passed (33)
+M6-kod-listeden-cik         PLAN_FAILURE_CODES'tan 'PLAN_IN_USE' silinir                    Tests 1 failed | 32 passed (33)
+M7-tr-detail-geri           tr UNKNOWN → "İşlem başarısız: {detail}"                        Tests 1 failed | 32 passed (33)
+M8-en-anahtar-sil           en adminPlans.errors.PLAN_IN_USE silinir (geçerli JSON)         × en: every code has a sentence … (1 failed | 26 passed)
+                            (ilk deneme son anahtarı silip JSON'u bozdu → suite yüklenmedi; temiz öldürme sayılmadı, ortadaki anahtarla yinelendi)
+M9-sayfa-metni-geri         page.tsx loadError = errorMessage(e)                            tsc: TS2322 Type 'string' is not assignable to type 'boolean'
+Sonuç: 9/9 öldü.

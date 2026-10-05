@@ -1,0 +1,6 @@
+D3c index dropped: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+D3c index dropped:  FAIL  tests/evidence-dev-store.live.test.ts > the download route serving the dev store > D-1 on the dev store: a PUT after confirm does not reach the recorded file
+D3c index dropped:  FAIL  tests/evidence-upload-s3.live.test.ts > D-1 (TASK-MUNTTZ94LJWBC): a confirmed file cannot be replaced through its signed PUT > A1: a PUT after confirm, same URL, type and length, leaves the recorded file as it was
+D3c index dropped:  FAIL  tests/evidence-upload-s3.live.test.ts > D-3 (TASK-MUNTTZ94LJWBC): one key is confirmed once > A2: a second confirm of the same key writes no second row and keeps the file
+D3c index dropped:  FAIL  tests/evidence-upload-s3.live.test.ts > D-3 (TASK-MUNTTZ94LJWBC): one key is confirmed once > the index itself refuses a second row with the same key
+D3c index dropped:       Tests  4 failed | 25 passed (29)

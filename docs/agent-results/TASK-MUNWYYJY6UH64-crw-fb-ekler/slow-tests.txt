@@ -1,0 +1,36 @@
+tests>5s in either run: 28
+ 87030 100492  src/lib/agency/report.test.ts :: property: 300 random tables — every cell of the report is the dashboard’s cell
+ 44439  76390  tests/rag-pdf-worker-isolation.test.ts :: İNCELEME-52 shape: 20 pages sharing one compressed stream of 100 000 text operators
+ 31140  54318  tests/prisma-delegate-types-are-real.test.ts :: tsc rejects a phantom model and a phantom column
+  7314  14684  src/lib/agency/funnel.attack.test.ts :: seed 1, D ≥ 0, random codes: 300 random small tables, every view and the code panel joined
+  8075  13706  tests/where-guard-src.test.ts :: every unguarded where under src/ is a known, explained one
+  9636  13593  tests/teardown-where-guard.test.ts :: no test file in the repo has an unguarded where
+ 13281   6685  src/lib/agency/funnel.attack.test.ts :: seed 42, D = 0, random codes: 300 random small tables, every view and the code panel joine
+  6641  13143  src/lib/agency/funnel.attack.test.ts :: seed 7, D ≥ 0, random codes: 300 random small tables, every view and the code panel joined
+  7042  12460  tests/withholding-rounding.test.ts :: every net from 1 to 3000, at each VAT rate and each withholding rate
+ 12127   8102  src/lib/agency/funnel.attack.test.ts :: seed 1, D = 0, sequential codes of 6: 300 random small tables, every view and the code pan
+  7938  12083  src/lib/agency/funnel.attack.test.ts :: seed 1, D ≥ 0, sequential codes of 6: 300 random small tables, every view and the code pan
+  7441  12082  tests/where-guard-src.test.ts :: KNOWN has no stale entries
+  7511  11900  src/lib/agency/funnel.attack.test.ts :: seed 42, D ≥ 0, sequential codes of 6: 300 random small tables, every view and the code pa
+  7110  11462  src/lib/agency/funnel.attack.test.ts :: seed 7, D ≥ 0, sequential codes of 6: 300 random small tables, every view and the code pan
+  6797  11261  src/lib/agency/funnel.attack.test.ts :: seed 42, D ≥ 0, random codes: 300 random small tables, every view and the code panel joine
+ 11259  10216  src/lib/agency/funnel.attack.test.ts :: seed 7, D = 0, sequential codes of 6: 300 random small tables, every view and the code pan
+  6027  10895  src/lib/billing/invoice-writer.test.ts :: reconstructs the charged amount exactly, for every amount and rate swept
+ 10726  10780  src/lib/agency/funnel.attack.test.ts :: seed 42, D = 0, sequential codes of 6: 300 random small tables, every view and the code pa
+ 10606   7687  src/lib/agency/funnel.attack.test.ts :: seed 7, D = 0, random codes: 300 random small tables, every view and the code panel joined
+  5605   9344  tests/rag-pdf-real-parse.test.ts :: 1000 dense pages stop extracting as soon as maxChunks is out of reach
+  8591   8334  src/lib/agency/funnel.attack.test.ts :: seed 1, D = 0, random codes: 300 random small tables, every view and the code panel joined
+  4358   8206  tests/rag-pdf-real-parse.test.ts :: maxPages (1000) pages is accepted
+  4902   6803  tests/rag-pdf-real-parse.test.ts :: the event loop keeps turning while a large PDF is extracted
+  4214   5508  tests/cordis-partner-profile.live.test.ts :: writes the same profiles and co-participations as the legacy job
+  2769   5281  tests/rag-pdf-real-parse.test.ts :: İNCELEME-45 shape: 30 000 pages in 4.8 MB is refused in well under a second
+  3685   5278  tests/vat-by-country.test.ts :: gross is always net plus the tax, exactly, with no third number
+  5272   3597  tests/rag-pdf-worker-isolation.test.ts :: parallel uploads are extracted one at a time and all answer
+  5041   5043  tests/use-server-exports.test.ts :: export only async functions
+
+skipped: 21
+  2 tests/adapters.test.ts
+  13 tests/evidence-upload-s3.live.test.ts
+  3 tests/k1-daily-calls.test.ts
+  1 tests/k1-embeddings.live.test.ts
+  2 tests/sedia-adapter.test.ts

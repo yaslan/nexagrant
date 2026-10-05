@@ -1,0 +1,316 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+$ playwright test --grep invoice
+[WebServer] [WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+[WebServer] $ next dev --port 3000
+[WebServer] [WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+Running 17 tests using 1 worker
+
+[WebServer] [browser] Image with src "/logo.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+[WebServer] [browser] Image with src "/logo.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+  ✓   1 [chromium] › tests/e2e/billing-invoice-history.spec.ts:69:7 › billing panel invoice history › with no invoice on record it says so, and quotes nothing (2.0s)
+[WebServer] [browser] Image with src "/logo.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+[WebServer] [browser] Image with src "/logo.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+  ✓   2 [chromium] › tests/e2e/billing-invoice-history.spec.ts:89:7 › billing panel invoice history › an invoice that exists is listed with its own stored total (1.3s)
+[WebServer] [browser] Image with src "/logo.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+[WebServer] [browser] Image with src "/logo.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+  ✓   3 [chromium] › tests/e2e/billing-invoice-history.spec.ts:129:7 › billing panel invoice history › it claims a GİB filing only once the row carries an envelope id (1.2s)
+  ✓   4 [chromium] › tests/e2e/invoice-export-real-record.spec.ts:117:7 › invoice export reads a real record › an anonymous caller gets no document at all (563ms)
+  ✓   5 [chromium] › tests/e2e/invoice-export-real-record.spec.ts:129:7 › invoice export reads a real record › an id that exists nowhere is 404, not an invented invoice (27ms)
+  ✓   6 [chromium] › tests/e2e/invoice-export-real-record.spec.ts:135:7 › invoice export reads a real record › another tenant invoice is 404, the same answer as one that does not exist (16ms)
+  ✓   7 [chromium] › tests/e2e/invoice-export-real-record.spec.ts:145:7 › invoice export reads a real record › an unsupported format is refused before anything is read (7ms)
+[WebServer] [ERROR] invoice supplier identity not configured {
+[WebServer]   missing: [
+[WebServer]     'INVOICE_SUPPLIER_NAME',
+[WebServer]     'INVOICE_SUPPLIER_VKN',
+[WebServer]     'INVOICE_SUPPLIER_TAX_OFFICE',
+[WebServer]     'INVOICE_SUPPLIER_ADDRESS',
+[WebServer]     'INVOICE_SUPPLIER_CITY'
+[WebServer]   ]
+[WebServer] } 
+  ✘   8 [chromium] › tests/e2e/invoice-export-real-record.spec.ts:150:7 › invoice export reads a real record › the tenant own invoice renders that row, and nothing invented (88ms)
+[WebServer] [ERROR] invoice supplier identity not configured {
+[WebServer]   missing: [
+[WebServer]     'INVOICE_SUPPLIER_NAME',
+[WebServer]     'INVOICE_SUPPLIER_VKN',
+[WebServer]     'INVOICE_SUPPLIER_TAX_OFFICE',
+[WebServer]     'INVOICE_SUPPLIER_ADDRESS',
+[WebServer]     'INVOICE_SUPPLIER_CITY'
+[WebServer]   ]
+[WebServer] } 
+  ✘   9 [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:166:7 › a foreign-currency invoice export › the USD document prices the sale in dollars and shows lira only as the stated equivalent (33ms)
+[WebServer] [ERROR] invoice supplier identity not configured {
+[WebServer]   missing: [
+[WebServer]     'INVOICE_SUPPLIER_NAME',
+[WebServer]     'INVOICE_SUPPLIER_VKN',
+[WebServer]     'INVOICE_SUPPLIER_TAX_OFFICE',
+[WebServer]     'INVOICE_SUPPLIER_ADDRESS',
+[WebServer]     'INVOICE_SUPPLIER_CITY'
+[WebServer]   ]
+[WebServer] } 
+  ✘  10 [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:203:7 › a foreign-currency invoice export › the XML declares one currency and uses it on every amount (35ms)
+[WebServer] [ERROR] invoice supplier identity not configured {
+[WebServer]   missing: [
+[WebServer]     'INVOICE_SUPPLIER_NAME',
+[WebServer]     'INVOICE_SUPPLIER_VKN',
+[WebServer]     'INVOICE_SUPPLIER_TAX_OFFICE',
+[WebServer]     'INVOICE_SUPPLIER_ADDRESS',
+[WebServer]     'INVOICE_SUPPLIER_CITY'
+[WebServer]   ]
+[WebServer] } 
+  ✘  11 [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:213:7 › a foreign-currency invoice export › the XML carries the TCMB rate the row was issued at (33ms)
+  ✓  12 [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:230:7 › a foreign-currency invoice export › the database itself refuses a foreign-currency invoice with no rate (51ms)
+[WebServer] [ERROR] invoice supplier identity not configured {
+[WebServer]   missing: [
+[WebServer]     'INVOICE_SUPPLIER_NAME',
+[WebServer]     'INVOICE_SUPPLIER_VKN',
+[WebServer]     'INVOICE_SUPPLIER_TAX_OFFICE',
+[WebServer]     'INVOICE_SUPPLIER_ADDRESS',
+[WebServer]     'INVOICE_SUPPLIER_CITY'
+[WebServer]   ]
+[WebServer] } 
+[WebServer] [ERROR] invoice supplier identity not configured {
+[WebServer]   missing: [
+[WebServer]     'INVOICE_SUPPLIER_NAME',
+[WebServer]     'INVOICE_SUPPLIER_VKN',
+[WebServer]     'INVOICE_SUPPLIER_TAX_OFFICE',
+[WebServer]     'INVOICE_SUPPLIER_ADDRESS',
+[WebServer]     'INVOICE_SUPPLIER_CITY'
+[WebServer]   ]
+[WebServer] } 
+  ✘  13 [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:259:7 › a foreign-currency invoice export › the printable page a customer sees agrees with itself (142ms)
+  ✓  14 [chromium] › tests/e2e/invoice-write-path.spec.ts:107:5 › a tenant with no billing identity is paid-up but not invoiced (74ms)
+[WebServer] [ERROR] invoice supplier identity not configured {
+[WebServer]   missing: [
+[WebServer]     'INVOICE_SUPPLIER_NAME',
+[WebServer]     'INVOICE_SUPPLIER_VKN',
+[WebServer]     'INVOICE_SUPPLIER_TAX_OFFICE',
+[WebServer]     'INVOICE_SUPPLIER_ADDRESS',
+[WebServer]     'INVOICE_SUPPLIER_CITY'
+[WebServer]   ]
+[WebServer] } 
+  ✘  15 [chromium] › tests/e2e/invoice-write-path.spec.ts:131:5 › a payment issues one invoice, and the export route serves it (53ms)
+  ✓  16 [chromium] › tests/e2e/invoice-write-path.spec.ts:180:5 › a redelivered webhook does not issue a second invoice (69ms)
+  ✘  17 [chromium] › tests/e2e/invoice-write-path.spec.ts:192:5 › two concurrent payments get two distinct numbers (39ms)
+
+
+  1) [chromium] › tests/e2e/invoice-export-real-record.spec.ts:150:7 › invoice export reads a real record › the tenant own invoice renders that row, and nothing invented 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 503
+
+      156 |     const body = await res.text();
+      157 |
+    > 158 |     expect(res.status()).toBe(200);
+          |                          ^
+      159 |     expect(body.length).toBeGreaterThan(0);
+      160 |
+      161 |     expect(body).toContain(`<cbc:ID>${invoiceA}</cbc:ID>`);
+        at /Users/macbook/AgentSpace/fabrika/tests/e2e/invoice-export-real-record.spec.ts:158:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/invoice-export-real-record-95e92-at-row-and-nothing-invented-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/invoice-export-real-record-95e92-at-row-and-nothing-invented-chromium/error-context.md
+
+    Error Context: test-results/invoice-export-real-record-95e92-at-row-and-nothing-invented-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/invoice-export-real-record-95e92-at-row-and-nothing-invented-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/invoice-export-real-record-95e92-at-row-and-nothing-invented-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:166:7 › a foreign-currency invoice export › the USD document prices the sale in dollars and shows lira only as the stated equivalent 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 503
+
+      149 |     const res = await authed(request, `/api/billing/invoices/${number}/export?format=${format}`);
+      150 |     const body = await res.text();
+    > 151 |     expect(res.status()).toBe(200);
+          |                          ^
+      152 |     expect(body.length).toBeGreaterThan(0);
+      153 |     return body;
+      154 |   }
+        at documentOrConfigRefusal (/Users/macbook/AgentSpace/fabrika/tests/e2e/invoice-foreign-currency-export.spec.ts:151:26)
+        at /Users/macbook/AgentSpace/fabrika/tests/e2e/invoice-foreign-currency-export.spec.ts:169:17
+
+    Error Context: test-results/invoice-foreign-currency-e-a3ae9-ly-as-the-stated-equivalent-chromium/error-context.md
+
+    Error Context: test-results/invoice-foreign-currency-e-a3ae9-ly-as-the-stated-equivalent-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/invoice-foreign-currency-e-a3ae9-ly-as-the-stated-equivalent-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/invoice-foreign-currency-e-a3ae9-ly-as-the-stated-equivalent-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:203:7 › a foreign-currency invoice export › the XML declares one currency and uses it on every amount 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 503
+
+      149 |     const res = await authed(request, `/api/billing/invoices/${number}/export?format=${format}`);
+      150 |     const body = await res.text();
+    > 151 |     expect(res.status()).toBe(200);
+          |                          ^
+      152 |     expect(body.length).toBeGreaterThan(0);
+      153 |     return body;
+      154 |   }
+        at documentOrConfigRefusal (/Users/macbook/AgentSpace/fabrika/tests/e2e/invoice-foreign-currency-export.spec.ts:151:26)
+        at /Users/macbook/AgentSpace/fabrika/tests/e2e/invoice-foreign-currency-export.spec.ts:204:17
+
+    Error Context: test-results/invoice-foreign-currency-e-3ce83-and-uses-it-on-every-amount-chromium/error-context.md
+
+    Error Context: test-results/invoice-foreign-currency-e-3ce83-and-uses-it-on-every-amount-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/invoice-foreign-currency-e-3ce83-and-uses-it-on-every-amount-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/invoice-foreign-currency-e-3ce83-and-uses-it-on-every-amount-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:213:7 › a foreign-currency invoice export › the XML carries the TCMB rate the row was issued at 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 503
+
+      149 |     const res = await authed(request, `/api/billing/invoices/${number}/export?format=${format}`);
+      150 |     const body = await res.text();
+    > 151 |     expect(res.status()).toBe(200);
+          |                          ^
+      152 |     expect(body.length).toBeGreaterThan(0);
+      153 |     return body;
+      154 |   }
+        at documentOrConfigRefusal (/Users/macbook/AgentSpace/fabrika/tests/e2e/invoice-foreign-currency-export.spec.ts:151:26)
+        at /Users/macbook/AgentSpace/fabrika/tests/e2e/invoice-foreign-currency-export.spec.ts:214:17
+
+    Error Context: test-results/invoice-foreign-currency-e-c1f12--rate-the-row-was-issued-at-chromium/error-context.md
+
+    Error Context: test-results/invoice-foreign-currency-e-c1f12--rate-the-row-was-issued-at-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/invoice-foreign-currency-e-c1f12--rate-the-row-was-issued-at-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/invoice-foreign-currency-e-c1f12--rate-the-row-was-issued-at-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:259:7 › a foreign-currency invoice export › the printable page a customer sees agrees with itself 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 503
+
+      262 |     const shown = await page.goto(`/api/billing/invoices/${usdNumber}/export?format=html`);
+      263 |     await page.screenshot({ path: `${SHOTS}/01-usd-invoice-html.png`, fullPage: true });
+    > 264 |     expect(shown?.status()).toBe(200);
+          |                             ^
+      265 |
+      266 |     // Read out of the rendered page, not out of the response string.
+      267 |     await expect(page.getByText('Para Birimi:')).toBeVisible();
+        at /Users/macbook/AgentSpace/fabrika/tests/e2e/invoice-foreign-currency-export.spec.ts:264:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/invoice-foreign-currency-e-e47d0-mer-sees-agrees-with-itself-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/invoice-foreign-currency-e-e47d0-mer-sees-agrees-with-itself-chromium/error-context.md
+
+    Error Context: test-results/invoice-foreign-currency-e-e47d0-mer-sees-agrees-with-itself-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/invoice-foreign-currency-e-e47d0-mer-sees-agrees-with-itself-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/invoice-foreign-currency-e-e47d0-mer-sees-agrees-with-itself-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › tests/e2e/invoice-write-path.spec.ts:131:5 › a payment issues one invoice, and the export route serves it 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 503
+
+      170 |   const body = await xml.text();
+      171 |
+    > 172 |   expect(xml.status()).toBe(200);
+          |                        ^
+      173 |   expect(body).toContain(invoice!.ettn);
+      174 |   expect(body).toContain(BUYER.buyerVknTckn);
+      175 |   expect(body).toContain('1000.00'); // the net the charge decomposed to
+        at /Users/macbook/AgentSpace/fabrika/tests/e2e/invoice-write-path.spec.ts:172:24
+
+    Error Context: test-results/invoice-write-path-a-payme-89fa2--the-export-route-serves-it-chromium/error-context.md
+
+    Error Context: test-results/invoice-write-path-a-payme-89fa2--the-export-route-serves-it-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/invoice-write-path-a-payme-89fa2--the-export-route-serves-it-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/invoice-write-path-a-payme-89fa2--the-export-route-serves-it-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [chromium] › tests/e2e/invoice-write-path.spec.ts:192:5 › two concurrent payments get two distinct numbers 
+
+    Error: every concurrent payment must be invoiced
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 3
+    Received length: 0
+    Received array:  []
+
+      212 |
+      213 |   const issued = after.filter((r) => payments.includes(r.paymentRef ?? ''));
+    > 214 |   expect(issued, 'every concurrent payment must be invoiced').toHaveLength(payments.length);
+          |                                                               ^
+      215 |   // No number may be handed out twice, and none may collide with what was there.
+      216 |   const numbers = after.map((r) => r.number);
+      217 |   expect(new Set(numbers).size).toBe(numbers.length);
+        at /Users/macbook/AgentSpace/fabrika/tests/e2e/invoice-write-path.spec.ts:214:63
+
+    Error Context: test-results/invoice-write-path-two-con-7f47b-ts-get-two-distinct-numbers-chromium/error-context.md
+
+    Error Context: test-results/invoice-write-path-two-con-7f47b-ts-get-two-distinct-numbers-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/invoice-write-path-two-con-7f47b-ts-get-two-distinct-numbers-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/invoice-write-path-two-con-7f47b-ts-get-two-distinct-numbers-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7 failed
+    [chromium] › tests/e2e/invoice-export-real-record.spec.ts:150:7 › invoice export reads a real record › the tenant own invoice renders that row, and nothing invented 
+    [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:166:7 › a foreign-currency invoice export › the USD document prices the sale in dollars and shows lira only as the stated equivalent 
+    [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:203:7 › a foreign-currency invoice export › the XML declares one currency and uses it on every amount 
+    [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:213:7 › a foreign-currency invoice export › the XML carries the TCMB rate the row was issued at 
+    [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:259:7 › a foreign-currency invoice export › the printable page a customer sees agrees with itself 
+    [chromium] › tests/e2e/invoice-write-path.spec.ts:131:5 › a payment issues one invoice, and the export route serves it 
+    [chromium] › tests/e2e/invoice-write-path.spec.ts:192:5 › two concurrent payments get two distinct numbers 
+  10 passed (11.5s)
+[ELIFECYCLE] Command failed with exit code 1.

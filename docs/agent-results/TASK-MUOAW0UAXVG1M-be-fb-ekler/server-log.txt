@@ -1,0 +1,46 @@
+▲ Next.js 16.3.4
+- Local:         http://localhost:47100
+- Network:       http://192.168.1.135:47100
+✓ Ready in 80ms
+✓ Running next.config.ts took 42ms
+⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+[app-url] NEXT_PUBLIC_APP_URL is unset in production: set it to https://fonbridge.com
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+⨯ Error: Maximum array nesting exceeded. Large nested arrays can be dangerous. Try adding intermediate objects.
+    at ignore-listed frames {
+  digest: '881547229'
+}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"PLATFORM_ADMIN_REQUIRED"}
+[WARN] [admin/plans] setVisibility refused {"code":"PLATFORM_ADMIN_REQUIRED"}
+[WARN] [admin/plans] setVisibility refused {"code":"PLATFORM_ADMIN_REQUIRED"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+[WARN] [admin/plans] setVisibility refused {"code":"INVALID_VISIBILITY"}
+⨯ Error: Maximum array nesting exceeded. Large nested arrays can be dangerous. Try adding intermediate objects.
+    at ignore-listed frames {
+  digest: '881547229'
+}

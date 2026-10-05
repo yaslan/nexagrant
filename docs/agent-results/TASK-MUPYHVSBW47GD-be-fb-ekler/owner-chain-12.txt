@@ -1,0 +1,13 @@
+without SET on app.system_scope the whole chain runs, and a second run before db:rls refuses 1487ms
+a file that brings back a function-level SET app.system_scope is refused before any file 241ms
+after db:rls, the FORCE-RLS backfills update as many rows as under the superuser 2645ms
+the migration session leaves no system scope behind: fabrika_app stays tenant-isolated 9ms
+a SECURITY DEFINER function owned by the NOSUPERUSER owner reads across tenants for fabrika_app 16ms
+the definer functions hand app.system_scope back to fabrika_app unchanged 18ms
+definer functions put the caller's app.system_scope back on every exit, and tenant A still sees no row of B 42ms
+the owner cannot store a default for app.system_scope 3ms
+a stored default for app.system_scope stops the run before any file 248ms
+a file that stores a default for app.system_scope fails the run after the files 1424ms
+rows in a FORCE table without a system_scope policy fail the run after the files 1988ms
+rollback files run only through --down, which restores the archived rows 2008ms
+      Tests  12 passed (12)

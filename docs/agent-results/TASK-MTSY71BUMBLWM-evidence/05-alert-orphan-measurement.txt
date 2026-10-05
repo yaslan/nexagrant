@@ -1,0 +1,6 @@
+# Why saving the identity does not resolve the open alerts (mac, 2026-09-10 14:23)
+# Question (f) on the card. Measured, not argued.
+
+IDENTITY ROWS: 0 []
+identity-missing open: 234; carrying a tenantId: 234; whose tenant STILL EXISTS: 1 (distinct 1)
+live tenants named in alerts: [ 'demo-tenant' ]

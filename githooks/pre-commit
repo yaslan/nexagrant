@@ -1,0 +1,86 @@
+#!/bin/sh
+# Fabrika commit gate.
+#
+# Every agent works in the SAME working tree on `dev`, so a whole-repo gate
+# would block you for a file a colleague is still halfway through editing.
+# This hook therefore judges you only on what YOU are committing:
+#   - ESLint runs on your staged files;
+#   - tsc runs project-wide (it has to), but only errors that land in a staged
+#     file block the commit. Everyone else's in-flight errors are shown as a
+#     warning so you know the tree is dirty without being held hostage by it.
+# The full gate (lint + typecheck + test, whole repo) is `pnpm gate`.
+
+set -e
+
+# --- docs/agent-results/ kanıt koruması ---------------------------------
+# docs/agent-results/ ajanların kanıt yazdığı ortak, sahipsiz bir alan: kimse
+# başka bir görevin dosyasını ezmemesi gerektiğini "bilerek" tutmuyor, ve bu
+# defalarca sessizce oldu (bkz. docs/agent-results/TASK-MTSHUZUMVLTBF-*.md).
+# Kural mekanik: bu dizin altında VAR OLAN (daha önce commit'lenmiş) bir
+# dosyanın İÇERİĞİ değişemez — yalnız yeni dosya eklenebilir. INDEX.md muaf
+# (o zaten her görevde güncellenmesi beklenen bir özet).
+MODIFIED_EVIDENCE=$(git diff --cached --no-renames --name-only --diff-filter=M -- 'docs/agent-results/' | grep -v -E '(^|/)INDEX\.md$' || true)
+if [ -n "$MODIFIED_EVIDENCE" ]; then
+  if [ -n "${ALLOW_EVIDENCE_OVERWRITE:-}" ]; then
+    echo "⚠ ALLOW_EVIDENCE_OVERWRITE=1: var olan kanıt dosyaları bilerek üzerine yazılıyor:"
+    printf '%s\n' "$MODIFIED_EVIDENCE" | sed 's/^/    /'
+  else
+    echo
+    echo "✗ Commit durduruldu: docs/agent-results/ altında VAR OLAN bir kanıt dosyasının"
+    echo "  içeriği değişiyor — başka bir görevin (ya da kendi eski koşunun) kanıtını"
+    echo "  eziyor olabilirsin:"
+    printf '%s\n' "$MODIFIED_EVIDENCE" | sed 's/^/    /'
+    echo
+    echo "  bu kanıt <GÖREV-ID> kartına ait, kendi kartının dosyasına yaz; gerçekten güncellemen gerekiyorsa -<n>.md soneki kullan"
+    echo
+    echo "  Kanıt dosyaları bir kez yazılır. Yeni bir deneme/düzeltme ise VAR OLAN"
+    echo "  dosyayı değiştirme, -<n>.md sonekiyle yeni bir dosya aç"
+    echo "  (ör. TASK-XXXX-ajanadi.md doluysa TASK-XXXX-ajanadi-2.md)."
+    echo
+    echo "  Bilerek üzerine yazman gerekiyorsa (ör. kendi az önceki yazım hatanı"
+    echo "  düzeltiyorsun ve kimse o kanıta bel bağlamadı):"
+    echo "    ALLOW_EVIDENCE_OVERWRITE=1 git commit ..."
+    exit 1
+  fi
+fi
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' || true)
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+printf '%s\n' "$STAGED" > "$TMP/staged.txt"
+
+echo "→ eslint (staged files)"
+# shellcheck disable=SC2086
+if ! printf '%s\n' "$STAGED" | tr '\n' '\0' | xargs -0 pnpm exec eslint --max-warnings=-1; then
+  echo
+  echo "✗ Commit durduruldu: staged dosyalarda lint HATASI var."
+  echo "  Kuralı gevşeterek geçme; hatayı düzelt ya da gerekçeli satır-içi istisna yaz."
+  exit 1
+fi
+
+echo "→ tsc --noEmit (proje geneli, yalnız staged dosyalar bloke eder)"
+TSC_OUT="$TMP/tsc.txt"
+pnpm exec tsc --noEmit > "$TSC_OUT" 2>&1 || true
+
+MINE=$(grep -F -f "$TMP/staged.txt" "$TSC_OUT" || true)
+THEIRS=$(grep -E '\.tsx?\([0-9]+,[0-9]+\): error' "$TSC_OUT" | grep -v -F -f "$TMP/staged.txt" || true)
+
+if [ -n "$THEIRS" ]; then
+  echo
+  echo "⚠ Ağaçta senin OLMAYAN typecheck hataları var (başka bir ajan yazıyor olabilir):"
+  printf '%s\n' "$THEIRS" | head -5
+  echo "  Bunlar commit'ini engellemiyor."
+fi
+
+if [ -n "$MINE" ]; then
+  echo
+  echo "✗ Commit durduruldu: staged dosyalarında typecheck hatası var:"
+  printf '%s\n' "$MINE"
+  exit 1
+fi
+
+echo "✓ Kapı temiz (staged kapsamı)."

@@ -1,0 +1,7 @@
+AYNI  | iç let act = run             | orijinal=[] mutant=[]
+AYNI  | parametre act = run          | orijinal=[] mutant=[]
+AYNI  | iç [act] = [run]             | orijinal=[] mutant=[]
+AYNI  | iç act ||= run               | orijinal=[] mutant=[]
+AYNI  | catch (act) { act = run }    | orijinal=[] mutant=[]
+AYNI  | dış act = run (kontrol)      | orijinal=[3] mutant=[3]
+farklı=0/6

@@ -1,0 +1,138 @@
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { Prisma } from '@prisma/client';
+
+import { prisma } from '@/lib/db';
+import { requireId } from './helpers/teardown-guard';
+
+// crw-fb İNCELEME-65 attack file — NOT committed. Only auth(), the module gate and
+// the LLM text are faked; role gate, withTenant, Prisma and action bodies are real.
+const s = vi.hoisted(() => ({ session: null as Record<string, unknown> | null }));
+vi.mock('@/lib/auth', () => ({ auth: vi.fn(async () => s.session) }));
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
+vi.mock('@/lib/modules/access', async (orig) => ({ ...(await orig<object>()), assertModuleAccess: vi.fn(async () => {}) }));
+vi.mock('@/lib/llm', async (orig) => ({ ...(await orig<object>()), generateText: vi.fn(async () => 'GIZLILIK SOZLESMESI (NDA) ... taraflar ...') }));
+
+const m10 = await import('@/modules/m10/server/actions');
+
+const TAG = `i65-${Date.now()}`;
+const fx: Record<string, string> = {};
+const as = (role: string, uid = `${TAG}-${role}`, tenantId = fx.a) => {
+  s.session = { user: { id: uid, name: `${TAG} ${role}`, email: `${role.toLowerCase()}@${TAG}.test` }, tenantId, role };
+};
+const row = (id: string) =>
+  prisma.followupDoc.findUnique({ where: { id }, select: { kind: true, signedAt: true, version: true, approvalSteps: { select: { id: true } } } });
+async function tenant(sfx: string) {
+  const t = await prisma.tenant.create({ data: { name: `${TAG} ${sfx}`, slug: `${TAG}-${sfx}`, country: 'TR' } });
+  const ws = await prisma.workspace.create({ data: { tenantId: t.id, name: 'ws', slug: `${TAG}-ws-${sfx}` } });
+  const opp = await prisma.opportunity.create({ data: { tenantId: t.id, workspaceId: ws.id, title: 'opp' } });
+  return { t: t.id, o: opp.id };
+}
+const doc = (kind: string, tenantId = fx.a, opportunityId = fx.oa) =>
+  prisma.followupDoc.create({ data: { tenantId: requireId(tenantId, 't'), opportunityId: requireId(opportunityId, 'o'), kind } });
+async function fullyApproved(kind = 'NDA') {
+  const d = await doc(kind);
+  as('WRITER'); await m10.submitDualApprovalAction(d.id);
+  as('TENANT_ADMIN', `${TAG}-fin`); await m10.departmentApproveAction(d.id, 'FINANCE');
+  as('TENANT_OWNER', `${TAG}-leg`); const l = await m10.departmentApproveAction(d.id, 'LEGAL');
+  expect(l.success && l.approvalState.stage).toBe('APPROVED_AND_SIGNED');
+  return d;
+}
+
+beforeAll(async () => {
+  const a = await tenant('a'); const b = await tenant('b');
+  Object.assign(fx, { a: a.t, oa: a.o, b: b.t, ob: b.o });
+});
+afterAll(async () => {
+  for (const id of [fx.a, fx.b]) if (id) await prisma.tenant.delete({ where: { id: requireId(id, 't') } });
+});
+
+describe('A1 kind spelling: generateStandardDoc persists the kind verbatim, signDocument signs it', () => {
+  test.each(['nda', 'Nda', 'NDA ', ' NDA', 'loi', 'Commitment', 'NDA​'])('kind %j', async (kind) => {
+    as('WRITER');
+    const gen = await m10.generateStandardDoc(fx.oa, kind);
+    const stored = await row(gen.id);
+    console.log(`A1 ${JSON.stringify(kind)} stored kind=${JSON.stringify(stored?.kind)}`);
+    const res = await m10.signDocument(gen.id);
+    const after = await row(gen.id);
+    console.log(`A1 ${JSON.stringify(kind)} sign=${JSON.stringify(res)} signedAt=${after?.signedAt?.toISOString()} steps=${after?.approvalSteps.length}`);
+    // The safe outcome: refused and not signed.
+    expect(res.success).toBe(false);
+    expect(after?.signedAt).toBeNull();
+  });
+});
+
+describe('A2 revision race between signDocument read and write', () => {
+  test('a revision committed after the read is not signed on the old approvals', async () => {
+    const d = await fullyApproved('NDA');
+    // Hold the row lock; signDocument reads (non-blocking) then blocks on its UPDATE.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let locked!: () => void;
+    const isLocked = new Promise<void>((r) => (locked = r));
+    const holder = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "FollowupDoc" WHERE id = ${d.id} FOR UPDATE`;
+      locked();
+      await gate;
+      // What createNewVersion writes (src/modules/m10/server/actions.ts), in the same order.
+      await tx.dualApprovalStep.deleteMany({ where: { followupDocId: d.id } });
+      await tx.followupDoc.update({
+        where: { id: d.id },
+        data: { version: { increment: 1 }, signedAt: null, approvalSubmittedAt: null, approvalSubmittedById: null, approvalSubmittedByName: null },
+      });
+    }, { timeout: 20_000 });
+    await isLocked;
+    as('WRITER');
+    const signing = m10.signDocument(d.id);
+    await new Promise((r) => setTimeout(r, 800));
+    const waiting = await prisma.$queryRaw<{ n: bigint }[]>(Prisma.sql`SELECT count(*)::bigint AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query ILIKE '%FollowupDoc%'`);
+    console.log(`A2 blocked sessions on FollowupDoc lock: ${waiting[0]?.n}`);
+    release();
+    await holder;
+    const res = await signing;
+    const after = await row(d.id);
+    console.log(`A2 sign=${JSON.stringify(res)} after=${JSON.stringify(after)}`);
+    expect(Number(waiting[0]?.n)).toBeGreaterThan(0); // the interleaving really happened
+    expect(res.success).toBe(false);
+    expect(after?.version).toBe(2);
+    expect(after?.signedAt).toBeNull();
+  });
+});
+
+describe('A3 other tenant / A4 roles / A5 concurrency', () => {
+  test('A3 another tenant\'s ESR_DEBRIEF and approved NDA are not found and not touched', async () => {
+    const e = await doc('ESR_DEBRIEF', fx.b, fx.ob);
+    as('TENANT_OWNER');
+    expect(await m10.signDocument(e.id)).toEqual({ success: false, signedAt: null, refusal: 'DOC_NOT_FOUND' });
+    expect((await row(e.id))?.signedAt).toBeNull();
+  });
+  test.each(['GUEST_PARTNER', 'MEMBER'])('A4 %s cannot sign even a direct kind; row unchanged', async (role) => {
+    const e = await doc('ESR_DEBRIEF');
+    as(role);
+    const err = await m10.signDocument(e.id).then((r) => `RESOLVED ${JSON.stringify(r)}`, (x: Error) => `${x.name}: ${x.message}`);
+    console.log(`A4 ${role}: ${err}`);
+    expect(err.startsWith('RESOLVED')).toBe(false);
+    expect((await row(e.id))?.signedAt).toBeNull();
+  });
+  test('A5 two concurrent signs on an unsubmitted NDA both refuse; on an approved NDA both keep the legal timestamp', async () => {
+    const n = await doc('NDA');
+    as('WRITER');
+    const [r1, r2] = await Promise.all([m10.signDocument(n.id), m10.signDocument(n.id)]);
+    expect([r1.success, r2.success]).toEqual([false, false]);
+    expect((await row(n.id))?.signedAt).toBeNull();
+    const d = await fullyApproved('LOI');
+    const legalAt = (await row(d.id))!.signedAt!.getTime();
+    as('WRITER');
+    const rs = await Promise.all(Array.from({ length: 5 }, () => m10.signDocument(d.id)));
+    console.log(`A5 approved LOI x5: ${JSON.stringify(rs.map((r) => r.success))}`);
+    expect(rs.every((r) => r.success && r.signedAt.getTime() === legalAt)).toBe(true);
+    expect((await row(d.id))!.signedAt!.getTime()).toBe(legalAt);
+  });
+  test('A6 submitted + finance only, then a flow-less direct call cannot promote it', async () => {
+    const d = await doc('COMMITMENT');
+    as('WRITER'); await m10.submitDualApprovalAction(d.id);
+    as('TENANT_ADMIN', `${TAG}-fin2`); await m10.departmentApproveAction(d.id, 'FINANCE');
+    as('TENANT_ADMIN', `${TAG}-fin2`);
+    expect((await m10.signDocument(d.id)).success).toBe(false);
+    expect((await row(d.id))?.signedAt).toBeNull();
+  });
+});

@@ -1,0 +1,69 @@
+dev-temel url    onayimi-bekleyen        320 main 320/320 EŞİT doc=320/320 main.ox=auto metin=görünür
+dev-temel url    onayimi-bekleyen        360 main 360/360 EŞİT doc=360/360 main.ox=auto metin=görünür
+dev-temel url    onayimi-bekleyen        390 main 390/390 EŞİT doc=390/390 main.ox=auto metin=görünür
+dev-temel url    onayimi-bekleyen        472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+dev-temel url    onayimi-bekleyen        640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+dev-temel url    onayimi-bekleyen        768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+dev-temel url    onayimi-bekleyen       1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+dev-temel url    onayimi-bekleyen       1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+dev-temel url    taleplerim              320 main 320/320 EŞİT doc=320/320 main.ox=auto metin=görünür
+dev-temel url    taleplerim              360 main 360/360 EŞİT doc=360/360 main.ox=auto metin=görünür
+dev-temel url    taleplerim              390 main 390/390 EŞİT doc=390/390 main.ox=auto metin=görünür
+dev-temel url    taleplerim              472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+dev-temel url    taleplerim              640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+dev-temel url    taleplerim              768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+dev-temel url    taleplerim             1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+dev-temel url    taleplerim             1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+dev-temel url    detay-modal            320 ×.right=279 başlık sw-cw=0 panel=16..304 sw-cw=0 OK
+dev-temel url    detay-modal kapandı=true
+dev-temel url    firsat-detay            320 main 320/320 EŞİT doc=320/320 main.ox=auto metin=görünür
+dev-temel url    firsat-detay            360 main 360/360 EŞİT doc=360/360 main.ox=auto metin=görünür
+dev-temel url    firsat-detay            390 main 390/390 EŞİT doc=390/390 main.ox=auto metin=görünür
+dev-temel url    firsat-detay            472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+dev-temel url    firsat-detay            640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+dev-temel url    firsat-detay            768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+dev-temel url    firsat-detay           1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+dev-temel url    firsat-detay           1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+dev-temel url    firsat-arsiv-onay       320 main 373/320 TAŞMA +53 doc=320/320 main.ox=auto metin=p sw>cw 329/232  <- 
+dev-temel url    firsat-arsiv-onay       360 main 373/360 TAŞMA +13 doc=360/360 main.ox=auto metin=p sw>cw 329/272  <- 
+dev-temel url    firsat-arsiv-onay       390 main 390/390 EŞİT doc=390/390 main.ox=auto metin=p sw>cw 329/302
+dev-temel url    firsat-arsiv-onay       472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+dev-temel url    firsat-arsiv-onay       640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+dev-temel url    firsat-arsiv-onay       768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=p sw>cw 329/300
+dev-temel url    firsat-arsiv-onay      1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+dev-temel url    firsat-arsiv-onay      1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+dev-temel kelime onayimi-bekleyen        320 main 320/320 EŞİT doc=320/320 main.ox=auto metin=görünür
+dev-temel kelime onayimi-bekleyen        360 main 360/360 EŞİT doc=360/360 main.ox=auto metin=görünür
+dev-temel kelime onayimi-bekleyen        390 main 390/390 EŞİT doc=390/390 main.ox=auto metin=görünür
+dev-temel kelime onayimi-bekleyen        472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+dev-temel kelime onayimi-bekleyen        640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+dev-temel kelime onayimi-bekleyen        768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+dev-temel kelime onayimi-bekleyen       1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+dev-temel kelime onayimi-bekleyen       1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+dev-temel kelime taleplerim              320 main 320/320 EŞİT doc=320/320 main.ox=auto metin=görünür
+dev-temel kelime taleplerim              360 main 360/360 EŞİT doc=360/360 main.ox=auto metin=görünür
+dev-temel kelime taleplerim              390 main 390/390 EŞİT doc=390/390 main.ox=auto metin=görünür
+dev-temel kelime taleplerim              472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+dev-temel kelime taleplerim              640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+dev-temel kelime taleplerim              768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+dev-temel kelime taleplerim             1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+dev-temel kelime taleplerim             1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+dev-temel kelime detay-modal            320 ×.right=279 başlık sw-cw=0 panel=16..304 sw-cw=0 OK
+dev-temel kelime detay-modal kapandı=true
+dev-temel kelime firsat-detay            320 main 320/320 EŞİT doc=320/320 main.ox=auto metin=görünür
+dev-temel kelime firsat-detay            360 main 360/360 EŞİT doc=360/360 main.ox=auto metin=görünür
+dev-temel kelime firsat-detay            390 main 390/390 EŞİT doc=390/390 main.ox=auto metin=görünür
+dev-temel kelime firsat-detay            472 main 472/472 EŞİT doc=472/472 main.ox=auto metin=görünür
+dev-temel kelime firsat-detay            640 main 640/640 EŞİT doc=640/640 main.ox=auto metin=görünür
+dev-temel kelime firsat-detay            768 main 512/512 EŞİT doc=768/768 main.ox=auto metin=görünür
+dev-temel kelime firsat-detay           1024 main 768/768 EŞİT doc=1024/1024 main.ox=auto metin=görünür
+dev-temel kelime firsat-detay           1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+dev-temel kelime firsat-arsiv-onay       320 main 707/320 TAŞMA +387 doc=320/320 main.ox=auto metin=p sw>cw 663/232  <- 
+dev-temel kelime firsat-arsiv-onay       360 main 707/360 TAŞMA +347 doc=360/360 main.ox=auto metin=p sw>cw 663/272  <- 
+dev-temel kelime firsat-arsiv-onay       390 main 707/390 TAŞMA +317 doc=390/390 main.ox=auto metin=p sw>cw 663/302  <- 
+dev-temel kelime firsat-arsiv-onay       472 main 707/472 TAŞMA +235 doc=472/472 main.ox=auto metin=p sw>cw 663/384  <- 
+dev-temel kelime firsat-arsiv-onay       640 main 745/640 TAŞMA +105 doc=640/640 main.ox=auto metin=p sw>cw 663/476  <- 
+dev-temel kelime firsat-arsiv-onay       768 main 769/512 TAŞMA +257 doc=768/768 main.ox=auto metin=p sw>cw 663/300  <- 
+dev-temel kelime firsat-arsiv-onay      1024 main 769/768 TAŞMA +1 doc=1024/1024 main.ox=auto metin=p sw>cw 663/556  <- 
+dev-temel kelime firsat-arsiv-onay      1280 main 1024/1024 EŞİT doc=1280/1280 main.ox=auto metin=görünür
+dev-temel BİTTİ sorunlu-ölçüm=11

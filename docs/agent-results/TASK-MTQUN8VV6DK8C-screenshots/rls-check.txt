@@ -1,0 +1,10 @@
+===== pnpm rls:check =====
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+$ tsx scripts/check-rls.ts
+Found 38 tenant-scoped models requiring RLS policies:
+AddOn, AiUsageLog, ApiKey, ApplicationPart, ApprovalRequest, AuditEvent, CalendarConnection, Claim, ConceptNote, ConsortiumSeat, CreditLedger, Criterion, Effort, Evaluation, Evidence, Feedback, FollowupDoc, GateDecision, Interaction, Invitation, MarketplaceListing, MeetingBrief, Membership, ModuleState, Opportunity, PartnerOrg, Proposal, ProposalUsage, Relationship, Reviewer, SavedSearch, Score, SeatCandidate, Subscription, TenantProfile, TopicMatch, TtoPortfolioItem, Workspace
+
+✅ SUCCESS: All 38 tenant-scoped models have RLS policies registered.
+
+-> SystemAlert is NOT in the tenant-scoped list: it has no tenantId and no RLS policy.
+   That is exactly why no tenant content is written into an alert.

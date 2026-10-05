@@ -1,0 +1,32 @@
+import { test } from 'vitest';
+import { unguardedServerErrors, catchReturnLeaks } from '../api/response-status-scan';
+
+const route: [string, string][] = [
+  ['R1 quoted status key', "return NextResponse.json({ error: (e as Error).message }, { 'status': 500 });"],
+  ['R2 double-quoted status key', 'return NextResponse.json({ error: (e as Error).message }, { "status": 500 });'],
+  ['R3 computed status key', "return NextResponse.json({ error: (e as Error).message }, { ['status']: 500 });"],
+  ['R4 name shadowing: typed param elsewhere', "function refuse(error: E, status: 400 | 413) { return NextResponse.json({ error }, { status }); }\nexport async function GET() { try { x(); } catch (e) { const status = upstream.status; return NextResponse.json({ error: (e as Error).message }, { status }); } }"],
+  ['R5 regex literal with quote masks rest of line', 'if (/"/.test(s)) return NextResponse.json({ error: (e as Error).message }, { status: 500 });'],
+  ['R6 regex literal with backtick masks following lines', "const re = /`/;\nexport async function GET() {\n  return NextResponse.json({ error: (e as Error).message }, { status: 500 });\n}\nconst z = /`/;"],
+  ['R7 destructured json', "const { json } = NextResponse;\nreturn json({ error: (e as Error).message }, { status: 500 });"],
+  ['R8 aliased NextResponse', "const R = NextResponse;\nreturn R.json({ error: (e as Error).message }, { status: 500 });"],
+  ['R9 bracket access', "return NextResponse['json']({ error: (e as Error).message }, { status: 500 });"],
+  ['R10 new globalThis.Response', "return new globalThis.Response((e as Error).message, { status: 500 });"],
+  ['R11 Reflect.construct', "return Reflect.construct(Response, [(e as Error).message, { status: 500 }]);"],
+  ['R12 variable status (control, should be caught)', "return NextResponse.json({ error: 'x' }, { status: s });"],
+  ['R13 new Response(body,{status}) variable (control)', "return new Response(body, { status });"],
+  ['R14 5e2 numeric (control)', "return NextResponse.json({ error: m }, { status: 5e2 });"],
+  ['R15 typed const via cast', "const status: 400 = 500 as 400;\nreturn NextResponse.json({ error: (e as Error).message }, { status });"],
+  ['R16 status in comment-looking string after ternary', "return NextResponse.json({ error: m }, { status: ok ? 400 : 500 });"],
+];
+const action: [string, string][] = [
+  ['A1 .catch arrow', "return doIt().catch((e) => ({ ok: false, error: (e as Error).message }));"],
+  ['A2 assign outside, return after', "let err = '';\ntry { x(); } catch (e) { err = (e as Error).message; }\nreturn { ok: false, error: err };"],
+  ['A3 push into outer array', "const errors: string[] = [];\ntry { x(); } catch (e) { errors.push(String(e)); }\nreturn { errors };"],
+  ['A4 then(onRejected)', "return doIt().then(ok, (e) => ({ error: String(e) }));"],
+  ['A5 return in nested fn inside catch (control)', "try { x(); } catch (e) { return { error: String(e) }; }"],
+];
+test('probe', () => {
+  for (const [n, s] of route) console.log(`ROUTE ${n}: ${unguardedServerErrors(s).length ? 'YAKALANDI' : 'KAÇTI'}`);
+  for (const [n, s] of action) console.log(`ACTION ${n}: ${catchReturnLeaks(s).length ? 'YAKALANDI' : 'KAÇTI'}`);
+});

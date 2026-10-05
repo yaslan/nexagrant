@@ -1,0 +1,19 @@
+## Düzeltmesiz (5a1e3db4 auth.ts), uygulama fabrika_app ile
+### admin@yasinaslan.com.tr
+callback=302
+session: {'tenantId': None, 'role': None, 'workspaceIds': []}
+GET /tr/default/dashboard -> 307 http://localhost:3417/tr/no-workspace
+### alice@fabrika.test
+callback=302
+session: {'tenantId': None, 'role': None, 'workspaceIds': []}
+GET /tr/default/dashboard -> 307 http://localhost:3417/tr/no-workspace
+
+## Düzeltmeli (b8f1f9a2), uygulama fabrika_app ile
+### admin@yasinaslan.com.tr
+callback=302
+session: {'tenantId': 'demo-tenant', 'role': 'TENANT_OWNER', 'workspaceIds': []}
+GET /tr/default/dashboard -> 200 
+### alice@fabrika.test
+callback=302
+session: {'tenantId': 'demo-tenant', 'role': 'PIPELINE_MANAGER', 'workspaceIds': []}
+GET /tr/default/dashboard -> 200 

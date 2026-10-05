@@ -1,0 +1,11 @@
+BASELINE exit=0 Test Files  1 passed (1) · Tests  179 passed (179) timeouts=0
+A1   | dynamic load used as value → clean | KILLED | Test Files  1 failed (1) · Tests  1 failed | 178 passed (179) | timeouts=0
+       × tests/api/action-leak-scan.test.ts > İNCELEME-118 Y-2: witnesses that tell A1, A4 and A10 apart > A1: a dynamic load handed back in place is the whole module 8ms
+A3   | catch binding handed to an import not a write | KILLED | Test Files  1 failed (1) · Tests  1 failed | 178 passed (179) | timeouts=0
+       × tests/api/action-leak-scan.test.ts > Y-4: witness tests for TASK-MUOIBQJJDKL28 (İNCELEME-116 gap coverage) > A3: catch binding handed to imported function, then .code read 4ms
+A4   | Reflect.apply(fn, e) not a write | KILLED | Test Files  1 failed (1) · Tests  1 failed | 178 passed (179) | timeouts=0
+       × tests/api/action-leak-scan.test.ts > İNCELEME-118 Y-2: witnesses that tell A1, A4 and A10 apart > A4: `Reflect.apply(fn, e, [])` writes the caught binding, so its `.code` is not trusted 5ms
+A10  | effects of (await import()).f(out) dropped | KILLED | Test Files  1 failed (1) · Tests  2 failed | 177 passed (179) | timeouts=0
+       × tests/api/action-leak-scan.test.ts > İNCELEME-118 Y-2: witnesses that tell A1, A4 and A10 apart > A10: `(await import(…)).fill(out, e)` writes into `out` 5ms
+       × tests/api/action-leak-scan.test.ts > İNCELEME-118 Y-1: a loader read the scan does not follow (fail-closed) > a loader exported to another module is a loader there too 2ms
+md5 orijinal 8272293a81afc3f23a1df9bcc3c080e3 · dosya şimdi 8272293a81afc3f23a1df9bcc3c080e3

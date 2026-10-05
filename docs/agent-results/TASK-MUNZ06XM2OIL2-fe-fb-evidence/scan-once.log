@@ -1,0 +1,48 @@
+320 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations st=200 doc=320/320 main.scrollWidth=516 main.clientWidth=320 over=196 TASMA
+    <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition fl w=180 +55 "REA Sık Hatalar KontrolüCheckl"
+    <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition fl w=132 +196 "ESR Kalibrasyonu"
+320 /tr/admin/cordis st=200 doc=320/320 main.scrollWidth=438 main.clientWidth=320 over=118 TASMA
+    <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition fl w=103 +15 "Canlı CORDIS Delta API"
+    <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition fl w=95 +118 "Vector RAG Lab"
+    <- div. w=112 +46 "Satır Sınırı (Limit)"
+320 /tr/admin/alerts st=200 doc=320/320 main.scrollWidth=361 main.clientWidth=320 over=41 TASMA
+    <- div.rounded-lg border border-border bg-ground px-3 py-2 w=62 +41 "Tekrar0"
+320 /tr/fabrika-beta/approvals st=200 doc=320/320 main.scrollWidth=344 main.clientWidth=320 over=24 TASMA
+    <- div.flex gap-2 w=342 +24 "Onayımı BekleyenlerTaleplerim "
+320 /tr/fabrika-beta/onay-merkezi st=200 doc=320/320 main.scrollWidth=344 main.clientWidth=320 over=24 TASMA
+    <- div.flex gap-2 w=342 +24 "Onayımı BekleyenlerTaleplerim "
+320 /tr/fabrika-beta/ayarlar/kapilar st=200 doc=320/320 main.scrollWidth=334 main.clientWidth=320 over=14 TASMA
+    <- span.text-sm text-ink font-mono w=17 +14 "12"
+    <- span.text-sm text-ink font-mono w=17 +10 "10"
+320 /tr/fabrika-beta/settings/gates st=200 doc=320/320 main.scrollWidth=334 main.clientWidth=320 over=14 TASMA
+    <- span.text-sm text-ink font-mono w=17 +14 "12"
+    <- span.text-sm text-ink font-mono w=17 +10 "10"
+360 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations st=200 doc=360/360 main.scrollWidth=516 main.clientWidth=360 over=156 TASMA
+    <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition fl w=180 +15 "REA Sık Hatalar KontrolüCheckl"
+    <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition fl w=132 +156 "ESR Kalibrasyonu"
+360 /tr/admin/cordis st=200 doc=360/360 main.scrollWidth=438 main.clientWidth=360 over=78 TASMA
+    <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition fl w=95 +78 "Vector RAG Lab"
+    <- div. w=112 +6 "Satır Sınırı (Limit)"
+360 /tr/admin/alerts st=200 doc=360/360 main.scrollWidth=361 main.clientWidth=360 over=1 TASMA
+    <- div.rounded-lg border border-border bg-ground px-3 py-2 w=62 +1 "Tekrar0"
+360 /tr/fabrika-beta/approvals st=200 doc=360/360 main.scrollWidth=360 main.clientWidth=360 over=0 OK
+360 /tr/fabrika-beta/onay-merkezi st=200 doc=360/360 main.scrollWidth=360 main.clientWidth=360 over=0 OK
+360 /tr/fabrika-beta/ayarlar/kapilar st=200 doc=360/360 main.scrollWidth=360 main.clientWidth=360 over=0 OK
+360 /tr/fabrika-beta/settings/gates st=200 doc=360/360 main.scrollWidth=360 main.clientWidth=360 over=0 OK
+390 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations st=200 doc=390/390 main.scrollWidth=516 main.clientWidth=390 over=126 TASMA
+    <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition fl w=132 +126 "ESR Kalibrasyonu"
+390 /tr/admin/cordis st=200 doc=390/390 main.scrollWidth=438 main.clientWidth=390 over=48 TASMA
+    <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition fl w=95 +48 "Vector RAG Lab"
+390 /tr/admin/alerts st=200 doc=390/390 main.scrollWidth=390 main.clientWidth=390 over=0 OK
+390 /tr/fabrika-beta/approvals st=200 doc=390/390 main.scrollWidth=390 main.clientWidth=390 over=0 OK
+390 /tr/fabrika-beta/onay-merkezi st=200 doc=390/390 main.scrollWidth=390 main.clientWidth=390 over=0 OK
+390 /tr/fabrika-beta/ayarlar/kapilar st=200 doc=390/390 main.scrollWidth=390 main.clientWidth=390 over=0 OK
+390 /tr/fabrika-beta/settings/gates st=200 doc=390/390 main.scrollWidth=390 main.clientWidth=390 over=0 OK
+472 /tr/fabrika-beta/opportunities/demo-opp-1/evaluations st=200 doc=472/472 main.scrollWidth=516 main.clientWidth=472 over=44 TASMA
+    <- button.px-4 py-2.5 font-semibold text-xs rounded-t-xl transition fl w=132 +44 "ESR Kalibrasyonu"
+472 /tr/admin/cordis st=200 doc=472/472 main.scrollWidth=472 main.clientWidth=472 over=0 OK
+472 /tr/admin/alerts st=200 doc=472/472 main.scrollWidth=472 main.clientWidth=472 over=0 OK
+472 /tr/fabrika-beta/approvals st=200 doc=472/472 main.scrollWidth=472 main.clientWidth=472 over=0 OK
+472 /tr/fabrika-beta/onay-merkezi st=200 doc=472/472 main.scrollWidth=472 main.clientWidth=472 over=0 OK
+472 /tr/fabrika-beta/ayarlar/kapilar st=200 doc=472/472 main.scrollWidth=472 main.clientWidth=472 over=0 OK
+472 /tr/fabrika-beta/settings/gates st=200 doc=472/472 main.scrollWidth=472 main.clientWidth=472 over=0 OK

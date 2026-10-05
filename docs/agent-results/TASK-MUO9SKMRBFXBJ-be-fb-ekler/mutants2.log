@@ -1,0 +1,12 @@
+=== M9 M1+M7 (pipeline başlık min-w-0 + satır sm:flex-wrap birlikte sil)
+✘ /tr/fabrika-beta/firsatlar/demo-opp-1 320:0 360:0 390:0 472:0 640:4 — 640px over=4
+7 passed, 1 failed
+=== M10 gates ızgara eski grid-cols-2 (min-w-0 kalsın)
+8 passed, 0 failed
+=== M11 gates ızgara eski + min-w-0 sil
+✘ /tr/fabrika-beta/ayarlar/kapilar 320:22 360:2 390:0 472:0 640:0 — 320px over=22
+✘ /tr/fabrika-beta/settings/gates 320:22 360:2 390:0 472:0 640:0 — 320px over=22
+6 passed, 2 failed
+=== M12 evaluations onFocus scrollIntoView sil (bekçi görmeli mi? — görmez beklenir)
+0	1	src/app/[locale]/(app)/[workspace]/opportunities/[id]/evaluations/client.tsx
+8 passed, 0 failed

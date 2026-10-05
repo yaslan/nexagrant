@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>NDA - Gizlilik Sözleşmesi</title>
+  <style>
+    @page { size: A4; margin: 20mm; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; font-size: 11pt; }
+    .header { border-bottom: 2px solid #1d4ed8; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
+    .logo-badge { font-weight: bold; font-size: 14pt; color: #1d4ed8; }
+    .sub-header { font-size: 9pt; color: #64748b; font-family: monospace; }
+    .provenance { font-size: 9pt; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 8px 12px; margin-bottom: 22px; }
+    .title { font-size: 18pt; font-weight: bold; margin-bottom: 8px; color: #0f172a; }
+    .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; }
+    .meta-table td { padding: 8px 12px; font-size: 10pt; border-bottom: 1px solid #e2e8f0; }
+    .meta-table td.label { font-weight: bold; color: #475569; width: 30%; }
+    .content-box { font-size: 10.5pt; text-align: justify; margin-bottom: 30px; }
+    .signature-section { margin-top: 50px; border-top: 1px solid #cbd5e1; padding-top: 20px; display: flex; justify-content: space-between; }
+    .sig-box { width: 45%; border: 1px dashed #cbd5e1; padding: 15px; border-radius: 6px; background: #fafafa; }
+    .sig-status { font-weight: bold; color: #047857; font-size: 10pt; }
+    .sig-status.unassigned { color: #b45309; }
+    .sig-unassigned { color: #b45309; font-size: 9.5pt; font-style: italic; }
+    .footer { position: fixed; bottom: 0; left: 0; right: 0; font-size: 8pt; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 5px; }
+    @media print {
+      .no-print { display: none; }
+      body { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="background:#f1f5f9; padding:10px; margin-bottom:20px; text-align:right;">
+    <button onclick="window.print()" style="background:#1d4ed8; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">
+      🖨️ Yazdır / PDF İndir
+    </button>
+  </div>
+
+  <div class="header">
+    <div>
+      <div class="logo-badge">Küçük Danışmanlık Ltd.</div>
+      <div class="sub-header">Doküman Ref: part-b-01H9Z | Sürüm v2</div>
+    </div>
+    <div style="text-align:right;" class="sub-header">
+      Dışa aktarma tarihi: 08.09.2026
+    </div>
+  </div>
+
+  <div class="provenance">Bu belge Küçük Danışmanlık Ltd. tarafından Fabrika'da hazırlanmıştır. Avrupa Komisyonu, TÜBİTAK ya da başka bir fon kuruluşu tarafından düzenlenmiş veya onaylanmış resmî bir belge DEĞİLDİR.</div>
+
+  <div class="title">Gizlilik Sözleşmesi</div>
+
+  <table class="meta-table">
+    <tr>
+      <td class="label">Proje / Çağrı Adı:</td>
+      <td><strong>HORIZON-CL4-2026-DIGITAL-EMERGING-01</strong></td>
+    </tr>
+    <tr>
+      <td class="label">Başvuran Kuruluş:</td>
+      <td>Küçük Danışmanlık Ltd.</td>
+    </tr>
+    <tr>
+      <td class="label">Doküman Türü:</td>
+      <td>NDA (Sürüm v2)</td>
+    </tr>
+    <tr>
+      <td class="label">E-İmza Onay Durumu:</td>
+      <td>İmzalayan atanmadı</td>
+    </tr>
+  </table>
+
+  <div class="content-box">
+    Taraflar arasında paylaşılan bilgiler gizlidir.
+  </div>
+
+  <div class="signature-section">
+    <div class="sig-box">
+      <strong>Koordinatör / Yetkili İmza:</strong><br><br>
+      <span class="sig-unassigned">Bu belgeye yetkili bir imzacı atanmadı. İmza alanı, imzalayan kayıt olarak atandığında doldurulur.</span><br>
+      <span class="sig-status unassigned">İmzalayan atanmadı</span>
+    </div>
+
+    <div class="sig-box">
+      <strong>Konsorsiyum Ortağı / Resmî Onay:</strong><br><br>
+      <span class="sig-unassigned">Bu belgeye yetkili bir imzacı atanmadı. İmza alanı, imzalayan kayıt olarak atandığında doldurulur.</span><br>
+      <span class="sig-status unassigned">İmzalayan atanmadı</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    Fabrika — Ufuk Avrupa &amp; TÜBİTAK doküman üretim motoru | Sayfa 1 / 1
+  </div>
+</body>
+</html>

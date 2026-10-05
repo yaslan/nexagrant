@@ -1,0 +1,123 @@
+PATH                                 CODE CONTENT-TYPE             CSP SCR   CACHE-CONTROL                          CSP-HEAD                                 LOCATION
+/logo.png                            200  image/png                0   0     public, max-age=0                                                               
+/next.svg                            200  image/svg+xml            0   0     public, max-age=0                                                               
+/file.svg                            200  image/svg+xml            0   0     public, max-age=0                                                               
+/favicon.ico                         200  image/x-icon             0   0     public, max-age=0, must-revalidate                                              
+/_next/static/chunks/03-3r36aa59-x.js 200  application/javascript;  0   0     public, max-age=31536000, immutable                                             
+/_next/static/media/favicon.2vob68tjqpejf.ico 200  image/x-icon             0   0     public, max-age=31536000, immutable                                             
+/_next/image?url=%2Flogo.png&w=64&q=75 200  image/png                1   0     public, max-age=14400, must-revalidate script-src 'none'; frame-src 'none'; san 
+/robots.txt                          404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/sitemap.xml                         404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/.well-known/security.txt            404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/yok.png                             404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/x.js                                404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/fonts/x.woff2                       404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/a/b/c.css                           404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/a/logo.png                          404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/api                                 404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; script-src 'unsafe-h 
+/api/                                308                           0   0                                                                                     /api
+/api/yok                             404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; script-src 'unsafe-h 
+/api/yok.png                         404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; script-src 'unsafe-h 
+/apifoo                              307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/apifoo
+/api.html                            404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/api-docs                            307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/api-docs
+/api.png                             404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/API                                 307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/API
+/API/x.png                           404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/Api/yok                             307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/Api/yok
+/_nextfoo                            307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/_nextfoo
+/_next                               404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/                              308                           0   0                                                                                     /_next
+/_next/yok                           404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/yok.js                        404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/static                        404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/static/chunks/yok.js          404  text/plain; charset=utf- 0   0     private, no-cache, no-store, max-age=0                                          
+/_vercel                             404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_vercel/x                           404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_vercelfoo                          307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/_vercelfoo
+/tr                                  200  text/html; charset=utf-8 1   39    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/tr/yok                              404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/tr/yok.png                          404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/en/x.js                             404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/TR/yok.png                          404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/yok.PNG                             404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/foo.bar                             404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/wp-login.php                        404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/yok                                 307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/yok
+/Logo.png                            404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/LOGO.PNG                            404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/logo.PNG                            404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/Next.svg                            404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/Favicon.ico                         404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/FAVICON.ICO                         404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/favicon.ICO                         404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_NEXT/static/x.js                   404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_next/STATIC/x.js                   404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_next/Static/chunks/x.js            404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_next/Image                         404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_next/IMAGE                         404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_Next/yok                           404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_VERCEL/x                           404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_next/static/                       308                           0   0                                                                                     /_next/static
+/_next/static/../yok.png             404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/static/%2e%2e/yok.png         404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/static%2Fyok.js               404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_next%2Fstatic/x.js                 404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/%5Fnext/yok                         307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/_next/yok
+/%5fnext/static/x.js                 404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/api%2Fyok.png                       404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/api%2fyok                           307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/api%2fyok
+/api%2F                              307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/api%2F
+/%61pi/yok                           307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/api/yok
+/%61pi/yok.png                       404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+//yok.png                            308                           0   0                                                                                     /yok.png
+//api/yok                            308                           0   0                                                                                     /api/yok
+//_next/yok                          308                           0   0                                                                                     /_next/yok
+///x.js                              308                           0   0                                                                                     /x.js
+/./yok.png                           404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/tr/../yok.png                       404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/logo.png/                           308                           0   0                                                                                     /logo.png
+/yok.png/                            308                           0   0                                                                                     /yok.png
+/logo%2Epng                          307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/logo.png
+/logo%2epng                          307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/logo.png
+/yok%2Epng                           307                           1   0                                            default-src 'self'; script-src 'self' 'n /tr/yok.png
+/logo.png%00                         404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/logo.png;x                          404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/yok.png?x=<script>                  404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/a/../logo.png                       200  image/png                0   0     public, max-age=0                                                               
+/tr/logo.png                         404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/TR/logo.png                         404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_next/image/                        308                           0   0                                                                                     /_next/image
+/_next/image/?url=%2Flogo.png&w=64&q=75 308                           0   0                                                                                     /_next/image?url=%2Flogo.png&w=64&q=75
+/_next/imagex                        404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/robots.TXT                          404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/x.JS                                404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/Favicon.ICO                         404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/FavIcon.ico                         404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/Logo.PNG                            404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/lOgo.png                            404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/File.svg                            404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/GLOBE.SVG                           404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/Vercel.svg                          404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/Window.svg                          404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/fav%C4%B1con.ico                    404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/fav%c4%b1con.ico                    404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/logo%C5%BF.png                      404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_next/Image?url=%2Flogo.png&w=64&q=75 404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_next/imAge                         404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_NEXT/image                         404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_Next/static/x.js                   404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_NEXT/STATIC/CHUNKS/X.JS            404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_next/staticfoo                     404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/statics/x.js                  404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/image/x                       404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_next/webpack-hmr                   404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'none'; style-src 'self' 'un 
+/_VERCEL/x.js                        404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/_Vercel                             404  text/html; charset=utf-8 1   31    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/TR/yok.png                          404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/API/x.png                           404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/Api/x.png                           404  text/html; charset=utf-8 1   19    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/robots.TXT                          404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/Robots.txt                          404  text/html; charset=utf-8 1   32    private, no-cache, no-store, max-age=0 default-src 'self'; script-src 'self' 'n 
+/logo.png                            200  image/png                0   0     public, max-age=0                                                               
+/favicon.ico                         200  image/x-icon             0   0     public, max-age=0, must-revalidate                                              

@@ -1,0 +1,39 @@
+// be-fb TASK-MUOAW0UAXVG1M — G-1 canlı: prod next start :47100 + izole befb100-pg :55100.
+import { execFileSync } from 'node:child_process';
+import { encode } from 'next-auth/jwt';
+const B = 'http://127.0.0.1:47100';
+const ACTION = '60de0980bf55b08ca9d916836948b59e364b037ade';
+const psql = (sql) => execFileSync('docker', ['exec', 'befb100-pg', 'psql', '-U', 'fabrika', '-d', 'fabrika', '-tAc', sql]).toString().trim();
+const token = (id) => encode({ token: { id, sub: id }, secret: process.env.AUTH_SECRET, salt: 'authjs.session-token', maxAge: 3600 });
+const vis = () => psql(`select visibility from "Plan" where id='ultra'`);
+const audits = () => psql(`select count(*) from "AuditEvent" where type='plan.visibility.changed' and target='ultra'`);
+async function call(cookie, body) {
+  const headers = { 'Next-Action': ACTION, Accept: 'text/x-component', 'Content-Type': 'text/plain;charset=UTF-8', Origin: B };
+  if (cookie) headers.Cookie = `authjs.session-token=${cookie}`;
+  const res = await fetch(`${B}/tr/admin/billing/plans`, { method: 'POST', headers, body });
+  const text = await res.text();
+  return { status: res.status, result: (text.match(/^1:(.*)$/m) || [])[1] ?? '<yok> ' + text.slice(0, 160).replace(/\n/g, ' ') };
+}
+const admin = await token('demo-user-superadmin');
+const member = await token('demo-user-alice');
+const REFUSE = '{"ok":false,"code":"INVALID_VISIBILITY"}';
+let pass = 0, total = 0;
+const run = async (label, cookie, args, expect, raw) => {
+  const before = vis(), a0 = audits();
+  const r = await call(cookie, raw ?? JSON.stringify(args));
+  const after = vis(), a1 = audits();
+  const ok = r.status === 200 && r.result === expect && (expect !== REFUSE || (before === after && a0 === a1));
+  total++; if (ok) pass++;
+  console.log(`${ok ? 'BEKLENEN   ' : 'BEKLENMEYEN'} | ${label} | HTTP ${r.status} ${r.result} | visibility ${before}→${after} | audit ${a0}→${a1}`);
+};
+const bads = ['be-fb-100', '', 'PUBLIC', 'Public', 'PRIVATE', ' public', 'public\n', 'publіc', 'p​ublic', 'constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf', 'x'.repeat(1_000_000)];
+for (const v of bads) await run(`admin, dize ${JSON.stringify(v).slice(0, 30)}${v.length > 30 ? `… (${v.length} kr)` : ''}`, admin, ['ultra', v], REFUSE);
+for (const v of [['public'], [['public']], [], null, true, 0, { v: 'public' }, { toString: 'public' }]) await run(`admin, dize değil ${JSON.stringify(v)}`, admin, ['ultra', v], REFUSE);
+await run('admin, argüman eksik (yalnız planId)', admin, ['ultra'], REFUSE);
+await run('admin, fazladan 3. argüman', admin, ['ultra', 'nope', 'public'], REFUSE);
+await run('üye (admin değil), geçerli "private"', member, ['ultra', 'private'], '{"ok":false,"code":"PLATFORM_ADMIN_REQUIRED"}');
+await run('üye (admin değil), geçersiz', member, ['ultra', 'PUBLIC'], '{"ok":false,"code":"PLATFORM_ADMIN_REQUIRED"}');
+await run('oturumsuz, geçerli "private"', null, ['ultra', 'private'], '{"ok":false,"code":"PLATFORM_ADMIN_REQUIRED"}');
+await run('admin, geçerli "private"', admin, ['ultra', 'private'], '{"ok":true}');
+await run('admin, geri "public"', admin, ['ultra', 'public'], '{"ok":true}');
+console.log(`SONUÇ: ${pass}/${total} beklenen; son Plan.visibility=${vis()}`);

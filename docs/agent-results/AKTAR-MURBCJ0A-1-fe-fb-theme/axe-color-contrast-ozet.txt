@@ -1,0 +1,60 @@
+# ONCE (dev @1b43b434)
+=== light: 420 nodes, 23 pages
+ 275 #64748b on #f4f6f8 (4.39) pages:17 | <div class="text-xs text-muted font-medium">Mevcut Abonelik Paketi</div>
+  46 #059669 on #daefe8 (3.13) pages: 6 | <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-ok
+  21 #d97706 on #f9ebda (2.71) pages:11 | <span class="text-[10px] bg-amber/15 text-amber border border-amber/20 px-1.5 py-0.5 round
+  21 #059669 on #ffffff (3.76) pages:12 | <span class="text-ok font-medium">Kullanıma hazır</span>
+  14 #4f5b70 on #0e1629 (2.62) pages: 1 | <div class="text-[10px] font-bold font-mono text-slate-400">İlk 5 abone</div>
+   9 #62748e on #0b1324 (3.89) pages: 1 | <span class="text-lg text-slate-500 line-through font-semibold">$99,75</span>
+   7 #307f92 on #0e1629 (3.92) pages: 1 | <div class="text-lg font-extrabold text-cyan-300 font-heading mt-0.5">-<!-- -->70<!-- -->%
+   4 #c27aff on #f3e3ff (2.29) pages: 2 | <span class="bg-purple-500/15 text-purple-400 border border-purple-500/20 font-bold px-1.5
+   4 #64748b on #f5f7f9 (4.43) pages: 2 | <span class="text-xs font-mono text-muted">CORDIS Node Analytics</span>
+   2 #dc2626 on #fadede (3.81) pages: 1 | <span>Kapat</span>
+   2 #dc2626 on #f0d7d8 (3.54) pages: 2 | <span class="bg-bad/15 text-bad text-xs font-bold uppercase tracking-wider py-1 px-3 round
+   2 #0369a1 on #d0e1eb (4.42) pages: 2 | <span class="inline-block rounded-full border px-2 py-0.5 text-xs font-semibold bg-accent/
+   2 #c27aff on #f7edff (2.46) pages: 2 | <div class="text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.
+   2 #059669 on #e6f4f0 (3.33) pages: 2 | <div class="text-[10px] text-ok bg-ok/10 border border-ok/20 px-1.5 py-0.5 rounded font-se
+=== dark: 91 nodes, 13 pages
+  46 #ffffff on #0891b2 (3.68) pages: 8 | <span>Yıllık</span>
+  14 #4f5b70 on #0e1629 (2.62) pages: 1 | <div class="text-[10px] font-bold font-mono text-slate-400">İlk 5 abone</div>
+   9 #62748e on #0b1324 (3.89) pages: 1 | <span class="text-lg text-slate-500 line-through font-semibold">$99,75</span>
+   7 #307f92 on #0e1629 (3.92) pages: 1 | <div class="text-lg font-extrabold text-cyan-300 font-heading mt-0.5">-<!-- -->70<!-- -->%
+   3 #4a5565 on #080d1a (2.56) pages: 1 | <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Gerçek zamanlı ölçümler ve eğilim
+   2 #155dfc on #080d1a (3.69) pages: 2 | <button type="button" role="tab" id="dashboard-tab-overview" aria-selected="true" aria-con
+   2 #4f39f6 on #080d1a (3) pages: 1 | <span>Kurumsal Güvenlik</span>
+   1 #1447e6 on #0c1a3a (2.51) pages: 1 | <div class="text-xs font-bold text-blue-700 dark:text-blue-400">Kiracı Hesapları</div>
+   1 #101828 on #080d1a (1.09) pages: 1 | <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Panel</h1>
+   1 #ffffff on #39a7c1 (2.81) pages: 1 | <span class="text-[10px] px-1.5 py-0.5 rounded-full font-extrabold bg-white/20 text-white"
+   1 #6a7282 on #080d1a (4.01) pages: 1 | <p class="text-gray-500 mt-2 max-w-3xl">Kritik bütçe, G4 başvuru onayı, hukuki taahhütler 
+   1 #62748e on #080d1a (4.07) pages: 1 | <p class="text-slate-500 text-xs leading-relaxed max-w-2xl mx-auto">Kilit, aboneliğiniz sü
+   1 #62748e on #0f172b (3.74) pages: 1 | <span class="line-through text-slate-500 text-[10px]">$2.576,00</span>
+   1 #62748e on #0f192e (3.67) pages: 1 | <span class="text-lg text-slate-500 line-through font-semibold">$62,25</span>
+
+# SONRA (fe-fb/dark-contrast)
+=== light: 139 nodes, 22 pages
+  46 #059669 on #daefe8 (3.13) pages: 6 | <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-ok
+  21 #d97706 on #f9ebda (2.71) pages:11 | <span class="text-[10px] bg-amber/15 text-amber border border-amber/20 px-1.5 py-0.5 round
+  21 #059669 on #ffffff (3.76) pages:12 | <span class="text-ok font-medium">Kullanıma hazır</span>
+  14 #4f5b70 on #0e1629 (2.62) pages: 1 | <div class="text-[10px] font-bold font-mono text-slate-400">İlk 5 abone</div>
+   9 #62748e on #0b1324 (3.89) pages: 1 | <span class="text-lg text-slate-500 line-through font-semibold">$99,75</span>
+   7 #307f92 on #0e1629 (3.92) pages: 1 | <div class="text-lg font-extrabold text-cyan-300 font-heading mt-0.5">-<!-- -->70<!-- -->%
+   4 #c27aff on #f3e3ff (2.29) pages: 2 | <span class="bg-purple-500/15 text-purple-400 border border-purple-500/20 font-bold px-1.5
+   2 #dc2626 on #fadede (3.81) pages: 1 | <span>Kapat</span>
+   2 #dc2626 on #f0d7d8 (3.54) pages: 2 | <span class="bg-bad/15 text-bad text-xs font-bold uppercase tracking-wider py-1 px-3 round
+   2 #0369a1 on #d0e1eb (4.42) pages: 2 | <span class="inline-block rounded-full border px-2 py-0.5 text-xs font-semibold bg-accent/
+   2 #c27aff on #f7edff (2.46) pages: 2 | <div class="text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.
+   2 #059669 on #e6f4f0 (3.33) pages: 2 | <div class="text-[10px] text-ok bg-ok/10 border border-ok/20 px-1.5 py-0.5 rounded font-se
+   1 #059669 on #d0e8e3 (2.93) pages: 1 | <span class="text-xs font-bold tracking-wide whitespace-nowrap px-2.5 py-1 rounded-md bg-o
+   1 #ffffff on #3587b4 (3.98) pages: 1 | <span class="text-[10px] px-1.5 py-0.5 rounded-full font-extrabold bg-white/20 text-white"
+=== dark: 83 nodes, 11 pages
+  46 #ffffff on #0891b2 (3.68) pages: 8 | <span>Yıllık</span>
+  14 #4f5b70 on #0e1629 (2.62) pages: 1 | <div class="text-[10px] font-bold font-mono text-slate-400">İlk 5 abone</div>
+   9 #62748e on #0b1324 (3.89) pages: 1 | <span class="text-lg text-slate-500 line-through font-semibold">$99,75</span>
+   7 #307f92 on #0e1629 (3.92) pages: 1 | <div class="text-lg font-extrabold text-cyan-300 font-heading mt-0.5">-<!-- -->70<!-- -->%
+   1 #155dfc on #080d1a (3.69) pages: 1 | <a class="text-blue-600 hover:underline" href="/tr/main/settings/members">Ekip üyelerini y
+   1 #ffffff on #39a7c1 (2.81) pages: 1 | <span class="text-[10px] px-1.5 py-0.5 rounded-full font-extrabold bg-white/20 text-white"
+   1 #6a7282 on #080d1a (4.01) pages: 1 | <p class="text-gray-500 mt-2 max-w-3xl">Kritik bütçe, G4 başvuru onayı, hukuki taahhütler 
+   1 #62748e on #080d1a (4.07) pages: 1 | <p class="text-slate-500 text-xs leading-relaxed max-w-2xl mx-auto">Kilit, aboneliğiniz sü
+   1 #62748e on #0f172b (3.74) pages: 1 | <span class="line-through text-slate-500 text-[10px]">$2.576,00</span>
+   1 #62748e on #0f192e (3.67) pages: 1 | <span class="text-lg text-slate-500 line-through font-semibold">$62,25</span>
+   1 #ffffff on #009966 (3.65) pages: 1 | <span>Ücretsiz Kayıt Ol</span>

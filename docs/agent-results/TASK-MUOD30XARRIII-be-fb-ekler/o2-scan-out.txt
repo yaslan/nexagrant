@@ -1,0 +1,3 @@
+hasUseServerDirective (dosya başı ya da fonksiyon gövdesi): true
+actionReturnLeaks satırları: []
+m11 actions hasUseServerDirective: true

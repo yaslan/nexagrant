@@ -1,0 +1,51 @@
+// TASK-MUOGR5FDKLH22 browser proof — scratch only, not committed.
+import { chromium } from '@playwright/test';
+import fs from 'node:fs';
+const SP = process.env.SP, MODE = process.env.MODE, LOCALE = process.env.LOC || 'tr', ARM = process.env.ARM ?? '1';
+const BASE = 'http://localhost:3188';
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: LOCALE });
+await page.addInitScript(() => localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: true, marketing: true })));
+const target = `/${LOCALE}/main/evidence`;
+await page.goto(`${BASE}/${LOCALE}/giris?callbackUrl=${encodeURIComponent(target)}`);
+await page.locator('input[type="email"]').fill('admin@yasinaslan.com.tr');
+await page.locator('form button[type="submit"]').click();
+await page.waitForURL(`**${target}`, { timeout: 60_000 });
+await page.waitForLoadState('networkidle');
+const mark = (s) => fs.appendFileSync(`${SP}/pg.log`, `---- ${MODE} ${LOCALE}: ${s}\n`);
+if (MODE !== 'calib') {
+  await page.route('**/api/evidence/mock-upload**', async (route) => {
+    const res = await route.fetch();
+    fs.writeFileSync(`${SP}/pg.flag`, ARM); // armed after the PUT: the next confirm's pilot check gets no connection
+    mark(`PUT done ${res.status()}, armed ${ARM}`);
+    await route.fulfill({ response: res });
+  });
+}
+const alerts = [];
+page.on('dialog', async (d) => { alerts.push(d.message()); await d.accept(); });
+if (process.env.OVERLAY) {
+  // Headless Chromium cannot photograph a native alert() box, and an open box
+  // blocks page.screenshot. For the picture only: the same string the app passes
+  // to alert() is written into a fixed banner on the upload screen.
+  await page.evaluate(() => {
+    window.alert = (msg) => {
+      const d = document.createElement('div');
+      d.setAttribute('data-befb-alert', '');
+      d.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:99999;background:#fff;color:#111;border:2px solid #b91c1c;border-radius:10px;padding:14px 18px;font:15px system-ui;max-width:640px;box-shadow:0 8px 30px rgba(0,0,0,.35)';
+      d.textContent = 'window.alert(): ' + String(msg);
+      document.body.appendChild(d);
+      window.__befbAlerts = [...(window.__befbAlerts || []), String(msg)];
+    };
+  });
+}
+await page.getByRole('button', { name: LOCALE === 'tr' ? 'Yeni Belge Yükle (R2)' : 'Upload Evidence (R2)' }).click();
+await page.locator('input[type="file"]').setInputFiles({ name: `befb-${MODE}-${LOCALE}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from(`%PDF-1.4\n% befb ${Date.now()}\n%%EOF\n`) });
+mark('submit');
+const actionResponses = [];
+page.on('response', async (r) => { if (r.request().method() === 'POST' && r.request().headers()['next-action']) { try { actionResponses.push((await r.text()).slice(-200)); } catch {} } });
+await page.locator('form button[type="submit"]').click();
+await page.waitForTimeout(6000);
+if (process.env.OVERLAY) alerts.push(...(await page.evaluate(() => window.__befbAlerts || [])));
+await page.screenshot({ path: `${SP}/shots/${MODE}-${LOCALE}${process.env.OVERLAY ? '-overlay' : ''}.png` });
+console.log(JSON.stringify({ MODE, LOCALE, alerts, actionResponses }, null, 1));
+await browser.close();

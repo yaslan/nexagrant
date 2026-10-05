@@ -1,0 +1,4 @@
+YAKALADI | CORDIS 5e674e7f, static import | [22,30] | 1030 ms
+KAÇTI    | CORDIS 5e674e7f, import made dynamic (one line) | [] | 3 ms
+KAÇTI    | m11 as is (real tree) | [] | 223 ms
+YAKALADI | m11, withSystemScope made to leak (dynamic import as in src) | [65,66,76,92,121,134,180,368,421,528,570] | 642 ms

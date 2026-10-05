@@ -1,0 +1,90 @@
+ÇALIŞMA ALANI
+Panel
+Çağrılar
+Fırsatlar
+Ortaklar
+İlişkiler
+Kanıtlar
+TTO Hızlandırıcısı (M7)
+Onay Merkezi (4-Eyes)
+Pazar Yeri & API
+Partner REST API
+Ayarlar
+DK
+Prof. Dr. Ayşe Kaya
+MODÜL 11 — FULL APPLİCATİON PRODUCTİON
+Part A & Part B Başvuru Üretim Paneli
+
+Teklif: CSV7 probe — application empty state
+
+Part B (.docx) Şablonu İndir
+Part A & B Aktif
+Toplam Konsorsiyum Eforu
+0 Kişi-Ay (PM)
+Toplam Bütçe (Lump Sum)
+€0
+İş Paketi Sayısı
+0 İş Paketi (WP)
+Sayfa Limiti Kontrolü
+RIA/IA Limit: 45 Sayfa
+Part B (Çoklu Yazar İşbirlikçi Metin Editörü)
+Part A (İdari & Lump-Sum Bütçe)
+Part B (Gantt Şeması & İş Paketleri)
+Gönderim Kontrol Listesi
+CANLI KONSORSİYUM EŞZAMANLI YAZARLARI (1 AKTİF)
+
+Tüm değişiklikler ve kilitler diğer konsorsiyum ortaklarıyla anlık senkronize edilir.
+
+Prof. Dr. Ayşe Kaya
+1.1
+Part B Toplam Sayfa Bütçesi:
+0 / 45 Sayfa (0 Kelime)
+Resmî DOCX İndir
+PART B BÖLÜM AĞACI
+8 BÖLÜM
+1. EXCELLENCE (Mükemmeliyet)
+~18 Sayfa
+1.1 Objectives and Ambition
+Lider: Atanmadı
+0.0/6 s.
+1.2 Methodology (Gender, Open Science & FAIR Data)
+Lider: Atanmadı
+0.0/10 s.
+1.3 Open Science & Research Data Management
+Lider: Atanmadı
+0.0/2 s.
+2. IMPACT (Etki & Yayma)
+~14 Sayfa
+2.1 Project's Pathways towards Impact
+Lider: Atanmadı
+0.0/6 s.
+2.2 Measures to Maximise Impact: DEC & IP Plan
+Lider: Atanmadı
+0.0/6 s.
+2.3 Summary Canvas (Impact & Scale Matrix)
+Lider: Atanmadı
+0.0/2 s.
+3. IMPLEMENTATION (Uygulama)
+~13 Sayfa
+3.1 Work Plan and Resources (Work Packages & Gantt)
+Lider: Atanmadı
+0.0/8 s.
+3.2 Capacity of Participants & Consortium as a Whole
+Lider: Atanmadı
+0.0/5 s.
+1.1 Objectives and Ambition
+Sorumlu: Atanmadı
+•
+Hedef: 6 Sayfa
+•
+Şu an: ~0.0 Sayfa (0 Kelime)
+Senkronize
+Bölümü Kilitle
+Düzenle (Markdown)
+Önizleme
+YZ Eş-Yazar Asistanı
+İnceleme Yorumları (0)
+Sürüm Geçmişi
+Kaydet
+0 kelime | ~0.0 sayfa
+Geri bildirim

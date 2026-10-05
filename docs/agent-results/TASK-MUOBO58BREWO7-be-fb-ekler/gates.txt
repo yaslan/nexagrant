@@ -1,0 +1,8 @@
+tsc exit=0
+eslint exit=0
+
+i18n exit=0
+wt104 exit=0
+VITEST_EXIT=0
+ Test Files  293 passed | 6 skipped (299)
+      Tests  3766 passed | 113 skipped (3879)

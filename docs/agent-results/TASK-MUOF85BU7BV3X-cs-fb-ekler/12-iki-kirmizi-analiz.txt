@@ -1,0 +1,9 @@
+tests/rag-pdf-worker-isolation.test.ts | a 128 MB-inflating stream (~130 KB file) is refused at the real limits, fast | duration 8044.6470839999965
+   AssertionError: expected 5079.959707999995 to be less than 3000     at /private/tmp/claude-501/-Users-macbook-alan/090021ea-c739-4c72-8da4-4b97074609f4/scratchpad/wtg1/tests/rag-pdf-worker-isolation.test.ts:168:16     at processTicksAndRejections (node:internal/process/task_queues:104:5)     at file:///private/tmp/claude-501/-Users-macbook-alan/090021ea-c739-4c72-8da4-4b97074609f4/scratchpad/wtg1/
+tests/api/api-error-body-guard.test.ts | no server action returns what it caught (beyond the known list) | duration 40119.964166
+   Error: STACK_TRACE_ERROR     at task (file:///private/tmp/claude-501/-Users-macbook-alan/090021ea-c739-4c72-8da4-4b97074609f4/scratchpad/wtg1/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1784:27)     at Object.<anonymous> (file:///private/tmp/claude-501/-Users-macbook-alan/090021ea-c739-4c72-8da4-4b97074609f4/scratchpad/wtg1/node_modules/.pnpm/@vitest
+tests/k1-embeddings.live.test.ts | duration 173
+   AssertionError: expected { profile: { has: true, …(1) }, …(1) } to deeply equal { profile: { has: true, …(1) }, …(1) }     at /private/tmp/claude-501/-Users-macbook-alan/090021ea-c739-4c72-8da4-4b97074609f4/scratchpad/wtg1/tests/k1-embeddings.live.test.ts:324:106     at processTicksAndRejections (no
+tests/rag-pdf-worker-isolation.test.ts | duration 5738
+   AssertionError: expected 3610.3773750000037 to be less than 3000     at /private/tmp/claude-501/-Users-macbook-alan/090021ea-c739-4c72-8da4-4b97074609f4/scratchpad/wtg1/tests/rag-pdf-worker-isolation.test.ts:168:16     at processTicksAndRejections (node:internal/process/task_queues:104:5)     at fil
+      Tests  35 passed | 1 skipped (36)

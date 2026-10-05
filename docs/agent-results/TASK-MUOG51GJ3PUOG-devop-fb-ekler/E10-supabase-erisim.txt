@@ -1,0 +1,41 @@
+-- has_table_privilege: uygulama tabloları (public, 75)
+    rolname    | tablo_yetkili | toplam 
+---------------+---------------+--------
+ anon          |             0 |     75
+ authenticated |             0 |     75
+ fabrika_app   |            75 |     75
+ fabrika_jobs  |             0 |     75
+ service_role  |             0 |     75
+(5 rows)
+
+-- şema erişimi
+        r        | public_usage | ext_usage 
+-----------------+--------------+-----------
+ anon            | t            | t
+ authenticated   | t            | t
+ fabrika_app     | t            | t
+ fabrika_jobs    | t            | f
+ fabrika_migrate | t            | t
+(5 rows)
+
+-- public tablolarında PUBLIC/anon/authenticated ACL girdisi
+ count 
+-------
+     0
+(1 row)
+
+-- PostgREST açık şemalar (authenticator rol ayarı)
+                                        rolconfig                                         
+------------------------------------------------------------------------------------------
+ {"session_preload_libraries=supautils, safeupdate",statement_timeout=8s,lock_timeout=8s}
+(1 row)
+
+BEGIN
+CREATE SCHEMA
+CREATE TABLE
+ jobs_reads_tenant 
+-------------------
+ f
+(1 row)
+
+ROLLBACK

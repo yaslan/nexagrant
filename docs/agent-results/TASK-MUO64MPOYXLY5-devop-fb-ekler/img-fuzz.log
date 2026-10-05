@@ -1,0 +1,12 @@
+{"kept":6871,"dropped":1437,"threw":0,"slow":0}
+TARGET png 0x0 KEPT
+TARGET png 2^31x2^31 KEPT
+TARGET gif 0x0 KEPT
+TARGET gif 65535^2 KEPT
+TARGET png padded to 2MiB KEPT
+TARGET png 2MiB+1 DROPPED
+TARGET svg as png DROPPED
+TARGET jpeg bytes labelled gif KEPT
+TARGET webp bytes DROPPED
+TARGET heif bytes DROPPED
+{"kept":6,"dropped":4,"threw":0,"slow":0}

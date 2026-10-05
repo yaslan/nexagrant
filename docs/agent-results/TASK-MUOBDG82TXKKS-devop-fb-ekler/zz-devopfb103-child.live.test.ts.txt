@@ -1,0 +1,36 @@
+import http from 'node:http';
+import { expect, test, vi } from 'vitest';
+
+/** D6 child (İNCELEME-103): a real confirm whose CopyObject the store never answers. Killed by the parent. */
+const state = vi.hoisted(() => {
+  const e = process.env;
+  const proxyPort = 36500 + (process.pid % 3000);
+  e.R2_ACCOUNT_ID = 'minio-test';
+  e.R2_ENDPOINT = `http://127.0.0.1:${proxyPort}`;
+  e.R2_ACCESS_KEY_ID = e.EVIDENCE_S3_TEST_ACCESS_KEY;
+  e.R2_SECRET_ACCESS_KEY = e.EVIDENCE_S3_TEST_SECRET_KEY;
+  e.R2_BUCKET = e.EVIDENCE_S3_TEST_BUCKET;
+  return { proxyPort };
+});
+vi.mock('@/lib/auth', () => ({
+  auth: async () => ({ user: { id: process.env.DVP_CHILD_USER }, tenantId: process.env.DVP_CHILD_TENANT, role: 'TENANT_OWNER' }),
+}));
+vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
+
+test.runIf(process.env.DVP_CHILD === '1')('child holds the confirm lock', async () => {
+  const upstream = new URL(process.env.EVIDENCE_S3_TEST_ENDPOINT!);
+  const proxy = http.createServer((req, res) => {
+    if (req.method === 'PUT' && req.headers['x-amz-copy-source']) return; // never answered
+    const up = http.request({ host: upstream.hostname, port: upstream.port, method: req.method, path: req.url, headers: req.headers }, (ur) => {
+      res.writeHead(ur.statusCode ?? 502, ur.headers);
+      ur.pipe(res);
+    });
+    req.pipe(up);
+  });
+  await new Promise<void>((r) => proxy.listen(state.proxyPort, '127.0.0.1', () => r()));
+  const evidence = await import('@/app/[locale]/(app)/[workspace]/evidence/actions');
+  const r = await evidence.confirmEvidenceUploadAction({
+    title: 'child', category: 'CAT-03', objectKey: process.env.DVP_CHILD_KEY!, fileName: 'b.pdf', fileSizeBytes: 1, mimeType: 'application/pdf',
+  });
+  expect(r).toBeDefined();
+}, 120_000);

@@ -1,0 +1,32 @@
+[D01] login + briefs page: Görüşme Brifingi & Not Alma Motoru
+[D01] records header: GÖRÜŞME KAYITLARI (0)
+[D02] whitespace-only name submitted. visible feedback dialog=null | button text now="Yapay Zeka Brief Oluştur" | records="GÖRÜŞME KAYITLARI (0)"
+[D03] date filled, no time -> Brussels preview blocks visible: 0
+[D04] local 2026-10-24 14:00 -> preview "24.10.2026 13:00:00" (browser TZ Europe/Istanbul)
+[D05] local 2026-11-01 14:00 -> preview "01.11.2026 12:00:00"
+[D06] after generate: records="GÖRÜŞME KAYITLARI (0)"
+[D07] XSS payload brief -> page title="Fabrika" (unchanged title = escaped)
+[D07] records="GÖRÜŞME KAYITLARI (0)"
+[D08] 600-char name -> records="GÖRÜŞME KAYITLARI (0)"
+[D09] double click -> records="GÖRÜŞME KAYITLARI (0)"
+[D10] .ics button count on active brief: 0
+[D13] after reload records="GÖRÜŞME KAYITLARI (0)" | note persisted: false
+[D14] opportunity 2 page: title="Çağrı Fırsatı: Industrial waste-heat recovery consortium"
+[D14] opportunity 2 records="GÖRÜŞME KAYITLARI (0)"
+[D15] bogus opportunity -> "Görüşme Brifingi & Not Alma Motoru" / call="Çağrı Fırsatı: HORIZON-CL5-2026-D3-01: Zero-Emission Transport Systems & Battery Tech"
+[D16] EN locale h1="Görüşme Brifingi & Not Alma Motoru" submit="Yapay Zeka Brief Oluştur"
+[D17] other-tenant user on demo-opp-1: call="Çağrı Fırsatı: HORIZON-CL5-2026-D3-01: Zero-Emission Transport Systems & Battery Tech"
+[D17] sees "Fraunhofer IWES" (our tenant's brief): false | sees "Çift Tık": false
+[CONSOLE] browser console errors: [
+ "Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every rende"
+]
+[D18] fallback brief shown. page mentions demo/örnek/test label: true
+[D18] .ics button present: 0 | Yazdır present: 1
+[D19] empty action item -> li count=0 dialog=null
+[D20] after 3 adds (2 duplicates + 300 chars) -> li count=3 (no duplicate guard, no length limit)
+[D21] after save: textarea now="" (empty = fields cleared) | note present on page: false | action items left: 0 | any error message: false | dialog=null
+[D22] print button clicked; page still responsive: true
+[D23] /tr/fabrika-beta/ayarlar -> mentions takvim/calendar/Google/Outlook: false (len 3948)
+[D23] /tr/fabrika-beta/settings -> mentions takvim/calendar/Google/Outlook: false (len 118)
+[D23] /tr/fabrika-beta/panel -> mentions takvim/calendar/Google/Outlook: false (len 656)
+[D24] 390px viewport -> horizontal overflow: false

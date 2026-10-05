@@ -1,0 +1,63 @@
+Timestamp: 2026-09-30T17:51:57Z
+
+=== All files containing 'use server' ===
+Total matches: 46
+
+src/actions/user/export-data.ts:'use server';
+src/actions/user/request-deletion.ts:'use server';
+src/app/[locale]/(app)/[workspace]/approvals/actions.ts:'use server';
+src/app/[locale]/(app)/[workspace]/concept-notes/actions.ts:'use server';
+src/app/[locale]/(app)/[workspace]/dashboard/export-csv.ts:'use server';
+src/app/[locale]/(app)/[workspace]/evidence/actions.ts:'use server';
+src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions.ts:'use server';
+src/app/[locale]/(app)/[workspace]/pipeline/actions.ts:'use server';
+src/app/[locale]/(app)/[workspace]/relationships/actions.ts:'use server';
+src/app/[locale]/(app)/[workspace]/settings/api-keys/actions.ts:'use server';
+src/app/[locale]/(app)/[workspace]/settings/api-keys/actions.ts:// Not exported: a 'use server' module may export async functions only.
+src/app/[locale]/(app)/[workspace]/settings/billing/identity-actions.ts:'use server';
+src/app/[locale]/(app)/[workspace]/settings/modules/actions.ts:'use server';
+src/app/[locale]/(app)/[workspace]/settings/profile/actions.ts:'use server';
+src/app/[locale]/(app)/ajans/actions.ts:'use server';
+src/app/[locale]/(app)/ajans/cobrand-actions.ts:'use server';
+src/app/[locale]/accept-invite/continue/actions.ts:'use server';
+src/app/[locale]/admin/alerts/actions.ts:'use server';
+src/app/[locale]/admin/billing/plans/actions.ts:'use server';
+src/app/[locale]/admin/billing/plans/failure-codes.ts: * Not in `actions.ts`: a `'use server'` module may only export async
+src/app/[locale]/admin/blog/actions.ts:'use server';
+src/app/[locale]/admin/cordis/actions.ts:'use server';
+src/app/[locale]/admin/feedback/actions.ts:'use server';
+src/app/[locale]/admin/modules/actions.ts:'use server';
+src/app/[locale]/admin/settings/actions.ts:'use server';
+src/app/[locale]/fon-hazirlik/actions.ts:'use server';
+src/app/[locale]/portal/partner/[token]/page.tsx:            'use server';
+src/lib/actions/auth.ts:'use server';
+src/lib/agency/actions.ts:'use server';
+src/lib/agency/errors.ts: * ./actions.ts because a 'use server' module may export only async functions:
+src/lib/calendar/errors.ts: * that file carries `'use server'`: every export of a Server Actions module
+src/lib/pipeline/archive.ts: * enforces it (a `'use server'` module can only export async functions, so the rule cannot live
+src/modules/m10/server/actions.ts:'use server';
+src/modules/m11/server/actions.ts:'use server';
+src/modules/m11/server/partner-link.ts:'use server';
+src/modules/m2/server/actions.ts:'use server';
+src/modules/m4/server/actions.ts:'use server';
+src/modules/m6/server/actions.ts: * Input shapes and the error types live in ./validation.ts — a `'use server'` module may
+src/modules/m6/server/actions.ts:'use server';
+src/modules/m6/server/validation.ts: * These live outside `actions.ts` because a `'use server'` module may only export async
+src/modules/m7/server/actions.ts:'use server';
+src/modules/m8/components/invite-candidate-button.tsx: * This was an inline `'use server'` form on the matching page whose catch only
+src/modules/m8/server/actions.ts:'use server';
+src/modules/m8/server/errors.ts: * No `'use server'` here: that file may only export async functions.
+src/modules/m9/server/actions.ts:'use server';
+src/modules/m9/server/calendar-actions.ts:'use server';
+
+=== Inline 'use server' (NOT at file start) ===
+src/app/[locale]/(app)/[workspace]/settings/api-keys/actions.ts:// Not exported: a 'use server' module may export async functions only.
+src/app/[locale]/admin/billing/plans/failure-codes.ts: * Not in `actions.ts`: a `'use server'` module may only export async
+src/lib/pipeline/archive.ts: * enforces it (a `'use server'` module can only export async functions, so the rule cannot live
+src/lib/calendar/errors.ts: * that file carries `'use server'`: every export of a Server Actions module
+src/lib/agency/errors.ts: * ./actions.ts because a 'use server' module may export only async functions:
+src/modules/m8/server/errors.ts: * No `'use server'` here: that file may only export async functions.
+src/modules/m8/components/invite-candidate-button.tsx: * This was an inline `'use server'` form on the matching page whose catch only
+src/modules/m6/server/validation.ts: * These live outside `actions.ts` because a `'use server'` module may only export async
+src/modules/m6/server/actions.ts: * Input shapes and the error types live in ./validation.ts — a `'use server'` module may
+

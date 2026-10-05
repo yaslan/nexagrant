@@ -1,0 +1,60 @@
+import { chromium, expect as baseExpect, type Browser } from '@playwright/test';
+
+export const expect = baseExpect.configure({ timeout: 10_000 });
+type Fn = (fx: { browser: Browser }) => unknown;
+const tests: { title: string; fn: Fn }[] = [];
+const befores: Fn[] = [];
+const afters: Fn[] = [];
+const prefix: string[] = [];
+class Skip extends Error {}
+
+export function test(title: string, fn: Fn) {
+  tests.push({ title: [...prefix, title].join(' › '), fn });
+}
+test.beforeAll = (fn: Fn) => void befores.push(fn);
+test.afterAll = (fn: Fn) => void afters.push(fn);
+test.describe = Object.assign(
+  (title: string, fn: () => void) => {
+    prefix.push(title);
+    fn();
+    prefix.pop();
+  },
+  { configure: () => {} },
+);
+test.skip = (cond: boolean, reason?: string) => {
+  if (cond) throw new Skip(reason);
+};
+
+export async function runAll(baseURL: string, grep: string) {
+  const real = await chromium.launch({ channel: 'chrome', headless: true });
+  // Config's `use.baseURL`: every context the spec opens resolves relative gotos against it.
+  const browser = new Proxy(real, {
+    get(t, k) {
+      if (k === 'newContext') return (o: object = {}) => t.newContext({ baseURL, ...o });
+      const v = Reflect.get(t, k);
+      return typeof v === 'function' ? v.bind(t) : v;
+    },
+  }) as Browser;
+  let passed = 0, failed = 0, skipped = 0;
+  try {
+    for (const b of befores) await b({ browser });
+    for (const t of tests.filter((x) => x.title.includes(grep))) {
+      const t0 = Date.now();
+      try {
+        await t.fn({ browser });
+        passed++;
+        console.log(`  ✓ ${t.title} (${Date.now() - t0} ms)`);
+      } catch (e) {
+        if (e instanceof Skip) { skipped++; console.log(`  - ${t.title} SKIP ${e.message}`); continue; }
+        failed++;
+        const msg = String((e as Error).message).split('\n').filter((l) => l.trim()).slice(0, 6).join('\n      ');
+        console.log(`  ✘ ${t.title}\n      ${msg}`);
+      }
+    }
+  } finally {
+    for (const a of afters) await a({ browser });
+    await real.close();
+  }
+  console.log(`${passed} passed, ${failed} failed, ${skipped} skipped`);
+  return failed;
+}

@@ -1,0 +1,49 @@
+# se-fb TASK-MUOAYGYXW8PHI — mutant koşusu (commit'lenmez). Her mutant: dosyayı yedekle, tek değişikliği yap,
+# dev sunucusunun yeniden derlemesini bekle, spec'i koş, dosyayı yedekten geri koy.
+import os, shutil, subprocess, sys, time, urllib.request
+
+A = 'src/app/[locale]/(app)/[workspace]/approvals/client.tsx'
+P = 'src/app/[locale]/(app)/[workspace]/pipeline/[id]/client.tsx'
+G = 'src/app/[locale]/(app)/[workspace]/settings/gates/page.tsx'
+C = 'src/app/[locale]/admin/cordis/client.tsx'
+M = [
+    ('M1', 'fırsat başlığı min-w-0 sil', P, 'w-full sm:w-auto min-w-0 break-words', 'w-full sm:w-auto break-words', 1),
+    ('M2', 'gates iki min-w-0 sil', G, 'min-w-0', '', 2),
+    ('M7', 'fırsat satırı sm:flex-wrap sil', P, 'sm:flex-row sm:flex-wrap lg:flex-nowrap', 'sm:flex-row lg:flex-nowrap', 1),
+    ('M12', 'cordis onFocus scrollIntoView sil', C, "        onFocus={(e) => e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })}\n", '', 1),
+    ('N1', 'approvals metin w-full md:w-auto sil', A, 'space-y-2 w-full md:w-auto flex-1', 'space-y-2 flex-1', 1),
+    ('N2', 'approvals metin min-w-0 sil', A, 'flex-1 min-w-0 break-words', 'flex-1 break-words', 1),
+    ('N3', 'approvals metin break-words sil', A, 'flex-1 min-w-0 break-words', 'flex-1 min-w-0', 1),
+    ('N6', 'modal başlık min-w-0 sil', A, '<div className="min-w-0 break-words">\n                <h3', '<div className="break-words">\n                <h3', 1),
+    ('N7', 'modal başlık break-words sil', A, '<div className="min-w-0 break-words">\n                <h3', '<div className="min-w-0">\n                <h3', 1),
+    ('N9', 'fırsat başlığı w-full sm:w-auto sil', P, 'w-full sm:w-auto min-w-0 break-words', 'min-w-0 break-words', 1),
+    ('N10', 'fırsat başlığı break-words sil', P, 'w-full sm:w-auto min-w-0 break-words', 'w-full sm:w-auto min-w-0', 1),
+]
+only = sys.argv[1:]
+env = dict(os.environ, AUTH_SECRET='test-e2e-auth-secret-fixture-not-for-any-deployment')
+for mid, desc, f, old, new, count in M:
+    if only and mid not in only:
+        continue
+    src = open(f).read()
+    assert src.count(old) == count, (mid, src.count(old))
+    shutil.copy(f, '/tmp/.sefb-bak' if False else f + '.sefbbak')
+    try:
+        open(f, 'w').write(src.replace(old, new))
+        time.sleep(15)
+        out = subprocess.run(['node', '--env-file=.env', '--import', 'tsx', '.sefb/specrun.mts',
+                              'tests/e2e/mobile-main-overflow.spec.ts', 'http://localhost:3432'],
+                             capture_output=True, text=True, env=env).stdout
+        fails = [l.strip() for l in out.splitlines() if l.strip().startswith('✘')]
+        msgs = [l.strip() for l in out.splitlines() if 'px' in l and ('Received' not in l) and l.strip() and not l.strip().startswith('✓')]
+        rec = [l.strip() for l in out.splitlines() if l.strip().startswith('Received')]
+        summary = out.strip().splitlines()[-1] if out.strip() else 'NO OUTPUT'
+        verdict = 'KIRMIZI (öldü)' if fails else 'yeşil (HAYATTA)'
+        print(f'{mid:4} {desc:38} {verdict} — {summary}')
+        for fl, m, r in zip(fails, [x for x in msgs if not x.startswith('✘')], rec):
+            print(f'       {fl} :: {m} :: {r}')
+        with open(f'.sefb/mut-{mid}.log', 'w') as fh:
+            fh.write(out)
+    finally:
+        shutil.move(f + '.sefbbak', f)
+        time.sleep(15)
+time.sleep(15)

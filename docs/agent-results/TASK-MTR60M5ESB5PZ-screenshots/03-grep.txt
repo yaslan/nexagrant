@@ -1,0 +1,20 @@
+### A) scope of this card — the two files the card names
+$ grep -rn "Dr. Mehmet Yılmaz" src/modules/m10 src/lib/dual-approval.ts
+(no output — clean)
+
+### B) whole src tree — the card asked for this to be empty; it is not, and none of the rest is in my scope
+$ grep -rn "Dr. Mehmet Yılmaz" src
+src/app/[locale]/admin/blog/client.tsx:49:    authorName: 'Dr. Mehmet Yılmaz',
+src/app/[locale]/admin/blog/client.tsx:76:      authorName: 'Dr. Mehmet Yılmaz',
+src/app/[locale]/login/LoginForm.tsx:216:              <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">Dr. Mehmet Yılmaz</div>
+src/app/[locale]/login/AuthCard.tsx:323:                <div className="font-bold text-xs text-ink group-hover:text-accent transition-colors">Dr. Mehmet Yılmaz</div>
+src/lib/user-display.ts:5: * `user.name || (email?.includes('ayse') ? 'Prof. Dr. Ayşe Kaya' : 'Dr. Mehmet Yılmaz')`.
+src/lib/blog.ts:27:      name: 'Dr. Mehmet Yılmaz',
+src/lib/document-exporter.ts:128:      <span>İsim: Dr. Mehmet Yılmaz</span><br>
+src/lib/auth.ts:21:    name: "Dr. Mehmet Yılmaz",
+src/modules/m11/types.ts:107:    leadAuthor: 'Dr. Mehmet Yılmaz',
+src/modules/m11/types.ts:120:    lastModifiedBy: 'Dr. Mehmet Yılmaz',
+src/modules/m11/types.ts:216:    leadAuthor: 'Dr. Mehmet Yılmaz',
+src/modules/m11/types.ts:224:    lastModifiedBy: 'Dr. Mehmet Yılmaz',
+src/modules/m11/ui/PartBCollaborativeEditor.tsx:92:      authorName: 'Dr. Mehmet Yılmaz',
+src/modules/m11/ui/PartBCollaborativeEditor.tsx:111:  const currentUserName = 'Dr. Mehmet Yılmaz';

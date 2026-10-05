@@ -1,0 +1,53 @@
+# G1 — yalıtılmış PG16/PG17 (pgvector) doğrulaması, dal devop-fb/supabase-system-scope (a617188a)
+## PG16 CI hazırlık (db push → db:rls-role → zincir ×2 → db:rls → seed(prisma generate sonrası exit 0) → rls:verify)
+✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
+apply-migrations: 41 files applied as fabrika
+apply-migrations: 41 files applied as fabrika
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+seed exit=1
+   ℹ dolu kiracıya özel tablo yok — okuma sondası koşulmadı.
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+verify exit=0
+## PG17 CI hazırlık (db push → db:rls-role → zincir ×2 → db:rls → seed(prisma generate sonrası exit 0) → rls:verify)
+✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
+apply-migrations: 41 files applied as fabrika
+apply-migrations: 41 files applied as fabrika
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+seed exit=1
+   ℹ dolu kiracıya özel tablo yok — okuma sondası koşulmadı.
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+verify exit=0
+
+## tests/migration-owner-chain.live.test.ts (11 test)
+## PG16
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+## PG17
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+
+## Etkilenen live paketler (owner-chain düzeltme ÖNCESİ koşu; 2 hata = varsayılanı sahip yazıyordu, düzeltildi)
+######## PG16
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed | 4 passed (5)
+      Tests  2 failed | 61 passed (63)
+######## PG17
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed | 4 passed (5)
+      Tests  2 failed | 61 passed (63)
+
+## Mutasyon: redeem_agency_invite son geri yükleme satırı silindi
+     × the definer functions hand app.system_scope back to fabrika_app unchanged
+AssertionError: SELECT public.redeem_agency_invite('aaaa…'): expected 'on' not to be 'on'
+      Tests  1 failed | 10 passed (11)   → mutant ÖLDÜ, dosya geri alındı
+
+## lint / typecheck
+lint exit=0 (0 error, 8 warning — önceden var)
+typecheck exit=0
+
+## Tam vitest (PG16)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  3 failed | 311 passed | 2 skipped (316)
+      Tests  9 failed | 4200 passed | 54 skipped (4263)
+9 hata: e2e-profile-save.spec.ts, server-action-rbac-guard G6, settings-profile-update ×7
+Taban (değişikliksiz dev 26f8121c, aynı DB): aynı 3 dosya → Tests 9 failed | 63 passed — ÖNCEDEN VAR, bu değişiklikle ilgisiz.

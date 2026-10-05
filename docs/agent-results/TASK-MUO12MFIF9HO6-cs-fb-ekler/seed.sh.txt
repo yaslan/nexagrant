@@ -1,0 +1,30 @@
+#!/bin/bash
+# İNCELEME-81 seed — ONLY csfb81-pg (127.0.0.1:5481). Prints raw invitation tokens as KEY=VALUE.
+q(){ docker exec -i csfb81-pg psql -U fabrika -d fabrika -tAq -c "$1"; }
+q "delete from \"Invitation\" where id like 'cf81-%'; delete from \"Tenant\" where id like 'cf81-%'; delete from \"User\" where id like 'cf81-%'"
+q "insert into \"Tenant\"(id,name,slug,country,\"updatedAt\",\"deletedAt\") values
+ ('cf81-a','cf81 A Kurulusu','cf81-a','TR',now(),null),
+ ('cf81-b','cf81 B Kurulusu','cf81-b','TR',now(),null),
+ ('cf81-c','cf81 C Kurulusu','cf81-c','TR',now(),null),
+ ('cf81-x','cf81 GIZLI X','cf81-x','TR',now(),null),
+ ('cf81-d','cf81 SILINMIS D','cf81-d','TR',now(),now()),
+ ('cf81-y','cf81 Y','cf81-y','TR',now(),null)"
+q "insert into \"User\"(id,email,name,\"updatedAt\") values
+ ('cf81-u','cf81@fabrika.test','Cf Kullanici',now()),
+ ('cf81-v','cf81-victim@fabrika.test','Cf Kurban',now())"
+# u: owner of A (oldest), member of B, member of soft-deleted D; NOT in X or C
+q "insert into \"Membership\"(id,\"tenantId\",\"userId\",role,\"workspaceIds\",\"createdAt\") values
+ ('cf81-ma','cf81-a','cf81-u','TENANT_OWNER','{}',now()-interval '3 hour'),
+ ('cf81-mb','cf81-b','cf81-u','MEMBER','{}',now()-interval '2 hour'),
+ ('cf81-md','cf81-d','cf81-u','TENANT_OWNER','{}',now()-interval '1 hour'),
+ ('cf81-mvx','cf81-x','cf81-v','TENANT_OWNER','{}',now())"
+inv(){ # id tenant email role expiresSql acceptedSql
+  local raw=$(openssl rand -hex 32); local h=$(printf '%s' "$raw" | shasum -a 256 | cut -d' ' -f1)
+  q "insert into \"Invitation\"(id,email,\"tenantId\",role,\"tokenHash\",expires,\"acceptedAt\") values ('$1','$3','$2','$4','$h',$5,$6)"
+  echo "$1=$raw"
+}
+inv cf81-inv-c   cf81-c cf81@fabrika.test        PIPELINE_MANAGER "now()+interval '1 day'" null
+inv cf81-inv-oth cf81-x cf81-victim@fabrika.test  TENANT_ADMIN     "now()+interval '1 day'" null
+inv cf81-inv-exp cf81-x cf81@fabrika.test        TENANT_ADMIN     "now()-interval '1 minute'" null
+inv cf81-inv-rev cf81-d cf81@fabrika.test        TENANT_ADMIN     "now()+interval '1 day'" null
+inv cf81-inv-usd cf81-y cf81@fabrika.test        TENANT_ADMIN     "now()+interval '1 day'" "now()-interval '1 minute'"

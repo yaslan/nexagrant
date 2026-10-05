@@ -1,0 +1,4 @@
+     × production: throws instead of handing out the dev mock-upload URL 2ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected { …(2) } to be an instance of ObjectStoreUnconfiguredError
+      Tests  1 failed | 12 passed (13)

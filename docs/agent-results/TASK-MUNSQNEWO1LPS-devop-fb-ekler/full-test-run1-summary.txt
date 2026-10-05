@@ -1,0 +1,29 @@
+
+
+ Test Files  13 failed | 245 passed | 2 skipped (260)
+      Tests  18 failed | 3088 passed | 48 skipped (3154)
+   Start at  10:54:39
+   Duration  190.83s (transform 113.63s, setup 0ms, import 482.45s, tests 1160.24s, environment 74.54s)
+
+rc=1
+ FAIL  src/lib/billing/invoice-writer.test.ts > decomposeGrossAmount > reconstructs the charged amount exactly, for every amount and rate swept
+ FAIL  src/modules/m8/server/schema-contract.test.ts > every Prisma query in src/, prisma/ and scripts/ matches prisma/schema.prisma > keeps the known-broken field list from going stale
+ FAIL  src/modules/m8/server/schema-contract.test.ts > every Prisma query in src/, prisma/ and scripts/ matches prisma/schema.prisma > names only models, relations and columns that exist
+ FAIL  tests/agency-funnel.live.test.ts > province (TASK-MULV3JXS1AW5X, fabrika_app) > getAgencyFunnel with a province: that province over every type, masked; an empty one is all "<5"
+ FAIL  tests/agency-invite.live.test.ts > redeeming an agency invite code (fabrika_app) > no use limit: a live code works N times in a row, and the counter keeps count
+ FAIL  tests/cordis-partner-profile.live.test.ts [ tests/cordis-partner-profile.live.test.ts ]
+ FAIL  tests/invitation-accept.live.test.ts [ tests/invitation-accept.live.test.ts ]
+ FAIL  tests/m9-briefs-form-errors.test.tsx > P2-9 — a half-filled meeting date is reported, not dropped > blocks submit and explains that the time is missing
+ FAIL  tests/oauth-registration.live.test.ts [ tests/oauth-registration.live.test.ts ]
+ FAIL  tests/rag-pdf-real-parse.test.ts > B-1: page and chunk limits hold on real PDFs before any embedding call > İNCELEME-45 shape: 30 000 pages in 4.8 MB is refused in well under a second
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > B-1': the event loop keeps turning while pdf.js works on one heavy page > İNCELEME-52 shape: 20 pages sharing one compressed stream of 100 000 text operators
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > what still works > parallel uploads are extracted one at a time and all answer
+ FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a contact after the reminder starts a new 60-day period
+ FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a contact logged after the reminder but dated before it starts a new period (İNCELEME-51 B-2)
+ FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a rejected send stamps nothing for that user; the others still go out
+ FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a row that goes stale later the same day waits for tomorrow: one digest per user per day
+ FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > a worker killed after the send and before the stamp sends no second digest that day (İNCELEME-51 B-1)
+ FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > one digest per user across tenants, only the due rows, module and pilot gates held
+ FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > two runs racing for the same day send one digest (the claim is a compare-and-set)
+ FAIL  tests/vat-by-country.test.ts > vatOnNetMinor — one rounding rule for the whole system > gross is always net plus the tax, exactly, with no third number
+ FAIL  tests/withholding-rounding.test.ts > the document and the panel withhold the same amount > every net from 1 to 3000, at each VAT rate and each withholding rate

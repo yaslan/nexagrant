@@ -1,0 +1,12 @@
+--pool=forks (process.cpuUsage yalnız test süreci)
+dev SCAN_CPU_MS=1026 wall=609
+new SCAN_CPU_MS=1029 wall=612
+dev SCAN_CPU_MS=1158 wall=705
+new SCAN_CPU_MS=1134 wall=686
+dev SCAN_CPU_MS=1201 wall=787
+new SCAN_CPU_MS=1495 wall=3248
+dev SCAN_CPU_MS=1521 wall=1554
+new SCAN_CPU_MS=1484 wall=2222
+dev SCAN_CPU_MS=1482 wall=2608
+new SCAN_CPU_MS=1569 wall=2366
+18:16  up 20:29, 1 user, load averages: 20.60 19.32 18.75

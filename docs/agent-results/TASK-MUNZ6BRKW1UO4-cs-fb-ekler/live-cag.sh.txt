@@ -1,0 +1,11 @@
+#!/bin/bash
+SP=/private/tmp/claude-501/-Users-macbook-alan/8c793703-37d0-48b6-8a19-6afae265f0ee/scratchpad
+C="$(cat $SP/cookie.txt)"; CB="$(cat $SP/cookie-bob.txt)"; B=http://127.0.0.1:47979
+echo "== 5 oturumsuz istek (sayaca girmemeli):"; for i in 1 2 3 4 5; do curl -s -m 20 -o /dev/null -w '%{http_code} ' "$B/api/cagrilar?lang=en"; done; echo
+echo "== alice: 40 EŞZAMANLI istek (xargs -P 40)"
+seq 1 40 | xargs -P 40 -I{} curl -s -m 60 -o /dev/null -H "Cookie: $C" -w '%{http_code}\n' "$B/api/cagrilar?lang=en&q=x{}" > $SP/cag-codes.txt
+echo "   dağılım: $(sort $SP/cag-codes.txt | uniq -c | tr -s ' ' | tr '\n' ';')"
+echo "== alice 41. istek (başlıklar):"; curl -s -m 20 -D - -H "Cookie: $C" "$B/api/cagrilar?lang=en" | tr -d '\r' | grep -iE '^HTTP|^retry-after|^\{' ; echo
+echo "== bob (aynı kiracı, farklı kullanıcı) alice kilitliyken:"; curl -s -m 60 -o /dev/null -H "Cookie: $CB" -w '   HTTP %{http_code}\n' "$B/api/cagrilar?lang=en"
+echo "== alice ?limit=abc (400 yolu) kilitliyken:"; curl -s -m 20 -H "Cookie: $C" -w '  HTTP %{http_code}\n' "$B/api/cagrilar?limit=abc"
+echo "== harness: SEDIA/çeviri dış çağrısı engellendi sayısı (log): $(grep -c 'csfb79-harness' $SP/server.log) satır (her 10'da bir)"

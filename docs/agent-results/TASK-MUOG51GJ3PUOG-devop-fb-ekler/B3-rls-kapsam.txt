@@ -1,0 +1,42 @@
+Amaç: FORCE RLS altında süper kullanıcı olmayan rolün kapsam olmadan 0 satır gördüğünü, betiğin SET LOCAL'ı ile gerçek sayıyı gördüğünü göstermek.
+ROL_URL=postgresql://fabrika_app:fabrika_app_ci@127.0.0.1:55224/fabrika  (fabrika_app: süper değil, BYPASSRLS değil)
+$ psql "$ROL_URL" -v ON_ERROR_STOP=1 -f scripts/golive/r1-topicmatch-check.sql
+-------------+---------------------------+-------
+ demo-tenant | cmuogae0p0019e9xksz8bb8of |     2
+
+mukerrer_cift=1 fazla_satir=1
+ kontrol  |    sonuc     
+----------+--------------
+ R1_SONUC | DUR_MUKERRER
+
+ROLLBACK
+
+$ diff scripts/golive/r1-topicmatch-check.sql r1-no-scope.sql   # yalnız SET LOCAL satırı çıkarılmış kopya (scratchpad)
+16d15
+< -- Bu yüzden işlem içinde `SET LOCAL app.system_scope = 'on'` verilir: prisma/rls.sql'in `system_scope`
+36d34
+< SET LOCAL app.system_scope = 'on';
+$ psql "$ROL_URL" -v ON_ERROR_STOP=1 -f r1-no-scope.sql
+ tenantId | topicId | count 
+----------+---------+-------
+
+mukerrer_cift=0 fazla_satir=0
+ kontrol  |     sonuc      
+----------+----------------
+ R1_SONUC | NULLS_DISTINCT
+
+ROLLBACK
+
+=== RLS_KOR dalı: system_scope politikası yokken (db:rls öncesi eski RLS) süper olmayan rol
+$ psql "$DATABASE_URL" -c 'DROP POLICY system_scope ON "TopicMatch"'
+DROP POLICY
+$ psql "$ROL_URL" -v ON_ERROR_STOP=1 -f scripts/golive/r1-topicmatch-check.sql
+tablo_var=t anahtar_var=t opportunity_kolonu_var=t rls_kor=t
+mukerrer_cift=0 fazla_satir=0
+ R1_SONUC | RLS_KOR
+$ pnpm db:rls   # politikayı geri kur
+✅ prisma/rls.sql applied. Policies in public: 111 → 112
+$ psql "$ROL_URL" -v ON_ERROR_STOP=1 -f scripts/golive/r1-topicmatch-check.sql
+tablo_var=t anahtar_var=t opportunity_kolonu_var=t rls_kor=f
+mukerrer_cift=1 fazla_satir=1
+ R1_SONUC | DUR_MUKERRER

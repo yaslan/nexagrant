@@ -1,0 +1,255 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+  # Manual runs, to measure the e2e suite against another server without a commit
+  # (TASK-MULXYMNTUELIK). Pushes and PRs always use `dev`.
+  workflow_dispatch:
+    inputs:
+      e2e_server:
+        description: 'Server the e2e suite runs against (see playwright.config.ts)'
+        type: choice
+        options: [ dev, start ]
+        default: dev
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    # The `e2e_server: start` run took 99 min (TASK-MUSJ4RYVZEZ6Q); GitHub's
+    # default is 360. 120 leaves ~20% headroom and stops a hung run 4 h sooner.
+    timeout-minutes: 120
+    # Job-wide so the DB preparation, the vitest suites that hit Postgres and
+    # the e2e run all reach the same service container.
+    env:
+      DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
+      # RLS-subject role (NOSUPERUSER NOBYPASSRLS) for the live RLS suites.
+      # `pnpm db:rls-role` creates fabrika_app with this password. A throwaway
+      # service-container credential like the one above, not a secret.
+      DATABASE_URL_RLS_TEST: postgresql://fabrika_app:fabrika_app_ci@localhost:5432/fabrika
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: fabrika
+          POSTGRES_USER: fabrika
+          POSTGRES_PASSWORD: fabrika
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      # Mail catcher for the e2e step (TASK-MUVFUDZDKSMWO). The invite cooldown
+      # answers (`recently_sent`, `role_change_blocked`) only exist once a mail
+      # has really been sent; with no SMTP the server stops at "created, mail
+      # not sent" and tests/e2e/team-members-ui.spec.ts cannot reach them.
+      # Accepts anything on :1025, nothing leaves the runner; :8025 is its API.
+      # axllent/mailpit v1.31.3, pinned by digest like MinIO below.
+      mailpit:
+        image: axllent/mailpit@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+        ports:
+          - 1025:1025
+          - 8025:8025
+    steps:
+    - uses: actions/checkout@v4
+    
+    # No `version:` here: action-setup reads `packageManager` from package.json,
+    # so CI runs the same pnpm as a developer. A pinned `version: 9` could not
+    # parse pnpm-workspace.yaml (no `packages:` field) and failed the cache step.
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+
+    # pnpm 11 requires Node >= 22.13; on Node 20 it cannot start.
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: 'pnpm'
+        
+    - name: Install dependencies
+      run: pnpm install
+
+    # `pnpm exec`, not `pnpm dlx`: dlx downloads the newest prisma from the
+    # registry instead of the pinned one, and prisma 8+ has no `validate`.
+    - name: Validate Prisma schema
+      run: pnpm exec prisma validate
+
+    # `prisma generate` writes into node_modules only, so a fresh checkout has no
+    # client and `@prisma/client` resolves to src/types/prisma-override.d.ts,
+    # where the query methods are `any`. Generating first is what makes
+    # `withTenant(id, (tx) => tx.planAssignment.findMany(…))` infer a row type
+    # instead of `unknown`. It needs no database and no DATABASE_URL.
+    - name: Generate Prisma client
+      run: pnpm db:generate
+
+    # The README setup (`db:migrate && db:rls && db:seed`) for a throwaway CI
+    # database: `db push` builds the schema from schema.prisma without the
+    # interactive `migrate dev`, `db:rls` installs the tenant policies and the
+    # system-scope functions, and the seed adds the demo tenant and the module
+    # catalogue that the database-backed tests read.
+    #
+    # `db:rls-role` sits between them on purpose. It needs the tables from
+    # `db push` for its grants, and `db:rls` grants EXECUTE on
+    # enter_system_scope() to fabrika_app only if the role already exists.
+    # Created after `db:rls`, the role gets "permission denied for function
+    # enter_system_scope" and the live RLS suites fail. Without the role at all
+    # they fail with "refusing to skip in CI" (tests/helpers/live-db-role.ts).
+    #
+    # scripts/apply-migrations.sh then applies prisma/migrations in the order
+    # listed in apply-order.txt (TASK-MULU7SAA4EPP8). `db push` builds only what
+    # schema.prisma describes; SECURITY DEFINER functions (redeem_agency_invite),
+    # CHECK constraints and the per-file policies live only in the migrations,
+    # and without them tests/agency-invite.live.test.ts had nothing to measure.
+    # It runs after `db push`, not instead of it: the migrations never create
+    # the base tables (Tenant, User, …). After `db:rls-role`, so their
+    # `GRANT … TO fabrika_app` guards find the role. Twice, because re-running
+    # is how production applies them (docs/RELEASE_CHECKLIST.md §1) and the
+    # second pass is the idempotency check; either pass failing fails the job.
+    # psql comes preinstalled on ubuntu-latest.
+    - name: Prepare database
+      run: |
+        pnpm exec prisma db push
+        pnpm db:rls-role
+        psql --version
+        scripts/apply-migrations.sh
+        scripts/apply-migrations.sh
+        pnpm db:rls
+        pnpm db:seed
+
+    # Catalog-level policy drift (TASK-MUPCYOCLINGC7, crw2-fb Y-1). A system_scope
+    # policy turned back into the bare, forgeable `app.system_scope = 'on'` test
+    # in the database (mutants N4/N5) kept every vitest suite green; only this
+    # live check, which reads pg_policies and measures isolation as fabrika_app,
+    # went red. It used to run only in the local `pnpm gate`.
+    - name: Verify RLS policies (live, as fabrika_app)
+      run: pnpm rls:verify
+
+    - name: Lint
+      run: pnpm lint
+      
+    - name: Typecheck
+      run: pnpm typecheck
+      
+    # AUTH_SECRET: the live suites that drive the real Auth.js callback
+    # (oauth-registration, invitation-accept) sign and verify cookies with it.
+    # Without it they skipped themselves and the step went green having run
+    # none of their 38 tests (İNCELEME-54 Y-1); they now fail instead
+    # (requireTestEnv in tests/helpers/live-db-role.ts). A fixed test-only
+    # value like the database passwords above, not a secret, and not the key
+    # of any deployment. The e2e step sets its own (playwright.config.ts).
+    #
+    # Live-skip gate (İNCELEME-62 O-1): the JSON report is read after the run
+    # and any skipped `*.live.test.ts` test fails the step, however the skip
+    # came about (scripts/live-skip-gate.ts). `vitest run` directly, not
+    # `pnpm test --reporter=…`: pnpm would take `--reporter` as its own flag.
+    # Pinned by tests/live-skip-gate.test.ts.
+    - name: Test
+      run: |
+        pnpm exec vitest run --passWithNoTests --reporter=default --reporter=json --outputFile.json=vitest-report.json
+        pnpm exec tsx scripts/check-live-skips.ts vitest-report.json
+      env:
+        AUTH_SECRET: 'ci-vitest-auth-secret-fixture-not-for-any-deployment'
+
+    # Same reason: the browsers must match the pinned @playwright/test.
+    - name: Install Playwright browsers
+      run: pnpm exec playwright install --with-deps
+
+    # Only for a manual `e2e_server: start` run: `next start` serves this build.
+    # Its own step so the build time shows up on its own in the run summary.
+    - name: Build for E2E (next build)
+      if: ${{ inputs.e2e_server == 'start' }}
+      run: pnpm build
+
+    # S3-compatible store for the evidence specs, which upload through a real
+    # presigned PUT (TASK-MUSJ4RYVZEZ6Q); without one, `next start` refuses
+    # evidence uploads (production has no local stand-in). A `docker run` step,
+    # not `services:`: the image has no default command and a service container
+    # cannot be given `server /data`. MinIO's own images and dl.min.io are gone
+    # (Docker Hub 404, quay.io unauthorized, dl.min.io 410 on 2026-10-03), so
+    # this is Chainguard's build, pinned by digest (MinIO RELEASE.2026-09-22).
+    # minioadmin/minioadmin is a throwaway credential like the Postgres one.
+    - name: Start MinIO (test object store)
+      run: |
+        docker run -d --name minio -p 9000:9000 \
+          -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+          cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034 \
+          server /data
+        for i in $(seq 1 30); do
+          curl -sf http://localhost:9000/minio/health/live && { echo "MinIO up after ${i}s"; break; }
+          sleep 1
+        done
+        curl -sf http://localhost:9000/minio/health/live || { docker logs minio; exit 1; }
+        aws --endpoint-url http://localhost:9000 s3api head-bucket --bucket test-evidence 2>/dev/null \
+          || aws --endpoint-url http://localhost:9000 s3api create-bucket --bucket test-evidence
+        aws --endpoint-url http://localhost:9000 s3api head-bucket --bucket test-evidence
+        echo "bucket test-evidence ready"
+        # Blog images (TASK-MUU20NSV2TETW): a second bucket anyone may read,
+        # like the public bucket a deployment serves blog covers from. The
+        # evidence bucket above stays private.
+        aws --endpoint-url http://localhost:9000 s3api head-bucket --bucket test-public 2>/dev/null \
+          || aws --endpoint-url http://localhost:9000 s3api create-bucket --bucket test-public
+        aws --endpoint-url http://localhost:9000 s3api put-bucket-policy --bucket test-public --policy \
+          '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::test-public/*"]}]}'
+        echo "bucket test-public ready (anonymous read)"
+      env:
+        AWS_ACCESS_KEY_ID: minioadmin
+        AWS_SECRET_ACCESS_KEY: minioadmin
+        AWS_REGION: us-east-1
+        AWS_EC2_METADATA_DISABLED: 'true'
+
+    # R2_* only here, not job-wide: the vitest suites import storage.ts and
+    # some (evidence-dev-store.live) need the local stand-in; the S3 live suites
+    # read EVIDENCE_S3_TEST_* instead. R2_ACCOUNT_ID only switches the client on;
+    # R2_ENDPOINT sends it to MinIO.
+    - name: E2E Test
+      run: pnpm test:e2e
+      env:
+        CI: 'true'
+        E2E_WEB_SERVER: ${{ inputs.e2e_server || 'dev' }}
+        R2_ACCOUNT_ID: 'ci-minio'
+        R2_ENDPOINT: 'http://localhost:9000'
+        R2_ACCESS_KEY_ID: 'minioadmin'
+        R2_SECRET_ACCESS_KEY: 'minioadmin'
+        R2_BUCKET: 'test-evidence'
+        R2_PUBLIC_BUCKET: 'test-public'
+        R2_PUBLIC_HOST: 'http://localhost:9000/test-public'
+        # OAuth placeholder env for E2E auth tests (tests render button only, no real Google interaction)
+        AUTH_GOOGLE_ID: 'ci-placeholder-id.apps.googleusercontent.com'
+        AUTH_GOOGLE_SECRET: 'ci-placeholder-google-secret'
+        AUTH_SECRET: 'ci-placeholder-secret-for-nextauth-at-least-32-chars-1234'
+        AUTH_URL: 'http://localhost:3000'
+        NEXTAUTH_URL: 'http://localhost:3000'
+        AUTH_TRUST_HOST: 'true'
+        # The mailpit service above; E2E_MAILPIT_URL turns on the inbox check.
+        # An invitation mail needs a base URL for its link and is not sent
+        # without one. The dev server falls back to this same origin anyway,
+        # so it changes nothing else (a `start` run refuses loopback here).
+        SMTP_HOST: 'localhost'
+        SMTP_PORT: '1025'
+        E2E_MAILPIT_URL: 'http://localhost:8025'
+        NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
+        # Invoice test data
+        INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.'
+        INVOICE_SUPPLIER_VKN: '1000000000'
+        INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD'
+        INVOICE_SUPPLIER_ADDRESS: 'TEST CAD NO:1'
+        INVOICE_SUPPLIER_CITY: 'Ankara'
+
+    # trace: 'retain-on-failure' (playwright.config.ts) writes a trace.zip per failed
+    # test into test-results/, and the HTML report into playwright-report/; without this
+    # step they died with the runner and a CI timeout could not be looked into
+    # (TASK-MULXYMNTUELIK). `gh run download <run-id> -n e2e-results-<run-id>-<attempt>`.
+    - name: Upload E2E traces and report
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-results-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |
+          test-results/
+          playwright-report/
+        if-no-files-found: ignore
+        retention-days: 14

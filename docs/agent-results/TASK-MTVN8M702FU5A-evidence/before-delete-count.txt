@@ -1,0 +1,12 @@
+toplam SystemAlert satırı            : 320
+  source ∈ {test-module, test-worker, test-api}   : 286
+  message 'truncation testing' içeren (source hariç yukarıdakiler) : 0
+  TEST İMZALI TOPLAM (silinecek)      : 286
+  test-imzasız kalan                  : 34
+
+kaynağa göre dağılım:
+   •   96  test-module
+   •   95  test-api
+   •   95  test-worker
+
+en eski: 2026-09-10T11:47:38.910Z  en yeni: 2026-09-10T11:47:38.910Z
