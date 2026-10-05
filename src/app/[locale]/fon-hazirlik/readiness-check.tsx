@@ -59,15 +59,15 @@ export default function ReadinessCheck({ locale, shared }: ReadinessCheckProps) 
   const [error, setError] = useState<string | null>(null);
   const [isShared, setIsShared] = useState(shared !== null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const firstRender = useRef(true);
+  const shownPhase = useRef(phase);
 
   // Move focus to the new heading on every screen change (not on first paint), so a
-  // keyboard or screen-reader user lands at the top of the new step.
+  // keyboard or screen-reader user lands at the top of the new step. Compared against
+  // the phase last shown, not a first-run flag: StrictMode runs this effect twice on
+  // mount, and a flag let the second run scroll a freshly loaded shared result to top.
   useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
+    if (shownPhase.current === phase) return;
+    shownPhase.current = phase;
     headingRef.current?.focus();
     window.scrollTo({ top: 0 });
   }, [phase]);
