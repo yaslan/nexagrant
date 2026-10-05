@@ -127,28 +127,28 @@ export default async function PersonDaysReportPage({
         </div>
       )}
 
-      <div className="bg-surface rounded-lg shadow-sm border border-border overflow-hidden mb-8">
-        <div className="p-4 bg-ground border-b border-border flex justify-between items-center">
+      <div className="bg-surface rounded-lg shadow-sm border border-border overflow-hidden mb-8 min-w-0">
+        <div className="p-3 sm:p-4 bg-ground border-b border-border flex flex-wrap gap-3 justify-between items-center sm:items-center">
           <div className="flex gap-2">
             <span className="px-4 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white">
               {isTr ? 'Fırsata Göre' : 'By Opportunity'}
             </span>
           </div>
-          <div className="text-sm font-medium text-ink-2">
+          <div className="text-xs sm:text-sm font-medium text-ink-2 whitespace-nowrap">
             {isTr ? 'Toplam' : 'Total'}: {totalHours} {isTr ? 'saat' : 'hours'} (
             {toPersonDays(totalHours).toFixed(1)} {isTr ? 'AG' : 'PDs'})
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm min-w-[500px]">
+          <table className="w-full text-left text-sm">
             <thead className="bg-surface border-b border-border text-muted uppercase tracking-wider text-xs">
               <tr>
-                <th className="px-6 py-3 font-semibold">{isTr ? 'Fırsat' : 'Opportunity'}</th>
-                <th className="px-6 py-3 font-semibold text-right">
+                <th className="px-3 sm:px-6 py-3 font-semibold">{isTr ? 'Fırsat' : 'Opportunity'}</th>
+                <th className="px-3 sm:px-6 py-3 font-semibold text-right whitespace-nowrap">
                   {isTr ? 'Toplam Saat' : 'Total Hours'}
                 </th>
-                <th className="px-6 py-3 font-semibold text-right">
+                <th className="px-3 sm:px-6 py-3 font-semibold text-right whitespace-nowrap">
                   {isTr ? 'Adam-Gün' : 'Person-Days'}
                 </th>
               </tr>
@@ -156,7 +156,7 @@ export default async function PersonDaysReportPage({
             <tbody className="divide-y divide-border">
               {groupedData.map((row) => (
                 <tr key={row.opportunityId} className="hover:bg-ground">
-                  <td className="px-6 py-4 text-ink font-medium">
+                  <td className="px-3 sm:px-6 py-4 text-ink font-medium [overflow-wrap:anywhere]">
                     {/* Was `../pipeline/mock_id` — a link to nothing. */}
                     <Link
                       href={`${getWorkspaceRoute('pipeline', locale, workspace)}/${row.opportunityId}`}
@@ -165,8 +165,8 @@ export default async function PersonDaysReportPage({
                       {row.title}
                     </Link>
                   </td>
-                  <td className="px-6 py-4 text-ink text-right">{row.hours}</td>
-                  <td className="px-6 py-4 text-ink font-semibold text-right">
+                  <td className="px-3 sm:px-6 py-4 text-ink text-right text-sm whitespace-nowrap">{row.hours}</td>
+                  <td className="px-3 sm:px-6 py-4 text-ink font-semibold text-right text-sm whitespace-nowrap">
                     {toPersonDays(row.hours).toFixed(1)}
                   </td>
                 </tr>
