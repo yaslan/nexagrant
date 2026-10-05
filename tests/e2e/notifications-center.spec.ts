@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { withSystemScope } from '@/lib/system-scope';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 import { shotsDir } from './fixtures/shots';
+import { requireId } from '../helpers/teardown-guard';
 
 /**
  * TASK-MUU7678DFI9QF — notification center (bell in the app shell + the
@@ -81,8 +82,9 @@ test.afterAll(async () => {
   await cleanupIdentity([A.userId, B.userId]);
   await withSystemScope('platform-admin', 'e2e.notif.cleanup', async (tx) => {
     for (const u of [A, B]) {
-      await tx.workspace.deleteMany({ where: { tenantId: u.tenantId } });
-      await tx.tenant.deleteMany({ where: { id: u.tenantId } });
+      const tenantId = requireId(u.tenantId, 'tenantId');
+      await tx.workspace.deleteMany({ where: { tenantId } });
+      await tx.tenant.deleteMany({ where: { id: tenantId } });
     }
   });
 });
