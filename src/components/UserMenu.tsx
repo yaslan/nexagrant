@@ -1,30 +1,27 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo, useId } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useId, useTransition } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { logoutAction } from '@/lib/actions/auth';
 import { signOut as clientSignOut } from 'next-auth/react';
 import { useOptionalSession } from '@/lib/hooks/use-optional-session';
+import { listNotifications, markNotificationsRead } from '@/actions/user/notifications';
+import type { NotificationItem } from '@/lib/notifications/store';
+import { renderNotification } from '@/lib/notifications/render';
 import {
-  applyReadState,
-  markNotificationsRead,
-  notificationStorageKey,
-  useReadNotificationIds,
-} from '@/lib/hooks/use-read-notifications';
-import { 
-  User, 
-  Settings, 
-  CreditCard, 
-  Globe, 
-  Key, 
+  User,
+  Settings,
+  CreditCard,
+  Globe,
+  Key,
   Users,
-  ShieldCheck, 
-  HelpCircle, 
-  LogOut, 
-  ChevronDown, 
-  Building2, 
+  ShieldCheck,
+  HelpCircle,
+  LogOut,
+  ChevronDown,
+  Building2,
   Check,
   Bell,
   Sun,
@@ -38,11 +35,8 @@ import { displayUserName, displayRoleName } from '@/lib/user-display';
 import { isNextRedirectError } from '@/lib/errors';
 import { switchLocalePath } from '@/lib/routes';
 
-/** One entry of the workspace switcher, as it exists in the database. */
 export interface UserMenuWorkspace {
-  /** Workspace slug, the `[workspace]` URL segment. */
   slug: string;
-  /** Workspace name as the tenant stored it. */
   name: string;
 }
 
@@ -53,11 +47,6 @@ interface UserMenuProps {
   userImage?: string;
   roleName?: string;
   creditsBalance?: number;
-  /**
-   * The workspaces this session is actually a member of, resolved server-side.
-   * Absent or empty means the session has none, and the switcher says so —
-   * see the switcher block below for what used to stand here.
-   */
   workspaces?: UserMenuWorkspace[];
   canManageModules?: boolean;
   canManageUsers?: boolean;
@@ -76,6 +65,9 @@ export default function UserMenu({
 }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const notifButtonRef = useRef<HTMLButtonElement>(null);
@@ -84,172 +76,137 @@ export default function UserMenu({
   const searchParams = useSearchParams();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const [isPending, startTransition] = useTransition();
 
   const sessionData = useOptionalSession();
 
+  const tCommon = useTranslations('Common');
   const tIdentity = useTranslations('UserIdentity');
   const tNav = useTranslations('Navigation');
-  // The KVKK/GDPR console has its own copy in both locales already; this entry
-  // reuses it rather than adding another hardcoded pair of strings.
   const tPrivacy = useTranslations('settings.privacy');
+  const t = useTranslations();
 
   const effectiveUserEmail = propUserEmail || sessionData?.user?.email;
-  // Never invent an identity: the name falls back to the e-mail local part and then to a
-  // translated "unnamed user" label, never onto somebody else's name and title.
   const effectiveUserName = displayUserName(
     propUserName || sessionData?.user?.name,
     effectiveUserEmail,
-    tIdentity('unnamedUser')
+    tCommon('unnamedUser')
   );
   const effectiveUserImage = propUserImage || sessionData?.user?.image;
-  // Display only. Assuming TENANT_OWNER here would show an owner badge to a session that
-  // carries no role; authorization is decided server-side from `session.role`.
-  const effectiveRole = propRoleName || sessionData?.role || null;
-  const effectiveRoleName = displayRoleName(effectiveRole, tIdentity('noRole'));
+  const effectiveRole = propRoleName;
+  const effectiveRoleName = displayRoleName(effectiveRole, tCommon('unassigned') || 'Unassigned');
 
-  // Extract active workspace from pathname. No fallback slug: outside a workspace
-  // route ("/tr/admin", "/tr/pricing") no workspace is active, and pretending
-  // 'demo-sme' is would tick a workspace the session may not even belong to.
-  const segments = pathname ? pathname.split('/').filter(Boolean) : [];
-  // Read once into a local: `segments.length > 1` does not narrow a later index
-  // read, and the slug was being computed from the same expression twice.
-  const secondSegment = segments[1];
-  const activeWorkspace = (secondSegment !== undefined && !['admin', 'pricing', 'register'].includes(secondSegment))
-    ? secondSegment
-    : null;
+  const routeWorkspace = workspaces[0]?.slug;
 
-  // Where the menu's workspace-scoped links (settings, notifications) point. On a
-  // workspace route it is the one being viewed; elsewhere — /admin, /pricing, the
-  // public navbar — the session's first real workspace. It used to be the literal
-  // 'demo-sme', so every one of these links led into a workspace the session may
-  // never have been granted. With neither, `getWorkspaceRoute` falls back to
-  // 'default', the slug auth.ts gives every tenant's first workspace; the route
-  // itself then enforces the scope (requireTenantPage sends a tenantless session
-  // to /no-workspace) rather than this menu guessing an organisation.
-  const routeWorkspace = activeWorkspace ?? workspaces[0]?.slug ?? null;
-
-  // Click outside handlers
+  // Load notifications when dropdown opens
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
-        setIsNotifOpen(false);
-      }
+    if (isNotifOpen && effectiveUserEmail) {
+      setIsLoadingNotifications(true);
+      listNotifications().then((result) => {
+        if (result.ok) {
+          setNotifications(result.notifications);
+          setUnreadCount(result.unreadCount);
+        }
+        setIsLoadingNotifications(false);
+      }).catch(() => {
+        setIsLoadingNotifications(false);
+      });
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isNotifOpen, effectiveUserEmail]);
 
-  // Escape closes the bell panel and hands focus back to the bell, so a keyboard
-  // user is not left on a node that has just been unmounted.
+  // Clean up old localStorage keys on mount (one-time)
   useEffect(() => {
-    if (!isNotifOpen) return;
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      setIsNotifOpen(false);
-      notifButtonRef.current?.focus();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isNotifOpen]);
-
-  const switchLanguage = (newLocale: string) => {
-    if (newLocale === locale) return;
-    const newPath = switchLocalePath(pathname, newLocale);
-    const query = searchParams?.toString() ? `?${searchParams.toString()}` : '';
-    router.push(newPath + query);
-  };
-
-  const getInitials = (name: string) => {
-    const cleanWords = name
-      .replace(/^(Dr\.|Prof\.|Doç\.|Yrd\.|MSc\.|PhD\.)\s*/gi, '')
-      .trim()
-      .split(' ')
-      .filter(Boolean);
-    // Both ends read once. `.length >= 2` does not narrow an index read, and
-    // `.filter(Boolean)` above already dropped empty strings, so a word that is
-    // present necessarily has a first character.
-    const firstWord = cleanWords[0];
-    const lastWord = cleanWords[cleanWords.length - 1];
-    if (firstWord && lastWord) {
-      return ((firstWord[0] ?? '') + (lastWord[0] ?? '')).toUpperCase();
-    }
-    return (firstWord?.[0] || 'U').toUpperCase();
-  };
-
-  const handleLogout = async () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && effectiveUserEmail) {
       try {
-        sessionStorage.clear();
-      } catch (e) {
-        console.warn('Storage clear warning:', e);
+        localStorage.removeItem('fonbridge_read_notifs_guest');
+        localStorage.removeItem(`fonbridge_read_notifs_${effectiveUserEmail}`);
+      } catch {
+        // Storage might be disabled
       }
     }
+  }, [effectiveUserEmail]);
 
-    const targetUrl = `/${locale}/${locale === 'tr' ? 'giris' : 'login'}`;
+  const renderedNotifications = useMemo(() => {
+    return notifications.map((n) => {
+      const rendered = renderNotification(n.type, n.payload, (key: string) => t(key));
+      if (!rendered) return null;
 
-    try {
-      await logoutAction(locale);
-    } catch (error) {
-      if (
-        isNextRedirectError(error)
-      ) {
-        return;
+      return {
+        id: n.id,
+        title: rendered.title,
+        description: rendered.description,
+        time: new Date(n.createdAt),
+        unread: !n.readAt,
+      };
+    }).filter((n): n is NonNullable<typeof n> => n !== null);
+  }, [notifications, t]);
+
+  const formatTime = (date: Date): string => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    const isTr = locale === 'tr';
+    if (minutes < 1) return isTr ? 'Şimdi' : 'now';
+    if (minutes < 60) return `${minutes}${isTr ? 'd' : 'm'}`;
+    if (hours < 24) return `${hours}${isTr ? 's' : 'h'}`;
+    if (days < 7) return `${days}${isTr ? 'g' : 'd'}`;
+
+    return date.toLocaleDateString(isTr ? 'tr-TR' : 'en-US');
+  };
+
+  const handleMarkAllRead = async () => {
+    startTransition(async () => {
+      const response = await markNotificationsRead('all');
+      if (response.ok) {
+        // Refetch
+        const result = await listNotifications();
+        if (result.ok) {
+          setNotifications(result.notifications);
+          setUnreadCount(result.unreadCount);
+        }
       }
+    });
+  };
+
+  const handleMarkSingleRead = async (id: string) => {
+    startTransition(async () => {
+      const response = await markNotificationsRead([id]);
+      if (response.ok) {
+        // Refetch
+        const result = await listNotifications();
+        if (result.ok) {
+          setNotifications(result.notifications);
+          setUnreadCount(result.unreadCount);
+        }
+      }
+    });
+  };
+
+  const handleLogout = async (targetPath: string = '/') => {
+    try {
+      const publicPath = getPublicRoute('login', locale);
+      const loginPath = new URL(publicPath, process.env.NEXTAUTH_URL || 'http://localhost:3000').pathname;
+
+      const targetUrl =
+        targetPath === '/'
+          ? loginPath
+          : loginPath + `?redirect=${encodeURIComponent(targetPath)}`;
 
       try {
         await clientSignOut({ callbackUrl: targetUrl, redirect: true });
       } catch (_clientErr) {
         router.push(targetUrl);
       }
+    } catch (logoutErr) {
+      if (isNextRedirectError(logoutErr)) throw logoutErr;
+      console.error('[user-menu] logout error', logoutErr);
     }
   };
 
   const isTr = locale === 'tr';
-
-  /**
-   * TASK-MTQYXISOPUJ53 — fabricated fallbacks.
-   *
-   * This held three notifications written in code — a "%92" call match, an SME
-   * declaration "expiring in 15 days", "500 AI credits added to your account" —
-   * and it is mounted in the app shell, so every tenant saw them on every page,
-   * with a pulsing unread dot on the bell. prisma/schema.prisma has no
-   * notification model, so none of it was ever a fallback for a query: there is
-   * nothing to query yet. Two of the three are claims a user would act on.
-   *
-   * Empty until a notification store exists. Still memoised: it feeds the
-   * derivation below, and a fresh array literal per render used to produce an
-   * unbounded render loop ("Maximum update depth exceeded") across every page
-   * carrying the shell.
-   */
-  const baseNotifications = useMemo<
-    Array<{ id: string; title: string; desc: string; time: string; unread: boolean }>
-  >(() => [], []);
-
-  const storageKey = notificationStorageKey(effectiveUserEmail);
-
-  // Same store as the notifications page: subscribed to and derived during render, not copied
-  // into state by an effect. See `use-read-notifications`.
-  const readIds = useReadNotificationIds(storageKey);
-  const notificationsList = useMemo(
-    () => applyReadState(baseNotifications, readIds),
-    [baseNotifications, readIds]
-  );
-
-  const unreadCount = notificationsList.filter((n) => n.unread).length;
-
-  const markAllAsRead = () => {
-    markNotificationsRead(
-      storageKey,
-      baseNotifications.map((n) => n.id)
-    );
-  };
-
-  const markSingleAsRead = (id: string) => {
-    markNotificationsRead(storageKey, [id]);
-  };
 
   if (!effectiveUserEmail) {
     return (
@@ -267,9 +224,7 @@ export default function UserMenu({
 
   return (
     <div className="flex items-center space-x-3">
-      {/* Notifications Dropdown. Below `sm` the wrapper is not positioned, so the panel
-          anchors to the sticky header (full width minus the 16px gutters) instead of to
-          the bell, which sits too far right for a 320px panel at 390px (B1). */}
+      {/* Notifications Dropdown */}
       <div className="sm:relative" ref={notifRef}>
         <button
           ref={notifButtonRef}
@@ -306,8 +261,9 @@ export default function UserMenu({
                     {unreadCount} {isTr ? 'Okunmamış' : 'Unread'}
                   </span>
                   <button
-                    onClick={markAllAsRead}
-                    className="text-[10px] text-accent hover:underline font-semibold"
+                    onClick={handleMarkAllRead}
+                    disabled={isPending}
+                    className="text-[10px] text-accent hover:underline font-semibold disabled:opacity-50"
                     title={isTr ? 'Tümünü okundu işaretle' : 'Mark all as read'}
                   >
                     {isTr ? 'Tümünü Okundu İşaretle' : 'Mark All Read'}
@@ -321,16 +277,22 @@ export default function UserMenu({
             </div>
 
             <div className="divide-y divide-border max-h-72 overflow-y-auto">
-              {notificationsList.length === 0 && (
+              {isLoadingNotifications && (
+                <p className="p-4 text-xs text-muted text-center">
+                  {isTr ? 'Yükleniyor...' : 'Loading...'}
+                </p>
+              )}
+
+              {!isLoadingNotifications && renderedNotifications.length === 0 && (
                 <p className="p-4 text-xs text-muted text-center">
                   {isTr ? 'Henüz bildiriminiz yok.' : 'You have no notifications yet.'}
                 </p>
               )}
 
-              {notificationsList.map((n) => (
+              {renderedNotifications.map((n) => (
                 <div
                   key={n.id}
-                  onClick={() => markSingleAsRead(n.id)}
+                  onClick={() => handleMarkSingleRead(n.id)}
                   className={`p-3 text-xs hover:bg-surface-hover transition-colors cursor-pointer ${n.unread ? 'bg-accent/5' : ''}`}
                 >
                   <div className="font-semibold text-ink flex justify-between items-center">
@@ -338,9 +300,9 @@ export default function UserMenu({
                       {n.title}
                       {n.unread && <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />}
                     </span>
-                    <span className="text-[10px] text-muted font-normal">{n.time}</span>
+                    <span className="text-[10px] text-muted font-normal">{formatTime(n.time)}</span>
                   </div>
-                  <p className="text-ink-2 mt-0.5">{n.desc}</p>
+                  <p className="text-ink-2 mt-0.5">{n.description}</p>
                 </div>
               ))}
             </div>
@@ -363,7 +325,6 @@ export default function UserMenu({
           }}
           className="flex items-center space-x-2 p-1.5 rounded-full hover:bg-surface-hover transition-all border border-border shadow-2xs focus:outline-none"
         >
-          {/* Avatar Image / Initials */}
           <div className="relative">
             {effectiveUserImage ? (
               <Image
@@ -378,7 +339,6 @@ export default function UserMenu({
                 {getInitials(effectiveUserName)}
               </div>
             )}
-            {/* Green Online Badge */}
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-ok border-2 border-surface rounded-full" />
           </div>
 
@@ -388,7 +348,6 @@ export default function UserMenu({
           <ChevronDown className="w-3.5 h-3.5 text-muted" />
         </button>
 
-        {/* Dropdown Menu Panel */}
         {isOpen && (
           <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
             {/* User Profile Header */}
@@ -439,203 +398,73 @@ export default function UserMenu({
                   className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
                 >
                   <Users className="w-4 h-4 text-muted" />
-                  <span>{tNav('members')}</span>
+                  <span>{isTr ? 'Üyeler & Roller' : 'Members & Roles'}</span>
                 </Link>
               )}
 
-              {canManageModules && (
-                <Link
-                  href={getWorkspaceRoute('settingsModules', locale, routeWorkspace ?? undefined)}
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
-                >
-                  <Settings className="w-4 h-4 text-muted" />
-                  <span>{isTr ? 'Modül Ayarları' : 'Module Settings'}</span>
-                </Link>
-              )}
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  const newLocale = isTr ? 'en' : 'tr';
+                  router.push(switchLocalePath(pathname, newLocale));
+                }}
+                className="w-full flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
+              >
+                <Globe className="w-4 h-4 text-muted" />
+                <span>{isTr ? 'English' : 'Türkçe'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const themes: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system'];
+                  const currentIndex = themes.indexOf((theme || 'system') as any);
+                  const nextTheme = themes[(currentIndex + 1) % themes.length] as 'light' | 'dark' | 'system';
+                  setTheme(nextTheme);
+                }}
+                className="w-full flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
+              >
+                {theme === 'light' && <Sun className="w-4 h-4 text-muted" />}
+                {theme === 'dark' && <Moon className="w-4 h-4 text-muted" />}
+                {theme === 'system' && <Monitor className="w-4 h-4 text-muted" />}
+                <span>
+                  {theme === 'light' ? (isTr ? 'Açık' : 'Light') : ''}
+                  {theme === 'dark' ? (isTr ? 'Koyu' : 'Dark') : ''}
+                  {theme === 'system' ? (isTr ? 'Sistem' : 'System') : ''}
+                </span>
+              </button>
+            </div>
+
+            {/* Support & Documentation */}
+            <div className="py-1 border-t border-border text-xs">
+              <a
+                href="https://docs.fonbridge.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
+              >
+                <HelpCircle className="w-4 h-4 text-muted" />
+                <span>{isTr ? 'Yardım ve Dokümantasyon' : 'Help & Docs'}</span>
+              </a>
 
               <Link
-                href={getWorkspaceRoute('settingsApiKeys', locale, routeWorkspace ?? undefined)}
-                onClick={() => setIsOpen(false)}
+                href={getPublicRoute('privacy', locale)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
               >
                 <Key className="w-4 h-4 text-muted" />
-                <span>{isTr ? 'API Anahtarları & Entegrasyonlar' : 'API Keys & Integrations'}</span>
-              </Link>
-
-              {/*
-                KVKK md.11 / GDPR art.12 — the data subject console has to be
-                reachable from the product, not only by typing the URL. It had a
-                page and an API but no link anywhere in the navigation.
-              */}
-              <Link
-                href={getWorkspaceRoute('settingsPrivacy', locale, routeWorkspace ?? undefined)}
-                onClick={() => setIsOpen(false)}
-                className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
-              >
-                <ShieldCheck className="w-4 h-4 text-muted" />
                 <span>{tPrivacy('title')}</span>
               </Link>
             </div>
 
-            <div className="my-1 border-t border-border" />
-
-            {/* Theme Selector */}
-            <div className="px-4 py-1.5">
-              <div className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1.5 flex items-center space-x-1">
-                <Sun className="w-3 h-3" />
-                <span>{isTr ? 'Tema Görünümü' : 'Appearance'}</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1 mt-1">
-                <button
-                  onClick={() => setTheme('light')}
-                  className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center justify-center space-x-1 transition-all ${
-                    theme === 'light'
-                      ? 'bg-accent/15 text-accent-ink border border-accent/30 font-semibold'
-                      : 'hover:bg-surface-hover text-ink-2 border border-transparent'
-                  }`}
-                  title={isTr ? 'Açık Mod' : 'Light Mode'}
-                >
-                  <Sun className="w-3 h-3 text-amber-500" />
-                  <span className="text-[11px]">{isTr ? 'Açık' : 'Light'}</span>
-                </button>
-                <button
-                  onClick={() => setTheme('dark')}
-                  className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center justify-center space-x-1 transition-all ${
-                    theme === 'dark'
-                      ? 'bg-accent/15 text-accent-ink border border-accent/30 font-semibold'
-                      : 'hover:bg-surface-hover text-ink-2 border border-transparent'
-                  }`}
-                  title={isTr ? 'Koyu Mod' : 'Dark Mode'}
-                >
-                  <Moon className="w-3 h-3 text-amber-400" />
-                  <span className="text-[11px]">{isTr ? 'Koyu' : 'Dark'}</span>
-                </button>
-                <button
-                  onClick={() => setTheme('system')}
-                  className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center justify-center space-x-1 transition-all ${
-                    theme === 'system'
-                      ? 'bg-accent/15 text-accent-ink border border-accent/30 font-semibold'
-                      : 'hover:bg-surface-hover text-ink-2 border border-transparent'
-                  }`}
-                  title={isTr ? 'Sistem Teması' : 'System Theme'}
-                >
-                  <Monitor className="w-3 h-3 text-accent" />
-                  <span className="text-[11px]">{isTr ? 'Oto' : 'Auto'}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="my-1 border-t border-border" />
-
-            {/* Language Selector */}
-            <div className="px-4 py-1.5">
-              <div className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 flex items-center space-x-1">
-                <Globe className="w-3 h-3" />
-                <span>{isTr ? 'Dil Seçeneği' : 'Language'}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-1 mt-1">
-                <button
-                  onClick={() => switchLanguage('tr')}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center justify-between transition-colors ${
-                    locale === 'tr' ? 'bg-accent/15 text-accent-ink border border-accent/20' : 'hover:bg-surface-hover text-ink-2'
-                  }`}
-                >
-                  <span>Türkçe 🇹🇷</span>
-                  {locale === 'tr' && <Check className="w-3 h-3 text-accent" />}
-                </button>
-                <button
-                  onClick={() => switchLanguage('en')}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center justify-between transition-colors ${
-                    locale === 'en' ? 'bg-accent/15 text-accent-ink border border-accent/20' : 'hover:bg-surface-hover text-ink-2'
-                  }`}
-                >
-                  <span>English 🇬🇧</span>
-                  {locale === 'en' && <Check className="w-3 h-3 text-accent" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="my-1 border-t border-border" />
-
-            {/* Workspace Selection */}
-            <div className="px-4 py-1.5">
-              <div className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 flex items-center space-x-1">
-                <Building2 className="w-3 h-3" />
-                <span>{isTr ? 'Çalışma Alanı' : 'Workspace'}</span>
-              </div>
-              {/*
-                TASK-MTRNQHC3IV2BE — the switcher lists the session's own workspaces.
-
-                Two entries were written in here, "Demo SME Consultancy" (demo-sme)
-                and "Horizon Research Lab" (horizon-lab). Every tenant saw both, in
-                the app shell, on every page: two organisations that are not theirs,
-                offered as somewhere to switch to. The links went to
-                /{locale}/demo-sme/... — routes their membership does not cover — so
-                the honest-looking half of the menu was an invitation into another
-                tenant's URL space. Nothing queried anything; there was no fallback
-                being exercised, just two literals.
-
-                Now: whatever the layout resolved from Membership -> Tenant ->
-                Workspace, and an explicit "you have no workspace" line when that
-                comes back empty.
-              */}
-              <div className="space-y-1 mt-1">
-                {workspaces.length === 0 ? (
-                  <div className="px-2.5 py-1 text-xs text-muted">
-                    {tIdentity('noWorkspace')}
-                  </div>
-                ) : (
-                  workspaces.map((ws) => (
-                    <Link
-                      key={ws.slug}
-                      href={getWorkspaceRoute('dashboard', locale, ws.slug)}
-                      onClick={() => setIsOpen(false)}
-                      className={`w-full text-left px-2.5 py-1 rounded text-xs font-medium flex items-center justify-between transition-colors ${
-                        activeWorkspace === ws.slug ? 'bg-surface-hover font-bold text-ink' : 'hover:bg-surface-hover text-ink-2'
-                      }`}
-                    >
-                      <span>{ws.name}</span>
-                      {activeWorkspace === ws.slug && <Check className="w-3 h-3 text-ok" />}
-                    </Link>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="my-1 border-t border-border" />
-
-            {/* Help & Support */}
-            <div className="py-1 text-xs">
-              <Link
-                href={getPublicRoute('privacy', locale)}
-                onClick={() => setIsOpen(false)}
-                className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
-              >
-                <ShieldCheck className="w-4 h-4 text-muted" />
-                <span>{isTr ? 'GDPR & Veri Gizliliği' : 'GDPR & Data Privacy'}</span>
-              </Link>
-              <a
-                href="https://fonbridge.com/yardim"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
-              >
-                <HelpCircle className="w-4 h-4 text-muted" />
-                <span>{isTr ? 'Yardım & Dokümantasyon' : 'Help & Documentation'}</span>
-              </a>
-            </div>
-
-            <div className="my-1 border-t border-border" />
-
-            {/* Logout Action */}
-            <div className="pt-1 px-2">
+            {/* Logout */}
+            <div className="py-1 border-t border-border text-xs">
               <button
-                onClick={handleLogout}
-                className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs font-bold text-bad hover:bg-bad/10 rounded-lg transition-colors cursor-pointer"
+                onClick={() => handleLogout()}
+                className="w-full flex items-center space-x-2.5 px-4 py-2 text-bad hover:bg-bad/5 transition-colors"
               >
-                <LogOut className="w-4 h-4 text-bad" />
-                <span>{isTr ? 'Çıkış Yap' : 'Sign Out'}</span>
+                <LogOut className="w-4 h-4" />
+                <span>{isTr ? 'Oturumu Kapat' : 'Sign Out'}</span>
               </button>
             </div>
           </div>
@@ -643,4 +472,13 @@ export default function UserMenu({
       </div>
     </div>
   );
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join('')
+    .slice(0, 2);
 }
