@@ -81,7 +81,7 @@ async function seed(): Promise<Fixture> {
 async function cleanup(fx: Fixture | undefined) {
   if (!fx) return;
   await withSystemScope('platform-admin', 'e2e.person-days-390.cleanup', async (tx) => {
-    const where = { tenantId: fx.tenantId };
+    const where = { tenantId: requireId(fx.tenantId, 'tenantId') };
     await tx.effort.deleteMany({ where });
     await tx.opportunity.deleteMany({ where });
     await tx.membership.deleteMany({ where });
@@ -89,7 +89,7 @@ async function cleanup(fx: Fixture | undefined) {
     await tx.subscription.deleteMany({ where });
     await tx.workspace.deleteMany({ where });
     await tx.user.deleteMany({ where: { id: { startsWith: requireId(fx.stamp, 'stamp') } } });
-    await tx.tenant.deleteMany({ where: { id: fx.tenantId } });
+    await tx.tenant.deleteMany({ where: { id: requireId(fx.tenantId, 'tenantId') } });
   });
 }
 
