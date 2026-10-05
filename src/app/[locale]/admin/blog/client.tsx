@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 // blog-shared, not blog: this is a client component and @/lib/blog reaches Prisma.
@@ -66,6 +66,7 @@ export default function AdminBlogClient({
   const [posts, setPosts] = useState<BlogPost[]>(initialPosts);
   const [notice, setNotice] = useState<Notice>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const formErrorRef = useRef<HTMLDivElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -92,6 +93,13 @@ export default function AdminBlogClient({
   });
 
   const categories = Array.from(new Set(posts.map((p) => p.category)));
+
+  useEffect(() => {
+    if (formError && formErrorRef.current) {
+      formErrorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      formErrorRef.current.focus();
+    }
+  }, [formError]);
 
   const filteredPosts = posts.filter((p) => {
     const matchesSearch = 
@@ -481,7 +489,13 @@ export default function AdminBlogClient({
             {/* Modal Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
               {formError && (
-                <div role="alert" data-testid="blog-form-error" className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-xs font-semibold text-bad">
+                <div
+                  ref={formErrorRef}
+                  role="alert"
+                  data-testid="blog-form-error"
+                  className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-xs font-semibold text-bad"
+                  tabIndex={-1}
+                >
                   {formError}
                 </div>
               )}
