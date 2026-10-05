@@ -83,6 +83,8 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
   let b: Fixture;
   let ready = false;
   let skipReason = '';
+  /** Users made by single tests, removed with the rest in afterAll. */
+  const extraEmails: string[] = [];
 
   /**
    * `withTenant`'s contract over the role the policies actually apply to, plus
@@ -207,6 +209,9 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
       // Membership cascades from both sides; the tenant delete takes it.
       await prisma.tenant.deleteMany({ where: { id: requireId(f.tenantId, 'f.tenantId') } });
       await prisma.user.deleteMany({ where: { email: requireId(f.email, 'f.email') } });
+    }
+    for (const email of extraEmails) {
+      await prisma.user.deleteMany({ where: { email: requireId(email, 'email') } });
     }
     await rls?.$disconnect();
     await prisma.$disconnect();
@@ -526,13 +531,56 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     const result = await sendSavedSearchAlerts([rowFor(a, 'a'), rowFor(b, 'b')], stale, mail.send);
     expect(mail.sent.map((m) => m.to)).toEqual([a.email]);
 
-    // Search B is looked up under tenant A's scope, so its owner membership is
-    // invisible and the search fails before it can mail or write anything.
+    // Search B is looked up under tenant A's scope: the search row itself is
+    // invisible there, so it fails before it can mail or write anything —
+    // rather than reading its owner's invisible membership as "left the
+    // tenant" and quietly skipping.
     expect(result.emailsFailed).toBe(1);
-    expect(result.errors).toEqual([{ searchId: b.searchId, reason: 'no_owner_email' }]);
+    expect(result.emailsSkipped).toBe(0);
+    expect(result.errors).toEqual([
+      { searchId: b.searchId, reason: 'saved search not visible under its own tenant scope' },
+    ]);
 
     expect((await lastRunOf(a.searchId))!.getTime()).toBeGreaterThan(LONG_AGO.getTime());
     expect(await lastRunOf(b.searchId)).toEqual(LONG_AGO);
+  });
+
+  // TASK-MUVRYPO9GTU7D: the mail used to go to the tenant's first owner
+  // whoever's search it was, carrying the searcher's free-text name.
+  it("alerts-daily: mails the search's own owner, and no one once they have left the tenant", async (ctx) => {
+    expect(ready, skipReason).toBe(true);
+    await assertMatchesExist(ctx);
+
+    const member = await prisma.user.create({ data: { email: `${RUN}-member@example.invalid`, name: 'Member' } });
+    const leaver = await prisma.user.create({ data: { email: `${RUN}-leaver@example.invalid`, name: 'Leaver' } });
+    extraEmails.push(member.email, leaver.email);
+    await prisma.membership.create({ data: { tenantId: a.tenantId, userId: member.id, role: 'MEMBER' } });
+    // `leaver` has no membership: removing a member leaves their searches behind.
+    const searchOf = (userId: string, label: string) =>
+      prisma.savedSearch.create({
+        data: { tenantId: a.tenantId, userId, name: `${label} ${RUN}`, filters: {}, notify: true, lastRunAt: LONG_AGO },
+      });
+    const mine = await searchOf(member.id, 'member');
+    const orphan = await searchOf(leaver.id, 'leaver');
+    const row = (s: { id: string; userId: string; name: string }): SavedSearchAlertRow => ({
+      id: s.id,
+      tenantId: a.tenantId,
+      userId: s.userId,
+      name: s.name,
+      filters: {},
+      lastRunAt: LONG_AGO,
+      createdAt: LONG_AGO,
+    });
+
+    const mail = recordingMailer();
+    const result = await sendSavedSearchAlerts([row(mine), row(orphan)], recordingRunner().run, mail.send);
+
+    expect(result.errors).toEqual([]);
+    expect(mail.sent.map((m) => m.to)).toEqual([member.email]);
+    expect(mail.sent.map((m) => m.to)).not.toContain(a.email);
+    expect(result).toMatchObject({ emailsSent: 1, emailsSkipped: 1, emailsFailed: 0 });
+    // Checked, not failed: the orphan does not come back every morning.
+    expect((await lastRunOf(orphan.id))!.getTime()).toBeGreaterThan(LONG_AGO.getTime());
   });
 
   it('alerts-daily: the lastRunAt write itself is refused under a foreign scope', async () => {
