@@ -58,10 +58,12 @@ describe('alerts-daily query contract', () => {
     expect(kind).not.toBe('PrismaClientValidationError');
   });
 
-  it('selects what the match-count query needs, and no relation', () => {
+  it('selects what the match-count query and the notification need, and no relation', () => {
     expect(SAVED_SEARCH_ALERT_QUERY.select).toEqual({
       id: true,
       tenantId: true,
+      // ADR-0011 K-6 a: the notification's recipient is the search's owner.
+      userId: true,
       name: true,
       filters: true,
       lastRunAt: true,

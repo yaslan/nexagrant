@@ -33,6 +33,7 @@ export const JOB_IDS = [
   'k1-embeddings',
   'm4-stale-relationships',
   'job-queue-health',
+  'notifications-retention',
 ] as const;
 
 export type JobId = (typeof JOB_IDS)[number];
@@ -68,6 +69,8 @@ export const SCHEDULE: readonly ScheduledJob[] = [
   },
   { id: 'invitation-cleanup', cron: '30 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   { id: 'public-lead-cleanup', cron: '45 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
+  // ADR-0011 §3.4: notifications older than 90 days.
+  { id: 'notifications-retention', cron: '50 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   // Between k1-daily-calls (02:00) and k1-topic-match (02:30): embeds the topics
   // that landed or changed and the profiles that changed. Own queue: a profile
   // save queued by hand waits for the sweep instead of paying for the same row.

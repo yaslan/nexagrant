@@ -49,6 +49,7 @@ model Tenant {
   billingIdentity TenantBillingIdentity?
   planAssignments PlanAssignment[]
   stripeEvents  StripeEventLog[]
+  notifications Notification[]
   // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
   // tenant opened with its invite code carries its id in agencyId, written once
   // at registration. The link grants the agency no read on this tenant's rows —
@@ -1306,6 +1307,39 @@ model StripeEventLog {
   processedAt   DateTime @default(now())
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   @@index([tenantId, processedAt])
+}
+
+// ADR-0011 (TASK-MUVR24EHWI2RA). One row per recipient: `readAt` is that
+// user's read state, so there is no per-workspace or browser-side copy of it
+// (K-1 a, K-2 a). Tenant isolation is RLS (`tenant_isolation`, prisma/rls.sql);
+// user isolation is the `userId` filter every read and write in
+// src/lib/notifications/store.ts carries (K-5 a). `payload` holds ids and
+// counts only; the text is rendered from `type` + `payload` with next-intl.
+// Deleted after NOTIFICATION_RETENTION_DAYS (90, K-3 a) by
+// `notifications-retention`, with the user (users-scheduled-deletion) and with
+// the tenant (cascade). Migration: add-notification.sql.
+model Notification {
+  id          String           @id @default(cuid())
+  tenantId    String
+  userId      String           // recipient; User.id, no FK (SavedSearch.userId pattern)
+  workspaceId String?          // NULL = tenant-wide (both MVP producers)
+  type        NotificationType
+  payload     Json             @default("{}")
+  dedupeKey   String?          // same event twice -> one row (@@unique below)
+  createdAt   DateTime         @default(now())
+  readAt      DateTime?        // NULL = unread
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, dedupeKey])
+  @@index([tenantId, userId, readAt, createdAt])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  SAVED_SEARCH_MATCH   // payload: { searchId, searchName, matchCount, since }
+  CREDIT_GRANTED       // payload: { amount, period?, source } (no producer yet)
+  CREDIT_EXHAUSTED     // payload: { module } (no producer yet)
+  EVIDENCE_EXPIRING    // payload: { evidenceId, validUntil } (no producer yet)
 }
 
 // ───────────────────────── v1.1+ (M6, M9, M10, M11, M7) ─────────────────────────

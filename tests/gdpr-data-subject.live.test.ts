@@ -192,6 +192,14 @@ async function seed() {
       { tenantId: ids.tenantA, userId: ids.neighbour, name: `Neighbour search ${RUN}`, filters: { q: 'neighbour-query' } },
     ],
   });
+  // ADR-0011: one notification each. `userId` has no FK, so `DELETE FROM
+  // "User"` would leave the subject's behind.
+  await db.notification.createMany({
+    data: [
+      { tenantId: ids.tenantA, userId: ids.subject, type: 'SAVED_SEARCH_MATCH', payload: { matchCount: 3 }, dedupeKey: `subject-${RUN}` },
+      { tenantId: ids.tenantA, userId: ids.neighbour, type: 'SAVED_SEARCH_MATCH', payload: { matchCount: 4 }, dedupeKey: `neighbour-${RUN}` },
+    ],
+  });
   await db.feedback.createMany({
     data: [
       { tenantId: ids.tenantA, userId: ids.subject, category: 'BUG', title: `Subject report ${RUN}`, body: 'subject-body' },
@@ -235,6 +243,7 @@ async function cleanup() {
   await db.auditEvent.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.calendarConnection.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.savedSearch.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
+  await db.notification.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.feedback.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.relationship.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.tenant.deleteMany({ where: { id: { in: [ids.tenantA, ids.tenantB] } } });
@@ -279,6 +288,8 @@ describe.skipIf(!HAS_DB)('GDPR export — live', () => {
     expect(tables.AiUsageLog).toHaveLength(1);
     expect(tables.ApprovalRequest).toHaveLength(1);
     expect(tables.Proposal).toHaveLength(1);
+    expect(tables.Notification).toHaveLength(1);
+    expect(tables.Notification?.[0]).toMatchObject({ tenantId: ids.tenantA, type: 'SAVED_SEARCH_MATCH', payload: { matchCount: 3 } });
 
     // Absent: a co-tenant's rows. This is the isolation that matters most here —
     // the endpoint runs inside a shared tenant, so "my data" must not mean
@@ -482,6 +493,7 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
     const residue = {
       calendarConnection: await db.calendarConnection.count({ where: { userId: ids.subject } }),
       savedSearch: await db.savedSearch.count({ where: { userId: ids.subject } }),
+      notification: await db.notification.count({ where: { userId: ids.subject } }),
       feedback: await db.feedback.count({ where: { userId: ids.subject } }),
       auditActor: await db.auditEvent.count({ where: { actorId: ids.subject } }),
       opportunityOwner: await db.opportunity.count({ where: { ownerId: ids.subject } }),
@@ -490,6 +502,7 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
     expect(residue).toEqual({
       calendarConnection: 0,
       savedSearch: 0,
+      notification: 0,
       feedback: 0,
       auditActor: 0,
       opportunityOwner: 0,
@@ -554,6 +567,7 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
     // nothing and must be untouched.
     expect(await db.calendarConnection.count({ where: { userId: ids.neighbour } })).toBe(1);
     expect(await db.savedSearch.count({ where: { userId: ids.neighbour } })).toBe(1);
+    expect(await db.notification.count({ where: { userId: ids.neighbour } })).toBe(1);
     expect(await db.feedback.count({ where: { userId: ids.neighbour } })).toBe(1);
     expect(await db.auditEvent.count({ where: { actorId: ids.neighbour } })).toBe(1);
     expect(await db.opportunity.count({ where: { ownerId: ids.neighbour } })).toBe(1);
