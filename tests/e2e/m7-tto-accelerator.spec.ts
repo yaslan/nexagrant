@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { withSystemScope } from '../../src/lib/system-scope';
 import { shotsDir } from './fixtures/shots';
 import { signInAs, seedIdentity } from './fixtures/session';
 import { expectHydrated } from './fixtures/hydration';
@@ -14,12 +15,21 @@ import { expectHydrated } from './fixtures/hydration';
  * responsive layout at 390px.
  *
  * Fixture data uses `seedIdentity` + `withSystemScope` RLS bypass; cleaned up in afterAll.
- * No demo-tenant rows are modified; all test data is isolated to seeded users.
+ * Both tenants are the spec's own: demo-tenant is on `pro`, which does not grant M7,
+ * so on a fresh database every page here rendered "This module is not available"
+ * and the soft checks passed on that (TASK-MUUS5HE3OW0CT). No demo-tenant row is
+ * read or written.
  */
 
 const SHOTS = shotsDir('TASK-MUU75WHQFP46P-screenshots');
-const WORKSPACE = 'main';
-const TENANT = 'demo-tenant';
+const TENANT = 'e2e-m7-tenant';
+/** Main workspace of TENANT. */
+const MAIN_WORKSPACE = {
+  id: 'e2e-m7-main-ws',
+  slug: 'm7-main',
+  name: 'M7 TTO Main',
+};
+const WORKSPACE = MAIN_WORKSPACE.slug;
 
 /** Test user for M7 tests — PIPELINE_MANAGER role */
 const M7_MEMBER = {
@@ -48,53 +58,75 @@ const ISOLATION_WORKSPACE = {
 const TTO_BASE_URL = `/${WORKSPACE}/tto`;
 
 /**
- * Cleanup function: removes demo-tenant items created by tests, plus the isolation
- * tenant user/workspace. Does NOT touch the demo-tenant itself.
+ * `signInAs` reads the user from `id` (or `sub`); these fixtures name it `userId`
+ * for `seedIdentity`. Passed as-is, every sign-in threw "token must include id".
+ */
+function sessionToken(member: typeof M7_MEMBER | typeof ISOLATION_MEMBER) {
+  return { id: member.userId, email: member.email, tenantId: member.tenantId, role: member.role };
+}
+
+/** Titles the TTO page used to invent for an empty tenant (BUG-2, TASK-MUUS5HE3OW0CT). */
+const FABRICATED_ITEM_TITLES = [
+  'Solid-State Electrolyte Micro-Sensor Array',
+  'AI-Driven Catalyst Design for Green Hydrogen Synthesis',
+  'Recyclable Carbon Fiber Composite Matrix',
+];
+
+/** Topics `matchTtoItemToCalls` used to return whatever the item was (BUG-3). */
+const FABRICATED_TOPIC_TITLES = [
+  'Zero-Emission Transport Systems & Battery Safety',
+  'Advanced Materials & Sensors for Clean Energy',
+  'EIC Accelerator Deep-Tech Scale-up',
+];
+
+const GATED_ITEM_TITLE = 'E2E M7 gated create item';
+const MATCH_ITEM_TITLE = 'E2E M7 match item';
+
+const SPEC_TENANTS = [TENANT, ISOLATION_TENANT];
+
+/**
+ * The spec's tenants themselves. `seedIdentity` creates a workspace, user and
+ * membership but never the Tenant row they point at, so on a fresh database
+ * (CI: db push + migrations + seed, which seeds only demo-tenant) the workspace
+ * upsert failed on Workspace_tenantId_fkey. A run against a database that still
+ * held the row from somewhere else passed — that was the difference. The plan is
+ * written out (`ultra`, no version: PLAN_GRANTS fallback) so M7 is inside it.
+ */
+async function seedSpecTenants() {
+  await withSystemScope('platform-admin', 'e2e.m7-tto.setup', async (tx) => {
+    for (const id of SPEC_TENANTS) {
+      await tx.tenant.upsert({
+        where: { id },
+        create: { id, name: `M7 TTO e2e (${id})`, slug: id, country: 'TR', orgType: 'SME' },
+        update: {},
+      });
+      await tx.subscription.upsert({
+        where: { tenantId: id },
+        create: { tenantId: id, planId: 'ultra', status: 'ACTIVE' },
+        update: { planId: 'ultra', status: 'ACTIVE', planVersionId: null },
+      });
+    }
+  });
+}
+
+/**
+ * Cleanup function: removes the spec's two tenants with everything in them and its
+ * two users. Runs before the suite as well, so an interrupted run leaves nothing behind.
  */
 async function cleanup() {
   try {
-    // Delete all demo-tenant TTO items created in this test run (identifiable by title)
-    await prisma.ttoPortfolioItem.deleteMany({
-      where: {
-        AND: [
-          { tenantId: TENANT },
-          {
-            title: {
-              in: [
-                'AI-Powered Drug Discovery Platform',
-                'Quantum Computing Framework',
-                'Biotech Platform',
-                'Main Tenant Item',
-              ],
-            },
-          },
-        ],
-      },
-    });
-
-    // Delete isolation tenant items
-    await prisma.ttoPortfolioItem.deleteMany({
-      where: { tenantId: ISOLATION_TENANT },
-    });
-
-    // Delete isolation user + workspace + membership
+    // TtoPortfolioItem has no foreign key to Tenant, so its rows do not cascade.
+    await prisma.ttoPortfolioItem.deleteMany({ where: { tenantId: { in: SPEC_TENANTS } } });
     await prisma.membership.deleteMany({
-      where: { userId: ISOLATION_MEMBER.userId },
-    });
-    await prisma.workspace.deleteMany({
-      where: { id: ISOLATION_WORKSPACE.id },
+      where: { userId: { in: [M7_MEMBER.userId, ISOLATION_MEMBER.userId] } },
     });
     await prisma.user.deleteMany({
-      where: { id: ISOLATION_MEMBER.userId },
+      where: { id: { in: [M7_MEMBER.userId, ISOLATION_MEMBER.userId] } },
     });
-
-    // Clean up demo-tenant test user
-    await prisma.membership.deleteMany({
-      where: { userId: M7_MEMBER.userId },
-    });
-    await prisma.user.deleteMany({
-      where: { id: M7_MEMBER.userId },
-    });
+    // Workspaces, subscriptions and module states go with the tenants (Cascade).
+    await withSystemScope('platform-admin', 'e2e.m7-tto.teardown', (tx) =>
+      tx.tenant.deleteMany({ where: { id: { in: SPEC_TENANTS } } })
+    );
   } catch (e) {
     // Teardown is best-effort; don't fail the suite if it fails
     console.warn('[M7 E2E cleanup]', e);
@@ -106,10 +138,8 @@ test.describe('M7 TTO Accelerator', () => {
     // Clean up any leftover from prior runs, then seed fresh fixtures
     await cleanup();
 
-    // Seed demo-tenant member
-    await seedIdentity(M7_MEMBER, { id: WORKSPACE, slug: WORKSPACE, name: WORKSPACE });
-
-    // Seed isolation tenant and user
+    await seedSpecTenants();
+    await seedIdentity(M7_MEMBER, MAIN_WORKSPACE);
     await seedIdentity(ISOLATION_MEMBER, ISOLATION_WORKSPACE);
 
     // Enable M7 module for both tenants
@@ -132,7 +162,7 @@ test.describe('M7 TTO Accelerator', () => {
 
   test('01 — sign-in and page load (hydration)', async ({ page }) => {
     // Page hydrates and shows "no items" or demo fallback on first load
-    await signInAs(page, M7_MEMBER);
+    await signInAs(page, sessionToken(M7_MEMBER));
     await page.goto(TTO_BASE_URL);
 
     // TTO page should be visible (either as main content or fallback)
@@ -144,7 +174,7 @@ test.describe('M7 TTO Accelerator', () => {
   });
 
   test('02 — create portfolio item with correct tenantId', async ({ page }) => {
-    await signInAs(page, M7_MEMBER);
+    await signInAs(page, sessionToken(M7_MEMBER));
     await page.goto(TTO_BASE_URL);
     await expectHydrated(page.locator('body'));
 
@@ -214,7 +244,7 @@ test.describe('M7 TTO Accelerator', () => {
     // Any external API calls should be fulfilled by the mock, not real network
     await context.route('https://api.example.com/**', (route) => route.fulfill(mockFulfill));
 
-    await signInAs(page, M7_MEMBER);
+    await signInAs(page, sessionToken(M7_MEMBER));
     await page.goto(TTO_BASE_URL);
     await expectHydrated(page.locator('body'));
 
@@ -245,7 +275,7 @@ test.describe('M7 TTO Accelerator', () => {
   test('04 — IP checklist with LLM fallback (blank keys)', async ({ page }) => {
     // Set E2E_* environment to ensure LLM keys are blank/missing → fallback
     // The test setup already does this in playwright.config.ts
-    await signInAs(page, M7_MEMBER);
+    await signInAs(page, sessionToken(M7_MEMBER));
     await page.goto(TTO_BASE_URL);
     await expectHydrated(page.locator('body'));
 
@@ -293,7 +323,7 @@ test.describe('M7 TTO Accelerator', () => {
   });
 
   test('05 — form validation (invalid title/trl)', async ({ page }) => {
-    await signInAs(page, M7_MEMBER);
+    await signInAs(page, sessionToken(M7_MEMBER));
     await page.goto(TTO_BASE_URL);
     await expectHydrated(page.locator('body'));
 
@@ -328,7 +358,7 @@ test.describe('M7 TTO Accelerator', () => {
     });
 
     try {
-      await signInAs(page, M7_MEMBER);
+      await signInAs(page, sessionToken(M7_MEMBER));
       await page.goto(TTO_BASE_URL);
       await expectHydrated(page.locator('body'));
 
@@ -391,7 +421,7 @@ test.describe('M7 TTO Accelerator', () => {
       // Context 1: Main tenant member
       const ctx1 = await browser.newContext();
       const page1 = await ctx1.newPage();
-      await signInAs(page1, M7_MEMBER);
+      await signInAs(page1, sessionToken(M7_MEMBER));
       await page1.goto(TTO_BASE_URL);
       await expectHydrated(page1.locator('body'));
 
@@ -415,7 +445,7 @@ test.describe('M7 TTO Accelerator', () => {
       // Context 2: Isolation tenant member
       const ctx2 = await browser.newContext();
       const page2 = await ctx2.newPage();
-      await signInAs(page2, ISOLATION_MEMBER);
+      await signInAs(page2, sessionToken(ISOLATION_MEMBER));
       await page2.goto(`/${ISOLATION_WORKSPACE.slug}/tto`);
       await expectHydrated(page2.locator('body'));
 
@@ -446,7 +476,7 @@ test.describe('M7 TTO Accelerator', () => {
     // Set viewport to 390px (common mobile width)
     await page.setViewportSize({ width: 390, height: 844 });
 
-    await signInAs(page, M7_MEMBER);
+    await signInAs(page, sessionToken(M7_MEMBER));
     await page.goto(TTO_BASE_URL);
     await expectHydrated(page.locator('body'));
 
@@ -473,7 +503,7 @@ test.describe('M7 TTO Accelerator', () => {
   });
 
   test('09 — navigation between /tto and /tto-hizlandirici', async ({ page }) => {
-    await signInAs(page, M7_MEMBER);
+    await signInAs(page, sessionToken(M7_MEMBER));
 
     // Start at /tto
     await page.goto(TTO_BASE_URL);
@@ -540,5 +570,101 @@ test.describe('M7 TTO Accelerator', () => {
     // Cleanup
     await prisma.ttoPortfolioItem.delete({ where: { id: item1.id } });
     await prisma.ttoPortfolioItem.delete({ where: { id: item2.id } });
+  });
+
+  // ── TASK-MUUS5HE3OW0CT: the three bugs FIX-2 closed. Each must go red on the
+  // pre-fix code (36cda69d) and green after it, with no expected-failure marks.
+
+  test('11 — BUG-1: createTtoItem refuses to write while M7 is off', async ({ page }) => {
+    await signInAs(page, sessionToken(M7_MEMBER));
+    await page.goto(TTO_BASE_URL);
+    await expectHydrated(page.locator('body'));
+
+    const titleInput = page.getByPlaceholder('Örn: Katı Hal Batarya Mikrosensör Dizesi');
+    const submitBtn = page.getByRole('button', { name: 'TTO Portföyüne Kaydet' });
+    await expect(titleInput).toBeVisible();
+    await titleInput.fill(GATED_ITEM_TITLE);
+
+    // The page was served with M7 on; the module goes off before the POST, so
+    // only the action's own gate stands between the request and the write.
+    await prisma.moduleState.update({
+      where: { tenantId_moduleId: { tenantId: TENANT, moduleId: 'M7' } },
+      data: { status: 'OFF' },
+    });
+    try {
+      const posted = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().includes('/tto'));
+      await submitBtn.click();
+      await posted;
+      await expect(submitBtn).toBeEnabled();
+
+      const written = await prisma.ttoPortfolioItem.count({ where: { tenantId: TENANT, title: GATED_ITEM_TITLE } });
+      expect(written).toBe(0);
+      await expect(page.locator('h4', { hasText: GATED_ITEM_TITLE })).toHaveCount(0);
+      await page.screenshot({ path: `${SHOTS}/11-bug1-gated-create.png`, fullPage: true });
+    } finally {
+      await prisma.moduleState.update({
+        where: { tenantId_moduleId: { tenantId: TENANT, moduleId: 'M7' } },
+        data: { status: 'ON' },
+      });
+    }
+
+    // Control: the same form, module back on, does write — so the 0 above was the
+    // gate, not a form that never submitted.
+    const posted = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().includes('/tto'));
+    await submitBtn.click();
+    await posted;
+    await expect(page.locator('h4', { hasText: GATED_ITEM_TITLE })).toBeVisible();
+    expect(await prisma.ttoPortfolioItem.count({ where: { tenantId: TENANT, title: GATED_ITEM_TITLE } })).toBe(1);
+  });
+
+  test('12 — BUG-2: an empty tenant sees an honest empty state, no invented portfolio', async ({ page }) => {
+    // Precondition: the isolation tenant really has no portfolio rows.
+    expect(await prisma.ttoPortfolioItem.count({ where: { tenantId: ISOLATION_TENANT } })).toBe(0);
+
+    await signInAs(page, sessionToken(ISOLATION_MEMBER));
+    await page.goto(`/${ISOLATION_WORKSPACE.slug}/tto`);
+    await expectHydrated(page.locator('body'));
+
+    await expect(page.getByText('Portföyde henüz teknoloji kaydı bulunmamaktadır.')).toBeVisible();
+    // Header figures come from the (zero) real rows.
+    await expect(page.getByText('TTO Portföy Kartları (0)')).toBeVisible();
+    await expect(page.getByText('Portföy Teknolojileri (0)')).toBeVisible();
+    await expect(page.getByText('TRL 0.0')).toBeVisible();
+    for (const fabricated of FABRICATED_ITEM_TITLES) {
+      await expect(page.getByText(fabricated)).toHaveCount(0);
+    }
+    await page.screenshot({ path: `${SHOTS}/12-bug2-empty-state.png`, fullPage: true });
+  });
+
+  test('13 — BUG-3: matching shows no invented topics or scores', async ({ page }) => {
+    const item = await prisma.ttoPortfolioItem.create({
+      data: {
+        tenantId: TENANT,
+        title: MATCH_ITEM_TITLE,
+        trl: 5,
+        patentStatus: 'granted',
+        summary: 'Item the matcher runs against',
+        keywords: ['e2e', 'matching'],
+      },
+    });
+    try {
+      await signInAs(page, sessionToken(M7_MEMBER));
+      await page.goto(TTO_BASE_URL);
+      await expectHydrated(page.locator('body'));
+
+      const card = page.locator('div.rounded-2xl', { has: page.locator('h4', { hasText: MATCH_ITEM_TITLE }) });
+      await expect(card).toHaveCount(1);
+      await card.getByRole('button', { name: 'AB Çağrıları Eşleştir' }).click();
+
+      await expect(page.getByText('AB Çağrı Eşleştirme Sonucu (0)')).toBeVisible();
+      await expect(page.getByText('Bu teknoloji için eşleşen AB çağrısı bulunamamıştır.')).toBeVisible();
+      for (const fabricated of FABRICATED_TOPIC_TITLES) {
+        await expect(page.getByText(fabricated)).toHaveCount(0);
+      }
+      await expect(page.getByText(/HORIZON-CL5-2026-D3-01|EIC-ACC-2026-STEP/)).toHaveCount(0);
+      await page.screenshot({ path: `${SHOTS}/13-bug3-matching-empty.png`, fullPage: true });
+    } finally {
+      await prisma.ttoPortfolioItem.delete({ where: { id: item.id } });
+    }
   });
 });
