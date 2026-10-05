@@ -12,6 +12,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { createTtoItem, matchTtoItemToCalls, generateIpChecklist } from '@/modules/m7/server/actions';
+import { useTranslations } from 'next-intl';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 export interface TtoItem {
@@ -41,6 +42,7 @@ interface MatchedTopic {
 export function TtoAcceleratorClient({
   items: initialItems,
 }: TtoAcceleratorClientProps) {
+  const t = useTranslations('m7.tto');
   const [items, setItems] = useState<TtoItem[]>(initialItems);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'roadmap' | 'checklist'>('portfolio');
 
@@ -210,10 +212,10 @@ export function TtoAcceleratorClient({
           </div>
 
           <div className="bg-ground border border-border rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Çağrı Eşleştirme</span>
+            <span className="text-muted block text-[11px]">{t('matchingStatLabel')}</span>
             <span className="text-xs font-bold text-muted mt-1 block flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5 text-muted" />
-              Kütüphane Yükleniyor
+              {t('matchingStatValue')}
             </span>
           </div>
         </div>
@@ -358,8 +360,8 @@ export function TtoAcceleratorClient({
             <div className="space-y-4">
               {items.length === 0 ? (
                 <div className="bg-surface border border-border rounded-2xl p-8 text-center shadow-xs">
-                  <p className="text-muted text-sm">Portföyde henüz teknoloji kaydı bulunmamaktadır.</p>
-                  <p className="text-ink-2 text-xs mt-2">Yukarıdaki form aracılığıyla yeni bir teknoloji ekleyerek başlayın.</p>
+                  <p className="text-muted text-sm">{t('emptyPortfolio')}</p>
+                  <p className="text-ink-2 text-xs mt-2">{t('emptyPortfolioHint')}</p>
                 </div>
               ) : (
                 items.map((item) => (
@@ -383,7 +385,7 @@ export function TtoAcceleratorClient({
                         className="px-3 py-1.5 bg-accent hover:opacity-90 text-white font-semibold rounded-xl text-xs transition shadow-2xs flex items-center gap-1.5 shrink-0"
                       >
                         <Sparkles className="w-3.5 h-3.5" />
-                        <span>AB Çağrıları Eşleştir</span>
+                        <span>{t('matchCalls')}</span>
                       </button>
                     </div>
 
@@ -512,12 +514,12 @@ export function TtoAcceleratorClient({
             ) : (
               <div className="space-y-3">
                 <h4 className="font-bold text-xs text-ink-2 uppercase tracking-wider">
-                  AB Çağrı Eşleştirme Sonucu ({matchedTopics.length})
+                  {t('matchResultTitle', { count: matchedTopics.length })}
                 </h4>
 
                 {matchedTopics.length === 0 ? (
                   <div className="bg-ground border border-border rounded-xl p-4 text-center">
-                    <p className="text-xs text-muted">Bu teknoloji için eşleşen AB çağrısı bulunamamıştır.</p>
+                    <p className="text-xs text-muted">{t('noMatch')}</p>
                   </div>
                 ) : (
                   matchedTopics.map((topic, idx) => (
@@ -543,7 +545,7 @@ export function TtoAcceleratorClient({
                           onClick={() => setSelectedMatchItem(null)}
                           className="px-3 py-1 bg-accent hover:opacity-90 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"
                         >
-                          <span>M4 İlişkisi Aç</span>
+                          <span>{t('openM4Relationship')}</span>
                           <ChevronRight className="w-3.5 h-3.5" />
                         </button>
                       </div>

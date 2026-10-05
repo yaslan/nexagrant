@@ -2824,5 +2824,17 @@
     "errorGeneric": "An error occurred",
     "savingButton": "Generating AI Embeddings...",
     "saveButton": "Save Profile"
+  },
+  "m7": {
+    "tto": {
+      "matchingStatLabel": "Call matching",
+      "matchingStatValue": "Library loading",
+      "emptyPortfolio": "No technologies in the portfolio yet.",
+      "emptyPortfolioHint": "Start by adding a new technology with the form above.",
+      "matchCalls": "Match EU calls",
+      "matchResultTitle": "EU call matching result ({count})",
+      "noMatch": "No matching EU call was found for this technology.",
+      "openM4Relationship": "Open M4 relationship"
+    }
   }
 }

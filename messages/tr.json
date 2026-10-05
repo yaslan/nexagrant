@@ -2824,5 +2824,17 @@
     "errorGeneric": "Bir hata oluştu",
     "savingButton": "YZ Vektörleri Hesaplanıyor...",
     "saveButton": "Profili Kaydet"
+  },
+  "m7": {
+    "tto": {
+      "matchingStatLabel": "Çağrı Eşleştirme",
+      "matchingStatValue": "Kütüphane Yükleniyor",
+      "emptyPortfolio": "Portföyde henüz teknoloji kaydı bulunmamaktadır.",
+      "emptyPortfolioHint": "Yukarıdaki form aracılığıyla yeni bir teknoloji ekleyerek başlayın.",
+      "matchCalls": "AB Çağrıları Eşleştir",
+      "matchResultTitle": "AB Çağrı Eşleştirme Sonucu ({count})",
+      "noMatch": "Bu teknoloji için eşleşen AB çağrısı bulunamamıştır.",
+      "openM4Relationship": "M4 İlişkisi Aç"
+    }
   }
 }
