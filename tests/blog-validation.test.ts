@@ -115,6 +115,37 @@ describe('validateBlogInput', () => {
   });
 });
 
+describe('uploaded images (TASK-MUU20XFIXZKTE): <public base>/blog/… only', () => {
+  const MINIO = 'http://localhost:9000/test-public';
+  const SUPABASE = 'https://ref.supabase.co/storage/v1/object/public/blog-images';
+
+  test.each([
+    ['MinIO path-style', MINIO, `${MINIO}/blog/2026/abc.png`],
+    ['Supabase Storage', SUPABASE, `${SUPABASE}/blog/2026/abc.webp`],
+    ['base with a trailing slash', `${MINIO}/`, `${MINIO}/blog/2026/abc.jpg`],
+  ])('accepted: %s', (_name, base, image) => {
+    expect(validateBlogInput({ ...VALID, image }, base)).toMatchObject({ ok: true, data: { image } });
+  });
+
+  test.each([
+    ['no public base configured', undefined, `${MINIO}/blog/2026/abc.png`],
+    ['outside blog/', MINIO, `${MINIO}/evidence/abc.png`],
+    ['the blog/ prefix alone', MINIO, `${MINIO}/blog/`],
+    ['another bucket on the same host', MINIO, 'http://localhost:9000/test-evidence/blog/abc.png'],
+    ['another port', MINIO, 'http://localhost:9001/test-public/blog/abc.png'],
+    ['https for an http base', MINIO, 'https://localhost:9000/test-public/blog/abc.png'],
+    ['a query string', MINIO, `${MINIO}/blog/abc.png?x=1`],
+    ['credentials', MINIO, 'http://u:p@localhost:9000/test-public/blog/abc.png'],
+    ['a dot-dot escape', SUPABASE, `${SUPABASE}/blog/%2e%2e/../x.png`],
+  ])('refused: %s', (_name, base, image) => {
+    expect(validateBlogInput({ ...VALID, image }, base)).toEqual({ ok: false, error: 'invalid_image' });
+  });
+
+  test('the unsplash covers saved before uploads keep validating with a base set', () => {
+    expect(validateBlogInput(VALID, MINIO)).toMatchObject({ ok: true });
+  });
+});
+
 describe('slugs', () => {
   test('a Turkish title is transliterated, not mangled', () => {
     expect(slugifyTitle('Çağrı Şartları ve Öğrenciler İçin Güncel Hibe')).toBe(

@@ -117,7 +117,37 @@ export function formatBlogDate(date: Date, locale: string): string {
   }).format(date);
 }
 
-function isAllowedImageUrl(value: string): boolean {
+/**
+ * Whether `url` is an uploaded blog image: an object under `<publicBase>/blog/`
+ * — the public bucket's base URL (R2_PUBLIC_HOST, TASK-MUU20NSV2TETW), the same
+ * host, port and path prefix next.config's `publicAssetImagePattern` admits.
+ * No credentials, query or fragment; no `..` segment.
+ */
+function isUploadedImageUrl(url: URL, publicBase: string | undefined): boolean {
+  if (!publicBase) return false;
+  let base: URL;
+  try {
+    base = new URL(publicBase);
+  } catch {
+    return false;
+  }
+  const prefix = `${base.pathname.replace(/\/+$/, '')}/blog/`;
+  return (
+    (url.protocol === 'https:' || url.protocol === 'http:') &&
+    url.protocol === base.protocol &&
+    url.hostname === base.hostname &&
+    url.port === base.port &&
+    url.username === '' &&
+    url.password === '' &&
+    url.search === '' &&
+    url.hash === '' &&
+    url.pathname.startsWith(prefix) &&
+    url.pathname.length > prefix.length &&
+    !url.pathname.split('/').includes('..')
+  );
+}
+
+function isAllowedImageUrl(value: string, publicImageBase?: string): boolean {
   if (value.length > BLOG_LIMITS.url) return false;
   let url: URL;
   try {
@@ -125,6 +155,7 @@ function isAllowedImageUrl(value: string): boolean {
   } catch {
     return false;
   }
+  if (isUploadedImageUrl(url, publicImageBase)) return true;
   return (
     url.protocol === 'https:' &&
     url.port === '' &&
@@ -154,9 +185,14 @@ type BlogColumns = {
 /**
  * Server-side validation of a complete editor submission. Pure: no database.
  * Returns the trimmed column values, or the first refusal.
+ *
+ * `publicImageBase` is the public bucket's base URL when one is configured;
+ * images uploaded there (`<base>/blog/…`) are accepted besides BLOG_IMAGE_HOSTS.
+ * The caller passes it, so this file stays free of server-only env.
  */
 export function validateBlogInput(
-  input: BlogPostInput
+  input: BlogPostInput,
+  publicImageBase?: string
 ): { ok: true; data: BlogColumns } | { ok: false; error: BlogWriteError } {
   const title = trimmedText(input.title);
   if (!lengthWithin(title, 3, BLOG_LIMITS.title)) return { ok: false, error: 'invalid_title' };
@@ -169,7 +205,7 @@ export function validateBlogInput(
   const readTime = trimmedText(input.readTime);
   if (!lengthWithin(readTime, 1, BLOG_LIMITS.readTime)) return { ok: false, error: 'invalid_read_time' };
   const image = trimmedText(input.image);
-  if (!isAllowedImageUrl(image)) return { ok: false, error: 'invalid_image' };
+  if (!isAllowedImageUrl(image, publicImageBase)) return { ok: false, error: 'invalid_image' };
 
   const authorName = trimmedText(input.authorName);
   const authorRole = trimmedText(input.authorRole);
@@ -179,7 +215,7 @@ export function validateBlogInput(
   }
   // A role or portrait without a name would be a byline for nobody.
   if (!authorName && (authorRole || authorAvatar)) return { ok: false, error: 'invalid_author' };
-  if (authorAvatar && !isAllowedImageUrl(authorAvatar)) return { ok: false, error: 'invalid_image' };
+  if (authorAvatar && !isAllowedImageUrl(authorAvatar, publicImageBase)) return { ok: false, error: 'invalid_image' };
 
   return {
     ok: true,

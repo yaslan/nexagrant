@@ -213,6 +213,24 @@ export function publicAssetImagePattern(
   }
 }
 
+/**
+ * True when R2_PUBLIC_HOST points at this machine (the MinIO of a local or CI
+ * e2e run). next.config then sets `images.dangerouslyAllowLocalIP`: Next 16's
+ * optimizer refuses an upstream that resolves to a private address, so the
+ * uploaded blog covers rendered through `next/image` showed broken
+ * (TASK-MUU20XFIXZKTE). A deployment's public bucket is never on loopback, so
+ * there the guard stays on.
+ */
+export function publicAssetHostIsLoopback(value: string | null | undefined): boolean {
+  if (!value?.trim()) return false;
+  try {
+    const host = new URL(value.trim()).hostname;
+    return host === 'localhost' || host === '[::1]' || /^127(?:\.\d{1,3}){3}$/.test(host);
+  } catch {
+    return false;
+  }
+}
+
 /** R2 account ids are 32 hex chars; anything else must not reach a header. */
 function r2UploadOrigin(accountId: string | null | undefined): string | null {
   const id = accountId?.trim();

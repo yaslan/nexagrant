@@ -8,6 +8,7 @@ import {
   API_CONTENT_SECURITY_POLICY,
   STATIC_FILE_CONTENT_SECURITY_POLICY,
   STATIC_SECURITY_HEADERS,
+  publicAssetHostIsLoopback,
   publicAssetImagePattern,
   staticFileNotFoundSource,
 } from './src/lib/security-headers';
@@ -91,6 +92,8 @@ const nextConfig: NextConfig = {
    * the CSP `img-src 'self'` covers it and needs no new host.
    */
   images: {
+    // Only for a public bucket on loopback (local/CI MinIO); see the helper.
+    dangerouslyAllowLocalIP: publicAssetHostIsLoopback(process.env.R2_PUBLIC_HOST),
     remotePatterns: [
       // `port: ''` = the default https port only. Left out, it means any port:
       // lh3…:8443 was accepted and the optimizer waited out a 504 upstream

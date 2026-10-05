@@ -2644,6 +2644,23 @@
       "slug_taken": "A post with this slug already exists. Change the title or the slug.",
       "not_found": "Post not found; another admin may have deleted it. Reload the page.",
       "save_failed": "The post could not be saved. Please try again."
+    },
+    "image": {
+      "label": "Cover image",
+      "choose": "Choose image",
+      "change": "Change image",
+      "hint": "JPG, PNG or WebP, up to {maxMb} MB.",
+      "uploading": "Uploading image…",
+      "uploaded": "Image uploaded.",
+      "previewAlt": "Cover image preview",
+      "missing": "Upload a cover image before saving.",
+      "errors": {
+        "type": "This file type is not supported. Choose a JPG, PNG or WebP image.",
+        "size": "The image is larger than {maxMb} MB. Choose a smaller file.",
+        "forbidden": "You are not allowed to upload images. Sign in as a platform admin.",
+        "object_store_unconfigured": "The file store is not configured, so the image cannot be uploaded right now. Tell your system administrator.",
+        "upload_failed": "The image could not be uploaded. Please try again."
+      }
     }
   },
   "adminDocuments": {
