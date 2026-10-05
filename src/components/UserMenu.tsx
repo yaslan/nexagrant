@@ -19,6 +19,7 @@ import {
   CreditCard, 
   Globe, 
   Key, 
+  Users,
   ShieldCheck, 
   HelpCircle, 
   LogOut, 
@@ -58,6 +59,7 @@ interface UserMenuProps {
    */
   workspaces?: UserMenuWorkspace[];
   canManageModules?: boolean;
+  canManageUsers?: boolean;
 }
 
 export default function UserMenu({
@@ -69,6 +71,7 @@ export default function UserMenu({
   creditsBalance = 500,
   workspaces = [],
   canManageModules = false,
+  canManageUsers = false,
 }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -81,6 +84,7 @@ export default function UserMenu({
   const sessionData = useOptionalSession();
 
   const tIdentity = useTranslations('UserIdentity');
+  const tNav = useTranslations('Navigation');
   // The KVKK/GDPR console has its own copy in both locales already; this entry
   // reuses it rather than adding another hardcoded pair of strings.
   const tPrivacy = useTranslations('settings.privacy');
@@ -396,6 +400,17 @@ export default function UserMenu({
                   {creditsBalance} {isTr ? 'Kredi' : 'Credits'}
                 </span>
               </Link>
+
+              {canManageUsers && (
+                <Link
+                  href={getWorkspaceRoute('settingsMembers', locale, routeWorkspace ?? undefined)}
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
+                >
+                  <Users className="w-4 h-4 text-muted" />
+                  <span>{tNav('members')}</span>
+                </Link>
+              )}
 
               {canManageModules && (
                 <Link

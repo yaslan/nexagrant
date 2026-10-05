@@ -10,9 +10,10 @@ interface SidebarNavProps {
   locale: string;
   isPlatformAdmin?: boolean;
   canManageModules?: boolean;
+  canManageUsers?: boolean;
 }
 
-export default function SidebarNav({ locale, isPlatformAdmin = false, canManageModules = false }: SidebarNavProps) {
+export default function SidebarNav({ locale, isPlatformAdmin = false, canManageModules = false, canManageUsers = false }: SidebarNavProps) {
   const t = useTranslations('Navigation');
   const pathname = usePathname();
 
@@ -35,6 +36,9 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
     { key: 'tto', href: getWorkspaceRoute('tto', locale, workspaceSlug), label: t('tto') },
     { key: 'approvals', href: getWorkspaceRoute('approvals', locale, workspaceSlug), label: t('approvals') },
     { key: 'apiKeys', href: getWorkspaceRoute('settingsApiKeys', locale, workspaceSlug), label: t('apiKeys') },
+    ...(canManageUsers
+      ? [{ key: 'members', href: getWorkspaceRoute('settingsMembers', locale, workspaceSlug), label: t('members') }]
+      : []),
     {
       key: 'settings',
       href: canManageModules
