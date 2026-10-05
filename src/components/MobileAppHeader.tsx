@@ -19,6 +19,7 @@ interface MobileAppHeaderProps {
   userImage?: string;
   roleName?: string;
   isPlatformAdmin?: boolean;
+  canManageModules?: boolean;
   /** Real workspaces of the session, resolved server-side. See UserMenu. */
   workspaces?: UserMenuWorkspace[];
   /** FB KAMU B4: the agency co-brand of a linked tenant; null elsewhere. */
@@ -32,6 +33,7 @@ export default function MobileAppHeader({
   userImage,
   roleName,
   isPlatformAdmin = false,
+  canManageModules = false,
   workspaces = [],
   cobrand = null,
 }: MobileAppHeaderProps) {
@@ -71,6 +73,7 @@ export default function MobileAppHeader({
             userEmail={userEmail}
             userImage={userImage}
             roleName={roleName}
+            canManageModules={canManageModules}
             workspaces={workspaces}
           />
         </div>
@@ -109,7 +112,7 @@ export default function MobileAppHeader({
 
             {/* Nav Body */}
             <div className="flex-1 overflow-y-auto" onClick={() => setMobileOpen(false)}>
-              <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} />
+              <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} canManageModules={canManageModules} />
             </div>
           </div>
         </div>

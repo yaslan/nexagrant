@@ -57,6 +57,7 @@ interface UserMenuProps {
    * see the switcher block below for what used to stand here.
    */
   workspaces?: UserMenuWorkspace[];
+  canManageModules?: boolean;
 }
 
 export default function UserMenu({
@@ -67,6 +68,7 @@ export default function UserMenu({
   roleName: propRoleName,
   creditsBalance = 500,
   workspaces = [],
+  canManageModules = false,
 }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -395,14 +397,16 @@ export default function UserMenu({
                 </span>
               </Link>
 
-              <Link
-                href={getWorkspaceRoute('settingsModules', locale, routeWorkspace ?? undefined)}
-                onClick={() => setIsOpen(false)}
-                className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
-              >
-                <Settings className="w-4 h-4 text-muted" />
-                <span>{isTr ? 'Modül Ayarları' : 'Module Settings'}</span>
-              </Link>
+              {canManageModules && (
+                <Link
+                  href={getWorkspaceRoute('settingsModules', locale, routeWorkspace ?? undefined)}
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
+                >
+                  <Settings className="w-4 h-4 text-muted" />
+                  <span>{isTr ? 'Modül Ayarları' : 'Module Settings'}</span>
+                </Link>
+              )}
 
               <Link
                 href={getWorkspaceRoute('settingsApiKeys', locale, routeWorkspace ?? undefined)}
