@@ -198,6 +198,16 @@ test.describe('public lead form — /tr/fon-hazirlik result screen', () => {
     await fillTr(page, { email: 'mehmet@belediye.bel.tr' });
     await expect(page.getByText('Geçerli bir e-posta adresi yazın (ör. ad@belediye.bel.tr).')).toHaveCount(0);
 
+    // 2c) Everything valid except the name (empty).
+    await fillTr(page, { name: '', email: 'valid@email.bel.tr', organisation: 'Test Kurumu' });
+    await submit.click();
+    await expect(page.getByText('Adınızı yazın (en az 2 karakter).')).toBeVisible();
+    await expect(page.getByLabel('Adınız soyadınız')).toBeFocused();
+
+    // Fix the name and verify the error clears when the field changes.
+    await fillTr(page, { name: 'Test Adı' });
+    await expect(page.getByText('Adınızı yazın (en az 2 karakter).')).toHaveCount(0);
+
     // 3) A valid address, but the consent box unticked.
     await fillTr(page, { email: address });
     await page.getByLabel(/açık rıza veriyorum/).uncheck();
@@ -285,6 +295,24 @@ test.describe('public lead form — /tr/fon-hazirlik result screen', () => {
     await expect(page.getByRole('alert').filter({ hasText: 'Kısa sürede çok fazla talep gönderildi.' })).toBeVisible();
     expect(await leadsFor(address)).toHaveLength(0);
     await context.close();
+  });
+
+  test('JS disabled: noscript message appears to guide the user to enable JavaScript', async ({ browser }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    const response = await page.goto(TR_RESULT);
+    const content = await response?.text();
+    expect(content).toContain('Bu formu göndermek için JavaScript gereklidir. Lütfen tarayıcınızda JavaScript\'i etkinleştirin.');
+    await page.screenshot({ path: `${SHOTS}/tr-noscript.png`, fullPage: true });
+    await context.close();
+
+    const enContext = await browser.newContext({ javaScriptEnabled: false });
+    const enPage = await enContext.newPage();
+    const enResponse = await enPage.goto(EN_RESULT);
+    const enContent = await enResponse?.text();
+    expect(enContent).toContain('JavaScript is required to submit this form. Please enable JavaScript in your browser.');
+    await enPage.screenshot({ path: `${SHOTS}/en-noscript.png`, fullPage: true });
+    await enContext.close();
   });
 
   test('EN at 390 px: the form fits, sends, and the row is stored with locale en', async ({ browser }) => {

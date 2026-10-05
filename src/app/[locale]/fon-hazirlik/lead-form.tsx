@@ -185,6 +185,11 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
       <p className="mt-1 text-sm text-ink-2">{t('intro')}</p>
 
       <form className="relative mt-4 space-y-4" noValidate onSubmit={onSubmit}>
+        <noscript>
+          <div className="rounded-lg border border-warn bg-surface px-3 py-2 text-sm text-warn">
+            {t('noscript_message')}
+          </div>
+        </noscript>
         <div>
           <label htmlFor="lead-name" className="block text-sm font-medium text-ink">
             {t('name_label')}

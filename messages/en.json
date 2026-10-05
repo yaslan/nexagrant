@@ -2240,7 +2240,8 @@
       "error_consent": "Tick the explicit consent box to send the form.",
       "error_outdated": "The form has been updated. Reload the page and try again.",
       "error_rate": "Too many requests in a short time. Please try again later.",
-      "error_server": "Your request could not be saved right now. Please try again in a moment."
+      "error_server": "Your request could not be saved right now. Please try again in a moment.",
+      "noscript_message": "JavaScript is required to submit this form. Please enable JavaScript in your browser."
     },
     "turkey": {
       "partial": "Türkiye takes part in part of it",
