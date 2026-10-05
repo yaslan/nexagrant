@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Bell, CheckCircle2, AlertTriangle, Sparkles, Clock, ArrowLeft, CheckCheck } from 'lucide-react';
 import Link from 'next/link';
 import { markNotificationsRead } from '@/actions/user/notifications';
 import type { NotificationItem } from '@/lib/notifications/store';
-import { renderNotification } from '@/lib/notifications/render';
+import { formatNotificationTime, renderNotification } from '@/lib/notifications/render';
 
 interface NotificationsClientProps {
   notifications: NotificationItem[];
@@ -22,51 +23,42 @@ export default function NotificationsClient({
   workspace,
 }: NotificationsClientProps) {
   const t = useTranslations();
-  const isTr = locale === 'tr';
+  const tNotif = useTranslations('Notifications');
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
-  const renderedNotifications = useMemo(() => {
-    return notifications.map((n) => {
-      const rendered = renderNotification(n.type, n.payload, (key: string) => t(key));
-      if (!rendered) return null;
+  // The list comes from the server page; after a write, or when the tab regains
+  // focus (another tab may have marked items read), the page is re-rendered.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') router.refresh();
+    };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [router]);
 
-      return {
+  // Plain text only: `searchName` is user input (see renderNotification).
+  const renderedNotifications = useMemo(
+    () =>
+      notifications.map((n) => ({
         id: n.id,
-        title: rendered.title,
-        description: rendered.description,
-        icon: rendered.icon,
-        createdAt: new Date(n.createdAt),
-        readAt: n.readAt ? new Date(n.readAt) : null,
-      };
-    }).filter((n): n is NonNullable<typeof n> => n !== null);
-  }, [notifications, t]);
+        ...renderNotification(n.type, n.payload, tNotif),
+        time: formatNotificationTime(n.createdAt, locale),
+        unread: n.readAt === null,
+      })),
+    [notifications, tNotif, locale]
+  );
 
-  const handleMarkAllRead = async () => {
-    const response = await markNotificationsRead('all');
-    if (!response.ok) {
-      console.error('Failed to mark all as read:', response.error);
-    }
-  };
-
-  const handleMarkSingleRead = async (id: string) => {
-    const response = await markNotificationsRead([id]);
-    if (!response.ok) {
-      console.error('Failed to mark as read:', response.error);
-    }
-  };
-
-  const formatTime = (date: Date): string => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return isTr ? 'Şimdi' : 'Just now';
-    if (minutes < 60) return isTr ? `${minutes}d önce` : `${minutes}m ago`;
-    if (hours < 24) return isTr ? `${hours}s önce` : `${hours}h ago`;
-    if (days < 7) return isTr ? `${days}g önce` : `${days}d ago`;
-
-    return date.toLocaleDateString(isTr ? 'tr-TR' : 'en-US');
+  const markRead = (target: string[] | 'all') => {
+    startTransition(async () => {
+      const response = await markNotificationsRead(target);
+      if (response.ok) router.refresh();
+      else console.error('[notifications] mark read failed:', response.error);
+    });
   };
 
   return (
@@ -99,7 +91,8 @@ export default function NotificationsClient({
                 {t('Notifications.unreadBadge', { count: unreadCount })}
               </span>
               <button
-                onClick={handleMarkAllRead}
+                onClick={() => markRead('all')}
+                disabled={isPending}
                 className="bg-surface hover:bg-surface-hover border border-border text-ink font-bold text-xs px-3.5 py-2 rounded-xl shadow-2xs transition flex items-center space-x-1.5"
               >
                 <CheckCheck className="w-4 h-4 text-ok" />
@@ -132,12 +125,20 @@ export default function NotificationsClient({
         {renderedNotifications.map((n) => (
           <div
             key={n.id}
-            onClick={() => handleMarkSingleRead(n.id)}
+            role="button"
+            tabIndex={0}
+            onClick={() => markRead([n.id])}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                markRead([n.id]);
+              }
+            }}
             className={`p-4 flex items-start justify-between space-x-4 transition-colors cursor-pointer hover:bg-surface-hover ${
-              !n.readAt ? 'bg-accent/5' : ''
+              n.unread ? 'bg-accent/5' : ''
             }`}
           >
-            <div className="flex items-start space-x-3.5">
+            <div className="flex items-start space-x-3.5 min-w-0">
               <div className="mt-0.5">
                 {n.icon === 'match' && (
                   <div className="w-8 h-8 rounded-full bg-accent/15 text-accent flex items-center justify-center">
@@ -161,17 +162,17 @@ export default function NotificationsClient({
                 )}
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <div className="flex items-center space-x-2">
                   <h3 className="font-semibold text-sm text-ink">{n.title}</h3>
-                  {!n.readAt && (
+                  {n.unread && (
                     <span className="w-2 h-2 rounded-full bg-accent" />
                   )}
                 </div>
-                <p className="text-xs text-ink-2 leading-relaxed">{n.description}</p>
+                <p className="text-xs text-ink-2 leading-relaxed break-words">{n.description}</p>
                 <div className="flex items-center space-x-1 text-[11px] text-muted pt-1">
                   <Clock className="w-3 h-3" />
-                  <span>{formatTime(n.createdAt)}</span>
+                  <span>{n.time}</span>
                 </div>
               </div>
             </div>

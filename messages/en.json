@@ -41,9 +41,7 @@
     "aiTruncated": "The AI text was cut off at the length limit, so nothing was saved and no credit was charged. Try again, or ask for a shorter document.",
     "aiRefused": "The AI model declined this request. Nothing was saved and no credit was charged.",
     "logoAlt": "{brand} logo",
-    "copyright": "© {year} {brand} ({brand} SaaS). All rights reserved.",
-    "unnamedUser": "Unnamed user",
-    "unassigned": "Unassigned"
+    "copyright": "© {year} {brand} ({brand} SaaS). All rights reserved."
   },
   "Notifications": {
     "title": "Notifications",
@@ -56,14 +54,17 @@
     "savedSearchTitle": "New match found",
     "savedSearchDesc": "{matchCount, plural, one {1 call} other {# calls}} matched \"{searchName}\"",
     "creditGrantedTitle": "Credits added",
-    "creditGrantedDesc": "{amount} AI credits from {source}",
+    "creditGrantedDesc": "{amount} AI credits added ({source})",
     "sourceMonthly": "Monthly grant",
     "sourceStripe": "Stripe",
     "sourceIyzico": "iyzico",
     "creditExhaustedTitle": "Credits exhausted",
     "creditExhaustedDesc": "No AI credits left for {module}",
     "evidenceExpiringTitle": "Document expiring soon",
-    "evidenceExpiringDesc": "Valid until {validUntil}"
+    "evidenceExpiringDesc": "Valid until {validUntil}",
+    "sourceOther": "another source",
+    "genericTitle": "Notification",
+    "genericDesc": "You have a new notification."
   },
   "Dashboard": {
     "title": "Dashboard",
