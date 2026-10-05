@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useId } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -73,6 +73,8 @@ export default function UserMenu({
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const notifButtonRef = useRef<HTMLButtonElement>(null);
+  const notifPanelId = useId();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -133,6 +135,19 @@ export default function UserMenu({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Escape closes the bell panel and hands focus back to the bell, so a keyboard
+  // user is not left on a node that has just been unmounted.
+  useEffect(() => {
+    if (!isNotifOpen) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      setIsNotifOpen(false);
+      notifButtonRef.current?.focus();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isNotifOpen]);
 
   const switchLanguage = (newLocale: string) => {
     if (newLocale === locale) return;
@@ -246,15 +261,23 @@ export default function UserMenu({
 
   return (
     <div className="flex items-center space-x-3">
-      {/* Notifications Dropdown */}
-      <div className="relative" ref={notifRef}>
+      {/* Notifications Dropdown. Below `sm` the wrapper is not positioned, so the panel
+          anchors to the sticky header (full width minus the 16px gutters) instead of to
+          the bell, which sits too far right for a 320px panel at 390px (B1). */}
+      <div className="sm:relative" ref={notifRef}>
         <button
+          ref={notifButtonRef}
+          type="button"
           onClick={() => {
             setIsNotifOpen(!isNotifOpen);
             setIsOpen(false);
           }}
           className="relative p-2 text-ink-2 hover:text-ink hover:bg-surface-hover rounded-full transition-all focus:outline-none"
           title={isTr ? 'Bildirimler' : 'Notifications'}
+          aria-label={isTr ? 'Bildirimler' : 'Notifications'}
+          aria-haspopup="dialog"
+          aria-expanded={isNotifOpen}
+          aria-controls={isNotifOpen ? notifPanelId : undefined}
         >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
@@ -263,7 +286,12 @@ export default function UserMenu({
         </button>
 
         {isNotifOpen && (
-          <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div
+            id={notifPanelId}
+            role="dialog"
+            aria-label={isTr ? 'Bildirimler' : 'Notifications'}
+            className="absolute inset-x-4 top-full sm:inset-x-auto sm:top-auto sm:right-0 mt-2 sm:w-80 max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+          >
             <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
               <h3 className="font-bold text-sm text-ink">{isTr ? 'Bildirimler' : 'Notifications'}</h3>
               {unreadCount > 0 ? (
