@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 // blog-shared, not blog: this is a client component and @/lib/blog reaches Prisma.
@@ -23,6 +23,8 @@ import {
   FileText,
   Eye,
   Tag,
+  ImagePlus,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -42,6 +44,18 @@ interface AdminBlogClientProps {
 /** One line of feedback above the table. `error` is only ever a translated message. */
 type Notice = { kind: 'ok' | 'error'; text: string } | null;
 
+/**
+ * The cover image upload, `POST /api/admin/blog/image` (TASK-MUU20NSV2TETW):
+ * multipart `file` → 200 `{ url }` · 400 `{ error: 'type' | 'size' }` ·
+ * 401/403 `{ error: 'forbidden' }` · 503 `{ error: 'object_store_unconfigured' }`.
+ * The route checks the bytes; the type and size are checked here first only so
+ * an obviously wrong file is refused before it is sent.
+ */
+const IMAGE_MAX_MB = 5;
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const IMAGE_ERRORS = ['type', 'size', 'forbidden', 'object_store_unconfigured', 'upload_failed'] as const;
+type ImageError = (typeof IMAGE_ERRORS)[number];
+
 export default function AdminBlogClient({
   initialPosts,
   locale,
@@ -52,11 +66,15 @@ export default function AdminBlogClient({
   const [posts, setPosts] = useState<BlogPost[]>(initialPosts);
   const [notice, setNotice] = useState<Notice>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const formErrorRef = useRef<HTMLDivElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [imageError, setImageError] = useState<ImageError | null>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -76,6 +94,13 @@ export default function AdminBlogClient({
 
   const categories = Array.from(new Set(posts.map((p) => p.category)));
 
+  useEffect(() => {
+    if (formError && formErrorRef.current) {
+      formErrorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      formErrorRef.current.focus();
+    }
+  }, [formError]);
+
   const filteredPosts = posts.filter((p) => {
     const matchesSearch = 
       p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -88,6 +113,7 @@ export default function AdminBlogClient({
   const handleOpenCreateModal = () => {
     setEditingSlug(null);
     setFormError(null);
+    setImageError(null);
     setFormData({
       title: '',
       slug: '',
@@ -107,6 +133,7 @@ export default function AdminBlogClient({
   const handleOpenEditModal = (post: BlogPost) => {
     setEditingSlug(post.slug);
     setFormError(null);
+    setImageError(null);
     setFormData({
       title: post.title,
       slug: post.slug,
@@ -124,8 +151,43 @@ export default function AdminBlogClient({
     setIsModalOpen(true);
   };
 
+  const handleImagePick = async (file: File | undefined) => {
+    if (!file) return;
+    setImageError(null);
+    // The same file can be picked again after an error.
+    if (imageInput.current) imageInput.current.value = '';
+    if (!IMAGE_TYPES.includes(file.type)) return setImageError('type');
+    if (file.size > IMAGE_MAX_MB * 1024 * 1024) return setImageError('size');
+
+    setIsUploading(true);
+    try {
+      const body = new FormData();
+      body.set('file', file);
+      const res = await fetch('/api/admin/blog/image', { method: 'POST', body });
+      const data: { url?: unknown; error?: unknown } = await res.json().catch(() => ({}));
+      if (res.ok && typeof data.url === 'string' && data.url) {
+        const url = data.url;
+        setFormData((prev) => ({ ...prev, image: url }));
+        return;
+      }
+      const code = IMAGE_ERRORS.find((c) => c === data.error);
+      setImageError(code ?? (res.status === 401 || res.status === 403 ? 'forbidden' : 'upload_failed'));
+    } catch (err) {
+      console.error(err);
+      setImageError('upload_failed');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUploading) return;
+    // BlogPost.image is required; the server refuses a post without one too.
+    if (!formData.image) {
+      setFormError(t('image.missing'));
+      return;
+    }
     setIsSubmitting(true);
     setFormError(null);
 
@@ -427,7 +489,13 @@ export default function AdminBlogClient({
             {/* Modal Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
               {formError && (
-                <div role="alert" data-testid="blog-form-error" className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-xs font-semibold text-bad">
+                <div
+                  ref={formErrorRef}
+                  role="alert"
+                  data-testid="blog-form-error"
+                  className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-xs font-semibold text-bad"
+                  tabIndex={-1}
+                >
                   {formError}
                 </div>
               )}
@@ -518,15 +586,60 @@ export default function AdminBlogClient({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-ink mb-1">Kapak Görsel URL&apos;i</label>
-                <input
-                  type="text"
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent"
-                />
+              <div aria-busy={isUploading}>
+                <span id="blog-image-label" className="block text-xs font-bold text-ink mb-1">{t('image.label')} *</span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  {formData.image && (
+                    // unoptimized: the preview shows the stored file itself, so an
+                    // uploaded image appears whatever host the store serves it from.
+                    <Image
+                      src={formData.image}
+                      alt={t('image.previewAlt')}
+                      width={160}
+                      height={96}
+                      unoptimized
+                      data-testid="blog-image-preview"
+                      className={`w-40 h-24 object-cover rounded-lg border border-border shrink-0 ${isUploading ? 'opacity-50' : ''}`}
+                    />
+                  )}
+                  <div className="min-w-0 space-y-1">
+                    <label
+                      htmlFor="blog-image-file"
+                      className={`inline-flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-lg border border-border bg-ground text-xs font-bold text-ink hover:bg-surface-hover transition cursor-pointer has-focus-visible:ring-2 has-focus-visible:ring-accent ${isUploading ? 'pointer-events-none opacity-60' : ''}`}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <ImagePlus className="w-4 h-4" aria-hidden="true" />
+                      )}
+                      <span>{formData.image ? t('image.change') : t('image.choose')}</span>
+                      <input
+                        ref={imageInput}
+                        id="blog-image-file"
+                        type="file"
+                        accept={IMAGE_TYPES.join(',')}
+                        disabled={isUploading}
+                        aria-describedby="blog-image-hint"
+                        data-testid="blog-image-input"
+                        onChange={(e) => void handleImagePick(e.target.files?.[0])}
+                        className="sr-only"
+                      />
+                    </label>
+                    <p id="blog-image-hint" className="text-[11px] text-muted">
+                      {t('image.hint', { maxMb: IMAGE_MAX_MB })}
+                    </p>
+                    {isUploading && (
+                      <p role="status" data-testid="blog-image-uploading" className="text-[11px] font-semibold text-ink-2">
+                        {t('image.uploading')}
+                      </p>
+                    )}
+                    {imageError && (
+                      <p role="alert" data-testid="blog-image-error" className="text-[11px] font-semibold text-bad break-words">
+                        {t(`image.errors.${imageError}`, { maxMb: IMAGE_MAX_MB })}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center space-x-2 pt-2">
@@ -554,7 +667,7 @@ export default function AdminBlogClient({
                 <button
                   type="submit"
                   data-testid="blog-submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isUploading}
                   className="bg-accent hover:opacity-90 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-2xs transition disabled:opacity-50"
                 >
                   {isSubmitting ? 'Kaydediliyor...' : editingSlug ? 'Değişiklikleri Kaydet' : 'Yayınla'}

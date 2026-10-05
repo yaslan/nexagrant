@@ -131,6 +131,94 @@ export function getWorkspaceRoute(
 }
 
 /**
+ * Switch the locale of a pathname, mapping it to the localized counterpart.
+ * Preserves workspace slug and query string.
+ */
+export function switchLocalePath(pathname: string, targetLocale: string): string {
+  if (!pathname) return `/${targetLocale}`;
+
+  const segments = pathname.split('/').filter(Boolean);
+  const currentLocale = segments[0];
+
+  if (!currentLocale || (currentLocale !== 'tr' && currentLocale !== 'en')) {
+    return `/${targetLocale}`;
+  }
+
+  if (segments.length === 1) {
+    return `/${targetLocale}`;
+  }
+
+  const workspace = segments[1] || '';
+
+  const publicRoutes: Record<string, PublicRouteKey> = {
+    'blog': 'blog', 'acik-cagrilar': 'openCalls', 'open-calls': 'openCalls',
+    'fiyatlandirma': 'pricing', 'pricing': 'pricing',
+    'giris': 'login', 'login': 'login', 'kayit': 'register', 'register': 'register',
+    'kullanim-kosullari': 'terms', 'terms': 'terms',
+    'gizlilik-politikasi': 'privacy', 'privacy': 'privacy',
+    'veri-isleme-sozlesmesi': 'dpa', 'dpa': 'dpa',
+  };
+
+  if (workspace in publicRoutes) {
+    const routeKey = publicRoutes[workspace];
+    if (routeKey === 'blog' && segments.length > 2) {
+      return getPublicRoute('blogDetail', targetLocale, segments[2]);
+    }
+    if (routeKey) return getPublicRoute(routeKey, targetLocale);
+  }
+
+  const workspaceRoutes: Record<string, WorkspaceRouteKey> = {
+    'panel': 'dashboard', 'dashboard': 'dashboard',
+    'cagrilar': 'calls', 'calls': 'calls',
+    'firsatlar': 'pipeline', 'pipeline': 'pipeline',
+    'ortaklar': 'partners', 'partners': 'partners',
+    'iliskiler': 'relationships', 'relationships': 'relationships',
+    'kanitlar': 'evidence', 'evidence': 'evidence',
+    'konsept-notlar': 'conceptNotes', 'concept-notes': 'conceptNotes',
+    'onay-merkezi': 'approvals', 'approvals': 'approvals',
+    'tto-hizlandirici': 'tto', 'tto': 'tto',
+    'bildirimler': 'notifications', 'notifications': 'notifications',
+    'ayarlar': 'settingsProfile', 'settings': 'settingsProfile',
+  };
+
+  const thirdSegment = segments[2];
+  if (!thirdSegment || thirdSegment in workspaceRoutes) {
+    const baseRoute = thirdSegment || 'panel';
+    const routeKey = (workspaceRoutes[baseRoute] || 'dashboard') as WorkspaceRouteKey;
+
+    if (segments.length > 3) {
+      const subRoute = segments[3] || '';
+      const detailedRoutes: Record<string, WorkspaceRouteKey> = {
+        'profil': 'settingsProfile', 'profile': 'settingsProfile',
+        'moduller': 'settingsModules', 'modules': 'settingsModules',
+        'faturalama': 'settingsBilling', 'billing': 'settingsBilling',
+        'api-anahtarlari': 'settingsApiKeys', 'api-keys': 'settingsApiKeys',
+        'takvim': 'settingsCalendar', 'calendar': 'settingsCalendar',
+        'kapilar': 'settingsGates', 'gates': 'settingsGates',
+        'uyeler': 'settingsMembers', 'members': 'settingsMembers',
+        'gizlilik': 'settingsPrivacy', 'privacy': 'settingsPrivacy',
+      };
+      const detailRouteKey = detailedRoutes[subRoute];
+      if (detailRouteKey) return getWorkspaceRoute(detailRouteKey, targetLocale, workspace);
+    }
+
+    if (segments.length > 3 && ['cagrilar', 'calls', 'ortaklar', 'partners', 'konsept-notlar', 'concept-notes'].includes(baseRoute)) {
+      const detailRoutes: Record<string, WorkspaceRouteKey> = {
+        'cagrilar': 'callDetail', 'calls': 'callDetail',
+        'ortaklar': 'partnerDetail', 'partners': 'partnerDetail',
+        'konsept-notlar': 'conceptNoteDetail', 'concept-notes': 'conceptNoteDetail',
+      };
+      const detailKey = detailRoutes[baseRoute];
+      if (detailKey) return getWorkspaceRoute(detailKey, targetLocale, workspace, segments[3]);
+    }
+
+    return getWorkspaceRoute(routeKey, targetLocale, workspace);
+  }
+
+  return `/${targetLocale}`;
+}
+
+/**
  * Where a public call card's "details" button goes.
  *
  * TASK-MUNWZGWA70P16 (İNCELEME-71 B-2): the cards linked /[locale]/calls/<id>,

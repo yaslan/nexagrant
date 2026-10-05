@@ -10,6 +10,7 @@
     "tto": "TTO Accelerator (M7)",
     "approvals": "Approvals (4-Eyes)",
     "apiKeys": "Partner REST API",
+    "members": "Members",
     "settings": "Settings",
     "adminModules": "Platform Admin",
     "workspaceLabel": "Workspace",
@@ -2643,6 +2644,23 @@
       "slug_taken": "A post with this slug already exists. Change the title or the slug.",
       "not_found": "Post not found; another admin may have deleted it. Reload the page.",
       "save_failed": "The post could not be saved. Please try again."
+    },
+    "image": {
+      "label": "Cover image",
+      "choose": "Choose image",
+      "change": "Change image",
+      "hint": "JPG, PNG or WebP, up to {maxMb} MB.",
+      "uploading": "Uploading image…",
+      "uploaded": "Image uploaded.",
+      "previewAlt": "Cover image preview",
+      "missing": "Upload a cover image before saving.",
+      "errors": {
+        "type": "This file type is not supported. Choose a JPG, PNG or WebP image.",
+        "size": "The image is larger than {maxMb} MB. Choose a smaller file.",
+        "forbidden": "You are not allowed to upload images. Sign in as a platform admin.",
+        "object_store_unconfigured": "The file store is not configured, so the image cannot be uploaded right now. Tell your system administrator.",
+        "upload_failed": "The image could not be uploaded. Please try again."
+      }
     }
   },
   "adminDocuments": {
@@ -2824,5 +2842,17 @@
     "errorGeneric": "An error occurred",
     "savingButton": "Generating AI Embeddings...",
     "saveButton": "Save Profile"
+  },
+  "m7": {
+    "tto": {
+      "matchingStatLabel": "Call matching",
+      "matchingStatValue": "Library loading",
+      "emptyPortfolio": "No technologies in the portfolio yet.",
+      "emptyPortfolioHint": "Start by adding a new technology with the form above.",
+      "matchCalls": "Match EU calls",
+      "matchResultTitle": "EU call matching result ({count})",
+      "noMatch": "No matching EU call was found for this technology.",
+      "openM4Relationship": "Open M4 relationship"
+    }
   }
 }

@@ -124,9 +124,13 @@ test.describe.serial('admin blog — a post outlives the process that wrote it',
     await page.goto('/tr/admin/blog');
     await fillNewPost(page);
 
-    await expect(page.getByTestId('blog-form-error')).toHaveText(
+    const errorMsg = page.getByTestId('blog-form-error');
+    await expect(errorMsg).toHaveText(
       'Bu kısa adla (slug) bir yazı zaten var. Başlığı ya da kısa adı değiştirin.'
     );
+    // Verify error is in viewport and focused (scrollIntoView works).
+    await expect(errorMsg).toBeInViewport();
+    await expect(errorMsg).toBeFocused();
     await expect(page.getByTestId('blog-success')).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/03-slug-taken.png`, fullPage: true });
     expect(await prisma.blogPost.count({ where: { slug: { startsWith: SLUG } } })).toBe(1);

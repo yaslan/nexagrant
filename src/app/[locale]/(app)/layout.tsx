@@ -4,6 +4,7 @@ import Link from 'next/link';
 import SidebarNav from '@/components/SidebarNav';
 import UserMenu from '@/components/UserMenu';
 import ThemeToggle from '@/components/ThemeToggle';
+import { LocaleUpdater } from '@/components/LocaleUpdater';
 import { auth } from '@/lib/auth';
 import { isPlatformAdminDemoEmail } from '@/lib/demo-login';
 import { redirect } from 'next/navigation';
@@ -15,6 +16,7 @@ import { tenantScopeOf } from '@/lib/tenant';
 import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-store';
 import CoBrandBadge from '@/components/CoBrandBadge';
 import PilotBanner from '@/components/PilotBanner';
+import { can, asRole } from '@/lib/rbac';
 
 import MobileAppHeader from '@/components/MobileAppHeader';
 import FeedbackWidget from '@/components/FeedbackWidget';
@@ -88,8 +90,12 @@ export default async function AppLayout({
     roleName === 'PLATFORM_ADMIN'
   );
 
+  const canManageModules = can(asRole(roleName), 'manage_modules');
+  const canManageUsers = can(asRole(roleName), 'manage_users');
+
   return (
     <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-background">
+      <LocaleUpdater />
       {/* Mobile Top Header */}
       <MobileAppHeader
         locale={locale}
@@ -98,6 +104,8 @@ export default async function AppLayout({
         userImage={userImage}
         roleName={roleName}
         isPlatformAdmin={isPlatformAdmin}
+        canManageModules={canManageModules}
+        canManageUsers={canManageUsers}
         workspaces={workspaces}
         cobrand={cobrand}
       />
@@ -118,7 +126,7 @@ export default async function AppLayout({
           />
         </Link>
 
-        <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} />
+        <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} canManageModules={canManageModules} canManageUsers={canManageUsers} />
       </aside>
 
       {/* Main Workspace Frame */}
@@ -137,6 +145,8 @@ export default async function AppLayout({
               userImage={userImage}
               roleName={roleName}
               workspaces={workspaces}
+              canManageModules={canManageModules}
+              canManageUsers={canManageUsers}
             />
           </div>
         </header>

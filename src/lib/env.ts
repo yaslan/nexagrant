@@ -181,12 +181,15 @@ const envSchema = z.object({
    * credentials stay on `process.env` inside src/lib/storage.ts because moving
    * a credential is a different change from moving a brand string.
    *
-   * R2_PUBLIC_HOST is the public origin of the bucket, if one exists. Evidence
-   * is no longer linked from it (B-2, TASK-MUNODY0DVDWC5): anyone holding such
-   * a URL read the file, CONFIDENTIAL ones included, and it went into the CSV
-   * export. Evidence is read through the authenticated download route, which
-   * redirects to a short-lived presigned GET. Only the CSP still reads this
-   * (src/lib/security-headers.ts); the bucket itself should not be public.
+   * R2_PUBLIC_HOST is the public base URL of R2_PUBLIC_BUCKET, a separate
+   * bucket the store serves to anyone (blog images, TASK-MUU20NSV2TETW); it may
+   * carry a path (MinIO `http://host:9000/<bucket>`, Supabase Storage
+   * `https://<ref>.supabase.co/storage/v1/object/public/<bucket>`). The CSP
+   * img-src and next.config `images.remotePatterns` read it too. Evidence is
+   * never linked from it (B-2, TASK-MUNODY0DVDWC5): anyone holding such a URL
+   * read the file, CONFIDENTIAL ones included. Evidence stays in the private
+   * R2_BUCKET and is read through the authenticated download route, which
+   * redirects to a short-lived presigned GET.
    *
    * R2_BUCKET keeps the historical bucket default that storage.ts applies: 50
    * Evidence rows already carry it, and a bucket name is an infrastructure
@@ -194,6 +197,7 @@ const envSchema = z.object({
    * stored object.
    */
   R2_PUBLIC_HOST: optionalUrl,
+  R2_PUBLIC_BUCKET: blankToUndefined(z.string().optional()),
   R2_BUCKET: z.string().optional(),
   /**
    * How many *consecutive* failed runs of the daily orphan-alert sweep
