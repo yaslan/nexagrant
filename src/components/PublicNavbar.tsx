@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
 import { useTranslations } from 'next-intl';
-import { getPublicRoute } from '@/lib/routes';
+import { getPublicRoute, switchLocalePath } from '@/lib/routes';
 import { PRODUCT_NAME } from '@/lib/brand';
 
 interface PublicNavbarProps {
@@ -17,7 +18,7 @@ interface PublicNavbarProps {
   roleName?: string;
 }
 
-export default function PublicNavbar({ 
+export default function PublicNavbar({
   locale,
   userName,
   userEmail,
@@ -27,6 +28,14 @@ export default function PublicNavbar({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const tCommon = useTranslations('Common');
   const isTr = locale === 'tr';
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const getLocalizedHref = (targetLocale: string) => {
+    const newPath = switchLocalePath(pathname, targetLocale);
+    const query = searchParams?.toString() ? `?${searchParams.toString()}` : '';
+    return newPath + query;
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md border-b border-border transition-all">
@@ -83,7 +92,7 @@ export default function PublicNavbar({
           {/* Language Switch */}
           <div className="flex items-center bg-ground border border-border rounded-lg p-1 text-xs font-bold">
             <Link
-              href="/tr"
+              href={getLocalizedHref('tr')}
               className={`px-2 py-1 rounded-md transition ${
                 locale === 'tr' ? 'bg-surface text-ink shadow-2xs' : 'text-muted hover:text-ink'
               }`}
@@ -91,7 +100,7 @@ export default function PublicNavbar({
               TR
             </Link>
             <Link
-              href="/en"
+              href={getLocalizedHref('en')}
               className={`px-2 py-1 rounded-md transition ${
                 locale === 'en' ? 'bg-surface text-ink shadow-2xs' : 'text-muted hover:text-ink'
               }`}
@@ -146,7 +155,7 @@ export default function PublicNavbar({
             </span>
             <div className="flex items-center bg-ground border border-border rounded-lg p-1 text-xs font-bold">
               <Link
-                href="/tr"
+                href={getLocalizedHref('tr')}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`px-3 py-1 rounded-md transition ${
                   locale === 'tr' ? 'bg-surface text-ink shadow-2xs' : 'text-muted hover:text-ink'
@@ -155,7 +164,7 @@ export default function PublicNavbar({
                 TR
               </Link>
               <Link
-                href="/en"
+                href={getLocalizedHref('en')}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`px-3 py-1 rounded-md transition ${
                   locale === 'en' ? 'bg-surface text-ink shadow-2xs' : 'text-muted hover:text-ink'

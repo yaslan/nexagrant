@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { logoutAction } from '@/lib/actions/auth';
 import { signOut as clientSignOut } from 'next-auth/react';
 import { useOptionalSession } from '@/lib/hooks/use-optional-session';
@@ -35,6 +35,7 @@ import { useTheme } from './ThemeProvider';
 import { getWorkspaceRoute, getPublicRoute } from '@/lib/routes';
 import { displayUserName, displayRoleName } from '@/lib/user-display';
 import { isNextRedirectError } from '@/lib/errors';
+import { switchLocalePath } from '@/lib/routes';
 
 /** One entry of the workspace switcher, as it exists in the database. */
 export interface UserMenuWorkspace {
@@ -73,6 +74,7 @@ export default function UserMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
 
@@ -134,8 +136,9 @@ export default function UserMenu({
 
   const switchLanguage = (newLocale: string) => {
     if (newLocale === locale) return;
-    const newPath = pathname ? pathname.replace(`/${locale}`, `/${newLocale}`) : `/${newLocale}`;
-    router.push(newPath);
+    const newPath = switchLocalePath(pathname, newLocale);
+    const query = searchParams?.toString() ? `?${searchParams.toString()}` : '';
+    router.push(newPath + query);
   };
 
   const getInitials = (name: string) => {
@@ -260,7 +263,7 @@ export default function UserMenu({
         </button>
 
         {isNotifOpen && (
-          <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
             <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
               <h3 className="font-bold text-sm text-ink">{isTr ? 'Bildirimler' : 'Notifications'}</h3>
               {unreadCount > 0 ? (
