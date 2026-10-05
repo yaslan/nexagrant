@@ -1,3 +1,0 @@
-ÖLDÜ   | Y1g | export * izlenmiyor | 1 failed | 67 passed (68)
-ÖLDÜ   | Y1j | fabrikada deep yok | 1 failed | 67 passed (68)
-ÖLDÜ   | Y1p | yerel kaynak fonksiyon çağrısı kaynak değil | 1 failed | 67 passed (68)

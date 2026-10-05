@@ -1,8 +1,0 @@
-(Use `node --trace-warnings ...` to show where the warning was created)
-
- Test Files  292 passed | 6 skipped (298)
-      Tests  3696 passed | 99 skipped (3795)
-   Start at  19:05:47
-   Duration  27.28s (transform 15.21s, setup 0ms, import 71.37s, tests 167.65s, environment 14.13s)
-
-exit=0

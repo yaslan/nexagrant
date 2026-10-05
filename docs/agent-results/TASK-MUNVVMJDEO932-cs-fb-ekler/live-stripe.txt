@@ -1,5 +1,0 @@
-<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
--- imzalı customer.subscription.updated (bilinmeyen abonelik): HTTP 500 content-type=application/json
-{"error":"internal_error"}
-== sunucu log'u (ayrıntı yalnız burada):
-Error processing webhook: Unable to determine tenantId from subscription sub_csfb_secret_4242 Error: Unable to determine tenantId from subscription sub_csfb_secret_4242

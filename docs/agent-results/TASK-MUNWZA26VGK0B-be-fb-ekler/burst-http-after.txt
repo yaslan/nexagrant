@@ -1,3 +1,0 @@
-round 1 (idle 7s, 20 parallel):  20 wz-b;
-round 2 (idle 7s, 20 parallel):  20 wz-b;
-round 3 (idle 7s, 20 parallel):  20 wz-b;

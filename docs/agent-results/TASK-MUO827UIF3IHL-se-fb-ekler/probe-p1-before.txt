@@ -1,2 +1,0 @@
-== ÖNCE (dev bekçisi) aynı P1 probe
-      Tests  52 passed (52)

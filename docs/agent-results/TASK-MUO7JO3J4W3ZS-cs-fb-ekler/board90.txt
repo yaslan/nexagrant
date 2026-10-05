@@ -1,4 +1,0 @@
-owner /tr/ws-a/firsatlar: işaretçiler=[CSFB90-26 CSFB90-41 CSFB90-42 CSFB90-44 CSFB90-45 CSFB90-47 CSFB90-48 CSFB90-49 CSFB90-9 CSFB90-S1 ] tampon-id(opp-<ts>)=0 modül-kapalı=1
-owner /en/ws-a/pipeline: işaretçiler=[CSFB90-26 CSFB90-41 CSFB90-42 CSFB90-44 CSFB90-45 CSFB90-47 CSFB90-48 CSFB90-49 CSFB90-9 CSFB90-S1 ] tampon-id(opp-<ts>)=0 modül-kapalı=0
-owner /tr/kalite/firsatlar: işaretçiler=[CSFB90-26 CSFB90-41 CSFB90-42 CSFB90-44 CSFB90-45 CSFB90-47 CSFB90-48 CSFB90-49 CSFB90-9 CSFB90-S1 ] tampon-id(opp-<ts>)=0 modül-kapalı=1
-restr /tr/ws-b/firsatlar: işaretçiler=[CSFB90-26 CSFB90-41 CSFB90-42 CSFB90-44 CSFB90-45 CSFB90-47 CSFB90-48 CSFB90-49 CSFB90-9 CSFB90-S1 ] tampon-id(opp-<ts>)=0 modül-kapalı=1

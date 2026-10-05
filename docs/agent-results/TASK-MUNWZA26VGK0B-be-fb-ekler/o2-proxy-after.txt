@@ -1,5 +1,0 @@
-O2 round 1: {"wz-b":20}
-O2 round 2: {"wz-b":20}
-O2 round 3: {"wz-b":20}
-O2 warnings: 0 []
- ✓ zz-befb-o2.test.ts > o2 burst through slow proxy 21359ms

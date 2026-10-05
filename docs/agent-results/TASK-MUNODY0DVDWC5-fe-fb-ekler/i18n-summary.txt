@@ -1,8 +1,0 @@
-  Baseline allows:  314 in 36 file(s)
-
-⚠️  Baseline is looser than reality — 2 literal(s) paid down. Refresh it with:
-      pnpm i18n:check --update-baseline
-   - src/app/[locale]/admin/settings/page.tsx  9 → 7
-
-✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
-

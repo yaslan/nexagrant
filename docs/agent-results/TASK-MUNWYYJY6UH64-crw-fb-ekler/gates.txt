@@ -1,7 +1,0 @@
-npx tsc --noEmit -p .  64.35s user 4.30s system 25% cpu 4:25.55 total
-tsc EXIT=0
-lint EXIT=0
-✓ Compiled successfully in 14.3s
-✓ Generating static pages using 11 workers (31/31) in 604ms
-✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
-build EXIT=0

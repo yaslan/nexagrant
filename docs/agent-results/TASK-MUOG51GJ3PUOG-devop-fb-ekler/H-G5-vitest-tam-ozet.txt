@@ -1,8 +1,0 @@
- Test Files  5 failed | 310 passed | 2 skipped (317)
-      Tests  33 failed | 4189 passed | 54 skipped (4276)
-exit 1
-  23  FAIL  src/lib/auth-callbacks.test.ts
-   1  FAIL  tests/e2e-profile-save.spec.ts [ tests/e2e-profile-save.spec.ts ]
-   1  FAIL  tests/server-action-rbac-guard.test.ts
-   8  FAIL  tests/settings-profile-update.test.ts
-   1  FAIL  tests/teardown-where-guard.test.ts

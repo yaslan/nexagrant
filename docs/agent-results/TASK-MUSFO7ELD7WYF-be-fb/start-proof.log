@@ -1,4 +1,0 @@
-Running 1 test using 1 worker
-[WebServer] [getPresignedUploadUrlAction] no object store configured in production (R2_ACCOUNT_ID unset); upload refused
-  ✓  1 [chromium] › tests/e2e/zz-befb-r2-proof.spec.ts:15:5 › production without R2: upload refused early, no mock-upload request (972ms)
-  1 passed (3.2s)

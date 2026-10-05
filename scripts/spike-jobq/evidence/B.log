@@ -1,4 +1,0 @@
-[B] 2026-09-29T12:05:01.726Z up (graphile-worker, cron "* * * * *")
-[core] INFO: Worker connected and looking for jobs... (task names: 'k2-monthly-cordis')
-[core] INFO: Received 'SIGTERM'; attempting global graceful shutdown... (all termination signals will be ignored for the next 5 seconds)
-[core] INFO: Global graceful shutdown complete; killing self via SIGTERM

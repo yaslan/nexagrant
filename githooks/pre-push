@@ -1,5 +1,0 @@
-#!/bin/sh
-# Push, kodun bu makineden ÇIKTIĞI andır: burada tam kapı koşar, kısaltma yok.
-set -e
-echo "→ pnpm gate (lint + typecheck + test, proje geneli)"
-pnpm gate

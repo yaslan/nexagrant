@@ -1,2 +1,0 @@
-B-5 /_next/image?url=https://lh3.googleusercontent.com:8443/a/x -> 400 0.002052s "url" parameter is not allowed
-B-5 /_next/image?url=https://images.unsplash.com:8080/photo-1 -> 400 0.000826s "url" parameter is not allowed

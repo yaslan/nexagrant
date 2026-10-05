@@ -1,5 +1,0 @@
- × tests/rag-pdf-real-parse.test.ts > B-1: page and chunk limits hold on real PDFs before any embedding call > İNCELEME-45 shape: 30 000 pages in 4.8 MB is refused in well under a second 30008ms
-   → Test timed out in 30000ms.
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
-Error: Test timed out in 30000ms.
-      Tests  1 failed | 18 skipped (19)

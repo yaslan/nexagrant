@@ -1,2 +1,0 @@
-src/lib/rag-pdf.worker.ts:21:// package through a runtime `createRequire`, which Next's file tracing cannot
-src/lib/blog.ts:59:export let BLOG_POSTS: BlogPost[] = [

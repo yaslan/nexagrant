@@ -1,7 +1,0 @@
-banner: Yükleme hatası: Belge yükleme bu kurulumda henüz açık değil: dosya deposu yapılandırılmamış. Dosyanız gönderilmedi; lütfen yöneticinize bildirin.
-dialogs (native alert): []
-requests total: 40
-requests containing "mock-upload": 0
-PUT requests: 0
-POST requests (server actions):
-POST http://localhost:3158/tr/ev-r2proof-e2e/evidence

@@ -1,5 +1,0 @@
-A1   | cs-fb testi: const m = await import(); return { svc: m } | orijinal=[4] · mutant=[4]
-A1   | ayırt edici: return { m: await import(…) } doğrudan | orijinal=[4] · mutant=[]
-A4   | ayırt edici: Reflect.apply(setCode, e, []) sonra e.code | orijinal=[4] · mutant=[]
-A10  | cs-fb testi: const svc = await import(); svc.fill(out, e) | orijinal=[6] · mutant=[6]
-A10  | ayırt edici: (await import()).fill(out, e) | orijinal=[6] · mutant=[]

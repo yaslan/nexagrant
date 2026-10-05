@@ -1,9 +1,0 @@
-KILLED   M2 lock_timeout oturum düzeyi (is_local=false) :: Tests  1 failed | 6 passed (7) (140s)
-          FAIL  tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > lock_timeout sızmaz: confirm'lerden sonra havuzdaki bağlan
-          × lock_timeout sızmaz: confirm'lerden sonra havuzdaki bağlantılarda lock_timeout=0; deadlock sayacı artmaz 790ms
-KILLED   M5 kilit anahtarı kiracı geneli :: Tests closed successfully but something prevents Vite server from exiting (143s)
-          FAIL  tests/zz-devopfb92-attack.live.test.ts > İNCELEME-92 devop-fb saldırıları > süreç ölümü: kilidi tutan süreç SIGKILL → kilit hemen bıra
-          × süreç ölümü: kilidi tutan süreç SIGKILL → kilit hemen bırakılır; SIGSTOP (donma) → kilit süresiz tutulur 2223ms
-SURVIVED M8 HEAD/GET süre sınırsız (yalnız kopya) :: Tests  7 passed (7) (144s)
-SURVIVED M12 tx süresi = kilit + kopya (payı yok, 25 sn) :: Tests  7 passed (7) (126s)
-restored: git status src clean

@@ -1,5 +1,0 @@
-typecheck rc=0
-lint rc=0
-
-i18n rc=0
-build rc=0

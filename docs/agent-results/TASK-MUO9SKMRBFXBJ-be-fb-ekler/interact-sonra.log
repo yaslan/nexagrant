@@ -1,5 +1,0 @@
-sonra approvals liste {"mainOver":12,"docOver":0,"mainScrollLeft":0}
-sonra approvals DETAY modalı açık {"mainOver":12,"docOver":0,"mainScrollLeft":0,"panel":{"left":16,"right":304,"iw":320,"fits":true,"innerOver":0}}
-sonra approvals YENİ TALEP modalı açık {"mainOver":12,"docOver":0,"mainScrollLeft":0,"panel":{"left":16,"right":304,"iw":320,"fits":true,"innerOver":0}}
-sonra /tr/admin/cordis şerit sw/cw=764/316 sekme=4 odak: K2 Ingestion & Dur:tam | OLAP & Hibe Dağılı:tam | Canlı CORDIS Delta:tam | Vector RAG Lab:tam ; Enter sonrası {"mainOver":0,"docOver":0,"mainScrollLeft":0} ; tap ilk sekme etkin=true ; tekerlek sonrası şerit.scrollLeft=300 main={"mainOver":0,"docOver":0,"mainScrollLeft":0}
-sonra /tr/fabrika-beta/opportunities/demo-opp-1/evaluations şerit sw/cw=727/316 sekme=3 odak: Değerlendirmeler &:tam | REA Sık Hatalar Ko:tam | ESR Kalibrasyonu:tam ; Enter sonrası {"mainOver":0,"docOver":0,"mainScrollLeft":0} ; tap ilk sekme etkin=true ; tekerlek sonrası şerit.scrollLeft=300 main={"mainOver":0,"docOver":0,"mainScrollLeft":0}

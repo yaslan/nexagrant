@@ -1,4 +1,0 @@
-scan#1: files=42 keys=128 findings=0 wall=503ms cpu=582ms (NO_OVERLAY yerine {} → önbelleksiz)
-scan#2: files=42 keys=128 findings=0 wall=462ms cpu=495ms (NO_OVERLAY yerine {} → önbelleksiz)
-scan#3: files=42 keys=128 findings=0 wall=931ms cpu=575ms (NO_OVERLAY yerine {} → önbelleksiz)
-src ts/tsx files=526

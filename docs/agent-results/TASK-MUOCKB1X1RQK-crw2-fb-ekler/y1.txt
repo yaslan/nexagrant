@@ -1,8 +1,0 @@
-own super=false bypassrls=false
-before (m4-claims.sql): []
-apply-migrations exit=0
-after  (m4-claims.sql): [uN]
-comm -13 (checklist 'boş olmalı'): [uN]
-m4-double.sql | comm -23 - before | wc -l = 1
-mN|2026-09-30
-mO|2026-09-29

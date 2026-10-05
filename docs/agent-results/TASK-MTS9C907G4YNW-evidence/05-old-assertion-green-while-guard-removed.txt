@@ -1,6 +1,0 @@
-[seed-plan-e2e] ready — ultra=plan-e2e-ultra-ws (ultra) flip=plan-e2e-flip-ws (pro)
-URL: http://localhost:3140/tr/plan-e2e-ultra-ws/opportunities/plan-e2e-ultra-opp/documents
-A anonymous + the id the spec pins   : {"status":404,"len":24,"head":"Server action not found."}
-B anonymous + a garbage id           : {"status":404,"len":24,"head":"Server action not found."}
-C SIGNED-IN + the id the spec pins   : {"status":404,"len":24,"head":"Server action not found."}
-D SIGNED-IN + a garbage id           : {"status":404,"len":24,"head":"Server action not found."}

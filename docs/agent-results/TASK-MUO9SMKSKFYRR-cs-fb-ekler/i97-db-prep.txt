@@ -1,9 +1,0 @@
-
-✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
-   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55897/fabrika
-apply-migrations: 41 files applied
-apply-migrations: 41 files applied
-✅ prisma/rls.sql applied. Policies in public: 28 → 112
-✓ E11.2 feedback seed complete
-Seeding completed with E10 data.
-SEED_EXIT=0

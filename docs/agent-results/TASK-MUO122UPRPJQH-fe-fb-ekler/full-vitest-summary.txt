@@ -1,8 +1,0 @@
-
- Test Files  285 passed | 2 skipped (287)
-      Tests  3460 passed | 9 skipped (3469)
-   Start at  15:11:11
-   Duration  91.31s (transform 31.34s, setup 0ms, import 222.22s, tests 540.67s, environment 55.90s)
-
-JSON report written to /private/tmp/claude-501/-Users-macbook-alan/dd23a311-be43-4035-b946-0c1fbd393f88/scratchpad/ekler/vitest-report.json
-vitest rc=0

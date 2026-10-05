@@ -1,6 +1,0 @@
-TSC_EXIT 0
-LINT_EXIT 0
-✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
-
-I18N_EXIT 0
-VITEST_EXIT 0

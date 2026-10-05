@@ -1,5 +1,0 @@
-tsc exit=0
-eslint (3 changed files) exit=0
-npm run lint exit=0
-next build exit=0
-npm run lint (after dev merge) exit=0

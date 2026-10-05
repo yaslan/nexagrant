@@ -1,7 +1,0 @@
-tsc=0
-lint=0
-i18n=0
-vitest:  Test Files  291 passed | 6 skipped (297)
-vitest:       Tests  3636 passed | 96 skipped (3732)
-vitest: exit=0
-build: exit=0

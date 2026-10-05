@@ -1,6 +1,0 @@
-chrome fefb-dtw-note page status 200
-chrome fefb-dtw-note GET export -> 200 content-disposition: attachment; filename="Cagri_ Kirsal Iklim Onculeri gusioc.docx"; filename*=UTF-8''%C3%87a%C4%9Fr%C4%B1_%20K%C4%B1rsal%20%C4%B0klim%20%C3%96nc%C3%BCleri%20%E2%80%94%20%C4%9F%C3%BC%C5%9F%C4%B1%C3%B6%C3%A7%20%F0%9F%9A%80.docx
-chrome fefb-dtw-note download suggestedFilename="Çağrı_ Kırsal İklim Öncüleri — ğüşıöç 🚀.docx" failure=null
-chrome fefb-dtw-note2 page status 200
-chrome fefb-dtw-note2 GET export -> 200 content-disposition: attachment; filename="District renovation pilot Izmir.docx"; filename*=UTF-8''District%20renovation%20pilot%20%E2%80%94%20%C4%B0zmir.docx
-chrome fefb-dtw-note2 download suggestedFilename="District renovation pilot — İzmir.docx" failure=null

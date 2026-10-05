@@ -1,8 +1,0 @@
-     × production: refuses early with object_store_unconfigured, and no URL 4ms
-     × tr: the modal shows the sentence, sends no PUT and raises no native alert 117ms
-     × en: the modal shows the sentence, sends no PUT and raises no native alert 42ms
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
-AssertionError: expected { success: false, …(1) } to strictly equal { success: false, …(1) }
-AssertionError: expected 'Yükleme hatası: Depolama şu an kullan…' to contain 'Belge yükleme bu kurulumda henüz açık…'
-AssertionError: expected 'Upload error: Storage is unavailable …' to contain 'Document upload is not available on t…'
-      Tests  3 failed | 10 passed (13)

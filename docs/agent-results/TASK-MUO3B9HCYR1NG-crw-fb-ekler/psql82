@@ -1,6 +1,0 @@
-#!/bin/bash
-# $1=url, then args; -f file → stdin
-args=(); file=""
-shift
-while [ $# -gt 0 ]; do if [ "$1" = "-f" ]; then file=$2; shift 2; else args+=("$1"); shift; fi; done
-docker exec -i crwfb82-pg psql -U fabrika -d fabrika "${args[@]}" < "$file"

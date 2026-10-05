@@ -1,5 +1,0 @@
-m4-user-today: [uN,uO]
-down.sql sahip rolle: ok
-iki özet sayısı: 1  (beklenen 1: uO)
-psql:m4-double.sql:5: ERROR:  column u.staleDigestOn does not exist
-LINE 3:    AND u."staleDigestOn" >= (now() AT TIME ZONE 'UTC')::date...

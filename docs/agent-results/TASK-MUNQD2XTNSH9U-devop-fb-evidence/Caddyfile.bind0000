@@ -1,8 +1,0 @@
-# NOT ENOUGH (control): plain 0.0.0.0 — Go binds it dual-stack, IPv6 still answers.
-{
-	default_bind 0.0.0.0
-	auto_https off
-}
-:80 {
-	reverse_proxy host.docker.internal:3962
-}

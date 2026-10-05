@@ -1,8 +1,0 @@
-MutationID,Result
-M0-baseline,✅ PASSED
-W1-mutation,❌ FAILED
-W2-mutation,❌ FAILED
-W3-mutation,❌ FAILED
-W4-mutation,❌ FAILED
-S4-mutation,❌ FAILED
-S5-mutation,❌ FAILED

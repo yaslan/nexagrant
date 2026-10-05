@@ -1,9 +1,0 @@
-CROSS MEMBER(A)+OWNER(X) session=A → 403 {"error":"No tenant found or insufficient permissions"} stripe=0 customer=null
- ✓ tests/munsrk-portal.live.test.ts > billing portal follows the session tenant (Ö-A) and hides internals (Ö-B), live DB > cross case: MEMBER of A who owns X → 403, Stripe never called 123ms
-CROSS same user session=X → 200 customer=cus_X
- ✓ tests/munsrk-portal.live.test.ts > billing portal follows the session tenant (Ö-A) and hides internals (Ö-B), live DB > same user with session in X (where they own) → the portal of X 124ms
-OWNER-BOTH session=A → 200 customer=cus_A; session=X → 200 customer=cus_X
-O-B session=N → 500 body={"error":"Failed to create portal session"} bodyHasTenantId=false logHasTenantId=true
- ✓ tests/munsrk-portal.live.test.ts > billing portal follows the session tenant (Ö-A) and hides internals (Ö-B), live DB > owner of A and X: session A → cus_A, session X → cus_X 121ms
- ✓ tests/munsrk-portal.live.test.ts > billing portal follows the session tenant (Ö-A) and hides internals (Ö-B), live DB > Ö-B: no Stripe customer → 500 with a fixed sentence; the tenant id stays in the log 29ms
-      Tests  4 passed (4)

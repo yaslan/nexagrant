@@ -1,5 +1,0 @@
-[WebServer] $ next start --port 3011
-[WebServer] ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
-[WebServer] DEMO_LOGIN_ENABLED=true is not allowed in a production build or with NODE_ENV=production: it lets anyone sign in as any account, platform admin included, without a password. Remove it from the production environment; the server will not start with it.
-Error: Process from config.webServer was not able to start. Exit code: 1
-

@@ -1,8 +1,0 @@
-
-Running 3 tests using 1 worker
-
-  ✓  1 [chromium] › tests/e2e/m10-audit-identity.spec.ts:54:7 › M10 dual approval identity › a real signed-in user sees the workflow and no invented signer (558ms)
-  ✓  2 [chromium] › tests/e2e/m10-audit-identity.spec.ts:74:7 › M10 dual approval identity › an identity-less visitor never reaches the approval surface (958ms)
-  ✓  3 [chromium] › tests/e2e/m10-audit-identity.spec.ts:95:7 › M10 dual approval identity › an identity-less POST to an M10 action is refused, never signed (49ms)
-
-  3 passed (2.0s)

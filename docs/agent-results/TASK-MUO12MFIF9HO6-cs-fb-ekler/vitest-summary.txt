@@ -1,5 +1,0 @@
- Test Files  278 passed | 6 skipped (284)
-      Tests  3359 passed | 81 skipped (3440)
-   Duration  22.25s (transform 13.45s, setup 0ms, import 62.72s, tests 128.76s, environment 11.17s)
-run1 (schema behind, env):  Test Files  15 failed | 263 passed | 6 skipped (284)
-run1 (schema behind, env):       Tests  54 failed | 3243 passed | 143 skipped (3440)

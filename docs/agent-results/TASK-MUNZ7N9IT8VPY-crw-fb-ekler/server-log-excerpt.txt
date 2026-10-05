@@ -1,6 +1,0 @@
-1:[m8] computeSeatCandidatesForm failed Error [PrismaClientKnownRequestError]: 
-5:Database error. Code: `P0001`. Message: `crwfb7n-internal-detail: tablo=SeatCandidate kolon=seatId`
-12:    driverAdapterError: Error [DriverAdapterError]: crwfb7n-internal-detail: tablo=SeatCandidate kolon=seatId
-21:[m8] computeSeatCandidatesForm failed Error [PrismaClientKnownRequestError]: 
-25:Database error. Code: `P0001`. Message: `crwfb7n-internal-detail: tablo=SeatCandidate kolon=seatId`
-32:    driverAdapterError: Error [DriverAdapterError]: crwfb7n-internal-detail: tablo=SeatCandidate kolon=seatId

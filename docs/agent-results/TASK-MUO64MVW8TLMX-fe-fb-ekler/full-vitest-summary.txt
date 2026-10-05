@@ -1,3 +1,0 @@
- Test Files  293 passed | 2 skipped (295)
-      Tests  3622 passed | 9 skipped (3631)
-rc=0

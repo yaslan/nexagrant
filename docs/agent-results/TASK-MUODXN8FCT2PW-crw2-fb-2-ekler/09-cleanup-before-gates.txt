@@ -1,6 +1,0 @@
-# kapılar öncesi temizlik
-DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55110/f
-exit=0
-own sahip nesne sayısı=0
-c2 kullanıcı=0
-own rolü silindi

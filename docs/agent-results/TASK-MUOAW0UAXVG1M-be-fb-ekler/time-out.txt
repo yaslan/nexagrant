@@ -1,3 +1,0 @@
-koşu 1: eylem dosyası=37 sızıntı=0 duvar=807 ms cpu=851 ms
-koşu 2: eylem dosyası=37 sızıntı=0 duvar=252 ms cpu=399 ms
-koşu 3: eylem dosyası=37 sızıntı=0 duvar=230 ms cpu=293 ms

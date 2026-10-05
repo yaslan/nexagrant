@@ -1,5 +1,0 @@
-$ DATABASE_URL=<fabrika_migrate> scripts/apply-migrations.sh
-apply-migrations: role "fabrika_migrate" may not create functions with SET app.system_scope (add-agency-invite-code.sql and later).
-  Once, as a superuser: psql "$SUPERUSER_URL" -v owner=fabrika_migrate -f prisma/migration-owner-grant.sql
-  No file was applied. docs/RELEASE_CHECKLIST.md §3.1.
-exit=1

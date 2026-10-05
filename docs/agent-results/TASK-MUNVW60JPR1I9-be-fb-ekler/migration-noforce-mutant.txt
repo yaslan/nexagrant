@@ -1,6 +1,0 @@
-## mutant: NO FORCE adımı silinmiş migration, aynı sahip rolle
-psql:<stdin>:53: NOTICE:  column "staleDigestOn" of relation "User" already exists, skipping
-psql:<stdin>:55: NOTICE:  relation "Membership_userId_idx" already exists, skipping
-exit=0
-0
-6005

@@ -1,1 +1,0 @@
-Y1b download skips view_proposal gate (up front): KILLED | Tests  1 failed | 60 passed (61) | ['FAIL  tests/evidence-upload-s3.live.test.ts > Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence > A6: GUEST_PARTNER cannot download, list or score any evidence, CONFIDENTIAL included']

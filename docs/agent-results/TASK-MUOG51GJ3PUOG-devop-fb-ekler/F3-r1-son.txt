@@ -1,4 +1,0 @@
-----------+-------
- R1_SONUC | TEMIZ
-
-ROLLBACK

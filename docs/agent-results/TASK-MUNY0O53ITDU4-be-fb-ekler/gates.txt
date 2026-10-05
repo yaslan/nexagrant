@@ -1,8 +1,0 @@
-tsc --noEmit exit=0
-eslint src tests exit=0
-✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
-i18n:check exit=0
-next build exit=0
-npx vitest run exit=0
- Test Files  277 passed | 6 skipped (283)
-      Tests  3333 passed | 81 skipped (3414)

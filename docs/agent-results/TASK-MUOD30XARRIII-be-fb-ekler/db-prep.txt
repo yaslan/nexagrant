@@ -1,5 +1,0 @@
-✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
-apply-migrations: 41 files applied
-apply-migrations: 41 files applied
-✅ prisma/rls.sql applied. Policies in public: 28 → 112
-Seeding completed with E10 data.

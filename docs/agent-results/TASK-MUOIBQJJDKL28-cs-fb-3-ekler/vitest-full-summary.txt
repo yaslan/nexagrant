@@ -1,6 +1,0 @@
- Test Files  305 passed | 2 skipped (307)
-      Tests  4144 passed | 52 skipped (4196)
-   Start at  23:57:44
-   Duration  31.26s (transform 14.11s, setup 0ms, import 70.11s, tests 196.77s, environment 14.54s)
-VITEST_EXIT=0
-failed lines: 0

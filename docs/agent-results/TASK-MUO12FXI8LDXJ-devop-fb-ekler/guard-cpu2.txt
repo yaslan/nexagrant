@@ -1,7 +1,0 @@
-load { 40.71 68.89 51.42 }
-      Tests  1 failed | 44 passed (45)
-   Duration  51.06s (transform 332ms, setup 0ms, import 10.85s, tests 39.74s, environment 0ms)
-scan#1: files=42 keys=128 findings=0 wall=10091ms cpu=7542ms (run başına tek overlay = scanSrc gibi önbellekli)
-scan#2: files=42 keys=128 findings=0 wall=10708ms cpu=8122ms (run başına tek overlay = scanSrc gibi önbellekli)
-scan#3: files=42 keys=128 findings=0 wall=12945ms cpu=8336ms (run başına tek overlay = scanSrc gibi önbellekli)
-src ts/tsx files=521

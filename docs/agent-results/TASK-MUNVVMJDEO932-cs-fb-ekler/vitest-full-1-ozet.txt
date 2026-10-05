@@ -1,8 +1,0 @@
- FAIL  tests/rag-pdf-worker-isolation.test.ts > B-1': the event loop keeps turning while pdf.js works on one heavy page > İNCELEME-52 shape: 20 pages sharing one compressed stream of 100 000 text operators
-AssertionError: expected PdfLimitError: PDF refused (parse_too_hea… { …(2) } to match object { pages: 20 }
- FAIL  tests/withholding-rounding.test.ts > the document and the panel withhold the same amount > every net from 1 to 3000, at each VAT rate and each withholding rate
-Error: Test timed out in 5000ms.
- FAIL  src/lib/billing/invoice-writer.test.ts > decomposeGrossAmount > reconstructs the charged amount exactly, for every amount and rate swept
-Error: Test timed out in 5000ms.
- Test Files  3 failed | 263 passed | 6 skipped (272)
-      Tests  3 failed | 3175 passed | 73 skipped (3251)

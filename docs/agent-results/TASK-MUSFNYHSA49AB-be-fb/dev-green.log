@@ -1,9 +1,0 @@
-Running 5 tests using 1 worker
-[seed-f10-e2e] ready — empty=f10-empty-ws full=f10-full-ws opportunity=f10-full-opp-a
-  ✓  1 [chromium] › tests/e2e/m9-calendar-connect.spec.ts:76:7 › M9 calendar connections › an unconfigured provider is refused in Turkish, not silently swallowed (2.9s)
-  ✓  2 [chromium] › tests/e2e/m9-calendar-connect.spec.ts:103:7 › M9 calendar connections › offers Google Calendar and .ics only — Outlook is gone, in both locales (1.2s)
-  ✓  3 [chromium] › tests/e2e/m9-calendar-connect.spec.ts:119:7 › M9 calendar connections › the browser tab title follows the locale (1.0s)
-  ✓  4 [chromium] › tests/e2e/m9-calendar-connect.spec.ts:131:7 › M9 calendar connections › .ics connects for real and the screen reflects the stored row (1.1s)
-[seed-f10-e2e] rolled back
-  ✓  5 [chromium] › tests/e2e/m9-calendar-connect.spec.ts:152:7 › M9 calendar connections › .ics disconnects for real and the row leaves the database (1.1s)
-  5 passed (12.9s)

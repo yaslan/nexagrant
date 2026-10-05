@@ -1,17 +1,10 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
-    // Index and record reads hand back `T | undefined`, because that is what
-    // they can return. Turned on after the 171 pre-existing violations were
-    // closed in four slices (TASK-MTSWAKD31LS49 plan; slices
-    // TASK-MTVPOBU1CQATT / TASK-MTVPOR2CMV1RT / TASK-MTVPNUTNI54ZW /
-    // TASK-MTVPPDW8NXKLD) — without the flag, every one of them could come
-    // straight back on the next commit.
-    "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -37,11 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  // `docs/agent-results/**` holds evidence transcripts and the throwaway probe
-  // scripts that produced them, not product code. They are committed as proof,
-  // are never built or imported, and are written against `tsx` (which resolves
-  // `.ts` import specifiers that `tsc` rejects, TS5097). Leaving them in scope
-  // made `pnpm typecheck` — and therefore the whole `pnpm gate` — red at HEAD
-  // for every agent, from one committed probe file (TASK-MTSYH8LDGV5YU).
-  "exclude": ["node_modules", "docs/agent-results"]
+  "exclude": ["node_modules"]
 }

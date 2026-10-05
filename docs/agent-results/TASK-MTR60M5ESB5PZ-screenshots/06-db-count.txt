@@ -1,8 +1,0 @@
-scanned 67 tables of database "fabrika" for the literal "Dr. Mehmet Yılmaz" in every text/json column
-tables with a match : (none)
-TOTAL MATCHING ROWS: 0
-
-why: the dual approval state has no table at all — grep for a persistence call:
-  AuditEvent rows      : 0
-  ApprovalRequest rows : 0
-  FollowupDoc rows     : 0

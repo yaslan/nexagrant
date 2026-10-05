@@ -1,5 +1,0 @@
-#!/bin/bash
-# psql shim -> docker exec csfb83-pg; -f FILE -> stdin; host/port rewritten
-args=(); file=""
-while [ $# -gt 0 ]; do case "$1" in -f) file="$2"; shift 2;; *) a="${1//localhost:55883/localhost:5432}"; args+=("$a"); shift;; esac; done
-if [ -n "$file" ]; then docker exec -i csfb83-pg psql "${args[@]}" < "$file"; else docker exec -i csfb83-pg psql "${args[@]}"; fi

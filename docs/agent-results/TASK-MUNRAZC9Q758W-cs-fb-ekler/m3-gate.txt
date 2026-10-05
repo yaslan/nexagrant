@@ -1,9 +1,0 @@
-== M3 applied, CI=true, ci.yml AUTH_SECRET
- Test Files  3 passed (3)
-      Tests  6 passed | 38 skipped (44)
-vitest EXIT=0
-live-skip gate: 3 live files, 6 live tests passed, 0 allowed skip(s)
-  SKIPPED: tests/invitation-accept.live.test.ts :: GET /[locale]/accept-invite (the e-mail link) moves the token into an httpOnly cookie and redirects to a URL without it [skipped]
-  SKIPPED: tests/invitation-accept.live.test.ts :: GET /[locale]/accept-invite (the e-mail link) a malformed token clears an earlier cookie instead of keeping it [skipped]
-  SKIPPED: tests/invitation-accept.live.test.ts :: an existing account accepts (acceptInvitation, fabrika_app) valid: membership with the invited role, link spent, audit row; a second accept is idempotent [skipped]
-gate EXIT=1
