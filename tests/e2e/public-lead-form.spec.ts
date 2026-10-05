@@ -297,6 +297,22 @@ test.describe('public lead form — /tr/fon-hazirlik result screen', () => {
     await context.close();
   });
 
+  test('JS disabled: noscript message appears to guide the user to enable JavaScript', async ({ browser }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    await page.goto(TR_RESULT);
+    await expect(page.getByText('Bu formu göndermek için JavaScript gereklidir. Lütfen tarayıcınızda JavaScript\'i etkinleştirin.')).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/tr-noscript.png`, fullPage: true });
+    await context.close();
+
+    const enContext = await browser.newContext({ javaScriptEnabled: false });
+    const enPage = await enContext.newPage();
+    await enPage.goto(EN_RESULT);
+    await expect(enPage.getByText('JavaScript is required to submit this form. Please enable JavaScript in your browser.')).toBeVisible();
+    await enPage.screenshot({ path: `${SHOTS}/en-noscript.png`, fullPage: true });
+    await enContext.close();
+  });
+
   test('EN at 390 px: the form fits, sends, and the row is stored with locale en', async ({ browser }) => {
     const { context, page } = await anonymousPage(browser, { width: 390, height: 844 });
     const address = email('jane');
