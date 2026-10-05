@@ -46,16 +46,18 @@ const ADMIN_SEAT = {
   role: 'TENANT_OWNER',
 };
 const WIDTHS = [320, 360, 390, 472, 640];
+// `main` is the seed's workspace (prisma/seed-tenant-workspace.ts). These routes used
+// `fabrika-beta` — the tenant's slug — which the [workspace] guard answers 404.
 const ROUTES = [
-  '/tr/fabrika-beta/opportunities/demo-opp-1/evaluations',
+  '/tr/main/opportunities/demo-opp-1/evaluations',
   '/tr/admin/cordis',
   '/tr/admin/alerts',
-  '/tr/fabrika-beta/approvals',
-  '/tr/fabrika-beta/onay-merkezi',
-  '/tr/fabrika-beta/ayarlar/kapilar',
-  '/tr/fabrika-beta/settings/gates',
+  '/tr/main/approvals',
+  '/tr/main/onay-merkezi',
+  '/tr/main/ayarlar/kapilar',
+  '/tr/main/settings/gates',
   // Over by 4px at 640 only (the header's action row would not let the title shrink).
-  '/tr/fabrika-beta/firsatlar/demo-opp-1',
+  '/tr/main/firsatlar/demo-opp-1',
 ];
 
 let storageState: Awaited<ReturnType<import('@playwright/test').BrowserContext['storageState']>>;
@@ -153,7 +155,7 @@ async function expectNoOverflowAcross(page: Page, label: string) {
 test.describe('long real-world content stays inside <main>', () => {
   test('approvals: a link pasted into the title and description', async ({ browser }) => {
     test.skip(skipReason !== '', skipReason);
-    const { ctx, page } = await openAt(browser, '/tr/fabrika-beta/approvals', 320);
+    const { ctx, page } = await openAt(browser, '/tr/main/approvals', 320);
     const main = page.locator('main');
 
     // Default tab: someone else's request, with the approve/reject buttons and
@@ -195,7 +197,7 @@ test.describe('long real-world content stays inside <main>', () => {
 
   test('opportunity detail: a link pasted into the title', async ({ browser }) => {
     test.skip(skipReason !== '', skipReason);
-    const { ctx, page } = await openAt(browser, `/tr/fabrika-beta/firsatlar/${LONG.opportunityId}`, 320);
+    const { ctx, page } = await openAt(browser, `/tr/main/firsatlar/${LONG.opportunityId}`, 320);
     const title = page.locator('main h1', { hasText: LONG.opportunityTitle });
     await expect(title).toBeVisible({ timeout: 30_000 });
     await expectNoOverflowAcross(page, 'opportunity detail');
@@ -231,7 +233,7 @@ test.describe('long real-world content stays inside <main>', () => {
 
   test('gate settings: a longer weight name than today’s', async ({ browser }) => {
     test.skip(skipReason !== '', skipReason);
-    const { ctx, page } = await openAt(browser, '/tr/fabrika-beta/settings/gates', 320);
+    const { ctx, page } = await openAt(browser, '/tr/main/settings/gates', 320);
     // Hydrated first: hydration would put the original text back. The page is
     // read-only since AKTAR-MURBCJ0A-1, so there is no submit button to wait on.
     await expectHydrated(page.getByTestId('weight-alignment'));
