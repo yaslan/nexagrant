@@ -310,6 +310,7 @@ test.describe('Notification center — read/unread flows (BLOCKED: no notificati
   const readIds = (page: Page) =>
     page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '[]') as string[], KEY);
 
+  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
   test.fixme('badge shows 2 unread; clicking one drops it to 1 and stores the id', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
@@ -319,6 +320,7 @@ test.describe('Notification center — read/unread flows (BLOCKED: no notificati
     expect(await readIds(page)).toContain('n1');
   });
 
+  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
   test.fixme('mark all as read from the header button', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
@@ -327,6 +329,7 @@ test.describe('Notification center — read/unread flows (BLOCKED: no notificati
     expect((await readIds(page)).sort()).toEqual(['n1', 'n2']);
   });
 
+  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
   test.fixme('read state survives a reload', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
@@ -336,6 +339,7 @@ test.describe('Notification center — read/unread flows (BLOCKED: no notificati
     await expect(page.getByText('1 Unread Notifications')).toBeVisible();
   });
 
+  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
   test.fixme('bell: unread dot, click item → read, dot clears', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/dashboard`);
@@ -346,6 +350,7 @@ test.describe('Notification center — read/unread flows (BLOCKED: no notificati
     await expect(bell.locator('span')).toHaveCount(0);
   });
 
+  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
   test.fixme('another tab marking read updates this tab (storage event)', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
@@ -357,6 +362,7 @@ test.describe('Notification center — read/unread flows (BLOCKED: no notificati
     await expect(page.getByText('1 Unread Notifications')).toBeVisible();
   });
 
+  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
   test.fixme("B's read ids do not mark A's notifications read", async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
