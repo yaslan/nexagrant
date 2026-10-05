@@ -53,3 +53,4 @@ evidence-unique-object-key.sql
 m4-stale-digest-user-claim.sql
 revoke-api-role-function-execute.sql
 add-blog-post.sql
+add-notification.sql

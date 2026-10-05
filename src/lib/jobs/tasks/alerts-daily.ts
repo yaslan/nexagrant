@@ -8,6 +8,7 @@ import { errorMessage } from '@/lib/errors';
 import { recordAlert, type RecordAlertInput } from '@/lib/observability/system-alert';
 import { AlertsDailyOutputSchema, type AlertsDailyOutput } from '../events';
 import { parseSavedSearchFilters } from '@/lib/saved-search-filters';
+import { recordNotification, savedSearchDedupeKey } from '@/lib/notifications/store';
 
 /**
  * Why a search's alert did not go out, when the reason is the mail provider
@@ -28,7 +29,7 @@ export const NO_MAIL_PROVIDER = 'no_mail_provider';
  */
 export const SAVED_SEARCH_ALERT_QUERY = {
   where: { notify: true },
-  select: { id: true, tenantId: true, name: true, filters: true, lastRunAt: true, createdAt: true },
+  select: { id: true, tenantId: true, userId: true, name: true, filters: true, lastRunAt: true, createdAt: true },
 } as const;
 
 /**
@@ -117,6 +118,8 @@ export type TenantRunner = <T>(
 export interface SavedSearchAlertRow {
   id: string;
   tenantId: string;
+  /** The search's owner: the in-app notification's recipient (ADR-0011 K-6 a). */
+  userId: string;
   name: string;
   filters: unknown;
   lastRunAt: Date | string | null;
@@ -163,7 +166,7 @@ export async function sendSavedSearchAlerts(
     // fix — it is a guard against the edit that would break it: reaching for a
     // tenant id that outlived the iteration does not crash here, it writes one
     // tenant's row under another tenant's scope.
-    const { id: searchId, tenantId, name } = search;
+    const { id: searchId, tenantId, userId, name } = search;
 
     try {
       const ownerEmail = await runTenant(tenantId, async (tx) => {
@@ -196,6 +199,25 @@ export async function sendSavedSearchAlerts(
         emailsSkipped++;
         continue;
       }
+
+      // ADR-0011 (TASK-MUVR24EHWI2RA): the in-app notification, for the
+      // search's OWNER — not for `ownerEmail` above, which is the tenant's first
+      // owner (a separate finding; the e-mail is unchanged here). Written before
+      // the mail and before the provider check, so it reaches the user with no
+      // SMTP at all. The key is this window's start: when the mail fails,
+      // `lastRunAt` stays put, the next run counts the same window with the
+      // same `since`, and this write is skipped instead of repeated. A failed
+      // write throws into the catch below like any other step: no mail goes
+      // out and `lastRunAt` stays, so the next run retries both.
+      await runTenant(tenantId, (tx) =>
+        recordNotification(tx, {
+          tenantId,
+          userId,
+          type: 'SAVED_SEARCH_MATCH',
+          payload: { searchId, searchName: name, matchCount, since: since.toISOString() },
+          dedupeKey: savedSearchDedupeKey(searchId, since),
+        })
+      );
 
       const subject = `New Call Opportunities: ${name} (${matchCount} new)`;
       const appUrl = resolveAppUrl();

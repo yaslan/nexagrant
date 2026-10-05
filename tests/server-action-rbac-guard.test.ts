@@ -251,6 +251,10 @@ export const ALLOWED: Record<string, string> = {
   'actions/user/request-deletion.ts#requestAccountDeletion': "the caller's own account (KVKK erasure)",
   'actions/user/request-deletion.ts#cancelAccountDeletion': "the caller's own account (KVKK erasure)",
   'actions/user/request-deletion.ts#getDeletionStatus': "reads the caller's own deletion request",
+  // ADR-0011 (TASK-MUVR24EHWI2RA): the caller's own read state. Every query is
+  // `where { tenantId, userId }` of the session; every role has a bell, and an
+  // expired pilot must still be able to clear it, so neither `can` nor the pilot gate.
+  'actions/user/notifications.ts#markNotificationsRead': "marks the caller's own notifications read (userId = session user)",
   // Token-authenticated partner portal: no session, no tenant role. Narrow by
   // construction (Part A budget lines only) and pilot-gated on the token's tenant.
   'modules/m11/server/actions.ts#addBudgetLineByToken': 'partner portal; the magic token is the credential',

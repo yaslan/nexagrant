@@ -230,6 +230,7 @@ Kısaltmalar:
 | 24 | TenantBillingIdentity | tenantId → Tenant | Y (VKN/TCKN) | E | C | |
 | 25 | CreditLedger | tenantId → Tenant | — | E | C | |
 | 26 | StripeEventLog | tenantId → Tenant | — | H | C | idempotency anahtarı |
+| 26a | Notification | tenantId → Tenant | D (`userId`, alıcı; `payload` yalnız kimlik/sayı) | E | C | ADR-0011 (TASK-MUVR24EHWI2RA). Kişi silmede `users-scheduled-deletion` `userId` ile siler, kişi dışa aktarmasında (`export-data.ts`) yer alır; 90 gün sonra `notifications-retention` siler. Ek A sayımına (75) sonradan eklendi. |
 
 ### A.3 Paylaşılan katalog (K1, K2, CORDIS) — dokunulmaz
 

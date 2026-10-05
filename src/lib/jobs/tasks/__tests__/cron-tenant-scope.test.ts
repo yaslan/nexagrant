@@ -72,6 +72,7 @@ const LONG_AGO = new Date('2000-01-01T00:00:00Z');
 
 interface Fixture {
   tenantId: string;
+  userId: string;
   searchId: string;
   email: string;
 }
@@ -124,7 +125,7 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
         lastRunAt: LONG_AGO,
       },
     });
-    return { tenantId: tenant.id, searchId: search.id, email };
+    return { tenantId: tenant.id, userId: user.id, searchId: search.id, email };
   }
 
   /** The row shape `fetch-saved-searches` hands the loop. */
@@ -132,6 +133,7 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     return {
       id: f.searchId,
       tenantId: f.tenantId,
+      userId: f.userId,
       name: `Search ${label} ${RUN}`,
       filters: {},
       lastRunAt: LONG_AGO,
@@ -201,6 +203,7 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
       if (!f) continue;
       await prisma.savedSearch.deleteMany({ where: { tenantId: requireId(f.tenantId, 'f.tenantId') } });
       await prisma.creditLedger.deleteMany({ where: { tenantId: requireId(f.tenantId, 'f.tenantId') } });
+      await prisma.notification.deleteMany({ where: { tenantId: requireId(f.tenantId, 'f.tenantId') } });
       // Membership cascades from both sides; the tenant delete takes it.
       await prisma.tenant.deleteMany({ where: { id: requireId(f.tenantId, 'f.tenantId') } });
       await prisma.user.deleteMany({ where: { email: requireId(f.email, 'f.email') } });
@@ -478,10 +481,20 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     expect(result.errors).toEqual([]);
     expect(result.emailsFailed).toBe(0);
 
-    // Two scopes per search — the owner lookup and the `lastRunAt` write — and
-    // every one of them the tenant of the search being processed. A run that
-    // reached for a stale id, or skipped the wrapper, cannot produce this.
-    expect(runner.scopes).toEqual([a.tenantId, a.tenantId, b.tenantId, b.tenantId]);
+    // Three scopes per search — the owner lookup, the notification write
+    // (ADR-0011) and the `lastRunAt` write — and every one of them the tenant
+    // of the search being processed. A run that reached for a stale id, or
+    // skipped the wrapper, cannot produce this.
+    expect(runner.scopes).toEqual([a.tenantId, a.tenantId, a.tenantId, b.tenantId, b.tenantId, b.tenantId]);
+    // Each search's owner got one SAVED_SEARCH_MATCH, readable through RLS
+    // under that tenant only.
+    for (const [f, other] of [[a, b], [b, a]] as const) {
+      const mine = await withTenantOn(rls, f.tenantId, (tx) =>
+        tx.notification.findMany({ where: { userId: { in: [a.userId, b.userId] } }, select: { userId: true, type: true } })
+      );
+      expect(mine).toEqual([{ userId: f.userId, type: 'SAVED_SEARCH_MATCH' }]);
+      expect(mine.some((n) => n.userId === other.userId)).toBe(false);
+    }
     // Each owner was mailed once, and only after the mailer accepted it was
     // the search counted as sent.
     expect(mail.sent.map((m) => m.to)).toEqual([a.email, b.email]);
@@ -550,8 +563,9 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
       { searchId: a.searchId, reason: NO_MAIL_PROVIDER },
       { searchId: b.searchId, reason: NO_MAIL_PROVIDER },
     ]);
-    // Owner lookups only — no `lastRunAt` write was attempted for either.
-    expect(runner.scopes).toEqual([a.tenantId, b.tenantId]);
+    // Owner lookup and notification write (ADR-0011: the notification does
+    // not need a mail provider) — no `lastRunAt` write was attempted for either.
+    expect(runner.scopes).toEqual([a.tenantId, a.tenantId, b.tenantId, b.tenantId]);
     expect(await lastRunOf(a.searchId)).toEqual(LONG_AGO);
     expect(await lastRunOf(b.searchId)).toEqual(LONG_AGO);
   });
