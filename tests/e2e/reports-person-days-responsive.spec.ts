@@ -34,11 +34,7 @@ test.describe('Person-Days Report - Responsive Layout', () => {
           tenantId: testTenantId,
           title: 'Advanced AI Solutions for Climate Modeling',
           workspaceId: testWorkspace.id,
-          pipeline: 'SCREENING',
-          budget: 100000,
-          budgetCurrency: 'EUR',
-          deadline: new Date('2026-12-31'),
-          deadlineTz: 'Europe/Brussels',
+          stage: 'G0',
         },
       });
 
@@ -48,11 +44,7 @@ test.describe('Person-Days Report - Responsive Layout', () => {
           tenantId: testTenantId,
           title: 'Smart Grids Optimization',
           workspaceId: testWorkspace.id,
-          pipeline: 'SCREENING',
-          budget: 150000,
-          budgetCurrency: 'EUR',
-          deadline: new Date('2026-12-31'),
-          deadlineTz: 'Europe/Brussels',
+          stage: 'G0',
         },
       });
 
