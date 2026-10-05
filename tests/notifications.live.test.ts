@@ -243,7 +243,7 @@ describe.skipIf(!HAS_DB)('notification store (live, fabrika_app)', () => {
     skipUnlessSeeded(ctx, SUITE, topics > 0, 'no Topic rows, so the search has no matches');
 
     const tenantId = requireId(fx.tenantA, 'tenantA');
-    const searcher = requireId(fx.users.u2, 'u2'); // a MEMBER; u1 is the tenant owner the e-mail goes to
+    const searcher = requireId(fx.users.u2, 'u2'); // a MEMBER; u1 is the tenant owner, who gets nothing
     const search = await admin.savedSearch.create({
       data: { tenantId, userId: searcher, name: `${RUN} search`, filters: {}, notify: true, lastRunAt: LONG_AGO },
     });
