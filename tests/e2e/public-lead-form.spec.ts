@@ -162,6 +162,10 @@ test.describe('public lead form — /tr/fon-hazirlik result screen', () => {
     await expect(page.getByLabel('E-posta adresiniz')).toBeFocused();
     await expect(page.getByText('Adınızı yazın (en az 2 karakter).')).toHaveCount(0);
 
+    // Fix the email and verify the error clears when the field changes.
+    await fillTr(page, { email: 'mehmet@belediye.bel.tr' });
+    await expect(page.getByText('Geçerli bir e-posta adresi yazın (ör. ad@belediye.bel.tr).')).toHaveCount(0);
+
     // 3) A valid address, but the consent box unticked.
     await fillTr(page, { email: address });
     await page.getByLabel(/açık rıza veriyorum/).uncheck();

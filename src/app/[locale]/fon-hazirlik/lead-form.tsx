@@ -189,7 +189,10 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
             required
             maxLength={120}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              setErrors((prev) => ({ ...prev, name: undefined }));
+            }}
             aria-invalid={errors.name ? true : undefined}
             aria-describedby={describedBy('name')}
             className={`${inputClass} ${border('name')}`}
@@ -214,7 +217,10 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
             required
             maxLength={254}
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setErrors((prev) => ({ ...prev, email: undefined }));
+            }}
             aria-invalid={errors.email ? true : undefined}
             aria-describedby={describedBy('email', 'lead-email-hint')}
             className={`${inputClass} ${border('email')}`}
@@ -235,7 +241,10 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
             required
             maxLength={200}
             value={organisation}
-            onChange={(e) => setOrganisation(e.target.value)}
+            onChange={(e) => {
+              setOrganisation(e.target.value);
+              setErrors((prev) => ({ ...prev, organisation: undefined }));
+            }}
             aria-invalid={errors.organisation ? true : undefined}
             aria-describedby={describedBy('organisation')}
             className={`${inputClass} ${border('organisation')}`}
@@ -252,7 +261,10 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
               id="lead-province"
               name="province"
               value={leadProvince}
-              onChange={(e) => setLeadProvince(e.target.value)}
+              onChange={(e) => {
+                setLeadProvince(e.target.value);
+                setErrors((prev) => ({ ...prev, province: undefined }));
+              }}
               aria-invalid={errors.province ? true : undefined}
               aria-describedby={describedBy('province')}
               className={`${inputClass} ${border('province')}`}
@@ -277,7 +289,10 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
               autoComplete="address-level2"
               maxLength={80}
               value={district}
-              onChange={(e) => setDistrict(e.target.value)}
+              onChange={(e) => {
+                setDistrict(e.target.value);
+                setErrors((prev) => ({ ...prev, district: undefined }));
+              }}
               aria-invalid={errors.district ? true : undefined}
               aria-describedby={describedBy('district')}
               className={`${inputClass} ${border('district')}`}
