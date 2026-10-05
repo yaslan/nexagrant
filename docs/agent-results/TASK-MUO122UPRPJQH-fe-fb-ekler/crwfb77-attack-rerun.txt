@@ -1,6 +1,0 @@
-down-before-copy → {"success":false,"error":"storage_unavailable"}
-     × store down before copy: object_missing, no row, staging kept 262ms
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
-AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
-    215|     console.log('down-before-copy →', JSON.stringify(r));
-      Tests  1 failed | 7 passed (8)

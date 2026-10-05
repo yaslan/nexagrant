@@ -1,5 +1,0 @@
-├ ƒ /[locale]/[workspace]/cagrilar/[id]
-├ ƒ /[locale]/[workspace]/calls/[id]
-├ ƒ /[locale]/calls/topic/[id]
-build EXIT 0
-● sayısı: 0

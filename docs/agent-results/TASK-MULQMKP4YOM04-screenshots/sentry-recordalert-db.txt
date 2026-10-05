@@ -1,4 +1,0 @@
-recordAlert → {"status":"recorded","id":"cmumi5idi0000zexktav04v68"}
-db row → {"id":"cmumi5idi0000zexktav04v68","level":"error","source":"se-fb-sentry-proof","message":"TASK-MULQMKP4YOM04 local proof 1790675826125 — contact test.user@example.org","meta":{"rows":0,"stage":"k2-parse","redactedKeys":["userEmail"]}}
-warn recordAlert → {"status":"recorded","id":"cmumi5ief0001zexkvh2ilb7o"}
-cleanup deleted rows → 2

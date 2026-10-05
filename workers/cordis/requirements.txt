@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-duckdb
-pandas
-networkx
-psycopg2-binary
-sqlalchemy

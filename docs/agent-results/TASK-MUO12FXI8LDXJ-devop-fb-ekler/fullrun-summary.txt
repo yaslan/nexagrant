@@ -1,6 +1,0 @@
-fullrun-2.log: Test Files  2 failed | 280 passed | 2 skipped (284)
-fullrun-2.log:      Tests  2 failed | 3408 passed | 30 skipped (3440)
-fullrun-2.log:   Duration  262.68s (transform 80.21s, setup 0ms, import 719.22s, tests 1402.50s, environment 133.65s)
-fullrun-1.log: Test Files  1 failed | 281 passed | 2 skipped (284)
-fullrun-1.log:      Tests  1 failed | 3409 passed | 30 skipped (3440)
-fullrun-1.log:   Duration  133.90s (transform 31.18s, setup 0ms, import 391.49s, tests 504.88s, environment 105.76s)

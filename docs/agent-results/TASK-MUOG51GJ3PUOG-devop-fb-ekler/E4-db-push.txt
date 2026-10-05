@@ -1,8 +1,0 @@
-◇ injected env (49) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
-Loaded Prisma config from prisma.config.ts.
-
-Prisma schema loaded from prisma/schema.prisma.
-Datasource "db": PostgreSQL database "postgres", schema "public" at "aws-0-eu-west-1.pooler.supabase.com:5432"
-
-🚀  Your database is now in sync with your Prisma schema. Done in 30.57s
-

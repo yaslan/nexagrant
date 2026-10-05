@@ -1,8 +1,0 @@
-rol=fabrika_migrate db=postgres pg=17.11 read_only=on system_scope=on
-tablo_var=f anahtar_var=f opportunity_kolonu_var=f rls_kor=f
---- TopicMatch tablosu yok: şema henüz kurulmamış (db push öncesi).
- kontrol  |     sonuc      
-----------+----------------
- R1_SONUC | DB_PUSH_ONCESI
-
-ROLLBACK

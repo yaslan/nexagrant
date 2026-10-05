@@ -1,4 +1,0 @@
-{"callbackUrl":"javascript:alert(document.domain)","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3477/tr/giris?callbackUrl=javascript%3Aalert(document.domain)"}
-{"callbackUrl":"https://evil.com/x","dialog":null,"blockedEvilNav":["https://evil.com/x"],"finalUrl":"https://evil.com/x"}
-{"callbackUrl":"//evil.com/x","dialog":null,"blockedEvilNav":["http://evil.com/x"],"finalUrl":"http://evil.com/x"}
-{"callbackUrl":"/tr/default/cagrilar/HORIZON-CL5-2026-D4-01","dialog":null,"blockedEvilNav":[],"finalUrl":"http://localhost:3477/tr/giris?callbackUrl=%2Ftr%2Fdefault%2Fcagrilar%2FHORIZON-CL5-2026-D4-01"}

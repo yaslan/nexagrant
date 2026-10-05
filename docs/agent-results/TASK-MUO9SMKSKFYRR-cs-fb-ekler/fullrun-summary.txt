@@ -1,6 +1,0 @@
-stderr | tests/workspace-scoped-writes.test.ts > createOpportunity refuses what is not a workspace slug, before the database > a query the database refuses is a refusal, not an outage: CREATE_FAILED, nothing buffered
-     × a 128 MB-inflating stream (~130 KB file) is refused at the real limits, fast 5336ms
- FAIL  tests/rag-pdf-worker-isolation.test.ts > decompression bomb: inflated stream bytes are capped before pdf.js starts > a 128 MB-inflating stream (~130 KB file) is refused at the real limits, fast
- Test Files  1 failed | 295 passed | 2 skipped (298)
-      Tests  1 failed | 3753 passed | 41 skipped (3795)
-   Duration  55.98s (transform 18.91s, setup 0ms, import 140.90s, tests 324.04s, environment 33.85s)

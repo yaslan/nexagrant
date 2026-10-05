@@ -1,6 +1,0 @@
-== PROBE N-1 (ikiz zztwin.ts + zztwin.js)
-         × N-1: no two code files under src/ share a path but for the extension 19ms
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
-+     "lib/zztwin.js",
-+     "lib/zztwin.ts",
-      Tests  1 failed | 58 passed (59)

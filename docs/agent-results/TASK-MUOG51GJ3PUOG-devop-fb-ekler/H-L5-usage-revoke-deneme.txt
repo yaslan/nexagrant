@@ -1,7 +1,0 @@
-WARNING:  no privileges could be revoked for "public"
- anon_usage_hala | acl_degismedi 
------------------+---------------
- t               | t
-(1 row)
-
-       2

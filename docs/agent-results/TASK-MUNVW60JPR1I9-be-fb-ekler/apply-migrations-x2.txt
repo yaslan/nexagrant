@@ -1,6 +1,0 @@
-psql:<stdin>:55: NOTICE:  relation "Membership_userId_idx" already exists, skipping
-apply-migrations: 41 files applied
-exit=0
-psql:<stdin>:55: NOTICE:  relation "Membership_userId_idx" already exists, skipping
-apply-migrations: 41 files applied
-exit=0

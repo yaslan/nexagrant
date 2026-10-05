@@ -1,8 +1,0 @@
-told TIMING cpu=1.290s wall=1.286s files=37 findings=0 load=19.88
-tnew TIMING cpu=1.011s wall=0.584s files=37 findings=0 load=19.88
-told TIMING cpu=0.987s wall=0.573s files=37 findings=0 load=19.88
-tnew TIMING cpu=1.029s wall=0.604s files=37 findings=0 load=19.88
-told TIMING cpu=1.084s wall=0.656s files=37 findings=0 load=18.77
-tnew TIMING cpu=1.057s wall=0.646s files=37 findings=0 load=18.77
-told TIMING cpu=0.992s wall=0.575s files=37 findings=0 load=18.77
-tnew TIMING cpu=0.996s wall=0.580s files=37 findings=0 load=17.75

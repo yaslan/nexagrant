@@ -1,5 +1,0 @@
-ASK domain=panel.oka-ornek.test -> 200
-ASK domain=saldirgan.test -> 404
-ASK domain=saldirgan.test -> 404
-ASK domain=fonbridge.com -> 404
-ASK domain=fonbridge.com -> 404

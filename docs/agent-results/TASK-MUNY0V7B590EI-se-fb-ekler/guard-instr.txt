@@ -1,2 +1,0 @@
-maxDepth=5 enters=10459 findings=0 files=37 keys=128
-deep=

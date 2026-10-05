@@ -1,8 +1,0 @@
-HEAD 2efa909f DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55481/fabrika 13:05  up 15:18, 1 user, load averages: 6.30 24.36 29.37
-rc=0
- Test Files  273 passed | 2 skipped (275)
-      Tests  3292 passed | 9 skipped (3301)
-   Start at  13:05:26
-   Duration  36.34s (transform 16.70s, setup 0ms, import 88.13s, tests 226.84s, environment 19.88s)
-
-[exited with code 0]

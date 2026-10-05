@@ -1,9 +1,0 @@
-✘ /tr/fabrika-beta/opportunities/demo-opp-1/evaluations st=200 over 320:196 360:156 390:126 472:44 640:0
-✘ /tr/admin/cordis st=200 over 320:118 360:78 390:48 472:0 640:0
-✘ /tr/admin/alerts st=200 over 320:41 360:1 390:0 472:0 640:0
-✘ /tr/fabrika-beta/approvals st=200 over 320:24 360:0 390:0 472:0 640:0
-✘ /tr/fabrika-beta/onay-merkezi st=200 over 320:24 360:0 390:0 472:0 640:0
-✘ /tr/fabrika-beta/ayarlar/kapilar st=200 over 320:14 360:0 390:0 472:0 640:0
-✘ /tr/fabrika-beta/settings/gates st=200 over 320:14 360:0 390:0 472:0 640:0
-✘ /tr/fabrika-beta/firsatlar/demo-opp-1 st=200 over 320:0 360:0 390:0 472:0 640:4
-0 passed, 8 failed

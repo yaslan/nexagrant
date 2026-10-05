@@ -1,9 +1,0 @@
-import fs from 'node:fs';
-import { actionReturnLeaks, fsModuleReader, hasUseServerDirective } from '../wt/tests/api/action-leak-scan.ts';
-const root = process.cwd();
-const f = 'src/app/[locale]/portal/partner/[token]/page.tsx';
-const src = fs.readFileSync(f, 'utf8');
-console.log('hasUseServerDirective (dosya başı ya da fonksiyon gövdesi):', hasUseServerDirective(src, f));
-console.log('actionReturnLeaks satırları:', JSON.stringify(actionReturnLeaks(src, f, fsModuleReader(root))));
-const m11 = 'src/modules/m11/server/actions.ts';
-console.log('m11 actions hasUseServerDirective:', hasUseServerDirective(fs.readFileSync(m11, 'utf8'), m11));

@@ -1,8 +1,0 @@
-├ ƒ /[locale]/[workspace]/calls
-├ ƒ /[locale]/[workspace]/calls/[id]
-├ ƒ /[locale]/calls
-├ ƒ /[locale]/calls/[region]
-├ ƒ /[locale]/calls/turkey
-├ ƒ /[locale]/municipal-calls
-├ ƒ /[locale]/open-calls
-├ ƒ /api/v1/calls

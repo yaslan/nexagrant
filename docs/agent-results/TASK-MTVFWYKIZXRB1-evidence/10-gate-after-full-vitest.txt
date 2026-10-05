@@ -1,7 +1,0 @@
-açık SystemAlert satırı            : 34
-  meta.tenantId taşıyan             : 3
-  tenant'ı YAŞAYAN                  : 3
-  tenant'ı SİLİNMİŞ (öksüz)         : 0
-  hiç tenant adı geçmeyen (normal)  : 31
-
-✅ Öksüz alarm yok: her açık alarm ya bir tenant adı taşımıyor ya da yaşayan bir tenant’ı gösteriyor.

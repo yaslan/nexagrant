@@ -1,3 +1,0 @@
-/private/tmp/claude-501/-Users-macbook-alan/3cc12619-494e-43a6-a2b0-40836b0ca785/scratchpad/full1.log: Test Files  293 passed | 2 skipped (295)
-/private/tmp/claude-501/-Users-macbook-alan/3cc12619-494e-43a6-a2b0-40836b0ca785/scratchpad/full1.log:      Tests  3595 passed | 36 skipped (3631)
-/private/tmp/claude-501/-Users-macbook-alan/3cc12619-494e-43a6-a2b0-40836b0ca785/scratchpad/full1.log:   Duration  29.86s (transform 13.73s, setup 0ms, import 69.07s, tests 187.37s, environment 15.32s)

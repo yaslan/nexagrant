@@ -1,3 +1,0 @@
- Test Files  278 passed | 6 skipped (284)
-      Tests  3359 passed | 81 skipped (3440)
-   Start at  14:31:25

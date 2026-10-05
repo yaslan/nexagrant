@@ -1,8 +1,0 @@
-
-    ────────────────────────────────────────────────────────────────────────────────────────────────
-
-  2 failed
-    [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:138:7 › a foreign-currency invoice export › the USD document never prints a lira sign, and the TRY one still does 
-    [chromium] › tests/e2e/invoice-foreign-currency-export.spec.ts:210:7 › a foreign-currency invoice export › the printable page a customer sees agrees with itself 
-  15 passed (10.2s)
-[ELIFECYCLE] Command failed with exit code 1.

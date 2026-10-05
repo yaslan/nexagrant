@@ -1,2 +1,0 @@
-$ tsx scripts/apply-rls.ts
-✅ prisma/rls.sql applied. Policies in public: 28 → 112

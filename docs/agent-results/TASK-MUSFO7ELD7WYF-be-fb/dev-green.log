@@ -1,5 +1,0 @@
-Running 3 tests using 1 worker
-  ✓  1 [chromium] › tests/e2e/evidence-fabrication.spec.ts:43:5 › an upload with no readable metadata does not gain invented metadata (3.4s)
-  ✓  2 [chromium] › tests/e2e/evidence-unverified-badge.spec.ts:67:5 › a document nothing has verified is not shown as verified (1.0s)
-  ✓  3 [chromium] › tests/e2e/evidence-unverified-badge.spec.ts:89:5 › a fresh upload is recorded as unverified, not valid (1.2s)
-  3 passed (10.4s)

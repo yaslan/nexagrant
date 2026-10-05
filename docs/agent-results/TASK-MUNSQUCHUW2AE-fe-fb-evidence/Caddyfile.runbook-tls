@@ -1,9 +1,0 @@
-# Runbook §10.1 shape: same global block + a site with TLS (internal CA instead of ACME, nothing leaves the machine)
-{
-	default_bind tcp4/0.0.0.0
-}
-fonbridge.test {
-	tls internal
-	encode zstd gzip
-	respond "ok {remote_host}" 200
-}

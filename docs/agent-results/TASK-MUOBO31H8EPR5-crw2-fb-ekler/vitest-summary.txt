@@ -1,5 +1,0 @@
-DATABASE_URL → 127.0.0.1:55117/fabrika
-vitest exit=0
- Test Files  295 passed | 6 skipped (301)
-      Tests  3833 passed | 113 skipped (3946)
-   Duration  35.66s (transform 17.22s, setup 0ms, import 102.41s, tests 206.63s, environment 17.54s)

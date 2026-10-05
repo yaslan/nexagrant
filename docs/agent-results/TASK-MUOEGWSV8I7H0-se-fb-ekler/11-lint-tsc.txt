@@ -1,7 +1,0 @@
-DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55141/f
-$ pnpm lint
-exit=0
-$ eslint
-$ pnpm typecheck
-exit=0
-$ tsc --noEmit

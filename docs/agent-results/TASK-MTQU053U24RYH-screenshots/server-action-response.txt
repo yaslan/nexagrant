@@ -1,7 +1,0 @@
-POST 200 http://localhost:3000/tr/fabrika-beta/opportunities/demo-opp-1/briefs
-  BODY: 0:{"a":"$@1","f":"","q":"","i":true,"b":"development"}
-1:D"$2"
-1:{"success":false,"brief":null,"error":"BRIEF_NOT_PERSISTED"}
-
-(dedup) distinct browser console errors during the run:
-CONSOLE error: Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every render.

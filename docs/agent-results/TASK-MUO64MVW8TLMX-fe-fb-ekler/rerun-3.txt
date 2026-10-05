@@ -1,2 +1,0 @@
- Test Files  3 passed (3)
-      Tests  46 passed (46)

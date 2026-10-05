@@ -1,2 +1,0 @@
-alice url http://localhost:3481/tr/main/kanitlar
-put url http://localhost:3481/api/evidence/mock-upload?key=demo-tenant%2Fincoming%2Forg-default%2Fcat-03%2F2026%2F78da1409_kanit_pdf.pdf

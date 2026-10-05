@@ -1,6 +1,0 @@
- Test Files  296 passed | 2 skipped (298)
-      Tests  3788 passed | 41 skipped (3829)
-   Duration  36.58s (transform 17.90s, setup 0ms, import 104.63s, tests 213.63s, environment 18.67s)
-VITEST_EXIT=0
-LIVESKIP_EXIT=0
-allowed-skip satırı: 33

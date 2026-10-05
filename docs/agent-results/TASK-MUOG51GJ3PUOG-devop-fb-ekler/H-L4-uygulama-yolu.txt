@@ -1,6 +1,0 @@
-### uygulama yolu, fabrika_app, verify-full+sslrootcert, NODE_EXTRA_CA_CERTS yok
-{"current_user":"fabrika_app","lifetime_licence_count":0}
-### negatif kontrol: revoke sonrası anon yetkisi yok → aynı çağrı anon rolüyle (SET ROLE, salt-okuma işlemi)
- f
-(1 row)
-

@@ -1,105 +1,26 @@
 @import "tailwindcss";
 
-/* The server puts .dark / data-theme="dark" on <html> only (src/app/layout.tsx), so the
-   variant has to match descendants too. Without ` *` it compiled to
-   `.dark\:x:where(.dark, …)` — the element itself had to be <html> — and every
-   dark: class below it was dead (AKTAR-MURBCJ0A-1 K-3, tests/e2e/theme-dark-variant). */
-@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
-
 :root {
-  --ground: #F4F6F8;
-  --surface: #FFFFFF;
-  --surface-hover: #F1F5F9;
-  --ink: #0F172A;
-  --ink-2: #334155;
-  --muted: #5B6B7F; /* 5.03:1 on --ground, 5.45:1 on white; #64748B was 4.39 (K-4) */
-  --line: #E2E8F0;
-  --accent: #0369A1;
-  --accent-ink: #0369A1;
-  --accent-light: rgba(3, 105, 161, 0.12);
-  /* Solid fills that carry white text. --accent alone drops to 3.68:1 against
-     white in dark mode, which fails WCAG AA for body-size text, so buttons use
-     this darker step instead. Light mode is already compliant at 6.4:1. */
-  --accent-strong: #0369A1;
-  --amber: #D97706;
-  --ok: #059669;
-  --bad: #DC2626;
-}
-
-.dark, [data-theme="dark"] {
-  --ground: #080D1A;
-  --surface: #0B1324;
-  --surface-hover: #0F192E;
-  --ink: #F8FAFC;
-  --ink-2: #CBD5E1;
-  --muted: #94A3B8;
-  --line: #1E293B;
-  --accent: #0891B2;
-  --accent-ink: #67E8F9;
-  --accent-light: rgba(8, 145, 178, 0.12);
-  --accent-strong: #0E7490; /* 5.36:1 against white */
-  --amber: #FBBF24;
-  --ok: #34D399;
-  --bad: #F87171;
+  --background: #ffffff;
+  --foreground: #171717;
 }
 
 @theme inline {
-  --color-ground: var(--ground);
-  --color-surface: var(--surface);
-  --color-surface-hover: var(--surface-hover);
-  --color-ink: var(--ink);
-  --color-ink-2: var(--ink-2);
-  --color-muted: var(--muted);
-  --color-line: var(--line);
-  --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
-  --color-accent-light: var(--accent-light);
-  --color-accent-strong: var(--accent-strong);
-  --color-amber: var(--amber);
-  --color-ok: var(--ok);
-  --color-bad: var(--bad);
-
-  --color-background: var(--ground);
-  --color-foreground: var(--ink);
-  --color-border: var(--line);
-  --color-card: var(--surface);
-  --color-card-foreground: var(--ink);
-  --color-popover: var(--surface);
-  --color-popover-foreground: var(--ink);
-  --color-primary: var(--accent);
-  --color-primary-foreground: #020617;
-  --color-secondary: var(--ground);
-  --color-secondary-foreground: var(--ink);
-  --color-muted-foreground: var(--muted);
-
-  --font-sans: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-heading: 'Newsreader', Georgia, serif;
-  --font-mono: 'IBM Plex Mono', Menlo, Monaco, Consolas, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
-/* Page gutter below sm (640px): the only horizontal space between the screen
-   edge and the page content on a phone (TASK-MUNU027UKJ2AD). It generates
-   `px-edge`, which the app/admin <main> and the outermost container of every
-   layout-less public page use as their mobile inline padding; from sm up they
-   keep their own values. Nested page roots add no horizontal padding below sm
-   (tests/mobile-edge-gutter.test.ts), so the gutter never stacks. Cards keep
-   their inner padding; this is the outer edge only. */
-@theme {
-  --spacing-edge: 2px;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
 }
 
 body {
-  background-color: var(--ground);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-/* Ensure inputs, select boxes and dialogs adapt nicely */
-input, select, textarea {
-  color-scheme: light dark;
-}
-
-.dark input, .dark select, .dark textarea {
-  color-scheme: dark;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
 }

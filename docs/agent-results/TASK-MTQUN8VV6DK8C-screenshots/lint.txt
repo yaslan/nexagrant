@@ -1,8 +1,0 @@
-===== eslint on the files this task changed =====
-eslint exit=0  (0 = no errors and no warnings on this task's files)
-
-===== repo-wide: pnpm lint =====
-✖ 203 problems (0 errors, 203 warnings)
-  0 errors and 4 warnings potentially fixable with the `--fix` option.
-
-pnpm lint exit=0  (repo-wide gate green: 0 errors, warnings only)

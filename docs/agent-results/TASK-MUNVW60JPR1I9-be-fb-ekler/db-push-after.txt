@@ -1,4 +1,0 @@
-Prisma schema loaded from prisma/schema.prisma.
-Datasource "db": PostgreSQL database "fabrika", schema "public" at "127.0.0.1:55796"
-The database is already in sync with the Prisma schema.
-1
