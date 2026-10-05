@@ -145,10 +145,10 @@ export default async function PersonDaysReportPage({
             <thead className="bg-surface border-b border-border text-muted uppercase tracking-wider text-xs">
               <tr>
                 <th className="px-3 sm:px-6 py-3 font-semibold">{isTr ? 'Fırsat' : 'Opportunity'}</th>
-                <th className="px-3 sm:px-6 py-3 font-semibold text-right">
+                <th className="px-3 sm:px-6 py-3 font-semibold text-right whitespace-nowrap">
                   {isTr ? 'Toplam Saat' : 'Total Hours'}
                 </th>
-                <th className="px-3 sm:px-6 py-3 font-semibold text-right">
+                <th className="px-3 sm:px-6 py-3 font-semibold text-right whitespace-nowrap">
                   {isTr ? 'Adam-Gün' : 'Person-Days'}
                 </th>
               </tr>
@@ -156,7 +156,7 @@ export default async function PersonDaysReportPage({
             <tbody className="divide-y divide-border">
               {groupedData.map((row) => (
                 <tr key={row.opportunityId} className="hover:bg-ground">
-                  <td className="px-3 sm:px-6 py-4 text-ink font-medium">
+                  <td className="px-3 sm:px-6 py-4 text-ink font-medium [overflow-wrap:anywhere]">
                     {/* Was `../pipeline/mock_id` — a link to nothing. */}
                     <Link
                       href={`${getWorkspaceRoute('pipeline', locale, workspace)}/${row.opportunityId}`}
@@ -165,8 +165,8 @@ export default async function PersonDaysReportPage({
                       {row.title}
                     </Link>
                   </td>
-                  <td className="px-3 sm:px-6 py-4 text-ink text-right text-sm">{row.hours}</td>
-                  <td className="px-3 sm:px-6 py-4 text-ink font-semibold text-right text-sm">
+                  <td className="px-3 sm:px-6 py-4 text-ink text-right text-sm whitespace-nowrap">{row.hours}</td>
+                  <td className="px-3 sm:px-6 py-4 text-ink font-semibold text-right text-sm whitespace-nowrap">
                     {toPersonDays(row.hours).toFixed(1)}
                   </td>
                 </tr>
