@@ -1,6 +1,6 @@
 # ADR-0011 — Bildirim deposu (Notification): model, üreticiler, okundu durumu
 
-- **Durum:** ÖNERİLDİ (taslak). Kod yok. Patron kararları K-1..K-6 bekleniyor (§9).
+- **Durum:** ÖNERİLDİ, patron kararları verildi (06.10.2026, K-1791..K-1798; §9). Kod yok. Lider onayı bekleniyor.
 - **Tarih:** 2026-10-06
 - **Kart:** TASK-MUVIK218O313G. Önceki tespit: `docs/agent-results/TASK-MUU7678DFI9QF-explor-fb.md` (alan/ kökünde; B0, N1).
 - **Hazırlayan:** PRM-FB
@@ -166,14 +166,14 @@ Neden kayıtlı arama en kolay: tek yer, tek alıcı, zaten kiracı kapsamlı tr
 
 ## 9. Patron kararları
 
-| # | Soru | Seçenekler | Öneri |
-|---|---|---|---|
-| K-1 | Okundu durumu kapsamı (N1) | a) kullanıcı başına (her satır tek kullanıcı, `readAt`) · b) çalışma alanı başına | **a** |
-| K-2 | localStorage overlay | a) tamamen kaldır, eski anahtarları bir kez temizle · b) iyimser önbellek olarak tut (misafir birleşmesi kalkar) | **a** |
-| K-3 | Saklama süresi | a) 90 gün (hepsi) · b) okunmuş 30 / okunmamış 180 gün · c) süresiz | **a** |
-| K-4 | MVP'deki üretici | A) yok · B) kayıtlı arama · C) kayıtlı arama + aylık kredi | **B** |
-| K-5 | Kullanıcı izolasyonu nerede | a) RLS kiracı + uygulama `where userId` (SavedSearch deseni) · b) yeni `app.user_id` ayarı ile RLS | **a** (b ayrı ADR) |
-| K-6 | Kayıtlı arama bildiriminin alıcısı | a) `SavedSearch.userId` · b) bugünkü e-posta gibi kurumun ilk sahibi | **a** |
+| # | Soru | Seçenekler | Öneri | Patron kararı |
+|---|---|---|---|---|
+| K-1 | Okundu durumu kapsamı (N1) | a) kullanıcı başına (her satır tek kullanıcı, `readAt`) · b) çalışma alanı başına | **a** | **a** (K-1791) |
+| K-2 | localStorage overlay | a) tamamen kaldır, eski anahtarları bir kez temizle · b) iyimser önbellek olarak tut (misafir birleşmesi kalkar) | **a** | **a** (K-1793) |
+| K-3 | Saklama süresi | a) 90 gün (hepsi) · b) okunmuş 30 / okunmamış 180 gün · c) süresiz | **a** | **a** (K-1795) |
+| K-4 | MVP'deki üretici | A) yok · B) kayıtlı arama · C) kayıtlı arama + aylık kredi | **B** | **B** (K-1796) |
+| K-5 | Kullanıcı izolasyonu nerede | a) RLS kiracı + uygulama `where userId` (SavedSearch deseni) · b) yeni `app.user_id` ayarı ile RLS | **a** (b ayrı ADR) | **a** (K-1797) |
+| K-6 | Kayıtlı arama bildiriminin alıcısı | a) `SavedSearch.userId` · b) bugünkü e-posta gibi kurumun ilk sahibi | **a** | **a** (K-1798) |
 
 ## 10. Platform
 
