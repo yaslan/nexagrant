@@ -2240,7 +2240,8 @@
       "error_consent": "Göndermek için açık rıza kutusunu işaretleyin.",
       "error_outdated": "Form güncellendi. Sayfayı yenileyip yeniden deneyin.",
       "error_rate": "Kısa sürede çok fazla talep gönderildi. Lütfen daha sonra yeniden deneyin.",
-      "error_server": "Talebiniz şu anda kaydedilemedi. Lütfen biraz sonra yeniden deneyin."
+      "error_server": "Talebiniz şu anda kaydedilemedi. Lütfen biraz sonra yeniden deneyin.",
+      "noscript_message": "Bu formu göndermek için JavaScript gereklidir. Lütfen tarayıcınızda JavaScript'i etkinleştirin."
     },
     "turkey": {
       "partial": "Türkiye kısmen katılıyor",
