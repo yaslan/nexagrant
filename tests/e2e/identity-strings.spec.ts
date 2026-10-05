@@ -133,7 +133,9 @@ test.describe('identity strings', () => {
       role: 'PIPELINE_MANAGER',
     });
 
-    await page.goto('/tr/fabrika-beta/panel');
+    // The workspace the membership above covers. `fabrika-beta` is the demo tenant's
+    // slug, not a workspace's, and the [workspace] guard answers it 404 (TASK-MUUS62C4SC7H5).
+    await page.goto('/tr/default/panel');
 
     // Real click: the switcher is rendered only while the menu is open.
     const header = page.locator('header:visible').first();
