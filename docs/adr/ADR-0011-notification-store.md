@@ -1,6 +1,6 @@
 # ADR-0011 — Bildirim deposu (Notification): model, üreticiler, okundu durumu
 
-- **Durum:** ÖNERİLDİ, patron kararları verildi (06.10.2026, K-1791..K-1798; §9). Kod yok. Lider onayı bekleniyor.
+- **Durum:** KABUL EDİLDİ (06.10.2026). Lider onayı ve patron kararı K-1790 = A (toplu); kalem kalem aynı cevaplar K-1791..K-1798 (§9). Uygulama: FB-NOTIF-1 sprinti (TASK-MUVR24EHWI2RA, TASK-MUVR2C9H3KTHQ, TASK-MUVR2HXPCYRGT).
 - **Tarih:** 2026-10-06
 - **Kart:** TASK-MUVIK218O313G. Önceki tespit: `docs/agent-results/TASK-MUU7678DFI9QF-explor-fb.md` (alan/ kökünde; B0, N1).
 - **Hazırlayan:** PRM-FB
