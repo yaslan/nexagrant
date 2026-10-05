@@ -8,6 +8,7 @@ import { prisma, withTenant } from '../../src/lib/db';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { createInviteCodeIn, redeemInviteCode } from '../../src/lib/agency/codes';
 import { generateAgencyReports, reportPeriod } from '../../src/lib/agency/report';
+import { presentIds, requireId } from '../helpers/teardown-guard';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
@@ -214,7 +215,7 @@ async function cleanupPersonDays(f: PdFixture | undefined) {
     await tx.moduleState.deleteMany({ where: { tenantId: { in: tenants } } });
     await tx.subscription.deleteMany({ where: { tenantId: { in: tenants } } });
     await tx.workspace.deleteMany({ where: { tenantId: { in: tenants } } });
-    await tx.user.deleteMany({ where: { id: { startsWith: f.stamp } } });
+    await tx.user.deleteMany({ where: { id: { startsWith: requireId(f.stamp, 'stamp') } } });
     await tx.tenant.deleteMany({ where: { id: { in: tenants } } });
   });
 }
@@ -429,10 +430,10 @@ async function cleanupAgencies(f: AgencyFixture | undefined) {
   await withSystemScope('platform-admin', 'e2e.reports-ui.agency.cleanup', async (tx) => {
     const tenants = [...f.orgIds, f.agencyA.id, f.agencyB.id];
     await tx.membership.deleteMany({ where: { tenantId: { in: tenants } } });
-    await tx.user.deleteMany({ where: { id: { startsWith: f.stamp } } });
+    await tx.user.deleteMany({ where: { id: { startsWith: requireId(f.stamp, 'stamp') } } });
     await tx.auditEvent.deleteMany({ where: { tenantId: { in: tenants } } });
     await tx.agencyInviteCode.deleteMany({ where: { tenantId: { in: [f.agencyA.id, f.agencyB.id] } } });
-    await tx.tenant.deleteMany({ where: { id: { in: f.orgIds } } });
+    await tx.tenant.deleteMany({ where: { id: { in: presentIds(f.orgIds) } } });
     await tx.tenant.deleteMany({ where: { id: { in: [f.agencyA.id, f.agencyB.id] } } });
   });
 }
