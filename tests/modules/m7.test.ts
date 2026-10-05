@@ -76,11 +76,9 @@ describe('M7 TTO Accelerator Module', () => {
     expect(h.ttoCreate).not.toHaveBeenCalled();
   });
 
-  test('matchTtoItemToCalls returns matched topics with fitScore and targetTrlRange', async () => {
+  test('matchTtoItemToCalls returns no matches (matching not yet implemented)', async () => {
     const res = await matchTtoItemToCalls('tto-123');
-    expect(res.matchedTopics.length).toBeGreaterThan(0);
-    expect(res.matchedTopics[0]?.fitScore).toBeGreaterThan(50);
-    expect(res.matchedTopics[0]?.targetTrlRange).toBeDefined();
+    expect(res.matchedTopics).toEqual([]);
     expect(h.ttoFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'tto-123', tenantId: 'tenant-1' } })
     );

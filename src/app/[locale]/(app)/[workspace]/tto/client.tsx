@@ -210,10 +210,10 @@ export function TtoAcceleratorClient({
           </div>
 
           <div className="bg-ground border border-border rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Yapay Zeka Çağrı Eşleşmesi</span>
-            <span className="text-xs font-bold text-purple-400 mt-1 block flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              Horizon Europe Uyumlu
+            <span className="text-muted block text-[11px]">Çağrı Eşleştirme</span>
+            <span className="text-xs font-bold text-muted mt-1 block flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-muted" />
+              Kütüphane Yükleniyor
             </span>
           </div>
         </div>
@@ -356,56 +356,63 @@ export function TtoAcceleratorClient({
             </h3>
 
             <div className="space-y-4">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-3.5 hover:border-accent/40 transition"
-                >
-                  <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
-                    <div>
-                      <h4 className="font-bold text-sm text-ink">{item.title}</h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        {getPatentBadge(item.patentStatus)}
-                        <span className="bg-purple-500/15 text-purple-400 border border-purple-500/30 font-mono font-bold px-2 py-0.5 rounded text-[11px]">
-                          TRL {item.trl}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleRunMatcher(item)}
-                      className="px-3 py-1.5 bg-accent hover:opacity-90 text-white font-semibold rounded-xl text-xs transition shadow-2xs flex items-center gap-1.5 shrink-0"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>AB Çağrıları Eşleştir</span>
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-ink-2 leading-relaxed">{item.summary}</p>
-
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border">
-                    <div className="flex flex-wrap gap-1.5">
-                      {item.keywords?.map((k, idx) => (
-                        <span key={idx} className="text-[10px] bg-ground border border-border text-ink-2 px-2 py-0.5 rounded font-mono">
-                          #{k}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* `isGeneratingChecklist` was set on both sides of the call and never
-                        read, so the button stayed idle-looking during an AI request and
-                        could be clicked again — each click debits credits (CLAUDE.md §5). */}
-                    <button
-                      onClick={() => handleGenerateIpChecklist(item)}
-                      disabled={isGeneratingChecklist}
-                      className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
-                    >
-                      <FileCheck className="w-3.5 h-3.5 text-accent" />
-                      <span>{isGeneratingChecklist ? 'Üretiliyor...' : 'IP Kontrol Listesi Üret'}</span>
-                    </button>
-                  </div>
+              {items.length === 0 ? (
+                <div className="bg-surface border border-border rounded-2xl p-8 text-center shadow-xs">
+                  <p className="text-muted text-sm">Portföyde henüz teknoloji kaydı bulunmamaktadır.</p>
+                  <p className="text-ink-2 text-xs mt-2">Yukarıdaki form aracılığıyla yeni bir teknoloji ekleyerek başlayın.</p>
                 </div>
-              ))}
+              ) : (
+                items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-3.5 hover:border-accent/40 transition"
+                  >
+                    <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
+                      <div>
+                        <h4 className="font-bold text-sm text-ink">{item.title}</h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          {getPatentBadge(item.patentStatus)}
+                          <span className="bg-purple-500/15 text-purple-400 border border-purple-500/30 font-mono font-bold px-2 py-0.5 rounded text-[11px]">
+                            TRL {item.trl}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleRunMatcher(item)}
+                        className="px-3 py-1.5 bg-accent hover:opacity-90 text-white font-semibold rounded-xl text-xs transition shadow-2xs flex items-center gap-1.5 shrink-0"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>AB Çağrıları Eşleştir</span>
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-ink-2 leading-relaxed">{item.summary}</p>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border">
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.keywords?.map((k, idx) => (
+                          <span key={idx} className="text-[10px] bg-ground border border-border text-ink-2 px-2 py-0.5 rounded font-mono">
+                            #{k}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* `isGeneratingChecklist` was set on both sides of the call and never
+                          read, so the button stayed idle-looking during an AI request and
+                          could be clicked again — each click debits credits (CLAUDE.md §5). */}
+                      <button
+                        onClick={() => handleGenerateIpChecklist(item)}
+                        disabled={isGeneratingChecklist}
+                        className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                      >
+                        <FileCheck className="w-3.5 h-3.5 text-accent" />
+                        <span>{isGeneratingChecklist ? 'Üretiliyor...' : 'IP Kontrol Listesi Üret'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -505,38 +512,44 @@ export function TtoAcceleratorClient({
             ) : (
               <div className="space-y-3">
                 <h4 className="font-bold text-xs text-ink-2 uppercase tracking-wider">
-                  Tespit Edilen En Yüksek Uyumlu AB Çağrıları ({matchedTopics.length})
+                  AB Çağrı Eşleştirme Sonucu ({matchedTopics.length})
                 </h4>
 
-                {matchedTopics.map((topic, idx) => (
-                  <div key={idx} className="bg-ground border border-border rounded-xl p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-xs text-accent bg-accent/15 border border-accent/20 px-2 py-0.5 rounded">
-                        {topic.topicId}
-                      </span>
-                      <span className="font-mono font-bold text-xs text-emerald-500 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
-                        Uyum Skoru: %{topic.fitScore}
-                      </span>
-                    </div>
-
-                    <h5 className="font-bold text-sm text-ink">{topic.title}</h5>
-                    <p className="text-xs text-ink-2">{topic.matchReason}</p>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs">
-                      <span className="text-[11px] font-mono text-muted">
-                        Hedef TRL: <strong>{topic.targetTrlRange}</strong>
-                      </span>
-
-                      <button
-                        onClick={() => setSelectedMatchItem(null)}
-                        className="px-3 py-1 bg-accent hover:opacity-90 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"
-                      >
-                        <span>M4 İlişkisi Aç</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                {matchedTopics.length === 0 ? (
+                  <div className="bg-ground border border-border rounded-xl p-4 text-center">
+                    <p className="text-xs text-muted">Bu teknoloji için eşleşen AB çağrısı bulunamamıştır.</p>
                   </div>
-                ))}
+                ) : (
+                  matchedTopics.map((topic, idx) => (
+                    <div key={idx} className="bg-ground border border-border rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-xs text-accent bg-accent/15 border border-accent/20 px-2 py-0.5 rounded">
+                          {topic.topicId}
+                        </span>
+                        <span className="font-mono font-bold text-xs text-emerald-500 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
+                          Uyum Skoru: %{topic.fitScore}
+                        </span>
+                      </div>
+
+                      <h5 className="font-bold text-sm text-ink">{topic.title}</h5>
+                      <p className="text-xs text-ink-2">{topic.matchReason}</p>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs">
+                        <span className="text-[11px] font-mono text-muted">
+                          Hedef TRL: <strong>{topic.targetTrlRange}</strong>
+                        </span>
+
+                        <button
+                          onClick={() => setSelectedMatchItem(null)}
+                          className="px-3 py-1 bg-accent hover:opacity-90 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"
+                        >
+                          <span>M4 İlişkisi Aç</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>

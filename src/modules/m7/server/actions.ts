@@ -33,6 +33,7 @@ export async function createTtoItem({
   summary: string;
   keywords: string[];
 }) {
+  await assertModuleAccess('M7');
   const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const item = await withTenant<TtoPortfolioItemRow>(tenantId, (tx) =>
@@ -70,36 +71,7 @@ export async function matchTtoItemToCalls(itemId: string) {
 
   if (!item) return { matchedTopics: [] };
 
-  const itemTrl = item.trl;
-
-  return {
-    matchedTopics: [
-      {
-        topicId: 'HORIZON-CL5-2026-D3-01',
-        title: 'Zero-Emission Transport Systems & Battery Safety',
-        fitScore: 92,
-        targetTrlRange: 'TRL 5 -> TRL 7',
-        matchReason: `Mevcut TRL ${itemTrl} olgunluğu ve batarya termal izleme patent odağı tam uyumlu.`,
-        recommendedRole: 'Key Technology Provider / Work Package Leader',
-      },
-      {
-        topicId: 'HORIZON-CL4-2026-TWIN-01',
-        title: 'Advanced Materials & Sensors for Clean Energy',
-        fitScore: 84,
-        targetTrlRange: `TRL ${itemTrl} -> TRL ${Math.min(9, itemTrl + 2)}`,
-        matchReason: 'Tescilli patent (granted) ve sensör dizesi mimarisi çağrı gereksinimleriyle örtüşüyor.',
-        recommendedRole: 'Co-applicant / Pilot Testbed Host',
-      },
-      {
-        topicId: 'EIC-ACC-2026-STEP',
-        title: 'EIC Accelerator Deep-Tech Scale-up',
-        fitScore: 78,
-        targetTrlRange: 'TRL 5 -> TRL 8/9',
-        matchReason: 'Yüksek lisanslama potansiyeli ve üniversite spin-off ticarileştirme kriterine uygun.',
-        recommendedRole: 'Grant & Blended Finance Applicant',
-      },
-    ],
-  };
+  return { matchedTopics: [] };
 }
 
 export async function generateIpChecklist({
