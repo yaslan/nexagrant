@@ -1,60 +1,64 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Bell, CheckCircle2, AlertTriangle, Sparkles, Clock, ArrowLeft, CheckCheck } from 'lucide-react';
 import Link from 'next/link';
-import { useOptionalSession } from '@/lib/hooks/use-optional-session';
-import {
-  applyReadState,
-  markNotificationsRead,
-  notificationStorageKey,
-  useReadNotificationIds,
-} from '@/lib/hooks/use-read-notifications';
-
-interface NotificationItem {
-  id: string;
-  title: string;
-  desc: string;
-  time: string;
-  type: string;
-  unread: boolean;
-  link?: string;
-}
+import { markNotificationsRead } from '@/actions/user/notifications';
+import type { NotificationItem } from '@/lib/notifications/store';
+import { formatNotificationTime, renderNotification } from '@/lib/notifications/render';
 
 interface NotificationsClientProps {
-  initialNotifications: NotificationItem[];
+  notifications: NotificationItem[];
+  unreadCount: number;
   locale: string;
   workspace: string;
 }
 
 export default function NotificationsClient({
-  initialNotifications,
+  notifications,
+  unreadCount,
   locale,
   workspace,
 }: NotificationsClientProps) {
-  const session = useOptionalSession();
-  const storageKey = notificationStorageKey(session?.user?.email);
-  const isTr = locale === 'tr';
+  const t = useTranslations();
+  const tNotif = useTranslations('Notifications');
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
-  // The read overlay is a browser-only store, so it is subscribed to and derived during render
-  // rather than copied into state by an effect. See `use-read-notifications`.
-  const readIds = useReadNotificationIds(storageKey);
-  const notifications: NotificationItem[] = useMemo(
-    () => applyReadState(initialNotifications, readIds),
-    [initialNotifications, readIds]
+  // The list comes from the server page; after a write, or when the tab regains
+  // focus (another tab may have marked items read), the page is re-rendered.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') router.refresh();
+    };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [router]);
+
+  // Plain text only: `searchName` is user input (see renderNotification).
+  const renderedNotifications = useMemo(
+    () =>
+      notifications.map((n) => ({
+        id: n.id,
+        ...renderNotification(n.type, n.payload, tNotif),
+        time: formatNotificationTime(n.createdAt, locale),
+        unread: n.readAt === null,
+      })),
+    [notifications, tNotif, locale]
   );
 
-  const unreadCount = notifications.filter((n) => n.unread).length;
-
-  const handleMarkAllRead = () => {
-    markNotificationsRead(
-      storageKey,
-      initialNotifications.map((n) => n.id)
-    );
-  };
-
-  const handleMarkSingleRead = (id: string) => {
-    markNotificationsRead(storageKey, [id]);
+  const markRead = (target: string[] | 'all') => {
+    startTransition(async () => {
+      const response = await markNotificationsRead(target);
+      if (response.ok) router.refresh();
+      else console.error('[notifications] mark read failed:', response.error);
+    });
   };
 
   return (
@@ -71,12 +75,10 @@ export default function NotificationsClient({
           <div>
             <h1 className="text-xl font-bold text-ink flex items-center space-x-2">
               <Bell className="w-5 h-5 text-accent" />
-              <span>{isTr ? 'Bildirimler' : 'Notifications'}</span>
+              <span>{t('Notifications.title')}</span>
             </h1>
             <p className="text-xs text-muted mt-0.5">
-              {isTr
-                ? 'Çalışma alanınızla ilgili tüm sistem uyarıları, eşleşmeler ve güncellemeler.'
-                : 'System alerts, match findings, and workspace updates.'}
+              {t('Notifications.description')}
             </p>
           </div>
         </div>
@@ -86,20 +88,21 @@ export default function NotificationsClient({
           {unreadCount > 0 ? (
             <div className="flex items-center space-x-3">
               <span className="text-xs font-semibold bg-bad/10 text-bad border border-bad/20 px-3 py-1 rounded-full">
-                {unreadCount} {isTr ? 'Okunmamış Bildirim' : 'Unread Notifications'}
+                {t('Notifications.unreadBadge', { count: unreadCount })}
               </span>
               <button
-                onClick={handleMarkAllRead}
+                onClick={() => markRead('all')}
+                disabled={isPending}
                 className="bg-surface hover:bg-surface-hover border border-border text-ink font-bold text-xs px-3.5 py-2 rounded-xl shadow-2xs transition flex items-center space-x-1.5"
               >
                 <CheckCheck className="w-4 h-4 text-ok" />
-                <span>{isTr ? 'Tümünü Okundu İşaretle' : 'Mark All as Read'}</span>
+                <span>{t('Notifications.markAllRead')}</span>
               </button>
             </div>
           ) : (
             <span className="text-xs font-semibold bg-good/10 text-good border border-good/20 px-3 py-1 rounded-full flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{isTr ? 'Tüm Bildirimler Okundu' : 'All Notifications Read'}</span>
+              <span>{t('Notifications.allRead')}</span>
             </span>
           )}
         </div>
@@ -107,77 +110,72 @@ export default function NotificationsClient({
 
       {/* Notifications List */}
       <div className="bg-surface border border-border rounded-xl shadow-xs divide-y divide-border overflow-hidden">
-        {/* No notification store exists yet (see page.tsx). An empty feed is the
-            honest state; it used to be filled with four invented items. */}
-        {notifications.length === 0 && (
+        {renderedNotifications.length === 0 && (
           <div className="p-12 text-center space-y-2">
             <Bell className="w-6 h-6 text-muted mx-auto" />
             <p className="font-semibold text-sm text-ink">
-              {isTr ? 'Henüz bildiriminiz yok.' : 'You have no notifications yet.'}
+              {t('Notifications.noNotifications')}
             </p>
             <p className="text-xs text-muted">
-              {isTr
-                ? 'Eşleşmeler, kanıt belgesi uyarıları ve kredi hareketleri burada görünecek.'
-                : 'Match findings, evidence alerts and credit activity will appear here.'}
+              {t('Notifications.noNotificationsDesc')}
             </p>
           </div>
         )}
 
-        {notifications.map((n) => (
+        {renderedNotifications.map((n) => (
           <div
             key={n.id}
-            onClick={() => handleMarkSingleRead(n.id)}
+            role="button"
+            tabIndex={0}
+            onClick={() => markRead([n.id])}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                markRead([n.id]);
+              }
+            }}
             className={`p-4 flex items-start justify-between space-x-4 transition-colors cursor-pointer hover:bg-surface-hover ${
               n.unread ? 'bg-accent/5' : ''
             }`}
           >
-            <div className="flex items-start space-x-3.5">
+            <div className="flex items-start space-x-3.5 min-w-0">
               <div className="mt-0.5">
-                {n.type === 'match' && (
+                {n.icon === 'match' && (
                   <div className="w-8 h-8 rounded-full bg-accent/15 text-accent flex items-center justify-center">
                     <Sparkles className="w-4 h-4" />
                   </div>
                 )}
-                {n.type === 'warning' && (
+                {n.icon === 'warning' && (
                   <div className="w-8 h-8 rounded-full bg-bad/15 text-bad flex items-center justify-center">
                     <AlertTriangle className="w-4 h-4" />
                   </div>
                 )}
-                {n.type === 'credit' && (
+                {n.icon === 'credit' && (
                   <div className="w-8 h-8 rounded-full bg-good/15 text-good flex items-center justify-center">
                     <CheckCircle2 className="w-4 h-4" />
                   </div>
                 )}
-                {n.type === 'info' && (
+                {n.icon === 'info' && (
                   <div className="w-8 h-8 rounded-full bg-ink/10 text-ink-2 flex items-center justify-center">
                     <Bell className="w-4 h-4" />
                   </div>
                 )}
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <div className="flex items-center space-x-2">
                   <h3 className="font-semibold text-sm text-ink">{n.title}</h3>
                   {n.unread && (
                     <span className="w-2 h-2 rounded-full bg-accent" />
                   )}
                 </div>
-                <p className="text-xs text-ink-2 leading-relaxed">{n.desc}</p>
+                <p className="text-xs text-ink-2 leading-relaxed break-words">{n.description}</p>
                 <div className="flex items-center space-x-1 text-[11px] text-muted pt-1">
                   <Clock className="w-3 h-3" />
                   <span>{n.time}</span>
                 </div>
               </div>
             </div>
-
-            {n.link && (
-              <Link
-                href={n.link}
-                className="text-xs font-semibold text-accent hover:underline shrink-0 self-center"
-              >
-                {isTr ? 'Görüntüle' : 'View'}
-              </Link>
-            )}
           </div>
         ))}
       </div>

@@ -1,18 +1,15 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo, useId } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useId, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { logoutAction } from '@/lib/actions/auth';
 import { signOut as clientSignOut } from 'next-auth/react';
 import { useOptionalSession } from '@/lib/hooks/use-optional-session';
-import {
-  applyReadState,
-  markNotificationsRead,
-  notificationStorageKey,
-  useReadNotificationIds,
-} from '@/lib/hooks/use-read-notifications';
+import { listNotifications, markNotificationsRead } from '@/actions/user/notifications';
+import type { NotificationItem } from '@/lib/notifications/store';
+import { formatNotificationTime, renderNotification } from '@/lib/notifications/render';
 import { 
   User, 
   Settings, 
@@ -92,6 +89,7 @@ export default function UserMenu({
   // The KVKK/GDPR console has its own copy in both locales already; this entry
   // reuses it rather than adding another hardcoded pair of strings.
   const tPrivacy = useTranslations('settings.privacy');
+  const tNotif = useTranslations('Notifications');
 
   const effectiveUserEmail = propUserEmail || sessionData?.user?.email;
   // Never invent an identity: the name falls back to the e-mail local part and then to a
@@ -210,45 +208,77 @@ export default function UserMenu({
   const isTr = locale === 'tr';
 
   /**
-   * TASK-MTQYXISOPUJ53 — fabricated fallbacks.
-   *
-   * This held three notifications written in code — a "%92" call match, an SME
-   * declaration "expiring in 15 days", "500 AI credits added to your account" —
-   * and it is mounted in the app shell, so every tenant saw them on every page,
-   * with a pulsing unread dot on the bell. prisma/schema.prisma has no
-   * notification model, so none of it was ever a fallback for a query: there is
-   * nothing to query yet. Two of the three are claims a user would act on.
-   *
-   * Empty until a notification store exists. Still memoised: it feeds the
-   * derivation below, and a fresh array literal per render used to produce an
-   * unbounded render loop ("Maximum update depth exceeded") across every page
-   * carrying the shell.
+   * The bell reads the notification store (ADR-0011 §3.3, TASK-MUVR2C9H3KTHQ):
+   * `readAt` on the server is the only read state; there is no browser overlay.
+   * Text is rendered from `type` + `payload` (see `renderNotification`) and shown
+   * as JSX text only — `searchName` is user input.
    */
-  const baseNotifications = useMemo<
-    Array<{ id: string; title: string; desc: string; time: string; unread: boolean }>
-  >(() => [], []);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const storageKey = notificationStorageKey(effectiveUserEmail);
-
-  // Same store as the notifications page: subscribed to and derived during render, not copied
-  // into state by an effect. See `use-read-notifications`.
-  const readIds = useReadNotificationIds(storageKey);
-  const notificationsList = useMemo(
-    () => applyReadState(baseNotifications, readIds),
-    [baseNotifications, readIds]
+  const refreshNotifications = useCallback(
+    () =>
+      listNotifications().then((res) => {
+        if (res.ok) {
+          setNotifications(res.notifications);
+          setUnreadCount(res.unreadCount);
+        }
+      }),
+    []
   );
 
-  const unreadCount = notificationsList.filter((n) => n.unread).length;
+  // Load for the badge, and again whenever the tab regains focus: another tab
+  // may have marked items read (this replaces the old `storage` event).
+  useEffect(() => {
+    if (!effectiveUserEmail) return;
+    void refreshNotifications();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshNotifications();
+    };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [effectiveUserEmail, refreshNotifications]);
 
-  const markAllAsRead = () => {
-    markNotificationsRead(
-      storageKey,
-      baseNotifications.map((n) => n.id)
-    );
+  // ADR-0011 §3.3: the old `fonbridge_read_notifs_*` overlay keys are removed
+  // once, without reading their contents.
+  useEffect(() => {
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('fonbridge_read_notifs_')) localStorage.removeItem(key);
+      }
+    } catch {
+      // Storage blocked (private mode, policy): nothing to clean.
+    }
+  }, []);
+
+  const notificationsList = useMemo(
+    () =>
+      notifications.map((n) => {
+        const text = renderNotification(n.type, n.payload, tNotif);
+        return {
+          id: n.id,
+          title: text.title,
+          desc: text.description,
+          time: formatNotificationTime(n.createdAt, locale),
+          unread: n.readAt === null,
+        };
+      }),
+    [notifications, tNotif, locale]
+  );
+
+  const markAllAsRead = async () => {
+    const res = await markNotificationsRead('all');
+    if (res.ok) await refreshNotifications();
   };
 
-  const markSingleAsRead = (id: string) => {
-    markNotificationsRead(storageKey, [id]);
+  const markSingleAsRead = async (id: string) => {
+    const res = await markNotificationsRead([id]);
+    if (res.ok) await refreshNotifications();
   };
 
   if (!effectiveUserEmail) {
@@ -328,20 +358,21 @@ export default function UserMenu({
               )}
 
               {notificationsList.map((n) => (
-                <div
+                <button
+                  type="button"
                   key={n.id}
                   onClick={() => markSingleAsRead(n.id)}
-                  className={`p-3 text-xs hover:bg-surface-hover transition-colors cursor-pointer ${n.unread ? 'bg-accent/5' : ''}`}
+                  className={`block w-full text-left p-3 text-xs hover:bg-surface-hover transition-colors cursor-pointer ${n.unread ? 'bg-accent/5' : ''}`}
                 >
-                  <div className="font-semibold text-ink flex justify-between items-center">
+                  <span className="font-semibold text-ink flex justify-between items-center">
                     <span className="flex items-center gap-1.5">
                       {n.title}
                       {n.unread && <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />}
                     </span>
                     <span className="text-[10px] text-muted font-normal">{n.time}</span>
-                  </div>
-                  <p className="text-ink-2 mt-0.5">{n.desc}</p>
-                </div>
+                  </span>
+                  <span className="block text-ink-2 mt-0.5 break-words">{n.desc}</span>
+                </button>
               ))}
             </div>
 
