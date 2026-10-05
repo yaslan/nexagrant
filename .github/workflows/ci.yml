@@ -225,9 +225,13 @@ jobs:
         NEXTAUTH_URL: 'http://localhost:3000'
         AUTH_TRUST_HOST: 'true'
         # The mailpit service above; E2E_MAILPIT_URL turns on the inbox check.
+        # An invitation mail needs a base URL for its link and is not sent
+        # without one. The dev server falls back to this same origin anyway,
+        # so it changes nothing else (a `start` run refuses loopback here).
         SMTP_HOST: 'localhost'
         SMTP_PORT: '1025'
         E2E_MAILPIT_URL: 'http://localhost:8025'
+        NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
         # Invoice test data
         INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.'
         INVOICE_SUPPLIER_VKN: '1000000000'
