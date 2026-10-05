@@ -254,26 +254,47 @@ test.describe('Notification center — live surface', () => {
   // it with the session's workspaces — report finding B2): B on A's URL gets a 200
   // shell. What must hold is that everything shown is B's: data is scoped by the
   // session tenant, not by the slug.
-  test("isolation: on A's URL, user B sees only B's session and nothing of A", async ({ page }) => {
+  test("isolation: on A's URL, user B gets a 404 and nothing of A; B's own URL shows B's session", async ({ page }) => {
     await signIn(page, B);
-    const res = await page.goto(`/en/${A.ws.slug}/notifications`);
-    await page.screenshot({ path: `${SHOTS}/isolation-b-on-a-url.png`, fullPage: true });
-    expect(res?.status()).toBeLessThan(500);
 
-    const session = await page.evaluate(async () => (await fetch('/api/auth/session')).json());
-    expect(session.user?.id ?? session.user?.sub ?? session.userId).toBe(B.userId);
-    await expect(page.getByRole('button', { name: new RegExp(`notif-b-${RUN}`) })).toBeVisible();
+    // FIX-4 (TASK-MUUS62C4SC7H5): [workspace]/layout answers 404 to a slug that
+    // is not the session's — A's workspace is not rendered for B at all.
+    for (const [path, title] of [
+      [`/en/${A.ws.slug}/notifications`, 'Page Not Found'],
+      [`/tr/${A.ws.slug}/bildirimler`, 'Sayfa Bulunamadı'],
+    ] as const) {
+      const res = await page.goto(path);
+      expect(res, `no response for ${path}`).not.toBeNull();
+      expect(res!.status(), `${path} must answer 404 to B`).toBe(404);
+      await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
+      if (path.startsWith('/en/')) {
+        await page.screenshot({ path: `${SHOTS}/isolation-b-on-a-url.png`, fullPage: true });
+      }
 
-    const text = await page.locator('body').innerText();
-    expect(text).not.toContain(`notif-a-${RUN}`);
-    expect(text).not.toContain(A.email);
-    expect(text).not.toContain(A.ws.name);
-    await expect(page.getByText('You have no notifications yet.').first()).toBeVisible();
+      // Nothing of A in the DOM: no feed, no workspace, no identity, no links in.
+      await expect(page.getByText(`notif-a-${RUN}`)).toHaveCount(0);
+      await expect(page.getByText(A.email)).toHaveCount(0);
+      await expect(page.getByText(A.ws.name, { exact: true })).toHaveCount(0);
+      await expect(page.locator(`a[href*="/${A.ws.slug}"]`)).toHaveCount(0);
+      await expect(page.getByRole('heading', { level: 1, name: /^(Notifications|Bildirimler)$/ })).toHaveCount(0);
+      await expect(page.getByText(/You have no notifications yet\.|Henüz bildiriminiz yok\./)).toHaveCount(0);
+      await expect(page.locator('body')).not.toContainText(FABRICATED);
 
-    // And B's own feed works and links back into B's workspace.
-    await page.goto(`/en/${B.ws.slug}/notifications`);
+      // The 404 did not cost B the session, nor swap it for A's.
+      const session = await page.evaluate(async () => (await fetch('/api/auth/session')).json());
+      expect(session.user?.id ?? session.user?.sub ?? session.userId).toBe(B.userId);
+    }
+
+    // On B's own URL: B's shell, B's feed, links back into B's workspace — and still nothing of A.
+    const own = await page.goto(`/en/${B.ws.slug}/notifications`);
+    expect(own?.status()).toBe(200);
     await expect(page.getByRole('heading', { level: 1, name: 'Notifications' })).toBeVisible();
+    await expect(page.getByRole('button', { name: new RegExp(`notif-b-${RUN}`) })).toBeVisible();
+    await expect(page.getByText('You have no notifications yet.').first()).toBeVisible();
     await expect(page.locator(`a[href="/en/${B.ws.slug}/dashboard"]`).first()).toBeVisible();
+    await expect(page.getByText(`notif-a-${RUN}`)).toHaveCount(0);
+    await expect(page.getByText(A.email)).toHaveCount(0);
+    await expect(page.locator(`a[href*="/${A.ws.slug}"]`)).toHaveCount(0);
   });
 });
 
