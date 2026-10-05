@@ -4,6 +4,7 @@ import Link from 'next/link';
 import SidebarNav from '@/components/SidebarNav';
 import UserMenu from '@/components/UserMenu';
 import ThemeToggle from '@/components/ThemeToggle';
+import { LocaleUpdater } from '@/components/LocaleUpdater';
 import { auth } from '@/lib/auth';
 import { isPlatformAdminDemoEmail } from '@/lib/demo-login';
 import { redirect } from 'next/navigation';
@@ -94,6 +95,7 @@ export default async function AppLayout({
 
   return (
     <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-background">
+      <LocaleUpdater />
       {/* Mobile Top Header */}
       <MobileAppHeader
         locale={locale}
