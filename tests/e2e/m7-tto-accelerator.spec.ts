@@ -55,7 +55,9 @@ const ISOLATION_WORKSPACE = {
   name: 'Isolation Test M7',
 };
 
-const TTO_BASE_URL = `/${WORKSPACE}/tto`;
+// The assertions read the Turkish UI text, so pin the locale: an unprefixed path is
+// redirected by Accept-Language, and Playwright's default en-US lands on /en.
+const TTO_BASE_URL = `/tr/${WORKSPACE}/tto`;
 
 /**
  * `signInAs` reads the user from `id` (or `sub`); these fixtures name it `userId`
@@ -446,7 +448,7 @@ test.describe('M7 TTO Accelerator', () => {
       const ctx2 = await browser.newContext();
       const page2 = await ctx2.newPage();
       await signInAs(page2, sessionToken(ISOLATION_MEMBER));
-      await page2.goto(`/${ISOLATION_WORKSPACE.slug}/tto`);
+      await page2.goto(`/tr/${ISOLATION_WORKSPACE.slug}/tto`);
       await expectHydrated(page2.locator('body'));
 
       // Isolation tenant member should see their item
@@ -622,7 +624,7 @@ test.describe('M7 TTO Accelerator', () => {
     expect(await prisma.ttoPortfolioItem.count({ where: { tenantId: ISOLATION_TENANT } })).toBe(0);
 
     await signInAs(page, sessionToken(ISOLATION_MEMBER));
-    await page.goto(`/${ISOLATION_WORKSPACE.slug}/tto`);
+    await page.goto(`/tr/${ISOLATION_WORKSPACE.slug}/tto`);
     await expectHydrated(page.locator('body'));
 
     await expect(page.getByText('Portföyde henüz teknoloji kaydı bulunmamaktadır.')).toBeVisible();
