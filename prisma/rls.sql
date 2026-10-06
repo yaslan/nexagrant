@@ -115,7 +115,7 @@ BEGIN
     'RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat','User','VerificationToken'
   ] LOOP
     IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass(format('public.%I', t)) AND relrowsecurity) THEN
-      EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
+      EXECUTE format('ALTER TABLE public.%I DISABLE ROW LEVEL SECURITY', t);
     END IF;
   END LOOP;
 END $$;
