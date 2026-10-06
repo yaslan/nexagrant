@@ -47,7 +47,9 @@ const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
  * Postgres to measure against — the way tests/rls.spec.ts and
  * tests/m9-calendar-tenant-scope.live.test.ts already do. A missing database is
  * an absent measurement, not a failing one, and reddening `pnpm gate` on every
- * machine without `docker compose up` would be the wrong alarm.
+ * machine without `docker compose up` would be the wrong alarm. In CI it is the
+ * opposite: a skipped file there is a green that measured nothing, so
+ * `skipOrFailInCi` throws at module scope and the file goes red.
  *
  * Note what does NOT skip: when the database IS reachable, the first test
  * asserts the probe role is genuinely NOBYPASSRLS and fails hard if it is not.
@@ -59,9 +61,9 @@ const dbReachable =
   (await prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 
 if (!dbReachable) {
-  console.warn(
-    'cron tenant-scope test skipped: needs Postgres and DATABASE_URL_RLS_TEST ' +
-      '(`docker compose up -d` then `pnpm db:rls-role`).'
+  skipOrFailInCi(
+    'cron tenant-scope test',
+    'needs Postgres and DATABASE_URL_RLS_TEST (`docker compose up -d` then `pnpm db:rls-role`)'
   );
 }
 
