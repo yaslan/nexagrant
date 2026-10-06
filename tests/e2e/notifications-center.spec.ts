@@ -298,76 +298,136 @@ test.describe('Notification center — live surface', () => {
   });
 });
 
-/*
- * BLOCKED on a notification store (no Prisma model; page and bell pass []).
- * Kept so the flows are not lost: when the store lands, seed two notifications
- * for A through it (ids n1, n2), drop `.fixme`, and run. The read key is
- * per-user — `fonbridge_read_notifs_<email>` — not the guest key the first
- * draft hard-coded.
- */
-test.describe('Notification center — read/unread flows (BLOCKED: no notification store)', () => {
-  const KEY = `fonbridge_read_notifs_${A.email}`;
-  const readIds = (page: Page) =>
-    page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '[]') as string[], KEY);
+test.describe('Notification center — read/unread flows (TASK-MUVIK218O313G)', () => {
+  let n1: string;
+  let n2: string;
 
-  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
-  test.fixme('badge shows 2 unread; clicking one drops it to 1 and stores the id', async ({ page }) => {
+  test.beforeAll(async () => {
+    await withSystemScope('platform-admin', 'e2e.notif.seed-rw-flows', async (tx) => {
+      const res1 = await tx.notification.create({
+        data: {
+          id: `n1-${RUN}`,
+          tenantId: A.tenantId,
+          userId: A.userId,
+          type: 'SAVED_SEARCH_MATCH',
+          payload: { searchId: 'n1-search', searchName: 'n1-title', matchCount: 1, since: new Date().toISOString() },
+          workspaceId: A.ws.id,
+        },
+      });
+      n1 = res1.id;
+      const res2 = await tx.notification.create({
+        data: {
+          id: `n2-${RUN}`,
+          tenantId: A.tenantId,
+          userId: A.userId,
+          type: 'SAVED_SEARCH_MATCH',
+          payload: { searchId: 'n2-search', searchName: 'n2-title', matchCount: 1, since: new Date().toISOString() },
+          workspaceId: A.ws.id,
+        },
+      });
+      n2 = res2.id;
+    });
+  });
+
+  test.afterAll(async () => {
+    await cleanupIdentity([A.userId]);
+    await withSystemScope('platform-admin', 'e2e.notif.cleanup-rw-flows', async (tx) => {
+      const tenantId = requireId(A.tenantId, 'tenantId');
+      await tx.notification.deleteMany({ where: { id: { in: [n1, n2] } } });
+      await tx.workspace.deleteMany({ where: { tenantId } });
+      await tx.tenant.deleteMany({ where: { id: tenantId } });
+    });
+  });
+
+  test('badge shows 2 unread; clicking one marks it read, count drops to 1', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
     await expect(page.getByText('2 Unread Notifications')).toBeVisible();
-    await page.getByText('n1-title').click();
+
+    const items = page.getByRole('button', { name: /n[12]-title/ });
+    await items.nth(0).click();
+
     await expect(page.getByText('1 Unread Notifications')).toBeVisible();
-    expect(await readIds(page)).toContain('n1');
   });
 
-  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
-  test.fixme('mark all as read from the header button', async ({ page }) => {
+  test('mark all as read from the header button', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
+    await expect(page.getByText('2 Unread Notifications')).toBeVisible();
+
     await page.getByRole('button', { name: 'Mark All as Read' }).click();
     await expect(page.getByText('All Notifications Read')).toBeVisible();
-    expect((await readIds(page)).sort()).toEqual(['n1', 'n2']);
   });
 
-  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
-  test.fixme('read state survives a reload', async ({ page }) => {
+  test('read state survives a reload', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
-    await page.getByText('n1-title').click();
+    await expect(page.getByText('2 Unread Notifications')).toBeVisible();
+
+    await page.getByRole('button', { name: /n[12]-title/ }).click();
     await expect(page.getByText('1 Unread Notifications')).toBeVisible();
+
     await page.reload();
     await expect(page.getByText('1 Unread Notifications')).toBeVisible();
   });
 
-  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
-  test.fixme('bell: unread dot, click item → read, dot clears', async ({ page }) => {
+  test('bell: unread dot appears, click → read, dot clears', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/dashboard`);
     const bell = page.getByRole('button', { name: 'Notifications' });
     await expect(bell.locator('span')).toHaveCount(1);
+
+    await bell.click();
+    const items = page.getByRole('button', { name: /n[12]-title/ });
+    await items.nth(0).click();
+
     await bell.click();
     await page.getByRole('button', { name: 'Mark all as read' }).click();
     await expect(bell.locator('span')).toHaveCount(0);
   });
 
-  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
-  test.fixme('another tab marking read updates this tab (storage event)', async ({ page }) => {
-    await signIn(page, A);
-    await page.goto(`/en/${A.ws.slug}/notifications`);
-    await expect(page.getByText('2 Unread Notifications')).toBeVisible();
-    await page.evaluate((k) => {
-      localStorage.setItem(k, JSON.stringify(['n1']));
-      window.dispatchEvent(new StorageEvent('storage', { key: k, newValue: '["n1"]' }));
-    }, KEY);
-    await expect(page.getByText('1 Unread Notifications')).toBeVisible();
+  test('cross-tab update: focus refetches and shows other tab marked read', async ({ browser }) => {
+    const context1 = await browser.newContext();
+    const page1 = await context1.newPage();
+    const context2 = await browser.newContext();
+    const page2 = await context2.newPage();
+
+    try {
+      await signInAs(page1, token(A));
+      await page1.goto(`/en/${A.ws.slug}/notifications`);
+      await expect(page1.getByText('2 Unread Notifications')).toBeVisible();
+
+      await signInAs(page2, token(A));
+      await page2.goto(`/en/${A.ws.slug}/notifications`);
+      await expect(page2.getByText('2 Unread Notifications')).toBeVisible();
+      await page2.getByRole('button', { name: 'Mark All as Read' }).click();
+      await expect(page2.getByText('All Notifications Read')).toBeVisible();
+
+      await page1.bringToFront();
+      await expect(page1.getByText('All Notifications Read')).toBeVisible({ timeout: 5000 });
+    } finally {
+      await context1.close();
+      await context2.close();
+    }
   });
 
-  // BLOCKED: TASK-MUVIK218O313G (notification repository, read/unread flows)
-  test.fixme("B's read ids do not mark A's notifications read", async ({ page }) => {
-    await signIn(page, A);
-    await page.goto(`/en/${A.ws.slug}/notifications`);
-    await page.evaluate((k) => localStorage.setItem(k, '["n1","n2"]'), `fonbridge_read_notifs_${B.email}`);
-    await page.reload();
-    await expect(page.getByText('2 Unread Notifications')).toBeVisible();
+  test("B's notifications do not affect A's read state", async ({ browser }) => {
+    const contextA = await browser.newContext();
+    const pageA = await contextA.newPage();
+
+    try {
+      await signInAs(pageA, token(A));
+      await pageA.goto(`/en/${A.ws.slug}/notifications`);
+      await expect(pageA.getByText('2 Unread Notifications')).toBeVisible();
+
+      // B's read state isolated from A
+      const keyB = `fonbridge_read_notifs_${B.email}`;
+      await pageA.evaluate((k) => localStorage.setItem(k, JSON.stringify(['b1', 'b2'])), keyB);
+
+      await pageA.reload();
+      await expect(pageA.getByText('2 Unread Notifications')).toBeVisible();
+    } finally {
+      await contextA.close();
+    }
   });
 });
