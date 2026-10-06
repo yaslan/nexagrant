@@ -119,10 +119,9 @@ describe.skipIf(!HAS_DB)('evidence-expiring producer (live, fabrika_app)', () =>
   });
 
   afterAll(async () => {
-    const tenants = presentIds([fx.tenantA, fx.tenantB]);
-    await admin.notification.deleteMany({ where: { tenantId: { in: tenants } } });
-    await admin.evidence.deleteMany({ where: { tenantId: { in: tenants } } });
-    for (const id of tenants) await admin.tenant.delete({ where: { id } });
+    await admin.notification.deleteMany({ where: { tenantId: { in: presentIds([fx.tenantA, fx.tenantB]) } } });
+    await admin.evidence.deleteMany({ where: { tenantId: { in: presentIds([fx.tenantA, fx.tenantB]) } } });
+    for (const id of presentIds([fx.tenantA, fx.tenantB])) await admin.tenant.delete({ where: { id } });
     for (const id of presentIds(Object.values(fx.users))) await admin.user.delete({ where: { id } });
     await admin.$disconnect();
   });
