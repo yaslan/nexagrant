@@ -31,6 +31,13 @@ const A = {
   email: `notif-a-${RUN}@e2e-notif.test`,
   ws: { id: `e2e-notif-a-ws-${RUN}`, slug: `notif-a-${RUN}`, name: 'Notif A' },
 };
+// A second member of A's tenant and workspace: same tenant, so only `userId` keeps their rows apart.
+const A2 = {
+  tenantId: A.tenantId,
+  userId: `e2e-notif-a2-user-${RUN}`,
+  email: `notif-a2-${RUN}@e2e-notif.test`,
+  ws: A.ws,
+};
 const B = {
   tenantId: `e2e-notif-b-${RUN}`,
   userId: `e2e-notif-b-user-${RUN}`,
@@ -65,13 +72,15 @@ test.beforeAll(async () => {
       u.ws,
     );
   }
+  await seedIdentity({ userId: A2.userId, email: A2.email, role: 'MEMBER', tenantId: A2.tenantId }, A2.ws);
 });
 
 test.afterAll(async () => {
-  await cleanupIdentity([A.userId, B.userId]);
+  await cleanupIdentity([A.userId, A2.userId, B.userId]);
   await withSystemScope('platform-admin', 'e2e.notif.cleanup', async (tx) => {
     for (const u of [A, B]) {
       const tenantId = requireId(u.tenantId, 'tenantId');
+      await tx.notification.deleteMany({ where: { tenantId } });
       await tx.workspace.deleteMany({ where: { tenantId } });
       await tx.tenant.deleteMany({ where: { id: tenantId } });
     }
@@ -298,7 +307,7 @@ test.describe('Notification center — live surface', () => {
  * the rows are removed afterwards so the live-surface tests above still see an
  * empty feed on the next `--repeat-each` round.
  */
-const itemName = (u: typeof A, n: 'n1' | 'n2') => `${n}-${u === A ? 'a' : 'b'}-${RUN}`;
+const itemName = (u: typeof A, n: 'n1' | 'n2') => `${n}-${u.userId}`;
 
 async function clearNotifications(u: typeof A) {
   const tenantId = requireId(u.tenantId, 'tenantId');
@@ -342,8 +351,7 @@ test.describe('Notification center — read/unread flows (store-backed)', () => 
   });
 
   test.afterEach(async () => {
-    await clearNotifications(A);
-    await clearNotifications(B);
+    for (const u of [A, A2, B]) await clearNotifications(u);
   });
 
   test('badge shows 2 unread; clicking one drops it to 1 and writes readAt for that row only', async ({ page }) => {
@@ -443,19 +451,22 @@ test.describe('Notification center — read/unread flows (store-backed)', () => 
     await other.close();
   });
 
-  test("B's reads do not mark A's notifications read", async ({ page }) => {
-    await seedTwoUnread(B);
+  // B is another tenant (RLS + tenantId keep them apart); A2 is another member
+  // of A's own tenant, where only the store's `userId` filter does.
+  test("B's and A2's reads do not mark A's notifications read", async ({ page }) => {
+    for (const other of [B, A2]) {
+      await seedTwoUnread(other);
+      await signInAs(page, { ...token(other), role: other === A2 ? 'MEMBER' : 'TENANT_OWNER' });
+      await page.goto(`/en/${other.ws.slug}/notifications`);
+      await expect(page.getByText('2 Unread Notifications', { exact: true })).toBeVisible();
+      // The other user sees only their own rows.
+      await expect(row(page, A, 'n1')).toHaveCount(0);
+      await page.getByRole('button', { name: 'Mark All as Read' }).click();
+      await expect(page.getByText('All Notifications Read')).toBeVisible();
 
-    await signIn(page, B);
-    await page.goto(`/en/${B.ws.slug}/notifications`);
-    await expect(page.getByText('2 Unread Notifications', { exact: true })).toBeVisible();
-    // B sees only B's rows.
-    await expect(row(page, A, 'n1')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Mark All as Read' }).click();
-    await expect(page.getByText('All Notifications Read')).toBeVisible();
-
-    expect(Object.values(await readState(B)).every((readAt) => readAt !== null), "B's rows read").toBe(true);
-    expect(Object.values(await readState(A)), "A's rows untouched").toEqual([null, null]);
+      expect(Object.values(await readState(other)).every((readAt) => readAt !== null), `${other.userId}'s rows read`).toBe(true);
+      expect(Object.values(await readState(A)), `A's rows untouched by ${other.userId}`).toEqual([null, null]);
+    }
 
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
