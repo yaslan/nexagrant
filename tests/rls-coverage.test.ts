@@ -384,6 +384,8 @@ describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TA
   test('the DISABLE loop only touches a table whose RLS is on (no lock, no ownership on a healthy DB)', () => {
     const block = rlsSql.split('DO $$').find((b) => /DISABLE ROW LEVEL SECURITY/.test(b)) as string;
     expect(block).toMatch(/to_regclass\(format\('public\.%I', t\)\) AND relrowsecurity/);
+    // The guard reads public.<T>; the ALTER must hit the same table, not whatever search_path resolves first.
+    expect(block).toMatch(/ALTER TABLE public\.%I DISABLE ROW LEVEL SECURITY/);
   });
 
   test('CHECK 4c: no forward migration leaves a policy-less table to the trigger', () => {
