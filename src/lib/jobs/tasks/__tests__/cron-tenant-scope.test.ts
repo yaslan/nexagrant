@@ -14,6 +14,7 @@ import { MailSendError, type Mailer, type MailMessage } from '@/lib/email/mailer
 import { grantCreditsToTenants } from '../credits-monthly-grant';
 import { requireId } from '../../../../../tests/helpers/teardown-guard';
 import { skipUnlessSeeded } from '../../../../../tests/helpers/seed';
+import { isCi } from '../../../../../tests/helpers/live-db-role';
 
 /**
  * TASK-MTVR8KK92G0GA — do the two cron jobs write under the tenant they are
@@ -559,7 +560,12 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
       'select rolbypassrls, rolsuper from pg_roles where rolname = current_user'
     );
     if (!role?.rolbypassrls && !role?.rolsuper) {
-      ctx.skip('the privileged client does not bypass RLS here, so there is nothing for this case to measure');
+      const reason = 'the privileged client does not bypass RLS here, so there is nothing for this case to measure';
+      if (isCi()) {
+        throw new Error(`alerts-daily BYPASSRLS role test: refusing to skip in CI — ${reason} ("Prepare database" in ci.yml does).`);
+      }
+      console.warn(`alerts-daily BYPASSRLS role test skipped: ${reason}`);
+      ctx.skip(reason);
     }
 
     // Honest runner (scope = the tenant it was given) over the bypassing role;
