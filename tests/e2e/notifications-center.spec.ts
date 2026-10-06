@@ -3,33 +3,25 @@ import { withSystemScope } from '@/lib/system-scope';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 import { shotsDir } from './fixtures/shots';
 import { requireId } from '../helpers/teardown-guard';
+import { withTenant } from '@/lib/db';
+import { sendSavedSearchAlerts } from '@/lib/jobs/tasks/alerts-daily';
+import { savedSearchDedupeKey } from '@/lib/notifications/store';
 
 /**
  * TASK-MUU7678DFI9QF — notification center (bell in the app shell + the
  * /notifications · /bildirimler page).
  *
- * What exists today, and so what this spec can honestly drive:
+ * The "live surface" block covers a user with no notifications: the empty
+ * feed on both locales, the bell and its dropdown, navigation, keyboard,
+ * 390px, workspace isolation, and a guard that the invented items of
+ * TASK-MTQYXISOPUJ53 never come back.
  *
- * There is NO notification store. `prisma/schema.prisma` has no notification
- * model, `notifications/page.tsx` passes `initialNotifications={[]}` and the
- * bell in `UserMenu.tsx` memoises `[]` (both removed fabricated items in
- * TASK-MTQYXISOPUJ53). No seed and no user action can make a notification
- * appear without either changing product code or inventing rows — both ruled
- * out for this card. So the live part covers the real surface: the empty feed
- * on both locales, the bell and its dropdown, navigation, keyboard, 390px,
- * workspace isolation, and a guard that the invented items never come back.
+ * Since the notification store (ADR-0011, PR #51/#53) the read/unread flows
+ * run against real rows and `readAt` (TASK-MUVR2HXPCYRGT), and a producer
+ * test drives the alerts-daily loop into the bell.
  *
- * The read/unread flows (badge count, click → read, mark all, reload
- * persistence, cross-tab) are kept below as `test.fixme`, BLOCKED on the
- * store. Their logic is covered meanwhile by the unit test
- * `tests/notifications-read-store.test.tsx`.
- *
- * Read state key: `notificationStorageKey(email)` →
- * `fonbridge_read_notifs_<email>` — per USER (e-mail), not per workspace.
- * `fonbridge_read_notifs_guest` is the signed-out key, and the hook merges it
- * into every signed-in user's overlay on the same browser.
- *
- * Own rows only: two tenants created here and deleted in afterAll.
+ * Own rows only: two tenants created here and deleted in afterAll; M is a
+ * second member of A's tenant.
  * demo-tenant is never touched.
  */
 
@@ -49,14 +41,21 @@ const B = {
   ws: { id: `e2e-notif-b-ws-${RUN}`, slug: `notif-b-${RUN}`, name: 'Notif B' },
 };
 
+const M = {
+  userId: `e2e-notif-m-user-${RUN}`,
+  email: `notif-m-${RUN}@e2e-notif.test`,
+};
+
 // The four/three items TASK-MTQYXISOPUJ53 removed from the page and the bell.
 const FABRICATED = /HORIZON-CL5-2026-D3|Fraunhofer|500 AI|%92|15 days|15 gün/;
 
-function token(u: typeof A) {
-  return { id: u.userId, email: u.email, tenantId: u.tenantId, role: 'TENANT_OWNER' };
+function token(u: typeof A | typeof M) {
+  return u === M
+    ? { id: M.userId, email: M.email, tenantId: A.tenantId, role: 'PIPELINE_MANAGER' }
+    : { id: u.userId, email: u.email, tenantId: (u as typeof A).tenantId, role: 'TENANT_OWNER' };
 }
 
-async function signIn(page: Page, u: typeof A) {
+async function signIn(page: Page, u: typeof A | typeof M) {
   await signInAs(page, token(u));
 }
 
@@ -76,10 +75,20 @@ test.beforeAll(async () => {
       u.ws,
     );
   }
+  await seedIdentity({
+    userId: M.userId, email: M.email, role: 'PIPELINE_MANAGER', tenantId: A.tenantId, workspaceIds: [A.ws.id],
+  });
 });
 
 test.afterAll(async () => {
-  await cleanupIdentity([A.userId, B.userId]);
+  await withSystemScope('platform-admin', 'e2e.notif.cleanup', async (tx) => {
+    for (const u of [A, B]) {
+      const tenantId = requireId(u.tenantId, 'tenantId');
+      await tx.notification.deleteMany({ where: { tenantId } });
+      await tx.savedSearch.deleteMany({ where: { tenantId } });
+    }
+  });
+  await cleanupIdentity([A.userId, B.userId, M.userId]);
   await withSystemScope('platform-admin', 'e2e.notif.cleanup', async (tx) => {
     for (const u of [A, B]) {
       const tenantId = requireId(u.tenantId, 'tenantId');
@@ -298,136 +307,248 @@ test.describe('Notification center — live surface', () => {
   });
 });
 
-test.describe('Notification center — read/unread flows (TASK-MUVIK218O313G)', () => {
-  let n1: string;
-  let n2: string;
+/*
+ * The six read/unread flows that were `test.fixme` until the store landed
+ * (BLOCKED on TASK-MUVIK218O313G), now against real rows. A gets two
+ * SAVED_SEARCH_MATCH rows, n1 (older) and n2; beforeEach puts both back to
+ * unread, so each test starts from "2 unread" whatever the one before did.
+ * Every flow also checks `readAt` in the database: the badge alone could be
+ * a client-side overlay again (the localStorage store ADR-0011 removed).
+ *
+ * M is a second member of A's tenant. Same tenant on purpose: RLS already
+ * keeps other tenants out, so the boundary under test is the store's
+ * `userId` filter (ADR-0011 K-5 a).
+ */
+test.describe('Notification center — read/unread flows', () => {
+  const N1 = `e2e-notif-n1-${RUN}`;
+  const N2 = `e2e-notif-n2-${RUN}`;
+  const MN = `e2e-notif-m1-${RUN}`;
+  const n1Row = (page: Page) => page.getByRole('button', { name: /matched "n1-title"/ });
+  const n2Row = (page: Page) => page.getByRole('button', { name: /matched "n2-title"/ });
+
+  async function readAtOf(ids: string[]) {
+    const rows = await withSystemScope('platform-admin', 'e2e.notif.check', (tx) =>
+      tx.notification.findMany({ where: { id: { in: ids } }, select: { id: true, readAt: true } }),
+    );
+    return Object.fromEntries(rows.map((r) => [r.id, r.readAt !== null]));
+  }
 
   test.beforeAll(async () => {
-    await withSystemScope('platform-admin', 'e2e.notif.seed-rw-flows', async (tx) => {
-      const res1 = await tx.notification.create({
-        data: {
-          id: `n1-${RUN}`,
-          tenantId: A.tenantId,
-          userId: A.userId,
-          type: 'SAVED_SEARCH_MATCH',
-          payload: { searchId: 'n1-search', searchName: 'n1-title', matchCount: 1, since: new Date().toISOString() },
-          workspaceId: A.ws.id,
-        },
+    const older = new Date(Date.now() - 60_000);
+    await withSystemScope('platform-admin', 'e2e.notif.seed-rw', async (tx) => {
+      await tx.notification.createMany({
+        data: [
+          { id: N1, tenantId: A.tenantId, userId: A.userId, type: 'SAVED_SEARCH_MATCH', createdAt: older,
+            payload: { searchId: `n1-${RUN}`, searchName: 'n1-title', matchCount: 1, since: older.toISOString() } },
+          { id: N2, tenantId: A.tenantId, userId: A.userId, type: 'SAVED_SEARCH_MATCH',
+            payload: { searchId: `n2-${RUN}`, searchName: 'n2-title', matchCount: 2, since: older.toISOString() } },
+          { id: MN, tenantId: A.tenantId, userId: M.userId, type: 'SAVED_SEARCH_MATCH',
+            payload: { searchId: `m1-${RUN}`, searchName: 'm1-title', matchCount: 3, since: older.toISOString() } },
+        ],
       });
-      n1 = res1.id;
-      const res2 = await tx.notification.create({
-        data: {
-          id: `n2-${RUN}`,
-          tenantId: A.tenantId,
-          userId: A.userId,
-          type: 'SAVED_SEARCH_MATCH',
-          payload: { searchId: 'n2-search', searchName: 'n2-title', matchCount: 1, since: new Date().toISOString() },
-          workspaceId: A.ws.id,
-        },
-      });
-      n2 = res2.id;
     });
   });
 
+  test.beforeEach(async () => {
+    await withSystemScope('platform-admin', 'e2e.notif.reset-rw', (tx) =>
+      tx.notification.updateMany({ where: { id: { in: [N1, N2, MN] } }, data: { readAt: null } }),
+    );
+  });
+
+  // The live-surface tests above expect an empty feed for A; on --repeat-each
+  // they run again, so A's rows go here, not only with the tenant.
   test.afterAll(async () => {
-    await cleanupIdentity([A.userId]);
-    await withSystemScope('platform-admin', 'e2e.notif.cleanup-rw-flows', async (tx) => {
-      const tenantId = requireId(A.tenantId, 'tenantId');
-      await tx.notification.deleteMany({ where: { id: { in: [n1, n2] } } });
-      await tx.workspace.deleteMany({ where: { tenantId } });
-      await tx.tenant.deleteMany({ where: { id: tenantId } });
-    });
+    await withSystemScope('platform-admin', 'e2e.notif.cleanup-rw', (tx) =>
+      tx.notification.deleteMany({ where: { id: { in: [N1, N2, MN] } } }),
+    );
   });
 
   test('badge shows 2 unread; clicking one marks it read, count drops to 1', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
-    await expect(page.getByText('2 Unread Notifications')).toBeVisible();
+    await expect(page.getByText('2 Unread Notifications', { exact: true })).toBeVisible();
+    // Newest first.
+    await expect(page.getByRole('button', { name: /matched "n[12]-title"/ }).first()).toContainText('n2-title');
 
-    const items = page.getByRole('button', { name: /n[12]-title/ });
-    await items.nth(0).click();
-
-    await expect(page.getByText('1 Unread Notifications')).toBeVisible();
+    await n1Row(page).click();
+    await expect(page.getByText('1 Unread Notification', { exact: true })).toBeVisible();
+    expect(await readAtOf([N1, N2])).toEqual({ [N1]: true, [N2]: false });
   });
 
   test('mark all as read from the header button', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
-    await expect(page.getByText('2 Unread Notifications')).toBeVisible();
+    await expect(page.getByText('2 Unread Notifications', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Mark All as Read' }).click();
     await expect(page.getByText('All Notifications Read')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Mark All as Read' })).toHaveCount(0);
+    expect(await readAtOf([N1, N2])).toEqual({ [N1]: true, [N2]: true });
   });
 
   test('read state survives a reload', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/notifications`);
-    await expect(page.getByText('2 Unread Notifications')).toBeVisible();
+    await expect(page.getByText('2 Unread Notifications', { exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: /n[12]-title/ }).click();
-    await expect(page.getByText('1 Unread Notifications')).toBeVisible();
+    await n1Row(page).click();
+    await expect(page.getByText('1 Unread Notification', { exact: true })).toBeVisible();
 
     await page.reload();
-    await expect(page.getByText('1 Unread Notifications')).toBeVisible();
+    await expect(page.getByText('1 Unread Notification', { exact: true })).toBeVisible();
+    // The unread dot is the only span in a row's title line: n1 lost it, n2 kept it.
+    await expect(n1Row(page).locator('h3 + span')).toHaveCount(0);
+    await expect(n2Row(page).locator('h3 + span')).toHaveCount(1);
+
+    // Also in a fresh browser context: nothing of it lives in the browser.
+    const other = await page.context().browser()!.newContext();
+    try {
+      const p2 = await other.newPage();
+      await signIn(p2, A);
+      await p2.goto(`/en/${A.ws.slug}/notifications`);
+      await expect(p2.getByText('1 Unread Notification', { exact: true })).toBeVisible();
+    } finally {
+      await other.close();
+    }
   });
 
-  test('bell: unread dot appears, click → read, dot clears', async ({ page }) => {
+  test('bell: unread dot, click item → read, mark all → dot clears', async ({ page }) => {
     await signIn(page, A);
     await page.goto(`/en/${A.ws.slug}/dashboard`);
     const bell = page.getByRole('button', { name: 'Notifications' });
     await expect(bell.locator('span')).toHaveCount(1);
 
     await bell.click();
-    const items = page.getByRole('button', { name: /n[12]-title/ });
-    await items.nth(0).click();
+    const panel = page.getByRole('dialog', { name: 'Notifications' });
+    await expect(panel.getByText('2 Unread', { exact: true })).toBeVisible();
+    await panel.getByRole('button', { name: /matched "n1-title"/ }).click();
+    await expect(panel.getByText('1 Unread', { exact: true })).toBeVisible();
+    await expect(bell.locator('span')).toHaveCount(1);
+    expect(await readAtOf([N1, N2])).toEqual({ [N1]: true, [N2]: false });
 
-    await bell.click();
-    await page.getByRole('button', { name: 'Mark all as read' }).click();
+    await panel.getByRole('button', { name: 'Mark All Read' }).click();
+    await expect(panel.getByText('All Read', { exact: true })).toBeVisible();
     await expect(bell.locator('span')).toHaveCount(0);
+    expect(await readAtOf([N1, N2])).toEqual({ [N1]: true, [N2]: true });
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Notifications' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Notifications' }).locator('span')).toHaveCount(0);
   });
 
-  test('cross-tab update: focus refetches and shows other tab marked read', async ({ browser }) => {
-    const context1 = await browser.newContext();
-    const page1 = await context1.newPage();
-    const context2 = await browser.newContext();
-    const page2 = await context2.newPage();
+  // ADR-0011 §3.3: the `storage` event went with the localStorage overlay; a
+  // tab re-reads the store when it regains focus. Two tabs of one session.
+  test('another tab marking read updates this tab when it regains focus', async ({ context }) => {
+    const tab1 = await context.newPage();
+    await signIn(tab1, A);
+    await tab1.goto(`/en/${A.ws.slug}/notifications`);
+    await expect(tab1.getByText('2 Unread Notifications', { exact: true })).toBeVisible();
+    await expect(tab1.getByRole('button', { name: 'Notifications' }).locator('span')).toHaveCount(1);
 
+    const tab2 = await context.newPage();
+    await tab2.goto(`/en/${A.ws.slug}/notifications`);
+    await tab2.getByRole('button', { name: 'Mark All as Read' }).click();
+    await expect(tab2.getByText('All Notifications Read')).toBeVisible();
+
+    // Without focus nothing refetches: tab1 still shows the old count.
+    await expect(tab1.getByText('2 Unread Notifications', { exact: true })).toBeVisible();
+
+    // Headless Chromium does not move window focus on bringToFront, so the
+    // focus event the product listens for is dispatched as the browser would.
+    await tab1.bringToFront();
+    await tab1.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(tab1.getByText('All Notifications Read')).toBeVisible();
+    await expect(tab1.getByRole('button', { name: 'Notifications' }).locator('span')).toHaveCount(0);
+  });
+
+  test("another member's reads do not touch A's notifications", async ({ browser }) => {
+    const ctxM = await browser.newContext();
+    const ctxA = await browser.newContext();
     try {
-      await signInAs(page1, token(A));
-      await page1.goto(`/en/${A.ws.slug}/notifications`);
-      await expect(page1.getByText('2 Unread Notifications')).toBeVisible();
+      const pm = await ctxM.newPage();
+      await signIn(pm, M);
+      await pm.goto(`/en/${A.ws.slug}/notifications`);
+      // M sees only M's own row, not A's two.
+      await expect(pm.getByText('1 Unread Notification', { exact: true })).toBeVisible();
+      await expect(pm.getByText(/n[12]-title/)).toHaveCount(0);
+      await pm.getByRole('button', { name: 'Mark All as Read' }).click();
+      await expect(pm.getByText('All Notifications Read')).toBeVisible();
+      expect(await readAtOf([N1, N2, MN])).toEqual({ [N1]: false, [N2]: false, [MN]: true });
 
-      await signInAs(page2, token(A));
-      await page2.goto(`/en/${A.ws.slug}/notifications`);
-      await expect(page2.getByText('2 Unread Notifications')).toBeVisible();
-      await page2.getByRole('button', { name: 'Mark All as Read' }).click();
-      await expect(page2.getByText('All Notifications Read')).toBeVisible();
-
-      await page1.bringToFront();
-      await expect(page1.getByText('All Notifications Read')).toBeVisible({ timeout: 5000 });
+      const pa = await ctxA.newPage();
+      await signIn(pa, A);
+      await pa.goto(`/en/${A.ws.slug}/notifications`);
+      await expect(pa.getByText('2 Unread Notifications', { exact: true })).toBeVisible();
+      await expect(pa.getByText(/m1-title/)).toHaveCount(0);
     } finally {
-      await context1.close();
-      await context2.close();
+      await ctxM.close();
+      await ctxA.close();
     }
   });
+});
 
-  test("B's notifications do not affect A's read state", async ({ browser }) => {
-    const contextA = await browser.newContext();
-    const pageA = await contextA.newPage();
+/*
+ * Producer (ADR-0011 K-6 a): the alerts-daily loop writes the notification for
+ * the saved search's OWNER. M (a member) owns the search; A is the tenant
+ * owner and must get nothing. No SMTP (mailer null): the in-app row is written
+ * anyway. Then M's bell shows it.
+ */
+test.describe('Notification center — producer: saved-search alert reaches the owner', () => {
+  const NAME = `e2e-producer-${RUN}`;
 
+  test.afterAll(async () => {
+    await withSystemScope('platform-admin', 'e2e.notif.cleanup-producer', async (tx) => {
+      const tenantId = requireId(A.tenantId, 'tenantId');
+      await tx.notification.deleteMany({ where: { tenantId, type: 'SAVED_SEARCH_MATCH', userId: requireId(M.userId, 'M.userId') } });
+      await tx.savedSearch.deleteMany({ where: { tenantId, name: NAME } });
+    });
+  });
+
+  test("sendSavedSearchAlerts → SavedSearch.userId's bell, not the tenant owner's", async ({ page }) => {
+    const LONG_AGO = new Date('2000-01-01T00:00:00.000Z');
+    const search = await withSystemScope('platform-admin', 'e2e.notif.seed-producer', (tx) =>
+      tx.savedSearch.create({
+        data: { tenantId: A.tenantId, userId: M.userId, name: NAME, filters: {}, notify: true, lastRunAt: LONG_AGO },
+      }),
+    );
+    const result = await sendSavedSearchAlerts(
+      [{ id: search.id, tenantId: A.tenantId, userId: M.userId, name: NAME, filters: {}, lastRunAt: LONG_AGO, createdAt: search.createdAt }],
+      withTenant,
+      null,
+    );
+    expect(result.errors).toEqual([{ searchId: search.id, reason: 'no_mail_provider' }]);
+
+    const written = await withSystemScope('platform-admin', 'e2e.notif.check-producer', (tx) =>
+      tx.notification.findMany({
+        where: { tenantId: A.tenantId, dedupeKey: savedSearchDedupeKey(search.id, LONG_AGO) },
+        select: { userId: true, type: true, payload: true },
+      }),
+    );
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatchObject({ userId: M.userId, type: 'SAVED_SEARCH_MATCH' });
+    const matchCount = (written[0]!.payload as { matchCount: number }).matchCount;
+    expect(matchCount).toBeGreaterThan(0);
+
+    // M's bell: dot and the alert's text.
+    await signIn(page, M);
+    await page.goto(`/en/${A.ws.slug}/dashboard`);
+    const bell = page.getByRole('button', { name: 'Notifications' });
+    await expect(bell.locator('span')).toHaveCount(1);
+    await bell.click();
+    const panel = page.getByRole('dialog', { name: 'Notifications' });
+    await expect(panel.getByText(new RegExp(`matched "${NAME}"`))).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/producer-bell-owner.png` });
+
+    // A (tenant owner, same workspace) gets nothing.
+    const ctxA = await page.context().browser()!.newContext();
     try {
-      await signInAs(pageA, token(A));
-      await pageA.goto(`/en/${A.ws.slug}/notifications`);
-      await expect(pageA.getByText('2 Unread Notifications')).toBeVisible();
-
-      // B's read state isolated from A
-      const keyB = `fonbridge_read_notifs_${B.email}`;
-      await pageA.evaluate((k) => localStorage.setItem(k, JSON.stringify(['b1', 'b2'])), keyB);
-
-      await pageA.reload();
-      await expect(pageA.getByText('2 Unread Notifications')).toBeVisible();
+      const pa = await ctxA.newPage();
+      await signIn(pa, A);
+      await pa.goto(`/en/${A.ws.slug}/notifications`);
+      await expect(pa.getByText('All Notifications Read')).toBeVisible();
+      await expect(pa.getByText(NAME)).toHaveCount(0);
     } finally {
-      await contextA.close();
+      await ctxA.close();
     }
   });
 });
