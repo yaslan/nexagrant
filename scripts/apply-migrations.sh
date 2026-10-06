@@ -171,6 +171,42 @@ postflight() {
     echo "apply-migrations: a file stored a default for app.system_scope ($leaked). RESET it before starting the app." >&2
     exit 1
   fi
+  # RLS on with zero policies is deny-all for fabrika_app: 0 rows read, every
+  # INSERT refused (TASK-MUWDA86A7U4LK). Supabase's `ensure_rls` event trigger
+  # ENABLEs RLS on every table created in public, and BlogPost reached live in
+  # that state (TASK-MUTP1R1C13GE3). Checked for every role, superuser included:
+  # it is fabrika_app that cannot read, not the role running this script.
+  # A table without a tenantId column is policy-less by design (SYSTEM_WIDE,
+  # scripts/rls-models.ts; tests/rls-coverage.test.ts pins that no SYSTEM_WIDE
+  # model has one), so it fails here: its migration lacks the DISABLE line.
+  # A tenant table only gets its policy from `pnpm db:rls`, which runs after
+  # this script, so it is a reminder, not a failure. Classified from the
+  # catalogue rather than a copy of the SYSTEM_WIDE list: no second list to
+  # drift, and no node/tsx needed on the deploy host.
+  deny=$("$psql_bin" "$url" -X -Atq -F '|' -v ON_ERROR_STOP=1 -c "
+    SELECT coalesce(string_agg(c.relname, ', ' ORDER BY c.relname) FILTER (WHERE NOT x.tenant), ''),
+           coalesce(string_agg(c.relname, ', ' ORDER BY c.relname) FILTER (WHERE x.tenant), '')
+      FROM pg_class c
+      CROSS JOIN LATERAL (SELECT EXISTS (SELECT 1 FROM pg_attribute a
+                                          WHERE a.attrelid = c.oid AND a.attname = 'tenantId'
+                                            AND a.attnum > 0 AND NOT a.attisdropped) AS tenant) x
+     WHERE c.relnamespace = current_schema()::regnamespace
+       AND c.relkind = 'r'
+       AND c.relrowsecurity
+       AND NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)")
+  IFS='|' read -r deny_system deny_tenant <<< "$deny"
+  if [ -n "$deny_tenant" ]; then
+    echo "apply-migrations: note: these tenant tables have RLS on and no policy yet, so fabrika_app sees none of their rows: $deny_tenant" >&2
+    echo "  Run \`pnpm db:rls\` before starting the app (docs/RELEASE_CHECKLIST.md §3.1 step 4)." >&2
+  fi
+  if [ -n "$deny_system" ]; then
+    echo "apply-migrations: these tables have no tenantId, RLS on and no policy, so fabrika_app reads none of their rows and every INSERT fails:" >&2
+    echo "  $deny_system" >&2
+    echo "  Supabase's ensure_rls trigger turns RLS on for every new table. Do not start the app. In the migration that creates it," >&2
+    echo "  right after CREATE TABLE add: ALTER TABLE \"<T>\" DISABLE ROW LEVEL SECURITY;  and list it in SYSTEM_WIDE" >&2
+    echo "  (scripts/rls-models.ts) and the DISABLE loop of prisma/rls.sql. \`pnpm db:rls\` repairs a table already listed there." >&2
+    exit 1
+  fi
   [ "$exempt" = t ] && return 0
   unseen=$("$psql_bin" "$url" -X -Atq -v ON_ERROR_STOP=1 -c "
     SELECT coalesce(string_agg(c.relname || ' (~' || s.n_live_tup || ' rows)', ', ' ORDER BY c.relname), '')

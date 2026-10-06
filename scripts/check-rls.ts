@@ -5,6 +5,8 @@
  *              model in the schema?
  *   CHECK 4b — does each migration protect the table it creates, in the same
  *              file (scripts/rls-migrations.ts)?
+ *   CHECK 4c — does each migration that creates a policy-less table DISABLE
+ *              its RLS in the same file (Supabase ensure_rls, TASK-MUWDA86A7U4LK)?
  *
  * This check reads two files and never touches the database, so it stays green
  * even when the database has no policies at all — on 2026-09-07 it reported
@@ -15,7 +17,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { scanMigrations } from './rls-migrations';
+import { scanMigrations, scanPolicylessMigrations } from './rls-migrations';
 import { tenantScopedModels } from './rls-models';
 
 function checkRlsCoverage() {
@@ -74,5 +76,33 @@ function checkMigrationCoverage() {
   console.log(`✅ SUCCESS: every one of them carries ENABLE + FORCE + tenant_isolation in its own migration.`);
 }
 
+/**
+ * CHECK 4c: a migration that creates a policy-less table DISABLEs its RLS.
+ *
+ * The live Supabase project ENABLEs RLS on every new table in public (event
+ * trigger `ensure_rls`). With no policy that is deny-all for fabrika_app, and no
+ * CI database has the trigger — BlogPost broke on live only (TASK-MUTP1R1C13GE3).
+ */
+function checkPolicylessMigrations() {
+  const { tables, findings } = scanPolicylessMigrations();
+
+  console.log(`\nCHECK 4c — ${tables.length} policy-less tables are created by migrations: ${tables.map((t) => t.table).join(', ')}`);
+
+  if (findings.length > 0) {
+    console.error(`\n❌ ERROR: a migration leaves a policy-less table to Supabase's ensure_rls trigger:`);
+    for (const f of findings) console.error(`  ${f.file}:${f.line} — ${f.problem}`);
+    console.error(
+      `\nRight after CREATE TABLE IF NOT EXISTS, add:\n` +
+        `  ALTER TABLE "<T>" DISABLE ROW LEVEL SECURITY;  -- Supabase ensure_rls turns it on; this table is policy-less by design (rls-models.ts SYSTEM_WIDE)\n` +
+        `and list the table in SYSTEM_WIDE (scripts/rls-models.ts) and in the DISABLE loop of prisma/rls.sql.\n` +
+        `A tenant table instead takes ENABLE + FORCE + tenant_isolation (CHECK 4b).`
+    );
+    process.exit(1);
+  }
+
+  console.log(`✅ SUCCESS: every one of them DISABLEs row level security in its own migration.`);
+}
+
 checkRlsCoverage();
 checkMigrationCoverage();
+checkPolicylessMigrations();

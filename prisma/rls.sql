@@ -97,6 +97,29 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Policy-less platform tables (TASK-MUWDA86A7U4LK): no tenantId, no policy, RLS
+-- off, on purpose — policylessSystemWide() in scripts/rls-models.ts, which
+-- tests/rls-coverage.test.ts pins this list to. Supabase's `ensure_rls` event
+-- trigger (platform-owned; we do not touch it) ENABLEs RLS on every new table
+-- in public, and with no policy that is deny-all for fabrika_app: BlogPost read
+-- 0 rows and refused every INSERT on live (06.10.2026, TASK-MUTP1R1C13GE3).
+-- Only a table whose RLS is actually on is altered, so on a healthy database
+-- this takes no lock and needs no ownership.
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'Account','AddOnCatalog','BlogPost','Call','CordisCoParticipation','CordisImportRun',
+    'CordisOrganization','CordisParticipation','CordisPartnerProfile','CordisProject',
+    'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','Programme','PublicLead',
+    'RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat','User','VerificationToken'
+  ] LOOP
+    IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass(format('public.%I', t)) AND relrowsecurity) THEN
+      EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
+    END IF;
+  END LOOP;
+END $$;
+
 -- ---------------------------------------------------------------------------
 -- Sanctioned cross-tenant scope (TASK-MTVTPVTEBCF5Z, slice 6; signed in
 -- TASK-MUOGMQK3JAH4Y).

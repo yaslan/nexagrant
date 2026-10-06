@@ -37,7 +37,36 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // anonymous visitors, owned by no tenant; written only by /admin/blog behind
   // requirePlatformAdmin(). See prisma/migrations/add-blog-post.sql.
   'BlogPost',
+  // TASK-MUWDA86A7U4LK: the programme catalogue (HE, DEP, EUREKA, …) behind
+  // Call. No tenantId, never was; it simply was never listed. Listed now so the
+  // policy-less set below — and the DISABLE loop in prisma/rls.sql derived from
+  // it — covers every table Supabase's ensure_rls trigger would lock.
+  'Programme',
 ]);
+
+/**
+ * SYSTEM_WIDE (or tenant-less) tables that DO carry policies: the read-only
+ * platform block in prisma/rls.sql (platform_read + platform_no_*). Their RLS is
+ * on on purpose. tests/rls-coverage.test.ts pins this set to that block.
+ */
+export const PLATFORM_POLICY: ReadonlySet<string> = new Set(['Plan', 'PlanVersion', 'PlanFeature']);
+
+/**
+ * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY.
+ *
+ * TASK-MUWDA86A7U4LK: the live Supabase project has an `ensure_rls` event
+ * trigger (ddl_command_end → public.rls_auto_enable(), owned by the platform,
+ * not by us) that runs ENABLE ROW LEVEL SECURITY on every table created in
+ * `public`. On one of these tables that means RLS on with zero policies — deny
+ * all for fabrika_app: 0 rows read, every INSERT refused. BlogPost was in that
+ * state on live (06.10.2026, TASK-MUTP1R1C13GE3). So each of them is DISABLEd
+ * explicitly: in the migration that creates it (CHECK 4c,
+ * scripts/rls-migrations.ts) and again by the loop in prisma/rls.sql, whose
+ * list tests/rls-coverage.test.ts pins to this function.
+ */
+export function policylessSystemWide(): string[] {
+  return [...SYSTEM_WIDE].filter((t) => !PLATFORM_POLICY.has(t)).sort();
+}
 
 /**
  * Nullable tenantId where NULL means "shared with every tenant": covered by the

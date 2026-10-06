@@ -9,6 +9,16 @@
 # commit that adds it; the script refuses to run while a forward file is
 # missing here or a listed file is missing on disk.
 #
+# Rule (TASK-MUWDA86A7U4LK): a migration that creates a table with no tenantId
+# and no policy (SYSTEM_WIDE in scripts/rls-models.ts) adds, right after its
+# CREATE TABLE IF NOT EXISTS:
+#   ALTER TABLE "<T>" DISABLE ROW LEVEL SECURITY;  -- Supabase ensure_rls turns it on; this table is policy-less by design (rls-models.ts SYSTEM_WIDE)
+# and lists the table in SYSTEM_WIDE and in the DISABLE loop of prisma/rls.sql.
+# Live Supabase ENABLEs RLS on every new table (event trigger ensure_rls); with
+# no policy that is deny-all for fabrika_app (BlogPost, 06.10.2026). Enforced by
+# `pnpm rls:check` (CHECK 4c), the postflight of scripts/apply-migrations.sh and
+# `pnpm rls:verify`. A tenant table takes ENABLE + FORCE + tenant_isolation (4b).
+#
 # Paths are relative to prisma/migrations. Down files are never listed.
 add-m6-evaluator-lens.sql
 add-soft-delete.sql

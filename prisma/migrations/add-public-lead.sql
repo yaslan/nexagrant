@@ -14,6 +14,11 @@
 -- scripts/rls-models.ts with that reason. No tenant code path reads it: the
 -- only reader is the platform-admin console, behind requirePlatformAdmin().
 --
+-- RLS is DISABLEd explicitly right after CREATE TABLE (TASK-MUWDA86A7U4LK):
+-- Supabase's `ensure_rls` event trigger ENABLEs it on every new table in
+-- public, and RLS on with no policy is deny-all for fabrika_app. A no-op where
+-- it is already off. scripts/rls-migrations.ts CHECK 4c enforces the line.
+--
 -- Idempotent: IF NOT EXISTS throughout, so a database built by `prisma db push`
 -- first, or a second run, is a no-op.
 --
@@ -38,6 +43,7 @@ CREATE TABLE IF NOT EXISTS "PublicLead" (
     "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "PublicLead_pkey" PRIMARY KEY ("id")
 );
+ALTER TABLE "PublicLead" DISABLE ROW LEVEL SECURITY;  -- Supabase ensure_rls turns it on; this table is policy-less by design (rls-models.ts SYSTEM_WIDE)
 
 CREATE INDEX IF NOT EXISTS "PublicLead_createdAt_idx" ON "PublicLead"("createdAt");
 CREATE INDEX IF NOT EXISTS "PublicLead_email_createdAt_idx" ON "PublicLead"("email", "createdAt");
