@@ -552,3 +552,43 @@ test.describe('Notification center — producer: saved-search alert reaches the 
     }
   });
 });
+
+test.describe('Notification center — mutations: markNotificationsRead must write readAt', () => {
+  let notifId: string;
+
+  test.beforeAll(async () => {
+    await withSystemScope('platform-admin', 'e2e.notif.seed-mutant', async (tx) => {
+      const notif = await tx.notification.create({
+        data: {
+          tenantId: A.tenantId,
+          userId: A.userId,
+          type: 'SAVED_SEARCH_MATCH',
+          payload: { searchId: 'mutant-test', searchName: 'Mutant Test', matchCount: 1, since: new Date().toISOString() },
+          workspaceId: A.ws.id,
+        },
+      });
+      notifId = notif.id;
+    });
+  });
+
+  test.afterAll(async () => {
+    await withSystemScope('platform-admin', 'e2e.notif.cleanup-mutant', async (tx) => {
+      const id = requireId(notifId, 'notifId');
+      await tx.notification.deleteMany({ where: { id } });
+    });
+  });
+
+  test('markNotificationsRead updates readAt (absence of write fails)', async ({ page }) => {
+    await signIn(page, A);
+    await page.goto(`/en/${A.ws.slug}/notifications`);
+    await expect(page.getByText('1 Unread Notification')).toBeVisible();
+
+    const { markNotificationsRead } = await import('@/actions/user/notifications');
+    const result = await markNotificationsRead([notifId]);
+    expect(result.ok).toBe(true);
+    expect(result.updated).toBe(1);
+
+    await page.reload();
+    await expect(page.getByText('All Notifications Read')).toBeVisible();
+  });
+});
