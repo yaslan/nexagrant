@@ -640,7 +640,48 @@ async function main() {
     );
     const apiExposed = apiCallable.rows.map((r) => `${r.fn} → ${r.role}`);
 
+    // RLS on with ZERO policies is deny-all for every non-owner role, fabrika_app
+    // included: it reads 0 rows and every INSERT fails "new row violates
+    // row-level security policy" (TASK-MUWDA86A7U4LK). Supabase's ensure_rls
+    // event trigger produces exactly that on every new table in public, and
+    // BlogPost sat in it on live (TASK-MUTP1R1C13GE3). No exception: no table is
+    // meant to be unreachable. The behavioural probe below cannot see it — it
+    // reads only populated tenant tables — so it is asked of the catalogue.
+    const denyAll = await client.query<{ relname: string; tenant: boolean }>(
+      `select c.relname,
+              exists (select 1 from pg_attribute a
+                       where a.attrelid = c.oid and a.attname = 'tenantId'
+                         and a.attnum > 0 and not a.attisdropped) as tenant
+         from pg_class c
+        where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+          and c.relrowsecurity
+          and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
+        order by 1`
+    );
+    const denyAllFixes = denyAll.rows.map((r) =>
+      r.tenant
+        ? `${r.relname} (kiracı tablosu → pnpm db:rls)`
+        : `${r.relname} (politikasız SYSTEM_WIDE → ALTER TABLE "${r.relname}" DISABLE ROW LEVEL SECURITY; migration'a ve prisma/rls.sql DISABLE döngüsüne ekle)`
+    );
+
+    // The other side of that DISABLE: a table with RLS off is guarded only by
+    // GRANTs. Supabase's Data API roles must hold none on it, or /rest/v1 serves
+    // it anonymously — the very thing ensure_rls exists to prevent. On live they
+    // hold none today (TASK-MUWDA86A7U4LK Phase 3); the roles exist only on
+    // Supabase, elsewhere this returns nothing.
+    const apiTables = await client.query<{ relname: string; role: string }>(
+      `select c.relname, r.rolname as role
+         from pg_class c
+         cross join (select rolname from pg_roles where rolname in ('anon', 'authenticated')) r
+        where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+          and not c.relrowsecurity
+          and has_table_privilege(r.rolname, c.oid, 'SELECT, INSERT, UPDATE, DELETE')
+        order by 1, 2`
+    );
+    const apiOpenTables = apiTables.rows.map((r) => `${r.relname} → ${r.role}`);
+
     console.log(`Kiracıya özel model: ${models.length} · RLS açık tablo: ${rlsOn.size} · tenant_isolation politikası: ${hasPolicy.size}`);
+    console.log(`RLS açık + 0 politika (deny-all): ${denyAll.rows.length} · RLS kapalı + anon/authenticated erişimi: ${apiOpenTables.length}`);
 
     if (missingTable.length > 0) {
       console.log(`\nℹ  Şemada olup veritabanında olmayan tablo (migration bekliyor): ${missingTable.join(', ')}`);
@@ -660,6 +701,19 @@ async function main() {
         console.error(`   Supabase API rolleri şema sahibinin fonksiyonlarını çağırabiliyor (/rest/v1/rpc): ${apiExposed.join(', ')}`);
       }
       console.error('\n   Onarım: pnpm db:rls   (gerekirse önce pnpm db:rls-role)');
+      process.exit(1);
+    }
+
+    if (denyAll.rows.length > 0 || apiOpenTables.length > 0) {
+      console.error('\n❌ ERİŞİLEMEZ YA DA AÇIK TABLO — bu bir ortam gürültüsü değil.');
+      if (denyAll.rows.length > 0) {
+        console.error(
+          `   RLS açık ama hiç politika yok (fabrika_app 0 satır görür, her INSERT reddedilir; Supabase ensure_rls): ${denyAllFixes.join(', ')}`
+        );
+      }
+      if (apiOpenTables.length > 0) {
+        console.error(`   RLS kapalı ve Supabase API rolleri tabloya erişebiliyor (/rest/v1): ${apiOpenTables.join(', ')} → REVOKE ALL ON "<T>" FROM anon, authenticated`);
+      }
       process.exit(1);
     }
 

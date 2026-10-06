@@ -253,3 +253,56 @@ export function scanMigrations(root = process.cwd()): {
   }
   return { tables, findings };
 }
+
+/**
+ * CHECK 4c (TASK-MUWDA86A7U4LK) — a migration that creates a table with no
+ * tenantId, and states no policy for it, DISABLEs its row level security in
+ * the same file.
+ *
+ * The live Supabase project runs an `ensure_rls` event trigger (platform-owned,
+ * not ours to change) that ENABLEs RLS on every table created in `public`. For a
+ * table designed policy-less — SYSTEM_WIDE in scripts/rls-models.ts — that is RLS
+ * on with zero policies: fabrika_app reads 0 rows and every INSERT is refused.
+ * CI and local databases have no such trigger, so every test stays green and
+ * only production breaks; BlogPost did, on 06.10.2026 (TASK-MUTP1R1C13GE3).
+ *
+ * In CI `prisma db push` creates every table before the migrations run, so a
+ * missing DISABLE line in the migration that creates the table is invisible to
+ * any database-backed check there. Hence this file-level check: it fails on the
+ * day the migration is written. Judged from the migration itself (no tenantId
+ * column, no CREATE POLICY on the table in the same file), like CHECK 4b.
+ */
+export function scanPolicylessMigrations(root = process.cwd()): {
+  tables: CreatedTable[];
+  findings: MigrationFinding[];
+} {
+  const tables: CreatedTable[] = [];
+  const findings: MigrationFinding[] = [];
+
+  for (const file of forwardMigrationFiles(root)) {
+    const sql = stripSqlComments(readFileSync(resolve(root, file), 'utf8'));
+    for (const { table, line, body } of createdTables(sql)) {
+      if (/(?:^|,)\s*"?tenantId"?\s+[A-Za-z0-9_]+/.test(body)) continue; // CHECK 4b's
+      const p = protectionFor(sql, table);
+      // A platform table with its own policies (PlanVersion): direct, or a loop
+      // whose policy is a plain format('CREATE POLICY … ON %I …') string.
+      const loopPolicy = loopBlocks(sql).some(
+        (b) => b.tables.includes(table) && /CREATE\s+POLICY\s+[A-Za-z0-9_]+\s+ON\s+%I/i.test(b.body)
+      );
+      if (p.policy || loopPolicy) continue;
+      tables.push({ file, table, line, strict: false });
+
+      const q = `(?:public\\.)?["']?${table}["']?`;
+      const disabled = new RegExp(
+        `ALTER\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(?:ONLY\\s+)?${q}\\s+DISABLE\\s+ROW\\s+LEVEL\\s+SECURITY`,
+        'i'
+      ).test(sql);
+      if (p.enabled) {
+        findings.push({ file, table, line, problem: `ENABLEs row level security on "${table}" with no policy in the same file — deny-all for fabrika_app` });
+      } else if (!disabled) {
+        findings.push({ file, table, line, problem: `creates policy-less table "${table}" without ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY (Supabase ensure_rls turns it on)` });
+      }
+    }
+  }
+  return { tables, findings };
+}

@@ -110,11 +110,25 @@ jobs:
     # is how production applies them (docs/RELEASE_CHECKLIST.md §1) and the
     # second pass is the idempotency check; either pass failing fails the job.
     # psql comes preinstalled on ubuntu-latest.
+    #
+    # Supabase's `ensure_rls` event trigger goes in first (TASK-MUWDA86A7U4LK).
+    # Live ENABLEs RLS on every new table in public; on a policy-less
+    # SYSTEM_WIDE table that is deny-all for fabrika_app, and BlogPost broke on
+    # live while every CI suite stayed green (TASK-MUTP1R1C13GE3). With it, every
+    # table `db push` builds starts locked, as on a fresh Supabase project. So
+    # `db:rls` also runs BEFORE the migrations: its DISABLE loop unlocks the
+    # policy-less base tables (Tenant, User, …) that no migration creates, and
+    # the apply-migrations postflight fails on any table without a tenantId
+    # left RLS on with no policy. It is also the live order of things: there
+    # the policies exist when the migrations run. The trailing `db:rls` stays,
+    # for what the migrations change.
     - name: Prepare database
       run: |
+        psql --version
+        psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -f .github/ci/supabase-ensure-rls.sql
         pnpm exec prisma db push
         pnpm db:rls-role
-        psql --version
+        pnpm db:rls
         scripts/apply-migrations.sh
         scripts/apply-migrations.sh
         pnpm db:rls

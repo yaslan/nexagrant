@@ -6,9 +6,16 @@ import {
   canonicalPolicyClauses,
   forwardMigrationFiles,
   scanMigrations,
+  scanPolicylessMigrations,
   stripSqlComments,
 } from '../scripts/rls-migrations';
-import { NULLABLE_TENANT, SYSTEM_WIDE, tenantScopedModels } from '../scripts/rls-models';
+import {
+  NULLABLE_TENANT,
+  PLATFORM_POLICY,
+  SYSTEM_WIDE,
+  policylessSystemWide,
+  tenantScopedModels,
+} from '../scripts/rls-models';
 
 /**
  * The RLS gates read two files and agree with each other; the risk is that both
@@ -324,9 +331,119 @@ describe('BlogPost — platform content, classified as SYSTEM_WIDE on purpose (A
     expect(policyTables('tenant_or_shared')).not.toContain('BlogPost');
   });
 
-  test('its migration states why it has no RLS', () => {
+  test('its migration states why it has no RLS, and DISABLEs it against Supabase ensure_rls', () => {
     const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/add-blog-post.sql'), 'utf8');
     expect(sql).toMatch(/RLS: none, on purpose/);
-    expect(stripSqlComments(sql)).not.toMatch(/ROW LEVEL SECURITY|CREATE POLICY/i);
+    const code = stripSqlComments(sql);
+    // TASK-MUWDA86A7U4LK: live turned RLS on for this table with no policy, and
+    // fabrika_app read nothing. The explicit DISABLE is the fix, not a leak.
+    expect(code).toMatch(/ALTER TABLE "BlogPost" DISABLE ROW LEVEL SECURITY;/);
+    expect(code).not.toMatch(/ENABLE ROW LEVEL SECURITY|FORCE ROW LEVEL SECURITY|CREATE POLICY/i);
+  });
+});
+
+/**
+ * TASK-MUWDA86A7U4LK — Supabase's `ensure_rls` event trigger ENABLEs row level
+ * security on every table created in public. On a table designed policy-less
+ * that is deny-all for fabrika_app (BlogPost, live, 06.10.2026). Three places
+ * hold the answer — the DISABLE line in each migration (CHECK 4c), the DISABLE
+ * loop in prisma/rls.sql, and policylessSystemWide() — and these tests keep
+ * them one list.
+ */
+describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TASK-MUWDA86A7U4LK)', () => {
+  /** The table array of the rls.sql loop whose body matches `marker`. */
+  function loopTables(marker: RegExp): string[] {
+    const block = rlsSql.split('DO $$').find((b) => marker.test(b));
+    expect(block, `prisma/rls.sql has no loop matching ${marker}`).toBeDefined();
+    const arr = /FOREACH\s+t\s+IN\s+ARRAY\s+ARRAY\[([\s\S]*?)\]\s*LOOP/.exec(block as string);
+    return [...(arr?.[1] ?? '').matchAll(/'([A-Za-z0-9_]+)'/g)].map((m) => m[1] as string).sort();
+  }
+
+  test('every model without a tenantId is classified: SYSTEM_WIDE or a platform-policy table', () => {
+    // Programme sat in neither and would have been locked by the trigger
+    // without any list naming it.
+    const unclassified = [...modelBodies()]
+      .filter(([, body]) => !/^\s*tenantId\s+String/m.test(body))
+      .map(([name]) => name)
+      .filter((name) => !SYSTEM_WIDE.has(name) && !PLATFORM_POLICY.has(name));
+    expect(unclassified).toEqual([]);
+  });
+
+  test('PLATFORM_POLICY is exactly the platform_read loop of prisma/rls.sql', () => {
+    expect(loopTables(/CREATE POLICY platform_read ON %I/)).toEqual([...PLATFORM_POLICY].sort());
+  });
+
+  test('the DISABLE loop in prisma/rls.sql is exactly policylessSystemWide()', () => {
+    const disabled = loopTables(/DISABLE ROW LEVEL SECURITY/);
+    expect(disabled).toEqual(policylessSystemWide());
+    expect(disabled).toContain('BlogPost');
+    expect(disabled).toContain('Tenant');
+    expect(disabled).not.toContain('Plan');
+  });
+
+  test('the DISABLE loop only touches a table whose RLS is on (no lock, no ownership on a healthy DB)', () => {
+    const block = rlsSql.split('DO $$').find((b) => /DISABLE ROW LEVEL SECURITY/.test(b)) as string;
+    expect(block).toMatch(/to_regclass\(format\('public\.%I', t\)\) AND relrowsecurity/);
+  });
+
+  test('CHECK 4c: no forward migration leaves a policy-less table to the trigger', () => {
+    const { tables, findings } = scanPolicylessMigrations();
+    expect(findings.map((f) => `${f.file}:${f.line} ${f.problem}`)).toEqual([]);
+    // A green check that inspects nothing is not a green check.
+    expect(tables.map((t) => t.table).sort()).toEqual(['BlogPost', 'PublicLead']);
+  });
+
+  test('CHECK 4c mutation probe — missing DISABLE and ENABLE-without-policy are caught', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rls-4c-'));
+    mkdirSync(join(root, 'prisma', 'migrations'), { recursive: true });
+    writeFileSync(join(root, 'prisma', 'rls.sql'), rlsSql);
+    const file = join(root, 'prisma', 'migrations', 'add-probe.sql');
+    const create = `CREATE TABLE IF NOT EXISTS "ProbeCatalogue" (\n  "id" TEXT NOT NULL\n);\n`;
+    try {
+      writeFileSync(file, create);
+      let { findings } = scanPolicylessMigrations(root);
+      expect(findings).toHaveLength(1);
+      expect(findings[0]?.table).toBe('ProbeCatalogue');
+      expect(findings[0]?.problem).toContain('DISABLE ROW LEVEL SECURITY');
+
+      writeFileSync(file, create + `ALTER TABLE "ProbeCatalogue" ENABLE ROW LEVEL SECURITY;\n`);
+      ({ findings } = scanPolicylessMigrations(root));
+      expect(findings[0]?.problem).toContain('deny-all');
+
+      writeFileSync(file, create + `ALTER TABLE "ProbeCatalogue" DISABLE ROW LEVEL SECURITY;\n`);
+      expect(scanPolicylessMigrations(root).findings).toEqual([]);
+
+      // A tenant table is CHECK 4b's business, never 4c's.
+      writeFileSync(file, `CREATE TABLE "ProbeTenant" ("id" TEXT NOT NULL, "tenantId" TEXT NOT NULL);\n`);
+      expect(scanPolicylessMigrations(root).tables).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('the apply-migrations postflight checks deny-all tables for every role, before the exempt return', () => {
+    const sh = readFileSync(resolve(process.cwd(), 'scripts/apply-migrations.sh'), 'utf8');
+    const post = sh.slice(sh.indexOf('postflight() {'));
+    const deny = post.indexOf('AND NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)');
+    expect(deny).toBeGreaterThan(-1);
+    // A superuser runs the chain in CI; the check is about fabrika_app, so it
+    // must not sit behind `[ "$exempt" = t ] && return 0`.
+    expect(deny).toBeLessThan(post.indexOf('[ "$exempt" = t ] && return 0'));
+    expect(post).toMatch(/a\.attname = 'tenantId'/);
+  });
+
+  test('CI installs the live trigger before db push and runs db:rls before the migrations', () => {
+    const ci = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
+    const step = ci.slice(ci.indexOf('- name: Prepare database'), ci.indexOf('- name: Verify RLS policies'));
+    const at = (needle: string) => {
+      const i = step.indexOf(needle);
+      expect(i, `"${needle}" is missing from the Prepare database step`).toBeGreaterThan(-1);
+      return i;
+    };
+    expect(at('.github/ci/supabase-ensure-rls.sql')).toBeLessThan(at('prisma db push'));
+    expect(at('pnpm db:rls\n')).toBeLessThan(at('scripts/apply-migrations.sh'));
+    const trig = readFileSync(resolve(process.cwd(), '.github/ci/supabase-ensure-rls.sql'), 'utf8');
+    expect(trig).toContain("EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);");
+    expect(trig).toMatch(/CREATE EVENT TRIGGER ensure_rls ON ddl_command_end EXECUTE FUNCTION public\.rls_auto_enable\(\);/);
   });
 });
