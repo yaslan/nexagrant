@@ -12,8 +12,15 @@
  * and so the list, the drawer and the health score cannot drift apart.
  */
 
+/**
+ * How many days before `validUntil` a verified document turns EXPIRING_SOON.
+ * The evidence-expiring job (src/lib/notifications/evidence-expiring.ts) reads
+ * the same constant, so the badge and the bell cannot disagree (TASK-MUVR7HQQZVA2Z).
+ */
+export const EXPIRING_SOON_DAYS = 30;
+
 /** The states in which a document has actually passed verification. */
-const VERIFIED_STATUSES = new Set(['VALID', 'EXPIRING_SOON']);
+export const VERIFIED_STATUSES: ReadonlySet<string> = new Set(['VALID', 'EXPIRING_SOON']);
 
 export type EvidenceBadgeKind =
   | 'EXPIRED'
@@ -79,7 +86,7 @@ export function evidenceBadge(
 
   if (hasExpiry) {
     const daysLeft = daysUntil(expiry, now);
-    if (daysLeft > 0 && daysLeft <= 30) {
+    if (daysLeft > 0 && daysLeft <= EXPIRING_SOON_DAYS) {
       return { kind: 'EXPIRING_SOON', daysLeft };
     }
   }

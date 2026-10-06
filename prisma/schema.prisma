@@ -1339,7 +1339,7 @@ enum NotificationType {
   SAVED_SEARCH_MATCH   // payload: { searchId, searchName, matchCount, since }
   CREDIT_GRANTED       // payload: { amount, period?, source } (no producer yet)
   CREDIT_EXHAUSTED     // payload: { module } (no producer yet)
-  EVIDENCE_EXPIRING    // payload: { evidenceId, validUntil } (no producer yet)
+  EVIDENCE_EXPIRING    // payload: { evidenceId, validUntil } (evidence-expiring job)
 }
 
 // ───────────────────────── v1.1+ (M6, M9, M10, M11, M7) ─────────────────────────

@@ -34,6 +34,7 @@ export const JOB_IDS = [
   'm4-stale-relationships',
   'job-queue-health',
   'notifications-retention',
+  'evidence-expiring',
 ] as const;
 
 export type JobId = (typeof JOB_IDS)[number];
@@ -71,6 +72,8 @@ export const SCHEDULE: readonly ScheduledJob[] = [
   { id: 'public-lead-cleanup', cron: '45 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   // ADR-0011 §3.4: notifications older than 90 days.
   { id: 'notifications-retention', cron: '50 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
+  // ADR-0011 §2.2: 08:20 Istanbul, verified documents within the badge's EXPIRING_SOON window.
+  { id: 'evidence-expiring', cron: '20 5 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   // Between k1-daily-calls (02:00) and k1-topic-match (02:30): embeds the topics
   // that landed or changed and the profiles that changed. Own queue: a profile
   // save queued by hand waits for the sweep instead of paying for the same row.

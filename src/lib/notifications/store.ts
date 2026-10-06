@@ -175,3 +175,12 @@ export async function recordNotification(tx: TenantTx, input: NewNotification): 
 export function savedSearchDedupeKey(searchId: string, since: Date): string {
   return `saved-search:${searchId}:${since.toISOString()}`;
 }
+
+/**
+ * The evidence-expiring key: one notification per document and expiry date
+ * (TASK-MUVR7HQQZVA2Z). A renewed document gets a new `validUntil`, so a new
+ * key, and is warned again when the new date comes near.
+ */
+export function evidenceExpiringDedupeKey(evidenceId: string, validUntil: Date): string {
+  return `evidence-expiring:${evidenceId}:${validUntil.toISOString()}`;
+}
