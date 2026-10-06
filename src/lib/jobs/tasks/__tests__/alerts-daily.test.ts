@@ -190,6 +190,34 @@ describe('alerts-daily mail rendering', () => {
     expect(subject).toBe('New Call Opportunities: Quantum Bcc: victim@example.invalid x y (3 new)');
   });
 
+  // TASK-MUVSIO5F4TLHK (N-2): each separator alone, so the regex losing either
+  // one leaves it in the Subject instead of hiding behind a neighbour.
+  it.each([
+    ['U+2028 line separator', '\u2028'],
+    ['U+2029 paragraph separator', '\u2029'],
+  ])('replaces a %s in the name with a space', (_label, separator) => {
+    const { subject } = renderSavedSearchAlert({ ...base, name: `Quantum${separator}Bcc: x@example.invalid` });
+
+    expect(subject).not.toContain(separator);
+    expect(subject).toBe('New Call Opportunities: Quantum Bcc: x@example.invalid (3 new)');
+  });
+
+  // TASK-MUVSIO5F4TLHK (se-fb N-2): `appUrl` comes from env and `searchId` is
+  // encoded, so this is defence in depth — but without it nothing failed when
+  // the href escape was removed.
+  it('escapes the app URL inside the href attribute', () => {
+    const { html } = renderSavedSearchAlert({
+      ...base,
+      name: 'x',
+      appUrl: 'https://app.example.invalid/" onmouseover="alert(1)',
+    });
+
+    expect(html).not.toContain('" onmouseover="');
+    expect(html).toContain(
+      '<a href="https://app.example.invalid/&quot; onmouseover=&quot;alert(1)/calls?search=ss_1">'
+    );
+  });
+
   it('leaves an ordinary Turkish name as it is', () => {
     const { subject, html } = renderSavedSearchAlert({ ...base, name: 'Yeşil dönüşüm & iklim' });
     expect(subject).toBe('New Call Opportunities: Yeşil dönüşüm & iklim (3 new)');

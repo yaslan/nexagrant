@@ -545,6 +545,38 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     expect(await lastRunOf(b.searchId)).toEqual(LONG_AGO);
   });
 
+  // TASK-MUVSIO5F4TLHK (N-1): the test above proves the guard under RLS, where
+  // the scope does the hiding. On a BYPASSRLS role the scope hides nothing, so
+  // a row handed in with the wrong tenant would pass a guard keyed by id alone,
+  // its owner's membership would not be found under that tenant, and the
+  // search would be skipped as "the searcher left" instead of failing.
+  it('alerts-daily: on a BYPASSRLS role, a row carrying the wrong tenant still fails the search', async (ctx) => {
+    expect(ready, skipReason).toBe(true);
+    await assertMatchesExist(ctx);
+    await resetLastRun();
+
+    const [role] = await prisma.$queryRawUnsafe<Array<{ rolbypassrls: boolean; rolsuper: boolean }>>(
+      'select rolbypassrls, rolsuper from pg_roles where rolname = current_user'
+    );
+    if (!role?.rolbypassrls && !role?.rolsuper) {
+      ctx.skip('the privileged client does not bypass RLS here, so there is nothing for this case to measure');
+    }
+
+    // Honest runner (scope = the tenant it was given) over the bypassing role;
+    // the mismatch is in the row: search B, handed in as tenant A's.
+    const bypass: TenantRunner = (tenantId, callback) => withTenantOn(prisma, tenantId, callback);
+    const mail = recordingMailer();
+    const result = await sendSavedSearchAlerts([{ ...rowFor(b, 'b'), tenantId: a.tenantId }], bypass, mail.send);
+
+    expect(mail.sent).toEqual([]);
+    expect(result.emailsSkipped).toBe(0);
+    expect(result.emailsFailed).toBe(1);
+    expect(result.errors).toEqual([
+      { searchId: b.searchId, reason: 'saved search not visible under its own tenant scope' },
+    ]);
+    expect(await lastRunOf(b.searchId)).toEqual(LONG_AGO);
+  });
+
   // TASK-MUVRYPO9GTU7D: the mail used to go to the tenant's first owner
   // whoever's search it was, carrying the searcher's free-text name.
   it("alerts-daily: mails the search's own owner, and no one once they have left the tenant", async (ctx) => {

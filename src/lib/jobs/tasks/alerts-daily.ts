@@ -209,9 +209,12 @@ export async function sendSavedSearchAlerts(
       // ordinary state, not a failure — see the skip below. Which is why the
       // search itself must be visible in the same scope first: under a wrong
       // tenant scope every membership is invisible too, and that must fail the
-      // search, not pass for "the searcher left".
+      // search, not pass for "the searcher left". The explicit `tenantId` makes
+      // the guard hold on a role that bypasses RLS too (the local `fabrika`),
+      // where the scope hides nothing and only the filter can catch a row whose
+      // tenant is not the one it was handed with (TASK-MUVSIO5F4TLHK, N-1).
       const recipientEmail = await runTenant(tenantId, async (tx) => {
-        if ((await tx.savedSearch.count({ where: { id: searchId } })) === 0) {
+        if ((await tx.savedSearch.count({ where: { id: searchId, tenantId } })) === 0) {
           throw new Error('saved search not visible under its own tenant scope');
         }
         const membership = await tx.membership.findFirst(recipientEmailQuery(tenantId, userId));
