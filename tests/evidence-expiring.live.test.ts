@@ -190,3 +190,69 @@ describe.skipIf(!HAS_DB)('evidence-expiring producer (live, fabrika_app)', () =>
     expect(mine.every((n) => n.userId === fx.users.member)).toBe(true);
   });
 });
+
+/**
+ * A large tenant (TASK-MUXODEF0OKBGR). Before batching, every (document,
+ * recipient) row was its own insert inside one tenant transaction: at 6000
+ * documents uploaded by 'system' with 3 owners (18 000 rows) the transaction
+ * passed Prisma's 5 s limit, every write was rolled back, and the tenant was
+ * never told — the next day failed the same way.
+ *
+ * Mutant: one insert per row in a single transaction → tenantsFailed 1, written 0.
+ */
+const LOAD_DOCS = 6000;
+const LOAD_OWNERS = 3;
+
+describe.skipIf(!HAS_DB)('evidence-expiring producer — a large tenant (live, fabrika_app)', () => {
+  const load: { tenant?: string; owners: string[] } = { owners: [] };
+  const runLoad = () => notifyExpiringEvidence({ now: NOW, tenantIds: presentIds([load.tenant]) });
+
+  beforeAll(async () => {
+    const t = await admin.tenant.create({ data: { name: `${RUN} load`, slug: `${RUN}-load`, country: 'TR' } });
+    load.tenant = t.id;
+    for (let i = 0; i < LOAD_OWNERS; i++) {
+      const u = await admin.user.create({ data: { email: `load-owner${i}@${RUN}.test`, name: `${RUN} load ${i}` } });
+      load.owners.push(u.id);
+    }
+    await admin.membership.createMany({
+      data: load.owners.map((userId) => ({ tenantId: t.id, userId, role: 'TENANT_OWNER' as const })),
+    });
+    await admin.evidence.createMany({
+      data: Array.from({ length: LOAD_DOCS }, (_, i) => ({
+        tenantId: t.id,
+        kind: 'certificate',
+        title: `${RUN} load ${i}`,
+        body: '',
+        createdBy: 'system',
+        status: 'VALID',
+        validUntil: inDays(1 + (i % (EXPIRING_SOON_DAYS - 2))),
+      })),
+    });
+  }, 120_000);
+
+  afterAll(async () => {
+    const tenantIds = presentIds([load.tenant]);
+    await admin.notification.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await admin.evidence.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    for (const id of tenantIds) await admin.tenant.delete({ where: { id } });
+    for (const id of presentIds(load.owners)) await admin.user.delete({ where: { id } });
+  }, 120_000);
+
+  test(`${LOAD_DOCS} documents × ${LOAD_OWNERS} owners are written in one run; a rerun writes nothing`, async () => {
+    const first = await runLoad();
+    expect({ failed: first.tenantsFailed, errors: first.errors.map((e) => e.reason.slice(0, 160)) }).toEqual({
+      failed: 0,
+      errors: [],
+    });
+    expect(first.documentsDue).toBe(LOAD_DOCS);
+    expect(first.notificationsWritten).toBe(LOAD_DOCS * LOAD_OWNERS);
+    expect(await admin.notification.count({ where: { tenantId: requireId(load.tenant, 'load') } })).toBe(
+      LOAD_DOCS * LOAD_OWNERS
+    );
+
+    const second = await runLoad();
+    expect(second.tenantsFailed).toBe(0);
+    expect(second.notificationsWritten).toBe(0);
+    expect(second.notificationsSkipped).toBe(LOAD_DOCS * LOAD_OWNERS);
+  }, 120_000);
+});

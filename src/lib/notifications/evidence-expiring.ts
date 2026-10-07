@@ -1,7 +1,7 @@
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 import { EXPIRING_SOON_DAYS, VERIFIED_STATUSES, evidenceBadge } from '@/lib/evidence-status';
-import { evidenceExpiringDedupeKey, recordNotification } from '@/lib/notifications/store';
+import { evidenceExpiringDedupeKey, recordNotifications, type NewNotification } from '@/lib/notifications/store';
 
 /**
  * "Your document is about to expire" notifications (ADR-0011 §2.2, TASK-MUVR7HQQZVA2Z).
@@ -69,61 +69,67 @@ async function tenantOwnerIds(tx: TenantTx, tenantId: string): Promise<string[]>
   return rows.map((r) => r.userId);
 }
 
-async function notifyTenant(
+/**
+ * One page of a tenant's documents, in its own transaction (TASK-MUXODEF0OKBGR).
+ * Every (document, recipient) row of the page goes out in one batched insert; a
+ * tenant with thousands of due documents used to send one insert per row inside
+ * a single transaction, ran past Prisma's 5 s limit, rolled everything back and
+ * failed the same way every day. `next` is the cursor for the following page, or
+ * null after the last one.
+ */
+async function notifyPage(
   tx: TenantTx,
   tenantId: string,
   now: Date,
-  pageSize: number
-): Promise<TenantCounts> {
-  const out: TenantCounts = { documentsDue: 0, notificationsWritten: 0, notificationsSkipped: 0, documentsWithoutRecipient: 0 };
+  pageSize: number,
+  cursor: string
+): Promise<{ counts: TenantCounts; next: string | null }> {
+  const counts: TenantCounts = { documentsDue: 0, notificationsWritten: 0, notificationsSkipped: 0, documentsWithoutRecipient: 0 };
   const horizon = new Date(now.getTime() + EXPIRING_SOON_DAYS * DAY_MS);
-  let owners: string[] | null = null;
-  let cursor = '';
-  for (;;) {
-    const page = await tx.evidence.findMany({
-      where: {
-        tenantId,
-        status: { in: [...VERIFIED_STATUSES] },
-        validUntil: { gt: now, lte: horizon },
-        id: { gt: cursor },
-      },
-      select: { id: true, status: true, validUntil: true, createdBy: true },
-      orderBy: { id: 'asc' },
-      take: pageSize,
-    });
-    const due = page.filter((e) => evidenceBadge(e, now).kind === 'EXPIRING_SOON');
-    const members = await liveMemberIds(tx, tenantId, [...new Set(due.map((e) => e.createdBy))]);
+  const page = await tx.evidence.findMany({
+    where: {
+      tenantId,
+      status: { in: [...VERIFIED_STATUSES] },
+      validUntil: { gt: now, lte: horizon },
+      id: { gt: cursor },
+    },
+    select: { id: true, status: true, validUntil: true, createdBy: true },
+    orderBy: { id: 'asc' },
+    take: pageSize,
+  });
+  const due = page.filter((e) => evidenceBadge(e, now).kind === 'EXPIRING_SOON');
+  const members = await liveMemberIds(tx, tenantId, [...new Set(due.map((e) => e.createdBy))]);
 
-    for (const e of due) {
-      out.documentsDue++;
-      let recipients: string[];
-      if (members.has(e.createdBy)) {
-        recipients = [e.createdBy];
-      } else {
-        owners ??= await tenantOwnerIds(tx, tenantId);
-        recipients = owners;
-      }
-      if (recipients.length === 0) {
-        out.documentsWithoutRecipient++;
-        continue;
-      }
-      const validUntil = e.validUntil as Date;
-      for (const userId of recipients) {
-        const wrote = await recordNotification(tx, {
-          tenantId,
-          userId,
-          type: 'EVIDENCE_EXPIRING',
-          payload: { evidenceId: e.id, validUntil: validUntil.toISOString() },
-          dedupeKey: evidenceExpiringDedupeKey(e.id, validUntil),
-        });
-        if (wrote) out.notificationsWritten++;
-        else out.notificationsSkipped++;
-      }
+  let owners: string[] | null = null;
+  const rows: NewNotification[] = [];
+  for (const e of due) {
+    counts.documentsDue++;
+    let recipients: string[];
+    if (members.has(e.createdBy)) {
+      recipients = [e.createdBy];
+    } else {
+      owners ??= await tenantOwnerIds(tx, tenantId);
+      recipients = owners;
     }
-    if (page.length < pageSize) break;
-    cursor = page[page.length - 1]!.id;
+    if (recipients.length === 0) {
+      counts.documentsWithoutRecipient++;
+      continue;
+    }
+    const validUntil = e.validUntil as Date;
+    for (const userId of recipients) {
+      rows.push({
+        tenantId,
+        userId,
+        type: 'EVIDENCE_EXPIRING',
+        payload: { evidenceId: e.id, validUntil: validUntil.toISOString() },
+        dedupeKey: evidenceExpiringDedupeKey(e.id, validUntil),
+      });
+    }
   }
-  return out;
+  const written = await recordNotifications(tx, rows);
+  counts.notificationsWritten = written;
+  counts.notificationsSkipped = rows.length - written;
+  return { counts, next: page.length < pageSize ? null : page[page.length - 1]!.id };
 }
 
 /**
@@ -159,14 +165,23 @@ export async function notifyExpiringEvidence(options: {
     });
     for (const { id: tenantId } of tenants) {
       out.tenants++;
+      // One transaction per page. Counted only after a page commits: a page that
+      // fails has its writes rolled back and must not report them as written. The
+      // pages before it stay; the dedupeKey makes tomorrow's run skip them and
+      // pick up where this one stopped.
+      let docCursor: string | null = '';
       try {
-        // Counted only after the transaction commits: a tenant that fails half-way
-        // has its writes rolled back and must not report them as written.
-        const c = await runTenant(tenantId, (tx) => notifyTenant(tx, tenantId, now, pageSize));
-        out.documentsDue += c.documentsDue;
-        out.notificationsWritten += c.notificationsWritten;
-        out.notificationsSkipped += c.notificationsSkipped;
-        out.documentsWithoutRecipient += c.documentsWithoutRecipient;
+        while (docCursor !== null) {
+          const from: string = docCursor;
+          const { counts: c, next } = await runTenant(tenantId, (tx) =>
+            notifyPage(tx, tenantId, now, pageSize, from)
+          );
+          out.documentsDue += c.documentsDue;
+          out.notificationsWritten += c.notificationsWritten;
+          out.notificationsSkipped += c.notificationsSkipped;
+          out.documentsWithoutRecipient += c.documentsWithoutRecipient;
+          docCursor = next;
+        }
       } catch (error) {
         out.tenantsFailed++;
         out.errors.push({ scope: 'tenant', reason: errorMessage(error) });
