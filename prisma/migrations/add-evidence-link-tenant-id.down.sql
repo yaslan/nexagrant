@@ -21,5 +21,5 @@ DROP INDEX IF EXISTS "EvidenceReminder_sent_notifyAt_idx";
 DROP INDEX IF EXISTS "EvidenceReminder_tenantId_idx";
 DROP INDEX IF EXISTS "ClaimEvidenceLink_tenantId_idx";
 
-ALTER TABLE "EvidenceReminder"  DROP COLUMN IF EXISTS "tenantId";
+ALTER TABLE IF EXISTS "EvidenceReminder" DROP COLUMN IF EXISTS "tenantId";
 ALTER TABLE "ClaimEvidenceLink" DROP COLUMN IF EXISTS "tenantId";

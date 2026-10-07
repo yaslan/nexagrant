@@ -20,10 +20,20 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 ALTER TABLE "ClaimEvidenceLink" ADD COLUMN IF NOT EXISTS "tenantId" TEXT NOT NULL;
-ALTER TABLE "EvidenceReminder"  ADD COLUMN IF NOT EXISTS "tenantId" TEXT NOT NULL;
 
 CREATE INDEX IF NOT EXISTS "ClaimEvidenceLink_tenantId_idx" ON "ClaimEvidenceLink" ("tenantId");
-CREATE INDEX IF NOT EXISTS "EvidenceReminder_tenantId_idx"  ON "EvidenceReminder"  ("tenantId");
 
--- The reminder job sweeps unsent reminders that are due; it reads this pair.
-CREATE INDEX IF NOT EXISTS "EvidenceReminder_sent_notifyAt_idx" ON "EvidenceReminder" ("sent", "notifyAt");
+-- EvidenceReminder was dropped later (drop-evidence-reminder.sql,
+-- TASK-MUXVOWBNIIQKD). The chain reruns every file, so these statements run
+-- only while the table still exists; on a database that never had it, or
+-- after the drop, they are skipped and a rerun still exits 0.
+DO $$
+BEGIN
+  IF to_regclass('"EvidenceReminder"') IS NULL THEN
+    RETURN;
+  END IF;
+  ALTER TABLE "EvidenceReminder" ADD COLUMN IF NOT EXISTS "tenantId" TEXT NOT NULL;
+  CREATE INDEX IF NOT EXISTS "EvidenceReminder_tenantId_idx" ON "EvidenceReminder" ("tenantId");
+  -- The reminder job sweeps unsent reminders that are due; it reads this pair.
+  CREATE INDEX IF NOT EXISTS "EvidenceReminder_sent_notifyAt_idx" ON "EvidenceReminder" ("sent", "notifyAt");
+END $$;
