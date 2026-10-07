@@ -168,10 +168,41 @@ export async function recordNotification(tx: TenantTx, input: NewNotification): 
 }
 
 /**
+ * {@link recordNotification} for many rows in one `INSERT … ON CONFLICT DO
+ * NOTHING`. Returns how many were written; the rest already existed. A producer
+ * that writes one row per recipient and document uses this, so a large tenant is
+ * one statement per page instead of one round trip per row.
+ */
+export async function recordNotifications(tx: TenantTx, inputs: readonly NewNotification[]): Promise<number> {
+  if (inputs.length === 0) return 0;
+  const { count } = await tx.notification.createMany({
+    data: inputs.map((input) => ({
+      tenantId: input.tenantId,
+      userId: input.userId,
+      type: input.type,
+      payload: input.payload,
+      workspaceId: input.workspaceId ?? null,
+      dedupeKey: input.dedupeKey ?? null,
+    })),
+    skipDuplicates: true,
+  });
+  return count;
+}
+
+/**
  * The saved-search alert's key: one notification per search and window start.
  * alerts-daily keeps `lastRunAt` where it was when the mail fails, so the next
  * run counts the same window again with the same `since` and writes nothing.
  */
 export function savedSearchDedupeKey(searchId: string, since: Date): string {
   return `saved-search:${searchId}:${since.toISOString()}`;
+}
+
+/**
+ * The evidence-expiring key: one notification per document and expiry date
+ * (TASK-MUVR7HQQZVA2Z). A renewed document gets a new `validUntil`, so a new
+ * key, and is warned again when the new date comes near.
+ */
+export function evidenceExpiringDedupeKey(evidenceId: string, validUntil: Date): string {
+  return `evidence-expiring:${evidenceId}:${validUntil.toISOString()}`;
 }

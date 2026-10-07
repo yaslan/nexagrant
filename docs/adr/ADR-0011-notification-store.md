@@ -43,6 +43,8 @@ Bildirim merkezi (kabuktaki zil + `/notifications` · `/bildirimler`) hep boş:
 
 Kanıt uyarısı için yeni bir cron işi gerekir (`validUntil` taraması + `EvidenceReminder` kullanımı). Bu ayrı bir karttır.
 
+> **Güncelleme (TASK-MUVR7HQQZVA2Z, 06.10.2026):** Üretici yazıldı: `evidence-expiring` işi (05:20 UTC), `src/lib/notifications/evidence-expiring.ts`. Kararlar: K-4956 = B, yani alıcı yükleyendir (`Evidence.createdBy`; yükleme akışı bu alanı dolduruyor, yukarıdaki "yükleyen alanı yok" tespiti eksikti). Değer `'system'` ise ya da kişi artık üye değilse uyarı TENANT_OWNER'lara gider. K-4958 = A: kural rozetle aynıdır (`EXPIRING_SOON_DAYS` = 30, yalnız doğrulanmış belge). K-4959 = A: `EvidenceReminder` kullanılmadı; tekrarı `dedupeKey = evidence-expiring:<id>:<validUntil ISO>` engelliyor. Modelin kaldırılması ayrı bir kart.
+
 ### 2.3 Kredi
 
 | Olay | Yer | Alıcı |

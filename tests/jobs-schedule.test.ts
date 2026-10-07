@@ -55,6 +55,7 @@ describe('schedule (ADR-0008 §2)', () => {
       'm4-stale-relationships': '0 7 * * *',
       'job-queue-health': '5 * * * *',
       'notifications-retention': '50 3 * * *',
+      'evidence-expiring': '20 5 * * *',
     });
   });
 
