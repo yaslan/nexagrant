@@ -243,10 +243,9 @@ describe.skipIf(!HAS_DB)('evidence-expiring producer — a large tenant (live, f
   }, 120_000);
 
   afterAll(async () => {
-    const tenantIds = presentIds([load.tenant]);
-    await admin.notification.deleteMany({ where: { tenantId: { in: tenantIds } } });
-    await admin.evidence.deleteMany({ where: { tenantId: { in: tenantIds } } });
-    for (const id of tenantIds) await admin.tenant.delete({ where: { id } });
+    await admin.notification.deleteMany({ where: { tenantId: { in: presentIds([load.tenant]) } } });
+    await admin.evidence.deleteMany({ where: { tenantId: { in: presentIds([load.tenant]) } } });
+    for (const id of presentIds([load.tenant])) await admin.tenant.delete({ where: { id } });
     for (const id of presentIds(load.owners)) await admin.user.delete({ where: { id } });
   }, 120_000);
 
