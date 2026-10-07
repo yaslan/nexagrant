@@ -35,9 +35,9 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
   return { rlsUrl, ownerUrl };
 });
 
-import { createDbClient, prisma } from '@/lib/db';
+import { createDbClient, prisma, withTenant, type TenantTx } from '@/lib/db';
 import { evidenceBadge, EXPIRING_SOON_DAYS } from '@/lib/evidence-status';
-import { notifyExpiringEvidence } from '@/lib/notifications/evidence-expiring';
+import { EVIDENCE_EXPIRING_PAGE_SIZE, notifyExpiringEvidence } from '@/lib/notifications/evidence-expiring';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 
@@ -189,4 +189,105 @@ describe.skipIf(!HAS_DB)('evidence-expiring producer (live, fabrika_app)', () =>
     expect(new Set(mine.map((n) => n.dedupeKey)).size).toBe(2);
     expect(mine.every((n) => n.userId === fx.users.member)).toBe(true);
   });
+});
+
+/**
+ * A large tenant (TASK-MUXODEF0OKBGR). Before batching, every (document,
+ * recipient) row was its own insert inside one tenant transaction: at 6000
+ * documents uploaded by 'system' with 3 owners (18 000 rows) the transaction
+ * passed Prisma's 5 s limit, every write was rolled back, and the tenant was
+ * never told — the next day failed the same way.
+ *
+ * Mutants (docs/agent-results/TASK-MUXODEF0OKBGR-be-fb.md): one insert per row in a
+ * single transaction → tenantsFailed 1, written 0; batched but one transaction for
+ * the whole tenant → the transaction count goes red; one transaction per page but one
+ * insert per row → the insert count goes red (TASK-MUXODEF0OKBGR-crw2-fb.md Ö-1).
+ */
+const LOAD_DOCS = 6000;
+const LOAD_OWNERS = 3;
+
+describe.skipIf(!HAS_DB)('evidence-expiring producer — a large tenant (live, fabrika_app)', () => {
+  const load: { tenant?: string; owners: string[] } = { owners: [] };
+  // Counts the transactions: one per page of documents, never one for the whole tenant.
+  let transactions = 0;
+  // Counts the notification insert calls: one per page, never one per (document, recipient).
+  let inserts = 0;
+  const countInserts = (tx: TenantTx): TenantTx =>
+    new Proxy(tx, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (prop !== 'notification') return value;
+        return new Proxy(value, {
+          get(model, key, r) {
+            const fn = Reflect.get(model, key, r);
+            if (key !== 'createMany') return fn;
+            return (...args: unknown[]) => {
+              inserts++;
+              return fn.apply(model, args);
+            };
+          },
+        });
+      },
+    });
+  const runLoad = () =>
+    notifyExpiringEvidence({
+      now: NOW,
+      tenantIds: presentIds([load.tenant]),
+      runTenant: (id, cb) => {
+        transactions++;
+        return withTenant(id, (tx) => cb(countInserts(tx)));
+      },
+    });
+
+  beforeAll(async () => {
+    const t = await admin.tenant.create({ data: { name: `${RUN} load`, slug: `${RUN}-load`, country: 'TR' } });
+    load.tenant = t.id;
+    for (let i = 0; i < LOAD_OWNERS; i++) {
+      const u = await admin.user.create({ data: { email: `load-owner${i}@${RUN}.test`, name: `${RUN} load ${i}` } });
+      load.owners.push(u.id);
+    }
+    await admin.membership.createMany({
+      data: load.owners.map((userId) => ({ tenantId: t.id, userId, role: 'TENANT_OWNER' as const })),
+    });
+    await admin.evidence.createMany({
+      data: Array.from({ length: LOAD_DOCS }, (_, i) => ({
+        tenantId: t.id,
+        kind: 'certificate',
+        title: `${RUN} load ${i}`,
+        body: '',
+        createdBy: 'system',
+        status: 'VALID',
+        validUntil: inDays(1 + (i % (EXPIRING_SOON_DAYS - 2))),
+      })),
+    });
+  }, 120_000);
+
+  afterAll(async () => {
+    await admin.notification.deleteMany({ where: { tenantId: { in: presentIds([load.tenant]) } } });
+    await admin.evidence.deleteMany({ where: { tenantId: { in: presentIds([load.tenant]) } } });
+    for (const id of presentIds([load.tenant])) await admin.tenant.delete({ where: { id } });
+    for (const id of presentIds(load.owners)) await admin.user.delete({ where: { id } });
+  }, 120_000);
+
+  test(`${LOAD_DOCS} documents × ${LOAD_OWNERS} owners are written in one run; a rerun writes nothing`, async () => {
+    const first = await runLoad();
+    expect({ failed: first.tenantsFailed, errors: first.errors.map((e) => e.reason.slice(0, 160)) }).toEqual({
+      failed: 0,
+      errors: [],
+    });
+    expect(first.documentsDue).toBe(LOAD_DOCS);
+    // Every full page and the empty one that ends the scan.
+    expect(transactions).toBe(Math.floor(LOAD_DOCS / EVIDENCE_EXPIRING_PAGE_SIZE) + 1);
+    // One insert statement per non-empty page, never one per (document, recipient).
+    expect(inserts).toBe(Math.ceil(LOAD_DOCS / EVIDENCE_EXPIRING_PAGE_SIZE));
+    expect(first.notificationsWritten).toBe(LOAD_DOCS * LOAD_OWNERS);
+    expect(await admin.notification.count({ where: { tenantId: requireId(load.tenant, 'load') } })).toBe(
+      LOAD_DOCS * LOAD_OWNERS
+    );
+
+    const second = await runLoad();
+    expect(second.tenantsFailed).toBe(0);
+    expect(second.notificationsWritten).toBe(0);
+    expect(second.notificationsSkipped).toBe(LOAD_DOCS * LOAD_OWNERS);
+  }, 120_000);
 });
