@@ -28,7 +28,7 @@ export function evidenceTenant(key: string) {
   const evidenceUrl = `/tr/${workspace}/evidence`;
 
   async function teardown() {
-    // ClaimEvidenceLink, EvidenceReminder and ProposalUsage cascade from Evidence;
+    // ClaimEvidenceLink and ProposalUsage cascade from Evidence;
     // Evidence and Claim carry a bare tenantId with no relation to cascade from.
     await prisma.evidence.deleteMany({ where: { tenantId } });
     await prisma.claim.deleteMany({ where: { tenantId } });

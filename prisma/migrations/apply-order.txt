@@ -64,3 +64,4 @@ m4-stale-digest-user-claim.sql
 revoke-api-role-function-execute.sql
 add-blog-post.sql
 add-notification.sql
+drop-evidence-reminder.sql
