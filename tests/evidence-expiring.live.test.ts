@@ -35,9 +35,9 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
   return { rlsUrl, ownerUrl };
 });
 
-import { createDbClient, prisma } from '@/lib/db';
+import { createDbClient, prisma, withTenant } from '@/lib/db';
 import { evidenceBadge, EXPIRING_SOON_DAYS } from '@/lib/evidence-status';
-import { notifyExpiringEvidence } from '@/lib/notifications/evidence-expiring';
+import { EVIDENCE_EXPIRING_PAGE_SIZE, notifyExpiringEvidence } from '@/lib/notifications/evidence-expiring';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 
@@ -198,14 +198,26 @@ describe.skipIf(!HAS_DB)('evidence-expiring producer (live, fabrika_app)', () =>
  * passed Prisma's 5 s limit, every write was rolled back, and the tenant was
  * never told — the next day failed the same way.
  *
- * Mutant: one insert per row in a single transaction → tenantsFailed 1, written 0.
+ * Mutants (docs/agent-results/TASK-MUXODEF0OKBGR-be-fb.md): one insert per row in a
+ * single transaction → tenantsFailed 1, written 0; batched but one transaction for
+ * the whole tenant → the transaction count goes red.
  */
 const LOAD_DOCS = 6000;
 const LOAD_OWNERS = 3;
 
 describe.skipIf(!HAS_DB)('evidence-expiring producer — a large tenant (live, fabrika_app)', () => {
   const load: { tenant?: string; owners: string[] } = { owners: [] };
-  const runLoad = () => notifyExpiringEvidence({ now: NOW, tenantIds: presentIds([load.tenant]) });
+  // Counts the transactions: one per page of documents, never one for the whole tenant.
+  let transactions = 0;
+  const runLoad = () =>
+    notifyExpiringEvidence({
+      now: NOW,
+      tenantIds: presentIds([load.tenant]),
+      runTenant: (id, cb) => {
+        transactions++;
+        return withTenant(id, cb);
+      },
+    });
 
   beforeAll(async () => {
     const t = await admin.tenant.create({ data: { name: `${RUN} load`, slug: `${RUN}-load`, country: 'TR' } });
@@ -245,6 +257,8 @@ describe.skipIf(!HAS_DB)('evidence-expiring producer — a large tenant (live, f
       errors: [],
     });
     expect(first.documentsDue).toBe(LOAD_DOCS);
+    // Every full page and the empty one that ends the scan.
+    expect(transactions).toBe(Math.floor(LOAD_DOCS / EVIDENCE_EXPIRING_PAGE_SIZE) + 1);
     expect(first.notificationsWritten).toBe(LOAD_DOCS * LOAD_OWNERS);
     expect(await admin.notification.count({ where: { tenantId: requireId(load.tenant, 'load') } })).toBe(
       LOAD_DOCS * LOAD_OWNERS
