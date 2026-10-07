@@ -167,8 +167,8 @@ export async function notifyExpiringEvidence(options: {
       out.tenants++;
       // One transaction per page. Counted only after a page commits: a page that
       // fails has its writes rolled back and must not report them as written. The
-      // pages before it stay; the dedupeKey makes tomorrow's run skip them and
-      // pick up where this one stopped.
+      // pages before it stay. Tomorrow's run re-scans from the start; the pages
+      // already written land in notificationsSkipped through the dedupeKey.
       let docCursor: string | null = '';
       try {
         while (docCursor !== null) {
