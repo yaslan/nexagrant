@@ -97,6 +97,11 @@ cpanel_*.tar.gz
 # avoid collecting test files from stale/diverged worktrees.
 .claude/worktrees/
 
+# _workspace — FONBRIDGE working artefacts moved in from the alan/ root
+# (evidence, deploy packages, scratch logs). Never committed; tsconfig, vitest
+# and eslint exclude it too.
+_workspace/
+
 # Local planning/business folder (TASK-MULQJZNB7U3QN) — holds a Google OAuth
 # client secret, .docx and .zip; not production code. Never commit.
 /AB Project SaaS/
